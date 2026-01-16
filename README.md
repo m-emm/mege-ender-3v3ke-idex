@@ -1,58 +1,24 @@
 # mege-ender-3v3ke-idex
 
-Add a short description here!
+IDEX (independent dual extruder) extension for the Creality Ender 3V3 KE, modeled in ShellForgePy for fast printable iterations of mounts, plates, and hardware interfaces.
 
-## Installation
+Status: work in progress—early infrastructure parts only; detailed content and assemblies are still to come.
 
-```bash
-pip install mege-ender-3v3ke-idex
-```
+## Purpose
+- Design and validate the mechanical pieces for the Ender 3V3 KE IDEX conversion.
+- Provide quick CAD previews and exportable STLs/OBJs for printing and fit checks.
 
-## Usage
+## Quick Start
+- Install for development: `pip install -e ".[testing]"`
+- Run design scripts from the repo root with `./run.sh <path/to/script.py>`; exports land in `runs/<timestamp>/`.
 
-```python
-import mege_ender_3v3ke_idex
-
-# Your code here
-```
-
-## NEMA Motor Demo (ShellForgePy)
-
-Visualize all NEMA sizes (14/17/23/34) side-by-side and a plate cut with a NEMA17 clearance:
-
-```bash
-cd mege-ender-3v3ke-idex
-./run.sh src/mege_ender_3v3ke_idex/designs/nema_motors.py
-```
-
-Artifacts land in `runs/<timestamp>/`:
-- `nema_motors_motor_visual_0..3.stl`: fused leaders+followers for NEMA14/17/23/34
-- `nema_motors_demo_plate_cut.stl`: plate with NEMA17 holes cut using `use_as_cutter_on`
-- `nema_motors.stl`/`.obj`: combined export for quick viewing
+## Demos
+- **Extrusion profile (T-slot) demo:** build 2020/4040 profiles with aligned T-slot cutters  
+  `./run.sh src/mege_ender_3v3ke_idex/designs/alu_extrusion_profile.py`  
+  Outputs: `alu_extrusion_profile_2020.stl` and `alu_extrusion_profile_4040.stl` in the run folder.
+- **NEMA motor demo:** visualize NEMA14/17/23/34 bodies and a plate cut with NEMA17 clearances  
+  `./run.sh src/mege_ender_3v3ke_idex/designs/nema_motors.py`
 
 ## Development
-
-### Setup
-
-```bash
-git clone <your-repo-url>
-cd mege-ender-3v3ke-idex
-pip install -e ".[testing]"
-```
-
-### Running Tests
-
-```bash
-pytest
-```
-
-### Code Formatting
-
-```bash
-black src/ tests/
-isort src/ tests/
-```
-
-## License
-
-See LICENSE.txt for details.
+- Tests: `pytest`
+- License: see `LICENSE.txt`
