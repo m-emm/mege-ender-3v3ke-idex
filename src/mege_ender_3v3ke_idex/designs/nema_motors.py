@@ -63,8 +63,8 @@ add_enum_attrs(
             # optional CAD helpers / typical coupler sizes
             "coupler_length_mm": 20.0,
             "coupler_diameter_mm": 15.0,
-            "connector_length_mm": None,
-            "connector_thick_mm": None,
+            "connector_length_mm": 16.15,
+            "connector_thick_mm": 11.5,
             # optional front boss / pilot (often present, varies widely)
             "pilot_diameter_mm": 22.0,
             "pilot_depth_mm": 1.5,
@@ -110,8 +110,8 @@ add_enum_attrs(
             "thick_variants_mm": [41.0, 56.0, 76.0, 100.0],
             "coupler_length_mm": 30.0,
             "coupler_diameter_mm": 22.0,
-            "connector_length_mm": None,
-            "connector_thick_mm": None,
+            "connector_length_mm": 16.15,
+            "connector_thick_mm": 11.5,
             "pilot_diameter_mm": 38.1,  # 1.5" pilot is common; varies
             "pilot_depth_mm": 2.0,
             "disc_thick_mm": 2.0,
@@ -133,8 +133,8 @@ add_enum_attrs(
             "thick_variants_mm": [66.0, 96.0, 126.0],
             "coupler_length_mm": 35.0,
             "coupler_diameter_mm": 28.0,
-            "connector_length_mm": None,
-            "connector_thick_mm": None,
+            "connector_length_mm": 16.15,
+            "connector_thick_mm": 11.5,
             "pilot_diameter_mm": 73.0,  # varies a lot; treat as rough
             "pilot_depth_mm": 2.5,
             "disc_thick_mm": 2.5,
@@ -302,17 +302,20 @@ def _create_axle(nema: NemaSizes):
 
 
 def _create_connector(nema: NemaSizes):
+    if any(
+        v is None
+        for v in (
+            nema.size_mm,
+            nema.connector_length_mm,
+            nema.connector_thick_mm,
+        )
+    ):
+        return None
     connector = create_box(
         nema.connector_length_mm,
         nema.connector_length_mm,
         nema.connector_thick_mm,
     )
-    if None in (
-        nema.size_mm,
-        nema.connector_length_mm,
-        nema.connector_thick_mm,
-    ):
-        raise ValueError(f"{nema.value} missing connector dimensions")
     return translate(
         nema.size_mm / 2.0,
         -nema.connector_length_mm / 2.0,
@@ -434,8 +437,11 @@ def create_nema_composite(
         stack_gap=-nema.coupler_length_mm / 2,
     )
     connector_follower = _create_connector(nema)
-    followers = [axle, coupler_follower, connector_follower]
-    follower_names = ["axle", "coupler", "connector"]
+    followers = [axle, coupler_follower]
+    follower_names = ["axle", "coupler"]
+    if connector_follower is not None:
+        followers.append(connector_follower)
+        follower_names.append("connector")
 
     cutters = [body_cutter, disc_cutter, axle_cutter, mount_holes]
     cutter_names = ["body", "front_boss", "axle", "mount_holes"]
@@ -460,56 +466,85 @@ def create_nema_composite(
 
 
 def create_nema_motors(
-    nema: NemaSizes = NemaSizes.NEMA17,
-    plate_size: float = 70.0,
-    plate_thickness: float = 6.0,
-    mount_hole_clearance: float = 0.2,
-    axle_clearance: float = 0.2,
-    boss_clearance: float = 0.8,
-    body_clearance: float = 0.2,
-    body_cut_depth: Optional[float] = None,
-    screw_size: Optional[str] = None,
+    plate_size: float = 120.0,
+    plate_thickness: float = 8.0,
 ):
-    """Create a NEMA17 assembly and a visualization with cutters fused on."""
-    chosen_body_cut_depth = (
-        body_cut_depth if body_cut_depth is not None else plate_thickness + 1.0
+    """Demo: show all NEMA sizes side-by-side and a NEMA17 cutting a plate."""
+
+    # Build composites for each size with nominal clearances
+    motors = []
+    for size in [
+        NemaSizes.NEMA14,
+        NemaSizes.NEMA17,
+        NemaSizes.NEMA23,
+        NemaSizes.NEMA34,
+    ]:
+        motors.append(
+            create_nema_composite(
+                mount_hole_clearance=0.2,
+                mount_hole_back_extension=6.0,
+                axle_clearance=0.2,
+                boss_clearance=0.2,
+                body_clearance_xy=0.2,
+                body_clearance_z=0.2,
+                screw_size=None,
+                nema=size,
+            )
+        )
+
+    # Position motors side by side (leaders+followers fused), no cutters
+    motor_visuals = []
+    current = None
+    for motor in motors:
+        fused = motor.leaders_followers_fused()
+        if current is None:
+            current = fused
+        else:
+            fused = align(fused, current, Alignment.STACK_RIGHT, stack_gap=10.0)
+            current = fused
+        motor_visuals.append(fused)
+
+    # Plate demo with visible clearance: use NEMA17 with 1mm clearance everywhere
+    demo_motor = create_nema_composite(
+        mount_hole_clearance=1.0,
+        mount_hole_back_extension=plate_thickness + 2.0,
+        axle_clearance=1.0,
+        boss_clearance=1.0,
+        boss_clearance_z=1.0,
+        body_clearance_xy=1.0,
+        body_clearance_z=1.0,
+        screw_size=None,
+        nema=NemaSizes.NEMA17,
     )
 
-    motor = create_nema_composite(
-        mount_hole_clearance=mount_hole_clearance,
-        mount_hole_back_extension=plate_thickness + 1.0,
-        axle_clearance=axle_clearance,
-        boss_clearance=boss_clearance,
-        body_clearance_xy=body_clearance,
-        body_clearance_z=body_clearance,
-        screw_size=screw_size,
-        nema=nema,
+    demo_motor = translate(0, 0, 100)(demo_motor)
+
+    plate = create_box(
+        plate_size,
+        plate_size,
+        plate_thickness,
+        origin=(-plate_size / 2.0, -plate_size / 2.0, -plate_thickness),
     )
+    plate = align(plate, demo_motor.get_leader_as_part(), Alignment.CENTER)
+    plate = align(plate, demo_motor.get_leader_as_part(), Alignment.TOP)
 
-    # Visualization: fuse selected followers (axle and coupler) to the leader.
-    visual_motor = motor.get_leader_as_part().fuse(
-        motor.get_follower_part_by_name("axle")
-    )
-    visual_motor = visual_motor.fuse(motor.get_follower_part_by_name("coupler"))
-    # Experiment: fuse all cutters to visualize alignment/positions.
-    cutter_visual = PartCollector()
-    for cutter in motor.cutters:
-        cutter_visual = cutter_visual.fuse(cutter)
+    plate_with_cuts = demo_motor.use_as_cutter_on(plate)
 
-    cutter_visual = translate(80, 0, 0)(cutter_visual)
-    visual_motor = visual_motor.fuse(cutter_visual)
+    plate_with_cuts = plate_with_cuts.fuse(demo_motor.leaders_followers_fused())
 
-    return motor, visual_motor
+    return motors, motor_visuals, plate_with_cuts
 
 
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
-    motor, visual_motor = create_nema_motors()
-    nema_name = motor.additional_data.get("nema_size", "nema")
-    parts.add(motor.get_leader_as_part(), f"{nema_name}_motor_leader", flip=False)
-    parts.add(visual_motor, f"{nema_name}_motor_visual_with_cutters", flip=False)
+    motors, motor_visuals, plate_with_cuts = create_nema_motors()
+
+    for idx, visual in enumerate(motor_visuals):
+        parts.add(visual, f"motor_visual_{idx}", flip=False)
+
+    parts.add(plate_with_cuts, "demo_plate_cut", flip=False)
 
     # Arrange and export
     arrange_and_export(
