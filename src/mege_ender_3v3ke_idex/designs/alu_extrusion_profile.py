@@ -11,6 +11,7 @@ import logging
 import os
 from enum import Enum
 
+from mege_3devops.process_data.mender3.process_data_04_high_speed import *
 from poemai_utils.enum_utils import add_enum_attrs
 from shellforgepy.simple import *
 
@@ -19,15 +20,7 @@ _logger = logging.getLogger(__name__)
 # Production mode from environment variable
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
-# Optional slicer process overrides
-PROCESS_DATA = {
-    "filament": "FilamentPLAMegeMaster",
-    "process_overrides": {
-        "nozzle_diameter": "0.6",
-        "layer_height": "0.2",
-    },
-}
-from enum import Enum
+PROCESS_DATA = PROCESS_DATA_PETGCF_04_HS
 
 
 class ExtrusionProfileType(Enum):
@@ -217,10 +210,7 @@ def create_alu_extrusion_profile(
     return body
 
 
-def main():
-    logging.basicConfig(level=logging.INFO)
-    parts = PartList()
-
+def creeate_demo_parts(parts: PartList):
     for i, profile in enumerate(
         [
             ExtrusionProfileType.PROFILE_2020,
@@ -231,6 +221,21 @@ def main():
         part = create_alu_extrusion_profile(profile)
         part = translate(i * 60, 0, 0)(part)
         parts.add(part, f"alu_extrusion_profile_{profile.value}", flip=False)
+
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+    parts = PartList()
+
+    if os.environ.get("CREATE_DEMO_PARTS", "0") == "1":
+        creeate_demo_parts(parts)
+
+    else:
+        # add a test part for a PETG CF test print
+        part = create_alu_extrusion_profile(
+            ExtrusionProfileType.PROFILE_2020, length_mm=20
+        )
+        parts.add(part, "alu_extrusion_profile_2020_30mm", flip=False)
 
     arrange_and_export(
         parts.as_list(),

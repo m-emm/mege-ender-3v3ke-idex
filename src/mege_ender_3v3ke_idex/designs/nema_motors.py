@@ -330,6 +330,7 @@ def create_nema_composite(
     mount_hole_clearance: float = 0.0,
     mount_hole_back_extension: float = 6.0,
     axle_clearance: float = 0.0,
+    axle_length: Optional[float] = None,
     boss_clearance: float = 0.0,
     boss_clearance_z: float = 0.0,
     body_clearance_xy: float = 0.2,
@@ -380,7 +381,8 @@ def create_nema_composite(
 
     # Axle follower and cutter
     axle_nominal_radius = nema.axle_diameter_mm / 2.0
-    axle_length = nema.axle_length_mm
+    if axle_length is None:
+        axle_length = nema.axle_length_mm
 
     axle = create_cylinder(axle_nominal_radius, axle_length)
     axle = align(axle, disc, Alignment.CENTER)
