@@ -15,6 +15,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
+from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler, create_gt2_pulley
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.simple import *
 
@@ -43,7 +44,10 @@ axis_profile_pitch = 40
 motor_y_offset = 6
 
 z_axis_guide_distance = 256
-motor_x_offset = z_axis_guide_distance / 2 - 35
+motor_x_offset = z_axis_guide_distance / 2 - 60
+x_axis_motor_axle_length = 14
+
+idler_gap = 2
 
 
 def create_z_axis():
@@ -175,7 +179,7 @@ def create_x_axis():
 
     motors = PartCollector()
     for i in [-1, 1]:
-        motor = create_nema_composite(axle_length=10)
+        motor = create_nema_composite(axle_length=x_axis_motor_axle_length)
         if i == -1:
             motor = rotate(180, axis=(0, 1, 0))(motor)
 
@@ -192,6 +196,32 @@ def create_x_axis():
         motor = translate(i * motor_x_offset, motor_y_offset, 0)(motor)
         motors = motors.fuse(motor.leader)
         motors = motors.fuse(motor.get_follower_part_by_name("axle"))
+
+        pulley = create_gt2_pulley(num_teeth=20, belt_width=6)
+        if i == -1:
+            pulley = rotate(180, axis=(0, 1, 0))(pulley)
+        pulley = align(
+            pulley, motor.get_follower_part_by_name("axle"), Alignment.CENTER
+        )
+        pulley = align(
+            pulley,
+            motor.get_follower_part_by_name("axle"),
+            Alignment.BOTTOM if i == -1 else Alignment.TOP,
+        )
+        motors = motors.fuse(pulley)
+
+        idlers = PartCollector()
+        for idler_alignment in (Alignment.LEFT, Alignment.RIGHT):
+            idler = create_gt2_idler(num_teeth=16)
+
+            idler = align(idler, pulley, Alignment.TOP if i == 1 else Alignment.BOTTOM)
+            idler = align(idler, motor, idler_alignment)
+            idler = align(
+                idler, profile_to_align, Alignment.STACK_BACK, stack_gap=idler_gap
+            )
+            idlers = idlers.fuse(idler)
+
+        motors = motors.fuse(idlers)
 
     axis = axis.fuse(motors)
 
