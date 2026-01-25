@@ -311,12 +311,12 @@ def _create_idlers_for_motor(
     profile_to_align,
     mount_plate,
     mount_plate_limit_cutter,
-    stack_sign,
+    stack_face,
 ):
     """Build idlers, their bases, and return updated mount plate for one motor side.
 
-    ``stack_sign`` is 1 for the top motor and -1 for the bottom motor, matching the
-    existing orientation logic in create_x_axis.
+    ``stack_face`` is Alignment.TOP for the top motor and Alignment.BOTTOM for the
+    bottom motor, matching the existing orientation logic in create_x_axis.
     """
 
     idlers = PartCollector()
@@ -326,7 +326,9 @@ def _create_idlers_for_motor(
         idler = create_gt2_idler(num_teeth=16)
 
         idler = align(
-            idler, pulley, Alignment.TOP if stack_sign == 1 else Alignment.BOTTOM
+            idler,
+            pulley,
+            stack_face,
         )
         idler = align(idler, motor.leader, idler_alignment)
         idler = align(
@@ -345,7 +347,7 @@ def _create_idlers_for_motor(
         idler_mount_base = align(
             idler_mount_base,
             idler,
-            Alignment.STACK_BOTTOM if stack_sign == 1 else Alignment.STACK_TOP,
+            stack_face.opposite.stack_alignment,
         )
 
         idler_mount_base = idler_mount_base.cut(mount_plate_limit_cutter)
@@ -361,7 +363,7 @@ def _create_idlers_for_motor(
         idler_mount_pillar = align(
             idler_mount_pillar,
             idler_mount_base,
-            Alignment.BOTTOM if stack_sign == 1 else Alignment.TOP,
+            stack_face,
         )
         idler_mount_pillar = align(
             idler_mount_pillar,
@@ -399,41 +401,45 @@ def _create_idlers_for_motor(
         idler_screw_nut_cutter = align(
             idler_screw_nut_cutter,
             mount_plate,
-            Alignment.BOTTOM if stack_sign == 1 else Alignment.TOP,
+            stack_face,
         )
         mount_plate = mount_plate.cut(idler_screw_nut_cutter)
 
     return idlers, idler_mount_bases, mount_plate
 
 
-def _create_motor_stack(side_sign, lower_axis_profile, top_axis_profile):
+def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
     """Build one motor + mount assembly (idler bases, shield, connector) for a side."""
 
     motor, mount_plate = create_motor_with_mount()
     motor.add_named_follower(mount_plate, "mount_plate")
 
-    if side_sign == -1:
+    if side == Alignment.LEFT:
         motor.rotate((0, 0, 0), (0, 1, 0), 180)
 
-    profile_to_align = lower_axis_profile if side_sign == -1 else top_axis_profile
+    profile_to_align = (
+        lower_axis_profile if side == Alignment.LEFT else top_axis_profile
+    )
 
     motor = align(motor, profile_to_align, Alignment.CENTER)
     motor = align(motor, profile_to_align, Alignment.STACK_BACK)
     motor = align(
         motor,
         profile_to_align,
-        Alignment.STACK_TOP if side_sign == -1 else Alignment.STACK_BOTTOM,
+        Alignment.STACK_TOP if side == Alignment.LEFT else Alignment.STACK_BOTTOM,
     )
-    motor.translate((side_sign * motor_x_offset, motor_y_offset, 0))
+    motor.translate((side.sign * motor_x_offset, motor_y_offset, 0))
 
     axle = motor.get_follower_part_by_name("axle")
     mount_plate = motor.get_follower_part_by_name("mount_plate")
 
     pulley = create_gt2_pulley(num_teeth=20, belt_width=6)
-    if side_sign == -1:
+    if side == Alignment.LEFT:
         pulley = rotate(180, axis=(0, 1, 0))(pulley)
     pulley = align(pulley, axle, Alignment.CENTER)
-    pulley = align(pulley, axle, Alignment.BOTTOM if side_sign == -1 else Alignment.TOP)
+    pulley = align(
+        pulley, axle, Alignment.BOTTOM if side == Alignment.LEFT else Alignment.TOP
+    )
 
     mount_plate_limit_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
     mount_plate_limit_cutter = align(
@@ -442,7 +448,7 @@ def _create_motor_stack(side_sign, lower_axis_profile, top_axis_profile):
     mount_plate_limit_cutter = align(
         mount_plate_limit_cutter,
         mount_plate,
-        Alignment.TOP if side_sign == 1 else Alignment.BOTTOM,
+        Alignment.TOP if side == Alignment.RIGHT else Alignment.BOTTOM,
     )
 
     idlers, idler_mount_bases, mount_plate = _create_idlers_for_motor(
@@ -451,7 +457,7 @@ def _create_motor_stack(side_sign, lower_axis_profile, top_axis_profile):
         profile_to_align=profile_to_align,
         mount_plate=mount_plate,
         mount_plate_limit_cutter=mount_plate_limit_cutter,
-        stack_sign=side_sign,
+        stack_face=Alignment.TOP if side == Alignment.RIGHT else Alignment.BOTTOM,
     )
 
     mount_shield = create_filleted_box(
@@ -467,9 +473,9 @@ def _create_motor_stack(side_sign, lower_axis_profile, top_axis_profile):
     mount_shield = align(
         mount_shield,
         profile_to_align,
-        Alignment.TOP if side_sign == 1 else Alignment.BOTTOM,
+        Alignment.TOP if side == Alignment.RIGHT else Alignment.BOTTOM,
     )
-    mount_shield = translate(0, 0, side_sign * mount_shield_oversize_z)(mount_shield)
+    mount_shield = translate(0, 0, side.sign * mount_shield_oversize_z)(mount_shield)
     mount_shield = mount_shield.cut(mount_plate_limit_cutter)
 
     mount_shield_mount_screw_hole_cutter = create_cylinder(
@@ -496,7 +502,7 @@ def _create_motor_stack(side_sign, lower_axis_profile, top_axis_profile):
         no_fillets_at=[
             Alignment.BOTTOM,
             Alignment.TOP,
-            Alignment.LEFT if side_sign == -1 else Alignment.RIGHT,
+            Alignment.LEFT if side == Alignment.LEFT else Alignment.RIGHT,
         ],
     )
 
@@ -505,10 +511,10 @@ def _create_motor_stack(side_sign, lower_axis_profile, top_axis_profile):
     mount_plate_connector = align(
         mount_plate_connector,
         mount_plate,
-        Alignment.STACK_RIGHT if side_sign == -1 else Alignment.STACK_LEFT,
+        Alignment.STACK_RIGHT if side == Alignment.LEFT else Alignment.STACK_LEFT,
     )
     mount_plate_connector = translate(
-        side_sign * motor_mount_plate_fillet_radius, 0, 0
+        side.sign * motor_mount_plate_fillet_radius, 0, 0
     )(mount_plate_connector)
 
     mount_plate = mount_plate.fuse(mount_plate_connector)
@@ -523,7 +529,7 @@ def _create_motor_stack(side_sign, lower_axis_profile, top_axis_profile):
     motor_visual.fuse(pulley)
     motor_visual.fuse(idlers)
 
-    motor_name = "motor_left" if side_sign == -1 else "motor_right"
+    motor_name = "motor_left" if side == Alignment.LEFT else "motor_right"
 
     return (
         mount_plate,
@@ -575,14 +581,14 @@ def create_x_axis():
     non_production_parts = [axis_frame]
     non_production_names = ["axis_frame"]
 
-    for i in [-1, 1]:
+    for side in (Alignment.LEFT, Alignment.RIGHT):
         (
             mount_plate,
             mount_plate_connector,
             mount_shield,
             motor_visual_part,
             motor_name,
-        ) = _create_motor_stack(i, lower_axis_profile, top_axis_profile)
+        ) = _create_motor_stack(side, lower_axis_profile, top_axis_profile)
 
         mount_plate_connectors = mount_plate_connectors.fuse(mount_plate_connector)
         mount_shields = mount_shields.fuse(mount_shield)
