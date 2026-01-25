@@ -521,14 +521,8 @@ def create_x_axis():
         )
         mount_shield = mount_shield.cut(mount_shield_mount_screw_hole_cutter)
 
-        mount_shield_side = align(
-            mount_shield,
-            mount_plate,
-            Alignment.RIGHT if i == -1 else Alignment.LEFT,
-        )
 
         mount_shields = mount_shields.fuse(mount_shield)
-        mount_shields = mount_shields.fuse(mount_shield_side)
 
         mount_plate_connector = create_filleted_box(
             mount_plate_connector_length,
@@ -561,13 +555,6 @@ def create_x_axis():
 
         mount_plate = mount_plate.fuse(mount_plate_connector)
 
-        mount_shields = mount_shields.fuse(
-            align(
-                mount_shield,
-                mount_plate_connector,
-                Alignment.RIGHT if i == -1 else Alignment.LEFT,
-            )
-        )
 
         mount_plate_connectors = mount_plate_connectors.fuse(mount_plate_connector)
 
