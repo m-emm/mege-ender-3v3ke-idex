@@ -182,18 +182,6 @@ mount_plate_link_width = mount_plate_connector_length * 0.8
 mount_plate_connector_link_thickness = 6
 
 
-def _calc_translation_vector(original_part, target_part):
-    """Return the translation vector that moves ``original_part`` onto ``target_part``.
-
-    Both parts are compared via their bounding-box minima; align() only translates,
-    so this delta matches the applied move for composite updates.
-    """
-
-    original_bb = get_bounding_box(original_part)
-    target_bb = get_bounding_box(target_part)
-    return tuple(target_bb[0][axis] - original_bb[0][axis] for axis in range(3))
-
-
 def create_z_axis():
     """Create the x_axis part."""
 
@@ -429,17 +417,13 @@ def _create_motor_stack(side_sign, lower_axis_profile, top_axis_profile):
 
     profile_to_align = lower_axis_profile if side_sign == -1 else top_axis_profile
 
-    aligned_motor_leader = align(motor.leader, profile_to_align, Alignment.CENTER)
-    aligned_motor_leader = align(
-        aligned_motor_leader, profile_to_align, Alignment.STACK_BACK
-    )
-    aligned_motor_leader = align(
-        aligned_motor_leader,
+    motor = align(motor, profile_to_align, Alignment.CENTER)
+    motor = align(motor, profile_to_align, Alignment.STACK_BACK)
+    motor = align(
+        motor,
         profile_to_align,
         Alignment.STACK_TOP if side_sign == -1 else Alignment.STACK_BOTTOM,
     )
-
-    motor.translate(_calc_translation_vector(motor.leader, aligned_motor_leader))
     motor.translate((side_sign * motor_x_offset, motor_y_offset, 0))
 
     axle = motor.get_follower_part_by_name("axle")
@@ -668,12 +652,8 @@ def main():
 
         x_axis = create_x_axis()
 
-        aligned_leader = align(x_axis.leader, z_axis, Alignment.CENTER)
-        aligned_leader = align(
-            aligned_leader, z_axis, Alignment.STACK_BACK, stack_gap=-28
-        )
-        move_vec = _calc_translation_vector(x_axis.leader, aligned_leader)
-        x_axis.translate(move_vec)
+        x_axis = align(x_axis, z_axis, Alignment.CENTER)
+        x_axis = align(x_axis, z_axis, Alignment.STACK_BACK, stack_gap=-28)
 
         # Non-production references for assembly context
         for name in ["axis_frame", "motor_left", "motor_right"]:
