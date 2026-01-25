@@ -317,6 +317,107 @@ def create_motor_with_mount():
     return motor, mount_plate
 
 
+def _create_idlers_for_motor(
+    pulley,
+    motor,
+    profile_to_align,
+    mount_plate,
+    mount_plate_limit_cutter,
+    stack_sign,
+):
+    """Build idlers, their bases, and return updated mount plate for one motor side.
+
+    ``stack_sign`` is 1 for the top motor and -1 for the bottom motor, matching the
+    existing orientation logic in create_x_axis.
+    """
+
+    idlers = PartCollector()
+    idler_mount_bases = PartCollector()
+
+    for idler_alignment in (Alignment.LEFT, Alignment.RIGHT):
+        idler = create_gt2_idler(num_teeth=16)
+
+        idler = align(
+            idler, pulley, Alignment.TOP if stack_sign == 1 else Alignment.BOTTOM
+        )
+        idler = align(idler, motor.leader, idler_alignment)
+        idler = align(
+            idler, profile_to_align, Alignment.STACK_BACK, stack_gap=idler_gap
+        )
+        idlers = idlers.fuse(idler)
+
+        idler_axle_cutter = create_cylinder(
+            idler_mount_axle_diameter / 2 + idler_mount_axle_clearance, 100
+        )
+        idler_axle_cutter = align(idler_axle_cutter, idler, Alignment.CENTER)
+        mount_plate = mount_plate.cut(idler_axle_cutter)
+
+        idler_mount_base = create_cylinder(idler_mount_diameter / 2, 100)
+        idler_mount_base = align(idler_mount_base, idler, Alignment.CENTER)
+        idler_mount_base = align(
+            idler_mount_base,
+            idler,
+            Alignment.STACK_BOTTOM if stack_sign == 1 else Alignment.STACK_TOP,
+        )
+
+        idler_mount_base = idler_mount_base.cut(mount_plate_limit_cutter)
+
+        idler_mount_base_size = get_bounding_box_size(idler_mount_base)
+        idler_mount_pillar = create_box(
+            idler_mount_base_size[0], BIG_THING, idler_mount_base_size[2] * 0.6
+        )
+
+        idler_mount_pillar = align(
+            idler_mount_pillar, idler_mount_base, Alignment.CENTER
+        )
+        idler_mount_pillar = align(
+            idler_mount_pillar,
+            idler_mount_base,
+            Alignment.BOTTOM if stack_sign == 1 else Alignment.TOP,
+        )
+        idler_mount_pillar = align(
+            idler_mount_pillar,
+            idler_mount_base,
+            Alignment.STACK_FRONT,
+            stack_gap=-idler_mount_diameter / 2,
+        )
+
+        idler_mount_pillar_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+        idler_mount_pillar_cutter = align(
+            idler_mount_pillar_cutter, mount_plate, Alignment.CENTER
+        )
+        idler_mount_pillar_cutter = align(
+            idler_mount_pillar_cutter, mount_plate, Alignment.CENTER
+        )
+        idler_mount_pillar_cutter = align(
+            idler_mount_pillar_cutter, mount_plate, Alignment.STACK_FRONT
+        )
+
+        idler_mount_pillar = idler_mount_pillar.cut(idler_mount_pillar_cutter)
+
+        idler_mount_base = idler_mount_base.fuse(idler_mount_pillar)
+
+        idler_mount_base = idler_mount_base.cut(idler_axle_cutter)
+
+        idler_mount_bases = idler_mount_bases.fuse(idler_mount_base)
+
+        idler_screw_nut_cutter = create_nut(
+            axle_screw_size,
+            height=axcle_screw_nut_hole_depth,
+            slack=axle_screw_nut_slack,
+        )
+        idler_screw_nut_cutter = rotate(30)(idler_screw_nut_cutter)
+        idler_screw_nut_cutter = align(idler_screw_nut_cutter, idler, Alignment.CENTER)
+        idler_screw_nut_cutter = align(
+            idler_screw_nut_cutter,
+            mount_plate,
+            Alignment.BOTTOM if stack_sign == 1 else Alignment.TOP,
+        )
+        mount_plate = mount_plate.cut(idler_screw_nut_cutter)
+
+    return idlers, idler_mount_bases, mount_plate
+
+
 def create_x_axis():
     """Create the x_axis assembly as a composite part.
 
@@ -393,9 +494,6 @@ def create_x_axis():
             Alignment.BOTTOM if i == -1 else Alignment.TOP,
         )
 
-        idlers = PartCollector()
-        idler_mount_bases = PartCollector()
-
         mount_plate_limit_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
         mount_plate_limit_cutter = align(
             mount_plate_limit_cutter, mount_plate, Alignment.CENTER
@@ -406,86 +504,14 @@ def create_x_axis():
             Alignment.TOP if i == 1 else Alignment.BOTTOM,
         )
 
-        for idler_alignment in (Alignment.LEFT, Alignment.RIGHT):
-            idler = create_gt2_idler(num_teeth=16)
-
-            idler = align(idler, pulley, Alignment.TOP if i == 1 else Alignment.BOTTOM)
-            idler = align(idler, motor.leader, idler_alignment)
-            idler = align(
-                idler, profile_to_align, Alignment.STACK_BACK, stack_gap=idler_gap
-            )
-            idlers = idlers.fuse(idler)
-
-            idler_axle_cutter = create_cylinder(
-                idler_mount_axle_diameter / 2 + idler_mount_axle_clearance, 100
-            )
-            idler_axle_cutter = align(idler_axle_cutter, idler, Alignment.CENTER)
-            mount_plate = mount_plate.cut(idler_axle_cutter)
-
-            idler_mount_base = create_cylinder(idler_mount_diameter / 2, 100)
-            idler_mount_base = align(idler_mount_base, idler, Alignment.CENTER)
-            idler_mount_base = align(
-                idler_mount_base,
-                idler,
-                Alignment.STACK_BOTTOM if i == 1 else Alignment.STACK_TOP,
-            )
-
-            idler_mount_base = idler_mount_base.cut(mount_plate_limit_cutter)
-
-            idler_mount_base_size = get_bounding_box_size(idler_mount_base)
-            idler_mount_pillar = create_box(
-                idler_mount_base_size[0], BIG_THING, idler_mount_base_size[2] * 0.6
-            )
-
-            idler_mount_pillar = align(
-                idler_mount_pillar, idler_mount_base, Alignment.CENTER
-            )
-            idler_mount_pillar = align(
-                idler_mount_pillar,
-                idler_mount_base,
-                Alignment.BOTTOM if i == 1 else Alignment.TOP,
-            )
-            idler_mount_pillar = align(
-                idler_mount_pillar,
-                idler_mount_base,
-                Alignment.STACK_FRONT,
-                stack_gap=-idler_mount_diameter / 2,
-            )
-
-            idler_mount_pillar_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
-            idler_mount_pillar_cutter = align(
-                idler_mount_pillar_cutter, mount_plate, Alignment.CENTER
-            )
-            idler_mount_pillar_cutter = align(
-                idler_mount_pillar_cutter, mount_plate, Alignment.CENTER
-            )
-            idler_mount_pillar_cutter = align(
-                idler_mount_pillar_cutter, mount_plate, Alignment.STACK_FRONT
-            )
-
-            idler_mount_pillar = idler_mount_pillar.cut(idler_mount_pillar_cutter)
-
-            idler_mount_base = idler_mount_base.fuse(idler_mount_pillar)
-
-            idler_mount_base = idler_mount_base.cut(idler_axle_cutter)
-
-            idler_mount_bases = idler_mount_bases.fuse(idler_mount_base)
-
-            idler_screw_nut_cutter = create_nut(
-                axle_screw_size,
-                height=axcle_screw_nut_hole_depth,
-                slack=axle_screw_nut_slack,
-            )
-            idler_screw_nut_cutter = rotate(30)(idler_screw_nut_cutter)
-            idler_screw_nut_cutter = align(
-                idler_screw_nut_cutter, idler, Alignment.CENTER
-            )
-            idler_screw_nut_cutter = align(
-                idler_screw_nut_cutter,
-                mount_plate,
-                Alignment.BOTTOM if i == 1 else Alignment.TOP,
-            )
-            mount_plate = mount_plate.cut(idler_screw_nut_cutter)
+        idlers, idler_mount_bases, mount_plate = _create_idlers_for_motor(
+            pulley=pulley,
+            motor=motor,
+            profile_to_align=profile_to_align,
+            mount_plate=mount_plate,
+            mount_plate_limit_cutter=mount_plate_limit_cutter,
+            stack_sign=i,
+        )
 
         mount_shield = create_filleted_box(
             mount_shield_width,
@@ -521,7 +547,6 @@ def create_x_axis():
         )
         mount_shield = mount_shield.cut(mount_shield_mount_screw_hole_cutter)
 
-
         mount_shields = mount_shields.fuse(mount_shield)
 
         mount_plate_connector = create_filleted_box(
@@ -554,7 +579,6 @@ def create_x_axis():
         )
 
         mount_plate = mount_plate.fuse(mount_plate_connector)
-
 
         mount_plate_connectors = mount_plate_connectors.fuse(mount_plate_connector)
 
