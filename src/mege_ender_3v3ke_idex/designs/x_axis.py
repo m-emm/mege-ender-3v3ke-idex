@@ -171,7 +171,7 @@ axle_screw_nut_slack = 0.4
 mount_shield_width = 17
 mount_shield_depth = 6
 mount_shield_fillet_radius = 1
-mount_shield_oversize_z = 3
+mount_shield_oversize_z = 0
 
 mount_plate_connector_length = (
     z_axis_guide_distance - 2 * motor_x_offset - motor_size + 8
@@ -180,6 +180,12 @@ mount_plate_connector_depth = 20
 
 mount_plate_link_width = mount_plate_connector_length * 0.8
 mount_plate_connector_link_thickness = 6
+
+flange_thickness = 5
+flange_depth = 18
+bevel_depth = flange_depth * 0.8
+idler_screw_size = "M3"
+idler_screw_head_clearance = 0.3
 
 
 def create_z_axis():
@@ -311,7 +317,7 @@ def create_idlers_for_motor(
     profile_to_align,
     mount_plate,
     mount_plate_limit_cutter,
-    top_bottom_alignment,
+    vertical_alignment,
 ):
     """Build idlers, their bases, and return updated mount plate for one motor side.
 
@@ -322,6 +328,7 @@ def create_idlers_for_motor(
     idlers = PartCollector()
     idler_mount_bases = PartCollector()
 
+    idler_axle_cutters = []
     for idler_alignment in (Alignment.LEFT, Alignment.RIGHT):
 
         idler = create_gt2_idler(num_teeth=16)
@@ -329,7 +336,7 @@ def create_idlers_for_motor(
         idler = align(
             idler,
             pulley,
-            top_bottom_alignment,
+            vertical_alignment,
         )
         idler = align(idler, motor.leader, idler_alignment)
         idler = align(
@@ -348,7 +355,7 @@ def create_idlers_for_motor(
         idler_mount_base = align(
             idler_mount_base,
             idler,
-            top_bottom_alignment.opposite.stack_alignment,
+            vertical_alignment.opposite.stack_alignment,
         )
 
         idler_mount_base = idler_mount_base.cut(mount_plate_limit_cutter)
@@ -364,7 +371,7 @@ def create_idlers_for_motor(
         idler_mount_pillar = align(
             idler_mount_pillar,
             idler_mount_base,
-            top_bottom_alignment.opposite,
+            vertical_alignment.opposite,
         )
         idler_mount_pillar = align(
             idler_mount_pillar,
@@ -402,11 +409,12 @@ def create_idlers_for_motor(
         idler_screw_nut_cutter = align(
             idler_screw_nut_cutter,
             mount_plate,
-            top_bottom_alignment.opposite,
+            vertical_alignment.opposite,
         )
         mount_plate = mount_plate.cut(idler_screw_nut_cutter)
+        idler_axle_cutters.append(idler_axle_cutter)
 
-    return idlers, idler_mount_bases, mount_plate
+    return idlers, idler_mount_bases, mount_plate, idler_axle_cutters
 
 
 def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
@@ -457,13 +465,15 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
         vertical_alignment,
     )
 
-    idlers, idler_mount_bases, mount_plate = create_idlers_for_motor(
-        pulley=pulley,
-        motor=motor,
-        profile_to_align=profile_to_align,
-        mount_plate=mount_plate,
-        mount_plate_limit_cutter=mount_plate_limit_cutter,
-        top_bottom_alignment=vertical_alignment,
+    idlers, idler_mount_bases, mount_plate, idler_axle_cutters = (
+        create_idlers_for_motor(
+            pulley=pulley,
+            motor=motor,
+            profile_to_align=profile_to_align,
+            mount_plate=mount_plate,
+            mount_plate_limit_cutter=mount_plate_limit_cutter,
+            vertical_alignment=vertical_alignment,
+        )
     )
 
     mount_shield = create_filleted_box(
@@ -471,7 +481,7 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
         mount_shield_depth,
         BIG_THING,
         mount_shield_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM, Alignment.FRONT],
+        no_fillets_at=[Alignment.FRONT, Alignment.TOP, Alignment.BOTTOM],
     )
 
     mount_shield = align(mount_shield, mount_plate, Alignment.CENTER)
@@ -523,8 +533,58 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
         side.sign * motor_mount_plate_fillet_radius, 0, 0
     )(mount_plate_connector)
 
+    mount_flange = create_filleted_box(
+        mount_plate_connector_length + motor_mount_plate_size,
+        flange_depth,
+        flange_thickness,
+        fillet_radius=mount_shield_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.FRONT],
+    )
+
+    mount_flange = align(mount_flange, mount_plate_connector, Alignment.CENTER)
+    mount_flange = align(mount_flange, mount_plate, side)
+    mount_flange = align(mount_flange, mount_plate_connector, Alignment.FRONT)
+    mount_flange = align(mount_flange, profile_to_align, vertical_alignment)
+
+    for idler_axle_cutter in idler_axle_cutters:
+        mount_flange = mount_flange.cut(idler_axle_cutter)
+
+        idler_screw_spec = MScrew.from_size(idler_screw_size)
+        cylinder_head_cutter = create_cylinder(
+            idler_screw_spec.cylinder_head_diameter / 2 + idler_screw_head_clearance,
+            idler_screw_spec.cylinder_head_height + 2 * idler_screw_head_clearance,
+        )
+        cylinder_head_cutter = align(
+            cylinder_head_cutter, idler_axle_cutter, Alignment.CENTER
+        )
+        cylinder_head_cutter = align(
+            cylinder_head_cutter, mount_flange, vertical_alignment
+        )
+        mount_flange = mount_flange.cut(cylinder_head_cutter)
+
+    mount_flange_bevel = create_right_triangle(
+        bevel_depth,
+        bevel_depth,
+        thickness=mount_plate_connector_length,
+        extrusion_direction=(side.sign, 0, 0),
+        a_normal=(0, 0, vertical_alignment.sign),
+        b_normal=(0, -1, 0),
+    )
+
+    mount_flange_bevel = align(
+        mount_flange_bevel, mount_plate_connector, Alignment.CENTER
+    )
+    mount_flange_bevel = align(mount_flange_bevel, mount_flange, Alignment.BACK)
+
+    mount_flange_bevel_flange_side = align(
+        mount_flange_bevel, mount_flange, vertical_alignment.opposite.stack_alignment
+    )
+
+    mount_flange = mount_flange.fuse(mount_flange_bevel_flange_side)
+
     mount_plate = mount_plate.fuse(mount_plate_connector)
     mount_plate = mount_plate.fuse(idler_mount_bases)
+    mount_plate = mount_plate.fuse(mount_flange)
 
     # sync follower with the modified mount plate geometry
     motor.followers[motor.get_follower_index_by_name("mount_plate")] = mount_plate
