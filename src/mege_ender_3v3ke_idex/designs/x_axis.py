@@ -418,6 +418,138 @@ def _create_idlers_for_motor(
     return idlers, idler_mount_bases, mount_plate
 
 
+def _create_motor_stack(side_sign, lower_axis_profile, top_axis_profile):
+    """Build one motor + mount assembly (idler bases, shield, connector) for a side."""
+
+    motor, mount_plate = create_motor_with_mount()
+    motor.add_named_follower(mount_plate, "mount_plate")
+
+    if side_sign == -1:
+        motor.rotate((0, 0, 0), (0, 1, 0), 180)
+
+    profile_to_align = lower_axis_profile if side_sign == -1 else top_axis_profile
+
+    aligned_motor_leader = align(motor.leader, profile_to_align, Alignment.CENTER)
+    aligned_motor_leader = align(
+        aligned_motor_leader, profile_to_align, Alignment.STACK_BACK
+    )
+    aligned_motor_leader = align(
+        aligned_motor_leader,
+        profile_to_align,
+        Alignment.STACK_TOP if side_sign == -1 else Alignment.STACK_BOTTOM,
+    )
+
+    motor.translate(_calc_translation_vector(motor.leader, aligned_motor_leader))
+    motor.translate((side_sign * motor_x_offset, motor_y_offset, 0))
+
+    axle = motor.get_follower_part_by_name("axle")
+    mount_plate = motor.get_follower_part_by_name("mount_plate")
+
+    pulley = create_gt2_pulley(num_teeth=20, belt_width=6)
+    if side_sign == -1:
+        pulley = rotate(180, axis=(0, 1, 0))(pulley)
+    pulley = align(pulley, axle, Alignment.CENTER)
+    pulley = align(pulley, axle, Alignment.BOTTOM if side_sign == -1 else Alignment.TOP)
+
+    mount_plate_limit_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    mount_plate_limit_cutter = align(
+        mount_plate_limit_cutter, mount_plate, Alignment.CENTER
+    )
+    mount_plate_limit_cutter = align(
+        mount_plate_limit_cutter,
+        mount_plate,
+        Alignment.TOP if side_sign == 1 else Alignment.BOTTOM,
+    )
+
+    idlers, idler_mount_bases, mount_plate = _create_idlers_for_motor(
+        pulley=pulley,
+        motor=motor,
+        profile_to_align=profile_to_align,
+        mount_plate=mount_plate,
+        mount_plate_limit_cutter=mount_plate_limit_cutter,
+        stack_sign=side_sign,
+    )
+
+    mount_shield = create_filleted_box(
+        mount_shield_width,
+        mount_shield_depth,
+        BIG_THING,
+        mount_shield_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.FRONT],
+    )
+
+    mount_shield = align(mount_shield, mount_plate, Alignment.CENTER)
+    mount_shield = align(mount_shield, mount_plate, Alignment.FRONT)
+    mount_shield = align(
+        mount_shield,
+        profile_to_align,
+        Alignment.TOP if side_sign == 1 else Alignment.BOTTOM,
+    )
+    mount_shield = translate(0, 0, side_sign * mount_shield_oversize_z)(mount_shield)
+    mount_shield = mount_shield.cut(mount_plate_limit_cutter)
+
+    mount_shield_mount_screw_hole_cutter = create_cylinder(
+        MScrew.from_size("M5").clearance_hole_normal / 2,
+        BIG_THING,
+        direction=(0, 1, 0),
+    )
+    mount_shield_mount_screw_hole_cutter = align(
+        mount_shield_mount_screw_hole_cutter, mount_shield, Alignment.CENTER
+    )
+    mount_shield_mount_screw_hole_cutter = align(
+        mount_shield_mount_screw_hole_cutter,
+        profile_to_align,
+        Alignment.CENTER,
+        axes=[2],
+    )
+    mount_shield = mount_shield.cut(mount_shield_mount_screw_hole_cutter)
+
+    mount_plate_connector = create_filleted_box(
+        mount_plate_connector_length,
+        mount_plate_connector_depth,
+        motor_mount_plate_thickness,
+        fillet_radius=motor_mount_plate_fillet_radius,
+        no_fillets_at=[
+            Alignment.BOTTOM,
+            Alignment.TOP,
+            Alignment.LEFT if side_sign == -1 else Alignment.RIGHT,
+        ],
+    )
+
+    mount_plate_connector = align(mount_plate_connector, mount_plate, Alignment.CENTER)
+    mount_plate_connector = align(mount_plate_connector, mount_plate, Alignment.FRONT)
+    mount_plate_connector = align(
+        mount_plate_connector,
+        mount_plate,
+        Alignment.STACK_RIGHT if side_sign == -1 else Alignment.STACK_LEFT,
+    )
+    mount_plate_connector = translate(
+        side_sign * motor_mount_plate_fillet_radius, 0, 0
+    )(mount_plate_connector)
+
+    mount_plate = mount_plate.fuse(mount_plate_connector)
+    mount_plate = mount_plate.fuse(idler_mount_bases)
+
+    # sync follower with the modified mount plate geometry
+    motor.followers[motor.get_follower_index_by_name("mount_plate")] = mount_plate
+
+    motor_visual = PartCollector()
+    motor_visual.fuse(motor.leader)
+    motor_visual.fuse(axle)
+    motor_visual.fuse(pulley)
+    motor_visual.fuse(idlers)
+
+    motor_name = "motor_left" if side_sign == -1 else "motor_right"
+
+    return (
+        mount_plate,
+        mount_plate_connector,
+        mount_shield,
+        motor_visual.part,
+        motor_name,
+    )
+
+
 def create_x_axis():
     """Create the x_axis assembly as a composite part.
 
@@ -460,142 +592,18 @@ def create_x_axis():
     non_production_names = ["axis_frame"]
 
     for i in [-1, 1]:
-        motor, mount_plate = create_motor_with_mount()
-        motor.add_named_follower(mount_plate, "mount_plate")
-
-        if i == -1:
-            motor.rotate((0, 0, 0), (0, 1, 0), 180)
-
-        profile_to_align = lower_axis_profile if i == -1 else top_axis_profile
-
-        aligned_motor_leader = align(motor.leader, profile_to_align, Alignment.CENTER)
-        aligned_motor_leader = align(
-            aligned_motor_leader, profile_to_align, Alignment.STACK_BACK
-        )
-        aligned_motor_leader = align(
-            aligned_motor_leader,
-            profile_to_align,
-            Alignment.STACK_TOP if i == -1 else Alignment.STACK_BOTTOM,
-        )
-
-        motor.translate(_calc_translation_vector(motor.leader, aligned_motor_leader))
-        motor.translate((i * motor_x_offset, motor_y_offset, 0))
-
-        axle = motor.get_follower_part_by_name("axle")
-        mount_plate = motor.get_follower_part_by_name("mount_plate")
-
-        pulley = create_gt2_pulley(num_teeth=20, belt_width=6)
-        if i == -1:
-            pulley = rotate(180, axis=(0, 1, 0))(pulley)
-        pulley = align(pulley, axle, Alignment.CENTER)
-        pulley = align(
-            pulley,
-            axle,
-            Alignment.BOTTOM if i == -1 else Alignment.TOP,
-        )
-
-        mount_plate_limit_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
-        mount_plate_limit_cutter = align(
-            mount_plate_limit_cutter, mount_plate, Alignment.CENTER
-        )
-        mount_plate_limit_cutter = align(
-            mount_plate_limit_cutter,
+        (
             mount_plate,
-            Alignment.TOP if i == 1 else Alignment.BOTTOM,
-        )
-
-        idlers, idler_mount_bases, mount_plate = _create_idlers_for_motor(
-            pulley=pulley,
-            motor=motor,
-            profile_to_align=profile_to_align,
-            mount_plate=mount_plate,
-            mount_plate_limit_cutter=mount_plate_limit_cutter,
-            stack_sign=i,
-        )
-
-        mount_shield = create_filleted_box(
-            mount_shield_width,
-            mount_shield_depth,
-            BIG_THING,
-            mount_shield_fillet_radius,
-            no_fillets_at=[Alignment.BOTTOM, Alignment.FRONT],
-        )
-
-        mount_shield = align(mount_shield, mount_plate, Alignment.CENTER)
-        mount_shield = align(mount_shield, mount_plate, Alignment.FRONT)
-        mount_shield = align(
-            mount_shield,
-            profile_to_align,
-            Alignment.TOP if i == 1 else Alignment.BOTTOM,
-        )
-        mount_shield = translate(0, 0, i * mount_shield_oversize_z)(mount_shield)
-        mount_shield = mount_shield.cut(mount_plate_limit_cutter)
-
-        mount_shield_mount_screw_hole_cutter = create_cylinder(
-            MScrew.from_size("M5").clearance_hole_normal / 2,
-            BIG_THING,
-            direction=(0, 1, 0),
-        )
-        mount_shield_mount_screw_hole_cutter = align(
-            mount_shield_mount_screw_hole_cutter, mount_shield, Alignment.CENTER
-        )
-        mount_shield_mount_screw_hole_cutter = align(
-            mount_shield_mount_screw_hole_cutter,
-            profile_to_align,
-            Alignment.CENTER,
-            axes=[2],
-        )
-        mount_shield = mount_shield.cut(mount_shield_mount_screw_hole_cutter)
-
-        mount_shields = mount_shields.fuse(mount_shield)
-
-        mount_plate_connector = create_filleted_box(
-            mount_plate_connector_length,
-            mount_plate_connector_depth,
-            motor_mount_plate_thickness,
-            fillet_radius=motor_mount_plate_fillet_radius,
-            no_fillets_at=[
-                Alignment.BOTTOM,
-                Alignment.TOP,
-                Alignment.LEFT if i == -1 else Alignment.RIGHT,
-            ],
-        )
-
-        mount_plate_connector = align(
-            mount_plate_connector, mount_plate, Alignment.CENTER
-        )
-
-        mount_plate_connector = align(
-            mount_plate_connector, mount_plate, Alignment.FRONT
-        )
-        mount_plate_connector = align(
             mount_plate_connector,
-            mount_plate,
-            Alignment.STACK_RIGHT if i == -1 else Alignment.STACK_LEFT,
-        )
-
-        mount_plate_connector = translate(i * motor_mount_plate_fillet_radius, 0, 0)(
-            mount_plate_connector
-        )
-
-        mount_plate = mount_plate.fuse(mount_plate_connector)
+            mount_shield,
+            motor_visual_part,
+            motor_name,
+        ) = _create_motor_stack(i, lower_axis_profile, top_axis_profile)
 
         mount_plate_connectors = mount_plate_connectors.fuse(mount_plate_connector)
-
-        mount_plate = mount_plate.fuse(idler_mount_bases)
-
-        # sync follower with the modified mount plate geometry
-        motor.followers[motor.get_follower_index_by_name("mount_plate")] = mount_plate
-
-        motor_visual = PartCollector()
-        motor_visual.fuse(motor.leader)
-        motor_visual.fuse(axle)
-        motor_visual.fuse(pulley)
-        motor_visual.fuse(idlers)
-
-        non_production_parts.append(motor_visual.part)
-        non_production_names.append("motor_left" if i == -1 else "motor_right")
-
+        mount_shields = mount_shields.fuse(mount_shield)
+        non_production_parts.append(motor_visual_part)
+        non_production_names.append(motor_name)
         mount_plates = mount_plates.fuse(mount_plate)
 
     mount_plate_connectors_size = get_bounding_box_size(mount_plate_connectors)
