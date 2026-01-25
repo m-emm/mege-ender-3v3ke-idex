@@ -182,6 +182,18 @@ mount_plate_link_width = mount_plate_connector_length * 0.8
 mount_plate_connector_link_thickness = 6
 
 
+def _calc_translation_vector(original_part, target_part):
+    """Return the translation vector that moves ``original_part`` onto ``target_part``.
+
+    Both parts are compared via their bounding-box minima; align() only translates,
+    so this delta matches the applied move for composite updates.
+    """
+
+    original_bb = get_bounding_box(original_part)
+    target_bb = get_bounding_box(target_part)
+    return tuple(target_bb[0][axis] - original_bb[0][axis] for axis in range(3))
+
+
 def create_z_axis():
     """Create the x_axis part."""
 
@@ -306,77 +318,80 @@ def create_motor_with_mount():
 
 
 def create_x_axis():
-    """Create the x_axis part."""
+    """Create the x_axis assembly as a composite part.
 
-    # resources/ender3top_only.step
+    Leader: printable mount-plate assembly (including shields/link/idler bases).
+    Non-production parts: axis frame and both motor hardware stacks.
+    """
 
     lower_axis_profile = create_alu_extrusion_profile(
         ExtrusionProfileType.PROFILE_2020, length_mm=axis_profile_length
     )
-
     lower_axis_profile = rotate(90, axis=(0, 1, 0))(lower_axis_profile)
 
     top_axis_profile = translate(0, 0, axis_profile_pitch)(lower_axis_profile)
-
-    axis = lower_axis_profile.fuse(top_axis_profile)
+    axis_profiles = lower_axis_profile.fuse(top_axis_profile)
 
     rail = create_mgn12h_rail(length_mm=rail_length)
 
     carriages = PartCollector()
-    mount_plates = PartCollector()
-    mount_shields = PartCollector()
-
     for i in [-1, 1]:
         carriage = create_mgn12h_carriage()
         carriage = align(carriage, rail, Alignment.CENTER, axes=[0, 1])
         carriage = translate(i * 50, 0, 0)(carriage)
         carriages = carriages.fuse(carriage)
 
-    rail = rail.fuse(carriages)
+    rail_with_carriages = rail.fuse(carriages)
+    rail_with_carriages = align(
+        rail_with_carriages, lower_axis_profile, Alignment.CENTER, axes=[0, 1]
+    )
+    rail_with_carriages = align(
+        rail_with_carriages, lower_axis_profile, Alignment.STACK_TOP
+    )
 
-    rail = align(rail, lower_axis_profile, Alignment.CENTER, axes=[0, 1])
-    rail = align(rail, lower_axis_profile, Alignment.STACK_TOP)
+    axis_frame = axis_profiles.fuse(rail_with_carriages)
 
-    axis = axis.fuse(rail)
-
-    motors = PartCollector()
+    mount_plates = PartCollector()
+    mount_shields = PartCollector()
     mount_plate_connectors = PartCollector()
+
+    non_production_parts = [axis_frame]
+    non_production_names = ["axis_frame"]
+
     for i in [-1, 1]:
-
         motor, mount_plate = create_motor_with_mount()
-
         motor.add_named_follower(mount_plate, "mount_plate")
 
         if i == -1:
-            motor = rotate(180, axis=(0, 1, 0))(motor)
+            motor.rotate((0, 0, 0), (0, 1, 0), 180)
 
         profile_to_align = lower_axis_profile if i == -1 else top_axis_profile
 
-        motor = align(motor, profile_to_align, Alignment.CENTER)
-        motor = align(motor, profile_to_align, Alignment.STACK_BACK)
-        motor = align(
-            motor,
+        aligned_motor_leader = align(motor.leader, profile_to_align, Alignment.CENTER)
+        aligned_motor_leader = align(
+            aligned_motor_leader, profile_to_align, Alignment.STACK_BACK
+        )
+        aligned_motor_leader = align(
+            aligned_motor_leader,
             profile_to_align,
             Alignment.STACK_TOP if i == -1 else Alignment.STACK_BOTTOM,
         )
 
-        motor = translate(i * motor_x_offset, motor_y_offset, 0)(motor)
-        motors = motors.fuse(motor.leader)
-        motors = motors.fuse(motor.get_follower_part_by_name("axle"))
+        motor.translate(_calc_translation_vector(motor.leader, aligned_motor_leader))
+        motor.translate((i * motor_x_offset, motor_y_offset, 0))
+
+        axle = motor.get_follower_part_by_name("axle")
         mount_plate = motor.get_follower_part_by_name("mount_plate")
 
         pulley = create_gt2_pulley(num_teeth=20, belt_width=6)
         if i == -1:
             pulley = rotate(180, axis=(0, 1, 0))(pulley)
-        pulley = align(
-            pulley, motor.get_follower_part_by_name("axle"), Alignment.CENTER
-        )
+        pulley = align(pulley, axle, Alignment.CENTER)
         pulley = align(
             pulley,
-            motor.get_follower_part_by_name("axle"),
+            axle,
             Alignment.BOTTOM if i == -1 else Alignment.TOP,
         )
-        motors = motors.fuse(pulley)
 
         idlers = PartCollector()
         idler_mount_bases = PartCollector()
@@ -395,7 +410,7 @@ def create_x_axis():
             idler = create_gt2_idler(num_teeth=16)
 
             idler = align(idler, pulley, Alignment.TOP if i == 1 else Alignment.BOTTOM)
-            idler = align(idler, motor, idler_alignment)
+            idler = align(idler, motor.leader, idler_alignment)
             idler = align(
                 idler, profile_to_align, Alignment.STACK_BACK, stack_gap=idler_gap
             )
@@ -472,9 +487,6 @@ def create_x_axis():
             )
             mount_plate = mount_plate.cut(idler_screw_nut_cutter)
 
-        motors = motors.fuse(idler_mount_bases)
-        motors = motors.fuse(idlers)
-
         mount_shield = create_filleted_box(
             mount_shield_width,
             mount_shield_depth,
@@ -509,7 +521,14 @@ def create_x_axis():
         )
         mount_shield = mount_shield.cut(mount_shield_mount_screw_hole_cutter)
 
+        mount_shield_side = align(
+            mount_shield,
+            mount_plate,
+            Alignment.RIGHT if i == -1 else Alignment.LEFT,
+        )
+
         mount_shields = mount_shields.fuse(mount_shield)
+        mount_shields = mount_shields.fuse(mount_shield_side)
 
         mount_plate_connector = create_filleted_box(
             mount_plate_connector_length,
@@ -542,18 +561,31 @@ def create_x_axis():
 
         mount_plate = mount_plate.fuse(mount_plate_connector)
 
-        mount_shield_2 = align(
-            mount_shield,
-            mount_plate_connector,
-            Alignment.RIGHT if i == -1 else Alignment.LEFT,
+        mount_shields = mount_shields.fuse(
+            align(
+                mount_shield,
+                mount_plate_connector,
+                Alignment.RIGHT if i == -1 else Alignment.LEFT,
+            )
         )
-
-        mount_shields = mount_shields.fuse(mount_shield_2)
 
         mount_plate_connectors = mount_plate_connectors.fuse(mount_plate_connector)
 
+        mount_plate = mount_plate.fuse(idler_mount_bases)
+
+        # sync follower with the modified mount plate geometry
+        motor.followers[motor.get_follower_index_by_name("mount_plate")] = mount_plate
+
+        motor_visual = PartCollector()
+        motor_visual.fuse(motor.leader)
+        motor_visual.fuse(axle)
+        motor_visual.fuse(pulley)
+        motor_visual.fuse(idlers)
+
+        non_production_parts.append(motor_visual.part)
+        non_production_names.append("motor_left" if i == -1 else "motor_right")
+
         mount_plates = mount_plates.fuse(mount_plate)
-        mount_plates = mount_plates.fuse(idler_mount_bases)
 
     mount_plate_connectors_size = get_bounding_box_size(mount_plate_connectors)
 
@@ -597,13 +629,13 @@ def create_x_axis():
     mount_plate_link = mount_plate_link.fuse(mount_plate_link_bevels)
 
     mount_plates = mount_plates.fuse(mount_plate_link)
-
-    axis = axis.fuse(motors)
-
     mount_plates = mount_plates.fuse(mount_shields)
-    axis = axis.fuse(mount_plates)
 
-    return axis, mount_plates
+    return LeaderFollowersCuttersPart(
+        leader=mount_plates,
+        non_production_parts=non_production_parts,
+        non_production_names=non_production_names,
+    )
 
 
 def main():
@@ -615,21 +647,34 @@ def main():
         z_axis = create_z_axis()
         parts.add(z_axis, "z_axis", flip=False, skip_in_production=True)
 
-        x_axis, mount_plates = create_x_axis()
+        x_axis = create_x_axis()
 
-        x_axis = align(x_axis, z_axis, Alignment.CENTER)
-        x_axis = align(x_axis, z_axis, Alignment.STACK_BACK, stack_gap=-28)
+        aligned_leader = align(x_axis.leader, z_axis, Alignment.CENTER)
+        aligned_leader = align(
+            aligned_leader, z_axis, Alignment.STACK_BACK, stack_gap=-28
+        )
+        move_vec = _calc_translation_vector(x_axis.leader, aligned_leader)
+        x_axis.translate(move_vec)
 
-        parts.add(x_axis, "x_axis", flip=False, skip_in_production=True)
-        if PROD:
+        # Non-production references for assembly context
+        for name in ["axis_frame", "motor_left", "motor_right"]:
             parts.add(
-                mount_plates,
-                "x_axis_mount_plates",
+                x_axis.get_non_production_part_by_name(name),
+                f"x_axis_{name}",
                 flip=False,
-                skip_in_production=False,
-                prod_rotation_angle=90,
-                prod_rotation_axis=(1, 0, 0),
+                skip_in_production=True,
             )
+
+        # Printable mount plate assembly (leader)
+        parts.add(
+            x_axis.leader,
+            "x_axis_mount_plates",
+            flip=False,
+            skip_in_production=False,
+            prod_rotation_angle=90,
+            prod_rotation_axis=(1, 0, 0),
+            color=(0.8, 1.0, 0.8),
+        )
 
     # motor, plate = create_motor_with_mount()
 
