@@ -7,11 +7,14 @@ Usage:
     cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/x_axis.py
 """
 
+import copy
 import logging
 import os
 from pathlib import Path
-import copy
 
+from mege_3devops.process_data.mender3.process_data_08_high_speed import (
+    PROCESS_DATA_PLA_08_HS,
+)
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
@@ -19,10 +22,6 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler, create_gt2_pulley
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.simple import *
-from mege_3devops.process_data.mender3.process_data_08_high_speed import (
-    PROCESS_DATA_PLA_08_HS,
-)
-
 
 _logger = logging.getLogger(__name__)
 
@@ -632,20 +631,20 @@ def main():
                 prod_rotation_axis=(1, 0, 0),
             )
 
-    motor, plate = create_motor_with_mount()
+    # motor, plate = create_motor_with_mount()
 
-    motor_part = motor.leader
-    motor_part = motor_part.fuse(motor.get_follower_part_by_name("axle"))
+    # motor_part = motor.leader
+    # motor_part = motor_part.fuse(motor.get_follower_part_by_name("axle"))
 
-    parts.add(
-        motor_part,
-        "x_axis_motor",
-        flip=False,
-        skip_in_production=True,
-    )
+    # parts.add(
+    #     motor_part,
+    #     "x_axis_motor",
+    #     flip=False,
+    #     skip_in_production=True,
+    # )
 
-    plate = translate(0, 0, 4)(plate)
-    parts.add(plate, "x_axis_motor_mount_plate", flip=False, skip_in_production=True)
+    # plate = translate(0, 0, 4)(plate)
+    # parts.add(plate, "x_axis_motor_mount_plate", flip=False, skip_in_production=True)
 
     # Arrange and export
     arrange_and_export(
