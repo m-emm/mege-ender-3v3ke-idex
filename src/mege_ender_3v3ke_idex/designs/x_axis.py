@@ -43,7 +43,7 @@ PROCESS_DATA["process_overrides"].update(
         # ============================================================
         # SINGLE-WALL INTENT
         # ============================================================
-        "wall_loops": "2",
+        "wall_loops": "1",
         # Make thickness == line width everywhere that could interfere
         "line_width": "0.90",
         "outer_wall_line_width": "0.90",
@@ -52,8 +52,8 @@ PROCESS_DATA["process_overrides"].update(
         "top_surface_line_width": "0.90",
         "gap_fill_line_width": "0.90",
         # If you truly want a pure shell, consider enabling these:
-        # "bottom_shell_layers": "0",
-        # "top_shell_layers": "0",
+        "bottom_shell_layers": "1",
+        "top_shell_layers": "1",
         # ============================================================
         # LAYER HEIGHT — tuned to ~30 mm³/s at outer wall speed
         # ============================================================
@@ -186,6 +186,12 @@ flange_depth = 18
 bevel_depth = flange_depth * 0.8
 idler_screw_size = "M3"
 idler_screw_head_clearance = 0.3
+mount_flange_screw_hole_inset = 10
+
+axis_holder_width = mount_plate_connector_length
+axis_holder_depth = ExtrusionProfileType.PROFILE_2020.grid_pitch_mm + flange_depth
+axis_holder_thickness = 3
+axis_holder_fillet_radius = 1
 
 
 def create_z_axis():
@@ -546,6 +552,25 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
     mount_flange = align(mount_flange, mount_plate_connector, Alignment.FRONT)
     mount_flange = align(mount_flange, profile_to_align, vertical_alignment)
 
+    nut_cutters = []
+    for screw_hole_alignment in (Alignment.LEFT, Alignment.RIGHT):
+
+        nut_cutter = create_hidden_nut_pocket_cutter(
+            "M3", bottom_cutter_length=3, top_cutter_length=100, slack=0.3
+        )
+
+        if vertical_alignment == Alignment.BOTTOM:
+            nut_cutter = rotate(180, axis=(0, 1, 0))(nut_cutter)
+
+        nut_cutter = align(nut_cutter, mount_flange, Alignment.CENTER)
+        nut_cutter = align(nut_cutter, mount_plate_connector, screw_hole_alignment)
+        nut_cutter = translate(
+            -screw_hole_alignment.sign * mount_flange_screw_hole_inset, 0, 0
+        )(nut_cutter)
+
+        nut_cutters.append(nut_cutter)
+        mount_flange = nut_cutter.use_as_cutter_on(mount_flange)
+
     for idler_axle_cutter in idler_axle_cutters:
         mount_flange = mount_flange.cut(idler_axle_cutter)
 
@@ -597,12 +622,58 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
 
     motor_name = f"motor_{side.name.lower()}"
 
+    axis_holding_counter_flange = create_filleted_box(
+        axis_holder_width,
+        axis_holder_depth,
+        axis_holder_thickness,
+        axis_holder_fillet_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+    )
+
+    axis_holding_counter_flange = align(
+        axis_holding_counter_flange, mount_flange, side.opposite
+    )
+    axis_holding_counter_flange = align(
+        axis_holding_counter_flange, mount_flange, vertical_alignment.stack_alignment
+    )
+    axis_holding_counter_flange = align(
+        axis_holding_counter_flange, mount_flange, Alignment.BACK
+    )
+
+    for nut_cutter in nut_cutters:
+        axis_holding_counter_flange = nut_cutter.use_as_cutter_on(
+            axis_holding_counter_flange
+        )
+
+        profile_mount_screw_hole_cutter = create_cylinder(
+            MScrew.from_size("M5").clearance_hole_normal / 2,
+            BIG_THING,
+        )
+        profile_mount_screw_hole_cutter = align(
+            profile_mount_screw_hole_cutter,
+            axis_holding_counter_flange,
+            Alignment.CENTER,
+        )
+        profile_mount_screw_hole_cutter = align(
+            profile_mount_screw_hole_cutter, nut_cutter, Alignment.CENTER, axes=[0]
+        )
+        profile_mount_screw_hole_cutter = align(
+            profile_mount_screw_hole_cutter,
+            profile_to_align,
+            Alignment.CENTER,
+            axes=[1],
+        )
+        axis_holding_counter_flange = axis_holding_counter_flange.cut(
+            profile_mount_screw_hole_cutter
+        )
+
     return (
         mount_plate,
         mount_plate_connector,
         mount_shield,
         motor_visual.part,
         motor_name,
+        axis_holding_counter_flange,
     )
 
 
@@ -647,6 +718,8 @@ def create_x_axis():
     non_production_parts = [axis_frame]
     non_production_names = ["axis_frame"]
 
+    axis_holding_counter_flanges = {}
+
     for side in (Alignment.LEFT, Alignment.RIGHT):
         (
             mount_plate,
@@ -654,6 +727,7 @@ def create_x_axis():
             mount_shield,
             motor_visual_part,
             motor_name,
+            axis_holding_counter_flange,
         ) = _create_motor_stack(side, lower_axis_profile, top_axis_profile)
 
         mount_plate_connectors = mount_plate_connectors.fuse(mount_plate_connector)
@@ -661,6 +735,9 @@ def create_x_axis():
         non_production_parts.append(motor_visual_part)
         non_production_names.append(motor_name)
         mount_plates = mount_plates.fuse(mount_plate)
+        axis_holding_counter_flanges[
+            f"axis_holding_counter_flange_{side.name.lower()}"
+        ] = axis_holding_counter_flange
 
     mount_plate_connectors_size = get_bounding_box_size(mount_plate_connectors)
 
@@ -706,11 +783,16 @@ def create_x_axis():
     mount_plates = mount_plates.fuse(mount_plate_link)
     mount_plates = mount_plates.fuse(mount_shields)
 
-    return LeaderFollowersCuttersPart(
+    retval = LeaderFollowersCuttersPart(
         leader=mount_plates,
         non_production_parts=non_production_parts,
         non_production_names=non_production_names,
     )
+
+    for name, part in axis_holding_counter_flanges.items():
+        retval.add_named_follower(part, name)
+
+    return retval
 
 
 def main():
@@ -747,6 +829,21 @@ def main():
             color=(0.8, 1.0, 0.8),
         )
 
+        # Printable axis holding counter flanges
+        for follower_name in [
+            "axis_holding_counter_flange_left",
+            "axis_holding_counter_flange_right",
+        ]:
+            parts.add(
+                x_axis.get_follower_part_by_name(follower_name),
+                follower_name,
+                flip=False,
+                skip_in_production=False,
+                prod_rotation_angle=0,
+                prod_rotation_axis=(1, 0, 0),
+                color=(1.0, 0.7, 0.8),
+            )
+
     # motor, plate = create_motor_with_mount()
 
     # motor_part = motor.leader
@@ -768,6 +865,7 @@ def main():
         script_file=__file__,
         prod=PROD,
         process_data=PROCESS_DATA,
+        prod_gap=4,
     )
 
     _logger.info("x_axis created successfully!")
