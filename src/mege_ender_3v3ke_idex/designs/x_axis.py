@@ -224,11 +224,13 @@ endcap_holder_thickness = 4
 endcap_holder_length = 10
 endcap_fillet_radius = 2
 endcap_idler_tooth_count = 20
-endcap_profile_overlap = 4
+endcap_profile_overlap = 7
 endcap_profile_clearance = 0.2
 endcap_axle_screw_length = 25
 endcap_axle_screw_size = "M3"
 inset_cutter_hole_slack = 0.3
+endcap_tensioner_length = 25
+endcap_tensioner_slit_width = 0.4
 
 
 def create_z_axis():
@@ -751,7 +753,7 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
     )
 
 
-def create_idler_endcap(profile):
+def create_idler_endcap(profile, with_tensioner: bool = False):
     """Create an endcap for the idler side of the x-axis profile."""
 
     idler = create_gt2_idler(num_teeth=endcap_idler_tooth_count)
@@ -760,9 +762,15 @@ def create_idler_endcap(profile):
 
     profile_size = get_bounding_box_size(profile)
 
+    endcap_length = idler_size[0] * 1.5 + endcap_profile_overlap
+    if with_tensioner:
+        endcap_length += endcap_tensioner_length
+
+    endcap_width = profile_size[1] + 2 * endcap_wall + 2 * endcap_clearance
+
     endcap_box = create_filleted_box(
-        idler_size[0] * 1.5 + endcap_profile_overlap,
-        profile_size[1] + 2 * endcap_wall + 2 * endcap_clearance,
+        endcap_length,
+        endcap_width,
         profile_size[2] + 2 * endcap_wall + 2 * endcap_clearance,
         endcap_fillet_radius,
         no_fillets_at=[Alignment.LEFT],
@@ -775,6 +783,13 @@ def create_idler_endcap(profile):
     )
     endcap_idler_space_cutter = align(
         endcap_idler_space_cutter, endcap_box, Alignment.CENTER
+    )
+    endcap_idler_space_cutter = align(
+        endcap_idler_space_cutter, endcap_box, Alignment.LEFT
+    )
+
+    endcap_idler_space_cutter = translate(endcap_profile_overlap, 0, 0)(
+        endcap_idler_space_cutter
     )
 
     endcap_box = endcap_box.cut(endcap_idler_space_cutter)
@@ -802,6 +817,8 @@ def create_idler_endcap(profile):
     endcap_core = align(endcap_core, profile_cutter, Alignment.STACK_RIGHT)
 
     endcap_box = align(endcap_box, endcap_core, Alignment.CENTER)
+    endcap_box = align(endcap_box, endcap_core, Alignment.LEFT)
+    endcap_box = translate(-endcap_profile_overlap, 0, 0)(endcap_box)
 
     endcap_box = endcap_box.cut(profile_cutter)
 
@@ -843,6 +860,40 @@ def create_idler_endcap(profile):
     )
     thread_inset_cutter = align(thread_inset_cutter, endcap_box, Alignment.BOTTOM)
     endcap_box = endcap_box.cut(thread_inset_cutter)
+
+    if with_tensioner:
+        tensioner_cutter = create_box(
+            endcap_tensioner_length,
+            endcap_width - 2 * endcap_wall,
+            BIG_THING,
+        )
+        tensioner_cutter = align(tensioner_cutter, endcap_box, Alignment.CENTER)
+        tensioner_cutter = align(tensioner_cutter, endcap_box, Alignment.RIGHT)
+        tensioner_cutter = translate(-endcap_wall, 0, 0)(tensioner_cutter)
+
+        endcap_box = endcap_box.cut(tensioner_cutter)
+
+        for alignment in (Alignment.STACK_FRONT, Alignment.STACK_BACK):
+            slit_cutter = create_box(
+                endcap_length - endcap_profile_overlap - endcap_wall,
+                endcap_tensioner_slit_width,
+                BIG_THING,
+            )
+            slit_cutter = align(slit_cutter, tensioner_cutter, Alignment.CENTER)
+            slit_cutter = align(slit_cutter, tensioner_cutter, alignment)
+
+            slit_cutter = align(slit_cutter, tensioner_cutter, Alignment.RIGHT)
+
+            endcap_box = endcap_box.cut(slit_cutter)
+        left_slit_cutter = create_box(
+            endcap_tensioner_slit_width,
+            endcap_width - 2 * endcap_wall,
+            BIG_THING,
+        )
+        left_slit_cutter = align(left_slit_cutter, tensioner_cutter, Alignment.CENTER)
+        left_slit_cutter = align(left_slit_cutter, endcap_box, Alignment.LEFT)
+        left_slit_cutter = translate(endcap_profile_overlap, 0, 0)(left_slit_cutter)
+        endcap_box = endcap_box.cut(left_slit_cutter)
 
     retval = LeaderFollowersCuttersPart(
         leader=endcap_core,
@@ -1143,7 +1194,7 @@ def main():
 
     lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
 
-    endcap = create_idler_endcap(lower_axis_profile)
+    endcap = create_idler_endcap(lower_axis_profile, with_tensioner=True)
 
     parts.add(
         endcap.get_follower_part_by_name("idler"),
@@ -1160,8 +1211,8 @@ def main():
         "x_axis_idler_endcap_right_box",
         flip=False,
         skip_in_production=False,
-        prod_rotation_angle=90,
-        prod_rotation_axis=(0, 1, 0),
+        prod_rotation_angle=0,
+        prod_rotation_axis=(1, 0, 0),
         color=(0.1, 0.4, 0.9),
     )
 
