@@ -10,6 +10,7 @@ Usage:
 import copy
 import logging
 import os
+from collections import defaultdict
 from pathlib import Path
 
 from mege_3devops.process_data.mender3.process_data_08_high_speed import (
@@ -182,7 +183,7 @@ mount_plate_link_width = mount_plate_connector_length * 0.8
 mount_plate_connector_link_thickness = 6
 
 flange_thickness = 5
-flange_depth = 18
+flange_depth = 20
 bevel_depth = flange_depth * 0.8
 idler_screw_size = "M3"
 idler_screw_head_clearance = 0.3
@@ -190,8 +191,10 @@ mount_flange_screw_hole_inset = 10
 
 axis_holder_width = mount_plate_connector_length
 axis_holder_depth = ExtrusionProfileType.PROFILE_2020.grid_pitch_mm + flange_depth
-axis_holder_thickness = 3
+axis_holder_thickness = 6
 axis_holder_fillet_radius = 1
+
+nut_cutter_offset_z = 2
 
 
 def create_z_axis():
@@ -565,7 +568,9 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
         nut_cutter = align(nut_cutter, mount_flange, Alignment.CENTER)
         nut_cutter = align(nut_cutter, mount_plate_connector, screw_hole_alignment)
         nut_cutter = translate(
-            -screw_hole_alignment.sign * mount_flange_screw_hole_inset, 0, 0
+            -screw_hole_alignment.sign * mount_flange_screw_hole_inset,
+            0,
+            -side.sign * nut_cutter_offset_z,
         )(nut_cutter)
 
         nut_cutters.append(nut_cutter)
@@ -590,7 +595,7 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
     mount_flange_bevel = create_right_triangle(
         bevel_depth,
         bevel_depth,
-        thickness=mount_plate_connector_length,
+        thickness=mount_plate_connector_length - 2 * motor_mount_plate_fillet_radius,
         extrusion_direction=(side.sign, 0, 0),
         a_normal=(0, 0, vertical_alignment.sign),
         b_normal=(0, -1, 0),
@@ -604,6 +609,11 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
     mount_flange_bevel_flange_side = align(
         mount_flange_bevel, mount_flange, vertical_alignment.opposite.stack_alignment
     )
+
+    for nut_cutter in nut_cutters:
+        mount_flange_bevel_flange_side = nut_cutter.use_as_cutter_on(
+            mount_flange_bevel_flange_side
+        )
 
     mount_flange = mount_flange.fuse(mount_flange_bevel_flange_side)
 
@@ -720,6 +730,8 @@ def create_x_axis():
 
     axis_holding_counter_flanges = {}
 
+    final_mount_plates_by_side = defaultdict(PartCollector)
+
     for side in (Alignment.LEFT, Alignment.RIGHT):
         (
             mount_plate,
@@ -738,6 +750,8 @@ def create_x_axis():
         axis_holding_counter_flanges[
             f"axis_holding_counter_flange_{side.name.lower()}"
         ] = axis_holding_counter_flange
+
+        final_mount_plates_by_side[side] = mount_plate.fuse(mount_shield)
 
     mount_plate_connectors_size = get_bounding_box_size(mount_plate_connectors)
 
@@ -781,7 +795,6 @@ def create_x_axis():
     mount_plate_link = mount_plate_link.fuse(mount_plate_link_bevels)
 
     mount_plates = mount_plates.fuse(mount_plate_link)
-    mount_plates = mount_plates.fuse(mount_shields)
 
     retval = LeaderFollowersCuttersPart(
         leader=mount_plates,
@@ -791,6 +804,12 @@ def create_x_axis():
 
     for name, part in axis_holding_counter_flanges.items():
         retval.add_named_follower(part, name)
+
+    for side in (Alignment.LEFT, Alignment.RIGHT):
+        retval.add_named_follower(
+            final_mount_plates_by_side[side],
+            f"mount_plate_{side.name.lower()}",
+        )
 
     return retval
 
@@ -818,16 +837,23 @@ def main():
                 skip_in_production=True,
             )
 
-        # Printable mount plate assembly (leader)
-        parts.add(
-            x_axis.leader,
-            "x_axis_mount_plates",
-            flip=False,
-            skip_in_production=False,
-            prod_rotation_angle=90,
-            prod_rotation_axis=(1, 0, 0),
-            color=(0.8, 1.0, 0.8),
-        )
+        for side in [Alignment.RIGHT, Alignment.LEFT]:
+            mount_plate_name = f"mount_plate_{side.name.lower()}"
+            color_by_side = {
+                Alignment.LEFT: (0.8, 0.8, 1.0),
+                Alignment.RIGHT: (1.0, 0.8, 0.8),
+            }
+
+            mount_plate_of_side = x_axis.get_follower_part_by_name(mount_plate_name)
+            parts.add(
+                mount_plate_of_side,
+                f"x_axis_{mount_plate_name}",
+                flip=False,
+                skip_in_production=False,
+                prod_rotation_angle=90,
+                prod_rotation_axis=(1, 0, 0),
+                color=color_by_side[side],
+            )
 
         # Printable axis holding counter flanges
         for follower_name in [
