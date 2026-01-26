@@ -177,13 +177,13 @@ mount_shield_oversize_z = 0
 mount_plate_connector_length = (
     z_axis_guide_distance - 2 * motor_x_offset - motor_size + 8
 )
-mount_plate_connector_depth = 20
+mount_plate_connector_depth = 22
 
 mount_plate_link_width = mount_plate_connector_length * 0.8
 mount_plate_connector_link_thickness = 6
 
 flange_thickness = 5
-flange_depth = 20
+flange_depth = 22
 bevel_depth = flange_depth * 0.8
 idler_screw_size = "M3"
 idler_screw_head_clearance = 0.3
@@ -195,6 +195,9 @@ axis_holder_thickness = 6
 axis_holder_fillet_radius = 1
 
 nut_cutter_offset_z = 2
+
+link_screw_size = "M5"
+link_screw_length = 80
 
 
 def create_z_axis():
@@ -794,6 +797,24 @@ def create_x_axis():
 
     mount_plate_link = mount_plate_link.fuse(mount_plate_link_bevels)
 
+    mount_plate_link_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    mount_plate_link_cutter = align(
+        mount_plate_link_cutter, axis_frame, Alignment.CENTER
+    )
+
+    mount_plate_link_cutter_center = get_bounding_box_center(mount_plate_link_cutter)
+    mount_plate_link_cutters = cut_in_two(
+        mount_plate_link_cutter,
+        cut_point=mount_plate_link_cutter_center,
+        cut_normal=(0, 0, 1),
+    )
+
+    for i, side in enumerate([Alignment.LEFT, Alignment.RIGHT]):
+        current_mount_plate_link = mount_plate_link.cut(mount_plate_link_cutters[i])
+        final_mount_plates_by_side[side] = final_mount_plates_by_side[side].fuse(
+            current_mount_plate_link
+        )
+
     mount_plates = mount_plates.fuse(mount_plate_link)
 
     retval = LeaderFollowersCuttersPart(
@@ -802,14 +823,51 @@ def create_x_axis():
         non_production_names=non_production_names,
     )
 
+    link_screw_hole_cutters = PartCollector()
+
+    for i, side in enumerate([Alignment.LEFT, Alignment.RIGHT]):
+        link_screw = create_cylinder_screw(link_screw_size, length=link_screw_length)
+
+        link_screw = align(link_screw, mount_plate_link, Alignment.CENTER)
+        link_screw = align(
+            link_screw, final_mount_plates_by_side[Alignment.RIGHT], Alignment.TOP
+        )
+        link_screw = translate(
+            side.sign * mount_plate_link_width / 4,
+            0,
+            MScrew.from_size(link_screw_size).cylinder_head_height
+            + axis_holder_thickness,
+        )(link_screw)
+        retval.add_named_non_production_part(
+            link_screw,
+            f"link_screw_{i+1}",
+        )
+
+        link_screw_hole_cutter = create_cylinder(
+            MScrew.from_size(link_screw_size).clearance_hole_normal / 2,
+            BIG_THING,
+        )
+        link_screw_hole_cutter = align(
+            link_screw_hole_cutter, link_screw, Alignment.CENTER
+        )
+        link_screw_hole_cutters = link_screw_hole_cutters.fuse(link_screw_hole_cutter)
+
+    for side in (Alignment.LEFT, Alignment.RIGHT):
+        final_mount_plates_by_side[side] = final_mount_plates_by_side[side].cut(
+            link_screw_hole_cutters
+        )
+
     for name, part in axis_holding_counter_flanges.items():
-        retval.add_named_follower(part, name)
+        drilled_part = part.cut(link_screw_hole_cutters)
+
+        retval.add_named_follower(drilled_part, name)
 
     for side in (Alignment.LEFT, Alignment.RIGHT):
         retval.add_named_follower(
             final_mount_plates_by_side[side],
             f"mount_plate_{side.name.lower()}",
         )
+    retval.add_named_cutter(link_screw_hole_cutters, "link_screw_holes")
 
     return retval
 
@@ -829,7 +887,13 @@ def main():
         x_axis = align(x_axis, z_axis, Alignment.STACK_BACK, stack_gap=-28)
 
         # Non-production references for assembly context
-        for name in ["axis_frame", "motor_left", "motor_right"]:
+        for name in [
+            "axis_frame",
+            "motor_left",
+            "motor_right",
+            "link_screw_1",
+            "link_screw_2",
+        ]:
             parts.add(
                 x_axis.get_non_production_part_by_name(name),
                 f"x_axis_{name}",
