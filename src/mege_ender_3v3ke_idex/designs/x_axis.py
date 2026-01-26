@@ -218,6 +218,19 @@ link_flange_thickness = 7
 link_flange_depth = 12
 
 
+endcap_wall = 3
+endcap_clearance = 0.8
+endcap_holder_thickness = 4
+endcap_holder_length = 10
+endcap_fillet_radius = 2
+endcap_idler_tooth_count = 20
+endcap_profile_overlap = 4
+endcap_profile_clearance = 0.2
+endcap_axle_screw_length = 25
+endcap_axle_screw_size = "M3"
+inset_cutter_hole_slack = 0.3
+
+
 def create_z_axis():
     """Create the x_axis part."""
 
@@ -738,6 +751,112 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
     )
 
 
+def create_idler_endcap(profile):
+    """Create an endcap for the idler side of the x-axis profile."""
+
+    idler = create_gt2_idler(num_teeth=endcap_idler_tooth_count)
+
+    idler_size = get_bounding_box_size(idler)
+
+    profile_size = get_bounding_box_size(profile)
+
+    endcap_box = create_filleted_box(
+        idler_size[0] * 1.5 + endcap_profile_overlap,
+        profile_size[1] + 2 * endcap_wall + 2 * endcap_clearance,
+        profile_size[2] + 2 * endcap_wall + 2 * endcap_clearance,
+        endcap_fillet_radius,
+        no_fillets_at=[Alignment.LEFT],
+    )
+
+    endcap_idler_space_cutter = create_box(
+        idler_size[0] + 2 * endcap_clearance,
+        BIG_THING,
+        idler_size[2] + 2 * endcap_clearance,
+    )
+    endcap_idler_space_cutter = align(
+        endcap_idler_space_cutter, endcap_box, Alignment.CENTER
+    )
+
+    endcap_box = endcap_box.cut(endcap_idler_space_cutter)
+
+    profile_cutter = create_box(
+        endcap_profile_overlap * 4,
+        profile_size[1] + 2 * endcap_profile_clearance,
+        profile_size[2] + 2 * endcap_profile_clearance,
+    )
+
+    profile_cutter = align(profile_cutter, endcap_box, Alignment.CENTER)
+    profile_cutter = align(
+        profile_cutter,
+        endcap_box,
+        Alignment.STACK_LEFT,
+        stack_gap=-endcap_profile_overlap,
+    )
+
+    endcap_core = create_box(
+        idler_size[0] + 2 * endcap_clearance,
+        idler_size[1] + 2 * endcap_clearance,
+        idler_size[2] + 2 * endcap_clearance,
+    )
+    endcap_core = align(endcap_core, profile_cutter, Alignment.CENTER)
+    endcap_core = align(endcap_core, profile_cutter, Alignment.STACK_RIGHT)
+
+    endcap_box = align(endcap_box, endcap_core, Alignment.CENTER)
+
+    endcap_box = endcap_box.cut(profile_cutter)
+
+    idler = align(idler, endcap_core, Alignment.CENTER)
+
+    axle = create_cylinder_screw(
+        endcap_axle_screw_size, length=endcap_axle_screw_length
+    )
+
+    axle = align(axle, idler, Alignment.CENTER)
+    axle = align(axle, endcap_box, Alignment.TOP)
+
+    axle_cutter = create_cylinder(
+        MScrew.from_size(endcap_axle_screw_size).clearance_hole_normal / 2, BIG_THING
+    )
+    axle_cutter = align(axle_cutter, idler, Alignment.CENTER)
+    endcap_box = endcap_box.cut(axle_cutter)
+
+    head_cutter = create_cylinder(
+        MScrew.from_size(endcap_axle_screw_size).cylinder_head_diameter / 2
+        + idler_screw_head_clearance,
+        MScrew.from_size(endcap_axle_screw_size).cylinder_head_height
+        + 2 * idler_screw_head_clearance,
+    )
+
+    head_cutter = align(head_cutter, idler, Alignment.CENTER)
+    head_cutter = align(head_cutter, endcap_box, Alignment.TOP)
+    endcap_box = endcap_box.cut(head_cutter)
+
+    thread_inset_cutter = create_cylinder(
+        m_screws_table[endcap_axle_screw_size]["thread_inset_hole_diameter"] / 2
+        + inset_cutter_hole_slack,
+        m_screws_table[endcap_axle_screw_size]["thread_inset_length"]
+        + inset_cutter_hole_slack,
+    )
+
+    thread_inset_cutter = align(
+        thread_inset_cutter, axle, Alignment.CENTER, axes=[0, 1]
+    )
+    thread_inset_cutter = align(thread_inset_cutter, endcap_box, Alignment.BOTTOM)
+    endcap_box = endcap_box.cut(thread_inset_cutter)
+
+    retval = LeaderFollowersCuttersPart(
+        leader=endcap_core,
+    )
+    retval.add_named_follower(endcap_box, "endcap_box")
+    retval.add_named_follower(idler, "idler")
+    retval.add_named_non_production_part(axle, "axle")
+
+    retval = align(retval, profile, Alignment.CENTER)
+    retval = align(retval, profile, Alignment.STACK_RIGHT, stack_gap=endcap_clearance)
+
+    return retval
+
+
 def create_x_axis():
     """Create the x_axis assembly as a composite part.
 
@@ -778,6 +897,11 @@ def create_x_axis():
 
     non_production_parts = [axis_frame]
     non_production_names = ["axis_frame"]
+
+    non_production_parts.append(lower_axis_profile)
+    non_production_names.append("lower_axis_profile")
+    non_production_parts.append(top_axis_profile)
+    non_production_names.append("top_axis_profile")
 
     axis_holding_counter_flanges = {}
 
@@ -947,91 +1071,107 @@ def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
-    if True:
-        # Create the part
-        z_axis = create_z_axis()
-        parts.add(z_axis, "z_axis", flip=False, skip_in_production=True)
+    # Create the part
+    z_axis = create_z_axis()
+    parts.add(z_axis, "z_axis", flip=False, skip_in_production=True)
 
-        x_axis = create_x_axis()
+    x_axis = create_x_axis()
 
-        x_axis = align(x_axis, z_axis, Alignment.CENTER)
-        x_axis = align(x_axis, z_axis, Alignment.STACK_BACK, stack_gap=-28)
+    x_axis = align(x_axis, z_axis, Alignment.CENTER)
+    x_axis = align(x_axis, z_axis, Alignment.STACK_BACK, stack_gap=-28)
 
-        # Non-production references for assembly context
-        for name in [
-            "axis_frame",
-            "motor_left",
-            "motor_right",
-            "link_screw_1",
-            "link_screw_2",
-        ]:
-            parts.add(
-                x_axis.get_non_production_part_by_name(name),
-                f"x_axis_{name}",
-                flip=False,
-                skip_in_production=True,
-            )
+    # Non-production references for assembly context
+    for name in [
+        "axis_frame",
+        "motor_left",
+        "motor_right",
+        "link_screw_1",
+        "link_screw_2",
+    ]:
+        parts.add(
+            x_axis.get_non_production_part_by_name(name),
+            f"x_axis_{name}",
+            flip=False,
+            skip_in_production=True,
+        )
 
-        for side in (Alignment.LEFT, Alignment.RIGHT):
-            mount_screws = PartCollector()
+    for side in (Alignment.LEFT, Alignment.RIGHT):
+        mount_screws = PartCollector()
 
-            for i in [0, 1]:
-                mount_screws = mount_screws.fuse(
-                    x_axis.get_non_production_part_by_name(
-                        f"axis_holding_counter_flange_screw_{i+1}_{side.name.lower()}"
-                    )
+        for i in [0, 1]:
+            mount_screws = mount_screws.fuse(
+                x_axis.get_non_production_part_by_name(
+                    f"axis_holding_counter_flange_screw_{i+1}_{side.name.lower()}"
                 )
-            parts.add(
-                mount_screws,
-                f"x_axis_mount_screws_{side.name.lower()}",
-                flip=False,
-                skip_in_production=True,
             )
+        parts.add(
+            mount_screws,
+            f"x_axis_mount_screws_{side.name.lower()}",
+            flip=False,
+            skip_in_production=True,
+        )
 
-        for side in [Alignment.RIGHT]:  #  , Alignment.LEFT]:
-            mount_plate_name = f"mount_plate_{side.name.lower()}"
-            color_by_side = {
-                Alignment.LEFT: (0.8, 0.8, 1.0),
-                Alignment.RIGHT: (1.0, 0.8, 0.8),
-            }
+    for side in [Alignment.RIGHT]:  #  , Alignment.LEFT]:
+        mount_plate_name = f"mount_plate_{side.name.lower()}"
+        color_by_side = {
+            Alignment.LEFT: (0.8, 0.8, 1.0),
+            Alignment.RIGHT: (1.0, 0.8, 0.8),
+        }
 
-            mount_plate_of_side = x_axis.get_follower_part_by_name(mount_plate_name)
-            parts.add(
-                mount_plate_of_side,
-                f"x_axis_{mount_plate_name}",
-                flip=False,
-                skip_in_production=False,
-                prod_rotation_angle=90,
-                prod_rotation_axis=(1, 0, 0),
-                color=color_by_side[side],
-            )
+        mount_plate_of_side = x_axis.get_follower_part_by_name(mount_plate_name)
+        parts.add(
+            mount_plate_of_side,
+            f"x_axis_{mount_plate_name}",
+            flip=False,
+            skip_in_production=False,
+            prod_rotation_angle=90,
+            prod_rotation_axis=(1, 0, 0),
+            color=color_by_side[side],
+        )
 
-            follower_name = f"axis_holding_counter_flange_{side.name.lower()}"
+        follower_name = f"axis_holding_counter_flange_{side.name.lower()}"
 
-            parts.add(
-                x_axis.get_follower_part_by_name(follower_name),
-                follower_name,
-                flip=False,
-                skip_in_production=False,
-                prod_rotation_angle=0,
-                prod_rotation_axis=(1, 0, 0),
-                color=(1.0, 0.7, 0.8),
-            )
+        parts.add(
+            x_axis.get_follower_part_by_name(follower_name),
+            follower_name,
+            flip=False,
+            skip_in_production=False,
+            prod_rotation_angle=0,
+            prod_rotation_axis=(1, 0, 0),
+            color=(1.0, 0.7, 0.8),
+        )
 
-    # motor, plate = create_motor_with_mount()
+    lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
 
-    # motor_part = motor.leader
-    # motor_part = motor_part.fuse(motor.get_follower_part_by_name("axle"))
+    endcap = create_idler_endcap(lower_axis_profile)
 
-    # parts.add(
-    #     motor_part,
-    #     "x_axis_motor",
-    #     flip=False,
-    #     skip_in_production=True,
-    # )
+    parts.add(
+        endcap.get_follower_part_by_name("idler"),
+        "x_axis_idler_endcap_right_idler",
+        flip=False,
+        skip_in_production=True,
+        prod_rotation_angle=90,
+        prod_rotation_axis=(1, 0, 0),
+        color=(0.8, 0.8, 0.8),
+    )
 
-    # plate = translate(0, 0, 4)(plate)
-    # parts.add(plate, "x_axis_motor_mount_plate", flip=False, skip_in_production=True)
+    parts.add(
+        endcap.get_follower_part_by_name("endcap_box"),
+        "x_axis_idler_endcap_right_box",
+        flip=False,
+        skip_in_production=False,
+        prod_rotation_angle=90,
+        prod_rotation_axis=(0, 1, 0),
+        color=(0.1, 0.4, 0.9),
+    )
+
+    parts.add(
+        endcap.get_non_production_part_by_name("axle"),
+        "x_axis_idler_endcap_right_axle",
+        flip=False,
+        skip_in_production=True,
+        color=(0.0, 0.9, 0.0),
+    )
 
     # Arrange and export
     arrange_and_export(
