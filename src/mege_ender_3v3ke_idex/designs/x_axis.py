@@ -201,6 +201,14 @@ idler_screw_size = "M3"
 idler_screw_head_clearance = 0.3
 mount_flange_screw_hole_inset = 10
 
+idler_cage_back_wall = 4
+idler_cage_wall = 2
+idler_cage_top_bottom_thickness = 4
+idler_cage_overlength = 6
+idler_cage_clearance = 0.5
+idler_cage_extra_screw_length = 6
+idler_cage_idler_tooth_count = 20
+
 axis_holder_width = mount_plate_connector_length
 axis_holder_depth = ExtrusionProfileType.PROFILE_2020.grid_pitch_mm + flange_depth
 axis_holder_thickness = 6
@@ -753,6 +761,185 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
     )
 
 
+def create_idler_cage(
+    cage_back_wall,
+    cage_wall,
+    cage_top_bottom_thickness,
+    cage_overlength,
+    idler_tooth_count,
+    idler_clearance,
+    add_tensioner=False,
+    tensioner_screw_size="M3",
+    tensioner_screw_length=30,
+    axle_screw_length=None,
+):
+    """Create a printable idler cage with visual idler and axle screw."""
+
+    idler = create_gt2_idler(num_teeth=idler_tooth_count)
+    idler_size = get_bounding_box_size(idler)
+
+    base_length = (
+        idler_size[0]
+        + cage_overlength
+        + cage_wall
+        + cage_back_wall
+        + 2 * idler_clearance
+    )
+    base_width = idler_size[1] + 2 * cage_wall + 2 * idler_clearance
+    base_thickness = cage_top_bottom_thickness
+    wall_height = idler_size[2] + 2 * idler_clearance + cage_top_bottom_thickness
+
+    # Offset so the idler hugs the thin wall (belt clearance) and leaves room for tensioner on the thick wall
+    x_offset = (cage_wall - cage_back_wall - cage_overlength) / 2
+    base_z_offset = -(idler_size[2] / 2 + idler_clearance + base_thickness / 2)
+    top_z_offset = idler_size[2] / 2 + idler_clearance + base_thickness / 2
+
+    base = create_box(base_length, base_width, base_thickness)
+    base = align(base, idler, Alignment.CENTER)
+    base = translate(x_offset, 0, base_z_offset)(base)
+
+    back_wall = create_box(cage_back_wall, base_width, wall_height)
+    back_wall = align(back_wall, base, Alignment.CENTER, axes=[1])
+    back_wall = align(back_wall, base, Alignment.LEFT)
+    back_wall = align(back_wall, base, Alignment.STACK_TOP)
+
+    walls = PartCollector()
+    side_wall_length = max(cage_overlength, 0)
+    if side_wall_length > 0:
+        side_wall = create_box(side_wall_length, cage_wall, wall_height)
+        side_wall = align(side_wall, base, Alignment.STACK_TOP)
+        side_wall = align(side_wall, back_wall, Alignment.STACK_RIGHT)
+        side_wall = align(side_wall, base, Alignment.BACK)
+        walls = walls.fuse(side_wall)
+
+        side_wall_2 = align(side_wall, base, Alignment.FRONT)
+        walls = walls.fuse(side_wall_2)
+
+    front_wall_width = idler_size[1] - 2 * idler_clearance
+    if front_wall_width > 0:
+        front_wall = create_box(
+            cage_wall,
+            front_wall_width,
+            wall_height,
+        )
+
+        front_wall = align(front_wall, base, Alignment.CENTER, axes=[1])
+        front_wall = align(front_wall, base, Alignment.STACK_TOP)
+        front_wall = align(front_wall, base, Alignment.RIGHT)
+        walls = walls.fuse(front_wall)
+
+    top_plate = create_box(base_length, base_width, base_thickness)
+    top_plate = align(top_plate, idler, Alignment.CENTER)
+    top_plate = translate(x_offset, 0, top_z_offset)(top_plate)
+
+    cage = PartCollector()
+    cage = cage.fuse(base)
+    cage = cage.fuse(back_wall)
+    cage = cage.fuse(walls)
+    cage = cage.fuse(top_plate)
+
+    axle_cutter_radius = (
+        MScrew.from_size(axle_screw_size).clearance_hole_normal / 2
+        + idler_mount_axle_clearance
+    )
+    axle_cutter = create_cylinder(axle_cutter_radius, BIG_THING)
+    axle_cutter = align(axle_cutter, idler, Alignment.CENTER)
+    cage = cage.cut(axle_cutter)
+
+    head_cutter = create_cylinder(
+        MScrew.from_size(axle_screw_size).cylinder_head_diameter / 2
+        + idler_screw_head_clearance,
+        MScrew.from_size(axle_screw_size).cylinder_head_height
+        + 2 * idler_screw_head_clearance,
+    )
+    head_cutter = align(head_cutter, idler, Alignment.CENTER)
+    head_cutter = align(head_cutter, cage, Alignment.TOP)
+    cage = cage.cut(head_cutter)
+
+    thread_inset_cutter = create_cylinder(
+        m_screws_table[axle_screw_size]["thread_inset_hole_diameter"] / 2
+        + inset_cutter_hole_slack,
+        m_screws_table[axle_screw_size]["thread_inset_length"]
+        + inset_cutter_hole_slack,
+    )
+    thread_inset_cutter = align(
+        thread_inset_cutter, idler, Alignment.CENTER, axes=[0, 1]
+    )
+    thread_inset_cutter = align(thread_inset_cutter, cage, Alignment.BOTTOM)
+    cage = cage.cut(thread_inset_cutter)
+
+    if axle_screw_length is None:
+        axle_screw_length = (
+            idler_size[2]
+            + 2 * idler_clearance
+            + 2 * cage_top_bottom_thickness
+            - MScrew.from_size(axle_screw_size).cylinder_head_height
+        )
+    axle = create_cylinder_screw(axle_screw_size, length=axle_screw_length)
+    axle = align(axle, idler, Alignment.CENTER)
+    axle = align(axle, cage, Alignment.TOP)
+
+    retval = LeaderFollowersCuttersPart(
+        leader=cage,
+    )
+    retval.add_named_non_production_part(idler, "idler")
+    retval.add_named_non_production_part(axle, "axle")
+
+    if add_tensioner:
+        tensioner_clearance_radius = (
+            MScrew.from_size(tensioner_screw_size).clearance_hole_normal / 2
+        )
+        tensioner_inset_radius = (
+            m_screws_table[tensioner_screw_size]["thread_inset_hole_diameter"] / 2
+            + inset_cutter_hole_slack
+        )
+        tensioner_inset_length = min(
+            cage_back_wall,
+            m_screws_table[tensioner_screw_size]["thread_inset_length"]
+            + inset_cutter_hole_slack,
+        )
+
+        clearance_cutter = create_cylinder(
+            tensioner_clearance_radius,
+            cage_back_wall + 0.2,
+        )
+        clearance_cutter = rotate(90, axis=(0, 1, 0))(clearance_cutter)
+        clearance_cutter = align(
+            clearance_cutter, back_wall, Alignment.CENTER, axes=[1, 2]
+        )
+        clearance_cutter = align(clearance_cutter, back_wall, Alignment.RIGHT)
+
+        inset_cutter = create_cylinder(
+            tensioner_inset_radius,
+            tensioner_inset_length,
+        )
+        inset_cutter = rotate(90, axis=(0, 1, 0))(inset_cutter)
+        inset_cutter = align(inset_cutter, back_wall, Alignment.CENTER, axes=[1, 2])
+        inset_cutter = align(inset_cutter, back_wall, Alignment.RIGHT)
+
+        cage = cage.cut(clearance_cutter)
+        cage = cage.cut(inset_cutter)
+        retval.leader = cage
+
+        tensioner_screw = create_cylinder_screw(
+            tensioner_screw_size, length=tensioner_screw_length
+        )
+        tensioner_screw = rotate(90, axis=(0, 1, 0))(tensioner_screw)
+        tensioner_screw = rotate(180)(tensioner_screw)
+
+        tensioner_screw = align(
+            tensioner_screw, back_wall, Alignment.CENTER, axes=[1, 2]
+        )
+        tensioner_screw = align(tensioner_screw, back_wall, Alignment.RIGHT)
+        retval.add_named_non_production_part(tensioner_screw, "tensioner_screw")
+
+    # Place the cage on the build plate for convenient exporting
+    drop_to_bed = idler_size[2] / 2 + idler_clearance + cage_top_bottom_thickness
+    retval = translate(0, 0, drop_to_bed)(retval)
+
+    return retval
+
+
 def create_idler_endcap(profile, with_tensioner: bool = False):
     """Create an endcap for the idler side of the x-axis profile."""
 
@@ -1222,6 +1409,56 @@ def main():
         flip=False,
         skip_in_production=True,
         color=(0.0, 0.9, 0.0),
+    )
+
+    # Demo: elongated idler cage with thick back wall and tensioner screw
+    idler_for_demo = create_gt2_idler(num_teeth=idler_cage_idler_tooth_count)
+    idler_for_demo_size = get_bounding_box_size(idler_for_demo)
+    long_cage_overlength = 3 * idler_for_demo_size[0]  # ≈4x idler length total
+
+    idler_cage_demo = create_idler_cage(
+        cage_back_wall=9,
+        cage_wall=idler_cage_wall,
+        cage_top_bottom_thickness=idler_cage_top_bottom_thickness,
+        cage_overlength=long_cage_overlength,
+        idler_tooth_count=idler_cage_idler_tooth_count,
+        idler_clearance=idler_cage_clearance,
+        add_tensioner=True,
+        tensioner_screw_size="M3",
+        tensioner_screw_length=30,
+    )
+
+    idler_cage_demo = translate(150, 100, 0)(idler_cage_demo)
+
+    parts.add(
+        idler_cage_demo.leader,
+        "idler_cage_demo",
+        flip=False,
+        skip_in_production=False,
+        prod_rotation_angle=90,
+        prod_rotation_axis=(1, 0, 0),
+        color=(0.95, 0.82, 0.2),
+    )
+    parts.add(
+        idler_cage_demo.get_non_production_part_by_name("idler"),
+        "idler_cage_demo_idler",
+        flip=False,
+        skip_in_production=True,
+        color=(0.6, 0.6, 0.6),
+    )
+    parts.add(
+        idler_cage_demo.get_non_production_part_by_name("axle"),
+        "idler_cage_demo_axle",
+        flip=False,
+        skip_in_production=True,
+        color=(0.1, 0.7, 0.1),
+    )
+    parts.add(
+        idler_cage_demo.get_non_production_part_by_name("tensioner_screw"),
+        "idler_cage_demo_tensioner_screw",
+        flip=False,
+        skip_in_production=True,
+        color=(0.9, 0.4, 0.1),
     )
 
     # Arrange and export
