@@ -770,7 +770,7 @@ def create_idler_cage(
     cage_overlength,
     idler_tooth_count,
     idler_clearance,
-    add_tensioner=False,
+    with_tensioner=False,
     tensioner_screw_size="M3",
     tensioner_screw_length=30,
     axle_screw_length=None,
@@ -896,7 +896,7 @@ def create_idler_cage(
     retval.add_named_non_production_part(idler, "idler")
     retval.add_named_non_production_part(axle, "axle")
 
-    if add_tensioner:
+    if with_tensioner:
         tensioner_clearance_radius = (
             MScrew.from_size(tensioner_screw_size).clearance_hole_normal / 2
         )
@@ -915,17 +915,17 @@ def create_idler_cage(
             cage_back_wall + 0.2,
         )
         clearance_cutter = rotate(90, axis=(0, 1, 0))(clearance_cutter)
-        clearance_cutter = align(
-            clearance_cutter, back_wall, Alignment.CENTER, axes=[1, 2]
-        )
-        clearance_cutter = align(clearance_cutter, back_wall, Alignment.RIGHT)
+        clearance_cutter = align(clearance_cutter, idler, Alignment.CENTER, axes=[1, 2])
+        clearance_cutter = align(clearance_cutter, back_wall, Alignment.LEFT)
 
         inset_cutter = create_cylinder(
             tensioner_inset_radius,
             tensioner_inset_length,
         )
         inset_cutter = rotate(90, axis=(0, 1, 0))(inset_cutter)
-        inset_cutter = align(inset_cutter, back_wall, Alignment.CENTER, axes=[1, 2])
+        inset_cutter = align(
+            inset_cutter, clearance_cutter, Alignment.CENTER, axes=[1, 2]
+        )
         inset_cutter = align(inset_cutter, back_wall, Alignment.RIGHT)
 
         cage = cage.cut(clearance_cutter)
@@ -939,9 +939,12 @@ def create_idler_cage(
         tensioner_screw = rotate(180)(tensioner_screw)
 
         tensioner_screw = align(
-            tensioner_screw, back_wall, Alignment.CENTER, axes=[1, 2]
+            tensioner_screw, clearance_cutter, Alignment.CENTER, axes=[1, 2]
         )
-        tensioner_screw = align(tensioner_screw, back_wall, Alignment.RIGHT)
+        tensioner_screw = align(
+            tensioner_screw, idler, Alignment.STACK_LEFT, stack_gap=idler_clearance
+        )
+
         retval.add_named_non_production_part(tensioner_screw, "tensioner_screw")
 
     # Place the cage on the build plate for convenient exporting
@@ -953,9 +956,6 @@ def create_idler_cage(
 
 def create_idler_endcap(profile, with_tensioner: bool = False):
     """Create an idler endcap built around the idler cage (no tensioner version for now)."""
-
-    if with_tensioner:
-        raise NotImplementedError("Tensioned endcap to be added in a follow-up step.")
 
     profile_size = get_bounding_box_size(profile)
 
@@ -974,14 +974,16 @@ def create_idler_endcap(profile, with_tensioner: bool = False):
     ) / 2
 
     cage = create_idler_cage(
-        cage_back_wall=idler_cage_back_wall,
+        cage_back_wall=(
+            idler_cage_back_wall if not with_tensioner else 2 * idler_cage_back_wall
+        ),
         cage_wall=idler_cage_wall,
         cage_front_wall_thickness=endcap_wall + endcap_profile_overlap,
         cage_top_bottom_thickness=cage_bottom_top_thickness,
         cage_overlength=cage_overlength,
         idler_tooth_count=endcap_idler_tooth_count,
         idler_clearance=endcap_idler_clearance,
-        add_tensioner=False,
+        with_tensioner=with_tensioner,
         axle_screw_length=endcap_axle_screw_length,
         belt_clearance=endcap_belt_clearance,
         cage_width_override=profile_size[1] + 2 * endcap_wall + 2 * endcap_clearance,
@@ -1008,6 +1010,10 @@ def create_idler_endcap(profile, with_tensioner: bool = False):
 
     axle_part = cage.get_non_production_part_by_name("axle")
     retval.add_named_non_production_part(axle_part, "axle")
+
+    if with_tensioner:
+        tensioner_screw_part = cage.get_non_production_part_by_name("tensioner_screw")
+        retval.add_named_non_production_part(tensioner_screw_part, "tensioner_screw")
 
     return retval
 
@@ -1298,7 +1304,9 @@ def main():
 
     lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
 
-    endcap = create_idler_endcap(lower_axis_profile, with_tensioner=False)
+    with_tensioner = True
+
+    endcap = create_idler_endcap(lower_axis_profile, with_tensioner=with_tensioner)
 
     parts.add(
         endcap.get_follower_part_by_name("idler"),
@@ -1328,6 +1336,15 @@ def main():
         color=(0.0, 0.9, 0.0),
     )
 
+    if with_tensioner:
+        parts.add(
+            endcap.get_non_production_part_by_name("tensioner_screw"),
+            "endcap_tensioner_screw",
+            flip=False,
+            skip_in_production=True,
+            color=(0.9, 0.4, 0.1),
+        )
+
     # Demo: elongated idler cage with thick back wall and tensioner screw
     idler_for_demo = create_gt2_idler(num_teeth=idler_cage_idler_tooth_count)
     idler_for_demo_size = get_bounding_box_size(idler_for_demo)
@@ -1340,7 +1357,7 @@ def main():
         cage_overlength=long_cage_overlength,
         idler_tooth_count=idler_cage_idler_tooth_count,
         idler_clearance=idler_cage_clearance,
-        add_tensioner=True,
+        with_tensioner=True,
         tensioner_screw_size="M3",
         tensioner_screw_length=30,
     )
