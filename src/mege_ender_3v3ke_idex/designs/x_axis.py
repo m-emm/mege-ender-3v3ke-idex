@@ -240,7 +240,7 @@ inset_cutter_hole_slack = 0.3
 endcap_tensioner_length = 25
 endcap_tensioner_slit_width = 0.4
 endcap_idler_clearance = 1.5
-endcap_belt_clearance = 2.0
+endcap_belt_clearance = 2.6
 
 
 def create_z_axis():
@@ -963,16 +963,28 @@ def create_idler_endcap(profile, with_tensioner: bool = False):
     idler_size = get_bounding_box_size(idler)
 
     target_cage_length = 1.3 * (idler_size[0] + 2 * endcap_clearance)
+    if with_tensioner:
+        target_cage_length += endcap_tensioner_length
     cage_overlength = target_cage_length - idler_size[0]
 
-    cage_bottom_top_thickness = (
-        profile_size[2]
-        + 2 * endcap_wall
-        + 2 * endcap_clearance
-        - idler_size[2]
-        - 2 * endcap_idler_clearance
-    ) / 2
+    if with_tensioner:
+        cage_bottom_top_thickness = (
+            profile_size[2] - idler_size[2] - 2 * endcap_idler_clearance
+        ) / 2
 
+    else:
+        cage_bottom_top_thickness = (
+            profile_size[2]
+            + 2 * endcap_wall
+            + 2 * endcap_clearance
+            - idler_size[2]
+            - 2 * endcap_idler_clearance
+        ) / 2
+
+    if with_tensioner:
+        cage_width_override = profile_size[1]
+    else:
+        cage_width_override = profile_size[1] + 2 * endcap_wall + 2 * endcap_clearance
     cage = create_idler_cage(
         cage_back_wall=(
             idler_cage_back_wall if not with_tensioner else 2 * idler_cage_back_wall
@@ -986,7 +998,7 @@ def create_idler_endcap(profile, with_tensioner: bool = False):
         with_tensioner=with_tensioner,
         axle_screw_length=endcap_axle_screw_length,
         belt_clearance=endcap_belt_clearance,
-        cage_width_override=profile_size[1] + 2 * endcap_wall + 2 * endcap_clearance,
+        cage_width_override=cage_width_override,
     )
 
     cage = align(cage, profile, Alignment.CENTER)
