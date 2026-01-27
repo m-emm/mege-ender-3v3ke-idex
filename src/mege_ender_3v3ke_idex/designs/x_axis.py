@@ -239,6 +239,8 @@ endcap_axle_screw_size = "M3"
 inset_cutter_hole_slack = 0.3
 endcap_tensioner_length = 25
 endcap_tensioner_slit_width = 0.4
+endcap_idler_clearance = 1.5
+endcap_belt_clearance = 2.0
 
 
 def create_z_axis():
@@ -772,25 +774,34 @@ def create_idler_cage(
     tensioner_screw_size="M3",
     tensioner_screw_length=30,
     axle_screw_length=None,
+    belt_clearance=1.0,
+    cage_width_override=None,
+    cage_front_wall_thickness=None,
 ):
     """Create a printable idler cage with visual idler and axle screw."""
 
     idler = create_gt2_idler(num_teeth=idler_tooth_count)
     idler_size = get_bounding_box_size(idler)
 
+    effective_front_wall_thickness = (
+        cage_wall if cage_front_wall_thickness is None else cage_front_wall_thickness
+    )
+
     base_length = (
         idler_size[0]
         + cage_overlength
-        + cage_wall
+        + effective_front_wall_thickness
         + cage_back_wall
         + 2 * idler_clearance
     )
-    base_width = idler_size[1] + 2 * cage_wall + 2 * idler_clearance
+    base_width = max(
+        idler_size[1] + 2 * cage_wall + 2 * idler_clearance, cage_width_override or 0
+    )
     base_thickness = cage_top_bottom_thickness
     wall_height = idler_size[2] + 2 * idler_clearance + cage_top_bottom_thickness
 
     # Offset so the idler hugs the thin wall (belt clearance) and leaves room for tensioner on the thick wall
-    x_offset = (cage_wall - cage_back_wall - cage_overlength) / 2
+    x_offset = (effective_front_wall_thickness - cage_back_wall - cage_overlength) / 2
     base_z_offset = -(idler_size[2] / 2 + idler_clearance + base_thickness / 2)
     top_z_offset = idler_size[2] / 2 + idler_clearance + base_thickness / 2
 
@@ -815,10 +826,10 @@ def create_idler_cage(
         side_wall_2 = align(side_wall, base, Alignment.FRONT)
         walls = walls.fuse(side_wall_2)
 
-    front_wall_width = idler_size[1] - 2 * idler_clearance
+    front_wall_width = idler_size[1] - 2 * belt_clearance
     if front_wall_width > 0:
         front_wall = create_box(
-            cage_wall,
+            effective_front_wall_thickness,
             front_wall_width,
             wall_height,
         )
@@ -941,156 +952,62 @@ def create_idler_cage(
 
 
 def create_idler_endcap(profile, with_tensioner: bool = False):
-    """Create an endcap for the idler side of the x-axis profile."""
+    """Create an idler endcap built around the idler cage (no tensioner version for now)."""
 
-    idler = create_gt2_idler(num_teeth=endcap_idler_tooth_count)
-
-    idler_size = get_bounding_box_size(idler)
+    if with_tensioner:
+        raise NotImplementedError("Tensioned endcap to be added in a follow-up step.")
 
     profile_size = get_bounding_box_size(profile)
 
-    endcap_length = idler_size[0] * 1.5 + endcap_profile_overlap
-    if with_tensioner:
-        endcap_length += endcap_tensioner_length
+    idler = create_gt2_idler(num_teeth=endcap_idler_tooth_count)
+    idler_size = get_bounding_box_size(idler)
 
-    endcap_width = profile_size[1] + 2 * endcap_wall + 2 * endcap_clearance
+    target_cage_length = 1.3 * (idler_size[0] + 2 * endcap_clearance)
+    cage_overlength = target_cage_length - idler_size[0]
 
-    endcap_box = create_filleted_box(
-        endcap_length,
-        endcap_width,
-        profile_size[2] + 2 * endcap_wall + 2 * endcap_clearance,
-        endcap_fillet_radius,
-        no_fillets_at=[Alignment.LEFT],
+    cage_bottom_top_thickness = (
+        profile_size[2]
+        + 2 * endcap_wall
+        + 2 * endcap_clearance
+        - idler_size[2]
+        - 2 * endcap_idler_clearance
+    ) / 2
+
+    cage = create_idler_cage(
+        cage_back_wall=idler_cage_back_wall,
+        cage_wall=idler_cage_wall,
+        cage_front_wall_thickness=endcap_wall + endcap_profile_overlap,
+        cage_top_bottom_thickness=cage_bottom_top_thickness,
+        cage_overlength=cage_overlength,
+        idler_tooth_count=endcap_idler_tooth_count,
+        idler_clearance=endcap_idler_clearance,
+        add_tensioner=False,
+        axle_screw_length=endcap_axle_screw_length,
+        belt_clearance=endcap_belt_clearance,
+        cage_width_override=profile_size[1] + 2 * endcap_wall + 2 * endcap_clearance,
     )
 
-    endcap_idler_space_cutter = create_box(
-        idler_size[0] + 2 * endcap_clearance,
-        BIG_THING,
-        idler_size[2] + 2 * endcap_clearance,
-    )
-    endcap_idler_space_cutter = align(
-        endcap_idler_space_cutter, endcap_box, Alignment.CENTER
-    )
-    endcap_idler_space_cutter = align(
-        endcap_idler_space_cutter, endcap_box, Alignment.LEFT
-    )
-
-    endcap_idler_space_cutter = translate(endcap_profile_overlap, 0, 0)(
-        endcap_idler_space_cutter
-    )
-
-    endcap_box = endcap_box.cut(endcap_idler_space_cutter)
+    cage = align(cage, profile, Alignment.CENTER)
+    cage = align(cage, profile, Alignment.STACK_LEFT, stack_gap=-endcap_profile_overlap)
 
     profile_cutter = create_box(
-        endcap_profile_overlap * 4,
-        profile_size[1] + 2 * endcap_profile_clearance,
-        profile_size[2] + 2 * endcap_profile_clearance,
+        BIG_THING,
+        profile_size[1] + endcap_profile_clearance,
+        profile_size[2] + endcap_profile_clearance,
     )
+    profile_cutter = align(profile_cutter, profile, Alignment.CENTER)
+    profile_cutter = align(profile_cutter, profile, Alignment.LEFT)
 
-    profile_cutter = align(profile_cutter, endcap_box, Alignment.CENTER)
-    profile_cutter = align(
-        profile_cutter,
-        endcap_box,
-        Alignment.STACK_LEFT,
-        stack_gap=-endcap_profile_overlap,
-    )
+    cage = cage.cut(profile_cutter)
 
-    endcap_core = create_box(
-        idler_size[0] + 2 * endcap_clearance,
-        idler_size[1] + 2 * endcap_clearance,
-        idler_size[2] + 2 * endcap_clearance,
-    )
-    endcap_core = align(endcap_core, profile_cutter, Alignment.CENTER)
-    endcap_core = align(endcap_core, profile_cutter, Alignment.STACK_RIGHT)
+    retval = LeaderFollowersCuttersPart(leader=cage.leader)
+    retval.add_named_follower(cage.leader, "endcap_box")
 
-    endcap_box = align(endcap_box, endcap_core, Alignment.CENTER)
-    endcap_box = align(endcap_box, endcap_core, Alignment.LEFT)
-    endcap_box = translate(-endcap_profile_overlap, 0, 0)(endcap_box)
+    idler_part = cage.get_non_production_part_by_name("idler")
+    retval.add_named_follower(idler_part, "idler")
 
-    endcap_box = endcap_box.cut(profile_cutter)
-
-    idler = align(idler, endcap_core, Alignment.CENTER)
-
-    axle = create_cylinder_screw(
-        endcap_axle_screw_size, length=endcap_axle_screw_length
-    )
-
-    axle = align(axle, idler, Alignment.CENTER)
-    axle = align(axle, endcap_box, Alignment.TOP)
-
-    axle_cutter = create_cylinder(
-        MScrew.from_size(endcap_axle_screw_size).clearance_hole_normal / 2, BIG_THING
-    )
-    axle_cutter = align(axle_cutter, idler, Alignment.CENTER)
-    endcap_box = endcap_box.cut(axle_cutter)
-
-    head_cutter = create_cylinder(
-        MScrew.from_size(endcap_axle_screw_size).cylinder_head_diameter / 2
-        + idler_screw_head_clearance,
-        MScrew.from_size(endcap_axle_screw_size).cylinder_head_height
-        + 2 * idler_screw_head_clearance,
-    )
-
-    head_cutter = align(head_cutter, idler, Alignment.CENTER)
-    head_cutter = align(head_cutter, endcap_box, Alignment.TOP)
-    endcap_box = endcap_box.cut(head_cutter)
-
-    thread_inset_cutter = create_cylinder(
-        m_screws_table[endcap_axle_screw_size]["thread_inset_hole_diameter"] / 2
-        + inset_cutter_hole_slack,
-        m_screws_table[endcap_axle_screw_size]["thread_inset_length"]
-        + inset_cutter_hole_slack,
-    )
-
-    thread_inset_cutter = align(
-        thread_inset_cutter, axle, Alignment.CENTER, axes=[0, 1]
-    )
-    thread_inset_cutter = align(thread_inset_cutter, endcap_box, Alignment.BOTTOM)
-    endcap_box = endcap_box.cut(thread_inset_cutter)
-
-    if with_tensioner:
-        tensioner_cutter = create_box(
-            endcap_tensioner_length,
-            endcap_width - 2 * endcap_wall,
-            BIG_THING,
-        )
-        tensioner_cutter = align(tensioner_cutter, endcap_box, Alignment.CENTER)
-        tensioner_cutter = align(tensioner_cutter, endcap_box, Alignment.RIGHT)
-        tensioner_cutter = translate(-endcap_wall, 0, 0)(tensioner_cutter)
-
-        endcap_box = endcap_box.cut(tensioner_cutter)
-
-        for alignment in (Alignment.STACK_FRONT, Alignment.STACK_BACK):
-            slit_cutter = create_box(
-                endcap_length - endcap_profile_overlap - endcap_wall,
-                endcap_tensioner_slit_width,
-                BIG_THING,
-            )
-            slit_cutter = align(slit_cutter, tensioner_cutter, Alignment.CENTER)
-            slit_cutter = align(slit_cutter, tensioner_cutter, alignment)
-
-            slit_cutter = align(slit_cutter, tensioner_cutter, Alignment.RIGHT)
-
-            endcap_box = endcap_box.cut(slit_cutter)
-        left_slit_cutter = create_box(
-            endcap_tensioner_slit_width,
-            endcap_width - 2 * endcap_wall,
-            BIG_THING,
-        )
-        left_slit_cutter = align(left_slit_cutter, tensioner_cutter, Alignment.CENTER)
-        left_slit_cutter = align(left_slit_cutter, endcap_box, Alignment.LEFT)
-        left_slit_cutter = translate(endcap_profile_overlap, 0, 0)(left_slit_cutter)
-        endcap_box = endcap_box.cut(left_slit_cutter)
-
-    retval = LeaderFollowersCuttersPart(
-        leader=endcap_core,
-    )
-    retval.add_named_follower(endcap_box, "endcap_box")
-    retval.add_named_follower(idler, "idler")
-    retval.add_named_non_production_part(axle, "axle")
-
-    retval = align(retval, profile, Alignment.CENTER)
-    retval = align(retval, profile, Alignment.STACK_RIGHT, stack_gap=endcap_clearance)
+    axle_part = cage.get_non_production_part_by_name("axle")
+    retval.add_named_non_production_part(axle_part, "axle")
 
     return retval
 
@@ -1381,7 +1298,7 @@ def main():
 
     lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
 
-    endcap = create_idler_endcap(lower_axis_profile, with_tensioner=True)
+    endcap = create_idler_endcap(lower_axis_profile, with_tensioner=False)
 
     parts.add(
         endcap.get_follower_part_by_name("idler"),
