@@ -1,0 +1,12 @@
+[Unit]
+Description=Turn on SSH if /boot/ssh is present (modified to always enable)
+ConditionPathExists=/boot/firmware
+After=regenerate_ssh_host_keys.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "systemctl enable --now ssh"
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

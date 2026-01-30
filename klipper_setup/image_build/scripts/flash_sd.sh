@@ -92,6 +92,12 @@ if [ "${IMG_PATH}" = "latest" ]; then
   echo "Using newest image: ${IMG_PATH}"
 fi
 
+# Resolve symlink to actual file path
+if [ -L "${IMG_PATH}" ]; then
+  IMG_PATH="$(readlink -f "${IMG_PATH}" 2>/dev/null || readlink "${IMG_PATH}")"
+  echo "Resolved symlink to: ${IMG_PATH}"
+fi
+
 if [ -z "${IMG_PATH}" ] || [ -z "${DISK_DEV}" ]; then
   echo "Usage: $0 <image.img|image.img.xz|image.zip> </dev/diskN>" >&2
   echo "       $0 </dev/diskN>   # auto-pick newest from ${OUT_DIR}" >&2
@@ -138,12 +144,6 @@ if ! command -v diskutil >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ "${DRY_RUN:-0}" = "1" ]; then
-  echo "DRY_RUN=1 set; will not unmount or write." >&2
-  echo "Would flash ${IMG_PATH} -> ${DISK_DEV/disk/rdisk}" >&2
-  exit 0
-fi
-
 INFO="$(diskutil info "${DISK_DEV}" 2>/dev/null || true)"
 if [ -z "${INFO}" ]; then
   echo "Disk ${DISK_DEV} not found." >&2
@@ -182,37 +182,62 @@ if [ "${EXTERNAL}" != "External" ]; then
   exit 1
 fi
 
-echo "Unmounting ${DISK_DEV}"
-diskutil unmountDisk "${DISK_DEV}"
-
 RAW_DEV="${DISK_DEV/disk/rdisk}"
 
-echo "Flashing ${IMG_PATH} -> ${RAW_DEV} (sudo dd ...)"
+if [ "${DRY_RUN:-0}" != "1" ]; then
+  echo "Unmounting ${DISK_DEV}"
+  diskutil unmountDisk "${DISK_DEV}"
+else
+  echo "[DRY_RUN] Would unmount ${DISK_DEV}"
+fi
+
+echo "Flashing ${IMG_PATH} -> ${RAW_DEV}"
 if [[ "${IMG_PATH}" == *.xz ]]; then
   TOTAL_BYTES="$(xz_uncompressed_bytes "${IMG_PATH}")"
   echo "Total to write: $(format_bytes "${TOTAL_BYTES}") (${TOTAL_BYTES:-unknown} bytes)"
-  xz -dc "${IMG_PATH}" | sudo dd of="${RAW_DEV}" bs=4m status=progress
+  if [ "${DRY_RUN:-0}" != "1" ]; then
+    xz -dc "${IMG_PATH}" | sudo dd of="${RAW_DEV}" bs=4m status=progress
+  else
+    echo "[DRY_RUN] Would execute: xz -dc <image> | sudo dd of=${RAW_DEV} bs=4m"
+  fi
 elif [[ "${IMG_PATH}" == *.zip ]]; then
   echo "Extracting from zip member: ${IMG_IN_ZIP}"
   if [[ "${IMG_IN_ZIP}" == *.xz ]]; then
     # The member is compressed; without extracting it we generally can't read the uncompressed size cheaply.
     echo "Total to write: unknown (zip member is compressed: ${IMG_IN_ZIP})"
-    unzip -p "${IMG_PATH}" "${IMG_IN_ZIP}" | xz -dc | sudo dd of="${RAW_DEV}" bs=4m status=progress
+    if [ "${DRY_RUN:-0}" != "1" ]; then
+      unzip -p "${IMG_PATH}" "${IMG_IN_ZIP}" | xz -dc | sudo dd of="${RAW_DEV}" bs=4m status=progress
+    else
+      echo "[DRY_RUN] Would execute: unzip -p <zip> ${IMG_IN_ZIP} | xz -dc | sudo dd of=${RAW_DEV} bs=4m"
+    fi
   else
     TOTAL_BYTES="$(zip_member_uncompressed_bytes "${IMG_PATH}" "${IMG_IN_ZIP}")"
     echo "Total to write: $(format_bytes "${TOTAL_BYTES}") (${TOTAL_BYTES:-unknown} bytes)"
-    unzip -p "${IMG_PATH}" "${IMG_IN_ZIP}" | sudo dd of="${RAW_DEV}" bs=4m status=progress
+    if [ "${DRY_RUN:-0}" != "1" ]; then
+      unzip -p "${IMG_PATH}" "${IMG_IN_ZIP}" | sudo dd of="${RAW_DEV}" bs=4m status=progress
+    else
+      echo "[DRY_RUN] Would execute: unzip -p <zip> ${IMG_IN_ZIP} | sudo dd of=${RAW_DEV} bs=4m"
+    fi
   fi
 else
   TOTAL_BYTES="$(bytes_of_file "${IMG_PATH}")"
   echo "Total to write: $(format_bytes "${TOTAL_BYTES}") (${TOTAL_BYTES:-unknown} bytes)"
-  sudo dd if="${IMG_PATH}" of="${RAW_DEV}" bs=4m status=progress
+  if [ "${DRY_RUN:-0}" != "1" ]; then
+    sudo dd if="${IMG_PATH}" of="${RAW_DEV}" bs=4m status=progress
+  else
+    echo "[DRY_RUN] Would execute: sudo dd if=${IMG_PATH} of=${RAW_DEV} bs=4m"
+  fi
 fi
 
-sync
-echo "Flash complete."
+if [ "${DRY_RUN:-0}" != "1" ]; then
+  sync
+  echo "Flash complete."
+else
+  echo "[DRY_RUN] Flash operation skipped. All validations passed."
+  exit 0
+fi
 
-if [ "${VERIFY:-0}" = "1" ]; then
+if [ "${VERIFY:-0}" = "1" ] && [ "${DRY_RUN:-0}" != "1" ]; then
   echo "Verifying first 16MB..."
   if [[ "${IMG_PATH}" == *.xz ]]; then
     sudo xz -dc "${IMG_PATH}" | head -c $((16*1024*1024)) | \

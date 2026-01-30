@@ -62,8 +62,21 @@ if [ -n "${LOCALE:-}" ]; then
 fi
 
 echo "Applying SSH hardening and keys"
+# Ensure openssh-server is installed
+apt-get update
+apt-get install -y --no-install-recommends openssh-server
+
+rm -f /etc/ssh/ssh_host_* || true
+ssh-keygen -A
+ls -l /etc/ssh/ssh_host_* || true
+
 install -d /etc/ssh/sshd_config.d
 install -m 644 "${FILES_DIR}/sshd_hardening.conf" /etc/ssh/sshd_config.d/99-klipper-hardening.conf
+# Disable sshswitch.service completely - we manage SSH directly
+systemctl disable sshswitch.service || true
+systemctl mask sshswitch.service || true
+# Enable and unmask SSH service directly
+systemctl unmask ssh || true
 systemctl enable ssh
 install -d -m 700 "${USER_HOME}/.ssh"
 install -m 600 "${FILES_DIR}/authorized_keys" "${USER_HOME}/.ssh/authorized_keys"
@@ -109,7 +122,6 @@ echo "Ensuring user groups"
 usermod -a -G tty,dialout "${USERNAME}" || true
 
 echo "Installing OS runtime dependencies"
-apt-get update
 apt-get install -y --no-install-recommends libsodium23
 
 echo "Setting up Klipper (venv + checkout)"

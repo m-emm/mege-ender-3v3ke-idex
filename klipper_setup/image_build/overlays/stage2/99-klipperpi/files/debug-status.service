@@ -1,0 +1,12 @@
+[Unit]
+Description=Generate debug status page for remote troubleshooting
+After=network-online.target ssh.service nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/debug-status.sh
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target

@@ -9,6 +9,13 @@ PIGEN_DIR="${IMAGE_BUILD_DIR}/pi-gen"
 
 timestamp() { date -u +"%Y-%m-%dT%H-%M-%SZ"; }
 
+# Setup logging
+mkdir -p "${OUT_DIR}"
+LOG_FILE="${OUT_DIR}/build-$(timestamp).log"
+exec > >(tee -a "${LOG_FILE}") 2>&1
+echo "==> Build started at $(date)"
+echo "==> Logging to ${LOG_FILE}"
+
 echo "==> Step 1: ensure pi-gen checkout"
 "${SCRIPT_DIR}/setup_pigen_submodule.sh"
 
@@ -94,3 +101,5 @@ ln -sfn "$(basename "${MANIFEST_PATH}")" "${OUT_DIR}/manifest.txt"
 ln -sfn "$(basename "${MANIFEST_PATH}")" "${OUT_DIR}/latest.manifest.txt"
 
 echo "Build complete. Artifacts in ${OUT_DIR}"
+echo "==> Build finished at $(date)"
+echo "==> Full log available at ${LOG_FILE}"
