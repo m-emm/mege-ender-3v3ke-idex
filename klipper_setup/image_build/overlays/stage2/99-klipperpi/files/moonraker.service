@@ -1,0 +1,16 @@
+[Unit]
+Description=Moonraker API Service
+After=network-online.target klipper.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=/home/__USER__/printer_data
+ExecStart=/opt/moonraker-env/bin/python /opt/moonraker/moonraker/moonraker.py -c /home/__USER__/printer_data/config/moonraker.conf
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

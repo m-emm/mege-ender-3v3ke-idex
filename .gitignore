@@ -71,3 +71,9 @@ output
 runs
 build
 resources/tmp/
+klipper_setup/image_build/out/
+klipper_setup/image_build/secrets/
+klipper_setup/image_build/pi-gen/
+klipper_setup/image_build/pi-gen/deploy/
+klipper_setup/image_build/pi-gen/work/
+klipper_setup/image_build/pi-gen/export-image/

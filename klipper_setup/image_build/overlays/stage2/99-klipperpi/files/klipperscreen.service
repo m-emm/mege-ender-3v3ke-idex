@@ -1,0 +1,18 @@
+[Unit]
+Description=KlipperScreen UI
+After=systemd-user-sessions.service network.target
+Wants=network-online.target
+
+[Service]
+User=__USER__
+Group=__USER__
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/__USER__/.Xauthority
+Environment=XDG_RUNTIME_DIR=/tmp/xdg-runtime-__USER__
+ExecStartPre=/usr/bin/install -d -o __USER__ -g __USER__ /tmp/xdg-runtime-__USER__
+ExecStart=/usr/bin/xinit /usr/local/bin/klipperscreen-xsession -- :0 vt1 -nocursor -s 0 -dpms
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
