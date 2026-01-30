@@ -129,6 +129,12 @@ apt-get install -y --no-install-recommends \
   pkg-config \
   ninja-build
 
+# Install X and lightdm for KlipperScreen
+apt-get install -y --no-install-recommends \
+  lightdm \
+  xserver-xorg \
+  xinit
+
 # --- Hostname / hosts --------------------------------------------------------
 
 log "Setting hostname to ${HOSTNAME}"
@@ -218,6 +224,58 @@ require_file "${FILES_DIR}/Xwrapper.config"
 install -d -m 0755 /etc/X11
 install -m 0644 "${FILES_DIR}/Xwrapper.config" /etc/X11/Xwrapper.config
 
+# Configure X to use DPI-1 output correctly
+log "Configuring X for DPI display"
+install -d -m 0755 /etc/X11/xorg.conf.d
+cat >/etc/X11/xorg.conf.d/99-dpi-display.conf <<'EOF'
+Section "Monitor"
+    Identifier "DPI-1"
+    Option "Primary" "true"
+EndSection
+
+Section "Screen"
+    Identifier "Default Screen"
+    Monitor "DPI-1"
+    DefaultDepth 24
+    SubSection "Display"
+        Depth 24
+        Modes "800x480"
+    EndSubSection
+EndSection
+EOF
+
+# --- LightDM auto-login ------------------------------------------------------
+
+log "Configuring LightDM auto-login for ${USERNAME}"
+install -d -m 0755 /etc/lightdm/lightdm.conf.d
+cat >/etc/lightdm/lightdm.conf.d/50-klipperpi.conf <<EOF
+[Seat:*]
+autologin-user=${USERNAME}
+autologin-user-timeout=0
+user-session=klipper
+EOF
+
+# --- Klipper X session desktop entry -----------------------------------------
+
+log "Installing Klipper xsession desktop entry"
+install -d -m 0755 /usr/share/xsessions
+cat >/usr/share/xsessions/klipper.desktop <<'EOF'
+[Desktop Entry]
+Name=Klipper
+Comment=Start KlipperScreen
+Exec=/usr/local/bin/klipperscreen-xsession
+Type=Application
+EOF
+
+# --- LightDM enablement and graphical target ---------------------------------
+
+log "Setting default display manager and graphical target"
+echo "/usr/sbin/lightdm" > /etc/X11/default-display-manager
+systemctl_enable_safe lightdm
+
+# Deterministic graphical target (works reliably in chroot)
+ln -sf /lib/systemd/system/graphical.target /etc/systemd/system/default.target
+
 # --- Nginx for Mainsail ------------------------------------------------------
 
 log "Configuring nginx for Mainsail"
@@ -234,24 +292,22 @@ log "Installing systemd units"
 
 require_file "${FILES_DIR}/klipper.service"
 require_file "${FILES_DIR}/moonraker.service"
-require_file "${FILES_DIR}/klipperscreen.service"
+# Note: klipperscreen.service not needed - LightDM handles KlipperScreen
 
 install -m 0644 "${FILES_DIR}/klipper.service" /etc/systemd/system/klipper.service
 install -m 0644 "${FILES_DIR}/moonraker.service" /etc/systemd/system/moonraker.service
-install -m 0644 "${FILES_DIR}/klipperscreen.service" /etc/systemd/system/klipperscreen.service
 
 # Replace __USER__ placeholder
 sed -i "s/__USER__/${USERNAME}/g" \
   /etc/systemd/system/klipper.service \
-  /etc/systemd/system/moonraker.service \
-  /etc/systemd/system/klipperscreen.service
+  /etc/systemd/system/moonraker.service
 
 systemctl daemon-reload
 
 # Enable units (after they exist)
 systemctl_enable_safe klipper
 systemctl_enable_safe moonraker
-systemctl_enable_safe klipperscreen
+# Note: klipperscreen runs via LightDM, not as a systemd service
 
 # --- Display overlay (optional) ---------------------------------------------
 
@@ -260,6 +316,25 @@ if [ -f "${BOOT_CONFIG}" ]; then
   require_file "${FILES_DIR}/pitft43.conf"
   if ! grep -q "gt911_btt_tft43_dip" "${BOOT_CONFIG}"; then
     cat "${FILES_DIR}/pitft43.conf" >> "${BOOT_CONFIG}"
+  fi
+  
+  # Disable DSI display auto-detection to prevent dual-screen setup
+  # (DPI display is configured manually in pitft43.conf)
+  if grep -q "^display_auto_detect=1" "${BOOT_CONFIG}"; then
+    sed -i 's/^display_auto_detect=1/display_auto_detect=0/' "${BOOT_CONFIG}"
+    log "Disabled display_auto_detect to prevent dual-screen configuration"
+  fi
+  
+  # Disable vc4-kms-v3d and replace with vc4-fkms-v3d for DPI compatibility
+  if grep -q "^dtoverlay=vc4-kms-v3d" "${BOOT_CONFIG}"; then
+    sed -i 's/^dtoverlay=vc4-kms-v3d/dtoverlay=vc4-fkms-v3d/' "${BOOT_CONFIG}"
+    log "Switched to vc4-fkms-v3d overlay for DPI display compatibility"
+  fi
+  
+  # Enable disable_fw_kms_setup if not already set
+  if ! grep -q "^disable_fw_kms_setup=1" "${BOOT_CONFIG}"; then
+    sed -i '/dtoverlay=vc4-kms-v3d/a disable_fw_kms_setup=1' "${BOOT_CONFIG}"
+    log "Enabled disable_fw_kms_setup for DPI display"
   fi
 
   mkdir -p /boot/firmware/overlays /boot/overlays
@@ -343,14 +418,24 @@ fi
 
 chown -R "${USERNAME}:${USERNAME}" /opt/klipperscreen
 
-cat >/usr/local/bin/klipperscreen-xsession <<EOF
+log "Creating klipperscreen-xsession launcher"
+cat >/usr/local/bin/klipperscreen-xsession <<'EOF'
 #!/usr/bin/env bash
+set -e
 export DISPLAY=:0
-export XAUTHORITY=${USER_HOME}/.Xauthority
-export XDG_RUNTIME_DIR=/tmp/xdg-runtime-${USERNAME}
-mkdir -p "\${XDG_RUNTIME_DIR}"
-chown ${USERNAME}:${USERNAME} "\${XDG_RUNTIME_DIR}"
-exec /opt/klipperscreen/.venv/bin/python /opt/klipperscreen/KlipperScreen.py
+export XDG_SESSION_TYPE=x11
+export GDK_BACKEND=x11
+
+# Disable X screensaver and DPMS (ignore errors if X not ready yet)
+xset s off 2>/dev/null || true
+xset s noblank 2>/dev/null || true
+xset -dpms 2>/dev/null || true
+
+# Start lightweight window manager for fullscreen handling
+matchbox-window-manager -use_titlebar no &
+
+# KlipperScreen uses screen.py as the main entry point
+exec /opt/klipperscreen/.venv/bin/python /opt/klipperscreen/screen.py
 EOF
 chmod 0755 /usr/local/bin/klipperscreen-xsession
 
@@ -365,7 +450,7 @@ systemctl_enable_safe avahi-daemon
 systemctl_enable_safe nginx
 systemctl_enable_safe klipper
 systemctl_enable_safe moonraker
-systemctl_enable_safe klipperscreen
+# Note: klipperscreen runs via LightDM session, not as a systemd service
 
 # Optional: record build info for later debugging
 log "Writing build info"

@@ -18,12 +18,14 @@ ninja-build
 avahi-daemon
 network-manager
 nginx
+dbus
+lightdm
 xserver-xorg
 xserver-xorg-input-libinput
-xserver-xorg-input-evdev
 xinit
 x11-xserver-utils
 xserver-xorg-legacy
+matchbox-window-manager
 fonts-dejavu
 fonts-noto
 fonts-noto-cjk

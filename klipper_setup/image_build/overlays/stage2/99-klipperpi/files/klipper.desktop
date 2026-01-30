@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=Klipper
+Comment=Start KlipperScreen
+Exec=/usr/local/bin/klipperscreen-xsession
+Type=Application
