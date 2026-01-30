@@ -22,6 +22,43 @@ if [ ! -d "${PIGEN_DIR}" ]; then
   exit 1
 fi
 
+# pi-gen arm64 currently ships a Debian sources file that references
+# /usr/share/keyrings/debian-archive-keyring.pgp. On modern Debian/Bookworm images
+# the keyring file is typically .gpg, and apt will fail with NO_PUBKEY if the
+# referenced keyring path doesn't exist.
+DEBIAN_SOURCES_FILE="${PIGEN_DIR}/stage0/00-configure-apt/files/debian.sources"
+if [ -f "${DEBIAN_SOURCES_FILE}" ] && grep -q "debian-archive-keyring\.pgp" "${DEBIAN_SOURCES_FILE}"; then
+  echo "Patching pi-gen debian.sources Signed-By to use debian-archive-keyring.gpg"
+  perl -pi -e 's/debian-archive-keyring\.pgp/debian-archive-keyring.gpg/g' "${DEBIAN_SOURCES_FILE}"
+fi
+
+# Some Raspberry Pi OS meta-packages have been removed/renamed over time. When they
+# disappear, pi-gen fails hard with "Unable to locate package". We don't rely on
+# them for this Klipper image, so strip them from the upstream package list.
+STAGE2_SYS_TWEAKS_PACKAGES_FILE="${PIGEN_DIR}/stage2/01-sys-tweaks/00-packages"
+if [ -f "${STAGE2_SYS_TWEAKS_PACKAGES_FILE}" ]; then
+  if grep -Eq '\brpi-swap\b|\brpi-loop-utils\b|\brpi-usb-gadget\b' "${STAGE2_SYS_TWEAKS_PACKAGES_FILE}"; then
+    echo "Removing unavailable packages from pi-gen stage2 sys-tweaks package list"
+    perl -pi -e 's/\brpi-swap\b//g; s/\brpi-loop-utils\b//g; s/\brpi-usb-gadget\b//g; s/[ \t]{2,}/ /g; s/^[ \t]+//g; s/[ \t]+$//g' "${STAGE2_SYS_TWEAKS_PACKAGES_FILE}"
+  fi
+fi
+
+STAGE2_SYS_TWEAKS_RUN_FILE="${PIGEN_DIR}/stage2/01-sys-tweaks/01-run.sh"
+if [ -f "${STAGE2_SYS_TWEAKS_RUN_FILE}" ]; then
+  if grep -q "systemctl enable rpi-resize" "${STAGE2_SYS_TWEAKS_RUN_FILE}" && ! grep -q "rpi-resize\.service not present" "${STAGE2_SYS_TWEAKS_RUN_FILE}"; then
+    echo "Patching pi-gen stage2 sys-tweaks to skip missing rpi-resize.service"
+    perl -0777 -pi -e 's/\n(\s*)systemctl enable rpi-resize\n/\n$1if [ -f \/lib\/systemd\/system\/rpi-resize.service ] || [ -f \/etc\/systemd\/system\/rpi-resize.service ]; then\n$1  systemctl enable rpi-resize\n$1else\n$1  echo "rpi-resize.service not present; skipping"\n$1fi\n/sm' "${STAGE2_SYS_TWEAKS_RUN_FILE}"
+  fi
+fi
+
+# Cloud-init isn't needed for this image, and the Raspberry Pi OS package providing
+# pi-gen's cloud-init modifications has disappeared in newer repos.
+CLOUD_INIT_STAGE_DIR="${PIGEN_DIR}/stage2/04-cloud-init"
+if [ -d "${CLOUD_INIT_STAGE_DIR}" ] && [ ! -f "${CLOUD_INIT_STAGE_DIR}/SKIP" ]; then
+  echo "Skipping pi-gen stage2/04-cloud-init"
+  touch "${CLOUD_INIT_STAGE_DIR}/SKIP"
+fi
+
 if [ ! -f "${BUILD_ENV_SRC}" ]; then
   echo "Missing ${BUILD_ENV_SRC}. Please create it from the template in the concept doc." >&2
   exit 1
