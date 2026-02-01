@@ -77,3 +77,6 @@ klipper_setup/image_build/pi-gen/
 klipper_setup/image_build/pi-gen/deploy/
 klipper_setup/image_build/pi-gen/work/
 klipper_setup/image_build/pi-gen/export-image/
+
+# RP2040 firmware build artifacts
+klipper_setup/rp2040_firmware/klipper/
