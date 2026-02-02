@@ -257,7 +257,7 @@ endcap_mount_fillet_radius = 2
 
 
 jig_width = 6
-jig_thickness = 1.5
+jig_thickness = 3.6
 
 
 def create_z_axis():
@@ -295,7 +295,7 @@ def create_mgn12h_carriage():
 
     width = 27
     length = 45.4
-    screw_hole_pitch = 20
+    screw_hole_pitch = 25
     height = 10
     screw_hole_depth = 3.5
     screw_hole_diameter = 3
@@ -325,7 +325,7 @@ def create_mgn12h_rail(length_mm: float):
 
     width = 12
     height = 8.5
-    hole_pitch = 40
+    hole_pitch = 25
     top_hole_diameter = 8
     bottom_hole_diameter = 4.5
     top_hole_depth = 4.5
@@ -1434,7 +1434,26 @@ def create_rail_drill_jig():
 
     rail = create_mgn12h_rail(length_mm=rail_length)
 
-    jig = create_box(axis_profile_length, jig_width, jig_thickness)
+    jig = create_box(axis_profile_length, jig_width / 2, jig_thickness)
+    jig_ear = create_right_triangle(
+        jig_thickness,
+        jig_thickness,
+        axis_profile_length,
+        extrusion_direction=(1, 0, 0),
+        a_normal=((0, -1, 0)),
+        b_normal=(0, 0, 1),
+    )
+    jig_ear = align(jig_ear, jig, Alignment.CENTER)
+    jig_ear = align(jig_ear, jig, Alignment.STACK_BACK)
+
+    jig = jig.fuse(jig_ear)
+    jig_cutter = create_box(axis_profile_length, BIG_THING, BIG_THING)
+    jig_cutter = align(jig_cutter, jig, Alignment.CENTER)
+    jig_cutter = align(jig_cutter, jig, Alignment.STACK_BACK, stack_gap=-2)
+    jig = jig.cut(jig_cutter)
+
+    jig_mirrored = mirror(normal=(0, 1, 0), point=(0, 0, 0))(jig)
+    jig = jig.fuse(jig_mirrored)
 
     jig = align(jig, rail, Alignment.CENTER)
     jig = align(jig, rail, Alignment.BOTTOM)
@@ -1499,7 +1518,7 @@ def main():
             skip_in_production=True,
         )
 
-    for side in []: # [Alignment.LEFT]:  #  , Alignment.RIGHT]:
+    for side in []:  # [Alignment.LEFT]:  #  , Alignment.RIGHT]:
         mount_plate_name = f"mount_plate_{side.name.lower()}"
         color_by_side = {
             Alignment.LEFT: (0.8, 0.8, 1.0),
@@ -1543,7 +1562,7 @@ def main():
     half_jig, _ = cut_in_two(jig)
 
     if PROD:
-        half_jig = rotate(45)(half_jig  )
+        half_jig = rotate(45)(half_jig)
 
     parts.add(
         half_jig,
@@ -1553,7 +1572,7 @@ def main():
         color=(0.5, 0.5, 0.5),
     )
 
-    for side in []: # Alignment.LEFT, Alignment.RIGHT]:
+    for side in []:  # Alignment.LEFT, Alignment.RIGHT]:
         with_tensioner = side == Alignment.RIGHT
 
         side_str = side.name.lower()
