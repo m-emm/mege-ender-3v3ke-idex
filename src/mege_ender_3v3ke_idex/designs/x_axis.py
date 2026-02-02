@@ -13,6 +13,7 @@ import os
 from collections import defaultdict
 from pathlib import Path
 
+import numpy as np
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (
     PROCESS_DATA_PETGCF_04_HS,
 )
@@ -237,16 +238,17 @@ endcap_profile_clearance = 0.2
 endcap_axle_screw_length = 25
 endcap_axle_screw_size = "M3"
 inset_cutter_hole_slack = 0.3
-endcap_tensioner_length = 18
+endcap_tensioner_length = 16
 endcap_tensioner_slit_width = 0.4
 endcap_idler_clearance = 1.5
 endcap_belt_clearance = 2.6
 endcap_tensioner_cage_clearance = 0.3
-endcap_tensioner_travel = 15
+endcap_tensioner_travel = 14
 endcap_belt_width = 6
 endcap_profile_groove_depth = 8
 endcap_tensioner_screw_size = "M3"
 endcap_tensioner_cage_back_wall = 8
+endcap_outer_box_back_wall = 4
 
 
 selected_parts = [
@@ -778,7 +780,7 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
 def create_idler_cage(
     cage_back_wall,
     cage_wall,
-    cage_top_bottom_thickness,
+    cage_height,
     cage_overlength,
     idler_tooth_count,
     idler_clearance,
@@ -809,8 +811,8 @@ def create_idler_cage(
     base_width = max(
         idler_size[1] + 2 * cage_wall + 2 * idler_clearance, cage_width_override or 0
     )
-    base_thickness = cage_top_bottom_thickness
-    wall_height = idler_size[2] + 2 * idler_clearance + cage_top_bottom_thickness
+    base_thickness = (cage_height - idler_size[2] - 2 * idler_clearance) / 2
+    wall_height = cage_height - 2 * base_thickness
 
     # Offset so the idler hugs the thin wall (belt clearance) and leaves room for tensioner on the thick wall
     x_offset = (effective_front_wall_thickness - cage_back_wall - cage_overlength) / 2
@@ -893,10 +895,7 @@ def create_idler_cage(
 
     if axle_screw_length is None:
         axle_screw_length = (
-            idler_size[2]
-            + 2 * idler_clearance
-            + 2 * cage_top_bottom_thickness
-            - MScrew.from_size(axle_screw_size).cylinder_head_height
+            cage_height - MScrew.from_size(axle_screw_size).cylinder_head_height
         )
     axle = create_cylinder_screw(axle_screw_size, length=axle_screw_length)
     axle = align(axle, idler, Alignment.CENTER)
@@ -962,7 +961,13 @@ def create_idler_cage(
         retval.add_named_non_production_part(tensioner_screw, "tensioner_screw")
 
     # Place the cage on the build plate for convenient exporting
-    drop_to_bed = idler_size[2] / 2 + idler_clearance + cage_top_bottom_thickness
+
+    retval_bbox = get_bounding_box(retval)
+    retval_bbox_size = get_bounding_box_size(retval)
+    assert np.allclose(
+        retval_bbox_size[2], cage_height
+    ), f"Expected cage height {cage_height}, got {retval_bbox_size[2]}"
+    drop_to_bed = -(retval_bbox[0][2])
     retval = translate(0, 0, drop_to_bed)(retval)
 
     return retval
@@ -983,33 +988,25 @@ def create_idler_endcap(
         target_cage_length += endcap_tensioner_length
     cage_overlength = target_cage_length - idler_size[0]
 
-    if with_tensioner:
-        cage_bottom_top_thickness = (
-            profile_size[2] - idler_size[2] - 2 * endcap_idler_clearance
-        ) / 2
-
-    else:
-        cage_bottom_top_thickness = (
-            profile_size[2]
-            + 2 * endcap_wall
-            + 2 * endcap_clearance
-            - idler_size[2]
-            - 2 * endcap_idler_clearance
-        ) / 2
+    outer_box_height = (
+        profile_size[2] + 2 * endcap_wall + 2 * endcap_tensioner_cage_clearance
+    )
 
     if with_tensioner:
         cage_width_override = profile_size[1]
     else:
         cage_width_override = profile_size[1] + 2 * endcap_wall + 2 * endcap_clearance
+
     cage = create_idler_cage(
         cage_back_wall=(
             idler_cage_back_wall
             if not with_tensioner
             else endcap_tensioner_cage_back_wall
         ),
+        cage_front_wall_thickness=endcap_wall
+        + (endcap_profile_overlap if not with_tensioner else 0),
         cage_wall=idler_cage_wall,
-        cage_front_wall_thickness=endcap_wall + endcap_profile_overlap,
-        cage_top_bottom_thickness=cage_bottom_top_thickness,
+        cage_height=outer_box_height,
         cage_overlength=cage_overlength,
         idler_tooth_count=endcap_idler_tooth_count,
         idler_clearance=endcap_idler_clearance,
@@ -1024,7 +1021,18 @@ def create_idler_endcap(
         cage = rotate(180)(cage)
 
     cage = align(cage, profile, Alignment.CENTER)
-    cage = align(cage, profile, side.stack_alignment, stack_gap=-endcap_profile_overlap)
+
+    if with_tensioner:
+        cage = align(
+            cage,
+            profile,
+            side.stack_alignment,
+            stack_gap=endcap_wall + endcap_tensioner_cage_clearance,
+        )
+    else:
+        cage = align(
+            cage, profile, side.stack_alignment, stack_gap=-endcap_profile_overlap
+        )
 
     profile_cutter = create_box(
         BIG_THING,
@@ -1037,23 +1045,18 @@ def create_idler_endcap(
     cage = cage.cut(profile_cutter)
 
     if with_tensioner:
-        cage = translate(
-            -side.sign * endcap_wall
-            + (endcap_profile_overlap + endcap_tensioner_cage_clearance),
-            0,
-            0,
-        )(cage)
 
         cage_size = get_bounding_box_size(cage)
 
         outer_box = create_box(
             cage_size[0]
             + endcap_profile_overlap
-            + 2 * endcap_wall
+            + endcap_wall
+            + endcap_outer_box_back_wall
             + 2 * endcap_tensioner_cage_clearance
             + endcap_tensioner_travel,
             cage_size[1] + 2 * endcap_wall,
-            cage_size[2] + 2 * endcap_wall + 2 * endcap_tensioner_cage_clearance,
+            outer_box_height,
         )
 
         outer_box = align(outer_box, cage, Alignment.CENTER)
@@ -1402,7 +1405,7 @@ def main():
             skip_in_production=True,
         )
 
-    for side in [Alignment.RIGHT]:  #  , Alignment.LEFT]:
+    for side in [Alignment.LEFT]:  #  , Alignment.RIGHT]:
         mount_plate_name = f"mount_plate_{side.name.lower()}"
         color_by_side = {
             Alignment.LEFT: (0.8, 0.8, 1.0),
