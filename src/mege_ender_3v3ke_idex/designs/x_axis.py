@@ -249,12 +249,9 @@ endcap_profile_groove_depth = 8
 endcap_tensioner_screw_size = "M3"
 endcap_tensioner_cage_back_wall = 8
 endcap_outer_box_back_wall = 4
+endcap_mount_screw_size = "M5"
 
-
-selected_parts = [
-    "x_axis_idler_endcap_right_box",
-    "x_axis_idler_endcap_right_tensioner_cage",
-]
+endcap_mount_fillet_radius = 2
 
 
 def create_z_axis():
@@ -1044,6 +1041,22 @@ def create_idler_endcap(
 
     cage = cage.cut(profile_cutter)
 
+    mount_eye = create_filleted_box(
+        profile_size[1] * 0.6,
+        profile_size[1],
+        endcap_wall,
+        fillet_radius=endcap_mount_fillet_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, side],
+    )
+    mont_eye_screw_hole_cutter = create_cylinder(
+        MScrew.from_size(endcap_mount_screw_size).clearance_hole_normal / 2,
+        BIG_THING,
+    )
+    mont_eye_screw_hole_cutter = align(
+        mont_eye_screw_hole_cutter, mount_eye, Alignment.CENTER
+    )
+    mount_eye = mount_eye.cut(mont_eye_screw_hole_cutter)
+
     if with_tensioner:
 
         cage_size = get_bounding_box_size(cage)
@@ -1130,13 +1143,40 @@ def create_idler_endcap(
         )
         outer_box = outer_box.cut(tensioner_screw_hole_cutter)
 
+        mount_eye = align(
+            mount_eye,
+            outer_box,
+            Alignment.CENTER,
+        )
+        mount_eye = align(mount_eye, outer_box, Alignment.BOTTOM)
+
+        mount_eye = align(
+            mount_eye,
+            outer_box,
+            side.opposite.stack_alignment,
+        )
+        outer_box = outer_box.fuse(mount_eye)
+
         retval = LeaderFollowersCuttersPart(leader=outer_box)
-        retval.add_named_follower(cage.leader, "endcap_box")
+        retval.add_named_follower(cage.leader, "endcap_idler_cage")
 
     else:
+        mount_eye = align(
+            mount_eye,
+            cage,
+            Alignment.CENTER,
+        )
+        mount_eye = align(mount_eye, cage, Alignment.BOTTOM)
+
+        mount_eye = align(
+            mount_eye,
+            cage,
+            side.opposite.stack_alignment,
+        )
+        cage = cage.fuse(mount_eye)
 
         retval = LeaderFollowersCuttersPart(leader=cage.leader)
-        retval.add_named_follower(cage.leader, "endcap_box")
+        retval.add_named_follower(cage.leader, "endcap_idler_cage")
 
     idler_part = cage.get_non_production_part_by_name("idler")
     retval.add_named_follower(idler_part, "idler")
@@ -1420,7 +1460,7 @@ def main():
             mount_plate_of_side,
             next_part_name,
             flip=False,
-            skip_in_production=not next_part_name in selected_parts,
+            skip_in_production=False,
             prod_rotation_angle=90,
             prod_rotation_axis=(1, 0, 0),
             color=color_by_side[side],
@@ -1433,7 +1473,7 @@ def main():
             x_axis.get_follower_part_by_name(follower_name),
             follower_name,
             flip=False,
-            skip_in_production=not next_part_name in selected_parts,
+            skip_in_production=False,
             prod_rotation_angle=0,
             prod_rotation_axis=(1, 0, 0),
             color=(1.0, 0.7, 0.8),
@@ -1466,12 +1506,12 @@ def main():
             color=(0.0, 0.9, 0.0),
         )
 
-        next_part_name = f"x_axis_idler_endcap_{side_str}_box"
+        next_part_name = f"x_axis_endcap_idler_cage_{side_str}"
         parts.add(
-            endcap.get_follower_part_by_name("endcap_box"),
+            endcap.get_follower_part_by_name("endcap_idler_cage"),
             next_part_name,
             flip=False,
-            skip_in_production=not next_part_name in selected_parts,
+            skip_in_production=False,
             prod_rotation_angle=side.sign * 90,
             prod_rotation_axis=(0, 1, 0),
             color=(0.8, 0.4, 0.6),
@@ -1492,7 +1532,7 @@ def main():
                 endcap.leader,
                 next_part_name,
                 flip=False,
-                skip_in_production=not next_part_name in selected_parts,
+                skip_in_production=False,
                 prod_rotation_angle=0,
                 prod_rotation_axis=(1, 0, 0),
                 color=(0.9, 0.6, 0.1),
