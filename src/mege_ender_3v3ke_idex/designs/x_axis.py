@@ -157,6 +157,8 @@ rail_length = 450
 axis_profile_pitch = 40
 motor_y_offset = 11
 
+rail_mount_screw_size = "M3"
+
 z_axis_guide_distance = 256
 
 motor_x_offset = z_axis_guide_distance / 2 - 60
@@ -254,6 +256,10 @@ endcap_mount_screw_size = "M5"
 endcap_mount_fillet_radius = 2
 
 
+jig_width = 6
+jig_thickness = 1.5
+
+
 def create_z_axis():
     """Create the x_axis part."""
 
@@ -329,6 +335,7 @@ def create_mgn12h_rail(length_mm: float):
     num_holes = int(length_mm // hole_pitch)
 
     holes = PartCollector()
+    holes_list = []
     for i in range(num_holes):
         x = i * hole_pitch
         # Top hole
@@ -336,18 +343,26 @@ def create_mgn12h_rail(length_mm: float):
         top_hole = translate(x, 0, 0)(top_hole)
         top_hole = align(top_hole, rail, Alignment.TOP)
 
+        current_hole = top_hole
         holes = holes.fuse(top_hole)
         # Bottom hole
         bottom_hole = create_cylinder(bottom_hole_diameter / 2, height)
         bottom_hole = translate(x, 0, 0)(bottom_hole)
         bottom_hole = align(bottom_hole, rail, Alignment.BOTTOM)
         holes = holes.fuse(bottom_hole)
+        current_hole = current_hole.fuse(bottom_hole)
+        holes_list.append(current_hole)
 
-    holes = align(holes, rail, Alignment.CENTER, axes=[0, 1])
+    holes_align_translation = align_translation(
+        holes, rail, Alignment.CENTER, axes=[0, 1]
+    )
 
-    rail = rail.cut(holes)
+    holes_aligned = [holes_align_translation(hole) for hole in holes_list]
 
-    return rail
+    for hole in holes_aligned:
+        rail = rail.cut(hole)
+
+    return LeaderFollowersCuttersPart(rail, cutters=holes_aligned)
 
 
 def create_motor_with_mount():
@@ -1204,18 +1219,21 @@ def create_x_axis():
     lower_axis_profile = rotate(90, axis=(0, 1, 0))(lower_axis_profile)
 
     top_axis_profile = translate(0, 0, axis_profile_pitch)(lower_axis_profile)
-    axis_profiles = lower_axis_profile.fuse(top_axis_profile)
+    axis_frame = lower_axis_profile.fuse(top_axis_profile)
 
     rail = create_mgn12h_rail(length_mm=rail_length)
 
-    carriages = PartCollector()
+    carriages = []
     for i in [-1, 1]:
         carriage = create_mgn12h_carriage()
         carriage = align(carriage, rail, Alignment.CENTER, axes=[0, 1])
         carriage = translate(i * 50, 0, 0)(carriage)
-        carriages = carriages.fuse(carriage)
+        carriages.append(carriage)
 
-    rail_with_carriages = rail.fuse(carriages)
+    for i, carriage in enumerate(carriages):
+        rail.add_named_follower(carriage, f"carriage_{i+1}")
+    rail_with_carriages = rail
+
     rail_with_carriages = align(
         rail_with_carriages, lower_axis_profile, Alignment.CENTER, axes=[0, 1]
     )
@@ -1223,14 +1241,25 @@ def create_x_axis():
         rail_with_carriages, lower_axis_profile, Alignment.STACK_TOP
     )
 
-    axis_frame = axis_profiles.fuse(rail_with_carriages)
-
     mount_plates = PartCollector()
     mount_shields = PartCollector()
     mount_plate_connectors = PartCollector()
 
     non_production_parts = [axis_frame]
     non_production_names = ["axis_frame"]
+
+    non_production_parts.append(
+        rail_with_carriages.get_follower_part_by_name("carriage_1")
+    )
+    non_production_names.append("carriage_1")
+
+    non_production_parts.append(
+        rail_with_carriages.get_follower_part_by_name("carriage_2")
+    )
+    non_production_names.append("carriage_2")
+
+    non_production_parts.append(rail_with_carriages.leader)
+    non_production_names.append("rail")
 
     non_production_parts.append(lower_axis_profile)
     non_production_names.append("lower_axis_profile")
@@ -1401,6 +1430,28 @@ def create_x_axis():
     return retval
 
 
+def create_rail_drill_jig():
+
+    rail = create_mgn12h_rail(length_mm=rail_length)
+
+    jig = create_box(axis_profile_length, jig_width, jig_thickness)
+
+    jig = align(jig, rail, Alignment.CENTER)
+    jig = align(jig, rail, Alignment.BOTTOM)
+
+    for cutter in rail.cutters:
+        current_drill = create_cylinder(
+            MScrew.from_size(rail_mount_screw_size).clearance_hole_close / 2,
+            jig_thickness + 5,
+        )
+        current_drill = align(current_drill, cutter, Alignment.CENTER)
+        current_drill = align(current_drill, jig, Alignment.CENTER, axes=[2])
+
+        jig = jig.cut(current_drill)
+
+    return jig
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
@@ -1421,6 +1472,9 @@ def main():
         "motor_right",
         "link_screw_1",
         "link_screw_2",
+        "rail",
+        "carriage_1",
+        "carriage_2",
     ]:
         parts.add(
             x_axis.get_non_production_part_by_name(name),
@@ -1445,7 +1499,7 @@ def main():
             skip_in_production=True,
         )
 
-    for side in [Alignment.LEFT]:  #  , Alignment.RIGHT]:
+    for side in []: # [Alignment.LEFT]:  #  , Alignment.RIGHT]:
         mount_plate_name = f"mount_plate_{side.name.lower()}"
         color_by_side = {
             Alignment.LEFT: (0.8, 0.8, 1.0),
@@ -1481,7 +1535,25 @@ def main():
 
     lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
 
-    for side in [Alignment.LEFT, Alignment.RIGHT]:
+    jig = create_rail_drill_jig()
+    jig = align(jig, lower_axis_profile, Alignment.CENTER)
+    jig = align(jig, lower_axis_profile, Alignment.TOP)
+    jig = translate(0, 0, 26)(jig)
+
+    half_jig, _ = cut_in_two(jig)
+
+    if PROD:
+        half_jig = rotate(45)(half_jig  )
+
+    parts.add(
+        half_jig,
+        "x_axis_rail_drill_jig",
+        flip=False,
+        skip_in_production=False,
+        color=(0.5, 0.5, 0.5),
+    )
+
+    for side in []: # Alignment.LEFT, Alignment.RIGHT]:
         with_tensioner = side == Alignment.RIGHT
 
         side_str = side.name.lower()
