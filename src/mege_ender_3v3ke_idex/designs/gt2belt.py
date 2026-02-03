@@ -7,11 +7,15 @@ Usage:
     cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/gt2belt.py
 """
 
+import copy
 import logging
 import math
 import os
 
 import numpy as np
+from mege_3devops.process_data.mender3.process_data_04_high_speed import (
+    PROCESS_DATA_PETGCF_04_HS,
+)
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -19,14 +23,8 @@ _logger = logging.getLogger(__name__)
 # Production mode from environment variable
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
-# Optional slicer process overrides
-PROCESS_DATA = {
-    "filament": "FilamentPLAMegeMaster",
-    "process_overrides": {
-        "nozzle_diameter": "0.6",
-        "layer_height": "0.2",
-    },
-}
+
+PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_04_HS)
 
 BIG_THING = 500
 gt2_pitch = 2.0
@@ -39,7 +37,7 @@ gt2_tooth_side_radius = 1.0
 gt2_tooth_inter_radius = 0.15
 
 
-def creae_gt2_tooth():
+def create_gt2_tooth():
 
     tooth_half = create_cylinder(gt2_tooth_radius, gt2_width, angle=180)
     tooth_half = rotate(90)(tooth_half)
@@ -127,7 +125,7 @@ def create_gt2belt(num_teeth=100):
     retval = PartCollector()
 
     for i in range(num_teeth):
-        tooth = creae_gt2_tooth()
+        tooth = create_gt2_tooth()
         tooth = translate(i * gt2_pitch, 0, 0)(tooth)
         retval = retval.fuse(tooth)
 
@@ -150,6 +148,104 @@ def create_gt2belt_loop(num_teeth=20, angle=180):
     )
 
 
+def create_gt_belt_clamp(
+    base_thicknness,
+    clamp_thickness,
+    belt_width=6,
+    clamp_length=20,
+    screw_size="M3",
+    screw_hole_border=1,
+    teeth_clearance=0.1,
+    clamp_gap=0.3,
+    belt_clearance=0.1,
+    nut_cutter_slack=0.1,
+):
+    """Create a belt clamp with scew holes for the given belt width."""
+
+    screw_hole_diameter = MScrew.from_size(screw_size).clearance_hole_close
+    base_width = belt_width + 4 * screw_hole_border + 2 * screw_hole_diameter
+
+    base = create_box(clamp_length, base_width, base_thicknness)
+
+    clamp = create_box(clamp_length, base_width, clamp_thickness + gt2_thickness)
+
+    num_ripples = int(clamp_length / gt2_pitch)
+
+    ripple_cutters = PartCollector()
+    for i in range(num_ripples + 1):
+        ripple = create_gt2_tooth()
+        ripple = align(ripple, clamp, Alignment.CENTER)
+        ripple = align(ripple, clamp, Alignment.BOTTOM)
+        ripple = translate(i * gt2_pitch, 0, 0)(ripple)
+        for i in [-1, 0, 1]:
+            cutter = translate(i * teeth_clearance, 0, 0)(ripple)
+            ripple_cutters = ripple_cutters.fuse(cutter)
+
+    ripple_cutters = rotate(-90, axis=(1, 0, 0))(ripple_cutters)
+
+    ripple_cutters = align(ripple_cutters, clamp, Alignment.CENTER)
+    ripple_cutters = align(ripple_cutters, clamp, Alignment.BOTTOM)
+    clamp = clamp.cut(ripple_cutters)
+
+    clamp = align(clamp, base, Alignment.CENTER)
+    clamp = align(clamp, base, Alignment.STACK_TOP, stack_gap=teeth_clearance)
+
+    belt_guides = PartCollector()
+    belt_guides_cutters = PartCollector()
+    screw_hole_cutters = PartCollector()
+
+    for fb in [Alignment.FRONT, Alignment.BACK]:
+
+        belt_guide = create_box(
+            clamp_length,
+            base_width / 2 - belt_width / 2 - belt_clearance,
+            gt2_thickness,
+        )
+
+        belt_guide = align(belt_guide, base, Alignment.CENTER)
+        belt_guide = align(belt_guide, base, fb)
+        belt_guide = align(belt_guide, base, Alignment.STACK_TOP)
+        belt_guides = belt_guides.fuse(belt_guide)
+
+        belt_guide_cutter = create_box(
+            clamp_length,
+            base_width / 2 - belt_width / 2 + 2 * belt_clearance,
+            gt2_thickness + clamp_gap,
+        )
+
+        belt_guide_cutter = align(belt_guide_cutter, clamp, Alignment.CENTER)
+        belt_guide_cutter = align(belt_guide_cutter, clamp, fb)
+        belt_guide_cutter = align(belt_guide_cutter, clamp, Alignment.BOTTOM)
+        belt_guides_cutters = belt_guides_cutters.fuse(belt_guide_cutter)
+
+        for lr in [Alignment.LEFT, Alignment.RIGHT]:
+            screw_hole = create_cylinder(screw_hole_diameter / 2, BIG_THING)
+            screw_hole = align(screw_hole, base, Alignment.CENTER)
+            screw_hole = align(screw_hole, base, lr)
+            screw_hole = align(screw_hole, base, fb)
+            screw_hole = translate(
+                -lr.sign * screw_hole_border, -fb.sign * screw_hole_border, 0
+            )(screw_hole)
+
+            screw_hole_cutters = screw_hole_cutters.fuse(screw_hole)
+
+            nut_cutter = create_nut(screw_size, slack=nut_cutter_slack, no_hole=True)
+            nut_cutter = align(nut_cutter, screw_hole, Alignment.CENTER)
+            nut_cutter = align(nut_cutter, base, Alignment.BOTTOM)
+            screw_hole_cutters = screw_hole_cutters.fuse(nut_cutter)
+
+    base = base.fuse(belt_guides)
+    clamp = clamp.cut(belt_guides_cutters)
+
+    base = base.cut(screw_hole_cutters)
+    clamp = clamp.cut(screw_hole_cutters)
+
+    retval = LeaderFollowersCuttersPart(base)
+    retval.add_named_follower(clamp, "clamp")
+
+    return retval
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
@@ -160,7 +256,21 @@ def main():
     pulley = create_gt2_pulley(num_teeth=20, belt_width=gt2_width)
 
     pulley = translate(0, 50, 0)(pulley)
-    parts.add(pulley, "pulley_20t", flip=False)
+    parts.add(pulley, "pulley_20t", flip=False, skip_in_production=True)
+
+    clamp = create_gt_belt_clamp(
+        base_thicknness=4,
+        clamp_thickness=3,
+        belt_width=gt2_width,
+        clamp_length=30,
+        screw_size="M3",
+        screw_hole_border=1.9,
+        teeth_clearance=0.1,
+    )
+    clamp = translate(30, 50, 0)(clamp)
+
+    parts.add(clamp.leader, "belt_clamp_base", flip=False)
+    parts.add(clamp.get_follower_part_by_name("clamp"), "belt_clamp", flip=True)
 
     # Arrange and export
     arrange_and_export(

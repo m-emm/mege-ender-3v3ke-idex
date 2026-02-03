@@ -27,7 +27,11 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
-from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler, create_gt2_pulley
+from mege_ender_3v3ke_idex.designs.gt2belt import (
+    create_gt2_idler,
+    create_gt2_pulley,
+    create_gt_belt_clamp,
+)
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.simple import *
 
@@ -262,6 +266,16 @@ endcap_side_hole_boundary = 5
 jig_width = 6
 jig_thickness = 3.6
 
+tool_head_mount_carriage_mount_plate_thickness = 3
+tool_head_mount_carriage_mount_plate_fillet_radiuis = 1
+tool_head_mount_y_extension = 4
+
+tool_head_mount_belt_z_offset = 12
+
+tool_head_mount_base_plate_thickness = 3
+tool_head_mount_base_plate_height = 35
+tool_head_mount_base_plate_width = 30
+
 
 def create_z_axis():
     """Create the x_axis part."""
@@ -317,6 +331,8 @@ def create_mgn12h_carriage():
     holes = align(holes, carriage, Alignment.STACK_TOP, stack_gap=-screw_hole_depth)
 
     carriage = carriage.cut(holes)
+
+    carriage = LeaderFollowersCuttersPart(carriage, cutters=[holes])
 
     carriage = translate(0, 0, h1)(carriage)
 
@@ -1505,6 +1521,80 @@ def create_rail_drill_jig():
     return jig
 
 
+def create_tool_head_mount():
+
+    clamp = create_gt_belt_clamp(
+        base_thicknness=4,
+        clamp_thickness=tool_head_mount_base_plate_thickness + 0.4,
+        clamp_length=tool_head_mount_base_plate_width,
+        screw_size="M3",
+        screw_hole_border=1.9,
+        teeth_clearance=0.1,
+    )
+    clamp = rotate(90, axis=(1, 0, 0))(clamp)
+    clamp = rotate(180)(clamp)
+
+    carriage = create_mgn12h_carriage()
+    carriage_size = get_bounding_box_size(carriage)
+
+    carriage_mount_plate = create_filleted_box(
+        carriage_size[0],
+        carriage_size[1] + tool_head_mount_y_extension,
+        tool_head_mount_carriage_mount_plate_thickness,
+        fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radiuis,
+        no_fillets_at=[Alignment.BOTTOM],
+    )
+
+    carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.CENTER)
+    carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.STACK_TOP)
+    carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.BACK)
+    carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
+
+    clamp = align(clamp, carriage_mount_plate, Alignment.CENTER)
+    clamp = align(clamp, carriage_mount_plate, Alignment.FRONT)
+    clamp = align(clamp, carriage_mount_plate, Alignment.STACK_BOTTOM)
+
+    clamp = translate(0, 0, -tool_head_mount_belt_z_offset)(clamp)
+
+    mount_base_plate = create_box(
+        tool_head_mount_base_plate_width,
+        tool_head_mount_base_plate_thickness,
+        tool_head_mount_base_plate_height,
+    )
+
+    mount_base_plate = align(mount_base_plate, carriage_mount_plate, Alignment.CENTER)
+    mount_base_plate = align(
+        mount_base_plate, carriage_mount_plate, Alignment.STACK_BOTTOM
+    )
+    mount_base_plate = align(mount_base_plate, carriage_mount_plate, Alignment.FRONT)
+
+    clamp_align_translation = align_translation(
+        clamp.get_follower_part_by_name("clamp"), mount_base_plate, Alignment.BACK
+    )
+    clamp = clamp_align_translation(clamp)
+
+    clamp_size = get_bounding_box_size(clamp.get_follower_part_by_name("clamp"))
+    clamp_cutter = create_box(BIG_THING, clamp_size[1], clamp_size[2])
+    clamp_cutter = align(
+        clamp_cutter, clamp.get_follower_part_by_name("clamp"), Alignment.CENTER
+    )
+
+    mount_base_plate = mount_base_plate.cut(clamp_cutter)
+
+    tool_head_mount = carriage_mount_plate.fuse(
+        clamp.get_follower_part_by_name("clamp")
+    )
+    tool_head_mount = tool_head_mount.fuse(mount_base_plate)
+
+    tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
+    tool_head_mount.add_named_follower(clamp.leader, "belt_clamp_base")
+
+    return tool_head_mount
+
+    # parts.add(clamp.leader, "belt_clamp_base", flip=False)
+    # parts.add(clamp.get_follower_part_by_name("clamp"), "belt_clamp", flip=True)
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
@@ -1567,7 +1657,7 @@ def main():
             mount_plate_of_side,
             next_part_name,
             flip=False,
-            skip_in_production=True, # False,
+            skip_in_production=True,  # False,
             prod_rotation_angle=90,
             prod_rotation_axis=(1, 0, 0),
             color=color_by_side[side],
@@ -1580,7 +1670,7 @@ def main():
             x_axis.get_follower_part_by_name(follower_name),
             follower_name,
             flip=False,
-            skip_in_production=True , # False,
+            skip_in_production=True,  # False,
             prod_rotation_angle=0,
             prod_rotation_axis=(1, 0, 0),
             color=(1.0, 0.7, 0.8),
@@ -1636,7 +1726,7 @@ def main():
             endcap.get_follower_part_by_name("endcap_idler_cage"),
             next_part_name,
             flip=False,
-            skip_in_production=False,
+            skip_in_production=True,  # False,
             prod_rotation_angle=side.sign * 90,
             prod_rotation_axis=(0, 1, 0),
             color=(0.8, 0.4, 0.6),
@@ -1657,11 +1747,54 @@ def main():
                 endcap.leader,
                 next_part_name,
                 flip=False,
-                skip_in_production=False,
+                skip_in_production=True,  # False,
                 prod_rotation_angle=0,
                 prod_rotation_axis=(1, 0, 0),
                 color=(0.9, 0.6, 0.1),
             )
+
+    tool_head_mount = create_tool_head_mount()
+
+    carriage_1 = x_axis.get_non_production_part_by_name("carriage_1")
+
+    tool_head_mount = align(
+        tool_head_mount,
+        carriage_1,
+        Alignment.CENTER,
+    )
+    tool_head_mount = align(
+        tool_head_mount,
+        carriage_1,
+        Alignment.BACK,
+    )
+    tool_head_mount = align(
+        tool_head_mount,
+        carriage_1,
+        Alignment.TOP,
+    )
+    tool_head_mount = translate(0, 0, tool_head_mount_carriage_mount_plate_thickness)(
+        tool_head_mount
+    )
+
+    parts.add(
+        tool_head_mount,
+        "x_axis_tool_head_mount",
+        flip=False,
+        skip_in_production=False,
+        prod_rotation_angle=180,
+        prod_rotation_axis=(1, 0, 0),
+        color=(0.7, 0.7, 0.2),
+    )
+
+    parts.add(
+        tool_head_mount.get_follower_part_by_name("belt_clamp_base"),
+        "x_axis_tool_head_mount_clamp",
+        flip=False,
+        skip_in_production=False,
+        prod_rotation_angle=90,
+        prod_rotation_axis=(1, 0, 0),
+        color=(0.7, 0.7, 0.2),
+    )
 
     # Arrange and export
     arrange_and_export(
