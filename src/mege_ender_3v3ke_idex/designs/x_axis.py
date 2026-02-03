@@ -255,6 +255,9 @@ endcap_mount_screw_size = "M5"
 
 endcap_mount_fillet_radius = 2
 
+endcap_side_hole_size = 4
+endcap_side_hole_boundary = 5
+
 
 jig_width = 6
 jig_thickness = 3.6
@@ -1115,6 +1118,37 @@ def create_idler_endcap(
         profile_cutter = align(profile_cutter, profile, Alignment.CENTER)
         outer_box = outer_box.cut(profile_cutter)
 
+        side_hole_size_diagonal = np.sqrt(2) * endcap_side_hole_size
+        side_hole_pitch = side_hole_size_diagonal * 1.5
+
+        outer_bounding_box_size = get_bounding_box_size(outer_box)
+
+        num_x_side_holes = int(
+            (outer_bounding_box_size[0] - 2 * endcap_side_hole_boundary)
+            / side_hole_pitch
+        )
+
+        num_z_side_holes = int(
+            (outer_bounding_box_size[2] - 2 * endcap_side_hole_boundary)
+            / side_hole_pitch
+        )
+
+        side_hole_drills = PartCollector()
+        for ix in range(num_x_side_holes):
+            for iz in range(num_z_side_holes):
+                side_hole_drill = create_box(
+                    endcap_side_hole_size, BIG_THING, endcap_side_hole_size
+                )
+                side_hole_drill = rotate(45, axis=(0, 1, 0))(side_hole_drill)
+                side_hole_drill = align(side_hole_drill, outer_box, Alignment.CENTER)
+                x_offset = ix * side_hole_pitch
+                z_offset = iz * side_hole_pitch
+                side_hole_drill = translate(x_offset, 0, z_offset)(side_hole_drill)
+                side_hole_drills = side_hole_drills.fuse(side_hole_drill)
+
+        side_hole_drills = align(side_hole_drills, outer_box, Alignment.CENTER)
+        outer_box = outer_box.cut(side_hole_drills)
+
         for fb in [Alignment.FRONT, Alignment.BACK]:
             belt_clearance_cutter = create_box(
                 BIG_THING,
@@ -1518,7 +1552,7 @@ def main():
             skip_in_production=True,
         )
 
-    for side in []:  # [Alignment.LEFT]:  #  , Alignment.RIGHT]:
+    for side in [Alignment.LEFT]:  # , Alignment.RIGHT]:
         mount_plate_name = f"mount_plate_{side.name.lower()}"
         color_by_side = {
             Alignment.LEFT: (0.8, 0.8, 1.0),
@@ -1533,7 +1567,7 @@ def main():
             mount_plate_of_side,
             next_part_name,
             flip=False,
-            skip_in_production=False,
+            skip_in_production=True, # False,
             prod_rotation_angle=90,
             prod_rotation_axis=(1, 0, 0),
             color=color_by_side[side],
@@ -1546,7 +1580,7 @@ def main():
             x_axis.get_follower_part_by_name(follower_name),
             follower_name,
             flip=False,
-            skip_in_production=False,
+            skip_in_production=True , # False,
             prod_rotation_angle=0,
             prod_rotation_axis=(1, 0, 0),
             color=(1.0, 0.7, 0.8),
@@ -1568,11 +1602,11 @@ def main():
         half_jig,
         "x_axis_rail_drill_jig",
         flip=False,
-        skip_in_production=False,
+        skip_in_production=True,
         color=(0.5, 0.5, 0.5),
     )
 
-    for side in []:  # Alignment.LEFT, Alignment.RIGHT]:
+    for side in [Alignment.LEFT, Alignment.RIGHT]:
         with_tensioner = side == Alignment.RIGHT
 
         side_str = side.name.lower()

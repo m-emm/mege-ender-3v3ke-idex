@@ -11,6 +11,7 @@ import logging
 import math
 import os
 
+import numpy as np
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -86,11 +87,15 @@ def create_gt2_pulley(
 
 
 def create_gt2_idler(
-    num_teeth=20, belt_width=6, shaft_diameter=3, end_disk_thickness=0.8
+    num_teeth=20,
+    belt_width=6,
+    shaft_diameter=3,
+    end_disk_thickness=0.8,
+    end_disk_oversisze=3,
 ):
     """Create a simple GT2 pulley model."""
-    core_diameter = (num_teeth * gt2_pitch) / math.pi - gt2_thickness
-    outer_disk_diameter = (num_teeth * gt2_pitch) / math.pi
+    core_diameter = (num_teeth * gt2_pitch) / math.pi / 1.061032953945969
+    outer_disk_diameter = core_diameter + 2 * end_disk_oversisze
 
     center = create_cylinder(core_diameter / 2, belt_width)
 
@@ -106,6 +111,12 @@ def create_gt2_idler(
 
     shaft = align(shaft, retval, Alignment.CENTER)
     retval = retval.cut(shaft)
+
+    idler_size = get_bounding_box_size(retval)
+    if num_teeth == 20:
+
+        assert np.allclose(core_diameter, 12), f"core diameter {core_diameter} != 12"
+        assert np.allclose(idler_size[0], 18), f"idler size {idler_size[0]} != 18"
 
     return retval
 
