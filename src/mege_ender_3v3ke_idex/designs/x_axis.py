@@ -166,6 +166,7 @@ rail_mount_screw_size = "M3"
 z_axis_guide_distance = 256
 
 motor_x_offset = z_axis_guide_distance / 2 - 60
+motor_z_offset = 2
 x_axis_motor_axle_length = 14
 
 idler_gap = 2
@@ -185,7 +186,7 @@ idler_mount_thickness = 1
 idler_mount_axle_clearance = 0.1
 idler_mount_axle_diameter = MScrew.from_size("M3").clearance_hole_normal
 axle_screw_size = "M3"
-axcle_screw_nut_hole_depth = 4
+axle_screw_nut_hole_depth = 4
 axle_screw_nut_slack = 0.4
 
 mount_shield_width = 17
@@ -200,6 +201,8 @@ mount_plate_connector_depth = 20
 
 mount_plate_link_width = mount_plate_connector_length * 0.8
 mount_plate_connector_link_thickness = 6
+
+pulley_clearance_z = 0.8
 
 flange_thickness = 5
 flange_depth = 15
@@ -234,6 +237,7 @@ link_flange_depth = 12
 
 
 endcap_wall = 3
+endcap_top_bottom_wall = 5
 endcap_clearance = 0.8
 endcap_holder_thickness = 4
 endcap_holder_length = 10
@@ -247,7 +251,7 @@ inset_cutter_hole_slack = 0.3
 endcap_tensioner_length = 16
 endcap_tensioner_slit_width = 0.4
 endcap_idler_clearance = 1.5
-endcap_belt_clearance = 2.6
+endcap_belt_clearance = 6
 endcap_tensioner_cage_clearance = 0.3
 endcap_tensioner_travel = 14
 endcap_belt_width = 6
@@ -268,13 +272,15 @@ jig_thickness = 3.6
 
 tool_head_mount_carriage_mount_plate_thickness = 3
 tool_head_mount_carriage_mount_plate_fillet_radiuis = 1
-tool_head_mount_y_extension = 4
 
 tool_head_mount_belt_z_offset = 12
 
 tool_head_mount_base_plate_thickness = 3
 tool_head_mount_base_plate_height = 35
 tool_head_mount_base_plate_width = 30
+tool_head_belt_clamp_gap = 0.5
+
+tool_head_mount_y_extension = tool_head_mount_base_plate_thickness + 0.3
 
 
 def create_z_axis():
@@ -312,17 +318,17 @@ def create_mgn12h_carriage():
 
     width = 27
     length = 45.4
-    screw_hole_pitch = 25
+    screw_hole_pitch = 20
     height = 10
     screw_hole_depth = 3.5
-    screw_hole_diameter = 3
+    screw_hole_diameter = MScrew.from_size("M3").clearance_hole_normal
     h1 = 3.4
 
     carriage = create_box(length, width, height)
 
     holes = PartCollector()
     for x in [-screw_hole_pitch / 2, screw_hole_pitch / 2]:
-        for y in [-width / 2 + 4, width / 2 - 4]:
+        for y in [-screw_hole_pitch / 2, screw_hole_pitch / 2]:
             hole = create_cylinder(screw_hole_diameter / 2, height)
             hole = translate(x, y, 0)(hole)
             holes = holes.fuse(hole)
@@ -450,58 +456,58 @@ def create_idlers_for_motor(
         idler_axle_cutter = align(idler_axle_cutter, idler, Alignment.CENTER)
         mount_plate = mount_plate.cut(idler_axle_cutter)
 
-        idler_mount_base = create_cylinder(idler_mount_diameter / 2, 100)
-        idler_mount_base = align(idler_mount_base, idler, Alignment.CENTER)
-        idler_mount_base = align(
-            idler_mount_base,
-            idler,
-            vertical_alignment.opposite.stack_alignment,
-        )
+        # idler_mount_base = create_cylinder(idler_mount_diameter / 2, 100)
+        # idler_mount_base = align(idler_mount_base, idler, Alignment.CENTER)
+        # idler_mount_base = align(
+        #     idler_mount_base,
+        #     idler,
+        #     vertical_alignment.opposite.stack_alignment,
+        # )
 
-        idler_mount_base = idler_mount_base.cut(mount_plate_limit_cutter)
+        # idler_mount_base = idler_mount_base.cut(mount_plate_limit_cutter)
 
-        idler_mount_base_size = get_bounding_box_size(idler_mount_base)
-        idler_mount_pillar = create_box(
-            idler_mount_base_size[0], BIG_THING, idler_mount_base_size[2] * 0.6
-        )
+        # idler_mount_base_size = get_bounding_box_size(idler_mount_base)
+        # idler_mount_pillar = create_box(
+        #     idler_mount_base_size[0], BIG_THING, idler_mount_base_size[2] * 0.6
+        # )
 
-        idler_mount_pillar = align(
-            idler_mount_pillar, idler_mount_base, Alignment.CENTER
-        )
-        idler_mount_pillar = align(
-            idler_mount_pillar,
-            idler_mount_base,
-            vertical_alignment.opposite,
-        )
-        idler_mount_pillar = align(
-            idler_mount_pillar,
-            idler_mount_base,
-            Alignment.STACK_FRONT,
-            stack_gap=-idler_mount_diameter / 2,
-        )
+        # idler_mount_pillar = align(
+        #     idler_mount_pillar, idler_mount_base, Alignment.CENTER
+        # )
+        # idler_mount_pillar = align(
+        #     idler_mount_pillar,
+        #     idler_mount_base,
+        #     vertical_alignment.opposite,
+        # )
+        # idler_mount_pillar = align(
+        #     idler_mount_pillar,
+        #     idler_mount_base,
+        #     Alignment.STACK_FRONT,
+        #     stack_gap=-idler_mount_diameter / 2,
+        # )
 
-        idler_mount_pillar_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
-        idler_mount_pillar_cutter = align(
-            idler_mount_pillar_cutter, mount_plate, Alignment.CENTER
-        )
-        idler_mount_pillar_cutter = align(
-            idler_mount_pillar_cutter, mount_plate, Alignment.CENTER
-        )
-        idler_mount_pillar_cutter = align(
-            idler_mount_pillar_cutter, mount_plate, Alignment.STACK_FRONT
-        )
+        # idler_mount_pillar_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+        # idler_mount_pillar_cutter = align(
+        #     idler_mount_pillar_cutter, mount_plate, Alignment.CENTER
+        # )
+        # idler_mount_pillar_cutter = align(
+        #     idler_mount_pillar_cutter, mount_plate, Alignment.CENTER
+        # )
+        # idler_mount_pillar_cutter = align(
+        #     idler_mount_pillar_cutter, mount_plate, Alignment.STACK_FRONT
+        # )
 
-        idler_mount_pillar = idler_mount_pillar.cut(idler_mount_pillar_cutter)
+        # idler_mount_pillar = idler_mount_pillar.cut(idler_mount_pillar_cutter)
 
-        idler_mount_base = idler_mount_base.fuse(idler_mount_pillar)
+        # idler_mount_base = idler_mount_base.fuse(idler_mount_pillar)
 
-        idler_mount_base = idler_mount_base.cut(idler_axle_cutter)
+        # idler_mount_base = idler_mount_base.cut(idler_axle_cutter)
 
-        idler_mount_bases = idler_mount_bases.fuse(idler_mount_base)
+        # idler_mount_bases = idler_mount_bases.fuse(idler_mount_base)
 
         idler_screw_nut_cutter = create_nut(
             axle_screw_size,
-            height=axcle_screw_nut_hole_depth,
+            height=axle_screw_nut_hole_depth,
             slack=axle_screw_nut_slack,
         )
         idler_screw_nut_cutter = rotate(30)(idler_screw_nut_cutter)
@@ -543,6 +549,7 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
         motor,
         profile_to_align,
         Alignment.STACK_TOP if side == Alignment.LEFT else Alignment.STACK_BOTTOM,
+        stack_gap=motor_z_offset,
     )
     motor.translate((side.sign * motor_x_offset, motor_y_offset, 0))
 
@@ -554,6 +561,7 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
         pulley = rotate(180, axis=(0, 1, 0))(pulley)
     pulley = align(pulley, axle, Alignment.CENTER)
     pulley = align(pulley, axle, vertical_alignment)
+    pulley = translate(0, 0, vertical_alignment.sign * pulley_clearance_z)(pulley)
 
     mount_plate_limit_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
     mount_plate_limit_cutter = align(
@@ -712,7 +720,6 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
     mount_flange = mount_flange.fuse(mount_flange_bevel_flange_side)
 
     mount_plate = mount_plate.fuse(mount_plate_connector)
-    mount_plate = mount_plate.fuse(idler_mount_bases)
     mount_plate = mount_plate.fuse(mount_flange)
 
     # sync follower with the modified mount plate geometry
@@ -1020,7 +1027,9 @@ def create_idler_endcap(
     cage_overlength = target_cage_length - idler_size[0]
 
     outer_box_height = (
-        profile_size[2] + 2 * endcap_wall + 2 * endcap_tensioner_cage_clearance
+        profile_size[2]
+        + 2 * endcap_top_bottom_wall
+        + 2 * endcap_tensioner_cage_clearance
     )
 
     if with_tensioner:
@@ -1078,7 +1087,7 @@ def create_idler_endcap(
     mount_eye = create_filleted_box(
         profile_size[1] * 0.6,
         profile_size[1],
-        endcap_wall,
+        endcap_top_bottom_wall + endcap_profile_clearance,
         fillet_radius=endcap_mount_fillet_radius,
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, side],
     )
@@ -1165,6 +1174,7 @@ def create_idler_endcap(
         side_hole_drills = align(side_hole_drills, outer_box, Alignment.CENTER)
         outer_box = outer_box.cut(side_hole_drills)
 
+        obbcc = PartCollector()
         for fb in [Alignment.FRONT, Alignment.BACK]:
             belt_clearance_cutter = create_box(
                 BIG_THING,
@@ -1180,6 +1190,40 @@ def create_idler_endcap(
             )
             outer_box = outer_box.cut(belt_clearance_cutter)
 
+            belt_side_clearance_cutter_length = endcap_profile_overlap
+            belt_side_clearance_cutter = create_pyramid_stump(
+                belt_side_clearance_cutter_length,
+                belt_side_clearance_cutter_length,
+                endcap_belt_width * 2,
+                endcap_belt_width,
+                endcap_belt_width / 2,
+            )
+
+            belt_side_clearance_cutter = rotate(-90 * fb.sign, axis=(1, 0, 0))(
+                belt_side_clearance_cutter
+            )
+            belt_side_clearance_cutter = align(
+                belt_side_clearance_cutter, outer_box, Alignment.CENTER
+            )
+
+            belt_side_clearance_cutter = align(
+                belt_side_clearance_cutter, outer_box, side.opposite
+            )
+            outer_box_size = get_bounding_box_size(outer_box)
+            wall_at_profile = (
+                outer_box_size[1] - profile_size[1]
+            ) / 2 + endcap_profile_clearance
+
+            belt_side_clearance_cutter = align(
+                belt_side_clearance_cutter,
+                outer_box,
+                fb.stack_alignment,
+                stack_gap=-wall_at_profile,
+            )
+
+            obbcc = obbcc.fuse(belt_side_clearance_cutter)
+
+        outer_box = outer_box.cut(obbcc)
         tensioner_screw_part = cage.get_non_production_part_by_name("tensioner_screw")
         tensioner_screw_part = align(tensioner_screw_part, outer_box, side)
         tensioner_screw_part = translate(
@@ -1523,16 +1567,17 @@ def create_rail_drill_jig():
 
 def create_tool_head_mount():
 
-    clamp = create_gt_belt_clamp(
+    clamp_1 = create_gt_belt_clamp(
         base_thicknness=4,
         clamp_thickness=tool_head_mount_base_plate_thickness + 0.4,
-        clamp_length=tool_head_mount_base_plate_width,
+        clamp_length=tool_head_mount_base_plate_width / 2 - tool_head_belt_clamp_gap,
         screw_size="M3",
         screw_hole_border=1.9,
         teeth_clearance=0.1,
+        single_screw=True,
     )
-    clamp = rotate(90, axis=(1, 0, 0))(clamp)
-    clamp = rotate(180)(clamp)
+    clamp_1 = rotate(90, axis=(1, 0, 0))(clamp_1)
+    clamp_1 = rotate(180)(clamp_1)
 
     carriage = create_mgn12h_carriage()
     carriage_size = get_bounding_box_size(carriage)
@@ -1550,12 +1595,6 @@ def create_tool_head_mount():
     carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.BACK)
     carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
 
-    clamp = align(clamp, carriage_mount_plate, Alignment.CENTER)
-    clamp = align(clamp, carriage_mount_plate, Alignment.FRONT)
-    clamp = align(clamp, carriage_mount_plate, Alignment.STACK_BOTTOM)
-
-    clamp = translate(0, 0, -tool_head_mount_belt_z_offset)(clamp)
-
     mount_base_plate = create_box(
         tool_head_mount_base_plate_width,
         tool_head_mount_base_plate_thickness,
@@ -1568,22 +1607,39 @@ def create_tool_head_mount():
     )
     mount_base_plate = align(mount_base_plate, carriage_mount_plate, Alignment.FRONT)
 
+    clamp_1 = align(clamp_1, mount_base_plate, Alignment.CENTER, axes=[0])
+    clamp_1 = align(clamp_1, mount_base_plate, Alignment.FRONT)
+    clamp_1 = align(clamp_1, carriage_mount_plate, Alignment.STACK_BOTTOM)
+
+    clamp_1 = align(clamp_1, mount_base_plate, Alignment.LEFT)
+
+    clamp_2 = align(clamp_1, mount_base_plate, Alignment.RIGHT)
+
+    clamp = LeaderFollowersCuttersPart(leader=clamp_1.leader.fuse(clamp_2.leader))
+
+    clamp.add_named_follower(clamp_1.get_follower_part_by_name("clamp"), "clamp_1")
+    clamp.add_named_follower(clamp_2.get_follower_part_by_name("clamp"), "clamp_2")
+
+    clamp = translate(0, 0, -tool_head_mount_belt_z_offset)(clamp)
+
     clamp_align_translation = align_translation(
-        clamp.get_follower_part_by_name("clamp"), mount_base_plate, Alignment.BACK
+        clamp.get_follower_part_by_name("clamp_1"), mount_base_plate, Alignment.BACK
     )
     clamp = clamp_align_translation(clamp)
 
-    clamp_size = get_bounding_box_size(clamp.get_follower_part_by_name("clamp"))
-    clamp_cutter = create_box(BIG_THING, clamp_size[1], clamp_size[2])
-    clamp_cutter = align(
-        clamp_cutter, clamp.get_follower_part_by_name("clamp"), Alignment.CENTER
+    clamps_fulsed = clamp.get_follower_part_by_name("clamp_1").fuse(
+        clamp.get_follower_part_by_name("clamp_2")
     )
+    clamp_size = get_bounding_box_size(clamps_fulsed)
+    clamp_cutter = create_box(BIG_THING, clamp_size[1], clamp_size[2])
+    clamp_cutter = align(clamp_cutter, clamps_fulsed, Alignment.CENTER)
 
     mount_base_plate = mount_base_plate.cut(clamp_cutter)
 
     tool_head_mount = carriage_mount_plate.fuse(
-        clamp.get_follower_part_by_name("clamp")
+        clamp.get_follower_part_by_name("clamp_1")
     )
+    tool_head_mount = tool_head_mount.fuse(clamp.get_follower_part_by_name("clamp_2"))
     tool_head_mount = tool_head_mount.fuse(mount_base_plate)
 
     tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
@@ -1657,7 +1713,7 @@ def main():
             mount_plate_of_side,
             next_part_name,
             flip=False,
-            skip_in_production=True,  # False,
+            skip_in_production=False,
             prod_rotation_angle=90,
             prod_rotation_axis=(1, 0, 0),
             color=color_by_side[side],
@@ -1726,7 +1782,7 @@ def main():
             endcap.get_follower_part_by_name("endcap_idler_cage"),
             next_part_name,
             flip=False,
-            skip_in_production=True,  # False,
+            skip_in_production=False,
             prod_rotation_angle=side.sign * 90,
             prod_rotation_axis=(0, 1, 0),
             color=(0.8, 0.4, 0.6),
@@ -1747,7 +1803,7 @@ def main():
                 endcap.leader,
                 next_part_name,
                 flip=False,
-                skip_in_production=True,  # False,
+                skip_in_production=False,
                 prod_rotation_angle=0,
                 prod_rotation_axis=(1, 0, 0),
                 color=(0.9, 0.6, 0.1),

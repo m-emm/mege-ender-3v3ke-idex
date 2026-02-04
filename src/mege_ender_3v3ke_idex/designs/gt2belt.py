@@ -159,6 +159,7 @@ def create_gt_belt_clamp(
     clamp_gap=0.3,
     belt_clearance=0.1,
     nut_cutter_slack=0.1,
+    single_screw=False,
 ):
     """Create a belt clamp with scew holes for the given belt width."""
 
@@ -218,10 +219,14 @@ def create_gt_belt_clamp(
         belt_guide_cutter = align(belt_guide_cutter, clamp, Alignment.BOTTOM)
         belt_guides_cutters = belt_guides_cutters.fuse(belt_guide_cutter)
 
-        for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        lr_list = [Alignment.LEFT, Alignment.RIGHT]
+        if single_screw:
+            lr_list = [Alignment.CENTER]
+
+        for lr in lr_list:
             screw_hole = create_cylinder(screw_hole_diameter / 2, BIG_THING)
             screw_hole = align(screw_hole, base, Alignment.CENTER)
-            screw_hole = align(screw_hole, base, lr)
+            screw_hole = align(screw_hole, base, lr, axes=[0])
             screw_hole = align(screw_hole, base, fb)
             screw_hole = translate(
                 -lr.sign * screw_hole_border, -fb.sign * screw_hole_border, 0
@@ -231,7 +236,7 @@ def create_gt_belt_clamp(
 
             nut_cutter = create_nut(screw_size, slack=nut_cutter_slack, no_hole=True)
             nut_cutter = align(nut_cutter, screw_hole, Alignment.CENTER)
-            nut_cutter = align(nut_cutter, base, Alignment.BOTTOM)
+            nut_cutter = align(nut_cutter, clamp, Alignment.TOP)
             screw_hole_cutters = screw_hole_cutters.fuse(nut_cutter)
 
     base = base.fuse(belt_guides)
@@ -271,6 +276,21 @@ def main():
 
     parts.add(clamp.leader, "belt_clamp_base", flip=False)
     parts.add(clamp.get_follower_part_by_name("clamp"), "belt_clamp", flip=True)
+
+    clamp_2 = create_gt_belt_clamp(
+        base_thicknness=4,
+        clamp_thickness=3,
+        belt_width=gt2_width,
+        clamp_length=30,
+        screw_size="M3",
+        screw_hole_border=1.9,
+        teeth_clearance=0.1,
+        single_screw=True,
+    )
+    clamp_2 = translate(-80, -40, 0)(clamp_2)
+
+    parts.add(clamp_2.leader, "belt_clamp_base_2", flip=False)
+    parts.add(clamp_2.get_follower_part_by_name("clamp"), "belt_clamp_2", flip=True)
 
     # Arrange and export
     arrange_and_export(
