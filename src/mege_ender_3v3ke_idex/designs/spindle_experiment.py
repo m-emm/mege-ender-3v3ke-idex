@@ -52,7 +52,7 @@ def create_t8_spindle_nut(length, outer_diameter):
     thread_outer_thickness = 0.665  # Thread depth for trapezoidal profile
 
     thread_radial_clearance = 0.1
-    thread_axial_clearance = 0.05
+    thread_axial_clearance = 0.2
 
     # Calculate number of turns based on length and pitch
     num_turns = length / pitch
@@ -66,16 +66,19 @@ def create_t8_spindle_nut(length, outer_diameter):
     # This creates the negative space that will be cut from the nut body
     thread_cutter = create_screw_thread(
         pitch=pitch,
-        inner_radius=thread_minor_radius - thread_radial_clearance,
+        inner_radius=thread_minor_radius + thread_radial_clearance,
         outer_radius=thread_major_radius + thread_radial_clearance,
         outer_thickness=thread_outer_thickness + thread_axial_clearance,
+        inner_thickness=thread_outer_thickness * 2.2 + thread_axial_clearance,
         num_turns=num_turns,
         starts=starts,  # 4-start thread
         resolution=48,  # High resolution for smooth threads
         with_core=False,  # Include solid core for proper cutting
     )
 
-    core_cutter = create_cylinder(thread_minor_radius + 0.1, length + 2)
+    core_cutter = create_cylinder(
+        thread_minor_radius + thread_radial_clearance * 1.1, length + 2
+    )
     core_cutter = align(core_cutter, nut_body, Alignment.CENTER)
     nut = nut_body.cut(core_cutter)
     nut = nut.cut(thread_cutter)
@@ -104,34 +107,12 @@ def create_t8_spindle_nut(length, outer_diameter):
     return nut
 
 
-def create_spindle_experiment():
-    """Create the spindle_experiment part."""
-    # Example: simple box with a cylindrical hole
-    width = 30
-    depth = 20
-    height = 10
-    hole_radius = 4
-
-    # Create base box
-    part = create_box(width, depth, height)
-
-    # Create a hole cutter
-    hole = create_cylinder(hole_radius, height + 2)
-    hole = align(hole, part, Alignment.CENTER)
-    hole = translate(0, 0, -1)(hole)
-
-    # Cut the hole
-    part = part.cut(hole)
-
-    return part
-
-
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
     # Create the part
-    part = create_t8_spindle_nut(length=15, outer_diameter=16)
+    part = create_t8_spindle_nut(length=6, outer_diameter=16)
 
     # part = create_cylinder(15, 10)
     # part = rotate(25, axis=(0, 1, 0))(part)
