@@ -52,6 +52,7 @@ def create_t8_spindle_nut(length, outer_diameter):
     thread_outer_thickness = 0.665  # Thread depth for trapezoidal profile
 
     thread_radial_clearance = 0.1
+    thread_outer_radial_correction = 1.5/2 # measured correction for outer radius
     thread_axial_clearance = 0.2
 
     # Calculate number of turns based on length and pitch
@@ -67,7 +68,7 @@ def create_t8_spindle_nut(length, outer_diameter):
     thread_cutter = create_screw_thread(
         pitch=pitch,
         inner_radius=thread_minor_radius + thread_radial_clearance,
-        outer_radius=thread_major_radius + thread_radial_clearance,
+        outer_radius=thread_major_radius + thread_radial_clearance + thread_outer_radial_correction,
         outer_thickness=thread_outer_thickness + thread_axial_clearance,
         inner_thickness=thread_outer_thickness * 2.2 + thread_axial_clearance,
         num_turns=num_turns,
