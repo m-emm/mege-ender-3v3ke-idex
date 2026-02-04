@@ -194,6 +194,7 @@ mount_shield_depth = 6
 mount_shield_fillet_radius = 1
 mount_shield_oversize_z = 0
 
+mount_flange_bevel_oversize = 1.5
 mount_plate_connector_length = (
     z_axis_guide_distance - 2 * motor_x_offset - motor_size + 8
 )
@@ -243,7 +244,7 @@ endcap_holder_thickness = 4
 endcap_holder_length = 10
 endcap_fillet_radius = 2
 endcap_idler_tooth_count = 20
-endcap_profile_overlap = 7
+endcap_profile_overlap = 15
 endcap_profile_clearance = 0.2
 endcap_axle_screw_length = 25
 endcap_axle_screw_size = "M3"
@@ -265,6 +266,9 @@ endcap_mount_fillet_radius = 2
 
 endcap_side_hole_size = 4
 endcap_side_hole_boundary = 5
+
+endcap_tensioner_outer_box_bottom_thickness = 1
+endcap_tensioner_outer_box_bottom_cage_clearance = 0.8
 
 
 jig_width = 6
@@ -456,55 +460,6 @@ def create_idlers_for_motor(
         idler_axle_cutter = align(idler_axle_cutter, idler, Alignment.CENTER)
         mount_plate = mount_plate.cut(idler_axle_cutter)
 
-        # idler_mount_base = create_cylinder(idler_mount_diameter / 2, 100)
-        # idler_mount_base = align(idler_mount_base, idler, Alignment.CENTER)
-        # idler_mount_base = align(
-        #     idler_mount_base,
-        #     idler,
-        #     vertical_alignment.opposite.stack_alignment,
-        # )
-
-        # idler_mount_base = idler_mount_base.cut(mount_plate_limit_cutter)
-
-        # idler_mount_base_size = get_bounding_box_size(idler_mount_base)
-        # idler_mount_pillar = create_box(
-        #     idler_mount_base_size[0], BIG_THING, idler_mount_base_size[2] * 0.6
-        # )
-
-        # idler_mount_pillar = align(
-        #     idler_mount_pillar, idler_mount_base, Alignment.CENTER
-        # )
-        # idler_mount_pillar = align(
-        #     idler_mount_pillar,
-        #     idler_mount_base,
-        #     vertical_alignment.opposite,
-        # )
-        # idler_mount_pillar = align(
-        #     idler_mount_pillar,
-        #     idler_mount_base,
-        #     Alignment.STACK_FRONT,
-        #     stack_gap=-idler_mount_diameter / 2,
-        # )
-
-        # idler_mount_pillar_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
-        # idler_mount_pillar_cutter = align(
-        #     idler_mount_pillar_cutter, mount_plate, Alignment.CENTER
-        # )
-        # idler_mount_pillar_cutter = align(
-        #     idler_mount_pillar_cutter, mount_plate, Alignment.CENTER
-        # )
-        # idler_mount_pillar_cutter = align(
-        #     idler_mount_pillar_cutter, mount_plate, Alignment.STACK_FRONT
-        # )
-
-        # idler_mount_pillar = idler_mount_pillar.cut(idler_mount_pillar_cutter)
-
-        # idler_mount_base = idler_mount_base.fuse(idler_mount_pillar)
-
-        # idler_mount_base = idler_mount_base.cut(idler_axle_cutter)
-
-        # idler_mount_bases = idler_mount_bases.fuse(idler_mount_base)
-
         idler_screw_nut_cutter = create_nut(
             axle_screw_size,
             height=axle_screw_nut_hole_depth,
@@ -695,7 +650,7 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
         mount_flange = mount_flange.cut(cylinder_head_cutter)
 
     mount_flange_bevel = create_right_triangle(
-        bevel_depth,
+        bevel_depth + motor_z_offset + mount_flange_bevel_oversize,
         bevel_depth,
         thickness=mount_plate_connector_length - 2 * motor_mount_plate_fillet_radius,
         extrusion_direction=(side.sign, 0, 0),
@@ -1026,10 +981,17 @@ def create_idler_endcap(
         target_cage_length += endcap_tensioner_length
     cage_overlength = target_cage_length - idler_size[0]
 
-    outer_box_height = (
+    cage_height = (
         profile_size[2]
         + 2 * endcap_top_bottom_wall
-        + 2 * endcap_tensioner_cage_clearance
+        - endcap_tensioner_outer_box_bottom_cage_clearance
+        - endcap_tensioner_outer_box_bottom_thickness
+    )
+
+    outer_box_height = (
+        cage_height
+        + endcap_tensioner_outer_box_bottom_cage_clearance
+        + endcap_tensioner_outer_box_bottom_thickness
     )
 
     if with_tensioner:
@@ -1046,7 +1008,7 @@ def create_idler_endcap(
         cage_front_wall_thickness=endcap_wall
         + (endcap_profile_overlap if not with_tensioner else 0),
         cage_wall=idler_cage_wall,
-        cage_height=outer_box_height,
+        cage_height=cage_height,
         cage_overlength=cage_overlength,
         idler_tooth_count=endcap_idler_tooth_count,
         idler_clearance=endcap_idler_clearance,
@@ -1087,7 +1049,10 @@ def create_idler_endcap(
     mount_eye = create_filleted_box(
         profile_size[1] * 0.6,
         profile_size[1],
-        endcap_top_bottom_wall + endcap_profile_clearance,
+        endcap_top_bottom_wall
+        + endcap_profile_clearance
+        + endcap_tensioner_outer_box_bottom_thickness
+        + endcap_tensioner_outer_box_bottom_cage_clearance,
         fillet_radius=endcap_mount_fillet_radius,
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, side],
     )
@@ -1116,6 +1081,7 @@ def create_idler_endcap(
         )
 
         outer_box = align(outer_box, cage, Alignment.CENTER)
+        outer_box = align(outer_box, cage, Alignment.TOP)
         outer_box = align(
             outer_box, profile, side.stack_alignment, stack_gap=-endcap_profile_overlap
         )
@@ -1129,9 +1095,12 @@ def create_idler_endcap(
         )
         cage_cutter = align(cage_cutter, cage, Alignment.CENTER)
         cage_cutter = align(cage_cutter, cage, side.opposite)
-        cage_cutter = translate(-side.sign * endcap_tensioner_cage_clearance, 0, 0)(
-            cage_cutter
-        )
+        cage_cutter = align(cage_cutter, outer_box, Alignment.BOTTOM)
+        cage_cutter = translate(
+            -side.sign * endcap_tensioner_cage_clearance,
+            0,
+            endcap_tensioner_outer_box_bottom_thickness,
+        )(cage_cutter)
 
         outer_box = outer_box.cut(cage_cutter)
 
@@ -1264,6 +1233,7 @@ def create_idler_endcap(
             outer_box,
             side.opposite.stack_alignment,
         )
+        mount_eye = mount_eye.cut(profile_cutter)
         outer_box = outer_box.fuse(mount_eye)
 
         retval = LeaderFollowersCuttersPart(leader=outer_box)
@@ -1282,6 +1252,8 @@ def create_idler_endcap(
             cage,
             side.opposite.stack_alignment,
         )
+
+        mount_eye = mount_eye.cut(profile_cutter)
         cage = cage.fuse(mount_eye)
 
         retval = LeaderFollowersCuttersPart(leader=cage.leader)
@@ -1798,9 +1770,11 @@ def main():
             )
 
             next_part_name = f"x_axis_idler_endcap_{side_str}_tensioner_cage"
+            tensioner_cage = endcap.leader
+            # tensioner_cage = translate(0, -8, 0)(tensioner_cage)
 
             parts.add(
-                endcap.leader,
+                tensioner_cage,
                 next_part_name,
                 flip=False,
                 skip_in_production=False,
@@ -1836,7 +1810,7 @@ def main():
         tool_head_mount,
         "x_axis_tool_head_mount",
         flip=False,
-        skip_in_production=False,
+        skip_in_production=True,  # was : False
         prod_rotation_angle=180,
         prod_rotation_axis=(1, 0, 0),
         color=(0.7, 0.7, 0.2),
@@ -1846,7 +1820,7 @@ def main():
         tool_head_mount.get_follower_part_by_name("belt_clamp_base"),
         "x_axis_tool_head_mount_clamp",
         flip=False,
-        skip_in_production=False,
+        skip_in_production=True,  # was : False
         prod_rotation_angle=90,
         prod_rotation_axis=(1, 0, 0),
         color=(0.7, 0.7, 0.2),
