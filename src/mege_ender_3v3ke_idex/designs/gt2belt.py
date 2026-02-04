@@ -163,7 +163,7 @@ def create_gt_belt_clamp(
 ):
     """Create a belt clamp with scew holes for the given belt width."""
 
-    screw_hole_diameter = MScrew.from_size(screw_size).clearance_hole_close
+    screw_hole_diameter = MScrew.from_size(screw_size).clearance_hole_normal
     base_width = belt_width + 4 * screw_hole_border + 2 * screw_hole_diameter
 
     base = create_box(clamp_length, base_width, base_thicknness)
@@ -187,6 +187,15 @@ def create_gt_belt_clamp(
     ripple_cutters = align(ripple_cutters, clamp, Alignment.CENTER)
     ripple_cutters = align(ripple_cutters, clamp, Alignment.BOTTOM)
     clamp = clamp.cut(ripple_cutters)
+
+    ripple_cutter_size = get_bounding_box_size(ripple_cutters)
+    belt_path_cutter = create_box(
+        BIG_THING, ripple_cutter_size[1], ripple_cutter_size[2]
+    )
+    belt_path_cutter = align(belt_path_cutter, ripple_cutters, Alignment.CENTER)
+
+    clamp = LeaderFollowersCuttersPart(clamp)
+    clamp.add_named_follower(belt_path_cutter, "clamp_belt_path_cutter")
 
     clamp = align(clamp, base, Alignment.CENTER)
     clamp = align(clamp, base, Alignment.STACK_TOP, stack_gap=teeth_clearance)
@@ -246,7 +255,10 @@ def create_gt_belt_clamp(
     clamp = clamp.cut(screw_hole_cutters)
 
     retval = LeaderFollowersCuttersPart(base)
-    retval.add_named_follower(clamp, "clamp")
+    retval.add_named_follower(clamp.leader, "clamp")
+    retval.add_named_follower(
+        clamp.get_follower_part_by_name("clamp_belt_path_cutter"), "belt_path_cutter"
+    )
 
     return retval
 

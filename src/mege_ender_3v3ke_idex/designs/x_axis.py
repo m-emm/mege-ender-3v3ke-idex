@@ -274,17 +274,23 @@ endcap_tensioner_outer_box_bottom_cage_clearance = 0.8
 jig_width = 6
 jig_thickness = 3.6
 
-tool_head_mount_carriage_mount_plate_thickness = 3
-tool_head_mount_carriage_mount_plate_fillet_radiuis = 1
+tool_head_mount_carriage_mount_plate_thickness = 4
+tool_head_mount_carriage_mount_plate_fillet_radius = 1
 
 tool_head_mount_belt_z_offset = 12
 
-tool_head_mount_base_plate_thickness = 3
+tool_head_mount_base_plate_thickness = 4
 tool_head_mount_base_plate_height = 35
-tool_head_mount_base_plate_width = 30
-tool_head_belt_clamp_gap = 0.5
+tool_head_belt_clamp_gap = 3
 
 tool_head_mount_y_extension = tool_head_mount_base_plate_thickness + 0.3
+
+tool_head_mount_side_clearance = 0.5
+tool_head_mount_side_plate_depth = 7
+tool_head_mount_side_plate_thickness = 2
+tool_head_mount_belt_clamp_thickness = 3.5
+tool_head_mount_clamp_base_cutter_clearance = 0.2
+tool_head_mount_belt_path_cutter_clearance = 0.5
 
 
 def create_z_axis():
@@ -1539,9 +1545,22 @@ def create_rail_drill_jig():
 
 def create_tool_head_mount():
 
+    carriage = create_mgn12h_carriage()
+    carriage_size = get_bounding_box_size(carriage)
+
+    carriage_mount_plate_width = (
+        carriage_size[0]
+        + 2 * tool_head_mount_side_clearance
+        + 2 * tool_head_mount_side_plate_thickness
+    )
+
+    tool_head_mount_base_plate_width = (
+        carriage_mount_plate_width - 2 * tool_head_mount_side_plate_thickness
+    )
+
     clamp_1 = create_gt_belt_clamp(
         base_thicknness=4,
-        clamp_thickness=tool_head_mount_base_plate_thickness + 0.4,
+        clamp_thickness=tool_head_mount_belt_clamp_thickness,
         clamp_length=tool_head_mount_base_plate_width / 2 - tool_head_belt_clamp_gap,
         screw_size="M3",
         screw_hole_border=1.9,
@@ -1551,14 +1570,11 @@ def create_tool_head_mount():
     clamp_1 = rotate(90, axis=(1, 0, 0))(clamp_1)
     clamp_1 = rotate(180)(clamp_1)
 
-    carriage = create_mgn12h_carriage()
-    carriage_size = get_bounding_box_size(carriage)
-
     carriage_mount_plate = create_filleted_box(
-        carriage_size[0],
+        carriage_mount_plate_width,
         carriage_size[1] + tool_head_mount_y_extension,
         tool_head_mount_carriage_mount_plate_thickness,
-        fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radiuis,
+        fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM],
     )
 
@@ -1579,8 +1595,23 @@ def create_tool_head_mount():
     )
     mount_base_plate = align(mount_base_plate, carriage_mount_plate, Alignment.FRONT)
 
+    side_plates = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        side_plate = create_filleted_box(
+            tool_head_mount_side_plate_thickness,
+            tool_head_mount_side_plate_depth,
+            tool_head_mount_base_plate_height,
+            fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
+            no_fillets_at=[Alignment.TOP, lr.opposite],
+        )
+
+        side_plate = align(side_plate, carriage_mount_plate, Alignment.STACK_BOTTOM)
+        side_plate = align(side_plate, carriage_mount_plate, Alignment.FRONT)
+        side_plate = align(side_plate, carriage_mount_plate, lr)
+        side_plates = side_plates.fuse(side_plate)
+
     clamp_1 = align(clamp_1, mount_base_plate, Alignment.CENTER, axes=[0])
-    clamp_1 = align(clamp_1, mount_base_plate, Alignment.FRONT)
+    clamp_1 = align(clamp_1, side_plates, Alignment.BACK)
     clamp_1 = align(clamp_1, carriage_mount_plate, Alignment.STACK_BOTTOM)
 
     clamp_1 = align(clamp_1, mount_base_plate, Alignment.LEFT)
@@ -1591,28 +1622,92 @@ def create_tool_head_mount():
 
     clamp.add_named_follower(clamp_1.get_follower_part_by_name("clamp"), "clamp_1")
     clamp.add_named_follower(clamp_2.get_follower_part_by_name("clamp"), "clamp_2")
+    clamp.add_named_follower(clamp_1.leader, "belt_clamp_base_1")
+    clamp.add_named_follower(clamp_2.leader, "belt_clamp_base_2")
+    clamp.add_named_follower(
+        clamp_1.get_follower_part_by_name("belt_path_cutter"), "belt_path_cutter_1"
+    )
+    clamp.add_named_follower(
+        clamp_2.get_follower_part_by_name("belt_path_cutter"), "belt_path_cutter_2"
+    )
 
     clamp = translate(0, 0, -tool_head_mount_belt_z_offset)(clamp)
 
     clamp_align_translation = align_translation(
-        clamp.get_follower_part_by_name("clamp_1"), mount_base_plate, Alignment.BACK
+        clamp.get_follower_part_by_name("clamp_1"), side_plates, Alignment.BACK
     )
     clamp = clamp_align_translation(clamp)
 
-    clamps_fulsed = clamp.get_follower_part_by_name("clamp_1").fuse(
+    clamps_list = [
+        clamp.get_follower_part_by_name("clamp_1"),
+        clamp.get_follower_part_by_name("clamp_2"),
+    ]
+    bases_list = [
+        clamp.get_follower_part_by_name("belt_clamp_base_1"),
+        clamp.get_follower_part_by_name("belt_clamp_base_2"),
+    ]
+
+    belt_path_cutters_list = [
+        clamp.get_follower_part_by_name("belt_path_cutter_1"),
+        clamp.get_follower_part_by_name("belt_path_cutter_2"),
+    ]
+
+    clamps_fused = clamp.get_follower_part_by_name("clamp_1").fuse(
         clamp.get_follower_part_by_name("clamp_2")
     )
-    clamp_size = get_bounding_box_size(clamps_fulsed)
-    clamp_cutter = create_box(BIG_THING, clamp_size[1], clamp_size[2])
-    clamp_cutter = align(clamp_cutter, clamps_fulsed, Alignment.CENTER)
+
+    clamp_cutter = PartCollector()
+    bases_cutter = PartCollector()
+    belt_path_cutter = PartCollector()
+    for current_clamp, current_base, current_belt_path_cutter in zip(
+        clamps_list, bases_list, belt_path_cutters_list
+    ):
+        current_clamp_size = get_bounding_box_size(current_clamp)
+        current_clamp_cutter = create_box(
+            current_clamp_size[0],
+            current_clamp_size[1],
+            current_clamp_size[2],
+        )
+        current_clamp_cutter = align(
+            current_clamp_cutter, current_clamp, Alignment.CENTER
+        )
+        clamp_cutter = clamp_cutter.fuse(current_clamp_cutter)
+
+        current_base_size = get_bounding_box_size(current_base)
+        current_base_cutter = create_box(
+            current_base_size[0] + 2 * tool_head_mount_clamp_base_cutter_clearance,
+            current_base_size[1] + 2 * tool_head_mount_clamp_base_cutter_clearance,
+            current_base_size[2] + 2 * tool_head_mount_clamp_base_cutter_clearance,
+        )
+        current_base_cutter = align(current_base_cutter, current_base, Alignment.CENTER)
+        bases_cutter = bases_cutter.fuse(current_base_cutter)
+
+        curent_belt_path_cutter_size = get_bounding_box_size(current_belt_path_cutter)
+        current_belt_path_cutter_enlarged = create_box(
+            curent_belt_path_cutter_size[0]
+            + 2 * tool_head_mount_belt_path_cutter_clearance,
+            curent_belt_path_cutter_size[1]
+            + 2 * tool_head_mount_belt_path_cutter_clearance,
+            curent_belt_path_cutter_size[2]
+            + 2 * tool_head_mount_belt_path_cutter_clearance,
+        )
+        current_belt_path_cutter_enlarged = align(
+            current_belt_path_cutter_enlarged,
+            current_belt_path_cutter,
+            Alignment.CENTER,
+        )
+        belt_path_cutter = belt_path_cutter.fuse(current_belt_path_cutter_enlarged)
 
     mount_base_plate = mount_base_plate.cut(clamp_cutter)
+    mount_base_plate = mount_base_plate.cut(bases_cutter)
 
-    tool_head_mount = carriage_mount_plate.fuse(
-        clamp.get_follower_part_by_name("clamp_1")
-    )
-    tool_head_mount = tool_head_mount.fuse(clamp.get_follower_part_by_name("clamp_2"))
+    tool_head_mount = carriage_mount_plate.fuse(clamps_fused)
+
     tool_head_mount = tool_head_mount.fuse(mount_base_plate)
+    side_plates = side_plates.cut(bases_cutter)
+    side_plates = side_plates.cut(belt_path_cutter)
+
+    tool_head_mount = tool_head_mount.fuse(side_plates)
 
     tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
     tool_head_mount.add_named_follower(clamp.leader, "belt_clamp_base")
@@ -1685,7 +1780,7 @@ def main():
             mount_plate_of_side,
             next_part_name,
             flip=False,
-            skip_in_production=False,
+            skip_in_production=True,  # was: False,
             prod_rotation_angle=90,
             prod_rotation_axis=(1, 0, 0),
             color=color_by_side[side],
@@ -1754,7 +1849,7 @@ def main():
             endcap.get_follower_part_by_name("endcap_idler_cage"),
             next_part_name,
             flip=False,
-            skip_in_production=False,
+            skip_in_production=True,  # was: False,
             prod_rotation_angle=side.sign * 90,
             prod_rotation_axis=(0, 1, 0),
             color=(0.8, 0.4, 0.6),
@@ -1777,7 +1872,7 @@ def main():
                 tensioner_cage,
                 next_part_name,
                 flip=False,
-                skip_in_production=False,
+                skip_in_production=True,  # was: False,
                 prod_rotation_angle=0,
                 prod_rotation_axis=(1, 0, 0),
                 color=(0.9, 0.6, 0.1),
@@ -1810,7 +1905,7 @@ def main():
         tool_head_mount,
         "x_axis_tool_head_mount",
         flip=False,
-        skip_in_production=True,  # was : False
+        skip_in_production=False,
         prod_rotation_angle=180,
         prod_rotation_axis=(1, 0, 0),
         color=(0.7, 0.7, 0.2),
@@ -1820,10 +1915,10 @@ def main():
         tool_head_mount.get_follower_part_by_name("belt_clamp_base"),
         "x_axis_tool_head_mount_clamp",
         flip=False,
-        skip_in_production=True,  # was : False
+        skip_in_production=False,
         prod_rotation_angle=90,
         prod_rotation_axis=(1, 0, 0),
-        color=(0.7, 0.7, 0.2),
+        color=(0.7, 0.6, 0.5),
     )
 
     # Arrange and export
