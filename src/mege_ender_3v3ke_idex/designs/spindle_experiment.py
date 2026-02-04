@@ -52,7 +52,7 @@ def create_t8_spindle_nut(length, outer_diameter):
     thread_outer_thickness = 0.665  # Thread depth for trapezoidal profile
 
     thread_radial_clearance = 0.1
-    thread_outer_radial_correction = 1.5/2 # measured correction for outer radius
+    thread_outer_radial_correction = 1.1
     thread_axial_clearance = 0.2
 
     # Calculate number of turns based on length and pitch
@@ -65,10 +65,19 @@ def create_t8_spindle_nut(length, outer_diameter):
 
     # Create thread cutter (for internal threads)
     # This creates the negative space that will be cut from the nut body
+    inner_radius = (
+        thread_minor_radius
+        + thread_radial_clearance
+        + thread_outer_radial_correction * 0.5
+    )
+    outer_radius = (
+        thread_major_radius + thread_radial_clearance + thread_outer_radial_correction
+    )
+
     thread_cutter = create_screw_thread(
         pitch=pitch,
-        inner_radius=thread_minor_radius + thread_radial_clearance,
-        outer_radius=thread_major_radius + thread_radial_clearance + thread_outer_radial_correction,
+        inner_radius=inner_radius,
+        outer_radius=outer_radius,
         outer_thickness=thread_outer_thickness + thread_axial_clearance,
         inner_thickness=thread_outer_thickness * 2.2 + thread_axial_clearance,
         num_turns=num_turns,
@@ -78,7 +87,7 @@ def create_t8_spindle_nut(length, outer_diameter):
     )
 
     core_cutter = create_cylinder(
-        thread_minor_radius + thread_radial_clearance * 1.1, length + 2
+        inner_radius + (outer_radius - inner_radius) * 0.05, length + 2
     )
     core_cutter = align(core_cutter, nut_body, Alignment.CENTER)
     nut = nut_body.cut(core_cutter)
@@ -90,7 +99,7 @@ def create_t8_spindle_nut(length, outer_diameter):
         flange = create_box(outer_diameter / 2, 10, length)
 
         flange = align(flange, nut, Alignment.CENTER)
-        flange = align(flange, nut, a.stack_alignment, stack_gap=-outer_diameter / 4)
+        flange = align(flange, nut, a.stack_alignment, stack_gap=-outer_diameter / 6)
         flanges = flanges.fuse(flange)
         screw_hole_drill = create_cylinder(
             MScrew.from_size("M3").clearance_hole_normal / 2, 100
