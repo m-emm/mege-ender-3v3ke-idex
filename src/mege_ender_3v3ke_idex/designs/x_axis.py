@@ -159,7 +159,7 @@ motor_size = 42.3
 axis_profile_length = 500
 rail_length = 450
 axis_profile_pitch = 40
-motor_y_offset = 11
+motor_y_offset = 15
 
 rail_mount_screw_size = "M3"
 
@@ -167,6 +167,8 @@ z_axis_guide_distance = 256
 
 motor_x_offset = z_axis_guide_distance / 2 - 60
 motor_z_offset = 2
+motor_idler_out_offset = 3
+
 x_axis_motor_axle_length = 14
 
 idler_gap = 2
@@ -257,6 +259,7 @@ endcap_tensioner_cage_clearance = 0.3
 endcap_tensioner_travel = 14
 endcap_belt_width = 6
 endcap_profile_groove_depth = 8
+endcap_belt_vertical_clearance = 1.2
 endcap_tensioner_screw_size = "M3"
 endcap_tensioner_cage_back_wall = 8
 endcap_outer_box_back_wall = 4
@@ -279,18 +282,23 @@ tool_head_mount_carriage_mount_plate_fillet_radius = 1
 
 tool_head_mount_belt_z_offset = 12
 
-tool_head_mount_base_plate_thickness = 4
+tool_head_mount_base_plate_thickness = 10
 tool_head_mount_base_plate_height = 35
 tool_head_belt_clamp_gap = 3
 
-tool_head_mount_y_extension = tool_head_mount_base_plate_thickness + 0.3
 
 tool_head_mount_side_clearance = 0.5
-tool_head_mount_side_plate_depth = 7
+tool_head_mount_side_plate_depth = 12
 tool_head_mount_side_plate_thickness = 2
 tool_head_mount_belt_clamp_thickness = 3.5
-tool_head_mount_clamp_base_cutter_clearance = 0.2
+tool_head_mount_belt_clamp_base_thickness = 5
+tool_head_mount_clamp_base_cutter_clearance = 0.8
+tool_head_mount_clamp_base_cutter_depth_clearance = 0.1
 tool_head_mount_belt_path_cutter_clearance = 0.5
+
+tool_head_mount_y_extension = max(
+    tool_head_mount_base_plate_thickness + 0.3, tool_head_mount_side_plate_depth
+)
 
 
 def create_z_axis():
@@ -455,6 +463,7 @@ def create_idlers_for_motor(
             vertical_alignment,
         )
         idler = align(idler, motor.leader, idler_alignment)
+        idler = translate(idler_alignment.sign * motor_idler_out_offset, 0, 0)(idler)
         idler = align(
             idler, profile_to_align, Alignment.STACK_BACK, stack_gap=idler_gap
         )
@@ -1154,7 +1163,7 @@ def create_idler_endcap(
             belt_clearance_cutter = create_box(
                 BIG_THING,
                 endcap_profile_groove_depth,
-                endcap_belt_width + endcap_profile_clearance,
+                endcap_belt_width + 2 * endcap_belt_vertical_clearance,
             )
             belt_clearance_cutter = align(
                 belt_clearance_cutter, profile, Alignment.CENTER
@@ -1559,7 +1568,7 @@ def create_tool_head_mount():
     )
 
     clamp_1 = create_gt_belt_clamp(
-        base_thicknness=4,
+        base_thicknness=tool_head_mount_belt_clamp_base_thickness,
         clamp_thickness=tool_head_mount_belt_clamp_thickness,
         clamp_length=tool_head_mount_base_plate_width / 2 - tool_head_belt_clamp_gap,
         screw_size="M3",
@@ -1676,10 +1685,12 @@ def create_tool_head_mount():
         current_base_size = get_bounding_box_size(current_base)
         current_base_cutter = create_box(
             current_base_size[0] + 2 * tool_head_mount_clamp_base_cutter_clearance,
-            current_base_size[1] + 2 * tool_head_mount_clamp_base_cutter_clearance,
+            BIG_THING,
             current_base_size[2] + 2 * tool_head_mount_clamp_base_cutter_clearance,
         )
         current_base_cutter = align(current_base_cutter, current_base, Alignment.CENTER)
+        current_base_cutter = align(current_base_cutter, current_base, Alignment.BACK)
+
         bases_cutter = bases_cutter.fuse(current_base_cutter)
 
         curent_belt_path_cutter_size = get_bounding_box_size(current_belt_path_cutter)
@@ -1780,7 +1791,7 @@ def main():
             mount_plate_of_side,
             next_part_name,
             flip=False,
-            skip_in_production=True,  # was: False,
+            skip_in_production=False,
             prod_rotation_angle=90,
             prod_rotation_axis=(1, 0, 0),
             color=color_by_side[side],
@@ -1819,7 +1830,7 @@ def main():
         color=(0.5, 0.5, 0.5),
     )
 
-    for side in [Alignment.LEFT, Alignment.RIGHT]:
+    for side in [Alignment.RIGHT]:  # Alignment.LEFT
         with_tensioner = side == Alignment.RIGHT
 
         side_str = side.name.lower()
@@ -1849,7 +1860,7 @@ def main():
             endcap.get_follower_part_by_name("endcap_idler_cage"),
             next_part_name,
             flip=False,
-            skip_in_production=True,  # was: False,
+            skip_in_production=False,
             prod_rotation_angle=side.sign * 90,
             prod_rotation_axis=(0, 1, 0),
             color=(0.8, 0.4, 0.6),
@@ -1872,7 +1883,7 @@ def main():
                 tensioner_cage,
                 next_part_name,
                 flip=False,
-                skip_in_production=True,  # was: False,
+                skip_in_production=False,
                 prod_rotation_angle=0,
                 prod_rotation_axis=(1, 0, 0),
                 color=(0.9, 0.6, 0.1),

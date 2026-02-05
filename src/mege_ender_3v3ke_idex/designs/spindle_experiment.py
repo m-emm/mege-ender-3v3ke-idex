@@ -23,6 +23,21 @@ PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
 # Optional slicer process overrides
 PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_04_HS)
+BIG_THING = 500
+
+z_profile_width = 40
+z_pillar_front_thickness = 3
+
+z_threaded_leadscrew_to_profile_front = 40
+
+z_profile_height = 100
+
+connector_wall_height = 20
+connector_wall_thickness = 4
+
+bearing_608z_diameter = 22
+bearing_608z_thickness = 7
+bearing_608z_inner_diameter = 8
 
 
 def create_t8_spindle_nut(length, outer_diameter):
@@ -74,24 +89,27 @@ def create_t8_spindle_nut(length, outer_diameter):
         thread_major_radius + thread_radial_clearance + thread_outer_radial_correction
     )
 
-    thread_cutter = create_screw_thread(
-        pitch=pitch,
-        inner_radius=inner_radius,
-        outer_radius=outer_radius,
-        outer_thickness=thread_outer_thickness + thread_axial_clearance,
-        inner_thickness=thread_outer_thickness * 2.2 + thread_axial_clearance,
-        num_turns=num_turns,
-        starts=starts,  # 4-start thread
-        resolution=48,  # High resolution for smooth threads
-        with_core=False,  # Include solid core for proper cutting
-    )
+    nut = nut_body
 
-    core_cutter = create_cylinder(
-        inner_radius + (outer_radius - inner_radius) * 0.05, length + 2
-    )
-    core_cutter = align(core_cutter, nut_body, Alignment.CENTER)
-    nut = nut_body.cut(core_cutter)
-    nut = nut.cut(thread_cutter)
+    if False:
+        thread_cutter = create_screw_thread(
+            pitch=pitch,
+            inner_radius=inner_radius,
+            outer_radius=outer_radius,
+            outer_thickness=thread_outer_thickness + thread_axial_clearance,
+            inner_thickness=thread_outer_thickness * 2.2 + thread_axial_clearance,
+            num_turns=num_turns,
+            starts=starts,  # 4-start thread
+            resolution=48,  # High resolution for smooth threads
+            with_core=False,  # Include solid core for proper cutting
+        )
+
+        core_cutter = create_cylinder(
+            inner_radius + (outer_radius - inner_radius) * 0.05, length + 2
+        )
+        core_cutter = align(core_cutter, nut_body, Alignment.CENTER)
+        nut = nut_body.cut(core_cutter)
+        nut = nut.cut(thread_cutter)
 
     flanges = PartCollector()
     screw_hole_drills = PartCollector()
@@ -122,17 +140,92 @@ def main():
     parts = PartList()
 
     # Create the part
-    part = create_t8_spindle_nut(length=6, outer_diameter=16)
+    spindle_nut = create_t8_spindle_nut(length=6, outer_diameter=16)
+
+    z_profile = create_box(
+        z_profile_width,
+        z_pillar_front_thickness,
+        z_profile_height,
+    )
+
+    rod = create_cylinder(8 / 2, z_profile_height)
+
+    rod = align(rod, z_profile, Alignment.CENTER)
+    rod = translate(
+        0, z_threaded_leadscrew_to_profile_front - z_pillar_front_thickness / 2, 0
+    )(rod)
+
+    z_axis_parts = z_profile.fuse(rod)
+
+    parts.add(
+        z_axis_parts,
+        "z_axis_parts",
+        flip=False,
+        skip_in_production=True,
+        color=(1, 0.4, 0.4),
+    )
+
+    spindle_nut = align(spindle_nut, rod, Alignment.CENTER)
+
+    # carriage_base = create_box(60, 60, 4)
+
+    # carriage_base = align(carriage_base, z_profile, Alignment.CENTER)
+
+    connectors = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        connector = create_box(18, 15, 2)
+
+        connector = align(connector, spindle_nut, Alignment.CENTER)
+        connector = align(connector, spindle_nut, Alignment.BOTTOM)
+        connector = align(connector, spindle_nut, lr.stack_alignment, stack_gap=-2)
+
+        connectors = connectors.fuse(connector)
+
+        connector_wall = create_box(connector_wall_thickness, 55, connector_wall_height)
+
+        connector_wall = align(connector_wall, connector, Alignment.CENTER)
+        connector_wall = align(connector_wall, connector, Alignment.BACK)
+        connector_wall = align(connector_wall, connector, Alignment.BOTTOM)
+        connector_wall = align(
+            connector_wall, connector, lr.stack_alignment, stack_gap=-2
+        )
+        connectors = connectors.fuse(connector_wall)
+
+    spindle_nut = spindle_nut.fuse(connectors)
+    spindle_nut_size = get_bounding_box_size(spindle_nut)
+
+    front_axle = create_cylinder(
+        bearing_608z_inner_diameter / 2, spindle_nut_size[0], direction=(1, 0, 0)
+    )
+
+    front_axle = align(front_axle, spindle_nut, Alignment.CENTER)
+    front_axle = align(front_axle, spindle_nut, Alignment.FRONT)
+    front_axle = align(front_axle, spindle_nut, Alignment.BOTTOM)
+    front_axle_m4_drill = create_cylinder(
+        MScrew.from_size("M4").clearance_hole_normal / 2, BIG_THING, direction=(1, 0, 0)
+    )
+    front_axle_m4_drill = align(front_axle_m4_drill, front_axle, Alignment.CENTER)
+
+    spindle_nut = spindle_nut.fuse(front_axle)
+    spindle_nut = spindle_nut.cut(front_axle_m4_drill)
+
+    parts.add(
+        spindle_nut,
+        "spindle_nut",
+        flip=False,
+        skip_in_production=False,
+        color=(0.4, 0.4, 1),
+    )
 
     # part = create_cylinder(15, 10)
     # part = rotate(25, axis=(0, 1, 0))(part)
     # part = rotate(30)(part)
 
-    n1, n2 = cut_in_two(part, cut_normal=(1, 0, 0))
-    n1 = translate(30, 0, 0)(n1)
-    n2 = translate(-30, 0, 0)(n2)
-    parts.add(n1, "spindle_nut_part1", flip=False, skip_in_production=False)
-    parts.add(n2, "spindle_nut_part2", flip=False, skip_in_production=False)
+    # n1, n2 = cut_in_two(part, cut_normal=(1, 0, 0))
+    # n1 = translate(30, 0, 0)(n1)
+    # n2 = translate(-30, 0, 0)(n2)
+    # parts.add(n1, "spindle_nut_part1", flip=False, skip_in_production=False)
+    # parts.add(n2, "spindle_nut_part2", flip=False, skip_in_production=False)
 
     # Arrange and export
     arrange_and_export(
