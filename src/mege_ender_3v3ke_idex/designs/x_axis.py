@@ -11,6 +11,7 @@ import copy
 import logging
 import os
 from collections import defaultdict
+from functools import reduce
 from pathlib import Path
 
 import numpy as np
@@ -171,7 +172,7 @@ idler_gap = 2
 motor_mount_plate_size = 50
 motor_mount_plate_depth = motor_size + motor_y_offset
 
-motor_mount_plate_thickness = 6
+motor_mount_plate_thickness = 5
 motor_mount_plate_fillet_radius = 2
 motor_mount_axle_clearance = 0.3
 motor_mount_boss_clearance = 0.6
@@ -453,8 +454,8 @@ def create_idlers_for_motor(
 
         idler = align(
             idler,
-            pulley,
-            vertical_alignment,
+            profile_to_align,
+            Alignment.CENTER,
         )
         idler = align(idler, motor.leader, idler_alignment)
         idler = translate(idler_alignment.sign * motor_idler_out_offset, 0, 0)(idler)
@@ -497,8 +498,8 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
 
     vertical_alignment = vertical_aligment_map[side]
 
-    motor, mount_plate = create_motor_with_mount()
-    motor.add_named_follower(mount_plate, "mount_plate")
+    motor, initial_mount_plate = create_motor_with_mount()
+    motor.add_named_follower(initial_mount_plate, "mount_plate")
 
     if side == Alignment.LEFT:
         motor.rotate((0, 0, 0), (0, 1, 0), 180)
@@ -517,8 +518,16 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
     )
     motor.translate((side.sign * motor_x_offset, motor_y_offset, 0))
 
-    axle = motor.get_follower_part_by_name("axle")
     mount_plate = motor.get_follower_part_by_name("mount_plate")
+
+    align_to_profile_translation = align_translation(
+        mount_plate, profile_to_align, vertical_alignment.opposite
+    )
+
+    motor = align_to_profile_translation(motor)
+    mount_plate = motor.get_follower_part_by_name("mount_plate")
+
+    axle = motor.get_follower_part_by_name("axle")
 
     pulley = create_gt2_pulley(num_teeth=20, belt_width=6)
     if side == Alignment.LEFT:
@@ -526,6 +535,8 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
     pulley = align(pulley, axle, Alignment.CENTER)
     pulley = align(pulley, axle, vertical_alignment)
     pulley = translate(0, 0, vertical_alignment.sign * pulley_clearance_z)(pulley)
+
+    motor.add_named_non_production_part(pulley, "pulley")
 
     mount_plate_limit_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
     mount_plate_limit_cutter = align(
@@ -547,6 +558,8 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
             vertical_alignment=vertical_alignment,
         )
     )
+
+    motor.add_named_non_production_part(idlers, "idlers")
 
     mount_shield = create_filleted_box(
         mount_shield_width,
@@ -582,6 +595,8 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
     )
     mount_shield = mount_shield.cut(mount_shield_mount_screw_hole_cutter)
 
+    motor.add_named_follower(mount_shield, "mount_shield")
+
     mount_plate_connector = create_filleted_box(
         mount_plate_connector_length,
         mount_plate_connector_depth,
@@ -605,6 +620,7 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
         side.sign * motor_mount_plate_fillet_radius, 0, 0
     )(mount_plate_connector)
 
+    motor.add_named_follower(mount_plate_connector, "mount_plate_connector")
     mount_flange = create_filleted_box(
         mount_plate_connector_length + motor_mount_plate_size,
         flange_depth,
@@ -683,19 +699,19 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
 
     mount_flange = mount_flange.fuse(mount_flange_bevel_flange_side)
 
+    motor.add_named_follower(mount_flange, "mount_flange")
+
     mount_plate = mount_plate.fuse(mount_plate_connector)
-    mount_plate = mount_plate.fuse(mount_flange)
 
     # sync follower with the modified mount plate geometry
     motor.followers[motor.get_follower_index_by_name("mount_plate")] = mount_plate
 
-    motor_visual = PartCollector()
-    motor_visual.fuse(motor.leader)
-    motor_visual.fuse(axle)
-    motor_visual.fuse(pulley)
-    motor_visual.fuse(idlers)
+    motor_visual = motor.leader.copy()
+    motor.add_named_non_production_part(motor_visual, "motor_visual")
 
     motor_name = f"motor_{side.name.lower()}"
+
+    motor.additional_data["name"] = motor_name
 
     axis_holding_counter_flange = create_filleted_box(
         axis_holder_width,
@@ -768,15 +784,54 @@ def _create_motor_stack(side, lower_axis_profile, top_axis_profile):
 
         axis_holding_counter_flange_screws.append(axis_holding_counter_flange_screw)
 
-    return (
-        mount_plate,
-        mount_plate_connector,
-        mount_shield,
-        motor_visual.part,
-        motor_name,
-        axis_holding_counter_flange,
+    motor.add_named_follower(axis_holding_counter_flange, "axis_holding_counter_flange")
+
+    axis_holding_counter_flange_screws_fused = reduce(
+        lambda acc, screw: acc.fuse(screw),
         axis_holding_counter_flange_screws,
+        PartCollector(),
     )
+    motor.add_named_non_production_part(
+        axis_holding_counter_flange_screws_fused, "axis_holding_counter_flange_screws"
+    )
+
+    retval = LeaderFollowersCuttersPart(motor.leader)
+
+    for follower_name in [
+        "mount_shield",
+        "mount_plate",
+        "mount_flange",
+    ]:
+        retval.add_named_follower(
+            motor.get_follower_part_by_name(follower_name), follower_name
+        )
+
+    for cross_follower_name in [
+        "mount_plate_connector",
+        "axis_holding_counter_flange",
+    ]:
+        retval.add_named_non_production_part(
+            motor.get_follower_part_by_name(cross_follower_name), cross_follower_name
+        )
+
+    for non_production_part_name in [
+        "pulley",
+        "idlers",
+        "motor_visual",
+        "axis_holding_counter_flange_screws",
+    ]:
+        retval.add_named_non_production_part(
+            motor.get_non_production_part_by_name(non_production_part_name),
+            non_production_part_name,
+        )
+
+    mount_plate = retval.get_follower_part_by_name("mount_plate")
+    align_to_profile_translation = align_translation(
+        mount_plate, profile_to_align, vertical_alignment.opposite
+    )
+    retval = align_to_profile_translation(retval)
+
+    return retval
 
 
 def create_idler_cage(
@@ -1346,28 +1401,60 @@ def create_x_axis():
     final_mount_plates_by_side = defaultdict(PartCollector)
     counter_flange_screws_by_side = {}
 
-    for side in (Alignment.LEFT, Alignment.RIGHT):
-        (
-            mount_plate,
-            mount_plate_connector,
-            mount_shield,
-            motor_visual_part,
-            motor_name,
-            axis_holding_counter_flange,
-            axis_holding_counter_flange_screws,
-        ) = _create_motor_stack(side, lower_axis_profile, top_axis_profile)
+    motors_fused_by_side = {}
 
+    for side in (Alignment.LEFT, Alignment.RIGHT):
+
+        motor_assembly = _create_motor_stack(side, lower_axis_profile, top_axis_profile)
+
+        motor_followers_fused = PartCollector()
+        for follower in motor_assembly.followers:
+            motor_followers_fused = motor_followers_fused.fuse(follower)
+
+        motors_fused_by_side[side] = motor_followers_fused
+
+        for (
+            non_production_part_name,
+            non_production_part,
+        ) in motor_assembly.get_named_non_production_part_items():
+            non_production_parts.append(non_production_part)
+            non_production_names.append(
+                non_production_part_name + f"_{side.name.lower()}"
+            )
+
+        mount_plate_connector = motor_assembly.get_non_production_part_by_name(
+            "mount_plate_connector"
+        )
         mount_plate_connectors = mount_plate_connectors.fuse(mount_plate_connector)
+
+        mount_shield = motor_assembly.get_follower_part_by_name("mount_shield")
         mount_shields = mount_shields.fuse(mount_shield)
-        non_production_parts.append(motor_visual_part)
-        non_production_names.append(motor_name)
+
+        axis_holding_counter_flange = motor_assembly.get_non_production_part_by_name(
+            "axis_holding_counter_flange"
+        )
+        axis_holding_counter_flange_screws = (
+            motor_assembly.get_non_production_part_by_name(
+                "axis_holding_counter_flange_screws"
+            )
+        )
+        motor_idlers = motor_assembly.get_non_production_part_by_name("idlers")
+
+        mount_plate = motor_assembly.get_follower_part_by_name("mount_plate")
+
         mount_plates = mount_plates.fuse(mount_plate)
         axis_holding_counter_flanges[
             f"axis_holding_counter_flange_{side.name.lower()}"
         ] = axis_holding_counter_flange
 
-        final_mount_plates_by_side[side] = mount_plate.fuse(mount_shield)
+        final_mount_plates_by_side[side] = motors_fused_by_side[side]
+        final_mount_plates_by_side[side] = final_mount_plates_by_side[side].fuse(
+            mount_shield
+        )
         counter_flange_screws_by_side[side] = axis_holding_counter_flange_screws
+
+        non_production_parts.append(motor_idlers)
+        non_production_names.append(f"idlers_{side.name.lower()}")
 
     mount_plate_connectors_size = get_bounding_box_size(mount_plate_connectors)
 
@@ -1734,19 +1821,25 @@ def main():
 
     x_axis = create_x_axis()
 
+    _logger.info(f"x_axis is: {x_axis}, z_axis is: {z_axis}")
+
     x_axis = align(x_axis, z_axis, Alignment.CENTER)
     x_axis = align(x_axis, z_axis, Alignment.STACK_BACK, stack_gap=-28)
 
     # Non-production references for assembly context
     for name in [
         "axis_frame",
-        "motor_left",
-        "motor_right",
+        "motor_visual_left",
+        "motor_visual_right",
         "link_screw_1",
         "link_screw_2",
         "rail",
         "carriage_1",
         "carriage_2",
+        "idlers_left",
+        "idlers_right",
+        "pulley_left",
+        "pulley_right",
     ]:
         parts.add(
             x_axis.get_non_production_part_by_name(name),
@@ -1786,7 +1879,7 @@ def main():
             mount_plate_of_side,
             next_part_name,
             flip=False,
-            skip_in_production=True,  # was: False,
+            skip_in_production=False,
             prod_rotation_angle=90,
             prod_rotation_axis=(1, 0, 0),
             color=color_by_side[side],
@@ -1799,7 +1892,7 @@ def main():
             x_axis.get_follower_part_by_name(follower_name),
             follower_name,
             flip=False,
-            skip_in_production=True,  # False,
+            skip_in_production=False,
             prod_rotation_angle=0,
             prod_rotation_axis=(1, 0, 0),
             color=(1.0, 0.7, 0.8),
