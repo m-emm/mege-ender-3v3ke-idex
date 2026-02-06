@@ -160,10 +160,13 @@ def create_gt_belt_clamp(
     belt_clearance=0.1,
     nut_cutter_slack=0.1,
     single_screw=False,
+    extra_scew_hole_clearance=0.0,
 ):
     """Create a belt clamp with scew holes for the given belt width."""
 
-    screw_hole_diameter = MScrew.from_size(screw_size).clearance_hole_normal
+    screw_hole_diameter = (
+        MScrew.from_size(screw_size).clearance_hole_normal + extra_scew_hole_clearance
+    )
     base_width = belt_width + 4 * screw_hole_border + 2 * screw_hole_diameter
 
     base = create_box(clamp_length, base_width, base_thicknness)
