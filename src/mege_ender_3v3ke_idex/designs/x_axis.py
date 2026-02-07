@@ -648,7 +648,7 @@ def create_idler_endcap(
                 belt_side_clearance_cutter_length,
                 endcap_belt_width * 2,
                 endcap_belt_width,
-                endcap_belt_width / 2,
+                endcap_belt_width * 0.8,
             )
 
             belt_side_clearance_cutter = rotate(-90 * fb.sign, axis=(1, 0, 0))(
@@ -1311,7 +1311,7 @@ def main():
             x_axis.get_follower_part_by_name(follower_name),
             follower_name,
             flip=False,
-            skip_in_production=False,
+            skip_in_production=True,  # was False,
             prod_rotation_angle=0,
             prod_rotation_axis=(1, 0, 0),
             color=(1.0, 0.7, 0.8),
@@ -1337,7 +1337,7 @@ def main():
         color=(0.5, 0.5, 0.5),
     )
 
-    for side in [Alignment.LEFT]:  # Alignment.RIGHT
+    for side in [Alignment.RIGHT]:  # Alignment.LEFT,
         with_tensioner = side == Alignment.RIGHT
 
         side_str = side.name.lower()
@@ -1367,7 +1367,7 @@ def main():
             endcap.get_follower_part_by_name("endcap_idler_cage"),
             next_part_name,
             flip=False,
-            skip_in_production=False,
+            skip_in_production=True,  # was: False,
             prod_rotation_angle=side.sign * 90,
             prod_rotation_axis=(0, 1, 0),
             color=(0.8, 0.4, 0.6),
