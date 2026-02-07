@@ -11,7 +11,6 @@ import copy
 import logging
 import os
 from collections import defaultdict
-from functools import reduce
 from pathlib import Path
 
 import numpy as np
@@ -22,14 +21,10 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
-
-from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
-from mege_ender_3v3ke_idex.designs.gt2belt import (
-    create_gt2_idler,
-    create_gt_belt_clamp,
-)
-from shellforgepy.simple import *
+from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler, create_gt_belt_clamp
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
+from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
 
@@ -256,7 +251,6 @@ def create_mgn12h_rail(length_mm: float):
         rail = rail.cut(hole)
 
     return LeaderFollowersCuttersPart(rail, cutters=holes_aligned)
-
 
 
 def create_idler_cage(
@@ -847,7 +841,7 @@ def create_x_axis():
                 non_production_part_name + f"_{side.name.lower()}"
             )
 
-        mount_plate_connector = motor_assembly.get_non_production_part_by_name(
+        mount_plate_connector = motor_assembly.get_follower_part_by_name(
             "mount_plate_connector"
         )
         mount_plate_connectors = mount_plate_connectors.fuse(mount_plate_connector)

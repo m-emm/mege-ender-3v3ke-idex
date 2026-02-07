@@ -1,7 +1,5 @@
+from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import ExtrusionProfileType
 from shellforgepy.simple import *
-from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
-    ExtrusionProfileType,
-)
 
 BIG_THING = 500
 
@@ -17,24 +15,25 @@ z_axis_guide_distance = 256
 
 motor_x_offset = z_axis_guide_distance / 2 - 60
 motor_z_offset = 2
-motor_idler_out_offset = 3
+motor_idler_out_offset = 17
 
 motor_pulley_idlers_distance = 25
+motor_pulley_gap = 2
 
 
 x_axis_motor_axle_length = 14
 
-idler_gap = 2
+motor_idler_profile_gap = 1
 
 
-motor_mount_plate_size = 50
-motor_mount_plate_depth = motor_size + motor_y_offset
+motor_mount_plate_size = 52
+
 
 motor_mount_plate_thickness = 5
 motor_mount_plate_fillet_radius = 2
 motor_mount_axle_clearance = 0.3
 motor_mount_boss_clearance = 0.6
-motor_mount_boss_clearance_z = 4
+motor_mount_boss_clearance_z = 8
 
 idler_mount_diameter = 4
 idler_mount_thickness = 1

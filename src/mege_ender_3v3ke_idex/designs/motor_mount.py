@@ -9,37 +9,16 @@ Usage:
 
 import logging
 import os
-
-from shellforgepy.simple import *
-from mege_ender_3v3ke_idex.designs.idex_parameters import *
-
-import copy
-import logging
-import os
-from collections import defaultdict
 from functools import reduce
-from pathlib import Path
-from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
-    ExtrusionProfileType,
-    create_alu_extrusion_profile,
-)
 
-import numpy as np
-from mege_3devops.process_data.mender3.process_data_04_high_speed import (
-    PROCESS_DATA_PETGCF_04_HS,
-)
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
-from mege_ender_3v3ke_idex.designs.gt2belt import (
-    create_gt2_idler,
-    create_gt2_pulley,
-)
+from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler, create_gt2_pulley
+from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.simple import *
-from mege_ender_3v3ke_idex.designs.idex_parameters import *
-
 
 _logger = logging.getLogger(__name__)
 
@@ -56,49 +35,14 @@ PROCESS_DATA = {
 }
 
 
-def create_motor_with_mount():
-
-    motor = create_nema_composite(
-        axle_length=x_axis_motor_axle_length,
-        axle_clearance=motor_mount_axle_clearance,
-        boss_clearance=motor_mount_boss_clearance,
-        boss_clearance_z=motor_mount_boss_clearance_z,
-    )
-
-    mount_plate = create_filleted_box(
-        motor_mount_plate_size,
-        motor_mount_plate_depth,
-        motor_mount_plate_thickness,
-        motor_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
-    )
-
-    mount_plate = align(mount_plate, motor, Alignment.CENTER)
-    mount_plate = align(mount_plate, motor, Alignment.STACK_TOP)
-    mount_plate = align(mount_plate, motor, Alignment.BACK)
-    mount_plate = translate(0, 0, -2.2)(mount_plate)
-
-    mount_plate = motor.use_as_cutter_on(mount_plate)
-
-    return motor, mount_plate
-
-
 def create_idlers_for_motor(
-    motor,
     profile_to_align,
-    mount_plate,
-    vertical_alignment,
-):
-    """Build idlers, their bases, and return updated mount plate for one motor side.
-
-    ``stack_face`` is Alignment.TOP for the top motor and Alignment.BOTTOM for the
-    bottom motor, matching the existing orientation logic in create_x_axis.
-    """
+) -> LeaderFollowersCuttersPart:
 
     idlers = PartCollector()
-    idler_mount_bases = PartCollector()
 
     idler_axle_cutters = []
+    idler_nut_cutters = []
     for idler_alignment in (Alignment.LEFT, Alignment.RIGHT):
 
         idler = create_gt2_idler(num_teeth=16)
@@ -108,10 +52,13 @@ def create_idlers_for_motor(
             profile_to_align,
             Alignment.CENTER,
         )
-        idler = align(idler, motor.leader, idler_alignment)
+
         idler = translate(idler_alignment.sign * motor_idler_out_offset, 0, 0)(idler)
         idler = align(
-            idler, profile_to_align, Alignment.STACK_BACK, stack_gap=idler_gap
+            idler,
+            profile_to_align,
+            Alignment.STACK_BACK,
+            stack_gap=motor_idler_profile_gap,
         )
         idlers = idlers.fuse(idler)
 
@@ -119,7 +66,6 @@ def create_idlers_for_motor(
             idler_mount_axle_diameter / 2 + idler_mount_axle_clearance, 100
         )
         idler_axle_cutter = align(idler_axle_cutter, idler, Alignment.CENTER)
-        mount_plate = mount_plate.cut(idler_axle_cutter)
 
         idler_screw_nut_cutter = create_nut(
             axle_screw_size,
@@ -128,15 +74,17 @@ def create_idlers_for_motor(
         )
         idler_screw_nut_cutter = rotate(30)(idler_screw_nut_cutter)
         idler_screw_nut_cutter = align(idler_screw_nut_cutter, idler, Alignment.CENTER)
-        idler_screw_nut_cutter = align(
-            idler_screw_nut_cutter,
-            mount_plate,
-            vertical_alignment.opposite,
-        )
-        mount_plate = mount_plate.cut(idler_screw_nut_cutter)
         idler_axle_cutters.append(idler_axle_cutter)
+        idler_nut_cutters.append(idler_screw_nut_cutter)
 
-    return idlers, idler_mount_bases, mount_plate, idler_axle_cutters
+    retval = LeaderFollowersCuttersPart(idlers)
+
+    for i, idler_axle_cutter in enumerate(idler_axle_cutters):
+        retval.add_named_cutter(idler_axle_cutter, f"idler_axle_cutter_{i}")
+    for i, idler_nut_cutter in enumerate(idler_nut_cutters):
+        retval.add_named_cutter(idler_nut_cutter, f"idler_nut_cutter_{i}")
+
+    return retval
 
 
 def create_motor_stack(
@@ -151,43 +99,80 @@ def create_motor_stack(
 
     vertical_alignment = vertical_aligment_map[side]
 
-    motor, initial_mount_plate = create_motor_with_mount()
-    motor.add_named_follower(initial_mount_plate, "mount_plate")
-
-    if side == Alignment.LEFT:
-        motor.rotate((0, 0, 0), (0, 1, 0), 180)
-
     profile_to_align = (
         lower_axis_profile if side == Alignment.LEFT else top_axis_profile
     )
 
-    motor = align(motor, profile_to_align, Alignment.CENTER)
-    motor = align(motor, profile_to_align, Alignment.STACK_BACK)
-    motor = align(
-        motor,
-        profile_to_align,
-        Alignment.STACK_TOP if side == Alignment.LEFT else Alignment.STACK_BOTTOM,
-        stack_gap=motor_z_offset,
-    )
-    motor.translate((side.sign * motor_x_offset, motor_y_offset, 0))
-
-    mount_plate = motor.get_follower_part_by_name("mount_plate")
-
-    align_to_profile_translation = align_translation(
-        mount_plate, profile_to_align, vertical_alignment.opposite
+    idlers_assembly = create_idlers_for_motor(
+        profile_to_align=profile_to_align,
     )
 
-    motor = align_to_profile_translation(motor)
-    mount_plate = motor.get_follower_part_by_name("mount_plate")
+    idlers_assembly = translate(side.sign * motor_x_offset, 0, 0)(idlers_assembly)
 
-    axle = motor.get_follower_part_by_name("axle")
+    idler_axle_cutters = [
+        idlers_assembly.get_cutter_part_by_name(f"idler_axle_cutter_{i}")
+        for i in range(2)
+    ]
+    idler_nut_cutters = [
+        idlers_assembly.get_cutter_part_by_name(f"idler_nut_cutter_{i}")
+        for i in range(2)
+    ]
 
     pulley = create_gt2_pulley(num_teeth=20, belt_width=6)
     if side == Alignment.LEFT:
         pulley = rotate(180, axis=(0, 1, 0))(pulley)
-    pulley = align(pulley, axle, Alignment.CENTER)
-    pulley = align(pulley, axle, vertical_alignment)
-    pulley = translate(0, 0, vertical_alignment.sign * pulley_clearance_z)(pulley)
+
+    pulley = align(pulley, idlers_assembly, Alignment.CENTER)
+    pulley = align(pulley, idlers_assembly, vertical_alignment)
+    pulley = translate(0, motor_pulley_idlers_distance, 0)(pulley)
+
+    motor = create_nema_composite(
+        axle_length=x_axis_motor_axle_length,
+        axle_clearance=motor_mount_axle_clearance,
+        boss_clearance=motor_mount_boss_clearance,
+        boss_clearance_z=motor_mount_boss_clearance_z,
+    )
+
+    if side == Alignment.LEFT:
+        motor.rotate((0, 0, 0), (0, 1, 0), 180)
+
+    motor = align(motor, idlers_assembly, Alignment.CENTER)
+    motor = align(
+        motor,
+        pulley,
+        vertical_alignment.opposite.stack_alignment,
+        stack_gap=motor_pulley_gap,
+    )
+
+    axle = motor.get_follower_part_by_name("axle")
+
+    axle_align_translation = align_translation(
+        axle, pulley, Alignment.CENTER, axes=[0, 1]
+    )
+
+    motor = axle_align_translation(motor)
+
+    mount_plate_seed = create_box(1, 1, 1)
+    mount_plate_seed = align(mount_plate_seed, motor, Alignment.CENTER)
+    mount_plate_seed = align(mount_plate_seed, motor, Alignment.STACK_TOP)
+    mount_plate_seed = align(mount_plate_seed, profile_to_align, Alignment.STACK_BACK)
+
+    mount_plate_seed_fused = mount_plate_seed.fuse(motor.leader)
+
+    mount_plate_seed_bounding_box_size = get_bounding_box_size(mount_plate_seed_fused)
+
+    mount_plate = create_filleted_box(
+        motor_mount_plate_size,
+        mount_plate_seed_bounding_box_size[1],
+        motor_mount_plate_thickness,
+        motor_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    mount_plate = align(mount_plate, motor, Alignment.CENTER)
+    mount_plate = align(mount_plate, profile_to_align, Alignment.STACK_BACK)
+    mount_plate = align(mount_plate, profile_to_align, vertical_alignment.opposite)
+
+    mount_plate = motor.use_as_cutter_on(mount_plate)
 
     motor.add_named_non_production_part(pulley, "pulley")
 
@@ -198,19 +183,68 @@ def create_motor_stack(
     mount_plate_limit_cutter = align(
         mount_plate_limit_cutter,
         mount_plate,
-        vertical_alignment,
+        vertical_alignment.opposite.stack_alignment,
     )
 
-    idlers, idler_mount_bases, mount_plate, idler_axle_cutters = (
-        create_idlers_for_motor(
-            motor=motor,
-            profile_to_align=profile_to_align,
-            mount_plate=mount_plate,
-            vertical_alignment=vertical_alignment,
+    mount_plate_opposite_limit_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    mount_plate_opposite_limit_cutter = align(
+        mount_plate_opposite_limit_cutter, mount_plate, Alignment.CENTER
+    )
+    mount_plate_opposite_limit_cutter = align(
+        mount_plate_opposite_limit_cutter,
+        mount_plate,
+        vertical_alignment.opposite,
+    )
+
+    motor_bbox_size = get_bounding_box_size(motor.leader)
+
+    motor_bridge = create_filleted_box(
+        motor_mount_plate_size,
+        motor_bbox_size[1],
+        BIG_THING / 2,
+        fillet_radius=motor_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.FRONT],
+    )
+    motor_bridge = align(motor_bridge, motor, Alignment.CENTER)
+
+    motor_body = motor.get_follower_part_by_name("body")
+
+    motor_bridge = align(motor_bridge, motor_body, vertical_alignment.stack_alignment)
+
+    motor_bridge = motor_bridge.cut(mount_plate_opposite_limit_cutter)
+
+    motor_bridge = motor.use_as_cutter_on(motor_bridge)
+
+    motor_bridge_bbox_size = get_bounding_box_size(motor_bridge)
+    motor_bridge_front_bevel = create_right_triangle(
+        motor_bridge_bbox_size[2],
+        motor_bridge_bbox_size[2],
+        thickness=motor_bridge_bbox_size[0],
+        extrusion_direction=(1, 0, 0),
+        a_normal=(0, 0, vertical_alignment.sign),
+        b_normal=(0, -1, 0),
+    )
+
+    motor_bridge_front_bevel = align(
+        motor_bridge_front_bevel, motor_bridge, Alignment.CENTER
+    )
+    motor_bridge_front_bevel = align(
+        motor_bridge_front_bevel, motor_bridge, Alignment.STACK_FRONT
+    )
+    motor_bridge = motor_bridge.fuse(motor_bridge_front_bevel)
+
+    for axle_cutter in idler_axle_cutters:
+        mount_plate = mount_plate.cut(axle_cutter)
+        motor_bridge = motor_bridge.cut(axle_cutter)
+
+    for nut_cutter in idler_nut_cutters:
+        nut_cutter_aligned = align(nut_cutter, mount_plate, vertical_alignment.opposite)
+        mount_plate = mount_plate.cut(nut_cutter_aligned)
+        nut_cutter_aligned = align(
+            nut_cutter, motor_bridge, vertical_alignment.opposite
         )
-    )
 
-    motor.add_named_non_production_part(idlers, "idlers")
+        motor_bridge = motor_bridge.cut(nut_cutter_aligned)
 
     mount_shield = create_filleted_box(
         mount_shield_width,
@@ -287,6 +321,8 @@ def create_motor_stack(
     mount_flange = align(mount_flange, mount_plate_connector, Alignment.FRONT)
     mount_flange = align(mount_flange, profile_to_align, vertical_alignment)
 
+    motor.add_named_non_production_part(idlers_assembly.leader, "idlers")
+
     nut_pocket_cutters = []
     for screw_hole_alignment in (Alignment.LEFT, Alignment.RIGHT):
 
@@ -353,9 +389,6 @@ def create_motor_stack(
     mount_flange = mount_flange.fuse(mount_flange_bevel_flange_side)
 
     motor.add_named_follower(mount_flange, "mount_flange")
-
-    # sync follower with the modified mount plate geometry
-    motor.followers[motor.get_follower_index_by_name("mount_plate")] = mount_plate
 
     motor_visual = motor.leader.copy()
     motor.add_named_non_production_part(motor_visual, "motor_visual")
@@ -446,21 +479,25 @@ def create_motor_stack(
         axis_holding_counter_flange_screws_fused, "axis_holding_counter_flange_screws"
     )
 
+    motor.add_named_follower(motor_bridge, "motor_bridge")
+    motor.add_named_follower(mount_plate, "mount_plate")
+
     retval = LeaderFollowersCuttersPart(motor.leader)
 
     for follower_name in [
         "mount_shield",
         "mount_plate",
         "mount_flange",
+        "motor_bridge",
+        "mount_plate_connector",
     ]:
         retval.add_named_follower(
             motor.get_follower_part_by_name(follower_name), follower_name
         )
 
     for cross_follower_name in [
-        "mount_plate_connector",
         "axis_holding_counter_flange",
-        "axle"
+        "axle",
     ]:
         retval.add_named_non_production_part(
             motor.get_follower_part_by_name(cross_follower_name), cross_follower_name
@@ -476,12 +513,6 @@ def create_motor_stack(
             motor.get_non_production_part_by_name(non_production_part_name),
             non_production_part_name,
         )
-
-    mount_plate = retval.get_follower_part_by_name("mount_plate")
-    align_to_profile_translation = align_translation(
-        mount_plate, profile_to_align, vertical_alignment.opposite
-    )
-    retval = align_to_profile_translation(retval)
 
     return retval
 
@@ -521,9 +552,17 @@ def main():
         bbox = get_bounding_box(part)
         all_bboxes_by_name[part_name] = bbox
 
+    # motor_followers_fused = PartCollector()
+    # for follower in motor_assembly.followers:
+    #     motor_followers_fused = motor_followers_fused.fuse(follower)
+
+    # motor_followers_fused = translate(80, 100, 0)(motor_followers_fused)
+    # parts.add(motor_followers_fused, f"motor_stack_{side.name.lower()}_followers_fused")
+
     for name, part in motor_assembly.get_named_non_production_part_items():
         part_name = f"motor_stack_{side.name.lower()}_{name}"
-        parts.add(part, part_name, skip_in_production=False)
+
+        parts.add(part, part_name, skip_in_production=False, color=(0.6, 0.6, 0.6))
         bbox = get_bounding_box(part)
         all_bboxes_by_name[part_name] = bbox
 

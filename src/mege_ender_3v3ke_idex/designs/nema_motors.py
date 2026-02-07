@@ -355,6 +355,8 @@ def create_nema_composite(
         origin=(-body_size / 2.0, -body_size / 2.0, 0.0),
     )
 
+    raw_body_box = body_box.copy()
+
     # Body clearance cutter
     body_cutter = create_box(
         body_size + 2.0 * body_clearance_xy,
@@ -439,8 +441,8 @@ def create_nema_composite(
         stack_gap=-nema.coupler_length_mm / 2,
     )
     connector_follower = _create_connector(nema)
-    followers = [axle, coupler_follower]
-    follower_names = ["axle", "coupler"]
+    followers = [axle, coupler_follower, raw_body_box]
+    follower_names = ["axle", "coupler", "body"]
     if connector_follower is not None:
         followers.append(connector_follower)
         follower_names.append("connector")
