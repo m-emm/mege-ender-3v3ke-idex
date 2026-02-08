@@ -48,7 +48,7 @@ mount_shield_depth = 6
 mount_shield_fillet_radius = 1
 mount_shield_oversize_z = 0
 
-mount_flange_bevel_oversize = 1.5
+
 mount_plate_connector_length = (
     z_axis_guide_distance - 2 * motor_x_offset - motor_size + 8
 )
@@ -61,7 +61,8 @@ pulley_clearance_z = 0.8
 
 flange_thickness = 5
 flange_depth = 15
-bevel_depth = flange_depth * 0.8
+bevel_depth = flange_depth * 0.75
+mount_flange_bevel_oversize = 2.0
 idler_screw_size = "M3"
 idler_screw_head_clearance = 0.3
 mount_flange_screw_hole_inset = 10

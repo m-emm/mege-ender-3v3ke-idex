@@ -364,7 +364,7 @@ def create_motor_stack(
         mount_flange = mount_flange.cut(cylinder_head_cutter)
 
     mount_flange_bevel = create_right_triangle(
-        bevel_depth + motor_z_offset + mount_flange_bevel_oversize,
+        bevel_depth + mount_flange_bevel_oversize,
         bevel_depth,
         thickness=mount_plate_connector_length - 2 * motor_mount_plate_fillet_radius,
         extrusion_direction=(side.sign, 0, 0),
