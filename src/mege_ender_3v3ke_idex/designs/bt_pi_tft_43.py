@@ -17,16 +17,7 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
     PROCESS_DATA_PETGCF_04_HS,
     PROCESS_DATA_PLACF_04_HS,
 )
-from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
-    ExtrusionProfileType,
-    create_alu_extrusion_profile,
-)
-from mege_ender_3v3ke_idex.designs.gt2belt import create_gt_belt_clamp
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.mgh_linear import (
-    create_mgn12h_carriage,
-    create_mgn12h_rail,
-)
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -38,11 +29,10 @@ PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLACF_04_HS)
 
 PROCESS_DATA["process_overrides"].update(
     {
-        "wall_loops": "1",
+        "wall_loops": "2",
         "bottom_shell_layers": "1",
         "top_shell_layers": "1",
-        "sparse_infill_density": "10%",
-        "brim_type": "no_brim",
+        "sparse_infill_density": "25%",
     }
 )
 
