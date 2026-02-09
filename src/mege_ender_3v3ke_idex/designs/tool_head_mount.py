@@ -12,10 +12,8 @@ import logging
 import os
 
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401
-    PROCESS_DATA_PLACF_04_HS,
-)
-from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401
     PROCESS_DATA_PETGCF_04_HS,
+    PROCESS_DATA_PLACF_04_HS,
 )
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
