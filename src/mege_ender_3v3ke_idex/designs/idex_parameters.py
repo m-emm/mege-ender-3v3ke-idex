@@ -17,7 +17,7 @@ motor_x_offset = z_axis_guide_distance / 2 - 60
 motor_z_offset = 2
 motor_idler_out_offset = 17
 
-motor_pulley_idlers_distance = 25
+motor_pulley_idlers_distance = 28
 motor_pulley_gap = 2
 
 
@@ -133,25 +133,29 @@ jig_thickness = 3.6
 tool_head_mount_carriage_mount_plate_thickness = 4
 tool_head_mount_carriage_mount_plate_fillet_radius = 1
 
-tool_head_mount_belt_z_offset = 12
 
 tool_head_mount_base_plate_thickness = 10
-tool_head_mount_base_plate_height = 35
+tool_head_mount_base_plate_height = 45
 tool_head_belt_clamp_gap = 3
 
 
 tool_head_mount_side_clearance = 0.5
+tool_head_mount_side_stiffener_thickness = 2
+
 tool_head_mount_side_plate_depth = 12
+tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
+
 tool_head_mount_side_plate_thickness = 2
 tool_head_mount_belt_clamp_thickness = 3.5
 tool_head_mount_belt_clamp_base_thickness = 5
 tool_head_mount_clamp_base_cutter_clearance = 0.8
 tool_head_mount_clamp_base_cutter_depth_clearance = 0.1
 tool_head_mount_belt_path_cutter_clearance = 0.5
-
-tool_head_mount_y_extension = max(
-    tool_head_mount_base_plate_thickness + 0.3, tool_head_mount_side_plate_depth
-)
+tool_head_mount_belt_deflector_thickness = 3
+tool_head_mount_belt_deflector_cage_thickness = 3
+tool_head_mount_belt_deflector_belt_clearance = 3.5
+tool_head_mount_belt_deflector_belt_z_clearance = 0.3
+tool_head_mount_belt_deflector_into_profile_distance = 0.3
 
 
 __all__ = sorted(

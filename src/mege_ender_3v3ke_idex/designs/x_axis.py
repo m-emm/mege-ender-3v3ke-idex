@@ -21,9 +21,14 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
-from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler, create_gt_belt_clamp
+from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.mgh_linear import (
+    create_mgn12h_carriage,
+    create_mgn12h_rail,
+)
 from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
+from mege_ender_3v3ke_idex.designs.tool_head_mount import create_tool_head_mount
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -174,83 +179,6 @@ def create_z_axis():
     # ender_part = ender_part.fuse(guides)
 
     return z_guides
-
-
-def create_mgn12h_carriage():
-    """Create the MGN12H carriage part."""
-
-    width = 27
-    length = 45.4
-    screw_hole_pitch = 20
-    height = 10
-    screw_hole_depth = 3.5
-    screw_hole_diameter = MScrew.from_size("M3").clearance_hole_normal
-    h1 = 3.4
-
-    carriage = create_box(length, width, height)
-
-    holes = PartCollector()
-    for x in [-screw_hole_pitch / 2, screw_hole_pitch / 2]:
-        for y in [-screw_hole_pitch / 2, screw_hole_pitch / 2]:
-            hole = create_cylinder(screw_hole_diameter / 2, height)
-            hole = translate(x, y, 0)(hole)
-            holes = holes.fuse(hole)
-
-    holes = align(holes, carriage, Alignment.CENTER)
-    holes = align(holes, carriage, Alignment.STACK_TOP, stack_gap=-screw_hole_depth)
-
-    carriage = carriage.cut(holes)
-
-    carriage = LeaderFollowersCuttersPart(carriage, cutters=[holes])
-
-    carriage = translate(0, 0, h1)(carriage)
-
-    return carriage
-
-
-def create_mgn12h_rail(length_mm: float):
-    """Create the MGN12H rail part."""
-
-    width = 12
-    height = 8.5
-    hole_pitch = 25
-    top_hole_diameter = 8
-    bottom_hole_diameter = 4.5
-    top_hole_depth = 4.5
-
-    rail = create_box(length_mm, width, height)
-
-    num_holes = int(length_mm // hole_pitch)
-
-    holes = PartCollector()
-    holes_list = []
-    for i in range(num_holes):
-        x = i * hole_pitch
-        # Top hole
-        top_hole = create_cylinder(top_hole_diameter / 2, top_hole_depth)
-        top_hole = translate(x, 0, 0)(top_hole)
-        top_hole = align(top_hole, rail, Alignment.TOP)
-
-        current_hole = top_hole
-        holes = holes.fuse(top_hole)
-        # Bottom hole
-        bottom_hole = create_cylinder(bottom_hole_diameter / 2, height)
-        bottom_hole = translate(x, 0, 0)(bottom_hole)
-        bottom_hole = align(bottom_hole, rail, Alignment.BOTTOM)
-        holes = holes.fuse(bottom_hole)
-        current_hole = current_hole.fuse(bottom_hole)
-        holes_list.append(current_hole)
-
-    holes_align_translation = align_translation(
-        holes, rail, Alignment.CENTER, axes=[0, 1]
-    )
-
-    holes_aligned = [holes_align_translation(hole) for hole in holes_list]
-
-    for hole in holes_aligned:
-        rail = rail.cut(hole)
-
-    return LeaderFollowersCuttersPart(rail, cutters=holes_aligned)
 
 
 def create_idler_cage(
@@ -1050,181 +978,6 @@ def create_rail_drill_jig():
         jig = jig.cut(current_drill)
 
     return jig
-
-
-def create_tool_head_mount():
-
-    carriage = create_mgn12h_carriage()
-    carriage_size = get_bounding_box_size(carriage)
-
-    carriage_mount_plate_width = (
-        carriage_size[0]
-        + 2 * tool_head_mount_side_clearance
-        + 2 * tool_head_mount_side_plate_thickness
-    )
-
-    tool_head_mount_base_plate_width = (
-        carriage_mount_plate_width - 2 * tool_head_mount_side_plate_thickness
-    )
-
-    clamp_1 = create_gt_belt_clamp(
-        base_thicknness=tool_head_mount_belt_clamp_base_thickness,
-        clamp_thickness=tool_head_mount_belt_clamp_thickness,
-        clamp_length=tool_head_mount_base_plate_width / 2 - tool_head_belt_clamp_gap,
-        screw_size="M3",
-        screw_hole_border=1.9,
-        teeth_clearance=0.1,
-        single_screw=True,
-        extra_scew_hole_clearance=0.2,
-    )
-    clamp_1 = rotate(90, axis=(1, 0, 0))(clamp_1)
-    clamp_1 = rotate(180)(clamp_1)
-
-    carriage_mount_plate = create_filleted_box(
-        carriage_mount_plate_width,
-        carriage_size[1] + tool_head_mount_y_extension,
-        tool_head_mount_carriage_mount_plate_thickness,
-        fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM],
-    )
-
-    carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.CENTER)
-    carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.STACK_TOP)
-    carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.BACK)
-    carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
-
-    mount_base_plate = create_box(
-        tool_head_mount_base_plate_width,
-        tool_head_mount_base_plate_thickness,
-        tool_head_mount_base_plate_height,
-    )
-
-    mount_base_plate = align(mount_base_plate, carriage_mount_plate, Alignment.CENTER)
-    mount_base_plate = align(
-        mount_base_plate, carriage_mount_plate, Alignment.STACK_BOTTOM
-    )
-    mount_base_plate = align(mount_base_plate, carriage_mount_plate, Alignment.FRONT)
-
-    side_plates = PartCollector()
-    for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        side_plate = create_filleted_box(
-            tool_head_mount_side_plate_thickness,
-            tool_head_mount_side_plate_depth,
-            tool_head_mount_base_plate_height,
-            fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
-            no_fillets_at=[Alignment.TOP, lr.opposite],
-        )
-
-        side_plate = align(side_plate, carriage_mount_plate, Alignment.STACK_BOTTOM)
-        side_plate = align(side_plate, carriage_mount_plate, Alignment.FRONT)
-        side_plate = align(side_plate, carriage_mount_plate, lr)
-        side_plates = side_plates.fuse(side_plate)
-
-    clamp_1 = align(clamp_1, mount_base_plate, Alignment.CENTER, axes=[0])
-    clamp_1 = align(clamp_1, side_plates, Alignment.BACK)
-    clamp_1 = align(clamp_1, carriage_mount_plate, Alignment.STACK_BOTTOM)
-
-    clamp_1 = align(clamp_1, mount_base_plate, Alignment.LEFT)
-
-    clamp_2 = align(clamp_1, mount_base_plate, Alignment.RIGHT)
-
-    clamp = LeaderFollowersCuttersPart(leader=clamp_1.leader.fuse(clamp_2.leader))
-
-    clamp.add_named_follower(clamp_1.get_follower_part_by_name("clamp"), "clamp_1")
-    clamp.add_named_follower(clamp_2.get_follower_part_by_name("clamp"), "clamp_2")
-    clamp.add_named_follower(clamp_1.leader, "belt_clamp_base_1")
-    clamp.add_named_follower(clamp_2.leader, "belt_clamp_base_2")
-    clamp.add_named_follower(
-        clamp_1.get_follower_part_by_name("belt_path_cutter"), "belt_path_cutter_1"
-    )
-    clamp.add_named_follower(
-        clamp_2.get_follower_part_by_name("belt_path_cutter"), "belt_path_cutter_2"
-    )
-
-    clamp = translate(0, 0, -tool_head_mount_belt_z_offset)(clamp)
-
-    clamp_align_translation = align_translation(
-        clamp.get_follower_part_by_name("clamp_1"), side_plates, Alignment.BACK
-    )
-    clamp = clamp_align_translation(clamp)
-
-    clamps_list = [
-        clamp.get_follower_part_by_name("clamp_1"),
-        clamp.get_follower_part_by_name("clamp_2"),
-    ]
-    bases_list = [
-        clamp.get_follower_part_by_name("belt_clamp_base_1"),
-        clamp.get_follower_part_by_name("belt_clamp_base_2"),
-    ]
-
-    belt_path_cutters_list = [
-        clamp.get_follower_part_by_name("belt_path_cutter_1"),
-        clamp.get_follower_part_by_name("belt_path_cutter_2"),
-    ]
-
-    clamps_fused = clamp.get_follower_part_by_name("clamp_1").fuse(
-        clamp.get_follower_part_by_name("clamp_2")
-    )
-
-    clamp_cutter = PartCollector()
-    bases_cutter = PartCollector()
-    belt_path_cutter = PartCollector()
-    for current_clamp, current_base, current_belt_path_cutter in zip(
-        clamps_list, bases_list, belt_path_cutters_list
-    ):
-        current_clamp_size = get_bounding_box_size(current_clamp)
-        current_clamp_cutter = create_box(
-            current_clamp_size[0],
-            current_clamp_size[1],
-            current_clamp_size[2],
-        )
-        current_clamp_cutter = align(
-            current_clamp_cutter, current_clamp, Alignment.CENTER
-        )
-        clamp_cutter = clamp_cutter.fuse(current_clamp_cutter)
-
-        current_base_size = get_bounding_box_size(current_base)
-        current_base_cutter = create_box(
-            current_base_size[0] + 2 * tool_head_mount_clamp_base_cutter_clearance,
-            BIG_THING,
-            current_base_size[2] + 2 * tool_head_mount_clamp_base_cutter_clearance,
-        )
-        current_base_cutter = align(current_base_cutter, current_base, Alignment.CENTER)
-        current_base_cutter = align(current_base_cutter, current_base, Alignment.BACK)
-
-        bases_cutter = bases_cutter.fuse(current_base_cutter)
-
-        curent_belt_path_cutter_size = get_bounding_box_size(current_belt_path_cutter)
-        current_belt_path_cutter_enlarged = create_box(
-            curent_belt_path_cutter_size[0]
-            + 2 * tool_head_mount_belt_path_cutter_clearance,
-            curent_belt_path_cutter_size[1]
-            + 2 * tool_head_mount_belt_path_cutter_clearance,
-            curent_belt_path_cutter_size[2]
-            + 2 * tool_head_mount_belt_path_cutter_clearance,
-        )
-        current_belt_path_cutter_enlarged = align(
-            current_belt_path_cutter_enlarged,
-            current_belt_path_cutter,
-            Alignment.CENTER,
-        )
-        belt_path_cutter = belt_path_cutter.fuse(current_belt_path_cutter_enlarged)
-
-    mount_base_plate = mount_base_plate.cut(clamp_cutter)
-    mount_base_plate = mount_base_plate.cut(bases_cutter)
-
-    tool_head_mount = carriage_mount_plate.fuse(clamps_fused)
-
-    tool_head_mount = tool_head_mount.fuse(mount_base_plate)
-    side_plates = side_plates.cut(bases_cutter)
-    side_plates = side_plates.cut(belt_path_cutter)
-
-    tool_head_mount = tool_head_mount.fuse(side_plates)
-
-    tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
-    tool_head_mount.add_named_follower(clamp.leader, "belt_clamp_base")
-
-    return tool_head_mount
 
     # parts.add(clamp.leader, "belt_clamp_base", flip=False)
     # parts.add(clamp.get_follower_part_by_name("clamp"), "belt_clamp", flip=True)
