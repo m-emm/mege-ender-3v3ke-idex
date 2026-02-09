@@ -64,3 +64,12 @@ Or explicitly use the symlink:
 ## Notes
 - Secrets and machine-specific files live in `klipper_setup/image_build/secrets/` (git-ignored).
 - pi-gen submodule, work dirs, and deploy outputs are ignored via `.gitignore`.
+
+## RP2040 Firmware (Klipper / Katapult)
+
+This repo also includes Dockerized scripts to build and flash RP2040 firmware:
+
+- Direct (no Katapult): build `klipper.uf2` and flash via BOOTSEL.
+- With Katapult: build+flash Katapult once, then build `klipper.bin` with a bootloader offset and flash via Katapult.
+
+See: `klipper_setup/rp2040_firmware/README.md`

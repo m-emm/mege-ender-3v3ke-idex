@@ -80,3 +80,7 @@ klipper_setup/image_build/pi-gen/export-image/
 
 # RP2040 firmware build artifacts
 klipper_setup/rp2040_firmware/klipper/
+klipper_setup/rp2040_firmware/katapult/
+klipper_setup/rp2040_firmware/katapult_venv/
+resources/step_experiments/
+*.code-workspace

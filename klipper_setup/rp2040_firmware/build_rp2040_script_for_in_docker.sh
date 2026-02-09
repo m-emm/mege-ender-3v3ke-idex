@@ -23,8 +23,11 @@ git submodule update --init --recursive
 
 echo "==> Cleaning previous build..."
 
+make clean
+
 echo '==> Configuring for RP2040...'
-cp /work/rp2040_config ./.config
+: "${KLIPPER_CONFIG_FILE:=rp2040_config}"
+cp "/work/${KLIPPER_CONFIG_FILE}" ./.config
 
 echo "==> Building firmware..."
 
@@ -33,5 +36,14 @@ make
 
 echo ""
 echo "==> Build complete!"
-echo "Firmware: /work/klipper/out/klipper.uf2"
-ls -lh /work/klipper/out/klipper.uf2
+if [[ -f /work/klipper/out/klipper.bin ]]; then
+    echo "Firmware (Katapult): /work/klipper/out/klipper.bin"
+    ls -lh /work/klipper/out/klipper.bin
+elif [[ -f /work/klipper/out/klipper.uf2 ]]; then
+    echo "Firmware (direct): /work/klipper/out/klipper.uf2"
+    ls -lh /work/klipper/out/klipper.uf2
+else
+    echo "ERROR: No expected firmware output found in /work/klipper/out" >&2
+    ls -lh /work/klipper/out >&2 || true
+    exit 1
+fi

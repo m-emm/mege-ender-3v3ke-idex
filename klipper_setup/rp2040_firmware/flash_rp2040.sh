@@ -1,5 +1,6 @@
 #!/bin/bash
-# Flash Klipper firmware to RP2040 (Raspberry Pi Pico)
+# Flash Klipper firmware to RP2040 via BOOTSEL mass-storage mode
+# (Use this only when NOT using Katapult.)
 
 set -e
 
@@ -11,7 +12,7 @@ echo "==> Flashing Klipper to RP2040"
 # Check if firmware exists
 if [ ! -f "${FIRMWARE}" ]; then
     echo "ERROR: Firmware not found at ${FIRMWARE}"
-    echo "Run ./build_rp2040.sh first"
+    echo "Run ./build_rp2040_docker.sh -d first"
     exit 1
 fi
 
