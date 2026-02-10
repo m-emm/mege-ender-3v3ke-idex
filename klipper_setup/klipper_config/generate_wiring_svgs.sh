@@ -16,19 +16,19 @@ run_pinout() {
   eval "$cmd"
 }
 
-if command -v shellforgepy-pinout >/dev/null 2>&1; then
-  run_pinout "shellforgepy-pinout \"$YAML_FILE\" -o \"$OUTPUT_DIR\""
-elif python3 -c "import shellforgepy_meges_workshop.pinout.cli" >/dev/null 2>&1; then
-  run_pinout "python3 -m shellforgepy_meges_workshop.pinout \"$YAML_FILE\" -o \"$OUTPUT_DIR\""
+if python3 -c "import mege_ender_3v3ke_idex.pinout.cli" >/dev/null 2>&1; then
+  run_pinout "python3 -m mege_ender_3v3ke_idex.pinout \"$YAML_FILE\" -o \"$OUTPUT_DIR\""
 else
-  SF_SRC_DEFAULT="$SCRIPT_DIR/../../../shellforgepy-meges-workshop/src"
-  if [[ -d "$SF_SRC_DEFAULT" ]]; then
-    echo "Using local shellforgepy-meges-workshop source: $SF_SRC_DEFAULT"
-    PYTHONPATH="${PYTHONPATH:-}:$SF_SRC_DEFAULT" \
-      run_pinout "python3 -m shellforgepy_meges_workshop.pinout \"$YAML_FILE\" -o \"$OUTPUT_DIR\""
+  PROJECT_SRC_DEFAULT="$SCRIPT_DIR/../../src"
+  if [[ -d "$PROJECT_SRC_DEFAULT" ]] && \
+    PYTHONPATH="${PYTHONPATH:-}:$PROJECT_SRC_DEFAULT" \
+      python3 -c "import mege_ender_3v3ke_idex.pinout.cli" >/dev/null 2>&1; then
+    echo "Using local mege-ender-3v3ke-idex source: $PROJECT_SRC_DEFAULT"
+    PYTHONPATH="${PYTHONPATH:-}:$PROJECT_SRC_DEFAULT" \
+      run_pinout "python3 -m mege_ender_3v3ke_idex.pinout \"$YAML_FILE\" -o \"$OUTPUT_DIR\""
   else
-    echo "Could not find shellforgepy pinout CLI." >&2
-    echo "Install shellforgepy-meges-workshop or set PYTHONPATH to its src/ directory." >&2
+    echo "Could not find pinout CLI." >&2
+    echo "Install mege-ender-3v3ke-idex or set PYTHONPATH to its src/ directory." >&2
     exit 2
   fi
 fi
@@ -50,4 +50,3 @@ BOTTOM_SVG="$OUTPUT_DIR/${BASE_NAME}_bottom.svg"
 echo "Generated:"
 echo "  $TOP_SVG"
 echo "  $BOTTOM_SVG"
-

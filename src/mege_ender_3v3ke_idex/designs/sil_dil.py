@@ -163,6 +163,7 @@ def create_dil_board(
     pin_cutter_slack=0.0,
     base_cutter_slack=None,
     board_cutter_slack=0.0,
+    x_overhang_in_pins=0.0,
     y_overhang_in_pins=0.5,
 ):
 
@@ -170,13 +171,19 @@ def create_dil_board(
     for key, slack in [("plain", 0), ("with_slack", board_cutter_slack)]:
         if board_corner_radius is None:
             board = create_box(
-                int_x_distance * dil_pitch + wire_wrap_pin_base_width + 2 * slack,
+                int_x_distance * dil_pitch
+                + wire_wrap_pin_base_width
+                + 2 * x_overhang_in_pins * dil_pitch
+                + 2 * slack,
                 num_y_pins * dil_pitch + 2 * slack + 2 * y_overhang_in_pins * dil_pitch,
                 board_thickness + 2 * slack,
             )
         else:
             board = create_filleted_box(
-                int_x_distance * dil_pitch + wire_wrap_pin_base_width + 2 * slack,
+                int_x_distance * dil_pitch
+                + wire_wrap_pin_base_width
+                + 2 * x_overhang_in_pins * dil_pitch
+                + 2 * slack,
                 num_y_pins * dil_pitch + 2 * slack + 2 * y_overhang_in_pins * dil_pitch,
                 board_thickness + 2 * slack,
                 board_corner_radius,
@@ -188,7 +195,11 @@ def create_dil_board(
         boards["with_slack"], boards["plain"], Alignment.CENTER
     )
 
-    boards = LeaderFollowersCuttersPart(boards["plain"], cutters=[boards["with_slack"]])
+    boards_lfc = LeaderFollowersCuttersPart(
+        boards["plain"], cutters=[boards["with_slack"]]
+    )
+
+    boards_lfc.add_named_follower(boards["plain"], "board")
 
     dil = create_dil(
         int_x_distance,
@@ -201,10 +212,10 @@ def create_dil_board(
         base_cutter_slack=base_cutter_slack,
     )
 
-    dil = align(dil, boards, Alignment.CENTER)
-    dil = align(dil, boards, Alignment.STACK_BOTTOM, stack_gap=0)
+    dil = align(dil, boards_lfc, Alignment.CENTER)
+    dil = align(dil, boards_lfc, Alignment.STACK_BOTTOM, stack_gap=0)
 
-    retval = dil.fuse(boards)
+    retval = dil.fuse(boards_lfc)
 
     return retval
 

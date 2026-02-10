@@ -44,8 +44,10 @@ tft_with_board_thickness = 7.6
 tft_screw_holder_height = 6.2
 tft_screw_holder_diameter = 5.52
 tft_screw_size = "M3"
-tft_screw_holders_envelope_width = 102.92
-tft_screw_holders_envelope_height = 64.5
+tft_screw_cylinder_head_clearance = 0.5
+tft_screw_holders_inset = 1.4075
+tft_screw_holders_envelope_width = tft_width - 2 * tft_screw_holders_inset
+tft_screw_holders_envelope_height = tft_height - 2 * tft_screw_holders_inset
 
 tft_screw_holders_center_to_center_distance_width = (
     tft_screw_holders_envelope_width - tft_screw_holder_diameter
@@ -54,12 +56,10 @@ tft_screw_holders_center_to_center_distance_height = (
     tft_screw_holders_envelope_height - tft_screw_holder_diameter
 )
 
-tft_screw_holders_inset = (tft_width - tft_screw_holders_envelope_width) / 2
-
 tft_cable_width = 16
 tft_cable_clearance = 1
 
-tft_screen_clearance = 0.2
+tft_screen_clearance = 0.5
 tft_button_2_offset = 26
 tft_button_1_offset = 13.7
 
@@ -71,15 +71,17 @@ raspi_connections_height = 17.2
 raspi_board_length = 84.88
 raspi_connectors_oversize = 1
 
-tft_housing_wall_thickness = 1.5
+tft_housing_wall_thickness = 2.4
 tft_housing_border = 20
 tft_housing_fillet_radius = 4
 
 tft_housing_height = 60
+tft_housing_cut_height = tft_housing_height
+
 tft_housing_front_screen_thickness = 2.5
 tft_housing_lip_size = 0.75
-tft_housing_screw_plate_size = 6
-tft_housing_screw_plate_thickness = 2
+tft_housing_screw_plate_size = 9
+tft_housing_screw_plate_thickness = 3.5
 
 tft_housing_air_hole_size = 4
 tft_housing_air_hole_spacing = 10
@@ -107,9 +109,25 @@ def creaate_tft():
             )(screw_holder)
             screw_holders.append(screw_holder)
 
+    screw_holders_fused = PartCollector()
     for screw_holder in screw_holders:
-        tft_with_board = tft_with_board.fuse(screw_holder)
+        screw_holders_fused = screw_holders_fused.fuse(screw_holder)
 
+    screw_holders_fused_size = get_bounding_box_size(screw_holders_fused)
+
+    if not np.allclose(screw_holders_fused_size[0], tft_screw_holders_envelope_width):
+
+        raise ValueError(
+            f"Screw holders fused width {screw_holders_fused_size[0]} does not match expected envelope width {tft_screw_holders_envelope_width}"
+        )
+
+    if not np.allclose(screw_holders_fused_size[1], tft_screw_holders_envelope_height):
+
+        raise ValueError(
+            f"Screw holders fused height {screw_holders_fused_size[1]} does not match expected envelope height {tft_screw_holders_envelope_height}"
+        )
+
+    tft_with_board = tft_with_board.fuse(screw_holders_fused)
     retval = LeaderFollowersCuttersPart(
         tft_with_board, followers=screw_holders, cutters=[]
     )
@@ -213,6 +231,7 @@ def create_housing(tft):
     tft_center = np.array(get_bounding_box_center(tft))
 
     bridges = PartCollector()
+    screw_drills = PartCollector()
     for screw_holder in tft.followers:
         screw_plate = create_box(
             tft_housing_screw_plate_size,
@@ -220,12 +239,24 @@ def create_housing(tft):
             tft_housing_screw_plate_thickness,
         )
 
-        screw_hole_diameter = MScrew.from_size(tft_screw_size).clearance_hole_normal
-        screw_hole = create_cylinder(screw_hole_diameter / 2, BIG_THING)
-        screw_hole = align(screw_hole, screw_plate, Alignment.CENTER)
-        screw_plate = screw_plate.cut(screw_hole)
         screw_plate = align(screw_plate, screw_holder, Alignment.CENTER)
         screw_plate = align(screw_plate, screw_holder, Alignment.STACK_TOP)
+
+        screw_hole_diameter = MScrew.from_size(tft_screw_size).clearance_hole_loose
+        screw_hole = create_cylinder(screw_hole_diameter / 2, BIG_THING)
+        screw_hole = align(screw_hole, screw_plate, Alignment.CENTER)
+        screw_drills = screw_drills.fuse(screw_hole)
+
+        screw_cylinder_drill = create_cylinder(
+            MScrew.from_size(tft_screw_size).cylinder_head_diameter / 2
+            + tft_screw_cylinder_head_clearance,
+            BIG_THING,
+        )
+        screw_cylinder_drill = align(screw_cylinder_drill, screw_hole, Alignment.CENTER)
+        screw_cylinder_drill = align(
+            screw_cylinder_drill, screw_plate, Alignment.STACK_TOP
+        )
+        screw_drills = screw_drills.fuse(screw_cylinder_drill)
 
         screw_plates = screw_plates.fuse(screw_plate)
 
@@ -249,6 +280,7 @@ def create_housing(tft):
                     + tft_screen_clearance
                     + tft_housing_wall_thickness * 0.25
                     + tft_screw_holders_inset
+                    - tft_housing_wall_thickness / 2
                 )
                 bridge = create_box(
                     (
@@ -268,8 +300,8 @@ def create_housing(tft):
                 bridges = bridges.fuse(bridge)
 
                 print_helper = create_right_triangle(
-                    bridge_length,
-                    bridge_length,
+                    bridge_length + tft_housing_screw_plate_size,
+                    bridge_length + tft_housing_screw_plate_size,
                     tft_housing_screw_plate_size,
                     extrusion_direction=(
                         1 if direction.axis == 1 else 0,
@@ -286,9 +318,7 @@ def create_housing(tft):
 
                 print_helper = align(print_helper, bridge, Alignment.CENTER)
 
-                print_helper = align(
-                    print_helper, screw_plate, direction.stack_alignment
-                )
+                print_helper = align(print_helper, screw_plate, direction.opposite)
                 print_helper = align(print_helper, bridge, Alignment.STACK_TOP)
                 bridges = bridges.fuse(print_helper)
 
@@ -362,8 +392,9 @@ def create_housing(tft):
     border_print_helpers = translate(0, 0, 100)(border_print_helpers_part_collector)
     housing = housing.fuse(border_print_helpers_part_collector)
 
-    housing = housing.fuse(bridges)
-    housing = housing.fuse(screw_plates)
+    bridges_and_screw_plates = bridges.fuse(screw_plates)
+    bridges_and_screw_plates = bridges_and_screw_plates.cut(screw_drills)
+    housing = housing.fuse(bridges_and_screw_plates)
 
     return housing
 
@@ -399,7 +430,26 @@ def main():
     parts.add(part, "bt_pi_tft_43", flip=False, skip_in_production=True)
 
     housing = create_housing(part)
-    parts.add(housing, "bt_pi_tft_43_housing", flip=True)
+
+    housing_real_height_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    housing_real_height_cutter = align(
+        housing_real_height_cutter, housing, Alignment.CENTER
+    )
+    housing_real_height_cutter = align(
+        housing_real_height_cutter,
+        housing,
+        Alignment.STACK_TOP,
+        stack_gap=-(tft_housing_height - tft_housing_cut_height),
+    )
+    housing = housing.cut(housing_real_height_cutter)
+
+    parts.add(
+        housing,
+        "bt_pi_tft_43_housing",
+        flip=True,
+    )
+
+    # parts.add(housing, "bt_pi_tft_43_housing", flip=True)
 
     # Arrange and export
     arrange_and_export(
@@ -407,6 +457,7 @@ def main():
         script_file=__file__,
         prod=PROD,
         process_data=PROCESS_DATA,
+        prod_gap=8,
     )
 
     _logger.info("bt_pi_tft_43 created successfully!")
