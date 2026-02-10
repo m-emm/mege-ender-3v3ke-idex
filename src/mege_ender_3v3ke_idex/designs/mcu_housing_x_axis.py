@@ -7,9 +7,16 @@ Usage:
     cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/mcu_housing_x_axis.py
 """
 
+import copy
 import logging
+import math
 import os
 
+from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401
+    PROCESS_DATA_PETGCF_04_HS,
+    PROCESS_DATA_PLACF_04_HS,
+)
+from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.sil_dil import (
     create_dil_board,
     dil_pitch,
@@ -26,14 +33,17 @@ _logger = logging.getLogger(__name__)
 # Production mode from environment variable
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
-# Optional slicer process overrides
-PROCESS_DATA = {
-    "filament": "FilamentPLAMegeMaster",
-    "process_overrides": {
-        "nozzle_diameter": "0.6",
-        "layer_height": "0.2",
-    },
-}
+PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLACF_04_HS)
+
+PROCESS_DATA["process_overrides"].update(
+    {
+        "wall_loops": "2",
+        "bottom_shell_layers": "1",
+        "top_shell_layers": "1",
+        "sparse_infill_density": "25%",
+        "brim_type": "no_brim",
+    }
+)
 
 BIG_THING = 500
 
@@ -96,6 +106,84 @@ tmc_board_y_oversize = 0  # in dil pitch units
 tmc_board_corner_radius = None
 tmc_board_cooler_size = 8.9
 tmc_board_cooler_height = 12
+
+
+board_clamp_spring_length = 10
+board_clamp_spring_thickness = 1.8
+board_clamp_height = 5
+board_clamp_tooth_size = 0.8
+board_clamp_teeth_length = 3
+board_clamp_spring_side_clearance = 1
+board_clamp_spring_front_cliearnce = 0.3
+board_clamp_clamping_inset = 0.8
+
+
+def create_board_clamp():
+
+    clamp_spring = create_box(
+        board_clamp_spring_thickness, board_clamp_spring_length, base_thickness
+    )
+
+    clamp_sping_clearance_cutter = create_box(
+        board_clamp_spring_thickness + board_clamp_spring_side_clearance,
+        board_clamp_spring_length + board_clamp_spring_front_cliearnce,
+        BIG_THING,
+    )
+    clamp_sping_clearance_cutter = align(
+        clamp_sping_clearance_cutter, clamp_spring, Alignment.CENTER
+    )
+    clamp_sping_clearance_cutter = align(
+        clamp_sping_clearance_cutter, clamp_spring, Alignment.FRONT
+    )
+    clamp_sping_clearance_cutter = align(
+        clamp_sping_clearance_cutter, clamp_spring, Alignment.LEFT
+    )
+
+    tooth_height = math.sqrt(2) * board_clamp_tooth_size
+
+    num_teeth = math.ceil(board_clamp_height / tooth_height)
+
+    teeth = PartCollector()
+    for i in range(num_teeth):
+        tooth = create_box(
+            board_clamp_tooth_size, board_clamp_teeth_length, board_clamp_tooth_size
+        )
+        tooth = rotate(45, axis=(0, 1, 0))(tooth)
+
+        tooth = translate(0, 0, tooth_height * i)(tooth)
+        teeth = teeth.fuse(tooth)
+
+    teeth = align(teeth, clamp_spring, Alignment.BOTTOM)
+    teeth = align(teeth, clamp_spring, Alignment.BACK)
+    teeth = align(teeth, clamp_spring, Alignment.LEFT)
+    teeth = translate(-board_clamp_clamping_inset, 0, 0)(teeth)
+
+    teeth_holder = create_box(
+        board_clamp_spring_thickness + board_clamp_clamping_inset - tooth_height / 2,
+        board_clamp_teeth_length,
+        board_clamp_height,
+    )
+    teeth_holder = align(teeth_holder, clamp_spring, Alignment.LEFT)
+    teeth_holder = align(teeth_holder, clamp_spring, Alignment.BOTTOM)
+    teeth_holder = align(teeth_holder, clamp_spring, Alignment.BACK)
+    teeth_holder = translate(-(board_clamp_clamping_inset - tooth_height / 2), 0, 0)(
+        teeth_holder
+    )
+    teeth = teeth.fuse(teeth_holder)
+
+    teeth_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+
+    teeth_cutter = align(teeth_cutter, teeth_holder, Alignment.CENTER)
+    teeth_cutter = align(teeth_cutter, teeth_holder, Alignment.STACK_TOP)
+    teeth = teeth.cut(teeth_cutter)
+
+    retval = LeaderFollowersCuttersPart(
+        clamp_spring, cutters=[clamp_sping_clearance_cutter]
+    )
+
+    retval.add_named_follower(teeth, "teeth")
+
+    return retval
 
 
 def create_usb_c_socket():
@@ -236,6 +324,31 @@ def main():
     boards_holder = pico.use_as_cutter_on(boards_holder)
     boards_holder = tmc_1.use_as_cutter_on(boards_holder)
     boards_holder = tmc_2.use_as_cutter_on(boards_holder)
+    for current_board in [pico, tmc_1, tmc_2]:
+
+        for lr in [Alignment.LEFT, Alignment.RIGHT]:
+
+            board_clamp_1 = create_board_clamp()
+            if lr == Alignment.LEFT:
+                board_clamp_1 = mirror(normal=(1, 0, 0))(board_clamp_1)
+
+            board_clamp_1 = align(
+                board_clamp_1, current_board, Alignment.CENTER, axes=[0, 1]
+            )
+
+            board_clamp_1 = align(
+                board_clamp_1,
+                current_board,
+                lr.stack_alignment,
+                stack_gap=electronics_holder_slack,
+            )
+            board_clamp_1 = align(board_clamp_1, boards_holder, Alignment.BOTTOM)
+
+            boards_holder = board_clamp_1.use_as_cutter_on(boards_holder)
+            boards_holder = board_clamp_1.leader.fuse(boards_holder)
+            boards_holder = boards_holder.fuse(
+                board_clamp_1.get_follower_part_by_name("teeth")
+            )
 
     parts.add(pico, "pico", flip=False, skip_in_production=True)
     parts.add(tmc_1, "tmc_1", flip=False, skip_in_production=True)
