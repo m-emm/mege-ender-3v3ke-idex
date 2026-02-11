@@ -48,11 +48,14 @@ def create_linear_guide(
     thickness,
     guide_end_border,
     guide_clearance=0.1,
+    skip_back_end_border=False,
 ):
     """Create the linear_guide part."""
 
     guide_rail_side = thickness * math.sqrt(2) / 2
     inner_length = guide_length - 2 * guide_end_border
+    if skip_back_end_border:
+        inner_length += guide_end_border
 
     carriage = create_box(carriage_width, carriage_length, thickness)
 
@@ -77,6 +80,8 @@ def create_linear_guide(
         carriage_width + 2 * guide_clearance, inner_length, BIG_THING
     )
     guide_raw_cutter = align(guide_raw_cutter, guide_frame, Alignment.CENTER)
+    if skip_back_end_border:
+        guide_raw_cutter = align(guide_raw_cutter, guide_frame, Alignment.BACK)
 
     guide_frame = guide_frame.cut(guide_raw_cutter)
 
@@ -113,9 +118,10 @@ def main():
     thickness = 3.5
     guide_end_border = 5
     guide_clearance = 0.4
-    spring_connector_length = 3
     spring_thickness = 1.8
-    spring_num_turns = 6
+    spring_pitch = 6
+    # Keep the old physical spring span: 6 turns with 3 mm connector on each side.
+    spring_total_length = 43.8
 
     # Create the part
     linear_guide = create_linear_guide(
@@ -132,33 +138,9 @@ def main():
         spring_thickness=spring_thickness,
         spring_height=thickness,
         spring_width=carriage_width - 4,
-        spring_pitch=6,
-        spring_turns=spring_num_turns,
+        spring_pitch=spring_pitch,
+        spring_total_length=spring_total_length,
     )
-
-    spring_connector_front = create_box(
-        spring_thickness, spring_connector_length + spring_thickness, thickness
-    )
-    spring_connector_front = align(spring_connector_front, spring, Alignment.CENTER)
-    spring_connector_front = align(
-        spring_connector_front,
-        spring,
-        Alignment.STACK_FRONT,
-        stack_gap=-spring_thickness,
-    )
-    spring = spring.fuse(spring_connector_front)
-
-    spring_connector_back = create_box(
-        spring_thickness, spring_connector_length + spring_thickness, thickness
-    )
-    spring_connector_back = align(spring_connector_back, spring, Alignment.CENTER)
-    spring_connector_back = align(
-        spring_connector_back,
-        spring,
-        Alignment.STACK_BACK,
-        stack_gap=-spring_thickness,
-    )
-    spring = spring.fuse(spring_connector_back)
 
     spring = align(spring, linear_guide, Alignment.CENTER)
 
