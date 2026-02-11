@@ -70,7 +70,7 @@ TMC_BOARD_LENGTH = 20.3
 
 # Approximate board placement from klipper_setup/klipper_config/pico_w_btt_tmc2226.yaml:
 # PICO origin [0,20], TMC1 origin [20,18], TMC2 origin [20,9]
-PICO_TO_DRIVER_RIGHT_GAP = 3.5 * dil_pitch
+PICO_TO_DRIVER_RIGHT_GAP = 4.5 * dil_pitch
 
 HEADER_CUTTER_SLACK = 0.35
 
@@ -120,23 +120,28 @@ tmc_current_potentiometer_underside_size_rasterized = 1.2
 
 board_clamp_spring_length = 10
 board_clamp_spring_thickness = 1.8
+
 board_clamp_height = 9
+board_clamp_spring_height = board_clamp_height * 0.6
 board_clamp_tooth_size = 0.8
 board_clamp_teeth_length = 3
 board_clamp_spring_side_clearance = 1.5
 board_clamp_spring_front_cliearnce = 0.8
-board_clamp_clamping_inset = 0.8
+board_clamp_clamping_inset = 1.4
 board_clamp_spring_action_clearance = 0.07
 
 
 connector_base_cuter_slack = 0.5
 connector_pin_cutter_slack = 0.5
+connector_side_gap = 9
 
 
 def create_board_clamp():
 
     clamp_spring = create_box(
-        board_clamp_spring_thickness, board_clamp_spring_length, base_thickness
+        board_clamp_spring_thickness,
+        board_clamp_spring_length,
+        board_clamp_spring_height,
     )
 
     clamp_sping_clearance_cutter = create_box(
@@ -457,7 +462,9 @@ def main():
     connector = create_connector()
 
     connector = align(connector, pico, Alignment.CENTER, axes=[0, 1])
-    connector = align(connector, tmc_1, Alignment.STACK_RIGHT, stack_gap=5)
+    connector = align(
+        connector, tmc_1, Alignment.STACK_RIGHT, stack_gap=connector_side_gap
+    )
 
     all_boards = [pico, tmc_1, tmc_2, connector]
 
