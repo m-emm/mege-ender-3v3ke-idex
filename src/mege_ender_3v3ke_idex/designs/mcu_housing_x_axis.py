@@ -91,8 +91,9 @@ pico_w_board_int_width = pico_w_board_int_pin_distance
 pico_w_board_y_oversize = 1  # in dil pitch units
 pico_w_board_corner_radius = 0.25 * dil_pitch
 pico_w_board_micro_usb_socket_offset = 1.3
+pico_bar_cutter_slack = 1.0
 
-electronics_holder_slack = 0.4
+electronics_holder_slack = 0.55
 electronics_board_cutter_slack = 0.3
 
 usb_c_socket_thickness = 3.2
@@ -111,18 +112,25 @@ tmc_board_y_oversize = 0  # in dil pitch units
 tmc_board_corner_radius = None
 tmc_board_cooler_size = 8.9
 tmc_board_cooler_height = 12
-tmc_board_chip_thickness = 1.5
-
+tmc_board_chip_thickness = 1.8
+tmc_board_base_cutter_slack = 0.6
+tmc_chip_y_size_rasterized = 2.5
+tmc_current_potentiometer_underside_thickness = 1.5
+tmc_current_potentiometer_underside_size_rasterized = 1.2
 
 board_clamp_spring_length = 10
 board_clamp_spring_thickness = 1.8
-board_clamp_height = 5
+board_clamp_height = 9
 board_clamp_tooth_size = 0.8
 board_clamp_teeth_length = 3
 board_clamp_spring_side_clearance = 1.5
 board_clamp_spring_front_cliearnce = 0.8
 board_clamp_clamping_inset = 0.8
 board_clamp_spring_action_clearance = 0.07
+
+
+connector_base_cuter_slack = 0.5
+connector_pin_cutter_slack = 0.5
 
 
 def create_board_clamp():
@@ -293,8 +301,7 @@ def create_pico_w_board() -> LeaderFollowersCuttersPart:
 
         bar_cutter = create_box(
             board_pcb_size[0],
-            dil_pitch * (bar_range[1] - bar_range[0] + 1)
-            + 2 * electronics_holder_slack,
+            dil_pitch * (bar_range[1] - bar_range[0] + 1) + 2 * pico_bar_cutter_slack,
             wire_wrap_pin_base_thickness,
         )
 
@@ -355,7 +362,9 @@ def create_tmc_board() -> LeaderFollowersCuttersPart:
     additional_pins = align(additional_pins, board_dil, Alignment.BACK)
 
     chip = create_box(
-        (tmc_board_int_width - 1.5) * dil_pitch, 2 * dil_pitch, tmc_board_chip_thickness
+        (tmc_board_int_width - 1.5) * dil_pitch,
+        tmc_chip_y_size_rasterized * dil_pitch,
+        tmc_board_chip_thickness,
     )
     chip_size = get_bounding_box_size(chip)
     chip = align(chip, board_plain, Alignment.CENTER)
@@ -369,7 +378,43 @@ def create_tmc_board() -> LeaderFollowersCuttersPart:
     )
     chip_cutter = align(chip_cutter, chip, Alignment.CENTER)
     chip_cutter = align(chip_cutter, chip, Alignment.TOP)
+
+    potentiometer_underside = create_box(
+        tmc_current_potentiometer_underside_size_rasterized * dil_pitch,
+        dil_pitch,
+        tmc_current_potentiometer_underside_thickness,
+    )
+
+    potentiometer_underside = align(
+        potentiometer_underside, board_plain, Alignment.CENTER
+    )
+    potentiometer_underside = align(potentiometer_underside, board_dil, Alignment.BACK)
+
+    potentiometer_underside = align(potentiometer_underside, board_dil, Alignment.RIGHT)
+    potentiometer_underside = align(
+        potentiometer_underside, board_plain, Alignment.STACK_BOTTOM
+    )
+
+    potentiometer_underside = translate(-dil_pitch * 1.5, 0, 0)(potentiometer_underside)
+
+    retval = retval.fuse(potentiometer_underside)
+
+    potentiometer_underside_size = get_bounding_box_size(potentiometer_underside)
+    potentiometer_cutter = create_box(
+        potentiometer_underside_size[0] + 2 * electronics_holder_slack,
+        potentiometer_underside_size[1] + 2 * electronics_holder_slack,
+        potentiometer_underside_size[2] + electronics_holder_slack,
+    )
+    potentiometer_cutter = align(
+        potentiometer_cutter, potentiometer_underside, Alignment.CENTER
+    )
+    potentiometer_cutter = align(
+        potentiometer_cutter, potentiometer_underside, Alignment.TOP
+    )
+
     retval.cutters.append(chip_cutter)
+    retval.cutters.append(potentiometer_cutter)
+
     retval.cutters.extend(additional_pins.cutters)
     retval = retval.fuse(additional_pins)
 
@@ -384,8 +429,8 @@ def create_connector():
         pin_side=wire_wrap_pin_side,
         top_pin_length=top_pin_length,
         base_thickness=wire_wrap_pin_base_thickness,
-        pin_cutter_slack=0.1,
-        base_cutter_slack=0.5,
+        pin_cutter_slack=connector_pin_cutter_slack,
+        base_cutter_slack=connector_base_cuter_slack,
         base_cutter_vertical_slack=0.1,
     )
 
