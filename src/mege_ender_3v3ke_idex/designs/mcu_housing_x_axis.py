@@ -19,6 +19,7 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.sil_dil import (
     create_dil_board,
+    create_sil,
     dil_pitch,
     pcb_thickness,
     top_pin_length,
@@ -37,7 +38,7 @@ PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLACF_04_HS)
 
 PROCESS_DATA["process_overrides"].update(
     {
-        "wall_loops": "2",
+        "wall_loops": "1",
         "bottom_shell_layers": "1",
         "top_shell_layers": "1",
         "sparse_infill_density": "25%",
@@ -75,13 +76,14 @@ HEADER_CUTTER_SLACK = 0.35
 
 
 base_border = 5.0
-base_thickness = 2.2
+base_thickness = 3.1
 electronics_boards_holder_offset = 0.005
+mcu_base_cutter_vertical_slack = 1.2
 
 
 pico_w_board_thickness = pcb_thickness
 pico_w_board_y_pins = 20
-pico_w_board_int_pin_distance = 8
+pico_w_board_int_pin_distance = 7
 pico_w_board_int_width = pico_w_board_int_pin_distance
 pico_w_board_y_oversize = 1  # in dil pitch units
 pico_w_board_corner_radius = 0.25 * dil_pitch
@@ -100,12 +102,13 @@ micro_usb_socket_depth = 5.0
 
 
 tmc_board_y_pins = 8
-tmc_board_int_pin_distance = 4
+tmc_board_int_pin_distance = 5
 tmc_board_int_width = tmc_board_int_pin_distance
 tmc_board_y_oversize = 0  # in dil pitch units
 tmc_board_corner_radius = None
 tmc_board_cooler_size = 8.9
 tmc_board_cooler_height = 12
+tmc_board_chip_thickness = 1.5
 
 
 board_clamp_spring_length = 10
@@ -113,9 +116,10 @@ board_clamp_spring_thickness = 1.8
 board_clamp_height = 5
 board_clamp_tooth_size = 0.8
 board_clamp_teeth_length = 3
-board_clamp_spring_side_clearance = 1
-board_clamp_spring_front_cliearnce = 0.3
+board_clamp_spring_side_clearance = 1.5
+board_clamp_spring_front_cliearnce = 0.8
 board_clamp_clamping_inset = 0.8
+board_clamp_spring_action_clearance = 0.07
 
 
 def create_board_clamp():
@@ -182,6 +186,20 @@ def create_board_clamp():
     )
 
     retval.add_named_follower(teeth, "teeth")
+    teeth_size = get_bounding_box_size(teeth)
+    clamp_action_cutter = create_box(
+        teeth_size[0] + board_clamp_spring_action_clearance,
+        board_clamp_spring_length + board_clamp_spring_front_cliearnce,
+        BIG_THING,
+    )
+    clamp_action_cutter = align(clamp_action_cutter, clamp_spring, Alignment.CENTER)
+    clamp_action_cutter = align(clamp_action_cutter, clamp_spring, Alignment.FRONT)
+    clamp_action_cutter = align(clamp_action_cutter, teeth, Alignment.LEFT)
+    clamp_action_cutter = translate(-board_clamp_spring_action_clearance, 0, 0)(
+        clamp_action_cutter
+    )
+
+    retval.cutters.append(clamp_action_cutter)
 
     return retval
 
@@ -225,6 +243,7 @@ def create_pico_w_board() -> LeaderFollowersCuttersPart:
         pin_cutter_slack=0.0,
         base_cutter_slack=electronics_holder_slack,
         board_cutter_slack=electronics_board_cutter_slack,
+        base_cutter_vertical_slack=mcu_base_cutter_vertical_slack,
         y_overhang_in_pins=0.5,
     )
 
@@ -252,6 +271,37 @@ def create_pico_w_board() -> LeaderFollowersCuttersPart:
 
     retval = retval.fuse(micro_usb_socket)
 
+    board_pcb = retval.get_follower_part_by_name("board")
+    board_pcb_size = get_bounding_box_size(board_pcb)
+
+    bars = PartCollector()
+    bar_cutters = PartCollector()
+    for bar_range in [(2, 2), (9, 10), (17, 17)]:
+        bar = create_box(
+            board_pcb_size[0],
+            dil_pitch * (bar_range[1] - bar_range[0] + 1),
+            wire_wrap_pin_base_thickness,
+        )
+        bar = align(bar, board_pcb, Alignment.CENTER)
+        bar = align(bar, board_pcb, Alignment.FRONT)
+        bar = align(bar, board_pcb, Alignment.STACK_BOTTOM)
+        bar = translate(0, dil_pitch * (bar_range[0]), 0)(bar)
+        bars = bars.fuse(bar)
+
+        bar_cutter = create_box(
+            board_pcb_size[0],
+            dil_pitch * (bar_range[1] - bar_range[0] + 1)
+            + 2 * electronics_holder_slack,
+            wire_wrap_pin_base_thickness,
+        )
+
+        bar_cutter = align(bar_cutter, bar, Alignment.CENTER)
+
+        bar_cutters = bar_cutters.fuse(bar_cutter)
+
+    retval = retval.fuse(bars)
+    retval.cutters.append(bar_cutters)
+
     top_center = get_bounding_box_center(retval)
     retval = rotate(180, center=top_center)(retval)
 
@@ -271,11 +321,13 @@ def create_tmc_board() -> LeaderFollowersCuttersPart:
         base_thickness=wire_wrap_pin_base_thickness,
         pin_cutter_slack=0.0,
         base_cutter_slack=electronics_holder_slack,
+        base_cutter_vertical_slack=mcu_base_cutter_vertical_slack,
         board_cutter_slack=electronics_board_cutter_slack,
         y_overhang_in_pins=0.5,
     )
 
     board_plain = retval.get_follower_part_by_name("board")
+    board_dil = retval.get_follower_part_by_name("dil")
     cooler = create_box(
         tmc_board_cooler_size, tmc_board_cooler_size, tmc_board_cooler_height
     )
@@ -283,7 +335,58 @@ def create_tmc_board() -> LeaderFollowersCuttersPart:
     cooler = align(cooler, board_plain, Alignment.STACK_TOP)
     retval = retval.fuse(cooler)
 
+    additional_pins = create_sil(
+        2,
+        pin_length=wire_wrap_pin_length,
+        pin_side=wire_wrap_pin_side,
+        top_pin_length=top_pin_length,
+        base_thickness=wire_wrap_pin_base_thickness,
+        pin_cutter_slack=0.0,
+        base_cutter_slack=electronics_holder_slack,
+        base_cutter_vertical_slack=mcu_base_cutter_vertical_slack,
+    )
+
+    additional_pins = rotate(90)(additional_pins)
+    additional_pins = align(additional_pins, board_dil, Alignment.LEFT)
+    additional_pins = translate(dil_pitch, 0, 0)(additional_pins)
+    additional_pins = align(additional_pins, board_dil, Alignment.BACK)
+
+    chip = create_box(
+        (tmc_board_int_width - 1.5) * dil_pitch, 2 * dil_pitch, tmc_board_chip_thickness
+    )
+    chip_size = get_bounding_box_size(chip)
+    chip = align(chip, board_plain, Alignment.CENTER)
+    chip = align(chip, board_plain, Alignment.STACK_BOTTOM)
+    retval = retval.fuse(chip)
+
+    chip_cutter = create_box(
+        chip_size[0] + 2 * electronics_holder_slack,
+        chip_size[1] + 2 * electronics_holder_slack,
+        chip_size[2] + electronics_holder_slack,
+    )
+    chip_cutter = align(chip_cutter, chip, Alignment.CENTER)
+    chip_cutter = align(chip_cutter, chip, Alignment.TOP)
+    retval.cutters.append(chip_cutter)
+    retval.cutters.extend(additional_pins.cutters)
+    retval = retval.fuse(additional_pins)
+
     return retval
+
+
+def create_connector():
+
+    connector = create_sil(
+        20,
+        pin_length=wire_wrap_pin_length,
+        pin_side=wire_wrap_pin_side,
+        top_pin_length=top_pin_length,
+        base_thickness=wire_wrap_pin_base_thickness,
+        pin_cutter_slack=0.1,
+        base_cutter_slack=0.5,
+        base_cutter_vertical_slack=0.1,
+    )
+
+    return connector
 
 
 def main():
@@ -301,12 +404,20 @@ def main():
     tmc_2 = align(
         tmc_1, pico, Alignment.STACK_RIGHT, stack_gap=PICO_TO_DRIVER_RIGHT_GAP
     )
-
     tmc_2 = align(tmc_1, pico, Alignment.BACK)
 
-    both = pico.leader.fuse(tmc_1.leader).fuse(tmc_2.leader)
+    connector = create_connector()
 
-    bards_size = get_bounding_box_size(both)
+    connector = align(connector, pico, Alignment.CENTER, axes=[0, 1])
+    connector = align(connector, tmc_1, Alignment.STACK_RIGHT, stack_gap=5)
+
+    all_boards = [pico, tmc_1, tmc_2, connector]
+
+    all_boards_fused = PartCollector()
+    for board in all_boards:
+        all_boards_fused = all_boards_fused.fuse(board.leader)
+
+    bards_size = get_bounding_box_size(all_boards_fused)
 
     boards_holder = create_box(
         bards_size[0] + 2 * base_border,
@@ -319,12 +430,14 @@ def main():
         0, 0, -boards_holder_bb[1][2] + electronics_boards_holder_offset
     )(boards_holder)
 
-    boards_holder = align(boards_holder, both, Alignment.CENTER, axes=[0, 1])
+    boards_holder = align(
+        boards_holder, all_boards_fused, Alignment.CENTER, axes=[0, 1]
+    )
 
-    boards_holder = pico.use_as_cutter_on(boards_holder)
-    boards_holder = tmc_1.use_as_cutter_on(boards_holder)
-    boards_holder = tmc_2.use_as_cutter_on(boards_holder)
-    for current_board in [pico, tmc_1, tmc_2]:
+    for board in all_boards:
+        boards_holder = board.use_as_cutter_on(boards_holder)
+
+    for current_board in all_boards:
 
         for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
@@ -353,6 +466,7 @@ def main():
     parts.add(pico, "pico", flip=False, skip_in_production=True)
     parts.add(tmc_1, "tmc_1", flip=False, skip_in_production=True)
     parts.add(tmc_2, "tmc_2", flip=False, skip_in_production=True)
+    parts.add(connector, "connector", flip=False, skip_in_production=True)
 
     parts.add(boards_holder, "boards_holder", flip=False)
 

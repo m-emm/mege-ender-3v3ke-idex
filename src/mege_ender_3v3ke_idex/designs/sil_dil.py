@@ -44,6 +44,7 @@ def create_sil(
     base_thickness=wire_wrap_pin_base_thickness,
     pin_cutter_slack=0.0,
     base_cutter_slack=None,
+    base_cutter_vertical_slack=None,
     add_top_pin_cutters=False,
 ) -> LeaderFollowersCuttersPart:
 
@@ -51,12 +52,15 @@ def create_sil(
         wire_wrap_pin_base_width, dil_pitch * (num_y_pins), base_thickness
     )
 
+    if base_cutter_vertical_slack is None:
+        base_cutter_vertical_slack = base_cutter_slack
+
     cutters = []
     if base_cutter_slack is not None:
         base_cutter = create_box(
             wire_wrap_pin_base_width + 2 * base_cutter_slack,
             dil_pitch * (num_y_pins) + 2 * base_cutter_slack,
-            base_thickness + 2 * base_cutter_slack,
+            base_thickness + 2 * base_cutter_vertical_slack,
         )
         base_cutter = align(base_cutter, base, Alignment.CENTER)
         cutters.append(base_cutter)
@@ -132,6 +136,7 @@ def create_dil(
     base_thickness=wire_wrap_pin_base_thickness,
     pin_cutter_slack=0.0,
     base_cutter_slack=None,
+    base_cutter_vertical_slack=None,
 ):
 
     base = create_sil(
@@ -142,6 +147,7 @@ def create_dil(
         base_thickness=base_thickness,
         pin_cutter_slack=pin_cutter_slack,
         base_cutter_slack=base_cutter_slack,
+        base_cutter_vertical_slack=base_cutter_vertical_slack,
     )
 
     base_right = translate(int_x_distance * dil_pitch, 0, 0)(base)
@@ -162,6 +168,7 @@ def create_dil_board(
     base_thickness=wire_wrap_pin_base_thickness,
     pin_cutter_slack=0.0,
     base_cutter_slack=None,
+    base_cutter_vertical_slack=None,
     board_cutter_slack=0.0,
     x_overhang_in_pins=0.0,
     y_overhang_in_pins=0.5,
@@ -210,12 +217,15 @@ def create_dil_board(
         base_thickness=base_thickness,
         pin_cutter_slack=pin_cutter_slack,
         base_cutter_slack=base_cutter_slack,
+        base_cutter_vertical_slack=base_cutter_vertical_slack,
     )
 
     dil = align(dil, boards_lfc, Alignment.CENTER)
     dil = align(dil, boards_lfc, Alignment.STACK_BOTTOM, stack_gap=0)
 
     retval = dil.fuse(boards_lfc)
+
+    retval.add_named_follower(dil, "dil")
 
     return retval
 
@@ -231,6 +241,7 @@ def create_sil_board(
     base_thickness=wire_wrap_pin_base_thickness,
     pin_cutter_slack=0.0,
     base_cutter_slack=None,
+    base_cutter_vertical_slack=None,
     board_cutter_slack=0.0,
     y_overhang_in_pins=0.5,
 ):
@@ -267,6 +278,7 @@ def create_sil_board(
         base_thickness=base_thickness,
         pin_cutter_slack=pin_cutter_slack,
         base_cutter_slack=base_cutter_slack,
+        base_cutter_vertical_slack=base_cutter_vertical_slack,
     )
     sil = align(sil, boards, Alignment.CENTER)
     sil = align(sil, boards, Alignment.RIGHT)
