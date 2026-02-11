@@ -75,11 +75,14 @@ PICO_TO_DRIVER_RIGHT_GAP = 3.5 * dil_pitch
 HEADER_CUTTER_SLACK = 0.35
 
 
-base_border = 5.0
+base_border = 7.0
+base_fillet_radius = 3.0
 base_thickness = 3.1
 electronics_boards_holder_offset = 0.005
 mcu_base_cutter_vertical_slack = 1.2
 
+screw_hole_inset = 1.8
+screw_size = "M3"
 
 pico_w_board_thickness = pcb_thickness
 pico_w_board_y_pins = 20
@@ -419,10 +422,12 @@ def main():
 
     bards_size = get_bounding_box_size(all_boards_fused)
 
-    boards_holder = create_box(
+    boards_holder = create_filleted_box(
         bards_size[0] + 2 * base_border,
         bards_size[1] + 2 * base_border,
         base_thickness,
+        base_fillet_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
 
     boards_holder_bb = get_bounding_box(boards_holder)
@@ -462,6 +467,20 @@ def main():
             boards_holder = boards_holder.fuse(
                 board_clamp_1.get_follower_part_by_name("teeth")
             )
+
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+            screw_hole = create_cylinder(
+                MScrew.from_size(screw_size).clearance_hole_normal / 2, BIG_THING
+            )
+            screw_hole = align(screw_hole, boards_holder, Alignment.CENTER)
+            screw_hole = align(screw_hole, boards_holder, lr)
+            screw_hole = align(screw_hole, boards_holder, fb)
+            screw_hole = translate(
+                -lr.sign * screw_hole_inset, -fb.sign * screw_hole_inset, 0
+            )(screw_hole)
+
+            boards_holder = boards_holder.cut(screw_hole)
 
     parts.add(pico, "pico", flip=False, skip_in_production=True)
     parts.add(tmc_1, "tmc_1", flip=False, skip_in_production=True)
