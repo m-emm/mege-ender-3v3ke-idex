@@ -44,71 +44,74 @@ BIG_THING = 500
 electronics_boards_holder_offset = 0.005
 
 
-def create_board_holder():
-    """Create the board_holder part."""
-    # Example: simple box with a cylindrical hole
-    width = 30
-    depth = 20
-    height = 10
-    hole_radius = 4
+def create_board_holder(
+    board,
+    board_pcb=None,
+    board_pcb_follower_name="board",
+    board_cutting_part=None,
+    base_plate_border=7.0,
+    base_plate_border_y_ratio=1.0 / 3.0,
+    base_plate_thickness=3.1,
+    board_z_offset=electronics_boards_holder_offset,
+    holder_thickness=6.0,
+    holder_width=5.0,
+    holder_fb_clearance=2.0,
+    holder_inset=2.0,
+    holder_z_offset=1.5,
+    holder_guide_width=10.0,
+    holder_carriage_width=5.0,
+    holder_guide_thickness=None,
+    holder_guide_clearance=0.4,
+    holder_guide_end_border=3.0,
+    holder_travel_length=3.0,
+    holder_carriage_length_factor=3.0,
+    holder_guide_length_factor=3.1,
+    central_spring_width=7.0,
+    central_spring_clearance=1.0,
+    central_spring_thickness=0.85,
+    central_spring_pitch_factor=3.5,
+    central_spring_length_factor=4.0,
+):
+    """Create a board holder assembly aligned to an arbitrary board.
 
-    # Create base box
-    part = create_box(width, depth, height)
+    Returns:
+        tuple(board, holder_assembly)
+    """
+    if board_pcb is None:
+        if hasattr(board, "get_follower_part_by_name"):
+            board_pcb = board.get_follower_part_by_name(board_pcb_follower_name)
+        else:
+            board_pcb = board
 
-    # Create a hole cutter
-    hole = create_cylinder(hole_radius, height + 2)
-    hole = align(hole, part, Alignment.CENTER)
-    hole = translate(0, 0, -1)(hole)
+    if holder_guide_thickness is None:
+        holder_guide_thickness = base_plate_thickness
 
-    # Cut the hole
-    part = part.cut(hole)
+    def cut_with_board(part):
+        if board_cutting_part is not None:
+            return part.cut(board_cutting_part)
+        if hasattr(board, "use_as_cutter_on"):
+            return board.use_as_cutter_on(part)
+        return part.cut(board)
 
-    return part
-
-
-def main():
-
-    base_plate_border = 10
-    base_plate_thickness = 3.1
-
-    logging.basicConfig(level=logging.INFO)
-    parts = PartList()
-
-    pico = create_pico_w_board()
-
-    pico_pcb = pico.get_follower_part_by_name("board")
-    pico_dil = pico.get_follower_part_by_name("dil")
-
-    parts.add(pico, "pico_w_board", flip=False, skip_in_production=True)
-
-    pico_size = get_bounding_box_size(pico)
+    board_size = get_bounding_box_size(board)
 
     base_plate_size = (
-        pico_size[0] + 2 * base_plate_border,
-        pico_size[1] + 2 * base_plate_border / 3,
+        board_size[0] + 2 * base_plate_border,
+        board_size[1] + 2 * base_plate_border * base_plate_border_y_ratio,
         base_plate_thickness,
     )
 
     base_plate = create_box(*base_plate_size)
-
-    base_plate = align(base_plate, pico, Alignment.CENTER, axes=[0, 1])
+    base_plate = align(base_plate, board, Alignment.CENTER, axes=[0, 1])
     boards_holder_bb = get_bounding_box(base_plate)
-    base_plate = translate(
-        0, 0, -boards_holder_bb[1][2] + electronics_boards_holder_offset
-    )(base_plate)
-
-    base_plate = pico.use_as_cutter_on(base_plate)
-
-    holder_thickness = 5
-    holder_width = 5
-    holder_fb_clearance = 2
-    holder_inset = 1.2
-    holder_z_offset = 1.5
+    base_plate = translate(0, 0, -boards_holder_bb[1][2] + board_z_offset)(base_plate)
+    base_plate = cut_with_board(base_plate)
 
     holders = PartCollector()
+    right_holder = None
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        holder_length = pico_size[1] - 2 * holder_fb_clearance
+        holder_length = board_size[1] - 2 * holder_fb_clearance
         holder = create_box(holder_width, holder_length, holder_thickness)
 
         holder_cutter_side_size = holder_thickness / math.sqrt(2)
@@ -120,11 +123,12 @@ def main():
         holder_cutter = align(holder_cutter, holder, lr.opposite)
         holder_cutter = translate(-lr.sign * holder_thickness / 2, 0, 0)(holder_cutter)
         holder = holder.cut(holder_cutter)
-        holder = align(holder, pico_pcb, Alignment.CENTER)
-        holder = align(holder, pico_pcb, Alignment.TOP)
-        holder = align(holder, pico, lr.stack_alignment)
-        inset_x_offset = -lr.sign * holder_inset if lr == Alignment.RIGHT else 0
 
+        holder = align(holder, board_pcb, Alignment.CENTER)
+        holder = align(holder, board_pcb, Alignment.TOP)
+        holder = align(holder, board, lr.stack_alignment)
+
+        inset_x_offset = -lr.sign * holder_inset if lr == Alignment.RIGHT else 0
         holder = translate(inset_x_offset, 0, holder_z_offset)(holder)
 
         if lr == Alignment.LEFT:
@@ -140,20 +144,15 @@ def main():
         if lr == Alignment.RIGHT:
             right_holder = holder
 
+    if right_holder is None:
+        raise ValueError("Right holder could not be generated.")
+
     holders = align(holders, base_plate, Alignment.BOTTOM)
 
-    holder_guide_width = 10
-
-    holder_carriage_width = 5
-    holder_guide_thickness = base_plate_thickness
-    holder_guide_clearance = 0.4
-    holder_guide_end_border = 1
-    holder_travel_length = 4
-    holder_carriage_length = holder_travel_length * 3
-
-    central_spring_width = 7
-    central_spring_clearance = 1.0
-    central_spring_thickness = 0.85
+    holder_carriage_length = holder_travel_length * holder_carriage_length_factor
+    holder_guide_length = (
+        holder_travel_length * holder_guide_length_factor + holder_guide_end_border
+    )
 
     right_holder_size = get_bounding_box_size(right_holder)
     right_holder_cutter = create_box(
@@ -164,14 +163,11 @@ def main():
     right_holder_cutter = align(right_holder_cutter, right_holder, Alignment.CENTER)
     right_holder_cutter = align(right_holder_cutter, right_holder, Alignment.LEFT)
 
-    holder_guide_length = holder_travel_length * 3.1 + holder_guide_end_border
-
     linear_guides = PartCollector()
     carriages = PartCollector()
     linear_guide_cutters = PartCollector()
 
     for fb in [Alignment.FRONT, Alignment.BACK]:
-
         linear_guide = create_linear_guide(
             guide_length=holder_guide_length,
             guide_width=holder_guide_width,
@@ -184,7 +180,6 @@ def main():
         )
 
         linear_guide = rotate(90)(linear_guide)
-
         linear_guide = align(linear_guide, holders, Alignment.CENTER)
         linear_guide = align(linear_guide, holders, Alignment.BOTTOM)
         linear_guide = align(
@@ -196,23 +191,18 @@ def main():
         linear_guides = linear_guides.fuse(linear_guide.leader)
 
         linear_guide_size = get_bounding_box_size(linear_guide)
-
         linear_guide_cutter = create_box(
             linear_guide_size[0] + 2 * holder_inset, linear_guide_size[1], BIG_THING
         )
-
         linear_guide_cutter = align(linear_guide_cutter, linear_guide, Alignment.CENTER)
         linear_guide_cutter = align(linear_guide_cutter, linear_guide, Alignment.RIGHT)
-
         linear_guide_cutters = linear_guide_cutters.fuse(linear_guide_cutter)
 
         carriage = linear_guide.get_follower_part_by_name("carriage")
         carriage = align(carriage, holders, Alignment.STACK_RIGHT)
-
         carriages = carriages.fuse(carriage)
 
-    central_spring_length = 4 * holder_travel_length
-
+    central_spring_length = central_spring_length_factor * holder_travel_length
     central_spring_cutter = create_box(
         central_spring_length,
         central_spring_width + 2 * central_spring_clearance,
@@ -226,10 +216,9 @@ def main():
         spring_thickness=central_spring_thickness,
         spring_height=base_plate_thickness,
         spring_width=central_spring_width,
-        spring_pitch=central_spring_thickness * 2.5,
+        spring_pitch=central_spring_thickness * central_spring_pitch_factor,
         spring_total_length=central_spring_length,
     )
-
     central_spring = rotate(90)(central_spring)
     central_spring = align(central_spring, holders, Alignment.CENTER)
     central_spring = align(central_spring, holders, Alignment.BOTTOM)
@@ -246,29 +235,39 @@ def main():
     )
     relevant_parts_bbox = get_bounding_box(relevant_parts_fused)
 
-    right_extenxion_size = relevant_parts_bbox[1][0] - base_plate_bbox[1][0]
-    right_extenxion = create_box(
-        right_extenxion_size,
+    right_extension_size = relevant_parts_bbox[1][0] - base_plate_bbox[1][0]
+    right_extension = create_box(
+        right_extension_size,
         base_plate_size[1],
         base_plate_size[2],
     )
+    right_extension = align(right_extension, base_plate, Alignment.CENTER)
+    right_extension = align(right_extension, base_plate, Alignment.STACK_RIGHT)
 
-    right_extenxion = align(right_extenxion, base_plate, Alignment.CENTER)
-    right_extenxion = align(right_extenxion, base_plate, Alignment.STACK_RIGHT)
-
-    base_plate = base_plate.fuse(right_extenxion)
-
+    base_plate = base_plate.fuse(right_extension)
     base_plate = base_plate.cut(right_holder_cutter)
     base_plate = base_plate.cut(linear_guide_cutters)
-    base_plate = pico.use_as_cutter_on(base_plate)
-
+    base_plate = cut_with_board(base_plate)
     base_plate = base_plate.cut(central_spring_cutter)
 
-    holders = holders.fuse(base_plate)
-    holders = holders.fuse(linear_guides)
-    holders = holders.fuse(central_spring)
+    holder_assembly = holders.fuse(base_plate).fuse(linear_guides).fuse(central_spring)
 
-    parts.add(holders, f"holders", flip=False)
+    return board, holder_assembly
+
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+    parts = PartList()
+
+    pico = create_pico_w_board()
+    aligned_board, holders = create_board_holder(
+        board=pico,
+        base_plate_border=7.0,
+        base_plate_thickness=3.1,
+    )
+
+    parts.add(aligned_board, "pico_w_board", flip=False, skip_in_production=True)
+    parts.add(holders, "holders", flip=False)
 
     # Arrange and export
     arrange_and_export(

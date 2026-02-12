@@ -95,6 +95,8 @@ def create_linear_guide(
         guide_cut = translate(lr.sign * (guide_clearance + thickness / 2), 0, 0)(
             guide_cut
         )
+        if skip_back_end_border:
+            guide_cut = align(guide_cut, guide_frame, Alignment.BACK)
 
         guide_cutters = guide_cutters.fuse(guide_cut)
 
