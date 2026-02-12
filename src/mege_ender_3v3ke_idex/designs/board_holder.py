@@ -68,7 +68,7 @@ def create_board_holder():
 
 def main():
 
-    base_plate_border = 25
+    base_plate_border = 10
     base_plate_thickness = 3.1
 
     logging.basicConfig(level=logging.INFO)
@@ -102,7 +102,7 @@ def main():
     holder_thickness = 5
     holder_width = 5
     holder_fb_clearance = 2
-    holder_inset = 1.5
+    holder_inset = 1.2
     holder_z_offset = 1.5
 
     holders = PartCollector()
@@ -142,14 +142,18 @@ def main():
 
     holders = align(holders, base_plate, Alignment.BOTTOM)
 
-    holder_guide_width = 8
+    holder_guide_width = 10
 
     holder_carriage_width = 5
-    holder_guide_thickness = 2
-    holder_guide_clearance = 0.3
+    holder_guide_thickness = base_plate_thickness
+    holder_guide_clearance = 0.4
     holder_guide_end_border = 1
     holder_travel_length = 4
-    holder_carriage_length = holder_travel_length * 2
+    holder_carriage_length = holder_travel_length * 3
+
+    central_spring_width = 7
+    central_spring_clearance = 1.0
+    central_spring_thickness = 0.85
 
     right_holder_size = get_bounding_box_size(right_holder)
     right_holder_cutter = create_box(
@@ -160,13 +164,8 @@ def main():
     right_holder_cutter = align(right_holder_cutter, right_holder, Alignment.CENTER)
     right_holder_cutter = align(right_holder_cutter, right_holder, Alignment.LEFT)
 
-    holder_guide_length = (
-        holder_carriage_length + holder_travel_length + holder_guide_end_border
-    )
+    holder_guide_length = holder_travel_length * 3.1 + holder_guide_end_border
 
-    holder_spring_length = (
-        holder_guide_length - holder_carriage_length / 2 - holder_guide_end_border
-    )
     linear_guides = PartCollector()
     carriages = PartCollector()
     linear_guide_cutters = PartCollector()
@@ -210,29 +209,64 @@ def main():
         carriage = linear_guide.get_follower_part_by_name("carriage")
         carriage = align(carriage, holders, Alignment.STACK_RIGHT)
 
-        spring = create_spring(
-            spring_thickness=0.9,
-            spring_height=holder_guide_thickness,
-            spring_width=holder_carriage_width - 1,
-            spring_pitch=1.5,
-            spring_total_length=holder_spring_length,
-        )
-        spring = rotate(90)(spring)
-        spring = align(spring, carriage, Alignment.CENTER)
-        spring = align(spring, carriage, Alignment.BOTTOM)
-        spring = align(spring, carriage, Alignment.STACK_RIGHT)
-
-        carriage = carriage.fuse(spring)
         carriages = carriages.fuse(carriage)
 
+    central_spring_length = 4 * holder_travel_length
+
+    central_spring_cutter = create_box(
+        central_spring_length,
+        central_spring_width + 2 * central_spring_clearance,
+        BIG_THING,
+    )
+    central_spring_cutter = align(central_spring_cutter, holders, Alignment.CENTER)
+    central_spring_cutter = align(central_spring_cutter, holders, Alignment.BOTTOM)
+    central_spring_cutter = align(central_spring_cutter, holders, Alignment.STACK_RIGHT)
+
+    central_spring = create_spring(
+        spring_thickness=central_spring_thickness,
+        spring_height=base_plate_thickness,
+        spring_width=central_spring_width,
+        spring_pitch=central_spring_thickness * 2.5,
+        spring_total_length=central_spring_length,
+    )
+
+    central_spring = rotate(90)(central_spring)
+    central_spring = align(central_spring, holders, Alignment.CENTER)
+    central_spring = align(central_spring, holders, Alignment.BOTTOM)
+    central_spring = align(central_spring, holders, Alignment.STACK_RIGHT)
+
     holders = holders.fuse(carriages)
+
+    base_plate_bbox = get_bounding_box(base_plate)
+    relevant_parts_fused = (
+        holders.fuse(linear_guides)
+        .fuse(central_spring)
+        .fuse(linear_guide_cutters)
+        .fuse(central_spring_cutter)
+    )
+    relevant_parts_bbox = get_bounding_box(relevant_parts_fused)
+
+    right_extenxion_size = relevant_parts_bbox[1][0] - base_plate_bbox[1][0]
+    right_extenxion = create_box(
+        right_extenxion_size,
+        base_plate_size[1],
+        base_plate_size[2],
+    )
+
+    right_extenxion = align(right_extenxion, base_plate, Alignment.CENTER)
+    right_extenxion = align(right_extenxion, base_plate, Alignment.STACK_RIGHT)
+
+    base_plate = base_plate.fuse(right_extenxion)
 
     base_plate = base_plate.cut(right_holder_cutter)
     base_plate = base_plate.cut(linear_guide_cutters)
     base_plate = pico.use_as_cutter_on(base_plate)
 
+    base_plate = base_plate.cut(central_spring_cutter)
+
     holders = holders.fuse(base_plate)
     holders = holders.fuse(linear_guides)
+    holders = holders.fuse(central_spring)
 
     parts.add(holders, f"holders", flip=False)
 
