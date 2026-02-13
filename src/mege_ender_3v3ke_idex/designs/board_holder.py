@@ -48,6 +48,9 @@ electronics_boards_holder_offset = 0.005
 pico_leaf_spring_angle = 45
 pico_leaf_spring_prod_rotation_axis = (0, 1, 0)
 pico_leaf_spring_prod_rotation_angle = 90 - pico_leaf_spring_angle
+pico_leaf_spring_thickness = 3.2
+
+base_plate_y_size = 80
 
 
 def create_board_holder(
@@ -57,6 +60,8 @@ def create_board_holder(
     board_cutting_part=None,
     base_plate_border=7.0,
     base_plate_border_y_ratio=1.0 / 3.0,
+    base_plate_x_size_override=None,
+    base_plate_y_size_override=None,
     base_plate_thickness=3.1,
     board_z_offset=electronics_boards_holder_offset,
     holder_thickness=6.0,
@@ -119,8 +124,16 @@ def create_board_holder(
     leaf_spring_length = board_size[1] + 2 * leaf_spring_holder_tower_outset
 
     base_plate_size = (
-        board_size[0] + 2 * base_plate_border,
-        board_size[1] + 2 * base_plate_border * base_plate_border_y_ratio,
+        (
+            base_plate_x_size_override
+            if base_plate_x_size_override is not None
+            else board_size[0] + 2 * base_plate_border
+        ),
+        (
+            base_plate_y_size_override
+            if base_plate_y_size_override is not None
+            else board_size[1] + 2 * base_plate_border * base_plate_border_y_ratio
+        ),
         base_plate_thickness,
     )
 
@@ -396,16 +409,20 @@ def main():
         board=pico,
         base_plate_border=7.0,
         base_plate_thickness=3.1,
+        base_plate_y_size_override=base_plate_y_size,
         leaf_spring_angle=pico_leaf_spring_angle,
         leaf_spring_holder_tower_x_size=pico_holder_tower_x_size,
         leaf_spring_holder_tower_y_size=pico_holder_tower_y_size,
+        leaf_spring_thickness=pico_leaf_spring_thickness,
     )
-    with_tmc = False
+    with_tmc = True
 
     if with_tmc:
         tmc = create_tmc_board()
 
-        tmc_2 = align(tmc, tmc, Alignment.STACK_BACK, stack_gap=4)
+        tmc = align(tmc, pico, Alignment.FRONT)
+
+        tmc_2 = align(tmc, pico, Alignment.BACK)
         tmc_2 = tmc_2.prefixed_copy("tmc_2")
 
         tmc = tmc.fuse(tmc_2)
@@ -414,6 +431,11 @@ def main():
             board=tmc,
             base_plate_border=7.0,
             base_plate_thickness=3.1,
+            base_plate_y_size_override=base_plate_y_size,
+            leaf_spring_angle=pico_leaf_spring_angle,
+            leaf_spring_holder_tower_x_size=pico_holder_tower_x_size,
+            leaf_spring_holder_tower_y_size=pico_holder_tower_y_size,
+            leaf_spring_thickness=pico_leaf_spring_thickness,
         )
 
         holder_gap_x = 0
@@ -448,6 +470,24 @@ def main():
     parts.add(
         pico_leaf_spring.get_follower_part_by_name("leaf_spring_preloaded"),
         "leaf_spring_pico_preloaded",
+        flip=False,
+        prod_rotation_angle=pico_leaf_spring_prod_rotation_angle,
+        prod_rotation_axis=pico_leaf_spring_prod_rotation_axis,
+        skip_in_production=False,  # we print the preloaded spring
+    )
+
+    parts.add(
+        tmc_leaf_spring,
+        "leaf_spring_tmc",
+        flip=False,
+        prod_rotation_angle=pico_leaf_spring_prod_rotation_angle,
+        prod_rotation_axis=pico_leaf_spring_prod_rotation_axis,
+        skip_in_production=True,  # we dont print the unpreloaded spring, only the preloaded one
+    )
+
+    parts.add(
+        tmc_leaf_spring.get_follower_part_by_name("leaf_spring_preloaded"),
+        "leaf_spring_tmc_preloaded",
         flip=False,
         prod_rotation_angle=pico_leaf_spring_prod_rotation_angle,
         prod_rotation_axis=pico_leaf_spring_prod_rotation_axis,
