@@ -62,7 +62,7 @@ def create_board_holder(
     holder_thickness=6.0,
     holder_width=5.0,
     holder_fb_clearance=2.0,
-    holder_inset=2.5,
+    holder_inset=1.0,
     holder_z_offset=1.5,
     holder_guide_width=10.0,
     holder_carriage_width=5.0,
@@ -73,17 +73,18 @@ def create_board_holder(
     holder_carriage_length_factor=3.0,
     holder_guide_length_factor=3.1,
     holder_board_holder_clearance=0.6,
-    leaf_spring_thickness=1.5,
+    leaf_spring_thickness=2.0,
     leaf_spring_width=2.5,
     leaf_spring_groove_clearance=0.1,
     leaf_spring_angle=45,
-    leaf_spring_preload_deflection=8,
+    leaf_spring_preload_deflection=12,
     leaf_spring_mid_deflection=4,
     leaf_spring_holder_tower_outset=10,
-    leaf_spring_holder_clearance=0.1,
+    leaf_spring_holder_clearance=0.5,
     leaf_spring_holder_spring_overstand=4,
-    leaf_spring_holder_tower_size=None,
-    leaf_spring_holder_tower_extra_height=5,
+    leaf_spring_holder_tower_x_size=None,
+    leaf_spring_holder_tower_y_size=None,
+    leaf_spring_holder_tower_extra_height=6,
 ):
     """Create a board holder assembly aligned to an arbitrary board.
 
@@ -91,8 +92,11 @@ def create_board_holder(
         tuple(board, holder_assembly)
     """
 
-    if leaf_spring_holder_tower_size is None:
-        leaf_spring_holder_tower_size = 2 * leaf_spring_width
+    if leaf_spring_holder_tower_x_size is None:
+        leaf_spring_holder_tower_x_size = 4 * leaf_spring_width
+
+    if leaf_spring_holder_tower_y_size is None:
+        leaf_spring_holder_tower_y_size = 4 * leaf_spring_width
 
     if board_pcb is None:
         if hasattr(board, "get_follower_part_by_name"):
@@ -284,8 +288,8 @@ def create_board_holder(
     leaf_spring_holder_towers = PartCollector()
     for fb in [Alignment.FRONT, Alignment.BACK]:
         leaf_spring_holder_tower = create_box(
-            leaf_spring_holder_tower_size,
-            leaf_spring_holder_tower_size,
+            leaf_spring_holder_tower_x_size,
+            leaf_spring_holder_tower_y_size,
             leaf_spring_holder_tower_height,
         )
         leaf_spring_holder_tower = align(
@@ -303,7 +307,9 @@ def create_board_holder(
         )
 
         leaf_spring_holder_tower = translate(
-            0, -fb.sign * leaf_spring_holder_spring_overstand, 0
+            leaf_spring_holder_tower_x_size / 4,
+            -fb.sign * leaf_spring_holder_spring_overstand,
+            0,
         )(leaf_spring_holder_tower)
 
         leaf_spring_holder_tower = leaf_spring.use_as_cutter_on(
@@ -383,11 +389,16 @@ def main():
     parts = PartList()
 
     pico = create_pico_w_board()
+
+    pico_holder_tower_x_size = 10
+    pico_holder_tower_y_size = 5
     pico_board, pico_holders, pico_leaf_spring = create_board_holder(
         board=pico,
         base_plate_border=7.0,
         base_plate_thickness=3.1,
         leaf_spring_angle=pico_leaf_spring_angle,
+        leaf_spring_holder_tower_x_size=pico_holder_tower_x_size,
+        leaf_spring_holder_tower_y_size=pico_holder_tower_y_size,
     )
     with_tmc = False
 
