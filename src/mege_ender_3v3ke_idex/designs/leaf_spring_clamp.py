@@ -36,6 +36,8 @@ PROCESS_DATA["process_overrides"].update(
     }
 )
 
+BIG_THING = 500
+
 
 def arc_from_chord_and_sagitta(L, d):
     """
@@ -83,14 +85,90 @@ def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
+    base_plate_length = 60
+    base_plate_width = 30
+
+    base_plate_thickness = 1.5
+
+    spring_width = 3
+    spring_thickness = 1.5
+
+    spring_length = 50
+
+    spring_holder_wall = 2
+
+    spring_holder_width = spring_width + 2 * spring_holder_wall
+    spring_holder_clearance = 0.6
+    spring_holder_z_clearance = 1
+
+    spring_holder_length = 4
+
+    spring_holder_height = 10
+
+    spring_hole_z_offset = 4
+    spring_holder_inset = 2
+
+    spring_preload = 2
+
+    base_plate = create_box(base_plate_length, base_plate_width, base_plate_thickness)
+    spring_hole_height = spring_thickness + 2 * spring_holder_z_clearance
+    spring_holders = PartCollector()
+    spring_holder_holes = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        spring_holder = create_box(
+            spring_holder_length,
+            spring_holder_width,
+            spring_holder_height,
+        )
+        spring_holder = align(spring_holder, base_plate, Alignment.CENTER)
+        spring_holder = align(spring_holder, base_plate, Alignment.STACK_TOP)
+        spring_holder = translate(
+            lr.sign
+            * (spring_length / 2 - spring_holder_length / 2 - spring_holder_inset),
+            0,
+            0,
+        )(spring_holder)
+
+        spring_slit_cutter = create_box(
+            BIG_THING,
+            spring_width + 2 * spring_holder_clearance,
+            spring_hole_height,
+        )
+        spring_slit_cutter = align(spring_slit_cutter, spring_holder, Alignment.CENTER)
+        spring_slit_cutter = align(spring_slit_cutter, spring_holder, Alignment.BOTTOM)
+        spring_slit_cutter = translate(0, 0, spring_hole_z_offset)(spring_slit_cutter)
+
+        spring_holder_holes = spring_holder_holes.fuse(spring_slit_cutter)
+
+        spring_holder = spring_holder.cut(spring_slit_cutter)
+        spring_holders = spring_holders.fuse(spring_holder)
+
+    base_plate = base_plate.fuse(spring_holders)
+
+    parts.add(base_plate, "leaf_spring_clamp", flip=False)
+
     # Create the part
-    part = create_leaf_sping(
-        spring_length=20,
-        spring_thickness=1.5,
-        spring_height=5,
-        spring_mid_deflection=0.5,
+    leaf_spring = create_leaf_sping(
+        spring_length=spring_length,
+        spring_thickness=spring_thickness,
+        spring_height=spring_width,
+        spring_mid_deflection=spring_hole_z_offset
+        + spring_hole_height
+        - spring_thickness
+        + spring_preload,
     )
-    parts.add(part, "leaf_spring", flip=False)
+    leaf_spring = rotate(-90, axis=(1, 0, 0))(leaf_spring)
+
+    leaf_spring = align(leaf_spring, spring_holder_holes, Alignment.CENTER)
+    leaf_spring = align(leaf_spring, spring_holder_holes, Alignment.TOP)
+
+    parts.add(
+        leaf_spring,
+        "leaf_spring",
+        flip=False,
+        prod_rotation_angle=90,
+        prod_rotation_axis=(1, 0, 0),
+    )
 
     # Arrange and export
     arrange_and_export(
