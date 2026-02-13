@@ -17,12 +17,12 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
     PROCESS_DATA_PLACF_04_HS,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.leaf_spring_clamp import create_leaf_spring
 from mege_ender_3v3ke_idex.designs.linear_guide import create_linear_guide
 from mege_ender_3v3ke_idex.designs.mcu_housing_x_axis import (
     create_pico_w_board,
     create_tmc_board,
 )
-from mege_ender_3v3ke_idex.designs.spring import create_spring
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -45,6 +45,9 @@ PROCESS_DATA["process_overrides"].update(
 BIG_THING = 500
 
 electronics_boards_holder_offset = 0.005
+pico_leaf_spring_angle = 45
+pico_leaf_spring_prod_rotation_axis = (0, 1, 0)
+pico_leaf_spring_prod_rotation_angle = 90 - pico_leaf_spring_angle
 
 
 def create_board_holder(
@@ -69,18 +72,28 @@ def create_board_holder(
     holder_travel_length=3.0,
     holder_carriage_length_factor=3.0,
     holder_guide_length_factor=3.1,
-    central_spring_width=7.0,
-    central_spring_clearance=1.0,
-    central_spring_thickness=1.1,
-    central_spring_pitch_factor=2.2,
-    central_spring_length_factor=4.0,
     holder_board_holder_clearance=0.6,
+    leaf_spring_thickness=1.5,
+    leaf_spring_width=2.5,
+    leaf_spring_groove_clearance=0.1,
+    leaf_spring_angle=45,
+    leaf_spring_preload_deflection=8,
+    leaf_spring_mid_deflection=4,
+    leaf_spring_holder_tower_outset=10,
+    leaf_spring_holder_clearance=0.1,
+    leaf_spring_holder_spring_overstand=4,
+    leaf_spring_holder_tower_size=None,
+    leaf_spring_holder_tower_extra_height=5,
 ):
     """Create a board holder assembly aligned to an arbitrary board.
 
     Returns:
         tuple(board, holder_assembly)
     """
+
+    if leaf_spring_holder_tower_size is None:
+        leaf_spring_holder_tower_size = 2 * leaf_spring_width
+
     if board_pcb is None:
         if hasattr(board, "get_follower_part_by_name"):
             board_pcb = board.get_follower_part_by_name(board_pcb_follower_name)
@@ -98,6 +111,8 @@ def create_board_holder(
         return part.cut(board)
 
     board_size = get_bounding_box_size(board)
+
+    leaf_spring_length = board_size[1] + 2 * leaf_spring_holder_tower_outset
 
     base_plate_size = (
         board_size[0] + 2 * base_plate_border,
@@ -144,9 +159,42 @@ def create_board_holder(
             holder_bottom_cutter = align(holder_bottom_cutter, holder, Alignment.RIGHT)
             holder = holder.cut(holder_bottom_cutter)
 
-        holders = holders.fuse(holder)
         if lr == Alignment.RIGHT:
+            holder_bounding_box = get_bounding_box(holder)
+            leaf_spring_groove_cutter = create_box(
+                leaf_spring_width + 2 * leaf_spring_groove_clearance,
+                holder_length,
+                4 * leaf_spring_thickness + 2 * leaf_spring_groove_clearance,
+            )
+            leaf_spring_groove_cutter = align(
+                leaf_spring_groove_cutter, None, Alignment.CENTER, axes=[0, 1]
+            )
+            leaf_spring_groove_cutter = align(
+                leaf_spring_groove_cutter, holder, Alignment.CENTER, axes=[1]
+            )
+
+            leaf_spring_groove_cutter = rotate(leaf_spring_angle, axis=(0, 1, 0))(
+                leaf_spring_groove_cutter
+            )
+
+            leaf_spring_groove_cutter = translate(
+                holder_bounding_box[1][0], 0, holder_bounding_box[1][2]
+            )(leaf_spring_groove_cutter)
+
+            cut_depth = leaf_spring_thickness + leaf_spring_groove_clearance
+
+            x_offset = -math.cos(math.radians(leaf_spring_angle)) * (cut_depth)
+            z_offset = -math.sin(math.radians(leaf_spring_angle)) * (cut_depth)
+
+            leaf_spring_groove_cutter = translate(x_offset, 0, z_offset)(
+                leaf_spring_groove_cutter
+            )
+
+            holder = holder.cut(leaf_spring_groove_cutter)
+
             right_holder = holder
+
+        holders = holders.fuse(holder)
 
     if right_holder is None:
         raise ValueError("Right holder could not be generated.")
@@ -169,6 +217,102 @@ def create_board_holder(
     right_holder_cutter = translate(-holder_board_holder_clearance, 0, 0)(
         right_holder_cutter
     )
+
+    leaf_spring = create_leaf_spring(
+        spring_length=leaf_spring_length,
+        spring_thickness=leaf_spring_thickness,
+        spring_height=leaf_spring_width,
+        spring_mid_deflection=leaf_spring_mid_deflection,
+    )
+
+    leaf_spring_cutter = create_leaf_spring(
+        spring_length=leaf_spring_length + 2 * leaf_spring_holder_clearance,
+        spring_thickness=leaf_spring_thickness + 2 * leaf_spring_holder_clearance,
+        spring_height=leaf_spring_width + 2 * leaf_spring_holder_clearance,
+        spring_mid_deflection=leaf_spring_mid_deflection,
+    )
+
+    leaf_spring_preloaded = create_leaf_spring(
+        spring_length=leaf_spring_length,
+        spring_thickness=leaf_spring_thickness,
+        spring_height=leaf_spring_width,
+        spring_mid_deflection=leaf_spring_mid_deflection
+        + leaf_spring_preload_deflection,
+    )
+
+    leaf_spring_cutter = align(leaf_spring_cutter, leaf_spring, Alignment.CENTER)
+    leaf_spring_preloaded = align(leaf_spring_preloaded, leaf_spring, Alignment.CENTER)
+
+    leaf_spring = LeaderFollowersCuttersPart(
+        leader=leaf_spring, cutters=[leaf_spring_cutter]
+    )
+    leaf_spring.add_named_follower(leaf_spring_preloaded, "leaf_spring_preloaded")
+
+    leaf_spring = rotate(-90, axis=(1, 0, 0))(leaf_spring)
+
+    leaf_spring = rotate(90)(leaf_spring)
+    leaf_spring = align(leaf_spring, None, Alignment.CENTER)
+
+    leaf_spring_bbox = get_bounding_box(leaf_spring)
+    leaf_spring = translate(0, 0, -leaf_spring_bbox[0][2])(leaf_spring)
+
+    leaf_spring = rotate(leaf_spring_angle, axis=(0, 1, 0))(leaf_spring)
+
+    leaf_spring = align(leaf_spring, right_holder, Alignment.CENTER, axes=[1])
+    right_holder_bounding_box = get_bounding_box(right_holder)
+
+    leaf_spring = translate(
+        right_holder_bounding_box[1][0], 0, right_holder_bounding_box[1][2]
+    )(leaf_spring)
+
+    shift_depth = leaf_spring_thickness
+
+    x_offset = -math.cos(math.radians(leaf_spring_angle)) * (shift_depth)
+    z_offset = -math.sin(math.radians(leaf_spring_angle)) * (shift_depth)
+    leaf_spring = translate(x_offset, 0, z_offset)(leaf_spring)
+
+    base_plate_bbox = get_bounding_box(base_plate)
+
+    leaf_spring_bbox = get_bounding_box(leaf_spring)
+
+    leaf_spring_holder_tower_height = (
+        leaf_spring_bbox[1][2]
+        - base_plate_bbox[1][2]
+        + leaf_spring_holder_tower_extra_height
+    )
+
+    leaf_spring_holder_towers = PartCollector()
+    for fb in [Alignment.FRONT, Alignment.BACK]:
+        leaf_spring_holder_tower = create_box(
+            leaf_spring_holder_tower_size,
+            leaf_spring_holder_tower_size,
+            leaf_spring_holder_tower_height,
+        )
+        leaf_spring_holder_tower = align(
+            leaf_spring_holder_tower, leaf_spring, Alignment.CENTER
+        )
+
+        leaf_spring_holder_tower = align(
+            leaf_spring_holder_tower, base_plate, Alignment.BOTTOM
+        )
+
+        leaf_spring_holder_tower = align(leaf_spring_holder_tower, leaf_spring, fb)
+
+        leaf_spring_holder_tower = align(
+            leaf_spring_holder_tower, leaf_spring, Alignment.RIGHT
+        )
+
+        leaf_spring_holder_tower = translate(
+            0, -fb.sign * leaf_spring_holder_spring_overstand, 0
+        )(leaf_spring_holder_tower)
+
+        leaf_spring_holder_tower = leaf_spring.use_as_cutter_on(
+            leaf_spring_holder_tower
+        )
+
+        leaf_spring_holder_towers = leaf_spring_holder_towers.fuse(
+            leaf_spring_holder_tower
+        )
 
     linear_guides = PartCollector()
     carriages = PartCollector()
@@ -209,37 +353,9 @@ def create_board_holder(
         carriage = align(carriage, holders, Alignment.STACK_RIGHT)
         carriages = carriages.fuse(carriage)
 
-    central_spring_length = central_spring_length_factor * holder_travel_length
-    central_spring_cutter = create_box(
-        central_spring_length,
-        central_spring_width + 2 * central_spring_clearance,
-        BIG_THING,
-    )
-    central_spring_cutter = align(central_spring_cutter, holders, Alignment.CENTER)
-    central_spring_cutter = align(central_spring_cutter, holders, Alignment.BOTTOM)
-    central_spring_cutter = align(central_spring_cutter, holders, Alignment.STACK_RIGHT)
-
-    central_spring = create_spring(
-        spring_thickness=central_spring_thickness,
-        spring_height=base_plate_thickness,
-        spring_width=central_spring_width,
-        spring_pitch=central_spring_thickness * central_spring_pitch_factor,
-        spring_total_length=central_spring_length,
-    )
-    central_spring = rotate(90)(central_spring)
-    central_spring = align(central_spring, holders, Alignment.CENTER)
-    central_spring = align(central_spring, holders, Alignment.BOTTOM)
-    central_spring = align(central_spring, holders, Alignment.STACK_RIGHT)
-
     holders = holders.fuse(carriages)
 
-    base_plate_bbox = get_bounding_box(base_plate)
-    relevant_parts_fused = (
-        holders.fuse(linear_guides)
-        .fuse(central_spring)
-        .fuse(linear_guide_cutters)
-        .fuse(central_spring_cutter)
-    )
+    relevant_parts_fused = holders.fuse(linear_guides).fuse(linear_guide_cutters)
     relevant_parts_bbox = get_bounding_box(relevant_parts_fused)
 
     right_extension_size = relevant_parts_bbox[1][0] - base_plate_bbox[1][0]
@@ -251,15 +367,15 @@ def create_board_holder(
     right_extension = align(right_extension, base_plate, Alignment.CENTER)
     right_extension = align(right_extension, base_plate, Alignment.STACK_RIGHT)
 
+    base_plate = base_plate.fuse(leaf_spring_holder_towers)
     base_plate = base_plate.fuse(right_extension)
     base_plate = base_plate.cut(right_holder_cutter)
     base_plate = base_plate.cut(linear_guide_cutters)
     base_plate = cut_with_board(base_plate)
-    base_plate = base_plate.cut(central_spring_cutter)
 
-    holder_assembly = holders.fuse(base_plate).fuse(linear_guides).fuse(central_spring)
+    holder_assembly = holders.fuse(base_plate).fuse(linear_guides)
 
-    return board, holder_assembly
+    return board, holder_assembly, leaf_spring
 
 
 def main():
@@ -267,42 +383,65 @@ def main():
     parts = PartList()
 
     pico = create_pico_w_board()
-    pico_board, pico_holders = create_board_holder(
+    pico_board, pico_holders, pico_leaf_spring = create_board_holder(
         board=pico,
         base_plate_border=7.0,
         base_plate_thickness=3.1,
+        leaf_spring_angle=pico_leaf_spring_angle,
     )
+    with_tmc = False
 
-    tmc = create_tmc_board()
+    if with_tmc:
+        tmc = create_tmc_board()
 
-    tmc_2 = align(tmc, tmc, Alignment.STACK_BACK, stack_gap=4)
-    tmc_2 = tmc_2.prefixed_copy("tmc_2")
+        tmc_2 = align(tmc, tmc, Alignment.STACK_BACK, stack_gap=4)
+        tmc_2 = tmc_2.prefixed_copy("tmc_2")
 
-    tmc = tmc.fuse(tmc_2)
+        tmc = tmc.fuse(tmc_2)
 
-    tmc_board, tmc_holders = create_board_holder(
-        board=tmc,
-        base_plate_border=7.0,
-        base_plate_thickness=3.1,
-    )
+        tmc_board, tmc_holders, tmc_leaf_spring = create_board_holder(
+            board=tmc,
+            base_plate_border=7.0,
+            base_plate_thickness=3.1,
+        )
 
-    holder_gap_x = 0
-    pico_holders_bbox = get_bounding_box(pico_holders)
-    tmc_holders_bbox = get_bounding_box(tmc_holders)
-    tmc_x_offset = pico_holders_bbox[1][0] - tmc_holders_bbox[0][0] + holder_gap_x
+        holder_gap_x = 0
+        pico_holders_bbox = get_bounding_box(pico_holders)
+        tmc_holders_bbox = get_bounding_box(tmc_holders)
+        tmc_x_offset = pico_holders_bbox[1][0] - tmc_holders_bbox[0][0] + holder_gap_x
 
-    tmc_board = translate(tmc_x_offset, 0, 0)(tmc_board)
-    tmc_holders = translate(tmc_x_offset, 0, 0)(tmc_holders)
+        tmc_board = translate(tmc_x_offset, 0, 0)(tmc_board)
+        tmc_holders = translate(tmc_x_offset, 0, 0)(tmc_holders)
+
+        parts.add(tmc_board, "tmc_board", flip=False, skip_in_production=True)
 
     parts.add(pico_board, "pico_w_board", flip=False, skip_in_production=True)
 
-    parts.add(tmc_board, "tmc_board", flip=False, skip_in_production=True)
-
-    all_holders = pico_holders.fuse(tmc_holders)
+    all_holders = pico_holders
+    if with_tmc:
+        all_holders = all_holders.fuse(tmc_holders)
     parts.add(
         all_holders, "holders", flip=False
     )  # parts.add(tmc_holders, "holders_tmc", flip=False)
     # parts.add(pico_holders, "holders_pico", flip=False)
+
+    parts.add(
+        pico_leaf_spring,
+        "leaf_spring_pico",
+        flip=False,
+        prod_rotation_angle=pico_leaf_spring_prod_rotation_angle,
+        prod_rotation_axis=pico_leaf_spring_prod_rotation_axis,
+        skip_in_production=True,  # we dont print the unpreloaded spring, only the preloaded one
+    )
+
+    parts.add(
+        pico_leaf_spring.get_follower_part_by_name("leaf_spring_preloaded"),
+        "leaf_spring_pico_preloaded",
+        flip=False,
+        prod_rotation_angle=pico_leaf_spring_prod_rotation_angle,
+        prod_rotation_axis=pico_leaf_spring_prod_rotation_axis,
+        skip_in_production=False,  # we print the preloaded spring
+    )
 
     # Arrange and export
     arrange_and_export(
@@ -310,6 +449,7 @@ def main():
         script_file=__file__,
         prod=PROD,
         process_data=PROCESS_DATA,
+        prod_gap=5,
     )
 
     _logger.info("board_holder created successfully!")

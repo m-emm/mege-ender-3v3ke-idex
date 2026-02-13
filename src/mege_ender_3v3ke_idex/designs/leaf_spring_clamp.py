@@ -58,7 +58,7 @@ def arc_from_chord_and_sagitta(L, d):
     return R, theta
 
 
-def create_leaf_sping(
+def create_leaf_spring(
     spring_length, spring_thickness, spring_height, spring_mid_deflection
 ):
 
@@ -148,7 +148,7 @@ def main():
     parts.add(base_plate, "leaf_spring_clamp", flip=False)
 
     # Create the part
-    leaf_spring = create_leaf_sping(
+    leaf_spring = create_leaf_spring(
         spring_length=spring_length,
         spring_thickness=spring_thickness,
         spring_height=spring_width,
