@@ -18,7 +18,10 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.linear_guide import create_linear_guide
-from mege_ender_3v3ke_idex.designs.mcu_housing_x_axis import create_pico_w_board
+from mege_ender_3v3ke_idex.designs.mcu_housing_x_axis import (
+    create_pico_w_board,
+    create_tmc_board,
+)
 from mege_ender_3v3ke_idex.designs.spring import create_spring
 from shellforgepy.simple import *
 
@@ -56,21 +59,22 @@ def create_board_holder(
     holder_thickness=6.0,
     holder_width=5.0,
     holder_fb_clearance=2.0,
-    holder_inset=2.0,
+    holder_inset=2.5,
     holder_z_offset=1.5,
     holder_guide_width=10.0,
     holder_carriage_width=5.0,
     holder_guide_thickness=None,
-    holder_guide_clearance=0.4,
+    holder_guide_clearance=0.35,
     holder_guide_end_border=3.0,
     holder_travel_length=3.0,
     holder_carriage_length_factor=3.0,
     holder_guide_length_factor=3.1,
     central_spring_width=7.0,
     central_spring_clearance=1.0,
-    central_spring_thickness=0.85,
-    central_spring_pitch_factor=3.5,
+    central_spring_thickness=1.1,
+    central_spring_pitch_factor=2.2,
     central_spring_length_factor=4.0,
+    holder_board_holder_clearance=0.6,
 ):
     """Create a board holder assembly aligned to an arbitrary board.
 
@@ -124,7 +128,7 @@ def create_board_holder(
         holder_cutter = translate(-lr.sign * holder_thickness / 2, 0, 0)(holder_cutter)
         holder = holder.cut(holder_cutter)
 
-        holder = align(holder, board_pcb, Alignment.CENTER)
+        holder = align(holder, board, Alignment.CENTER)
         holder = align(holder, board_pcb, Alignment.TOP)
         holder = align(holder, board, lr.stack_alignment)
 
@@ -156,12 +160,15 @@ def create_board_holder(
 
     right_holder_size = get_bounding_box_size(right_holder)
     right_holder_cutter = create_box(
-        right_holder_size[0] + holder_travel_length,
+        right_holder_size[0] + holder_travel_length + holder_board_holder_clearance,
         right_holder_size[1] + 2 * holder_fb_clearance,
         BIG_THING,
     )
     right_holder_cutter = align(right_holder_cutter, right_holder, Alignment.CENTER)
     right_holder_cutter = align(right_holder_cutter, right_holder, Alignment.LEFT)
+    right_holder_cutter = translate(-holder_board_holder_clearance, 0, 0)(
+        right_holder_cutter
+    )
 
     linear_guides = PartCollector()
     carriages = PartCollector()
@@ -186,7 +193,7 @@ def create_board_holder(
             linear_guide, holders, Alignment.STACK_RIGHT, stack_gap=holder_travel_length
         )
         linear_guide = align(linear_guide, holders, fb)
-        linear_guide = translate(0, -fb.sign * holder_width * 2, 0)(linear_guide)
+        # linear_guide = translate(0, -fb.sign * holder_carriage_width , 0)(linear_guide)
 
         linear_guides = linear_guides.fuse(linear_guide.leader)
 
@@ -260,14 +267,42 @@ def main():
     parts = PartList()
 
     pico = create_pico_w_board()
-    aligned_board, holders = create_board_holder(
+    pico_board, pico_holders = create_board_holder(
         board=pico,
         base_plate_border=7.0,
         base_plate_thickness=3.1,
     )
 
-    parts.add(aligned_board, "pico_w_board", flip=False, skip_in_production=True)
-    parts.add(holders, "holders", flip=False)
+    tmc = create_tmc_board()
+
+    tmc_2 = align(tmc, tmc, Alignment.STACK_BACK, stack_gap=4)
+    tmc_2 = tmc_2.prefixed_copy("tmc_2")
+
+    tmc = tmc.fuse(tmc_2)
+
+    tmc_board, tmc_holders = create_board_holder(
+        board=tmc,
+        base_plate_border=7.0,
+        base_plate_thickness=3.1,
+    )
+
+    holder_gap_x = 0
+    pico_holders_bbox = get_bounding_box(pico_holders)
+    tmc_holders_bbox = get_bounding_box(tmc_holders)
+    tmc_x_offset = pico_holders_bbox[1][0] - tmc_holders_bbox[0][0] + holder_gap_x
+
+    tmc_board = translate(tmc_x_offset, 0, 0)(tmc_board)
+    tmc_holders = translate(tmc_x_offset, 0, 0)(tmc_holders)
+
+    parts.add(pico_board, "pico_w_board", flip=False, skip_in_production=True)
+
+    parts.add(tmc_board, "tmc_board", flip=False, skip_in_production=True)
+
+    all_holders = pico_holders.fuse(tmc_holders)
+    parts.add(
+        all_holders, "holders", flip=False
+    )  # parts.add(tmc_holders, "holders_tmc", flip=False)
+    # parts.add(pico_holders, "holders_pico", flip=False)
 
     # Arrange and export
     arrange_and_export(

@@ -45,10 +45,12 @@ def _calculate_spring_layout(spring_total_length, spring_pitch, spring_thickness
     )
 
     if max_turns < 2:
-        min_total_length = spring_thickness + spring_pitch + 2 * min_connector_length
+        min_total_length = (
+            spring_thickness + 2 * spring_pitch + 2 * min_connector_length
+        )
         raise ValueError(
             f"Cannot create spring for total length {spring_total_length}. "
-            f"Need at least {min_total_length} for two turns and two connectors "
+            f"Need at least {min_total_length} for two turns at pitch {spring_pitch} and two connectors "
             f"with each connector >= {min_connector_length}."
         )
 
