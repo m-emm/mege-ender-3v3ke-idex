@@ -58,7 +58,7 @@ pico_leaf_spring_prod_rotation_axis = (0, 1, 0)
 pico_leaf_spring_prod_rotation_angle = 90 - pico_leaf_spring_angle
 pico_leaf_spring_thickness = 3.2
 
-base_plate_y_size = 80
+base_plate_y_size = 92
 base_plate_thickness = 3.1
 screw_size = "M3"
 screw_hole_inset = 2.5
@@ -76,7 +76,7 @@ def create_board_holder(
     base_plate_thickness=3.1,
     board_z_offset=electronics_boards_holder_offset,
     holder_thickness=6.0,
-    holder_width=5.0,
+    holder_width=7,
     holder_fb_clearance=2.0,
     holder_inset=1.0,
     holder_z_offset=1.5,
@@ -405,7 +405,15 @@ def create_board_holder(
 
     holder_assembly = holders.fuse(base_plate).fuse(linear_guides)
 
-    return board, holder_assembly, leaf_spring
+    holder_assembly = LeaderFollowersCuttersPart(holder_assembly)
+
+    holder_assembly.add_named_follower(leaf_spring.leader, "leaf_spring")
+    holder_assembly.add_named_follower(
+        leaf_spring.get_follower_part_by_name("leaf_spring_preloaded"),
+        "leaf_spring_preloaded",
+    )
+
+    return holder_assembly
 
 
 def create_sil_clamp(
@@ -414,7 +422,7 @@ def create_sil_clamp(
     electronics_holder_slack = 0.1
     electronics_board_cutter_slack = 0.3
     mcu_base_cutter_vertical_slack = 0.2
-    lip_size = 0.6
+    lip_size = 0.85
 
     pins = create_sil(
         num_y_pins=num_pins,
@@ -456,9 +464,14 @@ def create_sil_clamp(
     lip = align(lip, pins, Alignment.CENTER)
     lip = align(lip, pins, Alignment.RIGHT)
     lip = translate(electronics_holder_slack, 0, 0)(lip)
-    lip = align(lip, base_plate, Alignment.TOP)
+    lip = align(lip, base_plate, Alignment.STACK_TOP)
 
     base_plate = base_plate.fuse(lip)
+
+    lip_holder = create_box(lip_size, pins_size[1], lip_size)
+    lip_holder = align(lip_holder, lip, Alignment.CENTER)
+    lip_holder = align(lip_holder, lip, Alignment.STACK_RIGHT)
+    base_plate = base_plate.fuse(lip_holder)
 
     pins.add_named_follower(base_plate, "base_plate")
 
@@ -471,12 +484,12 @@ def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
-    pico = create_pico_w_board()
+    pico_board = create_pico_w_board()
 
     pico_holder_tower_x_size = 10
     pico_holder_tower_y_size = 5
-    pico_board, pico_holders, pico_leaf_spring = create_board_holder(
-        board=pico,
+    pico_holders = create_board_holder(
+        board=pico_board,
         base_plate_border=7.0,
         base_plate_thickness=base_plate_thickness,
         base_plate_y_size_override=base_plate_y_size,
@@ -490,14 +503,14 @@ def main():
     if with_tmc:
         tmc = create_tmc_board()
 
-        tmc = align(tmc, pico, Alignment.FRONT)
+        tmc = align(tmc, pico_board, Alignment.FRONT)
 
-        tmc_2 = align(tmc, pico, Alignment.BACK)
+        tmc_2 = align(tmc, pico_board, Alignment.BACK)
         tmc_2 = tmc_2.prefixed_copy("tmc_2")
 
         tmc = tmc.fuse(tmc_2)
 
-        tmc_board, tmc_holders, tmc_leaf_spring = create_board_holder(
+        tmc_holders = create_board_holder(
             board=tmc,
             base_plate_border=7.0,
             base_plate_thickness=base_plate_thickness,
@@ -513,14 +526,18 @@ def main():
         tmc_holders_bbox = get_bounding_box(tmc_holders)
         tmc_x_offset = pico_holders_bbox[1][0] - tmc_holders_bbox[0][0] + holder_gap_x
 
-        tmc_board = translate(tmc_x_offset, 0, 0)(tmc_board)
-        tmc_holders = translate(tmc_x_offset, 0, 0)(tmc_holders)
+        tmc_translation = translate(tmc_x_offset, 0, 0)
+        tmc = tmc_translation(tmc)
+        parts.add(tmc, "tmc_board", flip=False, skip_in_production=True)
+        tmc_2 = tmc_translation(tmc_2)
+        parts.add(tmc_2, "tmc_board_2", flip=False, skip_in_production=True)
 
-        parts.add(tmc_board, "tmc_board", flip=False, skip_in_production=True)
+        tmc_holders = tmc_translation(tmc_holders)
+        tmc_holders = tmc_holders.prefixed_copy("tmc")
 
     parts.add(pico_board, "pico_w_board", flip=False, skip_in_production=True)
 
-    all_holders = pico_holders
+    all_holders = pico_holders.prefixed_copy("pico")
     if with_tmc:
         all_holders = all_holders.fuse(tmc_holders)
 
@@ -574,7 +591,7 @@ def main():
     # parts.add(pico_holders, "holders_pico", flip=False)
 
     parts.add(
-        pico_leaf_spring,
+        all_holders.get_follower_part_by_name("pico_leaf_spring"),
         "leaf_spring_pico",
         flip=False,
         prod_rotation_angle=pico_leaf_spring_prod_rotation_angle,
@@ -583,7 +600,7 @@ def main():
     )
 
     parts.add(
-        pico_leaf_spring.get_follower_part_by_name("leaf_spring_preloaded"),
+        all_holders.get_follower_part_by_name("pico_leaf_spring_preloaded"),
         "leaf_spring_pico_preloaded",
         flip=False,
         prod_rotation_angle=pico_leaf_spring_prod_rotation_angle,
@@ -592,7 +609,7 @@ def main():
     )
 
     parts.add(
-        tmc_leaf_spring,
+        all_holders.get_follower_part_by_name("tmc_leaf_spring"),
         "leaf_spring_tmc",
         flip=False,
         prod_rotation_angle=pico_leaf_spring_prod_rotation_angle,
@@ -601,7 +618,7 @@ def main():
     )
 
     parts.add(
-        tmc_leaf_spring.get_follower_part_by_name("leaf_spring_preloaded"),
+        all_holders.get_follower_part_by_name("tmc_leaf_spring_preloaded"),
         "leaf_spring_tmc_preloaded",
         flip=False,
         prod_rotation_angle=pico_leaf_spring_prod_rotation_angle,
