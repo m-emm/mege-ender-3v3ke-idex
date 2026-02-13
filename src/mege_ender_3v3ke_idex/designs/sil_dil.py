@@ -115,12 +115,13 @@ def create_sil(
 
     cutters.append(pin_cutters)
     retval = base.fuse(pins)
-    followers = None
+
+    retval = LeaderFollowersCuttersPart(retval, cutters=cutters)
+
     if effective_top_pin_length > 0:
-        followers = [top_pins]
+        retval.add_named_follower(top_pins, "top_pins")
     else:
         raise ValueError("kaput")
-    retval = LeaderFollowersCuttersPart(retval, followers=followers, cutters=cutters)
 
     retval = rotate(180, axis=(0, 1, 0))(retval)
 
@@ -151,6 +152,9 @@ def create_dil(
     )
 
     base_right = translate(int_x_distance * dil_pitch, 0, 0)(base)
+
+    base = base.prefixed_copy("left_")
+    base_right = base_right.prefixed_copy("right_")
 
     retval = base.fuse(base_right)
 

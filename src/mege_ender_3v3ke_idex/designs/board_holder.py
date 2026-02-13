@@ -23,6 +23,14 @@ from mege_ender_3v3ke_idex.designs.mcu_housing_x_axis import (
     create_pico_w_board,
     create_tmc_board,
 )
+from mege_ender_3v3ke_idex.designs.sil_dil import (
+    create_sil,
+    dil_pitch,
+    top_pin_length,
+    wire_wrap_pin_base_thickness,
+    wire_wrap_pin_length,
+    wire_wrap_pin_side,
+)
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -51,6 +59,9 @@ pico_leaf_spring_prod_rotation_angle = 90 - pico_leaf_spring_angle
 pico_leaf_spring_thickness = 3.2
 
 base_plate_y_size = 80
+base_plate_thickness = 3.1
+screw_size = "M3"
+screw_hole_inset = 2.5
 
 
 def create_board_holder(
@@ -397,6 +408,65 @@ def create_board_holder(
     return board, holder_assembly, leaf_spring
 
 
+def create_sil_clamp(
+    num_pins, base_plate_length, base_plate_width, base_plate_thickness
+):
+    electronics_holder_slack = 0.1
+    electronics_board_cutter_slack = 0.3
+    mcu_base_cutter_vertical_slack = 0.2
+    lip_size = 0.6
+
+    pins = create_sil(
+        num_y_pins=num_pins,
+        pin_length=wire_wrap_pin_length,
+        pin_side=wire_wrap_pin_side,
+        top_pin_length=top_pin_length,
+        base_thickness=wire_wrap_pin_base_thickness,
+        pin_cutter_slack=0.5,
+        base_cutter_slack=electronics_holder_slack,
+        base_cutter_vertical_slack=mcu_base_cutter_vertical_slack,
+    )
+
+    base_plate = create_box(base_plate_length, base_plate_width, base_plate_thickness)
+    base_plate = translate(0, 0, -base_plate_thickness)(base_plate)
+
+    pins = align(pins, base_plate, Alignment.CENTER, axes=[0, 1])
+
+    base_plate = pins.use_as_cutter_on(base_plate)
+
+    pins_size = get_bounding_box_size(pins)
+
+    slit_length = pins_size[1] + 4 * dil_pitch
+    slit_width = 0.4
+
+    slit_cutter = create_box(slit_width, slit_length, BIG_THING)
+
+    slit_cutter = align(slit_cutter, pins, Alignment.CENTER)
+
+    base_plate = base_plate.cut(slit_cutter)
+
+    lip = create_right_triangle(
+        lip_size,
+        lip_size,
+        pins_size[1],
+        extrusion_direction=(0, 1, 0),
+        a_normal=(1, 0, 0),
+        b_normal=(0, 0, -1),
+    )
+    lip = align(lip, pins, Alignment.CENTER)
+    lip = align(lip, pins, Alignment.RIGHT)
+    lip = translate(electronics_holder_slack, 0, 0)(lip)
+    lip = align(lip, base_plate, Alignment.TOP)
+
+    base_plate = base_plate.fuse(lip)
+
+    pins.add_named_follower(base_plate, "base_plate")
+
+    pins = pins.fuse(pins.get_follower_part_by_name("top_pins"))
+
+    return pins
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
@@ -408,7 +478,7 @@ def main():
     pico_board, pico_holders, pico_leaf_spring = create_board_holder(
         board=pico,
         base_plate_border=7.0,
-        base_plate_thickness=3.1,
+        base_plate_thickness=base_plate_thickness,
         base_plate_y_size_override=base_plate_y_size,
         leaf_spring_angle=pico_leaf_spring_angle,
         leaf_spring_holder_tower_x_size=pico_holder_tower_x_size,
@@ -430,7 +500,7 @@ def main():
         tmc_board, tmc_holders, tmc_leaf_spring = create_board_holder(
             board=tmc,
             base_plate_border=7.0,
-            base_plate_thickness=3.1,
+            base_plate_thickness=base_plate_thickness,
             base_plate_y_size_override=base_plate_y_size,
             leaf_spring_angle=pico_leaf_spring_angle,
             leaf_spring_holder_tower_x_size=pico_holder_tower_x_size,
@@ -453,6 +523,51 @@ def main():
     all_holders = pico_holders
     if with_tmc:
         all_holders = all_holders.fuse(tmc_holders)
+
+    additional_pins = create_sil_clamp(
+        num_pins=20,
+        base_plate_length=6,
+        base_plate_width=base_plate_y_size,
+        base_plate_thickness=base_plate_thickness,
+    )
+    additional_pins = additional_pins.prefixed_copy("additional_pins")
+
+    align_pins_translation = align_translation(
+        additional_pins.get_follower_part_by_name("additional_pins_base_plate"),
+        all_holders,
+        Alignment.CENTER,
+        axes=[1],
+    )
+    additional_pins = align_pins_translation(additional_pins)
+
+    align_pins_translation = align_translation(
+        additional_pins.get_follower_part_by_name("additional_pins_base_plate"),
+        all_holders,
+        Alignment.STACK_RIGHT,
+    )
+
+    additional_pins = align_pins_translation(additional_pins)
+
+    parts.add(additional_pins, "additional_pins", flip=False, skip_in_production=True)
+
+    all_holders = all_holders.fuse(
+        additional_pins.get_follower_part_by_name("additional_pins_base_plate")
+    )
+
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+            screw_hole = create_cylinder(
+                MScrew.from_size(screw_size).clearance_hole_normal / 2, BIG_THING
+            )
+            screw_hole = align(screw_hole, all_holders, Alignment.CENTER)
+            screw_hole = align(screw_hole, all_holders, lr)
+            screw_hole = align(screw_hole, all_holders, fb)
+            screw_hole = translate(
+                -lr.sign * screw_hole_inset, -fb.sign * screw_hole_inset, 0
+            )(screw_hole)
+
+            all_holders = all_holders.cut(screw_hole)
+
     parts.add(
         all_holders, "holders", flip=False
     )  # parts.add(tmc_holders, "holders_tmc", flip=False)
