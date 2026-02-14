@@ -57,6 +57,7 @@ import os
 from matplotlib.pyplot import axis
 from mege_3devops.process_data.mender3.process_data_04_high_precision import (  # noqa: F401
     PROCESS_DATA_PLACF_04_HP,
+    PROCESS_DATA_PETG_04_HP,
 )
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401
     PROCESS_DATA_PETGCF_04_HS,
@@ -70,15 +71,16 @@ _logger = logging.getLogger(__name__)
 # Production mode from environment variable
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
-PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLACF_04_HP)
+PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETG_04_HP)
 
 PROCESS_DATA["process_overrides"].update(
     {
         #   "wall_loops": "1",
         # "bottom_shell_layers": "1",
         # "top_shell_layers": "1",
-        "sparse_infill_density": "25%",
-        "brim_type": "no_brim",
+        #        "sparse_infill_density": "25%",
+        # "brim_type": "no_brim",
+        #       "brim_width": "1",
         "seam_position": "random",
     }
 )
@@ -208,17 +210,17 @@ def create_ring_spike(outer_radius, height):
 
 def create_v_slot_wheel_608z():
 
-    bearing_radial_clearance = 0.0
+    bearing_radial_clearance = 0.05
 
     ease_in_size = 0.7
-    singularity_cutter_thickness = 0.1
+    singularity_cutter_thickness = 0.15
 
-    top_bottom_holder_size = 0.5
-    top_bottom_holder_axial_clearance = 0.1
+    top_bottom_holder_size = 0.4
+    top_bottom_holder_axial_clearance = 0.2
 
     width = 10.2
     inner_width = 5
-    outer_diameter = 27
+    outer_diameter = 27.5
 
     outer_radius_reduction = (width - inner_width) / 2
 
@@ -260,14 +262,6 @@ def create_v_slot_wheel_608z():
         bb_sized_through_cutter, roller_base, Alignment.CENTER
     )
     roller_base = roller_base.cut(bb_sized_through_cutter)
-
-    # bearing_cutter = create_608z_bearing(
-    #     diameter_increase=bearing_radial_clearance,
-    #     height_increase=bearing_axial_clearance,
-    # )
-
-    # bearing_cutter = align(bearing_cutter, roller_base, Alignment.CENTER)
-    # roller_base = roller_base.cut(bearing_cutter)
 
     ease_in_cutters = PartCollector()
     top_bottom_holders = PartCollector()
