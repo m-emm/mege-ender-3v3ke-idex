@@ -79,8 +79,7 @@ PROCESS_DATA["process_overrides"].update(
         # "bottom_shell_layers": "1",
         # "top_shell_layers": "1",
         #        "sparse_infill_density": "25%",
-        # "brim_type": "no_brim",
-        #       "brim_width": "1",
+         "brim_type": "no_brim",        
         "seam_position": "random",
     }
 )
@@ -210,13 +209,13 @@ def create_ring_spike(outer_radius, height):
 
 def create_v_slot_wheel_608z():
 
-    bearing_radial_clearance = 0.05
+    bearing_radial_clearance = 0.0
 
     ease_in_size = 0.7
     singularity_cutter_thickness = 0.15
 
-    top_bottom_holder_size = 0.4
-    top_bottom_holder_axial_clearance = 0.2
+    top_bottom_holder_size = 0.65
+    top_bottom_holder_axial_clearance = 0.05
 
     width = 10.2
     inner_width = 5
