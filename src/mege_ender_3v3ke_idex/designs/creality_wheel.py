@@ -7,47 +7,6 @@ Usage:
     cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/creality_wheel.py
 """
 
-# import copy
-# import logging
-# import math
-# import os
-
-# from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401
-#     PROCESS_DATA_PETGCF_04_HS,
-#     PROCESS_DATA_PLACF_04_HS,
-# )
-# from mege_3devops.process_data.mender3.process_data_04_high_precision import (  # noqa: F401
-#     PROCESS_DATA_PLACF_04_HP,
-# )
-# from mege_ender_3v3ke_idex.designs.idex_parameters import *
-# from mege_ender_3v3ke_idex.designs.leaf_spring_clamp import create_leaf_spring
-# from mege_ender_3v3ke_idex.designs.linear_guide import create_linear_guide
-# from mege_ender_3v3ke_idex.designs.mcu_housing_x_axis import (
-#     create_pico_w_board,
-#     create_tmc_board,
-# )
-# from shellforgepy.simple import *
-
-# _logger = logging.getLogger(__name__)
-
-# # Production mode from environment variable
-# PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
-
-# PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLACF_04_HS)
-
-# PROCESS_DATA["process_overrides"].update(
-#     {
-#         # "wall_loops": "1",
-#         # "bottom_shell_layers": "1",
-#         # "top_shell_layers": "1",
-#         # "sparse_infill_density": "25%",
-#         "brim_type": "no_brim",
-#     }
-# )
-
-# BIG_THING = 500
-
-
 import copy
 import logging
 import math
@@ -374,6 +333,20 @@ def create_v_slot_wheel_608z():
     roller_base = roller_base.fuse(connectors)
 
     return roller_base
+
+
+def create_v_slot_wheel_608z_with_ball_bearing():
+
+    wheel = create_v_slot_wheel_608z()
+
+    bb = create_608z_bearing()
+
+    bb = align(bb, wheel, Alignment.CENTER)
+
+    retval = LeaderFollowersCuttersPart(wheel)
+    retval.add_named_non_production_part(bb, "bearing")
+
+    return retval
 
 
 def create_bb_608z_holder(
