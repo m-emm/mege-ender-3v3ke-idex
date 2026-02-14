@@ -87,6 +87,17 @@ BIG_THING = 500
 
 bb_608z_outer_diameter = 22
 bb_608z_height = 7
+v_slot_wheel_608z_bearing_radial_clearance = 0.0
+
+v_slot_wheel_608z_ease_in_size = 0.7
+v_slot_wheel_608z_singularity_cutter_thickness = 0.15
+
+v_slot_wheel_608z_top_bottom_holder_size = 0.65
+v_slot_wheel_608z_top_bottom_holder_axial_clearance = 0.05
+
+v_slot_wheel_608z_width = 10.2
+v_slot_wheel_608z_inner_width = 5
+v_slot_wheel_608z_outer_diameter = 27.5
 
 
 def create_608z_bearing(diameter_increase=0, height_increase=0):
@@ -207,31 +218,25 @@ def create_ring_spike(outer_radius, height):
 
 def create_v_slot_wheel_608z():
 
-    bearing_radial_clearance = 0.0
+    outer_radius_reduction = (
+        v_slot_wheel_608z_width - v_slot_wheel_608z_inner_width
+    ) / 2
 
-    ease_in_size = 0.7
-    singularity_cutter_thickness = 0.15
+    roller_base = create_cylinder(
+        v_slot_wheel_608z_outer_diameter / 2, v_slot_wheel_608z_width
+    )
 
-    top_bottom_holder_size = 0.65
-    top_bottom_holder_axial_clearance = 0.05
-
-    width = 10.2
-    inner_width = 5
-    outer_diameter = 27.5
-
-    outer_radius_reduction = (width - inner_width) / 2
-
-    roller_base = create_cylinder(outer_diameter / 2, width)
-
-    roller_cutter_base = create_cylinder(outer_diameter / 2 + 1, width + 2)
+    roller_cutter_base = create_cylinder(
+        v_slot_wheel_608z_outer_diameter / 2 + 1, v_slot_wheel_608z_width + 2
+    )
 
     roller_cutter_base = align(roller_cutter_base, roller_base, Alignment.CENTER)
 
     for i in [Alignment.TOP, Alignment.BOTTOM]:
 
         roller_cutter = create_cone(
-            radius1=outer_diameter / 2,
-            radius2=outer_diameter / 2 - outer_radius_reduction,
+            radius1=v_slot_wheel_608z_outer_diameter / 2,
+            radius2=v_slot_wheel_608z_outer_diameter / 2 - outer_radius_reduction,
             height=outer_radius_reduction,
         )
         if i == Alignment.BOTTOM:
@@ -247,13 +252,17 @@ def create_v_slot_wheel_608z():
 
         roller_cutter_base = roller_cutter_base.cut(roller_cutter)
 
-    central_wheel = create_cylinder(outer_diameter / 2, inner_width)
+    central_wheel = create_cylinder(
+        v_slot_wheel_608z_outer_diameter / 2, v_slot_wheel_608z_inner_width
+    )
     central_wheel = align(central_wheel, roller_base, Alignment.CENTER)
     roller_cutter_base = roller_cutter_base.cut(central_wheel)
 
     roller_base = roller_base.cut(roller_cutter_base)
 
-    inner_cutter_radius = bb_608z_outer_diameter / 2 + bearing_radial_clearance
+    inner_cutter_radius = (
+        bb_608z_outer_diameter / 2 + v_slot_wheel_608z_bearing_radial_clearance
+    )
     bb_sized_through_cutter = create_cylinder(inner_cutter_radius, BIG_THING)
     bb_sized_through_cutter = align(
         bb_sized_through_cutter, roller_base, Alignment.CENTER
@@ -264,21 +273,24 @@ def create_v_slot_wheel_608z():
     top_bottom_holders = PartCollector()
     for tb in [Alignment.TOP, Alignment.BOTTOM]:
         ease_in_cutter = create_cone(
-            inner_cutter_radius + ease_in_size,
+            inner_cutter_radius + v_slot_wheel_608z_ease_in_size,
             inner_cutter_radius,
-            ease_in_size,
+            v_slot_wheel_608z_ease_in_size,
         )
         if tb == Alignment.TOP:
             ease_in_cutter = rotate(180, axis=(0, 1, 0))(ease_in_cutter)
 
         ease_in_cutter = align(ease_in_cutter, roller_base, Alignment.CENTER)
         ease_in_cutter = align(
-            ease_in_cutter, roller_base, tb.stack_alignment, stack_gap=-ease_in_size
+            ease_in_cutter,
+            roller_base,
+            tb.stack_alignment,
+            stack_gap=-v_slot_wheel_608z_ease_in_size,
         )
         ease_in_cutters = ease_in_cutters.fuse(ease_in_cutter)
 
         top_bottom_holder = create_ring_spike(
-            inner_cutter_radius, top_bottom_holder_size
+            inner_cutter_radius, v_slot_wheel_608z_top_bottom_holder_size
         )
         top_bottom_holder = align(top_bottom_holder, None, Alignment.CENTER, axes=[2])
 
@@ -288,8 +300,8 @@ def create_v_slot_wheel_608z():
             tb.sign
             * (
                 bb_608z_height / 2
-                + top_bottom_holder_axial_clearance
-                + top_bottom_holder_size / 2
+                + v_slot_wheel_608z_top_bottom_holder_axial_clearance
+                + v_slot_wheel_608z_top_bottom_holder_size / 2
             ),
         )(top_bottom_holder)
 
@@ -307,7 +319,7 @@ def create_v_slot_wheel_608z():
             singularity_cutter,
             roller_base,
             i.stack_alignment,
-            stack_gap=-singularity_cutter_thickness,
+            stack_gap=-v_slot_wheel_608z_singularity_cutter_thickness,
         )
         singularity_cutters = singularity_cutters.fuse(singularity_cutter)
 
@@ -321,7 +333,9 @@ def create_v_slot_wheel_608z():
     spacer_brim_connector_thickness = 0.2
     num_spacer_brim_connectors = 8
 
-    spacer_brim_radius = inner_cutter_radius + ease_in_size - spacer_brim_clearance
+    spacer_brim_radius = (
+        inner_cutter_radius + v_slot_wheel_608z_ease_in_size - spacer_brim_clearance
+    )
     spacer_brim = create_cone(
         radius1=spacer_brim_radius,
         radius2=spacer_brim_radius - spacer_brim_thickness,
@@ -408,27 +422,6 @@ def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
-    # # Create the part
-    # part = create_608z_bearing()
-    # parts.add(part, "608z_bearing", flip=False, skip_in_production=True)
-
-    # creality_wheel = create_creality_wheel()
-    # creality_wheel = align(creality_wheel, part, Alignment.STACK_TOP, stack_gap=1)
-    # parts.add(creality_wheel, "creality_wheel", flip=False, skip_in_production=True)
-
-    # v_slot_wheel_608z = create_v_slot_wheel_608z()
-    # v_slot_wheel_608z = align(
-    #     v_slot_wheel_608z, creality_wheel, Alignment.STACK_TOP, stack_gap=1
-    # )
-    # parts.add(v_slot_wheel_608z, "v_slot_wheel_608z", flip=False)
-
-    # bb_2 = create_608z_bearing()
-
-    # bb_2 = align(bb_2, v_slot_wheel_608z, Alignment.CENTER)
-    # bb_2 = align(bb_2, v_slot_wheel_608z, Alignment.STACK_RIGHT, stack_gap=1)
-
-    # parts.add(bb_2, "608z_bearing_2", flip=False, skip_in_production=True)
-
     v_slot_wheel_608z = create_v_slot_wheel_608z()
 
     bb_2 = create_608z_bearing()
@@ -446,24 +439,6 @@ def main():
     parts.add(
         v_slot_wheel_608z, "v_slot_wheel_608z", flip=False, skip_in_production=False
     )
-
-    # holder = create_bb_608z_holder(
-    #     thickness=bb_608z_height + 2,
-    #     outer_diameter=bb_608z_outer_diameter + 5,
-    #     preload_distance=0.2,
-    #     holder_fin_length=3,
-    #     holder_fin_thickness=1.0,
-    #     num_holder_fins=24,
-    # )
-
-    # holder = align(holder, part, Alignment.CENTER)
-    # holder = align(holder, part, Alignment.STACK_TOP, stack_gap=3)
-    # parts.add(holder, "bb_608z_holder", flip=False, skip_in_production=False)
-
-    # bb_608z = create_608z_bearing(diameter_increase=0.1, height_increase=0.2)
-    # bb_608z = align(bb_608z, holder, Alignment.CENTER)
-
-    # parts.add(bb_608z, "bb_608z", flip=False, skip_in_production=True)
 
     # Arrange and export
     arrange_and_export(
