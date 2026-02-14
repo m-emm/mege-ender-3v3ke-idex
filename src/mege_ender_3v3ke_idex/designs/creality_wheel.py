@@ -51,13 +51,11 @@ Usage:
 import copy
 import logging
 import math
-import math
 import os
 
-from matplotlib.pyplot import axis
 from mege_3devops.process_data.mender3.process_data_04_high_precision import (  # noqa: F401
-    PROCESS_DATA_PLACF_04_HP,
     PROCESS_DATA_PETG_04_HP,
+    PROCESS_DATA_PLACF_04_HP,
 )
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401
     PROCESS_DATA_PETGCF_04_HS,
@@ -79,7 +77,7 @@ PROCESS_DATA["process_overrides"].update(
         # "bottom_shell_layers": "1",
         # "top_shell_layers": "1",
         #        "sparse_infill_density": "25%",
-         "brim_type": "no_brim",        
+        "brim_type": "no_brim",
         "seam_position": "random",
     }
 )
@@ -315,6 +313,51 @@ def create_v_slot_wheel_608z():
 
     roller_base = roller_base.cut(singularity_cutters)
     roller_base = roller_base.fuse(top_bottom_holders)
+
+    spacer_brim_thickness = 1.2
+    spacer_brim_clearance = 0.8
+    spacer_brim_width = 1.5
+    spacer_brim_connector_width = 0.5
+    spacer_brim_connector_thickness = 0.2
+    num_spacer_brim_connectors = 8
+
+    spacer_brim_radius = inner_cutter_radius + ease_in_size - spacer_brim_clearance
+    spacer_brim = create_cone(
+        radius1=spacer_brim_radius,
+        radius2=spacer_brim_radius - spacer_brim_thickness,
+        height=spacer_brim_thickness,
+    )
+
+    spacer_brim_cutter = create_cylinder(
+        spacer_brim_radius - spacer_brim_width, BIG_THING
+    )
+    spacer_brim_cutter = align(spacer_brim_cutter, roller_base, Alignment.CENTER)
+    spacer_brim = spacer_brim.cut(spacer_brim_cutter)
+
+    spacer_brim = align(spacer_brim, roller_base, Alignment.CENTER)
+    spacer_brim = align(spacer_brim, roller_base, Alignment.BOTTOM)
+
+    roller_base = roller_base.fuse(spacer_brim)
+    connectors = PartCollector()
+    for i in range(num_spacer_brim_connectors):
+        angle = i * (360 / num_spacer_brim_connectors)
+        connector = create_box(
+            spacer_brim_clearance,
+            spacer_brim_connector_width,
+            spacer_brim_connector_thickness,
+        )
+
+        connector = translate(spacer_brim_radius - spacer_brim_clearance / 2, 0, 0)(
+            connector
+        )
+        connector = rotate(angle)(connector)
+
+        connectors = connectors.fuse(connector)
+
+    connectors = align(connectors, spacer_brim, Alignment.CENTER)
+    connectors = align(connectors, spacer_brim, Alignment.BOTTOM)
+
+    roller_base = roller_base.fuse(connectors)
 
     return roller_base
 
