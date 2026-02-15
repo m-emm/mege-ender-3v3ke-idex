@@ -67,7 +67,7 @@ axle_screw_conical_head_height = m_screws_table[wheel_axle_screw_size][
 ]
 
 wheel_axle_nut_screw_overlap = 3.5
-axle_nut_cuter_slack = 0.2
+axle_nut_cuter_slack = 0.3
 
 axle_screw_offset_from_front = axle_screw_conical_head_height / 2
 
@@ -76,7 +76,7 @@ axle_base_diameter = 12
 
 plate_connector_screw_size = "M3"
 
-screw_connector_length = 25
+screw_connector_length = 30
 
 cage_wall = 3
 cage_height = 30
@@ -98,7 +98,7 @@ spindle_nut_outer_diameter = 16
 spindle_nut_connector_length = 8.5
 spindle_nut_screw_connector_extra_size = 1.5
 spindle_nut_flange_size = 14
-spindle_nut_z_offset = 2
+spindle_nut_z_offset = 0.5
 
 shortened_step_export_path = "/Users/mege/git/mege-ender-3v3ke-idex/resources/step_experiments/creality_z_axis_one_side_only_shortened.step"
 
