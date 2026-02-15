@@ -40,7 +40,7 @@ bearing_608z_thickness = 7
 bearing_608z_inner_diameter = 8
 
 
-def create_t8_spindle_nut(length, outer_diameter):
+def create_t8_spindle_nut(length, outer_diameter, flange_size=10):
     """
     Create a simple cylindrical spindle nut for a T8 lead screw.
 
@@ -55,7 +55,7 @@ def create_t8_spindle_nut(length, outer_diameter):
     Args:
         length: Length/height of the nut in mm
         outer_diameter: Outer diameter of the nut body in mm
-
+        flange_size: Size of the flange in mm
     Returns:
         A cylindrical nut with internal T8 4-start threads
     """
@@ -91,7 +91,7 @@ def create_t8_spindle_nut(length, outer_diameter):
 
     nut = nut_body
 
-    if False:
+    if True:
         thread_cutter = create_screw_thread(
             pitch=pitch,
             inner_radius=inner_radius,
@@ -113,8 +113,9 @@ def create_t8_spindle_nut(length, outer_diameter):
 
     flanges = PartCollector()
     screw_hole_drills = PartCollector()
+    screw_hole_drill_list = []
     for a in [Alignment.FRONT, Alignment.BACK]:
-        flange = create_box(outer_diameter / 2, 10, length)
+        flange = create_box(outer_diameter / 2, flange_size, length)
 
         flange = align(flange, nut, Alignment.CENTER)
         flange = align(flange, nut, a.stack_alignment, stack_gap=-outer_diameter / 6)
@@ -128,11 +129,18 @@ def create_t8_spindle_nut(length, outer_diameter):
             screw_hole_drill, flange, a.stack_alignment, stack_gap=-6
         )
         screw_hole_drills = screw_hole_drills.fuse(screw_hole_drill)
+        screw_hole_drill_list.append(screw_hole_drill)
 
     nut = nut.fuse(flanges)
     nut = nut.cut(screw_hole_drills)
 
-    return nut
+    retval = LeaderFollowersCuttersPart(nut)
+    for i, drill in enumerate(screw_hole_drill_list):
+        retval.add_named_cutter(drill, f"screw_hole_drill_{i+1}")
+
+    retval.add_named_follower(flanges, "flanges")
+
+    return retval
 
 
 def main():

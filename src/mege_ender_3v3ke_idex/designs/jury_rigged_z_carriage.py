@@ -25,6 +25,7 @@ from mege_ender_3v3ke_idex.designs.creality_wheel import (
     v_slot_wheel_608z_outer_diameter,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.spindle_experiment import create_t8_spindle_nut
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -52,7 +53,8 @@ wheel_distance = 36
 wheel_front_y_offset = 6.5
 wheels_vertical_gap = 8
 wheels_plate_thickness = 8
-wheels_plate_border = 8
+wheels_plate_x_border = 8
+wheels_plate_z_border = 2
 wheels_plate_gap = 2
 wheels_plate_preload_gap = 1.6
 wheel_axle_diameter = 8
@@ -90,6 +92,13 @@ cage_enhancer_width = 7
 cage_enhancer_thickness = 7
 hidden_nut_pocket_slack = 0.35
 
+
+spindle_nut_height = 8
+spindle_nut_outer_diameter = 16
+spindle_nut_connector_length = 8.5
+spindle_nut_screw_connector_extra_size = 1.5
+spindle_nut_flange_size = 14
+spindle_nut_z_offset = 2
 
 shortened_step_export_path = "/Users/mege/git/mege-ender-3v3ke-idex/resources/step_experiments/creality_z_axis_one_side_only_shortened.step"
 
@@ -177,18 +186,23 @@ def create_creality_profile_segment_only():
     return retval
 
 
-def create_screww_connector(screw_size, length):
+def create_screw_connector(screw_size, length, extra_size=0, bottom_cutter_length=None):
 
     screw = MScrew.from_size(screw_size)
     screw_hole_diameter = screw.clearance_hole_normal
 
     connector_side = screw_hole_diameter * 2.5
 
-    connector = create_box(length, connector_side, connector_side)
+    connector = create_box(
+        length, connector_side + extra_size, connector_side + extra_size
+    )
 
+    bottom_cutter_length = (
+        connector_side / 2 if bottom_cutter_length is None else bottom_cutter_length
+    )
     nut_socked_cutter = create_hidden_nut_pocket_cutter(
         screw_size,
-        bottom_cutter_length=connector_side / 2,
+        bottom_cutter_length=bottom_cutter_length,
         slack=hidden_nut_pocket_slack,
     )
     nut_socked_cutter = rotate(90)(nut_socked_cutter)
@@ -201,6 +215,14 @@ def create_screww_connector(screw_size, length):
     nut_socked_cutter = translate(nut_size[0], 0, 0)(nut_socked_cutter)
 
     connector = nut_socked_cutter.use_as_cutter_on(connector)
+
+    connector = LeaderFollowersCuttersPart(connector)
+
+    nut_socket_cutters_fused = PartCollector()
+    for nsc in nut_socked_cutter.cutters:
+        nut_socket_cutters_fused = nut_socket_cutters_fused.fuse(nsc)
+
+    connector.add_named_cutter(nut_socket_cutters_fused, "nut_socket_cutters")
 
     return connector
 
@@ -245,9 +267,9 @@ def create_jury_rigged_z_carriage(z_axis_profile, threaded_rod):
     wheels_size = get_bounding_box_size(wheels)
 
     wheels_plate = create_box(
-        wheels_size[0] + 2 * wheels_plate_border,
+        wheels_size[0] + 2 * wheels_plate_x_border,
         wheels_plate_thickness,
-        wheels_size[2] + 2 * wheels_plate_border,
+        wheels_size[2] + 2 * wheels_plate_z_border,
     )
 
     wheels_plate = align(wheels_plate, wheels, Alignment.CENTER)
@@ -349,7 +371,7 @@ def create_jury_rigged_z_carriage(z_axis_profile, threaded_rod):
 
     screw_connectors = PartCollector()
     for tb in [Alignment.TOP, Alignment.BOTTOM]:
-        connector = create_screww_connector(
+        connector = create_screw_connector(
             plate_connector_screw_size, screw_connector_length
         )
         if tb == Alignment.BOTTOM:
@@ -357,9 +379,99 @@ def create_jury_rigged_z_carriage(z_axis_profile, threaded_rod):
         connector = align(connector, wheels_plate, Alignment.CENTER)
         connector = align(connector, wheels_plate, Alignment.BACK)
         connector = align(connector, wheels_plate, tb.stack_alignment)
+        connector = connector.prefixed_copy(f"plate_connector_{tb.name.lower()}")
         screw_connectors = screw_connectors.fuse(connector)
 
     retval = retval.fuse(screw_connectors)
+
+    spindle_nut = create_t8_spindle_nut(
+        length=spindle_nut_height,
+        outer_diameter=spindle_nut_outer_diameter,
+        flange_size=spindle_nut_flange_size,
+    )
+    spindle_nut = align(spindle_nut, retval, Alignment.CENTER)
+    spindle_nut = align(
+        spindle_nut, retval, Alignment.STACK_TOP, stack_gap=spindle_nut_z_offset
+    )
+    spindle_nut = align(spindle_nut, threaded_rod, Alignment.CENTER, axes=[0, 1])
+
+    spindle_nut_flanges = spindle_nut.get_named_follower("flanges")
+
+    spindle_nut_flanges_front_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    spindle_nut_flanges_front_cutter = align(
+        spindle_nut_flanges_front_cutter, spindle_nut_flanges, Alignment.CENTER
+    )
+    spindle_nut_flanges_front_cutter = align(
+        spindle_nut_flanges_front_cutter, spindle_nut_flanges, Alignment.STACK_FRONT
+    )
+
+    spindle_nut_screw_cutter = spindle_nut.get_named_cutter("screw_hole_drill_1")
+
+    spindle_nut_screw_connector = create_screw_connector(
+        plate_connector_screw_size,
+        spindle_nut_connector_length,
+        extra_size=spindle_nut_screw_connector_extra_size,
+        bottom_cutter_length=BIG_THING,
+    )
+
+    spindle_nut_screw_connector = rotate(-90, axis=(1, 0, 0))(
+        spindle_nut_screw_connector
+    )
+
+    spindle_nut_screw_connector = align(
+        spindle_nut_screw_connector, spindle_nut_screw_cutter, Alignment.CENTER
+    )
+
+    spindle_nut_screw_connector = align(
+        spindle_nut_screw_connector, spindle_nut_flanges, Alignment.STACK_RIGHT
+    )
+    spindle_nut_screw_connector = spindle_nut_screw_connector.cut(
+        wheels_plate_back_cutter
+    )
+    spindle_nut_screw_connector = spindle_nut_screw_connector.cut(
+        spindle_nut_flanges_front_cutter
+    )
+    retval = retval.fuse(spindle_nut_screw_connector)
+
+    spindle_nut_screw_connector_2 = spindle_nut_screw_connector.prefixed_copy(
+        "spindle_nut_screw_connector_2"
+    )
+    spindle_nut_screw_connector_2 = align(
+        spindle_nut_screw_connector_2, spindle_nut_screw_connector, Alignment.STACK_TOP
+    )
+
+    retval = retval.fuse(spindle_nut_screw_connector_2)
+    spindle_nut_screw_connector_size = get_bounding_box_size(
+        spindle_nut_screw_connector
+    )
+    spindle_nut_flanges_size = get_bounding_box_size(spindle_nut_flanges)
+    spindle_nut_flange_l = create_box(
+        spindle_nut_flanges_size[0],
+        spindle_nut_screw_connector_size[1],
+        spindle_nut_screw_connector_size[2] * 1.3,
+    )
+
+    spindle_nut_flange_l = align(
+        spindle_nut_flange_l, spindle_nut_flanges, Alignment.CENTER
+    )
+    spindle_nut_flange_l = align(
+        spindle_nut_flange_l, spindle_nut_screw_connector_2, Alignment.FRONT
+    )
+    spindle_nut_flange_l = align(
+        spindle_nut_flange_l, spindle_nut_screw_connector_2, Alignment.TOP
+    )
+
+    spindle_nut_flange_l = spindle_nut_flange_l.cut(spindle_nut_flanges_front_cutter)
+
+    spindle_nut = spindle_nut.fuse(spindle_nut_flange_l)
+
+    spindle_nut = spindle_nut_screw_connector_2.use_as_cutter_on(spindle_nut)
+
+    retval.add_named_follower(spindle_nut, "spindle_nut")
+
+    spindle_nut_left, spindle_nut_right = cut_in_two(spindle_nut, cut_normal=(1, 0, 0))
+    retval.add_named_follower(spindle_nut_left, "spindle_nut_left")
+    retval.add_named_follower(spindle_nut_right, "spindle_nut_right")
 
     plate_size = get_bounding_box_size(wheels_plate)
 
@@ -436,7 +548,6 @@ def main():
 
     short_z_axis_one_side = create_creality_z_axis_one_side_only_shortened_from_step()
 
-
     short_z_axis_one_side = align(
         short_z_axis_one_side, z_axis_profile, Alignment.CENTER
     )
@@ -458,9 +569,8 @@ def main():
         cut_point=(0, short_z_axis_bb[1][1] - 15, 0),
     )
 
-    #threaded_rod = translate(0, 0, 150)(threaded_rod)
-    #parts.add(threaded_rod, "threaded_rod", flip=False, skip_in_production=True)
-
+    # threaded_rod = translate(0, 0, 150)(threaded_rod)
+    # parts.add(threaded_rod, "threaded_rod", flip=False, skip_in_production=True)
 
     z_carriage = create_jury_rigged_z_carriage(z_axis_profile, threaded_rod)
 
@@ -474,6 +584,14 @@ def main():
             prod_rotation_axis=(1, 0, 0),
         )
 
+    for name in ["spindle_nut_left", "spindle_nut_right"]:
+        follower = z_carriage.get_follower_part_by_name(name)
+        parts.add(
+            follower,
+            name,
+            flip=False,
+        )
+
     parts.add(
         z_carriage.get_named_follower("cage"),
         "cage",
@@ -485,7 +603,7 @@ def main():
     for name, npp in z_carriage.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
 
-    sc = create_screww_connector("M3", 30)
+    sc = create_screw_connector("M3", 30)
     sc = translate(0, -50, 0)(sc)
 
     # Arrange and export
