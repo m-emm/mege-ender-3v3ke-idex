@@ -40,7 +40,7 @@ bearing_608z_thickness = 7
 bearing_608z_inner_diameter = 8
 
 
-def create_t8_spindle_nut(length, outer_diameter, flange_size=10):
+def create_t8_spindle_nut(length, outer_diameter, flange_size=10, with_thread=False):
     """
     Create a simple cylindrical spindle nut for a T8 lead screw.
 
@@ -91,7 +91,7 @@ def create_t8_spindle_nut(length, outer_diameter, flange_size=10):
 
     nut = nut_body
 
-    if True:
+    if with_thread:
         thread_cutter = create_screw_thread(
             pitch=pitch,
             inner_radius=inner_radius,

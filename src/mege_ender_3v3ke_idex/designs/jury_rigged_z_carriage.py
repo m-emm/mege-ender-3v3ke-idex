@@ -227,8 +227,14 @@ def create_screw_connector(screw_size, length, extra_size=0, bottom_cutter_lengt
     return connector
 
 
-def create_jury_rigged_z_carriage(z_axis_profile, threaded_rod):
+def create_jury_rigged_z_carriage(z_axis_profile, threaded_rod, side, with_thread):
     """Create the jury_rigged_z_carriage part."""
+
+    outside, inside = (
+        (Alignment.RIGHT, Alignment.LEFT)
+        if side == Alignment.LEFT
+        else (Alignment.LEFT, Alignment.RIGHT)
+    )
 
     wheels = LeaderFollowersCuttersPart(PartCollector())
 
@@ -238,7 +244,7 @@ def create_jury_rigged_z_carriage(z_axis_profile, threaded_rod):
         wheel = translate(lr.sign * wheel_distance / 2, 0, 0)(wheel)
         wheel = wheel.prefixed_copy(f"wheel_{lr.name.lower()}")
 
-        if lr == Alignment.RIGHT:
+        if lr == outside:
             wheel_front = create_v_slot_wheel_608z_with_ball_bearing()
             wheel_front = translate(
                 lr.sign * wheel_distance / 2, wheel_front_y_offset, 0
@@ -289,7 +295,11 @@ def create_jury_rigged_z_carriage(z_axis_profile, threaded_rod):
     wheel_axles = PartCollector()
     wheel_axle_screws_cutters = PartCollector()
     wheel_axle_screws = []
-    for wheel_name in ["wheel_right", "wheel_left", "wheel_right_top"]:
+    for wheel_name in [
+        "wheel_left",
+        "wheel_right",
+        f"wheel_{outside.name.lower()}_top",
+    ]:
 
         bearing_name = f"{wheel_name}_bearing"
         bearing = wheels.get_non_production_part_by_name(bearing_name)
@@ -379,7 +389,9 @@ def create_jury_rigged_z_carriage(z_axis_profile, threaded_rod):
         connector = align(connector, wheels_plate, Alignment.CENTER)
         connector = align(connector, wheels_plate, Alignment.BACK)
         connector = align(connector, wheels_plate, tb.stack_alignment)
-        connector = connector.prefixed_copy(f"plate_connector_{tb.name.lower()}")
+        connector = connector.prefixed_copy(
+            f"plate_connector_{side.name.lower()}_{tb.name.lower()}_"
+        )
         screw_connectors = screw_connectors.fuse(connector)
 
     retval = retval.fuse(screw_connectors)
@@ -388,6 +400,7 @@ def create_jury_rigged_z_carriage(z_axis_profile, threaded_rod):
         length=spindle_nut_height,
         outer_diameter=spindle_nut_outer_diameter,
         flange_size=spindle_nut_flange_size,
+        with_thread=with_thread,
     )
     spindle_nut = align(spindle_nut, retval, Alignment.CENTER)
     spindle_nut = align(
@@ -423,7 +436,7 @@ def create_jury_rigged_z_carriage(z_axis_profile, threaded_rod):
     )
 
     spindle_nut_screw_connector = align(
-        spindle_nut_screw_connector, spindle_nut_flanges, Alignment.STACK_RIGHT
+        spindle_nut_screw_connector, spindle_nut_flanges, outside.stack_alignment
     )
     spindle_nut_screw_connector = spindle_nut_screw_connector.cut(
         wheels_plate_back_cutter
@@ -537,6 +550,8 @@ def create_jury_rigged_z_carriage(z_axis_profile, threaded_rod):
 
     retval.add_named_follower(cage, "cage")
 
+    retval = retval.prefixed_copy(f"jury_rigged_z_carriage_{side.name.lower()}")
+
     return retval
 
 
@@ -569,42 +584,48 @@ def main():
         cut_point=(0, short_z_axis_bb[1][1] - 15, 0),
     )
 
-    # threaded_rod = translate(0, 0, 150)(threaded_rod)
-    # parts.add(threaded_rod, "threaded_rod", flip=False, skip_in_production=True)
+    z_carriage_right = create_jury_rigged_z_carriage(
+        z_axis_profile, threaded_rod, side=Alignment.RIGHT, with_thread=PROD
+    )
 
-    z_carriage = create_jury_rigged_z_carriage(z_axis_profile, threaded_rod)
+    z_carriage_left = create_jury_rigged_z_carriage(
+        z_axis_profile, threaded_rod, side=Alignment.LEFT, with_thread=PROD
+    )
 
-    for name in ["left_part", "right_part"]:
-        follower = z_carriage.get_follower_part_by_name(name)
+    z_carriage_left = translate(-100, 0, 0)(z_carriage_left)
+
+    for z_carriage, side in zip(
+        [z_carriage_right, z_carriage_left], [Alignment.RIGHT, Alignment.LEFT]
+    ):
+        prefix = f"jury_rigged_z_carriage_{side.name.lower()}"
+        for name in [f"{prefix}_left_part", f"{prefix}_right_part"]:
+            follower = z_carriage.get_follower_part_by_name(name)
+            parts.add(
+                follower,
+                name,
+                flip=False,
+                prod_rotation_angle=-90,
+                prod_rotation_axis=(1, 0, 0),
+            )
+
+        for name in [f"{prefix}_spindle_nut_left", f"{prefix}_spindle_nut_right"]:
+            follower = z_carriage.get_follower_part_by_name(name)
+            parts.add(
+                follower,
+                name,
+                flip=False,
+            )
+
         parts.add(
-            follower,
-            name,
+            z_carriage.get_named_follower(f"{prefix}_cage"),
+            f"{prefix}_cage",
             flip=False,
-            prod_rotation_angle=-90,
+            prod_rotation_angle=90,
             prod_rotation_axis=(1, 0, 0),
         )
 
-    for name in ["spindle_nut_left", "spindle_nut_right"]:
-        follower = z_carriage.get_follower_part_by_name(name)
-        parts.add(
-            follower,
-            name,
-            flip=False,
-        )
-
-    parts.add(
-        z_carriage.get_named_follower("cage"),
-        "cage",
-        flip=False,
-        prod_rotation_angle=90,
-        prod_rotation_axis=(1, 0, 0),
-    )
-
-    for name, npp in z_carriage.get_named_non_production_part_items():
-        parts.add(npp, name, flip=False, skip_in_production=True)
-
-    sc = create_screw_connector("M3", 30)
-    sc = translate(0, -50, 0)(sc)
+        for name, npp in z_carriage.get_named_non_production_part_items():
+            parts.add(npp, name, flip=False, skip_in_production=True)
 
     # Arrange and export
     arrange_and_export(
