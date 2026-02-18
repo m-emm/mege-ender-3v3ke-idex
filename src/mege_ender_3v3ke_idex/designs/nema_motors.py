@@ -8,6 +8,7 @@ Usage:
 """
 
 import logging
+import math
 import os
 from enum import Enum
 from typing import Optional
@@ -34,6 +35,8 @@ PROCESS_DATA = {
 }
 
 from enum import Enum
+
+BIG_THING = 500
 
 
 class NemaSizes(Enum):
@@ -69,6 +72,7 @@ add_enum_attrs(
             "pilot_diameter_mm": 22.0,
             "pilot_depth_mm": 1.5,
             "disc_thick_mm": 1.5,
+            "corner_cut_mm": 3.0,  # probably wrong
         },
         # ---------------------------------------------------------------------
         # NEMA 17 (42mm class)
@@ -92,6 +96,7 @@ add_enum_attrs(
             "pilot_diameter_mm": 22.0,
             "pilot_depth_mm": 2.0,
             "disc_thick_mm": 2.0,
+            "corner_cut_mm": 3.0,
         },
         # ---------------------------------------------------------------------
         # NEMA 23 (57mm class)
@@ -115,6 +120,7 @@ add_enum_attrs(
             "pilot_diameter_mm": 38.1,  # 1.5" pilot is common; varies
             "pilot_depth_mm": 2.0,
             "disc_thick_mm": 2.0,
+            "corner_cut_mm": 3.0,  # probably wrong
         },
         # ---------------------------------------------------------------------
         # NEMA 34 (86mm class)
@@ -138,6 +144,7 @@ add_enum_attrs(
             "pilot_diameter_mm": 73.0,  # varies a lot; treat as rough
             "pilot_depth_mm": 2.5,
             "disc_thick_mm": 2.5,
+            "corner_cut_mm": 3.0,  # probably wrong
         },
     }
 )
@@ -336,10 +343,11 @@ def create_nema_composite(
     body_clearance_xy: float = 0.2,
     body_clearance_z: float = 0.2,
     screw_size: Optional[str] = None,
+    body_thickness: Optional[float] = None,
 ):
     """Build a LeaderFollowersCuttersPart for a NEMA motor with aligned parts and cutters."""
 
-    body_thick = nema.thick_mm
+    body_thick = body_thickness if body_thickness is not None else nema.thick_mm
     disc_thick = (
         nema.disc_thick_mm
         if nema.disc_thick_mm is not None
@@ -354,6 +362,21 @@ def create_nema_composite(
         body_thick,
         origin=(-body_size / 2.0, -body_size / 2.0, 0.0),
     )
+
+    for i in range(4):
+        corner_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+        corner_cutter = translate(0, -BIG_THING / 2, -BIG_THING / 2)(corner_cutter)
+        corner_cutter = rotate(45)(corner_cutter)
+        corner_cutter = translate(
+            body_size / 2 - nema.corner_cut_mm / math.sqrt(2),
+            body_size / 2 - nema.corner_cut_mm / math.sqrt(2),
+            0,
+        )(corner_cutter)
+
+        corner_cutter = rotate(i * 360 / 4)(corner_cutter)
+        corner_cutter = align(corner_cutter, body_box, Alignment.CENTER, axes=[2])
+
+        body_box = body_box.cut(corner_cutter)
 
     raw_body_box = body_box.copy()
 
