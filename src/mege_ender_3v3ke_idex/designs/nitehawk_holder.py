@@ -16,6 +16,9 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
     PROCESS_DATA_PLACF_04_HS,
     PROCESS_DATA_PLAGFHT_04_HS,
 )
+from mege_3devops.process_data.mender3.process_data_utils import (
+    augment_with_layer_height,
+)
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
 from shellforgepy.simple import *
@@ -26,15 +29,34 @@ _logger = logging.getLogger(__name__)
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
 PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLAGFHT_04_HS)
+# Keep layer-height derivation consistent with process_data helpers:
+# 0.90 -> 0.28mm on 0.4mm nozzle.
+PROCESS_DATA = augment_with_layer_height(PROCESS_DATA, layer_height_factor=0.9)
 
 PROCESS_DATA["process_overrides"].update(
     {
-        #   "wall_loops": "1",
-        # "bottom_shell_layers": "1",
-        # "top_shell_layers": "1",
-        #        "sparse_infill_density": "25%",
-        "wall_loops": "1",
+        # Strength/interlayer-adhesion bias for PLAGFHT:
+        # hotter, thicker layers, less cooling, lower speed/acceleration.
+        "nozzle_temperature_initial_layer": "230",
+        "nozzle_temperature": "230",
+        "initial_layer_print_height": "0.28",
+        "fan_min_speed": "25",
+        "fan_max_speed": "45",
+        "overhang_fan_speed": "60",
+        "outer_wall_speed": "75",
+        "top_surface_speed": "75",
+        "inner_wall_speed": "130",
+        "internal_solid_infill_speed": "130",
+        "solid_infill_speed": "130",
+        "sparse_infill_speed": "130",
+        "outer_wall_acceleration": "2800",
+        "top_surface_acceleration": "2800",
+        "inner_wall_acceleration": "4500",
+        "solid_infill_acceleration": "4500",
+        "sparse_infill_acceleration": "4500",
+        "wall_loops": "3",
         "brim_type": "no_brim",
+        "sparse_infill_density": "60%",  # it is quite brittle, this plagfht
     }
 )
 
@@ -253,7 +275,7 @@ def create_nitehawk_holder(sprite_extruder):
         nitehawk_holder_height,
         nitehawk_holder_thickness,
         fillet_radius=nitehawk_holder_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.BACK],
     )
 
     mount_tower_1 = create_cone(
@@ -271,7 +293,7 @@ def create_nitehawk_holder(sprite_extruder):
         nitehawk_holder_cable_attachment_length,
         nitehawk_holder_cable_attachment_thickness,
         fillet_radius=nitehawk_holder_cable_attachment_fillet_radius,
-        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, Alignment.FRONT],
     )
 
     cable_attchment_hole_cutters = PartCollector()
@@ -313,6 +335,26 @@ def create_nitehawk_holder(sprite_extruder):
     cable_attchment = translate(0, nitehawk_holder_cable_attachment_y_offset, 0)(
         cable_attchment
     )
+
+    cable_attachment_bevel = create_right_triangle(
+        nitehawk_holder_cable_attachment_thickness,
+        nitehawk_holder_cable_attachment_thickness,
+        nitehawk_holder_cable_attachment_width,
+        extrusion_direction=(1, 0, 0),
+        a_normal=(0, 0, -1),
+        b_normal=(0, -1, 0),
+    )
+    cable_attachment_bevel = align(
+        cable_attachment_bevel, cable_attchment, Alignment.CENTER
+    )
+    cable_attachment_bevel = align(
+        cable_attachment_bevel, cable_attchment, Alignment.STACK_FRONT
+    )
+    cable_attachment_bevel = align(
+        cable_attachment_bevel, cable_attchment, Alignment.TOP
+    )
+
+    cable_attchment = cable_attchment.fuse(cable_attachment_bevel)
 
     mount_towers.add_named_follower(cable_attchment, "cable_attachment")
 
