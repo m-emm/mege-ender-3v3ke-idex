@@ -11,9 +11,10 @@ import copy
 import logging
 import os
 
-from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401
+from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401; Keep the materials menu around, in case we want to switch back to other materials
     PROCESS_DATA_PETG_04_HS,
     PROCESS_DATA_PLACF_04_HS,
+    PROCESS_DATA_PLAGFHT_04_HS,
 )
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
@@ -24,7 +25,7 @@ _logger = logging.getLogger(__name__)
 # Production mode from environment variable
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
-PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETG_04_HS)
+PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLAGFHT_04_HS)
 
 PROCESS_DATA["process_overrides"].update(
     {
@@ -34,7 +35,6 @@ PROCESS_DATA["process_overrides"].update(
         #        "sparse_infill_density": "25%",
         "wall_loops": "1",
         "brim_type": "no_brim",
-        "seam_position": "random",
     }
 )
 
@@ -73,12 +73,23 @@ nitehawk_holder_thickness = 1.5
 nitehawk_holder_width_extesion = 10
 nitehawk_holder_width = NemaSizes.NEMA17.size_mm + nitehawk_holder_width_extesion
 nitehawk_holder_height = NemaSizes.NEMA17.size_mm
+nitehawk_holder_fillet_radius = 3
 nitehawk_holder_mount_tower_diameter = 6.5
 nitehawk_holder_mount_tower_height = 5
 nitehawk_holder_mount_tower_x_offset = 3
 nitehawk_holder_mount_tower_y_offset = 8
 nitehawk_holder_mount_screw_size = "M3"
 nitehawk_holder_mount_cut_radius = nitehawk_holder_height * 0.5
+nitehawk_holder_cable_attachment_width = nitehawk_plug_width + 4
+nitehawk_holder_cable_attachment_length = 45
+nitehawk_holder_cable_attachment_y_offset = 20
+nitehawk_holder_cable_attachment_fillet_radius = 3
+
+nitehawk_holder_cable_attachment_thickness = 4
+nitehawk_holder_cable_attachment_holes_diameter = 4
+nitehawk_holder_cable_attachment_num_holes = 3
+
+
 nut_cutter_slack = 0.22
 mount_tower_base_extension = 2.0
 
@@ -222,11 +233,11 @@ def create_nitehawk_board():
     pcb = pcb.cut(front_cutter_left)
 
     pcb = pcb.cut(front_cutter)
-    pcb = pcb.fuse(plug)
-
-    pcb = pcb.fuse(heater_connector)
-
     retval = LeaderFollowersCuttersPart(pcb)
+    retval.add_named_follower(pcb, "pcb")
+
+    retval = retval.fuse(plug)
+    retval = retval.fuse(heater_connector)
 
     retval.add_named_cutter(hole_cutter_list[0], "hole_1")
     retval.add_named_cutter(hole_cutter_list[1], "hole_2")
@@ -237,8 +248,12 @@ def create_nitehawk_board():
 def create_nitehawk_holder(sprite_extruder):
     """Create the nitehawk_holder part."""
 
-    holder = create_box(
-        nitehawk_holder_width, nitehawk_holder_height, nitehawk_holder_thickness
+    holder = create_filleted_box(
+        nitehawk_holder_width,
+        nitehawk_holder_height,
+        nitehawk_holder_thickness,
+        fillet_radius=nitehawk_holder_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
 
     mount_tower_1 = create_cone(
@@ -250,6 +265,56 @@ def create_nitehawk_holder(sprite_extruder):
     mount_tower_2 = translate(nitehawk_holes_center_distance, 0, 0)(mount_tower_1)
 
     mount_towers = LeaderFollowersCuttersPart(mount_tower_1.fuse(mount_tower_2))
+
+    cable_attchment = create_filleted_box(
+        nitehawk_holder_cable_attachment_width,
+        nitehawk_holder_cable_attachment_length,
+        nitehawk_holder_cable_attachment_thickness,
+        fillet_radius=nitehawk_holder_cable_attachment_fillet_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+    )
+
+    cable_attchment_hole_cutters = PartCollector()
+    for i in range(nitehawk_holder_cable_attachment_num_holes):
+        for lr in [Alignment.LEFT, Alignment.RIGHT]:
+            hole_cutter = create_cylinder(
+                nitehawk_holder_cable_attachment_holes_diameter / 2, BIG_THING
+            )
+            hole_cutter = align(hole_cutter, cable_attchment, Alignment.CENTER)
+            hole_cutter = align(
+                hole_cutter,
+                cable_attchment,
+                lr.stack_alignment,
+                stack_gap=-1.5 * nitehawk_holder_cable_attachment_holes_diameter,
+            )
+            hole_cutter = translate(
+                0,
+                i
+                * (
+                    nitehawk_holder_cable_attachment_length
+                    / (nitehawk_holder_cable_attachment_num_holes + 1)
+                ),
+                0,
+            )(hole_cutter)
+
+            cable_attchment_hole_cutters = cable_attchment_hole_cutters.fuse(
+                hole_cutter
+            )
+
+    cable_attchment_hole_cutters = align(
+        cable_attchment_hole_cutters, cable_attchment, Alignment.CENTER, axes=[0, 1]
+    )
+
+    cable_attchment = cable_attchment.cut(cable_attchment_hole_cutters)
+
+    cable_attchment = align(cable_attchment, mount_towers, Alignment.CENTER)
+    cable_attchment = align(cable_attchment, mount_towers, Alignment.BOTTOM)
+    cable_attchment = align(cable_attchment, mount_towers, Alignment.FRONT)
+    cable_attchment = translate(0, nitehawk_holder_cable_attachment_y_offset, 0)(
+        cable_attchment
+    )
+
+    mount_towers.add_named_follower(cable_attchment, "cable_attachment")
 
     screw_hole_cutter_1 = create_cylinder(
         MScrew.from_size(nitehawk_holder_mount_screw_size).clearance_hole_normal / 2,
@@ -279,9 +344,14 @@ def create_nitehawk_holder(sprite_extruder):
     )(mount_towers)
 
     holder = holder.fuse(mount_towers.leader)
-    holder = mount_towers.use_as_cutter_on(holder)
 
     holder = LeaderFollowersCuttersPart(holder)
+
+    holder = mount_towers.use_as_cutter_on(holder)
+    holder.add_named_follower(
+        mount_towers.get_named_follower("cable_attachment"), "cable_attachment"
+    )
+
     holder.add_named_cutter(
         mount_towers.get_named_cutter("screw_hole_cutter_1"), "screw_hole_cutter_1"
     )
@@ -294,6 +364,8 @@ def create_nitehawk_holder(sprite_extruder):
     holder = align(holder, sprite_extruder, Alignment.BACK)
     holder = align(holder, sprite_extruder, Alignment.LEFT)
     holder = align(holder, sprite_extruder, Alignment.STACK_TOP)
+
+    holder = holder.fuse(holder.get_named_follower("cable_attachment"))
 
     holder = sprite_extruder.use_as_cutter_on(holder)
 
@@ -341,7 +413,12 @@ def main():
 
     nitehawk_board = create_nitehawk_board()
     nitehawk_board = rotate(nitehawk_board_angle)(nitehawk_board)
-    nitehawk_board = align(nitehawk_board, holder, Alignment.STACK_TOP, stack_gap=0.0)
+    nitehawk_pcb = nitehawk_board.get_named_follower("pcb")
+    board_alignment = align_translation(
+        nitehawk_pcb, holder, Alignment.STACK_TOP, stack_gap=0.0
+    )
+
+    nitehawk_board = board_alignment(nitehawk_board)
 
     board_hole_1 = nitehawk_board.get_named_cutter("hole_1")
 
