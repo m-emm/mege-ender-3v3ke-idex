@@ -5,6 +5,7 @@
 *.cfg
 !.isort.cfg
 !setup.cfg
+!klipper_setup/klipper_config/*.cfg
 *.orig
 *.log
 *.pot
