@@ -135,6 +135,18 @@ apt-get install -y --no-install-recommends \
   xserver-xorg \
   xinit
 
+# --- Disk space protection ---------------------------------------------------
+
+log "Configuring journal size limits to prevent disk exhaustion"
+require_file "${FILES_DIR}/journald-size-limit.conf"
+install -d -m 0755 /etc/systemd/journald.conf.d
+install -m 0644 "${FILES_DIR}/journald-size-limit.conf" /etc/systemd/journald.conf.d/size-limit.conf
+
+log "Configuring APT auto-clean to prevent cache buildup"
+require_file "${FILES_DIR}/99-auto-clean.conf"
+install -d -m 0755 /etc/apt/apt.conf.d
+install -m 0644 "${FILES_DIR}/99-auto-clean.conf" /etc/apt/apt.conf.d/99-auto-clean
+
 # --- Hostname / hosts --------------------------------------------------------
 
 log "Setting hostname to ${HOSTNAME}"

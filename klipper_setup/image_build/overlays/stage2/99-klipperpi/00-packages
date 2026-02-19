@@ -27,5 +27,7 @@ x11-xserver-utils
 xserver-xorg-legacy
 matchbox-window-manager
 fonts-dejavu
-fonts-noto
-fonts-noto-cjk
+fonts-noto-core
+fonts-noto-mono
+fonts-noto-ui-core
+fonts-noto-color-emoji
