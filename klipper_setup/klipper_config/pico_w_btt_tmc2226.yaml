@@ -69,11 +69,11 @@ pin_sets:
     direction: down
     pins:
       - EN_1
-      - UART_PDN_2
-      - NC_3
-      - NC_4
-      - NC_5
-      - DIAG_6
+      - MS1_2
+      - MS2_3
+      - UART_PDN_4
+      - STDBY_5
+      - CLK_6
       - STEP_7
       - DIR_8
   - prefix: TMC1_J2_
@@ -93,11 +93,11 @@ pin_sets:
     direction: down
     pins:
       - EN_1
-      - UART_PDN_2
-      - NC_3
-      - NC_4
-      - NC_5
-      - DIAG_6
+      - MS1_2
+      - MS2_3
+      - UART_PDN_4
+      - STDBY_5
+      - CLK_6
       - STEP_7
       - DIR_8
   - prefix: TMC2_J2_
@@ -160,7 +160,7 @@ wires:
     to: TMC1_J1_EN_1
     type: data
   - from: PICO_GPIO_9
-    to: TMC1_J1_UART_PDN_2
+    to: TMC1_J1_UART_PDN_4
     type: data
     color: "#9ca3af" # gray UART wire
   - from: PICO_GND_03
@@ -188,7 +188,7 @@ wires:
     to: TMC2_J1_EN_1
     type: data
   - from: PICO_GPIO_5
-    to: TMC2_J1_UART_PDN_2
+    to: TMC2_J1_UART_PDN_4
     type: data
     color: "#9ca3af" # gray UART wire
   - from: PICO_GPIO_4
