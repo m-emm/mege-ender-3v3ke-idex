@@ -21,6 +21,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
+from mege_ender_3v3ke_idex.designs.endstop_holder import create_endstop_holder
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.mgh_linear import (
@@ -149,6 +150,57 @@ BIG_THING = 500
 
 
 PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_04_HS)
+
+endstop_holder_z_offset = 8
+endstop_holder_inset_from_end = 15
+endstop_holder_stack_gap = 5
+endstop_holder_mount_plate_thickness = 3
+endstop_holder_mount_plate_width = 8
+endstop_holder_mount_plate_length = 20
+endstop_holder_mount_screw_size = "M3"
+endstop_holder_counter_rhomboid_size = 6.1
+endstop_holder_counter_rhomboid_thickness = 5.5
+endstop_holder_counter_rhomboid_angle = 60
+endstop_holder_counter_rhomboid_z_offset = -3
+endstop_holder_nut_clearance = 0.1
+endstop_holder_counter_rhomboid_fillet_radius = 1.5
+
+
+def create_rhomboid(length, width, thickness, angle, fillet_radius=None):
+    """Create a rhomboid shape by shearing a box."""
+    extra_length = width * np.tan(np.radians(angle))
+
+    rotation_angle = -(90 - angle)
+    box = create_box(length + extra_length, width, thickness)
+
+    cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+
+    cutter = translate(-BIG_THING, -BIG_THING / 2, 0)(cutter)
+    cutter = rotate(rotation_angle)(cutter)
+
+    rhomboid = box.cut(cutter)
+
+    right_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    right_cutter = translate(0, -BIG_THING / 2, 0)(right_cutter)
+    right_cutter = rotate(rotation_angle)(right_cutter)
+    right_cutter = translate(length, 0, 0)(right_cutter)
+    rhomboid = rhomboid.cut(right_cutter)
+
+    if fillet_radius is not None:
+
+        def edge_filter(bbox, v0_point, v1_point):
+            v0_point = np.array(v0_point)
+            v1_point = np.array(v1_point)
+            edge_direction = v1_point - v0_point
+            if np.allclose(edge_direction[0], 0) and np.allclose(edge_direction[1], 0):
+                return True
+
+            return False
+
+        fillet_edges = filter_edges_by_function(rhomboid, edge_filter)
+        rhomboid = apply_fillet_to_edges(rhomboid, fillet_radius, fillet_edges)
+
+    return rhomboid
 
 
 def create_z_axis():
@@ -683,7 +735,7 @@ def create_idler_endcap(
     return retval
 
 
-def create_x_axis():
+def create_x_axis() -> LeaderFollowersCuttersPart:
     """Create the x_axis assembly as a composite part.
 
     Leader: printable mount-plate assembly (including shields/link/idler bases).
@@ -936,6 +988,144 @@ def create_x_axis():
             f"mount_plate_{side.name.lower()}",
         )
 
+    for side in (Alignment.LEFT, Alignment.RIGHT):
+
+        endstop_holder = create_endstop_holder()
+
+        endstop_holder = rotate(-90, axis=(0, 1, 0))(endstop_holder)
+
+        endstop_holder = rotate(-side.sign * 90)(endstop_holder)
+
+        endstop_holder = align(endstop_holder, lower_axis_profile, Alignment.CENTER)
+        endstop_holder = align(endstop_holder, lower_axis_profile, side)
+
+        if side == Alignment.RIGHT:
+            endstop_board = endstop_holder.get_non_production_part_by_name("board")
+
+            board_align_translation = align_translation(
+                endstop_board,
+                lower_axis_profile,
+                Alignment.STACK_FRONT,
+                stack_gap=endstop_holder_stack_gap,
+            )
+            endstop_holder = board_align_translation(endstop_holder)
+            endstop_board = None  # this is no logner valid
+        else:
+            endstop_holder = align(
+                endstop_holder,
+                lower_axis_profile,
+                Alignment.STACK_FRONT,
+                stack_gap=endstop_holder_stack_gap,
+            )
+
+        tongue = endstop_holder.get_non_production_part_by_name("tongue")
+
+        tongue_align_translation = align_translation(
+            tongue,
+            lower_axis_profile,
+            Alignment.BOTTOM,
+        )
+
+        endstop_holder = tongue_align_translation(endstop_holder)
+
+        endstop_holder = translate(
+            -side.sign * endstop_holder_inset_from_end, 0, endstop_holder_z_offset
+        )(endstop_holder)
+
+        endstop_holder_mount_plate = create_box(
+            endstop_holder_mount_plate_width,
+            endstop_holder_mount_plate_length,
+            endstop_holder_mount_plate_thickness,
+        )
+
+        endstop_holder_mount_plate = align(
+            endstop_holder_mount_plate, endstop_holder, Alignment.CENTER
+        )
+        endstop_holder_mount_plate = align(
+            endstop_holder_mount_plate, endstop_holder, Alignment.STACK_BACK
+        )
+
+        endstop_holder_mount_plate = align(
+            endstop_holder_mount_plate, endstop_holder, side
+        )
+
+        endstop_holder_mount_plate = align(
+            endstop_holder_mount_plate, lower_axis_profile, Alignment.STACK_TOP
+        )
+
+        endstop_holder_mount_screw_drill_diameter = MScrew.from_size(
+            endstop_holder_mount_screw_size
+        ).clearance_hole_normal
+
+        endstop_holder_mount_screw_cutter = create_cylinder(
+            endstop_holder_mount_screw_drill_diameter / 2, BIG_THING
+        )
+        endstop_holder_mount_screw_cutter = align(
+            endstop_holder_mount_screw_cutter,
+            endstop_holder_mount_plate,
+            Alignment.CENTER,
+        )
+        endstop_holder_mount_screw_cutter = align(
+            endstop_holder_mount_screw_cutter,
+            lower_axis_profile,
+            Alignment.CENTER,
+            axes=[1],
+        )
+
+        endstop_holder_mount_plate = endstop_holder_mount_plate.cut(
+            endstop_holder_mount_screw_cutter
+        )
+
+        endstop_holder = endstop_holder.fuse(endstop_holder_mount_plate)
+
+        retval.add_named_follower(
+            endstop_holder.leader, f"endstop_holder_{side.name.lower()}"
+        )
+
+        retval.add_named_non_production_part(
+            endstop_holder.get_non_production_part_by_name("board"),
+            f"endstop_board_{side.name.lower()}",
+        )
+
+        counter_rhomboid = create_rhomboid(
+            endstop_holder_counter_rhomboid_size,
+            endstop_holder_counter_rhomboid_size,
+            endstop_holder_counter_rhomboid_thickness,
+            endstop_holder_counter_rhomboid_angle,
+            fillet_radius=endstop_holder_counter_rhomboid_fillet_radius,
+        )
+
+        counter_rhomboid = align(
+            counter_rhomboid,
+            endstop_holder_mount_screw_cutter,
+            Alignment.CENTER,
+        )
+        counter_rhomboid = align(
+            counter_rhomboid, endstop_holder_mount_plate, Alignment.STACK_BOTTOM
+        )
+
+        counter_rhomboid = counter_rhomboid.cut(endstop_holder_mount_screw_cutter)
+
+        counter_rhomboid = translate(0, 0, endstop_holder_counter_rhomboid_z_offset)(
+            counter_rhomboid
+        )
+
+        nut_cutter = create_nut(
+            endstop_holder_mount_screw_size, slack=endstop_holder_nut_clearance
+        )
+        nut_cutter = align(
+            nut_cutter,
+            endstop_holder_mount_screw_cutter,
+            Alignment.CENTER,
+        )
+        nut_cutter = align(nut_cutter, counter_rhomboid, Alignment.BOTTOM)
+        counter_rhomboid = counter_rhomboid.cut(nut_cutter)
+
+        retval.add_named_follower(
+            counter_rhomboid,
+            f"endstop_holder_counter_rhomboid_{side.name.lower()}",
+        )
+
     return retval
 
 
@@ -1012,6 +1202,8 @@ def main():
         "idlers_right",
         "pulley_left",
         "pulley_right",
+        "endstop_board_left",
+        "endstop_board_right",
     ]:
         parts.add(
             x_axis.get_non_production_part_by_name(name),
@@ -1051,7 +1243,7 @@ def main():
             mount_plate_of_side,
             next_part_name,
             flip=False,
-            skip_in_production=False,
+            skip_in_production=True,  # was: False,
             prod_rotation_angle=90,
             prod_rotation_axis=(1, 0, 0),
             color=color_by_side[side],
@@ -1090,7 +1282,7 @@ def main():
         color=(0.5, 0.5, 0.5),
     )
 
-    for side in [Alignment.RIGHT]:  # Alignment.LEFT,
+    for side in [Alignment.RIGHT, Alignment.LEFT]:
         with_tensioner = side == Alignment.RIGHT
 
         side_str = side.name.lower()
@@ -1143,13 +1335,32 @@ def main():
                 tensioner_cage,
                 next_part_name,
                 flip=False,
-                skip_in_production=False,
+                skip_in_production=True,  # was: False,
                 prod_rotation_angle=0,
                 prod_rotation_axis=(1, 0, 0),
                 color=(0.9, 0.6, 0.1),
             )
 
-    tool_head_mount = create_tool_head_mount()
+        if side == Alignment.LEFT:
+            parts.add(
+                x_axis.get_named_follower("endstop_holder_" + side_str),
+                f"x_axis_endstop_holder_{side_str}",
+                flip=False,
+                skip_in_production=False,
+                prod_rotation_angle=side.sign * 90,
+                prod_rotation_axis=(0, 1, 0),
+                color=(0.3, 0.3, 0.7),
+            )
+
+        parts.add(
+            x_axis.get_named_follower("endstop_holder_counter_rhomboid_" + side_str),
+            f"x_axis_endstop_holder_counter_rhomboid_{side_str}",
+            flip=True,
+            skip_in_production=False,
+            color=(0.7, 0.3, 0.7),
+        )
+
+    tool_head_mount, carriage = create_tool_head_mount(lower_axis_profile)
 
     carriage_1 = x_axis.get_non_production_part_by_name("carriage_1")
 
@@ -1199,6 +1410,7 @@ def main():
         prod=PROD,
         process_data=PROCESS_DATA,
         prod_gap=4,
+        export_individual_parts=False,
     )
 
     _logger.info("x_axis created successfully!")
