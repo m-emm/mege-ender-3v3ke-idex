@@ -158,9 +158,9 @@ endstop_holder_mount_plate_thickness = 3
 endstop_holder_mount_plate_width = 8
 endstop_holder_mount_plate_length = 20
 endstop_holder_mount_screw_size = "M3"
-endstop_holder_groove_holder_bottom_width = 7.5
-endstop_holder_groove_holder_top_width = 6
-endstop_holder_groove_holder_slit = 1
+endstop_holder_groove_holder_bottom_width = 6.1
+endstop_holder_groove_holder_top_width = 5.7
+endstop_holder_groove_holder_slit = 1.5
 endstop_holder_groove_holder_height = 5
 
 
@@ -1098,7 +1098,23 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
             groove_holder, endstop_holder_mount_plate, Alignment.STACK_BOTTOM
         )
 
-        groove_holder = groove_holder.cut(endstop_holder_mount_screw_cutter)
+        groove_holder_hole_cutter = create_cylinder(
+            MScrew.from_size(endstop_holder_mount_screw_size).core_hole / 2, BIG_THING
+        )
+        groove_holder_hole_cutter = align(
+            groove_holder_hole_cutter,
+            endstop_holder_mount_screw_cutter,
+            Alignment.CENTER,
+        )
+        groove_holder = groove_holder.cut(groove_holder_hole_cutter)
+
+        groove_holder_larger_hole_cutter = align(
+            endstop_holder_mount_screw_cutter,
+            groove_holder,
+            Alignment.STACK_TOP,
+            stack_gap=endstop_holder_groove_holder_height / 3,
+        )
+        groove_holder = groove_holder.cut(groove_holder_larger_hole_cutter)
 
         slit_cutter = create_box(
             BIG_THING, endstop_holder_groove_holder_slit, BIG_THING
@@ -1337,7 +1353,6 @@ def main():
                 prod_rotation_axis=(0, 1, 0),
                 color=(0.3, 0.3, 0.7),
             )
-
 
     tool_head_mount, carriage = create_tool_head_mount(lower_axis_profile)
 

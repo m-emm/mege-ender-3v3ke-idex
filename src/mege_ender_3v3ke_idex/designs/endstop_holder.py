@@ -51,7 +51,7 @@ endstop_board_holder_thickness = 5
 endstop_board_holder_sink = 2
 
 endstop_board_holder_length = 40
-endstop_board_holder_width = 20
+endstop_board_holder_width = 18
 endstop_board_holder_screw_size = "M3"
 endstop_board_holder_screw_length = 12
 endstop_board_holder_board_clearance = 0.3
@@ -153,11 +153,12 @@ def create_endstop_holder() -> LeaderFollowersCuttersPart:
 
     base = align(base, pcb, Alignment.CENTER)
     base = align(base, pcb, Alignment.TOP)
+    base = align(base, pcb, Alignment.FRONT)
 
     pcb_cutter = create_box(
         pcb_size[0] + endstop_board_holder_board_clearance * 2,
         pcb_size[1] + endstop_board_holder_board_clearance * 2,
-        pcb_size[2]+endstop_board_holder_sink,
+        pcb_size[2] + endstop_board_holder_sink,
     )
 
     pcb_cutter = align(pcb_cutter, pcb, Alignment.CENTER)
