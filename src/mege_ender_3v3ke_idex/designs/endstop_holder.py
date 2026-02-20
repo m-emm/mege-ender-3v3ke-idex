@@ -45,7 +45,7 @@ endstop_switch_width = 6.6
 endstop_switch_thickness = 5.5
 endstop_switch_x_offset = 5
 endstop_board_hole_diameter = 3.6
-endstop_board_hole_inset = 0.9
+endstop_board_hole_inset = 1.0
 
 endstop_board_holder_thickness = 5
 endstop_board_holder_sink = 2
@@ -54,7 +54,7 @@ endstop_board_holder_length = 40
 endstop_board_holder_width = 18
 endstop_board_holder_screw_size = "M3"
 endstop_board_holder_screw_length = 12
-endstop_board_holder_board_clearance = 0.3
+endstop_board_holder_board_clearance = 0.45
 
 
 def create_endstop_board():
@@ -167,6 +167,20 @@ def create_endstop_holder() -> LeaderFollowersCuttersPart:
     base = base.cut(pcb_cutter)
 
     for cutter in board.cutters:
+
+        spacer_width = (
+            get_bounding_box_size(cutter)[0] + 2 * endstop_board_holder_board_clearance
+        )
+        spacer_thickness = endstop_board_holder_thickness - endstop_board_thickness
+
+        spacer_length = endstop_board_holder_width
+
+        spacer = create_box(spacer_width, spacer_length, spacer_thickness)
+        spacer = align(spacer, cutter, Alignment.CENTER)
+        spacer = align(spacer, base, Alignment.BACK)
+        spacer = align(spacer, base, Alignment.BOTTOM)
+
+        base = base.fuse(spacer)
 
         screw_hole_drill = create_cylinder(
             MScrew.from_size(endstop_board_holder_screw_size).clearance_hole_normal / 2,

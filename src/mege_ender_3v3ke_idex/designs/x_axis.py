@@ -158,8 +158,8 @@ endstop_holder_mount_plate_thickness = 3
 endstop_holder_mount_plate_width = 8
 endstop_holder_mount_plate_length = 20
 endstop_holder_mount_screw_size = "M3"
-endstop_holder_groove_holder_bottom_width = 6.1
-endstop_holder_groove_holder_top_width = 5.7
+endstop_holder_groove_holder_bottom_width = 6.3
+endstop_holder_groove_holder_top_width = 6.0
 endstop_holder_groove_holder_slit = 1.5
 endstop_holder_groove_holder_height = 5
 
@@ -754,7 +754,7 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
     for i in [-1, 1]:
         carriage = create_mgn12h_carriage()
         carriage = align(carriage, rail, Alignment.CENTER, axes=[0, 1])
-        carriage = translate(i * 50, 0, 0)(carriage)
+        carriage = translate(i * 170, 0, 0)(carriage)
         carriages.append(carriage)
 
     for i, carriage in enumerate(carriages):
@@ -1099,7 +1099,8 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
         )
 
         groove_holder_hole_cutter = create_cylinder(
-            MScrew.from_size(endstop_holder_mount_screw_size).core_hole / 2, BIG_THING
+            MScrew.from_size(endstop_holder_mount_screw_size).core_hole / 2 - 0.1,
+            BIG_THING,
         )
         groove_holder_hole_cutter = align(
             groove_holder_hole_cutter,
@@ -1351,7 +1352,7 @@ def main():
                 skip_in_production=False,
                 prod_rotation_angle=side.sign * 90,
                 prod_rotation_axis=(0, 1, 0),
-                color=(0.3, 0.3, 0.7),
+                color=(0.3, 0.3, 1.0),
             )
 
     tool_head_mount, carriage = create_tool_head_mount(lower_axis_profile)
