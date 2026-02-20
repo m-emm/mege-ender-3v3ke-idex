@@ -158,12 +158,10 @@ endstop_holder_mount_plate_thickness = 3
 endstop_holder_mount_plate_width = 8
 endstop_holder_mount_plate_length = 20
 endstop_holder_mount_screw_size = "M3"
-endstop_holder_counter_rhomboid_size = 6.1
-endstop_holder_counter_rhomboid_thickness = 5.5
-endstop_holder_counter_rhomboid_angle = 60
-endstop_holder_counter_rhomboid_z_offset = -3
-endstop_holder_nut_clearance = 0.1
-endstop_holder_counter_rhomboid_fillet_radius = 1.5
+endstop_holder_groove_holder_bottom_width = 7.5
+endstop_holder_groove_holder_top_width = 6
+endstop_holder_groove_holder_slit = 1
+endstop_holder_groove_holder_height = 5
 
 
 def create_rhomboid(length, width, thickness, angle, fillet_radius=None):
@@ -1078,52 +1076,40 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
 
         endstop_holder = endstop_holder.fuse(endstop_holder_mount_plate)
 
-        retval.add_named_follower(
-            endstop_holder.leader, f"endstop_holder_{side.name.lower()}"
-        )
-
         retval.add_named_non_production_part(
             endstop_holder.get_non_production_part_by_name("board"),
             f"endstop_board_{side.name.lower()}",
         )
 
-        counter_rhomboid = create_rhomboid(
-            endstop_holder_counter_rhomboid_size,
-            endstop_holder_counter_rhomboid_size,
-            endstop_holder_counter_rhomboid_thickness,
-            endstop_holder_counter_rhomboid_angle,
-            fillet_radius=endstop_holder_counter_rhomboid_fillet_radius,
+        groove_holder = create_pyramid_stump(
+            endstop_holder_mount_plate_width,
+            endstop_holder_mount_plate_width,
+            endstop_holder_groove_holder_bottom_width,
+            endstop_holder_groove_holder_top_width,
+            endstop_holder_groove_holder_height,
         )
 
-        counter_rhomboid = align(
-            counter_rhomboid,
+        groove_holder = align(
+            groove_holder,
             endstop_holder_mount_screw_cutter,
             Alignment.CENTER,
         )
-        counter_rhomboid = align(
-            counter_rhomboid, endstop_holder_mount_plate, Alignment.STACK_BOTTOM
+        groove_holder = align(
+            groove_holder, endstop_holder_mount_plate, Alignment.STACK_BOTTOM
         )
 
-        counter_rhomboid = counter_rhomboid.cut(endstop_holder_mount_screw_cutter)
+        groove_holder = groove_holder.cut(endstop_holder_mount_screw_cutter)
 
-        counter_rhomboid = translate(0, 0, endstop_holder_counter_rhomboid_z_offset)(
-            counter_rhomboid
+        slit_cutter = create_box(
+            BIG_THING, endstop_holder_groove_holder_slit, BIG_THING
         )
+        slit_cutter = align(slit_cutter, groove_holder, Alignment.CENTER)
+        groove_holder = groove_holder.cut(slit_cutter)
 
-        nut_cutter = create_nut(
-            endstop_holder_mount_screw_size, slack=endstop_holder_nut_clearance
-        )
-        nut_cutter = align(
-            nut_cutter,
-            endstop_holder_mount_screw_cutter,
-            Alignment.CENTER,
-        )
-        nut_cutter = align(nut_cutter, counter_rhomboid, Alignment.BOTTOM)
-        counter_rhomboid = counter_rhomboid.cut(nut_cutter)
+        endstop_holder = endstop_holder.fuse(groove_holder)
 
         retval.add_named_follower(
-            counter_rhomboid,
-            f"endstop_holder_counter_rhomboid_{side.name.lower()}",
+            endstop_holder.leader, f"endstop_holder_{side.name.lower()}"
         )
 
     return retval
@@ -1352,13 +1338,6 @@ def main():
                 color=(0.3, 0.3, 0.7),
             )
 
-        parts.add(
-            x_axis.get_named_follower("endstop_holder_counter_rhomboid_" + side_str),
-            f"x_axis_endstop_holder_counter_rhomboid_{side_str}",
-            flip=True,
-            skip_in_production=False,
-            color=(0.7, 0.3, 0.7),
-        )
 
     tool_head_mount, carriage = create_tool_head_mount(lower_axis_profile)
 
