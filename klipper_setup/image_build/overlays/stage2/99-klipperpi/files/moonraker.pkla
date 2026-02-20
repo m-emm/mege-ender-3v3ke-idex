@@ -1,0 +1,41 @@
+[Allow Moonraker systemd service management]
+Identity=unix-user:pi
+Action=org.freedesktop.systemd1.manage-units
+ResultAny=yes
+ResultInactive=yes
+ResultActive=yes
+
+[Allow Moonraker power-off]
+Identity=unix-user:pi
+Action=org.freedesktop.login1.power-off;org.freedesktop.login1.power-off-multiple-sessions
+ResultAny=yes
+ResultInactive=yes
+ResultActive=yes
+
+[Allow Moonraker reboot]
+Identity=unix-user:pi
+Action=org.freedesktop.login1.reboot;org.freedesktop.login1.reboot-multiple-sessions
+ResultAny=yes
+ResultInactive=yes
+ResultActive=yes
+
+[Allow Moonraker packagekit refresh]
+Identity=unix-user:pi
+Action=org.freedesktop.packagekit.system-sources-refresh
+ResultAny=yes
+ResultInactive=yes
+ResultActive=yes
+
+[Allow Moonraker packagekit install]
+Identity=unix-user:pi
+Action=org.freedesktop.packagekit.package-install
+ResultAny=yes
+ResultInactive=yes
+ResultActive=yes
+
+[Allow Moonraker packagekit update]
+Identity=unix-user:pi
+Action=org.freedesktop.packagekit.system-update
+ResultAny=yes
+ResultInactive=yes
+ResultActive=yes

@@ -19,6 +19,7 @@ avahi-daemon
 network-manager
 nginx
 dbus
+packagekit
 lightdm
 xserver-xorg
 xserver-xorg-input-libinput

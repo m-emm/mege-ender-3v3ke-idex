@@ -177,6 +177,26 @@ if [ -n "${LOCALE:-}" ]; then
   update-locale LANG="${LOCALE}"
 fi
 
+# --- WiFi country configuration ----------------------------------------------
+
+if [ -n "${WIFI_COUNTRY:-}" ]; then
+  log "Configuring WiFi country: ${WIFI_COUNTRY}"
+  # Set regulatory domain for WiFi
+  if command -v raspi-config >/dev/null 2>&1; then
+    raspi-config nonint do_wifi_country "${WIFI_COUNTRY}"
+  else
+    # Fallback: write directly to wpa_supplicant.conf if raspi-config not available
+    install -d -m 0755 /etc/wpa_supplicant
+    if ! grep -q "^country=" /etc/wpa_supplicant/wpa_supplicant.conf 2>/dev/null; then
+      echo "country=${WIFI_COUNTRY}" > /etc/wpa_supplicant/wpa_supplicant.conf
+      echo "ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev" >> /etc/wpa_supplicant/wpa_supplicant.conf
+      echo "update_config=1" >> /etc/wpa_supplicant/wpa_supplicant.conf
+    fi
+  fi
+  # Unblock WiFi (rfkill might not work in chroot, but doesn't hurt to try)
+  rfkill unblock wifi 2>/dev/null || true
+fi
+
 # --- SSH: keys + hardening + host keys --------------------------------------
 
 log "Configuring SSH (hardening + authorized_keys + host keys)"
@@ -214,6 +234,13 @@ log "Configuring Avahi"
 require_file "${FILES_DIR}/avahi-daemon.conf"
 install -m 0644 "${FILES_DIR}/avahi-daemon.conf" /etc/avahi/avahi-daemon.conf
 systemctl_enable_safe avahi-daemon
+
+# --- PolicyKit rules (Moonraker permissions) ---------------------------------
+
+log "Configuring PolicyKit rules for Moonraker"
+require_file "${FILES_DIR}/moonraker.pkla"
+install -d -m 0755 /etc/polkit-1/localauthority/50-local.d
+install -m 0644 "${FILES_DIR}/moonraker.pkla" /etc/polkit-1/localauthority/50-local.d/moonraker.pkla
 
 # --- printer_data layout -----------------------------------------------------
 
