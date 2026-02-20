@@ -375,6 +375,18 @@ if [ -f "${BOOT_CONFIG}" ]; then
     sed -i '/dtoverlay=vc4-kms-v3d/a disable_fw_kms_setup=1' "${BOOT_CONFIG}"
     log "Enabled disable_fw_kms_setup for DPI display"
   fi
+  
+  # Enable increased USB current limit (1.2A instead of 600mA)
+  # Required for Pico MCU with TMC2209 motor driver to prevent boot crashes
+  if ! grep -q "^max_usb_current=1" "${BOOT_CONFIG}"; then
+    # Add to [all] section if it exists, otherwise append to end
+    if grep -q "^\[all\]" "${BOOT_CONFIG}"; then
+      sed -i '/^\[all\]/a max_usb_current=1' "${BOOT_CONFIG}"
+    else
+      echo -e "\n# Increase USB current limit for motor driver MCU\nmax_usb_current=1" >> "${BOOT_CONFIG}"
+    fi
+    log "Enabled max_usb_current=1 for USB peripherals (1.2A limit)"
+  fi
 
   mkdir -p /boot/firmware/overlays /boot/overlays
   if [ ! -f /boot/firmware/overlays/gt911_btt_tft43_dip.dtbo ] && [ ! -f /boot/overlays/gt911_btt_tft43_dip.dtbo ]; then
