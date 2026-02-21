@@ -7,6 +7,8 @@ metadata:
     Driver1 (X): STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
     Driver2 (X2): STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5.
 
+
+
 color_map:
   power: "#ff0000" # red: VCC/5V
   lv_power: "#9ca3af" # white wire shown as gray for visibility (3.3V)
@@ -15,6 +17,13 @@ color_map:
   data: "#ffd400" # yellow: data/control signals
   default: "#808080"
 
+################
+# Note on the coordinate system: 
+# The origin (0,0) is at the bottom-left corner
+# coordinates are [ X, Y ]
+# X increasing to the right
+# Y increasing upwards
+# ##############
 pin_sets:
   - prefix: PICO_
     origin: [0, 20]
@@ -112,6 +121,26 @@ pin_sets:
       - A2_6
       - VIO_7
       - GND_LOGIC_8
+  - prefix: TMC1_10K_PULL_UP_
+    origin: [20, 10]
+    direction: right
+    pins:
+      - "1"
+      - "2"
+  - prefix: TMC2_10K_PULL_UP_
+    origin: [20, 0]
+    direction: right
+    pins:
+      - "1"
+      - "2"
+  
+  - prefix: PICO_POWER_CAP_
+    origin: [15, 19]
+    direction: down
+    pins:
+      - "1"
+      - "2"
+  
   - prefix: ENDSTOP_1_
     origin: [34, 15]
     direction: down
@@ -150,6 +179,14 @@ pin_sets:
       - GND
 
 wires:
+  - from: PICO_GND_03
+    to: PICO_POWER_CAP_1
+    type: ground
+    color: "#000000" # black for capacitor ground
+  - from: PICO_POWER_CAP_2
+    to: PICO_THREEV3_OUT_36
+    type: lv_power
+    color: "#9ca3af" # gray for capacitor power
   - from: PICO_GPIO_11
     to: TMC1_J1_STEP_7
     type: clock
@@ -172,12 +209,28 @@ wires:
   - from: PICO_THREEV3_OUT_36
     to: TMC1_J2_VIO_7
     type: lv_power
+  - from: TMC1_J2_VIO_7
+    to: TMC1_10K_PULL_UP_2
+    type: lv_power
+    color: "#9ca3af" # gray for pull-up resistor
+  - from: TMC1_10K_PULL_UP_1
+    to: TMC1_J1_EN_1
+    type: data
+    color: "#9ca3af" # gray for pull-up resistor
   - from: PICO_GND_18
     to: TMC2_J2_GND_LOGIC_8
     type: ground
   - from: PICO_THREEV3_OUT_36
     to: TMC2_J2_VIO_7
     type: lv_power
+  - from: TMC2_J2_VIO_7
+    to: TMC2_10K_PULL_UP_2
+    type: lv_power
+    color: "#9ca3af" # gray for pull-up resistor
+  - from: TMC2_10K_PULL_UP_1
+    to: TMC2_J1_EN_1
+    type: data
+    color: "#9ca3af" # gray for pull-up resistor
   - from: PICO_GPIO_7
     to: TMC2_J1_STEP_7
     type: clock
