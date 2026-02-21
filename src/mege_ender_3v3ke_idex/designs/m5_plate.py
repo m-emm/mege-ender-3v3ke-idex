@@ -6,29 +6,15 @@ Usage:
     # or with production mode:
     cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/m5_plate.py
 """
+
 import copy
 import logging
 import os
-from collections import defaultdict
-from pathlib import Path
 
-import numpy as np
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (
     PROCESS_DATA_PETGCF_04_HS,
 )
-from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
-    ExtrusionProfileType,
-    create_alu_extrusion_profile,
-)
-from mege_ender_3v3ke_idex.designs.endstop_holder import create_endstop_holder
-from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.mgh_linear import (
-    create_mgn12h_carriage,
-    create_mgn12h_rail,
-)
-from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
-from mege_ender_3v3ke_idex.designs.tool_head_mount import create_tool_head_mount
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -38,7 +24,6 @@ PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
 
 BIG_THING = 500
-
 
 
 PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_04_HS)
@@ -52,7 +37,13 @@ angle_plate_fillet_radius = 3
 
 def create_angle_plate():
     """Create the angle_plate part."""
-    plate = create_filleted_box(angle_plate_width, angle_plate_length, angle_plate_thickness, angle_plate_fillet_radius, no_fillets_at=[Alignment.TOP, Alignment.BOTTOM])
+    plate = create_filleted_box(
+        angle_plate_width,
+        angle_plate_length,
+        angle_plate_thickness,
+        angle_plate_fillet_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+    )
 
     hole_drill_diameter = MScrew.from_size("M5").clearance_hole_loose
 
@@ -62,9 +53,6 @@ def create_angle_plate():
     plate = plate.cut(hole_drill)
 
     return plate
-    
-
-
 
 
 def main():

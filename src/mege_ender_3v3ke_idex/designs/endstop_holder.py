@@ -47,14 +47,19 @@ endstop_switch_x_offset = 5
 endstop_board_hole_diameter = 3.6
 endstop_board_hole_inset = 1.0
 
-endstop_board_holder_thickness = 5
-endstop_board_holder_sink = 2
+endstop_board_holder_thickness = 6.5
+endstop_board_holder_sink = 1.5
 
 endstop_board_holder_length = 40
 endstop_board_holder_width = 18
 endstop_board_holder_screw_size = "M3"
 endstop_board_holder_screw_length = 12
 endstop_board_holder_board_clearance = 0.45
+endstop_board_holder_nut_cutter_slack = 0.2
+
+
+endstop_board_holder_oversize_y = 1
+endstop_board_holder_oversize_x = 3
 
 
 def create_endstop_board():
@@ -146,23 +151,29 @@ def create_endstop_holder() -> LeaderFollowersCuttersPart:
     pcb_size = np.array(get_bounding_box_size(pcb))
 
     base = create_box(
-        endstop_board_holder_length,
-        endstop_board_holder_width,
+        endstop_board_holder_length + endstop_board_holder_oversize_x,
+        endstop_board_holder_width + endstop_board_holder_oversize_y,
         endstop_board_holder_thickness,
     )
 
     base = align(base, pcb, Alignment.CENTER)
     base = align(base, pcb, Alignment.TOP)
     base = align(base, pcb, Alignment.FRONT)
+    base = translate(0, -endstop_board_holder_oversize_y, 0)(base)
 
     pcb_cutter = create_box(
-        pcb_size[0] + endstop_board_holder_board_clearance * 2,
-        pcb_size[1] + endstop_board_holder_board_clearance * 2,
+        pcb_size[0]
+        + endstop_board_holder_board_clearance * 2
+        + endstop_board_holder_oversize_x,
+        pcb_size[1]
+        + endstop_board_holder_board_clearance * 2
+        + endstop_board_holder_oversize_y,
         pcb_size[2] + endstop_board_holder_sink,
     )
 
     pcb_cutter = align(pcb_cutter, pcb, Alignment.CENTER)
     pcb_cutter = align(pcb_cutter, pcb, Alignment.TOP)
+    pcb_cutter = translate(0, -endstop_board_holder_oversize_y, 0)(pcb_cutter)
 
     base = base.cut(pcb_cutter)
 
@@ -173,7 +184,7 @@ def create_endstop_holder() -> LeaderFollowersCuttersPart:
         )
         spacer_thickness = endstop_board_holder_thickness - endstop_board_thickness
 
-        spacer_length = endstop_board_holder_width
+        spacer_length = endstop_board_holder_width + endstop_board_holder_oversize_y
 
         spacer = create_box(spacer_width, spacer_length, spacer_thickness)
         spacer = align(spacer, cutter, Alignment.CENTER)
@@ -188,6 +199,13 @@ def create_endstop_holder() -> LeaderFollowersCuttersPart:
         )
         screw_hole_drill = align(screw_hole_drill, cutter, Alignment.CENTER)
         base = base.cut(screw_hole_drill)
+
+        nut_cutter = create_nut(
+            endstop_board_holder_screw_size, slack=endstop_board_holder_nut_cutter_slack
+        )
+        nut_cutter = align(nut_cutter, screw_hole_drill, Alignment.CENTER)
+        nut_cutter = align(nut_cutter, base, Alignment.BOTTOM)
+        base = base.cut(nut_cutter)
 
     retval = LeaderFollowersCuttersPart(base)
     retval.add_named_non_production_part(board, "board")

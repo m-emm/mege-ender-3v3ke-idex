@@ -153,8 +153,8 @@ PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_04_HS)
 
 endstop_holder_z_offset = 8
 endstop_holder_inset_from_end = 15
-endstop_holder_stack_gap = 5
-endstop_holder_mount_plate_thickness = 3
+endstop_holder_stack_gap = 1
+endstop_holder_mount_plate_thickness = 4.5
 endstop_holder_mount_plate_width = 8
 endstop_holder_mount_plate_length = 20
 endstop_holder_mount_screw_size = "M3"
@@ -1072,6 +1072,39 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
 
         endstop_holder_mount_plate = endstop_holder_mount_plate.cut(
             endstop_holder_mount_screw_cutter
+        )
+
+        endstop_holder_mount_plate_enhancer = create_right_triangle(
+            endstop_holder_mount_plate_length / 3,
+            endstop_holder_mount_plate_length / 3,
+            endstop_holder_mount_plate_thickness / 4,
+            extrusion_direction=(1, 0, 0),
+            a_normal=(0, -1, 0),
+            b_normal=(0, 0, 1),
+        )
+
+        endstop_holder_mount_plate_enhancer = align(
+            endstop_holder_mount_plate_enhancer,
+            endstop_holder_mount_plate,
+            Alignment.CENTER,
+        )
+        endstop_holder_mount_plate_enhancer = align(
+            endstop_holder_mount_plate_enhancer,
+            endstop_holder_mount_plate,
+            Alignment.FRONT,
+        )
+
+        endstop_holder_mount_plate_enhancer = align(
+            endstop_holder_mount_plate_enhancer, endstop_holder_mount_plate, side
+        )
+        endstop_holder_mount_plate_enhancer = align(
+            endstop_holder_mount_plate_enhancer,
+            endstop_holder_mount_plate,
+            Alignment.STACK_TOP,
+        )
+
+        endstop_holder_mount_plate = endstop_holder_mount_plate.fuse(
+            endstop_holder_mount_plate_enhancer
         )
 
         endstop_holder = endstop_holder.fuse(endstop_holder_mount_plate)
