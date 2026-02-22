@@ -1240,6 +1240,7 @@ def main():
         "pulley_right",
         "endstop_board_left",
         "endstop_board_right",
+        "toolhead_1",
     ]:
         parts.add(
             x_axis.get_non_production_part_by_name(name),

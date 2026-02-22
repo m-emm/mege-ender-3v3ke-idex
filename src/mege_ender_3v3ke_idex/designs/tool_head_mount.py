@@ -25,6 +25,7 @@ from mege_ender_3v3ke_idex.designs.mgh_linear import (
     create_mgn12h_carriage,
     create_mgn12h_rail,
 )
+from mege_ender_3v3ke_idex.designs.tool_head import create_tool_head
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -36,6 +37,8 @@ PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 _logger = logging.getLogger(__name__)
 
 PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLACF_04_HS)
+
+nitehawk_board_clearance = 1
 
 
 def create_tool_head_mount(target_profile):
@@ -383,7 +386,23 @@ def create_tool_head_mount(target_profile):
     tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
     tool_head_mount.add_named_follower(clamp.leader, "belt_clamp_base")
 
-    return tool_head_mount, carriage
+    tool_head = create_tool_head()
+
+    tool_head = align(tool_head, tool_head_mount, Alignment.CENTER)
+
+    nitehawk_board = tool_head.get_named_non_production_part("nitehawk_board")
+
+    tool_head_aligner = align_translation(
+        nitehawk_board,
+        tool_head_mount,
+        Alignment.STACK_FRONT,
+        stack_gap=nitehawk_board_clearance,
+    )
+
+    tool_head = tool_head_aligner(tool_head)
+    tool_head = align(tool_head, tool_head_mount, Alignment.TOP)
+
+    return tool_head_mount, carriage, tool_head
 
 
 def main():
@@ -429,9 +448,15 @@ def main():
     )
 
     # Create the part
-    tool_head_mount, carriage_1 = create_tool_head_mount(lower_axis_profile)
+    tool_head_mount, carriage_1, tool_head_1 = create_tool_head_mount(
+        lower_axis_profile
+    )
 
     parts.add(carriage_1, "carriage_1", flip=False, skip_in_production=True)
+    parts.add(tool_head_1, "tool_head_1", flip=False, skip_in_production=True)
+
+    for name, npp in tool_head_1.get_named_non_production_part_items():
+        parts.add(npp, name, flip=False, skip_in_production=True)
 
     # tool_head_mount = align(
     #     tool_head_mount,
