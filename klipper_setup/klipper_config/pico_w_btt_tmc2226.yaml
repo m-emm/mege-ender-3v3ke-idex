@@ -122,13 +122,13 @@ pin_sets:
       - VIO_7
       - GND_LOGIC_8
   - prefix: TMC1_10K_PULL_UP_
-    origin: [20, 10]
+    origin: [21, 10]
     direction: right
     pins:
       - "1"
       - "2"
   - prefix: TMC2_10K_PULL_UP_
-    origin: [20, 0]
+    origin: [21, 0]
     direction: right
     pins:
       - "1"
@@ -142,13 +142,16 @@ pin_sets:
       - "2"
   
   - prefix: ENDSTOP_1_
-    origin: [34, 15]
+    origin: [34, 10]
     direction: down
     pins:
       - "NO"
-      - COM
+      - GND
+      - VCC
+
+
   - prefix: MOTOR_1_
-    origin: [34, 12]
+    origin: [34, 15]
     direction: down
     pins:
       - A_PLUS
@@ -161,10 +164,11 @@ pin_sets:
     direction: down
     pins:
       - "NO"
-      - COM
+      - GND
+      - VCC
 
   - prefix: MOTOR_2_
-    origin: [34, 4]
+    origin: [34, 3]
     direction: down
     pins:
       - A_PLUS
@@ -176,6 +180,7 @@ pin_sets:
     direction: down
     pins:
       - V24
+      - N/C
       - GND
 
 wires:
@@ -248,16 +253,26 @@ wires:
     to: ENDSTOP_1_NO
     type: data
   - from: PWR_GND
-    to: ENDSTOP_1_COM
+    to: ENDSTOP_1_GND
     type: ground
 
-  - from: ENDSTOP_1_COM
-    to: ENDSTOP_2_COM
+
+
+  - from: ENDSTOP_1_VCC
+    to: PICO_THREEV3_OUT_36
+    type: lv_power
+
+  - from: ENDSTOP_1_GND
+    to: ENDSTOP_2_GND
     type: ground
 
   - from: PICO_GPIO_22_29
     to: ENDSTOP_2_NO
     type: data
+
+  - from: ENDSTOP_2_VCC
+    to: ENDSTOP_1_VCC
+    type: lv_power
     
   - from: MOTOR_1_A_PLUS
     to: TMC1_J2_A1_5
