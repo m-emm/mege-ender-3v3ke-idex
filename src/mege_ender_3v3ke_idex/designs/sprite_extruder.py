@@ -43,6 +43,8 @@ hot_side_holes_top_distance_front = 4
 hot_side_holes_z_pitch_back = 10
 hot_side_holes_z_pitch_front = 15
 
+hot_side_holes_back_holes_z_distance = 19
+
 side_holes_depth = 4
 
 extruder_mount_screw_size = "M3"
@@ -98,41 +100,41 @@ def create_sprite_extruder():
     retval = retval.cut(mount_nole_cutter)
 
     side_holes_drills = PartCollector()
+    hot_side_hole_diameter = MScrew.from_size(extruder_mount_screw_size).core_hole / 2
+    hot_side_hole = create_cylinder(hot_side_hole_diameter, 2 * side_holes_depth)
+    hot_side_hole = rotate(90, axis=(0, 1, 0))(hot_side_hole)
+    hot_side_hole = align(hot_side_hole, front, Alignment.CENTER)
+    hot_side_hole = align(hot_side_hole, front, Alignment.BACK)
+    hot_side_hole = align(hot_side_hole, front, Alignment.TOP)
+    hot_side_hole = align(
+        hot_side_hole, front, Alignment.STACK_LEFT, stack_gap=-side_holes_depth
+    )
+    hot_side_hole = translate(
+        0, hot_side_hole_diameter / 2, hot_side_hole_diameter / 2
+    )(hot_side_hole)
+
     for i in [0, 1]:
-        for j in [0, 1]:
-            hot_side_hole_diameter = (
-                MScrew.from_size(extruder_mount_screw_size).core_hole / 2
-            )
-            hot_side_hole = create_cylinder(
-                hot_side_hole_diameter, 2 * side_holes_depth
-            )
-            hot_side_hole = rotate(90, axis=(0, 1, 0))(hot_side_hole)
-            hot_side_hole = align(hot_side_hole, front, Alignment.CENTER)
-            hot_side_hole = align(hot_side_hole, front, Alignment.TOP)
-            hot_side_hole = align(hot_side_hole, front, Alignment.BACK)
-            hot_side_hole = align(
-                hot_side_hole, front, Alignment.STACK_LEFT, stack_gap=-side_holes_depth
-            )
+        current_side_hole = translate(
+            0,
+            -hot_side_holes_back_distance - i * hot_side_holes_y_pitch,
+            -hot_side_holes_back_holes_z_distance,
+        )(hot_side_hole)
 
-            hot_side_holes_top_distance = (
-                hot_side_holes_top_distance_back
-                if i == 0
-                else hot_side_holes_top_distance_front
-            )
-            hot_side_holes_z_pitch = (
-                hot_side_holes_z_pitch_back if i == 0 else hot_side_holes_z_pitch_front
-            )
-            hot_side_hole = translate(
-                0,
-                -hot_side_holes_back_distance
-                - i * hot_side_holes_y_pitch
-                + hot_side_hole_diameter / 2,
-                -hot_side_holes_top_distance
-                - j * hot_side_holes_z_pitch
-                + hot_side_hole_diameter / 2,
-            )(hot_side_hole)
+        side_holes_drills = side_holes_drills.fuse(current_side_hole)
 
-            side_holes_drills = side_holes_drills.fuse(hot_side_hole)
+    for i in [0, 1]:
+        top_distance = (
+            hot_side_holes_top_distance_back
+            if i == 0
+            else hot_side_holes_top_distance_front
+        )
+        current_side_hole = translate(
+            0,
+            -hot_side_holes_back_distance - i * hot_side_holes_y_pitch,
+            -top_distance,
+        )(hot_side_hole)
+
+        side_holes_drills = side_holes_drills.fuse(current_side_hole)
 
     retval = retval.fuse(side_holes_drills)
 

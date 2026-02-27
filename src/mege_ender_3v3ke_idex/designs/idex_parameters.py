@@ -140,6 +140,7 @@ tool_head_belt_clamp_gap = 3
 
 
 tool_head_mount_side_clearance = 0.5
+carriage_mount_plate_width = 75
 tool_head_mount_side_stiffener_thickness = 2
 
 tool_head_mount_side_plate_depth = 12

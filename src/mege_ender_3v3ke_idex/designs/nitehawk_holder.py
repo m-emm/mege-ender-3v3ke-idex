@@ -90,7 +90,7 @@ nitehawk_umbilical_connector_cable_connector_end_diameter = 9.4
 nitehawk_umbilical_cable_diameter = 5.1
 nitehawk_umbilical_cable_length = 30
 
-nitehawk_board_angle = 30
+nitehawk_board_angle = 79
 nitehawk_holder_thickness = 1.5
 nitehawk_holder_width_extesion = 10
 nitehawk_holder_width = NemaSizes.NEMA17.size_mm + nitehawk_holder_width_extesion
@@ -267,7 +267,7 @@ def create_nitehawk_board():
     return retval
 
 
-def create_nitehawk_holder(sprite_extruder):
+def create_nitehawk_holder():
     """Create the nitehawk_holder part."""
 
     holder = create_filleted_box(
@@ -401,32 +401,27 @@ def create_nitehawk_holder(sprite_extruder):
         mount_towers.get_named_cutter("screw_hole_cutter_2"), "screw_hole_cutter_2"
     )
 
-    holder = align(holder, sprite_extruder, Alignment.CENTER)
-
-    holder = align(holder, sprite_extruder, Alignment.BACK)
-    holder = align(holder, sprite_extruder, Alignment.LEFT)
-    holder = align(holder, sprite_extruder, Alignment.STACK_TOP)
-
     holder = holder.fuse(holder.get_named_follower("cable_attachment"))
 
-    holder = sprite_extruder.use_as_cutter_on(holder)
+    holder_screw_hole_cutter_1 = holder.get_named_cutter("screw_hole_cutter_1")
 
-    cut_cylinder = create_cylinder(nitehawk_holder_mount_cut_radius, BIG_THING)
-    cut_cylinder = align(cut_cylinder, holder, Alignment.CENTER)
-    cut_cylinder = align(
-        cut_cylinder,
-        holder,
-        Alignment.STACK_FRONT,
-        stack_gap=-nitehawk_holder_mount_cut_radius,
-    )
-    cut_cylinder = align(
-        cut_cylinder,
-        holder,
-        Alignment.STACK_RIGHT,
-        stack_gap=-nitehawk_holder_mount_cut_radius - nitehawk_holder_width_extesion,
+    nitehawk_board = create_nitehawk_board()
+    nitehawk_board = rotate(nitehawk_board_angle)(nitehawk_board)
+    nitehawk_pcb = nitehawk_board.get_named_follower("pcb")
+    board_alignment = align_translation(
+        nitehawk_pcb, holder, Alignment.STACK_TOP, stack_gap=0.0
     )
 
-    holder = holder.cut(cut_cylinder)
+    nitehawk_board = board_alignment(nitehawk_board)
+
+    board_hole_1 = nitehawk_board.get_named_cutter("hole_1")
+
+    align_board_translattion = align_translation(
+        board_hole_1, holder_screw_hole_cutter_1, Alignment.CENTER, axes=[0, 1]
+    )
+    nitehawk_board = align_board_translattion(nitehawk_board)
+
+    holder.add_named_non_production_part(nitehawk_board.leader, "nitehawk_board")
 
     return holder
 
@@ -441,7 +436,16 @@ def main():
 
     parts.add(sprite_extruder, "sprite_extruder", flip=False, skip_in_production=True)
 
-    holder = create_nitehawk_holder(sprite_extruder)
+    for name, npp in sprite_extruder.get_named_non_production_part_items():
+        parts.add(npp, name, flip=False, skip_in_production=True)
+
+    holder = create_nitehawk_holder()
+    holder = rotate(180, axis=(0, 1, 0))(holder)
+
+    holder = align(holder, sprite_extruder, Alignment.CENTER)
+    holder = align(holder, sprite_extruder, Alignment.STACK_BOTTOM)
+    holder = align(holder, sprite_extruder, Alignment.BACK)
+    holder = align(holder, sprite_extruder, Alignment.RIGHT)
 
     parts.add(
         holder,

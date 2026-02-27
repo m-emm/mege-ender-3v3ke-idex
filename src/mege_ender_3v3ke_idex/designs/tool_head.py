@@ -16,11 +16,7 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
     PROCESS_DATA_PLACF_04_HS,
     PROCESS_DATA_PLAGFHT_04_HS,
 )
-from mege_ender_3v3ke_idex.designs.nitehawk_holder import (
-    create_nitehawk_board,
-    create_nitehawk_holder,
-    nitehawk_board_angle,
-)
+from mege_ender_3v3ke_idex.designs.nitehawk_holder import create_nitehawk_holder
 from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
 from shellforgepy.simple import *
 
@@ -37,31 +33,18 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
 
     sprite_extruder = create_sprite_extruder()
 
-    holder = create_nitehawk_holder(sprite_extruder)
+    holder = create_nitehawk_holder()
+    holder = rotate(180, axis=(0, 1, 0))(holder)
 
-    holder_screw_hole_cutter_1 = holder.get_named_cutter("screw_hole_cutter_1")
-
-    nitehawk_board = create_nitehawk_board()
-    nitehawk_board = rotate(nitehawk_board_angle)(nitehawk_board)
-    nitehawk_pcb = nitehawk_board.get_named_follower("pcb")
-    board_alignment = align_translation(
-        nitehawk_pcb, holder, Alignment.STACK_TOP, stack_gap=0.0
-    )
-
-    nitehawk_board = board_alignment(nitehawk_board)
-
-    board_hole_1 = nitehawk_board.get_named_cutter("hole_1")
-
-    align_board_translattion = align_translation(
-        board_hole_1, holder_screw_hole_cutter_1, Alignment.CENTER, axes=[0, 1]
-    )
-    nitehawk_board = align_board_translattion(nitehawk_board)
+    holder = align(holder, sprite_extruder, Alignment.CENTER)
+    holder = align(holder, sprite_extruder, Alignment.STACK_BOTTOM)
+    holder = align(holder, sprite_extruder, Alignment.BACK)
+    holder = align(holder, sprite_extruder, Alignment.RIGHT)
 
     retval = sprite_extruder
 
     retval = retval.merge_except_leader(holder)
     retval.add_named_non_production_part(holder.leader, "nitehawk_holder_leader")
-    retval.add_named_non_production_part(nitehawk_board.leader, "nitehawk_board")
     retval = rotate(90, axis=(1, 0, 0))(retval)
     retval = rotate(180)(retval)
 
