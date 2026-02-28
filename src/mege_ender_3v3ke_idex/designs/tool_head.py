@@ -38,8 +38,8 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
 
     holder = align(holder, sprite_extruder, Alignment.CENTER)
     holder = align(holder, sprite_extruder, Alignment.STACK_BOTTOM)
-    holder = align(holder, sprite_extruder, Alignment.BACK)
-    holder = align(holder, sprite_extruder, Alignment.RIGHT)
+    holder = align(holder, sprite_extruder, Alignment.FRONT)
+    holder = align(holder, sprite_extruder, Alignment.LEFT)
 
     retval = sprite_extruder
 

@@ -27,7 +27,7 @@ PROCESS_DATA = {
         "layer_height": "0.2",
     },
 }
-
+BIG_THING = 500
 hotend_diameter = 13.9
 hotend_length = 24.8
 nozzle_diameter = 6.6
@@ -45,7 +45,12 @@ hot_side_holes_z_pitch_front = 15
 
 hot_side_holes_back_holes_z_distance = 19
 
+motor_hole_y_pitch = 24
+motor_hole_z_pitch = 20
+
 side_holes_depth = 4
+
+fan_thickness = 14
 
 extruder_mount_screw_size = "M3"
 
@@ -94,14 +99,11 @@ def create_sprite_extruder():
 
     front = front.fuse(cooler)
 
-    retval = motor.fuse(front)
-
-    mount_nole_cutter = motor_composite.get_named_cutter("mount_holes")
-    retval = retval.cut(mount_nole_cutter)
+    mount_hole_cutter = motor_composite.get_named_cutter("mount_holes")
 
     side_holes_drills = PartCollector()
     hot_side_hole_diameter = MScrew.from_size(extruder_mount_screw_size).core_hole / 2
-    hot_side_hole = create_cylinder(hot_side_hole_diameter, 2 * side_holes_depth)
+    hot_side_hole = create_cylinder(hot_side_hole_diameter, BIG_THING)
     hot_side_hole = rotate(90, axis=(0, 1, 0))(hot_side_hole)
     hot_side_hole = align(hot_side_hole, front, Alignment.CENTER)
     hot_side_hole = align(hot_side_hole, front, Alignment.BACK)
@@ -113,6 +115,8 @@ def create_sprite_extruder():
         0, hot_side_hole_diameter / 2, hot_side_hole_diameter / 2
     )(hot_side_hole)
 
+    hot_side_holes = []
+
     for i in [0, 1]:
         current_side_hole = translate(
             0,
@@ -121,6 +125,7 @@ def create_sprite_extruder():
         )(hot_side_hole)
 
         side_holes_drills = side_holes_drills.fuse(current_side_hole)
+        hot_side_holes.append(current_side_hole)
 
     for i in [0, 1]:
         top_distance = (
@@ -135,11 +140,52 @@ def create_sprite_extruder():
         )(hot_side_hole)
 
         side_holes_drills = side_holes_drills.fuse(current_side_hole)
+        hot_side_holes.append(current_side_hole)
 
-    retval = retval.fuse(side_holes_drills)
+    motor_holes = []
+    motor_hole_drills = PartCollector()
+
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+            for tb in [Alignment.TOP, Alignment.BOTTOM]:
+                if tb == Alignment.TOP and lr == Alignment.RIGHT:
+                    continue  # Skip top right holes
+                hole = create_cylinder(hot_side_hole_diameter, BIG_THING)
+                hole = rotate(90, axis=(0, 1, 0))(hole)
+
+                hole = align(hole, motor, Alignment.CENTER)
+                hole = align(
+                    hole, motor, lr.stack_alignment, stack_gap=-side_holes_depth
+                )
+
+                hole = translate(
+                    0,
+                    fb.sign * motor_hole_y_pitch / 2,
+                    tb.sign * motor_hole_z_pitch / 2,
+                )(hole)
+                motor_hole_drills = motor_hole_drills.fuse(hole)
+                motor_holes.append(hole)
+
+    motor_hole_drills = LeaderFollowersCuttersPart(motor_hole_drills)
+    for i, hole in enumerate(motor_holes):
+        motor_hole_drills.add_named_cutter(hole, f"motor_hole_{i}")
+
+    motor_hole_drills = align(motor_hole_drills, motor, Alignment.CENTER)
+
+    motor = motor.cut(motor_hole_drills.leader)
+
+    retval = motor.fuse(front)
+
+    retval = retval.cut(mount_hole_cutter)
+
+    retval = retval.cut(side_holes_drills)
 
     retval = LeaderFollowersCuttersPart(retval)
-    retval.add_named_cutter(mount_nole_cutter, "mount_holes")
+    for i, hole in enumerate(hot_side_holes):
+        retval.add_named_cutter(hole, f"hot_side_hole_{i}")
+
+    for cutter_name, cutter in motor_hole_drills.get_named_cutter_items():
+        retval.add_named_cutter(cutter, cutter_name)
 
     hotend = create_cylinder(hotend_diameter / 2, hotend_length)
     nozzle = create_cone(nozzle_diameter / 2, nozzle_tip_diameter / 2, nozzle_length)
@@ -155,6 +201,12 @@ def create_sprite_extruder():
 
     retval.add_named_non_production_part(hotend, "hotend")
 
+    fan = create_box(fan_thickness, front_size[1], front_size[2])
+    fan = align(fan, front, Alignment.CENTER)
+    fan = align(fan, front, Alignment.FRONT)
+    fan = align(fan, front, Alignment.STACK_RIGHT)
+    retval.add_named_non_production_part(fan, "fan")
+
     return retval
 
 
@@ -163,11 +215,21 @@ def main():
     parts = PartList()
 
     # Create the part
-    part = create_sprite_extruder()
-    parts.add(part, "sprite_extruder", flip=False)
+    extruder = create_sprite_extruder()
+    parts.add(extruder, "sprite_extruder", flip=False)
 
-    for name, npp in part.get_named_non_production_part_items():
+    for name, npp in extruder.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
+
+    mount_plates = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        mount_plate = create_box(3, 40, 60)
+        mount_plate = align(mount_plate, extruder, Alignment.CENTER)
+        mount_plate = align(mount_plate, extruder, lr.stack_alignment, stack_gap=6)
+        mount_plate = extruder.use_as_cutter_on(mount_plate)
+        mount_plates = mount_plates.fuse(mount_plate)
+
+    parts.add(mount_plates, "mount_plates", flip=False, skip_in_production=True)
 
     # Arrange and export
     arrange_and_export(
