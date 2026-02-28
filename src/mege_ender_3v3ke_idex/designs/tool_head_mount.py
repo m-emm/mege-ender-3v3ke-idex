@@ -38,9 +38,6 @@ _logger = logging.getLogger(__name__)
 
 PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLACF_04_HS)
 
-nitehawk_board_clearance = 1
-tool_head_z_offset = -10
-belt_clamp_y_offset = 8
 
 
 def create_tool_head_mount(target_profile):
@@ -62,13 +59,13 @@ def create_tool_head_mount(target_profile):
     carriage = rail_plus_carriage.followers[1]
 
     tool_head_mount_base_plate_width = (
-        carriage_mount_plate_width - 2 * tool_head_mount_side_plate_thickness
+        tool_head_mount_carriage_mount_plate_width - 2 * tool_head_mount_side_plate_thickness
     )
 
     clamp_1 = create_gt_belt_clamp(
         base_thicknness=tool_head_mount_belt_clamp_base_thickness,
         clamp_thickness=tool_head_mount_belt_clamp_thickness,
-        clamp_length=tool_head_mount_base_plate_width / 2 - tool_head_belt_clamp_gap,
+        clamp_length=tool_head_mount_base_plate_width / 2 - tool_head_mount_belt_clamp_gap,
         screw_size="M3",
         screw_hole_border=1.9,
         teeth_clearance=0.1,
@@ -79,7 +76,7 @@ def create_tool_head_mount(target_profile):
     clamp_1 = rotate(90)(clamp_1)
 
     carriage_mount_plate = create_filleted_box(
-        carriage_mount_plate_width,
+        tool_head_mount_carriage_mount_plate_width,
         carriage_size[1] + tool_head_mount_y_extension,
         tool_head_mount_carriage_mount_plate_thickness,
         fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
@@ -90,6 +87,22 @@ def create_tool_head_mount(target_profile):
     carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.STACK_TOP)
     carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.BACK)
     carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
+
+    extruder_cutout = create_filleted_box(
+        tool_head_mount_extruder_cutout_width,
+        BIG_THING,
+        BIG_THING,
+        fillet_radius=tool_head_mount_extruder_cutout_fillet_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+    )
+    extruder_cutout = align(extruder_cutout, carriage_mount_plate, Alignment.CENTER)
+    extruder_cutout = align(
+        extruder_cutout,
+        carriage,
+        Alignment.STACK_FRONT,
+        stack_gap=tool_head_mount_extruder_cutout_carriage_gap,
+    )
+    carriage_mount_plate = carriage_mount_plate.cut(extruder_cutout)
 
     mount_base_plate = create_box(
         tool_head_mount_base_plate_width,
@@ -171,7 +184,7 @@ def create_tool_head_mount(target_profile):
         clamp.get_follower_part_by_name("clamp_1"), side_plates, Alignment.BACK
     )
     clamp = clamp_align_translation(clamp)
-    clamp = translate(0, -belt_clamp_y_offset, 0)(clamp)
+    clamp = translate(0, -tool_head_mount_belt_clamp_y_offset, 0)(clamp)
 
     clamps_list = [
         clamp.get_follower_part_by_name("clamp_1"),
@@ -378,6 +391,44 @@ def create_tool_head_mount(target_profile):
     mount_base_plate = mount_base_plate.cut(clamp_cutter)
     mount_base_plate = mount_base_plate.cut(bases_cutter)
 
+    tool_head = create_tool_head()
+
+    tool_head = align(tool_head, carriage, Alignment.CENTER)
+
+    sprite_extruder = tool_head.get_named_non_production_part("sprite_extruder")
+
+    tool_head_aligner = align_translation(
+        sprite_extruder,
+        target_profile,
+        Alignment.STACK_FRONT,
+        stack_gap=tool_head_mount_sprite_extruder_clearance,
+    )
+
+    tool_head = tool_head_aligner(tool_head)
+    tool_head = align(tool_head, target_profile, Alignment.TOP)
+    tool_head = translate(tool_head_mount_tool_head_x_offset, 0, tool_head_mount_tool_head_z_offset)(tool_head)
+
+    extruder_cutout = create_filleted_box(
+        tool_head_mount_extruder_cutout_width,
+        BIG_THING,
+        BIG_THING,
+        fillet_radius=tool_head_mount_extruder_cutout_fillet_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+    )
+    extruder_cutout = align(extruder_cutout, carriage_mount_plate, Alignment.CENTER)
+
+    sprite_extruder = tool_head.get_named_non_production_part("sprite_extruder")
+
+    extruder_cutout = align(extruder_cutout, sprite_extruder, Alignment.RIGHT)
+
+    extruder_cutout = align(
+        extruder_cutout,
+        carriage,
+        Alignment.STACK_FRONT,
+        stack_gap=tool_head_mount_extruder_cutout_carriage_gap,
+    )
+    carriage_mount_plate = carriage_mount_plate.cut(extruder_cutout)
+
     tool_head_mount = carriage_mount_plate.fuse(clamps_fused)
     tool_head_mount = tool_head_mount.fuse(belt_deflectors)
 
@@ -390,23 +441,6 @@ def create_tool_head_mount(target_profile):
 
     tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
     tool_head_mount.add_named_follower(clamp.leader, "belt_clamp_base")
-
-    tool_head = create_tool_head()
-
-    tool_head = align(tool_head, tool_head_mount, Alignment.CENTER)
-
-    nitehawk_board = tool_head.get_named_non_production_part("nitehawk_board")
-
-    tool_head_aligner = align_translation(
-        nitehawk_board,
-        tool_head_mount,
-        Alignment.STACK_FRONT,
-        stack_gap=nitehawk_board_clearance,
-    )
-
-    tool_head = tool_head_aligner(tool_head)
-    tool_head = align(tool_head, tool_head_mount, Alignment.TOP)
-    tool_head = translate(0, 0, tool_head_z_offset)(tool_head)
 
     return tool_head_mount, carriage, tool_head
 

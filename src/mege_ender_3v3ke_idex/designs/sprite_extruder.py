@@ -54,6 +54,13 @@ fan_thickness = 14
 
 extruder_mount_screw_size = "M3"
 
+lever_width = 14.5
+lever_thickness = 4
+lever_length = 23
+lever_angle = 45
+lever_center_offset = 4.4
+lever_front_inset = 1
+
 
 def create_sprite_extruder():
     """Create the sprite_extruder part."""
@@ -200,6 +207,31 @@ def create_sprite_extruder():
     hotend = translate(0, 0, -hotend_inset)(hotend)
 
     retval.add_named_non_production_part(hotend, "hotend")
+
+    # lever_width = 14.5
+    # lever_thickness = 4
+    # lever_length = 23
+    # lever_angle = 45
+    # lever_center_offset = 4.4
+
+    lever = create_box(lever_thickness, lever_length, lever_width)
+
+    lever = align(lever, front, Alignment.CENTER)
+    lever = align(lever, front, Alignment.STACK_BACK)
+    lever = align(lever, front, Alignment.TOP)
+
+    lever = translate(lever_center_offset, lever_front_inset, 0)(lever)
+
+    lever_bbox = get_bounding_box(lever)
+    lever_rotation_center = (
+        (lever_bbox[0][0] + lever_bbox[1][0]) / 2,
+        lever_bbox[0][1],
+        0,
+    )
+
+    lever = rotate(-lever_angle, axis=(0, 0, 1), center=lever_rotation_center)(lever)
+    lever = translate(lever_center_offset, 0, -lever_front_inset)(lever)
+    retval.add_named_non_production_part(lever, "lever")
 
     fan = create_box(fan_thickness, front_size[1], front_size[2])
     fan = align(fan, front, Alignment.CENTER)

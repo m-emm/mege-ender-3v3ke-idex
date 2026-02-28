@@ -130,33 +130,37 @@ endcap_tensioner_outer_box_bottom_cage_clearance = 0.8
 jig_width = 6
 jig_thickness = 3.6
 
-tool_head_mount_carriage_mount_plate_thickness = 4
-tool_head_mount_carriage_mount_plate_fillet_radius = 1
 
 
-tool_head_mount_base_plate_thickness = 10
 tool_head_mount_base_plate_height = 45
-tool_head_belt_clamp_gap = 3
-
-
-tool_head_mount_side_clearance = 0.5
-carriage_mount_plate_width = 75
-tool_head_mount_side_stiffener_thickness = 2
-
-tool_head_mount_side_plate_depth = 12
-tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
-
-tool_head_mount_side_plate_thickness = 2
-tool_head_mount_belt_clamp_thickness = 3.5
+tool_head_mount_base_plate_thickness = 10
 tool_head_mount_belt_clamp_base_thickness = 5
-tool_head_mount_clamp_base_cutter_clearance = 0.8
-tool_head_mount_clamp_base_cutter_depth_clearance = 0.1
-tool_head_mount_belt_path_cutter_clearance = 0.5
-tool_head_mount_belt_deflector_thickness = 3
-tool_head_mount_belt_deflector_cage_thickness = 3
+tool_head_mount_belt_clamp_gap = 3
+tool_head_mount_belt_clamp_thickness = 3.5
+tool_head_mount_belt_clamp_y_offset = 8
 tool_head_mount_belt_deflector_belt_clearance = 3.5
 tool_head_mount_belt_deflector_belt_z_clearance = 0.3
+tool_head_mount_belt_deflector_cage_thickness = 3
 tool_head_mount_belt_deflector_into_profile_distance = 0.3
+tool_head_mount_belt_deflector_thickness = 3
+tool_head_mount_belt_path_cutter_clearance = 0.5
+tool_head_mount_carriage_mount_plate_fillet_radius = 1
+tool_head_mount_carriage_mount_plate_thickness = 4
+tool_head_mount_carriage_mount_plate_width = 75
+tool_head_mount_clamp_base_cutter_clearance = 0.8
+tool_head_mount_clamp_base_cutter_depth_clearance = 0.1
+tool_head_mount_extruder_cutout_carriage_gap = 3
+tool_head_mount_extruder_cutout_fillet_radius = 4
+tool_head_mount_extruder_cutout_width = 40
+tool_head_mount_nitehawk_board_clearance = 1
+tool_head_mount_side_clearance = 0.5
+tool_head_mount_side_plate_depth = 30
+tool_head_mount_side_plate_thickness = 5
+tool_head_mount_side_stiffener_thickness = 5
+tool_head_mount_sprite_extruder_clearance = 6
+tool_head_mount_tool_head_x_offset = 10
+tool_head_mount_tool_head_z_offset = 8
+tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
 
 
 __all__ = sorted(
