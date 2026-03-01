@@ -131,7 +131,6 @@ jig_width = 6
 jig_thickness = 3.6
 
 
-
 tool_head_mount_base_plate_height = 45
 tool_head_mount_base_plate_thickness = 10
 tool_head_mount_belt_clamp_base_thickness = 5
@@ -163,6 +162,9 @@ tool_head_mount_tool_head_z_offset = 8
 tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
 
 nitehawk_holder_extruder_gap = 2
+part_fan_bed_clearance = 9
+part_fan_ducts_clearance = 3
+
 
 __all__ = sorted(
     name
