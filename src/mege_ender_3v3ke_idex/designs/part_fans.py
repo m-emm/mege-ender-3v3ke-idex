@@ -34,6 +34,16 @@ PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 # PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLAGFHT_04_HS)
 PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLA_04_HS)
 
+PROCESS_DATA["process_overrides"].update(
+    {
+        "enable_support": "1",
+        "support_threshold_angle": "30",
+        "support_type": "tree(auto)",
+        "support_style": "tree_slim",
+        "brim_type": "no_brim",
+    }
+)
+
 
 BIG_THING = 500
 
@@ -50,6 +60,7 @@ part_fan_window_height = 8.1
 part_fan_hole_diameter = 31
 part_fan_diameter = 30
 part_fan_axis_from_left_offset = 17.2
+part_fan_outlet_connector_length = 2
 
 
 part_fan_parameters = {
@@ -66,7 +77,7 @@ part_fan_parameters = {
         "base_rotation": 0,
         "around_angle": 90,
         "x_offset": 20,
-        "y_offset": 2,
+        "y_offset": 5,
         "z_offset": 0,
         "rotation": 17,
         "tilt": 0,
@@ -89,6 +100,30 @@ feeder_ring_wall = 1.5
 feeder_ring_extra_angle = 10
 
 feeder_ring_rotation_angle = -10
+
+duct_extension_width = 15
+
+
+def create_duct_extension():
+
+    duct_extension_body = create_box(
+        duct_extension_width, part_fan_size, feeder_ring_height
+    )
+    duct_extension_cutter = create_box(
+        duct_extension_width - feeder_ring_wall * 2,
+        part_fan_size - 2 * feeder_ring_wall,
+        feeder_ring_height - 2 * feeder_ring_wall,
+    )
+    duct_extension_cutter = align(
+        duct_extension_cutter, duct_extension_body, Alignment.CENTER
+    )
+
+    duct_extension = duct_extension_body.cut(duct_extension_cutter)
+
+    retval = LeaderFollowersCuttersPart(duct_extension)
+    retval.add_named_cutter(duct_extension_body, "duct_extension_body_cutter")
+
+    return retval
 
 
 def crate_ducts():
@@ -174,17 +209,35 @@ def crate_ducts():
 
     feeder_ring = feeder_ring.cut(feeder_ring_cutter)
 
-    feeder_ring = rotate(-(360 / num_blowers - 360 / (num_blowers + 1)) / 2)(
-        feeder_ring
-    )
+    feeder_ring_rotation = rotate((-(360 / num_blowers - 360 / (num_blowers + 1)) / 2))
+
+    feeder_ring = feeder_ring_rotation(feeder_ring)
+    feeder_ring_cutter = feeder_ring_rotation(feeder_ring_cutter)
 
     retval = blower_tubes.fuse(feeder_ring)
 
     retval = retval.cut(blower_tube_cutters)
 
-    retval = rotate(feeder_ring_rotation_angle)(retval)
+    retval = retval.cut(feeder_ring_cutter)
+
+    retval = rotate(feeder_ring_rotation_angle, axis=(0, 0, 1))(retval)
 
     retval_bbox = get_bounding_box(retval)
+
+    duct_extension = create_duct_extension()
+
+    duct_extension = align(duct_extension, retval, Alignment.TOP)
+    duct_extension = align(duct_extension, retval, Alignment.LEFT)
+    duct_extension = align(duct_extension, retval, Alignment.FRONT)
+
+    duct_bbox_size = get_bounding_box_size(retval)
+    duct_extension = translate(
+        -duct_extension_width + feeder_ring_width, duct_bbox_size[1] / 2, 0
+    )(duct_extension)
+
+    duct_extension = duct_extension.cut(feeder_ring_cutter)
+    retval = retval.cut(duct_extension.get_named_cutter("duct_extension_body_cutter"))
+    retval = retval.fuse(duct_extension.leader)
 
     retval = translate(0, 0, -retval_bbox[0][2])(retval)
 
@@ -192,7 +245,11 @@ def crate_ducts():
 
 
 def create_part_fan(
-    window_cutter_outside_length=0, body_cutter_clearance=0
+    window_cutter_outside_length=0,
+    body_cutter_clearance=0,
+    outlet_length=2,
+    outlet_wall=1,
+    outlet_clearance=0.2,
 ) -> LeaderFollowersCuttersPart:
 
     body = create_filleted_box(
@@ -292,6 +349,32 @@ def create_part_fan(
     retval.add_named_cutter(screw_hole_cutters, "screw_hole_cutters")
     retval.add_named_cutter(body_cutter, "body_cutter")
 
+    if outlet_length is not None:
+        outlet = create_box(part_fan_size, outlet_length, part_fan_thickness)
+        outlet = align(outlet, body, Alignment.CENTER)
+        outlet = align(outlet, body, Alignment.STACK_FRONT, stack_gap=outlet_clearance)
+        outlet = outlet.cut(window_cutter)
+        outlet_inner_duct = create_box(
+            part_fan_window_width - 2 * outlet_clearance,
+            part_fan_outlet_connector_length + outlet_clearance + outlet_length,
+            part_fan_window_height - 2 * outlet_clearance,
+        )
+        outlet_inner_duct = align(outlet_inner_duct, window_cutter, Alignment.CENTER)
+        outlet_inner_duct = align(outlet_inner_duct, outlet, Alignment.FRONT)
+
+        outtlet_inner_duct_cutter = create_box(
+            part_fan_window_width - 2 * outlet_clearance - 2 * outlet_wall,
+            BIG_THING,
+            part_fan_window_height - 2 * outlet_clearance - 2 * outlet_wall,
+        )
+        outtlet_inner_duct_cutter = align(
+            outtlet_inner_duct_cutter, outlet_inner_duct, Alignment.CENTER
+        )
+        outlet_inner_duct = outlet_inner_duct.cut(outtlet_inner_duct_cutter)
+
+        outlet = outlet.fuse(outlet_inner_duct)
+        retval.add_named_follower(outlet, "outlet")
+
     return retval
 
 
@@ -352,6 +435,10 @@ def crate_part_fan_assembly():
         if "window_cutter" in name or "body_cutter" in name:
             ducts = ducts.cut(cutter)
 
+    for name, follower in fans.get_named_follower_items():
+        if "outlet" in name:
+            ducts = ducts.fuse(follower)
+
     fans.add_named_follower(ducts, "blower_ducts")
 
     return fans
@@ -384,7 +471,16 @@ def main():
     parts.add(fans, "angled_fans", flip=False, skip_in_production=True)
 
     for name, npp in fans.get_named_follower_items():
-        parts.add(npp, name, flip=True, skip_in_production=False)
+
+        if "blower_ducts" in name:
+            parts.add(
+                npp,
+                name,
+                flip=True,
+                skip_in_production=False,
+                prod_rotation_angle=50,
+                prod_rotation_axis=(1, 0, 0),
+            )
 
     # Arrange and export
     arrange_and_export(
