@@ -22,6 +22,7 @@ from mege_3devops.process_data.mender3.process_data_utils import (
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
 from shellforgepy.simple import *
+from mege_ender_3v3ke_idex.designs.idex_parameters import *
 
 _logger = logging.getLogger(__name__)
 
@@ -92,7 +93,7 @@ nitehawk_umbilical_cable_length = 30
 
 nitehawk_board_angle = 79
 nitehawk_holder_thickness = 1.5
-nitehawk_holder_width_extesion = 20
+nitehawk_holder_width_extesion = 0
 nitehawk_holder_height_extension = 12
 nitehawk_holder_width = NemaSizes.NEMA17.size_mm + nitehawk_holder_width_extesion
 nitehawk_holder_height = NemaSizes.NEMA17.size_mm + nitehawk_holder_height_extension
@@ -437,7 +438,9 @@ def align_holder_to_extruder(holder, extruder):
 
     holder = board_aligner(holder)
 
-    holder = align(holder, extruder, Alignment.STACK_BOTTOM)
+    holder = align(
+        holder, extruder, Alignment.STACK_BOTTOM, stack_gap=nitehawk_holder_extruder_gap
+    )
 
     holder = align(holder, extruder, Alignment.FRONT)
 

@@ -162,6 +162,7 @@ tool_head_mount_tool_head_x_offset = 10
 tool_head_mount_tool_head_z_offset = 8
 tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
 
+nitehawk_holder_extruder_gap = 2
 
 __all__ = sorted(
     name

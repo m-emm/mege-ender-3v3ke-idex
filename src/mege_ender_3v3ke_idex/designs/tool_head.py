@@ -46,9 +46,10 @@ part_fan_diameter = 30
 part_fan_axis_from_left_offset = 17.2
 
 
-part_fan_angle = 55
-part_fans_separator_angle = 10
-part_fan_x_offset = 50
+part_fan_angle = 20
+part_fans_around_angle = 60
+part_fan_x_offset = 70
+part_fan_tilt_angle = 50
 
 part_fan_bed_clearance = 9
 
@@ -134,6 +135,63 @@ def create_part_fan():
     return body
 
 
+fan_parameters = {
+    Alignment.LEFT: {
+        "base_rotation": 0,
+        "around_angle": 0,
+        "x_offset": 25,
+        "y_offset": 20,
+        "z_offset": 10,
+        "rotation": 90,
+        "tilt": 0,
+    },
+    Alignment.RIGHT: {
+        "base_rotation": 0,
+        "around_angle": 90,
+        "x_offset": 20,
+        "y_offset": 0,
+        "z_offset": 0,
+        "rotation": 27,
+        "tilt": 0,
+    },
+}
+
+
+def crate_angled_fans():
+    fans = PartCollector()
+    center_pillar = create_cylinder(0.01, 50)
+
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        fan = create_part_fan()
+        fan = rotate(180, axis=(1, 0, 0))(fan)
+        fan = rotate(lr.sign * 90, axis=(0, 0, 1))(fan)
+
+        fan = rotate(fan_parameters[lr]["base_rotation"])(fan)
+
+        fan = align(fan, None, Alignment.CENTER)
+
+        fan = rotate(
+            -lr.sign * fan_parameters[lr]["rotation"],
+            axis=(0, 1, 0),
+            center=(-lr.sign * part_fan_size / 2, 0, -part_fan_thickness / 2),
+        )(fan)
+
+        fan = rotate(-fan_parameters[lr]["tilt"], axis=(1, 0, 0))(fan)
+
+        fan = align(fan, center_pillar, lr.stack_alignment)
+
+        fan = translate(lr.sign * fan_parameters[lr]["x_offset"], 0, 0)(fan)
+
+        fan = rotate(lr.sign * fan_parameters[lr]["around_angle"], axis=(0, 0, 1))(fan)
+        fan = translate(
+            0, fan_parameters[lr]["y_offset"], fan_parameters[lr]["z_offset"]
+        )(fan)
+
+        fans = fans.fuse(fan)
+
+    return fans
+
+
 def create_tool_head() -> LeaderFollowersCuttersPart:
 
     sprite_extruder = create_sprite_extruder()
@@ -153,28 +211,18 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
 
     hotend = sprite_extruder.get_named_non_production_part("hotend")
 
-    fans = PartCollector()
-    for i in [-1, 1]:
-        fan = create_part_fan()
-        fan = align(fan, None, Alignment.CENTER)
-        if i == 1:
-            fan = rotate(180)(fan)
+    fans = crate_angled_fans()
 
-        fan = rotate(90, axis=(1, 0, 0))(fan)
+    fans = rotate(-90, axis=(1, 0, 0))(fans)
+    hotend_center = get_bounding_box_center(hotend)
 
-        fan = rotate(i * part_fan_angle, axis=(1, 0, 0))(fan)
-        fan = translate(part_fan_x_offset, 0, 0)(fan)
-        fan = rotate(i * part_fans_separator_angle, axis=(0, 1, 0))(fan)
-        fans = fans.fuse(fan)
+    hotend_bbox = get_bounding_box(hotend)
 
-    fans = rotate(-90, axis=(0, 1, 0))(fans)
-    fans = align(fans, hotend, Alignment.CENTER)
-    fans = align(fans, hotend, Alignment.FRONT)
-    fans = align(fans, hotend, Alignment.TOP)
+    fans = translate(hotend_center[0], hotend_bbox[0][1], hotend_center[2])(fans)
 
     fans = translate(0, part_fan_bed_clearance, 0)(fans)
 
-    retval.add_named_non_production_part(fans, f"part_fan_{i}")
+    retval.add_named_non_production_part(fans, f"part_fans")
 
     retval = rotate(90, axis=(1, 0, 0))(retval)
     retval = rotate(180)(retval)
@@ -186,8 +234,6 @@ def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
-    # Create the part
-
     toolhead = create_tool_head()
 
     parts.add(toolhead, "toolhead", flip=False, skip_in_production=True)
@@ -197,9 +243,11 @@ def main():
             continue
         parts.add(npp, name, flip=False, skip_in_production=True)
 
-    fan = create_part_fan()
-    fan = translate(100, 0, 0)(fan)
-    parts.add(fan, "part_fan", flip=False, skip_in_production=True)
+    # angled_fans = crate_angled_fans()
+    # parts.add(angled_fans, "angled_fans", flip=False, skip_in_production=True)
+
+    # center_pillar = create_cylinder(1, 50)
+    # parts.add(center_pillar, "center_pillar", flip=False, skip_in_production=True)
 
     # Arrange and export
     arrange_and_export(
