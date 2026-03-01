@@ -16,6 +16,7 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
     PROCESS_DATA_PETG_04_HS,
     PROCESS_DATA_PLACF_04_HS,
     PROCESS_DATA_PLAGFHT_04_HS,
+    PROCESS_DATA_PLA_04_HS,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.nitehawk_holder import (
@@ -30,7 +31,10 @@ _logger = logging.getLogger(__name__)
 # Production mode from environment variable
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
-PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLAGFHT_04_HS)
+# PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLAGFHT_04_HS)
+PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLA_04_HS)
+
+
 BIG_THING = 500
 
 part_fan_size = 40.2
@@ -48,7 +52,6 @@ part_fan_diameter = 30
 part_fan_axis_from_left_offset = 17.2
 
 
-
 part_fan_parameters = {
     Alignment.LEFT: {
         "base_rotation": 0,
@@ -63,9 +66,9 @@ part_fan_parameters = {
         "base_rotation": 0,
         "around_angle": 90,
         "x_offset": 20,
-        "y_offset": 4,
+        "y_offset": 2,
         "z_offset": 0,
-        "rotation": 20,
+        "rotation": 17,
         "tilt": 0,
     },
 }
@@ -78,8 +81,8 @@ blowers_duct_diameter = 6
 blowers_wall = 1.5
 blowers_nozzle_center_distance = 10
 
-feeder_ring_height = 10
-feeder_ring_width = 10
+feeder_ring_height = 11
+feeder_ring_width = 11
 
 feeder_ring_inner_diameter = 37
 feeder_ring_wall = 1.5
@@ -188,7 +191,9 @@ def crate_ducts():
     return retval
 
 
-def create_part_fan():
+def create_part_fan(
+    window_cutter_outside_length=0, body_cutter_clearance=0
+) -> LeaderFollowersCuttersPart:
 
     body = create_filleted_box(
         part_fan_size,
@@ -198,8 +203,19 @@ def create_part_fan():
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
 
+    if body_cutter_clearance > 0:
+        body_cutter = create_box(
+            part_fan_size + body_cutter_clearance * 2,
+            part_fan_size + body_cutter_clearance * 2,
+            part_fan_thickness + body_cutter_clearance * 2,
+        )
+        body_cutter = align(body_cutter, body, Alignment.CENTER)
+    else:
+        body_cutter = body.copy()
+
     screw_hole_diameter = MScrew.from_size(part_fan_screw_size).clearance_hole_normal
 
+    screw_hole_cutters = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         for fb in [Alignment.FRONT, Alignment.BACK]:
             hole = create_cylinder(screw_hole_diameter / 2, part_fan_thickness + 2)
@@ -212,6 +228,7 @@ def create_part_fan():
                 0,
             )(hole)
             body = body.cut(hole)
+            screw_hole_cutters = screw_hole_cutters.fuse(hole)
 
             mount_cutout = create_cylinder(
                 part_fan_screw_mount_cutout_size / 2, BIG_THING
@@ -258,7 +275,11 @@ def create_part_fan():
     )(fan_hole)
     body = body.cut(fan_hole)
 
-    window_cutter = create_box(part_fan_window_width, BIG_THING, part_fan_window_height)
+    window_cutter = create_box(
+        part_fan_window_width,
+        part_fan_size / 2 + window_cutter_outside_length,
+        part_fan_window_height,
+    )
     window_cutter = align(window_cutter, body, Alignment.CENTER)
     window_cutter = align(
         window_cutter, body, Alignment.STACK_FRONT, stack_gap=-part_fan_size / 2
@@ -266,16 +287,20 @@ def create_part_fan():
 
     body = body.cut(window_cutter)
 
-    return body
+    retval = LeaderFollowersCuttersPart(body)
+    retval.add_named_cutter(window_cutter, "window_cutter")
+    retval.add_named_cutter(screw_hole_cutters, "screw_hole_cutters")
+    retval.add_named_cutter(body_cutter, "body_cutter")
+
+    return retval
 
 
-
-def crate_angled_fans():
+def crate_angled_fans(window_cutter_outside_length, body_cutter_clearance):
     fans = PartCollector()
     center_pillar = create_cylinder(0.01, 50)
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        fan = create_part_fan()
+        fan = create_part_fan(window_cutter_outside_length, body_cutter_clearance)
         fan = rotate(180, axis=(1, 0, 0))(fan)
         fan = rotate(lr.sign * 90, axis=(0, 0, 1))(fan)
 
@@ -295,10 +320,14 @@ def crate_angled_fans():
 
         fan = translate(lr.sign * part_fan_parameters[lr]["x_offset"], 0, 0)(fan)
 
-        fan = rotate(lr.sign * part_fan_parameters[lr]["around_angle"], axis=(0, 0, 1))(fan)
+        fan = rotate(lr.sign * part_fan_parameters[lr]["around_angle"], axis=(0, 0, 1))(
+            fan
+        )
         fan = translate(
             0, part_fan_parameters[lr]["y_offset"], part_fan_parameters[lr]["z_offset"]
         )(fan)
+
+        fan = fan.prefixed_copy(f"part_fan_{lr.name.lower()}")
 
         fans = fans.fuse(fan)
 
@@ -310,16 +339,22 @@ def crate_angled_fans():
 
 def crate_part_fan_assembly():
 
-    fans = crate_angled_fans()
+    fans = crate_angled_fans(
+        window_cutter_outside_length=part_fan_window_cutter_outside_length,
+        body_cutter_clearance=part_fan_body_cutter_clearance,
+    )
 
     ducts = crate_ducts()
 
     ducts = translate(0, 0, part_fan_ducts_clearance)(ducts)
 
-    retval = LeaderFollowersCuttersPart(fans)
-    retval.add_named_follower(ducts, "blower_ducts")
+    for name, cutter in fans.get_named_cutter_items():
+        if "window_cutter" in name or "body_cutter" in name:
+            ducts = ducts.cut(cutter)
 
-    return retval
+    fans.add_named_follower(ducts, "blower_ducts")
+
+    return fans
 
 
 def main():
@@ -349,7 +384,7 @@ def main():
     parts.add(fans, "angled_fans", flip=False, skip_in_production=True)
 
     for name, npp in fans.get_named_follower_items():
-        parts.add(npp, name, flip=False, skip_in_production=False)
+        parts.add(npp, name, flip=True, skip_in_production=False)
 
     # Arrange and export
     arrange_and_export(

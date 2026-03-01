@@ -162,8 +162,10 @@ tool_head_mount_tool_head_z_offset = 8
 tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
 
 nitehawk_holder_extruder_gap = 2
-part_fan_bed_clearance = 9
-part_fan_ducts_clearance = 3
+part_fan_bed_clearance = 10
+part_fan_body_cutter_clearance = 0.1
+part_fan_window_cutter_outside_length = 3
+part_fan_ducts_clearance = 2
 
 
 __all__ = sorted(
