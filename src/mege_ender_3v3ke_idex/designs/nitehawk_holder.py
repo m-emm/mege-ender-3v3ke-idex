@@ -64,7 +64,6 @@ PROCESS_DATA["process_overrides"].update(
 BIG_THING = 500
 
 
-
 def create_nitehawk_board():
 
     pcb = create_box(nitehawk_width, nitehawk_height, nitehawk_pcb_thickness)
@@ -305,7 +304,9 @@ def create_nitehawk_holder():
     )
     screw_hole_cutter_1 = align(screw_hole_cutter_1, mount_tower_1, Alignment.CENTER)
 
-    nut_cuttter = create_nut(nitehawk_holder_mount_screw_size, slack=nitehawk_nut_cutter_slack)
+    nut_cuttter = create_nut(
+        nitehawk_holder_mount_screw_size, slack=nitehawk_nut_cutter_slack
+    )
     nut_cuttter = align(nut_cuttter, screw_hole_cutter_1, Alignment.CENTER)
     nut_cuttter = align(nut_cuttter, mount_tower_1, Alignment.BOTTOM)
     screw_hole_cutter_1 = screw_hole_cutter_1.fuse(nut_cuttter)
@@ -390,7 +391,9 @@ def align_holder_to_extruder(holder, extruder):
     )
 
     holder = align(holder, extruder, Alignment.FRONT)
-    holder = translate(0, nitehawk_holder_height_offset, 0)(holder)
+    holder = translate(nitehawk_holder_width_offset, nitehawk_holder_height_offset, 0)(
+        holder
+    )
 
     return holder
 

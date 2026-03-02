@@ -163,16 +163,18 @@ tool_head_mount_tool_head_z_offset = 8
 tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
 
 nitehawk_holder_extruder_gap = 2
-nitehawk_holder_height_offset = -2
+nitehawk_holder_height_offset = -1
+nitehawk_holder_width_offset = 3
 part_fan_bed_clearance = 10
 part_fan_body_cutter_clearance = 0.1
-part_fan_mount_plate_blow_direction_oversize = 5
-part_fan_mount_plate_cross_oversize = 0
+part_fan_mount_plate_blow_direction_oversize = 10
+part_fan_mount_plate_cross_oversize = 2
 part_fan_window_cutter_outside_length = 3
-part_fan_mount_plate_blow_direction_offset = 0
+part_fan_mount_plate_blow_direction_offset = -5
 part_fan_ducts_clearance = 2
-part_fan_mount_plate_thickness = 4
+part_fan_mount_plate_thickness = 3.8
 
+part_fan_nut_cutter_clearance = 0.15
 part_fan_size = 40.2
 part_fan_fillet_radius = 2
 part_fan_thickness = 10.5
@@ -226,7 +228,7 @@ nitehawk_umbilical_cable_length = 30
 
 nitehawk_board_angle = 79
 nitehawk_holder_thickness = 1.5
-nitehawk_holder_width_extesion = 0
+nitehawk_holder_width_extesion = 5
 nitehawk_holder_height_extension = 20
 nitehawk_holder_width = NemaSizes.NEMA17.size_mm + nitehawk_holder_width_extesion
 nitehawk_holder_height = NemaSizes.NEMA17.size_mm + nitehawk_holder_height_extension
@@ -249,6 +251,48 @@ nitehawk_holder_cable_attachment_num_holes = 3
 
 nitehawk_nut_cutter_slack = 0.22
 nitehawk_mount_tower_base_extension = 2.0
+
+
+part_fan_parameters = {
+    Alignment.LEFT: {
+        "base_rotation": 0,
+        "around_angle": 0,
+        "x_offset": 25,
+        "y_offset": 35,
+        "z_offset": 10,
+        "rotation": 90,
+        "tilt": 0,
+    },
+    Alignment.RIGHT: {
+        "base_rotation": 0,
+        "around_angle": 90,
+        "x_offset": 20,
+        "y_offset": 5,
+        "z_offset": 0,
+        "rotation": 17,
+        "tilt": 0,
+    },
+}
+
+
+num_blowers = 3
+blower_center_offset = 4
+blowers_down_angle = 35
+blowers_duct_diameter = 6
+blowers_wall = 1.5
+blowers_nozzle_center_distance = 10
+feeder_ring_height = 11
+feeder_ring_width = 11
+part_fan_duct_extension_length = 55
+
+feeder_ring_inner_diameter = 37
+feeder_ring_wall = 1.5
+feeder_ring_extra_angle = 10
+
+feeder_ring_rotation_angle = -10
+
+duct_extension_width = 15
+
 
 __all__ = sorted(
     name

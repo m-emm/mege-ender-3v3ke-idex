@@ -46,56 +46,14 @@ PROCESS_DATA["process_overrides"].update(
 BIG_THING = 500
 
 
-
-part_fan_parameters = {
-    Alignment.LEFT: {
-        "base_rotation": 0,
-        "around_angle": 0,
-        "x_offset": 25,
-        "y_offset": 20,
-        "z_offset": 10,
-        "rotation": 90,
-        "tilt": 0,
-    },
-    Alignment.RIGHT: {
-        "base_rotation": 0,
-        "around_angle": 90,
-        "x_offset": 20,
-        "y_offset": 5,
-        "z_offset": 0,
-        "rotation": 17,
-        "tilt": 0,
-    },
-}
-
-
-num_blowers = 3
-blower_center_offset = 4
-blowers_down_angle = 35
-blowers_duct_diameter = 6
-blowers_wall = 1.5
-blowers_nozzle_center_distance = 10
-
-feeder_ring_height = 11
-feeder_ring_width = 11
-
-feeder_ring_inner_diameter = 37
-feeder_ring_wall = 1.5
-feeder_ring_extra_angle = 10
-
-feeder_ring_rotation_angle = -10
-
-duct_extension_width = 15
-
-
 def create_duct_extension():
 
     duct_extension_body = create_box(
-        duct_extension_width, part_fan_size, feeder_ring_height
+        duct_extension_width, part_fan_duct_extension_length, feeder_ring_height
     )
     duct_extension_cutter = create_box(
         duct_extension_width - feeder_ring_wall * 2,
-        part_fan_size - 2 * feeder_ring_wall,
+        part_fan_duct_extension_length - 2 * feeder_ring_wall,
         feeder_ring_height - 2 * feeder_ring_wall,
     )
     duct_extension_cutter = align(
@@ -230,7 +188,7 @@ def crate_ducts():
 
 def create_part_fan(
     window_cutter_outside_length=0,
-    body_cutter_clearance=0,
+    body_cutter_clearance=None,
     outlet_length=2,
     outlet_wall=1,
     outlet_clearance=0.2,
@@ -290,6 +248,16 @@ def create_part_fan(
             )(hole)
             body = body.cut(hole)
             mount_plate = mount_plate.cut(hole)
+
+            nut_cutter = create_nut(
+                part_fan_screw_size, slack=part_fan_nut_cutter_clearance
+            )
+
+            nut_cutter = align(nut_cutter, hole, Alignment.CENTER)
+            nut_cutter = align(nut_cutter, mount_plate, Alignment.BOTTOM)
+
+            mount_plate = mount_plate.cut(nut_cutter)
+
             screw_hole_cutters = screw_hole_cutters.fuse(hole)
             screw_hole_cutters_map[(lr, fb)] = hole
 
@@ -408,7 +376,7 @@ def crate_angled_fans(
             mount_plate_blow_direction_oversize=mount_plate_blow_direction_oversize,
             mount_plate_cross_oversize=mount_plate_cross_oversize,
             mount_plate_blow_direction_offset=mount_plate_blow_direction_offset,
-            mount_plate_thickness=part_fan_mount_plate_thickness
+            mount_plate_thickness=part_fan_mount_plate_thickness,
         )
         fan = rotate(180, axis=(1, 0, 0))(fan)
         fan = rotate(lr.sign * 90, axis=(0, 0, 1))(fan)
@@ -459,6 +427,14 @@ def crate_part_fan_assembly():
     ducts = crate_ducts()
 
     ducts = translate(0, 0, part_fan_ducts_clearance)(ducts)
+
+    for name, cutter in fans.get_named_cutter_items():
+        if "window_cutter" in name or "body_cutter" in name:
+            ducts = ducts.cut(cutter)
+
+    for name, follower in fans.get_named_follower_items():
+        if "outlet" in name or "mount_plate" in name:
+            ducts = ducts.fuse(follower)
 
     for name, cutter in fans.get_named_cutter_items():
         if "window_cutter" in name or "body_cutter" in name:
