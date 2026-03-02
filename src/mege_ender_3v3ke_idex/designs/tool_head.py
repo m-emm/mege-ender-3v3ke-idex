@@ -71,6 +71,27 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
         holder.leader
     )
 
+    side_mount_plate = create_filleted_box(
+        tool_head_additional_mount_plate_thickness,
+        tool_head_additional_mount_plate_depth,
+        tool_head_additional_mount_plate_height,
+        tool_head_additional_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.LEFT, Alignment.RIGHT, Alignment.BOTTOM],
+    )
+    side_mount_plate = align(side_mount_plate, holder, Alignment.CENTER)
+    side_mount_plate = align(side_mount_plate, holder, Alignment.STACK_TOP)
+
+    side_mount_plate = align(
+        side_mount_plate,
+        sprite_extruder,
+        Alignment.STACK_RIGHT,
+        stack_gap=tool_head_additional_mount_plate_clearance,
+    )
+
+    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.FRONT)
+
+    parts_to_print = parts_to_print.fuse(side_mount_plate)
+
     for name, cutter in sprite_extruder.get_named_cutter_items():
         parts_to_print = parts_to_print.cut(cutter)
 

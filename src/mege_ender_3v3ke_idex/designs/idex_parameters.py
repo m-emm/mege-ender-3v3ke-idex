@@ -162,6 +162,16 @@ tool_head_mount_tool_head_x_offset = 10
 tool_head_mount_tool_head_z_offset = 8
 tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
 
+
+tool_head_additional_mount_plate_thickness = 3
+
+tool_head_additional_mount_plate_height = 10
+tool_head_additional_mount_plate_depth = 12
+
+tool_head_additional_mount_plate_fillet_radius = 2
+tool_head_additional_mount_plate_clearance = 0.5
+
+
 nitehawk_holder_extruder_gap = 2
 nitehawk_holder_height_offset = -1
 nitehawk_holder_width_offset = 3
