@@ -38,8 +38,6 @@ PROCESS_DATA["process_overrides"].update(
     {
         "enable_support": "1",
         "support_threshold_angle": "30",
-        "support_type": "tree(auto)",
-        "support_style": "tree_slim",
         "brim_type": "no_brim",
     }
 )
