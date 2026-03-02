@@ -21,6 +21,9 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
+
+from mege_ender_3v3ke_idex.designs.printer_frame import create_printer_frame
+
 from mege_ender_3v3ke_idex.designs.endstop_holder import create_endstop_holder
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
@@ -1240,7 +1243,6 @@ def main():
         "pulley_right",
         "endstop_board_left",
         "endstop_board_right",
-        "toolhead_1",
     ]:
         parts.add(
             x_axis.get_non_production_part_by_name(name),
@@ -1389,7 +1391,7 @@ def main():
                 color=(0.3, 0.3, 1.0),
             )
 
-    tool_head_mount, carriage = create_tool_head_mount(lower_axis_profile)
+    tool_head_mount, _carriage, _tool_head = create_tool_head_mount(lower_axis_profile)
 
     carriage_1 = x_axis.get_non_production_part_by_name("carriage_1")
 
@@ -1431,6 +1433,25 @@ def main():
         prod_rotation_axis=(1, 0, 0),
         color=(0.7, 0.6, 0.5),
     )
+
+    frame = create_printer_frame()
+    frame = align(frame, x_axis, Alignment.CENTER)
+    frame = align(frame, z_axis, Alignment.STACK_BOTTOM)
+
+    parts.add(
+        frame,
+        "printer_frame",
+        flip=False,
+        skip_in_production=True,
+    )
+
+    for name, npp in frame.get_named_non_production_part_items():
+        parts.add(
+            npp,
+            f"printer_frame_{name}",
+            flip=False,
+            skip_in_production=True,
+        )
 
     # Arrange and export
     arrange_and_export(

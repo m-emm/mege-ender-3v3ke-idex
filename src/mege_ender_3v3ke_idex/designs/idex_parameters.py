@@ -1,5 +1,6 @@
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import ExtrusionProfileType
 from shellforgepy.simple import *
+from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 
 BIG_THING = 500
 
@@ -162,11 +163,92 @@ tool_head_mount_tool_head_z_offset = 8
 tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
 
 nitehawk_holder_extruder_gap = 2
+nitehawk_holder_height_offset = -2
 part_fan_bed_clearance = 10
 part_fan_body_cutter_clearance = 0.1
+part_fan_mount_plate_blow_direction_oversize = 5
+part_fan_mount_plate_cross_oversize = 0
 part_fan_window_cutter_outside_length = 3
+part_fan_mount_plate_blow_direction_offset = 0
 part_fan_ducts_clearance = 2
+part_fan_mount_plate_thickness = 4
 
+part_fan_size = 40.2
+part_fan_fillet_radius = 2
+part_fan_thickness = 10.5
+part_fan_screw_size = "M2.5"
+part_fan_screw_hole_inset = 2.5
+part_fan_screw_mount_cutout_size = 5.3
+part_fan_screw_mount_cutout_fillet_radius = 2
+part_fan_screw_mount_base_thickness = 3.5
+part_fan_window_width = 28
+part_fan_window_height = 8.1
+part_fan_hole_diameter = 31
+part_fan_diameter = 30
+part_fan_axis_from_left_offset = 17.2
+part_fan_outlet_connector_length = 2
+
+print_bed_width = 310
+print_bed_depth = 310
+print_bed_thickness = 4
+
+frame_width = 350
+frame_depth = 420
+frame_alu_profile_size = 40
+
+
+nitehawk_width = 51.3
+nitehawk_height = 40.8
+nitehawk_pcb_thickness = 1.6
+nitehawk_top_width = 23
+nitehawk_holes_y_offset = 16
+nitehawk_holes_center_distance = 43
+nitehawk_back_triangle_y_offset = 27.8
+nitehawk_hole_diameter = 3.1
+nitehawk_plug_width = 14
+nitehawk_plug_thickness = 5.25
+nitehawk_plug_length = 8.8
+nitehawk_plug_overhang = 4
+nitehawk_heater_connector_width = 7.7
+nitehawk_heater_connector_length = 7.7
+nitehawk_heater_connector_thickness = 8.8
+nitehawk_heater_connector_x_offset_from_right = 10.3
+nitehawk_heater_connector_y_offset_from_front = 5.1
+nitehawk_front_cutter_width = 18.8
+nitehawk_front_cutter_y_size = 7.0
+nitehawk_front_cutter_back_width = 10.8
+nitehawk_umbilical_connector_height = 13.2
+nitehawk_umbilical_connector_gap = 0.15
+nitehawk_umbilical_connector_cable_connector_height = 14.4
+nitehawk_umbilical_connector_cable_connector_end_diameter = 9.4
+nitehawk_umbilical_cable_diameter = 5.1
+nitehawk_umbilical_cable_length = 30
+
+nitehawk_board_angle = 79
+nitehawk_holder_thickness = 1.5
+nitehawk_holder_width_extesion = 0
+nitehawk_holder_height_extension = 20
+nitehawk_holder_width = NemaSizes.NEMA17.size_mm + nitehawk_holder_width_extesion
+nitehawk_holder_height = NemaSizes.NEMA17.size_mm + nitehawk_holder_height_extension
+nitehawk_holder_fillet_radius = 3
+nitehawk_holder_mount_tower_diameter = 6.5
+nitehawk_holder_mount_tower_height = 5
+nitehawk_holder_mount_tower_x_offset = 0
+nitehawk_holder_mount_tower_y_offset = 0
+nitehawk_holder_mount_screw_size = "M3"
+nitehawk_holder_mount_cut_radius = nitehawk_holder_height * 0.5
+nitehawk_holder_cable_attachment_width = nitehawk_plug_width + 4
+nitehawk_holder_cable_attachment_length = 45
+nitehawk_holder_cable_attachment_y_offset = 20
+nitehawk_holder_cable_attachment_fillet_radius = 3
+
+nitehawk_holder_cable_attachment_thickness = 4
+nitehawk_holder_cable_attachment_holes_diameter = 4
+nitehawk_holder_cable_attachment_num_holes = 3
+
+
+nitehawk_nut_cutter_slack = 0.22
+nitehawk_mount_tower_base_extension = 2.0
 
 __all__ = sorted(
     name

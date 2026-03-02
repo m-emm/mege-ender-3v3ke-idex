@@ -13,7 +13,6 @@ from mege_ender_3v3ke_idex.designs.nitehawk_holder import (
 )
 from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
 from mege_ender_3v3ke_idex.designs.part_fans import (
-    crate_angled_fans,
     crate_part_fan_assembly,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
