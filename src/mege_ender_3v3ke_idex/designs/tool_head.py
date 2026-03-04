@@ -34,7 +34,7 @@ PROCESS_DATA["process_overrides"].update(
         "wall_loops": "3",
         "sparse_infill_density": "85%",  # PLAGFHT is very brittle and needs more strength
         # Inter-layer adhesion / brittleness tuning
-        "nozzle_temperature": "230",
+        "nozzle_temperature": "235",
         "fan_min_speed": "45",
         "fan_max_speed": "65",
         "overhang_fan_speed": "80",
