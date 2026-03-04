@@ -8,6 +8,7 @@ Usage:
 """
 
 import logging
+import math
 import os
 
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
@@ -60,6 +61,7 @@ lever_length = 23
 lever_angle = 45
 lever_center_offset = 4.4
 lever_front_inset = 1
+hotend_x_offset = 2.5
 
 
 def create_sprite_extruder():
@@ -195,6 +197,20 @@ def create_sprite_extruder():
         retval.add_named_cutter(cutter, cutter_name)
 
     hotend = create_cylinder(hotend_diameter / 2, hotend_length)
+
+    points = []
+    polygon_size = nozzle_diameter
+    for i in range(6):
+        angle = i * math.pi / 3
+        x = polygon_size * 0.5 * math.cos(angle)
+        y = polygon_size * 0.5 * math.sin(angle)
+        points.append((x, y))
+
+    nozzle_screw = create_extruded_polygon(points, nozzle_length)
+    nozzle_screw = align(nozzle_screw, hotend, Alignment.CENTER)
+    nozzle_screw = align(nozzle_screw, hotend, Alignment.STACK_TOP)
+    hotend = hotend.fuse(nozzle_screw)
+
     nozzle = create_cone(nozzle_diameter / 2, nozzle_tip_diameter / 2, nozzle_length)
     nozzle = align(nozzle, hotend, Alignment.CENTER)
     nozzle = align(nozzle, hotend, Alignment.STACK_TOP)
@@ -204,7 +220,8 @@ def create_sprite_extruder():
     hotend = align(hotend, cooler, Alignment.CENTER)
     hotend = align(hotend, cooler, Alignment.STACK_FRONT)
     hotend = align(hotend, cooler, Alignment.TOP)
-    hotend = translate(0, 0, -hotend_inset)(hotend)
+
+    hotend = translate(hotend_x_offset, 0, -hotend_inset)(hotend)
 
     retval.add_named_non_production_part(hotend, "hotend")
 

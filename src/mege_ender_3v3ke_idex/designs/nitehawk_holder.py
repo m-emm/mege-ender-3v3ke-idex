@@ -326,6 +326,18 @@ def create_nitehawk_holder():
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
 
+    holder_front_cutter = create_pyramid_stump(
+        nitehawk_holder_width - 4 * nitehawk_holder_slit_height,
+        nitehawk_holder_width - 8 * nitehawk_holder_slit_height,
+        nitehawk_holder_thickness + 2,
+        nitehawk_holder_thickness + 2,
+        nitehawk_holder_slit_height,
+    )
+    holder_front_cutter = rotate(-90, axis=(1, 0, 0))(holder_front_cutter)
+    holder_front_cutter = align(holder_front_cutter, holder, Alignment.CENTER)
+    holder_front_cutter = align(holder_front_cutter, holder, Alignment.FRONT)
+    holder = holder.cut(holder_front_cutter)
+
     mount_towers = align(mount_towers, holder, Alignment.CENTER)
     mount_towers = align(mount_towers, holder, Alignment.BOTTOM)
 
@@ -383,6 +395,7 @@ def align_holder_to_extruder(holder, extruder):
     nitehawk_board = holder.get_named_non_production_part("nitehawk_pcb")
 
     board_aligner = align_translation(nitehawk_board, extruder, Alignment.CENTER)
+    board_aligner = align_translation(nitehawk_board, extruder, Alignment.LEFT)
 
     holder = board_aligner(holder)
 

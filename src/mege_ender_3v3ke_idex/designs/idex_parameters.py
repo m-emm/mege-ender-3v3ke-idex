@@ -132,7 +132,7 @@ jig_width = 6
 jig_thickness = 3.6
 
 
-tool_head_mount_base_plate_height = 45
+tool_head_mount_base_plate_height = 37
 tool_head_mount_base_plate_thickness = 10
 tool_head_mount_belt_clamp_base_thickness = 5
 tool_head_mount_belt_clamp_gap = 3
@@ -154,33 +154,30 @@ tool_head_mount_extruder_cutout_fillet_radius = 4
 tool_head_mount_extruder_cutout_width = 40
 tool_head_mount_nitehawk_board_clearance = 1
 tool_head_mount_side_clearance = 0.5
-tool_head_mount_side_plate_depth = 30
+tool_head_mount_side_plate_depth = 20
 tool_head_mount_side_plate_thickness = 5
 tool_head_mount_side_stiffener_thickness = 5
 tool_head_mount_sprite_extruder_clearance = 6
-tool_head_mount_tool_head_x_offset = 10
-tool_head_mount_tool_head_z_offset = 8
+tool_head_mount_tool_head_x_offset = 0
+tool_head_mount_tool_head_z_offset = 38
 tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
-
+tool_head_mount_belt_clamp_length = 12
 
 tool_head_additional_mount_plate_thickness = 3
 
 tool_head_additional_mount_plate_height = 10
-tool_head_additional_mount_plate_depth = 12
+tool_head_additional_mount_plate_depth = 20
 
 tool_head_additional_mount_plate_fillet_radius = 2
 tool_head_additional_mount_plate_clearance = 0.5
+tool_head_additional_mount_plate_depth_offset = -7.5
 
 
 nitehawk_holder_extruder_gap = 2
-nitehawk_holder_height_offset = -1
-nitehawk_holder_width_offset = 3
 part_fan_bed_clearance = 10
 part_fan_body_cutter_clearance = 0.1
-part_fan_mount_plate_blow_direction_oversize = 10
-part_fan_mount_plate_cross_oversize = 2
 part_fan_window_cutter_outside_length = 3
-part_fan_mount_plate_blow_direction_offset = -5
+
 part_fan_ducts_clearance = 2
 part_fan_mount_plate_thickness = 3.8
 
@@ -236,11 +233,14 @@ nitehawk_umbilical_connector_cable_connector_end_diameter = 9.4
 nitehawk_umbilical_cable_diameter = 5.1
 nitehawk_umbilical_cable_length = 30
 
-nitehawk_board_angle = 79
-nitehawk_holder_thickness = 1.5
-nitehawk_holder_width_extesion = 5
-nitehawk_holder_height_extension = 20
-nitehawk_holder_width = NemaSizes.NEMA17.size_mm + nitehawk_holder_width_extesion
+nitehawk_board_angle = 0
+nitehawk_holder_thickness = 3
+nitehawk_holder_width_extension = 14
+nitehawk_holder_height_extension = -5
+nitehawk_holder_height_offset = 0
+nitehawk_holder_width_offset = 2
+
+nitehawk_holder_width = NemaSizes.NEMA17.size_mm + nitehawk_holder_width_extension
 nitehawk_holder_height = NemaSizes.NEMA17.size_mm + nitehawk_holder_height_extension
 nitehawk_holder_fillet_radius = 3
 nitehawk_holder_mount_tower_diameter = 6.5
@@ -258,22 +258,25 @@ nitehawk_holder_cable_attachment_thickness = 4
 nitehawk_holder_cable_attachment_holes_diameter = 4
 nitehawk_holder_cable_attachment_num_holes = 3
 
-
+nitehawk_holder_slit_height = 6
 nitehawk_nut_cutter_slack = 0.22
 nitehawk_mount_tower_base_extension = 2.0
 
 
 part_fan_parameters = {
-    Alignment.LEFT: {
+    Alignment.LEFT: { # this is the vertical downblower on the left
         "base_rotation": 0,
         "around_angle": 0,
-        "x_offset": 25,
+        "x_offset": 28.5,
         "y_offset": 35,
         "z_offset": 10,
         "rotation": 90,
         "tilt": 0,
+        "mount_plate_blow_direction_oversize": 15,
+        "mount_plate_cross_oversize": 3,
+        "mount_plate_blow_direction_offset": -12
     },
-    Alignment.RIGHT: {
+    Alignment.RIGHT: { # this is the flat blower on the back
         "base_rotation": 0,
         "around_angle": 90,
         "x_offset": 20,
@@ -281,6 +284,9 @@ part_fan_parameters = {
         "z_offset": 0,
         "rotation": 17,
         "tilt": 0,
+        "mount_plate_blow_direction_oversize": 7,
+        "mount_plate_cross_oversize": 3,
+        "mount_plate_blow_direction_offset":-2
     },
 }
 
@@ -301,7 +307,7 @@ feeder_ring_extra_angle = 10
 
 feeder_ring_rotation_angle = -10
 
-duct_extension_width = 15
+duct_extension_width = 20
 
 
 __all__ = sorted(

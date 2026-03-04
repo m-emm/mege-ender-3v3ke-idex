@@ -31,6 +31,8 @@ PROCESS_DATA["process_overrides"].update(
         "support_threshold_angle": "30",
         "brim_type": "outer_and_inner",
         "support_on_build_plate_only": "1",
+        "wall_loops":3,
+        "sparse_infill_density": "85%" # PLAGFHT is very brittle and needs more strength
     }
 )
 
@@ -89,6 +91,8 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
     )
 
     side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.FRONT)
+    side_mount_plate = translate(0, tool_head_additional_mount_plate_depth_offset, 0)(side_mount_plate)
+
 
     parts_to_print = parts_to_print.fuse(side_mount_plate)
 

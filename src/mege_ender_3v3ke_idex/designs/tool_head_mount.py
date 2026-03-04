@@ -65,7 +65,7 @@ def create_tool_head_mount(target_profile):
     clamp_1 = create_gt_belt_clamp(
         base_thicknness=tool_head_mount_belt_clamp_base_thickness,
         clamp_thickness=tool_head_mount_belt_clamp_thickness,
-        clamp_length=tool_head_mount_base_plate_width / 2 - tool_head_mount_belt_clamp_gap,
+        clamp_length=tool_head_mount_belt_clamp_length,
         screw_size="M3",
         screw_hole_border=1.9,
         teeth_clearance=0.1,

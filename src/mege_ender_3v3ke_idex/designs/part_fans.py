@@ -362,9 +362,6 @@ def create_part_fan(
 def crate_angled_fans(
     window_cutter_outside_length,
     body_cutter_clearance,
-    mount_plate_blow_direction_oversize,
-    mount_plate_cross_oversize,
-    mount_plate_blow_direction_offset,
 ):
     fans = PartCollector()
     center_pillar = create_cylinder(0.01, 50)
@@ -373,9 +370,15 @@ def crate_angled_fans(
         fan = create_part_fan(
             window_cutter_outside_length,
             body_cutter_clearance,
-            mount_plate_blow_direction_oversize=mount_plate_blow_direction_oversize,
-            mount_plate_cross_oversize=mount_plate_cross_oversize,
-            mount_plate_blow_direction_offset=mount_plate_blow_direction_offset,
+            mount_plate_blow_direction_oversize=part_fan_parameters[lr][
+                "mount_plate_blow_direction_oversize"
+            ],
+            mount_plate_cross_oversize=part_fan_parameters[lr][
+                "mount_plate_cross_oversize"
+            ],
+            mount_plate_blow_direction_offset=part_fan_parameters[lr][
+                "mount_plate_blow_direction_offset"
+            ],
             mount_plate_thickness=part_fan_mount_plate_thickness,
         )
         fan = rotate(180, axis=(1, 0, 0))(fan)
@@ -419,9 +422,6 @@ def crate_part_fan_assembly():
     fans = crate_angled_fans(
         window_cutter_outside_length=part_fan_window_cutter_outside_length,
         body_cutter_clearance=part_fan_body_cutter_clearance,
-        mount_plate_blow_direction_oversize=part_fan_mount_plate_blow_direction_oversize,
-        mount_plate_cross_oversize=part_fan_mount_plate_cross_oversize,
-        mount_plate_blow_direction_offset=part_fan_mount_plate_blow_direction_offset,
     )
 
     ducts = crate_ducts()
