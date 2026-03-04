@@ -1216,16 +1216,25 @@ def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
-    # Create the part
-    z_axis = create_z_axis()
-    parts.add(z_axis, "z_axis", flip=False, skip_in_production=True)
 
+
+    frame = create_printer_frame()
+    
+
+
+    parts.add(
+        frame,
+        "printer_frame",
+        flip=False,
+        skip_in_production=True,
+    )
+    
     x_axis = create_x_axis()
 
-    _logger.info(f"x_axis is: {x_axis}, z_axis is: {z_axis}")
+    _logger.info(f"x_axis is: {x_axis}")
 
-    x_axis = align(x_axis, z_axis, Alignment.CENTER)
-    x_axis = align(x_axis, z_axis, Alignment.STACK_BACK, stack_gap=-28)
+    x_axis = align(x_axis, frame, Alignment.CENTER)
+    x_axis = align(x_axis, frame, Alignment.STACK_TOP, stack_gap=100)
 
     # Non-production references for assembly context
     for name in [
@@ -1434,16 +1443,6 @@ def main():
         color=(0.7, 0.6, 0.5),
     )
 
-    frame = create_printer_frame()
-    frame = align(frame, x_axis, Alignment.CENTER)
-    frame = align(frame, z_axis, Alignment.STACK_BOTTOM)
-
-    parts.add(
-        frame,
-        "printer_frame",
-        flip=False,
-        skip_in_production=True,
-    )
 
     for name, npp in frame.get_named_non_production_part_items():
         parts.add(

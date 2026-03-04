@@ -235,7 +235,7 @@ nitehawk_umbilical_cable_length = 30
 
 nitehawk_board_angle = 0
 nitehawk_holder_thickness = 3
-nitehawk_holder_width_extension = 14
+nitehawk_holder_width_extension = 15
 nitehawk_holder_height_extension = -5
 nitehawk_holder_height_offset = 0
 nitehawk_holder_width_offset = 2
@@ -267,7 +267,7 @@ part_fan_parameters = {
     Alignment.LEFT: { # this is the vertical downblower on the left
         "base_rotation": 0,
         "around_angle": 0,
-        "x_offset": 28.5,
+        "x_offset": 27.8,
         "y_offset": 35,
         "z_offset": 10,
         "rotation": 90,
