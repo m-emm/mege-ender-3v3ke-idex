@@ -10,7 +10,7 @@ Usage:
 import logging
 import math
 import os
-
+import numpy as np
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.simple import *
@@ -30,9 +30,16 @@ PROCESS_DATA = {
 }
 BIG_THING = 500
 hotend_diameter = 13.9
-hotend_length = 24.8
+
+hotend_overall_length = (
+    33  # hotend from bottom of cooler to nozzle tip is 33mm according to measurements
+)
 nozzle_diameter = 6.6
 nozzle_length = 4.4
+nozzle_screw_length = 5.9
+
+hotend_length = hotend_overall_length - nozzle_length - nozzle_screw_length
+
 nozzle_tip_diameter = 1.0
 hotend_inset = 2
 
@@ -206,7 +213,7 @@ def create_sprite_extruder():
         y = polygon_size * 0.5 * math.sin(angle)
         points.append((x, y))
 
-    nozzle_screw = create_extruded_polygon(points, nozzle_length)
+    nozzle_screw = create_extruded_polygon(points, nozzle_screw_length)
     nozzle_screw = align(nozzle_screw, hotend, Alignment.CENTER)
     nozzle_screw = align(nozzle_screw, hotend, Alignment.STACK_TOP)
     hotend = hotend.fuse(nozzle_screw)
@@ -222,6 +229,11 @@ def create_sprite_extruder():
     hotend = align(hotend, cooler, Alignment.TOP)
 
     hotend = translate(hotend_x_offset, 0, -hotend_inset)(hotend)
+
+    hotend_size = get_bounding_box_size(hotend)
+    assert np.isclose(
+        hotend_size[1], hotend_overall_length
+    ), f"Hotend overall length is {hotend_size[1]}, expected {hotend_overall_length}"
 
     retval.add_named_non_production_part(hotend, "hotend")
 

@@ -166,11 +166,11 @@ tool_head_mount_belt_clamp_length = 12
 tool_head_additional_mount_plate_thickness = 3
 
 tool_head_additional_mount_plate_height = 10
-tool_head_additional_mount_plate_depth = 20
+tool_head_additional_mount_plate_depth = 19
 
 tool_head_additional_mount_plate_fillet_radius = 2
 tool_head_additional_mount_plate_clearance = 0.5
-tool_head_additional_mount_plate_depth_offset = -7.5
+tool_head_additional_mount_plate_depth_offset = -7
 
 
 nitehawk_holder_extruder_gap = 2
@@ -259,7 +259,7 @@ nitehawk_holder_cable_attachment_holes_diameter = 4
 nitehawk_holder_cable_attachment_num_holes = 3
 
 nitehawk_holder_slit_height = 6
-nitehawk_nut_cutter_slack = 0.22
+nitehawk_nut_cutter_slack = 0.19
 nitehawk_mount_tower_base_extension = 2.0
 
 

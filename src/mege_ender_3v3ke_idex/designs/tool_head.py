@@ -31,8 +31,20 @@ PROCESS_DATA["process_overrides"].update(
         "support_threshold_angle": "30",
         "brim_type": "outer_and_inner",
         "support_on_build_plate_only": "1",
-        "wall_loops":3,
-        "sparse_infill_density": "85%" # PLAGFHT is very brittle and needs more strength
+        "wall_loops": "3",
+        "sparse_infill_density": "85%",  # PLAGFHT is very brittle and needs more strength
+        # Inter-layer adhesion / brittleness tuning
+        "nozzle_temperature": "230",
+        "fan_min_speed": "45",
+        "fan_max_speed": "65",
+        "overhang_fan_speed": "80",
+        "filament_max_volumetric_speed": "18",
+        "outer_wall_speed": "85",
+        "inner_wall_speed": "150",
+        "sparse_infill_speed": "150",
+        "internal_solid_infill_speed": "150",
+        "filament_flow_ratio": "1.01",
+        "infill_wall_overlap": "28%",
     }
 )
 
@@ -91,8 +103,9 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
     )
 
     side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.FRONT)
-    side_mount_plate = translate(0, tool_head_additional_mount_plate_depth_offset, 0)(side_mount_plate)
-
+    side_mount_plate = translate(0, tool_head_additional_mount_plate_depth_offset, 0)(
+        side_mount_plate
+    )
 
     parts_to_print = parts_to_print.fuse(side_mount_plate)
 
