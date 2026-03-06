@@ -387,6 +387,8 @@ def create_nitehawk_holder():
 
     holder.add_named_non_production_part(nitehawk_pcb, "nitehawk_pcb")
 
+    holder = rotate(-90, axis=(1, 0, 0))(holder)
+
     return holder
 
 
@@ -394,16 +396,15 @@ def align_holder_to_extruder(holder, extruder):
 
     nitehawk_board = holder.get_named_non_production_part("nitehawk_pcb")
 
-    board_aligner = align_translation(nitehawk_board, extruder, Alignment.CENTER)
     board_aligner = align_translation(nitehawk_board, extruder, Alignment.LEFT)
 
     holder = board_aligner(holder)
 
     holder = align(
-        holder, extruder, Alignment.STACK_BOTTOM, stack_gap=nitehawk_holder_extruder_gap
+        holder, extruder, Alignment.STACK_BACK, stack_gap=nitehawk_holder_extruder_gap
     )
 
-    holder = align(holder, extruder, Alignment.FRONT)
+    holder = align(holder, extruder, Alignment.BOTTOM)
     holder = translate(nitehawk_holder_width_offset, nitehawk_holder_height_offset, 0)(
         holder
     )

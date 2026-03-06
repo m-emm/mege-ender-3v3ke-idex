@@ -41,6 +41,8 @@ nozzle_screw_length = 5.9
 
 hotend_length = hotend_overall_length - nozzle_length - nozzle_screw_length
 
+nozzle_y_offset = 7.5
+
 nozzle_tip_diameter = 1.0
 hotend_inset = 2
 
@@ -69,23 +71,26 @@ lever_length = 23
 lever_angle = 45
 lever_center_offset = 4.4
 lever_front_inset = 1
-hotend_x_offset = 2.5
+
+
+hotend_x_distance_from_right_edge = 18
 
 
 def create_sprite_extruder():
     """Create the sprite_extruder part."""
-    # Example: simple box with a cylindrical hole
 
     motor_composite = create_nema_composite(body_thickness=26.5)
+    motor_composite = rotate(90, axis=(1, 0, 0))(motor_composite)
     motor = motor_composite.get_named_follower("body")
     front_compound = create_nema_composite(body_thickness=23.2)
+    front_compound = rotate(90, axis=(1, 0, 0))(front_compound)
 
     front = LeaderFollowersCuttersPart(front_compound.get_named_follower("body"))
     front = front.merge_except_leader(front_compound)
 
-    front = rotate(180, axis=(0, 1, 0))(front)
+    front = rotate(180, axis=(0, 0, 1))(front)
     front = align(front, motor, Alignment.CENTER)
-    front = align(front, motor, Alignment.STACK_TOP)
+    front = align(front, motor, Alignment.STACK_FRONT)
 
     cooler_height = 13.6
     front_size = get_bounding_box_size(front)
@@ -98,15 +103,14 @@ def create_sprite_extruder():
 
     groove_cutter = PartCollector()
     for i in range(num_cooler_grooves):
-        groove = create_box(100, cooler_groove_width, 100)
-        groove = translate(0, i * cooler_groove_pitch, 0)(groove)
+        groove = create_box(100, cooler_groove_depth, cooler_groove_width)
+        groove = translate(0, 0, i * cooler_groove_pitch)(groove)
         groove_cutter = groove_cutter.fuse(groove)
 
     groove_cutter = align(groove_cutter, cooler, Alignment.CENTER)
-    groove_cutter = align(groove_cutter, cooler, Alignment.BACK)
-    groove_cutter = align(
-        groove_cutter, cooler, Alignment.STACK_TOP, stack_gap=-cooler_groove_depth
-    )
+    groove_cutter = align(groove_cutter, cooler, Alignment.FRONT)
+    groove_cutter = align(groove_cutter, cooler, Alignment.BOTTOM)
+    groove_cutter = translate(0, 0, cooler_groove_width)(groove_cutter)
 
     cooler = cooler.cut(groove_cutter)
 
@@ -131,12 +135,12 @@ def create_sprite_extruder():
     hot_side_hole = create_cylinder(hot_side_hole_radius, BIG_THING)
     hot_side_hole = rotate(90, axis=(0, 1, 0))(hot_side_hole)
     hot_side_hole = align(hot_side_hole, front, Alignment.CENTER)
-    hot_side_hole = align(hot_side_hole, front, Alignment.BACK)
     hot_side_hole = align(hot_side_hole, front, Alignment.TOP)
+    hot_side_hole = align(hot_side_hole, front, Alignment.FRONT)
     hot_side_hole = align(
         hot_side_hole, front, Alignment.STACK_LEFT, stack_gap=-side_holes_depth
     )
-    hot_side_hole = translate(0, hot_side_hole_radius / 2, hot_side_hole_radius / 2)(
+    hot_side_hole = translate(0, -hot_side_hole_radius / 2, hot_side_hole_radius / 2)(
         hot_side_hole
     )
 
@@ -146,8 +150,8 @@ def create_sprite_extruder():
     for i in [0, 1]:
         current_side_hole = translate(
             0,
+            hot_side_holes_back_holes_z_distance,
             -hot_side_holes_back_distance - i * hot_side_holes_y_pitch,
-            -hot_side_holes_back_holes_z_distance,
         )(hot_side_hole)
 
         side_holes_drills = side_holes_drills.fuse(current_side_hole)
@@ -168,8 +172,8 @@ def create_sprite_extruder():
         )
         current_side_hole = translate(
             0,
+            top_distance,
             -hot_side_holes_back_distance - i * hot_side_holes_y_pitch,
-            -top_distance,
         )(hot_side_hole)
 
         side_holes_drills = side_holes_drills.fuse(current_side_hole)
@@ -202,8 +206,8 @@ def create_sprite_extruder():
 
                 hole = translate(
                     0,
+                    -tb.sign * motor_hole_z_pitch / 2,
                     fb.sign * motor_hole_y_pitch / 2,
-                    tb.sign * motor_hole_z_pitch / 2,
                 )(hole)
                 motor_hole_drills = motor_hole_drills.fuse(hole)
                 motor_holes.append(hole)
@@ -259,17 +263,22 @@ def create_sprite_extruder():
     nozzle = align(nozzle, hotend, Alignment.STACK_TOP)
     hotend = hotend.fuse(nozzle)
 
-    hotend = rotate(90, axis=(1, 0, 0))(hotend)
+    hotend = rotate(180, axis=(1, 0, 0))(hotend)
     hotend = align(hotend, cooler, Alignment.CENTER)
-    hotend = align(hotend, cooler, Alignment.STACK_FRONT)
-    hotend = align(hotend, cooler, Alignment.TOP)
+    hotend = align(hotend, retval, Alignment.STACK_BOTTOM)
+    hotend = align(hotend, retval, Alignment.FRONT)
+    hotend = align(hotend, retval, Alignment.RIGHT)
 
-    hotend = translate(hotend_x_offset, 0, -hotend_inset)(hotend)
+    hotend = translate(
+        -hotend_x_distance_from_right_edge + hotend_diameter / 2,
+        nozzle_y_offset - hotend_diameter / 2,
+        0,
+    )(hotend)
 
     hotend_size = get_bounding_box_size(hotend)
     assert np.isclose(
-        hotend_size[1], hotend_overall_length
-    ), f"Hotend overall length is {hotend_size[1]}, expected {hotend_overall_length}"
+        hotend_size[2], hotend_overall_length
+    ), f"Hotend overall length is {hotend_size[2]}, expected {hotend_overall_length}"
 
     retval.add_named_non_production_part(hotend, "hotend")
 
@@ -279,23 +288,23 @@ def create_sprite_extruder():
     # lever_angle = 45
     # lever_center_offset = 4.4
 
-    lever = create_box(lever_thickness, lever_length, lever_width)
+    lever = create_box(lever_thickness, lever_width, lever_length)
 
     lever = align(lever, front, Alignment.CENTER)
-    lever = align(lever, front, Alignment.STACK_BACK)
-    lever = align(lever, front, Alignment.TOP)
+    lever = align(lever, front, Alignment.STACK_TOP)
+    lever = align(lever, front, Alignment.FRONT)
 
-    lever = translate(lever_center_offset, lever_front_inset, 0)(lever)
+    lever = translate(lever_center_offset, 0, lever_front_inset)(lever)
 
     lever_bbox = get_bounding_box(lever)
     lever_rotation_center = (
         (lever_bbox[0][0] + lever_bbox[1][0]) / 2,
-        lever_bbox[0][1],
         0,
+        lever_bbox[0][2],
     )
 
-    lever = rotate(-lever_angle, axis=(0, 0, 1), center=lever_rotation_center)(lever)
-    lever = translate(lever_center_offset, 0, -lever_front_inset)(lever)
+    lever = rotate(-lever_angle, axis=(0, -1, 0), center=lever_rotation_center)(lever)
+    lever = translate(lever_center_offset, lever_front_inset, 0)(lever)
     retval.add_named_non_production_part(lever, "lever")
 
     fan = create_box(fan_thickness, front_size[1], front_size[2])
@@ -321,24 +330,52 @@ def main():
 
     mount_plates = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        mount_plate = create_box(3, 40, 60)
+        mount_plate = create_box(3, 60, 40)
         mount_plate = align(mount_plate, extruder, Alignment.CENTER)
         mount_plate = align(mount_plate, extruder, lr.stack_alignment, stack_gap=6)
         mount_plate = extruder.use_as_cutter_on(mount_plate)
         mount_plates = mount_plates.fuse(mount_plate)
 
-    top_mount_plate = create_box(50, 50, 3)
+    top_mount_plate = create_box(50, 3, 50)
     top_mount_plate = align(top_mount_plate, extruder, Alignment.CENTER)
-    top_mount_plate = align(top_mount_plate, extruder, Alignment.STACK_TOP, stack_gap=6)
+    top_mount_plate = align(
+        top_mount_plate, extruder, Alignment.STACK_FRONT, stack_gap=6
+    )
 
     top_mount_plate = extruder.use_as_cutter_on(top_mount_plate)
 
-    mount_plates = mount_plates.fuse(top_mount_plate)
+    # mount_plates = mount_plates.fuse(top_mount_plate)
 
     parts.add(mount_plates, "mount_plates", flip=False, skip_in_production=True)
 
     # mount_holes = extruder.get_named_cutter("front_mount_holes")
     # parts.add(mount_holes, "mount_holes", flip=False, skip_in_production=True)
+
+    hotend_offset_measure_stick = create_box(hotend_x_distance_from_right_edge, 1, 5)
+    hotend_offset_measure_stick = align(
+        hotend_offset_measure_stick, extruder, Alignment.CENTER
+    )
+    hotend_offset_measure_stick = align(
+        hotend_offset_measure_stick, extruder, Alignment.STACK_FRONT, stack_gap=1
+    )
+    hotend_offset_measure_stick = align(
+        hotend_offset_measure_stick, extruder, Alignment.RIGHT
+    )
+
+    hotend = extruder.get_named_non_production_part("hotend")
+    hotend_offset_measure_stick = align(
+        hotend_offset_measure_stick, hotend, Alignment.BOTTOM
+    )
+    hotend_offset_measure_stick = align(
+        hotend_offset_measure_stick, hotend, Alignment.CENTER, axes=[1]
+    )
+
+    parts.add(
+        hotend_offset_measure_stick,
+        "hotend_offset_measure_stick",
+        flip=False,
+        skip_in_production=True,
+    )
 
     # Arrange and export
     arrange_and_export(
