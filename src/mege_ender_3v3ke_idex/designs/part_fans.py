@@ -445,6 +445,21 @@ def crate_part_fan_assembly():
     return fans
 
 
+def align_fans_to_sprite_extruder(fans, sprite_extruder):
+
+    hotend = sprite_extruder.get_named_non_production_part("hotend")
+
+    fans = crate_part_fan_assembly()
+
+    hotend_center = get_bounding_box_center(hotend)
+
+    hotend_bbox = get_bounding_box(hotend)
+
+    fans = translate(hotend_center[0], hotend_center[1], hotend_bbox[0][2])(fans)
+
+    return fans
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
 
@@ -453,21 +468,19 @@ def main():
     extruder = create_sprite_extruder()
     hotend = extruder.get_named_non_production_part("hotend")
 
-    hotend = rotate(90, axis=(1, 0, 0))(hotend)
     hotend = align(hotend, None, Alignment.CENTER)
 
     hotend_bbox = get_bounding_box(hotend)
 
-    hotend = translate(0, 0, -hotend_bbox[0][2])(hotend)
+    extruder = translate(0, 0, -hotend_bbox[0][2])(extruder)
+
+    hotend = extruder.get_named_non_production_part("hotend")
 
     parts.add(hotend, "hotend", flip=False, skip_in_production=True)
 
     fans = crate_part_fan_assembly()
 
-    hotend_center = get_bounding_box_center(hotend)
-    hotend_bbox = get_bounding_box(hotend)
-
-    fans = translate(hotend_center[0], hotend_center[1], hotend_bbox[0][2])(fans)
+    fans = align_fans_to_sprite_extruder(fans, extruder)
 
     parts.add(fans, "angled_fans", flip=False, skip_in_production=True)
 
@@ -482,6 +495,24 @@ def main():
                 prod_rotation_angle=50,
                 prod_rotation_axis=(1, 0, 0),
             )
+
+    simulated_part_to_print = create_box(50, 50, 1)
+    simulated_part_to_print = translate(0, 0, -1)(simulated_part_to_print)
+
+    simulated_part_to_print = align(
+        simulated_part_to_print, hotend, Alignment.CENTER, axes=[0, 1]
+    )  # but not z axis - this is to simulate the part being at z = 0
+
+    simulated_part_to_print = align(
+        simulated_part_to_print, hotend, Alignment.STACK_BOTTOM
+    )
+
+    parts.add(
+        simulated_part_to_print,
+        "simulated_part_to_print",
+        flip=False,
+        skip_in_production=True,
+    )
 
     # Arrange and export
     arrange_and_export(

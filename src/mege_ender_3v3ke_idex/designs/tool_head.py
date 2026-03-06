@@ -13,7 +13,10 @@ from mege_ender_3v3ke_idex.designs.nitehawk_holder import (
     align_holder_to_extruder,
     create_nitehawk_holder,
 )
-from mege_ender_3v3ke_idex.designs.part_fans import crate_part_fan_assembly
+from mege_ender_3v3ke_idex.designs.part_fans import (
+    align_fans_to_sprite_extruder,
+    crate_part_fan_assembly,
+)
 from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
 from shellforgepy.simple import *
 
@@ -57,7 +60,6 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
     sprite_extruder = create_sprite_extruder()
 
     holder = create_nitehawk_holder()
-    # holder = rotate(180, axis=(0, 1, 0))(holder)
 
     holder = align_holder_to_extruder(holder, sprite_extruder)
 
@@ -79,18 +81,18 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
                 holder_mount_plate_size,
             )
             mount_box = align(mount_box, holder_mount_plate, Alignment.CENTER)
-            mount_box = align(mount_box, holder_mount_plate, Alignment.BACK)
+            mount_box = align(mount_box, holder_mount_plate, Alignment.FRONT)
             mount_box = align(mount_box, holder_mount_plate, Alignment.STACK_LEFT)
-            mount_box = align(mount_box, holder_mount_plate, Alignment.TOP)
+            mount_box = align(mount_box, holder_mount_plate, Alignment.FRONT)
             holder_mount_plate = holder_mount_plate.fuse(mount_box)
 
         holder_mount_plate = align(holder_mount_plate, holder, Alignment.CENTER)
-        holder_mount_plate = align(holder_mount_plate, sprite_extruder, Alignment.BACK)
+        holder_mount_plate = align(holder_mount_plate, sprite_extruder, Alignment.FRONT)
 
         holder_mount_plate = align(
             holder_mount_plate, sprite_extruder, lr.stack_alignment
         )
-        holder_mount_plate = align(holder_mount_plate, holder, Alignment.BOTTOM)
+        holder_mount_plate = align(holder_mount_plate, holder, Alignment.BACK)
 
         holder_mount_plate = translate(0, -holder_mount_plate_top_offset, 0)(
             holder_mount_plate
@@ -107,16 +109,8 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
     sprite_extruder_fused = sprite_extruder.leaders_followers_fused()
     retval.add_named_non_production_part(sprite_extruder_fused, "sprite_extruder")
 
-    hotend = sprite_extruder.get_named_non_production_part("hotend")
-
     fans = crate_part_fan_assembly()
-
-    fans = rotate(-90, axis=(1, 0, 0))(fans)
-    hotend_center = get_bounding_box_center(hotend)
-
-    hotend_bbox = get_bounding_box(hotend)
-
-    fans = translate(hotend_center[0], hotend_bbox[0][1], hotend_center[2])(fans)
+    fans = align_fans_to_sprite_extruder(fans, sprite_extruder)
 
     retval.add_named_non_production_part(fans, f"part_fans")
 
@@ -130,7 +124,7 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
         no_fillets_at=[Alignment.LEFT, Alignment.RIGHT, Alignment.BOTTOM],
     )
     side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.CENTER)
-    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.BOTTOM)
+    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.BACK)
 
     side_mount_plate = align(
         side_mount_plate,
@@ -139,7 +133,7 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
         stack_gap=tool_head_additional_mount_plate_clearance,
     )
 
-    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.FRONT)
+    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.BOTTOM)
     side_mount_plate = translate(0, tool_head_additional_mount_plate_depth_offset, 0)(
         side_mount_plate
     )
@@ -171,17 +165,19 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
     )
     duct_front_mount_plate = duct_front_mount_plate.cut(duct_front_mount_plate_cutout)
 
+    duct_front_mount_plate = rotate(90, axis=(1, 0, 0))(duct_front_mount_plate)
+
     duct_front_mount_plate = align(
         duct_front_mount_plate, sprite_extruder, Alignment.CENTER
     )
     duct_front_mount_plate = align(
-        duct_front_mount_plate, sprite_extruder, Alignment.STACK_TOP
+        duct_front_mount_plate, sprite_extruder, Alignment.STACK_FRONT
     )
     duct_front_mount_plate = align(
-        duct_front_mount_plate, sprite_extruder, Alignment.FRONT
+        duct_front_mount_plate, sprite_extruder, Alignment.BOTTOM
     )
 
-    duct_front_mount_plate = translate(0, duct_front_mount_plate_offset, 0)(
+    duct_front_mount_plate = translate(0, 0, duct_front_mount_plate_offset)(
         duct_front_mount_plate
     )
 
@@ -193,9 +189,6 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
 
     retval.leader = parts_to_print
     retval.add_named_follower(blower_ducts, "blower_ducts")
-
-    retval = rotate(90, axis=(1, 0, 0))(retval)
-    retval = rotate(180)(retval)
 
     return retval
 

@@ -388,6 +388,7 @@ def create_nitehawk_holder():
     holder.add_named_non_production_part(nitehawk_pcb, "nitehawk_pcb")
 
     holder = rotate(-90, axis=(1, 0, 0))(holder)
+    holder = rotate(180, axis=(0, 1, 0))(holder)
 
     return holder
 
@@ -426,7 +427,6 @@ def main():
         parts.add(npp, name, flip=False, skip_in_production=True)
 
     holder = create_nitehawk_holder()
-    holder = rotate(180, axis=(0, 1, 0))(holder)
 
     holder = align_holder_to_extruder(holder, sprite_extruder)
 
