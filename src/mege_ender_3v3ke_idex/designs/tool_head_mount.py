@@ -39,7 +39,6 @@ _logger = logging.getLogger(__name__)
 PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLACF_04_HS)
 
 
-
 def create_tool_head_mount(target_profile):
 
     carriage = create_mgn12h_carriage()
@@ -59,7 +58,8 @@ def create_tool_head_mount(target_profile):
     carriage = rail_plus_carriage.followers[1]
 
     tool_head_mount_base_plate_width = (
-        tool_head_mount_carriage_mount_plate_width - 2 * tool_head_mount_side_plate_thickness
+        tool_head_mount_carriage_mount_plate_width
+        - 2 * tool_head_mount_side_plate_thickness
     )
 
     clamp_1 = create_gt_belt_clamp(
@@ -406,7 +406,9 @@ def create_tool_head_mount(target_profile):
 
     tool_head = tool_head_aligner(tool_head)
     tool_head = align(tool_head, target_profile, Alignment.TOP)
-    tool_head = translate(tool_head_mount_tool_head_x_offset, 0, tool_head_mount_tool_head_z_offset)(tool_head)
+    tool_head = translate(
+        tool_head_mount_tool_head_x_offset, 0, tool_head_mount_tool_head_z_offset
+    )(tool_head)
 
     extruder_cutout = create_filleted_box(
         tool_head_mount_extruder_cutout_width,

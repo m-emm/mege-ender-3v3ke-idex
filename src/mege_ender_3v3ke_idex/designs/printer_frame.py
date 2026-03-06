@@ -10,12 +10,12 @@ Usage:
 import logging
 import os
 
-from shellforgepy.simple import *
-from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
+from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
 

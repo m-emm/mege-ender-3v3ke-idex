@@ -10,6 +10,7 @@ Usage:
 import logging
 import math
 import os
+
 import numpy as np
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
@@ -77,8 +78,11 @@ def create_sprite_extruder():
 
     motor_composite = create_nema_composite(body_thickness=26.5)
     motor = motor_composite.get_named_follower("body")
-    front = create_nema_composite(body_thickness=23.2)
-    front = front.get_named_follower("body")
+    front_compound = create_nema_composite(body_thickness=23.2)
+
+    front = LeaderFollowersCuttersPart(front_compound.get_named_follower("body"))
+    front = front.merge_except_leader(front_compound)
+
     front = rotate(180, axis=(0, 1, 0))(front)
     front = align(front, motor, Alignment.CENTER)
     front = align(front, motor, Alignment.STACK_TOP)
@@ -118,8 +122,13 @@ def create_sprite_extruder():
     mount_hole_cutter = motor_composite.get_named_cutter("mount_holes")
 
     side_holes_drills = PartCollector()
-    hot_side_hole_diameter = MScrew.from_size(extruder_mount_screw_size).core_hole / 2
-    hot_side_hole = create_cylinder(hot_side_hole_diameter, BIG_THING)
+    hot_side_hole_radius = MScrew.from_size(extruder_mount_screw_size).core_hole / 2
+
+    mount_hole_diameter = MScrew.from_size(
+        extruder_mount_screw_size
+    ).clearance_hole_normal
+
+    hot_side_hole = create_cylinder(hot_side_hole_radius, BIG_THING)
     hot_side_hole = rotate(90, axis=(0, 1, 0))(hot_side_hole)
     hot_side_hole = align(hot_side_hole, front, Alignment.CENTER)
     hot_side_hole = align(hot_side_hole, front, Alignment.BACK)
@@ -127,11 +136,12 @@ def create_sprite_extruder():
     hot_side_hole = align(
         hot_side_hole, front, Alignment.STACK_LEFT, stack_gap=-side_holes_depth
     )
-    hot_side_hole = translate(
-        0, hot_side_hole_diameter / 2, hot_side_hole_diameter / 2
-    )(hot_side_hole)
+    hot_side_hole = translate(0, hot_side_hole_radius / 2, hot_side_hole_radius / 2)(
+        hot_side_hole
+    )
 
     hot_side_holes = []
+    hot_side_mount_holes = []
 
     for i in [0, 1]:
         current_side_hole = translate(
@@ -142,6 +152,13 @@ def create_sprite_extruder():
 
         side_holes_drills = side_holes_drills.fuse(current_side_hole)
         hot_side_holes.append(current_side_hole)
+        hot_side_mount_hole = create_cylinder(mount_hole_diameter / 2, BIG_THING)
+        hot_side_mount_hole = rotate(90, axis=(0, 1, 0))(hot_side_mount_hole)
+        hot_side_mount_hole = align(
+            hot_side_mount_hole, current_side_hole, Alignment.CENTER
+        )
+        hot_side_mount_hole = align(hot_side_mount_hole, front, Alignment.STACK_LEFT)
+        hot_side_mount_holes.append(hot_side_mount_hole)
 
     for i in [0, 1]:
         top_distance = (
@@ -158,7 +175,16 @@ def create_sprite_extruder():
         side_holes_drills = side_holes_drills.fuse(current_side_hole)
         hot_side_holes.append(current_side_hole)
 
+        hot_side_mount_hole = create_cylinder(mount_hole_diameter / 2, BIG_THING)
+        hot_side_mount_hole = rotate(90, axis=(0, 1, 0))(hot_side_mount_hole)
+        hot_side_mount_hole = align(
+            hot_side_mount_hole, current_side_hole, Alignment.CENTER
+        )
+        hot_side_mount_hole = align(hot_side_mount_hole, front, Alignment.STACK_LEFT)
+        hot_side_mount_holes.append(hot_side_mount_hole)
+
     motor_holes = []
+    mount_holes = []
     motor_hole_drills = PartCollector()
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
@@ -166,7 +192,7 @@ def create_sprite_extruder():
             for tb in [Alignment.TOP, Alignment.BOTTOM]:
                 if tb == Alignment.TOP and lr == Alignment.RIGHT:
                     continue  # Skip top right holes
-                hole = create_cylinder(hot_side_hole_diameter, BIG_THING)
+                hole = create_cylinder(hot_side_hole_radius, BIG_THING)
                 hole = rotate(90, axis=(0, 1, 0))(hole)
 
                 hole = align(hole, motor, Alignment.CENTER)
@@ -181,16 +207,26 @@ def create_sprite_extruder():
                 )(hole)
                 motor_hole_drills = motor_hole_drills.fuse(hole)
                 motor_holes.append(hole)
+                mount_hole = create_cylinder(mount_hole_diameter / 2, BIG_THING)
+                mount_hole = rotate(90, axis=(0, 1, 0))(mount_hole)
+                mount_hole = align(mount_hole, hole, Alignment.CENTER)
+                mount_hole = align(mount_hole, motor, lr.stack_alignment)
+
+                mount_holes.append(mount_hole)
 
     motor_hole_drills = LeaderFollowersCuttersPart(motor_hole_drills)
     for i, hole in enumerate(motor_holes):
         motor_hole_drills.add_named_cutter(hole, f"motor_hole_{i}")
+        motor_hole_drills.add_named_cutter(mount_holes[i], f"mount_hole_{i}")
+
+    for i, hole in enumerate(hot_side_mount_holes):
+        motor_hole_drills.add_named_cutter(hole, f"hot_side_mount_hole_{i}")
 
     motor_hole_drills = align(motor_hole_drills, motor, Alignment.CENTER)
 
     motor = motor.cut(motor_hole_drills.leader)
 
-    retval = motor.fuse(front)
+    retval = motor.fuse(front.leader)
 
     retval = retval.cut(mount_hole_cutter)
 
@@ -267,6 +303,7 @@ def create_sprite_extruder():
     fan = align(fan, front, Alignment.FRONT)
     fan = align(fan, front, Alignment.STACK_RIGHT)
     retval.add_named_non_production_part(fan, "fan")
+    retval.add_named_cutter(mount_hole_cutter, "mount_hole_cutter")
 
     return retval
 
@@ -290,7 +327,18 @@ def main():
         mount_plate = extruder.use_as_cutter_on(mount_plate)
         mount_plates = mount_plates.fuse(mount_plate)
 
+    top_mount_plate = create_box(50, 50, 3)
+    top_mount_plate = align(top_mount_plate, extruder, Alignment.CENTER)
+    top_mount_plate = align(top_mount_plate, extruder, Alignment.STACK_TOP, stack_gap=6)
+
+    top_mount_plate = extruder.use_as_cutter_on(top_mount_plate)
+
+    mount_plates = mount_plates.fuse(top_mount_plate)
+
     parts.add(mount_plates, "mount_plates", flip=False, skip_in_production=True)
+
+    # mount_holes = extruder.get_named_cutter("front_mount_holes")
+    # parts.add(mount_holes, "mount_holes", flip=False, skip_in_production=True)
 
     # Arrange and export
     arrange_and_export(

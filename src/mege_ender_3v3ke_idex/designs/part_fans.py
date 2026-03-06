@@ -14,15 +14,11 @@ import os
 
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401; Keep the materials menu around, in case we want to switch back to other materials
     PROCESS_DATA_PETG_04_HS,
+    PROCESS_DATA_PLA_04_HS,
     PROCESS_DATA_PLACF_04_HS,
     PROCESS_DATA_PLAGFHT_04_HS,
-    PROCESS_DATA_PLA_04_HS,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.nitehawk_holder import (
-    align_holder_to_extruder,
-    create_nitehawk_holder,
-)
 from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
 from shellforgepy.simple import *
 

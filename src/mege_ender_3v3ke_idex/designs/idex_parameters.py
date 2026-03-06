@@ -1,6 +1,6 @@
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import ExtrusionProfileType
-from shellforgepy.simple import *
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
+from shellforgepy.simple import *
 
 BIG_THING = 500
 
@@ -173,7 +173,22 @@ tool_head_additional_mount_plate_clearance = 0.5
 tool_head_additional_mount_plate_depth_offset = -7
 
 
-nitehawk_holder_extruder_gap = 2
+holder_mount_plate_thickness = 2
+holder_mount_plate_depth = 30
+holder_mount_plate_size = 8
+holder_mount_plate_top_offset = 5
+holder_mount_plate_left_extension = 17
+holder_mount_plate_spacer = 12
+
+duct_front_mount_plate_thickness = 3
+duct_front_mount_plate_width = 41
+duct_front_mount_plate_height = 12
+duct_front_mount_plate_height_border = 2
+duct_front_mount_plate_width_border = 10
+duct_front_mount_plate_offset = -3
+
+
+nitehawk_holder_extruder_gap = 12
 part_fan_bed_clearance = 10
 part_fan_body_cutter_clearance = 0.1
 part_fan_window_cutter_outside_length = 3
@@ -264,7 +279,7 @@ nitehawk_mount_tower_base_extension = 2.0
 
 
 part_fan_parameters = {
-    Alignment.LEFT: { # this is the vertical downblower on the left
+    Alignment.LEFT: {  # this is the vertical downblower on the left
         "base_rotation": 0,
         "around_angle": 0,
         "x_offset": 27.8,
@@ -272,21 +287,21 @@ part_fan_parameters = {
         "z_offset": 10,
         "rotation": 90,
         "tilt": 0,
-        "mount_plate_blow_direction_oversize": 15,
+        "mount_plate_blow_direction_oversize": 1,
         "mount_plate_cross_oversize": 3,
-        "mount_plate_blow_direction_offset": -12
+        "mount_plate_blow_direction_offset": -1,
     },
-    Alignment.RIGHT: { # this is the flat blower on the back
+    Alignment.RIGHT: {  # this is the flat blower on the back
         "base_rotation": 0,
         "around_angle": 90,
         "x_offset": 20,
         "y_offset": 5,
         "z_offset": 0,
-        "rotation": 17,
+        "rotation": 13,
         "tilt": 0,
         "mount_plate_blow_direction_oversize": 7,
         "mount_plate_cross_oversize": 3,
-        "mount_plate_blow_direction_offset":-2
+        "mount_plate_blow_direction_offset": -2,
     },
 }
 

@@ -21,9 +21,6 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
-
-from mege_ender_3v3ke_idex.designs.printer_frame import create_printer_frame
-
 from mege_ender_3v3ke_idex.designs.endstop_holder import create_endstop_holder
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
@@ -32,6 +29,7 @@ from mege_ender_3v3ke_idex.designs.mgh_linear import (
     create_mgn12h_rail,
 )
 from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
+from mege_ender_3v3ke_idex.designs.printer_frame import create_printer_frame
 from mege_ender_3v3ke_idex.designs.tool_head_mount import create_tool_head_mount
 from shellforgepy.simple import *
 
@@ -1216,11 +1214,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
-
-
     frame = create_printer_frame()
-    
-
 
     parts.add(
         frame,
@@ -1228,7 +1222,7 @@ def main():
         flip=False,
         skip_in_production=True,
     )
-    
+
     x_axis = create_x_axis()
 
     _logger.info(f"x_axis is: {x_axis}")
@@ -1442,7 +1436,6 @@ def main():
         prod_rotation_axis=(1, 0, 0),
         color=(0.7, 0.6, 0.5),
     )
-
 
     for name, npp in frame.get_named_non_production_part_items():
         parts.add(

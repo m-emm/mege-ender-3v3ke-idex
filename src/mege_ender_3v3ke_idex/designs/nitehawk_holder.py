@@ -19,9 +19,9 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
 from mege_3devops.process_data.mender3.process_data_utils import (
     augment_with_layer_height,
 )
+from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
 from shellforgepy.simple import *
-from mege_ender_3v3ke_idex.designs.idex_parameters import *
 
 _logger = logging.getLogger(__name__)
 
