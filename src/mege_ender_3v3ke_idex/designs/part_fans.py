@@ -65,10 +65,13 @@ def create_duct_extension():
 
 
 def crate_ducts():
+    _logger.info("Creating ducts...")
 
     blower_tube_cutters = PartCollector()
     blower_tubes = PartCollector()
     for i in range(num_blowers):
+
+        _logger.info(f"Creating blower tube {i+1}/{num_blowers}...")
 
         blower_tube_length = (
             feeder_ring_inner_diameter / 2
@@ -82,6 +85,31 @@ def crate_ducts():
             direction=(1, 0, 0),
         )
 
+        blower_tube_bb = get_bounding_box(blower_tube)
+        blower_tube_length = blower_tube_bb[1][0] - blower_tube_bb[0][0]
+        blower_tube_center = get_bounding_box_center(blower_tube)
+
+        blowers_nozzle_tip_scale = 0.4
+
+        def blower_tip_transform_function(point):
+            x, y, z = point
+
+            relative_x = x - blower_tube_bb[0][0]
+            scale_factor = (
+                blowers_nozzle_tip_scale
+                + relative_x / blower_tube_length * (1 - blowers_nozzle_tip_scale)
+            )
+            relative_z = z - blower_tube_center[2]
+            new_relative_z = relative_z * scale_factor
+            new_z = blower_tube_center[2] + new_relative_z
+            new_y = y
+
+            return x, new_y, new_z
+
+        blower_tube = transform_with_function_tesselating(
+            blower_tube, blower_tip_transform_function
+        )
+
         blower_tube = translate(
             blowers_nozzle_center_distance, blower_center_offset, 0
         )(blower_tube)
@@ -90,6 +118,9 @@ def crate_ducts():
             blowers_duct_diameter / 2,
             blower_tube_length + 2 * blowers_wall,
             direction=(1, 0, 0),
+        )
+        blower_tube_cutter = transform_with_function_tesselating(
+            blower_tube_cutter, blower_tip_transform_function
         )
         blower_tube_cutter = align(blower_tube_cutter, blower_tube, Alignment.CENTER)
 
@@ -109,6 +140,7 @@ def crate_ducts():
 
         blower_tubes = blower_tubes.fuse(blower_tube)
         blower_tube_cutters = blower_tube_cutters.fuse(blower_tube_cutter)
+        _logger.info(f"Blower tube {i+1}/{num_blowers} created.")
 
     feeder_ring_angle = 360 / (num_blowers + 1) * num_blowers + feeder_ring_extra_angle
     feeder_ring_outer_radius = (
@@ -413,7 +445,7 @@ def crate_angled_fans(
     return fans
 
 
-def crate_part_fan_assembly():
+def create_part_fan_assembly():
 
     fans = crate_angled_fans(
         window_cutter_outside_length=part_fan_window_cutter_outside_length,
@@ -449,8 +481,6 @@ def align_fans_to_sprite_extruder(fans, sprite_extruder):
 
     hotend = sprite_extruder.get_named_non_production_part("hotend")
 
-    fans = crate_part_fan_assembly()
-
     hotend_center = get_bounding_box_center(hotend)
 
     hotend_bbox = get_bounding_box(hotend)
@@ -478,7 +508,7 @@ def main():
 
     parts.add(hotend, "hotend", flip=False, skip_in_production=True)
 
-    fans = crate_part_fan_assembly()
+    fans = create_part_fan_assembly()
 
     fans = align_fans_to_sprite_extruder(fans, extruder)
 

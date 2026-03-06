@@ -389,6 +389,7 @@ def create_nitehawk_holder():
 
     holder = rotate(-90, axis=(1, 0, 0))(holder)
     holder = rotate(180, axis=(0, 1, 0))(holder)
+    holder = rotate(180)(holder)
 
     return holder
 

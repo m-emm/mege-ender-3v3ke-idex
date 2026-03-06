@@ -4,6 +4,7 @@ import os
 
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401; Keep the materials menu around, in case we want to switch back to other materials
     PROCESS_DATA_PETG_04_HS,
+    PROCESS_DATA_PETGCF_04_HS,
     PROCESS_DATA_PLA_04_HS,
     PROCESS_DATA_PLACF_04_HS,
     PROCESS_DATA_PLAGFHT_04_HS,
@@ -15,7 +16,7 @@ from mege_ender_3v3ke_idex.designs.nitehawk_holder import (
 )
 from mege_ender_3v3ke_idex.designs.part_fans import (
     align_fans_to_sprite_extruder,
-    crate_part_fan_assembly,
+    create_part_fan_assembly,
 )
 from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
 from shellforgepy.simple import *
@@ -26,28 +27,31 @@ _logger = logging.getLogger(__name__)
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
 # PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLAGFHT_04_HS)
-PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLAGFHT_04_HS)
+PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_04_HS)
 
 PROCESS_DATA["process_overrides"].update(
     {
         "enable_support": "1",
         "support_threshold_angle": "30",
-        "brim_type": "outer_and_inner",
+        "brim_type": "no_brim",
         "support_on_build_plate_only": "1",
-        "wall_loops": "3",
-        "sparse_infill_density": "85%",  # PLAGFHT is very brittle and needs more strength
-        # Inter-layer adhesion / brittleness tuning
-        "nozzle_temperature": "235",
-        "fan_min_speed": "45",
-        "fan_max_speed": "65",
-        "overhang_fan_speed": "80",
-        "filament_max_volumetric_speed": "18",
-        "outer_wall_speed": "85",
-        "inner_wall_speed": "150",
-        "sparse_infill_speed": "150",
-        "internal_solid_infill_speed": "150",
-        "filament_flow_ratio": "1.01",
-        "infill_wall_overlap": "28%",
+        "support_critical_regions_only": "1",
+        "support_type": "tree(auto)",
+        "support_style": "tree_slim",
+        # "wall_loops": "3",
+        # "sparse_infill_density": "85%",  # PLAGFHT is very brittle and needs more strength
+        # # Inter-layer adhesion / brittleness tuning
+        # "nozzle_temperature": "235",
+        # "fan_min_speed": "45",
+        # "fan_max_speed": "65",
+        # "overhang_fan_speed": "80",
+        # "filament_max_volumetric_speed": "18",
+        # "outer_wall_speed": "85",
+        # "inner_wall_speed": "150",
+        # "sparse_infill_speed": "150",
+        # "internal_solid_infill_speed": "150",
+        # "filament_flow_ratio": "1.01",
+        # "infill_wall_overlap": "28%",
     }
 )
 
@@ -70,8 +74,8 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
 
         holder_mount_plate = create_box(
             holder_mount_plate_thickness,
-            holder_mount_plate_size,
             holder_mount_plate_depth + extension,
+            holder_mount_plate_size,
         )
 
         if lr == Alignment.RIGHT:
@@ -83,18 +87,17 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
             mount_box = align(mount_box, holder_mount_plate, Alignment.CENTER)
             mount_box = align(mount_box, holder_mount_plate, Alignment.FRONT)
             mount_box = align(mount_box, holder_mount_plate, Alignment.STACK_LEFT)
-            mount_box = align(mount_box, holder_mount_plate, Alignment.FRONT)
             holder_mount_plate = holder_mount_plate.fuse(mount_box)
 
         holder_mount_plate = align(holder_mount_plate, holder, Alignment.CENTER)
-        holder_mount_plate = align(holder_mount_plate, sprite_extruder, Alignment.FRONT)
+        holder_mount_plate = align(holder_mount_plate, sprite_extruder, Alignment.TOP)
 
         holder_mount_plate = align(
             holder_mount_plate, sprite_extruder, lr.stack_alignment
         )
         holder_mount_plate = align(holder_mount_plate, holder, Alignment.BACK)
 
-        holder_mount_plate = translate(0, -holder_mount_plate_top_offset, 0)(
+        holder_mount_plate = translate(0, 0, -holder_mount_plate_top_offset)(
             holder_mount_plate
         )
 
@@ -109,7 +112,7 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
     sprite_extruder_fused = sprite_extruder.leaders_followers_fused()
     retval.add_named_non_production_part(sprite_extruder_fused, "sprite_extruder")
 
-    fans = crate_part_fan_assembly()
+    fans = create_part_fan_assembly()
     fans = align_fans_to_sprite_extruder(fans, sprite_extruder)
 
     retval.add_named_non_production_part(fans, f"part_fans")
@@ -204,15 +207,15 @@ def main():
         "toolhead",
         flip=False,
         skip_in_production=False,
-        prod_rotation_angle=45,
-        prod_rotation_axis=(0, 1, 0),
+        prod_rotation_angle=-90,
+        prod_rotation_axis=(1, 0, 0),
     )
 
     parts.add(
         toolhead.get_named_follower("blower_ducts"),
         "blower_ducts",
         flip=False,
-        skip_in_production=False,
+        skip_in_production=True,
         prod_rotation_angle=45,
         prod_rotation_axis=(0, 1, 0),
     )

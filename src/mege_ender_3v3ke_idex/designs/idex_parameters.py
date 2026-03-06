@@ -173,11 +173,11 @@ tool_head_additional_mount_plate_clearance = 0.5
 tool_head_additional_mount_plate_depth_offset = -7
 
 
-holder_mount_plate_thickness = 2
-holder_mount_plate_depth = 30
+holder_mount_plate_thickness = 2.5
+holder_mount_plate_depth = 28
 holder_mount_plate_size = 8
 holder_mount_plate_top_offset = 5
-holder_mount_plate_left_extension = 17
+holder_mount_plate_left_extension = 19
 holder_mount_plate_spacer = 12
 
 duct_front_mount_plate_thickness = 3
