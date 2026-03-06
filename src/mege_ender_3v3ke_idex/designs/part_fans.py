@@ -183,7 +183,6 @@ def crate_ducts():
 
     feeder_ring = feeder_ring_rotation(feeder_ring)
     feeder_ring_cutter = feeder_ring_rotation(feeder_ring_cutter)
-
     retval = blower_tubes.fuse(feeder_ring)
 
     retval = retval.cut(blower_tube_cutters)
@@ -410,9 +409,7 @@ def crate_angled_fans(
             mount_plate_thickness=part_fan_mount_plate_thickness,
         )
         fan = rotate(180, axis=(1, 0, 0))(fan)
-        fan = rotate(lr.sign * 90, axis=(0, 0, 1))(fan)
-
-        fan = rotate(part_fan_parameters[lr]["base_rotation"])(fan)
+        fan = rotate(lr.sign * 90)(fan)
 
         fan = align(fan, None, Alignment.CENTER)
 
@@ -439,9 +436,6 @@ def crate_angled_fans(
 
         fans = fans.fuse(fan)
 
-    fans_bbox = get_bounding_box(fans)
-    fans = translate(0, 0, -fans_bbox[0][2] + part_fan_bed_clearance)(fans)
-
     return fans
 
 
@@ -455,6 +449,12 @@ def create_part_fan_assembly():
     ducts = crate_ducts()
 
     ducts = translate(0, 0, part_fan_ducts_clearance)(ducts)
+
+    ducts_bbox = get_bounding_box(ducts)
+
+    max_z = ducts_bbox[1][2]
+
+    fans = translate(0, 0, max_z)(fans)
 
     for name, cutter in fans.get_named_cutter_items():
         if "window_cutter" in name or "body_cutter" in name:

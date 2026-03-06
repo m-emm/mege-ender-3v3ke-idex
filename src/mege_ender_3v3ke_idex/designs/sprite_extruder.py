@@ -322,27 +322,33 @@ def main():
     parts = PartList()
 
     # Create the part
-    extruder = create_sprite_extruder()
-    parts.add(extruder, "sprite_extruder", flip=False)
+    sprite_extruder = create_sprite_extruder()
 
-    for name, npp in extruder.get_named_non_production_part_items():
+    sprite_extruder_size = get_bounding_box_size(sprite_extruder)
+
+    _logger.info(f"sprite_extruder size: {sprite_extruder_size}")
+    parts.add(sprite_extruder, "sprite_extruder", flip=False)
+
+    for name, npp in sprite_extruder.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
 
     mount_plates = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         mount_plate = create_box(3, 60, 40)
-        mount_plate = align(mount_plate, extruder, Alignment.CENTER)
-        mount_plate = align(mount_plate, extruder, lr.stack_alignment, stack_gap=6)
-        mount_plate = extruder.use_as_cutter_on(mount_plate)
+        mount_plate = align(mount_plate, sprite_extruder, Alignment.CENTER)
+        mount_plate = align(
+            mount_plate, sprite_extruder, lr.stack_alignment, stack_gap=6
+        )
+        mount_plate = sprite_extruder.use_as_cutter_on(mount_plate)
         mount_plates = mount_plates.fuse(mount_plate)
 
     top_mount_plate = create_box(50, 3, 50)
-    top_mount_plate = align(top_mount_plate, extruder, Alignment.CENTER)
+    top_mount_plate = align(top_mount_plate, sprite_extruder, Alignment.CENTER)
     top_mount_plate = align(
-        top_mount_plate, extruder, Alignment.STACK_FRONT, stack_gap=6
+        top_mount_plate, sprite_extruder, Alignment.STACK_FRONT, stack_gap=6
     )
 
-    top_mount_plate = extruder.use_as_cutter_on(top_mount_plate)
+    top_mount_plate = sprite_extruder.use_as_cutter_on(top_mount_plate)
 
     # mount_plates = mount_plates.fuse(top_mount_plate)
 
@@ -353,16 +359,16 @@ def main():
 
     hotend_offset_measure_stick = create_box(hotend_x_distance_from_right_edge, 1, 5)
     hotend_offset_measure_stick = align(
-        hotend_offset_measure_stick, extruder, Alignment.CENTER
+        hotend_offset_measure_stick, sprite_extruder, Alignment.CENTER
     )
     hotend_offset_measure_stick = align(
-        hotend_offset_measure_stick, extruder, Alignment.STACK_FRONT, stack_gap=1
+        hotend_offset_measure_stick, sprite_extruder, Alignment.STACK_FRONT, stack_gap=1
     )
     hotend_offset_measure_stick = align(
-        hotend_offset_measure_stick, extruder, Alignment.RIGHT
+        hotend_offset_measure_stick, sprite_extruder, Alignment.RIGHT
     )
 
-    hotend = extruder.get_named_non_production_part("hotend")
+    hotend = sprite_extruder.get_named_non_production_part("hotend")
     hotend_offset_measure_stick = align(
         hotend_offset_measure_stick, hotend, Alignment.BOTTOM
     )

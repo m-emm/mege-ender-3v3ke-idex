@@ -165,12 +165,13 @@ tool_head_mount_belt_clamp_length = 12
 
 tool_head_additional_mount_plate_thickness = 3
 
-tool_head_additional_mount_plate_height = 10
-tool_head_additional_mount_plate_depth = 19
+tool_head_additional_mount_plate_height = 24
+tool_head_additional_mount_plate_depth = 10
+tool_head_additional_mount_plate_z_offset = -7
 
 tool_head_additional_mount_plate_fillet_radius = 2
 tool_head_additional_mount_plate_clearance = 0.5
-tool_head_additional_mount_plate_depth_offset = -7
+tool_head_additional_mount_plate_depth_offset = 0
 
 
 holder_mount_plate_thickness = 2.5
@@ -180,12 +181,16 @@ holder_mount_plate_top_offset = 5
 holder_mount_plate_left_extension = 19
 holder_mount_plate_spacer = 12
 
-duct_front_mount_plate_thickness = 3
+duct_front_mount_plate_thickness = 4
 duct_front_mount_plate_width = 41
 duct_front_mount_plate_height = 12
 duct_front_mount_plate_height_border = 2
 duct_front_mount_plate_width_border = 10
 duct_front_mount_plate_offset = -3
+
+tool_head_front_mount_plate_connector_thickness = 4
+tool_head_front_mount_plate_connector_height = 13
+tool_head_front_mount_plate_connector_width = 8
 
 
 nitehawk_holder_extruder_gap = 12
@@ -280,27 +285,25 @@ nitehawk_mount_tower_base_extension = 2.0
 
 part_fan_parameters = {
     Alignment.LEFT: {  # this is the vertical downblower on the left
-        "base_rotation": 0,
         "around_angle": 0,
         "x_offset": 27.8,
         "y_offset": 35,
-        "z_offset": 10,
+        "z_offset": 6,
         "rotation": 90,
         "tilt": 0,
-        "mount_plate_blow_direction_oversize": 1,
-        "mount_plate_cross_oversize": 3,
+        "mount_plate_blow_direction_oversize": 3,
+        "mount_plate_cross_oversize": 2,
         "mount_plate_blow_direction_offset": -1,
     },
     Alignment.RIGHT: {  # this is the flat blower on the back
-        "base_rotation": 0,
         "around_angle": 90,
-        "x_offset": 20,
+        "x_offset": 21,
         "y_offset": 5,
-        "z_offset": 0,
-        "rotation": 13,
+        "z_offset": -4.5,
+        "rotation": 15,
         "tilt": 0,
         "mount_plate_blow_direction_oversize": 7,
-        "mount_plate_cross_oversize": 3,
+        "mount_plate_cross_oversize": 8,
         "mount_plate_blow_direction_offset": -2,
     },
 }

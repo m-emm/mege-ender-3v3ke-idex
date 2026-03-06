@@ -36,8 +36,8 @@ PROCESS_DATA["process_overrides"].update(
         "brim_type": "no_brim",
         "support_on_build_plate_only": "1",
         "support_critical_regions_only": "1",
-        "support_type": "tree(auto)",
-        "support_style": "tree_slim",
+        # "support_type": "tree(auto)",
+        # "support_style": "tree_slim",
         # "wall_loops": "3",
         # "sparse_infill_density": "85%",  # PLAGFHT is very brittle and needs more strength
         # # Inter-layer adhesion / brittleness tuning
@@ -128,6 +128,7 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
     )
     side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.CENTER)
     side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.BACK)
+    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.BOTTOM)
 
     side_mount_plate = align(
         side_mount_plate,
@@ -136,10 +137,11 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
         stack_gap=tool_head_additional_mount_plate_clearance,
     )
 
-    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.BOTTOM)
-    side_mount_plate = translate(0, tool_head_additional_mount_plate_depth_offset, 0)(
-        side_mount_plate
-    )
+    side_mount_plate = translate(
+        0,
+        tool_head_additional_mount_plate_depth_offset,
+        tool_head_additional_mount_plate_z_offset,
+    )(side_mount_plate)
 
     # parts_to_print = parts_to_print.fuse(side_mount_plate)
 
@@ -186,6 +188,23 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
 
     blower_ducts = blower_ducts.fuse(duct_front_mount_plate)
 
+    duct_front_mount_plate_connector = create_box(
+        tool_head_front_mount_plate_connector_width,
+        tool_head_front_mount_plate_connector_thickness,
+        tool_head_front_mount_plate_connector_height,
+    )
+    duct_front_mount_plate_connector = align(
+        duct_front_mount_plate_connector, duct_front_mount_plate, Alignment.BACK
+    )
+    duct_front_mount_plate_connector = align(
+        duct_front_mount_plate_connector, duct_front_mount_plate, Alignment.STACK_BOTTOM
+    )
+    duct_front_mount_plate_connector = align(
+        duct_front_mount_plate_connector, duct_front_mount_plate, Alignment.LEFT
+    )
+
+    blower_ducts = blower_ducts.fuse(duct_front_mount_plate_connector)
+
     for name, cutter in sprite_extruder.get_named_cutter_items():
         parts_to_print = parts_to_print.cut(cutter)
         blower_ducts = blower_ducts.cut(cutter)
@@ -206,7 +225,7 @@ def main():
         toolhead,
         "toolhead",
         flip=False,
-        skip_in_production=False,
+        skip_in_production=True,
         prod_rotation_angle=-90,
         prod_rotation_axis=(1, 0, 0),
     )
@@ -215,7 +234,7 @@ def main():
         toolhead.get_named_follower("blower_ducts"),
         "blower_ducts",
         flip=False,
-        skip_in_production=True,
+        skip_in_production=False,
         prod_rotation_angle=45,
         prod_rotation_axis=(0, 1, 0),
     )
