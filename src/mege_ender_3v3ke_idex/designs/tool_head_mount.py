@@ -25,7 +25,7 @@ from mege_ender_3v3ke_idex.designs.mgh_linear import (
     create_mgn12h_carriage,
     create_mgn12h_rail,
 )
-from mege_ender_3v3ke_idex.designs.tool_head import create_tool_head
+from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -37,6 +37,19 @@ PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 _logger = logging.getLogger(__name__)
 
 PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLACF_04_HS)
+PROCESS_DATA["process_overrides"].update(
+    {
+        "enable_support": "1",
+        "support_threshold_angle": "30",
+        "brim_type": "no_brim",
+        "support_on_build_plate_only": "1",
+        "support_critical_regions_only": "1",
+        # "support_type": "tree(auto)",
+        # "support_style": "tree_slim",
+        "wall_loops": "3",
+        "sparse_infill_density": "75%",
+    }
+)
 
 
 def create_tool_head_mount(target_profile):
@@ -114,7 +127,12 @@ def create_tool_head_mount(target_profile):
     mount_base_plate = align(
         mount_base_plate, carriage_mount_plate, Alignment.STACK_BOTTOM
     )
-    mount_base_plate = align(mount_base_plate, carriage_mount_plate, Alignment.FRONT)
+    mount_base_plate = align(
+        mount_base_plate,
+        carriage,
+        Alignment.STACK_FRONT,
+        stack_gap=tool_head_mount_plate_carriage_clearance,
+    )
 
     side_plates = PartCollector()
     side_plate_stiffeners = PartCollector()
@@ -122,7 +140,7 @@ def create_tool_head_mount(target_profile):
         side_plate = create_filleted_box(
             tool_head_mount_side_plate_thickness,
             tool_head_mount_side_plate_depth,
-            tool_head_mount_base_plate_height,
+            tool_head_mount_side_plate_height,
             fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
             no_fillets_at=[Alignment.TOP, lr.opposite],
         )
@@ -268,7 +286,9 @@ def create_tool_head_mount(target_profile):
             stack_gap=-tool_head_mount_belt_deflector_into_profile_distance,
         )
 
-        belt_deflector_trimmer = create_box(BIG_THING, BIG_THING, BIG_THING)
+        belt_deflector_trimmer = create_box(
+            BIG_THING + 10, BIG_THING + 10, BIG_THING + 10
+        )
         belt_deflector_trimmer = align(
             belt_deflector_trimmer, belt_deflector, Alignment.CENTER
         )
@@ -391,24 +411,22 @@ def create_tool_head_mount(target_profile):
     mount_base_plate = mount_base_plate.cut(clamp_cutter)
     mount_base_plate = mount_base_plate.cut(bases_cutter)
 
-    tool_head = create_tool_head()
+    sprite_extruder = create_sprite_extruder()
+    sprite_extruder = rotate(180)(sprite_extruder)
 
-    tool_head = align(tool_head, carriage, Alignment.CENTER)
-
-    sprite_extruder = tool_head.get_named_non_production_part("sprite_extruder")
-
-    tool_head_aligner = align_translation(
+    sprite_extruder = align(sprite_extruder, target_profile, Alignment.TOP)
+    sprite_extruder = align(
         sprite_extruder,
-        target_profile,
+        mount_base_plate,
         Alignment.STACK_FRONT,
-        stack_gap=tool_head_mount_sprite_extruder_clearance,
+        stack_gap=tool_head_mount_tool_head_base_plate_clearance,
     )
 
-    tool_head = tool_head_aligner(tool_head)
-    tool_head = align(tool_head, target_profile, Alignment.TOP)
-    tool_head = translate(
+    sprite_extruder = translate(
         tool_head_mount_tool_head_x_offset, 0, tool_head_mount_tool_head_z_offset
-    )(tool_head)
+    )(sprite_extruder)
+
+    mount_base_plate = sprite_extruder.use_as_cutter_on(mount_base_plate)
 
     extruder_cutout = create_filleted_box(
         tool_head_mount_extruder_cutout_width,
@@ -418,8 +436,6 @@ def create_tool_head_mount(target_profile):
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
     extruder_cutout = align(extruder_cutout, carriage_mount_plate, Alignment.CENTER)
-
-    sprite_extruder = tool_head.get_named_non_production_part("sprite_extruder")
 
     extruder_cutout = align(extruder_cutout, sprite_extruder, Alignment.RIGHT)
 
@@ -434,7 +450,7 @@ def create_tool_head_mount(target_profile):
     tool_head_mount = carriage_mount_plate.fuse(clamps_fused)
     tool_head_mount = tool_head_mount.fuse(belt_deflectors)
 
-    #     tool_head_mount = tool_head_mount.fuse(mount_base_plate)
+    tool_head_mount = tool_head_mount.fuse(mount_base_plate)
     side_plates = side_plates.cut(bases_cutter)
     side_plates = side_plates.cut(belt_path_cutter)
 
@@ -443,8 +459,14 @@ def create_tool_head_mount(target_profile):
 
     tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
     tool_head_mount.add_named_follower(clamp.leader, "belt_clamp_base")
+    tool_head_mount.add_named_follower(
+        clamp.get_follower_part_by_name("belt_clamp_base_1"), "belt_clamp_base_1"
+    )
+    tool_head_mount.add_named_follower(
+        clamp.get_follower_part_by_name("belt_clamp_base_2"), "belt_clamp_base_2"
+    )
 
-    return tool_head_mount, carriage, tool_head
+    return tool_head_mount, carriage, sprite_extruder
 
 
 def main():
@@ -490,15 +512,20 @@ def main():
     )
 
     # Create the part
-    tool_head_mount, carriage_1, tool_head_1 = create_tool_head_mount(
+    tool_head_mount, carriage_1, sprite_extruder_1 = create_tool_head_mount(
         lower_axis_profile
     )
 
     parts.add(carriage_1, "carriage_1", flip=False, skip_in_production=True)
-    parts.add(tool_head_1, "tool_head_1", flip=False, skip_in_production=True)
 
-    for name, npp in tool_head_1.get_named_non_production_part_items():
-        parts.add(npp, name, flip=False, skip_in_production=True)
+    show_sprite_extruder = True
+    if show_sprite_extruder:
+        parts.add(
+            sprite_extruder_1, "sprite_extruder", flip=False, skip_in_production=True
+        )
+
+        for name, npp in sprite_extruder_1.get_named_non_production_part_items():
+            parts.add(npp, name, flip=False, skip_in_production=True)
 
     # tool_head_mount = align(
     #     tool_head_mount,
@@ -519,7 +546,32 @@ def main():
     #     tool_head_mount
     # )
 
-    parts.add(tool_head_mount, "tool_head_mount", flip=True)
+    parts.add(
+        tool_head_mount,
+        "tool_head_mount",
+        flip=True,
+        # prod_rotation_angle=-45,
+        # prod_rotation_axis=(1, 0, 0),
+        skip_in_production=False,
+    )
+
+    belt_clamp_base_1 = tool_head_mount.get_named_follower("belt_clamp_base_1")
+    parts.add(
+        belt_clamp_base_1,
+        "belt_clamp_base_1",
+        flip=False,
+        prod_rotation_angle=-90,
+        prod_rotation_axis=(0, 1, 0),
+    )
+
+    belt_clamp_base_2 = tool_head_mount.get_named_follower("belt_clamp_base_2")
+    parts.add(
+        belt_clamp_base_2,
+        "belt_clamp_base_2",
+        flip=False,
+        prod_rotation_angle=90,
+        prod_rotation_axis=(0, 1, 0),
+    )
 
     # Arrange and export
     arrange_and_export(
@@ -527,6 +579,7 @@ def main():
         script_file=__file__,
         prod=PROD,
         process_data=PROCESS_DATA,
+        prod_gap=8,
     )
 
     _logger.info("tool_head_mount created successfully!")
