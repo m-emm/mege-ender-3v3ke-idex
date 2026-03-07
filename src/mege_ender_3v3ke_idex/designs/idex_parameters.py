@@ -169,7 +169,7 @@ tool_head_additional_mount_plate_thickness = 3
 
 tool_head_additional_mount_plate_height = 24
 tool_head_additional_mount_plate_depth = 10
-tool_head_additional_mount_plate_z_offset = -7
+tool_head_additional_mount_plate_z_offset = -10
 
 tool_head_additional_mount_plate_fillet_radius = 2
 tool_head_additional_mount_plate_clearance = 0.5
@@ -186,13 +186,13 @@ holder_mount_plate_spacer = 12
 duct_front_mount_plate_thickness = 4
 duct_front_mount_plate_width = 41
 duct_front_mount_plate_height = 12
-duct_front_mount_plate_height_border = 2
+duct_front_mount_plate_height_border = 3
 duct_front_mount_plate_width_border = 10
 duct_front_mount_plate_offset = -3
 
 tool_head_front_mount_plate_connector_thickness = 4
-tool_head_front_mount_plate_connector_height = 13
-tool_head_front_mount_plate_connector_width = 8
+tool_head_front_mount_plate_connector_height = 14
+tool_head_front_mount_plate_connector_width = 7.5
 
 
 nitehawk_holder_extruder_gap = 12

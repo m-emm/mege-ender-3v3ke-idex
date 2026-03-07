@@ -157,11 +157,20 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
         duct_front_mount_plate_thickness,
     )
 
+    cutout_width = (
+        duct_front_mount_plate_width - 2 * duct_front_mount_plate_width_border
+    )
+    cutout_height = (
+        duct_front_mount_plate_height - 2 * duct_front_mount_plate_height_border
+    )
+    min_cutoout_dimension = min(cutout_width, cutout_height)
+    cutout_fillet_radius = min_cutoout_dimension / 4
+
     duct_front_mount_plate_cutout = create_filleted_box(
-        duct_front_mount_plate_width - 2 * duct_front_mount_plate_width_border,
-        duct_front_mount_plate_height - 2 * duct_front_mount_plate_height_border,
+        cutout_width,
+        cutout_height,
         duct_front_mount_plate_thickness + 10,
-        fillet_radius=duct_front_mount_plate_height / 4,
+        fillet_radius=cutout_fillet_radius,
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
 
