@@ -36,6 +36,13 @@ PROCESS_DATA["process_overrides"].update(
         "brim_type": "no_brim",
         "support_on_build_plate_only": "1",
         "support_critical_regions_only": "1",
+        "support_top_z_distance": "0.3",
+        "support_interface_spacing": "0.8",
+        "fan_min_speed": "10",
+        "fan_max_speed": "25",
+        "external_perimeter_speed": "75",
+        "outer_wall_speed": "75",
+        "sparse_infill_density": "85%",
         # "support_type": "tree(auto)",
         # "support_style": "tree_slim",
         # "wall_loops": "3",
@@ -244,7 +251,7 @@ def main():
         "blower_ducts",
         flip=False,
         skip_in_production=False,
-        prod_rotation_angle=45,
+        prod_rotation_angle=50,
         prod_rotation_axis=(0, 1, 0),
     )
 

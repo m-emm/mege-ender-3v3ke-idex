@@ -186,7 +186,7 @@ holder_mount_plate_spacer = 12
 duct_front_mount_plate_thickness = 4
 duct_front_mount_plate_width = 41
 duct_front_mount_plate_height = 12
-duct_front_mount_plate_height_border = 3
+duct_front_mount_plate_height_border = 2.5
 duct_front_mount_plate_width_border = 10
 duct_front_mount_plate_offset = -3
 
