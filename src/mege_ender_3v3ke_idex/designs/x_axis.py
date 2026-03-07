@@ -45,112 +45,42 @@ EXTUDER_STEP_PATH = PROJECT_ROOT / "resources" / "creality_sprite.step.zip"
 BIG_THING = 500
 
 
-# PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PLA_08_HS)
-
-
-# PROCESS_DATA["process_overrides"].update(
-#     {
-#         # ============================================================
-#         # SINGLE-WALL INTENT
-#         # ============================================================
-#         "wall_loops": "1",
-#         # Make thickness == line width everywhere that could interfere
-#         "line_width": "0.90",
-#         "outer_wall_line_width": "0.90",
-#         "inner_wall_line_width": "0.90",
-#         "thin_wall_line_width": "0.90",
-#         "top_surface_line_width": "0.90",
-#         "gap_fill_line_width": "0.90",
-#         # If you truly want a pure shell, consider enabling these:
-#         "bottom_shell_layers": "1",
-#         "top_shell_layers": "1",
-#         # ============================================================
-#         # LAYER HEIGHT — tuned to ~30 mm³/s at outer wall speed
-#         # ============================================================
-#         "adaptive_layer_height": "0",
-#         "layer_height": "0.42",
-#         "min_layer_height": "0.42",
-#         "max_layer_height": "0.42",
-#         # First layer: slightly fatter for adhesion (not too squished)
-#         "initial_layer_print_height": "0.32",
-#         "initial_layer_line_width": "1.00",
-#         # ============================================================
-#         # SPEEDS — volumetric-flow limited
-#         # With 0.90*0.42=0.378 mm²:
-#         # 80 mm/s => ~30.2 mm³/s
-#         # ============================================================
-#         "outer_wall_speed": "70",
-#         "external_perimeter_speed": "70",
-#         # First layer slower for stick
-#         "initial_layer_speed": "45",
-#         "initial_layer_infill_speed": "60",
-#         # Keep other paths consistent (not too relevant for pure shell)
-#         "inner_wall_speed": "150",
-#         "solid_infill_speed": "180",
-#         "sparse_infill_speed": "180",
-#         # Avoid slicer "gap fill" games for single-wall shells
-#         "gap_fill_speed": "180",
-#         "gap_infill_speed": "180",
-#         # ============================================================
-#         # ACCEL / JERK — tall shell stability (avoid ringing/wobble)
-#         # ============================================================
-#         "outer_wall_acceleration": "3000",
-#         "outer_wall_jerk": "6",
-#         # ============================================================
-#         # FLOW LIMIT — enforce the regime we designed for
-#         # ============================================================
-#         "filament_max_volumetric_speed": "30",
-#         # ============================================================
-#         # TEMPERATURE — you need more than 205C at ~30 mm³/s
-#         # ============================================================
-#         "nozzle_temperature": "230",
-#         "nozzle_temperature_initial_layer": "235",
-#         # ============================================================
-#         # COOLING — not 100% (helps layer welding on thick beads)
-#         # ============================================================
-#         "fan_min_speed": "70",
-#         "fan_max_speed": "70",
-#         "overhang_fan_speed": "70",
-#         "fan_cooling_layer_time": "8",
-#         "min_layer_time": "4",
-#         "slow_down_for_layer_cooling": "0",
-#         # ============================================================
-#         # BED / ADHESION — keep as you already do (75/75 is fine)
-#         # ============================================================
-#         "brim_width": "4",
-#         "brim_type": "no_brim",  # "outer_and_inner",
-#         "elefant_foot_compensation": "0.10",
-#         # ============================================================
-#         # RETRACTION — big nozzle needs a bit more, but keep it sane
-#         # ============================================================
-#         "filament_retraction_length": "1.2",
-#         "filament_retraction_speed": "40",
-#         "filament_deretraction_speed": "35",
-#         # ============================================================
-#         # OPTIONAL: pressure advance (keep modest for fat beads)
-#         # ============================================================
-#         "enable_pressure_advance": "1",
-#         "pressure_advance": "0.015",
-#         # ============================================================
-#         # OVERHANG / BRIDGE — disable overhang slowdown for draft mode
-#         # Let it print at full 70 mm/s outer_wall_speed throughout.
-#         # Only slow down for true bridges (extreme overhangs >115mm).
-#         # ============================================================
-#         "overhang_1_4_speed": "0",  # Disabled
-#         "overhang_2_4_speed": "0",  # Disabled - was causing ugly 55-100mm zone
-#         "overhang_3_4_speed": "0",  # Disabled
-#         "overhang_4_4_speed": "0",  # Disabled
-#         "bridge_speed": "35",  # Keep bridges slow when detected
-#         "enable_support": "0",
-#         "support_threshold_angle": "23",
-#     }
-# )
-
-
-# PROCESS_DATA = augment_with_layer_height(PROCESS_DATA, layer_height_factor=0.9)
 
 
 PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_04_HS)
+
+PROCESS_DATA["process_overrides"].update(
+    {
+        "enable_support": "1",
+        "support_threshold_angle": "30",
+        "brim_type": "no_brim",
+        "support_on_build_plate_only": "1",
+        "support_critical_regions_only": "1",
+        "support_top_z_distance": "0.3",
+        "support_interface_spacing": "0.8",
+        "fan_min_speed": "10",
+        "fan_max_speed": "25",
+        "external_perimeter_speed": "75",
+        "outer_wall_speed": "75",
+        "sparse_infill_density": "85%",
+        # "support_type": "tree(auto)",
+        # "support_style": "tree_slim",
+        # "wall_loops": "3",
+        # "sparse_infill_density": "85%",  # PLAGFHT is very brittle and needs more strength
+        # # Inter-layer adhesion / brittleness tuning
+        # "nozzle_temperature": "235",
+        # "fan_min_speed": "45",
+        # "fan_max_speed": "65",
+        # "overhang_fan_speed": "80",
+        # "filament_max_volumetric_speed": "18",
+        # "outer_wall_speed": "85",
+        # "inner_wall_speed": "150",
+        # "sparse_infill_speed": "150",
+        # "internal_solid_infill_speed": "150",
+        # "filament_flow_ratio": "1.01",
+        # "infill_wall_overlap": "28%",
+    }
+)
 
 endstop_holder_z_offset = 8
 endstop_holder_inset_from_end = 15
