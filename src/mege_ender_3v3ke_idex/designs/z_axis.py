@@ -84,7 +84,9 @@ z_axis_carriage_mount_screw_size = "M3"
 z_axis_carriage_bearing_inset = 5
 z_axis_carriage_threaded_rod_clearance = 0.3
 z_axis_carriage_profile_clearance = 2
-
+z_axis_motor_mount_plate_profile_distance = 0
+z_axis_motor_mount_plate_size = 52
+z_axis_motor_mount_plate_depth = 70
 igus_drylin_bearing_inner_diameter = 8
 igus_drylin_bearing_outer_diameter = 16
 igus_drylin_bearing_length = 25
@@ -642,9 +644,7 @@ def create_z_axis():
 
     retval = LeaderFollowersCuttersPart(z_axis_profile)
 
-
     rods_assembly = LeaderFollowersCuttersPart(guide_rod)
-
 
     rods_assembly.add_named_non_production_part(threaded_rod, "threaded_rod")
 
@@ -695,10 +695,14 @@ def create_z_axis():
     for name, part in rod_clamp.get_named_follower_items():
         rods_assembly.add_named_follower(part, name)
 
-    motor = create_nema_composite()
+    motor = create_nema_composite(
+        axle_clearance=motor_mount_axle_clearance,
+        boss_clearance=motor_mount_boss_clearance,
+        boss_clearance_z=motor_mount_boss_clearance_z,
+    )
 
     motor = align(motor, threaded_rod, Alignment.CENTER)
-    
+
     motor = align(motor, z_axis_profile, Alignment.BOTTOM)
 
     coupler = motor.get_named_follower("coupler")
@@ -707,7 +711,7 @@ def create_z_axis():
         threaded_rod_part,
         coupler,
         Alignment.STACK_TOP,
-        stack_gap=0 # -z_axis_threaded_rod_coupler_overlap,
+        stack_gap=0,  # -z_axis_threaded_rod_coupler_overlap,
     )
 
     rods_assembly = coupler_aligner(rods_assembly)
@@ -718,6 +722,28 @@ def create_z_axis():
 
     for name, part in motor.get_named_follower_items():
         retval.add_named_non_production_part(part, name)
+
+    motor_body = motor.get_named_follower("body")
+    mount_plate = create_filleted_box(
+        z_axis_motor_mount_plate_size,
+        z_axis_motor_mount_plate_depth,
+        motor_mount_plate_thickness,
+        motor_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    mount_plate = align(mount_plate, motor, Alignment.CENTER)
+    mount_plate = align(mount_plate, motor_body, Alignment.STACK_TOP)
+
+    mount_plate = align(
+        mount_plate,
+        z_axis_profile,
+        Alignment.STACK_FRONT,
+        stack_gap=z_axis_motor_mount_plate_profile_distance,
+    )
+
+    mount_plate = motor.use_as_cutter_on(mount_plate)
+
+    retval.add_named_follower(mount_plate, "motor_mount_plate")
 
     return retval
 
