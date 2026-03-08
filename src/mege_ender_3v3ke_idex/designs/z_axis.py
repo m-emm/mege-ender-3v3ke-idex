@@ -79,6 +79,66 @@ igus_drylin_bearing_inner_diameter = 8
 igus_drylin_bearing_outer_diameter = 16
 igus_drylin_bearing_length = 25
 
+pillow_block_bearing_base_thickness = 5.1
+pillow_block_bearing_base_width = 13.1
+pillow_block_bearing_base_overall_length = 55
+
+pillow_block_bearing_base_gap_length = 24.7
+pillow_block_bottom_base_bridge_width = 3.5
+
+pillow_block_bearing_mount_hole_diameter = 4.6
+pillow_block_bearing_mount_hole_center_distance = 41.5
+pillow_block_bearing_cage_diameter = 30
+pillow_block_bearing_cage_thickness = 9.6
+pillow_block_bearing_cage_rim = 2
+
+pillow_block_bearing_rod_holder_outer_diameter = 12
+pillow_block_bearing_rod_holder_inner_diameter = 8.03
+pillow_block_bearing_rod_holder_length = 11
+
+
+bb_608z_outer_diameter = 22
+bb_608z_height = 7
+v_slot_wheel_608z_bearing_radial_clearance = 0.0
+
+v_slot_wheel_608z_ease_in_size = 0.7
+v_slot_wheel_608z_singularity_cutter_thickness = 0.15
+
+v_slot_wheel_608z_top_bottom_holder_size = 0.65
+v_slot_wheel_608z_top_bottom_holder_axial_clearance = 0.05
+
+v_slot_wheel_608z_width = 10.2
+v_slot_wheel_608z_inner_width = 5
+v_slot_wheel_608z_outer_diameter = 27.5
+
+
+def create_608z_bearing(diameter_increase=0, height_increase=0):
+    inner_diameter = 8
+    height = bb_608z_height + height_increase
+    outer_ring_width = 2
+    inner_ring_width = 1.8
+    bearing_height = height - 0.2
+
+    outer_diameter = bb_608z_outer_diameter + diameter_increase
+    bb_608_z = create_ring(
+        outer_diameter / 2, outer_diameter / 2 - outer_ring_width, height
+    )
+    bb_608_z = bb_608_z.fuse(
+        create_ring(inner_diameter / 2 + outer_ring_width, inner_diameter / 2, height)
+    )
+    bearing = bb_608_z.fuse(
+        create_ring(
+            outer_diameter / 2 - outer_ring_width,
+            inner_diameter / 2 + inner_ring_width,
+            bearing_height,
+        )
+    )
+    bearing = translate(0, 0, (height - bearing_height) / 2)(bearing)
+
+    bb_608_z = bb_608_z.fuse(bearing)
+
+    return bb_608_z
+
 
 def create_igus_drylin_bearing(cutter_clearance=0.1, cutter_extra_length=2):
     bearing = create_ring(
@@ -93,6 +153,112 @@ def create_igus_drylin_bearing(cutter_clearance=0.1, cutter_extra_length=2):
     cutter = align(cutter, bearing, Alignment.CENTER)
 
     retval = LeaderFollowersCuttersPart(bearing, cutters=[cutter])
+
+    return retval
+
+
+def create_pillow_block_bearing():
+
+    bearing = create_608z_bearing()
+
+    cage = create_ring(
+        pillow_block_bearing_cage_diameter / 2,
+        (pillow_block_bearing_cage_diameter / 2) - pillow_block_bearing_cage_rim,
+        pillow_block_bearing_cage_thickness,
+    )
+
+    cage = align(cage, bearing, Alignment.CENTER)
+
+    cage_filler = create_ring(
+        pillow_block_bearing_cage_diameter / 2 - pillow_block_bearing_cage_rim,
+        bb_608z_outer_diameter / 2,
+        bb_608z_height,
+    )
+
+    cage_filler = align(cage_filler, bearing, Alignment.CENTER)
+
+    base = create_box(
+        pillow_block_bearing_base_overall_length,
+        pillow_block_bearing_base_thickness,
+        pillow_block_bearing_base_width,
+    )
+
+    base_gap_cutter = create_box(
+        pillow_block_bearing_base_gap_length, BIG_THING, BIG_THING
+    )
+    base_gap_cutter = align(base_gap_cutter, base, Alignment.CENTER)
+    base = base.cut(base_gap_cutter)
+
+    base_bridge = create_box(
+        pillow_block_bearing_base_gap_length,
+        pillow_block_bearing_base_thickness,
+        pillow_block_bottom_base_bridge_width,
+    )
+    base_bridge = align(base_bridge, base, Alignment.CENTER)
+    base_bridge = align(base_bridge, base, Alignment.FRONT)
+    base = base.fuse(base_bridge)
+
+    base = align(base, bearing, Alignment.CENTER)
+    base = align(base, cage, Alignment.FRONT)
+
+    base_sides = PartCollector()
+
+    mount_hole_cutters = []
+
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        # base_side = create_box(
+        #     pillow_block_bearing_cage_rim,
+        #     pillow_block_bearing_cage_diameter / 2,
+        #     pillow_block_bearing_cage_thickness,
+        # )
+
+        base_side = create_pyramid_stump(
+            pillow_block_bearing_cage_rim,
+            pillow_block_bearing_cage_rim,
+            pillow_block_bearing_base_width,
+            pillow_block_bearing_cage_thickness,
+            pillow_block_bearing_cage_diameter / 2,
+        )
+        base_side = rotate(-90, axis=(1, 0, 0))(base_side)
+
+        base_side = align(base_side, cage, Alignment.CENTER)
+        base_side = align(base_side, base, Alignment.FRONT)
+        base_side = align(base_side, cage, lr)
+        base_sides = base_sides.fuse(base_side)
+
+        mount_hole_cutter = create_cylinder(
+            pillow_block_bearing_mount_hole_diameter / 2, BIG_THING
+        )
+        mount_hole_cutter = rotate(90, axis=(1, 0, 0))(mount_hole_cutter)
+
+        mount_hole_cutter = align(mount_hole_cutter, base, Alignment.CENTER)
+        mount_hole_cutter = translate(
+            lr.sign * pillow_block_bearing_mount_hole_center_distance / 2, 0, 0
+        )(mount_hole_cutter)
+        mount_hole_cutters.append(mount_hole_cutter)
+
+    for mount_hole_cutter in mount_hole_cutters:
+        base = base.cut(mount_hole_cutter)
+
+    base = base.fuse(base_sides)
+
+    rod_holder = create_ring(
+        pillow_block_bearing_rod_holder_outer_diameter / 2,
+        pillow_block_bearing_rod_holder_inner_diameter / 2,
+        pillow_block_bearing_rod_holder_length,
+    )
+    rod_holder = align(rod_holder, bearing, Alignment.CENTER)
+    rod_holder = align(rod_holder, bearing, Alignment.BOTTOM)
+    bearing = bearing.fuse(rod_holder)
+
+    retval = LeaderFollowersCuttersPart(bearing)
+    retval.add_named_non_production_part(cage, "cage")
+    retval.add_named_non_production_part(cage_filler, "cage_filler")
+    retval.add_named_non_production_part(base, "base")
+    for i, mount_hole_cutter in enumerate(mount_hole_cutters):
+        retval.add_named_cutter(mount_hole_cutter, f"mount_hole_cutter_{i}")
+
+    retval = rotate(-90, axis=(1, 0, 0))(retval)
 
     return retval
 
@@ -284,7 +450,13 @@ def main():
     # part = create_z_axis()
     # parts.add(part, "z_axis", flip=False)
 
-    # Arrange and export
+    bearing = create_pillow_block_bearing()
+    bearing = translate(100, 0, -20)(bearing)
+
+    parts.add(bearing, "pillow_block_bearing", flip=False, skip_in_production=True)
+    for name, npp in bearing.get_named_non_production_part_items():
+        parts.add(npp, name, flip=False, skip_in_production=True)
+
     arrange_and_export(
         parts.as_list(),
         script_file=__file__,
