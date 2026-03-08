@@ -61,9 +61,10 @@ z_axis_threaded_rod_length = 500
 
 z_axis_threaded_rod_profile_distance = 22
 z_axis_thraded_rod_z_offset = 90
+z_axis_threaded_rod_coupler_overlap = 17.5
 
 
-z_axis_pillow_block_bearing_z_offset = 10
+z_axis_pillow_block_bearing_z_offset = 2
 
 z_axis_guide_rod_length = 600
 z_axis_guide_rod_diameter = 8
@@ -641,8 +642,11 @@ def create_z_axis():
 
     retval = LeaderFollowersCuttersPart(z_axis_profile)
 
-    retval.add_named_non_production_part(guide_rod, "guide_rod")
-    retval.add_named_non_production_part(threaded_rod, "threaded_rod")
+
+    rods_assembly = LeaderFollowersCuttersPart(guide_rod)
+
+
+    rods_assembly.add_named_non_production_part(threaded_rod, "threaded_rod")
 
     pillow_block_bearing = create_pillow_block_bearing()
 
@@ -656,13 +660,13 @@ def create_z_axis():
         pillow_block_bearing
     )
 
-    retval.add_named_non_production_part(
+    rods_assembly.add_named_non_production_part(
         pillow_block_bearing.leader, "pillow_block_bearing_body"
     )
 
     for name, part in pillow_block_bearing.get_named_non_production_part_items():
 
-        retval.add_named_non_production_part(part, name)
+        rods_assembly.add_named_non_production_part(part, name)
 
     axial_bearing_stopper = create_axial_bearing_stopper()
 
@@ -671,14 +675,14 @@ def create_z_axis():
         axial_bearing_stopper, pillow_block_bearing, Alignment.STACK_TOP
     )
 
-    retval.add_named_follower(axial_bearing_stopper, "axial_bearing_stopper")
+    rods_assembly.add_named_follower(axial_bearing_stopper, "axial_bearing_stopper")
 
     axial_bearing = create_axial_ball_bearing_8_x_19()
 
     axial_bearing = align(axial_bearing, threaded_rod, Alignment.CENTER)
     axial_bearing = align(axial_bearing, axial_bearing_stopper, Alignment.STACK_TOP)
 
-    retval.add_named_non_production_part(axial_bearing, "axial_bearing")
+    rods_assembly.add_named_non_production_part(axial_bearing, "axial_bearing")
 
     rod_clamp = create_axial_rod_clamp()
 
@@ -686,19 +690,31 @@ def create_z_axis():
     rod_clamp = align(rod_clamp, axial_bearing, Alignment.STACK_TOP)
 
     for name, part in rod_clamp.get_named_non_production_part_items():
-        retval.add_named_non_production_part(part, name)
+        rods_assembly.add_named_non_production_part(part, name)
 
     for name, part in rod_clamp.get_named_follower_items():
-        retval.add_named_follower(part, name)
+        rods_assembly.add_named_follower(part, name)
 
     motor = create_nema_composite()
 
     motor = align(motor, threaded_rod, Alignment.CENTER)
+    
+    motor = align(motor, z_axis_profile, Alignment.BOTTOM)
 
     coupler = motor.get_named_follower("coupler")
-    coupler_aligner = align_translation(coupler, threaded_rod, Alignment.STACK_BOTTOM)
+    threaded_rod_part = rods_assembly.get_named_non_production_part("threaded_rod")
+    coupler_aligner = align_translation(
+        threaded_rod_part,
+        coupler,
+        Alignment.STACK_TOP,
+        stack_gap=0 # -z_axis_threaded_rod_coupler_overlap,
+    )
 
-    motor = coupler_aligner(motor)
+    rods_assembly = coupler_aligner(rods_assembly)
+
+    retval = retval.merge_except_leader(rods_assembly)
+
+    retval.add_named_non_production_part(guide_rod, "guide_rod")
 
     for name, part in motor.get_named_follower_items():
         retval.add_named_non_production_part(part, name)
