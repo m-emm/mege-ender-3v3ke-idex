@@ -63,7 +63,7 @@ z_axis_threaded_rod_profile_distance = 22
 z_axis_thraded_rod_z_offset = 90
 
 
-z_axis_pillow_block_bearing_z_offset = 15
+z_axis_pillow_block_bearing_z_offset = 10
 
 z_axis_guide_rod_length = 600
 z_axis_guide_rod_diameter = 8
@@ -73,7 +73,7 @@ z_axis_profile_length = 700
 z_axis_guide_rod_threaded_rod_distance = 18
 z_axis_guide_rod_profile_distance = 75
 
-z_axis_carriage_height = 60
+z_axis_carriage_front_height = 70
 z_axis_carriage_width = 45
 z_axis_carriage_front_depth = 22
 z_axis_carriage_back_depth = 40
@@ -542,7 +542,7 @@ def create_carriage(guide_rod, threaded_rod, profile):
     carriage_front = create_filleted_box(
         z_axis_carriage_width,
         z_axis_carriage_front_depth,
-        z_axis_carriage_height,
+        z_axis_carriage_front_height,
         z_axis_carriage_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM],
     )
@@ -551,7 +551,7 @@ def create_carriage(guide_rod, threaded_rod, profile):
     carriage_front = align(carriage_front, guide_rod, Alignment.BOTTOM)
 
     bearing = create_igus_drylin_bearing(
-        cutter_clearance=0.1, cutter_extra_length=z_axis_carriage_height
+        cutter_clearance=0.1, cutter_extra_length=z_axis_carriage_front_height
     )
     bearing = align(bearing, carriage_front, Alignment.CENTER)
     bearing = align(bearing, guide_rod, Alignment.CENTER, axes=[0, 1])
@@ -562,7 +562,7 @@ def create_carriage(guide_rod, threaded_rod, profile):
 
     threaded_rod_cutter = create_cylinder(
         z_axis_threaded_rod_diameter / 2 + z_axis_carriage_threaded_rod_clearance,
-        z_axis_carriage_height + 10,
+        z_axis_carriage_front_height + 10,
     )
 
     threaded_rod_cutter = align(threaded_rod_cutter, carriage_front, Alignment.CENTER)
@@ -595,13 +595,8 @@ def create_carriage(guide_rod, threaded_rod, profile):
     base_aligner = align_translation(nut_raw_base, carriage_back, Alignment.STACK_TOP)
     nut = base_aligner(nut)
 
-
-
-
     carriage_back = nut.use_as_cutter_on(carriage_back)
     carriage_back = carriage_back.cut(threaded_rod_cutter)
-
-    
 
     carriage_body = carriage_front.fuse(carriage_back)
 
@@ -683,7 +678,7 @@ def create_z_axis():
     axial_bearing = align(axial_bearing, threaded_rod, Alignment.CENTER)
     axial_bearing = align(axial_bearing, axial_bearing_stopper, Alignment.STACK_TOP)
 
-    retval.add_named_follower(axial_bearing, "axial_bearing")
+    retval.add_named_non_production_part(axial_bearing, "axial_bearing")
 
     rod_clamp = create_axial_rod_clamp()
 
@@ -726,7 +721,11 @@ def main():
         parts.add(npp, name, flip=False, skip_in_production=True)
 
     for name, folllower in z_axis.get_named_follower_items():
-        parts.add(folllower, name, flip=False, skip_in_production=False)
+        skip_in_production = True
+        if "axial_bearing_stopper" in name:
+            skip_in_production = False
+
+        parts.add(folllower, name, flip=False, skip_in_production=skip_in_production)
 
     carriage = create_carriage(
         z_axis.get_named_non_production_part("guide_rod"),
