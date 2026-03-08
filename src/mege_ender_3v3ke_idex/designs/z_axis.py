@@ -9,6 +9,7 @@ Usage:
 
 import copy
 import logging
+import math
 import os
 
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401
@@ -110,6 +111,148 @@ v_slot_wheel_608z_top_bottom_holder_axial_clearance = 0.05
 v_slot_wheel_608z_width = 10.2
 v_slot_wheel_608z_inner_width = 5
 v_slot_wheel_608z_outer_diameter = 27.5
+
+
+axial_ball_bearing_8_x_19_thickness = 7
+axial_ball_bearing_8_x_19_outer_diameter = 19
+axial_ball_bearing_8_x_19_inner_diameter = 8.2
+axial_ball_bearing_8_x_19_disc_thickness = 2.15
+axial_ball_bearing_8_x_19_ball_diameter = 3.17
+axial_ball_bearing_8_x_19_ball_count = 6
+axial_ball_bearing_8_x_19_ball_holder_disc_thickness = 1.9
+axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter = 17.45
+axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter = 9.6
+
+
+axial_bearing_stopper_outer_diameter = 22.5
+axial_bearing_stopper_inner_diameter = 16
+axial_bearing_stopper_thickness = 4
+
+
+axial_rod_clamp_outer_diameter = 32
+axial_rod_clamp_inner_diameter = 8.2
+axial_rod_clamp_thickness = 10
+axial_rod_clamp_gap = 1.2
+axial_rod_clamp_screw_size = "M3"
+axial_rod_clamp_screw_length = 18
+axial_rod_clamp_nut_clearance = 0.15
+axial_rod_clamp_cylinder_head_cutter_clearance = 0.25
+axial_rod_clamp_outer_diameter_cutting_depth = 9
+axial_rod_clamp_screw_hole_distance_from_center = 10
+
+
+def create_axial_bearing_stopper():
+    stopper = create_ring(
+        axial_bearing_stopper_outer_diameter / 2,
+        axial_bearing_stopper_inner_diameter / 2,
+        axial_bearing_stopper_thickness,
+    )
+    return stopper
+
+
+def create_axial_rod_clamp():
+
+    clamp = create_ring(
+        axial_rod_clamp_outer_diameter / 2,
+        axial_rod_clamp_inner_diameter / 2,
+        axial_rod_clamp_thickness,
+    )
+
+    screw_cutter_diameter = MScrew.from_size(
+        axial_rod_clamp_screw_size
+    ).clearance_hole_normal
+    screw_cutters = []
+    nut_cutters = []
+    cylinder_head_cutters = []
+    for i in [-1, 1]:
+
+        screw_cutter = create_cylinder(screw_cutter_diameter / 2, BIG_THING)
+        screw_cutter = rotate(90, axis=(1, 0, 0))(screw_cutter)
+        screw_cutter = align(screw_cutter, clamp, Alignment.CENTER)
+        screw_cutter = translate(
+            i * axial_rod_clamp_screw_hole_distance_from_center, 0, 0
+        )(screw_cutter)
+
+        screw_cutters.append(screw_cutter)
+
+        nut_cutter = create_nut(
+            axial_rod_clamp_screw_size,
+            no_hole=True,
+            height=axial_rod_clamp_outer_diameter / 2,
+            slack=axial_rod_clamp_nut_clearance,
+        )
+
+        nut_cutter = rotate(90, axis=(1, 0, 0))(nut_cutter)
+
+        nut_cutter = align(nut_cutter, screw_cutter, Alignment.CENTER)
+
+        nut_cutters.append(nut_cutter)
+
+        cylinder_head_cutter = create_cylinder(
+            MScrew.from_size(axial_rod_clamp_screw_size).cylinder_head_diameter / 2
+            + axial_rod_clamp_cylinder_head_cutter_clearance,
+            axial_rod_clamp_outer_diameter / 2,
+        )
+        cylinder_head_cutter = rotate(90, axis=(1, 0, 0))(cylinder_head_cutter)
+        cylinder_head_cutter = align(
+            cylinder_head_cutter, screw_cutter, Alignment.CENTER
+        )
+        cylinder_head_cutters.append(cylinder_head_cutter)
+
+    for screw_cutter in screw_cutters:
+        clamp = clamp.cut(screw_cutter)
+
+    for nut_cutter in nut_cutters:
+        nut_cutter = align(
+            nut_cutter,
+            clamp,
+            Alignment.STACK_BACK,
+            stack_gap=-axial_rod_clamp_outer_diameter_cutting_depth,
+        )
+        clamp = clamp.cut(nut_cutter)
+
+    srews = []
+
+    for cylinder_head_cutter in cylinder_head_cutters:
+        cylinder_head_cutter = align(
+            cylinder_head_cutter,
+            clamp,
+            Alignment.STACK_FRONT,
+            stack_gap=-axial_rod_clamp_outer_diameter_cutting_depth,
+        )
+        clamp = clamp.cut(cylinder_head_cutter)
+
+        screw = create_cylinder_screw(
+            size=axial_rod_clamp_screw_size, length=axial_rod_clamp_screw_length
+        )
+        screw = rotate(90, axis=(1, 0, 0))(screw)
+
+        cylinder_head_height = MScrew.from_size(
+            axial_rod_clamp_screw_size
+        ).cylinder_head_height
+
+        screw = align(screw, cylinder_head_cutter, Alignment.CENTER)
+        screw = align(
+            screw,
+            cylinder_head_cutter,
+            Alignment.STACK_BACK,
+            stack_gap=-cylinder_head_height - 0.2,
+        )
+        srews.append(screw)
+
+    clamp_parts = cut_in_two(
+        clamp, cut_normal=((0, 1, 0)), cut_thickness=axial_rod_clamp_gap
+    )
+
+    retval = LeaderFollowersCuttersPart(clamp)
+
+    for i, clamp_part in enumerate(clamp_parts):
+        retval.add_named_follower(clamp_part, f"clamp_part_{i}")
+
+    for i, screw in enumerate(srews):
+        retval.add_named_non_production_part(screw, f"clamp_screw_{i}")
+
+    return retval
 
 
 def create_608z_bearing(diameter_increase=0, height_increase=0):
@@ -261,6 +404,51 @@ def create_pillow_block_bearing():
     retval = rotate(-90, axis=(1, 0, 0))(retval)
 
     return retval
+
+
+def create_axial_ball_bearing_8_x_19():
+
+    bearing = PartCollector()
+    for i in [0, 1]:
+        disc = create_ring(
+            axial_ball_bearing_8_x_19_outer_diameter / 2,
+            axial_ball_bearing_8_x_19_inner_diameter / 2,
+            axial_ball_bearing_8_x_19_disc_thickness,
+        )
+        disc = translate(
+            0,
+            0,
+            i
+            * (
+                axial_ball_bearing_8_x_19_thickness
+                - axial_ball_bearing_8_x_19_disc_thickness
+            ),
+        )(disc)
+        bearing = bearing.fuse(disc)
+
+    for i in range(axial_ball_bearing_8_x_19_ball_count):
+        angle = (360 / axial_ball_bearing_8_x_19_ball_count) * i
+        ball = create_sphere(axial_ball_bearing_8_x_19_ball_diameter / 2)
+        ball_position_radius = (
+            axial_ball_bearing_8_x_19_inner_diameter
+            + axial_ball_bearing_8_x_19_outer_diameter
+        ) / 4
+        ball = translate(
+            ball_position_radius * math.cos(math.radians(angle)),
+            ball_position_radius * math.sin(math.radians(angle)),
+            axial_ball_bearing_8_x_19_thickness / 2,
+        )(ball)
+        bearing = bearing.fuse(ball)
+
+    ball_holder_disc = create_ring(
+        axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter / 2,
+        axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter / 2,
+        axial_ball_bearing_8_x_19_ball_holder_disc_thickness,
+    )
+    ball_holder_disc = align(ball_holder_disc, bearing, Alignment.CENTER)
+
+    bearing = bearing.fuse(ball_holder_disc)
+    return bearing
 
 
 def create_creality_threaded_rod_nut():
@@ -424,7 +612,7 @@ def main():
 
     z_axis = create_z_axis()
 
-    parts.add(z_axis, "z_axis", flip=False)
+    parts.add(z_axis, "z_axis", flip=False, skip_in_production=True)
 
     for name, npp in z_axis.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
@@ -437,7 +625,7 @@ def main():
 
     carriage = translate(0, 0, 100)(carriage)
 
-    parts.add(carriage, "z_axis_carriage", flip=False)
+    parts.add(carriage, "z_axis_carriage", flip=False, skip_in_production=True)
 
     for name, npp in carriage.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
@@ -455,6 +643,21 @@ def main():
 
     parts.add(bearing, "pillow_block_bearing", flip=False, skip_in_production=True)
     for name, npp in bearing.get_named_non_production_part_items():
+        parts.add(npp, name, flip=False, skip_in_production=True)
+
+    axial_bearing = create_axial_ball_bearing_8_x_19()
+    axial_bearing = translate(120, 40, -20)(axial_bearing)
+    parts.add(
+        axial_bearing, "axial_ball_bearing_8_x_19", flip=False, skip_in_production=True
+    )
+
+    clamps = create_axial_rod_clamp()
+    clamps = translate(120, -40, -20)(clamps)
+
+    for name, folllower in clamps.get_named_follower_items():
+        parts.add(folllower, name, flip=False, skip_in_production=False)
+
+    for name, npp in clamps.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
 
     arrange_and_export(
