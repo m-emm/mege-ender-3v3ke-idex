@@ -36,7 +36,7 @@ def create_single_screw_mount_for_top(
     with_nut_cutter=True,
     nut_cutter_clearance=0.15,
     flush_with_top=False,
-    cylincder_head_cutter_clearance=0.1,
+    cylinder_head_cutter_clearance=0.1,
 ):
 
     screw = create_cylinder_screw(screw_size, screw_length)
@@ -95,8 +95,8 @@ def create_single_screw_mount_for_top(
     if flush_with_top:
 
         cylinder_head_cutter = create_cylinder(
-            m_screw_record.cylinder_head_diameter / 2 + cylincder_head_cutter_clearance,
-            cylinder_head_height + cylincder_head_cutter_clearance,
+            m_screw_record.cylinder_head_diameter / 2 + cylinder_head_cutter_clearance,
+            cylinder_head_height + cylinder_head_cutter_clearance,
         )
         cylinder_head_cutter = align(cylinder_head_cutter, screw, Alignment.CENTER)
         cylinder_head_cutter = align(cylinder_head_cutter, screw, Alignment.TOP)
@@ -109,32 +109,137 @@ def create_single_screw_mount_for_top(
 
 def create_screw_mount_assembly(
     for_part,
-    screw_sicz,
+    screw_size,
     screw_length,
     screw_direction=Alignment.TOP,
-    num_screws=4,
-    depth_inset=None,
-    width_inset=None,
+    with_nut_cutter=True,
+    nut_cutter_clearance=0.15,
+    flush_with_top=False,
+    cylinder_head_cutter_clearance=0.1,
 ):
-    """Create the screw_mount_assembly"""
-    # Example: simple box with a cylindrical hole
-    width = 30
-    depth = 20
-    height = 10
-    hole_radius = 4
 
-    # Create base box
-    part = create_box(width, depth, height)
+    part_bb_size = get_bounding_box_size(for_part)
 
-    # Create a hole cutter
-    hole = create_cylinder(hole_radius, height + 2)
-    hole = align(hole, part, Alignment.CENTER)
-    hole = translate(0, 0, -1)(hole)
+    if screw_direction in [Alignment.TOP, Alignment.BOTTOM]:
+        relevant_thickness = part_bb_size[2]
+    elif screw_direction in [Alignment.FRONT, Alignment.BACK]:
+        relevant_thickness = part_bb_size[1]
+    elif screw_direction in [Alignment.LEFT, Alignment.RIGHT]:
+        relevant_thickness = part_bb_size[0]
+    else:
+        raise ValueError("Invalid screw_direction")
 
-    # Cut the hole
-    part = part.cut(hole)
+    screw_mount_assembly = create_single_screw_mount_for_top(
+        relevant_thickness,
+        screw_size=screw_size,
+        screw_length=screw_length,
+        with_nut_cutter=with_nut_cutter,
+        nut_cutter_clearance=nut_cutter_clearance,
+        flush_with_top=flush_with_top,
+        cylinder_head_cutter_clearance=cylinder_head_cutter_clearance,
+    )
 
-    return part
+    if screw_direction == Alignment.FRONT:
+        screw_mount_assembly = rotate(90, axis=(1, 0, 0))(screw_mount_assembly)
+
+    elif screw_direction == Alignment.BACK:
+        screw_mount_assembly = rotate(-90, axis=(1, 0, 0))(screw_mount_assembly)
+
+    elif screw_direction == Alignment.LEFT:
+        screw_mount_assembly = rotate(-90, axis=(0, 1, 0))(screw_mount_assembly)
+    elif screw_direction == Alignment.RIGHT:
+        screw_mount_assembly = rotate(90, axis=(0, 1, 0))(screw_mount_assembly)
+    elif screw_direction == Alignment.BOTTOM:
+        screw_mount_assembly = rotate(180, axis=(1, 0, 0))(screw_mount_assembly)
+    elif screw_direction == Alignment.TOP:
+        pass  # no rotation needed
+
+    part_bbox = get_bounding_box(for_part)
+    part_bbox_center = get_bounding_box_center(for_part)
+
+    if screw_direction == Alignment.TOP:
+
+        translation_vector = [part_bbox_center[0], part_bbox_center[1], part_bbox[1][2]]
+    elif screw_direction == Alignment.BOTTOM:
+        translation_vector = [part_bbox_center[0], part_bbox_center[1], part_bbox[0][2]]
+    elif screw_direction == Alignment.FRONT:
+        translation_vector = [part_bbox_center[0], part_bbox[0][1], part_bbox_center[2]]
+    elif screw_direction == Alignment.BACK:
+        translation_vector = [part_bbox_center[0], part_bbox[1][1], part_bbox_center[2]]
+    elif screw_direction == Alignment.LEFT:
+        translation_vector = [part_bbox[0][0], part_bbox_center[1], part_bbox_center[2]]
+    elif screw_direction == Alignment.RIGHT:
+        translation_vector = [part_bbox[1][0], part_bbox_center[1], part_bbox_center[2]]
+
+    screw_mount_assembly = translate(*translation_vector)(screw_mount_assembly)
+
+    return screw_mount_assembly
+
+
+def create_four_screws_mount_assembly(
+    for_part,
+    screw_size,
+    screw_length,
+    screw_direction=Alignment.TOP,
+    with_nut_cutter=True,
+    nut_cutter_clearance=0.15,
+    flush_with_top=False,
+    cylinder_head_cutter_clearance=0.1,
+    width_inset=5,
+    length_inset=5,
+):
+
+    part_bb_size = get_bounding_box_size(for_part)
+
+    if screw_direction in [Alignment.TOP, Alignment.BOTTOM]:
+        width_size = part_bb_size[0]
+        length_size = part_bb_size[1]
+        width_axis = 0
+        length_axis = 1
+    elif screw_direction in [Alignment.FRONT, Alignment.BACK]:
+        width_size = part_bb_size[0]
+        length_size = part_bb_size[2]
+        width_axis = 0
+        length_axis = 2
+    elif screw_direction in [Alignment.LEFT, Alignment.RIGHT]:
+        width_size = part_bb_size[1]
+        length_size = part_bb_size[2]
+        width_axis = 1
+        length_axis = 2
+
+    assemblies = []
+
+    for i in [-1, 1]:
+        for j in [-1, 1]:
+
+            assembly = create_screw_mount_assembly(
+                for_part,
+                screw_size,
+                screw_length,
+                screw_direction,
+                with_nut_cutter,
+                nut_cutter_clearance,
+                flush_with_top,
+                cylinder_head_cutter_clearance,
+            )
+
+            translation_vector = [0, 0, 0]
+
+            translation_vector[width_axis] = i * (width_size / 2 - width_inset)
+            translation_vector[length_axis] = j * (length_size / 2 - length_inset)
+            assembly = translate(*translation_vector)(assembly)
+
+            assemblies.append(assembly)
+
+    retval = None
+    for k, assembly in enumerate(assemblies):
+        current_asssembly = assembly.prefixed_copy(f"screw_{k}")
+        if retval is None:
+            retval = current_asssembly
+        else:
+            retval = retval.fuse(current_asssembly)
+
+    return retval
 
 
 def main():
@@ -160,8 +265,6 @@ def main():
 
     base_plate = single_screw_mount.use_as_cutter_on(base_plate)
 
-
-
     single_screw_mount_2 = create_single_screw_mount_for_top(
         test_thickness,
         "M3",
@@ -171,7 +274,7 @@ def main():
 
     single_screw_mount_2 = align(
         single_screw_mount_2, base_plate, Alignment.CENTER, axes=[0, 1]
-    )  
+    )
 
     single_screw_mount_2 = translate(10, 0, 0)(single_screw_mount_2)
 
@@ -181,11 +284,100 @@ def main():
 
     base_plate, _ = cut_in_two(base_plate, cut_normal=(0, 1, 0))
 
-
-
     parts.add(
         base_plate,
         "base_plate",
+    )
+
+    second_experiment = create_box(50, 50, test_thickness)
+
+    second_experiment = translate(100, 0, -test_thickness)(second_experiment)
+
+    screw_mount_assembly_test = create_screw_mount_assembly(
+        second_experiment,
+        screw_size="M3",
+        screw_length=25,
+        screw_direction=Alignment.FRONT,
+        with_nut_cutter=True,
+        flush_with_top=True,
+    )
+
+    for name, npp in screw_mount_assembly_test.get_named_non_production_part_items():
+        parts.add(npp, name + "_front", skip_in_production=True)
+
+    second_experiment = screw_mount_assembly_test.use_as_cutter_on(second_experiment)
+
+    screw_mount_assembly_test_2 = create_screw_mount_assembly(
+        second_experiment,
+        screw_size="M3",
+        screw_length=25,
+        screw_direction=Alignment.BACK,
+        with_nut_cutter=True,
+        flush_with_top=True,
+    )
+
+    screw_mount_assembly_test_2 = translate(0, 0, 10)(screw_mount_assembly_test_2)
+
+    for name, npp in screw_mount_assembly_test_2.get_named_non_production_part_items():
+        parts.add(npp, name + "_back", skip_in_production=True)
+
+    second_experiment = screw_mount_assembly_test_2.use_as_cutter_on(second_experiment)
+
+    screw_mount_assembly_test_3 = create_screw_mount_assembly(
+        second_experiment,
+        screw_size="M3",
+        screw_length=25,
+        screw_direction=Alignment.RIGHT,
+        with_nut_cutter=True,
+        flush_with_top=True,
+    )
+
+    for name, npp in screw_mount_assembly_test_3.get_named_non_production_part_items():
+        parts.add(npp, name + "_left", skip_in_production=True)
+
+    screw_mount_assembly_test_4 = create_screw_mount_assembly(
+        second_experiment,
+        screw_size="M3",
+        screw_length=25,
+        screw_direction=Alignment.BOTTOM,
+        with_nut_cutter=True,
+        flush_with_top=True,
+    )
+
+    for name, npp in screw_mount_assembly_test_4.get_named_non_production_part_items():
+        parts.add(npp, name + "_bottom", skip_in_production=True)
+
+    second_experiment = screw_mount_assembly_test_4.use_as_cutter_on(second_experiment)
+
+    second_experiment = screw_mount_assembly_test_3.use_as_cutter_on(second_experiment)
+
+    second_experiment, _ = cut_in_two(second_experiment, cut_normal=(1, 0, 0))
+
+    parts.add(
+        second_experiment,
+        "second_experiment",
+    )
+
+    third_experiment = create_box(50, 50, test_thickness)
+    third_experiment = translate(200, 0, -test_thickness)(third_experiment)
+
+    four_screws_mount_assembly = create_four_screws_mount_assembly(
+        third_experiment,
+        screw_size="M3",
+        screw_length=25,
+        screw_direction=Alignment.TOP,
+        with_nut_cutter=True,
+        flush_with_top=False,
+    )
+
+    for name, npp in four_screws_mount_assembly.get_named_non_production_part_items():
+        parts.add(npp, name + "_four_screws", skip_in_production=True)
+
+    third_experiment = four_screws_mount_assembly.use_as_cutter_on(third_experiment)
+
+    parts.add(
+        third_experiment,
+        "third_experiment",
     )
 
     # Arrange and export
