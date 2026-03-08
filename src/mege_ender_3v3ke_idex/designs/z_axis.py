@@ -26,7 +26,7 @@ from mege_ender_3v3ke_idex.designs.mgh_linear import (
     create_mgn12h_carriage,
     create_mgn12h_rail,
 )
-from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
+from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -59,17 +59,25 @@ PROCESS_DATA["process_overrides"].update(
 z_axis_threaded_rod_diameter = 8
 z_axis_threaded_rod_length = 500
 
+z_axis_threaded_rod_profile_distance = 22
+z_axis_thraded_rod_z_offset = 90
+
+
+z_axis_pillow_block_bearing_z_offset = 15
+
 z_axis_guide_rod_length = 600
 z_axis_guide_rod_diameter = 8
 
 z_axis_profile_length = 700
 
 z_axis_guide_rod_threaded_rod_distance = 18
-z_axis_guide_rod_profile_distance = 50
+z_axis_guide_rod_profile_distance = 75
 
 z_axis_carriage_height = 60
 z_axis_carriage_width = 45
-z_axis_carriage_depth = 50
+z_axis_carriage_front_depth = 22
+z_axis_carriage_back_depth = 40
+z_axis_carriage_back_height = 12
 z_axis_carriage_fillet_radius = 4
 z_axis_carriage_mount_screw_size = "M3"
 z_axis_carriage_bearing_inset = 5
@@ -124,7 +132,7 @@ axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter = 17.45
 axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter = 9.6
 
 
-axial_bearing_stopper_outer_diameter = 22.5
+axial_bearing_stopper_outer_diameter = 24
 axial_bearing_stopper_inner_diameter = 16
 axial_bearing_stopper_thickness = 4
 
@@ -451,7 +459,7 @@ def create_axial_ball_bearing_8_x_19():
     return bearing
 
 
-def create_creality_threaded_rod_nut():
+def create_creality_threaded_rod_nut(guide_cutter_clearance=0.1):
     base_thickness = 3.5
     base_width = 12.5
     base_cut_radius = 15
@@ -509,64 +517,100 @@ def create_creality_threaded_rod_nut():
     rod_guide = align(rod_guide, base, Alignment.BOTTOM)
     rod_guide = translate(0, 0, -rod_guide_bottom_overstand)(rod_guide)
 
-    base = base.fuse(rod_guide)
+    whole_nut = base.fuse(rod_guide)
     rod_cutter = create_cylinder(z_axis_threaded_rod_diameter / 2, BIG_THING)
     rod_cutter = align(rod_cutter, rod_guide, Alignment.CENTER)
-    base = base.cut(rod_cutter)
+    whole_nut = whole_nut.cut(rod_cutter)
 
-    retval = LeaderFollowersCuttersPart(base)
+    retval = LeaderFollowersCuttersPart(whole_nut)
+    retval.add_named_non_production_part(base, "raw_base")
     for idx, external_mount_hole_drill in enumerate(external_mount_hole_drills):
         retval.add_named_cutter(
             external_mount_hole_drill, f"external_mount_hole_drill_{idx}"
         )
 
+    rod_guide_cutter = create_cylinder(
+        rod_guide_diameter / 2 + guide_cutter_clearance, BIG_THING
+    )
+    rod_guide_cutter = align(rod_guide_cutter, rod_guide, Alignment.CENTER)
+    retval.add_named_cutter(rod_guide_cutter, "rod_guide_cutter")
+
     return retval
 
 
 def create_carriage(guide_rod, threaded_rod, profile):
-    carriage = create_filleted_box(
+    carriage_front = create_filleted_box(
         z_axis_carriage_width,
-        z_axis_carriage_depth,
+        z_axis_carriage_front_depth,
         z_axis_carriage_height,
         z_axis_carriage_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM],
     )
 
-    carriage = align(carriage, guide_rod, Alignment.CENTER)
-    carriage = align(carriage, guide_rod, Alignment.BOTTOM)
-    carriage = align(
-        carriage,
-        profile,
-        Alignment.STACK_FRONT,
-        stack_gap=z_axis_carriage_profile_clearance,
-    )
+    carriage_front = align(carriage_front, guide_rod, Alignment.CENTER)
+    carriage_front = align(carriage_front, guide_rod, Alignment.BOTTOM)
 
     bearing = create_igus_drylin_bearing(
         cutter_clearance=0.1, cutter_extra_length=z_axis_carriage_height
     )
-    bearing = align(bearing, carriage, Alignment.CENTER)
+    bearing = align(bearing, carriage_front, Alignment.CENTER)
     bearing = align(bearing, guide_rod, Alignment.CENTER, axes=[0, 1])
 
-    carriage = bearing.use_as_cutter_on(carriage)
+    carriage_front = bearing.use_as_cutter_on(carriage_front)
 
-    top_bearing = align(bearing, carriage, Alignment.TOP)
+    top_bearing = align(bearing, carriage_front, Alignment.TOP)
 
     threaded_rod_cutter = create_cylinder(
         z_axis_threaded_rod_diameter / 2 + z_axis_carriage_threaded_rod_clearance,
         z_axis_carriage_height + 10,
     )
 
-    threaded_rod_cutter = align(threaded_rod_cutter, carriage, Alignment.CENTER)
+    threaded_rod_cutter = align(threaded_rod_cutter, carriage_front, Alignment.CENTER)
     threaded_rod_cutter = align(
         threaded_rod_cutter, threaded_rod, Alignment.CENTER, axes=[0, 1]
     )
 
-    carriage = carriage.cut(threaded_rod_cutter)
+    carriage_back = create_filleted_box(
+        z_axis_carriage_width,
+        z_axis_carriage_back_depth + 2 * z_axis_carriage_fillet_radius,
+        z_axis_carriage_back_height,
+        z_axis_carriage_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM],
+    )
 
-    retval = LeaderFollowersCuttersPart(carriage)
+    carriage_back = align(carriage_back, carriage_front, Alignment.CENTER)
+    carriage_back = align(carriage_back, carriage_front, Alignment.BOTTOM)
+    carriage_back = align(
+        carriage_back,
+        carriage_front,
+        Alignment.STACK_BACK,
+        stack_gap=-2 * z_axis_carriage_fillet_radius,
+    )
+
+    nut = create_creality_threaded_rod_nut()
+
+    nut = align(nut, threaded_rod, Alignment.CENTER)
+
+    nut_raw_base = nut.get_named_non_production_part("raw_base")
+    base_aligner = align_translation(nut_raw_base, carriage_back, Alignment.STACK_TOP)
+    nut = base_aligner(nut)
+
+
+
+
+    carriage_back = nut.use_as_cutter_on(carriage_back)
+    carriage_back = carriage_back.cut(threaded_rod_cutter)
+
+    
+
+    carriage_body = carriage_front.fuse(carriage_back)
+
+    retval = LeaderFollowersCuttersPart(carriage_body)
 
     retval.add_named_non_production_part(top_bearing, "top_bearing")
+    retval.add_named_non_production_part(nut, "threaded_rod_nut")
 
-    bottom_bearing = align(bearing, carriage, Alignment.BOTTOM)
+    bottom_bearing = align(bearing, carriage_front, Alignment.BOTTOM)
     retval.add_named_non_production_part(bottom_bearing, "bottom_bearing")
 
     return retval
@@ -592,13 +636,77 @@ def create_z_axis():
 
     threaded_rod = align(threaded_rod, guide_rod, Alignment.CENTER)
     threaded_rod = align(threaded_rod, guide_rod, Alignment.BOTTOM)
-
-    threaded_rod = translate(0, z_axis_guide_rod_threaded_rod_distance, 0)(threaded_rod)
+    threaded_rod = align(
+        threaded_rod,
+        z_axis_profile,
+        Alignment.STACK_FRONT,
+        stack_gap=z_axis_threaded_rod_profile_distance,
+    )
+    threaded_rod = translate(0, 0, z_axis_thraded_rod_z_offset)(threaded_rod)
 
     retval = LeaderFollowersCuttersPart(z_axis_profile)
 
     retval.add_named_non_production_part(guide_rod, "guide_rod")
     retval.add_named_non_production_part(threaded_rod, "threaded_rod")
+
+    pillow_block_bearing = create_pillow_block_bearing()
+
+    pillow_block_bearing = pillow_block_bearing.prefixed_copy("pillow_block_bearing")
+
+    pillow_block_bearing = rotate(-90, axis=(1, 0, 0))(pillow_block_bearing)
+
+    pillow_block_bearing = align(pillow_block_bearing, threaded_rod, Alignment.CENTER)
+    pillow_block_bearing = align(pillow_block_bearing, threaded_rod, Alignment.BOTTOM)
+    pillow_block_bearing = translate(0, 0, z_axis_pillow_block_bearing_z_offset)(
+        pillow_block_bearing
+    )
+
+    retval.add_named_non_production_part(
+        pillow_block_bearing.leader, "pillow_block_bearing_body"
+    )
+
+    for name, part in pillow_block_bearing.get_named_non_production_part_items():
+
+        retval.add_named_non_production_part(part, name)
+
+    axial_bearing_stopper = create_axial_bearing_stopper()
+
+    axial_bearing_stopper = align(axial_bearing_stopper, threaded_rod, Alignment.CENTER)
+    axial_bearing_stopper = align(
+        axial_bearing_stopper, pillow_block_bearing, Alignment.STACK_TOP
+    )
+
+    retval.add_named_follower(axial_bearing_stopper, "axial_bearing_stopper")
+
+    axial_bearing = create_axial_ball_bearing_8_x_19()
+
+    axial_bearing = align(axial_bearing, threaded_rod, Alignment.CENTER)
+    axial_bearing = align(axial_bearing, axial_bearing_stopper, Alignment.STACK_TOP)
+
+    retval.add_named_follower(axial_bearing, "axial_bearing")
+
+    rod_clamp = create_axial_rod_clamp()
+
+    rod_clamp = align(rod_clamp, threaded_rod, Alignment.CENTER)
+    rod_clamp = align(rod_clamp, axial_bearing, Alignment.STACK_TOP)
+
+    for name, part in rod_clamp.get_named_non_production_part_items():
+        retval.add_named_non_production_part(part, name)
+
+    for name, part in rod_clamp.get_named_follower_items():
+        retval.add_named_follower(part, name)
+
+    motor = create_nema_composite()
+
+    motor = align(motor, threaded_rod, Alignment.CENTER)
+
+    coupler = motor.get_named_follower("coupler")
+    coupler_aligner = align_translation(coupler, threaded_rod, Alignment.STACK_BOTTOM)
+
+    motor = coupler_aligner(motor)
+
+    for name, part in motor.get_named_follower_items():
+        retval.add_named_non_production_part(part, name)
 
     return retval
 
@@ -617,13 +725,16 @@ def main():
     for name, npp in z_axis.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
 
+    for name, folllower in z_axis.get_named_follower_items():
+        parts.add(folllower, name, flip=False, skip_in_production=False)
+
     carriage = create_carriage(
         z_axis.get_named_non_production_part("guide_rod"),
         z_axis.get_named_non_production_part("threaded_rod"),
         z_axis,
     )
 
-    carriage = translate(0, 0, 100)(carriage)
+    carriage = translate(0, 0, 200)(carriage)
 
     parts.add(carriage, "z_axis_carriage", flip=False, skip_in_production=True)
 
@@ -633,32 +744,6 @@ def main():
     # printer_frame = create_printer_frame()
 
     # parts.add(printer_frame, "printer_frame", flip=False, skip_in_production=True)
-
-    # # Create the part
-    # part = create_z_axis()
-    # parts.add(part, "z_axis", flip=False)
-
-    bearing = create_pillow_block_bearing()
-    bearing = translate(100, 0, -20)(bearing)
-
-    parts.add(bearing, "pillow_block_bearing", flip=False, skip_in_production=True)
-    for name, npp in bearing.get_named_non_production_part_items():
-        parts.add(npp, name, flip=False, skip_in_production=True)
-
-    axial_bearing = create_axial_ball_bearing_8_x_19()
-    axial_bearing = translate(120, 40, -20)(axial_bearing)
-    parts.add(
-        axial_bearing, "axial_ball_bearing_8_x_19", flip=False, skip_in_production=True
-    )
-
-    clamps = create_axial_rod_clamp()
-    clamps = translate(120, -40, -20)(clamps)
-
-    for name, folllower in clamps.get_named_follower_items():
-        parts.add(folllower, name, flip=False, skip_in_production=False)
-
-    for name, npp in clamps.get_named_non_production_part_items():
-        parts.add(npp, name, flip=False, skip_in_production=True)
 
     arrange_and_export(
         parts.as_list(),
