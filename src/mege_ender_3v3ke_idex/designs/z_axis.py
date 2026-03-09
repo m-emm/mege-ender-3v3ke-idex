@@ -26,6 +26,9 @@ from mege_ender_3v3ke_idex.designs.mgh_linear import (
     create_mgn12h_carriage,
     create_mgn12h_rail,
 )
+from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
+    create_four_screws_mount_assembly,
+)
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.simple import *
 
@@ -86,7 +89,14 @@ z_axis_carriage_threaded_rod_clearance = 0.3
 z_axis_carriage_profile_clearance = 2
 z_axis_motor_mount_plate_profile_distance = 0
 z_axis_motor_mount_plate_size = 52
-z_axis_motor_mount_plate_depth = 70
+z_axis_motor_mount_plate_depth = 66
+
+z_axis_guide_rod_clamp_depth = 20
+z_axis_guide_rod_clamp_thickness = 19
+z_axis_rod_clamp_gap = 1.5
+
+z_axis_guide_rod_clamp_screw_length = 18
+
 igus_drylin_bearing_inner_diameter = 8
 igus_drylin_bearing_outer_diameter = 16
 igus_drylin_bearing_length = 25
@@ -595,7 +605,9 @@ def create_carriage(guide_rod, threaded_rod, profile):
     nut = align(nut, threaded_rod, Alignment.CENTER)
 
     nut_raw_base = nut.get_named_non_production_part("raw_base")
-    base_aligner = align_translation(nut_raw_base, carriage_back, Alignment.STACK_TOP)
+    base_aligner = align_translation(
+        nut_raw_base, carriage_back, Alignment.STACK_BOTTOM
+    )
     nut = base_aligner(nut)
 
     carriage_back = nut.use_as_cutter_on(carriage_back)
@@ -743,7 +755,50 @@ def create_z_axis():
 
     mount_plate = motor.use_as_cutter_on(mount_plate)
 
-    retval.add_named_follower(mount_plate, "motor_mount_plate")
+    guide_rod_clamp = create_filleted_box(
+        z_axis_motor_mount_plate_size,
+        z_axis_guide_rod_clamp_depth,
+        z_axis_guide_rod_clamp_thickness,
+        motor_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    guide_rod_clamp = align(guide_rod_clamp, mount_plate, Alignment.CENTER)
+    guide_rod_clamp = align(guide_rod_clamp, mount_plate, Alignment.STACK_TOP)
+    guide_rod_clamp = align(guide_rod_clamp, mount_plate, Alignment.FRONT)
+
+    screws_mount_assembly = create_four_screws_mount_assembly(
+        guide_rod_clamp,
+        "M3",
+        z_axis_guide_rod_clamp_screw_length,
+        Alignment.FRONT,
+        flush_with_top=True,
+    )
+
+    guide_rod_clamp = screws_mount_assembly.use_as_cutter_on(guide_rod_clamp)
+
+    mount_plate = mount_plate.fuse(guide_rod_clamp)
+
+    for name, part in screws_mount_assembly.get_named_non_production_part_items():
+        retval.add_named_non_production_part(part, f"guide_rod_clamp_{name}")
+
+    guide_rod_center = get_bounding_box_center(guide_rod)
+    guide_rod_clamp_center = get_bounding_box_center(guide_rod_clamp)
+
+    cut_point = (
+        guide_rod_clamp_center[0],
+        guide_rod_center[1],
+        guide_rod_clamp_center[2],
+    )
+
+    mount_plate_front, mount_plate_back = cut_in_two(
+        mount_plate,
+        cut_normal=(0, 1, 0),
+        cut_thickness=z_axis_rod_clamp_gap,
+        cut_point=cut_point,
+    )
+
+    retval.add_named_follower(mount_plate_front, "mount_plate_front")
+    retval.add_named_follower(mount_plate_back, "mount_plate_back")
 
     return retval
 
