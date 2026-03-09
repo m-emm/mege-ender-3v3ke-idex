@@ -155,7 +155,7 @@ axial_bearing_stopper_inner_diameter = 16
 axial_bearing_stopper_thickness = 4
 
 
-axial_rod_clamp_outer_diameter = 32
+axial_rod_clamp_outer_diameter = 30
 axial_rod_clamp_inner_diameter = 8.2
 axial_rod_clamp_thickness = 10
 axial_rod_clamp_gap = 1.2
@@ -165,6 +165,44 @@ axial_rod_clamp_nut_clearance = 0.15
 axial_rod_clamp_cylinder_head_cutter_clearance = 0.25
 axial_rod_clamp_outer_diameter_cutting_depth = 9
 axial_rod_clamp_screw_hole_distance_from_center = 10
+
+
+def create_profile_mount_plate(num_holes=2, screw_inset=5):
+
+    profile_mount_plate_thickness = 5
+    profile_mount_plate_fillet_radius = 3
+    profile_mount_width = 28
+    profile_mount_plate_height = 33
+
+    plate = create_filleted_box(
+        profile_mount_width,
+        profile_mount_plate_thickness,
+        profile_mount_plate_height,
+        profile_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.FRONT, Alignment.BACK, Alignment.BOTTOM],
+    )
+
+    hole_drill_diameter = MScrew.from_size("M5").clearance_hole_loose
+
+    hole_drills = PartCollector()
+    hole_pitch = (
+        (profile_mount_plate_height - 2 * screw_inset - hole_drill_diameter)
+        / (num_holes - 1)
+        if num_holes > 1
+        else 0
+    )
+    for i in range(num_holes):
+
+        hole_drill = create_cylinder(hole_drill_diameter / 2, BIG_THING)
+        hole_drill = rotate(90, axis=(1, 0, 0))(hole_drill)
+        hole_drill = translate(0, 0, i * hole_pitch)(hole_drill)
+
+        hole_drills = hole_drills.fuse(hole_drill)
+
+    hole_drills = align(hole_drills, plate, Alignment.CENTER)
+    plate = plate.cut(hole_drills)
+
+    return plate
 
 
 def create_axial_bearing_stopper():
@@ -326,7 +364,7 @@ def create_igus_drylin_bearing(cutter_clearance=0.1, cutter_extra_length=2):
     return retval
 
 
-def create_pillow_block_bearing():
+def create_pillow_block_bearing(screw_length=15):
 
     bearing = create_608z_bearing()
 
@@ -374,6 +412,9 @@ def create_pillow_block_bearing():
 
     mount_hole_cutters = []
 
+    mount_screws = []
+    mount_screw_size = "M4"
+
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         # base_side = create_box(
         #     pillow_block_bearing_cage_rim,
@@ -406,6 +447,17 @@ def create_pillow_block_bearing():
         )(mount_hole_cutter)
         mount_hole_cutters.append(mount_hole_cutter)
 
+        mount_screw = create_cylinder_screw(size=mount_screw_size, length=screw_length)
+
+        mount_screw = rotate(-90, axis=(1, 0, 0))(mount_screw)
+        mount_screw = align(mount_screw, mount_hole_cutter, Alignment.CENTER)
+        mount_screw = align(mount_screw, base, Alignment.BACK)
+        mount_screw = translate(
+            0, MScrew.from_size(mount_screw_size).cylinder_head_height, 0
+        )(mount_screw)
+
+        mount_screws.append(mount_screw)
+
     for mount_hole_cutter in mount_hole_cutters:
         base = base.cut(mount_hole_cutter)
 
@@ -421,6 +473,10 @@ def create_pillow_block_bearing():
     bearing = bearing.fuse(rod_holder)
 
     retval = LeaderFollowersCuttersPart(bearing)
+
+    for i, mount_screw in enumerate(mount_screws):
+        retval.add_named_non_production_part(mount_screw, f"mount_screw_{i}")
+
     retval.add_named_non_production_part(cage, "cage")
     retval.add_named_non_production_part(cage_filler, "cage_filler")
     retval.add_named_non_production_part(base, "base")
@@ -788,6 +844,9 @@ def create_z_axis():
 
         rods_assembly.add_named_non_production_part(part, name)
 
+    for name, cutter in pillow_block_bearing.get_named_cutter_items():
+        rods_assembly.add_named_cutter(cutter, name)
+
     axial_bearing_stopper = create_axial_bearing_stopper()
 
     axial_bearing_stopper = align(axial_bearing_stopper, threaded_rod, Alignment.CENTER)
@@ -836,6 +895,67 @@ def create_z_axis():
 
     rods_assembly = coupler_aligner(rods_assembly)
 
+    pillow_base = rods_assembly.get_named_non_production_part(
+        "pillow_block_bearing_base"
+    )
+    pillow_base_size = get_bounding_box_size(pillow_base)
+
+    pillow_bearing_mount_plate = create_box(
+        pillow_base_size[0], BIG_THING, pillow_base_size[2]
+    )
+
+    pillow_bearing_mount_plate = align(
+        pillow_bearing_mount_plate, pillow_base, Alignment.CENTER
+    )
+    pillow_bearing_mount_plate = align(
+        pillow_bearing_mount_plate, pillow_base, Alignment.STACK_BACK
+    )
+
+    pillow_bearing_mount_plate = rods_assembly.use_as_cutter_on(
+        pillow_bearing_mount_plate
+    )
+
+    profile_plane_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    profile_plane_cutter = align(
+        profile_plane_cutter, pillow_bearing_mount_plate, Alignment.CENTER
+    )
+    profile_plane_cutter = align(profile_plane_cutter, z_axis_profile, Alignment.FRONT)
+
+    pillow_bearing_mount_plate = pillow_bearing_mount_plate.cut(profile_plane_cutter)
+
+    cutter_names = [f"pillow_block_bearing_mount_hole_cutter_{i}" for i in range(2)]
+
+    for cutter_name in cutter_names:
+        cutter = rods_assembly.get_named_cutter(cutter_name)
+
+        nut_cutter = create_nut("M4", no_hole=True, slack=0.2)
+        nut_cutter = rotate(90, axis=(1, 0, 0))(nut_cutter)
+        nut_cutter = align(nut_cutter, cutter, Alignment.CENTER)
+        nut_cutter = align(
+            nut_cutter,
+            pillow_bearing_mount_plate,
+            Alignment.BACK,
+        )
+        pillow_bearing_mount_plate = pillow_bearing_mount_plate.cut(nut_cutter)
+
+    pillow_bearing_profile_mount_plate = create_profile_mount_plate()
+    pillow_bearing_profile_mount_plate = align(
+        pillow_bearing_profile_mount_plate, pillow_bearing_mount_plate, Alignment.CENTER
+    )
+    pillow_bearing_profile_mount_plate = align(
+        pillow_bearing_profile_mount_plate, pillow_bearing_mount_plate, Alignment.BACK
+    )
+    pillow_bearing_profile_mount_plate = align(
+        pillow_bearing_profile_mount_plate,
+        pillow_bearing_mount_plate,
+        Alignment.STACK_TOP,
+    )
+    pillow_bearing_mount_plate = pillow_bearing_mount_plate.fuse(
+        pillow_bearing_profile_mount_plate
+    )
+
+    retval.add_named_follower(pillow_bearing_mount_plate, "pillow_bearing_mount_plate")
+
     retval = retval.merge_except_leader(rods_assembly)
 
     retval.add_named_non_production_part(guide_rod, "guide_rod")
@@ -861,6 +981,11 @@ def create_z_axis():
         stack_gap=z_axis_motor_mount_plate_profile_distance,
     )
 
+    profile_mount_plate = create_profile_mount_plate()
+    profile_mount_plate = align(profile_mount_plate, mount_plate, Alignment.CENTER)
+    profile_mount_plate = align(profile_mount_plate, mount_plate, Alignment.BACK)
+    profile_mount_plate = align(profile_mount_plate, mount_plate, Alignment.STACK_TOP)
+
     mount_plate = motor.use_as_cutter_on(mount_plate)
 
     guide_rod_clamp = create_filleted_box(
@@ -885,6 +1010,7 @@ def create_z_axis():
     guide_rod_clamp = screws_mount_assembly.use_as_cutter_on(guide_rod_clamp)
 
     mount_plate = mount_plate.fuse(guide_rod_clamp)
+    mount_plate = mount_plate.fuse(profile_mount_plate)
     mount_plate = mount_plate.cut(guide_rod_cutter)
 
     for name, part in screws_mount_assembly.get_named_non_production_part_items():
@@ -958,6 +1084,7 @@ def main():
         script_file=__file__,
         prod=PROD,
         process_data=PROCESS_DATA,
+        prod_gap=4,
     )
 
     _logger.info("z_axis created successfully!")
