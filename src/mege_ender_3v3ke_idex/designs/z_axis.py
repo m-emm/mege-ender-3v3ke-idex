@@ -79,7 +79,7 @@ z_axis_guide_rod_profile_distance = 75
 
 z_axis_carriage_front_height = 70
 z_axis_carriage_width = 45
-z_axis_carriage_front_depth = 22
+z_axis_carriage_front_depth = 25
 z_axis_carriage_back_depth = 40
 z_axis_carriage_back_height = 12
 z_axis_carriage_fillet_radius = 4
@@ -90,6 +90,11 @@ z_axis_carriage_profile_clearance = 2
 z_axis_motor_mount_plate_profile_distance = 0
 z_axis_motor_mount_plate_size = 52
 z_axis_motor_mount_plate_depth = 66
+
+z_axis_guide_rod_carriage_clamp_screw_length = 20
+
+
+z_axis_carriage_rod_clamp_screw_inset = 4
 
 z_axis_guide_rod_clamp_depth = 20
 z_axis_guide_rod_clamp_thickness = 19
@@ -569,9 +574,16 @@ def create_carriage(guide_rod, threaded_rod, profile):
     bearing = align(bearing, carriage_front, Alignment.CENTER)
     bearing = align(bearing, guide_rod, Alignment.CENTER, axes=[0, 1])
 
+    bearing_size = get_bounding_box_size(bearing)
+    gap_bewteen_bearings = (
+        z_axis_carriage_front_height - 2 * bearing_size[2] - z_axis_carriage_back_height
+    )
+
     carriage_front = bearing.use_as_cutter_on(carriage_front)
 
     top_bearing = align(bearing, carriage_front, Alignment.TOP)
+    bottom_bearing = align(bearing, carriage_front, Alignment.BOTTOM)
+    bottom_bearing = translate(0, 0, z_axis_carriage_back_height)(bottom_bearing)
 
     threaded_rod_cutter = create_cylinder(
         z_axis_threaded_rod_diameter / 2 + z_axis_carriage_threaded_rod_clearance,
@@ -613,14 +625,105 @@ def create_carriage(guide_rod, threaded_rod, profile):
     carriage_back = nut.use_as_cutter_on(carriage_back)
     carriage_back = carriage_back.cut(threaded_rod_cutter)
 
-    carriage_body = carriage_front.fuse(carriage_back)
+    guide_rod_center = get_bounding_box_center(guide_rod)
+    carriage_front_center = get_bounding_box_center(carriage_front)
 
+    carriage_cut_point = (
+        carriage_front_center[0],
+        guide_rod_center[1],
+        carriage_front_center[2],
+    )
+
+    carriage_front, carriage_front_clamps = cut_in_two(
+        carriage_front,
+        cut_normal=(0, 1, 0),
+        cut_thickness=z_axis_carriage_profile_clearance,
+        cut_point=carriage_cut_point,
+    )
+
+    front_clamps_cutter = create_box(BIG_THING, BIG_THING, gap_bewteen_bearings)
+
+    front_clamps_cutter = align(
+        front_clamps_cutter, carriage_front_clamps, Alignment.CENTER
+    )
+    front_clamps_cutter = align(
+        front_clamps_cutter, top_bearing, Alignment.STACK_BOTTOM
+    )
+
+    carriage_front_clamps = carriage_front_clamps.cut(front_clamps_cutter)
+
+    bearings_fused = top_bearing.fuse(bottom_bearing)
+    bearings_fused_center = get_bounding_box_center(bearings_fused)
+
+    carriage_front_clamps_center = get_bounding_box_center(carriage_front_clamps)
+    clamps_cut_point = (
+        carriage_front_clamps_center[0],
+        carriage_front_clamps_center[1],
+        bearings_fused_center[2],
+    )
+
+    carriage_top_clamp, carriage_bottom_clamp = cut_in_two(
+        carriage_front_clamps, cut_normal=(0, 0, 1), cut_point=clamps_cut_point
+    )
+
+    screw_assemblies = []
+
+    for bt in [Alignment.BOTTOM, Alignment.TOP]:
+        screw_representative_box = create_box(
+            z_axis_carriage_width, z_axis_carriage_front_depth, bearing_size[2]
+        )
+
+        screw_representative_box = align(
+            screw_representative_box, carriage_top_clamp, Alignment.CENTER
+        )
+
+        if bt == Alignment.TOP:
+            screw_representative_box = align(
+                screw_representative_box, carriage_top_clamp, Alignment.BOTTOM
+            )
+        else:
+            screw_representative_box = align(
+                screw_representative_box, carriage_bottom_clamp, Alignment.TOP
+            )
+
+        screw_representative_box = align(
+            screw_representative_box, carriage_top_clamp, Alignment.FRONT
+        )
+
+        screw_assembly = create_four_screws_mount_assembly(
+            screw_representative_box,
+            z_axis_carriage_mount_screw_size,
+            screw_length=z_axis_guide_rod_carriage_clamp_screw_length,
+            screw_direction=Alignment.FRONT,
+            flush_with_top=True,
+            width_inset=z_axis_carriage_rod_clamp_screw_inset,
+            length_inset=z_axis_carriage_rod_clamp_screw_inset,
+        )
+
+        screw_assembly = screw_assembly.prefixed_copy(
+            f"carriage_clamp_{bt.name.lower()}_screw_assembly"
+        )
+
+        carriage_top_clamp = screw_assembly.use_as_cutter_on(carriage_top_clamp)
+        carriage_bottom_clamp = screw_assembly.use_as_cutter_on(carriage_bottom_clamp)
+        carriage_front = screw_assembly.use_as_cutter_on(carriage_front)
+
+        screw_assemblies.append(screw_assembly)
+
+    carriage_back = bearing.use_as_cutter_on(carriage_back)
+    carriage_body = carriage_front.fuse(carriage_back)
     retval = LeaderFollowersCuttersPart(carriage_body)
+
+    for k, clamp in enumerate([carriage_top_clamp, carriage_bottom_clamp]):
+        retval.add_named_follower(clamp, f"carriage_clamp_{k}")
 
     retval.add_named_non_production_part(top_bearing, "top_bearing")
     retval.add_named_non_production_part(nut, "threaded_rod_nut")
 
-    bottom_bearing = align(bearing, carriage_front, Alignment.BOTTOM)
+    for screw_assembly in screw_assemblies:
+        for name, part in screw_assembly.get_named_non_production_part_items():
+            retval.add_named_non_production_part(part, name)
+
     retval.add_named_non_production_part(bottom_bearing, "bottom_bearing")
 
     return retval
@@ -639,6 +742,11 @@ def create_z_axis():
     guide_rod = align(guide_rod, z_axis_profile, Alignment.BOTTOM)
 
     guide_rod = translate(0, -z_axis_guide_rod_profile_distance, 0)(guide_rod)
+
+    guide_rod_cutter = create_cylinder(
+        z_axis_guide_rod_diameter / 2 + 0.1, 2 * BIG_THING
+    )
+    guide_rod_cutter = align(guide_rod_cutter, guide_rod, Alignment.CENTER)
 
     threaded_rod = create_cylinder(
         z_axis_threaded_rod_diameter / 2, z_axis_threaded_rod_length
@@ -777,6 +885,7 @@ def create_z_axis():
     guide_rod_clamp = screws_mount_assembly.use_as_cutter_on(guide_rod_clamp)
 
     mount_plate = mount_plate.fuse(guide_rod_clamp)
+    mount_plate = mount_plate.cut(guide_rod_cutter)
 
     for name, part in screws_mount_assembly.get_named_non_production_part_items():
         retval.add_named_non_production_part(part, f"guide_rod_clamp_{name}")
@@ -818,9 +927,9 @@ def main():
         parts.add(npp, name, flip=False, skip_in_production=True)
 
     for name, folllower in z_axis.get_named_follower_items():
-        skip_in_production = True
-        if "axial_bearing_stopper" in name:
-            skip_in_production = False
+        skip_in_production = False
+        if "axial_bearing_stopper" in name and False:
+            skip_in_production = False  ### FIXME...
 
         parts.add(folllower, name, flip=False, skip_in_production=skip_in_production)
 
@@ -832,7 +941,10 @@ def main():
 
     carriage = translate(0, 0, 200)(carriage)
 
-    parts.add(carriage, "z_axis_carriage", flip=False, skip_in_production=True)
+    parts.add(carriage, "z_axis_carriage", flip=False, skip_in_production=False)
+
+    for name, follower in carriage.get_named_follower_items():
+        parts.add(follower, name, flip=False, skip_in_production=False)
 
     for name, npp in carriage.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
