@@ -664,6 +664,26 @@ def create_top_mount(guide_rod, threaded_rod, profile):
 
     top_mount_plate = top_mount_plate.fuse(rod_holder)
 
+    rod_holder_reinforcement = create_right_triangle(
+        z_axis_top_mount_holder_height * z_axis_top_mount_reinforcement_factor,
+        z_axis_top_mount_holder_height * z_axis_top_mount_reinforcement_factor,
+        z_axis_top_mount_reinforcement_thickness,
+        extrusion_direction=(1, 0, 0),
+        a_normal=(0, 0, -1),
+        b_normal=(0, 1, 0),
+    )
+    rod_holder_reinforcement = align(
+        rod_holder_reinforcement, rod_holder, Alignment.CENTER
+    )
+    rod_holder_reinforcement = align(
+        rod_holder_reinforcement, rod_holder, Alignment.BOTTOM
+    )
+    rod_holder_reinforcement = align(
+        rod_holder_reinforcement, rod_holder, Alignment.STACK_BACK
+    )
+
+    top_mount_plate = top_mount_plate.fuse(rod_holder_reinforcement)
+
     guide_rod_top_aligner = align_translation(top_mount_plate, guide_rod, Alignment.TOP)
 
     top_mount_plate = guide_rod_top_aligner(top_mount_plate)
