@@ -20,16 +20,11 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
-from mege_ender_3v3ke_idex.designs.gt2belt import create_gt_belt_clamp
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.mgh_linear import (
-    create_mgn12h_carriage,
-    create_mgn12h_rail,
-)
+from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
 )
-from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -75,9 +70,9 @@ z_axis_guide_rod_diameter = 8
 z_axis_profile_length = 700
 
 z_axis_guide_rod_threaded_rod_distance = 18
-z_axis_guide_rod_profile_distance = 75
+z_axis_guide_rod_profile_distance = 55
 
-z_axis_carriage_front_height = 70
+z_axis_carriage_front_height = 75
 z_axis_carriage_width = 45
 z_axis_carriage_front_depth = 25
 z_axis_carriage_back_depth = 40
@@ -89,18 +84,37 @@ z_axis_carriage_threaded_rod_clearance = 0.3
 z_axis_carriage_profile_clearance = 2
 z_axis_motor_mount_plate_profile_distance = 0
 z_axis_motor_mount_plate_size = 52
-z_axis_motor_mount_plate_depth = 66
+z_axis_motor_mount_plate_depth = 69
+z_axis_guide_rod_clamp_screw_length = 20
+
 
 z_axis_guide_rod_carriage_clamp_screw_length = 20
 
 
+z_axis_top_mount_thickness = 5
+z_axis_top_mount_depth = (
+    z_axis_guide_rod_profile_distance + 2 * z_axis_guide_rod_diameter
+)
+z_axis_top_mount_width = 40
+z_axis_top_mount_fillet_radius = 5
+
+z_axis_top_mount_holder_depth = 20
+z_axis_top_mount_holder_height = 35
+z_axis_top_mount_screw_size = "M3"
+z_axis_top_mount_screw_length = 16
+z_axis_top_mount_screw_inset = 4
+z_axis_top_mount_threaded_rod_clearance = 1.5
+z_axis_top_mount_reinforcement_thickness = 3
+z_axis_top_mount_reinforcement_factor = 0.9
+z_axis_top_mount_profile_mount_width = 40
 z_axis_carriage_rod_clamp_screw_inset = 4
 
-z_axis_guide_rod_clamp_depth = 20
-z_axis_guide_rod_clamp_thickness = 19
-z_axis_rod_clamp_gap = 1.5
+z_axis_guide_rod_clamp_depth = 23.5
+z_axis_guide_rod_clamp_thickness = 22
+z_axis_rod_clamp_gap = 1.0
 
-z_axis_guide_rod_clamp_screw_length = 18
+z_axis_guide_rod_clamp_width = 28
+
 
 igus_drylin_bearing_inner_diameter = 8
 igus_drylin_bearing_outer_diameter = 16
@@ -166,13 +180,17 @@ axial_rod_clamp_cylinder_head_cutter_clearance = 0.25
 axial_rod_clamp_outer_diameter_cutting_depth = 9
 axial_rod_clamp_screw_hole_distance_from_center = 10
 
+profile_mount_plate_thickness = 5
+profile_mount_plate_fillet_radius = 3
+profile_mount_width = 28
+profile_mount_plate_height = 33
 
-def create_profile_mount_plate(num_holes=2, screw_inset=5):
+z_axis_cylinder_head_clearance = 0.6
 
-    profile_mount_plate_thickness = 5
-    profile_mount_plate_fillet_radius = 3
-    profile_mount_width = 28
-    profile_mount_plate_height = 33
+
+def create_profile_mount_plate(
+    num_holes=2, screw_inset=5, profile_mount_width=profile_mount_width
+):
 
     plate = create_filleted_box(
         profile_mount_width,
@@ -304,17 +322,17 @@ def create_axial_rod_clamp():
         )
         srews.append(screw)
 
-    clamp_parts = cut_in_two(
+    axial_clamp_parts = cut_in_two(
         clamp, cut_normal=((0, 1, 0)), cut_thickness=axial_rod_clamp_gap
     )
 
     retval = LeaderFollowersCuttersPart(clamp)
 
-    for i, clamp_part in enumerate(clamp_parts):
-        retval.add_named_follower(clamp_part, f"clamp_part_{i}")
+    for i, axial_clamp_part in enumerate(axial_clamp_parts):
+        retval.add_named_follower(axial_clamp_part, f"axial_clamp_part_{i}")
 
     for i, screw in enumerate(srews):
-        retval.add_named_non_production_part(screw, f"clamp_screw_{i}")
+        retval.add_named_non_production_part(screw, f"axial_clamp_screw_{i}")
 
     return retval
 
@@ -612,6 +630,152 @@ def create_creality_threaded_rod_nut(guide_cutter_clearance=0.1):
     return retval
 
 
+def create_top_mount(guide_rod, threaded_rod, profile):
+
+    top_mount_plate = create_filleted_box(
+        z_axis_top_mount_width,
+        z_axis_top_mount_depth,
+        z_axis_top_mount_thickness,
+        z_axis_top_mount_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.BACK],
+    )
+
+    top_mount_plate = align(top_mount_plate, guide_rod, Alignment.CENTER)
+
+    top_mount_plate = align(
+        top_mount_plate,
+        profile,
+        Alignment.STACK_FRONT,
+        stack_gap=z_axis_motor_mount_plate_profile_distance,
+    )
+
+    rod_holder = create_filleted_box(
+        z_axis_guide_rod_clamp_width,
+        z_axis_top_mount_holder_depth,
+        z_axis_top_mount_holder_height,
+        z_axis_top_mount_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM],
+    )
+
+    rod_holder = align(rod_holder, top_mount_plate, Alignment.CENTER)
+    rod_holder = align(rod_holder, top_mount_plate, Alignment.STACK_TOP)
+    rod_holder = align(rod_holder, top_mount_plate, Alignment.FRONT)
+
+    top_mount_plate = top_mount_plate.fuse(rod_holder)
+
+    guide_rod_top_aligner = align_translation(top_mount_plate, guide_rod, Alignment.TOP)
+
+    top_mount_plate = guide_rod_top_aligner(top_mount_plate)
+    rod_holder = guide_rod_top_aligner(rod_holder)
+
+    top_mount_plate = top_mount_plate.cut(guide_rod)
+
+    rod_holder_representation = create_box(
+        z_axis_guide_rod_clamp_width,
+        z_axis_top_mount_holder_depth,
+        z_axis_top_mount_holder_height - z_axis_top_mount_thickness,
+    )
+
+    rod_holder_representation = align(
+        rod_holder_representation, rod_holder, Alignment.CENTER
+    )
+    rod_holder_representation = align(
+        rod_holder_representation, rod_holder, Alignment.TOP
+    )
+
+    screw_assembly = create_four_screws_mount_assembly(
+        rod_holder_representation,
+        screw_size=z_axis_top_mount_screw_size,
+        screw_length=z_axis_top_mount_screw_length,
+        screw_direction=Alignment.FRONT,
+        flush_with_top=True,
+        length_inset=z_axis_top_mount_screw_inset,
+        width_inset=z_axis_top_mount_screw_inset,
+        cylinder_head_cutter_clearance=z_axis_cylinder_head_clearance,
+    )
+
+    top_mount_plate = screw_assembly.use_as_cutter_on(top_mount_plate)
+
+    threaded_rod_cutter = create_cylinder(
+        z_axis_threaded_rod_diameter / 2 + z_axis_top_mount_threaded_rod_clearance,
+        BIG_THING,
+    )
+    threaded_rod_cutter = align(threaded_rod_cutter, threaded_rod, Alignment.CENTER)
+    threaded_rod_cutter = align(
+        threaded_rod_cutter, top_mount_plate, Alignment.CENTER, axes=[2]
+    )
+
+    top_mount_plate = top_mount_plate.cut(threaded_rod_cutter)
+
+    top_mount_profile_mount_plate = create_profile_mount_plate(
+        profile_mount_width=z_axis_top_mount_profile_mount_width
+    )
+
+    top_mount_profile_mount_plate = align(
+        top_mount_profile_mount_plate, top_mount_plate, Alignment.CENTER
+    )
+    top_mount_profile_mount_plate = align(
+        top_mount_profile_mount_plate, top_mount_plate, Alignment.BACK
+    )
+    top_mount_profile_mount_plate = align(
+        top_mount_profile_mount_plate, top_mount_plate, Alignment.BOTTOM
+    )
+    top_mount_profile_mount_plate = translate(0, 0, z_axis_top_mount_thickness)(
+        top_mount_profile_mount_plate
+    )
+
+    top_mount_plate = top_mount_plate.fuse(top_mount_profile_mount_plate)
+
+    top_mount_reinforcements = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+
+        top_mount_reinforcement = create_right_triangle(
+            profile_mount_plate_height * z_axis_top_mount_reinforcement_factor,
+            profile_mount_plate_height * z_axis_top_mount_reinforcement_factor,
+            z_axis_top_mount_reinforcement_thickness,
+            extrusion_direction=(1, 0, 0),
+            a_normal=(0, 0, -1),
+            b_normal=(0, -1, 0),
+        )
+
+        top_mount_reinforcement = align(
+            top_mount_reinforcement, top_mount_profile_mount_plate, Alignment.CENTER
+        )
+        top_mount_reinforcement = align(
+            top_mount_reinforcement, top_mount_profile_mount_plate, Alignment.BACK
+        )
+        top_mount_reinforcement = align(
+            top_mount_reinforcement, top_mount_profile_mount_plate, Alignment.BOTTOM
+        )
+        top_mount_reinforcement = align(
+            top_mount_reinforcement, top_mount_profile_mount_plate, lr
+        )
+
+        top_mount_reinforcements = top_mount_reinforcements.fuse(
+            top_mount_reinforcement
+        )
+
+    top_mount_plate = top_mount_plate.fuse(top_mount_reinforcements)
+
+    rod_center = get_bounding_box_center(guide_rod)
+    rod_holder_center = get_bounding_box_center(rod_holder)
+    cut_point = (rod_holder_center[0], rod_center[1], rod_holder_center[2])
+
+    top_mount_back, top_mount_clamp = cut_in_two(
+        top_mount_plate,
+        cut_normal=(0, 1, 0),
+        cut_point=cut_point,
+        cut_thickness=z_axis_rod_clamp_gap,
+    )
+
+    retval = LeaderFollowersCuttersPart(top_mount_back)
+    retval.add_named_follower(top_mount_clamp, "top_mount_clamp")
+    for name, part in screw_assembly.get_named_non_production_part_items():
+        retval.add_named_non_production_part(part, f"top_mount_{name}")
+
+    return retval
+
+
 def create_carriage(guide_rod, threaded_rod, profile):
     carriage_front = create_filleted_box(
         z_axis_carriage_width,
@@ -754,6 +918,7 @@ def create_carriage(guide_rod, threaded_rod, profile):
             flush_with_top=True,
             width_inset=z_axis_carriage_rod_clamp_screw_inset,
             length_inset=z_axis_carriage_rod_clamp_screw_inset,
+            cylinder_head_cutter_clearance=z_axis_cylinder_head_clearance,
         )
 
         screw_assembly = screw_assembly.prefixed_copy(
@@ -795,6 +960,7 @@ def create_z_axis():
     guide_rod = create_cylinder(z_axis_guide_rod_diameter / 2, z_axis_guide_rod_length)
 
     guide_rod = align(guide_rod, z_axis_profile, Alignment.CENTER)
+    guide_rod = align(guide_rod, z_axis_profile, Alignment.STACK_FRONT)
     guide_rod = align(guide_rod, z_axis_profile, Alignment.BOTTOM)
 
     guide_rod = translate(0, -z_axis_guide_rod_profile_distance, 0)(guide_rod)
@@ -989,7 +1155,7 @@ def create_z_axis():
     mount_plate = motor.use_as_cutter_on(mount_plate)
 
     guide_rod_clamp = create_filleted_box(
-        z_axis_motor_mount_plate_size,
+        z_axis_guide_rod_clamp_width,
         z_axis_guide_rod_clamp_depth,
         z_axis_guide_rod_clamp_thickness,
         motor_mount_plate_fillet_radius,
@@ -1005,6 +1171,7 @@ def create_z_axis():
         z_axis_guide_rod_clamp_screw_length,
         Alignment.FRONT,
         flush_with_top=True,
+        cylinder_head_cutter_clearance=z_axis_cylinder_head_clearance,
     )
 
     guide_rod_clamp = screws_mount_assembly.use_as_cutter_on(guide_rod_clamp)
@@ -1025,22 +1192,34 @@ def create_z_axis():
         guide_rod_clamp_center[2],
     )
 
-    mount_plate_front, mount_plate_back = cut_in_two(
+    mount_plate_back, mount_plate_clamp_part = cut_in_two(
         mount_plate,
         cut_normal=(0, 1, 0),
         cut_thickness=z_axis_rod_clamp_gap,
         cut_point=cut_point,
     )
 
-    retval.add_named_follower(mount_plate_front, "mount_plate_front")
+    retval.add_named_follower(mount_plate_clamp_part, "mount_plate_clamp_part")
     retval.add_named_follower(mount_plate_back, "mount_plate_back")
+
+    top_mount = create_top_mount(guide_rod, threaded_rod, z_axis_profile)
+
+    retval.add_named_follower(top_mount.leader, "top_mount")
+
+    retval.add_named_follower(
+        top_mount.get_named_follower("top_mount_clamp"), "top_mount_clamp"
+    )
+    for name, part in top_mount.get_named_non_production_part_items():
+        retval.add_named_non_production_part(part, f"top_mount_{name}")
 
     return retval
 
 
 def main():
 
-    from mege_ender_3v3ke_idex.designs.printer_frame import create_printer_frame
+    from mege_ender_3v3ke_idex.designs.printer_frame import (  # noqa: F401
+        create_printer_frame,
+    )
 
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
@@ -1053,11 +1232,28 @@ def main():
         parts.add(npp, name, flip=False, skip_in_production=True)
 
     for name, folllower in z_axis.get_named_follower_items():
-        skip_in_production = False
-        if "axial_bearing_stopper" in name and False:
-            skip_in_production = False  ### FIXME...
 
-        parts.add(folllower, name, flip=False, skip_in_production=skip_in_production)
+        skip_in_production = False
+
+        prod_rotation_angle = None
+        prod_rotation_axis = None
+
+        if "clamp" in name and "axial" not in name:
+            prod_rotation_angle = 90
+            prod_rotation_axis = (1, 0, 0)
+
+        elif "pillow_bearing_mount_plate" in name:
+            prod_rotation_angle = -90
+            prod_rotation_axis = (1, 0, 0)
+
+        parts.add(
+            folllower,
+            name,
+            flip=False,
+            skip_in_production=skip_in_production,
+            prod_rotation_angle=prod_rotation_angle,
+            prod_rotation_axis=prod_rotation_axis,
+        )
 
     carriage = create_carriage(
         z_axis.get_named_non_production_part("guide_rod"),
@@ -1070,7 +1266,21 @@ def main():
     parts.add(carriage, "z_axis_carriage", flip=False, skip_in_production=False)
 
     for name, follower in carriage.get_named_follower_items():
-        parts.add(follower, name, flip=False, skip_in_production=False)
+        skip_in_production = False
+        prod_rotation_angle = None
+        prod_rotation_axis = None
+        if "clamp" in name:
+            prod_rotation_angle = 90
+            prod_rotation_axis = (1, 0, 0)
+
+        parts.add(
+            follower,
+            name,
+            flip=False,
+            skip_in_production=skip_in_production,
+            prod_rotation_angle=prod_rotation_angle,
+            prod_rotation_axis=prod_rotation_axis,
+        )
 
     for name, npp in carriage.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)

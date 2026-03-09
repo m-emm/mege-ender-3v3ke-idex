@@ -45,8 +45,6 @@ EXTUDER_STEP_PATH = PROJECT_ROOT / "resources" / "creality_sprite.step.zip"
 BIG_THING = 500
 
 
-
-
 PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_04_HS)
 
 PROCESS_DATA["process_overrides"].update(
