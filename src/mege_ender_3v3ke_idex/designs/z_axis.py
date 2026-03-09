@@ -40,6 +40,7 @@ PROCESS_DATA["process_overrides"].update(
     {
         "brim_type": "no_brim",
         "enable_support": "1",
+        "support_object_first_layer_gap": 0.8,
         "external_perimeter_speed": "75",
         "fan_max_speed": "25",
         "fan_min_speed": "10",
