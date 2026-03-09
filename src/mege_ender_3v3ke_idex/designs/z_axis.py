@@ -65,10 +65,10 @@ z_axis_threaded_rod_coupler_overlap = 17.5
 
 z_axis_pillow_block_bearing_z_offset = 2
 
-z_axis_guide_rod_length = 600
+z_axis_guide_rod_length = 500
 z_axis_guide_rod_diameter = 8
 
-z_axis_profile_length = 700
+z_axis_profile_length = 500
 
 z_axis_guide_rod_threaded_rod_distance = 18
 z_axis_guide_rod_profile_distance = 55
@@ -1242,69 +1242,127 @@ def main():
         create_printer_frame,
     )
 
+    from mege_ender_3v3ke_idex.designs.x_axis import (  # noqa: F401
+        create_x_axis,
+    )
+
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
-    z_axis = create_z_axis()
+    frame = create_printer_frame()
 
-    parts.add(z_axis, "z_axis", flip=False, skip_in_production=True)
+    parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
 
-    for name, npp in z_axis.get_named_non_production_part_items():
+    for name, npp in frame.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
 
-    for name, folllower in z_axis.get_named_follower_items():
+    z_axes_fused = PartCollector()
 
-        skip_in_production = False
+    carriages_fused = PartCollector()
 
-        prod_rotation_angle = None
-        prod_rotation_axis = None
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
-        if "clamp" in name and "axial" not in name:
-            prod_rotation_angle = 90
-            prod_rotation_axis = (1, 0, 0)
+        prefix = lr.name.lower()
 
-        elif "pillow_bearing_mount_plate" in name:
-            prod_rotation_angle = -90
-            prod_rotation_axis = (1, 0, 0)
+        z_axis_x_offset_from_center = 190
 
-        parts.add(
-            folllower,
-            name,
-            flip=False,
-            skip_in_production=skip_in_production,
-            prod_rotation_angle=prod_rotation_angle,
-            prod_rotation_axis=prod_rotation_axis,
+        z_axis_x_offset = lr.sign * z_axis_x_offset_from_center
+
+        translator = translate(z_axis_x_offset, 0, 40)
+
+        z_axis = create_z_axis()
+
+        z_axis = align(z_axis, frame, Alignment.CENTER)
+        z_axis = align(z_axis, frame, Alignment.BOTTOM)
+
+        z_axis = translator(z_axis)
+
+        z_axes_fused = z_axes_fused.fuse(z_axis.prefixed_copy(f"{prefix}"))
+
+        parts.add(z_axis, f"{prefix}_z_axis", flip=False, skip_in_production=True)
+
+        for name, npp in z_axis.get_named_non_production_part_items():
+            parts.add(npp, f"{prefix}_{name}", flip=False, skip_in_production=True)
+
+        for name, follower in z_axis.get_named_follower_items():
+
+            skip_in_production = False
+
+            prod_rotation_angle = None
+            prod_rotation_axis = None
+
+            if "clamp" in name and "axial" not in name:
+                prod_rotation_angle = 90
+                prod_rotation_axis = (1, 0, 0)
+
+            elif "pillow_bearing_mount_plate" in name:
+                prod_rotation_angle = -90
+                prod_rotation_axis = (1, 0, 0)
+
+            parts.add(
+                follower,
+                f"{prefix}_{name}",
+                flip=False,
+                skip_in_production=skip_in_production,
+                prod_rotation_angle=prod_rotation_angle,
+                prod_rotation_axis=prod_rotation_axis,
+            )
+
+        carriage = create_carriage(
+            z_axis.get_named_non_production_part("guide_rod"),
+            z_axis.get_named_non_production_part("threaded_rod"),
+            z_axis,
         )
 
-    carriage = create_carriage(
-        z_axis.get_named_non_production_part("guide_rod"),
-        z_axis.get_named_non_production_part("threaded_rod"),
-        z_axis,
-    )
+        carriage = translate(0, 0, 200)(carriage)
 
-    carriage = translate(0, 0, 200)(carriage)
-
-    parts.add(carriage, "z_axis_carriage", flip=False, skip_in_production=False)
-
-    for name, follower in carriage.get_named_follower_items():
-        skip_in_production = False
-        prod_rotation_angle = None
-        prod_rotation_axis = None
-        if "clamp" in name:
-            prod_rotation_angle = 90
-            prod_rotation_axis = (1, 0, 0)
-
-        parts.add(
-            follower,
-            name,
-            flip=False,
-            skip_in_production=skip_in_production,
-            prod_rotation_angle=prod_rotation_angle,
-            prod_rotation_axis=prod_rotation_axis,
+        carriages_fused = carriages_fused.fuse(
+            carriage.prefixed_copy(f"{prefix}_carriage")
         )
 
-    for name, npp in carriage.get_named_non_production_part_items():
-        parts.add(npp, name, flip=False, skip_in_production=True)
+        parts.add(
+            carriage, f"{prefix}_z_axis_carriage", flip=False, skip_in_production=False
+        )
+
+        for name, follower in carriage.get_named_follower_items():
+            skip_in_production = False
+            prod_rotation_angle = None
+            prod_rotation_axis = None
+            if "clamp" in name:
+                prod_rotation_angle = 90
+                prod_rotation_axis = (1, 0, 0)
+
+            parts.add(
+                follower,
+                f"{prefix}_{name}",
+                flip=False,
+                skip_in_production=skip_in_production,
+                prod_rotation_angle=prod_rotation_angle,
+                prod_rotation_axis=prod_rotation_axis,
+            )
+
+        for name, npp in carriage.get_named_non_production_part_items():
+            parts.add(npp, f"{prefix}_{name}", flip=False, skip_in_production=True)
+
+    x_axis = create_x_axis()
+    x_axis = align(x_axis, z_axes_fused, Alignment.CENTER)
+    x_axis = align(x_axis, carriages_fused, Alignment.CENTER, axes=[2])
+    x_axis = align(x_axis, carriages_fused, Alignment.STACK_FRONT)
+
+    parts.add(x_axis, "x_axis", flip=False, skip_in_production=True)
+
+    already_added_names = set()
+    for name, npp in x_axis.get_named_non_production_part_items():
+        current_naeme = f"x_axis_{name}"
+        already_added_names.add(current_naeme)
+        parts.add(npp, current_naeme, flip=False, skip_in_production=True)
+
+    for name, follower in x_axis.get_named_follower_items():
+        current_naeme = f"x_axis_{name}"
+        if current_naeme in already_added_names:
+            continue
+
+        parts.add(follower, current_naeme, flip=False, skip_in_production=True)
 
     # printer_frame = create_printer_frame()
 
@@ -1316,6 +1374,7 @@ def main():
         prod=PROD,
         process_data=PROCESS_DATA,
         prod_gap=4,
+        export_individual_parts=False,
     )
 
     _logger.info("z_axis created successfully!")
