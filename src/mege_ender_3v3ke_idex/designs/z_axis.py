@@ -1241,10 +1241,7 @@ def main():
     from mege_ender_3v3ke_idex.designs.printer_frame import (  # noqa: F401
         create_printer_frame,
     )
-
-    from mege_ender_3v3ke_idex.designs.x_axis import (  # noqa: F401
-        create_x_axis,
-    )
+    from mege_ender_3v3ke_idex.designs.x_axis import create_x_axis  # noqa: F401
 
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
