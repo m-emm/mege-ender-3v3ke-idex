@@ -6,8 +6,8 @@ BIG_THING = 500
 
 motor_size = 42.3
 axis_profile_length = 500
-rail_length = 450
-axis_profile_pitch = 40
+x_axis_rail_length = 450
+x_axis_profile_pitch = 48
 motor_y_offset = 15
 
 rail_mount_screw_size = "M3"

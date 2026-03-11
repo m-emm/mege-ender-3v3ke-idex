@@ -28,34 +28,40 @@ PROCESS_DATA = {
 }
 
 
+mgn_12h_carriage_width = 27
+mgn_12h_carriage_length = 45.4
+mgn_12h_screw_hole_pitch = 20
+mgn_12h_height = 10
+mgn_12h_screw_hole_depth = 3.5
+mgn_12h_h1 = 3.4
+
+
 def create_mgn12h_carriage():
     """Create the MGN12H carriage part."""
 
-    width = 27
-    length = 45.4
-    screw_hole_pitch = 20
-    height = 10
-    screw_hole_depth = 3.5
     screw_hole_diameter = MScrew.from_size("M3").clearance_hole_normal
-    h1 = 3.4
 
-    carriage = create_box(length, width, height)
+    carriage = create_box(
+        mgn_12h_carriage_length, mgn_12h_carriage_width, mgn_12h_height
+    )
 
     holes = PartCollector()
-    for x in [-screw_hole_pitch / 2, screw_hole_pitch / 2]:
-        for y in [-screw_hole_pitch / 2, screw_hole_pitch / 2]:
-            hole = create_cylinder(screw_hole_diameter / 2, height)
+    for x in [-mgn_12h_screw_hole_pitch / 2, mgn_12h_screw_hole_pitch / 2]:
+        for y in [-mgn_12h_screw_hole_pitch / 2, mgn_12h_screw_hole_pitch / 2]:
+            hole = create_cylinder(screw_hole_diameter / 2, mgn_12h_height)
             hole = translate(x, y, 0)(hole)
             holes = holes.fuse(hole)
 
     holes = align(holes, carriage, Alignment.CENTER)
-    holes = align(holes, carriage, Alignment.STACK_TOP, stack_gap=-screw_hole_depth)
+    holes = align(
+        holes, carriage, Alignment.STACK_TOP, stack_gap=-mgn_12h_screw_hole_depth
+    )
 
     carriage = carriage.cut(holes)
 
     carriage = LeaderFollowersCuttersPart(carriage, cutters=[holes])
 
-    carriage = translate(0, 0, h1)(carriage)
+    carriage = translate(0, 0, mgn_12h_h1)(carriage)
 
     return carriage
 

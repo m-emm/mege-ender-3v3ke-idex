@@ -37,6 +37,7 @@ def create_single_screw_mount_for_top(
     nut_cutter_clearance=0.15,
     flush_with_top=False,
     cylinder_head_cutter_clearance=0.1,
+    clearance_type="normal",
 ):
 
     screw = create_cylinder_screw(screw_size, screw_length)
@@ -55,9 +56,11 @@ def create_single_screw_mount_for_top(
     screw_body = align(screw_body, screw, Alignment.CENTER)
     screw_body = align(screw_body, screw, Alignment.BOTTOM)
 
-    hole_cutter = create_cylinder(
-        m_screw_record.clearance_hole_normal / 2, part_thickness
+    clearance_hole_diameter = m_screw_record.get_clearance_hole_diameter(
+        clearance_type=clearance_type
     )
+
+    hole_cutter = create_cylinder(clearance_hole_diameter / 2, part_thickness)
 
     hole_cutter = align(hole_cutter, screw_body, Alignment.CENTER)
     hole_cutter = align(hole_cutter, screw_body, Alignment.TOP)
@@ -116,6 +119,7 @@ def create_screw_mount_assembly(
     nut_cutter_clearance=0.15,
     flush_with_top=False,
     cylinder_head_cutter_clearance=0.1,
+    clearance_type="normal",
 ):
 
     part_bb_size = get_bounding_box_size(for_part)
@@ -137,6 +141,7 @@ def create_screw_mount_assembly(
         nut_cutter_clearance=nut_cutter_clearance,
         flush_with_top=flush_with_top,
         cylinder_head_cutter_clearance=cylinder_head_cutter_clearance,
+        clearance_type=clearance_type,
     )
 
     if screw_direction == Alignment.FRONT:
@@ -187,6 +192,7 @@ def create_four_screws_mount_assembly(
     cylinder_head_cutter_clearance=0.1,
     width_inset=5,
     length_inset=5,
+    clearance_type="normal",
 ):
 
     part_bb_size = get_bounding_box_size(for_part)
@@ -221,6 +227,7 @@ def create_four_screws_mount_assembly(
                 nut_cutter_clearance,
                 flush_with_top,
                 cylinder_head_cutter_clearance,
+                clearance_type=clearance_type,
             )
 
             translation_vector = [0, 0, 0]

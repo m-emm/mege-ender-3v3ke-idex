@@ -533,7 +533,7 @@ def main():
     )
     lower_axis_profile = rotate(90, axis=(0, 1, 0))(lower_axis_profile)
 
-    top_axis_profile = translate(0, 0, axis_profile_pitch)(lower_axis_profile)
+    top_axis_profile = translate(0, 0, x_axis_profile_pitch)(lower_axis_profile)
     axis_frame = lower_axis_profile.fuse(top_axis_profile)
 
     parts.add(axis_frame, "axis_frame")

@@ -27,6 +27,7 @@ from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.mgh_linear import (
     create_mgn12h_carriage,
     create_mgn12h_rail,
+    mgn_12h_carriage_length,
 )
 from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
 from mege_ender_3v3ke_idex.designs.printer_frame import create_printer_frame
@@ -91,6 +92,13 @@ endstop_holder_groove_holder_bottom_width = 6.3
 endstop_holder_groove_holder_top_width = 6.0
 endstop_holder_groove_holder_slit = 1.5
 endstop_holder_groove_holder_height = 5
+
+carriage_offset = x_axis_rail_length / 2 - mgn_12h_carriage_length / 2
+
+
+endcap_vertical_coupler_size = 10
+endcap_vertical_coupler_screw_size = "M5"
+endcap_vertical_coupler_screw_length = 50
 
 
 def create_rhomboid(length, width, thickness, angle, fillet_radius=None):
@@ -356,9 +364,7 @@ def create_idler_cage(
     return retval
 
 
-def create_idler_endcap(
-    profile, with_tensioner: bool = False, side: Alignment = Alignment.LEFT
-):
+def create_idler_endcap(profile, with_tensioner, side, endcap_top_bottom):
     """Create an idler endcap built around the idler cage (no tensioner version for now)."""
 
     profile_size = get_bounding_box_size(profile)
@@ -659,6 +665,54 @@ def create_idler_endcap(
 
         retval.add_named_non_production_part(tensioner_screw_part, "tensioner_screw")
 
+    endcap_vertical_couplers = PartCollector()
+    for fb in [Alignment.FRONT, Alignment.BACK]:
+        endcap_size = get_bounding_box_size(retval)
+        profile_size = get_bounding_box_size(profile)
+
+        endcap_vertical_coupler = create_box(
+            endcap_vertical_coupler_size, endcap_vertical_coupler_size, endcap_size[2]
+        )
+        endcap_vertical_coupler = align(
+            endcap_vertical_coupler, retval, Alignment.CENTER
+        )
+        endcap_vertical_coupler = align(
+            endcap_vertical_coupler, retval, fb.stack_alignment
+        )
+        endcap_vertical_coupler = align(
+            endcap_vertical_coupler, retval, Alignment.BOTTOM
+        )
+
+        endcap_vertical_coupler = align(endcap_vertical_coupler, retval, side)
+
+        endcap_vertical_coupler_connector = create_box(
+            endcap_vertical_coupler_size,
+            endcap_vertical_coupler_size,
+            x_axis_profile_pitch / 2 - profile_size[2] / 2,
+        )
+        endcap_vertical_coupler_connector = align(
+            endcap_vertical_coupler_connector, endcap_vertical_coupler, Alignment.CENTER
+        )
+        endcap_vertical_coupler_connector = align(
+            endcap_vertical_coupler_connector,
+            profile,
+            Alignment.STACK_TOP,
+        )
+
+        endcap_vertical_coupler = endcap_vertical_coupler.fuse(
+            endcap_vertical_coupler_connector
+        )
+
+        endcap_vertical_couplers = endcap_vertical_couplers.fuse(
+            endcap_vertical_coupler
+        )
+
+    retval = retval.fuse(endcap_vertical_couplers)
+
+    if endcap_top_bottom == Alignment.TOP:
+        center = get_bounding_box_center(cage)
+        retval = rotate(180, axis=(1, 0, 0), center=center)(retval)
+
     return retval
 
 
@@ -674,16 +728,16 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
     )
     lower_axis_profile = rotate(90, axis=(0, 1, 0))(lower_axis_profile)
 
-    top_axis_profile = translate(0, 0, axis_profile_pitch)(lower_axis_profile)
+    top_axis_profile = translate(0, 0, x_axis_profile_pitch)(lower_axis_profile)
     axis_frame = lower_axis_profile.fuse(top_axis_profile)
 
-    rail = create_mgn12h_rail(length_mm=rail_length)
+    rail = create_mgn12h_rail(length_mm=x_axis_rail_length)
 
     carriages = []
     for i in [-1, 1]:
         carriage = create_mgn12h_carriage()
         carriage = align(carriage, rail, Alignment.CENTER, axes=[0, 1])
-        carriage = translate(i * 170, 0, 0)(carriage)
+        carriage = translate(i * carriage_offset, 0, 0)(carriage)
         carriages.append(carriage)
 
     for i, carriage in enumerate(carriages):
@@ -921,6 +975,8 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
             lower_axis_profile if side == Alignment.LEFT else top_axis_profile
         )
 
+        top_bottom_string = "lower" if side == Alignment.LEFT else "top"
+
         endstop_holder = create_endstop_holder()
 
         endstop_holder = rotate(-90, axis=(0, 1, 0))(endstop_holder)
@@ -1095,38 +1151,44 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
             endstop_holder.leader, f"endstop_holder_{side.name.lower()}"
         )
 
-    for side in (Alignment.LEFT, Alignment.RIGHT):
+        for endcap_side in (Alignment.LEFT, Alignment.RIGHT):
 
-        profile_to_align = (
-            top_axis_profile if side == Alignment.LEFT else lower_axis_profile
-        )
+            with_tensioner = endcap_side == Alignment.RIGHT
 
-        with_tensioner = side == Alignment.RIGHT
+            endcap_top_bottom = (
+                Alignment.BOTTOM if side == Alignment.LEFT else Alignment.TOP
+            )
 
-        side_str = side.name.lower()
+            endcap_side_str = endcap_side.name.lower()
 
-        endcap = create_idler_endcap(
-            profile_to_align, with_tensioner=with_tensioner, side=side
-        )
+            endcap = create_idler_endcap(
+                profile_to_align_to,
+                with_tensioner=with_tensioner,
+                side=endcap_side,
+                endcap_top_bottom=endcap_top_bottom,
+            )
 
-        retval.add_named_non_production_part(
-            endcap.get_follower_part_by_name("idler"),
-            f"x_axis_idler_endcap_{side_str}_idler",
-        )
+            retval.add_named_non_production_part(
+                endcap.get_follower_part_by_name("idler"),
+                f"x_axis_idler_endcap_{top_bottom_string}_{endcap_side_str}_idler",
+            )
 
-        retval.add_named_follower(
-            endcap.get_follower_part_by_name("endcap_idler_cage"),
-            f"x_axis_idler_endcap_{side_str}_cage",
-        )
+            retval.add_named_follower(
+                endcap.get_follower_part_by_name("endcap_idler_cage"),
+                f"x_axis_idler_endcap_{top_bottom_string}_{endcap_side_str}_cage",
+            )
 
-        retval.add_named_follower(endcap.leader, f"x_axis_idler_endcap_{side_str}")
+            retval.add_named_follower(
+                endcap.leader,
+                f"x_axis_idler_endcap_{top_bottom_string}_{endcap_side_str}",
+            )
 
     return retval
 
 
 def create_rail_drill_jig():
 
-    rail = create_mgn12h_rail(length_mm=rail_length)
+    rail = create_mgn12h_rail(length_mm=x_axis_rail_length)
 
     jig = create_box(axis_profile_length, jig_width / 2, jig_thickness)
     jig_ear = create_right_triangle(
@@ -1253,23 +1315,23 @@ def main():
 
     lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
 
-    jig = create_rail_drill_jig()
-    jig = align(jig, lower_axis_profile, Alignment.CENTER)
-    jig = align(jig, lower_axis_profile, Alignment.TOP)
-    jig = translate(0, 0, 26)(jig)
+    # jig = create_rail_drill_jig()
+    # jig = align(jig, lower_axis_profile, Alignment.CENTER)
+    # jig = align(jig, lower_axis_profile, Alignment.TOP)
+    # jig = translate(0, 0, 31)(jig)
 
-    half_jig, _ = cut_in_two(jig)
+    # half_jig, _ = cut_in_two(jig)
 
-    if PROD:
-        half_jig = rotate(45)(half_jig)
+    # if PROD:
+    #     half_jig = rotate(45)(half_jig)
 
-    parts.add(
-        half_jig,
-        "x_axis_rail_drill_jig",
-        flip=False,
-        skip_in_production=True,
-        color=(0.5, 0.5, 0.5),
-    )
+    # parts.add(
+    #     half_jig,
+    #     "x_axis_rail_drill_jig",
+    #     flip=False,
+    #     skip_in_production=True,
+    #     color=(0.5, 0.5, 0.5),
+    # )
 
     # for side in [Alignment.RIGHT, Alignment.LEFT]:
     #     with_tensioner = side == Alignment.RIGHT

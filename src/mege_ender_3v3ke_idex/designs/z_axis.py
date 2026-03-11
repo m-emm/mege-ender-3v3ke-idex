@@ -39,7 +39,7 @@ PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_04_HS)
 PROCESS_DATA["process_overrides"].update(
     {
         "brim_type": "no_brim",
-        "enable_support": "1",
+        "enable_support": "0",
         "support_object_first_layer_gap": 0.8,
         "external_perimeter_speed": "75",
         "fan_max_speed": "25",
@@ -54,6 +54,11 @@ PROCESS_DATA["process_overrides"].update(
         "wall_loops": "3",
     }
 )
+
+z_axis_default_clearance_hole_type = "loose"
+z_axis_default_screw_nut_cutter_clearance = 0.2
+z_axis_creality_nut_threaded_rod_cuide_cutter_clearance = 0.3
+z_axis_nut_screw_hole_clearence_type = "loose"
 
 z_axis_threaded_rod_diameter = 8
 z_axis_threaded_rod_length = 500
@@ -552,7 +557,9 @@ def create_axial_ball_bearing_8_x_19():
     return bearing
 
 
-def create_creality_threaded_rod_nut(guide_cutter_clearance=0.1):
+def create_creality_threaded_rod_nut(
+    threaded_rod_guide_cutter_clearance=0.1, screw_hole_clearence_type="normal"
+):
     base_thickness = 3.5
     base_width = 12.5
     base_cut_radius = 15
@@ -568,7 +575,7 @@ def create_creality_threaded_rod_nut(guide_cutter_clearance=0.1):
     mount_hole_drill_diaameter = MScrew.from_size(mount_screw_size).core_hole
     external_mount_hole_drill_diameter = MScrew.from_size(
         mount_screw_size
-    ).clearance_hole_normal
+    ).get_clearance_hole_diameter(screw_hole_clearence_type)
 
     base_cutter = create_box(BIG_THING, BIG_THING, 2 * base_thickness)
     external_mount_hole_drills = []
@@ -623,7 +630,7 @@ def create_creality_threaded_rod_nut(guide_cutter_clearance=0.1):
         )
 
     rod_guide_cutter = create_cylinder(
-        rod_guide_diameter / 2 + guide_cutter_clearance, BIG_THING
+        rod_guide_diameter / 2 + threaded_rod_guide_cutter_clearance, BIG_THING
     )
     rod_guide_cutter = align(rod_guide_cutter, rod_guide, Alignment.CENTER)
     retval.add_named_cutter(rod_guide_cutter, "rod_guide_cutter")
@@ -713,6 +720,8 @@ def create_top_mount(guide_rod, threaded_rod, profile):
         length_inset=z_axis_top_mount_screw_inset,
         width_inset=z_axis_top_mount_screw_inset,
         cylinder_head_cutter_clearance=z_axis_cylinder_head_clearance,
+        clearance_type=z_axis_default_clearance_hole_type,
+        nut_cutter_clearance=z_axis_default_screw_nut_cutter_clearance,
     )
 
     top_mount_plate = screw_assembly.use_as_cutter_on(top_mount_plate)
@@ -853,7 +862,10 @@ def create_carriage(guide_rod, threaded_rod, profile):
         stack_gap=-2 * z_axis_carriage_fillet_radius,
     )
 
-    nut = create_creality_threaded_rod_nut()
+    nut = create_creality_threaded_rod_nut(
+        threaded_rod_guide_cutter_clearance=z_axis_creality_nut_threaded_rod_cuide_cutter_clearance,
+        screw_hole_clearence_type=z_axis_nut_screw_hole_clearence_type,
+    )
 
     nut = align(nut, threaded_rod, Alignment.CENTER)
 
@@ -940,6 +952,8 @@ def create_carriage(guide_rod, threaded_rod, profile):
             width_inset=z_axis_carriage_rod_clamp_screw_inset,
             length_inset=z_axis_carriage_rod_clamp_screw_inset,
             cylinder_head_cutter_clearance=z_axis_cylinder_head_clearance,
+            clearance_type=z_axis_default_clearance_hole_type,
+            nut_cutter_clearance=z_axis_default_screw_nut_cutter_clearance,
         )
 
         screw_assembly = screw_assembly.prefixed_copy(
@@ -1193,6 +1207,8 @@ def create_z_axis():
         Alignment.FRONT,
         flush_with_top=True,
         cylinder_head_cutter_clearance=z_axis_cylinder_head_clearance,
+        clearance_type=z_axis_default_clearance_hole_type,
+        nut_cutter_clearance=z_axis_default_screw_nut_cutter_clearance,
     )
 
     guide_rod_clamp = screws_mount_assembly.use_as_cutter_on(guide_rod_clamp)
@@ -1236,6 +1252,28 @@ def create_z_axis():
     return retval
 
 
+def create_box_hole_cutter(box_width, box_length, box_height):
+
+    box_to_leave_free = create_box(box_width, box_length, box_height)
+
+    box_hole_cutter = PartCollector()
+    for alignment in [
+        Alignment.STACK_TOP,
+        Alignment.STACK_BOTTOM,
+        Alignment.STACK_FRONT,
+        Alignment.STACK_BACK,
+        Alignment.STACK_LEFT,
+        Alignment.STACK_RIGHT,
+    ]:
+
+        cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+        cutter = align(cutter, box_to_leave_free, Alignment.CENTER)
+        cutter = align(cutter, box_to_leave_free, alignment)
+        box_hole_cutter = box_hole_cutter.fuse(cutter)
+
+    return LeaderFollowersCuttersPart(box_to_leave_free, cutters=[box_hole_cutter])
+
+
 def main():
 
     from mege_ender_3v3ke_idex.designs.printer_frame import (  # noqa: F401
@@ -1257,7 +1295,7 @@ def main():
 
     carriages_fused = PartCollector()
 
-    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+    for lr in [Alignment.LEFT]:  # , Alignment.RIGHT]:
 
         prefix = lr.name.lower()
 
@@ -1340,30 +1378,48 @@ def main():
 
         for name, npp in carriage.get_named_non_production_part_items():
             parts.add(npp, f"{prefix}_{name}", flip=False, skip_in_production=True)
+    if False:
+        x_axis = create_x_axis()
+        x_axis = align(x_axis, z_axes_fused, Alignment.CENTER)
+        x_axis = align(x_axis, carriages_fused, Alignment.CENTER, axes=[2])
+        x_axis = align(x_axis, carriages_fused, Alignment.STACK_FRONT)
 
-    x_axis = create_x_axis()
-    x_axis = align(x_axis, z_axes_fused, Alignment.CENTER)
-    x_axis = align(x_axis, carriages_fused, Alignment.CENTER, axes=[2])
-    x_axis = align(x_axis, carriages_fused, Alignment.STACK_FRONT)
+        parts.add(x_axis, "x_axis", flip=False, skip_in_production=True)
 
-    parts.add(x_axis, "x_axis", flip=False, skip_in_production=True)
+        already_added_names = set()
+        for name, npp in x_axis.get_named_non_production_part_items():
+            current_naeme = f"x_axis_{name}"
+            already_added_names.add(current_naeme)
+            parts.add(npp, current_naeme, flip=False, skip_in_production=True)
 
-    already_added_names = set()
-    for name, npp in x_axis.get_named_non_production_part_items():
-        current_naeme = f"x_axis_{name}"
-        already_added_names.add(current_naeme)
-        parts.add(npp, current_naeme, flip=False, skip_in_production=True)
+        for name, follower in x_axis.get_named_follower_items():
+            current_naeme = f"x_axis_{name}"
+            if current_naeme in already_added_names:
+                continue
 
-    for name, follower in x_axis.get_named_follower_items():
-        current_naeme = f"x_axis_{name}"
-        if current_naeme in already_added_names:
-            continue
+            parts.add(follower, current_naeme, flip=False, skip_in_production=True)
 
-        parts.add(follower, current_naeme, flip=False, skip_in_production=True)
+    new_parts_list = []
+    for part_info in parts.parts:
 
-    # printer_frame = create_printer_frame()
+        if "left_z_axis_carriage" in part_info.name:
 
-    # parts.add(printer_frame, "printer_frame", flip=False, skip_in_production=True)
+            bhc = create_box_hole_cutter(28, 20, 20)
+            solid_in_part = part_info.part
+
+            bhc = align(bhc, solid_in_part, Alignment.CENTER)
+            bhc = align(bhc, solid_in_part, Alignment.BOTTOM)
+            bhc = translate(0, 8, 0)(bhc)
+
+            solid_in_part = bhc.use_as_cutter_on(solid_in_part)
+
+            part_info.part = solid_in_part
+
+            new_parts_list.append(part_info)
+        else:
+            _logger.warning(f"Skipping {part_info.name}")
+
+    parts.parts = new_parts_list
 
     arrange_and_export(
         parts.as_list(),
