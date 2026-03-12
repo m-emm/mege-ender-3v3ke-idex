@@ -105,6 +105,8 @@ endcap_vertical_coupler_size = 13
 endcap_vertical_coupler_screw_size = "M5"
 endcap_vertical_coupler_screw_length = 70
 
+toolhead_path_width = 14
+
 
 def create_rhomboid(length, width, thickness, angle, fillet_radius=None):
     """Create a rhomboid shape by shearing a box."""
@@ -443,6 +445,18 @@ def create_idler_endcap(profile, with_tensioner, side, endcap_top_bottom):
     profile_cutter = align(profile_cutter, profile, Alignment.CENTER)
     profile_cutter = align(profile_cutter, profile, side)
 
+    tool_head_path = create_box(profile_size[0], BIG_THING, toolhead_path_width)
+    tool_head_path = align(tool_head_path, profile, Alignment.CENTER)
+    tool_head_path = align(
+        tool_head_path,
+        profile,
+        (
+            Alignment.STACK_FRONT
+            if endcap_top_bottom == Alignment.BOTTOM
+            else Alignment.STACK_BACK
+        ),
+    )
+
     cage = cage.cut(profile_cutter)
 
     mount_eye = create_filleted_box(
@@ -635,7 +649,10 @@ def create_idler_endcap(profile, with_tensioner, side, endcap_top_bottom):
         mount_eye = mount_eye.cut(profile_cutter)
         outer_box = outer_box.fuse(mount_eye)
 
+        outer_box = outer_box.cut(tool_head_path)
+
         retval = LeaderFollowersCuttersPart(leader=outer_box)
+
         retval.add_named_follower(cage.leader, "endcap_idler_cage")
 
     else:
@@ -655,6 +672,7 @@ def create_idler_endcap(profile, with_tensioner, side, endcap_top_bottom):
         mount_eye = mount_eye.cut(profile_cutter)
         cage = cage.fuse(mount_eye)
 
+        cage = cage.cut(tool_head_path)
         retval = LeaderFollowersCuttersPart(leader=cage.leader)
         retval.add_named_follower(cage.leader, "endcap_idler_cage")
 
@@ -1339,7 +1357,7 @@ def main():
     x_axis = align(x_axis, frame, Alignment.STACK_TOP, stack_gap=100)
 
     already_added_names = set()
-    for name, npp in x_axis.get_named_non_production_part_items():        
+    for name, npp in x_axis.get_named_non_production_part_items():
         if name in already_added_names:
             _logger.warning(
                 f"Duplicate non-production part name {name} in x_axis, skipping adding it to parts list"
@@ -1352,7 +1370,6 @@ def main():
             flip=False,
             skip_in_production=True,
         )
-
 
     for name, follower in x_axis.get_named_follower_items():
 
