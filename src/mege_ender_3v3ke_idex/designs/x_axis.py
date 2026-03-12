@@ -356,8 +356,6 @@ def create_idler_cage(
 
         retval.add_named_non_production_part(tensioner_screw, "tensioner_screw")
 
-    # Place the cage on the build plate for convenient exporting
-
     retval_bbox = get_bounding_box(retval)
     retval_bbox_size = get_bounding_box_size(retval)
     assert np.allclose(
@@ -809,8 +807,8 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
     mount_shields = PartCollector()
     mount_plate_connectors = PartCollector()
 
-    non_production_parts = [axis_frame]
-    non_production_names = ["axis_frame"]
+    non_production_parts = []
+    non_production_names = []
 
     non_production_parts.append(
         rail_with_carriages.get_follower_part_by_name("carriage_1")
@@ -1230,13 +1228,17 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
                 idler_name,
             )
 
-            cage_name = (
-                f"x_axis_idler_endcap_{top_bottom_string}_{endcap_side_str}_cage"
-            )
-            retval.add_named_follower(
-                endcap.get_follower_part_by_name("endcap_idler_cage"),
-                cage_name,
-            )
+            if with_tensioner:
+                cage_name = (
+                    f"x_axis_idler_endcap_{top_bottom_string}_{endcap_side_str}_cage"
+                )
+                retval.add_named_follower(
+                    endcap.get_follower_part_by_name("endcap_idler_cage"),
+                    cage_name,
+                )
+
+            else:
+                cage_name = None
 
             endcap_name = f"x_axis_idler_endcap_{top_bottom_string}_{endcap_side_str}"
             retval.add_named_follower(
@@ -1245,7 +1247,11 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
             )
 
             if endcap.additional_data.get("endcap_is_rotated", False):
-                for name in [idler_name, cage_name, endcap_name]:
+                part_names = [idler_name, endcap_name]
+                if cage_name is not None:
+                    part_names.append(cage_name)
+
+                for name in part_names:
                     retval.additional_data[name] = {"is_rotated": True}
 
             current_additional_data = retval.additional_data.get(cage_name, {})
@@ -1258,20 +1264,12 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
             )
             retval.additional_data[cage_name] = current_additional_data
 
-            _logger.info(
-                f"endcap additional data for {endcap_name}, {cage_name}, {idler_name}: { json.dumps(retval.additional_data, indent=4) }"
-            )
-
             for (
                 npp_name_in_endcap,
                 endcap_npp,
             ) in endcap.get_named_non_production_part_items():
                 full_npp_name = f"{endcap_name}_{npp_name_in_endcap}"
                 retval.add_named_non_production_part(endcap_npp, full_npp_name)
-
-    _logger.info(
-        f"additional data for x_axis: {json.dumps(retval.additional_data, indent=4)}"
-    )
 
     return retval
 
@@ -1341,7 +1339,7 @@ def main():
     x_axis = align(x_axis, frame, Alignment.STACK_TOP, stack_gap=100)
 
     already_added_names = set()
-    for name, npp in x_axis.get_named_non_production_part_items():
+    for name, npp in x_axis.get_named_non_production_part_items():        
         if name in already_added_names:
             _logger.warning(
                 f"Duplicate non-production part name {name} in x_axis, skipping adding it to parts list"
@@ -1355,7 +1353,9 @@ def main():
             skip_in_production=True,
         )
 
+
     for name, follower in x_axis.get_named_follower_items():
+
         if name in already_added_names:
             _logger.warning(
                 f"Duplicate follower name {name} in x_axis, skipping adding it to parts list"
@@ -1372,10 +1372,6 @@ def main():
             "prod_rotation_axis", None
         )
 
-        _logger.info(
-            f"additional data for follower {name}: {x_axis.additional_data.get(name, {})}, prod_rotation_angle_from_data: {prod_rotation_angle_from_data}, prod_rotation_axis_from_data: {prod_rotation_axis_from_data}"
-        )
-
         parts.add(
             follower,
             f"x_axis_{name}",
@@ -1385,129 +1381,7 @@ def main():
             prod_rotation_axis=prod_rotation_axis_from_data,
         )
 
-    # for side in [Alignment.LEFT]:  # , Alignment.RIGHT]:
-    #     mount_plate_name = f"mount_plate_{side.name.lower()}"
-    #     color_by_side = {
-    #         Alignment.LEFT: (0.8, 0.8, 1.0),
-    #         Alignment.RIGHT: (1.0, 0.8, 0.8),
-    #     }
-
-    #     mount_plate_of_side = x_axis.get_follower_part_by_name(mount_plate_name)
-
-    #     next_part_name = f"x_axis_{mount_plate_name}"
-
-    #     parts.add(
-    #         mount_plate_of_side,
-    #         next_part_name,
-    #         flip=False,
-    #         skip_in_production=True,  # was: False,
-    #         prod_rotation_angle=90,
-    #         prod_rotation_axis=(1, 0, 0),
-    #         color=color_by_side[side],
-    #     )
-
-    #     follower_name = f"axis_holding_counter_flange_{side.name.lower()}"
-
-    #     next_part_name = follower_name
-    #     parts.add(
-    #         x_axis.get_follower_part_by_name(follower_name),
-    #         follower_name,
-    #         flip=False,
-    #         skip_in_production=True,  # was False,
-    #         prod_rotation_angle=0,
-    #         prod_rotation_axis=(1, 0, 0),
-    #         color=(1.0, 0.7, 0.8),
-    #     )
-
     lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
-
-    # jig = create_rail_drill_jig()
-    # jig = align(jig, lower_axis_profile, Alignment.CENTER)
-    # jig = align(jig, lower_axis_profile, Alignment.TOP)
-    # jig = translate(0, 0, 31)(jig)
-
-    # half_jig, _ = cut_in_two(jig)
-
-    # if PROD:
-    #     half_jig = rotate(45)(half_jig)
-
-    # parts.add(
-    #     half_jig,
-    #     "x_axis_rail_drill_jig",
-    #     flip=False,
-    #     skip_in_production=True,
-    #     color=(0.5, 0.5, 0.5),
-    # )
-
-    # for side in [Alignment.RIGHT, Alignment.LEFT]:
-    #     with_tensioner = side == Alignment.RIGHT
-
-    #     side_str = side.name.lower()
-
-    #     endcap = create_idler_endcap(
-    #         lower_axis_profile, with_tensioner=with_tensioner, side=side
-    #     )
-
-    #     parts.add(
-    #         endcap.get_follower_part_by_name("idler"),
-    #         f"x_axis_idler_endcap_{side_str}_idler",
-    #         flip=False,
-    #         skip_in_production=True,
-    #         color=(0.8, 0.8, 0.8),
-    #     )
-
-    #     parts.add(
-    #         endcap.get_non_production_part_by_name("axle"),
-    #         f"x_axis_idler_endcap_{side_str}_axle",
-    #         flip=False,
-    #         skip_in_production=True,
-    #         color=(0.0, 0.9, 0.0),
-    #     )
-
-    #     next_part_name = f"x_axis_endcap_idler_cage_{side_str}"
-    #     parts.add(
-    #         endcap.get_follower_part_by_name("endcap_idler_cage"),
-    #         next_part_name,
-    #         flip=False,
-    #         skip_in_production=True,  # was: False,
-    #         prod_rotation_angle=side.sign * 90,
-    #         prod_rotation_axis=(0, 1, 0),
-    #         color=(0.8, 0.4, 0.6),
-    #     )
-
-    #     if with_tensioner:
-    #         parts.add(
-    #             endcap.get_non_production_part_by_name("tensioner_screw"),
-    #             f"x_axis_idler_endcap_{side_str}_tensioner_screw",
-    #             flip=False,
-    #             skip_in_production=True,
-    #             color=(0.9, 0.4, 0.1),
-    #         )
-
-    #         next_part_name = f"x_axis_idler_endcap_{side_str}_tensioner_cage"
-    #         tensioner_cage = endcap.leader
-    #         # tensioner_cage = translate(0, -8, 0)(tensioner_cage)
-
-    #         parts.add(
-    #             tensioner_cage,
-    #             next_part_name,
-    #             flip=False,
-    #             skip_in_production=True,  # was: False,
-    #             prod_rotation_angle=0,
-    #             prod_rotation_axis=(1, 0, 0),
-    #             color=(0.9, 0.6, 0.1),
-    #         )
-
-    #     if side == Alignment.LEFT:
-    #         parts.add(
-    #             x_axis.get_named_follower("endstop_holder_" + side_str),
-    #             f"x_axis_endstop_holder_{side_str}",
-    #             flip=False,
-    #             skip_in_production=False,
-    #             prod_rotation_angle=side.sign * 90,
-    #             prod_rotation_axis=(0, 1, 0),
-    #             color=(0.3, 0.3, 1.0),
-    #         )
 
     tool_head_mount, _carriage, _tool_head = create_tool_head_mount(lower_axis_profile)
 
