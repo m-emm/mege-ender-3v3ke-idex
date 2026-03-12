@@ -1378,7 +1378,7 @@ def main():
 
         for name, npp in carriage.get_named_non_production_part_items():
             parts.add(npp, f"{prefix}_{name}", flip=False, skip_in_production=True)
-    if False:
+    if True:
         x_axis = create_x_axis()
         x_axis = align(x_axis, z_axes_fused, Alignment.CENTER)
         x_axis = align(x_axis, carriages_fused, Alignment.CENTER, axes=[2])
@@ -1399,27 +1399,27 @@ def main():
 
             parts.add(follower, current_naeme, flip=False, skip_in_production=True)
 
-    new_parts_list = []
-    for part_info in parts.parts:
+    # new_parts_list = []
+    # for part_info in parts.parts:
 
-        if "left_z_axis_carriage" in part_info.name:
+    #     if "left_z_axis_carriage" in part_info.name:
 
-            bhc = create_box_hole_cutter(28, 20, 20)
-            solid_in_part = part_info.part
+    #         bhc = create_box_hole_cutter(28, 20, 20)
+    #         solid_in_part = part_info.part
 
-            bhc = align(bhc, solid_in_part, Alignment.CENTER)
-            bhc = align(bhc, solid_in_part, Alignment.BOTTOM)
-            bhc = translate(0, 8, 0)(bhc)
+    #         bhc = align(bhc, solid_in_part, Alignment.CENTER)
+    #         bhc = align(bhc, solid_in_part, Alignment.BOTTOM)
+    #         bhc = translate(0, 8, 0)(bhc)
 
-            solid_in_part = bhc.use_as_cutter_on(solid_in_part)
+    #         solid_in_part = bhc.use_as_cutter_on(solid_in_part)
 
-            part_info.part = solid_in_part
+    #         part_info.part = solid_in_part
 
-            new_parts_list.append(part_info)
-        else:
-            _logger.warning(f"Skipping {part_info.name}")
+    #         new_parts_list.append(part_info)
+    #     else:
+    #         _logger.warning(f"Skipping {part_info.name}")
 
-    parts.parts = new_parts_list
+    # parts.parts = new_parts_list
 
     arrange_and_export(
         parts.as_list(),

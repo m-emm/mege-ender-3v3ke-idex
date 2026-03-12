@@ -8,6 +8,7 @@ Usage:
 """
 
 import copy
+import json
 import logging
 import os
 from collections import defaultdict
@@ -31,6 +32,10 @@ from mege_ender_3v3ke_idex.designs.mgh_linear import (
 )
 from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
 from mege_ender_3v3ke_idex.designs.printer_frame import create_printer_frame
+from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (  # noqa: F401
+    create_four_screws_mount_assembly,
+    create_screw_mount_assembly,
+)
 from mege_ender_3v3ke_idex.designs.tool_head_mount import create_tool_head_mount
 from shellforgepy.simple import *
 
@@ -96,9 +101,9 @@ endstop_holder_groove_holder_height = 5
 carriage_offset = x_axis_rail_length / 2 - mgn_12h_carriage_length / 2
 
 
-endcap_vertical_coupler_size = 10
+endcap_vertical_coupler_size = 13
 endcap_vertical_coupler_screw_size = "M5"
-endcap_vertical_coupler_screw_length = 50
+endcap_vertical_coupler_screw_length = 70
 
 
 def create_rhomboid(length, width, thickness, angle, fillet_radius=None):
@@ -703,6 +708,53 @@ def create_idler_endcap(profile, with_tensioner, side, endcap_top_bottom):
             endcap_vertical_coupler_connector
         )
 
+        endcap_vertical_coupler_bbox_size = get_bounding_box_size(
+            endcap_vertical_coupler
+        )
+        endcap_vertical_coupler_total_representative = create_box(
+            endcap_vertical_coupler_bbox_size[0],
+            endcap_vertical_coupler_bbox_size[1],
+            endcap_vertical_coupler_bbox_size[2] * 2,
+        )
+        endcap_vertical_coupler_total_representative = align(
+            endcap_vertical_coupler_total_representative,
+            endcap_vertical_coupler,
+            Alignment.CENTER,
+        )
+        endcap_vertical_coupler_total_representative = align(
+            endcap_vertical_coupler_total_representative,
+            endcap_vertical_coupler,
+            Alignment.BOTTOM,
+        )
+
+        screw_mount_assembly = create_screw_mount_assembly(
+            endcap_vertical_coupler_total_representative,
+            screw_size=endcap_vertical_coupler_screw_size,
+            screw_length=endcap_vertical_coupler_screw_length,
+            screw_direction=(
+                Alignment.TOP
+                if endcap_top_bottom == Alignment.BOTTOM
+                else Alignment.BOTTOM
+            ),
+            flush_with_top=True,
+        )
+
+        endcap_vertical_coupler = screw_mount_assembly.use_as_cutter_on(
+            endcap_vertical_coupler
+        )
+
+        if endcap_top_bottom == Alignment.TOP:
+            npp_name = (
+                f"endcap_vertical_coupler_top_{fb.name.lower()}_{side.name.lower()}"
+            )
+            for (
+                screw_npp_name,
+                npp,
+            ) in screw_mount_assembly.get_named_non_production_part_items():
+                retval.add_named_non_production_part(
+                    npp, f"{npp_name}_{screw_npp_name}"
+                )
+
         endcap_vertical_couplers = endcap_vertical_couplers.fuse(
             endcap_vertical_coupler
         )
@@ -712,6 +764,8 @@ def create_idler_endcap(profile, with_tensioner, side, endcap_top_bottom):
     if endcap_top_bottom == Alignment.TOP:
         center = get_bounding_box_center(cage)
         retval = rotate(180, axis=(1, 0, 0), center=center)(retval)
+
+        retval.additional_data["endcap_is_rotated"] = True
 
     return retval
 
@@ -1168,20 +1222,56 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
                 endcap_top_bottom=endcap_top_bottom,
             )
 
+            idler_name = (
+                f"x_axis_idler_endcap_{top_bottom_string}_{endcap_side_str}_idler"
+            )
             retval.add_named_non_production_part(
                 endcap.get_follower_part_by_name("idler"),
-                f"x_axis_idler_endcap_{top_bottom_string}_{endcap_side_str}_idler",
+                idler_name,
             )
 
+            cage_name = (
+                f"x_axis_idler_endcap_{top_bottom_string}_{endcap_side_str}_cage"
+            )
             retval.add_named_follower(
                 endcap.get_follower_part_by_name("endcap_idler_cage"),
-                f"x_axis_idler_endcap_{top_bottom_string}_{endcap_side_str}_cage",
+                cage_name,
             )
 
+            endcap_name = f"x_axis_idler_endcap_{top_bottom_string}_{endcap_side_str}"
             retval.add_named_follower(
                 endcap.leader,
-                f"x_axis_idler_endcap_{top_bottom_string}_{endcap_side_str}",
+                endcap_name,
             )
+
+            if endcap.additional_data.get("endcap_is_rotated", False):
+                for name in [idler_name, cage_name, endcap_name]:
+                    retval.additional_data[name] = {"is_rotated": True}
+
+            current_additional_data = retval.additional_data.get(cage_name, {})
+
+            current_additional_data.update(
+                {
+                    "prod_rotation_angle": -90 * endcap_side.sign * side.sign,
+                    "prod_rotation_axis": (0, 1, 0),
+                }
+            )
+            retval.additional_data[cage_name] = current_additional_data
+
+            _logger.info(
+                f"endcap additional data for {endcap_name}, {cage_name}, {idler_name}: { json.dumps(retval.additional_data, indent=4) }"
+            )
+
+            for (
+                npp_name_in_endcap,
+                endcap_npp,
+            ) in endcap.get_named_non_production_part_items():
+                full_npp_name = f"{endcap_name}_{npp_name_in_endcap}"
+                retval.add_named_non_production_part(endcap_npp, full_npp_name)
+
+    _logger.info(
+        f"additional data for x_axis: {json.dumps(retval.additional_data, indent=4)}"
+    )
 
     return retval
 
@@ -1272,11 +1362,27 @@ def main():
             )
             continue
         already_added_names.add(name)
+
+        is_rotated = x_axis.additional_data.get(name, {}).get("is_rotated", False)
+
+        prod_rotation_angle_from_data = x_axis.additional_data.get(name, {}).get(
+            "prod_rotation_angle", None
+        )
+        prod_rotation_axis_from_data = x_axis.additional_data.get(name, {}).get(
+            "prod_rotation_axis", None
+        )
+
+        _logger.info(
+            f"additional data for follower {name}: {x_axis.additional_data.get(name, {})}, prod_rotation_angle_from_data: {prod_rotation_angle_from_data}, prod_rotation_axis_from_data: {prod_rotation_axis_from_data}"
+        )
+
         parts.add(
             follower,
             f"x_axis_{name}",
-            flip=False,
+            flip=is_rotated,  # flip if the part is rotated
             skip_in_production=False,
+            prod_rotation_angle=prod_rotation_angle_from_data,
+            prod_rotation_axis=prod_rotation_axis_from_data,
         )
 
     # for side in [Alignment.LEFT]:  # , Alignment.RIGHT]:
