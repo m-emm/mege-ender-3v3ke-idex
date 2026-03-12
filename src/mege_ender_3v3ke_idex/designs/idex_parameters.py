@@ -93,7 +93,7 @@ link_flange_thickness = 7
 link_flange_depth = 12
 
 
-endcap_wall = 3
+endcap_wall = 3.5
 endcap_top_bottom_wall = 5
 endcap_clearance = 0.8
 endcap_holder_thickness = 4
