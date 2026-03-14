@@ -35,7 +35,10 @@ from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (  # noqa: F401
     create_four_screws_mount_assembly,
     create_screw_mount_assembly,
 )
-from mege_ender_3v3ke_idex.designs.tool_head_mount import create_tool_head_mount
+from mege_ender_3v3ke_idex.designs.tool_head_mount import (
+    align_tool_head_mount_to_carriage,
+    create_tool_head_mount,
+)
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -86,7 +89,6 @@ PROCESS_DATA["process_overrides"].update(
 )
 
 endstop_holder_z_offset = 8
-endstop_holder_inset_from_end = 15
 endstop_holder_stack_gap = 10
 endstop_holder_mount_plate_thickness = 4.5
 endstop_holder_mount_plate_width = 8
@@ -96,6 +98,7 @@ endstop_holder_groove_holder_bottom_width = 6.3
 endstop_holder_groove_holder_top_width = 6.0
 endstop_holder_groove_holder_slit = 1.5
 endstop_holder_groove_holder_height = 5
+endstop_holder_y_offset = -4
 
 carriage_end_clearance = 3
 carriage_offset = (
@@ -1252,6 +1255,10 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
                     endstop_holder, rail_end_stopper_fused, Alignment.STACK_TOP
                 )
 
+                endstop_holder = translate(0, endstop_holder_y_offset, 0)(
+                    endstop_holder
+                )
+
                 endstop_holder_board = endstop_holder.get_non_production_part_by_name(
                     "board"
                 )
@@ -1428,33 +1435,27 @@ def main():
         )
 
     lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
+    top_axis_profile = x_axis.get_non_production_part_by_name("top_axis_profile")
 
-    for carriage_name in ["carriage_1", "carriage_2"]:
+    tool_head_mount_drive_positions = {
+        "carriage_1": Alignment.BOTTOM,
+        "carriage_2": Alignment.TOP,
+    }
+
+    for carriage_name, drive_position in tool_head_mount_drive_positions.items():
 
         tool_head_mount, _carriage, _tool_head = create_tool_head_mount(
-            lower_axis_profile
+            lower_axis_profile,
+            top_axis_profile,
+            drive_position=drive_position,
         )
 
         current_carriage = x_axis.get_non_production_part_by_name(carriage_name)
 
-        tool_head_mount = align(
+        tool_head_mount = align_tool_head_mount_to_carriage(
             tool_head_mount,
             current_carriage,
-            Alignment.CENTER,
         )
-        tool_head_mount = align(
-            tool_head_mount,
-            current_carriage,
-            Alignment.BACK,
-        )
-        tool_head_mount = align(
-            tool_head_mount,
-            current_carriage,
-            Alignment.TOP,
-        )
-        tool_head_mount = translate(
-            0, 0, tool_head_mount_carriage_mount_plate_thickness
-        )(tool_head_mount)
 
         parts.add(
             tool_head_mount,

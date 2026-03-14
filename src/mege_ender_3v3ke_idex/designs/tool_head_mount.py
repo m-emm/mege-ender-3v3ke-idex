@@ -53,15 +53,143 @@ PROCESS_DATA["process_overrides"].update(
 )
 
 
-def create_tool_head_mount(target_profile):
+def _create_lower_side_plates(carriage_mount_plate, carriage_size):
+    side_plates = PartCollector()
+    side_plate_stiffeners = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        side_plate = create_filleted_box(
+            tool_head_mount_side_plate_thickness,
+            tool_head_mount_side_plate_depth,
+            tool_head_mount_side_plate_height,
+            fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
+            no_fillets_at=[Alignment.TOP, lr.opposite],
+        )
+
+        side_plate = align(side_plate, carriage_mount_plate, Alignment.STACK_BOTTOM)
+        side_plate = align(side_plate, carriage_mount_plate, Alignment.FRONT)
+        side_plate = align(side_plate, carriage_mount_plate, lr)
+
+        side_plate_stiffener = create_right_triangle(
+            carriage_size[2],
+            carriage_size[2],
+            tool_head_mount_side_stiffener_thickness,
+            extrusion_direction=(1, 0, 0),
+            a_normal=(0, -1, 0),
+            b_normal=(0, 0, -1),
+        )
+        side_plate_stiffener = align(side_plate_stiffener, side_plate, Alignment.CENTER)
+        side_plate_stiffener = align(
+            side_plate_stiffener, carriage_mount_plate, Alignment.STACK_BOTTOM
+        )
+        side_plate_stiffener = align(
+            side_plate_stiffener,
+            side_plate,
+            Alignment.STACK_BACK,
+            stack_gap=-tool_head_mount_carriage_mount_plate_fillet_radius,
+        )
+        side_plate_stiffener = align(side_plate_stiffener, carriage_mount_plate, lr)
+
+        side_plate_stiffeners = side_plate_stiffeners.fuse(side_plate_stiffener)
+        side_plates = side_plates.fuse(side_plate)
+
+    return side_plates, side_plate_stiffeners
+
+
+def _create_upper_side_plates(carriage_mount_plate, belt_profile, rotated_clamp):
+    carriage_mount_plate_size = get_bounding_box_size(carriage_mount_plate)
+    carriage_mount_plate_center = get_bounding_box_center(carriage_mount_plate)
+    carriage_mount_plate_top_z = (
+        carriage_mount_plate_center[2] + carriage_mount_plate_size[2] / 2
+    )
+
+    belt_profile_center_z = get_bounding_box_center(belt_profile)[2]
+    rotated_clamp_size = get_bounding_box_size(rotated_clamp)
+    clamp_top_z = belt_profile_center_z + rotated_clamp_size[2] / 2
+
+    upper_side_plate_height = max(
+        clamp_top_z - carriage_mount_plate_top_z + 2,
+        tool_head_mount_base_plate_height
+        + tool_head_mount_carriage_mount_plate_thickness,
+    )
+
+    upper_side_plates = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        side_plate = create_filleted_box(
+            tool_head_mount_side_plate_thickness,
+            tool_head_mount_side_plate_depth,
+            upper_side_plate_height,
+            fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
+            no_fillets_at=[Alignment.BOTTOM, lr.opposite],
+        )
+        side_plate = align(side_plate, carriage_mount_plate, Alignment.STACK_TOP)
+        side_plate = align(side_plate, carriage_mount_plate, Alignment.FRONT)
+        side_plate = align(side_plate, carriage_mount_plate, lr)
+        upper_side_plates = upper_side_plates.fuse(side_plate)
+
+    return upper_side_plates
+
+
+def _create_top_clamp_shield_plate(
+    carriage_mount_plate, upper_side_plates, base_plate_width
+):
+    top_clamp_shield_plate = create_box(
+        base_plate_width,
+        tool_head_mount_base_plate_thickness,
+        tool_head_mount_base_plate_height,
+    )
+    top_clamp_shield_plate = align(
+        top_clamp_shield_plate, carriage_mount_plate, Alignment.CENTER
+    )
+    top_clamp_shield_plate = align(
+        top_clamp_shield_plate, carriage_mount_plate, Alignment.STACK_TOP
+    )
+    top_clamp_shield_plate = align(
+        top_clamp_shield_plate,
+        upper_side_plates,
+        Alignment.BACK,
+    )
+    return top_clamp_shield_plate
+
+
+def align_tool_head_mount_to_carriage(tool_head_mount, target_carriage):
+    tool_head_mount = tool_head_mount.aligned_from_follower(
+        "carriage", target_carriage, Alignment.CENTER
+    )
+    tool_head_mount = tool_head_mount.aligned_from_follower(
+        "carriage", target_carriage, Alignment.BACK
+    )
+    return tool_head_mount.aligned_from_follower(
+        "carriage", target_carriage, Alignment.TOP
+    )
+
+
+def create_tool_head_mount(
+    lower_axis_profile,
+    top_axis_profile=None,
+    drive_position=Alignment.BOTTOM,
+):
+    if drive_position not in {Alignment.BOTTOM, Alignment.TOP}:
+        raise ValueError(
+            f"Unsupported tool head mount drive position: {drive_position}"
+        )
+
+    if top_axis_profile is None:
+        top_axis_profile = translate(0, 0, x_axis_profile_pitch)(lower_axis_profile)
+
+    belt_profile = (
+        lower_axis_profile if drive_position == Alignment.BOTTOM else top_axis_profile
+    )
+
     rail_plus_carriage = create_mgn12h_rail_with_carriages(
         length_mm=10,
         carriage_offsets=[0],
     )
     rail_plus_carriage = align(
-        rail_plus_carriage, target_profile, Alignment.CENTER, axes=[0, 1]
+        rail_plus_carriage, lower_axis_profile, Alignment.CENTER, axes=[0, 1]
     )
-    rail_plus_carriage = align(rail_plus_carriage, target_profile, Alignment.STACK_TOP)
+    rail_plus_carriage = align(
+        rail_plus_carriage, lower_axis_profile, Alignment.STACK_TOP
+    )
 
     carriage = rail_plus_carriage.get_named_follower("carriage_1")
     carriage_size = get_bounding_box_size(carriage)
@@ -130,56 +258,35 @@ def create_tool_head_mount(target_profile):
         stack_gap=tool_head_mount_plate_carriage_clearance,
     )
 
-    side_plates = PartCollector()
-    side_plate_stiffeners = PartCollector()
-    for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        side_plate = create_filleted_box(
-            tool_head_mount_side_plate_thickness,
-            tool_head_mount_side_plate_depth,
-            tool_head_mount_side_plate_height,
-            fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
-            no_fillets_at=[Alignment.TOP, lr.opposite],
+    lower_side_plates, lower_side_plate_stiffeners = _create_lower_side_plates(
+        carriage_mount_plate, carriage_size
+    )
+    upper_side_plates = PartCollector()
+    top_clamp_shield_plate = None
+
+    clamp_support_plate = mount_base_plate
+    clamp_side_plates = lower_side_plates
+    if drive_position == Alignment.TOP:
+        upper_side_plates = _create_upper_side_plates(
+            carriage_mount_plate, belt_profile, clamp_1
         )
-
-        side_plate = align(side_plate, carriage_mount_plate, Alignment.STACK_BOTTOM)
-        side_plate = align(side_plate, carriage_mount_plate, Alignment.FRONT)
-        side_plate = align(side_plate, carriage_mount_plate, lr)
-
-        side_plate_stiffener = create_right_triangle(
-            carriage_size[2],
-            carriage_size[2],
-            tool_head_mount_side_stiffener_thickness,
-            extrusion_direction=(1, 0, 0),
-            a_normal=(0, -1, 0),
-            b_normal=(0, 0, -1),
+        top_clamp_shield_plate = _create_top_clamp_shield_plate(
+            carriage_mount_plate,
+            upper_side_plates,
+            tool_head_mount_base_plate_width,
         )
-        side_plate_stiffener = align(side_plate_stiffener, side_plate, Alignment.CENTER)
-        side_plate_stiffener = align(
-            side_plate_stiffener, carriage_mount_plate, Alignment.STACK_BOTTOM
-        )
-        side_plate_stiffener = align(
-            side_plate_stiffener,
-            side_plate,
-            Alignment.STACK_BACK,
-            stack_gap=-tool_head_mount_carriage_mount_plate_fillet_radius,
-        )
-        side_plate_stiffener = align(side_plate_stiffener, carriage_mount_plate, lr)
+        clamp_support_plate = carriage_mount_plate
+        clamp_side_plates = upper_side_plates
 
-        side_plate_stiffeners = side_plate_stiffeners.fuse(side_plate_stiffener)
-
-        side_plates = side_plates.fuse(side_plate)
-
-    clamp_1 = align(clamp_1, mount_base_plate, Alignment.CENTER, axes=[0])
-    clamp_1 = align(clamp_1, side_plates, Alignment.BACK)
-
-    clamp_1 = align(clamp_1, side_plates, Alignment.STACK_LEFT)
-
-    clamp_1 = align(clamp_1, target_profile, Alignment.CENTER, axes=[2])
+    clamp_1 = align(clamp_1, clamp_support_plate, Alignment.CENTER, axes=[0])
+    clamp_1 = align(clamp_1, clamp_side_plates, Alignment.BACK)
+    clamp_1 = align(clamp_1, clamp_side_plates, Alignment.STACK_LEFT)
+    clamp_1 = align(clamp_1, belt_profile, Alignment.CENTER, axes=[2])
 
     clamp_1_center = get_bounding_box_center(clamp_1)
     clamp_2 = rotate(180, axis=(0, 1, 0), center=clamp_1_center)(clamp_1)
 
-    clamp_2 = align(clamp_2, side_plates, Alignment.STACK_RIGHT)
+    clamp_2 = align(clamp_2, clamp_side_plates, Alignment.STACK_RIGHT)
 
     clamp = LeaderFollowersCuttersPart(leader=clamp_1.leader.fuse(clamp_2.leader))
 
@@ -194,7 +301,7 @@ def create_tool_head_mount(target_profile):
         clamp_2.get_follower_part_by_name("belt_path_cutter"), "belt_path_cutter_2"
     )
 
-    clamp = clamp.aligned_from_follower("clamp_1", side_plates, Alignment.BACK)
+    clamp = clamp.aligned_from_follower("clamp_1", clamp_side_plates, Alignment.BACK)
     clamp = translate(0, -tool_head_mount_belt_clamp_y_offset, 0)(clamp)
 
     clamps_list = [
@@ -274,7 +381,7 @@ def create_tool_head_mount(target_profile):
         )
         belt_deflector = align(
             belt_deflector,
-            target_profile,
+            belt_profile,
             Alignment.STACK_FRONT,
             stack_gap=-tool_head_mount_belt_deflector_into_profile_distance,
         )
@@ -286,13 +393,13 @@ def create_tool_head_mount(target_profile):
             belt_deflector_trimmer, belt_deflector, Alignment.CENTER
         )
         belt_deflector_trimmer = align(
-            belt_deflector_trimmer, side_plates, Alignment.BACK
+            belt_deflector_trimmer, clamp_side_plates, Alignment.BACK
         )
         belt_deflector = belt_deflector.cut(belt_deflector_trimmer)
 
         belt_deflector = align(
             belt_deflector,
-            side_plates,
+            clamp_side_plates,
             clamp_side.stack_alignment,
             stack_gap=tool_head_mount_belt_deflector_belt_clearance,
         )
@@ -332,7 +439,7 @@ def create_tool_head_mount(target_profile):
             belt_deflector_cage, belt_deflector, Alignment.STACK_FRONT
         )
         belt_deflector_cage = align(
-            belt_deflector_cage, side_plates, clamp_side.stack_alignment
+            belt_deflector_cage, clamp_side_plates, clamp_side.stack_alignment
         )
 
         bcd_belt_path_cutter = create_box(
@@ -399,15 +506,23 @@ def create_tool_head_mount(target_profile):
         # belt_deflectors = belt_deflectors.fuse(belt_deflector_cage_print_helper)
         # belt_deflectors = belt_deflectors.fuse(belt_deflector_print_helper)
 
-    side_plates = side_plates.cut(clamp_cutter)
-
-    mount_base_plate = mount_base_plate.cut(clamp_cutter)
-    mount_base_plate = mount_base_plate.cut(bases_cutter)
+    if drive_position == Alignment.TOP:
+        upper_side_plates = upper_side_plates.cut(clamp_cutter)
+        upper_side_plates = upper_side_plates.cut(bases_cutter)
+        upper_side_plates = upper_side_plates.cut(belt_path_cutter)
+        carriage_mount_plate = carriage_mount_plate.cut(clamp_cutter)
+        carriage_mount_plate = carriage_mount_plate.cut(bases_cutter)
+    else:
+        lower_side_plates = lower_side_plates.cut(clamp_cutter)
+        lower_side_plates = lower_side_plates.cut(bases_cutter)
+        lower_side_plates = lower_side_plates.cut(belt_path_cutter)
+        mount_base_plate = mount_base_plate.cut(clamp_cutter)
+        mount_base_plate = mount_base_plate.cut(bases_cutter)
 
     sprite_extruder = create_sprite_extruder()
     sprite_extruder = rotate(180)(sprite_extruder)
 
-    sprite_extruder = align(sprite_extruder, target_profile, Alignment.TOP)
+    sprite_extruder = align(sprite_extruder, lower_axis_profile, Alignment.TOP)
     sprite_extruder = align(
         sprite_extruder,
         mount_base_plate,
@@ -444,11 +559,11 @@ def create_tool_head_mount(target_profile):
     tool_head_mount = tool_head_mount.fuse(belt_deflectors)
 
     tool_head_mount = tool_head_mount.fuse(mount_base_plate)
-    side_plates = side_plates.cut(bases_cutter)
-    side_plates = side_plates.cut(belt_path_cutter)
-
-    tool_head_mount = tool_head_mount.fuse(side_plates)
-    tool_head_mount = tool_head_mount.fuse(side_plate_stiffeners)
+    tool_head_mount = tool_head_mount.fuse(lower_side_plates)
+    tool_head_mount = tool_head_mount.fuse(lower_side_plate_stiffeners)
+    if drive_position == Alignment.TOP:
+        tool_head_mount = tool_head_mount.fuse(top_clamp_shield_plate)
+        tool_head_mount = tool_head_mount.fuse(upper_side_plates)
 
     tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
     tool_head_mount.add_named_follower(clamp.leader, "belt_clamp_base")
@@ -458,6 +573,9 @@ def create_tool_head_mount(target_profile):
     tool_head_mount.add_named_follower(
         clamp.get_follower_part_by_name("belt_clamp_base_2"), "belt_clamp_base_2"
     )
+    tool_head_mount.add_named_follower(carriage, "carriage")
+    tool_head_mount.add_named_follower(sprite_extruder, "sprite_extruder")
+    tool_head_mount.additional_data["drive_position"] = drive_position
 
     return tool_head_mount, carriage, sprite_extruder
 
@@ -466,20 +584,22 @@ def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
-    test_axis_length = 150
+    test_axis_length = axis_profile_length
 
     lower_axis_profile = create_alu_extrusion_profile(
         ExtrusionProfileType.PROFILE_2020, length_mm=test_axis_length
     )
     lower_axis_profile = rotate(90, axis=(0, 1, 0))(lower_axis_profile)
+    top_axis_profile = translate(0, 0, x_axis_profile_pitch)(lower_axis_profile)
 
     parts.add(
         lower_axis_profile, "lower_axis_profile", flip=False, skip_in_production=True
     )
+    parts.add(top_axis_profile, "top_axis_profile", flip=False, skip_in_production=True)
 
     rail_with_carriages = create_mgn12h_rail_with_carriages(
-        length_mm=test_axis_length - 20,
-        carriage_offsets=[-20, 20],
+        length_mm=x_axis_rail_length,
+        carriage_offsets=[-90, 90],
     )
 
     rail_with_carriages = align(
@@ -496,63 +616,115 @@ def main():
         skip_in_production=True,
     )
 
-    # Create the part
-    tool_head_mount, carriage_1, sprite_extruder_1 = create_tool_head_mount(
-        lower_axis_profile
+    parts.add(
+        rail_with_carriages.get_follower_part_by_name("carriage_1"),
+        "carriage_1",
+        flip=False,
+        skip_in_production=True,
+    )
+    parts.add(
+        rail_with_carriages.get_follower_part_by_name("carriage_2"),
+        "carriage_2",
+        flip=False,
+        skip_in_production=True,
     )
 
-    parts.add(carriage_1, "carriage_1", flip=False, skip_in_production=True)
+    bottom_mount, _carriage_1, _sprite_extruder_1 = create_tool_head_mount(
+        lower_axis_profile,
+        top_axis_profile,
+        drive_position=Alignment.BOTTOM,
+    )
+    bottom_mount = align_tool_head_mount_to_carriage(
+        bottom_mount, rail_with_carriages.get_follower_part_by_name("carriage_1")
+    )
+
+    top_mount, _carriage_2, _sprite_extruder_2 = create_tool_head_mount(
+        lower_axis_profile,
+        top_axis_profile,
+        drive_position=Alignment.TOP,
+    )
+    top_mount = align_tool_head_mount_to_carriage(
+        top_mount, rail_with_carriages.get_follower_part_by_name("carriage_2")
+    )
 
     show_sprite_extruder = True
     if show_sprite_extruder:
+        sprite_extruder_1 = bottom_mount.get_follower_part_by_name("sprite_extruder")
         parts.add(
-            sprite_extruder_1, "sprite_extruder", flip=False, skip_in_production=True
+            sprite_extruder_1,
+            "sprite_extruder_bottom",
+            flip=False,
+            skip_in_production=True,
         )
 
         for name, npp in sprite_extruder_1.get_named_non_production_part_items():
-            parts.add(npp, name, flip=False, skip_in_production=True)
+            parts.add(
+                npp,
+                f"bottom_{name}",
+                flip=False,
+                skip_in_production=True,
+            )
 
-    # tool_head_mount = align(
-    #     tool_head_mount,
-    #     carriage_1,
-    #     Alignment.CENTER,
-    # )
-    # tool_head_mount = align(
-    #     tool_head_mount,
-    #     carriage_1,
-    #     Alignment.BACK,
-    # )
-    # tool_head_mount = align(
-    #     tool_head_mount,
-    #     carriage_1,
-    #     Alignment.TOP,
-    # )
-    # tool_head_mount = translate(0, 0, tool_head_mount_carriage_mount_plate_thickness)(
-    #     tool_head_mount
-    # )
+        sprite_extruder_2 = top_mount.get_follower_part_by_name("sprite_extruder")
+        parts.add(
+            sprite_extruder_2,
+            "sprite_extruder_top",
+            flip=False,
+            skip_in_production=True,
+        )
+
+        for name, npp in sprite_extruder_2.get_named_non_production_part_items():
+            parts.add(
+                npp,
+                f"top_{name}",
+                flip=False,
+                skip_in_production=True,
+            )
 
     parts.add(
-        tool_head_mount,
-        "tool_head_mount",
+        bottom_mount,
+        "tool_head_mount_bottom",
         flip=True,
-        # prod_rotation_angle=-45,
-        # prod_rotation_axis=(1, 0, 0),
+        skip_in_production=False,
+    )
+    parts.add(
+        top_mount,
+        "tool_head_mount_top",
+        flip=True,
         skip_in_production=False,
     )
 
-    belt_clamp_base_1 = tool_head_mount.get_named_follower("belt_clamp_base_1")
+    belt_clamp_base_1 = bottom_mount.get_named_follower("belt_clamp_base_1")
     parts.add(
         belt_clamp_base_1,
-        "belt_clamp_base_1",
+        "belt_clamp_base_1_bottom",
         flip=False,
         prod_rotation_angle=-90,
         prod_rotation_axis=(0, 1, 0),
     )
 
-    belt_clamp_base_2 = tool_head_mount.get_named_follower("belt_clamp_base_2")
+    belt_clamp_base_2 = bottom_mount.get_named_follower("belt_clamp_base_2")
     parts.add(
         belt_clamp_base_2,
-        "belt_clamp_base_2",
+        "belt_clamp_base_2_bottom",
+        flip=False,
+        prod_rotation_angle=90,
+        prod_rotation_axis=(0, 1, 0),
+    )
+
+    belt_clamp_base_1 = top_mount.get_named_follower("belt_clamp_base_1")
+    parts.add(
+        belt_clamp_base_1,
+        "belt_clamp_base_1_top",
+        flip=False,
+        prod_rotation_angle=-90,
+        prod_rotation_axis=(0, 1, 0),
+    )
+
+    belt_clamp_base_2 = top_mount.get_named_follower("belt_clamp_base_2")
+    parts.add(
+        belt_clamp_base_2,
+        "belt_clamp_base_2_top",
         flip=False,
         prod_rotation_angle=90,
         prod_rotation_axis=(0, 1, 0),
