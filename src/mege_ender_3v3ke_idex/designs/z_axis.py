@@ -834,6 +834,11 @@ def create_carriage(guide_rod, threaded_rod, profile):
 
         screw_assemblies.append(screw_assembly)
 
+    x_axis_mount_screw_size = ExtrusionProfileType.PROFILE_2020.nominal_hardware
+    x_axis_mount_screw_hole_diameter = MScrew.from_size(
+        x_axis_mount_screw_size
+    ).get_clearance_hole_diameter(z_axis_default_clearance_hole_type)
+
     x_axis_mount_plate_bottom = create_filleted_box(
         z_axis_carriage_width,
         z_axis_x_axis_to_carriage_gap + z_axis_carriage_fillet_radius,
@@ -853,6 +858,22 @@ def create_carriage(guide_rod, threaded_rod, profile):
         Alignment.STACK_FRONT,
         stack_gap=-z_axis_carriage_fillet_radius,
     )
+
+    mount_screw_hole_drill = create_cylinder(
+        x_axis_mount_screw_hole_diameter / 2, BIG_THING
+    )
+    mount_screw_hole_drill = align(
+        mount_screw_hole_drill, x_axis_mount_plate_bottom, Alignment.CENTER
+    )
+    mount_screw_hole_drill = align(
+        mount_screw_hole_drill, x_axis_mount_plate_bottom, Alignment.EDGE_FRONT
+    )
+    mount_screw_hole_drill = translate(
+        0,
+        ExtrusionProfileType.PROFILE_2020.size_mm[0] / 2,
+        0,
+    )(mount_screw_hole_drill)
+    x_axis_mount_plate_bottom = x_axis_mount_plate_bottom.cut(mount_screw_hole_drill)
 
     carriage_bottom_clamp = carriage_bottom_clamp.fuse(x_axis_mount_plate_bottom)
 
@@ -875,6 +896,8 @@ def create_carriage(guide_rod, threaded_rod, profile):
         Alignment.STACK_FRONT,
         stack_gap=-z_axis_carriage_fillet_radius,
     )
+
+    x_axis_mount_plate_top = x_axis_mount_plate_top.cut(mount_screw_hole_drill)
 
     carriage_top_clamp = carriage_top_clamp.fuse(x_axis_mount_plate_top)
 
