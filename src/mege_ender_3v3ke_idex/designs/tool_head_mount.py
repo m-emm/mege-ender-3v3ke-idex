@@ -227,7 +227,7 @@ def create_tool_head_mount(
         drive_position.sign * tool_head_mount_x_offset, 0, 0
     )(carriage_mount_plate)
 
-    carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
+    carriage_mount_plate = rail_plus_carriage.use_as_cutter_on(carriage_mount_plate)
 
     extruder_cutout = create_filleted_box(
         tool_head_mount_extruder_cutout_width,
@@ -526,6 +526,12 @@ def create_tool_head_mount(
     sprite_extruder = create_sprite_extruder()
     sprite_extruder = rotate(180)(sprite_extruder)
 
+    sprite_extruder = align(
+        sprite_extruder,
+        mount_base_plate,
+        Alignment.CENTER,
+    )
+
     sprite_extruder = align(sprite_extruder, lower_axis_profile, Alignment.TOP)
     sprite_extruder = align(
         sprite_extruder,
@@ -578,10 +584,15 @@ def create_tool_head_mount(
         clamp.get_follower_part_by_name("belt_clamp_base_2"), "belt_clamp_base_2"
     )
     tool_head_mount.add_named_follower(carriage, "carriage")
-    tool_head_mount.add_named_follower(sprite_extruder, "sprite_extruder")
+
+    tool_head_mount = tool_head_mount.merge_except_leader(sprite_extruder)
+
+    tool_head_mount.add_named_non_production_part(
+        sprite_extruder.leader, "sprite_extruder"
+    )
     tool_head_mount.additional_data["drive_position"] = drive_position
 
-    return tool_head_mount, carriage, sprite_extruder
+    return tool_head_mount
 
 
 def main():
@@ -633,106 +644,54 @@ def main():
         skip_in_production=True,
     )
 
-    bottom_mount, _carriage_1, _sprite_extruder_1 = create_tool_head_mount(
-        lower_axis_profile,
-        top_axis_profile,
-        drive_position=Alignment.BOTTOM,
-    )
-    bottom_mount = align_tool_head_mount_to_carriage(
-        bottom_mount, rail_with_carriages.get_follower_part_by_name("carriage_1")
-    )
+    carriage_names_from_tb = {
+        Alignment.BOTTOM: "carriage_1",
+        Alignment.TOP: "carriage_2",
+    }
+    for tb in [Alignment.BOTTOM, Alignment.TOP]:
 
-    top_mount, _carriage_2, _sprite_extruder_2 = create_tool_head_mount(
-        lower_axis_profile,
-        top_axis_profile,
-        drive_position=Alignment.TOP,
-    )
-    top_mount = align_tool_head_mount_to_carriage(
-        top_mount, rail_with_carriages.get_follower_part_by_name("carriage_2")
-    )
-
-    show_sprite_extruder = True
-    if show_sprite_extruder:
-        sprite_extruder_1 = bottom_mount.get_follower_part_by_name("sprite_extruder")
-        parts.add(
-            sprite_extruder_1,
-            "sprite_extruder_bottom",
-            flip=False,
-            skip_in_production=True,
+        mount = create_tool_head_mount(
+            lower_axis_profile,
+            top_axis_profile,
+            drive_position=tb,
+        )
+        mount = align_tool_head_mount_to_carriage(
+            mount,
+            rail_with_carriages.get_follower_part_by_name(carriage_names_from_tb[tb]),
         )
 
-        for name, npp in sprite_extruder_1.get_named_non_production_part_items():
+        parts.add(
+            mount,
+            f"tool_head_mount_{tb.name.lower()}",
+            flip=True,
+            skip_in_production=False,
+        )
+
+        belt_clamp_base_1 = mount.get_named_follower("belt_clamp_base_1")
+        parts.add(
+            belt_clamp_base_1,
+            f"belt_clamp_base_1_{tb.name.lower()}",
+            flip=False,
+            prod_rotation_angle=-90,
+            prod_rotation_axis=(0, 1, 0),
+        )
+
+        belt_clamp_base_2 = mount.get_named_follower("belt_clamp_base_2")
+        parts.add(
+            belt_clamp_base_2,
+            f"belt_clamp_base_2_{tb.name.lower()}",
+            flip=False,
+            prod_rotation_angle=90,
+            prod_rotation_axis=(0, 1, 0),
+        )
+
+        for name, npp in mount.get_named_non_production_part_items():
             parts.add(
                 npp,
-                f"bottom_{name}",
+                f"{name}_{tb.name.lower()}",
                 flip=False,
                 skip_in_production=True,
             )
-
-        sprite_extruder_2 = top_mount.get_follower_part_by_name("sprite_extruder")
-        parts.add(
-            sprite_extruder_2,
-            "sprite_extruder_top",
-            flip=False,
-            skip_in_production=True,
-        )
-
-        for name, npp in sprite_extruder_2.get_named_non_production_part_items():
-            parts.add(
-                npp,
-                f"top_{name}",
-                flip=False,
-                skip_in_production=True,
-            )
-
-    parts.add(
-        bottom_mount,
-        "tool_head_mount_bottom",
-        flip=True,
-        skip_in_production=False,
-    )
-    parts.add(
-        top_mount,
-        "tool_head_mount_top",
-        flip=True,
-        skip_in_production=False,
-    )
-
-    belt_clamp_base_1 = bottom_mount.get_named_follower("belt_clamp_base_1")
-    parts.add(
-        belt_clamp_base_1,
-        "belt_clamp_base_1_bottom",
-        flip=False,
-        prod_rotation_angle=-90,
-        prod_rotation_axis=(0, 1, 0),
-    )
-
-    belt_clamp_base_2 = bottom_mount.get_named_follower("belt_clamp_base_2")
-    parts.add(
-        belt_clamp_base_2,
-        "belt_clamp_base_2_bottom",
-        flip=False,
-        prod_rotation_angle=90,
-        prod_rotation_axis=(0, 1, 0),
-    )
-
-    belt_clamp_base_1 = top_mount.get_named_follower("belt_clamp_base_1")
-    parts.add(
-        belt_clamp_base_1,
-        "belt_clamp_base_1_top",
-        flip=False,
-        prod_rotation_angle=-90,
-        prod_rotation_axis=(0, 1, 0),
-    )
-
-    belt_clamp_base_2 = top_mount.get_named_follower("belt_clamp_base_2")
-    parts.add(
-        belt_clamp_base_2,
-        "belt_clamp_base_2_top",
-        flip=False,
-        prod_rotation_angle=90,
-        prod_rotation_axis=(0, 1, 0),
-    )
 
     # Arrange and export
     arrange_and_export(

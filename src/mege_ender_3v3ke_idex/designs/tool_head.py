@@ -122,7 +122,8 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
     fans = create_part_fan_assembly()
     fans = align_fans_to_sprite_extruder(fans, sprite_extruder)
 
-    retval.add_named_non_production_part(fans, f"part_fans")
+    retval = retval.merge_except_leader(fans)
+    retval.add_named_non_production_part(fans.leader, f"part_fans")
 
     parts_to_print = holder.leader  # .fuse(fans.get_named_follower("blower_ducts"))
 
@@ -226,7 +227,6 @@ def create_tool_head() -> LeaderFollowersCuttersPart:
         blower_ducts = blower_ducts.cut(cutter)
 
     retval.leader = parts_to_print
-    retval.add_named_follower(blower_ducts, "blower_ducts")
 
     return retval
 
@@ -282,6 +282,7 @@ def main():
         script_file=__file__,
         prod=PROD,
         process_data=PROCESS_DATA,
+        export_stl=PROD,
     )
 
     _logger.info("nitehawk_holder created successfully!")

@@ -208,7 +208,11 @@ def create_endstop_holder() -> LeaderFollowersCuttersPart:
         base = base.cut(nut_cutter)
 
     retval = LeaderFollowersCuttersPart(base)
-    retval.add_named_non_production_part(board, "board")
+
+    retval.add_named_non_production_part(board.leader, "board")
+    for npp, name in board.get_named_non_production_part_items():
+        retval.add_named_non_production_part(npp, name)
+
     tongue = board.get_named_follower("tongue")
     retval.add_named_non_production_part(tongue, "tongue")
 

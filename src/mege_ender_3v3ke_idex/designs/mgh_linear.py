@@ -140,7 +140,9 @@ def create_mgn12h_rail_with_carriages(
         carriage = create_mgn12h_carriage()
         carriage = align(carriage, rail.leader, Alignment.CENTER, axes=[0, 1])
         carriage = translate(carriage_offset, 0, 0)(carriage)
-        rail.add_named_follower(carriage, carriage_name)
+        carriage = carriage.prefixed_copy(carriage_name)
+        rail.add_named_follower(carriage.leader, name=carriage_name)
+        rail = rail.merge_except_leader(carriage)
 
     return rail
 

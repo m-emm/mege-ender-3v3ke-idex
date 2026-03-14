@@ -25,6 +25,10 @@ from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
 )
+from mege_ender_3v3ke_idex.designs.tool_head_mount import (
+    align_tool_head_mount_to_carriage,
+    create_tool_head_mount,
+)
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -908,19 +912,19 @@ def create_carriage(guide_rod, threaded_rod, profile):
     for k, clamp in enumerate([carriage_top_clamp, carriage_bottom_clamp]):
         retval.add_named_follower(clamp, f"carriage_clamp_{k}")
 
-    retval.add_named_non_production_part(top_bearing, "top_bearing")
-    retval.add_named_non_production_part(nut, "threaded_rod_nut")
+    retval.add_named_non_production_part(top_bearing.leader, "top_bearing")
+    retval.add_named_non_production_part(nut.leader, "threaded_rod_nut")
 
     for screw_assembly in screw_assemblies:
         for name, part in screw_assembly.get_named_non_production_part_items():
             retval.add_named_non_production_part(part, name)
 
-    retval.add_named_non_production_part(bottom_bearing, "bottom_bearing")
+    retval.add_named_non_production_part(bottom_bearing.leader, "bottom_bearing")
 
     return retval
 
 
-def create_z_axis():
+def create_z_axis(side):
     """Create the z_axis part."""
 
     z_axis_profile = create_alu_extrusion_profile(
@@ -1015,6 +1019,10 @@ def create_z_axis():
         boss_clearance=motor_mount_boss_clearance,
         boss_clearance_z=motor_mount_boss_clearance_z,
     )
+
+    if side == Alignment.LEFT:
+
+        motor = rotate(180)(motor)
 
     motor = align(motor, threaded_rod, Alignment.CENTER)
 
@@ -1292,7 +1300,7 @@ def create_positioned_x_z_axis_assembly(
     for side in [Alignment.LEFT, Alignment.RIGHT]:
         side_name = side.name.lower()
 
-        z_axis = z_axis_factory()
+        z_axis = z_axis_factory(side)
         if frame is not None:
             z_axis = align(z_axis, frame, Alignment.CENTER)
             z_axis = align(z_axis, frame, Alignment.BOTTOM)
@@ -1330,11 +1338,11 @@ def main():
 
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
-    z_animation = {"z_axis": (0, 0, 300)}
-    bed_animation = {"bed_y": (0, 155, 0)}
+    z_animation = {"z_axis": (0, 0, z_axis_z_travel)}
+    bed_animation = {"bed_y": (0, print_bed_y_travel, 0)}
     x_axis_carriage_animations = {
-        "carriage_1": {**z_animation, "x_carriage_1": (300, 0, 0)},
-        "carriage_2": {**z_animation, "x_carriage_2": (-300, 0, 0)},
+        "carriage_1": {**z_animation, "x_carriage_1": (x_axis_x_travel, 0, 0)},
+        "carriage_2": {**z_animation, "x_carriage_2": (-x_axis_x_travel, 0, 0)},
     }
 
     frame = create_printer_frame()
@@ -1391,6 +1399,7 @@ def main():
                 prod_rotation_angle=prod_rotation_angle,
                 prod_rotation_axis=prod_rotation_axis,
             )
+
     for prefix, carriage in positioned_carriages.items():
 
         parts.add(
@@ -1426,6 +1435,68 @@ def main():
                 flip=False,
                 skip_in_production=True,
                 animation=z_animation,
+            )
+
+    top_axis_profile = x_axis.get_named_non_production_part("top_axis_profile")
+    lower_axis_profile = x_axis.get_named_non_production_part("lower_axis_profile")
+    carriage_names = ["carriage_1", "carriage_2"]
+    drive_position_list = [Alignment.BOTTOM, Alignment.TOP]
+
+    def create_x_carriage_animation_map():
+        return {
+            carriage_name: {
+                f"x_{carriage_name}": (x_axis_x_travel * movement_sign, 0, 0),
+                f"z_axis": (0, 0, z_axis_z_travel),
+            }
+            for movement_sign, carriage_name in zip(
+                [1, -1], ["carriage_1", "carriage_2"]
+            )
+        }
+
+    x_carriage_animations = create_x_carriage_animation_map()
+
+    for drive_position, carriage_name in zip(drive_position_list, carriage_names):
+
+        current_carriage = x_axis.get_named_non_production_part(carriage_name)
+
+        tool_head_mount = create_tool_head_mount(
+            lower_axis_profile,
+            top_axis_profile,
+            drive_position=drive_position,
+        )
+
+        tool_head_mount = align_tool_head_mount_to_carriage(
+            tool_head_mount,
+            current_carriage,
+        )
+
+        parts.add(
+            tool_head_mount,
+            f"x_axis_tool_head_mount_{carriage_name}",
+            flip=False,
+            skip_in_production=True,  # was False,
+            prod_rotation_angle=180,
+            prod_rotation_axis=(1, 0, 0),
+            animation=x_carriage_animations[carriage_name],
+        )
+
+        parts.add(
+            tool_head_mount.get_follower_part_by_name("belt_clamp_base"),
+            f"x_axis_tool_head_mount_clamp_{carriage_name}",
+            flip=False,
+            skip_in_production=True,  # was False,
+            prod_rotation_angle=90,
+            prod_rotation_axis=(1, 0, 0),
+            animation=x_carriage_animations[carriage_name],
+        )
+
+        for name, npp in tool_head_mount.get_named_non_production_part_items():
+            parts.add(
+                npp,
+                f"{carriage_name}_{name}",
+                flip=False,
+                skip_in_production=True,
+                animation=x_carriage_animations[carriage_name],
             )
 
     parts.add(

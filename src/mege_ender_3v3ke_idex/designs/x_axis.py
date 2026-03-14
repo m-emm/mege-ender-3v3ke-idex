@@ -1432,7 +1432,7 @@ def main():
 
     for carriage_name, drive_position in tool_head_mount_drive_positions.items():
 
-        tool_head_mount, _carriage, _tool_head = create_tool_head_mount(
+        tool_head_mount = create_tool_head_mount(
             lower_axis_profile,
             top_axis_profile,
             drive_position=drive_position,
@@ -1466,6 +1466,15 @@ def main():
             color=(0.7, 0.6, 0.5),
             animation=x_carriage_animations[carriage_name],
         )
+
+        for name, npp in tool_head_mount.get_named_non_production_part_items():
+            parts.add(
+                npp,
+                f"{carriage_name}_{name}",
+                flip=False,
+                skip_in_production=True,
+                animation=x_carriage_animations[carriage_name],
+            )
 
     for name, npp in frame.get_named_non_production_part_items():
         parts.add(

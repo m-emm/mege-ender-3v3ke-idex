@@ -70,6 +70,8 @@ def create_printer_frame():
     print_bed = align(print_bed, profiles, Alignment.CENTER)
     print_bed = align(print_bed, profiles, Alignment.STACK_TOP, stack_gap=20)
 
+    print_bed = translate(0, -print_bed_depth / 2, 0)(print_bed)
+
     retval = LeaderFollowersCuttersPart(profiles)
 
     retval.add_named_non_production_part(print_bed, "print_bed")
