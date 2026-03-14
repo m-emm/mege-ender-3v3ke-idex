@@ -88,18 +88,6 @@ PROCESS_DATA["process_overrides"].update(
     }
 )
 
-endstop_holder_z_offset = 8
-endstop_holder_stack_gap = 10
-endstop_holder_mount_plate_thickness = 4.5
-endstop_holder_mount_plate_width = 8
-endstop_holder_mount_plate_length = 20
-endstop_holder_mount_screw_size = "M3"
-endstop_holder_groove_holder_bottom_width = 6.3
-endstop_holder_groove_holder_top_width = 6.0
-endstop_holder_groove_holder_slit = 1.5
-endstop_holder_groove_holder_height = 5
-endstop_holder_y_offset = -4
-
 carriage_end_clearance = 3
 carriage_offset = (
     x_axis_rail_length / 2 - mgn_12h_carriage_length / 2 - carriage_end_clearance
@@ -912,7 +900,7 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
     """
 
     lower_axis_profile = create_alu_extrusion_profile(
-        ExtrusionProfileType.PROFILE_2020, length_mm=axis_profile_length
+        ExtrusionProfileType.PROFILE_2020, length_mm=x_axis_profile_length
     )
     lower_axis_profile = rotate(90, axis=(0, 1, 0))(lower_axis_profile)
 
@@ -1322,11 +1310,11 @@ def create_rail_drill_jig():
 
     rail = create_mgn12h_rail(length_mm=x_axis_rail_length)
 
-    jig = create_box(axis_profile_length, jig_width / 2, jig_thickness)
+    jig = create_box(x_axis_profile_length, jig_width / 2, jig_thickness)
     jig_ear = create_right_triangle(
         jig_thickness,
         jig_thickness,
-        axis_profile_length,
+        x_axis_profile_length,
         extrusion_direction=(1, 0, 0),
         a_normal=((0, -1, 0)),
         b_normal=(0, 0, 1),
@@ -1335,7 +1323,7 @@ def create_rail_drill_jig():
     jig_ear = align(jig_ear, jig, Alignment.STACK_BACK)
 
     jig = jig.fuse(jig_ear)
-    jig_cutter = create_box(axis_profile_length, BIG_THING, BIG_THING)
+    jig_cutter = create_box(x_axis_profile_length, BIG_THING, BIG_THING)
     jig_cutter = align(jig_cutter, jig, Alignment.CENTER)
     jig_cutter = align(jig_cutter, jig, Alignment.STACK_BACK, stack_gap=-2)
     jig = jig.cut(jig_cutter)
@@ -1364,7 +1352,7 @@ def create_rail_drill_jig():
 
 def create_x_carriage_animation_map():
     return {
-        carriage_name: {f"x_{carriage_name}": (300 * movement_sign, 0, 0)}
+        carriage_name: {f"x_{carriage_name}": (x_axis_x_travel * movement_sign, 0, 0)}
         for movement_sign, carriage_name in zip([1, -1], ["carriage_1", "carriage_2"])
     }
 

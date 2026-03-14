@@ -528,7 +528,7 @@ def main():
     parts = PartList()
 
     lower_axis_profile = create_alu_extrusion_profile(
-        ExtrusionProfileType.PROFILE_2020, length_mm=axis_profile_length
+        ExtrusionProfileType.PROFILE_2020, length_mm=x_axis_profile_length
     )
     lower_axis_profile = rotate(90, axis=(0, 1, 0))(lower_axis_profile)
 
