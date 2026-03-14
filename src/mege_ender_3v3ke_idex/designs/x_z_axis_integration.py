@@ -10,30 +10,25 @@ Usage:
 import logging
 import os
 
-from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (  # noqa: F401
+from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.nema_motors import (  # noqa: F401
-    create_nema_composite,
+from mege_ender_3v3ke_idex.designs.mgh_linear import (
+    create_mgn12h_rail_with_carriages,
+    mgn_12h_carriage_length,
 )
-from mege_ender_3v3ke_idex.designs.printer_frame import (  # noqa: F401
-    create_printer_frame,
+from mege_ender_3v3ke_idex.designs.z_axis import (
+    create_minimal_z_axis_reference,
+    create_positioned_x_z_axis_assembly,
 )
-from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (  # noqa: F401
-    create_four_screws_mount_assembly,
-)
-from mege_ender_3v3ke_idex.designs.x_axis import create_x_axis  # noqa: F401
-from mege_ender_3v3ke_idex.designs.z_axis import create_z_axis  # noqa: F401
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
 
-# Production mode from environment variable
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
-# Optional slicer process overrides
 PROCESS_DATA = {
     "filament": "FilamentPLAMegeMaster",
     "process_overrides": {
@@ -42,43 +37,161 @@ PROCESS_DATA = {
     },
 }
 
+X_AXIS_CARRIAGE_END_CLEARANCE = 3
+
+PROFILE_COLOR = (0.84, 0.84, 0.86)
+ROD_COLOR = (0.76, 0.82, 0.88)
+X_AXIS_COLOR = (0.66, 0.82, 0.96)
+X_AXIS_RAIL_COLOR = (0.74, 0.88, 0.94)
+Z_CARRIAGE_COLOR = (0.98, 0.78, 0.62)
+Z_CLAMP_COLOR = (0.95, 0.70, 0.72)
+BEARING_COLOR = (0.82, 0.93, 0.78)
+
+
+def create_x_axis_reference():
+    lower_axis_profile = create_alu_extrusion_profile(
+        ExtrusionProfileType.PROFILE_2020, length_mm=axis_profile_length
+    )
+    lower_axis_profile = rotate(90, axis=(0, 1, 0))(lower_axis_profile)
+
+    top_axis_profile = translate(0, 0, x_axis_profile_pitch)(lower_axis_profile)
+
+    carriage_offset = (
+        x_axis_rail_length / 2
+        - mgn_12h_carriage_length / 2
+        - X_AXIS_CARRIAGE_END_CLEARANCE
+    )
+
+    rail_with_carriages = create_mgn12h_rail_with_carriages(
+        length_mm=x_axis_rail_length,
+        carriage_offsets=[-carriage_offset, carriage_offset],
+    )
+    rail_with_carriages = align(
+        rail_with_carriages,
+        lower_axis_profile,
+        Alignment.CENTER,
+        axes=[0, 1],
+    )
+    rail_with_carriages = align(
+        rail_with_carriages, lower_axis_profile, Alignment.STACK_TOP
+    )
+
+    retval = LeaderFollowersCuttersPart(lower_axis_profile.fuse(top_axis_profile))
+    retval.add_named_non_production_part(lower_axis_profile, "lower_axis_profile")
+    retval.add_named_non_production_part(top_axis_profile, "top_axis_profile")
+    retval.add_named_non_production_part(rail_with_carriages.leader, "rail")
+
+    for carriage_name in ["carriage_1", "carriage_2"]:
+        retval.add_named_non_production_part(
+            rail_with_carriages.get_named_follower(carriage_name),
+            carriage_name,
+        )
+
+    return retval
+
 
 def create_x_z_axis_integration():
-    """Create the x_z_axis_integration part."""
-    # Example: simple box with a cylindrical hole
-    width = 30
-    depth = 20
-    height = 10
-    hole_radius = 4
+    x_axis_reference = create_x_axis_reference()
+    positioned_z_axes, positioned_carriages, x_axis_reference = (
+        create_positioned_x_z_axis_assembly(
+            x_axis_reference,
+            create_minimal_z_axis_reference,
+        )
+    )
 
-    # Create base box
-    part = create_box(width, depth, height)
-
-    # Create a hole cutter
-    hole = create_cylinder(hole_radius, height + 2)
-    hole = align(hole, part, Alignment.CENTER)
-    hole = translate(0, 0, -1)(hole)
-
-    # Cut the hole
-    part = part.cut(hole)
-
-    return part
+    return positioned_z_axes, positioned_carriages, x_axis_reference
 
 
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
-    # Create the part
-    part = create_x_z_axis_integration()
-    parts.add(part, "x_z_axis_integration", flip=False)
+    z_axis_references, carriages, x_axis_reference = create_x_z_axis_integration()
 
-    # Arrange and export
+    for side_name, z_axis_reference in z_axis_references.items():
+        parts.add(
+            z_axis_reference.leader,
+            f"{side_name}_z_axis_profile",
+            flip=False,
+            skip_in_production=True,
+            color=PROFILE_COLOR,
+        )
+        parts.add(
+            z_axis_reference.get_named_non_production_part("guide_rod"),
+            f"{side_name}_guide_rod",
+            flip=False,
+            skip_in_production=True,
+            color=ROD_COLOR,
+        )
+        parts.add(
+            z_axis_reference.get_named_non_production_part("threaded_rod"),
+            f"{side_name}_threaded_rod",
+            flip=False,
+            skip_in_production=True,
+            color=ROD_COLOR,
+        )
+
+    for side_name, carriage in carriages.items():
+        parts.add(
+            carriage.leader,
+            f"{side_name}_z_axis_carriage",
+            flip=False,
+            skip_in_production=True,
+            color=Z_CARRIAGE_COLOR,
+        )
+        for clamp_name, clamp in carriage.get_named_follower_items():
+            parts.add(
+                clamp,
+                f"{side_name}_{clamp_name}",
+                flip=False,
+                skip_in_production=True,
+                color=Z_CLAMP_COLOR,
+            )
+        for bearing_name in ["top_bearing", "bottom_bearing"]:
+            parts.add(
+                carriage.get_named_non_production_part(bearing_name),
+                f"{side_name}_{bearing_name}",
+                flip=False,
+                skip_in_production=True,
+                color=BEARING_COLOR,
+            )
+
+    parts.add(
+        x_axis_reference.get_named_non_production_part("lower_axis_profile"),
+        "x_axis_lower_profile",
+        flip=False,
+        skip_in_production=True,
+        color=PROFILE_COLOR,
+    )
+    parts.add(
+        x_axis_reference.get_named_non_production_part("top_axis_profile"),
+        "x_axis_top_profile",
+        flip=False,
+        skip_in_production=True,
+        color=PROFILE_COLOR,
+    )
+    parts.add(
+        x_axis_reference.get_named_non_production_part("rail"),
+        "x_axis_rail",
+        flip=False,
+        skip_in_production=True,
+        color=X_AXIS_RAIL_COLOR,
+    )
+    for carriage_name in ["carriage_1", "carriage_2"]:
+        parts.add(
+            x_axis_reference.get_named_non_production_part(carriage_name),
+            f"x_axis_{carriage_name}",
+            flip=False,
+            skip_in_production=True,
+            color=X_AXIS_COLOR,
+        )
+
     arrange_and_export(
         parts.as_list(),
         script_file=__file__,
         prod=PROD,
         process_data=PROCESS_DATA,
+        export_individual_parts=False,
     )
 
     _logger.info("x_z_axis_integration created successfully!")

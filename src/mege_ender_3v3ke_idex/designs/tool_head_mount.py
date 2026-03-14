@@ -21,10 +21,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
 )
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt_belt_clamp
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.mgh_linear import (
-    create_mgn12h_carriage,
-    create_mgn12h_rail,
-)
+from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12h_rail_with_carriages
 from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
 from shellforgepy.simple import *
 
@@ -57,22 +54,17 @@ PROCESS_DATA["process_overrides"].update(
 
 
 def create_tool_head_mount(target_profile):
-
-    carriage = create_mgn12h_carriage()
-    carriage_size = get_bounding_box_size(carriage)
-
-    dummy_rail = create_mgn12h_rail(length_mm=10)
-
-    carriage_rail_fused = carriage.fuse(dummy_rail)
-    rail_plus_carriage = LeaderFollowersCuttersPart(
-        carriage_rail_fused, followers=[dummy_rail, carriage]
+    rail_plus_carriage = create_mgn12h_rail_with_carriages(
+        length_mm=10,
+        carriage_offsets=[0],
     )
     rail_plus_carriage = align(
         rail_plus_carriage, target_profile, Alignment.CENTER, axes=[0, 1]
     )
     rail_plus_carriage = align(rail_plus_carriage, target_profile, Alignment.STACK_TOP)
 
-    carriage = rail_plus_carriage.followers[1]
+    carriage = rail_plus_carriage.get_named_follower("carriage_1")
+    carriage_size = get_bounding_box_size(carriage)
 
     tool_head_mount_base_plate_width = (
         tool_head_mount_carriage_mount_plate_width
@@ -485,18 +477,10 @@ def main():
         lower_axis_profile, "lower_axis_profile", flip=False, skip_in_production=True
     )
 
-    rail = create_mgn12h_rail(length_mm=test_axis_length - 20)
-
-    carriages = []
-    for i in [-1, 1]:
-        carriage = create_mgn12h_carriage()
-        carriage = align(carriage, rail, Alignment.CENTER, axes=[0, 1])
-        carriage = translate(i * 20, 0, 0)(carriage)
-        carriages.append(carriage)
-
-    for i, carriage in enumerate(carriages):
-        rail.add_named_follower(carriage, f"carriage_{i+1}")
-    rail_with_carriages = rail
+    rail_with_carriages = create_mgn12h_rail_with_carriages(
+        length_mm=test_axis_length - 20,
+        carriage_offsets=[-20, 20],
+    )
 
     rail_with_carriages = align(
         rail_with_carriages, lower_axis_profile, Alignment.CENTER, axes=[0, 1]

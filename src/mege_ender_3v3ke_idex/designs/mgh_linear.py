@@ -113,17 +113,50 @@ def create_mgn12h_rail(length_mm: float):
     return LeaderFollowersCuttersPart(rail, cutters=holes_aligned)
 
 
+def create_mgn12h_rail_with_carriages(
+    length_mm: float,
+    carriage_offsets=None,
+    carriage_names=None,
+):
+    """Create a rail assembly with carriages mounted at the correct rail-relative height.
+
+    The carriage body is modeled in its own local coordinates with the required vertical
+    offset above the rail floor. By attaching carriages as followers of the rail assembly,
+    any later alignment or translation of the assembly preserves that relationship.
+    """
+
+    rail = create_mgn12h_rail(length_mm=length_mm)
+
+    if carriage_offsets is None:
+        return rail
+
+    if carriage_names is None:
+        carriage_names = [f"carriage_{i + 1}" for i in range(len(carriage_offsets))]
+
+    if len(carriage_names) != len(carriage_offsets):
+        raise ValueError("carriage_names must match carriage_offsets length")
+
+    for carriage_offset, carriage_name in zip(carriage_offsets, carriage_names):
+        carriage = create_mgn12h_carriage()
+        carriage = align(carriage, rail.leader, Alignment.CENTER, axes=[0, 1])
+        carriage = translate(carriage_offset, 0, 0)(carriage)
+        rail.add_named_follower(carriage, carriage_name)
+
+    return rail
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
     # Create the part
-    part = create_mgn12h_rail(length_mm=150)
-    parts.add(part, "mgh_linear", flip=False)
-
-    carriage = create_mgn12h_carriage()
-    carriage = align(carriage, part, Alignment.CENTER, axes=[0, 1])
-    parts.add(carriage, "mgh_linear_carriage", flip=False)
+    part = create_mgn12h_rail_with_carriages(length_mm=150, carriage_offsets=[0])
+    parts.add(part.leader, "mgh_linear", flip=False)
+    parts.add(
+        part.get_named_follower("carriage_1"),
+        "mgh_linear_carriage",
+        flip=False,
+    )
 
     # Arrange and export
     arrange_and_export(

@@ -25,8 +25,8 @@ from mege_ender_3v3ke_idex.designs.endstop_holder import create_endstop_holder
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.mgh_linear import (
-    create_mgn12h_carriage,
     create_mgn12h_rail,
+    create_mgn12h_rail_with_carriages,
     mgn_12h_carriage_length,
 )
 from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
@@ -916,18 +916,10 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
     top_axis_profile = translate(0, 0, x_axis_profile_pitch)(lower_axis_profile)
     axis_frame = lower_axis_profile.fuse(top_axis_profile)
 
-    rail = create_mgn12h_rail(length_mm=x_axis_rail_length)
-
-    carriages = []
-    for i in [-1, 1]:
-        carriage = create_mgn12h_carriage()
-        carriage = align(carriage, rail, Alignment.CENTER, axes=[0, 1])
-        carriage = translate(i * carriage_offset, 0, 0)(carriage)
-        carriages.append(carriage)
-
-    for i, carriage in enumerate(carriages):
-        rail.add_named_follower(carriage, f"carriage_{i+1}")
-    rail_with_carriages = rail
+    rail_with_carriages = create_mgn12h_rail_with_carriages(
+        length_mm=x_axis_rail_length,
+        carriage_offsets=[-carriage_offset, carriage_offset],
+    )
 
     rail_with_carriages = align(
         rail_with_carriages, lower_axis_profile, Alignment.CENTER, axes=[0, 1]

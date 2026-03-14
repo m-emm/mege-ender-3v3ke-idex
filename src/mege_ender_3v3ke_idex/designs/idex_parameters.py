@@ -282,7 +282,7 @@ z_axis_carriage_back_height = 12
 z_axis_carriage_bearing_inset = 5
 z_axis_carriage_fillet_radius = 4
 z_axis_carriage_front_depth = 25
-z_axis_carriage_front_height = 75
+z_axis_carriage_x_axis_connector_thickness = 8
 z_axis_carriage_mount_screw_size = "M3"
 z_axis_carriage_profile_clearance = 2
 z_axis_carriage_rod_clamp_screw_inset = 4
@@ -331,7 +331,7 @@ z_axis_top_mount_thickness = 5
 z_axis_top_mount_threaded_rod_clearance = 1.5
 z_axis_top_mount_width = 40
 z_axis_x_axis_carriage_vertical_offset = 8
-z_axis_x_axis_to_carriage_gap = 23
+z_axis_x_axis_to_carriage_gap = 28
 z_axis_x_offset_from_center = 190
 z_axis_y_offset = 60
 
@@ -369,6 +369,12 @@ nitehawk_holder_height = NemaSizes.NEMA17.size_mm + nitehawk_holder_height_exten
 frame_depth = y_axis_profile_length + 2 * (ExtrusionProfileType.PROFILE_4040.size_mm[1])
 nitehawk_holder_mount_cut_radius = nitehawk_holder_height * 0.5
 nitehawk_holder_cable_attachment_width = nitehawk_plug_width + 4
+
+z_axis_carriage_front_height = (
+    x_axis_profile_pitch
+    + ExtrusionProfileType.PROFILE_2020.size_mm[1]
+    + 2 * z_axis_carriage_x_axis_connector_thickness
+)
 
 
 part_fan_parameters = {

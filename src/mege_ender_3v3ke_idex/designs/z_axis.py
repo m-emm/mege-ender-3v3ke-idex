@@ -55,6 +55,9 @@ PROCESS_DATA["process_overrides"].update(
     }
 )
 
+Z_AXIS_ASSEMBLY_BASE_Z_OFFSET = 40
+Z_AXIS_CARRIAGE_ASSEMBLY_Z_OFFSET = 200
+
 
 def create_profile_mount_plate(
     num_holes=2, screw_inset=5, profile_mount_width=z_axis_profile_mount_width
@@ -674,7 +677,7 @@ def create_carriage(guide_rod, threaded_rod, profile):
         z_axis_carriage_front_depth,
         z_axis_carriage_front_height,
         z_axis_carriage_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM],
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
 
     carriage_front = align(carriage_front, guide_rod, Alignment.CENTER)
@@ -688,7 +691,10 @@ def create_carriage(guide_rod, threaded_rod, profile):
 
     bearing_size = get_bounding_box_size(bearing)
     gap_bewteen_bearings = (
-        z_axis_carriage_front_height - 2 * bearing_size[2] - z_axis_carriage_back_height
+        z_axis_carriage_front_height
+        - 2 * bearing_size[2]
+        - z_axis_carriage_back_height
+        - z_axis_carriage_x_axis_connector_thickness
     )
 
     carriage_front = bearing.use_as_cutter_on(carriage_front)
@@ -762,7 +768,10 @@ def create_carriage(guide_rod, threaded_rod, profile):
         front_clamps_cutter, carriage_front_clamps, Alignment.CENTER
     )
     front_clamps_cutter = align(
-        front_clamps_cutter, top_bearing, Alignment.STACK_BOTTOM
+        front_clamps_cutter,
+        top_bearing,
+        Alignment.STACK_BOTTOM,
+        stack_gap=z_axis_carriage_x_axis_connector_thickness,
     )
 
     carriage_front_clamps = carriage_front_clamps.cut(front_clamps_cutter)
@@ -827,6 +836,50 @@ def create_carriage(guide_rod, threaded_rod, profile):
         carriage_front = screw_assembly.use_as_cutter_on(carriage_front)
 
         screw_assemblies.append(screw_assembly)
+
+    x_axis_mount_plate_bottom = create_filleted_box(
+        z_axis_carriage_width,
+        z_axis_x_axis_to_carriage_gap + z_axis_carriage_fillet_radius,
+        z_axis_carriage_x_axis_connector_thickness,
+        z_axis_carriage_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.BACK],
+    )
+    x_axis_mount_plate_bottom = align(
+        x_axis_mount_plate_bottom, carriage_bottom_clamp, Alignment.CENTER
+    )
+    x_axis_mount_plate_bottom = align(
+        x_axis_mount_plate_bottom, carriage_bottom_clamp, Alignment.BOTTOM
+    )
+    x_axis_mount_plate_bottom = align(
+        x_axis_mount_plate_bottom,
+        carriage_bottom_clamp,
+        Alignment.STACK_FRONT,
+        stack_gap=-z_axis_carriage_fillet_radius,
+    )
+
+    carriage_bottom_clamp = carriage_bottom_clamp.fuse(x_axis_mount_plate_bottom)
+
+    x_axis_mount_plate_top = create_filleted_box(
+        z_axis_carriage_width,
+        z_axis_x_axis_to_carriage_gap + z_axis_carriage_fillet_radius,
+        z_axis_carriage_x_axis_connector_thickness,
+        z_axis_carriage_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.BACK],
+    )
+    x_axis_mount_plate_top = align(
+        x_axis_mount_plate_top, carriage_top_clamp, Alignment.CENTER
+    )
+    x_axis_mount_plate_top = align(
+        x_axis_mount_plate_top, carriage_top_clamp, Alignment.TOP
+    )
+    x_axis_mount_plate_top = align(
+        x_axis_mount_plate_top,
+        carriage_top_clamp,
+        Alignment.STACK_FRONT,
+        stack_gap=-z_axis_carriage_fillet_radius,
+    )
+
+    carriage_top_clamp = carriage_top_clamp.fuse(x_axis_mount_plate_top)
 
     carriage_back = bearing.use_as_cutter_on(carriage_back)
     carriage_body = carriage_front.fuse(carriage_back)
@@ -1136,6 +1189,118 @@ def create_box_hole_cutter(box_width, box_length, box_height):
     return LeaderFollowersCuttersPart(box_to_leave_free, cutters=[box_hole_cutter])
 
 
+def create_minimal_z_axis_reference():
+    """Create only the Z-profile and rod geometry required to build/place a carriage."""
+
+    z_axis_profile = create_alu_extrusion_profile(
+        ExtrusionProfileType.PROFILE_4040, length_mm=z_axis_profile_length
+    )
+
+    guide_rod = create_cylinder(z_axis_guide_rod_diameter / 2, z_axis_guide_rod_length)
+    guide_rod = align(guide_rod, z_axis_profile, Alignment.CENTER)
+    guide_rod = align(guide_rod, z_axis_profile, Alignment.STACK_FRONT)
+    guide_rod = align(guide_rod, z_axis_profile, Alignment.BOTTOM)
+    guide_rod = translate(0, -z_axis_guide_rod_profile_distance, 0)(guide_rod)
+
+    threaded_rod = create_cylinder(
+        z_axis_threaded_rod_diameter / 2, z_axis_threaded_rod_length
+    )
+    threaded_rod = align(threaded_rod, guide_rod, Alignment.CENTER)
+    threaded_rod = align(threaded_rod, guide_rod, Alignment.BOTTOM)
+    threaded_rod = align(
+        threaded_rod,
+        z_axis_profile,
+        Alignment.STACK_FRONT,
+        stack_gap=z_axis_threaded_rod_profile_distance,
+    )
+    threaded_rod = translate(0, 0, z_axis_thraded_rod_z_offset)(threaded_rod)
+
+    retval = LeaderFollowersCuttersPart(z_axis_profile)
+    retval.add_named_non_production_part(guide_rod, "guide_rod")
+    retval.add_named_non_production_part(threaded_rod, "threaded_rod")
+
+    return retval
+
+
+def align_x_axis_to_z_carriages(x_axis, z_axes_fused, carriages_fused):
+    """Place the X axis relative to the Z carriages using production alignment rules.
+
+    Source of truth:
+    - X axis stays centered between the two Z axes in X/Y.
+    - The lower X profile sits in front of the carriage set with the configured gap.
+    - The lower X profile bottom is raised above the carriage bottom by the connector thickness.
+    """
+
+    x_axis = align(x_axis, z_axes_fused, Alignment.CENTER, axes=[0, 1])
+
+    lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
+    axis_profile_aligner = align_translation(
+        lower_axis_profile,
+        carriages_fused,
+        Alignment.FRONT,
+    )
+    x_axis = axis_profile_aligner(x_axis)
+
+    lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
+    axis_profile_aligner = align_translation(
+        lower_axis_profile,
+        carriages_fused,
+        Alignment.BOTTOM,
+    )
+    x_axis = axis_profile_aligner(x_axis)
+
+    x_axis = translate(0, 0, z_axis_carriage_x_axis_connector_thickness)(x_axis)
+
+    return x_axis
+
+
+def create_positioned_x_z_axis_assembly(
+    x_axis,
+    z_axis_factory,
+    *,
+    frame=None,
+    z_axis_base_z_offset=Z_AXIS_ASSEMBLY_BASE_Z_OFFSET,
+    carriage_z_offset=Z_AXIS_CARRIAGE_ASSEMBLY_Z_OFFSET,
+):
+    """Build the aligned dual-Z and X-axis assembly from shared source-of-truth logic."""
+
+    positioned_z_axes = {}
+    positioned_carriages = {}
+    z_axes_fused = PartCollector()
+    carriages_fused = PartCollector()
+
+    for side in [Alignment.LEFT, Alignment.RIGHT]:
+        side_name = side.name.lower()
+
+        z_axis = z_axis_factory()
+        if frame is not None:
+            z_axis = align(z_axis, frame, Alignment.CENTER)
+            z_axis = align(z_axis, frame, Alignment.BOTTOM)
+
+        z_axis = translate(
+            side.sign * z_axis_x_offset_from_center,
+            z_axis_y_offset,
+            z_axis_base_z_offset,
+        )(z_axis)
+
+        positioned_z_axes[side_name] = z_axis
+        z_axes_fused = z_axes_fused.fuse(z_axis.leader)
+
+        carriage = create_carriage(
+            z_axis.get_named_non_production_part("guide_rod"),
+            z_axis.get_named_non_production_part("threaded_rod"),
+            z_axis,
+        )
+        carriage = translate(0, 0, carriage_z_offset)(carriage)
+
+        positioned_carriages[side_name] = carriage
+        carriages_fused = carriages_fused.fuse(carriage.leaders_followers_fused())
+
+    x_axis = align_x_axis_to_z_carriages(x_axis, z_axes_fused, carriages_fused)
+
+    return positioned_z_axes, positioned_carriages, x_axis
+
+
 def main():
 
     from mege_ender_3v3ke_idex.designs.printer_frame import (  # noqa: F401
@@ -1153,27 +1318,16 @@ def main():
     for name, npp in frame.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
 
-    z_axes_fused = PartCollector()
+    x_axis = create_x_axis()
+    positioned_z_axes, positioned_carriages, x_axis = (
+        create_positioned_x_z_axis_assembly(
+            x_axis,
+            create_z_axis,
+            frame=frame,
+        )
+    )
 
-    carriages_fused = PartCollector()
-
-    for lr in [Alignment.LEFT, Alignment.RIGHT]:
-
-        prefix = lr.name.lower()
-
-        z_axis_x_offset = lr.sign * z_axis_x_offset_from_center
-
-        translator = translate(z_axis_x_offset, z_axis_y_offset, 40)
-
-        z_axis = create_z_axis()
-
-        z_axis = align(z_axis, frame, Alignment.CENTER)
-        z_axis = align(z_axis, frame, Alignment.BOTTOM)
-
-        z_axis = translator(z_axis)
-
-        z_axes_fused = z_axes_fused.fuse(z_axis.prefixed_copy(f"{prefix}"))
-
+    for prefix, z_axis in positioned_z_axes.items():
         parts.add(z_axis, f"{prefix}_z_axis", flip=False, skip_in_production=True)
 
         for name, npp in z_axis.get_named_non_production_part_items():
@@ -1202,18 +1356,7 @@ def main():
                 prod_rotation_angle=prod_rotation_angle,
                 prod_rotation_axis=prod_rotation_axis,
             )
-
-        carriage = create_carriage(
-            z_axis.get_named_non_production_part("guide_rod"),
-            z_axis.get_named_non_production_part("threaded_rod"),
-            z_axis,
-        )
-
-        carriage = translate(0, 0, 200)(carriage)
-
-        carriages_fused = carriages_fused.fuse(
-            carriage.prefixed_copy(f"{prefix}_carriage")
-        )
+    for prefix, carriage in positioned_carriages.items():
 
         parts.add(
             carriage, f"{prefix}_z_axis_carriage", flip=False, skip_in_production=False
@@ -1239,29 +1382,6 @@ def main():
         for name, npp in carriage.get_named_non_production_part_items():
             parts.add(npp, f"{prefix}_{name}", flip=False, skip_in_production=True)
 
-    x_axis = create_x_axis()
-
-    x_axis = align(x_axis, z_axes_fused, Alignment.CENTER)
-    x_axis = align(x_axis, carriages_fused, Alignment.CENTER, axes=[2])
-
-    lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
-    axis_profile_aligner = align_translation(
-        lower_axis_profile,
-        carriages_fused,
-        Alignment.STACK_FRONT,
-        stack_gap=z_axis_x_axis_to_carriage_gap,
-    )
-    x_axis = axis_profile_aligner(x_axis)
-
-    lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
-
-    axis_profile_aligner = align_translation(
-        lower_axis_profile, carriages_fused, Alignment.BOTTOM
-    )
-    x_axis = axis_profile_aligner(x_axis)
-
-    x_axis = translate(0, 0, z_axis_x_axis_carriage_vertical_offset)(x_axis)
-
     parts.add(x_axis, "x_axis", flip=False, skip_in_production=True)
 
     already_added_names = set()
@@ -1276,28 +1396,6 @@ def main():
             continue
 
         parts.add(follower, current_naeme, flip=False, skip_in_production=True)
-
-    # new_parts_list = []
-    # for part_info in parts.parts:
-
-    #     if "left_z_axis_carriage" in part_info.name:
-
-    #         bhc = create_box_hole_cutter(28, 20, 20)
-    #         solid_in_part = part_info.part
-
-    #         bhc = align(bhc, solid_in_part, Alignment.CENTER)
-    #         bhc = align(bhc, solid_in_part, Alignment.BOTTOM)
-    #         bhc = translate(0, 8, 0)(bhc)
-
-    #         solid_in_part = bhc.use_as_cutter_on(solid_in_part)
-
-    #         part_info.part = solid_in_part
-
-    #         new_parts_list.append(part_info)
-    #     else:
-    #         _logger.warning(f"Skipping {part_info.name}")
-
-    # parts.parts = new_parts_list
 
     arrange_and_export(
         parts.as_list(),

@@ -15,10 +15,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     create_alu_extrusion_profile,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.mgh_linear import (
-    create_mgn12h_carriage,
-    create_mgn12h_rail,
-)
+from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12h_rail_with_carriages
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -52,23 +49,24 @@ def create_y_axis():
         profile = translate(i * y_axis_rail_spacing / 2, 0, 0)(profile)
 
         rail_side_name = "left" if i == -1 else "right"
-        rail = create_mgn12h_rail(y_axis_rail_length)
-        rail = rail.prefixed_copy(f"rail_{rail_side_name}")
+        rail = create_mgn12h_rail_with_carriages(
+            y_axis_rail_length,
+            carriage_offsets=[
+                -y_axis_carriage_spacing / 2,
+                y_axis_carriage_spacing / 2,
+            ],
+            carriage_names=["carriage_front", "carriage_back"],
+        )
         rail = rotate(90)(rail)
-
-        carriages = []
-        for j in [-1, 1]:
-            carriage = create_mgn12h_carriage()
-            carriage = rotate(90)(carriage)
-            carriage = align(carriage, rail, Alignment.CENTER, axes=[0, 1])
-            carriage = translate(0, j * y_axis_carriage_spacing / 2, 0)(carriage)
-            carriages.append(carriage)
-
-        for k, carriage in enumerate(carriages):
-            carriage_pos_name = "front" if k == 0 else "back"
-            rail.add_named_non_production_part(
-                carriage, f"carriage_{carriage_pos_name}_carriage_{rail_side_name}"
-            )
+        rail = rail.prefixed_copy(f"rail_{rail_side_name}")
+        rail.rename_follower(
+            f"rail_{rail_side_name}_carriage_front",
+            f"carriage_front_carriage_{rail_side_name}",
+        )
+        rail.rename_follower(
+            f"rail_{rail_side_name}_carriage_back",
+            f"carriage_back_carriage_{rail_side_name}",
+        )
 
         rail = align(rail, profile, Alignment.CENTER)
         rail = align(rail, profile, Alignment.STACK_TOP)
@@ -113,6 +111,9 @@ def main():
     y_axis = axis_aligner(y_axis)
 
     parts.add(y_axis.leader, "y_axis", flip=False, skip_in_production=True)
+
+    for name, follower in y_axis.get_named_follower_items():
+        parts.add(follower, name, flip=False, skip_in_production=True)
 
     for name, npp in y_axis.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
