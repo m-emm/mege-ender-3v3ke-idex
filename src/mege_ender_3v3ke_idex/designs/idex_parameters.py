@@ -224,7 +224,6 @@ print_bed_depth = 310
 print_bed_thickness = 4
 
 frame_width = 350
-frame_depth = 420
 frame_alu_profile_size = 40
 
 
@@ -328,6 +327,17 @@ feeder_ring_extra_angle = 10
 feeder_ring_rotation_angle = -10
 
 duct_extension_width = 20
+
+
+y_axis_rail_spacing = 200
+y_axis_carriage_spacing = 70 + 30
+y_axis_rail_length = print_bed_depth + y_axis_carriage_spacing
+
+y_axis_profile_extension = 20
+
+y_axis_profile_length = y_axis_rail_length + 2 * y_axis_profile_extension
+
+frame_depth = y_axis_profile_length + 2 * (ExtrusionProfileType.PROFILE_4040.size_mm[1])
 
 
 __all__ = sorted(

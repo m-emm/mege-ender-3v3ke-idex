@@ -36,6 +36,9 @@ def create_printer_frame():
     """Create the printer_frame part."""
 
     profiles = PartCollector()
+    _logger.info(
+        f"Creating printer frame with frame_depth={frame_depth} (depth profile length) and frame_width={frame_width} (width profile length)"
+    )
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
         alu_profile = create_alu_extrusion_profile(

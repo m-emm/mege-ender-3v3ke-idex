@@ -12,7 +12,6 @@ import math
 import os
 
 import numpy as np
-from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.simple import *
 

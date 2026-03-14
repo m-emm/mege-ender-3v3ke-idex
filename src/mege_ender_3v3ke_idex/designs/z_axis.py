@@ -60,6 +60,8 @@ z_axis_default_screw_nut_cutter_clearance = 0.2
 z_axis_creality_nut_threaded_rod_cuide_cutter_clearance = 0.3
 z_axis_nut_screw_hole_clearence_type = "loose"
 
+z_axis_y_offset = 60
+
 z_axis_threaded_rod_diameter = 8
 z_axis_threaded_rod_length = 500
 
@@ -93,7 +95,8 @@ z_axis_motor_mount_plate_size = 52
 z_axis_motor_mount_plate_depth = 69
 z_axis_guide_rod_clamp_screw_length = 20
 
-
+z_axis_x_axis_to_carriage_gap = 23
+z_axis_x_axis_carriage_vertical_offset = 8
 z_axis_guide_rod_carriage_clamp_screw_length = 20
 
 
@@ -1295,7 +1298,7 @@ def main():
 
     carriages_fused = PartCollector()
 
-    for lr in [Alignment.LEFT]:  # , Alignment.RIGHT]:
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
         prefix = lr.name.lower()
 
@@ -1303,7 +1306,7 @@ def main():
 
         z_axis_x_offset = lr.sign * z_axis_x_offset_from_center
 
-        translator = translate(z_axis_x_offset, 0, 40)
+        translator = translate(z_axis_x_offset, z_axis_y_offset, 40)
 
         z_axis = create_z_axis()
 
@@ -1378,26 +1381,44 @@ def main():
 
         for name, npp in carriage.get_named_non_production_part_items():
             parts.add(npp, f"{prefix}_{name}", flip=False, skip_in_production=True)
-    if True:
-        x_axis = create_x_axis()
-        x_axis = align(x_axis, z_axes_fused, Alignment.CENTER)
-        x_axis = align(x_axis, carriages_fused, Alignment.CENTER, axes=[2])
-        x_axis = align(x_axis, carriages_fused, Alignment.STACK_FRONT)
 
-        parts.add(x_axis, "x_axis", flip=False, skip_in_production=True)
+    x_axis = create_x_axis()
 
-        already_added_names = set()
-        for name, npp in x_axis.get_named_non_production_part_items():
-            current_naeme = f"x_axis_{name}"
-            already_added_names.add(current_naeme)
-            parts.add(npp, current_naeme, flip=False, skip_in_production=True)
+    x_axis = align(x_axis, z_axes_fused, Alignment.CENTER)
+    x_axis = align(x_axis, carriages_fused, Alignment.CENTER, axes=[2])
 
-        for name, follower in x_axis.get_named_follower_items():
-            current_naeme = f"x_axis_{name}"
-            if current_naeme in already_added_names:
-                continue
+    lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
+    axis_profile_aligner = align_translation(
+        lower_axis_profile,
+        carriages_fused,
+        Alignment.STACK_FRONT,
+        stack_gap=z_axis_x_axis_to_carriage_gap,
+    )
+    x_axis = axis_profile_aligner(x_axis)
 
-            parts.add(follower, current_naeme, flip=False, skip_in_production=True)
+    lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
+
+    axis_profile_aligner = align_translation(
+        lower_axis_profile, carriages_fused, Alignment.BOTTOM
+    )
+    x_axis = axis_profile_aligner(x_axis)
+
+    x_axis = translate(0, 0, z_axis_x_axis_carriage_vertical_offset)(x_axis)
+
+    parts.add(x_axis, "x_axis", flip=False, skip_in_production=True)
+
+    already_added_names = set()
+    for name, npp in x_axis.get_named_non_production_part_items():
+        current_naeme = f"x_axis_{name}"
+        already_added_names.add(current_naeme)
+        parts.add(npp, current_naeme, flip=False, skip_in_production=True)
+
+    for name, follower in x_axis.get_named_follower_items():
+        current_naeme = f"x_axis_{name}"
+        if current_naeme in already_added_names:
+            continue
+
+        parts.add(follower, current_naeme, flip=False, skip_in_production=True)
 
     # new_parts_list = []
     # for part_info in parts.parts:
