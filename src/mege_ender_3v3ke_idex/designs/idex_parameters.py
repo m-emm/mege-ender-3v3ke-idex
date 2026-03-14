@@ -299,7 +299,7 @@ z_axis_guide_rod_clamp_screw_length = 20
 z_axis_guide_rod_clamp_thickness = 22
 z_axis_guide_rod_clamp_width = 28
 z_axis_guide_rod_diameter = 8
-z_axis_guide_rod_length = 500
+z_axis_guide_rod_length = 550
 z_axis_guide_rod_profile_distance = 55
 z_axis_guide_rod_threaded_rod_distance = 18
 z_axis_motor_mount_plate_depth = 69
@@ -307,7 +307,7 @@ z_axis_motor_mount_plate_profile_distance = 0
 z_axis_motor_mount_plate_size = 52
 z_axis_nut_screw_hole_clearence_type = "loose"
 z_axis_pillow_block_bearing_z_offset = 2
-z_axis_profile_length = 500
+z_axis_profile_length = 550
 z_axis_profile_mount_plate_fillet_radius = 3
 z_axis_profile_mount_plate_height = 33
 z_axis_profile_mount_plate_thickness = 5
@@ -334,6 +334,8 @@ z_axis_x_axis_carriage_vertical_offset = 8
 z_axis_x_axis_to_carriage_gap = 28
 z_axis_x_offset_from_center = 190
 z_axis_y_offset = 60
+z_axis_carriage_z_offset = 120
+z_axis_base_z_offset = 40
 
 
 ############## Calculated parameters ##############

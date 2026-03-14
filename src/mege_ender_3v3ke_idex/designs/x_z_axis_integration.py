@@ -131,6 +131,8 @@ def main():
             color=ROD_COLOR,
         )
 
+    z_animation = {f"z_axis": (0, 0, 200)}
+
     for side_name, carriage in carriages.items():
         parts.add(
             carriage.leader,
@@ -138,6 +140,7 @@ def main():
             flip=False,
             skip_in_production=True,
             color=Z_CARRIAGE_COLOR,
+            animation=z_animation,
         )
         for clamp_name, clamp in carriage.get_named_follower_items():
             parts.add(
@@ -146,6 +149,7 @@ def main():
                 flip=False,
                 skip_in_production=True,
                 color=Z_CLAMP_COLOR,
+                animation=z_animation,
             )
         for bearing_name in ["top_bearing", "bottom_bearing"]:
             parts.add(
@@ -154,6 +158,7 @@ def main():
                 flip=False,
                 skip_in_production=True,
                 color=BEARING_COLOR,
+                animation=z_animation,
             )
 
     parts.add(
@@ -162,6 +167,7 @@ def main():
         flip=False,
         skip_in_production=True,
         color=PROFILE_COLOR,
+        animation=z_animation,
     )
     parts.add(
         x_axis_reference.get_named_non_production_part("top_axis_profile"),
@@ -169,6 +175,7 @@ def main():
         flip=False,
         skip_in_production=True,
         color=PROFILE_COLOR,
+        animation=z_animation,
     )
     parts.add(
         x_axis_reference.get_named_non_production_part("rail"),
@@ -176,14 +183,19 @@ def main():
         flip=False,
         skip_in_production=True,
         color=X_AXIS_RAIL_COLOR,
+        animation=z_animation,
     )
-    for carriage_name in ["carriage_1", "carriage_2"]:
+    for movement_sign, carriage_name in zip([1, -1], ["carriage_1", "carriage_2"]):
         parts.add(
             x_axis_reference.get_named_non_production_part(carriage_name),
             f"x_axis_{carriage_name}",
             flip=False,
             skip_in_production=True,
             color=X_AXIS_COLOR,
+            animation={
+                **{f"x_{carriage_name}": (300 * movement_sign, 0, 0)},
+                **z_animation,
+            },
         )
 
     arrange_and_export(

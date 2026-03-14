@@ -55,9 +55,6 @@ PROCESS_DATA["process_overrides"].update(
     }
 )
 
-Z_AXIS_ASSEMBLY_BASE_Z_OFFSET = 40
-Z_AXIS_CARRIAGE_ASSEMBLY_Z_OFFSET = 200
-
 
 def create_profile_mount_plate(
     num_holes=2, screw_inset=5, profile_mount_width=z_axis_profile_mount_width
@@ -1259,8 +1256,8 @@ def create_positioned_x_z_axis_assembly(
     z_axis_factory,
     *,
     frame=None,
-    z_axis_base_z_offset=Z_AXIS_ASSEMBLY_BASE_Z_OFFSET,
-    carriage_z_offset=Z_AXIS_CARRIAGE_ASSEMBLY_Z_OFFSET,
+    z_axis_base_z_offset,
+    carriage_z_offset,
 ):
     """Build the aligned dual-Z and X-axis assembly from shared source-of-truth logic."""
 
@@ -1310,13 +1307,26 @@ def main():
 
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
+    z_animation = {"z_axis": (0, 0, 300)}
+    bed_animation = {"bed_y": (0, 155, 0)}
+    x_axis_carriage_animations = {
+        "carriage_1": {**z_animation, "x_carriage_1": (300, 0, 0)},
+        "carriage_2": {**z_animation, "x_carriage_2": (-300, 0, 0)},
+    }
 
     frame = create_printer_frame()
 
     parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
 
     for name, npp in frame.get_named_non_production_part_items():
-        parts.add(npp, name, flip=False, skip_in_production=True)
+        animation = bed_animation if name == "print_bed" else None
+        parts.add(
+            npp,
+            name,
+            flip=False,
+            skip_in_production=True,
+            animation=animation,
+        )
 
     x_axis = create_x_axis()
     positioned_z_axes, positioned_carriages, x_axis = (
@@ -1324,6 +1334,8 @@ def main():
             x_axis,
             create_z_axis,
             frame=frame,
+            z_axis_base_z_offset=z_axis_base_z_offset,
+            carriage_z_offset=z_axis_carriage_z_offset,
         )
     )
 
@@ -1359,7 +1371,11 @@ def main():
     for prefix, carriage in positioned_carriages.items():
 
         parts.add(
-            carriage, f"{prefix}_z_axis_carriage", flip=False, skip_in_production=False
+            carriage,
+            f"{prefix}_z_axis_carriage",
+            flip=False,
+            skip_in_production=False,
+            animation=z_animation,
         )
 
         for name, follower in carriage.get_named_follower_items():
@@ -1377,25 +1393,52 @@ def main():
                 skip_in_production=skip_in_production,
                 prod_rotation_angle=prod_rotation_angle,
                 prod_rotation_axis=prod_rotation_axis,
+                animation=z_animation,
             )
 
         for name, npp in carriage.get_named_non_production_part_items():
-            parts.add(npp, f"{prefix}_{name}", flip=False, skip_in_production=True)
+            parts.add(
+                npp,
+                f"{prefix}_{name}",
+                flip=False,
+                skip_in_production=True,
+                animation=z_animation,
+            )
 
-    parts.add(x_axis, "x_axis", flip=False, skip_in_production=True)
+    parts.add(
+        x_axis,
+        "x_axis",
+        flip=False,
+        skip_in_production=True,
+        animation=z_animation,
+    )
 
     already_added_names = set()
     for name, npp in x_axis.get_named_non_production_part_items():
         current_naeme = f"x_axis_{name}"
         already_added_names.add(current_naeme)
-        parts.add(npp, current_naeme, flip=False, skip_in_production=True)
+        animation = x_axis_carriage_animations.get(name, z_animation)
+        parts.add(
+            npp,
+            current_naeme,
+            flip=False,
+            skip_in_production=True,
+            animation=animation,
+        )
 
     for name, follower in x_axis.get_named_follower_items():
         current_naeme = f"x_axis_{name}"
         if current_naeme in already_added_names:
             continue
 
-        parts.add(follower, current_naeme, flip=False, skip_in_production=True)
+        animation = x_axis_carriage_animations.get(name, z_animation)
+        parts.add(
+            follower,
+            current_naeme,
+            flip=False,
+            skip_in_production=True,
+            animation=animation,
+        )
 
     arrange_and_export(
         parts.as_list(),
@@ -1404,6 +1447,7 @@ def main():
         process_data=PROCESS_DATA,
         prod_gap=4,
         export_individual_parts=False,
+        export_stl=PROD,  # only export STL in production, for slicing; for obj export, not needed
     )
 
     _logger.info("z_axis created successfully!")
