@@ -202,10 +202,7 @@ def create_tool_head_mount(target_profile):
         clamp_2.get_follower_part_by_name("belt_path_cutter"), "belt_path_cutter_2"
     )
 
-    clamp_align_translation = align_translation(
-        clamp.get_follower_part_by_name("clamp_1"), side_plates, Alignment.BACK
-    )
-    clamp = clamp_align_translation(clamp)
+    clamp = clamp.aligned_from_follower("clamp_1", side_plates, Alignment.BACK)
     clamp = translate(0, -tool_head_mount_belt_clamp_y_offset, 0)(clamp)
 
     clamps_list = [

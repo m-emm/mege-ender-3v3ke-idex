@@ -55,157 +55,16 @@ PROCESS_DATA["process_overrides"].update(
     }
 )
 
-z_axis_default_clearance_hole_type = "loose"
-z_axis_default_screw_nut_cutter_clearance = 0.2
-z_axis_creality_nut_threaded_rod_cuide_cutter_clearance = 0.3
-z_axis_nut_screw_hole_clearence_type = "loose"
-
-z_axis_y_offset = 60
-
-z_axis_threaded_rod_diameter = 8
-z_axis_threaded_rod_length = 500
-
-z_axis_threaded_rod_profile_distance = 22
-z_axis_thraded_rod_z_offset = 90
-z_axis_threaded_rod_coupler_overlap = 17.5
-
-
-z_axis_pillow_block_bearing_z_offset = 2
-
-z_axis_guide_rod_length = 500
-z_axis_guide_rod_diameter = 8
-
-z_axis_profile_length = 500
-
-z_axis_guide_rod_threaded_rod_distance = 18
-z_axis_guide_rod_profile_distance = 55
-
-z_axis_carriage_front_height = 75
-z_axis_carriage_width = 45
-z_axis_carriage_front_depth = 25
-z_axis_carriage_back_depth = 40
-z_axis_carriage_back_height = 12
-z_axis_carriage_fillet_radius = 4
-z_axis_carriage_mount_screw_size = "M3"
-z_axis_carriage_bearing_inset = 5
-z_axis_carriage_threaded_rod_clearance = 0.3
-z_axis_carriage_profile_clearance = 2
-z_axis_motor_mount_plate_profile_distance = 0
-z_axis_motor_mount_plate_size = 52
-z_axis_motor_mount_plate_depth = 69
-z_axis_guide_rod_clamp_screw_length = 20
-
-z_axis_x_axis_to_carriage_gap = 23
-z_axis_x_axis_carriage_vertical_offset = 8
-z_axis_guide_rod_carriage_clamp_screw_length = 20
-
-
-z_axis_top_mount_thickness = 5
-z_axis_top_mount_depth = (
-    z_axis_guide_rod_profile_distance + 2 * z_axis_guide_rod_diameter
-)
-z_axis_top_mount_width = 40
-z_axis_top_mount_fillet_radius = 5
-
-z_axis_top_mount_holder_depth = 20
-z_axis_top_mount_holder_height = 35
-z_axis_top_mount_screw_size = "M3"
-z_axis_top_mount_screw_length = 16
-z_axis_top_mount_screw_inset = 4
-z_axis_top_mount_threaded_rod_clearance = 1.5
-z_axis_top_mount_reinforcement_thickness = 3
-z_axis_top_mount_reinforcement_factor = 0.9
-z_axis_top_mount_profile_mount_width = 40
-z_axis_carriage_rod_clamp_screw_inset = 4
-
-z_axis_guide_rod_clamp_depth = 23.5
-z_axis_guide_rod_clamp_thickness = 22
-z_axis_rod_clamp_gap = 1.0
-
-z_axis_guide_rod_clamp_width = 28
-
-
-igus_drylin_bearing_inner_diameter = 8
-igus_drylin_bearing_outer_diameter = 16
-igus_drylin_bearing_length = 25
-
-pillow_block_bearing_base_thickness = 5.1
-pillow_block_bearing_base_width = 13.1
-pillow_block_bearing_base_overall_length = 55
-
-pillow_block_bearing_base_gap_length = 24.7
-pillow_block_bottom_base_bridge_width = 3.5
-
-pillow_block_bearing_mount_hole_diameter = 4.6
-pillow_block_bearing_mount_hole_center_distance = 41.5
-pillow_block_bearing_cage_diameter = 30
-pillow_block_bearing_cage_thickness = 9.6
-pillow_block_bearing_cage_rim = 2
-
-pillow_block_bearing_rod_holder_outer_diameter = 12
-pillow_block_bearing_rod_holder_inner_diameter = 8.03
-pillow_block_bearing_rod_holder_length = 11
-
-
-bb_608z_outer_diameter = 22
-bb_608z_height = 7
-v_slot_wheel_608z_bearing_radial_clearance = 0.0
-
-v_slot_wheel_608z_ease_in_size = 0.7
-v_slot_wheel_608z_singularity_cutter_thickness = 0.15
-
-v_slot_wheel_608z_top_bottom_holder_size = 0.65
-v_slot_wheel_608z_top_bottom_holder_axial_clearance = 0.05
-
-v_slot_wheel_608z_width = 10.2
-v_slot_wheel_608z_inner_width = 5
-v_slot_wheel_608z_outer_diameter = 27.5
-
-
-axial_ball_bearing_8_x_19_thickness = 7
-axial_ball_bearing_8_x_19_outer_diameter = 19
-axial_ball_bearing_8_x_19_inner_diameter = 8.2
-axial_ball_bearing_8_x_19_disc_thickness = 2.15
-axial_ball_bearing_8_x_19_ball_diameter = 3.17
-axial_ball_bearing_8_x_19_ball_count = 6
-axial_ball_bearing_8_x_19_ball_holder_disc_thickness = 1.9
-axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter = 17.45
-axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter = 9.6
-
-
-axial_bearing_stopper_outer_diameter = 24
-axial_bearing_stopper_inner_diameter = 16
-axial_bearing_stopper_thickness = 4
-
-
-axial_rod_clamp_outer_diameter = 30
-axial_rod_clamp_inner_diameter = 8.2
-axial_rod_clamp_thickness = 10
-axial_rod_clamp_gap = 1.2
-axial_rod_clamp_screw_size = "M3"
-axial_rod_clamp_screw_length = 18
-axial_rod_clamp_nut_clearance = 0.15
-axial_rod_clamp_cylinder_head_cutter_clearance = 0.25
-axial_rod_clamp_outer_diameter_cutting_depth = 9
-axial_rod_clamp_screw_hole_distance_from_center = 10
-
-profile_mount_plate_thickness = 5
-profile_mount_plate_fillet_radius = 3
-profile_mount_width = 28
-profile_mount_plate_height = 33
-
-z_axis_cylinder_head_clearance = 0.6
-
 
 def create_profile_mount_plate(
-    num_holes=2, screw_inset=5, profile_mount_width=profile_mount_width
+    num_holes=2, screw_inset=5, profile_mount_width=z_axis_profile_mount_width
 ):
 
     plate = create_filleted_box(
         profile_mount_width,
-        profile_mount_plate_thickness,
-        profile_mount_plate_height,
-        profile_mount_plate_fillet_radius,
+        z_axis_profile_mount_plate_thickness,
+        z_axis_profile_mount_plate_height,
+        z_axis_profile_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.FRONT, Alignment.BACK, Alignment.BOTTOM],
     )
 
@@ -213,7 +72,7 @@ def create_profile_mount_plate(
 
     hole_drills = PartCollector()
     hole_pitch = (
-        (profile_mount_plate_height - 2 * screw_inset - hole_drill_diameter)
+        (z_axis_profile_mount_plate_height - 2 * screw_inset - hole_drill_diameter)
         / (num_holes - 1)
         if num_holes > 1
         else 0
@@ -763,8 +622,8 @@ def create_top_mount(guide_rod, threaded_rod, profile):
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
         top_mount_reinforcement = create_right_triangle(
-            profile_mount_plate_height * z_axis_top_mount_reinforcement_factor,
-            profile_mount_plate_height * z_axis_top_mount_reinforcement_factor,
+            z_axis_profile_mount_plate_height * z_axis_top_mount_reinforcement_factor,
+            z_axis_profile_mount_plate_height * z_axis_top_mount_reinforcement_factor,
             z_axis_top_mount_reinforcement_thickness,
             extrusion_direction=(1, 0, 0),
             a_normal=(0, 0, -1),
@@ -1301,8 +1160,6 @@ def main():
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
         prefix = lr.name.lower()
-
-        z_axis_x_offset_from_center = 190
 
         z_axis_x_offset = lr.sign * z_axis_x_offset_from_center
 

@@ -10,6 +10,22 @@ Usage:
 import logging
 import os
 
+from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (  # noqa: F401
+    ExtrusionProfileType,
+    create_alu_extrusion_profile,
+)
+from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.nema_motors import (  # noqa: F401
+    create_nema_composite,
+)
+from mege_ender_3v3ke_idex.designs.printer_frame import (  # noqa: F401
+    create_printer_frame,
+)
+from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (  # noqa: F401
+    create_four_screws_mount_assembly,
+)
+from mege_ender_3v3ke_idex.designs.x_axis import create_x_axis  # noqa: F401
+from mege_ender_3v3ke_idex.designs.z_axis import create_z_axis  # noqa: F401
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)

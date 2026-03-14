@@ -144,13 +144,12 @@ def create_motor_stack(
         stack_gap=motor_pulley_gap,
     )
 
-    axle = motor.get_follower_part_by_name("axle")
-
-    axle_align_translation = align_translation(
-        axle, pulley, Alignment.CENTER, axes=[0, 1]
+    motor = motor.aligned_from_follower(
+        "axle",
+        pulley,
+        Alignment.CENTER,
+        axes=[0, 1],
     )
-
-    motor = axle_align_translation(motor)
 
     mount_plate_seed = create_box(1, 1, 1)
     mount_plate_seed = align(mount_plate_seed, motor, Alignment.CENTER)

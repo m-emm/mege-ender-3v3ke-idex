@@ -549,21 +549,17 @@ def main():
     )
     additional_pins = additional_pins.prefixed_copy("additional_pins")
 
-    align_pins_translation = align_translation(
-        additional_pins.get_follower_part_by_name("additional_pins_base_plate"),
+    additional_pins = additional_pins.aligned_from_follower(
+        "additional_pins_base_plate",
         all_holders,
         Alignment.CENTER,
         axes=[1],
     )
-    additional_pins = align_pins_translation(additional_pins)
-
-    align_pins_translation = align_translation(
-        additional_pins.get_follower_part_by_name("additional_pins_base_plate"),
+    additional_pins = additional_pins.aligned_from_follower(
+        "additional_pins_base_plate",
         all_holders,
         Alignment.STACK_RIGHT,
     )
-
-    additional_pins = align_pins_translation(additional_pins)
 
     parts.add(additional_pins, "additional_pins", flip=False, skip_in_production=True)
 
