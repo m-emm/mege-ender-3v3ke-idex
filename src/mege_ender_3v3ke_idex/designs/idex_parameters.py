@@ -2,7 +2,15 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import ExtrusionProfile
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from shellforgepy.simple import *
 
+
 BIG_THING = 500
+
+mgn_12h_carriage_width = 27
+mgn_12h_carriage_length = 45.4
+mgn_12h_screw_hole_pitch = 20
+mgn_12h_height = 10
+mgn_12h_screw_hole_depth = 3.5
+mgn_12h_h1 = 3.4
 
 
 axial_ball_bearing_8_x_19_ball_count = 6
@@ -287,7 +295,7 @@ x_axis_profile_length = 600  # original length of profiles I got - no need to cu
 x_axis_profile_pitch = 48
 x_axis_rail_length = 450
 x_axis_x_travel = 355
-y_axis_carriage_spacing = 70 + 30
+y_axis_carriage_spacing = 80
 y_axis_profile_extension = 20
 y_axis_rail_spacing = 200
 z_axis_base_z_offset = -20
@@ -376,7 +384,9 @@ axis_holder_depth = ExtrusionProfileType.PROFILE_2020.grid_pitch_mm + flange_dep
 z_axis_top_mount_depth = (
     z_axis_guide_rod_profile_distance + 2 * z_axis_guide_rod_diameter
 )
-y_axis_rail_length = print_bed_depth + y_axis_carriage_spacing
+y_axis_rail_length = (
+    print_bed_depth + y_axis_carriage_spacing +  mgn_12h_carriage_length
+)
 
 y_axis_profile_length = y_axis_rail_length + 2 * y_axis_profile_extension
 

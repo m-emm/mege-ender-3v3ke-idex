@@ -15,7 +15,9 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     create_alu_extrusion_profile,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12h_rail_with_carriages
+from mege_ender_3v3ke_idex.designs.mgh_linear import (
+    create_mgn12h_rail_with_carriages,
+)
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -52,8 +54,10 @@ def create_y_axis():
         rail = create_mgn12h_rail_with_carriages(
             y_axis_rail_length,
             carriage_offsets=[
-                -y_axis_carriage_spacing / 2,
-                y_axis_carriage_spacing / 2,
+                -y_axis_rail_length / 2 + mgn_12h_carriage_length / 2,
+                -y_axis_rail_length / 2
+                + y_axis_carriage_spacing
+                + mgn_12h_carriage_length / 2,
             ],
             carriage_names=["carriage_front", "carriage_back"],
         )
@@ -90,6 +94,8 @@ def main():
     _logger.info(f"y_axis_profile_length: {y_axis_profile_length}")
     _logger.info(f"y_axis_rail_length: {y_axis_rail_length}")
 
+    bed_animation = {"bed_y": (0, print_bed_y_travel, 0)}
+
     parts = PartList()
 
     frame = create_printer_frame()
@@ -97,7 +103,9 @@ def main():
     parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
 
     for name, npp in frame.get_named_non_production_part_items():
-        parts.add(npp, name, flip=False, skip_in_production=True)
+        animation = bed_animation if name == "print_bed" else None
+
+        parts.add(npp, name, flip=False, skip_in_production=True, animation=animation)
 
     y_axis = create_y_axis()
 
@@ -113,10 +121,27 @@ def main():
     parts.add(y_axis.leader, "y_axis", flip=False, skip_in_production=True)
 
     for name, follower in y_axis.get_named_follower_items():
-        parts.add(follower, name, flip=False, skip_in_production=True)
+        animation = None
+
+        if "carriage" in name:
+            _logger.info(f"Using bed_animation for {name}")
+            animation = bed_animation
+        else:
+            _logger.info(f"NOT Using bed_animation for {name}")
+
+
+        parts.add(follower, name, flip=False, skip_in_production=True, animation=animation)
 
     for name, npp in y_axis.get_named_non_production_part_items():
-        parts.add(npp, name, flip=False, skip_in_production=True)
+        animation = None
+
+        if "carriage" in name:
+            _logger.info(f"Using bed_animation for {name}")
+            animation = bed_animation
+        else:
+            _logger.info(f"NOT Using bed_animation for {name}")
+
+        parts.add(npp, name, flip=False, skip_in_production=True, animation=animation)
 
     # Arrange and export
     arrange_and_export(
@@ -124,6 +149,7 @@ def main():
         script_file=__file__,
         prod=PROD,
         process_data=PROCESS_DATA,
+        export_stl=PROD,
     )
 
     _logger.info("y_axis created successfully!")

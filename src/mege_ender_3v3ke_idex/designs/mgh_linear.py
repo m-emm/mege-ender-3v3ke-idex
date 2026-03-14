@@ -28,12 +28,6 @@ PROCESS_DATA = {
 }
 
 
-mgn_12h_carriage_width = 27
-mgn_12h_carriage_length = 45.4
-mgn_12h_screw_hole_pitch = 20
-mgn_12h_height = 10
-mgn_12h_screw_hole_depth = 3.5
-mgn_12h_h1 = 3.4
 
 
 def create_mgn12h_carriage():
