@@ -1355,9 +1355,17 @@ def create_rail_drill_jig():
     # parts.add(clamp.get_follower_part_by_name("clamp"), "belt_clamp", flip=True)
 
 
+def create_x_carriage_animation_map():
+    return {
+        carriage_name: {f"x_{carriage_name}": (300 * movement_sign, 0, 0)}
+        for movement_sign, carriage_name in zip([1, -1], ["carriage_1", "carriage_2"])
+    }
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
+    x_carriage_animations = create_x_carriage_animation_map()
 
     frame = create_printer_frame()
 
@@ -1389,6 +1397,7 @@ def main():
             f"x_axis_{name}",
             flip=False,
             skip_in_production=True,
+            animation=x_carriage_animations.get(name),
         )
 
     for name, follower in x_axis.get_named_follower_items():
@@ -1455,6 +1464,7 @@ def main():
             prod_rotation_angle=180,
             prod_rotation_axis=(1, 0, 0),
             color=(0.7, 0.7, 0.2),
+            animation=x_carriage_animations[carriage_name],
         )
 
         parts.add(
@@ -1465,6 +1475,7 @@ def main():
             prod_rotation_angle=90,
             prod_rotation_axis=(1, 0, 0),
             color=(0.7, 0.6, 0.5),
+            animation=x_carriage_animations[carriage_name],
         )
 
     for name, npp in frame.get_named_non_production_part_items():
@@ -1483,6 +1494,7 @@ def main():
         process_data=PROCESS_DATA,
         prod_gap=4,
         export_individual_parts=False,
+        export_stl=PROD,
     )
 
     _logger.info("x_axis created successfully!")

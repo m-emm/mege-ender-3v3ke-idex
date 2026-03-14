@@ -565,6 +565,8 @@ def main():
         prod=PROD,
         process_data=PROCESS_DATA,
         prod_gap=8,
+        export_individual_parts=False,
+        export_stl=PROD,
     )
 
     _logger.info("tool_head_mount created successfully!")
