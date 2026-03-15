@@ -22,6 +22,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     create_alu_extrusion_profile,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.metrics_collector import record_length_metric
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
@@ -924,6 +925,12 @@ def create_carriage(guide_rod, threaded_rod, profile):
 def create_z_axis(side):
     """Create the z_axis part."""
 
+    record_length_metric(
+        "extrusion_profile",
+        ExtrusionProfileType.PROFILE_4040.value,
+        f"{side.name.lower()}_z_axis_profile",
+        z_axis_profile_length,
+    )
     z_axis_profile = create_alu_extrusion_profile(
         ExtrusionProfileType.PROFILE_4040, length_mm=z_axis_profile_length
     )
@@ -1247,6 +1254,30 @@ def create_minimal_z_axis_reference():
     return retval
 
 
+def create_top_bridge_profile(positioned_z_axes):
+    z_axis_profiles = PartCollector()
+    for z_axis in positioned_z_axes.values():
+        z_axis_profiles = z_axis_profiles.fuse(z_axis.leader)
+
+    bridge_length = get_bounding_box_size(z_axis_profiles)[0]
+    record_length_metric(
+        "extrusion_profile",
+        ExtrusionProfileType.PROFILE_2020.value,
+        "z_axis_top_bridge_profile",
+        bridge_length,
+    )
+    bridge = create_alu_extrusion_profile(
+        ExtrusionProfileType.PROFILE_2020,
+        length_mm=bridge_length,
+    )
+    bridge = rotate(90, axis=(0, 1, 0))(bridge)
+    bridge = align(bridge, z_axis_profiles, Alignment.CENTER, axes=[0])
+    bridge = align(bridge, z_axis_profiles, Alignment.TOP)
+    bridge = align(bridge, z_axis_profiles, Alignment.STACK_BACK)
+
+    return bridge
+
+
 def create_positioned_z_axis_assembly(
     *,
     z_axis_factory=create_z_axis,
@@ -1286,6 +1317,13 @@ def create_positioned_z_axis_assembly(
         carriage = translate(0, 0, carriage_z_offset)(carriage)
 
         positioned_carriages[side_name] = carriage
+
+    if len(positioned_z_axes) > 1:
+        top_bridge_profile = create_top_bridge_profile(positioned_z_axes)
+        positioned_z_axes[Alignment.LEFT.name.lower()].add_named_non_production_part(
+            top_bridge_profile,
+            "top_bridge_profile",
+        )
 
     return positioned_z_axes, positioned_carriages
 

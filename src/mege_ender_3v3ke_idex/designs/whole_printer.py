@@ -13,6 +13,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.metrics_collector import (
+    log_metrics_report,
+    reset_metrics,
+)
 from mege_ender_3v3ke_idex.designs.printer_feet import create_printer_feet
 from mege_ender_3v3ke_idex.designs.printer_frame import create_printer_frame
 from mege_ender_3v3ke_idex.designs.x_axis import (
@@ -147,6 +151,7 @@ def create_whole_printer():
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
+    reset_metrics()
     z_animation = {"z_axis": (0, 0, z_axis_z_travel)}
     bed_animation = {"bed_y": (0, print_bed_y_travel, 0)}
     x_axis_carriage_animations = {
@@ -171,6 +176,15 @@ def main():
         skip_in_production=True,
         animation=bed_animation,
     )
+
+    for name, npp in assembly.print_bed.get_named_non_production_part_items():
+        parts.add(
+            npp,
+            name,
+            flip=False,
+            skip_in_production=True,
+            animation=bed_animation,
+        )
 
     for name, follower in assembly.y_axis.get_named_follower_items():
         animation = bed_animation if "carriage" in name else None
@@ -317,6 +331,8 @@ def main():
             skip_in_production=True,
             animation=animation,
         )
+
+    log_metrics_report(_logger)
 
     # Arrange and export
     arrange_and_export(

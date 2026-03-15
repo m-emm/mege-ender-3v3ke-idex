@@ -24,6 +24,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
 from mege_ender_3v3ke_idex.designs.endstop_holder import create_endstop_holder
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.metrics_collector import record_length_metric
 from mege_ender_3v3ke_idex.designs.mgh_linear import (
     create_mgn12h_rail,
     create_mgn12h_rail_with_carriages,
@@ -899,14 +900,32 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
     Non-production parts: axis frame and both motor hardware stacks.
     """
 
+    record_length_metric(
+        "extrusion_profile",
+        ExtrusionProfileType.PROFILE_2020.value,
+        "x_axis_lower_profile",
+        x_axis_profile_length,
+    )
     lower_axis_profile = create_alu_extrusion_profile(
         ExtrusionProfileType.PROFILE_2020, length_mm=x_axis_profile_length
     )
     lower_axis_profile = rotate(90, axis=(0, 1, 0))(lower_axis_profile)
 
+    record_length_metric(
+        "extrusion_profile",
+        ExtrusionProfileType.PROFILE_2020.value,
+        "x_axis_top_profile",
+        x_axis_profile_length,
+    )
     top_axis_profile = translate(0, 0, x_axis_profile_pitch)(lower_axis_profile)
     axis_frame = lower_axis_profile.fuse(top_axis_profile)
 
+    record_length_metric(
+        "linear_rail",
+        "MGN12",
+        "x_axis_rail",
+        x_axis_rail_length,
+    )
     rail_with_carriages = create_mgn12h_rail_with_carriages(
         length_mm=x_axis_rail_length,
         carriage_offsets=[-carriage_offset, carriage_offset],

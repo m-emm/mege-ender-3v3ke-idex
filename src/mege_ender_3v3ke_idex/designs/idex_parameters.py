@@ -254,10 +254,14 @@ print_bed_depth = 310
 print_bed_y_travel = 325
 print_bed_thickness = 3
 print_bed_mount_hole_diameter = 4
+print_bed_mount_screw_size = "M4"
 print_bed_mount_hole_pitch = 240
+print_bed_mount_screw_length = 30
 print_bed_foil_thickness = 1.65
 print_bed_width = 310
-print_bed_vertical_gap_to_frame = 20
+print_bed_vertical_gap_to_frame = 30
+print_bed_damper_height = 18
+print_bed_damper_diameter = 15
 
 pulley_clearance_z = 0.8
 rail_mount_screw_size = "M3"
@@ -319,7 +323,6 @@ x_axis_x_travel = 355
 y_axis_carriage_spacing = 100
 y_axis_profile_extension = 20
 y_axis_rail_spacing = 200
-z_axis_base_z_offset = -20
 z_axis_carriage_back_depth = 40
 z_axis_carriage_back_height = 12
 z_axis_carriage_bearing_inset = 5
@@ -331,7 +334,6 @@ z_axis_carriage_rod_clamp_screw_inset = 4
 z_axis_carriage_threaded_rod_clearance = 0.3
 z_axis_carriage_width = 45
 z_axis_carriage_x_axis_connector_thickness = 8
-z_axis_carriage_z_offset = 118
 z_axis_creality_nut_threaded_rod_cuide_cutter_clearance = 0.3
 z_axis_cylinder_head_clearance = 0.6
 z_axis_default_clearance_hole_type = "loose"
@@ -382,6 +384,12 @@ z_axis_z_travel = 300
 
 
 ############## Calculated parameters ##############
+
+z_axis_base_z_offset = print_bed_vertical_gap_to_frame - 43
+
+z_axis_carriage_z_offset = print_bed_vertical_gap_to_frame + 93
+
+
 tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
 
 

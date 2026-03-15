@@ -15,6 +15,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     create_alu_extrusion_profile,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.metrics_collector import record_length_metric
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -40,6 +41,12 @@ def create_printer_frame():
         f"Creating printer frame with frame_depth={frame_inner_depth} (depth profile length) and frame_inner_width={frame_inner_width} (width profile length)"
     )
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        record_length_metric(
+            "extrusion_profile",
+            ExtrusionProfileType.PROFILE_4040.value,
+            f"printer_frame_side_profile_{lr.name.lower()}",
+            frame_inner_depth + 2 * ExtrusionProfileType.PROFILE_4040.size_mm[1],
+        )
 
         alu_profile = create_alu_extrusion_profile(
             ExtrusionProfileType.PROFILE_4040,
@@ -60,6 +67,12 @@ def create_printer_frame():
 
     profiles_fb = PartCollector()
     for fb in [Alignment.FRONT, Alignment.BACK]:
+        record_length_metric(
+            "extrusion_profile",
+            ExtrusionProfileType.PROFILE_4040.value,
+            f"printer_frame_cross_profile_{fb.name.lower()}",
+            frame_inner_width,
+        )
 
         alu_profile = create_alu_extrusion_profile(
             ExtrusionProfileType.PROFILE_4040, length_mm=frame_inner_width

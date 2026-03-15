@@ -15,6 +15,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     create_alu_extrusion_profile,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.metrics_collector import record_length_metric
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_rail_with_carriages
 from shellforgepy.simple import *
 
@@ -34,7 +35,50 @@ PROCESS_DATA = {
 
 
 def create_print_bed():
-    return create_box(print_bed_width, print_bed_depth, print_bed_thickness)
+
+    plate = create_box(print_bed_width, print_bed_depth, print_bed_thickness)
+
+    inset = (print_bed_depth - print_bed_mount_hole_pitch) / 2
+
+    retval = LeaderFollowersCuttersPart(plate)
+
+    for lr in [Alignment.EDGE_LEFT, Alignment.EDGE_RIGHT]:
+        for fb in [Alignment.EDGE_FRONT, Alignment.EDGE_BACK]:
+
+            hole_drill = create_cylinder(print_bed_mount_hole_diameter / 2, BIG_THING)
+            hole_drill = align(hole_drill, plate, Alignment.CENTER, axes=[2])
+            hole_drill = align(hole_drill, plate, lr)
+            hole_drill = align(hole_drill, plate, fb)
+            hole_drill = translate(-inset * lr.sign, -inset * fb.sign, 0)(hole_drill)
+
+            retval = retval.cut(hole_drill)
+
+            screw = create_conical_head_screw(
+                print_bed_mount_screw_size, print_bed_mount_screw_length
+            )
+
+            screw = align(screw, hole_drill, Alignment.CENTER)
+            screw = align(screw, plate, Alignment.TOP)
+
+            retval.add_named_non_production_part(screw, f"screw_{lr.name}_{fb.name}")
+            retval = retval.cut(screw)
+
+            damper = create_cylinder(
+                print_bed_damper_diameter / 2, print_bed_damper_height
+            )
+
+            damper = align(damper, hole_drill, Alignment.CENTER)
+            damper = align(damper, plate, Alignment.STACK_BOTTOM)
+            damper = damper.cut(hole_drill)
+
+            retval.add_named_non_production_part(damper, f"damper_{lr.name}_{fb.name}")
+
+    foil = create_box(print_bed_width, print_bed_depth, print_bed_foil_thickness)
+    foil = align(foil, plate, Alignment.CENTER, axes=[0, 1])
+    foil = align(foil, plate, Alignment.STACK_TOP)
+    retval.add_named_non_production_part(foil, "print_bed_foil")
+
+    return retval
 
 
 def create_positioned_print_bed(y_axis, frame):
@@ -75,6 +119,12 @@ def create_y_axis():
     for i in [-1, 1]:
 
         rail_side_name = "left" if i == -1 else "right"
+        record_length_metric(
+            "extrusion_profile",
+            ExtrusionProfileType.PROFILE_2020.value,
+            f"y_axis_profile_{rail_side_name}",
+            y_axis_profile_length,
+        )
         profile = create_alu_extrusion_profile(
             ExtrusionProfileType.PROFILE_2020, length_mm=y_axis_profile_length
         )
@@ -84,6 +134,12 @@ def create_y_axis():
         profile = translate(i * y_axis_rail_spacing / 2, 0, 0)(profile)
 
         rail_side_name = "left" if i == -1 else "right"
+        record_length_metric(
+            "linear_rail",
+            "MGN12",
+            f"y_axis_rail_{rail_side_name}",
+            y_axis_rail_length,
+        )
         rail = create_mgn12ca_rail_with_carriages(
             y_axis_rail_length,
             carriage_offsets=[
@@ -144,6 +200,14 @@ def main():
         skip_in_production=True,
         animation=bed_animation,
     )
+    for name, npp in print_bed.get_named_non_production_part_items():
+        parts.add(
+            npp,
+            name,
+            flip=False,
+            skip_in_production=True,
+            animation=bed_animation,
+        )
 
     for name, follower in y_axis.get_named_follower_items():
         animation = None
