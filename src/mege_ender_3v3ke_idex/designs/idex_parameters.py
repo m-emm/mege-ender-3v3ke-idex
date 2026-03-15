@@ -235,7 +235,7 @@ pillow_block_bearing_rod_holder_length = 11
 pillow_block_bearing_rod_holder_outer_diameter = 12
 pillow_block_bottom_base_bridge_width = 3.5
 print_bed_depth = 310
-print_bed_y_travel = 310
+print_bed_y_travel = 325
 print_bed_thickness = 4
 print_bed_width = 310
 pulley_clearance_z = 0.8
@@ -295,7 +295,7 @@ x_axis_profile_length = 600  # original length of profiles I got - no need to cu
 x_axis_profile_pitch = 48
 x_axis_rail_length = 450
 x_axis_x_travel = 355
-y_axis_carriage_spacing = 80
+y_axis_carriage_spacing = 100
 y_axis_profile_extension = 20
 y_axis_rail_spacing = 200
 z_axis_base_z_offset = -20
@@ -385,7 +385,7 @@ z_axis_top_mount_depth = (
     z_axis_guide_rod_profile_distance + 2 * z_axis_guide_rod_diameter
 )
 y_axis_rail_length = (
-    print_bed_depth + y_axis_carriage_spacing +  mgn_12h_carriage_length
+    print_bed_y_travel + y_axis_carriage_spacing +  mgn_12h_carriage_length
 )
 
 y_axis_profile_length = y_axis_rail_length + 2 * y_axis_profile_extension
