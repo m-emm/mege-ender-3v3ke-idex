@@ -17,6 +17,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
 )
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler, create_gt2_pulley
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.metrics_collector import record_mark_metric
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.simple import *
 
@@ -85,6 +86,15 @@ def create_idlers_for_motor(
         retval.add_named_cutter(idler_nut_cutter, f"idler_nut_cutter_{i}")
 
     return retval
+
+
+def _project_center_onto_profile_length_mm(profile_to_align, marker_part) -> float:
+    profile_bbox = get_bounding_box(profile_to_align)
+    profile_size = get_bounding_box_size(profile_to_align)
+    profile_length_axis = max(range(3), key=lambda axis: profile_size[axis])
+    marker_center = get_bounding_box_center(marker_part)
+
+    return marker_center[profile_length_axis] - profile_bbox[0][profile_length_axis]
 
 
 def create_motor_stack(
@@ -280,6 +290,30 @@ def create_motor_stack(
     mount_shield = mount_shield.cut(mount_shield_mount_screw_hole_cutter)
 
     motor.add_named_follower(mount_shield, "mount_shield")
+
+    mount_screw = create_cylinder_screw(
+        "M5", length=motor_mount_shield_mount_screw_length
+    )
+    mount_screw = rotate(-90, axis=(1, 0, 0))(mount_screw)
+    mount_screw = align(
+        mount_screw, mount_shield_mount_screw_hole_cutter, Alignment.CENTER
+    )
+
+    profile_part_name = (
+        "x_axis_lower_profile" if side == Alignment.LEFT else "x_axis_top_profile"
+    )
+    record_mark_metric(
+        stock_type=ExtrusionProfileType.PROFILE_2020.value,
+        part_name=profile_part_name,
+        stock_length_mm=x_axis_profile_length,
+        mark_name=f"mount_shield_mount_screw_{side.name.lower()}",
+        position_mm=_project_center_onto_profile_length_mm(
+            profile_to_align,
+            mount_shield_mount_screw_hole_cutter,
+        ),
+    )
+
+    motor.add_named_non_production_part(mount_screw, "mount_screw")
 
     mount_plate_connector = create_filleted_box(
         mount_plate_connector_length,
@@ -507,6 +541,7 @@ def create_motor_stack(
         "idlers",
         "axis_holding_counter_flange_screws",
         "motor_visual",
+        "mount_screw",
     ]:
         retval.add_named_non_production_part(
             motor.get_non_production_part_by_name(non_production_part_name),

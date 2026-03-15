@@ -160,6 +160,7 @@ motor_pulley_idlers_distance = 28
 motor_size = 42.3
 motor_y_offset = 15
 motor_z_offset = 2
+motor_mount_shield_mount_screw_length = 10
 mount_plate_connector_depth = 20
 mount_plate_connector_link_thickness = 6
 mount_shield_depth = 6
