@@ -1357,6 +1357,33 @@ def create_x_carriage_animation_map():
     }
 
 
+def create_positioned_tool_head_mounts(x_axis):
+    lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
+    top_axis_profile = x_axis.get_non_production_part_by_name("top_axis_profile")
+
+    tool_head_mount_drive_positions = {
+        "carriage_1": Alignment.BOTTOM,
+        "carriage_2": Alignment.TOP,
+    }
+    tool_head_mounts = {}
+
+    for carriage_name, drive_position in tool_head_mount_drive_positions.items():
+        tool_head_mount = create_tool_head_mount(
+            lower_axis_profile,
+            top_axis_profile,
+            drive_position=drive_position,
+        )
+
+        current_carriage = x_axis.get_non_production_part_by_name(carriage_name)
+        tool_head_mount = align_tool_head_mount_to_carriage(
+            tool_head_mount,
+            current_carriage,
+        )
+        tool_head_mounts[carriage_name] = tool_head_mount
+
+    return tool_head_mounts
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
@@ -1422,28 +1449,9 @@ def main():
             prod_rotation_axis=prod_rotation_axis_from_data,
         )
 
-    lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
-    top_axis_profile = x_axis.get_non_production_part_by_name("top_axis_profile")
+    tool_head_mounts = create_positioned_tool_head_mounts(x_axis)
 
-    tool_head_mount_drive_positions = {
-        "carriage_1": Alignment.BOTTOM,
-        "carriage_2": Alignment.TOP,
-    }
-
-    for carriage_name, drive_position in tool_head_mount_drive_positions.items():
-
-        tool_head_mount = create_tool_head_mount(
-            lower_axis_profile,
-            top_axis_profile,
-            drive_position=drive_position,
-        )
-
-        current_carriage = x_axis.get_non_production_part_by_name(carriage_name)
-
-        tool_head_mount = align_tool_head_mount_to_carriage(
-            tool_head_mount,
-            current_carriage,
-        )
+    for carriage_name, tool_head_mount in tool_head_mounts.items():
 
         parts.add(
             tool_head_mount,

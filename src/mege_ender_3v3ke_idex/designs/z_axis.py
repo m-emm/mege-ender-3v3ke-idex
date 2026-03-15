@@ -8,6 +8,7 @@ Usage:
 """
 
 import copy
+import inspect
 import logging
 import math
 import os
@@ -24,10 +25,6 @@ from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
-)
-from mege_ender_3v3ke_idex.designs.tool_head_mount import (
-    align_tool_head_mount_to_carriage,
-    create_tool_head_mount,
 )
 from shellforgepy.simple import *
 
@@ -1250,57 +1247,25 @@ def create_minimal_z_axis_reference():
     return retval
 
 
-def align_x_axis_to_z_carriages(x_axis, z_axes_fused, carriages_fused):
-    """Place the X axis relative to the Z carriages using production alignment rules.
-
-    Source of truth:
-    - X axis stays centered between the two Z axes in X/Y.
-    - The lower X profile sits in front of the carriage set with the configured gap.
-    - The lower X profile bottom is raised above the carriage bottom by the connector thickness.
-    """
-
-    x_axis = align(x_axis, z_axes_fused, Alignment.CENTER, axes=[0, 1])
-
-    lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
-    axis_profile_aligner = align_translation(
-        lower_axis_profile,
-        carriages_fused,
-        Alignment.FRONT,
-    )
-    x_axis = axis_profile_aligner(x_axis)
-
-    lower_axis_profile = x_axis.get_non_production_part_by_name("lower_axis_profile")
-    axis_profile_aligner = align_translation(
-        lower_axis_profile,
-        carriages_fused,
-        Alignment.BOTTOM,
-    )
-    x_axis = axis_profile_aligner(x_axis)
-
-    x_axis = translate(0, 0, z_axis_carriage_x_axis_connector_thickness)(x_axis)
-
-    return x_axis
-
-
-def create_positioned_x_z_axis_assembly(
-    x_axis,
-    z_axis_factory,
+def create_positioned_z_axis_assembly(
     *,
+    z_axis_factory=create_z_axis,
     frame=None,
     z_axis_base_z_offset,
     carriage_z_offset,
 ):
-    """Build the aligned dual-Z and X-axis assembly from shared source-of-truth logic."""
+    """Build the aligned dual-Z assembly with carriages."""
 
+    z_axis_factory_accepts_side = len(inspect.signature(z_axis_factory).parameters) > 0
     positioned_z_axes = {}
     positioned_carriages = {}
-    z_axes_fused = PartCollector()
-    carriages_fused = PartCollector()
 
     for side in [Alignment.LEFT, Alignment.RIGHT]:
         side_name = side.name.lower()
 
-        z_axis = z_axis_factory(side)
+        z_axis = (
+            z_axis_factory(side) if z_axis_factory_accepts_side else z_axis_factory()
+        )
         if frame is not None:
             z_axis = align(z_axis, frame, Alignment.CENTER)
             z_axis = align(z_axis, frame, Alignment.BOTTOM)
@@ -1312,7 +1277,6 @@ def create_positioned_x_z_axis_assembly(
         )(z_axis)
 
         positioned_z_axes[side_name] = z_axis
-        z_axes_fused = z_axes_fused.fuse(z_axis.leader)
 
         carriage = create_carriage(
             z_axis.get_named_non_production_part("guide_rod"),
@@ -1322,52 +1286,19 @@ def create_positioned_x_z_axis_assembly(
         carriage = translate(0, 0, carriage_z_offset)(carriage)
 
         positioned_carriages[side_name] = carriage
-        carriages_fused = carriages_fused.fuse(carriage.leaders_followers_fused())
 
-    x_axis = align_x_axis_to_z_carriages(x_axis, z_axes_fused, carriages_fused)
-
-    return positioned_z_axes, positioned_carriages, x_axis
+    return positioned_z_axes, positioned_carriages
 
 
 def main():
 
-    from mege_ender_3v3ke_idex.designs.printer_frame import (  # noqa: F401
-        create_printer_frame,
-    )
-    from mege_ender_3v3ke_idex.designs.x_axis import create_x_axis  # noqa: F401
-
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
     z_animation = {"z_axis": (0, 0, z_axis_z_travel)}
-    bed_animation = {"bed_y": (0, print_bed_y_travel, 0)}
-    x_axis_carriage_animations = {
-        "carriage_1": {**z_animation, "x_carriage_1": (x_axis_x_travel, 0, 0)},
-        "carriage_2": {**z_animation, "x_carriage_2": (-x_axis_x_travel, 0, 0)},
-    }
-
-    frame = create_printer_frame()
-
-    parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
-
-    for name, npp in frame.get_named_non_production_part_items():
-        animation = bed_animation if name == "print_bed" else None
-        parts.add(
-            npp,
-            name,
-            flip=False,
-            skip_in_production=True,
-            animation=animation,
-        )
-
-    x_axis = create_x_axis()
-    positioned_z_axes, positioned_carriages, x_axis = (
-        create_positioned_x_z_axis_assembly(
-            x_axis,
-            create_z_axis,
-            frame=frame,
-            z_axis_base_z_offset=z_axis_base_z_offset,
-            carriage_z_offset=z_axis_carriage_z_offset,
-        )
+    positioned_z_axes, positioned_carriages = create_positioned_z_axis_assembly(
+        frame=None,
+        z_axis_base_z_offset=z_axis_base_z_offset,
+        carriage_z_offset=z_axis_carriage_z_offset,
     )
 
     for prefix, z_axis in positioned_z_axes.items():
@@ -1436,103 +1367,6 @@ def main():
                 skip_in_production=True,
                 animation=z_animation,
             )
-
-    top_axis_profile = x_axis.get_named_non_production_part("top_axis_profile")
-    lower_axis_profile = x_axis.get_named_non_production_part("lower_axis_profile")
-    carriage_names = ["carriage_1", "carriage_2"]
-    drive_position_list = [Alignment.BOTTOM, Alignment.TOP]
-
-    def create_x_carriage_animation_map():
-        return {
-            carriage_name: {
-                f"x_{carriage_name}": (x_axis_x_travel * movement_sign, 0, 0),
-                f"z_axis": (0, 0, z_axis_z_travel),
-            }
-            for movement_sign, carriage_name in zip(
-                [1, -1], ["carriage_1", "carriage_2"]
-            )
-        }
-
-    x_carriage_animations = create_x_carriage_animation_map()
-
-    for drive_position, carriage_name in zip(drive_position_list, carriage_names):
-
-        current_carriage = x_axis.get_named_non_production_part(carriage_name)
-
-        tool_head_mount = create_tool_head_mount(
-            lower_axis_profile,
-            top_axis_profile,
-            drive_position=drive_position,
-        )
-
-        tool_head_mount = align_tool_head_mount_to_carriage(
-            tool_head_mount,
-            current_carriage,
-        )
-
-        parts.add(
-            tool_head_mount,
-            f"x_axis_tool_head_mount_{carriage_name}",
-            flip=False,
-            skip_in_production=True,  # was False,
-            prod_rotation_angle=180,
-            prod_rotation_axis=(1, 0, 0),
-            animation=x_carriage_animations[carriage_name],
-        )
-
-        parts.add(
-            tool_head_mount.get_follower_part_by_name("belt_clamp_base"),
-            f"x_axis_tool_head_mount_clamp_{carriage_name}",
-            flip=False,
-            skip_in_production=True,  # was False,
-            prod_rotation_angle=90,
-            prod_rotation_axis=(1, 0, 0),
-            animation=x_carriage_animations[carriage_name],
-        )
-
-        for name, npp in tool_head_mount.get_named_non_production_part_items():
-            parts.add(
-                npp,
-                f"{carriage_name}_{name}",
-                flip=False,
-                skip_in_production=True,
-                animation=x_carriage_animations[carriage_name],
-            )
-
-    parts.add(
-        x_axis,
-        "x_axis",
-        flip=False,
-        skip_in_production=True,
-        animation=z_animation,
-    )
-
-    already_added_names = set()
-    for name, npp in x_axis.get_named_non_production_part_items():
-        current_naeme = f"x_axis_{name}"
-        already_added_names.add(current_naeme)
-        animation = x_axis_carriage_animations.get(name, z_animation)
-        parts.add(
-            npp,
-            current_naeme,
-            flip=False,
-            skip_in_production=True,
-            animation=animation,
-        )
-
-    for name, follower in x_axis.get_named_follower_items():
-        current_naeme = f"x_axis_{name}"
-        if current_naeme in already_added_names:
-            continue
-
-        animation = x_axis_carriage_animations.get(name, z_animation)
-        parts.add(
-            follower,
-            current_naeme,
-            flip=False,
-            skip_in_production=True,
-            animation=animation,
-        )
 
     arrange_and_export(
         parts.as_list(),

@@ -37,27 +37,32 @@ def create_printer_frame():
 
     profiles = PartCollector()
     _logger.info(
-        f"Creating printer frame with frame_depth={frame_depth} (depth profile length) and frame_width={frame_width} (width profile length)"
+        f"Creating printer frame with frame_depth={frame_inner_depth} (depth profile length) and frame_inner_width={frame_inner_width} (width profile length)"
     )
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
         alu_profile = create_alu_extrusion_profile(
-            ExtrusionProfileType.PROFILE_4040, length_mm=frame_depth
+            ExtrusionProfileType.PROFILE_4040,
+            length_mm=frame_inner_depth
+            + 2 * ExtrusionProfileType.PROFILE_4040.size_mm[1],
         )
         alu_profile = rotate(90, axis=(1, 0, 0))(alu_profile)
 
         if lr == Alignment.RIGHT:
             alu_profile = translate(
-                frame_width + ExtrusionProfileType.PROFILE_4040.size_mm[0], 0, 0
+                frame_inner_width + ExtrusionProfileType.PROFILE_4040.size_mm[0], 0, 0
             )(alu_profile)
 
         profiles = profiles.fuse(alu_profile)
+
+    profiles_size = get_bounding_box_size(profiles)
+    _logger.info(f"Frame Profiles bounding box size: {point_string(profiles_size)}")
 
     profiles_fb = PartCollector()
     for fb in [Alignment.FRONT, Alignment.BACK]:
 
         alu_profile = create_alu_extrusion_profile(
-            ExtrusionProfileType.PROFILE_4040, length_mm=frame_width
+            ExtrusionProfileType.PROFILE_4040, length_mm=frame_inner_width
         )
         alu_profile = rotate(90, axis=(0, 1, 0))(alu_profile)
         alu_profile = align(alu_profile, profiles, Alignment.CENTER)
@@ -66,17 +71,7 @@ def create_printer_frame():
 
     profiles = profiles.fuse(profiles_fb)
 
-    print_bed = create_box(print_bed_width, print_bed_depth, print_bed_thickness)
-    print_bed = align(print_bed, profiles, Alignment.CENTER)
-    print_bed = align(print_bed, profiles, Alignment.STACK_TOP, stack_gap=20)
-
-    print_bed = translate(0, -print_bed_depth / 2, 0)(print_bed)
-
-    retval = LeaderFollowersCuttersPart(profiles)
-
-    retval.add_named_non_production_part(print_bed, "print_bed")
-
-    return retval
+    return LeaderFollowersCuttersPart(profiles)
 
 
 def main():
@@ -86,10 +81,6 @@ def main():
     # Create the part
     frame = create_printer_frame()
     parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
-
-    for name, npp in frame.get_named_non_production_part_items():
-        _logger.info(f"Adding non-production part: {name}")
-        parts.add(npp, name, flip=False, skip_in_production=True)
 
     # Arrange and export
     arrange_and_export(

@@ -2,7 +2,6 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import ExtrusionProfile
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from shellforgepy.simple import *
 
-
 BIG_THING = 500
 
 mgn_12h_carriage_width = 27
@@ -11,6 +10,13 @@ mgn_12h_screw_hole_pitch = 20
 mgn_12h_height = 10
 mgn_12h_screw_hole_depth = 3.5
 mgn_12h_h1 = 3.4
+
+mgn_12ca_cariage_width = 27
+mgn_12ca_carriage_length = 34.7
+mgn_12ca_screw_hole_pitch = 15
+mgn_12ca_height = 10
+mgn_12ca_screw_hole_depth = 3.5
+mgn_12ca_h1 = 3.4
 
 
 axial_ball_bearing_8_x_19_ball_count = 6
@@ -103,7 +109,7 @@ feeder_ring_rotation_angle = -10
 feeder_ring_wall = 1.5
 feeder_ring_width = 11
 frame_alu_profile_size = 40
-frame_width = 350
+frame_inner_width = 350
 holder_mount_plate_depth = 28
 holder_mount_plate_left_extension = 19
 holder_mount_plate_size = 8
@@ -236,8 +242,13 @@ pillow_block_bearing_rod_holder_outer_diameter = 12
 pillow_block_bottom_base_bridge_width = 3.5
 print_bed_depth = 310
 print_bed_y_travel = 325
-print_bed_thickness = 4
+print_bed_thickness = 3
+print_bed_mount_hole_diameter = 4
+print_bed_mount_hole_pitch = 240
+print_bed_foil_thickness = 1.65
 print_bed_width = 310
+print_bed_vertical_gap_to_frame = 20
+
 pulley_clearance_z = 0.8
 rail_mount_screw_size = "M3"
 tool_head_additional_mount_plate_clearance = 0.5
@@ -356,12 +367,13 @@ z_axis_top_mount_width = 40
 z_axis_x_axis_carriage_vertical_offset = 8
 z_axis_x_axis_to_carriage_gap = 28
 z_axis_x_offset_from_center = 235
-z_axis_y_offset = 140
+z_axis_y_offset = 130
 z_axis_z_travel = 300
 
 
 ############## Calculated parameters ##############
 tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
+
 
 motor_x_offset = z_axis_guide_distance / 2 - 60
 
@@ -385,7 +397,7 @@ z_axis_top_mount_depth = (
     z_axis_guide_rod_profile_distance + 2 * z_axis_guide_rod_diameter
 )
 y_axis_rail_length = (
-    print_bed_y_travel + y_axis_carriage_spacing +  mgn_12h_carriage_length
+    print_bed_y_travel + y_axis_carriage_spacing + mgn_12ca_carriage_length
 )
 
 y_axis_profile_length = y_axis_rail_length + 2 * y_axis_profile_extension
@@ -393,7 +405,7 @@ y_axis_profile_length = y_axis_rail_length + 2 * y_axis_profile_extension
 nitehawk_holder_width = NemaSizes.NEMA17.size_mm + nitehawk_holder_width_extension
 nitehawk_holder_height = NemaSizes.NEMA17.size_mm + nitehawk_holder_height_extension
 
-frame_depth = y_axis_profile_length + 2 * (ExtrusionProfileType.PROFILE_4040.size_mm[1])
+frame_inner_depth = y_axis_profile_length
 nitehawk_holder_mount_cut_radius = nitehawk_holder_height * 0.5
 nitehawk_holder_cable_attachment_width = nitehawk_plug_width + 4
 

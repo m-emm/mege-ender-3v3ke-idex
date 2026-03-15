@@ -15,9 +15,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     create_alu_extrusion_profile,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.mgh_linear import (
-    create_mgn12h_rail_with_carriages,
-)
+from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_rail_with_carriages
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -33,6 +31,41 @@ PROCESS_DATA = {
         "layer_height": "0.2",
     },
 }
+
+
+def create_print_bed():
+    return create_box(print_bed_width, print_bed_depth, print_bed_thickness)
+
+
+def create_positioned_print_bed(y_axis, frame):
+    y_axis_carriages = PartCollector()
+    for name, follower in y_axis.get_named_follower_items():
+        if "carriage" not in name:
+            continue
+
+        y_axis_carriages = y_axis_carriages.fuse(follower)
+
+    print_bed = create_print_bed()
+    print_bed = align(print_bed, y_axis_carriages, Alignment.CENTER, axes=[0, 1])
+    print_bed = align(
+        print_bed,
+        frame,
+        Alignment.STACK_TOP,
+        stack_gap=print_bed_vertical_gap_to_frame,
+    )
+
+    return print_bed
+
+
+def align_y_axis_to_frame(y_axis, frame):
+    y_axis = align(y_axis, frame, Alignment.CENTER, axes=[0, 1])
+    y_axis_profile_left = y_axis.get_non_production_part_by_name("profile_left")
+
+    axis_aligner = align_translation(
+        y_axis_profile_left, frame, Alignment.CENTER, axes=[2]
+    )
+
+    return axis_aligner(y_axis)
 
 
 def create_y_axis():
@@ -51,13 +84,13 @@ def create_y_axis():
         profile = translate(i * y_axis_rail_spacing / 2, 0, 0)(profile)
 
         rail_side_name = "left" if i == -1 else "right"
-        rail = create_mgn12h_rail_with_carriages(
+        rail = create_mgn12ca_rail_with_carriages(
             y_axis_rail_length,
             carriage_offsets=[
-                -y_axis_rail_length / 2 + mgn_12h_carriage_length / 2,
+                -y_axis_rail_length / 2 + mgn_12ca_carriage_length / 2,
                 -y_axis_rail_length / 2
                 + y_axis_carriage_spacing
-                + mgn_12h_carriage_length / 2,
+                + mgn_12ca_carriage_length / 2,
             ],
             carriage_names=["carriage_front", "carriage_back"],
         )
@@ -78,9 +111,7 @@ def create_y_axis():
 
         rails.append(rail)
 
-    rails_part = rails[0].fuse(rails[1])
-
-    return rails_part
+    return rails[0].fuse(rails[1])
 
 
 def main():
@@ -102,23 +133,17 @@ def main():
 
     parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
 
-    for name, npp in frame.get_named_non_production_part_items():
-        animation = bed_animation if name == "print_bed" else None
-
-        parts.add(npp, name, flip=False, skip_in_production=True, animation=animation)
-
-    y_axis = create_y_axis()
-
-    y_axis = align(y_axis, frame, Alignment.CENTER, axes=[0, 1])
-    y_axis_profile_left = y_axis.get_non_production_part_by_name("profile_left")
-
-    axis_aligner = align_translation(
-        y_axis_profile_left, frame, Alignment.CENTER, axes=[2]
-    )
-
-    y_axis = axis_aligner(y_axis)
+    y_axis = align_y_axis_to_frame(create_y_axis(), frame)
+    print_bed = create_positioned_print_bed(y_axis, frame)
 
     parts.add(y_axis.leader, "y_axis", flip=False, skip_in_production=True)
+    parts.add(
+        print_bed,
+        "print_bed",
+        flip=False,
+        skip_in_production=True,
+        animation=bed_animation,
+    )
 
     for name, follower in y_axis.get_named_follower_items():
         animation = None
@@ -129,8 +154,9 @@ def main():
         else:
             _logger.info(f"NOT Using bed_animation for {name}")
 
-
-        parts.add(follower, name, flip=False, skip_in_production=True, animation=animation)
+        parts.add(
+            follower, name, flip=False, skip_in_production=True, animation=animation
+        )
 
     for name, npp in y_axis.get_named_non_production_part_items():
         animation = None

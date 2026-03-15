@@ -19,10 +19,10 @@ from mege_ender_3v3ke_idex.designs.mgh_linear import (
     create_mgn12h_rail_with_carriages,
     mgn_12h_carriage_length,
 )
-from mege_ender_3v3ke_idex.designs.z_axis import (
-    create_minimal_z_axis_reference,
+from mege_ender_3v3ke_idex.designs.whole_printer import (
     create_positioned_x_z_axis_assembly,
 )
+from mege_ender_3v3ke_idex.designs.z_axis import create_minimal_z_axis_reference
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)

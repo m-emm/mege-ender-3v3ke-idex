@@ -28,8 +28,6 @@ PROCESS_DATA = {
 }
 
 
-
-
 def create_mgn12h_carriage():
     """Create the MGN12H carriage part."""
 
@@ -56,6 +54,36 @@ def create_mgn12h_carriage():
     carriage = LeaderFollowersCuttersPart(carriage, cutters=[holes])
 
     carriage = translate(0, 0, mgn_12h_h1)(carriage)
+
+    return carriage
+
+
+def create_mgn12ca_carriage():
+    """Create the MGN12CA carriage part."""
+
+    screw_hole_diameter = MScrew.from_size("M3").clearance_hole_normal
+
+    carriage = create_box(
+        mgn_12ca_carriage_length, mgn_12ca_cariage_width, mgn_12ca_height
+    )
+
+    holes = PartCollector()
+    for x in [-mgn_12ca_screw_hole_pitch / 2, mgn_12ca_screw_hole_pitch / 2]:
+        for y in [-mgn_12ca_screw_hole_pitch / 2, mgn_12ca_screw_hole_pitch / 2]:
+            hole = create_cylinder(screw_hole_diameter / 2, mgn_12ca_height)
+            hole = translate(x, y, 0)(hole)
+            holes = holes.fuse(hole)
+
+    holes = align(holes, carriage, Alignment.CENTER)
+    holes = align(
+        holes, carriage, Alignment.STACK_TOP, stack_gap=-mgn_12ca_screw_hole_depth
+    )
+
+    carriage = carriage.cut(holes)
+
+    carriage = LeaderFollowersCuttersPart(carriage, cutters=[holes])
+
+    carriage = translate(0, 0, mgn_12ca_h1)(carriage)
 
     return carriage
 
@@ -132,6 +160,40 @@ def create_mgn12h_rail_with_carriages(
 
     for carriage_offset, carriage_name in zip(carriage_offsets, carriage_names):
         carriage = create_mgn12h_carriage()
+        carriage = align(carriage, rail.leader, Alignment.CENTER, axes=[0, 1])
+        carriage = translate(carriage_offset, 0, 0)(carriage)
+        carriage = carriage.prefixed_copy(carriage_name)
+        rail.add_named_follower(carriage.leader, name=carriage_name)
+        rail = rail.merge_except_leader(carriage)
+
+    return rail
+
+
+def create_mgn12ca_rail_with_carriages(
+    length_mm: float,
+    carriage_offsets=None,
+    carriage_names=None,
+):
+    """Create a rail assembly with carriages mounted at the correct rail-relative height.
+
+    The carriage body is modeled in its own local coordinates with the required vertical
+    offset above the rail floor. By attaching carriages as followers of the rail assembly,
+    any later alignment or translation of the assembly preserves that relationship.
+    """
+
+    rail = create_mgn12h_rail(length_mm=length_mm)
+
+    if carriage_offsets is None:
+        return rail
+
+    if carriage_names is None:
+        carriage_names = [f"carriage_{i + 1}" for i in range(len(carriage_offsets))]
+
+    if len(carriage_names) != len(carriage_offsets):
+        raise ValueError("carriage_names must match carriage_offsets length")
+
+    for carriage_offset, carriage_name in zip(carriage_offsets, carriage_names):
+        carriage = create_mgn12ca_carriage()
         carriage = align(carriage, rail.leader, Alignment.CENTER, axes=[0, 1])
         carriage = translate(carriage_offset, 0, 0)(carriage)
         carriage = carriage.prefixed_copy(carriage_name)
