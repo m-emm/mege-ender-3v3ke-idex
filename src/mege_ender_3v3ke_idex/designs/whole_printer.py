@@ -297,13 +297,13 @@ def main():
                 animation=x_axis_carriage_animations[carriage_name],
             )
 
-    parts.add(
-        assembly.x_axis,
-        "x_axis",
-        flip=False,
-        skip_in_production=True,
-        animation=z_animation,
-    )
+    # parts.add(
+    #     assembly.x_axis,
+    #     "x_axis",
+    #     flip=False,
+    #     skip_in_production=True,
+    #     animation=z_animation,
+    # )
 
     already_added_names = set()
     for name, npp in assembly.x_axis.get_named_non_production_part_items():

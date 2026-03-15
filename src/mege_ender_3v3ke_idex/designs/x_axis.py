@@ -984,6 +984,8 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
             non_production_part_name,
             non_production_part,
         ) in motor_assembly.get_named_non_production_part_items():
+            if non_production_part_name == "axis_holding_counter_flange":
+                continue
             non_production_parts.append(non_production_part)
             non_production_names.append(
                 non_production_part_name + f"_{side.name.lower()}"
