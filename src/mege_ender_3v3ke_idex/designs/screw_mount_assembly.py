@@ -38,6 +38,7 @@ def create_single_screw_mount_for_top(
     flush_with_top=False,
     cylinder_head_cutter_clearance=0.1,
     clearance_type="normal",
+    top_sink=0,
 ):
 
     screw = create_cylinder_screw(screw_size, screw_length)
@@ -47,7 +48,7 @@ def create_single_screw_mount_for_top(
     cylinder_head_height = m_screw_record.cylinder_head_height
 
     if flush_with_top:
-        screw = translate(0, 0, -cylinder_head_height)(screw)
+        screw = translate(0, 0, -cylinder_head_height - top_sink)(screw)
 
     size_float = float(screw_size[1:])
 
@@ -99,10 +100,11 @@ def create_single_screw_mount_for_top(
 
         cylinder_head_cutter = create_cylinder(
             m_screw_record.cylinder_head_diameter / 2 + cylinder_head_cutter_clearance,
-            cylinder_head_height + cylinder_head_cutter_clearance,
+            cylinder_head_height + cylinder_head_cutter_clearance + top_sink,
         )
         cylinder_head_cutter = align(cylinder_head_cutter, screw, Alignment.CENTER)
         cylinder_head_cutter = align(cylinder_head_cutter, screw, Alignment.TOP)
+        cylinder_head_cutter = translate(0, 0, top_sink)(cylinder_head_cutter)
         retval.add_named_cutter(cylinder_head_cutter, "cylinder_head_cutter")
 
     retval.add_named_non_production_part(screw, "screw")
@@ -120,6 +122,7 @@ def create_screw_mount_assembly(
     flush_with_top=False,
     cylinder_head_cutter_clearance=0.1,
     clearance_type="normal",
+    top_sink=0,
 ):
 
     part_bb_size = get_bounding_box_size(for_part)
@@ -142,6 +145,7 @@ def create_screw_mount_assembly(
         flush_with_top=flush_with_top,
         cylinder_head_cutter_clearance=cylinder_head_cutter_clearance,
         clearance_type=clearance_type,
+        top_sink=top_sink,
     )
 
     if screw_direction == Alignment.FRONT:

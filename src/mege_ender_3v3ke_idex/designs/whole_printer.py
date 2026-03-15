@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.printer_feet import create_printer_feet
 from mege_ender_3v3ke_idex.designs.printer_frame import create_printer_frame
 from mege_ender_3v3ke_idex.designs.x_axis import (
     create_positioned_tool_head_mounts,
@@ -48,6 +49,7 @@ PROCESS_DATA = {
 @dataclass
 class WholePrinterAssembly:
     frame: LeaderFollowersCuttersPart
+    printer_feet: LeaderFollowersCuttersPart
     y_axis: LeaderFollowersCuttersPart
     print_bed: Any
     positioned_z_axes: dict
@@ -115,6 +117,7 @@ def create_whole_printer():
     """Create the whole printer assembly from the frame and axis modules."""
 
     frame = create_printer_frame()
+    printer_feet = create_printer_feet(frame)
     y_axis = align_y_axis_to_frame(create_y_axis(), frame)
     print_bed = create_positioned_print_bed(y_axis, frame)
     x_axis = create_x_axis()
@@ -131,6 +134,7 @@ def create_whole_printer():
 
     return WholePrinterAssembly(
         frame=frame,
+        printer_feet=printer_feet,
         y_axis=y_axis,
         print_bed=print_bed,
         positioned_z_axes=positioned_z_axes,
@@ -152,6 +156,12 @@ def main():
 
     assembly = create_whole_printer()
     parts.add(assembly.frame, "printer_frame", flip=False, skip_in_production=True)
+
+    for name, follower in assembly.printer_feet.get_named_follower_items():
+        parts.add(follower, name, flip=False, skip_in_production=False)
+
+    for name, npp in assembly.printer_feet.get_named_non_production_part_items():
+        parts.add(npp, name, flip=False, skip_in_production=True)
 
     parts.add(assembly.y_axis.leader, "y_axis", flip=False, skip_in_production=True)
     parts.add(

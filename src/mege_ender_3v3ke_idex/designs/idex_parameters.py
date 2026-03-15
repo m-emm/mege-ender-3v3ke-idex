@@ -19,6 +19,16 @@ mgn_12ca_screw_hole_depth = 3.5
 mgn_12ca_h1 = 3.4
 
 
+printer_foot_height = 37
+printer_foot_base_size = 40
+printer_foot_top_size = 35
+printer_foot_screw_length = 30
+printer_foot_screw_cylinder_head_clearance = 1.5
+printer_foot_nut_cutter_clearance = 0.2
+printer_foot_mount_screw_size = "M5"
+printer_foot_mount_screw_sink = 8
+
+
 axial_ball_bearing_8_x_19_ball_count = 6
 axial_ball_bearing_8_x_19_ball_diameter = 3.17
 axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter = 9.6
