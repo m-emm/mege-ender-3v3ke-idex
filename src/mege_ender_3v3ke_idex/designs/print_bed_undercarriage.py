@@ -32,7 +32,9 @@ print_bed_undercarriage_profiles_height = 30
 print_bed_undercarriage_profiles_width = 12
 print_bed_undercarriage_profiles_wall = 1.8
 
-print_bed_undercarriage_central_annulus_diameter = 80
+print_bed_undercarriage_central_annulus_diameter = 90
+
+print_bed_undercarriage_mount_tower_annulus_diameter = 110
 
 
 print_bed_undercarriage_bed_mount_annulus_diameter = 60
@@ -80,6 +82,8 @@ def create_hollow_profile_ring(
         angle=angle,
     )
 
+    cutter_angle = None
+
     if angle is not None:
         average_radius = outer_diameter / 2 - profile_depth / 2
         wall_thickness_angle = math.degrees(wall_thickness / average_radius)
@@ -103,11 +107,11 @@ def create_hollow_profile_ring(
 def create_print_bed_undercarriage(print_bed):
     """Create the print_bed_undercarriage part."""
 
-    central_annulus = create_ring(
-        print_bed_undercarriage_central_annulus_diameter / 2
-        + print_bed_undercarriage_profiles_width,
-        print_bed_undercarriage_central_annulus_diameter / 2,
-        print_bed_undercarriage_profiles_height,
+    central_annulus = create_hollow_profile_ring(
+        outer_diameter=print_bed_undercarriage_central_annulus_diameter,
+        profile_depth=print_bed_undercarriage_profiles_width,
+        profile_height=print_bed_undercarriage_profiles_height,
+        wall_thickness=print_bed_undercarriage_profiles_wall,
     )
 
     central_annulus = align(central_annulus, print_bed, Alignment.CENTER)
@@ -148,6 +152,64 @@ def create_print_bed_undercarriage(print_bed):
         outer_frame = outer_frame.fuse(profile)
 
     undercarriage = central_annulus.fuse(outer_frame)
+
+    half_diagonal = math.sqrt(2) * (print_bed_mount_hole_pitch) / 2
+
+    diagonal_profile_length = (
+        half_diagonal
+        - print_bed_undercarriage_central_annulus_diameter / 2
+        - print_bed_undercarriage_mount_tower_annulus_diameter / 2
+        + 4 * print_bed_undercarriage_profiles_wall
+    )
+
+    diagonal_profiles = PartCollector()
+    for i in range(4):
+        angle = 45 + i * 90
+
+        profile = create_hollow_profile(
+            profile_length=diagonal_profile_length,
+            prifile_depth=print_bed_undercarriage_profiles_width,
+            profile_height=print_bed_undercarriage_profiles_height,
+            wall_thickness=print_bed_undercarriage_profiles_wall,
+        )
+
+        profile = translate(
+            print_bed_undercarriage_central_annulus_diameter / 2
+            - print_bed_undercarriage_profiles_wall,
+            -print_bed_undercarriage_profiles_width / 2,
+            0,
+        )(profile)
+        profile = rotate(angle)(profile)
+        diagonal_profiles = diagonal_profiles.fuse(profile)
+
+    diagonal_profiles = align(diagonal_profiles, central_annulus, Alignment.CENTER)
+
+    undercarriage = undercarriage.fuse(diagonal_profiles)
+
+    all_mount_annulus = PartCollector()
+    for i in range(4):
+
+        angle = i * 90
+
+        mount_annulus = create_hollow_profile_ring(
+            outer_diameter=print_bed_undercarriage_mount_tower_annulus_diameter,
+            profile_depth=print_bed_undercarriage_profiles_width,
+            profile_height=print_bed_undercarriage_profiles_height,
+            wall_thickness=print_bed_undercarriage_profiles_wall,
+            angle=90,
+        )
+        mount_annulus = rotate(180)(mount_annulus)
+
+        mount_annulus = translate(
+            print_bed_mount_hole_pitch / 2, print_bed_mount_hole_pitch / 2, 0
+        )(mount_annulus)
+
+        mount_annulus = rotate(angle)(mount_annulus)
+
+        all_mount_annulus = all_mount_annulus.fuse(mount_annulus)
+
+    all_mount_annulus = align(all_mount_annulus, central_annulus, Alignment.CENTER)
+    undercarriage = undercarriage.fuse(all_mount_annulus)
 
     retval = LeaderFollowersCuttersPart(undercarriage)
 
@@ -212,6 +274,25 @@ def main():
     # profile_ring = translate(0, -200, 0)(profile_ring)
 
     # parts.add(profile_ring, "profile_ring", flip=False)
+
+    dovetail = create_dovetail_tongue_and_groove(
+        dovetail_width=10.0,
+        length=30.0,
+        box_size_x=18.0,
+        box_size_y=6.0,
+        taper_per_side=1.5,
+        dovetail_clearance=0.2,
+        parts_clearance=0.5,
+        groove_box_size_y=18,
+        front_wall_clearance=0.2,
+    )
+
+    # dovetail = translate(0, 0, 0)(dovetail)
+
+    parts.add(dovetail, "dovetail_leader", flip=False)
+    for name, follower in dovetail.get_named_follower_items():
+        parts.add(follower, name, flip=False)
+
 
     # Arrange and export
     arrange_and_export(

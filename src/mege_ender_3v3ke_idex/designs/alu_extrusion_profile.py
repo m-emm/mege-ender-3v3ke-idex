@@ -60,7 +60,7 @@ add_enum_attrs(
             "slot_corner_radius_mm": 1.2,
             # Hardware assumptions (typical)
             "nominal_hardware": "M5",
-            "center_bore_diameter_mm": 4.2,  # tap drill for M5 (if you model tapping)
+            "center_bore_diameter_mm": 5.1, # as measured on a common 2020 profile 
             "corner_radius_mm": 1.5,
             "recommended_clearance_mm": 0.2,
         },
