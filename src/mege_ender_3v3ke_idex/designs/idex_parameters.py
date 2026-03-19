@@ -262,7 +262,7 @@ print_bed_foil_thickness = 1.6
 print_bed_foil_measured_mass_kg = 0.414
 print_bed_main_measured_mass_kg = 0.760
 print_bed_width = 310
-print_bed_vertical_gap_to_frame = 30
+print_bed_vertical_gap_to_frame = 60
 print_bed_damper_height = 18
 print_bed_damper_diameter = 15
 
@@ -325,7 +325,7 @@ x_axis_rail_length = 450
 x_axis_x_travel = 355
 y_axis_carriage_spacing = 100
 y_axis_profile_extension = 20
-y_axis_rail_spacing = 240
+y_axis_rail_spacing = 280
 z_axis_carriage_back_depth = 40
 z_axis_carriage_back_height = 12
 z_axis_carriage_bearing_inset = 5
@@ -390,7 +390,10 @@ z_axis_z_travel = 300
 
 z_axis_base_z_offset = print_bed_vertical_gap_to_frame - 43
 
-z_axis_carriage_z_offset = print_bed_vertical_gap_to_frame + 93
+# This is a local offset along the Z assembly after the whole rod/profile/motor stack
+# has already been placed with z_axis_base_z_offset. Keep it independent from the
+# bed/frame gap so raising the bed lifts the whole Z system only once.
+z_axis_carriage_z_offset = 123
 
 
 tool_head_mount_y_extension = tool_head_mount_side_plate_depth + 1
