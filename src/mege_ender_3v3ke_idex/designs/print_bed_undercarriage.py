@@ -52,7 +52,15 @@ print_bed_mount_tower_clearance = 0.2
 print_bed_mount_tower_screw_size = "M5"
 print_bed_mount_tower_screw_length = 10
 
+print_bed_undercarriage_num_dovetails_per_side = 3
+print_bed_undercarriage_dovetail_width = 10
 
+print_bed_undercarriage_dovetail_clearance = 0.2
+print_bed_undercarriage_dovetail_parts_clearance = 0.05
+print_bed_undercarriage_dovetail_box_size_y = 2 * print_bed_undercarriage_profiles_wall
+
+
+print_bed_undercarriage_dovetail_front_clearance = 0.2
 
 _logger = logging.getLogger(__name__)
 
@@ -338,6 +346,74 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
 
     back_right_uc, front_right_uc = cut_in_two(right_uc, cut_normal=(0, 1, 0))
 
+    uc_parts = [front_left_uc, front_right_uc, back_right_uc, back_left_uc]
+
+    all_dovetails_fused = PartCollector()
+    all_dovetails_list = []
+    all_prefixed_dovetails_list = []
+    dovetail_pitch = (
+        straight_profile_length + print_bed_undercarriage_profiles_width
+    ) / (print_bed_undercarriage_num_dovetails_per_side)
+
+    for i, uc in enumerate(uc_parts):
+        previous_uc = uc_parts[(i - 1) % len(uc_parts)]
+        for k in range(print_bed_undercarriage_num_dovetails_per_side):
+            dovetail = create_dovetail_tongue_and_groove(
+                dovetail_width=print_bed_undercarriage_dovetail_width,
+                length=print_bed_undercarriage_profiles_height,
+                box_size_x=1.5 * print_bed_undercarriage_dovetail_width,
+                box_size_y=print_bed_undercarriage_dovetail_box_size_y,
+                taper_per_side=1.5,
+                dovetail_clearance=print_bed_undercarriage_dovetail_clearance,
+                parts_clearance=print_bed_undercarriage_dovetail_parts_clearance,
+                groove_box_size_y=print_bed_undercarriage_dovetail_box_size_y
+                + print_bed_undercarriage_dovetail_front_clearance
+                + print_bed_undercarriage_profiles_wall,
+                front_wall_clearance=print_bed_undercarriage_dovetail_front_clearance,
+            )
+
+            dovetail = translate(
+                print_bed_undercarriage_central_annulus_diameter / 2
+                + k * dovetail_pitch,
+                0,
+                0,
+            )(dovetail)
+            dovetail = rotate(-i * 90)(dovetail)
+            all_dovetails_list.append(dovetail)
+            dovetail = dovetail.prefixed_copy(f"uc_{i}_dovetail_{k}")
+            all_prefixed_dovetails_list.append(dovetail)
+            all_dovetails_fused = all_dovetails_fused.fuse(dovetail)
+
+    dovetails_aligner = align_translation(
+        all_dovetails_fused,
+        central_annulus,
+        Alignment.CENTER,
+    )
+
+    all_dovetails_list = [
+        dovetails_aligner(dovetail) for dovetail in all_dovetails_list
+    ]
+
+    dovetail_counter = 0
+    uc_dovetailed_parts = []
+    for i, uc in enumerate(uc_parts):
+        previous_uc_index = (i - 1) % len(uc_parts)
+
+        for k in range(print_bed_undercarriage_num_dovetails_per_side):
+            dovetail = all_dovetails_list[dovetail_counter]
+            dovetail_counter += 1
+
+            uc_parts[previous_uc_index] = dovetail.use_as_cutter_on(
+                uc_parts[previous_uc_index]
+            )
+            uc_parts[previous_uc_index] = uc_parts[previous_uc_index].fuse(
+                dovetail.get_follower_part_by_name("groove_part")
+            )
+
+            uc_parts[i] = uc_parts[i].fuse(dovetail.leader)
+
+    front_left_uc, front_right_uc, back_right_uc, back_left_uc = uc_parts
+
     retval.add_named_follower(front_left_uc.leader, "front_left_uc")
     retval.add_named_follower(front_right_uc.leader, "front_right_uc")
     retval.add_named_follower(back_left_uc.leader, "back_left_uc")
@@ -380,7 +456,7 @@ def main():
 
     uc_center = get_bounding_box_center(undercarriage)
 
-    explosion_factor = 0.1
+    explosion_factor = 0.001
 
     # parts.add(
     #     undercarriage, "print_bed_undercarriage", flip=False, skip_in_production=False
