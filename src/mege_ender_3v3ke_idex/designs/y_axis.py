@@ -15,11 +15,20 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     create_alu_extrusion_profile,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.metrics_collector import record_length_metric
+from mege_ender_3v3ke_idex.designs.metrics_collector import (
+    Material,
+    log_metrics_report,
+    record_length_metric,
+    record_measured_mass_metric,
+    record_weight_metric,
+    reset_metrics,
+)
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_rail_with_carriages
+from mege_ender_3v3ke_idex.designs.print_bed import create_print_bed
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
+
 
 # Production mode from environment variable
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
@@ -34,51 +43,29 @@ PROCESS_DATA = {
 }
 
 
-def create_print_bed():
+def _record_weight_for_part(part, *, material: Material, part_id: str):
+    record_weight_metric(
+        Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
+        material,
+        get_volume(part),
+        part_id=part_id,
+    )
 
-    plate = create_box(print_bed_width, print_bed_depth, print_bed_thickness)
 
-    inset = (print_bed_depth - print_bed_mount_hole_pitch) / 2
+def _record_y_axis_carriage_weight_metrics(y_axis):
+    carriage_volume_mm3 = 0.0
+    for name, part in y_axis.get_named_follower_items():
+        if "carriage" not in name:
+            continue
+        carriage_volume_mm3 += get_volume(part)
 
-    retval = LeaderFollowersCuttersPart(plate)
-
-    for lr in [Alignment.EDGE_LEFT, Alignment.EDGE_RIGHT]:
-        for fb in [Alignment.EDGE_FRONT, Alignment.EDGE_BACK]:
-
-            hole_drill = create_cylinder(print_bed_mount_hole_diameter / 2, BIG_THING)
-            hole_drill = align(hole_drill, plate, Alignment.CENTER, axes=[2])
-            hole_drill = align(hole_drill, plate, lr)
-            hole_drill = align(hole_drill, plate, fb)
-            hole_drill = translate(-inset * lr.sign, -inset * fb.sign, 0)(hole_drill)
-
-            retval = retval.cut(hole_drill)
-
-            screw = create_conical_head_screw(
-                print_bed_mount_screw_size, print_bed_mount_screw_length
-            )
-
-            screw = align(screw, hole_drill, Alignment.CENTER)
-            screw = align(screw, plate, Alignment.TOP)
-
-            retval.add_named_non_production_part(screw, f"screw_{lr.name}_{fb.name}")
-            retval = retval.cut(screw)
-
-            damper = create_cylinder(
-                print_bed_damper_diameter / 2, print_bed_damper_height
-            )
-
-            damper = align(damper, hole_drill, Alignment.CENTER)
-            damper = align(damper, plate, Alignment.STACK_BOTTOM)
-            damper = damper.cut(hole_drill)
-
-            retval.add_named_non_production_part(damper, f"damper_{lr.name}_{fb.name}")
-
-    foil = create_box(print_bed_width, print_bed_depth, print_bed_foil_thickness)
-    foil = align(foil, plate, Alignment.CENTER, axes=[0, 1])
-    foil = align(foil, plate, Alignment.STACK_TOP)
-    retval.add_named_non_production_part(foil, "print_bed_foil")
-
-    return retval
+    if carriage_volume_mm3 > 0:
+        record_weight_metric(
+            Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
+            Material.STEEL,
+            carriage_volume_mm3,
+            part_id="mgn12ca_carriages",
+        )
 
 
 def create_positioned_print_bed(y_axis, frame):
@@ -167,7 +154,10 @@ def create_y_axis():
 
         rails.append(rail)
 
-    return rails[0].fuse(rails[1])
+    y_axis = rails[0].fuse(rails[1])
+    _record_y_axis_carriage_weight_metrics(y_axis)
+
+    return y_axis
 
 
 def main():
@@ -177,6 +167,7 @@ def main():
     )
 
     logging.basicConfig(level=logging.INFO)
+    reset_metrics()
 
     _logger.info(f"y_axis_profile_length: {y_axis_profile_length}")
     _logger.info(f"y_axis_rail_length: {y_axis_rail_length}")
@@ -232,6 +223,13 @@ def main():
             _logger.info(f"NOT Using bed_animation for {name}")
 
         parts.add(npp, name, flip=False, skip_in_production=True, animation=animation)
+
+    log_metrics_report(_logger)
+    _logger.info(
+        "Y-axis moving mass currently includes the bed plate, magnetic foil, MGN12CA carriages, and bed screws. "
+        "The bed plate and foil use measured masses. The linear rails do not move and are excluded. "
+        "The bed holder is not implemented yet, and dampers are currently excluded."
+    )
 
     # Arrange and export
     arrange_and_export(
