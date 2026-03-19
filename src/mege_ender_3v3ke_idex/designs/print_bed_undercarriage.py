@@ -101,15 +101,16 @@ PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_04_HS)
 PROCESS_DATA["process_overrides"].update(
     {
         "brim_type": "no_brim",
-        "enable_support": "0",
+        "enable_support": "1",
         "support_object_first_layer_gap": 0.8,
-        "external_perimeter_speed": "75",
-        "fan_max_speed": "25",
-        "fan_min_speed": "10",
-        "outer_wall_speed": "75",
+        # "external_perimeter_speed": "75",
+        # "fan_max_speed": "25",
+        # "fan_min_speed": "10",
+        # "outer_wall_speed": "75",
         "sparse_infill_density": "75%",
         "support_critical_regions_only": "1",
         "support_interface_spacing": "0.8",
+        "support_object_xy_distance": "1.0",
         "support_on_build_plate_only": "1",
         "support_threshold_angle": "30",
         "support_top_z_distance": "0.3",
@@ -703,7 +704,7 @@ def main():
     # Create the part
     undercarriage = create_print_bed_undercarriage(print_bed)
 
-    # undercarriage = scale(0.4)(undercarriage) # small prototype
+    # undercarriage = scale(0.33)(undercarriage) # small prototype
 
     cut_normal = [1, 1, 0]
     # print_bed, _ = cut_in_two(print_bed, cut_normal=cut_normal)
