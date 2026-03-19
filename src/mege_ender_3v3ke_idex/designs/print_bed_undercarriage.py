@@ -35,6 +35,10 @@ from mege_ender_3v3ke_idex.designs.print_bed import (
 )
 from shellforgepy.simple import *
 
+from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
+    create_four_screws_mount_assembly,
+)
+
 print_bed_undercarriage_profiles_height = 30
 print_bed_undercarriage_profiles_width = 12
 print_bed_undercarriage_profiles_wall = 1.8
@@ -58,6 +62,13 @@ print_bed_undercarriage_dovetail_width = 10
 print_bed_undercarriage_dovetail_clearance = 0.2
 print_bed_undercarriage_dovetail_parts_clearance = 0.05
 print_bed_undercarriage_dovetail_box_size_y = 2 * print_bed_undercarriage_profiles_wall
+
+print_bed_undercarriage_outside_flange_size = 15
+print_bed_undercarriage_joining_screw_size = "M3"
+print_bed_undercarriage_joining_screw_length = 14
+print_bed_undercarriage_joining_screw_nut_clearance = 0.2
+print_bed_undercarriage_joining_screw_cylinder_head_clearance = 0.5
+print_bed_undercarriage_joining_screw_inset = 5
 
 
 print_bed_undercarriage_dovetail_front_clearance = 0.2
@@ -278,7 +289,25 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
         + print_bed_undercarriage_profiles_wall
     )
 
+    dovetail_pitch = (
+        straight_profile_length + print_bed_undercarriage_profiles_width
+    ) / (print_bed_undercarriage_num_dovetails_per_side)
+
+    flange_part_length = (
+        straight_profile_length
+        - dovetail_pitch / 2
+        + print_bed_undercarriage_outside_flange_size
+        + print_bed_undercarriage_profiles_width
+    )
+    flange_part_gap_lentgth = (
+        flange_part_length
+        - print_bed_undercarriage_outside_flange_size
+        - dovetail_pitch
+    )
+
     straight_profiles = PartCollector()
+    mount_screw_assemblies_list = []
+    msc_names = set()
     for i in range(4):
         angle = i * 90
         straight_profile = create_hollow_profile(
@@ -305,20 +334,87 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
 
         straight_profile = straight_profile.fuse(straight_profile_wall)
 
-        straight_profile = translate(
+        flange_part = create_box(
+            flange_part_length,
+            print_bed_undercarriage_profiles_width,
+            print_bed_undercarriage_profiles_height,
+        )
+        flange_part = align(flange_part, straight_profile, Alignment.CENTER)
+        flange_part = align(flange_part, straight_profile, Alignment.RIGHT)
+        flange_part = translate(print_bed_undercarriage_outside_flange_size, 0, 0)(
+            flange_part
+        )
+
+        mount_screw_assembly = create_four_screws_mount_assembly(
+            flange_part,
+            screw_size=print_bed_undercarriage_joining_screw_size,
+            screw_length=print_bed_undercarriage_joining_screw_length,
+            screw_direction=Alignment.FRONT,
+            with_nut_cutter=True,
+            nut_cutter_clearance=print_bed_undercarriage_joining_screw_nut_clearance,
+            cylinder_head_cutter_clearance=print_bed_undercarriage_joining_screw_cylinder_head_clearance,
+            width_inset=print_bed_undercarriage_joining_screw_inset,
+            length_inset=print_bed_undercarriage_joining_screw_inset,
+            clearance_type="loose",
+        )
+
+        msc_name = f"flange_mount_screw_assembly_{i}"
+        if msc_name in msc_names:
+            raise ValueError(f"Duplicate mount screw assembly name: {msc_name}")
+
+        mount_screw_assembly = mount_screw_assembly.prefixed_copy(msc_name)
+        msc_names.add(msc_name)
+
+        mount_screw_assemblies_list.append(mount_screw_assembly)
+
+        flange_part = mount_screw_assembly.use_as_cutter_on(flange_part)
+        straight_profile = mount_screw_assembly.use_as_cutter_on(straight_profile)
+
+        flange_part_gap_cutter = create_box(
+            flange_part_gap_lentgth, BIG_THING, BIG_THING
+        )
+        flange_part_gap_cutter = align(
+            flange_part_gap_cutter, flange_part, Alignment.CENTER
+        )
+        flange_part_gap_cutter = align(
+            flange_part_gap_cutter, flange_part, Alignment.LEFT
+        )
+        flange_part_gap_cutter = translate(dovetail_pitch, 0, 0)(flange_part_gap_cutter)
+        flange_part = flange_part.cut(flange_part_gap_cutter)
+
+        straight_profile = straight_profile.fuse(flange_part)
+
+        straight_profile = LeaderFollowersCuttersPart(straight_profile)
+        straight_profile = straight_profile.merge_except_leader(mount_screw_assembly)
+
+        straight_profile_translator = translate(
             print_bed_undercarriage_central_annulus_diameter / 2
             - print_bed_undercarriage_profiles_wall,
             -print_bed_undercarriage_profiles_width / 2,
             0,
-        )(straight_profile)
+        )
+        straight_profile, flange_part, mount_screw_assembly = [
+            straight_profile_translator(part)
+            for part in (straight_profile, flange_part, mount_screw_assembly)
+        ]
 
-        straight_profile = rotate(angle)(straight_profile)
+        rotator = rotate(angle)
+        straight_profile, flange_part, mount_screw_assembly = [
+            rotator(part)
+            for part in (straight_profile, flange_part, mount_screw_assembly)
+        ]
+
         straight_profiles = straight_profiles.fuse(straight_profile)
 
     straight_profiles = align(straight_profiles, central_annulus, Alignment.CENTER)
-    undercarriage = undercarriage.fuse(straight_profiles)
+    undercarriage = LeaderFollowersCuttersPart(undercarriage)
 
-    retval = LeaderFollowersCuttersPart(undercarriage)
+    undercarriage = undercarriage.fuse(straight_profiles)
+    retval = undercarriage
+
+    # for mount_screw_assembly in mount_screw_assemblies_list:
+    #     for name, npp in mount_screw_assembly.get_named_non_production_part_items():
+    #         retval.add_named_non_production_part(npp, name)
 
     for name, npp in print_bed.get_named_non_production_part_items():
         if not name.startswith("damper_"):
@@ -351,12 +447,7 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
     all_dovetails_fused = PartCollector()
     all_dovetails_list = []
     all_prefixed_dovetails_list = []
-    dovetail_pitch = (
-        straight_profile_length + print_bed_undercarriage_profiles_width
-    ) / (print_bed_undercarriage_num_dovetails_per_side)
-
     for i, uc in enumerate(uc_parts):
-        previous_uc = uc_parts[(i - 1) % len(uc_parts)]
         for k in range(print_bed_undercarriage_num_dovetails_per_side):
             dovetail = create_dovetail_tongue_and_groove(
                 dovetail_width=print_bed_undercarriage_dovetail_width,
@@ -406,9 +497,9 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
             uc_parts[previous_uc_index] = dovetail.use_as_cutter_on(
                 uc_parts[previous_uc_index]
             )
-            uc_parts[previous_uc_index] = uc_parts[previous_uc_index].fuse(
-                dovetail.get_follower_part_by_name("groove_part")
-            )
+            groove_part = dovetail.get_follower_part_by_name("groove_part")
+            groove_part = undercarriage.use_as_cutter_on(groove_part)
+            uc_parts[previous_uc_index] = uc_parts[previous_uc_index].fuse(groove_part)
 
             uc_parts[i] = uc_parts[i].fuse(dovetail.leader)
 
@@ -461,6 +552,9 @@ def main():
     # parts.add(
     #     undercarriage, "print_bed_undercarriage", flip=False, skip_in_production=False
     # )
+
+    used_names = {}
+
     for name, follower in undercarriage.get_named_follower_items():
 
         skip_in_production = True
@@ -475,7 +569,29 @@ def main():
 
         follower = translate(*translation_vector)(follower)
 
+        if name in used_names:
+            raise ValueError(
+                f"Duplicate follower name: {name}, already used for {used_names[name]}"
+            )
+
         parts.add(follower, name, flip=False, skip_in_production=skip_in_production)
+
+        used_names[name] = "follower"
+
+    for name, npp in undercarriage.get_named_non_production_part_items():
+        if "nut" in name:
+            continue
+        npp_center = get_bounding_box_center(npp)
+        translation_vector = np.array(npp_center) - np.array(uc_center)
+        translation_vector = translation_vector * explosion_factor
+        npp = translate(*translation_vector)(npp)
+
+        if name in used_names:
+            raise ValueError(
+                f"Duplicate non-production part name: {name}, already used for {used_names[name]}"
+            )
+        parts.add(npp, name, flip=False, skip_in_production=True)
+        used_names[name] = "undercarriage_npp"
 
     # uc_parts_fused = PartCollector()
     # for name, npp in undercarriage.get_named_non_production_part_items():
@@ -484,12 +600,12 @@ def main():
     # uc_parts_fused, _ = cut_in_two(uc_parts_fused, cut_normal=cut_normal)
     # parts.add(uc_parts_fused, "print_bed_undercarriage_npps", flip=False)
 
-    for name, npp in undercarriage.get_named_non_production_part_items():
-        npp_center = get_bounding_box_center(npp)
-        translation_vector = np.array(npp_center) - np.array(uc_center)
-        translation_vector = translation_vector * explosion_factor
-        npp = translate(*translation_vector)(npp)
-        parts.add(npp, name, flip=False, skip_in_production=True)
+    # for name, npp in undercarriage.get_named_non_production_part_items():
+    #     npp_center = get_bounding_box_center(npp)
+    #     translation_vector = np.array(npp_center) - np.array(uc_center)
+    #     translation_vector = translation_vector * explosion_factor
+    #     npp = translate(*translation_vector)(npp)
+    #     parts.add(npp, name, flip=False, skip_in_production=True)
 
     log_metrics_report(_logger)
     _logger.info(
@@ -497,23 +613,23 @@ def main():
         "to y_axis_moving_mass. Dampers are currently excluded."
     )
 
-    dovetail = create_dovetail_tongue_and_groove(
-        dovetail_width=10.0,
-        length=30.0,
-        box_size_x=18.0,
-        box_size_y=6.0,
-        taper_per_side=1.5,
-        dovetail_clearance=0.2,
-        parts_clearance=0.5,
-        groove_box_size_y=18,
-        front_wall_clearance=0.2,
-    )
+    # dovetail = create_dovetail_tongue_and_groove(
+    #     dovetail_width=10.0,
+    #     length=30.0,
+    #     box_size_x=18.0,
+    #     box_size_y=6.0,
+    #     taper_per_side=1.5,
+    #     dovetail_clearance=0.2,
+    #     parts_clearance=0.5,
+    #     groove_box_size_y=18,
+    #     front_wall_clearance=0.2,
+    # )
 
-    # dovetail = translate(0, 0, 0)(dovetail)
+    # # dovetail = translate(0, 0, 0)(dovetail)
 
-    parts.add(dovetail, "dovetail_leader", flip=False, skip_in_production=True)
-    for name, follower in dovetail.get_named_follower_items():
-        parts.add(follower, name, flip=False, skip_in_production=True)
+    # parts.add(dovetail, "dovetail_leader", flip=False, skip_in_production=True)
+    # for name, follower in dovetail.get_named_follower_items():
+    #     parts.add(follower, name, flip=False, skip_in_production=True)
 
     # Arrange and export
     arrange_and_export(
