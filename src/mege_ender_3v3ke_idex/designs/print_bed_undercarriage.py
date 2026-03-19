@@ -56,6 +56,10 @@ print_bed_mount_tower_clearance = 0.2
 print_bed_mount_tower_screw_size = "M5"
 print_bed_mount_tower_screw_length = 10
 
+print_bed_undercarriage_mount_tower_holder_size = 30
+print_bed_undercarriage_mount_tower_holder_fillet_radius = 5
+print_bed_undercarriage_mount_tower_holder_mount_screw_size = "M5"
+
 print_bed_undercarriage_num_dovetails_per_side = 3
 print_bed_undercarriage_dovetail_width = 10
 
@@ -436,6 +440,45 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
 
         retval.add_named_non_production_part(mount_tower, mount_tower_name)
 
+        mount_tower_holder = create_filleted_box(
+            print_bed_undercarriage_mount_tower_holder_size,
+            print_bed_undercarriage_mount_tower_holder_size,
+            print_bed_undercarriage_profiles_height,
+            fillet_radius=print_bed_undercarriage_mount_tower_holder_fillet_radius,
+            no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+        )
+        mount_tower_cutter = create_box(
+            print_bed_mount_tower_size + 2 * print_bed_mount_tower_clearance,
+            print_bed_mount_tower_size + 2 * print_bed_mount_tower_clearance,
+            BIG_THING,
+        )
+        mount_tower_cutter = align(
+            mount_tower_cutter, mount_tower_holder, Alignment.CENTER
+        )
+        mount_tower_holder = mount_tower_holder.cut(mount_tower_cutter)
+
+        for p in [0, 1]:
+            mount_tower_screw_cutter = create_cylinder(
+                MScrew.from_size(print_bed_mount_tower_screw_size).clearance_hole_loose
+                / 2,
+                BIG_THING,
+            )
+
+            mount_tower_screw_cutter = rotate(90, axis=(0, 1, 0))(
+                mount_tower_screw_cutter
+            )
+            if p == 0:
+                mount_tower_screw_cutter = rotate(90)(mount_tower_screw_cutter)
+
+            mount_tower_screw_cutter = align(
+                mount_tower_screw_cutter, mount_tower_holder, Alignment.CENTER
+            )
+            mount_tower_holder = mount_tower_holder.cut(mount_tower_screw_cutter)
+
+        mount_tower_holder = align(mount_tower_holder, mount_tower, Alignment.CENTER)
+
+        retval = retval.fuse(mount_tower_holder)
+
     left_uc, right_uc = cut_in_two(retval, cut_normal=(1, 0, 0))
 
     back_left_uc, front_left_uc = cut_in_two(left_uc, cut_normal=(0, 1, 0))
@@ -526,6 +569,8 @@ def main():
     # Create the part
     undercarriage = create_print_bed_undercarriage(print_bed)
 
+    # undercarriage = scale(0.4)(undercarriage) # small prototype
+
     cut_normal = [1, 1, 0]
     # print_bed, _ = cut_in_two(print_bed, cut_normal=cut_normal)
     # undercarriage_cut, _ = cut_in_two(undercarriage, cut_normal=cut_normal)
@@ -553,8 +598,6 @@ def main():
     #     undercarriage, "print_bed_undercarriage", flip=False, skip_in_production=False
     # )
 
-    used_names = {}
-
     for name, follower in undercarriage.get_named_follower_items():
 
         skip_in_production = True
@@ -569,14 +612,7 @@ def main():
 
         follower = translate(*translation_vector)(follower)
 
-        if name in used_names:
-            raise ValueError(
-                f"Duplicate follower name: {name}, already used for {used_names[name]}"
-            )
-
         parts.add(follower, name, flip=False, skip_in_production=skip_in_production)
-
-        used_names[name] = "follower"
 
     for name, npp in undercarriage.get_named_non_production_part_items():
         if "nut" in name:
@@ -586,26 +622,7 @@ def main():
         translation_vector = translation_vector * explosion_factor
         npp = translate(*translation_vector)(npp)
 
-        if name in used_names:
-            raise ValueError(
-                f"Duplicate non-production part name: {name}, already used for {used_names[name]}"
-            )
         parts.add(npp, name, flip=False, skip_in_production=True)
-        used_names[name] = "undercarriage_npp"
-
-    # uc_parts_fused = PartCollector()
-    # for name, npp in undercarriage.get_named_non_production_part_items():
-    #     uc_parts_fused = uc_parts_fused.fuse(npp)
-
-    # uc_parts_fused, _ = cut_in_two(uc_parts_fused, cut_normal=cut_normal)
-    # parts.add(uc_parts_fused, "print_bed_undercarriage_npps", flip=False)
-
-    # for name, npp in undercarriage.get_named_non_production_part_items():
-    #     npp_center = get_bounding_box_center(npp)
-    #     translation_vector = np.array(npp_center) - np.array(uc_center)
-    #     translation_vector = translation_vector * explosion_factor
-    #     npp = translate(*translation_vector)(npp)
-    #     parts.add(npp, name, flip=False, skip_in_production=True)
 
     log_metrics_report(_logger)
     _logger.info(
@@ -613,25 +630,6 @@ def main():
         "to y_axis_moving_mass. Dampers are currently excluded."
     )
 
-    # dovetail = create_dovetail_tongue_and_groove(
-    #     dovetail_width=10.0,
-    #     length=30.0,
-    #     box_size_x=18.0,
-    #     box_size_y=6.0,
-    #     taper_per_side=1.5,
-    #     dovetail_clearance=0.2,
-    #     parts_clearance=0.5,
-    #     groove_box_size_y=18,
-    #     front_wall_clearance=0.2,
-    # )
-
-    # # dovetail = translate(0, 0, 0)(dovetail)
-
-    # parts.add(dovetail, "dovetail_leader", flip=False, skip_in_production=True)
-    # for name, follower in dovetail.get_named_follower_items():
-    #     parts.add(follower, name, flip=False, skip_in_production=True)
-
-    # Arrange and export
     arrange_and_export(
         parts.as_list(),
         script_file=__file__,
