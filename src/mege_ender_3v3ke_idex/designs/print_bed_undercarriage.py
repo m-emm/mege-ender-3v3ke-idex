@@ -211,6 +211,35 @@ def create_print_bed_undercarriage(print_bed):
     all_mount_annulus = align(all_mount_annulus, central_annulus, Alignment.CENTER)
     undercarriage = undercarriage.fuse(all_mount_annulus)
 
+    straight_profile_length = (
+        print_bed_mount_hole_pitch / 2
+        - print_bed_undercarriage_central_annulus_diameter / 2
+        + 2 * print_bed_undercarriage_profiles_wall
+    )
+
+    straight_profiles = PartCollector()
+    for i in range(4):
+        angle = i * 90
+        straight_profile = create_hollow_profile(
+            profile_length=straight_profile_length,
+            prifile_depth=print_bed_undercarriage_profiles_width,
+            profile_height=print_bed_undercarriage_profiles_height,
+            wall_thickness=print_bed_undercarriage_profiles_wall,
+        )
+
+        straight_profile = translate(
+            print_bed_undercarriage_central_annulus_diameter / 2
+            - print_bed_undercarriage_profiles_wall,
+            -print_bed_undercarriage_profiles_width / 2,
+            0,
+        )(straight_profile)
+
+        straight_profile = rotate(angle)(straight_profile)
+        straight_profiles = straight_profiles.fuse(straight_profile)
+
+    straight_profiles = align(straight_profiles, central_annulus, Alignment.CENTER)
+    undercarriage = undercarriage.fuse(straight_profiles)
+
     retval = LeaderFollowersCuttersPart(undercarriage)
 
     for name, npp in print_bed.get_named_non_production_part_items():
@@ -240,40 +269,35 @@ def main():
     undercarriage = create_print_bed_undercarriage(print_bed)
 
     cut_normal = [1, 1, 0]
-    print_bed, _ = cut_in_two(print_bed, cut_normal=cut_normal)
-    undercarriage_cut, _ = cut_in_two(undercarriage, cut_normal=cut_normal)
+    # print_bed, _ = cut_in_two(print_bed, cut_normal=cut_normal)
+    # undercarriage_cut, _ = cut_in_two(undercarriage, cut_normal=cut_normal)
 
-    parts.add(print_bed, "print_bed", flip=False, skip_in_production=True)
-    npps_fused = PartCollector()
+    # parts.add(print_bed, "print_bed", flip=False, skip_in_production=True)
+    # npps_fused = PartCollector()
     for name, npp in print_bed.get_named_non_production_part_items():
 
-        # parts.add(npp, name, flip=False, skip_in_production=True)
-        npps_fused = npps_fused.fuse(npp)
+        if "foil" in name:
+            continue
 
-    npps_fused, _ = cut_in_two(npps_fused, cut_normal=cut_normal)
-    parts.add(npps_fused, "print_bed_npps", flip=False, skip_in_production=True)
+        parts.add(npp, name, flip=False, skip_in_production=True)
+        # npps_fused = npps_fused.fuse(npp)
 
-    parts.add(undercarriage_cut, "print_bed_undercarriage", flip=False)
+    # npps_fused, _ = cut_in_two(npps_fused, cut_normal=cut_normal)
+    # parts.add(npps_fused, "print_bed_npps", flip=False, skip_in_production=True)
 
-    uc_parts_fused = PartCollector()
+    # parts.add(undercarriage_cut, "print_bed_undercarriage", flip=False)
+
+    parts.add(undercarriage, "print_bed_undercarriage", flip=False)
+
+    # uc_parts_fused = PartCollector()
+    # for name, npp in undercarriage.get_named_non_production_part_items():
+    #     uc_parts_fused = uc_parts_fused.fuse(npp)
+
+    # uc_parts_fused, _ = cut_in_two(uc_parts_fused, cut_normal=cut_normal)
+    # parts.add(uc_parts_fused, "print_bed_undercarriage_npps", flip=False)
+
     for name, npp in undercarriage.get_named_non_production_part_items():
-        uc_parts_fused = uc_parts_fused.fuse(npp)
-
-    uc_parts_fused, _ = cut_in_two(uc_parts_fused, cut_normal=cut_normal)
-    parts.add(uc_parts_fused, "print_bed_undercarriage_npps", flip=False)
-
-    # profile_ring = create_hollow_profile_ring(
-    #     outer_diameter=print_bed_undercarriage_bed_mount_annulus_diameter,
-    #     profile_depth=print_bed_undercarriage_profiles_width,
-    #     profile_height=print_bed_undercarriage_profiles_height,
-    #     wall_thickness=print_bed_undercarriage_profiles_wall,
-    #     angle=110,
-    # )
-    # profile_ring, _ = cut_in_two(profile_ring, cut_normal=((0, 0, 1)))
-
-    # profile_ring = translate(0, -200, 0)(profile_ring)
-
-    # parts.add(profile_ring, "profile_ring", flip=False)
+        parts.add(npp, name, flip=False, skip_in_production=True)
 
     dovetail = create_dovetail_tongue_and_groove(
         dovetail_width=10.0,
@@ -293,13 +317,14 @@ def main():
     for name, follower in dovetail.get_named_follower_items():
         parts.add(follower, name, flip=False)
 
-
     # Arrange and export
     arrange_and_export(
         parts.as_list(),
         script_file=__file__,
         prod=PROD,
         process_data=PROCESS_DATA,
+        export_stl=False,
+        export_individual_parts=False,
     )
 
     _logger.info("print_bed_undercarriage created successfully!")
