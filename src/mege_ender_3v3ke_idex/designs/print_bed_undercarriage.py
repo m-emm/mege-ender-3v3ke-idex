@@ -31,6 +31,7 @@ from mege_ender_3v3ke_idex.designs.metrics_collector import (
     record_weight_metric,
     reset_metrics,
 )
+from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_carriage
 from mege_ender_3v3ke_idex.designs.print_bed import (
     Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
     create_print_bed,
@@ -85,6 +86,10 @@ print_bed_undercarriage_belt_clamp_clamp_length = 30
 print_bed_undercarriage_belt_clamp_x_offset = 0.5
 
 print_bed_undercarriage_dovetail_front_clearance = 0.2
+
+print_bed_undercarriage_carriage_mount_plate_thickness = 5
+print_bed_undercarriage_carriage_mount_plate_oversize = 4
+
 
 _logger = logging.getLogger(__name__)
 
@@ -423,6 +428,89 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
     undercarriage = LeaderFollowersCuttersPart(undercarriage)
 
     undercarriage = undercarriage.fuse(straight_profiles)
+
+    carriages_map = {}
+    carriages_fused = PartCollector()
+
+    for fb in [Alignment.FRONT, Alignment.BACK]:
+        for lr in [Alignment.LEFT, Alignment.RIGHT]:
+
+            carriage = create_mgn12ca_carriage()
+            carriage = rotate(90)(carriage)
+
+            carriage = translate(
+                lr.sign * y_axis_rail_spacing / 2,
+                fb.sign * y_axis_carriage_spacing / 2,
+                0,
+            )(carriage)
+
+            carriage_name = f"carriage_{fb.name.lower()}_{lr.name.lower()}"
+
+            carriages_map[carriage_name] = carriage
+
+            carriage = carriage.prefixed_copy(
+                f"carriage_{fb.name.lower()}_{lr.name.lower()}"
+            )
+
+            carriages_fused = carriages_fused.fuse(carriage)
+
+    carriages_aligner_1 = align_translation(
+        carriages_fused, central_annulus, Alignment.CENTER
+    )
+
+    carriages_fused = carriages_aligner_1(carriages_fused)
+    carriages_aligner_2 = align_translation(
+        carriages_fused, central_annulus, Alignment.STACK_BOTTOM
+    )
+    carriages_fused = carriages_aligner_2(carriages_fused)
+
+    new_carriages_map = {}
+    for name, carriage in carriages_map.items():
+        carriage = carriages_aligner_1(carriage)
+        carriage = carriages_aligner_2(carriage)
+        new_carriages_map[name] = carriage
+
+    mount_plates = PartCollector()
+    for name, carriage in new_carriages_map.items():
+
+
+
+
+
+        carriage_size = get_bounding_box_size(carriage)
+        carriage_mount_plate = create_box(
+            carriage_size[0] + 2 * print_bed_undercarriage_carriage_mount_plate_oversize,
+            carriage_size[1] + 2 * print_bed_undercarriage_carriage_mount_plate_oversize,
+            print_bed_undercarriage_profiles_height,
+        )
+        carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.CENTER)
+        carriage_mount_plate = align(
+            carriage_mount_plate, carriage, Alignment.STACK_TOP
+        )
+
+        carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
+        carriage_mount_plate_size = get_bounding_box_size(carriage_mount_plate)
+
+        inner_cutter = create_box(
+            carriage_mount_plate_size[0] - 2 * print_bed_undercarriage_profiles_wall,
+            carriage_mount_plate_size[1] - 2 * print_bed_undercarriage_profiles_wall,
+            BIG_THING,
+        )
+        inner_cutter = align(inner_cutter, carriage_mount_plate, Alignment.CENTER)
+        inner_cutter = align(inner_cutter, carriage_mount_plate, Alignment.BOTTOM)
+        inner_cutter = translate(0, 0, print_bed_undercarriage_carriage_mount_plate_thickness)(inner_cutter)
+
+        carriage_mount_plate = carriage_mount_plate.cut(inner_cutter)
+            
+
+        
+        mount_plates = mount_plates.fuse(carriage_mount_plate)
+
+
+
+
+    undercarriage = undercarriage.fuse(mount_plates)
+
     retval = undercarriage
 
     # for mount_screw_assembly in mount_screw_assemblies_list:
@@ -509,7 +597,7 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
             * (
                 print_bed_undercarriage_central_annulus_diameter / 2
                 + print_bed_undercarriage_belt_clamp_clamp_length / 2
-                - print_bed_undercarriage_profiles_width 
+                - print_bed_undercarriage_profiles_width
             ),
             0,
         )(belt_clamp)
