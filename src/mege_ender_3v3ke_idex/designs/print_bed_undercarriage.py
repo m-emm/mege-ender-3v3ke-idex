@@ -10,6 +10,12 @@ Usage:
 import logging
 import math
 import os
+import numpy as np
+from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401
+    PROCESS_DATA_PETGCF_04_HS,
+    PROCESS_DATA_PLACF_04_HS,
+)
+import copy
 
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
@@ -42,6 +48,10 @@ print_bed_undercarriage_bed_mount_annulus_diameter = 60
 
 print_bed_mount_tower_size = 20
 print_bed_mount_tower_height = print_bed_undercarriage_profiles_height
+print_bed_mount_tower_clearance = 0.2
+print_bed_mount_tower_screw_size = "M5"
+print_bed_mount_tower_screw_length = 10
+
 
 
 _logger = logging.getLogger(__name__)
@@ -49,14 +59,26 @@ _logger = logging.getLogger(__name__)
 # Production mode from environment variable
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
-# Optional slicer process overrides
-PROCESS_DATA = {
-    "filament": "FilamentPLAMegeMaster",
-    "process_overrides": {
-        "nozzle_diameter": "0.6",
-        "layer_height": "0.2",
-    },
-}
+
+PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_04_HS)
+PROCESS_DATA["process_overrides"].update(
+    {
+        "brim_type": "no_brim",
+        "enable_support": "0",
+        "support_object_first_layer_gap": 0.8,
+        "external_perimeter_speed": "75",
+        "fan_max_speed": "25",
+        "fan_min_speed": "10",
+        "outer_wall_speed": "75",
+        "sparse_infill_density": "75%",
+        "support_critical_regions_only": "1",
+        "support_interface_spacing": "0.8",
+        "support_on_build_plate_only": "1",
+        "support_threshold_angle": "30",
+        "support_top_z_distance": "0.3",
+        "wall_loops": "3",
+    }
+)
 
 
 def create_hollow_profile(
@@ -240,6 +262,13 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
         - print_bed_undercarriage_central_annulus_diameter / 2
         + 2 * print_bed_undercarriage_profiles_wall
     )
+    straight_profile_center_wall_length = straight_profile_length
+
+    straight_profile_center_wall_length = (
+        straight_profile_length
+        + print_bed_undercarriage_profiles_width
+        + print_bed_undercarriage_profiles_wall
+    )
 
     straight_profiles = PartCollector()
     for i in range(4):
@@ -250,6 +279,23 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
             profile_height=print_bed_undercarriage_profiles_height,
             wall_thickness=print_bed_undercarriage_profiles_wall,
         )
+
+        straight_profile_wall = create_box(
+            straight_profile_center_wall_length,
+            2 * print_bed_undercarriage_profiles_wall,
+            print_bed_undercarriage_profiles_height,
+        )
+        straight_profile_wall = align(
+            straight_profile_wall, straight_profile, Alignment.CENTER
+        )
+        straight_profile_wall = align(
+            straight_profile_wall, straight_profile, Alignment.RIGHT
+        )
+        straight_profile_wall = translate(
+            2 * print_bed_undercarriage_profiles_wall, 0, 0
+        )(straight_profile_wall)
+
+        straight_profile = straight_profile.fuse(straight_profile_wall)
 
         straight_profile = translate(
             print_bed_undercarriage_central_annulus_diameter / 2
@@ -286,6 +332,17 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
 
         retval.add_named_non_production_part(mount_tower, mount_tower_name)
 
+    left_uc, right_uc = cut_in_two(retval, cut_normal=(1, 0, 0))
+
+    back_left_uc, front_left_uc = cut_in_two(left_uc, cut_normal=(0, 1, 0))
+
+    back_right_uc, front_right_uc = cut_in_two(right_uc, cut_normal=(0, 1, 0))
+
+    retval.add_named_follower(front_left_uc.leader, "front_left_uc")
+    retval.add_named_follower(front_right_uc.leader, "front_right_uc")
+    retval.add_named_follower(back_left_uc.leader, "back_left_uc")
+    retval.add_named_follower(back_right_uc.leader, "back_right_uc")
+
     if record_metrics:
         _record_print_bed_undercarriage_weight_metrics(retval)
 
@@ -321,7 +378,28 @@ def main():
 
     # parts.add(undercarriage_cut, "print_bed_undercarriage", flip=False)
 
-    parts.add(undercarriage, "print_bed_undercarriage", flip=False)
+    uc_center = get_bounding_box_center(undercarriage)
+
+    explosion_factor = 0.1
+
+    # parts.add(
+    #     undercarriage, "print_bed_undercarriage", flip=False, skip_in_production=False
+    # )
+    for name, follower in undercarriage.get_named_follower_items():
+
+        skip_in_production = True
+
+        if name in ("front_left_uc"):
+            skip_in_production = False
+
+        follower_center = get_bounding_box_center(follower)
+
+        translation_vector = np.array(follower_center) - np.array(uc_center)
+        translation_vector = translation_vector * explosion_factor
+
+        follower = translate(*translation_vector)(follower)
+
+        parts.add(follower, name, flip=False, skip_in_production=skip_in_production)
 
     # uc_parts_fused = PartCollector()
     # for name, npp in undercarriage.get_named_non_production_part_items():
@@ -331,6 +409,10 @@ def main():
     # parts.add(uc_parts_fused, "print_bed_undercarriage_npps", flip=False)
 
     for name, npp in undercarriage.get_named_non_production_part_items():
+        npp_center = get_bounding_box_center(npp)
+        translation_vector = np.array(npp_center) - np.array(uc_center)
+        translation_vector = translation_vector * explosion_factor
+        npp = translate(*translation_vector)(npp)
         parts.add(npp, name, flip=False, skip_in_production=True)
 
     log_metrics_report(_logger)
@@ -353,9 +435,9 @@ def main():
 
     # dovetail = translate(0, 0, 0)(dovetail)
 
-    parts.add(dovetail, "dovetail_leader", flip=False)
+    parts.add(dovetail, "dovetail_leader", flip=False, skip_in_production=True)
     for name, follower in dovetail.get_named_follower_items():
-        parts.add(follower, name, flip=False)
+        parts.add(follower, name, flip=False, skip_in_production=True)
 
     # Arrange and export
     arrange_and_export(
@@ -363,7 +445,7 @@ def main():
         script_file=__file__,
         prod=PROD,
         process_data=PROCESS_DATA,
-        export_stl=False,
+        export_stl=PROD,
         export_individual_parts=False,
     )
 
