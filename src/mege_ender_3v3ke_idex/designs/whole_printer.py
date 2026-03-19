@@ -26,7 +26,7 @@ from mege_ender_3v3ke_idex.designs.x_axis import (
 )
 from mege_ender_3v3ke_idex.designs.y_axis import (
     align_y_axis_to_frame,
-    create_positioned_print_bed,
+    create_positioned_print_bed_assembly,
     create_y_axis,
 )
 from mege_ender_3v3ke_idex.designs.z_axis import (
@@ -55,7 +55,7 @@ class WholePrinterAssembly:
     frame: LeaderFollowersCuttersPart
     printer_feet: LeaderFollowersCuttersPart
     y_axis: LeaderFollowersCuttersPart
-    print_bed: Any
+    print_bed_assembly: Any
     positioned_z_axes: dict
     positioned_carriages: dict
     x_axis: LeaderFollowersCuttersPart
@@ -123,7 +123,7 @@ def create_whole_printer():
     frame = create_printer_frame()
     printer_feet = create_printer_feet(frame)
     y_axis = align_y_axis_to_frame(create_y_axis(), frame)
-    print_bed = create_positioned_print_bed(y_axis, frame)
+    print_bed_assembly = create_positioned_print_bed_assembly(y_axis, frame)
     x_axis = create_x_axis()
     positioned_z_axes, positioned_carriages, x_axis = (
         create_positioned_x_z_axis_assembly(
@@ -140,7 +140,7 @@ def create_whole_printer():
         frame=frame,
         printer_feet=printer_feet,
         y_axis=y_axis,
-        print_bed=print_bed,
+        print_bed_assembly=print_bed_assembly,
         positioned_z_axes=positioned_z_axes,
         positioned_carriages=positioned_carriages,
         x_axis=x_axis,
@@ -170,14 +170,22 @@ def main():
 
     parts.add(assembly.y_axis.leader, "y_axis", flip=False, skip_in_production=True)
     parts.add(
-        assembly.print_bed,
-        "print_bed",
+        assembly.print_bed_assembly,
+        "print_bed_undercarriage",
         flip=False,
-        skip_in_production=True,
+        skip_in_production=False,
         animation=bed_animation,
     )
+    for name, follower in assembly.print_bed_assembly.get_named_follower_items():
+        parts.add(
+            follower,
+            name,
+            flip=False,
+            skip_in_production=False,
+            animation=bed_animation,
+        )
 
-    for name, npp in assembly.print_bed.get_named_non_production_part_items():
+    for name, npp in assembly.print_bed_assembly.get_named_non_production_part_items():
         parts.add(
             npp,
             name,

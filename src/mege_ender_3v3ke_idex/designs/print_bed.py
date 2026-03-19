@@ -1,11 +1,8 @@
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.metrics_collector import (
     Material,
-    log_metrics_report,
-    record_length_metric,
     record_measured_mass_metric,
     record_weight_metric,
-    reset_metrics,
 )
 from shellforgepy.simple import *
 
@@ -43,7 +40,21 @@ def _record_print_bed_weight_metrics(print_bed):
         )
 
 
-def create_print_bed():
+def add_print_bed_parts_to_assembly(target_assembly, print_bed):
+    for name, follower in print_bed.get_named_follower_items():
+        target_assembly.add_named_follower(follower, name)
+
+    target_assembly.add_named_non_production_part(
+        print_bed.get_leader_as_part(),
+        "print_bed_main",
+    )
+    for name, non_production_part in print_bed.get_named_non_production_part_items():
+        target_assembly.add_named_non_production_part(non_production_part, name)
+
+    return target_assembly
+
+
+def create_print_bed(*, record_metrics=True):
 
     plate = create_box(print_bed_width, print_bed_depth, print_bed_thickness)
 
@@ -92,6 +103,7 @@ def create_print_bed():
     foil = align(foil, plate, Alignment.CENTER, axes=[0, 1])
     foil = align(foil, plate, Alignment.STACK_TOP)
     retval.add_named_non_production_part(foil, "print_bed_foil")
-    _record_print_bed_weight_metrics(retval)
+    if record_metrics:
+        _record_print_bed_weight_metrics(retval)
 
     return retval

@@ -19,12 +19,18 @@ from mege_ender_3v3ke_idex.designs.metrics_collector import (
     Material,
     log_metrics_report,
     record_length_metric,
-    record_measured_mass_metric,
     record_weight_metric,
     reset_metrics,
 )
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_rail_with_carriages
-from mege_ender_3v3ke_idex.designs.print_bed import create_print_bed
+from mege_ender_3v3ke_idex.designs.print_bed import (
+    Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
+    add_print_bed_parts_to_assembly,
+    create_print_bed,
+)
+from mege_ender_3v3ke_idex.designs.print_bed_undercarriage import (
+    create_print_bed_undercarriage,
+)
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -68,7 +74,7 @@ def _record_y_axis_carriage_weight_metrics(y_axis):
         )
 
 
-def create_positioned_print_bed(y_axis, frame):
+def _get_y_axis_carriages_fused(y_axis):
     y_axis_carriages = PartCollector()
     for name, follower in y_axis.get_named_follower_items():
         if "carriage" not in name:
@@ -76,7 +82,37 @@ def create_positioned_print_bed(y_axis, frame):
 
         y_axis_carriages = y_axis_carriages.fuse(follower)
 
-    print_bed = create_print_bed()
+    return y_axis_carriages
+
+
+def _align_y_axis_to_print_bed_undercarriage(y_axis, frame):
+    reference_print_bed = create_positioned_print_bed(
+        y_axis,
+        frame,
+        record_metrics=False,
+    )
+    undercarriage = create_print_bed_undercarriage(
+        reference_print_bed,
+        record_metrics=False,
+    )
+    y_axis_carriages = _get_y_axis_carriages_fused(y_axis)
+
+    undercarriage_bb = get_bounding_box(undercarriage.leader)
+    y_axis_carriages_bb = get_bounding_box(y_axis_carriages)
+    y_axis_drop_mm = y_axis_carriages_bb[1][2] - undercarriage_bb[0][2]
+
+    _logger.info(
+        "Dropping y_axis by %.3f mm so the print bed undercarriage seats on the Y carriages while preserving the bed Z reference",
+        y_axis_drop_mm,
+    )
+
+    return translate(0, 0, -y_axis_drop_mm)(y_axis)
+
+
+def create_positioned_print_bed(y_axis, frame, *, record_metrics=True):
+    y_axis_carriages = _get_y_axis_carriages_fused(y_axis)
+
+    print_bed = create_print_bed(record_metrics=record_metrics)
     print_bed = align(print_bed, y_axis_carriages, Alignment.CENTER, axes=[0, 1])
     print_bed = align(
         print_bed,
@@ -88,6 +124,12 @@ def create_positioned_print_bed(y_axis, frame):
     return print_bed
 
 
+def create_positioned_print_bed_assembly(y_axis, frame):
+    print_bed = create_positioned_print_bed(y_axis, frame)
+    print_bed_undercarriage = create_print_bed_undercarriage(print_bed)
+    return add_print_bed_parts_to_assembly(print_bed_undercarriage, print_bed)
+
+
 def align_y_axis_to_frame(y_axis, frame):
     y_axis = align(y_axis, frame, Alignment.CENTER, axes=[0, 1])
     y_axis_profile_left = y_axis.get_non_production_part_by_name("profile_left")
@@ -96,7 +138,9 @@ def align_y_axis_to_frame(y_axis, frame):
         y_axis_profile_left, frame, Alignment.CENTER, axes=[2]
     )
 
-    return axis_aligner(y_axis)
+    y_axis = axis_aligner(y_axis)
+
+    return _align_y_axis_to_print_bed_undercarriage(y_axis, frame)
 
 
 def create_y_axis():
@@ -181,17 +225,25 @@ def main():
     parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
 
     y_axis = align_y_axis_to_frame(create_y_axis(), frame)
-    print_bed = create_positioned_print_bed(y_axis, frame)
+    print_bed_assembly = create_positioned_print_bed_assembly(y_axis, frame)
 
     parts.add(y_axis.leader, "y_axis", flip=False, skip_in_production=True)
     parts.add(
-        print_bed,
-        "print_bed",
+        print_bed_assembly,
+        "print_bed_undercarriage",
         flip=False,
-        skip_in_production=True,
+        skip_in_production=False,
         animation=bed_animation,
     )
-    for name, npp in print_bed.get_named_non_production_part_items():
+    for name, follower in print_bed_assembly.get_named_follower_items():
+        parts.add(
+            follower,
+            name,
+            flip=False,
+            skip_in_production=False,
+            animation=bed_animation,
+        )
+    for name, npp in print_bed_assembly.get_named_non_production_part_items():
         parts.add(
             npp,
             name,
@@ -226,9 +278,10 @@ def main():
 
     log_metrics_report(_logger)
     _logger.info(
-        "Y-axis moving mass currently includes the bed plate, magnetic foil, MGN12CA carriages, and bed screws. "
+        "Y-axis moving mass currently includes the bed plate, magnetic foil, MGN12CA carriages, bed screws, "
+        "the PETG_CF print bed undercarriage, and the aluminum mount towers. "
         "The bed plate and foil use measured masses. The linear rails do not move and are excluded. "
-        "The bed holder is not implemented yet, and dampers are currently excluded."
+        "Dampers are currently excluded."
     )
 
     # Arrange and export

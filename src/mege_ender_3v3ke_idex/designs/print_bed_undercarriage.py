@@ -20,12 +20,13 @@ from mege_ender_3v3ke_idex.designs.metrics_collector import (
     Material,
     log_metrics_report,
     record_length_metric,
-    record_measured_mass_metric,
     record_weight_metric,
     reset_metrics,
 )
-from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_rail_with_carriages
-from mege_ender_3v3ke_idex.designs.print_bed import create_print_bed
+from mege_ender_3v3ke_idex.designs.print_bed import (
+    Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
+    create_print_bed,
+)
 from shellforgepy.simple import *
 
 print_bed_undercarriage_profiles_height = 30
@@ -104,7 +105,30 @@ def create_hollow_profile_ring(
     return ring.cut(inner_cutter)
 
 
-def create_print_bed_undercarriage(print_bed):
+def _record_print_bed_undercarriage_weight_metrics(undercarriage):
+    record_weight_metric(
+        Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
+        Material.PETG_CF,
+        get_volume(undercarriage.get_leader_as_part()),
+        part_id="print_bed_undercarriage_fused",
+    )
+
+    mount_tower_volume_mm3 = 0.0
+    for name, part in undercarriage.get_named_non_production_part_items():
+        if not name.startswith("mount_tower_"):
+            continue
+        mount_tower_volume_mm3 += get_volume(part)
+
+    if mount_tower_volume_mm3 > 0:
+        record_weight_metric(
+            Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
+            Material.ALUMINUM,
+            mount_tower_volume_mm3,
+            part_id="print_bed_mount_towers",
+        )
+
+
+def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
     """Create the print_bed_undercarriage part."""
 
     central_annulus = create_hollow_profile_ring(
@@ -246,21 +270,31 @@ def create_print_bed_undercarriage(print_bed):
         if not name.startswith("damper_"):
             continue
 
+        mount_tower_name = f"mount_tower_{name.replace('damper_', '', 1)}"
+        if record_metrics:
+            record_length_metric(
+                "extrusion_profile",
+                ExtrusionProfileType.PROFILE_2020.value,
+                mount_tower_name,
+                print_bed_mount_tower_height,
+            )
         mount_tower = create_alu_extrusion_profile(
             ExtrusionProfileType.PROFILE_2020, length_mm=print_bed_mount_tower_height
         )
         mount_tower = align(mount_tower, npp, Alignment.CENTER)
         mount_tower = align(mount_tower, npp, Alignment.STACK_BOTTOM)
 
-        retval.add_named_non_production_part(
-            mount_tower, f"mount_tower_{name.replace('damper','')}"
-        )
+        retval.add_named_non_production_part(mount_tower, mount_tower_name)
+
+    if record_metrics:
+        _record_print_bed_undercarriage_weight_metrics(retval)
 
     return retval
 
 
 def main():
     logging.basicConfig(level=logging.INFO)
+    reset_metrics()
     parts = PartList()
 
     print_bed = create_print_bed()
@@ -298,6 +332,12 @@ def main():
 
     for name, npp in undercarriage.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
+
+    log_metrics_report(_logger)
+    _logger.info(
+        "The print bed undercarriage contributes PETG_CF fused structure and aluminum mount towers "
+        "to y_axis_moving_mass. Dampers are currently excluded."
+    )
 
     dovetail = create_dovetail_tongue_and_groove(
         dovetail_width=10.0,
