@@ -15,6 +15,8 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
     PROCESS_DATA_PETGCF_04_HS,
     PROCESS_DATA_PLACF_04_HS,
 )
+from mege_ender_3v3ke_idex.designs.gt2belt import create_gt_belt_clamp
+
 import copy
 
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
@@ -74,6 +76,13 @@ print_bed_undercarriage_joining_screw_nut_clearance = 0.2
 print_bed_undercarriage_joining_screw_cylinder_head_clearance = 0.5
 print_bed_undercarriage_joining_screw_inset = 5
 
+print_bed_undercarriage_belt_clamp_base_thickness = 5
+print_bed_undercarriage_belt_clamp_clamp_thickness = (
+    print_bed_undercarriage_profiles_width * 0.4
+)
+
+print_bed_undercarriage_belt_clamp_clamp_length = 30
+print_bed_undercarriage_belt_clamp_x_offset = 0.5
 
 print_bed_undercarriage_dovetail_front_clearance = 0.2
 
@@ -479,7 +488,44 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
 
         retval = retval.fuse(mount_tower_holder)
 
-    left_uc, right_uc = cut_in_two(retval, cut_normal=(1, 0, 0))
+    belt_clamp_bases = PartCollector()
+    for k in [Alignment.FRONT, Alignment.BACK]:
+
+        belt_clamp = create_gt_belt_clamp(
+            base_thicknness=print_bed_undercarriage_belt_clamp_base_thickness,
+            clamp_thickness=print_bed_undercarriage_belt_clamp_clamp_thickness,
+            clamp_length=print_bed_undercarriage_belt_clamp_clamp_length,
+            screw_hole_border=2,
+        )
+        belt_clamp = rotate(90, axis=(1, 0, 0))(belt_clamp)
+        belt_clamp = rotate(90)(belt_clamp)
+        belt_clamp = align(belt_clamp, central_annulus, Alignment.CENTER)
+        belt_clamp = align(belt_clamp, central_annulus, Alignment.STACK_BOTTOM)
+
+        belt_clamp = translate(
+            -print_bed_undercarriage_belt_clamp_base_thickness / 2
+            + print_bed_undercarriage_belt_clamp_x_offset,
+            k.sign
+            * (
+                print_bed_undercarriage_central_annulus_diameter / 2
+                + print_bed_undercarriage_belt_clamp_clamp_length / 2
+                - print_bed_undercarriage_profiles_width 
+            ),
+            0,
+        )(belt_clamp)
+
+        belt_clamp_bases = belt_clamp_bases.fuse(
+            belt_clamp.get_follower_part_by_name("clamp")
+        )
+
+        retval.add_named_follower(
+            belt_clamp.leader,
+            f"belt_clamp_clamp_{k.name.lower()}",
+        )
+
+    undercarriage_with_belt_clamps = retval.fuse(belt_clamp_bases)
+
+    left_uc, right_uc = cut_in_two(undercarriage_with_belt_clamps, cut_normal=(1, 0, 0))
 
     back_left_uc, front_left_uc = cut_in_two(left_uc, cut_normal=(0, 1, 0))
 
@@ -612,7 +658,7 @@ def main():
 
         follower = translate(*translation_vector)(follower)
 
-        parts.add(follower, name, flip=False, skip_in_production=skip_in_production)
+        parts.add(follower, name, flip=True, skip_in_production=skip_in_production)
 
     for name, npp in undercarriage.get_named_non_production_part_items():
         if "nut" in name:

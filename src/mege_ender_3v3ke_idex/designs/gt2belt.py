@@ -238,7 +238,7 @@ def create_gt_belt_clamp(
         for lr in lr_list:
             screw_hole = create_cylinder(screw_hole_diameter / 2, BIG_THING)
             screw_hole = align(screw_hole, base, Alignment.CENTER)
-            screw_hole = align(screw_hole, base, lr, axes=[0])
+            screw_hole = align(screw_hole, base, lr)
             screw_hole = align(screw_hole, base, fb)
             screw_hole = translate(
                 -lr.sign * screw_hole_border, -fb.sign * screw_hole_border, 0

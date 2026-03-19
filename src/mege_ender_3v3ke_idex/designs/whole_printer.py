@@ -169,13 +169,13 @@ def main():
         parts.add(npp, name, flip=False, skip_in_production=True)
 
     parts.add(assembly.y_axis.leader, "y_axis", flip=False, skip_in_production=True)
-    parts.add(
-        assembly.print_bed_assembly,
-        "print_bed_undercarriage",
-        flip=False,
-        skip_in_production=False,
-        animation=bed_animation,
-    )
+    # parts.add( # this is duplicated with the followers below, but keeping it here for clarity of the main assembly structure
+    #     assembly.print_bed_assembly,
+    #     "print_bed_undercarriage",
+    #     flip=False,
+    #     skip_in_production=False,
+    #     animation=bed_animation,
+    # )
     for name, follower in assembly.print_bed_assembly.get_named_follower_items():
         parts.add(
             follower,
