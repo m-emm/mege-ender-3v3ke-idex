@@ -310,11 +310,8 @@ def _create_y_axis_idler_tensioner_cage():
     return rotate(90)(idler_cage)
 
 
-def _add_y_axis_idler_mount(y_axis, frame, front_belt_reference):
-    frame_front_profile = _create_y_axis_frame_cross_profile_reference(
-        frame,
-        Alignment.FRONT,
-    )
+def create_y_axis_idler_mount(frame, belt_reference):
+    frame_front_profile = frame.get_non_production_part_by_name("frame_profile_front")
     idler_cage = _create_y_axis_idler_tensioner_cage()
     idler_cage_size = get_bounding_box_size(idler_cage.leader)
 
@@ -408,54 +405,18 @@ def _add_y_axis_idler_mount(y_axis, frame, front_belt_reference):
         "idler_tensioner_nut",
     )
 
-    idler_running_surface = _create_gt2_idler_running_surface_reference(
-        y_axis_drive_idler_teeth
-    )
-    idler_running_surface = align(
-        idler_running_surface,
-        idler_mount_assembly.get_non_production_part_by_name("idler"),
-        Alignment.CENTER,
-    )
-    idler_mount_assembly = _align_part_from_belt_contact_surface(
-        idler_mount_assembly,
-        idler_running_surface,
-        front_belt_reference,
-    )
-    idler_mount_assembly = _align_part_to_frame_profile_inner_face(
-        idler_mount_assembly,
-        frame_front_profile,
-        Alignment.FRONT,
+    idler_mount_assembly = align(
+        idler_mount_assembly, frame_front_profile, Alignment.STACK_BACK
     )
 
-    y_axis.add_named_follower(idler_mount_assembly.leader, "idler_mount_box")
-    y_axis.add_named_follower(
-        idler_mount_assembly.get_follower_part_by_name("idler_tensioner_cage"),
-        "idler_tensioner_cage",
+    idler_mount_assembly = idler_mount_assembly.aligned_from_non_production_part(
+        "idler", belt_reference, Alignment.TOP
     )
-    y_axis.add_named_non_production_part(
-        idler_mount_assembly.get_non_production_part_by_name("idler"),
-        "idler",
-    )
-    y_axis.add_named_non_production_part(
-        idler_mount_assembly.get_non_production_part_by_name("idler_axle_screw"),
-        "idler_axle_screw",
-    )
-    y_axis.add_named_non_production_part(
-        idler_mount_assembly.get_non_production_part_by_name(
-            "idler_axle_threaded_inset"
-        ),
-        "idler_axle_threaded_inset",
-    )
-    y_axis.add_named_non_production_part(
-        idler_mount_assembly.get_non_production_part_by_name("idler_tensioner_screw"),
-        "idler_tensioner_screw",
-    )
-    y_axis.add_named_non_production_part(
-        idler_mount_assembly.get_non_production_part_by_name("idler_tensioner_nut"),
-        "idler_tensioner_nut",
+    idler_mount_assembly = idler_mount_assembly.aligned_from_non_production_part(
+        "idler", belt_reference, Alignment.LEFT
     )
 
-    return idler_mount_assembly.get_non_production_part_by_name("idler")
+    return idler_mount_assembly
 
 
 def add_y_axis_drive_hardware(y_axis, print_bed_assembly, frame):
@@ -506,9 +467,11 @@ def main():
 
     parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
 
-    belt_reference = create_box(10, 10, 10)
+    belt_reference = create_box(0.05, 10, 6)
     belt_reference = align(belt_reference, frame, Alignment.CENTER)
     belt_reference = align(belt_reference, frame, Alignment.STACK_TOP)
+
+    parts.add(belt_reference, "belt_reference", flip=False, skip_in_production=True, color=(1.0,0.8,0.8))
 
     belts = create_belts(frame)
     belts = align(belts, belt_reference, Alignment.CENTER)
@@ -526,6 +489,18 @@ def main():
     for name, npp in motor_mount.get_named_non_production_part_items():
         parts.add(
             npp, f"y_axis_motor_mount_{name}", flip=False, skip_in_production=True
+        )
+
+    idler_mount = create_y_axis_idler_mount(frame, belt_reference)
+
+    parts.add(idler_mount, "y_axis_idler_mount", flip=False, skip_in_production=True)
+    for name, follower in idler_mount.get_named_follower_items():
+        parts.add(
+            follower, f"y_axis_idler_mount_{name}", flip=False, skip_in_production=False
+        )
+    for name, npp in idler_mount.get_named_non_production_part_items():
+        parts.add(
+            npp, f"y_axis_idler_mount_{name}", flip=False, skip_in_production=True
         )
 
     # Arrange and export
