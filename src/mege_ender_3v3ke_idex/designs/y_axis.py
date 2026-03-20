@@ -14,6 +14,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
+from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler, create_gt2_pulley
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.metrics_collector import (
     Material,
@@ -23,6 +24,7 @@ from mege_ender_3v3ke_idex.designs.metrics_collector import (
     reset_metrics,
 )
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_rail_with_carriages
+from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from mege_ender_3v3ke_idex.designs.print_bed import (
     Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
     add_print_bed_parts_to_assembly,
@@ -47,6 +49,21 @@ PROCESS_DATA = {
         "layer_height": "0.2",
     },
 }
+
+y_axis_drive_profile_mount_plate_width = z_axis_profile_mount_width
+y_axis_drive_profile_mount_plate_height = z_axis_profile_mount_plate_height
+y_axis_drive_profile_mount_plate_thickness = z_axis_profile_mount_plate_thickness
+y_axis_drive_profile_mount_plate_fillet_radius = (
+    z_axis_profile_mount_plate_fillet_radius
+)
+y_axis_drive_mount_screw_inset = 5
+y_axis_drive_mount_screw_size = "M5"
+y_axis_drive_motor_plate_width = motor_mount_plate_size
+y_axis_drive_motor_plate_depth = 60
+y_axis_drive_idler_plate_width = 34
+y_axis_drive_idler_plate_depth = 40
+y_axis_drive_motor_pulley_teeth = 20
+y_axis_drive_idler_teeth = 20
 
 
 def _record_weight_for_part(part, *, material: Material, part_id: str):
@@ -143,6 +160,227 @@ def align_y_axis_to_frame(y_axis, frame):
     return _align_y_axis_to_print_bed_undercarriage(y_axis, frame)
 
 
+def _get_y_axis_profiles_fused(y_axis):
+    profile_left = y_axis.get_non_production_part_by_name("profile_left")
+    profile_right = y_axis.get_non_production_part_by_name("profile_right")
+    return profile_left.fuse(profile_right)
+
+
+def _create_y_axis_frame_cross_profile_reference(frame, front_back):
+    frame_cross_profile = create_alu_extrusion_profile(
+        ExtrusionProfileType.PROFILE_4040,
+        length_mm=frame_inner_width,
+    )
+    frame_cross_profile = rotate(90, axis=(0, 1, 0))(frame_cross_profile)
+    frame_cross_profile = align(
+        frame_cross_profile,
+        frame.leader,
+        Alignment.CENTER,
+        axes=[0, 2],
+    )
+    frame_cross_profile = align(frame_cross_profile, frame.leader, front_back)
+
+    return frame_cross_profile
+
+
+def _align_part_to_frame_profile_inner_face(part, frame_cross_profile, front_back):
+    part_bb = get_bounding_box(part)
+    frame_cross_profile_bb = get_bounding_box(frame_cross_profile)
+
+    if front_back == Alignment.BACK:
+        delta_y = frame_cross_profile_bb[0][1] - part_bb[1][1]
+    else:
+        delta_y = frame_cross_profile_bb[1][1] - part_bb[0][1]
+
+    return translate(0, delta_y, 0)(part)
+
+
+def create_y_axis_profile_mount_plate(
+    num_holes=2,
+    screw_inset=y_axis_drive_mount_screw_inset,
+):
+    plate = create_filleted_box(
+        y_axis_drive_profile_mount_plate_width,
+        y_axis_drive_profile_mount_plate_thickness,
+        y_axis_drive_profile_mount_plate_height,
+        y_axis_drive_profile_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.FRONT, Alignment.BACK, Alignment.BOTTOM],
+    )
+
+    hole_drill_diameter = MScrew.from_size(
+        y_axis_drive_mount_screw_size
+    ).clearance_hole_loose
+
+    hole_drills = PartCollector()
+    hole_pitch = (
+        (
+            y_axis_drive_profile_mount_plate_width
+            - 2 * screw_inset
+            - hole_drill_diameter
+        )
+        / (num_holes - 1)
+        if num_holes > 1
+        else 0
+    )
+
+    for i in range(num_holes):
+        hole_drill = create_cylinder(
+            hole_drill_diameter / 2,
+            BIG_THING,
+            direction=(0, 1, 0),
+        )
+        hole_drill = translate(i * hole_pitch, 0, 0)(hole_drill)
+        hole_drills = hole_drills.fuse(hole_drill)
+
+    hole_drills = align(hole_drills, plate, Alignment.CENTER)
+    plate = plate.cut(hole_drills)
+
+    return plate
+
+
+def _create_y_axis_motor_mount(y_axis, frame, back_belt_clamp):
+    frame_back_profile = _create_y_axis_frame_cross_profile_reference(
+        frame,
+        Alignment.BACK,
+    )
+    motor = create_nema_composite(
+        axle_length=x_axis_motor_axle_length,
+        axle_clearance=motor_mount_axle_clearance,
+        boss_clearance=motor_mount_boss_clearance,
+        boss_clearance_z=motor_mount_boss_clearance_z,
+    )
+
+    motor_mount_plate = create_filleted_box(
+        y_axis_drive_motor_plate_width,
+        y_axis_drive_motor_plate_depth,
+        motor_mount_plate_thickness,
+        motor_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    motor_mount_plate = align(
+        motor_mount_plate, back_belt_clamp, Alignment.CENTER, axes=[0]
+    )
+    motor_mount_plate = _align_part_to_frame_profile_inner_face(
+        motor_mount_plate,
+        frame_back_profile,
+        Alignment.BACK,
+    )
+
+    pulley = create_gt2_pulley(
+        num_teeth=y_axis_drive_motor_pulley_teeth,
+        belt_width=6,
+    )
+    pulley = align(pulley, back_belt_clamp, Alignment.CENTER, axes=[0, 2])
+    pulley = align(pulley, motor_mount_plate, Alignment.CENTER, axes=[1])
+
+    motor = motor.aligned_from_follower("axle", pulley, Alignment.CENTER)
+
+    motor_body = motor.get_follower_part_by_name("body")
+    motor_mount_plate = align(motor_mount_plate, motor_body, Alignment.STACK_TOP)
+
+    motor_mount_plate = motor.use_as_cutter_on(motor_mount_plate)
+
+    profile_mount_plate = create_y_axis_profile_mount_plate()
+    profile_mount_plate = align(
+        profile_mount_plate, motor_mount_plate, Alignment.CENTER, axes=[0]
+    )
+    profile_mount_plate = align(profile_mount_plate, motor_mount_plate, Alignment.BACK)
+    profile_mount_plate = align(
+        profile_mount_plate, motor_mount_plate, Alignment.STACK_BOTTOM
+    )
+
+    motor_mount_plate = motor_mount_plate.fuse(profile_mount_plate)
+
+    y_axis.add_named_follower(motor_mount_plate, "motor_mount_plate")
+    for name, part in motor.get_named_follower_items():
+        if name == "coupler":
+            continue
+        y_axis.add_named_non_production_part(part, f"motor_{name}")
+    y_axis.add_named_non_production_part(pulley, "motor_pulley")
+
+
+def _add_y_axis_idler_mount(y_axis, frame, front_belt_clamp):
+    frame_front_profile = _create_y_axis_frame_cross_profile_reference(
+        frame,
+        Alignment.FRONT,
+    )
+
+    idler_mount_plate = create_filleted_box(
+        y_axis_drive_idler_plate_width,
+        y_axis_drive_idler_plate_depth,
+        motor_mount_plate_thickness,
+        motor_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    idler_mount_plate = align(
+        idler_mount_plate, front_belt_clamp, Alignment.CENTER, axes=[0]
+    )
+    idler_mount_plate = _align_part_to_frame_profile_inner_face(
+        idler_mount_plate,
+        frame_front_profile,
+        Alignment.FRONT,
+    )
+
+    idler = create_gt2_idler(num_teeth=y_axis_drive_idler_teeth)
+    idler = align(idler, front_belt_clamp, Alignment.CENTER, axes=[0, 2])
+    idler = align(idler, idler_mount_plate, Alignment.CENTER, axes=[1])
+
+    idler_mount_plate = align(idler_mount_plate, idler, Alignment.STACK_BOTTOM)
+
+    axle_cutter = create_cylinder(
+        idler_mount_axle_diameter / 2 + idler_mount_axle_clearance,
+        BIG_THING,
+    )
+    axle_cutter = align(axle_cutter, idler, Alignment.CENTER)
+    idler_mount_plate = idler_mount_plate.cut(axle_cutter)
+
+    screw_head_cutter = create_cylinder(
+        MScrew.from_size(axle_screw_size).cylinder_head_diameter / 2
+        + idler_screw_head_clearance,
+        MScrew.from_size(axle_screw_size).cylinder_head_height
+        + 2 * idler_screw_head_clearance,
+    )
+    screw_head_cutter = align(screw_head_cutter, idler, Alignment.CENTER)
+    screw_head_cutter = align(screw_head_cutter, idler_mount_plate, Alignment.BOTTOM)
+    idler_mount_plate = idler_mount_plate.cut(screw_head_cutter)
+
+    profile_mount_plate = create_y_axis_profile_mount_plate()
+    profile_mount_plate = align(
+        profile_mount_plate, idler_mount_plate, Alignment.CENTER, axes=[0]
+    )
+    profile_mount_plate = align(profile_mount_plate, idler_mount_plate, Alignment.FRONT)
+    profile_mount_plate = align(
+        profile_mount_plate, idler_mount_plate, Alignment.STACK_BOTTOM
+    )
+
+    idler_mount_plate = idler_mount_plate.fuse(profile_mount_plate)
+
+    idler_axle_screw = create_cylinder_screw(
+        size=axle_screw_size,
+        length=endcap_axle_screw_length,
+    )
+    idler_axle_screw = align(idler_axle_screw, idler, Alignment.CENTER)
+    idler_axle_screw = align(idler_axle_screw, idler_mount_plate, Alignment.BOTTOM)
+
+    y_axis.add_named_follower(idler_mount_plate, "idler_mount_plate")
+    y_axis.add_named_non_production_part(idler, "idler")
+    y_axis.add_named_non_production_part(idler_axle_screw, "idler_axle_screw")
+
+
+def add_y_axis_drive_hardware(y_axis, print_bed_assembly, frame):
+    back_belt_clamp = print_bed_assembly.get_follower_part_by_name(
+        "belt_clamp_clamp_back"
+    )
+    front_belt_clamp = print_bed_assembly.get_follower_part_by_name(
+        "belt_clamp_clamp_front"
+    )
+
+    _create_y_axis_motor_mount(y_axis, frame, back_belt_clamp)
+    _add_y_axis_idler_mount(y_axis, frame, front_belt_clamp)
+
+    return y_axis
+
+
 def create_y_axis():
     """Create the y_axis part."""
 
@@ -226,15 +464,16 @@ def main():
 
     y_axis = align_y_axis_to_frame(create_y_axis(), frame)
     print_bed_assembly = create_positioned_print_bed_assembly(y_axis, frame)
+    y_axis = add_y_axis_drive_hardware(y_axis, print_bed_assembly, frame)
 
     parts.add(y_axis.leader, "y_axis", flip=False, skip_in_production=True)
-    parts.add(
-        print_bed_assembly,
-        "print_bed_undercarriage",
-        flip=False,
-        skip_in_production=False,
-        animation=bed_animation,
-    )
+    # parts.add(
+    #     print_bed_assembly,
+    #     "print_bed_undercarriage",
+    #     flip=False,
+    #     skip_in_production=False,
+    #     animation=bed_animation,
+    # )
     for name, follower in print_bed_assembly.get_named_follower_items():
         parts.add(
             follower,
@@ -254,15 +493,22 @@ def main():
 
     for name, follower in y_axis.get_named_follower_items():
         animation = None
+        skip_in_production = True
 
         if "carriage" in name:
             _logger.info(f"Using bed_animation for {name}")
             animation = bed_animation
+        elif "mount" in name:
+            skip_in_production = False
         else:
             _logger.info(f"NOT Using bed_animation for {name}")
 
         parts.add(
-            follower, name, flip=False, skip_in_production=True, animation=animation
+            follower,
+            name,
+            flip=False,
+            skip_in_production=skip_in_production,
+            animation=animation,
         )
 
     for name, npp in y_axis.get_named_non_production_part_items():
