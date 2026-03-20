@@ -40,6 +40,7 @@ def create_printer_frame():
     _logger.info(
         f"Creating printer frame with frame_depth={frame_inner_depth} (depth profile length) and frame_inner_width={frame_inner_width} (width profile length)"
     )
+    profiles_map = {}
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         record_length_metric(
             "extrusion_profile",
@@ -61,6 +62,7 @@ def create_printer_frame():
             )(alu_profile)
 
         profiles = profiles.fuse(alu_profile)
+        profiles_map[f"frame_profile_{lr.name.lower()}"] = alu_profile
 
     profiles_size = get_bounding_box_size(profiles)
     _logger.info(f"Frame Profiles bounding box size: {point_string(profiles_size)}")
@@ -82,9 +84,19 @@ def create_printer_frame():
         alu_profile = align(alu_profile, profiles, fb)
         profiles_fb = profiles_fb.fuse(alu_profile)
 
+        profiles_map[f"frame_profile_{fb.name.lower()}"] = alu_profile
+
     profiles = profiles.fuse(profiles_fb)
 
-    return LeaderFollowersCuttersPart(profiles)
+    retval = LeaderFollowersCuttersPart(profiles)
+
+    for name, profile in profiles_map.items():
+        retval.add_named_non_production_part(
+            profile,
+            name,
+        )
+
+    return retval
 
 
 def main():
@@ -93,7 +105,12 @@ def main():
 
     # Create the part
     frame = create_printer_frame()
-    parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
+
+    for name, npp in frame.get_named_non_production_part_items():
+        parts.add(npp, name, flip=False, skip_in_production=True)
+    # parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
+
+    
 
     # Arrange and export
     arrange_and_export(
