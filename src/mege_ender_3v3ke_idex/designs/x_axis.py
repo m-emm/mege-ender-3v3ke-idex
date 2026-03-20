@@ -24,6 +24,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
 from mege_ender_3v3ke_idex.designs.endstop_holder import create_endstop_holder
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.idler_cage import create_idler_cage
 from mege_ender_3v3ke_idex.designs.metrics_collector import record_length_metric
 from mege_ender_3v3ke_idex.designs.mgh_linear import (
     create_mgn12h_rail,
@@ -263,200 +264,6 @@ def create_z_axis():
     # ender_part = ender_part.fuse(guides)
 
     return z_guides
-
-
-def create_idler_cage(
-    cage_back_wall,
-    cage_wall,
-    cage_height,
-    cage_overlength,
-    idler_tooth_count,
-    idler_clearance,
-    with_tensioner=False,
-    tensioner_screw_size="M3",
-    tensioner_screw_length=30,
-    axle_screw_length=None,
-    belt_clearance=1.0,
-    cage_width_override=None,
-    cage_front_wall_thickness=None,
-):
-    """Create a printable idler cage with visual idler and axle screw."""
-
-    idler = create_gt2_idler(num_teeth=idler_tooth_count)
-    idler_size = get_bounding_box_size(idler)
-
-    effective_front_wall_thickness = (
-        cage_wall if cage_front_wall_thickness is None else cage_front_wall_thickness
-    )
-
-    base_length = (
-        idler_size[0]
-        + cage_overlength
-        + effective_front_wall_thickness
-        + cage_back_wall
-        + 2 * idler_clearance
-    )
-    base_width = max(
-        idler_size[1] + 2 * cage_wall + 2 * idler_clearance, cage_width_override or 0
-    )
-    base_thickness = (cage_height - idler_size[2] - 2 * idler_clearance) / 2
-    wall_height = cage_height - 2 * base_thickness
-
-    # Offset so the idler hugs the thin wall (belt clearance) and leaves room for tensioner on the thick wall
-    x_offset = (effective_front_wall_thickness - cage_back_wall - cage_overlength) / 2
-    base_z_offset = -(idler_size[2] / 2 + idler_clearance + base_thickness / 2)
-    top_z_offset = idler_size[2] / 2 + idler_clearance + base_thickness / 2
-
-    base = create_box(base_length, base_width, base_thickness)
-    base = align(base, idler, Alignment.CENTER)
-    base = translate(x_offset, 0, base_z_offset)(base)
-
-    back_wall = create_box(cage_back_wall, base_width, wall_height)
-    back_wall = align(back_wall, base, Alignment.CENTER, axes=[1])
-    back_wall = align(back_wall, base, Alignment.LEFT)
-    back_wall = align(back_wall, base, Alignment.STACK_TOP)
-
-    walls = PartCollector()
-    side_wall_length = max(cage_overlength, 0)
-    if side_wall_length > 0:
-        side_wall = create_box(side_wall_length, cage_wall, wall_height)
-        side_wall = align(side_wall, base, Alignment.STACK_TOP)
-        side_wall = align(side_wall, back_wall, Alignment.STACK_RIGHT)
-        side_wall = align(side_wall, base, Alignment.BACK)
-        walls = walls.fuse(side_wall)
-
-        side_wall_2 = align(side_wall, base, Alignment.FRONT)
-        walls = walls.fuse(side_wall_2)
-
-    front_wall_width = idler_size[1] - 2 * belt_clearance
-    if front_wall_width > 0:
-        front_wall = create_box(
-            effective_front_wall_thickness,
-            front_wall_width,
-            wall_height,
-        )
-
-        front_wall = align(front_wall, base, Alignment.CENTER, axes=[1])
-        front_wall = align(front_wall, base, Alignment.STACK_TOP)
-        front_wall = align(front_wall, base, Alignment.RIGHT)
-        walls = walls.fuse(front_wall)
-
-    top_plate = create_box(base_length, base_width, base_thickness)
-    top_plate = align(top_plate, idler, Alignment.CENTER)
-    top_plate = translate(x_offset, 0, top_z_offset)(top_plate)
-
-    cage = PartCollector()
-    cage = cage.fuse(base)
-    cage = cage.fuse(back_wall)
-    cage = cage.fuse(walls)
-    cage = cage.fuse(top_plate)
-
-    axle_cutter_radius = (
-        MScrew.from_size(axle_screw_size).clearance_hole_normal / 2
-        + idler_mount_axle_clearance
-    )
-    axle_cutter = create_cylinder(axle_cutter_radius, BIG_THING)
-    axle_cutter = align(axle_cutter, idler, Alignment.CENTER)
-    cage = cage.cut(axle_cutter)
-
-    head_cutter = create_cylinder(
-        MScrew.from_size(axle_screw_size).cylinder_head_diameter / 2
-        + idler_screw_head_clearance,
-        MScrew.from_size(axle_screw_size).cylinder_head_height
-        + 2 * idler_screw_head_clearance,
-    )
-    head_cutter = align(head_cutter, idler, Alignment.CENTER)
-    head_cutter = align(head_cutter, cage, Alignment.TOP)
-    cage = cage.cut(head_cutter)
-
-    thread_inset_cutter = create_cylinder(
-        m_screws_table[axle_screw_size]["thread_inset_hole_diameter"] / 2
-        + inset_cutter_hole_slack,
-        m_screws_table[axle_screw_size]["thread_inset_length"]
-        + inset_cutter_hole_slack,
-    )
-    thread_inset_cutter = align(
-        thread_inset_cutter, idler, Alignment.CENTER, axes=[0, 1]
-    )
-    thread_inset_cutter = align(thread_inset_cutter, cage, Alignment.BOTTOM)
-    cage = cage.cut(thread_inset_cutter)
-
-    if axle_screw_length is None:
-        axle_screw_length = (
-            cage_height - MScrew.from_size(axle_screw_size).cylinder_head_height
-        )
-    axle = create_cylinder_screw(axle_screw_size, length=axle_screw_length)
-    axle = align(axle, idler, Alignment.CENTER)
-    axle = align(axle, cage, Alignment.TOP)
-
-    retval = LeaderFollowersCuttersPart(
-        leader=cage,
-    )
-    retval.add_named_non_production_part(idler, "idler")
-    retval.add_named_non_production_part(axle, "axle")
-
-    if with_tensioner:
-        tensioner_clearance_radius = (
-            MScrew.from_size(tensioner_screw_size).clearance_hole_normal / 2
-        )
-
-        clearance_cutter = create_cylinder(
-            tensioner_clearance_radius,
-            cage_back_wall + 0.2,
-        )
-        clearance_cutter = rotate(90, axis=(0, 1, 0))(clearance_cutter)
-        clearance_cutter = align(clearance_cutter, idler, Alignment.CENTER, axes=[1, 2])
-        clearance_cutter = align(clearance_cutter, back_wall, Alignment.LEFT)
-
-        cage = cage.cut(clearance_cutter)
-
-        tensioner_screw = create_cylinder_screw(
-            tensioner_screw_size, length=tensioner_screw_length
-        )
-        tensioner_screw = rotate(90, axis=(0, 1, 0))(tensioner_screw)
-        tensioner_screw = rotate(180)(tensioner_screw)
-
-        tensioner_screw = align(
-            tensioner_screw, clearance_cutter, Alignment.CENTER, axes=[1, 2]
-        )
-        tensioner_screw = align(
-            tensioner_screw, idler, Alignment.STACK_LEFT, stack_gap=idler_clearance
-        )
-
-        hidden_nut_cutter = create_hidden_nut_pocket_cutter(
-            tensioner_screw_size,
-            bottom_cutter_length=3,
-            top_cutter_length=3,
-            slack=0.3,
-        )
-
-        hidden_nut_cutter = rotate(90, axis=(0, 1, 0))(hidden_nut_cutter)
-        hidden_nut_cutter = rotate(90, axis=(1, 0, 0))(hidden_nut_cutter)
-
-        hidden_nut_cutter = align(hidden_nut_cutter, tensioner_screw, Alignment.CENTER)
-
-        hidden_nut_cutter = align(hidden_nut_cutter, cage, Alignment.LEFT)
-
-        hidden_nut_cutter_size = get_bounding_box_size(hidden_nut_cutter)
-        hidden_nut_cutter = translate(
-            cage_back_wall / 2 - hidden_nut_cutter_size[0] / 2, 0, 0
-        )(hidden_nut_cutter)
-
-        cage = hidden_nut_cutter.use_as_cutter_on(cage)
-
-        retval.leader = cage
-
-        retval.add_named_non_production_part(tensioner_screw, "tensioner_screw")
-
-    retval_bbox = get_bounding_box(retval)
-    retval_bbox_size = get_bounding_box_size(retval)
-    assert np.allclose(
-        retval_bbox_size[2], cage_height
-    ), f"Expected cage height {cage_height}, got {retval_bbox_size[2]}"
-    drop_to_bed = -(retval_bbox[0][2])
-    retval = translate(0, 0, drop_to_bed)(retval)
-
-    return retval
 
 
 def create_idler_endcap(profile, with_tensioner, side, endcap_top_bottom):
@@ -788,10 +595,18 @@ def create_idler_endcap(profile, with_tensioner, side, endcap_top_bottom):
 
     axle_part = cage.get_non_production_part_by_name("axle")
     retval.add_named_non_production_part(axle_part, "axle")
+    retval.add_named_non_production_part(
+        cage.get_non_production_part_by_name("axle_threaded_inset"),
+        "axle_threaded_inset",
+    )
 
     if with_tensioner:
 
         retval.add_named_non_production_part(tensioner_screw_part, "tensioner_screw")
+        retval.add_named_non_production_part(
+            cage.get_non_production_part_by_name("tensioner_nut"),
+            "tensioner_nut",
+        )
 
     endcap_vertical_couplers = PartCollector()
     for fb in [Alignment.FRONT, Alignment.BACK]:

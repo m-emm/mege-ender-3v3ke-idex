@@ -30,6 +30,7 @@ from mege_ender_3v3ke_idex.designs.gt2belt import (
     gt2_width,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.idler_cage import create_idler_cage
 from mege_ender_3v3ke_idex.designs.metrics_collector import (
     Material,
     log_metrics_report,
@@ -454,8 +455,6 @@ def _add_y_axis_belt_sections(
 
 
 def _create_y_axis_idler_tensioner_cage():
-    from mege_ender_3v3ke_idex.designs.x_axis import create_idler_cage
-
     idler_cage = create_idler_cage(
         cage_back_wall=endcap_tensioner_cage_back_wall,
         cage_front_wall_thickness=idler_cage_wall,
@@ -560,8 +559,16 @@ def _add_y_axis_idler_mount(y_axis, frame, front_belt_reference):
         "idler_axle_screw",
     )
     idler_mount_assembly.add_named_non_production_part(
+        idler_cage.get_non_production_part_by_name("axle_threaded_inset"),
+        "idler_axle_threaded_inset",
+    )
+    idler_mount_assembly.add_named_non_production_part(
         tensioner_screw_part,
         "idler_tensioner_screw",
+    )
+    idler_mount_assembly.add_named_non_production_part(
+        idler_cage.get_non_production_part_by_name("tensioner_nut"),
+        "idler_tensioner_nut",
     )
 
     idler_running_surface = _create_gt2_idler_running_surface_reference(
@@ -597,8 +604,18 @@ def _add_y_axis_idler_mount(y_axis, frame, front_belt_reference):
         "idler_axle_screw",
     )
     y_axis.add_named_non_production_part(
+        idler_mount_assembly.get_non_production_part_by_name(
+            "idler_axle_threaded_inset"
+        ),
+        "idler_axle_threaded_inset",
+    )
+    y_axis.add_named_non_production_part(
         idler_mount_assembly.get_non_production_part_by_name("idler_tensioner_screw"),
         "idler_tensioner_screw",
+    )
+    y_axis.add_named_non_production_part(
+        idler_mount_assembly.get_non_production_part_by_name("idler_tensioner_nut"),
+        "idler_tensioner_nut",
     )
 
     return idler_mount_assembly.get_non_production_part_by_name("idler")
