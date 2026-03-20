@@ -14,7 +14,12 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
-from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler, create_gt2_pulley
+from mege_ender_3v3ke_idex.designs.gt2belt import (
+    create_gt2_idler,
+    create_gt2_pulley,
+    create_gt2belt,
+    gt2_pitch,
+)
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.metrics_collector import (
     Material,
@@ -64,6 +69,9 @@ y_axis_drive_idler_plate_width = 34
 y_axis_drive_idler_plate_depth = 40
 y_axis_drive_motor_pulley_teeth = 20
 y_axis_drive_idler_teeth = 20
+y_axis_drive_idler_box_shell_wall = 2.5
+y_axis_drive_idler_box_top_wall = motor_mount_plate_thickness
+y_axis_drive_belt_clear_span_extra = 0
 
 
 def _record_weight_for_part(part, *, material: Material, part_id: str):
@@ -184,15 +192,10 @@ def _create_y_axis_frame_cross_profile_reference(frame, front_back):
 
 
 def _align_part_to_frame_profile_inner_face(part, frame_cross_profile, front_back):
-    part_bb = get_bounding_box(part)
-    frame_cross_profile_bb = get_bounding_box(frame_cross_profile)
-
     if front_back == Alignment.BACK:
-        delta_y = frame_cross_profile_bb[0][1] - part_bb[1][1]
-    else:
-        delta_y = frame_cross_profile_bb[1][1] - part_bb[0][1]
+        return align(part, frame_cross_profile, Alignment.STACK_FRONT)
 
-    return translate(0, delta_y, 0)(part)
+    return align(part, frame_cross_profile, Alignment.STACK_BACK)
 
 
 def create_y_axis_profile_mount_plate(
@@ -207,6 +210,24 @@ def create_y_axis_profile_mount_plate(
         no_fillets_at=[Alignment.FRONT, Alignment.BACK, Alignment.BOTTOM],
     )
 
+    hole_drill_diameter = MScrew.from_size(
+        y_axis_drive_mount_screw_size
+    ).clearance_hole_loose
+
+    hole_drills = create_y_axis_profile_mount_hole_drills(
+        num_holes=num_holes,
+        screw_inset=screw_inset,
+    )
+    hole_drills = align(hole_drills, plate, Alignment.CENTER)
+    plate = plate.cut(hole_drills)
+
+    return plate
+
+
+def create_y_axis_profile_mount_hole_drills(
+    num_holes=2,
+    screw_inset=y_axis_drive_mount_screw_inset,
+):
     hole_drill_diameter = MScrew.from_size(
         y_axis_drive_mount_screw_size
     ).clearance_hole_loose
@@ -232,13 +253,10 @@ def create_y_axis_profile_mount_plate(
         hole_drill = translate(i * hole_pitch, 0, 0)(hole_drill)
         hole_drills = hole_drills.fuse(hole_drill)
 
-    hole_drills = align(hole_drills, plate, Alignment.CENTER)
-    plate = plate.cut(hole_drills)
-
-    return plate
+    return hole_drills
 
 
-def _create_y_axis_motor_mount(y_axis, frame, back_belt_clamp):
+def _create_y_axis_motor_mount(y_axis, frame, back_belt_reference):
     frame_back_profile = _create_y_axis_frame_cross_profile_reference(
         frame,
         Alignment.BACK,
@@ -258,7 +276,7 @@ def _create_y_axis_motor_mount(y_axis, frame, back_belt_clamp):
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
     motor_mount_plate = align(
-        motor_mount_plate, back_belt_clamp, Alignment.CENTER, axes=[0]
+        motor_mount_plate, back_belt_reference, Alignment.CENTER, axes=[0]
     )
     motor_mount_plate = _align_part_to_frame_profile_inner_face(
         motor_mount_plate,
@@ -270,7 +288,7 @@ def _create_y_axis_motor_mount(y_axis, frame, back_belt_clamp):
         num_teeth=y_axis_drive_motor_pulley_teeth,
         belt_width=6,
     )
-    pulley = align(pulley, back_belt_clamp, Alignment.CENTER, axes=[0, 2])
+    pulley = align(pulley, back_belt_reference, Alignment.CENTER, axes=[0, 2])
     pulley = align(pulley, motor_mount_plate, Alignment.CENTER, axes=[1])
 
     motor = motor.aligned_from_follower("axle", pulley, Alignment.CENTER)
@@ -298,22 +316,57 @@ def _create_y_axis_motor_mount(y_axis, frame, back_belt_clamp):
         y_axis.add_named_non_production_part(part, f"motor_{name}")
     y_axis.add_named_non_production_part(pulley, "motor_pulley")
 
+    return pulley
 
-def _add_y_axis_idler_mount(y_axis, frame, front_belt_clamp):
+
+def _translate_part_center_to_axis_value(part, axis, value):
+    center = get_bounding_box_center(part)
+    delta = [0, 0, 0]
+    delta[axis] = value - center[axis]
+    return translate(*delta)(part)
+
+
+def _add_y_axis_belt_sections(
+    y_axis,
+    pulley,
+    idler,
+    front_belt_reference,
+    back_belt_reference,
+):
+    pulley_center = get_bounding_box_center(pulley)
+    idler_center = get_bounding_box_center(idler)
+    belt_length = abs(pulley_center[1] - idler_center[1]) + y_axis_drive_belt_clear_span_extra
+    num_teeth = max(1, int(round(belt_length / gt2_pitch)))
+    belt_center_y = (pulley_center[1] + idler_center[1]) / 2
+
+    for side, rotation_angle, belt_reference in (
+        (Alignment.LEFT, -90, back_belt_reference),
+        (Alignment.RIGHT, 90, front_belt_reference),
+    ):
+        belt = create_gt2belt(num_teeth=num_teeth)
+        belt = rotate(rotation_angle)(belt)
+        belt = _translate_part_center_to_axis_value(belt, 1, belt_center_y)
+        belt = align(belt, belt_reference, Alignment.CENTER, axes=[2])
+        belt = align(belt, pulley, side.stack_alignment)
+        y_axis.add_named_non_production_part(
+            belt,
+            f"y_axis_belt_section_{side.name.lower()}",
+        )
+
+
+def _add_y_axis_idler_mount(y_axis, frame, front_belt_reference):
     frame_front_profile = _create_y_axis_frame_cross_profile_reference(
         frame,
         Alignment.FRONT,
     )
 
-    idler_mount_plate = create_filleted_box(
+    idler_mount_plate = create_box(
         y_axis_drive_idler_plate_width,
         y_axis_drive_idler_plate_depth,
-        motor_mount_plate_thickness,
-        motor_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+        y_axis_drive_profile_mount_plate_height,
     )
     idler_mount_plate = align(
-        idler_mount_plate, front_belt_clamp, Alignment.CENTER, axes=[0]
+        idler_mount_plate, front_belt_reference, Alignment.CENTER, axes=[0]
     )
     idler_mount_plate = _align_part_to_frame_profile_inner_face(
         idler_mount_plate,
@@ -322,10 +375,31 @@ def _add_y_axis_idler_mount(y_axis, frame, front_belt_clamp):
     )
 
     idler = create_gt2_idler(num_teeth=y_axis_drive_idler_teeth)
-    idler = align(idler, front_belt_clamp, Alignment.CENTER, axes=[0, 2])
+    idler = align(idler, front_belt_reference, Alignment.CENTER, axes=[0, 2])
     idler = align(idler, idler_mount_plate, Alignment.CENTER, axes=[1])
 
     idler_mount_plate = align(idler_mount_plate, idler, Alignment.STACK_BOTTOM)
+
+    inner_cutter = create_box(
+        y_axis_drive_idler_plate_width - 2 * y_axis_drive_idler_box_shell_wall,
+        y_axis_drive_idler_plate_depth - y_axis_drive_profile_mount_plate_thickness,
+        y_axis_drive_profile_mount_plate_height
+        - y_axis_drive_idler_box_top_wall
+        - y_axis_drive_idler_box_shell_wall,
+    )
+    inner_cutter = align(inner_cutter, idler_mount_plate, Alignment.CENTER, axes=[0])
+    inner_cutter = align(inner_cutter, idler_mount_plate, Alignment.BACK)
+    inner_cutter = align(inner_cutter, idler_mount_plate, Alignment.BOTTOM)
+    inner_cutter = translate(0, 0, y_axis_drive_idler_box_shell_wall)(inner_cutter)
+    idler_mount_plate = idler_mount_plate.cut(inner_cutter)
+
+    profile_mount_hole_drills = create_y_axis_profile_mount_hole_drills()
+    profile_mount_hole_drills = align(
+        profile_mount_hole_drills,
+        idler_mount_plate,
+        Alignment.CENTER,
+    )
+    idler_mount_plate = idler_mount_plate.cut(profile_mount_hole_drills)
 
     axle_cutter = create_cylinder(
         idler_mount_axle_diameter / 2 + idler_mount_axle_clearance,
@@ -334,49 +408,36 @@ def _add_y_axis_idler_mount(y_axis, frame, front_belt_clamp):
     axle_cutter = align(axle_cutter, idler, Alignment.CENTER)
     idler_mount_plate = idler_mount_plate.cut(axle_cutter)
 
-    screw_head_cutter = create_cylinder(
-        MScrew.from_size(axle_screw_size).cylinder_head_diameter / 2
-        + idler_screw_head_clearance,
-        MScrew.from_size(axle_screw_size).cylinder_head_height
-        + 2 * idler_screw_head_clearance,
-    )
-    screw_head_cutter = align(screw_head_cutter, idler, Alignment.CENTER)
-    screw_head_cutter = align(screw_head_cutter, idler_mount_plate, Alignment.BOTTOM)
-    idler_mount_plate = idler_mount_plate.cut(screw_head_cutter)
-
-    profile_mount_plate = create_y_axis_profile_mount_plate()
-    profile_mount_plate = align(
-        profile_mount_plate, idler_mount_plate, Alignment.CENTER, axes=[0]
-    )
-    profile_mount_plate = align(profile_mount_plate, idler_mount_plate, Alignment.FRONT)
-    profile_mount_plate = align(
-        profile_mount_plate, idler_mount_plate, Alignment.STACK_BOTTOM
-    )
-
-    idler_mount_plate = idler_mount_plate.fuse(profile_mount_plate)
-
     idler_axle_screw = create_cylinder_screw(
         size=axle_screw_size,
         length=endcap_axle_screw_length,
     )
     idler_axle_screw = align(idler_axle_screw, idler, Alignment.CENTER)
-    idler_axle_screw = align(idler_axle_screw, idler_mount_plate, Alignment.BOTTOM)
 
     y_axis.add_named_follower(idler_mount_plate, "idler_mount_plate")
     y_axis.add_named_non_production_part(idler, "idler")
     y_axis.add_named_non_production_part(idler_axle_screw, "idler_axle_screw")
 
+    return idler
+
 
 def add_y_axis_drive_hardware(y_axis, print_bed_assembly, frame):
-    back_belt_clamp = print_bed_assembly.get_follower_part_by_name(
-        "belt_clamp_clamp_back"
+    back_belt_reference = print_bed_assembly.get_cutter_part_by_name(
+        "belt_path_cutter_back"
     )
-    front_belt_clamp = print_bed_assembly.get_follower_part_by_name(
-        "belt_clamp_clamp_front"
+    front_belt_reference = print_bed_assembly.get_cutter_part_by_name(
+        "belt_path_cutter_front"
     )
 
-    _create_y_axis_motor_mount(y_axis, frame, back_belt_clamp)
-    _add_y_axis_idler_mount(y_axis, frame, front_belt_clamp)
+    pulley = _create_y_axis_motor_mount(y_axis, frame, back_belt_reference)
+    idler = _add_y_axis_idler_mount(y_axis, frame, front_belt_reference)
+    _add_y_axis_belt_sections(
+        y_axis,
+        pulley,
+        idler,
+        front_belt_reference,
+        back_belt_reference,
+    )
 
     return y_axis
 

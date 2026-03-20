@@ -611,6 +611,10 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
             belt_clamp.leader,
             f"belt_clamp_clamp_{k.name.lower()}",
         )
+        retval.add_named_cutter(
+            belt_clamp.get_follower_part_by_name("belt_path_cutter"),
+            f"belt_path_cutter_{k.name.lower()}",
+        )
 
     undercarriage_with_belt_clamps = retval.fuse(belt_clamp_bases)
 
