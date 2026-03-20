@@ -114,18 +114,8 @@ y_axis_drive_idler_housing_top_wall = 1.0
 y_axis_drive_idler_cage_top_clearance = 0.0
 y_axis_drive_idler_cage_front_clearance = idler_cage_clearance
 y_axis_drive_idler_cage_height = 19
-y_axis_drive_clamped_run_side = Alignment.RIGHT
 y_axis_drive_use_toothed_belt_visuals = False
-y_axis_drive_clamped_run_contact_alignment = (
-    Alignment.STACK_LEFT
-    if y_axis_drive_clamped_run_side == Alignment.RIGHT
-    else Alignment.STACK_RIGHT
-)
-y_axis_drive_return_run_alignment = (
-    Alignment.STACK_LEFT
-    if y_axis_drive_clamped_run_side == Alignment.RIGHT
-    else Alignment.STACK_RIGHT
-)
+
 
 gt2_idler_running_surface_diameter_factor = (
     1.061032953945969  # TODO: Remove this magic number
@@ -209,47 +199,6 @@ def create_y_axis_profile_mount_hole_drills(
     return hole_drills
 
 
-def _create_gt2_pulley_running_surface_reference(num_teeth, belt_width=6):
-    pulley_running_surface_diameter = (
-        (num_teeth * gt2_pitch) / math.pi - gt2_thickness + gt2_teeth_thickness
-    )
-    return create_cylinder(pulley_running_surface_diameter / 2, belt_width)
-
-
-def _create_gt2_idler_running_surface_reference(num_teeth, belt_width=6):
-    idler_running_surface_diameter = (
-        (num_teeth * gt2_pitch) / math.pi / gt2_idler_running_surface_diameter_factor
-    )
-    return create_cylinder(idler_running_surface_diameter / 2, belt_width)
-
-
-def _align_part_from_belt_contact_surface(part, contact_surface, belt_reference):
-    part = align_translation(
-        contact_surface,
-        belt_reference,
-        Alignment.CENTER,
-        axes=[2],
-    )(part)
-    return align_translation(
-        contact_surface,
-        belt_reference,
-        y_axis_drive_clamped_run_contact_alignment,
-    )(part)
-
-
-def _create_y_axis_belt_visual(num_teeth):
-    if y_axis_drive_use_toothed_belt_visuals:
-        return create_gt2belt(num_teeth=num_teeth)
-
-    belt_length = num_teeth * gt2_pitch
-    return create_box(
-        belt_length,
-        gt2_thickness,
-        gt2_width,
-        origin=(-belt_length / 2, -gt2_thickness / 2, -gt2_width / 2),
-    )
-
-
 def create_y_axis_motor_mount(frame, back_belt_reference):
     frame_back_profile = frame.get_non_production_part_by_name("frame_profile_back")
     motor = create_nema_composite(
@@ -277,15 +226,9 @@ def create_y_axis_motor_mount(frame, back_belt_reference):
         belt_width=6,
     )
     pulley = align(pulley, motor_mount_plate, Alignment.CENTER, axes=[1])
-    pulley_running_surface = _create_gt2_pulley_running_surface_reference(
-        y_axis_drive_motor_pulley_teeth
-    )
-    pulley_running_surface = align(pulley_running_surface, pulley, Alignment.CENTER)
-    pulley = _align_part_from_belt_contact_surface(
-        pulley,
-        pulley_running_surface,
-        back_belt_reference,
-    )
+
+    pulley = align(pulley, back_belt_reference, Alignment.LEFT)
+    pulley = align(pulley, back_belt_reference, Alignment.TOP)
 
     motor = motor.aligned_from_follower("axle", pulley, Alignment.CENTER)
 
@@ -346,49 +289,6 @@ def _translate_part_center_to_axis_value(part, axis, value):
     delta = [0, 0, 0]
     delta[axis] = value - center[axis]
     return translate(*delta)(part)
-
-
-def _add_y_axis_belt_sections(
-    y_axis,
-    pulley,
-    idler,
-    front_belt_reference,
-    back_belt_reference,
-):
-    pulley_center = get_bounding_box_center(pulley)
-    idler_center = get_bounding_box_center(idler)
-    belt_length = (
-        abs(pulley_center[1] - idler_center[1]) + y_axis_drive_belt_clear_span_extra
-    )
-    num_teeth = max(1, int(round(belt_length / gt2_pitch)))
-    belt_center_y = (pulley_center[1] + idler_center[1]) / 2
-
-    right_belt_reference = back_belt_reference
-    pulley_running_surface = _create_gt2_pulley_running_surface_reference(
-        y_axis_drive_motor_pulley_teeth
-    )
-    pulley_running_surface = align(pulley_running_surface, pulley, Alignment.CENTER)
-
-    for side, rotation_angle in (
-        (Alignment.LEFT, 90),
-        (Alignment.RIGHT, -90),
-    ):
-        belt = _create_y_axis_belt_visual(num_teeth)
-        belt = rotate(rotation_angle)(belt)
-        belt = _translate_part_center_to_axis_value(belt, 1, belt_center_y)
-        belt = align(belt, right_belt_reference, Alignment.CENTER, axes=[2])
-
-        if side == y_axis_drive_clamped_run_side:
-            belt = align(belt, right_belt_reference, Alignment.CENTER, axes=[0])
-        else:
-            belt = align(
-                belt, pulley_running_surface, y_axis_drive_return_run_alignment
-            )
-
-        y_axis.add_named_non_production_part(
-            belt,
-            f"y_axis_belt_section_{side.name.lower()}",
-        )
 
 
 def _create_y_axis_idler_tensioner_cage():
@@ -579,6 +479,25 @@ def add_y_axis_drive_hardware(y_axis, print_bed_assembly, frame):
     return y_axis
 
 
+def create_belts(frame):
+
+    frame_size = get_bounding_box_size(frame)
+
+    pulley = create_gt2_pulley(
+        num_teeth=y_axis_drive_motor_pulley_teeth,
+        belt_width=gt2_width,
+    )
+
+    retval = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        belt = create_box(gt2_thickness, frame_size[1], gt2_width)
+        belt = align(belt, pulley, lr)
+
+        retval = retval.fuse(belt)
+
+    return retval
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
@@ -590,6 +509,11 @@ def main():
     belt_reference = create_box(10, 10, 10)
     belt_reference = align(belt_reference, frame, Alignment.CENTER)
     belt_reference = align(belt_reference, frame, Alignment.STACK_TOP)
+
+    belts = create_belts(frame)
+    belts = align(belts, belt_reference, Alignment.CENTER)
+    belts = align(belts, belt_reference, Alignment.LEFT)
+    parts.add(belts, "belts", flip=False, skip_in_production=True)
 
     motor_mount = create_y_axis_motor_mount(frame, belt_reference)
 
