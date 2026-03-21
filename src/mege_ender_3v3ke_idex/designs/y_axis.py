@@ -8,9 +8,7 @@ Usage:
 """
 
 import copy
-import inspect
 import logging
-import math
 import os
 
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401
@@ -21,16 +19,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
-from mege_ender_3v3ke_idex.designs.gt2belt import (
-    create_gt2_pulley,
-    create_gt2belt,
-    gt2_pitch,
-    gt2_teeth_thickness,
-    gt2_thickness,
-    gt2_width,
-)
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.idler_cage import create_idler_cage
 from mege_ender_3v3ke_idex.designs.metrics_collector import (
     Material,
     log_metrics_report,
@@ -39,7 +28,6 @@ from mege_ender_3v3ke_idex.designs.metrics_collector import (
     reset_metrics,
 )
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_rail_with_carriages
-from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from mege_ender_3v3ke_idex.designs.print_bed import (
     Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
     add_print_bed_parts_to_assembly,
@@ -48,8 +36,9 @@ from mege_ender_3v3ke_idex.designs.print_bed import (
 from mege_ender_3v3ke_idex.designs.print_bed_undercarriage import (
     create_print_bed_undercarriage,
 )
-from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
-    create_four_screws_mount_assembly,
+from mege_ender_3v3ke_idex.designs.y_axis_drive import (
+    Y_AXIS_DRIVE_LEADER_NAME,
+    create_y_axis_drive,
 )
 from shellforgepy.simple import *
 
@@ -78,43 +67,6 @@ PROCESS_DATA["process_overrides"].update(
         "wall_loops": "3",
     }
 )
-
-
-y_axis_drive_profile_mount_plate_width = z_axis_profile_mount_width
-y_axis_drive_profile_mount_plate_height = z_axis_profile_mount_plate_height
-y_axis_drive_profile_mount_plate_thickness = z_axis_profile_mount_plate_thickness
-y_axis_drive_profile_mount_plate_fillet_radius = (
-    z_axis_profile_mount_plate_fillet_radius
-)
-y_axis_drive_mount_screw_inset = 5
-y_axis_drive_mount_screw_size = "M5"
-y_axis_drive_motor_plate_width = motor_mount_plate_size
-y_axis_drive_motor_plate_depth = 60
-y_axis_drive_idler_plate_width = 34
-y_axis_drive_idler_plate_depth = 40
-y_axis_drive_motor_pulley_teeth = 20
-y_axis_drive_idler_teeth = 20
-y_axis_drive_belt_clear_span_extra = 0
-y_axis_drive_idler_housing_side_wall = endcap_wall
-y_axis_drive_idler_housing_front_wall = motor_mount_plate_thickness
-y_axis_drive_idler_housing_top_wall = 1.0
-y_axis_drive_idler_cage_top_clearance = 0.0
-y_axis_drive_idler_cage_front_clearance = idler_cage_clearance
-y_axis_drive_idler_cage_height = 19
-y_axis_drive_clamped_run_side = Alignment.RIGHT
-y_axis_drive_use_toothed_belt_visuals = False
-y_axis_drive_clamped_run_contact_alignment = (
-    Alignment.STACK_LEFT
-    if y_axis_drive_clamped_run_side == Alignment.RIGHT
-    else Alignment.STACK_RIGHT
-)
-y_axis_drive_return_run_alignment = (
-    Alignment.STACK_LEFT
-    if y_axis_drive_clamped_run_side == Alignment.RIGHT
-    else Alignment.STACK_RIGHT
-)
-gt2_idler_running_surface_diameter_factor = 1.061032953945969
-
 
 
 def _record_y_axis_carriage_weight_metrics(y_axis):
@@ -202,9 +154,6 @@ def align_y_axis_to_frame(y_axis, frame):
     return _align_y_axis_to_print_bed_undercarriage(y_axis, frame)
 
 
-
-
-
 def create_y_axis():
     """Create the y_axis part."""
 
@@ -288,16 +237,9 @@ def main():
 
     y_axis = align_y_axis_to_frame(create_y_axis(), frame)
     print_bed_assembly = create_positioned_print_bed_assembly(y_axis, frame)
-    y_axis = add_y_axis_drive_hardware(y_axis, print_bed_assembly, frame)
+    y_axis_drive = create_y_axis_drive(frame, print_bed_assembly)
 
     parts.add(y_axis.leader, "y_axis", flip=False, skip_in_production=True)
-    # parts.add(
-    #     print_bed_assembly,
-    #     "print_bed_undercarriage",
-    #     flip=False,
-    #     skip_in_production=False,
-    #     animation=bed_animation,
-    # )
     for name, follower in print_bed_assembly.get_named_follower_items():
         parts.add(
             follower,
@@ -322,8 +264,6 @@ def main():
         if "carriage" in name:
             _logger.info(f"Using bed_animation for {name}")
             animation = bed_animation
-        elif "mount" in name or "cage" in name:
-            skip_in_production = False
         else:
             _logger.info(f"NOT Using bed_animation for {name}")
 
@@ -345,6 +285,17 @@ def main():
             _logger.info(f"NOT Using bed_animation for {name}")
 
         parts.add(npp, name, flip=False, skip_in_production=True, animation=animation)
+
+    parts.add(
+        y_axis_drive.leader,
+        Y_AXIS_DRIVE_LEADER_NAME,
+        flip=False,
+        skip_in_production=True,
+    )
+    for name, follower in y_axis_drive.get_named_follower_items():
+        parts.add(follower, name, flip=False, skip_in_production=True)
+    for name, npp in y_axis_drive.get_named_non_production_part_items():
+        parts.add(npp, name, flip=False, skip_in_production=True)
 
     log_metrics_report(_logger)
     _logger.info(

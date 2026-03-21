@@ -89,7 +89,7 @@ print_bed_undercarriage_dovetail_front_clearance = 0.2
 
 print_bed_undercarriage_carriage_mount_plate_thickness = 5
 print_bed_undercarriage_carriage_mount_plate_oversize = 4
-
+print_bed_undercarriage_belt_clamp_screw_hole_border = 4
 
 _logger = logging.getLogger(__name__)
 
@@ -474,14 +474,12 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
     mount_plates = PartCollector()
     for name, carriage in new_carriages_map.items():
 
-
-
-
-
         carriage_size = get_bounding_box_size(carriage)
         carriage_mount_plate = create_box(
-            carriage_size[0] + 2 * print_bed_undercarriage_carriage_mount_plate_oversize,
-            carriage_size[1] + 2 * print_bed_undercarriage_carriage_mount_plate_oversize,
+            carriage_size[0]
+            + 2 * print_bed_undercarriage_carriage_mount_plate_oversize,
+            carriage_size[1]
+            + 2 * print_bed_undercarriage_carriage_mount_plate_oversize,
             print_bed_undercarriage_profiles_height,
         )
         carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.CENTER)
@@ -499,16 +497,13 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
         )
         inner_cutter = align(inner_cutter, carriage_mount_plate, Alignment.CENTER)
         inner_cutter = align(inner_cutter, carriage_mount_plate, Alignment.BOTTOM)
-        inner_cutter = translate(0, 0, print_bed_undercarriage_carriage_mount_plate_thickness)(inner_cutter)
+        inner_cutter = translate(
+            0, 0, print_bed_undercarriage_carriage_mount_plate_thickness
+        )(inner_cutter)
 
         carriage_mount_plate = carriage_mount_plate.cut(inner_cutter)
-            
 
-        
         mount_plates = mount_plates.fuse(carriage_mount_plate)
-
-
-
 
     undercarriage = undercarriage.fuse(mount_plates)
 
@@ -584,7 +579,7 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
             base_thicknness=print_bed_undercarriage_belt_clamp_base_thickness,
             clamp_thickness=print_bed_undercarriage_belt_clamp_clamp_thickness,
             clamp_length=print_bed_undercarriage_belt_clamp_clamp_length,
-            screw_hole_border=2,
+            screw_hole_border=print_bed_undercarriage_belt_clamp_screw_hole_border,
         )
         belt_clamp = rotate(90, axis=(1, 0, 0))(belt_clamp)
         belt_clamp = rotate(90)(belt_clamp)
