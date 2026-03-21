@@ -116,6 +116,8 @@ y_axis_drive_idler_cage_front_clearance = idler_cage_clearance
 y_axis_drive_idler_cage_height = 19
 y_axis_drive_use_toothed_belt_visuals = False
 
+y_axis_drive_tensioner_screw_z_offset = 2.0
+
 
 gt2_idler_running_surface_diameter_factor = (
     1.061032953945969  # TODO: Remove this magic number
@@ -199,7 +201,7 @@ def create_y_axis_profile_mount_hole_drills(
     return hole_drills
 
 
-def create_y_axis_motor_mount(frame, back_belt_reference):
+def create_y_axis_motor_mount(frame, belts_reference):
     frame_back_profile = frame.get_non_production_part_by_name("frame_profile_back")
     motor = create_nema_composite(
         axle_length=x_axis_motor_axle_length,
@@ -227,8 +229,8 @@ def create_y_axis_motor_mount(frame, back_belt_reference):
     )
     pulley = align(pulley, motor_mount_plate, Alignment.CENTER, axes=[1])
 
-    pulley = align(pulley, back_belt_reference, Alignment.LEFT)
-    pulley = align(pulley, back_belt_reference, Alignment.TOP)
+    pulley = align(pulley, belts_reference, Alignment.CENTER, axes=[0])
+    pulley = align(pulley, belts_reference, Alignment.TOP)
 
     motor = motor.aligned_from_follower("axle", pulley, Alignment.CENTER)
 
@@ -305,6 +307,7 @@ def _create_y_axis_idler_tensioner_cage():
         axle_screw_length=endcap_axle_screw_length,
         belt_clearance=endcap_belt_clearance,
         cage_width_override=y_axis_drive_idler_plate_width,
+        tensioner_screw_z_offset=y_axis_drive_tensioner_screw_z_offset,
     )
 
     return rotate(90)(idler_cage)
@@ -413,7 +416,7 @@ def create_y_axis_idler_mount(frame, belt_reference):
         "idler", belt_reference, Alignment.TOP
     )
     idler_mount_assembly = idler_mount_assembly.aligned_from_non_production_part(
-        "idler", belt_reference, Alignment.LEFT
+        "idler", belt_reference, Alignment.CENTER, axes=[0]
     )
 
     return idler_mount_assembly
@@ -471,14 +474,19 @@ def main():
     belt_reference = align(belt_reference, frame, Alignment.CENTER)
     belt_reference = align(belt_reference, frame, Alignment.STACK_TOP)
 
-    parts.add(belt_reference, "belt_reference", flip=False, skip_in_production=True, color=(1.0,0.8,0.8))
+    parts.add(
+        belt_reference,
+        "belt_reference",
+        flip=False,
+        skip_in_production=True,
+        color=(1.0, 0.8, 0.8),
+    )
 
     belts = create_belts(frame)
     belts = align(belts, belt_reference, Alignment.CENTER)
     belts = align(belts, belt_reference, Alignment.LEFT)
-    parts.add(belts, "belts", flip=False, skip_in_production=True)
 
-    motor_mount = create_y_axis_motor_mount(frame, belt_reference)
+    motor_mount = create_y_axis_motor_mount(frame, belts)
 
     parts.add(motor_mount, "y_axis_motor_mount", flip=False, skip_in_production=True)
     for name, follower in motor_mount.get_named_follower_items():
@@ -491,7 +499,7 @@ def main():
             npp, f"y_axis_motor_mount_{name}", flip=False, skip_in_production=True
         )
 
-    idler_mount = create_y_axis_idler_mount(frame, belt_reference)
+    idler_mount = create_y_axis_idler_mount(frame, belts)
 
     parts.add(idler_mount, "y_axis_idler_mount", flip=False, skip_in_production=True)
     for name, follower in idler_mount.get_named_follower_items():
@@ -502,6 +510,23 @@ def main():
         parts.add(
             npp, f"y_axis_idler_mount_{name}", flip=False, skip_in_production=True
         )
+
+    idler = idler_mount.get_non_production_part_by_name("idler")
+
+    belt_idler_side_belt_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    idler_side_belt_cutter = align(belt_idler_side_belt_cutter, belts, Alignment.CENTER)
+    idler_side_belt_cutter = align(idler_side_belt_cutter, idler, Alignment.STACK_FRONT)
+    belts = belts.cut(idler_side_belt_cutter)
+
+    pulley = motor_mount.get_non_production_part_by_name("motor_pulley")
+    pulley_side_belt_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    pulley_side_belt_cutter = align(pulley_side_belt_cutter, belts, Alignment.CENTER)
+    pulley_side_belt_cutter = align(
+        pulley_side_belt_cutter, pulley, Alignment.STACK_BACK
+    )
+    belts = belts.cut(pulley_side_belt_cutter)
+
+    parts.add(belts, "belts", flip=False, skip_in_production=True)
 
     # Arrange and export
     arrange_and_export(
