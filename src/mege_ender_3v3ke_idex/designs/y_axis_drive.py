@@ -286,13 +286,6 @@ def create_y_axis_motor_mount(frame, belts_reference):
     return retval
 
 
-def _translate_part_center_to_axis_value(part, axis, value):
-    center = get_bounding_box_center(part)
-    delta = [0, 0, 0]
-    delta[axis] = value - center[axis]
-    return translate(*delta)(part)
-
-
 def _create_y_axis_idler_tensioner_cage():
     idler_cage = create_idler_cage(
         cage_back_wall=endcap_tensioner_cage_back_wall,
@@ -310,7 +303,9 @@ def _create_y_axis_idler_tensioner_cage():
         tensioner_screw_z_offset=y_axis_drive_tensioner_screw_z_offset,
     )
 
-    return rotate(90)(idler_cage)
+    retval = rotate(90)(idler_cage)
+
+    return retval
 
 
 def create_y_axis_idler_mount(frame, belt_reference):
@@ -386,6 +381,7 @@ def create_y_axis_idler_mount(frame, belt_reference):
     outer_box = outer_box.cut(tensioner_screw_hole_cutter)
 
     idler_mount_assembly = LeaderFollowersCuttersPart(leader=outer_box)
+    outer_box = None  # No longer valid - will be moved inside the assembly
     idler_mount_assembly.add_named_follower(idler_cage.leader, "idler_tensioner_cage")
     idler_mount_assembly.add_named_non_production_part(
         idler_cage.get_non_production_part_by_name("idler"),
@@ -418,6 +414,30 @@ def create_y_axis_idler_mount(frame, belt_reference):
     idler_mount_assembly = idler_mount_assembly.aligned_from_non_production_part(
         "idler", belt_reference, Alignment.CENTER, axes=[0]
     )
+
+    idler_profile_mount_plate = create_y_axis_profile_mount_plate()
+
+    idler_profile_center = get_bounding_box_center(idler_cage.leader)
+    idler_profile_mount_plate = rotate(180, center=idler_profile_center)(
+        idler_profile_mount_plate
+    )
+
+    idler_profile_mount_plate = idler_profile_mount_plate.prefixed_copy("idler")
+
+    idler_profile_mount_plate = align(
+        idler_profile_mount_plate, idler_mount_assembly, Alignment.CENTER, axes=[0]
+    )
+    idler_profile_mount_plate = align(
+        idler_profile_mount_plate, idler_mount_assembly, Alignment.FRONT
+    )
+    idler_profile_mount_plate = align(
+        idler_profile_mount_plate, frame_front_profile, Alignment.CENTER, axes=[2]
+    )
+
+    outer_box_cutter = materialize_bounding_box(idler_mount_assembly)
+    idler_profile_mount_plate = idler_profile_mount_plate.cut(outer_box_cutter)
+
+    idler_mount_assembly = idler_mount_assembly.fuse(idler_profile_mount_plate)
 
     return idler_mount_assembly
 
