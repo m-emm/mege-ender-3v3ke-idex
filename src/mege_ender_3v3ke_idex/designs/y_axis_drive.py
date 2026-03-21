@@ -83,9 +83,9 @@ y_axis_drive_idler_housing_front_wall = motor_mount_plate_thickness
 y_axis_drive_idler_housing_top_wall = 1.0
 y_axis_drive_idler_cage_top_clearance = 0.0
 y_axis_drive_idler_cage_front_clearance = idler_cage_clearance
-y_axis_drive_idler_cage_height = 19
+y_axis_drive_idler_cage_height = 20
 y_axis_drive_use_toothed_belt_visuals = False
-y_axis_drive_tensioner_screw_z_offset = 2.0
+y_axis_drive_tensioner_screw_z_offset = 3.5
 y_axis_drive_clamped_run_side = Alignment.RIGHT
 y_axis_drive_clamped_run_contact_alignment = (
     Alignment.STACK_LEFT

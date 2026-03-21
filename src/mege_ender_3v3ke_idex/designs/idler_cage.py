@@ -54,6 +54,16 @@ def _create_tensioner_nut_visual(screw_size):
     return nut
 
 
+def _get_min_cage_height_for_threaded_inset(
+    idler_height,
+    screw_size=axle_screw_size,
+    extra_length=0.0,
+):
+    return idler_height + 2 * (
+        m_screws_table[screw_size]["thread_inset_length"] + extra_length
+    )
+
+
 def create_idler_cage(
     cage_back_wall,
     cage_wall,
@@ -74,6 +84,15 @@ def create_idler_cage(
 
     idler = create_gt2_idler(num_teeth=idler_tooth_count)
     idler_size = get_bounding_box_size(idler)
+    min_cage_height_for_threaded_inset = _get_min_cage_height_for_threaded_inset(
+        idler_size[2],
+        screw_size=axle_screw_size,
+        extra_length=inset_cutter_hole_slack,
+    )
+    assert cage_height >= min_cage_height_for_threaded_inset, (
+        f"Cage height {cage_height} too low for {axle_screw_size} threaded inset; "
+        f"need at least {min_cage_height_for_threaded_inset:.2f}"
+    )
 
     effective_front_wall_thickness = (
         cage_wall if cage_front_wall_thickness is None else cage_front_wall_thickness
@@ -290,10 +309,10 @@ def _get_demo_cage_height(
     default_demo_height = (
         idler_height + 2 * idler_clearance + 2 * idler_cage_top_bottom_thickness
     )
-    min_height_for_threaded_inset = (
-        idler_height
-        + 2 * m_screws_table[axle_screw_size]["thread_inset_length"]
-        + 2 * threaded_inset_visual_gap
+    min_height_for_threaded_inset = _get_min_cage_height_for_threaded_inset(
+        idler_height,
+        screw_size=axle_screw_size,
+        extra_length=threaded_inset_visual_gap,
     )
 
     return max(default_demo_height, min_height_for_threaded_inset)
