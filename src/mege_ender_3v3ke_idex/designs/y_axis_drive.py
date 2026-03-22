@@ -17,6 +17,7 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
     PROCESS_DATA_PLACF_04_HS,
 )
 from mege_ender_3v3ke_idex.designs.gt2belt import (
+    create_gt_belt_clamp,
     create_gt2_pulley,
     create_gt2belt,
     gt2_pitch,
@@ -27,6 +28,16 @@ from mege_ender_3v3ke_idex.designs.gt2belt import (
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.idler_cage import create_idler_cage
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
+from mege_ender_3v3ke_idex.designs.print_bed_undercarriage import (
+    print_bed_undercarriage_belt_clamp_base_thickness,
+    print_bed_undercarriage_belt_clamp_clamp_length,
+    print_bed_undercarriage_belt_clamp_clamp_thickness,
+    print_bed_undercarriage_belt_clamp_screw_hole_border,
+    print_bed_undercarriage_belt_clamp_x_offset,
+    print_bed_undercarriage_central_annulus_diameter,
+    print_bed_undercarriage_profiles_height,
+    print_bed_undercarriage_profiles_width,
+)
 from mege_ender_3v3ke_idex.designs.printer_frame import create_printer_frame
 from shellforgepy.simple import *
 
@@ -151,6 +162,75 @@ def _create_y_axis_belt_visual(num_teeth):
         gt2_width,
         origin=(-belt_length / 2, -gt2_thickness / 2, -gt2_width / 2),
     )
+
+
+def _create_positioned_print_bed_reference(frame):
+    print_bed = create_box(print_bed_width, print_bed_depth, print_bed_thickness)
+    print_bed = align(print_bed, frame, Alignment.CENTER, axes=[0, 1])
+    print_bed = translate(0, -print_bed_y_travel / 2, 0)(print_bed)
+    return align(
+        print_bed,
+        frame,
+        Alignment.STACK_TOP,
+        stack_gap=print_bed_vertical_gap_to_frame,
+    )
+
+
+def _create_positioned_undercarriage_reference(print_bed_reference):
+    undercarriage_reference = create_box(
+        print_bed_undercarriage_central_annulus_diameter,
+        print_bed_undercarriage_central_annulus_diameter,
+        print_bed_undercarriage_profiles_height,
+    )
+    undercarriage_reference = align(
+        undercarriage_reference,
+        print_bed_reference,
+        Alignment.CENTER,
+        axes=[0, 1],
+    )
+    return align(
+        undercarriage_reference,
+        print_bed_reference,
+        Alignment.STACK_BOTTOM,
+        stack_gap=print_bed_damper_height,
+    )
+
+
+def create_y_axis_drive_belt_references(frame):
+    print_bed_reference = _create_positioned_print_bed_reference(frame)
+    undercarriage_reference = _create_positioned_undercarriage_reference(
+        print_bed_reference
+    )
+    belt_references = {}
+
+    for front_back in [Alignment.FRONT, Alignment.BACK]:
+        belt_clamp = create_gt_belt_clamp(
+            base_thicknness=print_bed_undercarriage_belt_clamp_base_thickness,
+            clamp_thickness=print_bed_undercarriage_belt_clamp_clamp_thickness,
+            clamp_length=print_bed_undercarriage_belt_clamp_clamp_length,
+            screw_hole_border=print_bed_undercarriage_belt_clamp_screw_hole_border,
+        )
+        belt_clamp = rotate(90, axis=(1, 0, 0))(belt_clamp)
+        belt_clamp = rotate(90)(belt_clamp)
+        belt_clamp = align(belt_clamp, undercarriage_reference, Alignment.CENTER)
+        belt_clamp = align(belt_clamp, undercarriage_reference, Alignment.STACK_BOTTOM)
+        belt_clamp = translate(
+            -print_bed_undercarriage_belt_clamp_base_thickness / 2
+            + print_bed_undercarriage_belt_clamp_x_offset,
+            front_back.sign
+            * (
+                print_bed_undercarriage_central_annulus_diameter / 2
+                + print_bed_undercarriage_belt_clamp_clamp_length / 2
+                - print_bed_undercarriage_profiles_width
+            ),
+            0,
+        )(belt_clamp)
+
+        belt_references[front_back] = belt_clamp.get_follower_part_by_name(
+            "belt_path_cutter"
+        )
+
+    return belt_references[Alignment.BACK], belt_references[Alignment.FRONT]
 
 
 def create_y_axis_profile_mount_plate():
@@ -529,14 +609,7 @@ def create_y_axis_drive_belt_sections(
     return belt_sections
 
 
-def create_y_axis_drive(frame, print_bed_assembly):
-    back_belt_reference = print_bed_assembly.get_cutter_part_by_name(
-        "belt_path_cutter_back"
-    )
-    front_belt_reference = print_bed_assembly.get_cutter_part_by_name(
-        "belt_path_cutter_front"
-    )
-
+def create_y_axis_drive(frame, *, back_belt_reference, front_belt_reference):
     motor_mount = create_y_axis_motor_mount(frame, back_belt_reference)
     idler_mount = create_y_axis_idler_mount(frame, front_belt_reference)
     belt_sections = create_y_axis_drive_belt_sections(
@@ -562,34 +635,20 @@ def create_y_axis_drive(frame, print_bed_assembly):
 
 
 def main():
-    from mege_ender_3v3ke_idex.designs.y_axis import (
-        align_y_axis_to_frame,
-        create_positioned_print_bed_assembly,
-        create_y_axis,
-    )
-
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
     frame = create_printer_frame()
-    y_axis = align_y_axis_to_frame(create_y_axis(), frame)
-    print_bed_assembly = create_positioned_print_bed_assembly(y_axis, frame)
-    drive = create_y_axis_drive(frame, print_bed_assembly)
+    back_belt_reference, front_belt_reference = create_y_axis_drive_belt_references(
+        frame
+    )
+    drive = create_y_axis_drive(
+        frame,
+        back_belt_reference=back_belt_reference,
+        front_belt_reference=front_belt_reference,
+    )
 
     parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
-    parts.add(y_axis.leader, "y_axis", flip=False, skip_in_production=True)
-
-    for name, follower in y_axis.get_named_follower_items():
-        parts.add(follower, name, flip=False, skip_in_production=True)
-
-    for name, npp in y_axis.get_named_non_production_part_items():
-        parts.add(npp, name, flip=False, skip_in_production=True)
-
-    for name, follower in print_bed_assembly.get_named_follower_items():
-        parts.add(follower, name, flip=False, skip_in_production=True)
-
-    for name, npp in print_bed_assembly.get_named_non_production_part_items():
-        parts.add(npp, name, flip=False, skip_in_production=True)
 
     parts.add(
         drive.leader,
@@ -609,6 +668,7 @@ def main():
         script_file=__file__,
         prod=PROD,
         process_data=PROCESS_DATA,
+        export_stl=PROD,
     )
 
     _logger.info("y_axis_drive created successfully!")

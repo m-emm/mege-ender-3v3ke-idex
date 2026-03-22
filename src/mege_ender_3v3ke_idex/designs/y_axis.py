@@ -237,7 +237,15 @@ def main():
 
     y_axis = align_y_axis_to_frame(create_y_axis(), frame)
     print_bed_assembly = create_positioned_print_bed_assembly(y_axis, frame)
-    y_axis_drive = create_y_axis_drive(frame, print_bed_assembly)
+    y_axis_drive = create_y_axis_drive(
+        frame,
+        back_belt_reference=print_bed_assembly.get_cutter_part_by_name(
+            "belt_path_cutter_back"
+        ),
+        front_belt_reference=print_bed_assembly.get_cutter_part_by_name(
+            "belt_path_cutter_front"
+        ),
+    )
 
     parts.add(y_axis.leader, "y_axis", flip=False, skip_in_production=True)
     for name, follower in print_bed_assembly.get_named_follower_items():
