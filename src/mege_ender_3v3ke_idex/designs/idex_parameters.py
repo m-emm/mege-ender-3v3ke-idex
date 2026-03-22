@@ -28,7 +28,7 @@ printer_foot_nut_cutter_clearance = 0.2
 printer_foot_mount_screw_size = "M5"
 printer_foot_mount_screw_sink = 8
 printer_foot_groove_filler_width = 7.4
-printer_foot_groove_filler_thickness = 4
+printer_foot_groove_filler_thickness = 2
 
 
 axial_ball_bearing_8_x_19_ball_count = 6

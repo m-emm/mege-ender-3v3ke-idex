@@ -57,7 +57,7 @@ PROCESS_DATA["process_overrides"].update(
         "fan_min_speed": "10",
         "outer_wall_speed": "75",
         "sparse_infill_density": "75%",
-        "support_critical_regions_only": "1",
+        # "support_critical_regions_only": "1",
         "support_interface_spacing": "0.8",
         "support_on_build_plate_only": "1",
         "support_threshold_angle": "30",
@@ -95,9 +95,9 @@ y_axis_drive_idler_housing_top_wall = 2
 y_axis_drive_idler_cage_top_clearance = 0.0
 y_axis_drive_idler_cage_front_clearance = idler_cage_clearance
 y_axis_drive_idler_cage_height = 23
-y_axis_drive_tensioner_screw_holder_thickness = 5
+y_axis_drive_tensioner_screw_holder_thickness = 9
 y_axis_drive_tensioner_screw_holder_depth = 5
-y_axis_drive_tensioner_screw_holder_width = 20
+y_axis_drive_tensioner_screw_holder_width = 25
 
 
 y_axis_drive_idler_cage_wall = 2
@@ -105,11 +105,17 @@ y_axis_drive_idler_cage_overlength = 0
 y_axis_drive_idler_clearance = 1.5
 y_axis_drive_idler_cage_back_wall = 4
 
-y_axis_drive_idler_tensioner_screw_length = 30
+y_axis_drive_idler_tensioner_screw_length = 25
+y_axis_drive_idler_tensioner_screw_nut_wall = 3.5
+y_axis_drive_idler_tensioner_guide_clearance = 0.2
+
+y_axis_drive_tensioner_screw_holder_side_width = (
+    y_axis_drive_tensioner_screw_holder_depth
+)
 
 y_axis_drive_idler_axle_screw_length = 20
 
-y_axis_drive_tensioner_screw_size = "M3"
+y_axis_drive_tensioner_screw_size = "M4"
 
 y_axis_drive_use_toothed_belt_visuals = False
 y_axis_drive_tensioner_screw_z_offset = 3.5
@@ -460,7 +466,7 @@ def create_y_axis_idler_mount(frame, belt_reference):
     tensioner_screw_holder_sides = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         front_tensioner_screw_holder_side = create_box(
-            y_axis_drive_tensioner_screw_holder_depth,
+            y_axis_drive_tensioner_screw_holder_side_width,
             idler_cage_raw_size[1],
             y_axis_drive_tensioner_screw_holder_thickness,
         )
@@ -500,6 +506,19 @@ def create_y_axis_idler_mount(frame, belt_reference):
     tensioner_screw = translate(
         0, MScrew.from_size(y_axis_drive_tensioner_screw_size).cylinder_head_height, 0
     )(tensioner_screw)
+
+    tensioner_screw_hole_drill = create_cylinder(
+        MScrew.from_size(y_axis_drive_tensioner_screw_size).clearance_hole_loose / 2,
+        BIG_THING,
+        direction=(0, 1, 0),
+    )
+    tensioner_screw_hole_drill = align(
+        tensioner_screw_hole_drill, tensioner_screw, Alignment.CENTER
+    )
+
+    front_tensioner_screw_holder = front_tensioner_screw_holder.cut(
+        tensioner_screw_hole_drill
+    )
 
     idler_cage = idler_cage.fuse(front_tensioner_screw_holder)
 
@@ -551,6 +570,72 @@ def create_y_axis_idler_mount(frame, belt_reference):
     inner_cutter = align(inner_cutter, idler_cage, Alignment.CENTER, axes=[0, 2])
     inner_cutter = align(inner_cutter, front_wall_ref, Alignment.STACK_BACK)
     outer_box = outer_box.cut(inner_cutter)
+
+    tensioner_screw = idler_cage.get_non_production_part_by_name(
+        "idler_tensioner_screw"
+    )
+
+    tensioner_guide_width = (
+        y_axis_drive_tensioner_screw_holder_width
+        - 2 * y_axis_drive_tensioner_screw_holder_side_width
+        - 2 * y_axis_drive_idler_tensioner_guide_clearance
+    )
+    tensioner_guide_thickness = (
+        y_axis_drive_tensioner_screw_holder_thickness
+        + idler_cage_clearance
+        - y_axis_drive_idler_tensioner_guide_clearance
+    )
+    tensioner_guide_depth = (
+        idler_cage_size[1]
+        - y_axis_drive_tensioner_screw_holder_depth
+        - y_axis_drive_idler_tensioner_guide_clearance
+    )
+
+    tensioner_guide = create_box(
+        tensioner_guide_width,
+        tensioner_guide_depth,
+        tensioner_guide_thickness,
+    )
+
+    tensioner_guide = align(tensioner_guide, idler_cage, Alignment.CENTER)
+    tensioner_guide = align(tensioner_guide, idler_cage, Alignment.BOTTOM)
+    tensioner_guide = align(tensioner_guide, outer_box, Alignment.BACK)
+
+    tensioner_guide = translate(
+        0,
+        -y_axis_drive_tensioner_screw_holder_depth
+        - y_axis_drive_idler_tensioner_guide_clearance,
+        -idler_cage_clearance,
+    )(tensioner_guide)
+
+    outer_box = outer_box.fuse(tensioner_guide)
+
+    hidden_nut_cutter = create_hidden_nut_pocket_cutter(
+        y_axis_drive_tensioner_screw_size,
+        bottom_cutter_length=20,
+        top_cutter_length=20,
+        slack=0.3,
+    )
+
+    hidden_nut_cutter = rotate(-90, axis=(1, 0, 0))(hidden_nut_cutter)
+    hidden_nut_cutter = rotate(180, axis=(0, 0, 1))(hidden_nut_cutter)
+
+    hidden_nut_cutter = align(
+        hidden_nut_cutter,
+        tensioner_screw,
+        Alignment.CENTER,
+    )
+    hidden_nut_cutter = align(
+        hidden_nut_cutter,
+        tensioner_guide,
+        Alignment.BACK,
+    )
+
+    hidden_nut_cutter = translate(0, -y_axis_drive_idler_tensioner_screw_nut_wall, 0)(
+        hidden_nut_cutter
+    )
+
+    outer_box = hidden_nut_cutter.use_as_cutter_on(outer_box)
 
     profile_mount_hole_drills = create_y_axis_profile_mount_hole_drills()
     profile_mount_hole_drills = align(
@@ -732,16 +817,59 @@ def main():
         Y_AXIS_DRIVE_LEADER_NAME,
         flip=False,
         skip_in_production=False,
+        prod_rotation_angle=-90,
+        prod_rotation_axis=(1, 0, 0),
     )
 
-    for name, follower in drive.get_named_follower_items():
-        if "idler_tensioner_cage" in name:
-            follower = translate(0, 30, 0)(follower)
+    idler_tensioner_cage = drive.get_follower_part_by_name("idler_tensioner_cage")
+    idler_tensioner_cage_size = get_bounding_box_size(idler_tensioner_cage)
 
-        _logger.info(f"Adding follower part '{name}'")
-        parts.add(follower, name, flip=False, skip_in_production=False)
+    tensioner_animation = {"tensioner_y": (0, 2 * idler_tensioner_cage_size[1], 0)}
+
+    for name, follower in drive.get_named_follower_items():
+        animation = None
+        if "idler_tensioner_cage" in name:
+            animation = tensioner_animation
+        if name == "idler_mount_box" and not PROD:
+
+            half_2, half_1 = cut_in_two(follower)
+            parts.add(
+                half_1,
+                name + "_half_1",
+                flip=False,
+                skip_in_production=False,
+            )
+
+            parts.add(
+                half_2,
+                name + "_half_2",
+                flip=False,
+                skip_in_production=False,
+                animation={"idler_mount_box_half_2_x": (0, -50, 0)},
+            )
+
+        else:
+
+            _logger.info(f"Adding production part '{name}'")
+
+            prod_rotation_angles = {
+                "idler_mount_box": 90,
+                "idler_tensioner_cage": -90,
+            }
+            prod_rotation_angle = prod_rotation_angles[name] 
+
+            parts.add(
+                follower,
+                name,
+                flip=False,
+                skip_in_production=False,
+                prod_rotation_angle=prod_rotation_angle,
+                prod_rotation_axis=(1, 0, 0),
+                animation=animation,
+            )
 
     for name, npp in drive.get_named_non_production_part_items():
+        animation = None
         if (
             "idler_tensioner_cage" in name
             or name == "idler"
@@ -749,10 +877,10 @@ def main():
             or name == "idler_axle_threaded_inset"
             or name == "idler_tensioner_screw"
         ):
-            npp = translate(0, 30, 0)(npp)
+            animation = tensioner_animation
 
         _logger.info(f"Adding non-production part '{name}'")
-        parts.add(npp, name, flip=False, skip_in_production=True)
+        parts.add(npp, name, flip=False, skip_in_production=True, animation=animation)
 
     for partspec in parts.parts:
         _logger.info(f"Part '{partspec.name}'")
@@ -763,6 +891,7 @@ def main():
         prod=PROD,
         process_data=PROCESS_DATA,
         export_stl=PROD,
+        prod_gap=5,
     )
 
     _logger.info("y_axis_drive created successfully!")
