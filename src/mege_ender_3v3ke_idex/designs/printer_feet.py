@@ -14,6 +14,7 @@ import os
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (
     PROCESS_DATA_TPU_04_HS,
 )
+from mege_ender_3v3ke_idex.designs import screw_mount_assembly
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (  # noqa: F401
     create_four_screws_mount_assembly,
@@ -33,6 +34,12 @@ PROCESS_DATA["process_overrides"].update(
         "brim_type": "no_brim",
     }
 )
+
+
+tpu_slit_thickness = 0.15
+tpu_slit_clearance = 0.5
+tpu_slit_distance = 1
+tpu_num_slits = 3
 
 
 def create_printer_feet(frame):
@@ -78,7 +85,39 @@ def create_printer_feet(frame):
                 f"printer_foot_{lr.name.lower()}_{fb.name.lower()}"
             )
 
+            slit_height = (
+                printer_foot_screw_length
+                - 2 * tpu_slit_clearance
+                - printer_foot_mount_screw_sink
+            )
+
+            for i in range(tpu_num_slits):
+
+                radius = (
+                    MScrew.from_size(printer_foot_mount_screw_size).clearance_hole_loose
+                    / 2
+                    + i * tpu_slit_distance
+                )
+
+                slit = create_ring(
+                    outer_radius=radius + tpu_slit_thickness / 2,
+                    inner_radius=radius - tpu_slit_thickness / 2,
+                    height=slit_height,
+                )
+
+                slit = align(slit, foot, Alignment.CENTER)
+
+                slit = align(slit, foot, Alignment.TOP)
+                slit = translate(0, 0, -tpu_slit_clearance)(slit)
+
+                foot = foot.cut(slit)
+
+                # retval.add_named_follower(
+                #     slit, f"foot_slit_{i}_{lr.name.lower()}_{fb.name.lower()}"
+                # )
+
             retval = retval.fuse(foot_assembly)
+
             retval.add_named_follower(foot, f"foot_{lr.name.lower()}_{fb.name.lower()}")
 
     return retval
@@ -94,11 +133,14 @@ def main():
     parts = PartList()
 
     frame = create_printer_frame()
-    parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
+    # parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
 
     feet = create_printer_feet(frame)
 
     for name, follower in feet.get_named_follower_items():
+        # follower, _ = cut_in_two(follower, cut_normal=(0, 0, 1))
+        if not "left_front" in name:
+            continue
         parts.add(follower, name, flip=True, skip_in_production=False)
 
     for name, npp in feet.get_named_non_production_part_items():
