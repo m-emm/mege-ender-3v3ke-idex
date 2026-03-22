@@ -112,9 +112,31 @@ def create_printer_feet(frame):
 
                 foot = foot.cut(slit)
 
-                # retval.add_named_follower(
-                #     slit, f"foot_slit_{i}_{lr.name.lower()}_{fb.name.lower()}"
-                # )
+            ratio = (
+                (printer_foot_base_size - printer_foot_top_size)
+                / 2
+                / printer_foot_height
+            )
+
+            # groove_filler = create_box(
+            #     printer_foot_groove_filler_width,
+            #     printer_foot_base_size,
+            #     printer_foot_groove_filler_thickness,
+            # )
+            groove_filler = create_pyramid_stump(
+                printer_foot_groove_filler_width,
+                printer_foot_groove_filler_width,
+                printer_foot_base_size,
+                printer_foot_base_size + (2*ratio * printer_foot_groove_filler_thickness),
+                printer_foot_groove_filler_thickness,
+            )
+
+            groove_filler = align(groove_filler, foot, Alignment.CENTER)
+            groove_filler = align(groove_filler, foot, Alignment.STACK_TOP)
+
+            groove_filler = screw_mount_assembly.use_as_cutter_on(groove_filler)
+
+            foot = foot.fuse(groove_filler)
 
             retval = retval.fuse(foot_assembly)
 
@@ -133,15 +155,18 @@ def main():
     parts = PartList()
 
     frame = create_printer_frame()
-    # parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
+    parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
 
     feet = create_printer_feet(frame)
 
     for name, follower in feet.get_named_follower_items():
         # follower, _ = cut_in_two(follower, cut_normal=(0, 0, 1))
-        if not "left_front" in name:
+        if not "left_front" in name and PROD:
             continue
-        parts.add(follower, name, flip=True, skip_in_production=False)
+
+        if PROD:
+            follower = orient_max_planar_area(follower, optimize_bed_adhesion_area=True)
+        parts.add(follower, name, flip=False, skip_in_production=False)
 
     for name, npp in feet.get_named_non_production_part_items():
         parts.add(npp, name, flip=False, skip_in_production=True)
