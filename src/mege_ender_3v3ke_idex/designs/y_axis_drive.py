@@ -830,6 +830,9 @@ def main():
         animation = None
         if "idler_tensioner_cage" in name:
             animation = tensioner_animation
+
+        if PROD:
+            animation = None
         if name == "idler_mount_box" and not PROD:
 
             half_2, half_1 = cut_in_two(follower)
@@ -856,7 +859,7 @@ def main():
                 "idler_mount_box": 90,
                 "idler_tensioner_cage": -90,
             }
-            prod_rotation_angle = prod_rotation_angles[name] 
+            prod_rotation_angle = prod_rotation_angles[name]
 
             parts.add(
                 follower,

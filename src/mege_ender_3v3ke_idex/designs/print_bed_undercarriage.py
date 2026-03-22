@@ -7,22 +7,21 @@ Usage:
     cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/print_bed_undercarriage.py
 """
 
+import copy
 import logging
 import math
 import os
+
 import numpy as np
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # noqa: F401
     PROCESS_DATA_PETGCF_04_HS,
     PROCESS_DATA_PLACF_04_HS,
 )
-from mege_ender_3v3ke_idex.designs.gt2belt import create_gt_belt_clamp
-
-import copy
-
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
+from mege_ender_3v3ke_idex.designs.gt2belt import create_gt_belt_clamp
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.metrics_collector import (
     Material,
@@ -36,11 +35,11 @@ from mege_ender_3v3ke_idex.designs.print_bed import (
     Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
     create_print_bed,
 )
-from shellforgepy.simple import *
-
-from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
+from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (  # noqa: F401
     create_four_screws_mount_assembly,
+    create_screw_mount_assembly,
 )
+from shellforgepy.simple import *
 
 print_bed_undercarriage_profiles_height = 30
 print_bed_undercarriage_profiles_width = 12
@@ -90,6 +89,13 @@ print_bed_undercarriage_dovetail_front_clearance = 0.2
 print_bed_undercarriage_carriage_mount_plate_thickness = 5
 print_bed_undercarriage_carriage_mount_plate_oversize = 4
 print_bed_undercarriage_belt_clamp_screw_hole_border = 4
+print_bed_undercarriage_torsion_rib_size = 7
+print_bed_undercarriage_torsion_rib_height = 52
+print_bed_undercarriage_torsion_rib_fillet_radius = 1.5
+
+
+print_bed_undercarriage_torsion_screw_size = "M3"
+print_bed_undercarriage_torsion_screw_length = 50
 
 _logger = logging.getLogger(__name__)
 
@@ -598,9 +604,41 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
             0,
         )(belt_clamp)
 
-        belt_clamp_bases = belt_clamp_bases.fuse(
-            belt_clamp.get_follower_part_by_name("clamp")
+        current_clamp_base = belt_clamp.get_follower_part_by_name("clamp")
+        belt_clamp_bases = belt_clamp_bases.fuse(current_clamp_base)
+
+        belt_clamp_torsion_rib = create_filleted_box(
+            print_bed_undercarriage_torsion_rib_size,
+            print_bed_undercarriage_torsion_rib_size,
+            print_bed_undercarriage_torsion_rib_height,
+            print_bed_undercarriage_torsion_rib_fillet_radius,
+            no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.LEFT],
         )
+
+        belt_clamp_torsion_rib = align(
+            belt_clamp_torsion_rib, current_clamp_base, Alignment.CENTER
+        )
+        belt_clamp_torsion_rib = align(belt_clamp_torsion_rib, retval, Alignment.TOP)
+        belt_clamp_torsion_rib = align(
+            belt_clamp_torsion_rib, current_clamp_base, Alignment.STACK_RIGHT
+        )
+
+        screw_mount_assembly = create_screw_mount_assembly(
+            belt_clamp_torsion_rib,
+            print_bed_undercarriage_torsion_screw_size,
+            print_bed_undercarriage_torsion_screw_length,
+            Alignment.TOP,
+            flush_with_top=True,
+        )
+        belt_clamp_torsion_rib = screw_mount_assembly.use_as_cutter_on(
+            belt_clamp_torsion_rib
+        )
+
+        retval.add_named_non_production_part(
+            screw_mount_assembly.get_non_production_part_by_name("screw"),
+            f"belt_clamp_torsion_screw_{k.name.lower()}",
+        )
+        belt_clamp_bases = belt_clamp_bases.fuse(belt_clamp_torsion_rib)
 
         retval.add_named_follower(
             belt_clamp.leader,
