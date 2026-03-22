@@ -91,7 +91,7 @@ y_axis_drive_idler_teeth = 20
 y_axis_drive_belt_clear_span_extra = 0
 y_axis_drive_idler_housing_side_wall = endcap_wall
 y_axis_drive_idler_housing_front_wall = 10
-y_axis_drive_idler_housing_top_wall = 4
+y_axis_drive_idler_housing_top_wall = 2
 y_axis_drive_idler_cage_top_clearance = 0.0
 y_axis_drive_idler_cage_front_clearance = idler_cage_clearance
 y_axis_drive_idler_cage_height = 23
@@ -105,7 +105,11 @@ y_axis_drive_idler_cage_overlength = 0
 y_axis_drive_idler_clearance = 1.5
 y_axis_drive_idler_cage_back_wall = 4
 
+y_axis_drive_idler_tensioner_screw_length = 30
+
 y_axis_drive_idler_axle_screw_length = 20
+
+y_axis_drive_tensioner_screw_size = "M3"
 
 y_axis_drive_use_toothed_belt_visuals = False
 y_axis_drive_tensioner_screw_z_offset = 3.5
@@ -482,7 +486,24 @@ def create_y_axis_idler_mount(frame, belt_reference):
         tensioner_screw_holder_sides
     )
 
+    tensioner_screw = create_cylinder_screw(
+        y_axis_drive_tensioner_screw_size, y_axis_drive_idler_tensioner_screw_length
+    )
+    tensioner_screw = rotate(-90, axis=(1, 0, 0))(tensioner_screw)
+
+    tensioner_screw = align(
+        tensioner_screw, front_tensioner_screw_holder, Alignment.CENTER
+    )
+    tensioner_screw = align(
+        tensioner_screw, front_tensioner_screw_holder, Alignment.BACK
+    )
+    tensioner_screw = translate(
+        0, MScrew.from_size(y_axis_drive_tensioner_screw_size).cylinder_head_height, 0
+    )(tensioner_screw)
+
     idler_cage = idler_cage.fuse(front_tensioner_screw_holder)
+
+    idler_cage.add_named_non_production_part(tensioner_screw, "idler_tensioner_screw")
 
     idler_cage_size = get_bounding_box_size(idler_cage)
 
@@ -551,12 +572,14 @@ def create_y_axis_idler_mount(frame, belt_reference):
             idler_cage.get_non_production_part_by_name("idler"),
             idler_cage.get_non_production_part_by_name("axle"),
             idler_cage.get_non_production_part_by_name("axle_threaded_inset"),
+            idler_cage.get_non_production_part_by_name("idler_tensioner_screw"),
         ],
         follower_names=["idler_tensioner_cage"],
         non_production_names=[
             "idler",
             "idler_axle_screw",
             "idler_axle_threaded_inset",
+            "idler_tensioner_screw",
         ],
     )
 
@@ -724,6 +747,7 @@ def main():
             or name == "idler"
             or name == "idler_axle_screw"
             or name == "idler_axle_threaded_inset"
+            or name == "idler_tensioner_screw"
         ):
             npp = translate(0, 30, 0)(npp)
 
