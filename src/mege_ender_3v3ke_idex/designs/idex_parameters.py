@@ -28,7 +28,7 @@ printer_foot_nut_cutter_clearance = 0.2
 printer_foot_mount_screw_size = "M5"
 printer_foot_mount_screw_sink = 8
 printer_foot_groove_filler_width = 7.4
-printer_foot_groove_filler_thickness = 2
+printer_foot_groove_filler_thickness = 3
 
 
 axial_ball_bearing_8_x_19_ball_count = 6
@@ -358,7 +358,7 @@ z_axis_motor_mount_plate_profile_distance = 0
 z_axis_motor_mount_plate_size = 52
 z_axis_nut_screw_hole_clearence_type = "loose"
 z_axis_pillow_block_bearing_z_offset = 2
-z_axis_profile_length = 550
+z_axis_profile_length = 580
 z_axis_profile_mount_plate_fillet_radius = 3
 z_axis_profile_mount_plate_height = 33
 z_axis_profile_mount_plate_thickness = 5

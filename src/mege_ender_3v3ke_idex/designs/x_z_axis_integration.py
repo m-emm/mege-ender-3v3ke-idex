@@ -96,7 +96,6 @@ def create_x_z_axis_integration():
         create_positioned_x_z_axis_assembly(
             x_axis_reference,
             create_minimal_z_axis_reference,
-            z_axis_base_z_offset=z_axis_base_z_offset,
             carriage_z_offset=z_axis_carriage_z_offset,
         )
     )

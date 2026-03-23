@@ -29,6 +29,10 @@ from mege_ender_3v3ke_idex.designs.y_axis import (
     create_positioned_print_bed_assembly,
     create_y_axis,
 )
+from mege_ender_3v3ke_idex.designs.y_axis_drive import (
+    Y_AXIS_DRIVE_LEADER_NAME,
+    create_y_axis_drive,
+)
 from mege_ender_3v3ke_idex.designs.z_axis import (
     create_positioned_z_axis_assembly,
     create_z_axis,
@@ -55,6 +59,7 @@ class WholePrinterAssembly:
     frame: LeaderFollowersCuttersPart
     printer_feet: LeaderFollowersCuttersPart
     y_axis: LeaderFollowersCuttersPart
+    y_axis_drive: LeaderFollowersCuttersPart
     print_bed_assembly: Any
     positioned_z_axes: dict
     positioned_carriages: dict
@@ -93,13 +98,11 @@ def create_positioned_x_z_axis_assembly(
     z_axis_factory,
     *,
     frame=None,
-    z_axis_base_z_offset,
     carriage_z_offset,
 ):
     positioned_z_axes, positioned_carriages = create_positioned_z_axis_assembly(
         z_axis_factory=z_axis_factory,
         frame=frame,
-        z_axis_base_z_offset=z_axis_base_z_offset,
         carriage_z_offset=carriage_z_offset,
     )
 
@@ -124,13 +127,21 @@ def create_whole_printer():
     printer_feet = create_printer_feet(frame)
     y_axis = align_y_axis_to_frame(create_y_axis(), frame)
     print_bed_assembly = create_positioned_print_bed_assembly(y_axis, frame)
+    y_axis_drive = create_y_axis_drive(
+        frame,
+        back_belt_reference=print_bed_assembly.get_cutter_part_by_name(
+            "belt_path_cutter_back"
+        ),
+        front_belt_reference=print_bed_assembly.get_cutter_part_by_name(
+            "belt_path_cutter_front"
+        ),
+    )
     x_axis = create_x_axis()
     positioned_z_axes, positioned_carriages, x_axis = (
         create_positioned_x_z_axis_assembly(
             x_axis,
             create_z_axis,
             frame=frame,
-            z_axis_base_z_offset=z_axis_base_z_offset,
             carriage_z_offset=z_axis_carriage_z_offset,
         )
     )
@@ -140,6 +151,7 @@ def create_whole_printer():
         frame=frame,
         printer_feet=printer_feet,
         y_axis=y_axis,
+        y_axis_drive=y_axis_drive,
         print_bed_assembly=print_bed_assembly,
         positioned_z_axes=positioned_z_axes,
         positioned_carriages=positioned_carriages,
@@ -212,6 +224,29 @@ def main():
             flip=False,
             skip_in_production=True,
             animation=animation,
+        )
+
+    parts.add(
+        assembly.y_axis_drive.leader,
+        f"y_axis_drive_{Y_AXIS_DRIVE_LEADER_NAME}",
+        flip=False,
+        skip_in_production=True,
+    )
+
+    for name, follower in assembly.y_axis_drive.get_named_follower_items():
+        parts.add(
+            follower,
+            f"y_axis_drive_{name}",
+            flip=False,
+            skip_in_production=True,
+        )
+
+    for name, npp in assembly.y_axis_drive.get_named_non_production_part_items():
+        parts.add(
+            npp,
+            f"y_axis_drive_{name}",
+            flip=False,
+            skip_in_production=True,
         )
 
     for prefix, z_axis in assembly.positioned_z_axes.items():

@@ -1196,6 +1196,8 @@ def create_z_axis(side):
     for name, part in top_mount.get_named_non_production_part_items():
         retval.add_named_non_production_part(part, f"top_mount_{name}")
 
+    retval.leader = translate(0, 0, -z_axis_base_z_offset)(retval.leader)
+
     return retval
 
 
@@ -1282,7 +1284,6 @@ def create_positioned_z_axis_assembly(
     *,
     z_axis_factory=create_z_axis,
     frame=None,
-    z_axis_base_z_offset,
     carriage_z_offset,
 ):
     """Build the aligned dual-Z assembly with carriages."""
@@ -1304,7 +1305,7 @@ def create_positioned_z_axis_assembly(
         z_axis = translate(
             side.sign * z_axis_x_offset_from_center,
             z_axis_y_offset,
-            z_axis_base_z_offset,
+            0,
         )(z_axis)
 
         positioned_z_axes[side_name] = z_axis
@@ -1335,12 +1336,11 @@ def main():
     z_animation = {"z_axis": (0, 0, z_axis_z_travel)}
     positioned_z_axes, positioned_carriages = create_positioned_z_axis_assembly(
         frame=None,
-        z_axis_base_z_offset=z_axis_base_z_offset,
         carriage_z_offset=z_axis_carriage_z_offset,
     )
 
     for prefix, z_axis in positioned_z_axes.items():
-        parts.add(z_axis, f"{prefix}_z_axis", flip=False, skip_in_production=True)
+        # parts.add(z_axis, f"{prefix}_z_axis", flip=False, skip_in_production=True)
 
         for name, npp in z_axis.get_named_non_production_part_items():
             parts.add(npp, f"{prefix}_{name}", flip=False, skip_in_production=True)
