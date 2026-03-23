@@ -121,7 +121,7 @@ feeder_ring_rotation_angle = -10
 feeder_ring_wall = 1.5
 feeder_ring_width = 11
 frame_alu_profile_size = 40
-frame_inner_width = 350
+frame_inner_width = 315
 holder_mount_plate_depth = 28
 holder_mount_plate_left_extension = 19
 holder_mount_plate_size = 8
@@ -383,7 +383,6 @@ z_axis_top_mount_threaded_rod_clearance = 1.5
 z_axis_top_mount_width = 40
 z_axis_x_axis_carriage_vertical_offset = 8
 z_axis_x_axis_to_carriage_gap = 28
-z_axis_x_offset_from_center = 235
 z_axis_y_offset = 130
 z_axis_z_travel = 300
 
@@ -391,6 +390,12 @@ z_axis_z_travel = 300
 ############## Calculated parameters ##############
 
 z_axis_base_z_offset = print_bed_vertical_gap_to_frame - 43
+
+z_axis_x_offset_from_center = (
+    frame_inner_width / 2    
+    + ExtrusionProfileType.PROFILE_4040.size_mm[1] * 1.5
+)
+
 
 # This is a local offset along the Z assembly after the whole rod/profile/motor stack
 # has already been placed with z_axis_base_z_offset. Keep it independent from the
