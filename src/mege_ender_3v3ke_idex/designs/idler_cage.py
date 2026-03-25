@@ -15,7 +15,6 @@ import numpy as np
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (
     PROCESS_DATA_PETGCF_04_HS,
 )
-
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from shellforgepy.simple import *
@@ -383,9 +382,7 @@ def main():
     basic_cage = create_demo_idler_cage().leader
     tensioner_cage = create_demo_idler_cage(with_tensioner=True).leader
     cutaway_view = create_demo_idler_cage_cutaway()
-    cutaway_view_z_offset = create_demo_idler_cage_cutaway(
-        tensioner_screw_z_offset=3.0
-    )
+    cutaway_view_z_offset = create_demo_idler_cage_cutaway(tensioner_screw_z_offset=3.0)
 
     tensioner_cage = align(
         tensioner_cage,

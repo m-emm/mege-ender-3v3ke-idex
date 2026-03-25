@@ -392,8 +392,7 @@ z_axis_z_travel = 300
 z_axis_base_z_offset = print_bed_vertical_gap_to_frame - 43
 
 z_axis_x_offset_from_center = (
-    frame_inner_width / 2    
-    + ExtrusionProfileType.PROFILE_4040.size_mm[1] * 1.5
+    frame_inner_width / 2 + ExtrusionProfileType.PROFILE_4040.size_mm[1] * 1.5
 )
 
 

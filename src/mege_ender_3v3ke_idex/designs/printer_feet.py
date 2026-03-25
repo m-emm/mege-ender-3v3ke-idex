@@ -14,7 +14,6 @@ import os
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (
     PROCESS_DATA_TPU_04_HS,
 )
-from mege_ender_3v3ke_idex.designs import screw_mount_assembly
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (  # noqa: F401
     create_four_screws_mount_assembly,
@@ -127,7 +126,8 @@ def create_printer_feet(frame):
                 printer_foot_groove_filler_width,
                 printer_foot_groove_filler_width,
                 printer_foot_base_size,
-                printer_foot_base_size + (2*ratio * printer_foot_groove_filler_thickness),
+                printer_foot_base_size
+                + (2 * ratio * printer_foot_groove_filler_thickness),
                 printer_foot_groove_filler_thickness,
             )
 
@@ -160,9 +160,9 @@ def main():
     feet = create_printer_feet(frame)
 
     for name, follower in feet.get_named_follower_items():
-        # follower, _ = cut_in_two(follower, cut_normal=(0, 0, 1))
-        if not "left_front" in name and PROD:
-            continue
+        #     # follower, _ = cut_in_two(follower, cut_normal=(0, 0, 1))
+        #     if not "left_front" in name and not "right_front" in name and PROD:
+        #         continue
 
         if PROD:
             follower = orient_max_planar_area(follower, optimize_bed_adhesion_area=True)

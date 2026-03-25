@@ -17,9 +17,9 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
     PROCESS_DATA_PLACF_04_HS,
 )
 from mege_ender_3v3ke_idex.designs.gt2belt import (
-    create_gt_belt_clamp,
     create_gt2_pulley,
     create_gt2belt,
+    create_gt_belt_clamp,
     gt2_pitch,
     gt2_teeth_thickness,
     gt2_thickness,

@@ -119,6 +119,67 @@ DEFAULT_EXTRUSION_LENGTH_MM = 120.0
 SLOT_OVERSHOOT_MM = 0.4
 LENGTH_OVERSHOOT_MM = 1.0
 
+corner_4040_depth = 37.4
+corner_4040_plate_thickness = 5.33
+corner_4040_side_thickness = 3.0
+corner_4040_side_length = 35.8
+corner_4040_slit_length = 20
+corner_4040_slit_width = 8.85
+corner_4040_slit_inset = 7.4
+corner_4040_guide_tongue_thickness = 1.6
+corner_4040_guide_tongue_width = 7.85
+
+
+def create_corner_4040():
+
+    corner = create_box(
+        corner_4040_side_length, corner_4040_depth, corner_4040_side_length
+    )
+
+    inner_cutter = create_box(
+        corner_4040_side_length,
+        corner_4040_depth - 2 * corner_4040_side_thickness,
+        corner_4040_side_length,
+    )
+
+    inner_cutter = align(inner_cutter, corner, Alignment.LEFT)
+    inner_cutter = align(inner_cutter, corner, Alignment.BOTTOM)
+    inner_cutter = align(inner_cutter, corner, Alignment.FRONT)
+
+    inner_cutter = translate(
+        corner_4040_plate_thickness,
+        corner_4040_side_thickness,
+        corner_4040_plate_thickness,
+    )(inner_cutter)
+    corner = corner.cut(inner_cutter)
+
+    diagonal_cutter = create_box(
+        corner_4040_side_length * 2, corner_4040_depth * 2, corner_4040_side_length * 2
+    )
+
+    diagonal_cutter = rotate(-45, axis=(0, 1, 0))(diagonal_cutter)
+    diagonal_cutter = translate(corner_4040_side_length, 0, corner_4040_side_thickness)(
+        diagonal_cutter
+    )
+    corner = corner.cut(diagonal_cutter)
+
+    for i in [0, 1]:
+        slit_cutter = create_box(
+            corner_4040_slit_length,
+            corner_4040_slit_width,
+            corner_4040_side_length * 2,
+        )
+        slit_cutter = align(slit_cutter, corner, Alignment.CENTER)
+        slit_cutter = align(slit_cutter, corner, Alignment.RIGHT)
+        slit_cutter = translate(-corner_4040_slit_inset, 0, 0)(slit_cutter)
+
+        if i == 1:
+            slit_cutter = rotate(-90, axis=(0, 1, 0))(slit_cutter)
+
+        corner = corner.cut(slit_cutter)
+
+    return corner
+
 
 def _compute_slot_lip_depth(slot_depth_mm: float) -> float:
     capped = slot_depth_mm - 0.8
@@ -222,20 +283,16 @@ def creeate_demo_parts(parts: PartList):
         part = translate(i * 60, 0, 0)(part)
         parts.add(part, f"alu_extrusion_profile_{profile.value}", flip=False)
 
+    corner_4040 = create_corner_4040()
+    corner_4040 = translate(0, 60, 0)(corner_4040)
+    parts.add(corner_4040, "corner_4040", flip=False)
+
 
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
-    if os.environ.get("CREATE_DEMO_PARTS", "0") == "1":
-        creeate_demo_parts(parts)
-
-    else:
-        # add a test part for a PETG CF test print
-        part = create_alu_extrusion_profile(
-            ExtrusionProfileType.PROFILE_2020, length_mm=20
-        )
-        parts.add(part, "alu_extrusion_profile_2020_30mm", flip=False)
+    creeate_demo_parts(parts)
 
     arrange_and_export(
         parts.as_list(),

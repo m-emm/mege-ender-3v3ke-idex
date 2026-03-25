@@ -110,8 +110,6 @@ def main():
         parts.add(npp, name, flip=False, skip_in_production=True)
     # parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
 
-    
-
     # Arrange and export
     arrange_and_export(
         parts.as_list(),
