@@ -233,7 +233,8 @@ def main():
 
     frame = create_printer_frame()
 
-    parts.add(frame, "printer_frame", flip=False, skip_in_production=True)
+    for name, npp in frame.get_named_non_production_part_items():
+        parts.add(npp, name, flip=False, skip_in_production=True)
 
     y_axis = align_y_axis_to_frame(create_y_axis(), frame)
     print_bed_assembly = create_positioned_print_bed_assembly(y_axis, frame)

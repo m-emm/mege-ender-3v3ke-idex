@@ -13,6 +13,7 @@ import os
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
+    create_corner_4040,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.metrics_collector import record_length_metric
@@ -95,6 +96,41 @@ def create_printer_frame():
             profile,
             name,
         )
+
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+
+            rotation_angle_map = {
+                (Alignment.LEFT, Alignment.FRONT): 90,
+                (Alignment.LEFT, Alignment.BACK): 0,
+                (Alignment.RIGHT, Alignment.FRONT): 180,
+                (Alignment.RIGHT, Alignment.BACK): -90,
+            }
+
+            corner = create_corner_4040()
+            corner = rotate(90, axis=(1, 0, 0))(corner)
+            corner = rotate(rotation_angle_map[(lr, fb)], axis=(0, 0, 1))(corner)
+            corner = align(
+                corner,
+                profiles_map[f"frame_profile_{lr.name.lower()}"],
+                Alignment.CENTER,
+            )
+            lr_prpofile = profiles_map[f"frame_profile_{lr.name.lower()}"]
+            fb_profile = profiles_map[f"frame_profile_{fb.name.lower()}"]
+
+            corner = align(corner, lr_prpofile, lr)
+            corner = align(corner, fb_profile, fb)
+
+            lr_profile_size = get_bounding_box_size(lr_prpofile)
+            fb_profile_size = get_bounding_box_size(fb_profile)
+            corner = translate(
+                -lr.sign * lr_profile_size[0], -fb.sign * fb_profile_size[1], 0
+            )(corner)
+
+            retval.add_named_non_production_part(
+                corner,
+                f"corner_4040_{lr.name.lower()}_{fb.name.lower()}",
+            )
 
     return retval
 
