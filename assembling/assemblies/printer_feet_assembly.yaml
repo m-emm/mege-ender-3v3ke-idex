@@ -1,0 +1,105 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the ender idex printer feet
+
+Builder:
+  Visualization:
+    arrange:
+      export_step: true
+      export_obj: true
+      export_stl: false
+      export_individual_parts: false
+    parts:
+      - source: dependencies
+        assembly: printer_frame_assembly
+        artifact: leader
+        name: printer_frame
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+
+  Production:
+    process_data:
+      source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_TPU_04_HS
+      overrides:
+        process_overrides:
+          brim_type: no_brim
+    arrange:
+      bed_width: 220
+      export_step: true
+      export_obj: true
+      export_stl: true
+      export_individual_parts: true
+    parts:
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+        transform:
+          function: orient_max_planar_area
+          kwargs:
+            optimize_bed_adhesion_area: true
+
+Parameters:
+  printer_foot_height:
+    Type: Float
+  printer_foot_base_size:
+    Type: Float
+  printer_foot_top_size:
+    Type: Float
+  printer_foot_screw_length:
+    Type: Float
+  printer_foot_screw_cylinder_head_clearance:
+    Type: Float
+  printer_foot_mount_screw_size:
+    Type: String
+  printer_foot_mount_screw_sink:
+    Type: Float
+  printer_foot_groove_filler_width:
+    Type: Float
+  printer_foot_groove_filler_thickness:
+    Type: Float
+  tpu_slit_thickness:
+    Type: Float
+  tpu_slit_clearance:
+    Type: Float
+  tpu_slit_distance:
+    Type: Float
+  tpu_num_slits:
+    Type: Integer
+
+Parts:
+  PrinterFeetAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.printer_feet_assembly.create_printer_feet_assembly
+      Properties:
+        printer_foot_height:
+          $ref: printer_foot_height
+        printer_foot_base_size:
+          $ref: printer_foot_base_size
+        printer_foot_top_size:
+          $ref: printer_foot_top_size
+        printer_foot_screw_length:
+          $ref: printer_foot_screw_length
+        printer_foot_screw_cylinder_head_clearance:
+          $ref: printer_foot_screw_cylinder_head_clearance
+        printer_foot_mount_screw_size:
+          $ref: printer_foot_mount_screw_size
+        printer_foot_mount_screw_sink:
+          $ref: printer_foot_mount_screw_sink
+        printer_foot_groove_filler_width:
+          $ref: printer_foot_groove_filler_width
+        printer_foot_groove_filler_thickness:
+          $ref: printer_foot_groove_filler_thickness
+        tpu_slit_thickness:
+          $ref: tpu_slit_thickness
+        tpu_slit_clearance:
+          $ref: tpu_slit_clearance
+        tpu_slit_distance:
+          $ref: tpu_slit_distance
+        tpu_num_slits:
+          $ref: tpu_num_slits
