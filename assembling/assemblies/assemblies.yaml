@@ -8,8 +8,12 @@ globals:
   y_axis_rail_length:
     $expr:
       "$sub": "${print_bed_y_travel} + ${y_axis_carriage_spacing} + ${mgn_12ca_carriage_length}"
+  y_axis_profile_extension: 60
+  y_axis_profile_length:
+    $expr:
+      "$sub": "${y_axis_rail_length} + 2 * ${y_axis_profile_extension}"
 
-  frame_inner_depth: !Ref y_axis_rail_length
+  frame_inner_depth: !Ref y_axis_profile_length
   frame_inner_width: 380
   print_bed_width: 310
   print_bed_depth: 310
@@ -120,6 +124,13 @@ globals:
   y_axis_drive_tensioner_screw_size: "M4"
   y_axis_drive_use_toothed_belt_visuals: false
   y_axis_drive_tensioner_screw_z_offset: 3.5
+  y_axis_rail_carrier_bracket_outer_diameter: 95
+  y_axis_rail_carrier_bracket_height: 40
+  y_axis_rail_carrier_bracket_profile_width: 20
+  y_axis_rail_carrier_bracket_profile_wall: 1.8
+  y_axis_rail_carrier_bracket_mount_plate_thickness: 5
+  y_axis_rail_carrier_bracket_mount_plate_length: 75
+  y_axis_rail_carrier_bracket_mount_plate_fillet_radius: 3
   hotend_diameter: 13.9
   hotend_overall_length: 33
   nozzle_diameter: 6.6
@@ -486,6 +497,45 @@ assemblies:
         $ref: endcap_tensioner_screw_size
       endcap_belt_clearance:
         $ref: endcap_belt_clearance
+
+  - name: y_axis_assembly
+
+    depends_on:
+      - printer_frame_assembly
+      - print_bed_assembly
+      - print_bed_undercarriage_assembly
+    inject_parts:
+      frame:
+        assembly: printer_frame_assembly
+        artifact: leader
+      print_bed_undercarriage:
+        assembly: print_bed_undercarriage_assembly
+        artifact: leader
+    parameters:
+      y_axis_rail_spacing:
+        $ref: y_axis_rail_spacing
+      y_axis_rail_length:
+        $ref: y_axis_rail_length
+      y_axis_profile_length:
+        $ref: y_axis_profile_length
+      y_axis_carriage_spacing:
+        $ref: y_axis_carriage_spacing
+      mgn_12ca_carriage_length:
+        $ref: mgn_12ca_carriage_length
+      y_axis_rail_carrier_bracket_outer_diameter:
+        $ref: y_axis_rail_carrier_bracket_outer_diameter
+      y_axis_rail_carrier_bracket_height:
+        $ref: y_axis_rail_carrier_bracket_height
+      y_axis_rail_carrier_bracket_profile_width:
+        $ref: y_axis_rail_carrier_bracket_profile_width
+      y_axis_rail_carrier_bracket_profile_wall:
+        $ref: y_axis_rail_carrier_bracket_profile_wall
+      y_axis_rail_carrier_bracket_mount_plate_thickness:
+        $ref: y_axis_rail_carrier_bracket_mount_plate_thickness
+      y_axis_rail_carrier_bracket_mount_plate_length:
+        $ref: y_axis_rail_carrier_bracket_mount_plate_length
+      y_axis_rail_carrier_bracket_mount_plate_fillet_radius:
+        $ref: y_axis_rail_carrier_bracket_mount_plate_fillet_radius
 
   - name: sprite_extruder_assembly
 
