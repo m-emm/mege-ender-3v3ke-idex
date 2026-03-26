@@ -81,6 +81,8 @@ globals:
   print_bed_undercarriage_torsion_screw_size: "M3"
   print_bed_undercarriage_torsion_screw_length: 50
   x_axis_motor_axle_length: 14
+  x_axis_profile_length: 600
+  x_axis_profile_pitch: 48
   motor_mount_axle_clearance: 0.3
   motor_mount_boss_clearance: 0.6
   motor_mount_boss_clearance_z: 8
@@ -278,6 +280,36 @@ globals:
   tool_head_front_mount_plate_connector_height: 14
   tool_head_front_mount_plate_connector_thickness: 4
   tool_head_front_mount_plate_connector_width: 7.5
+  tool_head_mount_base_plate_height: 20
+  tool_head_mount_base_plate_thickness: 5
+  tool_head_mount_belt_clamp_base_thickness: 5
+  tool_head_mount_belt_clamp_length: 12
+  tool_head_mount_belt_clamp_thickness: 5
+  tool_head_mount_belt_clamp_y_offset: 8
+  tool_head_mount_belt_deflector_belt_clearance: 3.5
+  tool_head_mount_belt_deflector_cage_thickness: 3
+  tool_head_mount_belt_deflector_into_profile_distance: 0.3
+  tool_head_mount_belt_deflector_thickness: 3
+  tool_head_mount_belt_path_cutter_clearance: 0.5
+  tool_head_mount_carriage_mount_plate_fillet_radius: 1
+  tool_head_mount_carriage_mount_plate_thickness: 4
+  tool_head_mount_carriage_mount_plate_width: 78
+  tool_head_mount_clamp_base_cutter_clearance: 0.8
+  tool_head_mount_extruder_cutout_carriage_gap: 3
+  tool_head_mount_extruder_cutout_fillet_radius: 4
+  tool_head_mount_extruder_cutout_width: 58
+  tool_head_mount_plate_carriage_clearance: 3
+  tool_head_mount_side_plate_depth: 20
+  tool_head_mount_side_plate_height: 40
+  tool_head_mount_side_plate_thickness: 8
+  tool_head_mount_side_stiffener_thickness: 5
+  tool_head_mount_tool_head_base_plate_clearance: 0.5
+  tool_head_mount_tool_head_x_offset: 8
+  tool_head_mount_tool_head_z_offset: 10
+  tool_head_mount_x_offset: 20
+  tool_head_mount_y_extension:
+    $expr:
+      "$sub": "${tool_head_mount_side_plate_depth} + 1"
 
 builder_defaults:
   Production:
@@ -656,6 +688,114 @@ assemblies:
       hotend_x_distance_from_right_edge:
         $ref: hotend_x_distance_from_right_edge
 
+  - name: sprite_extruder_bottom_assembly
+
+    resource_file: sprite_extruder_assembly.yaml
+    depends_on: []
+    parameters:
+      hotend_diameter:
+        $ref: hotend_diameter
+      hotend_overall_length:
+        $ref: hotend_overall_length
+      nozzle_diameter:
+        $ref: nozzle_diameter
+      nozzle_length:
+        $ref: nozzle_length
+      nozzle_screw_length:
+        $ref: nozzle_screw_length
+      nozzle_y_offset:
+        $ref: nozzle_y_offset
+      nozzle_tip_diameter:
+        $ref: nozzle_tip_diameter
+      hot_side_holes_y_pitch:
+        $ref: hot_side_holes_y_pitch
+      hot_side_holes_back_distance:
+        $ref: hot_side_holes_back_distance
+      hot_side_holes_top_distance_back:
+        $ref: hot_side_holes_top_distance_back
+      hot_side_holes_top_distance_front:
+        $ref: hot_side_holes_top_distance_front
+      hot_side_holes_back_holes_z_distance:
+        $ref: hot_side_holes_back_holes_z_distance
+      motor_hole_y_pitch:
+        $ref: motor_hole_y_pitch
+      motor_hole_z_pitch:
+        $ref: motor_hole_z_pitch
+      side_holes_depth:
+        $ref: side_holes_depth
+      fan_thickness:
+        $ref: fan_thickness
+      extruder_mount_screw_size:
+        $ref: extruder_mount_screw_size
+      lever_width:
+        $ref: lever_width
+      lever_thickness:
+        $ref: lever_thickness
+      lever_length:
+        $ref: lever_length
+      lever_angle:
+        $ref: lever_angle
+      lever_center_offset:
+        $ref: lever_center_offset
+      lever_front_inset:
+        $ref: lever_front_inset
+      hotend_x_distance_from_right_edge:
+        $ref: hotend_x_distance_from_right_edge
+
+  - name: sprite_extruder_top_assembly
+
+    resource_file: sprite_extruder_assembly.yaml
+    depends_on: []
+    parameters:
+      hotend_diameter:
+        $ref: hotend_diameter
+      hotend_overall_length:
+        $ref: hotend_overall_length
+      nozzle_diameter:
+        $ref: nozzle_diameter
+      nozzle_length:
+        $ref: nozzle_length
+      nozzle_screw_length:
+        $ref: nozzle_screw_length
+      nozzle_y_offset:
+        $ref: nozzle_y_offset
+      nozzle_tip_diameter:
+        $ref: nozzle_tip_diameter
+      hot_side_holes_y_pitch:
+        $ref: hot_side_holes_y_pitch
+      hot_side_holes_back_distance:
+        $ref: hot_side_holes_back_distance
+      hot_side_holes_top_distance_back:
+        $ref: hot_side_holes_top_distance_back
+      hot_side_holes_top_distance_front:
+        $ref: hot_side_holes_top_distance_front
+      hot_side_holes_back_holes_z_distance:
+        $ref: hot_side_holes_back_holes_z_distance
+      motor_hole_y_pitch:
+        $ref: motor_hole_y_pitch
+      motor_hole_z_pitch:
+        $ref: motor_hole_z_pitch
+      side_holes_depth:
+        $ref: side_holes_depth
+      fan_thickness:
+        $ref: fan_thickness
+      extruder_mount_screw_size:
+        $ref: extruder_mount_screw_size
+      lever_width:
+        $ref: lever_width
+      lever_thickness:
+        $ref: lever_thickness
+      lever_length:
+        $ref: lever_length
+      lever_angle:
+        $ref: lever_angle
+      lever_center_offset:
+        $ref: lever_center_offset
+      lever_front_inset:
+        $ref: lever_front_inset
+      hotend_x_distance_from_right_edge:
+        $ref: hotend_x_distance_from_right_edge
+
   - name: nitehawk_holder_assembly
 
     depends_on: []
@@ -889,3 +1029,285 @@ assemblies:
         $ref: duct_front_mount_plate_width
       duct_front_mount_plate_width_border:
         $ref: duct_front_mount_plate_width_border
+
+  - name: tool_head_bottom_assembly
+
+    resource_file: tool_head_assembly.yaml
+    depends_on:
+      - sprite_extruder_bottom_assembly
+      - nitehawk_holder_assembly
+      - part_fan_assembly
+    inject_parts:
+      sprite_extruder:
+        assembly: sprite_extruder_bottom_assembly
+        artifact: assembly
+      nitehawk_holder:
+        assembly: nitehawk_holder_assembly
+        artifact: assembly
+      part_fans:
+        assembly: part_fan_assembly
+        artifact: assembly
+    parameters:
+      holder_mount_plate_depth:
+        $ref: holder_mount_plate_depth
+      holder_mount_plate_left_extension:
+        $ref: holder_mount_plate_left_extension
+      holder_mount_plate_size:
+        $ref: holder_mount_plate_size
+      holder_mount_plate_spacer:
+        $ref: holder_mount_plate_spacer
+      holder_mount_plate_thickness:
+        $ref: holder_mount_plate_thickness
+      holder_mount_plate_top_offset:
+        $ref: holder_mount_plate_top_offset
+      nitehawk_holder_extruder_gap:
+        $ref: nitehawk_holder_extruder_gap
+      nitehawk_holder_height_offset:
+        $ref: nitehawk_holder_height_offset
+      nitehawk_holder_width_offset:
+        $ref: nitehawk_holder_width_offset
+      tool_head_additional_mount_plate_clearance:
+        $ref: tool_head_additional_mount_plate_clearance
+      tool_head_additional_mount_plate_depth:
+        $ref: tool_head_additional_mount_plate_depth
+      tool_head_additional_mount_plate_depth_offset:
+        $ref: tool_head_additional_mount_plate_depth_offset
+      tool_head_additional_mount_plate_fillet_radius:
+        $ref: tool_head_additional_mount_plate_fillet_radius
+      tool_head_additional_mount_plate_height:
+        $ref: tool_head_additional_mount_plate_height
+      tool_head_additional_mount_plate_thickness:
+        $ref: tool_head_additional_mount_plate_thickness
+      tool_head_additional_mount_plate_z_offset:
+        $ref: tool_head_additional_mount_plate_z_offset
+      tool_head_front_mount_plate_connector_height:
+        $ref: tool_head_front_mount_plate_connector_height
+      tool_head_front_mount_plate_connector_thickness:
+        $ref: tool_head_front_mount_plate_connector_thickness
+      tool_head_front_mount_plate_connector_width:
+        $ref: tool_head_front_mount_plate_connector_width
+      duct_front_mount_plate_height:
+        $ref: duct_front_mount_plate_height
+      duct_front_mount_plate_height_border:
+        $ref: duct_front_mount_plate_height_border
+      duct_front_mount_plate_offset:
+        $ref: duct_front_mount_plate_offset
+      duct_front_mount_plate_thickness:
+        $ref: duct_front_mount_plate_thickness
+      duct_front_mount_plate_width:
+        $ref: duct_front_mount_plate_width
+      duct_front_mount_plate_width_border:
+        $ref: duct_front_mount_plate_width_border
+
+  - name: tool_head_top_assembly
+
+    resource_file: tool_head_assembly.yaml
+    depends_on:
+      - sprite_extruder_top_assembly
+      - nitehawk_holder_assembly
+      - part_fan_assembly
+    inject_parts:
+      sprite_extruder:
+        assembly: sprite_extruder_top_assembly
+        artifact: assembly
+      nitehawk_holder:
+        assembly: nitehawk_holder_assembly
+        artifact: assembly
+      part_fans:
+        assembly: part_fan_assembly
+        artifact: assembly
+    parameters:
+      holder_mount_plate_depth:
+        $ref: holder_mount_plate_depth
+      holder_mount_plate_left_extension:
+        $ref: holder_mount_plate_left_extension
+      holder_mount_plate_size:
+        $ref: holder_mount_plate_size
+      holder_mount_plate_spacer:
+        $ref: holder_mount_plate_spacer
+      holder_mount_plate_thickness:
+        $ref: holder_mount_plate_thickness
+      holder_mount_plate_top_offset:
+        $ref: holder_mount_plate_top_offset
+      nitehawk_holder_extruder_gap:
+        $ref: nitehawk_holder_extruder_gap
+      nitehawk_holder_height_offset:
+        $ref: nitehawk_holder_height_offset
+      nitehawk_holder_width_offset:
+        $ref: nitehawk_holder_width_offset
+      tool_head_additional_mount_plate_clearance:
+        $ref: tool_head_additional_mount_plate_clearance
+      tool_head_additional_mount_plate_depth:
+        $ref: tool_head_additional_mount_plate_depth
+      tool_head_additional_mount_plate_depth_offset:
+        $ref: tool_head_additional_mount_plate_depth_offset
+      tool_head_additional_mount_plate_fillet_radius:
+        $ref: tool_head_additional_mount_plate_fillet_radius
+      tool_head_additional_mount_plate_height:
+        $ref: tool_head_additional_mount_plate_height
+      tool_head_additional_mount_plate_thickness:
+        $ref: tool_head_additional_mount_plate_thickness
+      tool_head_additional_mount_plate_z_offset:
+        $ref: tool_head_additional_mount_plate_z_offset
+      tool_head_front_mount_plate_connector_height:
+        $ref: tool_head_front_mount_plate_connector_height
+      tool_head_front_mount_plate_connector_thickness:
+        $ref: tool_head_front_mount_plate_connector_thickness
+      tool_head_front_mount_plate_connector_width:
+        $ref: tool_head_front_mount_plate_connector_width
+      duct_front_mount_plate_height:
+        $ref: duct_front_mount_plate_height
+      duct_front_mount_plate_height_border:
+        $ref: duct_front_mount_plate_height_border
+      duct_front_mount_plate_offset:
+        $ref: duct_front_mount_plate_offset
+      duct_front_mount_plate_thickness:
+        $ref: duct_front_mount_plate_thickness
+      duct_front_mount_plate_width:
+        $ref: duct_front_mount_plate_width
+      duct_front_mount_plate_width_border:
+        $ref: duct_front_mount_plate_width_border
+
+  - name: tool_head_mount_bottom_assembly
+
+    resource_file: tool_head_mount_assembly.yaml
+    depends_on:
+      - sprite_extruder_bottom_assembly
+    inject_parts:
+      sprite_extruder:
+        assembly: sprite_extruder_bottom_assembly
+        artifact: assembly
+    parameters:
+      x_axis_profile_length:
+        $ref: x_axis_profile_length
+      x_axis_profile_pitch:
+        $ref: x_axis_profile_pitch
+      tool_head_mount_base_plate_height:
+        $ref: tool_head_mount_base_plate_height
+      tool_head_mount_base_plate_thickness:
+        $ref: tool_head_mount_base_plate_thickness
+      tool_head_mount_belt_clamp_base_thickness:
+        $ref: tool_head_mount_belt_clamp_base_thickness
+      tool_head_mount_belt_clamp_length:
+        $ref: tool_head_mount_belt_clamp_length
+      tool_head_mount_belt_clamp_thickness:
+        $ref: tool_head_mount_belt_clamp_thickness
+      tool_head_mount_belt_clamp_y_offset:
+        $ref: tool_head_mount_belt_clamp_y_offset
+      tool_head_mount_belt_deflector_belt_clearance:
+        $ref: tool_head_mount_belt_deflector_belt_clearance
+      tool_head_mount_belt_deflector_cage_thickness:
+        $ref: tool_head_mount_belt_deflector_cage_thickness
+      tool_head_mount_belt_deflector_into_profile_distance:
+        $ref: tool_head_mount_belt_deflector_into_profile_distance
+      tool_head_mount_belt_deflector_thickness:
+        $ref: tool_head_mount_belt_deflector_thickness
+      tool_head_mount_belt_path_cutter_clearance:
+        $ref: tool_head_mount_belt_path_cutter_clearance
+      tool_head_mount_carriage_mount_plate_fillet_radius:
+        $ref: tool_head_mount_carriage_mount_plate_fillet_radius
+      tool_head_mount_carriage_mount_plate_thickness:
+        $ref: tool_head_mount_carriage_mount_plate_thickness
+      tool_head_mount_carriage_mount_plate_width:
+        $ref: tool_head_mount_carriage_mount_plate_width
+      tool_head_mount_clamp_base_cutter_clearance:
+        $ref: tool_head_mount_clamp_base_cutter_clearance
+      tool_head_mount_extruder_cutout_carriage_gap:
+        $ref: tool_head_mount_extruder_cutout_carriage_gap
+      tool_head_mount_extruder_cutout_fillet_radius:
+        $ref: tool_head_mount_extruder_cutout_fillet_radius
+      tool_head_mount_extruder_cutout_width:
+        $ref: tool_head_mount_extruder_cutout_width
+      tool_head_mount_plate_carriage_clearance:
+        $ref: tool_head_mount_plate_carriage_clearance
+      tool_head_mount_side_plate_depth:
+        $ref: tool_head_mount_side_plate_depth
+      tool_head_mount_side_plate_height:
+        $ref: tool_head_mount_side_plate_height
+      tool_head_mount_side_plate_thickness:
+        $ref: tool_head_mount_side_plate_thickness
+      tool_head_mount_side_stiffener_thickness:
+        $ref: tool_head_mount_side_stiffener_thickness
+      tool_head_mount_tool_head_base_plate_clearance:
+        $ref: tool_head_mount_tool_head_base_plate_clearance
+      tool_head_mount_tool_head_x_offset:
+        $ref: tool_head_mount_tool_head_x_offset
+      tool_head_mount_tool_head_z_offset:
+        $ref: tool_head_mount_tool_head_z_offset
+      tool_head_mount_x_offset:
+        $ref: tool_head_mount_x_offset
+      tool_head_mount_y_extension:
+        $ref: tool_head_mount_y_extension
+      drive_position: bottom
+
+  - name: tool_head_mount_top_assembly
+
+    resource_file: tool_head_mount_assembly.yaml
+    depends_on:
+      - sprite_extruder_top_assembly
+    inject_parts:
+      sprite_extruder:
+        assembly: sprite_extruder_top_assembly
+        artifact: assembly
+    parameters:
+      x_axis_profile_length:
+        $ref: x_axis_profile_length
+      x_axis_profile_pitch:
+        $ref: x_axis_profile_pitch
+      tool_head_mount_base_plate_height:
+        $ref: tool_head_mount_base_plate_height
+      tool_head_mount_base_plate_thickness:
+        $ref: tool_head_mount_base_plate_thickness
+      tool_head_mount_belt_clamp_base_thickness:
+        $ref: tool_head_mount_belt_clamp_base_thickness
+      tool_head_mount_belt_clamp_length:
+        $ref: tool_head_mount_belt_clamp_length
+      tool_head_mount_belt_clamp_thickness:
+        $ref: tool_head_mount_belt_clamp_thickness
+      tool_head_mount_belt_clamp_y_offset:
+        $ref: tool_head_mount_belt_clamp_y_offset
+      tool_head_mount_belt_deflector_belt_clearance:
+        $ref: tool_head_mount_belt_deflector_belt_clearance
+      tool_head_mount_belt_deflector_cage_thickness:
+        $ref: tool_head_mount_belt_deflector_cage_thickness
+      tool_head_mount_belt_deflector_into_profile_distance:
+        $ref: tool_head_mount_belt_deflector_into_profile_distance
+      tool_head_mount_belt_deflector_thickness:
+        $ref: tool_head_mount_belt_deflector_thickness
+      tool_head_mount_belt_path_cutter_clearance:
+        $ref: tool_head_mount_belt_path_cutter_clearance
+      tool_head_mount_carriage_mount_plate_fillet_radius:
+        $ref: tool_head_mount_carriage_mount_plate_fillet_radius
+      tool_head_mount_carriage_mount_plate_thickness:
+        $ref: tool_head_mount_carriage_mount_plate_thickness
+      tool_head_mount_carriage_mount_plate_width:
+        $ref: tool_head_mount_carriage_mount_plate_width
+      tool_head_mount_clamp_base_cutter_clearance:
+        $ref: tool_head_mount_clamp_base_cutter_clearance
+      tool_head_mount_extruder_cutout_carriage_gap:
+        $ref: tool_head_mount_extruder_cutout_carriage_gap
+      tool_head_mount_extruder_cutout_fillet_radius:
+        $ref: tool_head_mount_extruder_cutout_fillet_radius
+      tool_head_mount_extruder_cutout_width:
+        $ref: tool_head_mount_extruder_cutout_width
+      tool_head_mount_plate_carriage_clearance:
+        $ref: tool_head_mount_plate_carriage_clearance
+      tool_head_mount_side_plate_depth:
+        $ref: tool_head_mount_side_plate_depth
+      tool_head_mount_side_plate_height:
+        $ref: tool_head_mount_side_plate_height
+      tool_head_mount_side_plate_thickness:
+        $ref: tool_head_mount_side_plate_thickness
+      tool_head_mount_side_stiffener_thickness:
+        $ref: tool_head_mount_side_stiffener_thickness
+      tool_head_mount_tool_head_base_plate_clearance:
+        $ref: tool_head_mount_tool_head_base_plate_clearance
+      tool_head_mount_tool_head_x_offset:
+        $ref: tool_head_mount_tool_head_x_offset
+      tool_head_mount_tool_head_z_offset:
+        $ref: tool_head_mount_tool_head_z_offset
+      tool_head_mount_x_offset:
+        $ref: tool_head_mount_x_offset
+      tool_head_mount_y_extension:
+        $ref: tool_head_mount_y_extension
+      drive_position: top

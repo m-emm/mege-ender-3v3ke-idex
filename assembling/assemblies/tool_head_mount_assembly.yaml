@@ -1,0 +1,190 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for a single tool head mount
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: tool_head_mount
+      - source: self
+        artifact: followers
+        names:
+          - belt_clamp_base_1
+          - belt_clamp_base_2
+          - carriage
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+  Production:
+    process_data:
+      source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PETGCF_04_HS
+      overrides:
+        process_overrides:
+          brim_type: no_brim
+          enable_support: "1"
+          external_perimeter_speed: "75"
+          fan_max_speed: "25"
+          fan_min_speed: "10"
+          outer_wall_speed: "75"
+          sparse_infill_density: "75%"
+          support_critical_regions_only: "1"
+          support_interface_spacing: "0.8"
+          support_on_build_plate_only: "1"
+          support_threshold_angle: "30"
+          support_top_z_distance: "0.3"
+          wall_loops: "3"
+    parts:
+      - source: self
+        artifact: leader
+        name: tool_head_mount
+      - source: self
+        artifact: followers
+        names:
+          - belt_clamp_base_1
+        name_template: "{name}"
+        prod_rotation_angle: -90
+        prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        names:
+          - belt_clamp_base_2
+        name_template: "{name}"
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
+
+Parameters:
+  x_axis_profile_length:
+    Type: Float
+  x_axis_profile_pitch:
+    Type: Float
+  tool_head_mount_base_plate_height:
+    Type: Float
+  tool_head_mount_base_plate_thickness:
+    Type: Float
+  tool_head_mount_belt_clamp_base_thickness:
+    Type: Float
+  tool_head_mount_belt_clamp_length:
+    Type: Float
+  tool_head_mount_belt_clamp_thickness:
+    Type: Float
+  tool_head_mount_belt_clamp_y_offset:
+    Type: Float
+  tool_head_mount_belt_deflector_belt_clearance:
+    Type: Float
+  tool_head_mount_belt_deflector_cage_thickness:
+    Type: Float
+  tool_head_mount_belt_deflector_into_profile_distance:
+    Type: Float
+  tool_head_mount_belt_deflector_thickness:
+    Type: Float
+  tool_head_mount_belt_path_cutter_clearance:
+    Type: Float
+  tool_head_mount_carriage_mount_plate_fillet_radius:
+    Type: Float
+  tool_head_mount_carriage_mount_plate_thickness:
+    Type: Float
+  tool_head_mount_carriage_mount_plate_width:
+    Type: Float
+  tool_head_mount_clamp_base_cutter_clearance:
+    Type: Float
+  tool_head_mount_extruder_cutout_carriage_gap:
+    Type: Float
+  tool_head_mount_extruder_cutout_fillet_radius:
+    Type: Float
+  tool_head_mount_extruder_cutout_width:
+    Type: Float
+  tool_head_mount_plate_carriage_clearance:
+    Type: Float
+  tool_head_mount_side_plate_depth:
+    Type: Float
+  tool_head_mount_side_plate_height:
+    Type: Float
+  tool_head_mount_side_plate_thickness:
+    Type: Float
+  tool_head_mount_side_stiffener_thickness:
+    Type: Float
+  tool_head_mount_tool_head_base_plate_clearance:
+    Type: Float
+  tool_head_mount_tool_head_x_offset:
+    Type: Float
+  tool_head_mount_tool_head_z_offset:
+    Type: Float
+  tool_head_mount_x_offset:
+    Type: Float
+  tool_head_mount_y_extension:
+    Type: Float
+  drive_position:
+    Type: String
+
+Parts:
+  ToolHeadMountAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.tool_head_mount_assembly.create_tool_head_mount_assembly
+      Properties:
+        x_axis_profile_length:
+          $ref: x_axis_profile_length
+        x_axis_profile_pitch:
+          $ref: x_axis_profile_pitch
+        tool_head_mount_base_plate_height:
+          $ref: tool_head_mount_base_plate_height
+        tool_head_mount_base_plate_thickness:
+          $ref: tool_head_mount_base_plate_thickness
+        tool_head_mount_belt_clamp_base_thickness:
+          $ref: tool_head_mount_belt_clamp_base_thickness
+        tool_head_mount_belt_clamp_length:
+          $ref: tool_head_mount_belt_clamp_length
+        tool_head_mount_belt_clamp_thickness:
+          $ref: tool_head_mount_belt_clamp_thickness
+        tool_head_mount_belt_clamp_y_offset:
+          $ref: tool_head_mount_belt_clamp_y_offset
+        tool_head_mount_belt_deflector_belt_clearance:
+          $ref: tool_head_mount_belt_deflector_belt_clearance
+        tool_head_mount_belt_deflector_cage_thickness:
+          $ref: tool_head_mount_belt_deflector_cage_thickness
+        tool_head_mount_belt_deflector_into_profile_distance:
+          $ref: tool_head_mount_belt_deflector_into_profile_distance
+        tool_head_mount_belt_deflector_thickness:
+          $ref: tool_head_mount_belt_deflector_thickness
+        tool_head_mount_belt_path_cutter_clearance:
+          $ref: tool_head_mount_belt_path_cutter_clearance
+        tool_head_mount_carriage_mount_plate_fillet_radius:
+          $ref: tool_head_mount_carriage_mount_plate_fillet_radius
+        tool_head_mount_carriage_mount_plate_thickness:
+          $ref: tool_head_mount_carriage_mount_plate_thickness
+        tool_head_mount_carriage_mount_plate_width:
+          $ref: tool_head_mount_carriage_mount_plate_width
+        tool_head_mount_clamp_base_cutter_clearance:
+          $ref: tool_head_mount_clamp_base_cutter_clearance
+        tool_head_mount_extruder_cutout_carriage_gap:
+          $ref: tool_head_mount_extruder_cutout_carriage_gap
+        tool_head_mount_extruder_cutout_fillet_radius:
+          $ref: tool_head_mount_extruder_cutout_fillet_radius
+        tool_head_mount_extruder_cutout_width:
+          $ref: tool_head_mount_extruder_cutout_width
+        tool_head_mount_plate_carriage_clearance:
+          $ref: tool_head_mount_plate_carriage_clearance
+        tool_head_mount_side_plate_depth:
+          $ref: tool_head_mount_side_plate_depth
+        tool_head_mount_side_plate_height:
+          $ref: tool_head_mount_side_plate_height
+        tool_head_mount_side_plate_thickness:
+          $ref: tool_head_mount_side_plate_thickness
+        tool_head_mount_side_stiffener_thickness:
+          $ref: tool_head_mount_side_stiffener_thickness
+        tool_head_mount_tool_head_base_plate_clearance:
+          $ref: tool_head_mount_tool_head_base_plate_clearance
+        tool_head_mount_tool_head_x_offset:
+          $ref: tool_head_mount_tool_head_x_offset
+        tool_head_mount_tool_head_z_offset:
+          $ref: tool_head_mount_tool_head_z_offset
+        tool_head_mount_x_offset:
+          $ref: tool_head_mount_x_offset
+        tool_head_mount_y_extension:
+          $ref: tool_head_mount_y_extension
+        drive_position:
+          $ref: drive_position
