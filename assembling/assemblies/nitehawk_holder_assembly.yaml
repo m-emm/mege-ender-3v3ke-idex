@@ -1,0 +1,233 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the nitehawk holder
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: nitehawk_holder
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+  Production:
+    process_data:
+      source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PLAGFHT_04_HS
+      overrides:
+        process_overrides:
+          layer_height: "0.28"
+          nozzle_temperature_initial_layer: "230"
+          nozzle_temperature: "230"
+          initial_layer_print_height: "0.28"
+          fan_min_speed: "25"
+          fan_max_speed: "45"
+          overhang_fan_speed: "60"
+          outer_wall_speed: "75"
+          top_surface_speed: "75"
+          inner_wall_speed: "130"
+          internal_solid_infill_speed: "130"
+          solid_infill_speed: "130"
+          sparse_infill_speed: "130"
+          outer_wall_acceleration: "2800"
+          top_surface_acceleration: "2800"
+          inner_wall_acceleration: "4500"
+          solid_infill_acceleration: "4500"
+          sparse_infill_acceleration: "4500"
+          wall_loops: "3"
+          brim_type: no_brim
+          sparse_infill_density: "60%"
+    parts:
+      - source: self
+        artifact: leader
+        name: nitehawk_holder
+
+Parameters:
+  nitehawk_board_angle:
+    Type: Float
+  nitehawk_front_cutter_back_width:
+    Type: Float
+  nitehawk_front_cutter_width:
+    Type: Float
+  nitehawk_front_cutter_y_size:
+    Type: Float
+  nitehawk_heater_connector_length:
+    Type: Float
+  nitehawk_heater_connector_thickness:
+    Type: Float
+  nitehawk_heater_connector_width:
+    Type: Float
+  nitehawk_heater_connector_x_offset_from_right:
+    Type: Float
+  nitehawk_heater_connector_y_offset_from_front:
+    Type: Float
+  nitehawk_height:
+    Type: Float
+  nitehawk_holder_cable_attachment_fillet_radius:
+    Type: Float
+  nitehawk_holder_cable_attachment_holes_diameter:
+    Type: Float
+  nitehawk_holder_cable_attachment_length:
+    Type: Float
+  nitehawk_holder_cable_attachment_num_holes:
+    Type: Integer
+  nitehawk_holder_cable_attachment_thickness:
+    Type: Float
+  nitehawk_holder_cable_attachment_width:
+    Type: Float
+  nitehawk_holder_cable_attachment_y_offset:
+    Type: Float
+  nitehawk_holder_fillet_radius:
+    Type: Float
+  nitehawk_holder_height:
+    Type: Float
+  nitehawk_holder_mount_screw_size:
+    Type: String
+  nitehawk_holder_mount_tower_diameter:
+    Type: Float
+  nitehawk_holder_mount_tower_height:
+    Type: Float
+  nitehawk_holder_mount_tower_x_offset:
+    Type: Float
+  nitehawk_holder_mount_tower_y_offset:
+    Type: Float
+  nitehawk_holder_slit_height:
+    Type: Float
+  nitehawk_holder_thickness:
+    Type: Float
+  nitehawk_holder_width:
+    Type: Float
+  nitehawk_hole_diameter:
+    Type: Float
+  nitehawk_holes_center_distance:
+    Type: Float
+  nitehawk_holes_y_offset:
+    Type: Float
+  nitehawk_mount_tower_base_extension:
+    Type: Float
+  nitehawk_nut_cutter_slack:
+    Type: Float
+  nitehawk_pcb_thickness:
+    Type: Float
+  nitehawk_plug_length:
+    Type: Float
+  nitehawk_plug_overhang:
+    Type: Float
+  nitehawk_plug_thickness:
+    Type: Float
+  nitehawk_plug_width:
+    Type: Float
+  nitehawk_top_width:
+    Type: Float
+  nitehawk_umbilical_cable_diameter:
+    Type: Float
+  nitehawk_umbilical_cable_length:
+    Type: Float
+  nitehawk_umbilical_connector_cable_connector_end_diameter:
+    Type: Float
+  nitehawk_umbilical_connector_cable_connector_height:
+    Type: Float
+  nitehawk_umbilical_connector_gap:
+    Type: Float
+  nitehawk_umbilical_connector_height:
+    Type: Float
+  nitehawk_width:
+    Type: Float
+
+Parts:
+  NitehawkHolderAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.nitehawk_holder_assembly.create_nitehawk_holder_assembly
+      Properties:
+        nitehawk_board_angle:
+          $ref: nitehawk_board_angle
+        nitehawk_front_cutter_back_width:
+          $ref: nitehawk_front_cutter_back_width
+        nitehawk_front_cutter_width:
+          $ref: nitehawk_front_cutter_width
+        nitehawk_front_cutter_y_size:
+          $ref: nitehawk_front_cutter_y_size
+        nitehawk_heater_connector_length:
+          $ref: nitehawk_heater_connector_length
+        nitehawk_heater_connector_thickness:
+          $ref: nitehawk_heater_connector_thickness
+        nitehawk_heater_connector_width:
+          $ref: nitehawk_heater_connector_width
+        nitehawk_heater_connector_x_offset_from_right:
+          $ref: nitehawk_heater_connector_x_offset_from_right
+        nitehawk_heater_connector_y_offset_from_front:
+          $ref: nitehawk_heater_connector_y_offset_from_front
+        nitehawk_height:
+          $ref: nitehawk_height
+        nitehawk_holder_cable_attachment_fillet_radius:
+          $ref: nitehawk_holder_cable_attachment_fillet_radius
+        nitehawk_holder_cable_attachment_holes_diameter:
+          $ref: nitehawk_holder_cable_attachment_holes_diameter
+        nitehawk_holder_cable_attachment_length:
+          $ref: nitehawk_holder_cable_attachment_length
+        nitehawk_holder_cable_attachment_num_holes:
+          $ref: nitehawk_holder_cable_attachment_num_holes
+        nitehawk_holder_cable_attachment_thickness:
+          $ref: nitehawk_holder_cable_attachment_thickness
+        nitehawk_holder_cable_attachment_width:
+          $ref: nitehawk_holder_cable_attachment_width
+        nitehawk_holder_cable_attachment_y_offset:
+          $ref: nitehawk_holder_cable_attachment_y_offset
+        nitehawk_holder_fillet_radius:
+          $ref: nitehawk_holder_fillet_radius
+        nitehawk_holder_height:
+          $ref: nitehawk_holder_height
+        nitehawk_holder_mount_screw_size:
+          $ref: nitehawk_holder_mount_screw_size
+        nitehawk_holder_mount_tower_diameter:
+          $ref: nitehawk_holder_mount_tower_diameter
+        nitehawk_holder_mount_tower_height:
+          $ref: nitehawk_holder_mount_tower_height
+        nitehawk_holder_mount_tower_x_offset:
+          $ref: nitehawk_holder_mount_tower_x_offset
+        nitehawk_holder_mount_tower_y_offset:
+          $ref: nitehawk_holder_mount_tower_y_offset
+        nitehawk_holder_slit_height:
+          $ref: nitehawk_holder_slit_height
+        nitehawk_holder_thickness:
+          $ref: nitehawk_holder_thickness
+        nitehawk_holder_width:
+          $ref: nitehawk_holder_width
+        nitehawk_hole_diameter:
+          $ref: nitehawk_hole_diameter
+        nitehawk_holes_center_distance:
+          $ref: nitehawk_holes_center_distance
+        nitehawk_holes_y_offset:
+          $ref: nitehawk_holes_y_offset
+        nitehawk_mount_tower_base_extension:
+          $ref: nitehawk_mount_tower_base_extension
+        nitehawk_nut_cutter_slack:
+          $ref: nitehawk_nut_cutter_slack
+        nitehawk_pcb_thickness:
+          $ref: nitehawk_pcb_thickness
+        nitehawk_plug_length:
+          $ref: nitehawk_plug_length
+        nitehawk_plug_overhang:
+          $ref: nitehawk_plug_overhang
+        nitehawk_plug_thickness:
+          $ref: nitehawk_plug_thickness
+        nitehawk_plug_width:
+          $ref: nitehawk_plug_width
+        nitehawk_top_width:
+          $ref: nitehawk_top_width
+        nitehawk_umbilical_cable_diameter:
+          $ref: nitehawk_umbilical_cable_diameter
+        nitehawk_umbilical_cable_length:
+          $ref: nitehawk_umbilical_cable_length
+        nitehawk_umbilical_connector_cable_connector_end_diameter:
+          $ref: nitehawk_umbilical_connector_cable_connector_end_diameter
+        nitehawk_umbilical_connector_cable_connector_height:
+          $ref: nitehawk_umbilical_connector_cable_connector_height
+        nitehawk_umbilical_connector_gap:
+          $ref: nitehawk_umbilical_connector_gap
+        nitehawk_umbilical_connector_height:
+          $ref: nitehawk_umbilical_connector_height
+        nitehawk_width:
+          $ref: nitehawk_width
