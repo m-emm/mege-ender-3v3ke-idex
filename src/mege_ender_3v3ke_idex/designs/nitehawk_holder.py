@@ -7,6 +7,7 @@ Usage:
     cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/nitehawk_holder.py
 """
 
+# legacy - to be replaced by the new assembly-based design
 import copy
 import logging
 import os

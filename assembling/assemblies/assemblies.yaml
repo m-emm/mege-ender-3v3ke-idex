@@ -120,6 +120,30 @@ globals:
   y_axis_drive_tensioner_screw_size: "M4"
   y_axis_drive_use_toothed_belt_visuals: false
   y_axis_drive_tensioner_screw_z_offset: 3.5
+  hotend_diameter: 13.9
+  hotend_overall_length: 33
+  nozzle_diameter: 6.6
+  nozzle_length: 4.4
+  nozzle_screw_length: 5.9
+  nozzle_y_offset: 7.5
+  nozzle_tip_diameter: 1.0
+  hot_side_holes_y_pitch: 18
+  hot_side_holes_back_distance: 7
+  hot_side_holes_top_distance_back: 6.5
+  hot_side_holes_top_distance_front: 4
+  hot_side_holes_back_holes_z_distance: 19
+  motor_hole_y_pitch: 24
+  motor_hole_z_pitch: 20
+  side_holes_depth: 4
+  fan_thickness: 14
+  extruder_mount_screw_size: "M3"
+  lever_width: 14.5
+  lever_thickness: 4
+  lever_length: 23
+  lever_angle: 45
+  lever_center_offset: 4.4
+  lever_front_inset: 1
+  hotend_x_distance_from_right_edge: 18
 
 builder_defaults:
   Production:
@@ -415,3 +439,56 @@ assemblies:
         $ref: endcap_tensioner_screw_size
       endcap_belt_clearance:
         $ref: endcap_belt_clearance
+
+  - name: sprite_extruder_assembly
+
+    depends_on: []
+    parameters:
+      hotend_diameter:
+        $ref: hotend_diameter
+      hotend_overall_length:
+        $ref: hotend_overall_length
+      nozzle_diameter:
+        $ref: nozzle_diameter
+      nozzle_length:
+        $ref: nozzle_length
+      nozzle_screw_length:
+        $ref: nozzle_screw_length
+      nozzle_y_offset:
+        $ref: nozzle_y_offset
+      nozzle_tip_diameter:
+        $ref: nozzle_tip_diameter
+      hot_side_holes_y_pitch:
+        $ref: hot_side_holes_y_pitch
+      hot_side_holes_back_distance:
+        $ref: hot_side_holes_back_distance
+      hot_side_holes_top_distance_back:
+        $ref: hot_side_holes_top_distance_back
+      hot_side_holes_top_distance_front:
+        $ref: hot_side_holes_top_distance_front
+      hot_side_holes_back_holes_z_distance:
+        $ref: hot_side_holes_back_holes_z_distance
+      motor_hole_y_pitch:
+        $ref: motor_hole_y_pitch
+      motor_hole_z_pitch:
+        $ref: motor_hole_z_pitch
+      side_holes_depth:
+        $ref: side_holes_depth
+      fan_thickness:
+        $ref: fan_thickness
+      extruder_mount_screw_size:
+        $ref: extruder_mount_screw_size
+      lever_width:
+        $ref: lever_width
+      lever_thickness:
+        $ref: lever_thickness
+      lever_length:
+        $ref: lever_length
+      lever_angle:
+        $ref: lever_angle
+      lever_center_offset:
+        $ref: lever_center_offset
+      lever_front_inset:
+        $ref: lever_front_inset
+      hotend_x_distance_from_right_edge:
+        $ref: hotend_x_distance_from_right_edge

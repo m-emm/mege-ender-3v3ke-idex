@@ -21,7 +21,7 @@ from mege_ender_3v3ke_idex.designs.part_fans import (
 from mege_ender_3v3ke_idex.designs.sprite_extruder import create_sprite_extruder
 from shellforgepy.simple import *
 
-#LEGACY  - to be replaced by the new assembly-based design
+# LEGACY  - to be replaced by the new assembly-based design
 
 _logger = logging.getLogger(__name__)
 
