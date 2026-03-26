@@ -51,15 +51,6 @@ Builder:
             - 0
       - source: dependencies
         assembly: print_bed_undercarriage_assembly
-        artifact: leader
-        name: print_bed_undercarriage
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: print_bed_undercarriage_assembly
         artifact: followers
         name_template: "print_bed_undercarriage_{name}"
         animation:
@@ -76,6 +67,18 @@ Builder:
             - 0
             - { $ref: print_bed_y_travel }
             - 0
+      - source: dependencies
+        assembly: y_axis_drive_assembly
+        artifact: leader
+        name: y_axis_drive
+      - source: dependencies
+        assembly: y_axis_drive_assembly
+        artifact: followers
+        name_template: "y_axis_drive_{name}"
+      - source: dependencies
+        assembly: y_axis_drive_assembly
+        artifact: non_production_parts
+        name_template: "y_axis_drive_{name}"
       - source: self
         artifact: leader
         name: y_axis
