@@ -135,6 +135,7 @@ globals:
   endstop_holder_y_offset: -4
   z_axis_guide_distance: 256
   z_axis_carriage_z_offset: 123
+  z_axis_z_travel: 300
   motor_size: 42.3
   motor_x_offset:
     $expr:
@@ -408,14 +409,23 @@ placement:
       to: y_axis_assembly.non_production_parts.carriages_fused
       alignment: CENTER
       axes: [1]
-    - part: x_axis_assembly
+    - part: z_axis_assembly
       to: printer_frame_assembly
       alignment: CENTER
-      axes: [0, 1]
-    - part: x_axis_assembly
+      axes: [0]
+    - part: z_axis_assembly.non_production_parts.left_profile
       to: printer_frame_assembly
-      alignment: STACK_TOP
-      stack_gap: 100
+      alignment: BOTTOM
+    - part: x_axis_assembly
+      to: z_axis_assembly.non_production_parts.carriages_fused
+      alignment: CENTER
+      axes: [0, 1]
+    - part: x_axis_assembly.non_production_parts.lower_axis_profile
+      to: z_axis_assembly.non_production_parts.carriages_fused
+      alignment: FRONT
+    - part: x_axis_assembly.non_production_parts.lower_axis_profile
+      to: z_axis_assembly.non_production_parts.x_axis_alignment_reference
+      alignment: BOTTOM
     - part: tool_head_mount_bottom_assembly.followers.carriage
       to: x_axis_assembly.non_production_parts.carriage_1
       alignment: CENTER
@@ -860,13 +870,32 @@ assemblies:
     depends_on:
       - printer_frame_assembly
       - print_bed_assembly
-    inject_parts:
-      frame:
-        assembly: printer_frame_assembly
-        artifact: leader
     parameters:
       carriage_z_offset:
         $ref: z_axis_carriage_z_offset
+
+  - name: whole_printer_assembly
+
+    depends_on:
+      - printer_frame_assembly
+      - printer_feet_assembly
+      - print_bed_assembly
+      - print_bed_undercarriage_assembly
+      - y_axis_drive_assembly
+      - y_axis_assembly
+      - z_axis_assembly
+      - x_axis_assembly
+      - tool_head_mount_bottom_assembly
+      - tool_head_mount_top_assembly
+    parameters:
+      print_bed_y_travel:
+        $ref: print_bed_y_travel
+      x_axis_x_travel:
+        $ref: x_axis_x_travel
+      x_axis_x_travel_negative:
+        $ref: x_axis_x_travel_negative
+      z_axis_z_travel:
+        $ref: z_axis_z_travel
 
   - name: sprite_extruder_assembly
 

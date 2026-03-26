@@ -1199,7 +1199,7 @@ def create_z_axis(side):
     for name, part in top_mount.get_named_non_production_part_items():
         retval.add_named_non_production_part(part, f"top_mount_{name}")
 
-    retval.leader = translate(0, 0, -z_axis_base_z_offset)(retval.leader)
+    retval = translate(0, 0, -z_axis_base_z_offset)(retval)
 
     return retval
 
