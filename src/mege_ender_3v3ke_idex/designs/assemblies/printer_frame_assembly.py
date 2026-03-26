@@ -15,7 +15,6 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     create_alu_extrusion_profile,
     create_corner_4040,
 )
-
 from mege_ender_3v3ke_idex.designs.metrics_collector import record_length_metric
 from shellforgepy.simple import *
 
@@ -56,8 +55,7 @@ def create_printer_frame_assembly(
 
         alu_profile = create_alu_extrusion_profile(
             frame_profile_type_enum,
-            length_mm=frame_inner_depth
-            + 2 * frame_profile_type_enum.size_mm[1],
+            length_mm=frame_inner_depth + 2 * frame_profile_type_enum.size_mm[1],
         )
         alu_profile = rotate(90, axis=(1, 0, 0))(alu_profile)
 

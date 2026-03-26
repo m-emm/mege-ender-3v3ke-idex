@@ -1,0 +1,202 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the print bed undercarriage
+
+Builder:
+  Visualization:
+    parts:
+      - source: dependencies
+        assembly: print_bed_assembly
+        artifact: leader
+        name: print_bed
+      - source: dependencies
+        assembly: print_bed_assembly
+        artifact: non_production_parts
+        name_template: "{name}"
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+  Production:
+    process_data:
+      source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PETGCF_04_HS
+      overrides:
+        process_overrides:
+          brim_type: no_brim
+          enable_support: "1"
+          sparse_infill_density: "75%"
+          support_critical_regions_only: "1"
+          support_interface_spacing: "0.8"
+          support_object_first_layer_gap: 0.8
+          support_object_xy_distance: "1.0"
+          support_on_build_plate_only: "1"
+          support_threshold_angle: "30"
+          support_top_z_distance: "0.3"
+          wall_loops: "3"
+    arrange:
+      export_individual_parts: false
+
+Parameters:
+  print_bed_mount_hole_pitch:
+    Type: Float
+  y_axis_rail_spacing:
+    Type: Float
+  y_axis_carriage_spacing:
+    Type: Float
+  print_bed_undercarriage_profiles_height:
+    Type: Float
+  print_bed_undercarriage_profiles_width:
+    Type: Float
+  print_bed_undercarriage_profiles_wall:
+    Type: Float
+  print_bed_undercarriage_central_annulus_diameter:
+    Type: Float
+  print_bed_undercarriage_mount_tower_annulus_diameter:
+    Type: Float
+  print_bed_mount_tower_size:
+    Type: Float
+  print_bed_mount_tower_height:
+    Type: Float
+  print_bed_mount_tower_clearance:
+    Type: Float
+  print_bed_mount_tower_screw_size:
+    Type: String
+  print_bed_undercarriage_mount_tower_holder_size:
+    Type: Float
+  print_bed_undercarriage_mount_tower_holder_fillet_radius:
+    Type: Float
+  print_bed_undercarriage_num_dovetails_per_side:
+    Type: Integer
+  print_bed_undercarriage_dovetail_width:
+    Type: Float
+  print_bed_undercarriage_dovetail_clearance:
+    Type: Float
+  print_bed_undercarriage_dovetail_parts_clearance:
+    Type: Float
+  print_bed_undercarriage_dovetail_box_size_y:
+    Type: Float
+  print_bed_undercarriage_outside_flange_size:
+    Type: Float
+  print_bed_undercarriage_joining_screw_size:
+    Type: String
+  print_bed_undercarriage_joining_screw_length:
+    Type: Float
+  print_bed_undercarriage_joining_screw_nut_clearance:
+    Type: Float
+  print_bed_undercarriage_joining_screw_cylinder_head_clearance:
+    Type: Float
+  print_bed_undercarriage_joining_screw_inset:
+    Type: Float
+  print_bed_undercarriage_belt_clamp_base_thickness:
+    Type: Float
+  print_bed_undercarriage_belt_clamp_clamp_thickness:
+    Type: Float
+  print_bed_undercarriage_belt_clamp_clamp_length:
+    Type: Float
+  print_bed_undercarriage_belt_clamp_x_offset:
+    Type: Float
+  print_bed_undercarriage_dovetail_front_clearance:
+    Type: Float
+  print_bed_undercarriage_carriage_mount_plate_thickness:
+    Type: Float
+  print_bed_undercarriage_carriage_mount_plate_oversize:
+    Type: Float
+  print_bed_undercarriage_belt_clamp_screw_hole_border:
+    Type: Float
+  print_bed_undercarriage_torsion_rib_size:
+    Type: Float
+  print_bed_undercarriage_torsion_rib_height:
+    Type: Float
+  print_bed_undercarriage_torsion_rib_fillet_radius:
+    Type: Float
+  print_bed_undercarriage_torsion_screw_size:
+    Type: String
+  print_bed_undercarriage_torsion_screw_length:
+    Type: Float
+
+Parts:
+  PrintBedUndercarriageAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.print_bed_undercarriage_assembly.create_print_bed_undercarriage_assembly
+      Properties:
+        print_bed_mount_hole_pitch:
+          $ref: print_bed_mount_hole_pitch
+        y_axis_rail_spacing:
+          $ref: y_axis_rail_spacing
+        y_axis_carriage_spacing:
+          $ref: y_axis_carriage_spacing
+        print_bed_undercarriage_profiles_height:
+          $ref: print_bed_undercarriage_profiles_height
+        print_bed_undercarriage_profiles_width:
+          $ref: print_bed_undercarriage_profiles_width
+        print_bed_undercarriage_profiles_wall:
+          $ref: print_bed_undercarriage_profiles_wall
+        print_bed_undercarriage_central_annulus_diameter:
+          $ref: print_bed_undercarriage_central_annulus_diameter
+        print_bed_undercarriage_mount_tower_annulus_diameter:
+          $ref: print_bed_undercarriage_mount_tower_annulus_diameter
+        print_bed_mount_tower_size:
+          $ref: print_bed_mount_tower_size
+        print_bed_mount_tower_height:
+          $ref: print_bed_mount_tower_height
+        print_bed_mount_tower_clearance:
+          $ref: print_bed_mount_tower_clearance
+        print_bed_mount_tower_screw_size:
+          $ref: print_bed_mount_tower_screw_size
+        print_bed_undercarriage_mount_tower_holder_size:
+          $ref: print_bed_undercarriage_mount_tower_holder_size
+        print_bed_undercarriage_mount_tower_holder_fillet_radius:
+          $ref: print_bed_undercarriage_mount_tower_holder_fillet_radius
+        print_bed_undercarriage_num_dovetails_per_side:
+          $ref: print_bed_undercarriage_num_dovetails_per_side
+        print_bed_undercarriage_dovetail_width:
+          $ref: print_bed_undercarriage_dovetail_width
+        print_bed_undercarriage_dovetail_clearance:
+          $ref: print_bed_undercarriage_dovetail_clearance
+        print_bed_undercarriage_dovetail_parts_clearance:
+          $ref: print_bed_undercarriage_dovetail_parts_clearance
+        print_bed_undercarriage_dovetail_box_size_y:
+          $ref: print_bed_undercarriage_dovetail_box_size_y
+        print_bed_undercarriage_outside_flange_size:
+          $ref: print_bed_undercarriage_outside_flange_size
+        print_bed_undercarriage_joining_screw_size:
+          $ref: print_bed_undercarriage_joining_screw_size
+        print_bed_undercarriage_joining_screw_length:
+          $ref: print_bed_undercarriage_joining_screw_length
+        print_bed_undercarriage_joining_screw_nut_clearance:
+          $ref: print_bed_undercarriage_joining_screw_nut_clearance
+        print_bed_undercarriage_joining_screw_cylinder_head_clearance:
+          $ref: print_bed_undercarriage_joining_screw_cylinder_head_clearance
+        print_bed_undercarriage_joining_screw_inset:
+          $ref: print_bed_undercarriage_joining_screw_inset
+        print_bed_undercarriage_belt_clamp_base_thickness:
+          $ref: print_bed_undercarriage_belt_clamp_base_thickness
+        print_bed_undercarriage_belt_clamp_clamp_thickness:
+          $ref: print_bed_undercarriage_belt_clamp_clamp_thickness
+        print_bed_undercarriage_belt_clamp_clamp_length:
+          $ref: print_bed_undercarriage_belt_clamp_clamp_length
+        print_bed_undercarriage_belt_clamp_x_offset:
+          $ref: print_bed_undercarriage_belt_clamp_x_offset
+        print_bed_undercarriage_dovetail_front_clearance:
+          $ref: print_bed_undercarriage_dovetail_front_clearance
+        print_bed_undercarriage_carriage_mount_plate_thickness:
+          $ref: print_bed_undercarriage_carriage_mount_plate_thickness
+        print_bed_undercarriage_carriage_mount_plate_oversize:
+          $ref: print_bed_undercarriage_carriage_mount_plate_oversize
+        print_bed_undercarriage_belt_clamp_screw_hole_border:
+          $ref: print_bed_undercarriage_belt_clamp_screw_hole_border
+        print_bed_undercarriage_torsion_rib_size:
+          $ref: print_bed_undercarriage_torsion_rib_size
+        print_bed_undercarriage_torsion_rib_height:
+          $ref: print_bed_undercarriage_torsion_rib_height
+        print_bed_undercarriage_torsion_rib_fillet_radius:
+          $ref: print_bed_undercarriage_torsion_rib_fillet_radius
+        print_bed_undercarriage_torsion_screw_size:
+          $ref: print_bed_undercarriage_torsion_screw_size
+        print_bed_undercarriage_torsion_screw_length:
+          $ref: print_bed_undercarriage_torsion_screw_length
+        record_metrics: false

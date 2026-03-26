@@ -1,0 +1,57 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the print bed
+
+Parameters:
+  print_bed_width:
+    Type: Float
+  print_bed_depth:
+    Type: Float
+  print_bed_thickness:
+    Type: Float
+  print_bed_mount_hole_diameter:
+    Type: Float
+  print_bed_mount_screw_size:
+    Type: String
+  print_bed_mount_screw_length:
+    Type: Float
+  print_bed_mount_hole_pitch:
+    Type: Float
+  print_bed_foil_thickness:
+    Type: Float
+  print_bed_damper_height:
+    Type: Float
+  print_bed_damper_diameter:
+    Type: Float
+  print_bed_vertical_gap_to_frame:
+    Type: Float
+
+Parts:
+  PrintBedAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.print_bed_assembly.create_print_bed_assembly
+      Properties:
+        print_bed_width:
+          $ref: print_bed_width
+        print_bed_depth:
+          $ref: print_bed_depth
+        print_bed_thickness:
+          $ref: print_bed_thickness
+        print_bed_mount_hole_diameter:
+          $ref: print_bed_mount_hole_diameter
+        print_bed_mount_screw_size:
+          $ref: print_bed_mount_screw_size
+        print_bed_mount_screw_length:
+          $ref: print_bed_mount_screw_length
+        print_bed_mount_hole_pitch:
+          $ref: print_bed_mount_hole_pitch
+        print_bed_foil_thickness:
+          $ref: print_bed_foil_thickness
+        print_bed_damper_height:
+          $ref: print_bed_damper_height
+        print_bed_damper_diameter:
+          $ref: print_bed_damper_diameter
+        print_bed_vertical_gap_to_frame:
+          $ref: print_bed_vertical_gap_to_frame

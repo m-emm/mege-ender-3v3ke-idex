@@ -27,12 +27,6 @@ Builder:
       overrides:
         process_overrides:
           brim_type: no_brim
-    arrange:
-      bed_width: 220
-      export_step: true
-      export_obj: true
-      export_stl: true
-      export_individual_parts: true
     parts:
       - source: self
         artifact: followers

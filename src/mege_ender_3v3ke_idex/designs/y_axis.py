@@ -19,7 +19,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
-from mege_ender_3v3ke_idex.designs.hollow_profiles import (
+from mege_ender_3v3ke_idex.designs.hollow_profiles import (  # noqa: F401
     create_hollow_profile,
     create_hollow_profile_ring,
 )
