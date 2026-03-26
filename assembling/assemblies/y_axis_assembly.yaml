@@ -2,6 +2,28 @@ ShellforgepyBuilderVersion: "2026-03-27"
 
 Description: Assembly configuration for the y-axis
 
+placement:
+  alignments:
+    - part: y_axis_assembly
+      to: printer_frame_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: y_axis_assembly.non_production_parts.profile_left
+      to: printer_frame_assembly
+      alignment: CENTER
+      axes: [2]
+    - part: y_axis_assembly.non_production_parts.carriages_fused
+      to: print_bed_undercarriage_assembly
+      alignment: STACK_BOTTOM
+    - part: print_bed_assembly
+      to: y_axis_assembly.non_production_parts.carriages_fused
+      alignment: CENTER
+      axes: [1]
+    - part: print_bed_undercarriage_assembly
+      to: y_axis_assembly.non_production_parts.carriages_fused
+      alignment: CENTER
+      axes: [1]
+
 Builder:
   Visualization:
     parts:
@@ -13,27 +35,63 @@ Builder:
         assembly: print_bed_assembly
         artifact: leader
         name: print_bed
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
       - source: dependencies
         assembly: print_bed_assembly
         artifact: non_production_parts
         name_template: "print_bed_{name}"
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
       - source: dependencies
         assembly: print_bed_undercarriage_assembly
         artifact: leader
         name: print_bed_undercarriage
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: print_bed_undercarriage_assembly
+        artifact: followers
+        name_template: "print_bed_undercarriage_{name}"
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
       - source: dependencies
         assembly: print_bed_undercarriage_assembly
         artifact: non_production_parts
         name_template: "print_bed_undercarriage_{name}"
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
       - source: self
         artifact: leader
         name: y_axis
       - source: self
         artifact: followers
         name_template: "{name}"
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
       - source: self
         artifact: non_production_parts
         name_template: "{name}"
+        exclude_names:
+          - carriages_fused
 
 Parameters:
   y_axis_rail_spacing:

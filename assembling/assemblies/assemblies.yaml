@@ -500,17 +500,7 @@ assemblies:
 
   - name: y_axis_assembly
 
-    depends_on:
-      - printer_frame_assembly
-      - print_bed_assembly
-      - print_bed_undercarriage_assembly
-    inject_parts:
-      frame:
-        assembly: printer_frame_assembly
-        artifact: leader
-      print_bed_undercarriage:
-        assembly: print_bed_undercarriage_assembly
-        artifact: leader
+    depends_on: []
     parameters:
       y_axis_rail_spacing:
         $ref: y_axis_rail_spacing

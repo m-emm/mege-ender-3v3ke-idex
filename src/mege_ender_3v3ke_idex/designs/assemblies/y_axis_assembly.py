@@ -1,7 +1,5 @@
 """Declarative y-axis assembly."""
 
-import logging
-
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
@@ -15,9 +13,6 @@ from mege_ender_3v3ke_idex.designs.metrics_collector import (
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_rail_with_carriages
 from mege_ender_3v3ke_idex.designs.print_bed import Y_AXIS_MOVING_MASS_ASSEMBLY_ID
 from shellforgepy.simple import *
-
-_logger = logging.getLogger(__name__)
-
 
 def _record_y_axis_carriage_weight_metrics(y_axis):
     carriage_volume_mm3 = 0.0
@@ -44,28 +39,6 @@ def _get_y_axis_carriages_fused(y_axis):
     return y_axis_carriages
 
 
-def _align_y_axis_to_frame_and_undercarriage(y_axis, frame, print_bed_undercarriage):
-    y_axis = align(y_axis, frame, Alignment.CENTER, axes=[0, 1])
-    y_axis_profile_left = y_axis.get_non_production_part_by_name("profile_left")
-    y_axis = align_translation(
-        y_axis_profile_left,
-        frame,
-        Alignment.CENTER,
-        axes=[2],
-    )(y_axis)
-
-    y_axis_carriages = _get_y_axis_carriages_fused(y_axis)
-    undercarriage_bb = get_bounding_box(print_bed_undercarriage)
-    y_axis_carriages_bb = get_bounding_box(y_axis_carriages)
-    y_axis_drop_mm = y_axis_carriages_bb[1][2] - undercarriage_bb[0][2]
-
-    _logger.info(
-        "Dropping y_axis by %.3f mm so the print bed undercarriage seats on the Y carriages",
-        y_axis_drop_mm,
-    )
-    return translate(0, 0, -y_axis_drop_mm)(y_axis)
-
-
 def _create_rail_carrier_bracket(
     *,
     y_axis_rail_carrier_bracket_outer_diameter,
@@ -84,8 +57,6 @@ def _create_rail_carrier_bracket(
 
 def create_y_axis_assembly(
     *,
-    frame,
-    print_bed_undercarriage,
     y_axis_rail_spacing,
     y_axis_rail_length,
     y_axis_profile_length,
@@ -101,7 +72,7 @@ def create_y_axis_assembly(
     record_metrics=False,
     context=None,
 ):
-    """Create the y-axis assembly aligned against the frame and undercarriage."""
+    """Create the y-axis assembly in a canonical local coordinate system."""
 
     del context
 
@@ -257,10 +228,9 @@ def create_y_axis_assembly(
         rails.append(rail)
 
     y_axis = rails[0].fuse(rails[1])
-    y_axis = _align_y_axis_to_frame_and_undercarriage(
-        y_axis,
-        frame,
-        print_bed_undercarriage,
+    y_axis.add_named_non_production_part(
+        _get_y_axis_carriages_fused(y_axis),
+        "carriages_fused",
     )
 
     if record_metrics:
