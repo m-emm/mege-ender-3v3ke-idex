@@ -7,6 +7,8 @@ Usage:
     cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/extruder.py
 """
 
+###### LEGACY  - to be replaced by the new assembly-based design ######
+
 import logging
 import os
 import tempfile

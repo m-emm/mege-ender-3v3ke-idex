@@ -1,0 +1,206 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the y-axis drive
+
+Builder:
+  Visualization:
+    parts:
+      - source: dependencies
+        assembly: printer_frame_assembly
+        artifact: leader
+        name: printer_frame
+      - source: self
+        artifact: leader
+        name: motor_mount_plate
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+
+Parameters:
+  x_axis_motor_axle_length:
+    Type: Float
+  motor_mount_axle_clearance:
+    Type: Float
+  motor_mount_boss_clearance:
+    Type: Float
+  motor_mount_boss_clearance_z:
+    Type: Float
+  motor_mount_plate_thickness:
+    Type: Float
+  motor_mount_plate_fillet_radius:
+    Type: Float
+  y_axis_drive_profile_mount_plate_width:
+    Type: Float
+  y_axis_drive_profile_mount_plate_height:
+    Type: Float
+  y_axis_drive_profile_mount_plate_thickness:
+    Type: Float
+  y_axis_drive_profile_mount_plate_fillet_radius:
+    Type: Float
+  y_axis_motor_holder_side_wall_thickness:
+    Type: Float
+  y_axis_motor_holder_side_wall_height:
+    Type: Float
+  y_axis_motor_holder_side_wall_depth:
+    Type: Float
+  y_axis_drive_mount_screw_inset:
+    Type: Float
+  y_axis_drive_mount_screw_size:
+    Type: String
+  y_axis_drive_mount_screw_length:
+    Type: Float
+  y_axis_drive_motor_plate_width:
+    Type: Float
+  y_axis_drive_motor_plate_depth:
+    Type: Float
+  y_axis_drive_idler_plate_width:
+    Type: Float
+  y_axis_drive_motor_pulley_teeth:
+    Type: Integer
+  y_axis_drive_idler_teeth:
+    Type: Integer
+  y_axis_drive_belt_clear_span_extra:
+    Type: Float
+  y_axis_drive_idler_housing_side_wall:
+    Type: Float
+  y_axis_drive_idler_housing_front_wall:
+    Type: Float
+  y_axis_drive_idler_housing_top_wall:
+    Type: Float
+  y_axis_drive_idler_cage_top_clearance:
+    Type: Float
+  y_axis_drive_idler_cage_front_clearance:
+    Type: Float
+  y_axis_drive_idler_cage_height:
+    Type: Float
+  y_axis_drive_tensioner_screw_holder_thickness:
+    Type: Float
+  y_axis_drive_tensioner_screw_holder_depth:
+    Type: Float
+  y_axis_drive_tensioner_screw_holder_width:
+    Type: Float
+  y_axis_drive_idler_cage_wall:
+    Type: Float
+  y_axis_drive_idler_cage_overlength:
+    Type: Float
+  y_axis_drive_idler_clearance:
+    Type: Float
+  y_axis_drive_idler_cage_back_wall:
+    Type: Float
+  y_axis_drive_idler_tensioner_screw_length:
+    Type: Float
+  y_axis_drive_idler_tensioner_screw_nut_wall:
+    Type: Float
+  y_axis_drive_idler_tensioner_guide_clearance:
+    Type: Float
+  y_axis_drive_idler_axle_screw_length:
+    Type: Float
+  y_axis_drive_tensioner_screw_size:
+    Type: String
+  y_axis_drive_use_toothed_belt_visuals:
+    Type: Boolean
+  y_axis_drive_tensioner_screw_z_offset:
+    Type: Float
+  endcap_tensioner_screw_size:
+    Type: String
+  endcap_belt_clearance:
+    Type: Float
+
+Parts:
+  YAxisDriveAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.y_axis_drive_assembly.create_y_axis_drive_assembly
+      Properties:
+        x_axis_motor_axle_length:
+          $ref: x_axis_motor_axle_length
+        motor_mount_axle_clearance:
+          $ref: motor_mount_axle_clearance
+        motor_mount_boss_clearance:
+          $ref: motor_mount_boss_clearance
+        motor_mount_boss_clearance_z:
+          $ref: motor_mount_boss_clearance_z
+        motor_mount_plate_thickness:
+          $ref: motor_mount_plate_thickness
+        motor_mount_plate_fillet_radius:
+          $ref: motor_mount_plate_fillet_radius
+        y_axis_drive_profile_mount_plate_width:
+          $ref: y_axis_drive_profile_mount_plate_width
+        y_axis_drive_profile_mount_plate_height:
+          $ref: y_axis_drive_profile_mount_plate_height
+        y_axis_drive_profile_mount_plate_thickness:
+          $ref: y_axis_drive_profile_mount_plate_thickness
+        y_axis_drive_profile_mount_plate_fillet_radius:
+          $ref: y_axis_drive_profile_mount_plate_fillet_radius
+        y_axis_motor_holder_side_wall_thickness:
+          $ref: y_axis_motor_holder_side_wall_thickness
+        y_axis_motor_holder_side_wall_height:
+          $ref: y_axis_motor_holder_side_wall_height
+        y_axis_motor_holder_side_wall_depth:
+          $ref: y_axis_motor_holder_side_wall_depth
+        y_axis_drive_mount_screw_inset:
+          $ref: y_axis_drive_mount_screw_inset
+        y_axis_drive_mount_screw_size:
+          $ref: y_axis_drive_mount_screw_size
+        y_axis_drive_mount_screw_length:
+          $ref: y_axis_drive_mount_screw_length
+        y_axis_drive_motor_plate_width:
+          $ref: y_axis_drive_motor_plate_width
+        y_axis_drive_motor_plate_depth:
+          $ref: y_axis_drive_motor_plate_depth
+        y_axis_drive_idler_plate_width:
+          $ref: y_axis_drive_idler_plate_width
+        y_axis_drive_motor_pulley_teeth:
+          $ref: y_axis_drive_motor_pulley_teeth
+        y_axis_drive_idler_teeth:
+          $ref: y_axis_drive_idler_teeth
+        y_axis_drive_belt_clear_span_extra:
+          $ref: y_axis_drive_belt_clear_span_extra
+        y_axis_drive_idler_housing_side_wall:
+          $ref: y_axis_drive_idler_housing_side_wall
+        y_axis_drive_idler_housing_front_wall:
+          $ref: y_axis_drive_idler_housing_front_wall
+        y_axis_drive_idler_housing_top_wall:
+          $ref: y_axis_drive_idler_housing_top_wall
+        y_axis_drive_idler_cage_top_clearance:
+          $ref: y_axis_drive_idler_cage_top_clearance
+        y_axis_drive_idler_cage_front_clearance:
+          $ref: y_axis_drive_idler_cage_front_clearance
+        y_axis_drive_idler_cage_height:
+          $ref: y_axis_drive_idler_cage_height
+        y_axis_drive_tensioner_screw_holder_thickness:
+          $ref: y_axis_drive_tensioner_screw_holder_thickness
+        y_axis_drive_tensioner_screw_holder_depth:
+          $ref: y_axis_drive_tensioner_screw_holder_depth
+        y_axis_drive_tensioner_screw_holder_width:
+          $ref: y_axis_drive_tensioner_screw_holder_width
+        y_axis_drive_idler_cage_wall:
+          $ref: y_axis_drive_idler_cage_wall
+        y_axis_drive_idler_cage_overlength:
+          $ref: y_axis_drive_idler_cage_overlength
+        y_axis_drive_idler_clearance:
+          $ref: y_axis_drive_idler_clearance
+        y_axis_drive_idler_cage_back_wall:
+          $ref: y_axis_drive_idler_cage_back_wall
+        y_axis_drive_idler_tensioner_screw_length:
+          $ref: y_axis_drive_idler_tensioner_screw_length
+        y_axis_drive_idler_tensioner_screw_nut_wall:
+          $ref: y_axis_drive_idler_tensioner_screw_nut_wall
+        y_axis_drive_idler_tensioner_guide_clearance:
+          $ref: y_axis_drive_idler_tensioner_guide_clearance
+        y_axis_drive_idler_axle_screw_length:
+          $ref: y_axis_drive_idler_axle_screw_length
+        y_axis_drive_tensioner_screw_size:
+          $ref: y_axis_drive_tensioner_screw_size
+        y_axis_drive_use_toothed_belt_visuals:
+          $ref: y_axis_drive_use_toothed_belt_visuals
+        y_axis_drive_tensioner_screw_z_offset:
+          $ref: y_axis_drive_tensioner_screw_z_offset
+        endcap_tensioner_screw_size:
+          $ref: endcap_tensioner_screw_size
+        endcap_belt_clearance:
+          $ref: endcap_belt_clearance

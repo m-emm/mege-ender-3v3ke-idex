@@ -7,6 +7,8 @@ Usage:
     cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/x_z_axis_integration.py
 """
 
+###### LEGACY  - to be replaced by the new assembly-based design ######
+
 import logging
 import os
 

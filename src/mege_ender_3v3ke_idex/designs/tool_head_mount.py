@@ -6,7 +6,7 @@ Usage:
     # or with production mode:
     cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/tool_head_mount.py
 """
-
+#LEGACY  - to be replaced by the new assembly-based design
 import copy
 import logging
 import os
