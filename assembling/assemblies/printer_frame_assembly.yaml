@@ -1,0 +1,29 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the ender idex printer frame
+
+Parameters:
+  frame_inner_depth:
+    Type: Float
+    Description: The length in y direction of the printer frame inner area
+  frame_inner_width:
+    Type: Float
+    Description: The length in x direction of the printer frame inner area
+  frame_profile_type:
+    Type: String
+    Description: The type of the frame profile (e.g., "2020", "2040", "3030")
+    Default: "4040"
+
+Parts:
+  PrinterFrameAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.printer_frame_assembly.create_printer_frame_assembly
+      Properties:
+        frame_inner_depth:
+          $ref: frame_inner_depth
+        frame_inner_width:
+          $ref: frame_inner_width
+        frame_profile_type:
+          $ref: frame_profile_type

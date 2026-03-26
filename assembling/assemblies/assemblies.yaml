@@ -1,0 +1,26 @@
+globals:
+  BIG_THING: 500
+
+  print_bed_y_travel: 325
+  y_axis_carriage_spacing: 100
+  mgn_12ca_carriage_length: 34.7
+
+  y_axis_rail_length:
+    $expr:
+      "$sub": "${print_bed_y_travel} + ${y_axis_carriage_spacing} + ${mgn_12ca_carriage_length}"
+
+  frame_inner_depth: !Ref y_axis_rail_length
+  frame_inner_width: 380
+
+
+assemblies:
+
+  - name: printer_frame_assembly
+
+    depends_on: []
+    parameters:
+      frame_inner_depth:
+        $ref: frame_inner_depth
+      frame_inner_width:
+        $ref: frame_inner_width
+      frame_profile_type: "4040"
