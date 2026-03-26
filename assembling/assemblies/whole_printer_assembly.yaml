@@ -91,6 +91,72 @@ Builder:
       - source: dependencies
         assembly: z_axis_assembly
         artifact: followers
+        names:
+          - left_carriage
+          - left_carriage_clamp_0
+          - left_carriage_clamp_1
+          - right_carriage
+          - right_carriage_clamp_0
+          - right_carriage_clamp_1
+        name_template: "{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        exclude_names:
+          - left_carriage
+          - left_carriage_clamp_0
+          - left_carriage_clamp_1
+          - right_carriage
+          - right_carriage_clamp_0
+          - right_carriage_clamp_1
+        assembly: z_axis_assembly
+        artifact: followers
+        name_template: "{name}"
+      - source: dependencies
+        assembly: z_axis_assembly
+        artifact: non_production_parts
+        names:
+          - left_top_bearing
+          - left_threaded_rod_nut
+          - left_carriage_clamp_bottom_screw_assembly_screw_0_nut
+          - left_carriage_clamp_bottom_screw_assembly_screw_0_screw
+          - left_carriage_clamp_bottom_screw_assembly_screw_1_nut
+          - left_carriage_clamp_bottom_screw_assembly_screw_1_screw
+          - left_carriage_clamp_bottom_screw_assembly_screw_2_nut
+          - left_carriage_clamp_bottom_screw_assembly_screw_2_screw
+          - left_carriage_clamp_bottom_screw_assembly_screw_3_nut
+          - left_carriage_clamp_bottom_screw_assembly_screw_3_screw
+          - left_carriage_clamp_top_screw_assembly_screw_0_nut
+          - left_carriage_clamp_top_screw_assembly_screw_0_screw
+          - left_carriage_clamp_top_screw_assembly_screw_1_nut
+          - left_carriage_clamp_top_screw_assembly_screw_1_screw
+          - left_carriage_clamp_top_screw_assembly_screw_2_nut
+          - left_carriage_clamp_top_screw_assembly_screw_2_screw
+          - left_carriage_clamp_top_screw_assembly_screw_3_nut
+          - left_carriage_clamp_top_screw_assembly_screw_3_screw
+          - left_bottom_bearing
+          - right_top_bearing
+          - right_threaded_rod_nut
+          - right_carriage_clamp_bottom_screw_assembly_screw_0_nut
+          - right_carriage_clamp_bottom_screw_assembly_screw_0_screw
+          - right_carriage_clamp_bottom_screw_assembly_screw_1_nut
+          - right_carriage_clamp_bottom_screw_assembly_screw_1_screw
+          - right_carriage_clamp_bottom_screw_assembly_screw_2_nut
+          - right_carriage_clamp_bottom_screw_assembly_screw_2_screw
+          - right_carriage_clamp_bottom_screw_assembly_screw_3_nut
+          - right_carriage_clamp_bottom_screw_assembly_screw_3_screw
+          - right_carriage_clamp_top_screw_assembly_screw_0_nut
+          - right_carriage_clamp_top_screw_assembly_screw_0_screw
+          - right_carriage_clamp_top_screw_assembly_screw_1_nut
+          - right_carriage_clamp_top_screw_assembly_screw_1_screw
+          - right_carriage_clamp_top_screw_assembly_screw_2_nut
+          - right_carriage_clamp_top_screw_assembly_screw_2_screw
+          - right_carriage_clamp_top_screw_assembly_screw_3_nut
+          - right_carriage_clamp_top_screw_assembly_screw_3_screw
+          - right_bottom_bearing
         name_template: "{name}"
         animation:
           z_axis:
@@ -101,6 +167,44 @@ Builder:
         assembly: z_axis_assembly
         artifact: non_production_parts
         exclude_names:
+          - left_top_bearing
+          - left_threaded_rod_nut
+          - left_carriage_clamp_bottom_screw_assembly_screw_0_nut
+          - left_carriage_clamp_bottom_screw_assembly_screw_0_screw
+          - left_carriage_clamp_bottom_screw_assembly_screw_1_nut
+          - left_carriage_clamp_bottom_screw_assembly_screw_1_screw
+          - left_carriage_clamp_bottom_screw_assembly_screw_2_nut
+          - left_carriage_clamp_bottom_screw_assembly_screw_2_screw
+          - left_carriage_clamp_bottom_screw_assembly_screw_3_nut
+          - left_carriage_clamp_bottom_screw_assembly_screw_3_screw
+          - left_carriage_clamp_top_screw_assembly_screw_0_nut
+          - left_carriage_clamp_top_screw_assembly_screw_0_screw
+          - left_carriage_clamp_top_screw_assembly_screw_1_nut
+          - left_carriage_clamp_top_screw_assembly_screw_1_screw
+          - left_carriage_clamp_top_screw_assembly_screw_2_nut
+          - left_carriage_clamp_top_screw_assembly_screw_2_screw
+          - left_carriage_clamp_top_screw_assembly_screw_3_nut
+          - left_carriage_clamp_top_screw_assembly_screw_3_screw
+          - left_bottom_bearing
+          - right_top_bearing
+          - right_threaded_rod_nut
+          - right_carriage_clamp_bottom_screw_assembly_screw_0_nut
+          - right_carriage_clamp_bottom_screw_assembly_screw_0_screw
+          - right_carriage_clamp_bottom_screw_assembly_screw_1_nut
+          - right_carriage_clamp_bottom_screw_assembly_screw_1_screw
+          - right_carriage_clamp_bottom_screw_assembly_screw_2_nut
+          - right_carriage_clamp_bottom_screw_assembly_screw_2_screw
+          - right_carriage_clamp_bottom_screw_assembly_screw_3_nut
+          - right_carriage_clamp_bottom_screw_assembly_screw_3_screw
+          - right_carriage_clamp_top_screw_assembly_screw_0_nut
+          - right_carriage_clamp_top_screw_assembly_screw_0_screw
+          - right_carriage_clamp_top_screw_assembly_screw_1_nut
+          - right_carriage_clamp_top_screw_assembly_screw_1_screw
+          - right_carriage_clamp_top_screw_assembly_screw_2_nut
+          - right_carriage_clamp_top_screw_assembly_screw_2_screw
+          - right_carriage_clamp_top_screw_assembly_screw_3_nut
+          - right_carriage_clamp_top_screw_assembly_screw_3_screw
+          - right_bottom_bearing
           - carriages_fused
           - x_axis_alignment_reference
         name_template: "{name}"
