@@ -134,6 +134,7 @@ globals:
   endstop_holder_stack_gap: 30
   endstop_holder_y_offset: -4
   z_axis_guide_distance: 256
+  z_axis_carriage_z_offset: 123
   motor_size: 42.3
   motor_x_offset:
     $expr:
@@ -853,6 +854,19 @@ assemblies:
         $ref: endstop_holder_stack_gap
       endstop_holder_y_offset:
         $ref: endstop_holder_y_offset
+
+  - name: z_axis_assembly
+
+    depends_on:
+      - printer_frame_assembly
+      - print_bed_assembly
+    inject_parts:
+      frame:
+        assembly: printer_frame_assembly
+        artifact: leader
+    parameters:
+      carriage_z_offset:
+        $ref: z_axis_carriage_z_offset
 
   - name: sprite_extruder_assembly
 
