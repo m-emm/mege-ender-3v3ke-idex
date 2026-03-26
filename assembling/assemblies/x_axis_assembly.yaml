@@ -1,0 +1,381 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the x-axis
+
+placement:
+  alignments:
+    - part: x_axis_assembly
+      to: printer_frame_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: x_axis_assembly
+      to: printer_frame_assembly
+      alignment: STACK_TOP
+      stack_gap: 100
+    - part: tool_head_mount_bottom_assembly.followers.carriage
+      to: x_axis_assembly.non_production_parts.carriage_1
+      alignment: CENTER
+    - part: tool_head_mount_bottom_assembly.followers.carriage
+      to: x_axis_assembly.non_production_parts.carriage_1
+      alignment: BACK
+    - part: tool_head_mount_bottom_assembly.followers.carriage
+      to: x_axis_assembly.non_production_parts.carriage_1
+      alignment: TOP
+    - part: tool_head_mount_top_assembly.followers.carriage
+      to: x_axis_assembly.non_production_parts.carriage_2
+      alignment: CENTER
+    - part: tool_head_mount_top_assembly.followers.carriage
+      to: x_axis_assembly.non_production_parts.carriage_2
+      alignment: BACK
+    - part: tool_head_mount_top_assembly.followers.carriage
+      to: x_axis_assembly.non_production_parts.carriage_2
+      alignment: TOP
+
+Builder:
+  Visualization:
+    parts:
+      - source: dependencies
+        assembly: printer_frame_assembly
+        artifact: leader
+        name: printer_frame
+      - source: self
+        artifact: leader
+        name: x_axis
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        names:
+          - carriage_1
+        name_template: "{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: self
+        artifact: non_production_parts
+        names:
+          - carriage_2
+        name_template: "{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+        exclude_names:
+          - carriage_1
+          - carriage_2
+      - source: dependencies
+        assembly: tool_head_mount_bottom_assembly
+        artifact: leader
+        name: tool_head_mount_bottom
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: dependencies
+        assembly: tool_head_mount_bottom_assembly
+        artifact: followers
+        names:
+          - carriage
+          - belt_clamp_base_1
+          - belt_clamp_base_2
+        name_template: "tool_head_mount_bottom_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: dependencies
+        assembly: tool_head_mount_bottom_assembly
+        artifact: non_production_parts
+        name_template: "tool_head_mount_bottom_{name}"
+        exclude_names:
+          - rail
+          - lower_axis_profile
+          - top_axis_profile
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: dependencies
+        assembly: tool_head_mount_top_assembly
+        artifact: leader
+        name: tool_head_mount_top
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: dependencies
+        assembly: tool_head_mount_top_assembly
+        artifact: followers
+        names:
+          - carriage
+          - belt_clamp_base_1
+          - belt_clamp_base_2
+        name_template: "tool_head_mount_top_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: dependencies
+        assembly: tool_head_mount_top_assembly
+        artifact: non_production_parts
+        name_template: "tool_head_mount_top_{name}"
+        exclude_names:
+          - rail
+          - lower_axis_profile
+          - top_axis_profile
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+  Production:
+    parts:
+      - source: self
+        artifact: leader
+        name: x_axis
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+
+Parameters:
+  x_axis_profile_length:
+    Type: Float
+  x_axis_profile_pitch:
+    Type: Float
+  x_axis_rail_length:
+    Type: Float
+  mount_plate_connector_link_thickness:
+    Type: Float
+  mount_plate_link_width:
+    Type: Float
+  link_flange_depth:
+    Type: Float
+  link_flange_thickness:
+    Type: Float
+  link_screw_size:
+    Type: String
+  link_screw_length:
+    Type: Float
+  carriage_end_clearance:
+    Type: Float
+  carriage_end_rail_stopper_length:
+    Type: Float
+  carriage_end_rail_stopper_thickness:
+    Type: Float
+  carriage_end_rail_stopper_depth:
+    Type: Float
+  carriage_end_rail_stopper_fillet_radius:
+    Type: Float
+  carriage_end_rail_connector_thickness:
+    Type: Float
+  toolhead_path_width:
+    Type: Float
+  toolhead_path_extended_width:
+    Type: Float
+  toolhead_path_extended_gap:
+    Type: Float
+  endcap_vertical_coupler_size:
+    Type: Float
+  endcap_vertical_coupler_screw_size:
+    Type: String
+  endcap_vertical_coupler_screw_length:
+    Type: Float
+  endcap_axle_screw_length:
+    Type: Float
+  endcap_belt_clearance:
+    Type: Float
+  endcap_belt_vertical_clearance:
+    Type: Float
+  endcap_belt_width:
+    Type: Float
+  endcap_clearance:
+    Type: Float
+  endcap_idler_clearance:
+    Type: Float
+  endcap_idler_tooth_count:
+    Type: Integer
+  endcap_mount_fillet_radius:
+    Type: Float
+  endcap_mount_screw_size:
+    Type: String
+  endcap_outer_box_back_wall:
+    Type: Float
+  endcap_profile_clearance:
+    Type: Float
+  endcap_profile_groove_depth:
+    Type: Float
+  endcap_profile_overlap:
+    Type: Float
+  endcap_side_hole_boundary:
+    Type: Float
+  endcap_side_hole_size:
+    Type: Float
+  endcap_tensioner_cage_back_wall:
+    Type: Float
+  endcap_tensioner_cage_clearance:
+    Type: Float
+  endcap_tensioner_length:
+    Type: Float
+  endcap_tensioner_outer_box_bottom_cage_clearance:
+    Type: Float
+  endcap_tensioner_outer_box_bottom_thickness:
+    Type: Float
+  endcap_tensioner_screw_size:
+    Type: String
+  endcap_tensioner_travel:
+    Type: Float
+  endcap_top_bottom_wall:
+    Type: Float
+  endcap_wall:
+    Type: Float
+  idler_cage_back_wall:
+    Type: Float
+  idler_cage_wall:
+    Type: Float
+  endstop_holder_mount_screw_size:
+    Type: String
+  endstop_holder_mount_plate_width:
+    Type: Float
+  endstop_holder_groove_holder_bottom_width:
+    Type: Float
+  endstop_holder_groove_holder_top_width:
+    Type: Float
+  endstop_holder_groove_holder_height:
+    Type: Float
+  endstop_holder_groove_holder_slit:
+    Type: Float
+  endstop_holder_stack_gap:
+    Type: Float
+  endstop_holder_y_offset:
+    Type: Float
+
+Parts:
+  XAxisAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_assembly.create_x_axis_assembly
+      Properties:
+        x_axis_profile_length:
+          $ref: x_axis_profile_length
+        x_axis_profile_pitch:
+          $ref: x_axis_profile_pitch
+        x_axis_rail_length:
+          $ref: x_axis_rail_length
+        mount_plate_connector_link_thickness:
+          $ref: mount_plate_connector_link_thickness
+        mount_plate_link_width:
+          $ref: mount_plate_link_width
+        link_flange_depth:
+          $ref: link_flange_depth
+        link_flange_thickness:
+          $ref: link_flange_thickness
+        link_screw_size:
+          $ref: link_screw_size
+        link_screw_length:
+          $ref: link_screw_length
+        carriage_end_clearance:
+          $ref: carriage_end_clearance
+        carriage_end_rail_stopper_length:
+          $ref: carriage_end_rail_stopper_length
+        carriage_end_rail_stopper_thickness:
+          $ref: carriage_end_rail_stopper_thickness
+        carriage_end_rail_stopper_depth:
+          $ref: carriage_end_rail_stopper_depth
+        carriage_end_rail_stopper_fillet_radius:
+          $ref: carriage_end_rail_stopper_fillet_radius
+        carriage_end_rail_connector_thickness:
+          $ref: carriage_end_rail_connector_thickness
+        toolhead_path_width:
+          $ref: toolhead_path_width
+        toolhead_path_extended_width:
+          $ref: toolhead_path_extended_width
+        toolhead_path_extended_gap:
+          $ref: toolhead_path_extended_gap
+        endcap_vertical_coupler_size:
+          $ref: endcap_vertical_coupler_size
+        endcap_vertical_coupler_screw_size:
+          $ref: endcap_vertical_coupler_screw_size
+        endcap_vertical_coupler_screw_length:
+          $ref: endcap_vertical_coupler_screw_length
+        endcap_axle_screw_length:
+          $ref: endcap_axle_screw_length
+        endcap_belt_clearance:
+          $ref: endcap_belt_clearance
+        endcap_belt_vertical_clearance:
+          $ref: endcap_belt_vertical_clearance
+        endcap_belt_width:
+          $ref: endcap_belt_width
+        endcap_clearance:
+          $ref: endcap_clearance
+        endcap_idler_clearance:
+          $ref: endcap_idler_clearance
+        endcap_idler_tooth_count:
+          $ref: endcap_idler_tooth_count
+        endcap_mount_fillet_radius:
+          $ref: endcap_mount_fillet_radius
+        endcap_mount_screw_size:
+          $ref: endcap_mount_screw_size
+        endcap_outer_box_back_wall:
+          $ref: endcap_outer_box_back_wall
+        endcap_profile_clearance:
+          $ref: endcap_profile_clearance
+        endcap_profile_groove_depth:
+          $ref: endcap_profile_groove_depth
+        endcap_profile_overlap:
+          $ref: endcap_profile_overlap
+        endcap_side_hole_boundary:
+          $ref: endcap_side_hole_boundary
+        endcap_side_hole_size:
+          $ref: endcap_side_hole_size
+        endcap_tensioner_cage_back_wall:
+          $ref: endcap_tensioner_cage_back_wall
+        endcap_tensioner_cage_clearance:
+          $ref: endcap_tensioner_cage_clearance
+        endcap_tensioner_length:
+          $ref: endcap_tensioner_length
+        endcap_tensioner_outer_box_bottom_cage_clearance:
+          $ref: endcap_tensioner_outer_box_bottom_cage_clearance
+        endcap_tensioner_outer_box_bottom_thickness:
+          $ref: endcap_tensioner_outer_box_bottom_thickness
+        endcap_tensioner_screw_size:
+          $ref: endcap_tensioner_screw_size
+        endcap_tensioner_travel:
+          $ref: endcap_tensioner_travel
+        endcap_top_bottom_wall:
+          $ref: endcap_top_bottom_wall
+        endcap_wall:
+          $ref: endcap_wall
+        idler_cage_back_wall:
+          $ref: idler_cage_back_wall
+        idler_cage_wall:
+          $ref: idler_cage_wall
+        endstop_holder_mount_screw_size:
+          $ref: endstop_holder_mount_screw_size
+        endstop_holder_mount_plate_width:
+          $ref: endstop_holder_mount_plate_width
+        endstop_holder_groove_holder_bottom_width:
+          $ref: endstop_holder_groove_holder_bottom_width
+        endstop_holder_groove_holder_top_width:
+          $ref: endstop_holder_groove_holder_top_width
+        endstop_holder_groove_holder_height:
+          $ref: endstop_holder_groove_holder_height
+        endstop_holder_groove_holder_slit:
+          $ref: endstop_holder_groove_holder_slit
+        endstop_holder_stack_gap:
+          $ref: endstop_holder_stack_gap
+        endstop_holder_y_offset:
+          $ref: endstop_holder_y_offset
+        record_metrics: false

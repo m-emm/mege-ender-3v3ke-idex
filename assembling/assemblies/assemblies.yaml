@@ -83,11 +83,77 @@ globals:
   x_axis_motor_axle_length: 14
   x_axis_profile_length: 600
   x_axis_profile_pitch: 48
+  x_axis_rail_length: 450
+  x_axis_x_travel: 355
+  x_axis_x_travel_negative:
+    $expr:
+      "$sub": "-1 * ${x_axis_x_travel}"
+  carriage_end_clearance: 3
+  carriage_end_rail_stopper_length: 9
+  carriage_end_rail_stopper_thickness: 4.5
+  carriage_end_rail_stopper_depth: 17
+  carriage_end_rail_stopper_fillet_radius: 3
+  carriage_end_rail_connector_thickness: 3.5
+  endcap_vertical_coupler_size: 13
+  endcap_vertical_coupler_screw_size: "M5"
+  endcap_vertical_coupler_screw_length: 70
+  toolhead_path_width: 14
+  toolhead_path_extended_width: 60
+  toolhead_path_extended_gap: 3.5
+  endcap_axle_screw_length: 25
+  endcap_axle_screw_size: "M3"
+  endcap_belt_vertical_clearance: 1.2
+  endcap_belt_width: 6
+  endcap_clearance: 0.8
+  endcap_idler_clearance: 1.5
+  endcap_idler_tooth_count: 20
+  endcap_mount_fillet_radius: 2
+  endcap_mount_screw_size: "M5"
+  endcap_outer_box_back_wall: 4
+  endcap_profile_clearance: 0.2
+  endcap_profile_groove_depth: 8
+  endcap_profile_overlap: 15
+  endcap_side_hole_boundary: 5
+  endcap_side_hole_size: 4
+  endcap_tensioner_cage_back_wall: 8
+  endcap_tensioner_cage_clearance: 0.3
+  endcap_tensioner_length: 16
+  endcap_tensioner_outer_box_bottom_cage_clearance: 0.8
+  endcap_tensioner_outer_box_bottom_thickness: 1
+  endcap_tensioner_travel: 14
+  endcap_top_bottom_wall: 5
+  endcap_wall: 3.5
+  idler_cage_back_wall: 4
+  idler_cage_wall: 2
+  endstop_holder_groove_holder_bottom_width: 6.3
+  endstop_holder_groove_holder_height: 5
+  endstop_holder_groove_holder_slit: 1.5
+  endstop_holder_groove_holder_top_width: 6.0
+  endstop_holder_mount_plate_width: 8
+  endstop_holder_mount_screw_size: "M3"
+  endstop_holder_stack_gap: 30
+  endstop_holder_y_offset: -4
+  z_axis_guide_distance: 256
+  motor_size: 42.3
+  motor_x_offset:
+    $expr:
+      "$sub": "${z_axis_guide_distance} / 2 - 60"
+  mount_plate_connector_length:
+    $expr:
+      "$sub": "${z_axis_guide_distance} - 2 * ${motor_x_offset} - ${motor_size} + 8"
+  mount_plate_link_width:
+    $expr:
+      "$sub": "${mount_plate_connector_length} * 0.8"
   motor_mount_axle_clearance: 0.3
   motor_mount_boss_clearance: 0.6
   motor_mount_boss_clearance_z: 8
   motor_mount_plate_thickness: 5
   motor_mount_plate_fillet_radius: 2
+  mount_plate_connector_link_thickness: 6
+  link_flange_depth: 12
+  link_flange_thickness: 7
+  link_screw_length: 20
+  link_screw_size: "M5"
   endcap_tensioner_screw_size: "M3"
   endcap_belt_clearance: 6
   y_axis_drive_profile_mount_plate_width: 90
@@ -634,6 +700,121 @@ assemblies:
         $ref: y_axis_rail_carrier_bracket_mount_plate_length
       y_axis_rail_carrier_bracket_mount_plate_fillet_radius:
         $ref: y_axis_rail_carrier_bracket_mount_plate_fillet_radius
+
+  - name: x_axis_assembly
+
+    depends_on: []
+    parameters:
+      x_axis_profile_length:
+        $ref: x_axis_profile_length
+      x_axis_profile_pitch:
+        $ref: x_axis_profile_pitch
+      x_axis_rail_length:
+        $ref: x_axis_rail_length
+      mount_plate_connector_link_thickness:
+        $ref: mount_plate_connector_link_thickness
+      mount_plate_link_width:
+        $ref: mount_plate_link_width
+      link_flange_depth:
+        $ref: link_flange_depth
+      link_flange_thickness:
+        $ref: link_flange_thickness
+      link_screw_size:
+        $ref: link_screw_size
+      link_screw_length:
+        $ref: link_screw_length
+      carriage_end_clearance:
+        $ref: carriage_end_clearance
+      carriage_end_rail_stopper_length:
+        $ref: carriage_end_rail_stopper_length
+      carriage_end_rail_stopper_thickness:
+        $ref: carriage_end_rail_stopper_thickness
+      carriage_end_rail_stopper_depth:
+        $ref: carriage_end_rail_stopper_depth
+      carriage_end_rail_stopper_fillet_radius:
+        $ref: carriage_end_rail_stopper_fillet_radius
+      carriage_end_rail_connector_thickness:
+        $ref: carriage_end_rail_connector_thickness
+      toolhead_path_width:
+        $ref: toolhead_path_width
+      toolhead_path_extended_width:
+        $ref: toolhead_path_extended_width
+      toolhead_path_extended_gap:
+        $ref: toolhead_path_extended_gap
+      endcap_vertical_coupler_size:
+        $ref: endcap_vertical_coupler_size
+      endcap_vertical_coupler_screw_size:
+        $ref: endcap_vertical_coupler_screw_size
+      endcap_vertical_coupler_screw_length:
+        $ref: endcap_vertical_coupler_screw_length
+      endcap_axle_screw_length:
+        $ref: endcap_axle_screw_length
+      endcap_belt_clearance:
+        $ref: endcap_belt_clearance
+      endcap_belt_vertical_clearance:
+        $ref: endcap_belt_vertical_clearance
+      endcap_belt_width:
+        $ref: endcap_belt_width
+      endcap_clearance:
+        $ref: endcap_clearance
+      endcap_idler_clearance:
+        $ref: endcap_idler_clearance
+      endcap_idler_tooth_count:
+        $ref: endcap_idler_tooth_count
+      endcap_mount_fillet_radius:
+        $ref: endcap_mount_fillet_radius
+      endcap_mount_screw_size:
+        $ref: endcap_mount_screw_size
+      endcap_outer_box_back_wall:
+        $ref: endcap_outer_box_back_wall
+      endcap_profile_clearance:
+        $ref: endcap_profile_clearance
+      endcap_profile_groove_depth:
+        $ref: endcap_profile_groove_depth
+      endcap_profile_overlap:
+        $ref: endcap_profile_overlap
+      endcap_side_hole_boundary:
+        $ref: endcap_side_hole_boundary
+      endcap_side_hole_size:
+        $ref: endcap_side_hole_size
+      endcap_tensioner_cage_back_wall:
+        $ref: endcap_tensioner_cage_back_wall
+      endcap_tensioner_cage_clearance:
+        $ref: endcap_tensioner_cage_clearance
+      endcap_tensioner_length:
+        $ref: endcap_tensioner_length
+      endcap_tensioner_outer_box_bottom_cage_clearance:
+        $ref: endcap_tensioner_outer_box_bottom_cage_clearance
+      endcap_tensioner_outer_box_bottom_thickness:
+        $ref: endcap_tensioner_outer_box_bottom_thickness
+      endcap_tensioner_screw_size:
+        $ref: endcap_tensioner_screw_size
+      endcap_tensioner_travel:
+        $ref: endcap_tensioner_travel
+      endcap_top_bottom_wall:
+        $ref: endcap_top_bottom_wall
+      endcap_wall:
+        $ref: endcap_wall
+      idler_cage_back_wall:
+        $ref: idler_cage_back_wall
+      idler_cage_wall:
+        $ref: idler_cage_wall
+      endstop_holder_mount_screw_size:
+        $ref: endstop_holder_mount_screw_size
+      endstop_holder_mount_plate_width:
+        $ref: endstop_holder_mount_plate_width
+      endstop_holder_groove_holder_bottom_width:
+        $ref: endstop_holder_groove_holder_bottom_width
+      endstop_holder_groove_holder_top_width:
+        $ref: endstop_holder_groove_holder_top_width
+      endstop_holder_groove_holder_height:
+        $ref: endstop_holder_groove_holder_height
+      endstop_holder_groove_holder_slit:
+        $ref: endstop_holder_groove_holder_slit
+      endstop_holder_stack_gap:
+        $ref: endstop_holder_stack_gap
+      endstop_holder_y_offset:
+        $ref: endstop_holder_y_offset
 
   - name: sprite_extruder_assembly
 
