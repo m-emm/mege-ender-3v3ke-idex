@@ -386,6 +386,44 @@ builder_defaults:
       export_stl: true
       export_individual_parts: true
 
+placement:
+  alignments:
+    - part: y_axis_assembly
+      to: printer_frame_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: y_axis_assembly.non_production_parts.profile_left
+      to: printer_frame_assembly
+      alignment: CENTER
+      axes: [2]
+    - part: y_axis_assembly.non_production_parts.carriages_fused
+      to: print_bed_undercarriage_assembly
+      alignment: STACK_BOTTOM
+    - part: print_bed_assembly
+      to: y_axis_assembly.non_production_parts.carriages_fused
+      alignment: CENTER
+      axes: [1]
+    - part: print_bed_undercarriage_assembly
+      to: y_axis_assembly.non_production_parts.carriages_fused
+      alignment: CENTER
+      axes: [1]
+    - part: x_axis_assembly
+      to: printer_frame_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: x_axis_assembly
+      to: printer_frame_assembly
+      alignment: STACK_TOP
+      stack_gap: 100
+    - part: tool_head_mount_bottom_assembly.followers.carriage
+      to: x_axis_assembly.non_production_parts.carriage_1
+      alignment: CENTER
+
+    - part: tool_head_mount_top_assembly.followers.carriage
+      to: x_axis_assembly.non_production_parts.carriage_2
+      alignment: CENTER
+
+
 assemblies:
 
   - name: printer_frame_assembly

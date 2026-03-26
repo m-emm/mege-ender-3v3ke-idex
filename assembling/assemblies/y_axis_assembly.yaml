@@ -2,28 +2,6 @@ ShellforgepyBuilderVersion: "2026-03-27"
 
 Description: Assembly configuration for the y-axis
 
-placement:
-  alignments:
-    - part: y_axis_assembly
-      to: printer_frame_assembly
-      alignment: CENTER
-      axes: [0, 1]
-    - part: y_axis_assembly.non_production_parts.profile_left
-      to: printer_frame_assembly
-      alignment: CENTER
-      axes: [2]
-    - part: y_axis_assembly.non_production_parts.carriages_fused
-      to: print_bed_undercarriage_assembly
-      alignment: STACK_BOTTOM
-    - part: print_bed_assembly
-      to: y_axis_assembly.non_production_parts.carriages_fused
-      alignment: CENTER
-      axes: [1]
-    - part: print_bed_undercarriage_assembly
-      to: y_axis_assembly.non_production_parts.carriages_fused
-      alignment: CENTER
-      axes: [1]
-
 Builder:
   Visualization:
     parts:

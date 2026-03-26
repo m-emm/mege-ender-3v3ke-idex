@@ -2,35 +2,6 @@ ShellforgepyBuilderVersion: "2026-03-27"
 
 Description: Assembly configuration for the x-axis
 
-placement:
-  alignments:
-    - part: x_axis_assembly
-      to: printer_frame_assembly
-      alignment: CENTER
-      axes: [0, 1]
-    - part: x_axis_assembly
-      to: printer_frame_assembly
-      alignment: STACK_TOP
-      stack_gap: 100
-    - part: tool_head_mount_bottom_assembly.followers.carriage
-      to: x_axis_assembly.non_production_parts.carriage_1
-      alignment: CENTER
-    - part: tool_head_mount_bottom_assembly.followers.carriage
-      to: x_axis_assembly.non_production_parts.carriage_1
-      alignment: BACK
-    - part: tool_head_mount_bottom_assembly.followers.carriage
-      to: x_axis_assembly.non_production_parts.carriage_1
-      alignment: TOP
-    - part: tool_head_mount_top_assembly.followers.carriage
-      to: x_axis_assembly.non_production_parts.carriage_2
-      alignment: CENTER
-    - part: tool_head_mount_top_assembly.followers.carriage
-      to: x_axis_assembly.non_production_parts.carriage_2
-      alignment: BACK
-    - part: tool_head_mount_top_assembly.followers.carriage
-      to: x_axis_assembly.non_production_parts.carriage_2
-      alignment: TOP
-
 Builder:
   Visualization:
     parts:
