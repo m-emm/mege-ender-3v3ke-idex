@@ -124,12 +124,12 @@ def _align_y_axis_to_print_bed_undercarriage(y_axis, frame):
     return translate(0, 0, -y_axis_drop_mm)(y_axis)
 
 
-y_axis_rail_carrier_bracket_outer_diameter = 100
+y_axis_rail_carrier_bracket_outer_diameter = 95
 y_axis_rail_carrier_bracket_height = 40
 y_axis_rail_carrier_bracket_profile_width = 20
 y_axis_rail_carrier_bracket_profile_wall = 1.8
 y_axis_rail_carrier_bracket_mount_plate_thickness = 5
-y_axis_rail_carrier_bracket_mount_plate_length = 80
+y_axis_rail_carrier_bracket_mount_plate_length = 75
 y_axis_rail_carrier_bracket_mount_plate_fillet_radius = 3
 
 
