@@ -1,0 +1,158 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the tool head assembly
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: tool_head
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        exclude_names:
+          - nitehawk_pcb
+        name_template: "{name}"
+  Production:
+    process_data:
+      source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PETGCF_04_HS
+      overrides:
+        process_overrides:
+          enable_support: "1"
+          support_threshold_angle: "30"
+          brim_type: no_brim
+          support_on_build_plate_only: "1"
+          support_critical_regions_only: "1"
+          support_top_z_distance: "0.3"
+          support_interface_spacing: "0.8"
+          fan_min_speed: "10"
+          fan_max_speed: "25"
+          external_perimeter_speed: "75"
+          outer_wall_speed: "75"
+          sparse_infill_density: "85%"
+    parts:
+      - source: self
+        artifact: leader
+        name: tool_head
+        prod_rotation_angle: -90
+        prod_rotation_axis: [1, 0, 0]
+      - source: self
+        artifact: followers
+        names:
+          - blower_ducts
+        name_template: "{name}"
+        prod_rotation_angle: 50
+        prod_rotation_axis: [0, 1, 0]
+
+Parameters:
+  holder_mount_plate_depth:
+    Type: Float
+  holder_mount_plate_left_extension:
+    Type: Float
+  holder_mount_plate_size:
+    Type: Float
+  holder_mount_plate_spacer:
+    Type: Float
+  holder_mount_plate_thickness:
+    Type: Float
+  holder_mount_plate_top_offset:
+    Type: Float
+  nitehawk_holder_extruder_gap:
+    Type: Float
+  nitehawk_holder_height_offset:
+    Type: Float
+  nitehawk_holder_width_offset:
+    Type: Float
+  tool_head_additional_mount_plate_clearance:
+    Type: Float
+  tool_head_additional_mount_plate_depth:
+    Type: Float
+  tool_head_additional_mount_plate_depth_offset:
+    Type: Float
+  tool_head_additional_mount_plate_fillet_radius:
+    Type: Float
+  tool_head_additional_mount_plate_height:
+    Type: Float
+  tool_head_additional_mount_plate_thickness:
+    Type: Float
+  tool_head_additional_mount_plate_z_offset:
+    Type: Float
+  tool_head_front_mount_plate_connector_height:
+    Type: Float
+  tool_head_front_mount_plate_connector_thickness:
+    Type: Float
+  tool_head_front_mount_plate_connector_width:
+    Type: Float
+  duct_front_mount_plate_height:
+    Type: Float
+  duct_front_mount_plate_height_border:
+    Type: Float
+  duct_front_mount_plate_offset:
+    Type: Float
+  duct_front_mount_plate_thickness:
+    Type: Float
+  duct_front_mount_plate_width:
+    Type: Float
+  duct_front_mount_plate_width_border:
+    Type: Float
+
+Parts:
+  ToolHeadAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.tool_head_assembly.create_tool_head_assembly
+      Properties:
+        holder_mount_plate_depth:
+          $ref: holder_mount_plate_depth
+        holder_mount_plate_left_extension:
+          $ref: holder_mount_plate_left_extension
+        holder_mount_plate_size:
+          $ref: holder_mount_plate_size
+        holder_mount_plate_spacer:
+          $ref: holder_mount_plate_spacer
+        holder_mount_plate_thickness:
+          $ref: holder_mount_plate_thickness
+        holder_mount_plate_top_offset:
+          $ref: holder_mount_plate_top_offset
+        nitehawk_holder_extruder_gap:
+          $ref: nitehawk_holder_extruder_gap
+        nitehawk_holder_height_offset:
+          $ref: nitehawk_holder_height_offset
+        nitehawk_holder_width_offset:
+          $ref: nitehawk_holder_width_offset
+        tool_head_additional_mount_plate_clearance:
+          $ref: tool_head_additional_mount_plate_clearance
+        tool_head_additional_mount_plate_depth:
+          $ref: tool_head_additional_mount_plate_depth
+        tool_head_additional_mount_plate_depth_offset:
+          $ref: tool_head_additional_mount_plate_depth_offset
+        tool_head_additional_mount_plate_fillet_radius:
+          $ref: tool_head_additional_mount_plate_fillet_radius
+        tool_head_additional_mount_plate_height:
+          $ref: tool_head_additional_mount_plate_height
+        tool_head_additional_mount_plate_thickness:
+          $ref: tool_head_additional_mount_plate_thickness
+        tool_head_additional_mount_plate_z_offset:
+          $ref: tool_head_additional_mount_plate_z_offset
+        tool_head_front_mount_plate_connector_height:
+          $ref: tool_head_front_mount_plate_connector_height
+        tool_head_front_mount_plate_connector_thickness:
+          $ref: tool_head_front_mount_plate_connector_thickness
+        tool_head_front_mount_plate_connector_width:
+          $ref: tool_head_front_mount_plate_connector_width
+        duct_front_mount_plate_height:
+          $ref: duct_front_mount_plate_height
+        duct_front_mount_plate_height_border:
+          $ref: duct_front_mount_plate_height_border
+        duct_front_mount_plate_offset:
+          $ref: duct_front_mount_plate_offset
+        duct_front_mount_plate_thickness:
+          $ref: duct_front_mount_plate_thickness
+        duct_front_mount_plate_width:
+          $ref: duct_front_mount_plate_width
+        duct_front_mount_plate_width_border:
+          $ref: duct_front_mount_plate_width_border
