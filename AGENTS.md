@@ -223,6 +223,21 @@ Klipper `.cfg` files in `klipper_setup/klipper_config/` are tracked in git (see 
 SHELLFORGEPY_PRODUCTION=1 ./run.sh src/mege_ender_3v3ke_idex/designs/x_axis.py
 ```
 
+### Running Declarative Assemblies
+
+Use the repository's pyenv-selected Python directly from the repo root. Do not create or activate an ad-hoc `venv` here.
+
+```bash
+# Visualize a single assembly
+python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly y_axis_rail_carrier_brackets_assembly --visualize
+
+# Force a fresh rebuild and visualize the whole printer scene
+python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly whole_printer_assembly --visualize --force
+
+# Rebuild just the print bed assembly and export the geometry artifacts
+python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly print_bed_assembly --visualize --force
+```
+
 ### Typical Design Workflow
 
 1. **Define parameters** at module level (dimensions, clearances, etc.)
@@ -255,7 +270,9 @@ def create_motor_mount(motor_size, thickness):
 ## Environment Notes
 
 - Python ≥3.11 required
-- Install with: `pip install -e ".[testing]"` for development
+- This repo relies on its pyenv environment selection being already configured per development directory. From the repo root, plain `python ...` commands should use the correct interpreter automatically.
+- Do not create or suggest a separate `venv` for routine work in this repository unless the user explicitly asks for it.
+- Install/update dependencies into the selected environment with: `pip install -e ".[testing]"`
 - Dependencies: ShellForgePy, mege_3devops (for process_data)
 - Optional: FreeCAD or CadQuery backends (auto-selected by ShellForgePy)
 

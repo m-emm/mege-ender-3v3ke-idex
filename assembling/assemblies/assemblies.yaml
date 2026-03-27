@@ -47,7 +47,7 @@ globals:
   print_bed_undercarriage_central_annulus_diameter: 90
   print_bed_undercarriage_mount_tower_annulus_diameter: 110
   print_bed_mount_tower_size: 20
-  print_bed_mount_tower_height: 25   
+  print_bed_mount_tower_height: 25
   print_bed_mount_tower_clearance: 0.2
   print_bed_mount_tower_screw_size: "M5"
   print_bed_undercarriage_mount_tower_holder_size: 30
@@ -390,16 +390,19 @@ builder_defaults:
 
 placement:
   alignments:
+    - part: print_bed_assembly.non_production_parts.print_bed_foil
+      to: printer_frame_assembly
+      alignment: TOP
+      post_translation:
+        - 0
+        - 0
+        - $ref: print_bed_vertical_gap_to_frame
     - part: y_axis_assembly
       to: printer_frame_assembly
       alignment: CENTER
       axes: [0, 1]
     - part: y_axis_assembly.non_production_parts.profile_left
       to: printer_frame_assembly
-      alignment: CENTER
-      axes: [2]
-    - part: y_axis_rail_carrier_brackets_assembly.non_production_parts.profile_side_mount_plate_left_front
-      to: y_axis_assembly.non_production_parts.profile_left
       alignment: CENTER
       axes: [2]
     - part: y_axis_assembly.non_production_parts.carriages_fused
@@ -413,6 +416,12 @@ placement:
       to: y_axis_assembly.non_production_parts.carriages_fused
       alignment: CENTER
       axes: [1]
+
+    - part: y_axis_rail_carrier_brackets_assembly.non_production_parts.profile_side_mount_plate_left_front
+      to: y_axis_assembly.non_production_parts.profile_left
+      alignment: CENTER
+      axes: [2]
+
     - part: z_axis_assembly
       to: printer_frame_assembly
       alignment: CENTER
@@ -437,12 +446,8 @@ placement:
     - part: tool_head_mount_top_assembly.followers.carriage
       to: x_axis_assembly.non_production_parts.carriage_2
       alignment: CENTER
-    
-    
-
 
 assemblies:
-
   - name: printer_frame_assembly
 
     depends_on: []

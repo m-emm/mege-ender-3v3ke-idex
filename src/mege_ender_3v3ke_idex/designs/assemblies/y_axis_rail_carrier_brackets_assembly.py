@@ -4,30 +4,6 @@ from mege_ender_3v3ke_idex.designs.hollow_profiles import create_hollow_profile_
 from shellforgepy.simple import *
 
 
-def _translation_delta(source_part, target_part):
-    source_center = get_bounding_box_center(source_part)
-    target_center = get_bounding_box_center(target_part)
-    return tuple(
-        target - source for source, target in zip(source_center, target_center)
-    )
-
-
-def _create_rail_carrier_bracket(
-    *,
-    y_axis_rail_carrier_bracket_outer_diameter,
-    y_axis_rail_carrier_bracket_profile_width,
-    y_axis_rail_carrier_bracket_height,
-    y_axis_rail_carrier_bracket_profile_wall,
-):
-    return create_hollow_profile_ring(
-        y_axis_rail_carrier_bracket_outer_diameter,
-        profile_depth=y_axis_rail_carrier_bracket_profile_width,
-        profile_height=y_axis_rail_carrier_bracket_height,
-        wall_thickness=y_axis_rail_carrier_bracket_profile_wall,
-        angle=90,
-    )
-
-
 def _create_bracket_for_corner(
     *,
     frame_front_back_profile,
@@ -49,12 +25,14 @@ def _create_bracket_for_corner(
         (Alignment.RIGHT, Alignment.BACK): -90,
     }
 
-    rail_carrier_bracket = _create_rail_carrier_bracket(
-        y_axis_rail_carrier_bracket_outer_diameter=y_axis_rail_carrier_bracket_outer_diameter,
-        y_axis_rail_carrier_bracket_profile_width=y_axis_rail_carrier_bracket_profile_width,
-        y_axis_rail_carrier_bracket_height=y_axis_rail_carrier_bracket_height,
-        y_axis_rail_carrier_bracket_profile_wall=y_axis_rail_carrier_bracket_profile_wall,
+    rail_carrier_bracket = create_hollow_profile_ring(
+        y_axis_rail_carrier_bracket_outer_diameter,
+        profile_depth=y_axis_rail_carrier_bracket_profile_width,
+        profile_height=y_axis_rail_carrier_bracket_height,
+        wall_thickness=y_axis_rail_carrier_bracket_profile_wall,
+        angle=90,
     )
+
     rail_carrier_bracket = rotate(
         rotation_angle_map[(side_alignment, front_back_alignment)] - 90
     )(rail_carrier_bracket)
@@ -86,7 +64,7 @@ def _create_bracket_for_corner(
     rail_carrier_bracket = translate(
         -side_alignment.sign * y_axis_rail_carrier_bracket_mount_plate_thickness,
         -front_back_alignment.sign * y_axis_rail_carrier_bracket_mount_plate_thickness,
-        y_axis_rail_carrier_bracket_mount_plate_thickness,
+        0,  # y_axis_rail_carrier_bracket_mount_plate_thickness,
     )(rail_carrier_bracket)
 
     profile_size = get_bounding_box_size(y_axis_profile)
@@ -120,19 +98,6 @@ def _create_bracket_for_corner(
         front_back_alignment,
     )
 
-    target_rail_side_mount_plate = align(
-        rail_side_mount_plate,
-        y_axis_profile,
-        Alignment.CENTER,
-        axes=[2],
-    )
-    vertical_shift = _translation_delta(
-        rail_side_mount_plate, target_rail_side_mount_plate
-    )
-
-    rail_carrier_bracket = translate(*vertical_shift)(rail_carrier_bracket)
-    rail_side_mount_plate = translate(*vertical_shift)(rail_side_mount_plate)
-
     frame_side_mount_plate = create_filleted_box(
         y_axis_rail_carrier_bracket_mount_plate_length,
         y_axis_rail_carrier_bracket_mount_plate_thickness,
@@ -149,11 +114,6 @@ def _create_bracket_for_corner(
     frame_side_mount_plate = align(
         frame_side_mount_plate,
         y_axis_profile,
-        Alignment.TOP,
-    )
-    frame_side_mount_plate = align(
-        frame_side_mount_plate,
-        y_axis_profile,
         side_alignment.opposite.stack_alignment,
     )
     frame_side_mount_plate = align(
@@ -161,7 +121,11 @@ def _create_bracket_for_corner(
         y_axis_profile,
         front_back_alignment,
     )
-    frame_side_mount_plate = translate(*vertical_shift)(frame_side_mount_plate)
+    frame_side_mount_plate = align(
+        frame_side_mount_plate,
+        frame_front_back_profile,
+        Alignment.TOP,
+    )
 
     frame_front_back_profile_size = get_bounding_box_size(frame_front_back_profile)
     top_mount_plate_depth = frame_front_back_profile_size[1]

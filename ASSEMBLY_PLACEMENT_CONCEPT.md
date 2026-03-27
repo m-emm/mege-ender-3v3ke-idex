@@ -163,6 +163,11 @@ placement:
       alignment: STACK_TOP
       stack_gap: { $ref: print_bed_vertical_gap_to_frame }
 
+    - part: print_bed_assembly.non_production_parts.print_bed_foil
+      to: printer_frame_assembly
+      alignment: TOP
+      post_translation: [0, 0, { $ref: print_bed_vertical_gap_to_frame }]
+
     - part: print_bed_undercarriage_assembly
       to: print_bed_assembly
       alignment: CENTER
@@ -373,6 +378,7 @@ The YAML layer preserves the real behavior of the existing primitives.
 That means:
 - `stack_gap` is supported
 - `axes` are supported where `align_translation(...)` supports them
+- `post_translation` is supported as an additional translation applied immediately after the alignment move
 
 That means:
 - `axes` is valid with `CENTER`
@@ -381,6 +387,8 @@ That means:
 Partial placement on selected axes uses this idiom:
 - one `CENTER` with `axes`
 - followed by further `TOP`, `BACK`, `STACK_*`, and similar alignments
+
+`post_translation` is useful when the main anchor relationship should still be expressed as a normal alignment, but the final assembly pose needs an additional parameterized offset from globals.
 
 ## Y-axis / bed example
 
