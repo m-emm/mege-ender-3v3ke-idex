@@ -270,6 +270,10 @@ def _create_bracket_for_corner(
             (side_alignment.edge_alignment, bracket, None, 0),
             (front_back_alignment.opposite.edge_alignment, top_end_plate, None, 1),
         ],
+        [
+            (side_alignment.edge_alignment, bracket, None, 0),
+            (front_back_alignment.edge_alignment, y_axis_profile, None, 1),
+        ],
     ]
     top_bracket_screws = []
     for screw_alignment_list in screw_alignments:
@@ -371,7 +375,7 @@ def _create_bracket_for_corner(
     )
 
     frame_screw = translate(
-        side_alignment.sign* y_axis_rail_carrier_bracket_mount_screw_inset,
+        side_alignment.sign * y_axis_rail_carrier_bracket_mount_screw_inset,
         -front_back_alignment.sign
         * MScrew.from_size(
             y_axis_rail_carrier_bracket_mount_screw_size
