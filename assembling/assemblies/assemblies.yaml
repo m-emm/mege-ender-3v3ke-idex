@@ -134,8 +134,15 @@ globals:
   endstop_holder_stack_gap: 30
   endstop_holder_y_offset: -4
   z_axis_guide_distance: 256
+  z_axis_y_offset: 130
   z_axis_carriage_z_offset: 123
   z_axis_z_travel: 300
+  z_axis_base_z_offset:
+    $expr:
+      "$sub": "${print_bed_vertical_gap_to_frame} - 43"
+  z_axis_x_offset_from_center:
+    $expr:
+      "$sub": "${frame_inner_width} / 2 + 60"
   motor_size: 42.3
   motor_x_offset:
     $expr:
@@ -422,11 +429,28 @@ placement:
       alignment: CENTER
       axes: [2]
 
-    - part: z_axis_assembly
+    - part: left_z_axis_profile_assembly
       to: printer_frame_assembly
       alignment: CENTER
-      axes: [0]
-    - part: z_axis_assembly.non_production_parts.left_profile
+      axes: [0, 1]
+      post_translation:
+        -
+          $expr:
+            "$sub": "-1 * ${z_axis_x_offset_from_center}"
+        - $ref: z_axis_y_offset
+        - 0
+    - part: left_z_axis_profile_assembly
+      to: printer_frame_assembly
+      alignment: BOTTOM
+    - part: right_z_axis_profile_assembly
+      to: printer_frame_assembly
+      alignment: CENTER
+      axes: [0, 1]
+      post_translation:
+        - $ref: z_axis_x_offset_from_center
+        - $ref: z_axis_y_offset
+        - 0
+    - part: right_z_axis_profile_assembly
       to: printer_frame_assembly
       alignment: BOTTOM
     - part: x_axis_assembly
@@ -893,11 +917,71 @@ assemblies:
   - name: z_axis_assembly
 
     depends_on:
+      - left_z_axis_profile_assembly
+      - right_z_axis_profile_assembly
+      - left_z_axis_assembly
+      - right_z_axis_assembly
+    inject_parts:
+      left_z_axis_profile:
+        assembly: left_z_axis_profile_assembly
+        artifact: assembly
+      right_z_axis_profile:
+        assembly: right_z_axis_profile_assembly
+        artifact: assembly
+      left_z_axis:
+        assembly: left_z_axis_assembly
+        artifact: assembly
+      right_z_axis:
+        assembly: right_z_axis_assembly
+        artifact: assembly
+
+  - name: left_z_axis_profile_assembly
+
+    resource_file: z_axis_profile_assembly.yaml
+    depends_on:
       - printer_frame_assembly
-      - print_bed_assembly
     parameters:
+      side: left
+
+  - name: right_z_axis_profile_assembly
+
+    resource_file: z_axis_profile_assembly.yaml
+    depends_on:
+      - printer_frame_assembly
+    parameters:
+      side: right
+
+  - name: left_z_axis_assembly
+
+    resource_file: z_axis_side_assembly.yaml
+    depends_on:
+      - left_z_axis_profile_assembly
+    inject_parts:
+      z_axis_profile:
+        assembly: left_z_axis_profile_assembly
+        artifact: assembly
+    parameters:
+      side: left
       carriage_z_offset:
         $ref: z_axis_carriage_z_offset
+      z_axis_base_z_offset:
+        $ref: z_axis_base_z_offset
+
+  - name: right_z_axis_assembly
+
+    resource_file: z_axis_side_assembly.yaml
+    depends_on:
+      - right_z_axis_profile_assembly
+    inject_parts:
+      z_axis_profile:
+        assembly: right_z_axis_profile_assembly
+        artifact: assembly
+    parameters:
+      side: right
+      carriage_z_offset:
+        $ref: z_axis_carriage_z_offset
+      z_axis_base_z_offset:
+        $ref: z_axis_base_z_offset
 
   - name: whole_printer_assembly
 

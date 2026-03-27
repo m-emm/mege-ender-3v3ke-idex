@@ -232,10 +232,10 @@ Use the repository's pyenv-selected Python directly from the repo root. Do not c
 python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly y_axis_rail_carrier_brackets_assembly --visualize
 
 # Force a fresh rebuild and visualize the whole printer scene
-python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly whole_printer_assembly --visualize --force
+python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly whole_printer_assembly --visualize
 
 # Rebuild just the print bed assembly and export the geometry artifacts
-python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly print_bed_assembly --visualize --force
+python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly print_bed_assembly --visualize
 ```
 
 ### Typical Design Workflow

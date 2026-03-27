@@ -925,18 +925,27 @@ def create_carriage(guide_rod, threaded_rod, profile):
     return retval
 
 
-def create_z_axis(side):
-    """Create the z_axis part."""
+def create_z_axis_profile(*, side=None, record_metrics=True):
+    """Create the 4040 profile used by a single z-axis side."""
 
-    record_length_metric(
-        "extrusion_profile",
-        ExtrusionProfileType.PROFILE_4040.value,
-        f"{side.name.lower()}_z_axis_profile",
-        z_axis_profile_length,
+    if record_metrics:
+        if side is None:
+            raise ValueError("side is required when record_metrics=True")
+        record_length_metric(
+            "extrusion_profile",
+            ExtrusionProfileType.PROFILE_4040.value,
+            f"{side.name.lower()}_z_axis_profile",
+            z_axis_profile_length,
+        )
+
+    return create_alu_extrusion_profile(
+        ExtrusionProfileType.PROFILE_4040,
+        length_mm=z_axis_profile_length,
     )
-    z_axis_profile = create_alu_extrusion_profile(
-        ExtrusionProfileType.PROFILE_4040, length_mm=z_axis_profile_length
-    )
+
+
+def create_z_axis_from_profile(side, z_axis_profile):
+    """Create the z-axis mechanics around an existing positioned profile."""
 
     guide_rod = create_cylinder(z_axis_guide_rod_diameter / 2, z_axis_guide_rod_length)
 
@@ -988,7 +997,6 @@ def create_z_axis(side):
     )
 
     for name, part in pillow_block_bearing.get_named_non_production_part_items():
-
         rods_assembly.add_named_non_production_part(part, name)
 
     for name, cutter in pillow_block_bearing.get_named_cutter_items():
@@ -1028,7 +1036,6 @@ def create_z_axis(side):
     )
 
     if side == Alignment.LEFT:
-
         motor = rotate(180)(motor)
 
     motor = align(motor, threaded_rod, Alignment.CENTER)
@@ -1041,7 +1048,7 @@ def create_z_axis(side):
         threaded_rod_part,
         coupler,
         Alignment.STACK_TOP,
-        stack_gap=0,  # -z_axis_threaded_rod_coupler_overlap,
+        stack_gap=0,
     )
 
     rods_assembly = coupler_aligner(rods_assembly)
@@ -1199,6 +1206,15 @@ def create_z_axis(side):
     for name, part in top_mount.get_named_non_production_part_items():
         retval.add_named_non_production_part(part, f"top_mount_{name}")
 
+    return retval
+
+
+def create_z_axis(side):
+    """Create the z_axis part."""
+
+    z_axis_profile = create_z_axis_profile(side=side)
+    retval = create_z_axis_from_profile(side, z_axis_profile)
+
     retval = translate(0, 0, -z_axis_base_z_offset)(retval)
 
     return retval
@@ -1262,7 +1278,7 @@ def create_minimal_z_axis_reference():
 def create_top_bridge_profile(positioned_z_axes):
     z_axis_profiles = PartCollector()
     for z_axis in positioned_z_axes.values():
-        z_axis_profiles = z_axis_profiles.fuse(z_axis.leader)
+        z_axis_profiles = z_axis_profiles.fuse(getattr(z_axis, "leader", z_axis))
 
     bridge_length = get_bounding_box_size(z_axis_profiles)[0]
     record_length_metric(

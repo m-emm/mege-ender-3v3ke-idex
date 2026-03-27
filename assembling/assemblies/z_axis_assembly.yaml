@@ -5,18 +5,6 @@ Description: Assembly configuration for the dual z-axis
 Builder:
   Visualization:
     parts:
-      - source: dependencies
-        assembly: printer_frame_assembly
-        artifact: leader
-        name: printer_frame
-      - source: dependencies
-        assembly: print_bed_assembly
-        artifact: leader
-        name: print_bed
-      - source: dependencies
-        assembly: print_bed_assembly
-        artifact: non_production_parts
-        name_template: "print_bed_{name}"
       - source: self
         artifact: leader
         name: z_axis
@@ -32,16 +20,9 @@ Builder:
         artifact: followers
         name_template: "{name}"
 
-Parameters:
-  carriage_z_offset:
-    Type: Float
-
 Parts:
   ZAxisAssembly:
     Type: Shellforgepy::Assembly
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_assembly.create_z_axis_assembly
-      Properties:
-        carriage_z_offset:
-          $ref: carriage_z_offset
