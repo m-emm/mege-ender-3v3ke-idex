@@ -9,6 +9,23 @@ from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12h_rail_with_car
 from shellforgepy.simple import *
 
 
+def _mounted_sprite_reference(tool_head_like):
+    if "sprite_extruder" in tool_head_like.non_production_indices_by_name:
+        return tool_head_like.get_non_production_part_by_name("sprite_extruder")
+    return tool_head_like.leader
+
+
+def _align_tool_head_like(tool_head_like, target, alignment, *, stack_gap=0):
+    if "sprite_extruder" in tool_head_like.non_production_indices_by_name:
+        return tool_head_like.aligned_from_non_production_part(
+            "sprite_extruder",
+            target,
+            alignment,
+            stack_gap=stack_gap,
+        )
+    return align(tool_head_like, target, alignment, stack_gap=stack_gap)
+
+
 def _create_lower_side_plates(
     *,
     carriage_mount_plate,
@@ -531,17 +548,17 @@ def _create_single_tool_head_mount(
         mount_base_plate = mount_base_plate.cut(bases_cutter)
 
     mount_sprite_extruder = rotate(180)(sprite_extruder.copy())
-    mount_sprite_extruder = align(
+    mount_sprite_extruder = _align_tool_head_like(
         mount_sprite_extruder,
         mount_base_plate,
         Alignment.CENTER,
     )
-    mount_sprite_extruder = align(
+    mount_sprite_extruder = _align_tool_head_like(
         mount_sprite_extruder,
         lower_axis_profile,
         Alignment.TOP,
     )
-    mount_sprite_extruder = align(
+    mount_sprite_extruder = _align_tool_head_like(
         mount_sprite_extruder,
         mount_base_plate,
         Alignment.STACK_FRONT,
@@ -553,7 +570,9 @@ def _create_single_tool_head_mount(
         tool_head_mount_tool_head_z_offset,
     )(mount_sprite_extruder)
 
-    mount_base_plate = mount_sprite_extruder.use_as_cutter_on(mount_base_plate)
+    sprite_extruder_reference = _mounted_sprite_reference(mount_sprite_extruder)
+
+    mount_base_plate = mount_base_plate.cut(sprite_extruder_reference)
 
     extruder_cutout = create_filleted_box(
         tool_head_mount_extruder_cutout_width,
@@ -563,7 +582,7 @@ def _create_single_tool_head_mount(
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
     extruder_cutout = align(extruder_cutout, carriage_mount_plate, Alignment.CENTER)
-    extruder_cutout = align(extruder_cutout, mount_sprite_extruder, Alignment.RIGHT)
+    extruder_cutout = align(extruder_cutout, sprite_extruder_reference, Alignment.RIGHT)
     extruder_cutout = align(
         extruder_cutout,
         carriage,
@@ -594,10 +613,11 @@ def _create_single_tool_head_mount(
     tool_head_mount.add_named_follower(carriage, "carriage")
     tool_head_mount.add_named_non_production_part(rail_plus_carriage.leader, "rail")
     tool_head_mount = tool_head_mount.merge_except_leader(mount_sprite_extruder)
-    tool_head_mount.add_named_non_production_part(
-        mount_sprite_extruder.leader,
-        "sprite_extruder",
-    )
+    if "sprite_extruder" not in tool_head_mount.non_production_indices_by_name:
+        tool_head_mount.add_named_non_production_part(
+            mount_sprite_extruder.leader,
+            "sprite_extruder",
+        )
     return tool_head_mount
 
 

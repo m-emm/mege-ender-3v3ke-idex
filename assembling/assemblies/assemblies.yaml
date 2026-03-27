@@ -674,9 +674,9 @@ assemblies:
 
     resource_file: tool_head_mount_assembly.yaml
     depends_on:
-      - sprite_extruder_bottom_assembly
+      - tool_head_bottom_assembly
     inject_parts:
-      sprite_extruder: sprite_extruder_bottom_assembly
+      sprite_extruder: tool_head_bottom_assembly
     parameters:
       drive_position: bottom
 
@@ -684,8 +684,8 @@ assemblies:
 
     resource_file: tool_head_mount_assembly.yaml
     depends_on:
-      - sprite_extruder_top_assembly
+      - tool_head_top_assembly
     inject_parts:
-      sprite_extruder: sprite_extruder_top_assembly
+      sprite_extruder: tool_head_top_assembly
     parameters:
       drive_position: top
