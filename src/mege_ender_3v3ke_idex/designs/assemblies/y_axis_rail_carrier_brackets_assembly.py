@@ -315,12 +315,91 @@ def _create_bracket_for_corner(
         top_bracket_screws.append(screw)
 
     for screw in top_bracket_screws:
-        screw_cutter = create_cylinder(MScrew.from_size(y_axis_rail_carrier_bracket_mount_screw_size).clearance_hole_loose / 2, BIG_THING)
+        screw_cutter = create_cylinder(
+            MScrew.from_size(
+                y_axis_rail_carrier_bracket_mount_screw_size
+            ).clearance_hole_loose
+            / 2,
+            BIG_THING,
+        )
         screw_cutter = align(screw_cutter, screw, Alignment.CENTER)
         bracket = bracket.cut(screw_cutter)
-    
 
-    return bracket, rail_side_mount_plate, top_mount_plate, top_bracket_screws
+    profile_screw = create_cylinder_screw(
+        y_axis_rail_carrier_bracket_mount_screw_size,
+        y_axis_rail_carrier_bracket_mount_screw_length,
+    )
+    profile_screw = rotate(-side_alignment.sign * 90, axis=(0, 1, 0))(profile_screw)
+    profile_screw = align(profile_screw, rail_side_mount_plate, Alignment.CENTER)
+    profile_screw = align(
+        profile_screw,
+        rail_side_mount_plate,
+        front_back_alignment.opposite.edge_alignment,
+    )
+    profile_screw = align(profile_screw, rail_side_mount_plate, side_alignment.opposite)
+    profile_screw = translate(
+        -side_alignment.sign
+        * MScrew.from_size(
+            y_axis_rail_carrier_bracket_mount_screw_size
+        ).cylinder_head_height,
+        y_axis_rail_carrier_bracket_mount_screw_inset * front_back_alignment.sign,
+        0,
+    )(profile_screw)
+
+    profile_screw_cutter = create_cylinder(
+        MScrew.from_size(
+            y_axis_rail_carrier_bracket_mount_screw_size
+        ).clearance_hole_loose
+        / 2,
+        BIG_THING,
+    )
+    profile_screw_cutter = rotate(90, axis=(0, 1, 0))(profile_screw_cutter)
+    profile_screw_cutter = align(profile_screw_cutter, profile_screw, Alignment.CENTER)
+    bracket = bracket.cut(profile_screw_cutter)
+
+    frame_screw = create_cylinder_screw(
+        y_axis_rail_carrier_bracket_mount_screw_size,
+        y_axis_rail_carrier_bracket_mount_screw_length,
+    )
+    frame_screw = rotate(front_back_alignment.sign * 90, axis=(1, 0, 0))(frame_screw)
+    frame_screw = align(frame_screw, frame_side_mount_plate, Alignment.CENTER)
+    frame_screw = align(
+        frame_screw, frame_side_mount_plate, side_alignment.opposite.edge_alignment
+    )
+    frame_screw = align(
+        frame_screw, frame_side_mount_plate, front_back_alignment.opposite
+    )
+
+    frame_screw = translate(
+        side_alignment.sign* y_axis_rail_carrier_bracket_mount_screw_inset,
+        -front_back_alignment.sign
+        * MScrew.from_size(
+            y_axis_rail_carrier_bracket_mount_screw_size
+        ).cylinder_head_height,
+        0,
+    )(frame_screw)
+
+    frame_screw_cutter = create_cylinder(
+        MScrew.from_size(
+            y_axis_rail_carrier_bracket_mount_screw_size
+        ).clearance_hole_loose
+        / 2,
+        BIG_THING,
+    )
+    frame_screw_cutter = rotate(-front_back_alignment.sign * 90, axis=(1, 0, 0))(
+        frame_screw_cutter
+    )
+    frame_screw_cutter = align(frame_screw_cutter, frame_screw, Alignment.CENTER)
+    bracket = bracket.cut(frame_screw_cutter)
+
+    return (
+        bracket,
+        rail_side_mount_plate,
+        top_mount_plate,
+        top_bracket_screws,
+        profile_screw,
+        frame_screw,
+    )
 
 
 def create_y_axis_rail_carrier_brackets_assembly(
@@ -356,23 +435,28 @@ def create_y_axis_rail_carrier_brackets_assembly(
             frame_front_back_profile = frame.get_named_non_production_part(
                 f"frame_profile_{front_back_alignment.name.lower()}"
             )
-            bracket, rail_side_mount_plate, top_mount_plate, bracket_screws = (
-                _create_bracket_for_corner(
-                    frame_front_back_profile=frame_front_back_profile,
-                    y_axis_profile=y_axis_profile,
-                    side_alignment=side_alignment,
-                    front_back_alignment=front_back_alignment,
-                    y_axis_rail_carrier_bracket_outer_diameter=y_axis_rail_carrier_bracket_outer_diameter,
-                    y_axis_rail_carrier_bracket_height=y_axis_rail_carrier_bracket_height,
-                    y_axis_rail_carrier_bracket_profile_width=y_axis_rail_carrier_bracket_profile_width,
-                    y_axis_rail_carrier_bracket_profile_wall=y_axis_rail_carrier_bracket_profile_wall,
-                    y_axis_rail_carrier_bracket_mount_plate_thickness=y_axis_rail_carrier_bracket_mount_plate_thickness,
-                    y_axis_rail_carrier_bracket_mount_plate_length=y_axis_rail_carrier_bracket_mount_plate_length,
-                    y_axis_rail_carrier_bracket_mount_plate_fillet_radius=y_axis_rail_carrier_bracket_mount_plate_fillet_radius,
-                    y_axis_rail_carrier_bracket_mount_screw_length=y_axis_rail_carrier_bracket_mount_screw_length,
-                    y_axis_rail_carrier_bracket_mount_screw_size=y_axis_rail_carrier_bracket_mount_screw_size,
-                    y_axis_rail_carrier_bracket_mount_screw_inset=y_axis_rail_carrier_bracket_mount_screw_inset,
-                )
+            (
+                bracket,
+                rail_side_mount_plate,
+                top_mount_plate,
+                bracket_screws,
+                profile_screw,
+                frame_screw,
+            ) = _create_bracket_for_corner(
+                frame_front_back_profile=frame_front_back_profile,
+                y_axis_profile=y_axis_profile,
+                side_alignment=side_alignment,
+                front_back_alignment=front_back_alignment,
+                y_axis_rail_carrier_bracket_outer_diameter=y_axis_rail_carrier_bracket_outer_diameter,
+                y_axis_rail_carrier_bracket_height=y_axis_rail_carrier_bracket_height,
+                y_axis_rail_carrier_bracket_profile_width=y_axis_rail_carrier_bracket_profile_width,
+                y_axis_rail_carrier_bracket_profile_wall=y_axis_rail_carrier_bracket_profile_wall,
+                y_axis_rail_carrier_bracket_mount_plate_thickness=y_axis_rail_carrier_bracket_mount_plate_thickness,
+                y_axis_rail_carrier_bracket_mount_plate_length=y_axis_rail_carrier_bracket_mount_plate_length,
+                y_axis_rail_carrier_bracket_mount_plate_fillet_radius=y_axis_rail_carrier_bracket_mount_plate_fillet_radius,
+                y_axis_rail_carrier_bracket_mount_screw_length=y_axis_rail_carrier_bracket_mount_screw_length,
+                y_axis_rail_carrier_bracket_mount_screw_size=y_axis_rail_carrier_bracket_mount_screw_size,
+                y_axis_rail_carrier_bracket_mount_screw_inset=y_axis_rail_carrier_bracket_mount_screw_inset,
             )
             leader = leader.fuse(bracket)
             followers.append(bracket)
@@ -388,6 +472,15 @@ def create_y_axis_rail_carrier_brackets_assembly(
                 non_production_names.append(
                     f"screw_{side_name}_{front_back_alignment.name.lower()}_{screw_index}"
                 )
+
+            non_production_parts.append(profile_screw)
+            non_production_names.append(
+                f"profile_screw_{side_name}_{front_back_alignment.name.lower()}"
+            )
+            non_production_parts.append(frame_screw)
+            non_production_names.append(
+                f"frame_screw_{side_name}_{front_back_alignment.name.lower()}"
+            )
 
     return LeaderFollowersCuttersPart(
         leader=leader,
