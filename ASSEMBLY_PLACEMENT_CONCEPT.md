@@ -371,6 +371,103 @@ It is also useful for eager execution:
 
 It does not become another user-maintained declaration layer.
 
+## Current implementation in the builder
+
+The current implementation is graph-based, not a separate ad-hoc scheduler hack.
+
+Concretely:
+- the builder still computes one build dependency graph
+- explicit `depends_on` edges are added first
+- the builder then derives additional implicit edges from the global `placement.alignments` script
+- topological generations are computed from that augmented graph
+- after each built or cache-hit assembly, the eager placement cursor is advanced immediately as far as possible
+
+So the answer to "did the scheduler get hacked to look at placement?" is:
+- no separate runtime reordering layer was added
+- yes, the scheduler now consults the placement script while constructing the build graph
+- the actual build order is still determined by one graph
+
+## Exact rule used today
+
+The current rule is intentionally conservative and simple.
+
+For each assembly `A`:
+- inspect `A.inject_parts`
+- collect the set of injected upstream assemblies
+- find the first placement step whose moving assembly is `A`
+- look only at the placement prefix before that step
+- within that prefix, find the last placement step whose moving assembly is one of the injected assemblies
+- then add implicit build dependencies from `A` to every assembly referenced anywhere in that prefix up to and including that last relevant step
+
+Equivalent intuition:
+- if `A` consumes injected assembly `B`
+- and `B` is moved by the placement script before `A` starts moving in the global placement script
+- then `A` must not build until the whole relevant placement prefix that settles `B` has become executable and has run
+
+This is exactly what fixed the bracket case:
+- `y_axis_rail_carrier_brackets_assembly` injects `y_axis_assembly`
+- `y_axis_assembly` is moved again later by the step aligning it to `print_bed_undercarriage_assembly`
+- therefore the bracket assembly gets an implicit build dependency on the assemblies required to execute that placement prefix, including `print_bed_undercarriage_assembly`
+- that pushes the bracket build after the undercarriage-dependent y-axis placement step
+
+## Why this is conservative
+
+The current algorithm does not try to prove geometric solvability axis-by-axis.
+
+It does not attempt to infer that:
+- a later `CENTER` on `[0]` might be independent from an earlier `TOP`
+- a seemingly cyclic placement script could still work because different axes are resolved at different times
+- only part of the placement prefix actually matters for one injected consumer
+
+Instead it uses a safe approximation:
+- if the ordered placement prefix may affect the injected assembly pose that a consumer relies on, that whole prefix becomes a build-order requirement
+
+This keeps scheduling explicit and deterministic, but may reject some theoretically solvable cases.
+
+## Interaction with cycles
+
+Because placement-derived constraints are turned into graph edges, they participate in cycle detection exactly like explicit `depends_on` edges.
+
+That means:
+- if the augmented graph is acyclic, the builder computes normal topological generations
+- if the augmented graph becomes cyclic, the builder currently treats that as unschedulable and fails like any other dependency cycle
+
+Important:
+- some such cycles may represent genuinely impossible build ordering
+- some may only be artifacts of this conservative approximation
+- the current implementation deliberately does not try to distinguish those two cases from the placement script alone
+
+So the present design choice is:
+- prefer one explicit graph-based scheduling model
+- accept conservative false-negative cycles rather than silently building against partially settled placement state
+
+## Separation of responsibilities
+
+The builder now has two separate but cooperating mechanisms:
+
+1. Graph construction
+- explicit `depends_on`
+- implicit placement-derived edges for injected geometry consumers
+- result: one augmented DAG used for build generations
+
+2. Eager placement execution
+- after each assembly finishes building or is loaded from cache
+- repeatedly execute the next placement step while its referenced assemblies are available
+- stop at the first blocked step
+
+The graph decides when an assembly is allowed to build.
+The eager placement cursor decides how much of the global scene script has already been applied at that moment.
+
+## What is not implemented
+
+The current implementation does not yet provide:
+- a minimal dependency extraction based on per-axis reasoning
+- a proof system for "cyclic but still workable" placement scripts
+- user-visible placement dependency annotations separate from the graph
+- a split between hard scheduling edges and softer placement-order hints
+
+If those become necessary later, they would be a deliberate extension of the current conservative rule rather than a correction of it.
+
 ## Axes and stack gaps
 
 The YAML layer preserves the real behavior of the existing primitives.

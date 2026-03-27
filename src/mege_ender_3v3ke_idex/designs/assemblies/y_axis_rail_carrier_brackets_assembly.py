@@ -103,7 +103,7 @@ def _create_bracket_for_corner(
         y_axis_rail_carrier_bracket_mount_plate_thickness,
         2 * profile_size[2],
         y_axis_rail_carrier_bracket_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.FRONT, Alignment.BACK, side_alignment],
+        no_fillets_at=[Alignment.FRONT, Alignment.BACK, side_alignment, Alignment.TOP],
     )
     frame_side_mount_plate = align(
         frame_side_mount_plate,
@@ -128,15 +128,12 @@ def _create_bracket_for_corner(
     )
 
     frame_front_back_profile_size = get_bounding_box_size(frame_front_back_profile)
-    top_mount_plate_depth = frame_front_back_profile_size[1]
-    top_mount_plate_fillet_radius = min(
-        y_axis_rail_carrier_bracket_mount_plate_fillet_radius,
-        min(
-            y_axis_rail_carrier_bracket_mount_plate_thickness,
-            top_mount_plate_depth,
-        )
-        / 2
-        - 0.01,
+    top_mount_plate_depth = (
+        frame_front_back_profile_size[1]
+        + y_axis_rail_carrier_bracket_mount_plate_thickness
+    )
+    top_mount_plate_fillet_radius = (
+        y_axis_rail_carrier_bracket_mount_plate_fillet_radius
     )
 
     top_mount_plate = create_filleted_box(
@@ -144,7 +141,7 @@ def _create_bracket_for_corner(
         top_mount_plate_depth,
         y_axis_rail_carrier_bracket_mount_plate_thickness,
         top_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, front_back_alignment.opposite],
     )
     top_mount_plate = align(
         top_mount_plate,
@@ -155,8 +152,7 @@ def _create_bracket_for_corner(
     top_mount_plate = align(
         top_mount_plate,
         frame_front_back_profile,
-        Alignment.CENTER,
-        axes=[1],
+        front_back_alignment,
     )
     top_mount_plate = align(
         top_mount_plate,
