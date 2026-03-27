@@ -23,6 +23,7 @@ globals:
   print_bed_mount_screw_length: 50
   print_bed_mount_hole_pitch: 240
   print_bed_foil_thickness: 1.6
+  nozzle_bed_reach_margin: -2
   print_bed_vertical_gap_to_frame: 60
   print_bed_damper_height: 16
   print_bed_damper_diameter: 15
@@ -434,8 +435,7 @@ placement:
       alignment: CENTER
       axes: [0, 1]
       post_translation:
-        -
-          $expr:
+        - $expr:
             "$sub": "-1 * ${z_axis_x_offset_from_center}"
         - $ref: z_axis_y_offset
         - 0
@@ -470,6 +470,24 @@ placement:
     - part: tool_head_mount_top_assembly.followers.carriage
       to: x_axis_assembly.non_production_parts.carriage_2
       alignment: CENTER
+
+    - part: tool_head_mount_bottom_assembly.non_production_parts.hotend
+      to: print_bed_assembly.non_production_parts.print_bed_foil
+      alignment: STACK_TOP
+      stack_gap:
+        $ref: nozzle_bed_reach_margin
+    - part: x_axis_assembly.non_production_parts.carriage_1
+      to: tool_head_mount_bottom_assembly.followers.carriage
+      alignment: CENTER
+    - part: tool_head_mount_top_assembly.followers.carriage
+      to: x_axis_assembly.non_production_parts.carriage_2
+      alignment: CENTER
+    - part: z_axis_assembly.non_production_parts.carriages_fused
+      to: x_axis_assembly.non_production_parts.lower_axis_profile
+      alignment: FRONT
+    - part: z_axis_assembly.non_production_parts.x_axis_alignment_reference
+      to: x_axis_assembly.non_production_parts.lower_axis_profile
+      alignment: BOTTOM
 
 assemblies:
   - name: printer_frame_assembly
