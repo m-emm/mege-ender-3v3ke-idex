@@ -1,7 +1,6 @@
 """Declarative x-axis assembly."""
 
 import numpy as np
-
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
@@ -15,7 +14,9 @@ from mege_ender_3v3ke_idex.designs.mgh_linear import (
     mgn_12h_carriage_length,
 )
 from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
-from mege_ender_3v3ke_idex.designs.screw_mount_assembly import create_screw_mount_assembly
+from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
+    create_screw_mount_assembly,
+)
 from shellforgepy.simple import *
 
 
@@ -259,9 +260,11 @@ def _create_idler_endcap(
     tool_head_path = align(
         tool_head_path,
         profile,
-        Alignment.STACK_FRONT
-        if endcap_top_bottom == Alignment.BOTTOM
-        else Alignment.STACK_BACK,
+        (
+            Alignment.STACK_FRONT
+            if endcap_top_bottom == Alignment.BOTTOM
+            else Alignment.STACK_BACK
+        ),
     )
     extended_toolhead_path = create_box(
         profile_size[0],
@@ -272,9 +275,11 @@ def _create_idler_endcap(
     extended_toolhead_path = align(
         extended_toolhead_path,
         profile,
-        Alignment.STACK_FRONT
-        if endcap_top_bottom == Alignment.BOTTOM
-        else Alignment.STACK_BACK,
+        (
+            Alignment.STACK_FRONT
+            if endcap_top_bottom == Alignment.BOTTOM
+            else Alignment.STACK_BACK
+        ),
         stack_gap=toolhead_path_extended_gap,
     )
     tool_head_path = tool_head_path.fuse(extended_toolhead_path)
@@ -325,7 +330,9 @@ def _create_idler_endcap(
         )
 
         cage_cutter = create_box(
-            cage_size[0] + 2 * endcap_tensioner_cage_clearance + endcap_tensioner_travel,
+            cage_size[0]
+            + 2 * endcap_tensioner_cage_clearance
+            + endcap_tensioner_travel,
             cage_size[1] + 2 * endcap_tensioner_cage_clearance,
             big_thing,
         )
@@ -590,7 +597,10 @@ def _create_idler_endcap(
             npp_name = (
                 f"endcap_vertical_coupler_top_{fb.name.lower()}_{side.name.lower()}"
             )
-            for screw_npp_name, npp in screw_mount_assembly.get_named_non_production_part_items():
+            for (
+                screw_npp_name,
+                npp,
+            ) in screw_mount_assembly.get_named_non_production_part_items():
                 retval.add_named_non_production_part(
                     npp,
                     f"{npp_name}_{screw_npp_name}",
@@ -789,9 +799,7 @@ def create_x_axis_assembly(
             f"axis_holding_counter_flange_{side.name.lower()}"
         ] = axis_holding_counter_flange
 
-        final_mount_plates_by_side[side] = motors_fused_by_side[side].fuse(
-            mount_shield
-        )
+        final_mount_plates_by_side[side] = motors_fused_by_side[side].fuse(mount_shield)
         counter_flange_screws_by_side[side] = axis_holding_counter_flange_screws
 
         non_production_parts.append(
@@ -1023,7 +1031,10 @@ def create_x_axis_assembly(
                 )
                 retval.additional_data[cage_name] = current_additional_data
 
-            for npp_name_in_endcap, endcap_npp in endcap.get_named_non_production_part_items():
+            for (
+                npp_name_in_endcap,
+                endcap_npp,
+            ) in endcap.get_named_non_production_part_items():
                 retval.add_named_non_production_part(
                     endcap_npp,
                     f"{endcap_name}_{npp_name_in_endcap}",
@@ -1075,7 +1086,9 @@ def create_x_axis_assembly(
                     rail_end_stopper_fused,
                     Alignment.STACK_TOP,
                 )
-                endstop_holder = translate(0, endstop_holder_y_offset, 0)(endstop_holder)
+                endstop_holder = translate(0, endstop_holder_y_offset, 0)(
+                    endstop_holder
+                )
 
                 endstop_holder_board = endstop_holder.get_non_production_part_by_name(
                     "board"

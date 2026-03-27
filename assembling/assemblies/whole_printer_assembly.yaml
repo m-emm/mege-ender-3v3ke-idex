@@ -37,6 +37,10 @@ Builder:
           - carriages_fused
         name_template: "{name}"
       - source: dependencies
+        assembly: y_axis_rail_carrier_brackets_assembly
+        artifact: followers
+        name_template: "{name}"
+      - source: dependencies
         assembly: print_bed_assembly
         artifact: leader
         name: print_bed

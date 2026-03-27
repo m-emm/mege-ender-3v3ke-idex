@@ -195,7 +195,9 @@ def _create_single_tool_head_mount(
     big_thing,
 ):
     if drive_position not in {Alignment.BOTTOM, Alignment.TOP}:
-        raise ValueError(f"Unsupported tool head mount drive position: {drive_position}")
+        raise ValueError(
+            f"Unsupported tool head mount drive position: {drive_position}"
+        )
 
     top_axis_profile = translate(0, 0, x_axis_profile_pitch)(lower_axis_profile)
     belt_profile = (
@@ -434,7 +436,9 @@ def _create_single_tool_head_mount(
             stack_gap=-tool_head_mount_belt_deflector_into_profile_distance,
         )
 
-        belt_deflector_trimmer = create_box(big_thing + 10, big_thing + 10, big_thing + 10)
+        belt_deflector_trimmer = create_box(
+            big_thing + 10, big_thing + 10, big_thing + 10
+        )
         belt_deflector_trimmer = align(
             belt_deflector_trimmer,
             belt_deflector,

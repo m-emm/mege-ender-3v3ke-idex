@@ -1,45 +1,76 @@
-# Assembly Placement Concept
+# Global Assembly Placement Concept
 
-Goal: extend the declarative assembly system so that assemblies can be built in stable local coordinates first, and only afterwards be placed relative to each other in a declarative, ordered, ShellForgePy-idiomatic way.
+Goal: the declarative assembly system defines assemblies in stable local coordinates, and the global placement script from `assemblies.yaml` executes eagerly in lockstep with assembly creation.
 
-## Core direction
+## Core model
 
-The right abstraction for this codebase is:
+The placement script lives once, centrally, in the global `assemblies.yaml`, because relative placement is a scene-level concern.
+
+The build pipeline is:
+
+1. Build selected assemblies geometrically in dependency order, each in its own canonical local coordinates.
+2. Cache those canonical assembly artifacts using the geometry cache inputs: generator code hash, assembly resource YAML hash, public parameters, and injected dependency hashes.
+3. As soon as an assembly finishes building, insert it into one shared global placement scene.
+4. Keep a pointer into the ordered placement script from `assemblies.yaml`.
+5. After each assembly build completion, repeatedly execute the next placement step if all assemblies referenced by that step are already present in the scene.
+6. Stop as soon as the next placement step references an assembly that is not yet built.
+7. Resume from that exact placement step after the next assembly build completes.
+8. Build downstream assemblies against the currently placed scene state, not against a still-unplaced final batch.
+9. After the build is complete, visualization, scene export, and scene-style production output operate on the already placed result.
+
+## Abstraction
+
+The abstraction for this codebase is:
 - `align(...)`
 - ordered sequences of alignments
 - selectors that refer to `leader`, `followers`, `cutters`, and `non_production_parts`
 - the same mental model as `aligned_from_follower(...)` and `aligned_from_non_production_part(...)`
 
-The wrong abstraction for this codebase is:
+The system does not use:
 - points
 - planes
 - mates
 - axes as first-class feature objects
+- local per-assembly placement scripts
 - extra indirection layers such as `instances` unless they become necessary later
 
-So the placement layer should be intentionally small.
+The placement layer is intentionally small, global, and incrementally applied.
 
-## Problem statement
+## Problem
 
-The current builder handles geometry dependencies well:
+The builder already solves the local geometry problem well:
 - build one assembly
 - cache it
 - inject parts from it into downstream assemblies
 
-That is enough for geometry generation, but not for final relative placement.
+That is sufficient for pure local geometry generation.
+It is not sufficient for geometry that depends on the already resolved relative placement of multiple upstream assemblies.
+
+The reason is that placement is not owned by one assembly.
+It is a scene-level concern across already-built assemblies, and some later assemblies must be built against that already placed scene state.
 
 Example:
-- the bed and undercarriage can only be placed correctly in `y` after the y-axis rails and carriages exist
-- the y-axis can only be placed correctly in `z` after the bed and undercarriage stack exists
+- the bed may need to be positioned relative to the frame first
+- the undercarriage may then need to be positioned relative to the bed
+- the y-axis may then need to be positioned relative to the placed bed and undercarriage result
+- the x-axis may then need to be positioned relative to the placed frame and other already-placed assemblies
 
-This is not really a geometry cycle.
-It is a placement problem between already-built assemblies.
+That is not a geometry dependency cycle.
+It is one global ordered placement script whose already-satisfied prefix is applied as early as possible.
+
+Additional example:
+- profile A is built
+- profile B is built
+- the placement step aligning A relative to B now becomes executable and runs immediately
+- a corner bracket assembly that depends on both A and B can then be built against their already resolved relative pose
+
+The corner bracket assembly relies on the true scene relationship between A and B rather than their canonical local coordinates.
 
 ## What ShellForgePy already provides
 
 ### `align(...)` is already the placement language
 
-In [alignment_operations.py](/Users/mege/git/shellforgepy/src/shellforgepy/construct/alignment_operations.py), `align_translation(...)` and `align(...)` already provide the placement model that the codebase uses successfully:
+In [shellforgepy/src/shellforgepy/construct/alignment_operations.py](/Users/mege/git/shellforgepy/src/shellforgepy/construct/alignment_operations.py), `align_translation(...)` and `align(...)` already provide the placement language this codebase uses successfully:
 - `LEFT`
 - `RIGHT`
 - `FRONT`
@@ -51,86 +82,181 @@ In [alignment_operations.py](/Users/mege/git/shellforgepy/src/shellforgepy/const
 - `EDGE_*`
 - optional `stack_gap`
 
-Complex placement is already normally written as:
+Complex placement is already normally expressed as:
 - center this to that
 - then put it on top of that
-- then move it to the back of the other thing
+- then move it to the back of that
 
-That is the natural declarative shape too.
+That is the declarative language here as well.
 
-### Assemblies already expose named internal references
+### Assemblies already expose the right anchors
 
-In [leader_followers_cutters_part.py](/Users/mege/git/shellforgepy/src/shellforgepy/construct/leader_followers_cutters_part.py), assemblies already expose:
+In [shellforgepy/src/shellforgepy/construct/leader_followers_cutters_part.py](/Users/mege/git/shellforgepy/src/shellforgepy/construct/leader_followers_cutters_part.py), assemblies already expose:
 - `leader`
 - `followers`
 - `cutters`
 - `non_production_parts`
 
-and those can be named.
+and those can already be named.
 
-That already gives us the reference system we need.
+That is enough to define placement anchors.
 
-### `aligned_from_follower(...)` already shows the pattern
+### Existing alignment-from-subpart patterns already match this need
 
 The important existing pattern is:
 - align an assembly not from its `leader`
 - but from one of its named `followers` or `non_production_parts`
 
-That is exactly what declarative placement needs to express.
+The global placement YAML mirrors that pattern directly.
+It does not introduce a second placement language.
 
-So the YAML should mirror that pattern directly, not invent a different placement language.
+## Architecture
 
-## Recommended architecture
+The system has two layers.
 
-Keep the two-layer idea, but make the placement layer minimal.
+1. Geometry layer
+- defined by assembly resource YAML files such as `printer_frame_assembly.yaml`, `x_axis_assembly.yaml`, and similar
+- builds canonical geometry in stable local coordinates
+- remains acyclic
+- remains cached exactly as now
 
-1. Geometry assemblies
-- build canonical geometry
-- remain acyclic
-- remain cached exactly as now
-
-2. Placement section
-- works on already-built assemblies
-- applies ordered alignments
-- produces a derived placed composition for visualization or downstream use
+2. Global placement layer
+- defined only once in `assemblies.yaml`
+- works on already-built assemblies inside one shared scene state
+- applies one ordered script of alignments across the whole scene
+- advances eagerly whenever the next placement step has all required assemblies available
+- exposes the currently placed scene state to later assembly builds
+- produces the final placed composition for visualization and output
 
 Important:
 - canonical assembly artifacts stay untouched
-- placement is a derived layer on top of them
+- placement is a derived scene layer on top of them
+- the placed scene layer is updated incrementally during the build, not only after the build
+- assembly resource files do not define final relative scene placement
 
-## Minimal placement shape
+## Placement in `assemblies.yaml`
 
-The first version should only support ordered alignments.
+The placement section is top-level in the global assembly orchestration file.
 
-Recommended shape:
+Shape:
 
 ```yaml
+globals:
+  print_bed_vertical_gap_to_frame: 60
+
+assemblies:
+  - name: printer_frame_assembly
+  - name: print_bed_assembly
+  - name: print_bed_undercarriage_assembly
+  - name: y_axis_assembly
+  - name: x_axis_assembly
+
 placement:
   alignments:
-    - part: y_axis_drive_assembly.non_production_parts.motor_pulley
-      to: print_bed_assembly.non_production_parts.buffer_1
+    - part: print_bed_assembly
+      to: printer_frame_assembly
       alignment: CENTER
-      axes: [1, 2]
+      axes: [0]
 
-    - part: print_bed_undercarriage_assembly
+    - part: print_bed_assembly
       to: printer_frame_assembly
       alignment: STACK_TOP
-      stack_gap: { $ref: undercarriage_stack_gap }
+      stack_gap: { $ref: print_bed_vertical_gap_to_frame }
+
+    - part: print_bed_undercarriage_assembly
+      to: print_bed_assembly
+      alignment: CENTER
+      axes: [0, 1]
+
+    - part: y_axis_assembly.followers.carriage_front_carriage_left
+      to: print_bed_assembly
+      alignment: TOP
+
+    - part: x_axis_assembly
+      to: printer_frame_assembly
+      alignment: CENTER
+      axes: [0, 1]
 ```
 
-This is intentionally small:
-- no `operations`
-- no `group`
+This structure is intentionally minimal:
+- one global `placement` block
+- one `alignments` list
+- one ordered placement script for the whole scene
+- one implicit placement cursor that advances through the sequence as builds finish
+- no per-assembly placement blocks
+- no explicit placement graph model
 - no `instances`
-- no explicit `depends_on`
+- no generic `operations` framework
 
-It is just an ordered list of alignments.
+Execution properties:
+- the script is globally declared
+- the script executes incrementally rather than in one terminal batch
+
+## Why local placement blocks do not fit
+
+If placement is attached to one assembly resource file, several things become unclear or incorrect:
+
+1. It implies placement is owned by that assembly.
+It is not. Final placement is scene-level.
+
+2. It suggests placement order is fragmented by assembly ownership.
+The user reads and edits one global ordered script.
+
+3. It fragments ordering.
+The user actually needs one long ordered script, not many local scripts whose interaction rules are hard to reason about.
+
+4. It makes review harder.
+Users want to inspect and edit one placement script for the whole printer, not hunt through assembly resource files.
+
+The design optimizes for one global script that reads top to bottom.
+
+## Eager execution model
+
+The placement script is global, and its execution is incremental.
+
+The builder maintains:
+- a shared placed-scene state containing all assemblies built so far
+- a placement cursor pointing at the next not-yet-executed alignment entry
+- canonical cached assembly artifacts, unchanged from today
+
+After each assembly finishes building:
+
+1. Insert the newly built assembly into the shared scene state at its current canonical pose.
+2. Look at the next alignment entry referenced by the placement cursor.
+3. Resolve which assemblies are required by that entry:
+  - the owning assembly named by `part`
+  - the assembly named by `to`
+4. If any required assembly is still missing from the scene, stop immediately.
+5. If all required assemblies are present, execute the alignment.
+6. Advance the placement cursor by one.
+7. Repeat from step 2 until the next placement entry cannot yet run.
+
+Placement progresses in lockstep with assembly availability.
+At any moment, the applied state is the maximal executable prefix of the global placement script.
+
+## Why eager execution exists
+
+Some assemblies depend not just on upstream geometry, but on upstream geometry after a certain prefix of the placement script has already been applied.
+
+Example:
+- `profile_a_assembly` is built
+- `profile_b_assembly` is built
+- placement step 0 aligns `profile_b_assembly` to `profile_a_assembly`
+- `corner_bracket_assembly` depends on both profiles and is built afterwards
+
+The bracket generator inspects or injects the already placed profiles as they relate in the scene:
+- centered
+- stacked
+- top-aligned
+- offset by a declared gap
+
+The first placement step runs as soon as both profiles exist, so the bracket builds against the correct placed state.
 
 ## Selector rules
 
-The placement system should reuse the selector style already used elsewhere in the builder.
+The placement system reuses the selector style already used elsewhere in the builder.
 
-Recommended selector syntax:
+Selector syntax:
 - `assembly_name`
 - `assembly_name.leader`
 - `assembly_name.followers.<name>`
@@ -138,12 +264,12 @@ Recommended selector syntax:
 - `assembly_name.non_production_parts.<name>`
 - `assembly_name.fused`
 
-If only `assembly_name` is given, it should mean `assembly_name.leader`.
+If only `assembly_name` is given, it means `assembly_name.leader`.
 
 Examples:
 - `printer_frame_assembly`
 - `y_axis_assembly.followers.carriage_front_carriage_left`
-- `print_bed_assembly.non_production_parts.buffer_1`
+- `print_bed_assembly.non_production_parts.damper_left_front`
 - `print_bed_undercarriage_assembly.leader`
 
 This is enough to cover:
@@ -151,7 +277,7 @@ This is enough to cover:
 - align whole assembly from one of its internal parts
 - align to an internal part of another assembly
 
-The same reference naming should be used consistently across:
+The same reference naming is used consistently across:
 - dependency injection
 - visualization
 - placement
@@ -162,16 +288,18 @@ So:
 - a bare assembly name means its `leader`
 - a dotted reference means a named anchor within that assembly
 
-## Semantics of one alignment entry
+## Semantics of one global alignment entry
 
-Each alignment entry should mean:
+Each alignment entry means:
 
 1. Resolve the moving anchor from `part`
 2. Resolve the target anchor from `to`
 3. Determine the owning assembly named in `part`
-4. Compute a translation using `align_translation(moving_anchor, target_anchor, alignment, ...)`
-5. Apply that translation to the whole owning assembly
-6. Keep that updated pose for the following alignment entries
+4. Verify that all assemblies referenced by `part` and `to` are already present in the shared scene
+5. Look up the current already-placed pose of both referenced assemblies in that scene
+6. Compute a translation using `align_translation(moving_anchor, target_anchor, alignment, ...)`
+7. Apply that translation to the whole owning assembly of `part`
+8. Keep that updated global pose for all subsequent alignment entries and downstream assembly builds
 
 Examples:
 - `part: y_axis_drive_assembly` means `y_axis_drive_assembly.leader`
@@ -179,107 +307,92 @@ Examples:
 - `to: print_bed_assembly` means `print_bed_assembly.leader`
 - `to: print_bed_assembly.non_production_parts.buffer_1` means that named non-production part is the target anchor
 
-This is the declarative equivalent of:
-
-```python
-tool_head_mount = tool_head_mount.aligned_from_follower(
-    "carriage",
-    target_carriage,
-    Alignment.CENTER,
-)
-```
-
-except generalized to selector paths.
-
 The key point is:
 - the selector decides what geometric reference is used
-- the whole assembly moves
+- the whole owning assembly moves
+- the move happens in the shared global placement scene
+- once applied, that updated pose becomes immediately visible to later placement steps and later assembly builds
 
 ## Ordering is essential
 
-This model only works if alignments are executed in order.
+This model only works if alignments are executed exactly in order.
 
-That is already how the code works today.
+The placement engine does not:
+- reorder alignments
+- merge them
+- try to optimize them away
+- split them by owning assembly
 
-Example:
+The user needs one script because each step may depend on the already-updated scene state from previous steps.
 
-```python
-tool_head_mount = tool_head_mount.aligned_from_follower(
-    "carriage", target_carriage, Alignment.CENTER
-)
-tool_head_mount = tool_head_mount.aligned_from_follower(
-    "carriage", target_carriage, Alignment.BACK
-)
-tool_head_mount = tool_head_mount.aligned_from_follower(
-    "carriage", target_carriage, Alignment.TOP
-)
-```
-
-Declarative equivalent:
+Declarative example:
 
 ```yaml
 placement:
   alignments:
-    - part: tool_head_mount.followers.carriage
-      to: target_carriage
+    - part: tool_head_mount_bottom_assembly.followers.carriage
+      to: x_axis_assembly.non_production_parts.carriage_1
       alignment: CENTER
 
-    - part: tool_head_mount.followers.carriage
-      to: target_carriage
+    - part: tool_head_mount_bottom_assembly.followers.carriage
+      to: x_axis_assembly.non_production_parts.carriage_1
       alignment: BACK
 
-    - part: tool_head_mount.followers.carriage
-      to: target_carriage
+    - part: tool_head_mount_bottom_assembly.followers.carriage
+      to: x_axis_assembly.non_production_parts.carriage_1
       alignment: TOP
 ```
 
-The placement engine should not try to reorder, merge, or optimize these steps away.
+This must be interpreted literally as three sequential scene updates.
 
-## Implicit dependencies
+This rule stays the same.
+The difference is when the next entry is attempted:
+- after each assembly build completion
+- and repeatedly until the next entry is blocked by a missing assembly
 
-Explicit `depends_on` should not be required in the placement layer.
+## Implicit placement dependencies
 
-Dependencies can be derived implicitly:
+Explicit `depends_on` is not required in the placement layer.
+
+Placement dependencies can be derived implicitly from the selectors mentioned in the global script:
 - the owning assembly mentioned in `part`
 - every assembly mentioned in `to`
 
-So if a placement block references:
-- `printer_frame_assembly`
-- `print_bed_assembly`
-- `print_bed_undercarriage_assembly`
-- `y_axis_assembly`
+This is useful for validation and cache invalidation.
 
-then those are the placement dependencies.
+It is also useful for eager execution:
+- to decide whether the current placement entry is runnable yet
+- to know exactly why the placement cursor must stop
 
-This is simpler and avoids duplicate declarations.
+It does not become another user-maintained declaration layer.
 
 ## Axes and stack gaps
 
-The YAML layer should preserve the real behavior of the existing primitives.
+The YAML layer preserves the real behavior of the existing primitives.
 
 That means:
-- `stack_gap` should be supported
-- `axes` should only be supported where `align_translation(...)` actually supports it
+- `stack_gap` is supported
+- `axes` are supported where `align_translation(...)` supports them
 
-Today that means:
+That means:
 - `axes` is valid with `CENTER`
-- it should not pretend to work generically for every alignment mode
+- `axes` is not treated as generic across every alignment mode
 
-If partial placement on selected axes is needed, the intended idiom remains:
+Partial placement on selected axes uses this idiom:
 - one `CENTER` with `axes`
 - followed by further `TOP`, `BACK`, `STACK_*`, and similar alignments
 
-## Current y-axis / bed problem in this model
+## Y-axis / bed example
 
-The current coupled placement problem should be handled like this:
+The coupled placement problem is expressed as one global scene script.
 
 Geometry layer:
 - `printer_frame_assembly`
-- `y_axis_assembly`
 - `print_bed_assembly`
 - `print_bed_undercarriage_assembly`
+- `y_axis_assembly`
 
-Placement layer:
+Global placement layer in `assemblies.yaml`:
 
 ```yaml
 placement:
@@ -308,45 +421,76 @@ placement:
       alignment: TOP
 ```
 
-The exact numbers and selectors may change, but the structure is correct:
+The exact selectors may change, but the structure stays the same:
 - build geometry independently
-- place by ordered alignments afterwards
+- insert finished assemblies into the shared scene as they become available
+- advance the global placement script whenever the next step is now runnable
+- let later assemblies consume the already placed upstream scene state
+
+## Rendering and production
+
+The execution model is:
+
+1. Build canonical assemblies in dependency order.
+2. Insert each completed assembly into the shared scene.
+3. Advance the global placement script eagerly as far as possible after each build completion.
+4. Allow downstream assemblies to build against that current placed scene state when needed.
+5. Materialize visualization scene parts from the final placed scene.
+6. Export or render from that placed scene.
+
+Visualization and production operate on placed assemblies, not on pre-placement local geometry, whenever final assembly positioning matters.
+
+This is especially important for:
+- preview scenes
+- combined STEP export
+- final printer assembly visualization
+- any output where relative assembly positions are part of the result
+
+Production of individual printable parts can still use canonical local geometry where appropriate.
+Scene-style output uses the placed scene.
 
 ## Output of the placement layer
 
-The placement layer should output:
+The placement layer outputs:
 - placed transforms for each referenced assembly
 - metadata describing those transforms
-- a placed scene for visualization
+- a placed scene for visualization and export
+- placement cursor metadata describing which prefix of the global script has been applied at each stage
 
-Optionally it may also export transformed STEP files, but that is secondary.
+Transformed STEP export is secondary.
 
 The important result is:
-- resolved poses of already-built assemblies
+- resolved global poses of already-built assemblies
+- available incrementally during the build, not only after it
 
 ## Caching
 
-Geometry cache should remain based on:
+Geometry cache is based on:
 - generator code hash
 - assembly resource YAML hash
 - public parameters
 - injected dependency hashes
 
-Placement cache should be based on:
-- placement YAML content
+Global placement cache is based on:
+- the global `placement` section in `assemblies.yaml`
 - placement engine code
-- hashes of all referenced assemblies
+- hashes of all assemblies referenced by placement selectors
 
-So:
+Therefore:
 - if geometry changes, placement re-runs automatically
 - if only placement alignments change, geometry does not need rebuilding
 
-## Recommendation
+In the eager model:
+- rebuilding an upstream assembly may invalidate the already-applied placement prefix at or after the first step that references it
+- the placement cursor must then be recomputed from the beginning or from a safe invalidation point
+- downstream assemblies that depend on placed upstream scene state may also need rebuilding if their effective injected context changes
 
-Recommendation: implement placement as a minimal second declarative layer based on ordered alignments only.
+## System shape
 
-The first version should have:
-- `placement`
+Placement is one minimal global declarative script in `assemblies.yaml`, based on ordered alignments and executed eagerly in lockstep with dependency-order assembly creation.
+
+The system has:
+- top-level `placement`
 - `alignments`
 - `part`
 - `to`
@@ -354,19 +498,22 @@ The first version should have:
 - `alignment`
 - optional `axes`
 - optional `stack_gap`
+- one internal placement cursor managed by the builder
+- one shared placed-scene state visible during later assembly builds
 
-It should explicitly not have, for now:
+The system does not have:
+- per-assembly placement blocks
 - groups
 - operations as a generic meta-layer
 - instances indirection
 - explicit placement `depends_on`
 - point / plane / mate abstractions
 
-That keeps the system:
+The resulting system is:
 - close to real ShellForgePy code
-- easy to read in YAML
+- easy to read in one place
+- aligned with the actual execution order
+- able to support downstream assemblies that rely on already placed upstream geometry
 - expressive enough for the current problem
 - acyclic at the geometry level
 - cache-friendly
-
-This is the cleanest next step for this codebase.

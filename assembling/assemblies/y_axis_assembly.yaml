@@ -85,20 +85,6 @@ Parameters:
     Type: Float
   mgn_12ca_carriage_length:
     Type: Float
-  y_axis_rail_carrier_bracket_outer_diameter:
-    Type: Float
-  y_axis_rail_carrier_bracket_height:
-    Type: Float
-  y_axis_rail_carrier_bracket_profile_width:
-    Type: Float
-  y_axis_rail_carrier_bracket_profile_wall:
-    Type: Float
-  y_axis_rail_carrier_bracket_mount_plate_thickness:
-    Type: Float
-  y_axis_rail_carrier_bracket_mount_plate_length:
-    Type: Float
-  y_axis_rail_carrier_bracket_mount_plate_fillet_radius:
-    Type: Float
 
 Parts:
   YAxisAssembly:
@@ -117,18 +103,4 @@ Parts:
           $ref: y_axis_carriage_spacing
         mgn_12ca_carriage_length:
           $ref: mgn_12ca_carriage_length
-        y_axis_rail_carrier_bracket_outer_diameter:
-          $ref: y_axis_rail_carrier_bracket_outer_diameter
-        y_axis_rail_carrier_bracket_height:
-          $ref: y_axis_rail_carrier_bracket_height
-        y_axis_rail_carrier_bracket_profile_width:
-          $ref: y_axis_rail_carrier_bracket_profile_width
-        y_axis_rail_carrier_bracket_profile_wall:
-          $ref: y_axis_rail_carrier_bracket_profile_wall
-        y_axis_rail_carrier_bracket_mount_plate_thickness:
-          $ref: y_axis_rail_carrier_bracket_mount_plate_thickness
-        y_axis_rail_carrier_bracket_mount_plate_length:
-          $ref: y_axis_rail_carrier_bracket_mount_plate_length
-        y_axis_rail_carrier_bracket_mount_plate_fillet_radius:
-          $ref: y_axis_rail_carrier_bracket_mount_plate_fillet_radius
         record_metrics: false

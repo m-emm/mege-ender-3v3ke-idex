@@ -75,7 +75,9 @@ def create_z_axis_assembly(*, carriage_z_offset, context=None):
     non_production_items.append(
         (
             "x_axis_alignment_reference",
-            translate(0, 0, z_axis_carriage_x_axis_connector_thickness)(carriages_fused),
+            translate(0, 0, z_axis_carriage_x_axis_connector_thickness)(
+                carriages_fused
+            ),
         )
     )
 

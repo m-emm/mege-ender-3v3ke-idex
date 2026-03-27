@@ -398,6 +398,10 @@ placement:
       to: printer_frame_assembly
       alignment: CENTER
       axes: [2]
+    - part: y_axis_rail_carrier_brackets_assembly.non_production_parts.profile_side_mount_plate_left_front
+      to: y_axis_assembly.non_production_parts.profile_left
+      alignment: CENTER
+      axes: [2]
     - part: y_axis_assembly.non_production_parts.carriages_fused
       to: print_bed_undercarriage_assembly
       alignment: STACK_BOTTOM
@@ -433,6 +437,8 @@ placement:
     - part: tool_head_mount_top_assembly.followers.carriage
       to: x_axis_assembly.non_production_parts.carriage_2
       alignment: CENTER
+    
+    
 
 
 assemblies:
@@ -735,20 +741,6 @@ assemblies:
         $ref: y_axis_carriage_spacing
       mgn_12ca_carriage_length:
         $ref: mgn_12ca_carriage_length
-      y_axis_rail_carrier_bracket_outer_diameter:
-        $ref: y_axis_rail_carrier_bracket_outer_diameter
-      y_axis_rail_carrier_bracket_height:
-        $ref: y_axis_rail_carrier_bracket_height
-      y_axis_rail_carrier_bracket_profile_width:
-        $ref: y_axis_rail_carrier_bracket_profile_width
-      y_axis_rail_carrier_bracket_profile_wall:
-        $ref: y_axis_rail_carrier_bracket_profile_wall
-      y_axis_rail_carrier_bracket_mount_plate_thickness:
-        $ref: y_axis_rail_carrier_bracket_mount_plate_thickness
-      y_axis_rail_carrier_bracket_mount_plate_length:
-        $ref: y_axis_rail_carrier_bracket_mount_plate_length
-      y_axis_rail_carrier_bracket_mount_plate_fillet_radius:
-        $ref: y_axis_rail_carrier_bracket_mount_plate_fillet_radius
 
   - name: x_axis_assembly
 
@@ -865,6 +857,34 @@ assemblies:
       endstop_holder_y_offset:
         $ref: endstop_holder_y_offset
 
+  - name: y_axis_rail_carrier_brackets_assembly
+
+    depends_on:
+      - printer_frame_assembly
+      - y_axis_assembly
+    inject_parts:
+      frame:
+        assembly: printer_frame_assembly
+        artifact: assembly
+      y_axis:
+        assembly: y_axis_assembly
+        artifact: assembly
+    parameters:
+      y_axis_rail_carrier_bracket_outer_diameter:
+        $ref: y_axis_rail_carrier_bracket_outer_diameter
+      y_axis_rail_carrier_bracket_height:
+        $ref: y_axis_rail_carrier_bracket_height
+      y_axis_rail_carrier_bracket_profile_width:
+        $ref: y_axis_rail_carrier_bracket_profile_width
+      y_axis_rail_carrier_bracket_profile_wall:
+        $ref: y_axis_rail_carrier_bracket_profile_wall
+      y_axis_rail_carrier_bracket_mount_plate_thickness:
+        $ref: y_axis_rail_carrier_bracket_mount_plate_thickness
+      y_axis_rail_carrier_bracket_mount_plate_length:
+        $ref: y_axis_rail_carrier_bracket_mount_plate_length
+      y_axis_rail_carrier_bracket_mount_plate_fillet_radius:
+        $ref: y_axis_rail_carrier_bracket_mount_plate_fillet_radius
+
   - name: z_axis_assembly
 
     depends_on:
@@ -883,6 +903,7 @@ assemblies:
       - print_bed_undercarriage_assembly
       - y_axis_drive_assembly
       - y_axis_assembly
+      - y_axis_rail_carrier_brackets_assembly
       - z_axis_assembly
       - x_axis_assembly
       - tool_head_mount_bottom_assembly
