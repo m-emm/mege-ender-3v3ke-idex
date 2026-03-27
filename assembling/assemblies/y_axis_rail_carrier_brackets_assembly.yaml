@@ -26,11 +26,22 @@ Builder:
       - source: self
         artifact: followers
         name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        exclude_names:
+          - profile_side_mount_plate_left_front
+          - profile_side_mount_plate_left_back
+          - profile_side_mount_plate_right_front
+          - profile_side_mount_plate_right_back
+        name_template: "{name}"
   Production:
+    process_data:
+      source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PETGCF_04_HS
     parts:
       - source: self
         artifact: followers
         name_template: "{name}"
+        flip: true
 
 Parameters:
   y_axis_rail_carrier_bracket_outer_diameter:
@@ -46,6 +57,12 @@ Parameters:
   y_axis_rail_carrier_bracket_mount_plate_length:
     Type: Float
   y_axis_rail_carrier_bracket_mount_plate_fillet_radius:
+    Type: Float
+  y_axis_rail_carrier_bracket_mount_screw_length:
+    Type: Float
+  y_axis_rail_carrier_bracket_mount_screw_size:
+    Type: String
+  y_axis_rail_carrier_bracket_mount_screw_inset:
     Type: Float
 
 Parts:
@@ -69,3 +86,9 @@ Parts:
           $ref: y_axis_rail_carrier_bracket_mount_plate_length
         y_axis_rail_carrier_bracket_mount_plate_fillet_radius:
           $ref: y_axis_rail_carrier_bracket_mount_plate_fillet_radius
+        y_axis_rail_carrier_bracket_mount_screw_length:
+          $ref: y_axis_rail_carrier_bracket_mount_screw_length
+        y_axis_rail_carrier_bracket_mount_screw_size:
+          $ref: y_axis_rail_carrier_bracket_mount_screw_size
+        y_axis_rail_carrier_bracket_mount_screw_inset:
+          $ref: y_axis_rail_carrier_bracket_mount_screw_inset

@@ -123,6 +123,7 @@ globals:
   endcap_tensioner_outer_box_bottom_thickness: 1
   endcap_tensioner_travel: 14
   endcap_top_bottom_wall: 5
+  
   endcap_wall: 3.5
   idler_cage_back_wall: 4
   idler_cage_wall: 2
@@ -209,6 +210,9 @@ globals:
   y_axis_rail_carrier_bracket_mount_plate_thickness: 5
   y_axis_rail_carrier_bracket_mount_plate_length: 75
   y_axis_rail_carrier_bracket_mount_plate_fillet_radius: 3
+  y_axis_rail_carrier_bracket_mount_screw_length: 16
+  y_axis_rail_carrier_bracket_mount_screw_size: "M5"
+  y_axis_rail_carrier_bracket_mount_screw_inset: 8
   hotend_diameter: 13.9
   hotend_overall_length: 33
   nozzle_diameter: 6.6
