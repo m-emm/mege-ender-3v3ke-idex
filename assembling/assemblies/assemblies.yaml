@@ -8,7 +8,7 @@ globals:
   y_axis_rail_length:
     $expr:
       "$sub": "${print_bed_y_travel} + ${y_axis_carriage_spacing} + ${mgn_12ca_carriage_length}"
-  y_axis_profile_extension: 60
+  y_axis_profile_extension: 75
   y_axis_profile_length:
     $expr:
       "$sub": "${y_axis_rail_length} + 2 * ${y_axis_profile_extension}"
@@ -75,7 +75,7 @@ globals:
   print_bed_undercarriage_dovetail_front_clearance: 0.2
   print_bed_undercarriage_carriage_mount_plate_thickness: 5
   print_bed_undercarriage_carriage_mount_plate_oversize: 4
-  print_bed_undercarriage_belt_clamp_screw_hole_border: 4
+  print_bed_undercarriage_belt_clamp_screw_hole_border: 6
   print_bed_undercarriage_torsion_rib_size: 7
   print_bed_undercarriage_torsion_rib_height: 52
   print_bed_undercarriage_torsion_rib_fillet_radius: 1.5

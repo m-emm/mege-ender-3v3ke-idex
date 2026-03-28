@@ -103,4 +103,4 @@ Parts:
           $ref: y_axis_carriage_spacing
         mgn_12ca_carriage_length:
           $ref: mgn_12ca_carriage_length
-        record_metrics: false
+        record_metrics: true

@@ -20,6 +20,30 @@ Builder:
         artifact: non_production_parts
         name_template: "{name}"
   Production:
+    parts:
+      - source: self
+        artifact: followers
+        names:
+          - front_left_uc
+          - back_left_uc
+        name_template: "{name}"
+        flip: true
+      - source: self
+        artifact: followers
+        names:
+          - belt_clamp_clamp_front
+          - belt_clamp_clamp_back
+        name_template: "{name}"
+        prod_rotation_angle: -90
+        prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        exclude_names:
+          - front_left_uc
+          - back_left_uc
+          - belt_clamp_clamp_front
+          - belt_clamp_clamp_back
+        name_template: "{name}"
     process_data:
       source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PETGCF_04_HS
       overrides:
@@ -27,7 +51,6 @@ Builder:
           brim_type: no_brim
           enable_support: "1"
           sparse_infill_density: "75%"
-          support_critical_regions_only: "1"
           support_interface_spacing: "0.8"
           support_object_first_layer_gap: 0.8
           support_object_xy_distance: "1.0"
@@ -37,6 +60,23 @@ Builder:
           wall_loops: "3"
     arrange:
       export_individual_parts: false
+      plates:
+        - name: front_left
+          parts:
+            - front_left_uc
+        - name: front_right
+          parts:
+            - front_right_uc
+        - name: back_left
+          parts:
+            - back_left_uc
+        - name: back_right
+          parts:
+            - back_right_uc
+        - name: belt_clamps
+          parts:
+            - belt_clamp_clamp_front
+            - belt_clamp_clamp_back
 
 Parameters:
   print_bed_mount_hole_pitch:
@@ -199,4 +239,4 @@ Parts:
           $ref: print_bed_undercarriage_torsion_screw_size
         print_bed_undercarriage_torsion_screw_length:
           $ref: print_bed_undercarriage_torsion_screw_length
-        record_metrics: false
+        record_metrics: true

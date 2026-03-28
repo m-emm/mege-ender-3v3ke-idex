@@ -44,7 +44,6 @@ PROCESS_DATA["process_overrides"].update(
         "fan_min_speed": "10",
         "outer_wall_speed": "75",
         "sparse_infill_density": "75%",
-        "support_critical_regions_only": "1",
         "support_interface_spacing": "0.8",
         "support_on_build_plate_only": "1",
         "support_threshold_angle": "30",

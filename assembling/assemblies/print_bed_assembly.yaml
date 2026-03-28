@@ -55,3 +55,4 @@ Parts:
           $ref: print_bed_damper_diameter
         print_bed_vertical_gap_to_frame:
           $ref: print_bed_vertical_gap_to_frame
+        record_metrics: true

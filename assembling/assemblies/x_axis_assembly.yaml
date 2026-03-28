@@ -349,4 +349,4 @@ Parts:
           $ref: endstop_holder_stack_gap
         endstop_holder_y_offset:
           $ref: endstop_holder_y_offset
-        record_metrics: false
+        record_metrics: true

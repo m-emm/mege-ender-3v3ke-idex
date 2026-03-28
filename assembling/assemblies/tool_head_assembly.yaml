@@ -25,7 +25,6 @@ Builder:
           support_threshold_angle: "30"
           brim_type: no_brim
           support_on_build_plate_only: "1"
-          support_critical_regions_only: "1"
           support_top_z_distance: "0.3"
           support_interface_spacing: "0.8"
           fan_min_speed: "10"

@@ -468,6 +468,12 @@ def create_print_bed_undercarriage_assembly(
             mount_tower,
             Alignment.CENTER,
         )
+        mount_tower_holder = align(
+            mount_tower_holder,
+            retval,
+            Alignment.TOP,
+        )
+
         retval = retval.fuse(mount_tower_holder)
 
     belt_clamp_bases = PartCollector()

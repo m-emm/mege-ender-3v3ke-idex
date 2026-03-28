@@ -11,17 +11,15 @@
 - toolhead alignment mechanism
 - holder / attachment for host controller / display
 - holder for mcus (idex x axes mcu, z axes mcu with heater control, y axis mcu )
+- mcu housings
 - y endstop
 - y mount brackets
-- Abkantbank for bed holder?
+- y carriage stoppers
 - holders for filament sensors
 - holders for filament spools
-
 - cable holders / clamps (x axis umbilicals, heatbed, z-axes cabling)
 - nozzle cleaning pads holders
 - idex alignment sensor
-
-
 
 
 ## Done
