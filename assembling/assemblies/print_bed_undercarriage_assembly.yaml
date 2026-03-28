@@ -47,7 +47,8 @@ Builder:
     prototype:
       include_parts:
         - front_left_uc
-        - front_right_uc
+        - back_right_uc
+        - back_left_uc
       box_cutters:
         - part: front_left_uc
           around: self.non_production_parts.mount_tower_left_front
@@ -62,12 +63,31 @@ Builder:
             - 0
             - $expr:
                 $sub: "${print_bed_mount_tower_height} * 0.5"
-        - part: front_right_uc
-          around: self.followers.belt_clamp_clamp_front
+        - part: back_right_uc
+          around: print_bed_undercarriage_assembly.non_production_parts.belt_clamp_torsion_screw_back
           size:
-            - 70
+            - 40
             - 70
             - 200
+          offset:
+            - -8
+            - 0
+            - 0
+        - part: back_left_uc
+          around: print_bed_undercarriage_assembly.non_production_parts.belt_clamp_torsion_screw_back
+          size:
+            - 40
+            - 70
+            - 200
+          offset:
+            - -8
+            - 0
+            - 0
+      process_data:
+        overrides:
+          process_overrides:
+            wall_loops: "1"
+            sparse_infill_density: "20%"
       arrange:
         plates: null
         auto_assign_plates: false
@@ -80,7 +100,7 @@ Builder:
           sparse_infill_density: "75%"
           support_interface_spacing: "0.8"
           support_object_first_layer_gap: 0.8
-          support_object_xy_distance: "1.0"
+          support_object_xy_distance: "3.0"
           support_on_build_plate_only: "1"
           support_threshold_angle: "30"
           support_top_z_distance: "0.3"
