@@ -44,8 +44,25 @@ Builder:
           - belt_clamp_clamp_front
           - belt_clamp_clamp_back
         name_template: "{name}"
+    prototype:
+      include_parts:
+        - front_left_uc
+      box_cutters:
+        - part: front_left_uc
+          around: self.non_production_parts.mount_tower_left_front
+          size:
+            - $expr:
+                $sub: "${print_bed_undercarriage_mount_tower_holder_size} + 12"
+            - $expr:
+                $sub: "${print_bed_undercarriage_mount_tower_holder_size} + 12"
+            - 200
+          offset:
+            - 0
+            - 0
+            - $expr:
+                $sub: "${print_bed_mount_tower_height} * 0.5"
     process_data:
-      source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PETGCF_04_HS
+      source: mege_3devops.process_data.mender3.process_data_06_high_speed.PROCESS_DATA_PETGCF_06_HS
       overrides:
         process_overrides:
           brim_type: no_brim

@@ -546,7 +546,7 @@ def create_print_bed_undercarriage_assembly(
 
     undercarriage_with_belt_clamps = retval.fuse(belt_clamp_bases)
 
-    left_uc, right_uc = cut_in_two(
+    right_uc, left_uc = cut_in_two(
         undercarriage_with_belt_clamps,
         cut_normal=(1, 0, 0),
     )
