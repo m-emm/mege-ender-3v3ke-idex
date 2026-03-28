@@ -43,20 +43,21 @@ globals:
   tpu_slit_distance: 1
   tpu_num_slits: 3
   print_bed_undercarriage_profiles_height: 30
-  print_bed_undercarriage_profiles_width: 12
+  print_bed_undercarriage_profiles_width: 15
   print_bed_undercarriage_profiles_wall: 1.8
   print_bed_undercarriage_central_annulus_diameter: 90
   print_bed_undercarriage_mount_tower_annulus_diameter: 110
   print_bed_mount_tower_size: 20
   print_bed_mount_tower_height: 25
-  print_bed_mount_tower_clearance: 0.2
+  print_bed_mount_tower_clearance: 0.4
   print_bed_mount_tower_screw_size: "M5"
   print_bed_undercarriage_mount_tower_holder_size: 30
   print_bed_undercarriage_mount_tower_holder_fillet_radius: 5
   print_bed_undercarriage_num_dovetails_per_side: 3
   print_bed_undercarriage_dovetail_width: 10
-  print_bed_undercarriage_dovetail_clearance: 0.2
-  print_bed_undercarriage_dovetail_parts_clearance: 0.05
+  print_bed_undercarriage_dovetail_clearance: 0.4
+  print_bed_undercarriage_dovetail_parts_clearance: 0.1
+  print_bed_undercarriage_dovetail_front_clearance: 0.3
   print_bed_undercarriage_dovetail_box_size_y:
     $expr:
       "$sub": "2 * ${print_bed_undercarriage_profiles_wall}"
@@ -72,11 +73,11 @@ globals:
       "$sub": "${print_bed_undercarriage_profiles_width} * 0.4"
   print_bed_undercarriage_belt_clamp_clamp_length: 30
   print_bed_undercarriage_belt_clamp_x_offset: 0.5
-  print_bed_undercarriage_dovetail_front_clearance: 0.2
+  
   print_bed_undercarriage_carriage_mount_plate_thickness: 5
   print_bed_undercarriage_carriage_mount_plate_oversize: 4
   print_bed_undercarriage_belt_clamp_screw_hole_border: 6
-  print_bed_undercarriage_torsion_rib_size: 7
+  print_bed_undercarriage_torsion_rib_size: 8
   print_bed_undercarriage_torsion_rib_height: 52
   print_bed_undercarriage_torsion_rib_fillet_radius: 1.5
   print_bed_undercarriage_torsion_screw_size: "M3"

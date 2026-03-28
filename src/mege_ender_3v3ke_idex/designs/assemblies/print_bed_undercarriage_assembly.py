@@ -440,6 +440,10 @@ def create_print_bed_undercarriage_assembly(
             Alignment.CENTER,
         )
         mount_tower_holder = mount_tower_holder.cut(mount_tower_cutter)
+        mount_tower_holder = LeaderFollowersCuttersPart(mount_tower_holder)
+        mount_tower_holder.add_named_cutter(
+            mount_tower_cutter, f"mount_tower_cutter_{name}"
+        )
 
         for orientation in range(2):
             mount_tower_screw_cutter = create_cylinder(
@@ -471,6 +475,7 @@ def create_print_bed_undercarriage_assembly(
         )
 
         retval = retval.fuse(mount_tower_holder)
+        retval = mount_tower_holder.use_as_cutter_on(retval)
 
     belt_clamp_bases = PartCollector()
     for side in [Alignment.FRONT, Alignment.BACK]:
@@ -491,7 +496,6 @@ def create_print_bed_undercarriage_assembly(
             * (
                 print_bed_undercarriage_central_annulus_diameter / 2
                 + print_bed_undercarriage_belt_clamp_clamp_length / 2
-                - print_bed_undercarriage_profiles_width
             ),
             0,
         )(belt_clamp)
@@ -524,6 +528,7 @@ def create_print_bed_undercarriage_assembly(
             print_bed_undercarriage_torsion_screw_length,
             Alignment.TOP,
             flush_with_top=True,
+            clearance_type="loose",
         )
         belt_clamp_torsion_rib = screw_mount_assembly.use_as_cutter_on(
             belt_clamp_torsion_rib
@@ -579,6 +584,7 @@ def create_print_bed_undercarriage_assembly(
             )
             dovetail = translate(
                 print_bed_undercarriage_central_annulus_diameter / 2
+                - print_bed_undercarriage_dovetail_width / 2
                 + k * dovetail_pitch,
                 0,
                 0,
