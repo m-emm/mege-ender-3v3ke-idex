@@ -37,6 +37,8 @@ Builder:
   Production:
     process_data:
       source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PETGCF_04_HS
+    arrange:
+      auto_assign_plates: true
     parts:
       - source: self
         artifact: followers
