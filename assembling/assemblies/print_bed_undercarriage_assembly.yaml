@@ -24,8 +24,8 @@ Builder:
       - source: self
         artifact: followers
         names:
-          - front_left_uc
-          - back_left_uc
+          - front_right_uc
+          - back_right_uc
         name_template: "{name}"
         flip: true
       - source: self
@@ -39,8 +39,8 @@ Builder:
       - source: self
         artifact: followers
         exclude_names:
-          - front_left_uc
-          - back_left_uc
+          - front_right_uc
+          - back_right_uc
           - belt_clamp_clamp_front
           - belt_clamp_clamp_back
         name_template: "{name}"
