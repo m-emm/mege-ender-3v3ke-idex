@@ -608,18 +608,23 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
 
     undercarriage_with_belt_clamps = retval.fuse(belt_clamp_bases)
 
-    left_uc, right_uc = cut_in_two(undercarriage_with_belt_clamps, cut_normal=(1, 0, 0))
+    right_uc, left_uc = cut_in_two(undercarriage_with_belt_clamps, cut_normal=(1, 0, 0))
 
     back_left_uc, front_left_uc = cut_in_two(left_uc, cut_normal=(0, 1, 0))
 
     back_right_uc, front_right_uc = cut_in_two(right_uc, cut_normal=(0, 1, 0))
 
-    uc_parts = [front_left_uc, front_right_uc, back_right_uc, back_left_uc]
+    uc_parts_in_ring_order = [
+        front_right_uc,
+        front_left_uc,
+        back_left_uc,
+        back_right_uc,
+    ]
 
     all_dovetails_fused = PartCollector()
     all_dovetails_list = []
     all_prefixed_dovetails_list = []
-    for i, uc in enumerate(uc_parts):
+    for i, uc in enumerate(uc_parts_in_ring_order):
         for k in range(print_bed_undercarriage_num_dovetails_per_side):
             dovetail = create_dovetail_tongue_and_groove(
                 dovetail_width=print_bed_undercarriage_dovetail_width,
@@ -659,23 +664,25 @@ def create_print_bed_undercarriage(print_bed, *, record_metrics=True):
 
     dovetail_counter = 0
     uc_dovetailed_parts = []
-    for i, uc in enumerate(uc_parts):
-        previous_uc_index = (i - 1) % len(uc_parts)
+    for i, uc in enumerate(uc_parts_in_ring_order):
+        previous_uc_index = (i - 1) % len(uc_parts_in_ring_order)
 
         for k in range(print_bed_undercarriage_num_dovetails_per_side):
             dovetail = all_dovetails_list[dovetail_counter]
             dovetail_counter += 1
 
-            uc_parts[previous_uc_index] = dovetail.use_as_cutter_on(
-                uc_parts[previous_uc_index]
+            uc_parts_in_ring_order[previous_uc_index] = dovetail.use_as_cutter_on(
+                uc_parts_in_ring_order[previous_uc_index]
             )
             groove_part = dovetail.get_follower_part_by_name("groove_part")
             groove_part = undercarriage.use_as_cutter_on(groove_part)
-            uc_parts[previous_uc_index] = uc_parts[previous_uc_index].fuse(groove_part)
+            uc_parts_in_ring_order[previous_uc_index] = uc_parts_in_ring_order[
+                previous_uc_index
+            ].fuse(groove_part)
 
-            uc_parts[i] = uc_parts[i].fuse(dovetail.leader)
+            uc_parts_in_ring_order[i] = uc_parts_in_ring_order[i].fuse(dovetail.leader)
 
-    front_left_uc, front_right_uc, back_right_uc, back_left_uc = uc_parts
+    front_right_uc, front_left_uc, back_left_uc, back_right_uc = uc_parts_in_ring_order
 
     retval.add_named_follower(front_left_uc.leader, "front_left_uc")
     retval.add_named_follower(front_right_uc.leader, "front_right_uc")
