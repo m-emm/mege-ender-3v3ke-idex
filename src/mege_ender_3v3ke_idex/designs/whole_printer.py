@@ -15,10 +15,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.metrics_collector import (
-    log_metrics_report,
-    reset_metrics,
-)
 from mege_ender_3v3ke_idex.designs.printer_feet import create_printer_feet
 from mege_ender_3v3ke_idex.designs.printer_frame import create_printer_frame
 from mege_ender_3v3ke_idex.designs.x_axis import (
@@ -39,6 +35,7 @@ from mege_ender_3v3ke_idex.designs.z_axis import (
     create_positioned_z_axis_assembly,
     create_z_axis,
 )
+from shellforgepy.metrics import log_metrics_report, reset_metrics
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)

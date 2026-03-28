@@ -12,17 +12,13 @@ from mege_ender_3v3ke_idex.designs.hollow_profiles import (
     create_hollow_profile,
     create_hollow_profile_ring,
 )
-from mege_ender_3v3ke_idex.designs.metrics_collector import (
-    Material,
-    record_length_metric,
-    record_weight_metric,
-)
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_carriage
 from mege_ender_3v3ke_idex.designs.print_bed import Y_AXIS_MOVING_MASS_ASSEMBLY_ID
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
     create_screw_mount_assembly,
 )
+from shellforgepy.metrics import Material, record_length_metric, record_weight_metric
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)

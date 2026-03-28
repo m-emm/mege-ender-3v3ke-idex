@@ -1,4 +1,4 @@
-from mege_ender_3v3ke_idex.designs.metrics_collector import (
+from shellforgepy.metrics import (
     Material,
     build_metrics_report_lines,
     record_length_metric,

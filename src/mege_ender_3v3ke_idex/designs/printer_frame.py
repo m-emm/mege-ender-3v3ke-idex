@@ -16,7 +16,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     create_corner_4040,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.metrics_collector import record_length_metric
+from shellforgepy.metrics import record_length_metric
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)

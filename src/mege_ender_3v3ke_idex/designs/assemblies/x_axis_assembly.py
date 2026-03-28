@@ -8,7 +8,6 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
 from mege_ender_3v3ke_idex.designs.endstop_holder import create_endstop_holder
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idler_cage import create_idler_cage
-from mege_ender_3v3ke_idex.designs.metrics_collector import record_length_metric
 from mege_ender_3v3ke_idex.designs.mgh_linear import (
     create_mgn12h_rail_with_carriages,
     mgn_12h_carriage_length,
@@ -17,6 +16,7 @@ from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_screw_mount_assembly,
 )
+from shellforgepy.metrics import record_length_metric
 from shellforgepy.simple import *
 
 

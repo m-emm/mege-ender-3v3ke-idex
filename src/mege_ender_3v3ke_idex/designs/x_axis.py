@@ -27,7 +27,6 @@ from mege_ender_3v3ke_idex.designs.endstop_holder import create_endstop_holder
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.idler_cage import create_idler_cage
-from mege_ender_3v3ke_idex.designs.metrics_collector import record_length_metric
 from mege_ender_3v3ke_idex.designs.mgh_linear import (
     create_mgn12h_rail,
     create_mgn12h_rail_with_carriages,
@@ -43,6 +42,7 @@ from mege_ender_3v3ke_idex.designs.tool_head_mount import (
     align_tool_head_mount_to_carriage,
     create_tool_head_mount,
 )
+from shellforgepy.metrics import record_length_metric
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)

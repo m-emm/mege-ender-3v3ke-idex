@@ -25,13 +25,6 @@ from mege_ender_3v3ke_idex.designs.hollow_profiles import (  # noqa: F401
     create_hollow_profile_ring,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.metrics_collector import (
-    Material,
-    log_metrics_report,
-    record_length_metric,
-    record_weight_metric,
-    reset_metrics,
-)
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_rail_with_carriages
 from mege_ender_3v3ke_idex.designs.print_bed import (
     Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
@@ -44,6 +37,13 @@ from mege_ender_3v3ke_idex.designs.print_bed_undercarriage import (
 from mege_ender_3v3ke_idex.designs.y_axis_drive import (
     Y_AXIS_DRIVE_LEADER_NAME,
     create_y_axis_drive,
+)
+from shellforgepy.metrics import (
+    Material,
+    log_metrics_report,
+    record_length_metric,
+    record_weight_metric,
+    reset_metrics,
 )
 from shellforgepy.simple import *
 

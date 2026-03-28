@@ -17,8 +17,8 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
 )
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler, create_gt2_pulley
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.metrics_collector import record_mark_metric
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
+from shellforgepy.metrics import record_mark_metric
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)

@@ -25,11 +25,11 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     create_alu_extrusion_profile,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
-from mege_ender_3v3ke_idex.designs.metrics_collector import record_length_metric
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
 )
+from shellforgepy.metrics import record_length_metric
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
