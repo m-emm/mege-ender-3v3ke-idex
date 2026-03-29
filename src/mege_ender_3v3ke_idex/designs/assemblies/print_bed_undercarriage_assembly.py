@@ -3,6 +3,7 @@
 import logging
 import math
 
+import numpy as np
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
@@ -92,6 +93,7 @@ def create_print_bed_undercarriage_assembly(
     print_bed_undercarriage_torsion_rib_fillet_radius,
     print_bed_undercarriage_torsion_screw_size,
     print_bed_undercarriage_torsion_screw_length,
+    print_bed_undercarriage_screw_mount_clearance_type,
     record_metrics=False,
     context=None,
 ):
@@ -104,6 +106,10 @@ def create_print_bed_undercarriage_assembly(
         "damper_right_front": damper_right_front,
         "damper_right_back": damper_right_back,
     }
+    dampers_center = np.mean(
+        [get_bounding_box_center(damper) for damper in dampers_by_name.values()],
+        axis=0,
+    )
 
     central_annulus = create_hollow_profile_ring(
         outer_diameter=print_bed_undercarriage_central_annulus_diameter,
@@ -283,7 +289,7 @@ def create_print_bed_undercarriage_assembly(
             cylinder_head_cutter_clearance=print_bed_undercarriage_joining_screw_cylinder_head_clearance,
             width_inset=print_bed_undercarriage_joining_screw_inset,
             length_inset=print_bed_undercarriage_joining_screw_inset,
-            clearance_type="loose",
+            clearance_type=print_bed_undercarriage_screw_mount_clearance_type,
         )
         mount_screw_assembly = mount_screw_assembly.prefixed_copy(
             f"flange_mount_screw_assembly_{i}"
@@ -404,6 +410,11 @@ def create_print_bed_undercarriage_assembly(
 
     retval = retval.fuse(mount_plates)
 
+    mount_tower_holder_wall_thickness = (
+        print_bed_undercarriage_mount_tower_holder_size
+        - (print_bed_mount_tower_size + 2 * print_bed_mount_tower_clearance)
+    ) / 2
+
     for name, npp in dampers_by_name.items():
         mount_tower_name = f"mount_tower_{name.replace('damper_', '', 1)}"
         if record_metrics:
@@ -445,21 +456,44 @@ def create_print_bed_undercarriage_assembly(
             mount_tower_cutter, f"mount_tower_cutter_{name}"
         )
 
-        for orientation in range(2):
+        relative_damper_center = (
+            np.asarray(get_bounding_box_center(npp)) - dampers_center
+        )
+        outer_wall_alignments = [
+            (
+                Alignment.STACK_LEFT
+                if relative_damper_center[0] <= 0
+                else Alignment.STACK_RIGHT
+            ),
+            (
+                Alignment.STACK_FRONT
+                if relative_damper_center[1] <= 0
+                else Alignment.STACK_BACK
+            ),
+        ]
+
+        for wall_alignment in outer_wall_alignments:
+
             mount_tower_screw_cutter = create_cylinder(
                 MScrew.from_size(print_bed_mount_tower_screw_size).clearance_hole_loose
                 / 2,
                 big_thing,
+                direction=(
+                    (1, 0, 0)
+                    if wall_alignment in [Alignment.STACK_LEFT, Alignment.STACK_RIGHT]
+                    else (0, 1, 0)
+                ),
             )
-            mount_tower_screw_cutter = rotate(90, axis=(0, 1, 0))(
-                mount_tower_screw_cutter
-            )
-            if orientation == 0:
-                mount_tower_screw_cutter = rotate(90)(mount_tower_screw_cutter)
             mount_tower_screw_cutter = align(
                 mount_tower_screw_cutter,
                 mount_tower_holder,
                 Alignment.CENTER,
+            )
+            mount_tower_screw_cutter = align(
+                mount_tower_screw_cutter,
+                mount_tower_holder,
+                wall_alignment,
+                stack_gap=-1.5 * mount_tower_holder_wall_thickness,
             )
             mount_tower_holder = mount_tower_holder.cut(mount_tower_screw_cutter)
 
@@ -528,7 +562,7 @@ def create_print_bed_undercarriage_assembly(
             print_bed_undercarriage_torsion_screw_length,
             Alignment.TOP,
             flush_with_top=True,
-            clearance_type="loose",
+            clearance_type=print_bed_undercarriage_screw_mount_clearance_type,
         )
         belt_clamp_torsion_rib = screw_mount_assembly.use_as_cutter_on(
             belt_clamp_torsion_rib

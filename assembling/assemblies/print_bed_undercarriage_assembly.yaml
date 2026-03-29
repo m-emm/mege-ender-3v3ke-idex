@@ -203,6 +203,10 @@ Parameters:
   print_bed_undercarriage_torsion_screw_length:
     Type: Float
 
+  print_bed_undercarriage_screw_mount_clearance_type:
+    Type: String
+    Default: "loose"
+
 Parts:
   PrintBedUndercarriageAssembly:
     Type: Shellforgepy::Assembly
@@ -286,4 +290,6 @@ Parts:
           $ref: print_bed_undercarriage_torsion_screw_size
         print_bed_undercarriage_torsion_screw_length:
           $ref: print_bed_undercarriage_torsion_screw_length
+        print_bed_undercarriage_screw_mount_clearance_type:
+          $ref: print_bed_undercarriage_screw_mount_clearance_type
         record_metrics: true
