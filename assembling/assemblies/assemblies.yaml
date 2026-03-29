@@ -55,12 +55,10 @@ globals:
   print_bed_undercarriage_mount_tower_holder_fillet_radius: 5
   print_bed_undercarriage_num_dovetails_per_side: 3
   print_bed_undercarriage_dovetail_width: 10
-  print_bed_undercarriage_dovetail_clearance: 0.4
+  print_bed_undercarriage_dovetail_clearance: 0.5
   print_bed_undercarriage_dovetail_parts_clearance: 0.1
-  print_bed_undercarriage_dovetail_front_clearance: 0.3
-  print_bed_undercarriage_dovetail_box_size_y:
-    $expr:
-      "$sub": "2 * ${print_bed_undercarriage_profiles_wall}"
+  print_bed_undercarriage_dovetail_front_clearance: 0.4
+  print_bed_undercarriage_dovetail_box_size_y: 5    
   print_bed_undercarriage_outside_flange_size: 15
   print_bed_undercarriage_joining_screw_size: "M3"
   print_bed_undercarriage_joining_screw_length: 14

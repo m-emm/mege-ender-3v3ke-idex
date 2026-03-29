@@ -46,29 +46,29 @@ Builder:
         name_template: "{name}"
     prototype:
       include_parts:
-        - front_left_uc
+        # - front_left_uc
         - back_right_uc
         - back_left_uc
       box_cutters:
-        - part: front_left_uc
-          around: self.non_production_parts.mount_tower_left_front
-          size:
-            - $expr:
-                $sub: "${print_bed_undercarriage_mount_tower_holder_size} + 12"
-            - $expr:
-                $sub: "${print_bed_undercarriage_mount_tower_holder_size} + 12"
-            - 200
-          offset:
-            - 0
-            - 0
-            - $expr:
-                $sub: "${print_bed_mount_tower_height} * 0.5"
+        # - part: front_left_uc
+        #   around: self.non_production_parts.mount_tower_left_front
+        #   size:
+        #     - $expr:
+        #         $sub: "${print_bed_undercarriage_mount_tower_holder_size} + 12"
+        #     - $expr:
+        #         $sub: "${print_bed_undercarriage_mount_tower_holder_size} + 12"
+        #     - 200
+        #   offset:
+        #     - 0
+        #     - 0
+        #     - $expr:
+        #         $sub: "${print_bed_mount_tower_height} * 0.5"
         - part: back_right_uc
           around: print_bed_undercarriage_assembly.non_production_parts.belt_clamp_torsion_screw_back
           size:
             - 40
             - 70
-            - 200
+            - 12
           offset:
             - -8
             - 0
@@ -78,16 +78,16 @@ Builder:
           size:
             - 40
             - 70
-            - 200
+            - 12
           offset:
             - -8
             - 0
             - 0
-      process_data:
-        overrides:
-          process_overrides:
-            wall_loops: "1"
-            sparse_infill_density: "20%"
+      # process_data:
+      #   overrides:
+      #     process_overrides:
+      #       wall_loops: "1"
+      #       sparse_infill_density: "20%"
       arrange:
         plates: null
         auto_assign_plates: false
