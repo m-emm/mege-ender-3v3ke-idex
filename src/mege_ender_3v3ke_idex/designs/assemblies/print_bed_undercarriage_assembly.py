@@ -74,6 +74,7 @@ def create_print_bed_undercarriage_assembly(
     print_bed_undercarriage_dovetail_clearance,
     print_bed_undercarriage_dovetail_parts_clearance,
     print_bed_undercarriage_dovetail_box_size_y,
+    print_bed_undercarriage_dovetail_groove_box_size_x,
     print_bed_undercarriage_outside_flange_size,
     print_bed_undercarriage_joining_screw_size,
     print_bed_undercarriage_joining_screw_length,
@@ -611,6 +612,7 @@ def create_print_bed_undercarriage_assembly(
                 taper_per_side=1.5,
                 dovetail_clearance=print_bed_undercarriage_dovetail_clearance,
                 parts_clearance=print_bed_undercarriage_dovetail_parts_clearance,
+                groove_box_size_x=print_bed_undercarriage_dovetail_groove_box_size_x,
                 groove_box_size_y=print_bed_undercarriage_dovetail_box_size_y
                 + print_bed_undercarriage_dovetail_front_clearance
                 + print_bed_undercarriage_profiles_wall,

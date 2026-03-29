@@ -164,6 +164,8 @@ Parameters:
     Type: Float
   print_bed_undercarriage_dovetail_box_size_y:
     Type: Float
+  print_bed_undercarriage_dovetail_groove_box_size_x:
+    Type: Float
   print_bed_undercarriage_outside_flange_size:
     Type: Float
   print_bed_undercarriage_joining_screw_size:
@@ -252,6 +254,8 @@ Parts:
           $ref: print_bed_undercarriage_dovetail_parts_clearance
         print_bed_undercarriage_dovetail_box_size_y:
           $ref: print_bed_undercarriage_dovetail_box_size_y
+        print_bed_undercarriage_dovetail_groove_box_size_x:
+          $ref: print_bed_undercarriage_dovetail_groove_box_size_x
         print_bed_undercarriage_outside_flange_size:
           $ref: print_bed_undercarriage_outside_flange_size
         print_bed_undercarriage_joining_screw_size:
