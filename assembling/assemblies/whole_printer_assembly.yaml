@@ -10,6 +10,10 @@ Builder:
         artifact: leader
         name: printer_frame
       - source: dependencies
+        assembly: printer_frame_assembly
+        artifact: non_production_parts
+        name_template: "{name}"
+      - source: dependencies
         assembly: printer_feet_assembly
         artifact: followers
         name_template: "{name}"
@@ -39,6 +43,10 @@ Builder:
       - source: dependencies
         assembly: y_axis_rail_carrier_brackets_assembly
         artifact: followers
+        name_template: "{name}"
+      - source: dependencies
+        assembly: y_axis_rail_carrier_brackets_assembly
+        artifact: non_production_parts
         name_template: "{name}"
       - source: dependencies
         assembly: print_bed_assembly
