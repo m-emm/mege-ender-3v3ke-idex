@@ -11,9 +11,10 @@ mgn_12h_height = 10
 mgn_12h_screw_hole_depth = 3.5
 mgn_12h_h1 = 3.4
 
-mgn_12ca_cariage_width = 27
-mgn_12ca_carriage_length = 34.7
-mgn_12ca_screw_hole_pitch = 15
+mgn_12ca_carriage_width = 27
+mgn_12ca_carriage_length = 33.5
+mgn_12ca_screw_hole_pitch_x = 15
+mgn_12ca_screw_hole_pitch_y = 20
 mgn_12ca_height = 10
 mgn_12ca_screw_hole_depth = 3.5
 mgn_12ca_h1 = 3.4

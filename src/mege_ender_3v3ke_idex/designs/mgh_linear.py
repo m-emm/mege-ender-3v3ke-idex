@@ -64,19 +64,45 @@ def create_mgn12ca_carriage():
     screw_hole_diameter = MScrew.from_size("M3").clearance_hole_normal
 
     carriage = create_box(
-        mgn_12ca_carriage_length, mgn_12ca_cariage_width, mgn_12ca_height
+        mgn_12ca_carriage_length, mgn_12ca_carriage_width, mgn_12ca_height
     )
 
     holes = PartCollector()
-    for x in [-mgn_12ca_screw_hole_pitch / 2, mgn_12ca_screw_hole_pitch / 2]:
-        for y in [-mgn_12ca_screw_hole_pitch / 2, mgn_12ca_screw_hole_pitch / 2]:
+    individual_holes = []
+    for x in [-mgn_12ca_screw_hole_pitch_x / 2, mgn_12ca_screw_hole_pitch_x / 2]:
+        for y in [-mgn_12ca_screw_hole_pitch_y / 2, mgn_12ca_screw_hole_pitch_y / 2]:
             hole = create_cylinder(screw_hole_diameter / 2, mgn_12ca_height)
             hole = translate(x, y, 0)(hole)
+            individual_holes.append(hole)
             holes = holes.fuse(hole)
 
     holes = align(holes, carriage, Alignment.CENTER)
     holes = align(
         holes, carriage, Alignment.STACK_TOP, stack_gap=-mgn_12ca_screw_hole_depth
+    )
+    holes_aligner_xy = align_translation(holes, carriage, Alignment.CENTER)
+    holes_aligner_z = align_translation(
+        holes,
+        carriage,
+        Alignment.STACK_TOP,
+        stack_gap=-mgn_12ca_screw_hole_depth,
+    )
+    individual_holes = [holes_aligner_xy(hole) for hole in individual_holes]
+    individual_holes = [holes_aligner_z(hole) for hole in individual_holes]
+
+    hole_centers = [get_bounding_box_center(hole) for hole in individual_holes]
+    hole_centers_sorted = sorted(
+        [(round(center[0], 3), round(center[1], 3), round(center[2], 3)) for center in hole_centers]
+    )
+    x_positions = sorted({round(center[0], 3) for center in hole_centers})
+    y_positions = sorted({round(center[1], 3) for center in hole_centers})
+    _logger.info(
+        "MGN12CA carriage hole centers=%s x_positions=%s y_positions=%s x_pitch=%.3f y_pitch=%.3f",
+        hole_centers_sorted,
+        x_positions,
+        y_positions,
+        x_positions[-1] - x_positions[0],
+        y_positions[-1] - y_positions[0],
     )
 
     carriage = carriage.cut(holes)
