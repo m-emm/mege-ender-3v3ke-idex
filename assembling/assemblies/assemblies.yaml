@@ -58,7 +58,7 @@ globals:
   print_bed_undercarriage_dovetail_clearance: 0.9
   print_bed_undercarriage_dovetail_parts_clearance: 0.1
   print_bed_undercarriage_dovetail_front_clearance: 0.5
-  print_bed_undercarriage_dovetail_box_size_y: 5    
+  print_bed_undercarriage_dovetail_box_size_y: 5
   print_bed_undercarriage_dovetail_groove_box_size_x: 20
   print_bed_undercarriage_outside_flange_size: 15
   print_bed_undercarriage_joining_screw_size: "M3"
@@ -72,7 +72,7 @@ globals:
       "$sub": "${print_bed_undercarriage_profiles_width} * 0.4"
   print_bed_undercarriage_belt_clamp_clamp_length: 30
   print_bed_undercarriage_belt_clamp_x_offset: 0.5
-  
+
   print_bed_undercarriage_carriage_mount_plate_thickness: 5
   print_bed_undercarriage_carriage_mount_plate_oversize: 4
   print_bed_undercarriage_belt_clamp_screw_hole_border: 6
@@ -123,7 +123,7 @@ globals:
   endcap_tensioner_outer_box_bottom_thickness: 1
   endcap_tensioner_travel: 14
   endcap_top_bottom_wall: 5
-  
+
   endcap_wall: 3.5
   idler_cage_back_wall: 4
   idler_cage_wall: 2
@@ -445,7 +445,10 @@ placement:
         - 0
     - part: left_z_axis_profile_assembly
       to: printer_frame_assembly
-      alignment: BOTTOM
+      alignment: STACK_TOP
+    - part: left_z_axis_profile_assembly
+      to: printer_frame_assembly
+      alignment: LEFT
     - part: right_z_axis_profile_assembly
       to: printer_frame_assembly
       alignment: CENTER
@@ -456,7 +459,26 @@ placement:
         - 0
     - part: right_z_axis_profile_assembly
       to: printer_frame_assembly
-      alignment: BOTTOM
+      alignment: STACK_TOP
+    - part: right_z_axis_profile_assembly
+      to: printer_frame_assembly
+      alignment: RIGHT
+    - part: left_z_axis_carriage_assembly.non_production_parts.bottom_bearing
+      to: left_z_axis_core_assembly.non_production_parts.guide_rod
+      alignment: CENTER
+      axes: [0, 1]
+      post_translation:
+        - 0
+        - 0
+        - $ref: carriage_z_offset
+    - part: right_z_axis_carriage_assembly.non_production_parts.bottom_bearing
+      to: right_z_axis_core_assembly.non_production_parts.guide_rod
+      alignment: CENTER
+      axes: [0, 1]
+      post_translation:
+        - 0
+        - 0
+        - $ref: carriage_z_offset
     - part: x_axis_assembly
       to: z_axis_assembly.non_production_parts.carriages_fused
       alignment: CENTER
@@ -561,8 +583,8 @@ assemblies:
       - left_z_axis_assembly
       - right_z_axis_assembly
     inject_parts:
-      left_z_axis_profile: left_z_axis_profile_assembly
-      right_z_axis_profile: right_z_axis_profile_assembly
+      left_z_axis_profile: left_z_axis_profile_assembly.leader
+      right_z_axis_profile: right_z_axis_profile_assembly.leader
       left_z_axis: left_z_axis_assembly
       right_z_axis: right_z_axis_assembly
 
@@ -582,25 +604,89 @@ assemblies:
     parameters:
       side: right
 
+  - name: left_z_axis_core_assembly
+
+    resource_file: z_axis_core_assembly.yaml
+    depends_on:
+      - left_z_axis_profile_assembly
+    inject_parts:
+      z_axis_profile: left_z_axis_profile_assembly.leader
+    parameters:
+      side: left
+
+  - name: right_z_axis_core_assembly
+
+    resource_file: z_axis_core_assembly.yaml
+    depends_on:
+      - right_z_axis_profile_assembly
+    inject_parts:
+      z_axis_profile: right_z_axis_profile_assembly.leader
+    parameters:
+      side: right
+
+  - name: left_z_axis_top_mount_assembly
+
+    resource_file: z_axis_top_mount_assembly.yaml
+    depends_on:
+      - left_z_axis_profile_assembly
+      - left_z_axis_core_assembly
+    inject_parts:
+      z_axis_profile: left_z_axis_profile_assembly.leader
+      guide_rod: left_z_axis_core_assembly.non_production_parts.guide_rod
+      threaded_rod: left_z_axis_core_assembly.non_production_parts.threaded_rod
+
+  - name: right_z_axis_top_mount_assembly
+
+    resource_file: z_axis_top_mount_assembly.yaml
+    depends_on:
+      - right_z_axis_profile_assembly
+      - right_z_axis_core_assembly
+    inject_parts:
+      z_axis_profile: right_z_axis_profile_assembly.leader
+      guide_rod: right_z_axis_core_assembly.non_production_parts.guide_rod
+      threaded_rod: right_z_axis_core_assembly.non_production_parts.threaded_rod
+
+  - name: left_z_axis_carriage_assembly
+
+    resource_file: z_axis_carriage_assembly.yaml
+    depends_on:
+      - left_z_axis_core_assembly
+    inject_parts:
+      guide_rod: left_z_axis_core_assembly.non_production_parts.guide_rod
+      threaded_rod: left_z_axis_core_assembly.non_production_parts.threaded_rod
+
+  - name: right_z_axis_carriage_assembly
+
+    resource_file: z_axis_carriage_assembly.yaml
+    depends_on:
+      - right_z_axis_core_assembly
+    inject_parts:
+      guide_rod: right_z_axis_core_assembly.non_production_parts.guide_rod
+      threaded_rod: right_z_axis_core_assembly.non_production_parts.threaded_rod
+
   - name: left_z_axis_assembly
 
     resource_file: z_axis_side_assembly.yaml
     depends_on:
-      - left_z_axis_profile_assembly
+      - left_z_axis_core_assembly
+      - left_z_axis_top_mount_assembly
+      - left_z_axis_carriage_assembly
     inject_parts:
-      z_axis_profile: left_z_axis_profile_assembly
-    parameters:
-      side: left
+      z_axis_core: left_z_axis_core_assembly
+      z_axis_top_mount: left_z_axis_top_mount_assembly
+      z_axis_carriage: left_z_axis_carriage_assembly
 
   - name: right_z_axis_assembly
 
     resource_file: z_axis_side_assembly.yaml
     depends_on:
-      - right_z_axis_profile_assembly
+      - right_z_axis_core_assembly
+      - right_z_axis_top_mount_assembly
+      - right_z_axis_carriage_assembly
     inject_parts:
-      z_axis_profile: right_z_axis_profile_assembly
-    parameters:
-      side: right
+      z_axis_core: right_z_axis_core_assembly
+      z_axis_top_mount: right_z_axis_top_mount_assembly
+      z_axis_carriage: right_z_axis_carriage_assembly
 
   - name: whole_printer_assembly
 

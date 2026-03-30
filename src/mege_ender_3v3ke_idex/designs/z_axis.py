@@ -29,6 +29,7 @@ from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
 )
+from shellforgepy.adapters.cadquery.cadquery_adapter import normalize_to_solid
 from shellforgepy.metrics import record_length_metric
 from shellforgepy.simple import *
 
@@ -663,6 +664,8 @@ def create_top_mount(guide_rod, threaded_rod, profile):
         cut_point=cut_point,
         cut_thickness=z_axis_rod_clamp_gap,
     )
+    top_mount_back = normalize_to_solid(top_mount_back)
+    top_mount_clamp = normalize_to_solid(top_mount_clamp)
 
     retval = LeaderFollowersCuttersPart(top_mount_back)
     retval.add_named_follower(top_mount_clamp, "top_mount_clamp")
@@ -672,7 +675,7 @@ def create_top_mount(guide_rod, threaded_rod, profile):
     return retval
 
 
-def create_carriage(guide_rod, threaded_rod, profile):
+def create_carriage(guide_rod, threaded_rod):
     carriage_front = create_filleted_box(
         z_axis_carriage_width,
         z_axis_carriage_front_depth,
@@ -943,8 +946,8 @@ def create_z_axis_profile(*, side=None, record_metrics=True):
     )
 
 
-def create_z_axis_from_profile(side, z_axis_profile):
-    """Create the z-axis mechanics around an existing positioned profile."""
+def create_z_axis_core_from_profile(side, z_axis_profile):
+    """Create the z-axis core mechanics around an existing positioned profile."""
 
     guide_rod = create_cylinder(z_axis_guide_rod_diameter / 2, z_axis_guide_rod_length)
 
@@ -972,8 +975,6 @@ def create_z_axis_from_profile(side, z_axis_profile):
         stack_gap=z_axis_threaded_rod_profile_distance,
     )
     threaded_rod = translate(0, 0, z_axis_thraded_rod_z_offset)(threaded_rod)
-
-    retval = LeaderFollowersCuttersPart(z_axis_profile)
 
     rods_assembly = LeaderFollowersCuttersPart(guide_rod)
 
@@ -1111,11 +1112,10 @@ def create_z_axis_from_profile(side, z_axis_profile):
         pillow_bearing_profile_mount_plate
     )
 
-    retval.add_named_follower(pillow_bearing_mount_plate, "pillow_bearing_mount_plate")
-
+    retval = LeaderFollowersCuttersPart(rods_assembly.leader)
     retval = retval.merge_except_leader(rods_assembly)
-
-    retval.add_named_non_production_part(guide_rod, "guide_rod")
+    retval.add_named_follower(pillow_bearing_mount_plate, "pillow_bearing_mount_plate")
+    retval.add_named_non_production_part(rods_assembly.leader, "guide_rod")
 
     for name, part in motor.get_named_follower_items():
         retval.add_named_non_production_part(part, name)
@@ -1194,6 +1194,20 @@ def create_z_axis_from_profile(side, z_axis_profile):
 
     retval.add_named_follower(mount_plate_clamp_part, "mount_plate_clamp_part")
     retval.add_named_follower(mount_plate_back, "mount_plate_back")
+
+    return retval
+
+
+def create_z_axis_from_profile(side, z_axis_profile):
+    """Create the z-axis mechanics around an existing positioned profile."""
+
+    retval = LeaderFollowersCuttersPart(z_axis_profile)
+    retval = retval.merge_except_leader(
+        create_z_axis_core_from_profile(side, z_axis_profile)
+    )
+
+    guide_rod = retval.get_named_non_production_part("guide_rod")
+    threaded_rod = retval.get_named_non_production_part("threaded_rod")
 
     top_mount = create_top_mount(guide_rod, threaded_rod, z_axis_profile)
 
@@ -1276,8 +1290,8 @@ def create_minimal_z_axis_reference():
 
 def create_top_bridge_profile(positioned_z_axes):
     z_axis_profiles = PartCollector()
-    for z_axis in positioned_z_axes.values():
-        z_axis_profiles = z_axis_profiles.fuse(getattr(z_axis, "leader", z_axis))
+    for z_axis_profile in positioned_z_axes.values():
+        z_axis_profiles = z_axis_profiles.fuse(z_axis_profile)
 
     bridge_length = get_bounding_box_size(z_axis_profiles)[0]
     record_length_metric(
@@ -1331,14 +1345,15 @@ def create_positioned_z_axis_assembly(
         carriage = create_carriage(
             z_axis.get_named_non_production_part("guide_rod"),
             z_axis.get_named_non_production_part("threaded_rod"),
-            z_axis,
         )
         carriage = translate(0, 0, carriage_z_offset)(carriage)
 
         positioned_carriages[side_name] = carriage
 
     if len(positioned_z_axes) > 1:
-        top_bridge_profile = create_top_bridge_profile(positioned_z_axes)
+        top_bridge_profile = create_top_bridge_profile(
+            {name: z_axis.leader for name, z_axis in positioned_z_axes.items()}
+        )
         positioned_z_axes[Alignment.LEFT.name.lower()].add_named_non_production_part(
             top_bridge_profile,
             "top_bridge_profile",

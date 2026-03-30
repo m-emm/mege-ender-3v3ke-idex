@@ -6,14 +6,24 @@ Builder:
   Visualization:
     parts:
       - source: self
-        artifact: leader
-        name: z_axis
-      - source: self
         artifact: followers
         name_template: "{name}"
       - source: self
         artifact: non_production_parts
         name_template: "{name}"
+      - source: dependencies
+        assembly: printer_frame_assembly
+        artifact: leader
+        name: printer_frame
+      - source: dependencies
+        assembly: left_z_axis_profile_assembly
+        artifact: leader
+        name: left_z_axis_profile
+      - source: dependencies
+        assembly: right_z_axis_profile_assembly
+        artifact: leader
+        name: right_z_axis_profile
+
   Production:
     parts:
       - source: self

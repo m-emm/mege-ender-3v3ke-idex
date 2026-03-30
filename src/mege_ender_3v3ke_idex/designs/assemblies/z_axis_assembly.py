@@ -17,22 +17,18 @@ def create_z_axis_assembly(
     del context
 
     profiles = {
-        "left": left_z_axis_profile.leader,
-        "right": right_z_axis_profile.leader,
+        "left": left_z_axis_profile,
+        "right": right_z_axis_profile,
     }
     side_assemblies = {
         "left": left_z_axis,
         "right": right_z_axis,
     }
 
-    leader = PartCollector()
-    leader = leader.fuse(profiles["left"])
-    leader = leader.fuse(profiles["right"])
+    retval = LeaderFollowersCuttersPart(
+        leader=left_z_axis_profile.fuse(right_z_axis_profile)
+    )
 
-    retval = LeaderFollowersCuttersPart(leader=leader)
-
-    retval.add_named_non_production_part(profiles["left"], "left_profile")
-    retval.add_named_non_production_part(profiles["right"], "right_profile")
     retval.add_named_non_production_part(
         create_top_bridge_profile(profiles),
         "top_bridge_profile",
