@@ -60,6 +60,7 @@ def create_print_bed_undercarriage_assembly(
     y_axis_carriage_spacing,
     print_bed_undercarriage_profiles_height,
     print_bed_undercarriage_profiles_width,
+    print_bed_undercarriage_dovetail_profiles_width,
     print_bed_undercarriage_profiles_wall,
     print_bed_undercarriage_central_annulus_diameter,
     print_bed_undercarriage_mount_tower_annulus_diameter,
@@ -87,7 +88,8 @@ def create_print_bed_undercarriage_assembly(
     print_bed_undercarriage_belt_clamp_x_offset,
     print_bed_undercarriage_dovetail_front_clearance,
     print_bed_undercarriage_carriage_mount_plate_thickness,
-    print_bed_undercarriage_carriage_mount_plate_oversize,
+    print_bed_undercarriage_carriage_mount_plate_x_oversize,
+    print_bed_undercarriage_carriage_mount_plate_y_oversize,
     print_bed_undercarriage_belt_clamp_screw_hole_border,
     print_bed_undercarriage_torsion_rib_size,
     print_bed_undercarriage_torsion_rib_height,
@@ -215,73 +217,50 @@ def create_print_bed_undercarriage_assembly(
         - print_bed_undercarriage_central_annulus_diameter / 2
         + 2 * print_bed_undercarriage_profiles_wall
     )
-    straight_profile_center_wall_length = (
-        straight_profile_length
-        + print_bed_undercarriage_profiles_width
-        + print_bed_undercarriage_profiles_wall
-    )
     dovetail_pitch = (
-        straight_profile_length + print_bed_undercarriage_profiles_width
-    ) / print_bed_undercarriage_num_dovetails_per_side
-    flange_part_length = (
         straight_profile_length
-        - dovetail_pitch / 2
-        + print_bed_undercarriage_outside_flange_size
-        + print_bed_undercarriage_profiles_width
-    )
-    flange_part_gap_lentgth = (
-        flange_part_length
-        - print_bed_undercarriage_outside_flange_size
-        - dovetail_pitch
-    )
+        - print_bed_undercarriage_joining_screw_inset
+        - print_bed_undercarriage_dovetail_width
+    ) / print_bed_undercarriage_num_dovetails_per_side
 
     straight_profiles = PartCollector()
+    annnulus_center = get_bounding_box_center(central_annulus)
+
     for i in range(4):
         angle = i * 90
         straight_profile = create_hollow_profile(
             profile_length=straight_profile_length,
-            prifile_depth=print_bed_undercarriage_profiles_width,
+            prifile_depth=print_bed_undercarriage_dovetail_profiles_width,
             profile_height=print_bed_undercarriage_profiles_height,
             wall_thickness=print_bed_undercarriage_profiles_wall,
         )
-
-        straight_profile_wall = create_box(
-            straight_profile_center_wall_length,
-            2 * print_bed_undercarriage_profiles_wall,
-            print_bed_undercarriage_profiles_height,
-        )
-        straight_profile_wall = align(
-            straight_profile_wall,
-            straight_profile,
-            Alignment.CENTER,
-        )
-        straight_profile_wall = align(
-            straight_profile_wall,
-            straight_profile,
-            Alignment.RIGHT,
-        )
-        straight_profile_wall = translate(
-            2 * print_bed_undercarriage_profiles_wall,
-            0,
-            0,
-        )(straight_profile_wall)
-        straight_profile = straight_profile.fuse(straight_profile_wall)
-
         flange_part = create_box(
-            flange_part_length,
-            print_bed_undercarriage_profiles_width,
+            print_bed_undercarriage_outside_flange_size,
+            print_bed_undercarriage_dovetail_profiles_width,
             print_bed_undercarriage_profiles_height,
         )
         flange_part = align(flange_part, straight_profile, Alignment.CENTER)
-        flange_part = align(flange_part, straight_profile, Alignment.RIGHT)
-        flange_part = translate(
-            print_bed_undercarriage_outside_flange_size,
-            0,
-            0,
-        )(flange_part)
+        flange_part = align(flange_part, straight_profile, Alignment.STACK_RIGHT)
+
+        straight_profile = straight_profile.fuse(flange_part)
+
+        straight_profile_size = get_bounding_box_size(straight_profile)
+
+        straight_profile_stand_in = create_box(
+            straight_profile_size[0] - print_bed_undercarriage_profiles_width,
+            straight_profile_size[1],
+            straight_profile_size[2],
+        )
+
+        straight_profile_stand_in = align(
+            straight_profile_stand_in, straight_profile, Alignment.CENTER
+        )
+        straight_profile_stand_in = align(
+            straight_profile_stand_in, straight_profile, Alignment.RIGHT
+        )
 
         mount_screw_assembly = create_four_screws_mount_assembly(
-            flange_part,
+            straight_profile_stand_in,
             screw_size=print_bed_undercarriage_joining_screw_size,
             screw_length=print_bed_undercarriage_joining_screw_length,
             screw_direction=Alignment.FRONT,
@@ -296,39 +275,34 @@ def create_print_bed_undercarriage_assembly(
             f"flange_mount_screw_assembly_{i}"
         )
 
-        flange_part = mount_screw_assembly.use_as_cutter_on(flange_part)
         straight_profile = mount_screw_assembly.use_as_cutter_on(straight_profile)
 
-        flange_part_gap_cutter = create_box(
-            flange_part_gap_lentgth,
-            big_thing,
-            big_thing,
+        straight_profile_center_wall = create_box(
+            straight_profile_size[0],
+            print_bed_undercarriage_profiles_wall,
+            straight_profile_size[2],
         )
-        flange_part_gap_cutter = align(
-            flange_part_gap_cutter,
-            flange_part,
-            Alignment.CENTER,
+        straight_profile_center_wall = align(
+            straight_profile_center_wall, straight_profile, Alignment.CENTER
         )
-        flange_part_gap_cutter = align(
-            flange_part_gap_cutter,
-            flange_part,
-            Alignment.LEFT,
+
+        straight_profile_center_wall = mount_screw_assembly.use_as_cutter_on(
+            straight_profile_center_wall
         )
-        flange_part_gap_cutter = translate(dovetail_pitch, 0, 0)(flange_part_gap_cutter)
-        flange_part = flange_part.cut(flange_part_gap_cutter)
-        straight_profile = straight_profile.fuse(flange_part)
+        straight_profile = straight_profile.fuse(straight_profile_center_wall)
 
         straight_profile = LeaderFollowersCuttersPart(straight_profile)
         straight_profile = straight_profile.merge_except_leader(mount_screw_assembly)
 
-        straight_profile_translator = translate(
-            print_bed_undercarriage_central_annulus_diameter / 2
-            - print_bed_undercarriage_profiles_wall,
-            -print_bed_undercarriage_profiles_width / 2,
-            0,
+        straight_profile = align(straight_profile, central_annulus, Alignment.CENTER)
+        straight_profile = align(
+            straight_profile,
+            central_annulus,
+            Alignment.STACK_RIGHT,
+            stack_gap=-print_bed_undercarriage_profiles_width,
         )
-        straight_profile = straight_profile_translator(straight_profile)
-        straight_profile = rotate(angle)(straight_profile)
+
+        straight_profile = rotate(angle, center=annnulus_center)(straight_profile)
         straight_profiles = straight_profiles.fuse(straight_profile)
 
     straight_profiles = align(straight_profiles, central_annulus, Alignment.CENTER)
@@ -375,9 +349,9 @@ def create_print_bed_undercarriage_assembly(
         carriage_size = get_bounding_box_size(carriage)
         carriage_mount_plate = create_box(
             carriage_size[0]
-            + 2 * print_bed_undercarriage_carriage_mount_plate_oversize,
+            + 2 * print_bed_undercarriage_carriage_mount_plate_x_oversize,
             carriage_size[1]
-            + 2 * print_bed_undercarriage_carriage_mount_plate_oversize,
+            + 2 * print_bed_undercarriage_carriage_mount_plate_y_oversize,
             print_bed_undercarriage_profiles_height,
         )
         carriage_mount_plate = align(
@@ -602,34 +576,32 @@ def create_print_bed_undercarriage_assembly(
 
     all_dovetails_fused = PartCollector()
     all_dovetails_list = []
-    for i, _ in enumerate(uc_parts_in_ring_order):
-        for k in range(print_bed_undercarriage_num_dovetails_per_side):
-            dovetail = create_dovetail_tongue_and_groove(
-                dovetail_width=print_bed_undercarriage_dovetail_width,
-                length=print_bed_undercarriage_profiles_height,
-                box_size_x=1.5 * print_bed_undercarriage_dovetail_width,
-                box_size_y=print_bed_undercarriage_dovetail_box_size_y,
-                taper_per_side=1.5,
-                dovetail_clearance=print_bed_undercarriage_dovetail_clearance,
-                parts_clearance=print_bed_undercarriage_dovetail_parts_clearance,
-                groove_box_size_x=print_bed_undercarriage_dovetail_groove_box_size_x,
-                groove_box_size_y=print_bed_undercarriage_dovetail_box_size_y
-                + print_bed_undercarriage_dovetail_front_clearance
-                + print_bed_undercarriage_profiles_wall,
-                front_wall_clearance=print_bed_undercarriage_dovetail_front_clearance,
-            )
-            dovetail = translate(
-                print_bed_undercarriage_central_annulus_diameter / 2
-                - print_bed_undercarriage_dovetail_width / 2
-                + k * dovetail_pitch,
-                0,
-                0,
-            )(dovetail)
-            dovetail = rotate(-i * 90)(dovetail)
-            all_dovetails_list.append(dovetail)
-            all_dovetails_fused = all_dovetails_fused.fuse(
-                dovetail.prefixed_copy(f"uc_{i}_dovetail_{k}")
-            )
+    annulus_center = get_bounding_box_center(central_annulus)
+    for k in range(print_bed_undercarriage_num_dovetails_per_side):
+        dovetail = create_dovetail_tongue_and_groove(
+            dovetail_width=print_bed_undercarriage_dovetail_width,
+            length=print_bed_undercarriage_profiles_height,
+            box_size_x=1.5 * print_bed_undercarriage_dovetail_width,
+            box_size_y=print_bed_undercarriage_dovetail_box_size_y,
+            taper_per_side=1.5,
+            dovetail_clearance=print_bed_undercarriage_dovetail_clearance,
+            parts_clearance=print_bed_undercarriage_dovetail_parts_clearance,
+            groove_box_size_x=print_bed_undercarriage_dovetail_groove_box_size_x,
+            groove_box_size_y=print_bed_undercarriage_dovetail_box_size_y
+            + print_bed_undercarriage_dovetail_front_clearance
+            + print_bed_undercarriage_profiles_wall,
+            front_wall_clearance=print_bed_undercarriage_dovetail_front_clearance,
+        )
+        dovetail = align(dovetail, None, Alignment.CENTER)
+        dovetail = translate(
+            k * dovetail_pitch,
+            0,
+            0,
+        )(dovetail)
+        all_dovetails_list.append(dovetail)
+        all_dovetails_fused = all_dovetails_fused.fuse(
+            dovetail.prefixed_copy(f"dovetail_{k}")
+        )
 
     dovetails_aligner = align_translation(
         all_dovetails_fused,
@@ -639,12 +611,29 @@ def create_print_bed_undercarriage_assembly(
     all_dovetails_list = [
         dovetails_aligner(dovetail) for dovetail in all_dovetails_list
     ]
+    all_dovetails_fused = dovetails_aligner(all_dovetails_fused)
+
+    dovetail_aligner_2 = align_translation(
+        all_dovetails_fused,
+        central_annulus,
+        Alignment.STACK_RIGHT,
+        stack_gap=print_bed_undercarriage_joining_screw_inset
+        + print_bed_undercarriage_dovetail_width / 2,
+    )
+    all_dovetails_list = [
+        dovetail_aligner_2(dovetail) for dovetail in all_dovetails_list
+    ]
+    all_dovetails_fused = dovetail_aligner_2(all_dovetails_fused)
 
     dovetail_counter = 0
     for i, _ in enumerate(uc_parts_in_ring_order):
+
         previous_uc_index = (i - 1) % len(uc_parts_in_ring_order)
-        for _ in range(print_bed_undercarriage_num_dovetails_per_side):
-            dovetail = all_dovetails_list[dovetail_counter]
+
+        for dovetail in all_dovetails_list:
+
+            dovetail = rotate(-i * 90, center=annulus_center)(dovetail)
+
             dovetail_counter += 1
 
             uc_parts_in_ring_order[previous_uc_index] = dovetail.use_as_cutter_on(

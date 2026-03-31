@@ -145,6 +145,8 @@ Parameters:
     Type: Float
   print_bed_undercarriage_profiles_width:
     Type: Float
+  print_bed_undercarriage_dovetail_profiles_width:
+    Type: Float
   print_bed_undercarriage_profiles_wall:
     Type: Float
   print_bed_undercarriage_central_annulus_diameter:
@@ -199,7 +201,9 @@ Parameters:
     Type: Float
   print_bed_undercarriage_carriage_mount_plate_thickness:
     Type: Float
-  print_bed_undercarriage_carriage_mount_plate_oversize:
+  print_bed_undercarriage_carriage_mount_plate_x_oversize:
+    Type: Float
+  print_bed_undercarriage_carriage_mount_plate_y_oversize:
     Type: Float
   print_bed_undercarriage_belt_clamp_screw_hole_border:
     Type: Float
@@ -235,6 +239,8 @@ Parts:
           $ref: print_bed_undercarriage_profiles_height
         print_bed_undercarriage_profiles_width:
           $ref: print_bed_undercarriage_profiles_width
+        print_bed_undercarriage_dovetail_profiles_width:
+          $ref: print_bed_undercarriage_dovetail_profiles_width
         print_bed_undercarriage_profiles_wall:
           $ref: print_bed_undercarriage_profiles_wall
         print_bed_undercarriage_central_annulus_diameter:
@@ -289,8 +295,10 @@ Parts:
           $ref: print_bed_undercarriage_dovetail_front_clearance
         print_bed_undercarriage_carriage_mount_plate_thickness:
           $ref: print_bed_undercarriage_carriage_mount_plate_thickness
-        print_bed_undercarriage_carriage_mount_plate_oversize:
-          $ref: print_bed_undercarriage_carriage_mount_plate_oversize
+        print_bed_undercarriage_carriage_mount_plate_x_oversize:
+          $ref: print_bed_undercarriage_carriage_mount_plate_x_oversize
+        print_bed_undercarriage_carriage_mount_plate_y_oversize:
+          $ref: print_bed_undercarriage_carriage_mount_plate_y_oversize
         print_bed_undercarriage_belt_clamp_screw_hole_border:
           $ref: print_bed_undercarriage_belt_clamp_screw_hole_border
         print_bed_undercarriage_torsion_rib_size:

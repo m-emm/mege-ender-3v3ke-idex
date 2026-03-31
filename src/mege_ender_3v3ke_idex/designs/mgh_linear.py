@@ -92,7 +92,10 @@ def create_mgn12ca_carriage():
 
     hole_centers = [get_bounding_box_center(hole) for hole in individual_holes]
     hole_centers_sorted = sorted(
-        [(round(center[0], 3), round(center[1], 3), round(center[2], 3)) for center in hole_centers]
+        [
+            (round(center[0], 3), round(center[1], 3), round(center[2], 3))
+            for center in hole_centers
+        ]
     )
     x_positions = sorted({round(center[0], 3) for center in hole_centers})
     y_positions = sorted({round(center[1], 3) for center in hole_centers})
