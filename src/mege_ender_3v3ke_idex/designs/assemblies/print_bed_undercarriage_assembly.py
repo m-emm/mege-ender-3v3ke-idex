@@ -223,7 +223,7 @@ def create_print_bed_undercarriage_assembly(
         - print_bed_undercarriage_dovetail_width
     ) / print_bed_undercarriage_num_dovetails_per_side
 
-    straight_profiles = PartCollector()
+    straight_profiles = None
     annnulus_center = get_bounding_box_center(central_annulus)
 
     for i in range(4):
@@ -271,11 +271,33 @@ def create_print_bed_undercarriage_assembly(
             length_inset=print_bed_undercarriage_joining_screw_inset,
             clearance_type=print_bed_undercarriage_screw_mount_clearance_type,
         )
+
         mount_screw_assembly = mount_screw_assembly.prefixed_copy(
             f"flange_mount_screw_assembly_{i}"
         )
 
+        for name, npp in mount_screw_assembly.get_named_non_production_part_items():
+            if "screw" in name:
+
+                screw_hole_tube = create_cylinder(
+                    MScrew.from_size(
+                        print_bed_undercarriage_joining_screw_size
+                    ).cylinder_head_diameter
+                    / 2
+                    * 1.2,
+                    print_bed_undercarriage_dovetail_profiles_width,
+                    direction=(0, 1, 0),
+                )
+
+                screw_hole_tube = align(screw_hole_tube, npp, Alignment.CENTER)
+                screw_hole_tube = align(
+                    screw_hole_tube, straight_profile, Alignment.CENTER, axes=[1]
+                )
+                straight_profile = straight_profile.fuse(screw_hole_tube)
+
         straight_profile = mount_screw_assembly.use_as_cutter_on(straight_profile)
+        straight_profile = LeaderFollowersCuttersPart(straight_profile)
+        straight_profile = straight_profile.merge_except_leader(mount_screw_assembly)
 
         straight_profile_center_wall = create_box(
             straight_profile_size[0],
@@ -291,9 +313,6 @@ def create_print_bed_undercarriage_assembly(
         )
         straight_profile = straight_profile.fuse(straight_profile_center_wall)
 
-        straight_profile = LeaderFollowersCuttersPart(straight_profile)
-        straight_profile = straight_profile.merge_except_leader(mount_screw_assembly)
-
         straight_profile = align(straight_profile, central_annulus, Alignment.CENTER)
         straight_profile = align(
             straight_profile,
@@ -303,10 +322,15 @@ def create_print_bed_undercarriage_assembly(
         )
 
         straight_profile = rotate(angle, center=annnulus_center)(straight_profile)
-        straight_profiles = straight_profiles.fuse(straight_profile)
+        straight_profiles = (
+            straight_profiles.fuse(straight_profile)
+            if straight_profiles is not None
+            else straight_profile
+        )
 
     straight_profiles = align(straight_profiles, central_annulus, Alignment.CENTER)
-    retval = LeaderFollowersCuttersPart(undercarriage).fuse(straight_profiles)
+    retval = straight_profiles.fuse(undercarriage)
+    
 
     carriages_map = {}
     carriages_fused = PartCollector()
