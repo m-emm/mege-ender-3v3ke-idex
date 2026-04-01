@@ -34,8 +34,11 @@ def _record_print_bed_undercarriage_weight_metrics(undercarriage):
     )
 
     mount_tower_volume_mm3 = 0.0
+    screw_volume_mm3 = 0.0
     for name, part in undercarriage.get_named_non_production_part_items():
         if not name.startswith("mount_tower_"):
+            if "screw" in name:
+                screw_volume_mm3 += get_volume(part)
             continue
         mount_tower_volume_mm3 += get_volume(part)
 
@@ -45,6 +48,14 @@ def _record_print_bed_undercarriage_weight_metrics(undercarriage):
             Material.ALUMINUM,
             mount_tower_volume_mm3,
             part_id="print_bed_mount_towers",
+        )
+
+    if screw_volume_mm3 > 0:
+        record_weight_metric(
+            Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
+            Material.STEEL,
+            screw_volume_mm3,
+            part_id="print_bed_undercarriage_screws",
         )
 
 
@@ -97,6 +108,8 @@ def create_print_bed_undercarriage_assembly(
     print_bed_undercarriage_torsion_screw_size,
     print_bed_undercarriage_torsion_screw_length,
     print_bed_undercarriage_screw_mount_clearance_type,
+    print_bed_undercarriage_profiles_fillet_radius,
+    print_bed_undercarriage_carriage_mount_plate_wall,
     record_metrics=False,
     context=None,
 ):
@@ -330,7 +343,6 @@ def create_print_bed_undercarriage_assembly(
 
     straight_profiles = align(straight_profiles, central_annulus, Alignment.CENTER)
     retval = straight_profiles.fuse(undercarriage)
-    
 
     carriages_map = {}
     carriages_fused = PartCollector()
@@ -391,10 +403,14 @@ def create_print_bed_undercarriage_assembly(
         carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
         carriage_mount_plate_size = get_bounding_box_size(carriage_mount_plate)
 
-        inner_cutter = create_box(
-            carriage_mount_plate_size[0] - 2 * print_bed_undercarriage_profiles_wall,
-            carriage_mount_plate_size[1] - 2 * print_bed_undercarriage_profiles_wall,
+        inner_cutter = create_filleted_box(
+            carriage_mount_plate_size[0]
+            - 2 * print_bed_undercarriage_carriage_mount_plate_wall,
+            carriage_mount_plate_size[1]
+            - 2 * print_bed_undercarriage_carriage_mount_plate_wall,
             big_thing,
+            fillet_radius=print_bed_undercarriage_profiles_fillet_radius,
+            no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
         )
         inner_cutter = align(inner_cutter, carriage_mount_plate, Alignment.CENTER)
         inner_cutter = align(inner_cutter, carriage_mount_plate, Alignment.BOTTOM)
@@ -509,6 +525,25 @@ def create_print_bed_undercarriage_assembly(
 
         retval = retval.fuse(mount_tower_holder)
         retval = mount_tower_holder.use_as_cutter_on(retval)
+
+    def edge_filter(bbox, v0_point, v1_point):
+        v0_point = np.array(v0_point)
+        npv1_point = np.array(v1_point)
+        edge_center = (v0_point + npv1_point) / 2
+        edge_length = np.linalg.norm(npv1_point - v0_point)
+        edge_direction = npv1_point - v0_point
+        if np.allclose(edge_direction[1], 0) and np.isclose(edge_direction[0], 0):
+            if not np.isclose(edge_length, print_bed_undercarriage_profiles_height):
+                return False
+
+            return True
+
+        return False
+
+    fillet_edges = filter_edges_by_function(retval.leader, edge_filter)
+    retval.leader = apply_fillet_to_edges(
+        retval.leader, print_bed_undercarriage_profiles_fillet_radius, fillet_edges
+    )
 
     belt_clamp_bases = PartCollector()
     for side in [Alignment.FRONT, Alignment.BACK]:

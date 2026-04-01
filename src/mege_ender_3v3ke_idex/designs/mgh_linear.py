@@ -99,7 +99,7 @@ def create_mgn12ca_carriage():
     )
     x_positions = sorted({round(center[0], 3) for center in hole_centers})
     y_positions = sorted({round(center[1], 3) for center in hole_centers})
-    _logger.info(
+    _logger.debug(
         "MGN12CA carriage hole centers=%s x_positions=%s y_positions=%s x_pitch=%.3f y_pitch=%.3f",
         hole_centers_sorted,
         x_positions,

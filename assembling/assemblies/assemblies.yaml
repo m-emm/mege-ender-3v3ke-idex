@@ -41,47 +41,49 @@ globals:
   tpu_slit_thickness: 0.15
   tpu_slit_clearance: 0.5
   tpu_slit_distance: 1
-  tpu_num_slits: 3
-  print_bed_undercarriage_profiles_height: 30
-  print_bed_undercarriage_profiles_width: 6
-  print_bed_undercarriage_profiles_wall: 1.0
-  print_bed_undercarriage_dovetail_profiles_width: 16
-  print_bed_undercarriage_central_annulus_diameter: 90
-  print_bed_undercarriage_mount_tower_annulus_diameter: 110
-  print_bed_mount_tower_size: 20
-  print_bed_mount_tower_height: 25
-  print_bed_mount_tower_clearance: 0.4
-  print_bed_mount_tower_screw_size: "M5"
-  print_bed_undercarriage_mount_tower_holder_size: 30
-  print_bed_undercarriage_mount_tower_holder_fillet_radius: 5
-  print_bed_undercarriage_num_dovetails_per_side: 3
-  print_bed_undercarriage_dovetail_width: 10
-  print_bed_undercarriage_dovetail_clearance: 1.1
-  print_bed_undercarriage_dovetail_parts_clearance: 0.1
-  print_bed_undercarriage_dovetail_front_clearance: 0.5
-  print_bed_undercarriage_dovetail_box_size_y: 5    
-  print_bed_undercarriage_dovetail_groove_box_size_x: 20
-  print_bed_undercarriage_outside_flange_size: 18
-  print_bed_undercarriage_joining_screw_size: "M3"
-  print_bed_undercarriage_joining_screw_length: 16
-  print_bed_undercarriage_joining_screw_nut_clearance: 0.35
-  print_bed_undercarriage_joining_screw_cylinder_head_clearance: 0.5
-  print_bed_undercarriage_joining_screw_inset: 5
+  tpu_num_slits: 3    
   print_bed_undercarriage_belt_clamp_base_thickness: 5
-  print_bed_undercarriage_belt_clamp_clamp_thickness: 6
-      
   print_bed_undercarriage_belt_clamp_clamp_length: 30
+  print_bed_undercarriage_belt_clamp_clamp_thickness: 6
+  print_bed_undercarriage_belt_clamp_screw_hole_border: 6
   print_bed_undercarriage_belt_clamp_x_offset: 0.5
-  
   print_bed_undercarriage_carriage_mount_plate_thickness: 5
+  print_bed_undercarriage_carriage_mount_plate_wall: 2.0
   print_bed_undercarriage_carriage_mount_plate_x_oversize: 6
   print_bed_undercarriage_carriage_mount_plate_y_oversize: 4
-  print_bed_undercarriage_belt_clamp_screw_hole_border: 6
-  print_bed_undercarriage_torsion_rib_size: 8
-  print_bed_undercarriage_torsion_rib_height: 52
+  print_bed_undercarriage_central_annulus_diameter: 90
+  print_bed_undercarriage_dovetail_box_size_y: 5    
+  print_bed_undercarriage_dovetail_clearance: 1.1
+  print_bed_undercarriage_dovetail_front_clearance: 0.5
+  print_bed_undercarriage_dovetail_groove_box_size_x: 20
+  print_bed_undercarriage_dovetail_parts_clearance: 0.1
+  print_bed_undercarriage_dovetail_profiles_width: 16
+  print_bed_undercarriage_dovetail_width: 10
+  print_bed_undercarriage_joining_screw_cylinder_head_clearance: 0.5
+  print_bed_undercarriage_joining_screw_inset: 6
+  print_bed_undercarriage_joining_screw_length: 16
+  print_bed_undercarriage_joining_screw_nut_clearance: 0.35
+  print_bed_undercarriage_joining_screw_size: "M3"
+  print_bed_undercarriage_mount_tower_annulus_diameter: 110
+  print_bed_undercarriage_mount_tower_holder_fillet_radius: 5
+  print_bed_undercarriage_mount_tower_holder_size: 30
+  print_bed_undercarriage_num_dovetails_per_side: 3
+  print_bed_undercarriage_outside_flange_size: 25
+  print_bed_undercarriage_profiles_fillet_radius: 2.25
+  print_bed_undercarriage_profiles_height: 25
+  print_bed_undercarriage_profiles_wall: 1.1
+  print_bed_undercarriage_profiles_width: 9
   print_bed_undercarriage_torsion_rib_fillet_radius: 1.5
-  print_bed_undercarriage_torsion_screw_size: "M3"
+  print_bed_undercarriage_torsion_rib_height: 52
+  print_bed_undercarriage_torsion_rib_size: 8
   print_bed_undercarriage_torsion_screw_length: 50
+  print_bed_undercarriage_torsion_screw_size: "M3"
+
+  print_bed_mount_tower_clearance: 0.6
+  print_bed_mount_tower_height: 25
+  print_bed_mount_tower_screw_size: "M5"
+  print_bed_mount_tower_size: 20
+
   x_axis_motor_axle_length: 14
   x_axis_profile_length: 600
   x_axis_profile_pitch: 48

@@ -106,7 +106,7 @@ Builder:
         process_overrides:
           brim_type: no_brim
           enable_support: "1"
-          sparse_infill_density: "75%"
+          sparse_infill_density: "30%"
           support_interface_spacing: "0.8"
           support_object_first_layer_gap: 0.8
           support_object_xy_distance: "3.0"
@@ -114,6 +114,8 @@ Builder:
           support_threshold_angle: "30"
           support_top_z_distance: "0.3"
           wall_loops: "3"
+          top_shell_layers: "4"
+          bottom_shell_layers: "4"
     arrange:
       export_individual_parts: false
       plates:
@@ -192,6 +194,10 @@ Parameters:
   print_bed_undercarriage_belt_clamp_base_thickness:
     Type: Float
   print_bed_undercarriage_belt_clamp_clamp_thickness:
+    Type: Float
+  print_bed_undercarriage_carriage_mount_plate_wall:
+    Type: Float
+  print_bed_undercarriage_profiles_fillet_radius:
     Type: Float
   print_bed_undercarriage_belt_clamp_clamp_length:
     Type: Float
@@ -285,10 +291,14 @@ Parts:
           $ref: print_bed_undercarriage_joining_screw_inset
         print_bed_undercarriage_belt_clamp_base_thickness:
           $ref: print_bed_undercarriage_belt_clamp_base_thickness
+        print_bed_undercarriage_carriage_mount_plate_wall:
+          $ref: print_bed_undercarriage_carriage_mount_plate_wall
         print_bed_undercarriage_belt_clamp_clamp_thickness:
           $ref: print_bed_undercarriage_belt_clamp_clamp_thickness
         print_bed_undercarriage_belt_clamp_clamp_length:
           $ref: print_bed_undercarriage_belt_clamp_clamp_length
+        print_bed_undercarriage_profiles_fillet_radius:
+          $ref: print_bed_undercarriage_profiles_fillet_radius
         print_bed_undercarriage_belt_clamp_x_offset:
           $ref: print_bed_undercarriage_belt_clamp_x_offset
         print_bed_undercarriage_dovetail_front_clearance:
