@@ -24,7 +24,7 @@ globals:
   print_bed_mount_hole_pitch: 240
   print_bed_foil_thickness: 1.6
   nozzle_bed_reach_margin: -2
-  print_bed_vertical_gap_to_frame: 60
+  print_bed_vertical_gap_to_frame: 58
   print_bed_damper_height: 16
   print_bed_damper_diameter: 15
   y_axis_rail_spacing: 285

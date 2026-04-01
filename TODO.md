@@ -2,12 +2,8 @@
 
 ## Mechanical Design tasks
 
-- y endstop
-- heatbed holder
 - heatbed cable attachment
 - y rail drill jig
-- y mount brackets
-- y carriage stoppers
 - cable holders / clamps (x axis umbilicals, heatbed, z-axes cabling)
 - z-axis reconstruct: turn 90 deg
 - z-axis endstops
@@ -32,3 +28,7 @@
 - integration x,y,z,toolhead, including relative heights
 - z-axis placement and integration with frame
 - y rails, carriages, motors, belt
+- y endstop
+- heatbed holder
+- y mount brackets
+- y carriage stoppers
