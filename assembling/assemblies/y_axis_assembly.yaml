@@ -57,6 +57,14 @@ Builder:
         assembly: y_axis_drive_assembly
         artifact: non_production_parts
         name_template: "y_axis_drive_{name}"
+      - source: dependencies
+        assembly: y_axis_endstop_holder_assembly
+        artifact: leader
+        name: y_axis_endstop_holder
+      - source: dependencies
+        assembly: y_axis_endstop_holder_assembly
+        artifact: non_production_parts
+        name_template: "y_axis_endstop_{name}"
       - source: self
         artifact: leader
         name: y_axis
@@ -96,6 +104,11 @@ Builder:
           - carriage_stopper_right_front
           - carriage_stopper_right_back
         name_template: "{name}"
+        flip: true
+      - source: dependencies
+        assembly: y_axis_endstop_holder_assembly
+        artifact: leader
+        name: y_axis_endstop_holder
         flip: true
 
 Parameters:

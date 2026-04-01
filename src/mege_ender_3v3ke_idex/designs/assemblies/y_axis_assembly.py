@@ -159,6 +159,7 @@ def create_y_axis_assembly(
         )
         rail = align(rail, profile, Alignment.CENTER)
         rail = align(rail, profile, Alignment.STACK_TOP)
+        rail.add_named_non_production_part(rail.leader, f"rail_{rail_side_name}")
         rail.add_named_non_production_part(profile, f"profile_{rail_side_name}")
 
         for front_back_alignment in (Alignment.FRONT, Alignment.BACK):

@@ -107,6 +107,7 @@ arrange_and_export(
 - Use `PartCollector` for accumulating multiple parts before fusing
 - Use `LeaderFollowersCuttersPart` for complex assemblies with visual references
 - Align parts relative to each other using the `align()` function with `Alignment` enums
+- For symmetric corner hardware, prefer a nested `left/right` x `front/back` loop over copy-pasted per-corner code. Use an outer loop like `("left", Alignment.LEFT)` / `("right", Alignment.RIGHT)` and an inner loop over `Alignment.FRONT` and `Alignment.BACK`; then derive placement from `side_alignment.opposite.stack_alignment`, `front_back_alignment.stack_alignment`, and `front_back_alignment.opposite` instead of manual sign math.
 
 
 ### Avoid

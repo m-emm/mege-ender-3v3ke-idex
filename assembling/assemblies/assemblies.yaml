@@ -218,6 +218,11 @@ globals:
   y_axis_rail_carrier_bracket_mount_screw_inset: 8
   y_axis_carriage_stopper_length: 18
   y_axis_carriage_stopper_thickness: 12
+  y_axis_endstop_up: [1, 0, 0]
+  y_axis_endstop_out: [0, -1, 0]
+  y_axis_endstop_rail_gap: 0
+  y_axis_endstop_z_offset: 0
+  y_axis_endstop_x_offset: 0
   y_axis_carriage_stopper_fillet_radius: 3
   y_axis_carriage_stopper_mount_screw_size: "M5"
   y_axis_carriage_stopper_mount_screw_length: 16
@@ -438,10 +443,30 @@ placement:
       axes: [1]
 
     - part: y_axis_rail_carrier_brackets_assembly.non_production_parts.profile_side_mount_plate_left_front
-      to: y_axis_assembly.non_production_parts.profile_left
+      to: y_axis_assembly.non_production_parts.profile_right
       alignment: CENTER
       axes: [2]
 
+    - part: y_axis_endstop_holder_assembly
+      to: y_axis_assembly.non_production_parts.profile_right
+      alignment: CENTER      
+      post_translation:
+        - $ref: y_axis_endstop_x_offset
+        - 0
+        - 0
+    - part: y_axis_endstop_holder_assembly
+      to: y_axis_assembly.non_production_parts.profile_right
+      alignment: BOTTOM
+    - part: y_axis_endstop_holder_assembly
+      to: y_axis_assembly.non_production_parts.profile_right
+      alignment: STACK_RIGHT
+      stack_gap:
+        $ref: y_axis_endstop_z_offset
+    - part: y_axis_endstop_holder_assembly.non_production_parts.board
+      to: y_axis_assembly.non_production_parts.rail_right
+      alignment: STACK_BACK
+      stack_gap:
+        $ref: y_axis_endstop_rail_gap
     - part: left_z_axis_profile_assembly
       to: printer_frame_assembly
       alignment: CENTER
@@ -546,7 +571,16 @@ assemblies:
 
   - name: y_axis_assembly
 
+    depends_on:
+      - y_axis_endstop_holder_assembly
+
+  - name: y_axis_endstop_holder_assembly
+
+    resource_file: y_axis_endstop_holder_assembly.yaml
     depends_on: []
+    parameters:
+      up: !Ref y_axis_endstop_up
+      out: !Ref y_axis_endstop_out
 
   - name: x_axis_assembly
 
@@ -619,6 +653,7 @@ assemblies:
       - print_bed_undercarriage_assembly
       - y_axis_drive_assembly
       - y_axis_assembly
+      - y_axis_endstop_holder_assembly
       - y_axis_rail_carrier_brackets_assembly
       - z_axis_assembly
       - x_axis_assembly

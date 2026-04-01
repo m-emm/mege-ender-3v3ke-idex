@@ -55,6 +55,14 @@ Builder:
           - carriages_fused
         name_template: "{name}"
       - source: dependencies
+        assembly: y_axis_endstop_holder_assembly
+        artifact: leader
+        name: y_axis_endstop_holder
+      - source: dependencies
+        assembly: y_axis_endstop_holder_assembly
+        artifact: non_production_parts
+        name_template: "y_axis_endstop_{name}"
+      - source: dependencies
         assembly: y_axis_rail_carrier_brackets_assembly
         artifact: followers
         name_template: "{name}"
