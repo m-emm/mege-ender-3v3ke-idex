@@ -263,15 +263,15 @@ def _create_bracket_for_corner(
             (Alignment.CENTER, frame_front_back_profile, [1], None),
         ],
         [
-            (side_alignment.edge_alignment, top_end_plate, None, 0),
+            (Alignment.CENTER, y_axis_profile, [0], 0),
             (Alignment.CENTER, frame_front_back_profile, [1], None),
         ],
         [
-            (side_alignment.edge_alignment, bracket, None, 0),
+            (Alignment.CENTER, y_axis_profile, [0], 0),
             (front_back_alignment.opposite.edge_alignment, top_end_plate, None, 1),
         ],
         [
-            (side_alignment.edge_alignment, bracket, None, 0),
+            (Alignment.CENTER, y_axis_profile, [0], 0),
             (front_back_alignment.edge_alignment, y_axis_profile, None, 1),
         ],
     ]

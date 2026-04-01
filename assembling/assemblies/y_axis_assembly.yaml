@@ -62,6 +62,11 @@ Builder:
         name: y_axis
       - source: self
         artifact: followers
+        names:
+          - carriage_front_carriage_left
+          - carriage_back_carriage_left
+          - carriage_front_carriage_right
+          - carriage_back_carriage_right
         name_template: "{name}"
         animation:
           bed_y:
@@ -69,10 +74,29 @@ Builder:
             - { $ref: print_bed_y_travel }
             - 0
       - source: self
+        artifact: followers
+        exclude_names:
+          - carriage_front_carriage_left
+          - carriage_back_carriage_left
+          - carriage_front_carriage_right
+          - carriage_back_carriage_right
+        name_template: "{name}"
+      - source: self
         artifact: non_production_parts
         name_template: "{name}"
         exclude_names:
           - carriages_fused
+  Production:
+    parts:
+      - source: self
+        artifact: followers
+        names:
+          - carriage_stopper_left_front
+          - carriage_stopper_left_back
+          - carriage_stopper_right_front
+          - carriage_stopper_right_back
+        name_template: "{name}"
+        flip: true
 
 Parameters:
   y_axis_rail_spacing:
@@ -84,6 +108,16 @@ Parameters:
   y_axis_carriage_spacing:
     Type: Float
   mgn_12ca_carriage_length:
+    Type: Float
+  y_axis_carriage_stopper_length:
+    Type: Float
+  y_axis_carriage_stopper_thickness:
+    Type: Float
+  y_axis_carriage_stopper_fillet_radius:
+    Type: Float
+  y_axis_carriage_stopper_mount_screw_size:
+    Type: String
+  y_axis_carriage_stopper_mount_screw_length:
     Type: Float
 
 Parts:
@@ -103,4 +137,14 @@ Parts:
           $ref: y_axis_carriage_spacing
         mgn_12ca_carriage_length:
           $ref: mgn_12ca_carriage_length
+        y_axis_carriage_stopper_length:
+          $ref: y_axis_carriage_stopper_length
+        y_axis_carriage_stopper_thickness:
+          $ref: y_axis_carriage_stopper_thickness
+        y_axis_carriage_stopper_fillet_radius:
+          $ref: y_axis_carriage_stopper_fillet_radius
+        y_axis_carriage_stopper_mount_screw_size:
+          $ref: y_axis_carriage_stopper_mount_screw_size
+        y_axis_carriage_stopper_mount_screw_length:
+          $ref: y_axis_carriage_stopper_mount_screw_length
         record_metrics: true

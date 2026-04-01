@@ -216,6 +216,11 @@ globals:
   y_axis_rail_carrier_bracket_mount_screw_length: 16
   y_axis_rail_carrier_bracket_mount_screw_size: "M5"
   y_axis_rail_carrier_bracket_mount_screw_inset: 8
+  y_axis_carriage_stopper_length: 18
+  y_axis_carriage_stopper_thickness: 12
+  y_axis_carriage_stopper_fillet_radius: 3
+  y_axis_carriage_stopper_mount_screw_size: "M5"
+  y_axis_carriage_stopper_mount_screw_length: 16
   hotend_diameter: 13.9
   hotend_overall_length: 33
   nozzle_diameter: 6.6
