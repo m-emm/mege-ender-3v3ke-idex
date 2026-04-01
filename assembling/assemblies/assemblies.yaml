@@ -41,7 +41,7 @@ globals:
   tpu_slit_thickness: 0.15
   tpu_slit_clearance: 0.5
   tpu_slit_distance: 1
-  tpu_num_slits: 3    
+  tpu_num_slits: 3
   print_bed_undercarriage_belt_clamp_base_thickness: 5
   print_bed_undercarriage_belt_clamp_clamp_length: 30
   print_bed_undercarriage_belt_clamp_clamp_thickness: 6
@@ -52,7 +52,7 @@ globals:
   print_bed_undercarriage_carriage_mount_plate_x_oversize: 6
   print_bed_undercarriage_carriage_mount_plate_y_oversize: 4
   print_bed_undercarriage_central_annulus_diameter: 90
-  print_bed_undercarriage_dovetail_box_size_y: 5    
+  print_bed_undercarriage_dovetail_box_size_y: 5
   print_bed_undercarriage_dovetail_clearance: 1.1
   print_bed_undercarriage_dovetail_front_clearance: 0.5
   print_bed_undercarriage_dovetail_groove_box_size_x: 20
@@ -126,7 +126,7 @@ globals:
   endcap_tensioner_outer_box_bottom_thickness: 1
   endcap_tensioner_travel: 14
   endcap_top_bottom_wall: 5
-  
+
   endcap_wall: 3.5
   idler_cage_back_wall: 4
   idler_cage_wall: 2
@@ -223,6 +223,13 @@ globals:
   y_axis_endstop_rail_gap: 0
   y_axis_endstop_z_offset: 0
   y_axis_endstop_x_offset: 0
+  endstop_board_holder_mount_eye_thickness: 3
+  endstop_board_holder_mount_eye_length: 30
+  endstop_board_holder_mount_eye_width: 20
+  endstop_board_holder_mount_eye_hole_diameter: 5.5
+  endstop_board_holder_mount_eye_offset: 10
+  endstop_board_holder_mount_eye_fillet_radius: 2
+  endstop_board_holder_mount_eye_num_holes: 2
   y_axis_carriage_stopper_fillet_radius: 3
   y_axis_carriage_stopper_mount_screw_size: "M5"
   y_axis_carriage_stopper_mount_screw_length: 16
@@ -449,7 +456,7 @@ placement:
 
     - part: y_axis_endstop_holder_assembly
       to: y_axis_assembly.non_production_parts.profile_right
-      alignment: CENTER      
+      alignment: CENTER
       post_translation:
         - $ref: y_axis_endstop_x_offset
         - 0
@@ -467,6 +474,11 @@ placement:
       alignment: STACK_BACK
       stack_gap:
         $ref: y_axis_endstop_rail_gap
+    - part: y_axis_endstop_holder_assembly.cutters.mount_eye_hole
+      to: y_axis_assembly.non_production_parts.profile_right
+      alignment: CENTER
+      axes: [2]
+
     - part: left_z_axis_profile_assembly
       to: printer_frame_assembly
       alignment: CENTER
@@ -581,6 +593,13 @@ assemblies:
     parameters:
       up: !Ref y_axis_endstop_up
       out: !Ref y_axis_endstop_out
+      endstop_board_holder_mount_eye_thickness: !Ref endstop_board_holder_mount_eye_thickness
+      endstop_board_holder_mount_eye_length: !Ref endstop_board_holder_mount_eye_length
+      endstop_board_holder_mount_eye_width: !Ref endstop_board_holder_mount_eye_width
+      endstop_board_holder_mount_eye_hole_diameter: !Ref endstop_board_holder_mount_eye_hole_diameter
+      endstop_board_holder_mount_eye_offset: !Ref endstop_board_holder_mount_eye_offset
+      endstop_board_holder_mount_eye_fillet_radius: !Ref endstop_board_holder_mount_eye_fillet_radius
+      endstop_board_holder_mount_eye_num_holes: !Ref endstop_board_holder_mount_eye_num_holes
 
   - name: x_axis_assembly
 

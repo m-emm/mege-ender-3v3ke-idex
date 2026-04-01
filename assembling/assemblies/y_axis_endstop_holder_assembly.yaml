@@ -23,6 +23,20 @@ Parameters:
     Type: Vector
   out:
     Type: Vector
+  endstop_board_holder_mount_eye_thickness:
+    Type: Float
+  endstop_board_holder_mount_eye_length:
+    Type: Float
+  endstop_board_holder_mount_eye_width:
+    Type: Float
+  endstop_board_holder_mount_eye_hole_diameter:
+    Type: Float
+  endstop_board_holder_mount_eye_offset:
+    Type: Float
+  endstop_board_holder_mount_eye_fillet_radius:
+    Type: Float
+  endstop_board_holder_mount_eye_num_holes:
+    Type: Integer
 
 Parts:
   YAxisEndstopHolderAssembly:
@@ -35,3 +49,17 @@ Parts:
           $ref: up
         out:
           $ref: out
+        endstop_board_holder_mount_eye_thickness:
+          $ref: endstop_board_holder_mount_eye_thickness
+        endstop_board_holder_mount_eye_length:
+          $ref: endstop_board_holder_mount_eye_length
+        endstop_board_holder_mount_eye_width:
+          $ref: endstop_board_holder_mount_eye_width
+        endstop_board_holder_mount_eye_hole_diameter:
+          $ref: endstop_board_holder_mount_eye_hole_diameter
+        endstop_board_holder_mount_eye_offset:
+          $ref: endstop_board_holder_mount_eye_offset
+        endstop_board_holder_mount_eye_fillet_radius:
+          $ref: endstop_board_holder_mount_eye_fillet_radius
+        endstop_board_holder_mount_eye_num_holes:
+          $ref: endstop_board_holder_mount_eye_num_holes

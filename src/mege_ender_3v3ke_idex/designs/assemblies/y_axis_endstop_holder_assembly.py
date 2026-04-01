@@ -165,6 +165,13 @@ def create_y_axis_endstop_holder_assembly(
     endstop_board_holder_nut_cutter_slack=DEFAULT_ENDSTOP_BOARD_HOLDER_NUT_CUTTER_SLACK,
     endstop_board_holder_oversize_y=DEFAULT_ENDSTOP_BOARD_HOLDER_OVERSIZE_Y,
     endstop_board_holder_oversize_x=DEFAULT_ENDSTOP_BOARD_HOLDER_OVERSIZE_X,
+    endstop_board_holder_mount_eye_thickness=None,
+    endstop_board_holder_mount_eye_length=None,
+    endstop_board_holder_mount_eye_width=None,
+    endstop_board_holder_mount_eye_hole_diameter=None,
+    endstop_board_holder_mount_eye_offset=None,
+    endstop_board_holder_mount_eye_fillet_radius=None,
+    endstop_board_holder_mount_eye_num_holes=1,
     up=DEFAULT_LOCAL_UP,
     out=DEFAULT_LOCAL_OUT,
     big_thing=BIG_THING,
@@ -246,12 +253,60 @@ def create_y_axis_endstop_holder_assembly(
         nut_cutter = align(nut_cutter, holder, Alignment.BOTTOM)
         holder = holder.cut(nut_cutter)
 
+    mount_eye_hole = None
+
+    if endstop_board_holder_mount_eye_thickness is not None:
+
+        assert (
+            endstop_board_holder_mount_eye_length is not None
+            and endstop_board_holder_mount_eye_width is not None
+            and endstop_board_holder_mount_eye_hole_diameter is not None
+            and endstop_board_holder_mount_eye_offset is not None
+            and endstop_board_holder_mount_eye_fillet_radius is not None
+        ), "If mount eye thickness is specified, all mount eye parameters must be specified."
+        mount_eye = create_filleted_box(
+            endstop_board_holder_mount_eye_width,
+            endstop_board_holder_mount_eye_length,
+            endstop_board_holder_mount_eye_thickness,
+            endstop_board_holder_mount_eye_fillet_radius,
+            no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.FRONT],
+        )
+        mount_eye = align(mount_eye, holder, Alignment.CENTER)
+        mount_eye = align(mount_eye, holder, Alignment.BOTTOM)
+        mount_eye = align(mount_eye, holder, Alignment.STACK_BACK)
+        mount_eye = translate(endstop_board_holder_mount_eye_offset, 0, 0)(mount_eye)
+
+        mount_eye_hole = PartCollector()
+        for i in range(endstop_board_holder_mount_eye_num_holes):
+
+            current_hole = create_cylinder(
+                endstop_board_holder_mount_eye_hole_diameter / 2,
+                big_thing,
+            )
+            current_hole = translate(
+                0,
+                i
+                * (
+                    endstop_board_holder_mount_eye_length
+                    / (endstop_board_holder_mount_eye_num_holes + 0.5)
+                ),
+                0,
+            )(current_hole)
+            mount_eye_hole = mount_eye_hole.fuse(current_hole)
+
+        mount_eye_hole = align(mount_eye_hole, mount_eye, Alignment.CENTER)
+        mount_eye = mount_eye.cut(mount_eye_hole)
+        holder = holder.fuse(mount_eye)
+
     assembly = LeaderFollowersCuttersPart(holder)
     assembly.add_named_follower(holder, "holder")
     assembly.add_named_non_production_part(board.leader, "board")
     for name, non_production_part in board.get_named_non_production_part_items():
         assembly.add_named_non_production_part(non_production_part, name)
     assembly.add_named_non_production_part(board.get_named_follower("tongue"), "tongue")
+
+    if mount_eye_hole is not None:
+        assembly.add_named_cutter(mount_eye_hole, "mount_eye_hole")
 
     transform = coordinate_system_transformation_function(
         origin_a=(0, 0, 0),

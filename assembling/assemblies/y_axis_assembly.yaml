@@ -95,6 +95,22 @@ Builder:
         exclude_names:
           - carriages_fused
   Production:
+    process_data:
+      source: mege_3devops.process_data.mender3.process_data_06_high_speed.PROCESS_DATA_PETGCF_06_HS
+      overrides:
+        process_overrides:
+          brim_type: no_brim
+          enable_support: "1"
+          sparse_infill_density: "30%"
+          support_interface_spacing: "0.8"
+          support_object_first_layer_gap: 0.8
+          support_object_xy_distance: "3.0"
+          support_on_build_plate_only: "1"
+          support_threshold_angle: "30"
+          support_top_z_distance: "0.3"
+          wall_loops: "3"
+          top_shell_layers: "4"
+          bottom_shell_layers: "4"
     parts:
       - source: self
         artifact: followers
@@ -104,12 +120,13 @@ Builder:
           - carriage_stopper_right_front
           - carriage_stopper_right_back
         name_template: "{name}"
-        flip: true
       - source: dependencies
         assembly: y_axis_endstop_holder_assembly
         artifact: leader
         name: y_axis_endstop_holder
         flip: true
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
 
 Parameters:
   y_axis_rail_spacing:
