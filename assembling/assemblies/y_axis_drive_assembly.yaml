@@ -18,6 +18,37 @@ Builder:
       - source: self
         artifact: non_production_parts
         name_template: "{name}"
+  Production:
+    process_data:
+      source: mege_3devops.process_data.mender3.process_data_06_high_speed.PROCESS_DATA_PETGCF_06_HS
+      overrides:
+        process_overrides:
+          brim_type: no_brim
+          enable_support: "1"
+          sparse_infill_density: "30%"
+          support_interface_spacing: "0.8"
+          support_object_first_layer_gap: 0.8
+          support_object_xy_distance: "3.0"
+          support_on_build_plate_only: "1"
+          support_threshold_angle: "30"
+          support_top_z_distance: "0.3"
+          wall_loops: "3"
+          top_shell_layers: "4"
+          bottom_shell_layers: "4"
+    parts:
+      - source: self
+        artifact: leader
+        name: motor_mount_plate
+        prod_rotation_angle: -90
+        prod_rotation_axis: [1, 0, 0]
+      - source: self
+        artifact: followers
+        names:
+          - idler_mount_box
+          - idler_tensioner_cage
+        name_template: "{name}"
+        prod_rotation_angle: 90
+        prod_rotation_axis: [1, 0, 0]
 
 Parameters:
   x_axis_motor_axle_length:

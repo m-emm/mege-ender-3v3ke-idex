@@ -91,6 +91,7 @@ def _create_endstop_board(
     tongue = align(tongue, switch, Alignment.CENTER)
     tongue = align(tongue, switch, Alignment.RIGHT)
     tongue = align(tongue, switch, Alignment.STACK_FRONT)
+    tongue = align(tongue, switch, Alignment.TOP)
 
     for front_back_alignment in [Alignment.FRONT, Alignment.BACK]:
         hole = create_cylinder(endstop_board_hole_diameter / 2, big_thing)

@@ -11,8 +11,8 @@ import copy
 import logging
 import os
 
-from mege_3devops.process_data.mender3.process_data_04_high_speed import (
-    PROCESS_DATA_PETGCF_04_HS,
+from mege_3devops.process_data.mender3.process_data_06_high_speed import (
+    PROCESS_DATA_PETGCF_06_HS,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from shellforgepy.simple import *
@@ -26,13 +26,15 @@ PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 BIG_THING = 500
 
 
-PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_04_HS)
+PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF_06_HS)
 PROCESS_DATA["process_overrides"]["sparse_infill_density"] = "90%"
 
 angle_plate_width = 28
 angle_plate_length = 28
 angle_plate_thickness = 5
 angle_plate_fillet_radius = 3
+
+num_plates = 8
 
 
 def create_angle_plate():
@@ -61,8 +63,16 @@ def main():
 
     # Create the part
 
-    part = create_angle_plate()
-    parts.add(part, "m5_plate", flip=False)
+    side_by_side_spacing = 4
+    num_x = 5
+
+    for i in range(num_plates):
+        part = create_angle_plate()
+
+        x_pos = (i % num_x) * (angle_plate_width + side_by_side_spacing)
+        y_pos = (i // num_x) * (angle_plate_length + side_by_side_spacing)
+        part = translate(x_pos, y_pos, 0)(part)
+        parts.add(part, f"m5_plate_{i+1}", flip=False)
 
     # Arrange and export
     arrange_and_export(

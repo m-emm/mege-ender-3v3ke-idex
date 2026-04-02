@@ -239,12 +239,7 @@ def _create_y_axis_motor_mount(frame_back_profile, belt_reference, cfg):
         cfg.y_axis_drive_motor_plate_depth,
         cfg.motor_mount_plate_thickness,
         cfg.motor_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
-    )
-    motor_mount_plate = _align_part_to_frame_profile_inner_face(
-        motor_mount_plate,
-        frame_back_profile,
-        Alignment.BACK,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.BACK],
     )
 
     pulley = create_gt2_pulley(
@@ -292,7 +287,9 @@ def _create_y_axis_motor_mount(frame_back_profile, belt_reference, cfg):
         Alignment.CENTER,
         axes=[0],
     )
-    profile_mount_plate = align(profile_mount_plate, motor_mount_plate, Alignment.BACK)
+    profile_mount_plate = align(
+        profile_mount_plate, motor_mount_plate, Alignment.STACK_BACK
+    )
     profile_mount_plate = align(
         profile_mount_plate,
         frame_back_profile,
@@ -310,11 +307,17 @@ def _create_y_axis_motor_mount(frame_back_profile, belt_reference, cfg):
     mount_visual_items = list(profile_mount_plate.get_named_non_production_part_items())
     visual_items = motor_visual_items + mount_visual_items + [("motor_pulley", pulley)]
 
-    return LeaderFollowersCuttersPart(
+    retval = LeaderFollowersCuttersPart(
         leader=motor_mount_plate,
         non_production_parts=[part for _, part in visual_items],
         non_production_names=[name for name, _ in visual_items],
     )
+    retval = _align_part_to_frame_profile_inner_face(
+        retval,
+        frame_back_profile,
+        Alignment.BACK,
+    )
+    return retval
 
 
 def _create_y_axis_idler_cage(cfg):
