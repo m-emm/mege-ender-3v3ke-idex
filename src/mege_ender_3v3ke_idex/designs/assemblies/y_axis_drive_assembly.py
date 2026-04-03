@@ -52,6 +52,7 @@ class _DriveConfig:
     y_axis_drive_idler_housing_side_wall: float
     y_axis_drive_idler_housing_front_wall: float
     y_axis_drive_idler_housing_top_wall: float
+    y_axis_drive_idler_housing_top_above_frame_profile: float
     y_axis_drive_idler_cage_top_clearance: float
     y_axis_drive_idler_cage_front_clearance: float
     y_axis_drive_idler_cage_height: float
@@ -434,51 +435,88 @@ def _create_y_axis_idler_mount(frame_front_profile, belt_reference, cfg):
     idler_cage = idler_cage.fuse(front_tensioner_screw_holder)
     idler_cage.add_named_non_production_part(tensioner_screw, "idler_tensioner_screw")
 
+    idler_running_surface = _create_gt2_idler_running_surface_reference(
+        cfg.y_axis_drive_idler_teeth
+    )
+    idler_running_surface = align(
+        idler_running_surface,
+        idler_cage.get_non_production_part_by_name("idler"),
+        Alignment.CENTER,
+    )
+    idler_cage = _align_part_from_belt_contact_surface(
+        idler_cage,
+        idler_running_surface,
+        belt_reference,
+        cfg,
+    )
+
+    idler_cage_bbox = get_bounding_box(idler_cage)
     idler_cage_size = get_bounding_box_size(idler_cage)
+    frame_front_profile_bbox = get_bounding_box(frame_front_profile)
+    housing_inner_bottom_z = idler_cage_bbox[0][2] - cfg.y_axis_drive_idler_clearance
+    housing_bottom_wall_thickness = cfg.y_axis_drive_idler_housing_side_wall
+
+    housing_x_min = idler_cage_bbox[0][0] - cfg.y_axis_drive_idler_housing_side_wall
+    housing_y_min = frame_front_profile_bbox[1][1]
+    housing_z_min = housing_inner_bottom_z - housing_bottom_wall_thickness
+    housing_top_z = (
+        frame_front_profile_bbox[1][2]
+        + cfg.y_axis_drive_idler_housing_top_above_frame_profile
+    )
+
+    outer_box_size_x = idler_cage_size[0] + 2 * cfg.y_axis_drive_idler_housing_side_wall
+    outer_box_size_y = idler_cage_size[1] + cfg.y_axis_drive_idler_housing_front_wall
+    outer_box_size_z = housing_top_z - housing_z_min
+    if outer_box_size_z <= 0:
+        raise ValueError(
+            "y_axis_drive_idler_housing_top_above_frame_profile produces a "
+            f"non-positive housing height ({outer_box_size_z:.2f} mm)"
+        )
 
     outer_box = create_box(
-        idler_cage_size[0] + 2 * cfg.y_axis_drive_idler_housing_side_wall,
-        idler_cage_size[1] + cfg.y_axis_drive_idler_housing_front_wall,
-        cfg.y_axis_drive_profile_mount_plate_height,
+        outer_box_size_x,
+        outer_box_size_y,
+        outer_box_size_z,
+        origin=(housing_x_min, housing_y_min, housing_z_min),
     )
 
     front_wall_ref = create_box(
-        get_bounding_box_size(outer_box)[0],
+        outer_box_size_x,
         cfg.y_axis_drive_idler_housing_front_wall,
-        get_bounding_box_size(outer_box)[2],
+        outer_box_size_z,
+        origin=(housing_x_min, housing_y_min, housing_z_min),
     )
-    front_wall_ref = align(front_wall_ref, outer_box, Alignment.CENTER, axes=[0, 2])
-    front_wall_ref = align(front_wall_ref, outer_box, Alignment.FRONT)
 
-    top_wall_ref = create_box(
-        get_bounding_box_size(outer_box)[0],
-        get_bounding_box_size(outer_box)[1],
-        cfg.y_axis_drive_idler_housing_top_wall,
-    )
-    top_wall_ref = align(top_wall_ref, outer_box, Alignment.CENTER, axes=[0, 1])
-    top_wall_ref = align(top_wall_ref, outer_box, Alignment.TOP)
-
-    idler_cage = align(idler_cage, outer_box, Alignment.CENTER, axes=[0])
     idler_cage = align(
         idler_cage,
         front_wall_ref,
         Alignment.STACK_BACK,
         stack_gap=cfg.y_axis_drive_idler_cage_front_clearance,
     )
-    idler_cage = align(
-        idler_cage,
-        top_wall_ref,
-        Alignment.STACK_BOTTOM,
-        stack_gap=cfg.y_axis_drive_idler_cage_top_clearance,
+    idler_cage_bbox = get_bounding_box(idler_cage)
+    housing_inner_top_z = (
+        idler_cage_bbox[1][2]
+        + cfg.y_axis_drive_idler_clearance
+        + cfg.y_axis_drive_idler_cage_top_clearance
     )
+    housing_top_wall_thickness = housing_top_z - housing_inner_top_z
+    if housing_top_wall_thickness < cfg.y_axis_drive_idler_housing_top_wall:
+        raise ValueError(
+            "y_axis_drive_idler_housing_top_above_frame_profile is too small: "
+            f"derived top wall thickness {housing_top_wall_thickness:.2f} mm "
+            f"is below minimum {cfg.y_axis_drive_idler_housing_top_wall:.2f} mm"
+        )
 
     inner_cutter = create_box(
         idler_cage_size[0] + 2 * cfg.y_axis_drive_idler_clearance,
         cfg.big_thing,
-        idler_cage_size[2] + 2 * cfg.y_axis_drive_idler_clearance,
+        housing_inner_top_z - housing_inner_bottom_z,
+        origin=(
+            idler_cage_bbox[0][0] - cfg.y_axis_drive_idler_clearance,
+            get_bounding_box(front_wall_ref)[1][1],
+            housing_inner_bottom_z,
+        ),
     )
-    inner_cutter = align(inner_cutter, idler_cage, Alignment.CENTER, axes=[0, 2])
-    inner_cutter = align(inner_cutter, front_wall_ref, Alignment.STACK_BACK)
     outer_box = outer_box.cut(inner_cutter)
 
     tensioner_screw = idler_cage.get_non_production_part_by_name(
@@ -540,6 +578,13 @@ def _create_y_axis_idler_mount(frame_front_profile, belt_reference, cfg):
         profile_mount_hole_drills,
         outer_box,
         Alignment.CENTER,
+        axes=[0, 1],
+    )
+    profile_mount_hole_drills = align(
+        profile_mount_hole_drills,
+        frame_front_profile,
+        Alignment.CENTER,
+        axes=[2],
     )
     outer_box = outer_box.cut(profile_mount_hole_drills)
 
@@ -561,26 +606,6 @@ def _create_y_axis_idler_mount(frame_front_profile, belt_reference, cfg):
         ],
     )
 
-    idler_running_surface = _create_gt2_idler_running_surface_reference(
-        cfg.y_axis_drive_idler_teeth
-    )
-    idler_running_surface = align(
-        idler_running_surface,
-        idler_mount.get_non_production_part_by_name("idler"),
-        Alignment.CENTER,
-    )
-    idler_mount = _align_part_from_belt_contact_surface(
-        idler_mount,
-        idler_running_surface,
-        belt_reference,
-        cfg,
-    )
-    idler_mount = _align_part_to_frame_profile_inner_face(
-        idler_mount,
-        frame_front_profile,
-        Alignment.FRONT,
-    )
-
     idler_profile_mount_plate = _create_y_axis_profile_mount_plate(cfg).prefixed_copy(
         "idler"
     )
@@ -596,8 +621,8 @@ def _create_y_axis_idler_mount(frame_front_profile, belt_reference, cfg):
     )
     idler_profile_mount_plate = align(
         idler_profile_mount_plate,
-        idler_mount,
-        Alignment.FRONT,
+        frame_front_profile,
+        Alignment.STACK_BACK,
     )
     idler_profile_mount_plate = align(
         idler_profile_mount_plate,
@@ -697,6 +722,7 @@ def create_y_axis_drive_assembly(
     y_axis_drive_idler_housing_side_wall,
     y_axis_drive_idler_housing_front_wall,
     y_axis_drive_idler_housing_top_wall,
+    y_axis_drive_idler_housing_top_above_frame_profile,
     y_axis_drive_idler_cage_top_clearance,
     y_axis_drive_idler_cage_front_clearance,
     y_axis_drive_idler_cage_height,
@@ -746,6 +772,7 @@ def create_y_axis_drive_assembly(
         y_axis_drive_idler_housing_side_wall=y_axis_drive_idler_housing_side_wall,
         y_axis_drive_idler_housing_front_wall=y_axis_drive_idler_housing_front_wall,
         y_axis_drive_idler_housing_top_wall=y_axis_drive_idler_housing_top_wall,
+        y_axis_drive_idler_housing_top_above_frame_profile=y_axis_drive_idler_housing_top_above_frame_profile,
         y_axis_drive_idler_cage_top_clearance=y_axis_drive_idler_cage_top_clearance,
         y_axis_drive_idler_cage_front_clearance=y_axis_drive_idler_cage_front_clearance,
         y_axis_drive_idler_cage_height=y_axis_drive_idler_cage_height,

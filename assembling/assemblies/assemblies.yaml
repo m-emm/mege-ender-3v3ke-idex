@@ -196,6 +196,7 @@ globals:
   y_axis_drive_idler_housing_side_wall: 3.5
   y_axis_drive_idler_housing_front_wall: 10
   y_axis_drive_idler_housing_top_wall: 2
+  y_axis_drive_idler_housing_top_above_frame_profile: 10
   y_axis_drive_idler_cage_top_clearance: 0.0
   y_axis_drive_idler_cage_front_clearance: 0.5
   y_axis_drive_idler_cage_height: 23
@@ -208,7 +209,7 @@ globals:
   y_axis_drive_idler_cage_back_wall: 4
   y_axis_drive_idler_tensioner_screw_length: 25
   y_axis_drive_idler_tensioner_screw_nut_wall: 3.5
-  y_axis_drive_idler_tensioner_guide_clearance: 1
+  y_axis_drive_idler_tensioner_guide_clearance: 0.8
   y_axis_drive_idler_axle_screw_length: 20
   y_axis_drive_tensioner_screw_size: "M4"
   y_axis_drive_use_toothed_belt_visuals: false

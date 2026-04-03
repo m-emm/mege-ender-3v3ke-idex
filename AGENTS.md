@@ -148,7 +148,7 @@ arrange_and_export(
 - Use `PartCollector` for accumulating multiple parts before fusing
 - Prefer assembly manifests plus builder configuration for composition, export, and visualization
 - Use `LeaderFollowersCuttersPart` for complex assemblies with visual references and stable named artifacts
-- Align parts relative to each other using the `align()` function with `Alignment` enums
+- Align parts relative to each other using the `align()` function with `Alignment` enums; do not use align_translation, unless absolutely necessary to move multiple parts together
 - For symmetric corner hardware, prefer a nested `left/right` x `front/back` loop over copy-pasted per-corner code. Use an outer loop like `("left", Alignment.LEFT)` / `("right", Alignment.RIGHT)` and an inner loop over `Alignment.FRONT` and `Alignment.BACK`; then derive placement from `side_alignment.opposite.stack_alignment`, `front_back_alignment.stack_alignment`, and `front_back_alignment.opposite` instead of manual sign math.
 - Prefer named `followers` / `non_production_parts` that are easy to reference from YAML `Builder.Visualization.parts` and `Builder.Production.parts`
 - Prefer wiring process data, production flips, rotations, prototype selections, and plate arrangement in YAML instead of embedding that export logic in Python

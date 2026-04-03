@@ -65,6 +65,16 @@ Builder:
           wall_loops: "3"
           top_shell_layers: "4"
           bottom_shell_layers: "4"
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: motor_mount
+          parts:
+            - motor_mount_plate
+        - name: idler_mount
+          parts:
+            - idler_mount_box
+            - idler_tensioner_cage
     parts:
       - source: self
         artifact: leader
@@ -130,6 +140,8 @@ Parameters:
   y_axis_drive_idler_housing_front_wall:
     Type: Float
   y_axis_drive_idler_housing_top_wall:
+    Type: Float
+  y_axis_drive_idler_housing_top_above_frame_profile:
     Type: Float
   y_axis_drive_idler_cage_top_clearance:
     Type: Float
@@ -229,6 +241,8 @@ Parts:
           $ref: y_axis_drive_idler_housing_front_wall
         y_axis_drive_idler_housing_top_wall:
           $ref: y_axis_drive_idler_housing_top_wall
+        y_axis_drive_idler_housing_top_above_frame_profile:
+          $ref: y_axis_drive_idler_housing_top_above_frame_profile
         y_axis_drive_idler_cage_top_clearance:
           $ref: y_axis_drive_idler_cage_top_clearance
         y_axis_drive_idler_cage_front_clearance:
