@@ -14,9 +14,39 @@ Builder:
         name: motor_mount_plate
       - source: self
         artifact: followers
+        names:
+          - idler_tensioner_cage
+        name_template: "{name}"
+        animation:
+          y_axis_drive_tensioner:
+            - 0
+            - { $ref: y_axis_drive_tensioner_travel }
+            - 0
+      - source: self
+        artifact: followers
+        exclude_names:
+          - idler_tensioner_cage
         name_template: "{name}"
       - source: self
         artifact: non_production_parts
+        names:
+          - idler
+          - idler_axle_screw
+          - idler_axle_threaded_inset
+          - idler_tensioner_screw
+        name_template: "{name}"
+        animation:
+          y_axis_drive_tensioner:
+            - 0
+            - { $ref: y_axis_drive_tensioner_travel }
+            - 0
+      - source: self
+        artifact: non_production_parts
+        exclude_names:
+          - idler
+          - idler_axle_screw
+          - idler_axle_threaded_inset
+          - idler_tensioner_screw
         name_template: "{name}"
   Production:
     process_data:
@@ -131,6 +161,8 @@ Parameters:
     Type: Float
   y_axis_drive_tensioner_screw_size:
     Type: String
+  y_axis_drive_tensioner_travel:
+    Type: Float
   y_axis_drive_use_toothed_belt_visuals:
     Type: Boolean
   y_axis_drive_tensioner_screw_z_offset:

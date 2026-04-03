@@ -208,10 +208,11 @@ globals:
   y_axis_drive_idler_cage_back_wall: 4
   y_axis_drive_idler_tensioner_screw_length: 25
   y_axis_drive_idler_tensioner_screw_nut_wall: 3.5
-  y_axis_drive_idler_tensioner_guide_clearance: 0.2
+  y_axis_drive_idler_tensioner_guide_clearance: 1
   y_axis_drive_idler_axle_screw_length: 20
   y_axis_drive_tensioner_screw_size: "M4"
   y_axis_drive_use_toothed_belt_visuals: false
+  y_axis_drive_tensioner_travel: 25
   y_axis_drive_tensioner_screw_z_offset: 3.5
   y_axis_rail_carrier_bracket_outer_diameter: 95
   y_axis_rail_carrier_bracket_height: 40

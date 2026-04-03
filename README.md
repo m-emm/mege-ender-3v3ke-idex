@@ -11,6 +11,20 @@ Status: work in progress—early infrastructure parts only; detailed content and
 ## Quick Start
 - Install for development: `pip install -e ".[testing]"`
 - Run design scripts from the repo root with `./run.sh <path/to/script.py>`; exports land in `runs/<timestamp>/`.
+- Prefer the builder workflow for assemblies: `python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly <assembly_name> --visualize`
+
+## Assembly Builder
+- Use `assembling/assemblies/assemblies.yaml` as the top-level builder entrypoint.
+- Prefer per-assembly `*_assembly.yaml` manifests over directly running the Python generator when the assembly already exists in the builder graph.
+- Production slicing runs can be launched directly from the CLI, including opening the slicer UI for inspection.
+
+Example production run for the print bed undercarriage adjustment wheel plate:
+
+```bash
+( cd /Users/mege/git/mege-ender-3v3ke-idex ; python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly print_bed_undercarriage_assembly --production --slice --visualize --open --plate adjustment_wheel_single )
+```
+
+This builds the `print_bed_undercarriage_assembly`, selects the `adjustment_wheel_single` production plate, slices it, visualizes it, and opens the slicer GUI.
 
 ## Demos
 - **Extrusion profile (T-slot) demo:** build 2020/4040 profiles with aligned T-slot cutters  

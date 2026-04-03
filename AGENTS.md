@@ -2,6 +2,13 @@
 
 This repository (`mege-ender-3v3ke-idex`) contains ShellForgePy-based designs for an IDEX (Independent Dual Extruder) conversion of the Creality Ender 3V3 KE 3D printer. The project focuses on creating printable mechanical parts, mounts, frames, and hardware interfaces for the dual-extruder modification.
 
+The current preferred workflow in this repo is assembly-first. Treat the declarative assembly builder stack as the default entrypoint for new work:
+- Define or update an `assembling/assemblies/*_assembly.yaml` file for the assembly contract, dependencies, visualization output, production output, and process data
+- Wire global parameters and top-level composition through `assembling/assemblies/assemblies.yaml`
+- Keep Python geometry in `src/mege_ender_3v3ke_idex/designs/assemblies/*.py` as the generator implementation behind the assembly manifest
+
+Prefer this latest assembly-style geometry assembling over older standalone design-script-only workflows whenever possible.
+
 ## Project Overview
 
 This is a hardware design project that uses ShellForgePy to create parametric 3D models for:
@@ -18,7 +25,39 @@ This project follows ShellForgePy best practices. For comprehensive guidance on 
 
 ### Key Patterns Used in This Project
 
-#### 1. Composite Parts with LeaderFollowersCuttersPart
+#### 1. Assembly-First Builder Workflow
+
+Prefer the latest builder-driven assembly pattern for new geometry and refactors:
+
+```yaml
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: main_part
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+```
+
+- `assembling/assemblies/*_assembly.yaml` is the authoritative place for assembly structure
+- Use the `Builder` section to describe visualization and production behavior instead of hard-coding export layout in Python
+- Use `assemblies.yaml` for globals, shared parameters, and high-level assembly composition
+- Treat the Python generator as geometry implementation, not as the primary assembly definition
+
+When adding a new assembly, create both:
+- a generator in `src/mege_ender_3v3ke_idex/designs/assemblies/<name>.py`
+- a matching manifest in `assembling/assemblies/<name>.yaml`
+
+The generator should return assembly-friendly artifacts with stable names so the builder can select `leader`, `followers`, and `non_production_parts` cleanly.
+
+#### 2. Composite Parts with LeaderFollowersCuttersPart
 
 Complex assemblies use `LeaderFollowersCuttersPart` to manage printable parts, visual references, and cutting tools:
 
@@ -38,7 +77,9 @@ mount_plate = x_axis.get_follower_part_by_name("mount_plate")
 motor_visual = x_axis.get_non_production_part_by_name("motor_left")
 ```
 
-#### 2. Parameterized Design
+This pattern is especially important for the declarative builder, because production and visualization manifests frequently address parts by follower or non-production name.
+
+#### 3. Parameterized Design
 
 All dimensions are defined as module-level constants for easy tuning:
 
@@ -50,7 +91,7 @@ idler_gap = 2
 # ... etc.
 ```
 
-#### 3. Mechanical Hardware Integration
+#### 4. Mechanical Hardware Integration
 
 The project uses mechanical screws and fasteners:
 
@@ -68,7 +109,7 @@ thread_inset_cutter = create_cylinder(
 )
 ```
 
-#### 4. Process Data and Slicer Integration
+#### 5. Process Data and Slicer Integration
 
 Production parts include detailed slicer configuration via `mege_3devops.process_data`:
 
@@ -105,16 +146,20 @@ arrange_and_export(
 ### Design Patterns
 - Separate reusable components into their own functions (e.g., `create_motor_with_mount()`, `create_idler_cage()`)
 - Use `PartCollector` for accumulating multiple parts before fusing
-- Use `LeaderFollowersCuttersPart` for complex assemblies with visual references
+- Prefer assembly manifests plus builder configuration for composition, export, and visualization
+- Use `LeaderFollowersCuttersPart` for complex assemblies with visual references and stable named artifacts
 - Align parts relative to each other using the `align()` function with `Alignment` enums
 - For symmetric corner hardware, prefer a nested `left/right` x `front/back` loop over copy-pasted per-corner code. Use an outer loop like `("left", Alignment.LEFT)` / `("right", Alignment.RIGHT)` and an inner loop over `Alignment.FRONT` and `Alignment.BACK`; then derive placement from `side_alignment.opposite.stack_alignment`, `front_back_alignment.stack_alignment`, and `front_back_alignment.opposite` instead of manual sign math.
-
+- Prefer named `followers` / `non_production_parts` that are easy to reference from YAML `Builder.Visualization.parts` and `Builder.Production.parts`
+- Prefer wiring process data, production flips, rotations, prototype selections, and plate arrangement in YAML instead of embedding that export logic in Python
 
 ### Avoid
 - Do not use `collector.part` directly - treat collectors as parts themselves
 - Do use as little translation offset calculations as possible - use align(), align(part, target, Alignment.STACK_RIGHT,stack_gap=-move_into_part) .. patterns wherever possible
 - Do not catch exceptions - let scripts fail fast on geometry errors
 - Do not create ad-hoc test scripts - write proper pytest tests
+- Do not introduce new standalone export-oriented geometry scripts when the work belongs in the builder-based assembly system
+- Do not duplicate assembly structure in Python when the same concern belongs in `*_assembly.yaml`
 
 ## Testing
 
@@ -237,7 +282,28 @@ python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly wh
 
 # Rebuild just the print bed assembly and export the geometry artifacts
 python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly print_bed_assembly --visualize
+
+# Production run for one selected plate, including slicing
+python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly print_bed_undercarriage_assembly --production --slice --visualize --plate adjustment_wheel_single
 ```
+
+Prefer these builder commands over directly running a Python generator whenever the target geometry already exists as an assembly manifest.
+
+For assembly-related code changes, coding agents should prefer verification runs through `python -m shellforgepy build ...` instead of only running the generator module directly. Use `--production --slice` when the change affects production output, plate arrangement, process data, or slicer-facing geometry.
+
+Do not use `--open` in routine agent verification runs. Reserve `--open` for interactive user-requested slicer GUI sessions. The user-facing equivalent is:
+
+```bash
+python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly print_bed_undercarriage_assembly --production --slice --visualize --open --plate adjustment_wheel_single
+```
+
+### Assembly File Roles
+
+- `assembling/assemblies/assemblies.yaml` is the top-level builder input with globals, shared dimensions, and assembly graph wiring
+- `assembling/assemblies/*_assembly.yaml` defines one assembly's parameters, generator mapping, dependencies, visualization parts, production parts, arrangement, and process data
+- `src/mege_ender_3v3ke_idex/designs/assemblies/*.py` implements the geometry generator referenced by the YAML manifest
+
+For repo work, prefer editing the assembly YAML and builder configuration first, then adjust the Python generator only where geometry must change.
 
 ### Typical Design Workflow
 
