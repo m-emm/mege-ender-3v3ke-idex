@@ -652,13 +652,31 @@ assemblies:
     parameters:
       side: right
 
+  - name: left_z_axis_rods_assembly
+
+    resource_file: z_axis_rods_assembly.yaml
+    depends_on:
+      - left_z_axis_profile_assembly
+    inject_parts:
+      z_axis_profile: left_z_axis_profile_assembly
+
+  - name: right_z_axis_rods_assembly
+
+    resource_file: z_axis_rods_assembly.yaml
+    depends_on:
+      - right_z_axis_profile_assembly
+    inject_parts:
+      z_axis_profile: right_z_axis_profile_assembly
+
   - name: left_z_axis_assembly
 
     resource_file: z_axis_side_assembly.yaml
     depends_on:
       - left_z_axis_profile_assembly
+      - left_z_axis_rods_assembly
     inject_parts:
       z_axis_profile: left_z_axis_profile_assembly
+      z_axis_rods: left_z_axis_rods_assembly
     parameters:
       side: left
 
@@ -667,8 +685,10 @@ assemblies:
     resource_file: z_axis_side_assembly.yaml
     depends_on:
       - right_z_axis_profile_assembly
+      - right_z_axis_rods_assembly
     inject_parts:
       z_axis_profile: right_z_axis_profile_assembly
+      z_axis_rods: right_z_axis_rods_assembly
     parameters:
       side: right
 

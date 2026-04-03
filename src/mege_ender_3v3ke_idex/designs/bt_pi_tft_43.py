@@ -63,13 +63,69 @@ tft_screen_clearance = 0.5
 tft_button_2_offset = 26
 tft_button_1_offset = 13.7
 
-raspi_width = 55.6
+raspi_width = 56
 raspi_flight_height = 24
 raspi_inward_offset = 10
 raspi_connections_height = 17.2
 
-raspi_board_length = 84.88
+raspi_board_length = 85
+raspi_board_width = raspi_width
+raspi_board_corner_radius = 3
+raspi_board_thickness = 1.3
+raspi_screw_hole_diameter = 2.75
+raspi_screw_hole_distance = 58
+raspi_screw_hole_x_inset = 3.5
+raspi_screw_hole_y_inset = raspi_board_corner_radius
+
+raspi_network_dist = 10.25
+raspi_network_width = 16
+raspi_network_length = 21.3
+raspi_network_height = 13.6
+
+raspi_usb_1_dist = 29
+raspi_usb_2_dist = 47
+raspi_usb_width = 13.3
+raspi_usb_length = 17.3
+raspi_usb_height = 15.44
+
 raspi_connectors_oversize = 1
+raspi_connector_overstand = 1.6
+
+raspi_micro_usb_dist = 10.6
+raspi_micro_usb_width = 8.07
+raspi_micro_usb_length = 5.75
+raspi_micro_usb_height = 3.1
+raspi_micro_usb_overstand = 1
+
+raspi_hdmi_width = 15.1
+raspi_hdmi_height = 7
+raspi_hdmi_length = 12
+raspi_hdmi_overstand = 1
+raspi_hdmi_dist = 32
+
+raspi_jack_diameter = 6
+raspi_jack_dist = 53.5
+raspi_jack_length_cylinder = 2.6
+raspi_jack_length_cube = 12.7
+
+raspi_gpio_dist_y = 3.5 + 49
+raspi_gpio_dist_x = 3.5 + 29
+raspi_gpio_num_pins_x = 20
+raspi_gpio_num_pins_y = 2
+raspi_gpio_pin_pitch = 2.54
+raspi_gpio_pin_size = raspi_gpio_pin_pitch / 4
+raspi_gpio_pin_length = 7
+
+raspi_microsd_socket_width = 13.1
+raspi_microsd_socket_height = 1.3
+raspi_microsd_socket_length = 14.35
+raspi_microsd_thickness = 1.05
+raspi_microsd_width = 11.1
+raspi_microsd_overstand = 2.8
+
+raspi_pcb_color = (0.16, 0.42, 0.16)
+raspi_connector_color = (0.92, 0.93, 0.94)
+raspi_visualization_gap = 20
 
 tft_housing_wall_thickness = 2.4
 tft_housing_border = 20
@@ -399,26 +455,149 @@ def create_housing(tft):
     return housing
 
 
-def create_bt_pi_tft_43():
-    """Create the bt_pi_tft_43 part."""
-    # Example: simple box with a cylindrical hole
-    width = 30
-    depth = 20
-    height = 10
-    hole_radius = 4
+def create_raspi_board():
 
-    # Create base box
-    part = create_box(width, depth, height)
+    board = create_filleted_box(
+        raspi_board_length,
+        raspi_board_width,
+        raspi_board_thickness,
+        fillet_radius=raspi_board_corner_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+    )
 
-    # Create a hole cutter
-    hole = create_cylinder(hole_radius, height + 2)
-    hole = align(hole, part, Alignment.CENTER)
-    hole = translate(0, 0, -1)(hole)
+    for hole_x in [
+        raspi_screw_hole_x_inset,
+        raspi_screw_hole_x_inset + raspi_screw_hole_distance,
+    ]:
+        for hole_y in [
+            raspi_screw_hole_y_inset,
+            raspi_board_width - raspi_screw_hole_y_inset,
+        ]:
+            hole = create_cylinder(raspi_screw_hole_diameter / 2, BIG_THING)
+            hole = translate(hole_x, hole_y, -BIG_THING / 2)(hole)
+            board = board.cut(hole)
 
-    # Cut the hole
-    part = part.cut(hole)
+    return board
 
-    return part
+
+def create_raspi_gpio():
+
+    gpio = PartCollector()
+    for pin_x in range(raspi_gpio_num_pins_x):
+        for pin_y in range(raspi_gpio_num_pins_y):
+            pin = create_box(
+                raspi_gpio_pin_size,
+                raspi_gpio_pin_size,
+                raspi_gpio_pin_length,
+            )
+            pin = translate(
+                raspi_gpio_dist_x
+                + pin_x * raspi_gpio_pin_pitch
+                - (raspi_gpio_num_pins_x - 1) * raspi_gpio_pin_pitch / 2
+                - raspi_gpio_pin_size / 2,
+                raspi_gpio_dist_y
+                + pin_y * raspi_gpio_pin_pitch
+                - (raspi_gpio_num_pins_y - 1) * raspi_gpio_pin_pitch / 2
+                - raspi_gpio_pin_size / 2,
+                raspi_board_thickness,
+            )(pin)
+            gpio = gpio.fuse(pin)
+
+    return gpio
+
+
+def create_raspi_connectors():
+
+    connectors = PartCollector()
+
+    network = create_box(
+        raspi_network_length,
+        raspi_network_width,
+        raspi_network_height,
+    )
+    network = translate(
+        raspi_board_length - raspi_network_length + raspi_connector_overstand,
+        raspi_network_dist - raspi_network_width / 2,
+        raspi_board_thickness,
+    )(network)
+    connectors = connectors.fuse(network)
+
+    for usb_dist in [raspi_usb_1_dist, raspi_usb_2_dist]:
+        usb = create_box(raspi_usb_length, raspi_usb_width, raspi_usb_height)
+        usb = translate(
+            raspi_board_length - raspi_usb_length + raspi_connector_overstand,
+            usb_dist - raspi_usb_width / 2,
+            raspi_board_thickness,
+        )(usb)
+        connectors = connectors.fuse(usb)
+
+    micro_usb = create_box(
+        raspi_micro_usb_width,
+        raspi_micro_usb_length,
+        raspi_micro_usb_height,
+    )
+    micro_usb = translate(
+        raspi_micro_usb_dist - raspi_micro_usb_width / 2,
+        -raspi_micro_usb_overstand,
+        raspi_board_thickness,
+    )(micro_usb)
+    connectors = connectors.fuse(micro_usb)
+
+    hdmi = create_box(raspi_hdmi_width, raspi_hdmi_length, raspi_hdmi_height)
+    hdmi = translate(
+        raspi_hdmi_dist - raspi_hdmi_width / 2,
+        -raspi_hdmi_overstand,
+        raspi_board_thickness,
+    )(hdmi)
+    connectors = connectors.fuse(hdmi)
+
+    jack = create_box(
+        raspi_jack_diameter,
+        raspi_jack_length_cube,
+        raspi_jack_diameter,
+    )
+    jack = translate(
+        raspi_jack_dist - raspi_jack_diameter / 2,
+        -raspi_jack_length_cylinder,
+        raspi_board_thickness,
+    )(jack)
+    connectors = connectors.fuse(jack)
+
+    microsd_socket = create_box(
+        raspi_microsd_socket_length,
+        raspi_microsd_socket_width,
+        raspi_microsd_socket_height,
+    )
+    microsd_socket = translate(
+        0,
+        raspi_board_width / 2 - raspi_microsd_socket_width / 2,
+        -raspi_microsd_socket_height,
+    )(microsd_socket)
+    connectors = connectors.fuse(microsd_socket)
+
+    microsd_card = create_box(
+        raspi_microsd_overstand,
+        raspi_microsd_width,
+        raspi_microsd_thickness,
+    )
+    microsd_card = translate(
+        -raspi_microsd_overstand,
+        raspi_board_width / 2 - raspi_microsd_width / 2,
+        -(raspi_microsd_socket_height + raspi_microsd_thickness) / 2,
+    )(microsd_card)
+    connectors = connectors.fuse(microsd_card)
+
+    connectors = connectors.fuse(create_raspi_gpio())
+
+    return connectors
+
+
+def create_raspi_visualization():
+
+    raspi_board = create_raspi_board()
+    raspi_connectors = create_raspi_connectors()
+
+    return raspi_board, raspi_connectors
 
 
 def main():
@@ -426,10 +605,10 @@ def main():
     parts = PartList()
 
     # Create the part
-    part = creaate_tft()
-    parts.add(part, "bt_pi_tft_43", flip=False, skip_in_production=True)
+    tft = creaate_tft()
+    parts.add(tft, "bt_pi_tft_43", flip=False, skip_in_production=True)
 
-    housing = create_housing(part)
+    housing = create_housing(tft)
 
     housing_real_height_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
     housing_real_height_cutter = align(
@@ -447,6 +626,43 @@ def main():
         housing,
         "bt_pi_tft_43_housing",
         flip=True,
+    )
+
+    raspi_board, raspi_connectors = create_raspi_visualization()
+    raspi_visual = raspi_board.fuse(raspi_connectors)
+
+    move_raspi_to_side = align_translation(
+        raspi_visual,
+        housing,
+        Alignment.STACK_RIGHT,
+        stack_gap=raspi_visualization_gap,
+    )
+    raspi_visual = move_raspi_to_side(raspi_visual)
+    raspi_board = move_raspi_to_side(raspi_board)
+    raspi_connectors = move_raspi_to_side(raspi_connectors)
+
+    move_raspi_to_center = align_translation(
+        raspi_visual,
+        housing,
+        Alignment.CENTER,
+        axes=[1, 2],
+    )
+    raspi_board = move_raspi_to_center(raspi_board)
+    raspi_connectors = move_raspi_to_center(raspi_connectors)
+
+    parts.add(
+        raspi_board,
+        "raspi_board",
+        flip=False,
+        skip_in_production=True,
+        color=raspi_pcb_color,
+    )
+    parts.add(
+        raspi_connectors,
+        "raspi_connectors",
+        flip=False,
+        skip_in_production=True,
+        color=raspi_connector_color,
     )
 
     # parts.add(housing, "bt_pi_tft_43_housing", flip=True)
