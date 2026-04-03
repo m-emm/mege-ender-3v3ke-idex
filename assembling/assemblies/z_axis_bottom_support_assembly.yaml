@@ -1,0 +1,31 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for one z-axis lower support stack
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: pillow_bearing_mount_plate
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+  Production:
+    parts:
+      - source: self
+        artifact: leader
+        name: pillow_bearing_mount_plate
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+
+Parts:
+  ZAxisBottomSupportAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_bottom_support_assembly.create_z_axis_bottom_support_assembly

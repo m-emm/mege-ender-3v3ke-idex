@@ -668,9 +668,29 @@ assemblies:
     inject_parts:
       z_axis_profile: right_z_axis_profile_assembly
 
-  - name: left_z_axis_assembly
+  - name: left_z_axis_bottom_support_assembly
 
-    resource_file: z_axis_side_assembly.yaml
+    resource_file: z_axis_bottom_support_assembly.yaml
+    depends_on:
+      - left_z_axis_profile_assembly
+      - left_z_axis_rods_assembly
+    inject_parts:
+      z_axis_profile: left_z_axis_profile_assembly
+      z_axis_rods: left_z_axis_rods_assembly
+
+  - name: right_z_axis_bottom_support_assembly
+
+    resource_file: z_axis_bottom_support_assembly.yaml
+    depends_on:
+      - right_z_axis_profile_assembly
+      - right_z_axis_rods_assembly
+    inject_parts:
+      z_axis_profile: right_z_axis_profile_assembly
+      z_axis_rods: right_z_axis_rods_assembly
+
+  - name: left_z_axis_motor_mount_assembly
+
+    resource_file: z_axis_motor_mount_assembly.yaml
     depends_on:
       - left_z_axis_profile_assembly
       - left_z_axis_rods_assembly
@@ -680,9 +700,9 @@ assemblies:
     parameters:
       side: left
 
-  - name: right_z_axis_assembly
+  - name: right_z_axis_motor_mount_assembly
 
-    resource_file: z_axis_side_assembly.yaml
+    resource_file: z_axis_motor_mount_assembly.yaml
     depends_on:
       - right_z_axis_profile_assembly
       - right_z_axis_rods_assembly
@@ -691,6 +711,34 @@ assemblies:
       z_axis_rods: right_z_axis_rods_assembly
     parameters:
       side: right
+
+  - name: left_z_axis_assembly
+
+    resource_file: z_axis_side_assembly.yaml
+    depends_on:
+      - left_z_axis_profile_assembly
+      - left_z_axis_rods_assembly
+      - left_z_axis_bottom_support_assembly
+      - left_z_axis_motor_mount_assembly
+    inject_parts:
+      z_axis_profile: left_z_axis_profile_assembly
+      z_axis_rods: left_z_axis_rods_assembly
+      z_axis_bottom_support: left_z_axis_bottom_support_assembly
+      z_axis_motor_mount: left_z_axis_motor_mount_assembly
+
+  - name: right_z_axis_assembly
+
+    resource_file: z_axis_side_assembly.yaml
+    depends_on:
+      - right_z_axis_profile_assembly
+      - right_z_axis_rods_assembly
+      - right_z_axis_bottom_support_assembly
+      - right_z_axis_motor_mount_assembly
+    inject_parts:
+      z_axis_profile: right_z_axis_profile_assembly
+      z_axis_rods: right_z_axis_rods_assembly
+      z_axis_bottom_support: right_z_axis_bottom_support_assembly
+      z_axis_motor_mount: right_z_axis_motor_mount_assembly
 
   - name: whole_printer_assembly
 

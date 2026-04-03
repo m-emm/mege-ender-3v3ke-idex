@@ -25,8 +25,6 @@ Builder:
         name_template: "{name}"
 
 Parameters:
-  side:
-    Type: String
   carriage_z_offset:
     Type: Float
   z_axis_base_z_offset:
@@ -39,8 +37,6 @@ Parts:
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_side_assembly.create_z_axis_side_assembly
       Properties:
-        side:
-          $ref: side
         carriage_z_offset:
           $ref: carriage_z_offset
         z_axis_base_z_offset:

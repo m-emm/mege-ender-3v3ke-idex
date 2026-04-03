@@ -18,6 +18,13 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
     PROCESS_DATA_PLACF_04_HS,
 )
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
+from mege_ender_3v3ke_idex.designs.sil_dil import (
+    create_dil,
+    dil_pitch,
+    top_pin_length,
+    wire_wrap_pin_base_thickness,
+    wire_wrap_pin_side,
+)
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -110,11 +117,13 @@ raspi_jack_length_cube = 12.7
 
 raspi_gpio_dist_y = 3.5 + 49
 raspi_gpio_dist_x = 3.5 + 29
-raspi_gpio_num_pins_x = 20
-raspi_gpio_num_pins_y = 2
-raspi_gpio_pin_pitch = 2.54
-raspi_gpio_pin_size = raspi_gpio_pin_pitch / 4
+raspi_gpio_num_pins_per_row = 20
+raspi_gpio_inner_x_distance_in_pins = 1
+raspi_gpio_pin_pitch = dil_pitch
+raspi_gpio_pin_side = wire_wrap_pin_side
 raspi_gpio_pin_length = 7
+raspi_gpio_base_thickness = wire_wrap_pin_base_thickness
+raspi_gpio_top_pin_length = top_pin_length
 
 raspi_microsd_socket_width = 13.1
 raspi_microsd_socket_height = 1.3
@@ -123,8 +132,10 @@ raspi_microsd_thickness = 1.05
 raspi_microsd_width = 11.1
 raspi_microsd_overstand = 2.8
 
-raspi_pcb_color = (0.16, 0.42, 0.16)
-raspi_connector_color = (0.92, 0.93, 0.94)
+tft_visual_color = (0.82, 0.88, 0.92)
+tft_housing_visual_color = (0.9, 0.9, 0.86)
+raspi_pcb_color = (0.52, 0.78, 0.56)
+raspi_connector_color = (0.96, 0.97, 0.97)
 raspi_visualization_gap = 20
 
 tft_housing_wall_thickness = 2.4
@@ -482,26 +493,24 @@ def create_raspi_board():
 
 def create_raspi_gpio():
 
-    gpio = PartCollector()
-    for pin_x in range(raspi_gpio_num_pins_x):
-        for pin_y in range(raspi_gpio_num_pins_y):
-            pin = create_box(
-                raspi_gpio_pin_size,
-                raspi_gpio_pin_size,
-                raspi_gpio_pin_length,
-            )
-            pin = translate(
-                raspi_gpio_dist_x
-                + pin_x * raspi_gpio_pin_pitch
-                - (raspi_gpio_num_pins_x - 1) * raspi_gpio_pin_pitch / 2
-                - raspi_gpio_pin_size / 2,
-                raspi_gpio_dist_y
-                + pin_y * raspi_gpio_pin_pitch
-                - (raspi_gpio_num_pins_y - 1) * raspi_gpio_pin_pitch / 2
-                - raspi_gpio_pin_size / 2,
-                raspi_board_thickness,
-            )(pin)
-            gpio = gpio.fuse(pin)
+    gpio = create_dil(
+        raspi_gpio_inner_x_distance_in_pins,
+        raspi_gpio_num_pins_per_row,
+        pin_length=raspi_gpio_pin_length,
+        pin_side=raspi_gpio_pin_side,
+        top_pin_length=raspi_gpio_top_pin_length,
+        base_thickness=raspi_gpio_base_thickness,
+    )
+    gpio = gpio.leaders_followers_fused()
+    gpio = rotate(180, axis=(0, 1, 0))(gpio)
+    gpio = rotate(-90, axis=(0, 0, 1))(gpio)
+
+    gpio_center = np.array(get_bounding_box_center(gpio))
+    gpio = translate(
+        raspi_gpio_dist_x - gpio_center[0],
+        raspi_gpio_dist_y - gpio_center[1],
+        raspi_board_thickness,
+    )(gpio)
 
     return gpio
 
@@ -606,7 +615,13 @@ def main():
 
     # Create the part
     tft = creaate_tft()
-    parts.add(tft, "bt_pi_tft_43", flip=False, skip_in_production=True)
+    parts.add(
+        tft,
+        "bt_pi_tft_43",
+        flip=False,
+        skip_in_production=True,
+        color=tft_visual_color,
+    )
 
     housing = create_housing(tft)
 
@@ -626,6 +641,7 @@ def main():
         housing,
         "bt_pi_tft_43_housing",
         flip=True,
+        color=tft_housing_visual_color,
     )
 
     raspi_board, raspi_connectors = create_raspi_visualization()
