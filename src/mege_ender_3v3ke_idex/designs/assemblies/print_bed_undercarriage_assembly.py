@@ -25,6 +25,94 @@ from shellforgepy.simple import *
 _logger = logging.getLogger(__name__)
 
 
+def _create_print_bed_adjustment_wheel(
+    screw_size,
+    *,
+    total_diameter,
+    hub_diameter,
+    hub_thickness,
+    outer_disc_thickness,
+    grip_diameter,
+    grip_count,
+    nut_pocket_slack,
+):
+    mount_screw = MScrew.from_size(screw_size)
+    if total_diameter <= grip_diameter:
+        raise ValueError(
+            "print_bed_adjustment_wheel_total_diameter must exceed grip diameter"
+        )
+    if hub_thickness <= mount_screw.nut_thickness:
+        raise ValueError(
+            "print_bed_adjustment_wheel_hub_thickness must exceed nut thickness"
+        )
+    if grip_count < 1:
+        raise ValueError("print_bed_adjustment_wheel_grip_count must be positive")
+
+    outer_disc_diameter = total_diameter - grip_diameter
+
+    outer_disc = create_cylinder(
+        outer_disc_diameter / 2,
+        outer_disc_thickness,
+    )
+    center_disc = create_cylinder(
+        hub_diameter / 2,
+        hub_thickness,
+    )
+    center_disc = align(center_disc, outer_disc, Alignment.CENTER, axes=[0, 1])
+    center_disc = align(center_disc, outer_disc, Alignment.BOTTOM)
+
+    grips = PartCollector()
+    outer_disc_center = get_bounding_box_center(outer_disc)
+    for i in range(grip_count):
+        current_grip = create_cylinder(
+            grip_diameter / 2,
+            outer_disc_thickness,
+        )
+        current_grip = align(current_grip, outer_disc, Alignment.CENTER)
+        current_grip = align(
+            current_grip,
+            outer_disc,
+            Alignment.EDGE_RIGHT,
+        )
+        current_grip = rotate(
+            i * 360 / grip_count,
+            center=outer_disc_center,
+        )(current_grip)
+        grips = grips.fuse(current_grip)
+
+    adjustment_wheel = outer_disc.fuse(grips)
+
+    # adjustment_wheel = apply_fillet_by_alignment(
+    #     adjustment_wheel, 0.5, fillets_at= [Alignment.BOTTOM, Alignment.TOP]
+    # )
+
+    adjustment_wheel = adjustment_wheel.fuse(center_disc)
+
+    nut_pocket = create_nut(
+        screw_size,
+        slack=nut_pocket_slack,
+        no_hole=True,
+    )
+    nut_pocket = align(nut_pocket, adjustment_wheel, Alignment.CENTER, axes=[0, 1])
+    nut_pocket = align(nut_pocket, adjustment_wheel, Alignment.BOTTOM)
+
+    screw_hole = create_cylinder(
+        mount_screw.get_clearance_hole_diameter(clearance_type="loose") / 2,
+        hub_thickness,
+    )
+    screw_hole = align(screw_hole, adjustment_wheel, Alignment.CENTER, axes=[0, 1])
+    screw_hole = align(screw_hole, adjustment_wheel, Alignment.BOTTOM)
+
+    adjustment_wheel = adjustment_wheel.cut(nut_pocket)
+    adjustment_wheel = adjustment_wheel.cut(screw_hole)
+
+    nut = create_nut(screw_size)
+    nut = align(nut, adjustment_wheel, Alignment.CENTER, axes=[0, 1])
+    nut = align(nut, adjustment_wheel, Alignment.BOTTOM)
+
+    return adjustment_wheel, nut
+
+
 def _record_print_bed_undercarriage_weight_metrics(undercarriage):
     record_weight_metric(
         Y_AXIS_MOVING_MASS_ASSEMBLY_ID,
@@ -79,6 +167,14 @@ def create_print_bed_undercarriage_assembly(
     print_bed_mount_tower_height,
     print_bed_mount_tower_clearance,
     print_bed_mount_tower_screw_size,
+    print_bed_mount_screw_size,
+    print_bed_adjustment_wheel_total_diameter,
+    print_bed_adjustment_wheel_hub_diameter,
+    print_bed_adjustment_wheel_hub_thickness,
+    print_bed_adjustment_wheel_outer_disc_thickness,
+    print_bed_adjustment_wheel_grip_diameter,
+    print_bed_adjustment_wheel_grip_count,
+    print_bed_adjustment_wheel_nut_pocket_slack,
     print_bed_undercarriage_mount_tower_holder_size,
     print_bed_undercarriage_mount_tower_holder_fillet_radius,
     print_bed_undercarriage_num_dovetails_per_side,
@@ -431,7 +527,8 @@ def create_print_bed_undercarriage_assembly(
     ) / 2
 
     for name, npp in dampers_by_name.items():
-        mount_tower_name = f"mount_tower_{name.replace('damper_', '', 1)}"
+        position_name = name.replace("damper_", "", 1)
+        mount_tower_name = f"mount_tower_{position_name}"
         if record_metrics:
             record_length_metric(
                 "extrusion_profile",
@@ -525,6 +622,48 @@ def create_print_bed_undercarriage_assembly(
 
         retval = retval.fuse(mount_tower_holder)
         retval = mount_tower_holder.use_as_cutter_on(retval)
+
+        adjustment_wheel, adjustment_wheel_nut = _create_print_bed_adjustment_wheel(
+            print_bed_mount_screw_size,
+            total_diameter=print_bed_adjustment_wheel_total_diameter,
+            hub_diameter=print_bed_adjustment_wheel_hub_diameter,
+            hub_thickness=print_bed_adjustment_wheel_hub_thickness,
+            outer_disc_thickness=print_bed_adjustment_wheel_outer_disc_thickness,
+            grip_diameter=print_bed_adjustment_wheel_grip_diameter,
+            grip_count=print_bed_adjustment_wheel_grip_count,
+            nut_pocket_slack=print_bed_adjustment_wheel_nut_pocket_slack,
+        )
+        adjustment_wheel = align(
+            adjustment_wheel,
+            npp,
+            Alignment.CENTER,
+            axes=[0, 1],
+        )
+        adjustment_wheel = align(
+            adjustment_wheel,
+            mount_tower,
+            Alignment.STACK_BOTTOM,
+        )
+        adjustment_wheel_nut = align(
+            adjustment_wheel_nut,
+            adjustment_wheel,
+            Alignment.CENTER,
+            axes=[0, 1],
+        )
+        adjustment_wheel_nut = align(
+            adjustment_wheel_nut,
+            adjustment_wheel,
+            Alignment.BOTTOM,
+        )
+
+        retval.add_named_follower(
+            adjustment_wheel,
+            f"adjustment_wheel_{position_name}",
+        )
+        retval.add_named_non_production_part(
+            adjustment_wheel_nut,
+            f"adjustment_wheel_nut_{position_name}",
+        )
 
     def edge_filter(bbox, v0_point, v1_point):
         v0_point = np.array(v0_point)

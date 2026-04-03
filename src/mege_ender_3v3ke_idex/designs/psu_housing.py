@@ -47,6 +47,10 @@ def create_creality_psu():
     pass
 
 
+def crate_cheap_psu():
+    pass
+
+
 def create_psu_housing():
     """Create the psu_housing part."""
     # Example: simple box with a cylindrical hole

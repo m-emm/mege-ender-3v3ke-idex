@@ -38,11 +38,23 @@ Builder:
         prod_rotation_axis: [0, 1, 0]
       - source: self
         artifact: followers
+        names:
+          - adjustment_wheel_left_front
+          - adjustment_wheel_left_back
+          - adjustment_wheel_right_front
+          - adjustment_wheel_right_back
+        name_template: "{name}"
+      - source: self
+        artifact: followers
         exclude_names:
           - front_right_uc
           - back_right_uc
           - belt_clamp_clamp_front
           - belt_clamp_clamp_back
+          - adjustment_wheel_left_front
+          - adjustment_wheel_left_back
+          - adjustment_wheel_right_front
+          - adjustment_wheel_right_back
         name_template: "{name}"
     prototype:
       # include_parts:
@@ -135,6 +147,14 @@ Builder:
           parts:
             - belt_clamp_clamp_front
             - belt_clamp_clamp_back
+        - name: adjustment_wheel_single
+          parts:
+            - adjustment_wheel_left_front
+        - name: adjustment_wheels_group
+          parts:
+            - adjustment_wheel_left_back
+            - adjustment_wheel_right_front
+            - adjustment_wheel_right_back
 
 Parameters:
   print_bed_mount_hole_pitch:
@@ -163,6 +183,22 @@ Parameters:
     Type: Float
   print_bed_mount_tower_screw_size:
     Type: String
+  print_bed_mount_screw_size:
+    Type: String
+  print_bed_adjustment_wheel_total_diameter:
+    Type: Float
+  print_bed_adjustment_wheel_hub_diameter:
+    Type: Float
+  print_bed_adjustment_wheel_hub_thickness:
+    Type: Float
+  print_bed_adjustment_wheel_outer_disc_thickness:
+    Type: Float
+  print_bed_adjustment_wheel_grip_diameter:
+    Type: Float
+  print_bed_adjustment_wheel_grip_count:
+    Type: Integer
+  print_bed_adjustment_wheel_nut_pocket_slack:
+    Type: Float
   print_bed_undercarriage_mount_tower_holder_size:
     Type: Float
   print_bed_undercarriage_mount_tower_holder_fillet_radius:
@@ -261,6 +297,22 @@ Parts:
           $ref: print_bed_mount_tower_clearance
         print_bed_mount_tower_screw_size:
           $ref: print_bed_mount_tower_screw_size
+        print_bed_mount_screw_size:
+          $ref: print_bed_mount_screw_size
+        print_bed_adjustment_wheel_total_diameter:
+          $ref: print_bed_adjustment_wheel_total_diameter
+        print_bed_adjustment_wheel_hub_diameter:
+          $ref: print_bed_adjustment_wheel_hub_diameter
+        print_bed_adjustment_wheel_hub_thickness:
+          $ref: print_bed_adjustment_wheel_hub_thickness
+        print_bed_adjustment_wheel_outer_disc_thickness:
+          $ref: print_bed_adjustment_wheel_outer_disc_thickness
+        print_bed_adjustment_wheel_grip_diameter:
+          $ref: print_bed_adjustment_wheel_grip_diameter
+        print_bed_adjustment_wheel_grip_count:
+          $ref: print_bed_adjustment_wheel_grip_count
+        print_bed_adjustment_wheel_nut_pocket_slack:
+          $ref: print_bed_adjustment_wheel_nut_pocket_slack
         print_bed_undercarriage_mount_tower_holder_size:
           $ref: print_bed_undercarriage_mount_tower_holder_size
         print_bed_undercarriage_mount_tower_holder_fillet_radius:

@@ -2,18 +2,21 @@
 
 ## Mechanical Design tasks
 
+- holders for main PSU
+- holders for heatbed PSU
+- holder for y-axis / headbed mcu
+- fix y axis endstop
+- reprint stoppers in TPU
 - heatbed cable attachment
-- y rail drill jig
 - cable holders / clamps (x axis umbilicals, heatbed, z-axes cabling)
 - z-axis reconstruct: turn 90 deg
 - z-axis endstops
-- holders for main PSU
-- holders for heatbed PSU
 - z axis top profile angle attachment
 - creality touch holder
 - toolhead alignment mechanism
 - holder / attachment for host controller / display
-- holder for mcus (idex x axes mcu, z axes mcu with heater control, y axis mcu )
+- holder for idex x axes mcu
+- holder for z axes mcu
 - mcu housings
 - holders for filament sensors
 - holders for filament spools
@@ -32,3 +35,5 @@
 - heatbed holder
 - y mount brackets
 - y carriage stoppers
+- bed leveling wheels
+
