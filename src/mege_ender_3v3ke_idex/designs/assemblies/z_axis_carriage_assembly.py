@@ -26,7 +26,7 @@ from mege_ender_3v3ke_idex.designs.idex_parameters import (
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
 )
-from mege_ender_3v3ke_idex.designs.z_axis import (
+from mege_ender_3v3ke_idex.designs.z_axis_components import (
     create_creality_threaded_rod_nut,
     create_igus_drylin_bearing,
 )

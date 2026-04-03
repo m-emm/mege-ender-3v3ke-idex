@@ -1,6 +1,6 @@
 """Declarative dual z-axis assembly."""
 
-from mege_ender_3v3ke_idex.designs.z_axis import create_top_bridge_profile
+from mege_ender_3v3ke_idex.designs.z_axis_components import create_top_bridge_profile
 from shellforgepy.simple import *
 
 

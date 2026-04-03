@@ -83,6 +83,7 @@ raspi_screw_hole_diameter = 2.75
 raspi_screw_hole_distance = 58
 raspi_screw_hole_x_inset = 3.5
 raspi_screw_hole_y_inset = raspi_board_corner_radius
+raspi_mount_cylinder_diameter = 6
 
 raspi_network_dist = 10.25
 raspi_network_width = 16
@@ -468,7 +469,7 @@ def create_housing(tft):
 
 def create_raspi_board():
 
-    board = create_filleted_box(
+    raw_board = create_filleted_box(
         raspi_board_length,
         raspi_board_width,
         raspi_board_thickness,
@@ -476,19 +477,33 @@ def create_raspi_board():
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
 
-    for hole_x in [
-        raspi_screw_hole_x_inset,
-        raspi_screw_hole_x_inset + raspi_screw_hole_distance,
+    mount_hole_cutters = []
+    mount_hole_cutter_names = []
+    board_cutter = PartCollector()
+
+    for left_right_name, hole_x in [
+        ("left", raspi_screw_hole_x_inset),
+        ("right", raspi_screw_hole_x_inset + raspi_screw_hole_distance),
     ]:
-        for hole_y in [
-            raspi_screw_hole_y_inset,
-            raspi_board_width - raspi_screw_hole_y_inset,
+        for front_back_name, hole_y in [
+            ("front", raspi_screw_hole_y_inset),
+            ("back", raspi_board_width - raspi_screw_hole_y_inset),
         ]:
             hole = create_cylinder(raspi_screw_hole_diameter / 2, BIG_THING)
             hole = translate(hole_x, hole_y, -BIG_THING / 2)(hole)
-            board = board.cut(hole)
+            mount_hole_cutters.append(hole)
+            board_cutter = board_cutter.fuse(hole)
+            mount_hole_cutter_names.append(
+                f"mount_hole_{left_right_name}_{front_back_name}"
+            )
 
-    raspi = LeaderFollowersCuttersPart(board)
+    board = raw_board.cut(board_cutter)
+
+    raspi = LeaderFollowersCuttersPart(
+        board,
+        cutters=mount_hole_cutters,
+        cutter_names=mount_hole_cutter_names,
+    )
 
     network = create_box(
         raspi_network_length,
@@ -606,6 +621,31 @@ def create_raspi_connectors(raspi):
     return connectors
 
 
+def create_raspi_mount_cylinders(raspi, tft):
+
+    mount_cylinders = PartCollector()
+
+    for cutter_name, cutter_part in raspi.get_named_cutter_items():
+        if not cutter_name.startswith("mount_hole_"):
+            continue
+
+        mount_cylinder = create_cylinder(
+            raspi_mount_cylinder_diameter / 2,
+            raspi_tft_hover_gap,
+        )
+        mount_cylinder = align(
+            mount_cylinder,
+            cutter_part,
+            Alignment.CENTER,
+            axes=[0, 1],
+        )
+        mount_cylinder = align(mount_cylinder, tft, Alignment.BOTTOM)
+        mount_cylinder = translate(0, 0, tft_with_board_thickness)(mount_cylinder)
+        mount_cylinders = mount_cylinders.fuse(mount_cylinder)
+
+    return mount_cylinders
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
@@ -642,27 +682,27 @@ def main():
     )
 
     raspi = create_raspi_board()
-    raspi_visual = raspi.leaders_followers_fused()
 
-    move_raspi_above_tft = align_translation(
-        raspi_visual,
-        tft,
-        Alignment.STACK_TOP,
-        stack_gap=raspi_tft_hover_gap,
-    )
-    raspi = move_raspi_above_tft(raspi)
-
-    raspi_visual = raspi.leaders_followers_fused()
     move_raspi_to_center = align_translation(
-        raspi_visual,
+        raspi.leader,
         tft,
         Alignment.CENTER,
         axes=[0, 1],
     )
     raspi = move_raspi_to_center(raspi)
 
+    raspi_mount_cylinders = create_raspi_mount_cylinders(raspi, tft)
+
+    move_raspi_on_standoffs = align_translation(
+        raspi.leader,
+        raspi_mount_cylinders,
+        Alignment.STACK_TOP,
+    )
+    raspi = move_raspi_on_standoffs(raspi)
+
     raspi_board = raspi.leader
     raspi_connectors = create_raspi_connectors(raspi)
+    raspi_connectors = raspi_connectors.fuse(raspi_mount_cylinders)
 
     parts.add(
         raspi_board,

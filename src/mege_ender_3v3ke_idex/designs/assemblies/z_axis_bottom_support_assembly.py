@@ -4,7 +4,7 @@ from mege_ender_3v3ke_idex.designs.idex_parameters import (
     BIG_THING,
     z_axis_pillow_block_bearing_z_offset,
 )
-from mege_ender_3v3ke_idex.designs.z_axis import (
+from mege_ender_3v3ke_idex.designs.z_axis_components import (
     create_axial_ball_bearing_8_x_19,
     create_axial_bearing_stopper,
     create_axial_rod_clamp,

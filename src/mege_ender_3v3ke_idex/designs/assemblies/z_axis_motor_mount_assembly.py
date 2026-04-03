@@ -24,7 +24,7 @@ from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
 )
-from mege_ender_3v3ke_idex.designs.z_axis import create_profile_mount_plate
+from mege_ender_3v3ke_idex.designs.z_axis_components import create_profile_mount_plate
 from shellforgepy.simple import *
 
 
