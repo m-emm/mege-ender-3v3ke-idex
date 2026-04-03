@@ -1,32 +1,31 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for a single z-axis side
+Description: Assembly configuration for one z-axis top guide-rod mount
 
 Builder:
   Visualization:
     parts:
-      - source: dependencies
-        assembly: z_axis_profile
+      - source: self
         artifact: leader
-        name: z_axis_profile
+        name: top_mount
       - source: self
         artifact: followers
         name_template: "{name}"
       - source: self
         artifact: non_production_parts
-        exclude_names:
-          - carriage_fused
-          - x_axis_alignment_reference
         name_template: "{name}"
   Production:
     parts:
+      - source: self
+        artifact: leader
+        name: top_mount
       - source: self
         artifact: followers
         name_template: "{name}"
 
 Parts:
-  ZAxisSideAssembly:
+  ZAxisGuideRodTopMountAssembly:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_side_assembly.create_z_axis_side_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_guide_rod_top_mount_assembly.create_z_axis_guide_rod_top_mount_assembly

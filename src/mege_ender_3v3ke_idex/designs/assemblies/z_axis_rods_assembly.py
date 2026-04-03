@@ -22,7 +22,7 @@ def _get_profile_part(z_axis_profile):
     )
 
 
-def create_z_axis_rods_assembly(*, z_axis_profile, context=None):
+def create_z_axis_rods_assembly(*, z_axis_profile, z_axis_base_z_offset, context=None):
     """Create one guide rod and one threaded rod against a placed Z profile."""
 
     del context
@@ -71,4 +71,5 @@ def create_z_axis_rods_assembly(*, z_axis_profile, context=None):
         stack_gap=0,
     )
 
-    return coupler_aligner(retval)
+    retval = coupler_aligner(retval)
+    return translate(0, 0, z_axis_base_z_offset)(retval)

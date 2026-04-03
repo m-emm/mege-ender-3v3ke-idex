@@ -1,14 +1,13 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for a single z-axis side
+Description: Assembly configuration for one z-axis carriage
 
 Builder:
   Visualization:
     parts:
-      - source: dependencies
-        assembly: z_axis_profile
+      - source: self
         artifact: leader
-        name: z_axis_profile
+        name: carriage
       - source: self
         artifact: followers
         name_template: "{name}"
@@ -21,12 +20,22 @@ Builder:
   Production:
     parts:
       - source: self
+        artifact: leader
+        name: carriage
+      - source: self
         artifact: followers
         name_template: "{name}"
 
+Parameters:
+  carriage_z_offset:
+    Type: Float
+
 Parts:
-  ZAxisSideAssembly:
+  ZAxisCarriageAssembly:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_side_assembly.create_z_axis_side_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_carriage_assembly.create_z_axis_carriage_assembly
+      Properties:
+        carriage_z_offset:
+          $ref: carriage_z_offset

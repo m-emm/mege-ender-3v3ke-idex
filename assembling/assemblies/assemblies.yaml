@@ -659,6 +659,8 @@ assemblies:
       - left_z_axis_profile_assembly
     inject_parts:
       z_axis_profile: left_z_axis_profile_assembly
+    parameters:
+      z_axis_base_z_offset: !Ref z_axis_base_z_offset
 
   - name: right_z_axis_rods_assembly
 
@@ -667,6 +669,8 @@ assemblies:
       - right_z_axis_profile_assembly
     inject_parts:
       z_axis_profile: right_z_axis_profile_assembly
+    parameters:
+      z_axis_base_z_offset: !Ref z_axis_base_z_offset
 
   - name: left_z_axis_bottom_support_assembly
 
@@ -712,6 +716,46 @@ assemblies:
     parameters:
       side: right
 
+  - name: left_z_axis_guide_rod_top_mount_assembly
+
+    resource_file: z_axis_guide_rod_top_mount_assembly.yaml
+    depends_on:
+      - left_z_axis_profile_assembly
+      - left_z_axis_rods_assembly
+    inject_parts:
+      z_axis_profile: left_z_axis_profile_assembly
+      z_axis_rods: left_z_axis_rods_assembly
+
+  - name: right_z_axis_guide_rod_top_mount_assembly
+
+    resource_file: z_axis_guide_rod_top_mount_assembly.yaml
+    depends_on:
+      - right_z_axis_profile_assembly
+      - right_z_axis_rods_assembly
+    inject_parts:
+      z_axis_profile: right_z_axis_profile_assembly
+      z_axis_rods: right_z_axis_rods_assembly
+
+  - name: left_z_axis_carriage_assembly
+
+    resource_file: z_axis_carriage_assembly.yaml
+    depends_on:
+      - left_z_axis_rods_assembly
+    inject_parts:
+      z_axis_rods: left_z_axis_rods_assembly
+    parameters:
+      carriage_z_offset: !Ref carriage_z_offset
+
+  - name: right_z_axis_carriage_assembly
+
+    resource_file: z_axis_carriage_assembly.yaml
+    depends_on:
+      - right_z_axis_rods_assembly
+    inject_parts:
+      z_axis_rods: right_z_axis_rods_assembly
+    parameters:
+      carriage_z_offset: !Ref carriage_z_offset
+
   - name: left_z_axis_assembly
 
     resource_file: z_axis_side_assembly.yaml
@@ -720,11 +764,15 @@ assemblies:
       - left_z_axis_rods_assembly
       - left_z_axis_bottom_support_assembly
       - left_z_axis_motor_mount_assembly
+      - left_z_axis_guide_rod_top_mount_assembly
+      - left_z_axis_carriage_assembly
     inject_parts:
       z_axis_profile: left_z_axis_profile_assembly
       z_axis_rods: left_z_axis_rods_assembly
       z_axis_bottom_support: left_z_axis_bottom_support_assembly
       z_axis_motor_mount: left_z_axis_motor_mount_assembly
+      z_axis_guide_rod_top_mount: left_z_axis_guide_rod_top_mount_assembly
+      z_axis_carriage: left_z_axis_carriage_assembly
 
   - name: right_z_axis_assembly
 
@@ -734,11 +782,15 @@ assemblies:
       - right_z_axis_rods_assembly
       - right_z_axis_bottom_support_assembly
       - right_z_axis_motor_mount_assembly
+      - right_z_axis_guide_rod_top_mount_assembly
+      - right_z_axis_carriage_assembly
     inject_parts:
       z_axis_profile: right_z_axis_profile_assembly
       z_axis_rods: right_z_axis_rods_assembly
       z_axis_bottom_support: right_z_axis_bottom_support_assembly
       z_axis_motor_mount: right_z_axis_motor_mount_assembly
+      z_axis_guide_rod_top_mount: right_z_axis_guide_rod_top_mount_assembly
+      z_axis_carriage: right_z_axis_carriage_assembly
 
   - name: whole_printer_assembly
 

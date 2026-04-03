@@ -136,7 +136,7 @@ tft_visual_color = (0.82, 0.88, 0.92)
 tft_housing_visual_color = (0.9, 0.9, 0.86)
 raspi_pcb_color = (0.52, 0.78, 0.56)
 raspi_connector_color = (0.96, 0.97, 0.97)
-raspi_visualization_gap = 20
+raspi_tft_hover_gap = 23
 
 tft_housing_wall_thickness = 2.4
 tft_housing_border = 20
@@ -488,7 +488,88 @@ def create_raspi_board():
             hole = translate(hole_x, hole_y, -BIG_THING / 2)(hole)
             board = board.cut(hole)
 
-    return board
+    raspi = LeaderFollowersCuttersPart(board)
+
+    network = create_box(
+        raspi_network_length,
+        raspi_network_width,
+        raspi_network_height,
+    )
+    network = translate(
+        raspi_board_length - raspi_network_length + raspi_connector_overstand,
+        raspi_network_dist - raspi_network_width / 2,
+        raspi_board_thickness,
+    )(network)
+    raspi.add_named_follower(network, "network")
+
+    for usb_index, usb_dist in enumerate([raspi_usb_1_dist, raspi_usb_2_dist], start=1):
+        usb = create_box(raspi_usb_length, raspi_usb_width, raspi_usb_height)
+        usb = translate(
+            raspi_board_length - raspi_usb_length + raspi_connector_overstand,
+            usb_dist - raspi_usb_width / 2,
+            raspi_board_thickness,
+        )(usb)
+        raspi.add_named_follower(usb, f"usb_{usb_index}")
+
+    micro_usb = create_box(
+        raspi_micro_usb_width,
+        raspi_micro_usb_length,
+        raspi_micro_usb_height,
+    )
+    micro_usb = translate(
+        raspi_micro_usb_dist - raspi_micro_usb_width / 2,
+        -raspi_micro_usb_overstand,
+        raspi_board_thickness,
+    )(micro_usb)
+    raspi.add_named_follower(micro_usb, "micro_usb")
+
+    hdmi = create_box(raspi_hdmi_width, raspi_hdmi_length, raspi_hdmi_height)
+    hdmi = translate(
+        raspi_hdmi_dist - raspi_hdmi_width / 2,
+        -raspi_hdmi_overstand,
+        raspi_board_thickness,
+    )(hdmi)
+    raspi.add_named_follower(hdmi, "hdmi")
+
+    jack = create_box(
+        raspi_jack_diameter,
+        raspi_jack_length_cube,
+        raspi_jack_diameter,
+    )
+    jack = translate(
+        raspi_jack_dist - raspi_jack_diameter / 2,
+        -raspi_jack_length_cylinder,
+        raspi_board_thickness,
+    )(jack)
+    raspi.add_named_follower(jack, "jack")
+
+    microsd_socket = create_box(
+        raspi_microsd_socket_length,
+        raspi_microsd_socket_width,
+        raspi_microsd_socket_height,
+    )
+    microsd_socket = translate(
+        0,
+        raspi_board_width / 2 - raspi_microsd_socket_width / 2,
+        -raspi_microsd_socket_height,
+    )(microsd_socket)
+    raspi.add_named_follower(microsd_socket, "microsd_socket")
+
+    microsd_card = create_box(
+        raspi_microsd_overstand,
+        raspi_microsd_width,
+        raspi_microsd_thickness,
+    )
+    microsd_card = translate(
+        -raspi_microsd_overstand,
+        raspi_board_width / 2 - raspi_microsd_width / 2,
+        -(raspi_microsd_socket_height + raspi_microsd_thickness) / 2,
+    )(microsd_card)
+    raspi.add_named_follower(microsd_card, "microsd_card")
+
+    raspi.add_named_follower(create_raspi_gpio(), "gpio")
+
+    return raspi
 
 
 def create_raspi_gpio():
@@ -515,98 +596,14 @@ def create_raspi_gpio():
     return gpio
 
 
-def create_raspi_connectors():
+def create_raspi_connectors(raspi):
 
     connectors = PartCollector()
 
-    network = create_box(
-        raspi_network_length,
-        raspi_network_width,
-        raspi_network_height,
-    )
-    network = translate(
-        raspi_board_length - raspi_network_length + raspi_connector_overstand,
-        raspi_network_dist - raspi_network_width / 2,
-        raspi_board_thickness,
-    )(network)
-    connectors = connectors.fuse(network)
-
-    for usb_dist in [raspi_usb_1_dist, raspi_usb_2_dist]:
-        usb = create_box(raspi_usb_length, raspi_usb_width, raspi_usb_height)
-        usb = translate(
-            raspi_board_length - raspi_usb_length + raspi_connector_overstand,
-            usb_dist - raspi_usb_width / 2,
-            raspi_board_thickness,
-        )(usb)
-        connectors = connectors.fuse(usb)
-
-    micro_usb = create_box(
-        raspi_micro_usb_width,
-        raspi_micro_usb_length,
-        raspi_micro_usb_height,
-    )
-    micro_usb = translate(
-        raspi_micro_usb_dist - raspi_micro_usb_width / 2,
-        -raspi_micro_usb_overstand,
-        raspi_board_thickness,
-    )(micro_usb)
-    connectors = connectors.fuse(micro_usb)
-
-    hdmi = create_box(raspi_hdmi_width, raspi_hdmi_length, raspi_hdmi_height)
-    hdmi = translate(
-        raspi_hdmi_dist - raspi_hdmi_width / 2,
-        -raspi_hdmi_overstand,
-        raspi_board_thickness,
-    )(hdmi)
-    connectors = connectors.fuse(hdmi)
-
-    jack = create_box(
-        raspi_jack_diameter,
-        raspi_jack_length_cube,
-        raspi_jack_diameter,
-    )
-    jack = translate(
-        raspi_jack_dist - raspi_jack_diameter / 2,
-        -raspi_jack_length_cylinder,
-        raspi_board_thickness,
-    )(jack)
-    connectors = connectors.fuse(jack)
-
-    microsd_socket = create_box(
-        raspi_microsd_socket_length,
-        raspi_microsd_socket_width,
-        raspi_microsd_socket_height,
-    )
-    microsd_socket = translate(
-        0,
-        raspi_board_width / 2 - raspi_microsd_socket_width / 2,
-        -raspi_microsd_socket_height,
-    )(microsd_socket)
-    connectors = connectors.fuse(microsd_socket)
-
-    microsd_card = create_box(
-        raspi_microsd_overstand,
-        raspi_microsd_width,
-        raspi_microsd_thickness,
-    )
-    microsd_card = translate(
-        -raspi_microsd_overstand,
-        raspi_board_width / 2 - raspi_microsd_width / 2,
-        -(raspi_microsd_socket_height + raspi_microsd_thickness) / 2,
-    )(microsd_card)
-    connectors = connectors.fuse(microsd_card)
-
-    connectors = connectors.fuse(create_raspi_gpio())
+    for _, connector_part in raspi.get_named_follower_items():
+        connectors = connectors.fuse(connector_part)
 
     return connectors
-
-
-def create_raspi_visualization():
-
-    raspi_board = create_raspi_board()
-    raspi_connectors = create_raspi_connectors()
-
-    return raspi_board, raspi_connectors
 
 
 def main():
@@ -644,27 +641,28 @@ def main():
         color=tft_housing_visual_color,
     )
 
-    raspi_board, raspi_connectors = create_raspi_visualization()
-    raspi_visual = raspi_board.fuse(raspi_connectors)
+    raspi = create_raspi_board()
+    raspi_visual = raspi.leaders_followers_fused()
 
-    move_raspi_to_side = align_translation(
+    move_raspi_above_tft = align_translation(
         raspi_visual,
-        housing,
-        Alignment.STACK_RIGHT,
-        stack_gap=raspi_visualization_gap,
+        tft,
+        Alignment.STACK_TOP,
+        stack_gap=raspi_tft_hover_gap,
     )
-    raspi_visual = move_raspi_to_side(raspi_visual)
-    raspi_board = move_raspi_to_side(raspi_board)
-    raspi_connectors = move_raspi_to_side(raspi_connectors)
+    raspi = move_raspi_above_tft(raspi)
 
+    raspi_visual = raspi.leaders_followers_fused()
     move_raspi_to_center = align_translation(
         raspi_visual,
-        housing,
+        tft,
         Alignment.CENTER,
-        axes=[1, 2],
+        axes=[0, 1],
     )
-    raspi_board = move_raspi_to_center(raspi_board)
-    raspi_connectors = move_raspi_to_center(raspi_connectors)
+    raspi = move_raspi_to_center(raspi)
+
+    raspi_board = raspi.leader
+    raspi_connectors = create_raspi_connectors(raspi)
 
     parts.add(
         raspi_board,
