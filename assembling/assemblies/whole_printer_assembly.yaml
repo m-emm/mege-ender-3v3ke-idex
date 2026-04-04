@@ -264,15 +264,6 @@ Builder:
             - { $ref: z_axis_z_travel }
       - source: dependencies
         assembly: x_axis_assembly
-        artifact: leader
-        name: x_axis
-        animation:
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: x_axis_assembly
         artifact: followers
         name_template: "{name}"
         animation:
@@ -354,6 +345,7 @@ Builder:
         assembly: tool_head_mount_bottom_assembly
         artifact: non_production_parts
         exclude_names:
+          - nitehawk_pcb
           - rail
           - lower_axis_profile
           - top_axis_profile
@@ -399,6 +391,7 @@ Builder:
         assembly: tool_head_mount_top_assembly
         artifact: non_production_parts
         exclude_names:
+          - nitehawk_pcb
           - rail
           - lower_axis_profile
           - top_axis_profile

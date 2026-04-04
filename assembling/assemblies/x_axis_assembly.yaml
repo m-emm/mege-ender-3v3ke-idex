@@ -6,9 +6,6 @@ Builder:
   Visualization:
     parts:
       - source: self
-        artifact: leader
-        name: x_axis
-      - source: self
         artifact: followers
         name_template: "{name}"
       - source: self
@@ -39,9 +36,6 @@ Builder:
           - carriage_2
   Production:
     parts:
-      - source: self
-        artifact: leader
-        name: x_axis
       - source: self
         artifact: followers
         name_template: "{name}"

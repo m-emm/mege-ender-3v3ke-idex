@@ -18,6 +18,8 @@ Builder:
         name_template: "{name}"
       - source: self
         artifact: non_production_parts
+        exclude_names:
+          - nitehawk_pcb
         name_template: "{name}"
   Production:
     process_data:
