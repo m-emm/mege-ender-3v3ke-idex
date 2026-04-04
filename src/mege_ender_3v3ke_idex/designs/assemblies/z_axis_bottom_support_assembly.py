@@ -1,9 +1,5 @@
 """Declarative z-axis lower support assembly."""
 
-from mege_ender_3v3ke_idex.designs.idex_parameters import (
-    BIG_THING,
-    z_axis_pillow_block_bearing_z_offset,
-)
 from mege_ender_3v3ke_idex.designs.z_axis_components import (
     create_axial_ball_bearing_8_x_19,
     create_axial_bearing_stopper,
@@ -34,6 +30,8 @@ def create_z_axis_bottom_support_assembly(
     z_axis_guide_rod,
     z_axis_threaded_rod,
     z_axis_motor_mount,
+    BIG_THING,
+    z_axis_pillow_block_bearing_z_offset,
     context=None,
 ):
     """Create the printable lower support stack for one z-axis side."""

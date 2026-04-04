@@ -29,6 +29,46 @@ Builder:
 Parameters:
   carriage_z_offset:
     Type: Float
+  BIG_THING:
+    Type: Float
+  z_axis_carriage_back_depth:
+    Type: Float
+  z_axis_carriage_back_height:
+    Type: Float
+  z_axis_carriage_fillet_radius:
+    Type: Float
+  z_axis_carriage_front_depth:
+    Type: Float
+  z_axis_carriage_front_height:
+    Type: Float
+  z_axis_carriage_mount_screw_size:
+    Type: String
+  z_axis_carriage_profile_clearance:
+    Type: Float
+  z_axis_carriage_rod_clamp_screw_inset:
+    Type: Float
+  z_axis_carriage_threaded_rod_clearance:
+    Type: Float
+  z_axis_carriage_width:
+    Type: Float
+  z_axis_carriage_x_axis_connector_thickness:
+    Type: Float
+  z_axis_creality_nut_threaded_rod_cuide_cutter_clearance:
+    Type: Float
+  z_axis_cylinder_head_clearance:
+    Type: Float
+  z_axis_default_clearance_hole_type:
+    Type: String
+  z_axis_default_screw_nut_cutter_clearance:
+    Type: Float
+  z_axis_guide_rod_carriage_clamp_screw_length:
+    Type: Float
+  z_axis_nut_screw_hole_clearence_type:
+    Type: String
+  z_axis_threaded_rod_diameter:
+    Type: Float
+  z_axis_x_axis_to_carriage_gap:
+    Type: Float
 
 Parts:
   ZAxisCarriageAssembly:
@@ -39,3 +79,43 @@ Parts:
       Properties:
         carriage_z_offset:
           $ref: carriage_z_offset
+        BIG_THING:
+          $ref: BIG_THING
+        z_axis_carriage_back_depth:
+          $ref: z_axis_carriage_back_depth
+        z_axis_carriage_back_height:
+          $ref: z_axis_carriage_back_height
+        z_axis_carriage_fillet_radius:
+          $ref: z_axis_carriage_fillet_radius
+        z_axis_carriage_front_depth:
+          $ref: z_axis_carriage_front_depth
+        z_axis_carriage_front_height:
+          $ref: z_axis_carriage_front_height
+        z_axis_carriage_mount_screw_size:
+          $ref: z_axis_carriage_mount_screw_size
+        z_axis_carriage_profile_clearance:
+          $ref: z_axis_carriage_profile_clearance
+        z_axis_carriage_rod_clamp_screw_inset:
+          $ref: z_axis_carriage_rod_clamp_screw_inset
+        z_axis_carriage_threaded_rod_clearance:
+          $ref: z_axis_carriage_threaded_rod_clearance
+        z_axis_carriage_width:
+          $ref: z_axis_carriage_width
+        z_axis_carriage_x_axis_connector_thickness:
+          $ref: z_axis_carriage_x_axis_connector_thickness
+        z_axis_creality_nut_threaded_rod_cuide_cutter_clearance:
+          $ref: z_axis_creality_nut_threaded_rod_cuide_cutter_clearance
+        z_axis_cylinder_head_clearance:
+          $ref: z_axis_cylinder_head_clearance
+        z_axis_default_clearance_hole_type:
+          $ref: z_axis_default_clearance_hole_type
+        z_axis_default_screw_nut_cutter_clearance:
+          $ref: z_axis_default_screw_nut_cutter_clearance
+        z_axis_guide_rod_carriage_clamp_screw_length:
+          $ref: z_axis_guide_rod_carriage_clamp_screw_length
+        z_axis_nut_screw_hole_clearence_type:
+          $ref: z_axis_nut_screw_hole_clearence_type
+        z_axis_threaded_rod_diameter:
+          $ref: z_axis_threaded_rod_diameter
+        z_axis_x_axis_to_carriage_gap:
+          $ref: z_axis_x_axis_to_carriage_gap

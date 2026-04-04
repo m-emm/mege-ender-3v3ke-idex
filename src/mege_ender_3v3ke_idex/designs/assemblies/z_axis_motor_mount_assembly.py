@@ -1,27 +1,5 @@
 """Declarative z-axis motor mount assembly."""
 
-from mege_ender_3v3ke_idex.designs.idex_parameters import (
-    BIG_THING,
-    motor_mount_axle_clearance,
-    motor_mount_boss_clearance,
-    motor_mount_boss_clearance_z,
-    motor_mount_plate_fillet_radius,
-    motor_mount_plate_thickness,
-    z_axis_cylinder_head_clearance,
-    z_axis_default_clearance_hole_type,
-    z_axis_default_screw_nut_cutter_clearance,
-    z_axis_guide_rod_clamp_depth,
-    z_axis_guide_rod_clamp_screw_length,
-    z_axis_guide_rod_clamp_thickness,
-    z_axis_guide_rod_clamp_width,
-    z_axis_guide_rod_diameter,
-    z_axis_motor_mount_plate_depth,
-    z_axis_motor_mount_plate_profile_distance,
-    z_axis_motor_mount_plate_size,
-    z_axis_rod_clamp_gap,
-    z_axis_threaded_rod_diameter,
-    z_axis_threaded_rod_profile_distance,
-)
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
@@ -54,7 +32,31 @@ def _get_guide_rod_part(z_axis_guide_rod):
 
 
 def create_z_axis_motor_mount_assembly(
-    *, z_axis_profile, z_axis_guide_rod, side, context=None
+    *,
+    z_axis_profile,
+    z_axis_guide_rod,
+    side,
+    BIG_THING,
+    motor_mount_axle_clearance,
+    motor_mount_boss_clearance,
+    motor_mount_boss_clearance_z,
+    motor_mount_plate_fillet_radius,
+    motor_mount_plate_thickness,
+    z_axis_cylinder_head_clearance,
+    z_axis_default_clearance_hole_type,
+    z_axis_default_screw_nut_cutter_clearance,
+    z_axis_guide_rod_clamp_depth,
+    z_axis_guide_rod_clamp_screw_length,
+    z_axis_guide_rod_clamp_thickness,
+    z_axis_guide_rod_clamp_width,
+    z_axis_guide_rod_diameter,
+    z_axis_motor_mount_plate_depth,
+    z_axis_motor_mount_plate_profile_distance,
+    z_axis_motor_mount_plate_size,
+    z_axis_rod_clamp_gap,
+    z_axis_threaded_rod_diameter,
+    z_axis_threaded_rod_profile_distance,
+    context=None,
 ):
     """Create the printable motor mount assembly for one z-axis side."""
 

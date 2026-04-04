@@ -1,6 +1,27 @@
 """Declarative z-axis top guide-rod mount assembly."""
 
-from mege_ender_3v3ke_idex.designs.idex_parameters import (
+from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
+    create_four_screws_mount_assembly,
+)
+from mege_ender_3v3ke_idex.designs.z_axis_components import create_profile_mount_plate
+from shellforgepy.simple import *
+
+
+def _get_profile_part(z_axis_profile):
+    return (
+        z_axis_profile.leader if hasattr(z_axis_profile, "leader") else z_axis_profile
+    )
+
+
+def _get_rod_part(rod):
+    return rod.leader if hasattr(rod, "leader") else rod
+
+
+def create_z_axis_guide_rod_top_mount_assembly(
+    *,
+    z_axis_profile,
+    z_axis_guide_rod,
+    z_axis_threaded_rod,
     BIG_THING,
     z_axis_cylinder_head_clearance,
     z_axis_default_clearance_hole_type,
@@ -23,26 +44,7 @@ from mege_ender_3v3ke_idex.designs.idex_parameters import (
     z_axis_top_mount_thickness,
     z_axis_top_mount_threaded_rod_clearance,
     z_axis_top_mount_width,
-)
-from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
-    create_four_screws_mount_assembly,
-)
-from mege_ender_3v3ke_idex.designs.z_axis_components import create_profile_mount_plate
-from shellforgepy.simple import *
-
-
-def _get_profile_part(z_axis_profile):
-    return (
-        z_axis_profile.leader if hasattr(z_axis_profile, "leader") else z_axis_profile
-    )
-
-
-def _get_rod_part(rod):
-    return rod.leader if hasattr(rod, "leader") else rod
-
-
-def create_z_axis_guide_rod_top_mount_assembly(
-    *, z_axis_profile, z_axis_guide_rod, z_axis_threaded_rod, context=None
+    context=None,
 ):
     """Create the printable top mount for one z-axis side."""
 

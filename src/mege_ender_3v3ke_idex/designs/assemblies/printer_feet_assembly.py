@@ -138,39 +138,26 @@ def main():
     from mege_ender_3v3ke_idex.designs.assemblies.printer_frame_assembly import (
         create_printer_frame_assembly,
     )
-    from mege_ender_3v3ke_idex.designs.idex_parameters import (
-        frame_inner_depth,
-        frame_inner_width,
-        printer_foot_base_size,
-        printer_foot_groove_filler_thickness,
-        printer_foot_groove_filler_width,
-        printer_foot_height,
-        printer_foot_mount_screw_sink,
-        printer_foot_mount_screw_size,
-        printer_foot_screw_cylinder_head_clearance,
-        printer_foot_screw_length,
-        printer_foot_top_size,
-    )
 
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
     frame = create_printer_frame_assembly(
-        frame_inner_depth=frame_inner_depth,
-        frame_inner_width=frame_inner_width,
+        frame_inner_depth=610,
+        frame_inner_width=380,
         frame_profile_type="4040",
     )
     feet = create_printer_feet_assembly(
         frame=frame,
-        printer_foot_height=printer_foot_height,
-        printer_foot_base_size=printer_foot_base_size,
-        printer_foot_top_size=printer_foot_top_size,
-        printer_foot_screw_length=printer_foot_screw_length,
-        printer_foot_screw_cylinder_head_clearance=printer_foot_screw_cylinder_head_clearance,
-        printer_foot_mount_screw_size=printer_foot_mount_screw_size,
-        printer_foot_mount_screw_sink=printer_foot_mount_screw_sink,
-        printer_foot_groove_filler_width=printer_foot_groove_filler_width,
-        printer_foot_groove_filler_thickness=printer_foot_groove_filler_thickness,
+        printer_foot_height=37,
+        printer_foot_base_size=40,
+        printer_foot_top_size=35,
+        printer_foot_screw_length=30,
+        printer_foot_screw_cylinder_head_clearance=1.5,
+        printer_foot_mount_screw_size="M5",
+        printer_foot_mount_screw_sink=8,
+        printer_foot_groove_filler_width=7.4,
+        printer_foot_groove_filler_thickness=3,
         tpu_slit_thickness=0.15,
         tpu_slit_clearance=0.5,
         tpu_slit_distance=1,

@@ -1,7 +1,25 @@
 """Declarative z-axis carriage assembly."""
 
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import ExtrusionProfileType
-from mege_ender_3v3ke_idex.designs.idex_parameters import (
+from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
+    create_four_screws_mount_assembly,
+)
+from mege_ender_3v3ke_idex.designs.z_axis_components import (
+    create_creality_threaded_rod_nut,
+    create_igus_drylin_bearing,
+)
+from shellforgepy.simple import *
+
+
+def _get_rod_part(rod):
+    return rod.leader if hasattr(rod, "leader") else rod
+
+
+def create_z_axis_carriage_assembly(
+    *,
+    z_axis_guide_rod,
+    z_axis_threaded_rod,
+    carriage_z_offset,
     BIG_THING,
     z_axis_carriage_back_depth,
     z_axis_carriage_back_height,
@@ -22,23 +40,7 @@ from mege_ender_3v3ke_idex.designs.idex_parameters import (
     z_axis_nut_screw_hole_clearence_type,
     z_axis_threaded_rod_diameter,
     z_axis_x_axis_to_carriage_gap,
-)
-from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
-    create_four_screws_mount_assembly,
-)
-from mege_ender_3v3ke_idex.designs.z_axis_components import (
-    create_creality_threaded_rod_nut,
-    create_igus_drylin_bearing,
-)
-from shellforgepy.simple import *
-
-
-def _get_rod_part(rod):
-    return rod.leader if hasattr(rod, "leader") else rod
-
-
-def create_z_axis_carriage_assembly(
-    *, z_axis_guide_rod, z_axis_threaded_rod, carriage_z_offset, context=None
+    context=None,
 ):
     """Create the printable carriage module for one z-axis side."""
 

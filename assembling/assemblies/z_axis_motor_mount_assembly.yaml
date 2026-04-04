@@ -26,6 +26,46 @@ Builder:
 Parameters:
   side:
     Type: String
+  BIG_THING:
+    Type: Float
+  motor_mount_axle_clearance:
+    Type: Float
+  motor_mount_boss_clearance:
+    Type: Float
+  motor_mount_boss_clearance_z:
+    Type: Float
+  motor_mount_plate_fillet_radius:
+    Type: Float
+  motor_mount_plate_thickness:
+    Type: Float
+  z_axis_cylinder_head_clearance:
+    Type: Float
+  z_axis_default_clearance_hole_type:
+    Type: String
+  z_axis_default_screw_nut_cutter_clearance:
+    Type: Float
+  z_axis_guide_rod_clamp_depth:
+    Type: Float
+  z_axis_guide_rod_clamp_screw_length:
+    Type: Float
+  z_axis_guide_rod_clamp_thickness:
+    Type: Float
+  z_axis_guide_rod_clamp_width:
+    Type: Float
+  z_axis_guide_rod_diameter:
+    Type: Float
+  z_axis_motor_mount_plate_depth:
+    Type: Float
+  z_axis_motor_mount_plate_profile_distance:
+    Type: Float
+  z_axis_motor_mount_plate_size:
+    Type: Float
+  z_axis_rod_clamp_gap:
+    Type: Float
+  z_axis_threaded_rod_diameter:
+    Type: Float
+  z_axis_threaded_rod_profile_distance:
+    Type: Float
 
 Parts:
   ZAxisMotorMountAssembly:
@@ -36,3 +76,43 @@ Parts:
       Properties:
         side:
           $ref: side
+        BIG_THING:
+          $ref: BIG_THING
+        motor_mount_axle_clearance:
+          $ref: motor_mount_axle_clearance
+        motor_mount_boss_clearance:
+          $ref: motor_mount_boss_clearance
+        motor_mount_boss_clearance_z:
+          $ref: motor_mount_boss_clearance_z
+        motor_mount_plate_fillet_radius:
+          $ref: motor_mount_plate_fillet_radius
+        motor_mount_plate_thickness:
+          $ref: motor_mount_plate_thickness
+        z_axis_cylinder_head_clearance:
+          $ref: z_axis_cylinder_head_clearance
+        z_axis_default_clearance_hole_type:
+          $ref: z_axis_default_clearance_hole_type
+        z_axis_default_screw_nut_cutter_clearance:
+          $ref: z_axis_default_screw_nut_cutter_clearance
+        z_axis_guide_rod_clamp_depth:
+          $ref: z_axis_guide_rod_clamp_depth
+        z_axis_guide_rod_clamp_screw_length:
+          $ref: z_axis_guide_rod_clamp_screw_length
+        z_axis_guide_rod_clamp_thickness:
+          $ref: z_axis_guide_rod_clamp_thickness
+        z_axis_guide_rod_clamp_width:
+          $ref: z_axis_guide_rod_clamp_width
+        z_axis_guide_rod_diameter:
+          $ref: z_axis_guide_rod_diameter
+        z_axis_motor_mount_plate_depth:
+          $ref: z_axis_motor_mount_plate_depth
+        z_axis_motor_mount_plate_profile_distance:
+          $ref: z_axis_motor_mount_plate_profile_distance
+        z_axis_motor_mount_plate_size:
+          $ref: z_axis_motor_mount_plate_size
+        z_axis_rod_clamp_gap:
+          $ref: z_axis_rod_clamp_gap
+        z_axis_threaded_rod_diameter:
+          $ref: z_axis_threaded_rod_diameter
+        z_axis_threaded_rod_profile_distance:
+          $ref: z_axis_threaded_rod_profile_distance

@@ -1,10 +1,5 @@
 """Declarative z-axis guide rod assembly."""
 
-from mege_ender_3v3ke_idex.designs.idex_parameters import (
-    z_axis_guide_rod_diameter,
-    z_axis_guide_rod_length,
-    z_axis_guide_rod_profile_distance,
-)
 from shellforgepy.simple import *
 
 
@@ -15,7 +10,13 @@ def _get_profile_part(z_axis_profile):
 
 
 def create_z_axis_guide_rod_assembly(
-    *, z_axis_profile, z_axis_base_z_offset, context=None
+    *,
+    z_axis_profile,
+    z_axis_base_z_offset,
+    z_axis_guide_rod_diameter,
+    z_axis_guide_rod_length,
+    z_axis_guide_rod_profile_distance,
+    context=None,
 ):
     """Create one guide rod against a placed Z profile."""
 

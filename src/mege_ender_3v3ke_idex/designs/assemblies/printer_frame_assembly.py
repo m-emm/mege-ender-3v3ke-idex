@@ -138,18 +138,13 @@ def create_printer_frame_assembly(
 
 
 def main():
-    from mege_ender_3v3ke_idex.designs.idex_parameters import (
-        frame_inner_depth,
-        frame_inner_width,
-    )
-
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
     # Create the part
     frame = create_printer_frame_assembly(
-        frame_inner_depth=frame_inner_depth,
-        frame_inner_width=frame_inner_width,
+        frame_inner_depth=610,
+        frame_inner_width=380,
         frame_profile_type="4040",
     )
 

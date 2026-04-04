@@ -23,9 +23,100 @@ Builder:
         artifact: followers
         name_template: "{name}"
 
+Parameters:
+  BIG_THING:
+    Type: Float
+  z_axis_cylinder_head_clearance:
+    Type: Float
+  z_axis_default_clearance_hole_type:
+    Type: String
+  z_axis_default_screw_nut_cutter_clearance:
+    Type: Float
+  z_axis_guide_rod_clamp_width:
+    Type: Float
+  z_axis_motor_mount_plate_profile_distance:
+    Type: Float
+  z_axis_profile_mount_plate_height:
+    Type: Float
+  z_axis_rod_clamp_gap:
+    Type: Float
+  z_axis_threaded_rod_diameter:
+    Type: Float
+  z_axis_top_mount_depth:
+    Type: Float
+  z_axis_top_mount_fillet_radius:
+    Type: Float
+  z_axis_top_mount_holder_depth:
+    Type: Float
+  z_axis_top_mount_holder_height:
+    Type: Float
+  z_axis_top_mount_profile_mount_width:
+    Type: Float
+  z_axis_top_mount_reinforcement_factor:
+    Type: Float
+  z_axis_top_mount_reinforcement_thickness:
+    Type: Float
+  z_axis_top_mount_screw_inset:
+    Type: Float
+  z_axis_top_mount_screw_length:
+    Type: Float
+  z_axis_top_mount_screw_size:
+    Type: String
+  z_axis_top_mount_thickness:
+    Type: Float
+  z_axis_top_mount_threaded_rod_clearance:
+    Type: Float
+  z_axis_top_mount_width:
+    Type: Float
+
 Parts:
   ZAxisGuideRodTopMountAssembly:
     Type: Shellforgepy::Assembly
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_guide_rod_top_mount_assembly.create_z_axis_guide_rod_top_mount_assembly
+      Properties:
+        BIG_THING:
+          $ref: BIG_THING
+        z_axis_cylinder_head_clearance:
+          $ref: z_axis_cylinder_head_clearance
+        z_axis_default_clearance_hole_type:
+          $ref: z_axis_default_clearance_hole_type
+        z_axis_default_screw_nut_cutter_clearance:
+          $ref: z_axis_default_screw_nut_cutter_clearance
+        z_axis_guide_rod_clamp_width:
+          $ref: z_axis_guide_rod_clamp_width
+        z_axis_motor_mount_plate_profile_distance:
+          $ref: z_axis_motor_mount_plate_profile_distance
+        z_axis_profile_mount_plate_height:
+          $ref: z_axis_profile_mount_plate_height
+        z_axis_rod_clamp_gap:
+          $ref: z_axis_rod_clamp_gap
+        z_axis_threaded_rod_diameter:
+          $ref: z_axis_threaded_rod_diameter
+        z_axis_top_mount_depth:
+          $ref: z_axis_top_mount_depth
+        z_axis_top_mount_fillet_radius:
+          $ref: z_axis_top_mount_fillet_radius
+        z_axis_top_mount_holder_depth:
+          $ref: z_axis_top_mount_holder_depth
+        z_axis_top_mount_holder_height:
+          $ref: z_axis_top_mount_holder_height
+        z_axis_top_mount_profile_mount_width:
+          $ref: z_axis_top_mount_profile_mount_width
+        z_axis_top_mount_reinforcement_factor:
+          $ref: z_axis_top_mount_reinforcement_factor
+        z_axis_top_mount_reinforcement_thickness:
+          $ref: z_axis_top_mount_reinforcement_thickness
+        z_axis_top_mount_screw_inset:
+          $ref: z_axis_top_mount_screw_inset
+        z_axis_top_mount_screw_length:
+          $ref: z_axis_top_mount_screw_length
+        z_axis_top_mount_screw_size:
+          $ref: z_axis_top_mount_screw_size
+        z_axis_top_mount_thickness:
+          $ref: z_axis_top_mount_thickness
+        z_axis_top_mount_threaded_rod_clearance:
+          $ref: z_axis_top_mount_threaded_rod_clearance
+        z_axis_top_mount_width:
+          $ref: z_axis_top_mount_width

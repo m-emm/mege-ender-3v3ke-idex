@@ -23,9 +23,20 @@ Builder:
         artifact: followers
         name_template: "{name}"
 
+Parameters:
+  BIG_THING:
+    Type: Float
+  z_axis_pillow_block_bearing_z_offset:
+    Type: Float
+
 Parts:
   ZAxisBottomSupportAssembly:
     Type: Shellforgepy::Assembly
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_bottom_support_assembly.create_z_axis_bottom_support_assembly
+      Properties:
+        BIG_THING:
+          $ref: BIG_THING
+        z_axis_pillow_block_bearing_z_offset:
+          $ref: z_axis_pillow_block_bearing_z_offset

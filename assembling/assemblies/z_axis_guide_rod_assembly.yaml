@@ -14,6 +14,12 @@ Builder:
 Parameters:
   z_axis_base_z_offset:
     Type: Float
+  z_axis_guide_rod_diameter:
+    Type: Float
+  z_axis_guide_rod_length:
+    Type: Float
+  z_axis_guide_rod_profile_distance:
+    Type: Float
 
 Parts:
   ZAxisGuideRodAssembly:
@@ -24,3 +30,9 @@ Parts:
       Properties:
         z_axis_base_z_offset:
           $ref: z_axis_base_z_offset
+        z_axis_guide_rod_diameter:
+          $ref: z_axis_guide_rod_diameter
+        z_axis_guide_rod_length:
+          $ref: z_axis_guide_rod_length
+        z_axis_guide_rod_profile_distance:
+          $ref: z_axis_guide_rod_profile_distance

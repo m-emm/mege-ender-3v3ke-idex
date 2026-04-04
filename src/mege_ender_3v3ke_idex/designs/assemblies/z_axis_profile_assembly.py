@@ -4,7 +4,6 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
-from mege_ender_3v3ke_idex.designs.idex_parameters import z_axis_profile_length
 from shellforgepy.metrics import record_length_metric
 from shellforgepy.simple import *
 
@@ -18,7 +17,7 @@ def _normalize_side(side):
     raise ValueError(f"Unsupported z-axis side '{side}'")
 
 
-def create_z_axis_profile_assembly(*, side, context=None):
+def create_z_axis_profile_assembly(*, side, z_axis_profile_length, context=None):
     """Create a standalone z-axis profile in canonical local coordinates."""
 
     del context

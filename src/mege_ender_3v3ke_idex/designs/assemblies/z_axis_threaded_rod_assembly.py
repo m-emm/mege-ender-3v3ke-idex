@@ -1,11 +1,5 @@
 """Declarative z-axis threaded rod assembly."""
 
-from mege_ender_3v3ke_idex.designs.idex_parameters import (
-    z_axis_threaded_rod_coupler_overlap,
-    z_axis_threaded_rod_diameter,
-    z_axis_threaded_rod_length,
-    z_axis_threaded_rod_profile_distance,
-)
 from shellforgepy.simple import *
 
 
@@ -20,7 +14,14 @@ def _get_motor_mount_coupler(z_axis_motor_mount):
 
 
 def create_z_axis_threaded_rod_assembly(
-    *, z_axis_profile, z_axis_motor_mount, context=None
+    *,
+    z_axis_profile,
+    z_axis_motor_mount,
+    z_axis_threaded_rod_coupler_overlap,
+    z_axis_threaded_rod_diameter,
+    z_axis_threaded_rod_length,
+    z_axis_threaded_rod_profile_distance,
+    context=None,
 ):
     """Create one threaded rod from the actual motor mount coupler placement."""
 
