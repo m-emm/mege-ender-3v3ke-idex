@@ -653,7 +653,69 @@ assemblies:
 
   - name: x_axis_assembly
 
+    depends_on:
+      - x_axis_lower_profile_assembly
+      - x_axis_top_profile_assembly
+      - x_axis_rail_assembly
+      - x_axis_endstop_support_assembly
+    inject_parts:
+      x_axis_lower_profile: x_axis_lower_profile_assembly
+      x_axis_top_profile: x_axis_top_profile_assembly
+      x_axis_rail: x_axis_rail_assembly
+      x_axis_endstop_support: x_axis_endstop_support_assembly
+
+  - name: x_axis_lower_profile_assembly
+
+    resource_file: x_axis_profile_assembly.yaml
     depends_on: []
+    parameters:
+      profile_name: x_axis_lower_profile
+      x_axis_profile_length: !Ref x_axis_profile_length
+      profile_z_offset: 0
+
+  - name: x_axis_top_profile_assembly
+
+    resource_file: x_axis_profile_assembly.yaml
+    depends_on: []
+    parameters:
+      profile_name: x_axis_top_profile
+      x_axis_profile_length: !Ref x_axis_profile_length
+      profile_z_offset: !Ref x_axis_profile_pitch
+
+  - name: x_axis_rail_assembly
+
+    resource_file: x_axis_rail_assembly.yaml
+    depends_on:
+      - x_axis_lower_profile_assembly
+    inject_parts:
+      x_axis_lower_profile: x_axis_lower_profile_assembly
+    parameters:
+      x_axis_rail_length: !Ref x_axis_rail_length
+      carriage_end_clearance: !Ref carriage_end_clearance
+
+  - name: x_axis_endstop_support_assembly
+
+    resource_file: x_axis_endstop_support_assembly.yaml
+    depends_on:
+      - x_axis_lower_profile_assembly
+      - x_axis_rail_assembly
+    inject_parts:
+      x_axis_lower_profile: x_axis_lower_profile_assembly
+      x_axis_rail: x_axis_rail_assembly
+    parameters:
+      carriage_end_rail_stopper_length: !Ref carriage_end_rail_stopper_length
+      carriage_end_rail_stopper_thickness: !Ref carriage_end_rail_stopper_thickness
+      carriage_end_rail_stopper_depth: !Ref carriage_end_rail_stopper_depth
+      carriage_end_rail_stopper_fillet_radius: !Ref carriage_end_rail_stopper_fillet_radius
+      carriage_end_rail_connector_thickness: !Ref carriage_end_rail_connector_thickness
+      endstop_holder_mount_screw_size: !Ref endstop_holder_mount_screw_size
+      endstop_holder_mount_plate_width: !Ref endstop_holder_mount_plate_width
+      endstop_holder_groove_holder_bottom_width: !Ref endstop_holder_groove_holder_bottom_width
+      endstop_holder_groove_holder_top_width: !Ref endstop_holder_groove_holder_top_width
+      endstop_holder_groove_holder_height: !Ref endstop_holder_groove_holder_height
+      endstop_holder_groove_holder_slit: !Ref endstop_holder_groove_holder_slit
+      endstop_holder_stack_gap: !Ref endstop_holder_stack_gap
+      endstop_holder_y_offset: !Ref endstop_holder_y_offset
 
   - name: y_axis_rail_carrier_brackets_assembly
 

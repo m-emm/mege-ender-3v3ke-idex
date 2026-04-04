@@ -1,0 +1,34 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for one x-axis profile
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: x_axis_profile
+  Production:
+    parts: []
+
+Parameters:
+  profile_name:
+    Type: String
+  x_axis_profile_length:
+    Type: Float
+  profile_z_offset:
+    Type: Float
+
+Parts:
+  XAxisProfileAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_profile_assembly.create_x_axis_profile_assembly
+      Properties:
+        profile_name:
+          $ref: profile_name
+        x_axis_profile_length:
+          $ref: x_axis_profile_length
+        profile_z_offset:
+          $ref: profile_z_offset

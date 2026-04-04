@@ -1,0 +1,33 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the x-axis rail and carriages
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: rail
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+  Production:
+    parts: []
+
+Parameters:
+  x_axis_rail_length:
+    Type: Float
+  carriage_end_clearance:
+    Type: Float
+
+Parts:
+  XAxisRailAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_rail_assembly.create_x_axis_rail_assembly
+      Properties:
+        x_axis_rail_length:
+          $ref: x_axis_rail_length
+        carriage_end_clearance:
+          $ref: carriage_end_clearance

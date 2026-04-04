@@ -1,22 +1,12 @@
 """Declarative x-axis assembly."""
 
 import numpy as np
-from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
-    ExtrusionProfileType,
-    create_alu_extrusion_profile,
-)
-from mege_ender_3v3ke_idex.designs.endstop_holder import create_endstop_holder
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idler_cage import create_idler_cage
-from mege_ender_3v3ke_idex.designs.mgh_linear import (
-    create_mgn12h_rail_with_carriages,
-    mgn_12h_carriage_length,
-)
 from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_screw_mount_assembly,
 )
-from shellforgepy.metrics import record_length_metric
 from shellforgepy.simple import *
 
 
@@ -34,110 +24,8 @@ def _named_only(part):
     return cleaned
 
 
-def _create_groove_holder(
-    *,
-    screw_size,
-    endstop_holder_mount_plate_width,
-    endstop_holder_groove_holder_bottom_width,
-    endstop_holder_groove_holder_top_width,
-    endstop_holder_groove_holder_height,
-    endstop_holder_groove_holder_slit,
-    big_thing,
-):
-    mount_screw_cutter = create_cylinder(
-        MScrew.from_size(screw_size).clearance_hole_normal / 2,
-        big_thing,
-    )
-
-    groove_holder = create_pyramid_stump(
-        endstop_holder_mount_plate_width,
-        endstop_holder_mount_plate_width,
-        endstop_holder_groove_holder_bottom_width,
-        endstop_holder_groove_holder_top_width,
-        endstop_holder_groove_holder_height,
-    )
-
-    groove_holder_hole_cutter = create_cylinder(
-        MScrew.from_size(screw_size).core_hole / 2 - 0.1,
-        big_thing,
-    )
-    groove_holder_hole_cutter = align(
-        groove_holder_hole_cutter,
-        groove_holder,
-        Alignment.CENTER,
-    )
-    groove_holder = groove_holder.cut(groove_holder_hole_cutter)
-
-    mount_screw_cutter = align(
-        mount_screw_cutter,
-        groove_holder,
-        Alignment.CENTER,
-    )
-
-    groove_holder_larger_hole_cutter = align(
-        mount_screw_cutter,
-        groove_holder,
-        Alignment.STACK_TOP,
-        stack_gap=endstop_holder_groove_holder_height / 3,
-    )
-    groove_holder = groove_holder.cut(groove_holder_larger_hole_cutter)
-
-    slit_cutter = create_box(
-        big_thing,
-        endstop_holder_groove_holder_slit,
-        big_thing,
-    )
-    slit_cutter = align(slit_cutter, groove_holder, Alignment.CENTER)
-    groove_holder = groove_holder.cut(slit_cutter)
-
-    retval = LeaderFollowersCuttersPart(leader=groove_holder)
-    retval.add_named_cutter(mount_screw_cutter, "mount_screw_cutter")
-    return retval
-
-
-def _create_carriage_end_rail_stopper(
-    *,
-    carriage_end_rail_stopper_length,
-    carriage_end_rail_stopper_depth,
-    carriage_end_rail_stopper_thickness,
-    carriage_end_rail_stopper_fillet_radius,
-    endstop_holder_mount_screw_size,
-    endstop_holder_mount_plate_width,
-    endstop_holder_groove_holder_bottom_width,
-    endstop_holder_groove_holder_top_width,
-    endstop_holder_groove_holder_height,
-    endstop_holder_groove_holder_slit,
-    big_thing,
-):
-    stopper = create_filleted_box(
-        carriage_end_rail_stopper_length,
-        carriage_end_rail_stopper_depth,
-        carriage_end_rail_stopper_thickness,
-        fillet_radius=carriage_end_rail_stopper_fillet_radius,
-        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
-    )
-
-    groove_holder = _create_groove_holder(
-        screw_size=endstop_holder_mount_screw_size,
-        endstop_holder_mount_plate_width=endstop_holder_mount_plate_width,
-        endstop_holder_groove_holder_bottom_width=endstop_holder_groove_holder_bottom_width,
-        endstop_holder_groove_holder_top_width=endstop_holder_groove_holder_top_width,
-        endstop_holder_groove_holder_height=endstop_holder_groove_holder_height,
-        endstop_holder_groove_holder_slit=endstop_holder_groove_holder_slit,
-        big_thing=big_thing,
-    )
-    groove_holder = align(groove_holder, stopper, Alignment.CENTER)
-    groove_holder = align(groove_holder, stopper, Alignment.STACK_BOTTOM)
-
-    stopper = groove_holder.use_as_cutter_on(stopper)
-
-    retval = LeaderFollowersCuttersPart(stopper)
-    retval.add_named_follower(groove_holder.leader, "groove_holder")
-    retval.add_named_cutter(
-        groove_holder.get_cutter_part_by_name("mount_screw_cutter"),
-        "mount_screw_cutter",
-    )
-    return retval
+def _get_leader_part(part_like):
+    return part_like.leader if hasattr(part_like, "leader") else part_like
 
 
 def _create_idler_endcap(
@@ -622,21 +510,13 @@ def _create_idler_endcap(
 
 def create_x_axis_assembly(
     *,
-    x_axis_profile_length,
     x_axis_profile_pitch,
-    x_axis_rail_length,
     mount_plate_connector_link_thickness,
     mount_plate_link_width,
     link_flange_depth,
     link_flange_thickness,
     link_screw_size,
     link_screw_length,
-    carriage_end_clearance,
-    carriage_end_rail_stopper_length,
-    carriage_end_rail_stopper_thickness,
-    carriage_end_rail_stopper_depth,
-    carriage_end_rail_stopper_fillet_radius,
-    carriage_end_rail_connector_thickness,
     toolhead_path_width,
     toolhead_path_extended_width,
     toolhead_path_extended_gap,
@@ -669,67 +549,22 @@ def create_x_axis_assembly(
     endcap_wall,
     idler_cage_back_wall,
     idler_cage_wall,
-    endstop_holder_mount_screw_size,
-    endstop_holder_mount_plate_width,
-    endstop_holder_groove_holder_bottom_width,
-    endstop_holder_groove_holder_top_width,
-    endstop_holder_groove_holder_height,
-    endstop_holder_groove_holder_slit,
-    endstop_holder_stack_gap,
-    endstop_holder_y_offset,
+    x_axis_lower_profile,
+    x_axis_top_profile,
+    x_axis_rail,
+    x_axis_endstop_support,
     record_metrics=False,
     context=None,
 ):
     """Create the x-axis assembly in a canonical local coordinate system."""
 
     big_thing = (context or {}).get("BIG_THING", 500)
-    carriage_offset = (
-        x_axis_rail_length / 2 - mgn_12h_carriage_length / 2 - carriage_end_clearance
-    )
+    del record_metrics
 
-    if record_metrics:
-        record_length_metric(
-            "extrusion_profile",
-            ExtrusionProfileType.PROFILE_2020.value,
-            "x_axis_lower_profile",
-            x_axis_profile_length,
-        )
-
-    lower_axis_profile = create_alu_extrusion_profile(
-        ExtrusionProfileType.PROFILE_2020,
-        length_mm=x_axis_profile_length,
-    )
-    lower_axis_profile = rotate(90, axis=(0, 1, 0))(lower_axis_profile)
-
-    if record_metrics:
-        record_length_metric(
-            "extrusion_profile",
-            ExtrusionProfileType.PROFILE_2020.value,
-            "x_axis_top_profile",
-            x_axis_profile_length,
-        )
-
-    top_axis_profile = translate(0, 0, x_axis_profile_pitch)(lower_axis_profile)
+    lower_axis_profile = _get_leader_part(x_axis_lower_profile)
+    top_axis_profile = _get_leader_part(x_axis_top_profile)
     axis_frame = lower_axis_profile.fuse(top_axis_profile)
-
-    if record_metrics:
-        record_length_metric("linear_rail", "MGN12", "x_axis_rail", x_axis_rail_length)
-
-    rail_with_carriages = create_mgn12h_rail_with_carriages(
-        length_mm=x_axis_rail_length,
-        carriage_offsets=[-carriage_offset, carriage_offset],
-    )
-    rail_with_carriages = align(
-        rail_with_carriages,
-        lower_axis_profile,
-        Alignment.CENTER,
-        axes=[0, 1],
-    )
-    rail_with_carriages = align(
-        rail_with_carriages,
-        lower_axis_profile,
-        Alignment.STACK_TOP,
-    )
+    rail_with_carriages = x_axis_rail
 
     mount_plates = PartCollector()
     mount_plate_connectors = PartCollector()
@@ -938,7 +773,6 @@ def create_x_axis_assembly(
             f"mount_plate_{side.name.lower()}",
         )
 
-    rail_end_stoppers = {}
     for side in (Alignment.LEFT, Alignment.RIGHT):
         profile_to_align_to = (
             lower_axis_profile if side == Alignment.LEFT else top_axis_profile
@@ -1040,104 +874,12 @@ def create_x_axis_assembly(
                     f"{endcap_name}_{npp_name_in_endcap}",
                 )
 
-            if side == Alignment.LEFT:
-                rail_end_stopper = _create_carriage_end_rail_stopper(
-                    carriage_end_rail_stopper_length=carriage_end_rail_stopper_length,
-                    carriage_end_rail_stopper_depth=carriage_end_rail_stopper_depth,
-                    carriage_end_rail_stopper_thickness=carriage_end_rail_stopper_thickness,
-                    carriage_end_rail_stopper_fillet_radius=carriage_end_rail_stopper_fillet_radius,
-                    endstop_holder_mount_screw_size=endstop_holder_mount_screw_size,
-                    endstop_holder_mount_plate_width=endstop_holder_mount_plate_width,
-                    endstop_holder_groove_holder_bottom_width=endstop_holder_groove_holder_bottom_width,
-                    endstop_holder_groove_holder_top_width=endstop_holder_groove_holder_top_width,
-                    endstop_holder_groove_holder_height=endstop_holder_groove_holder_height,
-                    endstop_holder_groove_holder_slit=endstop_holder_groove_holder_slit,
-                    big_thing=big_thing,
-                )
-                rail_end_stopper = align(
-                    rail_end_stopper,
-                    rail_with_carriages,
-                    Alignment.CENTER,
-                )
-                rail_end_stopper = align(
-                    rail_end_stopper,
-                    rail_with_carriages,
-                    Alignment.BOTTOM,
-                )
-                rail_end_stopper = align(
-                    rail_end_stopper,
-                    rail_with_carriages,
-                    endcap_side.stack_alignment,
-                )
-
-                rail_end_stopper_fused = rail_end_stopper.leader.fuse(
-                    rail_end_stopper.get_named_follower("groove_holder")
-                )
-
-                endstop_holder = create_endstop_holder()
-                endstop_holder = rotate(-endcap_side.sign * 90)(endstop_holder)
-                endstop_holder = align(
-                    endstop_holder,
-                    profile_to_align_to,
-                    Alignment.CENTER,
-                )
-                endstop_holder = align(
-                    endstop_holder,
-                    rail_end_stopper_fused,
-                    Alignment.STACK_TOP,
-                )
-                endstop_holder = translate(0, endstop_holder_y_offset, 0)(
-                    endstop_holder
-                )
-
-                endstop_holder_board = endstop_holder.get_non_production_part_by_name(
-                    "board"
-                )
-                endstop_holder_board_aligner = align_translation(
-                    endstop_holder_board,
-                    rail_with_carriages,
-                    endcap_side.stack_alignment,
-                    stack_gap=endstop_holder_stack_gap,
-                )
-                endstop_holder = endstop_holder_board_aligner(endstop_holder)
-                retval.add_named_non_production_part(
-                    endstop_holder.get_non_production_part_by_name("board"),
-                    f"endstop_board_{endcap_side.name.lower()}",
-                )
-
-                fused = endstop_holder.leader.fuse(rail_end_stopper_fused)
-                fused_size = get_bounding_box_size(fused)
-                stopper_size = get_bounding_box_size(rail_end_stopper_fused)
-                endstop_holder_size = get_bounding_box_size(endstop_holder)
-
-                connector = create_box(
-                    fused_size[0] - endstop_holder_size[0],
-                    stopper_size[1],
-                    carriage_end_rail_connector_thickness,
-                )
-                connector = align(connector, rail_end_stopper_fused, Alignment.CENTER)
-                connector = align(
-                    connector,
-                    rail_end_stopper_fused,
-                    endcap_side.opposite,
-                )
-                connector = align(
-                    connector,
-                    rail_end_stopper_fused,
-                    Alignment.STACK_TOP,
-                )
-                connector = rail_end_stopper.use_as_cutter_on(connector)
-
-                rail_end_stopper_fused = rail_end_stopper_fused.fuse(connector)
-                rail_end_stopper_fused = rail_end_stopper_fused.fuse(
-                    endstop_holder.leader
-                )
-                rail_end_stoppers[endcap_side] = rail_end_stopper_fused
-
-    for alignment, rail_end_stopper in rail_end_stoppers.items():
-        retval.add_named_follower(
-            rail_end_stopper,
-            f"rail_end_stopper_{alignment.name.lower()}",
-        )
+    for name, follower in x_axis_endstop_support.get_named_follower_items():
+        retval.add_named_follower(follower, name)
+    for (
+        name,
+        non_production_part,
+    ) in x_axis_endstop_support.get_named_non_production_part_items():
+        retval.add_named_non_production_part(non_production_part, name)
 
     return _named_only(retval)

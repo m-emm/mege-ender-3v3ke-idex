@@ -121,11 +121,7 @@ Builder:
         name_template: "{name}"
 
 Parameters:
-  x_axis_profile_length:
-    Type: Float
   x_axis_profile_pitch:
-    Type: Float
-  x_axis_rail_length:
     Type: Float
   mount_plate_connector_link_thickness:
     Type: Float
@@ -138,18 +134,6 @@ Parameters:
   link_screw_size:
     Type: String
   link_screw_length:
-    Type: Float
-  carriage_end_clearance:
-    Type: Float
-  carriage_end_rail_stopper_length:
-    Type: Float
-  carriage_end_rail_stopper_thickness:
-    Type: Float
-  carriage_end_rail_stopper_depth:
-    Type: Float
-  carriage_end_rail_stopper_fillet_radius:
-    Type: Float
-  carriage_end_rail_connector_thickness:
     Type: Float
   toolhead_path_width:
     Type: Float
@@ -215,22 +199,6 @@ Parameters:
     Type: Float
   idler_cage_wall:
     Type: Float
-  endstop_holder_mount_screw_size:
-    Type: String
-  endstop_holder_mount_plate_width:
-    Type: Float
-  endstop_holder_groove_holder_bottom_width:
-    Type: Float
-  endstop_holder_groove_holder_top_width:
-    Type: Float
-  endstop_holder_groove_holder_height:
-    Type: Float
-  endstop_holder_groove_holder_slit:
-    Type: Float
-  endstop_holder_stack_gap:
-    Type: Float
-  endstop_holder_y_offset:
-    Type: Float
 
 Parts:
   XAxisAssembly:
@@ -239,12 +207,8 @@ Parts:
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_assembly.create_x_axis_assembly
       Properties:
-        x_axis_profile_length:
-          $ref: x_axis_profile_length
         x_axis_profile_pitch:
           $ref: x_axis_profile_pitch
-        x_axis_rail_length:
-          $ref: x_axis_rail_length
         mount_plate_connector_link_thickness:
           $ref: mount_plate_connector_link_thickness
         mount_plate_link_width:
@@ -257,18 +221,6 @@ Parts:
           $ref: link_screw_size
         link_screw_length:
           $ref: link_screw_length
-        carriage_end_clearance:
-          $ref: carriage_end_clearance
-        carriage_end_rail_stopper_length:
-          $ref: carriage_end_rail_stopper_length
-        carriage_end_rail_stopper_thickness:
-          $ref: carriage_end_rail_stopper_thickness
-        carriage_end_rail_stopper_depth:
-          $ref: carriage_end_rail_stopper_depth
-        carriage_end_rail_stopper_fillet_radius:
-          $ref: carriage_end_rail_stopper_fillet_radius
-        carriage_end_rail_connector_thickness:
-          $ref: carriage_end_rail_connector_thickness
         toolhead_path_width:
           $ref: toolhead_path_width
         toolhead_path_extended_width:
@@ -333,20 +285,4 @@ Parts:
           $ref: idler_cage_back_wall
         idler_cage_wall:
           $ref: idler_cage_wall
-        endstop_holder_mount_screw_size:
-          $ref: endstop_holder_mount_screw_size
-        endstop_holder_mount_plate_width:
-          $ref: endstop_holder_mount_plate_width
-        endstop_holder_groove_holder_bottom_width:
-          $ref: endstop_holder_groove_holder_bottom_width
-        endstop_holder_groove_holder_top_width:
-          $ref: endstop_holder_groove_holder_top_width
-        endstop_holder_groove_holder_height:
-          $ref: endstop_holder_groove_holder_height
-        endstop_holder_groove_holder_slit:
-          $ref: endstop_holder_groove_holder_slit
-        endstop_holder_stack_gap:
-          $ref: endstop_holder_stack_gap
-        endstop_holder_y_offset:
-          $ref: endstop_holder_y_offset
         record_metrics: true
