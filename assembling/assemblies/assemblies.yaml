@@ -240,7 +240,7 @@ globals:
   y_axis_drive_motor_plate_width: 70
   y_axis_drive_motor_plate_depth: 50
   y_axis_drive_idler_plate_width: 34
-  y_axis_drive_motor_pulley_teeth: 20
+  y_axis_drive_motor_pulley_teeth: 30
   y_axis_drive_idler_teeth: 20
   y_axis_drive_belt_clear_span_extra: 0
   y_axis_drive_idler_housing_side_wall: 3.5
@@ -690,6 +690,9 @@ assemblies:
     depends_on:
       - printer_frame_assembly
       - print_bed_undercarriage_assembly
+    parameters:
+      y_axis_drive_motor_pulley_teeth: !Ref y_axis_drive_motor_pulley_teeth
+      y_axis_drive_idler_teeth: !Ref y_axis_drive_idler_teeth
     inject_parts:
       frame_back_profile: printer_frame_assembly.non_production_parts.frame_profile_back
       frame_front_profile: printer_frame_assembly.non_production_parts.frame_profile_front
