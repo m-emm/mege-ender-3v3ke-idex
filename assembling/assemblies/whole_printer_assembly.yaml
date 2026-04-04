@@ -239,6 +239,8 @@ Builder:
           - right_carriage_clamp_top_screw_assembly_screw_3_nut
           - right_carriage_clamp_top_screw_assembly_screw_3_screw
           - right_bottom_bearing
+          - left_profile
+          - right_profile
           - carriages_fused
           - x_axis_alignment_reference
         name_template: "{name}"
