@@ -10,6 +10,114 @@ Implemented:
 
 The remainder of this document is kept as migration history/plan and still describes the intended decomposition, even where some items are now already completed.
 
+## Second Iteration
+
+This chapter records a follow-up refactor needed after the first migration landed.
+
+### Verification of the first migration
+
+Verified in the current tree:
+
+- `src/mege_ender_3v3ke_idex/designs/z_axis.py` is gone
+- the current assembly build path no longer imports from legacy `designs/z_axis.py`
+- the Z-axis is now assembled from assembly-era modules in `src/mege_ender_3v3ke_idex/designs/assemblies/`
+- left/right duplication is declared in `assembling/assemblies/assemblies.yaml`
+
+So the first migration should be considered complete.
+
+### Why a second iteration is needed
+
+The current decomposition still has one structural problem:
+
+- `z_axis_rods_assembly` owns both the guide rod and the threaded rod as one bundled assembly
+
+That coupling is too rigid for two reasons:
+
+1. It does not match the current placement reality.
+   - the guide rod and threaded rod do not share the same meaningful Z references
+   - the guide rod is primarily referenced by the top mount and carriage
+   - the threaded rod is primarily referenced by the bottom support stack and motor/coupler stack
+
+2. It blocks the next redesign step.
+   - later work will need to change the guide-rod and threaded-rod relative XY positioning
+   - a single bundled rods assembly makes that harder because all downstream consumers inherit one fixed internal rods relationship
+
+There is also a regression in the current code path:
+
+- `z_axis_rods_assembly.py` currently creates a temporary motor only to derive a coupler-relative translation for the threaded rod
+- this is the wrong responsibility boundary
+- the threaded rod should instead be placed where the real motor mount assembly needs it
+- specifically, the threaded rod must stack on top of the motor coupler and then sink into it with a negative stack gap of about `10 mm`
+
+That sink amount should become a named constant if one does not already exist.
+
+### Target split for the second iteration
+
+Replace the current single rods assembly with two separate assemblies:
+
+1. `z_axis_guide_rod_assembly`
+   - responsibility: own one guide rod only
+   - inputs:
+     - `z_axis_profile`
+     - `z_axis_base_z_offset`
+   - output:
+     - leader: `guide_rod`
+   - notes:
+     - this keeps the current guide-rod placement against the profile
+     - this remains the anchor used by the top mount and carriage
+
+2. `z_axis_threaded_rod_assembly`
+   - responsibility: own one threaded rod only
+   - inputs:
+     - `z_axis_profile`
+     - `z_axis_motor_mount`
+   - output:
+     - leader: `threaded_rod`
+   - notes:
+     - vertical placement must be derived from the actual motor coupler, not from a temporary motor created inside another assembly
+     - the threaded rod should be aligned to the coupler using `Alignment.STACK_TOP` with a negative stack gap
+     - introduce a constant for this overlap, approximately `10 mm`
+
+### Dependency changes
+
+This split changes downstream dependencies as follows:
+
+- `z_axis_bottom_support_assembly`
+  - should depend on `z_axis_profile`, `z_axis_guide_rod`, and `z_axis_threaded_rod`
+- `z_axis_motor_mount_assembly`
+  - should depend on `z_axis_profile` and `z_axis_guide_rod`
+  - it should publish the real coupler geometry needed by `z_axis_threaded_rod_assembly`
+- `z_axis_guide_rod_top_mount_assembly`
+  - should depend on `z_axis_profile`, `z_axis_guide_rod`, and `z_axis_threaded_rod`
+- `z_axis_carriage_assembly`
+  - should depend on `z_axis_guide_rod` and `z_axis_threaded_rod`
+- `z_axis_side_assembly`
+  - should inject and republish `guide_rod` and `threaded_rod` separately instead of unpacking a combined rods assembly
+
+### Assembly-graph consequence
+
+Because the threaded rod will now depend on the motor mount, the per-side build order should become:
+
+1. `z_axis_profile`
+2. `z_axis_guide_rod`
+3. `z_axis_motor_mount`
+4. `z_axis_threaded_rod`
+5. `z_axis_bottom_support`
+6. `z_axis_guide_rod_top_mount`
+7. `z_axis_carriage`
+8. `z_axis_side`
+
+This is the important graph change that the current single bundled rods assembly cannot express cleanly.
+
+### Scope rule for the second iteration
+
+This follow-up should stay narrow:
+
+- do not redesign the printable parts themselves yet
+- do not change exported external names unless required by the split
+- do not fold in the future XY rod-spacing redesign yet
+- only introduce the assembly split and the threaded-rod/coupler placement fix needed to support later work cleanly
+
 ## Goal
 
 Refactor the Z-axis so that:

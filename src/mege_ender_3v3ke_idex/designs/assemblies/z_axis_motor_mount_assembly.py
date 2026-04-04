@@ -19,6 +19,8 @@ from mege_ender_3v3ke_idex.designs.idex_parameters import (
     z_axis_motor_mount_plate_profile_distance,
     z_axis_motor_mount_plate_size,
     z_axis_rod_clamp_gap,
+    z_axis_threaded_rod_diameter,
+    z_axis_threaded_rod_profile_distance,
 )
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
@@ -43,14 +45,16 @@ def _get_profile_part(z_axis_profile):
     )
 
 
-def _get_rods_parts(z_axis_rods):
-    guide_rod = z_axis_rods.leader if hasattr(z_axis_rods, "leader") else z_axis_rods
-    threaded_rod = z_axis_rods.get_named_non_production_part("threaded_rod")
-    return guide_rod, threaded_rod
+def _get_guide_rod_part(z_axis_guide_rod):
+    return (
+        z_axis_guide_rod.leader
+        if hasattr(z_axis_guide_rod, "leader")
+        else z_axis_guide_rod
+    )
 
 
 def create_z_axis_motor_mount_assembly(
-    *, z_axis_profile, z_axis_rods, side, context=None
+    *, z_axis_profile, z_axis_guide_rod, side, context=None
 ):
     """Create the printable motor mount assembly for one z-axis side."""
 
@@ -58,7 +62,20 @@ def create_z_axis_motor_mount_assembly(
 
     side_alignment = _to_side_alignment(side)
     profile = _get_profile_part(z_axis_profile)
-    guide_rod, threaded_rod = _get_rods_parts(z_axis_rods)
+    guide_rod = _get_guide_rod_part(z_axis_guide_rod)
+
+    threaded_rod_reference = create_cylinder(
+        z_axis_threaded_rod_diameter / 2, BIG_THING
+    )
+    threaded_rod_reference = align(
+        threaded_rod_reference, guide_rod, Alignment.CENTER, axes=[0]
+    )
+    threaded_rod_reference = align(
+        threaded_rod_reference,
+        profile,
+        Alignment.STACK_FRONT,
+        stack_gap=z_axis_threaded_rod_profile_distance,
+    )
 
     motor = create_nema_composite(
         axle_clearance=motor_mount_axle_clearance,
@@ -68,7 +85,7 @@ def create_z_axis_motor_mount_assembly(
     if side_alignment == Alignment.LEFT:
         motor = rotate(180)(motor)
 
-    motor = align(motor, threaded_rod, Alignment.CENTER)
+    motor = align(motor, threaded_rod_reference, Alignment.CENTER, axes=[0, 1])
     motor = align(motor, profile, Alignment.BOTTOM)
 
     motor_body = motor.get_named_follower("body")

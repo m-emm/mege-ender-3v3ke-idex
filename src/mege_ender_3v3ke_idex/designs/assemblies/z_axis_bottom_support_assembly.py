@@ -20,19 +20,30 @@ def _get_profile_part(z_axis_profile):
     )
 
 
-def _get_rods_parts(z_axis_rods):
-    guide_rod = z_axis_rods.leader if hasattr(z_axis_rods, "leader") else z_axis_rods
-    threaded_rod = z_axis_rods.get_named_non_production_part("threaded_rod")
-    return guide_rod, threaded_rod
+def _get_rod_part(rod):
+    return rod.leader if hasattr(rod, "leader") else rod
 
 
-def create_z_axis_bottom_support_assembly(*, z_axis_profile, z_axis_rods, context=None):
+def _get_motor_mount_coupler(z_axis_motor_mount):
+    return z_axis_motor_mount.get_named_non_production_part("coupler")
+
+
+def create_z_axis_bottom_support_assembly(
+    *,
+    z_axis_profile,
+    z_axis_guide_rod,
+    z_axis_threaded_rod,
+    z_axis_motor_mount,
+    context=None,
+):
     """Create the printable lower support stack for one z-axis side."""
 
     del context
 
     profile = _get_profile_part(z_axis_profile)
-    guide_rod, threaded_rod = _get_rods_parts(z_axis_rods)
+    guide_rod = _get_rod_part(z_axis_guide_rod)
+    threaded_rod = _get_rod_part(z_axis_threaded_rod)
+    coupler = _get_motor_mount_coupler(z_axis_motor_mount)
 
     clearance_stack = LeaderFollowersCuttersPart(guide_rod)
     clearance_stack.add_named_non_production_part(threaded_rod, "threaded_rod")
@@ -42,9 +53,11 @@ def create_z_axis_bottom_support_assembly(*, z_axis_profile, z_axis_rods, contex
     )
     pillow_block_bearing = rotate(-90, axis=(1, 0, 0))(pillow_block_bearing)
     pillow_block_bearing = align(pillow_block_bearing, threaded_rod, Alignment.CENTER)
-    pillow_block_bearing = align(pillow_block_bearing, threaded_rod, Alignment.BOTTOM)
-    pillow_block_bearing = translate(0, 0, z_axis_pillow_block_bearing_z_offset)(
-        pillow_block_bearing
+    pillow_block_bearing = align(
+        pillow_block_bearing,
+        coupler,
+        Alignment.STACK_TOP,
+        stack_gap=z_axis_pillow_block_bearing_z_offset,
     )
 
     clearance_stack.add_named_non_production_part(

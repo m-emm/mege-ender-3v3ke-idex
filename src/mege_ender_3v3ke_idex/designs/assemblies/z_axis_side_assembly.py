@@ -3,10 +3,8 @@
 from shellforgepy.simple import *
 
 
-def _get_rods_parts(z_axis_rods):
-    guide_rod = z_axis_rods.leader if hasattr(z_axis_rods, "leader") else z_axis_rods
-    threaded_rod = z_axis_rods.get_named_non_production_part("threaded_rod")
-    return guide_rod, threaded_rod
+def _get_rod_part(rod):
+    return rod.leader if hasattr(rod, "leader") else rod
 
 
 def _fuse_printable_parts(*parts):
@@ -34,7 +32,8 @@ def _copy_non_production_parts(target, source, *, prefix=""):
 def create_z_axis_side_assembly(
     *,
     z_axis_profile,
-    z_axis_rods,
+    z_axis_guide_rod,
+    z_axis_threaded_rod,
     z_axis_bottom_support,
     z_axis_motor_mount,
     z_axis_guide_rod_top_mount,
@@ -46,7 +45,8 @@ def create_z_axis_side_assembly(
     del context
     del z_axis_profile
 
-    guide_rod, threaded_rod = _get_rods_parts(z_axis_rods)
+    guide_rod = _get_rod_part(z_axis_guide_rod)
+    threaded_rod = _get_rod_part(z_axis_threaded_rod)
 
     leader = _fuse_printable_parts(
         z_axis_bottom_support,

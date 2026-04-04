@@ -1,0 +1,19 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for one z-axis threaded rod
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: threaded_rod
+  Production:
+    parts: []
+
+Parts:
+  ZAxisThreadedRodAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_threaded_rod_assembly.create_z_axis_threaded_rod_assembly

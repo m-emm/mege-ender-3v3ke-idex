@@ -652,9 +652,9 @@ assemblies:
     parameters:
       side: right
 
-  - name: left_z_axis_rods_assembly
+  - name: left_z_axis_guide_rod_assembly
 
-    resource_file: z_axis_rods_assembly.yaml
+    resource_file: z_axis_guide_rod_assembly.yaml
     depends_on:
       - left_z_axis_profile_assembly
     inject_parts:
@@ -662,9 +662,9 @@ assemblies:
     parameters:
       z_axis_base_z_offset: !Ref z_axis_base_z_offset
 
-  - name: right_z_axis_rods_assembly
+  - name: right_z_axis_guide_rod_assembly
 
-    resource_file: z_axis_rods_assembly.yaml
+    resource_file: z_axis_guide_rod_assembly.yaml
     depends_on:
       - right_z_axis_profile_assembly
     inject_parts:
@@ -677,30 +677,38 @@ assemblies:
     resource_file: z_axis_bottom_support_assembly.yaml
     depends_on:
       - left_z_axis_profile_assembly
-      - left_z_axis_rods_assembly
+      - left_z_axis_guide_rod_assembly
+      - left_z_axis_threaded_rod_assembly
+      - left_z_axis_motor_mount_assembly
     inject_parts:
       z_axis_profile: left_z_axis_profile_assembly
-      z_axis_rods: left_z_axis_rods_assembly
+      z_axis_guide_rod: left_z_axis_guide_rod_assembly
+      z_axis_threaded_rod: left_z_axis_threaded_rod_assembly
+      z_axis_motor_mount: left_z_axis_motor_mount_assembly
 
   - name: right_z_axis_bottom_support_assembly
 
     resource_file: z_axis_bottom_support_assembly.yaml
     depends_on:
       - right_z_axis_profile_assembly
-      - right_z_axis_rods_assembly
+      - right_z_axis_guide_rod_assembly
+      - right_z_axis_threaded_rod_assembly
+      - right_z_axis_motor_mount_assembly
     inject_parts:
       z_axis_profile: right_z_axis_profile_assembly
-      z_axis_rods: right_z_axis_rods_assembly
+      z_axis_guide_rod: right_z_axis_guide_rod_assembly
+      z_axis_threaded_rod: right_z_axis_threaded_rod_assembly
+      z_axis_motor_mount: right_z_axis_motor_mount_assembly
 
   - name: left_z_axis_motor_mount_assembly
 
     resource_file: z_axis_motor_mount_assembly.yaml
     depends_on:
       - left_z_axis_profile_assembly
-      - left_z_axis_rods_assembly
+      - left_z_axis_guide_rod_assembly
     inject_parts:
       z_axis_profile: left_z_axis_profile_assembly
-      z_axis_rods: left_z_axis_rods_assembly
+      z_axis_guide_rod: left_z_axis_guide_rod_assembly
     parameters:
       side: left
 
@@ -709,40 +717,66 @@ assemblies:
     resource_file: z_axis_motor_mount_assembly.yaml
     depends_on:
       - right_z_axis_profile_assembly
-      - right_z_axis_rods_assembly
+      - right_z_axis_guide_rod_assembly
     inject_parts:
       z_axis_profile: right_z_axis_profile_assembly
-      z_axis_rods: right_z_axis_rods_assembly
+      z_axis_guide_rod: right_z_axis_guide_rod_assembly
     parameters:
       side: right
+
+  - name: left_z_axis_threaded_rod_assembly
+
+    resource_file: z_axis_threaded_rod_assembly.yaml
+    depends_on:
+      - left_z_axis_profile_assembly
+      - left_z_axis_motor_mount_assembly
+    inject_parts:
+      z_axis_profile: left_z_axis_profile_assembly
+      z_axis_motor_mount: left_z_axis_motor_mount_assembly
+
+  - name: right_z_axis_threaded_rod_assembly
+
+    resource_file: z_axis_threaded_rod_assembly.yaml
+    depends_on:
+      - right_z_axis_profile_assembly
+      - right_z_axis_motor_mount_assembly
+    inject_parts:
+      z_axis_profile: right_z_axis_profile_assembly
+      z_axis_motor_mount: right_z_axis_motor_mount_assembly
 
   - name: left_z_axis_guide_rod_top_mount_assembly
 
     resource_file: z_axis_guide_rod_top_mount_assembly.yaml
     depends_on:
       - left_z_axis_profile_assembly
-      - left_z_axis_rods_assembly
+      - left_z_axis_guide_rod_assembly
+      - left_z_axis_threaded_rod_assembly
     inject_parts:
       z_axis_profile: left_z_axis_profile_assembly
-      z_axis_rods: left_z_axis_rods_assembly
+      z_axis_guide_rod: left_z_axis_guide_rod_assembly
+      z_axis_threaded_rod: left_z_axis_threaded_rod_assembly
 
   - name: right_z_axis_guide_rod_top_mount_assembly
 
     resource_file: z_axis_guide_rod_top_mount_assembly.yaml
     depends_on:
       - right_z_axis_profile_assembly
-      - right_z_axis_rods_assembly
+      - right_z_axis_guide_rod_assembly
+      - right_z_axis_threaded_rod_assembly
     inject_parts:
       z_axis_profile: right_z_axis_profile_assembly
-      z_axis_rods: right_z_axis_rods_assembly
+      z_axis_guide_rod: right_z_axis_guide_rod_assembly
+      z_axis_threaded_rod: right_z_axis_threaded_rod_assembly
 
   - name: left_z_axis_carriage_assembly
 
     resource_file: z_axis_carriage_assembly.yaml
     depends_on:
-      - left_z_axis_rods_assembly
+      - left_z_axis_guide_rod_assembly
+      - left_z_axis_threaded_rod_assembly
     inject_parts:
-      z_axis_rods: left_z_axis_rods_assembly
+      z_axis_guide_rod: left_z_axis_guide_rod_assembly
+      z_axis_threaded_rod: left_z_axis_threaded_rod_assembly
     parameters:
       carriage_z_offset: !Ref carriage_z_offset
 
@@ -750,9 +784,11 @@ assemblies:
 
     resource_file: z_axis_carriage_assembly.yaml
     depends_on:
-      - right_z_axis_rods_assembly
+      - right_z_axis_guide_rod_assembly
+      - right_z_axis_threaded_rod_assembly
     inject_parts:
-      z_axis_rods: right_z_axis_rods_assembly
+      z_axis_guide_rod: right_z_axis_guide_rod_assembly
+      z_axis_threaded_rod: right_z_axis_threaded_rod_assembly
     parameters:
       carriage_z_offset: !Ref carriage_z_offset
 
@@ -761,14 +797,16 @@ assemblies:
     resource_file: z_axis_side_assembly.yaml
     depends_on:
       - left_z_axis_profile_assembly
-      - left_z_axis_rods_assembly
+      - left_z_axis_guide_rod_assembly
+      - left_z_axis_threaded_rod_assembly
       - left_z_axis_bottom_support_assembly
       - left_z_axis_motor_mount_assembly
       - left_z_axis_guide_rod_top_mount_assembly
       - left_z_axis_carriage_assembly
     inject_parts:
       z_axis_profile: left_z_axis_profile_assembly
-      z_axis_rods: left_z_axis_rods_assembly
+      z_axis_guide_rod: left_z_axis_guide_rod_assembly
+      z_axis_threaded_rod: left_z_axis_threaded_rod_assembly
       z_axis_bottom_support: left_z_axis_bottom_support_assembly
       z_axis_motor_mount: left_z_axis_motor_mount_assembly
       z_axis_guide_rod_top_mount: left_z_axis_guide_rod_top_mount_assembly
@@ -779,14 +817,16 @@ assemblies:
     resource_file: z_axis_side_assembly.yaml
     depends_on:
       - right_z_axis_profile_assembly
-      - right_z_axis_rods_assembly
+      - right_z_axis_guide_rod_assembly
+      - right_z_axis_threaded_rod_assembly
       - right_z_axis_bottom_support_assembly
       - right_z_axis_motor_mount_assembly
       - right_z_axis_guide_rod_top_mount_assembly
       - right_z_axis_carriage_assembly
     inject_parts:
       z_axis_profile: right_z_axis_profile_assembly
-      z_axis_rods: right_z_axis_rods_assembly
+      z_axis_guide_rod: right_z_axis_guide_rod_assembly
+      z_axis_threaded_rod: right_z_axis_threaded_rod_assembly
       z_axis_bottom_support: right_z_axis_bottom_support_assembly
       z_axis_motor_mount: right_z_axis_motor_mount_assembly
       z_axis_guide_rod_top_mount: right_z_axis_guide_rod_top_mount_assembly

@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for one z-axis guide/threaded rod pair
+Description: Assembly configuration for one z-axis guide rod
 
 Builder:
   Visualization:
@@ -8,9 +8,6 @@ Builder:
       - source: self
         artifact: leader
         name: guide_rod
-      - source: self
-        artifact: non_production_parts
-        name_template: "{name}"
   Production:
     parts: []
 
@@ -19,11 +16,11 @@ Parameters:
     Type: Float
 
 Parts:
-  ZAxisRodsAssembly:
+  ZAxisGuideRodAssembly:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_rods_assembly.create_z_axis_rods_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_guide_rod_assembly.create_z_axis_guide_rod_assembly
       Properties:
         z_axis_base_z_offset:
           $ref: z_axis_base_z_offset

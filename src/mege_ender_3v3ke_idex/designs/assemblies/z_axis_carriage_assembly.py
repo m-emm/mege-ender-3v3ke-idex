@@ -33,18 +33,19 @@ from mege_ender_3v3ke_idex.designs.z_axis_components import (
 from shellforgepy.simple import *
 
 
-def _get_rods_parts(z_axis_rods):
-    guide_rod = z_axis_rods.leader if hasattr(z_axis_rods, "leader") else z_axis_rods
-    threaded_rod = z_axis_rods.get_named_non_production_part("threaded_rod")
-    return guide_rod, threaded_rod
+def _get_rod_part(rod):
+    return rod.leader if hasattr(rod, "leader") else rod
 
 
-def create_z_axis_carriage_assembly(*, z_axis_rods, carriage_z_offset, context=None):
+def create_z_axis_carriage_assembly(
+    *, z_axis_guide_rod, z_axis_threaded_rod, carriage_z_offset, context=None
+):
     """Create the printable carriage module for one z-axis side."""
 
     del context
 
-    guide_rod, threaded_rod = _get_rods_parts(z_axis_rods)
+    guide_rod = _get_rod_part(z_axis_guide_rod)
+    threaded_rod = _get_rod_part(z_axis_threaded_rod)
 
     carriage_front = create_filleted_box(
         z_axis_carriage_width,
