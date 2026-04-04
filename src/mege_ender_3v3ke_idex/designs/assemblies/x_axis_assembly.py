@@ -552,7 +552,8 @@ def create_x_axis_assembly(
     x_axis_lower_profile,
     x_axis_top_profile,
     x_axis_rail,
-    x_axis_endstop_support,
+    x_axis_endstop_left_support,
+    x_axis_endstop_right_support,
     record_metrics=False,
     context=None,
 ):
@@ -874,12 +875,17 @@ def create_x_axis_assembly(
                     f"{endcap_name}_{npp_name_in_endcap}",
                 )
 
-    for name, follower in x_axis_endstop_support.get_named_follower_items():
-        retval.add_named_follower(follower, name)
-    for (
-        name,
-        non_production_part,
-    ) in x_axis_endstop_support.get_named_non_production_part_items():
-        retval.add_named_non_production_part(non_production_part, name)
+    for side_name, support in (
+        ("left", x_axis_endstop_left_support),
+        ("right", x_axis_endstop_right_support),
+    ):
+        retval.add_named_follower(
+            _get_leader_part(support),
+            f"rail_end_stopper_{side_name}",
+        )
+        retval.add_named_non_production_part(
+            support.get_non_production_part_by_name("endstop_board"),
+            f"endstop_board_{side_name}",
+        )
 
     return _named_only(retval)

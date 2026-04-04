@@ -1,24 +1,21 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for the x-axis endstop support pair
+Description: Assembly configuration for one x-axis endstop rail stopper
 
 Builder:
   Visualization:
     parts:
       - source: self
         artifact: leader
-        name: x_axis_endstop_support
+        name: x_axis_endstop_rail_stopper
       - source: self
         artifact: followers
-        name_template: "{name}"
-      - source: self
-        artifact: non_production_parts
         name_template: "{name}"
   Production:
     parts:
       - source: self
-        artifact: followers
-        name_template: "{name}"
+        artifact: leader
+        name: x_axis_endstop_rail_stopper
 
 Parameters:
   carriage_end_rail_stopper_length:
@@ -28,8 +25,6 @@ Parameters:
   carriage_end_rail_stopper_depth:
     Type: Float
   carriage_end_rail_stopper_fillet_radius:
-    Type: Float
-  carriage_end_rail_connector_thickness:
     Type: Float
   endstop_holder_mount_screw_size:
     Type: String
@@ -43,17 +38,13 @@ Parameters:
     Type: Float
   endstop_holder_groove_holder_slit:
     Type: Float
-  endstop_holder_stack_gap:
-    Type: Float
-  endstop_holder_y_offset:
-    Type: Float
 
 Parts:
-  XAxisEndstopSupportAssembly:
+  XAxisEndstopRailStopperAssembly:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_endstop_support_assembly.create_x_axis_endstop_support_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_endstop_rail_stopper_assembly.create_x_axis_endstop_rail_stopper_assembly
       Properties:
         carriage_end_rail_stopper_length:
           $ref: carriage_end_rail_stopper_length
@@ -63,8 +54,6 @@ Parts:
           $ref: carriage_end_rail_stopper_depth
         carriage_end_rail_stopper_fillet_radius:
           $ref: carriage_end_rail_stopper_fillet_radius
-        carriage_end_rail_connector_thickness:
-          $ref: carriage_end_rail_connector_thickness
         endstop_holder_mount_screw_size:
           $ref: endstop_holder_mount_screw_size
         endstop_holder_mount_plate_width:
@@ -77,7 +66,3 @@ Parts:
           $ref: endstop_holder_groove_holder_height
         endstop_holder_groove_holder_slit:
           $ref: endstop_holder_groove_holder_slit
-        endstop_holder_stack_gap:
-          $ref: endstop_holder_stack_gap
-        endstop_holder_y_offset:
-          $ref: endstop_holder_y_offset

@@ -538,6 +538,71 @@ placement:
       alignment: CENTER
       axes: [2]
 
+    - part: x_axis_endstop_rail_stopper_left_assembly
+      to: x_axis_rail_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: x_axis_endstop_rail_stopper_left_assembly
+      to: x_axis_rail_assembly
+      alignment: BOTTOM
+    - part: x_axis_endstop_rail_stopper_left_assembly
+      to: x_axis_rail_assembly
+      alignment: STACK_LEFT
+    - part: x_axis_endstop_rail_stopper_right_assembly
+      to: x_axis_rail_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: x_axis_endstop_rail_stopper_right_assembly
+      to: x_axis_rail_assembly
+      alignment: BOTTOM
+    - part: x_axis_endstop_rail_stopper_right_assembly
+      to: x_axis_rail_assembly
+      alignment: STACK_RIGHT
+
+    - part: x_axis_endstop_holder_left_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 0, 1]
+        center: x_axis_endstop_holder_left_assembly.CENTER
+    - part: x_axis_endstop_holder_left_assembly
+      to: x_axis_lower_profile_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: x_axis_endstop_holder_left_assembly
+      to: x_axis_endstop_rail_stopper_left_assembly
+      alignment: STACK_TOP
+      post_translation:
+        - 0
+        - $ref: endstop_holder_y_offset
+        - 0
+    - part: x_axis_endstop_holder_left_assembly.non_production_parts.board
+      to: x_axis_rail_assembly
+      alignment: STACK_LEFT
+      stack_gap:
+        $ref: endstop_holder_stack_gap
+
+    - part: x_axis_endstop_holder_right_assembly
+      post_rotation:
+        angle: -90
+        axis: [0, 0, 1]
+        center: x_axis_endstop_holder_right_assembly.CENTER
+    - part: x_axis_endstop_holder_right_assembly
+      to: x_axis_lower_profile_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: x_axis_endstop_holder_right_assembly
+      to: x_axis_endstop_rail_stopper_right_assembly
+      alignment: STACK_TOP
+      post_translation:
+        - 0
+        - $ref: endstop_holder_y_offset
+        - 0
+    - part: x_axis_endstop_holder_right_assembly.non_production_parts.board
+      to: x_axis_rail_assembly
+      alignment: STACK_RIGHT
+      stack_gap:
+        $ref: endstop_holder_stack_gap
+
     - part: left_z_axis_profile_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left
       alignment: CENTER
@@ -657,12 +722,14 @@ assemblies:
       - x_axis_lower_profile_assembly
       - x_axis_top_profile_assembly
       - x_axis_rail_assembly
-      - x_axis_endstop_support_assembly
+      - x_axis_endstop_left_side_assembly
+      - x_axis_endstop_right_side_assembly
     inject_parts:
       x_axis_lower_profile: x_axis_lower_profile_assembly
       x_axis_top_profile: x_axis_top_profile_assembly
       x_axis_rail: x_axis_rail_assembly
-      x_axis_endstop_support: x_axis_endstop_support_assembly
+      x_axis_endstop_left_support: x_axis_endstop_left_side_assembly
+      x_axis_endstop_right_support: x_axis_endstop_right_side_assembly
 
   - name: x_axis_lower_profile_assembly
 
@@ -693,29 +760,77 @@ assemblies:
       x_axis_rail_length: !Ref x_axis_rail_length
       carriage_end_clearance: !Ref carriage_end_clearance
 
-  - name: x_axis_endstop_support_assembly
+  - name: x_axis_endstop_holder_left_assembly
 
-    resource_file: x_axis_endstop_support_assembly.yaml
-    depends_on:
-      - x_axis_lower_profile_assembly
-      - x_axis_rail_assembly
-    inject_parts:
-      x_axis_lower_profile: x_axis_lower_profile_assembly
-      x_axis_rail: x_axis_rail_assembly
+    resource_file: x_axis_endstop_holder_assembly.yaml
+    depends_on: []
+
+  - name: x_axis_endstop_holder_right_assembly
+
+    resource_file: x_axis_endstop_holder_assembly.yaml
+    depends_on: []
+
+  - name: x_axis_endstop_rail_stopper_left_assembly
+
+    resource_file: x_axis_endstop_rail_stopper_assembly.yaml
+    depends_on: []
     parameters:
       carriage_end_rail_stopper_length: !Ref carriage_end_rail_stopper_length
       carriage_end_rail_stopper_thickness: !Ref carriage_end_rail_stopper_thickness
       carriage_end_rail_stopper_depth: !Ref carriage_end_rail_stopper_depth
       carriage_end_rail_stopper_fillet_radius: !Ref carriage_end_rail_stopper_fillet_radius
-      carriage_end_rail_connector_thickness: !Ref carriage_end_rail_connector_thickness
       endstop_holder_mount_screw_size: !Ref endstop_holder_mount_screw_size
       endstop_holder_mount_plate_width: !Ref endstop_holder_mount_plate_width
       endstop_holder_groove_holder_bottom_width: !Ref endstop_holder_groove_holder_bottom_width
       endstop_holder_groove_holder_top_width: !Ref endstop_holder_groove_holder_top_width
       endstop_holder_groove_holder_height: !Ref endstop_holder_groove_holder_height
       endstop_holder_groove_holder_slit: !Ref endstop_holder_groove_holder_slit
-      endstop_holder_stack_gap: !Ref endstop_holder_stack_gap
-      endstop_holder_y_offset: !Ref endstop_holder_y_offset
+
+  - name: x_axis_endstop_rail_stopper_right_assembly
+
+    resource_file: x_axis_endstop_rail_stopper_assembly.yaml
+    depends_on: []
+    parameters:
+      carriage_end_rail_stopper_length: !Ref carriage_end_rail_stopper_length
+      carriage_end_rail_stopper_thickness: !Ref carriage_end_rail_stopper_thickness
+      carriage_end_rail_stopper_depth: !Ref carriage_end_rail_stopper_depth
+      carriage_end_rail_stopper_fillet_radius: !Ref carriage_end_rail_stopper_fillet_radius
+      endstop_holder_mount_screw_size: !Ref endstop_holder_mount_screw_size
+      endstop_holder_mount_plate_width: !Ref endstop_holder_mount_plate_width
+      endstop_holder_groove_holder_bottom_width: !Ref endstop_holder_groove_holder_bottom_width
+      endstop_holder_groove_holder_top_width: !Ref endstop_holder_groove_holder_top_width
+      endstop_holder_groove_holder_height: !Ref endstop_holder_groove_holder_height
+      endstop_holder_groove_holder_slit: !Ref endstop_holder_groove_holder_slit
+
+  - name: x_axis_endstop_left_side_assembly
+
+    resource_file: x_axis_endstop_side_assembly.yaml
+    depends_on:
+      - x_axis_lower_profile_assembly
+      - x_axis_rail_assembly
+      - x_axis_endstop_holder_left_assembly
+      - x_axis_endstop_rail_stopper_left_assembly
+    inject_parts:
+      rail_stopper: x_axis_endstop_rail_stopper_left_assembly
+      endstop_holder: x_axis_endstop_holder_left_assembly
+    parameters:
+      side: left
+      carriage_end_rail_connector_thickness: !Ref carriage_end_rail_connector_thickness
+
+  - name: x_axis_endstop_right_side_assembly
+
+    resource_file: x_axis_endstop_side_assembly.yaml
+    depends_on:
+      - x_axis_lower_profile_assembly
+      - x_axis_rail_assembly
+      - x_axis_endstop_holder_right_assembly
+      - x_axis_endstop_rail_stopper_right_assembly
+    inject_parts:
+      rail_stopper: x_axis_endstop_rail_stopper_right_assembly
+      endstop_holder: x_axis_endstop_holder_right_assembly
+    parameters:
+      side: right
+      carriage_end_rail_connector_thickness: !Ref carriage_end_rail_connector_thickness
 
   - name: y_axis_rail_carrier_brackets_assembly
 

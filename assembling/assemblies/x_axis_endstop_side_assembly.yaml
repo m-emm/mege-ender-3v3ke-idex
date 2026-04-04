@@ -1,0 +1,36 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for one x-axis endstop support side
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: x_axis_endstop_side
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+  Production:
+    parts:
+      - source: self
+        artifact: leader
+        name: x_axis_endstop_side
+
+Parameters:
+  side:
+    Type: String
+  carriage_end_rail_connector_thickness:
+    Type: Float
+
+Parts:
+  XAxisEndstopSideAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_endstop_side_assembly.create_x_axis_endstop_side_assembly
+      Properties:
+        side:
+          $ref: side
+        carriage_end_rail_connector_thickness:
+          $ref: carriage_end_rail_connector_thickness
