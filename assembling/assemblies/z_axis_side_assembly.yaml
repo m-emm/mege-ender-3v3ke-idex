@@ -5,10 +5,6 @@ Description: Assembly configuration for a single z-axis side
 Builder:
   Visualization:
     parts:
-      - source: dependencies
-        assembly: z_axis_profile
-        artifact: leader
-        name: z_axis_profile
       - source: self
         artifact: followers
         name_template: "{name}"

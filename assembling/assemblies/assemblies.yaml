@@ -152,9 +152,6 @@ globals:
   z_axis_base_z_offset:
     $expr:
       "$sub": "${print_bed_vertical_gap_to_frame} - 43"
-  z_axis_x_offset_from_center:
-    $expr:
-      "$sub": "${frame_inner_width} / 2 + 60"
   motor_size: 42.3
   motor_x_offset:
     $expr:
@@ -489,28 +486,19 @@ placement:
       axes: [2]
 
     - part: left_z_axis_profile_assembly
-      to: printer_frame_assembly
+      to: printer_frame_assembly.non_production_parts.frame_profile_left
       alignment: CENTER
       axes: [0, 1]
-      post_translation:
-        - $expr:
-            "$sub": "-1 * ${z_axis_x_offset_from_center}"
-        - $ref: z_axis_y_offset
-        - 0
     - part: left_z_axis_profile_assembly
-      to: printer_frame_assembly
-      alignment: BOTTOM
+      to: printer_frame_assembly.non_production_parts.frame_profile_left
+      alignment: STACK_TOP
     - part: right_z_axis_profile_assembly
-      to: printer_frame_assembly
+      to: printer_frame_assembly.non_production_parts.frame_profile_right
       alignment: CENTER
       axes: [0, 1]
-      post_translation:
-        - $ref: z_axis_x_offset_from_center
-        - $ref: z_axis_y_offset
-        - 0
     - part: right_z_axis_profile_assembly
-      to: printer_frame_assembly
-      alignment: BOTTOM
+      to: printer_frame_assembly.non_production_parts.frame_profile_right
+      alignment: STACK_TOP
     - part: x_axis_assembly
       to: z_axis_assembly.non_production_parts.carriages_fused
       alignment: CENTER
@@ -635,6 +623,16 @@ assemblies:
       right_z_axis_profile: right_z_axis_profile_assembly
       left_z_axis: left_z_axis_assembly
       right_z_axis: right_z_axis_assembly
+
+  - name: z_axis_top_bridge_profile_assembly
+
+    resource_file: z_axis_top_bridge_profile_assembly.yaml
+    depends_on:
+      - left_z_axis_profile_assembly
+      - right_z_axis_profile_assembly
+    inject_parts:
+      left_z_axis_profile: left_z_axis_profile_assembly
+      right_z_axis_profile: right_z_axis_profile_assembly
 
   - name: left_z_axis_profile_assembly
 
@@ -844,6 +842,7 @@ assemblies:
       - y_axis_endstop_holder_assembly
       - y_axis_rail_carrier_brackets_assembly
       - z_axis_assembly
+      - z_axis_top_bridge_profile_assembly
       - x_axis_assembly
       - tool_head_mount_bottom_assembly
       - tool_head_mount_top_assembly

@@ -52,7 +52,6 @@ def create_z_axis_side_assembly(
         z_axis_bottom_support,
         z_axis_motor_mount,
         z_axis_guide_rod_top_mount,
-        z_axis_carriage,
     )
     retval = LeaderFollowersCuttersPart(leader=leader)
 

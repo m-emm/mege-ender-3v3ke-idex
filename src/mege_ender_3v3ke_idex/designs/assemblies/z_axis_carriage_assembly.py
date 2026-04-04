@@ -99,10 +99,10 @@ def create_z_axis_carriage_assembly(
         z_axis_carriage_back_depth + 2 * z_axis_carriage_fillet_radius,
         z_axis_carriage_back_height,
         z_axis_carriage_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM],
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
     carriage_back = align(carriage_back, carriage_front, Alignment.CENTER)
-    carriage_back = align(carriage_back, carriage_front, Alignment.BOTTOM)
+    carriage_back = align(carriage_back, carriage_front, Alignment.TOP)
     carriage_back = align(
         carriage_back,
         carriage_front,

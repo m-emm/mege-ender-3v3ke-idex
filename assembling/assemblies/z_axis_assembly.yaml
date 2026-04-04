@@ -6,16 +6,10 @@ Builder:
   Visualization:
     parts:
       - source: self
-        artifact: leader
-        name: z_axis
-      - source: self
         artifact: followers
         name_template: "{name}"
       - source: self
         artifact: non_production_parts
-        exclude_names:
-          - left_profile
-          - right_profile
         name_template: "{name}"
   Production:
     parts:
