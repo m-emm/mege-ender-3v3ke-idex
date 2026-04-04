@@ -7,10 +7,6 @@ Builder:
     parts:
       - source: dependencies
         assembly: printer_frame_assembly
-        artifact: leader
-        name: printer_frame
-      - source: dependencies
-        assembly: printer_frame_assembly
         artifact: non_production_parts
         name_template: "{name}"
       - source: dependencies
@@ -81,6 +77,11 @@ Builder:
       - source: dependencies
         assembly: y_axis_rail_carrier_brackets_assembly
         artifact: non_production_parts
+        exclude_names:
+          - profile_side_mount_plate_left_front
+          - profile_side_mount_plate_left_back
+          - profile_side_mount_plate_right_front
+          - profile_side_mount_plate_right_back
         name_template: "{name}"
       - source: dependencies
         assembly: print_bed_assembly
