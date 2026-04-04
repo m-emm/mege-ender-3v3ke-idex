@@ -11,6 +11,7 @@ Builder:
       - source: self
         artifact: followers
         names:
+          - blower_ducts
           - belt_clamp_base_1
           - belt_clamp_base_2
           - carriage

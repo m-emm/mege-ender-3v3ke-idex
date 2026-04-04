@@ -5,10 +5,6 @@ Description: Assembly configuration for the x-axis
 Builder:
   Visualization:
     parts:
-      - source: dependencies
-        assembly: printer_frame_assembly
-        artifact: leader
-        name: printer_frame
       - source: self
         artifact: leader
         name: x_axis
@@ -41,76 +37,6 @@ Builder:
         exclude_names:
           - carriage_1
           - carriage_2
-      - source: dependencies
-        assembly: tool_head_mount_bottom_assembly
-        artifact: leader
-        name: tool_head_mount_bottom
-        animation:
-          x_carriage_1:
-            - { $ref: x_axis_x_travel }
-            - 0
-            - 0
-      - source: dependencies
-        assembly: tool_head_mount_bottom_assembly
-        artifact: followers
-        names:
-          - carriage
-          - belt_clamp_base_1
-          - belt_clamp_base_2
-        name_template: "tool_head_mount_bottom_{name}"
-        animation:
-          x_carriage_1:
-            - { $ref: x_axis_x_travel }
-            - 0
-            - 0
-      - source: dependencies
-        assembly: tool_head_mount_bottom_assembly
-        artifact: non_production_parts
-        name_template: "tool_head_mount_bottom_{name}"
-        exclude_names:
-          - rail
-          - lower_axis_profile
-          - top_axis_profile
-        animation:
-          x_carriage_1:
-            - { $ref: x_axis_x_travel }
-            - 0
-            - 0
-      - source: dependencies
-        assembly: tool_head_mount_top_assembly
-        artifact: leader
-        name: tool_head_mount_top
-        animation:
-          x_carriage_2:
-            - { $ref: x_axis_x_travel_negative }
-            - 0
-            - 0
-      - source: dependencies
-        assembly: tool_head_mount_top_assembly
-        artifact: followers
-        names:
-          - carriage
-          - belt_clamp_base_1
-          - belt_clamp_base_2
-        name_template: "tool_head_mount_top_{name}"
-        animation:
-          x_carriage_2:
-            - { $ref: x_axis_x_travel_negative }
-            - 0
-            - 0
-      - source: dependencies
-        assembly: tool_head_mount_top_assembly
-        artifact: non_production_parts
-        name_template: "tool_head_mount_top_{name}"
-        exclude_names:
-          - rail
-          - lower_axis_profile
-          - top_axis_profile
-        animation:
-          x_carriage_2:
-            - { $ref: x_axis_x_travel_negative }
-            - 0
-            - 0
   Production:
     parts:
       - source: self

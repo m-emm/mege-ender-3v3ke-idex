@@ -338,6 +338,8 @@ Builder:
       - source: dependencies
         assembly: tool_head_mount_bottom_assembly
         artifact: followers
+        names:
+          - blower_ducts
         name_template: "tool_head_mount_bottom_{name}"
         animation:
           x_carriage_1:
@@ -381,6 +383,8 @@ Builder:
       - source: dependencies
         assembly: tool_head_mount_top_assembly
         artifact: followers
+        names:
+          - blower_ducts
         name_template: "tool_head_mount_top_{name}"
         animation:
           x_carriage_2:
