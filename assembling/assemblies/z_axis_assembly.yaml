@@ -50,10 +50,29 @@ Builder:
         names:
           - left_carriage
           - right_carriage
+        name_template: "{name}"
+        flip: true
+      - source: self
+        artifact: followers
+        names:
           - left_carriage_clamp_0
           - right_carriage_clamp_0
         name_template: "{name}"
         flip: true
+      - source: self
+        artifact: followers
+        names:
+          - left_pillow_bearing_mount_plate
+          - right_pillow_bearing_mount_plate
+        name_template: "{name}"
+        prod_rotation_angle: -90
+        prod_rotation_axis: [1, 0, 0]
+      - source: self
+        artifact: followers
+        names:
+          - left_carriage_clamp_1
+          - right_carriage_clamp_1
+        name_template: "{name}"
       - source: self
         artifact: followers
         exclude_names:
@@ -61,6 +80,10 @@ Builder:
           - right_carriage
           - left_carriage_clamp_0
           - right_carriage_clamp_0
+          - left_carriage_clamp_1
+          - right_carriage_clamp_1
+          - left_pillow_bearing_mount_plate
+          - right_pillow_bearing_mount_plate
         name_template: "{name}"
 
 Parts:
