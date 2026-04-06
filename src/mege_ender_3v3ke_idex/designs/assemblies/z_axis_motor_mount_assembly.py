@@ -84,7 +84,9 @@ def create_z_axis_motor_mount_assembly(
         boss_clearance=motor_mount_boss_clearance,
         boss_clearance_z=motor_mount_boss_clearance_z,
     )
-    if side_alignment == Alignment.LEFT:
+
+
+    if side_alignment == Alignment.RIGHT:
         motor = rotate(180)(motor)
 
     motor = align(motor, threaded_rod_reference, Alignment.CENTER, axes=[0, 1])

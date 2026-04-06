@@ -866,6 +866,7 @@ assemblies:
   - name: z_axis_assembly
 
     depends_on:
+      - printer_frame_assembly
       - left_z_axis_profile_assembly
       - right_z_axis_profile_assembly
       - left_z_axis_assembly
