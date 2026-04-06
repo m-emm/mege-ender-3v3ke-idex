@@ -167,6 +167,22 @@ def create_z_axis_motor_mount_assembly(
     mount_plate_box = align(mount_plate_box, mount_plate, Alignment.STACK_TOP)
     mount_plate_box = align(mount_plate_box, z_axis_profile, Alignment.STACK_FRONT)
 
+    mount_plate_box_back = create_box(
+        z_axis_motor_mount_plate_size,
+        z_axis_motor_mount_plate_box_wall,
+        z_axis_profile_mount_plate_height - z_axis_profile_mount_plate_fillet_radius,
+    )
+
+    mount_plate_box_back = align(
+        mount_plate_box_back, mount_plate_box, Alignment.CENTER
+    )
+    mount_plate_box_back = align(mount_plate_box_back, mount_plate_box, Alignment.BACK)
+    mount_plate_box_back = align(
+        mount_plate_box_back, profile_mount_plates, Alignment.BOTTOM
+    )
+
+    mount_plate_box = mount_plate_box.fuse(mount_plate_box_back)
+
     mount_plate = mount_plate.fuse(mount_plate_box)
 
     mount_plate = motor.use_as_cutter_on(mount_plate)
