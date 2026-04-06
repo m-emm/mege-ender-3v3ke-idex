@@ -36,7 +36,7 @@ Parameters:
     Type: Float
   z_axis_profile_mount_plate_fillet_radius:
     Type: Float
-  z_axis_profile_mount_plate_height:
+  z_axis_top_profile_mount_plate_height:
     Type: Float
   z_axis_profile_mount_plate_num_holes:
     Type: Integer
@@ -94,8 +94,8 @@ Parts:
           $ref: z_axis_motor_mount_plate_profile_distance
         z_axis_profile_mount_plate_fillet_radius:
           $ref: z_axis_profile_mount_plate_fillet_radius
-        z_axis_profile_mount_plate_height:
-          $ref: z_axis_profile_mount_plate_height
+        z_axis_top_profile_mount_plate_height:
+          $ref: z_axis_top_profile_mount_plate_height
         z_axis_profile_mount_plate_num_holes:
           $ref: z_axis_profile_mount_plate_num_holes
         z_axis_profile_mount_plate_screw_inset:

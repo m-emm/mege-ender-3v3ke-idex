@@ -22,6 +22,28 @@ Builder:
         name_template: "{name}"
       - source: self
         artifact: followers
+        names:
+          - left_carriage
+          - left_carriage_clamp_0
+          - left_carriage_clamp_1
+          - right_carriage
+          - right_carriage_clamp_0
+          - right_carriage_clamp_1
+        name_template: "{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: self
+        artifact: followers
+        exclude_names:
+          - left_carriage
+          - left_carriage_clamp_0
+          - left_carriage_clamp_1
+          - right_carriage
+          - right_carriage_clamp_0
+          - right_carriage_clamp_1
         name_template: "{name}"
       - source: self
         artifact: non_production_parts
@@ -35,38 +57,19 @@ Builder:
       plates:
         - name: left_z_axis
           parts:
-            # - left_axial_bearing_stopper
-            # - left_axial_clamp_part_0
-            #- left_axial_clamp_part_1
-            - left_mount_plate_back
-            - left_mount_plate_clamp_part
-            # - left_top_mount
-            # - left_top_mount_clamp
-            - left_carriage
-            - left_carriage_clamp_0
-            # - left_carriage_clamp_1
-        # - name: right_z_axis
-        #   process_data_preset: petgcf_medium_strength_high_speed_06
-        #   parts:
-        #     - right_pillow_bearing_mount_plate
-        #     - right_axial_bearing_stopper
-        #     - right_axial_clamp_part_0
-        #     - right_axial_clamp_part_1
-        #     - right_mount_plate_back
-        #     - right_mount_plate_clamp_part
-        #     - right_top_mount
-        #     - right_top_mount_clamp
-        #     - right_carriage
-        #     - right_carriage_clamp_0
-        #     - right_carriage_clamp_1
-
-        - name: remaining_parts
-          parts:
             - left_axial_bearing_stopper
             - left_axial_clamp_part_0
             - left_axial_clamp_part_1
+            - left_mount_plate_back
+            - left_mount_plate_clamp_part
             - left_top_mount
             - left_top_mount_clamp
+            - left_carriage
+            - left_carriage_clamp_0
+            - left_carriage_clamp_1
+        - name: right_z_axis
+          process_data_preset: petgcf_medium_strength_high_speed_06
+          parts:            
             - right_axial_bearing_stopper
             - right_axial_clamp_part_0
             - right_axial_clamp_part_1
@@ -77,7 +80,25 @@ Builder:
             - right_carriage
             - right_carriage_clamp_0
             - right_carriage_clamp_1
-            - left_carriage_clamp_1
+
+        # - name: remaining_parts
+        #   parts:
+        #     - left_axial_bearing_stopper
+        #     - left_axial_clamp_part_0
+        #     - left_axial_clamp_part_1
+        #     - left_top_mount
+        #     - left_top_mount_clamp
+        #     - right_axial_bearing_stopper
+        #     - right_axial_clamp_part_0
+        #     - right_axial_clamp_part_1
+        #     - right_mount_plate_back
+        #     - right_mount_plate_clamp_part
+        #     - right_top_mount
+        #     - right_top_mount_clamp
+        #     - right_carriage
+        #     - right_carriage_clamp_0
+        #     - right_carriage_clamp_1
+        #     - left_carriage_clamp_1
             
 
 
@@ -113,6 +134,10 @@ Builder:
           - left_carriage_clamp_1
           - right_carriage_clamp_1
         name_template: "{name}"
+
+Parameters:
+  z_axis_z_travel:
+    Type: Float
 
 Parts:
   ZAxisAssembly:

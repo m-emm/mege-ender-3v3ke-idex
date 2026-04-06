@@ -203,6 +203,7 @@ globals:
   z_axis_pillow_block_bottom_base_bridge_width: 3.5
   z_axis_profile_mount_plate_fillet_radius: 3
   z_axis_profile_mount_plate_height: 70
+  z_axis_top_profile_mount_plate_height: 70
   z_axis_profile_mount_plate_num_holes: 3
   z_axis_profile_mount_plate_screw_inset: 5
   z_axis_profile_mount_plate_thickness: 5
@@ -220,7 +221,7 @@ globals:
   z_axis_top_mount_screw_size: "M3"
   z_axis_top_mount_thickness: 5
   z_axis_top_mount_threaded_rod_clearance: 1.5
-  z_axis_top_mount_width: 40
+  z_axis_top_mount_width: 60
   z_axis_carriage_back_depth: 40
   z_axis_carriage_back_height: 9
   z_axis_carriage_fillet_radius: 4
@@ -977,6 +978,8 @@ assemblies:
       right_z_axis_profile: right_z_axis_profile_assembly
       left_z_axis: left_z_axis_assembly
       right_z_axis: right_z_axis_assembly
+    parameters:
+      z_axis_z_travel: !Ref z_axis_z_travel
 
   - name: z_axis_top_bridge_profile_assembly
 
@@ -1256,7 +1259,7 @@ assemblies:
       z_axis_guide_rod_clamp_width: !Ref z_axis_guide_rod_clamp_width
       z_axis_motor_mount_plate_profile_distance: !Ref z_axis_motor_mount_plate_profile_distance
       z_axis_profile_mount_plate_fillet_radius: !Ref z_axis_profile_mount_plate_fillet_radius
-      z_axis_profile_mount_plate_height: !Ref z_axis_profile_mount_plate_height
+      z_axis_top_profile_mount_plate_height: !Ref z_axis_top_profile_mount_plate_height
       z_axis_profile_mount_plate_num_holes: !Ref z_axis_profile_mount_plate_num_holes
       z_axis_profile_mount_plate_screw_inset: !Ref z_axis_profile_mount_plate_screw_inset
       z_axis_profile_mount_plate_thickness: !Ref z_axis_profile_mount_plate_thickness
@@ -1294,7 +1297,7 @@ assemblies:
       z_axis_guide_rod_clamp_width: !Ref z_axis_guide_rod_clamp_width
       z_axis_motor_mount_plate_profile_distance: !Ref z_axis_motor_mount_plate_profile_distance
       z_axis_profile_mount_plate_fillet_radius: !Ref z_axis_profile_mount_plate_fillet_radius
-      z_axis_profile_mount_plate_height: !Ref z_axis_profile_mount_plate_height
+      z_axis_top_profile_mount_plate_height: !Ref z_axis_top_profile_mount_plate_height
       z_axis_profile_mount_plate_num_holes: !Ref z_axis_profile_mount_plate_num_holes
       z_axis_profile_mount_plate_screw_inset: !Ref z_axis_profile_mount_plate_screw_inset
       z_axis_profile_mount_plate_thickness: !Ref z_axis_profile_mount_plate_thickness

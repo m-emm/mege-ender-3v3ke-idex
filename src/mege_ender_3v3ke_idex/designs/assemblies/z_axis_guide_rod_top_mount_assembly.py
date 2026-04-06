@@ -30,7 +30,7 @@ def create_z_axis_guide_rod_top_mount_assembly(
     z_axis_motor_mount_plate_profile_distance,
     z_axis_profile_mount_plate_num_holes,
     z_axis_profile_mount_plate_screw_inset,
-    z_axis_profile_mount_plate_height,
+    z_axis_top_profile_mount_plate_height,
     z_axis_profile_mount_plate_thickness,
     z_axis_profile_mount_plate_fillet_radius,
     z_axis_rod_clamp_gap,
@@ -109,8 +109,9 @@ def create_z_axis_guide_rod_top_mount_assembly(
 
     guide_rod_top_aligner = align_translation(
         top_mount_plate,
-        guide_rod,
-        Alignment.TOP,
+        z_axis_profile,
+        Alignment.STACK_TOP,
+        stack_gap=-z_axis_top_mount_thickness,
     )
     top_mount_plate = guide_rod_top_aligner(top_mount_plate)
     rod_holder = guide_rod_top_aligner(rod_holder)
@@ -164,70 +165,74 @@ def create_z_axis_guide_rod_top_mount_assembly(
     )
     top_mount_plate = top_mount_plate.cut(threaded_rod_cutter)
 
-    top_mount_profile_mount_plate = create_profile_mount_plate(
-        profile_mount_width=z_axis_top_mount_profile_mount_width,
-        z_axis_profile_mount_plate_thickness=z_axis_profile_mount_plate_thickness,
-        z_axis_profile_mount_plate_height=z_axis_profile_mount_plate_height,
-        z_axis_profile_mount_plate_fillet_radius=z_axis_profile_mount_plate_fillet_radius,
-        BIG_THING=BIG_THING,
-        num_holes=z_axis_profile_mount_plate_num_holes,
-        screw_inset=z_axis_profile_mount_plate_screw_inset,
-    )
-    top_mount_profile_mount_plate = align(
-        top_mount_profile_mount_plate,
-        top_mount_plate,
-        Alignment.CENTER,
-    )
-    top_mount_profile_mount_plate = align(
-        top_mount_profile_mount_plate,
-        top_mount_plate,
-        Alignment.BACK,
-    )
-    top_mount_profile_mount_plate = align(
-        top_mount_profile_mount_plate,
-        top_mount_plate,
-        Alignment.BOTTOM,
-    )
-    top_mount_profile_mount_plate = translate(0, 0, z_axis_top_mount_thickness)(
-        top_mount_profile_mount_plate
-    )
-    top_mount_plate = top_mount_plate.fuse(top_mount_profile_mount_plate)
+    top_mount_profile_mount_plates = PartCollector()
 
-    top_mount_reinforcements = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        top_mount_reinforcement = create_right_triangle(
-            z_axis_profile_mount_plate_height * z_axis_top_mount_reinforcement_factor,
-            z_axis_profile_mount_plate_height * z_axis_top_mount_reinforcement_factor,
-            z_axis_top_mount_reinforcement_thickness,
-            extrusion_direction=(1, 0, 0),
-            a_normal=(0, 0, -1),
-            b_normal=(0, -1, 0),
+
+        top_mount_profile_mount_plate = create_profile_mount_plate(
+            profile_mount_width=z_axis_top_mount_profile_mount_width,
+            z_axis_profile_mount_plate_thickness=z_axis_profile_mount_plate_thickness,
+            z_axis_profile_mount_plate_height=z_axis_top_profile_mount_plate_height,
+            z_axis_profile_mount_plate_fillet_radius=z_axis_profile_mount_plate_fillet_radius,
+            BIG_THING=BIG_THING,
+            num_holes=z_axis_profile_mount_plate_num_holes,
+            screw_inset=z_axis_profile_mount_plate_screw_inset,
         )
-        top_mount_reinforcement = align(
-            top_mount_reinforcement,
+        top_mount_profile_mount_plate = rotate(90)(top_mount_profile_mount_plate)
+
+        top_mount_profile_mount_plate = align(
             top_mount_profile_mount_plate,
+            z_axis_profile,
             Alignment.CENTER,
         )
-        top_mount_reinforcement = align(
-            top_mount_reinforcement,
+        top_mount_profile_mount_plate = align(
             top_mount_profile_mount_plate,
-            Alignment.BACK,
+            z_axis_profile,
+            Alignment.TOP,
         )
-        top_mount_reinforcement = align(
-            top_mount_reinforcement,
+        top_mount_profile_mount_plate = align(
             top_mount_profile_mount_plate,
-            Alignment.BOTTOM,
+            z_axis_profile,
+            lr.stack_alignment,
         )
-        top_mount_reinforcement = align(
-            top_mount_reinforcement,
-            top_mount_profile_mount_plate,
-            lr,
-        )
-        top_mount_reinforcements = top_mount_reinforcements.fuse(
-            top_mount_reinforcement
+        top_mount_profile_mount_plates = top_mount_profile_mount_plates.fuse(
+            top_mount_profile_mount_plate
         )
 
-    top_mount_plate = top_mount_plate.fuse(top_mount_reinforcements)
+    top_mount_plate = top_mount_plate.fuse(top_mount_profile_mount_plates)
+
+    top_mount_plate_box = create_box(
+        z_axis_top_mount_width,
+        z_axis_top_mount_width,
+        z_axis_top_profile_mount_plate_height / 2,
+    )
+
+    top_mount_plate_box_cutter = create_box(
+        z_axis_top_mount_width - 2 * z_axis_top_mount_reinforcement_thickness,
+        z_axis_top_mount_width - 2 * z_axis_top_mount_reinforcement_thickness,
+        BIG_THING,
+    )
+
+    top_mount_plate_box_cutter = align(
+        top_mount_plate_box_cutter, top_mount_plate_box, Alignment.CENTER
+    )
+    top_mount_plate_box_cutter = align(
+        top_mount_plate_box_cutter, top_mount_plate_box, Alignment.FRONT
+    )
+    top_mount_plate_box = top_mount_plate_box.cut(top_mount_plate_box_cutter)
+
+    top_mount_plate_box = align(top_mount_plate_box, top_mount_plate, Alignment.CENTER)
+    top_mount_plate_box = align(
+        top_mount_plate_box, top_mount_profile_mount_plates, Alignment.TOP
+    )
+    top_mount_plate_box = align(top_mount_plate_box, rod_holder, Alignment.STACK_BACK)
+
+    top_mount_profile_mount_plates_bbox = materialize_bounding_box(
+        top_mount_profile_mount_plates
+    )
+    top_mount_plate_box = top_mount_plate_box.cut(top_mount_profile_mount_plates_bbox)
+
+    top_mount_plate = top_mount_plate.fuse(top_mount_plate_box)
 
     rod_center = get_bounding_box_center(guide_rod)
     rod_holder_center = get_bounding_box_center(rod_holder)
