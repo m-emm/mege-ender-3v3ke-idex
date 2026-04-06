@@ -46,6 +46,12 @@ Parameters:
     Type: Float
   z_axis_axial_bearing_stopper_outer_diameter:
     Type: Float
+  z_axis_axial_bearing_stopper_inner_diameter_top:
+    Type: Float
+  z_axis_axial_bearing_stopper_axial_bearing_clearance:
+    Type: Float
+  z_axis_axial_bearing_stopper_axial_bearing_sink:
+    Type: Float
   z_axis_axial_bearing_stopper_thickness:
     Type: Float
   z_axis_axial_rod_clamp_cylinder_head_cutter_clearance:
@@ -102,6 +108,13 @@ Parts:
           $ref: z_axis_axial_bearing_stopper_inner_diameter
         z_axis_axial_bearing_stopper_outer_diameter:
           $ref: z_axis_axial_bearing_stopper_outer_diameter
+        z_axis_axial_bearing_stopper_inner_diameter_top:
+          $ref: z_axis_axial_bearing_stopper_inner_diameter_top
+
+        z_axis_axial_bearing_stopper_axial_bearing_sink:
+          $ref: z_axis_axial_bearing_stopper_axial_bearing_sink
+        z_axis_axial_bearing_stopper_axial_bearing_clearance:
+          $ref: z_axis_axial_bearing_stopper_axial_bearing_clearance
         z_axis_axial_bearing_stopper_thickness:
           $ref: z_axis_axial_bearing_stopper_thickness
         z_axis_axial_rod_clamp_cylinder_head_cutter_clearance:

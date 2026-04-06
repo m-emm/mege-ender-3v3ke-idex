@@ -2,6 +2,8 @@
 
 import math
 
+import numpy as np
+
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
@@ -49,18 +51,6 @@ def create_profile_mount_plate(
 
     return plate
 
-
-def create_axial_bearing_stopper(
-    *,
-    z_axis_axial_bearing_stopper_outer_diameter,
-    z_axis_axial_bearing_stopper_inner_diameter,
-    z_axis_axial_bearing_stopper_thickness,
-):
-    return create_ring(
-        z_axis_axial_bearing_stopper_outer_diameter / 2,
-        z_axis_axial_bearing_stopper_inner_diameter / 2,
-        z_axis_axial_bearing_stopper_thickness,
-    )
 
 
 def create_axial_rod_clamp(

@@ -2,7 +2,6 @@
 
 from mege_ender_3v3ke_idex.designs.z_axis_components import (
     create_axial_ball_bearing_8_x_19,
-    create_axial_bearing_stopper,
     create_axial_rod_clamp,
 )
 from shellforgepy.simple import *
@@ -12,8 +11,52 @@ def _get_rod_part(rod):
     return rod.leader if hasattr(rod, "leader") else rod
 
 
-def _get_threaded_rod_coupler_reference(z_axis_threaded_rod):
-    return z_axis_threaded_rod.get_named_non_production_part("coupler_reference")
+def create_axial_bearing_stopper(
+    *,
+    z_axis_axial_bearing_stopper_outer_diameter,
+    z_axis_axial_bearing_stopper_inner_diameter,
+    z_axis_axial_bearing_stopper_thickness,
+    z_axis_axial_bearing_stopper_inner_diameter_top,
+    z_axis_axial_bearing_stopper_axial_bearing_sink,
+    z_axis_axial_bearing_stopper_axial_bearing_clearance,
+    z_axis_axial_bearing_stopper_axial_bearing_outer_diaameter,
+):
+    disk = create_cylinder(
+        z_axis_axial_bearing_stopper_outer_diameter / 2,
+        z_axis_axial_bearing_stopper_thickness,
+    )
+
+    # disk = apply_fillet_by_alignment(
+    #     disk,
+    #     fillet_radius=z_axis_axial_bearing_stopper_thickness / 4,
+    #     fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+    # )
+
+    hole_cutter = create_cone(
+        radius1=z_axis_axial_bearing_stopper_inner_diameter / 2,
+        radius2=z_axis_axial_bearing_stopper_inner_diameter_top / 2,
+        height=z_axis_axial_bearing_stopper_thickness,
+    )
+
+    hole_cutter = align(hole_cutter, disk, Alignment.CENTER)
+    retval = disk.cut(hole_cutter)
+
+    retval = apply_fillet_by_alignment(
+        retval,
+        fillet_radius=z_axis_axial_bearing_stopper_thickness / 8,
+        fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+    )
+
+    axia_bearing_cutter_disk = create_cylinder(
+        z_axis_axial_bearing_stopper_axial_bearing_outer_diaameter / 2
+        + z_axis_axial_bearing_stopper_axial_bearing_clearance,
+        z_axis_axial_bearing_stopper_axial_bearing_sink,
+    )
+    axia_bearing_cutter_disk = align(axia_bearing_cutter_disk, retval, Alignment.CENTER)
+    axia_bearing_cutter_disk = align(axia_bearing_cutter_disk, retval, Alignment.TOP)
+    retval = retval.cut(axia_bearing_cutter_disk)
+
+    return retval
 
 
 def create_z_axis_bottom_support_assembly(
@@ -33,8 +76,11 @@ def create_z_axis_bottom_support_assembly(
     z_axis_axial_ball_bearing_8_x_19_outer_diameter,
     z_axis_axial_ball_bearing_8_x_19_thickness,
     z_axis_axial_bearing_stopper_inner_diameter,
+    z_axis_axial_bearing_stopper_inner_diameter_top,
     z_axis_axial_bearing_stopper_outer_diameter,
     z_axis_axial_bearing_stopper_thickness,
+    z_axis_axial_bearing_stopper_axial_bearing_sink,
+    z_axis_axial_bearing_stopper_axial_bearing_clearance,
     z_axis_axial_rod_clamp_cylinder_head_cutter_clearance,
     z_axis_axial_rod_clamp_gap,
     z_axis_axial_rod_clamp_inner_diameter,
@@ -60,6 +106,10 @@ def create_z_axis_bottom_support_assembly(
         z_axis_axial_bearing_stopper_outer_diameter=z_axis_axial_bearing_stopper_outer_diameter,
         z_axis_axial_bearing_stopper_inner_diameter=z_axis_axial_bearing_stopper_inner_diameter,
         z_axis_axial_bearing_stopper_thickness=z_axis_axial_bearing_stopper_thickness,
+        z_axis_axial_bearing_stopper_inner_diameter_top=z_axis_axial_bearing_stopper_inner_diameter_top,
+        z_axis_axial_bearing_stopper_axial_bearing_sink=z_axis_axial_bearing_stopper_axial_bearing_sink,
+        z_axis_axial_bearing_stopper_axial_bearing_clearance=z_axis_axial_bearing_stopper_axial_bearing_clearance,
+        z_axis_axial_bearing_stopper_axial_bearing_outer_diaameter=z_axis_axial_ball_bearing_8_x_19_outer_diameter,
     )
     axial_bearing_stopper = align(axial_bearing_stopper, threaded_rod, Alignment.CENTER)
     axial_bearing_stopper = align(

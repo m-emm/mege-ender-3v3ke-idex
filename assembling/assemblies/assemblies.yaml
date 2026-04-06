@@ -264,8 +264,12 @@ globals:
   z_axis_axial_ball_bearing_8_x_19_outer_diameter: 19
   z_axis_axial_ball_bearing_8_x_19_thickness: 7
   z_axis_axial_bearing_stopper_inner_diameter: 16
-  z_axis_axial_bearing_stopper_outer_diameter: 24
+  z_axis_axial_bearing_stopper_inner_diameter_top: 8.2
+  z_axis_axial_bearing_stopper_outer_diameter: 23.5
   z_axis_axial_bearing_stopper_thickness: 4
+  z_axis_axial_bearing_stopper_axial_bearing_sink: 0.25
+  z_axis_axial_bearing_stopper_axial_bearing_clearance: 0.25  
+
   z_axis_axial_rod_clamp_cylinder_head_cutter_clearance: 0.25
   z_axis_axial_rod_clamp_gap: 1.2
   z_axis_axial_rod_clamp_inner_diameter: 8.2
@@ -772,7 +776,7 @@ process_data_presets:
       nozzle_hardened: true
       nozzle_high_flow: true
       strength_factor: 0.5
-      quality_factor: 0.0 # as fast as possible
+      quality_factor: 0.1 
 
 assemblies:
   - name: printer_frame_assembly
@@ -1059,7 +1063,10 @@ assemblies:
       z_axis_axial_ball_bearing_8_x_19_thickness: !Ref z_axis_axial_ball_bearing_8_x_19_thickness
       z_axis_axial_bearing_stopper_inner_diameter: !Ref z_axis_axial_bearing_stopper_inner_diameter
       z_axis_axial_bearing_stopper_outer_diameter: !Ref z_axis_axial_bearing_stopper_outer_diameter
+      z_axis_axial_bearing_stopper_inner_diameter_top: !Ref z_axis_axial_bearing_stopper_inner_diameter_top
       z_axis_axial_bearing_stopper_thickness: !Ref z_axis_axial_bearing_stopper_thickness
+      z_axis_axial_bearing_stopper_axial_bearing_sink: !Ref z_axis_axial_bearing_stopper_axial_bearing_sink
+      z_axis_axial_bearing_stopper_axial_bearing_clearance: !Ref z_axis_axial_bearing_stopper_axial_bearing_clearance
       z_axis_axial_rod_clamp_cylinder_head_cutter_clearance: !Ref z_axis_axial_rod_clamp_cylinder_head_cutter_clearance
       z_axis_axial_rod_clamp_gap: !Ref z_axis_axial_rod_clamp_gap
       z_axis_axial_rod_clamp_inner_diameter: !Ref z_axis_axial_rod_clamp_inner_diameter
@@ -1095,8 +1102,11 @@ assemblies:
       z_axis_axial_ball_bearing_8_x_19_outer_diameter: !Ref z_axis_axial_ball_bearing_8_x_19_outer_diameter
       z_axis_axial_ball_bearing_8_x_19_thickness: !Ref z_axis_axial_ball_bearing_8_x_19_thickness
       z_axis_axial_bearing_stopper_inner_diameter: !Ref z_axis_axial_bearing_stopper_inner_diameter
+      z_axis_axial_bearing_stopper_inner_diameter_top: !Ref z_axis_axial_bearing_stopper_inner_diameter_top
       z_axis_axial_bearing_stopper_outer_diameter: !Ref z_axis_axial_bearing_stopper_outer_diameter
       z_axis_axial_bearing_stopper_thickness: !Ref z_axis_axial_bearing_stopper_thickness
+      z_axis_axial_bearing_stopper_axial_bearing_sink: !Ref z_axis_axial_bearing_stopper_axial_bearing_sink
+      z_axis_axial_bearing_stopper_axial_bearing_clearance: !Ref z_axis_axial_bearing_stopper_axial_bearing_clearance
       z_axis_axial_rod_clamp_cylinder_head_cutter_clearance: !Ref z_axis_axial_rod_clamp_cylinder_head_cutter_clearance
       z_axis_axial_rod_clamp_gap: !Ref z_axis_axial_rod_clamp_gap
       z_axis_axial_rod_clamp_inner_diameter: !Ref z_axis_axial_rod_clamp_inner_diameter

@@ -271,7 +271,7 @@ def create_z_axis_guide_rod_top_mount_assembly(
     diagonal_cutter = align(diagonal_cutter, top_mount_plate, Alignment.CENTER)
     diagonal_cutter = align(diagonal_cutter, z_axis_profile, Alignment.TOP)
     diagonal_cutter = align(
-        diagonal_cutter, guide_rod, Alignment.STACK_BACK, stack_gap=-rod_size[1] / 2
+        diagonal_cutter, guide_rod, Alignment.STACK_BACK, stack_gap=-rod_size[1] / 2 + z_axis_rod_clamp_gap / 2
     )
 
     diagonal_cutter = translate(0, 0, -z_axis_top_mount_thickness)(diagonal_cutter)
