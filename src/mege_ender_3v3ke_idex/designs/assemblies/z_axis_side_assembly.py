@@ -38,11 +38,8 @@ def create_z_axis_side_assembly(
     z_axis_motor_mount,
     z_axis_guide_rod_top_mount,
     z_axis_carriage,
-    context=None,
 ):
     """Create one z-axis side against already built subassemblies."""
-
-    del context
     del z_axis_profile
 
     guide_rod = _get_rod_part(z_axis_guide_rod)

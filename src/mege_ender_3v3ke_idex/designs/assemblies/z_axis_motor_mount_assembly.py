@@ -64,17 +64,15 @@ def create_z_axis_motor_mount_assembly(
     z_axis_motor_mount_plate_depth,
     z_axis_motor_mount_plate_profile_distance,
     z_axis_motor_mount_plate_size,
+    z_axis_motor_mount_plate_box_wall,
     z_axis_profile_mount_plate_fillet_radius,
     z_axis_profile_mount_plate_height,
     z_axis_profile_mount_plate_num_holes,
     z_axis_profile_mount_plate_screw_inset,
     z_axis_profile_mount_plate_thickness,
     z_axis_rod_clamp_gap,
-    context=None,
 ):
     """Create the printable motor mount assembly for one z-axis side."""
-
-    del context
 
     side_alignment = _to_side_alignment(side)
     profile = _get_profile_part(z_axis_profile)
@@ -101,8 +99,7 @@ def create_z_axis_motor_mount_assembly(
         motor_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
-    mount_plate = align(mount_plate, guide_rod, Alignment.CENTER, axes=[0])
-    mount_plate = align(mount_plate, z_axis_profile, side_alignment)
+    mount_plate = align(mount_plate, threaded_rod, Alignment.CENTER, axes=[0])
 
     mount_plate = align(mount_plate, motor_body, Alignment.STACK_TOP)
     mount_plate = align(
@@ -112,20 +109,30 @@ def create_z_axis_motor_mount_assembly(
         stack_gap=z_axis_motor_mount_plate_profile_distance,
     )
 
-    profile_mount_plate = create_profile_mount_plate(
-        profile_mount_width=z_axis_motor_mount_plate_size,
-        z_axis_profile_mount_plate_thickness=z_axis_profile_mount_plate_thickness,
-        z_axis_profile_mount_plate_height=z_axis_profile_mount_plate_height,
-        z_axis_profile_mount_plate_fillet_radius=z_axis_profile_mount_plate_fillet_radius,
-        BIG_THING=BIG_THING,
-        num_holes=z_axis_profile_mount_plate_num_holes,
-        screw_inset=z_axis_profile_mount_plate_screw_inset,
-    )
-    profile_mount_plate = align(profile_mount_plate, mount_plate, Alignment.CENTER)
-    profile_mount_plate = align(profile_mount_plate, mount_plate, Alignment.BACK)
-    profile_mount_plate = align(profile_mount_plate, mount_plate, Alignment.STACK_TOP)
-
-    mount_plate = motor.use_as_cutter_on(mount_plate)
+    profile_mount_plates = PartCollector()
+    for alignment in [Alignment.LEFT, Alignment.RIGHT]:
+        profile_mount_plate = create_profile_mount_plate(
+            profile_mount_width=z_axis_motor_mount_plate_size,
+            z_axis_profile_mount_plate_thickness=z_axis_profile_mount_plate_thickness,
+            z_axis_profile_mount_plate_height=z_axis_profile_mount_plate_height,
+            z_axis_profile_mount_plate_fillet_radius=z_axis_profile_mount_plate_fillet_radius,
+            BIG_THING=BIG_THING,
+            num_holes=z_axis_profile_mount_plate_num_holes,
+            screw_inset=z_axis_profile_mount_plate_screw_inset,
+        )
+        profile_mount_plate = rotate(90)(profile_mount_plate)
+        profile_mount_plate = align(profile_mount_plate, mount_plate, Alignment.CENTER)
+        profile_mount_plate = align(
+            profile_mount_plate,
+            mount_plate,
+            Alignment.STACK_BACK,
+            stack_gap=-motor_mount_plate_thickness,
+        )
+        profile_mount_plate = align(profile_mount_plate, mount_plate, Alignment.BOTTOM)
+        profile_mount_plate = align(
+            profile_mount_plate, z_axis_profile, alignment.stack_alignment
+        )
+        profile_mount_plates = profile_mount_plates.fuse(profile_mount_plate)
 
     guide_rod_clamp = create_filleted_box(
         z_axis_guide_rod_clamp_width,
@@ -135,8 +142,34 @@ def create_z_axis_motor_mount_assembly(
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
     guide_rod_clamp = align(guide_rod_clamp, mount_plate, Alignment.CENTER)
+    guide_rod_clamp = align(guide_rod_clamp, guide_rod, Alignment.CENTER, axes=[0, 1])
     guide_rod_clamp = align(guide_rod_clamp, mount_plate, Alignment.STACK_TOP)
-    guide_rod_clamp = align(guide_rod_clamp, mount_plate, Alignment.FRONT)
+
+    mount_plate_box = create_filleted_box(
+        z_axis_motor_mount_plate_size,
+        z_axis_motor_mount_plate_size,
+        z_axis_guide_rod_clamp_thickness,
+        motor_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    mount_plate_box_cutter = create_filleted_box(
+        z_axis_motor_mount_plate_size - 2 * z_axis_motor_mount_plate_box_wall,
+        z_axis_motor_mount_plate_size - 2 * z_axis_motor_mount_plate_box_wall,
+        z_axis_guide_rod_clamp_thickness,
+        motor_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    mount_plate_box_cutter = align(
+        mount_plate_box_cutter, mount_plate_box, Alignment.CENTER
+    )
+    mount_plate_box = mount_plate_box.cut(mount_plate_box_cutter)
+    mount_plate_box = align(mount_plate_box, mount_plate, Alignment.CENTER)
+    mount_plate_box = align(mount_plate_box, mount_plate, Alignment.STACK_TOP)
+    mount_plate_box = align(mount_plate_box, z_axis_profile, Alignment.STACK_FRONT)
+
+    mount_plate = mount_plate.fuse(mount_plate_box)
+
+    mount_plate = motor.use_as_cutter_on(mount_plate)
 
     screws_mount_assembly = create_four_screws_mount_assembly(
         guide_rod_clamp,
@@ -157,7 +190,7 @@ def create_z_axis_motor_mount_assembly(
     guide_rod_cutter = align(guide_rod_cutter, guide_rod, Alignment.CENTER)
 
     mount_plate = mount_plate.fuse(guide_rod_clamp)
-    mount_plate = mount_plate.fuse(profile_mount_plate)
+    mount_plate = mount_plate.fuse(profile_mount_plates)
     mount_plate = mount_plate.cut(guide_rod_cutter)
 
     guide_rod_center = get_bounding_box_center(guide_rod)

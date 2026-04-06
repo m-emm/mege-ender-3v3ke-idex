@@ -9,11 +9,8 @@ def create_z_axis_assembly(
     right_z_axis_profile,
     left_z_axis,
     right_z_axis,
-    context=None,
 ):
     """Aggregate the split left/right z-axis assemblies."""
-
-    del context
 
     del left_z_axis_profile
     del right_z_axis_profile

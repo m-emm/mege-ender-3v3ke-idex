@@ -29,6 +29,7 @@ def create_z_axis_bottom_support_assembly(
     z_axis_profile,
     z_axis_guide_rod,
     z_axis_threaded_rod,
+    side,
     BIG_THING,
     z_axis_axial_ball_bearing_8_x_19_ball_count,
     z_axis_axial_ball_bearing_8_x_19_ball_diameter,
@@ -72,19 +73,19 @@ def create_z_axis_bottom_support_assembly(
     z_axis_pillow_block_bearing_rod_holder_inner_diameter,
     z_axis_pillow_block_bearing_rod_holder_length,
     z_axis_pillow_block_bearing_rod_holder_outer_diameter,
+    z_axis_pillow_block_bearing_profile_mount_plate_thickness,
     z_axis_pillow_block_bottom_base_bridge_width,
     z_axis_profile_mount_plate_num_holes,
     z_axis_profile_mount_plate_screw_inset,
-    context=None,
 ):
     """Create the printable lower support stack for one z-axis side."""
-
-    del context
 
     profile = _get_profile_part(z_axis_profile)
     guide_rod = _get_rod_part(z_axis_guide_rod)
     threaded_rod = _get_rod_part(z_axis_threaded_rod)
     coupler = _get_threaded_rod_coupler_reference(z_axis_threaded_rod)
+
+    side_alignment = Alignment.LEFT if side == "left" else Alignment.RIGHT
 
     clearance_stack = LeaderFollowersCuttersPart(guide_rod)
     clearance_stack.add_named_non_production_part(threaded_rod, "threaded_rod")
@@ -106,9 +107,7 @@ def create_z_axis_bottom_support_assembly(
         z_axis_pillow_block_bearing_rod_holder_length=z_axis_pillow_block_bearing_rod_holder_length,
         z_axis_pillow_block_bearing_rod_holder_outer_diameter=z_axis_pillow_block_bearing_rod_holder_outer_diameter,
         z_axis_pillow_block_bottom_base_bridge_width=z_axis_pillow_block_bottom_base_bridge_width,
-    ).prefixed_copy(
-        "pillow_block_bearing"
-    )
+    ).prefixed_copy("pillow_block_bearing")
     pillow_block_bearing = rotate(-90, axis=(1, 0, 0))(pillow_block_bearing)
     pillow_block_bearing = align(pillow_block_bearing, threaded_rod, Alignment.CENTER)
     pillow_block_bearing = align(
@@ -141,15 +140,15 @@ def create_z_axis_bottom_support_assembly(
     clearance_stack.add_named_follower(axial_bearing_stopper, "axial_bearing_stopper")
 
     axial_bearing = create_axial_ball_bearing_8_x_19(
-        z_axis_axial_ball_bearing_8_x_19_ball_count=z_axis_axial_ball_bearing_8_x_19_ball_count,
-        z_axis_axial_ball_bearing_8_x_19_ball_diameter=z_axis_axial_ball_bearing_8_x_19_ball_diameter,
-        z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter=z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter,
-        z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter=z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter,
-        z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_thickness=z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_thickness,
-        z_axis_axial_ball_bearing_8_x_19_disc_thickness=z_axis_axial_ball_bearing_8_x_19_disc_thickness,
-        z_axis_axial_ball_bearing_8_x_19_inner_diameter=z_axis_axial_ball_bearing_8_x_19_inner_diameter,
-        z_axis_axial_ball_bearing_8_x_19_outer_diameter=z_axis_axial_ball_bearing_8_x_19_outer_diameter,
-        z_axis_axial_ball_bearing_8_x_19_thickness=z_axis_axial_ball_bearing_8_x_19_thickness,
+        axial_ball_bearing_8_x_19_ball_count=z_axis_axial_ball_bearing_8_x_19_ball_count,
+        axial_ball_bearing_8_x_19_ball_diameter=z_axis_axial_ball_bearing_8_x_19_ball_diameter,
+        axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter=z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter,
+        axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter=z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter,
+        axial_ball_bearing_8_x_19_ball_holder_disc_thickness=z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_thickness,
+        axial_ball_bearing_8_x_19_disc_thickness=z_axis_axial_ball_bearing_8_x_19_disc_thickness,
+        axial_ball_bearing_8_x_19_inner_diameter=z_axis_axial_ball_bearing_8_x_19_inner_diameter,
+        axial_ball_bearing_8_x_19_outer_diameter=z_axis_axial_ball_bearing_8_x_19_outer_diameter,
+        axial_ball_bearing_8_x_19_thickness=z_axis_axial_ball_bearing_8_x_19_thickness,
     )
     axial_bearing = align(axial_bearing, threaded_rod, Alignment.CENTER)
     axial_bearing = align(axial_bearing, axial_bearing_stopper, Alignment.STACK_TOP)
@@ -226,7 +225,7 @@ def create_z_axis_bottom_support_assembly(
 
     pillow_bearing_profile_mount_plate = create_profile_mount_plate(
         profile_mount_width=pillow_base_size[0],
-        z_axis_profile_mount_plate_thickness=z_axis_bottom_support_profile_mount_plate_thickness,
+        z_axis_profile_mount_plate_thickness=z_axis_pillow_block_bearing_profile_mount_plate_thickness,
         z_axis_profile_mount_plate_height=z_axis_bottom_support_profile_mount_plate_height,
         z_axis_profile_mount_plate_fillet_radius=z_axis_bottom_support_profile_mount_plate_fillet_radius,
         BIG_THING=BIG_THING,
@@ -240,7 +239,7 @@ def create_z_axis_bottom_support_assembly(
     )
 
     pillow_bearing_profile_mount_plate = align(
-        pillow_bearing_profile_mount_plate, profile, Alignment.CENTER, axes=[0]
+        pillow_bearing_profile_mount_plate, profile, side_alignment
     )
 
     pillow_bearing_profile_mount_plate = align(

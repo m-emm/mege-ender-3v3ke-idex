@@ -48,11 +48,8 @@ def create_z_axis_guide_rod_top_mount_assembly(
     z_axis_top_mount_thickness,
     z_axis_top_mount_threaded_rod_clearance,
     z_axis_top_mount_width,
-    context=None,
 ):
     """Create the printable top mount for one z-axis side."""
-
-    del context
 
     profile = _get_profile_part(z_axis_profile)
     guide_rod = _get_rod_part(z_axis_guide_rod)

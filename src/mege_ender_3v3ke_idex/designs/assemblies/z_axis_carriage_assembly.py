@@ -53,11 +53,8 @@ def create_z_axis_carriage_assembly(
     z_axis_nut_screw_hole_clearence_type,
     z_axis_threaded_rod_diameter,
     z_axis_x_axis_to_carriage_gap,
-    context=None,
 ):
     """Create the printable carriage module for one z-axis side."""
-
-    del context
 
     guide_rod = _get_rod_part(z_axis_guide_rod)
     threaded_rod = _get_rod_part(z_axis_threaded_rod)

@@ -9,11 +9,9 @@ from shellforgepy.simple import *
 
 
 def create_x_axis_profile_assembly(
-    *, profile_name, x_axis_profile_length, profile_z_offset, context=None
+    *, profile_name, x_axis_profile_length, profile_z_offset
 ):
     """Create one x-axis profile in canonical local coordinates."""
-
-    del context
 
     record_length_metric(
         "extrusion_profile",

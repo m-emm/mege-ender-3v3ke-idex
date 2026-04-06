@@ -22,11 +22,8 @@ def create_x_axis_endstop_side_assembly(
     rail_stopper,
     endstop_holder,
     carriage_end_rail_connector_thickness,
-    context=None,
 ):
     """Create one side of the x-axis endstop support."""
-
-    del context
 
     side_alignment = _resolve_side(side)
     rail_stopper_part = rail_stopper

@@ -206,12 +206,12 @@ def create_print_bed_undercarriage_assembly(
     print_bed_undercarriage_screw_mount_clearance_type,
     print_bed_undercarriage_profiles_fillet_radius,
     print_bed_undercarriage_carriage_mount_plate_wall,
+    BIG_THING,
     record_metrics=False,
-    context=None,
 ):
     """Create the print bed undercarriage assembly."""
 
-    big_thing = (context or {}).get("BIG_THING", 500)
+    big_thing = BIG_THING
     dampers_by_name = {
         "damper_left_front": damper_left_front,
         "damper_left_back": damper_left_back,

@@ -17,10 +17,8 @@ def _normalize_side(side):
     raise ValueError(f"Unsupported z-axis side '{side}'")
 
 
-def create_z_axis_profile_assembly(*, side, z_axis_profile_length, context=None):
+def create_z_axis_profile_assembly(*, side, z_axis_profile_length):
     """Create a standalone z-axis profile in canonical local coordinates."""
-
-    del context
 
     normalized_side = _normalize_side(side)
     record_length_metric(

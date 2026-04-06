@@ -32,11 +32,11 @@ def create_sprite_extruder_assembly(
     lever_center_offset,
     lever_front_inset,
     hotend_x_distance_from_right_edge,
-    context=None,
+    BIG_THING,
 ):
     """Create the sprite extruder assembly."""
 
-    big_thing = (context or {}).get("BIG_THING", 500)
+    big_thing = BIG_THING
     hotend_length = hotend_overall_length - nozzle_length - nozzle_screw_length
 
     motor_composite = create_nema_composite(body_thickness=26.5)

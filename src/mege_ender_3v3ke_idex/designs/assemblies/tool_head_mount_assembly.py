@@ -655,11 +655,11 @@ def create_tool_head_mount_assembly(
     tool_head_mount_x_offset,
     tool_head_mount_y_extension,
     drive_position,
-    context=None,
+    BIG_THING,
 ):
     """Create a single tool head mount assembly."""
 
-    big_thing = (context or {}).get("BIG_THING", 500)
+    big_thing = BIG_THING
     normalized_drive_position = str(drive_position).strip().lower()
     if normalized_drive_position == "bottom":
         drive_alignment = Alignment.BOTTOM

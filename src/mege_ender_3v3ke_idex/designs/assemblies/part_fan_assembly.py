@@ -499,11 +499,11 @@ def create_part_fan_assembly(
     part_fan_window_width,
     left_part_fan_parameters,
     right_part_fan_parameters,
-    context=None,
+    BIG_THING,
 ):
     """Create the standalone part fan assembly."""
 
-    big_thing = (context or {}).get("BIG_THING", 500)
+    big_thing = BIG_THING
     fans = _create_angled_fans(
         left_part_fan_parameters=left_part_fan_parameters,
         right_part_fan_parameters=right_part_fan_parameters,

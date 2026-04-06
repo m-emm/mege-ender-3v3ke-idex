@@ -1,5 +1,7 @@
-globals:
+context:
   BIG_THING: 500
+
+globals:
 
   print_bed_y_travel: 325
   y_axis_carriage_spacing: 100
@@ -158,12 +160,12 @@ globals:
   z_axis_profile_length: 500
   z_axis_guide_rod_diameter: 8
   z_axis_guide_rod_length: 550
-  z_axis_guide_rod_profile_distance: 55
+  z_axis_guide_rod_profile_distance: 50
   z_axis_threaded_rod_coupler_overlap: 17.5
   z_axis_threaded_rod_diameter: 8
   z_axis_threaded_rod_length: 500
-  z_axis_threaded_rod_profile_distance: 22
-  z_axis_threaded_rod_profile_center_in_offset: 10
+  z_axis_threaded_rod_profile_distance: 20
+  z_axis_threaded_rod_profile_center_in_offset: 0
   z_axis_threaded_rod_profile_center_in_offset_negative:
     $expr:
       "$sub": "-1 * ${z_axis_threaded_rod_profile_center_in_offset}"
@@ -178,12 +180,13 @@ globals:
   z_axis_guide_rod_clamp_width: 28
   z_axis_motor_mount_plate_depth: 69
   z_axis_motor_mount_plate_profile_distance: 0
-  z_axis_motor_mount_plate_size: 65
+  z_axis_motor_mount_plate_size: 50
+  z_axis_motor_mount_plate_box_wall: 2
   z_axis_rod_clamp_gap: 1.0
   z_axis_pillow_block_bearing_z_offset: 2
   z_axis_profile_mount_plate_fillet_radius: 3
-  z_axis_profile_mount_plate_height: 33
-  z_axis_profile_mount_plate_num_holes: 2
+  z_axis_profile_mount_plate_height: 60
+  z_axis_profile_mount_plate_num_holes: 3
   z_axis_profile_mount_plate_screw_inset: 5
   z_axis_profile_mount_plate_thickness: 5
   z_axis_top_mount_depth:
@@ -272,6 +275,7 @@ globals:
   z_axis_pillow_block_bearing_rod_holder_inner_diameter: 8.03
   z_axis_pillow_block_bearing_rod_holder_length: 11
   z_axis_pillow_block_bearing_rod_holder_outer_diameter: 12
+  z_axis_pillow_block_bearing_profile_mount_plate_thickness: 5
   z_axis_pillow_block_bottom_base_bridge_width: 3.5
   motor_size: 42.3
   motor_x_offset:
@@ -1040,7 +1044,7 @@ assemblies:
       z_axis_guide_rod: left_z_axis_guide_rod_assembly
       z_axis_threaded_rod: left_z_axis_threaded_rod_assembly
     parameters:
-      BIG_THING: !Ref BIG_THING
+      side: left
       z_axis_axial_ball_bearing_8_x_19_ball_count: !Ref z_axis_axial_ball_bearing_8_x_19_ball_count
       z_axis_axial_ball_bearing_8_x_19_ball_diameter: !Ref z_axis_axial_ball_bearing_8_x_19_ball_diameter
       z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter: !Ref z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter
@@ -1082,6 +1086,7 @@ assemblies:
       z_axis_pillow_block_bearing_rod_holder_inner_diameter: !Ref z_axis_pillow_block_bearing_rod_holder_inner_diameter
       z_axis_pillow_block_bearing_rod_holder_length: !Ref z_axis_pillow_block_bearing_rod_holder_length
       z_axis_pillow_block_bearing_rod_holder_outer_diameter: !Ref z_axis_pillow_block_bearing_rod_holder_outer_diameter
+      z_axis_pillow_block_bearing_profile_mount_plate_thickness: !Ref z_axis_pillow_block_bearing_profile_mount_plate_thickness
       z_axis_pillow_block_bottom_base_bridge_width: !Ref z_axis_pillow_block_bottom_base_bridge_width
       z_axis_pillow_block_bearing_z_offset: !Ref z_axis_pillow_block_bearing_z_offset
       z_axis_profile_mount_plate_num_holes: !Ref z_axis_profile_mount_plate_num_holes
@@ -1099,7 +1104,7 @@ assemblies:
       z_axis_guide_rod: right_z_axis_guide_rod_assembly
       z_axis_threaded_rod: right_z_axis_threaded_rod_assembly
     parameters:
-      BIG_THING: !Ref BIG_THING
+      side: right
       z_axis_axial_ball_bearing_8_x_19_ball_count: !Ref z_axis_axial_ball_bearing_8_x_19_ball_count
       z_axis_axial_ball_bearing_8_x_19_ball_diameter: !Ref z_axis_axial_ball_bearing_8_x_19_ball_diameter
       z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter: !Ref z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter
@@ -1141,6 +1146,7 @@ assemblies:
       z_axis_pillow_block_bearing_rod_holder_inner_diameter: !Ref z_axis_pillow_block_bearing_rod_holder_inner_diameter
       z_axis_pillow_block_bearing_rod_holder_length: !Ref z_axis_pillow_block_bearing_rod_holder_length
       z_axis_pillow_block_bearing_rod_holder_outer_diameter: !Ref z_axis_pillow_block_bearing_rod_holder_outer_diameter
+      z_axis_pillow_block_bearing_profile_mount_plate_thickness: !Ref z_axis_pillow_block_bearing_profile_mount_plate_thickness
       z_axis_pillow_block_bottom_base_bridge_width: !Ref z_axis_pillow_block_bottom_base_bridge_width
       z_axis_pillow_block_bearing_z_offset: !Ref z_axis_pillow_block_bearing_z_offset
       z_axis_profile_mount_plate_num_holes: !Ref z_axis_profile_mount_plate_num_holes
@@ -1159,7 +1165,6 @@ assemblies:
       z_axis_threaded_rod: left_z_axis_threaded_rod_assembly
     parameters:
       side: left
-      BIG_THING: !Ref BIG_THING
       motor_mount_axle_clearance: !Ref motor_mount_axle_clearance
       motor_mount_boss_clearance: !Ref motor_mount_boss_clearance
       motor_mount_boss_clearance_z: !Ref motor_mount_boss_clearance_z
@@ -1178,6 +1183,7 @@ assemblies:
       z_axis_motor_mount_plate_depth: !Ref z_axis_motor_mount_plate_depth
       z_axis_motor_mount_plate_profile_distance: !Ref z_axis_motor_mount_plate_profile_distance
       z_axis_motor_mount_plate_size: !Ref z_axis_motor_mount_plate_size
+      z_axis_motor_mount_plate_box_wall: !Ref z_axis_motor_mount_plate_box_wall
       z_axis_profile_mount_plate_fillet_radius: !Ref z_axis_profile_mount_plate_fillet_radius
       z_axis_profile_mount_plate_height: !Ref z_axis_profile_mount_plate_height
       z_axis_profile_mount_plate_num_holes: !Ref z_axis_profile_mount_plate_num_holes
@@ -1198,7 +1204,6 @@ assemblies:
       z_axis_threaded_rod: right_z_axis_threaded_rod_assembly
     parameters:
       side: right
-      BIG_THING: !Ref BIG_THING
       motor_mount_axle_clearance: !Ref motor_mount_axle_clearance
       motor_mount_boss_clearance: !Ref motor_mount_boss_clearance
       motor_mount_boss_clearance_z: !Ref motor_mount_boss_clearance_z
@@ -1217,6 +1222,7 @@ assemblies:
       z_axis_motor_mount_plate_depth: !Ref z_axis_motor_mount_plate_depth
       z_axis_motor_mount_plate_profile_distance: !Ref z_axis_motor_mount_plate_profile_distance
       z_axis_motor_mount_plate_size: !Ref z_axis_motor_mount_plate_size
+      z_axis_motor_mount_plate_box_wall: !Ref z_axis_motor_mount_plate_box_wall
       z_axis_profile_mount_plate_fillet_radius: !Ref z_axis_profile_mount_plate_fillet_radius
       z_axis_profile_mount_plate_height: !Ref z_axis_profile_mount_plate_height
       z_axis_profile_mount_plate_num_holes: !Ref z_axis_profile_mount_plate_num_holes
@@ -1256,7 +1262,6 @@ assemblies:
       z_axis_guide_rod: left_z_axis_guide_rod_assembly
       z_axis_threaded_rod: left_z_axis_threaded_rod_assembly
     parameters:
-      BIG_THING: !Ref BIG_THING
       z_axis_cylinder_head_clearance: !Ref z_axis_cylinder_head_clearance
       z_axis_default_clearance_hole_type: !Ref z_axis_default_clearance_hole_type
       z_axis_default_screw_nut_cutter_clearance: !Ref z_axis_default_screw_nut_cutter_clearance
@@ -1295,7 +1300,6 @@ assemblies:
       z_axis_guide_rod: right_z_axis_guide_rod_assembly
       z_axis_threaded_rod: right_z_axis_threaded_rod_assembly
     parameters:
-      BIG_THING: !Ref BIG_THING
       z_axis_cylinder_head_clearance: !Ref z_axis_cylinder_head_clearance
       z_axis_default_clearance_hole_type: !Ref z_axis_default_clearance_hole_type
       z_axis_default_screw_nut_cutter_clearance: !Ref z_axis_default_screw_nut_cutter_clearance
@@ -1333,7 +1337,6 @@ assemblies:
       z_axis_threaded_rod: left_z_axis_threaded_rod_assembly
     parameters:
       carriage_z_offset: !Ref carriage_z_offset
-      BIG_THING: !Ref BIG_THING
       z_axis_carriage_back_depth: !Ref z_axis_carriage_back_depth
       z_axis_carriage_back_height: !Ref z_axis_carriage_back_height
       z_axis_carriage_fillet_radius: !Ref z_axis_carriage_fillet_radius
@@ -1378,7 +1381,6 @@ assemblies:
       z_axis_threaded_rod: right_z_axis_threaded_rod_assembly
     parameters:
       carriage_z_offset: !Ref carriage_z_offset
-      BIG_THING: !Ref BIG_THING
       z_axis_carriage_back_depth: !Ref z_axis_carriage_back_depth
       z_axis_carriage_back_height: !Ref z_axis_carriage_back_height
       z_axis_carriage_fillet_radius: !Ref z_axis_carriage_fillet_radius

@@ -17,11 +17,9 @@ def _get_profile_part(x_axis_lower_profile):
 
 
 def create_x_axis_rail_assembly(
-    *, x_axis_lower_profile, x_axis_rail_length, carriage_end_clearance, context=None
+    *, x_axis_lower_profile, x_axis_rail_length, carriage_end_clearance
 ):
     """Create the x-axis rail and carriage references from the lower profile."""
-
-    del context
 
     lower_axis_profile = _get_profile_part(x_axis_lower_profile)
     carriage_offset = (

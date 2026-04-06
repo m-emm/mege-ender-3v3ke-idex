@@ -12,11 +12,8 @@ def create_z_axis_top_bridge_profile_assembly(
     *,
     left_z_axis_profile,
     right_z_axis_profile,
-    context=None,
 ):
     """Create the fixed top bridge profile from positioned z-axis profiles."""
-
-    del context
 
     bridge = create_top_bridge_profile(
         {

@@ -26,8 +26,6 @@ Builder:
 Parameters:
   side:
     Type: String
-  BIG_THING:
-    Type: Float
   motor_mount_axle_clearance:
     Type: Float
   motor_mount_boss_clearance:
@@ -64,6 +62,8 @@ Parameters:
     Type: Float
   z_axis_motor_mount_plate_size:
     Type: Float
+  z_axis_motor_mount_plate_box_wall:
+    Type: Float
   z_axis_profile_mount_plate_fillet_radius:
     Type: Float
   z_axis_profile_mount_plate_height:
@@ -86,8 +86,6 @@ Parts:
       Properties:
         side:
           $ref: side
-        BIG_THING:
-          $ref: BIG_THING
         motor_mount_axle_clearance:
           $ref: motor_mount_axle_clearance
         motor_mount_boss_clearance:
@@ -124,6 +122,8 @@ Parts:
           $ref: z_axis_motor_mount_plate_profile_distance
         z_axis_motor_mount_plate_size:
           $ref: z_axis_motor_mount_plate_size
+        z_axis_motor_mount_plate_box_wall:
+          $ref: z_axis_motor_mount_plate_box_wall
         z_axis_profile_mount_plate_fillet_radius:
           $ref: z_axis_profile_mount_plate_fillet_radius
         z_axis_profile_mount_plate_height:

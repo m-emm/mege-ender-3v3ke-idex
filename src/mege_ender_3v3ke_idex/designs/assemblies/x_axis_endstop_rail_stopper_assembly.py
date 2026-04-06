@@ -76,11 +76,11 @@ def create_x_axis_endstop_rail_stopper_assembly(
     endstop_holder_groove_holder_top_width,
     endstop_holder_groove_holder_height,
     endstop_holder_groove_holder_slit,
-    context=None,
+    BIG_THING,
 ):
     """Create one x-axis rail stopper with groove holder."""
 
-    big_thing = (context or {}).get("BIG_THING", 500)
+    big_thing = BIG_THING
 
     stopper = create_filleted_box(
         carriage_end_rail_stopper_length,

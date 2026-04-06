@@ -18,12 +18,12 @@ def create_print_bed_assembly(
     print_bed_damper_height,
     print_bed_damper_diameter,
     print_bed_vertical_gap_to_frame,
+    BIG_THING,
     record_metrics=False,
-    context=None,
 ):
     """Create the print bed assembly positioned relative to the frame."""
 
-    big_thing = (context or {}).get("BIG_THING", 500)
+    big_thing = BIG_THING
     plate = create_box(print_bed_width, print_bed_depth, print_bed_thickness)
     inset = (print_bed_depth - print_bed_mount_hole_pitch) / 2
 

@@ -554,12 +554,12 @@ def create_x_axis_assembly(
     x_axis_rail,
     x_axis_endstop_left_support,
     x_axis_endstop_right_support,
+    BIG_THING,
     record_metrics=False,
-    context=None,
 ):
     """Create the x-axis assembly in a canonical local coordinate system."""
 
-    big_thing = (context or {}).get("BIG_THING", 500)
+    big_thing = BIG_THING
     del record_metrics
 
     lower_axis_profile = _get_leader_part(x_axis_lower_profile)

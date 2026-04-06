@@ -24,8 +24,6 @@ Builder:
         name_template: "{name}"
 
 Parameters:
-  BIG_THING:
-    Type: Float
   z_axis_cylinder_head_clearance:
     Type: Float
   z_axis_default_clearance_hole_type:
@@ -84,8 +82,6 @@ Parts:
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_guide_rod_top_mount_assembly.create_z_axis_guide_rod_top_mount_assembly
       Properties:
-        BIG_THING:
-          $ref: BIG_THING
         z_axis_cylinder_head_clearance:
           $ref: z_axis_cylinder_head_clearance
         z_axis_default_clearance_hole_type:

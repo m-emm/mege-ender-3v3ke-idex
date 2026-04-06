@@ -215,11 +215,11 @@ def create_nitehawk_holder_assembly(
     nitehawk_umbilical_connector_gap,
     nitehawk_umbilical_connector_height,
     nitehawk_width,
-    context=None,
+    BIG_THING,
 ):
     """Create the standalone nitehawk holder assembly."""
 
-    big_thing = (context or {}).get("BIG_THING", 500)
+    big_thing = BIG_THING
 
     mount_tower_1 = create_cone(
         nitehawk_holder_mount_tower_diameter / 2 + nitehawk_mount_tower_base_extension,

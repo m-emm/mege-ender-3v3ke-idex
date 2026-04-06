@@ -103,11 +103,8 @@ def create_y_axis_assembly(
     y_axis_carriage_stopper_mount_screw_size,
     y_axis_carriage_stopper_mount_screw_length,
     record_metrics=False,
-    context=None,
 ):
     """Create the y-axis assembly in a canonical local coordinate system."""
-
-    del context
 
     rails = []
     for side_sign in (-1, 1):

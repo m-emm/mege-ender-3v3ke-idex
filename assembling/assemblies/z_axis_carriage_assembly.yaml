@@ -28,8 +28,6 @@ Builder:
 Parameters:
   carriage_z_offset:
     Type: Float
-  BIG_THING:
-    Type: Float
   z_axis_carriage_back_depth:
     Type: Float
   z_axis_carriage_back_height:
@@ -104,8 +102,6 @@ Parts:
       Properties:
         carriage_z_offset:
           $ref: carriage_z_offset
-        BIG_THING:
-          $ref: BIG_THING
         z_axis_carriage_back_depth:
           $ref: z_axis_carriage_back_depth
         z_axis_carriage_back_height:

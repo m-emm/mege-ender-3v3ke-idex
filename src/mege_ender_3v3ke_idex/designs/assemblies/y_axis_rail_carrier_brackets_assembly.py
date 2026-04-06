@@ -20,10 +20,8 @@ def _create_bracket_for_corner(
     y_axis_rail_carrier_bracket_mount_screw_length,
     y_axis_rail_carrier_bracket_mount_screw_size,
     y_axis_rail_carrier_bracket_mount_screw_inset,
-    context=None,
+    BIG_THING,
 ):
-
-    BIG_THING = (context or {}).get("BIG_THING", 500)
 
     rotation_angle_map = {
         (Alignment.LEFT, Alignment.FRONT): 90,
@@ -410,6 +408,7 @@ def create_y_axis_rail_carrier_brackets_assembly(
     *,
     frame,
     y_axis,
+    BIG_THING,
     y_axis_rail_carrier_bracket_outer_diameter,
     y_axis_rail_carrier_bracket_height,
     y_axis_rail_carrier_bracket_profile_width,
@@ -461,6 +460,7 @@ def create_y_axis_rail_carrier_brackets_assembly(
                 y_axis_rail_carrier_bracket_mount_screw_length=y_axis_rail_carrier_bracket_mount_screw_length,
                 y_axis_rail_carrier_bracket_mount_screw_size=y_axis_rail_carrier_bracket_mount_screw_size,
                 y_axis_rail_carrier_bracket_mount_screw_inset=y_axis_rail_carrier_bracket_mount_screw_inset,
+                BIG_THING=BIG_THING,
             )
             leader = leader.fuse(bracket)
             followers.append(bracket)

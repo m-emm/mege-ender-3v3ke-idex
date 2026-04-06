@@ -112,9 +112,7 @@ def create_axial_rod_clamp(
         nut_cutters.append(nut_cutter)
 
         cylinder_head_cutter = create_cylinder(
-            MScrew.from_size(
-                z_axis_axial_rod_clamp_screw_size
-            ).cylinder_head_diameter
+            MScrew.from_size(z_axis_axial_rod_clamp_screw_size).cylinder_head_diameter
             / 2
             + z_axis_axial_rod_clamp_cylinder_head_cutter_clearance,
             z_axis_axial_rod_clamp_outer_diameter / 2,
@@ -345,52 +343,52 @@ def create_pillow_block_bearing(
 
 def create_axial_ball_bearing_8_x_19(
     *,
-    z_axis_axial_ball_bearing_8_x_19_ball_count,
-    z_axis_axial_ball_bearing_8_x_19_ball_diameter,
-    z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter,
-    z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter,
-    z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_thickness,
-    z_axis_axial_ball_bearing_8_x_19_disc_thickness,
-    z_axis_axial_ball_bearing_8_x_19_inner_diameter,
-    z_axis_axial_ball_bearing_8_x_19_outer_diameter,
-    z_axis_axial_ball_bearing_8_x_19_thickness,
+    axial_ball_bearing_8_x_19_ball_count,
+    axial_ball_bearing_8_x_19_ball_diameter,
+    axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter,
+    axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter,
+    axial_ball_bearing_8_x_19_ball_holder_disc_thickness,
+    axial_ball_bearing_8_x_19_disc_thickness,
+    axial_ball_bearing_8_x_19_inner_diameter,
+    axial_ball_bearing_8_x_19_outer_diameter,
+    axial_ball_bearing_8_x_19_thickness,
 ):
     bearing = PartCollector()
     for i in [0, 1]:
         disc = create_ring(
-            z_axis_axial_ball_bearing_8_x_19_outer_diameter / 2,
-            z_axis_axial_ball_bearing_8_x_19_inner_diameter / 2,
-            z_axis_axial_ball_bearing_8_x_19_disc_thickness,
+            axial_ball_bearing_8_x_19_outer_diameter / 2,
+            axial_ball_bearing_8_x_19_inner_diameter / 2,
+            axial_ball_bearing_8_x_19_disc_thickness,
         )
         disc = translate(
             0,
             0,
             i
             * (
-                z_axis_axial_ball_bearing_8_x_19_thickness
-                - z_axis_axial_ball_bearing_8_x_19_disc_thickness
+                axial_ball_bearing_8_x_19_thickness
+                - axial_ball_bearing_8_x_19_disc_thickness
             ),
         )(disc)
         bearing = bearing.fuse(disc)
 
-    for i in range(z_axis_axial_ball_bearing_8_x_19_ball_count):
-        angle = (360 / z_axis_axial_ball_bearing_8_x_19_ball_count) * i
-        ball = create_sphere(z_axis_axial_ball_bearing_8_x_19_ball_diameter / 2)
+    for i in range(axial_ball_bearing_8_x_19_ball_count):
+        angle = (360 / axial_ball_bearing_8_x_19_ball_count) * i
+        ball = create_sphere(axial_ball_bearing_8_x_19_ball_diameter / 2)
         ball_position_radius = (
-            z_axis_axial_ball_bearing_8_x_19_inner_diameter
-            + z_axis_axial_ball_bearing_8_x_19_outer_diameter
+            axial_ball_bearing_8_x_19_inner_diameter
+            + axial_ball_bearing_8_x_19_outer_diameter
         ) / 4
         ball = translate(
             ball_position_radius * math.cos(math.radians(angle)),
             ball_position_radius * math.sin(math.radians(angle)),
-            z_axis_axial_ball_bearing_8_x_19_thickness / 2,
+            axial_ball_bearing_8_x_19_thickness / 2,
         )(ball)
         bearing = bearing.fuse(ball)
 
     ball_holder_disc = create_ring(
-        z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter / 2,
-        z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter / 2,
-        z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_thickness,
+        axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter / 2,
+        axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter / 2,
+        axial_ball_bearing_8_x_19_ball_holder_disc_thickness,
     )
     ball_holder_disc = align(ball_holder_disc, bearing, Alignment.CENTER)
 

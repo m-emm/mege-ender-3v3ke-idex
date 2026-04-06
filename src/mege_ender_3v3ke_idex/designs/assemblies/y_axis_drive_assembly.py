@@ -742,7 +742,7 @@ def create_y_axis_drive_assembly(
     y_axis_drive_tensioner_screw_z_offset,
     endcap_tensioner_screw_size,
     endcap_belt_clearance,
-    context=None,
+    BIG_THING,
 ):
     """Create the y-axis drive positioned against the frame and bed clamps."""
 
@@ -792,7 +792,7 @@ def create_y_axis_drive_assembly(
         y_axis_drive_tensioner_screw_z_offset=y_axis_drive_tensioner_screw_z_offset,
         endcap_tensioner_screw_size=endcap_tensioner_screw_size,
         endcap_belt_clearance=endcap_belt_clearance,
-        big_thing=(context or {}).get("BIG_THING", 500),
+        big_thing=BIG_THING,
     )
 
     motor_mount = _create_y_axis_motor_mount(

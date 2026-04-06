@@ -9,11 +9,8 @@ def create_z_axis_threaded_rod_assembly(
     z_axis_threaded_rod_coupler_overlap,
     z_axis_threaded_rod_diameter,
     z_axis_threaded_rod_length,
-    context=None,
 ):
     """Create one threaded rod with local motor-body/coupler placement references."""
-
-    del context
 
     motor_reference = create_nema_composite()
     motor_body_reference = motor_reference.get_named_follower("body")

@@ -13,6 +13,23 @@ Builder:
         exclude_names:
           - x_axis_alignment_reference
         name_template: "{name}"
+      - source: dependencies
+        assembly: left_z_axis_profile_assembly
+        artifact: leader
+        name: left_z_axis_profile
+      - source: dependencies
+        assembly: right_z_axis_profile_assembly
+        artifact: leader
+        name: right_z_axis_profile
+      - source: dependencies
+        assembly: printer_frame_assembly
+        artifact: non_production_parts
+        names:
+          - frame_profile_left
+          - frame_profile_right
+        name_template: "{name}"
+
+
   Production:
     parts:
       - source: self
