@@ -1,5 +1,8 @@
 """Declarative z-axis top guide-rod mount assembly."""
 
+from mege_ender_3v3ke_idex.designs.assemblies.y_axis_endstop_holder_assembly import (
+    create_y_axis_endstop_holder_assembly,
+)
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
 )
@@ -72,6 +75,7 @@ def create_z_axis_guide_rod_top_mount_assembly(
         Alignment.STACK_FRONT,
         stack_gap=z_axis_motor_mount_plate_profile_distance,
     )
+    flat_mount_plate = top_mount_plate
 
     rod_holder = create_filleted_box(
         z_axis_guide_rod_clamp_width,
@@ -117,6 +121,7 @@ def create_z_axis_guide_rod_top_mount_assembly(
         stack_gap=-z_axis_top_mount_thickness,
     )
     top_mount_plate = guide_rod_top_aligner(top_mount_plate)
+    flat_mount_plate = guide_rod_top_aligner(flat_mount_plate)
     rod_holder = guide_rod_top_aligner(rod_holder)
 
     top_mount_plate = top_mount_plate.cut(guide_rod)
@@ -294,9 +299,48 @@ def create_z_axis_guide_rod_top_mount_assembly(
         cut_thickness=z_axis_rod_clamp_gap,
     )
 
+    endstop_holder = create_y_axis_endstop_holder_assembly(
+        up=(0.0, -1.0, 0.0),
+        out=(0.0, 0.0, -1.0),
+        big_thing=BIG_THING,
+    )
+    endstop_holder = align(
+        endstop_holder,
+        flat_mount_plate,
+        Alignment.CENTER,
+        axes=[0],
+    )
+    endstop_holder = align(
+        endstop_holder,
+        flat_mount_plate,
+        Alignment.STACK_BOTTOM,
+    )
+    endstop_holder = align(
+        endstop_holder,
+        profile,
+        Alignment.STACK_FRONT,
+        stack_gap=z_axis_profile_mount_plate_clearance,
+    )
+
+    endstop_board = endstop_holder.get_non_production_part_by_name("board")
+    endstop_board_size = get_bounding_box_size(endstop_board)
+    cable_cutter = create_box(
+        2 * z_axis_profile_mount_plate_thickness,
+        BIG_THING,
+        endstop_board_size[2] + 2 * z_axis_profile_mount_plate_clearance,
+    )
+    cable_cutter = align(cable_cutter, endstop_holder.leader, Alignment.CENTER)
+    cable_cutter = align(cable_cutter, endstop_board, Alignment.CENTER, axes=[2])
+    cable_cutter = align(cable_cutter, endstop_holder.leader, Alignment.RIGHT)
+
+    top_mount_back = top_mount_back.fuse(endstop_holder.leader)
+    top_mount_back = top_mount_back.cut(cable_cutter)
+
     retval = LeaderFollowersCuttersPart(leader=top_mount_back)
     retval.add_named_follower(top_mount_clamp, "top_mount_clamp")
     for name, part in screw_assembly.get_named_non_production_part_items():
         retval.add_named_non_production_part(part, f"top_mount_{name}")
+    for name, part in endstop_holder.get_named_non_production_part_items():
+        retval.add_named_non_production_part(part, f"endstop_{name}")
 
     return retval
