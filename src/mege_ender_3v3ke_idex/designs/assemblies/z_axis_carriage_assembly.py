@@ -1,5 +1,7 @@
 """Declarative z-axis carriage assembly."""
 
+import math
+
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import ExtrusionProfileType
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
@@ -140,6 +142,7 @@ def create_z_axis_carriage_assembly(
         threaded_rod_guide_cutter_clearance=z_axis_creality_nut_threaded_rod_cuide_cutter_clearance,
         screw_hole_clearence_type=z_axis_nut_screw_hole_clearence_type,
     )
+    nut = rotate(180, axis=(1, 0, 0))(nut)
     nut = align(nut, threaded_rod, Alignment.CENTER)
 
     nut_raw_base = nut.get_named_non_production_part("raw_base")
@@ -324,6 +327,40 @@ def create_z_axis_carriage_assembly(
     )
     x_axis_mount_plate_top = x_axis_mount_plate_top.cut(mount_screw_hole_drill)
     carriage_top_clamp = carriage_top_clamp.fuse(x_axis_mount_plate_top)
+
+    carriage_back_size = get_bounding_box_size(carriage_back)
+
+    enhancement_length = math.sqrt(2) * carriage_back_size[1]
+
+    enhancements = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        enhancement = create_box(
+            z_axis_carriage_fillet_radius,
+            enhancement_length,
+            z_axis_carriage_fillet_radius,
+        )
+        enhancement = rotate(45, axis=(1, 0, 0))(enhancement)
+        enhancement = align(
+            enhancement,
+            carriage_back,
+            Alignment.BACK,
+        )
+        enhancement = align(
+            enhancement,
+            carriage_back,
+            Alignment.TOP,
+        )
+        enhancement = align(
+            enhancement,
+            carriage_back,
+            lr,
+        )
+        enhancement = translate(-lr.sign * z_axis_carriage_fillet_radius, 0, 0)(
+            enhancement
+        )
+
+        enhancements = enhancements.fuse(enhancement)
+    carriage_back = carriage_back.fuse(enhancements)
 
     carriage_back = bearing.use_as_cutter_on(carriage_back)
     carriage_body = carriage_front.fuse(carriage_back)

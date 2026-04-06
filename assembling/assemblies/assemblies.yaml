@@ -222,7 +222,7 @@ globals:
   z_axis_top_mount_threaded_rod_clearance: 1.5
   z_axis_top_mount_width: 40
   z_axis_carriage_back_depth: 40
-  z_axis_carriage_back_height: 12
+  z_axis_carriage_back_height: 9
   z_axis_carriage_fillet_radius: 4
   z_axis_carriage_front_depth: 25
   z_axis_carriage_front_height:
