@@ -35,7 +35,6 @@ Builder:
         - name: left_z_axis
           process_data_preset: petgcf_medium_strength_high_speed_06
           parts:
-            - left_pillow_bearing_mount_plate
             # - left_axial_bearing_stopper
             # - left_axial_clamp_part_0
             #- left_axial_clamp_part_1
@@ -68,7 +67,6 @@ Builder:
             - left_axial_clamp_part_1
             - left_top_mount
             - left_top_mount_clamp
-            - right_pillow_bearing_mount_plate
             - right_axial_bearing_stopper
             - right_axial_clamp_part_0
             - right_axial_clamp_part_1
@@ -102,14 +100,6 @@ Builder:
       - source: self
         artifact: followers
         names:
-          - left_pillow_bearing_mount_plate
-          - right_pillow_bearing_mount_plate
-        name_template: "{name}"
-        prod_rotation_angle: -90
-        prod_rotation_axis: [1, 0, 0]
-      - source: self
-        artifact: followers
-        names:
           - left_carriage_clamp_1
           - right_carriage_clamp_1
         name_template: "{name}"
@@ -122,8 +112,6 @@ Builder:
           - right_carriage_clamp_0
           - left_carriage_clamp_1
           - right_carriage_clamp_1
-          - left_pillow_bearing_mount_plate
-          - right_pillow_bearing_mount_plate
         name_template: "{name}"
 
 Parts:

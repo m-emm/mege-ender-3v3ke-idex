@@ -1,10 +1,15 @@
 """Declarative z-axis motor mount assembly."""
 
+import math
+
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
 )
-from mege_ender_3v3ke_idex.designs.z_axis_components import create_profile_mount_plate
+from mege_ender_3v3ke_idex.designs.z_axis_components import (
+    create_pillow_block_bearing,
+    create_profile_mount_plate,
+)
 from shellforgepy.simple import *
 
 
@@ -39,6 +44,10 @@ def _get_threaded_rod_part(z_axis_threaded_rod):
     )
 
 
+def _get_threaded_rod_coupler_reference(z_axis_threaded_rod):
+    return z_axis_threaded_rod.get_named_non_production_part("coupler_reference")
+
+
 def create_z_axis_motor_mount_assembly(
     *,
     z_axis_profile,
@@ -70,6 +79,23 @@ def create_z_axis_motor_mount_assembly(
     z_axis_profile_mount_plate_num_holes,
     z_axis_profile_mount_plate_screw_inset,
     z_axis_profile_mount_plate_thickness,
+    z_axis_pillow_block_bearing_z_offset,
+    z_axis_pillow_block_bearing_base_gap_length,
+    z_axis_pillow_block_bearing_base_overall_length,
+    z_axis_pillow_block_bearing_base_thickness,
+    z_axis_pillow_block_bearing_base_width,
+    z_axis_pillow_block_bearing_cage_diameter,
+    z_axis_pillow_block_bearing_cage_rim,
+    z_axis_pillow_block_bearing_cage_thickness,
+    z_axis_pillow_block_bearing_mount_hole_center_distance,
+    z_axis_pillow_block_bearing_mount_hole_diameter,
+    z_axis_pillow_block_bearing_mount_nut_clearance,
+    z_axis_pillow_block_bearing_mount_screw_length,
+    z_axis_pillow_block_bearing_mount_screw_size,
+    z_axis_pillow_block_bearing_rod_holder_inner_diameter,
+    z_axis_pillow_block_bearing_rod_holder_length,
+    z_axis_pillow_block_bearing_rod_holder_outer_diameter,
+    z_axis_pillow_block_bottom_base_bridge_width,
     z_axis_rod_clamp_gap,
 ):
     """Create the printable motor mount assembly for one z-axis side."""
@@ -78,6 +104,7 @@ def create_z_axis_motor_mount_assembly(
     profile = _get_profile_part(z_axis_profile)
     guide_rod = _get_guide_rod_part(z_axis_guide_rod)
     threaded_rod = _get_threaded_rod_part(z_axis_threaded_rod)
+    coupler = _get_threaded_rod_coupler_reference(z_axis_threaded_rod)
 
     motor = create_nema_composite(
         axle_clearance=motor_mount_axle_clearance,
@@ -109,6 +136,66 @@ def create_z_axis_motor_mount_assembly(
         stack_gap=z_axis_motor_mount_plate_profile_distance,
     )
 
+    pillow_block_bearing = create_pillow_block_bearing(
+        BIG_THING=BIG_THING,
+        z_axis_pillow_block_bearing_base_gap_length=z_axis_pillow_block_bearing_base_gap_length,
+        z_axis_pillow_block_bearing_base_overall_length=z_axis_pillow_block_bearing_base_overall_length,
+        z_axis_pillow_block_bearing_base_thickness=z_axis_pillow_block_bearing_base_thickness,
+        z_axis_pillow_block_bearing_base_width=z_axis_pillow_block_bearing_base_width,
+        z_axis_pillow_block_bearing_cage_diameter=z_axis_pillow_block_bearing_cage_diameter,
+        z_axis_pillow_block_bearing_cage_rim=z_axis_pillow_block_bearing_cage_rim,
+        z_axis_pillow_block_bearing_cage_thickness=z_axis_pillow_block_bearing_cage_thickness,
+        z_axis_pillow_block_bearing_mount_hole_center_distance=z_axis_pillow_block_bearing_mount_hole_center_distance,
+        z_axis_pillow_block_bearing_mount_hole_diameter=z_axis_pillow_block_bearing_mount_hole_diameter,
+        z_axis_pillow_block_bearing_mount_screw_length=z_axis_pillow_block_bearing_mount_screw_length,
+        z_axis_pillow_block_bearing_mount_screw_size=z_axis_pillow_block_bearing_mount_screw_size,
+        z_axis_pillow_block_bearing_rod_holder_inner_diameter=z_axis_pillow_block_bearing_rod_holder_inner_diameter,
+        z_axis_pillow_block_bearing_rod_holder_length=z_axis_pillow_block_bearing_rod_holder_length,
+        z_axis_pillow_block_bearing_rod_holder_outer_diameter=z_axis_pillow_block_bearing_rod_holder_outer_diameter,
+        z_axis_pillow_block_bottom_base_bridge_width=z_axis_pillow_block_bottom_base_bridge_width,
+    ).prefixed_copy("pillow_block_bearing")
+    pillow_block_bearing = rotate(-90, axis=(1, 0, 0))(pillow_block_bearing)
+    pillow_block_bearing = align(pillow_block_bearing, threaded_rod, Alignment.CENTER)
+    pillow_block_bearing = align(
+        pillow_block_bearing,
+        coupler,
+        Alignment.STACK_TOP,
+        stack_gap=z_axis_pillow_block_bearing_z_offset,
+    )
+
+    pillow_base = pillow_block_bearing.get_named_non_production_part(
+        "pillow_block_bearing_base"
+    )
+    pillow_base_size = get_bounding_box_size(pillow_base)
+
+    pillow_bearing_mount_plate = create_box(
+        pillow_base_size[0],
+        BIG_THING,
+        pillow_base_size[2],
+    )
+    pillow_bearing_mount_plate = align(
+        pillow_bearing_mount_plate,
+        pillow_base,
+        Alignment.CENTER,
+    )
+    pillow_bearing_mount_plate = align(
+        pillow_bearing_mount_plate,
+        pillow_base,
+        Alignment.STACK_BACK,
+    )
+    pillow_bearing_mount_plate = pillow_block_bearing.use_as_cutter_on(
+        pillow_bearing_mount_plate
+    )
+
+    profile_plane_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    profile_plane_cutter = align(
+        profile_plane_cutter,
+        pillow_bearing_mount_plate,
+        Alignment.CENTER,
+    )
+    profile_plane_cutter = align(profile_plane_cutter, profile, Alignment.FRONT)
+    pillow_bearing_mount_plate = pillow_bearing_mount_plate.cut(profile_plane_cutter)
+
     profile_mount_plates = PartCollector()
     for alignment in [Alignment.LEFT, Alignment.RIGHT]:
         profile_mount_plate = create_profile_mount_plate(
@@ -133,6 +220,29 @@ def create_z_axis_motor_mount_assembly(
             profile_mount_plate, z_axis_profile, alignment.stack_alignment
         )
         profile_mount_plates = profile_mount_plates.fuse(profile_mount_plate)
+
+    spacer_cutter_size = 2 * pillow_base_size[2] / math.sqrt(2)
+    pillow_block_bearing_screw_spacer_cutter = create_box(
+        BIG_THING,
+        spacer_cutter_size,
+        spacer_cutter_size,
+    )
+    pillow_block_bearing_screw_spacer_cutter = rotate(45, axis=(1, 0, 0))(
+        pillow_block_bearing_screw_spacer_cutter
+    )
+    pillow_block_bearing_screw_spacer_cutter = align(
+        pillow_block_bearing_screw_spacer_cutter,
+        pillow_base,
+        Alignment.CENTER,
+    )
+    pillow_block_bearing_screw_spacer_cutter = align(
+        pillow_block_bearing_screw_spacer_cutter,
+        profile_mount_plates,
+        Alignment.EDGE_FRONT,
+    )
+    profile_mount_plates = profile_mount_plates.cut(
+        pillow_block_bearing_screw_spacer_cutter
+    )
 
     guide_rod_clamp = create_filleted_box(
         z_axis_guide_rod_clamp_width,
@@ -208,6 +318,45 @@ def create_z_axis_motor_mount_assembly(
     mount_plate = mount_plate.fuse(guide_rod_clamp)
     mount_plate = mount_plate.fuse(profile_mount_plates)
     mount_plate = mount_plate.cut(guide_rod_cutter)
+    mount_plate = mount_plate.fuse(pillow_bearing_mount_plate)
+
+    for cutter_index in range(2):
+        cutter = pillow_block_bearing.get_named_cutter(
+            f"pillow_block_bearing_mount_hole_cutter_{cutter_index}"
+        )
+        nut_cutter = create_nut(
+            z_axis_pillow_block_bearing_mount_screw_size,
+            no_hole=True,
+            slack=z_axis_pillow_block_bearing_mount_nut_clearance,
+        )
+        nut_cutter = rotate(90, axis=(1, 0, 0))(nut_cutter)
+        nut_cutter = align(nut_cutter, cutter, Alignment.CENTER)
+        nut_cutter = align(nut_cutter, pillow_bearing_mount_plate, Alignment.BACK)
+        mount_plate = mount_plate.cut(nut_cutter)
+
+    pillow_bearing_mount_plate_size = get_bounding_box_size(pillow_bearing_mount_plate)
+
+    for tb in [Alignment.TOP, Alignment.BOTTOM]:
+        pillow_bearing_mount_plate_support = create_right_triangle(
+            pillow_bearing_mount_plate_size[1],
+            pillow_bearing_mount_plate_size[1],
+            pillow_bearing_mount_plate_size[0],
+            extrusion_direction=(1, 0, 0),
+            a_normal=(0, 0, -tb.sign),
+            b_normal=(0, -1, 0),
+        )
+        pillow_bearing_mount_plate_support = align(
+            pillow_bearing_mount_plate_support,
+            pillow_bearing_mount_plate,
+            Alignment.CENTER,
+        )
+        pillow_bearing_mount_plate_support = align(
+            pillow_bearing_mount_plate_support,
+            pillow_bearing_mount_plate,
+            tb.stack_alignment,
+        )
+
+        mount_plate = mount_plate.fuse(pillow_bearing_mount_plate_support)
 
     guide_rod_center = get_bounding_box_center(guide_rod)
     guide_rod_clamp_center = get_bounding_box_center(guide_rod_clamp)
@@ -226,6 +375,12 @@ def create_z_axis_motor_mount_assembly(
     retval = LeaderFollowersCuttersPart(leader=mount_plate_back)
     retval.add_named_follower(mount_plate_clamp_part, "mount_plate_clamp_part")
 
+    retval.add_named_non_production_part(
+        pillow_block_bearing.leader,
+        "pillow_block_bearing_body",
+    )
+    for name, part in pillow_block_bearing.get_named_non_production_part_items():
+        retval.add_named_non_production_part(part, name)
     for name, part in motor.get_named_follower_items():
         retval.add_named_non_production_part(part, name)
     for name, part in screws_mount_assembly.get_named_non_production_part_items():

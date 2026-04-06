@@ -55,7 +55,7 @@ def create_z_axis_side_assembly(
     _copy_followers_to_followers(
         retval,
         z_axis_bottom_support,
-        leader_name="pillow_bearing_mount_plate",
+        leader_name="axial_bearing_stopper",
     )
     _copy_followers_to_followers(
         retval,

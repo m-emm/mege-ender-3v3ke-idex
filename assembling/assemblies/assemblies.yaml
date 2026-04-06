@@ -184,8 +184,25 @@ globals:
   z_axis_motor_mount_plate_box_wall: 2
   z_axis_rod_clamp_gap: 1.0
   z_axis_pillow_block_bearing_z_offset: 2
+  z_axis_pillow_block_bearing_base_gap_length: 24.7
+  z_axis_pillow_block_bearing_base_overall_length: 55
+  z_axis_pillow_block_bearing_base_thickness: 5.1
+  z_axis_pillow_block_bearing_base_width: 13.1
+  z_axis_pillow_block_bearing_cage_diameter: 30
+  z_axis_pillow_block_bearing_cage_rim: 2
+  z_axis_pillow_block_bearing_cage_thickness: 9.6
+  z_axis_pillow_block_bearing_mount_hole_center_distance: 41.5
+  z_axis_pillow_block_bearing_mount_hole_diameter: 4.6
+  z_axis_pillow_block_bearing_mount_nut_clearance: 0.2
+  z_axis_pillow_block_bearing_mount_screw_length: 15
+  z_axis_pillow_block_bearing_mount_screw_size: "M4"
+  z_axis_pillow_block_bearing_rod_holder_inner_diameter: 8.03
+  z_axis_pillow_block_bearing_rod_holder_length: 11
+  z_axis_pillow_block_bearing_rod_holder_outer_diameter: 12
+  z_axis_pillow_block_bearing_profile_mount_plate_thickness: 5
+  z_axis_pillow_block_bottom_base_bridge_width: 3.5
   z_axis_profile_mount_plate_fillet_radius: 3
-  z_axis_profile_mount_plate_height: 60
+  z_axis_profile_mount_plate_height: 70
   z_axis_profile_mount_plate_num_holes: 3
   z_axis_profile_mount_plate_screw_inset: 5
   z_axis_profile_mount_plate_thickness: 5
@@ -260,23 +277,6 @@ globals:
   z_axis_bottom_support_profile_mount_plate_fillet_radius: 5
   z_axis_bottom_support_profile_mount_plate_height: 33
   z_axis_bottom_support_profile_mount_plate_thickness: 10
-  z_axis_pillow_block_bearing_base_gap_length: 24.7
-  z_axis_pillow_block_bearing_base_overall_length: 55
-  z_axis_pillow_block_bearing_base_thickness: 5.1
-  z_axis_pillow_block_bearing_base_width: 13.1
-  z_axis_pillow_block_bearing_cage_diameter: 30
-  z_axis_pillow_block_bearing_cage_rim: 2
-  z_axis_pillow_block_bearing_cage_thickness: 9.6
-  z_axis_pillow_block_bearing_mount_hole_center_distance: 41.5
-  z_axis_pillow_block_bearing_mount_hole_diameter: 4.6
-  z_axis_pillow_block_bearing_mount_nut_clearance: 0.2
-  z_axis_pillow_block_bearing_mount_screw_length: 15
-  z_axis_pillow_block_bearing_mount_screw_size: "M4"
-  z_axis_pillow_block_bearing_rod_holder_inner_diameter: 8.03
-  z_axis_pillow_block_bearing_rod_holder_length: 11
-  z_axis_pillow_block_bearing_rod_holder_outer_diameter: 12
-  z_axis_pillow_block_bearing_profile_mount_plate_thickness: 5
-  z_axis_pillow_block_bottom_base_bridge_width: 3.5
   motor_size: 42.3
   motor_x_offset:
     $expr:
@@ -1037,12 +1037,12 @@ assemblies:
     resource_file: z_axis_bottom_support_assembly.yaml
     depends_on:
       - left_z_axis_profile_assembly
-      - left_z_axis_guide_rod_assembly
       - left_z_axis_threaded_rod_assembly
+      - left_z_axis_motor_mount_assembly
     inject_parts:
       z_axis_profile: left_z_axis_profile_assembly
-      z_axis_guide_rod: left_z_axis_guide_rod_assembly
       z_axis_threaded_rod: left_z_axis_threaded_rod_assembly
+      z_axis_motor_mount: left_z_axis_motor_mount_assembly
     parameters:
       side: left
       z_axis_axial_ball_bearing_8_x_19_ball_count: !Ref z_axis_axial_ball_bearing_8_x_19_ball_count
@@ -1068,36 +1068,18 @@ assemblies:
       z_axis_axial_rod_clamp_screw_length: !Ref z_axis_axial_rod_clamp_screw_length
       z_axis_axial_rod_clamp_screw_size: !Ref z_axis_axial_rod_clamp_screw_size
       z_axis_axial_rod_clamp_thickness: !Ref z_axis_axial_rod_clamp_thickness
-      z_axis_bottom_support_profile_mount_plate_fillet_radius: !Ref z_axis_bottom_support_profile_mount_plate_fillet_radius
-      z_axis_pillow_block_bearing_base_gap_length: !Ref z_axis_pillow_block_bearing_base_gap_length
-      z_axis_pillow_block_bearing_base_overall_length: !Ref z_axis_pillow_block_bearing_base_overall_length
-      z_axis_pillow_block_bearing_base_thickness: !Ref z_axis_pillow_block_bearing_base_thickness
-      z_axis_pillow_block_bearing_base_width: !Ref z_axis_pillow_block_bearing_base_width
-      z_axis_pillow_block_bearing_cage_diameter: !Ref z_axis_pillow_block_bearing_cage_diameter
-      z_axis_pillow_block_bearing_cage_rim: !Ref z_axis_pillow_block_bearing_cage_rim
-      z_axis_pillow_block_bearing_cage_thickness: !Ref z_axis_pillow_block_bearing_cage_thickness
-      z_axis_pillow_block_bearing_mount_hole_center_distance: !Ref z_axis_pillow_block_bearing_mount_hole_center_distance
-      z_axis_pillow_block_bearing_mount_hole_diameter: !Ref z_axis_pillow_block_bearing_mount_hole_diameter
-      z_axis_pillow_block_bearing_mount_nut_clearance: !Ref z_axis_pillow_block_bearing_mount_nut_clearance
-      z_axis_pillow_block_bearing_mount_screw_length: !Ref z_axis_pillow_block_bearing_mount_screw_length
-      z_axis_pillow_block_bearing_mount_screw_size: !Ref z_axis_pillow_block_bearing_mount_screw_size
-      z_axis_pillow_block_bearing_rod_holder_inner_diameter: !Ref z_axis_pillow_block_bearing_rod_holder_inner_diameter
-      z_axis_pillow_block_bearing_rod_holder_length: !Ref z_axis_pillow_block_bearing_rod_holder_length
-      z_axis_pillow_block_bearing_rod_holder_outer_diameter: !Ref z_axis_pillow_block_bearing_rod_holder_outer_diameter
-      z_axis_pillow_block_bottom_base_bridge_width: !Ref z_axis_pillow_block_bottom_base_bridge_width
-      z_axis_pillow_block_bearing_z_offset: !Ref z_axis_pillow_block_bearing_z_offset
 
   - name: right_z_axis_bottom_support_assembly
 
     resource_file: z_axis_bottom_support_assembly.yaml
     depends_on:
       - right_z_axis_profile_assembly
-      - right_z_axis_guide_rod_assembly
       - right_z_axis_threaded_rod_assembly
+      - right_z_axis_motor_mount_assembly
     inject_parts:
       z_axis_profile: right_z_axis_profile_assembly
-      z_axis_guide_rod: right_z_axis_guide_rod_assembly
       z_axis_threaded_rod: right_z_axis_threaded_rod_assembly
+      z_axis_motor_mount: right_z_axis_motor_mount_assembly
     parameters:
       side: right
       z_axis_axial_ball_bearing_8_x_19_ball_count: !Ref z_axis_axial_ball_bearing_8_x_19_ball_count
@@ -1123,23 +1105,6 @@ assemblies:
       z_axis_axial_rod_clamp_screw_length: !Ref z_axis_axial_rod_clamp_screw_length
       z_axis_axial_rod_clamp_screw_size: !Ref z_axis_axial_rod_clamp_screw_size
       z_axis_axial_rod_clamp_thickness: !Ref z_axis_axial_rod_clamp_thickness
-      z_axis_pillow_block_bearing_base_gap_length: !Ref z_axis_pillow_block_bearing_base_gap_length
-      z_axis_pillow_block_bearing_base_overall_length: !Ref z_axis_pillow_block_bearing_base_overall_length
-      z_axis_pillow_block_bearing_base_thickness: !Ref z_axis_pillow_block_bearing_base_thickness
-      z_axis_pillow_block_bearing_base_width: !Ref z_axis_pillow_block_bearing_base_width
-      z_axis_pillow_block_bearing_cage_diameter: !Ref z_axis_pillow_block_bearing_cage_diameter
-      z_axis_pillow_block_bearing_cage_rim: !Ref z_axis_pillow_block_bearing_cage_rim
-      z_axis_pillow_block_bearing_cage_thickness: !Ref z_axis_pillow_block_bearing_cage_thickness
-      z_axis_pillow_block_bearing_mount_hole_center_distance: !Ref z_axis_pillow_block_bearing_mount_hole_center_distance
-      z_axis_pillow_block_bearing_mount_hole_diameter: !Ref z_axis_pillow_block_bearing_mount_hole_diameter
-      z_axis_pillow_block_bearing_mount_nut_clearance: !Ref z_axis_pillow_block_bearing_mount_nut_clearance
-      z_axis_pillow_block_bearing_mount_screw_length: !Ref z_axis_pillow_block_bearing_mount_screw_length
-      z_axis_pillow_block_bearing_mount_screw_size: !Ref z_axis_pillow_block_bearing_mount_screw_size
-      z_axis_pillow_block_bearing_rod_holder_inner_diameter: !Ref z_axis_pillow_block_bearing_rod_holder_inner_diameter
-      z_axis_pillow_block_bearing_rod_holder_length: !Ref z_axis_pillow_block_bearing_rod_holder_length
-      z_axis_pillow_block_bearing_rod_holder_outer_diameter: !Ref z_axis_pillow_block_bearing_rod_holder_outer_diameter
-      z_axis_pillow_block_bottom_base_bridge_width: !Ref z_axis_pillow_block_bottom_base_bridge_width
-      z_axis_pillow_block_bearing_z_offset: !Ref z_axis_pillow_block_bearing_z_offset
 
   - name: left_z_axis_motor_mount_assembly
 
@@ -1178,6 +1143,23 @@ assemblies:
       z_axis_profile_mount_plate_num_holes: !Ref z_axis_profile_mount_plate_num_holes
       z_axis_profile_mount_plate_screw_inset: !Ref z_axis_profile_mount_plate_screw_inset
       z_axis_profile_mount_plate_thickness: !Ref z_axis_profile_mount_plate_thickness
+      z_axis_pillow_block_bearing_z_offset: !Ref z_axis_pillow_block_bearing_z_offset
+      z_axis_pillow_block_bearing_base_gap_length: !Ref z_axis_pillow_block_bearing_base_gap_length
+      z_axis_pillow_block_bearing_base_overall_length: !Ref z_axis_pillow_block_bearing_base_overall_length
+      z_axis_pillow_block_bearing_base_thickness: !Ref z_axis_pillow_block_bearing_base_thickness
+      z_axis_pillow_block_bearing_base_width: !Ref z_axis_pillow_block_bearing_base_width
+      z_axis_pillow_block_bearing_cage_diameter: !Ref z_axis_pillow_block_bearing_cage_diameter
+      z_axis_pillow_block_bearing_cage_rim: !Ref z_axis_pillow_block_bearing_cage_rim
+      z_axis_pillow_block_bearing_cage_thickness: !Ref z_axis_pillow_block_bearing_cage_thickness
+      z_axis_pillow_block_bearing_mount_hole_center_distance: !Ref z_axis_pillow_block_bearing_mount_hole_center_distance
+      z_axis_pillow_block_bearing_mount_hole_diameter: !Ref z_axis_pillow_block_bearing_mount_hole_diameter
+      z_axis_pillow_block_bearing_mount_nut_clearance: !Ref z_axis_pillow_block_bearing_mount_nut_clearance
+      z_axis_pillow_block_bearing_mount_screw_length: !Ref z_axis_pillow_block_bearing_mount_screw_length
+      z_axis_pillow_block_bearing_mount_screw_size: !Ref z_axis_pillow_block_bearing_mount_screw_size
+      z_axis_pillow_block_bearing_rod_holder_inner_diameter: !Ref z_axis_pillow_block_bearing_rod_holder_inner_diameter
+      z_axis_pillow_block_bearing_rod_holder_length: !Ref z_axis_pillow_block_bearing_rod_holder_length
+      z_axis_pillow_block_bearing_rod_holder_outer_diameter: !Ref z_axis_pillow_block_bearing_rod_holder_outer_diameter
+      z_axis_pillow_block_bottom_base_bridge_width: !Ref z_axis_pillow_block_bottom_base_bridge_width
       z_axis_rod_clamp_gap: !Ref z_axis_rod_clamp_gap
 
   - name: right_z_axis_motor_mount_assembly
@@ -1217,6 +1199,23 @@ assemblies:
       z_axis_profile_mount_plate_num_holes: !Ref z_axis_profile_mount_plate_num_holes
       z_axis_profile_mount_plate_screw_inset: !Ref z_axis_profile_mount_plate_screw_inset
       z_axis_profile_mount_plate_thickness: !Ref z_axis_profile_mount_plate_thickness
+      z_axis_pillow_block_bearing_z_offset: !Ref z_axis_pillow_block_bearing_z_offset
+      z_axis_pillow_block_bearing_base_gap_length: !Ref z_axis_pillow_block_bearing_base_gap_length
+      z_axis_pillow_block_bearing_base_overall_length: !Ref z_axis_pillow_block_bearing_base_overall_length
+      z_axis_pillow_block_bearing_base_thickness: !Ref z_axis_pillow_block_bearing_base_thickness
+      z_axis_pillow_block_bearing_base_width: !Ref z_axis_pillow_block_bearing_base_width
+      z_axis_pillow_block_bearing_cage_diameter: !Ref z_axis_pillow_block_bearing_cage_diameter
+      z_axis_pillow_block_bearing_cage_rim: !Ref z_axis_pillow_block_bearing_cage_rim
+      z_axis_pillow_block_bearing_cage_thickness: !Ref z_axis_pillow_block_bearing_cage_thickness
+      z_axis_pillow_block_bearing_mount_hole_center_distance: !Ref z_axis_pillow_block_bearing_mount_hole_center_distance
+      z_axis_pillow_block_bearing_mount_hole_diameter: !Ref z_axis_pillow_block_bearing_mount_hole_diameter
+      z_axis_pillow_block_bearing_mount_nut_clearance: !Ref z_axis_pillow_block_bearing_mount_nut_clearance
+      z_axis_pillow_block_bearing_mount_screw_length: !Ref z_axis_pillow_block_bearing_mount_screw_length
+      z_axis_pillow_block_bearing_mount_screw_size: !Ref z_axis_pillow_block_bearing_mount_screw_size
+      z_axis_pillow_block_bearing_rod_holder_inner_diameter: !Ref z_axis_pillow_block_bearing_rod_holder_inner_diameter
+      z_axis_pillow_block_bearing_rod_holder_length: !Ref z_axis_pillow_block_bearing_rod_holder_length
+      z_axis_pillow_block_bearing_rod_holder_outer_diameter: !Ref z_axis_pillow_block_bearing_rod_holder_outer_diameter
+      z_axis_pillow_block_bottom_base_bridge_width: !Ref z_axis_pillow_block_bottom_base_bridge_width
       z_axis_rod_clamp_gap: !Ref z_axis_rod_clamp_gap
 
   - name: left_z_axis_threaded_rod_assembly
