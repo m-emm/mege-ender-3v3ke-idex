@@ -5,7 +5,6 @@ from mege_ender_3v3ke_idex.designs.z_axis_components import (
     create_axial_bearing_stopper,
     create_axial_rod_clamp,
     create_pillow_block_bearing,
-    create_profile_mount_plate,
 )
 from shellforgepy.simple import *
 
@@ -54,9 +53,6 @@ def create_z_axis_bottom_support_assembly(
     z_axis_axial_rod_clamp_screw_length,
     z_axis_axial_rod_clamp_screw_size,
     z_axis_axial_rod_clamp_thickness,
-    z_axis_bottom_support_profile_mount_plate_fillet_radius,
-    z_axis_bottom_support_profile_mount_plate_height,
-    z_axis_bottom_support_profile_mount_plate_thickness,
     z_axis_pillow_block_bearing_z_offset,
     z_axis_pillow_block_bearing_base_gap_length,
     z_axis_pillow_block_bearing_base_overall_length,
@@ -73,10 +69,7 @@ def create_z_axis_bottom_support_assembly(
     z_axis_pillow_block_bearing_rod_holder_inner_diameter,
     z_axis_pillow_block_bearing_rod_holder_length,
     z_axis_pillow_block_bearing_rod_holder_outer_diameter,
-    z_axis_pillow_block_bearing_profile_mount_plate_thickness,
     z_axis_pillow_block_bottom_base_bridge_width,
-    z_axis_profile_mount_plate_num_holes,
-    z_axis_profile_mount_plate_screw_inset,
 ):
     """Create the printable lower support stack for one z-axis side."""
 
@@ -222,39 +215,6 @@ def create_z_axis_bottom_support_assembly(
         nut_cutter = align(nut_cutter, cutter, Alignment.CENTER)
         nut_cutter = align(nut_cutter, pillow_bearing_mount_plate, Alignment.BACK)
         pillow_bearing_mount_plate = pillow_bearing_mount_plate.cut(nut_cutter)
-
-    pillow_bearing_profile_mount_plate = create_profile_mount_plate(
-        profile_mount_width=pillow_base_size[0],
-        z_axis_profile_mount_plate_thickness=z_axis_pillow_block_bearing_profile_mount_plate_thickness,
-        z_axis_profile_mount_plate_height=z_axis_bottom_support_profile_mount_plate_height,
-        z_axis_profile_mount_plate_fillet_radius=z_axis_bottom_support_profile_mount_plate_fillet_radius,
-        BIG_THING=BIG_THING,
-        num_holes=z_axis_profile_mount_plate_num_holes,
-        screw_inset=z_axis_profile_mount_plate_screw_inset,
-    )
-    pillow_bearing_profile_mount_plate = align(
-        pillow_bearing_profile_mount_plate,
-        pillow_bearing_mount_plate,
-        Alignment.CENTER,
-    )
-
-    pillow_bearing_profile_mount_plate = align(
-        pillow_bearing_profile_mount_plate, profile, side_alignment
-    )
-
-    pillow_bearing_profile_mount_plate = align(
-        pillow_bearing_profile_mount_plate,
-        pillow_bearing_mount_plate,
-        Alignment.BACK,
-    )
-    pillow_bearing_profile_mount_plate = align(
-        pillow_bearing_profile_mount_plate,
-        pillow_bearing_mount_plate,
-        Alignment.STACK_TOP,
-    )
-    pillow_bearing_mount_plate = pillow_bearing_mount_plate.fuse(
-        pillow_bearing_profile_mount_plate
-    )
 
     retval = LeaderFollowersCuttersPart(leader=pillow_bearing_mount_plate)
 

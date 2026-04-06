@@ -70,12 +70,6 @@ Parameters:
     Type: String
   z_axis_axial_rod_clamp_thickness:
     Type: Float
-  z_axis_bottom_support_profile_mount_plate_fillet_radius:
-    Type: Float
-  z_axis_bottom_support_profile_mount_plate_height:
-    Type: Float
-  z_axis_bottom_support_profile_mount_plate_thickness:
-    Type: Float
   z_axis_pillow_block_bearing_z_offset:
     Type: Float
   z_axis_pillow_block_bearing_base_gap_length:
@@ -108,13 +102,7 @@ Parameters:
     Type: Float
   z_axis_pillow_block_bearing_rod_holder_outer_diameter:
     Type: Float
-  z_axis_pillow_block_bearing_profile_mount_plate_thickness:
-    Type: Float
   z_axis_pillow_block_bottom_base_bridge_width:
-    Type: Float
-  z_axis_profile_mount_plate_num_holes:
-    Type: Integer
-  z_axis_profile_mount_plate_screw_inset:
     Type: Float
   side:
     Type: String
@@ -172,12 +160,6 @@ Parts:
           $ref: z_axis_axial_rod_clamp_screw_size
         z_axis_axial_rod_clamp_thickness:
           $ref: z_axis_axial_rod_clamp_thickness
-        z_axis_bottom_support_profile_mount_plate_fillet_radius:
-          $ref: z_axis_bottom_support_profile_mount_plate_fillet_radius
-        z_axis_bottom_support_profile_mount_plate_height:
-          $ref: z_axis_bottom_support_profile_mount_plate_height
-        z_axis_bottom_support_profile_mount_plate_thickness:
-          $ref: z_axis_bottom_support_profile_mount_plate_thickness
         z_axis_pillow_block_bearing_z_offset:
           $ref: z_axis_pillow_block_bearing_z_offset
         z_axis_pillow_block_bearing_base_gap_length:
@@ -210,13 +192,7 @@ Parts:
           $ref: z_axis_pillow_block_bearing_rod_holder_length
         z_axis_pillow_block_bearing_rod_holder_outer_diameter:
           $ref: z_axis_pillow_block_bearing_rod_holder_outer_diameter
-        z_axis_pillow_block_bearing_profile_mount_plate_thickness:
-          $ref: z_axis_pillow_block_bearing_profile_mount_plate_thickness
         z_axis_pillow_block_bottom_base_bridge_width:
           $ref: z_axis_pillow_block_bottom_base_bridge_width
-        z_axis_profile_mount_plate_num_holes:
-          $ref: z_axis_profile_mount_plate_num_holes
-        z_axis_profile_mount_plate_screw_inset:
-          $ref: z_axis_profile_mount_plate_screw_inset
         side:
           $ref: side
