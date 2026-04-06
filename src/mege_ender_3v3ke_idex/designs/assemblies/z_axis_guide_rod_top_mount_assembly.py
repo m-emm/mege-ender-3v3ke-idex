@@ -28,7 +28,11 @@ def create_z_axis_guide_rod_top_mount_assembly(
     z_axis_default_screw_nut_cutter_clearance,
     z_axis_guide_rod_clamp_width,
     z_axis_motor_mount_plate_profile_distance,
+    z_axis_profile_mount_plate_num_holes,
+    z_axis_profile_mount_plate_screw_inset,
     z_axis_profile_mount_plate_height,
+    z_axis_profile_mount_plate_thickness,
+    z_axis_profile_mount_plate_fillet_radius,
     z_axis_rod_clamp_gap,
     z_axis_threaded_rod_diameter,
     z_axis_top_mount_depth,
@@ -164,7 +168,13 @@ def create_z_axis_guide_rod_top_mount_assembly(
     top_mount_plate = top_mount_plate.cut(threaded_rod_cutter)
 
     top_mount_profile_mount_plate = create_profile_mount_plate(
-        profile_mount_width=z_axis_top_mount_profile_mount_width
+        profile_mount_width=z_axis_top_mount_profile_mount_width,
+        z_axis_profile_mount_plate_thickness=z_axis_profile_mount_plate_thickness,
+        z_axis_profile_mount_plate_height=z_axis_profile_mount_plate_height,
+        z_axis_profile_mount_plate_fillet_radius=z_axis_profile_mount_plate_fillet_radius,
+        BIG_THING=BIG_THING,
+        num_holes=z_axis_profile_mount_plate_num_holes,
+        screw_inset=z_axis_profile_mount_plate_screw_inset,
     )
     top_mount_profile_mount_plate = align(
         top_mount_profile_mount_plate,

@@ -1,51 +1,49 @@
 """Declarative z-axis threaded rod assembly."""
 
+from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.simple import *
-
-
-def _get_profile_part(z_axis_profile):
-    return (
-        z_axis_profile.leader if hasattr(z_axis_profile, "leader") else z_axis_profile
-    )
-
-
-def _get_motor_mount_coupler(z_axis_motor_mount):
-    return z_axis_motor_mount.get_named_non_production_part("coupler")
 
 
 def create_z_axis_threaded_rod_assembly(
     *,
-    z_axis_profile,
-    z_axis_motor_mount,
     z_axis_threaded_rod_coupler_overlap,
     z_axis_threaded_rod_diameter,
     z_axis_threaded_rod_length,
-    z_axis_threaded_rod_profile_distance,
     context=None,
 ):
-    """Create one threaded rod from the actual motor mount coupler placement."""
+    """Create one threaded rod with local motor-body/coupler placement references."""
 
     del context
 
-    profile = _get_profile_part(z_axis_profile)
-    coupler = _get_motor_mount_coupler(z_axis_motor_mount)
+    motor_reference = create_nema_composite()
+    motor_body_reference = motor_reference.get_named_follower("body")
+    coupler_reference = motor_reference.get_named_follower("coupler")
 
     threaded_rod = create_cylinder(
         z_axis_threaded_rod_diameter / 2,
         z_axis_threaded_rod_length,
     )
-    threaded_rod = align(threaded_rod, coupler, Alignment.CENTER, axes=[0])
     threaded_rod = align(
         threaded_rod,
-        profile,
-        Alignment.STACK_FRONT,
-        stack_gap=z_axis_threaded_rod_profile_distance,
+        coupler_reference,
+        Alignment.CENTER,
+        axes=[0, 1],
     )
     threaded_rod = align(
         threaded_rod,
-        coupler,
+        coupler_reference,
         Alignment.STACK_TOP,
         stack_gap=-z_axis_threaded_rod_coupler_overlap,
     )
 
-    return threaded_rod
+    retval = LeaderFollowersCuttersPart(leader=threaded_rod)
+    retval.add_named_non_production_part(
+        motor_body_reference,
+        "motor_body_reference",
+    )
+    retval.add_named_non_production_part(
+        coupler_reference,
+        "coupler_reference",
+    )
+
+    return retval

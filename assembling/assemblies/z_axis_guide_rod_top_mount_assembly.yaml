@@ -36,7 +36,15 @@ Parameters:
     Type: Float
   z_axis_motor_mount_plate_profile_distance:
     Type: Float
+  z_axis_profile_mount_plate_fillet_radius:
+    Type: Float
   z_axis_profile_mount_plate_height:
+    Type: Float
+  z_axis_profile_mount_plate_num_holes:
+    Type: Integer
+  z_axis_profile_mount_plate_screw_inset:
+    Type: Float
+  z_axis_profile_mount_plate_thickness:
     Type: Float
   z_axis_rod_clamp_gap:
     Type: Float
@@ -88,8 +96,16 @@ Parts:
           $ref: z_axis_guide_rod_clamp_width
         z_axis_motor_mount_plate_profile_distance:
           $ref: z_axis_motor_mount_plate_profile_distance
+        z_axis_profile_mount_plate_fillet_radius:
+          $ref: z_axis_profile_mount_plate_fillet_radius
         z_axis_profile_mount_plate_height:
           $ref: z_axis_profile_mount_plate_height
+        z_axis_profile_mount_plate_num_holes:
+          $ref: z_axis_profile_mount_plate_num_holes
+        z_axis_profile_mount_plate_screw_inset:
+          $ref: z_axis_profile_mount_plate_screw_inset
+        z_axis_profile_mount_plate_thickness:
+          $ref: z_axis_profile_mount_plate_thickness
         z_axis_rod_clamp_gap:
           $ref: z_axis_rod_clamp_gap
         z_axis_threaded_rod_diameter:

@@ -7,13 +7,19 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     create_alu_extrusion_profile,
 )
 from mege_ender_3v3ke_idex.designs.creality_wheel import create_608z_bearing
-from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from shellforgepy.metrics import record_length_metric
 from shellforgepy.simple import *
 
 
 def create_profile_mount_plate(
-    num_holes=2, screw_inset=5, profile_mount_width=z_axis_profile_mount_width
+    *,
+    profile_mount_width,
+    z_axis_profile_mount_plate_thickness,
+    z_axis_profile_mount_plate_height,
+    z_axis_profile_mount_plate_fillet_radius,
+    BIG_THING,
+    num_holes,
+    screw_inset,
 ):
     plate = create_filleted_box(
         profile_mount_width,
@@ -44,23 +50,42 @@ def create_profile_mount_plate(
     return plate
 
 
-def create_axial_bearing_stopper():
+def create_axial_bearing_stopper(
+    *,
+    z_axis_axial_bearing_stopper_outer_diameter,
+    z_axis_axial_bearing_stopper_inner_diameter,
+    z_axis_axial_bearing_stopper_thickness,
+):
     return create_ring(
-        axial_bearing_stopper_outer_diameter / 2,
-        axial_bearing_stopper_inner_diameter / 2,
-        axial_bearing_stopper_thickness,
+        z_axis_axial_bearing_stopper_outer_diameter / 2,
+        z_axis_axial_bearing_stopper_inner_diameter / 2,
+        z_axis_axial_bearing_stopper_thickness,
     )
 
 
-def create_axial_rod_clamp():
+def create_axial_rod_clamp(
+    *,
+    BIG_THING,
+    z_axis_axial_rod_clamp_cylinder_head_cutter_clearance,
+    z_axis_axial_rod_clamp_gap,
+    z_axis_axial_rod_clamp_inner_diameter,
+    z_axis_axial_rod_clamp_nut_clearance,
+    z_axis_axial_rod_clamp_outer_diameter,
+    z_axis_axial_rod_clamp_outer_diameter_cutting_depth,
+    z_axis_axial_rod_clamp_screw_head_backoff,
+    z_axis_axial_rod_clamp_screw_hole_distance_from_center,
+    z_axis_axial_rod_clamp_screw_length,
+    z_axis_axial_rod_clamp_screw_size,
+    z_axis_axial_rod_clamp_thickness,
+):
     clamp = create_ring(
-        axial_rod_clamp_outer_diameter / 2,
-        axial_rod_clamp_inner_diameter / 2,
-        axial_rod_clamp_thickness,
+        z_axis_axial_rod_clamp_outer_diameter / 2,
+        z_axis_axial_rod_clamp_inner_diameter / 2,
+        z_axis_axial_rod_clamp_thickness,
     )
 
     screw_cutter_diameter = MScrew.from_size(
-        axial_rod_clamp_screw_size
+        z_axis_axial_rod_clamp_screw_size
     ).clearance_hole_normal
     screw_cutters = []
     nut_cutters = []
@@ -70,26 +95,29 @@ def create_axial_rod_clamp():
         screw_cutter = rotate(90, axis=(1, 0, 0))(screw_cutter)
         screw_cutter = align(screw_cutter, clamp, Alignment.CENTER)
         screw_cutter = translate(
-            i * axial_rod_clamp_screw_hole_distance_from_center,
+            i * z_axis_axial_rod_clamp_screw_hole_distance_from_center,
             0,
             0,
         )(screw_cutter)
         screw_cutters.append(screw_cutter)
 
         nut_cutter = create_nut(
-            axial_rod_clamp_screw_size,
+            z_axis_axial_rod_clamp_screw_size,
             no_hole=True,
-            height=axial_rod_clamp_outer_diameter / 2,
-            slack=axial_rod_clamp_nut_clearance,
+            height=z_axis_axial_rod_clamp_outer_diameter / 2,
+            slack=z_axis_axial_rod_clamp_nut_clearance,
         )
         nut_cutter = rotate(90, axis=(1, 0, 0))(nut_cutter)
         nut_cutter = align(nut_cutter, screw_cutter, Alignment.CENTER)
         nut_cutters.append(nut_cutter)
 
         cylinder_head_cutter = create_cylinder(
-            MScrew.from_size(axial_rod_clamp_screw_size).cylinder_head_diameter / 2
-            + axial_rod_clamp_cylinder_head_cutter_clearance,
-            axial_rod_clamp_outer_diameter / 2,
+            MScrew.from_size(
+                z_axis_axial_rod_clamp_screw_size
+            ).cylinder_head_diameter
+            / 2
+            + z_axis_axial_rod_clamp_cylinder_head_cutter_clearance,
+            z_axis_axial_rod_clamp_outer_diameter / 2,
         )
         cylinder_head_cutter = rotate(90, axis=(1, 0, 0))(cylinder_head_cutter)
         cylinder_head_cutter = align(
@@ -107,7 +135,7 @@ def create_axial_rod_clamp():
             nut_cutter,
             clamp,
             Alignment.STACK_BACK,
-            stack_gap=-axial_rod_clamp_outer_diameter_cutting_depth,
+            stack_gap=-z_axis_axial_rod_clamp_outer_diameter_cutting_depth,
         )
         clamp = clamp.cut(nut_cutter)
 
@@ -117,18 +145,18 @@ def create_axial_rod_clamp():
             cylinder_head_cutter,
             clamp,
             Alignment.STACK_FRONT,
-            stack_gap=-axial_rod_clamp_outer_diameter_cutting_depth,
+            stack_gap=-z_axis_axial_rod_clamp_outer_diameter_cutting_depth,
         )
         clamp = clamp.cut(cylinder_head_cutter)
 
         screw = create_cylinder_screw(
-            size=axial_rod_clamp_screw_size,
-            length=axial_rod_clamp_screw_length,
+            size=z_axis_axial_rod_clamp_screw_size,
+            length=z_axis_axial_rod_clamp_screw_length,
         )
         screw = rotate(90, axis=(1, 0, 0))(screw)
 
         cylinder_head_height = MScrew.from_size(
-            axial_rod_clamp_screw_size
+            z_axis_axial_rod_clamp_screw_size
         ).cylinder_head_height
 
         screw = align(screw, cylinder_head_cutter, Alignment.CENTER)
@@ -136,14 +164,14 @@ def create_axial_rod_clamp():
             screw,
             cylinder_head_cutter,
             Alignment.STACK_BACK,
-            stack_gap=-cylinder_head_height - 0.2,
+            stack_gap=-cylinder_head_height - z_axis_axial_rod_clamp_screw_head_backoff,
         )
         screws.append(screw)
 
     axial_clamp_parts = cut_in_two(
         clamp,
         cut_normal=(0, 1, 0),
-        cut_thickness=axial_rod_clamp_gap,
+        cut_thickness=z_axis_axial_rod_clamp_gap,
     )
 
     retval = LeaderFollowersCuttersPart(clamp)
@@ -155,46 +183,76 @@ def create_axial_rod_clamp():
     return retval
 
 
-def create_igus_drylin_bearing(cutter_clearance=0.1, cutter_extra_length=2):
+def create_igus_drylin_bearing(
+    *,
+    z_axis_igus_drylin_bearing_inner_diameter,
+    z_axis_igus_drylin_bearing_length,
+    z_axis_igus_drylin_bearing_outer_diameter,
+    cutter_clearance,
+    cutter_extra_length,
+):
     bearing = create_ring(
-        igus_drylin_bearing_outer_diameter / 2,
-        igus_drylin_bearing_inner_diameter / 2,
-        igus_drylin_bearing_length,
+        z_axis_igus_drylin_bearing_outer_diameter / 2,
+        z_axis_igus_drylin_bearing_inner_diameter / 2,
+        z_axis_igus_drylin_bearing_length,
     )
     cutter = create_cylinder(
-        (igus_drylin_bearing_outer_diameter / 2) + cutter_clearance,
-        igus_drylin_bearing_length + cutter_extra_length,
+        (z_axis_igus_drylin_bearing_outer_diameter / 2) + cutter_clearance,
+        z_axis_igus_drylin_bearing_length + cutter_extra_length,
     )
     cutter = align(cutter, bearing, Alignment.CENTER)
 
     return LeaderFollowersCuttersPart(bearing, cutters=[cutter])
 
 
-def create_pillow_block_bearing(screw_length=15):
+def create_pillow_block_bearing(
+    *,
+    BIG_THING,
+    z_axis_pillow_block_bearing_base_gap_length,
+    z_axis_pillow_block_bearing_base_overall_length,
+    z_axis_pillow_block_bearing_base_thickness,
+    z_axis_pillow_block_bearing_base_width,
+    z_axis_pillow_block_bearing_cage_diameter,
+    z_axis_pillow_block_bearing_cage_rim,
+    z_axis_pillow_block_bearing_cage_thickness,
+    z_axis_pillow_block_bearing_mount_hole_center_distance,
+    z_axis_pillow_block_bearing_mount_hole_diameter,
+    z_axis_pillow_block_bearing_mount_screw_length,
+    z_axis_pillow_block_bearing_mount_screw_size,
+    z_axis_pillow_block_bearing_rod_holder_inner_diameter,
+    z_axis_pillow_block_bearing_rod_holder_length,
+    z_axis_pillow_block_bearing_rod_holder_outer_diameter,
+    z_axis_pillow_block_bottom_base_bridge_width,
+):
     bearing = create_608z_bearing()
+    bearing_size = get_bounding_box_size(bearing)
+    bearing_outer_diameter = bearing_size[0]
+    bearing_height = bearing_size[2]
 
     cage = create_ring(
-        pillow_block_bearing_cage_diameter / 2,
-        (pillow_block_bearing_cage_diameter / 2) - pillow_block_bearing_cage_rim,
-        pillow_block_bearing_cage_thickness,
+        z_axis_pillow_block_bearing_cage_diameter / 2,
+        (z_axis_pillow_block_bearing_cage_diameter / 2)
+        - z_axis_pillow_block_bearing_cage_rim,
+        z_axis_pillow_block_bearing_cage_thickness,
     )
     cage = align(cage, bearing, Alignment.CENTER)
 
     cage_filler = create_ring(
-        pillow_block_bearing_cage_diameter / 2 - pillow_block_bearing_cage_rim,
-        bb_608z_outer_diameter / 2,
-        bb_608z_height,
+        (z_axis_pillow_block_bearing_cage_diameter / 2)
+        - z_axis_pillow_block_bearing_cage_rim,
+        bearing_outer_diameter / 2,
+        bearing_height,
     )
     cage_filler = align(cage_filler, bearing, Alignment.CENTER)
 
     base = create_box(
-        pillow_block_bearing_base_overall_length,
-        pillow_block_bearing_base_thickness,
-        pillow_block_bearing_base_width,
+        z_axis_pillow_block_bearing_base_overall_length,
+        z_axis_pillow_block_bearing_base_thickness,
+        z_axis_pillow_block_bearing_base_width,
     )
 
     base_gap_cutter = create_box(
-        pillow_block_bearing_base_gap_length,
+        z_axis_pillow_block_bearing_base_gap_length,
         BIG_THING,
         BIG_THING,
     )
@@ -202,9 +260,9 @@ def create_pillow_block_bearing(screw_length=15):
     base = base.cut(base_gap_cutter)
 
     base_bridge = create_box(
-        pillow_block_bearing_base_gap_length,
-        pillow_block_bearing_base_thickness,
-        pillow_block_bottom_base_bridge_width,
+        z_axis_pillow_block_bearing_base_gap_length,
+        z_axis_pillow_block_bearing_base_thickness,
+        z_axis_pillow_block_bottom_base_bridge_width,
     )
     base_bridge = align(base_bridge, base, Alignment.CENTER)
     base_bridge = align(base_bridge, base, Alignment.FRONT)
@@ -216,15 +274,13 @@ def create_pillow_block_bearing(screw_length=15):
     base_sides = PartCollector()
     mount_hole_cutters = []
     mount_screws = []
-    mount_screw_size = "M4"
-
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         base_side = create_pyramid_stump(
-            pillow_block_bearing_cage_rim,
-            pillow_block_bearing_cage_rim,
-            pillow_block_bearing_base_width,
-            pillow_block_bearing_cage_thickness,
-            pillow_block_bearing_cage_diameter / 2,
+            z_axis_pillow_block_bearing_cage_rim,
+            z_axis_pillow_block_bearing_cage_rim,
+            z_axis_pillow_block_bearing_base_width,
+            z_axis_pillow_block_bearing_cage_thickness,
+            z_axis_pillow_block_bearing_cage_diameter / 2,
         )
         base_side = rotate(-90, axis=(1, 0, 0))(base_side)
         base_side = align(base_side, cage, Alignment.CENTER)
@@ -233,25 +289,30 @@ def create_pillow_block_bearing(screw_length=15):
         base_sides = base_sides.fuse(base_side)
 
         mount_hole_cutter = create_cylinder(
-            pillow_block_bearing_mount_hole_diameter / 2,
+            z_axis_pillow_block_bearing_mount_hole_diameter / 2,
             BIG_THING,
         )
         mount_hole_cutter = rotate(90, axis=(1, 0, 0))(mount_hole_cutter)
         mount_hole_cutter = align(mount_hole_cutter, base, Alignment.CENTER)
         mount_hole_cutter = translate(
-            lr.sign * pillow_block_bearing_mount_hole_center_distance / 2,
+            lr.sign * z_axis_pillow_block_bearing_mount_hole_center_distance / 2,
             0,
             0,
         )(mount_hole_cutter)
         mount_hole_cutters.append(mount_hole_cutter)
 
-        mount_screw = create_cylinder_screw(size=mount_screw_size, length=screw_length)
+        mount_screw = create_cylinder_screw(
+            size=z_axis_pillow_block_bearing_mount_screw_size,
+            length=z_axis_pillow_block_bearing_mount_screw_length,
+        )
         mount_screw = rotate(-90, axis=(1, 0, 0))(mount_screw)
         mount_screw = align(mount_screw, mount_hole_cutter, Alignment.CENTER)
         mount_screw = align(mount_screw, base, Alignment.BACK)
         mount_screw = translate(
             0,
-            MScrew.from_size(mount_screw_size).cylinder_head_height,
+            MScrew.from_size(
+                z_axis_pillow_block_bearing_mount_screw_size
+            ).cylinder_head_height,
             0,
         )(mount_screw)
         mount_screws.append(mount_screw)
@@ -262,9 +323,9 @@ def create_pillow_block_bearing(screw_length=15):
     base = base.fuse(base_sides)
 
     rod_holder = create_ring(
-        pillow_block_bearing_rod_holder_outer_diameter / 2,
-        pillow_block_bearing_rod_holder_inner_diameter / 2,
-        pillow_block_bearing_rod_holder_length,
+        z_axis_pillow_block_bearing_rod_holder_outer_diameter / 2,
+        z_axis_pillow_block_bearing_rod_holder_inner_diameter / 2,
+        z_axis_pillow_block_bearing_rod_holder_length,
     )
     rod_holder = align(rod_holder, bearing, Alignment.CENTER)
     rod_holder = align(rod_holder, bearing, Alignment.BOTTOM)
@@ -282,43 +343,54 @@ def create_pillow_block_bearing(screw_length=15):
     return rotate(-90, axis=(1, 0, 0))(retval)
 
 
-def create_axial_ball_bearing_8_x_19():
+def create_axial_ball_bearing_8_x_19(
+    *,
+    z_axis_axial_ball_bearing_8_x_19_ball_count,
+    z_axis_axial_ball_bearing_8_x_19_ball_diameter,
+    z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter,
+    z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter,
+    z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_thickness,
+    z_axis_axial_ball_bearing_8_x_19_disc_thickness,
+    z_axis_axial_ball_bearing_8_x_19_inner_diameter,
+    z_axis_axial_ball_bearing_8_x_19_outer_diameter,
+    z_axis_axial_ball_bearing_8_x_19_thickness,
+):
     bearing = PartCollector()
     for i in [0, 1]:
         disc = create_ring(
-            axial_ball_bearing_8_x_19_outer_diameter / 2,
-            axial_ball_bearing_8_x_19_inner_diameter / 2,
-            axial_ball_bearing_8_x_19_disc_thickness,
+            z_axis_axial_ball_bearing_8_x_19_outer_diameter / 2,
+            z_axis_axial_ball_bearing_8_x_19_inner_diameter / 2,
+            z_axis_axial_ball_bearing_8_x_19_disc_thickness,
         )
         disc = translate(
             0,
             0,
             i
             * (
-                axial_ball_bearing_8_x_19_thickness
-                - axial_ball_bearing_8_x_19_disc_thickness
+                z_axis_axial_ball_bearing_8_x_19_thickness
+                - z_axis_axial_ball_bearing_8_x_19_disc_thickness
             ),
         )(disc)
         bearing = bearing.fuse(disc)
 
-    for i in range(axial_ball_bearing_8_x_19_ball_count):
-        angle = (360 / axial_ball_bearing_8_x_19_ball_count) * i
-        ball = create_sphere(axial_ball_bearing_8_x_19_ball_diameter / 2)
+    for i in range(z_axis_axial_ball_bearing_8_x_19_ball_count):
+        angle = (360 / z_axis_axial_ball_bearing_8_x_19_ball_count) * i
+        ball = create_sphere(z_axis_axial_ball_bearing_8_x_19_ball_diameter / 2)
         ball_position_radius = (
-            axial_ball_bearing_8_x_19_inner_diameter
-            + axial_ball_bearing_8_x_19_outer_diameter
+            z_axis_axial_ball_bearing_8_x_19_inner_diameter
+            + z_axis_axial_ball_bearing_8_x_19_outer_diameter
         ) / 4
         ball = translate(
             ball_position_radius * math.cos(math.radians(angle)),
             ball_position_radius * math.sin(math.radians(angle)),
-            axial_ball_bearing_8_x_19_thickness / 2,
+            z_axis_axial_ball_bearing_8_x_19_thickness / 2,
         )(ball)
         bearing = bearing.fuse(ball)
 
     ball_holder_disc = create_ring(
-        axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter / 2,
-        axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter / 2,
-        axial_ball_bearing_8_x_19_ball_holder_disc_thickness,
+        z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter / 2,
+        z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter / 2,
+        z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_thickness,
     )
     ball_holder_disc = align(ball_holder_disc, bearing, Alignment.CENTER)
 
@@ -326,29 +398,45 @@ def create_axial_ball_bearing_8_x_19():
 
 
 def create_creality_threaded_rod_nut(
-    threaded_rod_guide_cutter_clearance=0.1, screw_hole_clearence_type="normal"
+    *,
+    BIG_THING,
+    z_axis_threaded_rod_diameter,
+    z_axis_creality_nut_base_cut_radius,
+    z_axis_creality_nut_base_length,
+    z_axis_creality_nut_base_thickness,
+    z_axis_creality_nut_base_width,
+    z_axis_creality_nut_mount_hole_center_center_distance,
+    z_axis_creality_nut_mount_screw_size,
+    z_axis_creality_nut_rod_guide_bottom_overstand,
+    z_axis_creality_nut_rod_guide_diameter,
+    z_axis_creality_nut_rod_guide_height,
+    threaded_rod_guide_cutter_clearance,
+    screw_hole_clearence_type,
 ):
-    base_thickness = 3.5
-    base_width = 12.5
-    base_cut_radius = 15
-    base_length = 23.8
-    rod_guide_diameter = 9.97
-    rod_guide_height = 10.55
-    rod_guide_bottom_overstand = 2
-    mount_hole_center_center_distance = 16.5
-    mount_screw_size = "M3"
+    base = create_box(
+        z_axis_creality_nut_base_length,
+        z_axis_creality_nut_base_width,
+        z_axis_creality_nut_base_thickness,
+    )
 
-    base = create_box(base_length, base_width, base_thickness)
-
-    mount_hole_drill_diaameter = MScrew.from_size(mount_screw_size).core_hole
+    mount_hole_drill_diaameter = MScrew.from_size(
+        z_axis_creality_nut_mount_screw_size
+    ).core_hole
     external_mount_hole_drill_diameter = MScrew.from_size(
-        mount_screw_size
+        z_axis_creality_nut_mount_screw_size
     ).get_clearance_hole_diameter(screw_hole_clearence_type)
 
-    base_cutter = create_box(BIG_THING, BIG_THING, 2 * base_thickness)
+    base_cutter = create_box(
+        BIG_THING,
+        BIG_THING,
+        2 * z_axis_creality_nut_base_thickness,
+    )
     external_mount_hole_drills = []
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        cutter_reducer = create_cylinder(base_cut_radius, 2 * base_thickness)
+        cutter_reducer = create_cylinder(
+            z_axis_creality_nut_base_cut_radius,
+            2 * z_axis_creality_nut_base_thickness,
+        )
         cutter_reducer = align(cutter_reducer, base_cutter, Alignment.CENTER)
         cutter_reducer = align(cutter_reducer, base_cutter, lr)
 
@@ -361,11 +449,11 @@ def create_creality_threaded_rod_nut(
 
         mount_hole_drill_cutter = create_cylinder(
             mount_hole_drill_diaameter / 2,
-            2 * base_thickness,
+            2 * z_axis_creality_nut_base_thickness,
         )
         mount_hole_drill_cutter = align(mount_hole_drill_cutter, base, Alignment.CENTER)
         mount_hole_drill_cutter = translate(
-            lr.sign * mount_hole_center_center_distance / 2,
+            lr.sign * z_axis_creality_nut_mount_hole_center_center_distance / 2,
             0,
             0,
         )(mount_hole_drill_cutter)
@@ -384,10 +472,17 @@ def create_creality_threaded_rod_nut(
 
         base = base.cut(mount_hole_drill_cutter)
 
-    rod_guide = create_cylinder(rod_guide_diameter / 2, rod_guide_height)
+    rod_guide = create_cylinder(
+        z_axis_creality_nut_rod_guide_diameter / 2,
+        z_axis_creality_nut_rod_guide_height,
+    )
     rod_guide = align(rod_guide, base, Alignment.CENTER)
     rod_guide = align(rod_guide, base, Alignment.BOTTOM)
-    rod_guide = translate(0, 0, -rod_guide_bottom_overstand)(rod_guide)
+    rod_guide = translate(
+        0,
+        0,
+        -z_axis_creality_nut_rod_guide_bottom_overstand,
+    )(rod_guide)
 
     whole_nut = base.fuse(rod_guide)
     rod_cutter = create_cylinder(z_axis_threaded_rod_diameter / 2, BIG_THING)
@@ -403,7 +498,8 @@ def create_creality_threaded_rod_nut(
         )
 
     rod_guide_cutter = create_cylinder(
-        rod_guide_diameter / 2 + threaded_rod_guide_cutter_clearance,
+        z_axis_creality_nut_rod_guide_diameter / 2
+        + threaded_rod_guide_cutter_clearance,
         BIG_THING,
     )
     rod_guide_cutter = align(rod_guide_cutter, rod_guide, Alignment.CENTER)

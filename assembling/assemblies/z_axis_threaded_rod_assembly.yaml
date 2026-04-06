@@ -18,8 +18,6 @@ Parameters:
     Type: Float
   z_axis_threaded_rod_length:
     Type: Float
-  z_axis_threaded_rod_profile_distance:
-    Type: Float
 
 Parts:
   ZAxisThreadedRodAssembly:
@@ -34,5 +32,3 @@ Parts:
           $ref: z_axis_threaded_rod_diameter
         z_axis_threaded_rod_length:
           $ref: z_axis_threaded_rod_length
-        z_axis_threaded_rod_profile_distance:
-          $ref: z_axis_threaded_rod_profile_distance

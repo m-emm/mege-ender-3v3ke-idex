@@ -32,11 +32,24 @@ def create_z_axis_carriage_assembly(
     z_axis_carriage_threaded_rod_clearance,
     z_axis_carriage_width,
     z_axis_carriage_x_axis_connector_thickness,
+    z_axis_creality_nut_base_cut_radius,
+    z_axis_creality_nut_base_length,
+    z_axis_creality_nut_base_thickness,
+    z_axis_creality_nut_base_width,
+    z_axis_creality_nut_mount_hole_center_center_distance,
+    z_axis_creality_nut_mount_screw_size,
+    z_axis_creality_nut_rod_guide_bottom_overstand,
+    z_axis_creality_nut_rod_guide_diameter,
+    z_axis_creality_nut_rod_guide_height,
     z_axis_creality_nut_threaded_rod_cuide_cutter_clearance,
     z_axis_cylinder_head_clearance,
     z_axis_default_clearance_hole_type,
     z_axis_default_screw_nut_cutter_clearance,
     z_axis_guide_rod_carriage_clamp_screw_length,
+    z_axis_igus_drylin_bearing_cutter_clearance,
+    z_axis_igus_drylin_bearing_inner_diameter,
+    z_axis_igus_drylin_bearing_length,
+    z_axis_igus_drylin_bearing_outer_diameter,
     z_axis_nut_screw_hole_clearence_type,
     z_axis_threaded_rod_diameter,
     z_axis_x_axis_to_carriage_gap,
@@ -60,7 +73,10 @@ def create_z_axis_carriage_assembly(
     carriage_front = align(carriage_front, guide_rod, Alignment.BOTTOM)
 
     bearing = create_igus_drylin_bearing(
-        cutter_clearance=0.1,
+        z_axis_igus_drylin_bearing_inner_diameter=z_axis_igus_drylin_bearing_inner_diameter,
+        z_axis_igus_drylin_bearing_length=z_axis_igus_drylin_bearing_length,
+        z_axis_igus_drylin_bearing_outer_diameter=z_axis_igus_drylin_bearing_outer_diameter,
+        cutter_clearance=z_axis_igus_drylin_bearing_cutter_clearance,
         cutter_extra_length=z_axis_carriage_front_height,
     )
     bearing = align(bearing, carriage_front, Alignment.CENTER)
@@ -113,6 +129,17 @@ def create_z_axis_carriage_assembly(
     )
 
     nut = create_creality_threaded_rod_nut(
+        BIG_THING=BIG_THING,
+        z_axis_threaded_rod_diameter=z_axis_threaded_rod_diameter,
+        z_axis_creality_nut_base_cut_radius=z_axis_creality_nut_base_cut_radius,
+        z_axis_creality_nut_base_length=z_axis_creality_nut_base_length,
+        z_axis_creality_nut_base_thickness=z_axis_creality_nut_base_thickness,
+        z_axis_creality_nut_base_width=z_axis_creality_nut_base_width,
+        z_axis_creality_nut_mount_hole_center_center_distance=z_axis_creality_nut_mount_hole_center_center_distance,
+        z_axis_creality_nut_mount_screw_size=z_axis_creality_nut_mount_screw_size,
+        z_axis_creality_nut_rod_guide_bottom_overstand=z_axis_creality_nut_rod_guide_bottom_overstand,
+        z_axis_creality_nut_rod_guide_diameter=z_axis_creality_nut_rod_guide_diameter,
+        z_axis_creality_nut_rod_guide_height=z_axis_creality_nut_rod_guide_height,
         threaded_rod_guide_cutter_clearance=z_axis_creality_nut_threaded_rod_cuide_cutter_clearance,
         screw_hole_clearence_type=z_axis_nut_screw_hole_clearence_type,
     )

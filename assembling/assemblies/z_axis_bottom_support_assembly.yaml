@@ -26,7 +26,95 @@ Builder:
 Parameters:
   BIG_THING:
     Type: Float
+  z_axis_axial_ball_bearing_8_x_19_ball_count:
+    Type: Integer
+  z_axis_axial_ball_bearing_8_x_19_ball_diameter:
+    Type: Float
+  z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter:
+    Type: Float
+  z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter:
+    Type: Float
+  z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_thickness:
+    Type: Float
+  z_axis_axial_ball_bearing_8_x_19_disc_thickness:
+    Type: Float
+  z_axis_axial_ball_bearing_8_x_19_inner_diameter:
+    Type: Float
+  z_axis_axial_ball_bearing_8_x_19_outer_diameter:
+    Type: Float
+  z_axis_axial_ball_bearing_8_x_19_thickness:
+    Type: Float
+  z_axis_axial_bearing_stopper_inner_diameter:
+    Type: Float
+  z_axis_axial_bearing_stopper_outer_diameter:
+    Type: Float
+  z_axis_axial_bearing_stopper_thickness:
+    Type: Float
+  z_axis_axial_rod_clamp_cylinder_head_cutter_clearance:
+    Type: Float
+  z_axis_axial_rod_clamp_gap:
+    Type: Float
+  z_axis_axial_rod_clamp_inner_diameter:
+    Type: Float
+  z_axis_axial_rod_clamp_nut_clearance:
+    Type: Float
+  z_axis_axial_rod_clamp_outer_diameter:
+    Type: Float
+  z_axis_axial_rod_clamp_outer_diameter_cutting_depth:
+    Type: Float
+  z_axis_axial_rod_clamp_screw_head_backoff:
+    Type: Float
+  z_axis_axial_rod_clamp_screw_hole_distance_from_center:
+    Type: Float
+  z_axis_axial_rod_clamp_screw_length:
+    Type: Float
+  z_axis_axial_rod_clamp_screw_size:
+    Type: String
+  z_axis_axial_rod_clamp_thickness:
+    Type: Float
+  z_axis_bottom_support_profile_mount_plate_fillet_radius:
+    Type: Float
+  z_axis_bottom_support_profile_mount_plate_height:
+    Type: Float
+  z_axis_bottom_support_profile_mount_plate_thickness:
+    Type: Float
   z_axis_pillow_block_bearing_z_offset:
+    Type: Float
+  z_axis_pillow_block_bearing_base_gap_length:
+    Type: Float
+  z_axis_pillow_block_bearing_base_overall_length:
+    Type: Float
+  z_axis_pillow_block_bearing_base_thickness:
+    Type: Float
+  z_axis_pillow_block_bearing_base_width:
+    Type: Float
+  z_axis_pillow_block_bearing_cage_diameter:
+    Type: Float
+  z_axis_pillow_block_bearing_cage_rim:
+    Type: Float
+  z_axis_pillow_block_bearing_cage_thickness:
+    Type: Float
+  z_axis_pillow_block_bearing_mount_hole_center_distance:
+    Type: Float
+  z_axis_pillow_block_bearing_mount_hole_diameter:
+    Type: Float
+  z_axis_pillow_block_bearing_mount_nut_clearance:
+    Type: Float
+  z_axis_pillow_block_bearing_mount_screw_length:
+    Type: Float
+  z_axis_pillow_block_bearing_mount_screw_size:
+    Type: String
+  z_axis_pillow_block_bearing_rod_holder_inner_diameter:
+    Type: Float
+  z_axis_pillow_block_bearing_rod_holder_length:
+    Type: Float
+  z_axis_pillow_block_bearing_rod_holder_outer_diameter:
+    Type: Float
+  z_axis_pillow_block_bottom_base_bridge_width:
+    Type: Float
+  z_axis_profile_mount_plate_num_holes:
+    Type: Integer
+  z_axis_profile_mount_plate_screw_inset:
     Type: Float
 
 Parts:
@@ -38,5 +126,93 @@ Parts:
       Properties:
         BIG_THING:
           $ref: BIG_THING
+        z_axis_axial_ball_bearing_8_x_19_ball_count:
+          $ref: z_axis_axial_ball_bearing_8_x_19_ball_count
+        z_axis_axial_ball_bearing_8_x_19_ball_diameter:
+          $ref: z_axis_axial_ball_bearing_8_x_19_ball_diameter
+        z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter:
+          $ref: z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_inner_diameter
+        z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter:
+          $ref: z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_outer_diameter
+        z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_thickness:
+          $ref: z_axis_axial_ball_bearing_8_x_19_ball_holder_disc_thickness
+        z_axis_axial_ball_bearing_8_x_19_disc_thickness:
+          $ref: z_axis_axial_ball_bearing_8_x_19_disc_thickness
+        z_axis_axial_ball_bearing_8_x_19_inner_diameter:
+          $ref: z_axis_axial_ball_bearing_8_x_19_inner_diameter
+        z_axis_axial_ball_bearing_8_x_19_outer_diameter:
+          $ref: z_axis_axial_ball_bearing_8_x_19_outer_diameter
+        z_axis_axial_ball_bearing_8_x_19_thickness:
+          $ref: z_axis_axial_ball_bearing_8_x_19_thickness
+        z_axis_axial_bearing_stopper_inner_diameter:
+          $ref: z_axis_axial_bearing_stopper_inner_diameter
+        z_axis_axial_bearing_stopper_outer_diameter:
+          $ref: z_axis_axial_bearing_stopper_outer_diameter
+        z_axis_axial_bearing_stopper_thickness:
+          $ref: z_axis_axial_bearing_stopper_thickness
+        z_axis_axial_rod_clamp_cylinder_head_cutter_clearance:
+          $ref: z_axis_axial_rod_clamp_cylinder_head_cutter_clearance
+        z_axis_axial_rod_clamp_gap:
+          $ref: z_axis_axial_rod_clamp_gap
+        z_axis_axial_rod_clamp_inner_diameter:
+          $ref: z_axis_axial_rod_clamp_inner_diameter
+        z_axis_axial_rod_clamp_nut_clearance:
+          $ref: z_axis_axial_rod_clamp_nut_clearance
+        z_axis_axial_rod_clamp_outer_diameter:
+          $ref: z_axis_axial_rod_clamp_outer_diameter
+        z_axis_axial_rod_clamp_outer_diameter_cutting_depth:
+          $ref: z_axis_axial_rod_clamp_outer_diameter_cutting_depth
+        z_axis_axial_rod_clamp_screw_head_backoff:
+          $ref: z_axis_axial_rod_clamp_screw_head_backoff
+        z_axis_axial_rod_clamp_screw_hole_distance_from_center:
+          $ref: z_axis_axial_rod_clamp_screw_hole_distance_from_center
+        z_axis_axial_rod_clamp_screw_length:
+          $ref: z_axis_axial_rod_clamp_screw_length
+        z_axis_axial_rod_clamp_screw_size:
+          $ref: z_axis_axial_rod_clamp_screw_size
+        z_axis_axial_rod_clamp_thickness:
+          $ref: z_axis_axial_rod_clamp_thickness
+        z_axis_bottom_support_profile_mount_plate_fillet_radius:
+          $ref: z_axis_bottom_support_profile_mount_plate_fillet_radius
+        z_axis_bottom_support_profile_mount_plate_height:
+          $ref: z_axis_bottom_support_profile_mount_plate_height
+        z_axis_bottom_support_profile_mount_plate_thickness:
+          $ref: z_axis_bottom_support_profile_mount_plate_thickness
         z_axis_pillow_block_bearing_z_offset:
           $ref: z_axis_pillow_block_bearing_z_offset
+        z_axis_pillow_block_bearing_base_gap_length:
+          $ref: z_axis_pillow_block_bearing_base_gap_length
+        z_axis_pillow_block_bearing_base_overall_length:
+          $ref: z_axis_pillow_block_bearing_base_overall_length
+        z_axis_pillow_block_bearing_base_thickness:
+          $ref: z_axis_pillow_block_bearing_base_thickness
+        z_axis_pillow_block_bearing_base_width:
+          $ref: z_axis_pillow_block_bearing_base_width
+        z_axis_pillow_block_bearing_cage_diameter:
+          $ref: z_axis_pillow_block_bearing_cage_diameter
+        z_axis_pillow_block_bearing_cage_rim:
+          $ref: z_axis_pillow_block_bearing_cage_rim
+        z_axis_pillow_block_bearing_cage_thickness:
+          $ref: z_axis_pillow_block_bearing_cage_thickness
+        z_axis_pillow_block_bearing_mount_hole_center_distance:
+          $ref: z_axis_pillow_block_bearing_mount_hole_center_distance
+        z_axis_pillow_block_bearing_mount_hole_diameter:
+          $ref: z_axis_pillow_block_bearing_mount_hole_diameter
+        z_axis_pillow_block_bearing_mount_nut_clearance:
+          $ref: z_axis_pillow_block_bearing_mount_nut_clearance
+        z_axis_pillow_block_bearing_mount_screw_length:
+          $ref: z_axis_pillow_block_bearing_mount_screw_length
+        z_axis_pillow_block_bearing_mount_screw_size:
+          $ref: z_axis_pillow_block_bearing_mount_screw_size
+        z_axis_pillow_block_bearing_rod_holder_inner_diameter:
+          $ref: z_axis_pillow_block_bearing_rod_holder_inner_diameter
+        z_axis_pillow_block_bearing_rod_holder_length:
+          $ref: z_axis_pillow_block_bearing_rod_holder_length
+        z_axis_pillow_block_bearing_rod_holder_outer_diameter:
+          $ref: z_axis_pillow_block_bearing_rod_holder_outer_diameter
+        z_axis_pillow_block_bottom_base_bridge_width:
+          $ref: z_axis_pillow_block_bottom_base_bridge_width
+        z_axis_profile_mount_plate_num_holes:
+          $ref: z_axis_profile_mount_plate_num_holes
+        z_axis_profile_mount_plate_screw_inset:
+          $ref: z_axis_profile_mount_plate_screw_inset

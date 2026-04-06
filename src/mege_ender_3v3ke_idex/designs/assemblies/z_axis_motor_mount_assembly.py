@@ -31,10 +31,19 @@ def _get_guide_rod_part(z_axis_guide_rod):
     )
 
 
+def _get_threaded_rod_part(z_axis_threaded_rod):
+    return (
+        z_axis_threaded_rod.leader
+        if hasattr(z_axis_threaded_rod, "leader")
+        else z_axis_threaded_rod
+    )
+
+
 def create_z_axis_motor_mount_assembly(
     *,
     z_axis_profile,
     z_axis_guide_rod,
+    z_axis_threaded_rod,
     side,
     BIG_THING,
     motor_mount_axle_clearance,
@@ -46,16 +55,21 @@ def create_z_axis_motor_mount_assembly(
     z_axis_default_clearance_hole_type,
     z_axis_default_screw_nut_cutter_clearance,
     z_axis_guide_rod_clamp_depth,
+    z_axis_guide_rod_clamp_rod_clearance,
     z_axis_guide_rod_clamp_screw_length,
+    z_axis_guide_rod_clamp_screw_size,
     z_axis_guide_rod_clamp_thickness,
     z_axis_guide_rod_clamp_width,
     z_axis_guide_rod_diameter,
     z_axis_motor_mount_plate_depth,
     z_axis_motor_mount_plate_profile_distance,
     z_axis_motor_mount_plate_size,
+    z_axis_profile_mount_plate_fillet_radius,
+    z_axis_profile_mount_plate_height,
+    z_axis_profile_mount_plate_num_holes,
+    z_axis_profile_mount_plate_screw_inset,
+    z_axis_profile_mount_plate_thickness,
     z_axis_rod_clamp_gap,
-    z_axis_threaded_rod_diameter,
-    z_axis_threaded_rod_profile_distance,
     context=None,
 ):
     """Create the printable motor mount assembly for one z-axis side."""
@@ -65,19 +79,7 @@ def create_z_axis_motor_mount_assembly(
     side_alignment = _to_side_alignment(side)
     profile = _get_profile_part(z_axis_profile)
     guide_rod = _get_guide_rod_part(z_axis_guide_rod)
-
-    threaded_rod_reference = create_cylinder(
-        z_axis_threaded_rod_diameter / 2, BIG_THING
-    )
-    threaded_rod_reference = align(
-        threaded_rod_reference, guide_rod, Alignment.CENTER, axes=[0]
-    )
-    threaded_rod_reference = align(
-        threaded_rod_reference,
-        profile,
-        Alignment.STACK_FRONT,
-        stack_gap=z_axis_threaded_rod_profile_distance,
-    )
+    threaded_rod = _get_threaded_rod_part(z_axis_threaded_rod)
 
     motor = create_nema_composite(
         axle_clearance=motor_mount_axle_clearance,
@@ -85,11 +87,10 @@ def create_z_axis_motor_mount_assembly(
         boss_clearance_z=motor_mount_boss_clearance_z,
     )
 
-
     if side_alignment == Alignment.RIGHT:
         motor = rotate(180)(motor)
 
-    motor = align(motor, threaded_rod_reference, Alignment.CENTER, axes=[0, 1])
+    motor = align(motor, threaded_rod, Alignment.CENTER, axes=[0, 1])
     motor = align(motor, profile, Alignment.BOTTOM)
 
     motor_body = motor.get_named_follower("body")
@@ -100,7 +101,9 @@ def create_z_axis_motor_mount_assembly(
         motor_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
-    mount_plate = align(mount_plate, motor, Alignment.CENTER)
+    mount_plate = align(mount_plate, guide_rod, Alignment.CENTER, axes=[0])
+    mount_plate = align(mount_plate, z_axis_profile, side_alignment)
+
     mount_plate = align(mount_plate, motor_body, Alignment.STACK_TOP)
     mount_plate = align(
         mount_plate,
@@ -109,7 +112,15 @@ def create_z_axis_motor_mount_assembly(
         stack_gap=z_axis_motor_mount_plate_profile_distance,
     )
 
-    profile_mount_plate = create_profile_mount_plate()
+    profile_mount_plate = create_profile_mount_plate(
+        profile_mount_width=z_axis_motor_mount_plate_size,
+        z_axis_profile_mount_plate_thickness=z_axis_profile_mount_plate_thickness,
+        z_axis_profile_mount_plate_height=z_axis_profile_mount_plate_height,
+        z_axis_profile_mount_plate_fillet_radius=z_axis_profile_mount_plate_fillet_radius,
+        BIG_THING=BIG_THING,
+        num_holes=z_axis_profile_mount_plate_num_holes,
+        screw_inset=z_axis_profile_mount_plate_screw_inset,
+    )
     profile_mount_plate = align(profile_mount_plate, mount_plate, Alignment.CENTER)
     profile_mount_plate = align(profile_mount_plate, mount_plate, Alignment.BACK)
     profile_mount_plate = align(profile_mount_plate, mount_plate, Alignment.STACK_TOP)
@@ -129,7 +140,7 @@ def create_z_axis_motor_mount_assembly(
 
     screws_mount_assembly = create_four_screws_mount_assembly(
         guide_rod_clamp,
-        "M3",
+        z_axis_guide_rod_clamp_screw_size,
         z_axis_guide_rod_clamp_screw_length,
         Alignment.FRONT,
         flush_with_top=True,
@@ -140,7 +151,7 @@ def create_z_axis_motor_mount_assembly(
     guide_rod_clamp = screws_mount_assembly.use_as_cutter_on(guide_rod_clamp)
 
     guide_rod_cutter = create_cylinder(
-        z_axis_guide_rod_diameter / 2 + 0.1,
+        z_axis_guide_rod_diameter / 2 + z_axis_guide_rod_clamp_rod_clearance,
         2 * BIG_THING,
     )
     guide_rod_cutter = align(guide_rod_cutter, guide_rod, Alignment.CENTER)
