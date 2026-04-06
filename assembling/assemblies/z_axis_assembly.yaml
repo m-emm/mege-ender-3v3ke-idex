@@ -29,11 +29,11 @@ Builder:
           - x_axis_alignment_reference
         name_template: "{name}"
   Production:
+    process_data_preset: petgcf_medium_strength_high_speed_06
     arrange:
       export_individual_parts: false
       plates:
         - name: left_z_axis
-          process_data_preset: petgcf_medium_strength_high_speed_06
           parts:
             # - left_axial_bearing_stopper
             # - left_axial_clamp_part_0
