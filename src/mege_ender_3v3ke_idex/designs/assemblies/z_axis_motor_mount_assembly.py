@@ -79,6 +79,7 @@ def create_z_axis_motor_mount_assembly(
     z_axis_profile_mount_plate_num_holes,
     z_axis_profile_mount_plate_screw_inset,
     z_axis_profile_mount_plate_thickness,
+    z_axis_profile_mount_plate_clearance,
     z_axis_pillow_block_bearing_z_offset,
     z_axis_pillow_block_bearing_base_gap_length,
     z_axis_pillow_block_bearing_base_overall_length,
@@ -217,7 +218,10 @@ def create_z_axis_motor_mount_assembly(
         )
         profile_mount_plate = align(profile_mount_plate, mount_plate, Alignment.BOTTOM)
         profile_mount_plate = align(
-            profile_mount_plate, z_axis_profile, alignment.stack_alignment
+            profile_mount_plate,
+            z_axis_profile,
+            alignment.stack_alignment,
+            stack_gap=z_axis_profile_mount_plate_clearance,
         )
         profile_mount_plates = profile_mount_plates.fuse(profile_mount_plate)
 

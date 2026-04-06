@@ -72,6 +72,8 @@ Parameters:
     Type: Integer
   z_axis_profile_mount_plate_screw_inset:
     Type: Float
+  z_axis_profile_mount_plate_clearance:
+    Type: Float    
   z_axis_profile_mount_plate_thickness:
     Type: Float
   z_axis_pillow_block_bearing_z_offset:
@@ -168,6 +170,8 @@ Parts:
           $ref: z_axis_profile_mount_plate_screw_inset
         z_axis_profile_mount_plate_thickness:
           $ref: z_axis_profile_mount_plate_thickness
+        z_axis_profile_mount_plate_clearance:
+          $ref: z_axis_profile_mount_plate_clearance
         z_axis_pillow_block_bearing_z_offset:
           $ref: z_axis_pillow_block_bearing_z_offset
         z_axis_pillow_block_bearing_base_gap_length:

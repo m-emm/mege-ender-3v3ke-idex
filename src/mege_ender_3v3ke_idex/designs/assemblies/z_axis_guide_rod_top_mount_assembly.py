@@ -31,6 +31,7 @@ def create_z_axis_guide_rod_top_mount_assembly(
     z_axis_profile_mount_plate_num_holes,
     z_axis_profile_mount_plate_screw_inset,
     z_axis_top_profile_mount_plate_height,
+    z_axis_profile_mount_plate_clearance,
     z_axis_profile_mount_plate_thickness,
     z_axis_profile_mount_plate_fillet_radius,
     z_axis_rod_clamp_gap,
@@ -47,6 +48,8 @@ def create_z_axis_guide_rod_top_mount_assembly(
     z_axis_top_mount_screw_size,
     z_axis_top_mount_thickness,
     z_axis_top_mount_threaded_rod_clearance,
+    z_axis_top_mount_carriage_clearance,
+    z_axis_carriage_width,
     z_axis_top_mount_width,
 ):
     """Create the printable top mount for one z-axis side."""
@@ -194,6 +197,7 @@ def create_z_axis_guide_rod_top_mount_assembly(
             top_mount_profile_mount_plate,
             z_axis_profile,
             lr.stack_alignment,
+            stack_gap=z_axis_profile_mount_plate_clearance,
         )
         top_mount_profile_mount_plates = top_mount_profile_mount_plates.fuse(
             top_mount_profile_mount_plate
@@ -203,13 +207,13 @@ def create_z_axis_guide_rod_top_mount_assembly(
 
     top_mount_plate_box = create_box(
         z_axis_top_mount_width,
-        z_axis_top_mount_width,
+        BIG_THING,
         z_axis_top_profile_mount_plate_height / 2,
     )
 
     top_mount_plate_box_cutter = create_box(
-        z_axis_top_mount_width - 2 * z_axis_top_mount_reinforcement_thickness,
-        z_axis_top_mount_width - 2 * z_axis_top_mount_reinforcement_thickness,
+        z_axis_carriage_width + 2 * z_axis_top_mount_carriage_clearance,
+        BIG_THING,
         BIG_THING,
     )
 
@@ -217,22 +221,64 @@ def create_z_axis_guide_rod_top_mount_assembly(
         top_mount_plate_box_cutter, top_mount_plate_box, Alignment.CENTER
     )
     top_mount_plate_box_cutter = align(
-        top_mount_plate_box_cutter, top_mount_plate_box, Alignment.FRONT
+        top_mount_plate_box_cutter, top_mount_plate_box, Alignment.BACK
     )
+    top_mount_plate_box_cutter = translate(0, -z_axis_profile_mount_plate_thickness, 0)(
+        top_mount_plate_box_cutter
+    )
+
     top_mount_plate_box = top_mount_plate_box.cut(top_mount_plate_box_cutter)
 
     top_mount_plate_box = align(top_mount_plate_box, top_mount_plate, Alignment.CENTER)
     top_mount_plate_box = align(
         top_mount_plate_box, top_mount_profile_mount_plates, Alignment.TOP
     )
-    top_mount_plate_box = align(top_mount_plate_box, rod_holder, Alignment.STACK_BACK)
+    top_mount_plate_box = align(
+        top_mount_plate_box,
+        z_axis_profile,
+        Alignment.STACK_FRONT,
+        stack_gap=-z_axis_profile_mount_plate_thickness,
+    )
 
     top_mount_profile_mount_plates_bbox = materialize_bounding_box(
-        top_mount_profile_mount_plates
+        top_mount_profile_mount_plates,
+        x_enlargement=2 * z_axis_profile_mount_plate_clearance,
     )
+
     top_mount_plate_box = top_mount_plate_box.cut(top_mount_profile_mount_plates_bbox)
 
+    rod_plane_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    rod_plane_cutter = align(rod_plane_cutter, top_mount_plate, Alignment.CENTER)
+
+    rod_size = get_bounding_box_size(guide_rod)
+    rod_plane_cutter = align(
+        rod_plane_cutter,
+        guide_rod,
+        Alignment.STACK_FRONT,
+        stack_gap=-rod_size[1] / 2 - z_axis_rod_clamp_gap / 2,
+    )
+
+    top_mount_plate_box = top_mount_plate_box.cut(rod_plane_cutter)
+
+    diagonal_cutter = create_right_triangle(
+        BIG_THING,
+        BIG_THING,
+        BIG_THING,
+        extrusion_direction=(1, 0, 0),
+        a_normal=(0, 0, -1),
+        b_normal=(0, 1, 0),
+    )
+    diagonal_cutter = align(diagonal_cutter, top_mount_plate, Alignment.CENTER)
+    diagonal_cutter = align(diagonal_cutter, z_axis_profile, Alignment.TOP)
+    diagonal_cutter = align(
+        diagonal_cutter, guide_rod, Alignment.STACK_BACK, stack_gap=-rod_size[1] / 2
+    )
+
+    diagonal_cutter = translate(0, 0, -z_axis_top_mount_thickness)(diagonal_cutter)
+
     top_mount_plate = top_mount_plate.fuse(top_mount_plate_box)
+
+    top_mount_plate = top_mount_plate.cut(diagonal_cutter)
 
     rod_center = get_bounding_box_center(guide_rod)
     rod_holder_center = get_bounding_box_center(rod_holder)

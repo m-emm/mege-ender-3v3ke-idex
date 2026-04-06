@@ -44,6 +44,8 @@ Parameters:
     Type: Float
   z_axis_profile_mount_plate_thickness:
     Type: Float
+  z_axis_profile_mount_plate_clearance:
+    Type: Float
   z_axis_rod_clamp_gap:
     Type: Float
   z_axis_threaded_rod_diameter:
@@ -71,6 +73,10 @@ Parameters:
   z_axis_top_mount_thickness:
     Type: Float
   z_axis_top_mount_threaded_rod_clearance:
+    Type: Float
+  z_axis_top_mount_carriage_clearance:
+    Type: Float
+  z_axis_carriage_width:
     Type: Float
   z_axis_top_mount_width:
     Type: Float
@@ -100,6 +106,8 @@ Parts:
           $ref: z_axis_profile_mount_plate_num_holes
         z_axis_profile_mount_plate_screw_inset:
           $ref: z_axis_profile_mount_plate_screw_inset
+        z_axis_profile_mount_plate_clearance:
+          $ref: z_axis_profile_mount_plate_clearance
         z_axis_profile_mount_plate_thickness:
           $ref: z_axis_profile_mount_plate_thickness
         z_axis_rod_clamp_gap:
@@ -130,5 +138,9 @@ Parts:
           $ref: z_axis_top_mount_thickness
         z_axis_top_mount_threaded_rod_clearance:
           $ref: z_axis_top_mount_threaded_rod_clearance
+        z_axis_top_mount_carriage_clearance:
+          $ref: z_axis_top_mount_carriage_clearance
+        z_axis_carriage_width:
+          $ref: z_axis_carriage_width
         z_axis_top_mount_width:
           $ref: z_axis_top_mount_width
