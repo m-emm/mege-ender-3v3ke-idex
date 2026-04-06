@@ -29,6 +29,8 @@ def create_z_axis_guide_rod_top_mount_assembly(
     z_axis_cylinder_head_clearance,
     z_axis_default_clearance_hole_type,
     z_axis_default_screw_nut_cutter_clearance,
+    z_axis_endstop_cable_hole_size,
+    z_axis_endstop_profile_clearance,
     z_axis_guide_rod_clamp_width,
     z_axis_motor_mount_plate_profile_distance,
     z_axis_profile_mount_plate_num_holes,
@@ -247,7 +249,6 @@ def create_z_axis_guide_rod_top_mount_assembly(
 
     top_mount_profile_mount_plates_bbox = materialize_bounding_box(
         top_mount_profile_mount_plates,
-        x_enlargement=2 * z_axis_profile_mount_plate_clearance,
     )
 
     top_mount_plate_box = top_mount_plate_box.cut(top_mount_profile_mount_plates_bbox)
@@ -276,7 +277,10 @@ def create_z_axis_guide_rod_top_mount_assembly(
     diagonal_cutter = align(diagonal_cutter, top_mount_plate, Alignment.CENTER)
     diagonal_cutter = align(diagonal_cutter, z_axis_profile, Alignment.TOP)
     diagonal_cutter = align(
-        diagonal_cutter, guide_rod, Alignment.STACK_BACK, stack_gap=-rod_size[1] / 2 + z_axis_rod_clamp_gap / 2
+        diagonal_cutter,
+        guide_rod,
+        Alignment.STACK_BACK,
+        stack_gap=-rod_size[1] / 2 + z_axis_rod_clamp_gap / 2,
     )
 
     diagonal_cutter = translate(0, 0, -z_axis_top_mount_thickness)(diagonal_cutter)
@@ -321,20 +325,25 @@ def create_z_axis_guide_rod_top_mount_assembly(
         Alignment.STACK_FRONT,
         stack_gap=z_axis_profile_mount_plate_clearance,
     )
+    endstop_holder = translate(0, -z_axis_endstop_profile_clearance, 0)(endstop_holder)
 
     endstop_board = endstop_holder.get_non_production_part_by_name("board")
-    endstop_board_size = get_bounding_box_size(endstop_board)
-    cable_cutter = create_box(
-        2 * z_axis_profile_mount_plate_thickness,
+    cable_cutter = create_cylinder(
+        z_axis_endstop_cable_hole_size / 2,
         BIG_THING,
-        endstop_board_size[2] + 2 * z_axis_profile_mount_plate_clearance,
+        direction=(1, 0, 0),
     )
-    cable_cutter = align(cable_cutter, endstop_holder.leader, Alignment.CENTER)
-    cable_cutter = align(cable_cutter, endstop_board, Alignment.CENTER, axes=[2])
-    cable_cutter = align(cable_cutter, endstop_holder.leader, Alignment.RIGHT)
+    cable_cutter = align(cable_cutter, endstop_board, Alignment.CENTER)
+    cable_cutter = align(cable_cutter, endstop_board, Alignment.TOP)
+    cable_cutter = align(
+        cable_cutter,
+        top_mount_back,
+        Alignment.STACK_RIGHT,
+        stack_gap=-z_axis_carriage_width / 2,
+    )
 
-    top_mount_back = top_mount_back.fuse(endstop_holder.leader)
     top_mount_back = top_mount_back.cut(cable_cutter)
+    top_mount_back = top_mount_back.fuse(endstop_holder.leader)
 
     retval = LeaderFollowersCuttersPart(leader=top_mount_back)
     retval.add_named_follower(top_mount_clamp, "top_mount_clamp")

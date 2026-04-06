@@ -172,6 +172,8 @@ globals:
   z_axis_cylinder_head_clearance: 0.6
   z_axis_default_clearance_hole_type: "loose"
   z_axis_default_screw_nut_cutter_clearance: 0.2
+  z_axis_endstop_cable_hole_size: 18
+  z_axis_endstop_profile_clearance: 0.8
   z_axis_guide_rod_clamp_depth: 23.5
   z_axis_guide_rod_clamp_rod_clearance: 0.1
   z_axis_guide_rod_clamp_screw_length: 20
@@ -1268,6 +1270,8 @@ assemblies:
       z_axis_cylinder_head_clearance: !Ref z_axis_cylinder_head_clearance
       z_axis_default_clearance_hole_type: !Ref z_axis_default_clearance_hole_type
       z_axis_default_screw_nut_cutter_clearance: !Ref z_axis_default_screw_nut_cutter_clearance
+      z_axis_endstop_cable_hole_size: !Ref z_axis_endstop_cable_hole_size
+      z_axis_endstop_profile_clearance: !Ref z_axis_endstop_profile_clearance
       z_axis_guide_rod_clamp_width: !Ref z_axis_guide_rod_clamp_width
       z_axis_motor_mount_plate_profile_distance: !Ref z_axis_motor_mount_plate_profile_distance
       z_axis_profile_mount_plate_fillet_radius: !Ref z_axis_profile_mount_plate_fillet_radius
@@ -1309,6 +1313,8 @@ assemblies:
       z_axis_cylinder_head_clearance: !Ref z_axis_cylinder_head_clearance
       z_axis_default_clearance_hole_type: !Ref z_axis_default_clearance_hole_type
       z_axis_default_screw_nut_cutter_clearance: !Ref z_axis_default_screw_nut_cutter_clearance
+      z_axis_endstop_cable_hole_size: !Ref z_axis_endstop_cable_hole_size
+      z_axis_endstop_profile_clearance: !Ref z_axis_endstop_profile_clearance
       z_axis_guide_rod_clamp_width: !Ref z_axis_guide_rod_clamp_width
       z_axis_motor_mount_plate_profile_distance: !Ref z_axis_motor_mount_plate_profile_distance
       z_axis_profile_mount_plate_fillet_radius: !Ref z_axis_profile_mount_plate_fillet_radius

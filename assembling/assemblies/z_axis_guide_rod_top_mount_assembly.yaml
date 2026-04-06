@@ -30,6 +30,10 @@ Parameters:
     Type: String
   z_axis_default_screw_nut_cutter_clearance:
     Type: Float
+  z_axis_endstop_cable_hole_size:
+    Type: Float
+  z_axis_endstop_profile_clearance:
+    Type: Float
   z_axis_guide_rod_clamp_width:
     Type: Float
   z_axis_motor_mount_plate_profile_distance:
@@ -94,6 +98,10 @@ Parts:
           $ref: z_axis_default_clearance_hole_type
         z_axis_default_screw_nut_cutter_clearance:
           $ref: z_axis_default_screw_nut_cutter_clearance
+        z_axis_endstop_cable_hole_size:
+          $ref: z_axis_endstop_cable_hole_size
+        z_axis_endstop_profile_clearance:
+          $ref: z_axis_endstop_profile_clearance
         z_axis_guide_rod_clamp_width:
           $ref: z_axis_guide_rod_clamp_width
         z_axis_motor_mount_plate_profile_distance:
