@@ -147,6 +147,9 @@ globals:
   endstop_holder_y_offset: -4
   z_axis_guide_distance: 256
   z_axis_y_offset: 130
+  x_axis_front_gap_to_frame_front:
+    $expr:
+      "$sub": "${frame_inner_depth} / 2 - (20 + ${z_axis_guide_rod_diameter} / 2 + ${z_axis_guide_rod_profile_distance} + ${z_axis_carriage_front_depth} / 2 + ${z_axis_x_axis_to_carriage_gap})"
   carriage_z_offset: 123
   z_axis_z_travel: 300
   z_axis_base_z_offset:
@@ -618,15 +621,14 @@ placement:
       to: printer_frame_assembly.non_production_parts.frame_profile_right
       alignment: STACK_TOP
     - part: x_axis_assembly
-      to: z_axis_assembly.non_production_parts.carriages_fused
+      to: printer_frame_assembly
       alignment: CENTER
-      axes: [0, 1]
+      axes: [0]
     - part: x_axis_assembly.non_production_parts.lower_axis_profile
-      to: z_axis_assembly.non_production_parts.carriages_fused
-      alignment: FRONT
-    - part: x_axis_assembly.non_production_parts.lower_axis_profile
-      to: z_axis_assembly.non_production_parts.x_axis_alignment_reference
-      alignment: BOTTOM
+      to: printer_frame_assembly.non_production_parts.frame_profile_front
+      alignment: STACK_BACK
+      stack_gap:
+        $ref: x_axis_front_gap_to_frame_front
     - part: tool_head_mount_bottom_assembly.followers.carriage
       to: x_axis_assembly.non_production_parts.carriage_1
       alignment: CENTER
@@ -646,10 +648,10 @@ placement:
     - part: tool_head_mount_top_assembly.followers.carriage
       to: x_axis_assembly.non_production_parts.carriage_2
       alignment: CENTER
-    - part: z_axis_assembly.non_production_parts.carriages_fused
+    - part: left_z_axis_carriage_assembly.non_production_parts.x_axis_alignment_reference
       to: x_axis_assembly.non_production_parts.lower_axis_profile
-      alignment: FRONT
-    - part: z_axis_assembly.non_production_parts.x_axis_alignment_reference
+      alignment: BOTTOM
+    - part: right_z_axis_carriage_assembly.non_production_parts.x_axis_alignment_reference
       to: x_axis_assembly.non_production_parts.lower_axis_profile
       alignment: BOTTOM
 

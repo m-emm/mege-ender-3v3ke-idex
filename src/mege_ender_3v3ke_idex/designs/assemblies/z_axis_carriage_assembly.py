@@ -314,10 +314,9 @@ def create_z_axis_carriage_assembly(
             retval.add_named_non_production_part(part, name)
     retval.add_named_non_production_part(bottom_bearing.leader, "bottom_bearing")
 
-    carriage_fused = retval.leaders_followers_fused()
-    retval.add_named_non_production_part(carriage_fused, "carriage_fused")
+    carriage_reference = retval.leaders_followers_fused()
     retval.add_named_non_production_part(
-        translate(0, 0, z_axis_carriage_x_axis_connector_thickness)(carriage_fused),
+        translate(0, 0, z_axis_carriage_x_axis_connector_thickness)(carriage_reference),
         "x_axis_alignment_reference",
     )
 

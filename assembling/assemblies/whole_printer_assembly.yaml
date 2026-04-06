@@ -170,7 +170,6 @@ Builder:
           - carriage_clamp_top_screw_assembly_screw_3_nut
           - carriage_clamp_top_screw_assembly_screw_3_screw
           - bottom_bearing
-          - carriage_fused
           - x_axis_alignment_reference
         name_template: "left_{name}"
       - source: dependencies
@@ -196,7 +195,6 @@ Builder:
           - carriage_clamp_top_screw_assembly_screw_3_nut
           - carriage_clamp_top_screw_assembly_screw_3_screw
           - bottom_bearing
-          - carriage_fused
           - x_axis_alignment_reference
         name_template: "right_{name}"
       - source: dependencies
