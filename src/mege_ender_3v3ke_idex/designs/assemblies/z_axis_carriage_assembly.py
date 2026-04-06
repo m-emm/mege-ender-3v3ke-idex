@@ -280,26 +280,31 @@ def create_z_axis_carriage_assembly(
         stack_gap=-z_axis_carriage_fillet_radius,
     )
 
-    mount_screw_hole_drill = create_cylinder(
-        x_axis_mount_screw_hole_diameter / 2,
-        BIG_THING,
-    )
-    mount_screw_hole_drill = align(
-        mount_screw_hole_drill,
-        x_axis_mount_plate_bottom,
-        Alignment.CENTER,
-    )
-    mount_screw_hole_drill = align(
-        mount_screw_hole_drill,
-        x_axis_mount_plate_bottom,
-        Alignment.EDGE_FRONT,
-    )
-    mount_screw_hole_drill = translate(
-        0,
-        ExtrusionProfileType.PROFILE_2020.size_mm[0] / 2,
-        0,
-    )(mount_screw_hole_drill)
-    x_axis_mount_plate_bottom = x_axis_mount_plate_bottom.cut(mount_screw_hole_drill)
+    mount_screw_hole_drills = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        mount_screw_hole_drill = create_cylinder(
+            x_axis_mount_screw_hole_diameter / 2,
+            BIG_THING,
+        )
+        mount_screw_hole_drill = align(
+            mount_screw_hole_drill,
+            x_axis_mount_plate_bottom,
+            Alignment.CENTER,
+        )
+        mount_screw_hole_drill = align(
+            mount_screw_hole_drill,
+            x_axis_mount_plate_bottom,
+            Alignment.EDGE_FRONT,
+        )
+        mount_screw_hole_drill = translate(
+            lr.sign * (z_axis_carriage_width / 3),
+            ExtrusionProfileType.PROFILE_2020.size_mm[0] / 2,
+            0,
+        )(mount_screw_hole_drill)
+        x_axis_mount_plate_bottom = x_axis_mount_plate_bottom.cut(
+            mount_screw_hole_drill
+        )
+        mount_screw_hole_drills = mount_screw_hole_drills.fuse(mount_screw_hole_drill)
     carriage_bottom_clamp = carriage_bottom_clamp.fuse(x_axis_mount_plate_bottom)
 
     x_axis_mount_plate_top = create_filleted_box(
@@ -325,7 +330,7 @@ def create_z_axis_carriage_assembly(
         Alignment.STACK_FRONT,
         stack_gap=-z_axis_carriage_fillet_radius,
     )
-    x_axis_mount_plate_top = x_axis_mount_plate_top.cut(mount_screw_hole_drill)
+    x_axis_mount_plate_top = x_axis_mount_plate_top.cut(mount_screw_hole_drills)
     carriage_top_clamp = carriage_top_clamp.fuse(x_axis_mount_plate_top)
 
     carriage_back_size = get_bounding_box_size(carriage_back)
