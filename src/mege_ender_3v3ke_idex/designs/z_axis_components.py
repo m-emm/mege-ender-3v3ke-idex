@@ -2,8 +2,6 @@
 
 import math
 
-import numpy as np
-
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
@@ -50,7 +48,6 @@ def create_profile_mount_plate(
     plate = plate.cut(hole_drills)
 
     return plate
-
 
 
 def create_axial_rod_clamp(

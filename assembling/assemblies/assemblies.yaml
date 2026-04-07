@@ -778,7 +778,14 @@ process_data_presets:
       nozzle_hardened: true
       nozzle_high_flow: true
       strength_factor: 0.5
-      quality_factor: 0.1 
+      quality_factor: 0.1
+    overrides:
+      process_overrides:
+        support_interface_spacing: "0.8"
+        support_on_build_plate_only: "1"
+        support_threshold_angle: "30"
+        support_top_z_distance: "0.3"
+    
 
 assemblies:
   - name: printer_frame_assembly
