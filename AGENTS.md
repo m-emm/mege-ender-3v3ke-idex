@@ -135,6 +135,8 @@ arrange_and_export(
 )
 ```
 
+For support tuning, interpret `support_threshold_angle` carefully: higher values produce more aggressive support generation, while lower values produce less support. In practice, values like `80` can support near-vertical walls, while values like `10` can leave even near-horizontal geometry unsupported. Do not assume that increasing `support_threshold_angle` reduces support.
+
 ## Code Style
 
 ### Python Conventions
