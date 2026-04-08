@@ -61,6 +61,7 @@ def create_z_axis_motor_mount_assembly(
     motor_mount_plate_fillet_radius,
     motor_mount_plate_thickness,
     z_axis_cylinder_head_clearance,
+    z_axis_additional_screw_mount_clearance,
     z_axis_default_clearance_hole_type,
     z_axis_default_screw_nut_cutter_clearance,
     z_axis_guide_rod_clamp_depth,
@@ -281,6 +282,26 @@ def create_z_axis_motor_mount_assembly(
     mount_plate_box = align(mount_plate_box, mount_plate, Alignment.STACK_TOP)
     mount_plate_box = align(mount_plate_box, z_axis_profile, Alignment.STACK_FRONT)
 
+    mount_plate_box_side_hole_cutter_size = (
+        z_axis_guide_rod_clamp_thickness * 0.8 / math.sqrt(2)
+    )
+
+    mount_plate_box_side_hole_cutter = create_filleted_box(
+        BIG_THING,
+        mount_plate_box_side_hole_cutter_size,
+        mount_plate_box_side_hole_cutter_size,
+        fillet_radius=mount_plate_box_side_hole_cutter_size / 4,
+    )
+
+    mount_plate_box_side_hole_cutter = rotate(45, axis=(1, 0, 0))(
+        mount_plate_box_side_hole_cutter
+    )
+
+    mount_plate_box_side_hole_cutter = align(
+        mount_plate_box_side_hole_cutter, mount_plate_box, Alignment.CENTER
+    )
+    mount_plate_box = mount_plate_box.cut(mount_plate_box_side_hole_cutter)
+
     mount_plate_box_back = create_box(
         z_axis_motor_mount_plate_size,
         z_axis_motor_mount_plate_box_wall,
@@ -309,6 +330,7 @@ def create_z_axis_motor_mount_assembly(
         flush_with_top=True,
         cylinder_head_cutter_clearance=z_axis_cylinder_head_clearance,
         clearance_type=z_axis_default_clearance_hole_type,
+        additional_screw_mount_clearance=z_axis_additional_screw_mount_clearance,
         nut_cutter_clearance=z_axis_default_screw_nut_cutter_clearance,
     )
     guide_rod_clamp = screws_mount_assembly.use_as_cutter_on(guide_rod_clamp)

@@ -45,6 +45,7 @@ def create_z_axis_carriage_assembly(
     z_axis_creality_nut_rod_guide_height,
     z_axis_creality_nut_threaded_rod_cuide_cutter_clearance,
     z_axis_cylinder_head_clearance,
+    z_axis_additional_screw_mount_clearance,
     z_axis_default_clearance_hole_type,
     z_axis_default_screw_nut_cutter_clearance,
     z_axis_guide_rod_carriage_clamp_screw_length,
@@ -240,6 +241,7 @@ def create_z_axis_carriage_assembly(
             length_inset=z_axis_carriage_rod_clamp_screw_inset,
             cylinder_head_cutter_clearance=z_axis_cylinder_head_clearance,
             clearance_type=z_axis_default_clearance_hole_type,
+            additional_screw_mount_clearance=z_axis_additional_screw_mount_clearance,
             nut_cutter_clearance=z_axis_default_screw_nut_cutter_clearance,
         )
         screw_assembly = screw_assembly.prefixed_copy(
@@ -339,10 +341,12 @@ def create_z_axis_carriage_assembly(
 
     enhancements = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        enhancement = create_box(
-            z_axis_carriage_fillet_radius,
+        enhancement = create_filleted_box(
+            1.5 * z_axis_carriage_fillet_radius,
             enhancement_length,
-            z_axis_carriage_fillet_radius,
+            1.5 * z_axis_carriage_fillet_radius,
+            fillet_radius=z_axis_carriage_fillet_radius / 4,
+            no_fillets_at=[Alignment.FRONT, Alignment.BACK],
         )
         enhancement = rotate(45, axis=(1, 0, 0))(enhancement)
         enhancement = align(

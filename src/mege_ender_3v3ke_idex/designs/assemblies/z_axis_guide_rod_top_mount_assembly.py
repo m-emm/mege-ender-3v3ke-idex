@@ -27,6 +27,7 @@ def create_z_axis_guide_rod_top_mount_assembly(
     z_axis_threaded_rod,
     BIG_THING,
     z_axis_cylinder_head_clearance,
+    z_axis_additional_screw_mount_clearance,
     z_axis_default_clearance_hole_type,
     z_axis_default_screw_nut_cutter_clearance,
     z_axis_endstop_cable_hole_size,
@@ -154,6 +155,7 @@ def create_z_axis_guide_rod_top_mount_assembly(
         width_inset=z_axis_top_mount_screw_inset,
         cylinder_head_cutter_clearance=z_axis_cylinder_head_clearance,
         clearance_type=z_axis_default_clearance_hole_type,
+        additional_screw_mount_clearance=z_axis_additional_screw_mount_clearance,
         nut_cutter_clearance=z_axis_default_screw_nut_cutter_clearance,
     )
     top_mount_plate = screw_assembly.use_as_cutter_on(top_mount_plate)

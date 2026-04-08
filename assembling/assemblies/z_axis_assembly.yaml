@@ -51,7 +51,6 @@ Builder:
           - x_axis_alignment_reference
         name_template: "{name}"
   Production:
-
     parts:
       - source: self
         artifact: followers
@@ -104,6 +103,8 @@ Builder:
           support_on_build_plate_only: "1"
           support_threshold_angle: "25"
           support_top_z_distance: "0.4"
+          xy_contour_compensation: "0.0"
+          xy_hole_compensation: "0.2"
 
     arrange:
       export_individual_parts: false

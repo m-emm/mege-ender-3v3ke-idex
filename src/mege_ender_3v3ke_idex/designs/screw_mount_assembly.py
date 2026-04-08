@@ -38,6 +38,7 @@ def create_single_screw_mount_for_top(
     flush_with_top=False,
     cylinder_head_cutter_clearance=0.1,
     clearance_type="normal",
+    additional_screw_mount_clearance=0.0,
     top_sink=0,
 ):
 
@@ -60,6 +61,7 @@ def create_single_screw_mount_for_top(
     clearance_hole_diameter = m_screw_record.get_clearance_hole_diameter(
         clearance_type=clearance_type
     )
+    clearance_hole_diameter += additional_screw_mount_clearance
 
     hole_cutter = create_cylinder(clearance_hole_diameter / 2, part_thickness)
 
@@ -122,6 +124,7 @@ def create_screw_mount_assembly(
     flush_with_top=False,
     cylinder_head_cutter_clearance=0.1,
     clearance_type="normal",
+    additional_screw_mount_clearance=0.0,
     top_sink=0,
 ):
 
@@ -145,6 +148,7 @@ def create_screw_mount_assembly(
         flush_with_top=flush_with_top,
         cylinder_head_cutter_clearance=cylinder_head_cutter_clearance,
         clearance_type=clearance_type,
+        additional_screw_mount_clearance=additional_screw_mount_clearance,
         top_sink=top_sink,
     )
 
@@ -197,6 +201,7 @@ def create_four_screws_mount_assembly(
     width_inset=5,
     length_inset=5,
     clearance_type="normal",
+    additional_screw_mount_clearance=0.0,
 ):
 
     part_bb_size = get_bounding_box_size(for_part)
@@ -232,6 +237,7 @@ def create_four_screws_mount_assembly(
                 flush_with_top,
                 cylinder_head_cutter_clearance,
                 clearance_type=clearance_type,
+                additional_screw_mount_clearance=additional_screw_mount_clearance,
             )
 
             translation_vector = [0, 0, 0]
