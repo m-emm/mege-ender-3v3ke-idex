@@ -48,21 +48,46 @@ Builder:
         names:
           - mount_plate_top
         name_template: "{name}"
-        prod_rotation_angle: -90
+        prod_rotation_angle: 90
         prod_rotation_axis: [1, 0, 0]
       - source: self
         artifact: followers
         names:
-          - x_axis_idler_endcap_top_left
           - x_axis_idler_endcap_top_right
           - x_axis_idler_endcap_top_right_cage
         name_template: "{name}"
-        flip: true
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        names:
+          - x_axis_idler_endcap_top_left
+        name_template: "{name}"
+        prod_rotation_angle: -90
+        prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        names:
+          - x_axis_idler_endcap_bottom_right
+          - x_axis_idler_endcap_bottom_right_cage
+        name_template: "{name}"
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        names:
+          - x_axis_idler_endcap_bottom_left
+        name_template: "{name}"
+        prod_rotation_angle: -90
+        prod_rotation_axis: [0, 1, 0]
       - source: self
         artifact: followers
         exclude_names:
           - mount_plate_bottom
           - mount_plate_top
+          - x_axis_idler_endcap_bottom_left
+          - x_axis_idler_endcap_bottom_right
+          - x_axis_idler_endcap_bottom_right_cage
           - x_axis_idler_endcap_top_left
           - x_axis_idler_endcap_top_right
           - x_axis_idler_endcap_top_right_cage
