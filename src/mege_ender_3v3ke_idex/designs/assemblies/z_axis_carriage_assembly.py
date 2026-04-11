@@ -62,15 +62,15 @@ def create_z_axis_carriage_assembly(
     guide_rod = _get_rod_part(z_axis_guide_rod)
     threaded_rod = _get_rod_part(z_axis_threaded_rod)
 
-    carriage_front = create_filleted_box(
+    carriage_front_block = create_filleted_box(
         z_axis_carriage_width,
         z_axis_carriage_front_depth,
         z_axis_carriage_front_height,
         z_axis_carriage_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
-    carriage_front = align(carriage_front, guide_rod, Alignment.CENTER)
-    carriage_front = align(carriage_front, guide_rod, Alignment.BOTTOM)
+    carriage_front_block = align(carriage_front_block, guide_rod, Alignment.CENTER)
+    carriage_front_block = align(carriage_front_block, guide_rod, Alignment.BOTTOM)
 
     bearing = create_igus_drylin_bearing(
         z_axis_igus_drylin_bearing_inner_diameter=z_axis_igus_drylin_bearing_inner_diameter,
@@ -79,7 +79,7 @@ def create_z_axis_carriage_assembly(
         cutter_clearance=z_axis_igus_drylin_bearing_cutter_clearance,
         cutter_extra_length=z_axis_carriage_front_height,
     )
-    bearing = align(bearing, carriage_front, Alignment.CENTER)
+    bearing = align(bearing, carriage_front_block, Alignment.CENTER)
     bearing = align(bearing, guide_rod, Alignment.CENTER, axes=[0, 1])
 
     bearing_size = get_bounding_box_size(bearing)
@@ -90,10 +90,10 @@ def create_z_axis_carriage_assembly(
         - z_axis_carriage_x_axis_connector_thickness
     )
 
-    carriage_front = bearing.use_as_cutter_on(carriage_front)
+    carriage_front_block = bearing.use_as_cutter_on(carriage_front_block)
 
-    top_bearing = align(bearing, carriage_front, Alignment.TOP)
-    bottom_bearing = align(bearing, carriage_front, Alignment.BOTTOM)
+    top_bearing = align(bearing, carriage_front_block, Alignment.TOP)
+    bottom_bearing = align(bearing, carriage_front_block, Alignment.BOTTOM)
     bottom_bearing = translate(0, 0, z_axis_carriage_back_height)(bottom_bearing)
 
     threaded_rod_cutter = create_cylinder(
@@ -102,7 +102,7 @@ def create_z_axis_carriage_assembly(
     )
     threaded_rod_cutter = align(
         threaded_rod_cutter,
-        carriage_front,
+        carriage_front_block,
         Alignment.CENTER,
     )
     threaded_rod_cutter = align(
@@ -119,11 +119,11 @@ def create_z_axis_carriage_assembly(
         z_axis_carriage_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
-    carriage_back = align(carriage_back, carriage_front, Alignment.CENTER)
-    carriage_back = align(carriage_back, carriage_front, Alignment.TOP)
+    carriage_back = align(carriage_back, carriage_front_block, Alignment.CENTER)
+    carriage_back = align(carriage_back, carriage_front_block, Alignment.TOP)
     carriage_back = align(
         carriage_back,
-        carriage_front,
+        carriage_front_block,
         Alignment.STACK_BACK,
         stack_gap=-2 * z_axis_carriage_fillet_radius,
     )
@@ -158,14 +158,14 @@ def create_z_axis_carriage_assembly(
     carriage_back = carriage_back.cut(threaded_rod_cutter)
 
     guide_rod_center = get_bounding_box_center(guide_rod)
-    carriage_front_center = get_bounding_box_center(carriage_front)
+    carriage_front_block_center = get_bounding_box_center(carriage_front_block)
     carriage_cut_point = (
-        carriage_front_center[0],
+        carriage_front_block_center[0],
         guide_rod_center[1],
-        carriage_front_center[2],
+        carriage_front_block_center[2],
     )
-    carriage_front, carriage_front_clamps = cut_in_two(
-        carriage_front,
+    carriage_front_block_back_half, carriage_front_clamps = cut_in_two(
+        carriage_front_block,
         cut_normal=(0, 1, 0),
         cut_thickness=z_axis_carriage_profile_clearance,
         cut_point=carriage_cut_point,
@@ -250,7 +250,9 @@ def create_z_axis_carriage_assembly(
 
         carriage_top_clamp = screw_assembly.use_as_cutter_on(carriage_top_clamp)
         carriage_bottom_clamp = screw_assembly.use_as_cutter_on(carriage_bottom_clamp)
-        carriage_front = screw_assembly.use_as_cutter_on(carriage_front)
+        carriage_front_block_back_half = screw_assembly.use_as_cutter_on(
+            carriage_front_block_back_half
+        )
         screw_assemblies.append(screw_assembly)
 
     x_axis_mount_screw_size = ExtrusionProfileType.PROFILE_2020.nominal_hardware
@@ -372,7 +374,7 @@ def create_z_axis_carriage_assembly(
     carriage_back = carriage_back.fuse(enhancements)
 
     carriage_back = bearing.use_as_cutter_on(carriage_back)
-    carriage_body = carriage_front.fuse(carriage_back)
+    carriage_body = carriage_front_block_back_half.fuse(carriage_back)
 
     retval = LeaderFollowersCuttersPart(leader=carriage_body)
     retval.add_named_follower(carriage_top_clamp, "carriage_clamp_0")

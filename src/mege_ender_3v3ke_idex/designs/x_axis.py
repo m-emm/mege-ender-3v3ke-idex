@@ -937,6 +937,7 @@ def create_x_axis() -> LeaderFollowersCuttersPart:
         cut_normal=(0, 0, 1),
     )
 
+    # TODO: cut_in_two returns (top, bottom) here; mapping index order to LEFT/RIGHT is implicit.
     for i, side in enumerate([Alignment.LEFT, Alignment.RIGHT]):
         current_mount_plate_link = mount_plate_link.cut(mount_plate_link_cutters[i])
         final_mount_plates_by_side[side] = final_mount_plates_by_side[side].fuse(

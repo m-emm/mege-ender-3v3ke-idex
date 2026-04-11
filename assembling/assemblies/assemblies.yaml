@@ -779,7 +779,7 @@ process_data_presets:
       nozzle_hardened: true
       nozzle_high_flow: true
       strength_factor: 0.5
-      quality_factor: 0.1
+      quality_factor: 0.4
     overrides:
       process_overrides:
         support_interface_spacing: "0.8"

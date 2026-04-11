@@ -318,9 +318,9 @@ def create_z_axis_motor_mount_assembly(
 
     mount_plate_box = mount_plate_box.fuse(mount_plate_box_back)
 
-    mount_plate = mount_plate.fuse(mount_plate_box)
-
-    mount_plate = motor.use_as_cutter_on(mount_plate)
+    mount_plate_box_back_half, mount_plate_box_front_half = cut_in_two(
+        mount_plate_box, cut_normal=(0, 1, 0)
+    )
 
     screws_mount_assembly = create_four_screws_mount_assembly(
         guide_rod_clamp,
@@ -334,6 +334,15 @@ def create_z_axis_motor_mount_assembly(
         nut_cutter_clearance=z_axis_default_screw_nut_cutter_clearance,
     )
     guide_rod_clamp = screws_mount_assembly.use_as_cutter_on(guide_rod_clamp)
+
+    mount_plate_box_front_half = screws_mount_assembly.use_as_cutter_on(
+        mount_plate_box_front_half
+    )
+
+    mount_plate = mount_plate.fuse(mount_plate_box_front_half)
+    mount_plate = mount_plate.fuse(mount_plate_box_back_half)
+
+    mount_plate = motor.use_as_cutter_on(mount_plate)
 
     guide_rod_cutter = create_cylinder(
         z_axis_guide_rod_diameter / 2 + z_axis_guide_rod_clamp_rod_clearance,
