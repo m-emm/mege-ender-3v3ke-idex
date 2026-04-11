@@ -569,10 +569,10 @@ def create_x_axis_assembly(
 
     mount_plates = PartCollector()
     mount_plate_connectors = PartCollector()
-    final_mount_plates_by_side = {}
-    axis_holding_counter_flanges = {}
-    counter_flange_screws_by_side = {}
-    motors_fused_by_side = {}
+    final_mount_plates_by_profile_position = {}
+    axis_holding_counter_flanges_by_profile_position = {}
+    counter_flange_screws_by_profile_position = {}
+    motors_fused_by_profile_position = {}
 
     non_production_parts = [
         rail_with_carriages.get_follower_part_by_name("carriage_1"),
@@ -589,9 +589,10 @@ def create_x_axis_assembly(
         "top_axis_profile",
     ]
 
-    for side in (Alignment.LEFT, Alignment.RIGHT):
+    for profile_position in (Alignment.BOTTOM, Alignment.TOP):
+        profile_position_name = profile_position.name.lower()
         motor_assembly = create_motor_stack(
-            side,
+            profile_position,
             lower_axis_profile,
             top_axis_profile,
         )
@@ -599,7 +600,7 @@ def create_x_axis_assembly(
         motor_followers_fused = PartCollector()
         for follower in motor_assembly.followers:
             motor_followers_fused = motor_followers_fused.fuse(follower)
-        motors_fused_by_side[side] = motor_followers_fused
+        motors_fused_by_profile_position[profile_position] = motor_followers_fused
 
         for (
             non_production_part_name,
@@ -612,7 +613,7 @@ def create_x_axis_assembly(
                 continue
             non_production_parts.append(non_production_part)
             non_production_names.append(
-                f"{non_production_part_name}_{side.name.lower()}"
+                f"{non_production_part_name}_{profile_position_name}"
             )
 
         mount_plate_connectors = mount_plate_connectors.fuse(
@@ -631,17 +632,21 @@ def create_x_axis_assembly(
         mount_plate = motor_assembly.get_follower_part_by_name("mount_plate")
 
         mount_plates = mount_plates.fuse(mount_plate)
-        axis_holding_counter_flanges[
-            f"axis_holding_counter_flange_{side.name.lower()}"
+        axis_holding_counter_flanges_by_profile_position[
+            f"axis_holding_counter_flange_{profile_position_name}"
         ] = axis_holding_counter_flange
 
-        final_mount_plates_by_side[side] = motors_fused_by_side[side].fuse(mount_shield)
-        counter_flange_screws_by_side[side] = axis_holding_counter_flange_screws
+        final_mount_plates_by_profile_position[profile_position] = (
+            motors_fused_by_profile_position[profile_position].fuse(mount_shield)
+        )
+        counter_flange_screws_by_profile_position[profile_position] = (
+            axis_holding_counter_flange_screws
+        )
 
         non_production_parts.append(
             motor_assembly.get_non_production_part_by_name("idlers")
         )
-        non_production_names.append(f"idlers_{side.name.lower()}")
+        non_production_names.append(f"idlers_{profile_position_name}")
 
     mount_plate_connectors_size = get_bounding_box_size(mount_plate_connectors)
     mount_plate_link = create_box(
@@ -741,11 +746,13 @@ def create_x_axis_assembly(
         cut_normal=(0, 0, 1),
     )
 
-    # TODO: cut_in_two returns (top, bottom) here; mapping index order to LEFT/RIGHT is implicit.
-    for index, side in enumerate([Alignment.LEFT, Alignment.RIGHT]):
+    # TODO: cut_in_two returns (top, bottom) here; mapping index order to BOTTOM/TOP is implicit.
+    for index, profile_position in enumerate([Alignment.BOTTOM, Alignment.TOP]):
         current_mount_plate_link = mount_plate_link.cut(mount_plate_link_cutters[index])
-        final_mount_plates_by_side[side] = final_mount_plates_by_side[side].fuse(
-            current_mount_plate_link
+        final_mount_plates_by_profile_position[profile_position] = (
+            final_mount_plates_by_profile_position[profile_position].fuse(
+                current_mount_plate_link
+            )
         )
 
     mount_plates = mount_plates.fuse(mount_plate_link)
@@ -759,33 +766,36 @@ def create_x_axis_assembly(
     for index, link_screw in enumerate(link_screws):
         retval.add_named_non_production_part(link_screw, f"link_screw_{index + 1}")
 
-    for side in (Alignment.LEFT, Alignment.RIGHT):
-        for index, screw in enumerate(counter_flange_screws_by_side[side]):
+    for profile_position in (Alignment.BOTTOM, Alignment.TOP):
+        for index, screw in enumerate(
+            counter_flange_screws_by_profile_position[profile_position]
+        ):
             retval.add_named_non_production_part(
                 screw,
-                f"axis_holding_counter_flange_screw_{index + 1}_{side.name.lower()}",
+                "axis_holding_counter_flange_screw_"
+                f"{index + 1}_{profile_position.name.lower()}",
             )
 
-    for name, part in axis_holding_counter_flanges.items():
+    for name, part in axis_holding_counter_flanges_by_profile_position.items():
         retval.add_named_follower(part, name)
 
-    for side in (Alignment.LEFT, Alignment.RIGHT):
+    for profile_position in (Alignment.BOTTOM, Alignment.TOP):
         retval.add_named_follower(
-            final_mount_plates_by_side[side],
-            f"mount_plate_{side.name.lower()}",
+            final_mount_plates_by_profile_position[profile_position],
+            f"mount_plate_{profile_position.name.lower()}",
         )
 
-    for side in (Alignment.LEFT, Alignment.RIGHT):
+    for profile_position in (Alignment.BOTTOM, Alignment.TOP):
         profile_to_align_to = (
-            lower_axis_profile if side == Alignment.LEFT else top_axis_profile
+            lower_axis_profile
+            if profile_position == Alignment.BOTTOM
+            else top_axis_profile
         )
-        top_bottom_string = "lower" if side == Alignment.LEFT else "top"
+        top_bottom_string = profile_position.name.lower()
 
         for endcap_side in (Alignment.LEFT, Alignment.RIGHT):
             with_tensioner = endcap_side == Alignment.RIGHT
-            endcap_top_bottom = (
-                Alignment.BOTTOM if side == Alignment.LEFT else Alignment.TOP
-            )
+            endcap_top_bottom = profile_position
             endcap_side_str = endcap_side.name.lower()
 
             endcap = _create_idler_endcap(
@@ -861,7 +871,9 @@ def create_x_axis_assembly(
                 current_additional_data = retval.additional_data.get(cage_name, {})
                 current_additional_data.update(
                     {
-                        "prod_rotation_angle": -90 * endcap_side.sign * side.sign,
+                        "prod_rotation_angle": (
+                            -90 * endcap_side.sign * profile_position.sign
+                        ),
                         "prod_rotation_axis": (0, 1, 0),
                     }
                 )

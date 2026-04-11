@@ -53,17 +53,17 @@ Builder:
       plates:
         - name: motor_side_parts
           parts:
-            - axis_holding_counter_flange_left
-            - axis_holding_counter_flange_right
-            - mount_plate_left
-            - mount_plate_right
+            - axis_holding_counter_flange_bottom
+            - axis_holding_counter_flange_top
+            - mount_plate_bottom
+            - mount_plate_top
             - rail_end_stopper_left
             - rail_end_stopper_right
         - name: idler_endcaps
           parts:
-            - x_axis_idler_endcap_lower_left
-            - x_axis_idler_endcap_lower_right
-            - x_axis_idler_endcap_lower_right_cage
+            - x_axis_idler_endcap_bottom_left
+            - x_axis_idler_endcap_bottom_right
+            - x_axis_idler_endcap_bottom_right_cage
             - x_axis_idler_endcap_top_left
             - x_axis_idler_endcap_top_right
             - x_axis_idler_endcap_top_right_cage

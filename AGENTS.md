@@ -177,12 +177,13 @@ mege-ender-3v3ke-idex/
 ├── src/
 │   └── mege_ender_3v3ke_idex/
 │       └── designs/
-│           ├── alu_extrusion_profile.py  # T-slot extrusion profiles
-│           ├── extruder.py               # Extruder mounting
-│           ├── gt2belt.py                # Belt/pulley components
-│           ├── nema_motors.py            # Stepper motor models
-│           ├── x_axis.py                 # X-axis assembly (main)
-│           └── jury_rigged_z_carriage.py # Z-axis components
+│           ├── alu_extrusion_profile.py      # T-slot extrusion profiles
+│           ├── extruder.py                   # Extruder mounting
+│           ├── gt2belt.py                    # Belt/pulley components
+│           ├── nema_motors.py                # Stepper motor models
+│           ├── jury_rigged_z_carriage.py     # Z-axis components
+│           └── assemblies/
+│               └── x_axis_assembly.py        # X-axis assembly generator
 ├── klipper_setup/
 │   ├── klipper_config/                  # Klipper configuration files
 │   │   ├── toolhead_nitehawk_and_x_axis.cfg  # Main config (Nitehawk 36 + X-axis)
@@ -261,21 +262,17 @@ Klipper `.cfg` files in `klipper_setup/klipper_config/` are tracked in git (see 
 
 ## Common Tasks
 
-### Running Design Scripts
-
-```bash
-# Development mode (all parts, colored)
-./run.sh src/mege_ender_3v3ke_idex/designs/x_axis.py
-
-# Production mode (printable parts only)
-SHELLFORGEPY_PRODUCTION=1 ./run.sh src/mege_ender_3v3ke_idex/designs/x_axis.py
-```
-
 ### Running Declarative Assemblies
 
 Use the repository's pyenv-selected Python directly from the repo root. Do not create or activate an ad-hoc `venv` here.
 
 ```bash
+# Visualize the x-axis assembly
+python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly x_axis_assembly --visualize
+
+# Production run for the x-axis with slicing
+python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly x_axis_assembly --production --slice --visualize
+
 # Visualize a single assembly
 python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly y_axis_rail_carrier_brackets_assembly --visualize
 

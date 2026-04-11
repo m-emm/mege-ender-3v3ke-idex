@@ -1,10 +1,9 @@
-"""
-X Axis
+"""Washer design helpers.
 
 Usage:
-    cd <project_root> && ./run.sh path/to/x_axis.py
+    cd <project_root> && ./run.sh path/to/washers.py
     # or with production mode:
-    cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/x_axis.py
+    cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/washers.py
 """
 
 import copy

@@ -98,26 +98,30 @@ def _project_center_onto_profile_length_mm(profile_to_align, marker_part) -> flo
 
 
 def create_motor_stack(
-    side, lower_axis_profile, top_axis_profile
+    profile_position, lower_axis_profile, top_axis_profile
 ) -> LeaderFollowersCuttersPart:
-    """Build one motor + mount assembly (idler bases, shield, connector) for a side."""
+    """Build one motor + mount assembly for the bottom or top x-axis profile."""
 
-    vertical_aligment_map = {
-        Alignment.LEFT: Alignment.BOTTOM,
-        Alignment.RIGHT: Alignment.TOP,
+    horizontal_side_map = {
+        Alignment.BOTTOM: Alignment.LEFT,
+        Alignment.TOP: Alignment.RIGHT,
     }
-
-    vertical_alignment = vertical_aligment_map[side]
+    horizontal_side = horizontal_side_map[profile_position]
+    vertical_alignment = profile_position
 
     profile_to_align = (
-        lower_axis_profile if side == Alignment.LEFT else top_axis_profile
+        lower_axis_profile
+        if profile_position == Alignment.BOTTOM
+        else top_axis_profile
     )
 
     idlers_assembly = create_idlers_for_motor(
         profile_to_align=profile_to_align,
     )
 
-    idlers_assembly = translate(side.sign * motor_x_offset, 0, 0)(idlers_assembly)
+    idlers_assembly = translate(horizontal_side.sign * motor_x_offset, 0, 0)(
+        idlers_assembly
+    )
 
     idler_axle_cutters = [
         idlers_assembly.get_cutter_part_by_name(f"idler_axle_cutter_{i}")
@@ -129,7 +133,7 @@ def create_motor_stack(
     ]
 
     pulley = create_gt2_pulley(num_teeth=20, belt_width=6)
-    if side == Alignment.LEFT:
+    if horizontal_side == Alignment.LEFT:
         pulley = rotate(180, axis=(0, 1, 0))(pulley)
 
     pulley = align(pulley, idlers_assembly, Alignment.CENTER)
@@ -143,7 +147,7 @@ def create_motor_stack(
         boss_clearance_z=motor_mount_boss_clearance_z,
     )
 
-    if side == Alignment.LEFT:
+    if horizontal_side == Alignment.LEFT:
         motor.rotate((0, 0, 0), (0, 1, 0), 180)
 
     motor = align(motor, idlers_assembly, Alignment.CENTER)
@@ -270,7 +274,9 @@ def create_motor_stack(
         profile_to_align,
         vertical_alignment,
     )
-    mount_shield = translate(0, 0, side.sign * mount_shield_oversize_z)(mount_shield)
+    mount_shield = translate(
+        0, 0, horizontal_side.sign * mount_shield_oversize_z
+    )(mount_shield)
     mount_shield = mount_shield.cut(mount_plate_limit_cutter)
 
     mount_shield_mount_screw_hole_cutter = create_cylinder(
@@ -300,13 +306,15 @@ def create_motor_stack(
     )
 
     profile_part_name = (
-        "x_axis_lower_profile" if side == Alignment.LEFT else "x_axis_top_profile"
+        "x_axis_lower_profile"
+        if profile_position == Alignment.BOTTOM
+        else "x_axis_top_profile"
     )
     record_mark_metric(
         stock_type=ExtrusionProfileType.PROFILE_2020.value,
         part_name=profile_part_name,
         stock_length_mm=x_axis_profile_length,
-        mark_name=f"mount_shield_mount_screw_{side.name.lower()}",
+        mark_name=f"mount_shield_mount_screw_{profile_position.name.lower()}",
         position_mm=_project_center_onto_profile_length_mm(
             profile_to_align,
             mount_shield_mount_screw_hole_cutter,
@@ -323,7 +331,7 @@ def create_motor_stack(
         no_fillets_at=[
             Alignment.BOTTOM,
             Alignment.TOP,
-            side,
+            horizontal_side,
         ],
     )
 
@@ -332,10 +340,10 @@ def create_motor_stack(
     mount_plate_connector = align(
         mount_plate_connector,
         mount_plate,
-        side.opposite.stack_alignment,
+        horizontal_side.opposite.stack_alignment,
     )
     mount_plate_connector = translate(
-        side.sign * motor_mount_plate_fillet_radius, 0, 0
+        horizontal_side.sign * motor_mount_plate_fillet_radius, 0, 0
     )(mount_plate_connector)
 
     mount_plate_connector = mount_plate_connector.cut(mount_plate)
@@ -350,7 +358,7 @@ def create_motor_stack(
     )
 
     mount_flange = align(mount_flange, mount_plate_connector, Alignment.CENTER)
-    mount_flange = align(mount_flange, mount_plate, side)
+    mount_flange = align(mount_flange, mount_plate, horizontal_side)
     mount_flange = align(mount_flange, mount_plate_connector, Alignment.FRONT)
     mount_flange = align(mount_flange, profile_to_align, vertical_alignment)
 
@@ -374,7 +382,7 @@ def create_motor_stack(
         nut_cutter = translate(
             -screw_hole_alignment.sign * mount_flange_screw_hole_inset,
             0,
-            -side.sign * nut_cutter_offset_z,
+            -horizontal_side.sign * nut_cutter_offset_z,
         )(nut_cutter)
 
         nut_pocket_cutters.append(nut_cutter)
@@ -400,7 +408,7 @@ def create_motor_stack(
         bevel_depth + mount_flange_bevel_oversize,
         bevel_depth,
         thickness=mount_plate_connector_length - 2 * motor_mount_plate_fillet_radius,
-        extrusion_direction=(side.sign, 0, 0),
+        extrusion_direction=(horizontal_side.sign, 0, 0),
         a_normal=(0, 0, vertical_alignment.sign),
         b_normal=(0, -1, 0),
     )
@@ -426,7 +434,7 @@ def create_motor_stack(
     motor_visual = motor.leader.copy()
     motor.add_named_non_production_part(motor_visual, "motor_visual")
 
-    motor_name = f"motor_{side.name.lower()}"
+    motor_name = f"motor_{profile_position.name.lower()}"
 
     motor.additional_data["name"] = motor_name
 
@@ -439,7 +447,7 @@ def create_motor_stack(
     )
 
     axis_holding_counter_flange = align(
-        axis_holding_counter_flange, mount_flange, side.opposite
+        axis_holding_counter_flange, mount_flange, horizontal_side.opposite
     )
     axis_holding_counter_flange = align(
         axis_holding_counter_flange, mount_flange, vertical_alignment.stack_alignment
@@ -480,7 +488,7 @@ def create_motor_stack(
         axis_holding_counter_flange_screw = create_cylinder_screw(
             counter_flange_mount_screw_size, length=counter_flange_mount_screw_length
         )
-        if side == Alignment.LEFT:
+        if horizontal_side == Alignment.LEFT:
             axis_holding_counter_flange_screw = rotate(180, axis=(0, 1, 0))(
                 axis_holding_counter_flange_screw
             )
@@ -574,14 +582,16 @@ def main():
 
     # Create the part
 
-    side = Alignment.RIGHT
+    profile_position = Alignment.TOP
 
-    motor_assembly = create_motor_stack(side, lower_axis_profile, top_axis_profile)
+    motor_assembly = create_motor_stack(
+        profile_position, lower_axis_profile, top_axis_profile
+    )
 
     all_bboxes_by_name = {}
 
     for name, part in motor_assembly.get_named_follower_items():
-        part_name = f"motor_stack_{side.name.lower()}_{name}"
+        part_name = f"motor_stack_{profile_position.name.lower()}_{name}"
         parts.add(part, part_name, skip_in_production=False)
         bbox = get_bounding_box(part)
         all_bboxes_by_name[part_name] = bbox
@@ -594,7 +604,7 @@ def main():
     # parts.add(motor_followers_fused, f"motor_stack_{side.name.lower()}_followers_fused")
 
     for name, part in motor_assembly.get_named_non_production_part_items():
-        part_name = f"motor_stack_{side.name.lower()}_{name}"
+        part_name = f"motor_stack_{profile_position.name.lower()}_{name}"
 
         parts.add(part, part_name, skip_in_production=False, color=(0.6, 0.6, 0.6))
         bbox = get_bounding_box(part)
