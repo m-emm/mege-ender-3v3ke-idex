@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for one generic endstop holder
+Description: Assembly configuration for one x-axis Creality endstop holder
 
 Builder:
   Visualization:
@@ -22,5 +22,5 @@ Parts:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.y_axis_endstop_holder_assembly.create_y_axis_endstop_holder_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.creality_endstop_holder_assembly.create_creality_endstop_holder_assembly
       Properties: {}

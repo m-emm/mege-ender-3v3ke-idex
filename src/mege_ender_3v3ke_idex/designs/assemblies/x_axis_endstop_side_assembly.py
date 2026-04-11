@@ -27,7 +27,8 @@ def create_x_axis_endstop_side_assembly(
 
     side_alignment = _resolve_side(side)
     rail_stopper_part = rail_stopper
-    holder_part = endstop_holder
+    holder_rotation_center = get_bounding_box_center(_get_leader_part(endstop_holder))
+    holder_part = rotate(180, center=holder_rotation_center)(endstop_holder)
 
     rail_stopper_fused = _get_leader_part(rail_stopper_part).fuse(
         rail_stopper_part.get_named_follower("groove_holder")
