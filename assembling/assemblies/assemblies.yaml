@@ -859,6 +859,14 @@ assemblies:
     resource_file: creality_endstop_board_assembly.yaml
     depends_on: []
 
+  - name: creality_endstop_holder_assembly
+
+    resource_file: creality_endstop_holder_assembly.yaml
+    depends_on: []
+    parameters:
+      up: !Ref y_axis_endstop_up
+      out: !Ref y_axis_endstop_out
+
   - name: x_axis_assembly
 
     depends_on:

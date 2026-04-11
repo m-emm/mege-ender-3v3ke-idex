@@ -148,6 +148,7 @@ def create_creality_endstop_board(
     creality_endstop_board.add_named_follower(lever, "lever")
     creality_endstop_board.add_named_follower(lever, "tongue")
     creality_endstop_board.add_named_follower(plug, "plug")
+    creality_endstop_board.add_named_non_production_part(leader, "board")
 
     return creality_endstop_board
 

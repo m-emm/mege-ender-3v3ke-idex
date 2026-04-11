@@ -6,8 +6,8 @@ Builder:
   Visualization:
     parts:
       - source: self
-        artifact: leader
-        name: creality_endstop_board
+        artifact: non_production_parts
+        name_template: "{name}"
 
 Parts:
   CrealityEndstopBoardAssembly:
