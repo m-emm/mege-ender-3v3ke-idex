@@ -35,6 +35,38 @@ Builder:
           - carriage_1
           - carriage_2
   Production:
+    parts:
+      - source: self
+        artifact: followers
+        names:
+          - mount_plate_bottom
+        name_template: "{name}"
+        prod_rotation_angle: 90
+        prod_rotation_axis: [1, 0, 0]
+      - source: self
+        artifact: followers
+        names:
+          - mount_plate_top
+        name_template: "{name}"
+        prod_rotation_angle: -90
+        prod_rotation_axis: [1, 0, 0]
+      - source: self
+        artifact: followers
+        names:
+          - x_axis_idler_endcap_top_left
+          - x_axis_idler_endcap_top_right
+          - x_axis_idler_endcap_top_right_cage
+        name_template: "{name}"
+        flip: true
+      - source: self
+        artifact: followers
+        exclude_names:
+          - mount_plate_bottom
+          - mount_plate_top
+          - x_axis_idler_endcap_top_left
+          - x_axis_idler_endcap_top_right
+          - x_axis_idler_endcap_top_right_cage
+        name_template: "{name}"
     process_data_preset: petgcf_medium_strength_high_speed_06
     process_data:
       overrides:
@@ -51,27 +83,23 @@ Builder:
     arrange:
       export_individual_parts: false
       plates:
-        - name: motor_side_parts
+        - name: bottom_parts
           parts:
             - axis_holding_counter_flange_bottom
-            - axis_holding_counter_flange_top
             - mount_plate_bottom
-            - mount_plate_top
-            - rail_end_stopper_left
-            - rail_end_stopper_right
-        - name: idler_endcaps
-          parts:
             - x_axis_idler_endcap_bottom_left
             - x_axis_idler_endcap_bottom_right
             - x_axis_idler_endcap_bottom_right_cage
+            - rail_end_stopper_left
+        - name: top_parts
+          parts:
+            - axis_holding_counter_flange_top
+            - mount_plate_top
             - x_axis_idler_endcap_top_left
             - x_axis_idler_endcap_top_right
             - x_axis_idler_endcap_top_right_cage
+            - rail_end_stopper_right
       auto_assign_plates: false
-    parts:
-      - source: self
-        artifact: followers
-        name_template: "{name}"
 
 Parameters:
   x_axis_x_travel:
