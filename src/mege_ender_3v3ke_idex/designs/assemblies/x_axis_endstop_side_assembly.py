@@ -33,6 +33,7 @@ def create_x_axis_endstop_side_assembly(
     rail_stopper_fused = _get_leader_part(rail_stopper_part).fuse(
         rail_stopper_part.get_named_follower("groove_holder")
     )
+    holder_part = align(holder_part, rail_stopper_fused, Alignment.BACK)
 
     fused = holder_part.leader.fuse(rail_stopper_fused)
     fused_size = get_bounding_box_size(fused)
