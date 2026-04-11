@@ -41,6 +41,10 @@ Builder:
         name_template: "{name}"
 
 Parameters:
+  x_axis_x_travel:
+    Type: Float
+  x_axis_x_travel_negative:
+    Type: Float
   x_axis_profile_pitch:
     Type: Float
   mount_plate_connector_link_thickness:

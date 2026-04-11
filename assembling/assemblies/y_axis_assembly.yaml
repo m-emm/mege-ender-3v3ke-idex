@@ -129,6 +129,8 @@ Builder:
         prod_rotation_axis: [0, 1, 0]
 
 Parameters:
+  print_bed_y_travel:
+    Type: Float
   y_axis_rail_spacing:
     Type: Float
   y_axis_rail_length:

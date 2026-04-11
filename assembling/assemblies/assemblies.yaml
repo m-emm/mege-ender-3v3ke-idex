@@ -854,6 +854,11 @@ assemblies:
       endstop_board_holder_mount_eye_fillet_radius: !Ref endstop_board_holder_mount_eye_fillet_radius
       endstop_board_holder_mount_eye_num_holes: !Ref endstop_board_holder_mount_eye_num_holes
 
+  - name: creality_endstop_board_assembly
+
+    resource_file: creality_endstop_board_assembly.yaml
+    depends_on: []
+
   - name: x_axis_assembly
 
     depends_on:
