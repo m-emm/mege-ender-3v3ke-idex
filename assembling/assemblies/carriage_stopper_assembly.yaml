@@ -32,6 +32,10 @@ Parameters:
   mount_screw_length:
     Type: Float
     Default: null
+  no_fillets_at:
+    Type: Any
+    Default:
+      - BOTTOM
 
 Parts:
   CarriageStopperAssembly:
@@ -52,3 +56,5 @@ Parts:
           $ref: mount_screw_size
         mount_screw_length:
           $ref: mount_screw_length
+        no_fillets_at:
+          $ref: no_fillets_at

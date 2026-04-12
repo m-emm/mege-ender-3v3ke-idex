@@ -1,16 +1,17 @@
 """Creality endstop holder assembly."""
 
-from mege_ender_3v3ke_idex.designs.assemblies.creality_endstop_board_assembly import (
-    BIG_THING,
-    DEFAULT_LOCAL_OUT,
-    DEFAULT_LOCAL_UP,
-    create_creality_endstop_board,
-)
+import copy
+
 from shellforgepy.simple import *
+
+BIG_THING = 500
+DEFAULT_LOCAL_UP = (0.0, 0.0, 1.0)
+DEFAULT_LOCAL_OUT = (0.0, -1.0, 0.0)
 
 
 def create_creality_endstop_holder_assembly(
     *,
+    creality_endstop_board_assembly,
     creality_endstop_holder_board_clearance,
     creality_endstop_holder_thickness,
     creality_endstop_holder_sink,
@@ -24,7 +25,7 @@ def create_creality_endstop_holder_assembly(
 ) -> LeaderFollowersCuttersPart:
     """Create a printable holder for the Creality-style endstop board."""
 
-    board = create_creality_endstop_board(big_thing=big_thing)
+    board = copy.deepcopy(creality_endstop_board_assembly)
 
     pcb = board.get_named_follower("base")
     pcb_size = get_bounding_box_size(pcb)

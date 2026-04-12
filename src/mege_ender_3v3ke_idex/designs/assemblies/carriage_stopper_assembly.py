@@ -3,6 +3,16 @@
 from shellforgepy.simple import *
 
 
+def _normalize_alignments(alignments):
+    normalized_alignments = []
+    for alignment in alignments or [Alignment.BOTTOM]:
+        if isinstance(alignment, str):
+            normalized_alignments.append(getattr(Alignment, alignment.upper()))
+            continue
+        normalized_alignments.append(alignment)
+    return normalized_alignments
+
+
 def create_carriage_stopper_assembly(
     *,
     stopper_width,
@@ -16,7 +26,7 @@ def create_carriage_stopper_assembly(
 ):
     """Create a printable carriage stopper with optional centered mount hardware."""
 
-    normalized_no_fillets_at = list(no_fillets_at or [Alignment.BOTTOM])
+    normalized_no_fillets_at = _normalize_alignments(no_fillets_at)
 
     stopper = create_filleted_box(
         stopper_width,

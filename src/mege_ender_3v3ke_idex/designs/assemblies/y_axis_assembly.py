@@ -1,11 +1,10 @@
 """Declarative y-axis assembly."""
 
+import copy
+
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
-)
-from mege_ender_3v3ke_idex.designs.assemblies.carriage_stopper_assembly import (
-    create_carriage_stopper_assembly,
 )
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_rail_with_carriages
 from mege_ender_3v3ke_idex.designs.print_bed import Y_AXIS_MOVING_MASS_ASSEMBLY_ID
@@ -44,6 +43,7 @@ def _get_y_axis_carriages_fused(y_axis):
 
 def create_y_axis_assembly(
     *,
+    y_axis_carriage_stopper_assembly,
     y_axis_rail_spacing,
     y_axis_rail_length,
     y_axis_profile_length,
@@ -113,19 +113,7 @@ def create_y_axis_assembly(
         rail.add_named_non_production_part(profile, f"profile_{rail_side_name}")
 
         for front_back_alignment in (Alignment.FRONT, Alignment.BACK):
-            stopper = create_carriage_stopper_assembly(
-                stopper_width=y_axis_carriage_stopper_width,
-                stopper_length=y_axis_carriage_stopper_length,
-                stopper_thickness=y_axis_carriage_stopper_thickness,
-                stopper_fillet_radius=y_axis_carriage_stopper_fillet_radius,
-                mount_screw_size=y_axis_carriage_stopper_mount_screw_size,
-                mount_screw_length=y_axis_carriage_stopper_mount_screw_length,
-                no_fillets_at=[
-                    Alignment.BOTTOM,
-                    Alignment.FRONT,
-                    Alignment.BACK,
-                ],
-            )
+            stopper = copy.deepcopy(y_axis_carriage_stopper_assembly)
             stopper = align(stopper, rail.leader, Alignment.CENTER, axes=[0])
             stopper = align(stopper, profile, Alignment.STACK_TOP)
             stopper = align(stopper, rail.leader, front_back_alignment.stack_alignment)

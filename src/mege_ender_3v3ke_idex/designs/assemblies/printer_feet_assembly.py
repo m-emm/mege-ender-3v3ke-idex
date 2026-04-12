@@ -3,13 +3,15 @@ Printer Feet Assembly
 
 Usage:
     cd <project_root> && ./run.sh path/to/printer_feet_assembly.py
-    # or with production mode:
-    cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/printer_feet_assembly.py
+    # Delegates to the builder-based printer_feet_assembly manifest.
 """
 
 import copy
 import logging
 import os
+from pathlib import Path
+import subprocess
+import sys
 
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (
     PROCESS_DATA_TPU_04_HS,
@@ -135,54 +137,21 @@ def create_printer_feet_assembly(
 
 
 def main():
-    from mege_ender_3v3ke_idex.designs.assemblies.printer_frame_assembly import (
-        create_printer_frame_assembly,
-    )
+    repo_root = Path(__file__).resolve().parents[4]
+    command = [
+        sys.executable,
+        "-m",
+        "shellforgepy",
+        "build",
+        "assembling/assemblies/assemblies.yaml",
+        "--assembly",
+        "printer_feet_assembly",
+        "--visualize",
+    ]
+    if PROD:
+        command.append("--production")
 
-    logging.basicConfig(level=logging.INFO)
-    parts = PartList()
-
-    frame = create_printer_frame_assembly(
-        frame_inner_depth=610,
-        frame_inner_width=380,
-        frame_profile_type="4040",
-    )
-    feet = create_printer_feet_assembly(
-        frame=frame,
-        printer_foot_height=37,
-        printer_foot_base_size=40,
-        printer_foot_top_size=35,
-        printer_foot_screw_length=30,
-        printer_foot_screw_cylinder_head_clearance=1.5,
-        printer_foot_mount_screw_size="M5",
-        printer_foot_mount_screw_sink=8,
-        printer_foot_groove_filler_width=7.4,
-        printer_foot_groove_filler_thickness=3,
-        tpu_slit_thickness=0.15,
-        tpu_slit_clearance=0.5,
-        tpu_slit_distance=1,
-        tpu_num_slits=3,
-    )
-
-    for name, follower in feet.get_named_follower_items():
-        if PROD:
-            follower = orient_max_planar_area(
-                follower,
-                optimize_bed_adhesion_area=True,
-            )
-        parts.add(follower, name, flip=False, skip_in_production=False)
-
-    for name, npp in feet.get_named_non_production_part_items():
-        parts.add(npp, name, flip=False, skip_in_production=True)
-
-    arrange_and_export(
-        parts.as_list(),
-        script_file=__file__,
-        prod=PROD,
-        process_data=PROCESS_DATA,
-    )
-
-    _logger.info("printer_feet_assembly created successfully!")
+    subprocess.run(command, check=True, cwd=repo_root)
 
 
 if __name__ == "__main__":

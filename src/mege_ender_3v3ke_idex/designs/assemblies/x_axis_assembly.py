@@ -1,9 +1,8 @@
 """Declarative x-axis assembly."""
 
+import copy
+
 import numpy as np
-from mege_ender_3v3ke_idex.designs.assemblies.carriage_stopper_assembly import (
-    create_carriage_stopper_assembly,
-)
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idler_cage import create_idler_cage
 from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
@@ -513,6 +512,8 @@ def _create_idler_endcap(
 
 def create_x_axis_assembly(
     *,
+    x_axis_carriage_stopper_left,
+    x_axis_carriage_stopper_right,
     x_axis_profile_pitch,
     x_axis_carriage_stopper_width,
     x_axis_carriage_stopper_thickness,
@@ -901,15 +902,12 @@ def create_x_axis_assembly(
         ("left", Alignment.LEFT, x_axis_endstop_left),
         ("right", Alignment.RIGHT, x_axis_endstop_right),
     ):
-        stopper = create_carriage_stopper_assembly(
-            stopper_width=x_axis_carriage_stopper_width,
-            stopper_length=x_axis_carriage_stopper_depth,
-            stopper_thickness=x_axis_carriage_stopper_thickness,
-            stopper_fillet_radius=x_axis_carriage_stopper_fillet_radius,
-            mount_screw_size=x_axis_carriage_stopper_mount_screw_size,
-            mount_screw_length=x_axis_carriage_stopper_mount_screw_length,
-            no_fillets_at=[Alignment.BOTTOM, side_alignment.opposite],
+        stopper_template = (
+            x_axis_carriage_stopper_left
+            if side_alignment == Alignment.LEFT
+            else x_axis_carriage_stopper_right
         )
+        stopper = copy.deepcopy(stopper_template)
         stopper = align(stopper, rail_with_carriages, Alignment.CENTER, axes=[0, 1])
         stopper = align(stopper, rail_with_carriages, Alignment.BOTTOM)
         stopper = align(stopper, rail_with_carriages, side_alignment.stack_alignment)

@@ -1,8 +1,7 @@
 """Declarative z-axis top guide-rod mount assembly."""
 
-from mege_ender_3v3ke_idex.designs.assemblies.y_axis_endstop_holder_assembly import (
-    create_y_axis_endstop_holder_assembly,
-)
+import copy
+
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
 )
@@ -25,6 +24,7 @@ def create_z_axis_guide_rod_top_mount_assembly(
     z_axis_profile,
     z_axis_guide_rod,
     z_axis_threaded_rod,
+    y_axis_endstop_holder_assembly,
     BIG_THING,
     z_axis_cylinder_head_clearance,
     z_axis_additional_screw_mount_clearance,
@@ -305,11 +305,7 @@ def create_z_axis_guide_rod_top_mount_assembly(
         cut_thickness=z_axis_rod_clamp_gap,
     )
 
-    endstop_holder = create_y_axis_endstop_holder_assembly(
-        up=(0.0, -1.0, 0.0),
-        out=(0.0, 0.0, -1.0),
-        big_thing=BIG_THING,
-    )
+    endstop_holder = copy.deepcopy(y_axis_endstop_holder_assembly)
     endstop_holder = align(
         endstop_holder,
         flat_mount_plate,

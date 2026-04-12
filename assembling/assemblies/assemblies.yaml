@@ -850,6 +850,25 @@ assemblies:
 
     depends_on:
       - y_axis_endstop_holder_assembly
+      - y_axis_carriage_stopper_assembly
+    inject_parts:
+      y_axis_carriage_stopper_assembly: y_axis_carriage_stopper_assembly
+
+  - name: y_axis_carriage_stopper_assembly
+
+    resource_file: carriage_stopper_assembly.yaml
+    depends_on: []
+    parameters:
+      stopper_width: !Ref y_axis_carriage_stopper_width
+      stopper_length: !Ref y_axis_carriage_stopper_length
+      stopper_thickness: !Ref y_axis_carriage_stopper_thickness
+      stopper_fillet_radius: !Ref y_axis_carriage_stopper_fillet_radius
+      mount_screw_size: !Ref y_axis_carriage_stopper_mount_screw_size
+      mount_screw_length: !Ref y_axis_carriage_stopper_mount_screw_length
+      no_fillets_at:
+        - BOTTOM
+        - FRONT
+        - BACK
 
   - name: y_axis_endstop_holder_assembly
 
@@ -866,6 +885,21 @@ assemblies:
       endstop_board_holder_mount_eye_fillet_radius: !Ref endstop_board_holder_mount_eye_fillet_radius
       endstop_board_holder_mount_eye_num_holes: !Ref endstop_board_holder_mount_eye_num_holes
 
+  - name: z_axis_top_mount_endstop_holder_assembly
+
+    resource_file: y_axis_endstop_holder_assembly.yaml
+    depends_on: []
+    parameters:
+      up: [0, -1, 0]
+      out: [0, 0, -1]
+      endstop_board_holder_mount_eye_thickness: !Ref endstop_board_holder_mount_eye_thickness
+      endstop_board_holder_mount_eye_length: !Ref endstop_board_holder_mount_eye_length
+      endstop_board_holder_mount_eye_width: !Ref endstop_board_holder_mount_eye_width
+      endstop_board_holder_mount_eye_hole_diameter: !Ref endstop_board_holder_mount_eye_hole_diameter
+      endstop_board_holder_mount_eye_offset: !Ref endstop_board_holder_mount_eye_offset
+      endstop_board_holder_mount_eye_fillet_radius: !Ref endstop_board_holder_mount_eye_fillet_radius
+      endstop_board_holder_mount_eye_num_holes: !Ref endstop_board_holder_mount_eye_num_holes
+
   - name: creality_endstop_board_assembly
 
     resource_file: creality_endstop_board_assembly.yaml
@@ -874,7 +908,10 @@ assemblies:
   - name: creality_endstop_holder_assembly
 
     resource_file: creality_endstop_holder_assembly.yaml
-    depends_on: []
+    depends_on:
+      - creality_endstop_board_assembly
+    inject_parts:
+      creality_endstop_board_assembly: creality_endstop_board_assembly
     parameters:
       up: !Ref y_axis_endstop_up
       out: !Ref y_axis_endstop_out
@@ -889,17 +926,51 @@ assemblies:
   - name: x_axis_assembly
 
     depends_on:
+      - x_axis_carriage_stopper_left_assembly
+      - x_axis_carriage_stopper_right_assembly
       - x_axis_lower_profile_assembly
       - x_axis_top_profile_assembly
       - x_axis_rail_assembly
       - x_axis_endstop_left_assembly
       - x_axis_endstop_right_assembly
     inject_parts:
+      x_axis_carriage_stopper_left: x_axis_carriage_stopper_left_assembly
+      x_axis_carriage_stopper_right: x_axis_carriage_stopper_right_assembly
       x_axis_lower_profile: x_axis_lower_profile_assembly
       x_axis_top_profile: x_axis_top_profile_assembly
       x_axis_rail: x_axis_rail_assembly
       x_axis_endstop_left: x_axis_endstop_left_assembly
       x_axis_endstop_right: x_axis_endstop_right_assembly
+
+  - name: x_axis_carriage_stopper_left_assembly
+
+    resource_file: carriage_stopper_assembly.yaml
+    depends_on: []
+    parameters:
+      stopper_width: !Ref x_axis_carriage_stopper_width
+      stopper_length: !Ref x_axis_carriage_stopper_depth
+      stopper_thickness: !Ref x_axis_carriage_stopper_thickness
+      stopper_fillet_radius: !Ref x_axis_carriage_stopper_fillet_radius
+      mount_screw_size: !Ref x_axis_carriage_stopper_mount_screw_size
+      mount_screw_length: !Ref x_axis_carriage_stopper_mount_screw_length
+      no_fillets_at:
+        - BOTTOM
+        - RIGHT
+
+  - name: x_axis_carriage_stopper_right_assembly
+
+    resource_file: carriage_stopper_assembly.yaml
+    depends_on: []
+    parameters:
+      stopper_width: !Ref x_axis_carriage_stopper_width
+      stopper_length: !Ref x_axis_carriage_stopper_depth
+      stopper_thickness: !Ref x_axis_carriage_stopper_thickness
+      stopper_fillet_radius: !Ref x_axis_carriage_stopper_fillet_radius
+      mount_screw_size: !Ref x_axis_carriage_stopper_mount_screw_size
+      mount_screw_length: !Ref x_axis_carriage_stopper_mount_screw_length
+      no_fillets_at:
+        - BOTTOM
+        - LEFT
 
   - name: x_axis_lower_profile_assembly
 
@@ -1278,10 +1349,12 @@ assemblies:
       - left_z_axis_profile_assembly
       - left_z_axis_guide_rod_assembly
       - left_z_axis_threaded_rod_assembly
+      - z_axis_top_mount_endstop_holder_assembly
     inject_parts:
       z_axis_profile: left_z_axis_profile_assembly
       z_axis_guide_rod: left_z_axis_guide_rod_assembly
       z_axis_threaded_rod: left_z_axis_threaded_rod_assembly
+      y_axis_endstop_holder_assembly: z_axis_top_mount_endstop_holder_assembly
     parameters:
       z_axis_cylinder_head_clearance: !Ref z_axis_cylinder_head_clearance
       z_axis_additional_screw_mount_clearance: !Ref z_axis_additional_screw_mount_clearance
@@ -1322,10 +1395,12 @@ assemblies:
       - right_z_axis_profile_assembly
       - right_z_axis_guide_rod_assembly
       - right_z_axis_threaded_rod_assembly
+      - z_axis_top_mount_endstop_holder_assembly
     inject_parts:
       z_axis_profile: right_z_axis_profile_assembly
       z_axis_guide_rod: right_z_axis_guide_rod_assembly
       z_axis_threaded_rod: right_z_axis_threaded_rod_assembly
+      y_axis_endstop_holder_assembly: z_axis_top_mount_endstop_holder_assembly
     parameters:
       z_axis_cylinder_head_clearance: !Ref z_axis_cylinder_head_clearance
       z_axis_additional_screw_mount_clearance: !Ref z_axis_additional_screw_mount_clearance
