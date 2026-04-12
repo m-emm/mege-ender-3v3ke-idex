@@ -136,6 +136,7 @@ Builder:
             - x_axis_idler_endcap_bottom_right
             - x_axis_idler_endcap_bottom_right_cage
             - rail_end_stopper_left
+            - x_axis_endstop_left
         - name: top_parts
           parts:
             - axis_holding_counter_flange_top
@@ -144,6 +145,7 @@ Builder:
             - x_axis_idler_endcap_top_right
             - x_axis_idler_endcap_top_right_cage
             - rail_end_stopper_right
+            - x_axis_endstop_right
       auto_assign_plates: false
 
 Parameters:
@@ -152,6 +154,18 @@ Parameters:
   x_axis_x_travel_negative:
     Type: Float
   x_axis_profile_pitch:
+    Type: Float
+  x_axis_carriage_stopper_width:
+    Type: Float
+  x_axis_carriage_stopper_thickness:
+    Type: Float
+  x_axis_carriage_stopper_depth:
+    Type: Float
+  x_axis_carriage_stopper_fillet_radius:
+    Type: Float
+  x_axis_carriage_stopper_mount_screw_size:
+    Type: String
+  x_axis_carriage_stopper_mount_screw_length:
     Type: Float
   mount_plate_connector_link_thickness:
     Type: Float
@@ -239,6 +253,18 @@ Parts:
       Properties:
         x_axis_profile_pitch:
           $ref: x_axis_profile_pitch
+        x_axis_carriage_stopper_width:
+          $ref: x_axis_carriage_stopper_width
+        x_axis_carriage_stopper_thickness:
+          $ref: x_axis_carriage_stopper_thickness
+        x_axis_carriage_stopper_depth:
+          $ref: x_axis_carriage_stopper_depth
+        x_axis_carriage_stopper_fillet_radius:
+          $ref: x_axis_carriage_stopper_fillet_radius
+        x_axis_carriage_stopper_mount_screw_size:
+          $ref: x_axis_carriage_stopper_mount_screw_size
+        x_axis_carriage_stopper_mount_screw_length:
+          $ref: x_axis_carriage_stopper_mount_screw_length
         mount_plate_connector_link_thickness:
           $ref: mount_plate_connector_link_thickness
         mount_plate_link_width:

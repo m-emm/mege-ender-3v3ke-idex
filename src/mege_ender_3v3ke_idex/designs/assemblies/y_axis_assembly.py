@@ -1,5 +1,8 @@
 """Declarative y-axis assembly."""
 
+from mege_ender_3v3ke_idex.designs.assemblies.carriage_stopper_assembly import (
+    create_carriage_stopper_assembly,
+)
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
@@ -39,62 +42,12 @@ def _get_y_axis_carriages_fused(y_axis):
     return y_axis_carriages
 
 
-def _create_carriage_stopper_for_end(
-    *,
-    y_axis_profile,
-    rail_reference,
-    front_back_alignment,
-    y_axis_carriage_stopper_length,
-    y_axis_carriage_stopper_thickness,
-    y_axis_carriage_stopper_fillet_radius,
-    y_axis_carriage_stopper_mount_screw_size,
-    y_axis_carriage_stopper_mount_screw_length,
-):
-    profile_size = get_bounding_box_size(y_axis_profile)
-
-    stopper = create_filleted_box(
-        profile_size[0],
-        y_axis_carriage_stopper_length,
-        y_axis_carriage_stopper_thickness,
-        y_axis_carriage_stopper_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM, front_back_alignment.opposite],
-    )
-    stopper = align(stopper, rail_reference, Alignment.CENTER, axes=[0])
-    stopper = align(stopper, y_axis_profile, Alignment.STACK_TOP)
-    stopper = align(stopper, rail_reference, front_back_alignment.stack_alignment)
-
-    stopper_screw = create_cylinder_screw(
-        y_axis_carriage_stopper_mount_screw_size,
-        y_axis_carriage_stopper_mount_screw_length,
-    )
-    stopper_screw = align(stopper_screw, stopper, Alignment.CENTER, axes=[0, 1])
-    stopper_screw = align(stopper_screw, stopper, Alignment.TOP)
-    stopper_screw = translate(
-        0,
-        0,
-        MScrew.from_size(y_axis_carriage_stopper_mount_screw_size).cylinder_head_height,
-    )(stopper_screw)
-
-    stopper_screw_cutter = create_cylinder(
-        MScrew.from_size(y_axis_carriage_stopper_mount_screw_size).clearance_hole_loose
-        / 2,
-        3 * profile_size[2],
-    )
-    stopper_screw_cutter = align(
-        stopper_screw_cutter,
-        stopper_screw,
-        Alignment.CENTER,
-    )
-    stopper = stopper.cut(stopper_screw_cutter)
-
-    return stopper, stopper_screw
-
-
 def create_y_axis_assembly(
     *,
     y_axis_rail_spacing,
     y_axis_rail_length,
     y_axis_profile_length,
+    y_axis_carriage_stopper_width,
     y_axis_carriage_spacing,
     mgn_12ca_carriage_length,
     y_axis_carriage_stopper_length,
@@ -160,18 +113,26 @@ def create_y_axis_assembly(
         rail.add_named_non_production_part(profile, f"profile_{rail_side_name}")
 
         for front_back_alignment in (Alignment.FRONT, Alignment.BACK):
-            stopper, stopper_screw = _create_carriage_stopper_for_end(
-                y_axis_profile=profile,
-                rail_reference=rail.leader,
-                front_back_alignment=front_back_alignment,
-                y_axis_carriage_stopper_length=y_axis_carriage_stopper_length,
-                y_axis_carriage_stopper_thickness=y_axis_carriage_stopper_thickness,
-                y_axis_carriage_stopper_fillet_radius=y_axis_carriage_stopper_fillet_radius,
-                y_axis_carriage_stopper_mount_screw_size=y_axis_carriage_stopper_mount_screw_size,
-                y_axis_carriage_stopper_mount_screw_length=y_axis_carriage_stopper_mount_screw_length,
+            stopper = create_carriage_stopper_assembly(
+                stopper_width=y_axis_carriage_stopper_width,
+                stopper_length=y_axis_carriage_stopper_length,
+                stopper_thickness=y_axis_carriage_stopper_thickness,
+                stopper_fillet_radius=y_axis_carriage_stopper_fillet_radius,
+                mount_screw_size=y_axis_carriage_stopper_mount_screw_size,
+                mount_screw_length=y_axis_carriage_stopper_mount_screw_length,
+                no_fillets_at=[
+                    Alignment.BOTTOM,
+                    Alignment.FRONT,
+                    Alignment.BACK,
+                ],
             )
+            stopper = align(stopper, rail.leader, Alignment.CENTER, axes=[0])
+            stopper = align(stopper, profile, Alignment.STACK_TOP)
+            stopper = align(stopper, rail.leader, front_back_alignment.stack_alignment)
+
+            stopper_screw = stopper.get_non_production_part_by_name("mount_screw")
             rail.add_named_follower(
-                stopper,
+                stopper.leader,
                 f"carriage_stopper_{rail_side_name}_{front_back_alignment.name.lower()}",
             )
             rail.add_named_non_production_part(

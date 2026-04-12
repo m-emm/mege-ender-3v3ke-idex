@@ -4,6 +4,12 @@ Description: Assembly configuration for the y-axis
 
 Builder:
   Visualization:
+    preview:
+      enabled: true
+      views:
+        - front_angle
+      width: 256
+      height: 256
     parts:
       - source: dependencies
         assembly: printer_frame_assembly
@@ -137,6 +143,8 @@ Parameters:
     Type: Float
   y_axis_profile_length:
     Type: Float
+  y_axis_carriage_stopper_width:
+    Type: Float
   y_axis_carriage_spacing:
     Type: Float
   mgn_12ca_carriage_length:
@@ -165,6 +173,8 @@ Parts:
           $ref: y_axis_rail_length
         y_axis_profile_length:
           $ref: y_axis_profile_length
+        y_axis_carriage_stopper_width:
+          $ref: y_axis_carriage_stopper_width
         y_axis_carriage_spacing:
           $ref: y_axis_carriage_spacing
         mgn_12ca_carriage_length:

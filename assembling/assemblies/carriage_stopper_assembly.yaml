@@ -1,0 +1,54 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Reusable carriage stopper assembly
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: carriage_stopper
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+  Production:
+    parts:
+      - source: self
+        artifact: leader
+        name: carriage_stopper
+
+Parameters:
+  stopper_width:
+    Type: Float
+  stopper_length:
+    Type: Float
+  stopper_thickness:
+    Type: Float
+  stopper_fillet_radius:
+    Type: Float
+  mount_screw_size:
+    Type: String
+    Default: null
+  mount_screw_length:
+    Type: Float
+    Default: null
+
+Parts:
+  CarriageStopperAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.carriage_stopper_assembly.create_carriage_stopper_assembly
+      Properties:
+        stopper_width:
+          $ref: stopper_width
+        stopper_length:
+          $ref: stopper_length
+        stopper_thickness:
+          $ref: stopper_thickness
+        stopper_fillet_radius:
+          $ref: stopper_fillet_radius
+        mount_screw_size:
+          $ref: mount_screw_size
+        mount_screw_length:
+          $ref: mount_screw_length
