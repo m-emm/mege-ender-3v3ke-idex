@@ -36,8 +36,6 @@ Parameters:
     Type: Float
   x_axis_endstop_mount_base_inward_extension:
     Type: Float
-  endstop_holder_y_offset:
-    Type: Float
   endstop_holder_mount_screw_size:
     Type: String
   endstop_holder_mount_screw_length:
@@ -70,8 +68,6 @@ Parts:
           $ref: x_axis_endstop_mount_base_width
         x_axis_endstop_mount_base_inward_extension:
           $ref: x_axis_endstop_mount_base_inward_extension
-        endstop_holder_y_offset:
-          $ref: endstop_holder_y_offset
         endstop_holder_mount_screw_size:
           $ref: endstop_holder_mount_screw_size
         endstop_holder_mount_screw_length:

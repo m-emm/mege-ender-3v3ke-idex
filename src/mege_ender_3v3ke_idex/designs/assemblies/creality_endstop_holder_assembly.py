@@ -1,13 +1,12 @@
 """Creality endstop holder assembly."""
 
-from shellforgepy.simple import *
-
 from mege_ender_3v3ke_idex.designs.assemblies.creality_endstop_board_assembly import (
     BIG_THING,
     DEFAULT_LOCAL_OUT,
     DEFAULT_LOCAL_UP,
     create_creality_endstop_board,
 )
+from shellforgepy.simple import *
 
 DEFAULT_CREALITY_ENDSTOP_HOLDER_THICKNESS = 6.0
 DEFAULT_CREALITY_ENDSTOP_HOLDER_SINK = 1.2

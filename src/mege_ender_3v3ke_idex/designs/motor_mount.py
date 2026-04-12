@@ -110,9 +110,7 @@ def create_motor_stack(
     vertical_alignment = profile_position
 
     profile_to_align = (
-        lower_axis_profile
-        if profile_position == Alignment.BOTTOM
-        else top_axis_profile
+        lower_axis_profile if profile_position == Alignment.BOTTOM else top_axis_profile
     )
 
     idlers_assembly = create_idlers_for_motor(
@@ -274,9 +272,9 @@ def create_motor_stack(
         profile_to_align,
         vertical_alignment,
     )
-    mount_shield = translate(
-        0, 0, horizontal_side.sign * mount_shield_oversize_z
-    )(mount_shield)
+    mount_shield = translate(0, 0, horizontal_side.sign * mount_shield_oversize_z)(
+        mount_shield
+    )
     mount_shield = mount_shield.cut(mount_plate_limit_cutter)
 
     mount_shield_mount_screw_hole_cutter = create_cylinder(

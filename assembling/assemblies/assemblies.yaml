@@ -111,7 +111,7 @@ globals:
   x_axis_endstop_mount_base_depth: 25
   x_axis_endstop_mount_base_thickness: 8
   x_axis_endstop_mount_base_fillet_radius: 3
-  x_axis_endstop_mount_base_width: 20
+  x_axis_endstop_mount_base_width: 24
   x_axis_endstop_mount_base_inward_extension: 12
   carriage_end_rail_connector_thickness: 3.5
   endcap_vertical_coupler_size: 13
@@ -154,7 +154,6 @@ globals:
   endstop_holder_mount_screw_size: "M3"
   endstop_holder_mount_screw_length: 14
   endstop_holder_stack_gap: 30
-  endstop_holder_y_offset: -4
   z_axis_guide_distance: 256
   z_axis_y_offset: 130
   x_axis_front_gap_to_frame_front:
@@ -915,7 +914,6 @@ assemblies:
       x_axis_endstop_mount_base_fillet_radius: !Ref x_axis_endstop_mount_base_fillet_radius
       x_axis_endstop_mount_base_width: !Ref x_axis_endstop_mount_base_width
       x_axis_endstop_mount_base_inward_extension: !Ref x_axis_endstop_mount_base_inward_extension
-      endstop_holder_y_offset: !Ref endstop_holder_y_offset
       endstop_holder_mount_screw_size: !Ref endstop_holder_mount_screw_size
       endstop_holder_mount_screw_length: !Ref endstop_holder_mount_screw_length
       endstop_holder_mount_plate_width: !Ref endstop_holder_mount_plate_width
@@ -936,7 +934,6 @@ assemblies:
       x_axis_endstop_mount_base_fillet_radius: !Ref x_axis_endstop_mount_base_fillet_radius
       x_axis_endstop_mount_base_width: !Ref x_axis_endstop_mount_base_width
       x_axis_endstop_mount_base_inward_extension: !Ref x_axis_endstop_mount_base_inward_extension
-      endstop_holder_y_offset: !Ref endstop_holder_y_offset
       endstop_holder_mount_screw_size: !Ref endstop_holder_mount_screw_size
       endstop_holder_mount_screw_length: !Ref endstop_holder_mount_screw_length
       endstop_holder_mount_plate_width: !Ref endstop_holder_mount_plate_width

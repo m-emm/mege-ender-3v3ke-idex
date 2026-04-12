@@ -120,7 +120,7 @@ def create_creality_endstop_board(
         Alignment.STACK_BACK,
         stack_gap=-creality_endstop_lever_overlap,
     )
-    
+
     lever = translate(creality_endstop_lever_x_offset, 0, 0)(lever)
 
     plug = create_box(
@@ -133,11 +133,7 @@ def create_creality_endstop_board(
     plug = align(plug, base, Alignment.FRONT)
     plug = translate(0, -creality_endstop_plug_front_overhang, 0)(plug)
 
-    leader = (
-        base.fuse(switch)
-        .fuse(lever)
-        .fuse(plug)
-    )
+    leader = base.fuse(switch).fuse(lever).fuse(plug)
     creality_endstop_board = LeaderFollowersCuttersPart(leader)
 
     for index, hole in enumerate(mounting_holes):

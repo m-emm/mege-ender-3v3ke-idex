@@ -1,11 +1,11 @@
 """Declarative y-axis assembly."""
 
-from mege_ender_3v3ke_idex.designs.assemblies.carriage_stopper_assembly import (
-    create_carriage_stopper_assembly,
-)
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
+)
+from mege_ender_3v3ke_idex.designs.assemblies.carriage_stopper_assembly import (
+    create_carriage_stopper_assembly,
 )
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_rail_with_carriages
 from mege_ender_3v3ke_idex.designs.print_bed import Y_AXIS_MOVING_MASS_ASSEMBLY_ID

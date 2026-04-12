@@ -74,7 +74,6 @@ def create_x_axis_endstop_assembly(
     x_axis_endstop_mount_base_fillet_radius,
     x_axis_endstop_mount_base_width,
     x_axis_endstop_mount_base_inward_extension,
-    endstop_holder_y_offset,
     endstop_holder_mount_screw_size,
     endstop_holder_mount_screw_length,
     endstop_holder_mount_plate_width,
@@ -87,9 +86,7 @@ def create_x_axis_endstop_assembly(
     """Create one x-axis endstop holder with an integrated profile groove clamp."""
 
     holder = create_creality_endstop_holder_assembly()
-    holder = rotate(180, axis=(0, 0, 1), center=get_bounding_box_center(holder))(
-        holder
-    )
+    holder = rotate(180, axis=(0, 0, 1), center=get_bounding_box_center(holder))(holder)
     holder_size = get_bounding_box_size(holder.leader)
 
     mount_pedestal_width = x_axis_endstop_mount_base_width
@@ -105,6 +102,23 @@ def create_x_axis_endstop_assembly(
         fillet_radius=x_axis_endstop_mount_base_fillet_radius,
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, Alignment.BACK],
     )
+    x_axis_endstop_mount_base_wall = 1.1
+
+    mount_pedestal_cut = create_filleted_box(
+        mount_pedestal_width - 2 * x_axis_endstop_mount_base_wall,
+        holder_size[1] / 2,
+        BIG_THING,
+        fillet_radius=x_axis_endstop_mount_base_fillet_radius / 2,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+    )
+
+    mount_pedestal_cut = align(mount_pedestal_cut, mount_pedestal, Alignment.CENTER)
+    mount_pedestal_cut = align(mount_pedestal_cut, mount_pedestal, Alignment.BACK)
+    mount_pedestal_cut = translate(0, -x_axis_endstop_mount_base_wall, 0)(
+        mount_pedestal_cut
+    )
+
+    mount_pedestal = mount_pedestal.cut(mount_pedestal_cut)
 
     groove_holder = _create_groove_holder(
         screw_size=endstop_holder_mount_screw_size,
@@ -124,17 +138,14 @@ def create_x_axis_endstop_assembly(
     holder = align(holder, mount_pedestal, Alignment.CENTER, axes=[0])
     holder = align(holder, mount_pedestal, Alignment.BACK)
     holder = align(holder, mount_pedestal, Alignment.STACK_TOP)
-    holder = translate(
-        0,
-        endstop_holder_y_offset,
-        0,
-    )(holder)
 
     mount_screw = create_cylinder_screw(
         endstop_holder_mount_screw_size,
         endstop_holder_mount_screw_length,
     )
-    mount_screw = align(mount_screw, groove_holder.leader, Alignment.CENTER, axes=[0, 1])
+    mount_screw = align(
+        mount_screw, groove_holder.leader, Alignment.CENTER, axes=[0, 1]
+    )
     mount_screw = align(mount_screw, mount_pedestal, Alignment.TOP)
     mount_screw = translate(
         0,
