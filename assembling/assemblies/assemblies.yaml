@@ -2,7 +2,6 @@ context:
   BIG_THING: 500
 
 globals:
-
   print_bed_y_travel: 325
   y_axis_carriage_spacing: 100
   mgn_12ca_carriage_length: 34.7
@@ -153,6 +152,13 @@ globals:
   endstop_holder_mount_plate_width: 8
   endstop_holder_mount_screw_size: "M3"
   endstop_holder_mount_screw_length: 14
+  creality_endstop_holder_thickness: 6.0
+  creality_endstop_holder_sink: 0.9
+  creality_endstop_holder_length_oversize: 4
+  creality_endstop_holder_width_oversize: 3.5
+  creality_endstop_holder_board_clearance: 1.5
+  creality_endstop_holder_screw_size: "M3"
+  creality_endstop_holder_nut_cutter_slack: 0.2
   endstop_holder_stack_gap: 30
   z_axis_guide_distance: 256
   z_axis_y_offset: 130
@@ -278,7 +284,7 @@ globals:
   z_axis_axial_bearing_stopper_outer_diameter: 23.5
   z_axis_axial_bearing_stopper_thickness: 4
   z_axis_axial_bearing_stopper_axial_bearing_sink: 0.25
-  z_axis_axial_bearing_stopper_axial_bearing_clearance: 0.25  
+  z_axis_axial_bearing_stopper_axial_bearing_clearance: 0.25
 
   z_axis_axial_rod_clamp_cylinder_head_cutter_clearance: 0.25
   z_axis_axial_rod_clamp_gap: 1.2
@@ -291,7 +297,7 @@ globals:
   z_axis_axial_rod_clamp_screw_length: 18
   z_axis_axial_rod_clamp_screw_size: "M3"
   z_axis_axial_rod_clamp_thickness: 10
-  
+
   motor_size: 42.3
   motor_x_offset:
     $expr:
@@ -575,7 +581,7 @@ placement:
       post_translation:
         - 0
         - 0
-        - $ref: print_bed_vertical_gap_to_frame
+        - $ref: print_bed_vertical_gap_to_frame    
     - part: y_axis_assembly
       to: printer_frame_assembly
       alignment: CENTER
@@ -626,6 +632,13 @@ placement:
       alignment: CENTER
       axes: [2]
 
+    - part: creality_endstop_holder_assembly
+      to: printer_frame_assembly
+      alignment: TOP
+      post_rotation:
+        angle: -90
+        axis: [0, 1, 0]
+        center: creality_endstop_holder_assembly.CENTER
     - part: x_axis_endstop_left_assembly
       post_rotation:
         angle: 90
@@ -641,8 +654,7 @@ placement:
       post_translation:
         - 0
         - 0
-        -
-          $expr:
+        - $expr:
             "$sub": "-1 * ${endstop_holder_groove_holder_height}"
     - part: x_axis_endstop_left_assembly.non_production_parts.board
       to: x_axis_rail_assembly
@@ -665,8 +677,7 @@ placement:
       post_translation:
         - 0
         - 0
-        -
-          $expr:
+        - $expr:
             "$sub": "-1 * ${endstop_holder_groove_holder_height}"
     - part: x_axis_endstop_right_assembly.non_production_parts.board
       to: x_axis_rail_assembly
@@ -788,7 +799,6 @@ process_data_presets:
       process_overrides:
         brim_type: "no_brim"
         sparse_infill_pattern: "cubic"
-    
 
 assemblies:
   - name: printer_frame_assembly
@@ -868,6 +878,13 @@ assemblies:
     parameters:
       up: !Ref y_axis_endstop_up
       out: !Ref y_axis_endstop_out
+      creality_endstop_holder_thickness: !Ref creality_endstop_holder_thickness
+      creality_endstop_holder_sink: !Ref creality_endstop_holder_sink
+      creality_endstop_holder_length_oversize: !Ref creality_endstop_holder_length_oversize
+      creality_endstop_holder_width_oversize: !Ref creality_endstop_holder_width_oversize
+      creality_endstop_holder_board_clearance: !Ref creality_endstop_holder_board_clearance
+      creality_endstop_holder_screw_size: !Ref creality_endstop_holder_screw_size
+      creality_endstop_holder_nut_cutter_slack: !Ref creality_endstop_holder_nut_cutter_slack
 
   - name: x_axis_assembly
 
@@ -919,6 +936,9 @@ assemblies:
     depends_on:
       - x_axis_lower_profile_assembly
       - x_axis_rail_assembly
+      - creality_endstop_holder_assembly
+    inject_parts:
+      creality_endstop_holder_assembly: creality_endstop_holder_assembly
     parameters:
       x_axis_endstop_mount_base_depth: !Ref x_axis_endstop_mount_base_depth
       x_axis_endstop_mount_base_thickness: !Ref x_axis_endstop_mount_base_thickness
@@ -939,6 +959,9 @@ assemblies:
     depends_on:
       - x_axis_lower_profile_assembly
       - x_axis_rail_assembly
+      - creality_endstop_holder_assembly
+    inject_parts:
+      creality_endstop_holder_assembly: creality_endstop_holder_assembly
     parameters:
       x_axis_endstop_mount_base_depth: !Ref x_axis_endstop_mount_base_depth
       x_axis_endstop_mount_base_thickness: !Ref x_axis_endstop_mount_base_thickness
@@ -1317,7 +1340,7 @@ assemblies:
       z_axis_profile_mount_plate_clearance: !Ref z_axis_profile_mount_plate_clearance
       z_axis_profile_mount_plate_num_holes: !Ref z_axis_profile_mount_plate_num_holes
       z_axis_profile_mount_plate_screw_inset: !Ref z_axis_profile_mount_plate_screw_inset
-      z_axis_profile_mount_plate_thickness: !Ref z_axis_profile_mount_plate_thickness      
+      z_axis_profile_mount_plate_thickness: !Ref z_axis_profile_mount_plate_thickness
       z_axis_rod_clamp_gap: !Ref z_axis_rod_clamp_gap
       z_axis_threaded_rod_diameter: !Ref z_axis_threaded_rod_diameter
       z_axis_top_mount_depth: !Ref z_axis_top_mount_depth

@@ -1,8 +1,7 @@
 """Standalone x-axis endstop holder with profile groove mount."""
 
-from mege_ender_3v3ke_idex.designs.assemblies.creality_endstop_holder_assembly import (
-    create_creality_endstop_holder_assembly,
-)
+import copy
+
 from shellforgepy.simple import *
 
 
@@ -16,21 +15,22 @@ def _create_groove_holder(
     endstop_holder_groove_holder_slit,
     big_thing,
 ):
+
     mount_screw_cutter = create_cylinder(
-        MScrew.from_size(screw_size).clearance_hole_normal / 2,
+        MScrew.from_size(screw_size).clearance_hole_loose / 2,
         big_thing,
     )
 
     groove_holder = create_pyramid_stump(
-        endstop_holder_mount_plate_width,
-        endstop_holder_mount_plate_width,
         endstop_holder_groove_holder_bottom_width,
         endstop_holder_groove_holder_top_width,
+        endstop_holder_mount_plate_width,
+        endstop_holder_mount_plate_width,
         endstop_holder_groove_holder_height,
     )
 
     groove_holder_hole_cutter = create_cylinder(
-        MScrew.from_size(screw_size).core_hole / 2 - 0.1,
+        MScrew.from_size(screw_size).core_hole / 2,
         big_thing,
     )
     groove_holder_hole_cutter = align(
@@ -69,6 +69,7 @@ def _create_groove_holder(
 
 def create_x_axis_endstop_assembly(
     *,
+    creality_endstop_holder_assembly,
     x_axis_endstop_mount_base_depth,
     x_axis_endstop_mount_base_thickness,
     x_axis_endstop_mount_base_fillet_radius,
@@ -85,7 +86,7 @@ def create_x_axis_endstop_assembly(
 ):
     """Create one x-axis endstop holder with an integrated profile groove clamp."""
 
-    holder = create_creality_endstop_holder_assembly()
+    holder = copy.deepcopy(creality_endstop_holder_assembly)
     holder = rotate(180, axis=(0, 0, 1), center=get_bounding_box_center(holder))(holder)
     holder_size = get_bounding_box_size(holder.leader)
 

@@ -95,13 +95,15 @@ Builder:
         names:
           - x_axis_endstop_right
         name_template: "{name}"
-        flip: true
+        prod_rotation_angle: 0
+        prod_rotation_axis: [0, 1, 0]
       - source: self
         artifact: followers
         names:
           - x_axis_endstop_left
         name_template: "{name}"
-        flip: true
+        prod_rotation_angle: 0
+        prod_rotation_axis: [0, 1, 0]
       - source: self
         artifact: followers
         exclude_names:
@@ -149,7 +151,7 @@ Builder:
             - x_axis_idler_endcap_top_left
             - x_axis_idler_endcap_top_right
             - x_axis_idler_endcap_top_right_cage
-        - name: endstops_with_support
+        - name: endstop_left_with_support
           process_data_preset: petgcf_medium_strength_high_speed_06
           process_data:
             overrides:
@@ -157,6 +159,13 @@ Builder:
                 enable_support: "1"
           parts:
             - x_axis_endstop_left
+        - name: endstop_right_with_support
+          process_data_preset: petgcf_medium_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "1"
+          parts:
             - x_axis_endstop_right
         - name: carriage_stoppers_tpu
           process_data_preset: tpu_minimal_quality_minimal_strength_06

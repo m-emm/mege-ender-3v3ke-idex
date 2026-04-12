@@ -8,24 +8,16 @@ from mege_ender_3v3ke_idex.designs.assemblies.creality_endstop_board_assembly im
 )
 from shellforgepy.simple import *
 
-DEFAULT_CREALITY_ENDSTOP_HOLDER_THICKNESS = 6.0
-DEFAULT_CREALITY_ENDSTOP_HOLDER_SINK = 1.2
-DEFAULT_CREALITY_ENDSTOP_HOLDER_LENGTH_OVERSIZE = 3
-DEFAULT_CREALITY_ENDSTOP_HOLDER_WIDTH_OVERSIZE = 3
-DEFAULT_CREALITY_ENDSTOP_HOLDER_SCREW_SIZE = "M3"
-DEFAULT_CREALITY_ENDSTOP_HOLDER_BOARD_CLEARANCE = 0.45
-DEFAULT_CREALITY_ENDSTOP_HOLDER_NUT_CUTTER_SLACK = 0.2
-
 
 def create_creality_endstop_holder_assembly(
     *,
-    creality_endstop_holder_thickness=DEFAULT_CREALITY_ENDSTOP_HOLDER_THICKNESS,
-    creality_endstop_holder_sink=DEFAULT_CREALITY_ENDSTOP_HOLDER_SINK,
-    creality_endstop_holder_length_oversize=DEFAULT_CREALITY_ENDSTOP_HOLDER_LENGTH_OVERSIZE,
-    creality_endstop_holder_width_oversize=DEFAULT_CREALITY_ENDSTOP_HOLDER_WIDTH_OVERSIZE,
-    creality_endstop_holder_screw_size=DEFAULT_CREALITY_ENDSTOP_HOLDER_SCREW_SIZE,
-    creality_endstop_holder_board_clearance=DEFAULT_CREALITY_ENDSTOP_HOLDER_BOARD_CLEARANCE,
-    creality_endstop_holder_nut_cutter_slack=DEFAULT_CREALITY_ENDSTOP_HOLDER_NUT_CUTTER_SLACK,
+    creality_endstop_holder_board_clearance,
+    creality_endstop_holder_thickness,
+    creality_endstop_holder_sink,
+    creality_endstop_holder_length_oversize,
+    creality_endstop_holder_width_oversize,
+    creality_endstop_holder_screw_size,
+    creality_endstop_holder_nut_cutter_slack,
     up=DEFAULT_LOCAL_UP,
     out=DEFAULT_LOCAL_OUT,
     big_thing=BIG_THING,
@@ -38,8 +30,8 @@ def create_creality_endstop_holder_assembly(
     pcb_size = get_bounding_box_size(pcb)
 
     holder = create_box(
-        pcb_size[0] + creality_endstop_holder_length_oversize,
-        pcb_size[1] + creality_endstop_holder_width_oversize,
+        pcb_size[0] + creality_endstop_holder_width_oversize,
+        pcb_size[1] + creality_endstop_holder_length_oversize,
         creality_endstop_holder_thickness,
     )
     holder = align(holder, pcb, Alignment.CENTER)
@@ -54,22 +46,28 @@ def create_creality_endstop_holder_assembly(
     pcb_cutter = align(pcb_cutter, pcb, Alignment.TOP)
     holder = holder.cut(pcb_cutter)
 
+    spacers = PartCollector()
+
     for cutter in board.cutters:
-        spacer_width = (
-            get_bounding_box_size(cutter)[0]
-            + 2 * creality_endstop_holder_board_clearance
-        )
-        spacer_length = pcb_size[1] + creality_endstop_holder_width_oversize
+        cutter_size = get_bounding_box_size(cutter)
+        spacer_width = cutter_size[0] * 1.5
+        spacer_length = 2 * cutter_size[1]
         spacer_thickness = creality_endstop_holder_thickness - pcb_size[2]
 
-        spacer = create_box(spacer_width, spacer_length, spacer_thickness)
+        fillet_radius = min(spacer_width, spacer_length, spacer_thickness) / 4
+        spacer = create_filleted_box(
+            spacer_width,
+            spacer_length,
+            spacer_thickness,
+            fillet_radius=fillet_radius,
+            no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+        )
         spacer = align(spacer, cutter, Alignment.CENTER)
-        spacer = align(spacer, holder, Alignment.BACK)
+        spacer = align(spacer, pcb, Alignment.FRONT)
         spacer = align(spacer, holder, Alignment.BOTTOM)
-        holder = holder.fuse(spacer)
 
         screw_hole_drill = create_cylinder(
-            MScrew.from_size(creality_endstop_holder_screw_size).clearance_hole_normal
+            MScrew.from_size(creality_endstop_holder_screw_size).clearance_hole_loose
             / 2,
             big_thing,
         )
@@ -84,11 +82,17 @@ def create_creality_endstop_holder_assembly(
         nut_cutter = align(nut_cutter, holder, Alignment.BOTTOM)
         holder = holder.cut(nut_cutter)
 
+        spacer = spacer.cut(screw_hole_drill)
+        spacer = spacer.cut(nut_cutter)
+        spacers = spacers.fuse(spacer)
+
+    holder = holder.fuse(spacers)
     assembly = LeaderFollowersCuttersPart(holder)
     assembly.add_named_follower(holder, "holder")
     for name, non_production_part in board.get_named_non_production_part_items():
         assembly.add_named_non_production_part(non_production_part, name)
 
+    assembly.add_named_cutter(pcb_cutter, "pcb_cutter")
     transform = coordinate_system_transformation_function(
         origin_a=(0, 0, 0),
         up_a=DEFAULT_LOCAL_UP,

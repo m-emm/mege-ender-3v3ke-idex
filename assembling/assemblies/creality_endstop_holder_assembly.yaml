@@ -29,6 +29,20 @@ Parameters:
     Type: Vector
   out:
     Type: Vector
+  creality_endstop_holder_thickness:
+    Type: Float
+  creality_endstop_holder_sink:
+    Type: Float
+  creality_endstop_holder_length_oversize:
+    Type: Float
+  creality_endstop_holder_width_oversize:
+    Type: Float
+  creality_endstop_holder_board_clearance:
+    Type: Float
+  creality_endstop_holder_screw_size:
+    Type: String
+  creality_endstop_holder_nut_cutter_slack:
+    Type: Float
 
 Parts:
   CrealityEndstopHolderAssembly:
@@ -41,3 +55,17 @@ Parts:
           $ref: up
         out:
           $ref: out
+        creality_endstop_holder_thickness:
+          $ref: creality_endstop_holder_thickness
+        creality_endstop_holder_sink:
+          $ref: creality_endstop_holder_sink
+        creality_endstop_holder_length_oversize:
+          $ref: creality_endstop_holder_length_oversize
+        creality_endstop_holder_width_oversize:
+          $ref: creality_endstop_holder_width_oversize
+        creality_endstop_holder_board_clearance:
+          $ref: creality_endstop_holder_board_clearance
+        creality_endstop_holder_screw_size:
+          $ref: creality_endstop_holder_screw_size
+        creality_endstop_holder_nut_cutter_slack:
+          $ref: creality_endstop_holder_nut_cutter_slack
