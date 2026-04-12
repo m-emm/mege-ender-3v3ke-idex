@@ -108,6 +108,9 @@ globals:
   x_axis_carriage_stopper_fillet_radius: 3
   x_axis_carriage_stopper_mount_screw_size: "M5"
   x_axis_carriage_stopper_mount_screw_length: 12
+  x_axis_endstop_mount_base_depth: 25
+  x_axis_endstop_mount_base_thickness: 8
+  x_axis_endstop_mount_base_fillet_radius: 3
   x_axis_endstop_mount_base_width: 20
   x_axis_endstop_mount_base_inward_extension: 12
   carriage_end_rail_connector_thickness: 3.5
@@ -907,9 +910,9 @@ assemblies:
       - x_axis_lower_profile_assembly
       - x_axis_rail_assembly
     parameters:
-      x_axis_carriage_stopper_depth: !Ref x_axis_carriage_stopper_depth
-      x_axis_carriage_stopper_thickness: !Ref x_axis_carriage_stopper_thickness
-      x_axis_carriage_stopper_fillet_radius: !Ref x_axis_carriage_stopper_fillet_radius
+      x_axis_endstop_mount_base_depth: !Ref x_axis_endstop_mount_base_depth
+      x_axis_endstop_mount_base_thickness: !Ref x_axis_endstop_mount_base_thickness
+      x_axis_endstop_mount_base_fillet_radius: !Ref x_axis_endstop_mount_base_fillet_radius
       x_axis_endstop_mount_base_width: !Ref x_axis_endstop_mount_base_width
       x_axis_endstop_mount_base_inward_extension: !Ref x_axis_endstop_mount_base_inward_extension
       endstop_holder_y_offset: !Ref endstop_holder_y_offset
@@ -928,9 +931,9 @@ assemblies:
       - x_axis_lower_profile_assembly
       - x_axis_rail_assembly
     parameters:
-      x_axis_carriage_stopper_depth: !Ref x_axis_carriage_stopper_depth
-      x_axis_carriage_stopper_thickness: !Ref x_axis_carriage_stopper_thickness
-      x_axis_carriage_stopper_fillet_radius: !Ref x_axis_carriage_stopper_fillet_radius
+      x_axis_endstop_mount_base_depth: !Ref x_axis_endstop_mount_base_depth
+      x_axis_endstop_mount_base_thickness: !Ref x_axis_endstop_mount_base_thickness
+      x_axis_endstop_mount_base_fillet_radius: !Ref x_axis_endstop_mount_base_fillet_radius
       x_axis_endstop_mount_base_width: !Ref x_axis_endstop_mount_base_width
       x_axis_endstop_mount_base_inward_extension: !Ref x_axis_endstop_mount_base_inward_extension
       endstop_holder_y_offset: !Ref endstop_holder_y_offset

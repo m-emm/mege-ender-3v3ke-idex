@@ -69,9 +69,9 @@ def _create_groove_holder(
 
 def create_x_axis_endstop_assembly(
     *,
-    x_axis_carriage_stopper_depth,
-    x_axis_carriage_stopper_thickness,
-    x_axis_carriage_stopper_fillet_radius,
+    x_axis_endstop_mount_base_depth,
+    x_axis_endstop_mount_base_thickness,
+    x_axis_endstop_mount_base_fillet_radius,
     x_axis_endstop_mount_base_width,
     x_axis_endstop_mount_base_inward_extension,
     endstop_holder_y_offset,
@@ -87,23 +87,23 @@ def create_x_axis_endstop_assembly(
     """Create one x-axis endstop holder with an integrated profile groove clamp."""
 
     holder = create_creality_endstop_holder_assembly()
-    holder = rotate(180, axis=(0, 0, 1), center=get_bounding_box_center(holder.leader))(
+    holder = rotate(180, axis=(0, 0, 1), center=get_bounding_box_center(holder))(
         holder
     )
     holder_size = get_bounding_box_size(holder.leader)
 
     mount_pedestal_width = x_axis_endstop_mount_base_width
     mount_pedestal_depth = max(
-        x_axis_carriage_stopper_depth,
+        x_axis_endstop_mount_base_depth,
         holder_size[1] + x_axis_endstop_mount_base_inward_extension,
     )
 
     mount_pedestal = create_filleted_box(
         mount_pedestal_width,
         mount_pedestal_depth,
-        x_axis_carriage_stopper_thickness,
-        fillet_radius=x_axis_carriage_stopper_fillet_radius,
-        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+        x_axis_endstop_mount_base_thickness,
+        fillet_radius=x_axis_endstop_mount_base_fillet_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, Alignment.BACK],
     )
 
     groove_holder = _create_groove_holder(

@@ -26,11 +26,11 @@ Builder:
         name: x_axis_endstop
 
 Parameters:
-  x_axis_carriage_stopper_depth:
+  x_axis_endstop_mount_base_depth:
     Type: Float
-  x_axis_carriage_stopper_thickness:
+  x_axis_endstop_mount_base_thickness:
     Type: Float
-  x_axis_carriage_stopper_fillet_radius:
+  x_axis_endstop_mount_base_fillet_radius:
     Type: Float
   x_axis_endstop_mount_base_width:
     Type: Float
@@ -60,12 +60,12 @@ Parts:
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_endstop_assembly.create_x_axis_endstop_assembly
       Properties:
-        x_axis_carriage_stopper_depth:
-          $ref: x_axis_carriage_stopper_depth
-        x_axis_carriage_stopper_thickness:
-          $ref: x_axis_carriage_stopper_thickness
-        x_axis_carriage_stopper_fillet_radius:
-          $ref: x_axis_carriage_stopper_fillet_radius
+        x_axis_endstop_mount_base_depth:
+          $ref: x_axis_endstop_mount_base_depth
+        x_axis_endstop_mount_base_thickness:
+          $ref: x_axis_endstop_mount_base_thickness
+        x_axis_endstop_mount_base_fillet_radius:
+          $ref: x_axis_endstop_mount_base_fillet_radius
         x_axis_endstop_mount_base_width:
           $ref: x_axis_endstop_mount_base_width
         x_axis_endstop_mount_base_inward_extension:
