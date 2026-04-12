@@ -50,6 +50,8 @@ Builder:
 - Use the `Builder` section to describe visualization and production behavior instead of hard-coding export layout in Python
 - Use `assemblies.yaml` for globals, shared parameters, and high-level assembly composition
 - Treat the Python generator as geometry implementation, not as the primary assembly definition
+- Do not import another module from `src/mege_ender_3v3ke_idex/designs/assemblies/` inside an assembly generator in order to build a subassembly. That bypasses explicit builder dependencies, makes parameter flow harder to reason about, and can break cache invalidation.
+- If assembly A needs assembly B, give B its own `*_assembly.yaml`, declare B as a dependency of A in YAML, and consume the injected dependency object in A's generator. Keep shared low-level geometry in non-assembly helper modules when it truly needs to be reused outside the builder graph.
 
 When adding a new assembly, create both:
 - a generator in `src/mege_ender_3v3ke_idex/designs/assemblies/<name>.py`
@@ -162,6 +164,7 @@ For support tuning, interpret `support_threshold_angle` carefully: higher values
 - Do not create ad-hoc test scripts - write proper pytest tests
 - Do not introduce new standalone export-oriented geometry scripts when the work belongs in the builder-based assembly system
 - Do not duplicate assembly structure in Python when the same concern belongs in `*_assembly.yaml`
+- Do not import or call another assembly generator from inside an assembly generator; model that relationship in YAML dependencies and use the injected assembly instead
 
 ## Testing
 

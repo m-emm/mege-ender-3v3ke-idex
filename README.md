@@ -16,6 +16,8 @@ Status: work in progress—early infrastructure parts only; detailed content and
 ## Assembly Builder
 - Use `assembling/assemblies/assemblies.yaml` as the top-level builder entrypoint.
 - Prefer per-assembly `*_assembly.yaml` manifests over directly running the Python generator when the assembly already exists in the builder graph.
+- Do not import one assembly generator module from another module under `src/mege_ender_3v3ke_idex/designs/assemblies/` and call it inside the downstream generator. That hides dependencies from the builder and has already caused incorrect parameter passing and stale cache invalidation.
+- The correct pattern is: create a `*_assembly.yaml` for the reusable assembly, declare it as a dependency in the downstream assembly YAML, and consume the injected dependency in the downstream Python generator.
 - Production slicing runs can be launched directly from the CLI, including opening the slicer UI for inspection.
 
 Example production run for the print bed undercarriage adjustment wheel plate:
