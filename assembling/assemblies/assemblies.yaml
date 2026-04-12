@@ -773,10 +773,24 @@ process_data_presets:
       quality_factor: 0.4
     overrides:
       process_overrides:
+        sparse_infill_pattern: "cubic"
         support_interface_spacing: "0.8"
         support_on_build_plate_only: "1"
         support_threshold_angle: "30"
         support_top_z_distance: "0.3"
+  tpu_minimal_quality_minimal_strength_06:
+    generator: mege3devops_parametric
+    arguments:
+      material_name: esun_tpu_95a
+      nozzle_diameter_mm: 0.6
+      nozzle_hardened: true
+      nozzle_high_flow: true
+      strength_factor: 0.4
+      quality_factor: 0.0
+    overrides:
+      process_overrides:
+        brim_type: "no_brim"
+        sparse_infill_pattern: "cubic"
     
 
 assemblies:
