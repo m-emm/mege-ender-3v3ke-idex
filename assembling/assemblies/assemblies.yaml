@@ -774,11 +774,7 @@ process_data_presets:
     overrides:
       process_overrides:
         sparse_infill_pattern: "cubic"
-        support_interface_spacing: "0.8"
         support_object_first_layer_gap: "2.5"
-        support_on_build_plate_only: "1"
-        support_threshold_angle: "30"
-        support_top_z_distance: "0.3"
   tpu_minimal_quality_minimal_strength_06:
     generator: mege3devops_parametric
     arguments:

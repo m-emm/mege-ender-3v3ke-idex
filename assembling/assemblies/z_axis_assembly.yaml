@@ -97,12 +97,6 @@ Builder:
       overrides:
         process_overrides:
           enable_support: "1"
-          support_interface_spacing: "1.0"
-          support_object_first_layer_gap: 2.5
-          support_object_xy_distance: "3.0"
-          support_on_build_plate_only: "1"
-          support_threshold_angle: "25"
-          support_top_z_distance: "0.4"
           xy_contour_compensation: "0.0"
           xy_hole_compensation: "0.2"
 
