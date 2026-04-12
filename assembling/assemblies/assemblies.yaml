@@ -107,7 +107,7 @@ globals:
   x_axis_carriage_stopper_depth: 25
   x_axis_carriage_stopper_fillet_radius: 3
   x_axis_carriage_stopper_mount_screw_size: "M5"
-  x_axis_carriage_stopper_mount_screw_length: 12
+  x_axis_carriage_stopper_mount_screw_length: 10
   x_axis_endstop_mount_base_depth: 25
   x_axis_endstop_mount_base_thickness: 8
   x_axis_endstop_mount_base_fillet_radius: 3

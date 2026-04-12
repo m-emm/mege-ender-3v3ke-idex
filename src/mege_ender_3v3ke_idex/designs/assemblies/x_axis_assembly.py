@@ -927,6 +927,10 @@ def create_x_axis_assembly(
             f"x_axis_endstop_{side_name}",
         )
         retval.add_named_non_production_part(
+            endstop.get_non_production_part_by_name("mount_screw"),
+            f"endstop_mount_screw_{side_name}",
+        )
+        retval.add_named_non_production_part(
             endstop.get_non_production_part_by_name("board"),
             f"endstop_board_{side_name}",
         )
