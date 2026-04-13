@@ -38,6 +38,9 @@ def create_creality_endstop_holder_assembly(
     holder = align(holder, pcb, Alignment.CENTER)
     holder = align(holder, pcb, Alignment.TOP)
 
+    holder = align(holder, pcb, Alignment.BACK)
+    holder = translate(0, creality_endstop_holder_board_clearance, 0)(holder)
+
     pcb_cutter = create_box(
         pcb_size[0] + 2 * creality_endstop_holder_board_clearance,
         pcb_size[1] + 2 * creality_endstop_holder_board_clearance,

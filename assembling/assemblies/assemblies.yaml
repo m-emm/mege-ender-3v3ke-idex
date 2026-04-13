@@ -156,7 +156,7 @@ globals:
   creality_endstop_holder_sink: 0.9
   creality_endstop_holder_length_oversize: 4
   creality_endstop_holder_width_oversize: 3.5
-  creality_endstop_holder_board_clearance: 1.5
+  creality_endstop_holder_board_clearance: 1.1
   creality_endstop_holder_screw_size: "M3"
   creality_endstop_holder_nut_cutter_slack: 0.2
   endstop_holder_stack_gap: 30

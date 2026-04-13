@@ -9,9 +9,9 @@ Usage:
 import copy
 import logging
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 from mege_3devops.process_data.mender3.process_data_04_high_speed import (
     PROCESS_DATA_TPU_04_HS,
