@@ -152,8 +152,9 @@ globals:
   endstop_holder_mount_plate_width: 8
   endstop_holder_mount_screw_size: "M3"
   endstop_holder_mount_screw_length: 14
-  creality_endstop_holder_thickness: 6.0
-  creality_endstop_holder_sink: 0.9
+  creality_endstop_holder_thickness: 7.0
+  creality_endstop_holder_bottom_clearance: 2.1
+  creality_endstop_holder_sink: 0.5
   creality_endstop_holder_length_oversize: 4
   creality_endstop_holder_width_oversize: 3.5
   creality_endstop_holder_board_clearance: 1.1
@@ -581,7 +582,7 @@ placement:
       post_translation:
         - 0
         - 0
-        - $ref: print_bed_vertical_gap_to_frame    
+        - $ref: print_bed_vertical_gap_to_frame
     - part: y_axis_assembly
       to: printer_frame_assembly
       alignment: CENTER
@@ -916,6 +917,7 @@ assemblies:
       up: !Ref y_axis_endstop_up
       out: !Ref y_axis_endstop_out
       creality_endstop_holder_thickness: !Ref creality_endstop_holder_thickness
+      creality_endstop_holder_bottom_clearance: !Ref creality_endstop_holder_bottom_clearance
       creality_endstop_holder_sink: !Ref creality_endstop_holder_sink
       creality_endstop_holder_length_oversize: !Ref creality_endstop_holder_length_oversize
       creality_endstop_holder_width_oversize: !Ref creality_endstop_holder_width_oversize

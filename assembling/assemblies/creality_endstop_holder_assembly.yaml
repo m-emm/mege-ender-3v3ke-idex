@@ -31,6 +31,9 @@ Parameters:
     Type: Vector
   creality_endstop_holder_thickness:
     Type: Float
+  creality_endstop_holder_bottom_clearance:
+    Type: Float
+
   creality_endstop_holder_sink:
     Type: Float
   creality_endstop_holder_length_oversize:
@@ -57,6 +60,8 @@ Parts:
           $ref: out
         creality_endstop_holder_thickness:
           $ref: creality_endstop_holder_thickness
+        creality_endstop_holder_bottom_clearance:
+          $ref: creality_endstop_holder_bottom_clearance
         creality_endstop_holder_sink:
           $ref: creality_endstop_holder_sink
         creality_endstop_holder_length_oversize:

@@ -14,6 +14,7 @@ def create_creality_endstop_holder_assembly(
     creality_endstop_board_assembly,
     creality_endstop_holder_board_clearance,
     creality_endstop_holder_thickness,
+    creality_endstop_holder_bottom_clearance,
     creality_endstop_holder_sink,
     creality_endstop_holder_length_oversize,
     creality_endstop_holder_width_oversize,
@@ -39,15 +40,20 @@ def create_creality_endstop_holder_assembly(
     holder = align(holder, pcb, Alignment.TOP)
 
     holder = align(holder, pcb, Alignment.BACK)
-    holder = translate(0, creality_endstop_holder_board_clearance, 0)(holder)
+    holder = translate(
+        0, creality_endstop_holder_board_clearance, creality_endstop_holder_sink
+    )(holder)
 
     pcb_cutter = create_box(
         pcb_size[0] + 2 * creality_endstop_holder_board_clearance,
         pcb_size[1] + 2 * creality_endstop_holder_board_clearance,
-        pcb_size[2] + creality_endstop_holder_sink,
+        pcb_size[2]
+        + creality_endstop_holder_bottom_clearance
+        + creality_endstop_holder_sink,
     )
     pcb_cutter = align(pcb_cutter, pcb, Alignment.CENTER)
     pcb_cutter = align(pcb_cutter, pcb, Alignment.TOP)
+    pcb_cutter = translate(0, 0, creality_endstop_holder_sink)(pcb_cutter)
     holder = holder.cut(pcb_cutter)
 
     spacers = PartCollector()
@@ -55,20 +61,34 @@ def create_creality_endstop_holder_assembly(
     for cutter in board.cutters:
         cutter_size = get_bounding_box_size(cutter)
         spacer_width = cutter_size[0] * 1.5
-        spacer_length = 2 * cutter_size[1]
-        spacer_thickness = creality_endstop_holder_thickness - pcb_size[2]
 
-        fillet_radius = min(spacer_width, spacer_length, spacer_thickness) / 4
-        spacer = create_filleted_box(
-            spacer_width,
-            spacer_length,
-            spacer_thickness,
-            fillet_radius=fillet_radius,
-            no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+        spacer_length = 2 * cutter_size[1]
+
+        spacer_thickness = (
+            creality_endstop_holder_thickness
+            - pcb_size[2]
+            - creality_endstop_holder_sink
         )
-        spacer = align(spacer, cutter, Alignment.CENTER)
-        spacer = align(spacer, pcb, Alignment.FRONT)
-        spacer = align(spacer, holder, Alignment.BOTTOM)
+        fillet_radius = min(spacer_width, spacer_length) / 4
+
+        spacer = PartCollector()
+        for spacer_alignment in [Alignment.FRONT, Alignment.BACK]:
+            effective_spacer_length = spacer_length
+
+            if spacer_alignment == Alignment.BACK:
+                effective_spacer_length = spacer_length / 2
+
+            spacer_part = create_filleted_box(
+                spacer_width,
+                effective_spacer_length,
+                spacer_thickness,
+                fillet_radius=fillet_radius,
+                no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+            )
+            spacer_part = align(spacer_part, cutter, Alignment.CENTER)
+            spacer_part = align(spacer_part, pcb, spacer_alignment)
+            spacer_part = align(spacer_part, holder, Alignment.BOTTOM)
+            spacer = spacer.fuse(spacer_part)
 
         screw_hole_drill = create_cylinder(
             MScrew.from_size(creality_endstop_holder_screw_size).clearance_hole_loose

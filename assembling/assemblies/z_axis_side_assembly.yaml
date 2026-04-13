@@ -29,7 +29,6 @@ Builder:
           - frame_profile_right
         name_template: "{name}"
 
-
   Production:
     parts:
       - source: self

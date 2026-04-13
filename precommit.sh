@@ -5,6 +5,7 @@ isort  $(find src -name '*.py' )  ; black  $(find src  -name '*.py' )
 
 # # Format workflow files
 # npx prettier --write  .github/workflows/*.yml
+npx prettier --write  assembling/assemblies/*.yaml
 
 # Run linting (same as GitHub Actions)
 echo "Running flake8 linting (syntax errors and undefined names only)..."
