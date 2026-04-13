@@ -603,6 +603,14 @@ def _create_single_tool_head_mount(
     tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
     tool_head_mount.add_named_follower(clamp.leader, "belt_clamp_base")
     tool_head_mount.add_named_follower(
+        clamp.get_follower_part_by_name("clamp_1"),
+        "clamp_1",
+    )
+    tool_head_mount.add_named_follower(
+        clamp.get_follower_part_by_name("clamp_2"),
+        "clamp_2",
+    )
+    tool_head_mount.add_named_follower(
         clamp.get_follower_part_by_name("belt_clamp_base_1"),
         "belt_clamp_base_1",
     )
