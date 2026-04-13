@@ -29,6 +29,7 @@ def create_creality_endstop_holder_assembly(
     board = copy.deepcopy(creality_endstop_board_assembly)
 
     pcb = board.get_named_follower("base")
+    plug = board.get_named_follower("plug")
     pcb_size = get_bounding_box_size(pcb)
 
     holder = create_box(
@@ -111,6 +112,16 @@ def create_creality_endstop_holder_assembly(
         spacers = spacers.fuse(spacer)
 
     holder = holder.fuse(spacers)
+
+    plug_cutter = materialize_bounding_box(
+        plug,
+        x_enlargement=creality_endstop_holder_board_clearance,
+        y_enlargement=creality_endstop_holder_board_clearance,
+        z_enlargement=creality_endstop_holder_board_clearance,
+    )
+
+    holder = holder.cut(plug_cutter)
+
     assembly = LeaderFollowersCuttersPart(holder)
     assembly.add_named_follower(holder, "holder")
     for name, non_production_part in board.get_named_non_production_part_items():

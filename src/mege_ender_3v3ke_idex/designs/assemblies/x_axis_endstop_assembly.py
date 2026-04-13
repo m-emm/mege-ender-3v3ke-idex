@@ -8,7 +8,7 @@ from shellforgepy.simple import *
 def _create_groove_holder(
     *,
     screw_size,
-    endstop_holder_mount_plate_width,
+    endstop_holder_groove_holder_length,
     endstop_holder_groove_holder_bottom_width,
     endstop_holder_groove_holder_top_width,
     endstop_holder_groove_holder_height,
@@ -24,8 +24,8 @@ def _create_groove_holder(
     groove_holder = create_pyramid_stump(
         endstop_holder_groove_holder_bottom_width,
         endstop_holder_groove_holder_top_width,
-        endstop_holder_mount_plate_width,
-        endstop_holder_mount_plate_width,
+        endstop_holder_groove_holder_length,
+        endstop_holder_groove_holder_length,
         endstop_holder_groove_holder_height,
     )
 
@@ -77,7 +77,7 @@ def create_x_axis_endstop_assembly(
     x_axis_endstop_mount_base_inward_extension,
     endstop_holder_mount_screw_size,
     endstop_holder_mount_screw_length,
-    endstop_holder_mount_plate_width,
+    endstop_holder_groove_holder_length,
     endstop_holder_groove_holder_bottom_width,
     endstop_holder_groove_holder_top_width,
     endstop_holder_groove_holder_height,
@@ -123,7 +123,7 @@ def create_x_axis_endstop_assembly(
 
     groove_holder = _create_groove_holder(
         screw_size=endstop_holder_mount_screw_size,
-        endstop_holder_mount_plate_width=endstop_holder_mount_plate_width,
+        endstop_holder_groove_holder_length=endstop_holder_groove_holder_length,
         endstop_holder_groove_holder_bottom_width=endstop_holder_groove_holder_bottom_width,
         endstop_holder_groove_holder_top_width=endstop_holder_groove_holder_top_width,
         endstop_holder_groove_holder_height=endstop_holder_groove_holder_height,

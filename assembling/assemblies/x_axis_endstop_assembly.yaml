@@ -40,7 +40,7 @@ Parameters:
     Type: String
   endstop_holder_mount_screw_length:
     Type: Float
-  endstop_holder_mount_plate_width:
+  endstop_holder_groove_holder_length:
     Type: Float
   endstop_holder_groove_holder_bottom_width:
     Type: Float
@@ -72,8 +72,8 @@ Parts:
           $ref: endstop_holder_mount_screw_size
         endstop_holder_mount_screw_length:
           $ref: endstop_holder_mount_screw_length
-        endstop_holder_mount_plate_width:
-          $ref: endstop_holder_mount_plate_width
+        endstop_holder_groove_holder_length:
+          $ref: endstop_holder_groove_holder_length
         endstop_holder_groove_holder_bottom_width:
           $ref: endstop_holder_groove_holder_bottom_width
         endstop_holder_groove_holder_top_width:

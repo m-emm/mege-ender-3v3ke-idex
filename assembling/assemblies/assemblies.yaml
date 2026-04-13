@@ -149,7 +149,7 @@ globals:
   endstop_holder_groove_holder_height: 5
   endstop_holder_groove_holder_slit: 1.5
   endstop_holder_groove_holder_top_width: 6.0
-  endstop_holder_mount_plate_width: 8
+  endstop_holder_groove_holder_length: 12
   endstop_holder_mount_screw_size: "M3"
   endstop_holder_mount_screw_length: 14
   creality_endstop_holder_thickness: 7.0
@@ -1020,7 +1020,7 @@ assemblies:
       x_axis_endstop_mount_base_inward_extension: !Ref x_axis_endstop_mount_base_inward_extension
       endstop_holder_mount_screw_size: !Ref endstop_holder_mount_screw_size
       endstop_holder_mount_screw_length: !Ref endstop_holder_mount_screw_length
-      endstop_holder_mount_plate_width: !Ref endstop_holder_mount_plate_width
+      endstop_holder_groove_holder_length: !Ref endstop_holder_groove_holder_length
       endstop_holder_groove_holder_bottom_width: !Ref endstop_holder_groove_holder_bottom_width
       endstop_holder_groove_holder_top_width: !Ref endstop_holder_groove_holder_top_width
       endstop_holder_groove_holder_height: !Ref endstop_holder_groove_holder_height
@@ -1043,7 +1043,7 @@ assemblies:
       x_axis_endstop_mount_base_inward_extension: !Ref x_axis_endstop_mount_base_inward_extension
       endstop_holder_mount_screw_size: !Ref endstop_holder_mount_screw_size
       endstop_holder_mount_screw_length: !Ref endstop_holder_mount_screw_length
-      endstop_holder_mount_plate_width: !Ref endstop_holder_mount_plate_width
+      endstop_holder_groove_holder_length: !Ref endstop_holder_groove_holder_length
       endstop_holder_groove_holder_bottom_width: !Ref endstop_holder_groove_holder_bottom_width
       endstop_holder_groove_holder_top_width: !Ref endstop_holder_groove_holder_top_width
       endstop_holder_groove_holder_height: !Ref endstop_holder_groove_holder_height
