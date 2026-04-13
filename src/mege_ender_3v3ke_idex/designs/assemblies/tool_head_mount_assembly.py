@@ -621,6 +621,11 @@ def _create_single_tool_head_mount(
     tool_head_mount.add_named_follower(carriage, "carriage")
     tool_head_mount.add_named_non_production_part(rail_plus_carriage.leader, "rail")
     tool_head_mount = tool_head_mount.merge_except_leader(mount_sprite_extruder)
+    if "nitehawk_holder" not in tool_head_mount.non_production_indices_by_name:
+        tool_head_mount.add_named_non_production_part(
+            mount_sprite_extruder.leader,
+            "nitehawk_holder",
+        )
     if "sprite_extruder" not in tool_head_mount.non_production_indices_by_name:
         tool_head_mount.add_named_non_production_part(
             mount_sprite_extruder.leader,

@@ -10,6 +10,8 @@ Builder:
         name: part_fans
       - source: self
         artifact: followers
+        names:
+          - blower_ducts
         name_template: "{name}"
   Production:
     process_data:

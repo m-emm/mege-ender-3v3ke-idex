@@ -10,6 +10,8 @@ Builder:
         name: tool_head
       - source: self
         artifact: followers
+        names:
+          - blower_ducts
         name_template: "{name}"
       - source: self
         artifact: non_production_parts
