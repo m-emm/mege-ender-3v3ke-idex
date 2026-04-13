@@ -330,8 +330,6 @@ Builder:
         artifact: followers
         names:
           - blower_ducts
-          - clamp_1
-          - clamp_2
           - belt_clamp_base_1
           - belt_clamp_base_2
         name_template: "tool_head_mount_bottom_{name}"
@@ -380,8 +378,6 @@ Builder:
         artifact: followers
         names:
           - blower_ducts
-          - clamp_1
-          - clamp_2
           - belt_clamp_base_1
           - belt_clamp_base_2
         name_template: "tool_head_mount_top_{name}"

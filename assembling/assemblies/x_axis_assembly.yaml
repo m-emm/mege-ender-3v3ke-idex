@@ -53,10 +53,16 @@ Builder:
       - source: self
         artifact: followers
         names:
-          - x_axis_idler_endcap_top_right
           - x_axis_idler_endcap_top_right_cage
         name_template: "{name}"
         prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        names:
+          - x_axis_idler_endcap_top_right
+        name_template: "{name}"
+        prod_rotation_angle: 0
         prod_rotation_axis: [0, 1, 0]
       - source: self
         artifact: followers
@@ -69,6 +75,12 @@ Builder:
         artifact: followers
         names:
           - x_axis_idler_endcap_bottom_right
+        name_template: "{name}"
+        prod_rotation_angle: 0
+        prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        names:
           - x_axis_idler_endcap_bottom_right_cage
         name_template: "{name}"
         prod_rotation_angle: 90
@@ -130,7 +142,8 @@ Builder:
               process_overrides:
                 xy_contour_compensation: "0.0"
                 xy_hole_compensation: "0.2"
-                #support_type: tree(auto)
+                support_type: tree(auto)
+                enable_support: "1"
           parts:
             - axis_holding_counter_flange_bottom
             - mount_plate_bottom
@@ -144,7 +157,9 @@ Builder:
               process_overrides:
                 xy_contour_compensation: "0.0"
                 xy_hole_compensation: "0.2"
-                #support_type: tree(auto)
+                support_type: tree(auto)
+                enable_support: "1"
+
           parts:
             - axis_holding_counter_flange_top
             - mount_plate_top

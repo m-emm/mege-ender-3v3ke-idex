@@ -12,8 +12,6 @@ Builder:
         artifact: followers
         names:
           - blower_ducts
-          - clamp_1
-          - clamp_2
           - belt_clamp_base_1
           - belt_clamp_base_2
           - carriage
