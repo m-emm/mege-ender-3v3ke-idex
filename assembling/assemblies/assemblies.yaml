@@ -129,13 +129,13 @@ globals:
   endcap_mount_fillet_radius: 2
   endcap_mount_screw_size: "M5"
   endcap_outer_box_back_wall: 4
-  endcap_profile_clearance: 0.2
+  endcap_profile_clearance: 0.4
   endcap_profile_groove_depth: 8
   endcap_profile_overlap: 15
   endcap_side_hole_boundary: 5
   endcap_side_hole_size: 4
   endcap_tensioner_cage_back_wall: 8
-  endcap_tensioner_cage_clearance: 0.3
+  endcap_tensioner_cage_clearance: 0.6
   endcap_tensioner_length: 16
   endcap_tensioner_outer_box_bottom_cage_clearance: 0.8
   endcap_tensioner_outer_box_bottom_thickness: 1
