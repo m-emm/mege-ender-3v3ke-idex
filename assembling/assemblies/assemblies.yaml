@@ -788,8 +788,6 @@ process_data_presets:
       process_overrides:
         sparse_infill_pattern: "cubic"
         support_object_first_layer_gap: "2.5"
-        xy_contour_compensation: "-0.5"
-        xy_hole_compensation: "0.2"
 
   petgcf_medium_strength_max_quality_06:
     generator: mege3devops_parametric
