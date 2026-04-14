@@ -619,6 +619,7 @@ def create_x_axis_assembly(
             if (
                 not non_production_part_name
                 or non_production_part_name == "axis_holding_counter_flange"
+                or non_production_part_name == "profile_to_align"
             ):
                 continue
             non_production_parts.append(non_production_part)

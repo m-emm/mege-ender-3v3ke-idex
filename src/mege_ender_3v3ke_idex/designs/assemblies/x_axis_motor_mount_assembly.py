@@ -17,6 +17,7 @@ def create_idlers_for_motor(
 
     idler_axle_cutters = []
     idler_nut_cutters = []
+    idlers_list = []
     for idler_alignment in (Alignment.LEFT, Alignment.RIGHT):
         idler = create_gt2_idler(num_teeth=16)
 
@@ -34,6 +35,7 @@ def create_idlers_for_motor(
             stack_gap=motor_idler_profile_gap,
         )
         idlers = idlers.fuse(idler)
+        idlers_list.append(idler)
 
         idler_axle_cutter = create_cylinder(
             idler_mount_axle_diameter / 2 + idler_mount_axle_clearance,
@@ -57,6 +59,8 @@ def create_idlers_for_motor(
         retval.add_named_cutter(idler_axle_cutter, f"idler_axle_cutter_{i}")
     for i, idler_nut_cutter in enumerate(idler_nut_cutters):
         retval.add_named_cutter(idler_nut_cutter, f"idler_nut_cutter_{i}")
+    for i, idler in enumerate(idlers_list):
+        retval.add_named_follower(idler, f"idler_{i}")
 
     return retval
 
@@ -95,8 +99,7 @@ def _project_center_onto_profile_length_mm(profile_to_align, marker_part) -> flo
 
 def create_x_axis_motor_mount_assembly(
     *,
-    x_axis_lower_profile,
-    x_axis_top_profile,
+    profile_to_align,
     profile_position,
 ) -> LeaderFollowersCuttersPart:
     """Build one motor + mount assembly for the bottom or top x-axis profile."""
@@ -108,13 +111,7 @@ def create_x_axis_motor_mount_assembly(
     }
     horizontal_side = horizontal_side_map[vertical_alignment]
 
-    lower_axis_profile = _get_leader_part(x_axis_lower_profile)
-    top_axis_profile = _get_leader_part(x_axis_top_profile)
-    profile_to_align = (
-        lower_axis_profile
-        if vertical_alignment == Alignment.BOTTOM
-        else top_axis_profile
-    )
+    profile_to_align = _get_leader_part(profile_to_align)
 
     idlers_assembly = create_idlers_for_motor(
         profile_to_align=profile_to_align,
@@ -131,6 +128,10 @@ def create_x_axis_motor_mount_assembly(
     idler_nut_cutters = [
         idlers_assembly.get_cutter_part_by_name(f"idler_nut_cutter_{i}")
         for i in range(2)
+    ]
+
+    idler_parts = [
+        idlers_assembly.get_follower_part_by_name(f"idler_{i}") for i in range(2)
     ]
 
     pulley = create_gt2_pulley(num_teeth=20, belt_width=6)
@@ -259,24 +260,46 @@ def create_x_axis_motor_mount_assembly(
     )
     motor_bridge = motor_bridge.fuse(motor_bridge_front_bevel)
 
-    # cone_height = 50
-    # cones = PartCollector()
-    # for axle_cutter in idler_axle_cutters:
-    #     axle_cone = create_cone(
-    #         r1=idler_mount_axle_diameter / 2 + idler_mount_axle_clearance + cone_height,
-    #         r2=idler_mount_axle_diameter / 2 + idler_mount_axle_clearance,
-    #         height=cone_height,
-    #     )
-    #     axle_cone = align(axle_cone, axle_cutter, Alignment.CENTER)
-    #     axle_cone = align(axle_cone, mount_plate, Alignment.STACK_TOP)
+    cone_height = 4
+    cones = PartCollector()
+    top_cones = PartCollector()
 
-    #     axle_cone = axle_cone.cut(axle_cutter)
-    #     cones = cones.fuse(axle_cone)
+    for idler_part in idler_parts:
+        axle_cone = create_cone(
+            radius1=idler_mount_axle_diameter / 2
+            + 2 * idler_mount_axle_clearance
+            + cone_height,
+            radius2=idler_mount_axle_diameter / 2 + 2 * idler_mount_axle_clearance,
+            height=cone_height,
+        )
+        axle_cone = rotate(90 - 90 * vertical_alignment.sign, axis=(1, 0, 0))(axle_cone)
 
-    #     mount_plate = mount_plate.cut(axle_cutter)
-    #     motor_bridge = motor_bridge.cut(axle_cutter)
+        axle_cone = align(axle_cone, idler_part, Alignment.CENTER)
+        axle_cone = align(
+            axle_cone,
+            idler_part,
+            vertical_alignment.opposite.stack_alignment,
+            stack_gap=idler_mount_axle_clearance,
+        )
+        cones = cones.fuse(axle_cone)
 
-    # mount_plate = mount_plate.fuse(cones)
+        axle_cone_top = rotate(180, axis=(1, 0, 0))(axle_cone)
+        axle_cone_top = align(
+            axle_cone_top,
+            idler_part,
+            vertical_alignment.stack_alignment,
+            stack_gap=idler_mount_axle_clearance,
+        )
+        top_cones = top_cones.fuse(axle_cone_top)
+
+    for axle_cutter in idler_axle_cutters:
+
+        cones = cones.cut(axle_cutter)
+        top_cones = top_cones.cut(axle_cutter)
+        mount_plate = mount_plate.cut(axle_cutter)
+        motor_bridge = motor_bridge.cut(axle_cutter)
+
+    mount_plate = mount_plate.fuse(cones)
 
     for nut_cutter in idler_nut_cutters:
         nut_cutter_aligned = align(
@@ -436,6 +459,14 @@ def create_x_axis_motor_mount_assembly(
         nut_pocket_cutters.append(nut_cutter)
         mount_flange = nut_cutter.use_as_cutter_on(mount_flange)
 
+    idler_axle_cutters_fused = reduce(
+        lambda acc, cutter: acc.fuse(cutter),
+        idler_axle_cutters,
+        PartCollector(),
+    )
+    top_cones = align(top_cones, idler_axle_cutters_fused, Alignment.CENTER, axes=[1])
+    top_cones = top_cones.cut(idler_axle_cutters_fused)
+
     for idler_axle_cutter in idler_axle_cutters:
         mount_flange = mount_flange.cut(idler_axle_cutter)
 
@@ -482,6 +513,8 @@ def create_x_axis_motor_mount_assembly(
         mount_flange_bevel_flange_side = nut_cutter.use_as_cutter_on(
             mount_flange_bevel_flange_side
         )
+
+    mount_flange = mount_flange.fuse(top_cones)
 
     mount_flange = mount_flange.fuse(mount_flange_bevel_flange_side)
 
@@ -634,5 +667,9 @@ def create_x_axis_motor_mount_assembly(
             motor.get_non_production_part_by_name(non_production_part_name),
             non_production_part_name,
         )
+    retval.add_named_non_production_part(
+        profile_to_align.copy(),
+        "profile_to_align",
+    )
 
     return retval

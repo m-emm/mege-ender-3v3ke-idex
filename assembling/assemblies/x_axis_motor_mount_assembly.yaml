@@ -5,14 +5,6 @@ Description: Assembly configuration for one standalone x-axis motor mount
 Builder:
   Visualization:
     parts:
-      - source: dependencies
-        assembly: x_axis_lower_profile_assembly
-        artifact: leader
-        name: x_axis_lower_profile
-      - source: dependencies
-        assembly: x_axis_top_profile_assembly
-        artifact: leader
-        name: x_axis_top_profile
       - source: self
         artifact: followers
         name_template: "{name}"

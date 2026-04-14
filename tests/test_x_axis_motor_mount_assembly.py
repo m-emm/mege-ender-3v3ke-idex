@@ -24,11 +24,14 @@ def _build_profiles():
 
 def test_x_axis_motor_mount_assembly_exposes_expected_parts_for_top_and_bottom():
     lower, top = _build_profiles()
+    profiles_by_position = {
+        "bottom": lower,
+        "top": top,
+    }
 
     for profile_position in ("bottom", "top"):
         assembly = create_x_axis_motor_mount_assembly(
-            x_axis_lower_profile=lower,
-            x_axis_top_profile=top,
+            profile_to_align=profiles_by_position[profile_position],
             profile_position=profile_position,
         )
 
@@ -44,3 +47,4 @@ def test_x_axis_motor_mount_assembly_exposes_expected_parts_for_top_and_bottom()
         assembly.get_non_production_part_by_name("axle")
         assembly.get_non_production_part_by_name("idlers")
         assembly.get_non_production_part_by_name("motor_visual")
+        assembly.get_non_production_part_by_name("profile_to_align")

@@ -687,6 +687,13 @@ placement:
       stack_gap:
         $ref: endstop_holder_stack_gap
 
+    - part: x_axis_motor_mount_bottom_assembly.non_production_parts.profile_to_align
+      to: x_axis_lower_profile_assembly
+      alignment: CENTER
+    - part: x_axis_motor_mount_top_assembly.non_production_parts.profile_to_align
+      to: x_axis_top_profile_assembly
+      alignment: CENTER
+
     - part: left_z_axis_profile_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left
       alignment: CENTER
@@ -1019,10 +1026,8 @@ assemblies:
     resource_file: x_axis_motor_mount_assembly.yaml
     depends_on:
       - x_axis_lower_profile_assembly
-      - x_axis_top_profile_assembly
     inject_parts:
-      x_axis_lower_profile: x_axis_lower_profile_assembly
-      x_axis_top_profile: x_axis_top_profile_assembly
+      profile_to_align: x_axis_lower_profile_assembly
     parameters:
       profile_position: bottom
 
@@ -1030,11 +1035,9 @@ assemblies:
 
     resource_file: x_axis_motor_mount_assembly.yaml
     depends_on:
-      - x_axis_lower_profile_assembly
       - x_axis_top_profile_assembly
     inject_parts:
-      x_axis_lower_profile: x_axis_lower_profile_assembly
-      x_axis_top_profile: x_axis_top_profile_assembly
+      profile_to_align: x_axis_top_profile_assembly
     parameters:
       profile_position: top
 
