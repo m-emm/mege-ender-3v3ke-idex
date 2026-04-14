@@ -5,7 +5,6 @@ import copy
 import numpy as np
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idler_cage import create_idler_cage
-from mege_ender_3v3ke_idex.designs.motor_mount import create_motor_stack
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_screw_mount_assembly,
 )
@@ -561,6 +560,8 @@ def create_x_axis_assembly(
     idler_cage_wall,
     x_axis_lower_profile,
     x_axis_top_profile,
+    x_axis_motor_mount_bottom,
+    x_axis_motor_mount_top,
     x_axis_rail,
     x_axis_endstop_left,
     x_axis_endstop_right,
@@ -597,14 +598,14 @@ def create_x_axis_assembly(
         "lower_axis_profile",
         "top_axis_profile",
     ]
+    motor_assemblies_by_profile_position = {
+        Alignment.BOTTOM: x_axis_motor_mount_bottom,
+        Alignment.TOP: x_axis_motor_mount_top,
+    }
 
     for profile_position in (Alignment.BOTTOM, Alignment.TOP):
         profile_position_name = profile_position.name.lower()
-        motor_assembly = create_motor_stack(
-            profile_position,
-            lower_axis_profile,
-            top_axis_profile,
-        )
+        motor_assembly = motor_assemblies_by_profile_position[profile_position]
 
         motor_followers_fused = PartCollector()
         for follower in motor_assembly.followers:

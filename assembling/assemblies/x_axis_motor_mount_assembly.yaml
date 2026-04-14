@@ -1,0 +1,45 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for one standalone x-axis motor mount
+
+Builder:
+  Visualization:
+    parts:
+      - source: dependencies
+        assembly: x_axis_lower_profile_assembly
+        artifact: leader
+        name: x_axis_lower_profile
+      - source: dependencies
+        assembly: x_axis_top_profile_assembly
+        artifact: leader
+        name: x_axis_top_profile
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+  Production:
+    parts:
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        names:
+          - axis_holding_counter_flange
+        name_template: "{name}"
+
+Parameters:
+  profile_position:
+    Type: String
+
+Parts:
+  XAxisMotorMountAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_motor_mount_assembly.create_x_axis_motor_mount_assembly
+      Properties:
+        profile_position:
+          $ref: profile_position

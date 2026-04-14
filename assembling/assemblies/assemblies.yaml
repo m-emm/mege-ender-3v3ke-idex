@@ -788,6 +788,8 @@ process_data_presets:
       process_overrides:
         sparse_infill_pattern: "cubic"
         support_object_first_layer_gap: "2.5"
+        xy_contour_compensation: "-0.3" # This is a carefully calibrated value, measured at 2026-04-14 using  assembling/assemblies/calibration_assembly.yaml for the petgcf_medium_strength_high_speed_06 preset
+        xy_hole_compensation: "0.4" # This is a carefully calibrated value, measured at 2026-04-14 using  assembling/assemblies/calibration_assembly.yaml for the petgcf_medium_strength_high_speed_06 preset
 
   petgcf_medium_strength_max_quality_06:
     generator: mege3devops_parametric
@@ -948,6 +950,8 @@ assemblies:
       - x_axis_carriage_stopper_right_assembly
       - x_axis_lower_profile_assembly
       - x_axis_top_profile_assembly
+      - x_axis_motor_mount_bottom_assembly
+      - x_axis_motor_mount_top_assembly
       - x_axis_rail_assembly
       - x_axis_endstop_left_assembly
       - x_axis_endstop_right_assembly
@@ -956,6 +960,8 @@ assemblies:
       x_axis_carriage_stopper_right: x_axis_carriage_stopper_right_assembly
       x_axis_lower_profile: x_axis_lower_profile_assembly
       x_axis_top_profile: x_axis_top_profile_assembly
+      x_axis_motor_mount_bottom: x_axis_motor_mount_bottom_assembly
+      x_axis_motor_mount_top: x_axis_motor_mount_top_assembly
       x_axis_rail: x_axis_rail_assembly
       x_axis_endstop_left: x_axis_endstop_left_assembly
       x_axis_endstop_right: x_axis_endstop_right_assembly
@@ -1007,6 +1013,30 @@ assemblies:
       profile_name: x_axis_top_profile
       x_axis_profile_length: !Ref x_axis_profile_length
       profile_z_offset: !Ref x_axis_profile_pitch
+
+  - name: x_axis_motor_mount_bottom_assembly
+
+    resource_file: x_axis_motor_mount_assembly.yaml
+    depends_on:
+      - x_axis_lower_profile_assembly
+      - x_axis_top_profile_assembly
+    inject_parts:
+      x_axis_lower_profile: x_axis_lower_profile_assembly
+      x_axis_top_profile: x_axis_top_profile_assembly
+    parameters:
+      profile_position: bottom
+
+  - name: x_axis_motor_mount_top_assembly
+
+    resource_file: x_axis_motor_mount_assembly.yaml
+    depends_on:
+      - x_axis_lower_profile_assembly
+      - x_axis_top_profile_assembly
+    inject_parts:
+      x_axis_lower_profile: x_axis_lower_profile_assembly
+      x_axis_top_profile: x_axis_top_profile_assembly
+    parameters:
+      profile_position: top
 
   - name: x_axis_rail_assembly
 

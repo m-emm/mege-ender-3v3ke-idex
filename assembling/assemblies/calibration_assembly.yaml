@@ -24,8 +24,6 @@ Builder:
             overrides:
               process_overrides:
                 enable_support: "0"
-                xy_contour_compensation: "-0.3"
-                xy_hole_compensation: "0.4"
 
           parts:
             - calibration_assembly_leader

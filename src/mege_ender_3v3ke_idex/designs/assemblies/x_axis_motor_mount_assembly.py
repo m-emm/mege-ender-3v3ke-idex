@@ -1,51 +1,23 @@
-"""
-Motor Mount
+"""Declarative x-axis motor mount assembly."""
 
-Usage:
-    cd <project_root> && ./run.sh path/to/motor_mount.py
-    # or with production mode:
-    cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/motor_mount.py
-"""
-
-import logging
-import os
 from functools import reduce
 
-from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
-    ExtrusionProfileType,
-    create_alu_extrusion_profile,
-)
+from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import ExtrusionProfileType
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler, create_gt2_pulley
 from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.metrics import record_mark_metric
 from shellforgepy.simple import *
 
-_logger = logging.getLogger(__name__)
-
-# Production mode from environment variable
-PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
-
-# Optional slicer process overrides
-PROCESS_DATA = {
-    "filament": "FilamentPLAMegeMaster",
-    "process_overrides": {
-        "nozzle_diameter": "0.6",
-        "layer_height": "0.2",
-    },
-}
-
 
 def create_idlers_for_motor(
     profile_to_align,
 ) -> LeaderFollowersCuttersPart:
-
     idlers = PartCollector()
 
     idler_axle_cutters = []
     idler_nut_cutters = []
     for idler_alignment in (Alignment.LEFT, Alignment.RIGHT):
-
         idler = create_gt2_idler(num_teeth=16)
 
         idler = align(
@@ -64,7 +36,8 @@ def create_idlers_for_motor(
         idlers = idlers.fuse(idler)
 
         idler_axle_cutter = create_cylinder(
-            idler_mount_axle_diameter / 2 + idler_mount_axle_clearance, 100
+            idler_mount_axle_diameter / 2 + idler_mount_axle_clearance,
+            100,
         )
         idler_axle_cutter = align(idler_axle_cutter, idler, Alignment.CENTER)
 
@@ -88,6 +61,29 @@ def create_idlers_for_motor(
     return retval
 
 
+def _get_leader_part(part_like):
+    return part_like.leader if hasattr(part_like, "leader") else part_like
+
+
+def _normalize_profile_position(profile_position):
+    if isinstance(profile_position, Alignment):
+        if profile_position in (Alignment.BOTTOM, Alignment.TOP):
+            return profile_position
+        raise ValueError(
+            "profile_position must be Alignment.TOP or Alignment.BOTTOM, "
+            f"got {profile_position!r}"
+        )
+
+    normalized = str(profile_position).strip().lower()
+    if normalized == "bottom":
+        return Alignment.BOTTOM
+    if normalized == "top":
+        return Alignment.TOP
+    raise ValueError(
+        f"Unsupported x-axis motor mount profile position '{profile_position}'"
+    )
+
+
 def _project_center_onto_profile_length_mm(profile_to_align, marker_part) -> float:
     profile_bbox = get_bounding_box(profile_to_align)
     profile_size = get_bounding_box_size(profile_to_align)
@@ -97,20 +93,27 @@ def _project_center_onto_profile_length_mm(profile_to_align, marker_part) -> flo
     return marker_center[profile_length_axis] - profile_bbox[0][profile_length_axis]
 
 
-def create_motor_stack(
-    profile_position, lower_axis_profile, top_axis_profile
+def create_x_axis_motor_mount_assembly(
+    *,
+    x_axis_lower_profile,
+    x_axis_top_profile,
+    profile_position,
 ) -> LeaderFollowersCuttersPart:
     """Build one motor + mount assembly for the bottom or top x-axis profile."""
 
+    vertical_alignment = _normalize_profile_position(profile_position)
     horizontal_side_map = {
         Alignment.BOTTOM: Alignment.LEFT,
         Alignment.TOP: Alignment.RIGHT,
     }
-    horizontal_side = horizontal_side_map[profile_position]
-    vertical_alignment = profile_position
+    horizontal_side = horizontal_side_map[vertical_alignment]
 
+    lower_axis_profile = _get_leader_part(x_axis_lower_profile)
+    top_axis_profile = _get_leader_part(x_axis_top_profile)
     profile_to_align = (
-        lower_axis_profile if profile_position == Alignment.BOTTOM else top_axis_profile
+        lower_axis_profile
+        if vertical_alignment == Alignment.BOTTOM
+        else top_axis_profile
     )
 
     idlers_assembly = create_idlers_for_motor(
@@ -189,7 +192,9 @@ def create_motor_stack(
 
     mount_plate_limit_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
     mount_plate_limit_cutter = align(
-        mount_plate_limit_cutter, mount_plate, Alignment.CENTER
+        mount_plate_limit_cutter,
+        mount_plate,
+        Alignment.CENTER,
     )
     mount_plate_limit_cutter = align(
         mount_plate_limit_cutter,
@@ -199,7 +204,9 @@ def create_motor_stack(
 
     mount_plate_opposite_limit_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
     mount_plate_opposite_limit_cutter = align(
-        mount_plate_opposite_limit_cutter, mount_plate, Alignment.CENTER
+        mount_plate_opposite_limit_cutter,
+        mount_plate,
+        Alignment.CENTER,
     )
     mount_plate_opposite_limit_cutter = align(
         mount_plate_opposite_limit_cutter,
@@ -220,7 +227,11 @@ def create_motor_stack(
 
     motor_body = motor.get_follower_part_by_name("body")
 
-    motor_bridge = align(motor_bridge, motor_body, vertical_alignment.stack_alignment)
+    motor_bridge = align(
+        motor_bridge,
+        motor_body,
+        vertical_alignment.stack_alignment,
+    )
 
     motor_bridge = motor_bridge.cut(mount_plate_opposite_limit_cutter)
 
@@ -237,22 +248,47 @@ def create_motor_stack(
     )
 
     motor_bridge_front_bevel = align(
-        motor_bridge_front_bevel, motor_bridge, Alignment.CENTER
+        motor_bridge_front_bevel,
+        motor_bridge,
+        Alignment.CENTER,
     )
     motor_bridge_front_bevel = align(
-        motor_bridge_front_bevel, motor_bridge, Alignment.STACK_FRONT
+        motor_bridge_front_bevel,
+        motor_bridge,
+        Alignment.STACK_FRONT,
     )
     motor_bridge = motor_bridge.fuse(motor_bridge_front_bevel)
 
-    for axle_cutter in idler_axle_cutters:
-        mount_plate = mount_plate.cut(axle_cutter)
-        motor_bridge = motor_bridge.cut(axle_cutter)
+    # cone_height = 50
+    # cones = PartCollector()
+    # for axle_cutter in idler_axle_cutters:
+    #     axle_cone = create_cone(
+    #         r1=idler_mount_axle_diameter / 2 + idler_mount_axle_clearance + cone_height,
+    #         r2=idler_mount_axle_diameter / 2 + idler_mount_axle_clearance,
+    #         height=cone_height,
+    #     )
+    #     axle_cone = align(axle_cone, axle_cutter, Alignment.CENTER)
+    #     axle_cone = align(axle_cone, mount_plate, Alignment.STACK_TOP)
+
+    #     axle_cone = axle_cone.cut(axle_cutter)
+    #     cones = cones.fuse(axle_cone)
+
+    #     mount_plate = mount_plate.cut(axle_cutter)
+    #     motor_bridge = motor_bridge.cut(axle_cutter)
+
+    # mount_plate = mount_plate.fuse(cones)
 
     for nut_cutter in idler_nut_cutters:
-        nut_cutter_aligned = align(nut_cutter, mount_plate, vertical_alignment.opposite)
+        nut_cutter_aligned = align(
+            nut_cutter,
+            mount_plate,
+            vertical_alignment.opposite,
+        )
         mount_plate = mount_plate.cut(nut_cutter_aligned)
         nut_cutter_aligned = align(
-            nut_cutter, motor_bridge, vertical_alignment.opposite
+            nut_cutter,
+            motor_bridge,
+            vertical_alignment.opposite,
         )
 
         motor_bridge = motor_bridge.cut(nut_cutter_aligned)
@@ -283,7 +319,9 @@ def create_motor_stack(
         direction=(0, 1, 0),
     )
     mount_shield_mount_screw_hole_cutter = align(
-        mount_shield_mount_screw_hole_cutter, mount_shield, Alignment.CENTER
+        mount_shield_mount_screw_hole_cutter,
+        mount_shield,
+        Alignment.CENTER,
     )
     mount_shield_mount_screw_hole_cutter = align(
         mount_shield_mount_screw_hole_cutter,
@@ -296,23 +334,26 @@ def create_motor_stack(
     motor.add_named_follower(mount_shield, "mount_shield")
 
     mount_screw = create_cylinder_screw(
-        "M5", length=motor_mount_shield_mount_screw_length
+        "M5",
+        length=motor_mount_shield_mount_screw_length,
     )
     mount_screw = rotate(-90, axis=(1, 0, 0))(mount_screw)
     mount_screw = align(
-        mount_screw, mount_shield_mount_screw_hole_cutter, Alignment.CENTER
+        mount_screw,
+        mount_shield_mount_screw_hole_cutter,
+        Alignment.CENTER,
     )
 
     profile_part_name = (
         "x_axis_lower_profile"
-        if profile_position == Alignment.BOTTOM
+        if vertical_alignment == Alignment.BOTTOM
         else "x_axis_top_profile"
     )
     record_mark_metric(
         stock_type=ExtrusionProfileType.PROFILE_2020.value,
         part_name=profile_part_name,
         stock_length_mm=x_axis_profile_length,
-        mark_name=f"mount_shield_mount_screw_{profile_position.name.lower()}",
+        mark_name=f"mount_shield_mount_screw_{vertical_alignment.name.lower()}",
         position_mm=_project_center_onto_profile_length_mm(
             profile_to_align,
             mount_shield_mount_screw_hole_cutter,
@@ -333,15 +374,25 @@ def create_motor_stack(
         ],
     )
 
-    mount_plate_connector = align(mount_plate_connector, mount_plate, Alignment.CENTER)
-    mount_plate_connector = align(mount_plate_connector, mount_plate, Alignment.FRONT)
+    mount_plate_connector = align(
+        mount_plate_connector,
+        mount_plate,
+        Alignment.CENTER,
+    )
+    mount_plate_connector = align(
+        mount_plate_connector,
+        mount_plate,
+        Alignment.FRONT,
+    )
     mount_plate_connector = align(
         mount_plate_connector,
         mount_plate,
         horizontal_side.opposite.stack_alignment,
     )
     mount_plate_connector = translate(
-        horizontal_side.sign * motor_mount_plate_fillet_radius, 0, 0
+        horizontal_side.sign * motor_mount_plate_fillet_radius,
+        0,
+        0,
     )(mount_plate_connector)
 
     mount_plate_connector = mount_plate_connector.cut(mount_plate)
@@ -364,7 +415,6 @@ def create_motor_stack(
 
     nut_pocket_cutters = []
     for screw_hole_alignment in (Alignment.LEFT, Alignment.RIGHT):
-
         nut_cutter = create_hidden_nut_pocket_cutter(
             counter_flange_mount_screw_size,
             bottom_cutter_length=3,
@@ -395,10 +445,14 @@ def create_motor_stack(
             idler_screw_spec.cylinder_head_height + 2 * idler_screw_head_clearance,
         )
         cylinder_head_cutter = align(
-            cylinder_head_cutter, idler_axle_cutter, Alignment.CENTER
+            cylinder_head_cutter,
+            idler_axle_cutter,
+            Alignment.CENTER,
         )
         cylinder_head_cutter = align(
-            cylinder_head_cutter, mount_flange, vertical_alignment
+            cylinder_head_cutter,
+            mount_flange,
+            vertical_alignment,
         )
         mount_flange = mount_flange.cut(cylinder_head_cutter)
 
@@ -412,12 +466,16 @@ def create_motor_stack(
     )
 
     mount_flange_bevel = align(
-        mount_flange_bevel, mount_plate_connector, Alignment.CENTER
+        mount_flange_bevel,
+        mount_plate_connector,
+        Alignment.CENTER,
     )
     mount_flange_bevel = align(mount_flange_bevel, mount_flange, Alignment.BACK)
 
     mount_flange_bevel_flange_side = align(
-        mount_flange_bevel, mount_flange, vertical_alignment.opposite.stack_alignment
+        mount_flange_bevel,
+        mount_flange,
+        vertical_alignment.opposite.stack_alignment,
     )
 
     for nut_cutter in nut_pocket_cutters:
@@ -432,10 +490,6 @@ def create_motor_stack(
     motor_visual = motor.leader.copy()
     motor.add_named_non_production_part(motor_visual, "motor_visual")
 
-    motor_name = f"motor_{profile_position.name.lower()}"
-
-    motor.additional_data["name"] = motor_name
-
     axis_holding_counter_flange = create_filleted_box(
         axis_holder_width,
         axis_holder_depth,
@@ -445,13 +499,19 @@ def create_motor_stack(
     )
 
     axis_holding_counter_flange = align(
-        axis_holding_counter_flange, mount_flange, horizontal_side.opposite
+        axis_holding_counter_flange,
+        mount_flange,
+        horizontal_side.opposite,
     )
     axis_holding_counter_flange = align(
-        axis_holding_counter_flange, mount_flange, vertical_alignment.stack_alignment
+        axis_holding_counter_flange,
+        mount_flange,
+        vertical_alignment.stack_alignment,
     )
     axis_holding_counter_flange = align(
-        axis_holding_counter_flange, mount_flange, Alignment.BACK
+        axis_holding_counter_flange,
+        mount_flange,
+        Alignment.BACK,
     )
 
     axis_holding_counter_flange_screws = []
@@ -471,7 +531,10 @@ def create_motor_stack(
             Alignment.CENTER,
         )
         profile_mount_screw_hole_cutter = align(
-            profile_mount_screw_hole_cutter, nut_cutter, Alignment.CENTER, axes=[0]
+            profile_mount_screw_hole_cutter,
+            nut_cutter,
+            Alignment.CENTER,
+            axes=[0],
         )
         profile_mount_screw_hole_cutter = align(
             profile_mount_screw_hole_cutter,
@@ -484,14 +547,17 @@ def create_motor_stack(
         )
 
         axis_holding_counter_flange_screw = create_cylinder_screw(
-            counter_flange_mount_screw_size, length=counter_flange_mount_screw_length
+            counter_flange_mount_screw_size,
+            length=counter_flange_mount_screw_length,
         )
         if horizontal_side == Alignment.LEFT:
             axis_holding_counter_flange_screw = rotate(180, axis=(0, 1, 0))(
                 axis_holding_counter_flange_screw
             )
         axis_holding_counter_flange_screw = align(
-            axis_holding_counter_flange_screw, nut_cutter, Alignment.CENTER
+            axis_holding_counter_flange_screw,
+            nut_cutter,
+            Alignment.CENTER,
         )
         axis_holding_counter_flange_screw = align(
             axis_holding_counter_flange_screw,
@@ -515,13 +581,26 @@ def create_motor_stack(
         PartCollector(),
     )
     motor.add_named_non_production_part(
-        axis_holding_counter_flange_screws_fused, "axis_holding_counter_flange_screws"
+        axis_holding_counter_flange_screws_fused,
+        "axis_holding_counter_flange_screws",
     )
 
     motor.add_named_follower(motor_bridge, "motor_bridge")
     motor.add_named_follower(mount_plate, "mount_plate")
 
-    retval = LeaderFollowersCuttersPart(motor.leader)
+    printable_parts = PartCollector()
+    for follower_name in [
+        "mount_shield",
+        "mount_plate",
+        "mount_flange",
+        "motor_bridge",
+        "mount_plate_connector",
+    ]:
+        printable_parts = printable_parts.fuse(
+            motor.get_follower_part_by_name(follower_name)
+        )
+
+    retval = LeaderFollowersCuttersPart(printable_parts)
 
     for follower_name in [
         "mount_shield",
@@ -531,7 +610,8 @@ def create_motor_stack(
         "mount_plate_connector",
     ]:
         retval.add_named_follower(
-            motor.get_follower_part_by_name(follower_name), follower_name
+            motor.get_follower_part_by_name(follower_name),
+            follower_name,
         )
 
     for cross_follower_name in [
@@ -539,7 +619,8 @@ def create_motor_stack(
         "axle",
     ]:
         retval.add_named_non_production_part(
-            motor.get_follower_part_by_name(cross_follower_name), cross_follower_name
+            motor.get_follower_part_by_name(cross_follower_name),
+            cross_follower_name,
         )
 
     for non_production_part_name in [
@@ -555,78 +636,3 @@ def create_motor_stack(
         )
 
     return retval
-
-
-def bboxes_overlap(bbox1, bbox2):
-    x_overlap = max(0, min(bbox1[1][0], bbox2[1][0]) - max(bbox1[0][0], bbox2[0][0]))
-    y_overlap = max(0, min(bbox1[1][1], bbox2[1][1]) - max(bbox1[0][1], bbox2[0][1]))
-    z_overlap = max(0, min(bbox1[1][2], bbox2[1][2]) - max(bbox1[0][2], bbox2[0][2]))
-    return x_overlap > 0 and y_overlap > 0 and z_overlap > 0
-
-
-def main():
-    logging.basicConfig(level=logging.INFO)
-    parts = PartList()
-
-    lower_axis_profile = create_alu_extrusion_profile(
-        ExtrusionProfileType.PROFILE_2020, length_mm=x_axis_profile_length
-    )
-    lower_axis_profile = rotate(90, axis=(0, 1, 0))(lower_axis_profile)
-
-    top_axis_profile = translate(0, 0, x_axis_profile_pitch)(lower_axis_profile)
-    axis_frame = lower_axis_profile.fuse(top_axis_profile)
-
-    parts.add(axis_frame, "axis_frame")
-
-    # Create the part
-
-    profile_position = Alignment.TOP
-
-    motor_assembly = create_motor_stack(
-        profile_position, lower_axis_profile, top_axis_profile
-    )
-
-    all_bboxes_by_name = {}
-
-    for name, part in motor_assembly.get_named_follower_items():
-        part_name = f"motor_stack_{profile_position.name.lower()}_{name}"
-        parts.add(part, part_name, skip_in_production=False)
-        bbox = get_bounding_box(part)
-        all_bboxes_by_name[part_name] = bbox
-
-    # motor_followers_fused = PartCollector()
-    # for follower in motor_assembly.followers:
-    #     motor_followers_fused = motor_followers_fused.fuse(follower)
-
-    # motor_followers_fused = translate(80, 100, 0)(motor_followers_fused)
-    # parts.add(motor_followers_fused, f"motor_stack_{side.name.lower()}_followers_fused")
-
-    for name, part in motor_assembly.get_named_non_production_part_items():
-        part_name = f"motor_stack_{profile_position.name.lower()}_{name}"
-
-        parts.add(part, part_name, skip_in_production=False, color=(0.6, 0.6, 0.6))
-        bbox = get_bounding_box(part)
-        all_bboxes_by_name[part_name] = bbox
-
-    all_bboxes_items = list(all_bboxes_by_name.items())
-
-    for i in range(len(all_bboxes_items)):
-        name_i, bbox_i = all_bboxes_items[i]
-        for j in range(i + 1, len(all_bboxes_items)):
-            name_j, bbox_j = all_bboxes_items[j]
-            if bboxes_overlap(bbox_i, bbox_j):
-                _logger.warning(f"Bounding boxes of {name_i} and {name_j} overlap")
-
-    # Arrange and export
-    arrange_and_export(
-        parts.as_list(),
-        script_file=__file__,
-        prod=PROD,
-        process_data=PROCESS_DATA,
-    )
-
-    _logger.info("motor_mount created successfully!")
-
-
-if __name__ == "__main__":
-    main()
