@@ -19,7 +19,7 @@ Builder:
       export_individual_parts: false
       plates:
         - name: the_plate
-          process_data_preset: petgcf_medium_strength_max_quality_06
+          process_data_preset: petgcf_medium_strength_high_speed_06
           process_data:
             overrides:
               process_overrides:
