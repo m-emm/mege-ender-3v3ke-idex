@@ -1,0 +1,42 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the hole calibration part
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name_template: "calibration_assembly_leader"
+
+  Production:
+    parts:
+      - source: self
+        artifact: leader
+        name_template: "calibration_assembly_leader"
+
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: the_plate
+          process_data_preset: petgcf_medium_strength_max_quality_06
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "0"
+                xy_contour_compensation: "-0.25"
+                xy_hole_compensation: "0.5"
+
+          parts:
+            - calibration_assembly_leader
+      auto_assign_plates: false
+
+Parameters: {}
+
+Parts:
+  CalibrationAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.calibration_assembly.create_calibration_assembly
+      Properties: {}

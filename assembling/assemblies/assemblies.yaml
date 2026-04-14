@@ -557,6 +557,7 @@ globals:
   tool_head_mount_side_plate_height: 40
   tool_head_mount_side_plate_thickness: 8
   tool_head_mount_side_stiffener_thickness: 5
+  tool_head_mount_sprite_mount_screw_length: 10
   tool_head_mount_tool_head_base_plate_clearance: 0.5
   tool_head_mount_tool_head_x_offset: 8
   tool_head_mount_tool_head_z_offset: 10
@@ -787,6 +788,23 @@ process_data_presets:
       process_overrides:
         sparse_infill_pattern: "cubic"
         support_object_first_layer_gap: "2.5"
+        xy_contour_compensation: "-0.5"
+        xy_hole_compensation: "0.2"
+
+  petgcf_medium_strength_max_quality_06:
+    generator: mege3devops_parametric
+    arguments:
+      material_name: petg_cf_generic
+      nozzle_diameter_mm: 0.6
+      nozzle_hardened: true
+      nozzle_high_flow: true
+      strength_factor: 0.5
+      quality_factor: 1.0
+    overrides:
+      process_overrides:
+        sparse_infill_pattern: "cubic"
+        support_object_first_layer_gap: "2.5"
+
   tpu_minimal_quality_minimal_strength_06:
     generator: mege3devops_parametric
     arguments:
@@ -1659,3 +1677,8 @@ assemblies:
       sprite_extruder: tool_head_top_assembly
     parameters:
       drive_position: top
+
+  - name: calibration_assembly
+
+    depends_on: []
+    parameters: {}

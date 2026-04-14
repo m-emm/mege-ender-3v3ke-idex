@@ -6,6 +6,7 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
 )
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt_belt_clamp
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12h_rail_with_carriages
+from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from shellforgepy.simple import *
 
 
@@ -24,6 +25,62 @@ def _align_tool_head_like(tool_head_like, target, alignment, *, stack_gap=0):
             stack_gap=stack_gap,
         )
     return align(tool_head_like, target, alignment, stack_gap=stack_gap)
+
+
+def _create_sprite_mount_hole_guides(*, mount_hole_cutter):
+    mount_hole_cutter_bbox = get_bounding_box(mount_hole_cutter)
+    mount_hole_cutter_size = get_bounding_box_size(mount_hole_cutter)
+    mount_hole_cutter_center = get_bounding_box_center(mount_hole_cutter)
+
+    mount_hole_diameter = mount_hole_cutter_size[0] - NemaSizes.NEMA17.hole_dist_mm
+    if mount_hole_diameter <= 0:
+        raise ValueError(
+            "Sprite extruder mount hole cutter bbox does not match a NEMA17 pattern"
+        )
+
+    hole_radius = mount_hole_diameter / 2
+    hole_length = mount_hole_cutter_size[1]
+    top_hole_center_z = mount_hole_cutter_bbox[1][2] - hole_radius
+    hole_centers_x = [
+        mount_hole_cutter_bbox[0][0] + hole_radius,
+        mount_hole_cutter_bbox[1][0] - hole_radius,
+    ]
+
+    hole_guides = []
+    for side_name, hole_center_x in zip(["left", "right"], hole_centers_x):
+        hole = create_cylinder(hole_radius, hole_length, direction=(0, 1, 0))
+        hole = align(hole, mount_hole_cutter, Alignment.CENTER)
+        hole = translate(
+            hole_center_x - mount_hole_cutter_center[0],
+            0,
+            top_hole_center_z - mount_hole_cutter_center[2],
+        )(hole)
+        hole_guides.append((side_name, hole))
+
+    return hole_guides
+
+
+def _create_sprite_mount_screws(
+    *,
+    mount_hole_cutter,
+    mount_base_plate,
+    screw_size,
+    screw_length,
+):
+    cylinder_head_height = MScrew.from_size(screw_size).cylinder_head_height
+    screws = []
+
+    for side_name, hole_guide in _create_sprite_mount_hole_guides(
+        mount_hole_cutter=mount_hole_cutter,
+    ):
+        screw = create_cylinder_screw(screw_size, screw_length)
+        screw = rotate(90, axis=(1, 0, 0))(screw)
+        screw = align(screw, hole_guide, Alignment.CENTER)
+        screw = align(screw, mount_base_plate, Alignment.BACK)
+        screw = translate(0, cylinder_head_height, 0)(screw)
+        screws.append((side_name, screw))
+
+    return screws
 
 
 def _create_lower_side_plates(
@@ -179,6 +236,7 @@ def _create_single_tool_head_mount(
     *,
     lower_axis_profile,
     sprite_extruder,
+    extruder_mount_screw_size,
     x_axis_profile_pitch,
     tool_head_mount_base_plate_height,
     tool_head_mount_base_plate_thickness,
@@ -203,6 +261,7 @@ def _create_single_tool_head_mount(
     tool_head_mount_side_plate_height,
     tool_head_mount_side_plate_thickness,
     tool_head_mount_side_stiffener_thickness,
+    tool_head_mount_sprite_mount_screw_length,
     tool_head_mount_tool_head_base_plate_clearance,
     tool_head_mount_tool_head_x_offset,
     tool_head_mount_tool_head_z_offset,
@@ -571,8 +630,16 @@ def _create_single_tool_head_mount(
     )(mount_sprite_extruder)
 
     sprite_extruder_reference = _mounted_sprite_reference(mount_sprite_extruder)
+    mount_hole_cutter = mount_sprite_extruder.get_named_cutter("mount_hole_cutter")
 
+    mount_base_plate = mount_base_plate.cut(mount_hole_cutter)
     mount_base_plate = mount_base_plate.cut(sprite_extruder_reference)
+    sprite_mount_screws = _create_sprite_mount_screws(
+        mount_hole_cutter=mount_hole_cutter,
+        mount_base_plate=mount_base_plate,
+        screw_size=extruder_mount_screw_size,
+        screw_length=tool_head_mount_sprite_mount_screw_length,
+    )
 
     extruder_cutout = create_filleted_box(
         tool_head_mount_extruder_cutout_width,
@@ -631,12 +698,18 @@ def _create_single_tool_head_mount(
             mount_sprite_extruder.leader,
             "sprite_extruder",
         )
+    for side_name, screw in sprite_mount_screws:
+        tool_head_mount.add_named_non_production_part(
+            screw,
+            f"sprite_mount_screw_{side_name}",
+        )
     return tool_head_mount
 
 
 def create_tool_head_mount_assembly(
     *,
     sprite_extruder,
+    extruder_mount_screw_size,
     x_axis_profile_length,
     x_axis_profile_pitch,
     tool_head_mount_base_plate_height,
@@ -662,6 +735,7 @@ def create_tool_head_mount_assembly(
     tool_head_mount_side_plate_height,
     tool_head_mount_side_plate_thickness,
     tool_head_mount_side_stiffener_thickness,
+    tool_head_mount_sprite_mount_screw_length,
     tool_head_mount_tool_head_base_plate_clearance,
     tool_head_mount_tool_head_x_offset,
     tool_head_mount_tool_head_z_offset,
@@ -691,6 +765,7 @@ def create_tool_head_mount_assembly(
     mount = _create_single_tool_head_mount(
         lower_axis_profile=lower_axis_profile,
         sprite_extruder=sprite_extruder,
+        extruder_mount_screw_size=extruder_mount_screw_size,
         x_axis_profile_pitch=x_axis_profile_pitch,
         tool_head_mount_base_plate_height=tool_head_mount_base_plate_height,
         tool_head_mount_base_plate_thickness=tool_head_mount_base_plate_thickness,
@@ -715,6 +790,7 @@ def create_tool_head_mount_assembly(
         tool_head_mount_side_plate_height=tool_head_mount_side_plate_height,
         tool_head_mount_side_plate_thickness=tool_head_mount_side_plate_thickness,
         tool_head_mount_side_stiffener_thickness=tool_head_mount_side_stiffener_thickness,
+        tool_head_mount_sprite_mount_screw_length=tool_head_mount_sprite_mount_screw_length,
         tool_head_mount_tool_head_base_plate_clearance=tool_head_mount_tool_head_base_plate_clearance,
         tool_head_mount_tool_head_x_offset=tool_head_mount_tool_head_x_offset,
         tool_head_mount_tool_head_z_offset=tool_head_mount_tool_head_z_offset,

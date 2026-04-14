@@ -117,6 +117,9 @@ def create_idler_cage(
     top_z_offset = idler_size[2] / 2 + idler_clearance + base_thickness / 2
 
     base = create_box(base_length, base_width, base_thickness)
+    _logger.info(
+        f"Creating idler cage with base_length={base_length:.2f}, base_width={base_width:.2f}, base_thickness={base_thickness:.2f}"
+    )
     base = align(base, idler, Alignment.CENTER)
     base = translate(x_offset, 0, base_z_offset)(base)
 

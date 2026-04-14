@@ -58,6 +58,8 @@ Builder:
         prod_rotation_axis: [0, 1, 0]
 
 Parameters:
+  extruder_mount_screw_size:
+    Type: String
   x_axis_profile_length:
     Type: Float
   x_axis_profile_pitch:
@@ -108,6 +110,8 @@ Parameters:
     Type: Float
   tool_head_mount_side_stiffener_thickness:
     Type: Float
+  tool_head_mount_sprite_mount_screw_length:
+    Type: Float
   tool_head_mount_tool_head_base_plate_clearance:
     Type: Float
   tool_head_mount_tool_head_x_offset:
@@ -128,6 +132,8 @@ Parts:
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.tool_head_mount_assembly.create_tool_head_mount_assembly
       Properties:
+        extruder_mount_screw_size:
+          $ref: extruder_mount_screw_size
         x_axis_profile_length:
           $ref: x_axis_profile_length
         x_axis_profile_pitch:
@@ -178,6 +184,8 @@ Parts:
           $ref: tool_head_mount_side_plate_thickness
         tool_head_mount_side_stiffener_thickness:
           $ref: tool_head_mount_side_stiffener_thickness
+        tool_head_mount_sprite_mount_screw_length:
+          $ref: tool_head_mount_sprite_mount_screw_length
         tool_head_mount_tool_head_base_plate_clearance:
           $ref: tool_head_mount_tool_head_base_plate_clearance
         tool_head_mount_tool_head_x_offset:
