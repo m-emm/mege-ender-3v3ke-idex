@@ -581,7 +581,6 @@ def create_x_axis_assembly(
     mount_plate_connectors = PartCollector()
     final_mount_plates_by_profile_position = {}
     axis_holding_counter_flanges_by_profile_position = {}
-    counter_flange_screws_by_profile_position = {}
     motors_fused_by_profile_position = {}
 
     non_production_parts = [
@@ -634,11 +633,6 @@ def create_x_axis_assembly(
         axis_holding_counter_flange = motor_assembly.get_non_production_part_by_name(
             "axis_holding_counter_flange"
         )
-        axis_holding_counter_flange_screws = (
-            motor_assembly.get_non_production_part_by_name(
-                "axis_holding_counter_flange_screws"
-            )
-        )
         mount_plate = motor_assembly.get_follower_part_by_name("mount_plate")
 
         mount_plates = mount_plates.fuse(mount_plate)
@@ -648,9 +642,6 @@ def create_x_axis_assembly(
 
         final_mount_plates_by_profile_position[profile_position] = (
             motors_fused_by_profile_position[profile_position].fuse(mount_shield)
-        )
-        counter_flange_screws_by_profile_position[profile_position] = (
-            axis_holding_counter_flange_screws
         )
 
         non_production_parts.append(
@@ -775,16 +766,6 @@ def create_x_axis_assembly(
 
     for index, link_screw in enumerate(link_screws):
         retval.add_named_non_production_part(link_screw, f"link_screw_{index + 1}")
-
-    for profile_position in (Alignment.BOTTOM, Alignment.TOP):
-        for index, screw in enumerate(
-            counter_flange_screws_by_profile_position[profile_position]
-        ):
-            retval.add_named_non_production_part(
-                screw,
-                "axis_holding_counter_flange_screw_"
-                f"{index + 1}_{profile_position.name.lower()}",
-            )
 
     for name, part in axis_holding_counter_flanges_by_profile_position.items():
         retval.add_named_follower(part, name)
