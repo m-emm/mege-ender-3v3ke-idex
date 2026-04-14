@@ -627,8 +627,14 @@ def create_x_axis_assembly(
                 f"{non_production_part_name}_{profile_position_name}"
             )
 
+        current_mount_plate_connector = motor_assembly.get_follower_part_by_name(
+            "mount_plate_connector"
+        )
         mount_plate_connectors = mount_plate_connectors.fuse(
-            motor_assembly.get_follower_part_by_name("mount_plate_connector")
+            current_mount_plate_connector
+        )
+        mount_plate_connector_size = get_bounding_box_size(
+            current_mount_plate_connector
         )
 
         mount_shield = motor_assembly.get_follower_part_by_name("mount_shield")
@@ -660,8 +666,10 @@ def create_x_axis_assembly(
     mount_plate_link = align(mount_plate_link, mount_plate_connectors, Alignment.CENTER)
     mount_plate_link = align(mount_plate_link, mount_plate_connectors, Alignment.BACK)
 
-    bevel_size = (mount_plate_connectors_size[2] - 2 * 5) / 2
     mount_plate_link_bevels = PartCollector()
+    bevel_inset = 3
+    bevel_size = mount_plate_connectors_size[1] - bevel_inset
+
     for direction in (-1, 1):
         mount_plate_link_bevel = create_right_triangle(
             bevel_size,
@@ -678,18 +686,25 @@ def create_x_axis_assembly(
         )
         mount_plate_link_bevel = align(
             mount_plate_link_bevel,
-            mount_plate_link,
-            Alignment.STACK_FRONT,
+            mount_plate_connectors,
+            Alignment.FRONT,
         )
         mount_plate_link_bevel = align(
             mount_plate_link_bevel,
             mount_plate_link,
-            Alignment.STACK_TOP if direction == 1 else Alignment.STACK_BOTTOM,
-            stack_gap=-5 - bevel_size,
+            Alignment.TOP if direction == 1 else Alignment.BOTTOM,
         )
+        mount_plate_link_bevel = translate(
+            0, bevel_inset, - direction * mount_plate_connector_size[2]
+        )(mount_plate_link_bevel)
+
         mount_plate_link_bevels = mount_plate_link_bevels.fuse(mount_plate_link_bevel)
 
-    mount_plate_link = mount_plate_link.fuse(mount_plate_link_bevels)
+    # mount_plate_link_bevel_cutter = materialize_bounding_box(mount_plate_link_bevels)
+    # mount_plate_link = mount_plate_link.cut(mount_plate_link_bevel_cutter)
+    mount_plate_link = (
+        mount_plate_link_bevels  # mount_plate_link.fuse(mount_plate_link_bevels)
+    )
 
     mount_plate_link_flange = create_filleted_box(
         mount_plate_link_width,
