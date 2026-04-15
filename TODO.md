@@ -2,6 +2,16 @@
 
 ## Mechanical Design tasks
 
+- x axis collision toolhead mount carriage stopper
+- x endcap tensioner lift / guide
+- x motor plate thickness/ screw length
+- x motor pulley screws accessibility
+- belt clamp: replace nuts wirh insets
+- x endcap top screw?
+- x endcap idler spacers / cones
+- x axis: fuse mount flange? nut pockets too loose?
+- x axis tensioner nut pocket difficult
+- x axis belt space in tnsioner endcap is tight
 - holders for main PSU
 - holders for heatbed PSU
 - holder for y-axis / headbed mcu
