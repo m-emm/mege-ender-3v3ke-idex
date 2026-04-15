@@ -86,15 +86,13 @@ def _create_sprite_mount_screws(
 def _create_lower_side_plates(
     *,
     carriage_mount_plate,
-    carriage_size,
     tool_head_mount_side_plate_thickness,
     tool_head_mount_side_plate_depth,
     tool_head_mount_side_plate_height,
     tool_head_mount_carriage_mount_plate_fillet_radius,
-    tool_head_mount_side_stiffener_thickness,
 ):
+
     side_plates = PartCollector()
-    side_plate_stiffeners = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         side_plate = create_filleted_box(
             tool_head_mount_side_plate_thickness,
@@ -107,36 +105,9 @@ def _create_lower_side_plates(
         side_plate = align(side_plate, carriage_mount_plate, Alignment.FRONT)
         side_plate = align(side_plate, carriage_mount_plate, lr)
 
-        side_plate_stiffener = create_right_triangle(
-            carriage_size[2],
-            carriage_size[2],
-            tool_head_mount_side_stiffener_thickness,
-            extrusion_direction=(1, 0, 0),
-            a_normal=(0, -1, 0),
-            b_normal=(0, 0, -1),
-        )
-        side_plate_stiffener = align(
-            side_plate_stiffener,
-            side_plate,
-            Alignment.CENTER,
-        )
-        side_plate_stiffener = align(
-            side_plate_stiffener,
-            carriage_mount_plate,
-            Alignment.STACK_BOTTOM,
-        )
-        side_plate_stiffener = align(
-            side_plate_stiffener,
-            side_plate,
-            Alignment.STACK_BACK,
-            stack_gap=-tool_head_mount_carriage_mount_plate_fillet_radius,
-        )
-        side_plate_stiffener = align(side_plate_stiffener, carriage_mount_plate, lr)
-
-        side_plate_stiffeners = side_plate_stiffeners.fuse(side_plate_stiffener)
         side_plates = side_plates.fuse(side_plate)
 
-    return side_plates, side_plate_stiffeners
+    return side_plates
 
 
 def _create_upper_side_plates(
@@ -268,6 +239,8 @@ def _create_single_tool_head_mount(
     tool_head_mount_x_offset,
     tool_head_mount_y_extension,
     drive_position,
+    tool_head_mount_top_box_wall,
+    tool_head_mount_top_box_height,
     big_thing,
 ):
     if drive_position not in {Alignment.BOTTOM, Alignment.TOP}:
@@ -372,14 +345,12 @@ def _create_single_tool_head_mount(
         stack_gap=tool_head_mount_plate_carriage_clearance,
     )
 
-    lower_side_plates, lower_side_plate_stiffeners = _create_lower_side_plates(
+    lower_side_plates = _create_lower_side_plates(
         carriage_mount_plate=carriage_mount_plate,
-        carriage_size=carriage_size,
         tool_head_mount_side_plate_thickness=tool_head_mount_side_plate_thickness,
         tool_head_mount_side_plate_depth=tool_head_mount_side_plate_depth,
         tool_head_mount_side_plate_height=tool_head_mount_side_plate_height,
         tool_head_mount_carriage_mount_plate_fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
-        tool_head_mount_side_stiffener_thickness=tool_head_mount_side_stiffener_thickness,
     )
 
     upper_side_plates = PartCollector()
@@ -658,11 +629,95 @@ def _create_single_tool_head_mount(
     )
     carriage_mount_plate = carriage_mount_plate.cut(extruder_cutout)
 
+    carriage_mount_plate_size = get_bounding_box_size(carriage_mount_plate)
+
+    top_box_center_wall = create_box(
+        carriage_mount_plate_size[0]
+        - 2 * tool_head_mount_carriage_mount_plate_fillet_radius,
+        tool_head_mount_top_box_wall,
+        tool_head_mount_top_box_height,
+    )
+
+    top_box_center_wall = align(
+        top_box_center_wall, carriage_mount_plate, Alignment.CENTER
+    )
+
+    top_box_center_wall = align(
+        top_box_center_wall, carriage, Alignment.CENTER, axes=[1]
+    )
+
+    top_box_center_wall = align(
+        top_box_center_wall, carriage_mount_plate, Alignment.STACK_TOP
+    )
+
+    top_box_side_walls = PartCollector()
+    for top_box_side in [Alignment.LEFT, Alignment.RIGHT]:
+        top_box_side_wall = create_box(
+            tool_head_mount_top_box_wall,
+            carriage_mount_plate_size[1]
+            - 2 * tool_head_mount_carriage_mount_plate_fillet_radius,
+            tool_head_mount_top_box_height,
+        )
+        top_box_side_wall = align(
+            top_box_side_wall, carriage_mount_plate, Alignment.CENTER
+        )
+        top_box_side_wall = align(
+            top_box_side_wall, carriage_mount_plate, Alignment.STACK_TOP
+        )
+        top_box_side_wall = align(top_box_side_wall, carriage_mount_plate, top_box_side)
+        top_box_side_wall = translate(
+            -top_box_side.sign * tool_head_mount_carriage_mount_plate_fillet_radius,
+            0,
+            0,
+        )(top_box_side_wall)
+
+        top_box_side_walls = top_box_side_walls.fuse(top_box_side_wall)
+
+    hollow_top_sizde_box = create_box(
+        carriage_mount_plate_size[0] / 2,
+        carriage_size[1],
+        tool_head_mount_top_box_height,
+    )
+    hollow_top_side_box_inside_cutter = create_box(
+        carriage_mount_plate_size[0] / 2 - 2 * tool_head_mount_top_box_wall,
+        carriage_size[1] - 2 * tool_head_mount_top_box_wall,
+        tool_head_mount_top_box_height - 2 * tool_head_mount_top_box_wall,
+    )
+    hollow_top_side_box_inside_cutter = align(
+        hollow_top_side_box_inside_cutter,
+        hollow_top_sizde_box,
+        Alignment.CENTER,
+    )
+    hollow_top_sizde_box = hollow_top_sizde_box.cut(hollow_top_side_box_inside_cutter)
+
+    hollow_top_sizde_box = align(
+        hollow_top_sizde_box,
+        top_box_side_walls,
+        Alignment.CENTER,
+    )
+
+    hollow_top_sizde_box = align(
+        hollow_top_sizde_box,
+        top_box_side_walls,
+        Alignment.BACK,
+    )
+
+    
+    hollow_top_sizde_box = align(
+        hollow_top_sizde_box,
+        top_box_side_walls,
+        Alignment.LEFT if drive_position == Alignment.BOTTOM else Alignment.RIGHT,
+    )
+
+    carriage_mount_plate = carriage_mount_plate.fuse(hollow_top_sizde_box)
+
+    carriage_mount_plate = carriage_mount_plate.fuse(top_box_side_walls)
+    carriage_mount_plate = carriage_mount_plate.fuse(top_box_center_wall)
+
     tool_head_mount = carriage_mount_plate.fuse(clamps_fused)
     tool_head_mount = tool_head_mount.fuse(belt_deflectors)
     tool_head_mount = tool_head_mount.fuse(mount_base_plate)
     tool_head_mount = tool_head_mount.fuse(lower_side_plates)
-    tool_head_mount = tool_head_mount.fuse(lower_side_plate_stiffeners)
     if drive_position == Alignment.TOP:
         tool_head_mount = tool_head_mount.fuse(top_clamp_shield_plate)
         tool_head_mount = tool_head_mount.fuse(upper_side_plates)
@@ -734,6 +789,8 @@ def create_tool_head_mount_assembly(
     tool_head_mount_x_offset,
     tool_head_mount_y_extension,
     drive_position,
+    tool_head_mount_top_box_wall,
+    tool_head_mount_top_box_height,
     BIG_THING,
 ):
     """Create a single tool head mount assembly."""
@@ -788,6 +845,8 @@ def create_tool_head_mount_assembly(
         tool_head_mount_tool_head_z_offset=tool_head_mount_tool_head_z_offset,
         tool_head_mount_x_offset=tool_head_mount_x_offset,
         tool_head_mount_y_extension=tool_head_mount_y_extension,
+        tool_head_mount_top_box_wall=tool_head_mount_top_box_wall,
+        tool_head_mount_top_box_height=tool_head_mount_top_box_height,
         drive_position=drive_alignment,
         big_thing=big_thing,
     )
