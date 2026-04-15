@@ -150,7 +150,18 @@ Builder:
         - name: adjustment_wheel_single
           parts:
             - adjustment_wheel_left_front
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "1"
+                support_object_xy_distance: "1"
+
         - name: adjustment_wheels_group
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "0"
+
           parts:
             - adjustment_wheel_left_back
             - adjustment_wheel_right_front

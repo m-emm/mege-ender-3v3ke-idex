@@ -62,7 +62,7 @@ Builder:
         names:
           - x_axis_idler_endcap_top_right
         name_template: "{name}"
-        prod_rotation_angle: 0
+        prod_rotation_angle: 180
         prod_rotation_axis: [0, 1, 0]
       - source: self
         artifact: followers

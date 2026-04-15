@@ -695,7 +695,7 @@ def create_x_axis_assembly(
             Alignment.TOP if direction == 1 else Alignment.BOTTOM,
         )
         mount_plate_link_bevel = translate(
-            0, bevel_inset, - direction * mount_plate_connector_size[2]
+            0, bevel_inset, -direction * mount_plate_connector_size[2]
         )(mount_plate_link_bevel)
 
         mount_plate_link_bevels = mount_plate_link_bevels.fuse(mount_plate_link_bevel)
