@@ -161,6 +161,7 @@ def create_gt_belt_clamp(
     nut_cutter_slack=0.1,
     single_screw=False,
     extra_scew_hole_clearance=0.0,
+    use_threaded_inset=False,
 ):
     """Create a belt clamp with scew holes for the given belt width."""
 
@@ -206,6 +207,7 @@ def create_gt_belt_clamp(
     belt_guides = PartCollector()
     belt_guides_cutters = PartCollector()
     screw_hole_cutters = PartCollector()
+    thread_inset_lfcs = []
 
     for fb in [Alignment.FRONT, Alignment.BACK]:
 
@@ -246,10 +248,25 @@ def create_gt_belt_clamp(
 
             screw_hole_cutters = screw_hole_cutters.fuse(screw_hole)
 
-            nut_cutter = create_nut(screw_size, slack=nut_cutter_slack, no_hole=True)
-            nut_cutter = align(nut_cutter, screw_hole, Alignment.CENTER)
-            nut_cutter = align(nut_cutter, clamp, Alignment.TOP)
-            screw_hole_cutters = screw_hole_cutters.fuse(nut_cutter)
+            if use_threaded_inset:
+                thread_inset = create_thread_inset_assembly(
+                    size=screw_size,
+                    thickness=clamp_thickness,
+                    extra_radius=screw_hole_border / 2,
+                    clearance_type="close",
+                )
+                thread_inset = rotate(180, axis=(1, 0, 0))(thread_inset)
+                thread_inset = align(thread_inset, screw_hole, Alignment.CENTER)
+                thread_inset = align(thread_inset, clamp, Alignment.TOP)
+                thread_inset_lfcs.append(thread_inset)
+
+            else:
+                nut_cutter = create_nut(
+                    screw_size, slack=nut_cutter_slack, no_hole=True
+                )
+                nut_cutter = align(nut_cutter, screw_hole, Alignment.CENTER)
+                nut_cutter = align(nut_cutter, clamp, Alignment.TOP)
+                screw_hole_cutters = screw_hole_cutters.fuse(nut_cutter)
 
     base = base.fuse(belt_guides)
     clamp = clamp.cut(belt_guides_cutters)
@@ -258,6 +275,16 @@ def create_gt_belt_clamp(
     clamp = clamp.cut(screw_hole_cutters)
 
     retval = LeaderFollowersCuttersPart(base)
+
+    for i, thread_inset in enumerate(thread_inset_lfcs):
+        thread_inset_inset = thread_inset.get_non_production_part_by_name(
+            "thread_inset"
+        )
+        retval.add_named_non_production_part(thread_inset_inset, f"thread_inset_{i}")
+
+        clamp = thread_inset.use_as_cutter_on(clamp)
+        clamp = clamp.fuse(thread_inset.leader)
+
     retval.add_named_follower(clamp.leader, "clamp")
     retval.add_named_follower(
         clamp.get_follower_part_by_name("clamp_belt_path_cutter"), "belt_path_cutter"
@@ -306,6 +333,24 @@ def main():
 
     parts.add(clamp_2.leader, "belt_clamp_base_2", flip=False)
     parts.add(clamp_2.get_follower_part_by_name("clamp"), "belt_clamp_2", flip=True)
+
+    clamp_3 = create_gt_belt_clamp(
+        base_thicknness=4,
+        clamp_thickness=7,
+        belt_width=gt2_width,
+        clamp_length=30,
+        screw_size="M3",
+        screw_hole_border=1.9,
+        teeth_clearance=0.1,
+        use_threaded_inset=True,
+    )
+    clamp_3 = rotate(90, axis=(0, 1, 0))(clamp_3)
+    clamp_3 = translate(30, -40, 0)(clamp_3)
+
+    parts.add(clamp_3.leader, "belt_clamp_base_3", flip=False)
+    parts.add(clamp_3.get_follower_part_by_name("clamp"), "belt_clamp_3", flip=True)
+    for name, npp in clamp_3.get_named_non_production_part_items():
+        parts.add(npp, name, flip=False, skip_in_production=True)
 
     # Arrange and export
     arrange_and_export(

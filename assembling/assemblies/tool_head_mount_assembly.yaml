@@ -26,14 +26,14 @@ Builder:
       - source: self
         artifact: leader
         name: tool_head_mount
-        prod_rotation_angle: 90
+        prod_rotation_angle: 180
         prod_rotation_axis: [1, 0, 0]
       - source: self
         artifact: followers
         names:
           - belt_clamp_base_1
         name_template: "{name}"
-        prod_rotation_angle: 90
+        prod_rotation_angle: -90
         prod_rotation_axis: [0, 1, 0]
       - source: self
         artifact: followers

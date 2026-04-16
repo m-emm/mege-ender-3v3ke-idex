@@ -286,6 +286,7 @@ def _create_single_tool_head_mount(
         teeth_clearance=0.1,
         single_screw=True,
         extra_scew_hole_clearance=0.2,
+        use_threaded_inset=True,
     )
     clamp_1 = rotate(90, axis=(1, 0, 0))(clamp_1)
     clamp_1 = rotate(90)(clamp_1)
@@ -385,6 +386,11 @@ def _create_single_tool_head_mount(
         clamp_2.get_follower_part_by_name("belt_path_cutter"),
         "belt_path_cutter_2",
     )
+    for name, npp in clamp_1.get_named_non_production_part_items():
+        clamp.add_named_non_production_part(npp, f"clamp_1_{name}")
+    for name, npp in clamp_2.get_named_non_production_part_items():
+        clamp.add_named_non_production_part(npp, f"clamp_2_{name}")
+
     clamp = clamp.aligned_from_follower("clamp_1", clamp_side_plates, Alignment.BACK)
     clamp = translate(0, -tool_head_mount_belt_clamp_y_offset, 0)(clamp)
 
@@ -710,16 +716,17 @@ def _create_single_tool_head_mount(
         top_box_right_extra_wall, sprite_extruder_reference, Alignment.BACK
     )
 
-    for name, cutter in mount_sprite_extruder.get_named_cutter_items():
-        if "mount_hole" in name:
-            top_box_right_extra_wall = top_box_right_extra_wall.cut(cutter)
-
     carriage_mount_plate = carriage_mount_plate.fuse(top_box_right_extra_wall)
 
     tool_head_mount = carriage_mount_plate.fuse(clamps_fused)
     tool_head_mount = tool_head_mount.fuse(belt_deflectors)
     tool_head_mount = tool_head_mount.fuse(mount_base_plate)
     tool_head_mount = tool_head_mount.fuse(lower_side_plates)
+
+    for name, cutter in mount_sprite_extruder.get_named_cutter_items():
+        if "mount_hole" in name:
+            tool_head_mount = tool_head_mount.cut(cutter)
+
     if drive_position == Alignment.TOP:
         tool_head_mount = tool_head_mount.fuse(top_clamp_shield_plate)
         tool_head_mount = tool_head_mount.fuse(upper_side_plates)
@@ -752,6 +759,9 @@ def _create_single_tool_head_mount(
             screw,
             f"sprite_mount_screw_{side_name}",
         )
+
+    for name, npp in clamp.get_named_non_production_part_items():
+        tool_head_mount.add_named_non_production_part(npp, name)
     return tool_head_mount
 
 
