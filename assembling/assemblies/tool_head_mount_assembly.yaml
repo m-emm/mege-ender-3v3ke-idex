@@ -52,7 +52,7 @@ Builder:
               process_overrides:
                 brim_type: no_brim
                 enable_support: "1"
-                support_type: tree(auto)                
+                support_type: tree(auto)
           parts:
             - tool_head_mount
             - belt_clamp_base_1
@@ -131,7 +131,6 @@ Parameters:
     Type: Float
   tool_head_mount_top_box_height:
     Type: Float
-
 
 Parts:
   ToolHeadMountAssembly:

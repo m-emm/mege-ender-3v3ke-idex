@@ -549,10 +549,10 @@ globals:
   tool_head_mount_carriage_mount_plate_thickness: 4
   tool_head_mount_carriage_mount_plate_width: 78
   tool_head_mount_clamp_base_cutter_clearance: 0.8
-  tool_head_mount_extruder_cutout_carriage_gap: 3
+  tool_head_mount_extruder_cutout_carriage_gap: 4
   tool_head_mount_extruder_cutout_fillet_radius: 4
   tool_head_mount_extruder_cutout_width: 58
-  tool_head_mount_plate_carriage_clearance: 3
+  tool_head_mount_plate_carriage_clearance: 4
   tool_head_mount_side_plate_depth: 20
   tool_head_mount_side_plate_height: 40
   tool_head_mount_side_plate_thickness: 8
@@ -814,9 +814,8 @@ process_data_presets:
       process_overrides:
         sparse_infill_pattern: "cubic"
         support_object_first_layer_gap: "2.5"
-        xy_contour_compensation: "-0.3" # This is a carefully calibrated value, measured at 2026-04-14 
-        xy_hole_compensation: "0.4" # This is a carefully calibrated value, measured at 2026-04-14 
-
+        xy_contour_compensation: "-0.3" # This is a carefully calibrated value, measured at 2026-04-14
+        xy_hole_compensation: "0.4" # This is a carefully calibrated value, measured at 2026-04-14
 
   petgcf_medium_strength_max_quality_06:
     generator: mege3devops_parametric

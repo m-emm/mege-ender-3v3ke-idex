@@ -311,22 +311,6 @@ def _create_single_tool_head_mount(
     )(carriage_mount_plate)
     carriage_mount_plate = rail_plus_carriage.use_as_cutter_on(carriage_mount_plate)
 
-    extruder_cutout = create_filleted_box(
-        tool_head_mount_extruder_cutout_width,
-        big_thing,
-        big_thing,
-        fillet_radius=tool_head_mount_extruder_cutout_fillet_radius,
-        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
-    )
-    extruder_cutout = align(extruder_cutout, carriage_mount_plate, Alignment.CENTER)
-    extruder_cutout = align(
-        extruder_cutout,
-        carriage,
-        Alignment.STACK_FRONT,
-        stack_gap=tool_head_mount_extruder_cutout_carriage_gap,
-    )
-    carriage_mount_plate = carriage_mount_plate.cut(extruder_cutout)
-
     mount_base_plate = create_box(
         base_plate_width,
         tool_head_mount_base_plate_thickness,
@@ -621,12 +605,8 @@ def _create_single_tool_head_mount(
     )
     extruder_cutout = align(extruder_cutout, carriage_mount_plate, Alignment.CENTER)
     extruder_cutout = align(extruder_cutout, sprite_extruder_reference, Alignment.RIGHT)
-    extruder_cutout = align(
-        extruder_cutout,
-        carriage,
-        Alignment.STACK_FRONT,
-        stack_gap=tool_head_mount_extruder_cutout_carriage_gap,
-    )
+    extruder_cutout = align(extruder_cutout, sprite_extruder_reference, Alignment.BACK)
+
     carriage_mount_plate = carriage_mount_plate.cut(extruder_cutout)
 
     carriage_mount_plate_size = get_bounding_box_size(carriage_mount_plate)
@@ -702,7 +682,6 @@ def _create_single_tool_head_mount(
         Alignment.BACK,
     )
 
-    
     hollow_top_sizde_box = align(
         hollow_top_sizde_box,
         top_box_side_walls,
@@ -713,6 +692,29 @@ def _create_single_tool_head_mount(
 
     carriage_mount_plate = carriage_mount_plate.fuse(top_box_side_walls)
     carriage_mount_plate = carriage_mount_plate.fuse(top_box_center_wall)
+
+    top_box_right_extra_wall = create_box(tool_head_mount_top_box_wall, 22.5, 26)
+
+    top_box_right_extra_wall = align(
+        top_box_right_extra_wall, sprite_extruder_reference, Alignment.CENTER
+    )
+
+    top_box_right_extra_wall = align(
+        top_box_right_extra_wall, top_box_side_walls, Alignment.TOP
+    )
+
+    top_box_right_extra_wall = align(
+        top_box_right_extra_wall, sprite_extruder_reference, Alignment.STACK_RIGHT
+    )
+    top_box_right_extra_wall = align(
+        top_box_right_extra_wall, sprite_extruder_reference, Alignment.BACK
+    )
+
+    for name, cutter in mount_sprite_extruder.get_named_cutter_items():
+        if "mount_hole" in name:
+            top_box_right_extra_wall = top_box_right_extra_wall.cut(cutter)
+
+    carriage_mount_plate = carriage_mount_plate.fuse(top_box_right_extra_wall)
 
     tool_head_mount = carriage_mount_plate.fuse(clamps_fused)
     tool_head_mount = tool_head_mount.fuse(belt_deflectors)
