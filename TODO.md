@@ -2,11 +2,9 @@
 
 ## Mechanical Design tasks
 
-- x axis collision toolhead mount carriage stopper
 - x endcap tensioner lift / guide
 - x motor plate thickness/ screw length
 - x motor pulley screws accessibility
-- belt clamp: replace nuts wirh insets
 - x endcap top screw?
 - x endcap idler spacers / cones
 - x axis: fuse mount flange? nut pockets too loose?
@@ -46,4 +44,5 @@
 - y mount brackets
 - y carriage stoppers
 - bed leveling wheels
-
+- x axis collision toolhead mount carriage stopper
+- belt clamp: replace nuts wirh insets

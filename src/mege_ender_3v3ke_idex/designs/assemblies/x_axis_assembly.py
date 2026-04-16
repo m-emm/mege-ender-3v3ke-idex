@@ -29,6 +29,35 @@ def _get_leader_part(part_like):
     return part_like.leader if hasattr(part_like, "leader") else part_like
 
 
+def cut_top_screw_hole(
+    outer_box, endcap_mount_screw_size, side, endcap_wall, big_thing
+):
+
+    top_screw_clearance_hole_diameter = MScrew.from_size(
+        endcap_mount_screw_size
+    ).clearance_hole_normal
+    top_screw_hole_cutter = create_cylinder(
+        top_screw_clearance_hole_diameter / 2,
+        big_thing,
+    )
+    top_screw_hole_cutter = align(top_screw_hole_cutter, outer_box, Alignment.CENTER)
+    top_screw_hole_cutter = align(
+        top_screw_hole_cutter, outer_box, side.opposite.edge_alignment
+    )
+    top_screw_hole_cutter = translate(
+        side.sign * top_screw_clearance_hole_diameter, 0, 0
+    )(top_screw_hole_cutter)
+
+    top_screw_hole_cutter = align(
+        top_screw_hole_cutter,
+        outer_box,
+        Alignment.STACK_TOP,
+        stack_gap=-2 * endcap_wall,
+    )
+    outer_box = outer_box.cut(top_screw_hole_cutter)
+    return outer_box
+
+
 def _create_idler_endcap(
     *,
     profile,
@@ -115,6 +144,7 @@ def _create_idler_endcap(
         axle_screw_length=endcap_axle_screw_length,
         belt_clearance=endcap_belt_clearance,
         cage_width_override=cage_width_override,
+        idler_cone_clearance=0.5,
     )
 
     if side != Alignment.LEFT:
@@ -330,6 +360,10 @@ def _create_idler_endcap(
 
         outer_box = outer_box.cut(belt_side_cutters)
 
+        outer_box = cut_top_screw_hole(
+            outer_box, endcap_mount_screw_size, side, endcap_wall, big_thing
+        )
+
         tensioner_screw_part = cage.get_non_production_part_by_name("tensioner_screw")
         tensioner_screw_part = align(tensioner_screw_part, outer_box, side)
         tensioner_screw_part = translate(
@@ -373,6 +407,11 @@ def _create_idler_endcap(
         retval = LeaderFollowersCuttersPart(leader=outer_box)
         retval.add_named_follower(cage.leader, "endcap_idler_cage")
     else:
+
+        cage = cut_top_screw_hole(
+            cage, endcap_mount_screw_size, side, endcap_wall, big_thing
+        )
+
         mount_eye = align(mount_eye, cage, Alignment.CENTER)
         mount_eye = align(mount_eye, cage, Alignment.BOTTOM)
         mount_eye = align(

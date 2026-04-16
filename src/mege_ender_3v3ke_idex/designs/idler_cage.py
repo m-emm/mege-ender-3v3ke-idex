@@ -78,6 +78,7 @@ def create_idler_cage(
     cage_width_override=None,
     cage_front_wall_thickness=None,
     tensioner_screw_z_offset=0.0,
+    idler_cone_clearance=0.5,
 ):
     """Create a printable idler cage with visual idler and axle screw."""
 
@@ -211,6 +212,25 @@ def create_idler_cage(
     axle = create_cylinder_screw(axle_screw_size, length=axle_screw_length)
     axle = align(axle, idler, Alignment.CENTER)
     axle = align(axle, cage, Alignment.TOP)
+
+    idler_cone_height = 4
+    idler_cone_extre_radius = 1
+    for bt in [Alignment.BOTTOM, Alignment.TOP]:
+
+        idler_cone = create_cone(
+            radius1=axle_cutter_radius + idler_cone_height + idler_cone_extre_radius,
+            radius2=axle_cutter_radius + idler_cone_extre_radius,
+            height=idler_cone_height,
+            direction=(0, 0, -bt.sign),
+        )
+
+        idler_cone = align(idler_cone, idler, Alignment.CENTER)
+        idler_cone = align(
+            idler_cone, idler, bt.stack_alignment, stack_gap=idler_cone_clearance
+        )
+
+        idler_cone = idler_cone.cut(axle_cutter)
+        cage = cage.fuse(idler_cone)
 
     retval = LeaderFollowersCuttersPart(leader=cage)
     retval.add_named_non_production_part(idler, "idler")
