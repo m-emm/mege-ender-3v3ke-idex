@@ -10,6 +10,13 @@ from mege_ender_3v3ke_idex.designs.sprite_extruder import (
 )
 from shellforgepy.simple import get_volume
 
+TOOL_HEAD_MOUNT_TOP_BOX_WALL = 2
+TOOL_HEAD_MOUNT_TOP_BOX_HEIGHT = 8
+TOOL_HEAD_MOUNT_BELT_CLAMP_THICKNESS = 7
+TOOL_HEAD_MOUNT_EXTRUDER_CUTOUT_CARRIAGE_GAP = 4
+TOOL_HEAD_MOUNT_PLATE_CARRIAGE_CLEARANCE = 4
+TOOL_HEAD_MOUNT_Y_EXTENSION = idex_parameters.tool_head_mount_side_plate_depth + 1
+
 
 def _build_mount(drive_position):
     return create_tool_head_mount_assembly(
@@ -21,7 +28,7 @@ def _build_mount(drive_position):
         tool_head_mount_base_plate_thickness=idex_parameters.tool_head_mount_base_plate_thickness,
         tool_head_mount_belt_clamp_base_thickness=idex_parameters.tool_head_mount_belt_clamp_base_thickness,
         tool_head_mount_belt_clamp_length=idex_parameters.tool_head_mount_belt_clamp_length,
-        tool_head_mount_belt_clamp_thickness=idex_parameters.tool_head_mount_belt_clamp_thickness,
+        tool_head_mount_belt_clamp_thickness=TOOL_HEAD_MOUNT_BELT_CLAMP_THICKNESS,
         tool_head_mount_belt_clamp_y_offset=idex_parameters.tool_head_mount_belt_clamp_y_offset,
         tool_head_mount_belt_deflector_belt_clearance=idex_parameters.tool_head_mount_belt_deflector_belt_clearance,
         tool_head_mount_belt_deflector_cage_thickness=idex_parameters.tool_head_mount_belt_deflector_cage_thickness,
@@ -32,10 +39,10 @@ def _build_mount(drive_position):
         tool_head_mount_carriage_mount_plate_thickness=idex_parameters.tool_head_mount_carriage_mount_plate_thickness,
         tool_head_mount_carriage_mount_plate_width=idex_parameters.tool_head_mount_carriage_mount_plate_width,
         tool_head_mount_clamp_base_cutter_clearance=idex_parameters.tool_head_mount_clamp_base_cutter_clearance,
-        tool_head_mount_extruder_cutout_carriage_gap=idex_parameters.tool_head_mount_extruder_cutout_carriage_gap,
+        tool_head_mount_extruder_cutout_carriage_gap=TOOL_HEAD_MOUNT_EXTRUDER_CUTOUT_CARRIAGE_GAP,
         tool_head_mount_extruder_cutout_fillet_radius=idex_parameters.tool_head_mount_extruder_cutout_fillet_radius,
         tool_head_mount_extruder_cutout_width=idex_parameters.tool_head_mount_extruder_cutout_width,
-        tool_head_mount_plate_carriage_clearance=idex_parameters.tool_head_mount_plate_carriage_clearance,
+        tool_head_mount_plate_carriage_clearance=TOOL_HEAD_MOUNT_PLATE_CARRIAGE_CLEARANCE,
         tool_head_mount_side_plate_depth=idex_parameters.tool_head_mount_side_plate_depth,
         tool_head_mount_side_plate_height=idex_parameters.tool_head_mount_side_plate_height,
         tool_head_mount_side_plate_thickness=idex_parameters.tool_head_mount_side_plate_thickness,
@@ -45,8 +52,10 @@ def _build_mount(drive_position):
         tool_head_mount_tool_head_x_offset=idex_parameters.tool_head_mount_tool_head_x_offset,
         tool_head_mount_tool_head_z_offset=idex_parameters.tool_head_mount_tool_head_z_offset,
         tool_head_mount_x_offset=idex_parameters.tool_head_mount_x_offset,
-        tool_head_mount_y_extension=idex_parameters.tool_head_mount_y_extension,
+        tool_head_mount_y_extension=TOOL_HEAD_MOUNT_Y_EXTENSION,
         drive_position=drive_position,
+        tool_head_mount_top_box_wall=TOOL_HEAD_MOUNT_TOP_BOX_WALL,
+        tool_head_mount_top_box_height=TOOL_HEAD_MOUNT_TOP_BOX_HEIGHT,
         BIG_THING=BIG_THING,
     )
 
