@@ -187,6 +187,36 @@ placement:
       alignment: STACK_BACK
       stack_gap:
         $ref: x_axis_front_gap_to_frame_front
+    - part: sprite_extruder_left_assembly
+      post_rotation:
+        angle: 180
+        axis: [0, 0, 1]
+        center: sprite_extruder_left_assembly.CENTER
+    - part: sprite_extruder_left_assembly
+      to: x_axis_rail_assembly.followers.carriage_1
+      alignment: CENTER
+      axes: [0]
+    - part: sprite_extruder_left_assembly
+      to: x_axis_rail_assembly.followers.carriage_1
+      alignment: STACK_FRONT
+    - part: sprite_extruder_left_assembly
+      to: x_axis_lower_profile_assembly
+      alignment: TOP
+    - part: sprite_extruder_right_assembly
+      post_rotation:
+        angle: 180
+        axis: [0, 0, 1]
+        center: sprite_extruder_right_assembly.CENTER
+    - part: sprite_extruder_right_assembly
+      to: x_axis_rail_assembly.followers.carriage_2
+      alignment: CENTER
+      axes: [0]
+    - part: sprite_extruder_right_assembly
+      to: x_axis_rail_assembly.followers.carriage_2
+      alignment: STACK_FRONT
+    - part: sprite_extruder_right_assembly
+      to: x_axis_lower_profile_assembly
+      alignment: TOP
     - part: tool_head_mount_bottom_assembly.followers.carriage
       to: x_axis_assembly.non_production_parts.carriage_1
       alignment: CENTER
@@ -1090,15 +1120,23 @@ assemblies:
 
     depends_on: []
 
-  - name: sprite_extruder_bottom_assembly
+  - name: sprite_extruder_left_assembly
 
     resource_file: sprite_extruder_assembly.yaml
     depends_on: []
 
-  - name: sprite_extruder_top_assembly
+  - name: sprite_extruder_right_assembly
 
     resource_file: sprite_extruder_assembly.yaml
     depends_on: []
+
+  - name: extruders_assembly
+
+    depends_on:
+      - x_axis_lower_profile_assembly
+      - x_axis_rail_assembly
+      - sprite_extruder_left_assembly
+      - sprite_extruder_right_assembly
 
   - name: nitehawk_holder_assembly
 
@@ -1123,11 +1161,11 @@ assemblies:
 
     resource_file: tool_head_assembly.yaml
     depends_on:
-      - sprite_extruder_bottom_assembly
+      - sprite_extruder_left_assembly
       - nitehawk_holder_assembly
       - part_fan_assembly
     inject_parts:
-      sprite_extruder: sprite_extruder_bottom_assembly
+      sprite_extruder: sprite_extruder_left_assembly
       nitehawk_holder: nitehawk_holder_assembly
       part_fans: part_fan_assembly
 
@@ -1135,11 +1173,11 @@ assemblies:
 
     resource_file: tool_head_assembly.yaml
     depends_on:
-      - sprite_extruder_top_assembly
+      - sprite_extruder_right_assembly
       - nitehawk_holder_assembly
       - part_fan_assembly
     inject_parts:
-      sprite_extruder: sprite_extruder_top_assembly
+      sprite_extruder: sprite_extruder_right_assembly
       nitehawk_holder: nitehawk_holder_assembly
       part_fans: part_fan_assembly
 

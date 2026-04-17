@@ -1,0 +1,44 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Extruder scene composed from the x-axis and left/right sprite extruders
+
+Builder:
+  Visualization:
+    parts:
+      - source: dependencies
+        assembly: x_axis_lower_profile_assembly
+        artifact: leader
+        name: lower_axis_profile
+      - source: dependencies
+        assembly: x_axis_rail_assembly
+        artifact: leader
+        name: rail
+      - source: dependencies
+        assembly: x_axis_rail_assembly
+        artifact: followers
+        name_template: "{name}"
+      - source: dependencies
+        assembly: sprite_extruder_left_assembly
+        artifact: leader
+        name: sprite_extruder_left
+      - source: dependencies
+        assembly: sprite_extruder_left_assembly
+        artifact: non_production_parts
+        name_template: "sprite_extruder_left_{name}"
+      - source: dependencies
+        assembly: sprite_extruder_right_assembly
+        artifact: leader
+        name: sprite_extruder_right
+      - source: dependencies
+        assembly: sprite_extruder_right_assembly
+        artifact: non_production_parts
+        name_template: "sprite_extruder_right_{name}"
+  Production:
+    parts: []
+
+Parts:
+  ExtrudersAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.extruders_assembly.create_extruders_assembly
