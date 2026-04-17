@@ -132,6 +132,43 @@ placement:
       to: x_axis_top_profile_assembly
       alignment: CENTER
 
+    - part: x_axis_top_profile_assembly
+      to: x_axis_lower_profile_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: x_axis_top_profile_assembly
+      to: x_axis_lower_profile_assembly
+      alignment: STACK_TOP
+      stack_gap:
+        $ref: x_axis_profile_stack_gap
+      rigid_attach: true
+    - part: x_axis_rail_assembly
+      to: x_axis_lower_profile_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: x_axis_rail_assembly
+      to: x_axis_lower_profile_assembly
+      alignment: STACK_TOP
+      rigid_attach: true
+    - part: x_axis_left_carriage_assembly
+      to: x_axis_rail_assembly
+      alignment: CENTER
+      axes: [0, 1]
+      post_translation:
+        - $ref: x_axis_left_carriage_x_offset
+        - 0
+        - $ref: x_axis_carriage_z_offset
+      rigid_attach: true
+    - part: x_axis_right_carriage_assembly
+      to: x_axis_rail_assembly
+      alignment: CENTER
+      axes: [0, 1]
+      post_translation:
+        - $ref: x_axis_right_carriage_x_offset
+        - 0
+        - $ref: x_axis_carriage_z_offset
+      rigid_attach: true
+
     - part: left_z_axis_profile_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left
       alignment: CENTER
@@ -193,49 +230,49 @@ placement:
         axis: [0, 0, 1]
         center: sprite_extruder_left_assembly.CENTER
     - part: sprite_extruder_left_assembly
-      to: x_axis_rail_assembly.followers.carriage_1
+      to: x_axis_left_carriage_assembly
       alignment: CENTER
       axes: [0]
     - part: sprite_extruder_left_assembly
-      to: x_axis_rail_assembly.followers.carriage_1
+      to: x_axis_left_carriage_assembly
       alignment: STACK_FRONT
+      stack_gap:
+        $ref: x_axis_sprite_extruder_carriage_stack_gap
     - part: sprite_extruder_left_assembly
-      to: x_axis_lower_profile_assembly
+      to: x_axis_rail_assembly
       alignment: TOP
+      post_translation:
+        - 0
+        - 0
+        - $ref: x_axis_sprite_extruder_rail_z_offset
+      rigid_attach: true
     - part: sprite_extruder_right_assembly
       post_rotation:
         angle: 180
         axis: [0, 0, 1]
         center: sprite_extruder_right_assembly.CENTER
     - part: sprite_extruder_right_assembly
-      to: x_axis_rail_assembly.followers.carriage_2
+      to: x_axis_right_carriage_assembly
       alignment: CENTER
       axes: [0]
     - part: sprite_extruder_right_assembly
-      to: x_axis_rail_assembly.followers.carriage_2
+      to: x_axis_right_carriage_assembly
       alignment: STACK_FRONT
+      stack_gap:
+        $ref: x_axis_sprite_extruder_carriage_stack_gap
     - part: sprite_extruder_right_assembly
-      to: x_axis_lower_profile_assembly
+      to: x_axis_rail_assembly
       alignment: TOP
-    - part: tool_head_mount_bottom_assembly.followers.carriage
-      to: x_axis_assembly.non_production_parts.carriage_1
-      alignment: CENTER
-
-    - part: tool_head_mount_top_assembly.followers.carriage
-      to: x_axis_assembly.non_production_parts.carriage_2
-      alignment: CENTER
-
-    - part: tool_head_mount_bottom_assembly.non_production_parts.hotend
+      post_translation:
+        - 0
+        - 0
+        - $ref: x_axis_sprite_extruder_rail_z_offset
+      rigid_attach: true
+    - part: sprite_extruder_left_assembly.non_production_parts.hotend
       to: print_bed_assembly.non_production_parts.print_bed_foil
       alignment: STACK_TOP
       stack_gap:
         $ref: nozzle_bed_reach_margin
-    - part: x_axis_assembly.non_production_parts.carriage_1
-      to: tool_head_mount_bottom_assembly.followers.carriage
-      alignment: CENTER
-    - part: tool_head_mount_top_assembly.followers.carriage
-      to: x_axis_assembly.non_production_parts.carriage_2
-      alignment: CENTER
     - part: left_z_axis_carriage_assembly.non_production_parts.x_axis_alignment_reference
       to: x_axis_assembly.non_production_parts.lower_axis_profile
       alignment: BOTTOM
@@ -444,6 +481,8 @@ assemblies:
       - x_axis_motor_mount_bottom_assembly
       - x_axis_motor_mount_top_assembly
       - x_axis_rail_assembly
+      - x_axis_left_carriage_assembly
+      - x_axis_right_carriage_assembly
       - x_axis_endstop_left_assembly
       - x_axis_endstop_right_assembly
     inject_parts:
@@ -454,6 +493,8 @@ assemblies:
       x_axis_motor_mount_bottom: x_axis_motor_mount_bottom_assembly
       x_axis_motor_mount_top: x_axis_motor_mount_top_assembly
       x_axis_rail: x_axis_rail_assembly
+      x_axis_left_carriage: x_axis_left_carriage_assembly
+      x_axis_right_carriage: x_axis_right_carriage_assembly
       x_axis_endstop_left: x_axis_endstop_left_assembly
       x_axis_endstop_right: x_axis_endstop_right_assembly
 
@@ -494,7 +535,6 @@ assemblies:
     parameters:
       profile_name: x_axis_lower_profile
       x_axis_profile_length: !Ref x_axis_profile_length
-      profile_z_offset: 0
 
   - name: x_axis_top_profile_assembly
 
@@ -503,7 +543,6 @@ assemblies:
     parameters:
       profile_name: x_axis_top_profile
       x_axis_profile_length: !Ref x_axis_profile_length
-      profile_z_offset: !Ref x_axis_profile_pitch
 
   - name: x_axis_motor_mount_bottom_assembly
 
@@ -528,13 +567,32 @@ assemblies:
   - name: x_axis_rail_assembly
 
     resource_file: x_axis_rail_assembly.yaml
-    depends_on:
-      - x_axis_lower_profile_assembly
-    inject_parts:
-      x_axis_lower_profile: x_axis_lower_profile_assembly
+    depends_on: []
     parameters:
       x_axis_rail_length: !Ref x_axis_rail_length
-      carriage_end_clearance: !Ref carriage_end_clearance
+
+  - name: x_axis_carriage_assembly
+
+    depends_on: []
+
+  - name: x_axis_left_carriage_assembly
+
+    resource_file: x_axis_carriage_assembly.yaml
+    depends_on: []
+
+  - name: x_axis_right_carriage_assembly
+
+    resource_file: x_axis_carriage_assembly.yaml
+    depends_on: []
+
+  - name: x_axis_profiles_rails_carriages_assembly
+
+    depends_on:
+      - x_axis_lower_profile_assembly
+      - x_axis_top_profile_assembly
+      - x_axis_rail_assembly
+      - x_axis_left_carriage_assembly
+      - x_axis_right_carriage_assembly
 
   - name: x_axis_endstop_left_assembly
 
@@ -1134,7 +1192,10 @@ assemblies:
 
     depends_on:
       - x_axis_lower_profile_assembly
+      - x_axis_top_profile_assembly
       - x_axis_rail_assembly
+      - x_axis_left_carriage_assembly
+      - x_axis_right_carriage_assembly
       - sprite_extruder_left_assembly
       - sprite_extruder_right_assembly
 
@@ -1183,21 +1244,35 @@ assemblies:
 
   - name: tool_head_mount_bottom_assembly
 
-    resource_file: tool_head_mount_assembly.yaml
+    resource_file: tool_head_mount_bottom_assembly.yaml
     depends_on:
-      - tool_head_bottom_assembly
+      - x_axis_lower_profile_assembly
+      - x_axis_top_profile_assembly
+      - x_axis_rail_assembly
+      - x_axis_left_carriage_assembly
+      - sprite_extruder_left_assembly
     inject_parts:
-      sprite_extruder: tool_head_bottom_assembly
+      carriage: x_axis_left_carriage_assembly
+      lower_axis_profile: x_axis_lower_profile_assembly
+      top_axis_profile: x_axis_top_profile_assembly
+      sprite_extruder: sprite_extruder_left_assembly
     parameters:
       drive_position: bottom
 
   - name: tool_head_mount_top_assembly
 
-    resource_file: tool_head_mount_assembly.yaml
+    resource_file: tool_head_mount_top_assembly.yaml
     depends_on:
-      - tool_head_top_assembly
+      - x_axis_lower_profile_assembly
+      - x_axis_top_profile_assembly
+      - x_axis_rail_assembly
+      - x_axis_right_carriage_assembly
+      - sprite_extruder_right_assembly
     inject_parts:
-      sprite_extruder: tool_head_top_assembly
+      carriage: x_axis_right_carriage_assembly
+      lower_axis_profile: x_axis_lower_profile_assembly
+      top_axis_profile: x_axis_top_profile_assembly
+      sprite_extruder: sprite_extruder_right_assembly
     parameters:
       drive_position: top
 

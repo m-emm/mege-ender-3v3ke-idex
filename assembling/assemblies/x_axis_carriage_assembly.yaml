@@ -1,0 +1,19 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for one standalone x-axis carriage
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: carriage
+  Production:
+    parts: []
+
+Parts:
+  XAxisCarriageAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_carriage_assembly.create_x_axis_carriage_assembly

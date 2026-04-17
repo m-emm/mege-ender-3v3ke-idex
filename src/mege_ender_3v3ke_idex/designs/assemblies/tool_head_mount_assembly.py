@@ -1,30 +1,8 @@
 """Declarative tool head mount assembly."""
 
-from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
-    ExtrusionProfileType,
-    create_alu_extrusion_profile,
-)
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt_belt_clamp
-from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12h_rail_with_carriages
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from shellforgepy.simple import *
-
-
-def _mounted_sprite_reference(tool_head_like):
-    if "sprite_extruder" in tool_head_like.non_production_indices_by_name:
-        return tool_head_like.get_non_production_part_by_name("sprite_extruder")
-    return tool_head_like.leader
-
-
-def _align_tool_head_like(tool_head_like, target, alignment, *, stack_gap=0):
-    if "sprite_extruder" in tool_head_like.non_production_indices_by_name:
-        return tool_head_like.aligned_from_non_production_part(
-            "sprite_extruder",
-            target,
-            alignment,
-            stack_gap=stack_gap,
-        )
-    return align(tool_head_like, target, alignment, stack_gap=stack_gap)
 
 
 def _create_sprite_mount_hole_guides(*, mount_hole_cutter):
@@ -185,30 +163,13 @@ def _create_top_clamp_shield_plate(
     return top_clamp_shield_plate
 
 
-def _align_tool_head_mount_to_carriage(tool_head_mount, target_carriage):
-    tool_head_mount = tool_head_mount.aligned_from_follower(
-        "carriage",
-        target_carriage,
-        Alignment.CENTER,
-    )
-    tool_head_mount = tool_head_mount.aligned_from_follower(
-        "carriage",
-        target_carriage,
-        Alignment.BACK,
-    )
-    return tool_head_mount.aligned_from_follower(
-        "carriage",
-        target_carriage,
-        Alignment.TOP,
-    )
-
-
 def _create_single_tool_head_mount(
     *,
+    carriage,
     lower_axis_profile,
+    top_axis_profile,
     sprite_extruder,
     extruder_mount_screw_size,
-    x_axis_profile_pitch,
     tool_head_mount_base_plate_height,
     tool_head_mount_base_plate_thickness,
     tool_head_mount_belt_clamp_base_thickness,
@@ -248,28 +209,9 @@ def _create_single_tool_head_mount(
             f"Unsupported tool head mount drive position: {drive_position}"
         )
 
-    top_axis_profile = translate(0, 0, x_axis_profile_pitch)(lower_axis_profile)
     belt_profile = (
         lower_axis_profile if drive_position == Alignment.BOTTOM else top_axis_profile
     )
-
-    rail_plus_carriage = create_mgn12h_rail_with_carriages(
-        length_mm=10,
-        carriage_offsets=[0],
-    )
-    rail_plus_carriage = align(
-        rail_plus_carriage,
-        lower_axis_profile,
-        Alignment.CENTER,
-        axes=[0, 1],
-    )
-    rail_plus_carriage = align(
-        rail_plus_carriage,
-        lower_axis_profile,
-        Alignment.STACK_TOP,
-    )
-
-    carriage = rail_plus_carriage.get_named_follower("carriage_1")
     carriage_size = get_bounding_box_size(carriage)
 
     base_plate_width = (
@@ -310,7 +252,7 @@ def _create_single_tool_head_mount(
         0,
         0,
     )(carriage_mount_plate)
-    carriage_mount_plate = rail_plus_carriage.use_as_cutter_on(carriage_mount_plate)
+    carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
 
     mount_base_plate = create_box(
         base_plate_width,
@@ -567,34 +509,10 @@ def _create_single_tool_head_mount(
         mount_base_plate = mount_base_plate.cut(clamp_cutter)
         mount_base_plate = mount_base_plate.cut(bases_cutter)
 
-    mount_sprite_extruder = rotate(180)(sprite_extruder.copy())
-    mount_sprite_extruder = _align_tool_head_like(
-        mount_sprite_extruder,
-        mount_base_plate,
-        Alignment.CENTER,
-    )
-    mount_sprite_extruder = _align_tool_head_like(
-        mount_sprite_extruder,
-        lower_axis_profile,
-        Alignment.TOP,
-    )
-    mount_sprite_extruder = _align_tool_head_like(
-        mount_sprite_extruder,
-        mount_base_plate,
-        Alignment.STACK_FRONT,
-        stack_gap=tool_head_mount_tool_head_base_plate_clearance,
-    )
-    mount_sprite_extruder = translate(
-        tool_head_mount_tool_head_x_offset,
-        0,
-        tool_head_mount_tool_head_z_offset,
-    )(mount_sprite_extruder)
-
-    sprite_extruder_reference = _mounted_sprite_reference(mount_sprite_extruder)
-    mount_hole_cutter = mount_sprite_extruder.get_named_cutter("mount_hole_cutter")
+    mount_hole_cutter = sprite_extruder.get_named_cutter("mount_hole_cutter")
 
     mount_base_plate = mount_base_plate.cut(mount_hole_cutter)
-    mount_base_plate = mount_base_plate.cut(sprite_extruder_reference)
+    mount_base_plate = mount_base_plate.cut(sprite_extruder.leader)
     sprite_mount_screws = _create_sprite_mount_screws(
         mount_hole_cutter=mount_hole_cutter,
         mount_base_plate=mount_base_plate,
@@ -610,8 +528,8 @@ def _create_single_tool_head_mount(
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
     extruder_cutout = align(extruder_cutout, carriage_mount_plate, Alignment.CENTER)
-    extruder_cutout = align(extruder_cutout, sprite_extruder_reference, Alignment.RIGHT)
-    extruder_cutout = align(extruder_cutout, sprite_extruder_reference, Alignment.BACK)
+    extruder_cutout = align(extruder_cutout, sprite_extruder, Alignment.RIGHT)
+    extruder_cutout = align(extruder_cutout, sprite_extruder, Alignment.BACK)
 
     carriage_mount_plate = carriage_mount_plate.cut(extruder_cutout)
 
@@ -702,7 +620,7 @@ def _create_single_tool_head_mount(
     top_box_right_extra_wall = create_box(tool_head_mount_top_box_wall, 22.5, 26)
 
     top_box_right_extra_wall = align(
-        top_box_right_extra_wall, sprite_extruder_reference, Alignment.CENTER
+        top_box_right_extra_wall, sprite_extruder, Alignment.CENTER
     )
 
     top_box_right_extra_wall = align(
@@ -710,10 +628,10 @@ def _create_single_tool_head_mount(
     )
 
     top_box_right_extra_wall = align(
-        top_box_right_extra_wall, sprite_extruder_reference, Alignment.STACK_RIGHT
+        top_box_right_extra_wall, sprite_extruder, Alignment.STACK_RIGHT
     )
     top_box_right_extra_wall = align(
-        top_box_right_extra_wall, sprite_extruder_reference, Alignment.BACK
+        top_box_right_extra_wall, sprite_extruder, Alignment.BACK
     )
 
     carriage_mount_plate = carriage_mount_plate.fuse(top_box_right_extra_wall)
@@ -723,7 +641,7 @@ def _create_single_tool_head_mount(
     tool_head_mount = tool_head_mount.fuse(mount_base_plate)
     tool_head_mount = tool_head_mount.fuse(lower_side_plates)
 
-    for name, cutter in mount_sprite_extruder.get_named_cutter_items():
+    for name, cutter in sprite_extruder.get_named_cutter_items():
         if "mount_hole" in name:
             tool_head_mount = tool_head_mount.cut(cutter)
 
@@ -741,19 +659,7 @@ def _create_single_tool_head_mount(
         clamp.get_follower_part_by_name("belt_clamp_base_2"),
         "belt_clamp_base_2",
     )
-    tool_head_mount.add_named_follower(carriage, "carriage")
-    tool_head_mount.add_named_non_production_part(rail_plus_carriage.leader, "rail")
-    tool_head_mount = tool_head_mount.merge_except_leader(mount_sprite_extruder)
-    if "nitehawk_holder" not in tool_head_mount.non_production_indices_by_name:
-        tool_head_mount.add_named_non_production_part(
-            mount_sprite_extruder.leader,
-            "nitehawk_holder",
-        )
-    if "sprite_extruder" not in tool_head_mount.non_production_indices_by_name:
-        tool_head_mount.add_named_non_production_part(
-            mount_sprite_extruder.leader,
-            "sprite_extruder",
-        )
+
     for side_name, screw in sprite_mount_screws:
         tool_head_mount.add_named_non_production_part(
             screw,
@@ -767,10 +673,11 @@ def _create_single_tool_head_mount(
 
 def create_tool_head_mount_assembly(
     *,
+    carriage,
+    lower_axis_profile,
+    top_axis_profile,
     sprite_extruder,
     extruder_mount_screw_size,
-    x_axis_profile_length,
-    x_axis_profile_pitch,
     tool_head_mount_base_plate_height,
     tool_head_mount_base_plate_thickness,
     tool_head_mount_belt_clamp_base_thickness,
@@ -816,18 +723,12 @@ def create_tool_head_mount_assembly(
     else:
         raise ValueError(f"Unsupported drive_position '{drive_position}'")
 
-    lower_axis_profile = create_alu_extrusion_profile(
-        ExtrusionProfileType.PROFILE_2020,
-        length_mm=x_axis_profile_length,
-    )
-    lower_axis_profile = rotate(90, axis=(0, 1, 0))(lower_axis_profile)
-    top_axis_profile = translate(0, 0, x_axis_profile_pitch)(lower_axis_profile)
-
     mount = _create_single_tool_head_mount(
+        carriage=carriage,
         lower_axis_profile=lower_axis_profile,
+        top_axis_profile=top_axis_profile,
         sprite_extruder=sprite_extruder,
         extruder_mount_screw_size=extruder_mount_screw_size,
-        x_axis_profile_pitch=x_axis_profile_pitch,
         tool_head_mount_base_plate_height=tool_head_mount_base_plate_height,
         tool_head_mount_base_plate_thickness=tool_head_mount_base_plate_thickness,
         tool_head_mount_belt_clamp_base_thickness=tool_head_mount_belt_clamp_base_thickness,
@@ -862,7 +763,5 @@ def create_tool_head_mount_assembly(
         drive_position=drive_alignment,
         big_thing=big_thing,
     )
-    mount.add_named_non_production_part(lower_axis_profile, "lower_axis_profile")
-    mount.add_named_non_production_part(top_axis_profile, "top_axis_profile")
     mount.additional_data["drive_position"] = normalized_drive_position
     return mount

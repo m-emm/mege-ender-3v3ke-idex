@@ -8,9 +8,7 @@ from shellforgepy.metrics import record_length_metric
 from shellforgepy.simple import *
 
 
-def create_x_axis_profile_assembly(
-    *, profile_name, x_axis_profile_length, profile_z_offset
-):
+def create_x_axis_profile_assembly(*, profile_name, x_axis_profile_length):
     """Create one x-axis profile in canonical local coordinates."""
 
     record_length_metric(
@@ -25,6 +23,4 @@ def create_x_axis_profile_assembly(
         length_mm=x_axis_profile_length,
     )
     profile = rotate(90, axis=(0, 1, 0))(profile)
-    profile = translate(0, 0, profile_z_offset)(profile)
-
     return LeaderFollowersCuttersPart(leader=profile)

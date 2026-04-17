@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for the x-axis rail and carriages
+Description: Assembly configuration for the standalone x-axis rail
 
 Builder:
   Visualization:
@@ -8,16 +8,11 @@ Builder:
       - source: self
         artifact: leader
         name: rail
-      - source: self
-        artifact: followers
-        name_template: "{name}"
   Production:
     parts: []
 
 Parameters:
   x_axis_rail_length:
-    Type: Float
-  carriage_end_clearance:
     Type: Float
 
 Parts:

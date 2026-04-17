@@ -10,13 +10,21 @@ Builder:
         artifact: leader
         name: lower_axis_profile
       - source: dependencies
+        assembly: x_axis_top_profile_assembly
+        artifact: leader
+        name: top_axis_profile
+      - source: dependencies
         assembly: x_axis_rail_assembly
         artifact: leader
         name: rail
       - source: dependencies
-        assembly: x_axis_rail_assembly
-        artifact: followers
-        name_template: "{name}"
+        assembly: x_axis_left_carriage_assembly
+        artifact: leader
+        name: left_carriage
+      - source: dependencies
+        assembly: x_axis_right_carriage_assembly
+        artifact: leader
+        name: right_carriage
       - source: dependencies
         assembly: sprite_extruder_left_assembly
         artifact: leader

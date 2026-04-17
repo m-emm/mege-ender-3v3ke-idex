@@ -1,0 +1,36 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Visualization assembly for the x-axis profiles, rail, and left/right carriages
+
+Builder:
+  Visualization:
+    parts:
+      - source: dependencies
+        assembly: x_axis_lower_profile_assembly
+        artifact: leader
+        name: lower_axis_profile
+      - source: dependencies
+        assembly: x_axis_top_profile_assembly
+        artifact: leader
+        name: top_axis_profile
+      - source: dependencies
+        assembly: x_axis_rail_assembly
+        artifact: leader
+        name: rail
+      - source: dependencies
+        assembly: x_axis_left_carriage_assembly
+        artifact: leader
+        name: left_carriage
+      - source: dependencies
+        assembly: x_axis_right_carriage_assembly
+        artifact: leader
+        name: right_carriage
+  Production:
+    parts: []
+
+Parts:
+  XAxisProfilesRailsCarriagesAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_profiles_rails_carriages_assembly.create_x_axis_profiles_rails_carriages_assembly

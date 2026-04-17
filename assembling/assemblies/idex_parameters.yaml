@@ -92,12 +92,27 @@ globals:
   x_axis_motor_axle_length: 14
   x_axis_profile_length: 600
   x_axis_profile_pitch: 48
+  x_axis_profile_stack_gap:
+    $expr:
+      "$sub": "${x_axis_profile_pitch} - 20"
   x_axis_rail_length: 450
+  x_axis_carriage_length: 45.4
+  x_axis_carriage_height: 10
   x_axis_x_travel: 355
   x_axis_x_travel_negative:
     $expr:
       "$sub": "-1 * ${x_axis_x_travel}"
   carriage_end_clearance: 3
+  x_axis_left_carriage_x_offset:
+    $expr:
+      "$sub": "-1 * ( ${x_axis_rail_length} / 2 - ${x_axis_carriage_length} / 2 - ${carriage_end_clearance} )"
+  x_axis_right_carriage_x_offset:
+    $expr:
+      "$sub": "${x_axis_rail_length} / 2 - ${x_axis_carriage_length} / 2 - ${carriage_end_clearance}"
+  x_axis_carriage_z_offset:
+    $ref: x_axis_carriage_height
+  x_axis_sprite_extruder_carriage_stack_gap: 8
+  x_axis_sprite_extruder_rail_z_offset: 2
   x_axis_carriage_stopper_width: 12
   x_axis_carriage_stopper_thickness: 8
   x_axis_carriage_stopper_depth: 25

@@ -602,6 +602,8 @@ def create_x_axis_assembly(
     x_axis_motor_mount_bottom,
     x_axis_motor_mount_top,
     x_axis_rail,
+    x_axis_left_carriage,
+    x_axis_right_carriage,
     x_axis_endstop_left,
     x_axis_endstop_right,
     BIG_THING,
@@ -615,7 +617,9 @@ def create_x_axis_assembly(
     lower_axis_profile = _get_leader_part(x_axis_lower_profile)
     top_axis_profile = _get_leader_part(x_axis_top_profile)
     axis_frame = lower_axis_profile.fuse(top_axis_profile)
-    rail_with_carriages = x_axis_rail
+    rail = _get_leader_part(x_axis_rail)
+    left_carriage = _get_leader_part(x_axis_left_carriage)
+    right_carriage = _get_leader_part(x_axis_right_carriage)
 
     mount_plates = PartCollector()
     mount_plate_connectors = PartCollector()
@@ -624,9 +628,9 @@ def create_x_axis_assembly(
     motors_fused_by_profile_position = {}
 
     non_production_parts = [
-        rail_with_carriages.get_follower_part_by_name("carriage_1"),
-        rail_with_carriages.get_follower_part_by_name("carriage_2"),
-        rail_with_carriages.leader,
+        left_carriage,
+        right_carriage,
+        rail,
         lower_axis_profile,
         top_axis_profile,
     ]
@@ -945,9 +949,9 @@ def create_x_axis_assembly(
             else x_axis_carriage_stopper_right
         )
         stopper = copy.deepcopy(stopper_template)
-        stopper = align(stopper, rail_with_carriages, Alignment.CENTER, axes=[0, 1])
-        stopper = align(stopper, rail_with_carriages, Alignment.BOTTOM)
-        stopper = align(stopper, rail_with_carriages, side_alignment.stack_alignment)
+        stopper = align(stopper, rail, Alignment.CENTER, axes=[0, 1])
+        stopper = align(stopper, rail, Alignment.BOTTOM)
+        stopper = align(stopper, rail, side_alignment.stack_alignment)
 
         retval.add_named_follower(
             stopper.leader,

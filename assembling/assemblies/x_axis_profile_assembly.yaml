@@ -16,8 +16,6 @@ Parameters:
     Type: String
   x_axis_profile_length:
     Type: Float
-  profile_z_offset:
-    Type: Float
 
 Parts:
   XAxisProfileAssembly:
