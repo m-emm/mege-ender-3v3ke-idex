@@ -112,6 +112,7 @@ globals:
   x_axis_carriage_z_offset:
     $ref: x_axis_carriage_height
   x_axis_sprite_extruder_carriage_stack_gap: 8
+  x_axis_sprite_extruder_carriage_x_offset: -10
   x_axis_sprite_extruder_rail_z_offset: 2
   x_axis_carriage_stopper_width: 12
   x_axis_carriage_stopper_thickness: 8
@@ -573,7 +574,7 @@ globals:
   tool_head_mount_tool_head_base_plate_clearance: 0.5
   tool_head_mount_tool_head_x_offset: 8
   tool_head_mount_tool_head_z_offset: 10
-  tool_head_mount_x_offset: 20
+  tool_head_mount_x_offset: 18
   tool_head_mount_y_extension:
     $expr:
       "$sub": "${tool_head_mount_side_plate_depth} + 1"

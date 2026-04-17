@@ -247,11 +247,8 @@ def _create_single_tool_head_mount(
         Alignment.STACK_TOP,
     )
     carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.BACK)
-    carriage_mount_plate = translate(
-        drive_position.sign * tool_head_mount_x_offset,
-        0,
-        0,
-    )(carriage_mount_plate)
+    carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.RIGHT if drive_position == Alignment.BOTTOM else Alignment.RIGHT)
+
     carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
 
     mount_base_plate = create_box(

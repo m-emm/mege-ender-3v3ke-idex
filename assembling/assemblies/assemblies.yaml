@@ -231,8 +231,11 @@ placement:
         center: sprite_extruder_left_assembly.CENTER
     - part: sprite_extruder_left_assembly
       to: x_axis_left_carriage_assembly
-      alignment: CENTER
-      axes: [0]
+      alignment: RIGHT
+      post_translation:
+        - $ref: x_axis_sprite_extruder_carriage_x_offset
+        - 0
+        - 0
     - part: sprite_extruder_left_assembly
       to: x_axis_left_carriage_assembly
       alignment: STACK_FRONT
@@ -253,8 +256,13 @@ placement:
         center: sprite_extruder_right_assembly.CENTER
     - part: sprite_extruder_right_assembly
       to: x_axis_right_carriage_assembly
-      alignment: CENTER
-      axes: [0]
+      alignment: LEFT
+      post_translation:
+        - $expr:
+            "$sub": "-1 * ${x_axis_sprite_extruder_carriage_x_offset}"
+        - 0
+        - 0
+
     - part: sprite_extruder_right_assembly
       to: x_axis_right_carriage_assembly
       alignment: STACK_FRONT
