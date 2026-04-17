@@ -91,24 +91,3 @@ Parts:
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.y_axis_rail_carrier_brackets_assembly.create_y_axis_rail_carrier_brackets_assembly
-      Properties:
-        y_axis_rail_carrier_bracket_outer_diameter:
-          $ref: y_axis_rail_carrier_bracket_outer_diameter
-        y_axis_rail_carrier_bracket_height:
-          $ref: y_axis_rail_carrier_bracket_height
-        y_axis_rail_carrier_bracket_profile_width:
-          $ref: y_axis_rail_carrier_bracket_profile_width
-        y_axis_rail_carrier_bracket_profile_wall:
-          $ref: y_axis_rail_carrier_bracket_profile_wall
-        y_axis_rail_carrier_bracket_mount_plate_thickness:
-          $ref: y_axis_rail_carrier_bracket_mount_plate_thickness
-        y_axis_rail_carrier_bracket_mount_plate_length:
-          $ref: y_axis_rail_carrier_bracket_mount_plate_length
-        y_axis_rail_carrier_bracket_mount_plate_fillet_radius:
-          $ref: y_axis_rail_carrier_bracket_mount_plate_fillet_radius
-        y_axis_rail_carrier_bracket_mount_screw_length:
-          $ref: y_axis_rail_carrier_bracket_mount_screw_length
-        y_axis_rail_carrier_bracket_mount_screw_size:
-          $ref: y_axis_rail_carrier_bracket_mount_screw_size
-        y_axis_rail_carrier_bracket_mount_screw_inset:
-          $ref: y_axis_rail_carrier_bracket_mount_screw_inset

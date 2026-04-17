@@ -25,10 +25,3 @@ Parts:
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_threaded_rod_assembly.create_z_axis_threaded_rod_assembly
-      Properties:
-        z_axis_threaded_rod_coupler_overlap:
-          $ref: z_axis_threaded_rod_coupler_overlap
-        z_axis_threaded_rod_diameter:
-          $ref: z_axis_threaded_rod_diameter
-        z_axis_threaded_rod_length:
-          $ref: z_axis_threaded_rod_length

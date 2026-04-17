@@ -29,8 +29,3 @@ Parts:
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_endstop_side_assembly.create_x_axis_endstop_side_assembly
-      Properties:
-        side:
-          $ref: side
-        carriage_end_rail_connector_thickness:
-          $ref: carriage_end_rail_connector_thickness

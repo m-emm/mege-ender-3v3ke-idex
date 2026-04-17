@@ -57,28 +57,3 @@ Parts:
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_endstop_assembly.create_x_axis_endstop_assembly
-      Properties:
-        x_axis_endstop_mount_base_depth:
-          $ref: x_axis_endstop_mount_base_depth
-        x_axis_endstop_mount_base_thickness:
-          $ref: x_axis_endstop_mount_base_thickness
-        x_axis_endstop_mount_base_fillet_radius:
-          $ref: x_axis_endstop_mount_base_fillet_radius
-        x_axis_endstop_mount_base_width:
-          $ref: x_axis_endstop_mount_base_width
-        x_axis_endstop_mount_base_inward_extension:
-          $ref: x_axis_endstop_mount_base_inward_extension
-        endstop_holder_mount_screw_size:
-          $ref: endstop_holder_mount_screw_size
-        endstop_holder_mount_screw_length:
-          $ref: endstop_holder_mount_screw_length
-        endstop_holder_groove_holder_length:
-          $ref: endstop_holder_groove_holder_length
-        endstop_holder_groove_holder_bottom_width:
-          $ref: endstop_holder_groove_holder_bottom_width
-        endstop_holder_groove_holder_top_width:
-          $ref: endstop_holder_groove_holder_top_width
-        endstop_holder_groove_holder_height:
-          $ref: endstop_holder_groove_holder_height
-        endstop_holder_groove_holder_slit:
-          $ref: endstop_holder_groove_holder_slit

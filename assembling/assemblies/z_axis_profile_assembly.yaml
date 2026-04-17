@@ -23,8 +23,3 @@ Parts:
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_profile_assembly.create_z_axis_profile_assembly
-      Properties:
-        side:
-          $ref: side
-        z_axis_profile_length:
-          $ref: z_axis_profile_length

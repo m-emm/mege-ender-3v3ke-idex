@@ -29,10 +29,3 @@ Parts:
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.printer_frame_assembly.create_printer_frame_assembly
-      Properties:
-        frame_inner_depth:
-          $ref: frame_inner_depth
-        frame_inner_width:
-          $ref: frame_inner_width
-        frame_profile_type:
-          $ref: frame_profile_type

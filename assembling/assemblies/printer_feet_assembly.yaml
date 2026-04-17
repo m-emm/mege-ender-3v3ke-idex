@@ -70,30 +70,3 @@ Parts:
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.printer_feet_assembly.create_printer_feet_assembly
-      Properties:
-        printer_foot_height:
-          $ref: printer_foot_height
-        printer_foot_base_size:
-          $ref: printer_foot_base_size
-        printer_foot_top_size:
-          $ref: printer_foot_top_size
-        printer_foot_screw_length:
-          $ref: printer_foot_screw_length
-        printer_foot_screw_cylinder_head_clearance:
-          $ref: printer_foot_screw_cylinder_head_clearance
-        printer_foot_mount_screw_size:
-          $ref: printer_foot_mount_screw_size
-        printer_foot_mount_screw_sink:
-          $ref: printer_foot_mount_screw_sink
-        printer_foot_groove_filler_width:
-          $ref: printer_foot_groove_filler_width
-        printer_foot_groove_filler_thickness:
-          $ref: printer_foot_groove_filler_thickness
-        tpu_slit_thickness:
-          $ref: tpu_slit_thickness
-        tpu_slit_clearance:
-          $ref: tpu_slit_clearance
-        tpu_slit_distance:
-          $ref: tpu_slit_distance
-        tpu_num_slits:
-          $ref: tpu_num_slits

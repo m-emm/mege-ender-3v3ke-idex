@@ -53,24 +53,3 @@ Parts:
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.creality_endstop_holder_assembly.create_creality_endstop_holder_assembly
-      Properties:
-        up:
-          $ref: up
-        out:
-          $ref: out
-        creality_endstop_holder_thickness:
-          $ref: creality_endstop_holder_thickness
-        creality_endstop_holder_bottom_clearance:
-          $ref: creality_endstop_holder_bottom_clearance
-        creality_endstop_holder_sink:
-          $ref: creality_endstop_holder_sink
-        creality_endstop_holder_length_oversize:
-          $ref: creality_endstop_holder_length_oversize
-        creality_endstop_holder_width_oversize:
-          $ref: creality_endstop_holder_width_oversize
-        creality_endstop_holder_board_clearance:
-          $ref: creality_endstop_holder_board_clearance
-        creality_endstop_holder_screw_size:
-          $ref: creality_endstop_holder_screw_size
-        creality_endstop_holder_nut_cutter_slack:
-          $ref: creality_endstop_holder_nut_cutter_slack

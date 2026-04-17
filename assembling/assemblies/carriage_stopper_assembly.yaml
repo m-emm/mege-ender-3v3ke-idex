@@ -43,18 +43,3 @@ Parts:
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.carriage_stopper_assembly.create_carriage_stopper_assembly
-      Properties:
-        stopper_width:
-          $ref: stopper_width
-        stopper_length:
-          $ref: stopper_length
-        stopper_thickness:
-          $ref: stopper_thickness
-        stopper_fillet_radius:
-          $ref: stopper_fillet_radius
-        mount_screw_size:
-          $ref: mount_screw_size
-        mount_screw_length:
-          $ref: mount_screw_length
-        no_fillets_at:
-          $ref: no_fillets_at

@@ -25,10 +25,3 @@ Parts:
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_profile_assembly.create_x_axis_profile_assembly
-      Properties:
-        profile_name:
-          $ref: profile_name
-        x_axis_profile_length:
-          $ref: x_axis_profile_length
-        profile_z_offset:
-          $ref: profile_z_offset
