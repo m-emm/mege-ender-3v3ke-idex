@@ -79,7 +79,11 @@ Parameters:
     Type: Float
   nitehawk_holder_fillet_radius:
     Type: Float
+  nitehawk_holder_extruder_gap:
+    Type: Float
   nitehawk_holder_height:
+    Type: Float
+  nitehawk_holder_height_offset:
     Type: Float
   nitehawk_holder_mount_screw_size:
     Type: String
@@ -96,6 +100,8 @@ Parameters:
   nitehawk_holder_thickness:
     Type: Float
   nitehawk_holder_width:
+    Type: Float
+  nitehawk_holder_width_offset:
     Type: Float
   nitehawk_hole_diameter:
     Type: Float

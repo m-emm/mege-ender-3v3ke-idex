@@ -3,6 +3,32 @@
 from shellforgepy.simple import *
 
 
+def _align_holder_to_extruder(
+    holder,
+    extruder,
+    *,
+    nitehawk_holder_extruder_gap,
+    nitehawk_holder_width_offset,
+    nitehawk_holder_height_offset,
+):
+    nitehawk_pcb = holder.get_named_non_production_part("nitehawk_pcb")
+    board_aligner = align_translation(nitehawk_pcb, extruder, Alignment.LEFT)
+    holder = board_aligner(holder)
+    holder = align(
+        holder,
+        extruder,
+        Alignment.STACK_BACK,
+        stack_gap=nitehawk_holder_extruder_gap,
+    )
+    holder = align(holder, extruder, Alignment.BOTTOM)
+    holder = translate(
+        nitehawk_holder_width_offset,
+        nitehawk_holder_height_offset,
+        0,
+    )(holder)
+    return holder
+
+
 def _create_nitehawk_board(
     *,
     nitehawk_width,
@@ -170,6 +196,7 @@ def _create_nitehawk_board(
 
 def create_nitehawk_holder_assembly(
     *,
+    sprite_extruder,
     nitehawk_board_angle,
     nitehawk_front_cutter_back_width,
     nitehawk_front_cutter_width,
@@ -215,6 +242,9 @@ def create_nitehawk_holder_assembly(
     nitehawk_umbilical_connector_gap,
     nitehawk_umbilical_connector_height,
     nitehawk_width,
+    nitehawk_holder_extruder_gap,
+    nitehawk_holder_width_offset,
+    nitehawk_holder_height_offset,
     BIG_THING,
 ):
     """Create the standalone nitehawk holder assembly."""
@@ -428,6 +458,12 @@ def create_nitehawk_holder_assembly(
 
     holder = rotate(-90, axis=(1, 0, 0))(holder)
     holder = rotate(180, axis=(0, 1, 0))(holder)
-    holder = rotate(180)(holder)
 
+    holder = _align_holder_to_extruder(
+        holder,
+        sprite_extruder,
+        nitehawk_holder_extruder_gap=nitehawk_holder_extruder_gap,
+        nitehawk_holder_width_offset=nitehawk_holder_width_offset,
+        nitehawk_holder_height_offset=nitehawk_holder_height_offset,
+    )
     return holder

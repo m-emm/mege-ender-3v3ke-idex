@@ -464,8 +464,16 @@ def _create_angled_fans(
     return fans
 
 
+def _align_fans_to_sprite_extruder(fans, sprite_extruder):
+    hotend = sprite_extruder.get_named_non_production_part("hotend")
+    hotend_center = get_bounding_box_center(hotend)
+    hotend_bbox = get_bounding_box(hotend)
+    return translate(hotend_center[0], hotend_center[1], hotend_bbox[0][2])(fans)
+
+
 def create_part_fan_assembly(
     *,
+    sprite_extruder,
     blower_center_offset,
     blowers_down_angle,
     blowers_duct_diameter,
@@ -574,4 +582,6 @@ def create_part_fan_assembly(
         hotend_alignment_reference,
         "hotend_alignment_reference",
     )
+
+    fans = _align_fans_to_sprite_extruder(fans, sprite_extruder)
     return fans
