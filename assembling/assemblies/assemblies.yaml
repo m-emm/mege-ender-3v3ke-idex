@@ -275,12 +275,103 @@ placement:
         - $ref: x_axis_sprite_extruder_rail_z_offset
       rigid_attach: true
 
+    - part: nitehawk_holder_left_assembly.non_production_parts.nitehawk_pcb
+      to: sprite_extruder_left_assembly
+      alignment: LEFT
+    - part: nitehawk_holder_left_assembly
+      to: sprite_extruder_left_assembly
+      alignment: STACK_BACK
+      stack_gap:
+        $ref: nitehawk_holder_extruder_gap
+    - part: nitehawk_holder_left_assembly
+      to: sprite_extruder_left_assembly
+      alignment: BOTTOM
+      post_translation:
+        - $ref: nitehawk_holder_width_offset
+        - $ref: nitehawk_holder_height_offset
+        - 0
+      rigid_attach: true
+
+    - part: nitehawk_holder_right_assembly.non_production_parts.nitehawk_pcb
+      to: sprite_extruder_right_assembly
+      alignment: LEFT
+    - part: nitehawk_holder_right_assembly
+      to: sprite_extruder_right_assembly
+      alignment: STACK_BACK
+      stack_gap:
+        $ref: nitehawk_holder_extruder_gap
+    - part: nitehawk_holder_right_assembly
+      to: sprite_extruder_right_assembly
+      alignment: BOTTOM
+      post_translation:
+        - $ref: nitehawk_holder_width_offset
+        - $ref: nitehawk_holder_height_offset
+        - 0
+      rigid_attach: true
+
+    - part: part_fan_left_assembly.non_production_parts.hotend_alignment_reference
+      to: sprite_extruder_left_assembly.non_production_parts.hotend
+      alignment: CENTER
+      axes: [0, 1]
+    - part: part_fan_left_assembly.non_production_parts.hotend_alignment_reference
+      to: sprite_extruder_left_assembly.non_production_parts.hotend
+      alignment: BOTTOM
+      rigid_attach: true
+
+    - part: part_fan_right_assembly.non_production_parts.hotend_alignment_reference
+      to: sprite_extruder_right_assembly.non_production_parts.hotend
+      alignment: CENTER
+      axes: [0, 1]
+    - part: part_fan_right_assembly.non_production_parts.hotend_alignment_reference
+      to: sprite_extruder_right_assembly.non_production_parts.hotend
+      alignment: BOTTOM
+      rigid_attach: true
+
     - part: tool_head_mount_bottom_assembly
       to: sprite_extruder_left_assembly
       rigid_attach: true
     - part: tool_head_mount_top_assembly
       to: sprite_extruder_right_assembly
       rigid_attach: true
+
+    - part: sprite_extruder_left_assembly
+      to: x_axis_assembly.non_production_parts.carriage_1
+      alignment: RIGHT
+      post_translation:
+        - $ref: x_axis_sprite_extruder_carriage_x_offset
+        - 0
+        - 0
+    - part: sprite_extruder_left_assembly
+      to: x_axis_assembly.non_production_parts.carriage_1
+      alignment: STACK_FRONT
+      stack_gap:
+        $ref: x_axis_sprite_extruder_carriage_stack_gap
+    - part: sprite_extruder_left_assembly
+      to: x_axis_assembly.non_production_parts.rail
+      alignment: TOP
+      post_translation:
+        - 0
+        - 0
+        - $ref: x_axis_sprite_extruder_rail_z_offset
+    - part: sprite_extruder_right_assembly
+      to: x_axis_assembly.non_production_parts.carriage_2
+      alignment: LEFT
+      post_translation:
+        - $ref: x_axis_sprite_extruder_carriage_x_offset
+        - 0
+        - 0
+    - part: sprite_extruder_right_assembly
+      to: x_axis_assembly.non_production_parts.carriage_2
+      alignment: STACK_FRONT
+      stack_gap:
+        $ref: x_axis_sprite_extruder_carriage_stack_gap
+    - part: sprite_extruder_right_assembly
+      to: x_axis_assembly.non_production_parts.rail
+      alignment: TOP
+      post_translation:
+        - 0
+        - 0
+        - $ref: x_axis_sprite_extruder_rail_z_offset
 
     - part: x_axis_assembly
       to: x_axis_rail_assembly
@@ -1189,6 +1280,12 @@ assemblies:
       - z_axis_assembly
       - z_axis_top_bridge_profile_assembly
       - x_axis_assembly
+      - sprite_extruder_left_assembly
+      - sprite_extruder_right_assembly
+      - nitehawk_holder_left_assembly
+      - nitehawk_holder_right_assembly
+      - part_fan_left_assembly
+      - part_fan_right_assembly
       - tool_head_mount_bottom_assembly
       - tool_head_mount_top_assembly
 
@@ -1221,6 +1318,16 @@ assemblies:
 
     depends_on: []
 
+  - name: nitehawk_holder_left_assembly
+
+    resource_file: nitehawk_holder_assembly.yaml
+    depends_on: []
+
+  - name: nitehawk_holder_right_assembly
+
+    resource_file: nitehawk_holder_assembly.yaml
+    depends_on: []
+
   - name: part_fan_assembly
 
     depends_on: []
@@ -1236,29 +1343,39 @@ assemblies:
       nitehawk_holder: nitehawk_holder_assembly
       part_fans: part_fan_assembly
 
-  - name: tool_head_bottom_assembly
+  - name: part_fan_left_assembly
+
+    resource_file: part_fan_assembly.yaml
+    depends_on: []
+
+  - name: part_fan_right_assembly
+
+    resource_file: part_fan_assembly.yaml
+    depends_on: []
+
+  - name: tool_head_left_assembly
 
     resource_file: tool_head_assembly.yaml
     depends_on:
       - sprite_extruder_left_assembly
-      - nitehawk_holder_assembly
-      - part_fan_assembly
+      - nitehawk_holder_left_assembly
+      - part_fan_left_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_left_assembly
-      nitehawk_holder: nitehawk_holder_assembly
-      part_fans: part_fan_assembly
+      nitehawk_holder: nitehawk_holder_left_assembly
+      part_fans: part_fan_left_assembly
 
-  - name: tool_head_top_assembly
+  - name: tool_head_right_assembly
 
     resource_file: tool_head_assembly.yaml
     depends_on:
       - sprite_extruder_right_assembly
-      - nitehawk_holder_assembly
-      - part_fan_assembly
+      - nitehawk_holder_right_assembly
+      - part_fan_right_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_right_assembly
-      nitehawk_holder: nitehawk_holder_assembly
-      part_fans: part_fan_assembly
+      nitehawk_holder: nitehawk_holder_right_assembly
+      part_fans: part_fan_right_assembly
 
   - name: tool_head_mount_bottom_assembly
 

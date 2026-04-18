@@ -1,40 +1,6 @@
 """Declarative tool head assembly composed from assembly dependencies."""
 
-from shellforgepy.construct.alignment_operations import align_translation
 from shellforgepy.simple import *
-
-
-def _align_holder_to_extruder(
-    holder,
-    extruder,
-    *,
-    nitehawk_holder_extruder_gap,
-    nitehawk_holder_width_offset,
-    nitehawk_holder_height_offset,
-):
-    nitehawk_pcb = holder.get_named_non_production_part("nitehawk_pcb")
-    board_aligner = align_translation(nitehawk_pcb, extruder, Alignment.LEFT)
-    holder = board_aligner(holder)
-    holder = align(
-        holder,
-        extruder,
-        Alignment.STACK_BACK,
-        stack_gap=nitehawk_holder_extruder_gap,
-    )
-    holder = align(holder, extruder, Alignment.BOTTOM)
-    holder = translate(
-        nitehawk_holder_width_offset,
-        nitehawk_holder_height_offset,
-        0,
-    )(holder)
-    return holder
-
-
-def _align_fans_to_sprite_extruder(fans, sprite_extruder):
-    hotend = sprite_extruder.get_named_non_production_part("hotend")
-    hotend_center = get_bounding_box_center(hotend)
-    hotend_bbox = get_bounding_box(hotend)
-    return translate(hotend_center[0], hotend_center[1], hotend_bbox[0][2])(fans)
 
 
 def create_tool_head_assembly(
@@ -70,13 +36,14 @@ def create_tool_head_assembly(
 ):
     """Create the tool head assembly from built subassemblies."""
 
-    holder = _align_holder_to_extruder(
-        nitehawk_holder,
-        sprite_extruder,
-        nitehawk_holder_extruder_gap=nitehawk_holder_extruder_gap,
-        nitehawk_holder_width_offset=nitehawk_holder_width_offset,
-        nitehawk_holder_height_offset=nitehawk_holder_height_offset,
-    )
+    # The holder and fan assemblies are positioned relative to the injected
+    # sprite extruder through global YAML placement steps before this assembly
+    # is built, so the assembly generator only consumes their resolved poses.
+    del nitehawk_holder_extruder_gap
+    del nitehawk_holder_height_offset
+    del nitehawk_holder_width_offset
+
+    holder = nitehawk_holder
 
     holder_mount_plates = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
@@ -120,7 +87,7 @@ def create_tool_head_assembly(
         "sprite_extruder",
     )
 
-    fans = _align_fans_to_sprite_extruder(part_fans, sprite_extruder)
+    fans = part_fans
     retval = retval.merge_except_leader(fans)
     retval.add_named_non_production_part(fans.leader, "part_fans")
 

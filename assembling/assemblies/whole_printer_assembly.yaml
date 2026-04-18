@@ -4,6 +4,14 @@ Description: Whole printer scene composed from declarative subassemblies
 
 Builder:
   Visualization:
+    preview:
+      enabled: true
+      views:
+        - front_angle
+        - isometric
+        - left
+      width: 512
+      height: 512
     parts:
       - source: dependencies
         assembly: printer_frame_assembly
@@ -313,6 +321,86 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: dependencies
+        assembly: sprite_extruder_left_assembly
+        artifact: leader
+        name: sprite_extruder_left
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: sprite_extruder_left_assembly
+        artifact: non_production_parts
+        name_template: "sprite_extruder_left_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: nitehawk_holder_left_assembly
+        artifact: leader
+        name: nitehawk_holder_left
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: nitehawk_holder_left_assembly
+        artifact: non_production_parts
+        name_template: "nitehawk_holder_left_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: part_fan_left_assembly
+        artifact: leader
+        name: part_fan_left
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: part_fan_left_assembly
+        artifact: followers
+        names:
+          - blower_ducts
+        name_template: "part_fan_left_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
         assembly: tool_head_mount_bottom_assembly
         artifact: leader
         name: tool_head_mount_bottom
@@ -329,7 +417,6 @@ Builder:
         assembly: tool_head_mount_bottom_assembly
         artifact: followers
         names:
-          - blower_ducts
           - belt_clamp_base_1
           - belt_clamp_base_2
         name_template: "tool_head_mount_bottom_{name}"
@@ -377,7 +464,6 @@ Builder:
         assembly: tool_head_mount_top_assembly
         artifact: followers
         names:
-          - blower_ducts
           - belt_clamp_base_1
           - belt_clamp_base_2
         name_template: "tool_head_mount_top_{name}"
@@ -399,6 +485,86 @@ Builder:
           - lower_axis_profile
           - top_axis_profile
         name_template: "tool_head_mount_top_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: sprite_extruder_right_assembly
+        artifact: leader
+        name: sprite_extruder_right
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: sprite_extruder_right_assembly
+        artifact: non_production_parts
+        name_template: "sprite_extruder_right_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: nitehawk_holder_right_assembly
+        artifact: leader
+        name: nitehawk_holder_right
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: nitehawk_holder_right_assembly
+        artifact: non_production_parts
+        name_template: "nitehawk_holder_right_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: part_fan_right_assembly
+        artifact: leader
+        name: part_fan_right
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: part_fan_right_assembly
+        artifact: followers
+        names:
+          - blower_ducts
+        name_template: "part_fan_right_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }

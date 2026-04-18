@@ -564,4 +564,14 @@ def create_part_fan_assembly(
             ducts = ducts.fuse(follower)
 
     fans.add_named_follower(ducts, "blower_ducts")
+    hotend_alignment_reference = create_box(
+        0.1,
+        0.1,
+        0.1,
+        origin=(-0.05, -0.05, 0),
+    )
+    fans.add_named_non_production_part(
+        hotend_alignment_reference,
+        "hotend_alignment_reference",
+    )
     return fans
