@@ -18,6 +18,11 @@ Builder:
         exclude_names:
           - nitehawk_pcb
         name_template: "{name}"
+      - source: injected
+        assembly: sprite_extruder
+        artifact: all
+
+
   Production:
     process_data:
       source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PETGCF_04_HS

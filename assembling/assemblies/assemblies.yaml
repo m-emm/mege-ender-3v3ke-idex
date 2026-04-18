@@ -337,6 +337,14 @@ placement:
         - 0
         - $ref: x_axis_sprite_extruder_rail_z_offset
 
+    - part: tool_head_left_assembly
+      to: sprite_extruder_left_assembly
+      rigid_attach: true
+
+    - part: tool_head_right_assembly
+      to: sprite_extruder_right_assembly
+      rigid_attach: true
+
     - part: x_axis_assembly
       to: x_axis_rail_assembly
       rigid_attach: true

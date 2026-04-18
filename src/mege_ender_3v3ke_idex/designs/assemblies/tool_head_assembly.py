@@ -61,8 +61,8 @@ def create_tool_head_assembly(
                 holder_mount_plate_size,
             )
             mount_box = align(mount_box, holder_mount_plate, Alignment.CENTER)
-            mount_box = align(mount_box, holder_mount_plate, Alignment.FRONT)
-            mount_box = align(mount_box, holder_mount_plate, Alignment.STACK_LEFT)
+            mount_box = align(mount_box, holder_mount_plate, Alignment.BACK)
+            mount_box = align(mount_box, holder_mount_plate, Alignment.STACK_RIGHT)
             holder_mount_plate = holder_mount_plate.fuse(mount_box)
 
         holder_mount_plate = align(holder_mount_plate, holder, Alignment.CENTER)
@@ -72,7 +72,7 @@ def create_tool_head_assembly(
             sprite_extruder,
             lr.stack_alignment,
         )
-        holder_mount_plate = align(holder_mount_plate, holder, Alignment.BACK)
+        holder_mount_plate = align(holder_mount_plate, holder, Alignment.FRONT)
         holder_mount_plate = translate(0, 0, -holder_mount_plate_top_offset)(
             holder_mount_plate
         )
@@ -80,12 +80,8 @@ def create_tool_head_assembly(
 
     holder = holder.fuse(holder_mount_plates)
 
-    retval = sprite_extruder
-    retval = retval.merge_except_leader(holder)
-    retval.add_named_non_production_part(
-        sprite_extruder.leaders_followers_fused(),
-        "sprite_extruder",
-    )
+    
+    retval = holder
 
     fans = part_fans
     retval = retval.merge_except_leader(fans)
@@ -101,12 +97,12 @@ def create_tool_head_assembly(
         no_fillets_at=[Alignment.LEFT, Alignment.RIGHT, Alignment.BOTTOM],
     )
     side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.CENTER)
-    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.BACK)
+    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.FRONT)
     side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.BOTTOM)
     side_mount_plate = align(
         side_mount_plate,
         sprite_extruder,
-        Alignment.STACK_RIGHT,
+        Alignment.STACK_LEFT,
         stack_gap=tool_head_additional_mount_plate_clearance,
     )
     side_mount_plate = translate(
