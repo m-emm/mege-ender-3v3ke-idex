@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for a single tool head mount
+Description: Assembly configuration for the tool head mount
 
 Builder:
   Visualization:
@@ -12,7 +12,6 @@ Builder:
         - left
       width: 512
       height: 512
-
     parts:
       - source: self
         artifact: leader
@@ -23,13 +22,36 @@ Builder:
           - blower_ducts
           - belt_clamp_base_1
           - belt_clamp_base_2
-          - carriage
         name_template: "{name}"
       - source: self
         artifact: non_production_parts
         exclude_names:
           - nitehawk_pcb
         name_template: "{name}"
+      - source: dependencies
+        assembly: x_axis_lower_profile_assembly
+        artifact: leader
+        name: lower_axis_profile
+      - source: dependencies
+        assembly: x_axis_top_profile_assembly
+        artifact: leader
+        name: top_axis_profile
+      - source: dependencies
+        assembly: x_axis_rail_assembly
+        artifact: leader
+        name: rail
+      - source: injected
+        assembly: carriage
+        artifact: leader
+        name: carriage
+      - source: injected
+        assembly: sprite_extruder
+        artifact: leader
+        name: sprite_extruder
+      - source: injected
+        assembly: sprite_extruder
+        artifact: non_production_parts
+        name_template: "sprite_extruder_{name}"
   Production:
     parts:
       - source: self
@@ -71,10 +93,6 @@ Builder:
 Parameters:
   extruder_mount_screw_size:
     Type: String
-  x_axis_profile_length:
-    Type: Float
-  x_axis_profile_pitch:
-    Type: Float
   tool_head_mount_base_plate_height:
     Type: Float
   tool_head_mount_base_plate_thickness:

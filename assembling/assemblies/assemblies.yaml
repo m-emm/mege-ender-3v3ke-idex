@@ -1371,7 +1371,7 @@ assemblies:
 
   - name: tool_head_mount_bottom_assembly
 
-    resource_file: tool_head_mount_bottom_assembly.yaml
+    resource_file: tool_head_mount_assembly.yaml
     depends_on:
       - x_axis_lower_profile_assembly
       - x_axis_rail_assembly
@@ -1386,7 +1386,7 @@ assemblies:
 
   - name: tool_head_mount_top_assembly
 
-    resource_file: tool_head_mount_top_assembly.yaml
+    resource_file: tool_head_mount_assembly.yaml
     depends_on:
       - x_axis_top_profile_assembly
       - x_axis_rail_assembly
