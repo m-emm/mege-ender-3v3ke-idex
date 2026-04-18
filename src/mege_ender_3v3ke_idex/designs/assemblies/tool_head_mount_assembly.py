@@ -166,8 +166,7 @@ def _create_top_clamp_shield_plate(
 def _create_single_tool_head_mount(
     *,
     carriage,
-    lower_axis_profile,
-    top_axis_profile,
+    axis_profile,
     sprite_extruder,
     extruder_mount_screw_size,
     tool_head_mount_base_plate_height,
@@ -209,9 +208,6 @@ def _create_single_tool_head_mount(
             f"Unsupported tool head mount drive position: {drive_position}"
         )
 
-    belt_profile = (
-        lower_axis_profile if drive_position == Alignment.BOTTOM else top_axis_profile
-    )
     carriage_size = get_bounding_box_size(carriage)
 
     base_plate_width = (
@@ -247,7 +243,11 @@ def _create_single_tool_head_mount(
         Alignment.STACK_TOP,
     )
     carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.BACK)
-    carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.RIGHT if drive_position == Alignment.BOTTOM else Alignment.RIGHT)
+    carriage_mount_plate = align(
+        carriage_mount_plate,
+        carriage,
+        Alignment.RIGHT if drive_position == Alignment.BOTTOM else Alignment.RIGHT,
+    )
 
     carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
 
@@ -285,7 +285,7 @@ def _create_single_tool_head_mount(
     if drive_position == Alignment.TOP:
         upper_side_plates = _create_upper_side_plates(
             carriage_mount_plate=carriage_mount_plate,
-            belt_profile=belt_profile,
+            belt_profile=axis_profile,
             rotated_clamp=clamp_1,
             tool_head_mount_base_plate_height=tool_head_mount_base_plate_height,
             tool_head_mount_carriage_mount_plate_thickness=tool_head_mount_carriage_mount_plate_thickness,
@@ -306,7 +306,7 @@ def _create_single_tool_head_mount(
     clamp_1 = align(clamp_1, clamp_support_plate, Alignment.CENTER, axes=[0])
     clamp_1 = align(clamp_1, clamp_side_plates, Alignment.BACK)
     clamp_1 = align(clamp_1, clamp_side_plates, Alignment.STACK_LEFT)
-    clamp_1 = align(clamp_1, belt_profile, Alignment.CENTER, axes=[2])
+    clamp_1 = align(clamp_1, axis_profile, Alignment.CENTER, axes=[2])
 
     clamp_1_center = get_bounding_box_center(clamp_1)
     clamp_2 = rotate(180, axis=(0, 1, 0), center=clamp_1_center)(clamp_1)
@@ -407,7 +407,7 @@ def _create_single_tool_head_mount(
         )
         belt_deflector = align(
             belt_deflector,
-            belt_profile,
+            axis_profile,
             Alignment.STACK_FRONT,
             stack_gap=-tool_head_mount_belt_deflector_into_profile_distance,
         )
@@ -671,8 +671,7 @@ def _create_single_tool_head_mount(
 def create_tool_head_mount_assembly(
     *,
     carriage,
-    lower_axis_profile,
-    top_axis_profile,
+    axis_profile,
     sprite_extruder,
     extruder_mount_screw_size,
     tool_head_mount_base_plate_height,
@@ -722,8 +721,7 @@ def create_tool_head_mount_assembly(
 
     mount = _create_single_tool_head_mount(
         carriage=carriage,
-        lower_axis_profile=lower_axis_profile,
-        top_axis_profile=top_axis_profile,
+        axis_profile=axis_profile,
         sprite_extruder=sprite_extruder,
         extruder_mount_screw_size=extruder_mount_screw_size,
         tool_head_mount_base_plate_height=tool_head_mount_base_plate_height,

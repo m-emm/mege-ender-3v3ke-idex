@@ -622,3 +622,275 @@ The resulting system is:
 - expressive enough for the current problem
 - acyclic at the geometry level
 - cache-friendly
+
+## Possible extension: `rigid_attach`
+
+The new x-axis / extruder work exposes a real gap in the current placement model.
+
+Today one placement step only ever moves the owning assembly named by `part`.
+That is the current architecture:
+- placement state stores transform history per assembly
+- scene updates are applied by `assembly_name`
+- the existing builder tests explicitly verify that one placement step moves only the owning assembly
+
+So the current system does this correctly:
+- align `sprite_extruder_left_assembly` to a carriage or profile
+- remember that placed pose for later references
+
+But it does not do this:
+- when `x_axis_assembly` is moved later, automatically drag the already placed left and right extruder assemblies along with it
+
+That means the need is real.
+It is not already solved by the current placement state structure.
+
+At the same time, this is not "impossible" today in a strict sense.
+The same final scene can still be achieved with the current system by using less attractive patterns:
+- repeat the extruder alignment later after every relevant x-axis move
+- fold the extruders into a larger geometry assembly so they are no longer independent scene assemblies
+- reintroduce Python-side assembly composition logic that manually reapplies those transforms
+
+Those options all work against the current design goals:
+- lean dependency graphs
+- one readable global placement script
+- independently buildable assemblies
+- no return to builder-script placement magic
+
+So the right conclusion is:
+- `rigid_attach` is feasible
+- it fits the scene-placement architecture
+- it is not mathematically necessary for final pose solvability
+- but it is necessary if the goal is to keep the placement graph lean while allowing independently built assemblies to become rigid subassemblies over time
+
+## Why a wrapper assembly is not enough
+
+The current `extruders_assembly` is a useful scene wrapper, but it does not by itself solve this problem.
+
+Why:
+- its visualization is composed from dependency assemblies
+- those scene parts keep their original `assembly_name`
+- placement transforms are currently applied by `assembly_name`
+
+So moving `extruders_assembly` would not automatically move `sprite_extruder_left_assembly`, `sprite_extruder_right_assembly`, `x_axis_lower_profile_assembly`, and `x_axis_rail_assembly` as one rigid unit unless the placement engine itself grows a notion of shared pose ownership.
+
+This is exactly why the missing primitive is not "another wrapper assembly", but "these assemblies now move as one".
+
+## Important selector detail
+
+`rigid_attach` should attach owning assemblies, not arbitrary selected subparts.
+
+So this entry:
+
+```yaml
+- part: sprite_extruder_left_assembly
+  to: x_axis_lower_profile_assembly
+  alignment: TOP
+  rigid_attach: true
+```
+
+would rigidly couple:
+- `sprite_extruder_left_assembly`
+- `x_axis_lower_profile_assembly`
+
+It would not automatically couple the extruder to `x_axis_assembly` unless `x_axis_assembly` and `x_axis_lower_profile_assembly` had themselves already become part of one rigid placement group.
+
+For the stated goal, the more important case is usually to attach the extruder to an anchor owned by `x_axis_assembly`, for example:
+
+```yaml
+- part: sprite_extruder_left_assembly
+  to: x_axis_assembly.non_production_parts.lower_axis_profile
+  alignment: TOP
+  rigid_attach: true
+```
+
+That way, later moves of `x_axis_assembly` would also move the extruder.
+
+## Proposed semantics
+
+The cleanest interpretation is:
+- `rigid_attach: true` is optional on a placement entry
+- it is valid only when `to` is present
+- normal alignment, optional post rotation, and optional post translation run first
+- after that step completes, the owning assembly of `part` and the owning assembly of `to` are merged into one rigid placement group
+- from then on, any later transform applied to any member of that rigid group is applied to all members of that group
+- rigid attachment is transitive
+- rigid attachment is monotonic
+- there is no detach operation in the first version
+
+This matches the physical interpretation well:
+- assemblies can be built independently
+- they can be positioned relative to one another
+- at some point they become bolted together
+- after that, scene motion applies to the whole rigid subassembly
+
+It also fits the existing placement philosophy:
+- still one global ordered script
+- still based on `align(...)` semantics
+- still no mates, planes, or generic constraint solver
+- still no geometry dependency loop
+
+## What should happen after attachment
+
+After two assemblies become rigidly attached:
+- a later move of the original source must move the original target too
+- a later move of the original target must move the original source too
+- a later move of any third assembly rigidly attached to either one must move the whole merged set
+
+That means `rigid_attach` is not just "remember that this alignment happened".
+It is a transform propagation rule for all later placement steps.
+
+It also means later placement steps that try to change the relative pose inside one already attached rigid group should be treated as invalid or redundant.
+The first implementation should prefer strict validation over trying to silently guess intent. Placement / alignment operations where there is a path in the "rigid_attach" graph between the assemblies implicated by the  "part:" and the "to:" immediately raise an exception.
+
+## What it would require in code
+
+### 1. YAML and validation
+
+The placement schema would need one new optional field:
+- `rigid_attach: true`
+
+Validation rules should include:
+- `rigid_attach` requires `to`
+- `rigid_attach` applies to owning assemblies, not only to the selected anchors
+- attaching two assemblies already in the same rigid group should either be a no-op or a validation error
+- a later placement step that tries to move one rigid-group member relative to another rigid-group member should fail clearly
+
+### 2. Placement runtime state in `builder.py`
+
+The eager placement execution state would need rigid-group tracking in addition to per-assembly transform history.
+
+The best implementation hint here is to use a dedicated undirected `networkx.Graph` as the rigidity graph.
+
+Shape:
+- nodes are assembly names
+- an undirected edge means "these two assemblies became rigidly attached at some placement step"
+- rigid groups are exactly the connected components of that graph
+
+That makes the core queries trivial and readable:
+- "are `A` and `B` rigidly connected?" means "are they in the same connected component?"
+- "give me everything rigidly connected to `A`" means `node_connected_component(...)`
+- "how many rigid groups exist, and what are their members?" means `connected_components(...)`
+
+This is a good fit here because the builder already uses `networkx` for graph reasoning, and the rigidity concept is naturally graph-shaped rather than list-shaped.
+
+When a placement step executes:
+- resolve the moving assembly
+- resolve the target assembly
+- determine the current rigid group of the moving assembly from the rigidity graph
+- apply the computed transforms to every member of that moving rigid group, not only to the moving assembly
+- if `rigid_attach: true`, add an edge between the owning assemblies of `part` and `to` after the step completes
+
+The current transform model can still work.
+Because transforms are ordinary translate / rotate functions, the first implementation can keep per-assembly histories and simply append the same step transforms to every assembly in the affected rigid group.
+
+### 3. Final scene placement in `_apply_placement_alignments(...)`
+
+The non-eager final scene placement path must mirror the same semantics.
+
+Today `_apply_transform_to_scene_parts(...)` updates scene parts by matching `assembly_name`.
+With rigid attachment, the caller would need to:
+- determine the current rigid group of the moving assembly
+- apply the step transform to every scene part whose `assembly_name` belongs to that rigid group
+- merge groups after a `rigid_attach` step
+
+Without that mirrored logic, eager placement during build and final scene export would diverge.
+
+### 4. Placement graph model in `graph_model.py`
+
+This is the subtle part.
+
+The current graph model reasons about placement steps mostly in terms of the moving assembly and the target assembly.
+With rigid attachment, later motion of assembly `B` may also move previously attached assembly `A`, even if `A` is not named as the moving assembly of that later step.
+
+So the graph model would need to simulate rigid-group growth while it walks the ordered placement script.
+The cleanest way to do that is again with an undirected `networkx.Graph` that is updated step by step while the placement DAG is constructed.
+
+Concretely:
+- `PlacementStep` should carry `rigid_attach`
+- placement DAG construction should track rigid groups while iterating through the steps
+- the current rigid group of any assembly should be derived from the current connected component in that rigidity graph
+- the predecessor set for a step should be derived from the latest placement event that affected any member of the moving rigid group and any member of the target rigid group
+- after a step with `rigid_attach`, the graph model should add the new rigidity edge so subsequent steps see the merged connected component
+
+This matters for scheduling as well:
+- if a later move of `x_axis_assembly` also moves `sprite_extruder_left_assembly` because they are rigidly attached
+- then any downstream assembly that injects the extruder and depends on its placed pose must wait for that later x-axis move too
+
+But there is an important boundary here for subset builds:
+- the rigidity graph should not be allowed to pull additional assemblies into the selected build set
+- `rigid_attach` should not extend `assembly_dependency_graph`
+- `rigid_attach` should not extend the global placement-derived build dependency closure used to decide which assemblies must be built
+
+So the safer rule is:
+- rigid attachment may affect transform propagation and placement-step reasoning inside the already selected active scene
+- but it must not create new assembly-selection pressure beyond what the non-rigid model would already require
+
+If full-printer placement fidelity requires assemblies outside the chosen subset, the user must explicitly build that larger subset.
+`rigid_attach` itself should not silently widen the scope.
+
+## Scope boundary
+
+This feature should remain a placement-layer feature, not a geometry-layer feature.
+
+That means:
+- canonical cached assembly artifacts stay unchanged
+- no new geometry dependency edges are introduced just because two assemblies later become rigidly attached in the scene
+- cache invalidation still belongs to the placement layer
+- the geometry layer remains acyclic
+
+This is important architecturally.
+`rigid_attach` should not turn scene composition back into one giant build-time geometry graph.
+
+## Subset builds must stay lean
+
+Yes, this is feasible, and it is a good design constraint.
+
+The intended rule should be:
+- building a small subset must not pull in extra assemblies just because some placement step somewhere uses `rigid_attach`
+- placement steps whose referenced assemblies are outside the active subset remain simply non-executable and therefore inert
+- no rigidity edge is created unless that placement step actually executes in the active build
+
+So the rigidity graph should be:
+- selection-scoped
+- scene-local
+- built only from the placement steps that actually execute for the current build
+
+In practice that means:
+- if the subset contains both `sprite_extruder_left_assembly` and `x_axis_assembly`, their rigid attachment can still work inside that subset
+- if the subset does not contain the later frame-level assemblies that would move the x-axis in the full printer build, those later moves are simply absent
+- the subset result is therefore intentionally a locally correct partial scene, not automatically the same as the fully placed global printer scene
+
+This is the tradeoff, and it is probably the right one:
+- subset builds stay fast and predictable
+- `rigid_attach` remains a transform-propagation mechanism
+- it does not become a hidden dependency-expansion mechanism
+
+So your proposed rule is a good one:
+- the rigidity graph should not extend the other dependency graphs
+
+More precisely:
+- it should not add new assembly build dependencies
+- it should not enlarge the selected assembly closure
+- it may still influence how already selected assemblies move together once their relevant placement steps have executed
+
+## Recommended first version
+
+The lean first version is:
+- support `rigid_attach: true` only on normal placement entries with `to`
+- attach owning assemblies after the step has been executed
+- propagate later transforms to all members of the rigid group
+- keep attachment monotonic and transitive
+- reject relative-motion steps inside an already attached rigid group
+
+That version is strong enough for the current x-axis / extruder problem and still keeps the system conceptually small.
+
+## Tests that would be required
+
+The builder test suite should gain explicit coverage for:
+- aligning `A` to `B` with `rigid_attach: true`, then later moving `A`, and verifying that `B` moves too
+- aligning `A` to `B` with `rigid_attach: true`, then later moving `B`, and verifying that `A` moves too
+- transitive attachment such as `A` attached to `B`, then `B` attached to `C`
+- final scene placement and eager placement producing the same rigid-group result
+- subset builds not enlarging the selected assembly closure just because `rigid_attach` exists elsewhere in the placement script
+- placement steps outside the active subset remaining inert rather than forcing extra assemblies to be built
+
+If those tests pass, the feature would be well grounded in the current architecture rather than being a placement hack.

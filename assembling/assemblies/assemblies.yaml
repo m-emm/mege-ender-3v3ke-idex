@@ -258,11 +258,9 @@ placement:
       to: x_axis_right_carriage_assembly
       alignment: LEFT
       post_translation:
-        - $expr:
-            "$sub": "-1 * ${x_axis_sprite_extruder_carriage_x_offset}"
+        - $ref: x_axis_sprite_extruder_carriage_x_offset
         - 0
         - 0
-
     - part: sprite_extruder_right_assembly
       to: x_axis_right_carriage_assembly
       alignment: STACK_FRONT
@@ -276,6 +274,18 @@ placement:
         - 0
         - $ref: x_axis_sprite_extruder_rail_z_offset
       rigid_attach: true
+
+    - part: tool_head_mount_bottom_assembly
+      to: sprite_extruder_left_assembly
+      rigid_attach: true
+    - part: tool_head_mount_top_assembly
+      to: sprite_extruder_right_assembly
+      rigid_attach: true
+
+    - part: x_axis_assembly
+      to: x_axis_rail_assembly
+      rigid_attach: true
+
     - part: sprite_extruder_left_assembly.non_production_parts.hotend
       to: print_bed_assembly.non_production_parts.print_bed_foil
       alignment: STACK_TOP
@@ -1255,14 +1265,12 @@ assemblies:
     resource_file: tool_head_mount_bottom_assembly.yaml
     depends_on:
       - x_axis_lower_profile_assembly
-      - x_axis_top_profile_assembly
       - x_axis_rail_assembly
       - x_axis_left_carriage_assembly
       - sprite_extruder_left_assembly
     inject_parts:
       carriage: x_axis_left_carriage_assembly
-      lower_axis_profile: x_axis_lower_profile_assembly
-      top_axis_profile: x_axis_top_profile_assembly
+      axis_profile: x_axis_lower_profile_assembly
       sprite_extruder: sprite_extruder_left_assembly
     parameters:
       drive_position: bottom
@@ -1271,15 +1279,13 @@ assemblies:
 
     resource_file: tool_head_mount_top_assembly.yaml
     depends_on:
-      - x_axis_lower_profile_assembly
       - x_axis_top_profile_assembly
       - x_axis_rail_assembly
       - x_axis_right_carriage_assembly
       - sprite_extruder_right_assembly
     inject_parts:
       carriage: x_axis_right_carriage_assembly
-      lower_axis_profile: x_axis_lower_profile_assembly
-      top_axis_profile: x_axis_top_profile_assembly
+      axis_profile: x_axis_top_profile_assembly
       sprite_extruder: sprite_extruder_right_assembly
     parameters:
       drive_position: top
