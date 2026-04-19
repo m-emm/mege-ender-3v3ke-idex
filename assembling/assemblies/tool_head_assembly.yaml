@@ -23,8 +23,6 @@ Builder:
       - source: injected
         assembly: nitehawk_holder
         artifact: non_production_parts
-        exclude_names:
-          - nitehawk_pcb
         name_template: "{name}"
       - source: injected
         assembly: part_fans

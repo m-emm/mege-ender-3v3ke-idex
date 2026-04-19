@@ -108,8 +108,6 @@ def _create_nitehawk_board(
         Alignment.STACK_BACK,
         stack_gap=nitehawk_umbilical_connector_gap,
     )
-    plug = plug.fuse(umbilical_connector)
-
     umbilical_cable_connector = create_pyramid_stump(
         nitehawk_plug_width,
         nitehawk_umbilical_connector_cable_connector_end_diameter,
@@ -128,7 +126,6 @@ def _create_nitehawk_board(
         umbilical_connector,
         Alignment.STACK_BACK,
     )
-    plug = plug.fuse(umbilical_cable_connector)
 
     cable = create_cylinder(
         nitehawk_umbilical_cable_diameter / 2,
@@ -137,7 +134,6 @@ def _create_nitehawk_board(
     )
     cable = align(cable, umbilical_cable_connector, Alignment.CENTER)
     cable = align(cable, umbilical_cable_connector, Alignment.STACK_BACK)
-    plug = plug.fuse(cable)
 
     heater_connector = create_box(
         nitehawk_heater_connector_width,
@@ -185,11 +181,16 @@ def _create_nitehawk_board(
     pcb = pcb.cut(mirror(normal=(1, 0, 0), point=(0, 0, 0))(front_cutter))
 
     board = LeaderFollowersCuttersPart(pcb)
-    board.add_named_follower(pcb, "pcb")
-    board = board.fuse(plug)
-    board = board.fuse(heater_connector)
     board.add_named_cutter(hole_cutters[0], "hole_1")
     board.add_named_cutter(hole_cutters[1], "hole_2")
+    board.add_named_non_production_part(plug, "plug")
+    board.add_named_non_production_part(umbilical_connector, "umbilical_connector")
+    board.add_named_non_production_part(
+        umbilical_cable_connector,
+        "umbilical_cable_connector",
+    )
+    board.add_named_non_production_part(cable, "umbilical_cable")
+    board.add_named_non_production_part(heater_connector, "heater_connector")
 
     return board
 
@@ -437,7 +438,7 @@ def create_nitehawk_holder_assembly(
         big_thing=big_thing,
     )
     nitehawk_board = rotate(nitehawk_board_angle)(nitehawk_board)
-    nitehawk_pcb = nitehawk_board.get_named_follower("pcb")
+    nitehawk_pcb = nitehawk_board.leader
 
     board_alignment = align_translation(
         nitehawk_pcb,
@@ -456,11 +457,12 @@ def create_nitehawk_holder_assembly(
     )
     nitehawk_board = align_board_translation(nitehawk_board)
 
-    holder.add_named_non_production_part(nitehawk_board.leader, "nitehawk_board")
-    holder.add_named_non_production_part(
-        nitehawk_board.get_named_follower("pcb"),
-        "nitehawk_pcb",
-    )
+    holder.add_named_non_production_part(nitehawk_board.leader, "nitehawk_pcb")
+    embellishments = PartCollector()
+    for name, part in nitehawk_board.get_named_non_production_part_items():
+        embellishments = embellishments.fuse(part)
+
+    holder.add_named_non_production_part(embellishments, "nitehawk_embellishments")
 
     holder = rotate(-90, axis=(1, 0, 0))(holder)
     holder = rotate(180, axis=(0, 1, 0))(holder)
