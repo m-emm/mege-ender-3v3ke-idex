@@ -12,6 +12,10 @@ Builder:
         name: tool_head
       - source: injected
         assembly: part_fans
+        artifact: leader
+        name: part_fans
+      - source: injected
+        assembly: part_fans
         artifact: followers
         names:
           - blower_ducts

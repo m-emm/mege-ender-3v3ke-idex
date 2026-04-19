@@ -363,6 +363,8 @@ Builder:
       - source: dependencies
         assembly: nitehawk_holder_left_assembly
         artifact: non_production_parts
+        exclude_names:
+          - nitehawk_pcb
         name_template: "nitehawk_holder_left_{name}"
         animation:
           x_carriage_1:
@@ -537,6 +539,8 @@ Builder:
       - source: dependencies
         assembly: nitehawk_holder_right_assembly
         artifact: non_production_parts
+        exclude_names:
+          - nitehawk_pcb
         name_template: "nitehawk_holder_right_{name}"
         animation:
           x_carriage_2:
