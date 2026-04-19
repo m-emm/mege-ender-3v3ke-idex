@@ -419,7 +419,15 @@ placement:
       to: left_z_axis_profile_assembly
       rigid_attach: true
 
+    - part: left_z_axis_guide_rod_top_mount_assembly
+      to: left_z_axis_profile_assembly
+      rigid_attach: true
+
     - part: right_z_axis_motor_mount_assembly
+      to: right_z_axis_profile_assembly
+      rigid_attach: true
+
+    - part: right_z_axis_guide_rod_top_mount_assembly
       to: right_z_axis_profile_assembly
       rigid_attach: true
 
@@ -1252,6 +1260,8 @@ assemblies:
       - right_z_axis_motor_mount_assembly
       - left_z_axis_bottom_support_assembly
       - right_z_axis_bottom_support_assembly
+      - left_z_axis_guide_rod_top_mount_assembly
+      - right_z_axis_guide_rod_top_mount_assembly
       - left_z_axis_carriage_assembly
       - right_z_axis_carriage_assembly
       - z_axis_top_bridge_profile_assembly
@@ -1296,6 +1306,8 @@ assemblies:
       right_z_axis_motor_mount: right_z_axis_motor_mount_assembly
       left_z_axis_bottom_support: left_z_axis_bottom_support_assembly
       right_z_axis_bottom_support: right_z_axis_bottom_support_assembly
+      left_z_axis_guide_rod_top_mount: left_z_axis_guide_rod_top_mount_assembly
+      right_z_axis_guide_rod_top_mount: right_z_axis_guide_rod_top_mount_assembly
       left_z_axis_carriage: left_z_axis_carriage_assembly
       right_z_axis_carriage: right_z_axis_carriage_assembly
       z_axis_top_bridge_profile: z_axis_top_bridge_profile_assembly

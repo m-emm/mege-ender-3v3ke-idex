@@ -111,9 +111,27 @@ Builder:
         artifact: all
         name_template: "{assembly_name}_{name}"
       - source: injected
+        assembly: left_z_axis_guide_rod_top_mount
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
         assembly: right_z_axis_bottom_support
         artifact: all
         name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: right_z_axis_guide_rod_top_mount
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
       - source: injected
         assembly: z_axis_top_bridge_profile
         artifact: all
