@@ -3,6 +3,7 @@ ShellforgepyBuilderVersion: "2026-03-27"
 Description: Whole printer scene composed from declarative subassemblies
 
 Builder:
+  Collection: true
   Visualization:
     preview:
       enabled: true
@@ -584,10 +585,3 @@ Parameters:
     Type: Float
   z_axis_z_travel:
     Type: Float
-
-Parts:
-  WholePrinterAssembly:
-    Type: Shellforgepy::Assembly
-
-    Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.whole_printer_assembly.create_whole_printer_assembly

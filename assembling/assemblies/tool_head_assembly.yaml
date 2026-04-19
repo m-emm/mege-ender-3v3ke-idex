@@ -3,20 +3,28 @@ ShellforgepyBuilderVersion: "2026-03-27"
 Description: Assembly configuration for the tool head assembly
 
 Builder:
+  Collection: true
   Visualization:
     parts:
-      - source: self
+      - source: injected
+        assembly: nitehawk_holder
         artifact: leader
         name: tool_head
-      - source: self
+      - source: injected
+        assembly: part_fans
         artifact: followers
         names:
           - blower_ducts
         name_template: "{name}"
-      - source: self
+      - source: injected
+        assembly: nitehawk_holder
         artifact: non_production_parts
         exclude_names:
           - nitehawk_pcb
+        name_template: "{name}"
+      - source: injected
+        assembly: part_fans
+        artifact: non_production_parts
         name_template: "{name}"
       - source: injected
         assembly: sprite_extruder
@@ -39,21 +47,17 @@ Builder:
           outer_wall_speed: "75"
           sparse_infill_density: "85%"
     parts:
-      - source: self
+      - source: injected
+        assembly: nitehawk_holder
         artifact: leader
         name: tool_head
         prod_rotation_angle: -90
         prod_rotation_axis: [1, 0, 0]
-      - source: self
+      - source: injected
+        assembly: part_fans
         artifact: followers
         names:
           - blower_ducts
         name_template: "{name}"
         prod_rotation_angle: 50
         prod_rotation_axis: [0, 1, 0]
-Parts:
-  ToolHeadAssembly:
-    Type: Shellforgepy::Assembly
-
-    Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.tool_head_assembly.create_tool_head_assembly
