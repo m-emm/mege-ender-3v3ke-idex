@@ -121,6 +121,8 @@ def create_x_axis_belt_carriage_assembly(
             cut_normal=(0, 1, 0),
             limiting_start_part=axis_profile,
             limiting_end_part=camp_and_base_fused,
+            start_gap=-tool_head_mount_belt_deflector_into_profile_distance,
+            end_gap=x_axis_belt_carriage_belt_clamp_clearance,
         )
 
         belt_deflector = align(
@@ -168,8 +170,8 @@ def create_x_axis_belt_carriage_assembly(
         )
 
         clamp_part = clamp_part.fuse(belt_deflector)
-        # clamp_part = clamp_part.fuse(belt_deflector_cage)
-        # clamp_part = clamp_part.fuse(belt_deflector_connector)
+        clamp_part = clamp_part.fuse(belt_deflector_cage)
+        clamp_part = clamp_part.fuse(belt_deflector_connector)
 
         clamp_lfc_new = LeaderFollowersCuttersPart(clamp_part)
 
