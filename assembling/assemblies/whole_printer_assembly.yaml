@@ -14,36 +14,18 @@ Builder:
       width: 512
       height: 512
     parts:
-      - source: dependencies
-        assembly: printer_frame_assembly
-        artifact: non_production_parts
-        name_template: "{name}"
-      - source: dependencies
-        assembly: left_z_axis_profile_assembly
-        artifact: leader
-        name: left_z_axis_profile
-      - source: dependencies
-        assembly: right_z_axis_profile_assembly
-        artifact: leader
-        name: right_z_axis_profile
-      - source: dependencies
-        assembly: z_axis_top_bridge_profile_assembly
-        artifact: leader
-        name: top_bridge_profile
-      - source: dependencies
-        assembly: printer_feet_assembly
-        artifact: followers
-        name_template: "{name}"
-      - source: dependencies
-        assembly: printer_feet_assembly
-        artifact: non_production_parts
-        name_template: "{name}"
-      - source: dependencies
-        assembly: y_axis_assembly
+      - source: injected
+        assembly: printer_frame
+        artifact: all
+      - source: injected
+        assembly: printer_feet
+        artifact: all
+      - source: injected
+        assembly: y_axis
         artifact: leader
         name: y_axis
-      - source: dependencies
-        assembly: y_axis_assembly
+      - source: injected
+        assembly: y_axis
         artifact: followers
         names:
           - carriage_front_carriage_left
@@ -56,8 +38,8 @@ Builder:
             - 0
             - { $ref: print_bed_y_travel }
             - 0
-      - source: dependencies
-        assembly: y_axis_assembly
+      - source: injected
+        assembly: y_axis
         artifact: followers
         exclude_names:
           - carriage_front_carriage_left
@@ -65,96 +47,173 @@ Builder:
           - carriage_front_carriage_right
           - carriage_back_carriage_right
         name_template: "{name}"
-      - source: dependencies
-        assembly: y_axis_assembly
+      - source: injected
+        assembly: y_axis
         artifact: non_production_parts
         exclude_names:
           - carriages_fused
         name_template: "{name}"
-      - source: dependencies
-        assembly: y_axis_endstop_holder_assembly
-        artifact: leader
-        name: y_axis_endstop_holder
-      - source: dependencies
-        assembly: y_axis_endstop_holder_assembly
-        artifact: non_production_parts
-        name_template: "y_axis_endstop_{name}"
-      - source: dependencies
-        assembly: y_axis_rail_carrier_brackets_assembly
-        artifact: followers
-        name_template: "{name}"
-      - source: dependencies
-        assembly: y_axis_rail_carrier_brackets_assembly
-        artifact: non_production_parts
-        exclude_names:
-          - profile_side_mount_plate_left_front
-          - profile_side_mount_plate_left_back
-          - profile_side_mount_plate_right_front
-          - profile_side_mount_plate_right_back
-        name_template: "{name}"
-      - source: dependencies
-        assembly: print_bed_assembly
-        artifact: leader
-        name: print_bed
+      - source: injected
+        assembly: y_axis_endstop_holder
+        artifact: all
+      - source: injected
+        assembly: y_axis_rail_carrier_brackets
+        artifact: all
+      - source: injected
+        assembly: print_bed
+        artifact: all
         animation:
           bed_y:
             - 0
             - { $ref: print_bed_y_travel }
             - 0
-      - source: dependencies
-        assembly: print_bed_assembly
-        artifact: non_production_parts
-        name_template: "print_bed_{name}"
+      - source: injected
+        assembly: print_bed_undercarriage
+        artifact: all
         animation:
           bed_y:
             - 0
             - { $ref: print_bed_y_travel }
             - 0
-      - source: dependencies
-        assembly: print_bed_undercarriage_assembly
-        artifact: followers
-        name_template: "print_bed_undercarriage_{name}"
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: print_bed_undercarriage_assembly
-        artifact: non_production_parts
-        name_template: "print_bed_undercarriage_{name}"
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: y_axis_drive_assembly
-        artifact: leader
-        name: y_axis_drive
-      - source: dependencies
-        assembly: y_axis_drive_assembly
-        artifact: followers
-        name_template: "y_axis_drive_{name}"
-      - source: dependencies
-        assembly: y_axis_drive_assembly
-        artifact: non_production_parts
-        name_template: "y_axis_drive_{name}"
-      - source: dependencies
-        assembly: x_axis_assembly
-        artifact: followers
-        name_template: "{name}"
+      - source: injected
+        assembly: y_axis_drive
+        artifact: all
+      - source: injected
+        assembly: left_z_axis_profile
+        artifact: all
+      - source: injected
+        assembly: right_z_axis_profile
+        artifact: all
+      - source: injected
+        assembly: left_z_axis_guide_rod
+        artifact: all
+      - source: injected
+        assembly: right_z_axis_guide_rod
+        artifact: all
+      - source: injected
+        assembly: left_z_axis_threaded_rod
+        artifact: all
+      - source: injected
+        assembly: right_z_axis_threaded_rod
+        artifact: all
+      - source: injected
+        assembly: left_z_axis_motor_mount
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: right_z_axis_motor_mount
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: left_z_axis_bottom_support
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: right_z_axis_bottom_support
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_top_bridge_profile
+        artifact: all
+      - source: injected
+        assembly: left_z_axis_carriage
+        artifact: all
+        name_template: "{assembly_name}_{name}"
         animation:
           z_axis:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: x_axis_assembly
-        artifact: non_production_parts
-        names:
-          - carriage_1
-        name_template: "{name}"
+      - source: injected
+        assembly: right_z_axis_carriage
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_lower_profile
+        artifact: all
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_top_profile
+        artifact: all
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_rail
+        artifact: all
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_motor_mount_bottom
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_motor_mount_top
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_carriage_stopper_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_carriage_stopper_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_endstop_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_endstop_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_left_carriage
+        artifact: all
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
@@ -164,12 +223,9 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: x_axis_assembly
-        artifact: non_production_parts
-        names:
-          - carriage_2
-        name_template: "{name}"
+      - source: injected
+        assembly: x_axis_right_carriage
+        artifact: all
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -179,22 +235,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: x_axis_assembly
-        artifact: non_production_parts
-        exclude_names:
-          - carriage_1
-          - carriage_2
-        name_template: "{name}"
-        animation:
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: sprite_extruder_left_assembly
-        artifact: leader
-        name: sprite_extruder_left
+      - source: injected
+        assembly: sprite_extruder_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
@@ -204,10 +248,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: sprite_extruder_left_assembly
-        artifact: non_production_parts
-        name_template: "sprite_extruder_left_{name}"
+      - source: injected
+        assembly: nitehawk_holder_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
@@ -217,10 +261,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: nitehawk_holder_left_assembly
-        artifact: leader
-        name: nitehawk_holder_left
+      - source: injected
+        assembly: part_fan_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
@@ -230,10 +274,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: nitehawk_holder_left_assembly
-        artifact: non_production_parts
-        name_template: "nitehawk_holder_left_{name}"
+      - source: injected
+        assembly: tool_head_mount_bottom
+        artifact: all
+        name_template: "{assembly_name}_{name}"
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
@@ -243,10 +287,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: part_fan_left_assembly
-        artifact: leader
-        name: part_fan_left
+      - source: injected
+        assembly: x_axis_belt_carriage_bottom
+        artifact: all
+        name_template: "{assembly_name}_{name}"
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
@@ -256,68 +300,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: part_fan_left_assembly
-        artifact: followers
-        names:
-          - blower_ducts
-        name_template: "part_fan_left_{name}"
-        animation:
-          x_carriage_1:
-            - { $ref: x_axis_x_travel }
-            - 0
-            - 0
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: tool_head_mount_bottom_assembly
-        artifact: leader
-        name: tool_head_mount_bottom
-        animation:
-          x_carriage_1:
-            - { $ref: x_axis_x_travel }
-            - 0
-            - 0
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: x_axis_belt_carriage_bottom_assembly
-        artifact: leader
-        name: x_axis_belt_carriage_bottom
-        animation:
-          x_carriage_1:
-            - { $ref: x_axis_x_travel }
-            - 0
-            - 0
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: tool_head_mount_bottom_assembly
-        artifact: non_production_parts
-        exclude_names:
-          - rail
-          - lower_axis_profile
-          - top_axis_profile
-        name_template: "tool_head_mount_bottom_{name}"
-        animation:
-          x_carriage_1:
-            - { $ref: x_axis_x_travel }
-            - 0
-            - 0
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: tool_head_mount_top_assembly
-        artifact: leader
-        name: tool_head_mount_top
+      - source: injected
+        assembly: sprite_extruder_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -327,10 +313,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: x_axis_belt_carriage_top_assembly
-        artifact: leader
-        name: x_axis_belt_carriage_top
+      - source: injected
+        assembly: nitehawk_holder_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -340,14 +326,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: tool_head_mount_top_assembly
-        artifact: non_production_parts
-        exclude_names:
-          - rail
-          - lower_axis_profile
-          - top_axis_profile
-        name_template: "tool_head_mount_top_{name}"
+      - source: injected
+        assembly: part_fan_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -357,10 +339,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: sprite_extruder_right_assembly
-        artifact: leader
-        name: sprite_extruder_right
+      - source: injected
+        assembly: tool_head_mount_top
+        artifact: all
+        name_template: "{assembly_name}_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -370,64 +352,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: sprite_extruder_right_assembly
-        artifact: non_production_parts
-        name_template: "sprite_extruder_right_{name}"
-        animation:
-          x_carriage_2:
-            - { $ref: x_axis_x_travel_negative }
-            - 0
-            - 0
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: nitehawk_holder_right_assembly
-        artifact: leader
-        name: nitehawk_holder_right
-        animation:
-          x_carriage_2:
-            - { $ref: x_axis_x_travel_negative }
-            - 0
-            - 0
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: nitehawk_holder_right_assembly
-        artifact: non_production_parts
-        name_template: "nitehawk_holder_right_{name}"
-        animation:
-          x_carriage_2:
-            - { $ref: x_axis_x_travel_negative }
-            - 0
-            - 0
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: part_fan_right_assembly
-        artifact: leader
-        name: part_fan_right
-        animation:
-          x_carriage_2:
-            - { $ref: x_axis_x_travel_negative }
-            - 0
-            - 0
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: part_fan_right_assembly
-        artifact: followers
-        names:
-          - blower_ducts
-        name_template: "part_fan_right_{name}"
+      - source: injected
+        assembly: x_axis_belt_carriage_top
+        artifact: all
+        name_template: "{assembly_name}_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
