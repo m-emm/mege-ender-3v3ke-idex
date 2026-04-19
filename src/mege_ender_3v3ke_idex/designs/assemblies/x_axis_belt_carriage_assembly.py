@@ -33,7 +33,7 @@ def create_x_axis_belt_carriage_assembly(
     tool_head_mount_side_plate_thickness,
     tool_head_mount_y_extension,
     x_axis_belt_carriage_belt_clamp_clearance,
-    x_axis_belt_carriage_right_gap,
+    x_axis_belt_carriage_fan_side_clamp_gap,
     x_axis_belt_carriage_bridge_profile_wall,
     x_axis_belt_carriage_bridge_depth,
     x_axis_belt_carriage_bridge_thickness,
@@ -62,7 +62,6 @@ def create_x_axis_belt_carriage_assembly(
 
     assembly = None
 
-
     clamps = []
     cages = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
@@ -90,12 +89,24 @@ def create_x_axis_belt_carriage_assembly(
             Alignment.STACK_FRONT,
             stack_gap=tool_head_mount_belt_clamp_y_offset,
         )
+
+        clamp_gap = 0
+        if lr == Alignment.LEFT:
+            clamp_gap = x_axis_belt_carriage_fan_side_clamp_gap
+
         clamp_lfc = clamp_lfc.aligned_from_follower(
-            "belt_path_cutter",
+            "clamp",
             sprite_extruder_all_fused,
             lr.stack_alignment,
-            stack_gap=tool_head_mount_belt_clamp_base_thickness * 1.5,
+            stack_gap=clamp_gap,
         )
+        # else:
+        #     clamp_lfc = align(
+        #         clamp_lfc,
+        #         sprite_extruder_all_fused,
+        #         lr.stack_alignment,
+        #         stack_gap=clamp_gap,
+        #     )
 
         clamp_lfc = align(clamp_lfc, axis_profile, Alignment.CENTER, axes=[2])
 
