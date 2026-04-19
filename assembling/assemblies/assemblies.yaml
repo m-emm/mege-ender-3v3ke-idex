@@ -369,15 +369,6 @@ placement:
     - part: z_axis_top_bridge_profile_assembly
       to: left_z_axis_profile_assembly
       rigid_attach: true
-    - part: left_z_axis_assembly
-      to: left_z_axis_profile_assembly
-      rigid_attach: true
-    - part: right_z_axis_assembly
-      to: right_z_axis_profile_assembly
-      rigid_attach: true
-    - part: z_axis_assembly
-      to: x_axis_assembly
-      rigid_attach: true
     - part: sprite_extruder_left_assembly.non_production_parts.hotend
       to: print_bed_assembly.non_production_parts.print_bed_foil
       alignment: STACK_BACK
@@ -750,22 +741,6 @@ assemblies:
     inject_parts:
       frame: printer_frame_assembly
       y_axis: y_axis_assembly
-
-  - name: z_axis_assembly
-
-    depends_on:
-      - printer_frame_assembly
-      - left_z_axis_profile_assembly
-      - right_z_axis_profile_assembly
-      - left_z_axis_assembly
-      - right_z_axis_assembly
-    inject_parts:
-      left_z_axis_profile: left_z_axis_profile_assembly
-      right_z_axis_profile: right_z_axis_profile_assembly
-      left_z_axis: left_z_axis_assembly
-      right_z_axis: right_z_axis_assembly
-    parameters:
-      z_axis_z_travel: !Ref z_axis_z_travel
 
   - name: z_axis_top_bridge_profile_assembly
 
@@ -1219,46 +1194,6 @@ assemblies:
       z_axis_threaded_rod_diameter: !Ref z_axis_threaded_rod_diameter
       z_axis_x_axis_to_carriage_gap: !Ref z_axis_x_axis_to_carriage_gap
 
-  - name: left_z_axis_assembly
-
-    resource_file: z_axis_side_assembly.yaml
-    depends_on:
-      - left_z_axis_profile_assembly
-      - left_z_axis_guide_rod_assembly
-      - left_z_axis_threaded_rod_assembly
-      - left_z_axis_bottom_support_assembly
-      - left_z_axis_motor_mount_assembly
-      - left_z_axis_guide_rod_top_mount_assembly
-      - left_z_axis_carriage_assembly
-    inject_parts:
-      z_axis_profile: left_z_axis_profile_assembly
-      z_axis_guide_rod: left_z_axis_guide_rod_assembly
-      z_axis_threaded_rod: left_z_axis_threaded_rod_assembly
-      z_axis_bottom_support: left_z_axis_bottom_support_assembly
-      z_axis_motor_mount: left_z_axis_motor_mount_assembly
-      z_axis_guide_rod_top_mount: left_z_axis_guide_rod_top_mount_assembly
-      z_axis_carriage: left_z_axis_carriage_assembly
-
-  - name: right_z_axis_assembly
-
-    resource_file: z_axis_side_assembly.yaml
-    depends_on:
-      - right_z_axis_profile_assembly
-      - right_z_axis_guide_rod_assembly
-      - right_z_axis_threaded_rod_assembly
-      - right_z_axis_bottom_support_assembly
-      - right_z_axis_motor_mount_assembly
-      - right_z_axis_guide_rod_top_mount_assembly
-      - right_z_axis_carriage_assembly
-    inject_parts:
-      z_axis_profile: right_z_axis_profile_assembly
-      z_axis_guide_rod: right_z_axis_guide_rod_assembly
-      z_axis_threaded_rod: right_z_axis_threaded_rod_assembly
-      z_axis_bottom_support: right_z_axis_bottom_support_assembly
-      z_axis_motor_mount: right_z_axis_motor_mount_assembly
-      z_axis_guide_rod_top_mount: right_z_axis_guide_rod_top_mount_assembly
-      z_axis_carriage: right_z_axis_carriage_assembly
-
   - name: whole_printer_assembly
 
     depends_on:
@@ -1270,7 +1205,6 @@ assemblies:
       - y_axis_assembly
       - y_axis_endstop_holder_assembly
       - y_axis_rail_carrier_brackets_assembly
-      - z_axis_assembly
       - z_axis_top_bridge_profile_assembly
       - x_axis_assembly
       - sprite_extruder_left_assembly
