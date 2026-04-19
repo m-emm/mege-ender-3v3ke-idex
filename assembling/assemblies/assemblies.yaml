@@ -15,6 +15,11 @@ builder_defaults:
 
 placement:
   alignments:
+    - part: x_axis_lower_profile_assembly
+      to: printer_frame_assembly.non_production_parts.frame_profile_front
+      alignment: CENTER
+      axes: [0]
+
     - part: nitehawk_holder_left_assembly
       to: sprite_extruder_left_assembly
       rigid_attach: true
@@ -100,6 +105,7 @@ placement:
         angle: 90
         axis: [0, 0, 1]
         center: x_axis_endstop_left_assembly.CENTER
+
     - part: x_axis_endstop_left_assembly
       to: x_axis_lower_profile_assembly
       alignment: CENTER
@@ -117,6 +123,7 @@ placement:
       alignment: STACK_LEFT
       stack_gap:
         $ref: endstop_holder_stack_gap
+      rigid_attach: true
 
     - part: x_axis_endstop_right_assembly
       post_rotation:
@@ -140,13 +147,16 @@ placement:
       alignment: STACK_RIGHT
       stack_gap:
         $ref: endstop_holder_stack_gap
+      rigid_attach: true
 
     - part: x_axis_motor_mount_bottom_assembly.non_production_parts.profile_to_align
       to: x_axis_lower_profile_assembly
       alignment: CENTER
+      rigid_attach: true
     - part: x_axis_motor_mount_top_assembly.non_production_parts.profile_to_align
       to: x_axis_top_profile_assembly
       alignment: CENTER
+      rigid_attach: true
 
     - part: x_axis_top_profile_assembly
       to: x_axis_lower_profile_assembly
@@ -215,6 +225,7 @@ placement:
     - part: left_z_axis_threaded_rod_assembly.non_production_parts.motor_body_reference
       to: left_z_axis_profile_assembly
       alignment: BOTTOM
+      rigid_attach: true
     - part: right_z_axis_threaded_rod_assembly
       to: right_z_axis_profile_assembly
       alignment: CENTER
@@ -231,15 +242,38 @@ placement:
     - part: right_z_axis_threaded_rod_assembly.non_production_parts.motor_body_reference
       to: right_z_axis_profile_assembly
       alignment: BOTTOM
+      rigid_attach: true
     - part: x_axis_assembly
       to: printer_frame_assembly
       alignment: CENTER
       axes: [0]
-    - part: x_axis_assembly.non_production_parts.lower_axis_profile
+    - part: x_axis_lower_profile_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_front
       alignment: STACK_BACK
       stack_gap:
         $ref: x_axis_front_gap_to_frame_front
+    - part: x_axis_carriage_stopper_left_assembly
+      to: x_axis_rail_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: x_axis_carriage_stopper_left_assembly
+      to: x_axis_rail_assembly
+      alignment: BOTTOM
+    - part: x_axis_carriage_stopper_left_assembly
+      to: x_axis_rail_assembly
+      alignment: STACK_LEFT
+      rigid_attach: true
+    - part: x_axis_carriage_stopper_right_assembly
+      to: x_axis_rail_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: x_axis_carriage_stopper_right_assembly
+      to: x_axis_rail_assembly
+      alignment: BOTTOM
+    - part: x_axis_carriage_stopper_right_assembly
+      to: x_axis_rail_assembly
+      alignment: STACK_RIGHT
+      rigid_attach: true
     - part: sprite_extruder_left_assembly
       post_rotation:
         angle: 180
@@ -304,45 +338,6 @@ placement:
       to: sprite_extruder_right_assembly
       rigid_attach: true
 
-    - part: sprite_extruder_left_assembly
-      to: x_axis_assembly.non_production_parts.carriage_1
-      alignment: RIGHT
-      post_translation:
-        - $ref: x_axis_sprite_extruder_carriage_x_offset
-        - 0
-        - 0
-    - part: sprite_extruder_left_assembly
-      to: x_axis_assembly.non_production_parts.carriage_1
-      alignment: STACK_FRONT
-      stack_gap:
-        $ref: x_axis_sprite_extruder_carriage_stack_gap
-    - part: sprite_extruder_left_assembly
-      to: x_axis_assembly.non_production_parts.rail
-      alignment: TOP
-      post_translation:
-        - 0
-        - 0
-        - $ref: x_axis_sprite_extruder_rail_z_offset
-    - part: sprite_extruder_right_assembly
-      to: x_axis_assembly.non_production_parts.carriage_2
-      alignment: LEFT
-      post_translation:
-        - $ref: x_axis_sprite_extruder_carriage_x_offset
-        - 0
-        - 0
-    - part: sprite_extruder_right_assembly
-      to: x_axis_assembly.non_production_parts.carriage_2
-      alignment: STACK_FRONT
-      stack_gap:
-        $ref: x_axis_sprite_extruder_carriage_stack_gap
-    - part: sprite_extruder_right_assembly
-      to: x_axis_assembly.non_production_parts.rail
-      alignment: TOP
-      post_translation:
-        - 0
-        - 0
-        - $ref: x_axis_sprite_extruder_rail_z_offset
-
     - part: tool_head_left_assembly
       to: sprite_extruder_left_assembly
       rigid_attach: true
@@ -383,6 +378,14 @@ placement:
       rigid_attach: true
 
     - part: right_z_axis_bottom_support_assembly
+      to: right_z_axis_profile_assembly
+      rigid_attach: true
+
+    - part: left_z_axis_motor_mount_assembly
+      to: left_z_axis_profile_assembly
+      rigid_attach: true
+
+    - part: right_z_axis_motor_mount_assembly
       to: right_z_axis_profile_assembly
       rigid_attach: true
 
@@ -596,17 +599,10 @@ assemblies:
       - x_axis_endstop_left_assembly
       - x_axis_endstop_right_assembly
     inject_parts:
-      x_axis_carriage_stopper_left: x_axis_carriage_stopper_left_assembly
-      x_axis_carriage_stopper_right: x_axis_carriage_stopper_right_assembly
       x_axis_lower_profile: x_axis_lower_profile_assembly
       x_axis_top_profile: x_axis_top_profile_assembly
       x_axis_motor_mount_bottom: x_axis_motor_mount_bottom_assembly
       x_axis_motor_mount_top: x_axis_motor_mount_top_assembly
-      x_axis_rail: x_axis_rail_assembly
-      x_axis_left_carriage: x_axis_left_carriage_assembly
-      x_axis_right_carriage: x_axis_right_carriage_assembly
-      x_axis_endstop_left: x_axis_endstop_left_assembly
-      x_axis_endstop_right: x_axis_endstop_right_assembly
 
   - name: x_axis_carriage_stopper_left_assembly
 

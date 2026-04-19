@@ -92,10 +92,12 @@ Builder:
         artifact: all
       - source: injected
         assembly: left_z_axis_threaded_rod
-        artifact: all
+        artifact: leader
+        name: left_z_axis_threaded_rod
       - source: injected
         assembly: right_z_axis_threaded_rod
-        artifact: all
+        artifact: leader
+        name: right_z_axis_threaded_rod
       - source: injected
         assembly: left_z_axis_motor_mount
         artifact: all
@@ -159,7 +161,18 @@ Builder:
             - { $ref: z_axis_z_travel }
       - source: injected
         assembly: x_axis_motor_mount_bottom
-        artifact: all
+        artifact: followers
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_motor_mount_bottom
+        artifact: non_production_parts
+        exclude_names:
+          - profile_to_align
         name_template: "{assembly_name}_{name}"
         animation:
           z_axis:
@@ -168,7 +181,18 @@ Builder:
             - { $ref: z_axis_z_travel }
       - source: injected
         assembly: x_axis_motor_mount_top
-        artifact: all
+        artifact: followers
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_motor_mount_top
+        artifact: non_production_parts
+        exclude_names:
+          - profile_to_align
         name_template: "{assembly_name}_{name}"
         animation:
           z_axis:

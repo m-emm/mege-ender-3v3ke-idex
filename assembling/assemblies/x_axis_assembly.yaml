@@ -5,37 +5,128 @@ Description: Assembly configuration for the x-axis
 Builder:
   Visualization:
     parts:
-      - source: self
-        artifact: followers
-        name_template: "{name}"
-      - source: self
-        artifact: non_production_parts
-        names:
-          - carriage_1
-        name_template: "{name}"
+      - source: dependencies
+        assembly: x_axis_lower_profile_assembly
+        artifact: leader
+        name: lower_axis_profile
+      - source: dependencies
+        assembly: x_axis_top_profile_assembly
+        artifact: leader
+        name: top_axis_profile
+      - source: dependencies
+        assembly: x_axis_rail_assembly
+        artifact: leader
+        name: rail
+      - source: dependencies
+        assembly: x_axis_left_carriage_assembly
+        artifact: leader
+        name: carriage_1
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
             - 0
             - 0
-      - source: self
-        artifact: non_production_parts
-        names:
-          - carriage_2
-        name_template: "{name}"
+      - source: dependencies
+        assembly: x_axis_right_carriage_assembly
+        artifact: leader
+        name: carriage_2
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
             - 0
             - 0
+      - source: dependencies
+        assembly: x_axis_motor_mount_bottom_assembly
+        artifact: non_production_parts
+        exclude_names:
+          - axis_holding_counter_flange
+          - profile_to_align
+        name_template: "{name}_bottom"
+      - source: dependencies
+        assembly: x_axis_motor_mount_bottom_assembly
+        artifact: non_production_parts
+        names:
+          - axis_holding_counter_flange
+        name: axis_holding_counter_flange_bottom
+      - source: dependencies
+        assembly: x_axis_motor_mount_top_assembly
+        artifact: non_production_parts
+        exclude_names:
+          - axis_holding_counter_flange
+          - profile_to_align
+        name_template: "{name}_top"
+      - source: dependencies
+        assembly: x_axis_motor_mount_top_assembly
+        artifact: non_production_parts
+        names:
+          - axis_holding_counter_flange
+        name: axis_holding_counter_flange_top
+      - source: dependencies
+        assembly: x_axis_carriage_stopper_left_assembly
+        artifact: leader
+        name: rail_end_stopper_left
+      - source: dependencies
+        assembly: x_axis_carriage_stopper_left_assembly
+        artifact: non_production_parts
+        names:
+          - mount_screw
+        name: rail_end_stopper_mount_screw_left
+      - source: dependencies
+        assembly: x_axis_carriage_stopper_right_assembly
+        artifact: leader
+        name: rail_end_stopper_right
+      - source: dependencies
+        assembly: x_axis_carriage_stopper_right_assembly
+        artifact: non_production_parts
+        names:
+          - mount_screw
+        name: rail_end_stopper_mount_screw_right
+      - source: dependencies
+        assembly: x_axis_endstop_left_assembly
+        artifact: leader
+        name: x_axis_endstop_left
+      - source: dependencies
+        assembly: x_axis_endstop_left_assembly
+        artifact: non_production_parts
+        names:
+          - mount_screw
+        name: endstop_mount_screw_left
+      - source: dependencies
+        assembly: x_axis_endstop_left_assembly
+        artifact: non_production_parts
+        names:
+          - board
+        name: endstop_board_left
+      - source: dependencies
+        assembly: x_axis_endstop_right_assembly
+        artifact: leader
+        name: x_axis_endstop_right
+      - source: dependencies
+        assembly: x_axis_endstop_right_assembly
+        artifact: non_production_parts
+        names:
+          - mount_screw
+        name: endstop_mount_screw_right
+      - source: dependencies
+        assembly: x_axis_endstop_right_assembly
+        artifact: non_production_parts
+        names:
+          - board
+        name: endstop_board_right
+      - source: self
+        artifact: followers
+        name_template: "{name}"
       - source: self
         artifact: non_production_parts
         name_template: "{name}"
-        exclude_names:
-          - carriage_1
-          - carriage_2
   Production:
     parts:
+      - source: dependencies
+        assembly: x_axis_motor_mount_bottom_assembly
+        artifact: non_production_parts
+        names:
+          - axis_holding_counter_flange
+        name: axis_holding_counter_flange_bottom
       - source: self
         artifact: followers
         names:
@@ -92,28 +183,30 @@ Builder:
         name_template: "{name}"
         prod_rotation_angle: -90
         prod_rotation_axis: [0, 1, 0]
-      - source: self
-        artifact: followers
+      - source: dependencies
+        assembly: x_axis_motor_mount_top_assembly
+        artifact: non_production_parts
         names:
-          - rail_end_stopper_right
-        name_template: "{name}"
-      - source: self
-        artifact: followers
-        names:
-          - rail_end_stopper_left
-        name_template: "{name}"
-      - source: self
-        artifact: followers
-        names:
-          - x_axis_endstop_right
-        name_template: "{name}"
+          - axis_holding_counter_flange
+        name: axis_holding_counter_flange_top
+      - source: dependencies
+        assembly: x_axis_carriage_stopper_right_assembly
+        artifact: leader
+        name: rail_end_stopper_right
+      - source: dependencies
+        assembly: x_axis_carriage_stopper_left_assembly
+        artifact: leader
+        name: rail_end_stopper_left
+      - source: dependencies
+        assembly: x_axis_endstop_right_assembly
+        artifact: leader
+        name: x_axis_endstop_right
         prod_rotation_angle: 0
         prod_rotation_axis: [0, 1, 0]
-      - source: self
-        artifact: followers
-        names:
-          - x_axis_endstop_left
-        name_template: "{name}"
+      - source: dependencies
+        assembly: x_axis_endstop_left_assembly
+        artifact: leader
+        name: x_axis_endstop_left
         prod_rotation_angle: 0
         prod_rotation_axis: [0, 1, 0]
       - source: self
@@ -127,10 +220,6 @@ Builder:
           - x_axis_idler_endcap_top_left
           - x_axis_idler_endcap_top_right
           - x_axis_idler_endcap_top_right_cage
-          - rail_end_stopper_right
-          - rail_end_stopper_left
-          - x_axis_endstop_right
-          - x_axis_endstop_left
         name_template: "{name}"
     arrange:
       export_individual_parts: false
@@ -191,18 +280,6 @@ Parameters:
   x_axis_x_travel_negative:
     Type: Float
   x_axis_profile_pitch:
-    Type: Float
-  x_axis_carriage_stopper_width:
-    Type: Float
-  x_axis_carriage_stopper_thickness:
-    Type: Float
-  x_axis_carriage_stopper_depth:
-    Type: Float
-  x_axis_carriage_stopper_fillet_radius:
-    Type: Float
-  x_axis_carriage_stopper_mount_screw_size:
-    Type: String
-  x_axis_carriage_stopper_mount_screw_length:
     Type: Float
   mount_plate_connector_link_thickness:
     Type: Float

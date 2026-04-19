@@ -10,6 +10,8 @@ Builder:
         name_template: "{name}"
       - source: self
         artifact: non_production_parts
+        exclude_names:
+          - profile_to_align
         name_template: "{name}"
   Production:
     parts:

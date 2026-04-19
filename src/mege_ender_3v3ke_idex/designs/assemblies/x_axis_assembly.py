@@ -1,7 +1,5 @@
 """Declarative x-axis assembly."""
 
-import copy
-
 import numpy as np
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
 from mege_ender_3v3ke_idex.designs.idler_cage import create_idler_cage
@@ -550,15 +548,7 @@ def _create_idler_endcap(
 
 def create_x_axis_assembly(
     *,
-    x_axis_carriage_stopper_left,
-    x_axis_carriage_stopper_right,
     x_axis_profile_pitch,
-    x_axis_carriage_stopper_width,
-    x_axis_carriage_stopper_thickness,
-    x_axis_carriage_stopper_depth,
-    x_axis_carriage_stopper_fillet_radius,
-    x_axis_carriage_stopper_mount_screw_size,
-    x_axis_carriage_stopper_mount_screw_length,
     mount_plate_connector_link_thickness,
     mount_plate_link_width,
     link_flange_depth,
@@ -601,11 +591,6 @@ def create_x_axis_assembly(
     x_axis_top_profile,
     x_axis_motor_mount_bottom,
     x_axis_motor_mount_top,
-    x_axis_rail,
-    x_axis_left_carriage,
-    x_axis_right_carriage,
-    x_axis_endstop_left,
-    x_axis_endstop_right,
     BIG_THING,
     record_metrics=False,
 ):
@@ -617,30 +602,11 @@ def create_x_axis_assembly(
     lower_axis_profile = _get_leader_part(x_axis_lower_profile)
     top_axis_profile = _get_leader_part(x_axis_top_profile)
     axis_frame = lower_axis_profile.fuse(top_axis_profile)
-    rail = _get_leader_part(x_axis_rail)
-    left_carriage = _get_leader_part(x_axis_left_carriage)
-    right_carriage = _get_leader_part(x_axis_right_carriage)
 
     mount_plates = PartCollector()
     mount_plate_connectors = PartCollector()
     final_mount_plates_by_profile_position = {}
-    axis_holding_counter_flanges_by_profile_position = {}
     motors_fused_by_profile_position = {}
-
-    non_production_parts = [
-        left_carriage,
-        right_carriage,
-        rail,
-        lower_axis_profile,
-        top_axis_profile,
-    ]
-    non_production_names = [
-        "carriage_1",
-        "carriage_2",
-        "rail",
-        "lower_axis_profile",
-        "top_axis_profile",
-    ]
     motor_assemblies_by_profile_position = {
         Alignment.BOTTOM: x_axis_motor_mount_bottom,
         Alignment.TOP: x_axis_motor_mount_top,
@@ -655,21 +621,6 @@ def create_x_axis_assembly(
             motor_followers_fused = motor_followers_fused.fuse(follower)
         motors_fused_by_profile_position[profile_position] = motor_followers_fused
 
-        for (
-            non_production_part_name,
-            non_production_part,
-        ) in motor_assembly.get_named_non_production_part_items():
-            if (
-                not non_production_part_name
-                or non_production_part_name == "axis_holding_counter_flange"
-                or non_production_part_name == "profile_to_align"
-            ):
-                continue
-            non_production_parts.append(non_production_part)
-            non_production_names.append(
-                f"{non_production_part_name}_{profile_position_name}"
-            )
-
         current_mount_plate_connector = motor_assembly.get_follower_part_by_name(
             "mount_plate_connector"
         )
@@ -681,24 +632,13 @@ def create_x_axis_assembly(
         )
 
         mount_shield = motor_assembly.get_follower_part_by_name("mount_shield")
-        axis_holding_counter_flange = motor_assembly.get_non_production_part_by_name(
-            "axis_holding_counter_flange"
-        )
         mount_plate = motor_assembly.get_follower_part_by_name("mount_plate")
 
         mount_plates = mount_plates.fuse(mount_plate)
-        axis_holding_counter_flanges_by_profile_position[
-            f"axis_holding_counter_flange_{profile_position_name}"
-        ] = axis_holding_counter_flange
 
         final_mount_plates_by_profile_position[profile_position] = (
             motors_fused_by_profile_position[profile_position].fuse(mount_shield)
         )
-
-        non_production_parts.append(
-            motor_assembly.get_non_production_part_by_name("idlers")
-        )
-        non_production_names.append(f"idlers_{profile_position_name}")
 
     mount_plate_connectors_size = get_bounding_box_size(mount_plate_connectors)
     mount_plate_link = create_box(
@@ -818,17 +758,10 @@ def create_x_axis_assembly(
 
     mount_plates = mount_plates.fuse(mount_plate_link)
 
-    retval = LeaderFollowersCuttersPart(
-        leader=mount_plates,
-        non_production_parts=non_production_parts,
-        non_production_names=non_production_names,
-    )
+    retval = LeaderFollowersCuttersPart(leader=mount_plates)
 
     for index, link_screw in enumerate(link_screws):
         retval.add_named_non_production_part(link_screw, f"link_screw_{index + 1}")
-
-    for name, part in axis_holding_counter_flanges_by_profile_position.items():
-        retval.add_named_follower(part, name)
 
     for profile_position in (Alignment.BOTTOM, Alignment.TOP):
         retval.add_named_follower(
@@ -938,40 +871,5 @@ def create_x_axis_assembly(
                     endcap_npp,
                     f"{endcap_name}_{npp_name_in_endcap}",
                 )
-
-    for side_name, side_alignment, endstop in (
-        ("left", Alignment.LEFT, x_axis_endstop_left),
-        ("right", Alignment.RIGHT, x_axis_endstop_right),
-    ):
-        stopper_template = (
-            x_axis_carriage_stopper_left
-            if side_alignment == Alignment.LEFT
-            else x_axis_carriage_stopper_right
-        )
-        stopper = copy.deepcopy(stopper_template)
-        stopper = align(stopper, rail, Alignment.CENTER, axes=[0, 1])
-        stopper = align(stopper, rail, Alignment.BOTTOM)
-        stopper = align(stopper, rail, side_alignment.stack_alignment)
-
-        retval.add_named_follower(
-            stopper.leader,
-            f"rail_end_stopper_{side_name}",
-        )
-        retval.add_named_non_production_part(
-            stopper.get_non_production_part_by_name("mount_screw"),
-            f"rail_end_stopper_mount_screw_{side_name}",
-        )
-        retval.add_named_follower(
-            _get_leader_part(endstop),
-            f"x_axis_endstop_{side_name}",
-        )
-        retval.add_named_non_production_part(
-            endstop.get_non_production_part_by_name("mount_screw"),
-            f"endstop_mount_screw_{side_name}",
-        )
-        retval.add_named_non_production_part(
-            endstop.get_non_production_part_by_name("board"),
-            f"endstop_board_{side_name}",
-        )
 
     return _named_only(retval)
