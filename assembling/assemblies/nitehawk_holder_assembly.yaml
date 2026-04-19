@@ -48,6 +48,18 @@ Builder:
         name: nitehawk_holder
 
 Parameters:
+  holder_mount_plate_depth:
+    Type: Float
+  holder_mount_plate_left_extension:
+    Type: Float
+  holder_mount_plate_size:
+    Type: Float
+  holder_mount_plate_spacer:
+    Type: Float
+  holder_mount_plate_thickness:
+    Type: Float
+  holder_mount_plate_top_offset:
+    Type: Float
   nitehawk_board_angle:
     Type: Float
   nitehawk_front_cutter_back_width:

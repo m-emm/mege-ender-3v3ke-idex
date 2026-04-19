@@ -22,7 +22,6 @@ Builder:
         assembly: sprite_extruder
         artifact: all
 
-
   Production:
     process_data:
       source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PETGCF_04_HS
@@ -52,59 +51,6 @@ Builder:
         name_template: "{name}"
         prod_rotation_angle: 50
         prod_rotation_axis: [0, 1, 0]
-
-Parameters:
-  holder_mount_plate_depth:
-    Type: Float
-  holder_mount_plate_left_extension:
-    Type: Float
-  holder_mount_plate_size:
-    Type: Float
-  holder_mount_plate_spacer:
-    Type: Float
-  holder_mount_plate_thickness:
-    Type: Float
-  holder_mount_plate_top_offset:
-    Type: Float
-  nitehawk_holder_extruder_gap:
-    Type: Float
-  nitehawk_holder_height_offset:
-    Type: Float
-  nitehawk_holder_width_offset:
-    Type: Float
-  tool_head_additional_mount_plate_clearance:
-    Type: Float
-  tool_head_additional_mount_plate_depth:
-    Type: Float
-  tool_head_additional_mount_plate_depth_offset:
-    Type: Float
-  tool_head_additional_mount_plate_fillet_radius:
-    Type: Float
-  tool_head_additional_mount_plate_height:
-    Type: Float
-  tool_head_additional_mount_plate_thickness:
-    Type: Float
-  tool_head_additional_mount_plate_z_offset:
-    Type: Float
-  tool_head_front_mount_plate_connector_height:
-    Type: Float
-  tool_head_front_mount_plate_connector_thickness:
-    Type: Float
-  tool_head_front_mount_plate_connector_width:
-    Type: Float
-  duct_front_mount_plate_height:
-    Type: Float
-  duct_front_mount_plate_height_border:
-    Type: Float
-  duct_front_mount_plate_offset:
-    Type: Float
-  duct_front_mount_plate_thickness:
-    Type: Float
-  duct_front_mount_plate_width:
-    Type: Float
-  duct_front_mount_plate_width_border:
-    Type: Float
-
 Parts:
   ToolHeadAssembly:
     Type: Shellforgepy::Assembly

@@ -13,6 +13,10 @@ Builder:
         names:
           - blower_ducts
         name_template: "{name}"
+      - source: injected
+        assembly: sprite_extruder
+        artifact: all
+
   Production:
     process_data:
       source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PLA_04_HS
@@ -92,6 +96,38 @@ Parameters:
   part_fan_window_height:
     Type: Float
   part_fan_window_width:
+    Type: Float
+  tool_head_additional_mount_plate_clearance:
+    Type: Float
+  tool_head_additional_mount_plate_depth:
+    Type: Float
+  tool_head_additional_mount_plate_depth_offset:
+    Type: Float
+  tool_head_additional_mount_plate_fillet_radius:
+    Type: Float
+  tool_head_additional_mount_plate_height:
+    Type: Float
+  tool_head_additional_mount_plate_thickness:
+    Type: Float
+  tool_head_additional_mount_plate_z_offset:
+    Type: Float
+  tool_head_front_mount_plate_connector_height:
+    Type: Float
+  tool_head_front_mount_plate_connector_thickness:
+    Type: Float
+  tool_head_front_mount_plate_connector_width:
+    Type: Float
+  duct_front_mount_plate_height:
+    Type: Float
+  duct_front_mount_plate_height_border:
+    Type: Float
+  duct_front_mount_plate_offset:
+    Type: Float
+  duct_front_mount_plate_thickness:
+    Type: Float
+  duct_front_mount_plate_width:
+    Type: Float
+  duct_front_mount_plate_width_border:
     Type: Float
   left_part_fan_parameters:
     Type: Json

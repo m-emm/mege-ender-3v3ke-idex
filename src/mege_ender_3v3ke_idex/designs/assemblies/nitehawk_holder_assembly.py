@@ -197,6 +197,12 @@ def _create_nitehawk_board(
 def create_nitehawk_holder_assembly(
     *,
     sprite_extruder,
+    holder_mount_plate_depth,
+    holder_mount_plate_left_extension,
+    holder_mount_plate_size,
+    holder_mount_plate_spacer,
+    holder_mount_plate_thickness,
+    holder_mount_plate_top_offset,
     nitehawk_board_angle,
     nitehawk_front_cutter_back_width,
     nitehawk_front_cutter_width,
@@ -458,6 +464,7 @@ def create_nitehawk_holder_assembly(
 
     holder = rotate(-90, axis=(1, 0, 0))(holder)
     holder = rotate(180, axis=(0, 1, 0))(holder)
+    holder = rotate(180)(holder)
 
     holder = _align_holder_to_extruder(
         holder,
@@ -466,4 +473,42 @@ def create_nitehawk_holder_assembly(
         nitehawk_holder_width_offset=nitehawk_holder_width_offset,
         nitehawk_holder_height_offset=nitehawk_holder_height_offset,
     )
+
+    holder_mount_plates = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        extension = holder_mount_plate_left_extension if lr == Alignment.LEFT else 0
+        holder_mount_plate = create_box(
+            holder_mount_plate_thickness,
+            holder_mount_plate_depth + extension,
+            holder_mount_plate_size,
+        )
+
+        if lr == Alignment.RIGHT:
+            mount_box = create_box(
+                holder_mount_plate_spacer,
+                holder_mount_plate_size,
+                holder_mount_plate_size,
+            )
+            mount_box = align(mount_box, holder_mount_plate, Alignment.CENTER)
+            mount_box = align(mount_box, holder_mount_plate, Alignment.FRONT)
+            mount_box = align(mount_box, holder_mount_plate, Alignment.STACK_LEFT)
+            holder_mount_plate = holder_mount_plate.fuse(mount_box)
+
+        holder_mount_plate = align(holder_mount_plate, holder, Alignment.CENTER)
+        holder_mount_plate = align(holder_mount_plate, sprite_extruder, Alignment.TOP)
+        holder_mount_plate = align(
+            holder_mount_plate,
+            sprite_extruder,
+            lr.stack_alignment,
+        )
+        holder_mount_plate = align(holder_mount_plate, holder, Alignment.BACK)
+        holder_mount_plate = translate(0, 0, -holder_mount_plate_top_offset)(
+            holder_mount_plate
+        )
+        holder_mount_plates = holder_mount_plates.fuse(holder_mount_plate)
+
+    holder = holder.fuse(holder_mount_plates)
+
+    for _, cutter in sprite_extruder.get_named_cutter_items():
+        holder.leader = holder.leader.cut(cutter)
     return holder
