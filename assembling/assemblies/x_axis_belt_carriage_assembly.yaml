@@ -103,8 +103,8 @@ Parameters:
     Type: Float
   x_axis_belt_carriage_fan_side_clamp_gap:
     Type: Float
-  x_axis_belt_carriage_bridge_profile_wall:
-    Type: Float
+  x_axis_belt_carriage_bridge_mount_screw_size:
+    Type: String
   x_axis_belt_carriage_bridge_depth:
     Type: Float
   x_axis_belt_carriage_bridge_thickness:

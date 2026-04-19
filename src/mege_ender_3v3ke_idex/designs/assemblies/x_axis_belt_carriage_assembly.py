@@ -34,7 +34,7 @@ def create_x_axis_belt_carriage_assembly(
     tool_head_mount_y_extension,
     x_axis_belt_carriage_belt_clamp_clearance,
     x_axis_belt_carriage_fan_side_clamp_gap,
-    x_axis_belt_carriage_bridge_profile_wall,
+    x_axis_belt_carriage_bridge_mount_screw_size,
     x_axis_belt_carriage_bridge_depth,
     x_axis_belt_carriage_bridge_thickness,
     x_axis_belt_carriage_bridge_web_height,
@@ -64,6 +64,7 @@ def create_x_axis_belt_carriage_assembly(
 
     clamps = []
     cages = PartCollector()
+    mount_hole_cutters = []
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         clamp_lfc = create_gt_belt_clamp(
             base_thicknness=tool_head_mount_belt_clamp_base_thickness,
@@ -197,6 +198,23 @@ def create_x_axis_belt_carriage_assembly(
         for name, npp in clamp_lfc.get_named_non_production_part_items():
             clamp_lfc_new.add_named_non_production_part(npp, name)
 
+        mount_screw_hole_cutter = create_cylinder(
+            MScrew.from_size(
+                x_axis_belt_carriage_bridge_mount_screw_size
+            ).clearance_hole_loose
+            / 2,
+            BIG_THING,
+        )
+        mount_screw_hole_cutter = align(
+            mount_screw_hole_cutter, clamps[-1], Alignment.CENTER
+        )
+        mount_screw_hole_cutter = align(
+            mount_screw_hole_cutter, clamps[-1], Alignment.BACK
+        )
+
+        clamp_lfc_new = clamp_lfc_new.cut(mount_screw_hole_cutter)
+        clamp_lfc_new.add_named_cutter(mount_screw_hole_cutter, "mount_screw_hole")
+
         clamp_lfc_new = clamp_lfc_new.prefixed_copy(f"belt_clamp_{lr.name.lower()}")
 
         if assembly is None:
@@ -207,7 +225,7 @@ def create_x_axis_belt_carriage_assembly(
     clamps_fused = clamps[0].fuse(clamps[1])
     clamps_fused_size = get_bounding_box_size(clamps_fused)
     bridge = create_box(
-        BIG_THING, tool_head_mount_belt_deflector_cage_thickness, clamps_fused_size[2]
+        BIG_THING, x_axis_belt_carriage_bridge_thickness, clamps_fused_size[2]
     )
 
     bridge = align(bridge, clamps_fused, Alignment.CENTER)

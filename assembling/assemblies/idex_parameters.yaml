@@ -583,9 +583,9 @@ globals:
   tool_head_mount_top_box_height: 8
   x_axis_belt_carriage_belt_clamp_clearance: 0.5
   x_axis_belt_carriage_fan_side_clamp_gap: 5
-  x_axis_belt_carriage_bridge_profile_wall: 1.5
+  x_axis_belt_carriage_bridge_mount_screw_size: "M3"
   x_axis_belt_carriage_bridge_depth: 12
-  x_axis_belt_carriage_bridge_thickness: 3.5
+  x_axis_belt_carriage_bridge_thickness: 5
   x_axis_belt_carriage_bridge_web_height: 14
   x_axis_belt_carriage_mount_eye_thickness: 4
   x_axis_belt_carriage_mount_eye_length: 24
