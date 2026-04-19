@@ -18,9 +18,6 @@ Builder:
         name: x_axis_belt_carriage
       - source: self
         artifact: followers
-        names:
-          - clamp_1
-          - clamp_2
         name_template: "{name}"
       - source: self
         artifact: non_production_parts
