@@ -12,13 +12,9 @@ Builder:
     parts: []
 
 Parameters:
-  z_axis_base_z_offset:
-    Type: Float
   z_axis_guide_rod_diameter:
     Type: Float
   z_axis_guide_rod_length:
-    Type: Float
-  z_axis_guide_rod_profile_distance:
     Type: Float
 
 Parts:

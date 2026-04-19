@@ -202,6 +202,23 @@ placement:
     - part: left_z_axis_profile_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left
       alignment: STACK_TOP
+    - part: left_z_axis_guide_rod_assembly
+      to: left_z_axis_profile_assembly
+      alignment: CENTER
+      axes: [0]
+    - part: left_z_axis_guide_rod_assembly
+      to: left_z_axis_profile_assembly
+      alignment: STACK_FRONT
+      stack_gap:
+        $ref: z_axis_guide_rod_profile_distance
+    - part: left_z_axis_guide_rod_assembly
+      to: left_z_axis_profile_assembly
+      alignment: BOTTOM
+      post_translation:
+        - 0
+        - 0
+        - $ref: z_axis_base_z_offset
+      rigid_attach: true
     - part: right_z_axis_profile_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_right
       alignment: CENTER
@@ -209,6 +226,23 @@ placement:
     - part: right_z_axis_profile_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_right
       alignment: STACK_TOP
+    - part: right_z_axis_guide_rod_assembly
+      to: right_z_axis_profile_assembly
+      alignment: CENTER
+      axes: [0]
+    - part: right_z_axis_guide_rod_assembly
+      to: right_z_axis_profile_assembly
+      alignment: STACK_FRONT
+      stack_gap:
+        $ref: z_axis_guide_rod_profile_distance
+    - part: right_z_axis_guide_rod_assembly
+      to: right_z_axis_profile_assembly
+      alignment: BOTTOM
+      post_translation:
+        - 0
+        - 0
+        - $ref: z_axis_base_z_offset
+      rigid_attach: true
     - part: left_z_axis_threaded_rod_assembly
       to: left_z_axis_profile_assembly
       alignment: CENTER
@@ -786,28 +820,18 @@ assemblies:
   - name: left_z_axis_guide_rod_assembly
 
     resource_file: z_axis_guide_rod_assembly.yaml
-    depends_on:
-      - left_z_axis_profile_assembly
-    inject_parts:
-      z_axis_profile: left_z_axis_profile_assembly
+    depends_on: []
     parameters:
-      z_axis_base_z_offset: !Ref z_axis_base_z_offset
       z_axis_guide_rod_diameter: !Ref z_axis_guide_rod_diameter
       z_axis_guide_rod_length: !Ref z_axis_guide_rod_length
-      z_axis_guide_rod_profile_distance: !Ref z_axis_guide_rod_profile_distance
 
   - name: right_z_axis_guide_rod_assembly
 
     resource_file: z_axis_guide_rod_assembly.yaml
-    depends_on:
-      - right_z_axis_profile_assembly
-    inject_parts:
-      z_axis_profile: right_z_axis_profile_assembly
+    depends_on: []
     parameters:
-      z_axis_base_z_offset: !Ref z_axis_base_z_offset
       z_axis_guide_rod_diameter: !Ref z_axis_guide_rod_diameter
       z_axis_guide_rod_length: !Ref z_axis_guide_rod_length
-      z_axis_guide_rod_profile_distance: !Ref z_axis_guide_rod_profile_distance
 
   - name: left_z_axis_bottom_support_assembly
 

@@ -3,28 +3,12 @@
 from shellforgepy.simple import *
 
 
-def _get_profile_part(z_axis_profile):
-    return (
-        z_axis_profile.leader if hasattr(z_axis_profile, "leader") else z_axis_profile
-    )
-
-
 def create_z_axis_guide_rod_assembly(
     *,
-    z_axis_profile,
-    z_axis_base_z_offset,
     z_axis_guide_rod_diameter,
     z_axis_guide_rod_length,
-    z_axis_guide_rod_profile_distance,
 ):
-    """Create one guide rod against a placed Z profile."""
-
-    profile = _get_profile_part(z_axis_profile)
+    """Create one z-axis guide rod at the origin for placement in YAML."""
 
     guide_rod = create_cylinder(z_axis_guide_rod_diameter / 2, z_axis_guide_rod_length)
-    guide_rod = align(guide_rod, profile, Alignment.CENTER)
-    guide_rod = align(guide_rod, profile, Alignment.STACK_FRONT)
-    guide_rod = align(guide_rod, profile, Alignment.BOTTOM)
-    guide_rod = translate(0, -z_axis_guide_rod_profile_distance, 0)(guide_rod)
-
-    return translate(0, 0, z_axis_base_z_offset)(guide_rod)
+    return guide_rod
