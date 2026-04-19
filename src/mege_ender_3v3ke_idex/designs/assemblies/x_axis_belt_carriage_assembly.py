@@ -61,6 +61,10 @@ def create_x_axis_belt_carriage_assembly(
     )
 
     assembly = None
+
+
+    clamps = []
+    cages = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         clamp_lfc = create_gt_belt_clamp(
             base_thicknness=tool_head_mount_belt_clamp_base_thickness,
@@ -169,6 +173,9 @@ def create_x_axis_belt_carriage_assembly(
             Alignment.STACK_BACK,
         )
 
+        clamps.append(clamp_part)
+
+        cages = cages.fuse(belt_deflector_cage)
         clamp_part = clamp_part.fuse(belt_deflector)
         clamp_part = clamp_part.fuse(belt_deflector_cage)
         clamp_part = clamp_part.fuse(belt_deflector_connector)
@@ -185,5 +192,21 @@ def create_x_axis_belt_carriage_assembly(
             assembly = clamp_lfc_new
         else:
             assembly = assembly.fuse(clamp_lfc_new)
+
+    clamps_fused = clamps[0].fuse(clamps[1])
+    clamps_fused_size = get_bounding_box_size(clamps_fused)
+    bridge = create_box(
+        BIG_THING, tool_head_mount_belt_deflector_cage_thickness, clamps_fused_size[2]
+    )
+
+    bridge = align(bridge, clamps_fused, Alignment.CENTER)
+    bridge = align(bridge, cages, Alignment.BACK)
+    bridge = fit_part_between(
+        bridge,
+        cut_normal=(1, 0, 0),
+        limiting_start_part=clamps[0],
+        limiting_end_part=clamps[1],
+    )
+    assembly = assembly.fuse(bridge)
 
     return assembly
