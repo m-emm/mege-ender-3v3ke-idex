@@ -354,12 +354,27 @@ placement:
       alignment: STACK_TOP
       stack_gap:
         $ref: nozzle_bed_reach_margin
-    - part: left_z_axis_carriage_assembly.non_production_parts.x_axis_alignment_reference
-      to: x_axis_assembly.non_production_parts.lower_axis_profile
-      alignment: BOTTOM
-    - part: right_z_axis_carriage_assembly.non_production_parts.x_axis_alignment_reference
-      to: x_axis_assembly.non_production_parts.lower_axis_profile
-      alignment: BOTTOM
+    - part: left_z_axis_profile_assembly
+      to: x_axis_assembly
+      rigid_attach: true
+    - part: right_z_axis_profile_assembly
+      to: x_axis_assembly
+      rigid_attach: true
+    - part: z_axis_top_bridge_profile_assembly
+      to: left_z_axis_profile_assembly
+      rigid_attach: true
+    - part: left_z_axis_assembly
+      to: left_z_axis_profile_assembly
+      rigid_attach: true
+    - part: right_z_axis_assembly
+      to: right_z_axis_profile_assembly
+      rigid_attach: true
+    - part: z_axis_assembly
+      to: x_axis_assembly
+      rigid_attach: true
+    - part: sprite_extruder_left_assembly.non_production_parts.hotend
+      to: print_bed_assembly.non_production_parts.print_bed_foil
+      alignment: STACK_BACK
 
 process_data_generators:
   mege3devops_parametric:
