@@ -415,12 +415,9 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: dependencies
-        assembly: tool_head_mount_bottom_assembly
-        artifact: followers
-        names:
-          - belt_clamp_base_1
-          - belt_clamp_base_2
-        name_template: "tool_head_mount_bottom_{name}"
+        assembly: x_axis_belt_carriage_bottom_assembly
+        artifact: leader
+        name: x_axis_belt_carriage_bottom
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
@@ -461,12 +458,9 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: dependencies
-        assembly: tool_head_mount_top_assembly
-        artifact: followers
-        names:
-          - belt_clamp_base_1
-          - belt_clamp_base_2
-        name_template: "tool_head_mount_top_{name}"
+        assembly: x_axis_belt_carriage_top_assembly
+        artifact: leader
+        name: x_axis_belt_carriage_top
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
