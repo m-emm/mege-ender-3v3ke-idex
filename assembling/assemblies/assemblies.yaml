@@ -297,6 +297,12 @@ placement:
     - part: tool_head_mount_top_assembly
       to: sprite_extruder_right_assembly
       rigid_attach: true
+    - part: x_axis_belt_carriage_bottom_assembly
+      to: sprite_extruder_left_assembly
+      rigid_attach: true
+    - part: x_axis_belt_carriage_top_assembly
+      to: sprite_extruder_right_assembly
+      rigid_attach: true
 
     - part: sprite_extruder_left_assembly
       to: x_axis_assembly.non_production_parts.carriage_1
@@ -1275,6 +1281,8 @@ assemblies:
       - part_fan_right_assembly
       - tool_head_mount_bottom_assembly
       - tool_head_mount_top_assembly
+      - x_axis_belt_carriage_bottom_assembly
+      - x_axis_belt_carriage_top_assembly
 
   - name: sprite_extruder_assembly
 
@@ -1407,12 +1415,40 @@ assemblies:
     parameters:
       drive_position: bottom
 
+  - name: x_axis_belt_carriage_bottom_assembly
+
+    resource_file: x_axis_belt_carriage_assembly.yaml
+    depends_on:
+      - x_axis_lower_profile_assembly
+      - x_axis_left_carriage_assembly
+      - sprite_extruder_left_assembly
+    inject_parts:
+      carriage: x_axis_left_carriage_assembly
+      axis_profile: x_axis_lower_profile_assembly
+      sprite_extruder: sprite_extruder_left_assembly
+    parameters:
+      drive_position: bottom
+
   - name: tool_head_mount_top_assembly
 
     resource_file: tool_head_mount_assembly.yaml
     depends_on:
       - x_axis_top_profile_assembly
       - x_axis_rail_assembly
+      - x_axis_right_carriage_assembly
+      - sprite_extruder_right_assembly
+    inject_parts:
+      carriage: x_axis_right_carriage_assembly
+      axis_profile: x_axis_top_profile_assembly
+      sprite_extruder: sprite_extruder_right_assembly
+    parameters:
+      drive_position: top
+
+  - name: x_axis_belt_carriage_top_assembly
+
+    resource_file: x_axis_belt_carriage_assembly.yaml
+    depends_on:
+      - x_axis_top_profile_assembly
       - x_axis_right_carriage_assembly
       - sprite_extruder_right_assembly
     inject_parts:

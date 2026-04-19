@@ -581,3 +581,14 @@ globals:
 
   tool_head_mount_top_box_wall: 2
   tool_head_mount_top_box_height: 8
+  x_axis_belt_carriage_left_gap: 12
+  x_axis_belt_carriage_right_gap: 4
+  x_axis_belt_carriage_bridge_clearance_to_sprite: 1.5
+  x_axis_belt_carriage_bridge_depth: 12
+  x_axis_belt_carriage_bridge_thickness: 3.5
+  x_axis_belt_carriage_bridge_web_height: 14
+  x_axis_belt_carriage_mount_eye_thickness: 4
+  x_axis_belt_carriage_mount_eye_length: 24
+  x_axis_belt_carriage_mount_eye_width: 16
+  x_axis_belt_carriage_mount_eye_hole_diameter: 5.5
+  x_axis_belt_carriage_mount_eye_fillet_radius: 2
