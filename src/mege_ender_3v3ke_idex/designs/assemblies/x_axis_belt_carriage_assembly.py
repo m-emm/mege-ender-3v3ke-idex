@@ -32,9 +32,9 @@ def create_x_axis_belt_carriage_assembly(
     tool_head_mount_side_plate_height,
     tool_head_mount_side_plate_thickness,
     tool_head_mount_y_extension,
-    x_axis_belt_carriage_left_gap,
+    x_axis_belt_carriage_belt_clamp_clearance,
     x_axis_belt_carriage_right_gap,
-    x_axis_belt_carriage_bridge_clearance_to_sprite,
+    x_axis_belt_carriage_bridge_profile_wall,
     x_axis_belt_carriage_bridge_depth,
     x_axis_belt_carriage_bridge_thickness,
     x_axis_belt_carriage_bridge_web_height,
@@ -80,6 +80,12 @@ def create_x_axis_belt_carriage_assembly(
             clamp_lfc = rotate(180)(clamp_lfc)
 
         clamp_lfc = align(clamp_lfc, sprite_extruder, Alignment.CENTER)
+        clamp_lfc = align(
+            clamp_lfc,
+            axis_profile,
+            Alignment.STACK_FRONT,
+            stack_gap=tool_head_mount_belt_clamp_y_offset,
+        )
         clamp_lfc = clamp_lfc.aligned_from_follower(
             "belt_path_cutter",
             sprite_extruder_all_fused,
@@ -89,15 +95,89 @@ def create_x_axis_belt_carriage_assembly(
 
         clamp_lfc = align(clamp_lfc, axis_profile, Alignment.CENTER, axes=[2])
 
+        current_belt_path_cutter = clamp_lfc.get_named_follower("belt_path_cutter")
+        current_belt_path_cutter_size = get_bounding_box_size(current_belt_path_cutter)
 
+        belt_deflector_clearance = 0.5
 
-        clamp_lfc_new = LeaderFollowersCuttersPart(clamp_lfc.get_named_follower("clamp"))
+        belt_deflector = create_box(
+            tool_head_mount_belt_deflector_thickness,
+            BIG_THING,
+            current_belt_path_cutter_size[2] - 2 * belt_deflector_clearance,
+        )
+        belt_deflector = align(
+            belt_deflector,
+            current_belt_path_cutter,
+            Alignment.CENTER,
+        )
+
+        clamp_part = clamp_lfc.get_named_follower("clamp")
+        base_part = clamp_lfc.leader
+
+        camp_and_base_fused = clamp_part.fuse(base_part)
+
+        belt_deflector = fit_part_between(
+            belt_deflector,
+            cut_normal=(0, 1, 0),
+            limiting_start_part=axis_profile,
+            limiting_end_part=camp_and_base_fused,
+        )
+
+        belt_deflector = align(
+            belt_deflector,
+            clamp_lfc.get_named_follower("belt_path_cutter"),
+            lr.stack_alignment,
+        )
+
+        base_and_clamp_fused = base_part.fuse(clamp_part)
+        all_clamp_size = get_bounding_box_size(base_and_clamp_fused)
+
+        bdc_x_size = all_clamp_size[0]
+        bdc_y_size = tool_head_mount_belt_deflector_cage_thickness
+        bdc_z_size = all_clamp_size[2]
+
+        belt_deflector_cage = create_box(bdc_x_size, bdc_y_size, bdc_z_size)
+        belt_deflector_cage = align(
+            belt_deflector_cage,
+            base_and_clamp_fused,
+            Alignment.CENTER,
+        )
+        belt_deflector_cage = align(
+            belt_deflector_cage, belt_deflector, Alignment.FRONT
+        )
+        belt_deflector_cage = belt_deflector_cage.cut(current_belt_path_cutter)
+
+        belt_deflector_connector = create_box(
+            tool_head_mount_belt_clamp_thickness,
+            x_axis_belt_carriage_belt_clamp_clearance,
+            all_clamp_size[2],
+        )
+
+        belt_deflector_connector = align(
+            belt_deflector_connector,
+            clamp_part,
+            Alignment.CENTER,
+        )
+        belt_deflector_connector = align(
+            belt_deflector_connector, clamp_part, lr.opposite
+        )
+        belt_deflector_connector = align(
+            belt_deflector_connector,
+            clamp_part,
+            Alignment.STACK_BACK,
+        )
+
+        clamp_part = clamp_part.fuse(belt_deflector)
+        # clamp_part = clamp_part.fuse(belt_deflector_cage)
+        # clamp_part = clamp_part.fuse(belt_deflector_connector)
+
+        clamp_lfc_new = LeaderFollowersCuttersPart(clamp_part)
+
         clamp_lfc_new.add_named_follower(clamp_lfc.leader, "base")
         for name, npp in clamp_lfc.get_named_non_production_part_items():
             clamp_lfc_new.add_named_non_production_part(npp, name)
-                                               
-        clamp_lfc_new = clamp_lfc_new.prefixed_copy(f"belt_clamp_{lr.name.lower()}")
 
+        clamp_lfc_new = clamp_lfc_new.prefixed_copy(f"belt_clamp_{lr.name.lower()}")
 
         if assembly is None:
             assembly = clamp_lfc_new

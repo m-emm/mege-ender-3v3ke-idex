@@ -99,11 +99,11 @@ Parameters:
     Type: Float
   tool_head_mount_y_extension:
     Type: Float
-  x_axis_belt_carriage_left_gap:
+  x_axis_belt_carriage_belt_clamp_clearance:
     Type: Float
   x_axis_belt_carriage_right_gap:
     Type: Float
-  x_axis_belt_carriage_bridge_clearance_to_sprite:
+  x_axis_belt_carriage_bridge_profile_wall:
     Type: Float
   x_axis_belt_carriage_bridge_depth:
     Type: Float
