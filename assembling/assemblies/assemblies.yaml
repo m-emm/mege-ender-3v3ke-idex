@@ -389,6 +389,17 @@ placement:
       alignment: STACK_TOP
       stack_gap:
         $ref: nozzle_bed_reach_margin
+
+    - part: right_z_axis_carriage_assembly.non_production_parts.x_axis_alignment_reference
+      to: x_axis_lower_profile_assembly
+      alignment: BOTTOM
+      rigid_attach: true
+
+    - part: left_z_axis_carriage_assembly.non_production_parts.x_axis_alignment_reference
+      to: x_axis_lower_profile_assembly
+      alignment: BOTTOM
+      rigid_attach: true
+
     - part: left_z_axis_profile_assembly
       to: x_axis_assembly
       rigid_attach: true
@@ -396,14 +407,6 @@ placement:
       to: x_axis_assembly
       rigid_attach: true
     - part: z_axis_top_bridge_profile_assembly
-      to: left_z_axis_profile_assembly
-      rigid_attach: true
-
-    - part: right_z_axis_carriage_assembly
-      to: right_z_axis_profile_assembly
-      rigid_attach: true
-
-    - part: left_z_axis_carriage_assembly
       to: left_z_axis_profile_assembly
       rigid_attach: true
 
