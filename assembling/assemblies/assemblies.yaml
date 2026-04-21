@@ -20,15 +20,21 @@ placement:
       alignment: CENTER
       axes: [0]
 
-    - to: sprite_extruder_left_assembly
-      rigid_group:
-        - nitehawk_holder_left_assembly
-        - part_fan_left_assembly
+    - part: nitehawk_holder_left_assembly
+      to: sprite_extruder_left_assembly
+      rigid_attach: true
 
-    - to: sprite_extruder_right_assembly
-      rigid_group:
-        - nitehawk_holder_right_assembly
-        - part_fan_right_assembly
+    - part: part_fan_left_assembly
+      to: sprite_extruder_left_assembly
+      rigid_attach: true
+
+    - part: nitehawk_holder_right_assembly
+      to: sprite_extruder_right_assembly
+      rigid_attach: true
+
+    - part: part_fan_right_assembly
+      to: sprite_extruder_right_assembly
+      rigid_attach: true
 
     - part: print_bed_assembly.non_production_parts.print_bed_foil
       to: printer_frame_assembly
@@ -161,6 +167,7 @@ placement:
       alignment: STACK_TOP
       stack_gap:
         $ref: x_axis_profile_stack_gap
+      rigid_attach: true
     - part: x_axis_rail_assembly
       to: x_axis_lower_profile_assembly
       alignment: CENTER
@@ -168,10 +175,7 @@ placement:
     - part: x_axis_rail_assembly
       to: x_axis_lower_profile_assembly
       alignment: STACK_TOP
-    - to: x_axis_lower_profile_assembly
-      rigid_group:
-        - x_axis_top_profile_assembly
-        - x_axis_rail_assembly
+      rigid_attach: true
     - part: x_axis_left_carriage_assembly
       to: x_axis_rail_assembly
       alignment: CENTER
@@ -180,6 +184,7 @@ placement:
         - $ref: x_axis_left_carriage_x_offset
         - 0
         - $ref: x_axis_carriage_z_offset
+      rigid_attach: true
     - part: x_axis_right_carriage_assembly
       to: x_axis_rail_assembly
       alignment: CENTER
@@ -188,10 +193,7 @@ placement:
         - $ref: x_axis_right_carriage_x_offset
         - 0
         - $ref: x_axis_carriage_z_offset
-    - to: x_axis_rail_assembly
-      rigid_group:
-        - x_axis_left_carriage_assembly
-        - x_axis_right_carriage_assembly
+      rigid_attach: true
 
     - part: left_z_axis_profile_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left
@@ -216,9 +218,7 @@ placement:
         - 0
         - 0
         - $ref: z_axis_base_z_offset
-    - to: left_z_axis_profile_assembly
-      rigid_group:
-        - left_z_axis_guide_rod_assembly
+      rigid_attach: true
     - part: right_z_axis_profile_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_right
       alignment: CENTER
@@ -242,9 +242,7 @@ placement:
         - 0
         - 0
         - $ref: z_axis_base_z_offset
-    - to: right_z_axis_profile_assembly
-      rigid_group:
-        - right_z_axis_guide_rod_assembly
+      rigid_attach: true
     - part: left_z_axis_threaded_rod_assembly
       to: left_z_axis_profile_assembly
       alignment: CENTER
@@ -298,6 +296,7 @@ placement:
     - part: x_axis_carriage_stopper_left_assembly
       to: x_axis_rail_assembly
       alignment: STACK_LEFT
+      rigid_attach: true
     - part: x_axis_carriage_stopper_right_assembly
       to: x_axis_rail_assembly
       alignment: CENTER
@@ -308,10 +307,7 @@ placement:
     - part: x_axis_carriage_stopper_right_assembly
       to: x_axis_rail_assembly
       alignment: STACK_RIGHT
-    - to: x_axis_rail_assembly
-      rigid_group:
-        - x_axis_carriage_stopper_left_assembly
-        - x_axis_carriage_stopper_right_assembly
+      rigid_attach: true
     - part: sprite_extruder_left_assembly
       post_rotation:
         angle: 180
@@ -336,6 +332,7 @@ placement:
         - 0
         - 0
         - $ref: x_axis_sprite_extruder_rail_z_offset
+      rigid_attach: true
     - part: sprite_extruder_right_assembly
       post_rotation:
         angle: 180
@@ -360,19 +357,20 @@ placement:
         - 0
         - 0
         - $ref: x_axis_sprite_extruder_rail_z_offset
-    - to: x_axis_rail_assembly
-      rigid_group:
-        - sprite_extruder_left_assembly
-        - sprite_extruder_right_assembly
+      rigid_attach: true
 
-    - to: sprite_extruder_left_assembly
-      rigid_group:
-        - tool_head_mount_bottom_assembly
-        - x_axis_belt_carriage_bottom_assembly
-    - to: sprite_extruder_right_assembly
-      rigid_group:
-        - tool_head_mount_top_assembly
-        - x_axis_belt_carriage_top_assembly
+    - part: tool_head_mount_bottom_assembly
+      to: sprite_extruder_left_assembly
+      rigid_attach: true
+    - part: tool_head_mount_top_assembly
+      to: sprite_extruder_right_assembly
+      rigid_attach: true
+    - part: x_axis_belt_carriage_bottom_assembly
+      to: sprite_extruder_left_assembly
+      rigid_attach: true
+    - part: x_axis_belt_carriage_top_assembly
+      to: sprite_extruder_right_assembly
+      rigid_attach: true
 
     - part: tool_head_left_assembly
       to: sprite_extruder_left_assembly
@@ -402,23 +400,39 @@ placement:
       alignment: BOTTOM
       rigid_attach: true
 
-    - to: x_axis_assembly
-      rigid_group:
-        - left_z_axis_profile_assembly
-        - right_z_axis_profile_assembly
-        - z_axis_top_bridge_profile_assembly
+    - part: left_z_axis_profile_assembly
+      to: x_axis_assembly
+      rigid_attach: true
+    - part: right_z_axis_profile_assembly
+      to: x_axis_assembly
+      rigid_attach: true
+    - part: z_axis_top_bridge_profile_assembly
+      to: left_z_axis_profile_assembly
+      rigid_attach: true
 
-    - to: left_z_axis_profile_assembly
-      rigid_group:
-        - left_z_axis_bottom_support_assembly
-        - left_z_axis_motor_mount_assembly
-        - left_z_axis_guide_rod_top_mount_assembly
+    - part: left_z_axis_bottom_support_assembly
+      to: left_z_axis_profile_assembly
+      rigid_attach: true
 
-    - to: right_z_axis_profile_assembly
-      rigid_group:
-        - right_z_axis_bottom_support_assembly
-        - right_z_axis_motor_mount_assembly
-        - right_z_axis_guide_rod_top_mount_assembly
+    - part: right_z_axis_bottom_support_assembly
+      to: right_z_axis_profile_assembly
+      rigid_attach: true
+
+    - part: left_z_axis_motor_mount_assembly
+      to: left_z_axis_profile_assembly
+      rigid_attach: true
+
+    - part: left_z_axis_guide_rod_top_mount_assembly
+      to: left_z_axis_profile_assembly
+      rigid_attach: true
+
+    - part: right_z_axis_motor_mount_assembly
+      to: right_z_axis_profile_assembly
+      rigid_attach: true
+
+    - part: right_z_axis_guide_rod_top_mount_assembly
+      to: right_z_axis_profile_assembly
+      rigid_attach: true
 
     - part: sprite_extruder_left_assembly.non_production_parts.hotend
       to: print_bed_assembly.non_production_parts.print_bed_foil
