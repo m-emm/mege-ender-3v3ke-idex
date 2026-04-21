@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for the ender idex printer feet
+Description: Assembly configuration for one ender idex printer foot
 
 Builder:
   Visualization:
@@ -10,13 +10,9 @@ Builder:
       export_stl: false
       export_individual_parts: false
     parts:
-      - source: dependencies
-        assembly: printer_frame_assembly
-        artifact: leader
-        name: printer_frame
       - source: self
-        artifact: followers
-        name_template: "{name}"
+        artifact: leader
+        name: printer_foot
       - source: self
         artifact: non_production_parts
         name_template: "{name}"
@@ -29,8 +25,8 @@ Builder:
           brim_type: no_brim
     parts:
       - source: self
-        artifact: followers
-        name_template: "{name}"
+        artifact: leader
+        name: printer_foot
         transform:
           function: orient_max_planar_area
           kwargs:
@@ -65,8 +61,8 @@ Parameters:
     Type: Integer
 
 Parts:
-  PrinterFeetAssembly:
+  PrinterFootAssembly:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.printer_feet_assembly.create_printer_feet_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.printer_foot_assembly.create_printer_foot_assembly

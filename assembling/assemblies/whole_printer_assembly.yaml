@@ -18,8 +18,21 @@ Builder:
         assembly: printer_frame
         artifact: all
       - source: injected
-        assembly: printer_feet
+        assembly: printer_foot_left_front
         artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: printer_foot_left_back
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: printer_foot_right_front
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: printer_foot_right_back
+        artifact: all
+        name_template: "{assembly_name}_{name}"
       - source: injected
         assembly: y_axis
         artifact: leader
