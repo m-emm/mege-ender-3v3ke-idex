@@ -22,17 +22,11 @@ placement:
 
     - rigid_group:
         - nitehawk_holder_left_assembly
-      to: sprite_extruder_left_assembly
-
-    - rigid_group:
         - part_fan_left_assembly
       to: sprite_extruder_left_assembly
 
     - rigid_group:
         - nitehawk_holder_right_assembly
-      to: sprite_extruder_right_assembly
-
-    - rigid_group:
         - part_fan_right_assembly
       to: sprite_extruder_right_assembly
 
@@ -123,9 +117,6 @@ placement:
       alignment: STACK_LEFT
       stack_gap:
         $ref: endstop_holder_stack_gap
-    - rigid_group:
-        - x_axis_endstop_left_assembly
-      to: x_axis_rail_assembly
 
     - part: x_axis_endstop_right_assembly
       post_rotation:
@@ -149,7 +140,9 @@ placement:
       alignment: STACK_RIGHT
       stack_gap:
         $ref: endstop_holder_stack_gap
+
     - rigid_group:
+        - x_axis_endstop_left_assembly
         - x_axis_endstop_right_assembly
       to: x_axis_rail_assembly
 
@@ -196,9 +189,6 @@ placement:
         - $ref: x_axis_left_carriage_x_offset
         - 0
         - $ref: x_axis_carriage_z_offset
-    - rigid_group:
-        - x_axis_left_carriage_assembly
-      to: x_axis_rail_assembly
     - part: x_axis_right_carriage_assembly
       to: x_axis_rail_assembly
       alignment: CENTER
@@ -208,6 +198,7 @@ placement:
         - 0
         - $ref: x_axis_carriage_z_offset
     - rigid_group:
+        - x_axis_left_carriage_assembly
         - x_axis_right_carriage_assembly
       to: x_axis_rail_assembly
 
@@ -320,9 +311,6 @@ placement:
     - part: x_axis_carriage_stopper_left_assembly
       to: x_axis_rail_assembly
       alignment: STACK_LEFT
-    - rigid_group:
-        - x_axis_carriage_stopper_left_assembly
-      to: x_axis_rail_assembly
     - part: x_axis_carriage_stopper_right_assembly
       to: x_axis_rail_assembly
       alignment: CENTER
@@ -333,7 +321,9 @@ placement:
     - part: x_axis_carriage_stopper_right_assembly
       to: x_axis_rail_assembly
       alignment: STACK_RIGHT
+
     - rigid_group:
+        - x_axis_carriage_stopper_left_assembly
         - x_axis_carriage_stopper_right_assembly
       to: x_axis_rail_assembly
     - part: sprite_extruder_left_assembly
