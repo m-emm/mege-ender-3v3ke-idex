@@ -378,26 +378,13 @@ placement:
     - rigid_group:
         - sprite_extruder_left_assembly
         - sprite_extruder_right_assembly
-      to: x_axis_rail_assembly
-
-    - rigid_group:
         - tool_head_mount_bottom_assembly
       to: x_axis_rail_assembly
     - rigid_group:
         - tool_head_mount_top_assembly
-      to: x_axis_rail_assembly
-    - rigid_group:
         - x_axis_belt_carriage_bottom_assembly
-      to: x_axis_rail_assembly
-    - rigid_group:
         - x_axis_belt_carriage_top_assembly
-      to: x_axis_rail_assembly
-
-    - rigid_group:
         - tool_head_left_assembly
-      to: x_axis_rail_assembly
-
-    - rigid_group:
         - tool_head_right_assembly
       to: x_axis_rail_assembly
 
