@@ -393,10 +393,6 @@ def create_nitehawk_holder_assembly(
     holder = holder.fuse(mount_towers.leader)
     holder = LeaderFollowersCuttersPart(holder)
     holder = mount_towers.use_as_cutter_on(holder)
-    holder.add_named_follower(
-        mount_towers.get_named_follower("cable_attachment"),
-        "cable_attachment",
-    )
     holder.add_named_cutter(
         mount_towers.get_named_cutter("screw_hole_cutter_1"),
         "screw_hole_cutter_1",
@@ -405,7 +401,7 @@ def create_nitehawk_holder_assembly(
         mount_towers.get_named_cutter("screw_hole_cutter_2"),
         "screw_hole_cutter_2",
     )
-    holder = holder.fuse(holder.get_named_follower("cable_attachment"))
+    holder = holder.fuse(mount_towers.get_named_follower("cable_attachment"))
 
     holder_screw_hole_cutter_1 = holder.get_named_cutter("screw_hole_cutter_1")
 

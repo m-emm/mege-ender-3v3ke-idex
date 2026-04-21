@@ -284,6 +284,24 @@ def create_z_axis_carriage_assembly(
         stack_gap=-z_axis_carriage_fillet_radius,
     )
 
+    carriage_reference = create_filleted_box(
+        z_axis_carriage_width,
+        z_axis_x_axis_to_carriage_gap + z_axis_carriage_fillet_radius,
+        0.01,
+        z_axis_carriage_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.BACK],
+    )
+    carriage_reference = align(
+        carriage_reference,
+        x_axis_mount_plate_bottom,
+        Alignment.CENTER,
+    )
+    carriage_reference = align(
+        carriage_reference,
+        x_axis_mount_plate_bottom,
+        Alignment.STACK_TOP,
+    )
+
     mount_screw_hole_drills = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         mount_screw_hole_drill = create_cylinder(
@@ -386,9 +404,8 @@ def create_z_axis_carriage_assembly(
             retval.add_named_non_production_part(part, name)
     retval.add_named_non_production_part(bottom_bearing.leader, "bottom_bearing")
 
-    carriage_reference = retval.leaders_followers_fused()
     retval.add_named_non_production_part(
-        translate(0, 0, z_axis_carriage_x_axis_connector_thickness)(carriage_reference),
+        carriage_reference,
         "x_axis_alignment_reference",
     )
 
