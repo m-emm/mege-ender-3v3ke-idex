@@ -10,6 +10,8 @@ Builder:
       views:
         - front_angle
         - isometric
+        - front
+        - top
         - left
       width: 512
       height: 512
@@ -192,27 +194,12 @@ Builder:
             - { $ref: z_axis_z_travel }
       - source: injected
         assembly: x_axis_motor_mount_bottom
-        artifact: followers
-        name_template: "{assembly_name}_{name}"
-        animation:
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: injected
-        assembly: x_axis_motor_mount_bottom
         artifact: non_production_parts
         exclude_names:
+          - axis_holding_counter_flange
+          - axis_holding_counter_flange_screws
+          - mount_screw
           - profile_to_align
-        name_template: "{assembly_name}_{name}"
-        animation:
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: injected
-        assembly: x_axis_motor_mount_top
-        artifact: followers
         name_template: "{assembly_name}_{name}"
         animation:
           z_axis:
@@ -223,8 +210,41 @@ Builder:
         assembly: x_axis_motor_mount_top
         artifact: non_production_parts
         exclude_names:
+          - axis_holding_counter_flange
+          - axis_holding_counter_flange_screws
+          - mount_screw
           - profile_to_align
         name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis
+        artifact: leader
+        name: x_axis
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis
+        artifact: followers
+        exclude_names:
+          - mount_plate_bottom
+          - mount_plate_top
+        name_template: "{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis
+        artifact: non_production_parts
+        name_template: "{name}"
         animation:
           z_axis:
             - 0
