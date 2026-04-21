@@ -4,6 +4,15 @@ Description: Assembly configuration for the nitehawk holder
 
 Builder:
   Visualization:
+    preview:
+      enabled: true
+      views:
+        - top
+        - left
+        - front
+      width: 512
+      height: 512
+
     parts:
       - source: self
         artifact: leader
