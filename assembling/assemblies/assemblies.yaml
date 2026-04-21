@@ -417,48 +417,46 @@ placement:
       alignment: BOTTOM
     - rigid_group:
         - right_z_axis_carriage_assembly
-      to: x_axis_lower_profile_assembly
+      to: x_axis_rail_assembly
 
     - part: left_z_axis_carriage_assembly.non_production_parts.x_axis_alignment_reference
-      to: x_axis_lower_profile_assembly
+      to: x_axis_rail_assembly
       alignment: BOTTOM
     - rigid_group:
         - left_z_axis_carriage_assembly
-      to: x_axis_lower_profile_assembly
+      to: x_axis_rail_assembly
 
     - rigid_group:
         - left_z_axis_profile_assembly
-      to: x_axis_assembly
-    - rigid_group:
         - right_z_axis_profile_assembly
-      to: x_axis_assembly
+      to: x_axis_rail_assembly
     - rigid_group:
         - z_axis_top_bridge_profile_assembly
-      to: left_z_axis_profile_assembly
+      to: x_axis_rail_assembly
 
     - rigid_group:
         - left_z_axis_bottom_support_assembly
-      to: left_z_axis_profile_assembly
+      to: x_axis_rail_assembly
 
     - rigid_group:
         - right_z_axis_bottom_support_assembly
-      to: right_z_axis_profile_assembly
+      to: x_axis_rail_assembly
 
     - rigid_group:
         - left_z_axis_motor_mount_assembly
-      to: left_z_axis_profile_assembly
+      to: x_axis_rail_assembly
 
     - rigid_group:
         - left_z_axis_guide_rod_top_mount_assembly
-      to: left_z_axis_profile_assembly
+      to: x_axis_rail_assembly
 
     - rigid_group:
         - right_z_axis_motor_mount_assembly
-      to: right_z_axis_profile_assembly
+      to: x_axis_rail_assembly
 
     - rigid_group:
         - right_z_axis_guide_rod_top_mount_assembly
-      to: right_z_axis_profile_assembly
+      to: x_axis_rail_assembly
 
     - part: sprite_extruder_left_assembly.non_production_parts.hotend
       to: print_bed_assembly.non_production_parts.print_bed_foil
