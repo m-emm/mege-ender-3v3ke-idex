@@ -129,13 +129,6 @@ placement:
       alignment: CENTER
       axes: [2]
 
-    - part: creality_endstop_holder_assembly
-      to: printer_frame_assembly
-      alignment: TOP
-      post_rotation:
-        angle: -90
-        axis: [0, 1, 0]
-        center: creality_endstop_holder_assembly.CENTER
     - part: x_axis_endstop_left_assembly
       post_rotation:
         angle: 90
@@ -684,6 +677,25 @@ assemblies:
       creality_endstop_holder_screw_size: !Ref creality_endstop_holder_screw_size
       creality_endstop_holder_nut_cutter_slack: !Ref creality_endstop_holder_nut_cutter_slack
 
+  - name: x_axis_creality_endstop_holder_assembly
+
+    resource_file: creality_endstop_holder_assembly.yaml
+    depends_on:
+      - creality_endstop_board_assembly
+    inject_parts:
+      creality_endstop_board_assembly: creality_endstop_board_assembly
+    parameters:
+      up: [0, 0, 1]
+      out: [0, -1, 0]
+      creality_endstop_holder_thickness: !Ref creality_endstop_holder_thickness
+      creality_endstop_holder_bottom_clearance: !Ref creality_endstop_holder_bottom_clearance
+      creality_endstop_holder_sink: !Ref creality_endstop_holder_sink
+      creality_endstop_holder_length_oversize: !Ref creality_endstop_holder_length_oversize
+      creality_endstop_holder_width_oversize: !Ref creality_endstop_holder_width_oversize
+      creality_endstop_holder_board_clearance: !Ref creality_endstop_holder_board_clearance
+      creality_endstop_holder_screw_size: !Ref creality_endstop_holder_screw_size
+      creality_endstop_holder_nut_cutter_slack: !Ref creality_endstop_holder_nut_cutter_slack
+
   - name: x_axis_assembly
 
     depends_on:
@@ -806,9 +818,9 @@ assemblies:
     depends_on:
       - x_axis_lower_profile_assembly
       - x_axis_rail_assembly
-      - creality_endstop_holder_assembly
+      - x_axis_creality_endstop_holder_assembly
     inject_parts:
-      creality_endstop_holder_assembly: creality_endstop_holder_assembly
+      creality_endstop_holder_assembly: x_axis_creality_endstop_holder_assembly
     parameters:
       x_axis_endstop_mount_base_depth: !Ref x_axis_endstop_mount_base_depth
       x_axis_endstop_mount_base_thickness: !Ref x_axis_endstop_mount_base_thickness
@@ -829,9 +841,9 @@ assemblies:
     depends_on:
       - x_axis_lower_profile_assembly
       - x_axis_rail_assembly
-      - creality_endstop_holder_assembly
+      - x_axis_creality_endstop_holder_assembly
     inject_parts:
-      creality_endstop_holder_assembly: creality_endstop_holder_assembly
+      creality_endstop_holder_assembly: x_axis_creality_endstop_holder_assembly
     parameters:
       x_axis_endstop_mount_base_depth: !Ref x_axis_endstop_mount_base_depth
       x_axis_endstop_mount_base_thickness: !Ref x_axis_endstop_mount_base_thickness
