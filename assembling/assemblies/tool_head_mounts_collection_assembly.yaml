@@ -1,0 +1,142 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Focused x-axis tool head mounts scene with animated carriages and tool heads
+
+Builder:
+  Collection: true
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - front_angle
+        - isometric
+        - front
+        - top
+        - left
+      width: 512
+      height: 512
+    parts:
+      - source: injected
+        assembly: x_axis_lower_profile
+        artifact: all
+        name_template: "{default_name}"
+      - source: injected
+        assembly: x_axis_top_profile
+        artifact: all
+        name_template: "{default_name}"
+      - source: injected
+        assembly: x_axis_rail
+        artifact: all
+        name_template: "{default_name}"
+      - source: injected
+        assembly: x_axis_endstop_left
+        artifact: all
+        name_template: "x_axis_endstop_left_{default_name}"
+      - source: injected
+        assembly: x_axis_endstop_right
+        artifact: all
+        name_template: "x_axis_endstop_right_{default_name}"
+      - source: injected
+        assembly: x_axis_carriage_stopper_left
+        artifact: all
+        name_template: "x_axis_carriage_stopper_left_{default_name}"
+      - source: injected
+        assembly: x_axis_carriage_stopper_right
+        artifact: all
+        name_template: "x_axis_carriage_stopper_right_{default_name}"
+      - source: injected
+        assembly: x_axis_left_carriage
+        artifact: all
+        name_template: "x_axis_left_carriage_{default_name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: x_axis_right_carriage
+        artifact: all
+        name_template: "x_axis_right_carriage_{default_name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
+        assembly: sprite_extruder_left
+        artifact: all
+        name_template: "sprite_extruder_left_{default_name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: part_fan_left
+        artifact: all
+        name_template: "part_fan_left_{default_name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: tool_head_mount_bottom
+        artifact: all
+        name_template: "tool_head_mount_bottom_{default_name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: x_axis_belt_carriage_bottom
+        artifact: all
+        name_template: "x_axis_belt_carriage_bottom_{default_name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: sprite_extruder_right
+        artifact: all
+        name_template: "sprite_extruder_right_{default_name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
+        assembly: part_fan_right
+        artifact: all
+        name_template: "part_fan_right_{default_name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
+        assembly: tool_head_mount_top
+        artifact: all
+        name_template: "tool_head_mount_top_{default_name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
+        assembly: x_axis_belt_carriage_top
+        artifact: all
+        name_template: "x_axis_belt_carriage_top_{default_name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+
+Parameters:
+  x_axis_x_travel:
+    Type: Float
+  x_axis_x_travel_negative:
+    Type: Float

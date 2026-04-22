@@ -1,7 +1,5 @@
 """Standalone x-axis endstop holder with profile groove mount."""
 
-import copy
-
 from shellforgepy.simple import *
 
 
@@ -86,7 +84,7 @@ def create_x_axis_endstop_assembly(
 ):
     """Create one x-axis endstop holder with an integrated profile groove clamp."""
 
-    holder = copy.deepcopy(creality_endstop_holder_assembly)
+    holder = creality_endstop_holder_assembly.copy()
     holder = rotate(180, axis=(0, 0, 1), center=get_bounding_box_center(holder))(holder)
     holder_size = get_bounding_box_size(holder.leader)
 
