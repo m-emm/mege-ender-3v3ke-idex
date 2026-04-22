@@ -166,7 +166,6 @@ def _create_top_clamp_shield_plate(
 def _create_single_tool_head_mount(
     *,
     carriage,
-    axis_profile,
     sprite_extruder,
     x_axis_belt_carriage,
     extruder_mount_screw_size,
@@ -437,7 +436,6 @@ def _create_single_tool_head_mount(
 def create_tool_head_mount_assembly(
     *,
     carriage,
-    axis_profile,
     sprite_extruder,
     x_axis_belt_carriage,
     extruder_mount_screw_size,
@@ -488,7 +486,6 @@ def create_tool_head_mount_assembly(
 
     mount = _create_single_tool_head_mount(
         carriage=carriage,
-        axis_profile=axis_profile,
         sprite_extruder=sprite_extruder,
         x_axis_belt_carriage=x_axis_belt_carriage,
         extruder_mount_screw_size=extruder_mount_screw_size,

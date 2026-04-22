@@ -1525,7 +1525,6 @@ assemblies:
       - x_axis_belt_carriage_bottom_assembly
     inject_parts:
       carriage: x_axis_left_carriage_assembly
-      axis_profile: x_axis_lower_profile_assembly
       sprite_extruder: sprite_extruder_left_assembly
       x_axis_belt_carriage: x_axis_belt_carriage_bottom_assembly
     parameters:
@@ -1549,14 +1548,12 @@ assemblies:
 
     resource_file: tool_head_mount_assembly.yaml
     depends_on:
-      - x_axis_top_profile_assembly
       - x_axis_rail_assembly
       - x_axis_right_carriage_assembly
       - sprite_extruder_right_assembly
       - x_axis_belt_carriage_top_assembly
     inject_parts:
       carriage: x_axis_right_carriage_assembly
-      axis_profile: x_axis_top_profile_assembly
       sprite_extruder: sprite_extruder_right_assembly
       x_axis_belt_carriage: x_axis_belt_carriage_top_assembly
     parameters:
