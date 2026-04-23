@@ -1,0 +1,72 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Composite x-axis motor mount and connector assembly
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: x_axis_composite
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+  Production:
+    parts:
+      - source: self
+        artifact: leader
+        name: x_axis_composite
+        prod_rotation_angle: 90
+        prod_rotation_axis: [1, 0, 0]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - axis_holding_counter_flange
+        name: axis_holding_counter_flange
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: x_axis_composite
+          process_data_preset: petgcf_medium_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                support_type: tree(auto)
+                enable_support: "1"
+          parts:
+            - x_axis_composite
+            - axis_holding_counter_flange
+      auto_assign_plates: false
+
+Parameters:
+  profile_position:
+    Type: String
+
+Parts:
+  XAxisCompositeAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Composite:
+        Leader:
+          Fused:
+            - source: injected
+              assembly: x_axis
+              artifact: followers
+              names:
+                - { $sub: "mount_plate_${profile_position}" }
+        Followers:
+          - source: injected
+            assembly: x_axis_motor_mount
+            artifact: followers
+            names:
+              - mount_plate
+            name: profile_mount_plate
+        Cutters: []
+        NonProductionParts:
+          - source: injected
+            assembly: x_axis_motor_mount
+            artifact: non_production_parts
+            exclude_names:
+              - profile_to_align
+            name_template: "{name}"

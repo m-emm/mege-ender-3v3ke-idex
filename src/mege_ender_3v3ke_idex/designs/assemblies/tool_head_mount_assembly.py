@@ -225,9 +225,8 @@ def create_tool_head_mount_assembly(
     )
     mount_base_plate = align(
         mount_base_plate,
-        carriage,
-        Alignment.STACK_FRONT,
-        stack_gap=tool_head_mount_plate_carriage_clearance,
+        sprite_extruder,
+        Alignment.STACK_BACK,
     )
 
     mount_hole_cutter = sprite_extruder.get_named_cutter("mount_hole_cutter")

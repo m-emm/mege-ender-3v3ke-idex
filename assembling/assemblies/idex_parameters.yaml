@@ -111,10 +111,10 @@ globals:
       "$sub": "${x_axis_rail_length} / 2 - ${x_axis_carriage_length} / 2 - ${carriage_end_clearance}"
   x_axis_carriage_z_offset:
     $ref: x_axis_carriage_height
-  x_axis_sprite_extruder_carriage_stack_gap: 8
+  x_axis_sprite_extruder_carriage_stack_gap: 8.5
   x_axis_sprite_extruder_carriage_x_offset: -8
   x_axis_right_sprite_extruder_carriage_x_offset: 18
-  x_axis_sprite_extruder_rail_z_offset: 2
+  x_axis_sprite_extruder_rail_z_offset: 3
   x_axis_carriage_stopper_width: 12
   x_axis_carriage_stopper_thickness: 8
   x_axis_carriage_stopper_depth: 25
@@ -548,7 +548,7 @@ globals:
   tool_head_front_mount_plate_connector_height: 14
   tool_head_front_mount_plate_connector_thickness: 4
   tool_head_front_mount_plate_connector_width: 7.5
-  tool_head_mount_base_plate_height: 20
+  tool_head_mount_base_plate_height: 12.5
   tool_head_mount_base_plate_thickness: 5
   tool_head_mount_belt_clamp_base_thickness: 5
   tool_head_mount_belt_clamp_length: 12

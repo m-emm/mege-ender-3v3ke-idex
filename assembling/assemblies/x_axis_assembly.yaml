@@ -121,26 +121,6 @@ Builder:
         name_template: "{name}"
   Production:
     parts:
-      - source: dependencies
-        assembly: x_axis_motor_mount_bottom_assembly
-        artifact: non_production_parts
-        names:
-          - axis_holding_counter_flange
-        name: axis_holding_counter_flange_bottom
-      - source: self
-        artifact: followers
-        names:
-          - mount_plate_bottom
-        name_template: "{name}"
-        prod_rotation_angle: 90
-        prod_rotation_axis: [1, 0, 0]
-      - source: self
-        artifact: followers
-        names:
-          - mount_plate_top
-        name_template: "{name}"
-        prod_rotation_angle: 90
-        prod_rotation_axis: [1, 0, 0]
       - source: self
         artifact: followers
         names:
@@ -184,12 +164,6 @@ Builder:
         prod_rotation_angle: -90
         prod_rotation_axis: [0, 1, 0]
       - source: dependencies
-        assembly: x_axis_motor_mount_top_assembly
-        artifact: non_production_parts
-        names:
-          - axis_holding_counter_flange
-        name: axis_holding_counter_flange_top
-      - source: dependencies
         assembly: x_axis_carriage_stopper_right_assembly
         artifact: leader
         name: rail_end_stopper_right
@@ -232,8 +206,6 @@ Builder:
                 support_type: tree(auto)
                 enable_support: "1"
           parts:
-            - axis_holding_counter_flange_bottom
-            - mount_plate_bottom
             - x_axis_idler_endcap_bottom_left
             - x_axis_idler_endcap_bottom_right
             - x_axis_idler_endcap_bottom_right_cage
@@ -246,8 +218,6 @@ Builder:
                 enable_support: "1"
 
           parts:
-            - axis_holding_counter_flange_top
-            - mount_plate_top
             - x_axis_idler_endcap_top_left
             - x_axis_idler_endcap_top_right
             - x_axis_idler_endcap_top_right_cage

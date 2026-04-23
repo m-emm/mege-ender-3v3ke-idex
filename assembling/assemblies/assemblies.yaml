@@ -440,6 +440,8 @@ placement:
 
     - rigid_group:
         - x_axis_assembly
+        - x_axis_composite_bottom_assembly
+        - x_axis_composite_top_assembly
       to: x_axis_rail_assembly
 
     - part: sprite_extruder_left_assembly.non_production_parts.hotend
@@ -716,6 +718,30 @@ assemblies:
       x_axis_top_profile: x_axis_top_profile_assembly
       x_axis_motor_mount_bottom: x_axis_motor_mount_bottom_assembly
       x_axis_motor_mount_top: x_axis_motor_mount_top_assembly
+
+  - name: x_axis_composite_bottom_assembly
+
+    resource_file: x_axis_composite_assembly.yaml
+    depends_on:
+      - x_axis_assembly
+      - x_axis_motor_mount_bottom_assembly
+    inject_parts:
+      x_axis: x_axis_assembly
+      x_axis_motor_mount: x_axis_motor_mount_bottom_assembly
+    parameters:
+      profile_position: bottom
+
+  - name: x_axis_composite_top_assembly
+
+    resource_file: x_axis_composite_assembly.yaml
+    depends_on:
+      - x_axis_assembly
+      - x_axis_motor_mount_top_assembly
+    inject_parts:
+      x_axis: x_axis_assembly
+      x_axis_motor_mount: x_axis_motor_mount_top_assembly
+    parameters:
+      profile_position: top
 
   - name: x_axis_carriage_stopper_left_assembly
 
@@ -1344,8 +1370,8 @@ assemblies:
       - x_axis_carriage_stopper_right_assembly
       - x_axis_lower_profile_assembly
       - x_axis_top_profile_assembly
-      - x_axis_motor_mount_bottom_assembly
-      - x_axis_motor_mount_top_assembly
+      - x_axis_composite_bottom_assembly
+      - x_axis_composite_top_assembly
       - x_axis_rail_assembly
       - x_axis_left_carriage_assembly
       - x_axis_right_carriage_assembly
@@ -1390,8 +1416,8 @@ assemblies:
       x_axis_lower_profile: x_axis_lower_profile_assembly
       x_axis_top_profile: x_axis_top_profile_assembly
       x_axis_rail: x_axis_rail_assembly
-      x_axis_motor_mount_bottom: x_axis_motor_mount_bottom_assembly
-      x_axis_motor_mount_top: x_axis_motor_mount_top_assembly
+      x_axis_composite_bottom: x_axis_composite_bottom_assembly
+      x_axis_composite_top: x_axis_composite_top_assembly
       x_axis_carriage_stopper_left: x_axis_carriage_stopper_left_assembly
       x_axis_carriage_stopper_right: x_axis_carriage_stopper_right_assembly
       x_axis_endstop_left: x_axis_endstop_left_assembly
