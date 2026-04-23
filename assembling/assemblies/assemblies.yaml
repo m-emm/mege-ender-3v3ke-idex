@@ -20,6 +20,17 @@ placement:
       alignment: CENTER
       axes: [0]
 
+    - part: x_axis_rail_assembly
+      to: x_axis_lower_profile_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: x_axis_rail_assembly
+      to: x_axis_lower_profile_assembly
+      alignment: STACK_TOP
+    - rigid_group:
+        - x_axis_rail_assembly
+      to: x_axis_lower_profile_assembly
+
     - part: printer_foot_left_front_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left
       alignment: LEFT
@@ -135,7 +146,7 @@ placement:
         axis: [0, 0, 1]
         center: x_axis_endstop_left_assembly.CENTER
 
-    - part: x_axis_endstop_left_assembly
+    - part: x_axis_endstop_left_assembly.non_production_parts.mount_screw
       to: x_axis_lower_profile_assembly
       alignment: CENTER
       axes: [0, 1]
@@ -158,7 +169,7 @@ placement:
         angle: -90
         axis: [0, 0, 1]
         center: x_axis_endstop_right_assembly.CENTER
-    - part: x_axis_endstop_right_assembly
+    - part: x_axis_endstop_right_assembly.non_production_parts.mount_screw
       to: x_axis_lower_profile_assembly
       alignment: CENTER
       axes: [0, 1]
@@ -205,16 +216,6 @@ placement:
         $ref: x_axis_profile_stack_gap
     - rigid_group:
         - x_axis_top_profile_assembly
-      to: x_axis_lower_profile_assembly
-    - part: x_axis_rail_assembly
-      to: x_axis_lower_profile_assembly
-      alignment: CENTER
-      axes: [0, 1]
-    - part: x_axis_rail_assembly
-      to: x_axis_lower_profile_assembly
-      alignment: STACK_TOP
-    - rigid_group:
-        - x_axis_rail_assembly
       to: x_axis_lower_profile_assembly
     - part: x_axis_left_carriage_assembly
       to: x_axis_rail_assembly
@@ -407,9 +408,9 @@ placement:
         center: sprite_extruder_right_assembly.CENTER
     - part: sprite_extruder_right_assembly
       to: x_axis_right_carriage_assembly
-      alignment: LEFT
+      alignment: RIGHT
       post_translation:
-        - $ref: x_axis_sprite_extruder_carriage_x_offset
+        - "$ref": x_axis_right_sprite_extruder_carriage_x_offset
         - 0
         - 0
     - part: sprite_extruder_right_assembly
@@ -1413,6 +1414,7 @@ assemblies:
   - name: tool_head_mounts_collection_assembly
 
     depends_on:
+      - x_axis_assembly
       - x_axis_lower_profile_assembly
       - x_axis_top_profile_assembly
       - x_axis_rail_assembly
@@ -1431,6 +1433,7 @@ assemblies:
       - x_axis_belt_carriage_bottom_assembly
       - x_axis_belt_carriage_top_assembly
     inject_parts:
+      x_axis: x_axis_assembly
       x_axis_lower_profile: x_axis_lower_profile_assembly
       x_axis_top_profile: x_axis_top_profile_assembly
       x_axis_rail: x_axis_rail_assembly

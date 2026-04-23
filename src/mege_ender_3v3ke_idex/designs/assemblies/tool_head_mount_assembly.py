@@ -163,7 +163,7 @@ def _create_top_clamp_shield_plate(
     return top_clamp_shield_plate
 
 
-def _create_single_tool_head_mount(
+def create_tool_head_mount_assembly(
     *,
     carriage,
     sprite_extruder,
@@ -201,12 +201,18 @@ def _create_single_tool_head_mount(
     drive_position,
     tool_head_mount_top_box_wall,
     tool_head_mount_top_box_height,
-    big_thing,
+    BIG_THING,
 ):
-    if drive_position not in {Alignment.BOTTOM, Alignment.TOP}:
-        raise ValueError(
-            f"Unsupported tool head mount drive position: {drive_position}"
-        )
+    """Create a single tool head mount assembly."""
+
+    big_thing = BIG_THING
+    normalized_drive_position = str(drive_position).strip().lower()
+    if normalized_drive_position == "bottom":
+        drive_position = Alignment.BOTTOM
+    elif normalized_drive_position == "top":
+        drive_position = Alignment.TOP
+    else:
+        raise ValueError(f"Unsupported drive_position '{drive_position}'")
 
     carriage_size = get_bounding_box_size(carriage)
 
@@ -232,7 +238,7 @@ def _create_single_tool_head_mount(
     carriage_mount_plate = align(
         carriage_mount_plate,
         carriage,
-        Alignment.RIGHT if drive_position == Alignment.BOTTOM else Alignment.RIGHT,
+        Alignment.RIGHT if drive_position == Alignment.BOTTOM else Alignment.LEFT,
     )
 
     carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
@@ -431,97 +437,3 @@ def _create_single_tool_head_mount(
             f"sprite_mount_screw_{side_name}",
         )
     return tool_head_mount
-
-
-def create_tool_head_mount_assembly(
-    *,
-    carriage,
-    sprite_extruder,
-    x_axis_belt_carriage,
-    extruder_mount_screw_size,
-    tool_head_mount_base_plate_height,
-    tool_head_mount_base_plate_thickness,
-    tool_head_mount_belt_clamp_base_thickness,
-    tool_head_mount_belt_clamp_length,
-    tool_head_mount_belt_clamp_thickness,
-    tool_head_mount_belt_clamp_y_offset,
-    tool_head_mount_belt_deflector_belt_clearance,
-    tool_head_mount_belt_deflector_cage_thickness,
-    tool_head_mount_belt_deflector_into_profile_distance,
-    tool_head_mount_belt_deflector_thickness,
-    tool_head_mount_belt_path_cutter_clearance,
-    tool_head_mount_carriage_mount_plate_fillet_radius,
-    tool_head_mount_carriage_mount_plate_thickness,
-    tool_head_mount_carriage_mount_plate_width,
-    tool_head_mount_clamp_base_cutter_clearance,
-    tool_head_mount_extruder_cutout_carriage_gap,
-    tool_head_mount_extruder_cutout_fillet_radius,
-    tool_head_mount_extruder_cutout_width,
-    tool_head_mount_plate_carriage_clearance,
-    tool_head_mount_side_plate_depth,
-    tool_head_mount_side_plate_height,
-    tool_head_mount_side_plate_thickness,
-    tool_head_mount_side_stiffener_thickness,
-    tool_head_mount_sprite_mount_screw_length,
-    tool_head_mount_tool_head_base_plate_clearance,
-    tool_head_mount_tool_head_x_offset,
-    tool_head_mount_tool_head_z_offset,
-    tool_head_mount_x_offset,
-    tool_head_mount_y_extension,
-    drive_position,
-    tool_head_mount_top_box_wall,
-    tool_head_mount_top_box_height,
-    BIG_THING,
-):
-    """Create a single tool head mount assembly."""
-
-    big_thing = BIG_THING
-    normalized_drive_position = str(drive_position).strip().lower()
-    if normalized_drive_position == "bottom":
-        drive_alignment = Alignment.BOTTOM
-    elif normalized_drive_position == "top":
-        drive_alignment = Alignment.TOP
-    else:
-        raise ValueError(f"Unsupported drive_position '{drive_position}'")
-
-    mount = _create_single_tool_head_mount(
-        carriage=carriage,
-        sprite_extruder=sprite_extruder,
-        x_axis_belt_carriage=x_axis_belt_carriage,
-        extruder_mount_screw_size=extruder_mount_screw_size,
-        tool_head_mount_base_plate_height=tool_head_mount_base_plate_height,
-        tool_head_mount_base_plate_thickness=tool_head_mount_base_plate_thickness,
-        tool_head_mount_belt_clamp_base_thickness=tool_head_mount_belt_clamp_base_thickness,
-        tool_head_mount_belt_clamp_length=tool_head_mount_belt_clamp_length,
-        tool_head_mount_belt_clamp_thickness=tool_head_mount_belt_clamp_thickness,
-        tool_head_mount_belt_clamp_y_offset=tool_head_mount_belt_clamp_y_offset,
-        tool_head_mount_belt_deflector_belt_clearance=tool_head_mount_belt_deflector_belt_clearance,
-        tool_head_mount_belt_deflector_cage_thickness=tool_head_mount_belt_deflector_cage_thickness,
-        tool_head_mount_belt_deflector_into_profile_distance=tool_head_mount_belt_deflector_into_profile_distance,
-        tool_head_mount_belt_deflector_thickness=tool_head_mount_belt_deflector_thickness,
-        tool_head_mount_belt_path_cutter_clearance=tool_head_mount_belt_path_cutter_clearance,
-        tool_head_mount_carriage_mount_plate_fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
-        tool_head_mount_carriage_mount_plate_thickness=tool_head_mount_carriage_mount_plate_thickness,
-        tool_head_mount_carriage_mount_plate_width=tool_head_mount_carriage_mount_plate_width,
-        tool_head_mount_clamp_base_cutter_clearance=tool_head_mount_clamp_base_cutter_clearance,
-        tool_head_mount_extruder_cutout_carriage_gap=tool_head_mount_extruder_cutout_carriage_gap,
-        tool_head_mount_extruder_cutout_fillet_radius=tool_head_mount_extruder_cutout_fillet_radius,
-        tool_head_mount_extruder_cutout_width=tool_head_mount_extruder_cutout_width,
-        tool_head_mount_plate_carriage_clearance=tool_head_mount_plate_carriage_clearance,
-        tool_head_mount_side_plate_depth=tool_head_mount_side_plate_depth,
-        tool_head_mount_side_plate_height=tool_head_mount_side_plate_height,
-        tool_head_mount_side_plate_thickness=tool_head_mount_side_plate_thickness,
-        tool_head_mount_side_stiffener_thickness=tool_head_mount_side_stiffener_thickness,
-        tool_head_mount_sprite_mount_screw_length=tool_head_mount_sprite_mount_screw_length,
-        tool_head_mount_tool_head_base_plate_clearance=tool_head_mount_tool_head_base_plate_clearance,
-        tool_head_mount_tool_head_x_offset=tool_head_mount_tool_head_x_offset,
-        tool_head_mount_tool_head_z_offset=tool_head_mount_tool_head_z_offset,
-        tool_head_mount_x_offset=tool_head_mount_x_offset,
-        tool_head_mount_y_extension=tool_head_mount_y_extension,
-        tool_head_mount_top_box_wall=tool_head_mount_top_box_wall,
-        tool_head_mount_top_box_height=tool_head_mount_top_box_height,
-        drive_position=drive_alignment,
-        big_thing=big_thing,
-    )
-    mount.additional_data["drive_position"] = normalized_drive_position
-    return mount

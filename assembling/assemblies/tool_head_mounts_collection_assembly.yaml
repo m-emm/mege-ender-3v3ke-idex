@@ -29,6 +29,17 @@ Builder:
         artifact: all
         name_template: "{default_name}"
       - source: injected
+        assembly: x_axis
+        artifact: followers
+        names:
+          - x_axis_idler_endcap_bottom_left
+          - x_axis_idler_endcap_bottom_right
+          - x_axis_idler_endcap_bottom_right_cage
+          - x_axis_idler_endcap_top_left
+          - x_axis_idler_endcap_top_right
+          - x_axis_idler_endcap_top_right_cage
+        name_template: "{name}"
+      - source: injected
         assembly: x_axis_endstop_left
         artifact: all
         name_template: "x_axis_endstop_left_{default_name}"

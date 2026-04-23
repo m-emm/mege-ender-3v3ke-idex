@@ -113,6 +113,7 @@ globals:
     $ref: x_axis_carriage_height
   x_axis_sprite_extruder_carriage_stack_gap: 8
   x_axis_sprite_extruder_carriage_x_offset: -8
+  x_axis_right_sprite_extruder_carriage_x_offset: 18
   x_axis_sprite_extruder_rail_z_offset: 2
   x_axis_carriage_stopper_width: 12
   x_axis_carriage_stopper_thickness: 8
