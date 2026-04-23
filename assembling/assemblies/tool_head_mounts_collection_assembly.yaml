@@ -83,18 +83,9 @@ Builder:
             - 0
             - 0
       - source: injected
-        assembly: nitehawk_holder_left
+        assembly: tool_head_left
         artifact: all
-        name_template: "nitehawk_holder_left_{default_name}"
-        animation:
-          x_carriage_1:
-            - { $ref: x_axis_x_travel }
-            - 0
-            - 0
-      - source: injected
-        assembly: part_fan_left
-        artifact: all
-        name_template: "part_fan_left_{default_name}"
+        name_template: "tool_head_left_{default_name}"
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
@@ -128,18 +119,9 @@ Builder:
             - 0
             - 0
       - source: injected
-        assembly: nitehawk_holder_right
+        assembly: tool_head_right
         artifact: all
-        name_template: "nitehawk_holder_right_{default_name}"
-        animation:
-          x_carriage_2:
-            - { $ref: x_axis_x_travel_negative }
-            - 0
-            - 0
-      - source: injected
-        assembly: part_fan_right
-        artifact: all
-        name_template: "part_fan_right_{default_name}"
+        name_template: "tool_head_right_{default_name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }

@@ -1353,10 +1353,8 @@ assemblies:
       - x_axis_endstop_right_assembly
       - sprite_extruder_left_assembly
       - sprite_extruder_right_assembly
-      - nitehawk_holder_left_assembly
-      - nitehawk_holder_right_assembly
-      - part_fan_left_assembly
-      - part_fan_right_assembly
+      - tool_head_left_assembly
+      - tool_head_right_assembly
       - tool_head_mount_bottom_assembly
       - tool_head_mount_top_assembly
       - x_axis_belt_carriage_bottom_assembly
@@ -1402,10 +1400,8 @@ assemblies:
       x_axis_right_carriage: x_axis_right_carriage_assembly
       sprite_extruder_left: sprite_extruder_left_assembly
       sprite_extruder_right: sprite_extruder_right_assembly
-      nitehawk_holder_left: nitehawk_holder_left_assembly
-      nitehawk_holder_right: nitehawk_holder_right_assembly
-      part_fan_left: part_fan_left_assembly
-      part_fan_right: part_fan_right_assembly
+      tool_head_left: tool_head_left_assembly
+      tool_head_right: tool_head_right_assembly
       tool_head_mount_bottom: tool_head_mount_bottom_assembly
       tool_head_mount_top: tool_head_mount_top_assembly
       x_axis_belt_carriage_bottom: x_axis_belt_carriage_bottom_assembly
@@ -1426,10 +1422,8 @@ assemblies:
       - x_axis_carriage_stopper_right_assembly
       - sprite_extruder_left_assembly
       - sprite_extruder_right_assembly
-      - nitehawk_holder_left_assembly
-      - nitehawk_holder_right_assembly
-      - part_fan_left_assembly
-      - part_fan_right_assembly
+      - tool_head_left_assembly
+      - tool_head_right_assembly
       - tool_head_mount_bottom_assembly
       - tool_head_mount_top_assembly
       - x_axis_belt_carriage_bottom_assembly
@@ -1447,10 +1441,8 @@ assemblies:
       x_axis_carriage_stopper_right: x_axis_carriage_stopper_right_assembly
       sprite_extruder_left: sprite_extruder_left_assembly
       sprite_extruder_right: sprite_extruder_right_assembly
-      nitehawk_holder_left: nitehawk_holder_left_assembly
-      nitehawk_holder_right: nitehawk_holder_right_assembly
-      part_fan_left: part_fan_left_assembly
-      part_fan_right: part_fan_right_assembly
+      tool_head_left: tool_head_left_assembly
+      tool_head_right: tool_head_right_assembly
       tool_head_mount_bottom: tool_head_mount_bottom_assembly
       tool_head_mount_top: tool_head_mount_top_assembly
       x_axis_belt_carriage_bottom: x_axis_belt_carriage_bottom_assembly
