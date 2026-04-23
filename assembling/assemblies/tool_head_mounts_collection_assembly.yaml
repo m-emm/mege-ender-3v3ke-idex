@@ -83,6 +83,15 @@ Builder:
             - 0
             - 0
       - source: injected
+        assembly: nitehawk_holder_left
+        artifact: all
+        name_template: "nitehawk_holder_left_{default_name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
         assembly: part_fan_left
         artifact: all
         name_template: "part_fan_left_{default_name}"
@@ -113,6 +122,15 @@ Builder:
         assembly: sprite_extruder_right
         artifact: all
         name_template: "sprite_extruder_right_{default_name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
+        assembly: nitehawk_holder_right
+        artifact: all
+        name_template: "nitehawk_holder_right_{default_name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }

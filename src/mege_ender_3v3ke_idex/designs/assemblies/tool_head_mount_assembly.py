@@ -132,35 +132,7 @@ def _create_upper_side_plates(
     return upper_side_plates
 
 
-def _create_top_clamp_shield_plate(
-    *,
-    carriage_mount_plate,
-    upper_side_plates,
-    base_plate_width,
-    tool_head_mount_base_plate_thickness,
-    tool_head_mount_base_plate_height,
-):
-    top_clamp_shield_plate = create_box(
-        base_plate_width,
-        tool_head_mount_base_plate_thickness,
-        tool_head_mount_base_plate_height,
-    )
-    top_clamp_shield_plate = align(
-        top_clamp_shield_plate,
-        carriage_mount_plate,
-        Alignment.CENTER,
-    )
-    top_clamp_shield_plate = align(
-        top_clamp_shield_plate,
-        carriage_mount_plate,
-        Alignment.STACK_TOP,
-    )
-    top_clamp_shield_plate = align(
-        top_clamp_shield_plate,
-        upper_side_plates,
-        Alignment.BACK,
-    )
-    return top_clamp_shield_plate
+
 
 
 def create_tool_head_mount_assembly(
@@ -261,35 +233,8 @@ def create_tool_head_mount_assembly(
         stack_gap=tool_head_mount_plate_carriage_clearance,
     )
 
-    lower_side_plates = _create_lower_side_plates(
-        carriage_mount_plate=carriage_mount_plate,
-        tool_head_mount_side_plate_thickness=tool_head_mount_side_plate_thickness,
-        tool_head_mount_side_plate_depth=tool_head_mount_side_plate_depth,
-        tool_head_mount_side_plate_height=tool_head_mount_side_plate_height,
-        tool_head_mount_carriage_mount_plate_fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
-    )
 
-    upper_side_plates = PartCollector()
-    top_clamp_shield_plate = None
-
-    if drive_position == Alignment.TOP:
-        upper_side_plates = _create_upper_side_plates(
-            carriage_mount_plate=carriage_mount_plate,
-            x_axis_belt_carriage=x_axis_belt_carriage,
-            tool_head_mount_base_plate_height=tool_head_mount_base_plate_height,
-            tool_head_mount_carriage_mount_plate_thickness=tool_head_mount_carriage_mount_plate_thickness,
-            tool_head_mount_side_plate_thickness=tool_head_mount_side_plate_thickness,
-            tool_head_mount_side_plate_depth=tool_head_mount_side_plate_depth,
-            tool_head_mount_carriage_mount_plate_fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
-        )
-        top_clamp_shield_plate = _create_top_clamp_shield_plate(
-            carriage_mount_plate=carriage_mount_plate,
-            upper_side_plates=upper_side_plates,
-            base_plate_width=base_plate_width,
-            tool_head_mount_base_plate_thickness=tool_head_mount_base_plate_thickness,
-            tool_head_mount_base_plate_height=tool_head_mount_base_plate_height,
-        )
-
+    
     mount_hole_cutter = sprite_extruder.get_named_cutter("mount_hole_cutter")
 
     mount_base_plate = mount_base_plate.cut(mount_hole_cutter)
@@ -425,9 +370,6 @@ def create_tool_head_mount_assembly(
         if "mount_hole" in name:
             tool_head_mount = tool_head_mount.cut(cutter)
 
-    if drive_position == Alignment.TOP:
-        tool_head_mount = tool_head_mount.fuse(top_clamp_shield_plate)
-        tool_head_mount = tool_head_mount.fuse(upper_side_plates)
 
     tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
 
