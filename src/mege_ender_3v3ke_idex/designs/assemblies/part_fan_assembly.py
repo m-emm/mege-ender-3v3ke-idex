@@ -412,9 +412,17 @@ def _create_angled_fans(
 ):
     fans = PartCollector()
     center_pillar = create_cylinder(0.01, 50)
+    fan_parts_by_name = {}
     fan_parameters_by_side = {
         Alignment.LEFT: left_part_fan_parameters,
         Alignment.RIGHT: right_part_fan_parameters,
+    }
+    # In the current toolhead-local coordinate system, the "left" configured
+    # fan becomes the side-mounted blower, while the "right" configured fan
+    # sits at the front of the hotend.
+    fan_name_by_side = {
+        Alignment.LEFT: "side_fan",
+        Alignment.RIGHT: "front_fan",
     }
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
@@ -459,9 +467,10 @@ def _create_angled_fans(
         fan = rotate(lr.sign * fan_parameters["around_angle"], axis=(0, 0, 1))(fan)
         fan = translate(0, fan_parameters["y_offset"], fan_parameters["z_offset"])(fan)
         fan = fan.prefixed_copy(f"part_fan_{lr.name.lower()}")
+        fan_parts_by_name[fan_name_by_side[lr]] = fan
         fans = fans.fuse(fan)
 
-    return fans
+    return fans, fan_parts_by_name
 
 
 def _align_fans_to_sprite_extruder(fans, sprite_extruder):
@@ -647,7 +656,7 @@ def create_part_fan_assembly(
     """Create the standalone part fan assembly."""
 
     big_thing = BIG_THING
-    fans = _create_angled_fans(
+    fans, fan_parts_by_name = _create_angled_fans(
         left_part_fan_parameters=left_part_fan_parameters,
         right_part_fan_parameters=right_part_fan_parameters,
         part_fan_window_cutter_outside_length=part_fan_window_cutter_outside_length,
@@ -689,6 +698,10 @@ def create_part_fan_assembly(
     ducts = translate(0, 0, part_fan_ducts_clearance)(ducts)
     ducts_bbox = get_bounding_box(ducts)
     fans = translate(0, 0, ducts_bbox[1][2])(fans)
+    fan_parts_by_name = {
+        name: translate(0, 0, ducts_bbox[1][2])(fan)
+        for name, fan in fan_parts_by_name.items()
+    }
 
     for name, cutter in fans.get_named_cutter_items():
         if "window_cutter" in name or "body_cutter" in name:
@@ -717,8 +730,11 @@ def create_part_fan_assembly(
         hotend_alignment_reference,
         "hotend_alignment_reference",
     )
-
     fans = _align_fans_to_sprite_extruder(fans, sprite_extruder)
+    fan_parts_by_name = {
+        name: _align_fans_to_sprite_extruder(fan, sprite_extruder)
+        for name, fan in fan_parts_by_name.items()
+    }
 
     blower_ducts = fans.get_named_follower("blower_ducts")
     blower_ducts = _extend_blower_ducts(
@@ -743,4 +759,12 @@ def create_part_fan_assembly(
     )
     blower_ducts_index = fans.follower_indices_by_name["blower_ducts"]
     fans.followers[blower_ducts_index] = blower_ducts
-    return fans
+
+    retval = LeaderFollowersCuttersPart(blower_ducts)
+    for name, fan in fan_parts_by_name.items():
+        retval.add_named_non_production_part(fan.leader, name)
+    retval.add_named_non_production_part(
+        fans.get_named_non_production_part("hotend_alignment_reference"),
+        "hotend_alignment_reference",
+    )
+    return retval

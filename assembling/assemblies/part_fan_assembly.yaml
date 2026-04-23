@@ -4,14 +4,17 @@ Description: Assembly configuration for the part fan assembly
 
 Builder:
   Visualization:
+    preview:
+      views:
+        - top
+        - left
+        - front
     parts:
       - source: self
         artifact: leader
-        name: part_fans
+        name: blower_ducts
       - source: self
-        artifact: followers
-        names:
-          - blower_ducts
+        artifact: non_production_parts
         name_template: "{name}"
       - source: injected
         assembly: sprite_extruder
@@ -27,10 +30,8 @@ Builder:
           brim_type: no_brim
     parts:
       - source: self
-        artifact: followers
-        names:
-          - blower_ducts
-        name_template: "{name}"
+        artifact: leader
+        name: blower_ducts
         prod_rotation_angle: 50
         prod_rotation_axis: [1, 0, 0]
 
