@@ -132,9 +132,6 @@ def _create_upper_side_plates(
     return upper_side_plates
 
 
-
-
-
 def create_tool_head_mount_assembly(
     *,
     carriage,
@@ -233,8 +230,6 @@ def create_tool_head_mount_assembly(
         stack_gap=tool_head_mount_plate_carriage_clearance,
     )
 
-
-    
     mount_hole_cutter = sprite_extruder.get_named_cutter("mount_hole_cutter")
 
     mount_base_plate = mount_base_plate.cut(mount_hole_cutter)
@@ -369,7 +364,6 @@ def create_tool_head_mount_assembly(
     for name, cutter in sprite_extruder.get_named_cutter_items():
         if "mount_hole" in name:
             tool_head_mount = tool_head_mount.cut(cutter)
-
 
     tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
 

@@ -10,15 +10,15 @@ def _get_profile_part(profile):
 
 def create_z_axis_top_bridge_profile_assembly(
     *,
-    left_z_axis_profile,
-    right_z_axis_profile,
+    z_axis_profile_left,
+    z_axis_profile_right,
 ):
     """Create the fixed top bridge profile from positioned z-axis profiles."""
 
     bridge = create_top_bridge_profile(
         {
-            "left": _get_profile_part(left_z_axis_profile),
-            "right": _get_profile_part(right_z_axis_profile),
+            "left": _get_profile_part(z_axis_profile_left),
+            "right": _get_profile_part(z_axis_profile_right),
         }
     )
     return LeaderFollowersCuttersPart(leader=bridge)

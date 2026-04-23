@@ -94,39 +94,39 @@ Builder:
         assembly: y_axis_drive
         artifact: all
       - source: injected
-        assembly: left_z_axis_profile
+        assembly: z_axis_profile_left
         artifact: all
       - source: injected
-        assembly: right_z_axis_profile
+        assembly: z_axis_profile_right
         artifact: all
       - source: injected
-        assembly: left_z_axis_guide_rod
+        assembly: z_axis_guide_rod_left
         artifact: all
       - source: injected
-        assembly: right_z_axis_guide_rod
+        assembly: z_axis_guide_rod_right
         artifact: all
       - source: injected
-        assembly: left_z_axis_threaded_rod
+        assembly: z_axis_threaded_rod_left
         artifact: leader
-        name: left_z_axis_threaded_rod
+        name: z_axis_threaded_rod_left
       - source: injected
-        assembly: right_z_axis_threaded_rod
+        assembly: z_axis_threaded_rod_right
         artifact: leader
-        name: right_z_axis_threaded_rod
+        name: z_axis_threaded_rod_right
       - source: injected
-        assembly: left_z_axis_motor_mount
+        assembly: z_axis_motor_mount_left
         artifact: all
         name_template: "{assembly_name}_{name}"
       - source: injected
-        assembly: right_z_axis_motor_mount
+        assembly: z_axis_motor_mount_right
         artifact: all
         name_template: "{assembly_name}_{name}"
       - source: injected
-        assembly: left_z_axis_bottom_support
+        assembly: z_axis_bottom_support_left
         artifact: all
         name_template: "{assembly_name}_{name}"
       - source: injected
-        assembly: left_z_axis_guide_rod_top_mount
+        assembly: z_axis_guide_rod_top_mount_left
         artifact: all
         name_template: "{assembly_name}_{name}"
         animation:
@@ -135,11 +135,11 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: injected
-        assembly: right_z_axis_bottom_support
+        assembly: z_axis_bottom_support_right
         artifact: all
         name_template: "{assembly_name}_{name}"
       - source: injected
-        assembly: right_z_axis_guide_rod_top_mount
+        assembly: z_axis_guide_rod_top_mount_right
         artifact: all
         name_template: "{assembly_name}_{name}"
         animation:
@@ -151,7 +151,7 @@ Builder:
         assembly: z_axis_top_bridge_profile
         artifact: all
       - source: injected
-        assembly: left_z_axis_carriage
+        assembly: z_axis_carriage_left
         artifact: all
         name_template: "{assembly_name}_{name}"
         animation:
@@ -160,7 +160,7 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: injected
-        assembly: right_z_axis_carriage
+        assembly: z_axis_carriage_right
         artifact: all
         name_template: "{assembly_name}_{name}"
         animation:
