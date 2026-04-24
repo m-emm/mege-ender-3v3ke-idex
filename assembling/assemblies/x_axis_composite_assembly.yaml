@@ -70,3 +70,7 @@ Parts:
             exclude_names:
               - profile_to_align
             name_template: "{name}"
+          - source: injected
+            assembly: x_axis
+            artifact: non_production_parts
+            name_template: "{name}"

@@ -1,5 +1,6 @@
 """Declarative tool head mount assembly."""
 
+import numpy as np
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from shellforgepy.simple import *
 
@@ -337,28 +338,73 @@ def create_tool_head_mount_assembly(
     carriage_mount_plate = carriage_mount_plate.fuse(top_box_side_walls)
     carriage_mount_plate = carriage_mount_plate.fuse(top_box_center_wall)
 
-    top_box_right_extra_wall = create_box(tool_head_mount_top_box_wall, 22.5, 26)
-
-    top_box_right_extra_wall = align(
-        top_box_right_extra_wall, sprite_extruder, Alignment.CENTER
+    end_of_extruder_helper = create_box(100, 1, 100)
+    end_of_extruder_helper = align(
+        end_of_extruder_helper, sprite_extruder, Alignment.CENTER
+    )
+    end_of_extruder_helper = align(
+        end_of_extruder_helper, sprite_extruder, Alignment.STACK_FRONT
     )
 
-    top_box_right_extra_wall = align(
-        top_box_right_extra_wall, top_box_side_walls, Alignment.TOP
-    )
+    tool_head_housing_top_walls = []
+    top_wall_height = 45
+    mount_block_size = 8
 
-    top_box_right_extra_wall = align(
-        top_box_right_extra_wall, sprite_extruder, Alignment.STACK_RIGHT
-    )
-    top_box_right_extra_wall = align(
-        top_box_right_extra_wall, sprite_extruder, Alignment.BACK
-    )
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
-    carriage_mount_plate = carriage_mount_plate.fuse(top_box_right_extra_wall)
+        mount_block = create_box(mount_block_size, mount_block_size, mount_block_size)
+        mount_block = align(mount_block, sprite_extruder, Alignment.CENTER)
+        mount_block = align(mount_block, sprite_extruder, lr.stack_alignment)
+        mount_block = align(mount_block, sprite_extruder, Alignment.TOP)
+        mount_block = align(mount_block, sprite_extruder, Alignment.FRONT)
+        mount_block = translate(0, 0, -5)(mount_block)
+        carriage_mount_plate = carriage_mount_plate.fuse(mount_block)
+
+        marker = create_box(8, 7, 7)
+        marker = align(marker, mount_base_plate, Alignment.CENTER)
+        marker = align(marker, mount_base_plate, Alignment.STACK_TOP, stack_gap=3)
+        marker = align(marker, mount_base_plate, lr.stack_alignment)
+        marker = align(marker, mount_base_plate, Alignment.FRONT)
+
+        marker_bb_center = np.array(get_bounding_box_center(marker))
+        mount_block_bb_center = np.array(get_bounding_box_center(mount_block))
+        dist = np.linalg.norm(marker_bb_center - mount_block_bb_center)
+        radius = dist / 2
+
+        third_point = (
+            (marker_bb_center[0] + mount_block_bb_center[0]) / 2,
+            (marker_bb_center[1] + mount_block_bb_center[1]) / 2,
+            mount_block_bb_center[2] - 20,
+        )
+
+        mount_segment_width = 25
+        mount_segment_start = marker_bb_center + np.array(
+            [0, 0, mount_segment_width / 4]
+        )
+        mount_segment_end = mount_block_bb_center + np.array(
+            [0, -mount_segment_width / 4, mount_segment_width / 4]
+        )
+
+        mount_segment = create_ring_segment_between_points(
+            mount_segment_start,
+            mount_segment_end,
+            third_point,
+            inner_radius=radius,
+            outer_radius=radius + mount_segment_width,
+            height=6,
+        )
+        mount_segment = mount_segment.cut(sprite_extruder.leader)
+        carriage_mount_plate = carriage_mount_plate.fuse(mount_segment)
 
     tool_head_mount = carriage_mount_plate
     tool_head_mount = tool_head_mount.fuse(mount_base_plate)
-    # tool_head_mount = tool_head_mount.fuse(lower_side_plates)
+
+    tool_head_mount = x_axis_belt_carriage.use_as_cutter_on(tool_head_mount)
+
+    x_axis_belt_carriage_cutter = materialize_bounding_box(
+        x_axis_belt_carriage, x_enlargement=5, y_enlargement=0.2, z_enlargement=0.2
+    )
+    tool_head_mount = tool_head_mount.cut(x_axis_belt_carriage_cutter)
 
     for name, cutter in sprite_extruder.get_named_cutter_items():
         if "mount_hole" in name:
