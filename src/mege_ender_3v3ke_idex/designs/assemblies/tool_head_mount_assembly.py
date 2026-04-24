@@ -346,8 +346,6 @@ def create_tool_head_mount_assembly(
         end_of_extruder_helper, sprite_extruder, Alignment.STACK_FRONT
     )
 
-    tool_head_housing_top_walls = []
-    top_wall_height = 45
     mount_block_size = 8
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
@@ -398,6 +396,21 @@ def create_tool_head_mount_assembly(
 
     tool_head_mount = carriage_mount_plate
     tool_head_mount = tool_head_mount.fuse(mount_base_plate)
+
+    for name, part in x_axis_belt_carriage.get_named_cutter_items():
+        mount_box = create_box(8, 8, 15)
+        mount_box = align(mount_box, part, Alignment.CENTER)
+        mount_box = align(
+            mount_box,
+            x_axis_belt_carriage,
+            (
+                Alignment.STACK_BOTTOM
+                if drive_position == Alignment.TOP
+                else Alignment.STACK_TOP
+            ),
+        )
+        mount_box = mount_box.cut(sprite_extruder.leader)
+        tool_head_mount = tool_head_mount.fuse(mount_box)
 
     tool_head_mount = x_axis_belt_carriage.use_as_cutter_on(tool_head_mount)
 

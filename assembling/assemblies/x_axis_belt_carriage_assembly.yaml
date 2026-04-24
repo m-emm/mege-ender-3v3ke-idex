@@ -46,18 +46,31 @@ Builder:
       - source: self
         artifact: followers
         names:
-          - clamp_1
-          - clamp_2
+          - belt_clamp_left_base
         name_template: "{name}"
+        prod_rotation_angle: -90
+        prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        names:
+          - belt_clamp_right_base
+        name_template: "{name}"
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
     arrange:
       export_individual_parts: false
       plates:
         - name: x_axis_belt_carriage
           process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                support_type: tree(auto)
+                enable_support: "1"
           parts:
             - x_axis_belt_carriage
-            - clamp_1
-            - clamp_2
+            - belt_clamp_left_base
+            - belt_clamp_right_base
       auto_assign_plates: false
 
 Parameters:
