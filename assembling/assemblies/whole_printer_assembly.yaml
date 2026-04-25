@@ -229,6 +229,22 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: injected
+        assembly: x_axis
+        artifact: followers
+        names:
+          - x_axis_idler_endcap_bottom_left
+          - x_axis_idler_endcap_bottom_right
+          - x_axis_idler_endcap_bottom_right_cage
+          - x_axis_idler_endcap_top_left
+          - x_axis_idler_endcap_top_right
+          - x_axis_idler_endcap_top_right_cage
+        name_template: "{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
         assembly: x_axis_carriage_stopper_left
         artifact: all
         name_template: "{assembly_name}_{name}"
