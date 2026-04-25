@@ -25,20 +25,20 @@ Builder:
       - source: self
         artifact: leader
         name: tool_head
-        prod_rotation_angle: 60
-        prod_rotation_axis: [1, 0.3, 0]
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0,1, 0]
     arrange:
       export_individual_parts: false
       plates:
         - name: tool_head
-          process_data_preset: petgcf_medium_strength_high_speed_06
+          process_data_preset: petgcf_medium_strength_medium_quality_06
           process_data:
             overrides:
               process_overrides:
                 brim_type: no_brim
                 enable_support: "1"
                 support_type: tree(auto)
-                support_threshold_angle: "20"
+                # support_threshold_angle: "20"
                 support_on_build_plate_only: "1"
           parts:
             - tool_head

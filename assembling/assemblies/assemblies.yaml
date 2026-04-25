@@ -529,6 +529,20 @@ process_data_presets:
         sparse_infill_pattern: "cubic"
         support_object_first_layer_gap: "2.5"
 
+  petgcf_medium_strength_medium_quality_06:
+    generator: mege3devops_parametric
+    arguments:
+      material_name: petg_cf_generic
+      nozzle_diameter_mm: 0.6
+      nozzle_hardened: true
+      nozzle_high_flow: true
+      strength_factor: 0.5
+      quality_factor: 0.5
+    overrides:
+      process_overrides:
+        sparse_infill_pattern: "cubic"
+        support_object_first_layer_gap: "2.5"
+
   tpu_minimal_quality_minimal_strength_06:
     generator: mege3devops_parametric
     arguments:
