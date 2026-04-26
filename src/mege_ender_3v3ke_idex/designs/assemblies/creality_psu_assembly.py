@@ -14,7 +14,7 @@ creality_psu_front_cutout_depth = 15.2
 creality_psu_num_cable_clamps = 9
 creality_psu_cable_clamp_width_one_wall = 85.5 / creality_psu_num_cable_clamps
 creality_psu_cable_clamp_wall = 1.4
-creality_psu_cable_clamp_depth = 18.3
+creality_psu_cable_clamp_depth = 14.5
 creality_psu_cable_clamp_height = 14.1
 creality_psu_cable_clamp_height_at_front = 7
 creality_psu_cable_clamp_right_gap = 3.4
@@ -24,6 +24,8 @@ creality_psu_mount_screw_size = "M4"
 creality_psu_mount_screw_hole_depth = 3
 creality_psu_mount_screw_hole_inset = 32.3
 creality_psu_mount_screw_hole_z_offset_from_bottom = 12
+creality_psu_cable_clamp_lid_thickness = 2.9
+creality_psu_cable_clamp_lid_depth = 12
 
 
 def create_creality_psu_assembly(
@@ -48,6 +50,7 @@ def create_creality_psu_assembly(
     """Create a Creality PSU assembly."""
 
     psu_mount_electrics_box_psu_clearance = 0.5
+    psu_mount_cable_camps_top_extra_clearance = 4
 
     psu_body = create_box(creality_psu_width, creality_psu_length, creality_psu_height)
 
@@ -190,6 +193,16 @@ def create_creality_psu_assembly(
         creality_psu_cable_clamp_flight_height,
     )(cable_clamps)
 
+    cable_clamps_lid = create_box(
+        creality_psu_num_cable_clamps * creality_psu_cable_clamp_width_one_wall
+        + creality_psu_cable_clamp_wall,
+        creality_psu_cable_clamp_lid_depth,
+        creality_psu_cable_clamp_lid_thickness,
+    )
+    cable_clamps_lid = align(cable_clamps_lid, cable_clamps, Alignment.CENTER)
+    cable_clamps_lid = align(cable_clamps_lid, cable_clamps, Alignment.FRONT)
+    cable_clamps_lid = align(cable_clamps_lid, cable_clamps, Alignment.STACK_TOP)
+
     psu_electrics_box = create_box(
         creality_psu_width
         + 2 * psu_mount_electrics_box_wall_thickness
@@ -197,13 +210,16 @@ def create_creality_psu_assembly(
         psu_mount_electrics_box_depth,
         creality_psu_height
         + 2 * psu_mount_electrics_box_wall_thickness
-        + 2 * psu_mount_electrics_box_psu_clearance,
+        + 2 * psu_mount_electrics_box_psu_clearance
+        + psu_mount_cable_camps_top_extra_clearance,
     )
 
     low_voltage_window_cutter = create_box(
         psu_mount_electrics_box_low_voltage_window_width,
         psu_mount_electrics_box_low_voltage_window_depth,
-        psu_mount_electrics_box_wall_thickness,
+        psu_mount_electrics_box_wall_thickness
+        + psu_mount_electrics_box_psu_clearance
+        + psu_mount_cable_camps_top_extra_clearance,
     )
     low_voltage_window_cutter = align(
         low_voltage_window_cutter, psu_electrics_box, Alignment.LEFT
@@ -278,9 +294,28 @@ def create_creality_psu_assembly(
     for hole_type, lr, fb, clearance_hole in clearance_holes:
         psu_electrics_box = psu_electrics_box.cut(clearance_hole)
 
+    psu_front_to_extra_clearance_cutter = create_box(
+        creality_psu_width - 2 * creality_psu_sheet_metal_thickness,
+        creality_psu_front_cutout_depth,
+        psu_mount_electrics_box_psu_clearance
+        + psu_mount_cable_camps_top_extra_clearance,
+    )
+    psu_front_to_extra_clearance_cutter = align(
+        psu_front_to_extra_clearance_cutter, psu_body, Alignment.CENTER
+    )
+    psu_front_to_extra_clearance_cutter = align(
+        psu_front_to_extra_clearance_cutter, psu_body, Alignment.FRONT
+    )
+    psu_front_to_extra_clearance_cutter = align(
+        psu_front_to_extra_clearance_cutter, psu_body, Alignment.STACK_TOP
+    )
+
+    psu_electrics_box = psu_electrics_box.cut(psu_front_to_extra_clearance_cutter)
+
     retval = LeaderFollowersCuttersPart(leader=psu_electrics_box)
     retval.add_named_non_production_part(psu_body, "psu_body")
     retval.add_named_non_production_part(cable_clamps, "cable_clamps")
+    retval.add_named_non_production_part(cable_clamps_lid, "cable_clamps_lid")
 
     # Export clearance holes as cutters for other consumers
     for hole_type, lr, fb, clearance_hole in clearance_holes:

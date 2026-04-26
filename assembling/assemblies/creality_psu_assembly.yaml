@@ -10,6 +10,19 @@ Builder:
         name: psu_electrics_box
       - source: self
         artifact: non_production_parts
+        names:
+          - cable_clamps_lid
+        name_template: "{name}"
+        animation:
+          cable_clamps_lid_open:
+            type: rotation
+            axis: [1, 0, 0]
+            angle_degrees: -90
+            center: [BACK]
+      - source: self
+        artifact: non_production_parts
+        exclude_names:
+          - cable_clamps_lid
         name_template: "{name}"
   Production:
     parts:

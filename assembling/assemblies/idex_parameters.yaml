@@ -99,7 +99,7 @@ globals:
   psu_mount_electrics_box_height: 29.7
   psu_mount_electrics_box_wall_thickness: 2.5
   psu_mount_electrics_box_low_voltage_window_width: 78
-  psu_mount_electrics_box_low_voltage_window_depth: 25
+  psu_mount_electrics_box_low_voltage_window_depth: 35
   psu_mount_cable_hole_diameter: 8
   psu_mount_cable_clamp_length: 18
   psu_mount_cable_clamp_width: 12
