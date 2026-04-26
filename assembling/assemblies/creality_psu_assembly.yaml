@@ -32,6 +32,8 @@ Parameters:
     Type: Float
   psu_mount_electrics_box_height:
     Type: Float
+  psu_mount_electrics_box_depth_overlap:
+    Type: Float
   psu_mount_cable_hole_diameter:
     Type: Float
   psu_mount_cable_clamp_length:

@@ -94,7 +94,8 @@ globals:
   psu_mount_wall_thickness: 3
   psu_mount_base_thickness: 4
   psu_mount_electrics_box_width: 114.7
-  psu_mount_electrics_box_depth: 30
+  psu_mount_electrics_box_depth: 60
+  psu_mount_electrics_box_depth_overlap: 40
   psu_mount_electrics_box_height: 29.7
   psu_mount_cable_hole_diameter: 8
   psu_mount_cable_clamp_length: 18

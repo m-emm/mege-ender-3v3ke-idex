@@ -725,6 +725,7 @@ assemblies:
       psu_mount_electrics_box_width: !Ref psu_mount_electrics_box_width
       psu_mount_electrics_box_depth: !Ref psu_mount_electrics_box_depth
       psu_mount_electrics_box_height: !Ref psu_mount_electrics_box_height
+      psu_mount_electrics_box_depth_overlap: !Ref psu_mount_electrics_box_depth_overlap
       psu_mount_cable_hole_diameter: !Ref psu_mount_cable_hole_diameter
       psu_mount_cable_clamp_length: !Ref psu_mount_cable_clamp_length
       psu_mount_cable_clamp_width: !Ref psu_mount_cable_clamp_width
