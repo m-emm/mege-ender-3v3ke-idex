@@ -32,7 +32,13 @@ Parameters:
     Type: Float
   psu_mount_electrics_box_height:
     Type: Float
+  psu_mount_electrics_box_wall_thickness:
+    Type: Float
   psu_mount_electrics_box_depth_overlap:
+    Type: Float
+  psu_mount_electrics_box_low_voltage_window_width:
+    Type: Float
+  psu_mount_electrics_box_low_voltage_window_depth:
     Type: Float
   psu_mount_cable_hole_diameter:
     Type: Float

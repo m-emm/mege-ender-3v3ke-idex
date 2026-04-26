@@ -35,8 +35,10 @@ def create_creality_psu_assembly(
     psu_mount_electrics_box_width,
     psu_mount_electrics_box_depth,
     psu_mount_electrics_box_height,
+    psu_mount_electrics_box_wall_thickness,
     psu_mount_electrics_box_depth_overlap,
-    # TODO: psu_mount_electrics_box_wall_thickness,
+    psu_mount_electrics_box_low_voltage_window_width,
+    psu_mount_electrics_box_low_voltage_window_depth,
     psu_mount_cable_clamp_length,
     psu_mount_cable_clamp_width,
     psu_mount_cable_clamp_clamp_screw_size,
@@ -45,7 +47,6 @@ def create_creality_psu_assembly(
 ):
     """Create a Creality PSU assembly."""
 
-    psu_mount_electrics_box_wall_thickness = 2.5
     psu_mount_electrics_box_psu_clearance = 0.5
 
     psu_body = create_box(creality_psu_width, creality_psu_length, creality_psu_height)
@@ -69,8 +70,7 @@ def create_creality_psu_assembly(
     psu_front_cutout_cutter = align(psu_front_cutout_cutter, psu_body, Alignment.TOP)
     psu_body = psu_body.cut(psu_front_cutout_cutter)
 
-    mount_screw_holes = []
-    mount_screw_hole_collector = PartCollector()
+    # Mount screw hole parameters
     mount_screw_hole_radius = (
         MScrew.from_size(creality_psu_mount_screw_size).clearance_hole_normal / 2
     )
@@ -78,86 +78,85 @@ def create_creality_psu_assembly(
         MScrew.from_size(creality_psu_mount_screw_size).core_hole / 2
     )
 
+    # Define hole positions with their properties:
+    # (hole_type, lr_alignment, fb_alignment)
+    # hole_type: "side" = X-axis oriented (rotated 90° around Y)
+    #            "bottom" = Z-axis oriented (upright)
+    hole_specs = []
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         for fb in [Alignment.FRONT, Alignment.BACK]:
-            mount_screw_hole = create_cylinder(
-                mount_screw_core_hole_radius,
-                BIG_THING,
-            )
-            mount_screw_hole = rotate(90, axis=(0, 1, 0))(mount_screw_hole)
-            mount_screw_hole = align(mount_screw_hole, psu_body, Alignment.CENTER)
-            mount_screw_hole = align(
-                mount_screw_hole,
-                psu_body,
-                lr.stack_alignment,
-                stack_gap=-creality_psu_mount_screw_hole_depth,
-            )
+            hole_specs.append(("side", lr, fb))
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+            hole_specs.append(("bottom", lr, fb))
 
-            mount_screw_hole = align(mount_screw_hole, psu_body, Alignment.EDGE_BOTTOM)
-            mount_screw_hole = align(mount_screw_hole, psu_body, fb.edge_alignment)
-            mount_screw_hole = align(
-                mount_screw_hole,
+    # Collect all core bores to cut the PSU body
+    core_bore_collector = PartCollector()
+    # Store clearance holes for cutting the electrics box
+    clearance_holes = []
+
+    for hole_type, lr, fb in hole_specs:
+        # Create and position core bore
+        core_bore = create_cylinder(mount_screw_core_hole_radius, BIG_THING)
+
+        if hole_type == "side":
+            # Side holes: X-axis oriented (rotate 90° around Y axis)
+            core_bore = rotate(90, axis=(0, 1, 0))(core_bore)
+            core_bore = align(core_bore, psu_body, Alignment.CENTER)
+            core_bore = align(
+                core_bore,
                 psu_body,
                 lr.stack_alignment,
                 stack_gap=-creality_psu_mount_screw_hole_depth,
             )
-            mount_screw_hole = translate(
+            core_bore = align(core_bore, psu_body, Alignment.EDGE_BOTTOM)
+            core_bore = align(core_bore, psu_body, fb.edge_alignment)
+            core_bore = align(
+                core_bore,
+                psu_body,
+                lr.stack_alignment,
+                stack_gap=-creality_psu_mount_screw_hole_depth,
+            )
+            core_bore = translate(
                 0,
                 -fb.sign * creality_psu_mount_screw_hole_inset,
                 creality_psu_mount_screw_hole_z_offset_from_bottom,
-            )(mount_screw_hole)
-            mount_screw_hole_collector = mount_screw_hole_collector.fuse(
-                mount_screw_hole
-            )
-            clearance_hole_drill = create_cylinder(mount_screw_hole_radius, BIG_THING)
-            clearance_hole_drill = rotate(90, axis=(0, 1, 0))(clearance_hole_drill)
-            clearance_hole_drill = align(
-                clearance_hole_drill, mount_screw_hole, Alignment.CENTER
-            )
-            clearance_hole_drill = align(
-                clearance_hole_drill, psu_body, lr.stack_alignment
-            )
-
-            mount_screw_holes.append((lr, fb, clearance_hole_drill))
-
-    bottom_mount_screw_holes = []
-    for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        for fb in [Alignment.FRONT, Alignment.BACK]:
-            bottom_mount_screw_hole = create_cylinder(
-                mount_screw_hole_radius,
-                BIG_THING,
-            )
-            bottom_mount_screw_hole = align(
-                bottom_mount_screw_hole,
-                psu_body,
-                Alignment.CENTER,
-            )
-            bottom_mount_screw_hole = align(
-                bottom_mount_screw_hole,
+            )(core_bore)
+        else:
+            # Bottom holes: Z-axis oriented (upright)
+            core_bore = align(core_bore, psu_body, Alignment.CENTER)
+            core_bore = align(
+                core_bore,
                 psu_body,
                 Alignment.STACK_BOTTOM,
                 stack_gap=-creality_psu_mount_screw_hole_depth,
             )
-            bottom_mount_screw_hole = align(
-                bottom_mount_screw_hole,
-                psu_body,
-                lr.edge_alignment,
-            )
-            bottom_mount_screw_hole = align(
-                bottom_mount_screw_hole,
-                psu_body,
-                fb.edge_alignment,
-            )
-            bottom_mount_screw_hole = translate(
+            core_bore = align(core_bore, psu_body, lr.edge_alignment)
+            core_bore = align(core_bore, psu_body, fb.edge_alignment)
+            core_bore = translate(
                 -lr.sign * creality_psu_mount_screw_hole_inset,
                 -fb.sign * creality_psu_mount_screw_hole_inset,
                 0,
-            )(bottom_mount_screw_hole)
+            )(core_bore)
 
-            bottom_mount_screw_holes.append((lr, fb, bottom_mount_screw_hole))
-            psu_body = psu_body.cut(bottom_mount_screw_hole)
+        core_bore_collector = core_bore_collector.fuse(core_bore)
 
-    psu_body = psu_body.cut(mount_screw_hole_collector)
+        # Create and position clearance hole (same position as core bore)
+        clearance_hole = create_cylinder(mount_screw_hole_radius, BIG_THING)
+
+        if hole_type == "side":
+            # Side clearance holes: same X-axis orientation
+            clearance_hole = rotate(90, axis=(0, 1, 0))(clearance_hole)
+            clearance_hole = align(clearance_hole, core_bore, Alignment.CENTER)
+            clearance_hole = align(clearance_hole, psu_body, lr.stack_alignment)
+        else:
+            # Bottom clearance holes: align to core bore position
+            clearance_hole = align(clearance_hole, core_bore, Alignment.CENTER)
+
+        clearance_holes.append((hole_type, lr, fb, clearance_hole))
+
+    # Cut all core bores into the PSU body
+    psu_body = psu_body.cut(core_bore_collector)
 
     cable_clamps = create_box(
         creality_psu_num_cable_clamps * creality_psu_cable_clamp_width_one_wall
@@ -201,18 +200,71 @@ def create_creality_psu_assembly(
         + 2 * psu_mount_electrics_box_psu_clearance,
     )
 
-    psu_electrics_box_cutter = create_box(
+    low_voltage_window_cutter = create_box(
+        psu_mount_electrics_box_low_voltage_window_width,
+        psu_mount_electrics_box_low_voltage_window_depth,
+        psu_mount_electrics_box_wall_thickness,
+    )
+    low_voltage_window_cutter = align(
+        low_voltage_window_cutter, psu_electrics_box, Alignment.LEFT
+    )
+    low_voltage_window_cutter = align(
+        low_voltage_window_cutter, psu_electrics_box, Alignment.FRONT
+    )
+    low_voltage_window_cutter = align(
+        low_voltage_window_cutter, psu_electrics_box, Alignment.TOP
+    )
+    low_voltage_window_cutter = translate(
+        psu_mount_electrics_box_wall_thickness,
+        psu_mount_electrics_box_wall_thickness,
+        0,
+    )(low_voltage_window_cutter)
+
+    psu_electrics_box_inner_cutter = create_box(
         creality_psu_width + 2 * psu_mount_electrics_box_psu_clearance,
         psu_mount_electrics_box_depth - psu_mount_electrics_box_wall_thickness,
         creality_psu_height + 2 * psu_mount_electrics_box_psu_clearance,
     )
-    psu_electrics_box_cutter = align(
-        psu_electrics_box_cutter, psu_electrics_box, Alignment.CENTER
+    psu_electrics_box_inner_cutter = align(
+        psu_electrics_box_inner_cutter, psu_electrics_box, Alignment.CENTER
     )
-    psu_electrics_box_cutter = align(
-        psu_electrics_box_cutter, psu_electrics_box, Alignment.BACK
+    psu_electrics_box_inner_cutter = align(
+        psu_electrics_box_inner_cutter, psu_electrics_box, Alignment.BACK
     )
-    psu_electrics_box = psu_electrics_box.cut(psu_electrics_box_cutter)
+    psu_electrics_box = psu_electrics_box.cut(psu_electrics_box_inner_cutter)
+
+    low_voltage_separator_wall = create_box(
+        psu_mount_electrics_box_wall_thickness,
+        psu_mount_electrics_box_depth,
+        get_bounding_box_size(psu_electrics_box)[2],
+    )
+    low_voltage_separator_wall = align(
+        low_voltage_separator_wall,
+        low_voltage_window_cutter,
+        Alignment.STACK_RIGHT,
+    )
+    low_voltage_separator_wall = align(
+        low_voltage_separator_wall, psu_electrics_box, Alignment.FRONT
+    )
+    low_voltage_separator_wall = align(
+        low_voltage_separator_wall, psu_electrics_box, Alignment.BOTTOM
+    )
+    psu_electrics_box = psu_electrics_box.fuse(low_voltage_separator_wall)
+
+    psu_electrics_box_clearance_cutter = create_box(
+        creality_psu_width + 2 * psu_mount_electrics_box_psu_clearance,
+        psu_mount_electrics_box_depth_overlap,
+        creality_psu_height + 2 * psu_mount_electrics_box_psu_clearance,
+    )
+    psu_electrics_box_clearance_cutter = align(
+        psu_electrics_box_clearance_cutter, psu_electrics_box, Alignment.CENTER
+    )
+    psu_electrics_box_clearance_cutter = align(
+        psu_electrics_box_clearance_cutter, psu_electrics_box, Alignment.BACK
+    )
+    psu_electrics_box = psu_electrics_box.cut(psu_electrics_box_clearance_cutter)
+
+    psu_electrics_box = psu_electrics_box.cut(low_voltage_window_cutter)
 
     psu_electrics_box = align(psu_electrics_box, psu_body, Alignment.CENTER)
     psu_electrics_box = align(
@@ -222,25 +274,19 @@ def create_creality_psu_assembly(
         stack_gap=-psu_mount_electrics_box_depth_overlap,
     )
 
-    for cutter in [mount_screw_hole for _, _, mount_screw_hole in mount_screw_holes] + [
-        bottom_mount_screw_hole
-        for _, _, bottom_mount_screw_hole in bottom_mount_screw_holes
-    ]:
-
-        psu_electrics_box = psu_electrics_box.cut(cutter)
+    # Cut all clearance holes into the electrics box
+    for hole_type, lr, fb, clearance_hole in clearance_holes:
+        psu_electrics_box = psu_electrics_box.cut(clearance_hole)
 
     retval = LeaderFollowersCuttersPart(leader=psu_electrics_box)
     retval.add_named_non_production_part(psu_body, "psu_body")
     retval.add_named_non_production_part(cable_clamps, "cable_clamps")
-    for lr, fb, mount_screw_hole in mount_screw_holes:
+
+    # Export clearance holes as cutters for other consumers
+    for hole_type, lr, fb, clearance_hole in clearance_holes:
         retval.add_named_cutter(
-            mount_screw_hole,
-            f"mount_screw_hole_{lr.name.lower()}_{fb.name.lower()}",
-        )
-    for lr, fb, bottom_mount_screw_hole in bottom_mount_screw_holes:
-        retval.add_named_cutter(
-            bottom_mount_screw_hole,
-            f"bottom_mount_screw_hole_{lr.name.lower()}_{fb.name.lower()}",
+            clearance_hole,
+            f"{hole_type}_mount_screw_hole_{lr.name.lower()}_{fb.name.lower()}",
         )
 
     return retval
