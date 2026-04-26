@@ -168,7 +168,6 @@ Builder:
         support_on_build_plate_only: "1"
         support_style: organic
 
-
     arrange:
       export_individual_parts: false
       plates:

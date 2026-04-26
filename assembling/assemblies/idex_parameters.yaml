@@ -89,6 +89,19 @@ globals:
   print_bed_mount_tower_screw_size: "M5"
   print_bed_mount_tower_size: 20
 
+  psu_mount_screw_length: 20
+  psu_mount_screw_cylinder_head_clearance: 0.6
+  psu_mount_wall_thickness: 3
+  psu_mount_base_thickness: 4
+  psu_mount_electrics_box_width: 114.7
+  psu_mount_electrics_box_depth: 30
+  psu_mount_electrics_box_height: 29.7
+  psu_mount_cable_hole_diameter: 8
+  psu_mount_cable_clamp_length: 18
+  psu_mount_cable_clamp_width: 12
+  psu_mount_cable_clamp_clamp_screw_size: "M3"
+  psu_mount_cable_clamp_clamp_screw_length: 14
+
   x_axis_motor_axle_length: 14
   x_axis_profile_length: 600
   x_axis_profile_pitch: 48

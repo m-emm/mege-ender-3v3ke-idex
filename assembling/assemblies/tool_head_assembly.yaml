@@ -26,7 +26,7 @@ Builder:
         artifact: leader
         name: tool_head
         prod_rotation_angle: 90
-        prod_rotation_axis: [0,1, 0]
+        prod_rotation_axis: [0, 1, 0]
     arrange:
       export_individual_parts: false
       plates:

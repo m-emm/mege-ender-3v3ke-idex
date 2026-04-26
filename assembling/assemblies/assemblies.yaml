@@ -713,6 +713,24 @@ assemblies:
       creality_endstop_holder_screw_size: !Ref creality_endstop_holder_screw_size
       creality_endstop_holder_nut_cutter_slack: !Ref creality_endstop_holder_nut_cutter_slack
 
+  - name: creality_psu_assembly
+
+    resource_file: creality_psu_assembly.yaml
+    depends_on: []
+    parameters:
+      psu_mount_screw_length: !Ref psu_mount_screw_length
+      psu_mount_screw_cylinder_head_clearance: !Ref psu_mount_screw_cylinder_head_clearance
+      psu_mount_wall_thickness: !Ref psu_mount_wall_thickness
+      psu_mount_base_thickness: !Ref psu_mount_base_thickness
+      psu_mount_electrics_box_width: !Ref psu_mount_electrics_box_width
+      psu_mount_electrics_box_depth: !Ref psu_mount_electrics_box_depth
+      psu_mount_electrics_box_height: !Ref psu_mount_electrics_box_height
+      psu_mount_cable_hole_diameter: !Ref psu_mount_cable_hole_diameter
+      psu_mount_cable_clamp_length: !Ref psu_mount_cable_clamp_length
+      psu_mount_cable_clamp_width: !Ref psu_mount_cable_clamp_width
+      psu_mount_cable_clamp_clamp_screw_size: !Ref psu_mount_cable_clamp_clamp_screw_size
+      psu_mount_cable_clamp_clamp_screw_length: !Ref psu_mount_cable_clamp_clamp_screw_length
+
   - name: x_axis_assembly
 
     depends_on:
