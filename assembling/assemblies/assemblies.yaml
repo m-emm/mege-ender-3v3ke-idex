@@ -476,6 +476,26 @@ placement:
       to: print_bed_assembly.non_production_parts.print_bed_foil
       alignment: STACK_BACK
 
+    - part: creality_psu_assembly
+      post_rotation:
+        angle: -90
+        axis: [0, 1, 0]
+    - part: creality_psu_assembly
+      post_rotation:
+        angle: 90
+        axis: [1, 0, 0]
+
+    - part: creality_psu_assembly
+      to: printer_frame_assembly
+      alignment: STACK_TOP
+    - part: creality_psu_assembly
+      to: printer_frame_assembly
+      alignment: RIGHT
+
+    - part: creality_psu_assembly
+      to: printer_frame_assembly
+      alignment: BACK
+
 process_data_generators:
   mege3devops_parametric:
     function: mege_3devops.process_data.parametric.resolve_process_data_from_parameters
@@ -716,7 +736,10 @@ assemblies:
   - name: creality_psu_assembly
 
     resource_file: creality_psu_assembly.yaml
-    depends_on: []
+    depends_on: [printer_frame_assembly]
+    inject_parts:
+      frame: printer_frame_assembly
+
     parameters:
       psu_mount_screw_length: !Ref psu_mount_screw_length
       psu_mount_screw_cylinder_head_clearance: !Ref psu_mount_screw_cylinder_head_clearance
@@ -1468,6 +1491,7 @@ assemblies:
       tool_head_mount_top: tool_head_mount_top_assembly
       x_axis_belt_carriage_bottom: x_axis_belt_carriage_bottom_assembly
       x_axis_belt_carriage_top: x_axis_belt_carriage_top_assembly
+      creality_psu: creality_psu_assembly
 
   - name: tool_head_mounts_collection_assembly
 

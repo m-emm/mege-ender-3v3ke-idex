@@ -24,6 +24,10 @@ Builder:
         exclude_names:
           - cable_clamps_lid
         name_template: "{name}"
+      - source: injected
+        assembly: frame
+        artifact: all
+
   Production:
     parts:
       - source: self

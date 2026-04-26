@@ -30,6 +30,7 @@ creality_psu_cable_clamp_lid_depth = 12
 
 def create_creality_psu_assembly(
     *,
+    frame,
     psu_mount_screw_length,
     psu_mount_screw_cylinder_head_clearance,
     psu_mount_wall_thickness,
@@ -51,6 +52,8 @@ def create_creality_psu_assembly(
 
     psu_mount_electrics_box_psu_clearance = 0.5
     psu_mount_cable_camps_top_extra_clearance = 4
+    psu_mount_eye_screw_size = "M5"
+    cable_hole_diameter = 9
 
     psu_body = create_box(creality_psu_width, creality_psu_length, creality_psu_height)
 
@@ -311,6 +314,51 @@ def create_creality_psu_assembly(
     )
 
     psu_electrics_box = psu_electrics_box.cut(psu_front_to_extra_clearance_cutter)
+    cable_hole = create_cylinder(
+        cable_hole_diameter / 2,
+        BIG_THING,
+    )
+    cable_hole = align(cable_hole, psu_electrics_box, Alignment.CENTER)
+    cable_hole = align(
+        cable_hole,
+        psu_electrics_box,
+        Alignment.STACK_BOTTOM,
+        stack_gap=-2 * psu_mount_electrics_box_wall_thickness,
+    )
+    cable_hole = align(cable_hole, psu_electrics_box, Alignment.EDGE_RIGHT)
+    cable_hole = align(cable_hole, psu_electrics_box, Alignment.EDGE_FRONT)
+
+    cable_hole = translate(-1.5 * cable_hole_diameter, 1.5 * cable_hole_diameter, 0)(
+        cable_hole
+    )
+    psu_electrics_box = psu_electrics_box.cut(cable_hole)
+
+    mount_eyes = PartCollector()
+    for side in [Alignment.LEFT, Alignment.RIGHT]:
+        mount_eye = create_filleted_box(
+            10,
+            30,
+            4,
+            fillet_radius=3,
+            no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, side.opposite],
+        )
+        mount_eye_screw_hole_cutter = create_cylinder(
+            MScrew.from_size(psu_mount_eye_screw_size).clearance_hole_normal / 2,
+            BIG_THING,
+        )
+        mount_eye_screw_hole_cutter = align(
+            mount_eye_screw_hole_cutter,
+            mount_eye,
+            Alignment.CENTER,
+        )
+        mount_eye = mount_eye.cut(mount_eye_screw_hole_cutter)
+        mount_eye = rotate(90, axis=(1, 0, 0))(mount_eye)
+
+        mount_eye = align(mount_eye, psu_electrics_box, Alignment.CENTER)
+        mount_eye = align(mount_eye, psu_electrics_box, side.stack_alignment)
+        mount_eye = align(mount_eye, psu_electrics_box, Alignment.FRONT)
+        mount_eyes = mount_eyes.fuse(mount_eye)
+    psu_electrics_box = psu_electrics_box.fuse(mount_eyes)
 
     retval = LeaderFollowersCuttersPart(leader=psu_electrics_box)
     retval.add_named_non_production_part(psu_body, "psu_body")

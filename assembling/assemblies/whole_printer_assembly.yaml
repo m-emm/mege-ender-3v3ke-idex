@@ -409,6 +409,11 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
 
+      - source: injected
+        assembly: creality_psu
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+
 Parameters:
   print_bed_y_travel:
     Type: Float
