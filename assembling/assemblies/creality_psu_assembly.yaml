@@ -38,6 +38,29 @@ Builder:
       - source: self
         artifact: leader
         name: psu_electrics_box
+      - source: self
+        artifact: followers
+        names:
+          - cable_holder
+        name_template: "{name}"
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: creality_psu
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                brim_type: no_brim
+                enable_support: "1"
+                support_type: tree(auto)
+                support_on_build_plate_only: "1"
+          parts:
+            - psu_electrics_box
+            - cable_holder
+      auto_assign_plates: false
 
 Parameters:
   psu_mount_screw_length:
