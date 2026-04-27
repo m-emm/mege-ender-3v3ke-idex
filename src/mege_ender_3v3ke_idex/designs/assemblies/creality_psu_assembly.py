@@ -3,6 +3,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (  # noqa: F401
+    create_screw_mount_assembly,
+)
 from shellforgepy.simple import *
 
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
@@ -54,6 +57,16 @@ def create_creality_psu_assembly(
     psu_mount_cable_camps_top_extra_clearance = 4
     psu_mount_eye_screw_size = "M5"
     cable_hole_diameter = 9
+    cable_holder_hole_diameter = 5
+    cable_holder_slit_width = 2.5
+    cable_holder_arm_thickness = 7
+    cable_holder_arm_depth = 22
+    cable_holder_tightner_screw_size = "M3"
+    cable_holder_tightner_screw_length = 10
+    cable_holder_wall_clearance = 1.2
+    cable_hole_x_inset = 16
+    cable_hole_y_inset = 12
+    cable_holder_arm_width = 3.5
 
     psu_body = create_box(creality_psu_width, creality_psu_length, creality_psu_height)
 
@@ -325,13 +338,91 @@ def create_creality_psu_assembly(
         Alignment.STACK_BOTTOM,
         stack_gap=-2 * psu_mount_electrics_box_wall_thickness,
     )
+
     cable_hole = align(cable_hole, psu_electrics_box, Alignment.EDGE_RIGHT)
     cable_hole = align(cable_hole, psu_electrics_box, Alignment.EDGE_FRONT)
 
-    cable_hole = translate(-1.5 * cable_hole_diameter, 1.5 * cable_hole_diameter, 0)(
-        cable_hole
-    )
+    cable_hole = translate(-cable_hole_x_inset, cable_hole_y_inset, 0)(cable_hole)
     psu_electrics_box = psu_electrics_box.cut(cable_hole)
+
+    cable_holder = create_box(
+        cable_holder_arm_depth,
+        cable_holder_hole_diameter + 2 * cable_holder_arm_width,
+        cable_holder_arm_thickness,
+    )
+
+    cable_holder = align(cable_holder, cable_hole, Alignment.CENTER)
+    cable_holder = align(cable_holder, cable_hole, Alignment.LEFT)
+    cable_holder = align(cable_holder, psu_electrics_box, Alignment.BOTTOM)
+    cable_holder = translate(
+        -cable_holder_hole_diameter,
+        0,
+        psu_mount_electrics_box_wall_thickness
+        + psu_mount_electrics_box_psu_clearance
+        + cable_holder_wall_clearance,
+    )(cable_holder)
+
+    cable_holder_cable_hole_cutter = create_cylinder(
+        cable_holder_hole_diameter / 2,
+        BIG_THING,
+    )
+    cable_holder_cable_hole_cutter = align(
+        cable_holder_cable_hole_cutter, cable_hole, Alignment.CENTER
+    )
+    cable_holder_cable_hole_cutter = align(
+        cable_holder_cable_hole_cutter, cable_holder, Alignment.CENTER, axes=[2]
+    )
+
+    cable_holder = cable_holder.cut(cable_holder_cable_hole_cutter)
+
+    cable_holder_slit_cutter = create_filleted_box(
+        BIG_THING,
+        cable_holder_slit_width,
+        BIG_THING,
+        fillet_radius=cable_holder_slit_width / 3,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+    )
+    cable_holder_slit_cutter = align(
+        cable_holder_slit_cutter, cable_holder, Alignment.CENTER
+    )
+    cable_holder_slit_cutter = align(
+        cable_holder_slit_cutter,
+        cable_holder,
+        Alignment.STACK_RIGHT,
+        stack_gap=-cable_holder_arm_depth + cable_holder_hole_diameter / 2,
+    )
+
+    cable_holder = cable_holder.cut(cable_holder_slit_cutter)
+    cable_holder_screw_reference = create_box(
+        2 * cable_holder_hole_diameter,
+        cable_holder_hole_diameter + 2 * cable_holder_arm_width,
+        cable_holder_arm_thickness,
+    )
+    cable_holder_screw_reference = align(
+        cable_holder_screw_reference, cable_holder, Alignment.CENTER
+    )
+    cable_holder_screw_reference = align(
+        cable_holder_screw_reference, cable_holder, Alignment.RIGHT
+    )
+
+    cable_holder_mount_screw_assembly = create_screw_mount_assembly(
+        cable_holder_screw_reference,
+        cable_holder_tightner_screw_size,
+        cable_holder_tightner_screw_length,
+        Alignment.BACK,
+        flush_with_top=True,
+    )
+
+    cable_holder = cable_holder_mount_screw_assembly.use_as_cutter_on(cable_holder)
+
+    cable_holder_clearance_cutter = materialize_bounding_box(
+        cable_holder,
+        x_enlargement=2 * cable_holder_wall_clearance,
+        y_enlargement=2 * cable_holder_wall_clearance,
+        z_enlargement=2 * cable_holder_wall_clearance,
+    )
+
+    psu_electrics_box = psu_electrics_box.cut(cable_holder_clearance_cutter)
 
     mount_eyes = PartCollector()
     for side in [Alignment.LEFT, Alignment.RIGHT]:
@@ -358,12 +449,18 @@ def create_creality_psu_assembly(
         mount_eye = align(mount_eye, psu_electrics_box, side.stack_alignment)
         mount_eye = align(mount_eye, psu_electrics_box, Alignment.FRONT)
         mount_eyes = mount_eyes.fuse(mount_eye)
+
     psu_electrics_box = psu_electrics_box.fuse(mount_eyes)
 
     retval = LeaderFollowersCuttersPart(leader=psu_electrics_box)
     retval.add_named_non_production_part(psu_body, "psu_body")
     retval.add_named_non_production_part(cable_clamps, "cable_clamps")
     retval.add_named_non_production_part(cable_clamps_lid, "cable_clamps_lid")
+    retval.add_named_non_production_part(
+        cable_holder_mount_screw_assembly.get_named_non_production_part("screw"),
+        "cable_holder_tightner_screw",
+    )
+    retval.add_named_follower(cable_holder, "cable_holder")
 
     # Export clearance holes as cutters for other consumers
     for hole_type, lr, fb, clearance_hole in clearance_holes:
