@@ -65,6 +65,8 @@ Parameters:
     Type: String
   board_holder_mount_screw_hole_inset:
     Type: Float
+  board_holder_tmc_board_count:
+    Type: Integer
 
 Parts:
   BoardHolderAssembly:

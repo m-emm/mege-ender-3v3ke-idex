@@ -116,8 +116,11 @@ globals:
   board_holder_leaf_spring_holder_tower_y_size: 5
   board_holder_mount_screw_size: "M3"
   board_holder_mount_screw_hole_inset: 2.5
+  board_holder_tmc_board_count: 2
   board_holder_additional_pins_num_pins: 20
   board_holder_additional_pins_base_plate_length: 6
+  y_z_axis_mcu_holder_tmc_board_count: 3
+  y_z_axis_mcu_holder_additional_pins_num_pins: 30
   x_axis_mcu_dil_pitch: 2.54
   x_axis_mcu_wire_wrap_pin_side: 0.63
   x_axis_mcu_wire_wrap_pin_length: 12.1

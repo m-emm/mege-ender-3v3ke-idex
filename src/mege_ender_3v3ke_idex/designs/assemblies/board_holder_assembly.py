@@ -528,6 +528,63 @@ def _cut_mount_screw_holes(
     return holder
 
 
+def _get_named_tmc_board_visual_prefix(index):
+    if index == 0:
+        return "tmc_board"
+    return f"tmc_board_{index + 1}"
+
+
+def _get_named_tmc_holder_prefix(index):
+    if index == 0:
+        return "tmc"
+    return f"tmc_{index + 1}"
+
+
+def _create_tmc_board_row(
+    *,
+    pico_board,
+    tmc_board_template,
+    tmc_board_count,
+):
+    if tmc_board_count < 1:
+        raise ValueError("tmc_board_count must be at least 1")
+
+    first_tmc_board = tmc_board_template.copy()
+    first_tmc_board = align(first_tmc_board, pico_board, Alignment.FRONT)
+
+    tmc_board_size = get_bounding_box_size(first_tmc_board)
+    pico_board_size = get_bounding_box_size(pico_board)
+    inter_board_gap = pico_board_size[1] - 2 * tmc_board_size[1]
+    if inter_board_gap < 0:
+        raise ValueError("TMC board row gap became negative")
+
+    tmc_board_pitch = tmc_board_size[1] + inter_board_gap
+
+    tmc_boards = []
+    previous_tmc_board = first_tmc_board
+    tmc_boards.append(previous_tmc_board)
+
+    for tmc_index in range(1, tmc_board_count):
+        current_tmc_board = tmc_board_template.copy()
+        current_tmc_board = align(
+            current_tmc_board,
+            previous_tmc_board,
+            Alignment.STACK_BACK,
+            stack_gap=inter_board_gap,
+        )
+        current_tmc_board = current_tmc_board.prefixed_copy(
+            _get_named_tmc_holder_prefix(tmc_index)
+        )
+        tmc_boards.append(current_tmc_board)
+        previous_tmc_board = current_tmc_board
+
+    tmc_board_row = tmc_boards[0]
+    for current_tmc_board in tmc_boards[1:]:
+        tmc_board_row = tmc_board_row.fuse(current_tmc_board)
+
+    return tmc_board_row, tmc_boards, tmc_board_pitch
+
+
 def create_board_holder_assembly(
     *,
     pico_w_board_assembly,
@@ -543,6 +600,7 @@ def create_board_holder_assembly(
     board_holder_leaf_spring_holder_tower_y_size,
     board_holder_mount_screw_size,
     board_holder_mount_screw_hole_inset,
+    board_holder_tmc_board_count,
     BIG_THING,
 ):
     """Create the x-axis MCU board holder assembly."""
@@ -562,20 +620,22 @@ def create_board_holder_assembly(
     )
     all_holders = pico_holders.prefixed_copy("pico")
 
-    tmc_board_front = tmc_board_assembly.copy()
-    tmc_board_front = align(tmc_board_front, pico_board, Alignment.FRONT)
+    tmc_boards, positioned_tmc_boards, tmc_board_pitch = _create_tmc_board_row(
+        pico_board=pico_board,
+        tmc_board_template=tmc_board_assembly,
+        tmc_board_count=board_holder_tmc_board_count,
+    )
+    tmc_base_plate_y_size = (
+        board_holder_base_plate_y_size
+        + max(0, board_holder_tmc_board_count - 2) * tmc_board_pitch
+    )
 
-    tmc_board_back = tmc_board_assembly.copy()
-    tmc_board_back = align(tmc_board_back, pico_board, Alignment.BACK)
-    tmc_board_back = tmc_board_back.prefixed_copy("tmc_2")
-
-    tmc_boards = tmc_board_front.fuse(tmc_board_back)
     tmc_holders = _create_board_holder(
         board=tmc_boards,
         big_thing=BIG_THING,
         base_plate_border=board_holder_base_plate_border,
         base_plate_thickness=board_holder_base_plate_thickness,
-        base_plate_y_size_override=board_holder_base_plate_y_size,
+        base_plate_y_size_override=tmc_base_plate_y_size,
         board_z_offset=board_holder_board_z_offset,
         leaf_spring_angle=board_holder_leaf_spring_angle,
         leaf_spring_holder_tower_x_size=board_holder_leaf_spring_holder_tower_x_size,
@@ -588,8 +648,9 @@ def create_board_holder_assembly(
     tmc_x_offset = pico_holders_bbox[1][0] - tmc_holders_bbox[0][0]
 
     tmc_translation = translate(tmc_x_offset, 0, 0)
-    tmc_board_front = tmc_translation(tmc_board_front)
-    tmc_board_back = tmc_translation(tmc_board_back)
+    translated_tmc_boards = []
+    for current_tmc_board in positioned_tmc_boards:
+        translated_tmc_boards.append(tmc_translation(current_tmc_board))
     tmc_holders = tmc_translation(tmc_holders).prefixed_copy("tmc")
 
     all_holders = all_holders.fuse(tmc_holders)
@@ -610,13 +671,14 @@ def create_board_holder_assembly(
         pico_board.prefixed_copy("pico_board")
     )
     all_holders = all_holders.merge_except_leader(
-        tmc_board_front.prefixed_copy("tmc_board")
-    )
-    all_holders = all_holders.merge_except_leader(
-        tmc_board_back.prefixed_copy("tmc_board_2")
-    )
-    all_holders = all_holders.merge_except_leader(
         additional_pins.prefixed_copy("additional_pins")
     )
+
+    for tmc_index, current_tmc_board in enumerate(translated_tmc_boards):
+        all_holders = all_holders.merge_except_leader(
+            current_tmc_board.prefixed_copy(
+                _get_named_tmc_board_visual_prefix(tmc_index)
+            )
+        )
 
     return all_holders
