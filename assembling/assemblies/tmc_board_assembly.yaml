@@ -1,0 +1,58 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the x-axis TMC board
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+
+Parameters:
+  x_axis_mcu_dil_pitch:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_side:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_length:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_base_thickness:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_base_width:
+    Type: Float
+  x_axis_mcu_top_pin_length:
+    Type: Float
+  x_axis_mcu_electronics_holder_slack:
+    Type: Float
+  x_axis_mcu_electronics_board_cutter_slack:
+    Type: Float
+  x_axis_mcu_base_cutter_vertical_slack:
+    Type: Float
+  x_axis_mcu_tmc_board_y_pins:
+    Type: Integer
+  x_axis_mcu_tmc_board_int_width:
+    Type: Float
+  x_axis_mcu_tmc_board_thickness:
+    Type: Float
+  x_axis_mcu_tmc_board_cooler_size:
+    Type: Float
+  x_axis_mcu_tmc_board_cooler_height:
+    Type: Float
+  x_axis_mcu_tmc_board_chip_thickness:
+    Type: Float
+  x_axis_mcu_tmc_chip_y_size_rasterized:
+    Type: Float
+  x_axis_mcu_tmc_current_potentiometer_underside_thickness:
+    Type: Float
+  x_axis_mcu_tmc_current_potentiometer_underside_size_rasterized:
+    Type: Float
+
+Parts:
+  TmcBoardAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_mcu_board_assemblies.create_tmc_board_assembly

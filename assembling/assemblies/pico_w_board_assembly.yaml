@@ -1,0 +1,58 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the x-axis Pico W board
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+
+Parameters:
+  x_axis_mcu_dil_pitch:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_side:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_length:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_base_thickness:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_base_width:
+    Type: Float
+  x_axis_mcu_top_pin_length:
+    Type: Float
+  x_axis_mcu_electronics_holder_slack:
+    Type: Float
+  x_axis_mcu_electronics_board_cutter_slack:
+    Type: Float
+  x_axis_mcu_base_cutter_vertical_slack:
+    Type: Float
+  x_axis_mcu_pico_board_thickness:
+    Type: Float
+  x_axis_mcu_pico_board_y_pins:
+    Type: Integer
+  x_axis_mcu_pico_board_int_width:
+    Type: Float
+  x_axis_mcu_pico_board_corner_radius:
+    Type: Float
+  x_axis_mcu_pico_board_micro_usb_socket_offset:
+    Type: Float
+  x_axis_mcu_pico_bar_cutter_slack:
+    Type: Float
+  x_axis_mcu_micro_usb_socket_width:
+    Type: Float
+  x_axis_mcu_micro_usb_socket_thickness:
+    Type: Float
+  x_axis_mcu_micro_usb_socket_depth:
+    Type: Float
+
+Parts:
+  PicoWBoardAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_mcu_board_assemblies.create_pico_w_board_assembly

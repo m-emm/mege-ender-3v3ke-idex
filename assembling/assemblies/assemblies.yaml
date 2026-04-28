@@ -758,6 +758,90 @@ assemblies:
       psu_mount_cable_clamp_clamp_screw_size: !Ref psu_mount_cable_clamp_clamp_screw_size
       psu_mount_cable_clamp_clamp_screw_length: !Ref psu_mount_cable_clamp_clamp_screw_length
 
+  - name: x_axis_pico_w_board_assembly
+
+    resource_file: pico_w_board_assembly.yaml
+    parameters:
+      x_axis_mcu_dil_pitch: !Ref x_axis_mcu_dil_pitch
+      x_axis_mcu_wire_wrap_pin_side: !Ref x_axis_mcu_wire_wrap_pin_side
+      x_axis_mcu_wire_wrap_pin_length: !Ref x_axis_mcu_wire_wrap_pin_length
+      x_axis_mcu_wire_wrap_pin_base_thickness: !Ref x_axis_mcu_wire_wrap_pin_base_thickness
+      x_axis_mcu_wire_wrap_pin_base_width: !Ref x_axis_mcu_wire_wrap_pin_base_width
+      x_axis_mcu_top_pin_length: !Ref x_axis_mcu_top_pin_length
+      x_axis_mcu_electronics_holder_slack: !Ref x_axis_mcu_electronics_holder_slack
+      x_axis_mcu_electronics_board_cutter_slack: !Ref x_axis_mcu_electronics_board_cutter_slack
+      x_axis_mcu_base_cutter_vertical_slack: !Ref x_axis_mcu_base_cutter_vertical_slack
+      x_axis_mcu_pico_board_thickness: !Ref x_axis_mcu_pico_board_thickness
+      x_axis_mcu_pico_board_y_pins: !Ref x_axis_mcu_pico_board_y_pins
+      x_axis_mcu_pico_board_int_width: !Ref x_axis_mcu_pico_board_int_width
+      x_axis_mcu_pico_board_corner_radius: !Ref x_axis_mcu_pico_board_corner_radius
+      x_axis_mcu_pico_board_micro_usb_socket_offset: !Ref x_axis_mcu_pico_board_micro_usb_socket_offset
+      x_axis_mcu_pico_bar_cutter_slack: !Ref x_axis_mcu_pico_bar_cutter_slack
+      x_axis_mcu_micro_usb_socket_width: !Ref x_axis_mcu_micro_usb_socket_width
+      x_axis_mcu_micro_usb_socket_thickness: !Ref x_axis_mcu_micro_usb_socket_thickness
+      x_axis_mcu_micro_usb_socket_depth: !Ref x_axis_mcu_micro_usb_socket_depth
+
+  - name: x_axis_tmc_board_assembly
+
+    resource_file: tmc_board_assembly.yaml
+    parameters:
+      x_axis_mcu_dil_pitch: !Ref x_axis_mcu_dil_pitch
+      x_axis_mcu_wire_wrap_pin_side: !Ref x_axis_mcu_wire_wrap_pin_side
+      x_axis_mcu_wire_wrap_pin_length: !Ref x_axis_mcu_wire_wrap_pin_length
+      x_axis_mcu_wire_wrap_pin_base_thickness: !Ref x_axis_mcu_wire_wrap_pin_base_thickness
+      x_axis_mcu_wire_wrap_pin_base_width: !Ref x_axis_mcu_wire_wrap_pin_base_width
+      x_axis_mcu_top_pin_length: !Ref x_axis_mcu_top_pin_length
+      x_axis_mcu_electronics_holder_slack: !Ref x_axis_mcu_electronics_holder_slack
+      x_axis_mcu_electronics_board_cutter_slack: !Ref x_axis_mcu_electronics_board_cutter_slack
+      x_axis_mcu_base_cutter_vertical_slack: !Ref x_axis_mcu_base_cutter_vertical_slack
+      x_axis_mcu_tmc_board_y_pins: !Ref x_axis_mcu_tmc_board_y_pins
+      x_axis_mcu_tmc_board_int_width: !Ref x_axis_mcu_tmc_board_int_width
+      x_axis_mcu_tmc_board_thickness: !Ref x_axis_mcu_tmc_board_thickness
+      x_axis_mcu_tmc_board_cooler_size: !Ref x_axis_mcu_tmc_board_cooler_size
+      x_axis_mcu_tmc_board_cooler_height: !Ref x_axis_mcu_tmc_board_cooler_height
+      x_axis_mcu_tmc_board_chip_thickness: !Ref x_axis_mcu_tmc_board_chip_thickness
+      x_axis_mcu_tmc_chip_y_size_rasterized: !Ref x_axis_mcu_tmc_chip_y_size_rasterized
+      x_axis_mcu_tmc_current_potentiometer_underside_thickness: !Ref x_axis_mcu_tmc_current_potentiometer_underside_thickness
+      x_axis_mcu_tmc_current_potentiometer_underside_size_rasterized: !Ref x_axis_mcu_tmc_current_potentiometer_underside_size_rasterized
+
+  - name: x_axis_mcu_additional_pins_assembly
+
+    resource_file: sil_clamp_assembly.yaml
+    parameters:
+      x_axis_mcu_dil_pitch: !Ref x_axis_mcu_dil_pitch
+      x_axis_mcu_wire_wrap_pin_side: !Ref x_axis_mcu_wire_wrap_pin_side
+      x_axis_mcu_wire_wrap_pin_length: !Ref x_axis_mcu_wire_wrap_pin_length
+      x_axis_mcu_wire_wrap_pin_base_thickness: !Ref x_axis_mcu_wire_wrap_pin_base_thickness
+      x_axis_mcu_wire_wrap_pin_base_width: !Ref x_axis_mcu_wire_wrap_pin_base_width
+      x_axis_mcu_top_pin_length: !Ref x_axis_mcu_top_pin_length
+      board_holder_additional_pins_num_pins: !Ref board_holder_additional_pins_num_pins
+      board_holder_additional_pins_base_plate_length: !Ref board_holder_additional_pins_base_plate_length
+      board_holder_base_plate_y_size: !Ref board_holder_base_plate_y_size
+      board_holder_base_plate_thickness: !Ref board_holder_base_plate_thickness
+
+  - name: x_axis_mcu_holder_assembly
+
+    resource_file: board_holder_assembly.yaml
+    depends_on:
+      - x_axis_pico_w_board_assembly
+      - x_axis_tmc_board_assembly
+      - x_axis_mcu_additional_pins_assembly
+    inject_parts:
+      pico_w_board_assembly: x_axis_pico_w_board_assembly
+      tmc_board_assembly: x_axis_tmc_board_assembly
+      additional_pins_assembly: x_axis_mcu_additional_pins_assembly
+    parameters:
+      board_holder_base_plate_border: !Ref board_holder_base_plate_border
+      board_holder_base_plate_y_size: !Ref board_holder_base_plate_y_size
+      board_holder_base_plate_thickness: !Ref board_holder_base_plate_thickness
+      board_holder_board_z_offset: !Ref board_holder_board_z_offset
+      board_holder_leaf_spring_angle: !Ref board_holder_leaf_spring_angle
+      board_holder_leaf_spring_thickness: !Ref board_holder_leaf_spring_thickness
+      board_holder_leaf_spring_holder_tower_x_size: !Ref board_holder_leaf_spring_holder_tower_x_size
+      board_holder_leaf_spring_holder_tower_y_size: !Ref board_holder_leaf_spring_holder_tower_y_size
+      board_holder_mount_screw_size: !Ref board_holder_mount_screw_size
+      board_holder_mount_screw_hole_inset: !Ref board_holder_mount_screw_hole_inset
+
   - name: x_axis_assembly
 
     depends_on:

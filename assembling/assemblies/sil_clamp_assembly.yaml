@@ -1,0 +1,42 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the x-axis auxiliary pin clamp
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: sil_clamp_base_plate
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+
+Parameters:
+  x_axis_mcu_dil_pitch:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_side:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_length:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_base_thickness:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_base_width:
+    Type: Float
+  x_axis_mcu_top_pin_length:
+    Type: Float
+  board_holder_additional_pins_num_pins:
+    Type: Integer
+  board_holder_additional_pins_base_plate_length:
+    Type: Float
+  board_holder_base_plate_y_size:
+    Type: Float
+  board_holder_base_plate_thickness:
+    Type: Float
+
+Parts:
+  SilClampAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_mcu_board_assemblies.create_sil_clamp_assembly
