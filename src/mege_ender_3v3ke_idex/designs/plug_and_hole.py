@@ -42,7 +42,15 @@ PROCESS_DATA_TPU = resolve_process_data_from_parameters(
     quality_factor=0.8,
 )
 
-PROCESS_DATA = copy.deepcopy(PROCESS_DATA_TPU)
+
+WHAT_TO_PRINT = "plugs"  # "plugs" or "counter_plate"
+
+if WHAT_TO_PRINT == "plugs":
+    PROCESS_DATA = copy.deepcopy(PROCESS_DATA_TPU)
+    PROCESS_DATA["process_overrides"]["brim_type"] = "no_brim"
+else:
+    PROCESS_DATA = copy.deepcopy(PROCESS_DATA_PETGCF)
+    PROCESS_DATA["process_overrides"]["brim_type"] = "no_brim"
 
 
 def create_plug(
@@ -185,15 +193,126 @@ def create_plug_and_hole():
     return retval, counter_plate
 
 
+def create_plugged_plate(
+    num_x_plugs=2,
+    num_y_plugs=2,
+    border=5,
+    plate_width=50,
+    plate_depth=40,
+    plug_plate_thickness=1,
+    counter_plate_thickness=2.5,
+    plug_diameter=7,
+    plug_slack=0.1,
+    plug_angle_deg=5,
+    plug_height=6,
+    plug_wall_thickness=1.2,
+    plug_base_thickness=0.8,
+    plug_slit_width=0.5,
+    fillet_radius=0.5,
+    plug_lip_height=0.8,
+    plug_lip_size=0.5,
+    plug_lip_top_gap=1.0,
+):
+
+    base = create_box(plate_width, plate_depth, plug_plate_thickness)
+
+    plug_x_pitch = (
+        (plate_width - 2 * border - plug_diameter) / (num_x_plugs - 1)
+        if num_x_plugs > 1
+        else 0
+    )
+    plug_y_pitch = (
+        (plate_depth - 2 * border - plug_diameter) / (num_y_plugs - 1)
+        if num_y_plugs > 1
+        else 0
+    )
+
+    counter_plate = create_box(plate_width, plate_depth, counter_plate_thickness)
+    counter_plate = align(counter_plate, base, Alignment.CENTER)
+    counter_plate = align(counter_plate, base, Alignment.STACK_TOP)
+
+    plugs = PartCollector()
+    hole_cutters = PartCollector()
+    for i in range(num_x_plugs):
+        for j in range(num_y_plugs):
+            plug = create_plug(
+                plug_diameter=plug_diameter,
+                plug_angle_deg=plug_angle_deg,
+                plug_height=plug_height,
+                plug_wall_thickness=plug_wall_thickness,
+                plug_base_thickness=plug_base_thickness,
+                plug_slit_width=0.5,
+                fillet_radius=0.5,
+                plug_lip_height=plug_lip_height,
+                plug_lip_size=plug_lip_size,
+                plug_lip_top_gap=plug_lip_top_gap,
+            )
+            x_pos = -plate_width / 2 + border + i * plug_x_pitch
+            y_pos = -plate_depth / 2 + border + j * plug_y_pitch
+            plug = translate(x_pos, y_pos, 0)(plug)
+            plugs = plugs.fuse(plug)
+
+            hole_cutter = create_cylinder(plug_diameter / 2 + plug_slack, BIG_THING)
+            hole_cutter = align(hole_cutter, plug, Alignment.CENTER)
+            hole_cutters = hole_cutters.fuse(hole_cutter)
+
+    plugs_and_holes = LeaderFollowersCuttersPart(plugs)
+    plugs_and_holes.add_named_cutter(hole_cutters, "hole_cutters")
+    plugs_and_holes = align(plugs_and_holes, base, Alignment.CENTER)
+    plugs_and_holes = align(plugs_and_holes, base, Alignment.STACK_TOP)
+
+    plugs_and_holes = plugs_and_holes.fuse(base)
+
+    counter_plate = plugs_and_holes.use_as_cutter_on(counter_plate)
+
+    plugs_and_holes.add_named_follower(counter_plate, "counter_plate")
+
+    return plugs_and_holes
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
 
     # Create the part
     plug, counter_plate = create_plug_and_hole()
-    parts.add(plug, "plug", flip=False)
-    parts.add(counter_plate, "counter_plate", flip=False)
+    parts.add(plug, "plug", flip=False, skip_in_production=True)
+    parts.add(counter_plate, "counter_plate", flip=False, skip_in_production=True)
 
+    plugs_plate = create_plugged_plate(
+        num_x_plugs=2,
+        num_y_plugs=2,
+        border=5,
+        plate_width=35,
+        plate_depth=30,
+        plug_plate_thickness=1,
+        counter_plate_thickness=2.5,
+        plug_diameter=7,
+        plug_slack=0.1,
+        plug_angle_deg=5,
+        plug_height=4,
+        plug_wall_thickness=1.2,
+        plug_base_thickness=0.8,
+        plug_slit_width=0.5,
+        fillet_radius=0.5,
+        plug_lip_height=0.8,
+        plug_lip_size=0.5,
+        plug_lip_top_gap=1.0,
+    )
+    plugs_plate = align(plugs_plate, plug, Alignment.STACK_RIGHT, stack_gap=10)
+    parts.add(
+        plugs_plate,
+        "plugs_plate",
+        flip=False,
+        skip_in_production=WHAT_TO_PRINT != "plugs",
+    )
+
+    parts.add(
+        plugs_plate.get_named_follower("counter_plate"),
+        "plugs_plate_counter",
+        flip=False,
+        skip_in_production=WHAT_TO_PRINT != "counter_plate",
+    )
     # Arrange and export
     arrange_and_export(
         parts.as_list(),
