@@ -771,11 +771,13 @@ def create_board_holder_assembly_parameterized(
         tpu_cover_cross_strap_width_in_pitches=tpu_cover_cross_strap_width_in_pitches,
         big_thing=big_thing,
     )
-    tpu_cover, plug_parts, plug_hole_cutters, plug_positions, effective_plug_height = _create_cover_plugs(
-        tpu_cover,
-        plug_spec,
-        big_thing,
-        tpu_cover_gap_above_base,
+    tpu_cover, plug_parts, plug_hole_cutters, plug_positions, effective_plug_height = (
+        _create_cover_plugs(
+            tpu_cover,
+            plug_spec,
+            big_thing,
+            tpu_cover_gap_above_base,
+        )
     )
 
     if plug_hole_cutters:

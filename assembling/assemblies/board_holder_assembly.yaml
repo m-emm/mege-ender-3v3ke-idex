@@ -24,19 +24,28 @@ Builder:
         name_template: "{name}"
 
   Production:
-    process_data:
-      source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PLACF_04_HS
-      overrides:
-        process_overrides:
-          wall_loops: "1"
-          bottom_shell_layers: "1"
-          top_shell_layers: "1"
-          sparse_infill_density: "25%"
-          brim_type: no_brim
+    process_data_preset: petgcf_medium_strength_high_speed_06
     parts:
       - source: self
         artifact: leader
         name: board_holder
+      - source: self
+        artifact: followers
+        names:
+          - tpu_cover
+        name_template: "{name}"
+        flip: true
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: board_holder_base
+          parts:
+            - board_holder
+        - name: board_holder_tpu_cover
+          process_data_preset: tpu_minimal_quality_minimal_strength_06
+          parts:
+            - tpu_cover
+      auto_assign_plates: false
 
 Parameters:
   board_holder_base_plate_border:
@@ -53,6 +62,46 @@ Parameters:
     Type: Float
   board_holder_tmc_board_count:
     Type: Integer
+  x_axis_mcu_dil_pitch:
+    Type: Float
+  board_holder_tpu_cover_thickness:
+    Type: Float
+  board_holder_tpu_cover_gap_above_base:
+    Type: Float
+  board_holder_tpu_cover_pin_overlap_in_pitches:
+    Type: Float
+  board_holder_tpu_cover_cross_strap_pin_indices:
+    Type: Json
+  board_holder_tpu_cover_cross_strap_width_in_pitches:
+    Type: Float
+  board_holder_plug_corner_inset:
+    Type: Float
+  board_holder_plug_positions:
+    Type: Json
+  board_holder_plug_diameter:
+    Type: Float
+  board_holder_plug_angle_deg:
+    Type: Float
+  board_holder_plug_height:
+    Type: Float
+  board_holder_plug_wall_thickness:
+    Type: Float
+  board_holder_plug_base_thickness:
+    Type: Float
+  board_holder_plug_slit_width:
+    Type: Float
+  board_holder_plug_fillet_radius:
+    Type: Float
+  board_holder_plug_lip_height:
+    Type: Float
+  board_holder_plug_lip_size:
+    Type: Float
+  board_holder_plug_lip_top_gap:
+    Type: Float
+  board_holder_plug_no_inner_hole:
+    Type: Boolean
+  board_holder_plug_hole_slack:
+    Type: Float
 
 Parts:
   BoardHolderAssembly:

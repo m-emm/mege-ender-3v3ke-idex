@@ -853,6 +853,26 @@ assemblies:
       board_holder_mount_screw_size: !Ref board_holder_mount_screw_size
       board_holder_mount_screw_hole_inset: !Ref board_holder_mount_screw_hole_inset
       board_holder_tmc_board_count: !Ref board_holder_tmc_board_count
+      x_axis_mcu_dil_pitch: !Ref x_axis_mcu_dil_pitch
+      board_holder_tpu_cover_thickness: !Ref board_holder_tpu_cover_thickness
+      board_holder_tpu_cover_gap_above_base: !Ref board_holder_tpu_cover_gap_above_base
+      board_holder_tpu_cover_pin_overlap_in_pitches: !Ref board_holder_tpu_cover_pin_overlap_in_pitches
+      board_holder_tpu_cover_cross_strap_pin_indices: !Ref board_holder_tpu_cover_cross_strap_pin_indices
+      board_holder_tpu_cover_cross_strap_width_in_pitches: !Ref board_holder_tpu_cover_cross_strap_width_in_pitches
+      board_holder_plug_corner_inset: !Ref board_holder_plug_corner_inset
+      board_holder_plug_positions: !Ref board_holder_plug_positions
+      board_holder_plug_diameter: !Ref board_holder_plug_diameter
+      board_holder_plug_angle_deg: !Ref board_holder_plug_angle_deg
+      board_holder_plug_height: !Ref board_holder_plug_height
+      board_holder_plug_wall_thickness: !Ref board_holder_plug_wall_thickness
+      board_holder_plug_base_thickness: !Ref board_holder_plug_base_thickness
+      board_holder_plug_slit_width: !Ref board_holder_plug_slit_width
+      board_holder_plug_fillet_radius: !Ref board_holder_plug_fillet_radius
+      board_holder_plug_lip_height: !Ref board_holder_plug_lip_height
+      board_holder_plug_lip_size: !Ref board_holder_plug_lip_size
+      board_holder_plug_lip_top_gap: !Ref board_holder_plug_lip_top_gap
+      board_holder_plug_no_inner_hole: !Ref board_holder_plug_no_inner_hole
+      board_holder_plug_hole_slack: !Ref board_holder_plug_hole_slack
 
   - name: y_z_axis_mcu_holder_assembly
 
@@ -873,6 +893,26 @@ assemblies:
       board_holder_mount_screw_size: !Ref board_holder_mount_screw_size
       board_holder_mount_screw_hole_inset: !Ref board_holder_mount_screw_hole_inset
       board_holder_tmc_board_count: !Ref y_z_axis_mcu_holder_tmc_board_count
+      x_axis_mcu_dil_pitch: !Ref x_axis_mcu_dil_pitch
+      board_holder_tpu_cover_thickness: !Ref board_holder_tpu_cover_thickness
+      board_holder_tpu_cover_gap_above_base: !Ref board_holder_tpu_cover_gap_above_base
+      board_holder_tpu_cover_pin_overlap_in_pitches: !Ref board_holder_tpu_cover_pin_overlap_in_pitches
+      board_holder_tpu_cover_cross_strap_pin_indices: !Ref board_holder_tpu_cover_cross_strap_pin_indices
+      board_holder_tpu_cover_cross_strap_width_in_pitches: !Ref board_holder_tpu_cover_cross_strap_width_in_pitches
+      board_holder_plug_corner_inset: !Ref board_holder_plug_corner_inset
+      board_holder_plug_positions: !Ref board_holder_plug_positions
+      board_holder_plug_diameter: !Ref board_holder_plug_diameter
+      board_holder_plug_angle_deg: !Ref board_holder_plug_angle_deg
+      board_holder_plug_height: !Ref board_holder_plug_height
+      board_holder_plug_wall_thickness: !Ref board_holder_plug_wall_thickness
+      board_holder_plug_base_thickness: !Ref board_holder_plug_base_thickness
+      board_holder_plug_slit_width: !Ref board_holder_plug_slit_width
+      board_holder_plug_fillet_radius: !Ref board_holder_plug_fillet_radius
+      board_holder_plug_lip_height: !Ref board_holder_plug_lip_height
+      board_holder_plug_lip_size: !Ref board_holder_plug_lip_size
+      board_holder_plug_lip_top_gap: !Ref board_holder_plug_lip_top_gap
+      board_holder_plug_no_inner_hole: !Ref board_holder_plug_no_inner_hole
+      board_holder_plug_hole_slack: !Ref board_holder_plug_hole_slack
 
   - name: pico_w_board_holder_protoype_assembly
 
