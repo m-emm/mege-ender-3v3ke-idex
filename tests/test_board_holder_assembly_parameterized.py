@@ -61,6 +61,7 @@ def _build_assembly(
     board_placements=None,
     pin_lines=None,
     tpu_cover_cross_strap_pin_indices=None,
+    tpu_cover_gap_above_base=0.0,
 ):
     if board_catalog is None:
         board_catalog = [_dil_board_spec()]
@@ -76,6 +77,7 @@ def _build_assembly(
         board_placements=board_placements,
         pin_lines=pin_lines,
         tpu_cover_cross_strap_pin_indices=tpu_cover_cross_strap_pin_indices,
+        tpu_cover_gap_above_base=tpu_cover_gap_above_base,
     )
 
 
@@ -222,6 +224,23 @@ def test_base_has_plug_holes_and_tpu_cover_contains_plug_geometry():
     assert len(assembly.additional_data["plug_positions"]) == 4
     assert "tpu_cover_plug_0" not in non_production_names
     assert "tpu_cover_strap_0" not in non_production_names
+
+
+def test_cover_gap_lifts_cover_sheet_and_extends_plug_reach():
+    assembly = _build_assembly(tpu_cover_gap_above_base=default_top_pin_length)
+
+    base_bbox = get_bounding_box(assembly.leader)
+    cover_sheet_bbox = assembly.additional_data["tpu_cover_sheet_bbox"]
+
+    assert cover_sheet_bbox[0][2] == pytest.approx(
+        base_bbox[1][2] + default_top_pin_length
+    )
+    assert assembly.additional_data["tpu_cover_gap_above_base"] == pytest.approx(
+        default_top_pin_length
+    )
+    assert assembly.additional_data["effective_plug_height"] == pytest.approx(
+        4.0 + default_top_pin_length
+    )
 
 
 def test_mixed_parameterized_holder_builds_without_raising():

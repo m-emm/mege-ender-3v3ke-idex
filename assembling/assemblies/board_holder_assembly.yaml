@@ -37,12 +37,6 @@ Builder:
       - source: self
         artifact: leader
         name: board_holder
-      - source: self
-        artifact: followers
-        names:
-          - pico_leaf_spring_preloaded
-          - tmc_leaf_spring_preloaded
-        name_template: "{name}"
 
 Parameters:
   board_holder_base_plate_border:
@@ -52,14 +46,6 @@ Parameters:
   board_holder_base_plate_thickness:
     Type: Float
   board_holder_board_z_offset:
-    Type: Float
-  board_holder_leaf_spring_angle:
-    Type: Float
-  board_holder_leaf_spring_thickness:
-    Type: Float
-  board_holder_leaf_spring_holder_tower_x_size:
-    Type: Float
-  board_holder_leaf_spring_holder_tower_y_size:
     Type: Float
   board_holder_mount_screw_size:
     Type: String
