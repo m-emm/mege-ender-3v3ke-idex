@@ -174,8 +174,8 @@ def _cut_cover_window_for_dil_board(
     board_bbox = get_bounding_box(board_part)
     x_min = board_bbox[0][0] + overlap_mm
     x_max = board_bbox[1][0] - overlap_mm
-    y_min = board_bbox[0][1]
-    y_max = board_bbox[1][1]
+    y_min = board_bbox[0][1] + overlap_mm
+    y_max = board_bbox[1][1] - overlap_mm
 
     if x_max <= x_min:
         raise ValueError("Cover overlap left no window width for board.")
@@ -231,7 +231,6 @@ def _create_tpu_cover(
     board_holder_tpu_cover_thickness,
     board_holder_tpu_cover_gap_above_base,
     board_holder_tpu_cover_pin_overlap_in_pitches,
-    board_holder_tpu_cover_cross_strap_pin_indices,
     board_holder_tpu_cover_cross_strap_width_in_pitches,
 ):
     if board_holder_tpu_cover_gap_above_base < 0:
@@ -261,7 +260,7 @@ def _create_tpu_cover(
         overlap_mm=overlap_mm,
         strap_width=strap_width,
         dil_pitch=x_axis_mcu_dil_pitch,
-        strap_pin_indices=board_holder_tpu_cover_cross_strap_pin_indices,
+        strap_pin_indices=[3, 10, 17],
     )
 
     for tmc_board in translated_tmc_boards:
@@ -273,11 +272,11 @@ def _create_tpu_cover(
             overlap_mm=overlap_mm,
             strap_width=strap_width,
             dil_pitch=x_axis_mcu_dil_pitch,
-            strap_pin_indices=board_holder_tpu_cover_cross_strap_pin_indices,
+            strap_pin_indices=[1,6],
         )
         strap_metadata["tmc_boards"].append(current_tmc_strap_metadata)
 
-    additional_pins_bbox = get_bounding_box(additional_pins.leader)
+    additional_pins_bbox = get_bounding_box(additional_pins.get_named_non_production_part("pins"))
     additional_pins_window = _create_cut_box_from_xy(
         additional_pins_bbox[0][0],
         additional_pins_bbox[1][0],
@@ -486,7 +485,6 @@ def create_board_holder_assembly(
     board_holder_tpu_cover_thickness,
     board_holder_tpu_cover_gap_above_base,
     board_holder_tpu_cover_pin_overlap_in_pitches,
-    board_holder_tpu_cover_cross_strap_pin_indices,
     board_holder_tpu_cover_cross_strap_width_in_pitches,
     board_holder_plug_corner_inset,
     board_holder_plug_positions,
@@ -586,8 +584,7 @@ def create_board_holder_assembly(
         x_axis_mcu_dil_pitch=x_axis_mcu_dil_pitch,
         board_holder_tpu_cover_thickness=board_holder_tpu_cover_thickness,
         board_holder_tpu_cover_gap_above_base=board_holder_tpu_cover_gap_above_base,
-        board_holder_tpu_cover_pin_overlap_in_pitches=board_holder_tpu_cover_pin_overlap_in_pitches,
-        board_holder_tpu_cover_cross_strap_pin_indices=board_holder_tpu_cover_cross_strap_pin_indices,
+        board_holder_tpu_cover_pin_overlap_in_pitches=board_holder_tpu_cover_pin_overlap_in_pitches,        
         board_holder_tpu_cover_cross_strap_width_in_pitches=board_holder_tpu_cover_cross_strap_width_in_pitches,
     )
     tpu_cover, cover_plug_hole_cutters = _create_cover_plugs(

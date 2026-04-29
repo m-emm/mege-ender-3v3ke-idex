@@ -857,7 +857,6 @@ assemblies:
       board_holder_tpu_cover_thickness: !Ref board_holder_tpu_cover_thickness
       board_holder_tpu_cover_gap_above_base: !Ref board_holder_tpu_cover_gap_above_base
       board_holder_tpu_cover_pin_overlap_in_pitches: !Ref board_holder_tpu_cover_pin_overlap_in_pitches
-      board_holder_tpu_cover_cross_strap_pin_indices: !Ref board_holder_tpu_cover_cross_strap_pin_indices
       board_holder_tpu_cover_cross_strap_width_in_pitches: !Ref board_holder_tpu_cover_cross_strap_width_in_pitches
       board_holder_plug_corner_inset: !Ref board_holder_plug_corner_inset
       board_holder_plug_positions: !Ref board_holder_plug_positions
@@ -897,7 +896,6 @@ assemblies:
       board_holder_tpu_cover_thickness: !Ref board_holder_tpu_cover_thickness
       board_holder_tpu_cover_gap_above_base: !Ref board_holder_tpu_cover_gap_above_base
       board_holder_tpu_cover_pin_overlap_in_pitches: !Ref board_holder_tpu_cover_pin_overlap_in_pitches
-      board_holder_tpu_cover_cross_strap_pin_indices: !Ref board_holder_tpu_cover_cross_strap_pin_indices
       board_holder_tpu_cover_cross_strap_width_in_pitches: !Ref board_holder_tpu_cover_cross_strap_width_in_pitches
       board_holder_plug_corner_inset: !Ref board_holder_plug_corner_inset
       board_holder_plug_positions: !Ref board_holder_plug_positions

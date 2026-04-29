@@ -70,8 +70,6 @@ Parameters:
     Type: Float
   board_holder_tpu_cover_pin_overlap_in_pitches:
     Type: Float
-  board_holder_tpu_cover_cross_strap_pin_indices:
-    Type: Json
   board_holder_tpu_cover_cross_strap_width_in_pitches:
     Type: Float
   board_holder_plug_corner_inset:
