@@ -909,6 +909,7 @@ assemblies:
       board_z_offset: !Ref board_holder_board_z_offset
       base_border: !Ref board_holder_base_plate_border
       tpu_cover_thickness: 1.0
+      tpu_cover_gap_above_base: !Ref x_axis_mcu_top_pin_length
 
   - name: x_axis_assembly
 

@@ -61,7 +61,7 @@ class PinLineSpec:
 class PlugSpec:
     corner_inset: float = 5.0
     positions: Sequence[tuple[float, float]] | None = None
-    plug_diameter: float = 7.0
+    plug_diameter: float = 5.0
     plug_angle_deg: float = 5.0
     plug_height: float = 4.0
     plug_wall_thickness: float = 1.2
@@ -486,6 +486,8 @@ def _create_tpu_cover(
     big_thing,
 ):
     base_bbox = get_bounding_box(base_plate)
+    if tpu_cover_gap_above_base < 0:
+        raise ValueError("tpu_cover_gap_above_base must be non-negative.")
     cover_z_min = base_bbox[1][2] + tpu_cover_gap_above_base
     cover = create_box(
         base_bbox[1][0] - base_bbox[0][0],
@@ -571,10 +573,10 @@ def _create_tpu_cover(
         )
         cover = cover.cut(pin_line_window)
 
-    return cover, strap_parts, strap_metadata
+    return cover, strap_parts, strap_metadata, _bbox_to_list(get_bounding_box(cover))
 
 
-def _create_cover_plugs(cover, plug_spec, big_thing):
+def _create_cover_plugs(cover, plug_spec, big_thing, tpu_cover_gap_above_base):
     anchor_thickness = 1e-3
     if plug_spec.positions is None:
         plug_anchors = []
@@ -618,12 +620,13 @@ def _create_cover_plugs(cover, plug_spec, big_thing):
     cover_with_plugs = cover
     plug_parts = []
     hole_cutters = []
+    effective_plug_height = plug_spec.plug_height + tpu_cover_gap_above_base
 
     for plug_anchor in plug_anchors:
         plug = create_plug(
             plug_diameter=plug_spec.plug_diameter,
             plug_angle_deg=plug_spec.plug_angle_deg,
-            plug_height=plug_spec.plug_height,
+            plug_height=effective_plug_height,
             plug_wall_thickness=plug_spec.plug_wall_thickness,
             plug_base_thickness=plug_spec.plug_base_thickness,
             plug_slit_width=plug_spec.plug_slit_width,
@@ -649,7 +652,7 @@ def _create_cover_plugs(cover, plug_spec, big_thing):
         hole_cutter = align(hole_cutter, plug, Alignment.CENTER)
         hole_cutters.append(hole_cutter)
 
-    return cover_with_plugs, plug_parts, hole_cutters, positions
+    return cover_with_plugs, plug_parts, hole_cutters, positions, effective_plug_height
 
 
 def _add_non_production_board_visuals(assembly, board_instance, prefix):
@@ -756,7 +759,7 @@ def create_board_holder_assembly_parameterized(
         )
         base_pin_line_cutters.extend(pin_line.cutters)
 
-    tpu_cover, strap_parts, strap_metadata = _create_tpu_cover(
+    tpu_cover, strap_parts, strap_metadata, tpu_cover_sheet_bbox = _create_tpu_cover(
         base_plate=base_plate_with_all_cutouts,
         board_instances=board_instances,
         ordered_board_names=ordered_board_names,
@@ -768,10 +771,11 @@ def create_board_holder_assembly_parameterized(
         tpu_cover_cross_strap_width_in_pitches=tpu_cover_cross_strap_width_in_pitches,
         big_thing=big_thing,
     )
-    tpu_cover, plug_parts, plug_hole_cutters, plug_positions = _create_cover_plugs(
+    tpu_cover, plug_parts, plug_hole_cutters, plug_positions, effective_plug_height = _create_cover_plugs(
         tpu_cover,
         plug_spec,
         big_thing,
+        tpu_cover_gap_above_base,
     )
 
     if plug_hole_cutters:
@@ -833,7 +837,12 @@ def create_board_holder_assembly_parameterized(
             "pin_line_order": ordered_pin_line_names,
             "pin_line_bboxes": pin_line_bboxes,
             "tpu_cover_straps": strap_metadata,
+            "tpu_cover_gap_above_base": tpu_cover_gap_above_base,
+            "tpu_cover_sheet_bbox": tpu_cover_sheet_bbox,
             "plug_positions": [[x, y] for x, y in plug_positions],
+            "effective_plug_height": effective_plug_height,
+            "effective_plug_downward_reach": effective_plug_height
+            + plug_spec.plug_base_thickness,
             "base_bbox": _bbox_to_list(get_bounding_box(assembly.leader)),
         }
     )

@@ -48,6 +48,8 @@ Parameters:
     Type: Float
   tpu_cover_thickness:
     Type: Float
+  tpu_cover_gap_above_base:
+    Type: Float
 
 Parts:
   PicoWBoardHolderProtoypeAssembly:
