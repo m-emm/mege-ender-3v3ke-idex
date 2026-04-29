@@ -229,7 +229,7 @@ def create_dil_board(
 
     retval = dil.fuse(boards_lfc)
 
-    retval.add_named_follower(dil, "dil")
+    retval.add_named_follower(dil.leaders_followers_fused(), "dil")
 
     return retval
 
@@ -271,8 +271,10 @@ def create_sil_board(
     boards["with_slack"] = align(
         boards["with_slack"], boards["plain"], Alignment.CENTER
     )
+    board_plain = boards["plain"]
 
-    boards = LeaderFollowersCuttersPart(boards["plain"], cutters=[boards["with_slack"]])
+    boards = LeaderFollowersCuttersPart(board_plain, cutters=[boards["with_slack"]])
+    boards.add_named_follower(board_plain, "board")
 
     sil = create_sil(
         num_y_pins,
@@ -289,6 +291,7 @@ def create_sil_board(
     sil = align(sil, boards, Alignment.STACK_BOTTOM)
 
     retval = sil.fuse(boards)
+    retval.add_named_follower(sil.leaders_followers_fused(), "sil")
 
     return retval
 
