@@ -574,46 +574,52 @@ def _create_tpu_cover(
     return cover, strap_parts, strap_metadata
 
 
-def _move_part_center_xy(part, x_pos, y_pos):
-    center = get_bounding_box_center(part)
-    return translate(x_pos - center[0], y_pos - center[1], 0)(part)
-
-
-def _place_z_by_top(part, z_top):
-    bbox = get_bounding_box(part)
-    return translate(0, 0, z_top - bbox[1][2])(part)
-
-
 def _create_cover_plugs(cover, plug_spec, big_thing):
-    cover_bbox = get_bounding_box(cover)
-
+    anchor_thickness = 1e-3
     if plug_spec.positions is None:
-        positions = [
-            (
-                cover_bbox[0][0] + plug_spec.corner_inset,
-                cover_bbox[0][1] + plug_spec.corner_inset,
-            ),
-            (
-                cover_bbox[1][0] - plug_spec.corner_inset,
-                cover_bbox[0][1] + plug_spec.corner_inset,
-            ),
-            (
-                cover_bbox[1][0] - plug_spec.corner_inset,
-                cover_bbox[1][1] - plug_spec.corner_inset,
-            ),
-            (
-                cover_bbox[0][0] + plug_spec.corner_inset,
-                cover_bbox[1][1] - plug_spec.corner_inset,
-            ),
-        ]
+        plug_anchors = []
+        for lr in [Alignment.LEFT, Alignment.RIGHT]:
+            for fb in [Alignment.FRONT, Alignment.BACK]:
+                plug_anchor = create_box(
+                    anchor_thickness,
+                    anchor_thickness,
+                    anchor_thickness,
+                )
+                plug_anchor = align(plug_anchor, cover, lr.edge_alignment)
+                plug_anchor = align(plug_anchor, cover, fb.edge_alignment)
+                plug_anchor = align(plug_anchor, cover, Alignment.BOTTOM)
+                plug_anchor = translate(
+                    -lr.sign * plug_spec.corner_inset,
+                    -fb.sign * plug_spec.corner_inset,
+                    0,
+                )(plug_anchor)
+                plug_anchors.append(plug_anchor)
     else:
-        positions = list(plug_spec.positions)
+        plug_anchors = []
+        for x_pos, y_pos in plug_spec.positions:
+            plug_anchor = create_box(
+                anchor_thickness,
+                anchor_thickness,
+                anchor_thickness,
+                origin=(
+                    x_pos - anchor_thickness / 2,
+                    y_pos - anchor_thickness / 2,
+                    -anchor_thickness / 2,
+                ),
+            )
+            plug_anchor = align(plug_anchor, cover, Alignment.BOTTOM)
+            plug_anchors.append(plug_anchor)
+
+    positions = []
+    for plug_anchor in plug_anchors:
+        center = get_bounding_box_center(plug_anchor)
+        positions.append((center[0], center[1]))
 
     cover_with_plugs = cover
     plug_parts = []
     hole_cutters = []
 
-    for x_pos, y_pos in positions:
+    for plug_anchor in plug_anchors:
         plug = create_plug(
             plug_diameter=plug_spec.plug_diameter,
             plug_angle_deg=plug_spec.plug_angle_deg,
@@ -628,8 +634,8 @@ def _create_cover_plugs(cover, plug_spec, big_thing):
             no_inner_hole=plug_spec.no_inner_hole,
         )
         plug = rotate(180, axis=(1, 0, 0))(plug)
-        plug = _move_part_center_xy(plug, x_pos, y_pos)
-        plug = _place_z_by_top(plug, cover_bbox[0][2])
+        plug = align(plug, plug_anchor, Alignment.CENTER, axes=[0, 1])
+        plug = align(plug, plug_anchor, Alignment.STACK_BOTTOM, stack_gap=0)
 
         cover_with_plugs = cover_with_plugs.fuse(plug)
         plug_parts.append(plug)
