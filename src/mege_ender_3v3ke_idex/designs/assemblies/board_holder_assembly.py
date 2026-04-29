@@ -11,9 +11,7 @@ def _create_board_holder(
     board_pcb_follower_name="board",
     board_cutting_part=None,
     base_plate_border=7.0,
-    base_plate_border_y_ratio=1.0 / 3.0,
     base_plate_x_size_override=None,
-    base_plate_y_size_override=None,
     base_plate_thickness=3.1,
     board_z_offset=0.005,
 ):
@@ -35,11 +33,7 @@ def _create_board_holder(
             if base_plate_x_size_override is not None
             else board_size[0] + 2 * base_plate_border
         ),
-        (
-            base_plate_y_size_override
-            if base_plate_y_size_override is not None
-            else board_size[1] + 2 * base_plate_border * base_plate_border_y_ratio
-        ),
+        board_size[1] + 2 * base_plate_border,
         base_plate_thickness,
     )
 
@@ -56,16 +50,12 @@ def _create_enclosing_base_plate(
     *,
     enclosure_reference,
     base_plate_border,
-    base_plate_y_size_min,
     base_plate_thickness,
     board_z_offset,
 ):
     enclosure_size = get_bounding_box_size(enclosure_reference)
     base_plate_x_size = enclosure_size[0] + 2 * base_plate_border
-    base_plate_y_size = max(
-        enclosure_size[1] + 2 * base_plate_border,
-        base_plate_y_size_min,
-    )
+    base_plate_y_size = enclosure_size[1] + 2 * base_plate_border
 
     base_plate = create_box(
         base_plate_x_size,
@@ -475,7 +465,6 @@ def create_board_holder_assembly(
     tmc_board_assembly,
     additional_pins_assembly,
     board_holder_base_plate_border,
-    board_holder_base_plate_y_size,
     board_holder_base_plate_thickness,
     board_holder_board_z_offset,
     board_holder_mount_screw_size,
@@ -509,7 +498,6 @@ def create_board_holder_assembly(
         board=pico_board,
         base_plate_border=board_holder_base_plate_border,
         base_plate_thickness=board_holder_base_plate_thickness,
-        base_plate_y_size_override=board_holder_base_plate_y_size,
         board_z_offset=board_holder_board_z_offset,
     )
 
@@ -518,16 +506,10 @@ def create_board_holder_assembly(
         tmc_board_template=tmc_board_assembly,
         tmc_board_count=board_holder_tmc_board_count,
     )
-    tmc_base_plate_y_size = (
-        board_holder_base_plate_y_size
-        + max(0, board_holder_tmc_board_count - 2) * tmc_board_pitch
-    )
-
     tmc_holder_reference = _create_board_holder(
         board=tmc_boards,
         base_plate_border=board_holder_base_plate_border,
         base_plate_thickness=board_holder_base_plate_thickness,
-        base_plate_y_size_override=tmc_base_plate_y_size,
         board_z_offset=board_holder_board_z_offset,
     )
 
@@ -559,7 +541,6 @@ def create_board_holder_assembly(
     base_plate = _create_enclosing_base_plate(
         enclosure_reference=enclosure_reference,
         base_plate_border=board_holder_base_plate_border,
-        base_plate_y_size_min=board_holder_base_plate_y_size,
         base_plate_thickness=board_holder_base_plate_thickness,
         board_z_offset=board_holder_board_z_offset,
     )

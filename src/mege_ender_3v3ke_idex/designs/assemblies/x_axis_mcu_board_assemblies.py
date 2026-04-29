@@ -462,7 +462,6 @@ def create_sil_clamp_assembly(
     x_axis_mcu_top_pin_length,
     board_holder_additional_pins_num_pins,
     board_holder_additional_pins_base_plate_length,
-    board_holder_base_plate_y_size,
     board_holder_base_plate_thickness,
     BIG_THING,
 ):
@@ -482,10 +481,11 @@ def create_sil_clamp_assembly(
         base_cutter_slack=holder_slack,
         base_cutter_vertical_slack=base_cutter_vertical_slack,
     )
+    pins_size = get_bounding_box_size(pins)
 
     base_plate = create_box(
         board_holder_additional_pins_base_plate_length,
-        board_holder_base_plate_y_size,
+        pins_size[1] + 2 * x_axis_mcu_dil_pitch,
         board_holder_base_plate_thickness,
     )
     base_plate = translate(0, 0, -board_holder_base_plate_thickness)(base_plate)
@@ -493,7 +493,6 @@ def create_sil_clamp_assembly(
     pins = align(pins, base_plate, Alignment.CENTER, axes=[0, 1])
     base_plate = pins.use_as_cutter_on(base_plate)
 
-    pins_size = get_bounding_box_size(pins)
     slit_cutter = create_box(
         0.4,
         pins_size[1] + 4 * x_axis_mcu_dil_pitch,

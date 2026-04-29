@@ -29,8 +29,6 @@ Parameters:
     Type: Integer
   board_holder_additional_pins_base_plate_length:
     Type: Float
-  board_holder_base_plate_y_size:
-    Type: Float
   board_holder_base_plate_thickness:
     Type: Float
 

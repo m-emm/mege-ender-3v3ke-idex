@@ -816,7 +816,6 @@ assemblies:
       x_axis_mcu_top_pin_length: !Ref x_axis_mcu_top_pin_length
       board_holder_additional_pins_num_pins: !Ref board_holder_additional_pins_num_pins
       board_holder_additional_pins_base_plate_length: !Ref board_holder_additional_pins_base_plate_length
-      board_holder_base_plate_y_size: !Ref board_holder_base_plate_y_size
       board_holder_base_plate_thickness: !Ref board_holder_base_plate_thickness
 
   - name: y_z_axis_mcu_additional_pins_assembly
@@ -831,7 +830,6 @@ assemblies:
       x_axis_mcu_top_pin_length: !Ref x_axis_mcu_top_pin_length
       board_holder_additional_pins_num_pins: !Ref y_z_axis_mcu_holder_additional_pins_num_pins
       board_holder_additional_pins_base_plate_length: !Ref board_holder_additional_pins_base_plate_length
-      board_holder_base_plate_y_size: !Ref board_holder_base_plate_y_size
       board_holder_base_plate_thickness: !Ref board_holder_base_plate_thickness
 
   - name: x_axis_mcu_holder_assembly
@@ -847,7 +845,6 @@ assemblies:
       additional_pins_assembly: x_axis_mcu_additional_pins_assembly
     parameters:
       board_holder_base_plate_border: !Ref board_holder_base_plate_border
-      board_holder_base_plate_y_size: !Ref board_holder_base_plate_y_size
       board_holder_base_plate_thickness: !Ref board_holder_base_plate_thickness
       board_holder_board_z_offset: !Ref board_holder_board_z_offset
       board_holder_mount_screw_size: !Ref board_holder_mount_screw_size
@@ -886,7 +883,6 @@ assemblies:
       additional_pins_assembly: y_z_axis_mcu_additional_pins_assembly
     parameters:
       board_holder_base_plate_border: !Ref board_holder_base_plate_border
-      board_holder_base_plate_y_size: !Ref board_holder_base_plate_y_size
       board_holder_base_plate_thickness: !Ref board_holder_base_plate_thickness
       board_holder_board_z_offset: !Ref board_holder_board_z_offset
       board_holder_mount_screw_size: !Ref board_holder_mount_screw_size
