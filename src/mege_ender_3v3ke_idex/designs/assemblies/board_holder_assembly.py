@@ -283,6 +283,7 @@ def _create_tpu_cover(
 def _create_cover_plugs(
     *,
     cover,
+    base_part,
     big_thing,
     board_holder_tpu_cover_gap_above_base,
     board_holder_plug_corner_inset,
@@ -301,28 +302,58 @@ def _create_cover_plugs(
     board_holder_plug_hole_slack,
 ):
     anchor_thickness = 1e-3
+    lip_clearance_below_base = 0.1
     if board_holder_plug_positions is None:
-        plug_anchors = []
-        for left_right_alignment in [Alignment.LEFT, Alignment.RIGHT]:
-            for front_back_alignment in [Alignment.FRONT, Alignment.BACK]:
-                plug_anchor = create_box(
-                    anchor_thickness,
-                    anchor_thickness,
-                    anchor_thickness,
-                )
+        def create_default_plug_anchor(
+            *,
+            left_right_alignment=None,
+            front_back_alignment=None,
+        ):
+            plug_anchor = create_box(
+                anchor_thickness,
+                anchor_thickness,
+                anchor_thickness,
+            )
+            x_offset = 0
+            y_offset = 0
+
+            if left_right_alignment is None:
+                plug_anchor = align(plug_anchor, cover, Alignment.CENTER, axes=[0])
+            else:
                 plug_anchor = align(
                     plug_anchor, cover, left_right_alignment.edge_alignment
                 )
+                x_offset = -left_right_alignment.sign * board_holder_plug_corner_inset
+
+            if front_back_alignment is None:
+                plug_anchor = align(plug_anchor, cover, Alignment.CENTER, axes=[1])
+            else:
                 plug_anchor = align(
                     plug_anchor, cover, front_back_alignment.edge_alignment
                 )
-                plug_anchor = align(plug_anchor, cover, Alignment.BOTTOM)
-                plug_anchor = translate(
-                    -left_right_alignment.sign * board_holder_plug_corner_inset,
-                    -front_back_alignment.sign * board_holder_plug_corner_inset,
-                    0,
-                )(plug_anchor)
-                plug_anchors.append(plug_anchor)
+                y_offset = -front_back_alignment.sign * board_holder_plug_corner_inset
+
+            plug_anchor = align(plug_anchor, cover, Alignment.BOTTOM)
+            return translate(x_offset, y_offset, 0)(plug_anchor)
+
+        plug_anchors = []
+        for left_right_alignment in [Alignment.LEFT, Alignment.RIGHT]:
+            for front_back_alignment in [Alignment.FRONT, Alignment.BACK]:
+                plug_anchors.append(
+                    create_default_plug_anchor(
+                        left_right_alignment=left_right_alignment,
+                        front_back_alignment=front_back_alignment,
+                    )
+                )
+        for left_right_alignment in [Alignment.LEFT, Alignment.RIGHT]:
+            plug_anchors.append(
+                create_default_plug_anchor(left_right_alignment=left_right_alignment)
+            )
+        for front_back_alignment in [Alignment.FRONT, Alignment.BACK]:
+            plug_anchors.append(
+                create_default_plug_anchor(front_back_alignment=front_back_alignment)
+            )
+        plug_anchors.append(create_default_plug_anchor())
     else:
         plug_anchors = []
         for x_pos, y_pos in board_holder_plug_positions:
@@ -341,9 +372,36 @@ def _create_cover_plugs(
 
     cover_with_plugs = cover
     hole_cutters = []
-    effective_plug_height = (
+    nominal_effective_plug_height = (
         board_holder_plug_height + board_holder_tpu_cover_gap_above_base
     )
+    base_bottom_z = get_bounding_box(base_part)[0][2]
+    cover_bottom_z = get_bounding_box(cover)[0][2]
+    cover_to_base_bottom_distance = cover_bottom_z - base_bottom_z
+
+    if (
+        board_holder_plug_lip_height is not None
+        and board_holder_plug_lip_top_gap is not None
+    ):
+        minimum_effective_plug_height = (
+            cover_to_base_bottom_distance
+            - board_holder_plug_base_thickness
+            + board_holder_plug_lip_top_gap
+            + board_holder_plug_lip_height
+            + lip_clearance_below_base
+        )
+    else:
+        minimum_effective_plug_height = (
+            cover_to_base_bottom_distance
+            - board_holder_plug_base_thickness
+            + lip_clearance_below_base
+        )
+
+    effective_plug_height = max(
+        nominal_effective_plug_height,
+        minimum_effective_plug_height,
+    )
+
     for plug_anchor in plug_anchors:
         plug = create_plug(
             plug_diameter=board_holder_plug_diameter,
@@ -570,6 +628,7 @@ def create_board_holder_assembly(
     )
     tpu_cover, cover_plug_hole_cutters = _create_cover_plugs(
         cover=tpu_cover,
+        base_part=all_holders.leader,
         big_thing=BIG_THING,
         board_holder_tpu_cover_gap_above_base=board_holder_tpu_cover_gap_above_base,
         board_holder_plug_corner_inset=board_holder_plug_corner_inset,

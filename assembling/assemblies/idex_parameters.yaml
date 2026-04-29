@@ -127,7 +127,7 @@ globals:
   board_holder_plug_height: 4.0
   board_holder_plug_wall_thickness: 1.2
   board_holder_plug_base_thickness: 0.8
-  board_holder_plug_slit_width: 0.5
+  board_holder_plug_slit_width: 1
   board_holder_plug_fillet_radius: 0.5
   board_holder_plug_lip_height: 0.8
   board_holder_plug_lip_size: 0.5
