@@ -524,6 +524,7 @@ def create_sil_clamp_assembly(
     base_plate = base_plate.fuse(lip_holder)
 
     retval = LeaderFollowersCuttersPart(base_plate)
+    retval.add_named_follower(base_plate, "additional_pins_base_plate")
     retval.add_named_non_production_part(pins.leader, "pins")
     retval.add_named_non_production_part(
         pins.get_follower_part_by_name("top_pins"),

@@ -850,6 +850,8 @@ assemblies:
       board_holder_mount_screw_size: !Ref board_holder_mount_screw_size
       board_holder_mount_screw_hole_inset: !Ref board_holder_mount_screw_hole_inset
       board_holder_tmc_board_count: !Ref board_holder_tmc_board_count
+      board_holder_pico_to_tmc_gap_x: !Ref board_holder_pico_to_tmc_gap_x
+      board_holder_tmc_to_additional_pins_gap_x: !Ref board_holder_tmc_to_additional_pins_gap_x
       x_axis_mcu_dil_pitch: !Ref x_axis_mcu_dil_pitch
       board_holder_tpu_cover_thickness: !Ref board_holder_tpu_cover_thickness
       board_holder_tpu_cover_gap_above_base: !Ref board_holder_tpu_cover_gap_above_base
@@ -888,6 +890,8 @@ assemblies:
       board_holder_mount_screw_size: !Ref board_holder_mount_screw_size
       board_holder_mount_screw_hole_inset: !Ref board_holder_mount_screw_hole_inset
       board_holder_tmc_board_count: !Ref y_z_axis_mcu_holder_tmc_board_count
+      board_holder_pico_to_tmc_gap_x: !Ref board_holder_pico_to_tmc_gap_x
+      board_holder_tmc_to_additional_pins_gap_x: !Ref board_holder_tmc_to_additional_pins_gap_x
       x_axis_mcu_dil_pitch: !Ref x_axis_mcu_dil_pitch
       board_holder_tpu_cover_thickness: !Ref board_holder_tpu_cover_thickness
       board_holder_tpu_cover_gap_above_base: !Ref board_holder_tpu_cover_gap_above_base

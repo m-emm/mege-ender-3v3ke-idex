@@ -60,6 +60,10 @@ Parameters:
     Type: Float
   board_holder_tmc_board_count:
     Type: Integer
+  board_holder_pico_to_tmc_gap_x:
+    Type: Float
+  board_holder_tmc_to_additional_pins_gap_x:
+    Type: Float
   x_axis_mcu_dil_pitch:
     Type: Float
   board_holder_tpu_cover_thickness:

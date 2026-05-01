@@ -116,7 +116,9 @@ globals:
   board_holder_mount_screw_size: "M3"
   board_holder_mount_screw_hole_inset: 2.5
   board_holder_tmc_board_count: 2
-  board_holder_tpu_cover_thickness: 1.0
+  board_holder_pico_to_tmc_gap_x: 11.43
+  board_holder_tmc_to_additional_pins_gap_x: 5
+  board_holder_tpu_cover_thickness: 1.4
   board_holder_tpu_cover_gap_above_base: 1.5
   board_holder_tpu_cover_pin_overlap_in_pitches: 0.5
   board_holder_tpu_cover_cross_strap_width_in_pitches: 1.0

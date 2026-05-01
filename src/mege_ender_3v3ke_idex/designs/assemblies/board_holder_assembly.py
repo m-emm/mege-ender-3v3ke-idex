@@ -473,51 +473,6 @@ def _get_named_tmc_holder_prefix(index):
     return f"tmc_{index + 1}"
 
 
-def _create_tmc_board_row(
-    *,
-    pico_board,
-    tmc_board_template,
-    tmc_board_count,
-):
-    if tmc_board_count < 1:
-        raise ValueError("tmc_board_count must be at least 1")
-
-    first_tmc_board = tmc_board_template.copy()
-    first_tmc_board = align(first_tmc_board, pico_board, Alignment.FRONT)
-
-    tmc_board_size = get_bounding_box_size(first_tmc_board)
-    pico_board_size = get_bounding_box_size(pico_board)
-    inter_board_gap = pico_board_size[1] - 2 * tmc_board_size[1]
-    if inter_board_gap < 0:
-        raise ValueError("TMC board row gap became negative")
-
-    tmc_board_pitch = tmc_board_size[1] + inter_board_gap
-
-    tmc_boards = []
-    previous_tmc_board = first_tmc_board
-    tmc_boards.append(previous_tmc_board)
-
-    for tmc_index in range(1, tmc_board_count):
-        current_tmc_board = tmc_board_template.copy()
-        current_tmc_board = align(
-            current_tmc_board,
-            previous_tmc_board,
-            Alignment.STACK_BACK,
-            stack_gap=inter_board_gap,
-        )
-        current_tmc_board = current_tmc_board.prefixed_copy(
-            _get_named_tmc_holder_prefix(tmc_index)
-        )
-        tmc_boards.append(current_tmc_board)
-        previous_tmc_board = current_tmc_board
-
-    tmc_board_row = tmc_boards[0]
-    for current_tmc_board in tmc_boards[1:]:
-        tmc_board_row = tmc_board_row.fuse(current_tmc_board)
-
-    return tmc_board_row, tmc_boards, tmc_board_pitch
-
-
 def create_board_holder_assembly(
     *,
     pico_w_board_assembly,
@@ -529,6 +484,8 @@ def create_board_holder_assembly(
     board_holder_mount_screw_size,
     board_holder_mount_screw_hole_inset,
     board_holder_tmc_board_count,
+    board_holder_pico_to_tmc_gap_x,
+    board_holder_tmc_to_additional_pins_gap_x,
     x_axis_mcu_dil_pitch,
     board_holder_tpu_cover_thickness,
     board_holder_tpu_cover_gap_above_base,
@@ -560,40 +517,95 @@ def create_board_holder_assembly(
         board_z_offset=board_holder_board_z_offset,
     )
 
-    tmc_boards, positioned_tmc_boards, tmc_board_pitch = _create_tmc_board_row(
-        pico_board=pico_board,
-        tmc_board_template=tmc_board_assembly,
-        tmc_board_count=board_holder_tmc_board_count,
+    if board_holder_tmc_board_count < 1:
+        raise ValueError("tmc_board_count must be at least 1")
+
+    pico_board_part = pico_board.get_follower_part_by_name("board")
+
+    first_tmc_board = tmc_board_assembly.copy()
+    first_tmc_board = first_tmc_board.aligned_from_follower(
+        "board",
+        pico_board_part,
+        Alignment.FRONT,
     )
+    first_tmc_board = first_tmc_board.aligned_from_follower(
+        "board",
+        pico_board_part,
+        Alignment.STACK_RIGHT,
+        stack_gap=board_holder_pico_to_tmc_gap_x,
+    )
+
+    tmc_board_size = get_bounding_box_size(
+        first_tmc_board.get_follower_part_by_name("board")
+    )
+    pico_board_size = get_bounding_box_size(pico_board_part)
+    # Keep the two-board row spanning the same front/back envelope as the Pico board.
+    inter_tmc_board_gap = pico_board_size[1] - 2 * tmc_board_size[1]
+    if inter_tmc_board_gap < 0:
+        raise ValueError("TMC board row gap became negative")
+
+    positioned_tmc_boards = [first_tmc_board]
+    tmc_boards = [first_tmc_board]
+    previous_tmc_board = first_tmc_board
+
+    for tmc_index in range(1, board_holder_tmc_board_count):
+        previous_tmc_board_part = previous_tmc_board.get_follower_part_by_name("board")
+        current_tmc_board = tmc_board_assembly.copy()
+        current_tmc_board = current_tmc_board.aligned_from_follower(
+            "board",
+            previous_tmc_board_part,
+            Alignment.CENTER,
+            axes=[0],
+        )
+        current_tmc_board = current_tmc_board.aligned_from_follower(
+            "board",
+            previous_tmc_board_part,
+            Alignment.STACK_BACK,
+            stack_gap=inter_tmc_board_gap,
+        )
+        positioned_tmc_boards.append(current_tmc_board)
+        tmc_boards.append(
+            current_tmc_board.prefixed_copy(_get_named_tmc_holder_prefix(tmc_index))
+        )
+        previous_tmc_board = current_tmc_board
+
+    positioned_tmc_board_row = _fuse_parts(tmc_boards)
     tmc_holder_reference = _create_board_holder(
-        board=tmc_boards,
+        board=positioned_tmc_board_row,
         base_plate_border=board_holder_base_plate_border,
         base_plate_thickness=board_holder_base_plate_thickness,
         board_z_offset=board_holder_board_z_offset,
     )
 
-    pico_holder_reference_bbox = get_bounding_box(pico_holder_reference)
-    tmc_holder_reference_bbox = get_bounding_box(tmc_holder_reference)
-    tmc_x_offset = pico_holder_reference_bbox[1][0] - tmc_holder_reference_bbox[0][0]
-
-    tmc_translation = translate(tmc_x_offset, 0, 0)
-    translated_tmc_board_row = tmc_translation(tmc_boards)
-    translated_tmc_boards = []
-    for current_tmc_board in positioned_tmc_boards:
-        translated_tmc_boards.append(tmc_translation(current_tmc_board))
-
-    holder_reference = pico_holder_reference.fuse(tmc_translation(tmc_holder_reference))
+    holder_reference = pico_holder_reference.fuse(tmc_holder_reference)
 
     additional_pins = additional_pins_assembly.copy()
-    additional_pins = align(
-        additional_pins, holder_reference, Alignment.CENTER, axes=[1]
+    additional_pins = additional_pins.aligned_from_follower(
+        "additional_pins_base_plate",
+        positioned_tmc_board_row,
+        Alignment.CENTER,
+        axes=[1],
     )
-    additional_pins = align(additional_pins, holder_reference, Alignment.STACK_RIGHT)
-    additional_pins = translate(0, 0, board_holder_board_z_offset)(additional_pins)
+    additional_pins = additional_pins.aligned_from_follower(
+        "additional_pins_base_plate",
+        positioned_tmc_board_row,
+        Alignment.STACK_RIGHT,
+        stack_gap=board_holder_tmc_to_additional_pins_gap_x,
+    )
+    additional_pins = additional_pins.aligned_from_follower(
+        "additional_pins_base_plate",
+        tmc_holder_reference,
+        Alignment.BOTTOM,
+    )
 
-    additional_pins_base_plate_bbox = materialize_bounding_box(additional_pins.leader)
+    additional_pins_base_plate = additional_pins.get_follower_part_by_name(
+        "additional_pins_base_plate"
+    )
+    additional_pins_base_plate_bbox = materialize_bounding_box(
+        additional_pins_base_plate
+    )
     enclosure_reference = pico_board.leaders_followers_fused().fuse(
-        translated_tmc_board_row.leaders_followers_fused()
+        positioned_tmc_board_row.leaders_followers_fused()
     )
     enclosure_reference = enclosure_reference.fuse(additional_pins_base_plate_bbox)
 
@@ -604,7 +616,7 @@ def create_board_holder_assembly(
         board_z_offset=board_holder_board_z_offset,
     )
     base_plate = pico_board.use_as_cutter_on(base_plate)
-    base_plate = translated_tmc_board_row.use_as_cutter_on(base_plate)
+    base_plate = positioned_tmc_board_row.use_as_cutter_on(base_plate)
     base_plate = base_plate.cut(additional_pins_base_plate_bbox)
 
     all_holders = LeaderFollowersCuttersPart(base_plate.fuse(additional_pins.leader))
@@ -619,7 +631,7 @@ def create_board_holder_assembly(
     tpu_cover, tpu_cover_strap_metadata = _create_tpu_cover(
         base_plate=all_holders.leader,
         pico_board=pico_board,
-        translated_tmc_boards=translated_tmc_boards,
+        translated_tmc_boards=positioned_tmc_boards,
         additional_pins=additional_pins,
         x_axis_mcu_dil_pitch=x_axis_mcu_dil_pitch,
         board_holder_tpu_cover_thickness=board_holder_tpu_cover_thickness,
@@ -660,7 +672,7 @@ def create_board_holder_assembly(
     for name, part in additional_pins_prefixed.get_named_non_production_part_items():
         all_holders.add_named_non_production_part(part, name)
 
-    for tmc_index, current_tmc_board in enumerate(translated_tmc_boards):
+    for tmc_index, current_tmc_board in enumerate(positioned_tmc_boards):
         all_holders = all_holders.merge_except_leader(
             current_tmc_board.prefixed_copy(
                 _get_named_tmc_board_visual_prefix(tmc_index)
