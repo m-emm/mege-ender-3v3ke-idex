@@ -4,48 +4,6 @@ from mege_ender_3v3ke_idex.designs.plug_and_hole import create_plug
 from shellforgepy.simple import *
 
 
-def _create_board_holder(
-    *,
-    board,
-    board_pcb=None,
-    board_pcb_follower_name="board",
-    board_cutting_part=None,
-    base_plate_border=7.0,
-    base_plate_x_size_override=None,
-    base_plate_thickness=3.1,
-    board_z_offset=0.005,
-):
-    if board_pcb is None:
-        board_pcb = board.get_follower_part_by_name(board_pcb_follower_name)
-
-    def cut_with_board(part):
-        if board_cutting_part is not None:
-            return part.cut(board_cutting_part)
-        if hasattr(board, "use_as_cutter_on"):
-            return board.use_as_cutter_on(part)
-        return part.cut(board)
-
-    board_size = get_bounding_box_size(board)
-
-    base_plate_size = (
-        (
-            base_plate_x_size_override
-            if base_plate_x_size_override is not None
-            else board_size[0] + 2 * base_plate_border
-        ),
-        board_size[1] + 2 * base_plate_border,
-        base_plate_thickness,
-    )
-
-    base_plate = create_box(*base_plate_size)
-    base_plate = align(base_plate, board, Alignment.CENTER, axes=[0, 1])
-    base_plate_bbox = get_bounding_box(base_plate)
-    base_plate = translate(0, 0, -base_plate_bbox[1][2] + board_z_offset)(base_plate)
-    base_plate = cut_with_board(base_plate)
-
-    return LeaderFollowersCuttersPart(base_plate)
-
-
 def _create_enclosing_base_plate(
     *,
     enclosure_reference,
@@ -510,12 +468,6 @@ def create_board_holder_assembly(
     """Create the simplified MCU board holder assembly."""
 
     pico_board = pico_w_board_assembly.copy()
-    pico_holder_reference = _create_board_holder(
-        board=pico_board,
-        base_plate_border=board_holder_base_plate_border,
-        base_plate_thickness=board_holder_base_plate_thickness,
-        board_z_offset=board_holder_board_z_offset,
-    )
 
     if board_holder_tmc_board_count < 1:
         raise ValueError("tmc_board_count must be at least 1")
@@ -526,7 +478,7 @@ def create_board_holder_assembly(
     first_tmc_board = first_tmc_board.aligned_from_follower(
         "board",
         pico_board_part,
-        Alignment.FRONT,
+        Alignment.BACK,
     )
     first_tmc_board = first_tmc_board.aligned_from_follower(
         "board",
@@ -560,7 +512,7 @@ def create_board_holder_assembly(
         current_tmc_board = current_tmc_board.aligned_from_follower(
             "board",
             previous_tmc_board_part,
-            Alignment.STACK_BACK,
+            Alignment.STACK_FRONT,
             stack_gap=inter_tmc_board_gap,
         )
         positioned_tmc_boards.append(current_tmc_board)
@@ -570,14 +522,7 @@ def create_board_holder_assembly(
         previous_tmc_board = current_tmc_board
 
     positioned_tmc_board_row = _fuse_parts(tmc_boards)
-    tmc_holder_reference = _create_board_holder(
-        board=positioned_tmc_board_row,
-        base_plate_border=board_holder_base_plate_border,
-        base_plate_thickness=board_holder_base_plate_thickness,
-        board_z_offset=board_holder_board_z_offset,
-    )
-
-    holder_reference = pico_holder_reference.fuse(tmc_holder_reference)
+    first_tmc_board_part = first_tmc_board.get_follower_part_by_name("board")
 
     additional_pins = additional_pins_assembly.copy()
     additional_pins = additional_pins.aligned_from_follower(
@@ -588,14 +533,9 @@ def create_board_holder_assembly(
     )
     additional_pins = additional_pins.aligned_from_follower(
         "additional_pins_base_plate",
-        positioned_tmc_board_row,
+        first_tmc_board_part,
         Alignment.STACK_RIGHT,
         stack_gap=board_holder_tmc_to_additional_pins_gap_x,
-    )
-    additional_pins = additional_pins.aligned_from_follower(
-        "additional_pins_base_plate",
-        tmc_holder_reference,
-        Alignment.BOTTOM,
     )
 
     additional_pins_base_plate = additional_pins.get_follower_part_by_name(
@@ -614,6 +554,17 @@ def create_board_holder_assembly(
         base_plate_border=board_holder_base_plate_border,
         base_plate_thickness=board_holder_base_plate_thickness,
         board_z_offset=board_holder_board_z_offset,
+    )
+    additional_pins = additional_pins.aligned_from_follower(
+        "additional_pins_base_plate",
+        base_plate,
+        Alignment.BOTTOM,
+    )
+    additional_pins_base_plate = additional_pins.get_follower_part_by_name(
+        "additional_pins_base_plate"
+    )
+    additional_pins_base_plate_bbox = materialize_bounding_box(
+        additional_pins_base_plate
     )
     base_plate = pico_board.use_as_cutter_on(base_plate)
     base_plate = positioned_tmc_board_row.use_as_cutter_on(base_plate)

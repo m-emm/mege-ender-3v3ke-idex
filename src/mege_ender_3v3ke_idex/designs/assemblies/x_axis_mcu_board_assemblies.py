@@ -503,6 +503,7 @@ def create_sil_clamp_assembly(
     )
     slit_cutter = align(slit_cutter, pins, Alignment.CENTER)
     base_plate = base_plate.cut(slit_cutter)
+    flat_base_plate = base_plate
 
     lip = create_right_triangle(
         lip_size,
@@ -524,7 +525,7 @@ def create_sil_clamp_assembly(
     base_plate = base_plate.fuse(lip_holder)
 
     retval = LeaderFollowersCuttersPart(base_plate)
-    retval.add_named_follower(base_plate, "additional_pins_base_plate")
+    retval.add_named_follower(flat_base_plate, "additional_pins_base_plate")
     retval.add_named_non_production_part(pins.leader, "pins")
     retval.add_named_non_production_part(
         pins.get_follower_part_by_name("top_pins"),
