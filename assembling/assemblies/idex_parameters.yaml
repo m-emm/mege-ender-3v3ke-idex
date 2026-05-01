@@ -106,7 +106,7 @@ globals:
   psu_mount_cable_clamp_clamp_screw_size: "M3"
   psu_mount_cable_clamp_clamp_screw_length: 14
 
-  board_holder_base_plate_border: 9.0
+  board_holder_base_plate_border: 11
   board_holder_base_plate_thickness: 3.1
   board_holder_board_z_offset: 0.005
   board_holder_leaf_spring_angle: 45

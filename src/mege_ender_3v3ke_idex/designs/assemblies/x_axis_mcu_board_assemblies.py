@@ -349,6 +349,9 @@ def create_tmc_board_assembly(
     )
     cooler = align(cooler, board_plain, Alignment.CENTER)
     cooler = align(cooler, board_plain, Alignment.STACK_TOP)
+    cooler = align(cooler, board_dil, Alignment.FRONT)
+    cooler = translate(0, x_axis_mcu_dil_pitch, 0)(cooler)
+
     retval = retval.fuse(cooler)
     retval.add_named_non_production_part(cooler, "cooler")
 

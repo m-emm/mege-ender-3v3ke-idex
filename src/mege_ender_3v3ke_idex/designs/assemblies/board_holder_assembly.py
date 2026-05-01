@@ -253,6 +253,17 @@ def _create_tpu_cover(
         strap_pin_indices=[3, 10, 17],
     )
 
+    connector_part = pico_board.get_non_production_part_by_name("micro_usb_socket")
+    connector_size = get_bounding_box_size(connector_part)
+    connector_window = materialize_bounding_box(
+        connector_part,
+        x_enlargement=0.5 * connector_size[0],
+        y_enlargement=2 * connector_size[1],
+        z_enlargement=board_holder_tpu_cover_thickness + 1.0,
+    )
+    connector_window = align(connector_window, connector_part, Alignment.FRONT)
+    cover = cover.cut(connector_window)
+
     for tmc_board in translated_tmc_boards:
         cover, current_tmc_strap_metadata = _cut_cover_window_for_dil_board(
             cover=cover,
@@ -262,20 +273,9 @@ def _create_tpu_cover(
             overlap_mm=overlap_mm,
             strap_width=strap_width,
             dil_pitch=x_axis_mcu_dil_pitch,
-            strap_pin_indices=[1,6],
+            strap_pin_indices=[5],
         )
         strap_metadata["tmc_boards"].append(current_tmc_strap_metadata)
-
-    additional_pins_bbox = get_bounding_box(additional_pins.get_named_non_production_part("pins"))
-    additional_pins_window = _create_cut_box_from_xy(
-        additional_pins_bbox[0][0],
-        additional_pins_bbox[1][0],
-        additional_pins_bbox[0][1],
-        additional_pins_bbox[1][1],
-        z_min=cover_z_min - 1.0,
-        z_height=board_holder_tpu_cover_thickness + 2.0,
-    )
-    cover = cover.cut(additional_pins_window)
 
     return cover, strap_metadata
 
@@ -304,6 +304,7 @@ def _create_cover_plugs(
     anchor_thickness = 1e-3
     lip_clearance_below_base = 0.1
     if board_holder_plug_positions is None:
+
         def create_default_plug_anchor(
             *,
             left_right_alignment=None,
@@ -623,7 +624,7 @@ def create_board_holder_assembly(
         x_axis_mcu_dil_pitch=x_axis_mcu_dil_pitch,
         board_holder_tpu_cover_thickness=board_holder_tpu_cover_thickness,
         board_holder_tpu_cover_gap_above_base=board_holder_tpu_cover_gap_above_base,
-        board_holder_tpu_cover_pin_overlap_in_pitches=board_holder_tpu_cover_pin_overlap_in_pitches,        
+        board_holder_tpu_cover_pin_overlap_in_pitches=board_holder_tpu_cover_pin_overlap_in_pitches,
         board_holder_tpu_cover_cross_strap_width_in_pitches=board_holder_tpu_cover_cross_strap_width_in_pitches,
     )
     tpu_cover, cover_plug_hole_cutters = _create_cover_plugs(
@@ -646,10 +647,9 @@ def create_board_holder_assembly(
         board_holder_plug_no_inner_hole=board_holder_plug_no_inner_hole,
         board_holder_plug_hole_slack=board_holder_plug_hole_slack,
     )
-    if cover_plug_hole_cutters:
-        cover_plug_holes = _fuse_parts(cover_plug_hole_cutters)
-        all_holders.leader = all_holders.leader.cut(cover_plug_holes)
-        all_holders.add_named_cutter(cover_plug_holes, "cover_plug_holes")
+    cover_plug_holes = _fuse_parts(cover_plug_hole_cutters)
+    all_holders.leader = all_holders.leader.cut(cover_plug_holes)
+    all_holders.add_named_cutter(cover_plug_holes, "cover_plug_holes")
     all_holders.add_named_follower(tpu_cover, "tpu_cover")
     all_holders.additional_data["tpu_cover_straps"] = tpu_cover_strap_metadata
 
