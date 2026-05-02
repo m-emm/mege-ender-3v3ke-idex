@@ -253,6 +253,26 @@ globals:
   creality_endstop_holder_board_clearance: 1.1
   creality_endstop_holder_screw_size: "M3"
   creality_endstop_holder_nut_cutter_slack: 0.2
+  mosfet_driver_board_length: 34
+  mosfet_driver_board_width: 17.3
+  mosfet_driver_board_thickness: 1.2
+  mosfet_driver_mount_hole_diameter: 2.4
+  mosfet_driver_mount_hole_edge_clearance: 0.7
+  mosfet_driver_terminal_block_length: 9.0
+  mosfet_driver_terminal_block_width: 7.7
+  mosfet_driver_terminal_block_height: 10
+  mosfet_driver_terminal_block_gap: 1.5
+  mosfet_driver_terminal_block_top_taper_height: 2.6
+  mosfet_driver_terminal_block_top_width: 6.4
+  mosfet_driver_terminal_block_window_side_margin: 0.8
+  mosfet_driver_terminal_block_window_center_divider: 1.1
+  mosfet_driver_terminal_block_window_bottom_lip: 1.0
+  mosfet_driver_terminal_block_window_top_lip: 0.7
+  mosfet_driver_terminal_block_window_back_wall: 1.0
+  mosfet_driver_package_length: 6.9
+  mosfet_driver_package_width: 6.1
+  mosfet_driver_package_height: 2.4
+  mosfet_driver_package_gap_to_terminal_block: 1.2
   endstop_holder_stack_gap: 30
   z_axis_guide_distance: 256
   z_axis_y_offset: 130

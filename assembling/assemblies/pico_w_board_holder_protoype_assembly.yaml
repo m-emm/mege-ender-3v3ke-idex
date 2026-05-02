@@ -7,9 +7,10 @@ Builder:
     preview:
       enabled: true
       views:
-        - front_angle
         - isometric
         - top
+        - left
+        - front
       width: 512
       height: 512
     parts:

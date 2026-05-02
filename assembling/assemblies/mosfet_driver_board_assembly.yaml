@@ -1,0 +1,69 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the MOSFET driver board
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - left
+        - front
+        - back
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+
+Parameters:
+  mosfet_driver_board_length:
+    Type: Float
+  mosfet_driver_board_width:
+    Type: Float
+  mosfet_driver_board_thickness:
+    Type: Float
+  mosfet_driver_mount_hole_diameter:
+    Type: Float
+  mosfet_driver_mount_hole_edge_clearance:
+    Type: Float
+  mosfet_driver_terminal_block_length:
+    Type: Float
+  mosfet_driver_terminal_block_width:
+    Type: Float
+  mosfet_driver_terminal_block_height:
+    Type: Float
+  mosfet_driver_terminal_block_gap:
+    Type: Float
+  mosfet_driver_terminal_block_top_taper_height:
+    Type: Float
+  mosfet_driver_terminal_block_top_width:
+    Type: Float
+  mosfet_driver_terminal_block_window_side_margin:
+    Type: Float
+  mosfet_driver_terminal_block_window_center_divider:
+    Type: Float
+  mosfet_driver_terminal_block_window_bottom_lip:
+    Type: Float
+  mosfet_driver_terminal_block_window_top_lip:
+    Type: Float
+  mosfet_driver_terminal_block_window_back_wall:
+    Type: Float
+  mosfet_driver_package_length:
+    Type: Float
+  mosfet_driver_package_width:
+    Type: Float
+  mosfet_driver_package_height:
+    Type: Float
+  mosfet_driver_package_gap_to_terminal_block:
+    Type: Float
+
+Parts:
+  MosfetDriverBoardAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.mosfet_driver_board_assembly.create_mosfet_driver_board_assembly

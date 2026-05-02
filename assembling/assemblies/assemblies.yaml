@@ -695,6 +695,32 @@ assemblies:
     resource_file: creality_endstop_board_assembly.yaml
     depends_on: []
 
+  - name: mosfet_driver_board_assembly
+
+    resource_file: mosfet_driver_board_assembly.yaml
+    depends_on: []
+    parameters:
+      mosfet_driver_board_length: !Ref mosfet_driver_board_length
+      mosfet_driver_board_width: !Ref mosfet_driver_board_width
+      mosfet_driver_board_thickness: !Ref mosfet_driver_board_thickness
+      mosfet_driver_mount_hole_diameter: !Ref mosfet_driver_mount_hole_diameter
+      mosfet_driver_mount_hole_edge_clearance: !Ref mosfet_driver_mount_hole_edge_clearance
+      mosfet_driver_terminal_block_length: !Ref mosfet_driver_terminal_block_length
+      mosfet_driver_terminal_block_width: !Ref mosfet_driver_terminal_block_width
+      mosfet_driver_terminal_block_height: !Ref mosfet_driver_terminal_block_height
+      mosfet_driver_terminal_block_gap: !Ref mosfet_driver_terminal_block_gap
+      mosfet_driver_terminal_block_top_taper_height: !Ref mosfet_driver_terminal_block_top_taper_height
+      mosfet_driver_terminal_block_top_width: !Ref mosfet_driver_terminal_block_top_width
+      mosfet_driver_terminal_block_window_side_margin: !Ref mosfet_driver_terminal_block_window_side_margin
+      mosfet_driver_terminal_block_window_center_divider: !Ref mosfet_driver_terminal_block_window_center_divider
+      mosfet_driver_terminal_block_window_bottom_lip: !Ref mosfet_driver_terminal_block_window_bottom_lip
+      mosfet_driver_terminal_block_window_top_lip: !Ref mosfet_driver_terminal_block_window_top_lip
+      mosfet_driver_terminal_block_window_back_wall: !Ref mosfet_driver_terminal_block_window_back_wall
+      mosfet_driver_package_length: !Ref mosfet_driver_package_length
+      mosfet_driver_package_width: !Ref mosfet_driver_package_width
+      mosfet_driver_package_height: !Ref mosfet_driver_package_height
+      mosfet_driver_package_gap_to_terminal_block: !Ref mosfet_driver_package_gap_to_terminal_block
+
   - name: creality_endstop_holder_assembly
 
     resource_file: creality_endstop_holder_assembly.yaml
