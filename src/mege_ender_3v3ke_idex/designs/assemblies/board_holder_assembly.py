@@ -548,7 +548,7 @@ def create_board_holder_assembly(
 
     positioned_mosfet_driver_board = None
     if mosfet_driver_board_assembly is not None:
-        positioned_mosfet_driver_board = rotate(90)(mosfet_driver_board_assembly)
+        positioned_mosfet_driver_board = rotate(-90)(mosfet_driver_board_assembly)
 
         positioned_mosfet_driver_board = (
             positioned_mosfet_driver_board.aligned_from_follower(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
@@ -86,6 +87,246 @@ def _transform_positions_for_view(
 def _add_text(parent: ET.Element, content: str, **attrs: str) -> None:
     text_node = ET.SubElement(parent, "text", attrs)
     text_node.text = content
+
+
+def _rotate_point(
+    point_x: float,
+    point_y: float,
+    *,
+    origin_x: float,
+    origin_y: float,
+    angle_degrees: float,
+) -> tuple[float, float]:
+    angle_radians = math.radians(angle_degrees)
+    translated_x = point_x - origin_x
+    translated_y = point_y - origin_y
+    rotated_x = translated_x * math.cos(angle_radians) - translated_y * math.sin(
+        angle_radians
+    )
+    rotated_y = translated_x * math.sin(angle_radians) + translated_y * math.cos(
+        angle_radians
+    )
+    return rotated_x + origin_x, rotated_y + origin_y
+
+
+def _estimate_text_bbox(
+    content: str,
+    *,
+    x: float,
+    y: float,
+    font_size: float,
+    text_anchor: str,
+    rotation_degrees: float = 0.0,
+) -> tuple[float, float, float, float]:
+    width = max(len(content), 1) * font_size * 0.62
+    ascent = font_size * 0.82
+    descent = font_size * 0.28
+
+    if text_anchor == "start":
+        left = x
+        right = x + width
+    elif text_anchor == "end":
+        left = x - width
+        right = x
+    else:
+        left = x - (width / 2.0)
+        right = x + (width / 2.0)
+
+    top = y - ascent
+    bottom = y + descent
+    corners = [
+        (left, top),
+        (right, top),
+        (right, bottom),
+        (left, bottom),
+    ]
+
+    if rotation_degrees:
+        corners = [
+            _rotate_point(
+                px, py, origin_x=x, origin_y=y, angle_degrees=rotation_degrees
+            )
+            for px, py in corners
+        ]
+
+    xs = [px for px, _ in corners]
+    ys = [py for _, py in corners]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _rectangles_overlap(
+    left: tuple[float, float, float, float],
+    right: tuple[float, float, float, float],
+    *,
+    padding: float = 0.0,
+) -> bool:
+    return not (
+        left[2] + padding <= right[0]
+        or right[2] + padding <= left[0]
+        or left[3] + padding <= right[1]
+        or right[3] + padding <= left[1]
+    )
+
+
+def _build_label_candidates(
+    *,
+    name: str,
+    cx: int,
+    cy: int,
+    pin_radius: int,
+    has_left_neighbor: bool,
+    has_right_neighbor: bool,
+    has_top_neighbor: bool,
+    has_bottom_neighbor: bool,
+    flip_x: bool,
+) -> list[dict[str, str | float]]:
+    candidates: list[dict[str, str | float]] = []
+
+    is_horizontal_row = (
+        (has_left_neighbor or has_right_neighbor)
+        and not has_top_neighbor
+        and not has_bottom_neighbor
+    )
+
+    if is_horizontal_row:
+        primary_anchor = "start" if not flip_x else "end"
+        primary_x = cx + pin_radius + 2 if not flip_x else cx - pin_radius - 2
+        primary_angle = -45.0 if not flip_x else 45.0
+        base_y = cy - pin_radius - 6
+        for lift in (0, 12, 24, 36):
+            candidates.append(
+                {
+                    "x": primary_x,
+                    "y": base_y - lift,
+                    "font_size": 11.0,
+                    "text_anchor": primary_anchor,
+                    "rotation_degrees": primary_angle,
+                }
+            )
+
+        secondary_anchor = "end" if not flip_x else "start"
+        secondary_x = cx - pin_radius - 2 if not flip_x else cx + pin_radius + 2
+        secondary_angle = 45.0 if not flip_x else -45.0
+        for lift in (0, 12):
+            candidates.append(
+                {
+                    "x": secondary_x,
+                    "y": base_y - lift,
+                    "font_size": 11.0,
+                    "text_anchor": secondary_anchor,
+                    "rotation_degrees": secondary_angle,
+                }
+            )
+
+    if not has_right_neighbor and not flip_x:
+        candidates.append(
+            {
+                "x": cx + pin_radius + 5,
+                "y": cy + 4,
+                "font_size": 12.0,
+                "text_anchor": "start",
+                "rotation_degrees": 0.0,
+            }
+        )
+    if not has_left_neighbor and flip_x:
+        candidates.append(
+            {
+                "x": cx - pin_radius - 5,
+                "y": cy + 4,
+                "font_size": 12.0,
+                "text_anchor": "end",
+                "rotation_degrees": 0.0,
+            }
+        )
+    if not has_left_neighbor:
+        candidates.append(
+            {
+                "x": cx - pin_radius - 5,
+                "y": cy + 4,
+                "font_size": 12.0,
+                "text_anchor": "end",
+                "rotation_degrees": 0.0,
+            }
+        )
+    if not has_top_neighbor:
+        candidates.append(
+            {
+                "x": cx,
+                "y": cy - pin_radius - 8,
+                "font_size": 12.0,
+                "text_anchor": "middle",
+                "rotation_degrees": 0.0,
+            }
+        )
+    if not has_bottom_neighbor:
+        candidates.append(
+            {
+                "x": cx,
+                "y": cy + pin_radius + 16,
+                "font_size": 12.0,
+                "text_anchor": "middle",
+                "rotation_degrees": 0.0,
+            }
+        )
+
+    for lift in (0, 10, 20):
+        y_offset = cy - pin_radius - 8 - lift
+        candidates.append(
+            {
+                "x": cx,
+                "y": y_offset,
+                "font_size": 11.0,
+                "text_anchor": "middle",
+                "rotation_degrees": -30.0 if not flip_x else 30.0,
+            }
+        )
+
+    return candidates
+
+
+def _select_label_candidate(
+    *,
+    name: str,
+    candidates: list[dict[str, str | float]],
+    occupied_rectangles: list[tuple[float, float, float, float]],
+) -> tuple[dict[str, str | float], tuple[float, float, float, float]]:
+    best_candidate = candidates[0]
+    best_bbox = _estimate_text_bbox(
+        name,
+        x=float(best_candidate["x"]),
+        y=float(best_candidate["y"]),
+        font_size=float(best_candidate["font_size"]),
+        text_anchor=str(best_candidate["text_anchor"]),
+        rotation_degrees=float(best_candidate["rotation_degrees"]),
+    )
+    best_collision_score = sum(
+        1
+        for rectangle in occupied_rectangles
+        if _rectangles_overlap(best_bbox, rectangle, padding=4.0)
+    )
+
+    for candidate in candidates:
+        candidate_bbox = _estimate_text_bbox(
+            name,
+            x=float(candidate["x"]),
+            y=float(candidate["y"]),
+            font_size=float(candidate["font_size"]),
+            text_anchor=str(candidate["text_anchor"]),
+            rotation_degrees=float(candidate["rotation_degrees"]),
+        )
+        collision_score = sum(
+            1
+            for rectangle in occupied_rectangles
+            if _rectangles_overlap(candidate_bbox, rectangle, padding=4.0)
+        )
+        if collision_score == 0:
+            return candidate, candidate_bbox
+        if collision_score < best_collision_score:
+            best_candidate = candidate
+            best_bbox = candidate_bbox
+            best_collision_score = collision_score
+
+    return best_candidate, best_bbox
 
 
 def generate_routed_svg(
@@ -216,6 +457,20 @@ def generate_routed_svg(
         )
 
     pin_radius = 6
+    pin_rectangles = []
+    for x, y in actual_pin_positions.values():
+        cx = int((x + coord_shift_x) * grid_size)
+        cy = int((y + coord_shift_y) * grid_size)
+        pin_rectangles.append(
+            (
+                cx - pin_radius - 2,
+                cy - pin_radius - 2,
+                cx + pin_radius + 2,
+                cy + pin_radius + 2,
+            )
+        )
+
+    placed_label_rectangles: list[tuple[float, float, float, float]] = []
     for name, (x, y) in actual_pin_positions.items():
         cx = int((x + coord_shift_x) * grid_size)
         cy = int((y + coord_shift_y) * grid_size)
@@ -248,81 +503,44 @@ def generate_routed_svg(
             for other, (ox, oy) in actual_pin_positions.items()
         )
 
-        if not has_right_neighbor and not flip_x:
-            _add_text(
-                root,
-                name,
-                x=str(cx + pin_radius + 5),
-                y=str(cy + 4),
-                **{
-                    "font-size": "12px",
-                    "font-family": "monospace",
-                    "text-anchor": "start",
-                },
+        label_candidates = _build_label_candidates(
+            name=name,
+            cx=cx,
+            cy=cy,
+            pin_radius=pin_radius,
+            has_left_neighbor=has_left_neighbor,
+            has_right_neighbor=has_right_neighbor,
+            has_top_neighbor=has_top_neighbor,
+            has_bottom_neighbor=has_bottom_neighbor,
+            flip_x=flip_x,
+        )
+        label_candidate, label_bbox = _select_label_candidate(
+            name=name,
+            candidates=label_candidates,
+            occupied_rectangles=[*pin_rectangles, *placed_label_rectangles],
+        )
+
+        label_attrs = {
+            "font-size": f"{int(float(label_candidate['font_size']))}px",
+            "font-family": "monospace",
+            "text-anchor": str(label_candidate["text_anchor"]),
+        }
+        rotation_degrees = float(label_candidate["rotation_degrees"])
+        label_x = float(label_candidate["x"])
+        label_y = float(label_candidate["y"])
+        if rotation_degrees:
+            label_attrs["transform"] = (
+                f"rotate({rotation_degrees:g},{label_x:g},{label_y:g})"
             )
-        elif not has_left_neighbor and flip_x:
-            _add_text(
-                root,
-                name,
-                x=str(cx - pin_radius - 5),
-                y=str(cy + 4),
-                **{
-                    "font-size": "12px",
-                    "font-family": "monospace",
-                    "text-anchor": "end",
-                },
-            )
-        elif not has_left_neighbor:
-            _add_text(
-                root,
-                name,
-                x=str(cx - pin_radius - 5),
-                y=str(cy + 4),
-                **{
-                    "font-size": "12px",
-                    "font-family": "monospace",
-                    "text-anchor": "end",
-                },
-            )
-        elif not has_top_neighbor:
-            _add_text(
-                root,
-                name,
-                x=str(cx),
-                y=str(cy - pin_radius - 8),
-                **{
-                    "font-size": "12px",
-                    "font-family": "monospace",
-                    "text-anchor": "middle",
-                },
-            )
-        elif not has_bottom_neighbor:
-            _add_text(
-                root,
-                name,
-                x=str(cx),
-                y=str(cy + pin_radius + 16),
-                **{
-                    "font-size": "12px",
-                    "font-family": "monospace",
-                    "text-anchor": "middle",
-                },
-            )
-        else:
-            angle = -30 if not flip_x else 30
-            y_offset = cy - pin_radius - 8
-            _add_text(
-                root,
-                name,
-                x=str(cx),
-                y=str(y_offset),
-                **{
-                    "font-size": "11px",
-                    "font-family": "monospace",
-                    "text-anchor": "middle",
-                    "transform": f"rotate({angle},{cx},{y_offset})",
-                },
-            )
+
+        _add_text(
+            root,
+            name,
+            x=f"{label_x:g}",
+            y=f"{label_y:g}",
+            **label_attrs,
+        )
+        placed_label_rectangles.append(label_bbox)
 
     label_x = vb_w - 20
     label_y = 30

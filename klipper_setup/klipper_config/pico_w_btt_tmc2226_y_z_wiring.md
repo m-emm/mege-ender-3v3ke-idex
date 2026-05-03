@@ -33,6 +33,9 @@ Suggested auxiliary signal pins:
 | Y endstop | `GP4` | Mechanical Y endstop input |
 | Z left endstop | `GP22` | Left Z endstop input |
 | Z right endstop | `GP17` | Right Z endstop input |
+| Heatbed MOSFET gate | `GP21` | Heatbed on/off digital control |
+| Heatbed thermistor signal | `GP26` / `ADC0` | Analog thermistor input |
+| Heatbed thermistor ground | `AGND` | Analog ground return |
 
 ## Shared power and logic wiring
 
@@ -50,6 +53,7 @@ Important:
 - Each motor keeps its own four coil wires on its own driver output.
 - The two Z motors are electrically independent because they use two drivers, which keeps them compatible with dual-Z stepper configuration in Klipper.
 - The two Z endstops are also electrically independent, with one signal line per side.
+- The heatbed MOSFET control is a single digital output line, while the heatbed thermistor uses a dedicated ADC input and analog ground.
 
 ## Klipper mapping summary
 
