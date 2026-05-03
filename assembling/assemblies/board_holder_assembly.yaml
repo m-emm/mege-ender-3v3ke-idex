@@ -37,12 +37,19 @@ Builder:
           - tpu_cover
         name_template: "{name}"
         flip: true
+      - source: self
+        artifact: followers
+        names:
+          - side_walls
+        name_template: "{name}"
+        flip: false
     arrange:
       export_individual_parts: false
       plates:
         - name: board_holder_base
           parts:
             - board_holder
+            - side_walls
         - name: board_holder_tpu_cover
           process_data_preset: tpu_minimal_quality_minimal_strength_06
           parts:

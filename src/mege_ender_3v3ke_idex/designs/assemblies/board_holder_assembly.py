@@ -1,6 +1,7 @@
 """Assembly wrapper for the simplified MCU board holder."""
 
 from mege_ender_3v3ke_idex.designs.plug_and_hole import create_plug
+from mege_ender_3v3ke_idex.designs.trellis_plate import create_trellis_plate
 from shellforgepy.simple import *
 
 
@@ -447,35 +448,6 @@ def _create_cover_plugs(
     return cover_with_plugs, hole_cutters
 
 
-def _cut_mount_screw_holes(
-    *,
-    holder,
-    mount_screw_size,
-    mount_screw_hole_inset,
-    big_thing,
-):
-    mount_screw_holes = PartCollector()
-    for left_right_alignment in [Alignment.LEFT, Alignment.RIGHT]:
-        for front_back_alignment in [Alignment.FRONT, Alignment.BACK]:
-            screw_hole = create_cylinder(
-                MScrew.from_size(mount_screw_size).clearance_hole_normal / 2,
-                big_thing,
-            )
-            screw_hole = align(screw_hole, holder, Alignment.CENTER)
-            screw_hole = align(screw_hole, holder, left_right_alignment)
-            screw_hole = align(screw_hole, holder, front_back_alignment)
-            screw_hole = translate(
-                -left_right_alignment.sign * mount_screw_hole_inset,
-                -front_back_alignment.sign * mount_screw_hole_inset,
-                0,
-            )(screw_hole)
-            mount_screw_holes = mount_screw_holes.fuse(screw_hole)
-
-    holder = holder.cut(mount_screw_holes)
-    holder.add_named_cutter(mount_screw_holes, "mount_screw_holes")
-    return holder
-
-
 def _get_named_tmc_board_visual_prefix(index):
     if index == 0:
         return "tmc_board"
@@ -671,13 +643,6 @@ def create_board_holder_assembly(
 
     all_holders = LeaderFollowersCuttersPart(base_plate.fuse(additional_pins.leader))
 
-    all_holders = _cut_mount_screw_holes(
-        holder=all_holders,
-        mount_screw_size=board_holder_mount_screw_size,
-        mount_screw_hole_inset=board_holder_mount_screw_hole_inset,
-        big_thing=BIG_THING,
-    )
-
     tpu_cover, tpu_cover_strap_metadata = _create_tpu_cover(
         base_plate=all_holders.leader,
         pico_board=pico_board,
@@ -734,5 +699,150 @@ def create_board_holder_assembly(
         all_holders = all_holders.merge_except_leader(
             positioned_mosfet_driver_board.prefixed_copy("mosfet_driver_board")
         )
+
+    base_plate_cutter = materialize_bounding_box(all_holders)
+
+    side_wall_thickness = 2.2
+    side_wall_height = 40
+    mount_plate_extension = 7
+    side_wall_clearance = 0.6
+    side_wall_border = 1
+    trelllis_band_width = 3
+    trellis_band_fillet_radius = 0.05
+    trelllis_band_pitch = 8
+
+    base_plate_enlargement = materialize_bounding_box(
+        all_holders,
+        x_enlargement=2 * mount_plate_extension,
+        y_enlargement=2 * mount_plate_extension,
+    )
+
+    base_plate_enlargement = base_plate_enlargement.cut(base_plate_cutter)
+    all_holders = all_holders.fuse(base_plate_enlargement)
+
+    base_plate_size = get_bounding_box_size(all_holders)
+
+    def create_side_wall(
+        length,
+        width,
+        thickness,
+        x_border_width,
+        y_border_width,
+        band_width,
+        band_pitch,
+        hole_fillet_radius=None,
+    ):
+        # side_wall = create_box(length, width, thickness)
+        # return side_wall
+
+        side_wall = create_trellis_plate(
+            length,
+            width,
+            thickness,
+            x_border_width=x_border_width,
+            y_border_width=y_border_width,
+            band_width=band_width,
+            band_pitch=band_pitch,
+            hole_fillet_radius=hole_fillet_radius,
+        )
+        return side_wall
+
+    side_walls = PartCollector()
+    for fb in [Alignment.FRONT, Alignment.BACK]:
+
+        side_wall = create_side_wall(
+            base_plate_size[0] + 2 * side_wall_thickness + 2 * side_wall_clearance,
+            side_wall_height + board_holder_base_plate_thickness,
+            side_wall_thickness,
+            x_border_width=side_wall_border,
+            y_border_width=side_wall_border,
+            band_width=trelllis_band_width,
+            band_pitch=trelllis_band_pitch,
+            hole_fillet_radius=trellis_band_fillet_radius,
+        )
+        side_wall = rotate(90, axis=(1, 0, 0))(side_wall)
+        side_wall = align(side_wall, all_holders, Alignment.CENTER, axes=[0])
+        side_wall = align(
+            side_wall, all_holders, fb.stack_alignment, stack_gap=side_wall_clearance
+        )
+        side_wall = align(side_wall, all_holders, Alignment.CENTER, axes=[2])
+        side_walls = side_walls.fuse(side_wall)
+
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+
+        side_wall = create_side_wall(
+            base_plate_size[1] + 2 * side_wall_thickness + 2 * side_wall_clearance,
+            side_wall_height + board_holder_base_plate_thickness,
+            side_wall_thickness,
+            x_border_width=side_wall_border,
+            y_border_width=side_wall_border,
+            band_width=trelllis_band_width,
+            band_pitch=trelllis_band_pitch,
+            hole_fillet_radius=trellis_band_fillet_radius,
+        )
+        side_wall = rotate(90, axis=(1, 0, 0))(side_wall)
+        side_wall = rotate(90)(side_wall)
+
+        side_wall = align(side_wall, all_holders, Alignment.CENTER, axes=[1])
+        side_wall = align(
+            side_wall, all_holders, lr.stack_alignment, stack_gap=side_wall_clearance
+        )
+        side_wall = align(side_wall, all_holders, Alignment.CENTER, axes=[2])
+        side_walls = side_walls.fuse(side_wall)
+
+    mount_screw_hole_diameter = MScrew.from_size(
+        board_holder_mount_screw_size
+    ).clearance_hole_normal
+    mount_screw_holes = PartCollector()
+    for left_right_alignment in [Alignment.LEFT, Alignment.RIGHT]:
+        for front_back_alignment in [Alignment.FRONT, Alignment.BACK]:
+            screw_hole = create_cylinder(
+                mount_screw_hole_diameter / 2,
+                BIG_THING,
+            )
+            screw_hole = align(screw_hole, all_holders, Alignment.CENTER)
+            screw_hole = align(screw_hole, all_holders, left_right_alignment)
+            screw_hole = align(screw_hole, all_holders, front_back_alignment)
+            screw_hole = translate(
+                -left_right_alignment.sign * board_holder_mount_screw_hole_inset,
+                -front_back_alignment.sign * board_holder_mount_screw_hole_inset,
+                0,
+            )(screw_hole)
+            mount_screw_holes = mount_screw_holes.fuse(screw_hole)
+
+    all_holders = all_holders.cut(mount_screw_holes)
+    all_holders.add_named_cutter(mount_screw_holes, "mount_screw_holes")
+
+    walls_bottom_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    walls_bottom_cutter = align(walls_bottom_cutter, side_walls, Alignment.CENTER)
+    walls_bottom_cutter = align(walls_bottom_cutter, side_walls, Alignment.STACK_BOTTOM)
+
+    mount_posts = PartCollector()
+    mount_post_size = (
+        2 * mount_screw_hole_diameter
+        + board_holder_mount_screw_hole_inset
+        + side_wall_clearance
+    )
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+            mount_post = create_box(mount_post_size, mount_post_size, BIG_THING)
+            mount_post = align(mount_post, side_walls, Alignment.CENTER)
+            mount_post = align(mount_post, side_walls, lr)
+            mount_post = align(mount_post, side_walls, fb)
+            mount_post = align(mount_post, all_holders, Alignment.STACK_BOTTOM)
+            mount_post = mount_post.cut(walls_bottom_cutter)
+            mount_posts = mount_posts.fuse(mount_post)
+
+    connector_part = pico_board.get_non_production_part_by_name("micro_usb_socket")
+    usb_cable_cutter = create_box(10, BIG_THING, 10)
+
+    usb_cable_cutter = align(usb_cable_cutter, connector_part, Alignment.CENTER)
+
+    # side_walls = side_walls.cut(usb_cable_cutter)
+
+    side_walls = side_walls.fuse(mount_posts)
+    side_walls = side_walls.cut(mount_screw_holes)
+
+    all_holders.add_named_follower(side_walls, "side_walls")
 
     return all_holders

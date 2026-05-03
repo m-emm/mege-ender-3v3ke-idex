@@ -42,7 +42,7 @@ def create_trellis_plate(
 
     base = create_box(length, width, thickness)
 
-    cutter_template_size = band_pitch - 2 * band_width
+    cutter_template_size = band_pitch - band_width
     if hole_fillet_radius is not None:
 
         trellis_cutter_template = create_filleted_box(
@@ -110,16 +110,23 @@ def main():
 
     # Create the part
     part = create_trellis_plate(
-        length=400,
-        width=50,
+        length=50,
+        width=40,
         thickness=5,
-        x_border_width=5,
-        y_border_width=5,
-        band_width=5,
-        band_pitch=30,
+        x_border_width=2,
+        y_border_width=2,
+        band_width=1,
+        band_pitch=10,
         hole_fillet_radius=2,
     )
     parts.add(part, "trellis_plate", flip=False)
+
+    band = create_box(50, 1, 1)
+    band = rotate(45)(band)
+    band = align(band, part, Alignment.CENTER)
+    band = align(band, part, Alignment.STACK_TOP, stack_gap=3)
+
+    parts.add(band, "band", flip=False)
 
     # Arrange and export
     arrange_and_export(
