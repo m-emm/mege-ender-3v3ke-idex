@@ -703,10 +703,11 @@ def create_board_holder_assembly(
     base_plate_cutter = materialize_bounding_box(all_holders)
 
     side_wall_thickness = 2.2
-    side_wall_height = 40
+    side_wall_top_height = 22
+    side_wall_bottom_height = 20
     mount_plate_extension = 7
     side_wall_clearance = 0.6
-    side_wall_border = 1
+    side_wall_trellis_border = 3
     trelllis_band_width = 3
     trellis_band_fillet_radius = 0.05
     trelllis_band_pitch = 8
@@ -750,45 +751,86 @@ def create_board_holder_assembly(
     side_walls = PartCollector()
     for fb in [Alignment.FRONT, Alignment.BACK]:
 
-        side_wall = create_side_wall(
+        side_wall_top = create_side_wall(
             base_plate_size[0] + 2 * side_wall_thickness + 2 * side_wall_clearance,
-            side_wall_height + board_holder_base_plate_thickness,
+            side_wall_top_height + board_holder_base_plate_thickness,
             side_wall_thickness,
-            x_border_width=side_wall_border,
-            y_border_width=side_wall_border,
+            x_border_width=side_wall_trellis_border,
+            y_border_width=side_wall_trellis_border,
             band_width=trelllis_band_width,
             band_pitch=trelllis_band_pitch,
             hole_fillet_radius=trellis_band_fillet_radius,
         )
-        side_wall = rotate(90, axis=(1, 0, 0))(side_wall)
-        side_wall = align(side_wall, all_holders, Alignment.CENTER, axes=[0])
-        side_wall = align(
-            side_wall, all_holders, fb.stack_alignment, stack_gap=side_wall_clearance
+        side_wall_top = rotate(90, axis=(1, 0, 0))(side_wall_top)
+        side_wall_top = align(side_wall_top, all_holders, Alignment.CENTER, axes=[0])
+        side_wall_top = align(
+            side_wall_top,
+            all_holders,
+            fb.stack_alignment,
+            stack_gap=side_wall_clearance,
         )
-        side_wall = align(side_wall, all_holders, Alignment.CENTER, axes=[2])
-        side_walls = side_walls.fuse(side_wall)
+        side_wall_top = align(side_wall_top, all_holders, Alignment.BOTTOM)
+        side_walls = side_walls.fuse(side_wall_top)
+
+        side_wall_bottom = create_box(
+            base_plate_size[0] + 2 * side_wall_thickness + 2 * side_wall_clearance,
+            side_wall_thickness,
+            side_wall_bottom_height,
+        )
+        side_wall_bottom = align(
+            side_wall_bottom, all_holders, Alignment.CENTER, axes=[0]
+        )
+        side_wall_bottom = align(
+            side_wall_bottom,
+            all_holders,
+            fb.stack_alignment,
+            stack_gap=side_wall_clearance,
+        )
+        side_wall_bottom = align(side_wall_bottom, all_holders, Alignment.STACK_BOTTOM)
+        side_walls = side_walls.fuse(side_wall_bottom)
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
-        side_wall = create_side_wall(
+        side_wall_top = create_side_wall(
             base_plate_size[1] + 2 * side_wall_thickness + 2 * side_wall_clearance,
-            side_wall_height + board_holder_base_plate_thickness,
+            side_wall_top_height + board_holder_base_plate_thickness,
             side_wall_thickness,
-            x_border_width=side_wall_border,
-            y_border_width=side_wall_border,
+            x_border_width=side_wall_trellis_border,
+            y_border_width=side_wall_trellis_border,
             band_width=trelllis_band_width,
             band_pitch=trelllis_band_pitch,
             hole_fillet_radius=trellis_band_fillet_radius,
         )
-        side_wall = rotate(90, axis=(1, 0, 0))(side_wall)
-        side_wall = rotate(90)(side_wall)
+        side_wall_top = rotate(90, axis=(1, 0, 0))(side_wall_top)
+        side_wall_top = rotate(90)(side_wall_top)
 
-        side_wall = align(side_wall, all_holders, Alignment.CENTER, axes=[1])
-        side_wall = align(
-            side_wall, all_holders, lr.stack_alignment, stack_gap=side_wall_clearance
+        side_wall_top = align(side_wall_top, all_holders, Alignment.CENTER, axes=[1])
+        side_wall_top = align(
+            side_wall_top,
+            all_holders,
+            lr.stack_alignment,
+            stack_gap=side_wall_clearance,
         )
-        side_wall = align(side_wall, all_holders, Alignment.CENTER, axes=[2])
-        side_walls = side_walls.fuse(side_wall)
+        side_wall_top = align(side_wall_top, all_holders, Alignment.BOTTOM)
+        side_walls = side_walls.fuse(side_wall_top)
+
+        side_wall_bottom = create_box(
+            side_wall_thickness,
+            base_plate_size[1] + 2 * side_wall_thickness + 2 * side_wall_clearance,
+            side_wall_bottom_height,
+        )
+
+        side_wall_bottom = align(
+            side_wall_bottom, all_holders, Alignment.CENTER, axes=[1]
+        )
+        side_wall_bottom = align(
+            side_wall_bottom,
+            all_holders,
+            lr.stack_alignment,
+            stack_gap=side_wall_clearance,
+        )
+        side_wall_bottom = align(side_wall_bottom, all_holders, Alignment.STACK_BOTTOM)
+        side_walls = side_walls.fuse(side_wall_bottom)
 
     mount_screw_hole_diameter = MScrew.from_size(
         board_holder_mount_screw_size
