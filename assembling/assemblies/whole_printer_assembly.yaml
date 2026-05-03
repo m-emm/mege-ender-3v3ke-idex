@@ -8,11 +8,11 @@ Builder:
     preview:
       enabled: true
       views:
-        - front_angle
         - isometric
         - front
         - top
         - left
+        - bottom
       width: 512
       height: 512
     parts:
@@ -411,6 +411,10 @@ Builder:
 
       - source: injected
         assembly: creality_psu
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: y_z_axis_mcu_holder
         artifact: all
         name_template: "{assembly_name}_{name}"
 

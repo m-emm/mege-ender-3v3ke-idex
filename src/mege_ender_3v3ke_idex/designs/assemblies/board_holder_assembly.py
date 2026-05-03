@@ -733,8 +733,8 @@ def create_board_holder_assembly(
         band_pitch,
         hole_fillet_radius=None,
     ):
-        # side_wall = create_box(length, width, thickness)
-        # return side_wall
+        side_wall = create_box(length, width, thickness)
+        return side_wall
 
         side_wall = create_trellis_plate(
             length,
