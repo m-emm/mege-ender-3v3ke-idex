@@ -54,6 +54,25 @@ def _create_cut_box_from_xy(
     )
 
 
+def _create_cut_box_from_bbox(
+    part,
+    *,
+    z_min,
+    z_height,
+    x_enlargement=0.0,
+    y_enlargement=0.0,
+):
+    bbox = get_bounding_box(part)
+    return _create_cut_box_from_xy(
+        bbox[0][0] - x_enlargement,
+        bbox[1][0] + x_enlargement,
+        bbox[0][1] - y_enlargement,
+        bbox[1][1] + y_enlargement,
+        z_min=z_min,
+        z_height=z_height,
+    )
+
+
 def _resolve_strap_definitions(
     *,
     board_part,
@@ -169,12 +188,32 @@ def _cut_cover_window_for_dil_board(
     return cover, strap_metadata
 
 
+def _cut_cover_window_for_part_bbox(
+    *,
+    cover,
+    part,
+    cover_z_min,
+    tpu_cover_thickness,
+    x_enlargement=0.0,
+    y_enlargement=0.0,
+):
+    window = _create_cut_box_from_bbox(
+        part,
+        z_min=cover_z_min - 1.0,
+        z_height=tpu_cover_thickness + 2.0,
+        x_enlargement=x_enlargement,
+        y_enlargement=y_enlargement,
+    )
+    return cover.cut(window)
+
+
 def _create_tpu_cover(
     *,
     base_plate,
     pico_board,
     translated_tmc_boards,
     additional_pins,
+    mosfet_driver_board,
     x_axis_mcu_dil_pitch,
     board_holder_tpu_cover_thickness,
     board_holder_tpu_cover_gap_above_base,
@@ -234,6 +273,24 @@ def _create_tpu_cover(
             strap_pin_indices=[5],
         )
         strap_metadata["tmc_boards"].append(current_tmc_strap_metadata)
+
+    if mosfet_driver_board is not None:
+        mosfet_clearance_reference = _fuse_parts(
+            [
+                mosfet_driver_board.get_follower_part_by_name("terminal_block_front"),
+                mosfet_driver_board.get_follower_part_by_name("terminal_block_back"),
+                mosfet_driver_board.get_follower_part_by_name("mosfet_package_front"),
+                mosfet_driver_board.get_follower_part_by_name("mosfet_package_back"),
+            ]
+        )
+        cover = _cut_cover_window_for_part_bbox(
+            cover=cover,
+            part=mosfet_clearance_reference,
+            cover_z_min=cover_z_min,
+            tpu_cover_thickness=board_holder_tpu_cover_thickness,
+            x_enlargement=0.25 * x_axis_mcu_dil_pitch,
+            y_enlargement=0.25 * x_axis_mcu_dil_pitch,
+        )
 
     return cover, strap_metadata
 
@@ -431,11 +488,26 @@ def _get_named_tmc_holder_prefix(index):
     return f"tmc_{index + 1}"
 
 
+def _cut_base_plate_for_mosfet_driver(
+    *,
+    base_plate,
+    mosfet_driver_board,
+):
+    base_plate = base_plate.cut(
+        mosfet_driver_board.get_cutter_part_by_name("board_clearance")
+    )
+    base_plate = base_plate.cut(
+        mosfet_driver_board.get_cutter_part_by_name("j1_connector_clearance")
+    )
+    return base_plate
+
+
 def create_board_holder_assembly(
     *,
     pico_w_board_assembly,
     tmc_board_assembly,
     additional_pins_assembly,
+    mosfet_driver_board_assembly=None,
     board_holder_base_plate_border,
     board_holder_base_plate_thickness,
     board_holder_board_z_offset,
@@ -473,6 +545,24 @@ def create_board_holder_assembly(
         raise ValueError("tmc_board_count must be at least 1")
 
     pico_board_part = pico_board.get_follower_part_by_name("board")
+
+    positioned_mosfet_driver_board = None
+    if mosfet_driver_board_assembly is not None:
+        positioned_mosfet_driver_board = rotate(90)(mosfet_driver_board_assembly)
+
+        positioned_mosfet_driver_board = (
+            positioned_mosfet_driver_board.aligned_from_follower(
+                "board",
+                pico_board_part,
+                Alignment.CENTER,
+                axes=[0],
+            )
+        )
+        positioned_mosfet_driver_board = (
+            positioned_mosfet_driver_board.aligned_from_follower(
+                "board", pico_board_part, Alignment.STACK_FRONT, stack_gap=4
+            )
+        )
 
     first_tmc_board = tmc_board_assembly.copy()
     first_tmc_board = first_tmc_board.aligned_from_follower(
@@ -548,6 +638,10 @@ def create_board_holder_assembly(
         positioned_tmc_board_row.leaders_followers_fused()
     )
     enclosure_reference = enclosure_reference.fuse(additional_pins_base_plate_bbox)
+    if positioned_mosfet_driver_board is not None:
+        enclosure_reference = enclosure_reference.fuse(
+            positioned_mosfet_driver_board.leaders_followers_fused()
+        )
 
     base_plate = _create_enclosing_base_plate(
         enclosure_reference=enclosure_reference,
@@ -569,6 +663,11 @@ def create_board_holder_assembly(
     base_plate = pico_board.use_as_cutter_on(base_plate)
     base_plate = positioned_tmc_board_row.use_as_cutter_on(base_plate)
     base_plate = base_plate.cut(additional_pins_base_plate_bbox)
+    if positioned_mosfet_driver_board is not None:
+        base_plate = _cut_base_plate_for_mosfet_driver(
+            base_plate=base_plate,
+            mosfet_driver_board=positioned_mosfet_driver_board,
+        )
 
     all_holders = LeaderFollowersCuttersPart(base_plate.fuse(additional_pins.leader))
 
@@ -584,6 +683,7 @@ def create_board_holder_assembly(
         pico_board=pico_board,
         translated_tmc_boards=positioned_tmc_boards,
         additional_pins=additional_pins,
+        mosfet_driver_board=positioned_mosfet_driver_board,
         x_axis_mcu_dil_pitch=x_axis_mcu_dil_pitch,
         board_holder_tpu_cover_thickness=board_holder_tpu_cover_thickness,
         board_holder_tpu_cover_gap_above_base=board_holder_tpu_cover_gap_above_base,
@@ -628,6 +728,11 @@ def create_board_holder_assembly(
             current_tmc_board.prefixed_copy(
                 _get_named_tmc_board_visual_prefix(tmc_index)
             )
+        )
+
+    if positioned_mosfet_driver_board is not None:
+        all_holders = all_holders.merge_except_leader(
+            positioned_mosfet_driver_board.prefixed_copy("mosfet_driver_board")
         )
 
     return all_holders

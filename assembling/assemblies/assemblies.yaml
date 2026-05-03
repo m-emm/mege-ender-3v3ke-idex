@@ -729,6 +729,9 @@ assemblies:
       x_axis_mcu_wire_wrap_pin_length: !Ref x_axis_mcu_wire_wrap_pin_length
       x_axis_mcu_wire_wrap_pin_base_thickness: !Ref x_axis_mcu_wire_wrap_pin_base_thickness
       x_axis_mcu_top_pin_length: !Ref x_axis_mcu_top_pin_length
+      x_axis_mcu_electronics_holder_slack: !Ref x_axis_mcu_electronics_holder_slack
+      x_axis_mcu_electronics_board_cutter_slack: !Ref x_axis_mcu_electronics_board_cutter_slack
+      x_axis_mcu_base_cutter_vertical_slack: !Ref x_axis_mcu_base_cutter_vertical_slack
 
   - name: creality_endstop_holder_assembly
 
@@ -914,10 +917,12 @@ assemblies:
       - x_axis_pico_w_board_assembly
       - x_axis_tmc_board_assembly
       - y_z_axis_mcu_additional_pins_assembly
+      - mosfet_driver_board_assembly
     inject_parts:
       pico_w_board_assembly: x_axis_pico_w_board_assembly
       tmc_board_assembly: x_axis_tmc_board_assembly
       additional_pins_assembly: y_z_axis_mcu_additional_pins_assembly
+      mosfet_driver_board_assembly: mosfet_driver_board_assembly
     parameters:
       board_holder_base_plate_border: !Ref board_holder_base_plate_border
       board_holder_base_plate_thickness: !Ref board_holder_base_plate_thickness

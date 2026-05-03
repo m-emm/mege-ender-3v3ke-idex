@@ -78,6 +78,12 @@ Parameters:
     Type: Float
   x_axis_mcu_top_pin_length:
     Type: Float
+  x_axis_mcu_electronics_holder_slack:
+    Type: Float
+  x_axis_mcu_electronics_board_cutter_slack:
+    Type: Float
+  x_axis_mcu_base_cutter_vertical_slack:
+    Type: Float
 
 Parts:
   MosfetDriverBoardAssembly:

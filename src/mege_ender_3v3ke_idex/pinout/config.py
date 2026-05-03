@@ -100,6 +100,29 @@ def _load_explicit_pins(raw_pins: Any) -> dict[str, tuple[float, float]]:
     return pins
 
 
+def _raise_if_duplicate_pin_coordinates(
+    pin_positions: dict[str, tuple[float, float]],
+) -> None:
+    coordinate_to_pins: dict[tuple[float, float], list[str]] = {}
+    for pin_name, pin_position in pin_positions.items():
+        coordinate_to_pins.setdefault(pin_position, []).append(pin_name)
+
+    duplicate_coordinate_groups = [
+        (coordinate, sorted(pin_names))
+        for coordinate, pin_names in coordinate_to_pins.items()
+        if len(pin_names) > 1
+    ]
+    if not duplicate_coordinate_groups:
+        return
+
+    duplicate_coordinate_groups.sort(key=lambda item: (item[0][0], item[0][1], item[1]))
+    details = "; ".join(
+        f"{coordinate}: {', '.join(pin_names)}"
+        for coordinate, pin_names in duplicate_coordinate_groups
+    )
+    raise ValueError(f"Duplicate pin coordinates detected: {details}")
+
+
 def _normalize_connections(raw_connections: Any) -> list[dict[str, Any]]:
     if not isinstance(raw_connections, list) or not raw_connections:
         raise ValueError("wires/connections must be a non-empty list")
@@ -136,6 +159,7 @@ def load_pinout_config(config_path: str | Path) -> PinoutProject:
     pin_positions.update(explicit_pins)
     if not pin_positions:
         raise ValueError("Config must define at least one pin via pin_sets or pins")
+    _raise_if_duplicate_pin_coordinates(pin_positions)
 
     raw_connections = data.get("wires", data.get("connections"))
     connections = _normalize_connections(raw_connections)

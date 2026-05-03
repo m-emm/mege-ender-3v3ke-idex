@@ -4,6 +4,13 @@ from mege_ender_3v3ke_idex.designs.sil_dil import create_sil
 from shellforgepy.simple import *
 
 
+def _fuse_parts(parts):
+    fused = PartCollector()
+    for part in parts:
+        fused = fused.fuse(part)
+    return fused
+
+
 def _create_terminal_block(
     *,
     terminal_block_length,
@@ -117,6 +124,9 @@ def create_mosfet_driver_board_assembly(
     x_axis_mcu_wire_wrap_pin_length,
     x_axis_mcu_wire_wrap_pin_base_thickness,
     x_axis_mcu_top_pin_length,
+    x_axis_mcu_electronics_holder_slack,
+    x_axis_mcu_electronics_board_cutter_slack,
+    x_axis_mcu_base_cutter_vertical_slack,
 ):
     hole_center_offset = (
         mosfet_driver_mount_hole_edge_clearance + mosfet_driver_mount_hole_diameter / 2
@@ -157,6 +167,12 @@ def create_mosfet_driver_board_assembly(
         mosfet_driver_board_thickness,
         origin=(0, 0, 0),
     )
+    board_cutter = create_box(
+        mosfet_driver_board_length + 2 * x_axis_mcu_electronics_board_cutter_slack,
+        mosfet_driver_board_width + 2 * x_axis_mcu_electronics_board_cutter_slack,
+        mosfet_driver_board_thickness + 2 * x_axis_mcu_electronics_board_cutter_slack,
+    )
+    board_cutter = align(board_cutter, board, Alignment.CENTER)
 
     mount_hole_y_positions = [
         hole_center_offset,
@@ -201,8 +217,7 @@ def create_mosfet_driver_board_assembly(
         )
         j1_hole = translate(
             mosfet_driver_j1_two_pin_row_x,
-            mosfet_driver_board_width / 2
-            + y_sign * mosfet_driver_j1_two_pin_y_offset,
+            mosfet_driver_board_width / 2 + y_sign * mosfet_driver_j1_two_pin_y_offset,
             -1,
         )(j1_hole)
         board = board.cut(j1_hole)
@@ -214,9 +229,9 @@ def create_mosfet_driver_board_assembly(
         pin_side=x_axis_mcu_wire_wrap_pin_side,
         top_pin_length=x_axis_mcu_top_pin_length,
         base_thickness=x_axis_mcu_wire_wrap_pin_base_thickness,
+        base_cutter_slack=x_axis_mcu_electronics_holder_slack,
+        base_cutter_vertical_slack=x_axis_mcu_base_cutter_vertical_slack,
         pin_cutter_slack=0.0,
-        base_cutter_slack=0.0,
-        base_cutter_vertical_slack=0.0,
     )
     j1_pin_row_center = get_bounding_box_center(j1_connector.cutters[1])
     j1_connector = translate(
@@ -224,6 +239,7 @@ def create_mosfet_driver_board_assembly(
         mosfet_driver_board_width / 2 - j1_pin_row_center[1],
         0,
     )(j1_connector)
+    j1_connector_clearance = _fuse_parts(j1_connector.cutters)
 
     terminal_block_front = _create_terminal_block(
         terminal_block_length=mosfet_driver_terminal_block_length,
@@ -306,6 +322,8 @@ def create_mosfet_driver_board_assembly(
     assembly.add_named_follower(terminal_block_back, "terminal_block_back")
     assembly.add_named_follower(mosfet_package_front, "mosfet_package_front")
     assembly.add_named_follower(mosfet_package_back, "mosfet_package_back")
+    assembly.add_named_cutter(board_cutter, "board_clearance")
+    assembly.add_named_cutter(j1_connector_clearance, "j1_connector_clearance")
     assembly.add_named_cutter(mount_holes[0], "mounting_hole_front")
     assembly.add_named_cutter(mount_holes[1], "mounting_hole_back")
     for hole_name, j1_hole in j1_holes:

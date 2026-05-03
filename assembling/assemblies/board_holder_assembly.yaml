@@ -10,6 +10,8 @@ Builder:
         - front_angle
         - isometric
         - top
+        - bottom
+        - left
       width: 512
       height: 512
     parts:

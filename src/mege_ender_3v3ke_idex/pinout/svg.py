@@ -16,6 +16,25 @@ DEFAULT_COLOR_MAP = {
 }
 
 
+def _estimate_annotation_width_px(
+    *,
+    view_label: str,
+    version_label: str | None,
+    notes_text: str | None,
+) -> int:
+    line_specs = [(view_label, 16, 0.58)]
+    if version_label:
+        line_specs.append((version_label, 12, 0.56))
+    if notes_text:
+        line_specs.extend((line, 10, 0.54) for line in notes_text.splitlines())
+
+    widest_line_px = max(
+        int(len(line) * font_size * width_factor)
+        for line, font_size, width_factor in line_specs
+    )
+    return widest_line_px + 24
+
+
 def _calculate_bounds(
     pin_positions: dict[str, tuple[float, float]],
     waypoint_solutions: dict[int, dict[str, Any]] | None,
@@ -98,8 +117,14 @@ def generate_routed_svg(
         flip_x=flip_x,
     )
 
+    view_label = "Underside View" if flip_x else "Top View"
     base_margin = 0.5
-    margin_right = base_margin + 3.0
+    annotation_width_px = _estimate_annotation_width_px(
+        view_label=view_label,
+        version_label=version_label,
+        notes_text=notes_text,
+    )
+    margin_right = base_margin + 3.0 + (annotation_width_px / 40.0) + 0.75
     margin_top = base_margin + 0.5
     margin_left = base_margin + 1.0
     margin_bottom = base_margin
@@ -299,7 +324,6 @@ def generate_routed_svg(
                 },
             )
 
-    view_label = "Underside View" if flip_x else "Top View"
     label_x = vb_w - 20
     label_y = 30
     _add_text(
