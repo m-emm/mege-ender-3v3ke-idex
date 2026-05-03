@@ -720,6 +720,15 @@ assemblies:
       mosfet_driver_package_width: !Ref mosfet_driver_package_width
       mosfet_driver_package_height: !Ref mosfet_driver_package_height
       mosfet_driver_package_gap_to_terminal_block: !Ref mosfet_driver_package_gap_to_terminal_block
+      mosfet_driver_j1_row_pin_count: !Ref mosfet_driver_j1_row_pin_count
+      mosfet_driver_j1_hole_diameter: !Ref mosfet_driver_j1_hole_diameter
+      mosfet_driver_j1_four_pin_row_x: !Ref mosfet_driver_j1_four_pin_row_x
+      mosfet_driver_j1_two_pin_row_x: !Ref mosfet_driver_j1_two_pin_row_x
+      mosfet_driver_j1_two_pin_y_offset: !Ref mosfet_driver_j1_two_pin_y_offset
+      x_axis_mcu_wire_wrap_pin_side: !Ref x_axis_mcu_wire_wrap_pin_side
+      x_axis_mcu_wire_wrap_pin_length: !Ref x_axis_mcu_wire_wrap_pin_length
+      x_axis_mcu_wire_wrap_pin_base_thickness: !Ref x_axis_mcu_wire_wrap_pin_base_thickness
+      x_axis_mcu_top_pin_length: !Ref x_axis_mcu_top_pin_length
 
   - name: creality_endstop_holder_assembly
 

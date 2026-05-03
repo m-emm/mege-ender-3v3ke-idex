@@ -60,6 +60,24 @@ Parameters:
     Type: Float
   mosfet_driver_package_gap_to_terminal_block:
     Type: Float
+  mosfet_driver_j1_row_pin_count:
+    Type: Integer
+  mosfet_driver_j1_hole_diameter:
+    Type: Float
+  mosfet_driver_j1_four_pin_row_x:
+    Type: Float
+  mosfet_driver_j1_two_pin_row_x:
+    Type: Float
+  mosfet_driver_j1_two_pin_y_offset:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_side:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_length:
+    Type: Float
+  x_axis_mcu_wire_wrap_pin_base_thickness:
+    Type: Float
+  x_axis_mcu_top_pin_length:
+    Type: Float
 
 Parts:
   MosfetDriverBoardAssembly:

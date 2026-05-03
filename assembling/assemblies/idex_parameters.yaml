@@ -273,6 +273,11 @@ globals:
   mosfet_driver_package_width: 6.1
   mosfet_driver_package_height: 2.4
   mosfet_driver_package_gap_to_terminal_block: 1.2
+  mosfet_driver_j1_row_pin_count: 4
+  mosfet_driver_j1_hole_diameter: 1.2
+  mosfet_driver_j1_four_pin_row_x: 3.7
+  mosfet_driver_j1_two_pin_row_x: 1.4
+  mosfet_driver_j1_two_pin_y_offset: 2.55
   endstop_holder_stack_gap: 30
   z_axis_guide_distance: 256
   z_axis_y_offset: 130
