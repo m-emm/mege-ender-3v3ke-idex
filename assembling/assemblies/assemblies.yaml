@@ -932,7 +932,6 @@ assemblies:
       board_holder_frame_mount_eyes_enabled: false
       board_holder_frame_mount_eye_screw_size: !Ref board_holder_frame_mount_eye_screw_size
       board_holder_frame_mount_eye_width: !Ref board_holder_frame_mount_eye_width
-      board_holder_frame_mount_eye_length: !Ref board_holder_frame_mount_eye_length
       board_holder_frame_mount_eye_thickness: !Ref board_holder_frame_mount_eye_thickness
       board_holder_frame_mount_eye_fillet_radius: !Ref board_holder_frame_mount_eye_fillet_radius
 
@@ -980,7 +979,6 @@ assemblies:
       board_holder_frame_mount_eyes_enabled: true
       board_holder_frame_mount_eye_screw_size: !Ref board_holder_frame_mount_eye_screw_size
       board_holder_frame_mount_eye_width: !Ref board_holder_frame_mount_eye_width
-      board_holder_frame_mount_eye_length: !Ref board_holder_frame_mount_eye_length
       board_holder_frame_mount_eye_thickness: !Ref board_holder_frame_mount_eye_thickness
       board_holder_frame_mount_eye_fillet_radius: !Ref board_holder_frame_mount_eye_fillet_radius
 

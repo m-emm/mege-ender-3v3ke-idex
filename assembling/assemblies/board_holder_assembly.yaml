@@ -121,8 +121,6 @@ Parameters:
     Type: String
   board_holder_frame_mount_eye_width:
     Type: Float
-  board_holder_frame_mount_eye_length:
-    Type: Float
   board_holder_frame_mount_eye_thickness:
     Type: Float
   board_holder_frame_mount_eye_fillet_radius:

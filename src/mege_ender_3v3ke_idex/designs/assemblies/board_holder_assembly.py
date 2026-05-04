@@ -510,7 +510,6 @@ def create_board_holder_assembly(
     board_holder_frame_mount_eyes_enabled,
     board_holder_frame_mount_eye_screw_size,
     board_holder_frame_mount_eye_width,
-    board_holder_frame_mount_eye_length,
     board_holder_frame_mount_eye_thickness,
     board_holder_frame_mount_eye_fillet_radius,
     BIG_THING,
@@ -935,11 +934,12 @@ def create_board_holder_assembly(
     side_walls = side_walls.cut(mount_screw_holes)
 
     if board_holder_frame_mount_eyes_enabled:
+        side_walls_size = get_bounding_box_size(side_walls)
         frame_mount_eyes = PartCollector()
         for side in [Alignment.LEFT, Alignment.RIGHT]:
             frame_mount_eye = create_filleted_box(
                 board_holder_frame_mount_eye_width,
-                board_holder_frame_mount_eye_length,
+                side_walls_size[2],
                 board_holder_frame_mount_eye_thickness,
                 fillet_radius=board_holder_frame_mount_eye_fillet_radius,
                 no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, side.opposite],

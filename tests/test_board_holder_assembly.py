@@ -113,7 +113,6 @@ def _build_holder(
         board_holder_frame_mount_eyes_enabled=board_holder_frame_mount_eyes_enabled,
         board_holder_frame_mount_eye_screw_size="M5",
         board_holder_frame_mount_eye_width=board_holder_frame_mount_eye_width,
-        board_holder_frame_mount_eye_length=30.0,
         board_holder_frame_mount_eye_thickness=4.0,
         board_holder_frame_mount_eye_fillet_radius=3.0,
         BIG_THING=500,
@@ -252,3 +251,5 @@ def test_enabled_frame_mount_eyes_expand_side_walls_left_and_right():
     assert disabled_bbox[0][0] - enabled_bbox[0][0] == pytest.approx(mount_eye_width)
     assert enabled_bbox[1][0] - disabled_bbox[1][0] == pytest.approx(mount_eye_width)
     assert enabled_bbox[0][1] == pytest.approx(disabled_bbox[0][1])
+    assert enabled_bbox[0][2] == pytest.approx(disabled_bbox[0][2])
+    assert enabled_bbox[1][2] == pytest.approx(disabled_bbox[1][2])

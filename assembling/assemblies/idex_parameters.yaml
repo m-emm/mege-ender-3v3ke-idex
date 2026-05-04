@@ -139,7 +139,6 @@ globals:
   board_holder_frame_mount_eyes_enabled: false
   board_holder_frame_mount_eye_screw_size: "M5"
   board_holder_frame_mount_eye_width: 10
-  board_holder_frame_mount_eye_length: 30
   board_holder_frame_mount_eye_thickness: 4
   board_holder_frame_mount_eye_fillet_radius: 3
   board_holder_additional_pins_num_pins: 20
