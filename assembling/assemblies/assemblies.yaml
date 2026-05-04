@@ -505,14 +505,14 @@ placement:
         angle: 90
         axis: [1, 0, 0]
 
-    - part: y_z_axis_mcu_holder_assembly
+    - part: y_z_axis_mcu_holder_assembly.followers.side_walls
       to: printer_frame_assembly
       alignment: STACK_TOP
-    - part: y_z_axis_mcu_holder_assembly
+    - part: y_z_axis_mcu_holder_assembly.followers.side_walls
       to: printer_frame_assembly
       alignment: LEFT
 
-    - part: y_z_axis_mcu_holder_assembly
+    - part: y_z_axis_mcu_holder_assembly.followers.side_walls
       to: printer_frame_assembly
       alignment: BACK
 
@@ -929,6 +929,12 @@ assemblies:
       board_holder_plug_lip_top_gap: !Ref board_holder_plug_lip_top_gap
       board_holder_plug_no_inner_hole: !Ref board_holder_plug_no_inner_hole
       board_holder_plug_hole_slack: !Ref board_holder_plug_hole_slack
+      board_holder_frame_mount_eyes_enabled: false
+      board_holder_frame_mount_eye_screw_size: !Ref board_holder_frame_mount_eye_screw_size
+      board_holder_frame_mount_eye_width: !Ref board_holder_frame_mount_eye_width
+      board_holder_frame_mount_eye_length: !Ref board_holder_frame_mount_eye_length
+      board_holder_frame_mount_eye_thickness: !Ref board_holder_frame_mount_eye_thickness
+      board_holder_frame_mount_eye_fillet_radius: !Ref board_holder_frame_mount_eye_fillet_radius
 
   - name: y_z_axis_mcu_holder_assembly
 
@@ -971,6 +977,12 @@ assemblies:
       board_holder_plug_lip_top_gap: !Ref board_holder_plug_lip_top_gap
       board_holder_plug_no_inner_hole: !Ref board_holder_plug_no_inner_hole
       board_holder_plug_hole_slack: !Ref board_holder_plug_hole_slack
+      board_holder_frame_mount_eyes_enabled: true
+      board_holder_frame_mount_eye_screw_size: !Ref board_holder_frame_mount_eye_screw_size
+      board_holder_frame_mount_eye_width: !Ref board_holder_frame_mount_eye_width
+      board_holder_frame_mount_eye_length: !Ref board_holder_frame_mount_eye_length
+      board_holder_frame_mount_eye_thickness: !Ref board_holder_frame_mount_eye_thickness
+      board_holder_frame_mount_eye_fillet_radius: !Ref board_holder_frame_mount_eye_fillet_radius
 
   - name: pico_w_board_holder_protoype_assembly
 

@@ -507,6 +507,12 @@ def create_board_holder_assembly(
     board_holder_plug_lip_top_gap,
     board_holder_plug_no_inner_hole,
     board_holder_plug_hole_slack,
+    board_holder_frame_mount_eyes_enabled,
+    board_holder_frame_mount_eye_screw_size,
+    board_holder_frame_mount_eye_width,
+    board_holder_frame_mount_eye_length,
+    board_holder_frame_mount_eye_thickness,
+    board_holder_frame_mount_eye_fillet_radius,
     BIG_THING,
 ):
     """Create the simplified MCU board holder assembly."""
@@ -789,6 +795,8 @@ def create_board_holder_assembly(
         side_wall_bottom = align(side_wall_bottom, all_holders, Alignment.STACK_BOTTOM)
         side_walls = side_walls.fuse(side_wall_bottom)
 
+    top_side_walls = PartCollector()
+    bottom_side_walls = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
         side_wall_top = create_side_wall(
@@ -812,6 +820,7 @@ def create_board_holder_assembly(
             stack_gap=side_wall_clearance,
         )
         side_wall_top = align(side_wall_top, all_holders, Alignment.BOTTOM)
+        top_side_walls = top_side_walls.fuse(side_wall_top)
         side_walls = side_walls.fuse(side_wall_top)
 
         side_wall_bottom = create_box(
@@ -830,7 +839,45 @@ def create_board_holder_assembly(
             stack_gap=side_wall_clearance,
         )
         side_wall_bottom = align(side_wall_bottom, all_holders, Alignment.STACK_BOTTOM)
+
         side_walls = side_walls.fuse(side_wall_bottom)
+        bottom_side_walls = bottom_side_walls.fuse(side_wall_bottom)
+
+    num_cable_holes = 8
+    cable_hole_diameter = 4
+    cable_hole_pitch = 8
+
+    cable_hole_drills = PartCollector()
+    for i in range(num_cable_holes):
+        cable_hole_drill = create_cylinder(cable_hole_diameter / 2, BIG_THING)
+        cable_hole_drill = rotate(90, axis=(0, 1, 0))(cable_hole_drill)
+
+        cable_hole_drill = translate(0, i * cable_hole_pitch, 0)(cable_hole_drill)
+        cable_hole_drills = cable_hole_drills.fuse(cable_hole_drill)
+
+    cable_hole_drills = align(cable_hole_drills, top_side_walls, Alignment.CENTER)
+
+    side_walls = side_walls.cut(cable_hole_drills)
+
+    bottom_cable_hole_pitch = 12
+    bottom_cable_hole_size = 6
+    bottom_cable_hole_drills = PartCollector()
+    for i in range(num_cable_holes):
+        bottom_cable_hole_drill = create_box(
+            BIG_THING, bottom_cable_hole_size, bottom_cable_hole_size
+        )
+        bottom_cable_hole_drill = rotate(45, axis=(1, 0, 0))(bottom_cable_hole_drill)
+        bottom_cable_hole_drill = translate(0, i * bottom_cable_hole_pitch, 0)(
+            bottom_cable_hole_drill
+        )
+        bottom_cable_hole_drills = bottom_cable_hole_drills.fuse(
+            bottom_cable_hole_drill
+        )
+
+    bottom_cable_hole_drills = align(
+        bottom_cable_hole_drills, bottom_side_walls, Alignment.CENTER
+    )
+    side_walls = side_walls.cut(bottom_cable_hole_drills)
 
     mount_screw_hole_diameter = MScrew.from_size(
         board_holder_mount_screw_size
@@ -879,11 +926,48 @@ def create_board_holder_assembly(
     usb_cable_cutter = create_box(10, BIG_THING, 10)
 
     usb_cable_cutter = align(usb_cable_cutter, connector_part, Alignment.CENTER)
+    usb_cable_cutter = align(usb_cable_cutter, connector_part, Alignment.FRONT)
+    usb_cable_cutter = align(usb_cable_cutter, base_plate, Alignment.STACK_TOP)
 
-    # side_walls = side_walls.cut(usb_cable_cutter)
+    side_walls = side_walls.cut(usb_cable_cutter)
 
     side_walls = side_walls.fuse(mount_posts)
     side_walls = side_walls.cut(mount_screw_holes)
+
+    if board_holder_frame_mount_eyes_enabled:
+        frame_mount_eyes = PartCollector()
+        for side in [Alignment.LEFT, Alignment.RIGHT]:
+            frame_mount_eye = create_filleted_box(
+                board_holder_frame_mount_eye_width,
+                board_holder_frame_mount_eye_length,
+                board_holder_frame_mount_eye_thickness,
+                fillet_radius=board_holder_frame_mount_eye_fillet_radius,
+                no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, side.opposite],
+            )
+            frame_mount_eye_screw_hole_cutter = create_cylinder(
+                MScrew.from_size(
+                    board_holder_frame_mount_eye_screw_size
+                ).clearance_hole_normal
+                / 2,
+                BIG_THING,
+            )
+            frame_mount_eye_screw_hole_cutter = align(
+                frame_mount_eye_screw_hole_cutter,
+                frame_mount_eye,
+                Alignment.CENTER,
+            )
+            frame_mount_eye = frame_mount_eye.cut(frame_mount_eye_screw_hole_cutter)
+            frame_mount_eye = rotate(90, axis=(1, 0, 0))(frame_mount_eye)
+            frame_mount_eye = align(frame_mount_eye, side_walls, Alignment.CENTER)
+            frame_mount_eye = align(
+                frame_mount_eye,
+                side_walls,
+                side.stack_alignment,
+            )
+            frame_mount_eye = align(frame_mount_eye, side_walls, Alignment.FRONT)
+            frame_mount_eyes = frame_mount_eyes.fuse(frame_mount_eye)
+
+        side_walls = side_walls.fuse(frame_mount_eyes)
 
     all_holders.add_named_follower(side_walls, "side_walls")
 

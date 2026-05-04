@@ -37,6 +37,8 @@ def _build_holder(
     board_holder_tmc_board_count,
     board_holder_pico_to_tmc_gap_x,
     board_holder_tmc_to_additional_pins_gap_x=11.0,
+    board_holder_frame_mount_eyes_enabled=False,
+    board_holder_frame_mount_eye_width=10.0,
 ):
     common_board_params = _common_board_params()
 
@@ -108,6 +110,12 @@ def _build_holder(
         board_holder_plug_lip_top_gap=1.0,
         board_holder_plug_no_inner_hole=False,
         board_holder_plug_hole_slack=0.1,
+        board_holder_frame_mount_eyes_enabled=board_holder_frame_mount_eyes_enabled,
+        board_holder_frame_mount_eye_screw_size="M5",
+        board_holder_frame_mount_eye_width=board_holder_frame_mount_eye_width,
+        board_holder_frame_mount_eye_length=30.0,
+        board_holder_frame_mount_eye_thickness=4.0,
+        board_holder_frame_mount_eye_fillet_radius=3.0,
         BIG_THING=500,
     )
 
@@ -192,3 +200,55 @@ def test_tmc_to_additional_pins_gap_x_controls_holder_width():
     looser_width = looser_bbox[1][0] - looser_bbox[0][0]
 
     assert looser_width - tighter_width == pytest.approx(5.5)
+
+
+def test_disabled_frame_mount_eyes_do_not_change_side_wall_width():
+    baseline_assembly = _build_holder(
+        board_holder_tmc_board_count=2,
+        board_holder_pico_to_tmc_gap_x=11.43,
+        board_holder_frame_mount_eyes_enabled=False,
+        board_holder_frame_mount_eye_width=10.0,
+    )
+    wider_disabled_assembly = _build_holder(
+        board_holder_tmc_board_count=2,
+        board_holder_pico_to_tmc_gap_x=11.43,
+        board_holder_frame_mount_eyes_enabled=False,
+        board_holder_frame_mount_eye_width=22.0,
+    )
+
+    baseline_bbox = get_bounding_box(
+        baseline_assembly.get_follower_part_by_name("side_walls")
+    )
+    wider_disabled_bbox = get_bounding_box(
+        wider_disabled_assembly.get_follower_part_by_name("side_walls")
+    )
+
+    assert wider_disabled_bbox[0][0] == pytest.approx(baseline_bbox[0][0])
+    assert wider_disabled_bbox[1][0] == pytest.approx(baseline_bbox[1][0])
+
+
+def test_enabled_frame_mount_eyes_expand_side_walls_left_and_right():
+    mount_eye_width = 10.0
+    disabled_assembly = _build_holder(
+        board_holder_tmc_board_count=2,
+        board_holder_pico_to_tmc_gap_x=11.43,
+        board_holder_frame_mount_eyes_enabled=False,
+        board_holder_frame_mount_eye_width=mount_eye_width,
+    )
+    enabled_assembly = _build_holder(
+        board_holder_tmc_board_count=2,
+        board_holder_pico_to_tmc_gap_x=11.43,
+        board_holder_frame_mount_eyes_enabled=True,
+        board_holder_frame_mount_eye_width=mount_eye_width,
+    )
+
+    disabled_bbox = get_bounding_box(
+        disabled_assembly.get_follower_part_by_name("side_walls")
+    )
+    enabled_bbox = get_bounding_box(
+        enabled_assembly.get_follower_part_by_name("side_walls")
+    )
+
+    assert disabled_bbox[0][0] - enabled_bbox[0][0] == pytest.approx(mount_eye_width)
+    assert enabled_bbox[1][0] - disabled_bbox[1][0] == pytest.approx(mount_eye_width)
+    assert enabled_bbox[0][1] == pytest.approx(disabled_bbox[0][1])

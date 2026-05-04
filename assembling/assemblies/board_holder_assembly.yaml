@@ -15,6 +15,10 @@ Builder:
       width: 512
       height: 512
     parts:
+      - source: dependencies
+        assembly: printer_frame_assembly
+        artifact: leader
+        name: printer_frame
       - source: self
         artifact: leader
         name: board_holder
@@ -110,6 +114,18 @@ Parameters:
   board_holder_plug_no_inner_hole:
     Type: Boolean
   board_holder_plug_hole_slack:
+    Type: Float
+  board_holder_frame_mount_eyes_enabled:
+    Type: Boolean
+  board_holder_frame_mount_eye_screw_size:
+    Type: String
+  board_holder_frame_mount_eye_width:
+    Type: Float
+  board_holder_frame_mount_eye_length:
+    Type: Float
+  board_holder_frame_mount_eye_thickness:
+    Type: Float
+  board_holder_frame_mount_eye_fillet_radius:
     Type: Float
 
 Parts:
