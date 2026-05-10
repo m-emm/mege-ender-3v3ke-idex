@@ -41,6 +41,91 @@ tft_housing_air_hole_size = 4
 tft_housing_air_hole_spacing = 10
 tft_air_hole_border = 5
 
+tft_housing_join_screw_size = "M4"
+tft_housing_join_screw_length = 12
+tft_housing_join_screw_edge_inset = 11
+tft_housing_join_boss_radius = 6.5
+tft_housing_join_boss_height = 9
+tft_housing_join_nut_slack = 0.25
+tft_housing_join_countersink_clearance = 0.3
+
+
+def iter_housing_join_positions(part):
+    bbox = get_bounding_box(part)
+    min_x, min_y, min_z = bbox[0]
+    max_x, max_y, _ = bbox[1]
+
+    for left_right in [Alignment.LEFT, Alignment.RIGHT]:
+        x = (
+            min_x + tft_housing_join_screw_edge_inset
+            if left_right == Alignment.LEFT
+            else max_x - tft_housing_join_screw_edge_inset
+        )
+        for front_back in [Alignment.FRONT, Alignment.BACK]:
+            y = (
+                min_y + tft_housing_join_screw_edge_inset
+                if front_back == Alignment.FRONT
+                else max_y - tft_housing_join_screw_edge_inset
+            )
+            name = f"{left_right.name.lower()}_{front_back.name.lower()}"
+            yield name, left_right, front_back, np.array([x, y, min_z])
+
+
+def create_housing_join_front_panel_cutter(front_panel):
+    screw = MScrew.from_size(tft_housing_join_screw_size)
+    cutter = PartCollector()
+
+    for _, _, _, center in iter_housing_join_positions(front_panel):
+        hole = create_cylinder(
+            screw.clearance_hole_loose / 2,
+            BIG_THING,
+            origin=(center[0], center[1], center[2] - BIG_THING / 2),
+        )
+        cutter = cutter.fuse(hole)
+
+        countersink = create_cone(
+            radius1=screw.conical_head_diameter / 2
+            + tft_housing_join_countersink_clearance,
+            radius2=screw.clearance_hole_loose / 2,
+            height=screw.conical_head_height + tft_housing_join_countersink_clearance,
+            origin=(center[0], center[1], center[2] - 1e-3),
+        )
+        cutter = cutter.fuse(countersink)
+
+    return cutter
+
+
+def create_housing_join_hardware(front_panel, housing_body):
+    screw = MScrew.from_size(tft_housing_join_screw_size)
+    body_bbox = get_bounding_box(housing_body)
+    body_bottom = body_bbox[0][2]
+    boss_top = body_bottom + tft_housing_join_boss_height
+
+    hardware = []
+    for name, _, _, center in iter_housing_join_positions(front_panel):
+        visual_screw = create_conical_head_screw(
+            tft_housing_join_screw_size,
+            tft_housing_join_screw_length,
+        )
+        visual_screw = rotate(180, axis=(1, 0, 0))(visual_screw)
+        visual_screw = translate(
+            center[0],
+            center[1],
+            center[2] + tft_housing_join_screw_length,
+        )(visual_screw)
+        hardware.append((f"housing_join_screw_{name}", visual_screw))
+
+        nut = create_nut(tft_housing_join_screw_size)
+        nut = rotate(30)(nut)
+        nut = translate(
+            center[0],
+            center[1],
+            boss_top - screw.nut_thickness - tft_housing_join_nut_slack,
+        )(nut)
+        hardware.append((f"housing_join_nut_{name}", nut))
+
+    return hardware
+
 
 def create_tft():
     tft_with_board = create_box(tft_width, tft_height, tft_with_board_thickness)
@@ -158,7 +243,7 @@ def create_housing(tft):
     tft_bounding_box = get_bounding_box(tft)
     min_z = tft_bounding_box[0][2]
 
-    arc_reach = tft_housing_border
+    arc_reach = tft_housing_border * 0.5
 
     screw_drills = PartCollector()
 
@@ -229,8 +314,190 @@ def create_housing(tft):
 
     screw_plates = screw_plates.cut(screw_drills)
     housing = housing.fuse(screw_plates)
+    housing = housing.cut(create_housing_join_front_panel_cutter(housing))
 
     return housing
+
+
+def create_housing_air_hole_cutter(housing_body):
+    housing_size = get_bounding_box_size(housing_body)
+
+    num_air_holes_width = math.floor(
+        (housing_size[0] - 2 * tft_air_hole_border) / tft_housing_air_hole_spacing
+    )
+    num_air_holes_height = math.floor(
+        (housing_size[1] - 2 * tft_air_hole_border) / tft_housing_air_hole_spacing
+    )
+    num_air_holes_z = math.floor(
+        (housing_size[2] - 2 * tft_air_hole_border) / tft_housing_air_hole_spacing
+    )
+
+    air_holes = PartCollector()
+    air_holes_front_back = PartCollector()
+    for i in range(num_air_holes_width):
+        for j in range(num_air_holes_z):
+            air_hole = create_box(
+                tft_housing_air_hole_size,
+                BIG_THING,
+                tft_housing_air_hole_size,
+            )
+            air_hole = rotate(45, axis=(0, 1, 0))(air_hole)
+            air_hole = translate(
+                i * tft_housing_air_hole_spacing,
+                0,
+                j * tft_housing_air_hole_spacing,
+            )(air_hole)
+            air_holes_front_back = air_holes_front_back.fuse(air_hole)
+
+    air_holes_front_back = align(air_holes_front_back, housing_body, Alignment.CENTER)
+    air_holes = air_holes.fuse(air_holes_front_back)
+
+    air_holes_left_right = PartCollector()
+    for i in range(num_air_holes_height):
+        for j in range(num_air_holes_z):
+            air_hole = create_box(
+                BIG_THING,
+                tft_housing_air_hole_size,
+                tft_housing_air_hole_size,
+            )
+            air_hole = rotate(45, axis=(1, 0, 0))(air_hole)
+            air_hole = translate(
+                0,
+                i * tft_housing_air_hole_spacing,
+                j * tft_housing_air_hole_spacing,
+            )(air_hole)
+            air_holes_left_right = air_holes_left_right.fuse(air_hole)
+
+    air_holes_left_right = align(air_holes_left_right, housing_body, Alignment.CENTER)
+    air_holes = air_holes.fuse(air_holes_left_right)
+
+    return air_holes
+
+
+def create_housing_join_receptacles(front_panel, housing_body):
+    screw = MScrew.from_size(tft_housing_join_screw_size)
+    body_bbox = get_bounding_box(housing_body)
+    body_min = np.array(body_bbox[0])
+    body_max = np.array(body_bbox[1])
+    body_bottom = body_min[2]
+    boss_top = body_bottom + tft_housing_join_boss_height
+    bridge_width = tft_housing_join_boss_radius * 1.25
+
+    receptacles = PartCollector()
+    cutters = PartCollector()
+
+    for _, left_right, front_back, center in iter_housing_join_positions(front_panel):
+        boss = create_cylinder(
+            tft_housing_join_boss_radius,
+            tft_housing_join_boss_height,
+            origin=(center[0], center[1], body_bottom),
+        )
+        receptacles = receptacles.fuse(boss)
+
+        if left_right == Alignment.LEFT:
+            bridge_x_min = body_min[0]
+            bridge_x_max = center[0] + tft_housing_join_boss_radius
+        else:
+            bridge_x_min = center[0] - tft_housing_join_boss_radius
+            bridge_x_max = body_max[0]
+        x_bridge = create_box(
+            bridge_x_max - bridge_x_min,
+            bridge_width,
+            tft_housing_join_boss_height,
+            origin=(
+                bridge_x_min,
+                center[1] - bridge_width / 2,
+                body_bottom,
+            ),
+        )
+        receptacles = receptacles.fuse(x_bridge)
+
+        if front_back == Alignment.FRONT:
+            bridge_y_min = body_min[1]
+            bridge_y_max = center[1] + tft_housing_join_boss_radius
+        else:
+            bridge_y_min = center[1] - tft_housing_join_boss_radius
+            bridge_y_max = body_max[1]
+        y_bridge = create_box(
+            bridge_width,
+            bridge_y_max - bridge_y_min,
+            tft_housing_join_boss_height,
+            origin=(
+                center[0] - bridge_width / 2,
+                bridge_y_min,
+                body_bottom,
+            ),
+        )
+        receptacles = receptacles.fuse(y_bridge)
+
+        hole = create_cylinder(
+            screw.clearance_hole_loose / 2,
+            tft_housing_join_boss_height + 2,
+            origin=(center[0], center[1], body_bottom - 1),
+        )
+        cutters = cutters.fuse(hole)
+
+        nut_height = screw.nut_thickness + 2 * tft_housing_join_nut_slack
+        nut_pocket = create_nut(
+            tft_housing_join_screw_size,
+            height=nut_height,
+            slack=tft_housing_join_nut_slack,
+            no_hole=True,
+        )
+        nut_pocket = rotate(30)(nut_pocket)
+        nut_pocket = translate(
+            center[0],
+            center[1],
+            boss_top - nut_height,
+        )(nut_pocket)
+        cutters = cutters.fuse(nut_pocket)
+
+    return receptacles.cut(cutters)
+
+
+def create_housing_body(tft, front_panel):
+    body_height = tft_housing_cut_height - tft_housing_front_screen_thickness
+
+    housing_body = create_filleted_box(
+        tft_width
+        + 2 * tft_housing_border
+        + 2 * tft_screen_clearance
+        + 2 * tft_housing_wall_thickness,
+        tft_height
+        + 2 * tft_housing_border
+        + 2 * tft_screen_clearance
+        + 2 * tft_housing_wall_thickness,
+        body_height,
+        fillet_radius=tft_housing_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+
+    housing_cutter = create_box(
+        tft_width + 2 * tft_screen_clearance + 2 * tft_housing_border,
+        tft_height + 2 * tft_screen_clearance + 2 * tft_housing_border,
+        BIG_THING,
+    )
+    housing_cutter = align(housing_cutter, housing_body, Alignment.CENTER)
+    housing_cutter = align(housing_cutter, housing_body, Alignment.BOTTOM)
+    housing_body = housing_body.cut(housing_cutter)
+
+    housing_body = align(housing_body, front_panel, Alignment.CENTER, axes=[0, 1])
+    front_panel_bbox = get_bounding_box(front_panel)
+    housing_body_bbox = get_bounding_box(housing_body)
+    housing_body = translate(
+        0,
+        0,
+        front_panel_bbox[0][2]
+        + tft_housing_front_screen_thickness
+        - housing_body_bbox[0][2],
+    )(housing_body)
+
+    housing_body = housing_body.cut(create_housing_air_hole_cutter(housing_body))
+    housing_body = housing_body.fuse(
+        create_housing_join_receptacles(front_panel, housing_body)
+    )
+
+    return housing_body
 
 
 def create_raspi_mount_cylinders(raspi, tft):
@@ -271,6 +538,7 @@ def create_printer_host_and_screen_assembly(*, raspberry_pi_assembly):
         stack_gap=-(tft_housing_height - tft_housing_cut_height),
     )
     housing = housing.cut(housing_real_height_cutter)
+    housing_body = create_housing_body(tft, housing)
 
     move_raspi_to_center = align_translation(
         raspberry_pi_assembly.leader,
@@ -283,10 +551,13 @@ def create_printer_host_and_screen_assembly(*, raspberry_pi_assembly):
     raspi_mount_cylinders = create_raspi_mount_cylinders(raspi, tft)
 
     assembly = LeaderFollowersCuttersPart(housing)
+    assembly.add_named_follower(housing_body, "housing_body")
     assembly.add_named_non_production_part(tft.leaders_followers_fused(), "tft_43")
     assembly.add_named_non_production_part(
         raspi_mount_cylinders,
         "raspberry_pi_standoffs",
     )
+    for name, part in create_housing_join_hardware(housing, housing_body):
+        assembly.add_named_non_production_part(part, name)
 
     return assembly
