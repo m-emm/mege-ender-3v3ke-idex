@@ -34,6 +34,10 @@ Builder:
         assembly: printer_foot_right_back_assembly
         artifact: all
         name_template: "{assembly_name}_{name}"
+      - source: dependencies
+        assembly: raspberry_pi_assembly
+        artifact: all
+        name_template: "{assembly_name}_{name}"
       - source: self
         artifact: leader
         name: printer_host_screen_housing

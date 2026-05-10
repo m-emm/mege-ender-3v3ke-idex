@@ -420,6 +420,10 @@ Builder:
         assembly: printer_host_and_screen
         artifact: all
         name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: raspberry_pi
+        artifact: all
+        name_template: "{assembly_name}_{name}"
 
 Parameters:
   print_bed_y_travel:

@@ -1,0 +1,29 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the Raspberry Pi board
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - top
+        - right
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: leader
+        name: raspberry_pi_board
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+
+Parts:
+  RaspberryPiAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.raspberry_pi_assembly.create_raspberry_pi_assembly
