@@ -83,6 +83,7 @@ def create_tft():
 
 
 def create_housing(tft):
+
     housing = create_filleted_box(
         tft_width
         + 2 * tft_housing_border
@@ -92,7 +93,7 @@ def create_housing(tft):
         + 2 * tft_housing_border
         + 2 * tft_screen_clearance
         + 2 * tft_housing_wall_thickness,
-        tft_housing_height,
+        tft_housing_front_screen_thickness,
         fillet_radius=tft_housing_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
@@ -118,60 +119,9 @@ def create_housing(tft):
     housing = align(housing, tft, Alignment.CENTER)
     housing = align(housing, tft, Alignment.BOTTOM)
 
-    housing_size = get_bounding_box_size(housing)
-    num_air_holes_width = math.floor(
-        (housing_size[0] - 2 * tft_air_hole_border) / tft_housing_air_hole_spacing
-    )
-    num_air_holes_height = math.floor(
-        (housing_size[1] - 2 * tft_air_hole_border) / tft_housing_air_hole_spacing
-    )
-    num_air_holes_z = math.ceil(
-        (housing_size[2] - 2 * tft_air_hole_border) / tft_housing_air_hole_spacing
-    )
-
-    air_holes_width = PartCollector()
-    for i in range(num_air_holes_width):
-        for j in range(num_air_holes_z):
-            air_hole_cutter = create_box(
-                tft_housing_air_hole_size,
-                BIG_THING,
-                tft_housing_air_hole_size,
-            )
-            air_hole_cutter = rotate(45, axis=(0, 1, 0))(air_hole_cutter)
-            air_hole_cutter = translate(
-                i * tft_housing_air_hole_spacing,
-                0,
-                j * tft_housing_air_hole_spacing,
-            )(air_hole_cutter)
-            air_holes_width = air_holes_width.fuse(air_hole_cutter)
-
-    air_holes_width = align(air_holes_width, housing, Alignment.CENTER)
-    housing = housing.cut(air_holes_width)
-
-    air_holes_height = PartCollector()
-    for i in range(num_air_holes_height):
-        for j in range(num_air_holes_z):
-            air_hole_cutter = create_box(
-                BIG_THING,
-                tft_housing_air_hole_size,
-                tft_housing_air_hole_size,
-            )
-            air_hole_cutter = rotate(45, axis=(1, 0, 0))(air_hole_cutter)
-            air_hole_cutter = translate(
-                0,
-                i * tft_housing_air_hole_spacing,
-                j * tft_housing_air_hole_spacing,
-            )(air_hole_cutter)
-            air_holes_height = air_holes_height.fuse(air_hole_cutter)
-
-    air_holes_height = align(air_holes_height, housing, Alignment.CENTER)
-    housing = housing.cut(air_holes_height)
-
     screw_plates = PartCollector()
-    bridges = PartCollector()
     screw_drills = PartCollector()
-    tft_center = np.array(get_bounding_box_center(tft))
-
+    screw_plates_list = []
     for screw_holder in tft.followers:
         screw_plate = create_box(
             tft_housing_screw_plate_size,
@@ -201,124 +151,84 @@ def create_housing(tft):
 
         screw_plates = screw_plates.fuse(screw_plate)
 
-        screw_holder_center = np.array(get_bounding_box_center(screw_holder))
-        direction_vector = screw_holder_center - tft_center
-        direction_vector_signs = [int(math.copysign(1, v)) for v in direction_vector]
+        screw_plates_list.append(screw_plate)
 
-        for direction in [
-            Alignment.LEFT,
-            Alignment.RIGHT,
-            Alignment.FRONT,
-            Alignment.BACK,
-        ]:
-            if (
-                direction_vector_signs[0] == direction.sign and direction.axis == 0
-            ) or (direction_vector_signs[1] == direction.sign and direction.axis == 1):
-                bridge_length = (
-                    tft_housing_border
-                    + tft_screen_clearance
-                    + tft_housing_wall_thickness * 0.25
-                    + tft_screw_holders_inset
-                    - tft_housing_wall_thickness / 2
-                )
-                bridge = create_box(
-                    (
-                        tft_housing_screw_plate_size
-                        if direction.axis == 1
-                        else bridge_length
-                    ),
-                    (
-                        tft_housing_screw_plate_size
-                        if direction.axis == 0
-                        else bridge_length
-                    ),
-                    tft_housing_screw_plate_thickness,
-                )
-                bridge = align(bridge, screw_plate, Alignment.CENTER)
-                bridge = align(bridge, screw_plate, direction.stack_alignment)
-                bridges = bridges.fuse(bridge)
+    all_screw_plates_center = np.array(get_bounding_box_center(screw_plates))
 
-                print_helper = create_right_triangle(
-                    bridge_length + tft_housing_screw_plate_size,
-                    bridge_length + tft_housing_screw_plate_size,
-                    tft_housing_screw_plate_size,
-                    extrusion_direction=(
-                        1 if direction.axis == 1 else 0,
-                        1 if direction.axis == 0 else 0,
-                        0,
-                    ),
-                    a_normal=(
-                        direction.sign if direction.axis == 0 else 0,
-                        direction.sign if direction.axis == 1 else 0,
-                        0,
-                    ),
-                    b_normal=(0, 0, 1),
-                )
-                print_helper = align(print_helper, bridge, Alignment.CENTER)
-                print_helper = align(print_helper, screw_plate, direction.opposite)
-                print_helper = align(print_helper, bridge, Alignment.STACK_TOP)
-                bridges = bridges.fuse(print_helper)
+    tft_bounding_box = get_bounding_box(tft)
+    min_z = tft_bounding_box[0][2]
 
-    housing_size = get_bounding_box_size(housing)
-    housing_inner_length = (
-        housing_size[0] - 2 * tft_housing_wall_thickness - 2 * tft_housing_fillet_radius
-    )
-    housing_inner_width = (
-        housing_size[1] - 2 * tft_housing_wall_thickness - 2 * tft_housing_fillet_radius
-    )
-    helper_size = (
-        tft_housing_border + tft_screen_clearance + tft_housing_wall_thickness / 2
-    )
+    arc_reach = tft_housing_border
 
-    border_print_helpers = []
-    for left_right in [Alignment.LEFT, Alignment.RIGHT]:
-        border_print_helper = create_right_triangle(
-            helper_size,
-            helper_size,
-            housing_inner_width,
-            extrusion_direction=(0, 1, 0),
-            a_normal=(left_right.sign, 0, 0),
-            b_normal=(0, 0, 1),
+    screw_drills = PartCollector()
+
+    for screw_plate in screw_plates_list:
+
+        screw_hole_diameter = MScrew.from_size(tft_screw_size).clearance_hole_loose
+        screw_hole = create_cylinder(screw_hole_diameter / 2, BIG_THING)
+        screw_hole = align(screw_hole, screw_plate, Alignment.CENTER)
+        screw_drills = screw_drills.fuse(screw_hole)
+
+        screw_plate_center = np.array(get_bounding_box_center(screw_plate))
+        p1 = np.array(screw_plate_center)
+        direction = normalize(p1 - all_screw_plates_center)
+        p1 += direction * (math.sqrt(2) * tft_housing_screw_plate_size / 2)
+
+        p2 = p1 + direction * arc_reach
+
+        p2[2] = min_z + tft_housing_front_screen_thickness / 2
+
+        p3 = [p1[0], p1[1], min_z]
+
+        screw_plate_support = create_ring_segment_between_points(
+            p1,
+            p2,
+            p3,
+            arc_reach * 4,
+            arc_reach * 4 + tft_housing_screw_plate_thickness,
+            tft_housing_screw_plate_size,
         )
-        border_print_helper = align(border_print_helper, housing, Alignment.CENTER)
-        border_print_helper = align(border_print_helper, housing, Alignment.BOTTOM)
-        border_print_helper = align(border_print_helper, housing, left_right)
-        border_print_helper = translate(
-            0,
-            0,
-            tft_housing_front_screen_thickness - 1e-1,
-        )(border_print_helper)
-        border_print_helpers.append(border_print_helper)
 
-    for front_back in [Alignment.FRONT, Alignment.BACK]:
-        border_print_helper = create_right_triangle(
-            helper_size,
-            helper_size,
-            housing_inner_length,
-            extrusion_direction=(1, 0, 0),
-            a_normal=(0, front_back.sign, 0),
-            b_normal=(0, 0, 1),
+        screw_plates = screw_plates.fuse(screw_plate_support)
+
+        # screw_plate_support_extension = create_box(
+        #     tft_housing_screw_plate_size,
+        #     tft_housing_screw_plate_size,
+        #     tft_housing_screw_plate_thickness,
+        # )
+
+        screw_plate_support_extension = create_cylinder(
+            tft_housing_screw_plate_size / 2,
+            tft_housing_screw_plate_thickness,
         )
-        border_print_helper = align(border_print_helper, housing, Alignment.CENTER)
-        border_print_helper = align(border_print_helper, housing, Alignment.BOTTOM)
-        border_print_helper = align(border_print_helper, housing, front_back)
-        border_print_helper = translate(
-            0,
-            0,
-            tft_housing_front_screen_thickness - 1e-1,
-        )(border_print_helper)
-        border_print_helpers.append(border_print_helper)
 
-    border_print_helpers_collector = PartCollector()
-    for border_print_helper in border_print_helpers:
-        border_print_helpers_collector = border_print_helpers_collector.fuse(
-            border_print_helper
+        screw_plate_support_extension = rotate(45)(screw_plate_support_extension)
+        screw_plate_support_extension = align(
+            screw_plate_support_extension, screw_plate, Alignment.CENTER
         )
-    housing = housing.fuse(border_print_helpers_collector)
 
-    bridges_and_screw_plates = bridges.fuse(screw_plates)
-    bridges_and_screw_plates = bridges_and_screw_plates.cut(screw_drills)
-    housing = housing.fuse(bridges_and_screw_plates)
+        extension_direction = normalize(np.sign(direction) * np.array([1, 1, 0]))
+        (
+            extension_rotation_axis,
+            direction_to_extension_direction_angle,
+        ) = shortest_arc_axis_angle(extension_direction, direction)
+        screw_plate_support_extension = rotate(
+            direction_to_extension_direction_angle,
+            axis=tuple(extension_rotation_axis),
+            center=tuple(screw_plate_center),
+        )(screw_plate_support_extension)
+
+        screw_plate_support_extension = translate(
+            *(direction * tft_housing_screw_plate_size * math.sqrt(2) / 2)
+        )(screw_plate_support_extension)
+        screw_plate_extension_hull = create_convex_hull(
+            screw_plate,
+            screw_plate_support_extension,
+        )
+        screw_plates = screw_plates.fuse(screw_plate_extension_hull)
+
+    screw_plates = screw_plates.cut(screw_drills)
+    housing = housing.fuse(screw_plates)
 
     return housing
 
