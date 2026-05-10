@@ -4,6 +4,15 @@ Description: Assembly configuration for the x-axis
 
 Builder:
   Visualization:
+    preview:
+      enabled: true
+      views:
+        - top
+        - left
+        - front
+      width: 512
+      height: 512
+
     parts:
       - source: dependencies
         assembly: x_axis_lower_profile_assembly
