@@ -578,6 +578,22 @@ process_data_generators:
       printer_id: megemaster
 
 process_data_presets:
+  petgcf_low_strength_high_speed_06:
+    generator: mege3devops_parametric
+    arguments:
+      material_name: petg_cf_generic
+      nozzle_diameter_mm: 0.6
+      nozzle_hardened: true
+      nozzle_high_flow: true
+      strength_factor: 0.25
+      quality_factor: 0.0
+    overrides:
+      process_overrides:
+        sparse_infill_pattern: "cubic"
+        support_object_first_layer_gap: "2.5"
+        xy_contour_compensation: "-0.3" # Calibrated for the high-speed PETG-CF 0.6 profile family.
+        xy_hole_compensation: "0.4" # Calibrated for the high-speed PETG-CF 0.6 profile family.
+
   petgcf_medium_strength_high_speed_06:
     generator: mege3devops_parametric
     arguments:

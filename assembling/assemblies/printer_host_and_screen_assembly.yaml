@@ -46,7 +46,7 @@ Builder:
         name_template: "{name}"
 
   Production:
-    process_data_preset: petgcf_medium_strength_high_speed_06
+    process_data_preset: petgcf_low_strength_high_speed_06
     parts:
       - source: self
         artifact: leader
