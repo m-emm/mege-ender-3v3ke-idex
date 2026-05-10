@@ -646,19 +646,8 @@ def create_raspi_mount_cylinders(raspi, tft):
     return mount_cylinders
 
 
-def main():
-    logging.basicConfig(level=logging.INFO)
-    parts = PartList()
-
-    # Create the part
+def create_printer_host_and_screen_assembly():
     tft = creaate_tft()
-    parts.add(
-        tft,
-        "bt_pi_tft_43",
-        flip=False,
-        skip_in_production=True,
-        color=tft_visual_color,
-    )
 
     housing = create_housing(tft)
 
@@ -673,13 +662,6 @@ def main():
         stack_gap=-(tft_housing_height - tft_housing_cut_height),
     )
     housing = housing.cut(housing_real_height_cutter)
-
-    parts.add(
-        housing,
-        "bt_pi_tft_43_housing",
-        flip=True,
-        color=tft_housing_visual_color,
-    )
 
     raspi = create_raspi_board()
 
@@ -700,19 +682,49 @@ def main():
     )
     raspi = move_raspi_on_standoffs(raspi)
 
-    raspi_board = raspi.leader
     raspi_connectors = create_raspi_connectors(raspi)
     raspi_connectors = raspi_connectors.fuse(raspi_mount_cylinders)
 
+    assembly = LeaderFollowersCuttersPart(housing)
+    assembly.add_named_non_production_part(tft.leaders_followers_fused(), "tft_43")
+    assembly.add_named_non_production_part(raspi.leader, "raspberry_pi_board")
+    assembly.add_named_non_production_part(
+        raspi_connectors,
+        "raspberry_pi_connectors",
+    )
+
+    return assembly
+
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+    parts = PartList()
+
+    assembly = create_printer_host_and_screen_assembly()
     parts.add(
-        raspi_board,
+        assembly.get_non_production_part_by_name("tft_43"),
+        "bt_pi_tft_43",
+        flip=False,
+        skip_in_production=True,
+        color=tft_visual_color,
+    )
+
+    parts.add(
+        assembly.leader,
+        "bt_pi_tft_43_housing",
+        flip=True,
+        color=tft_housing_visual_color,
+    )
+
+    parts.add(
+        assembly.get_non_production_part_by_name("raspberry_pi_board"),
         "raspi_board",
         flip=False,
         skip_in_production=True,
         color=raspi_pcb_color,
     )
     parts.add(
-        raspi_connectors,
+        assembly.get_non_production_part_by_name("raspberry_pi_connectors"),
         "raspi_connectors",
         flip=False,
         skip_in_production=True,

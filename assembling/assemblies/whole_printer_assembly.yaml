@@ -129,11 +129,6 @@ Builder:
         assembly: z_axis_guide_rod_top_mount_left
         artifact: all
         name_template: "{assembly_name}_{name}"
-        animation:
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
       - source: injected
         assembly: z_axis_bottom_support_right
         artifact: all
@@ -142,11 +137,6 @@ Builder:
         assembly: z_axis_guide_rod_top_mount_right
         artifact: all
         name_template: "{assembly_name}_{name}"
-        animation:
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
       - source: injected
         assembly: z_axis_top_bridge_profile
         artifact: all
@@ -179,6 +169,15 @@ Builder:
       - source: injected
         assembly: x_axis_top_profile
         artifact: all
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_mcu_holder
+        artifact: all
+        name_template: "{assembly_name}_{name}"
         animation:
           z_axis:
             - 0
@@ -415,6 +414,10 @@ Builder:
         name_template: "{assembly_name}_{name}"
       - source: injected
         assembly: y_z_axis_mcu_holder
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: printer_host_and_screen
         artifact: all
         name_template: "{assembly_name}_{name}"
 

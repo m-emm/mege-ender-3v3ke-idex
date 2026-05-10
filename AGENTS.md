@@ -268,6 +268,7 @@ Klipper `.cfg` files in `klipper_setup/klipper_config/` are tracked in git (see 
 ### Running Declarative Assemblies
 
 Use the repository's pyenv-selected Python directly from the repo root. Do not create or activate an ad-hoc `venv` here.
+Do not use --force unless absolutely necessary for shellforgepy development - the caching mechanism works reliably.
 
 ```bash
 # Visualize the x-axis assembly

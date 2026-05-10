@@ -1,0 +1,59 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the printer host and touchscreen
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - top
+        - right
+      width: 512
+      height: 512
+    parts:
+      - source: dependencies
+        assembly: printer_frame_assembly
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: dependencies
+        assembly: printer_foot_left_front_assembly
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: dependencies
+        assembly: printer_foot_left_back_assembly
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: dependencies
+        assembly: printer_foot_right_front_assembly
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: dependencies
+        assembly: printer_foot_right_back_assembly
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: self
+        artifact: leader
+        name: printer_host_screen_housing
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+
+  Production:
+    process_data_preset: petgcf_medium_strength_high_speed_06
+    parts:
+      - source: self
+        artifact: leader
+        name: printer_host_screen_housing
+        flip: true
+    arrange:
+      export_individual_parts: false
+
+Parts:
+  PrinterHostAndScreenAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.printer_host_and_screen_assembly.create_printer_host_and_screen_assembly

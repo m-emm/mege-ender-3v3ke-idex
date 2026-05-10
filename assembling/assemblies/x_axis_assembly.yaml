@@ -23,6 +23,10 @@ Builder:
         artifact: leader
         name: top_axis_profile
       - source: dependencies
+        assembly: x_axis_mcu_holder_assembly
+        artifact: all
+        name_template: "x_axis_mcu_holder_{name}"
+      - source: dependencies
         assembly: x_axis_rail_assembly
         artifact: leader
         name: rail
