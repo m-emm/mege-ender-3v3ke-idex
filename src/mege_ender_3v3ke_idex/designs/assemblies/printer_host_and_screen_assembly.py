@@ -27,7 +27,7 @@ raspi_mount_cylinder_diameter = 6
 raspi_tft_hover_gap = 23
 
 tft_housing_wall_thickness = 2.4
-tft_housing_border = 20
+tft_housing_border = 35
 tft_housing_fillet_radius = 4
 
 tft_housing_height = 60
@@ -48,6 +48,16 @@ tft_housing_join_boss_radius = 6.5
 tft_housing_join_boss_height = 9
 tft_housing_join_nut_slack = 0.25
 tft_housing_join_countersink_clearance = 0.3
+
+tft_housing_back_mount_screw_size = "M3"
+tft_housing_back_mount_wall_edge_margin = 10
+tft_housing_back_mount_pattern_x_spacing = 10
+tft_housing_back_mount_hole_to_slit_gap = 10
+tft_housing_back_mount_horizontal_slit_length = 60
+tft_housing_back_mount_vertical_slit_length = 22
+tft_housing_back_mount_slit_width = MScrew.from_size(
+    tft_housing_back_mount_screw_size
+).clearance_hole_loose
 
 
 def iter_housing_join_positions(part):
@@ -333,12 +343,12 @@ def create_housing_air_hole_cutter(housing_body):
     )
 
     air_holes = PartCollector()
-    air_holes_front_back = PartCollector()
+    air_holes_front = PartCollector()
     for i in range(num_air_holes_width):
         for j in range(num_air_holes_z):
             air_hole = create_box(
                 tft_housing_air_hole_size,
-                BIG_THING,
+                tft_housing_wall_thickness * 4,
                 tft_housing_air_hole_size,
             )
             air_hole = rotate(45, axis=(0, 1, 0))(air_hole)
@@ -347,10 +357,13 @@ def create_housing_air_hole_cutter(housing_body):
                 0,
                 j * tft_housing_air_hole_spacing,
             )(air_hole)
-            air_holes_front_back = air_holes_front_back.fuse(air_hole)
+            air_holes_front = air_holes_front.fuse(air_hole)
 
-    air_holes_front_back = align(air_holes_front_back, housing_body, Alignment.CENTER)
-    air_holes = air_holes.fuse(air_holes_front_back)
+    air_holes_front = align(
+        air_holes_front, housing_body, Alignment.CENTER, axes=[0, 2]
+    )
+    air_holes_front = align(air_holes_front, housing_body, Alignment.FRONT)
+    air_holes = air_holes.fuse(air_holes_front)
 
     air_holes_left_right = PartCollector()
     for i in range(num_air_holes_height):
@@ -372,6 +385,148 @@ def create_housing_air_hole_cutter(housing_body):
     air_holes = air_holes.fuse(air_holes_left_right)
 
     return air_holes
+
+
+def create_single_back_mount_pattern_cutter():
+    screw = MScrew.from_size(tft_housing_back_mount_screw_size)
+    hole_radius = screw.clearance_hole_loose / 2
+    cutter_depth = tft_housing_wall_thickness * 4
+
+    pattern = PartCollector()
+
+    hole = create_cylinder(
+        hole_radius,
+        cutter_depth,
+        direction=(0, 1, 0),
+        origin=(0, -cutter_depth / 2, 0),
+    )
+    pattern = pattern.fuse(hole)
+
+    horizontal_slit = create_rounded_slab(
+        tft_housing_back_mount_horizontal_slit_length,
+        tft_housing_back_mount_slit_width,
+        cutter_depth,
+        tft_housing_back_mount_slit_width / 2,
+    )
+    horizontal_slit = rotate(90, axis=(1, 0, 0))(horizontal_slit)
+    horizontal_slit = translate(
+        hole_radius + tft_housing_back_mount_hole_to_slit_gap,
+        0,
+        -tft_housing_back_mount_slit_width / 2,
+    )(horizontal_slit)
+    pattern = pattern.fuse(horizontal_slit)
+
+    vertical_slit = create_rounded_slab(
+        tft_housing_back_mount_slit_width,
+        tft_housing_back_mount_vertical_slit_length,
+        cutter_depth,
+        tft_housing_back_mount_slit_width / 2,
+    )
+    vertical_slit = rotate(90, axis=(1, 0, 0))(vertical_slit)
+    vertical_slit = translate(
+        -tft_housing_back_mount_slit_width / 2,
+        0,
+        hole_radius + tft_housing_back_mount_hole_to_slit_gap,
+    )(vertical_slit)
+    pattern = pattern.fuse(vertical_slit)
+
+    return pattern
+
+
+def get_back_mount_pattern_local_bounds():
+    screw = MScrew.from_size(tft_housing_back_mount_screw_size)
+    hole_radius = screw.clearance_hole_loose / 2
+    slit_radius = tft_housing_back_mount_slit_width / 2
+
+    if tft_housing_back_mount_wall_edge_margin < 0:
+        raise ValueError("Back mount wall edge margin must be non-negative")
+    if tft_housing_back_mount_pattern_x_spacing < 0:
+        raise ValueError("Back mount pattern X spacing must be non-negative")
+    if tft_housing_back_mount_hole_to_slit_gap < 0:
+        raise ValueError("Back mount hole-to-slit gap must be non-negative")
+    if tft_housing_back_mount_horizontal_slit_length <= 0:
+        raise ValueError("Back mount horizontal slit length must be positive")
+    if tft_housing_back_mount_vertical_slit_length <= 0:
+        raise ValueError("Back mount vertical slit length must be positive")
+    if tft_housing_back_mount_slit_width <= 0:
+        raise ValueError("Back mount slit width must be positive")
+
+    return (
+        -max(hole_radius, slit_radius),
+        max(
+            hole_radius,
+            hole_radius
+            + tft_housing_back_mount_hole_to_slit_gap
+            + tft_housing_back_mount_horizontal_slit_length,
+        ),
+        -max(hole_radius, slit_radius),
+        max(
+            hole_radius,
+            hole_radius
+            + tft_housing_back_mount_hole_to_slit_gap
+            + tft_housing_back_mount_vertical_slit_length,
+        ),
+    )
+
+
+def create_back_mount_pattern_cutter(housing_body):
+    body_bbox = get_bounding_box(housing_body)
+    body_min = np.array(body_bbox[0])
+    body_max = np.array(body_bbox[1])
+    back_y = body_bbox[1][1]
+    pattern_min_x, pattern_max_x, pattern_min_z, pattern_max_z = (
+        get_back_mount_pattern_local_bounds()
+    )
+    pattern_width = pattern_max_x - pattern_min_x
+    pattern_height = pattern_max_z - pattern_min_z
+
+    usable_min_x = body_min[0] + tft_housing_back_mount_wall_edge_margin
+    usable_max_x = body_max[0] - tft_housing_back_mount_wall_edge_margin
+    usable_min_z = body_min[2] + tft_housing_back_mount_wall_edge_margin
+    usable_max_z = body_max[2] - tft_housing_back_mount_wall_edge_margin
+    usable_width = usable_max_x - usable_min_x
+    usable_height = usable_max_z - usable_min_z
+
+    if pattern_width > usable_width:
+        raise ValueError(
+            "Back mount pattern is wider than the available back wall: "
+            f"{pattern_width:.2f} > {usable_width:.2f}"
+        )
+    if pattern_height > usable_height:
+        raise ValueError(
+            "Back mount pattern is taller than the available back wall: "
+            f"{pattern_height:.2f} > {usable_height:.2f}"
+        )
+
+    pattern_count = math.floor(
+        (usable_width + tft_housing_back_mount_pattern_x_spacing)
+        / (pattern_width + tft_housing_back_mount_pattern_x_spacing)
+    )
+    if pattern_count < 1:
+        raise ValueError("No back mount pattern fits on the available back wall")
+
+    total_pattern_width = (
+        pattern_count * pattern_width
+        + (pattern_count - 1) * tft_housing_back_mount_pattern_x_spacing
+    )
+    first_pattern_min_x = usable_min_x + (usable_width - total_pattern_width) / 2
+    hole_z = usable_min_z - pattern_min_z
+
+    patterns = PartCollector()
+
+    for index in range(pattern_count):
+        pattern = create_single_back_mount_pattern_cutter()
+        pattern_min_x_at_index = first_pattern_min_x + index * (
+            pattern_width + tft_housing_back_mount_pattern_x_spacing
+        )
+        pattern = translate(
+            pattern_min_x_at_index - pattern_min_x,
+            back_y,
+            hole_z,
+        )(pattern)
+        patterns = patterns.fuse(pattern)
+
+    return patterns
 
 
 def create_housing_join_receptacles(front_panel, housing_body):
@@ -493,6 +648,7 @@ def create_housing_body(tft, front_panel):
     )(housing_body)
 
     housing_body = housing_body.cut(create_housing_air_hole_cutter(housing_body))
+    housing_body = housing_body.cut(create_back_mount_pattern_cutter(housing_body))
     housing_body = housing_body.fuse(
         create_housing_join_receptacles(front_panel, housing_body)
     )
