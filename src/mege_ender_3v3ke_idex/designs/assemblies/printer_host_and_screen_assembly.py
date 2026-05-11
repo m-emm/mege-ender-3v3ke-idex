@@ -27,7 +27,7 @@ raspi_mount_cylinder_diameter = 6
 raspi_tft_hover_gap = 23
 
 tft_housing_wall_thickness = 2.4
-tft_housing_border = 35
+tft_housing_border = 38
 tft_housing_fillet_radius = 4
 
 tft_housing_height = 60
@@ -50,10 +50,11 @@ tft_housing_join_nut_slack = 0.25
 tft_housing_join_countersink_clearance = 0.3
 
 tft_housing_back_mount_screw_size = "M3"
+tft_housing_back_mount_arc_reach = 8
 tft_housing_back_mount_wall_edge_margin = 10
 tft_housing_back_mount_pattern_x_spacing = 10
 tft_housing_back_mount_hole_to_slit_gap = 10
-tft_housing_back_mount_horizontal_slit_length = 60
+tft_housing_back_mount_horizontal_slit_length = 55
 tft_housing_back_mount_vertical_slit_length = 22
 tft_housing_back_mount_slit_width = MScrew.from_size(
     tft_housing_back_mount_screw_size
@@ -253,8 +254,6 @@ def create_housing(tft):
     tft_bounding_box = get_bounding_box(tft)
     min_z = tft_bounding_box[0][2]
 
-    arc_reach = tft_housing_border * 0.5
-
     screw_drills = PartCollector()
 
     for screw_plate in screw_plates_list:
@@ -269,7 +268,7 @@ def create_housing(tft):
         direction = normalize(p1 - all_screw_plates_center)
         p1 += direction * (math.sqrt(2) * tft_housing_screw_plate_size / 2)
 
-        p2 = p1 + direction * arc_reach
+        p2 = p1 + direction * tft_housing_back_mount_arc_reach
 
         p2[2] = min_z + tft_housing_front_screen_thickness / 2
 
@@ -279,8 +278,8 @@ def create_housing(tft):
             p1,
             p2,
             p3,
-            arc_reach * 4,
-            arc_reach * 4 + tft_housing_screw_plate_thickness,
+            tft_housing_back_mount_arc_reach * 4,
+            tft_housing_back_mount_arc_reach * 4 + tft_housing_screw_plate_thickness,
             tft_housing_screw_plate_size,
         )
 
