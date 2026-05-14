@@ -42,10 +42,16 @@ tft_housing_air_hole_spacing = 10
 tft_air_hole_border = 5
 
 tft_housing_lid_thickness = tft_housing_wall_thickness
-tft_housing_lid_rim_height = 4.0
+tft_housing_lid_rim_height = 5
 tft_housing_lid_rim_thickness = tft_housing_wall_thickness
 tft_housing_lid_rim_clearance = 0.25
 tft_housing_lid_rim_fillet_radius = min(0.8, tft_housing_lid_rim_thickness * 0.4)
+tft_housing_lid_body_clearance = 0.4
+tft_housing_lid_holder_diameter = (
+    tft_housing_lid_rim_height * 0.75 - 2 * tft_housing_lid_body_clearance
+)
+tft_housing_lid_holder_x_inset = 20.0
+tft_housing_lid_holder_clearance = 0.2
 
 tft_housing_join_screw_size = "M4"
 tft_housing_join_screw_length = 12
@@ -466,6 +472,68 @@ def create_housing_lid_cable_cutout(lid):
     return retval
 
 
+def create_y_facing_hemisphere(radius, front_back):
+    if front_back not in [Alignment.FRONT, Alignment.BACK]:
+        raise ValueError("Hemisphere direction must be FRONT or BACK")
+
+    sphere = create_sphere(radius)
+    cut_positive_y = front_back == Alignment.FRONT
+    cutter = create_box(
+        BIG_THING,
+        BIG_THING,
+        BIG_THING,
+        origin=(
+            -BIG_THING / 2,
+            0 if cut_positive_y else -BIG_THING,
+            -BIG_THING / 2,
+        ),
+    )
+    return sphere.cut(cutter)
+
+
+def create_housing_lid_holders(rim):
+    holder_radius = tft_housing_lid_holder_diameter / 2
+    cutter_radius = holder_radius + tft_housing_lid_holder_clearance
+
+    holders = PartCollector()
+    holder_cutters = []
+    holder_cutter_names = []
+
+    for left_right in [Alignment.LEFT, Alignment.RIGHT]:
+        for front_back in [Alignment.FRONT, Alignment.BACK]:
+            holder = create_y_facing_hemisphere(holder_radius, front_back)
+            holder = align(holder, rim, left_right.edge_alignment)
+            holder = translate(
+                -left_right.sign * tft_housing_lid_holder_x_inset,
+                0,
+                0,
+            )(holder)
+            holder = align(holder, rim, Alignment.BOTTOM)
+            holder = align(holder, rim, front_back.stack_alignment)
+            holders = holders.fuse(holder)
+
+            holder_cutter = create_y_facing_hemisphere(cutter_radius, front_back)
+            holder_cutter = align(holder_cutter, rim, left_right.edge_alignment)
+            holder_cutter = translate(
+                -left_right.sign * tft_housing_lid_holder_x_inset,
+                0,
+                0,
+            )(holder_cutter)
+            holder_cutter = align(holder_cutter, rim, Alignment.CENTER, axes=[2])
+            holder_cutter = align(holder_cutter, rim, front_back.stack_alignment)
+            holder_cutters.append(holder_cutter)
+            holder_cutter_names.append(
+                f"lid_holder_dimple_{left_right.name.lower()}_"
+                f"{front_back.name.lower()}"
+            )
+
+    return LeaderFollowersCuttersPart(
+        holders,
+        cutters=holder_cutters,
+        cutter_names=holder_cutter_names,
+    )
+
+
 def create_single_back_mount_pattern_cutter():
     screw = MScrew.from_size(tft_housing_back_mount_screw_size)
     hole_radius = screw.clearance_hole_loose / 2
@@ -863,7 +931,12 @@ def create_housing_lid(front_panel, housing_body):
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
     lid = align(lid, front_panel, Alignment.CENTER, axes=[0, 1])
-    lid = align(lid, housing_body, Alignment.STACK_TOP)
+    lid = align(
+        lid,
+        housing_body,
+        Alignment.STACK_TOP,
+        stack_gap=tft_housing_lid_body_clearance,
+    )
 
     air_hole_cutter = create_housing_lid_air_hole_cutter(lid)
     lid = lid.cut(air_hole_cutter)
@@ -917,7 +990,11 @@ def create_housing_lid(front_panel, housing_body):
     rim = align(rim, lid, Alignment.CENTER, axes=[0, 1])
     rim = align(rim, lid, Alignment.STACK_BOTTOM)
 
-    return lid.fuse(rim)
+    holders = create_housing_lid_holders(rim)
+    lid = LeaderFollowersCuttersPart(lid.fuse(rim))
+    lid = lid.fuse(holders)
+
+    return lid
 
 
 def create_raspi_mount_cylinders(raspi, tft):
@@ -960,6 +1037,7 @@ def create_printer_host_and_screen_assembly(*, raspberry_pi_assembly):
     housing = housing.cut(housing_real_height_cutter)
     housing_body = create_housing_body(tft, housing)
     housing_lid = create_housing_lid(housing, housing_body)
+    housing_body = housing_lid.use_as_cutter_on(housing_body)
 
     move_raspi_to_center = align_translation(
         raspberry_pi_assembly.leader,
@@ -975,7 +1053,7 @@ def create_printer_host_and_screen_assembly(*, raspberry_pi_assembly):
 
     assembly = assembly.merge_except_leader(housing_body)
     assembly.add_named_follower(housing_body.leader, "housing_body")
-    assembly.add_named_follower(housing_lid, "housing_lid")
+    assembly.add_named_follower(housing_lid.leader, "housing_lid")
 
     assembly.add_named_non_production_part(tft.leaders_followers_fused(), "tft_43")
     assembly.add_named_non_production_part(
