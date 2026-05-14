@@ -38,12 +38,14 @@ Builder:
       - source: self
         artifact: leader
         name: psu_electrics_box
+        prod_rotation_angle: 90
+        prod_rotation_axis: [1, 0, 0]
       - source: self
         artifact: followers
         names:
           - cable_holder
         name_template: "{name}"
-        prod_rotation_angle: 90
+        prod_rotation_angle: 0
         prod_rotation_axis: [0, 1, 0]
     arrange:
       export_individual_parts: false
