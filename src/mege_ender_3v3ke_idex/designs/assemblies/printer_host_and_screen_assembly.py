@@ -41,7 +41,7 @@ tft_housing_air_hole_size = 4
 tft_housing_air_hole_spacing = 10
 tft_air_hole_border = 5
 
-tft_housing_lid_thickness = tft_housing_wall_thickness
+tft_housing_lid_thickness = 0.9
 tft_housing_lid_rim_height = 5
 tft_housing_lid_rim_thickness = tft_housing_wall_thickness
 tft_housing_lid_rim_clearance = 0.25
