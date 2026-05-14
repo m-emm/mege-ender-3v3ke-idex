@@ -139,6 +139,20 @@ remove_cmdline_param_prefix() {
   fi
 }
 
+remove_boot_config_setting_outside_all() {
+  local setting="$1"
+  local tmp
+
+  tmp="$(mktemp)"
+  awk -v setting="${setting}" '
+    /^\[/ { section=$0 }
+    $0 == setting && section != "[all]" { next }
+    { print }
+  ' "${BOOT_CONFIG}" > "${tmp}"
+  cat "${tmp}" > "${BOOT_CONFIG}"
+  rm -f "${tmp}"
+}
+
 # --- Base package install ----------------------------------------------------
 
 log "APT: update + baseline packages"
@@ -239,6 +253,25 @@ if [ -n "${WIFI_COUNTRY:-}" ]; then
   fi
   # Unblock WiFi (rfkill might not work in chroot, but doesn't hurt to try)
   rfkill unblock wifi 2>/dev/null || true
+fi
+
+if [ -f "${FILES_DIR}/klipperpi-wifi.nmconnection" ]; then
+  log "Installing NetworkManager WiFi profile"
+  install -d -m 0700 /etc/NetworkManager/system-connections
+  install -m 0600 "${FILES_DIR}/klipperpi-wifi.nmconnection" \
+    /etc/NetworkManager/system-connections/klipperpi-wifi-dongle.nmconnection
+
+  install -d -m 0755 /var/lib/NetworkManager
+  cat > /var/lib/NetworkManager/NetworkManager.state <<'EOF'
+[main]
+NetworkingEnabled=true
+WirelessEnabled=true
+WWANEnabled=true
+EOF
+
+  if [ -f /lib/systemd/system/NetworkManager.service ] || [ -f /etc/systemd/system/NetworkManager.service ]; then
+    systemctl_enable_safe NetworkManager
+  fi
 fi
 
 # --- SSH: keys + hardening + host keys --------------------------------------
@@ -387,10 +420,14 @@ log "Installing systemd units"
 
 require_file "${FILES_DIR}/klipper.service"
 require_file "${FILES_DIR}/moonraker.service"
+require_file "${FILES_DIR}/klipperpi-expand-rootfs.service"
+require_file "${FILES_DIR}/klipperpi-expand-rootfs-once.sh"
 # Note: klipperscreen.service not needed - LightDM handles KlipperScreen
 
 install -m 0644 "${FILES_DIR}/klipper.service" /etc/systemd/system/klipper.service
 install -m 0644 "${FILES_DIR}/moonraker.service" /etc/systemd/system/moonraker.service
+install -m 0644 "${FILES_DIR}/klipperpi-expand-rootfs.service" /etc/systemd/system/klipperpi-expand-rootfs.service
+install -m 0755 "${FILES_DIR}/klipperpi-expand-rootfs-once.sh" /usr/local/sbin/klipperpi-expand-rootfs-once.sh
 
 # Replace __USER__ placeholder
 sed -i "s/__USER__/${USERNAME}/g" \
@@ -400,6 +437,7 @@ sed -i "s/__USER__/${USERNAME}/g" \
 systemctl daemon-reload
 
 # Enable units (after they exist)
+systemctl_enable_safe klipperpi-expand-rootfs
 systemctl_enable_safe klipper
 systemctl_enable_safe moonraker
 # Note: klipperscreen runs via LightDM, not as a systemd service
@@ -409,6 +447,7 @@ systemctl_enable_safe moonraker
 log "Applying PiTFT43 display overlay"
 if [ -f "${BOOT_CONFIG}" ]; then
   log "Configuring Raspberry Pi 3 USB host driver"
+  remove_boot_config_setting_outside_all "dtoverlay=dwc2,dr_mode=host"
   ensure_boot_config_in_all \
     "dtoverlay=dwc2,dr_mode=host" \
     "Use dwc2 host mode; dwc_otg can hard-freeze Pi 3 with USB ACM MCU traffic."
@@ -477,6 +516,14 @@ python3 -m venv /opt/klipper-env
 /opt/klipper-env/bin/pip install --upgrade pip wheel
 /opt/klipper-env/bin/pip install -r /opt/klipper/scripts/klippy-requirements.txt
 chown -R "${USERNAME}:${USERNAME}" /opt/klipper /opt/klipper-env
+
+log "Pre-building Klipper host C helper"
+runuser -u "${USERNAME}" -- bash -lc 'cd /opt/klipper && /opt/klipper-env/bin/python - <<'"'"'PY'"'"'
+import sys
+sys.path.insert(0, "/opt/klipper")
+from klippy import chelper
+chelper.get_ffi()
+PY'
 
 log "Setting up Moonraker (venv + checkout)"
 clone_repo https://github.com/Arksine/moonraker.git /opt/moonraker "${MOONRAKER_COMMIT:-}"
@@ -562,6 +609,7 @@ log "Enablement sanity check"
 systemctl_enable_safe ssh
 systemctl_enable_safe avahi-daemon
 systemctl_enable_safe nginx
+systemctl_enable_safe klipperpi-expand-rootfs
 systemctl_enable_safe klipper
 systemctl_enable_safe moonraker
 # Note: klipperscreen runs via LightDM session, not as a systemd service

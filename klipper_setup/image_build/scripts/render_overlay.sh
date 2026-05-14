@@ -11,6 +11,8 @@ OUT_CONFIG="${PIGEN_DIR}/config"
 
 BUILD_ENV_SRC="${SECRETS_DIR}/build.env"
 AUTHORIZED_KEYS_SRC="${SECRETS_DIR}/authorized_keys"
+DEFAULT_WIFI_ENV_SRC="${HOME:-}/.config/klipperpi-idex/wifi.env"
+WIFI_ENV_SRC="${WIFI_ENV_SRC:-}"
 
 if [ ! -d "${PIGEN_DIR}" ]; then
   echo "pi-gen not found at ${PIGEN_DIR}. Bootstrapping local clone." >&2
@@ -79,12 +81,73 @@ if [ -z "${IMG_NAME:-}" ] || [ -z "${RELEASE:-}" ] || [ -z "${HOSTNAME:-}" ] || 
   exit 1
 fi
 
+if [ -z "${WIFI_ENV_SRC}" ]; then
+  if [ -f "${SECRETS_DIR}/wifi.env" ]; then
+    WIFI_ENV_SRC="${SECRETS_DIR}/wifi.env"
+  elif [ -n "${DEFAULT_WIFI_ENV_SRC}" ] && [ -f "${DEFAULT_WIFI_ENV_SRC}" ]; then
+    WIFI_ENV_SRC="${DEFAULT_WIFI_ENV_SRC}"
+  fi
+fi
+
 echo "Refreshing overlay into pi-gen/stage2/99-klipperpi"
 rsync -a --delete "${OVERLAY_SRC}/" "${PIGEN_DIR}/stage2/99-klipperpi/"
 
 echo "Injecting secrets (authorized_keys, build.env) into overlay files/"
 cp "${AUTHORIZED_KEYS_SRC}" "${PIGEN_DIR}/stage2/99-klipperpi/files/authorized_keys"
 cp "${BUILD_ENV_SRC}" "${PIGEN_DIR}/stage2/99-klipperpi/files/build.env"
+
+if [ -n "${WIFI_ENV_SRC}" ]; then
+  if [ ! -f "${WIFI_ENV_SRC}" ]; then
+    echo "WIFI_ENV_SRC points to a missing file: ${WIFI_ENV_SRC}" >&2
+    exit 1
+  fi
+
+  echo "Rendering NetworkManager WiFi profile from ${WIFI_ENV_SRC}"
+  set -a
+  # shellcheck disable=SC1090
+  source "${WIFI_ENV_SRC}"
+  set +a
+
+  if [ -z "${WIFI_SSID:-}" ] || [ -z "${WIFI_PASSWORD:-}" ]; then
+    echo "${WIFI_ENV_SRC} must define WIFI_SSID and WIFI_PASSWORD" >&2
+    exit 1
+  fi
+
+  if [[ "${WIFI_SSID}${WIFI_PASSWORD}${WIFI_IFACE:-}" == *$'\n'* ]] || \
+     [[ "${WIFI_SSID}${WIFI_PASSWORD}${WIFI_IFACE:-}" == *$'\r'* ]]; then
+    echo "WiFi values must not contain newline characters" >&2
+    exit 1
+  fi
+
+  WIFI_UUID="$(uuidgen | tr 'A-Z' 'a-z')"
+  WIFI_PROFILE="${PIGEN_DIR}/stage2/99-klipperpi/files/klipperpi-wifi.nmconnection"
+  cat > "${WIFI_PROFILE}" <<EOF
+[connection]
+id=klipperpi-wifi-dongle
+uuid=${WIFI_UUID}
+type=wifi
+autoconnect-priority=80
+interface-name=${WIFI_IFACE:-wlan1}
+
+[wifi]
+mode=infrastructure
+ssid=${WIFI_SSID}
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=${WIFI_PASSWORD}
+
+[ipv4]
+method=auto
+
+[ipv6]
+addr-gen-mode=default
+method=auto
+
+[proxy]
+EOF
+  chmod 0600 "${WIFI_PROFILE}"
+fi
 
 echo "Rendering pi-gen config at ${OUT_CONFIG}"
 cat > "${OUT_CONFIG}" <<EOF

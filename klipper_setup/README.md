@@ -19,7 +19,14 @@ cd klipper_setup/image_build
 cp klipper_setup/image_build/build.env.example klipper_setup/image_build/secrets/build.env
 ```
 2) Put your SSH public key in `klipper_setup/image_build/secrets/authorized_keys` (one or more lines).
-3) Adjust `build.env` values (hostname, locale, pins, etc.).
+3) Optional Wi-Fi: create `/Users/mege/.config/klipperpi-idex/wifi.env` or
+   `klipper_setup/image_build/secrets/wifi.env`:
+```bash
+WIFI_SSID="your-ssid"
+WIFI_PASSWORD="your-password"
+WIFI_IFACE="wlan1"
+```
+4) Adjust `build.env` values (hostname, locale, pins, etc.).
 
 ## Build
 ```bash
@@ -52,6 +59,8 @@ Or explicitly use the symlink:
 
 ## After boot (Milestone checks)
 - `ssh <USER>@<HOSTNAME>.local` works with your key.
+- If Wi-Fi was configured, `nmcli -t -f DEVICE,STATE,CONNECTION dev` shows
+  `wlan1` connected to `klipperpi-wifi-dongle`.
 - `lsusb -t` shows the root USB bus using `Driver=dwc2/1p` on Raspberry Pi 3.
 - `systemctl status klipper moonraker nginx lightdm` all green.
 - PiTFT43 shows KlipperScreen UI.
@@ -68,6 +77,11 @@ The image forces `dtoverlay=dwc2,dr_mode=host` under `[all]` because the legacy
 traffic on a USB CDC ACM MCU such as an RP2040/Pico. The build also removes
 stale `dwc_otg.*` kernel command-line options and masks ModemManager so it
 cannot probe the MCU serial port.
+
+The first boot also enables `klipperpi-expand-rootfs.service`, a one-shot
+service that grows the root partition/filesystem before Klipper starts. Without
+that, Klipper may run out of space while compiling its host C helper module on a
+freshly flashed card.
 
 ## Notes
 - Secrets and machine-specific files live in `klipper_setup/image_build/secrets/` (git-ignored).

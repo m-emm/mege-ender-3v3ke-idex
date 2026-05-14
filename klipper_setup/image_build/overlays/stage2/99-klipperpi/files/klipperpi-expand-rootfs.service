@@ -1,0 +1,13 @@
+[Unit]
+Description=Expand root filesystem on first boot
+After=local-fs.target
+Before=klipper.service moonraker.service lightdm.service
+ConditionPathExists=!/var/lib/klipperpi/rootfs-expanded
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/klipperpi-expand-rootfs-once.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
