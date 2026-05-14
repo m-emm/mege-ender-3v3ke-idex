@@ -41,6 +41,12 @@ tft_housing_air_hole_size = 4
 tft_housing_air_hole_spacing = 10
 tft_air_hole_border = 5
 
+tft_housing_lid_thickness = tft_housing_wall_thickness
+tft_housing_lid_rim_height = 4.0
+tft_housing_lid_rim_thickness = tft_housing_wall_thickness
+tft_housing_lid_rim_clearance = 0.25
+tft_housing_lid_rim_fillet_radius = min(0.8, tft_housing_lid_rim_thickness * 0.4)
+
 tft_housing_join_screw_size = "M4"
 tft_housing_join_screw_length = 12
 tft_housing_join_screw_edge_inset = 11
@@ -68,6 +74,11 @@ tft_housing_side_mount_screw_hole_front_offset = 20
 tft_housing_side_mount_tilt_range = 110
 tft_housing_side_mount_tilt_screw_spacing = 25
 tft_housing_side_mount_border = 6
+
+tft_housing_lid_cable_cutout_width = 10
+tft_housing_lid_cable_cutout_depth_ratio = 0.8
+tft_housing_lid_cable_cutout_right_offset = 12
+tft_housing_lid_cable_cutout_border = tft_housing_side_mount_border
 
 
 def iter_housing_join_positions(part):
@@ -393,6 +404,66 @@ def create_housing_air_hole_cutter(housing_body):
     air_holes = air_holes.fuse(air_holes_left_right)
 
     return air_holes
+
+
+def create_housing_lid_air_hole_cutter(lid):
+    lid_size = get_bounding_box_size(lid)
+
+    num_air_holes_width = math.floor(
+        (lid_size[0] - 2 * tft_air_hole_border) / tft_housing_air_hole_spacing
+    )
+    num_air_holes_height = math.floor(
+        (lid_size[1] - 2 * tft_air_hole_border) / tft_housing_air_hole_spacing
+    )
+
+    air_holes = PartCollector()
+    for i in range(num_air_holes_width):
+        for j in range(num_air_holes_height):
+            air_hole = create_box(
+                tft_housing_air_hole_size,
+                tft_housing_air_hole_size,
+                BIG_THING,
+            )
+            air_hole = rotate(45, axis=(0, 0, 1))(air_hole)
+            air_hole = translate(
+                i * tft_housing_air_hole_spacing,
+                j * tft_housing_air_hole_spacing,
+                0,
+            )(air_hole)
+            air_holes = air_holes.fuse(air_hole)
+
+    air_holes = align(air_holes, lid, Alignment.CENTER)
+
+    return air_holes
+
+
+def create_housing_lid_cable_cutout(lid):
+    lid_size = get_bounding_box_size(lid)
+    cutout_width = tft_housing_lid_cable_cutout_width
+    cutout_depth = lid_size[1] * tft_housing_lid_cable_cutout_depth_ratio
+    border = tft_housing_lid_cable_cutout_border
+    cutout_radius = cutout_width / 2
+    cutout_thickness = BIG_THING
+
+    cable_border_material = create_rounded_slab(
+        cutout_width + 2 * border,
+        cutout_depth + 2 * border,
+        tft_housing_lid_thickness,
+        cutout_radius + border,
+    )
+    cable_cutout = create_rounded_slab(
+        cutout_width,
+        cutout_depth,
+        cutout_thickness,
+        cutout_radius,
+    )
+    cable_cutout = align(cable_cutout, cable_border_material, Alignment.CENTER)
+    cable_border_material = cable_border_material.cut(cable_cutout)
+
+    retval = LeaderFollowersCuttersPart(cable_border_material)
+    retval.add_named_cutter(cable_cutout, "cable_cutout")
+
+    return retval
 
 
 def create_single_back_mount_pattern_cutter():
@@ -781,6 +852,74 @@ def create_housing_body(tft, front_panel):
     return housing_body
 
 
+def create_housing_lid(front_panel, housing_body):
+    front_panel_size = get_bounding_box_size(front_panel)
+
+    lid = create_filleted_box(
+        front_panel_size[0],
+        front_panel_size[1],
+        tft_housing_lid_thickness,
+        fillet_radius=tft_housing_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    lid = align(lid, front_panel, Alignment.CENTER, axes=[0, 1])
+    lid = align(lid, housing_body, Alignment.STACK_TOP)
+
+    air_hole_cutter = create_housing_lid_air_hole_cutter(lid)
+    lid = lid.cut(air_hole_cutter)
+
+    cable_cutout = create_housing_lid_cable_cutout(lid)
+    cable_cutout = align(cable_cutout, lid, Alignment.CENTER)
+    cable_cutout = align(cable_cutout, lid, Alignment.TOP)
+    cable_cutout = align(cable_cutout, lid, Alignment.EDGE_RIGHT)
+    cable_cutout = translate(-tft_housing_lid_cable_cutout_right_offset, 0, 0)(
+        cable_cutout
+    )
+
+    lid = lid.fuse(cable_cutout.leader)
+
+    lid = cable_cutout.use_as_cutter_on(lid)
+
+    rim_outer_length = (
+        front_panel_size[0]
+        - 2 * tft_housing_wall_thickness
+        - 2 * tft_housing_lid_rim_clearance
+    )
+    rim_outer_width = (
+        front_panel_size[1]
+        - 2 * tft_housing_wall_thickness
+        - 2 * tft_housing_lid_rim_clearance
+    )
+    rim_inner_length = rim_outer_length - 2 * tft_housing_lid_rim_thickness
+    rim_inner_width = rim_outer_width - 2 * tft_housing_lid_rim_thickness
+
+    if rim_inner_length <= 0 or rim_inner_width <= 0:
+        raise ValueError("Housing lid inner rim dimensions must be positive")
+
+    rim = create_filleted_box(
+        rim_outer_length,
+        rim_outer_width,
+        tft_housing_lid_rim_height,
+        fillet_radius=tft_housing_lid_rim_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    rim_inner_cutter = create_filleted_box(
+        rim_inner_length,
+        rim_inner_width,
+        BIG_THING,
+        fillet_radius=tft_housing_lid_rim_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    rim_inner_cutter = align(rim_inner_cutter, rim, Alignment.CENTER, axes=[0, 1])
+    rim_inner_cutter = align(rim_inner_cutter, rim, Alignment.CENTER, axes=[2])
+    rim = rim.cut(rim_inner_cutter)
+
+    rim = align(rim, lid, Alignment.CENTER, axes=[0, 1])
+    rim = align(rim, lid, Alignment.STACK_BOTTOM)
+
+    return lid.fuse(rim)
+
+
 def create_raspi_mount_cylinders(raspi, tft):
     mount_cylinders = PartCollector()
 
@@ -820,6 +959,7 @@ def create_printer_host_and_screen_assembly(*, raspberry_pi_assembly):
     )
     housing = housing.cut(housing_real_height_cutter)
     housing_body = create_housing_body(tft, housing)
+    housing_lid = create_housing_lid(housing, housing_body)
 
     move_raspi_to_center = align_translation(
         raspberry_pi_assembly.leader,
@@ -835,6 +975,7 @@ def create_printer_host_and_screen_assembly(*, raspberry_pi_assembly):
 
     assembly = assembly.merge_except_leader(housing_body)
     assembly.add_named_follower(housing_body.leader, "housing_body")
+    assembly.add_named_follower(housing_lid, "housing_lid")
 
     assembly.add_named_non_production_part(tft.leaders_followers_fused(), "tft_43")
     assembly.add_named_non_production_part(

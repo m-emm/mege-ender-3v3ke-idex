@@ -11,6 +11,7 @@ Builder:
         - front
         - top
         - right
+        - back
       width: 512
       height: 512
     parts:
@@ -57,8 +58,16 @@ Builder:
         flip: false
       - source: self
         artifact: followers
+        exclude_names:
+          - housing_lid
         name_template: "{name}"
         flip: false
+      - source: self
+        artifact: followers
+        names:
+          - housing_lid
+        name_template: "{name}"
+        flip: true
     arrange:
       export_individual_parts: false
       plates:
@@ -74,6 +83,12 @@ Builder:
         - name: housing_body
           parts:
             - housing_body
+          process_data:
+            process_overrides:
+              enable_support: "0"
+        - name: housing_lid
+          parts:
+            - housing_lid
           process_data:
             process_overrides:
               enable_support: "0"
