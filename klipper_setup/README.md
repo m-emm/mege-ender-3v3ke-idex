@@ -52,7 +52,8 @@ Or explicitly use the symlink:
 
 ## After boot (Milestone checks)
 - `ssh <USER>@<HOSTNAME>.local` works with your key.
-- `systemctl status klipper moonraker klipperscreen nginx` all green.
+- `lsusb -t` shows the root USB bus using `Driver=dwc2/1p` on Raspberry Pi 3.
+- `systemctl status klipper moonraker nginx lightdm` all green.
 - PiTFT43 shows KlipperScreen UI.
 - Mainsail reachable at `http://<hostname>.local/`.
 
@@ -60,6 +61,13 @@ Or explicitly use the symlink:
 - `overlays/stage2/99-klipperpi/files/printer.cfg` — replace with your real printer config.
 - `overlays/stage2/99-klipperpi/files/moonraker.conf` — extend to match your setup.
 - `overlays/stage2/99-klipperpi/files/pitft43.conf` — adjust rotation if you mount the screen differently.
+
+## Raspberry Pi 3 USB note
+The image forces `dtoverlay=dwc2,dr_mode=host` under `[all]` because the legacy
+`dwc_otg` host driver can hard-freeze a Raspberry Pi 3 when Klipper starts
+traffic on a USB CDC ACM MCU such as an RP2040/Pico. The build also removes
+stale `dwc_otg.*` kernel command-line options and masks ModemManager so it
+cannot probe the MCU serial port.
 
 ## Notes
 - Secrets and machine-specific files live in `klipper_setup/image_build/secrets/` (git-ignored).

@@ -55,6 +55,11 @@ if [ ! -f "${BOOT_CONFIG}" ]; then
   BOOT_CONFIG="/boot/config.txt"
 fi
 
+BOOT_CMDLINE="/boot/firmware/cmdline.txt"
+if [ ! -f "${BOOT_CMDLINE}" ]; then
+  BOOT_CMDLINE="/boot/cmdline.txt"
+fi
+
 # --- Sanity prerequisites ----------------------------------------------------
 
 require_cmd apt-get
@@ -93,6 +98,45 @@ systemctl_enable_safe() {
   local unit="$1"
   # "enable" should work even if systemd isn't running; it creates symlinks.
   systemctl enable "${unit}" >/dev/null 2>&1 || die "Failed to enable ${unit}"
+}
+
+ensure_boot_config_in_all() {
+  local setting="$1"
+  local comment="${2:-}"
+
+  if awk -v setting="${setting}" '
+    /^\[/ { section=$0 }
+    section == "[all]" && $0 == setting { found=1 }
+    END { exit found ? 0 : 1 }
+  ' "${BOOT_CONFIG}"; then
+    return 0
+  fi
+
+  if grep -q '^\[all\]' "${BOOT_CONFIG}"; then
+    if [ -n "${comment}" ]; then
+      sed -i "/^\\[all\\]/a ${setting}" "${BOOT_CONFIG}"
+      sed -i "/^\\[all\\]/a # ${comment}" "${BOOT_CONFIG}"
+    else
+      sed -i "/^\\[all\\]/a ${setting}" "${BOOT_CONFIG}"
+    fi
+  else
+    {
+      echo
+      echo "[all]"
+      if [ -n "${comment}" ]; then
+        echo "# ${comment}"
+      fi
+      echo "${setting}"
+    } >> "${BOOT_CONFIG}"
+  fi
+}
+
+remove_cmdline_param_prefix() {
+  local prefix="$1"
+
+  if [ -f "${BOOT_CMDLINE}" ]; then
+    sed -i -E "s/(^| )${prefix}[^ ]*//g; s/  +/ /g; s/^ //; s/ $//" "${BOOT_CMDLINE}"
+  fi
 }
 
 # --- Base package install ----------------------------------------------------
@@ -242,6 +286,18 @@ require_file "${FILES_DIR}/moonraker.pkla"
 install -d -m 0755 /etc/polkit-1/localauthority/50-local.d
 install -m 0644 "${FILES_DIR}/moonraker.pkla" /etc/polkit-1/localauthority/50-local.d/moonraker.pkla
 
+# --- USB serial hygiene ------------------------------------------------------
+
+log "Configuring USB serial stability"
+require_file "${FILES_DIR}/99-klipper-no-modemmanager.rules"
+install -d -m 0755 /etc/udev/rules.d
+install -m 0644 "${FILES_DIR}/99-klipper-no-modemmanager.rules" /etc/udev/rules.d/99-klipper-no-modemmanager.rules
+
+# ModemManager probing USB CDC ACM devices is hostile to Klipper MCUs. The unit
+# may not be installed on all image variants, so mask it opportunistically.
+systemctl disable ModemManager.service >/dev/null 2>&1 || true
+systemctl mask ModemManager.service >/dev/null 2>&1 || true
+
 # --- printer_data layout -----------------------------------------------------
 
 log "Creating printer_data layout under ${PRINTER_DATA}"
@@ -352,6 +408,16 @@ systemctl_enable_safe moonraker
 
 log "Applying PiTFT43 display overlay"
 if [ -f "${BOOT_CONFIG}" ]; then
+  log "Configuring Raspberry Pi 3 USB host driver"
+  ensure_boot_config_in_all \
+    "dtoverlay=dwc2,dr_mode=host" \
+    "Use dwc2 host mode; dwc_otg can hard-freeze Pi 3 with USB ACM MCU traffic."
+
+  if [ -f "${BOOT_CMDLINE}" ]; then
+    remove_cmdline_param_prefix 'dwc_otg\.'
+    remove_cmdline_param_prefix 'usbcore\.autosuspend='
+  fi
+
   require_file "${FILES_DIR}/pitft43.conf"
   if ! grep -q "gt911_btt_tft43_dip" "${BOOT_CONFIG}"; then
     cat "${FILES_DIR}/pitft43.conf" >> "${BOOT_CONFIG}"
@@ -377,15 +443,12 @@ if [ -f "${BOOT_CONFIG}" ]; then
   fi
   
   # Enable increased USB current limit (1.2A instead of 600mA)
-  # Required for Pico MCU with TMC2209 motor driver to prevent boot crashes
+  # Harmless on newer boards and useful for USB peripherals on older Pi models.
   if ! grep -q "^max_usb_current=1" "${BOOT_CONFIG}"; then
-    # Add to [all] section if it exists, otherwise append to end
-    if grep -q "^\[all\]" "${BOOT_CONFIG}"; then
-      sed -i '/^\[all\]/a max_usb_current=1' "${BOOT_CONFIG}"
-    else
-      echo -e "\n# Increase USB current limit for motor driver MCU\nmax_usb_current=1" >> "${BOOT_CONFIG}"
-    fi
-    log "Enabled max_usb_current=1 for USB peripherals (1.2A limit)"
+    ensure_boot_config_in_all \
+      "max_usb_current=1" \
+      "Increase USB current limit for USB peripherals on older Pi models."
+    log "Enabled max_usb_current=1 for USB peripherals"
   fi
 
   mkdir -p /boot/firmware/overlays /boot/overlays
