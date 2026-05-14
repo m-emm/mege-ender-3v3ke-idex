@@ -255,11 +255,14 @@ if [ -n "${WIFI_COUNTRY:-}" ]; then
   rfkill unblock wifi 2>/dev/null || true
 fi
 
-if [ -f "${FILES_DIR}/klipperpi-wifi.nmconnection" ]; then
-  log "Installing NetworkManager WiFi profile"
+wifi_profiles=("${FILES_DIR}"/klipperpi-wifi*.nmconnection)
+if [ -e "${wifi_profiles[0]}" ]; then
+  log "Installing NetworkManager WiFi profiles"
   install -d -m 0700 /etc/NetworkManager/system-connections
-  install -m 0600 "${FILES_DIR}/klipperpi-wifi.nmconnection" \
-    /etc/NetworkManager/system-connections/klipperpi-wifi-dongle.nmconnection
+  for wifi_profile in "${wifi_profiles[@]}"; do
+    install -m 0600 "${wifi_profile}" \
+      "/etc/NetworkManager/system-connections/$(basename "${wifi_profile}")"
+  done
 
   install -d -m 0755 /var/lib/NetworkManager
   cat > /var/lib/NetworkManager/NetworkManager.state <<'EOF'

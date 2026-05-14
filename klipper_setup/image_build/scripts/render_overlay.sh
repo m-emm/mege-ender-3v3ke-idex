@@ -108,22 +108,48 @@ if [ -n "${WIFI_ENV_SRC}" ]; then
   source "${WIFI_ENV_SRC}"
   set +a
 
-  if [ -z "${WIFI_SSID:-}" ] || [ -z "${WIFI_PASSWORD:-}" ]; then
-    echo "${WIFI_ENV_SRC} must define WIFI_SSID and WIFI_PASSWORD" >&2
+  WIFI_PROFILE_SSIDS=()
+  if declare -p WIFI_SSIDS >/dev/null 2>&1; then
+    eval 'WIFI_PROFILE_SSIDS=("${WIFI_SSIDS[@]}")'
+  elif [ -n "${WIFI_SSID:-}" ]; then
+    WIFI_PROFILE_SSIDS=("${WIFI_SSID}")
+  fi
+
+  if [ "${#WIFI_PROFILE_SSIDS[@]}" -eq 0 ] || [ -z "${WIFI_PASSWORD:-}" ]; then
+    echo "${WIFI_ENV_SRC} must define WIFI_SSID or WIFI_SSIDS, plus WIFI_PASSWORD" >&2
     exit 1
   fi
 
-  if [[ "${WIFI_SSID}${WIFI_PASSWORD}${WIFI_IFACE:-}" == *$'\n'* ]] || \
-     [[ "${WIFI_SSID}${WIFI_PASSWORD}${WIFI_IFACE:-}" == *$'\r'* ]]; then
+  if [[ "${WIFI_PASSWORD}${WIFI_IFACE:-}" == *$'\n'* ]] || \
+     [[ "${WIFI_PASSWORD}${WIFI_IFACE:-}" == *$'\r'* ]]; then
     echo "WiFi values must not contain newline characters" >&2
     exit 1
   fi
 
-  WIFI_UUID="$(uuidgen | tr 'A-Z' 'a-z')"
-  WIFI_PROFILE="${PIGEN_DIR}/stage2/99-klipperpi/files/klipperpi-wifi.nmconnection"
-  cat > "${WIFI_PROFILE}" <<EOF
+  rm -f \
+    "${PIGEN_DIR}/stage2/99-klipperpi/files/klipperpi-wifi.nmconnection" \
+    "${PIGEN_DIR}/stage2/99-klipperpi/files"/klipperpi-wifi-*.nmconnection
+
+  WIFI_INDEX=0
+  for WIFI_PROFILE_SSID in "${WIFI_PROFILE_SSIDS[@]}"; do
+    WIFI_INDEX=$((WIFI_INDEX + 1))
+
+    if [ -z "${WIFI_PROFILE_SSID}" ] || [[ "${WIFI_PROFILE_SSID}" == *$'\n'* ]] || \
+       [[ "${WIFI_PROFILE_SSID}" == *$'\r'* ]]; then
+      echo "WiFi SSIDs must be non-empty and must not contain newline characters" >&2
+      exit 1
+    fi
+
+    WIFI_UUID="$(uuidgen | tr 'A-Z' 'a-z')"
+    WIFI_SAFE_NAME="$(printf '%s' "${WIFI_PROFILE_SSID}" | tr -cs 'A-Za-z0-9_.-' '-' | sed -E 's/^-+//; s/-+$//')"
+    if [ -z "${WIFI_SAFE_NAME}" ]; then
+      WIFI_SAFE_NAME="network-${WIFI_INDEX}"
+    fi
+
+    WIFI_PROFILE="${PIGEN_DIR}/stage2/99-klipperpi/files/klipperpi-wifi-${WIFI_INDEX}-${WIFI_SAFE_NAME}.nmconnection"
+    cat > "${WIFI_PROFILE}" <<EOF
 [connection]
-id=klipperpi-wifi-dongle
+id=klipperpi-wifi-${WIFI_SAFE_NAME}
 uuid=${WIFI_UUID}
 type=wifi
 autoconnect-priority=80
@@ -131,7 +157,7 @@ interface-name=${WIFI_IFACE:-wlan1}
 
 [wifi]
 mode=infrastructure
-ssid=${WIFI_SSID}
+ssid=${WIFI_PROFILE_SSID}
 
 [wifi-security]
 key-mgmt=wpa-psk
@@ -146,7 +172,8 @@ method=auto
 
 [proxy]
 EOF
-  chmod 0600 "${WIFI_PROFILE}"
+    chmod 0600 "${WIFI_PROFILE}"
+  done
 fi
 
 echo "Rendering pi-gen config at ${OUT_CONFIG}"

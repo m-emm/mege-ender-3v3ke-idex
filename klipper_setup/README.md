@@ -22,7 +22,7 @@ cp klipper_setup/image_build/build.env.example klipper_setup/image_build/secrets
 3) Optional Wi-Fi: create `/Users/mege/.config/klipperpi-idex/wifi.env` or
    `klipper_setup/image_build/secrets/wifi.env`:
 ```bash
-WIFI_SSID="your-ssid"
+WIFI_SSIDS=("office-ssid" "basement-ssid")
 WIFI_PASSWORD="your-password"
 WIFI_IFACE="wlan1"
 ```
