@@ -53,6 +53,8 @@ Builder:
         - name: board_holder_base
           parts:
             - board_holder
+        - name: board_holder_side_walls
+          parts:
             - side_walls
         - name: board_holder_tpu_cover
           process_data_preset: tpu_minimal_quality_minimal_strength_06
