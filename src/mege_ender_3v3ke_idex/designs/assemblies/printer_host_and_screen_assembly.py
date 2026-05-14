@@ -60,6 +60,15 @@ tft_housing_back_mount_slit_width = MScrew.from_size(
     tft_housing_back_mount_screw_size
 ).clearance_hole_loose
 
+tft_housing_side_mount_screw_size = "M5"
+tft_housing_side_mount_screw_length = 12
+tft_housing_side_mount_screw_hole_back_offset = 20
+tft_housing_side_mount_screw_hole_front_offset = 20
+
+tft_housing_side_mount_tilt_range = 110
+tft_housing_side_mount_tilt_screw_spacing = 25
+tft_housing_side_mount_border = 6
+
 
 def iter_housing_join_positions(part):
     bbox = get_bounding_box(part)
@@ -651,6 +660,123 @@ def create_housing_body(tft, front_panel):
     housing_body = housing_body.fuse(
         create_housing_join_receptacles(front_panel, housing_body)
     )
+    housing_body = LeaderFollowersCuttersPart(housing_body)
+
+    side_mount_screw = create_cylinder_screw(
+        tft_housing_side_mount_screw_size,
+        tft_housing_side_mount_screw_length,
+    )
+
+    side_mount_screw_offset = (
+        MScrew.from_size(tft_housing_side_mount_screw_size).cylinder_head_height
+        + tft_housing_wall_thickness
+    )
+    side_mount_screw = rotate(90, axis=(0, 1, 0))(side_mount_screw)
+    side_mount_screw = align(side_mount_screw, housing_body, Alignment.CENTER)
+    side_mount_screw = align(
+        side_mount_screw,
+        housing_body,
+        Alignment.STACK_LEFT,
+        stack_gap=-side_mount_screw_offset,
+    )
+
+    side_mount_screw = align(side_mount_screw, housing_body, Alignment.EDGE_BACK)
+    side_mount_screw = align(side_mount_screw, housing_body, Alignment.EDGE_BOTTOM)
+
+    side_mount_screw = translate(
+        0,
+        -tft_housing_side_mount_screw_hole_back_offset,
+        tft_housing_side_mount_screw_hole_front_offset,
+    )(side_mount_screw)
+
+    tft_housing_side_mount_screw_hole_diameter = MScrew.from_size(
+        tft_housing_side_mount_screw_size
+    ).clearance_hole_loose
+
+    housing_body.add_named_non_production_part(side_mount_screw, "side_mount_screw")
+
+    side_mount_screw_hole_cutter = create_cylinder(
+        MScrew.from_size(tft_housing_side_mount_screw_size).clearance_hole_loose / 2,
+        BIG_THING,
+    )
+    side_mount_screw_hole_border_material = create_ring(
+        tft_housing_side_mount_screw_hole_diameter / 2 + tft_housing_side_mount_border,
+        tft_housing_side_mount_screw_hole_diameter / 2,
+        tft_housing_wall_thickness,
+    )
+
+    side_mount_screw_hole_and_border = LeaderFollowersCuttersPart(
+        side_mount_screw_hole_border_material, cutters=[side_mount_screw_hole_cutter]
+    )
+
+    side_mount_screw_hole_and_border = rotate(90, axis=(0, 1, 0))(
+        side_mount_screw_hole_and_border
+    )
+    side_mount_screw_hole_and_border = align(
+        side_mount_screw_hole_and_border, side_mount_screw, Alignment.CENTER
+    )
+    side_mount_screw_hole_and_border = align(
+        side_mount_screw_hole_and_border, housing_body, Alignment.LEFT
+    )
+
+    tilt_screw_mount_cutter = create_rounded_ends_ring(
+        tft_housing_side_mount_tilt_screw_spacing
+        + tft_housing_side_mount_screw_hole_diameter,
+        tft_housing_side_mount_tilt_screw_spacing,
+        BIG_THING,
+        angle=tft_housing_side_mount_tilt_range,
+    )
+
+    tilt_screw_mount_border_material = create_rounded_ends_ring(
+        tft_housing_side_mount_tilt_screw_spacing
+        + tft_housing_side_mount_screw_hole_diameter
+        + tft_housing_side_mount_border,
+        tft_housing_side_mount_tilt_screw_spacing - tft_housing_side_mount_border,
+        tft_housing_wall_thickness,
+        angle=tft_housing_side_mount_tilt_range,
+    )
+
+    marker = create_box(0.01, 0.001, 0.01, origin=(-0.005, -0.0005, -0.005))
+
+    tilt_screw_mount_cutter_assembly = LeaderFollowersCuttersPart(marker)
+
+    tilt_screw_mount_cutter_assembly.add_named_cutter(
+        tilt_screw_mount_cutter, "slit_cutter"
+    )
+
+    tilt_screw_mount_cutter_assembly.add_named_follower(
+        tilt_screw_mount_border_material, "border_material"
+    )
+
+    tilt_screw_mount_cutter_assembly = rotate(180)(tilt_screw_mount_cutter_assembly)
+
+    tilt_screw_mount_cutter_assembly = rotate(90, axis=(0, 1, 0))(
+        tilt_screw_mount_cutter_assembly
+    )
+
+    tilt_screw_mount_cutter_assembly = align(
+        tilt_screw_mount_cutter_assembly, side_mount_screw, Alignment.CENTER
+    )
+    tilt_screw_mount_cutter_assembly = (
+        tilt_screw_mount_cutter_assembly.aligned_from_cutter(
+            "slit_cutter",
+            housing_body,
+            Alignment.STACK_LEFT,
+            stack_gap=-2 * tft_housing_wall_thickness,
+        )
+    )
+
+    tilt_screw_mount_border_material = (
+        tilt_screw_mount_cutter_assembly.get_follower_part_by_name("border_material")
+    )
+    tilt_screw_mount_border_material = align(
+        tilt_screw_mount_border_material, housing_body, Alignment.LEFT
+    )
+    housing_body = housing_body.fuse(tilt_screw_mount_border_material)
+    housing_body = housing_body.fuse(side_mount_screw_hole_and_border)
+
+    housing_body = tilt_screw_mount_cutter_assembly.use_as_cutter_on(housing_body)
+    housing_body = side_mount_screw_hole_and_border.use_as_cutter_on(housing_body)
 
     return housing_body
 
@@ -706,7 +832,10 @@ def create_printer_host_and_screen_assembly(*, raspberry_pi_assembly):
     raspi_mount_cylinders = create_raspi_mount_cylinders(raspi, tft)
 
     assembly = LeaderFollowersCuttersPart(housing)
-    assembly.add_named_follower(housing_body, "housing_body")
+
+    assembly = assembly.merge_except_leader(housing_body)
+    assembly.add_named_follower(housing_body.leader, "housing_body")
+
     assembly.add_named_non_production_part(tft.leaders_followers_fused(), "tft_43")
     assembly.add_named_non_production_part(
         raspi_mount_cylinders,
