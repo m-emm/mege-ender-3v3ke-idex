@@ -72,6 +72,7 @@ Builder:
       export_individual_parts: false
       plates:
         - name: front_panel
+          process_data_preset: petgcf_max_strength_high_speed_06
           parts:
             - printer_host_screen_housing
           process_data:

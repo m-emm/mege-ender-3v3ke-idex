@@ -86,6 +86,9 @@ tft_housing_lid_cable_cutout_depth_ratio = 0.8
 tft_housing_lid_cable_cutout_right_offset = 12
 tft_housing_lid_cable_cutout_border = tft_housing_side_mount_border
 
+tft_housing_screw_plate_arc_thickness = 7
+tft_housing_screw_plate_arc_inner_slit_thickness = 0.2
+
 
 def iter_housing_join_positions(part):
     bbox = get_bounding_box(part)
@@ -244,6 +247,7 @@ def create_housing(tft):
     screw_plates = PartCollector()
     screw_drills = PartCollector()
     screw_plates_list = []
+    screw_plate_support_cutters = PartCollector()
     for screw_holder in tft.followers:
         screw_plate = create_box(
             tft_housing_screw_plate_size,
@@ -305,8 +309,30 @@ def create_housing(tft):
             p2,
             p3,
             tft_housing_back_mount_arc_reach * 4,
-            tft_housing_back_mount_arc_reach * 4 + tft_housing_screw_plate_thickness,
+            tft_housing_back_mount_arc_reach * 4
+            + tft_housing_screw_plate_arc_thickness,
             tft_housing_screw_plate_size,
+        )
+
+        support_cutter_p1 = (
+            p1
+            + np.array([0, 0, -tft_housing_screw_plate_thickness])
+            + direction * tft_housing_screw_plate_thickness
+        )
+        support_cutter_p2 = np.array(
+            [p2[0], p2[1], min_z + tft_housing_front_screen_thickness / 2]
+        )
+        screw_plate_support_cutter = create_ring_segment_between_points(
+            support_cutter_p1,
+            support_cutter_p2,
+            p3,
+            tft_housing_back_mount_arc_reach * 4
+            + tft_housing_screw_plate_arc_thickness / 2
+            - tft_housing_screw_plate_arc_inner_slit_thickness / 2,
+            tft_housing_back_mount_arc_reach * 4
+            + tft_housing_screw_plate_arc_thickness / 2
+            + tft_housing_screw_plate_arc_inner_slit_thickness / 2,
+            tft_housing_screw_plate_size * 0.5,
         )
 
         screw_plates = screw_plates.fuse(screw_plate_support)
@@ -345,10 +371,17 @@ def create_housing(tft):
             screw_plate,
             screw_plate_support_extension,
         )
+
         screw_plates = screw_plates.fuse(screw_plate_extension_hull)
+        screw_plates = screw_plates.cut(screw_plate_support_cutter)
+
+        screw_plate_support_cutters = screw_plate_support_cutters.fuse(
+            screw_plate_support_cutter
+        )
 
     screw_plates = screw_plates.cut(screw_drills)
     housing = housing.fuse(screw_plates)
+    housing = housing.cut(screw_plate_support_cutters)
     housing = housing.cut(create_housing_join_front_panel_cutter(housing))
 
     return housing
