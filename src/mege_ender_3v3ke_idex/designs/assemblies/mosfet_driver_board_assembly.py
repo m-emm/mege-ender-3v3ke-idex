@@ -145,7 +145,7 @@ def create_mosfet_driver_board_assembly(
         raise ValueError("Terminal blocks do not fit within the board width.")
 
     terminal_block_x_origin = (
-        mosfet_driver_board_length - mosfet_driver_terminal_block_length
+        mosfet_driver_board_length - mosfet_driver_terminal_block_length - 2
     )
     package_x_origin = (
         terminal_block_x_origin

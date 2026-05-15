@@ -79,6 +79,10 @@ Parameters:
     Type: Float
   board_holder_tmc_to_additional_pins_gap_x:
     Type: Float
+  board_holder_usb_cable_hole_width:
+    Type: Float
+  board_holder_usb_cable_hole_height:
+    Type: Float
   x_axis_mcu_dil_pitch:
     Type: Float
   board_holder_tpu_cover_thickness:

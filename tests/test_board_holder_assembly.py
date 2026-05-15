@@ -91,6 +91,8 @@ def _build_holder(
         board_holder_tmc_board_count=board_holder_tmc_board_count,
         board_holder_pico_to_tmc_gap_x=board_holder_pico_to_tmc_gap_x,
         board_holder_tmc_to_additional_pins_gap_x=board_holder_tmc_to_additional_pins_gap_x,
+        board_holder_usb_cable_hole_width=10,
+        board_holder_usb_cable_hole_height=10,
         x_axis_mcu_dil_pitch=dil_pitch,
         board_holder_tpu_cover_thickness=1.4,
         board_holder_tpu_cover_gap_above_base=1.5,

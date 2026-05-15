@@ -284,6 +284,11 @@ def _create_tpu_cover(
                 mosfet_driver_board.get_follower_part_by_name("mosfet_package_back"),
             ]
         )
+
+        mosfet_clearance_reference = materialize_bounding_box(
+            mosfet_clearance_reference, x_enlargement=0.5, y_enlargement=2
+        )
+
         cover = _cut_cover_window_for_part_bbox(
             cover=cover,
             part=mosfet_clearance_reference,
@@ -488,6 +493,8 @@ def create_board_holder_assembly(
     board_holder_tmc_board_count,
     board_holder_pico_to_tmc_gap_x,
     board_holder_tmc_to_additional_pins_gap_x,
+    board_holder_usb_cable_hole_width,
+    board_holder_usb_cable_hole_height,
     x_axis_mcu_dil_pitch,
     board_holder_tpu_cover_thickness,
     board_holder_tpu_cover_gap_above_base,
@@ -683,9 +690,6 @@ def create_board_holder_assembly(
     cover_plug_holes = _fuse_parts(cover_plug_hole_cutters)
     all_holders.leader = all_holders.leader.cut(cover_plug_holes)
     all_holders.add_named_cutter(cover_plug_holes, "cover_plug_holes")
-    all_holders.add_named_follower(tpu_cover, "tpu_cover")
-    all_holders.additional_data["tpu_cover_straps"] = tpu_cover_strap_metadata
-
     all_holders = all_holders.merge_except_leader(
         pico_board.prefixed_copy("pico_board")
     )
@@ -922,16 +926,65 @@ def create_board_holder_assembly(
             mount_posts = mount_posts.fuse(mount_post)
 
     connector_part = pico_board.get_non_production_part_by_name("micro_usb_socket")
-    usb_cable_cutter = create_box(10, BIG_THING, 10)
+    usb_cable_cutter = create_box(
+        board_holder_usb_cable_hole_width,
+        BIG_THING,
+        board_holder_usb_cable_hole_height,
+    )
 
     usb_cable_cutter = align(usb_cable_cutter, connector_part, Alignment.CENTER)
     usb_cable_cutter = align(usb_cable_cutter, connector_part, Alignment.FRONT)
-    usb_cable_cutter = align(usb_cable_cutter, base_plate, Alignment.STACK_TOP)
 
     side_walls = side_walls.cut(usb_cable_cutter)
 
     side_walls = side_walls.fuse(mount_posts)
     side_walls = side_walls.cut(mount_screw_holes)
+
+    # pico usb bridge
+
+    bridge_wall_thickness = 2
+
+    usb_cover_bridge = materialize_bounding_box(
+        usb_cable_cutter,
+        x_enlargement=bridge_wall_thickness,
+        z_enlargement=bridge_wall_thickness,
+    )
+    usb_cover_bridge = usb_cover_bridge.cut(usb_cable_cutter)
+
+    usb_cover_bridge = fit_part_between(
+        usb_cover_bridge, (0, 1, 0), limiting_start_part=connector_part
+    )
+
+    all_holders_size = get_bounding_box_size(all_holders)
+
+    usb_cover_bridge_cutter = create_box_hole_cutter(
+        all_holders_size[0], all_holders_size[1], BIG_THING
+    )
+    usb_cover_bridge_cutter = align(
+        usb_cover_bridge_cutter, all_holders, Alignment.CENTER
+    )
+    usb_cover_bridge_cutter = align(
+        usb_cover_bridge_cutter, all_holders, Alignment.BOTTOM
+    )
+
+    usb_cover_bridge = usb_cover_bridge_cutter.use_as_cutter_on(usb_cover_bridge)
+
+    all_holders = all_holders.fuse(usb_cover_bridge)
+
+    usb_cover_bridge_bottom_cutter = fit_part_between(
+        usb_cable_cutter, (0, 1, 0), limiting_start_part=connector_part
+    )
+
+    all_holders = all_holders.cut(usb_cover_bridge_bottom_cutter)
+
+    usb_cover_bridge_outside_cutter = materialize_bounding_box(
+        usb_cover_bridge, x_enlargement=0.2, y_enlargement=0.2
+    )
+
+    tpu_cover = tpu_cover.cut(usb_cover_bridge_outside_cutter)
+
+    all_holders.add_named_follower(tpu_cover, "tpu_cover")
+    all_holders.additional_data["tpu_cover_straps"] = tpu_cover_strap_metadata
 
     if board_holder_frame_mount_eyes_enabled:
         side_walls_size = get_bounding_box_size(side_walls)
