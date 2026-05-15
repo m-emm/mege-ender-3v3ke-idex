@@ -15,10 +15,10 @@ Builder:
       width: 512
       height: 512
     parts:
-      - source: dependencies
-        assembly: printer_frame_assembly
-        artifact: leader
-        name: printer_frame
+      # - source: dependencies
+      #   assembly: printer_frame_assembly
+      #   artifact: leader
+      #   name: printer_frame
       - source: self
         artifact: leader
         name: board_holder

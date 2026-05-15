@@ -958,7 +958,7 @@ def create_board_holder_assembly(
     all_holders_size = get_bounding_box_size(all_holders)
 
     usb_cover_bridge_cutter = create_box_hole_cutter(
-        all_holders_size[0], all_holders_size[1], BIG_THING
+        all_holders_size[0], all_holders_size[1], BIG_THING, cutter_size=2000
     )
     usb_cover_bridge_cutter = align(
         usb_cover_bridge_cutter, all_holders, Alignment.CENTER
