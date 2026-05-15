@@ -145,6 +145,20 @@ def _contains_point(positions, expected_position):
     )
 
 
+def _tmc_follower_prefix(tmc_index):
+    if tmc_index == 0:
+        return "tmc_board"
+    return f"tmc_board_{tmc_index + 1}"
+
+
+def _elko_names(assembly):
+    return sorted(
+        name
+        for name in assembly.non_production_indices_by_name
+        if name.startswith("elko_") and name.endswith("_elko")
+    )
+
+
 def test_pico_to_tmc_gap_x_controls_the_board_to_board_spacing():
     configured_gap = 7.25
     assembly = _build_holder(
@@ -256,6 +270,69 @@ def test_tmc_row_keeps_the_same_front_back_story_as_before():
 
     assert row_front == pytest.approx(pico_board_bbox[0][1])
     assert row_back == pytest.approx(pico_board_bbox[1][1])
+
+
+def test_elko_socket_count_tracks_tmc_board_count():
+    for tmc_board_count in [2, 3]:
+        assembly = _build_holder(
+            board_holder_tmc_board_count=tmc_board_count,
+            board_holder_pico_to_tmc_gap_x=11.43,
+        )
+
+        assembly.get_follower_part_by_name("elko_sleeve_plates")
+        assert _elko_names(assembly) == [
+            f"elko_{tmc_index + 1}_elko"
+            for tmc_index in range(tmc_board_count)
+        ]
+        assert len(assembly.additional_data["elko_socket_plate_bboxes"]) == (
+            tmc_board_count
+        )
+        assert len(assembly.additional_data["elko_socket_sleeve_bboxes"]) == (
+            tmc_board_count
+        )
+
+
+def test_elko_socket_plates_span_the_tmc_pin_fields():
+    tmc_board_count = 3
+    assembly = _build_holder(
+        board_holder_tmc_board_count=tmc_board_count,
+        board_holder_pico_to_tmc_gap_x=11.43,
+    )
+
+    for tmc_index in range(tmc_board_count):
+        tmc_dil_bbox = get_bounding_box(
+            assembly.get_follower_part_by_name(
+                f"{_tmc_follower_prefix(tmc_index)}_dil"
+            )
+        )
+        socket_plate_bbox = assembly.additional_data["elko_socket_plate_bboxes"][
+            tmc_index
+        ]
+
+        assert socket_plate_bbox[0][0] < tmc_dil_bbox[0][0]
+        assert socket_plate_bbox[1][0] > tmc_dil_bbox[1][0]
+        assert socket_plate_bbox[0][1] < tmc_dil_bbox[0][1]
+        assert socket_plate_bbox[1][1] > tmc_dil_bbox[1][1]
+        assert socket_plate_bbox[0][2] == pytest.approx(tmc_dil_bbox[0][2])
+
+
+def test_elko_sleeves_fall_back_to_the_fixed_side_wall_envelope():
+    assembly = _build_holder(
+        board_holder_tmc_board_count=3,
+        board_holder_pico_to_tmc_gap_x=11.43,
+    )
+
+    side_walls_bbox = get_bounding_box(assembly.get_follower_part_by_name("side_walls"))
+    assert assembly.additional_data["elko_socket_placements"] == [
+        "side",
+        "side",
+        "side",
+    ]
+
+    for sleeve_bbox in assembly.additional_data["elko_socket_sleeve_bboxes"]:
+        for axis in range(3):
+            assert sleeve_bbox[0][axis] >= side_walls_bbox[0][axis]
+            assert sleeve_bbox[1][axis] <= side_walls_bbox[1][axis]
 
 
 def test_tmc_to_additional_pins_gap_x_controls_holder_width():

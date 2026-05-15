@@ -40,6 +40,7 @@ Builder:
         artifact: followers
         names:
           - tpu_cover
+          - elko_sleeve_plates
         name_template: "{name}"
         flip: true
       - source: self
@@ -85,6 +86,10 @@ Builder:
           process_data_preset: tpu_minimal_quality_minimal_strength_06
           parts:
             - tpu_cover
+        - name: board_holder_elko_sleeve_plates
+          process_data_preset: tpu_minimal_quality_minimal_strength_06
+          parts:
+            - elko_sleeve_plates
       auto_assign_plates: false
 
 Parameters:

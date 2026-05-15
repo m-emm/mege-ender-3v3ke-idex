@@ -34,6 +34,329 @@ BOARD_HOLDER_MOUNT_HARDWARE_CLEARANCE = 1.2
 BOARD_HOLDER_MOUNT_SCREW_EXPOSED_THREAD = 1.0
 
 
+board_holder_elko_diameter = 10.15
+board_holder_elko_height = 15.61
+board_holder_elko_pin_pitch = 4.2
+board_holder_elko_pin_length = 8
+board_holder_elko_pin_diameter = 0.8
+board_holder_elko_sleve_wall = 1.0
+board_holder_elko_sleve_clearance = 0.1
+BOARD_HOLDER_ELKO_SLEEVE_BODY_INSERTION = 1.6
+BOARD_HOLDER_ELKO_SLEEVE_PIN_TOP_CLEARANCE = 0.4
+BOARD_HOLDER_ELKO_SOCKET_PLATE_THICKNESS = 1.2
+BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN = 1.2
+BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_SIZE = 0.8
+BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_Z_SLACK = 0.2
+BOARD_HOLDER_ELKO_SOCKET_SLEEVE_GAP_BELOW_PIN_TIPS = 0.8
+BOARD_HOLDER_ELKO_SOCKET_ATTACH_WEB_WIDTH = 3.0
+BOARD_HOLDER_ELKO_SOCKET_ATTACH_OVERLAP = 0.1
+BOARD_HOLDER_ELKO_SOCKET_ENVELOPE_CLEARANCE = 0.4
+BIG_THING = 500
+
+
+def create_elko():
+
+    body = create_cylinder(board_holder_elko_diameter / 2, board_holder_elko_height)
+    pins = PartCollector()
+    for i in [0, 1]:
+        pin = create_cylinder(
+            board_holder_elko_pin_diameter / 2,
+            board_holder_elko_pin_length,
+            origin=(
+                0,
+                (-1) ** i * board_holder_elko_pin_pitch / 2,
+                -board_holder_elko_pin_length,
+            ),
+        )
+        pins = pins.fuse(pin)
+
+    pins = align(pins, body, Alignment.CENTER)
+    pins = align(pins, body, Alignment.STACK_TOP)
+
+    return body.fuse(pins)
+
+
+def create_elko_sleeve():
+    sleeve_height = (
+        board_holder_elko_pin_length
+        + board_holder_elko_sleve_wall
+        + BOARD_HOLDER_ELKO_SLEEVE_BODY_INSERTION
+        + BOARD_HOLDER_ELKO_SLEEVE_PIN_TOP_CLEARANCE
+    )
+    elko_sleeve_body = create_cylinder(
+        board_holder_elko_diameter / 2
+        + board_holder_elko_sleve_wall
+        + board_holder_elko_sleve_clearance,
+        sleeve_height,
+    )
+
+    elko_sleeve_inner_cutter = create_cylinder(
+        board_holder_elko_diameter / 2 + board_holder_elko_sleve_clearance,
+        BIG_THING + sleeve_height,
+        origin=(0, 0, -BIG_THING),
+    )
+    elko_sleeve_cutter = align(
+        elko_sleeve_inner_cutter,
+        elko_sleeve_body,
+        Alignment.CENTER,
+        axes=[0, 1],
+    )
+    elko_sleeve_cutter = translate(
+        0,
+        0,
+        -board_holder_elko_sleve_wall,
+    )(elko_sleeve_cutter)
+    elko_sleeve = elko_sleeve_body.cut(elko_sleeve_cutter)
+
+    return elko_sleeve
+
+
+def _elko_socket_plate_bbox_from_dil(dil_part):
+    dil_bbox = get_bounding_box(dil_part)
+    return (
+        (
+            dil_bbox[0][0] - BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN,
+            dil_bbox[0][1] - BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN,
+            dil_bbox[0][2],
+        ),
+        (
+            dil_bbox[1][0] + BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN,
+            dil_bbox[1][1] + BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN,
+            dil_bbox[0][2] + BOARD_HOLDER_ELKO_SOCKET_PLATE_THICKNESS,
+        ),
+    )
+
+
+def _create_elko_socket_plate_for_tmc_dil(*, tmc_dil, x_axis_mcu_dil_pitch):
+    dil_bbox = get_bounding_box(tmc_dil)
+    socket_plate_bbox = _elko_socket_plate_bbox_from_dil(tmc_dil)
+    socket_plate = create_box(
+        socket_plate_bbox[1][0] - socket_plate_bbox[0][0],
+        socket_plate_bbox[1][1] - socket_plate_bbox[0][1],
+        socket_plate_bbox[1][2] - socket_plate_bbox[0][2],
+        origin=socket_plate_bbox[0],
+    )
+
+    pin_holes = PartCollector()
+    num_y_pins = int(round((dil_bbox[1][1] - dil_bbox[0][1]) / x_axis_mcu_dil_pitch))
+    pin_x_positions = [
+        dil_bbox[0][0] + x_axis_mcu_dil_pitch / 2,
+        dil_bbox[1][0] - x_axis_mcu_dil_pitch / 2,
+    ]
+    for pin_x in pin_x_positions:
+        for y_index in range(num_y_pins):
+            pin_y = dil_bbox[0][1] + (y_index + 0.5) * x_axis_mcu_dil_pitch
+            pin_hole = create_box(
+                BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_SIZE,
+                BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_SIZE,
+                BOARD_HOLDER_ELKO_SOCKET_PLATE_THICKNESS
+                + 2 * BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_Z_SLACK,
+                origin=(
+                    pin_x - BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_SIZE / 2,
+                    pin_y - BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_SIZE / 2,
+                    socket_plate_bbox[0][2] - BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_Z_SLACK,
+                ),
+            )
+            pin_holes = pin_holes.fuse(pin_hole)
+
+    return socket_plate.cut(pin_holes)
+
+
+def _bbox_fits_inside(inner_bbox, outer_bbox, clearance=0.0):
+    for axis in range(3):
+        if inner_bbox[0][axis] < outer_bbox[0][axis] + clearance:
+            return False
+        if inner_bbox[1][axis] > outer_bbox[1][axis] - clearance:
+            return False
+    return True
+
+
+def _create_elko_sleeve_with_elko():
+    sleeve = create_elko_sleeve()
+    elko = create_elko()
+    elko = align(elko, sleeve, Alignment.CENTER, axes=[0, 1])
+    elko_bbox = get_bounding_box(elko)
+    sleeve_bbox = get_bounding_box(sleeve)
+    elko_pin_top_z = (
+        sleeve_bbox[1][2]
+        - board_holder_elko_sleve_wall
+        - BOARD_HOLDER_ELKO_SLEEVE_PIN_TOP_CLEARANCE
+    )
+    elko = translate(0, 0, elko_pin_top_z - elko_bbox[1][2])(elko)
+
+    return LeaderFollowersCuttersPart(
+        leader=sleeve,
+        non_production_parts=[elko],
+        non_production_names=["elko"],
+    )
+
+
+def _position_elko_sleeve_vertical(*, sleeve_with_elko, socket_plate, sleeve_top_z):
+    positioned = sleeve_with_elko.copy()
+    positioned = align(positioned, socket_plate, Alignment.CENTER, axes=[0, 1])
+    positioned_bbox = get_bounding_box(positioned.leader)
+    return translate(0, 0, sleeve_top_z - positioned_bbox[1][2])(positioned)
+
+
+def _create_elko_socket_vertical_attach_web(
+    *,
+    socket_plate_bbox,
+    socket_plate_center,
+    sleeve_top_z,
+):
+    web_height = socket_plate_bbox[0][2] - sleeve_top_z
+    return create_box(
+        BOARD_HOLDER_ELKO_SOCKET_ATTACH_WEB_WIDTH,
+        socket_plate_bbox[1][1] - socket_plate_bbox[0][1],
+        web_height + 2 * BOARD_HOLDER_ELKO_SOCKET_ATTACH_OVERLAP,
+        origin=(
+            socket_plate_center[0] - BOARD_HOLDER_ELKO_SOCKET_ATTACH_WEB_WIDTH / 2,
+            socket_plate_bbox[0][1],
+            sleeve_top_z - BOARD_HOLDER_ELKO_SOCKET_ATTACH_OVERLAP,
+        ),
+    )
+
+
+def _position_elko_sleeve_sideways(
+    *,
+    sleeve_with_elko,
+    socket_plate_bbox,
+    fixed_envelope_bbox,
+):
+    positioned = rotate(90, axis=(0, 1, 0))(sleeve_with_elko)
+    positioned = rotate(90, axis=(0, 0, 1))(positioned)
+    socket_plate_center = (
+        (socket_plate_bbox[0][0] + socket_plate_bbox[1][0]) / 2,
+        (socket_plate_bbox[0][1] + socket_plate_bbox[1][1]) / 2,
+    )
+    positioned_center = get_bounding_box_center(positioned.leader)
+    positioned = translate(
+        socket_plate_center[0] - positioned_center[0],
+        socket_plate_center[1] - positioned_center[1],
+        0,
+    )(positioned)
+    positioned_bbox = get_bounding_box(positioned.leader)
+    target_z_min = (
+        fixed_envelope_bbox[0][2] + BOARD_HOLDER_ELKO_SOCKET_ENVELOPE_CLEARANCE
+    )
+    positioned = translate(0, 0, target_z_min - positioned_bbox[0][2])(positioned)
+    return positioned
+
+
+def _trim_elko_sleeve_to_socket_plate_top(*, sleeve_with_elko, socket_plate_bbox):
+    sleeve_bbox = get_bounding_box(sleeve_with_elko.leader)
+    if sleeve_bbox[1][2] <= socket_plate_bbox[1][2]:
+        return sleeve_with_elko
+
+    sleeve_center = get_bounding_box_center(sleeve_with_elko.leader)
+    upper_trim_cutter = create_box(
+        BIG_THING,
+        BIG_THING,
+        BIG_THING,
+        origin=(
+            sleeve_center[0] - BIG_THING / 2,
+            sleeve_center[1] - BIG_THING / 2,
+            socket_plate_bbox[1][2],
+        ),
+    )
+    return LeaderFollowersCuttersPart(
+        leader=sleeve_with_elko.leader.cut(upper_trim_cutter),
+        non_production_parts=[sleeve_with_elko.get_non_production_part_by_name("elko")],
+        non_production_names=["elko"],
+    )
+
+
+def _create_elko_socket_assembly_for_tmc_board(
+    *,
+    tmc_board,
+    x_axis_mcu_dil_pitch,
+    fixed_envelope_bbox,
+):
+    tmc_dil = tmc_board.get_follower_part_by_name("dil")
+    tmc_dil_bbox = get_bounding_box(tmc_dil)
+    socket_plate_bbox = _elko_socket_plate_bbox_from_dil(tmc_dil)
+    socket_plate = _create_elko_socket_plate_for_tmc_dil(
+        tmc_dil=tmc_dil,
+        x_axis_mcu_dil_pitch=x_axis_mcu_dil_pitch,
+    )
+
+    sleeve_with_elko = _create_elko_sleeve_with_elko()
+    sleeve_top_z = (
+        tmc_dil_bbox[0][2] - BOARD_HOLDER_ELKO_SOCKET_SLEEVE_GAP_BELOW_PIN_TIPS
+    )
+    sleeve_with_elko = _position_elko_sleeve_vertical(
+        sleeve_with_elko=sleeve_with_elko,
+        socket_plate=socket_plate,
+        sleeve_top_z=sleeve_top_z,
+    )
+    socket_plate_center = get_bounding_box_center(socket_plate)
+    placement = "vertical"
+    if not _bbox_fits_inside(
+        get_bounding_box(sleeve_with_elko.leader),
+        fixed_envelope_bbox,
+        clearance=BOARD_HOLDER_ELKO_SOCKET_ENVELOPE_CLEARANCE,
+    ):
+        placement = "side"
+        sleeve_with_elko = _position_elko_sleeve_sideways(
+            sleeve_with_elko=_create_elko_sleeve_with_elko(),
+            socket_plate_bbox=socket_plate_bbox,
+            fixed_envelope_bbox=fixed_envelope_bbox,
+        )
+        sleeve_with_elko = _trim_elko_sleeve_to_socket_plate_top(
+            sleeve_with_elko=sleeve_with_elko,
+            socket_plate_bbox=socket_plate_bbox,
+        )
+        attach_web = None
+    else:
+        attach_web = _create_elko_socket_vertical_attach_web(
+            socket_plate_bbox=socket_plate_bbox,
+            socket_plate_center=socket_plate_center,
+            sleeve_top_z=sleeve_top_z,
+        )
+
+    socket = socket_plate.fuse(sleeve_with_elko.leader)
+    if attach_web is not None:
+        socket = socket.fuse(attach_web)
+    return LeaderFollowersCuttersPart(
+        leader=socket,
+        non_production_parts=[sleeve_with_elko.get_non_production_part_by_name("elko")],
+        additional_data={
+            "placement": placement,
+            "socket_plate_bbox": get_bounding_box(socket_plate),
+            "sleeve_bbox": get_bounding_box(sleeve_with_elko.leader),
+        },
+        non_production_names=["elko"],
+    )
+
+
+def _create_elko_socket_assemblies_for_tmc_boards(
+    *,
+    positioned_tmc_boards,
+    x_axis_mcu_dil_pitch,
+    fixed_envelope_bbox,
+):
+    socket_assemblies = []
+    socket_plate_bboxes = []
+    socket_sleeve_bboxes = []
+    socket_placements = []
+    for tmc_index, current_tmc_board in enumerate(positioned_tmc_boards):
+        socket_assembly = _create_elko_socket_assembly_for_tmc_board(
+            tmc_board=current_tmc_board,
+            x_axis_mcu_dil_pitch=x_axis_mcu_dil_pitch,
+            fixed_envelope_bbox=fixed_envelope_bbox,
+        )
+        socket_plate_bboxes.append(socket_assembly.additional_data["socket_plate_bbox"])
+        socket_sleeve_bboxes.append(socket_assembly.additional_data["sleeve_bbox"])
+        socket_placements.append(socket_assembly.additional_data["placement"])
+        socket_assemblies.append(socket_assembly.prefixed_copy(f"elko_{tmc_index + 1}"))
+
+    sockets = _fuse_parts(socket_assemblies)
+    sockets.additional_data["socket_plate_bboxes"] = socket_plate_bboxes
+    sockets.additional_data["socket_sleeve_bboxes"] = socket_sleeve_bboxes
+    sockets.additional_data["socket_placements"] = socket_placements
+    return sockets
+
+
 def _create_enclosing_base_plate(
     *,
     enclosure_reference,
@@ -1419,6 +1742,33 @@ def create_board_holder_assembly(
             frame_mount_eyes = frame_mount_eyes.fuse(frame_mount_eye)
 
         side_walls = side_walls.fuse(frame_mount_eyes)
+
+    elko_socket_assemblies = _create_elko_socket_assemblies_for_tmc_boards(
+        positioned_tmc_boards=positioned_tmc_boards,
+        x_axis_mcu_dil_pitch=x_axis_mcu_dil_pitch,
+        fixed_envelope_bbox=get_bounding_box(side_walls),
+    )
+    all_holders.add_named_follower(
+        elko_socket_assemblies.leader,
+        "elko_sleeve_plates",
+    )
+    for name, part in elko_socket_assemblies.get_named_non_production_part_items():
+        all_holders.add_named_non_production_part(part, name)
+    all_holders.additional_data["elko_socket_plate_bboxes"] = [
+        [list(corner) for corner in socket_plate_bbox]
+        for socket_plate_bbox in elko_socket_assemblies.additional_data[
+            "socket_plate_bboxes"
+        ]
+    ]
+    all_holders.additional_data["elko_socket_sleeve_bboxes"] = [
+        [list(corner) for corner in socket_sleeve_bbox]
+        for socket_sleeve_bbox in elko_socket_assemblies.additional_data[
+            "socket_sleeve_bboxes"
+        ]
+    ]
+    all_holders.additional_data["elko_socket_placements"] = (
+        elko_socket_assemblies.additional_data["socket_placements"]
+    )
 
     all_holders.add_named_follower(top_lid.leader, "top_lid")
     all_holders.add_named_follower(bottom_lid.leader, "bottom_lid")
