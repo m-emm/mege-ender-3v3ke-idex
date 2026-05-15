@@ -26,6 +26,8 @@ from shellforgepy.simple import (
     get_bounding_box_size,
 )
 
+TMC_PIN_CUTTER_SLACK = 0.5
+
 
 def _placeholder_tmc_board(*, origin=(0, 0, -8), y_pins=3):
     board = create_box(
@@ -48,13 +50,19 @@ def _placeholder_tmc_board(*, origin=(0, 0, -8), y_pins=3):
             (right_pin_cutters, 5 * dil_pitch - dil_pitch / 2),
         ]:
             pin_cutter = create_box(
-                wire_wrap_pin_side,
-                wire_wrap_pin_side,
-                wire_wrap_pin_length,
+                wire_wrap_pin_side + 2 * TMC_PIN_CUTTER_SLACK,
+                wire_wrap_pin_side + 2 * TMC_PIN_CUTTER_SLACK,
+                wire_wrap_pin_length + 2 * TMC_PIN_CUTTER_SLACK,
                 origin=(
-                    origin[0] + pin_x_offset - wire_wrap_pin_side / 2,
-                    origin[1] + (y_index + 0.5) * dil_pitch - wire_wrap_pin_side / 2,
-                    origin[2],
+                    origin[0]
+                    + pin_x_offset
+                    - wire_wrap_pin_side / 2
+                    - TMC_PIN_CUTTER_SLACK,
+                    origin[1]
+                    + (y_index + 0.5) * dil_pitch
+                    - wire_wrap_pin_side / 2
+                    - TMC_PIN_CUTTER_SLACK,
+                    origin[2] - TMC_PIN_CUTTER_SLACK,
                 ),
             )
             pin_cutters = pin_cutters.fuse(pin_cutter)
@@ -224,7 +232,13 @@ def test_elko_socket_pin_holes_use_named_tmc_pin_cutters():
     right_pin_cutters_bbox = get_bounding_box(
         tmc_board.get_cutter_part_by_name("right_pin_cutters")
     )
+    left_pin_cutters_size = get_bounding_box_size(
+        tmc_board.get_cutter_part_by_name("left_pin_cutters")
+    )
 
+    assert left_pin_cutters_size[0] == pytest.approx(
+        wire_wrap_pin_side + 2 * TMC_PIN_CUTTER_SLACK
+    )
     assert socket_plate_bbox[0][0] < left_pin_cutters_bbox[0][0]
     assert socket_plate_bbox[1][0] > right_pin_cutters_bbox[1][0]
     assert socket_plate_bbox[0][1] <= left_pin_cutters_bbox[0][1]

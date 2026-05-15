@@ -327,6 +327,7 @@ def create_tmc_board_assembly(
     x_axis_mcu_tmc_chip_y_size_rasterized,
     x_axis_mcu_tmc_current_potentiometer_underside_thickness,
     x_axis_mcu_tmc_current_potentiometer_underside_size_rasterized,
+    x_axis_mcu_tmc_pin_cutter_slack=0.5,
 ):
     retval = _create_dil_board(
         int_x_distance=x_axis_mcu_tmc_board_int_width,
@@ -339,7 +340,7 @@ def create_tmc_board_assembly(
         wire_wrap_pin_base_thickness=x_axis_mcu_wire_wrap_pin_base_thickness,
         wire_wrap_pin_base_width=x_axis_mcu_wire_wrap_pin_base_width,
         top_pin_length=x_axis_mcu_top_pin_length,
-        pin_cutter_slack=0.0,
+        pin_cutter_slack=x_axis_mcu_tmc_pin_cutter_slack,
         base_cutter_slack=x_axis_mcu_electronics_holder_slack,
         base_cutter_vertical_slack=x_axis_mcu_base_cutter_vertical_slack,
         board_cutter_slack=x_axis_mcu_electronics_board_cutter_slack,

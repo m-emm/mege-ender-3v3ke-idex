@@ -145,14 +145,12 @@ def _create_elko_socket_assembly_for_tmc_board(
     socket_plate = align(socket_plate, tmc_dil, Alignment.CENTER, axes=[0])
     socket_plate = align(socket_plate, tmc_dil, Alignment.FRONT)
     socket_plate = align(socket_plate, tmc_dil, Alignment.BOTTOM)
-    tmc_pin_cutters = PartCollector()
-    tmc_pin_cutters = tmc_pin_cutters.fuse(
+    socket_plate = socket_plate.cut(
         tmc_board.get_cutter_part_by_name("left_pin_cutters")
     )
-    tmc_pin_cutters = tmc_pin_cutters.fuse(
+    socket_plate = socket_plate.cut(
         tmc_board.get_cutter_part_by_name("right_pin_cutters")
     )
-    socket_plate = socket_plate.cut(tmc_pin_cutters)
 
     sleeve_with_elko = align(
         sleeve_with_elko,

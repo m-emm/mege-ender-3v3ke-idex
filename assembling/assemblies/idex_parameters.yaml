@@ -155,6 +155,7 @@ globals:
   x_axis_mcu_electronics_holder_slack: 0.55
   x_axis_mcu_electronics_board_cutter_slack: 0.3
   x_axis_mcu_base_cutter_vertical_slack: 1.2
+  x_axis_mcu_tmc_pin_cutter_slack: 0.5
   x_axis_mcu_micro_usb_socket_thickness: 3.0
   x_axis_mcu_micro_usb_socket_width: 7.0
   x_axis_mcu_micro_usb_socket_depth: 5.0

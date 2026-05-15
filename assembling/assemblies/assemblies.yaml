@@ -941,6 +941,7 @@ assemblies:
       x_axis_mcu_electronics_holder_slack: !Ref x_axis_mcu_electronics_holder_slack
       x_axis_mcu_electronics_board_cutter_slack: !Ref x_axis_mcu_electronics_board_cutter_slack
       x_axis_mcu_base_cutter_vertical_slack: !Ref x_axis_mcu_base_cutter_vertical_slack
+      x_axis_mcu_tmc_pin_cutter_slack: !Ref x_axis_mcu_tmc_pin_cutter_slack
       x_axis_mcu_tmc_board_y_pins: !Ref x_axis_mcu_tmc_board_y_pins
       x_axis_mcu_tmc_board_int_width: !Ref x_axis_mcu_tmc_board_int_width
       x_axis_mcu_tmc_board_thickness: !Ref x_axis_mcu_tmc_board_thickness
