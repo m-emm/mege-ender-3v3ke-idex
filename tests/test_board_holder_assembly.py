@@ -6,7 +6,6 @@ from mege_ender_3v3ke_idex.designs.assemblies.board_holder_assembly import (
     COVER_PLUG_MIN_DISTANCE,
     _create_cover_plug_positions,
     _create_elko_socket_assemblies_for_tmc_boards,
-    _create_elko_socket_plate_for_tmc_dil,
     board_holder_elko_sleve_wall,
 )
 from mege_ender_3v3ke_idex.designs.assemblies.x_axis_mcu_board_assemblies import (
@@ -21,8 +20,10 @@ from mege_ender_3v3ke_idex.designs.sil_dil import (
 )
 from shellforgepy.simple import (
     LeaderFollowersCuttersPart,
+    PartCollector,
     create_box,
     get_bounding_box,
+    get_bounding_box_size,
 )
 
 
@@ -39,9 +40,34 @@ def _placeholder_tmc_board(*, origin=(0, 0, -8), y_pins=3):
         wire_wrap_pin_length,
         origin=origin,
     )
+    left_pin_cutters = PartCollector()
+    right_pin_cutters = PartCollector()
+    for y_index in range(y_pins):
+        for pin_cutters, pin_x_offset in [
+            (left_pin_cutters, dil_pitch / 2),
+            (right_pin_cutters, 5 * dil_pitch - dil_pitch / 2),
+        ]:
+            pin_cutter = create_box(
+                wire_wrap_pin_side,
+                wire_wrap_pin_side,
+                wire_wrap_pin_length,
+                origin=(
+                    origin[0] + pin_x_offset - wire_wrap_pin_side / 2,
+                    origin[1] + (y_index + 0.5) * dil_pitch - wire_wrap_pin_side / 2,
+                    origin[2],
+                ),
+            )
+            pin_cutters = pin_cutters.fuse(pin_cutter)
+            if pin_x_offset < dil_pitch:
+                left_pin_cutters = pin_cutters
+            else:
+                right_pin_cutters = pin_cutters
+
     board_part = LeaderFollowersCuttersPart(board)
     board_part.add_named_follower(board, "board")
     board_part.add_named_follower(dil, "dil")
+    board_part.add_named_cutter(left_pin_cutters, "left_pin_cutters")
+    board_part.add_named_cutter(right_pin_cutters, "right_pin_cutters")
     return board_part
 
 
@@ -139,7 +165,6 @@ def test_elko_socket_count_tracks_tmc_board_count_without_full_holder():
     ]
     sockets = _create_elko_socket_assemblies_for_tmc_boards(
         positioned_tmc_boards=tmc_boards,
-        x_axis_mcu_dil_pitch=dil_pitch,
     )
 
     assert sorted(sockets.non_production_indices_by_name) == [
@@ -156,16 +181,21 @@ def test_elko_socket_count_tracks_tmc_board_count_without_full_holder():
     assert len(sockets.additional_data["socket_sleeve_bboxes"]) == 3
 
 
-def test_elko_socket_plate_spans_the_tmc_pin_field_without_full_holder():
-    tmc_board = _placeholder_tmc_board(origin=(10, 20, -8), y_pins=4)
+def test_elko_socket_plate_is_short_and_front_aligned_without_full_holder():
+    tmc_board = _placeholder_tmc_board(origin=(10, 20, -8), y_pins=8)
     tmc_dil = tmc_board.get_follower_part_by_name("dil")
-    socket_plate = _create_elko_socket_plate_for_tmc_dil(
-        tmc_dil=tmc_dil,
-        x_axis_mcu_dil_pitch=dil_pitch,
+    sockets = _create_elko_socket_assemblies_for_tmc_boards(
+        positioned_tmc_boards=[tmc_board],
     )
 
     tmc_dil_bbox = get_bounding_box(tmc_dil)
-    socket_plate_bbox = get_bounding_box(socket_plate)
+    tmc_dil_size = get_bounding_box_size(tmc_dil)
+    socket_plate_bbox = sockets.additional_data["socket_plate_bboxes"][0]
+    socket_plate_size = (
+        socket_plate_bbox[1][0] - socket_plate_bbox[0][0],
+        socket_plate_bbox[1][1] - socket_plate_bbox[0][1],
+        socket_plate_bbox[1][2] - socket_plate_bbox[0][2],
+    )
 
     assert socket_plate_bbox[0][0] == pytest.approx(
         tmc_dil_bbox[0][0] - BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN
@@ -173,13 +203,32 @@ def test_elko_socket_plate_spans_the_tmc_pin_field_without_full_holder():
     assert socket_plate_bbox[1][0] == pytest.approx(
         tmc_dil_bbox[1][0] + BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN
     )
-    assert socket_plate_bbox[0][1] == pytest.approx(
-        tmc_dil_bbox[0][1] - BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN
-    )
-    assert socket_plate_bbox[1][1] == pytest.approx(
-        tmc_dil_bbox[1][1] + BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN
-    )
+    assert socket_plate_bbox[0][1] == pytest.approx(tmc_dil_bbox[0][1])
+    assert socket_plate_size[1] < tmc_dil_size[1]
     assert socket_plate_bbox[0][2] == pytest.approx(tmc_dil_bbox[0][2])
+
+
+def test_elko_socket_pin_holes_use_named_tmc_pin_cutters():
+    tmc_board = _placeholder_tmc_board(origin=(10, 20, -8), y_pins=8)
+    tmc_dil = tmc_board.get_follower_part_by_name("dil")
+    sockets = _create_elko_socket_assemblies_for_tmc_boards(
+        positioned_tmc_boards=[tmc_board],
+    )
+
+    tmc_dil_bbox = get_bounding_box(tmc_dil)
+    socket_plate_bbox = sockets.additional_data["socket_plate_bboxes"][0]
+
+    left_pin_cutters_bbox = get_bounding_box(
+        tmc_board.get_cutter_part_by_name("left_pin_cutters")
+    )
+    right_pin_cutters_bbox = get_bounding_box(
+        tmc_board.get_cutter_part_by_name("right_pin_cutters")
+    )
+
+    assert socket_plate_bbox[0][0] < left_pin_cutters_bbox[0][0]
+    assert socket_plate_bbox[1][0] > right_pin_cutters_bbox[1][0]
+    assert socket_plate_bbox[0][1] <= left_pin_cutters_bbox[0][1]
+    assert socket_plate_bbox[1][1] < tmc_dil_bbox[1][1]
 
 
 def test_elko_sleeves_center_x_front_align_and_overlap_plate_by_wall():
@@ -189,7 +238,6 @@ def test_elko_sleeves_center_x_front_align_and_overlap_plate_by_wall():
     ]
     sockets = _create_elko_socket_assemblies_for_tmc_boards(
         positioned_tmc_boards=tmc_boards,
-        x_axis_mcu_dil_pitch=dil_pitch,
     )
 
     for plate_bbox, sleeve_bbox in zip(

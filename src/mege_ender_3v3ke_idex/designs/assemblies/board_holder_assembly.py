@@ -41,12 +41,10 @@ board_holder_elko_pin_length = 8
 board_holder_elko_pin_diameter = 0.8
 board_holder_elko_sleve_wall = 1.0
 board_holder_elko_sleve_clearance = 0.1
-BOARD_HOLDER_ELKO_SLEEVE_BODY_INSERTION = 1.6
-BOARD_HOLDER_ELKO_SLEEVE_PIN_TOP_CLEARANCE = 0.4
+BOARD_HOLDER_ELKO_SLEEVE_BODY_INSERTION = 15
+BOARD_HOLDER_ELKO_SLEEVE_PIN_TOP_CLEARANCE = 0.1
 BOARD_HOLDER_ELKO_SOCKET_PLATE_THICKNESS = 1.2
 BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN = 1.2
-BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_SIZE = 0.8
-BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_Z_SLACK = 0.2
 BIG_THING = 500
 
 
@@ -107,43 +105,6 @@ def create_elko_sleeve():
     return elko_sleeve
 
 
-def _create_elko_socket_plate_for_tmc_dil(*, tmc_dil, x_axis_mcu_dil_pitch):
-    dil_bbox = get_bounding_box(tmc_dil)
-    dil_size = get_bounding_box_size(tmc_dil)
-    socket_plate = create_box(
-        dil_size[0] + 2 * BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN,
-        dil_size[1] + 2 * BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN,
-        BOARD_HOLDER_ELKO_SOCKET_PLATE_THICKNESS,
-    )
-    socket_plate = align(socket_plate, tmc_dil, Alignment.CENTER, axes=[0, 1])
-    socket_plate = align(socket_plate, tmc_dil, Alignment.BOTTOM)
-    socket_plate_bbox = get_bounding_box(socket_plate)
-
-    pin_holes = PartCollector()
-    num_y_pins = int(round((dil_bbox[1][1] - dil_bbox[0][1]) / x_axis_mcu_dil_pitch))
-    pin_x_positions = [
-        dil_bbox[0][0] + x_axis_mcu_dil_pitch / 2,
-        dil_bbox[1][0] - x_axis_mcu_dil_pitch / 2,
-    ]
-    for pin_x in pin_x_positions:
-        for y_index in range(num_y_pins):
-            pin_y = dil_bbox[0][1] + (y_index + 0.5) * x_axis_mcu_dil_pitch
-            pin_hole = create_box(
-                BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_SIZE,
-                BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_SIZE,
-                BOARD_HOLDER_ELKO_SOCKET_PLATE_THICKNESS
-                + 2 * BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_Z_SLACK,
-                origin=(
-                    pin_x - BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_SIZE / 2,
-                    pin_y - BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_SIZE / 2,
-                    socket_plate_bbox[0][2] - BOARD_HOLDER_ELKO_SOCKET_PIN_HOLE_Z_SLACK,
-                ),
-            )
-            pin_holes = pin_holes.fuse(pin_hole)
-
-    return socket_plate.cut(pin_holes)
-
-
 def _create_elko_sleeve_with_elko():
     sleeve = create_elko_sleeve()
     elko = create_elko()
@@ -167,18 +128,32 @@ def _create_elko_sleeve_with_elko():
 def _create_elko_socket_assembly_for_tmc_board(
     *,
     tmc_board,
-    x_axis_mcu_dil_pitch,
 ):
     tmc_dil = tmc_board.get_follower_part_by_name("dil")
-    socket_plate = _create_elko_socket_plate_for_tmc_dil(
-        tmc_dil=tmc_dil,
-        x_axis_mcu_dil_pitch=x_axis_mcu_dil_pitch,
-    )
-
     sleeve_with_elko = _create_elko_sleeve_with_elko()
     sleeve_with_elko = rotate(90, axis=(0, 1, 0))(sleeve_with_elko)
     sleeve_with_elko = rotate(90, axis=(0, 0, 1))(sleeve_with_elko)
     sleeve_with_elko = rotate(180, axis=(0, 0, 1))(sleeve_with_elko)
+
+    tmc_dil_size = get_bounding_box_size(tmc_dil)
+    sleeve_size = get_bounding_box_size(sleeve_with_elko.leader)
+    socket_plate = create_box(
+        tmc_dil_size[0] + 2 * BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN,
+        tmc_dil_size[1] / 2,
+        BOARD_HOLDER_ELKO_SOCKET_PLATE_THICKNESS,
+    )
+    socket_plate = align(socket_plate, tmc_dil, Alignment.CENTER, axes=[0])
+    socket_plate = align(socket_plate, tmc_dil, Alignment.FRONT)
+    socket_plate = align(socket_plate, tmc_dil, Alignment.BOTTOM)
+    tmc_pin_cutters = PartCollector()
+    tmc_pin_cutters = tmc_pin_cutters.fuse(
+        tmc_board.get_cutter_part_by_name("left_pin_cutters")
+    )
+    tmc_pin_cutters = tmc_pin_cutters.fuse(
+        tmc_board.get_cutter_part_by_name("right_pin_cutters")
+    )
+    socket_plate = socket_plate.cut(tmc_pin_cutters)
+
     sleeve_with_elko = align(
         sleeve_with_elko,
         socket_plate,
@@ -208,7 +183,6 @@ def _create_elko_socket_assembly_for_tmc_board(
 def _create_elko_socket_assemblies_for_tmc_boards(
     *,
     positioned_tmc_boards,
-    x_axis_mcu_dil_pitch,
 ):
     socket_assemblies = []
     socket_plate_bboxes = []
@@ -216,7 +190,6 @@ def _create_elko_socket_assemblies_for_tmc_boards(
     for tmc_index, current_tmc_board in enumerate(positioned_tmc_boards):
         socket_assembly = _create_elko_socket_assembly_for_tmc_board(
             tmc_board=current_tmc_board,
-            x_axis_mcu_dil_pitch=x_axis_mcu_dil_pitch,
         )
         socket_plate_bboxes.append(socket_assembly.additional_data["socket_plate_bbox"])
         socket_sleeve_bboxes.append(socket_assembly.additional_data["sleeve_bbox"])
@@ -1621,7 +1594,6 @@ def create_board_holder_assembly(
 
     elko_socket_assemblies = _create_elko_socket_assemblies_for_tmc_boards(
         positioned_tmc_boards=positioned_tmc_boards,
-        x_axis_mcu_dil_pitch=x_axis_mcu_dil_pitch,
     )
     all_holders.add_named_follower(
         elko_socket_assemblies.leader,

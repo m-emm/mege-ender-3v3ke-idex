@@ -26,6 +26,7 @@ def _create_sil(
         base_cutter_vertical_slack = base_cutter_slack
 
     cutters = []
+    cutter_names = []
     if base_cutter_slack is not None:
         base_cutter = create_box(
             wire_wrap_pin_base_width + 2 * base_cutter_slack,
@@ -34,6 +35,7 @@ def _create_sil(
         )
         base_cutter = align(base_cutter, base, Alignment.CENTER)
         cutters.append(base_cutter)
+        cutter_names.append("base_cutters")
 
     pins = PartCollector()
     top_pins = PartCollector()
@@ -72,9 +74,14 @@ def _create_sil(
         top_pins = top_pins.fuse(current_top_pin)
 
     cutters.append(pin_cutters)
+    cutter_names.append("pin_cutters")
 
     retval = base.fuse(pins)
-    retval = LeaderFollowersCuttersPart(retval, cutters=cutters)
+    retval = LeaderFollowersCuttersPart(
+        retval,
+        cutters=cutters,
+        cutter_names=cutter_names,
+    )
     retval.add_named_follower(top_pins, "top_pins")
 
     return rotate(180, axis=(0, 1, 0))(retval)
