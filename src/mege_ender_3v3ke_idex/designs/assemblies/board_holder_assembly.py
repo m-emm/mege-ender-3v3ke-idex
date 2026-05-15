@@ -3,9 +3,9 @@
 from mege_ender_3v3ke_idex.designs.plug_and_hole import create_plug
 from shellforgepy.simple import *
 
-COVER_PLUG_GRID_PLACES = 8
+COVER_PLUG_GRID_PLACES = 20
 COVER_PLUG_BOARD_CLEARANCE = 1.5
-COVER_PLUG_MIN_DISTANCE = 15.0
+COVER_PLUG_MIN_DISTANCE = 18
 
 
 def _create_enclosing_base_plate(

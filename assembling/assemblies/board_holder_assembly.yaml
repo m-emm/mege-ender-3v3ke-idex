@@ -54,6 +54,12 @@ Builder:
         - name: board_holder_base
           parts:
             - board_holder
+
+          process_data:
+            process_overrides:
+              enable_support: "1"
+              support_threshold_angle: "30"
+
         - name: board_holder_side_walls
           parts:
             - side_walls

@@ -468,7 +468,7 @@ def create_sil_clamp_assembly(
     board_holder_base_plate_thickness,
     BIG_THING,
 ):
-    holder_slack = 0.1
+    holder_slack = 0.3
     base_cutter_vertical_slack = 0.2
     lip_size = 0.85
 

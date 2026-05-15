@@ -125,15 +125,15 @@ globals:
   board_holder_tpu_cover_pin_overlap_in_pitches: 0.5
   board_holder_tpu_cover_cross_strap_width_in_pitches: 1.0
   board_holder_plug_corner_inset: 5.0
-  board_holder_plug_diameter: 5.0
-  board_holder_plug_angle_deg: 5.0
+  board_holder_plug_diameter: 6.5
+  board_holder_plug_angle_deg: 3
   board_holder_plug_height: 4.0
   board_holder_plug_wall_thickness: 1.2
   board_holder_plug_base_thickness: 0.8
   board_holder_plug_slit_width: 1
   board_holder_plug_fillet_radius: 0.5
   board_holder_plug_lip_height: 0.8
-  board_holder_plug_lip_size: 0.5
+  board_holder_plug_lip_size: 0.8
   board_holder_plug_lip_top_gap: 1.0
   board_holder_plug_no_inner_hole: false
   board_holder_plug_hole_slack: 0.1
