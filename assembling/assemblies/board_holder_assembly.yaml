@@ -25,6 +25,8 @@ Builder:
         name: board_holder
       - source: self
         artifact: followers
+        exclude_names:
+          - elko_sleeve_plate_*
         name_template: "{name}"
       - source: self
         artifact: non_production_parts
@@ -40,9 +42,16 @@ Builder:
         artifact: followers
         names:
           - tpu_cover
-          - elko_sleeve_plates
         name_template: "{name}"
         flip: true
+      - source: self
+        artifact: followers
+        names:
+          - elko_sleeve_plate_*
+        name_template: "{name}"
+        flip: true
+        prod_rotation_angle: 90
+        prod_rotation_axis: [1, 0, 0]
       - source: self
         artifact: followers
         names:
@@ -89,7 +98,7 @@ Builder:
         - name: board_holder_elko_sleeve_plates
           process_data_preset: tpu_minimal_quality_minimal_strength_06
           parts:
-            - elko_sleeve_plates
+            - elko_sleeve_plate_*
       auto_assign_plates: false
 
 Parameters:

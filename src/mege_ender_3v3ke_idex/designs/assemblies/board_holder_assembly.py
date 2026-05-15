@@ -221,49 +221,25 @@ def _position_elko_sleeve_sideways(
     *,
     sleeve_with_elko,
     socket_plate_bbox,
-    fixed_envelope_bbox,
 ):
     positioned = rotate(90, axis=(0, 1, 0))(sleeve_with_elko)
     positioned = rotate(90, axis=(0, 0, 1))(positioned)
-    socket_plate_center = (
-        (socket_plate_bbox[0][0] + socket_plate_bbox[1][0]) / 2,
-        (socket_plate_bbox[0][1] + socket_plate_bbox[1][1]) / 2,
+    positioned = rotate(180, axis=(0, 0, 1))(positioned)
+    socket_plate_reference = create_box(
+        socket_plate_bbox[1][0] - socket_plate_bbox[0][0],
+        socket_plate_bbox[1][1] - socket_plate_bbox[0][1],
+        socket_plate_bbox[1][2] - socket_plate_bbox[0][2],
+        origin=socket_plate_bbox[0],
     )
-    positioned_center = get_bounding_box_center(positioned.leader)
-    positioned = translate(
-        socket_plate_center[0] - positioned_center[0],
-        socket_plate_center[1] - positioned_center[1],
-        0,
-    )(positioned)
-    positioned_bbox = get_bounding_box(positioned.leader)
-    target_z_min = (
-        fixed_envelope_bbox[0][2] + BOARD_HOLDER_ELKO_SOCKET_ENVELOPE_CLEARANCE
+    positioned = align(positioned, socket_plate_reference, Alignment.CENTER, axes=[0])
+    positioned = align(positioned, socket_plate_reference, Alignment.FRONT)
+    positioned = align(
+        positioned,
+        socket_plate_reference,
+        Alignment.STACK_BOTTOM,
+        stack_gap=-board_holder_elko_sleve_wall,
     )
-    positioned = translate(0, 0, target_z_min - positioned_bbox[0][2])(positioned)
     return positioned
-
-
-def _trim_elko_sleeve_to_socket_plate_top(*, sleeve_with_elko, socket_plate_bbox):
-    sleeve_bbox = get_bounding_box(sleeve_with_elko.leader)
-    if sleeve_bbox[1][2] <= socket_plate_bbox[1][2]:
-        return sleeve_with_elko
-
-    sleeve_center = get_bounding_box_center(sleeve_with_elko.leader)
-    upper_trim_cutter = create_box(
-        BIG_THING,
-        BIG_THING,
-        BIG_THING,
-        origin=(
-            sleeve_center[0] - BIG_THING / 2,
-            sleeve_center[1] - BIG_THING / 2,
-            socket_plate_bbox[1][2],
-        ),
-    )
-    return LeaderFollowersCuttersPart(
-        leader=sleeve_with_elko.leader.cut(upper_trim_cutter),
-        non_production_parts=[sleeve_with_elko.get_non_production_part_by_name("elko")],
-        non_production_names=["elko"],
-    )
 
 
 def _create_elko_socket_assembly_for_tmc_board(
@@ -299,11 +275,6 @@ def _create_elko_socket_assembly_for_tmc_board(
         placement = "side"
         sleeve_with_elko = _position_elko_sleeve_sideways(
             sleeve_with_elko=_create_elko_sleeve_with_elko(),
-            socket_plate_bbox=socket_plate_bbox,
-            fixed_envelope_bbox=fixed_envelope_bbox,
-        )
-        sleeve_with_elko = _trim_elko_sleeve_to_socket_plate_top(
-            sleeve_with_elko=sleeve_with_elko,
             socket_plate_bbox=socket_plate_bbox,
         )
         attach_web = None
@@ -351,6 +322,11 @@ def _create_elko_socket_assemblies_for_tmc_boards(
         socket_assemblies.append(socket_assembly.prefixed_copy(f"elko_{tmc_index + 1}"))
 
     sockets = _fuse_parts(socket_assemblies)
+    for socket_index, socket_assembly in enumerate(socket_assemblies, start=1):
+        sockets.add_named_follower(
+            socket_assembly.leader,
+            f"elko_sleeve_plate_{socket_index}",
+        )
     sockets.additional_data["socket_plate_bboxes"] = socket_plate_bboxes
     sockets.additional_data["socket_sleeve_bboxes"] = socket_sleeve_bboxes
     sockets.additional_data["socket_placements"] = socket_placements
@@ -1752,6 +1728,8 @@ def create_board_holder_assembly(
         elko_socket_assemblies.leader,
         "elko_sleeve_plates",
     )
+    for name, part in elko_socket_assemblies.get_named_follower_items():
+        all_holders.add_named_follower(part, name)
     for name, part in elko_socket_assemblies.get_named_non_production_part_items():
         all_holders.add_named_non_production_part(part, name)
     all_holders.additional_data["elko_socket_plate_bboxes"] = [
