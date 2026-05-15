@@ -4,7 +4,6 @@ from mege_ender_3v3ke_idex.designs.assemblies.board_holder_assembly import (
     BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN,
     COVER_PLUG_BOARD_CLEARANCE,
     COVER_PLUG_MIN_DISTANCE,
-    _bbox_fits_inside,
     _create_cover_plug_positions,
     _create_elko_socket_assemblies_for_tmc_boards,
     _create_elko_socket_plate_for_tmc_dil,
@@ -64,10 +63,6 @@ def _contains_point(positions, expected_position):
         and position[1] == pytest.approx(expected_position[1])
         for position in positions
     )
-
-
-def _bbox_center_x(bbox):
-    return (bbox[0][0] + bbox[1][0]) / 2
 
 
 def test_cover_plug_positions_are_dense_and_clear_keepouts_without_building_holder():
@@ -145,7 +140,6 @@ def test_elko_socket_count_tracks_tmc_board_count_without_full_holder():
     sockets = _create_elko_socket_assemblies_for_tmc_boards(
         positioned_tmc_boards=tmc_boards,
         x_axis_mcu_dil_pitch=dil_pitch,
-        fixed_envelope_bbox=((-20, -20, -24), (30, 80, 24)),
     )
 
     assert sorted(sockets.non_production_indices_by_name) == [
@@ -188,40 +182,24 @@ def test_elko_socket_plate_spans_the_tmc_pin_field_without_full_holder():
     assert socket_plate_bbox[0][2] == pytest.approx(tmc_dil_bbox[0][2])
 
 
-def test_elko_sleeves_center_x_back_align_and_overlap_plate_by_wall():
+def test_elko_sleeves_center_x_front_align_and_overlap_plate_by_wall():
     tmc_boards = [
         _placeholder_tmc_board(origin=(0, index * 24, -8))
         for index in range(2)
     ]
-    fixed_envelope_bbox = ((-20, -20, -24), (30, 60, -10))
     sockets = _create_elko_socket_assemblies_for_tmc_boards(
         positioned_tmc_boards=tmc_boards,
         x_axis_mcu_dil_pitch=dil_pitch,
-        fixed_envelope_bbox=fixed_envelope_bbox,
     )
 
-    assert sockets.additional_data["socket_placements"] == ["side", "side"]
     for plate_bbox, sleeve_bbox in zip(
         sockets.additional_data["socket_plate_bboxes"],
         sockets.additional_data["socket_sleeve_bboxes"],
     ):
-        assert _bbox_center_x(sleeve_bbox) == pytest.approx(_bbox_center_x(plate_bbox))
-        assert sleeve_bbox[1][1] == pytest.approx(plate_bbox[1][1])
-        assert sleeve_bbox[0][2] == pytest.approx(
-            plate_bbox[1][2] - board_holder_elko_sleve_wall
+        assert sleeve_bbox[0][0] + sleeve_bbox[1][0] == pytest.approx(
+            plate_bbox[0][0] + plate_bbox[1][0]
         )
-
-
-def test_bbox_fits_inside_respects_clearance_on_all_axes():
-    assert _bbox_fits_inside(((1, 1, 1), (4, 4, 4)), ((0, 0, 0), (5, 5, 5)))
-    assert _bbox_fits_inside(
-        ((1, 1, 1), (4, 4, 4)),
-        ((0, 0, 0), (5, 5, 5)),
-        clearance=1,
-    )
-    assert not _bbox_fits_inside(
-        ((1, 1, 1), (4, 4, 4)),
-        ((0, 0, 0), (5, 5, 5)),
-        clearance=1.1,
-    )
-    assert not _bbox_fits_inside(((1, -0.1, 1), (4, 4, 4)), ((0, 0, 0), (5, 5, 5)))
+        assert sleeve_bbox[0][1] == pytest.approx(plate_bbox[0][1])
+        assert sleeve_bbox[1][2] == pytest.approx(
+            plate_bbox[0][2] + board_holder_elko_sleve_wall
+        )
