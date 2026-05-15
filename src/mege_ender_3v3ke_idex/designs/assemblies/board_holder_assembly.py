@@ -1,11 +1,37 @@
 """Assembly wrapper for the simplified MCU board holder."""
 
+import math
+
 from mege_ender_3v3ke_idex.designs.plug_and_hole import create_plug
 from shellforgepy.simple import *
 
 COVER_PLUG_GRID_PLACES = 20
 COVER_PLUG_BOARD_CLEARANCE = 1.5
 COVER_PLUG_MIN_DISTANCE = 18
+
+BOARD_HOLDER_SIDE_WALL_THICKNESS = 2.2
+
+BOARD_HOLDER_LID_THICKNESS = 1.2
+BOARD_HOLDER_LID_BODY_CLEARANCE = 0.4
+BOARD_HOLDER_LID_FILLET_RADIUS = 3.0
+BOARD_HOLDER_LID_RIM_HEIGHT = 5.0
+BOARD_HOLDER_LID_RIM_THICKNESS = BOARD_HOLDER_SIDE_WALL_THICKNESS
+BOARD_HOLDER_LID_RIM_CLEARANCE = 0.25
+BOARD_HOLDER_LID_RIM_FILLET_RADIUS = min(
+    0.8,
+    BOARD_HOLDER_LID_RIM_THICKNESS * 0.4,
+)
+BOARD_HOLDER_LID_HOLDER_BODY_CLEARANCE = 0.4
+BOARD_HOLDER_LID_HOLDER_DIAMETER = (
+    BOARD_HOLDER_LID_RIM_HEIGHT * 0.75 - 2 * BOARD_HOLDER_LID_HOLDER_BODY_CLEARANCE
+)
+BOARD_HOLDER_LID_HOLDER_X_INSET = 20.0
+BOARD_HOLDER_LID_HOLDER_CLEARANCE = 0.2
+BOARD_HOLDER_LID_AIR_HOLE_SIZE = 4.0
+BOARD_HOLDER_LID_AIR_HOLE_SPACING = 10.0
+BOARD_HOLDER_LID_AIR_HOLE_BORDER = 6.0
+BOARD_HOLDER_MOUNT_HARDWARE_CLEARANCE = 1.2
+BOARD_HOLDER_MOUNT_SCREW_EXPOSED_THREAD = 1.0
 
 
 def _create_enclosing_base_plate(
@@ -39,6 +65,270 @@ def _fuse_parts(parts):
     for part in parts[1:]:
         fused = fused.fuse(part)
     return fused
+
+
+def _create_y_facing_hemisphere(radius, front_back, big_thing):
+    if front_back not in [Alignment.FRONT, Alignment.BACK]:
+        raise ValueError("Hemisphere direction must be FRONT or BACK")
+
+    sphere = create_sphere(radius)
+    cut_positive_y = front_back == Alignment.FRONT
+    cutter = create_box(
+        big_thing,
+        big_thing,
+        big_thing,
+        origin=(
+            -big_thing / 2,
+            0 if cut_positive_y else -big_thing,
+            -big_thing / 2,
+        ),
+    )
+    return sphere.cut(cutter)
+
+
+def _create_board_holder_lid_air_hole_cutter(lid, big_thing):
+    lid_size = get_bounding_box_size(lid)
+
+    num_air_holes_x = math.floor(
+        (lid_size[0] - 2 * BOARD_HOLDER_LID_AIR_HOLE_BORDER)
+        / BOARD_HOLDER_LID_AIR_HOLE_SPACING
+    )
+    num_air_holes_y = math.floor(
+        (lid_size[1] - 2 * BOARD_HOLDER_LID_AIR_HOLE_BORDER)
+        / BOARD_HOLDER_LID_AIR_HOLE_SPACING
+    )
+
+    air_holes = PartCollector()
+    for x_index in range(max(0, num_air_holes_x)):
+        for y_index in range(max(0, num_air_holes_y)):
+            air_hole = create_box(
+                BOARD_HOLDER_LID_AIR_HOLE_SIZE,
+                BOARD_HOLDER_LID_AIR_HOLE_SIZE,
+                big_thing,
+            )
+            air_hole = rotate(45, axis=(0, 0, 1))(air_hole)
+            air_hole = translate(
+                x_index * BOARD_HOLDER_LID_AIR_HOLE_SPACING,
+                y_index * BOARD_HOLDER_LID_AIR_HOLE_SPACING,
+                0,
+            )(air_hole)
+            air_holes = air_holes.fuse(air_hole)
+
+    air_holes = align(air_holes, lid, Alignment.CENTER)
+    return air_holes
+
+
+def _create_board_holder_lid_holders(rim, holder_z_alignment, big_thing):
+    if holder_z_alignment not in [Alignment.TOP, Alignment.BOTTOM]:
+        raise ValueError("Lid holder z alignment must be TOP or BOTTOM")
+
+    holder_radius = BOARD_HOLDER_LID_HOLDER_DIAMETER / 2
+    cutter_radius = holder_radius + BOARD_HOLDER_LID_HOLDER_CLEARANCE
+
+    holders = PartCollector()
+    holder_cutters = []
+    holder_cutter_names = []
+
+    for left_right in [Alignment.LEFT, Alignment.RIGHT]:
+        for front_back in [Alignment.FRONT, Alignment.BACK]:
+            holder = _create_y_facing_hemisphere(
+                holder_radius,
+                front_back,
+                big_thing,
+            )
+            holder = align(holder, rim, left_right.edge_alignment)
+            holder = translate(
+                -left_right.sign * BOARD_HOLDER_LID_HOLDER_X_INSET,
+                0,
+                0,
+            )(holder)
+            holder = align(holder, rim, holder_z_alignment)
+            holder = align(holder, rim, front_back.stack_alignment)
+            holders = holders.fuse(holder)
+
+            holder_cutter = _create_y_facing_hemisphere(
+                cutter_radius,
+                front_back,
+                big_thing,
+            )
+            holder_cutter = align(holder_cutter, rim, left_right.edge_alignment)
+            holder_cutter = translate(
+                -left_right.sign * BOARD_HOLDER_LID_HOLDER_X_INSET,
+                0,
+                0,
+            )(holder_cutter)
+            holder_cutter = align(holder_cutter, rim, Alignment.CENTER, axes=[2])
+            holder_cutter = align(holder_cutter, rim, front_back.stack_alignment)
+            holder_cutters.append(holder_cutter)
+            holder_cutter_names.append(
+                f"lid_holder_dimple_{left_right.name.lower()}_"
+                f"{front_back.name.lower()}"
+            )
+
+    return LeaderFollowersCuttersPart(
+        holders,
+        cutters=holder_cutters,
+        cutter_names=holder_cutter_names,
+    )
+
+
+def _create_board_holder_lid(
+    *,
+    side_walls,
+    lid_alignment,
+    big_thing,
+    clearance_cutters=None,
+):
+    if lid_alignment not in [Alignment.TOP, Alignment.BOTTOM]:
+        raise ValueError("Board holder lid alignment must be TOP or BOTTOM")
+
+    side_walls_size = get_bounding_box_size(side_walls)
+
+    lid = create_filleted_box(
+        side_walls_size[0],
+        side_walls_size[1],
+        BOARD_HOLDER_LID_THICKNESS,
+        fillet_radius=BOARD_HOLDER_LID_FILLET_RADIUS,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    lid = align(lid, side_walls, Alignment.CENTER, axes=[0, 1])
+    lid = align(
+        lid,
+        side_walls,
+        lid_alignment.stack_alignment,
+        stack_gap=BOARD_HOLDER_LID_BODY_CLEARANCE,
+    )
+
+    lid = lid.cut(_create_board_holder_lid_air_hole_cutter(lid, big_thing))
+
+    rim_outer_length = (
+        side_walls_size[0]
+        - 2 * BOARD_HOLDER_SIDE_WALL_THICKNESS
+        - 2 * BOARD_HOLDER_LID_RIM_CLEARANCE
+    )
+    rim_outer_width = (
+        side_walls_size[1]
+        - 2 * BOARD_HOLDER_SIDE_WALL_THICKNESS
+        - 2 * BOARD_HOLDER_LID_RIM_CLEARANCE
+    )
+    rim_inner_length = rim_outer_length - 2 * BOARD_HOLDER_LID_RIM_THICKNESS
+    rim_inner_width = rim_outer_width - 2 * BOARD_HOLDER_LID_RIM_THICKNESS
+
+    if rim_inner_length <= 0 or rim_inner_width <= 0:
+        raise ValueError("Board holder lid inner rim dimensions must be positive")
+
+    rim = create_filleted_box(
+        rim_outer_length,
+        rim_outer_width,
+        BOARD_HOLDER_LID_RIM_HEIGHT,
+        fillet_radius=BOARD_HOLDER_LID_RIM_FILLET_RADIUS,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    rim_inner_cutter = create_filleted_box(
+        rim_inner_length,
+        rim_inner_width,
+        big_thing,
+        fillet_radius=BOARD_HOLDER_LID_RIM_FILLET_RADIUS,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    rim_inner_cutter = align(rim_inner_cutter, rim, Alignment.CENTER, axes=[0, 1])
+    rim_inner_cutter = align(rim_inner_cutter, rim, Alignment.CENTER, axes=[2])
+    rim = rim.cut(rim_inner_cutter)
+
+    rim = align(rim, lid, Alignment.CENTER, axes=[0, 1])
+    if lid_alignment == Alignment.TOP:
+        rim = align(rim, lid, Alignment.STACK_BOTTOM)
+        holder_z_alignment = Alignment.BOTTOM
+    else:
+        rim = align(rim, lid, Alignment.STACK_TOP)
+        holder_z_alignment = Alignment.TOP
+
+    holders = _create_board_holder_lid_holders(
+        rim,
+        holder_z_alignment,
+        big_thing,
+    )
+    lid_part = LeaderFollowersCuttersPart(lid.fuse(rim))
+    lid_part = lid_part.fuse(holders)
+
+    if clearance_cutters is not None:
+        lid_part.leader = lid_part.leader.cut(clearance_cutters)
+
+    return lid_part
+
+
+def _get_mount_hardware_clearance_radius(screw_size):
+    screw = MScrew.from_size(screw_size)
+    nut_corner_diameter = screw.nut_size / math.cos(math.radians(30))
+    return (
+        max(
+            screw.cylinder_head_diameter,
+            screw.nut_circle_diameter,
+            nut_corner_diameter,
+        )
+        / 2
+        + BOARD_HOLDER_MOUNT_HARDWARE_CLEARANCE
+    )
+
+
+def _create_mount_hardware_lid_clearance_cutters(
+    *,
+    mount_screw_positions,
+    screw_size,
+    big_thing,
+):
+    clearance_radius = _get_mount_hardware_clearance_radius(screw_size)
+    cutters = PartCollector()
+    for position in mount_screw_positions:
+        cutter = create_cylinder(
+            clearance_radius,
+            big_thing,
+            origin=(position[0], position[1], -big_thing / 2),
+        )
+        cutters = cutters.fuse(cutter)
+
+    return cutters
+
+
+def _create_mount_hardware(
+    *,
+    mount_screw_positions,
+    screw_size,
+    screw_head_bottom_z,
+    side_walls,
+):
+    screw = MScrew.from_size(screw_size)
+    side_walls_bbox = get_bounding_box(side_walls)
+    screw_shaft_bottom_z = (
+        side_walls_bbox[0][2]
+        - screw.nut_thickness
+        - BOARD_HOLDER_MOUNT_SCREW_EXPOSED_THREAD
+    )
+    screw_length = screw_head_bottom_z - screw_shaft_bottom_z
+    if screw_length <= 0:
+        raise ValueError("Mount screw visual length must be positive")
+
+    mount_screws = PartCollector()
+    mount_nuts = PartCollector()
+    for position in mount_screw_positions:
+        mount_screw = create_cylinder_screw(screw_size, screw_length)
+        mount_screw = translate(
+            position[0],
+            position[1],
+            screw_shaft_bottom_z,
+        )(mount_screw)
+        mount_screws = mount_screws.fuse(mount_screw)
+
+        mount_nut = create_nut(screw_size)
+        mount_nut = rotate(30)(mount_nut)
+        mount_nut = translate(
+            position[0],
+            position[1],
+            side_walls_bbox[0][2] - screw.nut_thickness,
+        )(mount_nut)
+        mount_nuts = mount_nuts.fuse(mount_nut)
+
+    return mount_screws, mount_nuts
 
 
 def _create_cut_box_from_xy(
@@ -747,6 +1037,7 @@ def create_board_holder_assembly(
             base_plate=base_plate,
             mosfet_driver_board=positioned_mosfet_driver_board,
         )
+    base_plate_mount_top_z = get_bounding_box(base_plate)[1][2]
 
     all_holders = LeaderFollowersCuttersPart(base_plate.fuse(additional_pins.leader))
 
@@ -837,7 +1128,7 @@ def create_board_holder_assembly(
 
     base_plate_cutter = materialize_bounding_box(all_holders)
 
-    side_wall_thickness = 2.2
+    side_wall_thickness = BOARD_HOLDER_SIDE_WALL_THICKNESS
     side_wall_top_height = 22
     side_wall_bottom_height = 20
     mount_plate_extension = 7
@@ -976,6 +1267,7 @@ def create_board_holder_assembly(
         board_holder_mount_screw_size
     ).clearance_hole_normal
     mount_screw_holes = PartCollector()
+    mount_screw_positions = []
     for left_right_alignment in [Alignment.LEFT, Alignment.RIGHT]:
         for front_back_alignment in [Alignment.FRONT, Alignment.BACK]:
             screw_hole = create_cylinder(
@@ -991,6 +1283,7 @@ def create_board_holder_assembly(
                 0,
             )(screw_hole)
             mount_screw_holes = mount_screw_holes.fuse(screw_hole)
+            mount_screw_positions.append(get_bounding_box_center(screw_hole))
 
     all_holders = all_holders.cut(mount_screw_holes)
     all_holders.add_named_cutter(mount_screw_holes, "mount_screw_holes")
@@ -1019,6 +1312,33 @@ def create_board_holder_assembly(
 
     side_walls = side_walls.fuse(mount_posts)
     side_walls = side_walls.cut(mount_screw_holes)
+
+    mount_screws, mount_nuts = _create_mount_hardware(
+        mount_screw_positions=mount_screw_positions,
+        screw_size=board_holder_mount_screw_size,
+        screw_head_bottom_z=base_plate_mount_top_z,
+        side_walls=side_walls,
+    )
+    bottom_lid_hardware_clearance_cutters = (
+        _create_mount_hardware_lid_clearance_cutters(
+            mount_screw_positions=mount_screw_positions,
+            screw_size=board_holder_mount_screw_size,
+            big_thing=BIG_THING,
+        )
+    )
+    top_lid = _create_board_holder_lid(
+        side_walls=side_walls,
+        lid_alignment=Alignment.TOP,
+        big_thing=BIG_THING,
+    )
+    bottom_lid = _create_board_holder_lid(
+        side_walls=side_walls,
+        lid_alignment=Alignment.BOTTOM,
+        big_thing=BIG_THING,
+        clearance_cutters=bottom_lid_hardware_clearance_cutters,
+    )
+    side_walls = top_lid.use_as_cutter_on(side_walls)
+    side_walls = bottom_lid.use_as_cutter_on(side_walls)
 
     all_holders_size = get_bounding_box_size(all_holders)
 
@@ -1057,6 +1377,12 @@ def create_board_holder_assembly(
         list(usb_cover_bridge_keepout_bbox[0]),
         list(usb_cover_bridge_keepout_bbox[1]),
     ]
+    all_holders.additional_data["mount_screw_positions"] = [
+        list(position) for position in mount_screw_positions
+    ]
+    all_holders.additional_data["bottom_lid_hardware_clearance_radius"] = (
+        _get_mount_hardware_clearance_radius(board_holder_mount_screw_size)
+    )
 
     if board_holder_frame_mount_eyes_enabled:
         side_walls_size = get_bounding_box_size(side_walls)
@@ -1094,6 +1420,10 @@ def create_board_holder_assembly(
 
         side_walls = side_walls.fuse(frame_mount_eyes)
 
+    all_holders.add_named_follower(top_lid.leader, "top_lid")
+    all_holders.add_named_follower(bottom_lid.leader, "bottom_lid")
     all_holders.add_named_follower(side_walls, "side_walls")
+    all_holders.add_named_non_production_part(mount_screws, "mount_screws")
+    all_holders.add_named_non_production_part(mount_nuts, "mount_nuts")
 
     return all_holders

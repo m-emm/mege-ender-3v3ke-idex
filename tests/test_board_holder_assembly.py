@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 import pytest
 
 from mege_ender_3v3ke_idex.designs.assemblies.board_holder_assembly import (
@@ -17,7 +19,7 @@ from mege_ender_3v3ke_idex.designs.sil_dil import (
     wire_wrap_pin_length,
     wire_wrap_pin_side,
 )
-from shellforgepy.simple import get_bounding_box
+from shellforgepy.simple import get_bounding_box, get_volume
 
 
 def _common_board_params():
@@ -34,6 +36,7 @@ def _common_board_params():
     }
 
 
+@lru_cache(maxsize=None)
 def _build_holder(
     *,
     board_holder_tmc_board_count,
@@ -248,8 +251,11 @@ def test_tmc_row_keeps_the_same_front_back_story_as_before():
         assembly.get_follower_part_by_name("tmc_board_2_board")
     )
 
-    assert first_tmc_board_bbox[0][1] == pytest.approx(pico_board_bbox[0][1])
-    assert second_tmc_board_bbox[1][1] == pytest.approx(pico_board_bbox[1][1])
+    row_front = min(first_tmc_board_bbox[0][1], second_tmc_board_bbox[0][1])
+    row_back = max(first_tmc_board_bbox[1][1], second_tmc_board_bbox[1][1])
+
+    assert row_front == pytest.approx(pico_board_bbox[0][1])
+    assert row_back == pytest.approx(pico_board_bbox[1][1])
 
 
 def test_tmc_to_additional_pins_gap_x_controls_holder_width():
@@ -325,3 +331,78 @@ def test_enabled_frame_mount_eyes_expand_side_walls_left_and_right():
     assert enabled_bbox[0][1] == pytest.approx(disabled_bbox[0][1])
     assert enabled_bbox[0][2] == pytest.approx(disabled_bbox[0][2])
     assert enabled_bbox[1][2] == pytest.approx(disabled_bbox[1][2])
+
+
+def test_exterior_lids_and_mount_hardware_are_exposed():
+    assembly = _build_holder(
+        board_holder_tmc_board_count=2,
+        board_holder_pico_to_tmc_gap_x=11.43,
+    )
+
+    top_lid_bbox = get_bounding_box(assembly.get_follower_part_by_name("top_lid"))
+    bottom_lid_bbox = get_bounding_box(assembly.get_follower_part_by_name("bottom_lid"))
+    side_walls_bbox = get_bounding_box(assembly.get_follower_part_by_name("side_walls"))
+
+    assembly.get_non_production_part_by_name("mount_screws")
+    assembly.get_non_production_part_by_name("mount_nuts")
+
+    assert top_lid_bbox[0][0] == pytest.approx(bottom_lid_bbox[0][0])
+    assert top_lid_bbox[1][0] == pytest.approx(bottom_lid_bbox[1][0])
+    assert top_lid_bbox[0][1] == pytest.approx(bottom_lid_bbox[0][1])
+    assert top_lid_bbox[1][1] == pytest.approx(bottom_lid_bbox[1][1])
+    assert top_lid_bbox[1][2] > side_walls_bbox[1][2]
+    assert top_lid_bbox[0][2] < side_walls_bbox[1][2]
+    assert bottom_lid_bbox[0][2] < side_walls_bbox[0][2]
+    assert bottom_lid_bbox[1][2] > side_walls_bbox[0][2]
+
+
+def test_bottom_lid_clears_fixed_mount_hardware():
+    assembly = _build_holder(
+        board_holder_tmc_board_count=2,
+        board_holder_pico_to_tmc_gap_x=11.43,
+    )
+
+    top_lid = assembly.get_follower_part_by_name("top_lid")
+    bottom_lid = assembly.get_follower_part_by_name("bottom_lid")
+    bottom_lid_bbox = get_bounding_box(bottom_lid)
+    mount_nuts_bbox = get_bounding_box(
+        assembly.get_non_production_part_by_name("mount_nuts")
+    )
+
+    assert get_volume(bottom_lid) < get_volume(top_lid)
+    assert mount_nuts_bbox[0][2] < bottom_lid_bbox[1][2]
+    assert bottom_lid_bbox[0][2] < mount_nuts_bbox[1][2]
+
+    clearance_radius = assembly.additional_data["bottom_lid_hardware_clearance_radius"]
+    for mount_screw_position in assembly.additional_data["mount_screw_positions"]:
+        assert bottom_lid_bbox[0][0] + clearance_radius < mount_screw_position[0]
+        assert mount_screw_position[0] < bottom_lid_bbox[1][0] - clearance_radius
+        assert bottom_lid_bbox[0][1] + clearance_radius < mount_screw_position[1]
+        assert mount_screw_position[1] < bottom_lid_bbox[1][1] - clearance_radius
+
+
+def test_frame_mount_eyes_do_not_enlarge_exterior_lids():
+    disabled_assembly = _build_holder(
+        board_holder_tmc_board_count=2,
+        board_holder_pico_to_tmc_gap_x=11.43,
+        board_holder_frame_mount_eyes_enabled=False,
+    )
+    enabled_assembly = _build_holder(
+        board_holder_tmc_board_count=2,
+        board_holder_pico_to_tmc_gap_x=11.43,
+        board_holder_frame_mount_eyes_enabled=True,
+        board_holder_frame_mount_eye_width=10.0,
+    )
+
+    for lid_name in ["top_lid", "bottom_lid"]:
+        disabled_lid_bbox = get_bounding_box(
+            disabled_assembly.get_follower_part_by_name(lid_name)
+        )
+        enabled_lid_bbox = get_bounding_box(
+            enabled_assembly.get_follower_part_by_name(lid_name)
+        )
+
+        assert enabled_lid_bbox[0][0] == pytest.approx(disabled_lid_bbox[0][0])
+        assert enabled_lid_bbox[1][0] == pytest.approx(disabled_lid_bbox[1][0])
+        assert enabled_lid_bbox[0][1] == pytest.approx(disabled_lid_bbox[0][1])
+        assert enabled_lid_bbox[1][1] == pytest.approx(disabled_lid_bbox[1][1])

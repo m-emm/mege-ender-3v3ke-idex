@@ -48,6 +48,18 @@ Builder:
           - side_walls
         name_template: "{name}"
         flip: false
+      - source: self
+        artifact: followers
+        names:
+          - top_lid
+        name_template: "{name}"
+        flip: true
+      - source: self
+        artifact: followers
+        names:
+          - bottom_lid
+        name_template: "{name}"
+        flip: false
     arrange:
       export_individual_parts: false
       plates:
@@ -63,6 +75,12 @@ Builder:
         - name: board_holder_side_walls
           parts:
             - side_walls
+        - name: board_holder_top_lid
+          parts:
+            - top_lid
+        - name: board_holder_bottom_lid
+          parts:
+            - bottom_lid
         - name: board_holder_tpu_cover
           process_data_preset: tpu_minimal_quality_minimal_strength_06
           parts:
