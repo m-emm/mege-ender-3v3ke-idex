@@ -1,6 +1,8 @@
 import pytest
 
 from mege_ender_3v3ke_idex.designs.assemblies.board_holder_assembly import (
+    COVER_PLUG_BOARD_CLEARANCE,
+    COVER_PLUG_MIN_DISTANCE,
     create_board_holder_assembly,
 )
 from mege_ender_3v3ke_idex.designs.assemblies.x_axis_mcu_board_assemblies import (
@@ -99,7 +101,6 @@ def _build_holder(
         board_holder_tpu_cover_pin_overlap_in_pitches=0.5,
         board_holder_tpu_cover_cross_strap_width_in_pitches=1.0,
         board_holder_plug_corner_inset=5.0,
-        board_holder_plug_positions=None,
         board_holder_plug_diameter=5.0,
         board_holder_plug_angle_deg=5.0,
         board_holder_plug_height=4.0,
@@ -121,6 +122,26 @@ def _build_holder(
     )
 
 
+def _distance_xy(point_a, point_b):
+    x_distance = point_a[0] - point_b[0]
+    y_distance = point_a[1] - point_b[1]
+    return (x_distance * x_distance + y_distance * y_distance) ** 0.5
+
+
+def _distance_to_bbox_xy(point, bbox):
+    x_distance = max(bbox[0][0] - point[0], 0, point[0] - bbox[1][0])
+    y_distance = max(bbox[0][1] - point[1], 0, point[1] - bbox[1][1])
+    return (x_distance * x_distance + y_distance * y_distance) ** 0.5
+
+
+def _contains_point(positions, expected_position):
+    return any(
+        position[0] == pytest.approx(expected_position[0])
+        and position[1] == pytest.approx(expected_position[1])
+        for position in positions
+    )
+
+
 def test_pico_to_tmc_gap_x_controls_the_board_to_board_spacing():
     configured_gap = 7.25
     assembly = _build_holder(
@@ -136,6 +157,55 @@ def test_pico_to_tmc_gap_x_controls_the_board_to_board_spacing():
     )
 
     assert tmc_board_bbox[0][0] - pico_board_bbox[1][0] == pytest.approx(configured_gap)
+
+
+def test_automatic_cover_plugs_are_dense_and_clear_keepouts():
+    assembly = _build_holder(
+        board_holder_tmc_board_count=2,
+        board_holder_pico_to_tmc_gap_x=11.43,
+    )
+
+    plug_positions = [
+        tuple(plug_position)
+        for plug_position in assembly.additional_data["plug_positions"]
+    ]
+    cover_bbox = get_bounding_box(assembly.get_follower_part_by_name("tpu_cover"))
+    corner_inset = 5.0
+    expected_corner_positions = [
+        (cover_bbox[0][0] + corner_inset, cover_bbox[0][1] + corner_inset),
+        (cover_bbox[0][0] + corner_inset, cover_bbox[1][1] - corner_inset),
+        (cover_bbox[1][0] - corner_inset, cover_bbox[0][1] + corner_inset),
+        (cover_bbox[1][0] - corner_inset, cover_bbox[1][1] - corner_inset),
+    ]
+
+    assert len(plug_positions) > 9
+    for expected_corner_position in expected_corner_positions:
+        assert _contains_point(plug_positions, expected_corner_position)
+
+    for plug_index, plug_position in enumerate(plug_positions):
+        for other_plug_position in plug_positions[plug_index + 1 :]:
+            assert _distance_xy(plug_position, other_plug_position) >= (
+                COVER_PLUG_MIN_DISTANCE - 1e-6
+            )
+
+    keepout_bboxes = [
+        get_bounding_box(assembly.get_follower_part_by_name("pico_board_board")),
+        get_bounding_box(assembly.get_follower_part_by_name("tmc_board_board")),
+        get_bounding_box(assembly.get_follower_part_by_name("tmc_board_2_board")),
+        get_bounding_box(
+            assembly.get_non_production_part_by_name("additional_pins_pins")
+        ),
+        get_bounding_box(
+            assembly.get_non_production_part_by_name("additional_pins_top_pins")
+        ),
+        assembly.additional_data["usb_cover_bridge_keepout_bbox"],
+    ]
+    minimum_center_to_keepout_distance = 2.5 + COVER_PLUG_BOARD_CLEARANCE
+    for plug_position in plug_positions:
+        for keepout_bbox in keepout_bboxes:
+            assert _distance_to_bbox_xy(plug_position, keepout_bbox) >= (
+                minimum_center_to_keepout_distance - 1e-6
+            )
 
 
 def test_additional_pins_base_plate_follower_tracks_the_flat_plate_bottom():

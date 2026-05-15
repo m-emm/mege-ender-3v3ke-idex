@@ -125,7 +125,6 @@ globals:
   board_holder_tpu_cover_pin_overlap_in_pitches: 0.5
   board_holder_tpu_cover_cross_strap_width_in_pitches: 1.0
   board_holder_plug_corner_inset: 5.0
-  board_holder_plug_positions: null
   board_holder_plug_diameter: 5.0
   board_holder_plug_angle_deg: 5.0
   board_holder_plug_height: 4.0

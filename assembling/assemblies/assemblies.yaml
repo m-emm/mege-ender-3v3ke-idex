@@ -1005,7 +1005,6 @@ assemblies:
       board_holder_tpu_cover_pin_overlap_in_pitches: !Ref board_holder_tpu_cover_pin_overlap_in_pitches
       board_holder_tpu_cover_cross_strap_width_in_pitches: !Ref board_holder_tpu_cover_cross_strap_width_in_pitches
       board_holder_plug_corner_inset: !Ref board_holder_plug_corner_inset
-      board_holder_plug_positions: !Ref board_holder_plug_positions
       board_holder_plug_diameter: !Ref board_holder_plug_diameter
       board_holder_plug_angle_deg: !Ref board_holder_plug_angle_deg
       board_holder_plug_height: !Ref board_holder_plug_height
@@ -1052,7 +1051,6 @@ assemblies:
       board_holder_tpu_cover_pin_overlap_in_pitches: !Ref board_holder_tpu_cover_pin_overlap_in_pitches
       board_holder_tpu_cover_cross_strap_width_in_pitches: !Ref board_holder_tpu_cover_cross_strap_width_in_pitches
       board_holder_plug_corner_inset: !Ref board_holder_plug_corner_inset
-      board_holder_plug_positions: !Ref board_holder_plug_positions
       board_holder_plug_diameter: !Ref board_holder_plug_diameter
       board_holder_plug_angle_deg: !Ref board_holder_plug_angle_deg
       board_holder_plug_height: !Ref board_holder_plug_height

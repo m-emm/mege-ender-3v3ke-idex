@@ -1,8 +1,11 @@
 """Assembly wrapper for the simplified MCU board holder."""
 
 from mege_ender_3v3ke_idex.designs.plug_and_hole import create_plug
-from mege_ender_3v3ke_idex.designs.trellis_plate import create_trellis_plate
 from shellforgepy.simple import *
+
+COVER_PLUG_GRID_PLACES = 8
+COVER_PLUG_BOARD_CLEARANCE = 1.5
+COVER_PLUG_MIN_DISTANCE = 15.0
 
 
 def _create_enclosing_base_plate(
@@ -301,14 +304,123 @@ def _create_tpu_cover(
     return cover, strap_metadata
 
 
+def _distance_xy(point_a, point_b):
+    x_distance = point_a[0] - point_b[0]
+    y_distance = point_a[1] - point_b[1]
+    return (x_distance * x_distance + y_distance * y_distance) ** 0.5
+
+
+def _distance_to_bbox_xy(point, bbox):
+    x_distance = max(bbox[0][0] - point[0], 0, point[0] - bbox[1][0])
+    y_distance = max(bbox[0][1] - point[1], 0, point[1] - bbox[1][1])
+    return (x_distance * x_distance + y_distance * y_distance) ** 0.5
+
+
+def _point_clears_board_keepouts(point, board_keepout_bboxes, required_clearance):
+    for board_keepout_bbox in board_keepout_bboxes:
+        if _distance_to_bbox_xy(point, board_keepout_bbox) < required_clearance:
+            return False
+    return True
+
+
+def _point_clears_plugs(point, existing_points):
+    for existing_point in existing_points:
+        if _distance_xy(point, existing_point) < COVER_PLUG_MIN_DISTANCE:
+            return False
+    return True
+
+
+def _point_matches_existing_plug(point, existing_points):
+    for existing_point in existing_points:
+        if _distance_xy(point, existing_point) < 1e-6:
+            return True
+    return False
+
+
+def _grid_values(min_value, max_value):
+    step = (max_value - min_value) / (COVER_PLUG_GRID_PLACES - 1)
+    return [min_value + step * index for index in range(COVER_PLUG_GRID_PLACES)]
+
+
+def _create_cover_plug_positions(
+    *,
+    cover,
+    board_keepout_bboxes,
+    board_holder_plug_corner_inset,
+    board_holder_plug_diameter,
+):
+    cover_bbox = get_bounding_box(cover)
+    x_min = cover_bbox[0][0] + board_holder_plug_corner_inset
+    x_max = cover_bbox[1][0] - board_holder_plug_corner_inset
+    y_min = cover_bbox[0][1] + board_holder_plug_corner_inset
+    y_max = cover_bbox[1][1] - board_holder_plug_corner_inset
+
+    if x_max <= x_min or y_max <= y_min:
+        raise ValueError("Cover is too small for inset cover plug placement.")
+
+    board_clearance = board_holder_plug_diameter / 2 + COVER_PLUG_BOARD_CLEARANCE
+    plug_positions = [
+        (x_min, y_min),
+        (x_min, y_max),
+        (x_max, y_min),
+        (x_max, y_max),
+    ]
+
+    for plug_index, plug_position in enumerate(plug_positions):
+        if not _point_clears_board_keepouts(
+            plug_position,
+            board_keepout_bboxes,
+            board_clearance,
+        ):
+            raise ValueError(
+                f"Corner cover plug {plug_index} violates board clearance."
+            )
+        if not _point_clears_plugs(plug_position, plug_positions[:plug_index]):
+            raise ValueError("Corner cover plugs are closer than the minimum distance.")
+
+    candidate_positions = []
+    for x_pos in _grid_values(x_min, x_max):
+        for y_pos in _grid_values(y_min, y_max):
+            candidate_position = (x_pos, y_pos)
+            if _point_matches_existing_plug(candidate_position, plug_positions):
+                continue
+            if _point_clears_board_keepouts(
+                candidate_position,
+                board_keepout_bboxes,
+                board_clearance,
+            ):
+                candidate_positions.append(candidate_position)
+
+    while True:
+        valid_candidate_positions = [
+            candidate_position
+            for candidate_position in candidate_positions
+            if _point_clears_plugs(candidate_position, plug_positions)
+        ]
+        if not valid_candidate_positions:
+            break
+
+        best_candidate_position = max(
+            valid_candidate_positions,
+            key=lambda candidate_position: min(
+                _distance_xy(candidate_position, plug_position)
+                for plug_position in plug_positions
+            ),
+        )
+        plug_positions.append(best_candidate_position)
+        candidate_positions.remove(best_candidate_position)
+
+    return plug_positions
+
+
 def _create_cover_plugs(
     *,
     cover,
     base_part,
     big_thing,
+    board_keepout_bboxes,
     board_holder_tpu_cover_gap_above_base,
     board_holder_plug_corner_inset,
-    board_holder_plug_positions,
     board_holder_plug_diameter,
     board_holder_plug_angle_deg,
     board_holder_plug_height,
@@ -324,73 +436,27 @@ def _create_cover_plugs(
 ):
     anchor_thickness = 1e-3
     lip_clearance_below_base = 0.1
-    if board_holder_plug_positions is None:
+    plug_positions = _create_cover_plug_positions(
+        cover=cover,
+        board_keepout_bboxes=board_keepout_bboxes,
+        board_holder_plug_corner_inset=board_holder_plug_corner_inset,
+        board_holder_plug_diameter=board_holder_plug_diameter,
+    )
 
-        def create_default_plug_anchor(
-            *,
-            left_right_alignment=None,
-            front_back_alignment=None,
-        ):
-            plug_anchor = create_box(
-                anchor_thickness,
-                anchor_thickness,
-                anchor_thickness,
-            )
-            x_offset = 0
-            y_offset = 0
-
-            if left_right_alignment is None:
-                plug_anchor = align(plug_anchor, cover, Alignment.CENTER, axes=[0])
-            else:
-                plug_anchor = align(
-                    plug_anchor, cover, left_right_alignment.edge_alignment
-                )
-                x_offset = -left_right_alignment.sign * board_holder_plug_corner_inset
-
-            if front_back_alignment is None:
-                plug_anchor = align(plug_anchor, cover, Alignment.CENTER, axes=[1])
-            else:
-                plug_anchor = align(
-                    plug_anchor, cover, front_back_alignment.edge_alignment
-                )
-                y_offset = -front_back_alignment.sign * board_holder_plug_corner_inset
-
-            plug_anchor = align(plug_anchor, cover, Alignment.BOTTOM)
-            return translate(x_offset, y_offset, 0)(plug_anchor)
-
-        plug_anchors = []
-        for left_right_alignment in [Alignment.LEFT, Alignment.RIGHT]:
-            for front_back_alignment in [Alignment.FRONT, Alignment.BACK]:
-                plug_anchors.append(
-                    create_default_plug_anchor(
-                        left_right_alignment=left_right_alignment,
-                        front_back_alignment=front_back_alignment,
-                    )
-                )
-        for left_right_alignment in [Alignment.LEFT, Alignment.RIGHT]:
-            plug_anchors.append(
-                create_default_plug_anchor(left_right_alignment=left_right_alignment)
-            )
-        for front_back_alignment in [Alignment.FRONT, Alignment.BACK]:
-            plug_anchors.append(
-                create_default_plug_anchor(front_back_alignment=front_back_alignment)
-            )
-        plug_anchors.append(create_default_plug_anchor())
-    else:
-        plug_anchors = []
-        for x_pos, y_pos in board_holder_plug_positions:
-            plug_anchor = create_box(
-                anchor_thickness,
-                anchor_thickness,
-                anchor_thickness,
-                origin=(
-                    x_pos - anchor_thickness / 2,
-                    y_pos - anchor_thickness / 2,
-                    -anchor_thickness / 2,
-                ),
-            )
-            plug_anchor = align(plug_anchor, cover, Alignment.BOTTOM)
-            plug_anchors.append(plug_anchor)
+    plug_anchors = []
+    for x_pos, y_pos in plug_positions:
+        plug_anchor = create_box(
+            anchor_thickness,
+            anchor_thickness,
+            anchor_thickness,
+            origin=(
+                x_pos - anchor_thickness / 2,
+                y_pos - anchor_thickness / 2,
+                -anchor_thickness / 2,
+            ),
+        )
+        plug_anchor = align(plug_anchor, cover, Alignment.BOTTOM)
+        plug_anchors.append(plug_anchor)
 
     cover_with_plugs = cover
     hole_cutters = []
@@ -450,7 +516,7 @@ def _create_cover_plugs(
         hole_cutter = align(hole_cutter, plug, Alignment.CENTER)
         hole_cutters.append(hole_cutter)
 
-    return cover_with_plugs, hole_cutters
+    return cover_with_plugs, hole_cutters, plug_positions
 
 
 def _get_named_tmc_board_visual_prefix(index):
@@ -479,6 +545,36 @@ def _cut_base_plate_for_mosfet_driver(
     return base_plate
 
 
+def _create_usb_cover_bridge_parts(
+    *,
+    pico_board,
+    board_holder_usb_cable_hole_width,
+    board_holder_usb_cable_hole_height,
+    big_thing,
+):
+    connector_part = pico_board.get_non_production_part_by_name("micro_usb_socket")
+    usb_cable_cutter = create_box(
+        board_holder_usb_cable_hole_width,
+        big_thing,
+        board_holder_usb_cable_hole_height,
+    )
+    usb_cable_cutter = align(usb_cable_cutter, connector_part, Alignment.CENTER)
+    usb_cable_cutter = align(usb_cable_cutter, connector_part, Alignment.FRONT)
+
+    bridge_wall_thickness = 2
+    usb_cover_bridge = materialize_bounding_box(
+        usb_cable_cutter,
+        x_enlargement=bridge_wall_thickness,
+        z_enlargement=bridge_wall_thickness,
+    )
+    usb_cover_bridge = usb_cover_bridge.cut(usb_cable_cutter)
+    usb_cover_bridge = fit_part_between(
+        usb_cover_bridge, (0, 1, 0), limiting_start_part=connector_part
+    )
+
+    return connector_part, usb_cable_cutter, usb_cover_bridge
+
+
 def create_board_holder_assembly(
     *,
     pico_w_board_assembly,
@@ -501,7 +597,6 @@ def create_board_holder_assembly(
     board_holder_tpu_cover_pin_overlap_in_pitches,
     board_holder_tpu_cover_cross_strap_width_in_pitches,
     board_holder_plug_corner_inset,
-    board_holder_plug_positions,
     board_holder_plug_diameter,
     board_holder_plug_angle_deg,
     board_holder_plug_height,
@@ -667,13 +762,44 @@ def create_board_holder_assembly(
         board_holder_tpu_cover_pin_overlap_in_pitches=board_holder_tpu_cover_pin_overlap_in_pitches,
         board_holder_tpu_cover_cross_strap_width_in_pitches=board_holder_tpu_cover_cross_strap_width_in_pitches,
     )
-    tpu_cover, cover_plug_hole_cutters = _create_cover_plugs(
+    connector_part, usb_cable_cutter, usb_cover_bridge = _create_usb_cover_bridge_parts(
+        pico_board=pico_board,
+        board_holder_usb_cable_hole_width=board_holder_usb_cable_hole_width,
+        board_holder_usb_cable_hole_height=board_holder_usb_cable_hole_height,
+        big_thing=BIG_THING,
+    )
+
+    board_keepout_bboxes = [get_bounding_box(_get_board_part(pico_board))]
+    for current_tmc_board in positioned_tmc_boards:
+        board_keepout_bboxes.append(
+            get_bounding_box(_get_board_part(current_tmc_board))
+        )
+    if positioned_mosfet_driver_board is not None:
+        board_keepout_bboxes.append(
+            get_bounding_box(_get_board_part(positioned_mosfet_driver_board))
+        )
+    board_keepout_bboxes.append(
+        get_bounding_box(additional_pins.get_non_production_part_by_name("pins"))
+    )
+    board_keepout_bboxes.append(
+        get_bounding_box(additional_pins.get_non_production_part_by_name("top_pins"))
+    )
+    usb_cover_bridge_keepout_bbox = get_bounding_box(
+        materialize_bounding_box(
+            usb_cover_bridge,
+            x_enlargement=0.2,
+            y_enlargement=0.2,
+        )
+    )
+    board_keepout_bboxes.append(usb_cover_bridge_keepout_bbox)
+
+    tpu_cover, cover_plug_hole_cutters, cover_plug_positions = _create_cover_plugs(
         cover=tpu_cover,
         base_part=all_holders.leader,
         big_thing=BIG_THING,
+        board_keepout_bboxes=board_keepout_bboxes,
         board_holder_tpu_cover_gap_above_base=board_holder_tpu_cover_gap_above_base,
         board_holder_plug_corner_inset=board_holder_plug_corner_inset,
-        board_holder_plug_positions=board_holder_plug_positions,
         board_holder_plug_diameter=board_holder_plug_diameter,
         board_holder_plug_angle_deg=board_holder_plug_angle_deg,
         board_holder_plug_height=board_holder_plug_height,
@@ -716,10 +842,6 @@ def create_board_holder_assembly(
     side_wall_bottom_height = 20
     mount_plate_extension = 7
     side_wall_clearance = 0.6
-    side_wall_trellis_border = 3
-    trelllis_band_width = 3
-    trellis_band_fillet_radius = 0.05
-    trelllis_band_pitch = 8
 
     base_plate_enlargement = materialize_bounding_box(
         all_holders,
@@ -732,30 +854,8 @@ def create_board_holder_assembly(
 
     base_plate_size = get_bounding_box_size(all_holders)
 
-    def create_side_wall(
-        length,
-        width,
-        thickness,
-        x_border_width,
-        y_border_width,
-        band_width,
-        band_pitch,
-        hole_fillet_radius=None,
-    ):
-        side_wall = create_box(length, width, thickness)
-        return side_wall
-
-        side_wall = create_trellis_plate(
-            length,
-            width,
-            thickness,
-            x_border_width=x_border_width,
-            y_border_width=y_border_width,
-            band_width=band_width,
-            band_pitch=band_pitch,
-            hole_fillet_radius=hole_fillet_radius,
-        )
-        return side_wall
+    def create_side_wall(length, width, thickness):
+        return create_box(length, width, thickness)
 
     side_walls = PartCollector()
     for fb in [Alignment.FRONT, Alignment.BACK]:
@@ -764,11 +864,6 @@ def create_board_holder_assembly(
             base_plate_size[0] + 2 * side_wall_thickness + 2 * side_wall_clearance,
             side_wall_top_height + board_holder_base_plate_thickness,
             side_wall_thickness,
-            x_border_width=side_wall_trellis_border,
-            y_border_width=side_wall_trellis_border,
-            band_width=trelllis_band_width,
-            band_pitch=trelllis_band_pitch,
-            hole_fillet_radius=trellis_band_fillet_radius,
         )
         side_wall_top = rotate(90, axis=(1, 0, 0))(side_wall_top)
         side_wall_top = align(side_wall_top, all_holders, Alignment.CENTER, axes=[0])
@@ -806,11 +901,6 @@ def create_board_holder_assembly(
             base_plate_size[1] + 2 * side_wall_thickness + 2 * side_wall_clearance,
             side_wall_top_height + board_holder_base_plate_thickness,
             side_wall_thickness,
-            x_border_width=side_wall_trellis_border,
-            y_border_width=side_wall_trellis_border,
-            band_width=trelllis_band_width,
-            band_pitch=trelllis_band_pitch,
-            hole_fillet_radius=trellis_band_fillet_radius,
         )
         side_wall_top = rotate(90, axis=(1, 0, 0))(side_wall_top)
         side_wall_top = rotate(90)(side_wall_top)
@@ -925,35 +1015,10 @@ def create_board_holder_assembly(
             mount_post = mount_post.cut(walls_bottom_cutter)
             mount_posts = mount_posts.fuse(mount_post)
 
-    connector_part = pico_board.get_non_production_part_by_name("micro_usb_socket")
-    usb_cable_cutter = create_box(
-        board_holder_usb_cable_hole_width,
-        BIG_THING,
-        board_holder_usb_cable_hole_height,
-    )
-
-    usb_cable_cutter = align(usb_cable_cutter, connector_part, Alignment.CENTER)
-    usb_cable_cutter = align(usb_cable_cutter, connector_part, Alignment.FRONT)
-
     side_walls = side_walls.cut(usb_cable_cutter)
 
     side_walls = side_walls.fuse(mount_posts)
     side_walls = side_walls.cut(mount_screw_holes)
-
-    # pico usb bridge
-
-    bridge_wall_thickness = 2
-
-    usb_cover_bridge = materialize_bounding_box(
-        usb_cable_cutter,
-        x_enlargement=bridge_wall_thickness,
-        z_enlargement=bridge_wall_thickness,
-    )
-    usb_cover_bridge = usb_cover_bridge.cut(usb_cable_cutter)
-
-    usb_cover_bridge = fit_part_between(
-        usb_cover_bridge, (0, 1, 0), limiting_start_part=connector_part
-    )
 
     all_holders_size = get_bounding_box_size(all_holders)
 
@@ -985,6 +1050,13 @@ def create_board_holder_assembly(
 
     all_holders.add_named_follower(tpu_cover, "tpu_cover")
     all_holders.additional_data["tpu_cover_straps"] = tpu_cover_strap_metadata
+    all_holders.additional_data["plug_positions"] = [
+        [x_pos, y_pos] for x_pos, y_pos in cover_plug_positions
+    ]
+    all_holders.additional_data["usb_cover_bridge_keepout_bbox"] = [
+        list(usb_cover_bridge_keepout_bbox[0]),
+        list(usb_cover_bridge_keepout_bbox[1]),
+    ]
 
     if board_holder_frame_mount_eyes_enabled:
         side_walls_size = get_bounding_box_size(side_walls)

@@ -12,6 +12,7 @@ Builder:
         - top
         - bottom
         - left
+        - right
       width: 512
       height: 512
     parts:
@@ -95,8 +96,6 @@ Parameters:
     Type: Float
   board_holder_plug_corner_inset:
     Type: Float
-  board_holder_plug_positions:
-    Type: Json
   board_holder_plug_diameter:
     Type: Float
   board_holder_plug_angle_deg:
