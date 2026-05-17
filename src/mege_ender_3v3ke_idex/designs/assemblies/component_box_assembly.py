@@ -140,10 +140,9 @@ def create_component_box_assembly(
         wall_thickness + hinge_depth + 2 * lid_clearance,
         hinge_thickness + lid_clearance + 1e-3,
     )
-    lid_hinge_clearance = align(lid_hinge_clearance, hinge, Alignment.CENTER, axes=[0])
+    lid_hinge_clearance = align(lid_hinge_clearance, hinge, Alignment.CENTER)
     lid_hinge_clearance = align(lid_hinge_clearance, lid, Alignment.FRONT)
     lid_hinge_clearance = align(lid_hinge_clearance, lid, Alignment.TOP)
-    lid_hinge_clearance = translate(0, -lid_clearance, 0)(lid_hinge_clearance)
     lid = lid.cut(lid_hinge_clearance)
 
     resistor_body = create_cylinder(RESISTOR_BODY_DIAMETER / 2, RESISTOR_BODY_LENGTH)
