@@ -1070,35 +1070,6 @@ assemblies:
       board_holder_frame_mount_eye_thickness: !Ref board_holder_frame_mount_eye_thickness
       board_holder_frame_mount_eye_fillet_radius: !Ref board_holder_frame_mount_eye_fillet_radius
 
-  - name: pico_w_board_holder_protoype_assembly
-
-    resource_file: pico_w_board_holder_protoype_assembly.yaml
-    parameters:
-      board_catalog:
-        - name: pico_proto_board
-          board_type: dil
-          params:
-            int_x_distance: 5
-            num_y_pins: 8
-            board_thickness: !Ref x_axis_mcu_pico_board_thickness
-            board_corner_radius: !Ref x_axis_mcu_pico_board_corner_radius
-            top_pin_length: !Ref x_axis_mcu_top_pin_length
-            pin_length: !Ref x_axis_mcu_wire_wrap_pin_length
-            pin_side: !Ref x_axis_mcu_wire_wrap_pin_side
-            base_thickness: !Ref x_axis_mcu_wire_wrap_pin_base_thickness
-            board_cutter_slack: !Ref x_axis_mcu_electronics_board_cutter_slack
-            base_cutter_slack: !Ref x_axis_mcu_electronics_holder_slack
-            base_cutter_vertical_slack: !Ref x_axis_mcu_base_cutter_vertical_slack
-      board_placements:
-        - instance_name: pico_proto_board
-          board_name: pico_proto_board
-      pin_lines: []
-      base_plate_thickness: !Ref board_holder_base_plate_thickness
-      board_z_offset: !Ref board_holder_board_z_offset
-      base_border: !Ref board_holder_base_plate_border
-      tpu_cover_thickness: 1.0
-      tpu_cover_gap_above_base: !Ref x_axis_mcu_top_pin_length
-
   - name: x_axis_assembly
 
     depends_on:
