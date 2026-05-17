@@ -695,6 +695,23 @@ assemblies:
     resource_file: printer_foot_assembly.yaml
     depends_on: []
 
+  - name: resistor_box_assembly
+
+    resource_file: component_box_assembly.yaml
+    depends_on: []
+    parameters:
+      inner_length: !Ref resistor_box_inner_length
+      inner_width: !Ref resistor_box_inner_width
+      inner_height: !Ref resistor_box_inner_height
+      wall_thickness: !Ref resistor_box_wall_thickness
+      floor_thickness: !Ref resistor_box_floor_thickness
+      lid_thickness: !Ref resistor_box_lid_thickness
+      fillet_radius: !Ref resistor_box_fillet_radius
+      hinge_gap: !Ref resistor_box_hinge_gap
+      hinge_width: !Ref resistor_box_hinge_width
+      hinge_depth: !Ref resistor_box_hinge_depth
+      hinge_thickness: !Ref resistor_box_hinge_thickness
+
   - name: print_bed_assembly
 
     depends_on:

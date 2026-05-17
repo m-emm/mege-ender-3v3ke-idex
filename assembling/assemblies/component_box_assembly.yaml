@@ -1,0 +1,74 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Generic one-piece TPU component box assembly
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - front
+        - right
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: leader
+        name: component_box
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+
+  Production:
+    process_data_preset: tpu_minimal_quality_minimal_strength_06
+    process_data:
+      overrides:
+        process_overrides:
+          enable_support: "0"
+          brim_type: no_brim
+          sparse_infill_density: "100%"
+          wall_loops: "3"
+    parts:
+      - source: self
+        artifact: leader
+        name: component_box
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: component_box
+          parts:
+            - component_box
+      auto_assign_plates: false
+
+Parameters:
+  inner_length:
+    Type: Float
+  inner_width:
+    Type: Float
+  inner_height:
+    Type: Float
+  wall_thickness:
+    Type: Float
+  floor_thickness:
+    Type: Float
+  lid_thickness:
+    Type: Float
+  fillet_radius:
+    Type: Float
+  hinge_gap:
+    Type: Float
+  hinge_width:
+    Type: Float
+  hinge_depth:
+    Type: Float
+  hinge_thickness:
+    Type: Float
+
+Parts:
+  ComponentBoxAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.component_box_assembly.create_component_box_assembly
