@@ -19,6 +19,25 @@ Builder:
         name: component_box
       - source: self
         artifact: non_production_parts
+        names:
+          - lid_closing_preview
+        name_template: "{name}"
+        animation:
+          lid_close:
+            type: rotation
+            axis: [1, 0, 0]
+            angle_degrees: 180
+            origin:
+              - $expr:
+                  "$sub": "${wall_thickness}  + ${inner_length} / 2"
+              - $expr:
+                  "$sub":  "${hinge_gap} + ${wall_thickness}/2 + ${lid_clearance} /2"
+              - $expr:
+                  "$sub": "${inner_height} / 2 +  ${floor_thickness}"
+      - source: self
+        artifact: non_production_parts
+        exclude_names:
+          - lid_closing_preview
         name_template: "{name}"
 
   Production:
@@ -54,6 +73,8 @@ Parameters:
   floor_thickness:
     Type: Float
   lid_thickness:
+    Type: Float
+  lid_clearance:
     Type: Float
   fillet_radius:
     Type: Float
