@@ -47,6 +47,7 @@ def create_component_box_assembly(
     floor_thickness,
     lid_thickness,
     lid_clearance,
+    wire_cut_width,
     fillet_radius,
     hinge_gap,
     hinge_width,
@@ -63,6 +64,7 @@ def create_component_box_assembly(
         ("floor_thickness", floor_thickness),
         ("lid_thickness", lid_thickness),
         ("lid_clearance", lid_clearance),
+        ("wire_cut_width", wire_cut_width),
         ("hinge_width", hinge_width),
         ("hinge_depth", hinge_depth),
         ("hinge_thickness", hinge_thickness),
@@ -109,6 +111,11 @@ def create_component_box_assembly(
     body_inner_space_cutter = translate(0, 0, floor_thickness)(body_inner_space_cutter)
     body = body.cut(body_inner_space_cutter)
 
+    wire_slit = create_box(wall_thickness + 1, wire_cut_width, inner_height / 2)
+    wire_slit = align(wire_slit, body, Alignment.CENTER, axes=[1])
+    wire_slit = align(wire_slit, body, Alignment.TOP)
+    body = body.cut(align(wire_slit, body, Alignment.LEFT))
+    body = body.cut(align(wire_slit, body, Alignment.RIGHT))
 
     lid = create_box(lid_outer_length, lid_outer_width, lid_outer_height)
     lid = _fillet_box(

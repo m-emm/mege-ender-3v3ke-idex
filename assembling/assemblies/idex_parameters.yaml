@@ -54,11 +54,13 @@ globals:
   resistor_box_floor_thickness: 0.8
   resistor_box_lid_thickness: 0.8
   resistor_box_lid_clearance: 0.2
+  resistor_box_wire_cut_width: 0.45
   resistor_box_fillet_radius: 0.4
   resistor_box_hinge_gap: 10
   resistor_box_hinge_width: 15
   resistor_box_hinge_depth: 1.2
   resistor_box_hinge_thickness: 0.5
+  resistor_box_num_copies: 3
   print_bed_undercarriage_belt_clamp_base_thickness: 5
   print_bed_undercarriage_belt_clamp_clamp_length: 30
   print_bed_undercarriage_belt_clamp_clamp_thickness: 6

@@ -707,6 +707,8 @@ assemblies:
       floor_thickness: !Ref resistor_box_floor_thickness
       lid_thickness: !Ref resistor_box_lid_thickness
       lid_clearance: !Ref resistor_box_lid_clearance
+      wire_cut_width: !Ref resistor_box_wire_cut_width
+      num_copies: !Ref resistor_box_num_copies
       fillet_radius: !Ref resistor_box_fillet_radius
       hinge_gap: !Ref resistor_box_hinge_gap
       hinge_width: !Ref resistor_box_hinge_width

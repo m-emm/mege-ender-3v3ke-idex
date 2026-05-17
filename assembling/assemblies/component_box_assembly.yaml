@@ -31,7 +31,7 @@ Builder:
               - $expr:
                   "$sub": "${wall_thickness}  + ${inner_length} / 2"
               - $expr:
-                  "$sub":  "${hinge_gap} + ${wall_thickness}/2 + ${lid_clearance} /2"
+                  "$sub": "${hinge_gap} + ${wall_thickness}/2 + ${lid_clearance} /2"
               - $expr:
                   "$sub": "${inner_height} / 2 +  ${floor_thickness}"
       - source: self
@@ -41,6 +41,7 @@ Builder:
         name_template: "{name}"
 
   Production:
+    num_copies: !Ref num_copies
     process_data_preset: tpu_minimal_quality_minimal_strength_06
     process_data:
       overrides:
@@ -76,6 +77,10 @@ Parameters:
     Type: Float
   lid_clearance:
     Type: Float
+  wire_cut_width:
+    Type: Float
+  num_copies:
+    Type: Integer
   fillet_radius:
     Type: Float
   hinge_gap:
