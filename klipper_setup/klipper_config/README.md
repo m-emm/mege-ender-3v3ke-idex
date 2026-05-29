@@ -72,6 +72,19 @@ git clone git@github.com:m-emm/mege-ender-3v3ke-idex.git ~/mege-ender-3v3ke-idex
 Normal update and install flow:
 
 ```bash
+cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
+./update_menderpi.sh
+```
+
+`update_menderpi.sh` copies the current local
+`pico_w_btt_tmc2226_y_z_bringup.cfg` to `pi@menderpi.local`, backs up the live
+`~/printer_data/config/printer.cfg`, installs the new config, restarts Klipper,
+and reports the Klippy state through Moonraker. This is the fastest bring-up
+path while the Raspberry Pi does not have a local checkout of this repository.
+
+If the repository is later cloned on the Pi, the equivalent Git-based flow is:
+
+```bash
 ssh pi@menderpi.local
 cd ~/mege-ender-3v3ke-idex
 git fetch origin
@@ -81,9 +94,6 @@ git pull --ff-only origin main
 sudo systemctl restart klipper
 tail -f ~/printer_data/logs/klippy.log
 ```
-
-The installer backs up the current live `~/printer_data/config/printer.cfg`
-before replacing it.
 
 ## Y + Dual-Z Homing
 
@@ -98,6 +108,7 @@ G28 Z
 G28
 
 Y_TEST_TRAVEL_100
+Y_TEST_TRAVEL_100_AUDACIOUS
 MOTORS_OFF
 ```
 
@@ -109,13 +120,17 @@ and Z. `G28 X` only marks the placeholder X homed and does not command physical
 motion.
 
 `Y_TEST_TRAVEL_100` requires Y to be homed. It picks a safe 100 mm direction
-from the current Y position, temporarily sets `550` mm/s velocity, `6500`
+from the current Y position, temporarily sets `550` mm/s velocity, `8000`
 mm/s^2 acceleration, and `11` mm/s square-corner velocity, then runs three
 out-and-back cycles. It then moves to the farther test position and performs a
 slow `G28 Y` verification pass, so the hardware Y endstop stops the final move
 back to the rear. Klipper macros can safely use that homing stop and will error
 if the endstop is not found, but they do not expose enough trigger-distance data
 to automatically flag an early trigger as lost steps.
+
+`Y_TEST_TRAVEL_100_AUDACIOUS` uses the same path and verification pass, but
+raises the acceleration to `9500` mm/s^2. Both Y travel-test macros use the
+configured Y driver current of `1.7` A.
 
 If either Z motor moves opposite the other, stop testing and invert that side's
 `dir_pin` in `pico_w_btt_tmc2226_y_z_bringup.cfg` before redeploying.
