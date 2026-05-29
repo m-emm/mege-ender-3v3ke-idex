@@ -97,13 +97,21 @@ G28 Y
 G28 Z
 G28
 
+Y_TEST_TRAVEL_100
 MOTORS_OFF
 ```
 
-`G28 Y` homes the real Y axis. `G28 Z` homes both Z motors upward to their
-top-mounted independent left/right endstops and sets Z to `250`. `G28` or
-"home all" marks the placeholder X as homed, then homes Y and Z. `G28 X` only
-marks the placeholder X homed and does not command physical motion.
+`G28 Y` homes the real Y axis to the back-mounted min-Y endstop, sets Y to
+`0`, and uses a configured Y travel range of `0..310`. `G28 Z` homes both Z
+motors upward to their top-mounted independent left/right endstops and sets Z
+to `250`. `G28` or "home all" marks the placeholder X as homed, then homes Y
+and Z. `G28 X` only marks the placeholder X homed and does not command physical
+motion.
+
+`Y_TEST_TRAVEL_100` requires Y to be homed. It picks a safe 100 mm direction
+from the current Y position, temporarily sets `400` mm/s velocity, `5000`
+mm/s^2 acceleration, and `5` mm/s square-corner velocity, moves out and back,
+then restores the prior velocity limits.
 
 If either Z motor moves opposite the other, stop testing and invert that side's
 `dir_pin` in `pico_w_btt_tmc2226_y_z_bringup.cfg` before redeploying.
