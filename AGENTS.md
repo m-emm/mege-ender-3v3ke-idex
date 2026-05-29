@@ -161,6 +161,7 @@ For support tuning, interpret `support_threshold_angle` carefully: higher values
 - Do not use `collector.part` directly - treat collectors as parts themselves
 - Do use as little translation offset calculations as possible - use align(), align(part, target, Alignment.STACK_RIGHT,stack_gap=-move_into_part) .. patterns wherever possible
 - Do not catch exceptions - let scripts fail fast on geometry errors
+- Do not add tons of validations for parameters - parameters are visually tuned by users, they will see if something is off
 - Do not create ad-hoc test scripts - write proper pytest tests
 - Do not introduce new standalone export-oriented geometry scripts when the work belongs in the builder-based assembly system
 - Do not duplicate assembly structure in Python when the same concern belongs in `*_assembly.yaml`
