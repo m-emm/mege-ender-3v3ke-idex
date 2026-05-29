@@ -109,9 +109,13 @@ and Z. `G28 X` only marks the placeholder X homed and does not command physical
 motion.
 
 `Y_TEST_TRAVEL_100` requires Y to be homed. It picks a safe 100 mm direction
-from the current Y position, temporarily sets `400` mm/s velocity, `5000`
-mm/s^2 acceleration, and `5` mm/s square-corner velocity, moves out and back,
-then restores the prior velocity limits.
+from the current Y position, temporarily sets `550` mm/s velocity, `6500`
+mm/s^2 acceleration, and `11` mm/s square-corner velocity, then runs three
+out-and-back cycles. It then moves to the farther test position and performs a
+slow `G28 Y` verification pass, so the hardware Y endstop stops the final move
+back to the rear. Klipper macros can safely use that homing stop and will error
+if the endstop is not found, but they do not expose enough trigger-distance data
+to automatically flag an early trigger as lost steps.
 
 If either Z motor moves opposite the other, stop testing and invert that side's
 `dir_pin` in `pico_w_btt_tmc2226_y_z_bringup.cfg` before redeploying.
