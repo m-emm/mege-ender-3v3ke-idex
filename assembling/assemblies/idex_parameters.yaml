@@ -299,6 +299,46 @@ globals:
   mosfet_driver_j1_four_pin_row_x: 3.7
   mosfet_driver_j1_two_pin_row_x: 1.4
   mosfet_driver_j1_two_pin_y_offset: 2.55
+  nitehawk_usb_board_length: 30.0
+  nitehawk_usb_board_width: 28.0
+  nitehawk_usb_board_thickness: 1.6
+  nitehawk_usb_board_corner_radius: 1.0
+  nitehawk_usb_board_clearance_slack: 0.3
+  nitehawk_usb_component_clearance_slack: 0.8
+  nitehawk_usb_mount_hole_diameter: 3.2
+  nitehawk_usb_mount_hole_front_left_x: 3.0
+  nitehawk_usb_mount_hole_front_left_y: 4.0
+  nitehawk_usb_mount_hole_front_right_x: 26.6
+  nitehawk_usb_mount_hole_front_right_y: 4.0
+  nitehawk_usb_mount_hole_back_x: 15.4
+  nitehawk_usb_mount_hole_back_y: 21.8
+  nitehawk_usb_terminal_block_length: 10.6
+  nitehawk_usb_terminal_block_width: 8.3
+  nitehawk_usb_terminal_block_height: 10.0
+  nitehawk_usb_terminal_block_x: 0.3
+  nitehawk_usb_terminal_block_y: 19.7
+  nitehawk_usb_terminal_block_top_taper_height: 2.4
+  nitehawk_usb_terminal_block_top_width: 6.6
+  nitehawk_usb_terminal_block_window_side_margin: 0.8
+  nitehawk_usb_terminal_block_window_center_divider: 1.1
+  nitehawk_usb_terminal_block_window_bottom_lip: 0.9
+  nitehawk_usb_terminal_block_window_top_lip: 0.7
+  nitehawk_usb_terminal_block_window_back_wall: 1.0
+  nitehawk_usb_usb_c_connector_length: 9.2
+  nitehawk_usb_usb_c_connector_width: 6.4
+  nitehawk_usb_usb_c_connector_height: 3.2
+  nitehawk_usb_usb_c_connector_x: 20.4
+  nitehawk_usb_usb_c_connector_y: 21.6
+  nitehawk_usb_front_plug_length: 11.6
+  nitehawk_usb_front_plug_width: 8.8
+  nitehawk_usb_front_plug_height: 10.5
+  nitehawk_usb_front_plug_x: 11.4
+  nitehawk_usb_front_plug_y: 0.0
+  nitehawk_usb_white_connector_length: 10.9
+  nitehawk_usb_white_connector_width: 5.2
+  nitehawk_usb_white_connector_height: 4.2
+  nitehawk_usb_white_connector_x: 0.9
+  nitehawk_usb_white_connector_y: 10.5
   endstop_holder_stack_gap: 30
   z_axis_guide_distance: 256
   z_axis_y_offset: 130

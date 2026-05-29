@@ -844,6 +844,52 @@ assemblies:
       x_axis_mcu_electronics_board_cutter_slack: !Ref x_axis_mcu_electronics_board_cutter_slack
       x_axis_mcu_base_cutter_vertical_slack: !Ref x_axis_mcu_base_cutter_vertical_slack
 
+  - name: nitehawk_usb_board_assembly
+
+    resource_file: nitehawk_usb_board_assembly.yaml
+    depends_on: []
+    parameters:
+      nitehawk_usb_board_length: !Ref nitehawk_usb_board_length
+      nitehawk_usb_board_width: !Ref nitehawk_usb_board_width
+      nitehawk_usb_board_thickness: !Ref nitehawk_usb_board_thickness
+      nitehawk_usb_board_corner_radius: !Ref nitehawk_usb_board_corner_radius
+      nitehawk_usb_board_clearance_slack: !Ref nitehawk_usb_board_clearance_slack
+      nitehawk_usb_component_clearance_slack: !Ref nitehawk_usb_component_clearance_slack
+      nitehawk_usb_mount_hole_diameter: !Ref nitehawk_usb_mount_hole_diameter
+      nitehawk_usb_mount_hole_front_left_x: !Ref nitehawk_usb_mount_hole_front_left_x
+      nitehawk_usb_mount_hole_front_left_y: !Ref nitehawk_usb_mount_hole_front_left_y
+      nitehawk_usb_mount_hole_front_right_x: !Ref nitehawk_usb_mount_hole_front_right_x
+      nitehawk_usb_mount_hole_front_right_y: !Ref nitehawk_usb_mount_hole_front_right_y
+      nitehawk_usb_mount_hole_back_x: !Ref nitehawk_usb_mount_hole_back_x
+      nitehawk_usb_mount_hole_back_y: !Ref nitehawk_usb_mount_hole_back_y
+      nitehawk_usb_terminal_block_length: !Ref nitehawk_usb_terminal_block_length
+      nitehawk_usb_terminal_block_width: !Ref nitehawk_usb_terminal_block_width
+      nitehawk_usb_terminal_block_height: !Ref nitehawk_usb_terminal_block_height
+      nitehawk_usb_terminal_block_x: !Ref nitehawk_usb_terminal_block_x
+      nitehawk_usb_terminal_block_y: !Ref nitehawk_usb_terminal_block_y
+      nitehawk_usb_terminal_block_top_taper_height: !Ref nitehawk_usb_terminal_block_top_taper_height
+      nitehawk_usb_terminal_block_top_width: !Ref nitehawk_usb_terminal_block_top_width
+      nitehawk_usb_terminal_block_window_side_margin: !Ref nitehawk_usb_terminal_block_window_side_margin
+      nitehawk_usb_terminal_block_window_center_divider: !Ref nitehawk_usb_terminal_block_window_center_divider
+      nitehawk_usb_terminal_block_window_bottom_lip: !Ref nitehawk_usb_terminal_block_window_bottom_lip
+      nitehawk_usb_terminal_block_window_top_lip: !Ref nitehawk_usb_terminal_block_window_top_lip
+      nitehawk_usb_terminal_block_window_back_wall: !Ref nitehawk_usb_terminal_block_window_back_wall
+      nitehawk_usb_usb_c_connector_length: !Ref nitehawk_usb_usb_c_connector_length
+      nitehawk_usb_usb_c_connector_width: !Ref nitehawk_usb_usb_c_connector_width
+      nitehawk_usb_usb_c_connector_height: !Ref nitehawk_usb_usb_c_connector_height
+      nitehawk_usb_usb_c_connector_x: !Ref nitehawk_usb_usb_c_connector_x
+      nitehawk_usb_usb_c_connector_y: !Ref nitehawk_usb_usb_c_connector_y
+      nitehawk_usb_front_plug_length: !Ref nitehawk_usb_front_plug_length
+      nitehawk_usb_front_plug_width: !Ref nitehawk_usb_front_plug_width
+      nitehawk_usb_front_plug_height: !Ref nitehawk_usb_front_plug_height
+      nitehawk_usb_front_plug_x: !Ref nitehawk_usb_front_plug_x
+      nitehawk_usb_front_plug_y: !Ref nitehawk_usb_front_plug_y
+      nitehawk_usb_white_connector_length: !Ref nitehawk_usb_white_connector_length
+      nitehawk_usb_white_connector_width: !Ref nitehawk_usb_white_connector_width
+      nitehawk_usb_white_connector_height: !Ref nitehawk_usb_white_connector_height
+      nitehawk_usb_white_connector_x: !Ref nitehawk_usb_white_connector_x
+      nitehawk_usb_white_connector_y: !Ref nitehawk_usb_white_connector_y
+
   - name: creality_endstop_holder_assembly
 
     resource_file: creality_endstop_holder_assembly.yaml

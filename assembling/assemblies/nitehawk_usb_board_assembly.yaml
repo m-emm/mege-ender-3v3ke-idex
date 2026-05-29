@@ -1,0 +1,109 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the Nitehawk USB daughterboard
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - left
+        - front
+        - back
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+
+Parameters:
+  nitehawk_usb_board_length:
+    Type: Float
+  nitehawk_usb_board_width:
+    Type: Float
+  nitehawk_usb_board_thickness:
+    Type: Float
+  nitehawk_usb_board_corner_radius:
+    Type: Float
+  nitehawk_usb_board_clearance_slack:
+    Type: Float
+  nitehawk_usb_component_clearance_slack:
+    Type: Float
+  nitehawk_usb_mount_hole_diameter:
+    Type: Float
+  nitehawk_usb_mount_hole_front_left_x:
+    Type: Float
+  nitehawk_usb_mount_hole_front_left_y:
+    Type: Float
+  nitehawk_usb_mount_hole_front_right_x:
+    Type: Float
+  nitehawk_usb_mount_hole_front_right_y:
+    Type: Float
+  nitehawk_usb_mount_hole_back_x:
+    Type: Float
+  nitehawk_usb_mount_hole_back_y:
+    Type: Float
+  nitehawk_usb_terminal_block_length:
+    Type: Float
+  nitehawk_usb_terminal_block_width:
+    Type: Float
+  nitehawk_usb_terminal_block_height:
+    Type: Float
+  nitehawk_usb_terminal_block_x:
+    Type: Float
+  nitehawk_usb_terminal_block_y:
+    Type: Float
+  nitehawk_usb_terminal_block_top_taper_height:
+    Type: Float
+  nitehawk_usb_terminal_block_top_width:
+    Type: Float
+  nitehawk_usb_terminal_block_window_side_margin:
+    Type: Float
+  nitehawk_usb_terminal_block_window_center_divider:
+    Type: Float
+  nitehawk_usb_terminal_block_window_bottom_lip:
+    Type: Float
+  nitehawk_usb_terminal_block_window_top_lip:
+    Type: Float
+  nitehawk_usb_terminal_block_window_back_wall:
+    Type: Float
+  nitehawk_usb_usb_c_connector_length:
+    Type: Float
+  nitehawk_usb_usb_c_connector_width:
+    Type: Float
+  nitehawk_usb_usb_c_connector_height:
+    Type: Float
+  nitehawk_usb_usb_c_connector_x:
+    Type: Float
+  nitehawk_usb_usb_c_connector_y:
+    Type: Float
+  nitehawk_usb_front_plug_length:
+    Type: Float
+  nitehawk_usb_front_plug_width:
+    Type: Float
+  nitehawk_usb_front_plug_height:
+    Type: Float
+  nitehawk_usb_front_plug_x:
+    Type: Float
+  nitehawk_usb_front_plug_y:
+    Type: Float
+  nitehawk_usb_white_connector_length:
+    Type: Float
+  nitehawk_usb_white_connector_width:
+    Type: Float
+  nitehawk_usb_white_connector_height:
+    Type: Float
+  nitehawk_usb_white_connector_x:
+    Type: Float
+  nitehawk_usb_white_connector_y:
+    Type: Float
+
+Parts:
+  NitehawkUsbBoardAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.nitehawk_usb_board_assembly.create_nitehawk_usb_board_assembly

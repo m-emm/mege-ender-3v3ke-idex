@@ -115,7 +115,7 @@ MOTORS_OFF
 `G28 Y` homes the real Y axis to the back-mounted min-Y endstop, sets Y to
 `0`, and uses a configured Y travel range of `0..310`. `G28 Z` homes both Z
 motors upward to their top-mounted independent left/right endstops and sets Z
-to `250`. `G28` or "home all" marks the placeholder X as homed, then homes Y
+to `290`. `G28` or "home all" marks the placeholder X as homed, then homes Y
 and Z. `G28 X` only marks the placeholder X homed and does not command physical
 motion.
 
