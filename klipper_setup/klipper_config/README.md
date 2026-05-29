@@ -94,20 +94,30 @@ Y_TEST_HOME
 Y_TEST_DISABLE
 
 Z_TEST_QUERY_ENDSTOPS
-Z_TEST_WAIT_ENDSTOP SIDE=LEFT
-Z_TEST_WAIT_ENDSTOP SIDE=RIGHT
-Z_TEST_WAIT_ENDSTOP SIDE=BOTH
+Z_TEST_WAIT_LEFT_ENDSTOP
+Z_TEST_WAIT_RIGHT_ENDSTOP
+Z_TEST_WAIT_BOTH_ENDSTOPS
+Z_TEST_WAIT_CANCEL
 
 Z_TEST_ENABLE
-Z_TEST_MOVE DIST=1
+Z_TEST_MOVE_UP_1
+Z_TEST_MOVE_DOWN_1
+Z_TEST_MOVE_UP_3
+Z_TEST_MOVE_DOWN_3
 Z_TEST_BUZZ
-Z_TEST_MOVE DIST=0
 Z_TEST_DISABLE
 ```
 
-`Z_TEST_MOVE` rejects any absolute `DIST` over `3` mm. Both Z motors are always
-commanded together: the left move is queued with `SYNC=0`, then the right move
-is queued and waited on, causing both sides to move at the same time.
+The Z move macros are explicit GUI-friendly commands with no parameters. Both Z
+motors are always commanded together: the left move is queued with `SYNC=0`,
+then the right move is queued and waited on, causing both sides to move at the
+same time. The largest explicit Z move is `3` mm.
+
+The Z wait macros also have no parameters, but they are intentionally
+non-blocking: they arm a software poller and return to the UI immediately.
+Completion is reported with a console message when the requested switch is
+pressed by hand. This avoids using `STOP_ON_ENDSTOP`, which is a motion command
+and can emit step pulses. Use `Z_TEST_WAIT_CANCEL` to cancel any armed pollers.
 
 If either Z motor moves opposite the other, stop testing and invert that side's
 `dir_pin` in `pico_w_btt_tmc2226_y_z_bringup.cfg` before redeploying.
