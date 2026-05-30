@@ -421,7 +421,7 @@ globals:
   z_axis_top_mount_screw_size: "M3"
   z_axis_top_mount_thickness: 5
   z_axis_top_mount_threaded_rod_clearance: 1.5
-  z_axis_top_mount_carriage_clearance: 1.5
+  z_axis_top_mount_carriage_clearance: 3.5
   z_axis_top_mount_width: 60
   z_axis_carriage_back_depth: 40
   z_axis_carriage_back_height: 9
