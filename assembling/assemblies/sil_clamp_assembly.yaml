@@ -37,4 +37,4 @@ Parts:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_mcu_board_assemblies.create_sil_clamp_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.sil_clamp_assembly.create_sil_clamp_assembly

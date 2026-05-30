@@ -8,7 +8,7 @@ from mege_ender_3v3ke_idex.designs.assemblies.board_holder_assembly import (
     _create_elko_socket_assemblies_for_tmc_boards,
     board_holder_elko_sleve_wall,
 )
-from mege_ender_3v3ke_idex.designs.assemblies.x_axis_mcu_board_assemblies import (
+from mege_ender_3v3ke_idex.designs.assemblies.sil_clamp_assembly import (
     create_sil_clamp_assembly,
 )
 from mege_ender_3v3ke_idex.designs.sil_dil import (

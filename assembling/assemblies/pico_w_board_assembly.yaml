@@ -55,4 +55,4 @@ Parts:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.x_axis_mcu_board_assemblies.create_pico_w_board_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.pico_w_board_assembly.create_pico_w_board_assembly
