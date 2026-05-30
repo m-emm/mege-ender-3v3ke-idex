@@ -16,10 +16,6 @@ Builder:
       width: 512
       height: 512
     parts:
-      # - source: dependencies
-      #   assembly: printer_frame_assembly
-      #   artifact: leader
-      #   name: printer_frame
       - source: self
         artifact: leader
         name: board_holder
@@ -168,6 +164,9 @@ Parameters:
     Type: Float
   board_holder_frame_mount_eye_fillet_radius:
     Type: Float
+  board_holder_frame_mount_eye_hole_front_offset:
+    Type: Any
+    Default: null
 
 Parts:
   BoardHolderAssembly:

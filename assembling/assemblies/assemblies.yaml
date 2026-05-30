@@ -1092,6 +1092,7 @@ assemblies:
       board_holder_frame_mount_eye_width: !Ref board_holder_frame_mount_eye_width
       board_holder_frame_mount_eye_thickness: !Ref board_holder_frame_mount_eye_thickness
       board_holder_frame_mount_eye_fillet_radius: !Ref board_holder_frame_mount_eye_fillet_radius
+      board_holder_frame_mount_eye_hole_front_offset: !Ref x_axis_mcu_holder_frame_mount_eye_hole_front_offset
 
   - name: y_z_axis_mcu_holder_assembly
 
@@ -1138,6 +1139,7 @@ assemblies:
       board_holder_frame_mount_eye_width: !Ref board_holder_frame_mount_eye_width
       board_holder_frame_mount_eye_thickness: !Ref board_holder_frame_mount_eye_thickness
       board_holder_frame_mount_eye_fillet_radius: !Ref board_holder_frame_mount_eye_fillet_radius
+      board_holder_frame_mount_eye_hole_front_offset: !Ref board_holder_frame_mount_eye_hole_front_offset
 
   - name: x_axis_assembly
 

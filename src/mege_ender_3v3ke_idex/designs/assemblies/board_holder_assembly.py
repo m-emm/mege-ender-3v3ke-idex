@@ -1074,6 +1074,7 @@ def create_board_holder_assembly(
     board_holder_frame_mount_eye_width,
     board_holder_frame_mount_eye_thickness,
     board_holder_frame_mount_eye_fillet_radius,
+    board_holder_frame_mount_eye_hole_front_offset=None,
     BIG_THING,
 ):
     """Create the simplified MCU board holder assembly."""
@@ -1577,6 +1578,20 @@ def create_board_holder_assembly(
                 frame_mount_eye,
                 Alignment.CENTER,
             )
+            if board_holder_frame_mount_eye_hole_front_offset is not None:
+                frame_mount_eye_hole_front_offset = float(
+                    board_holder_frame_mount_eye_hole_front_offset
+                )
+                frame_mount_eye_screw_hole_cutter = align(
+                    frame_mount_eye_screw_hole_cutter,
+                    frame_mount_eye,
+                    Alignment.EDGE_BACK,
+                )
+                frame_mount_eye_screw_hole_cutter = translate(
+                    0,
+                    -Alignment.BACK.sign * frame_mount_eye_hole_front_offset,
+                    0,
+                )(frame_mount_eye_screw_hole_cutter)
             frame_mount_eye = frame_mount_eye.cut(frame_mount_eye_screw_hole_cutter)
             frame_mount_eye = rotate(90, axis=(1, 0, 0))(frame_mount_eye)
             frame_mount_eye = align(frame_mount_eye, side_walls, Alignment.CENTER)

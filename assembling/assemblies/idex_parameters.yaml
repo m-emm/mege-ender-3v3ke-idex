@@ -153,10 +153,12 @@ globals:
   board_holder_plug_hole_slack: 0.1
   board_holder_frame_mount_eyes_enabled: false
   board_holder_frame_mount_eye_screw_size: "M5"
-  board_holder_frame_mount_eye_width: 10
+  board_holder_frame_mount_eye_width: 15
   board_holder_frame_mount_eye_thickness: 4
   board_holder_frame_mount_eye_fillet_radius: 3
+  board_holder_frame_mount_eye_hole_front_offset: null
   x_axis_mcu_holder_motor_flange_gap: 5
+  x_axis_mcu_holder_frame_mount_eye_hole_front_offset: 10
   board_holder_additional_pins_num_pins: 20
   board_holder_additional_pins_base_plate_length: 6
   y_z_axis_mcu_holder_tmc_board_count: 3
