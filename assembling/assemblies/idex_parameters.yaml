@@ -159,7 +159,7 @@ globals:
   board_holder_frame_mount_eye_hole_front_offset: null
   x_axis_mcu_holder_motor_flange_gap: 5
   x_axis_mcu_holder_frame_mount_eye_hole_front_offset: 10
-  board_holder_additional_pins_num_pins: 20
+  board_holder_additional_pins_num_pins: 30
   board_holder_additional_pins_base_plate_length: 6
   y_z_axis_mcu_holder_tmc_board_count: 3
   y_z_axis_mcu_holder_additional_pins_num_pins: 30
