@@ -56,7 +56,7 @@ fan_mount_hole_wall = 1.2
 BIG_THING = 500
 
 
-def create_fan(mount_plate_thickness):
+def create_fan(mount_plate_thickness, mount_plate_oversize=25):
     fan_hole = create_cylinder(fan_size / 2 - fan_wall, BIG_THING)
     base = create_box(fan_size, fan_size, fan_thickness)
 
@@ -85,7 +85,25 @@ def create_fan(mount_plate_thickness):
     base = base.fuse(mount_holes)
     base = base.cut(mount_holes_cutters)
 
-    return base
+    mount_plate = create_box(
+        fan_size + 2 * mount_plate_oversize,
+        fan_size + 2 * mount_plate_oversize,
+        mount_plate_thickness,
+    )
+
+    mount_plate = align(mount_plate, base, Alignment.CENTER)
+    mount_plate = align(mount_plate, base, Alignment.STACK_BOTTOM)
+    mount_plate = mount_plate.cut(mount_holes_cutters)
+    mount_plate = mount_plate.cut(fan_hole)
+
+    retval = LeaderFollowersCuttersPart(base)
+    retval.add_named_follower(mount_plate, "mount_plate")
+
+    mount_plate_cuttter = materialize_bounding_box(mount_plate, z_enlargement=BIG_THING)
+
+    retval.add_named_cutter(mount_plate_cuttter, "mount_plate_cutter")
+
+    return retval
 
 
 def create_elko():
@@ -1657,10 +1675,14 @@ def create_board_holder_assembly(
         ]
     ]
 
-    fan = create_fan()
+    fan = create_fan(BOARD_HOLDER_LID_THICKNESS)
     fan = align(fan, top_lid, Alignment.CENTER)
     fan = align(fan, top_lid, Alignment.STACK_TOP)
-    all_holders.add_named_follower(fan.leader, "fan")
+    all_holders.add_named_non_production_part(fan.leader, "fan")
+
+    top_lid = fan.use_as_cutter_on(top_lid)
+
+    top_lid = top_lid.fuse(fan.get_named_follower("mount_plate"))
 
     all_holders.add_named_follower(top_lid.leader, "top_lid")
     all_holders.add_named_follower(bottom_lid.leader, "bottom_lid")
