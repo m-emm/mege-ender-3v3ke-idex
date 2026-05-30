@@ -45,7 +45,47 @@ BOARD_HOLDER_ELKO_SLEEVE_BODY_INSERTION = 15
 BOARD_HOLDER_ELKO_SLEEVE_PIN_TOP_CLEARANCE = 0.1
 BOARD_HOLDER_ELKO_SOCKET_PLATE_THICKNESS = 1.2
 BOARD_HOLDER_ELKO_SOCKET_PLATE_MARGIN = 1.2
+
+fan_hole_pitch = 20
+fan_size = 25.7
+fan_mount_hole_diameter = 2.95
+fan_thickness = 10.25
+fan_wall = 1
+fan_mount_hole_wall = 1.2
+
 BIG_THING = 500
+
+
+def create_fan(mount_plate_thickness):
+    fan_hole = create_cylinder(fan_size / 2 - fan_wall, BIG_THING)
+    base = create_box(fan_size, fan_size, fan_thickness)
+
+    fan_hole = align(fan_hole, base, Alignment.CENTER)
+    base = base.cut(fan_hole)
+
+    mount_holes = PartCollector()
+    mount_holes_cutters = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+            mount_hole = create_ring(
+                fan_mount_hole_diameter / 2,
+                fan_mount_hole_diameter / 2 - fan_mount_hole_wall,
+                fan_thickness,
+            )
+            mount_hole_cutter = create_cylinder(fan_mount_hole_diameter / 2, BIG_THING)
+
+            mount_hole = align(mount_hole, base, Alignment.CENTER)
+            mount_hole = align(mount_hole, base, Alignment.BOTTOM)
+            mount_hole = align(mount_hole, base, lr)
+            mount_hole = align(mount_hole, base, fb)
+            mount_hole_cutter = align(mount_hole_cutter, mount_hole, Alignment.CENTER)
+            mount_holes = mount_holes.fuse(mount_hole)
+            mount_holes_cutters = mount_holes_cutters.fuse(mount_hole_cutter)
+
+    base = base.fuse(mount_holes)
+    base = base.cut(mount_holes_cutters)
+
+    return base
 
 
 def create_elko():
@@ -1616,6 +1656,12 @@ def create_board_holder_assembly(
             "socket_sleeve_bboxes"
         ]
     ]
+
+    fan = create_fan()
+    fan = align(fan, top_lid, Alignment.CENTER)
+    fan = align(fan, top_lid, Alignment.STACK_TOP)
+    all_holders.add_named_follower(fan.leader, "fan")
+
     all_holders.add_named_follower(top_lid.leader, "top_lid")
     all_holders.add_named_follower(bottom_lid.leader, "bottom_lid")
     all_holders.add_named_follower(side_walls, "side_walls")
