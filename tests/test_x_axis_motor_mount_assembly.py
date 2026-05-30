@@ -12,12 +12,10 @@ def _build_profiles():
     lower = create_x_axis_profile_assembly(
         profile_name="x_axis_lower_profile",
         x_axis_profile_length=idex_parameters.x_axis_profile_length,
-        profile_z_offset=0,
     )
     top = create_x_axis_profile_assembly(
         profile_name="x_axis_top_profile",
         x_axis_profile_length=idex_parameters.x_axis_profile_length,
-        profile_z_offset=idex_parameters.x_axis_profile_pitch,
     )
     return lower, top
 

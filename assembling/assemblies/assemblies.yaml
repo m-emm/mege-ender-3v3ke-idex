@@ -220,18 +220,19 @@ placement:
 
     - part: x_axis_mcu_holder_assembly
       post_rotation:
-        angle: 90
-        axis: [1, 0, 0]
+        angle: -90
+        axis: [0, 1, 0]
         center: x_axis_mcu_holder_assembly.CENTER
     - part: x_axis_mcu_holder_assembly
       post_rotation:
         angle: 90
-        axis: [0, 1, 0]
+        axis: [1, 0, 0]
         center: x_axis_mcu_holder_assembly.CENTER
-    - part: x_axis_mcu_holder_assembly.followers.side_walls
-      to: x_axis_top_profile_assembly
-      alignment: CENTER
-      axes: [0]
+
+    - part: x_axis_mcu_holder_assembly
+      post_rotation:
+        angle: 90
+
     - part: x_axis_mcu_holder_assembly.followers.side_walls
       to: x_axis_top_profile_assembly
       alignment: STACK_TOP
@@ -458,16 +459,18 @@ placement:
       to: x_axis_rail_assembly
 
     - part: x_axis_mcu_holder_assembly.followers.side_walls
-      to: x_axis_composite_top_assembly.non_production_parts.axis_holding_counter_flange
+      to: x_axis_motor_mount_top_assembly.non_production_parts.axis_holding_counter_flange
       alignment: FRONT
 
     - part: x_axis_mcu_holder_assembly.followers.side_walls
-      to: x_axis_composite_top_assembly.non_production_parts.axis_holding_counter_flange
-      alignment: STACK_RIGHT
+      to: x_axis_motor_mount_top_assembly.non_production_parts.axis_holding_counter_flange
+      alignment: STACK_LEFT
+      stack_gap:
+        $ref: x_axis_mcu_holder_motor_flange_gap
 
     - rigid_group:
         - x_axis_mcu_holder_assembly
-      to: x_axis_composite_top_assembly
+      to: x_axis_motor_mount_top_assembly
 
     - rigid_group:
         - x_axis_assembly
@@ -1084,7 +1087,7 @@ assemblies:
       board_holder_plug_lip_top_gap: !Ref board_holder_plug_lip_top_gap
       board_holder_plug_no_inner_hole: !Ref board_holder_plug_no_inner_hole
       board_holder_plug_hole_slack: !Ref board_holder_plug_hole_slack
-      board_holder_frame_mount_eyes_enabled: false
+      board_holder_frame_mount_eyes_enabled: true
       board_holder_frame_mount_eye_screw_size: !Ref board_holder_frame_mount_eye_screw_size
       board_holder_frame_mount_eye_width: !Ref board_holder_frame_mount_eye_width
       board_holder_frame_mount_eye_thickness: !Ref board_holder_frame_mount_eye_thickness

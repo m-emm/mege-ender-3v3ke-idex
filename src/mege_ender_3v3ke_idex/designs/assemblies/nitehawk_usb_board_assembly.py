@@ -1,8 +1,6 @@
 """Nitehawk USB daughterboard assembly."""
 
-from mege_ender_3v3ke_idex.designs.electronics_components import (
-    create_terminal_block,
-)
+from mege_ender_3v3ke_idex.designs.electronics_components import create_terminal_block
 from shellforgepy.simple import *
 
 
