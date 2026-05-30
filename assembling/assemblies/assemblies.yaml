@@ -796,6 +796,7 @@ assemblies:
     parameters:
       up: [0, -1, 0]
       out: [0, 0, -1]
+      endstop_board_holder_mount_eye_enabled: false
       endstop_board_holder_mount_eye_thickness: !Ref endstop_board_holder_mount_eye_thickness
       endstop_board_holder_mount_eye_length: !Ref endstop_board_holder_mount_eye_length
       endstop_board_holder_mount_eye_width: !Ref endstop_board_holder_mount_eye_width
@@ -1609,7 +1610,7 @@ assemblies:
       z_axis_profile: z_axis_profile_left_assembly
       z_axis_guide_rod: z_axis_guide_rod_left_assembly
       z_axis_threaded_rod: z_axis_threaded_rod_left_assembly
-      y_axis_endstop_holder_assembly: z_axis_top_mount_endstop_holder_assembly
+      endstop_holder_assembly: z_axis_top_mount_endstop_holder_assembly
     parameters:
       z_axis_cylinder_head_clearance: !Ref z_axis_cylinder_head_clearance
       z_axis_additional_screw_mount_clearance: !Ref z_axis_additional_screw_mount_clearance
@@ -1655,7 +1656,7 @@ assemblies:
       z_axis_profile: z_axis_profile_right_assembly
       z_axis_guide_rod: z_axis_guide_rod_right_assembly
       z_axis_threaded_rod: z_axis_threaded_rod_right_assembly
-      y_axis_endstop_holder_assembly: z_axis_top_mount_endstop_holder_assembly
+      endstop_holder_assembly: z_axis_top_mount_endstop_holder_assembly
     parameters:
       z_axis_cylinder_head_clearance: !Ref z_axis_cylinder_head_clearance
       z_axis_additional_screw_mount_clearance: !Ref z_axis_additional_screw_mount_clearance

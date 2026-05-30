@@ -23,6 +23,9 @@ Parameters:
     Type: Vector
   out:
     Type: Vector
+  endstop_board_holder_mount_eye_enabled:
+    Type: Boolean
+    Default: true
   endstop_board_holder_mount_eye_thickness:
     Type: Float
   endstop_board_holder_mount_eye_length:

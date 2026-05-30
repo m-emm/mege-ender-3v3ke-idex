@@ -166,6 +166,7 @@ def create_y_axis_endstop_holder_assembly(
     endstop_board_holder_nut_cutter_slack=DEFAULT_ENDSTOP_BOARD_HOLDER_NUT_CUTTER_SLACK,
     endstop_board_holder_oversize_y=DEFAULT_ENDSTOP_BOARD_HOLDER_OVERSIZE_Y,
     endstop_board_holder_oversize_x=DEFAULT_ENDSTOP_BOARD_HOLDER_OVERSIZE_X,
+    endstop_board_holder_mount_eye_enabled=True,
     endstop_board_holder_mount_eye_thickness=None,
     endstop_board_holder_mount_eye_length=None,
     endstop_board_holder_mount_eye_width=None,
@@ -256,7 +257,10 @@ def create_y_axis_endstop_holder_assembly(
 
     mount_eye_hole = None
 
-    if endstop_board_holder_mount_eye_thickness is not None:
+    if (
+        endstop_board_holder_mount_eye_enabled
+        and endstop_board_holder_mount_eye_thickness is not None
+    ):
 
         assert (
             endstop_board_holder_mount_eye_length is not None
