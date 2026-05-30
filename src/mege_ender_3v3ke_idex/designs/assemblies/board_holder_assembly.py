@@ -56,7 +56,7 @@ fan_mount_hole_wall = 1.2
 BIG_THING = 500
 
 
-def create_fan(mount_plate_thickness, mount_plate_oversize=25):
+def create_fan(mount_plate_thickness, mount_plate_oversize=18):
     fan_hole = create_cylinder(fan_size / 2 - fan_wall, BIG_THING)
     base = create_box(fan_size, fan_size, fan_thickness)
 
