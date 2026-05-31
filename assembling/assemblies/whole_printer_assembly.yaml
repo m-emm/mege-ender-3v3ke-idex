@@ -175,6 +175,15 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: injected
+        assembly: umbilical_guide
+        artifact: leader
+        name: umbilical_guide
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
         assembly: x_axis_mcu_holder
         artifact: all
         name_template: "{assembly_name}_{name}"

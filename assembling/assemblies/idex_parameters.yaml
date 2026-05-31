@@ -198,6 +198,12 @@ globals:
   x_axis_profile_stack_gap:
     $expr:
       "$sub": "${x_axis_profile_pitch} - 20"
+  x_axis_umbilical_guide_radius: 100
+  x_axis_umbilical_guide_cable_diameter: 5.25
+  x_axis_umbilical_guide_inner_width: 5
+  x_axis_umbilical_guide_wall_thickness: 1
+  x_axis_umbilical_guide_depth: 8
+  x_axis_umbilical_guide_stack_gap: 0
   x_axis_rail_length: 450
   x_axis_carriage_length: 45.4
   x_axis_carriage_height: 10

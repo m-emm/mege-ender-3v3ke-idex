@@ -218,6 +218,19 @@ placement:
         - x_axis_top_profile_assembly
       to: x_axis_lower_profile_assembly
 
+    - part: umbilical_guide_assembly
+      to: x_axis_top_profile_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: umbilical_guide_assembly
+      to: x_axis_top_profile_assembly
+      alignment: STACK_TOP
+      stack_gap:
+        $ref: x_axis_umbilical_guide_stack_gap
+    - rigid_group:
+        - umbilical_guide_assembly
+      to: x_axis_top_profile_assembly
+
     - part: x_axis_mcu_holder_assembly
       post_rotation:
         angle: -90
@@ -1157,6 +1170,7 @@ assemblies:
       - x_axis_endstop_left_assembly
       - x_axis_endstop_right_assembly
       - x_axis_mcu_holder_assembly
+      - umbilical_guide_assembly
     inject_parts:
       x_axis_lower_profile: x_axis_lower_profile_assembly
       x_axis_top_profile: x_axis_top_profile_assembly
@@ -1232,6 +1246,18 @@ assemblies:
     parameters:
       profile_name: x_axis_top_profile
       x_axis_profile_length: !Ref x_axis_profile_length
+
+  - name: umbilical_guide_assembly
+
+    resource_file: umbilical_guide_assembly.yaml
+    depends_on:
+      - x_axis_top_profile_assembly
+    parameters:
+      x_axis_umbilical_guide_radius: !Ref x_axis_umbilical_guide_radius
+      x_axis_umbilical_guide_cable_diameter: !Ref x_axis_umbilical_guide_cable_diameter
+      x_axis_umbilical_guide_inner_width: !Ref x_axis_umbilical_guide_inner_width
+      x_axis_umbilical_guide_wall_thickness: !Ref x_axis_umbilical_guide_wall_thickness
+      x_axis_umbilical_guide_depth: !Ref x_axis_umbilical_guide_depth
 
   - name: x_axis_motor_mount_bottom_assembly
 
@@ -1822,6 +1848,7 @@ assemblies:
       - x_axis_endstop_left_assembly
       - x_axis_endstop_right_assembly
       - x_axis_mcu_holder_assembly
+      - umbilical_guide_assembly
       - sprite_extruder_left_assembly
       - sprite_extruder_right_assembly
       - tool_head_left_assembly
@@ -1873,6 +1900,7 @@ assemblies:
       x_axis_left_carriage: x_axis_left_carriage_assembly
       x_axis_right_carriage: x_axis_right_carriage_assembly
       x_axis_mcu_holder: x_axis_mcu_holder_assembly
+      umbilical_guide: umbilical_guide_assembly
       sprite_extruder_left: sprite_extruder_left_assembly
       sprite_extruder_right: sprite_extruder_right_assembly
       tool_head_left: tool_head_left_assembly

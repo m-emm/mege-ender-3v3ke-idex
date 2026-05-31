@@ -1,0 +1,65 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Printable TPU x-axis umbilical cable guide
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - left
+        - top
+      width: 512
+      height: 512
+    parts:
+      - source: dependencies
+        assembly: x_axis_top_profile_assembly
+        artifact: leader
+        name: x_axis_top_profile
+      - source: self
+        artifact: leader
+        name: umbilical_guide
+
+  Production:
+    process_data_preset: tpu_minimal_quality_minimal_strength_06
+    process_data:
+      overrides:
+        process_overrides:
+          enable_support: "0"
+          brim_type: no_brim
+          sparse_infill_density: "100%"
+          wall_loops: "3"
+    parts:
+      - source: self
+        artifact: leader
+        name: umbilical_guide
+        prod_rotation_angle: -90
+        prod_rotation_axis: [1, 0, 0]
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: umbilical_guide
+          parts:
+            - umbilical_guide
+      auto_assign_plates: false
+
+Parameters:
+  x_axis_umbilical_guide_radius:
+    Type: Float
+  x_axis_umbilical_guide_cable_diameter:
+    Type: Float
+  x_axis_umbilical_guide_inner_width:
+    Type: Float
+  x_axis_umbilical_guide_wall_thickness:
+    Type: Float
+  x_axis_umbilical_guide_depth:
+    Type: Float
+
+Parts:
+  UmbilicalGuideAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.umbilical_guide.create_umbilical_guide_assembly
