@@ -8,7 +8,7 @@ from typing import Sequence
 
 from .config import load_pinout_config
 from .routing import route_problematic_connections
-from .svg import generate_routed_svg, write_svg
+from .svg import SvgMarginsPx, generate_routed_svg, write_svg
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -64,6 +64,7 @@ def _write_view(
     color_map: dict[str, str],
     version_label: str | None,
     notes_text: str | None,
+    svg_margins_px: SvgMarginsPx,
     flip_x: bool,
 ) -> Path:
     svg_content = generate_routed_svg(
@@ -74,6 +75,7 @@ def _write_view(
         version_label=version_label,
         notes_text=notes_text,
         color_map=color_map,
+        svg_margins_px=svg_margins_px,
     )
     return write_svg(svg_content, output_dir / f"{basename}_{suffix}.svg")
 
@@ -110,6 +112,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 color_map=project.color_map,
                 version_label=project.version_label,
                 notes_text=project.notes_text,
+                svg_margins_px=project.svg_margins_px,
                 flip_x=False,
             )
         )
@@ -126,6 +129,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 color_map=project.color_map,
                 version_label=project.version_label,
                 notes_text=project.notes_text,
+                svg_margins_px=project.svg_margins_px,
                 flip_x=True,
             )
         )

@@ -38,6 +38,11 @@ basename: headmask_pinout
 
 metadata:
   version_label: v1.2
+  svg_margins_px:
+    left: 24
+    right: 20
+    top: 20
+    bottom: 24
   notes: |
     Diode: 1N5819 Schottky.
     Compass: QMC5883L.
@@ -106,6 +111,9 @@ wires:
 - `basename` (optional): output filename prefix (default `pinout`)
 - `metadata.version_label` (optional): shown in SVG corner
 - `metadata.notes` (optional): multiline notes shown in SVG corner
+- `metadata.svg_margins_px` (optional): SVG pixel margins around rendered content.
+  Use either one number for all sides or a `left`/`right`/`top`/`bottom` mapping.
+  Defaults to `20`.
 - `color_map` (optional): wire type to color mapping
 - `pin_sets` (optional): repeated linear pin definitions
   - `origin`: `[x, y]` start coordinate

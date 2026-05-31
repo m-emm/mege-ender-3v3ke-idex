@@ -16,6 +16,62 @@ DEFAULT_COLOR_MAP = {
     "default": "gray",
 }
 
+DEFAULT_SVG_MARGINS_PX = (20.0, 20.0, 20.0, 20.0)
+SvgMarginsPx = tuple[float, float, float, float]
+
+
+class _SvgBounds:
+    def __init__(self) -> None:
+        self.min_x = math.inf
+        self.min_y = math.inf
+        self.max_x = -math.inf
+        self.max_y = -math.inf
+
+    def add_rect(self, rect: tuple[float, float, float, float]) -> None:
+        self.min_x = min(self.min_x, rect[0])
+        self.min_y = min(self.min_y, rect[1])
+        self.max_x = max(self.max_x, rect[2])
+        self.max_y = max(self.max_y, rect[3])
+
+    def viewbox(self, margins_px: SvgMarginsPx) -> tuple[int, int, int, int]:
+        if not math.isfinite(self.min_x):
+            return 0, 0, 0, 0
+
+        margin_left, margin_right, margin_top, margin_bottom = margins_px
+        min_x = math.floor(self.min_x - margin_left)
+        min_y = math.floor(self.min_y - margin_top)
+        max_x = math.ceil(self.max_x + margin_right)
+        max_y = math.ceil(self.max_y + margin_bottom)
+        return min_x, min_y, max_x - min_x, max_y - min_y
+
+
+def _line_bbox(
+    x1: float,
+    y1: float,
+    x2: float,
+    y2: float,
+    *,
+    stroke_width: float,
+) -> tuple[float, float, float, float]:
+    half_stroke = stroke_width / 2.0
+    return (
+        min(x1, x2) - half_stroke,
+        min(y1, y2) - half_stroke,
+        max(x1, x2) + half_stroke,
+        max(y1, y2) + half_stroke,
+    )
+
+
+def _circle_bbox(
+    cx: float,
+    cy: float,
+    *,
+    radius: float,
+    stroke_width: float,
+) -> tuple[float, float, float, float]:
+    extent = radius + (stroke_width / 2.0)
+    return cx - extent, cy - extent, cx + extent, cy + extent
+
 
 def _estimate_annotation_width_px(
     *,
@@ -338,6 +394,7 @@ def generate_routed_svg(
     version_label: str | None = None,
     notes_text: str | None = None,
     color_map: dict[str, str] | None = None,
+    svg_margins_px: SvgMarginsPx = DEFAULT_SVG_MARGINS_PX,
 ) -> str:
     """Generate SVG content for a routed pinout view."""
     if not pin_positions:
@@ -387,6 +444,7 @@ def generate_routed_svg(
             "height": "100%",
         },
     )
+    svg_bounds = _SvgBounds()
 
     for i, connection in enumerate(connections):
         p1 = actual_pin_positions[connection["from"]]
@@ -405,6 +463,7 @@ def generate_routed_svg(
         if i in actual_waypoints:
             wx = int((actual_waypoints[i][0] + coord_shift_x) * grid_size)
             wy = int((actual_waypoints[i][1] + coord_shift_y) * grid_size)
+            svg_bounds.add_rect(_line_bbox(x1, y1, wx, wy, stroke_width=2.0))
             ET.SubElement(
                 root,
                 "line",
@@ -417,6 +476,7 @@ def generate_routed_svg(
                     "stroke-width": "2",
                 },
             )
+            svg_bounds.add_rect(_line_bbox(wx, wy, x2, y2, stroke_width=2.0))
             ET.SubElement(
                 root,
                 "line",
@@ -429,6 +489,7 @@ def generate_routed_svg(
                     "stroke-width": "2",
                 },
             )
+            svg_bounds.add_rect(_circle_bbox(wx, wy, radius=3.0, stroke_width=1.0))
             ET.SubElement(
                 root,
                 "circle",
@@ -443,6 +504,7 @@ def generate_routed_svg(
             )
             continue
 
+        svg_bounds.add_rect(_line_bbox(x1, y1, x2, y2, stroke_width=2.0))
         ET.SubElement(
             root,
             "line",
@@ -474,6 +536,7 @@ def generate_routed_svg(
     for name, (x, y) in actual_pin_positions.items():
         cx = int((x + coord_shift_x) * grid_size)
         cy = int((y + coord_shift_y) * grid_size)
+        svg_bounds.add_rect(_circle_bbox(cx, cy, radius=pin_radius, stroke_width=1.0))
         ET.SubElement(
             root,
             "circle",
@@ -541,9 +604,19 @@ def generate_routed_svg(
             **label_attrs,
         )
         placed_label_rectangles.append(label_bbox)
+        svg_bounds.add_rect(label_bbox)
 
     label_x = vb_w - 20
     label_y = 30
+    svg_bounds.add_rect(
+        _estimate_text_bbox(
+            view_label,
+            x=label_x,
+            y=label_y,
+            font_size=16.0,
+            text_anchor="end",
+        )
+    )
     _add_text(
         root,
         view_label,
@@ -559,6 +632,15 @@ def generate_routed_svg(
     )
 
     if version_label:
+        svg_bounds.add_rect(
+            _estimate_text_bbox(
+                version_label,
+                x=label_x,
+                y=label_y + 20,
+                font_size=12.0,
+                text_anchor="end",
+            )
+        )
         _add_text(
             root,
             version_label,
@@ -574,6 +656,15 @@ def generate_routed_svg(
 
     if notes_text:
         for i, line in enumerate(notes_text.splitlines()):
+            svg_bounds.add_rect(
+                _estimate_text_bbox(
+                    line,
+                    x=label_x,
+                    y=label_y + 40 + i * 15,
+                    font_size=10.0,
+                    text_anchor="end",
+                )
+            )
             _add_text(
                 root,
                 line,
@@ -587,6 +678,8 @@ def generate_routed_svg(
                 },
             )
 
+    final_vb_x, final_vb_y, final_vb_w, final_vb_h = svg_bounds.viewbox(svg_margins_px)
+    root.set("viewBox", f"{final_vb_x} {final_vb_y} {final_vb_w} {final_vb_h}")
     return ET.tostring(root, encoding="unicode")
 
 

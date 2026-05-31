@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from .svg import DEFAULT_COLOR_MAP
+from .svg import DEFAULT_COLOR_MAP, DEFAULT_SVG_MARGINS_PX, SvgMarginsPx
 
 
 @dataclass(frozen=True)
@@ -22,6 +22,7 @@ class PinoutProject:
     basename: str
     version_label: str | None = None
     notes_text: str | None = None
+    svg_margins_px: SvgMarginsPx = DEFAULT_SVG_MARGINS_PX
 
 
 def _as_xy(value: Any, *, context: str) -> tuple[float, float]:
@@ -146,6 +147,52 @@ def _normalize_connections(raw_connections: Any) -> list[dict[str, Any]]:
     return normalized
 
 
+def _as_non_negative_margin(value: Any, *, context: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{context} must be a non-negative number")
+
+    margin = float(value)
+    if margin < 0:
+        raise ValueError(f"{context} must be >= 0")
+    return margin
+
+
+def _normalize_svg_margins_px(raw_margins: Any) -> SvgMarginsPx:
+    if raw_margins is None:
+        return DEFAULT_SVG_MARGINS_PX
+
+    if isinstance(raw_margins, (int, float)) and not isinstance(raw_margins, bool):
+        margin = _as_non_negative_margin(raw_margins, context="metadata.svg_margins_px")
+        return margin, margin, margin, margin
+
+    if not isinstance(raw_margins, dict):
+        raise ValueError(
+            "metadata.svg_margins_px must be a number or mapping with "
+            "left/right/top/bottom keys"
+        )
+
+    allowed_keys = {"left", "right", "top", "bottom"}
+    unknown_keys = sorted(
+        str(key) for key in raw_margins if str(key) not in allowed_keys
+    )
+    if unknown_keys:
+        raise ValueError(f"Unknown metadata.svg_margins_px keys: {unknown_keys}")
+
+    values = {
+        "left": DEFAULT_SVG_MARGINS_PX[0],
+        "right": DEFAULT_SVG_MARGINS_PX[1],
+        "top": DEFAULT_SVG_MARGINS_PX[2],
+        "bottom": DEFAULT_SVG_MARGINS_PX[3],
+    }
+    for key, raw_value in raw_margins.items():
+        key_text = str(key)
+        values[key_text] = _as_non_negative_margin(
+            raw_value, context=f"metadata.svg_margins_px.{key_text}"
+        )
+
+    return values["left"], values["right"], values["top"], values["bottom"]
+
+
 def load_pinout_config(config_path: str | Path) -> PinoutProject:
     """Load and validate pinout config from YAML or JSON."""
     path = Path(config_path)
@@ -190,6 +237,7 @@ def load_pinout_config(config_path: str | Path) -> PinoutProject:
     basename = str(data.get("basename", metadata.get("basename", "pinout")))
     version_label = data.get("version_label", metadata.get("version_label"))
     notes_text = data.get("notes_text", metadata.get("notes"))
+    svg_margins_px = _normalize_svg_margins_px(metadata.get("svg_margins_px"))
 
     return PinoutProject(
         pin_positions=pin_positions,
@@ -198,4 +246,5 @@ def load_pinout_config(config_path: str | Path) -> PinoutProject:
         basename=basename,
         version_label=str(version_label) if version_label is not None else None,
         notes_text=str(notes_text) if notes_text is not None else None,
+        svg_margins_px=svg_margins_px,
     )

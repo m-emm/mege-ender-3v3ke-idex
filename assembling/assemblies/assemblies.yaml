@@ -1108,6 +1108,16 @@ assemblies:
       board_holder_frame_mount_eye_fillet_radius: !Ref board_holder_frame_mount_eye_fillet_radius
       board_holder_frame_mount_eye_hole_front_offset: !Ref x_axis_mcu_holder_frame_mount_eye_hole_front_offset
 
+  - name: rubbery_things_production_assembly
+
+    resource_file: rubbery_things_production_assembly.yaml
+    depends_on:
+      - x_axis_mcu_holder_assembly
+      - resistor_box_assembly
+    inject_parts:
+      x_axis_mcu_holder: x_axis_mcu_holder_assembly
+      resistor_box: resistor_box_assembly
+
   - name: y_z_axis_mcu_holder_assembly
 
     resource_file: board_holder_assembly.yaml

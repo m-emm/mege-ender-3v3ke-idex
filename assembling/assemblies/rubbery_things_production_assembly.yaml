@@ -1,0 +1,62 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Focused TPU production plate for rubbery electronics parts
+
+Builder:
+  Collection: true
+
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - front
+        - right
+      width: 512
+      height: 512
+    parts:
+      - source: injected
+        assembly: x_axis_mcu_holder
+        artifact: followers
+        names:
+          - elko_sleeve_plate_*
+        name_template: "{name}"
+      - source: injected
+        assembly: resistor_box
+        artifact: leader
+        name: resistor_component_box
+
+  Production:
+    parts:
+      - source: injected
+        assembly: x_axis_mcu_holder
+        artifact: followers
+        names:
+          - elko_sleeve_plate_*
+        name_template: "{name}"
+        flip: true
+        prod_rotation_angle: 90
+        prod_rotation_axis: [1, 0, 0]
+      - source: injected
+        assembly: resistor_box
+        artifact: leader
+        name: resistor_component_box
+        num_copies: 2
+
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: rubbery_things
+          process_data_preset: tpu_minimal_quality_minimal_strength_06
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "0"
+                brim_type: no_brim
+                sparse_infill_density: "100%"
+                wall_loops: "3"
+          parts:
+            - elko_sleeve_plate_*
+            - resistor_component_box
+      auto_assign_plates: false
