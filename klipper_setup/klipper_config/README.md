@@ -31,17 +31,19 @@ cd /Users/mege/git/mege-ender-3v3ke-idex
 - `pico_w_btt_tmc2226_y_axis_bringup.cfg` is the older Y-only temporary
   `printer.cfg`.
 - `pico_w_btt_tmc2226_y_z_bringup.cfg` is the current temporary real-kinematics
-  Y + dual-Z `printer.cfg`.
+  right-X + Y + dual-Z `printer.cfg`.
 - `toolhead_nitehawk_and_x_axis.cfg` is the fuller printer config kept for
   later integration.
 - `snippets/x_axis_stepper_endstop_pico_w.cfg` and
   `snippets/y_z_dual_endstop_heatbed_pico_w.cfg` are include-style snippets, not
   the current live bring-up config.
 
-The Y + dual-Z config uses normal `cartesian` kinematics so Mainsail and
-KlipperScreen can use standard `G28` homing. There is no physical X axis during
-this stage, so `stepper_x` is a placeholder on unused Pico pins and the homing
-override marks X homed without movement.
+The right-X + Y + dual-Z config uses normal `cartesian` kinematics so Mainsail
+and KlipperScreen can use standard `G28` homing and GUI jogging. The right IDEX
+carriage is temporarily exposed as `stepper_x` with travel `X40..X340` and the
+right endstop at `X340`. The left IDEX carriage remains a manual stepper until
+its endstop mechanics are fixed; full Klipper `dual_carriage` mode is deferred
+until both carriages can home safely.
 
 ## Local Git Workflow
 
@@ -98,7 +100,7 @@ sudo systemctl restart klipper
 tail -f ~/printer_data/logs/klippy.log
 ```
 
-## Y + Dual-Z Homing
+## Right-X + Y + Dual-Z Homing
 
 Run these from the Mainsail/Klipper console:
 
@@ -120,16 +122,18 @@ Y_TEST_TRAVEL_100_AUDACIOUS
 MOTORS_OFF
 ```
 
-`G28 Y` homes the real Y axis to the back-mounted min-Y endstop, sets Y to
-`0`, and uses a configured Y travel range of `0..310`. `G28 Z` homes both Z
-motors upward to their top-mounted independent left/right endstops and sets Z
-to `290`. `G28` or "home all" marks the placeholder X as homed, then homes Y
-and Z. `G28 X` only marks the placeholder X homed and does not command physical
-motion.
+`G28 X` homes the real right IDEX carriage to the right-mounted endstop, sets X
+to `340`, and uses a temporary safe range of `40..340`. Stay above `X40` until
+the current left-carriage collision risk is mechanically fixed. `G28 Y` homes
+the real Y axis to the back-mounted min-Y endstop, sets Y to `0`, and uses a
+configured Y travel range of `0..310`. `G28 Z` homes both Z motors upward to
+their top-mounted independent left/right endstops and sets Z to `295`. `G28` or
+"home all" homes right-X first, then Y and Z.
 
-The X endstop macros are manual bring-up buttons for the separate X Pico. The
-left switch uses `x_pico:gpio4` and the right switch uses `x_pico:gpio22`, both
-as NC-to-ground contacts with internal pull-ups. `X_WAIT_LEFT_ENDSTOP`,
+The X endstop macros remain bring-up buttons for the separate X Pico. The left
+switch uses `x_pico:gpio4` and remains registered as `manual_stepper x_left`.
+The right switch uses `x_pico:gpio22` and is now registered as `stepper_x`.
+Both are NC-to-ground contacts with internal pull-ups. `X_WAIT_LEFT_ENDSTOP`,
 `X_WAIT_RIGHT_ENDSTOP`, and `X_WAIT_BOTH_ENDSTOPS` poll `QUERY_ENDSTOPS` until
 the requested switch or switches report triggered, then show the result with
 `RESPOND` and `M117`. Use `X_CANCEL_ENDSTOP_WAIT` to stop an active wait.

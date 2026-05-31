@@ -21,7 +21,7 @@ cleanup_remote_tmp() {
 }
 trap cleanup_remote_tmp EXIT
 
-echo "Updating ${REMOTE_HOST} with current Y + dual-Z Klipper config..."
+echo "Updating ${REMOTE_HOST} with current right-X + Y + dual-Z Klipper config..."
 echo "  Source: ${SOURCE_CFG}"
 
 scp "${SOURCE_CFG}" "${REMOTE_HOST}:${REMOTE_TMP}"
@@ -71,6 +71,16 @@ if state_message:
 y_current = settings.get("tmc2209 stepper_y", {}).get("run_current")
 if y_current is not None:
     print(f"Y run_current: {y_current}")
+
+x_current = settings.get("tmc2209 stepper_x", {}).get("run_current")
+if x_current is not None:
+    print(f"Right-X run_current: {x_current}")
+
+x_min = settings.get("stepper_x", {}).get("position_min")
+x_max = settings.get("stepper_x", {}).get("position_max")
+x_endstop = settings.get("stepper_x", {}).get("position_endstop")
+if x_min is not None and x_max is not None:
+    print(f"Right-X range: {x_min}..{x_max}, endstop={x_endstop}")
 PY
 REMOTE_SCRIPT
 

@@ -27,7 +27,7 @@ fi
 
 mkdir -p "${TARGET_DIR}"
 
-echo "Installing Y + dual-Z Pico bring-up Klipper configuration..."
+echo "Installing right-X + Y + dual-Z Pico bring-up Klipper configuration..."
 echo "  Source: ${SOURCE_CFG}"
 echo "  Target: ${MAIN_CFG}"
 
@@ -40,6 +40,6 @@ echo "Configuration installed successfully."
 echo "Next steps:"
 echo "  1. Restart Klipper: sudo systemctl restart klipper"
 echo "  2. Watch logs: tail -f ~/printer_data/logs/klippy.log"
-echo "  3. In Mainsail, run YZ_QUERY_ENDSTOPS and the X_WAIT_* endstop tests"
+echo "  3. In Mainsail, run YZ_QUERY_ENDSTOPS, X_QUERY_ENDSTOPS, and G28 X"
 echo ""
 echo "Previous printer.cfg was backed up, if it existed, with .bak.TIMESTAMP."
