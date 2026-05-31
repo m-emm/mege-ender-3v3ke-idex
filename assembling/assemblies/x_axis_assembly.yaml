@@ -244,6 +244,7 @@ Builder:
             overrides:
               process_overrides:
                 enable_support: "1"
+                support_top_z_distance: "0.4"
           parts:
             - x_axis_endstop_left
         - name: endstop_right_with_support

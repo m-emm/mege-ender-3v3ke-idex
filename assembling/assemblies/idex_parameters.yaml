@@ -268,10 +268,10 @@ globals:
   endcap_wall: 3.5
   idler_cage_back_wall: 4
   idler_cage_wall: 2
-  endstop_holder_groove_holder_bottom_width: 6.3
+  endstop_holder_groove_holder_bottom_width: 7.0
+  endstop_holder_groove_holder_top_width: 6.2
   endstop_holder_groove_holder_height: 5
   endstop_holder_groove_holder_slit: 1.5
-  endstop_holder_groove_holder_top_width: 6.0
   endstop_holder_groove_holder_length: 12
   endstop_holder_mount_screw_size: "M3"
   endstop_holder_mount_screw_length: 14

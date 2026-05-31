@@ -11,12 +11,12 @@ This wiring matches `pico_w_btt_tmc2226_x.yaml`, the generated SVGs under
 | X-left DIR | `GP10` | Inverted in config |
 | X-left EN | `GP12` | Active low |
 | X-left UART | `GP9` | Single-wire UART |
-| X-left endstop | `GP4` | `^!gpio4` NO switch wiring |
+| X-left endstop | `GP4` | `^gpio4` NC switch wiring |
 | X-right STEP | `GP7` | Commented `[dual_carriage]` template |
 | X-right DIR | `GP6` | Inverted in template |
 | X-right EN | `GP8` | Active low |
 | X-right UART | `GP5` | Single-wire UART |
-| X-right endstop | `GP22` | `^!gpio22` template |
+| X-right endstop | `GP22` | `^gpio22` NC switch template |
 | Left SFS V2.0 switch | `GP0` | Runout switch output |
 | Left SFS V2.0 motion | `GP1` | Encoder/motion output |
 | Right SFS V2.0 switch | `GP2` | Runout switch output |
@@ -43,6 +43,11 @@ Each BTT TMC2226 V1.0 driver is wired the same way:
 Important: Pico ground, driver logic ground, motor PSU ground, endstop ground,
 SFS ground, and CR Touch ground must be common.
 
+The X endstops use normally-closed switch wiring: switch `COM` goes to common
+ground and switch `NC` goes to the Pico input. Klipper enables the Pico internal
+pull-up with `^`, so a pressed switch or broken wire reads as triggered. Do not
+route `3V3` through the bare switch contact.
+
 ## Connectors
 
 ### X-left motor and endstop
@@ -53,9 +58,9 @@ SFS ground, and CR Touch ground must be common.
 | `X_LEFT_MOTOR_A_MINUS` | TMC1 `A2` |
 | `X_LEFT_MOTOR_B_PLUS` | TMC1 `B1` |
 | `X_LEFT_MOTOR_B_MINUS` | TMC1 `B2` |
-| `X_LEFT_ENDSTOP_NO` | Pico `GP4` |
-| `X_LEFT_ENDSTOP_GND` | Common ground |
-| `X_LEFT_ENDSTOP_VCC` | Pico `3V3(OUT)` if using a 3-wire endstop board |
+| `X_LEFT_ENDSTOP_NC` | Pico `GP4` |
+| `X_LEFT_ENDSTOP_GND` | Common ground / switch `COM` |
+| `X_LEFT_ENDSTOP_VCC` | Unused for a bare NC microswitch |
 
 ### X-right motor and endstop
 
@@ -65,9 +70,9 @@ SFS ground, and CR Touch ground must be common.
 | `X_RIGHT_MOTOR_A_MINUS` | TMC2 `A2` |
 | `X_RIGHT_MOTOR_B_PLUS` | TMC2 `B1` |
 | `X_RIGHT_MOTOR_B_MINUS` | TMC2 `B2` |
-| `X_RIGHT_ENDSTOP_NO` | Pico `GP22` |
-| `X_RIGHT_ENDSTOP_GND` | Common ground |
-| `X_RIGHT_ENDSTOP_VCC` | Pico `3V3(OUT)` if using a 3-wire endstop board |
+| `X_RIGHT_ENDSTOP_NC` | Pico `GP22` |
+| `X_RIGHT_ENDSTOP_GND` | Common ground / switch `COM` |
+| `X_RIGHT_ENDSTOP_VCC` | Unused for a bare NC microswitch |
 
 ## BTT Smart Filament Sensor V2.0
 

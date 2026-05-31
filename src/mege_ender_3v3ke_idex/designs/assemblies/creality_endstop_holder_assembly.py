@@ -77,7 +77,7 @@ def create_creality_endstop_holder_assembly(
             effective_spacer_length = spacer_length
 
             if spacer_alignment == Alignment.BACK:
-                effective_spacer_length = spacer_length *0.5
+                effective_spacer_length = spacer_length * 0.5
 
             spacer_part = create_filleted_box(
                 spacer_width,
@@ -91,7 +91,7 @@ def create_creality_endstop_holder_assembly(
             spacer_part = align(spacer_part, holder, Alignment.BOTTOM)
 
             if spacer_alignment == Alignment.FRONT:
-                spacer_part = translate(0, -cutter_size[1] * 0.4, 0)(spacer_part)            
+                spacer_part = translate(0, -cutter_size[1] * 0.4, 0)(spacer_part)
             spacer = spacer.fuse(spacer_part)
 
         screw_hole_drill = create_cylinder(

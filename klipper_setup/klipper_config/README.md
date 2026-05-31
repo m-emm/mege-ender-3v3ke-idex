@@ -105,6 +105,11 @@ Run these from the Mainsail/Klipper console:
 ```gcode
 QUERY_ENDSTOPS
 YZ_QUERY_ENDSTOPS
+X_QUERY_ENDSTOPS
+X_WAIT_LEFT_ENDSTOP
+X_WAIT_RIGHT_ENDSTOP
+X_WAIT_BOTH_ENDSTOPS
+X_CANCEL_ENDSTOP_WAIT
 
 G28 Y
 G28 Z
@@ -121,6 +126,13 @@ motors upward to their top-mounted independent left/right endstops and sets Z
 to `290`. `G28` or "home all" marks the placeholder X as homed, then homes Y
 and Z. `G28 X` only marks the placeholder X homed and does not command physical
 motion.
+
+The X endstop macros are manual bring-up buttons for the separate X Pico. The
+left switch uses `x_pico:gpio4` and the right switch uses `x_pico:gpio22`, both
+as NC-to-ground contacts with internal pull-ups. `X_WAIT_LEFT_ENDSTOP`,
+`X_WAIT_RIGHT_ENDSTOP`, and `X_WAIT_BOTH_ENDSTOPS` poll `QUERY_ENDSTOPS` until
+the requested switch or switches report triggered, then show the result with
+`RESPOND` and `M117`. Use `X_CANCEL_ENDSTOP_WAIT` to stop an active wait.
 
 `Y_TEST_TRAVEL_100` requires Y to be homed. It picks a safe 100 mm direction
 from the current Y position, temporarily sets `550` mm/s velocity, `8000`

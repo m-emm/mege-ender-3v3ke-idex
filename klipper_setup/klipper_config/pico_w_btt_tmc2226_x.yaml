@@ -3,8 +3,9 @@ basename: pico_w_btt_tmc2226_x
 metadata:
   version_label: "Pico W + BTT TMC2226 (X axis MCU)"
   notes: |
-    X-left: STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
-    X-right: STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5, endstop=GPIO22.
+    X-left: STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, NC endstop=GPIO4.
+    X-right: STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5, NC endstop=GPIO22.
+    X endstops use NC-to-ground wiring with the Pico internal pull-up; VCC is unused for bare switches.
     SFS left: SWITCH=GPIO0, MOTION=GPIO1. SFS right: SWITCH=GPIO2, MOTION=GPIO3.
     CR Touch: CONTROL=GPIO13, Z_SIGNAL=GPIO14 open-drain with Pico internal pull-up; 5V power only.
 
@@ -157,7 +158,7 @@ pin_sets:
     origin: [34, 20]
     direction: down
     pins:
-      - "NO"
+      - "NC"
       - GND
       - VCC
   - prefix: X_RIGHT_MOTOR_
@@ -172,7 +173,7 @@ pin_sets:
     origin: [34, 15]
     direction: down
     pins:
-      - "NO"
+      - "NC"
       - GND
       - VCC
   - prefix: SFS_X_LEFT_
@@ -271,10 +272,10 @@ wires:
     color: "#9ca3af"
 
   - from: PICO_GPIO_4
-    to: X_LEFT_ENDSTOP_NO
+    to: X_LEFT_ENDSTOP_NC
     type: data
   - from: PICO_GPIO_22_29
-    to: X_RIGHT_ENDSTOP_NO
+    to: X_RIGHT_ENDSTOP_NC
     type: data
   - from: PWR_GND
     to: X_LEFT_ENDSTOP_GND
@@ -282,12 +283,6 @@ wires:
   - from: X_LEFT_ENDSTOP_GND
     to: X_RIGHT_ENDSTOP_GND
     type: ground
-  - from: X_LEFT_ENDSTOP_VCC
-    to: PICO_THREEV3_OUT_36
-    type: lv_power
-  - from: X_RIGHT_ENDSTOP_VCC
-    to: X_LEFT_ENDSTOP_VCC
-    type: lv_power
 
   - from: PICO_GPIO_0
     to: SFS_X_LEFT_SWITCH
