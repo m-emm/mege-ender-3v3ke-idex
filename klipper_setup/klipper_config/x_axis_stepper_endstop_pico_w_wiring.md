@@ -96,7 +96,8 @@ movement. Enable them only after the matching extruder names are final.
 
 ## CR Touch
 
-Treat the CR Touch as BLTouch-compatible in Klipper:
+Wire the CR Touch like a BLTouch-compatible probe, but keep it in manual
+bring-up mode until the deploy behavior is fully understood:
 
 | CR Touch signal | Connect to |
 |---|---|
@@ -111,15 +112,26 @@ safe for the Pico when pulled up to 3.3V. Use `sensor_pin: ^gpio14` so Klipper
 enables the RP2040 internal pull-up. No external pull-up should be needed for
 first bring-up; add one to 3.3V only if the signal is noisy or unreliable.
 
-The `[bltouch]` template in `snippets/x_axis_stepper_endstop_pico_w.cfg` is
-commented until the probe is physically moved to this MCU and its offsets are
-measured.
+The live bring-up config currently uses temporary raw PWM control for CR Touch
+manual testing because the built-in BLTouch `pin_down` path alarmed the probe
+during bring-up, while a raw 650us deploy pulse worked. It does not use the
+probe for Z homing, safe Z home, or bed mesh until the normal BLTouch path,
+offsets, and safe movement path are measured. The include snippet still keeps
+its `[bltouch]` template commented for future full config integration.
+
+2026-05-31 bring-up notes: raw PWM confirmed that `GP13` can command the probe
+and `GP14` can read a trigger transition, but the probe still entered red error
+mode during repeated manual deploy/trigger experiments. At shutdown the user
+observed the probe in error mode. Resume by issuing reset, stow, and query only;
+do not immediately run another deploy or use the probe for motion.
 
 ## Config Notes
 
-- The active X-left driver remains `[stepper_x]` plus `[tmc2209 stepper_x]`.
+- The live bring-up config temporarily maps the X-right driver to `[stepper_x]`
+  plus `[tmc2209 stepper_x]`; the left carriage remains a manual stepper until
+  its endstop mechanics are fixed.
 - BTT TMC2226 V1.0 is configured through the `tmc2209` section used by this repo.
-- X-right wiring is present in the SVG and config template as `[dual_carriage]`,
-  but should stay commented until the IDEX limits and kinematics are finished.
-- The SFS and CR Touch snippets are intentionally commented so this include can be
-  used for motor bring-up without requiring unfinished extruder/probe setup.
+- Full IDEX `[dual_carriage]` mode should stay deferred until both carriages can
+  home safely and the temporary right-X-only travel limit is replaced.
+- The SFS and CR Touch snippets are intentionally commented so this include can
+  be used for motor bring-up without requiring unfinished extruder/probe setup.

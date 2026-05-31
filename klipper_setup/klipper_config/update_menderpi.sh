@@ -81,6 +81,20 @@ x_max = settings.get("stepper_x", {}).get("position_max")
 x_endstop = settings.get("stepper_x", {}).get("position_endstop")
 if x_min is not None and x_max is not None:
     print(f"Right-X range: {x_min}..{x_max}, endstop={x_endstop}")
+
+bltouch = settings.get("bltouch", {})
+raw_control = settings.get("output_pin cr_touch_control", {})
+raw_signal = settings.get("gcode_button cr_touch_signal", {})
+if bltouch:
+    print(
+        "CR Touch BLTouch pins: "
+        f"control={bltouch.get('control_pin')}, sensor={bltouch.get('sensor_pin')}"
+    )
+elif raw_control or raw_signal:
+    print(
+        "CR Touch raw pins: "
+        f"control={raw_control.get('pin')}, sensor={raw_signal.get('pin')}"
+    )
 PY
 REMOTE_SCRIPT
 

@@ -112,6 +112,18 @@ X_WAIT_LEFT_ENDSTOP
 X_WAIT_RIGHT_ENDSTOP
 X_WAIT_BOTH_ENDSTOPS
 X_CANCEL_ENDSTOP_WAIT
+CR_TOUCH_QUERY
+CR_TOUCH_DEPLOY
+CR_TOUCH_DEPLOY_650
+CR_TOUCH_DEPLOY_750
+CR_TOUCH_DEPLOY_900
+CR_TOUCH_DEPLOY_1000
+CR_TOUCH_TOUCH_MODE
+CR_TOUCH_STOW
+CR_TOUCH_RESET
+CR_TOUCH_SELF_TEST
+CR_TOUCH_WAIT_TRIGGER
+CR_TOUCH_CANCEL_WAIT
 
 G28 Y
 G28 Z
@@ -137,6 +149,64 @@ Both are NC-to-ground contacts with internal pull-ups. `X_WAIT_LEFT_ENDSTOP`,
 `X_WAIT_RIGHT_ENDSTOP`, and `X_WAIT_BOTH_ENDSTOPS` poll `QUERY_ENDSTOPS` until
 the requested switch or switches report triggered, then show the result with
 `RESPOND` and `M117`. Use `X_CANCEL_ENDSTOP_WAIT` to stop an active wait.
+
+The CR Touch is in temporary raw-pulse bring-up mode on the X Pico:
+`CONTROL=x_pico:gpio13`, `Z_SIGNAL=^x_pico:gpio14`. It is not used by Z
+homing, bed mesh, safe-Z-home, or any automatic movement. The built-in
+`[bltouch]` `pin_down` path alarmed the probe during bring-up, while a raw
+650us PWM deploy pulse worked. The raw test buttons send 20 ms servo pulses
+directly so deploy behavior can be tested without using the probe for motion:
+`CR_TOUCH_DEPLOY_650`, `CR_TOUCH_DEPLOY_750`, `CR_TOUCH_DEPLOY_900`, and
+`CR_TOUCH_DEPLOY_1000`. `CR_TOUCH_STOW`, `CR_TOUCH_RESET`,
+`CR_TOUCH_SELF_TEST`, `CR_TOUCH_TOUCH_MODE`, and `CR_TOUCH_QUERY` use the same
+raw-control path. Once the normal BLTouch path is understood, switch this back
+to `[bltouch]` before using the probe for actual probing.
+
+### CR Touch Bring-Up Log, 2026-05-31
+
+Known wiring during the test:
+
+- CR Touch control/servo wire: `x_pico:gpio13`
+- CR Touch Z signal wire: `^x_pico:gpio14`
+- CR Touch powered from 5V, with signal/common ground tied to the Pico/common
+  printer ground
+- Klipper query object in raw mode: `gcode_button cr_touch_signal`
+
+Observed behavior:
+
+- `CR_TOUCH_QUERY` reported `open` when the probe was stowed and calm.
+- Klipper's built-in `[bltouch]` `BLTOUCH_DEBUG COMMAND=pin_down` repeatedly
+  put the probe into red error mode instead of reliably deploying it.
+- Increasing the BLTouch `pin_move_time` did not fix that built-in `pin_down`
+  failure.
+- `BLTOUCH_DEBUG COMMAND=self_test` did move the pin during one test, and
+  `reset` plus `stow` could recover the probe to an open signal state.
+- Raw PWM control proved the control pin is alive: a 650us pulse at 20ms servo
+  period deployed the pin once, with the probe LED changing to blue.
+- A clean raw deploy-only test showed the signal transition from `RELEASED` to
+  `PRESSED`, then a reset+stow command returned Klipper's signal query to
+  `RELEASED/open`.
+- The first implementation of `CR_TOUCH_WAIT_TRIGGER` was too eager because it
+  called `CR_TOUCH_TOUCH_MODE` immediately after deploy. That made the wait
+  report `TRIGGERED` instantly, so the source config now polls the raw signal
+  directly after deploy instead.
+- End-of-session physical state: after another manual test, the user observed
+  the probe in error mode again and shut the printer down. Do not assume the
+  probe recovered physically just because the last successful Klipper query from
+  earlier had shown `open`.
+
+Resume checklist:
+
+1. Power the printer back on and do not run any deploy command first.
+2. Run `CR_TOUCH_RESET`, then `CR_TOUCH_STOW`, then `CR_TOUCH_QUERY`.
+3. Confirm physically that the probe is stowed and not blinking red.
+4. Redeploy this local source config before using `CR_TOUCH_WAIT_TRIGGER`; the
+   live printer may still have the older wait macro that used touch-mode.
+5. For the next controlled test, prefer `CR_TOUCH_DEPLOY_650`, visually confirm
+   the pin deployed, then manually query or poll `cr_touch_signal` before
+   touching the pin.
+6. Keep the CR Touch disconnected from all homing/probing features until the
+   deploy, trigger, reset, and stow sequence is repeatable.
 
 `Y_TEST_TRAVEL_100` requires Y to be homed. It picks a safe 100 mm direction
 from the current Y position, temporarily sets `550` mm/s velocity, `8000`
