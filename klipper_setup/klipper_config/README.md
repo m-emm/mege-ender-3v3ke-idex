@@ -9,19 +9,21 @@ git.
 
 The wiring starts in YAML:
 
+- `pico_w_btt_tmc2226_x.yaml` describes the X-axis Pico W, TMC2226 drivers,
+  endstops, Smart Filament Sensors, and CR Touch pins.
 - `pico_w_btt_tmc2226_y_z.yaml` describes Pico W, TMC2226 driver, motor,
   endstop, heatbed, and thermistor pins.
-- `generate_wiring_svgs.sh` renders the YAML into top and bottom wiring SVGs.
+- `generate_wiring_svgs.sh` renders the X and Y/Z YAML files into top and
+  bottom wiring SVGs under `wiring_diagrams/`.
 - The generated `*_wiring.md` notes summarize the human-readable wiring plan.
-- The Klipper `.cfg` files map those same GPIO choices into stepper, TMC, and
-  debug macro sections.
+- Include-style snippets live under `snippets/`; deployable bring-up and full
+  Klipper `.cfg` files stay in this directory.
 
 Regenerate the wiring diagrams after changing YAML pin assignments:
 
 ```bash
 cd /Users/mege/git/mege-ender-3v3ke-idex
-./klipper_setup/klipper_config/generate_wiring_svgs.sh \
-  klipper_setup/klipper_config/pico_w_btt_tmc2226_y_z.yaml
+./klipper_setup/klipper_config/generate_wiring_svgs.sh
 ```
 
 ## Bring-Up Configs
@@ -32,7 +34,8 @@ cd /Users/mege/git/mege-ender-3v3ke-idex
   Y + dual-Z `printer.cfg`.
 - `toolhead_nitehawk_and_x_axis.cfg` is the fuller printer config kept for
   later integration.
-- `y_z_dual_endstop_heatbed_pico_w.cfg` is a future include-style snippet, not
+- `snippets/x_axis_stepper_endstop_pico_w.cfg` and
+  `snippets/y_z_dual_endstop_heatbed_pico_w.cfg` are include-style snippets, not
   the current live bring-up config.
 
 The Y + dual-Z config uses normal `cartesian` kinematics so Mainsail and

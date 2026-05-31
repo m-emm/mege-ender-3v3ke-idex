@@ -68,8 +68,8 @@ TMC_ROW_SPACING = 4 * dil_pitch
 TMC_BOARD_WIDTH = 15.2
 TMC_BOARD_LENGTH = 20.3
 
-# Approximate board placement from klipper_setup/klipper_config/pico_w_btt_tmc2226.yaml:
-# PICO origin [0,20], TMC1 origin [20,18], TMC2 origin [20,9]
+# Approximate board placement from klipper_setup/klipper_config/pico_w_btt_tmc2226_x.yaml:
+# PICO origin [0,30], TMC1 origin [20,28], TMC2 origin [20,18]
 PICO_TO_DRIVER_RIGHT_GAP = 4.5 * dil_pitch
 
 HEADER_CUTTER_SLACK = 0.35

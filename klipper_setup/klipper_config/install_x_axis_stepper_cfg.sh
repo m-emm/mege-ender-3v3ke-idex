@@ -2,12 +2,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE_CFG="${SCRIPT_DIR}/x_axis_stepper_endstop_pico_w.cfg"
+SOURCE_CFG="${SCRIPT_DIR}/snippets/x_axis_stepper_endstop_pico_w.cfg"
 
 TARGET_DIR="${KLIPPER_CONFIG_DIR:-${HOME}/printer_data/config}"
-TARGET_CFG="${TARGET_DIR}/x_axis_stepper_endstop_pico_w.cfg"
+TARGET_SNIPPET_DIR="${TARGET_DIR}/snippets"
+TARGET_CFG="${TARGET_SNIPPET_DIR}/x_axis_stepper_endstop_pico_w.cfg"
 MAIN_CFG="${TARGET_DIR}/printer.cfg"
-INCLUDE_LINE="[include x_axis_stepper_endstop_pico_w.cfg]"
+INCLUDE_LINE="[include snippets/x_axis_stepper_endstop_pico_w.cfg]"
+LEGACY_INCLUDE_LINE="[include x_axis_stepper_endstop_pico_w.cfg]"
 SAVE_CONFIG_MARKER="#*# <---------------------- SAVE_CONFIG ---------------------->"
 
 timestamp() {
@@ -28,7 +30,15 @@ insert_include_line() {
   local tmp
   tmp="$(mktemp)"
 
-  awk -v include_line="${INCLUDE_LINE}" -v marker="${SAVE_CONFIG_MARKER}" '
+  awk \
+    -v include_line="${INCLUDE_LINE}" \
+    -v legacy_include_line="${LEGACY_INCLUDE_LINE}" \
+    -v marker="${SAVE_CONFIG_MARKER}" '
+    $0 == legacy_include_line && !inserted {
+      print include_line
+      inserted=1
+      next
+    }
     $0 == marker && !inserted {
       print include_line
       inserted=1
@@ -50,7 +60,7 @@ if [[ ! -f "${SOURCE_CFG}" ]]; then
   exit 1
 fi
 
-mkdir -p "${TARGET_DIR}"
+mkdir -p "${TARGET_SNIPPET_DIR}"
 
 backup_file "${TARGET_CFG}"
 cp -a "${SOURCE_CFG}" "${TARGET_CFG}"
@@ -73,5 +83,5 @@ fi
 
 backup_file "${MAIN_CFG}"
 insert_include_line "${MAIN_CFG}"
-echo "Added include to: ${MAIN_CFG}"
+echo "Added or updated include in: ${MAIN_CFG}"
 echo "Done. Restart Klipper: sudo systemctl restart klipper"

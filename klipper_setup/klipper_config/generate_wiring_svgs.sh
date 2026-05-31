@@ -2,7 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-OUTPUT_DIR="$SCRIPT_DIR"
+OUTPUT_DIR="$SCRIPT_DIR/wiring_diagrams"
+DEFAULT_YAML_FILES=(
+  "$SCRIPT_DIR/pico_w_btt_tmc2226_x.yaml"
+  "$SCRIPT_DIR/pico_w_btt_tmc2226_y_z.yaml"
+)
 
 resolve_yaml_file() {
   local candidate="$1"
@@ -32,12 +36,13 @@ collect_yaml_files() {
     return 0
   fi
 
-  local config_file
-  shopt -s nullglob
-  for config_file in "$SCRIPT_DIR"/*.yaml "$SCRIPT_DIR"/*.yml; do
-    printf '%s\n' "$config_file"
+  local default_file
+  for default_file in "${DEFAULT_YAML_FILES[@]}"; do
+    resolve_yaml_file "$default_file" || {
+      echo "Default config file not found: $default_file" >&2
+      exit 1
+    }
   done
-  shopt -u nullglob
 }
 
 mapfile -t YAML_FILES < <(collect_yaml_files "$@")
@@ -46,6 +51,8 @@ if (( ${#YAML_FILES[@]} == 0 )); then
   echo "No YAML config files found in: $SCRIPT_DIR" >&2
   exit 1
 fi
+
+mkdir -p "$OUTPUT_DIR"
 
 run_pinout() {
   local yaml_file="$1"

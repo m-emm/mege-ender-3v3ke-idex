@@ -1,13 +1,12 @@
-basename: pico_w_btt_tmc2226
+basename: pico_w_btt_tmc2226_x
 
 metadata:
-  version_label: "Pico W + BTT TMC2226 (X axis)"
+  version_label: "Pico W + BTT TMC2226 (X axis MCU)"
   notes: |
-    Wiring aligned to x_axis_stepper_endstop_pico_w.cfg and x_axis_stepper_endstop_pico_w_wiring.md.
-    Driver1 (X): STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
-    Driver2 (X2): STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5.
-
-
+    X-left: STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
+    X-right: STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5, endstop=GPIO22.
+    SFS left: SWITCH=GPIO0, MOTION=GPIO1. SFS right: SWITCH=GPIO2, MOTION=GPIO3.
+    CR Touch: CONTROL=GPIO13, Z_SIGNAL=GPIO14 open-drain with Pico internal pull-up; 5V power only.
 
 color_map:
   power: "#ff0000" # red: VCC/5V
@@ -18,7 +17,7 @@ color_map:
   default: "#808080"
 
 ################
-# Note on the coordinate system: 
+# Note on the coordinate system:
 # The origin (0,0) is at the bottom-left corner
 # coordinates are [ X, Y ]
 # X increasing to the right
@@ -26,7 +25,7 @@ color_map:
 # ##############
 pin_sets:
   - prefix: PICO_
-    origin: [0, 20]
+    origin: [0, 30]
     direction: down
     pins:
       - GPIO_0
@@ -50,7 +49,7 @@ pin_sets:
       - GPIO_14
       - GPIO_15
   - prefix: PICO_
-    origin: [8, 20]
+    origin: [8, 30]
     direction: down
     pins:
       - VBUS_40
@@ -74,7 +73,7 @@ pin_sets:
       - GPIO_17_22
       - GPIO_16_21
   - prefix: TMC1_J1_
-    origin: [20, 18]
+    origin: [20, 28]
     direction: down
     pins:
       - EN_1
@@ -86,11 +85,11 @@ pin_sets:
       - STEP_7
       - DIR_8
   - prefix: TMC1_J2_
-    origin: [24, 18]
+    origin: [24, 28]
     direction: down
     pins:
       - VM_1
-      - GND_MOTOR_2
+      - GND_VM_2
       - B2_3
       - B1_4
       - A1_5
@@ -98,7 +97,7 @@ pin_sets:
       - VIO_7
       - GND_LOGIC_8
   - prefix: TMC2_J1_
-    origin: [20, 8]
+    origin: [20, 18]
     direction: down
     pins:
       - EN_1
@@ -110,11 +109,11 @@ pin_sets:
       - STEP_7
       - DIR_8
   - prefix: TMC2_J2_
-    origin: [24, 8]
+    origin: [24, 18]
     direction: down
     pins:
       - VM_1
-      - GND_MOTOR_2
+      - GND_VM_2
       - B2_3
       - B1_4
       - A1_5
@@ -122,35 +121,46 @@ pin_sets:
       - VIO_7
       - GND_LOGIC_8
   - prefix: TMC1_10K_PULL_UP_
-    origin: [21, 10]
+    origin: [21, 20]
     direction: right
     pins:
       - "1"
       - "2"
   - prefix: TMC2_10K_PULL_UP_
-    origin: [21, 0]
+    origin: [21, 10]
     direction: right
     pins:
       - "1"
       - "2"
-  
   - prefix: PICO_POWER_CAP_
-    origin: [15, 19]
+    origin: [15, 29]
     direction: down
     pins:
       - "1"
       - "2"
-  
-  - prefix: ENDSTOP_1_
-    origin: [34, 10]
+  - prefix: PWR_
+    origin: [34, 29]
+    direction: down
+    pins:
+      - V24
+      - N/C
+      - GND
+  - prefix: X_LEFT_MOTOR_
+    origin: [34, 25]
+    direction: down
+    pins:
+      - A_PLUS
+      - A_MINUS
+      - B_PLUS
+      - B_MINUS
+  - prefix: X_LEFT_ENDSTOP_
+    origin: [34, 20]
     direction: down
     pins:
       - "NO"
       - GND
       - VCC
-
-
-  - prefix: MOTOR_1_
+  - prefix: X_RIGHT_MOTOR_
     origin: [34, 15]
     direction: down
     pins:
@@ -158,40 +168,49 @@ pin_sets:
       - A_MINUS
       - B_PLUS
       - B_MINUS
-
-  - prefix: ENDSTOP_2_
-    origin: [34, 7]
+  - prefix: X_RIGHT_ENDSTOP_
+    origin: [34, 10]
     direction: down
     pins:
       - "NO"
       - GND
       - VCC
-
-  - prefix: MOTOR_2_
-    origin: [34, 3]
+  - prefix: SFS_X_LEFT_
+    origin: [34, 6]
     direction: down
     pins:
-      - A_PLUS
-      - A_MINUS
-      - B_PLUS
-      - B_MINUS
-  - prefix: PWR_
-    origin: [34, 18]
-    direction: down
-    pins:
-      - V24
-      - N/C
+      - SWITCH
+      - MOTION
+      - VCC
       - GND
+  - prefix: SFS_X_RIGHT_
+    origin: [34, 1]
+    direction: down
+    pins:
+      - SWITCH
+      - MOTION
+      - VCC
+      - GND
+  - prefix: CR_TOUCH_
+    origin: [34, -4]
+    direction: down
+    pins:
+      - GND
+      - FIVE_V
+      - CONTROL
+      - Z_GND
+      - Z_SIGNAL
 
 wires:
   - from: PICO_GND_03
     to: PICO_POWER_CAP_1
     type: ground
-    color: "#000000" # black for capacitor ground
+    color: "#000000"
   - from: PICO_POWER_CAP_2
     to: PICO_THREEV3_OUT_36
     type: lv_power
-    color: "#9ca3af" # gray for capacitor power
+    color: "#9ca3af"
+
   - from: PICO_GPIO_11
     to: TMC1_J1_STEP_7
     type: clock
@@ -204,12 +223,12 @@ wires:
   - from: PICO_GPIO_9
     to: TMC1_J1_UART_PDN_4
     type: data
-    color: "#9ca3af" # gray UART wire
+    color: "#9ca3af"
   - from: PICO_GND_03
     to: TMC1_J2_GND_LOGIC_8
     type: ground
   - from: PICO_GND_08
-    to: TMC1_J2_GND_MOTOR_2
+    to: TMC1_J2_GND_VM_2
     type: ground
   - from: PICO_THREEV3_OUT_36
     to: TMC1_J2_VIO_7
@@ -217,25 +236,12 @@ wires:
   - from: TMC1_J2_VIO_7
     to: TMC1_10K_PULL_UP_2
     type: lv_power
-    color: "#9ca3af" # gray for pull-up resistor
+    color: "#9ca3af"
   - from: TMC1_10K_PULL_UP_1
     to: TMC1_J1_EN_1
     type: data
-    color: "#9ca3af" # gray for pull-up resistor
-  - from: PICO_GND_18
-    to: TMC2_J2_GND_LOGIC_8
-    type: ground
-  - from: PICO_THREEV3_OUT_36
-    to: TMC2_J2_VIO_7
-    type: lv_power
-  - from: TMC2_J2_VIO_7
-    to: TMC2_10K_PULL_UP_2
-    type: lv_power
-    color: "#9ca3af" # gray for pull-up resistor
-  - from: TMC2_10K_PULL_UP_1
-    to: TMC2_J1_EN_1
-    type: data
-    color: "#9ca3af" # gray for pull-up resistor
+    color: "#9ca3af"
+
   - from: PICO_GPIO_7
     to: TMC2_J1_STEP_7
     type: clock
@@ -248,64 +254,117 @@ wires:
   - from: PICO_GPIO_5
     to: TMC2_J1_UART_PDN_4
     type: data
-    color: "#9ca3af" # gray UART wire
+    color: "#9ca3af"
+  - from: PICO_GND_18
+    to: TMC2_J2_GND_LOGIC_8
+    type: ground
+  - from: PICO_THREEV3_OUT_36
+    to: TMC2_J2_VIO_7
+    type: lv_power
+  - from: TMC2_J2_VIO_7
+    to: TMC2_10K_PULL_UP_2
+    type: lv_power
+    color: "#9ca3af"
+  - from: TMC2_10K_PULL_UP_1
+    to: TMC2_J1_EN_1
+    type: data
+    color: "#9ca3af"
+
   - from: PICO_GPIO_4
-    to: ENDSTOP_1_NO
+    to: X_LEFT_ENDSTOP_NO
+    type: data
+  - from: PICO_GPIO_22_29
+    to: X_RIGHT_ENDSTOP_NO
     type: data
   - from: PWR_GND
-    to: ENDSTOP_1_GND
+    to: X_LEFT_ENDSTOP_GND
     type: ground
-
-
-
-  - from: ENDSTOP_1_VCC
+  - from: X_LEFT_ENDSTOP_GND
+    to: X_RIGHT_ENDSTOP_GND
+    type: ground
+  - from: X_LEFT_ENDSTOP_VCC
     to: PICO_THREEV3_OUT_36
     type: lv_power
+  - from: X_RIGHT_ENDSTOP_VCC
+    to: X_LEFT_ENDSTOP_VCC
+    type: lv_power
 
-  - from: ENDSTOP_1_GND
-    to: ENDSTOP_2_GND
+  - from: PICO_GPIO_0
+    to: SFS_X_LEFT_SWITCH
+    type: data
+  - from: PICO_GPIO_1
+    to: SFS_X_LEFT_MOTION
+    type: data
+  - from: PICO_GPIO_2
+    to: SFS_X_RIGHT_SWITCH
+    type: data
+  - from: PICO_GPIO_3
+    to: SFS_X_RIGHT_MOTION
+    type: data
+  - from: PICO_THREEV3_OUT_36
+    to: SFS_X_LEFT_VCC
+    type: lv_power
+  - from: SFS_X_RIGHT_VCC
+    to: SFS_X_LEFT_VCC
+    type: lv_power
+  - from: PICO_GND_28
+    to: SFS_X_LEFT_GND
+    type: ground
+  - from: SFS_X_RIGHT_GND
+    to: SFS_X_LEFT_GND
     type: ground
 
-  - from: PICO_GPIO_22_29
-    to: ENDSTOP_2_NO
+  - from: PICO_GPIO_13
+    to: CR_TOUCH_CONTROL
     type: data
+  - from: PICO_GPIO_14
+    to: CR_TOUCH_Z_SIGNAL
+    type: data
+    color: "#9ca3af"
+  - from: PICO_VBUS_40
+    to: CR_TOUCH_FIVE_V
+    type: power
+  - from: PICO_GND_23
+    to: CR_TOUCH_GND
+    type: ground
+  - from: CR_TOUCH_Z_GND
+    to: CR_TOUCH_GND
+    type: ground
 
-  - from: ENDSTOP_2_VCC
-    to: ENDSTOP_1_VCC
-    type: lv_power
-    
-  - from: MOTOR_1_A_PLUS
+  - from: X_LEFT_MOTOR_A_PLUS
     to: TMC1_J2_A1_5
     type: default
-    color: "#ff0000" # red (plus)
-  - from: MOTOR_1_A_MINUS
+    color: "#ff0000"
+  - from: X_LEFT_MOTOR_A_MINUS
     to: TMC1_J2_A2_6
     type: default
-    color: "#000000" # black (minus)
-  - from: MOTOR_1_B_PLUS
+    color: "#000000"
+  - from: X_LEFT_MOTOR_B_PLUS
     to: TMC1_J2_B1_4
     type: default
-    color: "#ffd400" # yellow
-  - from: MOTOR_1_B_MINUS
+    color: "#ffd400"
+  - from: X_LEFT_MOTOR_B_MINUS
     to: TMC1_J2_B2_3
     type: default
-    color: "#0057d8" # blue
-  - from: MOTOR_2_A_PLUS
+    color: "#0057d8"
+
+  - from: X_RIGHT_MOTOR_A_PLUS
     to: TMC2_J2_A1_5
     type: default
-    color: "#ff0000" # red (plus)
-  - from: MOTOR_2_A_MINUS
+    color: "#ff0000"
+  - from: X_RIGHT_MOTOR_A_MINUS
     to: TMC2_J2_A2_6
     type: default
-    color: "#000000" # black (minus)
-  - from: MOTOR_2_B_PLUS
+    color: "#000000"
+  - from: X_RIGHT_MOTOR_B_PLUS
     to: TMC2_J2_B1_4
     type: default
-    color: "#ffd400" # yellow
-  - from: MOTOR_2_B_MINUS
+    color: "#ffd400"
+  - from: X_RIGHT_MOTOR_B_MINUS
     to: TMC2_J2_B2_3
     type: default
-    color: "#0057d8" # blue
+    color: "#0057d8"
+
   - from: PWR_V24
     to: TMC1_J2_VM_1
     type: power
@@ -313,8 +372,8 @@ wires:
     to: TMC2_J2_VM_1
     type: power
   - from: PWR_GND
-    to: TMC1_J2_GND_MOTOR_2
+    to: TMC1_J2_GND_VM_2
     type: ground
   - from: PWR_GND
-    to: TMC2_J2_GND_MOTOR_2
+    to: TMC2_J2_GND_VM_2
     type: ground
