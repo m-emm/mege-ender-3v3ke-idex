@@ -161,7 +161,7 @@ pin_sets:
       - GND
       - VCC
   - prefix: X_RIGHT_MOTOR_
-    origin: [34, 15]
+    origin: [34, 11]
     direction: down
     pins:
       - A_PLUS
@@ -169,7 +169,7 @@ pin_sets:
       - B_PLUS
       - B_MINUS
   - prefix: X_RIGHT_ENDSTOP_
-    origin: [34, 10]
+    origin: [34, 15]
     direction: down
     pins:
       - "NO"
