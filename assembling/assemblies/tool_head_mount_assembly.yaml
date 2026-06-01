@@ -52,9 +52,10 @@ Builder:
   Production:
     parts:
       - source: self
+        
         artifact: leader
         name: tool_head_mount
-        prod_rotation_angle: 180
+        prod_rotation_angle: -45
         prod_rotation_axis: [1, 0, 0]
     arrange:
       export_individual_parts: false

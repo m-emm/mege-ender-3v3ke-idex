@@ -397,6 +397,28 @@ def create_tool_head_mount_assembly(
     tool_head_mount = carriage_mount_plate
     tool_head_mount = tool_head_mount.fuse(mount_base_plate)
 
+    belt_carriage_mount_screws = []
+    belt_carriage_mount_screw_length = 50
+    belt_carriage_mount_screw_size = "M3"
+    belt_carriage_mount_screw_head_clearance = 1.5
+    belt_carriage_mount_screw_tower_wall = 3.3
+
+    belt_carriage_mount_screw_tower_size = (
+        MScrew.from_size(belt_carriage_mount_screw_size).cylinder_head_diameter / 2
+        + 2*belt_carriage_mount_screw_head_clearance
+        + 2*belt_carriage_mount_screw_tower_wall
+    )
+
+    mount_towers = PartCollector()
+
+    top_of_tool_head_mount = create_box(BIG_THING, BIG_THING, 1)
+    top_of_tool_head_mount = align(
+        top_of_tool_head_mount, tool_head_mount, Alignment.CENTER
+    )
+    top_of_tool_head_mount = align(
+        top_of_tool_head_mount, tool_head_mount, Alignment.STACK_TOP
+    )
+
     for name, part in x_axis_belt_carriage.get_named_cutter_items():
         mount_box = create_box(8, 8, 15)
         mount_box = align(mount_box, part, Alignment.CENTER)
@@ -411,6 +433,82 @@ def create_tool_head_mount_assembly(
         )
         mount_box = mount_box.cut(sprite_extruder.leader)
         tool_head_mount = tool_head_mount.fuse(mount_box)
+
+        belt_carriage_mount_screw_tower = create_cylinder(
+            belt_carriage_mount_screw_tower_size / 2,
+            BIG_THING,
+        )
+
+        belt_carriage_mount_screw_tower = align(
+            belt_carriage_mount_screw_tower,
+            part,
+            Alignment.CENTER,
+        )
+
+        belt_carriage_mount_screw_tower = align(
+            belt_carriage_mount_screw_tower,
+            x_axis_belt_carriage,
+            Alignment.STACK_TOP,
+        )
+
+        belt_carriage_mount_screw_tower = fit_part_between(
+            belt_carriage_mount_screw_tower,
+            cut_normal=(0, 0, 1),
+            limiting_start_part=top_of_tool_head_mount,
+            limiting_end_part=x_axis_belt_carriage,
+        )
+
+        belt_carriage_mount_screw = create_cylinder_screw(
+            "M3", belt_carriage_mount_screw_length
+        )
+
+        belt_carriage_mount_screw = align(
+            belt_carriage_mount_screw, part, Alignment.CENTER
+        )
+        belt_carriage_mount_screw = align(
+            belt_carriage_mount_screw, carriage_mount_plate, Alignment.TOP
+        )
+
+        belt_carriage_mount_screw_head_cutter = create_cylinder(
+            MScrew.from_size(belt_carriage_mount_screw_size).cylinder_head_diameter / 2
+            + belt_carriage_mount_screw_head_clearance,
+            BIG_THING,
+        )
+        belt_carriage_mount_screw_head_cutter = align(
+            belt_carriage_mount_screw_head_cutter,
+            belt_carriage_mount_screw,
+            Alignment.CENTER,
+        )
+        belt_carriage_mount_screw_head_cutter = align(
+            belt_carriage_mount_screw_head_cutter,
+            x_axis_belt_carriage,
+            Alignment.BOTTOM,
+        )
+
+        belt_carriage_mount_screw_head_cutter = translate(
+            0, 0, belt_carriage_mount_screw_length - 3.5
+        )(belt_carriage_mount_screw_head_cutter)
+
+        tool_head_mount = tool_head_mount.cut(belt_carriage_mount_screw_head_cutter)
+
+        belt_carriage_mount_screw = align(
+            belt_carriage_mount_screw,
+            belt_carriage_mount_screw_head_cutter,
+            Alignment.STACK_BOTTOM,
+        )
+        belt_carriage_mount_screw = translate(
+            0, 0, MScrew.from_size(belt_carriage_mount_screw_size).cylinder_head_height
+        )(belt_carriage_mount_screw)
+
+        belt_carriage_mount_screws.append(belt_carriage_mount_screw)
+
+        belt_carriage_mount_screw_tower = belt_carriage_mount_screw_tower.cut(
+            belt_carriage_mount_screw_head_cutter
+        )
+        belt_carriage_mount_screw_tower = belt_carriage_mount_screw_tower.cut(part)
+        mount_towers = mount_towers.fuse(belt_carriage_mount_screw_tower)
+
+    tool_head_mount = tool_head_mount.fuse(mount_towers)
 
     tool_head_mount = x_axis_belt_carriage.use_as_cutter_on(tool_head_mount)
 
@@ -429,5 +527,11 @@ def create_tool_head_mount_assembly(
         tool_head_mount.add_named_non_production_part(
             screw,
             f"sprite_mount_screw_{side_name}",
+        )
+
+    for i, screw in enumerate(belt_carriage_mount_screws):
+        tool_head_mount.add_named_non_production_part(
+            screw,
+            f"belt_carriage_mount_screw_{i}",
         )
     return tool_head_mount
