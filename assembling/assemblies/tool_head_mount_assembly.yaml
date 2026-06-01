@@ -140,6 +140,12 @@ Parameters:
   tool_head_mount_top_box_height:
     Type: Float
 
+
+  tool_head_mount_carriage_mount_l_profile_thickness:
+    Type: Float
+  tool_head_mount_carriage_mount_l_profile_outer_size:
+    Type: Float
+
 Parts:
   ToolHeadMountAssembly:
     Type: Shellforgepy::Assembly

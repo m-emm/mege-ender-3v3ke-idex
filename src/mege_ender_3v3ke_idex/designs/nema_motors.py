@@ -471,7 +471,12 @@ def create_nema_composite(
         follower_names.append("connector")
 
     cutters = [body_cutter, disc_cutter, axle_cutter, mount_holes]
-    cutter_names = ["body", "front_boss", "axle", "mount_holes"]
+    cutter_names = [
+        "body_clearance",
+        "front_boss_clearance",
+        "axle_clearance",
+        "mount_holes",
+    ]
 
     return LeaderFollowersCuttersPart(
         leader=leader,

@@ -8,7 +8,10 @@ from mege_ender_3v3ke_idex.designs.sprite_extruder import (
     create_sprite_extruder,
     extruder_mount_screw_size,
 )
-from shellforgepy.simple import get_volume
+from shellforgepy.construct.leader_followers_cutters_part import (
+    LeaderFollowersCuttersPart,
+)
+from shellforgepy.simple import create_box, get_volume
 
 TOOL_HEAD_MOUNT_TOP_BOX_WALL = 2
 TOOL_HEAD_MOUNT_TOP_BOX_HEIGHT = 8
@@ -19,11 +22,14 @@ TOOL_HEAD_MOUNT_Y_EXTENSION = idex_parameters.tool_head_mount_side_plate_depth +
 
 
 def _build_mount(drive_position):
+    carriage = LeaderFollowersCuttersPart(create_box(34.7, 27, 8))
+    x_axis_belt_carriage = LeaderFollowersCuttersPart(create_box(70, 12, 14))
+
     return create_tool_head_mount_assembly(
+        carriage=carriage,
         sprite_extruder=create_sprite_extruder(),
+        x_axis_belt_carriage=x_axis_belt_carriage,
         extruder_mount_screw_size=extruder_mount_screw_size,
-        x_axis_profile_length=idex_parameters.x_axis_profile_length,
-        x_axis_profile_pitch=idex_parameters.x_axis_profile_pitch,
         tool_head_mount_base_plate_height=idex_parameters.tool_head_mount_base_plate_height,
         tool_head_mount_base_plate_thickness=idex_parameters.tool_head_mount_base_plate_thickness,
         tool_head_mount_belt_clamp_base_thickness=idex_parameters.tool_head_mount_belt_clamp_base_thickness,
@@ -56,6 +62,12 @@ def _build_mount(drive_position):
         drive_position=drive_position,
         tool_head_mount_top_box_wall=TOOL_HEAD_MOUNT_TOP_BOX_WALL,
         tool_head_mount_top_box_height=TOOL_HEAD_MOUNT_TOP_BOX_HEIGHT,
+        tool_head_mount_carriage_mount_l_profile_thickness=(
+            idex_parameters.tool_head_mount_carriage_mount_l_profile_thickness
+        ),
+        tool_head_mount_carriage_mount_l_profile_outer_size=(
+            idex_parameters.tool_head_mount_carriage_mount_l_profile_outer_size
+        ),
         BIG_THING=BIG_THING,
     )
 

@@ -171,6 +171,8 @@ def create_tool_head_mount_assembly(
     drive_position,
     tool_head_mount_top_box_wall,
     tool_head_mount_top_box_height,
+    tool_head_mount_carriage_mount_l_profile_thickness,
+    tool_head_mount_carriage_mount_l_profile_outer_size,
     BIG_THING,
 ):
     """Create a single tool head mount assembly."""
@@ -254,90 +256,6 @@ def create_tool_head_mount_assembly(
 
     carriage_mount_plate = carriage_mount_plate.cut(extruder_cutout)
 
-    carriage_mount_plate_size = get_bounding_box_size(carriage_mount_plate)
-
-    top_box_center_wall = create_box(
-        carriage_mount_plate_size[0]
-        - 2 * tool_head_mount_carriage_mount_plate_fillet_radius,
-        tool_head_mount_top_box_wall,
-        tool_head_mount_top_box_height,
-    )
-
-    top_box_center_wall = align(
-        top_box_center_wall, carriage_mount_plate, Alignment.CENTER
-    )
-
-    top_box_center_wall = align(
-        top_box_center_wall, carriage, Alignment.CENTER, axes=[1]
-    )
-
-    top_box_center_wall = align(
-        top_box_center_wall, carriage_mount_plate, Alignment.STACK_TOP
-    )
-
-    top_box_side_walls = PartCollector()
-    for top_box_side in [Alignment.LEFT, Alignment.RIGHT]:
-        top_box_side_wall = create_box(
-            tool_head_mount_top_box_wall,
-            carriage_mount_plate_size[1]
-            - 2 * tool_head_mount_carriage_mount_plate_fillet_radius,
-            tool_head_mount_top_box_height,
-        )
-        top_box_side_wall = align(
-            top_box_side_wall, carriage_mount_plate, Alignment.CENTER
-        )
-        top_box_side_wall = align(
-            top_box_side_wall, carriage_mount_plate, Alignment.STACK_TOP
-        )
-        top_box_side_wall = align(top_box_side_wall, carriage_mount_plate, top_box_side)
-        top_box_side_wall = translate(
-            -top_box_side.sign * tool_head_mount_carriage_mount_plate_fillet_radius,
-            0,
-            0,
-        )(top_box_side_wall)
-
-        top_box_side_walls = top_box_side_walls.fuse(top_box_side_wall)
-
-    hollow_top_sizde_box = create_box(
-        carriage_mount_plate_size[0] / 2,
-        carriage_size[1],
-        tool_head_mount_top_box_height,
-    )
-    hollow_top_side_box_inside_cutter = create_box(
-        carriage_mount_plate_size[0] / 2 - 2 * tool_head_mount_top_box_wall,
-        carriage_size[1] - 2 * tool_head_mount_top_box_wall,
-        tool_head_mount_top_box_height - 2 * tool_head_mount_top_box_wall,
-    )
-    hollow_top_side_box_inside_cutter = align(
-        hollow_top_side_box_inside_cutter,
-        hollow_top_sizde_box,
-        Alignment.CENTER,
-    )
-    hollow_top_sizde_box = hollow_top_sizde_box.cut(hollow_top_side_box_inside_cutter)
-
-    hollow_top_sizde_box = align(
-        hollow_top_sizde_box,
-        top_box_side_walls,
-        Alignment.CENTER,
-    )
-
-    hollow_top_sizde_box = align(
-        hollow_top_sizde_box,
-        top_box_side_walls,
-        Alignment.BACK,
-    )
-
-    hollow_top_sizde_box = align(
-        hollow_top_sizde_box,
-        top_box_side_walls,
-        Alignment.LEFT if drive_position == Alignment.BOTTOM else Alignment.RIGHT,
-    )
-
-    carriage_mount_plate = carriage_mount_plate.fuse(hollow_top_sizde_box)
-
-    carriage_mount_plate = carriage_mount_plate.fuse(top_box_side_walls)
-    carriage_mount_plate = carriage_mount_plate.fuse(top_box_center_wall)
-
     end_of_extruder_helper = create_box(100, 1, 100)
     end_of_extruder_helper = align(
         end_of_extruder_helper, sprite_extruder, Alignment.CENTER
@@ -348,51 +266,9 @@ def create_tool_head_mount_assembly(
 
     mount_block_size = 8
 
-    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+    carriage_mount_plate_top = carriage_mount_plate
 
-        mount_block = create_box(mount_block_size, mount_block_size, mount_block_size)
-        mount_block = align(mount_block, sprite_extruder, Alignment.CENTER)
-        mount_block = align(mount_block, sprite_extruder, lr.stack_alignment)
-        mount_block = align(mount_block, sprite_extruder, Alignment.TOP)
-        mount_block = align(mount_block, sprite_extruder, Alignment.FRONT)
-        mount_block = translate(0, 0, -5)(mount_block)
-        carriage_mount_plate = carriage_mount_plate.fuse(mount_block)
-
-        marker = create_box(8, 7, 7)
-        marker = align(marker, mount_base_plate, Alignment.CENTER)
-        marker = align(marker, mount_base_plate, Alignment.STACK_TOP, stack_gap=3)
-        marker = align(marker, mount_base_plate, lr.stack_alignment)
-        marker = align(marker, mount_base_plate, Alignment.FRONT)
-
-        marker_bb_center = np.array(get_bounding_box_center(marker))
-        mount_block_bb_center = np.array(get_bounding_box_center(mount_block))
-        dist = np.linalg.norm(marker_bb_center - mount_block_bb_center)
-        radius = dist / 2
-
-        third_point = (
-            (marker_bb_center[0] + mount_block_bb_center[0]) / 2,
-            (marker_bb_center[1] + mount_block_bb_center[1]) / 2,
-            mount_block_bb_center[2] - 20,
-        )
-
-        mount_segment_width = 25
-        mount_segment_start = marker_bb_center + np.array(
-            [0, 0, mount_segment_width / 4]
-        )
-        mount_segment_end = mount_block_bb_center + np.array(
-            [0, -mount_segment_width / 4, mount_segment_width / 4]
-        )
-
-        mount_segment = create_ring_segment_between_points(
-            mount_segment_start,
-            mount_segment_end,
-            third_point,
-            inner_radius=radius,
-            outer_radius=radius + mount_segment_width,
-            height=6,
-        )
-        mount_segment = mount_segment.cut(sprite_extruder.leader)
-        carriage_mount_plate = carriage_mount_plate.fuse(mount_segment)
+    carriage_mount_plate = PartCollector()
 
     tool_head_mount = carriage_mount_plate
     tool_head_mount = tool_head_mount.fuse(mount_base_plate)
@@ -424,10 +300,44 @@ def create_tool_head_mount_assembly(
             tool_head_mount = tool_head_mount.cut(cutter)
 
     tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
+    tool_head_mount.add_named_cutter(mount_hole_cutter, "mount_hole_cutter")
 
     for side_name, screw in sprite_mount_screws:
         tool_head_mount.add_named_non_production_part(
             screw,
             f"sprite_mount_screw_{side_name}",
         )
+
+    l_profile = create_box(
+        tool_head_mount_carriage_mount_plate_width,
+        tool_head_mount_carriage_mount_l_profile_outer_size,
+        tool_head_mount_carriage_mount_l_profile_thickness,
+    )
+
+    l_profile = align(l_profile, carriage_mount_plate_top, Alignment.CENTER)
+    l_profile = align(l_profile, carriage, Alignment.STACK_TOP)
+    l_profile = align(l_profile, carriage, Alignment.BACK)
+    l_profile_front = create_box(
+        tool_head_mount_carriage_mount_plate_width,
+        tool_head_mount_carriage_mount_l_profile_thickness,
+        tool_head_mount_carriage_mount_l_profile_outer_size,
+    )
+    l_profile_front = align(l_profile_front, l_profile, Alignment.CENTER)
+    l_profile_front = align(l_profile_front, l_profile, Alignment.TOP)
+    l_profile_front = align(l_profile_front, l_profile, Alignment.FRONT)
+
+    l_profile = l_profile.fuse(l_profile_front)
+
+    l_profile = align_translation(l_profile_front, carriage, Alignment.STACK_FRONT)(
+        l_profile
+    )
+
+    l_profile = carriage.use_as_cutter_on(l_profile)
+
+    for name, cutter in sprite_extruder.get_named_cutter_items():
+        if "mount_hole" in name:
+            l_profile = l_profile.cut(cutter)
+
+    tool_head_mount.add_named_non_production_part(l_profile, "l_profile")
+
     return tool_head_mount
