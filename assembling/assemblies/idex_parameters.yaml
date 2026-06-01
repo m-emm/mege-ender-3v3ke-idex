@@ -734,7 +734,7 @@ globals:
   tool_head_mount_belt_deflector_thickness: 3
   tool_head_mount_belt_path_cutter_clearance: 0.5
   tool_head_mount_carriage_mount_plate_fillet_radius: 1
-  tool_head_mount_carriage_mount_plate_thickness: 4
+  tool_head_mount_carriage_mount_plate_thickness: 5.5
   tool_head_mount_carriage_mount_plate_width: 80
   tool_head_mount_carriage_mount_l_profile_thickness: 3.2
   tool_head_mount_carriage_mount_l_profile_outer_size: 30
@@ -756,8 +756,8 @@ globals:
     $expr:
       "$sub": "${tool_head_mount_side_plate_depth} + 1"
 
-  tool_head_mount_top_box_wall: 2
-  tool_head_mount_top_box_height: 8
+  tool_head_mount_top_box_wall: 3
+  tool_head_mount_top_box_height: 7
   x_axis_belt_carriage_belt_clamp_clearance: 0.5
   x_axis_belt_carriage_fan_side_clamp_gap: 5
   x_axis_belt_carriage_bridge_mount_screw_size: "M3"

@@ -67,6 +67,7 @@ Builder:
                 brim_type: no_brim
                 enable_support: "1"
                 support_type: tree(auto)
+                support_threshold_angle: 33
           parts:
             - tool_head_mount
       auto_assign_plates: false
