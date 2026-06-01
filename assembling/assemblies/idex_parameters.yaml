@@ -731,7 +731,7 @@ globals:
   tool_head_mount_belt_deflector_belt_clearance: 3.5
   tool_head_mount_belt_deflector_cage_thickness: 3
   tool_head_mount_belt_deflector_into_profile_distance: 0.3
-  tool_head_mount_belt_deflector_thickness: 3
+  tool_head_mount_belt_deflector_thickness: 4
   tool_head_mount_belt_path_cutter_clearance: 0.5
   tool_head_mount_carriage_mount_plate_fillet_radius: 1
   tool_head_mount_carriage_mount_plate_thickness: 5.5
