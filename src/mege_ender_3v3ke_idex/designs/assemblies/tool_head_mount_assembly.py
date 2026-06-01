@@ -1,8 +1,74 @@
 """Declarative tool head mount assembly."""
 
-import numpy as np
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from shellforgepy.simple import *
+
+hardware_store_angle_width = 14.3
+hardware_store_angle_outer_size = 30.3
+hardware_store_angle_thickness = 1.5
+
+hardware_store_angle_clearance = 0.8
+
+hardware_store_angle_screw_hole_diameter = 4.7
+
+hardware_store_angle_screw_hole_positions = [ (  7.7, 6.2) , ( 5.7, 20) ]
+
+def create_hardware_store_angle():
+    top = create_box(
+        hardware_store_angle_width,
+        hardware_store_angle_outer_size,
+        hardware_store_angle_thickness,
+    )
+
+    top_cutter = materialize_bounding_box(
+        top,
+        x_enlargement=hardware_store_angle_clearance,
+        y_enlargement=hardware_store_angle_clearance,
+        z_enlargement=hardware_store_angle_clearance,
+    )
+
+    for hole_center in hardware_store_angle_screw_hole_positions:
+        hole = create_cylinder(
+            hardware_store_angle_screw_hole_diameter / 2 ,
+            hardware_store_angle_thickness + 2,            
+        )
+
+        hole = align(hole, top, Alignment.CENTER)
+        hole = align(hole, top, Alignment.EDGE_FRONT)
+        hole = align(hole, top, Alignment.EDGE_LEFT)
+
+        hole = translate(hole_center[0] , hole_center[1], 0)(hole)
+
+        top = top.cut(hole)
+
+        smaller_hole = create_cylinder(
+            hardware_store_angle_screw_hole_diameter / 2 - hardware_store_angle_clearance,
+            hardware_store_angle_thickness + 2,
+        )
+
+        smaller_hole = align(smaller_hole, hole, Alignment.CENTER)
+        top_cutter = top_cutter.cut(smaller_hole)
+
+
+    top = LeaderFollowersCuttersPart(leader=top)
+    top.add_named_cutter(top_cutter, "cutter")
+
+    
+    front = rotate(90, axis=(1, 0, 0))(top)
+
+    front = align(front, top, Alignment.CENTER)
+    front = align(front, top, Alignment.TOP)
+    front = align(front, top, Alignment.FRONT)
+    front = front.prefixed_copy("front")
+    angle = top.fuse(front)
+
+    retval = LeaderFollowersCuttersPart(leader=top.leader)
+
+    retval.add_named_follower(angle.leader, "angle")
+    for name, cutter in angle.get_named_cutter_items():
+        retval.add_named_cutter(cutter, name)
+
+    return retval
 
 
 def _create_sprite_mount_hole_guides(*, mount_hole_cutter):
@@ -264,11 +330,9 @@ def create_tool_head_mount_assembly(
         end_of_extruder_helper, sprite_extruder, Alignment.STACK_FRONT
     )
 
-    mount_block_size = 8
 
     carriage_mount_plate_top = carriage_mount_plate
 
-    carriage_mount_plate = PartCollector()
 
     tool_head_mount = carriage_mount_plate
     tool_head_mount = tool_head_mount.fuse(mount_base_plate)
@@ -290,6 +354,7 @@ def create_tool_head_mount_assembly(
 
     tool_head_mount = x_axis_belt_carriage.use_as_cutter_on(tool_head_mount)
 
+
     x_axis_belt_carriage_cutter = materialize_bounding_box(
         x_axis_belt_carriage, x_enlargement=5, y_enlargement=0.2, z_enlargement=0.2
     )
@@ -298,6 +363,21 @@ def create_tool_head_mount_assembly(
     for name, cutter in sprite_extruder.get_named_cutter_items():
         if "mount_hole" in name:
             tool_head_mount = tool_head_mount.cut(cutter)
+
+    tool_head_mount = tool_head_mount.fuse(carriage_mount_plate_top)
+
+
+
+    l_profile = create_hardware_store_angle()
+
+    l_profile = align(l_profile, carriage, Alignment.CENTER)
+    l_profile = align(l_profile, carriage, Alignment.STACK_TOP)
+    l_profile = align(l_profile, sprite_extruder, Alignment.STACK_BACK)
+
+
+    angle_full = l_profile.get_named_follower("angle")
+
+    tool_head_mount = l_profile.use_as_cutter_on(tool_head_mount)
 
     tool_head_mount = LeaderFollowersCuttersPart(leader=tool_head_mount)
     tool_head_mount.add_named_cutter(mount_hole_cutter, "mount_hole_cutter")
@@ -308,36 +388,7 @@ def create_tool_head_mount_assembly(
             f"sprite_mount_screw_{side_name}",
         )
 
-    l_profile = create_box(
-        tool_head_mount_carriage_mount_plate_width,
-        tool_head_mount_carriage_mount_l_profile_outer_size,
-        tool_head_mount_carriage_mount_l_profile_thickness,
-    )
 
-    l_profile = align(l_profile, carriage_mount_plate_top, Alignment.CENTER)
-    l_profile = align(l_profile, carriage, Alignment.STACK_TOP)
-    l_profile = align(l_profile, carriage, Alignment.BACK)
-    l_profile_front = create_box(
-        tool_head_mount_carriage_mount_plate_width,
-        tool_head_mount_carriage_mount_l_profile_thickness,
-        tool_head_mount_carriage_mount_l_profile_outer_size,
-    )
-    l_profile_front = align(l_profile_front, l_profile, Alignment.CENTER)
-    l_profile_front = align(l_profile_front, l_profile, Alignment.TOP)
-    l_profile_front = align(l_profile_front, l_profile, Alignment.FRONT)
-
-    l_profile = l_profile.fuse(l_profile_front)
-
-    l_profile = align_translation(l_profile_front, carriage, Alignment.STACK_FRONT)(
-        l_profile
-    )
-
-    l_profile = carriage.use_as_cutter_on(l_profile)
-
-    for name, cutter in sprite_extruder.get_named_cutter_items():
-        if "mount_hole" in name:
-            l_profile = l_profile.cut(cutter)
-
-    tool_head_mount.add_named_non_production_part(l_profile, "l_profile")
+    tool_head_mount.add_named_non_production_part(angle_full, "l_profile")
 
     return tool_head_mount
