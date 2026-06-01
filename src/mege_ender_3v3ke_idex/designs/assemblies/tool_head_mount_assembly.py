@@ -186,10 +186,11 @@ def create_tool_head_mount_assembly(
 
     carriage_size = get_bounding_box_size(carriage)
 
-    base_plate_width = (
-        tool_head_mount_carriage_mount_plate_width
-        - 2 * tool_head_mount_side_plate_thickness
-    )
+    base_plate_width = tool_head_mount_carriage_mount_plate_width
+    if drive_position == Alignment.BOTTOM:
+        base_plate_width -= 2 * tool_head_mount_side_plate_thickness
+    else:
+        base_plate_width += tool_head_mount_side_plate_thickness
 
     carriage_mount_plate = create_filleted_box(
         tool_head_mount_carriage_mount_plate_width,
@@ -229,6 +230,13 @@ def create_tool_head_mount_assembly(
         sprite_extruder,
         Alignment.STACK_BACK,
     )
+
+    if drive_position == Alignment.TOP:
+        mount_base_plate = align(
+            mount_base_plate,
+            carriage_mount_plate,
+            Alignment.RIGHT,
+        )
 
     mount_hole_cutter = sprite_extruder.get_named_cutter("mount_hole_cutter")
 
@@ -298,7 +306,7 @@ def create_tool_head_mount_assembly(
 
         top_box_side_walls = top_box_side_walls.fuse(top_box_side_wall)
 
-    hollow_top_sizde_box = create_box(
+    hollow_top_side_box = create_box(
         carriage_mount_plate_size[0] / 2,
         carriage_size[1],
         tool_head_mount_top_box_height,
@@ -310,30 +318,30 @@ def create_tool_head_mount_assembly(
     )
     hollow_top_side_box_inside_cutter = align(
         hollow_top_side_box_inside_cutter,
-        hollow_top_sizde_box,
+        hollow_top_side_box,
         Alignment.CENTER,
     )
-    hollow_top_sizde_box = hollow_top_sizde_box.cut(hollow_top_side_box_inside_cutter)
+    hollow_top_side_box = hollow_top_side_box.cut(hollow_top_side_box_inside_cutter)
 
-    hollow_top_sizde_box = align(
-        hollow_top_sizde_box,
+    hollow_top_side_box = align(
+        hollow_top_side_box,
         top_box_side_walls,
         Alignment.CENTER,
     )
 
-    hollow_top_sizde_box = align(
-        hollow_top_sizde_box,
+    hollow_top_side_box = align(
+        hollow_top_side_box,
         top_box_side_walls,
         Alignment.BACK,
     )
 
-    hollow_top_sizde_box = align(
-        hollow_top_sizde_box,
+    hollow_top_side_box = align(
+        hollow_top_side_box,
         top_box_side_walls,
         Alignment.LEFT if drive_position == Alignment.BOTTOM else Alignment.RIGHT,
     )
 
-    carriage_mount_plate = carriage_mount_plate.fuse(hollow_top_sizde_box)
+    carriage_mount_plate = carriage_mount_plate.fuse(hollow_top_side_box)
 
     carriage_mount_plate = carriage_mount_plate.fuse(top_box_side_walls)
     carriage_mount_plate = carriage_mount_plate.fuse(top_box_center_wall)
@@ -359,9 +367,20 @@ def create_tool_head_mount_assembly(
         carriage_mount_plate = carriage_mount_plate.fuse(mount_block)
 
         marker = create_box(8, 7, 7)
-        marker = align(marker, mount_base_plate, Alignment.CENTER)
+
+        part_to_align_to = (
+            mount_base_plate
+            if drive_position == Alignment.BOTTOM
+            else carriage_mount_plate
+        )
+
+        marker = align(marker, part_to_align_to, Alignment.CENTER)
         marker = align(marker, mount_base_plate, Alignment.STACK_TOP, stack_gap=1)
-        marker = align(marker, mount_base_plate, lr.stack_alignment)
+        marker = align(
+            marker,
+            part_to_align_to,
+            lr.stack_alignment if drive_position == Alignment.BOTTOM else lr,
+        )
         marker = align(marker, mount_base_plate, Alignment.FRONT)
 
         marker_bb_center = np.array(get_bounding_box_center(marker))
@@ -405,8 +424,8 @@ def create_tool_head_mount_assembly(
 
     belt_carriage_mount_screw_tower_size = (
         MScrew.from_size(belt_carriage_mount_screw_size).cylinder_head_diameter / 2
-        + 2*belt_carriage_mount_screw_head_clearance
-        + 2*belt_carriage_mount_screw_tower_wall
+        + 2 * belt_carriage_mount_screw_head_clearance
+        + 2 * belt_carriage_mount_screw_tower_wall
     )
 
     mount_towers = PartCollector()
@@ -500,15 +519,29 @@ def create_tool_head_mount_assembly(
             0, 0, MScrew.from_size(belt_carriage_mount_screw_size).cylinder_head_height
         )(belt_carriage_mount_screw)
 
+        if drive_position == Alignment.TOP:
+            belt_carriage_mount_screw = align(
+                belt_carriage_mount_screw,
+                x_axis_belt_carriage,
+                Alignment.TOP,
+            )
+            belt_carriage_mount_screw = translate(
+                0,
+                0,
+                MScrew.from_size(belt_carriage_mount_screw_size).cylinder_head_height,
+            )(belt_carriage_mount_screw)
+
         belt_carriage_mount_screws.append(belt_carriage_mount_screw)
 
-        belt_carriage_mount_screw_tower = belt_carriage_mount_screw_tower.cut(
-            belt_carriage_mount_screw_head_cutter
-        )
-        belt_carriage_mount_screw_tower = belt_carriage_mount_screw_tower.cut(part)
-        mount_towers = mount_towers.fuse(belt_carriage_mount_screw_tower)
+        if drive_position == Alignment.BOTTOM:
+            belt_carriage_mount_screw_tower = belt_carriage_mount_screw_tower.cut(
+                belt_carriage_mount_screw_head_cutter
+            )
+            belt_carriage_mount_screw_tower = belt_carriage_mount_screw_tower.cut(part)
+            mount_towers = mount_towers.fuse(belt_carriage_mount_screw_tower)
 
-    tool_head_mount = tool_head_mount.fuse(mount_towers)
+    if drive_position == Alignment.BOTTOM:
+        tool_head_mount = tool_head_mount.fuse(mount_towers)
 
     tool_head_mount = x_axis_belt_carriage.use_as_cutter_on(tool_head_mount)
 
