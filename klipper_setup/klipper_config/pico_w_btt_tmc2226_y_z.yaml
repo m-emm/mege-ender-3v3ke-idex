@@ -9,7 +9,7 @@ metadata:
     Driver3 (Z-right): STEP=GPIO14, DIR=GPIO15, EN=GPIO16, UART=GPIO13.
     Z endstops: Z-left=GPIO22, Z-right=GPIO17.
     Heatbed MOSFET: HEATBED_ON=GPIO21.
-    Heatbed thermistor: SIGNAL=GPIO26_ADC0, GND=AGND.
+    Heatbed thermistor: SIGNAL=GPIO26_ADC0, GND=AGND, 4.7k pull-up REF-to-SIGNAL.
 
 color_map:
   power: "#ff0000" # red: VCC/5V
@@ -177,6 +177,12 @@ pin_sets:
     pins:
       - GND
       - SIGNAL
+      - REF
+  - prefix: R_BED_4K7_
+    origin: [29, -3.5]
+    direction: right
+    pins:
+      - SIG
       - REF
   - prefix: ENDSTOP_Y_
     origin: [34, 20]
@@ -369,11 +375,17 @@ wires:
     to: HEATBED_THERM_SIGNAL
     type: data
     color: "#9ca3af"
-
   - from: PICO_THREEV3_OUT_36
     to: HEATBED_THERM_REF
     type: lv_power
-  
+  - from: HEATBED_THERM_REF
+    to: R_BED_4K7_REF
+    type: lv_power
+    color: "#9ca3af"
+  - from: R_BED_4K7_SIG
+    to: HEATBED_THERM_SIGNAL
+    type: data
+    color: "#9ca3af"
 
   - from: MOTOR_Y_A_PLUS
     to: TMC1_J2_A1_5
