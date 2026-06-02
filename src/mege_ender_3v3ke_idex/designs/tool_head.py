@@ -38,7 +38,7 @@ PROCESS_DATA["process_overrides"].update(
         "brim_type": "no_brim",
         "support_on_build_plate_only": "1",
         "support_top_z_distance": "0.3",
-        "support_interface_spacing": "0.8",
+        "support_interface_spacing": "0.8",  # on Orca UI, this is Top interface spacing
         "fan_min_speed": "10",
         "fan_max_speed": "25",
         "external_perimeter_speed": "75",

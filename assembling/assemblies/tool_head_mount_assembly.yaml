@@ -52,7 +52,7 @@ Builder:
   Production:
     parts:
       - source: self
-        
+
         artifact: leader
         name: tool_head_mount
         prod_rotation_angle: -45
@@ -141,7 +141,6 @@ Parameters:
     Type: Float
   tool_head_mount_top_box_height:
     Type: Float
-
 
   tool_head_mount_carriage_mount_l_profile_thickness:
     Type: Float

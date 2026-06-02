@@ -25,7 +25,7 @@ Builder:
           support_on_build_plate_only: "1"
           support_threshold_angle: "25"
           support_top_z_distance: "0.3"
-          support_interface_spacing: "0.8"
+          support_interface_spacing: "0.8" # on Orca UI, this is Top interface spacing
           support_object_xy_distance: "0.8"
           sparse_infill_density: "75%"
           wall_loops: "3"

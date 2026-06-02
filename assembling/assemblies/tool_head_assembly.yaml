@@ -40,6 +40,7 @@ Builder:
                 support_type: tree(auto)
                 # support_threshold_angle: "20"
                 support_on_build_plate_only: "1"
+                support_interface_spacing: "2" # on Orca UI, this is Top interface spacing
           parts:
             - tool_head
       auto_assign_plates: false
