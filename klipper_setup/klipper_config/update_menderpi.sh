@@ -21,7 +21,7 @@ cleanup_remote_tmp() {
 }
 trap cleanup_remote_tmp EXIT
 
-echo "Updating ${REMOTE_HOST} with current right-X + Y + dual-Z Klipper config..."
+echo "Updating ${REMOTE_HOST} with current IDEX motion Klipper config..."
 echo "  Source: ${SOURCE_CFG}"
 
 scp "${SOURCE_CFG}" "${REMOTE_HOST}:${REMOTE_TMP}"
@@ -72,28 +72,28 @@ y_current = settings.get("tmc2209 stepper_y", {}).get("run_current")
 if y_current is not None:
     print(f"Y run_current: {y_current}")
 
-x_current = settings.get("tmc2209 stepper_x", {}).get("run_current")
-if x_current is not None:
-    print(f"Right-X run_current: {x_current}")
+left_x_current = settings.get("tmc2209 stepper_x", {}).get("run_current")
+if left_x_current is not None:
+    print(f"X-left run_current: {left_x_current}")
 
-x_min = settings.get("stepper_x", {}).get("position_min")
-x_max = settings.get("stepper_x", {}).get("position_max")
-x_endstop = settings.get("stepper_x", {}).get("position_endstop")
-if x_min is not None and x_max is not None:
-    print(f"Right-X range: {x_min}..{x_max}, endstop={x_endstop}")
+right_x_current = settings.get("tmc2209 dual_carriage", {}).get("run_current")
+if right_x_current is not None:
+    print(f"X-right run_current: {right_x_current}")
 
-bltouch = settings.get("bltouch", {})
-raw_control = settings.get("output_pin cr_touch_control", {})
-raw_signal = settings.get("gcode_button cr_touch_signal", {})
-if bltouch:
+left_x = settings.get("stepper_x", {})
+right_x = settings.get("dual_carriage", {})
+if left_x.get("position_min") is not None and left_x.get("position_max") is not None:
     print(
-        "CR Touch BLTouch pins: "
-        f"control={bltouch.get('control_pin')}, sensor={bltouch.get('sensor_pin')}"
+        "X-left range: "
+        f"{left_x.get('position_min')}..{left_x.get('position_max')}, "
+        f"endstop={left_x.get('position_endstop')}"
     )
-elif raw_control or raw_signal:
+if right_x.get("position_min") is not None and right_x.get("position_max") is not None:
     print(
-        "CR Touch raw pins: "
-        f"control={raw_control.get('pin')}, sensor={raw_signal.get('pin')}"
+        "X-right range: "
+        f"{right_x.get('position_min')}..{right_x.get('position_max')}, "
+        f"endstop={right_x.get('position_endstop')}, "
+        f"safe_distance={right_x.get('safe_distance')}"
     )
 PY
 REMOTE_SCRIPT

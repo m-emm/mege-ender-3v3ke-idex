@@ -21,8 +21,8 @@ This wiring matches `pico_w_btt_tmc2226_x.yaml`, the generated SVGs under
 | Left SFS V2.0 motion | `GP1` | Encoder/motion output |
 | Right SFS V2.0 switch | `GP2` | Runout switch output |
 | Right SFS V2.0 motion | `GP3` | Encoder/motion output |
-| CR Touch control | `GP13` | BLTouch-compatible servo/control pin |
-| CR Touch Z signal | `GP14` | Open-drain output; `^gpio14` enables the Pico pull-up |
+| CR Touch control | `GP13` | Wiring retained; not configured in Klipper |
+| CR Touch Z signal | `GP14` | Wiring retained; not configured in Klipper |
 
 ## Driver Wiring
 
@@ -94,10 +94,11 @@ The config file includes commented templates for both Klipper sensor types:
 `[filament_switch_sensor]` for runout and `[filament_motion_sensor]` for encoder
 movement. Enable them only after the matching extruder names are final.
 
-## CR Touch
+## CR Touch Wiring
 
-Wire the CR Touch like a BLTouch-compatible probe, but keep it in manual
-bring-up mode until the deploy behavior is fully understood:
+The physical CR Touch wiring is retained for now, but the current Klipper
+configuration intentionally provides no probe, button, or output-pin section for
+it:
 
 | CR Touch signal | Connect to |
 |---|---|
@@ -107,31 +108,15 @@ bring-up mode until the deploy behavior is fully understood:
 | `Z_GND` | Common ground |
 | `Z_SIGNAL` | Pico `GP14` directly, using the internal pull-up |
 
-The CR Touch still needs 5V power, but its Z signal is an open-drain output and is
-safe for the Pico when pulled up to 3.3V. Use `sensor_pin: ^gpio14` so Klipper
-enables the RP2040 internal pull-up. No external pull-up should be needed for
-first bring-up; add one to 3.3V only if the signal is noisy or unreliable.
-
-The live bring-up config currently uses temporary raw PWM control for CR Touch
-manual testing because the built-in BLTouch `pin_down` path alarmed the probe
-during bring-up, while a raw 650us deploy pulse worked. It does not use the
-probe for Z homing, safe Z home, or bed mesh until the normal BLTouch path,
-offsets, and safe movement path are measured. The include snippet still keeps
-its `[bltouch]` template commented for future full config integration.
-
-2026-05-31 bring-up notes: raw PWM confirmed that `GP13` can command the probe
-and `GP14` can read a trigger transition, but the probe still entered red error
-mode during repeated manual deploy/trigger experiments. At shutdown the user
-observed the probe in error mode. Resume by issuing reset, stow, and query only;
-do not immediately run another deploy or use the probe for motion.
+The CR Touch still needs 5V power, but its signal line is open-drain and should
+remain Pico-safe when pulled to 3.3V. This wiring is documentation only; do not
+expect CR Touch commands, status buttons, homing, or automatic probing in the
+current printer config.
 
 ## Config Notes
 
-- The live bring-up config temporarily maps the X-right driver to `[stepper_x]`
-  plus `[tmc2209 stepper_x]`; the left carriage remains a manual stepper until
-  its endstop mechanics are fixed.
+- The live bring-up config maps X-left to `[stepper_x]` and X-right to
+  `[dual_carriage]`.
 - BTT TMC2226 V1.0 is configured through the `tmc2209` section used by this repo.
-- Full IDEX `[dual_carriage]` mode should stay deferred until both carriages can
-  home safely and the temporary right-X-only travel limit is replaced.
-- The SFS and CR Touch snippets are intentionally commented so this include can
-  be used for motor bring-up without requiring unfinished extruder/probe setup.
+- The SFS snippets are intentionally commented so this include can be used for
+  motor bring-up without requiring unfinished extruder setup.
