@@ -66,6 +66,8 @@ Parameters:
     Type: Float
   part_fan_body_cutter_clearance:
     Type: Float
+  part_fan_clearance:
+    Type: Float
   part_fan_duct_extension_length:
     Type: Float
   part_fan_ducts_clearance:
@@ -97,6 +99,8 @@ Parameters:
   part_fan_window_height:
     Type: Float
   part_fan_window_width:
+    Type: Float
+  part_fan_outlet_wall:
     Type: Float
   tool_head_additional_mount_plate_clearance:
     Type: Float

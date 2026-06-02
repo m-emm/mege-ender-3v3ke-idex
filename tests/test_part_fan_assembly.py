@@ -1,9 +1,15 @@
+import inspect
+from pathlib import Path
+
 import pytest
+
+pytest.importorskip("cadquery")
 
 from mege_ender_3v3ke_idex.designs import idex_parameters
 from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly import (
     _blower_feeder_ring_path_metrics,
     _blower_nozzle_tip_scales,
+    create_part_fan_assembly,
 )
 
 
@@ -50,3 +56,15 @@ def test_blower_nozzle_tip_scales_increase_with_path_length():
     assert scales == pytest.approx([0.75, 0.25, 0.63], abs=0.01)
     assert scales[1] < scales[2] < scales[0]
     assert all(0.25 <= scale <= 0.75 for scale in scales)
+
+
+def test_part_fan_clearance_is_declarative_parameter():
+    assert "part_fan_clearance" in inspect.signature(
+        create_part_fan_assembly
+    ).parameters
+
+    assembly_yaml = Path("assembling/assemblies/part_fan_assembly.yaml").read_text()
+    defaults_yaml = Path("assembling/assemblies/idex_parameters.yaml").read_text()
+
+    assert "part_fan_clearance:" in assembly_yaml
+    assert "part_fan_clearance: 0.8" in defaults_yaml

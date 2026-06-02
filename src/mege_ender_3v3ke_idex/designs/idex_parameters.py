@@ -1,3 +1,6 @@
+# LEGACY!!! This module is retained for old design scripts only.
+# Prefer the declarative assembly YAML parameters for current builds.
+
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import ExtrusionProfileType
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from shellforgepy.simple import *

@@ -381,7 +381,7 @@ def _create_part_fan(
     window_cutter_outside_length=0,
     body_cutter_clearance=None,
     outlet_length=2,
-    outlet_wall=1,
+    outlet_wall,
     outlet_clearance=0.2,
     outlet_inner_duct_length=3.5,
     mount_plate_thickness=None,
@@ -573,6 +573,7 @@ def _create_angled_fans(
     part_fan_window_height,
     part_fan_outlet_connector_length,
     part_fan_nut_cutter_clearance,
+    part_fan_outlet_wall,
     big_thing,
 ):
     fans = PartCollector()
@@ -617,6 +618,7 @@ def _create_angled_fans(
                 "mount_plate_blow_direction_offset"
             ],
             mount_plate_thickness=part_fan_mount_plate_thickness,
+            outlet_wall=part_fan_outlet_wall,
         )
         fan = rotate(180, axis=(1, 0, 0))(fan)
         fan = rotate(lr.sign * 90)(fan)
@@ -782,6 +784,8 @@ def create_part_fan_assembly(
     num_blowers,
     part_fan_axis_from_left_offset,
     part_fan_body_cutter_clearance,
+    part_fan_clearance,
+    part_fan_outlet_wall,
     part_fan_duct_extension_length,
     part_fan_ducts_clearance,
     part_fan_fillet_radius,
@@ -840,6 +844,7 @@ def create_part_fan_assembly(
         part_fan_window_height=part_fan_window_height,
         part_fan_outlet_connector_length=part_fan_outlet_connector_length,
         part_fan_nut_cutter_clearance=part_fan_nut_cutter_clearance,
+        part_fan_outlet_wall=part_fan_outlet_wall,
         big_thing=big_thing,
     )
 
@@ -922,6 +927,7 @@ def create_part_fan_assembly(
         duct_front_mount_plate_width=duct_front_mount_plate_width,
         duct_front_mount_plate_width_border=duct_front_mount_plate_width_border,
     )
+    blower_ducts = blower_ducts.cut(expand(fans.leader, part_fan_clearance))
     blower_ducts_index = fans.follower_indices_by_name["blower_ducts"]
     fans.followers[blower_ducts_index] = blower_ducts
 
