@@ -490,7 +490,7 @@ def create_nitehawk_holder_assembly(
             )
             mount_box = align(mount_box, holder_mount_plate, Alignment.CENTER)
             mount_box = align(mount_box, holder_mount_plate, Alignment.FRONT)
-            mount_box = align(mount_box, holder_mount_plate, Alignment.STACK_LEFT )
+            mount_box = align(mount_box, holder_mount_plate, Alignment.STACK_LEFT)
             holder_mount_plate = holder_mount_plate.fuse(mount_box)
 
         holder_mount_plate = align(holder_mount_plate, holder, Alignment.CENTER)
@@ -498,7 +498,8 @@ def create_nitehawk_holder_assembly(
         holder_mount_plate = align(
             holder_mount_plate,
             sprite_extruder,
-            lr.stack_alignment,stack_gap=tool_head_additional_mount_plate_clearance
+            lr.stack_alignment,
+            stack_gap=tool_head_additional_mount_plate_clearance,
         )
         holder_mount_plate = align(holder_mount_plate, holder, Alignment.BACK)
         holder_mount_plate = translate(0, 0, -holder_mount_plate_top_offset)(

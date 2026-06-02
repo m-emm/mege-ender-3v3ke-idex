@@ -4,6 +4,160 @@ import math
 
 from shellforgepy.simple import *
 
+BLOWERS_NOZZLE_TIP_SCALE_MIN = 0.25
+BLOWERS_NOZZLE_TIP_SCALE_MAX = 0.75
+
+
+def _shortest_angle_distance_degrees(angle_a, angle_b):
+    return abs((angle_a - angle_b + 180) % 360 - 180)
+
+
+def _rotate_xy(point, angle_degrees):
+    x, y = point
+    angle = math.radians(angle_degrees)
+    return (
+        x * math.cos(angle) - y * math.sin(angle),
+        x * math.sin(angle) + y * math.cos(angle),
+    )
+
+
+def _blower_nozzle_tip_angle_degrees(
+    *,
+    blower_index,
+    num_blowers,
+    feeder_ring_inner_diameter,
+    blowers_nozzle_center_distance,
+    feeder_ring_wall,
+    blowers_down_angle,
+    blowers_duct_diameter,
+    blower_center_offset,
+    feeder_ring_rotation_angle,
+):
+    blower_tube_length = (
+        feeder_ring_inner_diameter / 2
+        - blowers_nozzle_center_distance
+        + feeder_ring_wall
+    ) + math.tan(math.radians(blowers_down_angle)) * blowers_duct_diameter
+    nozzle_tip_x = blower_tube_length + (
+        blowers_nozzle_center_distance - blower_tube_length
+    ) * math.cos(math.radians(-blowers_down_angle))
+    nozzle_tip_y = blower_center_offset
+    nozzle_tip_x, nozzle_tip_y = _rotate_xy(
+        (nozzle_tip_x, nozzle_tip_y),
+        blower_index * 360 / num_blowers + feeder_ring_rotation_angle,
+    )
+    return math.degrees(math.atan2(nozzle_tip_y, nozzle_tip_x)) % 360
+
+
+def _blower_fan_entry_angle_degrees(
+    *,
+    feeder_ring_inner_diameter,
+    feeder_ring_width,
+    feeder_ring_wall,
+):
+    feeder_ring_inner_radius = feeder_ring_inner_diameter / 2
+    feeder_ring_outer_radius = (
+        feeder_ring_inner_radius + feeder_ring_width + feeder_ring_wall
+    )
+    feeder_ring_average_radius = (
+        feeder_ring_outer_radius + feeder_ring_inner_radius
+    ) / 2
+    fan_entry_x = -(feeder_ring_inner_radius + feeder_ring_wall)
+    fan_entry_y = math.sqrt(max(feeder_ring_average_radius**2 - fan_entry_x**2, 0))
+    return math.degrees(math.atan2(fan_entry_y, fan_entry_x)) % 360
+
+
+def _blower_feeder_ring_path_metrics(
+    *,
+    num_blowers,
+    feeder_ring_inner_diameter,
+    blowers_nozzle_center_distance,
+    feeder_ring_width,
+    feeder_ring_wall,
+    blowers_down_angle,
+    blowers_duct_diameter,
+    blower_center_offset,
+    feeder_ring_rotation_angle,
+):
+    feeder_ring_inner_radius = feeder_ring_inner_diameter / 2
+    feeder_ring_outer_radius = (
+        feeder_ring_inner_radius + feeder_ring_width + feeder_ring_wall
+    )
+    feeder_ring_average_radius = (
+        feeder_ring_outer_radius + feeder_ring_inner_radius
+    ) / 2
+    fan_entry_angle_degrees = _blower_fan_entry_angle_degrees(
+        feeder_ring_inner_diameter=feeder_ring_inner_diameter,
+        feeder_ring_width=feeder_ring_width,
+        feeder_ring_wall=feeder_ring_wall,
+    )
+
+    metrics = []
+    for blower_index in range(num_blowers):
+        nozzle_tip_angle_degrees = _blower_nozzle_tip_angle_degrees(
+            blower_index=blower_index,
+            num_blowers=num_blowers,
+            feeder_ring_inner_diameter=feeder_ring_inner_diameter,
+            blowers_nozzle_center_distance=blowers_nozzle_center_distance,
+            feeder_ring_wall=feeder_ring_wall,
+            blowers_down_angle=blowers_down_angle,
+            blowers_duct_diameter=blowers_duct_diameter,
+            blower_center_offset=blower_center_offset,
+            feeder_ring_rotation_angle=feeder_ring_rotation_angle,
+        )
+        path_angle_degrees = _shortest_angle_distance_degrees(
+            nozzle_tip_angle_degrees,
+            fan_entry_angle_degrees,
+        )
+        path_length = feeder_ring_average_radius * math.radians(path_angle_degrees)
+        metrics.append(
+            {
+                "fan_entry_angle_degrees": fan_entry_angle_degrees,
+                "nozzle_tip_angle_degrees": nozzle_tip_angle_degrees,
+                "path_angle_degrees": path_angle_degrees,
+                "path_length": path_length,
+            }
+        )
+    return metrics
+
+
+def _blower_nozzle_tip_scales(
+    *,
+    num_blowers,
+    feeder_ring_inner_diameter,
+    blowers_nozzle_center_distance,
+    feeder_ring_width,
+    feeder_ring_wall,
+    blowers_down_angle,
+    blowers_duct_diameter,
+    blower_center_offset,
+    feeder_ring_rotation_angle,
+):
+    metrics = _blower_feeder_ring_path_metrics(
+        num_blowers=num_blowers,
+        feeder_ring_inner_diameter=feeder_ring_inner_diameter,
+        blowers_nozzle_center_distance=blowers_nozzle_center_distance,
+        feeder_ring_width=feeder_ring_width,
+        feeder_ring_wall=feeder_ring_wall,
+        blowers_down_angle=blowers_down_angle,
+        blowers_duct_diameter=blowers_duct_diameter,
+        blower_center_offset=blower_center_offset,
+        feeder_ring_rotation_angle=feeder_ring_rotation_angle,
+    )
+    path_lengths = [metric["path_length"] for metric in metrics]
+    shortest_path = min(path_lengths)
+    path_span = max(path_lengths) - shortest_path
+    if path_span <= 0:
+        return [0.4 for _ in path_lengths]
+
+    return [
+        BLOWERS_NOZZLE_TIP_SCALE_MIN
+        + (path_length - shortest_path)
+        / path_span
+        * (BLOWERS_NOZZLE_TIP_SCALE_MAX - BLOWERS_NOZZLE_TIP_SCALE_MIN)
+        for path_length in path_lengths
+    ]
+
 
 def _create_duct_extension(
     *,
@@ -53,6 +207,17 @@ def _create_ducts(
 ):
     blower_tube_cutters = PartCollector()
     blower_tubes = PartCollector()
+    blowers_nozzle_tip_scales = _blower_nozzle_tip_scales(
+        num_blowers=num_blowers,
+        feeder_ring_inner_diameter=feeder_ring_inner_diameter,
+        blowers_nozzle_center_distance=blowers_nozzle_center_distance,
+        feeder_ring_width=feeder_ring_width,
+        feeder_ring_wall=feeder_ring_wall,
+        blowers_down_angle=blowers_down_angle,
+        blowers_duct_diameter=blowers_duct_diameter,
+        blower_center_offset=blower_center_offset,
+        feeder_ring_rotation_angle=feeder_ring_rotation_angle,
+    )
     for i in range(num_blowers):
         blower_tube_length = (
             feeder_ring_inner_diameter / 2
@@ -70,7 +235,7 @@ def _create_ducts(
         blower_tube_length = blower_tube_bb[1][0] - blower_tube_bb[0][0]
         blower_tube_center = get_bounding_box_center(blower_tube)
 
-        blowers_nozzle_tip_scale = 0.4
+        blowers_nozzle_tip_scale = blowers_nozzle_tip_scales[i]
 
         def blower_tip_transform_function(point):
             x, y, z = point
