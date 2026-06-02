@@ -165,6 +165,8 @@ Parameters:
     Type: Float
   nitehawk_width:
     Type: Float
+  tool_head_additional_mount_plate_clearance:
+    Type: Float
 
 Parts:
   NitehawkHolderAssembly:
