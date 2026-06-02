@@ -507,6 +507,21 @@ def create_nitehawk_holder_assembly(
         )
         holder_mount_plates = holder_mount_plates.fuse(holder_mount_plate)
 
+    lower_holder_trim_overlap = 0.05
+    lower_holder_cutter = create_box(big_thing, big_thing, big_thing)
+    lower_holder_cutter = align(
+        lower_holder_cutter,
+        holder.leader,
+        Alignment.CENTER,
+        axes=[0, 1],
+    )
+    lower_holder_cutter = align(
+        lower_holder_cutter,
+        holder_mount_plates,
+        Alignment.STACK_BOTTOM,
+        stack_gap=-lower_holder_trim_overlap,
+    )
+    holder = holder.cut(lower_holder_cutter)
     holder = holder.fuse(holder_mount_plates)
 
     for _, cutter in sprite_extruder.get_named_cutter_items():
