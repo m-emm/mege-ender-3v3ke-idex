@@ -11,6 +11,8 @@ DEFAULT_FIRMWARE_BIN="${SCRIPT_DIR}/klipper/out/klipper.bin"
 DEVICE=""
 FIRMWARE_BIN="${DEFAULT_FIRMWARE_BIN}"
 
+: "${KATAPULT_REF:=b0bf421}"
+
 usage() {
   cat <<EOF
 Usage: $(basename "$0") -d <device> [-f <klipper.bin>]
@@ -22,6 +24,7 @@ Options:
 
 Notes:
 - This script uses Katapult's scripts/flashtool.py.
+- KATAPULT_REF pins the helper checkout (default: ${KATAPULT_REF}).
 - For best results, put the board into Katapult bootloader mode first (often double-tap RESET).
 EOF
 }
@@ -66,6 +69,10 @@ if [[ ! -d "${KATAPULT_DIR}/.git" ]]; then
   echo "==> Katapult repo not found, cloning..."
   git clone https://github.com/Arksine/katapult.git "${KATAPULT_DIR}"
 fi
+
+echo "==> Preparing Katapult flashtool checkout (${KATAPULT_REF})..."
+git -C "${KATAPULT_DIR}" fetch --all --tags
+git -C "${KATAPULT_DIR}" checkout -f "${KATAPULT_REF}"
 
 if [[ ! -x "${VENV_DIR}/bin/python3" ]]; then
   echo "==> Creating venv and installing pyserial (one-time)..."

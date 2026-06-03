@@ -3,8 +3,16 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FIRMWARE="${SCRIPT_DIR}/katapult/out/katapult.withclear.uf2"
 
 echo "==> Flashing Katapult to RP2040"
+
+if [[ ! -f "${FIRMWARE}" ]]; then
+    echo "ERROR: Katapult firmware not found at ${FIRMWARE}" >&2
+    echo "Run ./build.sh first" >&2
+    exit 1
+fi
+
 echo "==> Waiting for RP2040 in BOOTSEL mode..."
 echo "    (Hold BOOTSEL button and connect USB)"
 
@@ -29,7 +37,7 @@ if [ ! -d "/Volumes/RPI-RP2" ]; then
 fi
 
 echo "==> Copying Katapult UF2 (withclear version)..."
-cp "${SCRIPT_DIR}/katapult/out/katapult.withclear.uf2" /Volumes/RPI-RP2/
+cp "${FIRMWARE}" /Volumes/RPI-RP2/
 
 echo "==> Katapult flashed successfully!"
 echo "NOTE: Katapult will stay in bootloader mode (no application installed yet)"

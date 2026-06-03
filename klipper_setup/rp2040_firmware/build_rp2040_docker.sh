@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Build RP2040 Klipper firmware using Docker
-# Deterministic: pins Pico SDK and Klipper refs via env vars.
+# Build RP2040 Klipper firmware using Docker.
+# Host-side RP2040 builds are intentionally unsupported in this repo.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_NAME="klipper-rp2040-builder"
@@ -25,8 +25,8 @@ Options:
 
 Environment:
   KLIPPER_REF  Git ref/commit for Klipper (default: ${KLIPPER_REF})
-  SKIP_CLEAN   Set to 1 to preserve the existing build output and rebuild
-               incrementally
+  CLEAN=1      Opt in to make clean before building. By default, existing
+               ignored build output is reused and rebuilt incrementally.
 EOF
 }
 
@@ -64,8 +64,16 @@ if [[ ! -f "${SCRIPT_DIR}/${CONFIG_FILE}" ]]; then
   exit 1
 fi
 
+if grep -qE '^CONFIG_RPXXXX_HAVE_BOOTLOADER=y' "${SCRIPT_DIR}/${CONFIG_FILE}"; then
+  EXPECTED_FIRMWARE="klipper.bin"
+else
+  EXPECTED_FIRMWARE="klipper.uf2"
+fi
+
 echo "==> Building Docker image..."
 echo "    KLIPPER_REF=${KLIPPER_REF}"
+echo "    Config=${CONFIG_FILE}"
+echo "    Expected firmware=${EXPECTED_FIRMWARE}"
 
 docker build  -t "${IMAGE_NAME}" "${SCRIPT_DIR}"
 
@@ -80,7 +88,8 @@ if [[ "${INTERACTIVE}" -eq 1 ]]; then
     -u "$(id -u):$(id -g)" \
     -e "KLIPPER_REF=${KLIPPER_REF}" \
     -e "KLIPPER_CONFIG_FILE=${CONFIG_FILE}" \
-    -e "SKIP_CLEAN=${SKIP_CLEAN:-0}" \
+    -e "CLEAN=${CLEAN:-0}" \
+    -e "EXPECTED_FIRMWARE=${EXPECTED_FIRMWARE}" \
     "${IMAGE_NAME}" \
     bash
   exit 0
@@ -91,19 +100,20 @@ docker run --rm \
   -u "$(id -u):$(id -g)" \
   -e "KLIPPER_REF=${KLIPPER_REF}" \
   -e "KLIPPER_CONFIG_FILE=${CONFIG_FILE}" \
-  -e "SKIP_CLEAN=${SKIP_CLEAN:-0}" \
+  -e "CLEAN=${CLEAN:-0}" \
+  -e "EXPECTED_FIRMWARE=${EXPECTED_FIRMWARE}" \
   "${IMAGE_NAME}" \
   bash -lc "/work/build_rp2040_script_for_in_docker.sh"
 
 echo ""
-if [[ -f "${SCRIPT_DIR}/klipper/out/klipper.bin" ]]; then
+if [[ "${EXPECTED_FIRMWARE}" == "klipper.bin" && -f "${SCRIPT_DIR}/klipper/out/klipper.bin" ]]; then
   echo "==> Success! Firmware ready to flash via Katapult."
   echo "    Location: ${SCRIPT_DIR}/klipper/out/klipper.bin"
-elif [[ -f "${SCRIPT_DIR}/klipper/out/klipper.uf2" ]]; then
+elif [[ "${EXPECTED_FIRMWARE}" == "klipper.uf2" && -f "${SCRIPT_DIR}/klipper/out/klipper.uf2" ]]; then
   echo "==> Success! Firmware ready to flash (BOOTSEL mass storage)."
   echo "    Location: ${SCRIPT_DIR}/klipper/out/klipper.uf2"
 else
-  echo "==> Build finished, but no expected output was found in ${SCRIPT_DIR}/klipper/out" >&2
+  echo "==> Build finished, but ${EXPECTED_FIRMWARE} was not found in ${SCRIPT_DIR}/klipper/out" >&2
   exit 1
 fi
 

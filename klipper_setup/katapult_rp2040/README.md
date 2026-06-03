@@ -1,6 +1,11 @@
 # Katapult RP2040 Bootloader Builder
 
-Clean, focused environment for building and debugging Katapult bootloader for Raspberry Pi Pico/Pico W.
+Clean, focused environment for building and debugging the Katapult bootloader
+for Raspberry Pi Pico/Pico W.
+
+Katapult is separate from normal Klipper firmware builds. Use this directory
+only for Katapult bootloader build/flash/debug work. Klipper application
+firmware lives in `../rp2040_firmware`.
 
 ## Quick Start
 
@@ -20,6 +25,9 @@ Clean, focused environment for building and debugging Katapult bootloader for Ra
 - `katapult_config` - Katapult configuration (menuconfig format)
 - `Dockerfile` - Docker build environment
 - `build_in_docker.sh` - Build script (runs inside container)
+
+The generated `katapult/` checkout and `katapult/out/` firmware outputs are
+ignored. The build script clones Katapult into that working directory on demand.
 
 ## Configuration
 

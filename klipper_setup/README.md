@@ -89,9 +89,14 @@ freshly flashed card.
 
 ## RP2040 Firmware (Klipper / Katapult)
 
-This repo also includes Dockerized scripts to build and flash RP2040 firmware:
+This repo also includes Dockerized RP2040 firmware builders and native flashing
+helpers:
 
-- Direct (no Katapult): build `klipper.uf2` and flash via BOOTSEL.
-- With Katapult: build+flash Katapult once, then build `klipper.bin` with a bootloader offset and flash via Katapult.
+- Klipper firmware builds are Docker-only; do not use a native macOS compiler
+  toolchain for RP2040 firmware.
+- Direct (no Katapult): build `klipper.uf2` in Docker and flash via BOOTSEL.
+- With Katapult: build/flash the Katapult bootloader in
+  `katapult_rp2040`, then build `klipper.bin` with a bootloader offset and
+  flash the Klipper application via Katapult.
 
 See: `klipper_setup/rp2040_firmware/README.md`

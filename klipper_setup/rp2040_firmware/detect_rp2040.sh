@@ -152,7 +152,7 @@ main() {
       echo "  Mount: ${bootsel_path}"
       echo ""
       echo "Actions available:"
-      echo "  - Flash Katapult:     ./flash_katapult.sh"
+      echo "  - Flash Katapult:     (cd ../katapult_rp2040 && ./flash.sh)"
       echo "  - Flash Klipper UF2:  ./build_rp2040_docker.sh -d && ./flash_rp2040.sh"
     else
       echo "BOOTSEL:${bootsel_path}"

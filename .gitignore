@@ -84,7 +84,10 @@ klipper_setup/image_build/pi-gen/export-image/
 klipper_setup/rp2040_firmware/klipper/
 klipper_setup/rp2040_firmware/katapult/
 klipper_setup/rp2040_firmware/katapult_venv/
+klipper_setup/rp2040_firmware/saved_firmware/
+klipper_setup/rp2040_firmware/*.bin
+klipper_setup/rp2040_firmware/*.uf2
 resources/step_experiments/
 *.code-workspace
-klipper_setup/katapult_rp2040/katapult
+klipper_setup/katapult_rp2040/katapult/
 assembling/repository
