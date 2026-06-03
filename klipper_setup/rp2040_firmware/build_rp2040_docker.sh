@@ -25,6 +25,8 @@ Options:
 
 Environment:
   KLIPPER_REF  Git ref/commit for Klipper (default: ${KLIPPER_REF})
+  SKIP_CLEAN   Set to 1 to preserve the existing build output and rebuild
+               incrementally
 EOF
 }
 
@@ -78,6 +80,7 @@ if [[ "${INTERACTIVE}" -eq 1 ]]; then
     -u "$(id -u):$(id -g)" \
     -e "KLIPPER_REF=${KLIPPER_REF}" \
     -e "KLIPPER_CONFIG_FILE=${CONFIG_FILE}" \
+    -e "SKIP_CLEAN=${SKIP_CLEAN:-0}" \
     "${IMAGE_NAME}" \
     bash
   exit 0
@@ -88,6 +91,7 @@ docker run --rm \
   -u "$(id -u):$(id -g)" \
   -e "KLIPPER_REF=${KLIPPER_REF}" \
   -e "KLIPPER_CONFIG_FILE=${CONFIG_FILE}" \
+  -e "SKIP_CLEAN=${SKIP_CLEAN:-0}" \
   "${IMAGE_NAME}" \
   bash -lc "/work/build_rp2040_script_for_in_docker.sh"
 

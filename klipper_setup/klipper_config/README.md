@@ -33,7 +33,9 @@ cd /Users/mege/git/mege-ender-3v3ke-idex
 - `pico_w_btt_tmc2226_y_z_bringup.cfg` is the current conservative IDEX
   motion-first `printer.cfg`: X-left is `[stepper_x]`, X-right is
   `[dual_carriage]`, Y plus independent dual-Z are real Klipper axes, and the
-  heatbed thermistor is monitored without enabling bed heater control.
+  heatbed thermistor is monitored without enabling bed heater control. It also
+  brings up the left Nitehawk toolhead board with the calibrated left
+  hotend/extruder.
 - `toolhead_nitehawk_and_x_axis.cfg` is the fuller printer config kept for
   later integration.
 - `snippets/x_axis_stepper_endstop_pico_w.cfg` and
@@ -45,7 +47,9 @@ The IDEX motion config uses normal `cartesian` kinematics with Klipper
 homing and GUI jogging. X-left is carriage 0 with provisional travel `X0..X300`;
 X-right is carriage 1 with provisional travel `X15..X340`; Klipper enforces a
 temporary `10` mm safe distance between them. Toolchanging, copy mode, mirror
-mode, and the second extruder remain deferred.
+mode, and the second extruder remain deferred. The left toolhead uses the
+Nitehawk by-id path `usb-Klipper_rp2040_30333938340637C1-if00` and the
+Micro Swiss calibrated thermistor values from `toolhead_nitehawk_and_x_axis.cfg`.
 
 ## Local Git Workflow
 

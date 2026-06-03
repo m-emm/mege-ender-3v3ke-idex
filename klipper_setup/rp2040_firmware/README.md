@@ -94,6 +94,16 @@ After flashing, the board will reboot as a Katapult USB device (e.g., `/dev/cu.u
 
 This builds `klipper/out/klipper.bin` with the correct bootloader offset (0x10004000).
 
+For the LDO Nitehawk-36 toolhead board, use the dedicated config:
+
+```bash
+SKIP_CLEAN=1 KLIPPER_REF=<host-klipper-commit> ./build_rp2040_docker.sh -c rp2040_config_nitehawk
+```
+
+`rp2040_config_nitehawk` keeps the Katapult-safe 16KiB offset and sets the
+active-low activity LED startup pin (`!gpio8`). `SKIP_CLEAN=1` preserves any
+existing build products and performs an incremental rebuild.
+
 #### Step 3: Flash Klipper via Katapult
 
 ```bash

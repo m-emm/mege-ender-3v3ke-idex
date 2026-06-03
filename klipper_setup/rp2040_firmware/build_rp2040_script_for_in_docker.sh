@@ -21,9 +21,12 @@ git checkout -f "${KLIPPER_REF}"
 git submodule update --init --recursive
 
 
-echo "==> Cleaning previous build..."
-
-make clean
+if [[ "${SKIP_CLEAN:-0}" == "1" ]]; then
+    echo "==> Preserving previous build output (SKIP_CLEAN=1)."
+else
+    echo "==> Cleaning previous build..."
+    make clean
+fi
 
 echo '==> Configuring for RP2040...'
 : "${KLIPPER_CONFIG_FILE:=rp2040_config}"
