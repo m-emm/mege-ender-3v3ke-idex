@@ -907,6 +907,25 @@ assemblies:
       nitehawk_usb_white_connector_x: !Ref nitehawk_usb_white_connector_x
       nitehawk_usb_white_connector_y: !Ref nitehawk_usb_white_connector_y
 
+  - name: emergency_button_assembly
+
+    resource_file: emergency_button_assembly.yaml
+    depends_on: []
+    parameters:
+      emergency_button_button_diameter: !Ref emergency_button_button_diameter
+      emergency_button_button_thickness: !Ref emergency_button_button_thickness
+      emergency_button_neck_diameter: !Ref emergency_button_neck_diameter
+      emergency_button_neck_height: !Ref emergency_button_neck_height
+      emergency_button_neck_silver_collar_height: !Ref emergency_button_neck_silver_collar_height
+      emergency_button_neck_collar_wall_thickness: !Ref emergency_button_neck_collar_wall_thickness
+      emergency_button_neck_collar_fit_clearance: !Ref emergency_button_neck_collar_fit_clearance
+      emergency_button_neck_collar_gap: !Ref emergency_button_neck_collar_gap
+      emergency_button_body_width: !Ref emergency_button_body_width
+      emergency_button_body_length: !Ref emergency_button_body_length
+      emergency_button_body_height: !Ref emergency_button_body_height
+      emergency_button_neck_mount_hole_diameter: !Ref emergency_button_neck_mount_hole_diameter
+      emergency_button_neck_mount_hole_clearance: !Ref emergency_button_neck_mount_hole_clearance
+
   - name: creality_endstop_holder_assembly
 
     resource_file: creality_endstop_holder_assembly.yaml

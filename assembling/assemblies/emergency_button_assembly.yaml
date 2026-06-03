@@ -1,0 +1,70 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Standalone emergency stop button reference assembly
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - right
+        - top
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: followers
+        names:
+          - body
+          - neck
+        name_template: "{name}"
+        color: [0.72, 0.62, 0.46]
+      - source: self
+        artifact: followers
+        names:
+          - silver_collar
+        name_template: "{name}"
+        color: [1.0, 1.0, 1.0]
+      - source: self
+        artifact: followers
+        names:
+          - button_disc
+        name_template: "{name}"
+        color: [0.88, 0.02, 0.02]
+
+Parameters:
+  emergency_button_button_diameter:
+    Type: Float
+  emergency_button_button_thickness:
+    Type: Float
+  emergency_button_neck_diameter:
+    Type: Float
+  emergency_button_neck_height:
+    Type: Float
+  emergency_button_neck_silver_collar_height:
+    Type: Float
+  emergency_button_neck_collar_wall_thickness:
+    Type: Float
+  emergency_button_neck_collar_fit_clearance:
+    Type: Float
+  emergency_button_neck_collar_gap:
+    Type: Float
+  emergency_button_body_width:
+    Type: Float
+  emergency_button_body_length:
+    Type: Float
+  emergency_button_body_height:
+    Type: Float
+  emergency_button_neck_mount_hole_diameter:
+    Type: Float
+  emergency_button_neck_mount_hole_clearance:
+    Type: Float
+
+Parts:
+  EmergencyButtonAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.emergency_button_assembly.create_emergency_button_assembly

@@ -351,6 +351,19 @@ globals:
   nitehawk_usb_white_connector_height: 4.2
   nitehawk_usb_white_connector_x: 0.9
   nitehawk_usb_white_connector_y: 10.5
+  emergency_button_button_diameter: 40.15
+  emergency_button_button_thickness: 6
+  emergency_button_neck_diameter: 27.9
+  emergency_button_neck_height: 27
+  emergency_button_neck_silver_collar_height: 14
+  emergency_button_neck_collar_wall_thickness: 2.0
+  emergency_button_neck_collar_fit_clearance: 0.1
+  emergency_button_neck_collar_gap: 2.4
+  emergency_button_body_width: 30
+  emergency_button_body_length: 36
+  emergency_button_body_height: 34.2
+  emergency_button_neck_mount_hole_diameter: 22
+  emergency_button_neck_mount_hole_clearance: 1.0
   endstop_holder_stack_gap: 30
   z_axis_guide_distance: 256
   z_axis_y_offset: 130
