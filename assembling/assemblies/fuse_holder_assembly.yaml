@@ -1,0 +1,69 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Standalone side-mounted fuse holder reference assembly
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - right
+        - top
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: followers
+        names:
+          - holder_body
+        name_template: "{name}"
+        color: [0.35, 0.45, 0.55]
+      - source: self
+        artifact: followers
+        names:
+          - mount_nut
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
+      - source: self
+        artifact: followers
+        names:
+          - terminal_blades
+        name_template: "{name}"
+        color: [0.9, 0.86, 0.72]
+
+Parameters:
+  fuse_holder_thread_diameter:
+    Type: Float
+  fuse_holder_thread_length:
+    Type: Float
+  fuse_holder_total_cylinder_length:
+    Type: Float
+  fuse_holder_thin_cylinder_diameter:
+    Type: Float
+  fuse_holder_thin_cylinder_length:
+    Type: Float
+  fuse_holder_thicker_cylinder_diameter:
+    Type: Float
+  fuse_holder_thicker_cylinder_length:
+    Type: Float
+  fuse_holder_front_diameter:
+    Type: Float
+  fuse_holder_front_length:
+    Type: Float
+  fuse_holder_mount_nut_outer_diameter:
+    Type: Float
+  fuse_holder_mount_nut_thickness:
+    Type: Float
+  fuse_holder_mount_hole_clearance:
+    Type: Float
+  fuse_holder_body_clearance:
+    Type: Float
+
+Parts:
+  FuseHolderAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.fuse_holder_assembly.create_fuse_holder_assembly

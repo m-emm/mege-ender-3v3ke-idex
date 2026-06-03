@@ -943,6 +943,25 @@ assemblies:
       electric_switchboard_cable_hole_pitch: !Ref electric_switchboard_cable_hole_pitch
       electric_switchboard_cable_hole_z_offset_from_open_bottom: !Ref electric_switchboard_cable_hole_z_offset_from_open_bottom
 
+  - name: fuse_holder_assembly
+
+    resource_file: fuse_holder_assembly.yaml
+    depends_on: []
+    parameters:
+      fuse_holder_thread_diameter: !Ref fuse_holder_thread_diameter
+      fuse_holder_thread_length: !Ref fuse_holder_thread_length
+      fuse_holder_total_cylinder_length: !Ref fuse_holder_total_cylinder_length
+      fuse_holder_thin_cylinder_diameter: !Ref fuse_holder_thin_cylinder_diameter
+      fuse_holder_thin_cylinder_length: !Ref fuse_holder_thin_cylinder_length
+      fuse_holder_thicker_cylinder_diameter: !Ref fuse_holder_thicker_cylinder_diameter
+      fuse_holder_thicker_cylinder_length: !Ref fuse_holder_thicker_cylinder_length
+      fuse_holder_front_diameter: !Ref fuse_holder_front_diameter
+      fuse_holder_front_length: !Ref fuse_holder_front_length
+      fuse_holder_mount_nut_outer_diameter: !Ref fuse_holder_mount_nut_outer_diameter
+      fuse_holder_mount_nut_thickness: !Ref fuse_holder_mount_nut_thickness
+      fuse_holder_mount_hole_clearance: !Ref fuse_holder_mount_hole_clearance
+      fuse_holder_body_clearance: !Ref fuse_holder_body_clearance
+
   - name: creality_endstop_holder_assembly
 
     resource_file: creality_endstop_holder_assembly.yaml

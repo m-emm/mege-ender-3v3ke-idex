@@ -374,6 +374,19 @@ globals:
   electric_switchboard_cable_hole_diameter: 4
   electric_switchboard_cable_hole_pitch: 8
   electric_switchboard_cable_hole_z_offset_from_open_bottom: 18
+  fuse_holder_thread_diameter: 14.85
+  fuse_holder_thread_length: 8.5
+  fuse_holder_total_cylinder_length: 50
+  fuse_holder_thin_cylinder_diameter: 11
+  fuse_holder_thin_cylinder_length: 18.6
+  fuse_holder_thicker_cylinder_diameter: 13.13
+  fuse_holder_thicker_cylinder_length: 11.7
+  fuse_holder_front_diameter: 16.9
+  fuse_holder_front_length: 10
+  fuse_holder_mount_nut_outer_diameter: 21
+  fuse_holder_mount_nut_thickness: 5
+  fuse_holder_mount_hole_clearance: 0.5
+  fuse_holder_body_clearance: 0.5
   endstop_holder_stack_gap: 30
   z_axis_guide_distance: 256
   z_axis_y_offset: 130
