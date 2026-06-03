@@ -366,14 +366,21 @@ globals:
     $expr:
       "$sub": "${emergency_button_neck_diameter} - 2 * ${emergency_button_neck_collar_wall_thickness}"
   emergency_button_neck_mount_hole_clearance: 0.5
-  electric_switchboard_height: 90
+  electric_switchboard_height: 100
   electric_switchboard_width: 40
-  electric_switchboard_depth: 80
+  electric_switchboard_depth: 90
   electric_switchboard_wall_thickness: 1.8
   electric_switchboard_cable_hole_count: 8
   electric_switchboard_cable_hole_diameter: 4
   electric_switchboard_cable_hole_pitch: 8
   electric_switchboard_cable_hole_z_offset_from_open_bottom: 18
+  electric_switchboard_fuse_holder_bottom_clearance: 20
+  electric_switchboard_mount_flange_screw_size: "M5"
+  electric_switchboard_mount_flange_width: 15
+  electric_switchboard_mount_flange_length: 18
+  electric_switchboard_mount_flange_thickness: 4
+  electric_switchboard_mount_flange_fillet_radius: 3
+  electric_switchboard_frame_back_offset: 120
   fuse_holder_thread_diameter: 14.85
   fuse_holder_thread_length: 8.5
   fuse_holder_total_cylinder_length: 50

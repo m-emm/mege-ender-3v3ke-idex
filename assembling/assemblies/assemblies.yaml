@@ -587,6 +587,17 @@ placement:
       to: printer_frame_assembly
       alignment: STACK_RIGHT
 
+    - part: electric_switchboard_assembly
+      to: printer_frame_assembly
+      alignment: STACK_RIGHT
+    - part: electric_switchboard_assembly
+      to: printer_frame_assembly
+      alignment: FRONT
+      post_translation:
+        - 0
+        - $ref: electric_switchboard_frame_back_offset
+        - 0
+
 process_data_generators:
   mege3devops_parametric:
     function: mege_3devops.process_data.parametric.resolve_process_data_from_parameters
@@ -931,8 +942,10 @@ assemblies:
     resource_file: electric_switchboard_assembly.yaml
     depends_on:
       - emergency_button_assembly
+      - fuse_holder_assembly
     inject_parts:
       emergency_button: emergency_button_assembly
+      fuse_holder: fuse_holder_assembly
     parameters:
       electric_switchboard_height: !Ref electric_switchboard_height
       electric_switchboard_width: !Ref electric_switchboard_width
@@ -942,6 +955,12 @@ assemblies:
       electric_switchboard_cable_hole_diameter: !Ref electric_switchboard_cable_hole_diameter
       electric_switchboard_cable_hole_pitch: !Ref electric_switchboard_cable_hole_pitch
       electric_switchboard_cable_hole_z_offset_from_open_bottom: !Ref electric_switchboard_cable_hole_z_offset_from_open_bottom
+      electric_switchboard_fuse_holder_bottom_clearance: !Ref electric_switchboard_fuse_holder_bottom_clearance
+      electric_switchboard_mount_flange_screw_size: !Ref electric_switchboard_mount_flange_screw_size
+      electric_switchboard_mount_flange_width: !Ref electric_switchboard_mount_flange_width
+      electric_switchboard_mount_flange_length: !Ref electric_switchboard_mount_flange_length
+      electric_switchboard_mount_flange_thickness: !Ref electric_switchboard_mount_flange_thickness
+      electric_switchboard_mount_flange_fillet_radius: !Ref electric_switchboard_mount_flange_fillet_radius
 
   - name: fuse_holder_assembly
 

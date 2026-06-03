@@ -4,13 +4,18 @@ from pathlib import Path
 import pytest
 import yaml
 
+from assembly_defaults import ASSEMBLIES_DIR, AssemblyDefaultsLoader
 from mege_ender_3v3ke_idex.designs.assemblies.electric_switchboard_assembly import (
     create_electric_switchboard_assembly,
 )
 from mege_ender_3v3ke_idex.designs.assemblies.emergency_button_assembly import (
     create_emergency_button_assembly,
 )
+from mege_ender_3v3ke_idex.designs.assemblies.fuse_holder_assembly import (
+    create_fuse_holder_assembly,
+)
 from shellforgepy.simple import (
+    MScrew,
     create_box,
     create_cylinder,
     get_bounding_box,
@@ -46,6 +51,29 @@ ELECTRIC_SWITCHBOARD_PARAMS = {
     "electric_switchboard_cable_hole_diameter": 4,
     "electric_switchboard_cable_hole_pitch": 8,
     "electric_switchboard_cable_hole_z_offset_from_open_bottom": 18,
+    "electric_switchboard_fuse_holder_bottom_clearance": 5,
+    "electric_switchboard_mount_flange_screw_size": "M5",
+    "electric_switchboard_mount_flange_width": 15,
+    "electric_switchboard_mount_flange_length": 18,
+    "electric_switchboard_mount_flange_thickness": 4,
+    "electric_switchboard_mount_flange_fillet_radius": 3,
+}
+
+
+FUSE_HOLDER_PARAMS = {
+    "fuse_holder_thread_diameter": 14.85,
+    "fuse_holder_thread_length": 8.5,
+    "fuse_holder_total_cylinder_length": 50,
+    "fuse_holder_thin_cylinder_diameter": 11,
+    "fuse_holder_thin_cylinder_length": 18.6,
+    "fuse_holder_thicker_cylinder_diameter": 13.13,
+    "fuse_holder_thicker_cylinder_length": 11.7,
+    "fuse_holder_front_diameter": 16.9,
+    "fuse_holder_front_length": 10,
+    "fuse_holder_mount_nut_outer_diameter": 21,
+    "fuse_holder_mount_nut_thickness": 5,
+    "fuse_holder_mount_hole_clearance": 0.5,
+    "fuse_holder_body_clearance": 0.5,
 }
 
 
@@ -55,22 +83,32 @@ RESOURCE_FILE = (
     / "assemblies"
     / "electric_switchboard_assembly.yaml"
 )
+ASSEMBLIES_FILE = ASSEMBLIES_DIR / "assemblies.yaml"
 
 
 def _build_switchboard():
     emergency_button = create_emergency_button_assembly(**EMERGENCY_BUTTON_PARAMS)
+    fuse_holder = create_fuse_holder_assembly(**FUSE_HOLDER_PARAMS)
     return create_electric_switchboard_assembly(
         emergency_button=emergency_button,
+        fuse_holder=fuse_holder,
         **ELECTRIC_SWITCHBOARD_PARAMS,
     )
 
 
 def test_switchboard_leader_has_measured_outer_dimensions():
     switchboard = _build_switchboard()
+    bbox = get_bounding_box(switchboard.leader)
     size = get_bounding_box_size(switchboard.leader)
 
+    assert bbox[0][0] == pytest.approx(0, abs=0.05)
+    assert bbox[1][0] == pytest.approx(40, abs=0.05)
+    assert bbox[0][1] == pytest.approx(-18, abs=0.05)
+    assert bbox[1][1] == pytest.approx(98, abs=0.05)
+    assert bbox[0][2] == pytest.approx(0, abs=0.05)
+    assert bbox[1][2] == pytest.approx(90, abs=0.05)
     assert size[0] == pytest.approx(40, abs=0.05)
-    assert size[1] == pytest.approx(80, abs=0.05)
+    assert size[1] == pytest.approx(116, abs=0.05)
     assert size[2] == pytest.approx(90, abs=0.05)
 
 
@@ -105,7 +143,24 @@ def test_switchboard_reexports_positioned_emergency_button_parts():
         "emergency_button_neck_mount_hole",
         "emergency_button_neck_clearance",
         "left_cable_holes",
+        "mount_flange_screw_holes",
         "right_cable_holes",
+    }.issubset(set(switchboard.cutter_indices_by_name))
+
+
+def test_switchboard_reexports_positioned_fuse_holder_parts():
+    switchboard = _build_switchboard()
+
+    assert {
+        "fuse_holder_holder_body",
+        "fuse_holder_mount_nut",
+        "fuse_holder_terminal_blades",
+        "fuse_holder_holder_reference",
+        "fuse_holder_mount_panel_reference",
+    }.issubset(set(switchboard.non_production_indices_by_name))
+    assert {
+        "fuse_holder_mount_hole",
+        "fuse_holder_body_clearance",
     }.issubset(set(switchboard.cutter_indices_by_name))
 
 
@@ -143,6 +198,85 @@ def test_switchboard_top_opening_uses_collar_inner_bore_mount_hole():
 
     assert leader_volume - get_volume(leader.cut(inside_hole_probe)) == pytest.approx(0)
     assert leader_volume - get_volume(leader.cut(outside_hole_probe)) > 0
+
+
+def test_switchboard_aligns_front_wall_to_fuse_holder_panel_reference():
+    switchboard = _build_switchboard()
+    mount_panel_reference = switchboard.get_non_production_part_by_name(
+        "fuse_holder_mount_panel_reference"
+    )
+    reference_bbox = get_bounding_box(mount_panel_reference)
+    reference_center = get_bounding_box_center(mount_panel_reference)
+    reference_size = get_bounding_box_size(mount_panel_reference)
+
+    assert reference_size[0] == pytest.approx(15.35, abs=0.05)
+    assert reference_size[1] == pytest.approx(1.8, abs=0.05)
+    assert reference_size[2] == pytest.approx(15.35, abs=0.05)
+    assert reference_bbox[0][2] == pytest.approx(
+        ELECTRIC_SWITCHBOARD_PARAMS[
+            "electric_switchboard_fuse_holder_bottom_clearance"
+        ],
+        abs=0.05,
+    )
+    assert reference_center[0] == pytest.approx(20, abs=0.05)
+    assert reference_center[1] == pytest.approx(0.9, abs=0.05)
+    assert reference_center[2] == pytest.approx(12.675, abs=0.05)
+
+
+def test_switchboard_front_opening_uses_fuse_holder_mount_hole_only():
+    switchboard = _build_switchboard()
+    leader = switchboard.leader
+    leader_volume = get_volume(leader)
+    inside_mount_hole_probe = create_cylinder(
+        15.35 / 2 - 0.05,
+        2.2,
+        origin=(20, -0.2, 12.675),
+        direction=(0, 1, 0),
+    )
+    would_be_body_clearance_probe = create_cylinder(
+        17.4 / 2 - 0.15,
+        2.2,
+        origin=(20, -0.2, 12.675),
+        direction=(0, 1, 0),
+    )
+
+    assert leader_volume - get_volume(
+        leader.cut(inside_mount_hole_probe)
+    ) == pytest.approx(0)
+    assert leader_volume - get_volume(leader.cut(would_be_body_clearance_probe)) > 0
+
+
+def test_switchboard_bottom_flanges_are_flush_and_have_m5_clearance_holes():
+    switchboard = _build_switchboard()
+    leader = switchboard.leader
+    leader_volume = get_volume(leader)
+    mount_flange_screw_holes = switchboard.get_cutter_part_by_name(
+        "mount_flange_screw_holes"
+    )
+    mount_flange_screw_holes_bbox = get_bounding_box(mount_flange_screw_holes)
+    mount_flange_screw_holes_size = get_bounding_box_size(mount_flange_screw_holes)
+    hole_diameter = MScrew.from_size("M5").clearance_hole_normal
+    front_hole_empty_probe = create_cylinder(
+        hole_diameter / 2 - 0.05,
+        6,
+        origin=(20, -9, -1),
+    )
+    front_hole_edge_probe = create_cylinder(
+        hole_diameter / 2 + 0.2,
+        6,
+        origin=(20, -9, -1),
+    )
+
+    assert mount_flange_screw_holes_bbox[0][0] == pytest.approx(20 - 2.75, abs=0.05)
+    assert mount_flange_screw_holes_bbox[1][0] == pytest.approx(20 + 2.75, abs=0.05)
+    assert mount_flange_screw_holes_bbox[0][1] == pytest.approx(-9 - 2.75, abs=0.05)
+    assert mount_flange_screw_holes_bbox[1][1] == pytest.approx(89 + 2.75, abs=0.05)
+    assert mount_flange_screw_holes_size[0] == pytest.approx(hole_diameter, abs=0.05)
+    assert mount_flange_screw_holes_size[2] == pytest.approx(6, abs=0.05)
+    assert leader_volume - get_volume(
+        leader.cut(front_hole_empty_probe)
+    ) == pytest.approx(0)
+    assert leader_volume - get_volume(leader.cut(front_hole_edge_probe)) > 0
 
 
 def test_switchboard_cable_hole_rows_are_on_both_long_sides():
@@ -192,8 +326,20 @@ def test_switchboard_cable_hole_rows_are_on_both_long_sides():
 
 def test_switchboard_resource_declares_visualization_and_production_rules():
     resource = yaml.safe_load(RESOURCE_FILE.read_text())
+    assemblies = yaml.load(ASSEMBLIES_FILE.read_text(), Loader=AssemblyDefaultsLoader)
     visualization_parts = resource["Builder"]["Visualization"]["parts"]
     production = resource["Builder"]["Production"]
+    resource_parameters = resource["Parameters"]
+    switchboard_assembly = next(
+        assembly
+        for assembly in assemblies["assemblies"]
+        if assembly["name"] == "electric_switchboard_assembly"
+    )
+    switchboard_placements = [
+        placement
+        for placement in assemblies["placement"]["alignments"]
+        if placement.get("part") == "electric_switchboard_assembly"
+    ]
 
     switchboard_rule = next(
         rule
@@ -215,16 +361,64 @@ def test_switchboard_resource_declares_visualization_and_production_rules():
         for rule in visualization_parts
         if rule.get("names") == ["emergency_button_button_disc"]
     )
+    fuse_holder_body_rule = next(
+        rule
+        for rule in visualization_parts
+        if rule.get("names") == ["fuse_holder_holder_body"]
+    )
+    fuse_holder_nut_rule = next(
+        rule
+        for rule in visualization_parts
+        if rule.get("names") == ["fuse_holder_mount_nut"]
+    )
+    fuse_holder_blade_rule = next(
+        rule
+        for rule in visualization_parts
+        if rule.get("names") == ["fuse_holder_terminal_blades"]
+    )
     production_part = production["parts"][0]
 
     assert switchboard_rule["color"] == [1, 1, 1]
     assert beige_rule["color"] == [0.72, 0.62, 0.46]
     assert collar_rule["color"] == [1.0, 1.0, 1.0]
     assert button_rule["color"] == [0.88, 0.02, 0.02]
+    assert fuse_holder_body_rule["color"] == [0.35, 0.45, 0.55]
+    assert fuse_holder_nut_rule["color"] == [0.78, 0.78, 0.72]
+    assert fuse_holder_blade_rule["color"] == [0.9, 0.86, 0.72]
     assert production["process_data_preset"] == "petgcf_max_strength_high_speed_06"
     assert production_part["artifact"] == "leader"
     assert production_part["name"] == "electric_switchboard_box"
     assert production_part["flip"] is True
+    assert "electric_switchboard_fuse_holder_bottom_clearance" in resource_parameters
+    assert "electric_switchboard_fuse_holder_z_offset_from_open_bottom" not in (
+        resource_parameters
+    )
+    assert switchboard_assembly["depends_on"] == [
+        "emergency_button_assembly",
+        "fuse_holder_assembly",
+    ]
+    assert switchboard_assembly["inject_parts"] == {
+        "emergency_button": "emergency_button_assembly",
+        "fuse_holder": "fuse_holder_assembly",
+    }
+    assert switchboard_assembly["parameters"][
+        "electric_switchboard_fuse_holder_bottom_clearance"
+    ] == {"$ref": "electric_switchboard_fuse_holder_bottom_clearance"}
+    assert "electric_switchboard_fuse_holder_z_offset_from_open_bottom" not in (
+        switchboard_assembly["parameters"]
+    )
+    assert any(
+        placement["alignment"] == "STACK_RIGHT"
+        and placement["to"] == "printer_frame_assembly"
+        for placement in switchboard_placements
+    )
+    assert any(
+        placement["alignment"] == "FRONT"
+        and placement["to"] == "printer_frame_assembly"
+        and placement["post_translation"]
+        == [0, {"$ref": "electric_switchboard_frame_back_offset"}, 0]
+        for placement in switchboard_placements
+    )
     assert production["arrange"]["plates"] == [
         {"name": "electric_switchboard", "parts": ["electric_switchboard_box"]}
     ]
