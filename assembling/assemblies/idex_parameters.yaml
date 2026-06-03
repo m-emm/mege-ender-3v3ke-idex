@@ -20,7 +20,7 @@ globals:
   print_bed_mount_screw_size: "M4"
   print_bed_mount_screw_length: 50
   print_bed_mount_hole_pitch: 240
-  print_bed_adjustment_wheel_total_diameter: 36
+  print_bed_adjustment_wheel_total_diameter: 22
   print_bed_adjustment_wheel_hub_diameter: 19
   print_bed_adjustment_wheel_hub_thickness: 4.3
   print_bed_adjustment_wheel_outer_disc_thickness: 2.5
