@@ -52,7 +52,7 @@ fan_mount_hole_diameter = 2.95
 fan_thickness = 10.25
 fan_wall = 1
 fan_mount_hole_wall = 1.2
-
+fan_screw_hole_pitch = 20
 BIG_THING = 500
 
 
@@ -72,15 +72,25 @@ def create_fan(mount_plate_thickness, mount_plate_oversize=18):
                 fan_mount_hole_diameter / 2 - fan_mount_hole_wall,
                 fan_thickness,
             )
-            mount_hole_cutter = create_cylinder(fan_mount_hole_diameter / 2, BIG_THING)
 
             mount_hole = align(mount_hole, base, Alignment.CENTER)
             mount_hole = align(mount_hole, base, Alignment.BOTTOM)
             mount_hole = align(mount_hole, base, lr)
             mount_hole = align(mount_hole, base, fb)
-            mount_hole_cutter = align(mount_hole_cutter, mount_hole, Alignment.CENTER)
             mount_holes = mount_holes.fuse(mount_hole)
+
+    mount_holes_cutters = PartCollector()
+
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+            mount_hole_cutter = create_cylinder(fan_mount_hole_diameter / 2, BIG_THING)
+            mount_hole_cutter = translate(
+                lr.sign * fan_screw_hole_pitch / 2,
+                fb.sign * fan_screw_hole_pitch / 2,
+                0,
+            )(mount_hole_cutter)
             mount_holes_cutters = mount_holes_cutters.fuse(mount_hole_cutter)
+    mount_holes_cutters = align(mount_holes_cutters, base, Alignment.CENTER)
 
     base = base.fuse(mount_holes)
     base = base.cut(mount_holes_cutters)

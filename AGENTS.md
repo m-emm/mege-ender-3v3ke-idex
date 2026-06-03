@@ -166,6 +166,7 @@ For support tuning, interpret `support_threshold_angle` carefully: higher values
 - Do not introduce new standalone export-oriented geometry scripts when the work belongs in the builder-based assembly system
 - Do not duplicate assembly structure in Python when the same concern belongs in `*_assembly.yaml`
 - Do not import or call another assembly generator from inside an assembly generator; model that relationship in YAML dependencies and use the injected assembly instead
+- Do not use dark colors for visualization - they hide the shape. Use ample lightness and bright colors.
 
 ## Testing
 

@@ -926,6 +926,23 @@ assemblies:
       emergency_button_neck_mount_hole_diameter: !Ref emergency_button_neck_mount_hole_diameter
       emergency_button_neck_mount_hole_clearance: !Ref emergency_button_neck_mount_hole_clearance
 
+  - name: electric_switchboard_assembly
+
+    resource_file: electric_switchboard_assembly.yaml
+    depends_on:
+      - emergency_button_assembly
+    inject_parts:
+      emergency_button: emergency_button_assembly
+    parameters:
+      electric_switchboard_height: !Ref electric_switchboard_height
+      electric_switchboard_width: !Ref electric_switchboard_width
+      electric_switchboard_depth: !Ref electric_switchboard_depth
+      electric_switchboard_wall_thickness: !Ref electric_switchboard_wall_thickness
+      electric_switchboard_cable_hole_count: !Ref electric_switchboard_cable_hole_count
+      electric_switchboard_cable_hole_diameter: !Ref electric_switchboard_cable_hole_diameter
+      electric_switchboard_cable_hole_pitch: !Ref electric_switchboard_cable_hole_pitch
+      electric_switchboard_cable_hole_z_offset_from_open_bottom: !Ref electric_switchboard_cable_hole_z_offset_from_open_bottom
+
   - name: creality_endstop_holder_assembly
 
     resource_file: creality_endstop_holder_assembly.yaml

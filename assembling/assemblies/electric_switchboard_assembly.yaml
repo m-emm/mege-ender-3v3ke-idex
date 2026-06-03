@@ -1,0 +1,84 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: 24 V distribution switchboard with emergency button
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - right
+        - top
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: leader
+        name: electric_switchboard_box
+        color: [1, 1, 1]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - emergency_button_body
+          - emergency_button_neck
+        name_template: "{name}"
+        color: [0.72, 0.62, 0.46]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - emergency_button_silver_collar
+        name_template: "{name}"
+        color: [1.0, 1.0, 1.0]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - emergency_button_button_disc
+        name_template: "{name}"
+        color: [0.88, 0.02, 0.02]
+
+  Production:
+    process_data_preset: petgcf_max_strength_high_speed_06
+    process_data:
+      overrides:
+        process_overrides:
+          enable_support: "0"
+          wall_loops: "3"
+    parts:
+      - source: self
+        artifact: leader
+        name: electric_switchboard_box
+        flip: true
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: electric_switchboard
+          parts:
+            - electric_switchboard_box
+      auto_assign_plates: false
+
+Parameters:
+  electric_switchboard_height:
+    Type: Float
+  electric_switchboard_width:
+    Type: Float
+  electric_switchboard_depth:
+    Type: Float
+  electric_switchboard_wall_thickness:
+    Type: Float
+  electric_switchboard_cable_hole_count:
+    Type: Integer
+  electric_switchboard_cable_hole_diameter:
+    Type: Float
+  electric_switchboard_cable_hole_pitch:
+    Type: Float
+  electric_switchboard_cable_hole_z_offset_from_open_bottom:
+    Type: Float
+
+Parts:
+  ElectricSwitchboardAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.electric_switchboard_assembly.create_electric_switchboard_assembly

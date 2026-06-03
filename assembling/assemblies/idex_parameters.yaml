@@ -362,8 +362,18 @@ globals:
   emergency_button_body_width: 30
   emergency_button_body_length: 36
   emergency_button_body_height: 34.2
-  emergency_button_neck_mount_hole_diameter: 22
-  emergency_button_neck_mount_hole_clearance: 1.0
+  emergency_button_neck_mount_hole_diameter:
+    $expr:
+      "$sub": "${emergency_button_neck_diameter} - 2 * ${emergency_button_neck_collar_wall_thickness}"
+  emergency_button_neck_mount_hole_clearance: 0.5
+  electric_switchboard_height: 90
+  electric_switchboard_width: 40
+  electric_switchboard_depth: 80
+  electric_switchboard_wall_thickness: 1.8
+  electric_switchboard_cable_hole_count: 8
+  electric_switchboard_cable_hole_diameter: 4
+  electric_switchboard_cable_hole_pitch: 8
+  electric_switchboard_cable_hole_z_offset_from_open_bottom: 18
   endstop_holder_stack_gap: 30
   z_axis_guide_distance: 256
   z_axis_y_offset: 130

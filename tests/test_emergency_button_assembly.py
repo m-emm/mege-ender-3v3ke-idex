@@ -22,8 +22,8 @@ EMERGENCY_BUTTON_PARAMS = {
     "emergency_button_body_width": 30,
     "emergency_button_body_length": 36,
     "emergency_button_body_height": 34.2,
-    "emergency_button_neck_mount_hole_diameter": 22,
-    "emergency_button_neck_mount_hole_clearance": 1.0,
+    "emergency_button_neck_mount_hole_diameter": 23.9,
+    "emergency_button_neck_mount_hole_clearance": 0.5,
 }
 
 
@@ -84,10 +84,9 @@ def test_emergency_button_neck_steps_down_inside_collar():
     neck_size = get_bounding_box_size(neck)
     lower_height = 27 - 14 - 2.4
     top_diameter = 27.9 - 2 * 2.0 - 0.1
-    expected_volume = (
-        math.pi * (27.9 / 2) ** 2 * lower_height
-        + math.pi * (top_diameter / 2) ** 2 * (14 + 2.4)
-    )
+    expected_volume = math.pi * (27.9 / 2) ** 2 * lower_height + math.pi * (
+        top_diameter / 2
+    ) ** 2 * (14 + 2.4)
 
     assert neck_size[0] == pytest.approx(27.9, abs=0.05)
     assert neck_size[1] == pytest.approx(27.9, abs=0.05)
@@ -111,8 +110,8 @@ def test_emergency_button_mount_hole_includes_clearance():
     mount_hole = emergency_button.get_cutter_part_by_name("neck_mount_hole")
     mount_hole_size = get_bounding_box_size(mount_hole)
 
-    assert mount_hole_size[0] == pytest.approx(23.0, abs=0.05)
-    assert mount_hole_size[1] == pytest.approx(23.0, abs=0.05)
+    assert mount_hole_size[0] == pytest.approx(24.4, abs=0.05)
+    assert mount_hole_size[1] == pytest.approx(24.4, abs=0.05)
 
 
 def test_emergency_button_resource_declares_visualization_colors():
