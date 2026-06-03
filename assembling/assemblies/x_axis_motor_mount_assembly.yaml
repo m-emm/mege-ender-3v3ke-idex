@@ -27,6 +27,84 @@ Builder:
 Parameters:
   profile_position:
     Type: String
+  axis_holder_depth:
+    Type: Float
+  axis_holder_fillet_radius:
+    Type: Float
+  axis_holder_thickness:
+    Type: Float
+  axis_holder_width:
+    Type: Float
+  axle_screw_nut_hole_depth:
+    Type: Float
+  axle_screw_nut_slack:
+    Type: Float
+  axle_screw_size:
+    Type: String
+  x_axis_profile_clamp_flange_bevel_depth:
+    Type: Float
+  counter_flange_mount_screw_length:
+    Type: Float
+  counter_flange_mount_screw_size:
+    Type: String
+  x_axis_profile_clamp_flange_depth:
+    Type: Float
+  x_axis_profile_clamp_flange_thickness:
+    Type: Float
+  idler_mount_axle_clearance:
+    Type: Float
+  idler_mount_axle_diameter:
+    Type: Float
+  idler_screw_head_clearance:
+    Type: Float
+  idler_screw_size:
+    Type: String
+  motor_idler_out_offset:
+    Type: Float
+  motor_idler_profile_gap:
+    Type: Float
+  motor_mount_axle_clearance:
+    Type: Float
+  motor_mount_boss_clearance:
+    Type: Float
+  motor_mount_boss_clearance_z:
+    Type: Float
+  motor_mount_plate_fillet_radius:
+    Type: Float
+  motor_mount_plate_size:
+    Type: Float
+  motor_mount_plate_thickness:
+    Type: Float
+  motor_mount_shield_mount_screw_length:
+    Type: Float
+  motor_pulley_gap:
+    Type: Float
+  motor_pulley_idlers_distance:
+    Type: Float
+  motor_x_offset:
+    Type: Float
+  x_axis_profile_clamp_flange_bevel_oversize:
+    Type: Float
+  x_axis_profile_clamp_flange_screw_hole_inset:
+    Type: Float
+  mount_plate_connector_depth:
+    Type: Float
+  mount_plate_connector_length:
+    Type: Float
+  mount_shield_depth:
+    Type: Float
+  mount_shield_fillet_radius:
+    Type: Float
+  mount_shield_oversize_z:
+    Type: Float
+  mount_shield_width:
+    Type: Float
+  nut_cutter_offset_z:
+    Type: Float
+  x_axis_motor_axle_length:
+    Type: Float
+  x_axis_profile_length:
+    Type: Float
 
 Parts:
   XAxisMotorMountAssembly:

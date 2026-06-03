@@ -541,7 +541,7 @@ def create_tool_head_mount_assembly(
             mount_towers = mount_towers.fuse(belt_carriage_mount_screw_tower)
 
     if drive_position == Alignment.BOTTOM:
-        tool_head_mount = tool_head_mount.fuse(mount_towers)
+        tool_head_mount = mount_towers.fuse(tool_head_mount)
 
     tool_head_mount = x_axis_belt_carriage.use_as_cutter_on(tool_head_mount)
 
@@ -567,4 +567,5 @@ def create_tool_head_mount_assembly(
             screw,
             f"belt_carriage_mount_screw_{i}",
         )
+    tool_head_mount.add_named_cutter(mount_hole_cutter, "mount_hole_cutter")
     return tool_head_mount

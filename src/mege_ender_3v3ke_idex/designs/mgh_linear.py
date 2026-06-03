@@ -10,7 +10,6 @@ Usage:
 import logging
 import os
 
-from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -26,6 +25,21 @@ PROCESS_DATA = {
         "layer_height": "0.2",
     },
 }
+
+mgn_12h_carriage_width = 27
+mgn_12h_carriage_length = 45.4
+mgn_12h_screw_hole_pitch = 20
+mgn_12h_height = 10
+mgn_12h_screw_hole_depth = 3.5
+mgn_12h_h1 = 3.4
+
+mgn_12ca_carriage_width = 27
+mgn_12ca_carriage_length = 33.5
+mgn_12ca_screw_hole_pitch_x = 15
+mgn_12ca_screw_hole_pitch_y = 20
+mgn_12ca_height = 10
+mgn_12ca_screw_hole_depth = 3.5
+mgn_12ca_h1 = 3.4
 
 
 def create_mgn12h_carriage():

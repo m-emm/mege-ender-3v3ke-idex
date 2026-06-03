@@ -16,7 +16,6 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (  # no
     PROCESS_DATA_PETGCF_04_HS,
     PROCESS_DATA_PLACF_04_HS,
 )
-from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.spring import create_spring
 from shellforgepy.simple import *
 

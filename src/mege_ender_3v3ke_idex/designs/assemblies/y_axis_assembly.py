@@ -6,8 +6,8 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
+from mege_ender_3v3ke_idex.designs.bed_metrics import Y_AXIS_MOVING_MASS_ASSEMBLY_ID
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_rail_with_carriages
-from mege_ender_3v3ke_idex.designs.print_bed import Y_AXIS_MOVING_MASS_ASSEMBLY_ID
 from shellforgepy.metrics import Material, record_length_metric, record_weight_metric
 from shellforgepy.simple import *
 

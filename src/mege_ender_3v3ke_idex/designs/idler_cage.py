@@ -16,7 +16,6 @@ from mege_3devops.process_data.mender3.process_data_04_high_speed import (
     PROCESS_DATA_PETGCF_04_HS,
 )
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler
-from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -31,6 +30,22 @@ PROCESS_DATA["process_overrides"].update(
         "enable_support": "0",
     }
 )
+
+BIG_THING = 500
+
+axle_screw_size = "M3"
+endcap_tensioner_cage_back_wall = 8
+endcap_tensioner_length = 16
+endcap_tensioner_screw_size = "M3"
+idler_cage_back_wall = 4
+idler_cage_clearance = 0.5
+idler_cage_idler_tooth_count = 20
+idler_cage_overlength = 6
+idler_cage_top_bottom_thickness = 4
+idler_cage_wall = 2
+idler_mount_axle_clearance = 0.1
+idler_screw_head_clearance = 0.3
+inset_cutter_hole_slack = 0.05
 
 
 def _create_threaded_inset_visual(screw_size):

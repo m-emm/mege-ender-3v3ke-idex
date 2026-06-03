@@ -14,7 +14,6 @@ import os
 from mege_3devops.process_data.mender3.process_data_06_high_speed import (
     PROCESS_DATA_PETGCF_06_HS,
 )
-from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)

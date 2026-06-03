@@ -29,6 +29,8 @@ globals:
   print_bed_adjustment_wheel_nut_pocket_slack: 0.5
   print_bed_adjustment_wheel_nut_pocket_depth_clearance: 0.3
   print_bed_foil_thickness: 1.6
+  print_bed_foil_measured_mass_kg: 0.414
+  print_bed_main_measured_mass_kg: 0.760
   nozzle_bed_reach_margin: -2
   print_bed_vertical_gap_to_frame: 58
   print_bed_damper_height: 16
@@ -498,6 +500,41 @@ globals:
   mount_plate_link_width:
     $expr:
       "$sub": "${mount_plate_connector_length} * 0.8"
+  x_axis_profile_clamp_flange_depth: 15
+  x_axis_profile_clamp_flange_thickness: 5
+  x_axis_profile_clamp_flange_bevel_depth:
+    $expr:
+      "$sub": "${x_axis_profile_clamp_flange_depth} * 0.75"
+  axis_holder_width:
+    $ref: mount_plate_connector_length
+  axis_holder_depth:
+    $expr:
+      "$sub": "20 + ${x_axis_profile_clamp_flange_depth}"
+  axis_holder_thickness: 6
+  axis_holder_fillet_radius: 1
+  axle_screw_size: "M3"
+  axle_screw_nut_hole_depth: 4
+  axle_screw_nut_slack: 0.4
+  counter_flange_mount_screw_length: 14
+  counter_flange_mount_screw_size: "M3"
+  idler_mount_axle_clearance: 0.1
+  idler_mount_axle_diameter: 3.4
+  idler_screw_size: "M3"
+  idler_screw_head_clearance: 0.3
+  motor_idler_out_offset: 17
+  motor_idler_profile_gap: 1
+  motor_mount_plate_size: 52
+  motor_mount_shield_mount_screw_length: 10
+  motor_pulley_gap: 2
+  motor_pulley_idlers_distance: 28
+  x_axis_profile_clamp_flange_bevel_oversize: 2.0
+  x_axis_profile_clamp_flange_screw_hole_inset: 10
+  mount_plate_connector_depth: 20
+  mount_shield_depth: 6
+  mount_shield_fillet_radius: 1
+  mount_shield_oversize_z: 0
+  mount_shield_width: 17
+  nut_cutter_offset_z: 2
   motor_mount_axle_clearance: 0.3
   motor_mount_boss_clearance: 0.6
   motor_mount_boss_clearance_z: 8

@@ -25,6 +25,10 @@ Parameters:
     Type: Float
   print_bed_vertical_gap_to_frame:
     Type: Float
+  print_bed_main_measured_mass_kg:
+    Type: Float
+  print_bed_foil_measured_mass_kg:
+    Type: Float
 
 Parts:
   PrintBedAssembly:

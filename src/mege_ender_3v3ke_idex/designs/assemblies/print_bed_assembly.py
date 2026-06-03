@@ -1,6 +1,6 @@
 """Declarative print bed assembly."""
 
-from mege_ender_3v3ke_idex.designs.print_bed import _record_print_bed_weight_metrics
+from mege_ender_3v3ke_idex.designs.bed_metrics import record_print_bed_weight_metrics
 from shellforgepy.simple import *
 
 
@@ -18,6 +18,8 @@ def create_print_bed_assembly(
     print_bed_damper_height,
     print_bed_damper_diameter,
     print_bed_vertical_gap_to_frame,
+    print_bed_main_measured_mass_kg,
+    print_bed_foil_measured_mass_kg,
     BIG_THING,
     record_metrics=False,
 ):
@@ -71,7 +73,11 @@ def create_print_bed_assembly(
     retval.add_named_non_production_part(foil, "print_bed_foil")
 
     if record_metrics:
-        _record_print_bed_weight_metrics(retval)
+        record_print_bed_weight_metrics(
+            retval,
+            print_bed_main_measured_mass_kg=print_bed_main_measured_mass_kg,
+            print_bed_foil_measured_mass_kg=print_bed_foil_measured_mass_kg,
+        )
 
     retval = align(retval, frame, Alignment.CENTER, axes=[0, 1])
     retval = align(

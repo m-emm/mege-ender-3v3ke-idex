@@ -4,7 +4,6 @@ from functools import reduce
 
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import ExtrusionProfileType
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt2_idler, create_gt2_pulley
-from mege_ender_3v3ke_idex.designs.idex_parameters import *
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.metrics import record_mark_metric
 from shellforgepy.simple import *
@@ -12,6 +11,14 @@ from shellforgepy.simple import *
 
 def create_idlers_for_motor(
     profile_to_align,
+    *,
+    motor_idler_out_offset,
+    motor_idler_profile_gap,
+    idler_mount_axle_diameter,
+    idler_mount_axle_clearance,
+    axle_screw_size,
+    axle_screw_nut_hole_depth,
+    axle_screw_nut_slack,
 ) -> LeaderFollowersCuttersPart:
     idlers = PartCollector()
 
@@ -101,6 +108,46 @@ def create_x_axis_motor_mount_assembly(
     *,
     profile_to_align,
     profile_position,
+    axis_holder_depth,
+    axis_holder_fillet_radius,
+    axis_holder_thickness,
+    axis_holder_width,
+    axle_screw_nut_hole_depth,
+    axle_screw_nut_slack,
+    axle_screw_size,
+    counter_flange_mount_screw_length,
+    counter_flange_mount_screw_size,
+    idler_mount_axle_clearance,
+    idler_mount_axle_diameter,
+    idler_screw_head_clearance,
+    idler_screw_size,
+    motor_idler_out_offset,
+    motor_idler_profile_gap,
+    motor_mount_axle_clearance,
+    motor_mount_boss_clearance,
+    motor_mount_boss_clearance_z,
+    motor_mount_plate_fillet_radius,
+    motor_mount_plate_size,
+    motor_mount_plate_thickness,
+    motor_mount_shield_mount_screw_length,
+    motor_pulley_gap,
+    motor_pulley_idlers_distance,
+    motor_x_offset,
+    mount_plate_connector_depth,
+    mount_plate_connector_length,
+    mount_shield_depth,
+    mount_shield_fillet_radius,
+    mount_shield_oversize_z,
+    mount_shield_width,
+    nut_cutter_offset_z,
+    x_axis_profile_clamp_flange_bevel_depth,
+    x_axis_profile_clamp_flange_bevel_oversize,
+    x_axis_profile_clamp_flange_depth,
+    x_axis_profile_clamp_flange_screw_hole_inset,
+    x_axis_profile_clamp_flange_thickness,
+    x_axis_motor_axle_length,
+    x_axis_profile_length,
+    BIG_THING,
 ) -> LeaderFollowersCuttersPart:
     """Build one motor + mount assembly for the bottom or top x-axis profile."""
 
@@ -115,6 +162,13 @@ def create_x_axis_motor_mount_assembly(
 
     idlers_assembly = create_idlers_for_motor(
         profile_to_align=profile_to_align,
+        motor_idler_out_offset=motor_idler_out_offset,
+        motor_idler_profile_gap=motor_idler_profile_gap,
+        idler_mount_axle_diameter=idler_mount_axle_diameter,
+        idler_mount_axle_clearance=idler_mount_axle_clearance,
+        axle_screw_size=axle_screw_size,
+        axle_screw_nut_hole_depth=axle_screw_nut_hole_depth,
+        axle_screw_nut_slack=axle_screw_nut_slack,
     )
 
     idlers_assembly = translate(horizontal_side.sign * motor_x_offset, 0, 0)(
@@ -421,18 +475,26 @@ def create_x_axis_motor_mount_assembly(
     mount_plate_connector = mount_plate_connector.cut(mount_plate)
 
     motor.add_named_follower(mount_plate_connector, "mount_plate_connector")
-    mount_flange = create_filleted_box(
+    x_axis_profile_clamp_flange = create_filleted_box(
         mount_plate_connector_length + motor_mount_plate_size,
-        flange_depth,
-        flange_thickness,
+        x_axis_profile_clamp_flange_depth,
+        x_axis_profile_clamp_flange_thickness,
         fillet_radius=mount_shield_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.FRONT],
     )
 
-    mount_flange = align(mount_flange, mount_plate_connector, Alignment.CENTER)
-    mount_flange = align(mount_flange, mount_plate, horizontal_side)
-    mount_flange = align(mount_flange, mount_plate_connector, Alignment.FRONT)
-    mount_flange = align(mount_flange, profile_to_align, vertical_alignment)
+    x_axis_profile_clamp_flange = align(
+        x_axis_profile_clamp_flange, mount_plate_connector, Alignment.CENTER
+    )
+    x_axis_profile_clamp_flange = align(
+        x_axis_profile_clamp_flange, mount_plate, horizontal_side
+    )
+    x_axis_profile_clamp_flange = align(
+        x_axis_profile_clamp_flange, mount_plate_connector, Alignment.FRONT
+    )
+    x_axis_profile_clamp_flange = align(
+        x_axis_profile_clamp_flange, profile_to_align, vertical_alignment
+    )
 
     motor.add_named_non_production_part(idlers_assembly.leader, "idlers")
 
@@ -448,16 +510,18 @@ def create_x_axis_motor_mount_assembly(
         if vertical_alignment == Alignment.BOTTOM:
             nut_cutter = rotate(180, axis=(0, 1, 0))(nut_cutter)
 
-        nut_cutter = align(nut_cutter, mount_flange, Alignment.CENTER)
+        nut_cutter = align(nut_cutter, x_axis_profile_clamp_flange, Alignment.CENTER)
         nut_cutter = align(nut_cutter, mount_plate_connector, screw_hole_alignment)
         nut_cutter = translate(
-            -screw_hole_alignment.sign * mount_flange_screw_hole_inset,
+            -screw_hole_alignment.sign * x_axis_profile_clamp_flange_screw_hole_inset,
             0,
             -horizontal_side.sign * nut_cutter_offset_z,
         )(nut_cutter)
 
         nut_pocket_cutters.append(nut_cutter)
-        mount_flange = nut_cutter.use_as_cutter_on(mount_flange)
+        x_axis_profile_clamp_flange = nut_cutter.use_as_cutter_on(
+            x_axis_profile_clamp_flange
+        )
 
     idler_axle_cutters_fused = reduce(
         lambda acc, cutter: acc.fuse(cutter),
@@ -468,7 +532,7 @@ def create_x_axis_motor_mount_assembly(
     top_cones = top_cones.cut(idler_axle_cutters_fused)
 
     for idler_axle_cutter in idler_axle_cutters:
-        mount_flange = mount_flange.cut(idler_axle_cutter)
+        x_axis_profile_clamp_flange = x_axis_profile_clamp_flange.cut(idler_axle_cutter)
 
         idler_screw_spec = MScrew.from_size(idler_screw_size)
         cylinder_head_cutter = create_cylinder(
@@ -482,43 +546,52 @@ def create_x_axis_motor_mount_assembly(
         )
         cylinder_head_cutter = align(
             cylinder_head_cutter,
-            mount_flange,
+            x_axis_profile_clamp_flange,
             vertical_alignment,
         )
-        mount_flange = mount_flange.cut(cylinder_head_cutter)
+        x_axis_profile_clamp_flange = x_axis_profile_clamp_flange.cut(
+            cylinder_head_cutter
+        )
 
-    mount_flange_bevel = create_right_triangle(
-        bevel_depth + mount_flange_bevel_oversize,
-        bevel_depth,
+    x_axis_profile_clamp_flange_bevel = create_right_triangle(
+        x_axis_profile_clamp_flange_bevel_depth
+        + x_axis_profile_clamp_flange_bevel_oversize,
+        x_axis_profile_clamp_flange_bevel_depth,
         thickness=mount_plate_connector_length - 2 * motor_mount_plate_fillet_radius,
         extrusion_direction=(horizontal_side.sign, 0, 0),
         a_normal=(0, 0, vertical_alignment.sign),
         b_normal=(0, -1, 0),
     )
 
-    mount_flange_bevel = align(
-        mount_flange_bevel,
+    x_axis_profile_clamp_flange_bevel = align(
+        x_axis_profile_clamp_flange_bevel,
         mount_plate_connector,
         Alignment.CENTER,
     )
-    mount_flange_bevel = align(mount_flange_bevel, mount_flange, Alignment.BACK)
+    x_axis_profile_clamp_flange_bevel = align(
+        x_axis_profile_clamp_flange_bevel,
+        x_axis_profile_clamp_flange,
+        Alignment.BACK,
+    )
 
-    mount_flange_bevel_flange_side = align(
-        mount_flange_bevel,
-        mount_flange,
+    x_axis_profile_clamp_flange_bevel_clamp_side = align(
+        x_axis_profile_clamp_flange_bevel,
+        x_axis_profile_clamp_flange,
         vertical_alignment.opposite.stack_alignment,
     )
 
     for nut_cutter in nut_pocket_cutters:
-        mount_flange_bevel_flange_side = nut_cutter.use_as_cutter_on(
-            mount_flange_bevel_flange_side
+        x_axis_profile_clamp_flange_bevel_clamp_side = nut_cutter.use_as_cutter_on(
+            x_axis_profile_clamp_flange_bevel_clamp_side
         )
 
-    mount_flange = mount_flange.fuse(top_cones)
+    x_axis_profile_clamp_flange = x_axis_profile_clamp_flange.fuse(top_cones)
 
-    mount_flange = mount_flange.fuse(mount_flange_bevel_flange_side)
+    x_axis_profile_clamp_flange = x_axis_profile_clamp_flange.fuse(
+        x_axis_profile_clamp_flange_bevel_clamp_side
+    )
 
-    motor.add_named_follower(mount_flange, "mount_flange")
+    motor.add_named_follower(x_axis_profile_clamp_flange, "x_axis_profile_clamp_flange")
 
     motor_visual = motor.leader.copy()
     motor.add_named_non_production_part(motor_visual, "motor_visual")
@@ -533,17 +606,17 @@ def create_x_axis_motor_mount_assembly(
 
     axis_holding_counter_flange = align(
         axis_holding_counter_flange,
-        mount_flange,
+        x_axis_profile_clamp_flange,
         horizontal_side.opposite,
     )
     axis_holding_counter_flange = align(
         axis_holding_counter_flange,
-        mount_flange,
+        x_axis_profile_clamp_flange,
         vertical_alignment.stack_alignment,
     )
     axis_holding_counter_flange = align(
         axis_holding_counter_flange,
-        mount_flange,
+        x_axis_profile_clamp_flange,
         Alignment.BACK,
     )
 
@@ -625,7 +698,7 @@ def create_x_axis_motor_mount_assembly(
     for follower_name in [
         "mount_shield",
         "mount_plate",
-        "mount_flange",
+        "x_axis_profile_clamp_flange",
         "motor_bridge",
         "mount_plate_connector",
     ]:
@@ -638,7 +711,7 @@ def create_x_axis_motor_mount_assembly(
     for follower_name in [
         "mount_shield",
         "mount_plate",
-        "mount_flange",
+        "x_axis_profile_clamp_flange",
         "motor_bridge",
         "mount_plate_connector",
     ]:

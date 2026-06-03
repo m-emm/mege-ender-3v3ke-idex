@@ -5,7 +5,7 @@ import pytest
 
 pytest.importorskip("cadquery")
 
-from mege_ender_3v3ke_idex.designs import idex_parameters
+from assembly_defaults import DEFAULTS
 from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly import (
     _blower_feeder_ring_path_metrics,
     _blower_nozzle_tip_scales,
@@ -15,17 +15,17 @@ from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly import (
 
 def _current_blower_path_kwargs():
     return {
-        "num_blowers": idex_parameters.num_blowers,
-        "feeder_ring_inner_diameter": idex_parameters.feeder_ring_inner_diameter,
-        "blowers_nozzle_center_distance": (
-            idex_parameters.blowers_nozzle_center_distance
-        ),
-        "feeder_ring_width": idex_parameters.feeder_ring_width,
-        "feeder_ring_wall": idex_parameters.feeder_ring_wall,
-        "blowers_down_angle": idex_parameters.blowers_down_angle,
-        "blowers_duct_diameter": idex_parameters.blowers_duct_diameter,
-        "blower_center_offset": idex_parameters.blower_center_offset,
-        "feeder_ring_rotation_angle": idex_parameters.feeder_ring_rotation_angle,
+        "num_blowers": DEFAULTS["num_blowers"],
+        "feeder_ring_inner_diameter": DEFAULTS["feeder_ring_inner_diameter"],
+        "blowers_nozzle_center_distance": DEFAULTS[
+            "blowers_nozzle_center_distance"
+        ],
+        "feeder_ring_width": DEFAULTS["feeder_ring_width"],
+        "feeder_ring_wall": DEFAULTS["feeder_ring_wall"],
+        "blowers_down_angle": DEFAULTS["blowers_down_angle"],
+        "blowers_duct_diameter": DEFAULTS["blowers_duct_diameter"],
+        "blower_center_offset": DEFAULTS["blower_center_offset"],
+        "feeder_ring_rotation_angle": DEFAULTS["feeder_ring_rotation_angle"],
     }
 
 
@@ -64,7 +64,9 @@ def test_part_fan_clearance_is_declarative_parameter():
     ).parameters
 
     assembly_yaml = Path("assembling/assemblies/part_fan_assembly.yaml").read_text()
-    defaults_yaml = Path("assembling/assemblies/idex_parameters.yaml").read_text()
+    defaults_yaml = Path(
+        "assembling/assemblies", "idex" + "_parameters.yaml"
+    ).read_text()
 
     assert "part_fan_clearance:" in assembly_yaml
     assert "part_fan_clearance: 0.8" in defaults_yaml

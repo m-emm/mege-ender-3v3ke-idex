@@ -8,13 +8,13 @@ from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import (
     ExtrusionProfileType,
     create_alu_extrusion_profile,
 )
+from mege_ender_3v3ke_idex.designs.bed_metrics import Y_AXIS_MOVING_MASS_ASSEMBLY_ID
 from mege_ender_3v3ke_idex.designs.gt2belt import create_gt_belt_clamp
 from mege_ender_3v3ke_idex.designs.hollow_profiles import (
     create_hollow_profile,
     create_hollow_profile_ring,
 )
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn12ca_carriage
-from mege_ender_3v3ke_idex.designs.print_bed import Y_AXIS_MOVING_MASS_ASSEMBLY_ID
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
     create_screw_mount_assembly,
