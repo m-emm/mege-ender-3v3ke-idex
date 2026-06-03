@@ -35,15 +35,17 @@ def _create_print_bed_adjustment_wheel(
     grip_diameter,
     grip_count,
     nut_pocket_slack,
+    nut_pocket_depth_clearance,
 ):
     mount_screw = MScrew.from_size(screw_size)
+    nut_pocket_depth = mount_screw.nut_thickness + nut_pocket_depth_clearance
     if total_diameter <= grip_diameter:
         raise ValueError(
             "print_bed_adjustment_wheel_total_diameter must exceed grip diameter"
         )
-    if hub_thickness <= mount_screw.nut_thickness:
+    if hub_thickness <= nut_pocket_depth:
         raise ValueError(
-            "print_bed_adjustment_wheel_hub_thickness must exceed nut thickness"
+            "print_bed_adjustment_wheel_hub_thickness must exceed nut pocket depth"
         )
     if grip_count < 1:
         raise ValueError("print_bed_adjustment_wheel_grip_count must be positive")
@@ -90,6 +92,7 @@ def _create_print_bed_adjustment_wheel(
 
     nut_pocket = create_nut(
         screw_size,
+        height=nut_pocket_depth,
         slack=nut_pocket_slack,
         no_hole=True,
     )
@@ -175,6 +178,7 @@ def create_print_bed_undercarriage_assembly(
     print_bed_adjustment_wheel_grip_diameter,
     print_bed_adjustment_wheel_grip_count,
     print_bed_adjustment_wheel_nut_pocket_slack,
+    print_bed_adjustment_wheel_nut_pocket_depth_clearance,
     print_bed_undercarriage_mount_tower_holder_size,
     print_bed_undercarriage_mount_tower_holder_fillet_radius,
     print_bed_undercarriage_num_dovetails_per_side,
@@ -632,6 +636,7 @@ def create_print_bed_undercarriage_assembly(
             grip_diameter=print_bed_adjustment_wheel_grip_diameter,
             grip_count=print_bed_adjustment_wheel_grip_count,
             nut_pocket_slack=print_bed_adjustment_wheel_nut_pocket_slack,
+            nut_pocket_depth_clearance=print_bed_adjustment_wheel_nut_pocket_depth_clearance,
         )
         adjustment_wheel = align(
             adjustment_wheel,

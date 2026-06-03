@@ -22,11 +22,12 @@ globals:
   print_bed_mount_hole_pitch: 240
   print_bed_adjustment_wheel_total_diameter: 36
   print_bed_adjustment_wheel_hub_diameter: 19
-  print_bed_adjustment_wheel_hub_thickness: 4
+  print_bed_adjustment_wheel_hub_thickness: 4.3
   print_bed_adjustment_wheel_outer_disc_thickness: 2.5
   print_bed_adjustment_wheel_grip_diameter: 4
   print_bed_adjustment_wheel_grip_count: 8
-  print_bed_adjustment_wheel_nut_pocket_slack: 0.2
+  print_bed_adjustment_wheel_nut_pocket_slack: 0.5
+  print_bed_adjustment_wheel_nut_pocket_depth_clearance: 0.3
   print_bed_foil_thickness: 1.6
   nozzle_bed_reach_margin: -2
   print_bed_vertical_gap_to_frame: 58
