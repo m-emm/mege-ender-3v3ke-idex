@@ -433,6 +433,54 @@ Builder:
         assembly: raspberry_pi
         artifact: all
         name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: electric_switchboard
+        artifact: leader
+        name: electric_switchboard_box
+        color: [1, 1, 1]
+      - source: injected
+        assembly: electric_switchboard
+        artifact: non_production_parts
+        names:
+          - emergency_button_body
+          - emergency_button_neck
+        name_template: "electric_switchboard_{name}"
+        color: [0.72, 0.62, 0.46]
+      - source: injected
+        assembly: electric_switchboard
+        artifact: non_production_parts
+        names:
+          - emergency_button_silver_collar
+        name_template: "electric_switchboard_{name}"
+        color: [1.0, 1.0, 1.0]
+      - source: injected
+        assembly: electric_switchboard
+        artifact: non_production_parts
+        names:
+          - emergency_button_button_disc
+        name_template: "electric_switchboard_{name}"
+        color: [0.88, 0.02, 0.02]
+      - source: injected
+        assembly: electric_switchboard
+        artifact: non_production_parts
+        names:
+          - fuse_holder_holder_body
+        name_template: "electric_switchboard_{name}"
+        color: [0.35, 0.45, 0.55]
+      - source: injected
+        assembly: electric_switchboard
+        artifact: non_production_parts
+        names:
+          - fuse_holder_mount_nut
+        name_template: "electric_switchboard_{name}"
+        color: [0.78, 0.78, 0.72]
+      - source: injected
+        assembly: electric_switchboard
+        artifact: non_production_parts
+        names:
+          - fuse_holder_terminal_blades
+        name_template: "electric_switchboard_{name}"
+        color: [0.9, 0.86, 0.72]
 
 Parameters:
   print_bed_y_travel:

@@ -83,6 +83,12 @@ RESOURCE_FILE = (
     / "assemblies"
     / "electric_switchboard_assembly.yaml"
 )
+WHOLE_PRINTER_RESOURCE_FILE = (
+    Path(__file__).resolve().parents[1]
+    / "assembling"
+    / "assemblies"
+    / "whole_printer_assembly.yaml"
+)
 ASSEMBLIES_FILE = ASSEMBLIES_DIR / "assemblies.yaml"
 
 
@@ -326,14 +332,23 @@ def test_switchboard_cable_hole_rows_are_on_both_long_sides():
 
 def test_switchboard_resource_declares_visualization_and_production_rules():
     resource = yaml.safe_load(RESOURCE_FILE.read_text())
+    whole_printer_resource = yaml.safe_load(WHOLE_PRINTER_RESOURCE_FILE.read_text())
     assemblies = yaml.load(ASSEMBLIES_FILE.read_text(), Loader=AssemblyDefaultsLoader)
     visualization_parts = resource["Builder"]["Visualization"]["parts"]
+    whole_printer_visualization_parts = whole_printer_resource["Builder"][
+        "Visualization"
+    ]["parts"]
     production = resource["Builder"]["Production"]
     resource_parameters = resource["Parameters"]
     switchboard_assembly = next(
         assembly
         for assembly in assemblies["assemblies"]
         if assembly["name"] == "electric_switchboard_assembly"
+    )
+    whole_printer_assembly = next(
+        assembly
+        for assembly in assemblies["assemblies"]
+        if assembly["name"] == "whole_printer_assembly"
     )
     switchboard_placements = [
         placement
@@ -376,6 +391,24 @@ def test_switchboard_resource_declares_visualization_and_production_rules():
         for rule in visualization_parts
         if rule.get("names") == ["fuse_holder_terminal_blades"]
     )
+    whole_printer_switchboard_rule = next(
+        rule
+        for rule in whole_printer_visualization_parts
+        if rule.get("assembly") == "electric_switchboard"
+        and rule.get("artifact") == "leader"
+    )
+    whole_printer_switchboard_button_rule = next(
+        rule
+        for rule in whole_printer_visualization_parts
+        if rule.get("assembly") == "electric_switchboard"
+        and rule.get("names") == ["emergency_button_button_disc"]
+    )
+    whole_printer_switchboard_fuse_rule = next(
+        rule
+        for rule in whole_printer_visualization_parts
+        if rule.get("assembly") == "electric_switchboard"
+        and rule.get("names") == ["fuse_holder_holder_body"]
+    )
     production_part = production["parts"][0]
 
     assert switchboard_rule["color"] == [1, 1, 1]
@@ -385,6 +418,9 @@ def test_switchboard_resource_declares_visualization_and_production_rules():
     assert fuse_holder_body_rule["color"] == [0.35, 0.45, 0.55]
     assert fuse_holder_nut_rule["color"] == [0.78, 0.78, 0.72]
     assert fuse_holder_blade_rule["color"] == [0.9, 0.86, 0.72]
+    assert whole_printer_switchboard_rule["color"] == [1, 1, 1]
+    assert whole_printer_switchboard_button_rule["color"] == [0.88, 0.02, 0.02]
+    assert whole_printer_switchboard_fuse_rule["color"] == [0.35, 0.45, 0.55]
     assert production["process_data_preset"] == "petgcf_max_strength_high_speed_06"
     assert production_part["artifact"] == "leader"
     assert production_part["name"] == "electric_switchboard_box"
@@ -401,6 +437,11 @@ def test_switchboard_resource_declares_visualization_and_production_rules():
         "emergency_button": "emergency_button_assembly",
         "fuse_holder": "fuse_holder_assembly",
     }
+    assert "electric_switchboard_assembly" in whole_printer_assembly["depends_on"]
+    assert (
+        whole_printer_assembly["inject_parts"]["electric_switchboard"]
+        == "electric_switchboard_assembly"
+    )
     assert switchboard_assembly["parameters"][
         "electric_switchboard_fuse_holder_bottom_clearance"
     ] == {"$ref": "electric_switchboard_fuse_holder_bottom_clearance"}
