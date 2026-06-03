@@ -30,9 +30,10 @@ cd /Users/mege/git/mege-ender-3v3ke-idex
 
 - `pico_w_btt_tmc2226_y_axis_bringup.cfg` is the older Y-only temporary
   `printer.cfg`.
-- `pico_w_btt_tmc2226_y_z_bringup.cfg` is the current conservative IDEX motion
-  `printer.cfg`: X-left is `[stepper_x]`, X-right is `[dual_carriage]`, and Y
-  plus independent dual-Z are real Klipper axes.
+- `pico_w_btt_tmc2226_y_z_bringup.cfg` is the current conservative IDEX
+  motion-first `printer.cfg`: X-left is `[stepper_x]`, X-right is
+  `[dual_carriage]`, Y plus independent dual-Z are real Klipper axes, and the
+  heatbed thermistor is monitored without enabling bed heater control.
 - `toolhead_nitehawk_and_x_axis.cfg` is the fuller printer config kept for
   later integration.
 - `snippets/x_axis_stepper_endstop_pico_w.cfg` and
