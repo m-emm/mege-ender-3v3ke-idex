@@ -1,0 +1,134 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Heatbed PSU housing with side lid and M5 mount flanges
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - right
+        - top
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: leader
+        name: heatbed_psu_housing_box
+        color: [1, 1, 1]
+      - source: self
+        artifact: followers
+        names:
+          - heatbed_psu_housing_lid
+        name_template: "{name}"
+        color: [1, 1, 1]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - lid_mount_screw_*_screw
+          - lid_mount_screw_*_nut
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
+
+  Production:
+    process_data_preset: petgcf_max_strength_high_speed_06
+    parts:
+      - source: self
+        artifact: leader
+        name: heatbed_psu_housing_box
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        names:
+          - heatbed_psu_housing_lid
+        name_template: "{name}"
+        prod_rotation_angle: -90
+        prod_rotation_axis: [0, 1, 0]
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: heatbed_psu_housing_box
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                brim_type: no_brim
+                enable_support: "1"
+                support_type: tree(auto)
+                support_style: organic
+                support_on_build_plate_only: "1"
+                support_interface_spacing: "2"
+                wall_loops: "3"
+          parts:
+            - heatbed_psu_housing_box
+        - name: heatbed_psu_housing_lid
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                brim_type: no_brim
+                enable_support: "1"
+                support_type: tree(auto)
+                support_style: organic
+                support_on_build_plate_only: "1"
+                support_interface_spacing: "2"
+                wall_loops: "3"
+          parts:
+            - heatbed_psu_housing_lid
+      auto_assign_plates: false
+
+Parameters:
+  heatbed_psu_housing_height:
+    Type: Float
+  heatbed_psu_housing_width:
+    Type: Float
+  heatbed_psu_housing_depth:
+    Type: Float
+  heatbed_psu_housing_wall_thickness:
+    Type: Float
+  heatbed_psu_housing_cable_hole_diameter:
+    Type: Float
+  heatbed_psu_housing_cable_hole_x_inset:
+    Type: Float
+  heatbed_psu_housing_cable_hole_y_inset:
+    Type: Float
+  heatbed_psu_housing_mount_flange_screw_size:
+    Type: String
+  heatbed_psu_housing_mount_flange_width:
+    Type: Float
+  heatbed_psu_housing_mount_flange_length:
+    Type: Float
+  heatbed_psu_housing_mount_flange_thickness:
+    Type: Float
+  heatbed_psu_housing_mount_flange_fillet_radius:
+    Type: Float
+  heatbed_psu_housing_corner_fillet_radius:
+    Type: Float
+  heatbed_psu_housing_lid_thickness:
+    Type: Float
+  heatbed_psu_housing_lid_body_clearance:
+    Type: Float
+  heatbed_psu_housing_lid_rim_depth:
+    Type: Float
+  heatbed_psu_housing_lid_rim_thickness:
+    Type: Float
+  heatbed_psu_housing_lid_rim_clearance:
+    Type: Float
+  heatbed_psu_housing_lid_screw_size:
+    Type: String
+  heatbed_psu_housing_lid_screw_length:
+    Type: Float
+  heatbed_psu_housing_lid_screw_inset:
+    Type: Float
+  heatbed_psu_housing_lid_screw_mount_block_size:
+    Type: Float
+
+Parts:
+  HeatbedPsuHousingAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.heatbed_psu_housing_assembly.create_heatbed_psu_housing_assembly

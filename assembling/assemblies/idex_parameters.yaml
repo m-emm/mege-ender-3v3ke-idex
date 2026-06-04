@@ -408,6 +408,28 @@ globals:
   electric_switchboard_lid_screw_mount_block_size: 15
   electric_switchboard_lid_screw_mount_depth: 30
   electric_switchboard_frame_back_offset: 120
+  heatbed_psu_housing_height: 45
+  heatbed_psu_housing_width: 55
+  heatbed_psu_housing_depth: 90
+  heatbed_psu_housing_wall_thickness: !Ref electric_switchboard_wall_thickness
+  heatbed_psu_housing_cable_hole_diameter: 9
+  heatbed_psu_housing_cable_hole_x_inset: 16
+  heatbed_psu_housing_cable_hole_y_inset: 12
+  heatbed_psu_housing_mount_flange_screw_size: !Ref electric_switchboard_mount_flange_screw_size
+  heatbed_psu_housing_mount_flange_width: !Ref electric_switchboard_mount_flange_width
+  heatbed_psu_housing_mount_flange_length: !Ref electric_switchboard_mount_flange_length
+  heatbed_psu_housing_mount_flange_thickness: !Ref electric_switchboard_mount_flange_thickness
+  heatbed_psu_housing_mount_flange_fillet_radius: !Ref electric_switchboard_mount_flange_fillet_radius
+  heatbed_psu_housing_corner_fillet_radius: !Ref electric_switchboard_corner_fillet_radius
+  heatbed_psu_housing_lid_thickness: !Ref electric_switchboard_lid_thickness
+  heatbed_psu_housing_lid_body_clearance: !Ref electric_switchboard_lid_body_clearance
+  heatbed_psu_housing_lid_rim_depth: !Ref electric_switchboard_lid_rim_depth
+  heatbed_psu_housing_lid_rim_thickness: !Ref heatbed_psu_housing_wall_thickness
+  heatbed_psu_housing_lid_rim_clearance: !Ref electric_switchboard_lid_rim_clearance
+  heatbed_psu_housing_lid_screw_size: !Ref electric_switchboard_lid_screw_size
+  heatbed_psu_housing_lid_screw_length: !Ref electric_switchboard_lid_screw_length
+  heatbed_psu_housing_lid_screw_inset: !Ref electric_switchboard_lid_screw_inset
+  heatbed_psu_housing_lid_screw_mount_block_size: !Ref electric_switchboard_lid_screw_mount_block_size
   fuse_holder_thread_diameter: 14.85
   fuse_holder_thread_length: 8.5
   fuse_holder_total_cylinder_length: 50

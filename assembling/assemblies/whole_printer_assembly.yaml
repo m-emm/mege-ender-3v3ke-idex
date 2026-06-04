@@ -506,6 +506,26 @@ Builder:
           - cable_cutout_cover_mount_nuts
         name_template: "electric_switchboard_{name}"
         color: [0.78, 0.78, 0.72]
+      - source: injected
+        assembly: heatbed_psu_housing
+        artifact: leader
+        name: heatbed_psu_housing_box
+        color: [1, 1, 1]
+      - source: injected
+        assembly: heatbed_psu_housing
+        artifact: followers
+        names:
+          - heatbed_psu_housing_lid
+        name_template: "heatbed_psu_housing_{name}"
+        color: [1, 1, 1]
+      - source: injected
+        assembly: heatbed_psu_housing
+        artifact: non_production_parts
+        names:
+          - lid_mount_screw_*_screw
+          - lid_mount_screw_*_nut
+        name_template: "heatbed_psu_housing_{name}"
+        color: [0.78, 0.78, 0.72]
 
 Parameters:
   print_bed_y_travel:

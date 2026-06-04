@@ -601,6 +601,20 @@ placement:
         - $ref: electric_switchboard_frame_back_offset
         - 0
 
+    - part: heatbed_psu_housing_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 1, 0]
+    - part: heatbed_psu_housing_assembly
+      to: printer_frame_assembly
+      alignment: CENTER
+    - part: heatbed_psu_housing_assembly
+      to: printer_frame_assembly
+      alignment: STACK_RIGHT
+    - part: heatbed_psu_housing_assembly
+      to: printer_frame_assembly
+      alignment: BOTTOM
+
 process_data_generators:
   mege3devops_parametric:
     function: mege_3devops.process_data.parametric.resolve_process_data_from_parameters
@@ -1032,6 +1046,34 @@ assemblies:
       electric_switchboard_lid_screw_inset: !Ref electric_switchboard_lid_screw_inset
       electric_switchboard_lid_screw_mount_block_size: !Ref electric_switchboard_lid_screw_mount_block_size
       electric_switchboard_lid_screw_mount_depth: !Ref electric_switchboard_lid_screw_mount_depth
+
+  - name: heatbed_psu_housing_assembly
+
+    resource_file: heatbed_psu_housing_assembly.yaml
+    depends_on: []
+    parameters:
+      heatbed_psu_housing_height: !Ref heatbed_psu_housing_height
+      heatbed_psu_housing_width: !Ref heatbed_psu_housing_width
+      heatbed_psu_housing_depth: !Ref heatbed_psu_housing_depth
+      heatbed_psu_housing_wall_thickness: !Ref heatbed_psu_housing_wall_thickness
+      heatbed_psu_housing_cable_hole_diameter: !Ref heatbed_psu_housing_cable_hole_diameter
+      heatbed_psu_housing_cable_hole_x_inset: !Ref heatbed_psu_housing_cable_hole_x_inset
+      heatbed_psu_housing_cable_hole_y_inset: !Ref heatbed_psu_housing_cable_hole_y_inset
+      heatbed_psu_housing_mount_flange_screw_size: !Ref heatbed_psu_housing_mount_flange_screw_size
+      heatbed_psu_housing_mount_flange_width: !Ref heatbed_psu_housing_mount_flange_width
+      heatbed_psu_housing_mount_flange_length: !Ref heatbed_psu_housing_mount_flange_length
+      heatbed_psu_housing_mount_flange_thickness: !Ref heatbed_psu_housing_mount_flange_thickness
+      heatbed_psu_housing_mount_flange_fillet_radius: !Ref heatbed_psu_housing_mount_flange_fillet_radius
+      heatbed_psu_housing_corner_fillet_radius: !Ref heatbed_psu_housing_corner_fillet_radius
+      heatbed_psu_housing_lid_thickness: !Ref heatbed_psu_housing_lid_thickness
+      heatbed_psu_housing_lid_body_clearance: !Ref heatbed_psu_housing_lid_body_clearance
+      heatbed_psu_housing_lid_rim_depth: !Ref heatbed_psu_housing_lid_rim_depth
+      heatbed_psu_housing_lid_rim_thickness: !Ref heatbed_psu_housing_lid_rim_thickness
+      heatbed_psu_housing_lid_rim_clearance: !Ref heatbed_psu_housing_lid_rim_clearance
+      heatbed_psu_housing_lid_screw_size: !Ref heatbed_psu_housing_lid_screw_size
+      heatbed_psu_housing_lid_screw_length: !Ref heatbed_psu_housing_lid_screw_length
+      heatbed_psu_housing_lid_screw_inset: !Ref heatbed_psu_housing_lid_screw_inset
+      heatbed_psu_housing_lid_screw_mount_block_size: !Ref heatbed_psu_housing_lid_screw_mount_block_size
 
   - name: fuse_holder_assembly
 
@@ -2016,6 +2058,7 @@ assemblies:
       - printer_host_and_screen_assembly
       - raspberry_pi_assembly
       - electric_switchboard_assembly
+      - heatbed_psu_housing_assembly
     inject_parts:
       printer_frame: printer_frame_assembly
       printer_foot_left_front: printer_foot_left_front_assembly
@@ -2070,6 +2113,7 @@ assemblies:
       printer_host_and_screen: printer_host_and_screen_assembly
       raspberry_pi: raspberry_pi_assembly
       electric_switchboard: electric_switchboard_assembly
+      heatbed_psu_housing: heatbed_psu_housing_assembly
 
   - name: tool_head_mounts_collection_assembly
 
