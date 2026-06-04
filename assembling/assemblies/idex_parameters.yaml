@@ -368,7 +368,7 @@ globals:
   emergency_button_neck_mount_hole_clearance: 0.5
   electric_switchboard_height: 100
   electric_switchboard_width: 40
-  electric_switchboard_depth: 90
+  electric_switchboard_depth: 120
   electric_switchboard_wall_thickness: 1.8
   electric_switchboard_fuse_holder_bottom_clearance: 20
   electric_switchboard_mount_flange_screw_size: "M5"
