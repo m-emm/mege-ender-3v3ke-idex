@@ -14,7 +14,8 @@ def create_electric_switchboard_assembly(
     electric_switchboard_width,
     electric_switchboard_depth,
     electric_switchboard_wall_thickness,
-    electric_switchboard_fuse_holder_bottom_clearance,
+    electric_switchboard_fuse_holder_top_y_offset,
+    electric_switchboard_emergency_button_top_y_offset,
     electric_switchboard_mount_flange_screw_size,
     electric_switchboard_mount_flange_width,
     electric_switchboard_mount_flange_length,
@@ -76,28 +77,22 @@ def create_electric_switchboard_assembly(
         top_panel_reference,
         Alignment.CENTER,
     )
+    emergency_button = translate(
+        0,
+        electric_switchboard_emergency_button_top_y_offset,
+        0,
+    )(emergency_button)
     switchboard_box = switchboard_box.cut(
         emergency_button.get_cutter_part_by_name("neck_mount_hole")
     )
 
-    fuse_holder_front_panel_reference = create_box(
-        electric_switchboard_width,
-        electric_switchboard_wall_thickness,
-        electric_switchboard_height,
-    )
-    fuse_holder = rotate(-90, axis=(0, 0, 1))(fuse_holder)
+    fuse_holder = rotate(-90, axis=(0, 1, 0))(fuse_holder)
     fuse_holder = fuse_holder.aligned_from_non_production_part(
         "mount_panel_reference",
-        fuse_holder_front_panel_reference,
+        top_panel_reference,
         Alignment.CENTER,
-        axes=[0, 1],
     )
-    fuse_holder = fuse_holder.aligned_from_non_production_part(
-        "mount_panel_reference",
-        fuse_holder_front_panel_reference,
-        Alignment.BOTTOM,
-    )
-    fuse_holder = translate(0, 0, electric_switchboard_fuse_holder_bottom_clearance)(
+    fuse_holder = translate(0, electric_switchboard_fuse_holder_top_y_offset, 0)(
         fuse_holder
     )
     switchboard_box = switchboard_box.cut(

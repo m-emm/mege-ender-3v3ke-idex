@@ -75,6 +75,18 @@ def create_fuse_holder_assembly(
     holder_body = holder_body.fuse(thread)
     holder_body = holder_body.fuse(front_cap)
 
+    mount_panel_reference_thickness = 1.8
+    mount_panel_reference = create_cylinder(
+        fuse_holder_mount_hole_diameter / 2,
+        mount_panel_reference_thickness,
+        origin=(
+            fuse_holder_front_start - mount_panel_reference_thickness,
+            0,
+            0,
+        ),
+        direction=(1, 0, 0),
+    )
+
     nut_points = []
     for point_index in range(6):
         angle = point_index * math.pi / 3
@@ -89,8 +101,8 @@ def create_fuse_holder_assembly(
         fuse_holder_mount_nut_thickness,
     )
     mount_nut = rotate(90, axis=(0, 1, 0))(mount_nut)
-    mount_nut = align(mount_nut, front_cap, Alignment.CENTER, axes=[1, 2])
-    mount_nut = align(mount_nut, front_cap, Alignment.STACK_LEFT)
+    mount_nut = align(mount_nut, mount_panel_reference, Alignment.CENTER, axes=[1, 2])
+    mount_nut = align(mount_nut, mount_panel_reference, Alignment.STACK_LEFT)
 
     mount_nut_bore = create_cylinder(
         fuse_holder_mount_hole_diameter / 2,
@@ -109,17 +121,6 @@ def create_fuse_holder_assembly(
     terminal_blades = blade_1.fuse(blade_2)
 
     holder_reference = holder_body.fuse(mount_nut).fuse(terminal_blades)
-
-    mount_panel_reference = create_cylinder(
-        fuse_holder_mount_hole_diameter / 2,
-        1.8,
-        origin=(
-            fuse_holder_front_start - fuse_holder_mount_nut_thickness - 1.8,
-            0,
-            0,
-        ),
-        direction=(1, 0, 0),
-    )
 
     cutter_length = fuse_holder_total_cylinder_length + 20
     mount_hole = create_cylinder(
