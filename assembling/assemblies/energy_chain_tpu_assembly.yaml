@@ -1,0 +1,89 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: TPU skeleton for the y-axis energy chain
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - front
+        - right
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: leader
+        name: energy_chain_tpu
+
+  Production:
+    process_data_preset: tpu_minimal_quality_minimal_strength_06
+    process_data:
+      overrides:
+        process_overrides:
+          enable_support: "0"
+          brim_type: no_brim
+          sparse_infill_density: "100%"
+          wall_loops: "3"
+    parts:
+      - source: self
+        artifact: leader
+        name: energy_chain_tpu
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: energy_chain_tpu
+          parts:
+            - energy_chain_tpu
+      auto_assign_plates: false
+
+Parameters:
+  energy_chain_num_links:
+    Type: Integer
+  energy_chain_width:
+    Type: Float
+  energy_chain_base_thickness:
+    Type: Float
+  energy_chain_link_length:
+    Type: Float
+  energy_chain_link_connector_thickness:
+    Type: Float
+  energy_chain_link_connector_width:
+    Type: Float
+  energy_chain_plug_diameter:
+    Type: Float
+  energy_chain_plug_slit_width:
+    Type: Float
+  energy_chain_plug_base_thickness:
+    Type: Float
+  energy_chain_plug_fillet_radius:
+    Type: Float
+  energy_chain_plug_wall_thickness:
+    Type: Float
+  energy_chain_plug_lip_height:
+    Type: Float
+  energy_chain_plug_lip_size:
+    Type: Float
+  energy_chain_plug_lip_top_gap:
+    Type: Float
+  energy_chain_plug_hole_slack:
+    Type: Float
+  energy_chain_channel_wall_thickness:
+    Type: Float
+  energy_chain_channel_link_thickness:
+    Type: Float
+  energy_chain_channel_link_width:
+    Type: Float
+  energy_chain_channel_height:
+    Type: Float
+  energy_chain_plug_plate_width:
+    Type: Float
+
+Parts:
+  EnergyChainTpuAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.energy_chain_tpu_assembly.create_energy_chain_tpu_assembly

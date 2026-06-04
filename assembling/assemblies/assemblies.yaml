@@ -801,6 +801,32 @@ assemblies:
         - FRONT
         - BACK
 
+  - name: y_axis_energy_chain_tpu_assembly
+
+    resource_file: energy_chain_tpu_assembly.yaml
+    depends_on: []
+    parameters:
+      energy_chain_num_links: !Ref y_axis_energy_chain_num_links
+      energy_chain_width: !Ref y_axis_energy_chain_width
+      energy_chain_base_thickness: !Ref y_axis_energy_chain_base_thickness
+      energy_chain_link_length: !Ref y_axis_energy_chain_link_length
+      energy_chain_link_connector_thickness: !Ref y_axis_energy_chain_link_connector_thickness
+      energy_chain_link_connector_width: !Ref y_axis_energy_chain_link_connector_width
+      energy_chain_plug_diameter: !Ref y_axis_energy_chain_plug_diameter
+      energy_chain_plug_slit_width: !Ref y_axis_energy_chain_plug_slit_width
+      energy_chain_plug_base_thickness: !Ref y_axis_energy_chain_plug_base_thickness
+      energy_chain_plug_fillet_radius: !Ref y_axis_energy_chain_plug_fillet_radius
+      energy_chain_plug_wall_thickness: !Ref y_axis_energy_chain_plug_wall_thickness
+      energy_chain_plug_lip_height: !Ref y_axis_energy_chain_plug_lip_height
+      energy_chain_plug_lip_size: !Ref y_axis_energy_chain_plug_lip_size
+      energy_chain_plug_lip_top_gap: !Ref y_axis_energy_chain_plug_lip_top_gap
+      energy_chain_plug_hole_slack: !Ref y_axis_energy_chain_plug_hole_slack
+      energy_chain_channel_wall_thickness: !Ref y_axis_energy_chain_channel_wall_thickness
+      energy_chain_channel_link_thickness: !Ref y_axis_energy_chain_channel_link_thickness
+      energy_chain_channel_link_width: !Ref y_axis_energy_chain_channel_link_width
+      energy_chain_channel_height: !Ref y_axis_energy_chain_channel_height
+      energy_chain_plug_plate_width: !Ref y_axis_energy_chain_plug_plate_width
+
   - name: y_axis_endstop_holder_assembly
 
     resource_file: y_axis_endstop_holder_assembly.yaml
