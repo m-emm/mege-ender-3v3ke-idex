@@ -80,11 +80,6 @@ Builder:
 
   Production:
     process_data_preset: petgcf_max_strength_high_speed_06
-    process_data:
-      overrides:
-        process_overrides:
-          enable_support: "0"
-          wall_loops: "3"
     parts:
       - source: self
         artifact: leader
@@ -96,19 +91,30 @@ Builder:
         names:
           - electric_switchboard_lid
         name_template: "{name}"
-        prod_rotation_angle: 90
+        prod_rotation_angle: -90
         prod_rotation_axis: [0, 1, 0]
       - source: self
         artifact: followers
         names:
           - electric_switchboard_cable_cutout_cover
         name_template: "{name}"
-        prod_rotation_angle: 90
+        prod_rotation_angle: -90
         prod_rotation_axis: [1, 0, 0]
     arrange:
       export_individual_parts: false
       plates:
         - name: electric_switchboard
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                brim_type: no_brim
+                enable_support: "1"
+                support_type: tree(auto)
+                support_style: organic
+                support_on_build_plate_only: "1"
+                support_interface_spacing: "2"
+                wall_loops: "3"
           parts:
             - electric_switchboard_box
             - electric_switchboard_lid
