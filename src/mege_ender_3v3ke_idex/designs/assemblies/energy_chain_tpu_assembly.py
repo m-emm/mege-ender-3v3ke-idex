@@ -44,8 +44,9 @@ def create_energy_chain_tpu_assembly(
 
     chain = PartCollector()
     walls_2 = PartCollector()
-    plug_hole_cutters = PartCollector()
     for i in range(energy_chain_num_links):
+
+        fixed_link_body = PartCollector()
 
         plate = create_box(
             energy_chain_base_thickness,
@@ -54,7 +55,7 @@ def create_energy_chain_tpu_assembly(
         )
 
         plate = translate(0, i * link_pitch, 0)(plate)
-        chain = chain.fuse(plate)
+        fixed_link_body = fixed_link_body.fuse(plate)
 
         link = create_box(
             energy_chain_link_connector_thickness,
@@ -64,7 +65,7 @@ def create_energy_chain_tpu_assembly(
         link = align(link, plate, Alignment.CENTER)
         link = align(link, plate, Alignment.STACK_BACK)
         link = align(link, plate, Alignment.LEFT)
-        chain = chain.fuse(link)
+        fixed_link_body = fixed_link_body.fuse(link)
 
         channel_wall_1 = create_box(
             energy_chain_channel_height,
@@ -75,7 +76,7 @@ def create_energy_chain_tpu_assembly(
         channel_wall_1 = align(channel_wall_1, plate, Alignment.CENTER)
         channel_wall_1 = align(channel_wall_1, plate, Alignment.BOTTOM)
         channel_wall_1 = align(channel_wall_1, plate, Alignment.STACK_RIGHT)
-        chain = chain.fuse(channel_wall_1)
+        fixed_link_body = fixed_link_body.fuse(channel_wall_1)
 
         channel_link_1 = create_box(
             energy_chain_channel_link_width,
@@ -85,7 +86,7 @@ def create_energy_chain_tpu_assembly(
         channel_link_1 = align(channel_link_1, channel_wall_1, Alignment.CENTER)
         channel_link_1 = align(channel_link_1, channel_wall_1, Alignment.STACK_RIGHT)
         channel_link_1 = align(channel_link_1, channel_wall_1, Alignment.BOTTOM)
-        chain = chain.fuse(channel_link_1)
+        fixed_link_body = fixed_link_body.fuse(channel_link_1)
 
         channel_wall_2 = create_box(
             energy_chain_width - energy_chain_plug_plate_width,
@@ -133,15 +134,13 @@ def create_energy_chain_tpu_assembly(
         hole_cutter = rotate(-90, axis=(0, 1, 0), center=closure_rotation_center)(
             hole_cutter
         )
-        plug_hole_cutters = plug_hole_cutters.fuse(hole_cutter)
 
+        fixed_link_body = fixed_link_body.cut(hole_cutter)
+        chain = chain.fuse(fixed_link_body)
         chain = chain.fuse(channel_wall_2)
 
         walls_2 = walls_2.fuse(channel_wall_2)
 
-    chain = chain.cut(plug_hole_cutters)
-
     retval = LeaderFollowersCuttersPart(leader=chain)
-    retval.add_named_cutter(plug_hole_cutters, "plug_hole_cutters")
     retval.add_named_non_production_part(walls_2, "walls_2")
     return retval
