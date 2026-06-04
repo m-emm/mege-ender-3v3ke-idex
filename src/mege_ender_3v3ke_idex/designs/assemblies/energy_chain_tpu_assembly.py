@@ -85,7 +85,7 @@ def create_energy_chain_tpu_assembly(
         channel_wall_2 = align(channel_wall_2, channel_link_1, Alignment.STACK_RIGHT)
         chain = chain.fuse(channel_wall_2)
 
-        walls_2 = walls_2.fuse(channel_wall_1).fuse(channel_wall_2)
+        walls_2 = walls_2.fuse(channel_wall_2)
 
     unused_parameters = (
         energy_chain_num_links,
