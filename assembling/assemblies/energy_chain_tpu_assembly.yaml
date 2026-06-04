@@ -70,6 +70,10 @@ Parameters:
     Type: Float
   energy_chain_plug_diameter:
     Type: Float
+  energy_chain_plug_angle_deg:
+    Type: Float
+  energy_chain_plug_height:
+    Type: Float
   energy_chain_plug_slit_width:
     Type: Float
   energy_chain_plug_base_thickness:

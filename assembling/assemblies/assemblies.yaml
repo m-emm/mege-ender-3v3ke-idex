@@ -813,6 +813,8 @@ assemblies:
       energy_chain_link_connector_thickness: !Ref y_axis_energy_chain_link_connector_thickness
       energy_chain_link_connector_width: !Ref y_axis_energy_chain_link_connector_width
       energy_chain_plug_diameter: !Ref y_axis_energy_chain_plug_diameter
+      energy_chain_plug_angle_deg: !Ref y_axis_energy_chain_plug_angle_deg
+      energy_chain_plug_height: !Ref y_axis_energy_chain_plug_height
       energy_chain_plug_slit_width: !Ref y_axis_energy_chain_plug_slit_width
       energy_chain_plug_base_thickness: !Ref y_axis_energy_chain_plug_base_thickness
       energy_chain_plug_fillet_radius: !Ref y_axis_energy_chain_plug_fillet_radius
