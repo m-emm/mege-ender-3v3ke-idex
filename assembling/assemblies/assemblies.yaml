@@ -954,16 +954,21 @@ assemblies:
       electric_switchboard_width: !Ref electric_switchboard_width
       electric_switchboard_depth: !Ref electric_switchboard_depth
       electric_switchboard_wall_thickness: !Ref electric_switchboard_wall_thickness
-      electric_switchboard_cable_hole_count: !Ref electric_switchboard_cable_hole_count
-      electric_switchboard_cable_hole_diameter: !Ref electric_switchboard_cable_hole_diameter
-      electric_switchboard_cable_hole_pitch: !Ref electric_switchboard_cable_hole_pitch
-      electric_switchboard_cable_hole_z_offset_from_open_bottom: !Ref electric_switchboard_cable_hole_z_offset_from_open_bottom
       electric_switchboard_fuse_holder_bottom_clearance: !Ref electric_switchboard_fuse_holder_bottom_clearance
       electric_switchboard_mount_flange_screw_size: !Ref electric_switchboard_mount_flange_screw_size
       electric_switchboard_mount_flange_width: !Ref electric_switchboard_mount_flange_width
       electric_switchboard_mount_flange_length: !Ref electric_switchboard_mount_flange_length
       electric_switchboard_mount_flange_thickness: !Ref electric_switchboard_mount_flange_thickness
       electric_switchboard_mount_flange_fillet_radius: !Ref electric_switchboard_mount_flange_fillet_radius
+      electric_switchboard_corner_fillet_radius: !Ref electric_switchboard_corner_fillet_radius
+      electric_switchboard_lid_thickness: !Ref electric_switchboard_lid_thickness
+      electric_switchboard_lid_rim_depth: !Ref electric_switchboard_lid_rim_depth
+      electric_switchboard_lid_rim_clearance: !Ref electric_switchboard_lid_rim_clearance
+      electric_switchboard_lid_screw_size: !Ref electric_switchboard_lid_screw_size
+      electric_switchboard_lid_screw_length: !Ref electric_switchboard_lid_screw_length
+      electric_switchboard_lid_screw_inset: !Ref electric_switchboard_lid_screw_inset
+      electric_switchboard_lid_screw_mount_block_size: !Ref electric_switchboard_lid_screw_mount_block_size
+      electric_switchboard_lid_screw_mount_depth: !Ref electric_switchboard_lid_screw_mount_depth
 
   - name: fuse_holder_assembly
 

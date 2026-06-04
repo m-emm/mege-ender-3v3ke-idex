@@ -19,6 +19,12 @@ Builder:
         name: electric_switchboard_box
         color: [1, 1, 1]
       - source: self
+        artifact: followers
+        names:
+          - electric_switchboard_lid
+        name_template: "{name}"
+        color: [1, 1, 1]
+      - source: self
         artifact: non_production_parts
         names:
           - emergency_button_body
@@ -55,6 +61,13 @@ Builder:
           - fuse_holder_terminal_blades
         name_template: "{name}"
         color: [0.9, 0.86, 0.72]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - lid_screws
+          - lid_nuts
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
 
   Production:
     process_data_preset: petgcf_max_strength_high_speed_06
@@ -67,13 +80,22 @@ Builder:
       - source: self
         artifact: leader
         name: electric_switchboard_box
-        flip: true
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        names:
+          - electric_switchboard_lid
+        name_template: "{name}"
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
     arrange:
       export_individual_parts: false
       plates:
         - name: electric_switchboard
           parts:
             - electric_switchboard_box
+            - electric_switchboard_lid
       auto_assign_plates: false
 
 Parameters:
@@ -84,14 +106,6 @@ Parameters:
   electric_switchboard_depth:
     Type: Float
   electric_switchboard_wall_thickness:
-    Type: Float
-  electric_switchboard_cable_hole_count:
-    Type: Integer
-  electric_switchboard_cable_hole_diameter:
-    Type: Float
-  electric_switchboard_cable_hole_pitch:
-    Type: Float
-  electric_switchboard_cable_hole_z_offset_from_open_bottom:
     Type: Float
   electric_switchboard_fuse_holder_bottom_clearance:
     Type: Float
@@ -104,6 +118,24 @@ Parameters:
   electric_switchboard_mount_flange_thickness:
     Type: Float
   electric_switchboard_mount_flange_fillet_radius:
+    Type: Float
+  electric_switchboard_corner_fillet_radius:
+    Type: Float
+  electric_switchboard_lid_thickness:
+    Type: Float
+  electric_switchboard_lid_rim_depth:
+    Type: Float
+  electric_switchboard_lid_rim_clearance:
+    Type: Float
+  electric_switchboard_lid_screw_size:
+    Type: String
+  electric_switchboard_lid_screw_length:
+    Type: Float
+  electric_switchboard_lid_screw_inset:
+    Type: Float
+  electric_switchboard_lid_screw_mount_block_size:
+    Type: Float
+  electric_switchboard_lid_screw_mount_depth:
     Type: Float
 
 Parts:

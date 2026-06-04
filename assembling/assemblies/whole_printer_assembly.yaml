@@ -440,6 +440,13 @@ Builder:
         color: [1, 1, 1]
       - source: injected
         assembly: electric_switchboard
+        artifact: followers
+        names:
+          - electric_switchboard_lid
+        name_template: "electric_switchboard_{name}"
+        color: [1, 1, 1]
+      - source: injected
+        assembly: electric_switchboard
         artifact: non_production_parts
         names:
           - emergency_button_body
@@ -481,6 +488,14 @@ Builder:
           - fuse_holder_terminal_blades
         name_template: "electric_switchboard_{name}"
         color: [0.9, 0.86, 0.72]
+      - source: injected
+        assembly: electric_switchboard
+        artifact: non_production_parts
+        names:
+          - lid_screws
+          - lid_nuts
+        name_template: "electric_switchboard_{name}"
+        color: [0.78, 0.78, 0.72]
 
 Parameters:
   print_bed_y_travel:
