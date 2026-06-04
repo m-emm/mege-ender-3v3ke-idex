@@ -683,7 +683,7 @@ globals:
   y_axis_carriage_stopper_fillet_radius: 3
   y_axis_carriage_stopper_mount_screw_size: "M5"
   y_axis_carriage_stopper_mount_screw_length: 16
-  y_axis_energy_chain_num_links: 30
+  y_axis_energy_chain_num_links: 6
   y_axis_energy_chain_max_diameter_on_print_bed: 210
   y_axis_energy_chain_width: 15
   y_axis_energy_chain_base_thickness: 3.5
@@ -700,7 +700,7 @@ globals:
   y_axis_energy_chain_plug_lip_height: 0.8
   y_axis_energy_chain_plug_lip_size: 0.8
   y_axis_energy_chain_plug_lip_top_gap: 1.0
-  y_axis_energy_chain_plug_hole_slack: 0.1
+  y_axis_energy_chain_plug_hole_slack: 0.4
   y_axis_energy_chain_channel_wall_thickness: 0.9
   y_axis_energy_chain_channel_link_thickness: 0.4
   y_axis_energy_chain_channel_link_width: 1
