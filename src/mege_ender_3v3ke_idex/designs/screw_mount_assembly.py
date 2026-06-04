@@ -127,6 +127,33 @@ def create_screw_mount_assembly(
     additional_screw_mount_clearance=0.0,
     top_sink=0,
 ):
+    """Create one screw mount centered on one face of ``for_part``.
+
+    ``screw_direction`` names the face where the screw head sits on the
+    outside of the part. The screw tip always points inward through the part,
+    toward the opposite face.
+
+    Example: for ``Alignment.TOP``, the head is above the part on the top face
+    and the tip points downward into the part toward ``Alignment.BOTTOM``.
+
+    The directions are meant like this:
+
+    - ``Alignment.TOP``: head points to top, tip points to bottom.
+    - ``Alignment.BOTTOM``: head points to bottom, tip points to top.
+    - ``Alignment.FRONT``: head points to front, tip points to back.
+    - ``Alignment.BACK``: head points to back, tip points to front.
+    - ``Alignment.LEFT``: head points to left, tip points to right.
+    - ``Alignment.RIGHT``: head points to right, tip points to left.
+
+    In bounding-box terms this is placed on:
+
+    - ``TOP``: ``max z`` face
+    - ``BOTTOM``: ``min z`` face
+    - ``FRONT``: ``min y`` face
+    - ``BACK``: ``max y`` face
+    - ``LEFT``: ``min x`` face
+    - ``RIGHT``: ``max x`` face
+    """
 
     part_bb_size = get_bounding_box_size(for_part)
 
@@ -203,6 +230,19 @@ def create_four_screws_mount_assembly(
     clearance_type="normal",
     additional_screw_mount_clearance=0.0,
 ):
+    """Create four inset screw mounts on one face of ``for_part``.
+
+    ``screw_direction`` has the same meaning as in
+    ``create_screw_mount_assembly()``: it selects the outer face where all four
+    screw heads sit, while the screw tips point inward toward the opposite
+    face.
+
+    Example: with ``screw_direction=Alignment.RIGHT``, all four heads are on the
+    right side of the part and all four tips point leftward into the part.
+
+    ``width_inset`` and ``length_inset`` move the four screw positions inward
+    from the face edges in the two in-plane directions of that selected face.
+    """
 
     part_bb_size = get_bounding_box_size(for_part)
 
