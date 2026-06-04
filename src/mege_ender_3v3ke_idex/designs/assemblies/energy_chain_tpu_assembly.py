@@ -25,36 +25,14 @@ def _spiral_arc_length(theta, outer_radius, spiral_b):
     ) / spiral_b
 
 
-def _minimum_outer_spiral_radius(
-    *,
-    total_path_length,
-    inner_radius,
-    spiral_revolution_spacing,
+def _theta_at_spiral_length(
+    target_length,
+    outer_radius,
+    spiral_b,
+    minimum_radius,
 ):
-    spiral_b = spiral_revolution_spacing / (2 * math.pi)
-    lower = inner_radius + 1e-6
-    upper = max(lower + spiral_revolution_spacing, lower + total_path_length / math.pi)
-
-    def available_length(radius):
-        theta_end = (radius - inner_radius) / spiral_b
-        return _spiral_arc_length(theta_end, radius, spiral_b)
-
-    while available_length(upper) < total_path_length:
-        upper *= 2
-
-    for _ in range(80):
-        middle = (lower + upper) / 2
-        if available_length(middle) < total_path_length:
-            lower = middle
-        else:
-            upper = middle
-
-    return upper, spiral_b
-
-
-def _theta_at_spiral_length(target_length, outer_radius, spiral_b):
     lower = 0
-    upper = outer_radius / spiral_b
+    upper = (outer_radius - minimum_radius) / spiral_b
 
     for _ in range(80):
         middle = (lower + upper) / 2
@@ -66,8 +44,23 @@ def _theta_at_spiral_length(target_length, outer_radius, spiral_b):
     return upper
 
 
-def _spiral_point(path_length, outer_radius, spiral_b):
-    theta = _theta_at_spiral_length(path_length, outer_radius, spiral_b)
+def _spiral_radius_at_path_length(path_length, outer_radius, spiral_b, minimum_radius):
+    theta = _theta_at_spiral_length(
+        path_length,
+        outer_radius,
+        spiral_b,
+        minimum_radius,
+    )
+    return outer_radius - spiral_b * theta
+
+
+def _spiral_point(path_length, outer_radius, spiral_b, minimum_radius):
+    theta = _theta_at_spiral_length(
+        path_length,
+        outer_radius,
+        spiral_b,
+        minimum_radius,
+    )
     radius = outer_radius - spiral_b * theta
     return radius * math.cos(theta), radius * math.sin(theta)
 
@@ -78,32 +71,6 @@ def _rotate_xy(point, angle_degrees):
     return (
         x * math.cos(angle) - y * math.sin(angle),
         x * math.sin(angle) + y * math.cos(angle),
-    )
-
-
-def _placed_xy(local_point, position, angle_degrees):
-    rotated = _rotate_xy(local_point, angle_degrees)
-    return position[0] + rotated[0], position[1] + rotated[1]
-
-
-def _normalize_degrees(angle):
-    return (angle + 180) % 360 - 180
-
-
-def _normalize_3d(vector):
-    length = math.sqrt(sum(component * component for component in vector))
-    return tuple(component / length for component in vector)
-
-
-def _dot_3d(left, right):
-    return sum(a * b for a, b in zip(left, right))
-
-
-def _cross_3d(left, right):
-    return (
-        left[1] * right[2] - left[2] * right[1],
-        left[2] * right[0] - left[0] * right[2],
-        left[0] * right[1] - left[1] * right[0],
     )
 
 
@@ -229,134 +196,93 @@ def _create_energy_chain_tpu_link(
 
 def _create_spiral_connector(
     *,
+    start_xy,
+    end_xy,
+    midpoint_radius,
+    energy_chain_link_length,
+    energy_chain_link_connector_thickness,
+    energy_chain_width,
     current_position,
     current_angle,
     next_position,
     next_angle,
-    energy_chain_link_length,
-    energy_chain_link_connector_thickness,
-    energy_chain_link_connector_width,
-    energy_chain_width,
-    energy_chain_base_thickness,
 ):
-    connector_embed = min(
-        energy_chain_link_length * 0.45,
-        max(energy_chain_base_thickness * 1.5, energy_chain_link_connector_width * 3),
-    )
-
-    start_xy = _placed_xy(
-        (
-            energy_chain_link_connector_thickness / 2,
-            energy_chain_link_length - connector_embed,
-        ),
-        current_position,
-        current_angle,
-    )
-    end_xy = _placed_xy(
-        (energy_chain_link_connector_thickness / 2, connector_embed),
-        next_position,
-        next_angle,
-    )
     start = (start_xy[0], start_xy[1], energy_chain_width / 2)
     end = (end_xy[0], end_xy[1], energy_chain_width / 2)
-
-    dx = end_xy[0] - start_xy[0]
-    dy = end_xy[1] - start_xy[1]
-    connector_length = math.hypot(dx, dy)
-    connector_length = max(connector_length, 1e-6)
-    angle_delta = abs(_normalize_degrees(next_angle - current_angle))
-
-    if angle_delta < 1:
-        return _create_straight_spiral_connector(
-            start=start,
-            end=end,
-            connector_length=connector_length,
-            energy_chain_link_connector_thickness=energy_chain_link_connector_thickness,
-            energy_chain_width=energy_chain_width,
-        )
-
-    middle_radius = connector_length / (
-        2 * math.sin(math.radians(angle_delta) / 2)
-    )
-    middle_radius = max(middle_radius, connector_length / 2 + 1e-6)
-    inner_radius = middle_radius - energy_chain_link_connector_thickness / 2
-    outer_radius = middle_radius + energy_chain_link_connector_thickness / 2
+    inner_radius = midpoint_radius - energy_chain_link_connector_thickness / 2
+    outer_radius = midpoint_radius + energy_chain_link_connector_thickness / 2
     if inner_radius <= 0:
         return _create_straight_spiral_connector(
             start=start,
             end=end,
-            connector_length=connector_length,
             energy_chain_link_connector_thickness=energy_chain_link_connector_thickness,
             energy_chain_width=energy_chain_width,
         )
 
-    midpoint = ((start[0] + end[0]) / 2, (start[1] + end[1]) / 2)
-    chord_half_length = connector_length / 2
-    distance_to_center = math.sqrt(
-        max(0, middle_radius * middle_radius - chord_half_length * chord_half_length)
-    )
-    if distance_to_center <= 1e-6:
-        return _create_straight_spiral_connector(
-            start=start,
-            end=end,
-            connector_length=connector_length,
-            energy_chain_link_connector_thickness=energy_chain_link_connector_thickness,
-            energy_chain_width=energy_chain_width,
-        )
-
-    chord_perpendicular = (-dy / connector_length, dx / connector_length)
-    center_candidates = [
-        (
-            midpoint[0] + chord_perpendicular[0] * distance_to_center,
-            midpoint[1] + chord_perpendicular[1] * distance_to_center,
-            energy_chain_width / 2,
-        ),
-        (
-            midpoint[0] - chord_perpendicular[0] * distance_to_center,
-            midpoint[1] - chord_perpendicular[1] * distance_to_center,
-            energy_chain_width / 2,
-        ),
-    ]
-    current_direction = (*_rotate_xy((0, 1), current_angle), 0)
-    next_direction = (*_rotate_xy((0, 1), next_angle), 0)
-
-    def tangent_score(center):
-        edge = (end[0] - start[0], end[1] - start[1], 0)
-        center_side = (
-            center[0] - midpoint[0],
-            center[1] - midpoint[1],
-            0,
-        )
-        plane_normal = _normalize_3d(_cross_3d(edge, center_side))
-        start_radius = (start[0] - center[0], start[1] - center[1], 0)
-        end_radius = (end[0] - center[0], end[1] - center[1], 0)
-        start_tangent = _normalize_3d(_cross_3d(plane_normal, start_radius))
-        end_tangent = _normalize_3d(_cross_3d(plane_normal, end_radius))
-        return _dot_3d(start_tangent, current_direction) + _dot_3d(
-            end_tangent, next_direction
-        )
-
-    center = max(center_candidates, key=tangent_score)
-    return create_ring_segment_between_points(
+    third_point_on_plane = (0, 0, energy_chain_width / 2)
+    connector = create_ring_segment_between_points(
         start,
         end,
-        center,
+        third_point_on_plane,
         inner_radius,
         outer_radius,
         energy_chain_width,
     )
+    connector = connector.fuse(
+        _create_connector_edge_pad(
+            position=current_position,
+            angle=current_angle,
+            local_edge_y=energy_chain_link_length,
+            inside_direction=-1,
+            energy_chain_link_connector_thickness=energy_chain_link_connector_thickness,
+            energy_chain_width=energy_chain_width,
+        )
+    )
+    return connector.fuse(
+        _create_connector_edge_pad(
+            position=next_position,
+            angle=next_angle,
+            local_edge_y=0,
+            inside_direction=1,
+            energy_chain_link_connector_thickness=energy_chain_link_connector_thickness,
+            energy_chain_width=energy_chain_width,
+        )
+    )
+
+
+def _create_connector_edge_pad(
+    *,
+    position,
+    angle,
+    local_edge_y,
+    inside_direction,
+    energy_chain_link_connector_thickness,
+    energy_chain_width,
+):
+    pad_overlap = 0.2
+    pad_length = 2 * pad_overlap
+    origin_y = -pad_overlap if inside_direction > 0 else -pad_length + pad_overlap
+    pad = create_box(
+        energy_chain_link_connector_thickness,
+        pad_length,
+        energy_chain_width,
+        origin=(0, origin_y, 0),
+    )
+    pad = translate(0, local_edge_y, 0)(pad)
+    pad = rotate(angle)(pad)
+    return translate(position[0], position[1], 0)(pad)
 
 
 def _create_straight_spiral_connector(
     *,
     start,
     end,
-    connector_length,
     energy_chain_link_connector_thickness,
     energy_chain_width,
 ):
     dx = end[0] - start[0]
     dy = end[1] - start[1]
+    connector_length = math.hypot(dx, dy)
     connector_angle = math.degrees(math.atan2(dy, dx)) - 90
     connector = create_box(
         energy_chain_link_connector_thickness,
@@ -365,53 +291,96 @@ def _create_straight_spiral_connector(
         origin=(-energy_chain_link_connector_thickness / 2, -connector_length / 2, 0),
     )
     connector = rotate(connector_angle)(connector)
-    return translate((start[0] + end[0]) / 2, (start[1] + end[1]) / 2, 0)(
-        connector
-    )
+    return translate((start[0] + end[0]) / 2, (start[1] + end[1]) / 2, 0)(connector)
 
 
 def _spiral_link_placements(
     *,
     energy_chain_num_links,
-    link_pitch,
-    radial_footprint,
+    energy_chain_max_diameter_on_print_bed,
+    energy_chain_base_thickness,
+    energy_chain_width,
+    energy_chain_link_length,
+    energy_chain_link_connector_thickness,
+    energy_chain_link_connector_width,
+    energy_chain_channel_height,
     energy_chain_channel_wall_thickness,
 ):
-    total_path_length = energy_chain_num_links * link_pitch
-    inner_radius = radial_footprint / 2
+    if energy_chain_num_links < 1:
+        raise ValueError("energy_chain_num_links must be at least 1")
+
+    radial_footprint = (
+        energy_chain_base_thickness + energy_chain_channel_height + energy_chain_width
+    )
+    connector_lane_x = energy_chain_link_connector_thickness / 2
+    outer_radius = energy_chain_max_diameter_on_print_bed / 2 - (
+        radial_footprint - connector_lane_x
+    )
+    minimum_radius = radial_footprint / 2
     spiral_revolution_spacing = radial_footprint + max(
         1.0, energy_chain_channel_wall_thickness
     )
-    outer_radius, spiral_b = _minimum_outer_spiral_radius(
-        total_path_length=total_path_length,
-        inner_radius=inner_radius,
-        spiral_revolution_spacing=spiral_revolution_spacing,
-    )
+    spiral_b = spiral_revolution_spacing / (2 * math.pi)
+    link_pitch = energy_chain_link_length + energy_chain_link_connector_width
+    required_path_length = (
+        energy_chain_num_links - 1
+    ) * link_pitch + energy_chain_link_length
+    maximum_theta = (outer_radius - minimum_radius) / spiral_b
 
-    raw_placements = []
-    for index in range(energy_chain_num_links):
-        current_point = _spiral_point(index * link_pitch, outer_radius, spiral_b)
-        next_point = _spiral_point((index + 1) * link_pitch, outer_radius, spiral_b)
-        dx = next_point[0] - current_point[0]
-        dy = next_point[1] - current_point[1]
-        angle = math.degrees(math.atan2(dy, dx)) - 90
-        raw_placements.append((current_point, angle))
-
-    first_point, first_angle = raw_placements[0]
-    placements = []
-    for current_point, angle in raw_placements:
-        normalized_point = _rotate_xy(
-            (current_point[0] - first_point[0], current_point[1] - first_point[1]),
-            -first_angle,
+    if maximum_theta <= 0:
+        raise ValueError(
+            "energy_chain_max_diameter_on_print_bed is too small for the link footprint"
         )
-        placements.append((normalized_point, angle - first_angle))
 
-    return placements
+    available_path_length = _spiral_arc_length(
+        maximum_theta,
+        outer_radius,
+        spiral_b,
+    )
+    if required_path_length > available_path_length:
+        raise ValueError(
+            "Energy chain does not fit in the configured spiral: "
+            f"requires {required_path_length:.2f} mm of path, "
+            f"but only {available_path_length:.2f} mm are available before "
+            f"the centerline radius reaches {minimum_radius:.2f} mm"
+        )
+
+    placements = []
+    for index in range(energy_chain_num_links):
+        start_path_length = index * link_pitch
+        end_path_length = start_path_length + energy_chain_link_length
+        start_point = _spiral_point(
+            start_path_length,
+            outer_radius,
+            spiral_b,
+            minimum_radius,
+        )
+        end_point = _spiral_point(
+            end_path_length,
+            outer_radius,
+            spiral_b,
+            minimum_radius,
+        )
+        dx = end_point[0] - start_point[0]
+        dy = end_point[1] - start_point[1]
+        angle = math.degrees(math.atan2(dy, dx)) - 90
+        connector_lane_offset = _rotate_xy(
+            (connector_lane_x, 0),
+            angle,
+        )
+        position = (
+            start_point[0] - connector_lane_offset[0],
+            start_point[1] - connector_lane_offset[1],
+        )
+        placements.append((position, angle))
+
+    return placements, outer_radius, spiral_b, minimum_radius
 
 
 def create_energy_chain_tpu_assembly(
     *,
     energy_chain_num_links,
+    energy_chain_max_diameter_on_print_bed,
     energy_chain_width,
     energy_chain_base_thickness,
     energy_chain_link_length,
@@ -436,7 +405,6 @@ def create_energy_chain_tpu_assembly(
 ):
     """Create the TPU energy chain as a spiral-printable assembly."""
 
-    link_pitch = energy_chain_link_length + energy_chain_link_connector_width
     link_template = _create_energy_chain_tpu_link(
         energy_chain_width=energy_chain_width,
         energy_chain_base_thickness=energy_chain_base_thickness,
@@ -459,13 +427,18 @@ def create_energy_chain_tpu_assembly(
         energy_chain_plug_plate_width=energy_chain_plug_plate_width,
         include_non_production_part=True,
     )
-    radial_footprint = get_bounding_box_size(link_template.leader)[0]
-    placements = _spiral_link_placements(
+    placements, outer_radius, spiral_b, minimum_radius = _spiral_link_placements(
         energy_chain_num_links=energy_chain_num_links,
-        link_pitch=link_pitch,
-        radial_footprint=radial_footprint,
+        energy_chain_max_diameter_on_print_bed=(energy_chain_max_diameter_on_print_bed),
+        energy_chain_base_thickness=energy_chain_base_thickness,
+        energy_chain_width=energy_chain_width,
+        energy_chain_link_length=energy_chain_link_length,
+        energy_chain_link_connector_thickness=energy_chain_link_connector_thickness,
+        energy_chain_link_connector_width=energy_chain_link_connector_width,
+        energy_chain_channel_height=energy_chain_channel_height,
         energy_chain_channel_wall_thickness=energy_chain_channel_wall_thickness,
     )
+    link_pitch = energy_chain_link_length + energy_chain_link_connector_width
 
     chain = PartCollector()
     first_walls_2 = None
@@ -479,16 +452,34 @@ def create_energy_chain_tpu_assembly(
 
     for index, (position, angle) in enumerate(placements[:-1]):
         next_position, next_angle = placements[index + 1]
+        connector_start_path_length = index * link_pitch + energy_chain_link_length
+        connector_end_path_length = (index + 1) * link_pitch
         connector = _create_spiral_connector(
+            start_xy=_spiral_point(
+                connector_start_path_length,
+                outer_radius,
+                spiral_b,
+                minimum_radius,
+            ),
+            end_xy=_spiral_point(
+                connector_end_path_length,
+                outer_radius,
+                spiral_b,
+                minimum_radius,
+            ),
+            midpoint_radius=_spiral_radius_at_path_length(
+                (connector_start_path_length + connector_end_path_length) / 2,
+                outer_radius,
+                spiral_b,
+                minimum_radius,
+            ),
+            energy_chain_link_length=energy_chain_link_length,
+            energy_chain_link_connector_thickness=energy_chain_link_connector_thickness,
+            energy_chain_width=energy_chain_width,
             current_position=position,
             current_angle=angle,
             next_position=next_position,
             next_angle=next_angle,
-            energy_chain_link_length=energy_chain_link_length,
-            energy_chain_link_connector_thickness=energy_chain_link_connector_thickness,
-            energy_chain_link_connector_width=energy_chain_link_connector_width,
-            energy_chain_width=energy_chain_width,
-            energy_chain_base_thickness=energy_chain_base_thickness,
         )
         chain = chain.fuse(connector)
 

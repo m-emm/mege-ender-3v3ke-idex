@@ -684,6 +684,7 @@ globals:
   y_axis_carriage_stopper_mount_screw_size: "M5"
   y_axis_carriage_stopper_mount_screw_length: 16
   y_axis_energy_chain_num_links: 30
+  y_axis_energy_chain_max_diameter_on_print_bed: 210
   y_axis_energy_chain_width: 15
   y_axis_energy_chain_base_thickness: 3.5
   y_axis_energy_chain_link_length: 15

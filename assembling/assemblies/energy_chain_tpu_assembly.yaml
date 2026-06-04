@@ -22,17 +22,6 @@ Builder:
         names:
           - walls_2
         name_template: "{name}"
-        animation:
-          energy_chain_close:
-            type: rotation
-            axis: [0, 1, 0]
-            angle_degrees: -90
-            origin:
-              - $expr:
-                  "$sub": "${energy_chain_base_thickness} + ${energy_chain_channel_height} + ${energy_chain_channel_link_width} / 2"
-              - 0
-              - $expr:
-                  "$sub": "${energy_chain_channel_link_thickness} *0.75 "
 
   Production:
     process_data_preset: tpu_minimal_quality_minimal_strength_06
@@ -58,6 +47,8 @@ Builder:
 Parameters:
   energy_chain_num_links:
     Type: Integer
+  energy_chain_max_diameter_on_print_bed:
+    Type: Float
   energy_chain_width:
     Type: Float
   energy_chain_base_thickness:
