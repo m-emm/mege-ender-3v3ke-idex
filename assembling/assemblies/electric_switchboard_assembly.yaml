@@ -66,6 +66,7 @@ Builder:
         names:
           - lid_mount_screw_*_screw
           - lid_mount_screw_*_nut
+          - electric_switchboard_rail_screws
         name_template: "{name}"
         color: [0.78, 0.78, 0.72]
 
@@ -110,6 +111,18 @@ Parameters:
   electric_switchboard_fuse_holder_top_y_offset:
     Type: Float
   electric_switchboard_emergency_button_top_y_offset:
+    Type: Float
+  electric_switchboard_rail_width:
+    Type: Float
+  electric_switchboard_rail_height:
+    Type: Float
+  electric_switchboard_rail_screw_size:
+    Type: String
+  electric_switchboard_rail_screw_length:
+    Type: Float
+  electric_switchboard_rail_num_spots:
+    Type: Integer
+  electric_switchboard_rail_z_offset_from_bottom:
     Type: Float
   electric_switchboard_mount_flange_screw_size:
     Type: String

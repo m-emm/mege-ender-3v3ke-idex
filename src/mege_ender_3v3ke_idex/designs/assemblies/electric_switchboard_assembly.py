@@ -16,6 +16,12 @@ def create_electric_switchboard_assembly(
     electric_switchboard_wall_thickness,
     electric_switchboard_fuse_holder_top_y_offset,
     electric_switchboard_emergency_button_top_y_offset,
+    electric_switchboard_rail_width,
+    electric_switchboard_rail_height,
+    electric_switchboard_rail_screw_size,
+    electric_switchboard_rail_screw_length,
+    electric_switchboard_rail_num_spots,
+    electric_switchboard_rail_z_offset_from_bottom,
     electric_switchboard_mount_flange_screw_size,
     electric_switchboard_mount_flange_width,
     electric_switchboard_mount_flange_length,
@@ -98,6 +104,60 @@ def create_electric_switchboard_assembly(
     switchboard_box = switchboard_box.cut(
         fuse_holder.get_cutter_part_by_name("mount_hole")
     )
+
+    rail = create_box(
+        electric_switchboard_rail_height,
+        electric_switchboard_depth - 2 * electric_switchboard_wall_thickness,
+        electric_switchboard_rail_width,
+    )
+    rail = align(rail, switchboard_reference, Alignment.CENTER, axes=[1])
+    rail = align(rail, switchboard_reference, Alignment.RIGHT)
+    rail = translate(-electric_switchboard_wall_thickness, 0, 0)(rail)
+    rail = align(rail, switchboard_reference, Alignment.BOTTOM)
+    rail = translate(0, 0, electric_switchboard_rail_z_offset_from_bottom)(rail)
+
+    rail_screw_spec = MScrew.from_size(electric_switchboard_rail_screw_size)
+    rail_pitch = get_bounding_box_size(rail)[1] / (
+        electric_switchboard_rail_num_spots + 1
+    )
+    rail_bbox = get_bounding_box(rail)
+    rail_center_y = get_bounding_box_center(rail)[1]
+    rail_screws = PartCollector()
+
+    for rail_spot_index in range(electric_switchboard_rail_num_spots):
+        rail_screw_y = rail_bbox[0][1] + rail_pitch * (rail_spot_index + 1)
+        rail_y_offset = rail_screw_y - rail_center_y
+
+        rail_screw = create_cylinder_screw(
+            electric_switchboard_rail_screw_size,
+            electric_switchboard_rail_screw_length,
+        )
+        rail_screw = translate(0, 0, -electric_switchboard_rail_screw_length)(
+            rail_screw
+        )
+        rail_screw = rotate(-90, axis=(0, 1, 0))(rail_screw)
+        rail_screw = align(rail_screw, rail, Alignment.CENTER, axes=[1, 2])
+        rail_screw = align(rail_screw, rail, Alignment.LEFT)
+        rail_screw = translate(
+            -rail_screw_spec.cylinder_head_height,
+            rail_y_offset,
+            0,
+        )(rail_screw)
+        rail_screws = rail_screws.fuse(rail_screw)
+
+        rail_nut_pocket_cutter = create_hidden_nut_pocket_cutter(
+            electric_switchboard_rail_screw_size,
+            bottom_cutter_length=electric_switchboard_rail_width,
+            top_cutter_length=electric_switchboard_rail_width,
+            slack=0.3,
+        )
+        rail_nut_pocket_cutter = rotate(-90, axis=(0, 1, 0))(rail_nut_pocket_cutter)
+        rail_nut_pocket_cutter = rotate(90, axis=(1, 0, 0))(rail_nut_pocket_cutter)
+        rail_nut_pocket_cutter = align(rail_nut_pocket_cutter, rail, Alignment.CENTER)
+        rail_nut_pocket_cutter = translate(0, rail_y_offset, 0)(rail_nut_pocket_cutter)
+        rail = rail_nut_pocket_cutter.use_as_cutter_on(rail)
+
+    switchboard_box = switchboard_box.fuse(rail)
 
     lid = create_filleted_box(
         electric_switchboard_lid_thickness,
@@ -223,6 +283,9 @@ def create_electric_switchboard_assembly(
     switchboard = LeaderFollowersCuttersPart(leader=switchboard_box)
     switchboard.add_named_follower(lid, "electric_switchboard_lid")
     switchboard.add_named_cutter(mount_flange_screw_holes, "mount_flange_screw_holes")
+    switchboard.add_named_non_production_part(
+        rail_screws, "electric_switchboard_rail_screws"
+    )
     switchboard = switchboard.merge_except_leader(
         lid_screw_mount.prefixed_copy("lid_mount")
     )
