@@ -109,7 +109,7 @@ def create_electric_switchboard_assembly(
         electric_switchboard_depth,
         electric_switchboard_height,
         fillet_radius=electric_switchboard_corner_fillet_radius,
-        no_fillets_at=[Alignment.LEFT, Alignment.RIGHT],
+        no_fillets_at=[Alignment.LEFT, Alignment.RIGHT, Alignment.BOTTOM],
     )
     lid = align(lid, switchboard_reference, Alignment.CENTER, axes=[1, 2])
     lid = align(lid, switchboard_reference, Alignment.STACK_LEFT)
