@@ -369,7 +369,7 @@ globals:
   electric_switchboard_height: 100
   electric_switchboard_width: 40
   electric_switchboard_depth: 120
-  electric_switchboard_wall_thickness: 1.8
+  electric_switchboard_wall_thickness: 2.8
   electric_switchboard_fuse_holder_top_y_offset: -30
   electric_switchboard_emergency_button_top_y_offset: 20
   electric_switchboard_rail_width: 7
@@ -378,6 +378,7 @@ globals:
   electric_switchboard_rail_screw_length: 12
   electric_switchboard_rail_num_spots: 8
   electric_switchboard_rail_z_offset_from_bottom: 20
+  electric_switchboard_rail_nut_pocket_clearance: 0.3
   electric_switchboard_cable_cutout_width: 10
   electric_switchboard_cable_cutout_height_ratio: 0.4
   electric_switchboard_cable_cutout_fillet_radius: 3
@@ -387,7 +388,7 @@ globals:
   electric_switchboard_cable_cutout_cover_clearance: 0.2
   electric_switchboard_cable_cutout_cover_mount_screw_size: "M3"
   electric_switchboard_cable_cutout_cover_mount_screw_length: 8
-  electric_switchboard_cable_cutout_cover_mount_nut_clearance: 0.2
+  electric_switchboard_cable_cutout_cover_mount_nut_clearance: 0.3
   electric_switchboard_cable_cutout_cover_mount_nut_pocket_sink_depth: 1.2
   electric_switchboard_mount_flange_screw_size: "M5"
   electric_switchboard_mount_flange_width: 15
@@ -396,7 +397,9 @@ globals:
   electric_switchboard_mount_flange_fillet_radius: 3
   electric_switchboard_corner_fillet_radius: 3
   electric_switchboard_lid_thickness: 4
+  electric_switchboard_lid_body_clearance: 0.4
   electric_switchboard_lid_rim_depth: 3
+  electric_switchboard_lid_rim_thickness: 1.8
   electric_switchboard_lid_rim_clearance: 0.3
   electric_switchboard_lid_screw_size: "M3"
   electric_switchboard_lid_screw_length: 30

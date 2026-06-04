@@ -103,7 +103,7 @@ Builder:
     arrange:
       export_individual_parts: false
       plates:
-        - name: electric_switchboard
+        - name: electric_switchboard_box
           process_data_preset: petgcf_max_strength_high_speed_06
           process_data:
             overrides:
@@ -117,6 +117,19 @@ Builder:
                 wall_loops: "3"
           parts:
             - electric_switchboard_box
+        - name: electric_switchboard_lid
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                brim_type: no_brim
+                enable_support: "1"
+                support_type: tree(auto)
+                support_style: organic
+                support_on_build_plate_only: "1"
+                support_interface_spacing: "2"
+                wall_loops: "3"
+          parts:
             - electric_switchboard_lid
         - name: electric_switchboard_cable_cutout_cover
           process_data_preset: tpu_minimal_quality_minimal_strength_06
@@ -148,6 +161,8 @@ Parameters:
   electric_switchboard_rail_num_spots:
     Type: Integer
   electric_switchboard_rail_z_offset_from_bottom:
+    Type: Float
+  electric_switchboard_rail_nut_pocket_clearance:
     Type: Float
   electric_switchboard_cable_cutout_width:
     Type: Float
@@ -185,7 +200,11 @@ Parameters:
     Type: Float
   electric_switchboard_lid_thickness:
     Type: Float
+  electric_switchboard_lid_body_clearance:
+    Type: Float
   electric_switchboard_lid_rim_depth:
+    Type: Float
+  electric_switchboard_lid_rim_thickness:
     Type: Float
   electric_switchboard_lid_rim_clearance:
     Type: Float

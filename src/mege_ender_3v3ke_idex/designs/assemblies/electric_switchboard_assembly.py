@@ -22,6 +22,7 @@ def create_electric_switchboard_assembly(
     electric_switchboard_rail_screw_length,
     electric_switchboard_rail_num_spots,
     electric_switchboard_rail_z_offset_from_bottom,
+    electric_switchboard_rail_nut_pocket_clearance,
     electric_switchboard_cable_cutout_width,
     electric_switchboard_cable_cutout_height_ratio,
     electric_switchboard_cable_cutout_fillet_radius,
@@ -40,7 +41,9 @@ def create_electric_switchboard_assembly(
     electric_switchboard_mount_flange_fillet_radius,
     electric_switchboard_corner_fillet_radius,
     electric_switchboard_lid_thickness,
+    electric_switchboard_lid_body_clearance,
     electric_switchboard_lid_rim_depth,
+    electric_switchboard_lid_rim_thickness,
     electric_switchboard_lid_rim_clearance,
     electric_switchboard_lid_screw_size,
     electric_switchboard_lid_screw_length,
@@ -160,7 +163,7 @@ def create_electric_switchboard_assembly(
             electric_switchboard_rail_screw_size,
             bottom_cutter_length=electric_switchboard_rail_width,
             top_cutter_length=electric_switchboard_rail_width,
-            slack=0.3,
+            slack=electric_switchboard_rail_nut_pocket_clearance,
         )
         rail_nut_pocket_cutter = rotate(-90, axis=(0, 1, 0))(rail_nut_pocket_cutter)
         rail_nut_pocket_cutter = rotate(90, axis=(1, 0, 0))(rail_nut_pocket_cutter)
@@ -505,7 +508,12 @@ def create_electric_switchboard_assembly(
         no_fillets_at=[Alignment.LEFT, Alignment.RIGHT, Alignment.BOTTOM],
     )
     lid = align(lid, switchboard_reference, Alignment.CENTER, axes=[1, 2])
-    lid = align(lid, switchboard_reference, Alignment.STACK_LEFT)
+    lid = align(
+        lid,
+        switchboard_reference,
+        Alignment.STACK_LEFT,
+        stack_gap=electric_switchboard_lid_body_clearance,
+    )
 
     lid_rim_outer_width = (
         electric_switchboard_depth
@@ -517,23 +525,27 @@ def create_electric_switchboard_assembly(
         - 2 * electric_switchboard_wall_thickness
         - 2 * electric_switchboard_lid_rim_clearance
     )
-    lid_rim_inner_width = lid_rim_outer_width - 2 * electric_switchboard_wall_thickness
+    lid_rim_inner_width = (
+        lid_rim_outer_width - 2 * electric_switchboard_lid_rim_thickness
+    )
     lid_rim_inner_height = (
-        lid_rim_outer_height - 2 * electric_switchboard_wall_thickness
+        lid_rim_outer_height - 2 * electric_switchboard_lid_rim_thickness
     )
     lid_rim_fillet_radius = min(
         electric_switchboard_corner_fillet_radius,
-        electric_switchboard_wall_thickness / 2 - 0.1,
+        electric_switchboard_lid_rim_thickness / 2 - 0.1,
     )
     lid_rim = create_filleted_box(
-        electric_switchboard_lid_rim_depth,
+        electric_switchboard_lid_body_clearance + electric_switchboard_lid_rim_depth,
         lid_rim_outer_width,
         lid_rim_outer_height,
         fillet_radius=lid_rim_fillet_radius,
         no_fillets_at=[Alignment.LEFT, Alignment.RIGHT],
     )
     lid_rim_inner_cutter = create_box(
-        electric_switchboard_lid_rim_depth + 2,
+        electric_switchboard_lid_body_clearance
+        + electric_switchboard_lid_rim_depth
+        + 2,
         lid_rim_inner_width,
         lid_rim_inner_height,
     )

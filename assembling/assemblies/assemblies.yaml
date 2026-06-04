@@ -962,6 +962,7 @@ assemblies:
       electric_switchboard_rail_screw_length: !Ref electric_switchboard_rail_screw_length
       electric_switchboard_rail_num_spots: !Ref electric_switchboard_rail_num_spots
       electric_switchboard_rail_z_offset_from_bottom: !Ref electric_switchboard_rail_z_offset_from_bottom
+      electric_switchboard_rail_nut_pocket_clearance: !Ref electric_switchboard_rail_nut_pocket_clearance
       electric_switchboard_cable_cutout_width: !Ref electric_switchboard_cable_cutout_width
       electric_switchboard_cable_cutout_height_ratio: !Ref electric_switchboard_cable_cutout_height_ratio
       electric_switchboard_cable_cutout_fillet_radius: !Ref electric_switchboard_cable_cutout_fillet_radius
@@ -980,7 +981,9 @@ assemblies:
       electric_switchboard_mount_flange_fillet_radius: !Ref electric_switchboard_mount_flange_fillet_radius
       electric_switchboard_corner_fillet_radius: !Ref electric_switchboard_corner_fillet_radius
       electric_switchboard_lid_thickness: !Ref electric_switchboard_lid_thickness
+      electric_switchboard_lid_body_clearance: !Ref electric_switchboard_lid_body_clearance
       electric_switchboard_lid_rim_depth: !Ref electric_switchboard_lid_rim_depth
+      electric_switchboard_lid_rim_thickness: !Ref electric_switchboard_lid_rim_thickness
       electric_switchboard_lid_rim_clearance: !Ref electric_switchboard_lid_rim_clearance
       electric_switchboard_lid_screw_size: !Ref electric_switchboard_lid_screw_size
       electric_switchboard_lid_screw_length: !Ref electric_switchboard_lid_screw_length
