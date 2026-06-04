@@ -22,6 +22,17 @@ def create_electric_switchboard_assembly(
     electric_switchboard_rail_screw_length,
     electric_switchboard_rail_num_spots,
     electric_switchboard_rail_z_offset_from_bottom,
+    electric_switchboard_cable_cutout_width,
+    electric_switchboard_cable_cutout_height_ratio,
+    electric_switchboard_cable_cutout_fillet_radius,
+    electric_switchboard_cable_cutout_cover_y_oversize,
+    electric_switchboard_cable_cutout_cover_x_oversize,
+    electric_switchboard_cable_cutout_cover_thickness,
+    electric_switchboard_cable_cutout_cover_clearance,
+    electric_switchboard_cable_cutout_cover_mount_screw_size,
+    electric_switchboard_cable_cutout_cover_mount_screw_length,
+    electric_switchboard_cable_cutout_cover_mount_nut_clearance,
+    electric_switchboard_cable_cutout_cover_mount_nut_pocket_sink_depth,
     electric_switchboard_mount_flange_screw_size,
     electric_switchboard_mount_flange_width,
     electric_switchboard_mount_flange_length,
@@ -159,6 +170,333 @@ def create_electric_switchboard_assembly(
 
     switchboard_box = switchboard_box.fuse(rail)
 
+    cable_cutout_height = (
+        electric_switchboard_height * electric_switchboard_cable_cutout_height_ratio
+    )
+    cable_cutout_cutter_y_length = (
+        electric_switchboard_wall_thickness
+        + electric_switchboard_cable_cutout_cover_thickness
+        + 10
+    )
+    cable_cutout_fillet_radius = min(
+        electric_switchboard_cable_cutout_fillet_radius,
+        electric_switchboard_cable_cutout_width / 2 - 0.1,
+        cable_cutout_height / 2 - 0.1,
+    )
+
+    cable_cutout_cutter = PartCollector()
+    cable_cutout_cutter = cable_cutout_cutter.fuse(
+        create_box(
+            electric_switchboard_cable_cutout_width - 2 * cable_cutout_fillet_radius,
+            cable_cutout_cutter_y_length,
+            cable_cutout_height,
+            origin=(cable_cutout_fillet_radius, 0, 0),
+        )
+    )
+    cable_cutout_cutter = cable_cutout_cutter.fuse(
+        create_box(
+            electric_switchboard_cable_cutout_width,
+            cable_cutout_cutter_y_length,
+            cable_cutout_height - 2 * cable_cutout_fillet_radius,
+            origin=(0, 0, cable_cutout_fillet_radius),
+        )
+    )
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for tb in [Alignment.TOP, Alignment.BOTTOM]:
+            cable_cutout_corner = create_cylinder(
+                cable_cutout_fillet_radius,
+                cable_cutout_cutter_y_length,
+                origin=(
+                    (
+                        cable_cutout_fillet_radius
+                        if lr == Alignment.LEFT
+                        else electric_switchboard_cable_cutout_width
+                        - cable_cutout_fillet_radius
+                    ),
+                    0,
+                    (
+                        cable_cutout_fillet_radius
+                        if tb == Alignment.BOTTOM
+                        else cable_cutout_height - cable_cutout_fillet_radius
+                    ),
+                ),
+                direction=(0, 1, 0),
+            )
+            cable_cutout_cutter = cable_cutout_cutter.fuse(cable_cutout_corner)
+    cable_cutout_cutter = align(
+        cable_cutout_cutter, switchboard_reference, Alignment.CENTER, axes=[0, 2]
+    )
+    cable_cutout_cutter = align(
+        cable_cutout_cutter, switchboard_reference, Alignment.BACK
+    )
+    switchboard_box = switchboard_box.cut(cable_cutout_cutter)
+
+    cable_cutout_cover_width = (
+        electric_switchboard_cable_cutout_width
+        + electric_switchboard_cable_cutout_cover_x_oversize
+    )
+    cable_cutout_cover_height = (
+        cable_cutout_height + electric_switchboard_cable_cutout_cover_y_oversize
+    )
+    cable_cutout_cover_plug_depth = min(
+        electric_switchboard_wall_thickness,
+        electric_switchboard_cable_cutout_cover_thickness,
+    )
+    cable_cutout_cover_flange_thickness = (
+        electric_switchboard_cable_cutout_cover_thickness
+        - cable_cutout_cover_plug_depth
+    )
+    cable_cutout_cover_plug_width = (
+        electric_switchboard_cable_cutout_width
+        - 2 * electric_switchboard_cable_cutout_cover_clearance
+    )
+    cable_cutout_cover_plug_height = (
+        cable_cutout_height - 2 * electric_switchboard_cable_cutout_cover_clearance
+    )
+    cable_cutout_cover_fillet_radius = min(
+        electric_switchboard_cable_cutout_fillet_radius,
+        cable_cutout_cover_width / 2 - 0.1,
+        cable_cutout_cover_height / 2 - 0.1,
+    )
+    cable_cutout_cover_plug_fillet_radius = min(
+        cable_cutout_fillet_radius - electric_switchboard_cable_cutout_cover_clearance,
+        cable_cutout_cover_plug_width / 2 - 0.1,
+        cable_cutout_cover_plug_height / 2 - 0.1,
+    )
+
+    cable_cutout_cover_flange = PartCollector()
+    cable_cutout_cover_flange = cable_cutout_cover_flange.fuse(
+        create_box(
+            cable_cutout_cover_width - 2 * cable_cutout_cover_fillet_radius,
+            cable_cutout_cover_flange_thickness,
+            cable_cutout_cover_height,
+            origin=(cable_cutout_cover_fillet_radius, 0, 0),
+        )
+    )
+    cable_cutout_cover_flange = cable_cutout_cover_flange.fuse(
+        create_box(
+            cable_cutout_cover_width,
+            cable_cutout_cover_flange_thickness,
+            cable_cutout_cover_height - 2 * cable_cutout_cover_fillet_radius,
+            origin=(0, 0, cable_cutout_cover_fillet_radius),
+        )
+    )
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for tb in [Alignment.TOP, Alignment.BOTTOM]:
+            cable_cutout_cover_corner = create_cylinder(
+                cable_cutout_cover_fillet_radius,
+                cable_cutout_cover_flange_thickness,
+                origin=(
+                    (
+                        cable_cutout_cover_fillet_radius
+                        if lr == Alignment.LEFT
+                        else cable_cutout_cover_width - cable_cutout_cover_fillet_radius
+                    ),
+                    0,
+                    (
+                        cable_cutout_cover_fillet_radius
+                        if tb == Alignment.BOTTOM
+                        else cable_cutout_cover_height
+                        - cable_cutout_cover_fillet_radius
+                    ),
+                ),
+                direction=(0, 1, 0),
+            )
+            cable_cutout_cover_flange = cable_cutout_cover_flange.fuse(
+                cable_cutout_cover_corner
+            )
+    cable_cutout_cover_flange = align(
+        cable_cutout_cover_flange,
+        switchboard_reference,
+        Alignment.CENTER,
+        axes=[0, 2],
+    )
+    cable_cutout_cover_flange = align(
+        cable_cutout_cover_flange, switchboard_reference, Alignment.STACK_BACK
+    )
+
+    cable_cutout_cover_plug = PartCollector()
+    cable_cutout_cover_plug = cable_cutout_cover_plug.fuse(
+        create_box(
+            cable_cutout_cover_plug_width - 2 * cable_cutout_cover_plug_fillet_radius,
+            cable_cutout_cover_plug_depth,
+            cable_cutout_cover_plug_height,
+            origin=(cable_cutout_cover_plug_fillet_radius, 0, 0),
+        )
+    )
+    cable_cutout_cover_plug = cable_cutout_cover_plug.fuse(
+        create_box(
+            cable_cutout_cover_plug_width,
+            cable_cutout_cover_plug_depth,
+            cable_cutout_cover_plug_height - 2 * cable_cutout_cover_plug_fillet_radius,
+            origin=(0, 0, cable_cutout_cover_plug_fillet_radius),
+        )
+    )
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for tb in [Alignment.TOP, Alignment.BOTTOM]:
+            cable_cutout_cover_plug_corner = create_cylinder(
+                cable_cutout_cover_plug_fillet_radius,
+                cable_cutout_cover_plug_depth,
+                origin=(
+                    (
+                        cable_cutout_cover_plug_fillet_radius
+                        if lr == Alignment.LEFT
+                        else cable_cutout_cover_plug_width
+                        - cable_cutout_cover_plug_fillet_radius
+                    ),
+                    0,
+                    (
+                        cable_cutout_cover_plug_fillet_radius
+                        if tb == Alignment.BOTTOM
+                        else cable_cutout_cover_plug_height
+                        - cable_cutout_cover_plug_fillet_radius
+                    ),
+                ),
+                direction=(0, 1, 0),
+            )
+            cable_cutout_cover_plug = cable_cutout_cover_plug.fuse(
+                cable_cutout_cover_plug_corner
+            )
+    cable_cutout_cover_plug = align(
+        cable_cutout_cover_plug,
+        cable_cutout_cover_flange,
+        Alignment.CENTER,
+        axes=[0, 2],
+    )
+    cable_cutout_cover_plug = align(
+        cable_cutout_cover_plug, cable_cutout_cover_flange, Alignment.STACK_FRONT
+    )
+
+    cable_cutout_cover = cable_cutout_cover_flange.fuse(cable_cutout_cover_plug)
+
+    back_wall_reference = create_box(
+        electric_switchboard_width,
+        electric_switchboard_wall_thickness,
+        electric_switchboard_height,
+        origin=(
+            0,
+            electric_switchboard_depth - electric_switchboard_wall_thickness,
+            0,
+        ),
+    )
+    cable_cutout_cover_mount_screw_spec = MScrew.from_size(
+        electric_switchboard_cable_cutout_cover_mount_screw_size
+    )
+    cable_cutout_cover_mount_screw_z_offset = (
+        cable_cutout_height / 2 + (cable_cutout_cover_height - cable_cutout_height) / 4
+    )
+    cable_cutout_cover_mount_holes = PartCollector()
+    cable_cutout_cover_mount_nut_pocket_cutters = PartCollector()
+    cable_cutout_cover_mount_screws = PartCollector()
+    cable_cutout_cover_mount_nuts = PartCollector()
+
+    for tb in [Alignment.TOP, Alignment.BOTTOM]:
+        screw_z_translation = tb.sign * cable_cutout_cover_mount_screw_z_offset
+
+        cable_cutout_cover_mount_hole = create_cylinder(
+            cable_cutout_cover_mount_screw_spec.clearance_hole_normal / 2,
+            electric_switchboard_wall_thickness
+            + electric_switchboard_cable_cutout_cover_thickness
+            + 4,
+            direction=(0, 1, 0),
+        )
+        cable_cutout_cover_mount_hole = align(
+            cable_cutout_cover_mount_hole, cable_cutout_cover, Alignment.CENTER
+        )
+        cable_cutout_cover_mount_hole = translate(0, 0, screw_z_translation)(
+            cable_cutout_cover_mount_hole
+        )
+        cable_cutout_cover_mount_holes = cable_cutout_cover_mount_holes.fuse(
+            cable_cutout_cover_mount_hole
+        )
+
+        cable_cutout_cover_mount_screw = create_cylinder_screw(
+            electric_switchboard_cable_cutout_cover_mount_screw_size,
+            electric_switchboard_cable_cutout_cover_mount_screw_length,
+        )
+        cable_cutout_cover_mount_screw = translate(
+            0, 0, -electric_switchboard_cable_cutout_cover_mount_screw_length
+        )(cable_cutout_cover_mount_screw)
+        cable_cutout_cover_mount_screw = rotate(-90, axis=(1, 0, 0))(
+            cable_cutout_cover_mount_screw
+        )
+        cable_cutout_cover_mount_screw = align(
+            cable_cutout_cover_mount_screw,
+            cable_cutout_cover,
+            Alignment.CENTER,
+            axes=[0, 2],
+        )
+        cable_cutout_cover_mount_screw = align(
+            cable_cutout_cover_mount_screw,
+            cable_cutout_cover,
+            Alignment.BACK,
+        )
+        cable_cutout_cover_mount_screw = translate(
+            0,
+            cable_cutout_cover_mount_screw_spec.cylinder_head_height,
+            screw_z_translation,
+        )(cable_cutout_cover_mount_screw)
+        cable_cutout_cover_mount_screws = cable_cutout_cover_mount_screws.fuse(
+            cable_cutout_cover_mount_screw
+        )
+
+        cable_cutout_cover_mount_nut = create_nut(
+            electric_switchboard_cable_cutout_cover_mount_screw_size
+        )
+        cable_cutout_cover_mount_nut = rotate(-90, axis=(1, 0, 0))(
+            cable_cutout_cover_mount_nut
+        )
+        cable_cutout_cover_mount_nut = align(
+            cable_cutout_cover_mount_nut,
+            back_wall_reference,
+            Alignment.CENTER,
+            axes=[0, 2],
+        )
+        cable_cutout_cover_mount_nut = align(
+            cable_cutout_cover_mount_nut,
+            back_wall_reference,
+            Alignment.STACK_FRONT,
+        )
+        cable_cutout_cover_mount_nut = translate(0, 0, screw_z_translation)(
+            cable_cutout_cover_mount_nut
+        )
+        cable_cutout_cover_mount_nuts = cable_cutout_cover_mount_nuts.fuse(
+            cable_cutout_cover_mount_nut
+        )
+
+        cable_cutout_cover_mount_nut_pocket = create_nut(
+            electric_switchboard_cable_cutout_cover_mount_screw_size,
+            height=electric_switchboard_cable_cutout_cover_mount_nut_pocket_sink_depth,
+            slack=electric_switchboard_cable_cutout_cover_mount_nut_clearance,
+            no_hole=True,
+        )
+        cable_cutout_cover_mount_nut_pocket = rotate(-90, axis=(1, 0, 0))(
+            cable_cutout_cover_mount_nut_pocket
+        )
+        cable_cutout_cover_mount_nut_pocket = align(
+            cable_cutout_cover_mount_nut_pocket,
+            back_wall_reference,
+            Alignment.CENTER,
+            axes=[0, 2],
+        )
+        cable_cutout_cover_mount_nut_pocket = align(
+            cable_cutout_cover_mount_nut_pocket,
+            back_wall_reference,
+            Alignment.FRONT,
+        )
+        cable_cutout_cover_mount_nut_pocket = translate(0, 0, screw_z_translation)(
+            cable_cutout_cover_mount_nut_pocket
+        )
+        cable_cutout_cover_mount_nut_pocket_cutters = (
+            cable_cutout_cover_mount_nut_pocket_cutters.fuse(
+                cable_cutout_cover_mount_nut_pocket
+            )
+        )
+
+    cable_cutout_cover = cable_cutout_cover.cut(cable_cutout_cover_mount_holes)
+    switchboard_box = switchboard_box.cut(cable_cutout_cover_mount_holes)
+    switchboard_box = switchboard_box.cut(cable_cutout_cover_mount_nut_pocket_cutters)
+
     lid = create_filleted_box(
         electric_switchboard_lid_thickness,
         electric_switchboard_depth,
@@ -282,9 +620,18 @@ def create_electric_switchboard_assembly(
 
     switchboard = LeaderFollowersCuttersPart(leader=switchboard_box)
     switchboard.add_named_follower(lid, "electric_switchboard_lid")
+    switchboard.add_named_follower(
+        cable_cutout_cover, "electric_switchboard_cable_cutout_cover"
+    )
     switchboard.add_named_cutter(mount_flange_screw_holes, "mount_flange_screw_holes")
     switchboard.add_named_non_production_part(
         rail_screws, "electric_switchboard_rail_screws"
+    )
+    switchboard.add_named_non_production_part(
+        cable_cutout_cover_mount_screws, "cable_cutout_cover_mount_screws"
+    )
+    switchboard.add_named_non_production_part(
+        cable_cutout_cover_mount_nuts, "cable_cutout_cover_mount_nuts"
     )
     switchboard = switchboard.merge_except_leader(
         lid_screw_mount.prefixed_copy("lid_mount")

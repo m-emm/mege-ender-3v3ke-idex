@@ -962,6 +962,17 @@ assemblies:
       electric_switchboard_rail_screw_length: !Ref electric_switchboard_rail_screw_length
       electric_switchboard_rail_num_spots: !Ref electric_switchboard_rail_num_spots
       electric_switchboard_rail_z_offset_from_bottom: !Ref electric_switchboard_rail_z_offset_from_bottom
+      electric_switchboard_cable_cutout_width: !Ref electric_switchboard_cable_cutout_width
+      electric_switchboard_cable_cutout_height_ratio: !Ref electric_switchboard_cable_cutout_height_ratio
+      electric_switchboard_cable_cutout_fillet_radius: !Ref electric_switchboard_cable_cutout_fillet_radius
+      electric_switchboard_cable_cutout_cover_y_oversize: !Ref electric_switchboard_cable_cutout_cover_y_oversize
+      electric_switchboard_cable_cutout_cover_x_oversize: !Ref electric_switchboard_cable_cutout_cover_x_oversize
+      electric_switchboard_cable_cutout_cover_thickness: !Ref electric_switchboard_cable_cutout_cover_thickness
+      electric_switchboard_cable_cutout_cover_clearance: !Ref electric_switchboard_cable_cutout_cover_clearance
+      electric_switchboard_cable_cutout_cover_mount_screw_size: !Ref electric_switchboard_cable_cutout_cover_mount_screw_size
+      electric_switchboard_cable_cutout_cover_mount_screw_length: !Ref electric_switchboard_cable_cutout_cover_mount_screw_length
+      electric_switchboard_cable_cutout_cover_mount_nut_clearance: !Ref electric_switchboard_cable_cutout_cover_mount_nut_clearance
+      electric_switchboard_cable_cutout_cover_mount_nut_pocket_sink_depth: !Ref electric_switchboard_cable_cutout_cover_mount_nut_pocket_sink_depth
       electric_switchboard_mount_flange_screw_size: !Ref electric_switchboard_mount_flange_screw_size
       electric_switchboard_mount_flange_width: !Ref electric_switchboard_mount_flange_width
       electric_switchboard_mount_flange_length: !Ref electric_switchboard_mount_flange_length

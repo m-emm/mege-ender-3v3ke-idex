@@ -447,6 +447,13 @@ Builder:
         color: [1, 1, 1]
       - source: injected
         assembly: electric_switchboard
+        artifact: followers
+        names:
+          - electric_switchboard_cable_cutout_cover
+        name_template: "electric_switchboard_{name}"
+        color: [0.78, 0.86, 0.82]
+      - source: injected
+        assembly: electric_switchboard
         artifact: non_production_parts
         names:
           - emergency_button_body
@@ -495,6 +502,8 @@ Builder:
           - lid_mount_screw_*_screw
           - lid_mount_screw_*_nut
           - electric_switchboard_rail_screws
+          - cable_cutout_cover_mount_screws
+          - cable_cutout_cover_mount_nuts
         name_template: "electric_switchboard_{name}"
         color: [0.78, 0.78, 0.72]
 

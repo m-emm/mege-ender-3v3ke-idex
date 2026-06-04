@@ -25,6 +25,12 @@ Builder:
         name_template: "{name}"
         color: [1, 1, 1]
       - source: self
+        artifact: followers
+        names:
+          - electric_switchboard_cable_cutout_cover
+        name_template: "{name}"
+        color: [0.78, 0.86, 0.82]
+      - source: self
         artifact: non_production_parts
         names:
           - emergency_button_body
@@ -67,6 +73,8 @@ Builder:
           - lid_mount_screw_*_screw
           - lid_mount_screw_*_nut
           - electric_switchboard_rail_screws
+          - cable_cutout_cover_mount_screws
+          - cable_cutout_cover_mount_nuts
         name_template: "{name}"
         color: [0.78, 0.78, 0.72]
 
@@ -90,6 +98,13 @@ Builder:
         name_template: "{name}"
         prod_rotation_angle: 90
         prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        names:
+          - electric_switchboard_cable_cutout_cover
+        name_template: "{name}"
+        prod_rotation_angle: 90
+        prod_rotation_axis: [1, 0, 0]
     arrange:
       export_individual_parts: false
       plates:
@@ -97,6 +112,10 @@ Builder:
           parts:
             - electric_switchboard_box
             - electric_switchboard_lid
+        - name: electric_switchboard_cable_cutout_cover
+          process_data_preset: tpu_minimal_quality_minimal_strength_06
+          parts:
+            - electric_switchboard_cable_cutout_cover
       auto_assign_plates: false
 
 Parameters:
@@ -123,6 +142,28 @@ Parameters:
   electric_switchboard_rail_num_spots:
     Type: Integer
   electric_switchboard_rail_z_offset_from_bottom:
+    Type: Float
+  electric_switchboard_cable_cutout_width:
+    Type: Float
+  electric_switchboard_cable_cutout_height_ratio:
+    Type: Float
+  electric_switchboard_cable_cutout_fillet_radius:
+    Type: Float
+  electric_switchboard_cable_cutout_cover_y_oversize:
+    Type: Float
+  electric_switchboard_cable_cutout_cover_x_oversize:
+    Type: Float
+  electric_switchboard_cable_cutout_cover_thickness:
+    Type: Float
+  electric_switchboard_cable_cutout_cover_clearance:
+    Type: Float
+  electric_switchboard_cable_cutout_cover_mount_screw_size:
+    Type: String
+  electric_switchboard_cable_cutout_cover_mount_screw_length:
+    Type: Float
+  electric_switchboard_cable_cutout_cover_mount_nut_clearance:
+    Type: Float
+  electric_switchboard_cable_cutout_cover_mount_nut_pocket_sink_depth:
     Type: Float
   electric_switchboard_mount_flange_screw_size:
     Type: String
