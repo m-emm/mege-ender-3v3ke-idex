@@ -683,10 +683,10 @@ globals:
   y_axis_carriage_stopper_fillet_radius: 3
   y_axis_carriage_stopper_mount_screw_size: "M5"
   y_axis_carriage_stopper_mount_screw_length: 16
-  y_axis_energy_chain_num_links: 3
+  y_axis_energy_chain_num_links: 30
   y_axis_energy_chain_width: 15
   y_axis_energy_chain_base_thickness: 3.5
-  y_axis_energy_chain_link_length: 10
+  y_axis_energy_chain_link_length: 15
   y_axis_energy_chain_link_connector_thickness: 1.5
   y_axis_energy_chain_link_connector_width: 2
   y_axis_energy_chain_plug_diameter: 4
