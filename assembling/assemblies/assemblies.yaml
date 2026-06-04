@@ -969,6 +969,7 @@ assemblies:
       electric_switchboard_cable_cutout_cover_y_oversize: !Ref electric_switchboard_cable_cutout_cover_y_oversize
       electric_switchboard_cable_cutout_cover_x_oversize: !Ref electric_switchboard_cable_cutout_cover_x_oversize
       electric_switchboard_cable_cutout_cover_thickness: !Ref electric_switchboard_cable_cutout_cover_thickness
+      electric_switchboard_cable_cutout_cover_flange_thickness: !Ref electric_switchboard_cable_cutout_cover_flange_thickness
       electric_switchboard_cable_cutout_cover_clearance: !Ref electric_switchboard_cable_cutout_cover_clearance
       electric_switchboard_cable_cutout_cover_mount_screw_size: !Ref electric_switchboard_cable_cutout_cover_mount_screw_size
       electric_switchboard_cable_cutout_cover_mount_screw_length: !Ref electric_switchboard_cable_cutout_cover_mount_screw_length

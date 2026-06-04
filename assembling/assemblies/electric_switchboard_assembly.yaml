@@ -176,6 +176,8 @@ Parameters:
     Type: Float
   electric_switchboard_cable_cutout_cover_thickness:
     Type: Float
+  electric_switchboard_cable_cutout_cover_flange_thickness:
+    Type: Float
   electric_switchboard_cable_cutout_cover_clearance:
     Type: Float
   electric_switchboard_cable_cutout_cover_mount_screw_size:

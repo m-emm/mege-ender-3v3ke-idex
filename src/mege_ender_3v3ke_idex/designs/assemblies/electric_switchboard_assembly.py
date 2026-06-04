@@ -29,6 +29,7 @@ def create_electric_switchboard_assembly(
     electric_switchboard_cable_cutout_cover_y_oversize,
     electric_switchboard_cable_cutout_cover_x_oversize,
     electric_switchboard_cable_cutout_cover_thickness,
+    electric_switchboard_cable_cutout_cover_flange_thickness,
     electric_switchboard_cable_cutout_cover_clearance,
     electric_switchboard_cable_cutout_cover_mount_screw_size,
     electric_switchboard_cable_cutout_cover_mount_screw_length,
@@ -241,13 +242,13 @@ def create_electric_switchboard_assembly(
     cable_cutout_cover_height = (
         cable_cutout_height + electric_switchboard_cable_cutout_cover_y_oversize
     )
-    cable_cutout_cover_plug_depth = min(
-        electric_switchboard_wall_thickness,
-        electric_switchboard_cable_cutout_cover_thickness,
+    cable_cutout_cover_flange_thickness = min(
+        electric_switchboard_cable_cutout_cover_flange_thickness,
+        electric_switchboard_cable_cutout_cover_thickness - 0.1,
     )
-    cable_cutout_cover_flange_thickness = (
+    cable_cutout_cover_plug_depth = (
         electric_switchboard_cable_cutout_cover_thickness
-        - cable_cutout_cover_plug_depth
+        - cable_cutout_cover_flange_thickness
     )
     cable_cutout_cover_plug_width = (
         electric_switchboard_cable_cutout_width
