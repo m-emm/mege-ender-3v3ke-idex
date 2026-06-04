@@ -829,6 +829,18 @@ assemblies:
       energy_chain_channel_link_width: !Ref y_axis_energy_chain_channel_link_width
       energy_chain_channel_height: !Ref y_axis_energy_chain_channel_height
       energy_chain_plug_plate_width: !Ref y_axis_energy_chain_plug_plate_width
+      energy_chain_start_fixture_type: !Ref y_axis_energy_chain_start_fixture_type
+      energy_chain_start_fixture_screw_size: !Ref y_axis_energy_chain_start_fixture_screw_size
+      energy_chain_start_fixture_screw_hole_clearance_type: !Ref y_axis_energy_chain_start_fixture_screw_hole_clearance_type
+      energy_chain_start_fixture_length: !Ref y_axis_energy_chain_start_fixture_length
+      energy_chain_start_fixture_thickness: !Ref y_axis_energy_chain_start_fixture_thickness
+      energy_chain_start_fixture_vertical_side_thickness: !Ref y_axis_energy_chain_start_fixture_vertical_side_thickness
+      energy_chain_end_fixture_type: !Ref y_axis_energy_chain_end_fixture_type
+      energy_chain_end_fixture_screw_size: !Ref y_axis_energy_chain_end_fixture_screw_size
+      energy_chain_end_fixture_screw_hole_clearance_type: !Ref y_axis_energy_chain_end_fixture_screw_hole_clearance_type
+      energy_chain_end_fixture_length: !Ref y_axis_energy_chain_end_fixture_length
+      energy_chain_end_fixture_thickness: !Ref y_axis_energy_chain_end_fixture_thickness
+      energy_chain_end_fixture_vertical_side_thickness: !Ref y_axis_energy_chain_end_fixture_vertical_side_thickness
 
   - name: y_axis_endstop_holder_assembly
 

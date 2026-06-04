@@ -6,6 +6,10 @@ from mege_ender_3v3ke_idex.designs.plug_and_hole import create_plug
 from shellforgepy.simple import *
 
 BIG_THING = 500
+FIXTURE_TYPE_NONE = "NONE"
+FIXTURE_TYPE_MOUNT_EYE_FLAT = "MOUNT_EYE_FLAT"
+FIXTURE_TYPE_MOUNT_EYE_VERTICAL = "MOUNT_EYE_VERTICAL"
+FIXTURE_TYPE_MOUNT_EYE_CROSS = "MOUNT_EYE_CROSS"
 
 
 def _spiral_antiderivative(radius, spiral_b):
@@ -72,6 +76,183 @@ def _rotate_xy(point, angle_degrees):
         x * math.cos(angle) - y * math.sin(angle),
         x * math.sin(angle) + y * math.cos(angle),
     )
+
+
+def _fixture_type_name(fixture_type):
+    if fixture_type is None:
+        return FIXTURE_TYPE_NONE
+    fixture_type = str(fixture_type).strip().upper()
+    return fixture_type or FIXTURE_TYPE_NONE
+
+
+def _fixture_is_enabled(fixture_type):
+    return _fixture_type_name(fixture_type) not in {FIXTURE_TYPE_NONE, "NULL"}
+
+
+def _dimension_or_default(value, default):
+    return default if value is None else value
+
+
+def _fixture_hole_diameter(screw_size, clearance_type):
+    return MScrew.from_size(screw_size).get_clearance_hole_diameter(
+        clearance_type=clearance_type or "loose"
+    )
+
+
+def _create_mount_eye_hole_cutter(*, hole_diameter, target, axis):
+    hole_cutter = create_cylinder(hole_diameter / 2, BIG_THING)
+    if axis == "x":
+        hole_cutter = rotate(90, axis=(0, 1, 0))(hole_cutter)
+    elif axis == "y":
+        hole_cutter = rotate(90, axis=(1, 0, 0))(hole_cutter)
+    elif axis == "z":
+        pass
+    else:
+        raise ValueError(f"Unsupported mount-eye hole axis: {axis}")
+    return align(hole_cutter, target, Alignment.CENTER)
+
+
+def _create_mount_eye_flat_fixture(
+    *,
+    energy_chain_width,
+    fixture_screw_size,
+    fixture_screw_hole_clearance_type,
+    fixture_length,
+    fixture_thickness,
+):
+    mount_eye = create_box(
+        fixture_thickness,
+        fixture_length,
+        energy_chain_width,
+    )
+    hole_cutter = _create_mount_eye_hole_cutter(
+        hole_diameter=_fixture_hole_diameter(
+            fixture_screw_size,
+            fixture_screw_hole_clearance_type,
+        ),
+        target=mount_eye,
+        axis="x",
+    )
+    return LeaderFollowersCuttersPart(leader=mount_eye.cut(hole_cutter))
+
+
+def _create_mount_eye_vertical_fixture(
+    *,
+    energy_chain_width,
+    fixture_screw_size,
+    fixture_screw_hole_clearance_type,
+    fixture_length,
+    fixture_thickness,
+    fixture_vertical_side_thickness,
+):
+    base_extension = create_box(
+        fixture_thickness,
+        fixture_length,
+        energy_chain_width,
+    )
+    side_plate = create_box(
+        energy_chain_width,
+        fixture_length,
+        fixture_vertical_side_thickness,
+    )
+    side_plate = align(side_plate, base_extension, Alignment.CENTER, axes=[1])
+    side_plate = align(side_plate, base_extension, Alignment.BOTTOM)
+    side_plate = align(side_plate, base_extension, Alignment.STACK_RIGHT)
+
+    mount_eye = base_extension.fuse(side_plate)
+    hole_cutter = _create_mount_eye_hole_cutter(
+        hole_diameter=_fixture_hole_diameter(
+            fixture_screw_size,
+            fixture_screw_hole_clearance_type,
+        ),
+        target=side_plate,
+        axis="z",
+    )
+    return LeaderFollowersCuttersPart(leader=mount_eye.cut(hole_cutter))
+
+
+def _create_mount_eye_cross_fixture(
+    *,
+    energy_chain_width,
+    fixture_screw_size,
+    fixture_screw_hole_clearance_type,
+    fixture_length,
+    fixture_thickness,
+    fixture_vertical_side_thickness,
+):
+    base_extension = create_box(
+        fixture_thickness,
+        fixture_length,
+        energy_chain_width,
+    )
+    side_plate = create_box(
+        energy_chain_width,
+        fixture_vertical_side_thickness,
+        energy_chain_width,
+    )
+    side_plate = align(side_plate, base_extension, Alignment.CENTER, axes=[1, 2])
+    side_plate = align(side_plate, base_extension, Alignment.STACK_RIGHT)
+
+    mount_eye = base_extension.fuse(side_plate)
+    hole_cutter = _create_mount_eye_hole_cutter(
+        hole_diameter=_fixture_hole_diameter(
+            fixture_screw_size,
+            fixture_screw_hole_clearance_type,
+        ),
+        target=side_plate,
+        axis="y",
+    )
+    return LeaderFollowersCuttersPart(leader=mount_eye.cut(hole_cutter))
+
+
+def _create_mount_eye_fixture(
+    *,
+    fixture_type,
+    energy_chain_width,
+    energy_chain_base_thickness,
+    fixture_screw_size,
+    fixture_screw_hole_clearance_type,
+    fixture_length,
+    fixture_thickness,
+    fixture_vertical_side_thickness,
+):
+    fixture_type = _fixture_type_name(fixture_type)
+    fixture_thickness = _dimension_or_default(
+        fixture_thickness,
+        energy_chain_base_thickness,
+    )
+    fixture_vertical_side_thickness = _dimension_or_default(
+        fixture_vertical_side_thickness,
+        energy_chain_base_thickness,
+    )
+
+    if fixture_type == FIXTURE_TYPE_MOUNT_EYE_FLAT:
+        return _create_mount_eye_flat_fixture(
+            energy_chain_width=energy_chain_width,
+            fixture_screw_size=fixture_screw_size,
+            fixture_screw_hole_clearance_type=fixture_screw_hole_clearance_type,
+            fixture_length=fixture_length,
+            fixture_thickness=fixture_thickness,
+        )
+    if fixture_type == FIXTURE_TYPE_MOUNT_EYE_VERTICAL:
+        return _create_mount_eye_vertical_fixture(
+            energy_chain_width=energy_chain_width,
+            fixture_screw_size=fixture_screw_size,
+            fixture_screw_hole_clearance_type=fixture_screw_hole_clearance_type,
+            fixture_length=fixture_length,
+            fixture_thickness=fixture_thickness,
+            fixture_vertical_side_thickness=fixture_vertical_side_thickness,
+        )
+    if fixture_type == FIXTURE_TYPE_MOUNT_EYE_CROSS:
+        return _create_mount_eye_cross_fixture(
+            energy_chain_width=energy_chain_width,
+            fixture_screw_size=fixture_screw_size,
+            fixture_screw_hole_clearance_type=fixture_screw_hole_clearance_type,
+            fixture_length=fixture_length,
+            fixture_thickness=fixture_thickness,
+            fixture_vertical_side_thickness=fixture_vertical_side_thickness,
+        )
+    raise ValueError(f"Unsupported energy-chain fixture type: {fixture_type}")
 
 
 def _create_energy_chain_tpu_link(
@@ -199,7 +380,7 @@ def _create_spiral_connector(
     start_xy,
     end_xy,
     midpoint_radius,
-    energy_chain_link_length,
+    current_segment_length,
     energy_chain_link_connector_thickness,
     energy_chain_width,
     current_position,
@@ -232,7 +413,7 @@ def _create_spiral_connector(
         _create_connector_edge_pad(
             position=current_position,
             angle=current_angle,
-            local_edge_y=energy_chain_link_length,
+            local_edge_y=current_segment_length,
             inside_direction=-1,
             energy_chain_link_connector_thickness=energy_chain_link_connector_thickness,
             energy_chain_width=energy_chain_width,
@@ -294,20 +475,19 @@ def _create_straight_spiral_connector(
     return translate((start[0] + end[0]) / 2, (start[1] + end[1]) / 2, 0)(connector)
 
 
-def _spiral_link_placements(
+def _spiral_segment_placements(
     *,
-    energy_chain_num_links,
+    segment_lengths,
     energy_chain_max_diameter_on_print_bed,
     energy_chain_base_thickness,
     energy_chain_width,
-    energy_chain_link_length,
     energy_chain_link_connector_thickness,
     energy_chain_link_connector_width,
     energy_chain_channel_height,
     energy_chain_channel_wall_thickness,
 ):
-    if energy_chain_num_links < 1:
-        raise ValueError("energy_chain_num_links must be at least 1")
+    if not segment_lengths:
+        raise ValueError("Energy chain must contain at least one segment")
 
     radial_footprint = (
         energy_chain_base_thickness + energy_chain_channel_height + energy_chain_width
@@ -321,10 +501,10 @@ def _spiral_link_placements(
         1.0, energy_chain_channel_wall_thickness
     )
     spiral_b = spiral_revolution_spacing / (2 * math.pi)
-    link_pitch = energy_chain_link_length + energy_chain_link_connector_width
     required_path_length = (
-        energy_chain_num_links - 1
-    ) * link_pitch + energy_chain_link_length
+        sum(segment_lengths)
+        + (len(segment_lengths) - 1) * energy_chain_link_connector_width
+    )
     maximum_theta = (outer_radius - minimum_radius) / spiral_b
 
     if maximum_theta <= 0:
@@ -346,9 +526,10 @@ def _spiral_link_placements(
         )
 
     placements = []
-    for index in range(energy_chain_num_links):
-        start_path_length = index * link_pitch
-        end_path_length = start_path_length + energy_chain_link_length
+    next_start_path_length = 0
+    for segment_length in segment_lengths:
+        start_path_length = next_start_path_length
+        end_path_length = start_path_length + segment_length
         start_point = _spiral_point(
             start_path_length,
             outer_radius,
@@ -372,7 +553,16 @@ def _spiral_link_placements(
             start_point[0] - connector_lane_offset[0],
             start_point[1] - connector_lane_offset[1],
         )
-        placements.append((position, angle))
+        placements.append(
+            {
+                "position": position,
+                "angle": angle,
+                "start_path_length": start_path_length,
+                "end_path_length": end_path_length,
+                "length": segment_length,
+            }
+        )
+        next_start_path_length = end_path_length + energy_chain_link_connector_width
 
     return placements, outer_radius, spiral_b, minimum_radius
 
@@ -402,8 +592,23 @@ def create_energy_chain_tpu_assembly(
     energy_chain_channel_link_width,
     energy_chain_channel_height,
     energy_chain_plug_plate_width,
+    energy_chain_start_fixture_type,
+    energy_chain_start_fixture_screw_size,
+    energy_chain_start_fixture_screw_hole_clearance_type,
+    energy_chain_start_fixture_length,
+    energy_chain_start_fixture_thickness,
+    energy_chain_start_fixture_vertical_side_thickness,
+    energy_chain_end_fixture_type,
+    energy_chain_end_fixture_screw_size,
+    energy_chain_end_fixture_screw_hole_clearance_type,
+    energy_chain_end_fixture_length,
+    energy_chain_end_fixture_thickness,
+    energy_chain_end_fixture_vertical_side_thickness,
 ):
     """Create the TPU energy chain as a spiral-printable assembly."""
+
+    if energy_chain_num_links < 1:
+        raise ValueError("energy_chain_num_links must be at least 1")
 
     link_template = _create_energy_chain_tpu_link(
         energy_chain_width=energy_chain_width,
@@ -427,33 +632,93 @@ def create_energy_chain_tpu_assembly(
         energy_chain_plug_plate_width=energy_chain_plug_plate_width,
         include_non_production_part=True,
     )
-    placements, outer_radius, spiral_b, minimum_radius = _spiral_link_placements(
-        energy_chain_num_links=energy_chain_num_links,
+
+    segments = []
+    if _fixture_is_enabled(energy_chain_start_fixture_type):
+        segments.append(
+            {
+                "kind": "fixture",
+                "length": energy_chain_start_fixture_length,
+                "part": _create_mount_eye_fixture(
+                    fixture_type=energy_chain_start_fixture_type,
+                    energy_chain_width=energy_chain_width,
+                    energy_chain_base_thickness=energy_chain_base_thickness,
+                    fixture_screw_size=energy_chain_start_fixture_screw_size,
+                    fixture_screw_hole_clearance_type=(
+                        energy_chain_start_fixture_screw_hole_clearance_type
+                    ),
+                    fixture_length=energy_chain_start_fixture_length,
+                    fixture_thickness=energy_chain_start_fixture_thickness,
+                    fixture_vertical_side_thickness=(
+                        energy_chain_start_fixture_vertical_side_thickness
+                    ),
+                ),
+            }
+        )
+
+    for index in range(energy_chain_num_links):
+        segments.append(
+            {
+                "kind": "link",
+                "link_index": index,
+                "length": energy_chain_link_length,
+                "part": link_template,
+            }
+        )
+
+    if _fixture_is_enabled(energy_chain_end_fixture_type):
+        segments.append(
+            {
+                "kind": "fixture",
+                "length": energy_chain_end_fixture_length,
+                "part": _create_mount_eye_fixture(
+                    fixture_type=energy_chain_end_fixture_type,
+                    energy_chain_width=energy_chain_width,
+                    energy_chain_base_thickness=energy_chain_base_thickness,
+                    fixture_screw_size=energy_chain_end_fixture_screw_size,
+                    fixture_screw_hole_clearance_type=(
+                        energy_chain_end_fixture_screw_hole_clearance_type
+                    ),
+                    fixture_length=energy_chain_end_fixture_length,
+                    fixture_thickness=energy_chain_end_fixture_thickness,
+                    fixture_vertical_side_thickness=(
+                        energy_chain_end_fixture_vertical_side_thickness
+                    ),
+                ),
+            }
+        )
+
+    placements, outer_radius, spiral_b, minimum_radius = _spiral_segment_placements(
+        segment_lengths=[segment["length"] for segment in segments],
         energy_chain_max_diameter_on_print_bed=(energy_chain_max_diameter_on_print_bed),
         energy_chain_base_thickness=energy_chain_base_thickness,
         energy_chain_width=energy_chain_width,
-        energy_chain_link_length=energy_chain_link_length,
         energy_chain_link_connector_thickness=energy_chain_link_connector_thickness,
         energy_chain_link_connector_width=energy_chain_link_connector_width,
         energy_chain_channel_height=energy_chain_channel_height,
         energy_chain_channel_wall_thickness=energy_chain_channel_wall_thickness,
     )
-    link_pitch = energy_chain_link_length + energy_chain_link_connector_width
 
     chain = PartCollector()
     first_walls_2 = None
-    for index, (position, angle) in enumerate(placements):
-        placed_link = rotate(angle)(link_template)
-        placed_link = translate(position[0], position[1], 0)(placed_link)
-        chain = chain.fuse(placed_link.leader)
+    for segment, placement in zip(segments, placements):
+        position = placement["position"]
+        angle = placement["angle"]
+        placed_segment = rotate(angle)(segment["part"])
+        placed_segment = translate(position[0], position[1], 0)(placed_segment)
+        chain = chain.fuse(placed_segment.leader)
 
-        if index == 0:
-            first_walls_2 = placed_link.get_named_non_production_part("walls_2")
+        if segment["kind"] == "link" and first_walls_2 is None:
+            first_walls_2 = placed_segment.get_named_non_production_part("walls_2")
 
-    for index, (position, angle) in enumerate(placements[:-1]):
-        next_position, next_angle = placements[index + 1]
-        connector_start_path_length = index * link_pitch + energy_chain_link_length
-        connector_end_path_length = (index + 1) * link_pitch
+    for index, placement in enumerate(placements[:-1]):
+        next_placement = placements[index + 1]
+        position = placement["position"]
+        angle = placement["angle"]
+        next_position = next_placement["position"]
+        next_angle = next_placement["angle"]
+        connector_start_path_length = placement["end_path_length"]
+        connector_end_path_length = next_placement["start_path_length"]
         connector = _create_spiral_connector(
             start_xy=_spiral_point(
                 connector_start_path_length,
@@ -473,7 +738,7 @@ def create_energy_chain_tpu_assembly(
                 spiral_b,
                 minimum_radius,
             ),
-            energy_chain_link_length=energy_chain_link_length,
+            current_segment_length=placement["length"],
             energy_chain_link_connector_thickness=energy_chain_link_connector_thickness,
             energy_chain_width=energy_chain_width,
             current_position=position,
@@ -484,5 +749,6 @@ def create_energy_chain_tpu_assembly(
         chain = chain.fuse(connector)
 
     retval = LeaderFollowersCuttersPart(leader=chain)
-    retval.add_named_non_production_part(first_walls_2, "walls_2")
+    if first_walls_2 is not None:
+        retval.add_named_non_production_part(first_walls_2, "walls_2")
     return retval

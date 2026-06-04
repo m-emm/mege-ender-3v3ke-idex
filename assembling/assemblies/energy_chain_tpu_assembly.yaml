@@ -91,6 +91,34 @@ Parameters:
     Type: Float
   energy_chain_plug_plate_width:
     Type: Float
+  energy_chain_start_fixture_type:
+    Type: String
+  energy_chain_start_fixture_screw_size:
+    Type: String
+  energy_chain_start_fixture_screw_hole_clearance_type:
+    Type: String
+  energy_chain_start_fixture_length:
+    Type: Float
+  energy_chain_start_fixture_thickness:
+    Type: Any
+    Default: null
+  energy_chain_start_fixture_vertical_side_thickness:
+    Type: Any
+    Default: null
+  energy_chain_end_fixture_type:
+    Type: String
+  energy_chain_end_fixture_screw_size:
+    Type: String
+  energy_chain_end_fixture_screw_hole_clearance_type:
+    Type: String
+  energy_chain_end_fixture_length:
+    Type: Float
+  energy_chain_end_fixture_thickness:
+    Type: Any
+    Default: null
+  energy_chain_end_fixture_vertical_side_thickness:
+    Type: Any
+    Default: null
 
 Parts:
   EnergyChainTpuAssembly:
