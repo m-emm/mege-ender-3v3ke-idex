@@ -382,8 +382,8 @@ globals:
   electric_switchboard_lid_rim_clearance: 0.3
   electric_switchboard_lid_screw_size: "M3"
   electric_switchboard_lid_screw_length: 30
-  electric_switchboard_lid_screw_inset: 12
-  electric_switchboard_lid_screw_mount_block_size: 24
+  electric_switchboard_lid_screw_inset: 8
+  electric_switchboard_lid_screw_mount_block_size: 12
   electric_switchboard_lid_screw_mount_depth: 30
   electric_switchboard_frame_back_offset: 120
   fuse_holder_thread_diameter: 14.85

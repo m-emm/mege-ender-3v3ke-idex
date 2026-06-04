@@ -64,8 +64,8 @@ Builder:
       - source: self
         artifact: non_production_parts
         names:
-          - lid_screws
-          - lid_nuts
+          - lid_mount_screw_*_screw
+          - lid_mount_screw_*_nut
         name_template: "{name}"
         color: [0.78, 0.78, 0.72]
 

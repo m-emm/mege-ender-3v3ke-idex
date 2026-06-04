@@ -43,7 +43,7 @@ def create_electric_switchboard_assembly(
         electric_switchboard_depth,
         electric_switchboard_height,
         fillet_radius=electric_switchboard_corner_fillet_radius,
-        no_fillets_at=[Alignment.LEFT],
+        no_fillets_at=[Alignment.LEFT, Alignment.BOTTOM, Alignment.RIGHT],
     )
 
     inner_space_cutter = create_box(
@@ -124,9 +124,7 @@ def create_electric_switchboard_assembly(
         - 2 * electric_switchboard_wall_thickness
         - 2 * electric_switchboard_lid_rim_clearance
     )
-    lid_rim_inner_width = (
-        lid_rim_outer_width - 2 * electric_switchboard_wall_thickness
-    )
+    lid_rim_inner_width = lid_rim_outer_width - 2 * electric_switchboard_wall_thickness
     lid_rim_inner_height = (
         lid_rim_outer_height - 2 * electric_switchboard_wall_thickness
     )
@@ -146,25 +144,18 @@ def create_electric_switchboard_assembly(
         lid_rim_inner_width,
         lid_rim_inner_height,
     )
-    lid_rim_inner_cutter = align(
-        lid_rim_inner_cutter, lid_rim, Alignment.CENTER
-    )
+    lid_rim_inner_cutter = align(lid_rim_inner_cutter, lid_rim, Alignment.CENTER)
     lid_rim = lid_rim.cut(lid_rim_inner_cutter)
     lid_rim = align(lid_rim, switchboard_reference, Alignment.CENTER, axes=[1, 2])
     lid_rim = align(lid_rim, lid, Alignment.STACK_RIGHT)
     lid = lid.fuse(lid_rim)
 
-    lid_screw_holes = PartCollector()
-    lid_screw_head_recesses = PartCollector()
-    lid_screw_nut_pockets = PartCollector()
-    lid_screws = PartCollector()
-    lid_nuts = PartCollector()
     lid_screw_mount_blocks = PartCollector()
 
-    for front_back in [Alignment.FRONT, Alignment.BACK]:
-        for bottom_top in [Alignment.BOTTOM, Alignment.TOP]:
+    for fb in [Alignment.FRONT, Alignment.BACK]:
+        for tb in [Alignment.TOP, Alignment.BOTTOM]:
             screw_mount_block = create_filleted_box(
-                electric_switchboard_lid_screw_mount_depth,
+                electric_switchboard_width,
                 electric_switchboard_lid_screw_mount_block_size,
                 electric_switchboard_lid_screw_mount_block_size,
                 fillet_radius=min(
@@ -173,28 +164,16 @@ def create_electric_switchboard_assembly(
                 ),
                 no_fillets_at=[Alignment.LEFT, Alignment.RIGHT],
             )
+
             screw_mount_block = align(
-                screw_mount_block, switchboard_reference, Alignment.LEFT
+                screw_mount_block, switchboard_reference, Alignment.CENTER, axes=[1, 2]
             )
-            screw_mount_block = align(
-                screw_mount_block,
-                switchboard_reference,
-                front_back.edge_alignment,
-            )
-            screw_mount_block = align(
-                screw_mount_block,
-                switchboard_reference,
-                bottom_top.edge_alignment,
-            )
+            screw_mount_block = align(screw_mount_block, switchboard_reference, fb)
+            screw_mount_block = align(screw_mount_block, switchboard_reference, tb)
+
             lid_screw_mount_blocks = lid_screw_mount_blocks.fuse(screw_mount_block)
 
-    lid_screw_span_reference = create_box(
-        electric_switchboard_lid_thickness
-        + electric_switchboard_lid_screw_mount_depth,
-        electric_switchboard_depth,
-        electric_switchboard_height,
-        origin=(-electric_switchboard_lid_thickness, 0, 0),
-    )
+    lid_screw_span_reference = lid.fuse(lid_screw_mount_blocks)
     lid_screw_mount = create_four_screws_mount_assembly(
         lid_screw_span_reference,
         electric_switchboard_lid_screw_size,
@@ -209,22 +188,8 @@ def create_electric_switchboard_assembly(
 
     lid = lid_screw_mount.use_as_cutter_on(lid)
     lid_screw_mount_blocks = lid_screw_mount.use_as_cutter_on(lid_screw_mount_blocks)
-
-    for name, cutter in lid_screw_mount.get_named_cutter_items():
-        if name.endswith("_hole_cutter"):
-            lid_screw_holes = lid_screw_holes.fuse(cutter)
-        elif name.endswith("_cylinder_head_cutter"):
-            lid_screw_head_recesses = lid_screw_head_recesses.fuse(cutter)
-        elif name.endswith("_nut_cutter"):
-            lid_screw_nut_pockets = lid_screw_nut_pockets.fuse(cutter)
-
-    for name, part in lid_screw_mount.get_named_non_production_part_items():
-        if name.endswith("_screw"):
-            lid_screws = lid_screws.fuse(part)
-        elif name.endswith("_nut"):
-            lid_nuts = lid_nuts.fuse(part)
-
     switchboard_box = switchboard_box.fuse(lid_screw_mount_blocks)
+    switchboard_box = lid_screw_mount.use_as_cutter_on(switchboard_box)
 
     mount_flange_screw_hole_diameter = MScrew.from_size(
         electric_switchboard_mount_flange_screw_size
@@ -263,11 +228,9 @@ def create_electric_switchboard_assembly(
     switchboard = LeaderFollowersCuttersPart(leader=switchboard_box)
     switchboard.add_named_follower(lid, "electric_switchboard_lid")
     switchboard.add_named_cutter(mount_flange_screw_holes, "mount_flange_screw_holes")
-    switchboard.add_named_cutter(lid_screw_holes, "lid_screw_holes")
-    switchboard.add_named_cutter(lid_screw_head_recesses, "lid_screw_head_recesses")
-    switchboard.add_named_cutter(lid_screw_nut_pockets, "lid_screw_nut_pockets")
-    switchboard.add_named_non_production_part(lid_screws, "lid_screws")
-    switchboard.add_named_non_production_part(lid_nuts, "lid_nuts")
+    switchboard = switchboard.merge_except_leader(
+        lid_screw_mount.prefixed_copy("lid_mount")
+    )
 
     for name, part in emergency_button.get_named_follower_items():
         switchboard.add_named_non_production_part(part, f"emergency_button_{name}")
