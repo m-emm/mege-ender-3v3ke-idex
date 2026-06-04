@@ -558,6 +558,7 @@ def create_electric_switchboard_assembly(
 
     lid_screw_mount_blocks = PartCollector()
 
+    lid_screw_mount_blocks_list = []
     for fb in [Alignment.FRONT, Alignment.BACK]:
         for tb in [Alignment.TOP, Alignment.BOTTOM]:
             screw_mount_block = create_filleted_box(
@@ -579,6 +580,8 @@ def create_electric_switchboard_assembly(
 
             lid_screw_mount_blocks = lid_screw_mount_blocks.fuse(screw_mount_block)
 
+            lid_screw_mount_blocks_list.append(screw_mount_block)
+
     lid_screw_span_reference = lid.fuse(lid_screw_mount_blocks)
     lid_screw_mount = create_four_screws_mount_assembly(
         lid_screw_span_reference,
@@ -593,6 +596,16 @@ def create_electric_switchboard_assembly(
     )
 
     lid = lid_screw_mount.use_as_cutter_on(lid)
+
+    for lid_screw_mount_block in lid_screw_mount_blocks_list:
+        lid_screw_mount_block_cutter = materialize_bounding_box(
+            lid_screw_mount_block,
+            x_enlargement=0.2,
+            y_enlargement=0.2,
+            z_enlargement=0.2,
+        )
+        lid = lid.cut(lid_screw_mount_block_cutter)
+
     lid_screw_mount_blocks = lid_screw_mount.use_as_cutter_on(lid_screw_mount_blocks)
     switchboard_box = switchboard_box.fuse(lid_screw_mount_blocks)
     switchboard_box = lid_screw_mount.use_as_cutter_on(switchboard_box)
