@@ -712,22 +712,34 @@ globals:
   y_axis_energy_chain_link_length: 15
   y_axis_energy_chain_link_connector_thickness: 1.5
   y_axis_energy_chain_link_connector_width: 2
-  y_axis_energy_chain_plug_diameter: 4
-  y_axis_energy_chain_plug_angle_deg: 3
-  y_axis_energy_chain_plug_height: 6.0
-  y_axis_energy_chain_plug_slit_width: 1
-  y_axis_energy_chain_plug_base_thickness: 0.8
-  y_axis_energy_chain_plug_fillet_radius: 0.5
-  y_axis_energy_chain_plug_wall_thickness: 1.2
-  y_axis_energy_chain_plug_lip_height: 0.8
-  y_axis_energy_chain_plug_lip_size: 0.8
-  y_axis_energy_chain_plug_lip_top_gap: 1.0
-  y_axis_energy_chain_plug_hole_slack: 0.4
+  energy_chain_plug_diameter: 4
+  energy_chain_plug_angle_deg: 3
+  energy_chain_plug_height: 6.0
+  energy_chain_plug_slit_width: 1
+  energy_chain_plug_base_thickness: 0.8
+  energy_chain_plug_fillet_radius: 0.5
+  energy_chain_plug_wall_thickness: 1.2
+  energy_chain_plug_lip_height: 0.8
+  energy_chain_plug_lip_size: 0.8
+  energy_chain_plug_lip_top_gap: 1.0
+  energy_chain_plug_hole_slack: 0.4
   y_axis_energy_chain_channel_wall_thickness: 0.9
   y_axis_energy_chain_channel_link_thickness: 0.4
   y_axis_energy_chain_channel_link_width: 1
   y_axis_energy_chain_channel_height: 3
   y_axis_energy_chain_plug_plate_width: 8.5
+  x_axis_energy_chain_num_links: 32
+  x_axis_energy_chain_max_diameter_on_print_bed: 210
+  x_axis_energy_chain_width: 15
+  x_axis_energy_chain_base_thickness: 3.5
+  x_axis_energy_chain_link_length: 15
+  x_axis_energy_chain_link_connector_thickness: 1.5
+  x_axis_energy_chain_link_connector_width: 2
+  x_axis_energy_chain_channel_wall_thickness: 0.9
+  x_axis_energy_chain_channel_link_thickness: 0.4
+  x_axis_energy_chain_channel_link_width: 1
+  x_axis_energy_chain_channel_height: 5.6
+  x_axis_energy_chain_plug_plate_width: 8.5
   y_axis_energy_chain_start_fixture_type: "MOUNT_EYE_FLAT"
   y_axis_energy_chain_start_fixture_screw_size: "M5"
   y_axis_energy_chain_start_fixture_screw_hole_clearance_type: "loose"

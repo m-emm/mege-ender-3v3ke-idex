@@ -827,22 +827,104 @@ assemblies:
       energy_chain_link_length: !Ref y_axis_energy_chain_link_length
       energy_chain_link_connector_thickness: !Ref y_axis_energy_chain_link_connector_thickness
       energy_chain_link_connector_width: !Ref y_axis_energy_chain_link_connector_width
-      energy_chain_plug_diameter: !Ref y_axis_energy_chain_plug_diameter
-      energy_chain_plug_angle_deg: !Ref y_axis_energy_chain_plug_angle_deg
-      energy_chain_plug_height: !Ref y_axis_energy_chain_plug_height
-      energy_chain_plug_slit_width: !Ref y_axis_energy_chain_plug_slit_width
-      energy_chain_plug_base_thickness: !Ref y_axis_energy_chain_plug_base_thickness
-      energy_chain_plug_fillet_radius: !Ref y_axis_energy_chain_plug_fillet_radius
-      energy_chain_plug_wall_thickness: !Ref y_axis_energy_chain_plug_wall_thickness
-      energy_chain_plug_lip_height: !Ref y_axis_energy_chain_plug_lip_height
-      energy_chain_plug_lip_size: !Ref y_axis_energy_chain_plug_lip_size
-      energy_chain_plug_lip_top_gap: !Ref y_axis_energy_chain_plug_lip_top_gap
-      energy_chain_plug_hole_slack: !Ref y_axis_energy_chain_plug_hole_slack
+      energy_chain_plug_diameter: !Ref energy_chain_plug_diameter
+      energy_chain_plug_angle_deg: !Ref energy_chain_plug_angle_deg
+      energy_chain_plug_height: !Ref energy_chain_plug_height
+      energy_chain_plug_slit_width: !Ref energy_chain_plug_slit_width
+      energy_chain_plug_base_thickness: !Ref energy_chain_plug_base_thickness
+      energy_chain_plug_fillet_radius: !Ref energy_chain_plug_fillet_radius
+      energy_chain_plug_wall_thickness: !Ref energy_chain_plug_wall_thickness
+      energy_chain_plug_lip_height: !Ref energy_chain_plug_lip_height
+      energy_chain_plug_lip_size: !Ref energy_chain_plug_lip_size
+      energy_chain_plug_lip_top_gap: !Ref energy_chain_plug_lip_top_gap
+      energy_chain_plug_hole_slack: !Ref energy_chain_plug_hole_slack
       energy_chain_channel_wall_thickness: !Ref y_axis_energy_chain_channel_wall_thickness
       energy_chain_channel_link_thickness: !Ref y_axis_energy_chain_channel_link_thickness
       energy_chain_channel_link_width: !Ref y_axis_energy_chain_channel_link_width
       energy_chain_channel_height: !Ref y_axis_energy_chain_channel_height
       energy_chain_plug_plate_width: !Ref y_axis_energy_chain_plug_plate_width
+      energy_chain_start_fixture_type: !Ref y_axis_energy_chain_start_fixture_type
+      energy_chain_start_fixture_screw_size: !Ref y_axis_energy_chain_start_fixture_screw_size
+      energy_chain_start_fixture_screw_hole_clearance_type: !Ref y_axis_energy_chain_start_fixture_screw_hole_clearance_type
+      energy_chain_start_fixture_length: !Ref y_axis_energy_chain_start_fixture_length
+      energy_chain_start_fixture_thickness: !Ref y_axis_energy_chain_start_fixture_thickness
+      energy_chain_start_fixture_vertical_side_thickness: !Ref y_axis_energy_chain_start_fixture_vertical_side_thickness
+      energy_chain_end_fixture_type: !Ref y_axis_energy_chain_end_fixture_type
+      energy_chain_end_fixture_screw_size: !Ref y_axis_energy_chain_end_fixture_screw_size
+      energy_chain_end_fixture_screw_hole_clearance_type: !Ref y_axis_energy_chain_end_fixture_screw_hole_clearance_type
+      energy_chain_end_fixture_length: !Ref y_axis_energy_chain_end_fixture_length
+      energy_chain_end_fixture_thickness: !Ref y_axis_energy_chain_end_fixture_thickness
+      energy_chain_end_fixture_vertical_side_thickness: !Ref y_axis_energy_chain_end_fixture_vertical_side_thickness
+
+  - name: x_axis_left_energy_chain_tpu_assembly
+
+    resource_file: energy_chain_tpu_assembly.yaml
+    depends_on: []
+    parameters:
+      energy_chain_num_links: !Ref x_axis_energy_chain_num_links
+      energy_chain_max_diameter_on_print_bed: !Ref x_axis_energy_chain_max_diameter_on_print_bed
+      energy_chain_width: !Ref x_axis_energy_chain_width
+      energy_chain_base_thickness: !Ref x_axis_energy_chain_base_thickness
+      energy_chain_link_length: !Ref x_axis_energy_chain_link_length
+      energy_chain_link_connector_thickness: !Ref x_axis_energy_chain_link_connector_thickness
+      energy_chain_link_connector_width: !Ref x_axis_energy_chain_link_connector_width
+      energy_chain_plug_diameter: !Ref energy_chain_plug_diameter
+      energy_chain_plug_angle_deg: !Ref energy_chain_plug_angle_deg
+      energy_chain_plug_height: !Ref energy_chain_plug_height
+      energy_chain_plug_slit_width: !Ref energy_chain_plug_slit_width
+      energy_chain_plug_base_thickness: !Ref energy_chain_plug_base_thickness
+      energy_chain_plug_fillet_radius: !Ref energy_chain_plug_fillet_radius
+      energy_chain_plug_wall_thickness: !Ref energy_chain_plug_wall_thickness
+      energy_chain_plug_lip_height: !Ref energy_chain_plug_lip_height
+      energy_chain_plug_lip_size: !Ref energy_chain_plug_lip_size
+      energy_chain_plug_lip_top_gap: !Ref energy_chain_plug_lip_top_gap
+      energy_chain_plug_hole_slack: !Ref energy_chain_plug_hole_slack
+      energy_chain_channel_wall_thickness: !Ref x_axis_energy_chain_channel_wall_thickness
+      energy_chain_channel_link_thickness: !Ref x_axis_energy_chain_channel_link_thickness
+      energy_chain_channel_link_width: !Ref x_axis_energy_chain_channel_link_width
+      energy_chain_channel_height: !Ref x_axis_energy_chain_channel_height
+      energy_chain_plug_plate_width: !Ref x_axis_energy_chain_plug_plate_width
+      energy_chain_start_fixture_type: !Ref y_axis_energy_chain_start_fixture_type
+      energy_chain_start_fixture_screw_size: !Ref y_axis_energy_chain_start_fixture_screw_size
+      energy_chain_start_fixture_screw_hole_clearance_type: !Ref y_axis_energy_chain_start_fixture_screw_hole_clearance_type
+      energy_chain_start_fixture_length: !Ref y_axis_energy_chain_start_fixture_length
+      energy_chain_start_fixture_thickness: !Ref y_axis_energy_chain_start_fixture_thickness
+      energy_chain_start_fixture_vertical_side_thickness: !Ref y_axis_energy_chain_start_fixture_vertical_side_thickness
+      energy_chain_end_fixture_type: !Ref y_axis_energy_chain_end_fixture_type
+      energy_chain_end_fixture_screw_size: !Ref y_axis_energy_chain_end_fixture_screw_size
+      energy_chain_end_fixture_screw_hole_clearance_type: !Ref y_axis_energy_chain_end_fixture_screw_hole_clearance_type
+      energy_chain_end_fixture_length: !Ref y_axis_energy_chain_end_fixture_length
+      energy_chain_end_fixture_thickness: !Ref y_axis_energy_chain_end_fixture_thickness
+      energy_chain_end_fixture_vertical_side_thickness: !Ref y_axis_energy_chain_end_fixture_vertical_side_thickness
+
+  - name: x_axis_right_energy_chain_tpu_assembly
+
+    resource_file: energy_chain_tpu_assembly.yaml
+    depends_on: []
+    parameters:
+      energy_chain_num_links: !Ref x_axis_energy_chain_num_links
+      energy_chain_max_diameter_on_print_bed: !Ref x_axis_energy_chain_max_diameter_on_print_bed
+      energy_chain_width: !Ref x_axis_energy_chain_width
+      energy_chain_base_thickness: !Ref x_axis_energy_chain_base_thickness
+      energy_chain_link_length: !Ref x_axis_energy_chain_link_length
+      energy_chain_link_connector_thickness: !Ref x_axis_energy_chain_link_connector_thickness
+      energy_chain_link_connector_width: !Ref x_axis_energy_chain_link_connector_width
+      energy_chain_plug_diameter: !Ref energy_chain_plug_diameter
+      energy_chain_plug_angle_deg: !Ref energy_chain_plug_angle_deg
+      energy_chain_plug_height: !Ref energy_chain_plug_height
+      energy_chain_plug_slit_width: !Ref energy_chain_plug_slit_width
+      energy_chain_plug_base_thickness: !Ref energy_chain_plug_base_thickness
+      energy_chain_plug_fillet_radius: !Ref energy_chain_plug_fillet_radius
+      energy_chain_plug_wall_thickness: !Ref energy_chain_plug_wall_thickness
+      energy_chain_plug_lip_height: !Ref energy_chain_plug_lip_height
+      energy_chain_plug_lip_size: !Ref energy_chain_plug_lip_size
+      energy_chain_plug_lip_top_gap: !Ref energy_chain_plug_lip_top_gap
+      energy_chain_plug_hole_slack: !Ref energy_chain_plug_hole_slack
+      energy_chain_channel_wall_thickness: !Ref x_axis_energy_chain_channel_wall_thickness
+      energy_chain_channel_link_thickness: !Ref x_axis_energy_chain_channel_link_thickness
+      energy_chain_channel_link_width: !Ref x_axis_energy_chain_channel_link_width
+      energy_chain_channel_height: !Ref x_axis_energy_chain_channel_height
+      energy_chain_plug_plate_width: !Ref x_axis_energy_chain_plug_plate_width
       energy_chain_start_fixture_type: !Ref y_axis_energy_chain_start_fixture_type
       energy_chain_start_fixture_screw_size: !Ref y_axis_energy_chain_start_fixture_screw_size
       energy_chain_start_fixture_screw_hole_clearance_type: !Ref y_axis_energy_chain_start_fixture_screw_hole_clearance_type
