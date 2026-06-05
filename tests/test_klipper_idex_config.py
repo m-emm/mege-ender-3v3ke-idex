@@ -55,3 +55,28 @@ def test_idex_part_fan_pins_and_slicer_routing():
 
     assert "_IDEX_APPLY_PART_FAN TOOL=0" in _section(config_text, "gcode_macro T0")
     assert "_IDEX_APPLY_PART_FAN TOOL=1" in _section(config_text, "gcode_macro T1")
+
+
+def test_idex_tool_offsets_are_current_machine_calibration():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    tool_state = _section(config_text, "gcode_macro _IDEX_TOOL_STATE")
+
+    assert "variable_t0_x_offset: 0.0" in tool_state
+    assert "variable_t0_y_offset: 0.0" in tool_state
+    assert "variable_t0_z_offset: 0.0" in tool_state
+    assert "variable_t1_x_offset: 0.0" in tool_state
+    assert "variable_t1_y_offset: 1.0" in tool_state
+    assert "variable_t1_z_offset: -0.6" in tool_state
+
+
+def test_idex_tool_parking_uses_full_speed_travel():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    tool_state = _section(config_text, "gcode_macro _IDEX_TOOL_STATE")
+    select_left = _section(config_text, "gcode_macro IDEX_SELECT_LEFT")
+    select_right = _section(config_text, "gcode_macro IDEX_SELECT_RIGHT")
+
+    assert "variable_park_move_speed: 180.0" in tool_state
+    for select_macro in [select_left, select_right]:
+        assert "park_move_speed|float * 60.0" in select_macro
+        assert "F{park_feed}" in select_macro
+        assert "F3000" not in select_macro
