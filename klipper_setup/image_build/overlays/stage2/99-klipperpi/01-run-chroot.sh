@@ -255,6 +255,13 @@ if [ -n "${WIFI_COUNTRY:-}" ]; then
   rfkill unblock wifi 2>/dev/null || true
 fi
 
+if [ -f "${BOOT_CONFIG}" ]; then
+  log "Disabling onboard Raspberry Pi WiFi; external USB WiFi remains available"
+  ensure_boot_config_in_all \
+    "dtoverlay=disable-wifi" \
+    "Disable the onboard Raspberry Pi WiFi radio; use the external USB WiFi adapter."
+fi
+
 wifi_profiles=("${FILES_DIR}"/klipperpi-wifi*.nmconnection)
 if [ -e "${wifi_profiles[0]}" ]; then
   log "Installing NetworkManager WiFi profiles"

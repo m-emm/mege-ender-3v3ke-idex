@@ -146,6 +146,11 @@ if [ -n "${WIFI_ENV_SRC}" ]; then
       WIFI_SAFE_NAME="network-${WIFI_INDEX}"
     fi
 
+    WIFI_INTERFACE_LINE=""
+    if [ -n "${WIFI_IFACE:-}" ]; then
+      WIFI_INTERFACE_LINE="interface-name=${WIFI_IFACE}"
+    fi
+
     WIFI_PROFILE="${PIGEN_DIR}/stage2/99-klipperpi/files/klipperpi-wifi-${WIFI_INDEX}-${WIFI_SAFE_NAME}.nmconnection"
     cat > "${WIFI_PROFILE}" <<EOF
 [connection]
@@ -153,7 +158,7 @@ id=klipperpi-wifi-${WIFI_SAFE_NAME}
 uuid=${WIFI_UUID}
 type=wifi
 autoconnect-priority=80
-interface-name=${WIFI_IFACE:-wlan1}
+${WIFI_INTERFACE_LINE}
 
 [wifi]
 mode=infrastructure
