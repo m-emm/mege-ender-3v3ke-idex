@@ -20,7 +20,7 @@ _logger = logging.getLogger(__name__)
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
 CALIBRATION_HEIGHT_MM = 0.6
-CENTER_VOID_MM = 8.0
+CENTER_VOID_MM = 4
 CENTER_GAP_MM = 0.8
 ARM_LENGTH_MM = 28.0
 ARM_WIDTH_MM = 2.0
