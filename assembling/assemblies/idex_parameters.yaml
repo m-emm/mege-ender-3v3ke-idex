@@ -728,7 +728,7 @@ globals:
   y_axis_energy_chain_channel_link_width: 1
   y_axis_energy_chain_channel_height: 3
   y_axis_energy_chain_plug_plate_width: 8.5
-  x_axis_energy_chain_num_links: 32
+  x_axis_energy_chain_num_links: 29
   x_axis_energy_chain_max_diameter_on_print_bed: 210
   x_axis_energy_chain_width: 15
   x_axis_energy_chain_base_thickness: 3.5
@@ -746,7 +746,7 @@ globals:
   y_axis_energy_chain_start_fixture_length: 20
   y_axis_energy_chain_start_fixture_thickness: null
   y_axis_energy_chain_start_fixture_vertical_side_thickness: null
-  y_axis_energy_chain_end_fixture_type: "MOUNT_EYE_VERTICAL"
+  y_axis_energy_chain_end_fixture_type: "MOUNT_EYE_CROSS"
   y_axis_energy_chain_end_fixture_screw_size: "M3"
   y_axis_energy_chain_end_fixture_screw_hole_clearance_type: "loose"
   y_axis_energy_chain_end_fixture_length: 16
