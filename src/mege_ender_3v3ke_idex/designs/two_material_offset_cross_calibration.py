@@ -11,7 +11,7 @@ from mege_3devops.process_data.mege_ender_3v3ke_idex import (
     SAFE_BED_DEPTH_MM,
     SAFE_BED_ORIGIN,
     SAFE_BED_WIDTH_MM,
-    copy_cold_bed_dual_pla_04_offset_calibration_process_data,
+    copy_dual_pla_04_offset_calibration_process_data,
 )
 from shellforgepy.simple import *
 
@@ -19,8 +19,8 @@ _logger = logging.getLogger(__name__)
 
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
-CALIBRATION_HEIGHT_MM = 0.6
-CENTER_VOID_MM = 4
+CALIBRATION_HEIGHT_MM = 1.5
+CENTER_VOID_MM = 3
 CENTER_GAP_MM = 0.8
 ARM_LENGTH_MM = 28.0
 ARM_WIDTH_MM = 2.0
@@ -62,6 +62,20 @@ def create_offset_cross_materials():
     t1_collector = PartCollector()
     t1_collector = t1_collector.fuse(right_arm)
     t1_collector = t1_collector.fuse(bottom_arm)
+
+    all = t0_collector.fuse(t1_collector)
+
+
+    t0_bar = create_box(2*ARM_LENGTH_MM + CENTER_VOID_MM + 2*CENTER_GAP_MM, 4*ARM_WIDTH_MM, CALIBRATION_HEIGHT_MM)
+    t0_bar = align(t0_bar, all, Alignment.CENTER)
+    t0_bar = align(t0_bar, all, Alignment.STACK_BACK, stack_gap=4*ARM_WIDTH_MM)
+
+    t0_collector = t0_collector.fuse(t0_bar)
+
+    t1_bar = align(t0_bar, all, Alignment.STACK_FRONT, stack_gap=4*ARM_WIDTH_MM)
+
+    t1_collector = t1_collector.fuse(t1_bar)
+
 
     return t0_collector, t1_collector
 
@@ -114,7 +128,7 @@ def main():
         parts.as_list(),
         script_file=__file__,
         prod=PROD,
-        process_data=copy_cold_bed_dual_pla_04_offset_calibration_process_data(),
+        process_data=copy_dual_pla_04_offset_calibration_process_data(),
         prod_gap=4,
         bed_width=SAFE_BED_WIDTH_MM,
         bed_depth=SAFE_BED_DEPTH_MM,
