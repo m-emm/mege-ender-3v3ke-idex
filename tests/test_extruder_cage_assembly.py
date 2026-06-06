@@ -1,9 +1,13 @@
 import inspect
 
 import pytest
-from assembly_defaults import assembly_kwargs
+import yaml
+from assembly_defaults import ASSEMBLIES_DIR, AssemblyDefaultsLoader, assembly_kwargs
 from mege_ender_3v3ke_idex.designs.assemblies.extruder_cage_assembly import (
     create_extruder_cage_assembly,
+)
+from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_board_assembly import (
+    create_nitehawk_board_assembly,
 )
 from mege_ender_3v3ke_idex.designs.assemblies.sprite_extruder_assembly import (
     create_sprite_extruder_assembly,
@@ -37,6 +41,7 @@ def _recut_delta(part, cutter):
 def test_extruder_cage_signature_uses_cage_owned_mount_dimensions():
     parameters = inspect.signature(create_extruder_cage_assembly).parameters
 
+    assert "nitehawk_board" in parameters
     assert "extruder_cage_mount_plate_fillet_radius" in parameters
     assert "nitehawk_holder_extruder_gap" in parameters
     for parameter_name in REMOVED_CAGE_PARAMETERS:
@@ -47,9 +52,13 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
     sprite_extruder = create_sprite_extruder_assembly(
         **assembly_kwargs(create_sprite_extruder_assembly)
     )
+    nitehawk_board = create_nitehawk_board_assembly(
+        **assembly_kwargs(create_nitehawk_board_assembly)
+    )
     cage_kwargs = assembly_kwargs(
         create_extruder_cage_assembly,
         sprite_extruder=sprite_extruder,
+        nitehawk_board=nitehawk_board,
     )
 
     cage = create_extruder_cage_assembly(**cage_kwargs)
@@ -125,3 +134,70 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
     ]:
         recut_delta = _recut_delta(cage.leader, cage.get_named_cutter(cutter_name))
         assert recut_delta < 0.01
+
+
+def test_extruder_cage_side_variants_inject_side_specific_nitehawk_boards():
+    config = yaml.load(
+        (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+    assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
+
+    assert assemblies["nitehawk_board_left_assembly"]["resource_file"] == (
+        "nitehawk_board_assembly.yaml"
+    )
+    assert assemblies["nitehawk_board_right_assembly"]["resource_file"] == (
+        "nitehawk_board_assembly.yaml"
+    )
+
+    assert assemblies["extruder_cage_left_assembly"]["inject_parts"] == {
+        "sprite_extruder": "sprite_extruder_left_assembly",
+        "nitehawk_board": "nitehawk_board_left_assembly",
+    }
+    assert assemblies["extruder_cage_right_assembly"]["inject_parts"] == {
+        "sprite_extruder": "sprite_extruder_right_assembly",
+        "nitehawk_board": "nitehawk_board_right_assembly",
+    }
+
+    placements = config["placement"]["alignments"]
+
+    for side in ["left", "right"]:
+        board = f"nitehawk_board_{side}_assembly"
+        sprite_extruder = f"sprite_extruder_{side}_assembly"
+        cage = f"extruder_cage_{side}_assembly"
+
+        right_alignment = next(
+            placement
+            for placement in placements
+            if placement.get("part") == board and placement.get("alignment") == "RIGHT"
+        )
+        assert right_alignment["to"] == sprite_extruder
+
+        back_alignment = next(
+            placement
+            for placement in placements
+            if placement.get("part") == board
+            and placement.get("alignment") == "STACK_BACK"
+        )
+        assert back_alignment["to"] == sprite_extruder
+        assert back_alignment["stack_gap"] == {
+            "$ref": "nitehawk_board_extruder_back_gap"
+        }
+
+        bottom_alignment = next(
+            placement
+            for placement in placements
+            if placement.get("part") == board and placement.get("alignment") == "BOTTOM"
+        )
+        assert bottom_alignment["to"] == sprite_extruder
+        assert bottom_alignment["post_translation"][2] == {
+            "$ref": "nitehawk_board_extruder_body_bottom_offset"
+        }
+
+        rigid_group = next(
+            placement
+            for placement in placements
+            if placement.get("to") == sprite_extruder
+            and cage in placement.get("rigid_group", [])
+        )
+        assert board in rigid_group["rigid_group"]

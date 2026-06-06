@@ -23,6 +23,10 @@ Builder:
       - source: injected
         assembly: sprite_extruder
         artifact: all
+      - source: injected
+        assembly: nitehawk_board
+        artifact: followers
+        name_template: "nitehawk_board_{name}"
 
   Production:
     parts: []

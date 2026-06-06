@@ -806,6 +806,8 @@ globals:
   holder_mount_plate_thickness: 2.5
   holder_mount_plate_top_offset: 29
   nitehawk_board_angle: 0
+  nitehawk_board_extruder_back_gap: 9
+  nitehawk_board_extruder_body_bottom_offset: 0
   nitehawk_front_cutter_back_width: 10.8
   nitehawk_front_cutter_width: 18.8
   nitehawk_front_cutter_y_size: 7.0
