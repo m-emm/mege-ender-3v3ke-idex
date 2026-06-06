@@ -320,10 +320,46 @@ def create_extruder_cage_assembly(
 
     right_mount_plate = sprite_extruder.use_as_cutter_on(right_mount_plate)
 
+    left_mount_plate = create_box(
+        extruder_cage_mount_plate_thickness,
+        BIG_THING,
+        tool_head_additional_mount_plate_depth,
+    )
+    left_mount_plate = align(
+        left_mount_plate,
+        sprite_mount_base_plate,
+        Alignment.CENTER,
+    )
+    left_mount_plate = align(
+        left_mount_plate,
+        sprite_extruder,
+        Alignment.STACK_LEFT,
+        stack_gap=tool_head_additional_mount_plate_clearance,
+    )
+
+    left_mount_plate = align(
+        left_mount_plate,
+        sprite_mount_base_plate,
+        Alignment.STACK_BACK,
+    )
+    left_mount_plate = align(
+        left_mount_plate,
+        sprite_mount_base_plate,
+        Alignment.BOTTOM,
+    )
+
+    left_mount_plate = fit_part_between(
+        left_mount_plate,
+        cut_normal=(0, 1, 0),
+        limiting_start_part=sprite_mount_base_plate,
+        limiting_end_part=nitehawk_rear_mount_plate,
+    )
+
     cage_leader = sprite_mount_base_plate
     cage_leader = cage_leader.fuse(right_mount_plate)
     cage_leader = cage_leader.fuse(part_fan_front_mount_plate)
     cage_leader = cage_leader.fuse(nitehawk_rear_mount_plate)
+    cage_leader = cage_leader.fuse(left_mount_plate)
     cage_leader = sprite_extruder.use_as_cutter_on(cage_leader)
     for cutter in nitehawk_cutters.values():
         cage_leader = cage_leader.cut(cutter)
