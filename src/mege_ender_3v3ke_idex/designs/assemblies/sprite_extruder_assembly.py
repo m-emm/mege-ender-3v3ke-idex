@@ -274,7 +274,23 @@ def create_sprite_extruder_assembly(
     lever = translate(lever_center_offset, lever_front_inset, 0)(lever)
     retval.add_named_non_production_part(lever, "lever")
 
-    fan = create_box(fan_thickness, front_size[1], front_size[2])
+    fan_size = 30
+    fan = create_box(fan_thickness,fan_size, front_size[2])
+
+    fan_hole_diameter = 28
+    fan_hole_top_distance = 1.5
+    fan_hole_cutter = create_cylinder(
+        fan_hole_diameter / 2,
+        BIG_THING,
+        direction=(1, 0, 0),
+    )
+
+    fan_hole_cutter = align(fan_hole_cutter, fan, Alignment.CENTER)
+    fan_hole_cutter = align(fan_hole_cutter, fan, Alignment.TOP)
+    fan_hole_cutter = translate(0, 0, -fan_hole_top_distance)(fan_hole_cutter)
+
+    fan = fan.cut(fan_hole_cutter)
+
     fan = align(fan, front, Alignment.CENTER)
     fan = align(fan, front, Alignment.FRONT)
     fan = align(fan, front, Alignment.STACK_RIGHT)
