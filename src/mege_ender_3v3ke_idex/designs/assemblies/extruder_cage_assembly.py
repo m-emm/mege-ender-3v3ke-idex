@@ -3,6 +3,8 @@
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from shellforgepy.simple import *
 
+extruder_cage_top_right_bridge_clearance = 2
+
 
 def create_extruder_cage_assembly(
     *,
@@ -34,6 +36,7 @@ def create_extruder_cage_assembly(
 ):
     """Create a standalone extruder cage around the injected sprite extruder."""
 
+    extruder_size = get_bounding_box_size(sprite_extruder)
     screw_record = MScrew.from_size(extruder_cage_screw_size)
     sprite_extruder_size = get_bounding_box_size(sprite_extruder)
     sprite_extruder_body_size = get_bounding_box_size(sprite_extruder.leader)
@@ -180,7 +183,7 @@ def create_extruder_cage_assembly(
     nitehawk_rear_mount_plate = create_filleted_box(
         nitehawk_plate_width,
         nitehawk_plate_depth,
-        nitehawk_plate_height,
+        extruder_size[2],
         fillet_radius=extruder_cage_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.FRONT, Alignment.BACK],
     )
@@ -243,6 +246,13 @@ def create_extruder_cage_assembly(
         Alignment.STACK_FRONT,
     )
 
+    nitehawk_rear_mount_plate = align(
+        nitehawk_rear_mount_plate,
+        sprite_extruder,
+        Alignment.CENTER,
+        axes=[2],
+    )
+
     for index, hole_cutter in enumerate(nitehawk_hole_cutters):
         nut_pocket = create_nut(
             extruder_cage_screw_size,
@@ -262,11 +272,10 @@ def create_extruder_cage_assembly(
         nitehawk_rear_mount_plate
     )
 
-    extruder_size = get_bounding_box_size(sprite_extruder)
     right_mount_plate = create_filleted_box(
         extruder_cage_mount_plate_thickness,
         tool_head_additional_mount_plate_depth,
-        extruder_size[2],
+        extruder_size[2] + extruder_cage_top_right_bridge_clearance,
         fillet_radius=extruder_cage_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.LEFT, Alignment.RIGHT, Alignment.TOP],
     )
@@ -369,7 +378,7 @@ def create_extruder_cage_assembly(
     front_strip_inset = 1.5
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         front_strip = create_box(
-            tool_head_additional_mount_plate_depth/2,
+            tool_head_additional_mount_plate_depth / 2,
             extruder_cage_mount_plate_thickness,
             extruder_size[2],
         )
@@ -389,8 +398,49 @@ def create_extruder_cage_assembly(
             limiting_end_part=part_fan_front_mount_plate,
         )
 
-        front_strip = translate(-lr.sign*front_strip_inset, 0,0)(front_strip)
+        front_strip = translate(-lr.sign * front_strip_inset, 0, 0)(front_strip)
         front_strips = front_strips.fuse(front_strip)
+
+    top_right_bridge = create_box(
+        tool_head_additional_mount_plate_depth,
+        extruder_size[1] + extruder_cage_mount_plate_thickness,
+        extruder_cage_mount_plate_thickness,
+    )
+    top_right_bridge = align(top_right_bridge, sprite_extruder, Alignment.CENTER)
+
+    top_right_bridge = align(
+        top_right_bridge,
+        sprite_extruder,
+        Alignment.STACK_TOP,
+        stack_gap=extruder_cage_top_right_bridge_clearance,
+    )
+
+    top_right_bridge = align(top_right_bridge, sprite_extruder, Alignment.STACK_RIGHT)
+    top_right_bridge = align(top_right_bridge, sprite_mount_base_plate, Alignment.FRONT)
+    
+
+    top_right_bridge_connector = create_box(
+        tool_head_additional_mount_plate_depth,
+        extruder_cage_mount_plate_thickness,
+        tool_head_mount_base_plate_height + extruder_cage_top_right_bridge_clearance,
+    )
+
+    top_right_bridge_connector = align(
+        top_right_bridge_connector,
+        top_right_bridge,
+        Alignment.CENTER,
+    )
+    top_right_bridge_connector = align(
+        top_right_bridge_connector,
+        top_right_bridge,
+        Alignment.FRONT,
+    )
+    top_right_bridge_connector = align(
+        top_right_bridge_connector,
+        top_right_bridge,
+        Alignment.STACK_BOTTOM,
+    )
+    top_right_bridge = top_right_bridge.fuse(top_right_bridge_connector)
 
     cage_leader = sprite_mount_base_plate
     cage_leader = cage_leader.fuse(right_mount_plate)
@@ -398,6 +448,7 @@ def create_extruder_cage_assembly(
     cage_leader = cage_leader.fuse(nitehawk_rear_mount_plate)
     cage_leader = cage_leader.fuse(left_mount_plate)
     cage_leader = cage_leader.fuse(front_strips)
+    cage_leader = cage_leader.fuse(top_right_bridge)
     cage_leader = sprite_extruder.use_as_cutter_on(cage_leader)
     for cutter in nitehawk_cutters.values():
         cage_leader = cage_leader.cut(cutter)
