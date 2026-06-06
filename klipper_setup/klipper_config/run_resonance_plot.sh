@@ -47,9 +47,37 @@ for arg in "${remote_args[@]}"; do
 done
 
 echo "Running resonance helper on ${REMOTE_HOST}..."
-ssh "${REMOTE_HOST}" "${REMOTE_HELPER}${quoted_args}"
+
+set +e
+helper_output="$(ssh "${REMOTE_HOST}" "${REMOTE_HELPER}${quoted_args}" 2>&1)"
+helper_status=$?
+set -e
+
+if [[ "${helper_status}" -ne 0 ]]; then
+  printf '%s\n' "${helper_output}"
+  exit "${helper_status}"
+fi
 
 mkdir -p "${LOCAL_OUT_DIR}"
+
+copy_remote_file() {
+  local remote_path="$1"
+  local local_path
+
+  if [[ -z "${remote_path}" ]]; then
+    return 0
+  fi
+
+  local_path="${LOCAL_OUT_DIR}/$(basename "${remote_path}")"
+  scp -q "${REMOTE_HOST}:${remote_path}" "${local_path}"
+  printf '%s\n' "${local_path}"
+}
+
+remote_plot="$(printf '%s\n' "${helper_output}" | sed -n 's/^Plot: //p' | tail -n 1)"
+remote_summary="$(printf '%s\n' "${helper_output}" | sed -n 's/^Summary: //p' | tail -n 1)"
+recommended_shaper="$(printf '%s\n' "${helper_output}" | sed -n 's/^Recommended shaper is /Recommended shaper: /p' | tail -n 1)"
+local_plot="$(copy_remote_file "${remote_plot}")"
+local_summary="$(copy_remote_file "${remote_summary}")"
 
 if [[ -n "${axis}" ]]; then
   remote_pattern="printer_data/config/resonance/latest_${axis}*"
@@ -57,10 +85,26 @@ else
   remote_pattern="printer_data/config/resonance/latest_*"
 fi
 
-echo "Copying latest resonance outputs to ${LOCAL_OUT_DIR}..."
-if ! scp -q "${REMOTE_HOST}:${remote_pattern}" "${LOCAL_OUT_DIR}/"; then
+if ! scp -q "${REMOTE_HOST}:${remote_pattern}" "${LOCAL_OUT_DIR}/" >/dev/null 2>&1; then
   echo "Warning: could not copy ${remote_pattern}; check the helper output above." >&2
 fi
 
-echo "Local resonance outputs:"
-find "${LOCAL_OUT_DIR}" -maxdepth 1 -type f -name 'latest_*' -print | sort
+if [[ -n "${local_plot}" ]]; then
+  if [[ -n "${recommended_shaper}" ]]; then
+    echo "${recommended_shaper}"
+    echo ""
+  fi
+
+  echo ""
+  echo "Plot written to"
+  echo "${local_plot}"
+  echo ""
+  echo "Open with"
+  printf 'open %q\n' "${local_plot}"
+fi
+
+if [[ -n "${local_summary}" ]]; then
+  echo ""
+  echo "Summary written to"
+  echo "${local_summary}"
+fi
