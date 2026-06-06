@@ -36,10 +36,6 @@ def create_extruder_cage_assembly(
 ):
     """Create a standalone extruder cage around the injected sprite extruder."""
 
-    mount_plate_fillet_radius = min(
-        extruder_cage_mount_plate_fillet_radius,
-        extruder_cage_mount_plate_thickness / 2 - 0.01,
-    )
     screw_record = MScrew.from_size(extruder_cage_screw_size)
     sprite_extruder_size = get_bounding_box_size(sprite_extruder)
     sprite_extruder_body_size = get_bounding_box_size(sprite_extruder.leader)
@@ -49,7 +45,7 @@ def create_extruder_cage_assembly(
         sprite_extruder_size[0] + 2 * extruder_cage_flange_thickness,
         extruder_cage_mount_plate_thickness,
         tool_head_mount_base_plate_height,
-        fillet_radius=mount_plate_fillet_radius,
+        fillet_radius=extruder_cage_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.FRONT, Alignment.BACK],
     )
     sprite_mount_base_plate = align(
@@ -115,7 +111,7 @@ def create_extruder_cage_assembly(
         extruder_cage_mount_plate_thickness,
         tool_head_additional_mount_plate_depth,
         tool_head_additional_mount_plate_height,
-        fillet_radius=mount_plate_fillet_radius,
+        fillet_radius=extruder_cage_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.LEFT, Alignment.RIGHT, Alignment.BOTTOM],
     )
     part_fan_side_mount_plate = align(
@@ -153,8 +149,8 @@ def create_extruder_cage_assembly(
         duct_front_mount_plate_width,
         duct_front_mount_plate_height,
         extruder_cage_mount_plate_thickness,
-        fillet_radius=mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.FRONT, Alignment.BACK],
+        fillet_radius=extruder_cage_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
     front_mount_plate_cutout = create_filleted_box(
         duct_front_mount_plate_width - 2 * duct_front_mount_plate_width_border,
@@ -201,30 +197,6 @@ def create_extruder_cage_assembly(
         part_fan_front_mount_plate
     )
 
-    part_fan_front_mount_plate_connector = create_box(
-        tool_head_front_mount_plate_connector_width,
-        extruder_cage_mount_plate_thickness,
-        tool_head_front_mount_plate_connector_height,
-    )
-    part_fan_front_mount_plate_connector = align(
-        part_fan_front_mount_plate_connector,
-        part_fan_front_mount_plate,
-        Alignment.BACK,
-    )
-    part_fan_front_mount_plate_connector = align(
-        part_fan_front_mount_plate_connector,
-        part_fan_front_mount_plate,
-        Alignment.STACK_BOTTOM,
-    )
-    part_fan_front_mount_plate_connector = align(
-        part_fan_front_mount_plate_connector,
-        part_fan_front_mount_plate,
-        Alignment.LEFT,
-    )
-    part_fan_front_mount_plate_connector = sprite_extruder.use_as_cutter_on(
-        part_fan_front_mount_plate_connector
-    )
-
     tower_base_radius = (
         nitehawk_holder_mount_tower_diameter / 2 + nitehawk_mount_tower_base_extension
     )
@@ -242,7 +214,7 @@ def create_extruder_cage_assembly(
         nitehawk_plate_width,
         nitehawk_plate_depth,
         nitehawk_plate_height,
-        fillet_radius=mount_plate_fillet_radius,
+        fillet_radius=extruder_cage_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.FRONT, Alignment.BACK],
     )
     nitehawk_rear_mount_plate = align(
@@ -259,10 +231,7 @@ def create_extruder_cage_assembly(
     nitehawk_rear_mount_plate = align(
         nitehawk_rear_mount_plate,
         sprite_extruder,
-        Alignment.TOP,
-    )
-    nitehawk_rear_mount_plate = translate(0, 0, -holder_mount_plate_top_offset)(
-        nitehawk_rear_mount_plate
+        Alignment.BOTTOM,
     )
 
     nitehawk_mount_screws = []
@@ -305,7 +274,7 @@ def create_extruder_cage_assembly(
         )
         nut_pocket = rotate(-90, axis=(1, 0, 0))(nut_pocket)
         nut_pocket = align(nut_pocket, hole_cutter, Alignment.CENTER)
-        nut_pocket = align(nut_pocket, tower, Alignment.BACK)
+        nut_pocket = align(nut_pocket, nitehawk_rear_mount_plate, Alignment.BACK)
 
         nitehawk_cutters[f"nitehawk_mount_hole_{index}"] = hole_cutter
         nitehawk_cutters[f"nitehawk_mount_nut_pocket_{index}"] = nut_pocket
@@ -331,7 +300,6 @@ def create_extruder_cage_assembly(
     cage_leader = sprite_mount_base_plate
     cage_leader = cage_leader.fuse(part_fan_side_mount_plate)
     cage_leader = cage_leader.fuse(part_fan_front_mount_plate)
-    cage_leader = cage_leader.fuse(part_fan_front_mount_plate_connector)
     cage_leader = cage_leader.fuse(nitehawk_rear_mount_plate)
     cage_leader = sprite_extruder.use_as_cutter_on(cage_leader)
     for cutter in nitehawk_cutters.values():
@@ -341,10 +309,6 @@ def create_extruder_cage_assembly(
     cage.add_named_follower(sprite_mount_base_plate, "sprite_mount_base_plate")
     cage.add_named_follower(part_fan_side_mount_plate, "part_fan_side_mount_plate")
     cage.add_named_follower(part_fan_front_mount_plate, "part_fan_front_mount_plate")
-    cage.add_named_follower(
-        part_fan_front_mount_plate_connector,
-        "part_fan_front_mount_plate_connector",
-    )
     cage.add_named_follower(nitehawk_rear_mount_plate, "nitehawk_rear_mount_plate")
 
     for side_name, screw in sprite_mount_screws:
