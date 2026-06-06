@@ -788,6 +788,9 @@ globals:
   side_holes_depth: 4
   fan_thickness: 14
   extruder_mount_screw_size: "M3"
+  extruder_cage_mount_plate_thickness: 2
+  extruder_cage_flange_thickness: 3
+  extruder_cage_screw_size: "M3"
   lever_width: 14.5
   lever_thickness: 4
   lever_length: 23

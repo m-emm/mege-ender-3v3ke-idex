@@ -2245,6 +2245,13 @@ assemblies:
 
     depends_on: []
 
+  - name: extruder_cage_assembly
+
+    depends_on:
+      - sprite_extruder_assembly
+    inject_parts:
+      sprite_extruder: sprite_extruder_assembly
+
   - name: sprite_extruder_left_assembly
 
     resource_file: sprite_extruder_assembly.yaml

@@ -275,7 +275,7 @@ def create_sprite_extruder_assembly(
     retval.add_named_non_production_part(lever, "lever")
 
     fan_size = 30
-    fan = create_box(fan_thickness,fan_size, front_size[2])
+    fan = create_box(fan_thickness, fan_size, front_size[2])
 
     fan_hole_diameter = 28
     fan_hole_top_distance = 1.5
