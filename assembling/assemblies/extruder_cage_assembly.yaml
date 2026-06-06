@@ -66,8 +66,6 @@ Parameters:
     Type: Float
   holder_mount_plate_size:
     Type: Float
-  nitehawk_holder_extruder_gap:
-    Type: Float
   nitehawk_holder_mount_tower_diameter:
     Type: Float
   nitehawk_holder_mount_tower_height:

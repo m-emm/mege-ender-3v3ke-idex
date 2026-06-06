@@ -25,7 +25,6 @@ def create_extruder_cage_assembly(
     duct_front_mount_plate_width_border,
     holder_mount_plate_depth,
     holder_mount_plate_size,
-    nitehawk_holder_extruder_gap,
     nitehawk_holder_mount_tower_diameter,
     nitehawk_holder_mount_tower_height,
     nitehawk_mount_tower_base_extension,
@@ -196,13 +195,19 @@ def create_extruder_cage_assembly(
         part_fan_front_mount_plate
     )
 
+    nitehawk_pcb = nitehawk_board.get_named_follower("pcb")
+    nitehawk_board_holes = sorted(
+        [
+            nitehawk_board.get_named_cutter("hole_1"),
+            nitehawk_board.get_named_cutter("hole_2"),
+        ],
+        key=lambda hole: get_bounding_box_center(hole)[0],
+    )
     tower_base_radius = (
         nitehawk_holder_mount_tower_diameter / 2 + nitehawk_mount_tower_base_extension
     )
     tower_tip_radius = nitehawk_holder_mount_tower_diameter / 2
-    nitehawk_plate_width = nitehawk_holes_center_distance + 2 * (
-        tower_base_radius + holder_mount_plate_size
-    )
+    nitehawk_plate_width = nitehawk_holes_center_distance + 2 * (tower_base_radius)
     nitehawk_plate_depth = extruder_cage_mount_plate_thickness
     nitehawk_plate_height = max(
         holder_mount_plate_depth,
@@ -216,47 +221,21 @@ def create_extruder_cage_assembly(
         fillet_radius=extruder_cage_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.FRONT, Alignment.BACK],
     )
-    nitehawk_rear_mount_plate = align(
-        nitehawk_rear_mount_plate,
-        sprite_extruder,
-        Alignment.CENTER,
-    )
-    nitehawk_rear_mount_plate = align(
-        nitehawk_rear_mount_plate,
-        sprite_extruder,
-        Alignment.STACK_BACK,
-        stack_gap=nitehawk_holder_extruder_gap,
-    )
-    nitehawk_rear_mount_plate = align(
-        nitehawk_rear_mount_plate,
-        sprite_extruder,
-        Alignment.BOTTOM,
-    )
 
     nitehawk_mount_screws = []
     nitehawk_cutters = {}
+    nitehawk_hole_cutters = []
     nitehawk_towers = PartCollector()
-    tower_spacing_reference = create_box(
-        nitehawk_holes_center_distance + 2 * tower_base_radius,
-        nitehawk_plate_depth,
-        nitehawk_plate_height,
-    )
-    tower_spacing_reference = align(
-        tower_spacing_reference,
-        nitehawk_rear_mount_plate,
-        Alignment.CENTER,
-    )
 
-    for index, lr in enumerate([Alignment.LEFT, Alignment.RIGHT]):
+    for index, board_hole in enumerate(nitehawk_board_holes):
         tower = create_cone(
             tower_base_radius,
             tower_tip_radius,
             nitehawk_holder_mount_tower_height,
         )
         tower = rotate(-90, axis=(1, 0, 0))(tower)
-        tower = align(tower, nitehawk_rear_mount_plate, Alignment.CENTER)
-        tower = align(tower, nitehawk_rear_mount_plate, Alignment.STACK_BACK)
-        tower = align(tower, tower_spacing_reference, lr)
+        tower = align(tower, board_hole, Alignment.CENTER, axes=[0, 2])
+        tower = align(tower, nitehawk_pcb, Alignment.STACK_FRONT)
 
         hole_cutter = create_cylinder(
             screw_record.clearance_hole_normal / 2,
@@ -265,18 +244,8 @@ def create_extruder_cage_assembly(
         )
         hole_cutter = align(hole_cutter, tower, Alignment.CENTER)
 
-        nut_pocket = create_nut(
-            extruder_cage_screw_size,
-            height=screw_record.nut_thickness + nitehawk_nut_cutter_slack,
-            slack=nitehawk_nut_cutter_slack,
-            no_hole=True,
-        )
-        nut_pocket = rotate(-90, axis=(1, 0, 0))(nut_pocket)
-        nut_pocket = align(nut_pocket, hole_cutter, Alignment.CENTER)
-        nut_pocket = align(nut_pocket, nitehawk_rear_mount_plate, Alignment.BACK)
-
         nitehawk_cutters[f"nitehawk_mount_hole_{index}"] = hole_cutter
-        nitehawk_cutters[f"nitehawk_mount_nut_pocket_{index}"] = nut_pocket
+        nitehawk_hole_cutters.append(hole_cutter)
         nitehawk_towers = nitehawk_towers.fuse(tower)
 
         screw = create_cylinder_screw(
@@ -288,6 +257,30 @@ def create_extruder_cage_assembly(
         screw = align(screw, tower, Alignment.BACK)
         screw = translate(0, screw_record.cylinder_head_height, 0)(screw)
         nitehawk_mount_screws.append(screw)
+
+    nitehawk_rear_mount_plate = align(
+        nitehawk_rear_mount_plate,
+        nitehawk_towers,
+        Alignment.CENTER,
+        axes=[0, 2],
+    )
+    nitehawk_rear_mount_plate = align(
+        nitehawk_rear_mount_plate,
+        nitehawk_towers,
+        Alignment.STACK_FRONT,
+    )
+
+    for index, hole_cutter in enumerate(nitehawk_hole_cutters):
+        nut_pocket = create_nut(
+            extruder_cage_screw_size,
+            height=screw_record.nut_thickness + nitehawk_nut_cutter_slack,
+            slack=nitehawk_nut_cutter_slack,
+            no_hole=True,
+        )
+        nut_pocket = rotate(-90, axis=(1, 0, 0))(nut_pocket)
+        nut_pocket = align(nut_pocket, hole_cutter, Alignment.CENTER)
+        nut_pocket = align(nut_pocket, nitehawk_rear_mount_plate, Alignment.BACK)
+        nitehawk_cutters[f"nitehawk_mount_nut_pocket_{index}"] = nut_pocket
 
     nitehawk_rear_mount_plate = nitehawk_rear_mount_plate.fuse(nitehawk_towers)
     for cutter in nitehawk_cutters.values():
