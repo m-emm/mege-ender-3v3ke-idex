@@ -17,6 +17,9 @@ Builder:
       - source: self
         artifact: leader
         name: extruder_cage
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
       - source: injected
         assembly: sprite_extruder
         artifact: all
@@ -31,6 +34,64 @@ Parameters:
     Type: Float
   extruder_cage_screw_size:
     Type: String
+  tool_head_mount_base_plate_height:
+    Type: Float
+  tool_head_mount_base_plate_thickness:
+    Type: Float
+  tool_head_mount_sprite_mount_screw_length:
+    Type: Float
+  tool_head_additional_mount_plate_clearance:
+    Type: Float
+  tool_head_additional_mount_plate_depth:
+    Type: Float
+  tool_head_additional_mount_plate_depth_offset:
+    Type: Float
+  tool_head_additional_mount_plate_fillet_radius:
+    Type: Float
+  tool_head_additional_mount_plate_height:
+    Type: Float
+  tool_head_additional_mount_plate_thickness:
+    Type: Float
+  tool_head_additional_mount_plate_z_offset:
+    Type: Float
+  tool_head_front_mount_plate_connector_height:
+    Type: Float
+  tool_head_front_mount_plate_connector_thickness:
+    Type: Float
+  tool_head_front_mount_plate_connector_width:
+    Type: Float
+  duct_front_mount_plate_height:
+    Type: Float
+  duct_front_mount_plate_height_border:
+    Type: Float
+  duct_front_mount_plate_offset:
+    Type: Float
+  duct_front_mount_plate_thickness:
+    Type: Float
+  duct_front_mount_plate_width:
+    Type: Float
+  duct_front_mount_plate_width_border:
+    Type: Float
+  holder_mount_plate_depth:
+    Type: Float
+  holder_mount_plate_size:
+    Type: Float
+  holder_mount_plate_thickness:
+    Type: Float
+  holder_mount_plate_top_offset:
+    Type: Float
+  nitehawk_holder_mount_tower_diameter:
+    Type: Float
+  nitehawk_holder_mount_tower_height:
+    Type: Float
+  nitehawk_mount_tower_base_extension:
+    Type: Float
+  nitehawk_holes_center_distance:
+    Type: Float
+  nitehawk_nut_cutter_slack:
+    Type: Float
+  BIG_THING:
+    Type: Float
 
 Parts:
   ExtruderCageAssembly:
