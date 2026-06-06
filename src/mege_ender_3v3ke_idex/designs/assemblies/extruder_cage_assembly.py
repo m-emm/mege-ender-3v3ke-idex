@@ -53,8 +53,8 @@ def _create_sprite_mount_screws(
         screw = create_cylinder_screw(screw_size, screw_length)
         screw = rotate(-90, axis=(1, 0, 0))(screw)
         screw = align(screw, hole_guide, Alignment.CENTER)
-        screw = align(screw, mount_base_plate, Alignment.BACK)
-        screw = translate(0, cylinder_head_height, 0)(screw)
+        screw = align(screw, mount_base_plate, Alignment.FRONT)
+        screw = translate(0, -cylinder_head_height, 0)(screw)
         screws.append((side_name, screw))
 
     return screws
@@ -88,7 +88,7 @@ def _create_sprite_mount_base_plate(
     mount_base_plate = align(
         mount_base_plate,
         sprite_extruder,
-        Alignment.STACK_BACK,
+        Alignment.STACK_FRONT,
     )
     mount_base_plate = mount_base_plate.cut(mount_hole_cutter)
     mount_base_plate = mount_base_plate.cut(sprite_extruder.leader)
