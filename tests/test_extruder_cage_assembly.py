@@ -41,6 +41,11 @@ REMOVED_CAGE_PARAMETERS = [
     "tool_head_front_mount_plate_connector_width",
     "holder_mount_plate_top_offset",
     "nitehawk_holder_extruder_gap",
+    "tool_head_additional_mount_plate_depth_offset",
+    "tool_head_additional_mount_plate_height",
+    "tool_head_additional_mount_plate_z_offset",
+    "holder_mount_plate_depth",
+    "holder_mount_plate_size",
 ]
 
 
@@ -71,6 +76,7 @@ def test_extruder_cage_signature_uses_cage_owned_mount_dimensions():
 
     assert "nitehawk_board" in parameters
     assert "extruder_cage_mount_plate_fillet_radius" in parameters
+    assert "extruder_cage_top_right_bridge_clearance" in parameters
     for parameter_name in REMOVED_CAGE_PARAMETERS:
         assert parameter_name not in parameters
 
@@ -182,13 +188,14 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
     shifted_hole_0_center = get_bounding_box_center(
         shifted_cage.get_named_cutter("nitehawk_mount_hole_0")
     )
-    for axis, translation in enumerate(board_translation):
+    for axis in [0, 1]:
         assert shifted_mount_plate_center[axis] - nitehawk_mount_plate_center[
             axis
-        ] == pytest.approx(translation)
+        ] == pytest.approx(board_translation[axis])
+    for axis in [0, 2]:
         assert shifted_hole_0_center[axis] - nitehawk_hole_0_center[
             axis
-        ] == pytest.approx(translation)
+        ] == pytest.approx(board_translation[axis])
 
     for cutter_name in [
         "mount_hole_cutter",

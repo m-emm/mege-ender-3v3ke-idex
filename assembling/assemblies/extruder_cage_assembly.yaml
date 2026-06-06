@@ -40,6 +40,8 @@ Parameters:
     Type: Float
   extruder_cage_screw_size:
     Type: String
+  extruder_cage_top_right_bridge_clearance:
+    Type: Float
   tool_head_mount_base_plate_height:
     Type: Float
   tool_head_mount_sprite_mount_screw_length:
@@ -48,12 +50,6 @@ Parameters:
     Type: Float
   tool_head_additional_mount_plate_depth:
     Type: Float
-  tool_head_additional_mount_plate_depth_offset:
-    Type: Float
-  tool_head_additional_mount_plate_height:
-    Type: Float
-  tool_head_additional_mount_plate_z_offset:
-    Type: Float
   duct_front_mount_plate_height:
     Type: Float
   duct_front_mount_plate_height_border:
@@ -61,10 +57,6 @@ Parameters:
   duct_front_mount_plate_offset:
     Type: Float
   duct_front_mount_plate_width_border:
-    Type: Float
-  holder_mount_plate_depth:
-    Type: Float
-  holder_mount_plate_size:
     Type: Float
   nitehawk_holder_mount_tower_diameter:
     Type: Float

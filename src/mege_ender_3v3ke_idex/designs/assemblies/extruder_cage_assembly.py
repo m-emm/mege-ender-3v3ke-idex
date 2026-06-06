@@ -3,8 +3,6 @@
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from shellforgepy.simple import *
 
-extruder_cage_top_right_bridge_clearance = 2
-
 
 def create_extruder_cage_assembly(
     *,
@@ -14,19 +12,15 @@ def create_extruder_cage_assembly(
     extruder_cage_mount_plate_fillet_radius,
     extruder_cage_flange_thickness,
     extruder_cage_screw_size,
+    extruder_cage_top_right_bridge_clearance,
     tool_head_mount_base_plate_height,
     tool_head_mount_sprite_mount_screw_length,
     tool_head_additional_mount_plate_clearance,
     tool_head_additional_mount_plate_depth,
-    tool_head_additional_mount_plate_depth_offset,
-    tool_head_additional_mount_plate_height,
-    tool_head_additional_mount_plate_z_offset,
     duct_front_mount_plate_height,
     duct_front_mount_plate_height_border,
     duct_front_mount_plate_offset,
     duct_front_mount_plate_width_border,
-    holder_mount_plate_depth,
-    holder_mount_plate_size,
     nitehawk_holder_mount_tower_diameter,
     nitehawk_holder_mount_tower_height,
     nitehawk_mount_tower_base_extension,
@@ -175,10 +169,6 @@ def create_extruder_cage_assembly(
     tower_tip_radius = nitehawk_holder_mount_tower_diameter / 2
     nitehawk_plate_width = nitehawk_holes_center_distance + 2 * (tower_base_radius)
     nitehawk_plate_depth = extruder_cage_mount_plate_thickness
-    nitehawk_plate_height = max(
-        holder_mount_plate_depth,
-        2 * tower_base_radius + holder_mount_plate_size,
-    )
 
     nitehawk_rear_mount_plate = create_filleted_box(
         nitehawk_plate_width,
@@ -417,7 +407,6 @@ def create_extruder_cage_assembly(
 
     top_right_bridge = align(top_right_bridge, sprite_extruder, Alignment.STACK_RIGHT)
     top_right_bridge = align(top_right_bridge, sprite_mount_base_plate, Alignment.FRONT)
-    
 
     top_right_bridge_connector = create_box(
         tool_head_additional_mount_plate_depth,
