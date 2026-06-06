@@ -53,7 +53,7 @@ def create_extruder_cage_assembly(
     )
     sprite_mount_base_plate = align(
         sprite_mount_base_plate,
-        mount_hole_cutter,
+        sprite_extruder,
         Alignment.TOP,
     )
     sprite_mount_base_plate = align(
