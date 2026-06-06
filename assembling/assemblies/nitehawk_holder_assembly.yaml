@@ -71,24 +71,6 @@ Parameters:
     Type: Float
   nitehawk_board_angle:
     Type: Float
-  nitehawk_front_cutter_back_width:
-    Type: Float
-  nitehawk_front_cutter_width:
-    Type: Float
-  nitehawk_front_cutter_y_size:
-    Type: Float
-  nitehawk_heater_connector_length:
-    Type: Float
-  nitehawk_heater_connector_thickness:
-    Type: Float
-  nitehawk_heater_connector_width:
-    Type: Float
-  nitehawk_heater_connector_x_offset_from_right:
-    Type: Float
-  nitehawk_heater_connector_y_offset_from_front:
-    Type: Float
-  nitehawk_height:
-    Type: Float
   nitehawk_holder_cable_attachment_fillet_radius:
     Type: Float
   nitehawk_holder_cable_attachment_holes_diameter:
@@ -129,41 +111,11 @@ Parameters:
     Type: Float
   nitehawk_holder_width_offset:
     Type: Float
-  nitehawk_hole_diameter:
-    Type: Float
   nitehawk_holes_center_distance:
-    Type: Float
-  nitehawk_holes_y_offset:
     Type: Float
   nitehawk_mount_tower_base_extension:
     Type: Float
   nitehawk_nut_cutter_slack:
-    Type: Float
-  nitehawk_pcb_thickness:
-    Type: Float
-  nitehawk_plug_length:
-    Type: Float
-  nitehawk_plug_overhang:
-    Type: Float
-  nitehawk_plug_thickness:
-    Type: Float
-  nitehawk_plug_width:
-    Type: Float
-  nitehawk_top_width:
-    Type: Float
-  nitehawk_umbilical_cable_diameter:
-    Type: Float
-  nitehawk_umbilical_cable_length:
-    Type: Float
-  nitehawk_umbilical_connector_cable_connector_end_diameter:
-    Type: Float
-  nitehawk_umbilical_connector_cable_connector_height:
-    Type: Float
-  nitehawk_umbilical_connector_gap:
-    Type: Float
-  nitehawk_umbilical_connector_height:
-    Type: Float
-  nitehawk_width:
     Type: Float
   tool_head_additional_mount_plate_clearance:
     Type: Float

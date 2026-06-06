@@ -1,0 +1,84 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the Nitehawk toolhead board
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - left
+        - front
+        - back
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+
+  Production:
+    parts: []
+
+Parameters:
+  nitehawk_width:
+    Type: Float
+  nitehawk_height:
+    Type: Float
+  nitehawk_pcb_thickness:
+    Type: Float
+  nitehawk_hole_diameter:
+    Type: Float
+  nitehawk_holes_center_distance:
+    Type: Float
+  nitehawk_holes_y_offset:
+    Type: Float
+  nitehawk_top_width:
+    Type: Float
+  nitehawk_plug_width:
+    Type: Float
+  nitehawk_plug_length:
+    Type: Float
+  nitehawk_plug_thickness:
+    Type: Float
+  nitehawk_plug_overhang:
+    Type: Float
+  nitehawk_umbilical_connector_height:
+    Type: Float
+  nitehawk_umbilical_connector_gap:
+    Type: Float
+  nitehawk_umbilical_connector_cable_connector_end_diameter:
+    Type: Float
+  nitehawk_umbilical_connector_cable_connector_height:
+    Type: Float
+  nitehawk_umbilical_cable_diameter:
+    Type: Float
+  nitehawk_umbilical_cable_length:
+    Type: Float
+  nitehawk_heater_connector_width:
+    Type: Float
+  nitehawk_heater_connector_length:
+    Type: Float
+  nitehawk_heater_connector_thickness:
+    Type: Float
+  nitehawk_heater_connector_x_offset_from_right:
+    Type: Float
+  nitehawk_heater_connector_y_offset_from_front:
+    Type: Float
+  nitehawk_front_cutter_width:
+    Type: Float
+  nitehawk_front_cutter_back_width:
+    Type: Float
+  nitehawk_front_cutter_y_size:
+    Type: Float
+  BIG_THING:
+    Type: Float
+
+Parts:
+  NitehawkBoardAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.nitehawk_board_assembly.create_nitehawk_board_assembly

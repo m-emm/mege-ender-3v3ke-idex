@@ -1061,6 +1061,38 @@ assemblies:
       nitehawk_usb_white_connector_x: !Ref nitehawk_usb_white_connector_x
       nitehawk_usb_white_connector_y: !Ref nitehawk_usb_white_connector_y
 
+  - name: nitehawk_board_assembly
+
+    resource_file: nitehawk_board_assembly.yaml
+    depends_on: []
+    parameters:
+      nitehawk_width: !Ref nitehawk_width
+      nitehawk_height: !Ref nitehawk_height
+      nitehawk_pcb_thickness: !Ref nitehawk_pcb_thickness
+      nitehawk_hole_diameter: !Ref nitehawk_hole_diameter
+      nitehawk_holes_center_distance: !Ref nitehawk_holes_center_distance
+      nitehawk_holes_y_offset: !Ref nitehawk_holes_y_offset
+      nitehawk_top_width: !Ref nitehawk_top_width
+      nitehawk_plug_width: !Ref nitehawk_plug_width
+      nitehawk_plug_length: !Ref nitehawk_plug_length
+      nitehawk_plug_thickness: !Ref nitehawk_plug_thickness
+      nitehawk_plug_overhang: !Ref nitehawk_plug_overhang
+      nitehawk_umbilical_connector_height: !Ref nitehawk_umbilical_connector_height
+      nitehawk_umbilical_connector_gap: !Ref nitehawk_umbilical_connector_gap
+      nitehawk_umbilical_connector_cable_connector_end_diameter: !Ref nitehawk_umbilical_connector_cable_connector_end_diameter
+      nitehawk_umbilical_connector_cable_connector_height: !Ref nitehawk_umbilical_connector_cable_connector_height
+      nitehawk_umbilical_cable_diameter: !Ref nitehawk_umbilical_cable_diameter
+      nitehawk_umbilical_cable_length: !Ref nitehawk_umbilical_cable_length
+      nitehawk_heater_connector_width: !Ref nitehawk_heater_connector_width
+      nitehawk_heater_connector_length: !Ref nitehawk_heater_connector_length
+      nitehawk_heater_connector_thickness: !Ref nitehawk_heater_connector_thickness
+      nitehawk_heater_connector_x_offset_from_right: !Ref nitehawk_heater_connector_x_offset_from_right
+      nitehawk_heater_connector_y_offset_from_front: !Ref nitehawk_heater_connector_y_offset_from_front
+      nitehawk_front_cutter_width: !Ref nitehawk_front_cutter_width
+      nitehawk_front_cutter_back_width: !Ref nitehawk_front_cutter_back_width
+      nitehawk_front_cutter_y_size: !Ref nitehawk_front_cutter_y_size
+      BIG_THING: !Ref BIG_THING
+
   - name: emergency_button_assembly
 
     resource_file: emergency_button_assembly.yaml
@@ -2277,8 +2309,10 @@ assemblies:
 
     depends_on:
       - sprite_extruder_assembly
+      - nitehawk_board_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_assembly
+      nitehawk_board: nitehawk_board_assembly
     parameters:
       nitehawk_holder_extruder_gap:
         $ref: nitehawk_holder_extruder_gap
@@ -2292,8 +2326,10 @@ assemblies:
     resource_file: nitehawk_holder_assembly.yaml
     depends_on:
       - sprite_extruder_left_assembly
+      - nitehawk_board_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_left_assembly
+      nitehawk_board: nitehawk_board_assembly
     parameters:
       nitehawk_holder_extruder_gap:
         $ref: nitehawk_holder_extruder_gap
@@ -2307,8 +2343,10 @@ assemblies:
     resource_file: nitehawk_holder_assembly.yaml
     depends_on:
       - sprite_extruder_right_assembly
+      - nitehawk_board_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_right_assembly
+      nitehawk_board: nitehawk_board_assembly
     parameters:
       nitehawk_holder_extruder_gap:
         $ref: nitehawk_holder_extruder_gap
