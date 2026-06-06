@@ -65,47 +65,43 @@ def create_offset_cross_materials():
 
     all = t0_collector.fuse(t1_collector)
 
-
-    t0_bar = create_box(2*ARM_LENGTH_MM + CENTER_VOID_MM + 2*CENTER_GAP_MM, 4*ARM_WIDTH_MM, CALIBRATION_HEIGHT_MM)
+    t0_bar = create_box(
+        2 * ARM_LENGTH_MM + CENTER_VOID_MM + 2 * CENTER_GAP_MM,
+        4 * ARM_WIDTH_MM,
+        CALIBRATION_HEIGHT_MM,
+    )
     t0_bar = align(t0_bar, all, Alignment.CENTER)
-    t0_bar = align(t0_bar, all, Alignment.STACK_BACK, stack_gap=4*ARM_WIDTH_MM)
+    t0_bar = align(t0_bar, all, Alignment.STACK_BACK, stack_gap=4 * ARM_WIDTH_MM)
 
     t0_collector = t0_collector.fuse(t0_bar)
 
-    t1_bar = align(t0_bar, all, Alignment.STACK_FRONT, stack_gap=4*ARM_WIDTH_MM)
+    t1_bar = align(t0_bar, all, Alignment.STACK_FRONT, stack_gap=4 * ARM_WIDTH_MM)
 
     t1_collector = t1_collector.fuse(t1_bar)
 
-
     radius_step = 2
-
 
     t1_rings = PartCollector()
     t2_rings = PartCollector()
     for i in range(10):
-        cur_radius = (i+2)*radius_step
-        ring = create_ring(cur_radius, cur_radius-radius_step, CALIBRATION_HEIGHT_MM)
+        cur_radius = (i + 2) * radius_step
+        ring = create_ring(cur_radius, cur_radius - radius_step, CALIBRATION_HEIGHT_MM)
 
         if i % 2 == 0:
             t1_rings = t1_rings.fuse(ring)
         else:
             t2_rings = t2_rings.fuse(ring)
 
-
     rings_aligner = align_translation(t1_rings, all, Alignment.CENTER)
-    rings_aligner = align_translation(t1_rings, all, Alignment.STACK_RIGHT, stack_gap=2*ARM_WIDTH_MM)
+    rings_aligner = align_translation(
+        t1_rings, all, Alignment.STACK_RIGHT, stack_gap=2 * ARM_WIDTH_MM
+    )
 
-    t1_rings =  rings_aligner(t1_rings)
-    t2_rings =  rings_aligner(t2_rings)
+    t1_rings = rings_aligner(t1_rings)
+    t2_rings = rings_aligner(t2_rings)
 
     t1_collector = t1_collector.fuse(t1_rings)
     t0_collector = t0_collector.fuse(t2_rings)
-
-
-
-
-
-
 
     return t0_collector, t1_collector
 

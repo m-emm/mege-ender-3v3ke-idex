@@ -49,6 +49,8 @@ Parameters:
     Type: Integer
   energy_chain_max_diameter_on_print_bed:
     Type: Float
+  energy_chain_spiral_clearance:
+    Type: Float
   energy_chain_width:
     Type: Float
   energy_chain_base_thickness:

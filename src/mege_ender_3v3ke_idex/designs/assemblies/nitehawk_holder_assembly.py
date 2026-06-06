@@ -463,7 +463,6 @@ def create_nitehawk_holder_assembly(
 
     holder = rotate(-90, axis=(1, 0, 0))(holder)
     holder = rotate(180, axis=(0, 1, 0))(holder)
-    holder = rotate(180)(holder)
 
     holder = _align_holder_to_extruder(
         holder,
@@ -474,40 +473,36 @@ def create_nitehawk_holder_assembly(
     )
 
     holder_mount_plates = PartCollector()
-    for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        extension = holder_mount_plate_left_extension if lr == Alignment.LEFT else 0
-        holder_mount_plate = create_box(
-            holder_mount_plate_thickness,
-            holder_mount_plate_depth + extension,
-            holder_mount_plate_size,
-        )
+    holder_mount_plate = create_box(
+        holder_mount_plate_thickness,
+        holder_mount_plate_depth,
+        holder_mount_plate_size,
+    )
 
-        if lr == Alignment.RIGHT:
-            mount_box = create_box(
-                holder_mount_plate_spacer,
-                holder_mount_plate_size,
-                holder_mount_plate_size,
-            )
-            mount_box = align(mount_box, holder_mount_plate, Alignment.CENTER)
-            mount_box = align(mount_box, holder_mount_plate, Alignment.FRONT)
-            mount_box = align(mount_box, holder_mount_plate, Alignment.STACK_LEFT)
-            holder_mount_plate = holder_mount_plate.fuse(mount_box)
+    mount_box = create_box(
+        holder_mount_plate_spacer,
+        holder_mount_plate_size,
+        holder_mount_plate_size,
+    )
+    mount_box = align(mount_box, holder_mount_plate, Alignment.CENTER)
+    mount_box = align(mount_box, sprite_extruder, Alignment.BACK)
+    mount_box = align(mount_box, holder_mount_plate, Alignment.STACK_LEFT)
+    holder_mount_plate = mount_box
 
-        holder_mount_plate = align(holder_mount_plate, holder, Alignment.CENTER)
-        holder_mount_plate = align(holder_mount_plate, sprite_extruder, Alignment.TOP)
-        holder_mount_plate = align(
-            holder_mount_plate,
-            sprite_extruder,
-            lr.stack_alignment,
-            stack_gap=tool_head_additional_mount_plate_clearance,
-        )
-        holder_mount_plate = align(holder_mount_plate, holder, Alignment.BACK)
-        holder_mount_plate = translate(0, 0, -holder_mount_plate_top_offset)(
-            holder_mount_plate
-        )
-        holder_mount_plates = holder_mount_plates.fuse(holder_mount_plate)
+    holder_mount_plate = align(holder_mount_plate, holder, Alignment.CENTER)
+    holder_mount_plate = align(holder_mount_plate, sprite_extruder, Alignment.TOP)
+    holder_mount_plate = align(
+        holder_mount_plate,
+        sprite_extruder,
+        lr.stack_alignment,
+        stack_gap=tool_head_additional_mount_plate_clearance,
+    )
+    holder_mount_plate = align(holder_mount_plate, holder, Alignment.BACK)
+    holder_mount_plate = translate(0, 0, -holder_mount_plate_top_offset)(
+        holder_mount_plate
+    )
 
-    lower_holder_trim_overlap = 0.05
+    holder_bottom_gap = 4
     lower_holder_cutter = create_box(big_thing, big_thing, big_thing)
     lower_holder_cutter = align(
         lower_holder_cutter,
@@ -517,11 +512,27 @@ def create_nitehawk_holder_assembly(
     )
     lower_holder_cutter = align(
         lower_holder_cutter,
-        holder_mount_plates,
+        sprite_extruder,
         Alignment.STACK_BOTTOM,
-        stack_gap=-lower_holder_trim_overlap,
+        stack_gap=-holder_bottom_gap,
     )
     holder = holder.cut(lower_holder_cutter)
+
+    holder_mount_plates = create_filleted_box(
+        3,
+        12,
+        10,
+        fillet_radius=1,
+        no_fillets_at=[Alignment.RIGHT, Alignment.LEFT, Alignment.BACK],
+    )
+    holder_mount_plates = align(holder_mount_plates, holder, Alignment.CENTER)
+    holder_mount_plates = align(holder_mount_plates, holder, Alignment.STACK_FRONT)
+
+    holder_mount_plates = align(
+        holder_mount_plates, sprite_extruder, Alignment.STACK_RIGHT, stack_gap=0.5
+    )
+    holder_mount_plates = align(holder_mount_plates, holder, Alignment.BOTTOM)
+
     holder = holder.fuse(holder_mount_plates)
 
     for _, cutter in sprite_extruder.get_named_cutter_items():

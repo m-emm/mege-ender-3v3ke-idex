@@ -479,15 +479,17 @@ def _spiral_segment_placements(
     *,
     segment_lengths,
     energy_chain_max_diameter_on_print_bed,
+    energy_chain_spiral_clearance,
     energy_chain_base_thickness,
     energy_chain_width,
     energy_chain_link_connector_thickness,
     energy_chain_link_connector_width,
     energy_chain_channel_height,
-    energy_chain_channel_wall_thickness,
 ):
     if not segment_lengths:
         raise ValueError("Energy chain must contain at least one segment")
+    if energy_chain_spiral_clearance < 0:
+        raise ValueError("energy_chain_spiral_clearance must be non-negative")
 
     radial_footprint = (
         energy_chain_base_thickness + energy_chain_channel_height + energy_chain_width
@@ -497,9 +499,7 @@ def _spiral_segment_placements(
         radial_footprint - connector_lane_x
     )
     minimum_radius = radial_footprint / 2
-    spiral_revolution_spacing = radial_footprint + max(
-        1.0, energy_chain_channel_wall_thickness
-    )
+    spiral_revolution_spacing = radial_footprint + energy_chain_spiral_clearance
     spiral_b = spiral_revolution_spacing / (2 * math.pi)
     required_path_length = (
         sum(segment_lengths)
@@ -571,6 +571,7 @@ def create_energy_chain_tpu_assembly(
     *,
     energy_chain_num_links,
     energy_chain_max_diameter_on_print_bed,
+    energy_chain_spiral_clearance,
     energy_chain_width,
     energy_chain_base_thickness,
     energy_chain_link_length,
@@ -691,12 +692,12 @@ def create_energy_chain_tpu_assembly(
     placements, outer_radius, spiral_b, minimum_radius = _spiral_segment_placements(
         segment_lengths=[segment["length"] for segment in segments],
         energy_chain_max_diameter_on_print_bed=(energy_chain_max_diameter_on_print_bed),
+        energy_chain_spiral_clearance=energy_chain_spiral_clearance,
         energy_chain_base_thickness=energy_chain_base_thickness,
         energy_chain_width=energy_chain_width,
         energy_chain_link_connector_thickness=energy_chain_link_connector_thickness,
         energy_chain_link_connector_width=energy_chain_link_connector_width,
         energy_chain_channel_height=energy_chain_channel_height,
-        energy_chain_channel_wall_thickness=energy_chain_channel_wall_thickness,
     )
 
     chain = PartCollector()

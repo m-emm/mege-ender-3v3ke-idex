@@ -715,6 +715,7 @@ globals:
   energy_chain_plug_lip_size: 0.8
   energy_chain_plug_lip_top_gap: 1.0
   energy_chain_plug_slit_width: 1
+  energy_chain_spiral_clearance: 3
   energy_chain_plug_wall_thickness: 1.2
   x_axis_energy_chain_base_thickness: 3.5
   x_axis_energy_chain_channel_height: 5.6
@@ -819,7 +820,7 @@ globals:
     $expr:
       "$sub": "${nitehawk_plug_width} + 4"
   nitehawk_holder_cable_attachment_y_offset: 20
-  nitehawk_holder_extruder_gap: 12
+  nitehawk_holder_extruder_gap: 2
   nitehawk_holder_fillet_radius: 3
   nitehawk_holder_height: 37.3
   nitehawk_holder_height_offset: 0
@@ -873,7 +874,7 @@ globals:
   part_fan_window_width: 28
   left_part_fan_parameters:
     around_angle: 0
-    x_offset: 27.8
+    x_offset: 28.1
     y_offset: 35
     z_offset: 6
     rotation: 90

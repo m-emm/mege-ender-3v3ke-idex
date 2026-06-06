@@ -822,6 +822,7 @@ assemblies:
     parameters:
       energy_chain_num_links: !Ref y_axis_energy_chain_num_links
       energy_chain_max_diameter_on_print_bed: !Ref y_axis_energy_chain_max_diameter_on_print_bed
+      energy_chain_spiral_clearance: !Ref energy_chain_spiral_clearance
       energy_chain_width: !Ref y_axis_energy_chain_width
       energy_chain_base_thickness: !Ref y_axis_energy_chain_base_thickness
       energy_chain_link_length: !Ref y_axis_energy_chain_link_length
@@ -863,6 +864,7 @@ assemblies:
     parameters:
       energy_chain_num_links: !Ref x_axis_energy_chain_num_links
       energy_chain_max_diameter_on_print_bed: !Ref x_axis_energy_chain_max_diameter_on_print_bed
+      energy_chain_spiral_clearance: !Ref energy_chain_spiral_clearance
       energy_chain_width: !Ref x_axis_energy_chain_width
       energy_chain_base_thickness: !Ref x_axis_energy_chain_base_thickness
       energy_chain_link_length: !Ref x_axis_energy_chain_link_length
@@ -904,6 +906,7 @@ assemblies:
     parameters:
       energy_chain_num_links: !Ref x_axis_energy_chain_num_links
       energy_chain_max_diameter_on_print_bed: !Ref x_axis_energy_chain_max_diameter_on_print_bed
+      energy_chain_spiral_clearance: !Ref energy_chain_spiral_clearance
       energy_chain_width: !Ref x_axis_energy_chain_width
       energy_chain_base_thickness: !Ref x_axis_energy_chain_base_thickness
       energy_chain_link_length: !Ref x_axis_energy_chain_link_length
