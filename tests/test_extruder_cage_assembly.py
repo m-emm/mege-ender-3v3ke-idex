@@ -9,6 +9,7 @@ from mege_ender_3v3ke_idex.designs.assemblies.sprite_extruder_assembly import (
     create_sprite_extruder_assembly,
 )
 from shellforgepy.simple import (
+    get_bounding_box,
     get_bounding_box_center,
     get_bounding_box_size,
     get_volume,
@@ -23,6 +24,9 @@ REMOVED_CAGE_PARAMETERS = [
     "duct_front_mount_plate_thickness",
     "duct_front_mount_plate_width",
     "holder_mount_plate_thickness",
+    "tool_head_front_mount_plate_connector_height",
+    "tool_head_front_mount_plate_connector_width",
+    "holder_mount_plate_top_offset",
 ]
 
 
@@ -34,6 +38,7 @@ def test_extruder_cage_signature_uses_cage_owned_mount_dimensions():
     parameters = inspect.signature(create_extruder_cage_assembly).parameters
 
     assert "extruder_cage_mount_plate_fillet_radius" in parameters
+    assert "nitehawk_holder_extruder_gap" in parameters
     for parameter_name in REMOVED_CAGE_PARAMETERS:
         assert parameter_name not in parameters
 
@@ -57,7 +62,6 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
         "sprite_mount_base_plate",
         "part_fan_side_mount_plate",
         "part_fan_front_mount_plate",
-        "part_fan_front_mount_plate_connector",
         "nitehawk_rear_mount_plate",
     ]:
         cage.get_follower_part_by_name(follower_name)
@@ -81,15 +85,11 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
     front_mount_plate_size = get_bounding_box_size(
         cage.get_follower_part_by_name("part_fan_front_mount_plate")
     )
-    front_mount_plate_connector_size = get_bounding_box_size(
-        cage.get_follower_part_by_name("part_fan_front_mount_plate_connector")
-    )
 
     assert sprite_mount_base_plate_size[1] == pytest.approx(mount_plate_thickness)
     assert side_mount_plate_size[0] == pytest.approx(mount_plate_thickness)
     assert front_mount_plate_size[0] == pytest.approx(sprite_extruder_body_size[0])
     assert front_mount_plate_size[1] == pytest.approx(mount_plate_thickness)
-    assert front_mount_plate_connector_size[1] == pytest.approx(mount_plate_thickness)
 
     nitehawk_hole_0_center = get_bounding_box_center(
         cage.get_named_cutter("nitehawk_mount_hole_0")
@@ -100,6 +100,10 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
     nitehawk_mount_plate_center = get_bounding_box_center(
         cage.get_follower_part_by_name("nitehawk_rear_mount_plate")
     )
+    nitehawk_mount_plate_bbox = get_bounding_box(
+        cage.get_follower_part_by_name("nitehawk_rear_mount_plate")
+    )
+    sprite_extruder_bbox = get_bounding_box(sprite_extruder)
 
     assert nitehawk_hole_0_center[0] < nitehawk_hole_1_center[0]
     assert nitehawk_hole_1_center[0] - nitehawk_hole_0_center[0] == pytest.approx(
@@ -108,6 +112,9 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
     assert (nitehawk_hole_0_center[0] + nitehawk_hole_1_center[0]) / 2 == pytest.approx(
         nitehawk_mount_plate_center[0]
     )
+    assert nitehawk_mount_plate_bbox[0][1] - sprite_extruder_bbox[1][
+        1
+    ] == pytest.approx(cage_kwargs["nitehawk_holder_extruder_gap"])
 
     for cutter_name in [
         "mount_hole_cutter",

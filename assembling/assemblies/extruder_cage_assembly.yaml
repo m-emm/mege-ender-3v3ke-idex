@@ -50,10 +50,6 @@ Parameters:
     Type: Float
   tool_head_additional_mount_plate_z_offset:
     Type: Float
-  tool_head_front_mount_plate_connector_height:
-    Type: Float
-  tool_head_front_mount_plate_connector_width:
-    Type: Float
   duct_front_mount_plate_height:
     Type: Float
   duct_front_mount_plate_height_border:
@@ -66,7 +62,7 @@ Parameters:
     Type: Float
   holder_mount_plate_size:
     Type: Float
-  holder_mount_plate_top_offset:
+  nitehawk_holder_extruder_gap:
     Type: Float
   nitehawk_holder_mount_tower_diameter:
     Type: Float
