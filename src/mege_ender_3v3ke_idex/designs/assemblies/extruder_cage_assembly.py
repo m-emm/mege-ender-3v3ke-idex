@@ -190,6 +190,14 @@ def create_extruder_cage_assembly(
     nitehawk_hole_cutters = []
     nitehawk_towers = PartCollector()
 
+    sprite_extruder_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    sprite_extruder_cutter = align(
+        sprite_extruder_cutter, sprite_extruder, Alignment.CENTER
+    )
+    sprite_extruder_cutter = align(
+        sprite_extruder_cutter, sprite_extruder, Alignment.BACK
+    )
+
     for index, board_hole in enumerate(nitehawk_board_holes):
         tower = create_cone(
             tower_base_radius,
@@ -206,6 +214,8 @@ def create_extruder_cage_assembly(
             direction=(0, 1, 0),
         )
         hole_cutter = align(hole_cutter, tower, Alignment.CENTER)
+
+        hole_cutter = hole_cutter.cut(sprite_extruder_cutter)
 
         nitehawk_cutters[f"nitehawk_mount_hole_{index}"] = hole_cutter
         nitehawk_hole_cutters.append(hole_cutter)
@@ -355,11 +365,39 @@ def create_extruder_cage_assembly(
         limiting_end_part=nitehawk_rear_mount_plate,
     )
 
+    front_strips = PartCollector()
+    front_strip_inset = 1.5
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        front_strip = create_box(
+            tool_head_additional_mount_plate_depth/2,
+            extruder_cage_mount_plate_thickness,
+            extruder_size[2],
+        )
+        front_strip = align(
+            front_strip,
+            sprite_mount_base_plate,
+            Alignment.CENTER,
+        )
+
+        front_strip = align(front_strip, sprite_extruder, Alignment.CENTER, axes=[2])
+        front_strip = align(front_strip, sprite_extruder, lr)
+
+        front_strip = fit_part_between(
+            front_strip,
+            cut_normal=(0, 0, 1),
+            limiting_start_part=sprite_mount_base_plate,
+            limiting_end_part=part_fan_front_mount_plate,
+        )
+
+        front_strip = translate(-lr.sign*front_strip_inset, 0,0)(front_strip)
+        front_strips = front_strips.fuse(front_strip)
+
     cage_leader = sprite_mount_base_plate
     cage_leader = cage_leader.fuse(right_mount_plate)
     cage_leader = cage_leader.fuse(part_fan_front_mount_plate)
     cage_leader = cage_leader.fuse(nitehawk_rear_mount_plate)
     cage_leader = cage_leader.fuse(left_mount_plate)
+    cage_leader = cage_leader.fuse(front_strips)
     cage_leader = sprite_extruder.use_as_cutter_on(cage_leader)
     for cutter in nitehawk_cutters.values():
         cage_leader = cage_leader.cut(cutter)
