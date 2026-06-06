@@ -8,6 +8,7 @@ OVERLAY_SRC="${IMAGE_BUILD_DIR}/overlays/stage2/99-klipperpi"
 PIGEN_DIR="${IMAGE_BUILD_DIR}/pi-gen"
 SECRETS_DIR="${IMAGE_BUILD_DIR}/secrets"
 OUT_CONFIG="${PIGEN_DIR}/config"
+RESONANCE_HELPER_SRC="${IMAGE_BUILD_DIR}/../klipper_config/resonance/run_resonance_plot.py"
 
 BUILD_ENV_SRC="${SECRETS_DIR}/build.env"
 AUTHORIZED_KEYS_SRC="${SECRETS_DIR}/authorized_keys"
@@ -91,6 +92,17 @@ fi
 
 echo "Refreshing overlay into pi-gen/stage2/99-klipperpi"
 rsync -a --delete "${OVERLAY_SRC}/" "${PIGEN_DIR}/stage2/99-klipperpi/"
+
+if [ ! -f "${RESONANCE_HELPER_SRC}" ]; then
+  echo "Missing resonance helper: ${RESONANCE_HELPER_SRC}" >&2
+  exit 1
+fi
+
+echo "Injecting resonance helper"
+install -d "${PIGEN_DIR}/stage2/99-klipperpi/files/resonance"
+install -m 0755 \
+  "${RESONANCE_HELPER_SRC}" \
+  "${PIGEN_DIR}/stage2/99-klipperpi/files/resonance/run_resonance_plot.py"
 
 echo "Injecting secrets (authorized_keys, build.env) into overlay files/"
 cp "${AUTHORIZED_KEYS_SRC}" "${PIGEN_DIR}/stage2/99-klipperpi/files/authorized_keys"

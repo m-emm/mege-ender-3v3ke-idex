@@ -8,28 +8,39 @@ fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_CFG="${SCRIPT_DIR}/pico_w_btt_tmc2226_y_z_bringup.cfg"
+SOURCE_RESONANCE_HELPER="${SCRIPT_DIR}/resonance/run_resonance_plot.py"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 REMOTE_TMP="/tmp/pico_w_btt_tmc2226_y_z_bringup.cfg.$$"
+REMOTE_RESONANCE_HELPER_TMP="/tmp/run_resonance_plot.py.$$"
 
 if [[ ! -f "${SOURCE_CFG}" ]]; then
   echo "Error: source config not found: ${SOURCE_CFG}" >&2
   exit 1
 fi
 
+if [[ ! -f "${SOURCE_RESONANCE_HELPER}" ]]; then
+  echo "Error: resonance helper not found: ${SOURCE_RESONANCE_HELPER}" >&2
+  exit 1
+fi
+
 cleanup_remote_tmp() {
-  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP}'" >/dev/null 2>&1 || true
+  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP}' '${REMOTE_RESONANCE_HELPER_TMP}'" >/dev/null 2>&1 || true
 }
 trap cleanup_remote_tmp EXIT
 
 echo "Updating ${REMOTE_HOST} with current IDEX motion Klipper config..."
 echo "  Source: ${SOURCE_CFG}"
+echo "  Resonance helper: ${SOURCE_RESONANCE_HELPER}"
 
 scp "${SOURCE_CFG}" "${REMOTE_HOST}:${REMOTE_TMP}"
+scp "${SOURCE_RESONANCE_HELPER}" "${REMOTE_HOST}:${REMOTE_RESONANCE_HELPER_TMP}"
 
-ssh "${REMOTE_HOST}" "REMOTE_TMP='${REMOTE_TMP}' bash -s" <<'REMOTE_SCRIPT'
+ssh "${REMOTE_HOST}" "REMOTE_TMP='${REMOTE_TMP}' REMOTE_RESONANCE_HELPER_TMP='${REMOTE_RESONANCE_HELPER_TMP}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 MAIN_CFG="${HOME}/printer_data/config/printer.cfg"
+RESONANCE_DIR="${HOME}/printer_data/config/resonance"
+RESONANCE_HELPER="${RESONANCE_DIR}/run_resonance_plot.py"
 TS="$(date +%Y%m%d-%H%M%S)"
 BACKUP="${MAIN_CFG}.bak.${TS}"
 
@@ -38,7 +49,13 @@ if [[ ! -f "${REMOTE_TMP}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${REMOTE_RESONANCE_HELPER_TMP}" ]]; then
+  echo "Error: uploaded resonance helper not found: ${REMOTE_RESONANCE_HELPER_TMP}" >&2
+  exit 1
+fi
+
 mkdir -p "$(dirname -- "${MAIN_CFG}")"
+mkdir -p "${RESONANCE_DIR}"
 
 if [[ -f "${MAIN_CFG}" ]]; then
   cp -a "${MAIN_CFG}" "${BACKUP}"
@@ -46,8 +63,11 @@ if [[ -f "${MAIN_CFG}" ]]; then
 fi
 
 cp -a "${REMOTE_TMP}" "${MAIN_CFG}"
+install -m 0755 "${REMOTE_RESONANCE_HELPER_TMP}" "${RESONANCE_HELPER}"
 rm -f "${REMOTE_TMP}"
+rm -f "${REMOTE_RESONANCE_HELPER_TMP}"
 echo "Installed: ${MAIN_CFG}"
+echo "Installed: ${RESONANCE_HELPER}"
 
 sudo systemctl restart klipper
 sleep 4

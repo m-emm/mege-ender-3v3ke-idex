@@ -34,8 +34,8 @@ cd /Users/mege/git/mege-ender-3v3ke-idex
   motion-first `printer.cfg`: X-left is `[stepper_x]`, X-right is
   `[dual_carriage]`, Y plus independent dual-Z are real Klipper axes, and the
   heatbed is enabled through the Y/Z Pico MOSFET on `gpio21` with a 100k B3950
-  NTC on `gpio26` / ADC0. It also brings up the left Nitehawk toolhead board
-  with the calibrated left hotend/extruder.
+  NTC on `gpio26` / ADC0. It also brings up both Nitehawk toolhead boards,
+  both onboard ADXL345 accelerometers, and the calibrated toolhead extruders.
 - `toolhead_nitehawk_and_x_axis.cfg` is the fuller printer config kept for
   later integration.
 - `snippets/x_axis_stepper_endstop_pico_w.cfg` and
@@ -44,14 +44,18 @@ cd /Users/mege/git/mege-ender-3v3ke-idex
 
 The IDEX motion config uses normal `cartesian` kinematics with Klipper
 `[dual_carriage]` support so Mainsail and KlipperScreen can use standard `G28`
-homing and GUI jogging. X-left is carriage 0 with provisional travel `X0..X300`;
-X-right is carriage 1 with provisional travel `X15..X340`; Klipper enforces a
-temporary `10` mm safe distance between them. Toolchanging, copy mode, mirror
-mode, and the second extruder remain deferred. The heatbed uses Klipper
-`sensor_type: Generic 3950` for the known 100k B3950 NTC. The left toolhead
-uses the Nitehawk by-id path `usb-Klipper_rp2040_30333938340637C1-if00` and
-the Micro Swiss calibrated thermistor values from
-`toolhead_nitehawk_and_x_axis.cfg`.
+homing and GUI jogging. X-left is carriage 0 with current travel `X-91..X244`;
+X-right is carriage 1 with current travel `X0..X335.1`; Klipper enforces a
+temporary `10` mm safe distance between them. Tool-switching is active, while
+copy and mirror modes remain deferred. The heatbed uses Klipper
+`sensor_type: Generic 3950` for the known 100k B3950 NTC. The left and right
+toolheads use the Nitehawk by-id
+paths `usb-Klipper_rp2040_30333938340637C1-if00` and
+`usb-Klipper_rp2040_3232323236198418-if00`, share the Micro Swiss calibrated
+thermistor values from `toolhead_nitehawk_and_x_axis.cfg`, and expose named
+accelerometers as `left_toolhead` and `right_toolhead`. Resonance testing
+defaults to the left toolhead accelerometer until per-toolhead shaper tuning is
+done.
 
 ## Local Git Workflow
 
@@ -90,10 +94,11 @@ cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
 ```
 
 `update_menderpi.sh` copies the current local
-`pico_w_btt_tmc2226_y_z_bringup.cfg` to `pi@menderpi.local`, backs up the live
-`~/printer_data/config/printer.cfg`, installs the new config, restarts Klipper,
-and reports the Klippy state through Moonraker. This is the fastest bring-up
-path while the Raspberry Pi does not have a local checkout of this repository.
+`pico_w_btt_tmc2226_y_z_bringup.cfg` and resonance plotting helper to
+`pi@menderpi.local`, backs up the live `~/printer_data/config/printer.cfg`,
+installs the new config, restarts Klipper, and reports the Klippy state through
+Moonraker. This is the fastest bring-up path while the Raspberry Pi does not
+have a local checkout of this repository.
 
 If the repository is later cloned on the Pi, the equivalent Git-based flow is:
 
@@ -107,6 +112,28 @@ git pull --ff-only origin main
 sudo systemctl restart klipper
 tail -f ~/printer_data/logs/klippy.log
 ```
+
+## Resonance Plotting
+
+Run a resonance test from the local machine and copy the latest rendered plot
+back into `runs/klipper_resonance/`:
+
+```bash
+cd /Users/mege/git/mege-ender-3v3ke-idex
+./klipper_setup/klipper_config/run_resonance_plot.sh X
+```
+
+The Pi-side helper can also be run directly:
+
+```bash
+ssh pi@menderpi.local '~/printer_data/config/resonance/run_resonance_plot.py --axis X'
+ssh pi@menderpi.local '~/printer_data/config/resonance/run_resonance_plot.py --axis Y --chip left_toolhead'
+ssh pi@menderpi.local '~/printer_data/config/resonance/run_resonance_plot.py --render-only /tmp/resonances_x_20260606_193833.csv'
+```
+
+Plots, summaries, raw CSVs, and stable `latest_x.*` / `latest_y.*` convenience
+files are written under `~/printer_data/config/resonance/`, which Mainsail can
+browse as `config/resonance/`.
 
 ## IDEX Motion Homing
 

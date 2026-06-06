@@ -172,7 +172,11 @@ apt-get install -y --no-install-recommends \
   python3-venv \
   python3-pip \
   python3-dev \
+  python3-numpy \
+  python3-matplotlib \
   build-essential \
+  libatlas-base-dev \
+  libopenblas-dev \
   libsodium23
 
 # You install these later; keeping them separate is fine, but installing here makes it deterministic.
@@ -347,12 +351,16 @@ log "Creating printer_data layout under ${PRINTER_DATA}"
 
 require_file "${FILES_DIR}/printer.cfg"
 require_file "${FILES_DIR}/moonraker.conf"
+require_file "${FILES_DIR}/resonance/run_resonance_plot.py"
 
 install -d -m 0755 -o "${USERNAME}" -g "${USERNAME}" \
-  "${CONFIG_DIR}" "${LOG_DIR}" "${COMMS_DIR}"
+  "${CONFIG_DIR}" "${CONFIG_DIR}/resonance" "${LOG_DIR}" "${COMMS_DIR}"
 
 install -m 0644 "${FILES_DIR}/printer.cfg" "${CONFIG_DIR}/printer.cfg"
 install -m 0644 "${FILES_DIR}/moonraker.conf" "${CONFIG_DIR}/moonraker.conf"
+install -m 0755 \
+  "${FILES_DIR}/resonance/run_resonance_plot.py" \
+  "${CONFIG_DIR}/resonance/run_resonance_plot.py"
 chown -R "${USERNAME}:${USERNAME}" "${PRINTER_DATA}"
 
 # --- X wrapper (KlipperScreen) ----------------------------------------------
@@ -525,6 +533,9 @@ clone_repo https://github.com/Klipper3d/klipper.git /opt/klipper "${KLIPPER_COMM
 python3 -m venv /opt/klipper-env
 /opt/klipper-env/bin/pip install --upgrade pip wheel
 /opt/klipper-env/bin/pip install -r /opt/klipper/scripts/klippy-requirements.txt
+/opt/klipper-env/bin/pip install "numpy<1.26"
+/opt/klipper-env/bin/pip install "matplotlib<3.11"
+/opt/klipper-env/bin/python -c 'import numpy, matplotlib'
 chown -R "${USERNAME}:${USERNAME}" /opt/klipper /opt/klipper-env
 
 log "Pre-building Klipper host C helper"
