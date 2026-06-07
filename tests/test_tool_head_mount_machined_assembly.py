@@ -1,3 +1,5 @@
+import inspect
+
 from assembly_defaults import assembly_kwargs
 from mege_ender_3v3ke_idex.designs.assemblies.tool_head_mount_machined_assembly import (
     TOOL_HEAD_MOUNT_MACHINED_METRICS_ID,
@@ -19,16 +21,17 @@ from shellforgepy.simple import create_box, get_volume
 
 
 def test_tool_head_mount_machined_top_is_carriage_plate_with_mount_holes():
+    parameters = inspect.signature(create_tool_head_mount_machined_assembly).parameters
+    assert "x_axis_belt_carriage" not in parameters
+
     carriage = create_x_axis_carriage_assembly()
     sprite_extruder = LeaderFollowersCuttersPart(create_box(10, 10, 10))
-    x_axis_belt_carriage = LeaderFollowersCuttersPart(create_box(10, 10, 10))
 
     mount = create_tool_head_mount_machined_assembly(
         **assembly_kwargs(
             create_tool_head_mount_machined_assembly,
             carriage=carriage,
             sprite_extruder=sprite_extruder,
-            x_axis_belt_carriage=x_axis_belt_carriage,
             drive_position="top",
         )
     )
@@ -48,14 +51,12 @@ def test_tool_head_mount_machined_records_aluminum_weight_metrics():
     try:
         carriage = create_x_axis_carriage_assembly()
         sprite_extruder = LeaderFollowersCuttersPart(create_box(10, 10, 10))
-        x_axis_belt_carriage = LeaderFollowersCuttersPart(create_box(10, 10, 10))
 
         mount = create_tool_head_mount_machined_assembly(
             **assembly_kwargs(
                 create_tool_head_mount_machined_assembly,
                 carriage=carriage,
                 sprite_extruder=sprite_extruder,
-                x_axis_belt_carriage=x_axis_belt_carriage,
                 drive_position="top",
                 record_metrics=True,
             )

@@ -75,6 +75,8 @@ def test_extruder_cage_signature_uses_cage_owned_mount_dimensions():
     parameters = inspect.signature(create_extruder_cage_assembly).parameters
 
     assert "nitehawk_board" in parameters
+    assert "tool_head_mount_machined" in parameters
+    assert "carriage" in parameters
     assert "extruder_cage_mount_plate_fillet_radius" in parameters
     assert "extruder_cage_top_right_bridge_clearance" in parameters
     for parameter_name in REMOVED_CAGE_PARAMETERS:
@@ -214,6 +216,11 @@ def test_extruder_cage_side_variants_inject_side_specific_nitehawk_boards():
         Loader=AssemblyDefaultsLoader,
     )
     assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
+    cage_resource = yaml.load(
+        (ASSEMBLIES_DIR / "extruder_cage_assembly.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+    visualization_parts = cage_resource["Builder"]["Visualization"]["parts"]
 
     assert assemblies["nitehawk_board_left_assembly"]["resource_file"] == (
         "nitehawk_board_assembly.yaml"
@@ -222,21 +229,119 @@ def test_extruder_cage_side_variants_inject_side_specific_nitehawk_boards():
         "nitehawk_board_assembly.yaml"
     )
 
-    assert assemblies["extruder_cage_left_assembly"]["inject_parts"] == {
-        "sprite_extruder": "sprite_extruder_left_assembly",
-        "nitehawk_board": "nitehawk_board_left_assembly",
-    }
-    assert assemblies["extruder_cage_right_assembly"]["inject_parts"] == {
-        "sprite_extruder": "sprite_extruder_right_assembly",
-        "nitehawk_board": "nitehawk_board_right_assembly",
+    assert {
+        "source": "injected",
+        "assembly": "tool_head_mount_machined",
+        "artifact": "leader",
+        "name": "tool_head_mount_machined",
+    } in visualization_parts
+    assert {
+        "source": "injected",
+        "assembly": "carriage",
+        "artifact": "leader",
+        "name": "carriage",
+    } in visualization_parts
+    for dependency_assembly, visual_name in [
+        ("x_axis_rail_assembly", "rail"),
+        ("x_axis_lower_profile_assembly", "lower_axis_profile"),
+        ("x_axis_top_profile_assembly", "top_axis_profile"),
+    ]:
+        assert {
+            "source": "dependencies",
+            "assembly": dependency_assembly,
+            "artifact": "leader",
+            "name": visual_name,
+        } in visualization_parts
+
+    expected_context = {
+        "left": {
+            "sprite_extruder": "sprite_extruder_left_assembly",
+            "nitehawk_board": "nitehawk_board_left_assembly",
+            "tool_head_mount_machined": "tool_head_mount_machined_bottom_assembly",
+            "carriage": "x_axis_left_carriage_assembly",
+        },
+        "right": {
+            "sprite_extruder": "sprite_extruder_right_assembly",
+            "nitehawk_board": "nitehawk_board_right_assembly",
+            "tool_head_mount_machined": "tool_head_mount_machined_top_assembly",
+            "carriage": "x_axis_right_carriage_assembly",
+        },
     }
 
+    assert assemblies["extruder_cage_assembly"]["inject_parts"] == {
+        "sprite_extruder": "sprite_extruder_assembly",
+        "nitehawk_board": "nitehawk_board_assembly",
+        "tool_head_mount_machined": "tool_head_mount_machined_top_assembly",
+        "carriage": "x_axis_right_carriage_assembly",
+    }
+    for side, injected_context in expected_context.items():
+        cage_entry = assemblies[f"extruder_cage_{side}_assembly"]
+        assert cage_entry["inject_parts"] == injected_context
+        assert set(cage_entry["depends_on"]).issuperset(
+            {
+                injected_context["tool_head_mount_machined"],
+                injected_context["carriage"],
+                "x_axis_rail_assembly",
+                "x_axis_lower_profile_assembly",
+                "x_axis_top_profile_assembly",
+            }
+        )
+
     placements = config["placement"]["alignments"]
+
+    for side, injected_context in expected_context.items():
+        machined_mount = injected_context["tool_head_mount_machined"]
+        sprite_extruder = injected_context["sprite_extruder"]
+        carriage = injected_context["carriage"]
+        cage = f"extruder_cage_{side}_assembly"
+        board = injected_context["nitehawk_board"]
+
+        machined_group_indices = [
+            index
+            for index, placement in enumerate(placements)
+            if machined_mount in placement.get("rigid_group", [])
+        ]
+        assert len(machined_group_indices) == 1
+        machined_group_index = machined_group_indices[0]
+        machined_group = placements[machined_group_index]
+        assert machined_group["to"] == carriage
+        assert machined_group["to"] not in {
+            sprite_extruder,
+            "x_axis_rail_assembly",
+        }
+
+        sprite_rail_alignment_index = next(
+            index
+            for index, placement in enumerate(placements)
+            if placement.get("part") == sprite_extruder
+            and placement.get("to") == "x_axis_rail_assembly"
+            and placement.get("alignment") == "TOP"
+        )
+        assert machined_group_index > sprite_rail_alignment_index
+
+        early_sprite_group = next(
+            placement
+            for index, placement in enumerate(placements)
+            if index < machined_group_index
+            and placement.get("to") == sprite_extruder
+            and board in placement.get("rigid_group", [])
+        )
+        assert cage not in early_sprite_group["rigid_group"]
+
+        cage_group_indices = [
+            index
+            for index, placement in enumerate(placements)
+            if placement.get("to") == sprite_extruder
+            and cage in placement.get("rigid_group", [])
+        ]
+        assert len(cage_group_indices) == 1
+        cage_group_index = cage_group_indices[0]
+        assert cage_group_index > machined_group_index
+        assert placements[cage_group_index]["rigid_group"] == [cage]
 
     for side in ["left", "right"]:
         board = f"nitehawk_board_{side}_assembly"
         sprite_extruder = f"sprite_extruder_{side}_assembly"
-        cage = f"extruder_cage_{side}_assembly"
 
         left_alignment = next(
             placement
@@ -266,10 +371,49 @@ def test_extruder_cage_side_variants_inject_side_specific_nitehawk_boards():
             "$ref": "nitehawk_board_extruder_body_bottom_offset"
         }
 
-        rigid_group = next(
-            placement
-            for placement in placements
-            if placement.get("to") == sprite_extruder
-            and cage in placement.get("rigid_group", [])
+
+def test_tool_head_mount_machined_assemblies_use_side_drive_context_without_belts():
+    config = yaml.load(
+        (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+    assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
+    expected_context = {
+        "tool_head_mount_machined_bottom_assembly": {
+            "carriage": "x_axis_left_carriage_assembly",
+            "sprite_extruder": "sprite_extruder_left_assembly",
+            "drive_position": "bottom",
+            "dependencies": {
+                "x_axis_lower_profile_assembly",
+                "x_axis_rail_assembly",
+                "x_axis_left_carriage_assembly",
+                "sprite_extruder_left_assembly",
+            },
+        },
+        "tool_head_mount_machined_top_assembly": {
+            "carriage": "x_axis_right_carriage_assembly",
+            "sprite_extruder": "sprite_extruder_right_assembly",
+            "drive_position": "top",
+            "dependencies": {
+                "x_axis_rail_assembly",
+                "x_axis_right_carriage_assembly",
+                "sprite_extruder_right_assembly",
+            },
+        },
+    }
+
+    for assembly_name, expected in expected_context.items():
+        mount = assemblies[assembly_name]
+
+        assert mount["resource_file"] == "tool_head_mount_machined_assembly.yaml"
+        assert mount["inject_parts"] == {
+            "carriage": expected["carriage"],
+            "sprite_extruder": expected["sprite_extruder"],
+        }
+        assert "x_axis_belt_carriage" not in mount["inject_parts"]
+        assert not any(
+            "x_axis_belt_carriage" in dependency
+            for dependency in mount.get("depends_on", [])
         )
-        assert board in rigid_group["rigid_group"]
+        assert mount["parameters"] == {"drive_position": expected["drive_position"]}
+        assert set(mount["depends_on"]).issuperset(expected["dependencies"])

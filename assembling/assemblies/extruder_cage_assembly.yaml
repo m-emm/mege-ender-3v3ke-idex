@@ -27,6 +27,26 @@ Builder:
         assembly: nitehawk_board
         artifact: followers
         name_template: "nitehawk_board_{name}"
+      - source: injected
+        assembly: tool_head_mount_machined
+        artifact: leader
+        name: tool_head_mount_machined
+      - source: injected
+        assembly: carriage
+        artifact: leader
+        name: carriage
+      - source: dependencies
+        assembly: x_axis_rail_assembly
+        artifact: leader
+        name: rail
+      - source: dependencies
+        assembly: x_axis_lower_profile_assembly
+        artifact: leader
+        name: lower_axis_profile
+      - source: dependencies
+        assembly: x_axis_top_profile_assembly
+        artifact: leader
+        name: top_axis_profile
 
   Production:
     parts: []

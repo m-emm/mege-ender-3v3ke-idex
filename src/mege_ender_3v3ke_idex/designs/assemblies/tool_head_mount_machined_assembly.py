@@ -14,7 +14,6 @@ def create_tool_head_mount_machined_assembly(
     *,
     carriage,
     sprite_extruder,
-    x_axis_belt_carriage,
     tool_head_mount_machined_plate_fillet_radius,
     tool_head_mount_machined_plate_thickness,
     tool_head_mount_machined_plate_width,
@@ -23,7 +22,7 @@ def create_tool_head_mount_machined_assembly(
 ):
     """Create a machined tool head mount carriage plate."""
 
-    _ = (x_axis_belt_carriage, tool_head_mount_machined_plate_fillet_radius)
+    _ = tool_head_mount_machined_plate_fillet_radius
 
     extruder_size = get_bounding_box_size(sprite_extruder)
 

@@ -18,10 +18,6 @@ Builder:
       - source: self
         artifact: leader
         name: tool_head_mount_machined
-      - source: injected
-        assembly: x_axis_belt_carriage
-        artifact: leader
-        name: x_axis_belt_carriage
       - source: dependencies
         assembly: x_axis_rail_assembly
         artifact: leader
