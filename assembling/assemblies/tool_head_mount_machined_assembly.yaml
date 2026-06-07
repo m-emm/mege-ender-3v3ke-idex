@@ -43,15 +43,24 @@ Builder:
       - source: self
         artifact: leader
         name: tool_head_mount_machined
+    arrange:
+      export_step: true
+      export_stl: false
+      export_obj: false
+      export_individual_parts: false
+      plates:
+        - name: tool_head_mount_machined
+          filename: thm_machined
+          parts:
+            - tool_head_mount_machined
+      auto_assign_plates: false
 
 Parameters:
-  tool_head_mount_carriage_mount_plate_fillet_radius:
+  tool_head_mount_machined_plate_fillet_radius:
     Type: Float
-  tool_head_mount_carriage_mount_plate_thickness:
+  tool_head_mount_machined_plate_thickness:
     Type: Float
-  tool_head_mount_carriage_mount_plate_width:
-    Type: Float
-  tool_head_mount_y_extension:
+  tool_head_mount_machined_plate_width:
     Type: Float
   drive_position:
     Type: String

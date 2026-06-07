@@ -10,15 +10,14 @@ def create_tool_head_mount_machined_assembly(
     carriage,
     sprite_extruder,
     x_axis_belt_carriage,
-    tool_head_mount_carriage_mount_plate_fillet_radius,
-    tool_head_mount_carriage_mount_plate_thickness,
-    tool_head_mount_carriage_mount_plate_width,
-    tool_head_mount_y_extension,
+    tool_head_mount_machined_plate_fillet_radius,
+    tool_head_mount_machined_plate_thickness,
+    tool_head_mount_machined_plate_width,
     drive_position,
 ):
     """Create a machined tool head mount carriage plate."""
 
-    _ = (sprite_extruder, x_axis_belt_carriage)
+    _ = (x_axis_belt_carriage, tool_head_mount_machined_plate_fillet_radius)
 
     extruder_size = get_bounding_box_size(sprite_extruder)
 
@@ -35,13 +34,11 @@ def create_tool_head_mount_machined_assembly(
     else:
         raise ValueError(f"Unsupported drive_position '{drive_position}'")
 
-    carriage_size = get_bounding_box_size(carriage)
-
     carriage_mount_plate = create_box(
-        tool_head_mount_carriage_mount_plate_width,
+        tool_head_mount_machined_plate_width,
         mount_plate_y_size,
-        tool_head_mount_carriage_mount_plate_thickness,
-        # fillet_radius=tool_head_mount_carriage_mount_plate_fillet_radius,
+        tool_head_mount_machined_plate_thickness,
+        # fillet_radius=tool_head_mount_machined_plate_fillet_radius,
         # no_fillets_at=[Alignment.BOTTOM],
     )
     carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.CENTER)
