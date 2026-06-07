@@ -43,6 +43,21 @@ Builder:
       - source: self
         artifact: leader
         name: tool_head_mount_machined
+    prototype:
+      include_parts:
+        - tool_head_mount_machined
+      process_data_preset: petgcf_max_strength_high_speed_06
+      arrange:
+        export_step: false
+        export_stl: true
+        export_obj: true
+        export_individual_parts: false
+        plates:
+          - name: tool_head_mount_machined_prototype
+            filename: thm_machined_proto
+            parts:
+              - tool_head_mount_machined
+        auto_assign_plates: false
     arrange:
       export_step: true
       export_stl: false
