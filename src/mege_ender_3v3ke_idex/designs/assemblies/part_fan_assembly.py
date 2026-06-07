@@ -736,7 +736,7 @@ def _extend_blower_ducts(
     duct_front_mount_plate = translate(0, 0, duct_front_mount_plate_offset)(
         duct_front_mount_plate
     )
-    blower_ducts = blower_ducts.fuse(duct_front_mount_plate)
+    
 
     duct_front_mount_plate_connector = create_box(
         tool_head_front_mount_plate_connector_width,
@@ -758,7 +758,30 @@ def _extend_blower_ducts(
         duct_front_mount_plate,
         Alignment.LEFT,
     )
+
+    duct_front_flange = create_box(
+        tool_head_front_mount_plate_connector_width,
+        tool_head_front_mount_plate_connector_width,
+        tool_head_front_mount_plate_connector_thickness)
+    
+    duct_front_flange = align(
+        duct_front_flange,
+        duct_front_mount_plate_connector,
+        Alignment.CENTER,
+    )
+    duct_front_flange = align(
+        duct_front_flange,
+        duct_front_mount_plate_connector,
+        Alignment.STACK_FRONT,
+    )
+    duct_front_flange = align(
+        duct_front_flange,
+        duct_front_mount_plate_connector,
+        Alignment.TOP,
+    )
+
     blower_ducts = blower_ducts.fuse(duct_front_mount_plate_connector)
+    blower_ducts = blower_ducts.fuse(duct_front_flange)
 
     for _, cutter in sprite_extruder.get_named_cutter_items():
         blower_ducts = blower_ducts.cut(cutter)
