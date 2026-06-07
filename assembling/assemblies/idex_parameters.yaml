@@ -924,7 +924,7 @@ globals:
   tool_head_mount_carriage_mount_plate_thickness: 5.5
   tool_head_mount_carriage_mount_plate_width: 80
   tool_head_mount_machined_plate_fillet_radius: 1
-  tool_head_mount_machined_plate_thickness: 5.5
+  tool_head_mount_machined_plate_thickness: 5
   tool_head_mount_machined_plate_width: 80
   tool_head_mount_carriage_mount_l_profile_thickness: 3.2
   tool_head_mount_carriage_mount_l_profile_outer_size: 30

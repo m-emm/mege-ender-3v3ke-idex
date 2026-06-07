@@ -1,8 +1,13 @@
 """Declarative machined tool head mount assembly."""
 
+from shellforgepy.metrics import Material, record_weight_metric
 from shellforgepy.simple import *
 
 BIG_THING = 500
+
+screw_hole_inset = 5
+screw_size = "M3"
+TOOL_HEAD_MOUNT_MACHINED_METRICS_ID = "tool_head_mount_machined"
 
 
 def create_tool_head_mount_machined_assembly(
@@ -14,6 +19,7 @@ def create_tool_head_mount_machined_assembly(
     tool_head_mount_machined_plate_thickness,
     tool_head_mount_machined_plate_width,
     drive_position,
+    record_metrics=False,
 ):
     """Create a machined tool head mount carriage plate."""
 
@@ -48,13 +54,16 @@ def create_tool_head_mount_machined_assembly(
         Alignment.STACK_TOP,
     )
     carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.BACK)
+
+    for alignment in [Alignment.RIGHT, Alignment.LEFT]:
+        carriage_mount_plate = align(carriage_mount_plate, carriage, alignment)
+        carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
+
     carriage_mount_plate = align(
         carriage_mount_plate,
         carriage,
         Alignment.RIGHT if drive_position == Alignment.BOTTOM else Alignment.LEFT,
     )
-
-    carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
 
     extruder_cutout_cutter = create_filleted_box(
         extruder_size[0] + 4,
@@ -68,5 +77,42 @@ def create_tool_head_mount_machined_assembly(
     )
 
     carriage_mount_plate = carriage_mount_plate.cut(extruder_cutout_cutter)
+
+    screw_hole_diameter = MScrew.from_size(screw_size).clearance_hole_loose
+
+    for lr in [Alignment.RIGHT, Alignment.LEFT]:
+
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+            drill = create_cylinder(screw_hole_diameter / 2, 50)
+
+            drill = align(drill, carriage_mount_plate, Alignment.CENTER)
+            drill = align(drill, carriage_mount_plate, lr.edge_alignment)
+            drill = align(drill, sprite_extruder, fb.edge_alignment)
+
+            drill = translate(
+                -lr.sign * screw_hole_inset, -fb.sign * screw_hole_inset, 0
+            )(drill)
+
+            carriage_mount_plate = carriage_mount_plate.cut(drill)
+
+            if fb == Alignment.BACK:
+                drill = create_cylinder(screw_hole_diameter / 2, 100)
+
+                drill = align(drill, carriage_mount_plate, Alignment.CENTER)
+                drill = align(drill, carriage_mount_plate, lr.edge_alignment)
+                drill = align(drill, sprite_extruder, Alignment.STACK_BACK)
+                drill = translate(
+                    -lr.sign * screw_hole_inset, fb.sign * screw_hole_inset, 0
+                )(drill)
+
+                carriage_mount_plate = carriage_mount_plate.cut(drill)
+
+    if record_metrics:
+        record_weight_metric(
+            TOOL_HEAD_MOUNT_MACHINED_METRICS_ID,
+            Material.ALUMINUM,
+            get_volume(carriage_mount_plate),
+            part_id="tool_head_mount_machined",
+        )
 
     return LeaderFollowersCuttersPart(leader=carriage_mount_plate)

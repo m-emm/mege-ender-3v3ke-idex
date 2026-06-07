@@ -71,3 +71,5 @@ Parts:
 
     Properties:
       Generator: mege_ender_3v3ke_idex.designs.assemblies.tool_head_mount_machined_assembly.create_tool_head_mount_machined_assembly
+      Properties:
+        record_metrics: true
