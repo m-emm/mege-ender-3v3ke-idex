@@ -336,7 +336,7 @@ def _create_ducts(
     retval = blower_tubes.fuse(feeder_ring)
     retval = retval.cut(blower_tube_cutters)
     retval = retval.cut(feeder_ring_cutter)
-    retval = rotate(feeder_ring_rotation_angle, axis=(0, 0, 1))(retval)
+    retval = rotate(feeder_ring_rotation_angle + 180, axis=(0, 0, 1))(retval)
 
     retval_bbox = get_bounding_box(retval)
     duct_extension = _create_duct_extension(
@@ -346,13 +346,13 @@ def _create_ducts(
         feeder_ring_wall=feeder_ring_wall,
     )
     duct_extension = align(duct_extension, retval, Alignment.TOP)
-    duct_extension = align(duct_extension, retval, Alignment.LEFT)
-    duct_extension = align(duct_extension, retval, Alignment.FRONT)
+    duct_extension = align(duct_extension, retval, Alignment.RIGHT)
+    duct_extension = align(duct_extension, retval, Alignment.BACK)
 
     duct_bbox_size = get_bounding_box_size(retval)
     duct_extension = translate(
-        -duct_extension_width + feeder_ring_width,
-        duct_bbox_size[1] / 2,
+        duct_extension_width - feeder_ring_width,
+        -duct_bbox_size[1] / 2,
         0,
     )(duct_extension)
 
@@ -667,15 +667,15 @@ def _extend_blower_ducts(
     tool_head_additional_mount_plate_height,
     tool_head_additional_mount_plate_thickness,
     tool_head_additional_mount_plate_z_offset,
-    tool_head_front_mount_plate_connector_height,
-    tool_head_front_mount_plate_connector_thickness,
-    tool_head_front_mount_plate_connector_width,
-    duct_front_mount_plate_height,
-    duct_front_mount_plate_height_border,
-    duct_front_mount_plate_offset,
-    duct_front_mount_plate_thickness,
-    duct_front_mount_plate_width,
-    duct_front_mount_plate_width_border,
+    tool_head_back_mount_plate_connector_height,
+    tool_head_back_mount_plate_connector_thickness,
+    tool_head_back_mount_plate_connector_width,
+    duct_back_mount_plate_height,
+    duct_back_mount_plate_height_border,
+    duct_back_mount_plate_offset,
+    duct_back_mount_plate_thickness,
+    duct_back_mount_plate_width,
+    duct_back_mount_plate_width_border,
 ):
     side_mount_plate = create_filleted_box(
         tool_head_additional_mount_plate_thickness,
@@ -700,97 +700,95 @@ def _extend_blower_ducts(
     )(side_mount_plate)
     blower_ducts = blower_ducts.fuse(side_mount_plate)
 
-    duct_front_mount_plate = create_box(
-        duct_front_mount_plate_width,
-        duct_front_mount_plate_height,
-        duct_front_mount_plate_thickness,
+    duct_back_mount_plate = create_box(
+        duct_back_mount_plate_width,
+        duct_back_mount_plate_height,
+        duct_back_mount_plate_thickness,
     )
-    cutout_width = (
-        duct_front_mount_plate_width - 2 * duct_front_mount_plate_width_border
-    )
+    cutout_width = duct_back_mount_plate_width - 2 * duct_back_mount_plate_width_border
     cutout_height = (
-        duct_front_mount_plate_height - 2 * duct_front_mount_plate_height_border
+        duct_back_mount_plate_height - 2 * duct_back_mount_plate_height_border
     )
     cutout_fillet_radius = min(cutout_width, cutout_height) / 4
 
-    duct_front_mount_plate_cutout = create_filleted_box(
+    duct_back_mount_plate_cutout = create_filleted_box(
         cutout_width,
         cutout_height,
-        duct_front_mount_plate_thickness + 10,
+        duct_back_mount_plate_thickness + 10,
         fillet_radius=cutout_fillet_radius,
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
-    duct_front_mount_plate_cutout = align(
-        duct_front_mount_plate_cutout,
-        duct_front_mount_plate,
+    duct_back_mount_plate_cutout = align(
+        duct_back_mount_plate_cutout,
+        duct_back_mount_plate,
         Alignment.CENTER,
     )
-    duct_front_mount_plate = duct_front_mount_plate.cut(duct_front_mount_plate_cutout)
-    duct_front_mount_plate = rotate(90, axis=(1, 0, 0))(duct_front_mount_plate)
-    duct_front_mount_plate = align(
-        duct_front_mount_plate,
+    duct_back_mount_plate = duct_back_mount_plate.cut(duct_back_mount_plate_cutout)
+    duct_back_mount_plate = rotate(90, axis=(1, 0, 0))(duct_back_mount_plate)
+    duct_back_mount_plate = align(
+        duct_back_mount_plate,
         sprite_extruder,
         Alignment.CENTER,
     )
-    duct_front_mount_plate = align(
-        duct_front_mount_plate,
+    duct_back_mount_plate = align(
+        duct_back_mount_plate,
         sprite_extruder,
-        Alignment.STACK_FRONT,
+        Alignment.STACK_BACK,
     )
-    duct_front_mount_plate = align(
-        duct_front_mount_plate,
+    duct_back_mount_plate = align(
+        duct_back_mount_plate,
         sprite_extruder,
         Alignment.BOTTOM,
     )
-    duct_front_mount_plate = translate(0, 0, duct_front_mount_plate_offset)(
-        duct_front_mount_plate
+    duct_back_mount_plate = translate(0, 0, duct_back_mount_plate_offset)(
+        duct_back_mount_plate
     )
 
-    duct_front_mount_plate_connector = create_box(
-        tool_head_front_mount_plate_connector_width,
-        tool_head_front_mount_plate_connector_thickness,
-        tool_head_front_mount_plate_connector_height,
+    duct_back_mount_plate_connector = create_box(
+        tool_head_back_mount_plate_connector_width,
+        tool_head_back_mount_plate_connector_thickness,
+        tool_head_back_mount_plate_connector_height,
     )
-    duct_front_mount_plate_connector = align(
-        duct_front_mount_plate_connector,
-        duct_front_mount_plate,
+    duct_back_mount_plate_connector = align(
+        duct_back_mount_plate_connector,
+        duct_back_mount_plate,
         Alignment.BACK,
     )
-    duct_front_mount_plate_connector = align(
-        duct_front_mount_plate_connector,
-        duct_front_mount_plate,
+    duct_back_mount_plate_connector = align(
+        duct_back_mount_plate_connector,
+        duct_back_mount_plate,
         Alignment.STACK_BOTTOM,
     )
-    duct_front_mount_plate_connector = align(
-        duct_front_mount_plate_connector,
-        duct_front_mount_plate,
-        Alignment.LEFT,
+    duct_back_mount_plate_connector = align(
+        duct_back_mount_plate_connector,
+        duct_back_mount_plate,
+        Alignment.RIGHT,
     )
 
-    duct_front_flange = create_box(
-        tool_head_front_mount_plate_connector_width,
-        tool_head_front_mount_plate_connector_width,
-        tool_head_front_mount_plate_connector_thickness,
+    duct_back_flange = create_box(
+        tool_head_back_mount_plate_connector_width,
+        tool_head_back_mount_plate_connector_width,
+        tool_head_back_mount_plate_connector_thickness,
     )
 
-    duct_front_flange = align(
-        duct_front_flange,
-        duct_front_mount_plate_connector,
+    duct_back_flange = align(
+        duct_back_flange,
+        duct_back_mount_plate_connector,
         Alignment.CENTER,
     )
-    duct_front_flange = align(
-        duct_front_flange,
-        duct_front_mount_plate_connector,
+    duct_back_flange = align(
+        duct_back_flange,
+        duct_back_mount_plate_connector,
         Alignment.STACK_FRONT,
     )
-    duct_front_flange = align(
-        duct_front_flange,
-        duct_front_mount_plate_connector,
+    duct_back_flange = align(
+        duct_back_flange,
+        duct_back_mount_plate_connector,
         Alignment.TOP,
     )
 
-    blower_ducts = blower_ducts.fuse(duct_front_mount_plate_connector)
-    blower_ducts = blower_ducts.fuse(duct_front_flange)
+    blower_ducts = blower_ducts.fuse(duct_back_mount_plate_connector)
+    blower_ducts = blower_ducts.fuse(duct_back_flange)
 
     for _, cutter in sprite_extruder.get_named_cutter_items():
         blower_ducts = blower_ducts.cut(cutter)
@@ -841,15 +839,15 @@ def create_part_fan_assembly(
     tool_head_additional_mount_plate_height,
     tool_head_additional_mount_plate_thickness,
     tool_head_additional_mount_plate_z_offset,
-    tool_head_front_mount_plate_connector_height,
-    tool_head_front_mount_plate_connector_thickness,
-    tool_head_front_mount_plate_connector_width,
-    duct_front_mount_plate_height,
-    duct_front_mount_plate_height_border,
-    duct_front_mount_plate_offset,
-    duct_front_mount_plate_thickness,
-    duct_front_mount_plate_width,
-    duct_front_mount_plate_width_border,
+    tool_head_back_mount_plate_connector_height,
+    tool_head_back_mount_plate_connector_thickness,
+    tool_head_back_mount_plate_connector_width,
+    duct_back_mount_plate_height,
+    duct_back_mount_plate_height_border,
+    duct_back_mount_plate_offset,
+    duct_back_mount_plate_thickness,
+    duct_back_mount_plate_width,
+    duct_back_mount_plate_width_border,
     side_part_fan_parameters,
     front_part_fan_parameters,
     BIG_THING,
@@ -949,15 +947,15 @@ def create_part_fan_assembly(
         tool_head_additional_mount_plate_height=tool_head_additional_mount_plate_height,
         tool_head_additional_mount_plate_thickness=tool_head_additional_mount_plate_thickness,
         tool_head_additional_mount_plate_z_offset=tool_head_additional_mount_plate_z_offset,
-        tool_head_front_mount_plate_connector_height=tool_head_front_mount_plate_connector_height,
-        tool_head_front_mount_plate_connector_thickness=tool_head_front_mount_plate_connector_thickness,
-        tool_head_front_mount_plate_connector_width=tool_head_front_mount_plate_connector_width,
-        duct_front_mount_plate_height=duct_front_mount_plate_height,
-        duct_front_mount_plate_height_border=duct_front_mount_plate_height_border,
-        duct_front_mount_plate_offset=duct_front_mount_plate_offset,
-        duct_front_mount_plate_thickness=duct_front_mount_plate_thickness,
-        duct_front_mount_plate_width=duct_front_mount_plate_width,
-        duct_front_mount_plate_width_border=duct_front_mount_plate_width_border,
+        tool_head_back_mount_plate_connector_height=tool_head_back_mount_plate_connector_height,
+        tool_head_back_mount_plate_connector_thickness=tool_head_back_mount_plate_connector_thickness,
+        tool_head_back_mount_plate_connector_width=tool_head_back_mount_plate_connector_width,
+        duct_back_mount_plate_height=duct_back_mount_plate_height,
+        duct_back_mount_plate_height_border=duct_back_mount_plate_height_border,
+        duct_back_mount_plate_offset=duct_back_mount_plate_offset,
+        duct_back_mount_plate_thickness=duct_back_mount_plate_thickness,
+        duct_back_mount_plate_width=duct_back_mount_plate_width,
+        duct_back_mount_plate_width_border=duct_back_mount_plate_width_border,
     )
     blower_ducts = blower_ducts.cut(expand(fans.leader, part_fan_clearance))
     blower_ducts_index = fans.follower_indices_by_name["blower_ducts"]

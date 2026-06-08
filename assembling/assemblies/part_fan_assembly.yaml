@@ -116,23 +116,23 @@ Parameters:
     Type: Float
   tool_head_additional_mount_plate_z_offset:
     Type: Float
-  tool_head_front_mount_plate_connector_height:
+  tool_head_back_mount_plate_connector_height:
     Type: Float
-  tool_head_front_mount_plate_connector_thickness:
+  tool_head_back_mount_plate_connector_thickness:
     Type: Float
-  tool_head_front_mount_plate_connector_width:
+  tool_head_back_mount_plate_connector_width:
     Type: Float
-  duct_front_mount_plate_height:
+  duct_back_mount_plate_height:
     Type: Float
-  duct_front_mount_plate_height_border:
+  duct_back_mount_plate_height_border:
     Type: Float
-  duct_front_mount_plate_offset:
+  duct_back_mount_plate_offset:
     Type: Float
-  duct_front_mount_plate_thickness:
+  duct_back_mount_plate_thickness:
     Type: Float
-  duct_front_mount_plate_width:
+  duct_back_mount_plate_width:
     Type: Float
-  duct_front_mount_plate_width_border:
+  duct_back_mount_plate_width_border:
     Type: Float
   side_part_fan_parameters:
     Type: Json
