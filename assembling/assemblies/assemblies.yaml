@@ -2292,6 +2292,8 @@ assemblies:
       - nitehawk_board_right_assembly
       - tool_head_left_assembly
       - tool_head_right_assembly
+      - tool_head_mount_machined_bottom_assembly
+      - tool_head_mount_machined_top_assembly
       - x_axis_belt_carriage_bottom_assembly
       - x_axis_belt_carriage_top_assembly
       - y_z_axis_mcu_holder_assembly
@@ -2346,6 +2348,8 @@ assemblies:
       nitehawk_board_right: nitehawk_board_right_assembly
       tool_head_left: tool_head_left_assembly
       tool_head_right: tool_head_right_assembly
+      tool_head_mount_machined_bottom: tool_head_mount_machined_bottom_assembly
+      tool_head_mount_machined_top: tool_head_mount_machined_top_assembly
       x_axis_belt_carriage_bottom: x_axis_belt_carriage_bottom_assembly
       x_axis_belt_carriage_top: x_axis_belt_carriage_top_assembly
       creality_psu: creality_psu_assembly
