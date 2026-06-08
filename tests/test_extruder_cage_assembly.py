@@ -256,6 +256,10 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         (ASSEMBLIES_DIR / "extruder_cage_left_assembly.yaml").read_text(),
         Loader=AssemblyDefaultsLoader,
     )
+    joiner_resource = yaml.load(
+        (ASSEMBLIES_DIR / "part_fan_cage_joiner.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
 
     assert assemblies["nitehawk_board_left_assembly"]["resource_file"] == (
         "nitehawk_board_assembly.yaml"
@@ -324,8 +328,7 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
             "name": "tool_head_mount_machined",
         } in visualization_parts
         assert not any(
-            rule.get("source") == "injected"
-            and rule.get("assembly") == "carriage"
+            rule.get("source") == "injected" and rule.get("assembly") == "carriage"
             for rule in visualization_parts
         )
         for dependency_assembly, visual_name in [
@@ -444,7 +447,47 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         assert part_fan["depends_on"] == [sprite_extruder]
         assert part_fan["inject_parts"] == {"sprite_extruder": sprite_extruder}
 
+    assert joiner_resource["Parts"]["PartFanCageJoiner"]["Type"] == (
+        "Shellforgepy::AssemblyJoiner"
+    )
+    assert set(joiner_resource["Builder"]["Outputs"]) == {
+        "part_fans",
+        "extruder_cage",
+    }
+
+    expected_joins = {
+        "left": {
+            "part_fans": "part_fan_left_assembly",
+            "extruder_cage": "extruder_cage_left_assembly",
+            "part_fans_output": "part_fan_left_joined_assembly",
+            "extruder_cage_output": "extruder_cage_left_joined_assembly",
+        },
+        "right": {
+            "part_fans": "part_fan_right_assembly",
+            "extruder_cage": "extruder_cage_right_assembly",
+            "part_fans_output": "part_fan_right_joined_assembly",
+            "extruder_cage_output": "extruder_cage_right_joined_assembly",
+        },
+    }
+    for side, expected_join in expected_joins.items():
+        join_entry = assemblies[f"part_fan_cage_{side}_join"]
+        assert join_entry["kind"] == "join"
+        assert join_entry["resource_file"] == "part_fan_cage_joiner.yaml"
+        assert join_entry["inject_parts"] == {
+            "part_fans": expected_join["part_fans"],
+            "extruder_cage": expected_join["extruder_cage"],
+        }
+        assert join_entry["outputs"] == {
+            "part_fans": expected_join["part_fans_output"],
+            "extruder_cage": expected_join["extruder_cage_output"],
+        }
+
     graph_model = builder_graph_model.build_graph_model(config["assemblies"], config)
+    for side, expected_join in expected_joins.items():
+        assert f"part_fan_cage_{side}_join" not in graph_model.assemblies_by_name
+        assert expected_join["part_fans_output"] in graph_model.assemblies_by_name
+        assert expected_join["extruder_cage_output"] in graph_model.assemblies_by_name
+
     generation_index = {
         assembly_name: index
         for index, generation in enumerate(
@@ -459,8 +502,15 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         machined_mount = injected_context["tool_head_mount_machined"]
         cage = f"extruder_cage_{side}_assembly"
         part_fan = f"part_fan_{side}_assembly"
+        join_node = f"join:part_fan_cage_{side}_join"
+        joined_cage = f"extruder_cage_{side}_joined_assembly"
+        joined_part_fan = f"part_fan_{side}_joined_assembly"
         assert generation_index[machined_mount] < generation_index[cage]
         assert generation_index[machined_mount] < generation_index[part_fan]
+        assert generation_index[cage] < generation_index[join_node]
+        assert generation_index[part_fan] < generation_index[join_node]
+        assert generation_index[join_node] < generation_index[joined_cage]
+        assert generation_index[join_node] < generation_index[joined_part_fan]
 
         placement_deps = set(graph_model.placement_build_dependencies[machined_mount])
         assert not placement_deps & {
@@ -468,12 +518,16 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
             "extruder_cage_right_assembly",
             "part_fan_left_assembly",
             "part_fan_right_assembly",
+            "extruder_cage_left_joined_assembly",
+            "extruder_cage_right_joined_assembly",
+            "part_fan_left_joined_assembly",
+            "part_fan_right_joined_assembly",
         }
 
     assert "nitehawk_holder" not in tool_head_resource_text
-    tool_head_composite = tool_head_resource["Parts"]["ToolHeadAssembly"][
-        "Properties"
-    ]["Composite"]
+    tool_head_composite = tool_head_resource["Parts"]["ToolHeadAssembly"]["Properties"][
+        "Composite"
+    ]
     assert tool_head_composite["Leader"]["Fused"] == [
         {
             "source": "injected",
@@ -498,13 +552,13 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
     expected_tool_head_inputs = {
         "left": {
             "sprite_extruder": "sprite_extruder_left_assembly",
-            "extruder_cage": "extruder_cage_left_assembly",
-            "part_fans": "part_fan_left_assembly",
+            "extruder_cage": "extruder_cage_left_joined_assembly",
+            "part_fans": "part_fan_left_joined_assembly",
         },
         "right": {
             "sprite_extruder": "sprite_extruder_right_assembly",
-            "extruder_cage": "extruder_cage_right_assembly",
-            "part_fans": "part_fan_right_assembly",
+            "extruder_cage": "extruder_cage_right_joined_assembly",
+            "part_fans": "part_fan_right_joined_assembly",
         },
     }
     for side, expected_inputs in expected_tool_head_inputs.items():

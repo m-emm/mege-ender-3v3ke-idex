@@ -1,0 +1,104 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Joiner for part fan and extruder cage assemblies
+
+Builder:
+  Outputs:
+    part_fans:
+      Visualization:
+        preview:
+          enabled: true
+          views:
+            - top
+            - left
+            - front
+            - isometric
+          width: 512
+          height: 512
+        parts:
+          - source: self
+            artifact: leader
+            name: part_fans_joined
+          - source: self
+            artifact: non_production_parts
+            name_template: "part_fans_{name}"
+          - source: output
+            assembly: extruder_cage
+            artifact: leader
+            name: extruder_cage_joined
+          - source: output
+            assembly: extruder_cage
+            artifact: non_production_parts
+            name_template: "extruder_cage_{name}"
+      Production:
+        parts:
+          - source: self
+            artifact: leader
+            name: part_fans_joined
+
+    extruder_cage:
+      Visualization:
+        preview:
+          enabled: true
+          views:
+            - top
+            - left
+            - front
+            - isometric
+          width: 512
+          height: 512
+        parts:
+          - source: self
+            artifact: leader
+            name: extruder_cage_joined
+          - source: self
+            artifact: non_production_parts
+            name_template: "extruder_cage_{name}"
+          - source: output
+            assembly: part_fans
+            artifact: leader
+            name: part_fans_joined
+          - source: output
+            assembly: part_fans
+            artifact: non_production_parts
+            name_template: "part_fans_{name}"
+      Production:
+        parts:
+          - source: self
+            artifact: leader
+            name: extruder_cage_joined
+
+Parameters:
+  flange_extension:
+    Type: Float
+    Default: 8.0
+  flange_half_height:
+    Type: Float
+    Default: 3.0
+  screw_size:
+    Type: String
+    Default: M3
+  clearance_type:
+    Type: String
+    Default: loose
+  fillet_radius:
+    Type: Float
+    Default: 0.0
+
+Parts:
+  PartFanCageJoiner:
+    Type: Shellforgepy::AssemblyJoiner
+
+    Properties:
+      Joiner: mege_ender_3v3ke_idex.designs.assemblies.part_fan_cage_joiner.join_part_fans_with_extruder_cage
+      Properties:
+        flange_extension:
+          $ref: flange_extension
+        flange_half_height:
+          $ref: flange_half_height
+        screw_size:
+          $ref: screw_size
+        clearance_type:
+          $ref: clearance_type
+        fillet_radius:
+          $ref: fillet_radius
