@@ -448,12 +448,14 @@ placement:
         - $ref: nitehawk_board_extruder_body_bottom_offset
 
     - rigid_group:
+        - extruder_cage_left_assembly
         - nitehawk_holder_left_assembly
         - part_fan_left_assembly
         - nitehawk_board_left_assembly
       to: sprite_extruder_left_assembly
 
     - rigid_group:
+        - extruder_cage_right_assembly
         - nitehawk_holder_right_assembly
         - part_fan_right_assembly
         - nitehawk_board_right_assembly
@@ -518,12 +520,6 @@ placement:
     - rigid_group:
         - tool_head_mount_machined_top_assembly
       to: x_axis_right_carriage_assembly
-    - rigid_group:
-        - extruder_cage_left_assembly
-      to: sprite_extruder_left_assembly
-    - rigid_group:
-        - extruder_cage_right_assembly
-      to: sprite_extruder_right_assembly
     - rigid_group:
         - sprite_extruder_left_assembly
         - sprite_extruder_right_assembly
@@ -2412,33 +2408,19 @@ assemblies:
     depends_on:
       - sprite_extruder_assembly
       - nitehawk_board_assembly
-      - tool_head_mount_machined_top_assembly
-      - x_axis_right_carriage_assembly
-      - x_axis_rail_assembly
-      - x_axis_lower_profile_assembly
-      - x_axis_top_profile_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_assembly
       nitehawk_board: nitehawk_board_assembly
-      tool_head_mount_machined: tool_head_mount_machined_top_assembly
-      carriage: x_axis_right_carriage_assembly
 
   - name: extruder_cage_left_assembly
 
-    resource_file: extruder_cage_assembly.yaml
+    resource_file: extruder_cage_left_assembly.yaml
     depends_on:
       - sprite_extruder_left_assembly
       - nitehawk_board_left_assembly
-      - tool_head_mount_machined_bottom_assembly
-      - x_axis_left_carriage_assembly
-      - x_axis_rail_assembly
-      - x_axis_lower_profile_assembly
-      - x_axis_top_profile_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_left_assembly
       nitehawk_board: nitehawk_board_left_assembly
-      tool_head_mount_machined: tool_head_mount_machined_bottom_assembly
-      carriage: x_axis_left_carriage_assembly
 
   - name: extruder_cage_right_assembly
 
@@ -2446,16 +2428,9 @@ assemblies:
     depends_on:
       - sprite_extruder_right_assembly
       - nitehawk_board_right_assembly
-      - tool_head_mount_machined_top_assembly
-      - x_axis_right_carriage_assembly
-      - x_axis_rail_assembly
-      - x_axis_lower_profile_assembly
-      - x_axis_top_profile_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_right_assembly
       nitehawk_board: nitehawk_board_right_assembly
-      tool_head_mount_machined: tool_head_mount_machined_top_assembly
-      carriage: x_axis_right_carriage_assembly
 
   - name: sprite_extruder_left_assembly
 

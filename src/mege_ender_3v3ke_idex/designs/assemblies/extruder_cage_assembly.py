@@ -8,8 +8,6 @@ def create_extruder_cage_assembly(
     *,
     sprite_extruder,
     nitehawk_board,
-    tool_head_mount_machined=None,
-    carriage=None,
     extruder_cage_mount_plate_thickness,
     extruder_cage_mount_plate_fillet_radius,
     extruder_cage_flange_thickness,
@@ -31,8 +29,6 @@ def create_extruder_cage_assembly(
     BIG_THING,
 ):
     """Create a standalone extruder cage around the injected sprite extruder."""
-
-    _ = (tool_head_mount_machined, carriage)
 
     extruder_size = get_bounding_box_size(sprite_extruder)
     screw_record = MScrew.from_size(extruder_cage_screw_size)

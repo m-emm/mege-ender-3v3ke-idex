@@ -736,7 +736,6 @@ def _extend_blower_ducts(
     duct_front_mount_plate = translate(0, 0, duct_front_mount_plate_offset)(
         duct_front_mount_plate
     )
-    
 
     duct_front_mount_plate_connector = create_box(
         tool_head_front_mount_plate_connector_width,
@@ -762,8 +761,9 @@ def _extend_blower_ducts(
     duct_front_flange = create_box(
         tool_head_front_mount_plate_connector_width,
         tool_head_front_mount_plate_connector_width,
-        tool_head_front_mount_plate_connector_thickness)
-    
+        tool_head_front_mount_plate_connector_thickness,
+    )
+
     duct_front_flange = align(
         duct_front_flange,
         duct_front_mount_plate_connector,
