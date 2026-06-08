@@ -122,21 +122,29 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
         cage.get_non_production_part_by_name(screw_name)
 
     mount_plate_thickness = cage_kwargs["extruder_cage_mount_plate_thickness"]
+    sprite_extruder_bbox = get_bounding_box(sprite_extruder)
+    sprite_extruder_center = get_bounding_box_center(sprite_extruder.leader)
+    hotend_center = get_bounding_box_center(
+        sprite_extruder.get_named_non_production_part("hotend")
+    )
     sprite_extruder_body_size = get_bounding_box_size(sprite_extruder.leader)
-    sprite_mount_base_plate_size = get_bounding_box_size(
-        cage.get_follower_part_by_name("sprite_mount_base_plate")
-    )
-    side_mount_plate_size = get_bounding_box_size(
-        cage.get_follower_part_by_name("part_fan_side_mount_plate")
-    )
-    front_mount_plate_size = get_bounding_box_size(
-        cage.get_follower_part_by_name("part_fan_front_mount_plate")
-    )
+    sprite_mount_base_plate = cage.get_follower_part_by_name("sprite_mount_base_plate")
+    side_mount_plate = cage.get_follower_part_by_name("part_fan_side_mount_plate")
+    front_mount_plate = cage.get_follower_part_by_name("part_fan_front_mount_plate")
+    sprite_mount_base_plate_size = get_bounding_box_size(sprite_mount_base_plate)
+    side_mount_plate_size = get_bounding_box_size(side_mount_plate)
+    front_mount_plate_size = get_bounding_box_size(front_mount_plate)
+    side_mount_plate_bbox = get_bounding_box(side_mount_plate)
+    front_mount_plate_bbox = get_bounding_box(front_mount_plate)
 
     assert sprite_mount_base_plate_size[1] == pytest.approx(mount_plate_thickness)
     assert side_mount_plate_size[0] == pytest.approx(mount_plate_thickness)
     assert front_mount_plate_size[0] == pytest.approx(sprite_extruder_body_size[0])
     assert front_mount_plate_size[1] == pytest.approx(mount_plate_thickness)
+    assert hotend_center[0] > sprite_extruder_center[0]
+    assert hotend_center[1] < sprite_extruder_center[1]
+    assert side_mount_plate_bbox[0][0] >= sprite_extruder_bbox[1][0] - 1e-6
+    assert front_mount_plate_bbox[1][1] <= sprite_extruder_bbox[0][1] + 1e-6
 
     nitehawk_hole_0_center = get_bounding_box_center(
         cage.get_named_cutter("nitehawk_mount_hole_0")
@@ -163,6 +171,7 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
     ]
 
     assert nitehawk_hole_0_center[0] < nitehawk_hole_1_center[0]
+    assert nitehawk_mount_plate_bbox[0][1] >= sprite_extruder_bbox[1][1] - 1e-6
     assert nitehawk_hole_1_center[0] - nitehawk_hole_0_center[0] == pytest.approx(
         cage_kwargs["nitehawk_holes_center_distance"]
     )
@@ -337,6 +346,13 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         "sprite_extruder_right_assembly": "x_axis_right_sprite_extruder_carriage_x_offset",
     }
     for sprite_extruder, offset_parameter in expected_sprite_x_offsets.items():
+        assert not any(
+            placement.get("part") == sprite_extruder
+            and placement.get("post_rotation", {}).get("angle") == 180
+            and placement.get("post_rotation", {}).get("axis") == [0, 0, 1]
+            for placement in placements
+        )
+
         right_alignment = next(
             placement
             for placement in placements

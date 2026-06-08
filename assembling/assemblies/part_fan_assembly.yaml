@@ -134,9 +134,9 @@ Parameters:
     Type: Float
   duct_front_mount_plate_width_border:
     Type: Float
-  left_part_fan_parameters:
+  side_part_fan_parameters:
     Type: Json
-  right_part_fan_parameters:
+  front_part_fan_parameters:
     Type: Json
 
 Parts:

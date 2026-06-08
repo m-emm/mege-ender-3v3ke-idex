@@ -879,7 +879,7 @@ globals:
   part_fan_window_cutter_outside_length: 3
   part_fan_window_height: 8.1
   part_fan_window_width: 28
-  left_part_fan_parameters:
+  side_part_fan_parameters:
     around_angle: 0
     x_offset: 28.1
     y_offset: 35
@@ -889,7 +889,7 @@ globals:
     mount_plate_blow_direction_oversize: 3
     mount_plate_cross_oversize: 2
     mount_plate_blow_direction_offset: -1
-  right_part_fan_parameters:
+  front_part_fan_parameters:
     around_angle: 90
     x_offset: 21
     y_offset: 5

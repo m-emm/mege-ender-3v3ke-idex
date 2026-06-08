@@ -5,12 +5,16 @@ import pytest
 
 pytest.importorskip("cadquery")
 
-from assembly_defaults import DEFAULTS
+from assembly_defaults import DEFAULTS, assembly_kwargs
 from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly import (
     _blower_feeder_ring_path_metrics,
     _blower_nozzle_tip_scales,
     create_part_fan_assembly,
 )
+from mege_ender_3v3ke_idex.designs.assemblies.sprite_extruder_assembly import (
+    create_sprite_extruder_assembly,
+)
+from shellforgepy.simple import get_bounding_box_center
 
 
 def _current_blower_path_kwargs():
@@ -59,9 +63,13 @@ def test_blower_nozzle_tip_scales_increase_with_path_length():
 
 
 def test_part_fan_clearance_is_declarative_parameter():
-    assert "part_fan_clearance" in inspect.signature(
-        create_part_fan_assembly
-    ).parameters
+    parameters = inspect.signature(create_part_fan_assembly).parameters
+
+    assert "part_fan_clearance" in parameters
+    assert "side_part_fan_parameters" in parameters
+    assert "front_part_fan_parameters" in parameters
+    assert "left_part_fan_parameters" not in parameters
+    assert "right_part_fan_parameters" not in parameters
 
     assembly_yaml = Path("assembling/assemblies/part_fan_assembly.yaml").read_text()
     defaults_yaml = Path(
@@ -70,3 +78,34 @@ def test_part_fan_clearance_is_declarative_parameter():
 
     assert "part_fan_clearance:" in assembly_yaml
     assert "part_fan_clearance: 0.8" in defaults_yaml
+    assert "side_part_fan_parameters:" in assembly_yaml
+    assert "front_part_fan_parameters:" in assembly_yaml
+    assert "side_part_fan_parameters:" in defaults_yaml
+    assert "front_part_fan_parameters:" in defaults_yaml
+    assert "left_part_fan_parameters:" not in assembly_yaml
+    assert "right_part_fan_parameters:" not in assembly_yaml
+    assert "left_part_fan_parameters:" not in defaults_yaml
+    assert "right_part_fan_parameters:" not in defaults_yaml
+
+
+def test_part_fans_use_physical_side_and_front_roles():
+    sprite_extruder = create_sprite_extruder_assembly(
+        **assembly_kwargs(create_sprite_extruder_assembly)
+    )
+    part_fans = create_part_fan_assembly(
+        **assembly_kwargs(create_part_fan_assembly, sprite_extruder=sprite_extruder)
+    )
+
+    hotend_center = get_bounding_box_center(
+        sprite_extruder.get_named_non_production_part("hotend")
+    )
+    side_fan_center = get_bounding_box_center(
+        part_fans.get_named_non_production_part("side_fan")
+    )
+    front_fan_center = get_bounding_box_center(
+        part_fans.get_named_non_production_part("front_fan")
+    )
+
+    assert side_fan_center[0] > hotend_center[0]
+    assert side_fan_center[1] < hotend_center[1]
+    assert front_fan_center[1] < hotend_center[1]

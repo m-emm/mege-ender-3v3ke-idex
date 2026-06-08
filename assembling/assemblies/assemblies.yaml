@@ -272,11 +272,6 @@ placement:
       to: x_axis_rail_assembly
 
     - part: sprite_extruder_left_assembly
-      post_rotation:
-        angle: 180
-        axis: [0, 0, 1]
-        center: sprite_extruder_left_assembly.CENTER
-    - part: sprite_extruder_left_assembly
       to: x_axis_left_carriage_assembly
       alignment: RIGHT
       post_translation:
@@ -299,11 +294,6 @@ placement:
         - sprite_extruder_left_assembly
       to: x_axis_left_carriage_assembly
 
-    - part: sprite_extruder_right_assembly
-      post_rotation:
-        angle: 180
-        axis: [0, 0, 1]
-        center: sprite_extruder_right_assembly.CENTER
     - part: sprite_extruder_right_assembly
       to: x_axis_right_carriage_assembly
       alignment: RIGHT

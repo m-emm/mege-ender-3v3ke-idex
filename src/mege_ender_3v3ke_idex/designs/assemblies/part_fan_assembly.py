@@ -555,8 +555,8 @@ def _create_part_fan(
 
 def _create_angled_fans(
     *,
-    left_part_fan_parameters,
-    right_part_fan_parameters,
+    side_part_fan_parameters,
+    front_part_fan_parameters,
     part_fan_window_cutter_outside_length,
     part_fan_body_cutter_clearance,
     part_fan_mount_plate_thickness,
@@ -579,20 +579,26 @@ def _create_angled_fans(
     fans = PartCollector()
     center_pillar = create_cylinder(0.01, 50)
     fan_parts_by_name = {}
-    fan_parameters_by_side = {
-        Alignment.LEFT: left_part_fan_parameters,
-        Alignment.RIGHT: right_part_fan_parameters,
-    }
-    # In the current toolhead-local coordinate system, the "left" configured
-    # fan becomes the side-mounted blower, while the "right" configured fan
-    # sits at the front of the hotend.
-    fan_name_by_side = {
-        Alignment.LEFT: "side_fan",
-        Alignment.RIGHT: "front_fan",
-    }
+    fan_roles = [
+        {
+            "name": "side_fan",
+            "part_prefix": "part_fan_side",
+            "parameters": side_part_fan_parameters,
+            "side": Alignment.RIGHT,
+            "around_angle_sign": -1,
+        },
+        {
+            "name": "front_fan",
+            "part_prefix": "part_fan_front",
+            "parameters": front_part_fan_parameters,
+            "side": Alignment.RIGHT,
+            "around_angle_sign": -1,
+        },
+    ]
 
-    for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        fan_parameters = fan_parameters_by_side[lr]
+    for role in fan_roles:
+        lr = role["side"]
+        fan_parameters = role["parameters"]
         fan = _create_part_fan(
             part_fan_size=part_fan_size,
             part_fan_thickness=part_fan_thickness,
@@ -631,10 +637,15 @@ def _create_angled_fans(
         fan = rotate(-fan_parameters["tilt"], axis=(1, 0, 0))(fan)
         fan = align(fan, center_pillar, lr.stack_alignment)
         fan = translate(lr.sign * fan_parameters["x_offset"], 0, 0)(fan)
-        fan = rotate(lr.sign * fan_parameters["around_angle"], axis=(0, 0, 1))(fan)
-        fan = translate(0, fan_parameters["y_offset"], fan_parameters["z_offset"])(fan)
-        fan = fan.prefixed_copy(f"part_fan_{lr.name.lower()}")
-        fan_parts_by_name[fan_name_by_side[lr]] = fan
+        fan = rotate(
+            role["around_angle_sign"] * lr.sign * fan_parameters["around_angle"],
+            axis=(0, 0, 1),
+        )(fan)
+        fan = translate(0, -fan_parameters["y_offset"], fan_parameters["z_offset"])(
+            fan
+        )
+        fan = fan.prefixed_copy(role["part_prefix"])
+        fan_parts_by_name[role["name"]] = fan
         fans = fans.fuse(fan)
 
     return fans, fan_parts_by_name
@@ -841,16 +852,16 @@ def create_part_fan_assembly(
     duct_front_mount_plate_thickness,
     duct_front_mount_plate_width,
     duct_front_mount_plate_width_border,
-    left_part_fan_parameters,
-    right_part_fan_parameters,
+    side_part_fan_parameters,
+    front_part_fan_parameters,
     BIG_THING,
 ):
     """Create the standalone part fan assembly."""
 
     big_thing = BIG_THING
     fans, fan_parts_by_name = _create_angled_fans(
-        left_part_fan_parameters=left_part_fan_parameters,
-        right_part_fan_parameters=right_part_fan_parameters,
+        side_part_fan_parameters=side_part_fan_parameters,
+        front_part_fan_parameters=front_part_fan_parameters,
         part_fan_window_cutter_outside_length=part_fan_window_cutter_outside_length,
         part_fan_body_cutter_clearance=part_fan_body_cutter_clearance,
         part_fan_mount_plate_thickness=part_fan_mount_plate_thickness,
