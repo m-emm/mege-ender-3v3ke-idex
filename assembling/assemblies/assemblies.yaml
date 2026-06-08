@@ -465,7 +465,7 @@ placement:
         center: nitehawk_board_left_assembly.CENTER
     - part: nitehawk_board_left_assembly
       to: sprite_extruder_left_assembly
-      alignment: LEFT
+      alignment: RIGHT
     - part: nitehawk_board_left_assembly
       to: sprite_extruder_left_assembly
       alignment: STACK_FRONT
@@ -496,7 +496,7 @@ placement:
         center: nitehawk_board_right_assembly.CENTER
     - part: nitehawk_board_right_assembly
       to: sprite_extruder_right_assembly
-      alignment: LEFT
+      alignment: RIGHT
     - part: nitehawk_board_right_assembly
       to: sprite_extruder_right_assembly
       alignment: STACK_FRONT

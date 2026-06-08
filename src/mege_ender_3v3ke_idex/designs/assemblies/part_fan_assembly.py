@@ -641,9 +641,7 @@ def _create_angled_fans(
             role["around_angle_sign"] * lr.sign * fan_parameters["around_angle"],
             axis=(0, 0, 1),
         )(fan)
-        fan = translate(0, -fan_parameters["y_offset"], fan_parameters["z_offset"])(
-            fan
-        )
+        fan = translate(0, -fan_parameters["y_offset"], fan_parameters["z_offset"])(fan)
         fan = fan.prefixed_copy(role["part_prefix"])
         fan_parts_by_name[role["name"]] = fan
         fans = fans.fuse(fan)

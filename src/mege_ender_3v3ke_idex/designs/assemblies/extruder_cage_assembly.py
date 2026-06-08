@@ -59,7 +59,7 @@ def create_extruder_cage_assembly(
     sprite_mount_base_plate = align(
         sprite_mount_base_plate,
         sprite_extruder,
-        Alignment.STACK_FRONT,
+        Alignment.STACK_BACK,
     )
     sprite_mount_base_plate = sprite_extruder.use_as_cutter_on(sprite_mount_base_plate)
     sprite_mount_base_plate = sprite_mount_base_plate.cut(sprite_extruder.leader)
@@ -198,7 +198,7 @@ def create_extruder_cage_assembly(
             tower_tip_radius,
             nitehawk_holder_mount_tower_height,
         )
-        tower = rotate(-90, axis=(1, 0, 0))(tower)
+        tower = rotate(90, axis=(1, 0, 0))(tower)
         tower = align(tower, board_hole, Alignment.CENTER, axes=[0, 2])
         tower = align(tower, nitehawk_pcb, Alignment.STACK_BACK)
 
@@ -219,9 +219,9 @@ def create_extruder_cage_assembly(
             extruder_cage_screw_size,
             tool_head_mount_sprite_mount_screw_length,
         )
-        screw = rotate(-90, axis=(1, 0, 0))(screw)
+        screw = rotate(90, axis=(1, 0, 0))(screw)
         screw = align(screw, hole_cutter, Alignment.CENTER)
-        screw = align(screw, tower, Alignment.FRONT)
+        screw = align(screw, nitehawk_board, Alignment.FRONT)
         screw = translate(0, -screw_record.cylinder_head_height, 0)(screw)
         nitehawk_mount_screws.append(screw)
 
@@ -263,32 +263,32 @@ def create_extruder_cage_assembly(
         nitehawk_rear_mount_plate
     )
 
-    right_mount_plate = create_filleted_box(
+    left_mount_plate = create_filleted_box(
         extruder_cage_mount_plate_thickness,
         tool_head_additional_mount_plate_depth,
         extruder_size[2],
         fillet_radius=extruder_cage_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.LEFT, Alignment.RIGHT, Alignment.TOP],
     )
-    right_mount_plate = align(
-        right_mount_plate,
+    left_mount_plate = align(
+        left_mount_plate,
         sprite_extruder,
         Alignment.CENTER,
     )
-    right_mount_plate = align(
-        right_mount_plate,
+    left_mount_plate = align(
+        left_mount_plate,
         sprite_extruder,
         Alignment.FRONT,
     )
-    right_mount_plate = align(
-        right_mount_plate,
+    left_mount_plate = align(
+        left_mount_plate,
         sprite_extruder,
         Alignment.BOTTOM,
     )
-    right_mount_plate = align(
-        right_mount_plate,
+    left_mount_plate = align(
+        left_mount_plate,
         sprite_extruder,
-        Alignment.STACK_RIGHT,
+        Alignment.STACK_LEFT,
         stack_gap=tool_head_additional_mount_plate_clearance,
     )
 
@@ -303,12 +303,12 @@ def create_extruder_cage_assembly(
 
         nitehawk_board_connector = align(
             nitehawk_board_connector,
-            right_mount_plate,
+            left_mount_plate,
             Alignment.CENTER,
         )
         nitehawk_board_connector = align(
             nitehawk_board_connector,
-            right_mount_plate,
+            left_mount_plate,
             Alignment.STACK_FRONT,
         )
 
@@ -326,43 +326,47 @@ def create_extruder_cage_assembly(
             nitehawk_board_connector
         )
 
-    right_mount_plate = right_mount_plate.fuse(nitehawk_board_connectors)
+    left_mount_plate = left_mount_plate.fuse(nitehawk_board_connectors)
 
-    right_mount_plate = sprite_extruder.use_as_cutter_on(right_mount_plate)
+    left_mount_plate = sprite_extruder.use_as_cutter_on(left_mount_plate)
 
-    left_mount_plate = create_box(
+    right_mount_plate = create_box(
         extruder_cage_mount_plate_thickness,
         BIG_THING,
         tool_head_additional_mount_plate_depth,
     )
-    left_mount_plate = align(
-        left_mount_plate,
+    right_mount_plate = align(
+        right_mount_plate,
         sprite_mount_base_plate,
         Alignment.CENTER,
     )
-    left_mount_plate = align(
-        left_mount_plate,
+    right_mount_plate = align(
+        right_mount_plate,
         sprite_extruder,
-        Alignment.STACK_LEFT,
+        Alignment.STACK_RIGHT,
         stack_gap=tool_head_additional_mount_plate_clearance,
     )
 
-    left_mount_plate = align(
-        left_mount_plate,
+    right_mount_plate = align(
+        right_mount_plate,
         sprite_mount_base_plate,
-        Alignment.STACK_BACK,
+        Alignment.STACK_FRONT,
     )
-    left_mount_plate = align(
-        left_mount_plate,
+    right_mount_plate = align(
+        right_mount_plate,
         sprite_mount_base_plate,
         Alignment.BOTTOM,
     )
 
-    left_mount_plate = fit_part_between(
-        left_mount_plate,
+    nitehawk_rear_mount_plate_shifted = translate(0, -nitehawk_plate_depth, 0)(
+        nitehawk_rear_mount_plate
+    )
+
+    right_mount_plate = fit_part_between(
+        right_mount_plate,
         cut_normal=(0, 1, 0),
-        limiting_start_part=sprite_mount_base_plate,
-        limiting_end_part=nitehawk_rear_mount_plate,
+        limiting_start_part=nitehawk_rear_mount_plate_shifted,
+        limiting_end_part=sprite_mount_base_plate,
     )
 
     back_strips = PartCollector()
@@ -389,14 +393,14 @@ def create_extruder_cage_assembly(
             limiting_end_part=part_fan_back_mount_plate,
         )
 
-        back_strip = translate(lr.sign * back_strip_inset, 0, 0)(back_strip)
+        back_strip = translate(-lr.sign * back_strip_inset, 0, 0)(back_strip)
         back_strips = back_strips.fuse(back_strip)
 
     cage_leader = sprite_mount_base_plate
-    cage_leader = cage_leader.fuse(right_mount_plate)
+    cage_leader = cage_leader.fuse(left_mount_plate)
     cage_leader = cage_leader.fuse(part_fan_back_mount_plate)
     cage_leader = cage_leader.fuse(nitehawk_rear_mount_plate)
-    cage_leader = cage_leader.fuse(left_mount_plate)
+    cage_leader = cage_leader.fuse(right_mount_plate)
     cage_leader = cage_leader.fuse(back_strips)
     cage_leader = sprite_extruder.use_as_cutter_on(cage_leader)
     for cutter in nitehawk_cutters.values():
@@ -404,7 +408,7 @@ def create_extruder_cage_assembly(
 
     cage = LeaderFollowersCuttersPart(cage_leader)
     cage.add_named_follower(sprite_mount_base_plate, "sprite_mount_base_plate")
-    cage.add_named_follower(right_mount_plate, "part_fan_side_mount_plate")
+    cage.add_named_follower(left_mount_plate, "part_fan_side_mount_plate")
     cage.add_named_follower(part_fan_back_mount_plate, "part_fan_back_mount_plate")
     cage.add_named_follower(nitehawk_rear_mount_plate, "nitehawk_rear_mount_plate")
 
