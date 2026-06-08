@@ -1,0 +1,149 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Lean animated visualization of the two X-axis tool heads
+
+Builder:
+  Collection: true
+
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - top
+        - left
+      width: 512
+      height: 512
+    parts:
+      - source: injected
+        assembly: x_axis_lower_profile
+        artifact: leader
+        name: x_axis_lower_profile
+      - source: injected
+        assembly: x_axis_top_profile
+        artifact: leader
+        name: x_axis_top_profile
+      - source: injected
+        assembly: x_axis_rail
+        artifact: leader
+        name: x_axis_rail
+
+      - source: injected
+        assembly: x_axis_left_carriage
+        artifact: all
+        name_template: "x_axis_left_carriage_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: sprite_extruder_left
+        artifact: all
+        name_template: "sprite_extruder_left_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: nitehawk_board_left
+        artifact: followers
+        name_template: "nitehawk_board_left_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: tool_head_left
+        artifact: all
+        name_template: "tool_head_left_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: tool_head_mount_machined_bottom
+        artifact: all
+        name_template: "tool_head_mount_machined_bottom_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: x_axis_belt_carriage_bottom
+        artifact: all
+        name_template: "x_axis_belt_carriage_bottom_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+
+      - source: injected
+        assembly: x_axis_right_carriage
+        artifact: all
+        name_template: "x_axis_right_carriage_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
+        assembly: sprite_extruder_right
+        artifact: all
+        name_template: "sprite_extruder_right_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
+        assembly: nitehawk_board_right
+        artifact: followers
+        name_template: "nitehawk_board_right_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
+        assembly: tool_head_right
+        artifact: all
+        name_template: "tool_head_right_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
+        assembly: tool_head_mount_machined_top
+        artifact: all
+        name_template: "tool_head_mount_machined_top_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
+        assembly: x_axis_belt_carriage_top
+        artifact: all
+        name_template: "x_axis_belt_carriage_top_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+
+  Production:
+    parts: []
+
+Parameters:
+  x_axis_x_travel:
+    Type: Float
+  x_axis_x_travel_negative:
+    Type: Float

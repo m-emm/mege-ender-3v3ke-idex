@@ -2359,6 +2359,45 @@ assemblies:
       electric_switchboard: electric_switchboard_assembly
       heatbed_psu_housing: heatbed_psu_housing_assembly
 
+  - name: tool_heads_assembly
+
+    resource_file: tool_heads_assembly.yaml
+    depends_on:
+      - x_axis_lower_profile_assembly
+      - x_axis_top_profile_assembly
+      - x_axis_rail_assembly
+      - x_axis_left_carriage_assembly
+      - x_axis_right_carriage_assembly
+      - sprite_extruder_left_assembly
+      - sprite_extruder_right_assembly
+      - nitehawk_board_left_assembly
+      - nitehawk_board_right_assembly
+      - tool_head_left_assembly
+      - tool_head_right_assembly
+      - tool_head_mount_machined_bottom_assembly
+      - tool_head_mount_machined_top_assembly
+      - x_axis_belt_carriage_bottom_assembly
+      - x_axis_belt_carriage_top_assembly
+    parameters:
+      x_axis_x_travel: !Ref x_axis_x_travel
+      x_axis_x_travel_negative: !Ref x_axis_x_travel_negative
+    inject_parts:
+      x_axis_lower_profile: x_axis_lower_profile_assembly
+      x_axis_top_profile: x_axis_top_profile_assembly
+      x_axis_rail: x_axis_rail_assembly
+      x_axis_left_carriage: x_axis_left_carriage_assembly
+      x_axis_right_carriage: x_axis_right_carriage_assembly
+      sprite_extruder_left: sprite_extruder_left_assembly
+      sprite_extruder_right: sprite_extruder_right_assembly
+      nitehawk_board_left: nitehawk_board_left_assembly
+      nitehawk_board_right: nitehawk_board_right_assembly
+      tool_head_left: tool_head_left_assembly
+      tool_head_right: tool_head_right_assembly
+      tool_head_mount_machined_bottom: tool_head_mount_machined_bottom_assembly
+      tool_head_mount_machined_top: tool_head_mount_machined_top_assembly
+      x_axis_belt_carriage_bottom: x_axis_belt_carriage_bottom_assembly
+      x_axis_belt_carriage_top: x_axis_belt_carriage_top_assembly
+
   - name: tool_head_mounts_collection_assembly
 
     depends_on:
