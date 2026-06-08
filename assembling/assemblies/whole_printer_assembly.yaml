@@ -339,7 +339,20 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: injected
-        assembly: tool_head_left
+        assembly: extruder_cage_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: part_fan_left
         artifact: all
         name_template: "{assembly_name}_{name}"
         animation:
@@ -404,7 +417,20 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: injected
-        assembly: tool_head_right
+        assembly: extruder_cage_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: part_fan_right
         artifact: all
         name_template: "{assembly_name}_{name}"
         animation:

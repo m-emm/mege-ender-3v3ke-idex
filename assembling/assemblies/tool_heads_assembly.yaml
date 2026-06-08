@@ -57,9 +57,18 @@ Builder:
             - 0
             - 0
       - source: injected
-        assembly: tool_head_left
+        assembly: extruder_cage_left
         artifact: all
-        name_template: "tool_head_left_{name}"
+        name_template: "extruder_cage_left_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: part_fan_left
+        artifact: all
+        name_template: "part_fan_left_{name}"
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
@@ -112,9 +121,18 @@ Builder:
             - 0
             - 0
       - source: injected
-        assembly: tool_head_right
+        assembly: extruder_cage_right
         artifact: all
-        name_template: "tool_head_right_{name}"
+        name_template: "extruder_cage_right_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
+        assembly: part_fan_right
+        artifact: all
+        name_template: "part_fan_right_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
