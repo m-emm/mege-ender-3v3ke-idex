@@ -14,7 +14,7 @@ from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly import (
 from mege_ender_3v3ke_idex.designs.assemblies.sprite_extruder_assembly import (
     create_sprite_extruder_assembly,
 )
-from shellforgepy.simple import get_bounding_box_center
+from shellforgepy.simple import get_bounding_box, get_bounding_box_center
 
 
 def _current_blower_path_kwargs():
@@ -99,6 +99,7 @@ def test_part_fans_use_physical_side_and_front_roles():
     hotend_center = get_bounding_box_center(
         sprite_extruder.get_named_non_production_part("hotend")
     )
+    sprite_body_bbox = get_bounding_box(sprite_extruder.leader)
     side_fan_center = get_bounding_box_center(
         part_fans.get_named_non_production_part("side_fan")
     )
@@ -109,3 +110,6 @@ def test_part_fans_use_physical_side_and_front_roles():
     assert side_fan_center[0] > hotend_center[0]
     assert side_fan_center[1] < hotend_center[1]
     assert front_fan_center[1] < hotend_center[1]
+    assert abs(front_fan_center[0] - hotend_center[0]) < DEFAULTS["part_fan_size"] / 2
+    assert side_fan_center[1] >= sprite_body_bbox[0][1] - DEFAULTS["part_fan_size"] / 2
+    assert front_fan_center[1] >= sprite_body_bbox[0][1] - DEFAULTS["part_fan_size"] / 2

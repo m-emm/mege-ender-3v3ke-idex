@@ -57,11 +57,12 @@ def _recut_delta(part, cutter):
 def _place_nitehawk_board_like_graph(nitehawk_board, sprite_extruder):
     nitehawk_board = rotate(-90, axis=(1, 0, 0))(nitehawk_board)
     nitehawk_board = rotate(180, axis=(0, 1, 0))(nitehawk_board)
+    nitehawk_board = rotate(180, axis=(0, 0, 1))(nitehawk_board)
     nitehawk_board = align(nitehawk_board, sprite_extruder, Alignment.LEFT)
     nitehawk_board = align(
         nitehawk_board,
         sprite_extruder,
-        Alignment.STACK_BACK,
+        Alignment.STACK_FRONT,
         stack_gap=DEFAULTS["nitehawk_board_extruder_back_gap"],
     )
     nitehawk_board = align(nitehawk_board, sprite_extruder, Alignment.BOTTOM)
@@ -127,6 +128,12 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
     hotend_center = get_bounding_box_center(
         sprite_extruder.get_named_non_production_part("hotend")
     )
+    lever_center = get_bounding_box_center(
+        sprite_extruder.get_named_non_production_part("lever")
+    )
+    built_in_fan_center = get_bounding_box_center(
+        sprite_extruder.get_named_non_production_part("fan")
+    )
     sprite_extruder_body_size = get_bounding_box_size(sprite_extruder.leader)
     sprite_mount_base_plate = cage.get_follower_part_by_name("sprite_mount_base_plate")
     side_mount_plate = cage.get_follower_part_by_name("part_fan_side_mount_plate")
@@ -141,9 +148,14 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
     assert side_mount_plate_size[0] == pytest.approx(mount_plate_thickness)
     assert front_mount_plate_size[0] == pytest.approx(sprite_extruder_body_size[0])
     assert front_mount_plate_size[1] == pytest.approx(mount_plate_thickness)
-    assert hotend_center[0] > sprite_extruder_center[0]
-    assert hotend_center[1] < sprite_extruder_center[1]
+    assert hotend_center[0] < sprite_extruder_center[0]
+    assert hotend_center[1] > sprite_extruder_center[1]
+    assert lever_center[0] < sprite_extruder_center[0]
+    assert lever_center[1] > sprite_extruder_center[1]
+    assert built_in_fan_center[0] < sprite_extruder_center[0]
+    assert built_in_fan_center[1] > sprite_extruder_center[1]
     assert side_mount_plate_bbox[0][0] >= sprite_extruder_bbox[1][0] - 1e-6
+    assert side_mount_plate_bbox[1][1] <= sprite_extruder_center[1] + 1e-6
     assert front_mount_plate_bbox[1][1] <= sprite_extruder_bbox[0][1] + 1e-6
 
     nitehawk_hole_0_center = get_bounding_box_center(
@@ -171,7 +183,7 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
     ]
 
     assert nitehawk_hole_0_center[0] < nitehawk_hole_1_center[0]
-    assert nitehawk_mount_plate_bbox[0][1] >= sprite_extruder_bbox[1][1] - 1e-6
+    assert nitehawk_mount_plate_bbox[1][1] <= sprite_extruder_bbox[0][1] + 1e-6
     assert nitehawk_hole_1_center[0] - nitehawk_hole_0_center[0] == pytest.approx(
         cage_kwargs["nitehawk_holes_center_distance"]
     )
@@ -184,9 +196,9 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
     ):
         assert cage_hole_center[0] == pytest.approx(board_hole_center[0])
         assert cage_hole_center[2] == pytest.approx(board_hole_center[2])
-    assert nitehawk_mount_plate_bbox[1][1] == pytest.approx(nitehawk_pcb_bbox[0][1])
+    assert nitehawk_mount_plate_bbox[0][1] == pytest.approx(nitehawk_pcb_bbox[1][1])
 
-    board_translation = (3, 4, 2)
+    board_translation = (3, -4, 2)
     shifted_nitehawk_board = translate(*board_translation)(nitehawk_board)
     shifted_cage = create_extruder_cage_assembly(
         **assembly_kwargs(
@@ -545,6 +557,15 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         board = f"nitehawk_board_{side}_assembly"
         sprite_extruder = f"sprite_extruder_{side}_assembly"
 
+        board_z_rotation = next(
+            placement
+            for placement in placements
+            if placement.get("part") == board
+            and placement.get("post_rotation", {}).get("angle") == 180
+            and placement.get("post_rotation", {}).get("axis") == [0, 0, 1]
+        )
+        assert board_z_rotation["post_rotation"]["center"] == f"{board}.CENTER"
+
         left_alignment = next(
             placement
             for placement in placements
@@ -552,14 +573,14 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         )
         assert left_alignment["to"] == sprite_extruder
 
-        back_alignment = next(
+        front_alignment = next(
             placement
             for placement in placements
             if placement.get("part") == board
-            and placement.get("alignment") == "STACK_BACK"
+            and placement.get("alignment") == "STACK_FRONT"
         )
-        assert back_alignment["to"] == sprite_extruder
-        assert back_alignment["stack_gap"] == {
+        assert front_alignment["to"] == sprite_extruder
+        assert front_alignment["stack_gap"] == {
             "$ref": "nitehawk_board_extruder_back_gap"
         }
 

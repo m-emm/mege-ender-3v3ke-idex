@@ -49,9 +49,8 @@ def create_sprite_extruder_assembly(
     front = LeaderFollowersCuttersPart(front_compound.get_named_follower("body"))
     front = front.merge_except_leader(front_compound)
 
-    front = rotate(180, axis=(0, 0, 1))(front)
     front = align(front, motor, Alignment.CENTER)
-    front = align(front, motor, Alignment.STACK_FRONT)
+    front = align(front, motor, Alignment.STACK_BACK)
 
     cooler_height = 13.6
     front_size = get_bounding_box_size(front)
@@ -69,13 +68,13 @@ def create_sprite_extruder_assembly(
         groove_cutter = groove_cutter.fuse(groove)
 
     groove_cutter = align(groove_cutter, cooler, Alignment.CENTER)
-    groove_cutter = align(groove_cutter, cooler, Alignment.FRONT)
+    groove_cutter = align(groove_cutter, cooler, Alignment.BACK)
     groove_cutter = align(groove_cutter, cooler, Alignment.BOTTOM)
     groove_cutter = translate(0, 0, cooler_groove_width)(groove_cutter)
 
     cooler = cooler.cut(groove_cutter)
     cooler = align(cooler, front, Alignment.CENTER)
-    cooler = align(cooler, front, Alignment.FRONT)
+    cooler = align(cooler, front, Alignment.BACK)
 
     cooler_cutter = create_box(*get_bounding_box_size(cooler))
     cooler_cutter = align(cooler_cutter, cooler, Alignment.CENTER)
@@ -83,6 +82,8 @@ def create_sprite_extruder_assembly(
     front = front.fuse(cooler)
 
     mount_hole_cutter = motor_composite.get_named_cutter("mount_holes")
+    mount_hole_cutter = align(mount_hole_cutter, motor, Alignment.CENTER, axes=[0, 2])
+    mount_hole_cutter = align(mount_hole_cutter, motor, Alignment.STACK_BACK)
 
     side_holes_drills = PartCollector()
     hot_side_hole_radius = MScrew.from_size(extruder_mount_screw_size).core_hole / 2
@@ -94,16 +95,16 @@ def create_sprite_extruder_assembly(
     hot_side_hole = rotate(90, axis=(0, 1, 0))(hot_side_hole)
     hot_side_hole = align(hot_side_hole, front, Alignment.CENTER)
     hot_side_hole = align(hot_side_hole, front, Alignment.TOP)
-    hot_side_hole = align(hot_side_hole, front, Alignment.FRONT)
+    hot_side_hole = align(hot_side_hole, front, Alignment.BACK)
     hot_side_hole = align(
         hot_side_hole,
         front,
-        Alignment.STACK_LEFT,
+        Alignment.STACK_RIGHT,
         stack_gap=-side_holes_depth,
     )
     hot_side_hole = translate(
         0,
-        -hot_side_hole_radius / 2,
+        hot_side_hole_radius / 2,
         hot_side_hole_radius / 2,
     )(hot_side_hole)
 
@@ -113,7 +114,7 @@ def create_sprite_extruder_assembly(
     for i in [0, 1]:
         current_side_hole = translate(
             0,
-            hot_side_holes_back_holes_z_distance,
+            -hot_side_holes_back_holes_z_distance,
             -hot_side_holes_back_distance - i * hot_side_holes_y_pitch,
         )(hot_side_hole)
         side_holes_drills = side_holes_drills.fuse(current_side_hole)
@@ -129,7 +130,7 @@ def create_sprite_extruder_assembly(
         hot_side_mount_hole = align(
             hot_side_mount_hole,
             front,
-            Alignment.STACK_LEFT,
+            Alignment.STACK_RIGHT,
         )
         hot_side_mount_holes.append(hot_side_mount_hole)
 
@@ -141,7 +142,7 @@ def create_sprite_extruder_assembly(
         )
         current_side_hole = translate(
             0,
-            top_distance,
+            -top_distance,
             -hot_side_holes_back_distance - i * hot_side_holes_y_pitch,
         )(hot_side_hole)
         side_holes_drills = side_holes_drills.fuse(current_side_hole)
@@ -157,7 +158,7 @@ def create_sprite_extruder_assembly(
         hot_side_mount_hole = align(
             hot_side_mount_hole,
             front,
-            Alignment.STACK_LEFT,
+            Alignment.STACK_RIGHT,
         )
         hot_side_mount_holes.append(hot_side_mount_hole)
 
@@ -168,7 +169,7 @@ def create_sprite_extruder_assembly(
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         for fb in [Alignment.FRONT, Alignment.BACK]:
             for tb in [Alignment.TOP, Alignment.BOTTOM]:
-                if tb == Alignment.TOP and lr == Alignment.RIGHT:
+                if tb == Alignment.TOP and lr == Alignment.LEFT:
                     continue
 
                 hole = create_cylinder(hot_side_hole_radius, big_thing)
@@ -182,7 +183,7 @@ def create_sprite_extruder_assembly(
                 )
                 hole = translate(
                     0,
-                    -tb.sign * motor_hole_z_pitch / 2,
+                    tb.sign * motor_hole_z_pitch / 2,
                     fb.sign * motor_hole_y_pitch / 2,
                 )(hole)
                 motor_hole_drills = motor_hole_drills.fuse(hole)
@@ -237,11 +238,11 @@ def create_sprite_extruder_assembly(
     hotend = rotate(180, axis=(1, 0, 0))(hotend)
     hotend = align(hotend, cooler, Alignment.CENTER)
     hotend = align(hotend, retval, Alignment.STACK_BOTTOM)
-    hotend = align(hotend, retval, Alignment.FRONT)
-    hotend = align(hotend, retval, Alignment.RIGHT)
+    hotend = align(hotend, retval, Alignment.BACK)
+    hotend = align(hotend, retval, Alignment.LEFT)
     hotend = translate(
-        -hotend_x_distance_from_right_edge + hotend_diameter / 2,
-        nozzle_y_offset - hotend_diameter / 2,
+        hotend_x_distance_from_right_edge - hotend_diameter / 2,
+        -nozzle_y_offset + hotend_diameter / 2,
         0,
     )(hotend)
 
@@ -257,8 +258,8 @@ def create_sprite_extruder_assembly(
     lever = create_box(lever_thickness, lever_width, lever_length)
     lever = align(lever, front, Alignment.CENTER)
     lever = align(lever, front, Alignment.STACK_TOP)
-    lever = align(lever, front, Alignment.FRONT)
-    lever = translate(lever_center_offset, 0, lever_front_inset)(lever)
+    lever = align(lever, front, Alignment.BACK)
+    lever = translate(-lever_center_offset, 0, lever_front_inset)(lever)
 
     lever_bbox = get_bounding_box(lever)
     lever_rotation_center = (
@@ -268,10 +269,10 @@ def create_sprite_extruder_assembly(
     )
     lever = rotate(
         -lever_angle,
-        axis=(0, -1, 0),
+        axis=(0, 1, 0),
         center=lever_rotation_center,
     )(lever)
-    lever = translate(lever_center_offset, lever_front_inset, 0)(lever)
+    lever = translate(-lever_center_offset, -lever_front_inset, 0)(lever)
     retval.add_named_non_production_part(lever, "lever")
 
     fan_size = 30
@@ -292,8 +293,8 @@ def create_sprite_extruder_assembly(
     fan = fan.cut(fan_hole_cutter)
 
     fan = align(fan, front, Alignment.CENTER)
-    fan = align(fan, front, Alignment.FRONT)
-    fan = align(fan, front, Alignment.STACK_RIGHT)
+    fan = align(fan, front, Alignment.BACK)
+    fan = align(fan, front, Alignment.STACK_LEFT)
     retval.add_named_non_production_part(fan, "fan")
     retval.add_named_cutter(mount_hole_cutter, "mount_hole_cutter")
 

@@ -459,11 +459,16 @@ placement:
         axis: [0, 1, 0]
         center: nitehawk_board_left_assembly.CENTER
     - part: nitehawk_board_left_assembly
+      post_rotation:
+        angle: 180
+        axis: [0, 0, 1]
+        center: nitehawk_board_left_assembly.CENTER
+    - part: nitehawk_board_left_assembly
       to: sprite_extruder_left_assembly
       alignment: LEFT
     - part: nitehawk_board_left_assembly
       to: sprite_extruder_left_assembly
-      alignment: STACK_BACK
+      alignment: STACK_FRONT
       stack_gap:
         $ref: nitehawk_board_extruder_back_gap
     - part: nitehawk_board_left_assembly
@@ -485,11 +490,16 @@ placement:
         axis: [0, 1, 0]
         center: nitehawk_board_right_assembly.CENTER
     - part: nitehawk_board_right_assembly
+      post_rotation:
+        angle: 180
+        axis: [0, 0, 1]
+        center: nitehawk_board_right_assembly.CENTER
+    - part: nitehawk_board_right_assembly
       to: sprite_extruder_right_assembly
       alignment: LEFT
     - part: nitehawk_board_right_assembly
       to: sprite_extruder_right_assembly
-      alignment: STACK_BACK
+      alignment: STACK_FRONT
       stack_gap:
         $ref: nitehawk_board_extruder_back_gap
     - part: nitehawk_board_right_assembly
