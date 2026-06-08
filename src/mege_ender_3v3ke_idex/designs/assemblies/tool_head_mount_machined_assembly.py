@@ -79,6 +79,7 @@ def create_tool_head_mount_machined_assembly(
 
     screw_hole_diameter = MScrew.from_size(screw_size).clearance_hole_loose
 
+    drills = {}
     for lr in [Alignment.RIGHT, Alignment.LEFT]:
 
         for fb in [Alignment.FRONT, Alignment.BACK]:
@@ -94,6 +95,8 @@ def create_tool_head_mount_machined_assembly(
 
             carriage_mount_plate = carriage_mount_plate.cut(drill)
 
+            drills[f"hole_drill_{lr.name}_{fb.name}"] = drill
+
             if fb == Alignment.BACK:
                 drill = create_cylinder(screw_hole_diameter / 2, 100)
 
@@ -106,6 +109,8 @@ def create_tool_head_mount_machined_assembly(
 
                 carriage_mount_plate = carriage_mount_plate.cut(drill)
 
+                drills[f"hole_drill_{lr.name}_{fb.name}_extra"] = drill
+
     if record_metrics:
         record_weight_metric(
             TOOL_HEAD_MOUNT_MACHINED_METRICS_ID,
@@ -114,4 +119,9 @@ def create_tool_head_mount_machined_assembly(
             part_id="tool_head_mount_machined",
         )
 
-    return LeaderFollowersCuttersPart(leader=carriage_mount_plate)
+    retval = LeaderFollowersCuttersPart(leader=carriage_mount_plate)
+
+    for name, drill in drills.items():
+        retval.add_named_cutter(drill, name)
+
+    return retval

@@ -882,7 +882,7 @@ globals:
   part_fan_window_width: 28
   side_part_fan_parameters:
     around_angle: 0
-    x_offset: 29.5
+    x_offset: 29.0
     y_offset: 35
     z_offset: 6
     rotation: 90

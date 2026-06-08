@@ -932,6 +932,41 @@ def create_part_fan_assembly(
         duct_back_mount_plate_width=duct_back_mount_plate_width,
         duct_back_mount_plate_width_border=duct_back_mount_plate_width_border,
     )
+
+    side_fan_mount_plate = fans.get_named_follower("part_fan_side_mount_plate")
+
+    side_fan_mount_plate_size = get_bounding_box_size(side_fan_mount_plate)
+
+    side_fan_mount_plate_height = side_fan_mount_plate_size[2]
+
+    side_fan_mount_eye = create_filleted_box(
+        side_fan_mount_plate_size[0],
+        8,
+        side_fan_mount_plate_height / 3,
+        fillet_radius=2,
+        no_fillets_at=[Alignment.RIGHT, Alignment.LEFT, Alignment.FRONT],
+    )
+    side_fan_mount_eye = align(
+        side_fan_mount_eye, side_fan_mount_plate, Alignment.CENTER
+    )
+    side_fan_mount_eye = align(
+        side_fan_mount_eye, side_fan_mount_plate, Alignment.STACK_BACK
+    )
+    side_fan_mount_eye = align(side_fan_mount_eye, side_fan_mount_plate, Alignment.TOP)
+    side_fan_mount_eye = translate(0, 0, -side_fan_mount_plate_height / 8)(
+        side_fan_mount_eye
+    )
+
+    side_fan_mount_eye = align(
+        side_fan_mount_eye,
+        sprite_extruder,
+        Alignment.STACK_RIGHT,
+        stack_gap=tool_head_additional_mount_plate_clearance,
+    )
+
+    side_fan_mount_eye = sprite_extruder.use_as_cutter_on(side_fan_mount_eye)
+    blower_ducts = blower_ducts.fuse(side_fan_mount_eye)
+
     blower_ducts = blower_ducts.cut(expand(fans.leader, part_fan_clearance))
     blower_ducts_index = fans.follower_indices_by_name["blower_ducts"]
     fans.followers[blower_ducts_index] = blower_ducts

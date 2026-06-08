@@ -413,6 +413,7 @@ def create_extruder_cage_assembly(
         limiting_start_part=tool_head_mount_machined,
         limiting_end_part=right_mount_plate,
     )
+    right_flange =  tool_head_mount_machined.use_as_cutter_on(right_flange)
 
     left_mount_plate_bbox = get_bounding_box(left_mount_plate)
     left_mount_plate_bbox_size = get_bounding_box_size(left_mount_plate)
@@ -436,6 +437,8 @@ def create_extruder_cage_assembly(
         limiting_start_part=right_mount_plate,
         limiting_end_part=tool_head_mount_machined,
     )
+
+    left_flange =  tool_head_mount_machined.use_as_cutter_on(left_flange)
 
     flange_size = get_bounding_box_size(left_flange)
 
