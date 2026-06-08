@@ -677,26 +677,24 @@ def _extend_blower_ducts(
     duct_back_mount_plate_width,
     duct_back_mount_plate_width_border,
 ):
-    side_mount_plate = create_filleted_box(
+    side_mount_plate = create_box(
         tool_head_additional_mount_plate_thickness,
         tool_head_additional_mount_plate_depth,
-        tool_head_additional_mount_plate_height,
-        tool_head_additional_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.LEFT, Alignment.RIGHT, Alignment.BOTTOM],
+        tool_head_additional_mount_plate_height,        
     )
     side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.CENTER)
-    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.BACK)
-    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.BOTTOM)
+    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.FRONT)
+    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.STACK_BOTTOM)
     side_mount_plate = align(
         side_mount_plate,
         sprite_extruder,
-        Alignment.STACK_RIGHT,
+        Alignment.STACK_LEFT,
         stack_gap=tool_head_additional_mount_plate_clearance,
     )
     side_mount_plate = translate(
         0,
         tool_head_additional_mount_plate_depth_offset,
-        tool_head_additional_mount_plate_z_offset,
+        0,
     )(side_mount_plate)
     blower_ducts = blower_ducts.fuse(side_mount_plate)
 
