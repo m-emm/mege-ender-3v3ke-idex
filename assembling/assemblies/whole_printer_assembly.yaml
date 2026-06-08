@@ -352,19 +352,6 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: injected
-        assembly: tool_head_mount_bottom
-        artifact: all
-        name_template: "{assembly_name}_{name}"
-        animation:
-          x_carriage_1:
-            - { $ref: x_axis_x_travel }
-            - 0
-            - 0
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: injected
         assembly: x_axis_belt_carriage_bottom
         artifact: all
         name_template: "{assembly_name}_{name}"
@@ -405,19 +392,6 @@ Builder:
             - { $ref: z_axis_z_travel }
       - source: injected
         assembly: tool_head_right
-        artifact: all
-        name_template: "{assembly_name}_{name}"
-        animation:
-          x_carriage_2:
-            - { $ref: x_axis_x_travel_negative }
-            - 0
-            - 0
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: injected
-        assembly: tool_head_mount_top
         artifact: all
         name_template: "{assembly_name}_{name}"
         animation:
