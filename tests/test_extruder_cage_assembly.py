@@ -304,6 +304,29 @@ def test_extruder_cage_side_variants_use_visualization_dependencies_only():
             } in visualization_parts
 
     placements = config["placement"]["alignments"]
+    assemblies_yaml_text = (ASSEMBLIES_DIR / "assemblies.yaml").read_text()
+
+    assert "x_axis_sprite_extruder_carriage_x_offset" not in DEFAULTS
+    assert "x_axis_sprite_extruder_carriage_x_offset" not in assemblies_yaml_text
+    assert DEFAULTS["x_axis_left_sprite_extruder_carriage_x_offset"] == pytest.approx(
+        -21.1
+    )
+    assert DEFAULTS["x_axis_right_sprite_extruder_carriage_x_offset"] == pytest.approx(
+        18
+    )
+
+    expected_sprite_x_offsets = {
+        "sprite_extruder_left_assembly": "x_axis_left_sprite_extruder_carriage_x_offset",
+        "sprite_extruder_right_assembly": "x_axis_right_sprite_extruder_carriage_x_offset",
+    }
+    for sprite_extruder, offset_parameter in expected_sprite_x_offsets.items():
+        right_alignment = next(
+            placement
+            for placement in placements
+            if placement.get("part") == sprite_extruder
+            and placement.get("alignment") == "RIGHT"
+        )
+        assert right_alignment["post_translation"][0] == {"$ref": offset_parameter}
 
     for side, injected_context in expected_true_inputs.items():
         visual_context = expected_visual_context[side]

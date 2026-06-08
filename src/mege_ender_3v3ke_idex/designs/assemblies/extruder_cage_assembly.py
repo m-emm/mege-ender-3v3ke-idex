@@ -265,7 +265,7 @@ def create_extruder_cage_assembly(
     right_mount_plate = create_filleted_box(
         extruder_cage_mount_plate_thickness,
         tool_head_additional_mount_plate_depth,
-        extruder_size[2] + extruder_cage_top_right_bridge_clearance,
+        extruder_size[2],
         fillet_radius=extruder_cage_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.LEFT, Alignment.RIGHT, Alignment.TOP],
     )
@@ -391,53 +391,12 @@ def create_extruder_cage_assembly(
         front_strip = translate(-lr.sign * front_strip_inset, 0, 0)(front_strip)
         front_strips = front_strips.fuse(front_strip)
 
-    top_right_bridge = create_box(
-        tool_head_additional_mount_plate_depth,
-        extruder_size[1] + extruder_cage_mount_plate_thickness,
-        extruder_cage_mount_plate_thickness,
-    )
-    top_right_bridge = align(top_right_bridge, sprite_extruder, Alignment.CENTER)
-
-    top_right_bridge = align(
-        top_right_bridge,
-        sprite_extruder,
-        Alignment.STACK_TOP,
-        stack_gap=extruder_cage_top_right_bridge_clearance,
-    )
-
-    top_right_bridge = align(top_right_bridge, sprite_extruder, Alignment.STACK_RIGHT)
-    top_right_bridge = align(top_right_bridge, sprite_mount_base_plate, Alignment.FRONT)
-
-    top_right_bridge_connector = create_box(
-        tool_head_additional_mount_plate_depth,
-        extruder_cage_mount_plate_thickness,
-        tool_head_mount_base_plate_height + extruder_cage_top_right_bridge_clearance,
-    )
-
-    top_right_bridge_connector = align(
-        top_right_bridge_connector,
-        top_right_bridge,
-        Alignment.CENTER,
-    )
-    top_right_bridge_connector = align(
-        top_right_bridge_connector,
-        top_right_bridge,
-        Alignment.FRONT,
-    )
-    top_right_bridge_connector = align(
-        top_right_bridge_connector,
-        top_right_bridge,
-        Alignment.STACK_BOTTOM,
-    )
-    top_right_bridge = top_right_bridge.fuse(top_right_bridge_connector)
-
     cage_leader = sprite_mount_base_plate
     cage_leader = cage_leader.fuse(right_mount_plate)
     cage_leader = cage_leader.fuse(part_fan_front_mount_plate)
     cage_leader = cage_leader.fuse(nitehawk_rear_mount_plate)
     cage_leader = cage_leader.fuse(left_mount_plate)
     cage_leader = cage_leader.fuse(front_strips)
-    cage_leader = cage_leader.fuse(top_right_bridge)
     cage_leader = sprite_extruder.use_as_cutter_on(cage_leader)
     for cutter in nitehawk_cutters.values():
         cage_leader = cage_leader.cut(cutter)

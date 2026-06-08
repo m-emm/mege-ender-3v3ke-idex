@@ -475,7 +475,8 @@ placement:
       to: x_axis_left_carriage_assembly
       alignment: RIGHT
       post_translation:
-        - $ref: x_axis_sprite_extruder_carriage_x_offset
+        - $expr:
+            "$sub": "-1 * ${x_axis_right_sprite_extruder_carriage_x_offset}"
         - 0
         - 0
     - part: sprite_extruder_left_assembly
