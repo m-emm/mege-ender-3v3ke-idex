@@ -395,12 +395,75 @@ def create_extruder_cage_assembly(
         back_strip = translate(-lr.sign * back_strip_inset, 0, 0)(back_strip)
         back_strips = back_strips.fuse(back_strip)
 
+    top_strip_size = get_bounding_box_size(right_mount_plate)
+
+    top_strip_bbox_min_x = get_bounding_box(right_mount_plate)[0][0]
+    tool_head_mount_machined_bbox = get_bounding_box(tool_head_mount_machined)
+    tool_head_mount_machined_max_x = tool_head_mount_machined_bbox[1][0]
+
+    left_flange_width = tool_head_mount_machined_max_x - top_strip_bbox_min_x
+
+    right_flange = create_box(left_flange_width, top_strip_size[1], BIG_THING)
+    right_flange = align(right_flange, right_mount_plate, Alignment.CENTER)
+    right_flange = align(right_flange, right_mount_plate, Alignment.LEFT)
+
+    right_flange = fit_part_between(
+        right_flange,
+        cut_normal=(0, 0, 1),
+        limiting_start_part=tool_head_mount_machined,
+        limiting_end_part=right_mount_plate,
+    )
+
+    left_mount_plate_bbox = get_bounding_box(left_mount_plate)
+    left_mount_plate_bbox_size = get_bounding_box_size(left_mount_plate)
+    left_mount_plate_max_x = left_mount_plate_bbox[1][0]
+    tool_head_mount_machined_min_x = tool_head_mount_machined_bbox[0][0]
+
+    left_flange_width = left_mount_plate_max_x - tool_head_mount_machined_min_x
+
+    left_flange = create_box(
+        left_flange_width,
+        left_mount_plate_bbox_size[1] + extruder_cage_mount_plate_thickness,
+        BIG_THING,
+    )
+    left_flange = align(left_flange, left_mount_plate, Alignment.CENTER)
+    left_flange = align(left_flange, left_mount_plate, Alignment.BACK)
+    left_flange = align(left_flange, left_mount_plate, Alignment.RIGHT)
+
+    left_flange = fit_part_between(
+        left_flange,
+        cut_normal=(0, 0, 1),
+        limiting_start_part=right_mount_plate,
+        limiting_end_part=tool_head_mount_machined,
+    )
+
+    flange_size = get_bounding_box_size(left_flange)
+
+    left_flange_min_x = get_bounding_box(left_flange)[0][0]
+    right_flange_max_x = get_bounding_box(right_flange)[1][0]
+
+    flange_connector_width = right_flange_max_x - left_flange_min_x
+
+    flange_connector = create_box(
+        flange_connector_width, extruder_cage_mount_plate_thickness, flange_size[2]
+    )
+    flange_connector = align(flange_connector, left_flange, Alignment.LEFT)
+
+    flange_connector = align(flange_connector, left_flange, Alignment.FRONT)
+    flange_connector = align(
+        flange_connector, tool_head_mount_machined, Alignment.STACK_BOTTOM
+    )
+
     cage_leader = sprite_mount_base_plate
     cage_leader = cage_leader.fuse(left_mount_plate)
     cage_leader = cage_leader.fuse(part_fan_back_mount_plate)
     cage_leader = cage_leader.fuse(nitehawk_rear_mount_plate)
     cage_leader = cage_leader.fuse(right_mount_plate)
     cage_leader = cage_leader.fuse(back_strips)
+    cage_leader = cage_leader.fuse(right_flange)
+    cage_leader = cage_leader.fuse(left_flange)
+    cage_leader = cage_leader.fuse(flange_connector)
+
     cage_leader = sprite_extruder.use_as_cutter_on(cage_leader)
     for cutter in nitehawk_cutters.values():
         cage_leader = cage_leader.cut(cutter)

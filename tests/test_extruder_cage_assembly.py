@@ -418,7 +418,7 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
             index
             for index, placement in enumerate(placements)
             if placement.get("to") == sprite_extruder
-            and {cage, part_fan, board}.issubset(set(placement.get("rigid_group", [])))
+            and {cage, part_fan}.issubset(set(placement.get("rigid_group", [])))
         ]
         assert len(downstream_sprite_group_indices) == 1
         assert machined_group_index < downstream_sprite_group_indices[0]

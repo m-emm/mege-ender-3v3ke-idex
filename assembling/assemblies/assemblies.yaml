@@ -466,6 +466,12 @@ placement:
     - part: nitehawk_board_left_assembly
       to: sprite_extruder_left_assembly
       alignment: RIGHT
+
+      post_translation:
+        - $ref: nitehawk_board_sprite_extruder_x_offset
+        - 0
+        - 0
+
     - part: nitehawk_board_left_assembly
       to: sprite_extruder_left_assembly
       alignment: STACK_FRONT
@@ -478,6 +484,10 @@ placement:
         - 0
         - 0
         - $ref: nitehawk_board_extruder_body_bottom_offset
+
+    - rigid_group:
+        - nitehawk_board_left_assembly
+      to: sprite_extruder_left_assembly
 
     - part: nitehawk_board_right_assembly
       post_rotation:
@@ -515,15 +525,17 @@ placement:
         - $ref: nitehawk_board_extruder_body_bottom_offset
 
     - rigid_group:
+        - nitehawk_board_right_assembly
+      to: sprite_extruder_right_assembly
+
+    - rigid_group:
         - extruder_cage_left_assembly
         - part_fan_left_assembly
-        - nitehawk_board_left_assembly
       to: sprite_extruder_left_assembly
 
     - rigid_group:
         - extruder_cage_right_assembly
         - part_fan_right_assembly
-        - nitehawk_board_right_assembly
       to: sprite_extruder_right_assembly
 
     - rigid_group:
