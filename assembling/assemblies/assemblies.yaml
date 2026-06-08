@@ -271,6 +271,69 @@ placement:
         - x_axis_right_carriage_assembly
       to: x_axis_rail_assembly
 
+    - part: sprite_extruder_left_assembly
+      post_rotation:
+        angle: 180
+        axis: [0, 0, 1]
+        center: sprite_extruder_left_assembly.CENTER
+    - part: sprite_extruder_left_assembly
+      to: x_axis_left_carriage_assembly
+      alignment: RIGHT
+      post_translation:
+        - "$ref": x_axis_left_sprite_extruder_carriage_x_offset
+        - 0
+        - 0
+    - part: sprite_extruder_left_assembly
+      to: x_axis_left_carriage_assembly
+      alignment: STACK_FRONT
+      stack_gap:
+        $ref: x_axis_sprite_extruder_carriage_stack_gap
+    - part: sprite_extruder_left_assembly
+      to: x_axis_rail_assembly
+      alignment: TOP
+      post_translation:
+        - 0
+        - 0
+        - $ref: x_axis_sprite_extruder_rail_z_offset
+    - rigid_group:
+        - sprite_extruder_left_assembly
+      to: x_axis_left_carriage_assembly
+
+    - part: sprite_extruder_right_assembly
+      post_rotation:
+        angle: 180
+        axis: [0, 0, 1]
+        center: sprite_extruder_right_assembly.CENTER
+    - part: sprite_extruder_right_assembly
+      to: x_axis_right_carriage_assembly
+      alignment: RIGHT
+      post_translation:
+        - "$ref": x_axis_right_sprite_extruder_carriage_x_offset
+        - 0
+        - 0
+    - part: sprite_extruder_right_assembly
+      to: x_axis_right_carriage_assembly
+      alignment: STACK_FRONT
+      stack_gap:
+        $ref: x_axis_sprite_extruder_carriage_stack_gap
+    - part: sprite_extruder_right_assembly
+      to: x_axis_rail_assembly
+      alignment: TOP
+      post_translation:
+        - 0
+        - 0
+        - $ref: x_axis_sprite_extruder_rail_z_offset
+    - rigid_group:
+        - sprite_extruder_right_assembly
+      to: x_axis_right_carriage_assembly
+
+    - rigid_group:
+        - tool_head_mount_machined_bottom_assembly
+      to: x_axis_left_carriage_assembly
+    - rigid_group:
+        - tool_head_mount_machined_top_assembly
+      to: x_axis_right_carriage_assembly
+
     - part: z_axis_profile_left_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left
       alignment: CENTER
@@ -464,65 +527,6 @@ placement:
         - x_axis_carriage_stopper_right_assembly
       to: x_axis_rail_assembly
 
-    - part: sprite_extruder_left_assembly
-      post_rotation:
-        angle: 180
-        axis: [0, 0, 1]
-        center: sprite_extruder_left_assembly.CENTER
-    - part: sprite_extruder_left_assembly
-      to: x_axis_left_carriage_assembly
-      alignment: RIGHT
-      post_translation:
-        - "$ref": x_axis_left_sprite_extruder_carriage_x_offset
-        - 0
-        - 0
-    - part: sprite_extruder_left_assembly
-      to: x_axis_left_carriage_assembly
-      alignment: STACK_FRONT
-      stack_gap:
-        $ref: x_axis_sprite_extruder_carriage_stack_gap
-    - part: sprite_extruder_left_assembly
-      to: x_axis_rail_assembly
-      alignment: TOP
-      post_translation:
-        - 0
-        - 0
-        - $ref: x_axis_sprite_extruder_rail_z_offset
-    - part: sprite_extruder_right_assembly
-      post_rotation:
-        angle: 180
-        axis: [0, 0, 1]
-        center: sprite_extruder_right_assembly.CENTER
-    - part: sprite_extruder_right_assembly
-      to: x_axis_right_carriage_assembly
-      alignment: RIGHT
-      post_translation:
-        - "$ref": x_axis_right_sprite_extruder_carriage_x_offset
-        - 0
-        - 0
-    - part: sprite_extruder_right_assembly
-      to: x_axis_right_carriage_assembly
-      alignment: STACK_FRONT
-      stack_gap:
-        $ref: x_axis_sprite_extruder_carriage_stack_gap
-    - part: sprite_extruder_right_assembly
-      to: x_axis_rail_assembly
-      alignment: TOP
-      post_translation:
-        - 0
-        - 0
-        - $ref: x_axis_sprite_extruder_rail_z_offset
-    - rigid_group:
-        - tool_head_mount_machined_bottom_assembly
-      to: x_axis_left_carriage_assembly
-    - rigid_group:
-        - tool_head_mount_machined_top_assembly
-      to: x_axis_right_carriage_assembly
-    - rigid_group:
-        - sprite_extruder_left_assembly
-        - sprite_extruder_right_assembly
-
-      to: x_axis_rail_assembly
     - rigid_group:
         - x_axis_belt_carriage_bottom_assembly
         - x_axis_belt_carriage_top_assembly
@@ -2454,9 +2458,11 @@ assemblies:
     depends_on:
       - sprite_extruder_left_assembly
       - nitehawk_board_left_assembly
+      - tool_head_mount_machined_bottom_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_left_assembly
       nitehawk_board: nitehawk_board_left_assembly
+      tool_head_mount_machined: tool_head_mount_machined_bottom_assembly
 
   - name: extruder_cage_right_assembly
 
@@ -2464,9 +2470,11 @@ assemblies:
     depends_on:
       - sprite_extruder_right_assembly
       - nitehawk_board_right_assembly
+      - tool_head_mount_machined_top_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_right_assembly
       nitehawk_board: nitehawk_board_right_assembly
+      tool_head_mount_machined: tool_head_mount_machined_top_assembly
 
   - name: sprite_extruder_left_assembly
 

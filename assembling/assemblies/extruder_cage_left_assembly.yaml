@@ -27,8 +27,8 @@ Builder:
         assembly: nitehawk_board
         artifact: followers
         name_template: "nitehawk_board_{name}"
-      - source: dependencies
-        assembly: tool_head_mount_machined_bottom_assembly
+      - source: injected
+        assembly: tool_head_mount_machined
         artifact: leader
         name: tool_head_mount_machined
       - source: dependencies

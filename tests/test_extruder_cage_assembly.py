@@ -17,6 +17,7 @@ from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_board_assembly import (
 from mege_ender_3v3ke_idex.designs.assemblies.sprite_extruder_assembly import (
     create_sprite_extruder_assembly,
 )
+from shellforgepy.builder import graph_model as builder_graph_model
 from shellforgepy.simple import (
     Alignment,
     align,
@@ -75,7 +76,8 @@ def test_extruder_cage_signature_uses_cage_owned_mount_dimensions():
     parameters = inspect.signature(create_extruder_cage_assembly).parameters
 
     assert "nitehawk_board" in parameters
-    assert "tool_head_mount_machined" not in parameters
+    assert "tool_head_mount_machined" in parameters
+    assert parameters["tool_head_mount_machined"].default is None
     assert "carriage" not in parameters
     assert "extruder_cage_mount_plate_fillet_radius" in parameters
     assert "extruder_cage_top_right_bridge_clearance" in parameters
@@ -210,7 +212,7 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
         assert recut_delta < 0.01
 
 
-def test_extruder_cage_side_variants_use_visualization_dependencies_only():
+def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
     config = yaml.load(
         (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
         Loader=AssemblyDefaultsLoader,
@@ -245,10 +247,12 @@ def test_extruder_cage_side_variants_use_visualization_dependencies_only():
         "left": {
             "sprite_extruder": "sprite_extruder_left_assembly",
             "nitehawk_board": "nitehawk_board_left_assembly",
+            "tool_head_mount_machined": "tool_head_mount_machined_bottom_assembly",
         },
         "right": {
             "sprite_extruder": "sprite_extruder_right_assembly",
             "nitehawk_board": "nitehawk_board_right_assembly",
+            "tool_head_mount_machined": "tool_head_mount_machined_top_assembly",
         },
     }
     expected_visual_context = {
@@ -283,7 +287,6 @@ def test_extruder_cage_side_variants_use_visualization_dependencies_only():
         assert cage_entry["inject_parts"] == injected_context
         assert set(cage_entry["depends_on"]) == set(injected_context.values())
         assert not set(cage_entry["depends_on"]) & {
-            visual_context["tool_head_mount_machined"],
             visual_context["carriage"],
             "x_axis_rail_assembly",
             "x_axis_lower_profile_assembly",
@@ -293,13 +296,18 @@ def test_extruder_cage_side_variants_use_visualization_dependencies_only():
         visualization_parts = visual_context["resource"]["Builder"]["Visualization"][
             "parts"
         ]
+        assert {
+            "source": "injected",
+            "assembly": "tool_head_mount_machined",
+            "artifact": "leader",
+            "name": "tool_head_mount_machined",
+        } in visualization_parts
         assert not any(
             rule.get("source") == "injected"
-            and rule.get("assembly") in {"tool_head_mount_machined", "carriage"}
+            and rule.get("assembly") == "carriage"
             for rule in visualization_parts
         )
         for dependency_assembly, visual_name in [
-            (visual_context["tool_head_mount_machined"], "tool_head_mount_machined"),
             (visual_context["carriage"], "carriage"),
             ("x_axis_rail_assembly", "rail"),
             ("x_axis_lower_profile_assembly", "lower_axis_profile"),
@@ -343,6 +351,7 @@ def test_extruder_cage_side_variants_use_visualization_dependencies_only():
         sprite_extruder = injected_context["sprite_extruder"]
         carriage = visual_context["carriage"]
         cage = f"extruder_cage_{side}_assembly"
+        part_fan = f"part_fan_{side}_assembly"
         board = injected_context["nitehawk_board"]
 
         machined_group_indices = [
@@ -359,23 +368,32 @@ def test_extruder_cage_side_variants_use_visualization_dependencies_only():
             "x_axis_rail_assembly",
         }
 
-        sprite_rail_alignment_index = next(
+        sprite_indices = [
             index
             for index, placement in enumerate(placements)
             if placement.get("part") == sprite_extruder
-            and placement.get("to") == "x_axis_rail_assembly"
-            and placement.get("alignment") == "TOP"
-        )
-        assert machined_group_index > sprite_rail_alignment_index
+        ]
+        assert sprite_indices
 
-        early_sprite_group = next(
-            placement
+        sprite_rigid_indices = [
+            index
             for index, placement in enumerate(placements)
-            if index < machined_group_index
-            and placement.get("to") == sprite_extruder
-            and board in placement.get("rigid_group", [])
-        )
-        assert cage in early_sprite_group["rigid_group"]
+            if placement.get("rigid_group") == [sprite_extruder]
+            and placement.get("to") == carriage
+        ]
+        assert len(sprite_rigid_indices) == 1
+        sprite_rigid_index = sprite_rigid_indices[0]
+
+        assert max(sprite_indices) < sprite_rigid_index < machined_group_index
+
+        downstream_sprite_group_indices = [
+            index
+            for index, placement in enumerate(placements)
+            if placement.get("to") == sprite_extruder
+            and {cage, part_fan, board}.issubset(set(placement.get("rigid_group", [])))
+        ]
+        assert len(downstream_sprite_group_indices) == 1
+        assert machined_group_index < downstream_sprite_group_indices[0]
 
         cage_group_indices = [
             index
@@ -383,9 +401,46 @@ def test_extruder_cage_side_variants_use_visualization_dependencies_only():
             if placement.get("to") == sprite_extruder
             and cage in placement.get("rigid_group", [])
         ]
-        assert cage_group_indices == [
-            placements.index(early_sprite_group),
-        ]
+        assert cage_group_indices == downstream_sprite_group_indices
+
+    assert not any(
+        set(placement.get("rigid_group", []) or [])
+        == {"sprite_extruder_left_assembly", "sprite_extruder_right_assembly"}
+        and placement.get("to") == "x_axis_rail_assembly"
+        for placement in placements
+    )
+
+    for side in ["left", "right"]:
+        part_fan = assemblies[f"part_fan_{side}_assembly"]
+        sprite_extruder = f"sprite_extruder_{side}_assembly"
+        assert part_fan["depends_on"] == [sprite_extruder]
+        assert part_fan["inject_parts"] == {"sprite_extruder": sprite_extruder}
+
+    graph_model = builder_graph_model.build_graph_model(config["assemblies"], config)
+    generation_index = {
+        assembly_name: index
+        for index, generation in enumerate(
+            builder_graph_model.resolve_build_generation_names(
+                graph_model,
+                ["tool_heads_assembly"],
+            )
+        )
+        for assembly_name in generation
+    }
+    for side, injected_context in expected_true_inputs.items():
+        machined_mount = injected_context["tool_head_mount_machined"]
+        cage = f"extruder_cage_{side}_assembly"
+        part_fan = f"part_fan_{side}_assembly"
+        assert generation_index[machined_mount] < generation_index[cage]
+        assert generation_index[machined_mount] < generation_index[part_fan]
+
+        placement_deps = set(graph_model.placement_build_dependencies[machined_mount])
+        assert not placement_deps & {
+            "extruder_cage_left_assembly",
+            "extruder_cage_right_assembly",
+            "part_fan_left_assembly",
+            "part_fan_right_assembly",
+        }
 
     assert "nitehawk_holder" not in tool_head_resource_text
     tool_head_composite = tool_head_resource["Parts"]["ToolHeadAssembly"][
