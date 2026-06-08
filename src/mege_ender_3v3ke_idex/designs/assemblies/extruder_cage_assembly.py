@@ -18,10 +18,10 @@ def create_extruder_cage_assembly(
     tool_head_mount_sprite_mount_screw_length,
     tool_head_additional_mount_plate_clearance,
     tool_head_additional_mount_plate_depth,
-    duct_front_mount_plate_height,
-    duct_front_mount_plate_height_border,
-    duct_front_mount_plate_offset,
-    duct_front_mount_plate_width_border,
+    duct_back_mount_plate_height,
+    duct_back_mount_plate_height_border,
+    duct_back_mount_plate_offset,
+    duct_back_mount_plate_width_border,
     nitehawk_holder_mount_tower_diameter,
     nitehawk_holder_mount_tower_height,
     nitehawk_mount_tower_base_extension,
@@ -99,29 +99,28 @@ def create_extruder_cage_assembly(
             extruder_cage_screw_size,
             tool_head_mount_sprite_mount_screw_length,
         )
-        screw = rotate(90, axis=(1, 0, 0))(screw)
+        screw = rotate(-90, axis=(1, 0, 0))(screw)
         screw = align(screw, hole_guide, Alignment.CENTER)
-        screw = align(screw, sprite_mount_base_plate, Alignment.FRONT)
-        screw = translate(0, -screw_record.cylinder_head_height, 0)(screw)
+        screw = align(screw, sprite_mount_base_plate, Alignment.BACK)
+        screw = translate(0, screw_record.cylinder_head_height, 0)(screw)
         sprite_mount_screws.append((side_name, screw))
 
     duct_back_mount_plate_width = sprite_extruder_body_size[0]
     part_fan_back_mount_plate = create_filleted_box(
         duct_back_mount_plate_width,
-        duct_front_mount_plate_height,
+        duct_back_mount_plate_height,
         extruder_cage_mount_plate_thickness,
         fillet_radius=extruder_cage_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
     back_mount_plate_cutout = create_filleted_box(
-        duct_back_mount_plate_width - 2 * duct_front_mount_plate_width_border,
-        duct_front_mount_plate_height - 2 * duct_front_mount_plate_height_border,
+        duct_back_mount_plate_width - 2 * duct_back_mount_plate_width_border,
+        duct_back_mount_plate_height - 2 * duct_back_mount_plate_height_border,
         extruder_cage_mount_plate_thickness + 10,
         fillet_radius=(
             min(
-                duct_back_mount_plate_width - 2 * duct_front_mount_plate_width_border,
-                duct_front_mount_plate_height
-                - 2 * duct_front_mount_plate_height_border,
+                duct_back_mount_plate_width - 2 * duct_back_mount_plate_width_border,
+                duct_back_mount_plate_height - 2 * duct_back_mount_plate_height_border,
             )
             / 4
         ),
@@ -149,7 +148,7 @@ def create_extruder_cage_assembly(
         sprite_extruder,
         Alignment.BOTTOM,
     )
-    part_fan_back_mount_plate = translate(0, 0, duct_front_mount_plate_offset)(
+    part_fan_back_mount_plate = translate(0, 0, duct_back_mount_plate_offset)(
         part_fan_back_mount_plate
     )
     part_fan_back_mount_plate = sprite_extruder.use_as_cutter_on(

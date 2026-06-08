@@ -497,6 +497,10 @@ placement:
     - part: nitehawk_board_right_assembly
       to: sprite_extruder_right_assembly
       alignment: RIGHT
+      post_translation:
+        - $ref: nitehawk_board_sprite_extruder_x_offset
+        - 0
+        - 0
     - part: nitehawk_board_right_assembly
       to: sprite_extruder_right_assembly
       alignment: STACK_FRONT

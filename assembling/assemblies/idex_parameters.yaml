@@ -809,6 +809,7 @@ globals:
   nitehawk_board_angle: 0
   nitehawk_board_extruder_back_gap: 9
   nitehawk_board_extruder_body_bottom_offset: 0
+  nitehawk_board_sprite_extruder_x_offset: -3
   nitehawk_front_cutter_back_width: 10.8
   nitehawk_front_cutter_width: 18.8
   nitehawk_front_cutter_y_size: 7.0
@@ -881,7 +882,7 @@ globals:
   part_fan_window_width: 28
   side_part_fan_parameters:
     around_angle: 0
-    x_offset: 28.1
+    x_offset: 30
     y_offset: 35
     z_offset: 6
     rotation: 90
@@ -891,7 +892,7 @@ globals:
     mount_plate_blow_direction_offset: -1
   front_part_fan_parameters:
     around_angle: 90
-    x_offset: 21
+    x_offset: 20
     y_offset: 5
     z_offset: -4.5
     rotation: 15

@@ -70,13 +70,13 @@ Parameters:
     Type: Float
   tool_head_additional_mount_plate_depth:
     Type: Float
-  duct_front_mount_plate_height:
+  duct_back_mount_plate_height:
     Type: Float
-  duct_front_mount_plate_height_border:
+  duct_back_mount_plate_height_border:
     Type: Float
-  duct_front_mount_plate_offset:
+  duct_back_mount_plate_offset:
     Type: Float
-  duct_front_mount_plate_width_border:
+  duct_back_mount_plate_width_border:
     Type: Float
   nitehawk_holder_mount_tower_diameter:
     Type: Float
