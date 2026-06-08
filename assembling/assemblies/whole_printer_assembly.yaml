@@ -326,6 +326,19 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: injected
+        assembly: nitehawk_board_left
+        artifact: followers
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
         assembly: tool_head_left
         artifact: all
         name_template: "{assembly_name}_{name}"
@@ -367,6 +380,19 @@ Builder:
       - source: injected
         assembly: sprite_extruder_right
         artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: nitehawk_board_right
+        artifact: followers
         name_template: "{assembly_name}_{name}"
         animation:
           x_carriage_2:

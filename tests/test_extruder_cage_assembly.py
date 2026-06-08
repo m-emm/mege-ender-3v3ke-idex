@@ -216,6 +216,15 @@ def test_extruder_cage_side_variants_use_visualization_dependencies_only():
         Loader=AssemblyDefaultsLoader,
     )
     assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
+    tool_head_resource_text = (ASSEMBLIES_DIR / "tool_head_assembly.yaml").read_text()
+    tool_head_resource = yaml.load(
+        tool_head_resource_text,
+        Loader=AssemblyDefaultsLoader,
+    )
+    whole_printer_resource = yaml.load(
+        (ASSEMBLIES_DIR / "whole_printer_assembly.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
     right_cage_resource = yaml.load(
         (ASSEMBLIES_DIR / "extruder_cage_assembly.yaml").read_text(),
         Loader=AssemblyDefaultsLoader,
@@ -377,6 +386,89 @@ def test_extruder_cage_side_variants_use_visualization_dependencies_only():
         assert cage_group_indices == [
             placements.index(early_sprite_group),
         ]
+
+    assert "nitehawk_holder" not in tool_head_resource_text
+    tool_head_composite = tool_head_resource["Parts"]["ToolHeadAssembly"][
+        "Properties"
+    ]["Composite"]
+    assert tool_head_composite["Leader"]["Fused"] == [
+        {
+            "source": "injected",
+            "assembly": "extruder_cage",
+            "artifact": "leader",
+        },
+        {
+            "source": "injected",
+            "assembly": "part_fans",
+            "artifact": "leader",
+        },
+    ]
+    assert tool_head_composite["NonProductionParts"] == [
+        {
+            "source": "injected",
+            "assembly": "part_fans",
+            "artifact": "non_production_parts",
+            "name_template": "part_fans_{name}",
+        },
+    ]
+
+    expected_tool_head_inputs = {
+        "left": {
+            "sprite_extruder": "sprite_extruder_left_assembly",
+            "extruder_cage": "extruder_cage_left_assembly",
+            "part_fans": "part_fan_left_assembly",
+        },
+        "right": {
+            "sprite_extruder": "sprite_extruder_right_assembly",
+            "extruder_cage": "extruder_cage_right_assembly",
+            "part_fans": "part_fan_right_assembly",
+        },
+    }
+    for side, expected_inputs in expected_tool_head_inputs.items():
+        tool_head = assemblies[f"tool_head_{side}_assembly"]
+        assert tool_head["inject_parts"] == expected_inputs
+        assert set(tool_head["depends_on"]) == set(expected_inputs.values())
+        assert "nitehawk_holder" not in tool_head["inject_parts"]
+        assert not any(
+            "nitehawk_holder" in dependency
+            for dependency in tool_head.get("depends_on", [])
+        )
+
+    whole_printer = assemblies["whole_printer_assembly"]
+    whole_printer_visualization_parts = whole_printer_resource["Builder"][
+        "Visualization"
+    ]["parts"]
+    expected_board_inputs = {
+        "left": {
+            "alias": "nitehawk_board_left",
+            "assembly": "nitehawk_board_left_assembly",
+            "animation": {
+                "x_carriage_1": [{"$ref": "x_axis_x_travel"}, 0, 0],
+                "z_axis": [0, 0, {"$ref": "z_axis_z_travel"}],
+            },
+        },
+        "right": {
+            "alias": "nitehawk_board_right",
+            "assembly": "nitehawk_board_right_assembly",
+            "animation": {
+                "x_carriage_2": [{"$ref": "x_axis_x_travel_negative"}, 0, 0],
+                "z_axis": [0, 0, {"$ref": "z_axis_z_travel"}],
+            },
+        },
+    }
+    for expected in expected_board_inputs.values():
+        assert expected["assembly"] in whole_printer["depends_on"]
+        assert whole_printer["inject_parts"][expected["alias"]] == expected["assembly"]
+
+        board_rule = next(
+            rule
+            for rule in whole_printer_visualization_parts
+            if rule.get("source") == "injected"
+            and rule.get("assembly") == expected["alias"]
+        )
+        assert board_rule["artifact"] == "followers"
+        assert board_rule["name_template"] == "{assembly_name}_{name}"
+        assert board_rule["animation"] == expected["animation"]
 
     for side in ["left", "right"]:
         board = f"nitehawk_board_{side}_assembly"

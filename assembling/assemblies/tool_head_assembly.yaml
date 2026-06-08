@@ -55,7 +55,7 @@ Parts:
         Leader:
           Fused:
             - source: injected
-              assembly: nitehawk_holder
+              assembly: extruder_cage
               artifact: leader
             - source: injected
               assembly: part_fans
@@ -63,10 +63,6 @@ Parts:
         Followers: []
         Cutters: []
         NonProductionParts:
-          - source: injected
-            assembly: nitehawk_holder
-            artifact: non_production_parts
-            name_template: "nitehawk_holder_{name}"
           - source: injected
             assembly: part_fans
             artifact: non_production_parts
