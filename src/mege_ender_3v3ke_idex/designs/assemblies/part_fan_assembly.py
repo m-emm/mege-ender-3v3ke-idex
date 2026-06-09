@@ -768,7 +768,7 @@ def _extend_blower_ducts(
     for _, cutter in sprite_extruder.get_named_cutter_items():
         blower_ducts = blower_ducts.cut(cutter)
 
-    return blower_ducts, side_mount_plate, duct_back_mount_plate
+    return blower_ducts, side_mount_plate, duct_back_mount_plate_connector
 
 
 def create_part_fan_assembly(
@@ -912,7 +912,7 @@ def create_part_fan_assembly(
     }
 
     blower_ducts = fans.get_named_follower("blower_ducts")
-    blower_ducts, side_mount_plate, duct_back_mount_plate = _extend_blower_ducts(
+    blower_ducts, side_mount_plate, duct_back_mount_plate_connector = _extend_blower_ducts(
         blower_ducts=blower_ducts,
         sprite_extruder=sprite_extruder,
         tool_head_additional_mount_plate_clearance=tool_head_additional_mount_plate_clearance,
@@ -979,5 +979,5 @@ def create_part_fan_assembly(
         "hotend_alignment_reference",
     )
     retval.add_named_non_production_part(side_mount_plate, "side_mount_plate")
-    retval.add_named_non_production_part(duct_back_mount_plate, "duct_back_mount_plate")
+    retval.add_named_non_production_part(duct_back_mount_plate_connector, "duct_back_mount_plate_connector")
     return retval

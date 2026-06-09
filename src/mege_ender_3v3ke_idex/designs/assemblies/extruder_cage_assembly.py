@@ -472,10 +472,10 @@ def create_extruder_cage_assembly(
         cage_leader = cage_leader.cut(cutter)
 
     cage = LeaderFollowersCuttersPart(cage_leader)
-    cage.add_named_follower(sprite_mount_base_plate, "sprite_mount_base_plate")
-    cage.add_named_follower(left_mount_plate, "part_fan_side_mount_plate")
-    cage.add_named_follower(part_fan_back_mount_plate, "part_fan_back_mount_plate")
-    cage.add_named_follower(nitehawk_rear_mount_plate, "nitehawk_rear_mount_plate")
+    #cage.add_named_follower(sprite_mount_base_plate, "sprite_mount_base_plate")
+    #cage.add_named_follower(left_mount_plate, "part_fan_side_mount_plate")
+    #cage.add_named_follower(part_fan_back_mount_plate, "part_fan_back_mount_plate")
+    #cage.add_named_follower(nitehawk_rear_mount_plate, "nitehawk_rear_mount_plate")
 
     for side_name, screw in sprite_mount_screws:
         cage.add_named_non_production_part(
