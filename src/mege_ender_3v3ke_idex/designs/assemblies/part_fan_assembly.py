@@ -912,25 +912,27 @@ def create_part_fan_assembly(
     }
 
     blower_ducts = fans.get_named_follower("blower_ducts")
-    blower_ducts, side_mount_plate, duct_back_mount_plate_connector = _extend_blower_ducts(
-        blower_ducts=blower_ducts,
-        sprite_extruder=sprite_extruder,
-        tool_head_additional_mount_plate_clearance=tool_head_additional_mount_plate_clearance,
-        tool_head_additional_mount_plate_depth=tool_head_additional_mount_plate_depth,
-        tool_head_additional_mount_plate_depth_offset=tool_head_additional_mount_plate_depth_offset,
-        tool_head_additional_mount_plate_fillet_radius=tool_head_additional_mount_plate_fillet_radius,
-        tool_head_additional_mount_plate_height=tool_head_additional_mount_plate_height,
-        tool_head_additional_mount_plate_thickness=tool_head_additional_mount_plate_thickness,
-        tool_head_additional_mount_plate_z_offset=tool_head_additional_mount_plate_z_offset,
-        tool_head_back_mount_plate_connector_height=tool_head_back_mount_plate_connector_height,
-        tool_head_back_mount_plate_connector_thickness=tool_head_back_mount_plate_connector_thickness,
-        tool_head_back_mount_plate_connector_width=tool_head_back_mount_plate_connector_width,
-        duct_back_mount_plate_height=duct_back_mount_plate_height,
-        duct_back_mount_plate_height_border=duct_back_mount_plate_height_border,
-        duct_back_mount_plate_offset=duct_back_mount_plate_offset,
-        duct_back_mount_plate_thickness=duct_back_mount_plate_thickness,
-        duct_back_mount_plate_width=duct_back_mount_plate_width,
-        duct_back_mount_plate_width_border=duct_back_mount_plate_width_border,
+    blower_ducts, side_mount_plate, duct_back_mount_plate_connector = (
+        _extend_blower_ducts(
+            blower_ducts=blower_ducts,
+            sprite_extruder=sprite_extruder,
+            tool_head_additional_mount_plate_clearance=tool_head_additional_mount_plate_clearance,
+            tool_head_additional_mount_plate_depth=tool_head_additional_mount_plate_depth,
+            tool_head_additional_mount_plate_depth_offset=tool_head_additional_mount_plate_depth_offset,
+            tool_head_additional_mount_plate_fillet_radius=tool_head_additional_mount_plate_fillet_radius,
+            tool_head_additional_mount_plate_height=tool_head_additional_mount_plate_height,
+            tool_head_additional_mount_plate_thickness=tool_head_additional_mount_plate_thickness,
+            tool_head_additional_mount_plate_z_offset=tool_head_additional_mount_plate_z_offset,
+            tool_head_back_mount_plate_connector_height=tool_head_back_mount_plate_connector_height,
+            tool_head_back_mount_plate_connector_thickness=tool_head_back_mount_plate_connector_thickness,
+            tool_head_back_mount_plate_connector_width=tool_head_back_mount_plate_connector_width,
+            duct_back_mount_plate_height=duct_back_mount_plate_height,
+            duct_back_mount_plate_height_border=duct_back_mount_plate_height_border,
+            duct_back_mount_plate_offset=duct_back_mount_plate_offset,
+            duct_back_mount_plate_thickness=duct_back_mount_plate_thickness,
+            duct_back_mount_plate_width=duct_back_mount_plate_width,
+            duct_back_mount_plate_width_border=duct_back_mount_plate_width_border,
+        )
     )
 
     side_fan_mount_plate = fans.get_named_follower("part_fan_side_mount_plate")
@@ -979,5 +981,7 @@ def create_part_fan_assembly(
         "hotend_alignment_reference",
     )
     retval.add_named_non_production_part(side_mount_plate, "side_mount_plate")
-    retval.add_named_non_production_part(duct_back_mount_plate_connector, "duct_back_mount_plate_connector")
+    retval.add_named_non_production_part(
+        duct_back_mount_plate_connector, "duct_back_mount_plate_connector"
+    )
     return retval
