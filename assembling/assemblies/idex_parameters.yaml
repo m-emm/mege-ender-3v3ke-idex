@@ -787,7 +787,7 @@ globals:
   side_holes_depth: 4
   fan_thickness: 14
   extruder_mount_screw_size: "M3"
-  extruder_cage_mount_plate_thickness: 2
+  extruder_cage_mount_plate_thickness: 3
   extruder_cage_mount_plate_fillet_radius: 1.0
   extruder_cage_flange_thickness: 3
   extruder_cage_screw_size: "M3"
@@ -933,18 +933,10 @@ globals:
   tool_head_mount_machined_cutout_center_y: 24.85
   tool_head_mount_machined_cutout_fillet_radius: 3
   tool_head_mount_machined_sprite_mount_hole_diameter: 3.6
-  tool_head_mount_machined_sprite_mount_hole_x_0: 5
-  tool_head_mount_machined_sprite_mount_hole_x_1: 75
-  tool_head_mount_machined_sprite_mount_hole_y_0: 5
-  tool_head_mount_machined_sprite_mount_hole_y_1: 44.7
-  tool_head_mount_machined_sprite_mount_hole_y_2: 56.5
-  tool_head_mount_machined_carriage_mount_hole_diameter: 3.4
-  tool_head_mount_machined_carriage_mount_hole_x_0: 12.7
-  tool_head_mount_machined_carriage_mount_hole_x_1: 32.7
-  tool_head_mount_machined_carriage_mount_hole_x_2: 47.3
-  tool_head_mount_machined_carriage_mount_hole_x_3: 67.3
-  tool_head_mount_machined_carriage_mount_hole_y_0: 61.7
-  tool_head_mount_machined_carriage_mount_hole_y_1: 81.7
+  tool_head_mount_machined_sprite_mount_hole_x_inset: 5
+  tool_head_mount_machined_sprite_mount_hole_front_y_inset: 5
+  tool_head_mount_machined_sprite_mount_hole_primary_y_pitch: 39.7
+  tool_head_mount_machined_sprite_mount_hole_secondary_y_pitch: 11.8
   tool_head_mount_carriage_mount_l_profile_thickness: 3.2
   tool_head_mount_carriage_mount_l_profile_outer_size: 30
   tool_head_mount_clamp_base_cutter_clearance: 0.8
@@ -958,7 +950,6 @@ globals:
   tool_head_mount_side_stiffener_thickness: 5
   tool_head_mount_sprite_mount_screw_length: 10
   tool_head_mount_tool_head_base_plate_clearance: 0.5
-  tool_head_mount_tool_head_x_offset: 8
   tool_head_mount_tool_head_z_offset: 10
   tool_head_mount_x_offset: 18
   tool_head_mount_y_extension:

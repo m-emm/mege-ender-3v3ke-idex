@@ -11,7 +11,6 @@
 - part fan mount air inlet rim too thin, breaks off
 - fan bloat cutting too aggressive - walls vanish
 - missing umbilical cable holder on cage
-- missing space for extruder motor calable in cage
 - fan / cage flanges too weak
 - extruder x positioning extruder clamp lever not free enough
 - x belt carriage not fitting to machined toolhead holder

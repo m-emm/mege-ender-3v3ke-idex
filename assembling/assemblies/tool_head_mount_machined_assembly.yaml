@@ -75,29 +75,13 @@ Parameters:
     Type: Float
   tool_head_mount_machined_sprite_mount_hole_diameter:
     Type: Float
-  tool_head_mount_machined_sprite_mount_hole_x_0:
+  tool_head_mount_machined_sprite_mount_hole_x_inset:
     Type: Float
-  tool_head_mount_machined_sprite_mount_hole_x_1:
+  tool_head_mount_machined_sprite_mount_hole_front_y_inset:
     Type: Float
-  tool_head_mount_machined_sprite_mount_hole_y_0:
+  tool_head_mount_machined_sprite_mount_hole_primary_y_pitch:
     Type: Float
-  tool_head_mount_machined_sprite_mount_hole_y_1:
-    Type: Float
-  tool_head_mount_machined_sprite_mount_hole_y_2:
-    Type: Float
-  tool_head_mount_machined_carriage_mount_hole_diameter:
-    Type: Float
-  tool_head_mount_machined_carriage_mount_hole_x_0:
-    Type: Float
-  tool_head_mount_machined_carriage_mount_hole_x_1:
-    Type: Float
-  tool_head_mount_machined_carriage_mount_hole_x_2:
-    Type: Float
-  tool_head_mount_machined_carriage_mount_hole_x_3:
-    Type: Float
-  tool_head_mount_machined_carriage_mount_hole_y_0:
-    Type: Float
-  tool_head_mount_machined_carriage_mount_hole_y_1:
+  tool_head_mount_machined_sprite_mount_hole_secondary_y_pitch:
     Type: Float
   drive_position:
     Type: String

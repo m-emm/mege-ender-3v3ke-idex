@@ -973,8 +973,8 @@ def create_part_fan_assembly(
 
     side_fan_mount_eye = create_filleted_box(
         side_fan_mount_plate_size[0],
-        8,
-        side_fan_mount_plate_height / 3,
+        7,
+        side_fan_mount_plate_height / 4,
         fillet_radius=2,
         no_fillets_at=[Alignment.RIGHT, Alignment.LEFT, Alignment.FRONT],
     )
@@ -985,9 +985,7 @@ def create_part_fan_assembly(
         side_fan_mount_eye, side_fan_mount_plate, Alignment.STACK_BACK
     )
     side_fan_mount_eye = align(side_fan_mount_eye, side_fan_mount_plate, Alignment.TOP)
-    side_fan_mount_eye = translate(0, 0, -side_fan_mount_plate_height / 8)(
-        side_fan_mount_eye
-    )
+    side_fan_mount_eye = translate(0, 0, -3)(side_fan_mount_eye)
 
     side_fan_mount_eye = align(
         side_fan_mount_eye,

@@ -291,6 +291,32 @@ def create_extruder_cage_assembly(
         stack_gap=tool_head_additional_mount_plate_clearance,
     )
 
+    cutout_length = extruder_size[2] / 3
+    cutout_depth = tool_head_additional_mount_plate_depth / 2
+
+    left_mount_plate_cutout = create_pyramid_stump(
+        bottom_width=cutout_length + cutout_depth,
+        top_width=cutout_length,
+        bottom_depth=BIG_THING,
+        top_depth=BIG_THING,
+        height=cutout_depth,
+    )
+    left_mount_plate_cutout = rotate(90)(left_mount_plate_cutout)
+
+    left_mount_plate_cutout = rotate(90, axis=(1, 0, 0))(left_mount_plate_cutout)
+
+    left_mount_plate_cutout = align(
+        left_mount_plate_cutout,
+        left_mount_plate,
+        Alignment.CENTER,
+    )
+    left_mount_plate_cutout = align(
+        left_mount_plate_cutout,
+        left_mount_plate,
+        Alignment.BACK,
+    )
+    left_mount_plate = left_mount_plate.cut(left_mount_plate_cutout)
+
     nitehawk_board_connectors = PartCollector()
     for tb in [Alignment.TOP, Alignment.BOTTOM]:
 
