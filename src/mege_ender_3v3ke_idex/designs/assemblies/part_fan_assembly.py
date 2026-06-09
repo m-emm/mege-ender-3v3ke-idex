@@ -909,7 +909,7 @@ def create_part_fan_assembly(
     }
 
     for name, cutter in fans.get_named_cutter_items():
-        if "window_cutter" in name or "body_cutter" in name:
+        if "window_cutter_DISABLED" in name or "body_cutter" in name:
             ducts = ducts.cut(cutter)
 
     for name, follower in fans.get_named_follower_items():
