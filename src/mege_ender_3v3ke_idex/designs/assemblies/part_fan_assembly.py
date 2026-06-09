@@ -159,6 +159,21 @@ def _blower_nozzle_tip_scales(
     ]
 
 
+def _blower_air_squeeze_scale(*, tip_scale, relative_x, blower_tube_length):
+    return tip_scale + relative_x / blower_tube_length * (1 - tip_scale)
+
+
+def _blower_outer_squeeze_scale(
+    *,
+    air_scale,
+    blowers_duct_diameter,
+    blowers_wall,
+):
+    inner_radius = blowers_duct_diameter / 2
+    outer_radius = inner_radius + blowers_wall
+    return (inner_radius * air_scale + blowers_wall) / outer_radius
+
+
 def _create_duct_extension(
     *,
     duct_extension_width,
@@ -237,21 +252,36 @@ def _create_ducts(
 
         blowers_nozzle_tip_scale = blowers_nozzle_tip_scales[i]
 
-        def blower_tip_transform_function(point):
+        def squeeze_z_transform_function(point, squeeze_scale_function):
             x, y, z = point
             relative_x = x - blower_tube_bb[0][0]
-            scale_factor = (
-                blowers_nozzle_tip_scale
-                + relative_x / blower_tube_length * (1 - blowers_nozzle_tip_scale)
+            air_scale = _blower_air_squeeze_scale(
+                tip_scale=blowers_nozzle_tip_scale,
+                relative_x=relative_x,
+                blower_tube_length=blower_tube_length,
             )
+            scale_factor = squeeze_scale_function(air_scale)
             relative_z = z - blower_tube_center[2]
             new_relative_z = relative_z * scale_factor
             new_z = blower_tube_center[2] + new_relative_z
             return x, y, new_z
 
+        def blower_outer_transform_function(point):
+            return squeeze_z_transform_function(
+                point,
+                lambda air_scale: _blower_outer_squeeze_scale(
+                    air_scale=air_scale,
+                    blowers_duct_diameter=blowers_duct_diameter,
+                    blowers_wall=blowers_wall,
+                ),
+            )
+
+        def blower_air_transform_function(point):
+            return squeeze_z_transform_function(point, lambda air_scale: air_scale)
+
         blower_tube = transform_with_function_tesselating(
             blower_tube,
-            blower_tip_transform_function,
+            blower_outer_transform_function,
         )
 
         blower_tube = translate(
@@ -267,7 +297,7 @@ def _create_ducts(
         )
         blower_tube_cutter = transform_with_function_tesselating(
             blower_tube_cutter,
-            blower_tip_transform_function,
+            blower_air_transform_function,
         )
         blower_tube_cutter = align(
             blower_tube_cutter,

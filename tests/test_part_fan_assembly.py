@@ -11,8 +11,10 @@ from mege_ender_3v3ke_idex.designs.assemblies.part_fan_cage_joiner import (
     join_part_fans_with_extruder_cage,
 )
 from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly import (
+    _blower_air_squeeze_scale,
     _blower_feeder_ring_path_metrics,
     _blower_nozzle_tip_scales,
+    _blower_outer_squeeze_scale,
     create_part_fan_assembly,
 )
 from mege_ender_3v3ke_idex.designs.assemblies.sprite_extruder_assembly import (
@@ -72,6 +74,37 @@ def test_blower_nozzle_tip_scales_increase_with_path_length():
     assert scales == pytest.approx([0.75, 0.25, 0.63], abs=0.01)
     assert scales[1] < scales[2] < scales[0]
     assert all(0.25 <= scale <= 0.75 for scale in scales)
+
+
+@pytest.mark.parametrize("tip_scale", [0.25, 0.63, 0.75])
+def test_blower_outer_squeeze_preserves_wall_without_changing_airflow(tip_scale):
+    inner_radius = DEFAULTS["blowers_duct_diameter"] / 2
+    wall = DEFAULTS["blowers_wall"]
+    outer_radius = inner_radius + wall
+
+    air_scale = _blower_air_squeeze_scale(
+        tip_scale=tip_scale,
+        relative_x=0,
+        blower_tube_length=20,
+    )
+    outer_scale = _blower_outer_squeeze_scale(
+        air_scale=air_scale,
+        blowers_duct_diameter=DEFAULTS["blowers_duct_diameter"],
+        blowers_wall=wall,
+    )
+
+    assert inner_radius * air_scale == pytest.approx(inner_radius * tip_scale)
+    assert outer_radius * outer_scale - inner_radius * air_scale == pytest.approx(wall)
+
+
+def test_blower_outer_squeeze_is_unsqueezed_when_air_scale_is_unsqueezed():
+    outer_scale = _blower_outer_squeeze_scale(
+        air_scale=1.0,
+        blowers_duct_diameter=DEFAULTS["blowers_duct_diameter"],
+        blowers_wall=DEFAULTS["blowers_wall"],
+    )
+
+    assert outer_scale == pytest.approx(1.0)
 
 
 def test_part_fan_clearance_is_declarative_parameter():
