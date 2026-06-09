@@ -867,7 +867,7 @@ globals:
   part_fan_ducts_clearance: 2
   part_fan_fillet_radius: 2
   part_fan_hole_diameter: 31
-  part_fan_mount_plate_thickness: 3.8
+  part_fan_mount_plate_thickness: 4.2
   part_fan_nut_cutter_clearance: 0.15
   part_fan_outlet_connector_length: 2
   part_fan_outlet_wall: 1.8

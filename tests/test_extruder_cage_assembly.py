@@ -239,11 +239,6 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         Loader=AssemblyDefaultsLoader,
     )
     assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
-    tool_head_resource_text = (ASSEMBLIES_DIR / "tool_head_assembly.yaml").read_text()
-    tool_head_resource = yaml.load(
-        tool_head_resource_text,
-        Loader=AssemblyDefaultsLoader,
-    )
     whole_printer_resource = yaml.load(
         (ASSEMBLIES_DIR / "whole_printer_assembly.yaml").read_text(),
         Loader=AssemblyDefaultsLoader,
@@ -383,6 +378,8 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         carriage = visual_context["carriage"]
         cage = f"extruder_cage_{side}_assembly"
         part_fan = f"part_fan_{side}_assembly"
+        joined_cage = f"extruder_cage_{side}_joined_assembly"
+        joined_part_fan = f"part_fan_{side}_joined_assembly"
         board = injected_context["nitehawk_board"]
 
         machined_group_indices = [
@@ -417,20 +414,31 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
 
         assert max(sprite_indices) < sprite_rigid_index < machined_group_index
 
-        downstream_sprite_group_indices = [
+        pre_join_sprite_group_indices = [
             index
             for index, placement in enumerate(placements)
             if placement.get("to") == sprite_extruder
             and {cage, part_fan}.issubset(set(placement.get("rigid_group", [])))
         ]
+        assert len(pre_join_sprite_group_indices) == 1
+        assert machined_group_index < pre_join_sprite_group_indices[0]
+
+        downstream_sprite_group_indices = [
+            index
+            for index, placement in enumerate(placements)
+            if placement.get("to") == sprite_extruder
+            and {joined_cage, joined_part_fan}.issubset(
+                set(placement.get("rigid_group", []))
+            )
+        ]
         assert len(downstream_sprite_group_indices) == 1
-        assert machined_group_index < downstream_sprite_group_indices[0]
+        assert pre_join_sprite_group_indices[0] < downstream_sprite_group_indices[0]
 
         cage_group_indices = [
             index
             for index, placement in enumerate(placements)
             if placement.get("to") == sprite_extruder
-            and cage in placement.get("rigid_group", [])
+            and joined_cage in placement.get("rigid_group", [])
         ]
         assert cage_group_indices == downstream_sprite_group_indices
 
@@ -500,6 +508,7 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
     }
     for side, injected_context in expected_true_inputs.items():
         machined_mount = injected_context["tool_head_mount_machined"]
+        sprite_extruder = injected_context["sprite_extruder"]
         cage = f"extruder_cage_{side}_assembly"
         part_fan = f"part_fan_{side}_assembly"
         join_node = f"join:part_fan_cage_{side}_join"
@@ -524,52 +533,28 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
             "part_fan_right_joined_assembly",
         }
 
-    assert "nitehawk_holder" not in tool_head_resource_text
-    tool_head_composite = tool_head_resource["Parts"]["ToolHeadAssembly"]["Properties"][
-        "Composite"
-    ]
-    assert tool_head_composite["Leader"]["Fused"] == [
-        {
-            "source": "injected",
-            "assembly": "extruder_cage",
-            "artifact": "leader",
-        },
-        {
-            "source": "injected",
-            "assembly": "part_fans",
-            "artifact": "leader",
-        },
-    ]
-    assert tool_head_composite["NonProductionParts"] == [
-        {
-            "source": "injected",
-            "assembly": "part_fans",
-            "artifact": "non_production_parts",
-            "name_template": "part_fans_{name}",
-        },
-    ]
-
-    expected_tool_head_inputs = {
-        "left": {
-            "sprite_extruder": "sprite_extruder_left_assembly",
-            "extruder_cage": "extruder_cage_left_joined_assembly",
-            "part_fans": "part_fan_left_joined_assembly",
-        },
-        "right": {
-            "sprite_extruder": "sprite_extruder_right_assembly",
-            "extruder_cage": "extruder_cage_right_joined_assembly",
-            "part_fans": "part_fan_right_joined_assembly",
-        },
-    }
-    for side, expected_inputs in expected_tool_head_inputs.items():
-        tool_head = assemblies[f"tool_head_{side}_assembly"]
-        assert tool_head["inject_parts"] == expected_inputs
-        assert set(tool_head["depends_on"]) == set(expected_inputs.values())
-        assert "nitehawk_holder" not in tool_head["inject_parts"]
-        assert not any(
-            "nitehawk_holder" in dependency
-            for dependency in tool_head.get("depends_on", [])
+        joined_group_index = next(
+            index
+            for index, placement in enumerate(placements)
+            if placement.get("to") == sprite_extruder
+            and {joined_cage, joined_part_fan}.issubset(
+                set(placement.get("rigid_group", []))
+            )
         )
+        joined_group_step = graph_model.placement_steps[joined_group_index]
+        assert joined_group_step.affected_assembly_names == (
+            joined_cage,
+            joined_part_fan,
+        )
+        for joined_output in [joined_cage, joined_part_fan]:
+            assert (
+                graph_model.first_involved_alignment_index[joined_output]
+                == joined_group_index
+            )
+
+    assert not (ASSEMBLIES_DIR / "tool_head_assembly.yaml").exists()
+    for side in ["left", "right"]:
+        assert f"tool_head_{side}_assembly" not in assemblies
 
     whole_printer = assemblies["whole_printer_assembly"]
     whole_printer_visualization_parts = whole_printer_resource["Builder"][
@@ -620,12 +605,15 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         )
         assert board_z_rotation["post_rotation"]["center"] == f"{board}.CENTER"
 
-        left_alignment = next(
+        side_alignment = next(
             placement
             for placement in placements
-            if placement.get("part") == board and placement.get("alignment") == "LEFT"
+            if placement.get("part") == board and placement.get("alignment") == "RIGHT"
         )
-        assert left_alignment["to"] == sprite_extruder
+        assert side_alignment["to"] == sprite_extruder
+        assert side_alignment["post_translation"][0] == {
+            "$ref": "nitehawk_board_sprite_extruder_x_offset"
+        }
 
         front_alignment = next(
             placement

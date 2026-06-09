@@ -539,6 +539,16 @@ placement:
       to: sprite_extruder_right_assembly
 
     - rigid_group:
+        - extruder_cage_left_joined_assembly
+        - part_fan_left_joined_assembly
+      to: sprite_extruder_left_assembly
+
+    - rigid_group:
+        - extruder_cage_right_joined_assembly
+        - part_fan_right_joined_assembly
+      to: sprite_extruder_right_assembly
+
+    - rigid_group:
         - x_axis_carriage_stopper_left_assembly
         - x_axis_carriage_stopper_right_assembly
       to: x_axis_rail_assembly

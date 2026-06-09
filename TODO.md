@@ -1,35 +1,34 @@
 # Open Tasks in IDEX
 
+
+## Current issues
+
+- cage mount plates too thin
+- cage and fan M3 holes too small
+- some cage holes misaligned to extruder threaded holes
+- cage to machined tool head carrier missing fourth mount point
+- part fan mount eye covers toohlead fan exhaust
+- fan bloat cutting too aggressive - walls vanish
+- missing umbilical cable holder on cage
+- missing space for extruder motor calable in cage
+- fan / cage flanges too weak
+- extruder x positioning missing symmetry right / left
+- extruder x positioning extruder clamp lever not free enough
+- x belt carriage not fitting to machined toolhead holder
+
 ## Mechanical Design tasks
 
-- x endcap tensioner lift / guide
-- x motor plate thickness/ screw length
-- x motor pulley screws accessibility
-- x endcap top screw?
-- x endcap idler spacers / cones
-- x axis: fuse mount flange? nut pockets too loose?
-- x axis tensioner nut pocket difficult
-- x axis belt space in tnsioner endcap is tight
-- holders for main PSU
 - holders for heatbed PSU
-- holder for y-axis / headbed mcu
-- fix y axis endstop
-- reprint stoppers in TPU
-- heatbed cable attachment
-- cable holders / clamps (x axis umbilicals, heatbed, z-axes cabling)
-- z-axis reconstruct: turn 90 deg
-- z-axis endstops
-- z axis top profile angle attachment
-- creality touch holder
 - toolhead alignment mechanism
-- holder / attachment for host controller / display
-- holder for idex x axes mcu
-- holder for z axes mcu
-- mcu housings
 - holders for filament sensors
 - holders for filament spools
 - nozzle cleaning pads holders
 - idex alignment sensor
+
+## On Hold
+
+- creality touch holder
+
 
 ## Done
 - integration x-axis / z-axis 
