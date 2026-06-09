@@ -8,11 +8,11 @@
 - some cage holes misaligned to extruder threaded holes
 - cage to machined tool head carrier missing fourth mount point
 - part fan mount eye covers toohlead fan exhaust
+- part fan mount air inlet rim too thin, breaks off
 - fan bloat cutting too aggressive - walls vanish
 - missing umbilical cable holder on cage
 - missing space for extruder motor calable in cage
 - fan / cage flanges too weak
-- extruder x positioning missing symmetry right / left
 - extruder x positioning extruder clamp lever not free enough
 - x belt carriage not fitting to machined toolhead holder
 

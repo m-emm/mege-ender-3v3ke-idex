@@ -18,22 +18,10 @@ Builder:
       - source: self
         artifact: leader
         name: tool_head_mount_machined
-      - source: dependencies
-        assembly: x_axis_rail_assembly
-        artifact: leader
-        name: rail
       - source: injected
         assembly: carriage
         artifact: leader
         name: carriage
-      - source: injected
-        assembly: sprite_extruder
-        artifact: leader
-        name: sprite_extruder
-      - source: injected
-        assembly: sprite_extruder
-        artifact: non_production_parts
-        name_template: "sprite_extruder_{name}"
   Production:
     parts:
       - source: self
@@ -72,6 +60,44 @@ Parameters:
   tool_head_mount_machined_plate_thickness:
     Type: Float
   tool_head_mount_machined_plate_width:
+    Type: Float
+  tool_head_mount_machined_plate_depth:
+    Type: Float
+  tool_head_mount_machined_cutout_width:
+    Type: Float
+  tool_head_mount_machined_cutout_depth:
+    Type: Float
+  tool_head_mount_machined_cutout_center_x:
+    Type: Float
+  tool_head_mount_machined_cutout_center_y:
+    Type: Float
+  tool_head_mount_machined_cutout_fillet_radius:
+    Type: Float
+  tool_head_mount_machined_sprite_mount_hole_diameter:
+    Type: Float
+  tool_head_mount_machined_sprite_mount_hole_x_0:
+    Type: Float
+  tool_head_mount_machined_sprite_mount_hole_x_1:
+    Type: Float
+  tool_head_mount_machined_sprite_mount_hole_y_0:
+    Type: Float
+  tool_head_mount_machined_sprite_mount_hole_y_1:
+    Type: Float
+  tool_head_mount_machined_sprite_mount_hole_y_2:
+    Type: Float
+  tool_head_mount_machined_carriage_mount_hole_diameter:
+    Type: Float
+  tool_head_mount_machined_carriage_mount_hole_x_0:
+    Type: Float
+  tool_head_mount_machined_carriage_mount_hole_x_1:
+    Type: Float
+  tool_head_mount_machined_carriage_mount_hole_x_2:
+    Type: Float
+  tool_head_mount_machined_carriage_mount_hole_x_3:
+    Type: Float
+  tool_head_mount_machined_carriage_mount_hole_y_0:
+    Type: Float
+  tool_head_mount_machined_carriage_mount_hole_y_1:
     Type: Float
   drive_position:
     Type: String

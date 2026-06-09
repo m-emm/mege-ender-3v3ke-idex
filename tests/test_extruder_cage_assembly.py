@@ -342,20 +342,29 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
     placements = config["placement"]["alignments"]
     assemblies_yaml_text = (ASSEMBLIES_DIR / "assemblies.yaml").read_text()
 
-    assert "x_axis_sprite_extruder_carriage_x_offset" not in DEFAULTS
-    assert "x_axis_sprite_extruder_carriage_x_offset" not in assemblies_yaml_text
-    assert DEFAULTS["x_axis_left_sprite_extruder_carriage_x_offset"] == pytest.approx(
-        -21.1
+    for removed_parameter in [
+        "x_axis_sprite_extruder_carriage_stack_gap",
+        "x_axis_left_sprite_extruder_carriage_x_offset",
+        "x_axis_right_sprite_extruder_carriage_x_offset",
+        "x_axis_sprite_extruder_rail_z_offset",
+    ]:
+        assert removed_parameter not in DEFAULTS
+        assert removed_parameter not in assemblies_yaml_text
+
+    assert DEFAULTS["x_axis_sprite_extruder_tool_head_mount_x_offset"] == pytest.approx(
+        2.25
     )
-    assert DEFAULTS["x_axis_right_sprite_extruder_carriage_x_offset"] == pytest.approx(
-        18
+    assert DEFAULTS["x_axis_sprite_extruder_tool_head_mount_y_offset"] == pytest.approx(
+        -17.75
+    )
+    assert DEFAULTS["x_axis_sprite_extruder_tool_head_mount_z_offset"] == pytest.approx(
+        -25.55
     )
 
-    expected_sprite_x_offsets = {
-        "sprite_extruder_left_assembly": "x_axis_left_sprite_extruder_carriage_x_offset",
-        "sprite_extruder_right_assembly": "x_axis_right_sprite_extruder_carriage_x_offset",
-    }
-    for sprite_extruder, offset_parameter in expected_sprite_x_offsets.items():
+    for sprite_extruder in [
+        "sprite_extruder_left_assembly",
+        "sprite_extruder_right_assembly",
+    ]:
         assert not any(
             placement.get("part") == sprite_extruder
             and placement.get("post_rotation", {}).get("angle") == 180
@@ -363,13 +372,17 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
             for placement in placements
         )
 
-        right_alignment = next(
-            placement
+        assert not any(
+            placement.get("part") == sprite_extruder
+            and placement.get("alignment") in {"RIGHT", "STACK_FRONT", "TOP"}
+            and placement.get("to")
+            in {
+                "x_axis_left_carriage_assembly",
+                "x_axis_right_carriage_assembly",
+                "x_axis_rail_assembly",
+            }
             for placement in placements
-            if placement.get("part") == sprite_extruder
-            and placement.get("alignment") == "RIGHT"
         )
-        assert right_alignment["post_translation"][0] == {"$ref": offset_parameter}
 
     for side, injected_context in expected_true_inputs.items():
         visual_context = expected_visual_context[side]
@@ -403,16 +416,32 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         ]
         assert sprite_indices
 
+        sprite_center_indices = [
+            index
+            for index, placement in enumerate(placements)
+            if placement.get("part") == sprite_extruder
+            and placement.get("to") == machined_mount
+            and placement.get("alignment") == "CENTER"
+        ]
+        assert len(sprite_center_indices) == 1
+        sprite_center_index = sprite_center_indices[0]
+        sprite_center_alignment = placements[sprite_center_index]
+        assert sprite_center_alignment["post_translation"] == [
+            {"$ref": "x_axis_sprite_extruder_tool_head_mount_x_offset"},
+            {"$ref": "x_axis_sprite_extruder_tool_head_mount_y_offset"},
+            {"$ref": "x_axis_sprite_extruder_tool_head_mount_z_offset"},
+        ]
+
         sprite_rigid_indices = [
             index
             for index, placement in enumerate(placements)
             if placement.get("rigid_group") == [sprite_extruder]
-            and placement.get("to") == carriage
+            and placement.get("to") == machined_mount
         ]
         assert len(sprite_rigid_indices) == 1
         sprite_rigid_index = sprite_rigid_indices[0]
 
-        assert max(sprite_indices) < sprite_rigid_index < machined_group_index
+        assert machined_group_index < max(sprite_indices) < sprite_rigid_index
 
         pre_join_sprite_group_indices = [
             index
@@ -421,7 +450,7 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
             and {cage, part_fan}.issubset(set(placement.get("rigid_group", [])))
         ]
         assert len(pre_join_sprite_group_indices) == 1
-        assert machined_group_index < pre_join_sprite_group_indices[0]
+        assert sprite_rigid_index < pre_join_sprite_group_indices[0]
 
         downstream_sprite_group_indices = [
             index
@@ -515,7 +544,6 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         joined_cage = f"extruder_cage_{side}_joined_assembly"
         joined_part_fan = f"part_fan_{side}_joined_assembly"
         assert generation_index[machined_mount] < generation_index[cage]
-        assert generation_index[machined_mount] < generation_index[part_fan]
         assert generation_index[cage] < generation_index[join_node]
         assert generation_index[part_fan] < generation_index[join_node]
         assert generation_index[join_node] < generation_index[joined_cage]
@@ -646,23 +674,16 @@ def test_tool_head_mount_machined_assemblies_use_side_drive_context_without_belt
     expected_context = {
         "tool_head_mount_machined_bottom_assembly": {
             "carriage": "x_axis_left_carriage_assembly",
-            "sprite_extruder": "sprite_extruder_left_assembly",
             "drive_position": "bottom",
             "dependencies": {
-                "x_axis_lower_profile_assembly",
-                "x_axis_rail_assembly",
                 "x_axis_left_carriage_assembly",
-                "sprite_extruder_left_assembly",
             },
         },
         "tool_head_mount_machined_top_assembly": {
             "carriage": "x_axis_right_carriage_assembly",
-            "sprite_extruder": "sprite_extruder_right_assembly",
             "drive_position": "top",
             "dependencies": {
-                "x_axis_rail_assembly",
                 "x_axis_right_carriage_assembly",
-                "sprite_extruder_right_assembly",
             },
         },
     }
@@ -673,12 +694,12 @@ def test_tool_head_mount_machined_assemblies_use_side_drive_context_without_belt
         assert mount["resource_file"] == "tool_head_mount_machined_assembly.yaml"
         assert mount["inject_parts"] == {
             "carriage": expected["carriage"],
-            "sprite_extruder": expected["sprite_extruder"],
         }
         assert "x_axis_belt_carriage" not in mount["inject_parts"]
+        assert "sprite_extruder" not in mount["inject_parts"]
         assert not any(
             "x_axis_belt_carriage" in dependency
             for dependency in mount.get("depends_on", [])
         )
         assert mount["parameters"] == {"drive_position": expected["drive_position"]}
-        assert set(mount["depends_on"]).issuperset(expected["dependencies"])
+        assert set(mount["depends_on"]) == expected["dependencies"]

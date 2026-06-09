@@ -5,18 +5,60 @@ from shellforgepy.simple import *
 
 BIG_THING = 500
 
-screw_hole_inset = 5
-screw_size = "M3"
 TOOL_HEAD_MOUNT_MACHINED_METRICS_ID = "tool_head_mount_machined"
+
+
+def _normalize_drive_position(drive_position):
+    normalized_drive_position = str(drive_position).strip().lower()
+    if normalized_drive_position == "bottom":
+        return Alignment.BOTTOM
+    if normalized_drive_position == "top":
+        return Alignment.TOP
+    raise ValueError(f"Unsupported drive_position '{drive_position}'")
+
+
+def _create_vertical_hole(*, center_x, center_y, diameter):
+    return translate(center_x, center_y, 0)(create_cylinder(diameter / 2, BIG_THING))
+
+
+def _cut_hole_grid(part, *, x_positions, y_positions, diameter, name_prefix, cutters):
+    for x_index, x_position in enumerate(x_positions):
+        for y_index, y_position in enumerate(y_positions):
+            hole = _create_vertical_hole(
+                center_x=x_position,
+                center_y=y_position,
+                diameter=diameter,
+            )
+            part = part.cut(hole)
+            cutters[f"{name_prefix}_{x_index}_{y_index}"] = hole
+    return part
 
 
 def create_tool_head_mount_machined_assembly(
     *,
     carriage,
-    sprite_extruder,
     tool_head_mount_machined_plate_fillet_radius,
     tool_head_mount_machined_plate_thickness,
     tool_head_mount_machined_plate_width,
+    tool_head_mount_machined_plate_depth,
+    tool_head_mount_machined_cutout_width,
+    tool_head_mount_machined_cutout_depth,
+    tool_head_mount_machined_cutout_center_x,
+    tool_head_mount_machined_cutout_center_y,
+    tool_head_mount_machined_cutout_fillet_radius,
+    tool_head_mount_machined_sprite_mount_hole_diameter,
+    tool_head_mount_machined_sprite_mount_hole_x_0,
+    tool_head_mount_machined_sprite_mount_hole_x_1,
+    tool_head_mount_machined_sprite_mount_hole_y_0,
+    tool_head_mount_machined_sprite_mount_hole_y_1,
+    tool_head_mount_machined_sprite_mount_hole_y_2,
+    tool_head_mount_machined_carriage_mount_hole_diameter,
+    tool_head_mount_machined_carriage_mount_hole_x_0,
+    tool_head_mount_machined_carriage_mount_hole_x_1,
+    tool_head_mount_machined_carriage_mount_hole_x_2,
+    tool_head_mount_machined_carriage_mount_hole_x_3,
+    tool_head_mount_machined_carriage_mount_hole_y_0,
+    tool_head_mount_machined_carriage_mount_hole_y_1,
     drive_position,
     record_metrics=False,
 ):
@@ -24,92 +66,83 @@ def create_tool_head_mount_machined_assembly(
 
     _ = tool_head_mount_machined_plate_fillet_radius
 
-    extruder_size = get_bounding_box_size(sprite_extruder)
-
-    extruder_bbox = get_bounding_box(sprite_extruder)
-    carriage_bbox = get_bounding_box(carriage)
-
-    mount_plate_y_size = carriage_bbox[1][1] - extruder_bbox[0][1]
-
-    normalized_drive_position = str(drive_position).strip().lower()
-    if normalized_drive_position == "bottom":
-        drive_position = Alignment.BOTTOM
-    elif normalized_drive_position == "top":
-        drive_position = Alignment.TOP
-    else:
-        raise ValueError(f"Unsupported drive_position '{drive_position}'")
+    drive_position = _normalize_drive_position(drive_position)
 
     carriage_mount_plate = create_box(
         tool_head_mount_machined_plate_width,
-        mount_plate_y_size,
+        tool_head_mount_machined_plate_depth,
         tool_head_mount_machined_plate_thickness,
-        # fillet_radius=tool_head_mount_machined_plate_fillet_radius,
-        # no_fillets_at=[Alignment.BOTTOM],
     )
-    carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.CENTER)
-    carriage_mount_plate = align(
+
+    cutters = {}
+
+    extruder_cutout_cutter = create_filleted_box(
+        tool_head_mount_machined_cutout_width,
+        tool_head_mount_machined_cutout_depth,
+        BIG_THING,
+        fillet_radius=tool_head_mount_machined_cutout_fillet_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, Alignment.FRONT],
+    )
+    cutout_center = get_bounding_box_center(extruder_cutout_cutter)
+    extruder_cutout_cutter = translate(
+        tool_head_mount_machined_cutout_center_x - cutout_center[0],
+        tool_head_mount_machined_cutout_center_y - cutout_center[1],
+        tool_head_mount_machined_plate_thickness / 2 - cutout_center[2],
+    )(extruder_cutout_cutter)
+    carriage_mount_plate = carriage_mount_plate.cut(extruder_cutout_cutter)
+    cutters["extruder_cutout"] = extruder_cutout_cutter
+
+    carriage_mount_plate = _cut_hole_grid(
         carriage_mount_plate,
+        x_positions=[
+            tool_head_mount_machined_sprite_mount_hole_x_0,
+            tool_head_mount_machined_sprite_mount_hole_x_1,
+        ],
+        y_positions=[
+            tool_head_mount_machined_sprite_mount_hole_y_0,
+            tool_head_mount_machined_sprite_mount_hole_y_1,
+            tool_head_mount_machined_sprite_mount_hole_y_2,
+        ],
+        diameter=tool_head_mount_machined_sprite_mount_hole_diameter,
+        name_prefix="sprite_mount_hole",
+        cutters=cutters,
+    )
+
+    carriage_mount_plate = _cut_hole_grid(
+        carriage_mount_plate,
+        x_positions=[
+            tool_head_mount_machined_carriage_mount_hole_x_0,
+            tool_head_mount_machined_carriage_mount_hole_x_1,
+            tool_head_mount_machined_carriage_mount_hole_x_2,
+            tool_head_mount_machined_carriage_mount_hole_x_3,
+        ],
+        y_positions=[
+            tool_head_mount_machined_carriage_mount_hole_y_0,
+            tool_head_mount_machined_carriage_mount_hole_y_1,
+        ],
+        diameter=tool_head_mount_machined_carriage_mount_hole_diameter,
+        name_prefix="carriage_mount_hole",
+        cutters=cutters,
+    )
+
+    retval = LeaderFollowersCuttersPart(leader=carriage_mount_plate)
+    for name, cutter in cutters.items():
+        retval.add_named_cutter(cutter, name)
+
+    retval = align(retval, carriage, Alignment.CENTER)
+    retval = align(
+        retval,
         carriage,
         Alignment.STACK_TOP,
     )
-    carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.BACK)
-
-    for alignment in [Alignment.RIGHT, Alignment.LEFT]:
-        carriage_mount_plate = align(carriage_mount_plate, carriage, alignment)
-        carriage_mount_plate = carriage.use_as_cutter_on(carriage_mount_plate)
-
-    carriage_mount_plate = align(
-        carriage_mount_plate,
+    retval = align(retval, carriage, Alignment.BACK)
+    retval = align(
+        retval,
         carriage,
         Alignment.RIGHT if drive_position == Alignment.BOTTOM else Alignment.LEFT,
     )
 
-    extruder_cutout_cutter = create_filleted_box(
-        extruder_size[0] + 4,
-        extruder_size[1] + 4,
-        BIG_THING,
-        fillet_radius=3,
-    )
-
-    extruder_cutout_cutter = align(
-        extruder_cutout_cutter, sprite_extruder, Alignment.CENTER
-    )
-
-    carriage_mount_plate = carriage_mount_plate.cut(extruder_cutout_cutter)
-
-    screw_hole_diameter = MScrew.from_size(screw_size).clearance_hole_loose
-
-    drills = {}
-    for lr in [Alignment.RIGHT, Alignment.LEFT]:
-
-        for fb in [Alignment.FRONT, Alignment.BACK]:
-            drill = create_cylinder(screw_hole_diameter / 2, 50)
-
-            drill = align(drill, carriage_mount_plate, Alignment.CENTER)
-            drill = align(drill, carriage_mount_plate, lr.edge_alignment)
-            drill = align(drill, sprite_extruder, fb.edge_alignment)
-
-            drill = translate(
-                -lr.sign * screw_hole_inset, -fb.sign * screw_hole_inset, 0
-            )(drill)
-
-            carriage_mount_plate = carriage_mount_plate.cut(drill)
-
-            drills[f"hole_drill_{lr.name}_{fb.name}"] = drill
-
-            if fb == Alignment.BACK:
-                drill = create_cylinder(screw_hole_diameter / 2, 100)
-
-                drill = align(drill, carriage_mount_plate, Alignment.CENTER)
-                drill = align(drill, carriage_mount_plate, lr.edge_alignment)
-                drill = align(drill, sprite_extruder, Alignment.STACK_BACK)
-                drill = translate(
-                    -lr.sign * screw_hole_inset, fb.sign * screw_hole_inset, 0
-                )(drill)
-
-                carriage_mount_plate = carriage_mount_plate.cut(drill)
-
-                drills[f"hole_drill_{lr.name}_{fb.name}_extra"] = drill
+    carriage_mount_plate = retval.leader
 
     if record_metrics:
         record_weight_metric(
@@ -118,10 +151,5 @@ def create_tool_head_mount_machined_assembly(
             get_volume(carriage_mount_plate),
             part_id="tool_head_mount_machined",
         )
-
-    retval = LeaderFollowersCuttersPart(leader=carriage_mount_plate)
-
-    for name, drill in drills.items():
-        retval.add_named_cutter(drill, name)
 
     return retval

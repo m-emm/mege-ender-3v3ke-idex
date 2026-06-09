@@ -223,10 +223,9 @@ globals:
       "$sub": "${x_axis_rail_length} / 2 - ${x_axis_carriage_length} / 2 - ${carriage_end_clearance}"
   x_axis_carriage_z_offset:
     $ref: x_axis_carriage_height
-  x_axis_sprite_extruder_carriage_stack_gap: 8.5
-  x_axis_left_sprite_extruder_carriage_x_offset: -21.1
-  x_axis_right_sprite_extruder_carriage_x_offset: 18
-  x_axis_sprite_extruder_rail_z_offset: 3
+  x_axis_sprite_extruder_tool_head_mount_x_offset: 2.25
+  x_axis_sprite_extruder_tool_head_mount_y_offset: -17.75
+  x_axis_sprite_extruder_tool_head_mount_z_offset: -25.55
   x_axis_carriage_stopper_width: 12
   x_axis_carriage_stopper_thickness: 8
   x_axis_carriage_stopper_depth: 25
@@ -927,6 +926,25 @@ globals:
   tool_head_mount_machined_plate_fillet_radius: 1
   tool_head_mount_machined_plate_thickness: 5
   tool_head_mount_machined_plate_width: 80
+  tool_head_mount_machined_plate_depth: 85.2
+  tool_head_mount_machined_cutout_width: 46.3
+  tool_head_mount_machined_cutout_depth: 53.7
+  tool_head_mount_machined_cutout_center_x: 42.25
+  tool_head_mount_machined_cutout_center_y: 24.85
+  tool_head_mount_machined_cutout_fillet_radius: 3
+  tool_head_mount_machined_sprite_mount_hole_diameter: 3.6
+  tool_head_mount_machined_sprite_mount_hole_x_0: 5
+  tool_head_mount_machined_sprite_mount_hole_x_1: 75
+  tool_head_mount_machined_sprite_mount_hole_y_0: 5
+  tool_head_mount_machined_sprite_mount_hole_y_1: 44.7
+  tool_head_mount_machined_sprite_mount_hole_y_2: 56.5
+  tool_head_mount_machined_carriage_mount_hole_diameter: 3.4
+  tool_head_mount_machined_carriage_mount_hole_x_0: 12.7
+  tool_head_mount_machined_carriage_mount_hole_x_1: 32.7
+  tool_head_mount_machined_carriage_mount_hole_x_2: 47.3
+  tool_head_mount_machined_carriage_mount_hole_x_3: 67.3
+  tool_head_mount_machined_carriage_mount_hole_y_0: 61.7
+  tool_head_mount_machined_carriage_mount_hole_y_1: 81.7
   tool_head_mount_carriage_mount_l_profile_thickness: 3.2
   tool_head_mount_carriage_mount_l_profile_outer_size: 30
   tool_head_mount_clamp_base_cutter_clearance: 0.8
