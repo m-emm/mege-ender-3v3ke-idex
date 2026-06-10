@@ -548,9 +548,21 @@ placement:
         - 0
         - $ref: part_fan_v2_side_y_shift
         - $ref: part_fan_v2_side_z_shift
+    - part: blower_ring_left_assembly.non_production_parts.ring_center_reference
+      to: sprite_extruder_left_assembly.non_production_parts.hotend
+      alignment: CENTER
+      axes: [0, 1]
+    - part: blower_ring_left_assembly
+      to: sprite_extruder_left_assembly.non_production_parts.hotend
+      alignment: BOTTOM
+      post_translation:
+        - 0
+        - 0
+        - $ref: part_fan_ducts_clearance
     - rigid_group:
         - single_part_fan_front_left_assembly
         - single_part_fan_side_left_assembly
+        - blower_ring_left_assembly
       to: sprite_extruder_left_assembly
     - part: single_part_fan_front_right_assembly
       post_rotation:
@@ -599,9 +611,21 @@ placement:
         - 0
         - $ref: part_fan_v2_side_y_shift
         - $ref: part_fan_v2_side_z_shift
+    - part: blower_ring_right_assembly.non_production_parts.ring_center_reference
+      to: sprite_extruder_right_assembly.non_production_parts.hotend
+      alignment: CENTER
+      axes: [0, 1]
+    - part: blower_ring_right_assembly
+      to: sprite_extruder_right_assembly.non_production_parts.hotend
+      alignment: BOTTOM
+      post_translation:
+        - 0
+        - 0
+        - $ref: part_fan_ducts_clearance
     - rigid_group:
         - single_part_fan_front_right_assembly
         - single_part_fan_side_right_assembly
+        - blower_ring_right_assembly
       to: sprite_extruder_right_assembly
 
     - rigid_group:
@@ -2646,6 +2670,16 @@ assemblies:
     resource_file: blower_ring_assembly.yaml
     depends_on: []
 
+  - name: blower_ring_left_assembly
+
+    resource_file: blower_ring_assembly.yaml
+    depends_on: []
+
+  - name: blower_ring_right_assembly
+
+    resource_file: blower_ring_assembly.yaml
+    depends_on: []
+
   - name: part_fan_left_assembly
 
     resource_file: part_fan_assembly.yaml
@@ -2672,10 +2706,12 @@ assemblies:
       - sprite_extruder_left_assembly
       - single_part_fan_front_left_assembly
       - single_part_fan_side_left_assembly
+      - blower_ring_left_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_left_assembly
       front_part_fan: single_part_fan_front_left_assembly
       side_part_fan: single_part_fan_side_left_assembly
+      blower_ring: blower_ring_left_assembly
 
   - name: part_fan_right_assembly_v2
 
@@ -2687,10 +2723,12 @@ assemblies:
       - sprite_extruder_right_assembly
       - single_part_fan_front_right_assembly
       - single_part_fan_side_right_assembly
+      - blower_ring_right_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_right_assembly
       front_part_fan: single_part_fan_front_right_assembly
       side_part_fan: single_part_fan_side_right_assembly
+      blower_ring: blower_ring_right_assembly
 
   - name: part_fan_cage_left_join
 

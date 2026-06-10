@@ -281,6 +281,12 @@ def create_blower_ring_assembly(
         feeder_ring_height,
         angle=feeder_ring_angle,
     )
+    ring_center_reference = create_box(
+        0.1,
+        0.1,
+        0.1,
+        origin=(-0.05, -0.05, feeder_ring_height / 2 - 0.05),
+    )
     feeder_ring_cutter = create_ring(
         feeder_ring_inner_diameter / 2 + feeder_ring_width,
         feeder_ring_inner_diameter / 2 + feeder_ring_wall,
@@ -306,7 +312,19 @@ def create_blower_ring_assembly(
     blower_ring = blower_ring.cut(blower_tube_cutters)
     blower_ring = blower_ring.cut(feeder_ring_cutter)
     blower_ring = rotate(feeder_ring_rotation_angle + 180, axis=(0, 0, 1))(blower_ring)
+    ring_center_reference = rotate(
+        feeder_ring_rotation_angle + 180,
+        axis=(0, 0, 1),
+    )(ring_center_reference)
 
     blower_ring_bbox = get_bounding_box(blower_ring)
-    blower_ring = translate(0, 0, -blower_ring_bbox[0][2])(blower_ring)
-    return LeaderFollowersCuttersPart(blower_ring)
+    bottom_normalization = translate(0, 0, -blower_ring_bbox[0][2])
+    blower_ring = bottom_normalization(blower_ring)
+    ring_center_reference = bottom_normalization(ring_center_reference)
+
+    retval = LeaderFollowersCuttersPart(blower_ring)
+    retval.add_named_non_production_part(
+        ring_center_reference,
+        "ring_center_reference",
+    )
+    return retval

@@ -39,6 +39,11 @@ Builder:
         artifact: followers
         name_template: "side_part_fan_{name}"
 
+      - source: injected
+        assembly: blower_ring
+        artifact: leader
+        name: blower_ring
+
   Production:
     parts: []
 

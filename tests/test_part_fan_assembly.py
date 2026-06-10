@@ -193,10 +193,21 @@ def test_blower_ring_assembly_exposes_standalone_ring():
 
     blower_ring_bbox = get_bounding_box(blower_ring.leader)
     blower_ring_size = get_bounding_box_size(blower_ring.leader)
+    ring_center_reference = blower_ring.get_named_non_production_part(
+        "ring_center_reference"
+    )
+    ring_center_reference_bbox_size = get_bounding_box_size(ring_center_reference)
+    ring_center_reference_center = get_bounding_box_center(ring_center_reference)
 
     assert get_volume(blower_ring.leader) > 0
     assert blower_ring_bbox[0][2] == pytest.approx(0)
     assert all(size > 0 for size in blower_ring_size)
+    assert get_volume(ring_center_reference) == pytest.approx(0.001)
+    assert all(size < 0.12 for size in ring_center_reference_bbox_size)
+    assert ring_center_reference_center[0] == pytest.approx(0)
+    assert ring_center_reference_center[1] == pytest.approx(0)
+    assert blower_ring_bbox[0][2] < ring_center_reference_center[2]
+    assert ring_center_reference_center[2] < blower_ring_bbox[1][2]
 
 
 def test_blower_ring_assembly_is_registered_as_standalone():
@@ -213,11 +224,16 @@ def test_blower_ring_assembly_is_registered_as_standalone():
         Loader=AssemblyDefaultsLoader,
     )
 
-    blower_ring = assemblies["blower_ring_assembly"]
+    for blower_ring_name in [
+        "blower_ring_assembly",
+        "blower_ring_left_assembly",
+        "blower_ring_right_assembly",
+    ]:
+        blower_ring = assemblies[blower_ring_name]
+        assert blower_ring["resource_file"] == "blower_ring_assembly.yaml"
+        assert blower_ring["depends_on"] == []
+        assert "inject_parts" not in blower_ring
 
-    assert blower_ring["resource_file"] == "blower_ring_assembly.yaml"
-    assert blower_ring["depends_on"] == []
-    assert "inject_parts" not in blower_ring
     generator_path = blower_ring_resource["Parts"]["BlowerRingAssembly"]["Properties"][
         "Generator"
     ]
@@ -272,6 +288,12 @@ def test_part_fan_v2_resource_is_visualization_only_collection():
             "artifact": "followers",
             "name_template": "side_part_fan_{name}",
         },
+        {
+            "source": "injected",
+            "assembly": "blower_ring",
+            "artifact": "leader",
+            "name": "blower_ring",
+        },
     ]
     assert resource["Parameters"] == {
         "part_fan_v2_front_rotation": {"Type": "Float"},
@@ -301,6 +323,15 @@ def test_part_fan_v2_assemblies_are_registered_with_standalone_fans():
         assert fan["depends_on"] == []
         assert "inject_parts" not in fan
 
+    for blower_ring_name in [
+        "blower_ring_left_assembly",
+        "blower_ring_right_assembly",
+    ]:
+        blower_ring = assemblies[blower_ring_name]
+        assert blower_ring["resource_file"] == "blower_ring_assembly.yaml"
+        assert blower_ring["depends_on"] == []
+        assert "inject_parts" not in blower_ring
+
     expected_v2 = {
         "left": {
             "mount_chain": [
@@ -311,6 +342,7 @@ def test_part_fan_v2_assemblies_are_registered_with_standalone_fans():
             "sprite": "sprite_extruder_left_assembly",
             "front": "single_part_fan_front_left_assembly",
             "side": "single_part_fan_side_left_assembly",
+            "blower_ring": "blower_ring_left_assembly",
         },
         "right": {
             "mount_chain": [
@@ -321,6 +353,7 @@ def test_part_fan_v2_assemblies_are_registered_with_standalone_fans():
             "sprite": "sprite_extruder_right_assembly",
             "front": "single_part_fan_front_right_assembly",
             "side": "single_part_fan_side_right_assembly",
+            "blower_ring": "blower_ring_right_assembly",
         },
     }
     for side, expected in expected_v2.items():
@@ -332,12 +365,14 @@ def test_part_fan_v2_assemblies_are_registered_with_standalone_fans():
                 expected["sprite"],
                 expected["front"],
                 expected["side"],
+                expected["blower_ring"],
             ]
         )
         assert assembly["inject_parts"] == {
             "sprite_extruder": expected["sprite"],
             "front_part_fan": expected["front"],
             "side_part_fan": expected["side"],
+            "blower_ring": expected["blower_ring"],
         }
 
 
@@ -372,6 +407,11 @@ def test_part_fan_v2_standalone_fans_use_parameterized_legacy_pose():
         0,
         {"$ref": "part_fan_v2_side_y_shift"},
         {"$ref": "part_fan_v2_side_z_shift"},
+    ]
+    blower_ring_translation = [
+        0,
+        0,
+        {"$ref": "part_fan_ducts_clearance"},
     ]
 
     expected_front_targets = {
@@ -432,10 +472,35 @@ def test_part_fan_v2_standalone_fans_use_parameterized_legacy_pose():
         }
         assert mount_plate_steps[-1]["post_translation"] == side_translation
 
+        blower_ring_name = f"blower_ring_{side}_assembly"
+        hotend_target = f"sprite_extruder_{side}_assembly.non_production_parts.hotend"
+        ring_center_steps = [
+            placement
+            for placement in placements
+            if placement.get("part")
+            == f"{blower_ring_name}.non_production_parts.ring_center_reference"
+            and placement.get("to") == hotend_target
+        ]
+        assert [
+            (step["alignment"], step.get("axes")) for step in ring_center_steps
+        ] == [("CENTER", [0, 1])]
+
+        ring_leader_steps = [
+            placement
+            for placement in placements
+            if placement.get("part") == blower_ring_name
+            and placement.get("to") == hotend_target
+        ]
+        assert [
+            (step["alignment"], step.get("axes")) for step in ring_leader_steps
+        ] == [("BOTTOM", None)]
+        assert ring_leader_steps[-1]["post_translation"] == blower_ring_translation
+
     for side in ["left", "right"]:
         fan_group = {
             f"single_part_fan_front_{side}_assembly",
             f"single_part_fan_side_{side}_assembly",
+            f"blower_ring_{side}_assembly",
         }
         rigid_step = next(
             placement
