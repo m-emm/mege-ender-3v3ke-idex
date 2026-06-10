@@ -532,7 +532,7 @@ placement:
     - part: single_part_fan_side_left_assembly.followers.mount_plate
       to: sprite_extruder_left_assembly
       alignment: BOTTOM
-    - part: single_part_fan_side_left_assembly
+    - part: single_part_fan_side_left_assembly.followers.mount_plate
       to: sprite_extruder_left_assembly
       alignment: STACK_RIGHT
     - rigid_group:
@@ -563,14 +563,14 @@ placement:
       post_rotation:
         angle: 90
         axis: [0, 1, 0]
-    - part: single_part_fan_side_right_assembly
-      to: sprite_extruder_right_assembly.non_production_parts.hotend
-      alignment: CENTER
+    - part: single_part_fan_side_right_assembly.followers.mount_plate
+      to: sprite_extruder_right_assembly
+      alignment: FRONT
 
-    - part: single_part_fan_side_right_assembly
-      to: sprite_extruder_right_assembly.non_production_parts.hotend
+    - part: single_part_fan_side_right_assembly.followers.mount_plate
+      to: sprite_extruder_right_assembly
       alignment: BOTTOM
-    - part: single_part_fan_side_right_assembly
+    - part: single_part_fan_side_right_assembly.followers.mount_plate
       to: sprite_extruder_right_assembly
       alignment: STACK_RIGHT
     - rigid_group:
