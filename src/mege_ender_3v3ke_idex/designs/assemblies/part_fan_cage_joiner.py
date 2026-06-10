@@ -140,8 +140,12 @@ def join_part_fans_with_extruder_cage(
 
     bottom_flanges = []
     top_flanges = []
+    consumed_part_fan_refs = []
     for anchor_name, extension_alignment in flange_specs:
         anchor_part = part_fans.get_named_non_production_part(anchor_name)
+        consumed_part_fan_refs.append(
+            part_fans.part_ref_for_named_non_production_part(anchor_name)
+        )
         bottom_flange, top_flange, _ = _create_join_flange_halves(
             anchor_part=anchor_part,
             extension_alignment=extension_alignment,
@@ -161,6 +165,8 @@ def join_part_fans_with_extruder_cage(
         joined_part_fans.leader = joined_part_fans.leader.fuse(bottom_flange)
     for top_flange in top_flanges:
         joined_extruder_cage.leader = joined_extruder_cage.leader.fuse(top_flange)
+    for consumed_part_fan_ref in consumed_part_fan_refs:
+        joined_part_fans.add_consumed_part_ref(consumed_part_fan_ref)
 
     return {
         "part_fans": joined_part_fans,

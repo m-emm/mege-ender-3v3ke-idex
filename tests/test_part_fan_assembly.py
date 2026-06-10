@@ -23,6 +23,9 @@ from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly import (
     _blower_outer_squeeze_scale,
     create_part_fan_assembly,
 )
+from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly_v2 import (
+    create_part_fan_assembly_v2,
+)
 from mege_ender_3v3ke_idex.designs.assemblies.blower_ring_assembly import (
     create_blower_ring_assembly,
 )
@@ -247,17 +250,64 @@ def test_blower_ring_assembly_is_registered_as_standalone():
     assert "part_fan_duct_extension_length" not in blower_ring_resource_text
 
 
-def test_part_fan_v2_resource_is_visualization_only_collection():
+def test_part_fan_v2_assembly_fuses_and_consumes_selected_injected_artifacts():
+    front_part_fan = create_single_part_fan_assembly(
+        **assembly_kwargs(create_single_part_fan_assembly)
+    )
+    front_part_fan.additional_data["part_ref_origin"] = {
+        "assembly_name": "single_part_fan_front_left_assembly"
+    }
+    side_part_fan = create_single_part_fan_assembly(
+        **assembly_kwargs(create_single_part_fan_assembly)
+    )
+    side_part_fan.additional_data["part_ref_origin"] = {
+        "assembly_name": "single_part_fan_side_left_assembly"
+    }
+    blower_ring = create_blower_ring_assembly(
+        **assembly_kwargs(create_blower_ring_assembly)
+    )
+    blower_ring.additional_data["part_ref_origin"] = {
+        "assembly_name": "blower_ring_left_assembly"
+    }
+
+    part_fan_v2 = create_part_fan_assembly_v2(
+        sprite_extruder=create_box(1, 1, 1),
+        front_part_fan=front_part_fan,
+        side_part_fan=side_part_fan,
+        blower_ring=blower_ring,
+    )
+
+    assert get_volume(part_fan_v2.leader) > 0
+    assert part_fan_v2.consumed_part_refs() == [
+        "single_part_fan_front_left_assembly.followers.mount_plate",
+        "single_part_fan_front_left_assembly.followers.outlet",
+        "single_part_fan_side_left_assembly.followers.mount_plate",
+        "single_part_fan_side_left_assembly.followers.outlet",
+        "blower_ring_left_assembly.leader",
+    ]
+
+
+def test_part_fan_v2_resource_has_generator_and_broad_consumption_visualization():
     resource_text = (ASSEMBLIES_DIR / "part_fan_assembly_v2.yaml").read_text()
     resource = yaml.load(resource_text, Loader=AssemblyDefaultsLoader)
 
-    assert resource["Builder"]["Collection"] is True
+    assert "Collection" not in resource["Builder"]
     assert resource["Builder"]["Production"]["parts"] == []
-    assert "Parts" not in resource
-    assert "Generator" not in resource_text
+    generator_path = resource["Parts"]["PartFanAssemblyV2"]["Properties"][
+        "Generator"
+    ]
+    assert generator_path == (
+        "mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly_v2."
+        "create_part_fan_assembly_v2"
+    )
 
     visualization_parts = resource["Builder"]["Visualization"]["parts"]
     assert visualization_parts == [
+        {
+            "source": "self",
+            "artifact": "leader",
+            "name": "part_fan_v2",
+        },
         {
             "source": "injected",
             "assembly": "sprite_extruder",
