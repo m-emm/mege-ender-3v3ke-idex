@@ -2516,6 +2516,11 @@ assemblies:
     inject_parts:
       sprite_extruder: sprite_extruder_assembly
 
+  - name: single_part_fan_assembly
+
+    resource_file: single_part_fan_assembly.yaml
+    depends_on: []
+
   - name: part_fan_left_assembly
 
     resource_file: part_fan_assembly.yaml

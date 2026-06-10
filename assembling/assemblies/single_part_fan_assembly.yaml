@@ -1,0 +1,61 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Standalone single part fan assembly
+
+Builder:
+  Visualization:
+    preview:
+      views:
+        - top
+        - left
+        - front
+    parts:
+      - source: self
+        artifact: leader
+        name: single_part_fan
+      - source: self
+        artifact: followers
+        name_template: "single_part_fan_{name}"
+
+Parameters:
+  part_fan_axis_from_left_offset:
+    Type: Float
+  part_fan_body_cutter_clearance:
+    Type: Float
+  part_fan_fillet_radius:
+    Type: Float
+  part_fan_hole_diameter:
+    Type: Float
+  part_fan_mount_plate_thickness:
+    Type: Float
+  part_fan_nut_cutter_clearance:
+    Type: Float
+  part_fan_outlet_connector_length:
+    Type: Float
+  part_fan_outlet_wall:
+    Type: Float
+  part_fan_screw_hole_inset:
+    Type: Float
+  part_fan_screw_mount_base_thickness:
+    Type: Float
+  part_fan_screw_mount_cutout_size:
+    Type: Float
+  part_fan_screw_size:
+    Type: String
+  part_fan_size:
+    Type: Float
+  part_fan_thickness:
+    Type: Float
+  part_fan_window_cutter_outside_length:
+    Type: Float
+  part_fan_window_height:
+    Type: Float
+  part_fan_window_width:
+    Type: Float
+
+Parts:
+  SinglePartFanAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.single_part_fan_assembly.create_single_part_fan_assembly

@@ -2,10 +2,16 @@ import inspect
 from pathlib import Path
 
 import pytest
+import yaml
 
 pytest.importorskip("cadquery")
 
-from assembly_defaults import DEFAULTS, assembly_kwargs
+from assembly_defaults import (
+    ASSEMBLIES_DIR,
+    DEFAULTS,
+    AssemblyDefaultsLoader,
+    assembly_kwargs,
+)
 from mege_ender_3v3ke_idex.designs.assemblies.part_fan_cage_joiner import (
     _create_join_flange_halves,
     join_part_fans_with_extruder_cage,
@@ -16,6 +22,9 @@ from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly import (
     _blower_nozzle_tip_scales,
     _blower_outer_squeeze_scale,
     create_part_fan_assembly,
+)
+from mege_ender_3v3ke_idex.designs.assemblies.single_part_fan_assembly import (
+    create_single_part_fan_assembly,
 )
 from mege_ender_3v3ke_idex.designs.assemblies.sprite_extruder_assembly import (
     create_sprite_extruder_assembly,
@@ -131,6 +140,47 @@ def test_part_fan_clearance_is_declarative_parameter():
     assert "right_part_fan_parameters:" not in assembly_yaml
     assert "left_part_fan_parameters:" not in defaults_yaml
     assert "right_part_fan_parameters:" not in defaults_yaml
+
+
+def test_single_part_fan_assembly_exposes_body_mount_plate_and_outlet():
+    single_part_fan = create_single_part_fan_assembly(
+        **assembly_kwargs(create_single_part_fan_assembly)
+    )
+
+    assert get_volume(single_part_fan.leader) > 0
+    assert {"mount_plate", "outlet"}.issubset(single_part_fan.follower_indices_by_name)
+
+    body_bbox = get_bounding_box(single_part_fan.leader)
+    outlet_bbox = get_bounding_box(single_part_fan.get_named_follower("outlet"))
+
+    assert outlet_bbox[0][1] < body_bbox[0][1]
+
+
+def test_single_part_fan_assembly_is_registered_as_standalone():
+    config = yaml.load(
+        (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+    assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
+    single_part_fan_resource = yaml.load(
+        (ASSEMBLIES_DIR / "single_part_fan_assembly.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+
+    single_part_fan = assemblies["single_part_fan_assembly"]
+
+    assert single_part_fan["resource_file"] == "single_part_fan_assembly.yaml"
+    assert single_part_fan["depends_on"] == []
+    assert "inject_parts" not in single_part_fan
+    generator_path = single_part_fan_resource["Parts"]["SinglePartFanAssembly"][
+        "Properties"
+    ]["Generator"]
+
+    assert generator_path == (
+        "mege_ender_3v3ke_idex.designs.assemblies.single_part_fan_assembly."
+        "create_single_part_fan_assembly"
+    )
+    assert ".part_fan_assembly." not in generator_path
 
 
 def test_part_fans_use_physical_side_and_front_roles():

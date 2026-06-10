@@ -57,6 +57,9 @@ When adding a new assembly, create both:
 - a generator in `src/mege_ender_3v3ke_idex/designs/assemblies/<name>.py`
 - a matching manifest in `assembling/assemblies/<name>.yaml`
 
+- Keep resource YAMLs cache-isolated: one `*_assembly.yaml` should normally point to one dedicated generator module. The builder hashes the generator source file, so two resource YAMLs sharing one module will invalidate each other's cached CAD artifacts when either generator changes.
+- During staged refactors of expensive CAD assemblies, prefer intentional short-lived duplication in separate generator modules over sharing assembly generator modules. Remove the legacy copy once the downstream assembly has been migrated.
+
 The generator should return assembly-friendly artifacts with stable names so the builder can select `leader`, `followers`, and `non_production_parts` cleanly.
 
 #### 2. Composite Parts with LeaderFollowersCuttersPart
@@ -148,6 +151,7 @@ For support tuning, interpret `support_threshold_angle` carefully: higher values
 - Prefer module-level constants for all tunable parameters
 
 ### Design Patterns
+- Avoid local internal helpers in assembly generator modules, use straight scripts telling the story of constructing the part in a linear way. shellforgepy is a DSL, use it directly and do not wrap it in local wrappers
 - Separate reusable components into their own functions (e.g., `create_motor_with_mount()`, `create_idler_cage()`)
 - Use `PartCollector` for accumulating multiple parts before fusing
 - Prefer assembly manifests plus builder configuration for composition, export, and visualization
