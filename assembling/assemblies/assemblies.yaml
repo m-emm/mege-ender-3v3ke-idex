@@ -538,16 +538,13 @@ placement:
       alignment: FRONT
     - part: single_part_fan_side_left_assembly.followers.mount_plate
       to: sprite_extruder_left_assembly
-      alignment: BOTTOM
-    - part: single_part_fan_side_left_assembly.followers.mount_plate
-      to: sprite_extruder_left_assembly
       alignment: STACK_RIGHT
       stack_gap:
         $ref: part_fan_v2_side_stack_gap
       post_translation:
         - 0
         - $ref: part_fan_v2_side_y_shift
-        - $ref: part_fan_v2_side_z_shift
+        - 0
     - part: blower_ring_left_assembly.non_production_parts.ring_center_reference
       to: sprite_extruder_left_assembly.non_production_parts.hotend
       alignment: CENTER
@@ -559,6 +556,10 @@ placement:
         - 0
         - 0
         - $ref: part_fan_ducts_clearance
+    - part: single_part_fan_side_left_assembly.followers.outlet
+      to: blower_ring_left_assembly
+      alignment: STACK_TOP
+      stack_gap: -2
     - rigid_group:
         - single_part_fan_front_left_assembly
         - single_part_fan_side_left_assembly
@@ -601,16 +602,13 @@ placement:
 
     - part: single_part_fan_side_right_assembly.followers.mount_plate
       to: sprite_extruder_right_assembly
-      alignment: BOTTOM
-    - part: single_part_fan_side_right_assembly.followers.mount_plate
-      to: sprite_extruder_right_assembly
       alignment: STACK_RIGHT
       stack_gap:
         $ref: part_fan_v2_side_stack_gap
       post_translation:
         - 0
         - $ref: part_fan_v2_side_y_shift
-        - $ref: part_fan_v2_side_z_shift
+        - 0
     - part: blower_ring_right_assembly.non_production_parts.ring_center_reference
       to: sprite_extruder_right_assembly.non_production_parts.hotend
       alignment: CENTER
@@ -622,6 +620,10 @@ placement:
         - 0
         - 0
         - $ref: part_fan_ducts_clearance
+    - part: single_part_fan_side_right_assembly.followers.outlet
+      to: blower_ring_right_assembly
+      alignment: STACK_TOP
+      stack_gap: -2
     - rigid_group:
         - single_part_fan_front_right_assembly
         - single_part_fan_side_right_assembly

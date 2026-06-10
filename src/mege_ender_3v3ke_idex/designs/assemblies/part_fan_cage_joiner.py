@@ -2,6 +2,10 @@
 
 from shellforgepy.simple import *
 
+import logging
+
+_logger = logging.getLogger(__name__)
+
 
 def _create_flange_block(width, depth, height, fillet_radius, attachment_alignment):
     if fillet_radius > 0:
@@ -158,14 +162,40 @@ def join_part_fans_with_extruder_cage(
         bottom_flanges.append(bottom_flange)
         top_flanges.append(top_flange)
 
-    joined_part_fans = part_fans.copy()
-    joined_extruder_cage = extruder_cage.copy()
+    joined_part_fans = LeaderFollowersCuttersPart(part_fans.leader.copy())
+    for name, follower in part_fans.get_named_follower_items():
+        if name in [anchor_name for anchor_name, _ in flange_specs]:
+            continue
+        joined_part_fans.add_named_follower(follower.copy(), name)
+
+    for name, nfp in part_fans.get_named_non_production_part_items():
+        if name in [anchor_name for anchor_name, _ in flange_specs]:
+            continue
+        joined_part_fans.add_named_non_production_part(nfp.copy(), name)
+
+    for name, cutter in part_fans.get_named_cutter_items():
+        joined_part_fans.add_named_cutter(cutter.copy(), name)
+
+    joined_extruder_cage = LeaderFollowersCuttersPart(extruder_cage.leader.copy())
+    for name, follower in extruder_cage.get_named_follower_items():
+        if name in [anchor_name for anchor_name, _ in flange_specs]:
+            continue
+        joined_extruder_cage.add_named_follower(follower.copy(), name)
+    for name, nfp in extruder_cage.get_named_non_production_part_items():
+        if name in [anchor_name for anchor_name, _ in flange_specs]:
+            continue
+        joined_extruder_cage.add_named_non_production_part(nfp.copy(), name)
+    for name, cutter in extruder_cage.get_named_cutter_items():
+        if name in [anchor_name for anchor_name, _ in flange_specs]:
+            continue
+        joined_extruder_cage.add_named_cutter(cutter.copy(), name)
 
     for bottom_flange in bottom_flanges:
         joined_part_fans.leader = joined_part_fans.leader.fuse(bottom_flange)
     for top_flange in top_flanges:
         joined_extruder_cage.leader = joined_extruder_cage.leader.fuse(top_flange)
     for consumed_part_fan_ref in consumed_part_fan_refs:
+        _logger.info(f"Adding consumed part ref for {consumed_part_fan_ref}")
         joined_part_fans.add_consumed_part_ref(consumed_part_fan_ref)
 
     return {

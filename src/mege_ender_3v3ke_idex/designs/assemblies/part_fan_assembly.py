@@ -34,86 +34,6 @@ def _create_side_mount_plate(
     return side_mount_plate
 
 
-def _create_duct_back_mount_plate_connector(
-    *,
-    sprite_extruder,
-    tool_head_back_mount_plate_connector_height,
-    tool_head_back_mount_plate_connector_thickness,
-    tool_head_back_mount_plate_connector_width,
-    duct_back_mount_plate_height,
-    duct_back_mount_plate_height_border,
-    duct_back_mount_plate_offset,
-    duct_back_mount_plate_thickness,
-    duct_back_mount_plate_width,
-    duct_back_mount_plate_width_border,
-):
-    duct_back_mount_plate = create_box(
-        duct_back_mount_plate_width,
-        duct_back_mount_plate_height,
-        duct_back_mount_plate_thickness,
-    )
-    cutout_width = duct_back_mount_plate_width - 2 * duct_back_mount_plate_width_border
-    cutout_height = (
-        duct_back_mount_plate_height - 2 * duct_back_mount_plate_height_border
-    )
-    cutout_fillet_radius = min(cutout_width, cutout_height) / 4
-
-    duct_back_mount_plate_cutout = create_filleted_box(
-        cutout_width,
-        cutout_height,
-        duct_back_mount_plate_thickness + 10,
-        fillet_radius=cutout_fillet_radius,
-        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
-    )
-    duct_back_mount_plate_cutout = align(
-        duct_back_mount_plate_cutout,
-        duct_back_mount_plate,
-        Alignment.CENTER,
-    )
-    duct_back_mount_plate = duct_back_mount_plate.cut(duct_back_mount_plate_cutout)
-    duct_back_mount_plate = rotate(90, axis=(1, 0, 0))(duct_back_mount_plate)
-    duct_back_mount_plate = align(
-        duct_back_mount_plate,
-        sprite_extruder,
-        Alignment.CENTER,
-    )
-    duct_back_mount_plate = align(
-        duct_back_mount_plate,
-        sprite_extruder,
-        Alignment.STACK_BACK,
-    )
-    duct_back_mount_plate = align(
-        duct_back_mount_plate,
-        sprite_extruder,
-        Alignment.BOTTOM,
-    )
-    duct_back_mount_plate = translate(0, 0, duct_back_mount_plate_offset)(
-        duct_back_mount_plate
-    )
-
-    duct_back_mount_plate_connector = create_box(
-        tool_head_back_mount_plate_connector_width,
-        tool_head_back_mount_plate_connector_thickness,
-        tool_head_back_mount_plate_connector_height,
-    )
-    duct_back_mount_plate_connector = align(
-        duct_back_mount_plate_connector,
-        duct_back_mount_plate,
-        Alignment.BACK,
-    )
-    duct_back_mount_plate_connector = align(
-        duct_back_mount_plate_connector,
-        duct_back_mount_plate,
-        Alignment.STACK_BOTTOM,
-    )
-    duct_back_mount_plate_connector = align(
-        duct_back_mount_plate_connector,
-        duct_back_mount_plate,
-        Alignment.RIGHT,
-    )
-    return duct_back_mount_plate_connector
-
-
 def _create_side_fan_mount_eye(
     *,
     side_fan_mount_plate,
@@ -159,8 +79,7 @@ def _create_side_fan_mount_eye(
         Alignment.STACK_RIGHT,
         stack_gap=tool_head_additional_mount_plate_clearance,
     )
-    if hasattr(sprite_extruder, "use_as_cutter_on"):
-        side_fan_mount_eye = sprite_extruder.use_as_cutter_on(side_fan_mount_eye)
+    side_fan_mount_eye = sprite_extruder.use_as_cutter_on(side_fan_mount_eye)
     return side_fan_mount_eye
 
 
@@ -240,18 +159,24 @@ def create_part_fan_assembly(
         tool_head_additional_mount_plate_height=tool_head_additional_mount_plate_height,
         tool_head_additional_mount_plate_thickness=tool_head_additional_mount_plate_thickness,
     )
-    duct_back_mount_plate_connector = _create_duct_back_mount_plate_connector(
-        sprite_extruder=sprite_extruder,
-        tool_head_back_mount_plate_connector_height=tool_head_back_mount_plate_connector_height,
-        tool_head_back_mount_plate_connector_thickness=tool_head_back_mount_plate_connector_thickness,
-        tool_head_back_mount_plate_connector_width=tool_head_back_mount_plate_connector_width,
-        duct_back_mount_plate_height=duct_back_mount_plate_height,
-        duct_back_mount_plate_height_border=duct_back_mount_plate_height_border,
-        duct_back_mount_plate_offset=duct_back_mount_plate_offset,
-        duct_back_mount_plate_thickness=duct_back_mount_plate_thickness,
-        duct_back_mount_plate_width=duct_back_mount_plate_width,
-        duct_back_mount_plate_width_border=duct_back_mount_plate_width_border,
+
+    duct_back_mount_plate_connector = create_box(
+        tool_head_back_mount_plate_connector_width,
+        tool_head_back_mount_plate_connector_thickness,
+        tool_head_back_mount_plate_connector_height,
     )
+    duct_back_mount_plate_connector = align(
+        duct_back_mount_plate_connector,
+        sprite_extruder,
+        Alignment.STACK_BACK,
+    )
+    duct_back_mount_plate_connector = align(
+        duct_back_mount_plate_connector, sprite_extruder, Alignment.RIGHT
+    )
+    duct_back_mount_plate_connector = align(
+        duct_back_mount_plate_connector, blower_ring, Alignment.STACK_TOP
+    )
+
     side_fan_mount_eye = _create_side_fan_mount_eye(
         side_fan_mount_plate=side_fan_mount_plate,
         sprite_extruder=sprite_extruder,
@@ -264,6 +189,7 @@ def create_part_fan_assembly(
     part_fans = part_fans.fuse(duct_back_mount_plate_connector)
     part_fans = part_fans.fuse(side_fan_mount_eye)
 
+    part_fans = sprite_extruder.use_as_cutter_on(part_fans)
     retval = LeaderFollowersCuttersPart(part_fans)
     retval.add_named_non_production_part(side_mount_plate, "side_mount_plate")
     retval.add_named_non_production_part(
