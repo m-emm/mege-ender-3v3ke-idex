@@ -886,10 +886,10 @@ globals:
   side_part_fan_mount_plate_cross_oversize: 5
   front_part_fan_mount_plate_blow_direction_offset: -2
   front_part_fan_mount_plate_blow_direction_oversize: 7
-  front_part_fan_mount_plate_cross_oversize: 8
+  front_part_fan_mount_plate_cross_oversize: 9
   part_fan_v2_front_rotation: 15
-  part_fan_v2_front_y_shift: -18.06
-  part_fan_v2_front_z_shift: 8.731555
+  part_fan_v2_front_y_shift: -19.7
+  part_fan_v2_front_z_shift: 7.2
   part_fan_v2_side_stack_gap: 0.51
   part_fan_v2_side_y_shift: -17
   part_fan_v2_side_z_shift: -13.768445

@@ -421,8 +421,8 @@ def create_extruder_cage_assembly(
         )
         back_strip = align(
             back_strip,
-            sprite_mount_base_plate,
-            Alignment.CENTER,
+            sprite_extruder,
+            Alignment.STACK_BACK,
         )
 
         back_strip = align(back_strip, sprite_extruder, Alignment.CENTER, axes=[2])

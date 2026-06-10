@@ -1,6 +1,12 @@
 """Standalone single part fan assembly."""
 
+import logging
+
 from shellforgepy.simple import *
+
+_logger = logging.getLogger(__name__)
+
+part_fan_overall_clearance = 0.2
 
 
 def create_single_part_fan_assembly(
@@ -31,7 +37,7 @@ def create_single_part_fan_assembly(
 
     big_thing = BIG_THING
     outlet_length = 2
-    outlet_clearance = 0.2
+    outlet_clearance = 0.25
     outlet_inner_duct_length = 3.5
 
     body = create_filleted_box(
@@ -155,6 +161,15 @@ def create_single_part_fan_assembly(
     )
     body = body.cut(window_cutter)
 
+    body_stand_in = materialize_bounding_box(body)
+
+    _logger.info(
+        f"Expanding side fan stand in by {part_fan_overall_clearance}mm for clearance"
+    )
+
+    fan_clearance_cutter = expand(body_stand_in, part_fan_overall_clearance)
+    mount_plate = mount_plate.cut(fan_clearance_cutter)
+
     retval = LeaderFollowersCuttersPart(body)
     retval.add_named_cutter(window_cutter, "window_cutter")
 
@@ -195,5 +210,8 @@ def create_single_part_fan_assembly(
     outlet_inner_duct = outlet_inner_duct.cut(outlet_inner_duct_cutter)
     outlet = outlet.fuse(outlet_inner_duct)
     retval.add_named_follower(outlet, "outlet")
+
+    _logger.info(f"Adding cutter")
+    retval.add_named_cutter(fan_clearance_cutter, "fan_clearance_cutter")
 
     return retval

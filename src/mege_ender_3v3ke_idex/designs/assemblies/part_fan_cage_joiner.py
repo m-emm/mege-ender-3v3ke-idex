@@ -1,8 +1,8 @@
 """Join part fan and extruder cage assemblies with a shared flange."""
 
-from shellforgepy.simple import *
-
 import logging
+
+from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
 

@@ -1,37 +1,12 @@
 """Part fan assembly built from standalone injected fan artifacts."""
 
+import logging
+
 from shellforgepy.simple import *
 
+_logger = logging.getLogger(__name__)
 
-def _create_side_mount_plate(
-    *,
-    sprite_extruder,
-    tool_head_additional_mount_plate_clearance,
-    tool_head_additional_mount_plate_depth,
-    tool_head_additional_mount_plate_depth_offset,
-    tool_head_additional_mount_plate_height,
-    tool_head_additional_mount_plate_thickness,
-):
-    side_mount_plate = create_box(
-        tool_head_additional_mount_plate_thickness,
-        tool_head_additional_mount_plate_depth,
-        tool_head_additional_mount_plate_height,
-    )
-    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.CENTER)
-    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.FRONT)
-    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.STACK_BOTTOM)
-    side_mount_plate = align(
-        side_mount_plate,
-        sprite_extruder,
-        Alignment.STACK_LEFT,
-        stack_gap=tool_head_additional_mount_plate_clearance,
-    )
-    side_mount_plate = translate(
-        0,
-        tool_head_additional_mount_plate_depth_offset,
-        0,
-    )(side_mount_plate)
-    return side_mount_plate
+part_fan_overall_clearance = 0.15
 
 
 def _create_side_fan_mount_eye(
@@ -149,16 +124,35 @@ def create_part_fan_assembly(
 
     front_part_fan_cutter = create_convex_hull(front_part_fan.leader, front_outlet)
     blower_ring_with_cut = blower_ring.leader.cut(front_part_fan_cutter)
+
     blower_ring_with_cut = blower_ring_with_cut.cut(duct_extension_air_cutter)
 
-    side_mount_plate = _create_side_mount_plate(
-        sprite_extruder=sprite_extruder,
-        tool_head_additional_mount_plate_clearance=tool_head_additional_mount_plate_clearance,
-        tool_head_additional_mount_plate_depth=tool_head_additional_mount_plate_depth,
-        tool_head_additional_mount_plate_depth_offset=tool_head_additional_mount_plate_depth_offset,
-        tool_head_additional_mount_plate_height=tool_head_additional_mount_plate_height,
-        tool_head_additional_mount_plate_thickness=tool_head_additional_mount_plate_thickness,
+    blower_ring_with_cut = front_part_fan.use_as_cutter_on(blower_ring_with_cut)
+
+    side_mount_plate = create_box(
+        tool_head_additional_mount_plate_thickness,
+        tool_head_additional_mount_plate_depth,
+        tool_head_additional_mount_plate_height,
     )
+    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.CENTER)
+    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.FRONT)
+    side_mount_plate = align(side_mount_plate, sprite_extruder, Alignment.STACK_BOTTOM)
+    side_mount_plate = align(
+        side_mount_plate,
+        sprite_extruder,
+        Alignment.STACK_LEFT,
+        stack_gap=tool_head_additional_mount_plate_clearance,
+    )
+    side_mount_plate = translate(
+        0,
+        tool_head_additional_mount_plate_depth_offset,
+        0,
+    )(side_mount_plate)
+
+    front_fan_cutter = front_mount_plate.fuse(front_part_fan.leader)
+    front_fan_cutter = create_convex_hull(front_fan_cutter)
+
+    side_mount_plate = side_mount_plate.cut(front_fan_cutter)
 
     duct_back_mount_plate_connector = create_box(
         tool_head_back_mount_plate_connector_width,
@@ -183,13 +177,15 @@ def create_part_fan_assembly(
         tool_head_additional_mount_plate_clearance=tool_head_additional_mount_plate_clearance,
     )
 
-    part_fans = part_fans.fuse(blower_ring_with_cut)
-    part_fans = part_fans.fuse(duct_extension)
     part_fans = part_fans.fuse(side_mount_plate)
-    part_fans = part_fans.fuse(duct_back_mount_plate_connector)
     part_fans = part_fans.fuse(side_fan_mount_eye)
 
+    part_fans = part_fans.fuse(blower_ring_with_cut)
+    part_fans = part_fans.fuse(duct_extension)
+    part_fans = part_fans.fuse(duct_back_mount_plate_connector)
+
     part_fans = sprite_extruder.use_as_cutter_on(part_fans)
+
     retval = LeaderFollowersCuttersPart(part_fans)
     retval.add_named_non_production_part(side_mount_plate, "side_mount_plate")
     retval.add_named_non_production_part(
