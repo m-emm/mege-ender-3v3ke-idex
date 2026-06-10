@@ -163,7 +163,9 @@ def create_single_part_fan_assembly(
     outlet = create_box(part_fan_size, outlet_length, part_fan_thickness)
     outlet = align(outlet, body, Alignment.CENTER)
     outlet = align(outlet, body, Alignment.STACK_FRONT, stack_gap=outlet_clearance)
-    outlet = outlet.cut(window_cutter)
+
+    outlet_window_cutter = align(window_cutter, outlet, Alignment.STACK_FRONT)
+    outlet = outlet.cut(outlet_window_cutter)
 
     outlet_inner_duct = create_box(
         part_fan_window_width - 2 * outlet_clearance,
@@ -183,6 +185,7 @@ def create_single_part_fan_assembly(
         outlet_inner_duct,
         Alignment.CENTER,
     )
+    outlet = outlet.cut(outlet_inner_duct_cutter)
     outlet_inner_duct = outlet_inner_duct.cut(outlet_inner_duct_cutter)
     outlet = outlet.fuse(outlet_inner_duct)
     retval.add_named_follower(outlet, "outlet")

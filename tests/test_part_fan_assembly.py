@@ -269,15 +269,35 @@ def test_part_fan_v2_assembly_fuses_and_consumes_selected_injected_artifacts():
     blower_ring.additional_data["part_ref_origin"] = {
         "assembly_name": "blower_ring_left_assembly"
     }
+    side_outlet = side_part_fan.get_named_follower("outlet")
+    side_outlet_bbox = get_bounding_box(side_outlet)
+    side_outlet_center = get_bounding_box_center(side_outlet)
+    ring_center = get_bounding_box_center(
+        blower_ring.get_named_non_production_part("ring_center_reference")
+    )
 
     part_fan_v2 = create_part_fan_assembly_v2(
-        sprite_extruder=create_box(1, 1, 1),
-        front_part_fan=front_part_fan,
-        side_part_fan=side_part_fan,
-        blower_ring=blower_ring,
+        **assembly_kwargs(
+            create_part_fan_assembly_v2,
+            sprite_extruder=create_box(1, 1, 1),
+            front_part_fan=front_part_fan,
+            side_part_fan=side_part_fan,
+            blower_ring=blower_ring,
+        )
+    )
+    part_fan_v2_bbox = get_bounding_box(part_fan_v2.leader)
+    connector_axis = (
+        0
+        if abs(ring_center[0] - side_outlet_center[0])
+        >= abs(ring_center[1] - side_outlet_center[1])
+        else 1
     )
 
     assert get_volume(part_fan_v2.leader) > 0
+    if ring_center[connector_axis] > side_outlet_center[connector_axis]:
+        assert part_fan_v2_bbox[1][connector_axis] > side_outlet_bbox[1][connector_axis]
+    else:
+        assert part_fan_v2_bbox[0][connector_axis] < side_outlet_bbox[0][connector_axis]
     assert part_fan_v2.consumed_part_refs() == [
         "single_part_fan_front_left_assembly.followers.mount_plate",
         "single_part_fan_front_left_assembly.followers.outlet",
@@ -293,9 +313,7 @@ def test_part_fan_v2_resource_has_generator_and_broad_consumption_visualization(
 
     assert "Collection" not in resource["Builder"]
     assert resource["Builder"]["Production"]["parts"] == []
-    generator_path = resource["Parts"]["PartFanAssemblyV2"]["Properties"][
-        "Generator"
-    ]
+    generator_path = resource["Parts"]["PartFanAssemblyV2"]["Properties"]["Generator"]
     assert generator_path == (
         "mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly_v2."
         "create_part_fan_assembly_v2"
@@ -352,6 +370,10 @@ def test_part_fan_v2_resource_has_generator_and_broad_consumption_visualization(
         "part_fan_v2_side_stack_gap": {"Type": "Float"},
         "part_fan_v2_side_y_shift": {"Type": "Float"},
         "part_fan_v2_side_z_shift": {"Type": "Float"},
+        "duct_extension_width": {"Type": "Float"},
+        "part_fan_duct_extension_length": {"Type": "Float"},
+        "feeder_ring_height": {"Type": "Float"},
+        "feeder_ring_wall": {"Type": "Float"},
     }
 
 
