@@ -1,32 +1,63 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for the part fan assembly
+Description: Part fan fused connector assembly
 
 Builder:
   Visualization:
     preview:
+      enabled: true
       views:
+        - isometric
+        - front
         - top
         - left
-        - front
+      width: 512
+      height: 512
     parts:
       - source: self
         artifact: leader
-        name: blower_ducts
+        name: part_fan
       - source: self
         artifact: non_production_parts
         name_template: "{name}"
+
       - source: injected
         assembly: sprite_extruder
         artifact: all
+        name_template: "sprite_extruder_{name}"
+
+      - source: injected
+        assembly: front_part_fan
+        artifact: leader
+        name: front_part_fan
+      - source: injected
+        assembly: front_part_fan
+        artifact: followers
+        name_template: "front_part_fan_{name}"
+
+      - source: injected
+        assembly: side_part_fan
+        artifact: leader
+        name: side_part_fan
+      - source: injected
+        assembly: side_part_fan
+        artifact: followers
+        name_template: "side_part_fan_{name}"
+
+      - source: injected
+        assembly: blower_ring
+        artifact: leader
+        name: blower_ring
 
   Production:
+    process_data_preset: petgcf_max_strength_high_speed_06
     process_data:
-      source: mege_3devops.process_data.mender3.process_data_04_high_speed.PROCESS_DATA_PLA_04_HS
       overrides:
         process_overrides:
           enable_support: "1"
-          support_threshold_angle: "30"
+          support_type: tree(auto)
+          support_style: organic
+          support_threshold_angle: "25"
           brim_type: no_brim
     parts:
       - source: self
@@ -36,71 +67,13 @@ Builder:
         prod_rotation_axis: [1, 0, 0]
 
 Parameters:
-  blower_center_offset:
-    Type: Float
-  blowers_down_angle:
-    Type: Float
-  blowers_duct_diameter:
-    Type: Float
-  blowers_nozzle_center_distance:
-    Type: Float
-  blowers_wall:
-    Type: Float
   duct_extension_width:
-    Type: Float
-  feeder_ring_extra_angle:
-    Type: Float
-  feeder_ring_height:
-    Type: Float
-  feeder_ring_inner_diameter:
-    Type: Float
-  feeder_ring_rotation_angle:
-    Type: Float
-  feeder_ring_wall:
-    Type: Float
-  feeder_ring_width:
-    Type: Float
-  num_blowers:
-    Type: Integer
-  part_fan_axis_from_left_offset:
-    Type: Float
-  part_fan_body_cutter_clearance:
-    Type: Float
-  part_fan_clearance:
     Type: Float
   part_fan_duct_extension_length:
     Type: Float
-  part_fan_ducts_clearance:
+  feeder_ring_height:
     Type: Float
-  part_fan_fillet_radius:
-    Type: Float
-  part_fan_hole_diameter:
-    Type: Float
-  part_fan_mount_plate_thickness:
-    Type: Float
-  part_fan_nut_cutter_clearance:
-    Type: Float
-  part_fan_outlet_connector_length:
-    Type: Float
-  part_fan_screw_hole_inset:
-    Type: Float
-  part_fan_screw_mount_base_thickness:
-    Type: Float
-  part_fan_screw_mount_cutout_size:
-    Type: Float
-  part_fan_screw_size:
-    Type: String
-  part_fan_size:
-    Type: Float
-  part_fan_thickness:
-    Type: Float
-  part_fan_window_cutter_outside_length:
-    Type: Float
-  part_fan_window_height:
-    Type: Float
-  part_fan_window_width:
-    Type: Float
-  part_fan_outlet_wall:
+  feeder_ring_wall:
     Type: Float
   tool_head_additional_mount_plate_clearance:
     Type: Float
@@ -108,13 +81,9 @@ Parameters:
     Type: Float
   tool_head_additional_mount_plate_depth_offset:
     Type: Float
-  tool_head_additional_mount_plate_fillet_radius:
-    Type: Float
   tool_head_additional_mount_plate_height:
     Type: Float
   tool_head_additional_mount_plate_thickness:
-    Type: Float
-  tool_head_additional_mount_plate_z_offset:
     Type: Float
   tool_head_back_mount_plate_connector_height:
     Type: Float
@@ -134,10 +103,6 @@ Parameters:
     Type: Float
   duct_back_mount_plate_width_border:
     Type: Float
-  side_part_fan_parameters:
-    Type: Json
-  front_part_fan_parameters:
-    Type: Json
 
 Parts:
   PartFanAssembly:

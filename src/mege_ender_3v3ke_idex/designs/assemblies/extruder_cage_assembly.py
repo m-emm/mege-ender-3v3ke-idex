@@ -36,15 +36,26 @@ def create_extruder_cage_assembly(
     extruder_size = get_bounding_box_size(sprite_extruder)
     screw_record = MScrew.from_size(extruder_cage_screw_size)
     sprite_extruder_size = get_bounding_box_size(sprite_extruder)
+    sprite_extruder_bbox = get_bounding_box(sprite_extruder)
     sprite_extruder_body_size = get_bounding_box_size(sprite_extruder.leader)
     mount_hole_cutter = sprite_extruder.get_named_cutter("mount_hole_cutter")
 
-    sprite_mount_base_plate = create_filleted_box(
-        sprite_extruder_size[0] + 2 * extruder_cage_flange_thickness,
-        extruder_cage_mount_plate_thickness,
+    extruder_mount_base_plate_thickness = extruder_cage_mount_plate_thickness + 2
+    tool_head_mount_machined_bbox = get_bounding_box(tool_head_mount_machined)
+    tool_head_mount_machined_max_x = tool_head_mount_machined_bbox[1][0]
+    tool_head_mount_machined_min_x = tool_head_mount_machined_bbox[0][0]
+
+    sprite_extruder_max_x = sprite_extruder_bbox[1][0]
+    sprite_mount_base_plate_width = (
+        sprite_extruder_max_x
+        - tool_head_mount_machined_min_x
+        + extruder_cage_flange_thickness
+    )
+
+    sprite_mount_base_plate = create_box(
+        sprite_mount_base_plate_width,
+        extruder_mount_base_plate_thickness,
         tool_head_mount_base_plate_height,
-        fillet_radius=extruder_cage_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.FRONT, Alignment.BACK],
     )
     sprite_mount_base_plate = align(
         sprite_mount_base_plate,
@@ -60,6 +71,12 @@ def create_extruder_cage_assembly(
         sprite_mount_base_plate,
         sprite_extruder,
         Alignment.STACK_BACK,
+    )
+
+    sprite_mount_base_plate = align(
+        sprite_mount_base_plate,
+        tool_head_mount_machined,
+        Alignment.LEFT,
     )
     sprite_mount_base_plate = sprite_extruder.use_as_cutter_on(sprite_mount_base_plate)
     sprite_mount_base_plate = sprite_mount_base_plate.cut(sprite_extruder.leader)
@@ -424,8 +441,6 @@ def create_extruder_cage_assembly(
     top_strip_size = get_bounding_box_size(right_mount_plate)
 
     top_strip_bbox_min_x = get_bounding_box(right_mount_plate)[0][0]
-    tool_head_mount_machined_bbox = get_bounding_box(tool_head_mount_machined)
-    tool_head_mount_machined_max_x = tool_head_mount_machined_bbox[1][0]
 
     left_flange_width = tool_head_mount_machined_max_x - top_strip_bbox_min_x
 
@@ -444,7 +459,6 @@ def create_extruder_cage_assembly(
     left_mount_plate_bbox = get_bounding_box(left_mount_plate)
     left_mount_plate_bbox_size = get_bounding_box_size(left_mount_plate)
     left_mount_plate_max_x = left_mount_plate_bbox[1][0]
-    tool_head_mount_machined_min_x = tool_head_mount_machined_bbox[0][0]
 
     left_flange_width = left_mount_plate_max_x - tool_head_mount_machined_min_x
 
@@ -483,6 +497,24 @@ def create_extruder_cage_assembly(
         flange_connector, tool_head_mount_machined, Alignment.STACK_BOTTOM
     )
 
+    extruder_fan = sprite_extruder.get_named_non_production_part("fan")
+    extruder_fan_bbox = get_bounding_box(extruder_fan)
+    extruder_fan_min_x = extruder_fan_bbox[0][0]
+
+    back_left_flange_width = extruder_fan_min_x - tool_head_mount_machined_min_x - 1
+    back_left_flange = create_box(
+        back_left_flange_width,
+        extruder_size[1] + extruder_mount_base_plate_thickness,
+        flange_size[2] / 2,
+    )
+
+    back_left_flange = align(back_left_flange, sprite_extruder, Alignment.FRONT)
+    back_left_flange = align(back_left_flange, left_flange, Alignment.LEFT)
+    back_left_flange = align(back_left_flange, left_flange, Alignment.TOP)
+
+    left_flange = left_flange.fuse(back_left_flange)
+    left_flange = tool_head_mount_machined.use_as_cutter_on(left_flange)
+
     cage_leader = sprite_mount_base_plate
     cage_leader = cage_leader.fuse(left_mount_plate)
     cage_leader = cage_leader.fuse(part_fan_back_mount_plate)
@@ -498,10 +530,6 @@ def create_extruder_cage_assembly(
         cage_leader = cage_leader.cut(cutter)
 
     cage = LeaderFollowersCuttersPart(cage_leader)
-    # cage.add_named_follower(sprite_mount_base_plate, "sprite_mount_base_plate")
-    # cage.add_named_follower(left_mount_plate, "part_fan_side_mount_plate")
-    # cage.add_named_follower(part_fan_back_mount_plate, "part_fan_back_mount_plate")
-    # cage.add_named_follower(nitehawk_rear_mount_plate, "nitehawk_rear_mount_plate")
 
     for side_name, screw in sprite_mount_screws:
         cage.add_named_non_production_part(

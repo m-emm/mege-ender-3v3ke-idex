@@ -1,6 +1,4 @@
 import inspect
-from pathlib import Path
-
 import pytest
 import yaml
 
@@ -16,18 +14,14 @@ from mege_ender_3v3ke_idex.designs.assemblies.part_fan_cage_joiner import (
     _create_join_flange_halves,
     join_part_fans_with_extruder_cage,
 )
-from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly import (
+from mege_ender_3v3ke_idex.designs.assemblies.blower_ring_assembly import (
     _blower_air_squeeze_scale,
-    _blower_feeder_ring_path_metrics,
     _blower_nozzle_tip_scales,
     _blower_outer_squeeze_scale,
-    create_part_fan_assembly,
-)
-from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly_v2 import (
-    create_part_fan_assembly_v2,
-)
-from mege_ender_3v3ke_idex.designs.assemblies.blower_ring_assembly import (
     create_blower_ring_assembly,
+)
+from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly import (
+    create_part_fan_assembly,
 )
 from mege_ender_3v3ke_idex.designs.assemblies.single_part_fan_assembly import (
     create_single_part_fan_assembly,
@@ -62,25 +56,50 @@ def _current_blower_path_kwargs():
     }
 
 
-def test_blower_feeder_ring_path_metrics_match_current_geometry():
-    metrics = _blower_feeder_ring_path_metrics(**_current_blower_path_kwargs())
+def _create_part_fan_inputs(sprite_extruder=None):
+    if sprite_extruder is None:
+        sprite_extruder = create_sprite_extruder_assembly(
+            **assembly_kwargs(create_sprite_extruder_assembly)
+        )
 
-    assert [metric["fan_entry_angle_degrees"] for metric in metrics] == pytest.approx(
-        [143.91, 143.91, 143.91],
-        abs=0.01,
+    front_part_fan = create_single_part_fan_assembly(
+        **assembly_kwargs(create_single_part_fan_assembly)
     )
-    assert [metric["nozzle_tip_angle_degrees"] for metric in metrics] == pytest.approx(
-        [10.39, 130.39, 250.39],
-        abs=0.01,
+    front_part_fan.additional_data["part_ref_origin"] = {
+        "assembly_name": "single_part_fan_front_left_assembly"
+    }
+    side_part_fan = create_single_part_fan_assembly(
+        **assembly_kwargs(create_single_part_fan_assembly)
     )
-    assert [metric["path_angle_degrees"] for metric in metrics] == pytest.approx(
-        [133.52, 13.52, 106.48],
-        abs=0.01,
+    side_part_fan.additional_data["part_ref_origin"] = {
+        "assembly_name": "single_part_fan_side_left_assembly"
+    }
+    blower_ring = create_blower_ring_assembly(
+        **assembly_kwargs(create_blower_ring_assembly)
     )
-    assert [metric["path_length"] for metric in metrics] == pytest.approx(
-        [57.67, 5.84, 46.00],
-        abs=0.05,
+    blower_ring.additional_data["part_ref_origin"] = {
+        "assembly_name": "blower_ring_left_assembly"
+    }
+    return sprite_extruder, front_part_fan, side_part_fan, blower_ring
+
+
+def _create_part_fans_with_origin():
+    sprite_extruder, front_part_fan, side_part_fan, blower_ring = (
+        _create_part_fan_inputs()
     )
+    part_fans = create_part_fan_assembly(
+        **assembly_kwargs(
+            create_part_fan_assembly,
+            sprite_extruder=sprite_extruder,
+            front_part_fan=front_part_fan,
+            side_part_fan=side_part_fan,
+            blower_ring=blower_ring,
+        )
+    )
+    part_fans.additional_data["part_ref_origin"] = {
+        "assembly_name": "part_fan_left_assembly"
+    }
+    return part_fans
 
 
 def test_blower_nozzle_tip_scales_increase_with_path_length():
@@ -122,30 +141,27 @@ def test_blower_outer_squeeze_is_unsqueezed_when_air_scale_is_unsqueezed():
     assert outer_scale == pytest.approx(1.0)
 
 
-def test_part_fan_clearance_is_declarative_parameter():
+def test_part_fan_promoted_signature_and_defaults_drop_legacy_role_parameters():
     parameters = inspect.signature(create_part_fan_assembly).parameters
 
-    assert "part_fan_clearance" in parameters
-    assert "side_part_fan_parameters" in parameters
-    assert "front_part_fan_parameters" in parameters
-    assert "left_part_fan_parameters" not in parameters
-    assert "right_part_fan_parameters" not in parameters
+    assert "front_part_fan" in parameters
+    assert "side_part_fan" in parameters
+    assert "blower_ring" in parameters
+    assert "part_fan_clearance" not in parameters
+    assert "side_part_fan_parameters" not in parameters
+    assert "front_part_fan_parameters" not in parameters
 
-    assembly_yaml = Path("assembling/assemblies/part_fan_assembly.yaml").read_text()
-    defaults_yaml = Path(
-        "assembling/assemblies", "idex" + "_parameters.yaml"
-    ).read_text()
+    assembly_yaml = (ASSEMBLIES_DIR / "part_fan_assembly.yaml").read_text()
+    defaults_yaml = (ASSEMBLIES_DIR / ("idex" + "_parameters.yaml")).read_text()
 
-    assert "part_fan_clearance:" in assembly_yaml
-    assert "part_fan_clearance: 0.8" in defaults_yaml
-    assert "side_part_fan_parameters:" in assembly_yaml
-    assert "front_part_fan_parameters:" in assembly_yaml
-    assert "side_part_fan_parameters:" in defaults_yaml
-    assert "front_part_fan_parameters:" in defaults_yaml
-    assert "left_part_fan_parameters:" not in assembly_yaml
-    assert "right_part_fan_parameters:" not in assembly_yaml
-    assert "left_part_fan_parameters:" not in defaults_yaml
-    assert "right_part_fan_parameters:" not in defaults_yaml
+    assert "part_fan_clearance:" not in assembly_yaml
+    assert "part_fan_clearance:" not in defaults_yaml
+    assert "side_part_fan_parameters:" not in assembly_yaml
+    assert "front_part_fan_parameters:" not in assembly_yaml
+    assert "side_part_fan_parameters:" not in defaults_yaml
+    assert "front_part_fan_parameters:" not in defaults_yaml
+    assert "front_part_fan_mount_plate_cross_oversize:" in defaults_yaml
+    assert "side_part_fan_mount_plate_cross_oversize:" in defaults_yaml
 
 
 def test_single_part_fan_assembly_exposes_body_mount_plate_and_outlet():
@@ -160,6 +176,34 @@ def test_single_part_fan_assembly_exposes_body_mount_plate_and_outlet():
     outlet_bbox = get_bounding_box(single_part_fan.get_named_follower("outlet"))
 
     assert outlet_bbox[0][1] < body_bbox[0][1]
+
+
+def test_single_part_fan_mount_plate_uses_role_specific_oversize_and_offset():
+    baseline_mount_plate = create_single_part_fan_assembly(
+        **assembly_kwargs(
+            create_single_part_fan_assembly,
+            part_fan_mount_plate_blow_direction_offset=0,
+            part_fan_mount_plate_blow_direction_oversize=7,
+            part_fan_mount_plate_cross_oversize=8,
+        )
+    ).get_named_follower("mount_plate")
+    mount_plate = create_single_part_fan_assembly(
+        **assembly_kwargs(
+            create_single_part_fan_assembly,
+            part_fan_mount_plate_blow_direction_offset=-2,
+            part_fan_mount_plate_blow_direction_oversize=7,
+            part_fan_mount_plate_cross_oversize=8,
+        )
+    ).get_named_follower("mount_plate")
+
+    mount_plate_size = get_bounding_box_size(mount_plate)
+    mount_plate_center = get_bounding_box_center(mount_plate)
+
+    assert mount_plate_size[0] == pytest.approx(DEFAULTS["part_fan_size"] + 8)
+    assert mount_plate_size[1] == pytest.approx(DEFAULTS["part_fan_size"] + 7)
+    assert mount_plate_center[1] - get_bounding_box_center(baseline_mount_plate)[
+        1
+    ] == pytest.approx(2)
 
 
 def test_single_part_fan_assembly_is_registered_as_standalone():
@@ -250,25 +294,10 @@ def test_blower_ring_assembly_is_registered_as_standalone():
     assert "part_fan_duct_extension_length" not in blower_ring_resource_text
 
 
-def test_part_fan_v2_assembly_fuses_and_consumes_selected_injected_artifacts():
-    front_part_fan = create_single_part_fan_assembly(
-        **assembly_kwargs(create_single_part_fan_assembly)
+def test_part_fan_assembly_fuses_and_consumes_selected_injected_artifacts():
+    sprite_extruder, front_part_fan, side_part_fan, blower_ring = (
+        _create_part_fan_inputs(sprite_extruder=create_box(1, 1, 1))
     )
-    front_part_fan.additional_data["part_ref_origin"] = {
-        "assembly_name": "single_part_fan_front_left_assembly"
-    }
-    side_part_fan = create_single_part_fan_assembly(
-        **assembly_kwargs(create_single_part_fan_assembly)
-    )
-    side_part_fan.additional_data["part_ref_origin"] = {
-        "assembly_name": "single_part_fan_side_left_assembly"
-    }
-    blower_ring = create_blower_ring_assembly(
-        **assembly_kwargs(create_blower_ring_assembly)
-    )
-    blower_ring.additional_data["part_ref_origin"] = {
-        "assembly_name": "blower_ring_left_assembly"
-    }
     side_outlet = side_part_fan.get_named_follower("outlet")
     side_outlet_bbox = get_bounding_box(side_outlet)
     side_outlet_center = get_bounding_box_center(side_outlet)
@@ -276,16 +305,16 @@ def test_part_fan_v2_assembly_fuses_and_consumes_selected_injected_artifacts():
         blower_ring.get_named_non_production_part("ring_center_reference")
     )
 
-    part_fan_v2 = create_part_fan_assembly_v2(
+    part_fans = create_part_fan_assembly(
         **assembly_kwargs(
-            create_part_fan_assembly_v2,
-            sprite_extruder=create_box(1, 1, 1),
+            create_part_fan_assembly,
+            sprite_extruder=sprite_extruder,
             front_part_fan=front_part_fan,
             side_part_fan=side_part_fan,
             blower_ring=blower_ring,
         )
     )
-    part_fan_v2_bbox = get_bounding_box(part_fan_v2.leader)
+    part_fans_bbox = get_bounding_box(part_fans.leader)
     connector_axis = (
         0
         if abs(ring_center[0] - side_outlet_center[0])
@@ -293,12 +322,22 @@ def test_part_fan_v2_assembly_fuses_and_consumes_selected_injected_artifacts():
         else 1
     )
 
-    assert get_volume(part_fan_v2.leader) > 0
+    assert get_volume(part_fans.leader) > 0
+    assert {"side_mount_plate", "duct_back_mount_plate_connector"}.issubset(
+        part_fans.non_production_indices_by_name
+    )
+    assert get_volume(part_fans.get_named_non_production_part("side_mount_plate")) > 0
+    assert (
+        get_volume(
+            part_fans.get_named_non_production_part("duct_back_mount_plate_connector")
+        )
+        > 0
+    )
     if ring_center[connector_axis] > side_outlet_center[connector_axis]:
-        assert part_fan_v2_bbox[1][connector_axis] > side_outlet_bbox[1][connector_axis]
+        assert part_fans_bbox[1][connector_axis] > side_outlet_bbox[1][connector_axis]
     else:
-        assert part_fan_v2_bbox[0][connector_axis] < side_outlet_bbox[0][connector_axis]
-    assert part_fan_v2.consumed_part_refs() == [
+        assert part_fans_bbox[0][connector_axis] < side_outlet_bbox[0][connector_axis]
+    assert part_fans.consumed_part_refs() == [
         "single_part_fan_front_left_assembly.followers.mount_plate",
         "single_part_fan_front_left_assembly.followers.outlet",
         "single_part_fan_side_left_assembly.followers.mount_plate",
@@ -307,25 +346,41 @@ def test_part_fan_v2_assembly_fuses_and_consumes_selected_injected_artifacts():
     ]
 
 
-def test_part_fan_v2_resource_has_generator_and_broad_consumption_visualization():
-    resource_text = (ASSEMBLIES_DIR / "part_fan_assembly_v2.yaml").read_text()
+def test_part_fan_resource_has_canonical_generator_and_consumption_visualization():
+    resource_text = (ASSEMBLIES_DIR / "part_fan_assembly.yaml").read_text()
     resource = yaml.load(resource_text, Loader=AssemblyDefaultsLoader)
 
+    assert not (ASSEMBLIES_DIR / ("part_fan_assembly" + "_v2.yaml")).exists()
     assert "Collection" not in resource["Builder"]
-    assert resource["Builder"]["Production"]["parts"] == []
-    generator_path = resource["Parts"]["PartFanAssemblyV2"]["Properties"]["Generator"]
-    assert generator_path == (
-        "mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly_v2."
-        "create_part_fan_assembly_v2"
-    )
-
-    visualization_parts = resource["Builder"]["Visualization"]["parts"]
-    assert visualization_parts == [
+    assert resource["Builder"]["Production"]["parts"] == [
         {
             "source": "self",
             "artifact": "leader",
-            "name": "part_fan_v2",
+            "name": "blower_ducts",
+            "prod_rotation_angle": 50,
+            "prod_rotation_axis": [1, 0, 0],
+        }
+    ]
+    generator_path = resource["Parts"]["PartFanAssembly"]["Properties"]["Generator"]
+    assert generator_path == (
+        "mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly."
+        "create_part_fan_assembly"
+    )
+
+    visualization_parts = resource["Builder"]["Visualization"]["parts"]
+    assert visualization_parts[:2] == [
+        {
+            "source": "self",
+            "artifact": "leader",
+            "name": "part_fan",
         },
+        {
+            "source": "self",
+            "artifact": "non_production_parts",
+            "name_template": "{name}",
+        },
+    ]
+    assert visualization_parts[2:] == [
         {
             "source": "injected",
             "assembly": "sprite_extruder",
@@ -364,20 +419,28 @@ def test_part_fan_v2_resource_has_generator_and_broad_consumption_visualization(
         },
     ]
     assert resource["Parameters"] == {
-        "part_fan_v2_front_rotation": {"Type": "Float"},
-        "part_fan_v2_front_y_shift": {"Type": "Float"},
-        "part_fan_v2_front_z_shift": {"Type": "Float"},
-        "part_fan_v2_side_stack_gap": {"Type": "Float"},
-        "part_fan_v2_side_y_shift": {"Type": "Float"},
-        "part_fan_v2_side_z_shift": {"Type": "Float"},
         "duct_extension_width": {"Type": "Float"},
         "part_fan_duct_extension_length": {"Type": "Float"},
         "feeder_ring_height": {"Type": "Float"},
         "feeder_ring_wall": {"Type": "Float"},
+        "tool_head_additional_mount_plate_clearance": {"Type": "Float"},
+        "tool_head_additional_mount_plate_depth": {"Type": "Float"},
+        "tool_head_additional_mount_plate_depth_offset": {"Type": "Float"},
+        "tool_head_additional_mount_plate_height": {"Type": "Float"},
+        "tool_head_additional_mount_plate_thickness": {"Type": "Float"},
+        "tool_head_back_mount_plate_connector_height": {"Type": "Float"},
+        "tool_head_back_mount_plate_connector_thickness": {"Type": "Float"},
+        "tool_head_back_mount_plate_connector_width": {"Type": "Float"},
+        "duct_back_mount_plate_height": {"Type": "Float"},
+        "duct_back_mount_plate_height_border": {"Type": "Float"},
+        "duct_back_mount_plate_offset": {"Type": "Float"},
+        "duct_back_mount_plate_thickness": {"Type": "Float"},
+        "duct_back_mount_plate_width": {"Type": "Float"},
+        "duct_back_mount_plate_width_border": {"Type": "Float"},
     }
 
 
-def test_part_fan_v2_assemblies_are_registered_with_standalone_fans():
+def test_part_fan_assemblies_are_registered_with_standalone_fans():
     config = yaml.load(
         (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
         Loader=AssemblyDefaultsLoader,
@@ -394,6 +457,29 @@ def test_part_fan_v2_assemblies_are_registered_with_standalone_fans():
         assert fan["resource_file"] == "single_part_fan_assembly.yaml"
         assert fan["depends_on"] == []
         assert "inject_parts" not in fan
+
+    assert assemblies["single_part_fan_front_left_assembly"]["parameters"] == {
+        "part_fan_mount_plate_blow_direction_offset": {
+            "$ref": "front_part_fan_mount_plate_blow_direction_offset"
+        },
+        "part_fan_mount_plate_blow_direction_oversize": {
+            "$ref": "front_part_fan_mount_plate_blow_direction_oversize"
+        },
+        "part_fan_mount_plate_cross_oversize": {
+            "$ref": "front_part_fan_mount_plate_cross_oversize"
+        },
+    }
+    assert assemblies["single_part_fan_side_left_assembly"]["parameters"] == {
+        "part_fan_mount_plate_blow_direction_offset": {
+            "$ref": "side_part_fan_mount_plate_blow_direction_offset"
+        },
+        "part_fan_mount_plate_blow_direction_oversize": {
+            "$ref": "side_part_fan_mount_plate_blow_direction_oversize"
+        },
+        "part_fan_mount_plate_cross_oversize": {
+            "$ref": "side_part_fan_mount_plate_cross_oversize"
+        },
+    }
 
     for blower_ring_name in [
         "blower_ring_left_assembly",
@@ -429,8 +515,9 @@ def test_part_fan_v2_assemblies_are_registered_with_standalone_fans():
         },
     }
     for side, expected in expected_v2.items():
-        assembly = assemblies[f"part_fan_{side}_assembly_v2"]
-        assert assembly["resource_file"] == "part_fan_assembly_v2.yaml"
+        assert f"part_fan_{side}_assembly" + "_v2" not in assemblies
+        assembly = assemblies[f"part_fan_{side}_assembly"]
+        assert assembly["resource_file"] == "part_fan_assembly.yaml"
         assert assembly["depends_on"] == (
             expected["mount_chain"]
             + [
@@ -582,40 +669,19 @@ def test_part_fan_v2_standalone_fans_use_parameterized_legacy_pose():
         assert rigid_step["to"] == f"sprite_extruder_{side}_assembly"
 
 
-def test_part_fans_use_physical_side_and_front_roles():
-    sprite_extruder = create_sprite_extruder_assembly(
-        **assembly_kwargs(create_sprite_extruder_assembly)
-    )
-    part_fans = create_part_fan_assembly(
-        **assembly_kwargs(create_part_fan_assembly, sprite_extruder=sprite_extruder)
-    )
+def test_part_fans_preserve_joiner_anchor_markers_in_leader():
+    part_fans = _create_part_fans_with_origin()
 
-    hotend_center = get_bounding_box_center(
-        sprite_extruder.get_named_non_production_part("hotend")
-    )
-    sprite_body_bbox = get_bounding_box(sprite_extruder.leader)
-    side_fan_center = get_bounding_box_center(
-        part_fans.get_named_non_production_part("side_fan")
-    )
-    front_fan_center = get_bounding_box_center(
-        part_fans.get_named_non_production_part("front_fan")
-    )
-
-    assert side_fan_center[0] > hotend_center[0]
-    assert side_fan_center[1] < hotend_center[1]
-    assert front_fan_center[1] < hotend_center[1]
-    assert abs(front_fan_center[0] - hotend_center[0]) < DEFAULTS["part_fan_size"] / 2
-    assert side_fan_center[1] >= sprite_body_bbox[0][1] - DEFAULTS["part_fan_size"] / 2
-    assert front_fan_center[1] >= sprite_body_bbox[0][1] - DEFAULTS["part_fan_size"] / 2
+    for marker_name in ["side_mount_plate", "duct_back_mount_plate_connector"]:
+        marker = part_fans.get_named_non_production_part(marker_name)
+        assert get_volume(marker) > 0
+        assert (
+            get_volume(part_fans.leader) - get_volume(part_fans.leader.cut(marker)) > 1
+        )
 
 
 def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
-    sprite_extruder = create_sprite_extruder_assembly(
-        **assembly_kwargs(create_sprite_extruder_assembly)
-    )
-    part_fans = create_part_fan_assembly(
-        **assembly_kwargs(create_part_fan_assembly, sprite_extruder=sprite_extruder)
-    )
+    part_fans = _create_part_fans_with_origin()
     extruder_cage = LeaderFollowersCuttersPart(
         translate(100, 100, 100)(create_box(5, 5, 5))
     )
@@ -657,8 +723,8 @@ def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
     )
     side_mount_plate_depth = get_bounding_box_size(side_mount_plate)[1]
 
-    assert get_volume(bottom_flange) < 8.0 * side_mount_plate_depth * 3.0
-    assert get_volume(top_flange) < 8.0 * side_mount_plate_depth * 3.0
+    assert get_volume(bottom_flange) > 8.0 * side_mount_plate_depth * 3.0
+    assert get_volume(top_flange) > 8.0 * side_mount_plate_depth * 3.0
 
     fan_bottom_delta = get_volume(joined_part_fans.leader) - get_volume(
         joined_part_fans.leader.cut(bottom_flange)

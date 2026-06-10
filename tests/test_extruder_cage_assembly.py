@@ -478,11 +478,48 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         for placement in placements
     )
 
-    for side in ["left", "right"]:
+    expected_part_fans = {
+        "left": {
+            "mount_chain": [
+                "x_axis_rail_assembly",
+                "x_axis_left_carriage_assembly",
+                "tool_head_mount_machined_bottom_assembly",
+            ],
+            "sprite": "sprite_extruder_left_assembly",
+            "front": "single_part_fan_front_left_assembly",
+            "side": "single_part_fan_side_left_assembly",
+            "blower_ring": "blower_ring_left_assembly",
+        },
+        "right": {
+            "mount_chain": [
+                "x_axis_rail_assembly",
+                "x_axis_right_carriage_assembly",
+                "tool_head_mount_machined_top_assembly",
+            ],
+            "sprite": "sprite_extruder_right_assembly",
+            "front": "single_part_fan_front_right_assembly",
+            "side": "single_part_fan_side_right_assembly",
+            "blower_ring": "blower_ring_right_assembly",
+        },
+    }
+    for side, expected in expected_part_fans.items():
+        assert f"part_fan_{side}_assembly" + "_v2" not in assemblies
         part_fan = assemblies[f"part_fan_{side}_assembly"]
-        sprite_extruder = f"sprite_extruder_{side}_assembly"
-        assert part_fan["depends_on"] == [sprite_extruder]
-        assert part_fan["inject_parts"] == {"sprite_extruder": sprite_extruder}
+        assert part_fan["depends_on"] == (
+            expected["mount_chain"]
+            + [
+                expected["sprite"],
+                expected["front"],
+                expected["side"],
+                expected["blower_ring"],
+            ]
+        )
+        assert part_fan["inject_parts"] == {
+            "sprite_extruder": expected["sprite"],
+            "front_part_fan": expected["front"],
+            "side_part_fan": expected["side"],
+            "blower_ring": expected["blower_ring"],
+        }
 
     assert joiner_resource["Parts"]["PartFanCageJoiner"]["Type"] == (
         "Shellforgepy::AssemblyJoiner"

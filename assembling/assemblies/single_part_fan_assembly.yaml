@@ -26,6 +26,12 @@ Parameters:
     Type: Float
   part_fan_hole_diameter:
     Type: Float
+  part_fan_mount_plate_blow_direction_offset:
+    Type: Float
+  part_fan_mount_plate_blow_direction_oversize:
+    Type: Float
+  part_fan_mount_plate_cross_oversize:
+    Type: Float
   part_fan_mount_plate_thickness:
     Type: Float
   part_fan_nut_cutter_clearance:

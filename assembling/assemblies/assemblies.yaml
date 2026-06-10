@@ -2637,8 +2637,13 @@ assemblies:
 
     depends_on:
       - sprite_extruder_assembly
+      - single_part_fan_assembly
+      - blower_ring_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_assembly
+      front_part_fan: single_part_fan_assembly
+      side_part_fan: single_part_fan_assembly
+      blower_ring: blower_ring_assembly
 
   - name: single_part_fan_assembly
 
@@ -2649,21 +2654,37 @@ assemblies:
 
     resource_file: single_part_fan_assembly.yaml
     depends_on: []
+    parameters:
+      part_fan_mount_plate_blow_direction_offset: !Ref front_part_fan_mount_plate_blow_direction_offset
+      part_fan_mount_plate_blow_direction_oversize: !Ref front_part_fan_mount_plate_blow_direction_oversize
+      part_fan_mount_plate_cross_oversize: !Ref front_part_fan_mount_plate_cross_oversize
 
   - name: single_part_fan_front_right_assembly
 
     resource_file: single_part_fan_assembly.yaml
     depends_on: []
+    parameters:
+      part_fan_mount_plate_blow_direction_offset: !Ref front_part_fan_mount_plate_blow_direction_offset
+      part_fan_mount_plate_blow_direction_oversize: !Ref front_part_fan_mount_plate_blow_direction_oversize
+      part_fan_mount_plate_cross_oversize: !Ref front_part_fan_mount_plate_cross_oversize
 
   - name: single_part_fan_side_left_assembly
 
     resource_file: single_part_fan_assembly.yaml
     depends_on: []
+    parameters:
+      part_fan_mount_plate_blow_direction_offset: !Ref side_part_fan_mount_plate_blow_direction_offset
+      part_fan_mount_plate_blow_direction_oversize: !Ref side_part_fan_mount_plate_blow_direction_oversize
+      part_fan_mount_plate_cross_oversize: !Ref side_part_fan_mount_plate_cross_oversize
 
   - name: single_part_fan_side_right_assembly
 
     resource_file: single_part_fan_assembly.yaml
     depends_on: []
+    parameters:
+      part_fan_mount_plate_blow_direction_offset: !Ref side_part_fan_mount_plate_blow_direction_offset
+      part_fan_mount_plate_blow_direction_oversize: !Ref side_part_fan_mount_plate_blow_direction_oversize
+      part_fan_mount_plate_cross_oversize: !Ref side_part_fan_mount_plate_cross_oversize
 
   - name: blower_ring_assembly
 
@@ -2684,22 +2705,6 @@ assemblies:
 
     resource_file: part_fan_assembly.yaml
     depends_on:
-      - sprite_extruder_left_assembly
-    inject_parts:
-      sprite_extruder: sprite_extruder_left_assembly
-
-  - name: part_fan_right_assembly
-
-    resource_file: part_fan_assembly.yaml
-    depends_on:
-      - sprite_extruder_right_assembly
-    inject_parts:
-      sprite_extruder: sprite_extruder_right_assembly
-
-  - name: part_fan_left_assembly_v2
-
-    resource_file: part_fan_assembly_v2.yaml
-    depends_on:
       - x_axis_rail_assembly
       - x_axis_left_carriage_assembly
       - tool_head_mount_machined_bottom_assembly
@@ -2713,9 +2718,9 @@ assemblies:
       side_part_fan: single_part_fan_side_left_assembly
       blower_ring: blower_ring_left_assembly
 
-  - name: part_fan_right_assembly_v2
+  - name: part_fan_right_assembly
 
-    resource_file: part_fan_assembly_v2.yaml
+    resource_file: part_fan_assembly.yaml
     depends_on:
       - x_axis_rail_assembly
       - x_axis_right_carriage_assembly

@@ -9,6 +9,9 @@ def create_single_part_fan_assembly(
     part_fan_body_cutter_clearance,
     part_fan_fillet_radius,
     part_fan_hole_diameter,
+    part_fan_mount_plate_blow_direction_offset,
+    part_fan_mount_plate_blow_direction_oversize,
+    part_fan_mount_plate_cross_oversize,
     part_fan_mount_plate_thickness,
     part_fan_nut_cutter_clearance,
     part_fan_outlet_connector_length,
@@ -40,8 +43,8 @@ def create_single_part_fan_assembly(
     )
 
     mount_plate = create_filleted_box(
-        part_fan_size,
-        part_fan_size,
+        part_fan_size + part_fan_mount_plate_cross_oversize,
+        part_fan_size + part_fan_mount_plate_blow_direction_oversize,
         part_fan_mount_plate_thickness,
         part_fan_fillet_radius,
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
@@ -49,6 +52,9 @@ def create_single_part_fan_assembly(
     mount_plate = align(mount_plate, body, Alignment.CENTER)
     mount_plate = align(mount_plate, body, Alignment.BACK)
     mount_plate = align(mount_plate, body, Alignment.STACK_BOTTOM)
+    mount_plate = translate(0, -part_fan_mount_plate_blow_direction_offset, 0)(
+        mount_plate
+    )
 
     if part_fan_body_cutter_clearance > 0:
         body_cutter = create_box(
