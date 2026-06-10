@@ -64,8 +64,8 @@ def create_extruder_cage_assembly(
     )
     sprite_mount_base_plate = align(
         sprite_mount_base_plate,
-        sprite_extruder,
-        Alignment.TOP,
+        tool_head_mount_machined,
+        Alignment.STACK_BOTTOM,
     )
     sprite_mount_base_plate = align(
         sprite_mount_base_plate,
@@ -269,7 +269,7 @@ def create_extruder_cage_assembly(
         )
         nut_pocket = rotate(-90, axis=(1, 0, 0))(nut_pocket)
         nut_pocket = align(nut_pocket, hole_cutter, Alignment.CENTER)
-        nut_pocket = align(nut_pocket, nitehawk_rear_mount_plate, Alignment.FRONT)
+        nut_pocket = align(nut_pocket, nitehawk_rear_mount_plate, Alignment.BACK)
         nitehawk_cutters[f"nitehawk_mount_nut_pocket_{index}"] = nut_pocket
 
     nitehawk_rear_mount_plate = nitehawk_rear_mount_plate.fuse(nitehawk_towers)
