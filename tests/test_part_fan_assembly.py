@@ -231,6 +231,155 @@ def test_blower_ring_assembly_is_registered_as_standalone():
     assert "part_fan_duct_extension_length" not in blower_ring_resource_text
 
 
+def test_part_fan_v2_resource_is_visualization_only_collection():
+    resource_text = (ASSEMBLIES_DIR / "part_fan_assembly_v2.yaml").read_text()
+    resource = yaml.load(resource_text, Loader=AssemblyDefaultsLoader)
+
+    assert resource["Builder"]["Collection"] is True
+    assert resource["Builder"]["Production"]["parts"] == []
+    assert "Parts" not in resource
+    assert "Generator" not in resource_text
+
+    visualization_parts = resource["Builder"]["Visualization"]["parts"]
+    assert visualization_parts == [
+        {
+            "source": "injected",
+            "assembly": "sprite_extruder",
+            "artifact": "all",
+            "name_template": "sprite_extruder_{name}",
+        },
+        {
+            "source": "injected",
+            "assembly": "front_part_fan",
+            "artifact": "leader",
+            "name": "front_part_fan",
+        },
+        {
+            "source": "injected",
+            "assembly": "front_part_fan",
+            "artifact": "followers",
+            "name_template": "front_part_fan_{name}",
+        },
+        {
+            "source": "injected",
+            "assembly": "side_part_fan",
+            "artifact": "leader",
+            "name": "side_part_fan",
+        },
+        {
+            "source": "injected",
+            "assembly": "side_part_fan",
+            "artifact": "followers",
+            "name_template": "side_part_fan_{name}",
+        },
+    ]
+
+
+def test_part_fan_v2_assemblies_are_registered_with_standalone_fans():
+    config = yaml.load(
+        (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+    assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
+
+    for fan_name in [
+        "single_part_fan_front_left_assembly",
+        "single_part_fan_front_right_assembly",
+        "single_part_fan_side_left_assembly",
+        "single_part_fan_side_right_assembly",
+    ]:
+        fan = assemblies[fan_name]
+        assert fan["resource_file"] == "single_part_fan_assembly.yaml"
+        assert fan["depends_on"] == []
+        assert "inject_parts" not in fan
+
+    expected_v2 = {
+        "left": {
+            "mount_chain": [
+                "x_axis_rail_assembly",
+                "x_axis_left_carriage_assembly",
+                "tool_head_mount_machined_bottom_assembly",
+            ],
+            "sprite": "sprite_extruder_left_assembly",
+            "front": "single_part_fan_front_left_assembly",
+            "side": "single_part_fan_side_left_assembly",
+        },
+        "right": {
+            "mount_chain": [
+                "x_axis_rail_assembly",
+                "x_axis_right_carriage_assembly",
+                "tool_head_mount_machined_top_assembly",
+            ],
+            "sprite": "sprite_extruder_right_assembly",
+            "front": "single_part_fan_front_right_assembly",
+            "side": "single_part_fan_side_right_assembly",
+        },
+    }
+    for side, expected in expected_v2.items():
+        assembly = assemblies[f"part_fan_{side}_assembly_v2"]
+        assert assembly["resource_file"] == "part_fan_assembly_v2.yaml"
+        assert assembly["depends_on"] == (
+            expected["mount_chain"]
+            + [
+                expected["sprite"],
+                expected["front"],
+                expected["side"],
+            ]
+        )
+        assert assembly["inject_parts"] == {
+            "sprite_extruder": expected["sprite"],
+            "front_part_fan": expected["front"],
+            "side_part_fan": expected["side"],
+        }
+
+
+def test_part_fan_v2_standalone_fans_align_to_sprite_hotend():
+    config = yaml.load(
+        (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+    placements = config["placement"]["alignments"]
+
+    expected_alignments = {
+        "single_part_fan_front_left_assembly": (
+            "sprite_extruder_left_assembly.non_production_parts.hotend",
+            ["BOTTOM", "EDGE_BACK"],
+        ),
+        "single_part_fan_front_right_assembly": (
+            "sprite_extruder_right_assembly.non_production_parts.hotend",
+            ["BOTTOM", "EDGE_BACK"],
+        ),
+        "single_part_fan_side_left_assembly": (
+            "sprite_extruder_left_assembly.non_production_parts.hotend",
+            ["BOTTOM", "EDGE_RIGHT"],
+        ),
+        "single_part_fan_side_right_assembly": (
+            "sprite_extruder_right_assembly.non_production_parts.hotend",
+            ["BOTTOM", "EDGE_RIGHT"],
+        ),
+    }
+
+    for fan_name, (target, alignments) in expected_alignments.items():
+        fan_steps = [
+            placement
+            for placement in placements
+            if placement.get("part") == fan_name and placement.get("to") == target
+        ]
+        assert [step["alignment"] for step in fan_steps] == alignments
+
+    for side in ["left", "right"]:
+        fan_group = {
+            f"single_part_fan_front_{side}_assembly",
+            f"single_part_fan_side_{side}_assembly",
+        }
+        rigid_step = next(
+            placement
+            for placement in placements
+            if set(placement.get("rigid_group", [])) == fan_group
+        )
+        assert rigid_step["to"] == f"sprite_extruder_{side}_assembly"
+
+
 def test_part_fans_use_physical_side_and_front_roles():
     sprite_extruder = create_sprite_extruder_assembly(
         **assembly_kwargs(create_sprite_extruder_assembly)

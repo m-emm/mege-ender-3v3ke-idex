@@ -1,0 +1,43 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Visualization-only part fan v2 skeleton
+
+Builder:
+  Collection: true
+
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - top
+        - left
+      width: 512
+      height: 512
+    parts:
+      - source: injected
+        assembly: sprite_extruder
+        artifact: all
+        name_template: "sprite_extruder_{name}"
+
+      - source: injected
+        assembly: front_part_fan
+        artifact: leader
+        name: front_part_fan
+      - source: injected
+        assembly: front_part_fan
+        artifact: followers
+        name_template: "front_part_fan_{name}"
+
+      - source: injected
+        assembly: side_part_fan
+        artifact: leader
+        name: side_part_fan
+      - source: injected
+        assembly: side_part_fan
+        artifact: followers
+        name_template: "side_part_fan_{name}"
+
+  Production:
+    parts: []
