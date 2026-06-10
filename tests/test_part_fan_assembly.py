@@ -343,29 +343,31 @@ def test_part_fan_v2_standalone_fans_align_to_sprite_hotend():
     expected_alignments = {
         "single_part_fan_front_left_assembly": (
             "sprite_extruder_left_assembly.non_production_parts.hotend",
-            ["BOTTOM", "EDGE_BACK"],
+            [("CENTER", [0]), ("BOTTOM", None), ("EDGE_BACK", None)],
         ),
         "single_part_fan_front_right_assembly": (
             "sprite_extruder_right_assembly.non_production_parts.hotend",
-            ["BOTTOM", "EDGE_BACK"],
+            [("CENTER", [0]), ("BOTTOM", None), ("EDGE_BACK", None)],
         ),
         "single_part_fan_side_left_assembly": (
             "sprite_extruder_left_assembly.non_production_parts.hotend",
-            ["BOTTOM", "EDGE_RIGHT"],
+            [("CENTER", [1]), ("BOTTOM", None), ("EDGE_RIGHT", None)],
         ),
         "single_part_fan_side_right_assembly": (
             "sprite_extruder_right_assembly.non_production_parts.hotend",
-            ["BOTTOM", "EDGE_RIGHT"],
+            [("CENTER", [1]), ("BOTTOM", None), ("EDGE_RIGHT", None)],
         ),
     }
 
-    for fan_name, (target, alignments) in expected_alignments.items():
+    for fan_name, (target, expected_steps) in expected_alignments.items():
         fan_steps = [
             placement
             for placement in placements
             if placement.get("part") == fan_name and placement.get("to") == target
         ]
-        assert [step["alignment"] for step in fan_steps] == alignments
+        assert [
+            (step["alignment"], step.get("axes")) for step in fan_steps
+        ] == expected_steps
 
     for side in ["left", "right"]:
         fan_group = {

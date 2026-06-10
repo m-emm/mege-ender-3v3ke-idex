@@ -505,34 +505,74 @@ placement:
       to: sprite_extruder_right_assembly
 
     - part: single_part_fan_front_left_assembly
+      post_rotation:
+        angle: 180
+        axis: [0, 0, 1]
+    - part: single_part_fan_front_left_assembly
+      to: sprite_extruder_left_assembly.non_production_parts.hotend
+      alignment: CENTER
+    - part: single_part_fan_front_left_assembly
       to: sprite_extruder_left_assembly.non_production_parts.hotend
       alignment: BOTTOM
     - part: single_part_fan_front_left_assembly
       to: sprite_extruder_left_assembly.non_production_parts.hotend
-      alignment: EDGE_BACK
+      alignment: STACK_FRONT
     - part: single_part_fan_side_left_assembly
-      to: sprite_extruder_left_assembly.non_production_parts.hotend
+      post_rotation:
+        angle: 90
+        axis: [0, 0, 1]
+    - part: single_part_fan_side_left_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 1, 0]
+
+    - part: single_part_fan_side_left_assembly.followers.mount_plate
+      to: sprite_extruder_left_assembly
+      alignment: FRONT
+    - part: single_part_fan_side_left_assembly.followers.mount_plate
+      to: sprite_extruder_left_assembly
       alignment: BOTTOM
     - part: single_part_fan_side_left_assembly
-      to: sprite_extruder_left_assembly.non_production_parts.hotend
-      alignment: EDGE_RIGHT
+      to: sprite_extruder_left_assembly
+      alignment: STACK_RIGHT
     - rigid_group:
         - single_part_fan_front_left_assembly
         - single_part_fan_side_left_assembly
       to: sprite_extruder_left_assembly
+    - part: single_part_fan_front_right_assembly
+      post_rotation:
+        angle: 180
+        axis: [0, 0, 1]
+
+    - part: single_part_fan_front_right_assembly
+      to: sprite_extruder_right_assembly.non_production_parts.hotend
+      alignment: CENTER
 
     - part: single_part_fan_front_right_assembly
       to: sprite_extruder_right_assembly.non_production_parts.hotend
       alignment: BOTTOM
     - part: single_part_fan_front_right_assembly
       to: sprite_extruder_right_assembly.non_production_parts.hotend
-      alignment: EDGE_BACK
+      alignment: STACK_FRONT
+    - part: single_part_fan_side_right_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 0, 1]
+
+    - part: single_part_fan_side_right_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 1, 0]
+    - part: single_part_fan_side_right_assembly
+      to: sprite_extruder_right_assembly.non_production_parts.hotend
+      alignment: CENTER
+
     - part: single_part_fan_side_right_assembly
       to: sprite_extruder_right_assembly.non_production_parts.hotend
       alignment: BOTTOM
     - part: single_part_fan_side_right_assembly
-      to: sprite_extruder_right_assembly.non_production_parts.hotend
-      alignment: EDGE_RIGHT
+      to: sprite_extruder_right_assembly
+      alignment: STACK_RIGHT
     - rigid_group:
         - single_part_fan_front_right_assembly
         - single_part_fan_side_right_assembly
