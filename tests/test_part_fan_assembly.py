@@ -273,6 +273,14 @@ def test_part_fan_v2_resource_is_visualization_only_collection():
             "name_template": "side_part_fan_{name}",
         },
     ]
+    assert resource["Parameters"] == {
+        "part_fan_v2_front_rotation": {"Type": "Float"},
+        "part_fan_v2_front_y_shift": {"Type": "Float"},
+        "part_fan_v2_front_z_shift": {"Type": "Float"},
+        "part_fan_v2_side_stack_gap": {"Type": "Float"},
+        "part_fan_v2_side_y_shift": {"Type": "Float"},
+        "part_fan_v2_side_z_shift": {"Type": "Float"},
+    }
 
 
 def test_part_fan_v2_assemblies_are_registered_with_standalone_fans():
@@ -333,41 +341,96 @@ def test_part_fan_v2_assemblies_are_registered_with_standalone_fans():
         }
 
 
-def test_part_fan_v2_standalone_fans_align_to_sprite_hotend():
+def test_part_fan_v2_standalone_fans_use_parameterized_legacy_pose():
     config = yaml.load(
         (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
         Loader=AssemblyDefaultsLoader,
     )
     placements = config["placement"]["alignments"]
 
-    expected_alignments = {
-        "single_part_fan_front_left_assembly": (
-            "sprite_extruder_left_assembly.non_production_parts.hotend",
-            [("CENTER", [0]), ("BOTTOM", None), ("EDGE_BACK", None)],
-        ),
-        "single_part_fan_front_right_assembly": (
-            "sprite_extruder_right_assembly.non_production_parts.hotend",
-            [("CENTER", [0]), ("BOTTOM", None), ("EDGE_BACK", None)],
-        ),
-        "single_part_fan_side_left_assembly": (
-            "sprite_extruder_left_assembly.non_production_parts.hotend",
-            [("CENTER", [1]), ("BOTTOM", None), ("EDGE_RIGHT", None)],
-        ),
-        "single_part_fan_side_right_assembly": (
-            "sprite_extruder_right_assembly.non_production_parts.hotend",
-            [("CENTER", [1]), ("BOTTOM", None), ("EDGE_RIGHT", None)],
-        ),
+    for name, expected_value in {
+        "part_fan_v2_front_rotation": 15,
+        "part_fan_v2_front_y_shift": -18.06,
+        "part_fan_v2_front_z_shift": 8.731555,
+        "part_fan_v2_side_stack_gap": 0.51,
+        "part_fan_v2_side_y_shift": -12.9,
+        "part_fan_v2_side_z_shift": -13.768445,
+    }.items():
+        assert DEFAULTS[name] == expected_value
+
+    front_rotation = {
+        "$expr": {
+            "$sub": "180 - ${part_fan_v2_front_rotation}",
+        },
+    }
+    front_translation = [
+        0,
+        {"$ref": "part_fan_v2_front_y_shift"},
+        {"$ref": "part_fan_v2_front_z_shift"},
+    ]
+    side_translation = [
+        0,
+        {"$ref": "part_fan_v2_side_y_shift"},
+        {"$ref": "part_fan_v2_side_z_shift"},
+    ]
+
+    expected_front_targets = {
+        "left": "sprite_extruder_left_assembly.non_production_parts.hotend",
+        "right": "sprite_extruder_right_assembly.non_production_parts.hotend",
     }
 
-    for fan_name, (target, expected_steps) in expected_alignments.items():
+    for side, target in expected_front_targets.items():
+        fan_name = f"single_part_fan_front_{side}_assembly"
+        rotation_step = next(
+            placement
+            for placement in placements
+            if placement.get("part") == fan_name and "post_rotation" in placement
+        )
+        assert rotation_step["post_rotation"] == {
+            "angle": front_rotation,
+            "axis": [1, 0, 0],
+        }
+        assert "center" not in rotation_step["post_rotation"]
+
         fan_steps = [
             placement
             for placement in placements
             if placement.get("part") == fan_name and placement.get("to") == target
         ]
-        assert [
-            (step["alignment"], step.get("axes")) for step in fan_steps
-        ] == expected_steps
+        assert [(step["alignment"], step.get("axes")) for step in fan_steps] == [
+            ("CENTER", [0]),
+            ("BOTTOM", None),
+            ("STACK_FRONT", None),
+        ]
+        assert fan_steps[-1]["post_translation"] == front_translation
+
+    for side in ["left", "right"]:
+        fan_name = f"single_part_fan_side_{side}_assembly"
+        rotation_steps = [
+            placement["post_rotation"]
+            for placement in placements
+            if placement.get("part") == fan_name and "post_rotation" in placement
+        ]
+        assert rotation_steps == [
+            {"angle": 90, "axis": [0, 0, 1]},
+            {"angle": 90, "axis": [0, 1, 0]},
+        ]
+
+        mount_plate_steps = [
+            placement
+            for placement in placements
+            if placement.get("part") == f"{fan_name}.followers.mount_plate"
+            and placement.get("to") == f"sprite_extruder_{side}_assembly"
+        ]
+        assert [step["alignment"] for step in mount_plate_steps] == [
+            "FRONT",
+            "BOTTOM",
+            "STACK_RIGHT",
+        ]
+        assert mount_plate_steps[-1]["stack_gap"] == {
+            "$ref": "part_fan_v2_side_stack_gap"
+        }
+        assert mount_plate_steps[-1]["post_translation"] == side_translation
 
     for side in ["left", "right"]:
         fan_group = {

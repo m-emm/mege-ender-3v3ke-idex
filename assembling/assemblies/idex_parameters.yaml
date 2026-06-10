@@ -899,6 +899,12 @@ globals:
     mount_plate_blow_direction_oversize: 7
     mount_plate_cross_oversize: 8
     mount_plate_blow_direction_offset: -2
+  part_fan_v2_front_rotation: 15
+  part_fan_v2_front_y_shift: -18.06
+  part_fan_v2_front_z_shift: 8.731555
+  part_fan_v2_side_stack_gap: 0.51
+  part_fan_v2_side_y_shift: -12.9
+  part_fan_v2_side_z_shift: -13.768445
   tool_head_additional_mount_plate_clearance: 0.5
   tool_head_additional_mount_plate_depth: 10
   tool_head_additional_mount_plate_depth_offset: 0

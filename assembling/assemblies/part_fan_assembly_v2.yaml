@@ -41,3 +41,17 @@ Builder:
 
   Production:
     parts: []
+
+Parameters:
+  part_fan_v2_front_rotation:
+    Type: Float
+  part_fan_v2_front_y_shift:
+    Type: Float
+  part_fan_v2_front_z_shift:
+    Type: Float
+  part_fan_v2_side_stack_gap:
+    Type: Float
+  part_fan_v2_side_y_shift:
+    Type: Float
+  part_fan_v2_side_z_shift:
+    Type: Float
