@@ -89,7 +89,7 @@ def create_sprite_extruder_assembly(
     hot_side_hole_radius = MScrew.from_size(extruder_mount_screw_size).core_hole / 2
     mount_hole_diameter = MScrew.from_size(
         extruder_mount_screw_size
-    ).clearance_hole_normal
+    ).clearance_hole_loose
 
     hot_side_hole = create_cylinder(hot_side_hole_radius, big_thing)
     hot_side_hole = rotate(90, axis=(0, 1, 0))(hot_side_hole)
