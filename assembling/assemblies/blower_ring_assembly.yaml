@@ -1,0 +1,48 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Standalone blower ring and nozzle assembly
+
+Builder:
+  Visualization:
+    preview:
+      views:
+        - top
+        - left
+        - front
+    parts:
+      - source: self
+        artifact: leader
+        name: blower_ring
+
+Parameters:
+  blower_center_offset:
+    Type: Float
+  blowers_down_angle:
+    Type: Float
+  blowers_duct_diameter:
+    Type: Float
+  blowers_nozzle_center_distance:
+    Type: Float
+  blowers_wall:
+    Type: Float
+  feeder_ring_extra_angle:
+    Type: Float
+  feeder_ring_height:
+    Type: Float
+  feeder_ring_inner_diameter:
+    Type: Float
+  feeder_ring_rotation_angle:
+    Type: Float
+  feeder_ring_wall:
+    Type: Float
+  feeder_ring_width:
+    Type: Float
+  num_blowers:
+    Type: Integer
+
+Parts:
+  BlowerRingAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.blower_ring_assembly.create_blower_ring_assembly

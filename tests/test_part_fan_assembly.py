@@ -23,6 +23,9 @@ from mege_ender_3v3ke_idex.designs.assemblies.part_fan_assembly import (
     _blower_outer_squeeze_scale,
     create_part_fan_assembly,
 )
+from mege_ender_3v3ke_idex.designs.assemblies.blower_ring_assembly import (
+    create_blower_ring_assembly,
+)
 from mege_ender_3v3ke_idex.designs.assemblies.single_part_fan_assembly import (
     create_single_part_fan_assembly,
 )
@@ -181,6 +184,51 @@ def test_single_part_fan_assembly_is_registered_as_standalone():
         "create_single_part_fan_assembly"
     )
     assert ".part_fan_assembly." not in generator_path
+
+
+def test_blower_ring_assembly_exposes_standalone_ring():
+    blower_ring = create_blower_ring_assembly(
+        **assembly_kwargs(create_blower_ring_assembly)
+    )
+
+    blower_ring_bbox = get_bounding_box(blower_ring.leader)
+    blower_ring_size = get_bounding_box_size(blower_ring.leader)
+
+    assert get_volume(blower_ring.leader) > 0
+    assert blower_ring_bbox[0][2] == pytest.approx(0)
+    assert all(size > 0 for size in blower_ring_size)
+
+
+def test_blower_ring_assembly_is_registered_as_standalone():
+    config = yaml.load(
+        (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+    assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
+    blower_ring_resource_text = (
+        ASSEMBLIES_DIR / "blower_ring_assembly.yaml"
+    ).read_text()
+    blower_ring_resource = yaml.load(
+        blower_ring_resource_text,
+        Loader=AssemblyDefaultsLoader,
+    )
+
+    blower_ring = assemblies["blower_ring_assembly"]
+
+    assert blower_ring["resource_file"] == "blower_ring_assembly.yaml"
+    assert blower_ring["depends_on"] == []
+    assert "inject_parts" not in blower_ring
+    generator_path = blower_ring_resource["Parts"]["BlowerRingAssembly"]["Properties"][
+        "Generator"
+    ]
+
+    assert generator_path == (
+        "mege_ender_3v3ke_idex.designs.assemblies.blower_ring_assembly."
+        "create_blower_ring_assembly"
+    )
+    assert ".part_fan_assembly." not in generator_path
+    assert "duct_extension_width" not in blower_ring_resource_text
+    assert "part_fan_duct_extension_length" not in blower_ring_resource_text
 
 
 def test_part_fans_use_physical_side_and_front_roles():
