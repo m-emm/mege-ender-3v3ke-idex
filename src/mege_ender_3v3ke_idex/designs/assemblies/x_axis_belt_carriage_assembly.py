@@ -68,7 +68,6 @@ def create_x_axis_belt_carriage_assembly(
 
     clamps = []
     cages = PartCollector()
-    mount_hole_cutters = []
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         clamp_lfc = create_gt_belt_clamp(
             base_thicknness=tool_head_mount_belt_clamp_base_thickness,
@@ -95,22 +94,32 @@ def create_x_axis_belt_carriage_assembly(
             stack_gap=tool_head_mount_belt_clamp_y_offset,
         )
 
-        clamp_gap = 0
+        clamp_gap = 5
         if lr == Alignment.LEFT:
             clamp_gap = x_axis_belt_carriage_fan_side_clamp_gap
 
-        clamp_lfc = clamp_lfc.aligned_from_follower(
-            "clamp",
-            tool_heead_mount_machined,
-            lr.stack_alignment,
-        )
-        # else:
-        #     clamp_lfc = align(
-        #         clamp_lfc,
-        #         sprite_extruder_all_fused,
-        #         lr.stack_alignment,
-        #         stack_gap=clamp_gap,
-        #     )
+        if drive_alignment == Alignment.BOTTOM:
+
+            if lr == Alignment.LEFT:
+                clamp_gap = 0.3
+                part_to_align_to = tool_heead_mount_machined
+            else:
+                part_to_align_to = sprite_extruder_all_fused
+
+            clamp_lfc = clamp_lfc.aligned_from_follower(
+                "clamp",
+                part_to_align_to,
+                lr.stack_alignment,
+                stack_gap=clamp_gap,
+            )
+
+        else:
+
+            clamp_lfc = clamp_lfc.aligned_from_follower(
+                "clamp",
+                tool_heead_mount_machined,
+                lr.stack_alignment,
+            )
 
         clamp_lfc = align(clamp_lfc, axis_profile, Alignment.CENTER, axes=[2])
 
@@ -201,23 +210,6 @@ def create_x_axis_belt_carriage_assembly(
         for name, npp in clamp_lfc.get_named_non_production_part_items():
             clamp_lfc_new.add_named_non_production_part(npp, name)
 
-        mount_screw_hole_cutter = create_cylinder(
-            MScrew.from_size(
-                x_axis_belt_carriage_bridge_mount_screw_size
-            ).clearance_hole_loose
-            / 2,
-            BIG_THING,
-        )
-        mount_screw_hole_cutter = align(
-            mount_screw_hole_cutter, clamps[-1], Alignment.CENTER
-        )
-        mount_screw_hole_cutter = align(
-            mount_screw_hole_cutter, clamps[-1], Alignment.BACK
-        )
-
-        clamp_lfc_new = clamp_lfc_new.cut(mount_screw_hole_cutter)
-        clamp_lfc_new.add_named_cutter(mount_screw_hole_cutter, "mount_screw_hole")
-
         clamp_lfc_new = clamp_lfc_new.prefixed_copy(f"belt_clamp_{lr.name.lower()}")
 
         if assembly is None:
@@ -228,7 +220,13 @@ def create_x_axis_belt_carriage_assembly(
     clamps_fused = clamps[0].fuse(clamps[1])
     clamps_fused_size = get_bounding_box_size(clamps_fused)
     bridge_height = clamps_fused_size[2]
-    bridge = create_box(BIG_THING, x_axis_belt_carriage_bridge_thickness, bridge_height)
+
+    bridge_thickness = x_axis_belt_carriage_bridge_thickness
+    if drive_alignment == Alignment.BOTTOM:
+        bridge_height -= 3
+        bridge_thickness *= 0.75
+
+    bridge = create_box(BIG_THING, bridge_thickness, bridge_height)
 
     bridge = align(bridge, clamps_fused, Alignment.CENTER)
     bridge = align(bridge, cages, Alignment.BACK)
@@ -238,7 +236,28 @@ def create_x_axis_belt_carriage_assembly(
         limiting_start_part=clamps[0],
         limiting_end_part=clamps[1],
     )
+    bridge = align(bridge, clamps_fused, Alignment.BOTTOM)
+
+    bridge_size = get_bounding_box_size(bridge)
+
+    bridge_reinforcer = None
+    if drive_alignment == Alignment.BOTTOM:
+
+        bridge_reinforcer = create_box(
+            bridge_size[0] - 8,
+            bridge_thickness,
+            4.5,
+        )
+        bridge_reinforcer = align(bridge_reinforcer, bridge, Alignment.RIGHT)
+        bridge_reinforcer = align(
+            bridge_reinforcer, belt_deflector, Alignment.CENTER, axes=[2]
+        )
+
+        bridge_reinforcer = align(bridge_reinforcer, bridge, Alignment.STACK_BACK)
+
     assembly = assembly.fuse(bridge)
+    if bridge_reinforcer is not None:
+        assembly = assembly.fuse(bridge_reinforcer)
 
     if drive_alignment == Alignment.TOP:
         mount_flange_width = 2.5 * x_axis_belt_carriage_bridge_thickness
@@ -280,5 +299,60 @@ def create_x_axis_belt_carriage_assembly(
             )
 
             assembly = assembly.fuse(mount_flange_back).fuse(mount_flange_floor)
+
+    if drive_alignment == Alignment.BOTTOM:
+
+        right_clamp = clamps[1]
+        clamp_drill = create_cylinder(
+            MScrew.from_size("M3").clearance_hole_loose / 2,
+            BIG_THING,
+            direction=(0, 1, 0),
+        )
+        clamp_drill = align(clamp_drill, right_clamp, Alignment.CENTER)
+
+        threaded_inset_holder = create_cylinder(
+            3, bridge_thickness, direction=(0, 1, 0)
+        )
+        threaded_inset_holder = align(
+            threaded_inset_holder, clamp_drill, Alignment.CENTER
+        )
+        threaded_inset_holder = align(
+            threaded_inset_holder, bridge, Alignment.STACK_BACK
+        )
+        assembly = assembly.fuse(threaded_inset_holder)
+
+        assembly = assembly.cut(clamp_drill)
+        assembly.add_named_cutter(clamp_drill, "right_clamp_hole_drill")
+
+        thread_inset = create_thread_inset_assembly(
+            size="M3",
+            thickness=6,
+            extra_radius=0.1,
+            clearance_type="close",
+        )
+        thread_inset = rotate(-90, axis=(1, 0, 0))(thread_inset)
+
+        thread_inset = align(thread_inset, clamp_drill, Alignment.CENTER)
+        thread_inset = align(thread_inset, threaded_inset_holder, Alignment.BACK)
+
+        assembly = thread_inset.use_as_cutter_on(assembly)
+        thread_inset = thread_inset.prefixed_copy("right_clamp_thread_inset")
+        assembly = assembly.merge_except_leader(thread_inset)
+
+        left_bridge_drill = create_cylinder(
+            MScrew.from_size("M3").clearance_hole_loose / 2,
+            BIG_THING,
+            direction=(0, 1, 0),
+        )
+        left_bridge_drill = align(left_bridge_drill, bridge, Alignment.CENTER)
+
+        left_bridge_drill = align(
+            left_bridge_drill, tool_heead_mount_machined, Alignment.LEFT
+        )
+
+        left_bridge_drill = translate(2, 0, 0)(left_bridge_drill)
+
+        assembly = assembly.cut(left_bridge_drill)
+        assembly.add_named_cutter(left_bridge_drill, "left_bridge_hole_drill")
 
     return assembly

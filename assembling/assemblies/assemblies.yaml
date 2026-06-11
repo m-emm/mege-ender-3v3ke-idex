@@ -2744,6 +2744,8 @@ assemblies:
     inject_parts:
       part_fans: part_fan_left_assembly
       extruder_cage: extruder_cage_left_assembly
+      belt_carriage: x_axis_belt_carriage_bottom_assembly
+      sprite_extruder: sprite_extruder_left_assembly
     outputs:
       part_fans: part_fan_left_joined_assembly
       extruder_cage: extruder_cage_left_joined_assembly

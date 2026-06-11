@@ -57,6 +57,37 @@ def create_extruder_cage_assembly(
         extruder_mount_base_plate_thickness,
         tool_head_mount_base_plate_height,
     )
+
+    cutter_size = tool_head_mount_base_plate_height * 0.7
+    sprite_mount_base_plate_cutter = create_right_triangle(
+        cutter_size,
+        cutter_size,
+        2 * extruder_mount_base_plate_thickness,
+        extrusion_direction=(0, 1, 0),
+        a_normal=(-1, 0, 0),
+        b_normal=(0, 0, 1),
+    )
+
+    sprite_mount_base_plate_cutter = align(
+        sprite_mount_base_plate_cutter,
+        sprite_mount_base_plate,
+        Alignment.CENTER,
+    )
+    sprite_mount_base_plate_cutter = align(
+        sprite_mount_base_plate_cutter,
+        sprite_mount_base_plate,
+        Alignment.LEFT,
+    )
+    sprite_mount_base_plate_cutter = align(
+        sprite_mount_base_plate_cutter,
+        sprite_mount_base_plate,
+        Alignment.BOTTOM,
+    )
+
+    sprite_mount_base_plate = sprite_mount_base_plate.cut(
+        sprite_mount_base_plate_cutter
+    )
+
     sprite_mount_base_plate = align(
         sprite_mount_base_plate,
         mount_hole_cutter,
@@ -79,6 +110,9 @@ def create_extruder_cage_assembly(
         Alignment.LEFT,
     )
     sprite_mount_base_plate = sprite_extruder.use_as_cutter_on(sprite_mount_base_plate)
+    for name, cutter in tool_head_mount_machined.get_named_cutter_items():
+        if "hole_drill_" in name:
+            sprite_mount_base_plate = sprite_mount_base_plate.cut(cutter)
     sprite_mount_base_plate = sprite_mount_base_plate.cut(sprite_extruder.leader)
 
     mount_hole_cutter_bbox = get_bounding_box(mount_hole_cutter)

@@ -129,6 +129,8 @@ def join_part_fans_with_extruder_cage(
     *,
     part_fans,
     extruder_cage,
+    belt_carriage=None,
+    sprite_extruder=None,
     flange_extension=8.0,
     flange_half_height=3.0,
     screw_size="M3",
@@ -197,6 +199,51 @@ def join_part_fans_with_extruder_cage(
     for consumed_part_fan_ref in consumed_part_fan_refs:
         _logger.info(f"Adding consumed part ref for {consumed_part_fan_ref}")
         joined_part_fans.add_consumed_part_ref(consumed_part_fan_ref)
+
+    if belt_carriage is not None:
+        belt_carriage_mount_eye = create_box(12.5, 5, 20)
+        belt_carriage_mount_eye = align(
+            belt_carriage_mount_eye, belt_carriage, Alignment.CENTER
+        )
+        belt_carriage_mount_eye = align(
+            belt_carriage_mount_eye, belt_carriage, Alignment.TOP
+        )
+        belt_carriage_mount_eye = align(
+            belt_carriage_mount_eye, belt_carriage, Alignment.STACK_FRONT
+        )
+        belt_carriage_mount_eye = align(
+            belt_carriage_mount_eye, sprite_extruder, Alignment.STACK_RIGHT, stack_gap=1
+        )
+
+        right_clamp_hole_drill = belt_carriage.get_named_cutter(
+            "right_clamp_hole_drill"
+        )
+
+        joined_extruder_cage = joined_extruder_cage.fuse(belt_carriage_mount_eye)
+        joined_extruder_cage = joined_extruder_cage.cut(right_clamp_hole_drill)
+
+        left_bridge_hole_drill = belt_carriage.get_named_cutter(
+            "left_bridge_hole_drill"
+        )
+
+        left_bridge_maount_eye = create_box(8, 3, 30)
+        left_bridge_maount_eye = align(
+            left_bridge_maount_eye, left_bridge_hole_drill, Alignment.CENTER
+        )
+
+        left_bridge_maount_eye = align(
+            left_bridge_maount_eye, sprite_extruder, Alignment.STACK_BACK
+        )
+        left_bridge_maount_eye = align(
+            left_bridge_maount_eye, joined_extruder_cage, Alignment.TOP
+        )
+
+        left_bridge_maount_eye = align(
+            left_bridge_maount_eye, joined_extruder_cage, Alignment.LEFT
+        )
+
+        left_bridge_maount_eye = left_bridge_maount_eye.cut(left_bridge_hole_drill)
+        joined_extruder_cage = joined_extruder_cage.fuse(left_bridge_maount_eye)
 
     return {
         "part_fans": joined_part_fans,
