@@ -9,6 +9,8 @@
 
 ## Mechanical Design tasks
 
+- housing for nitehawk usb connector boards
+- fan cover for x axis mcu
 - holders for heatbed PSU
 - toolhead alignment mechanism
 - holders for filament sensors

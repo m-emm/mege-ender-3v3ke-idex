@@ -8,7 +8,7 @@ def create_extruder_cage_assembly(
     *,
     sprite_extruder,
     nitehawk_board,
-    tool_head_mount_machined=None,
+    tool_head_mount_machined,
     extruder_cage_mount_plate_thickness,
     extruder_cage_mount_plate_fillet_radius,
     extruder_cage_flange_thickness,

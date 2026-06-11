@@ -17,6 +17,12 @@ from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_board_assembly import (
 from mege_ender_3v3ke_idex.designs.assemblies.sprite_extruder_assembly import (
     create_sprite_extruder_assembly,
 )
+from mege_ender_3v3ke_idex.designs.assemblies.tool_head_mount_machined_assembly import (
+    create_tool_head_mount_machined_assembly,
+)
+from mege_ender_3v3ke_idex.designs.assemblies.x_axis_carriage_assembly import (
+    create_x_axis_carriage_assembly,
+)
 from shellforgepy.builder import graph_model as builder_graph_model
 from shellforgepy.simple import (
     Alignment,
@@ -73,12 +79,23 @@ def _place_nitehawk_board_like_graph(nitehawk_board, sprite_extruder):
     )(nitehawk_board)
 
 
+def _create_machined_mount():
+    carriage = create_x_axis_carriage_assembly()
+    return create_tool_head_mount_machined_assembly(
+        **assembly_kwargs(
+            create_tool_head_mount_machined_assembly,
+            carriage=carriage,
+            drive_position="bottom",
+        )
+    )
+
+
 def test_extruder_cage_signature_uses_cage_owned_mount_dimensions():
     parameters = inspect.signature(create_extruder_cage_assembly).parameters
 
     assert "nitehawk_board" in parameters
     assert "tool_head_mount_machined" in parameters
-    assert parameters["tool_head_mount_machined"].default is None
+    assert parameters["tool_head_mount_machined"].default is inspect.Parameter.empty
     assert "carriage" not in parameters
     assert "extruder_cage_mount_plate_fillet_radius" in parameters
     assert "extruder_cage_top_right_bridge_clearance" in parameters
@@ -94,10 +111,12 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
         **assembly_kwargs(create_nitehawk_board_assembly)
     )
     nitehawk_board = _place_nitehawk_board_like_graph(nitehawk_board, sprite_extruder)
+    tool_head_mount_machined = _create_machined_mount()
     cage_kwargs = assembly_kwargs(
         create_extruder_cage_assembly,
         sprite_extruder=sprite_extruder,
         nitehawk_board=nitehawk_board,
+        tool_head_mount_machined=tool_head_mount_machined,
     )
 
     cage = create_extruder_cage_assembly(**cage_kwargs)
@@ -205,6 +224,7 @@ def test_extruder_cage_exposes_mounting_interfaces_and_screw_visuals():
             create_extruder_cage_assembly,
             sprite_extruder=sprite_extruder,
             nitehawk_board=shifted_nitehawk_board,
+            tool_head_mount_machined=tool_head_mount_machined,
         )
     )
     shifted_mount_plate_center = get_bounding_box_center(
@@ -293,10 +313,12 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
     assert assemblies["extruder_cage_assembly"]["inject_parts"] == {
         "sprite_extruder": "sprite_extruder_assembly",
         "nitehawk_board": "nitehawk_board_assembly",
+        "tool_head_mount_machined": "tool_head_mount_machined_bottom_assembly",
     }
     assert set(assemblies["extruder_cage_assembly"]["depends_on"]) == {
         "sprite_extruder_assembly",
         "nitehawk_board_assembly",
+        "tool_head_mount_machined_bottom_assembly",
     }
 
     for side, injected_context in expected_true_inputs.items():

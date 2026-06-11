@@ -2601,9 +2601,11 @@ assemblies:
     depends_on:
       - sprite_extruder_assembly
       - nitehawk_board_assembly
+      - tool_head_mount_machined_bottom_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_assembly
       nitehawk_board: nitehawk_board_assembly
+      tool_head_mount_machined: tool_head_mount_machined_bottom_assembly
 
   - name: extruder_cage_left_assembly
 

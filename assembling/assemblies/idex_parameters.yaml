@@ -843,7 +843,7 @@ globals:
   nitehawk_holes_center_distance: 43
   nitehawk_holes_y_offset: 16
   nitehawk_mount_tower_base_extension: 2.0
-  nitehawk_nut_cutter_slack: 0.19
+  nitehawk_nut_cutter_slack: 0.14
   nitehawk_pcb_thickness: 1.6
   nitehawk_plug_length: 8.8
   nitehawk_plug_overhang: 4
@@ -893,7 +893,7 @@ globals:
   part_fan_v2_side_stack_gap: 0.51
   part_fan_v2_side_y_shift: -17
   part_fan_v2_side_z_shift: -13.768445
-  tool_head_additional_mount_plate_clearance: 0.5
+  tool_head_additional_mount_plate_clearance: 0.05
   tool_head_additional_mount_plate_depth: 10
   tool_head_additional_mount_plate_depth_offset: 0
   tool_head_additional_mount_plate_height: 10
