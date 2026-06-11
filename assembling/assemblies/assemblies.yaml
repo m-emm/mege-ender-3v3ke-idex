@@ -278,6 +278,13 @@ placement:
         - tool_head_mount_machined_top_assembly
       to: x_axis_right_carriage_assembly
 
+    - rigid_group:
+        - tool_head_cable_attach_shield_left_assembly
+      to: tool_head_mount_machined_bottom_assembly
+    - rigid_group:
+        - tool_head_cable_attach_shield_right_assembly
+      to: tool_head_mount_machined_top_assembly
+
     - part: sprite_extruder_left_assembly
       to: tool_head_mount_machined_bottom_assembly
       alignment: CENTER
@@ -2426,6 +2433,8 @@ assemblies:
       - part_fan_right_joined_assembly
       - tool_head_mount_machined_bottom_assembly
       - tool_head_mount_machined_top_assembly
+      - tool_head_cable_attach_shield_left_assembly
+      - tool_head_cable_attach_shield_right_assembly
       - x_axis_belt_carriage_bottom_assembly
       - x_axis_belt_carriage_top_assembly
       - y_z_axis_mcu_holder_assembly
@@ -2484,6 +2493,8 @@ assemblies:
       part_fan_right: part_fan_right_joined_assembly
       tool_head_mount_machined_bottom: tool_head_mount_machined_bottom_assembly
       tool_head_mount_machined_top: tool_head_mount_machined_top_assembly
+      tool_head_cable_attach_shield_left: tool_head_cable_attach_shield_left_assembly
+      tool_head_cable_attach_shield_right: tool_head_cable_attach_shield_right_assembly
       x_axis_belt_carriage_bottom: x_axis_belt_carriage_bottom_assembly
       x_axis_belt_carriage_top: x_axis_belt_carriage_top_assembly
       creality_psu: creality_psu_assembly
@@ -2512,6 +2523,8 @@ assemblies:
       - part_fan_right_joined_assembly
       - tool_head_mount_machined_bottom_assembly
       - tool_head_mount_machined_top_assembly
+      - tool_head_cable_attach_shield_left_assembly
+      - tool_head_cable_attach_shield_right_assembly
       - x_axis_belt_carriage_bottom_assembly
       - x_axis_belt_carriage_top_assembly
     parameters:
@@ -2533,6 +2546,8 @@ assemblies:
       part_fan_right: part_fan_right_joined_assembly
       tool_head_mount_machined_bottom: tool_head_mount_machined_bottom_assembly
       tool_head_mount_machined_top: tool_head_mount_machined_top_assembly
+      tool_head_cable_attach_shield_left: tool_head_cable_attach_shield_left_assembly
+      tool_head_cable_attach_shield_right: tool_head_cable_attach_shield_right_assembly
       x_axis_belt_carriage_bottom: x_axis_belt_carriage_bottom_assembly
       x_axis_belt_carriage_top: x_axis_belt_carriage_top_assembly
 
@@ -2796,6 +2811,30 @@ assemblies:
       carriage: x_axis_right_carriage_assembly
     parameters:
       drive_position: top
+
+  - name: tool_head_cable_attach_shield_assembly
+
+    resource_file: tool_head_cable_attach_shield_assembly.yaml
+    depends_on:
+      - tool_head_mount_machined_bottom_assembly
+    inject_parts:
+      tool_head_mount_machined: tool_head_mount_machined_bottom_assembly
+
+  - name: tool_head_cable_attach_shield_left_assembly
+
+    resource_file: tool_head_cable_attach_shield_assembly.yaml
+    depends_on:
+      - tool_head_mount_machined_bottom_assembly
+    inject_parts:
+      tool_head_mount_machined: tool_head_mount_machined_bottom_assembly
+
+  - name: tool_head_cable_attach_shield_right_assembly
+
+    resource_file: tool_head_cable_attach_shield_assembly.yaml
+    depends_on:
+      - tool_head_mount_machined_top_assembly
+    inject_parts:
+      tool_head_mount_machined: tool_head_mount_machined_top_assembly
 
   - name: x_axis_belt_carriage_top_assembly
 

@@ -901,6 +901,17 @@ globals:
   tool_head_back_mount_plate_connector_height: 11
   tool_head_back_mount_plate_connector_thickness: 4
   tool_head_back_mount_plate_connector_width: 7.5
+  tool_head_cable_attach_shield_fillet_radius: 3
+  tool_head_cable_attach_shield_flange_depth: 14
+  tool_head_cable_attach_shield_flange_thickness: 4
+  tool_head_cable_attach_shield_flange_width: 16
+  tool_head_cable_attach_shield_height: 45
+  tool_head_cable_attach_shield_hole_columns: 6
+  tool_head_cable_attach_shield_hole_diameter: 4
+  tool_head_cable_attach_shield_hole_rows: 3
+  tool_head_cable_attach_shield_hole_x_margin: 8
+  tool_head_cable_attach_shield_hole_z_margin: 7
+  tool_head_cable_attach_shield_thickness: 4
   tool_head_mount_base_plate_height: 14
   tool_head_mount_base_plate_thickness: 5
   tool_head_mount_belt_clamp_base_thickness: 5
