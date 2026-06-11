@@ -352,7 +352,39 @@ def create_x_axis_belt_carriage_assembly(
 
         left_bridge_drill = translate(2, 0, 0)(left_bridge_drill)
 
+        left_threaded_inset_holder = create_cylinder(
+            3, bridge_thickness, direction=(0, 1, 0)
+        )
+        left_threaded_inset_holder = align(
+            left_threaded_inset_holder, left_bridge_drill, Alignment.CENTER
+        )
+        left_threaded_inset_holder = align(
+            left_threaded_inset_holder, bridge, Alignment.STACK_BACK
+        )
+        assembly = assembly.fuse(left_threaded_inset_holder)
+
         assembly = assembly.cut(left_bridge_drill)
         assembly.add_named_cutter(left_bridge_drill, "left_bridge_hole_drill")
+
+        left_thread_inset = create_thread_inset_assembly(
+            size="M3",
+            thickness=6,
+            extra_radius=0.1,
+            clearance_type="close",
+        )
+        left_thread_inset = rotate(-90, axis=(1, 0, 0))(left_thread_inset)
+
+        left_thread_inset = align(
+            left_thread_inset, left_bridge_drill, Alignment.CENTER
+        )
+        left_thread_inset = align(
+            left_thread_inset, left_threaded_inset_holder, Alignment.BACK
+        )
+
+        assembly = left_thread_inset.use_as_cutter_on(assembly)
+        left_thread_inset = left_thread_inset.prefixed_copy(
+            "left_bridge_thread_inset"
+        )
+        assembly = assembly.merge_except_leader(left_thread_inset)
 
     return assembly
