@@ -47,7 +47,7 @@ Builder:
       - source: self
         artifact: leader
         name: x_axis_belt_carriage
-        flip: true
+        flip: false
       # currently disabled, I have printed the clamps to satisfaction already and can use them
       # - source: self
       #   artifact: followers

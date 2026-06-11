@@ -310,8 +310,10 @@ def create_x_axis_belt_carriage_assembly(
         )
         clamp_drill = align(clamp_drill, right_clamp, Alignment.CENTER)
 
+        threaded_inset_holder_radius = 4
+
         threaded_inset_holder = create_cylinder(
-            3, bridge_thickness, direction=(0, 1, 0)
+            threaded_inset_holder_radius, bridge_thickness, direction=(0, 1, 0)
         )
         threaded_inset_holder = align(
             threaded_inset_holder, clamp_drill, Alignment.CENTER
@@ -346,6 +348,10 @@ def create_x_axis_belt_carriage_assembly(
         )
         left_bridge_drill = align(left_bridge_drill, bridge, Alignment.CENTER)
 
+        left_bridge_drill = align(left_bridge_drill, right_clamp, Alignment.CENTER,axes=[2])
+
+        
+
         left_bridge_drill = align(
             left_bridge_drill, tool_heead_mount_machined, Alignment.LEFT
         )
@@ -353,7 +359,7 @@ def create_x_axis_belt_carriage_assembly(
         left_bridge_drill = translate(2, 0, 0)(left_bridge_drill)
 
         left_threaded_inset_holder = create_cylinder(
-            3, bridge_thickness, direction=(0, 1, 0)
+            threaded_inset_holder_radius, bridge_thickness, direction=(0, 1, 0)
         )
         left_threaded_inset_holder = align(
             left_threaded_inset_holder, left_bridge_drill, Alignment.CENTER
@@ -382,9 +388,7 @@ def create_x_axis_belt_carriage_assembly(
         )
 
         assembly = left_thread_inset.use_as_cutter_on(assembly)
-        left_thread_inset = left_thread_inset.prefixed_copy(
-            "left_bridge_thread_inset"
-        )
+        left_thread_inset = left_thread_inset.prefixed_copy("left_bridge_thread_inset")
         assembly = assembly.merge_except_leader(left_thread_inset)
 
     return assembly
