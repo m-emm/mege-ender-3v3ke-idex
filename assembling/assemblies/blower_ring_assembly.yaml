@@ -13,6 +13,12 @@ Builder:
       - source: self
         artifact: leader
         name: blower_ring
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+      - source: self
+        artifact: followers
+        name_template: "{name}"
 
 Parameters:
   blower_center_offset:

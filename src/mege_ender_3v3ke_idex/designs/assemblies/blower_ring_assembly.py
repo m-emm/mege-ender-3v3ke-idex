@@ -6,6 +6,7 @@ from shellforgepy.simple import *
 
 BLOWERS_NOZZLE_TIP_SCALE_MIN = 0.25
 BLOWERS_NOZZLE_TIP_SCALE_MAX = 0.75
+BIG_THING = 500
 
 
 def _shortest_angle_distance_degrees(angle_a, angle_b):
@@ -311,7 +312,9 @@ def create_blower_ring_assembly(
     blower_ring = blower_tubes.fuse(feeder_ring)
     blower_ring = blower_ring.cut(blower_tube_cutters)
     blower_ring = blower_ring.cut(feeder_ring_cutter)
+    feeder_ring = feeder_ring.cut(blower_tube_cutters)
     blower_ring = rotate(feeder_ring_rotation_angle + 180, axis=(0, 0, 1))(blower_ring)
+    feeder_ring = rotate(feeder_ring_rotation_angle + 180, axis=(0, 0, 1))(feeder_ring)
     ring_center_reference = rotate(
         feeder_ring_rotation_angle + 180,
         axis=(0, 0, 1),
@@ -321,10 +324,28 @@ def create_blower_ring_assembly(
     bottom_normalization = translate(0, 0, -blower_ring_bbox[0][2])
     blower_ring = bottom_normalization(blower_ring)
     ring_center_reference = bottom_normalization(ring_center_reference)
+    feeder_ring = bottom_normalization(feeder_ring)
 
     retval = LeaderFollowersCuttersPart(blower_ring)
     retval.add_named_non_production_part(
         ring_center_reference,
         "ring_center_reference",
     )
+    retval.add_named_follower(feeder_ring, "feeder_ring")
+
+    feeder_ring_bottom_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    feeder_ring_bottom_cutter = align(
+        feeder_ring_bottom_cutter, feeder_ring, Alignment.CENTER
+    )
+    feeder_ring_bottom_cutter = align(
+        feeder_ring_bottom_cutter, feeder_ring, Alignment.BOTTOM
+    )
+
+    feeder_ring_bottom_cutter = translate(0, 0, feeder_ring_wall)(
+        feeder_ring_bottom_cutter
+    )
+
+    feeder_ring_bottom = feeder_ring.cut(feeder_ring_bottom_cutter)
+    retval.add_named_follower(feeder_ring_bottom, "feeder_ring_bottom")
+
     return retval

@@ -3,11 +3,6 @@
 
 ## Current issues
 
-- **part fan mount air inlet rim too thin, breaks off**
-- fan bloat cutting too aggressive - walls vanish
-- cage and fan M3 holes too small
-- some cage holes misaligned to extruder threaded holes
-- cage to machined tool head carrier missing fourth mount point
 - missing umbilical cable holder on cage
 - fan / cage flanges too weak
 - x belt carriage not fitting to machined toolhead holder

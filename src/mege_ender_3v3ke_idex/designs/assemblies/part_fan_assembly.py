@@ -129,6 +129,18 @@ def create_part_fan_assembly(
 
     blower_ring_with_cut = front_part_fan.use_as_cutter_on(blower_ring_with_cut)
 
+    feeder_ring_bottom = blower_ring.get_named_follower("feeder_ring_bottom")
+
+    front_outlet_cutter = create_convex_hull(front_outlet)
+
+    feeder_ring_bottom_with_cut = feeder_ring_bottom.cut(front_outlet_cutter)
+
+    front_fan_cutter = create_convex_hull(front_part_fan.leader, front_outlet)
+
+    feeder_ring_bottom_with_cut = feeder_ring_bottom_with_cut.cut(front_fan_cutter)
+
+    blower_ring_with_cut = blower_ring_with_cut.fuse(feeder_ring_bottom_with_cut)
+
     side_mount_plate = create_box(
         tool_head_additional_mount_plate_thickness,
         tool_head_additional_mount_plate_depth,
@@ -199,7 +211,9 @@ def create_part_fan_assembly(
     retval.add_consumed_part_ref(
         side_part_fan.part_ref_for_named_follower("mount_plate")
     )
+
     retval.add_consumed_part_ref(side_part_fan.part_ref_for_named_follower("outlet"))
     retval.add_consumed_part_ref(blower_ring.part_ref_for_leader())
+    retval.add_consumed_part_ref(blower_ring.part_ref_for_named_follower("feeder_ring"))
 
     return retval
