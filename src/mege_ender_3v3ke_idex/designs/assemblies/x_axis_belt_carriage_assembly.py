@@ -8,11 +8,15 @@ from shellforgepy.simple import *
 _logger = logging.getLogger(__name__)
 
 
+top_mount_flange_thickness = 4
+
+
 def create_x_axis_belt_carriage_assembly(
     *,
     carriage,
     axis_profile,
     sprite_extruder,
+    tool_heead_mount_machined,
     tool_head_mount_base_plate_height,
     tool_head_mount_belt_clamp_base_thickness,
     tool_head_mount_belt_clamp_length,
@@ -97,9 +101,8 @@ def create_x_axis_belt_carriage_assembly(
 
         clamp_lfc = clamp_lfc.aligned_from_follower(
             "clamp",
-            sprite_extruder_all_fused,
+            tool_heead_mount_machined,
             lr.stack_alignment,
-            stack_gap=clamp_gap,
         )
         # else:
         #     clamp_lfc = align(
@@ -224,9 +227,8 @@ def create_x_axis_belt_carriage_assembly(
 
     clamps_fused = clamps[0].fuse(clamps[1])
     clamps_fused_size = get_bounding_box_size(clamps_fused)
-    bridge = create_box(
-        BIG_THING, x_axis_belt_carriage_bridge_thickness, clamps_fused_size[2]
-    )
+    bridge_height = clamps_fused_size[2]
+    bridge = create_box(BIG_THING, x_axis_belt_carriage_bridge_thickness, bridge_height)
 
     bridge = align(bridge, clamps_fused, Alignment.CENTER)
     bridge = align(bridge, cages, Alignment.BACK)
@@ -237,5 +239,46 @@ def create_x_axis_belt_carriage_assembly(
         limiting_end_part=clamps[1],
     )
     assembly = assembly.fuse(bridge)
+
+    if drive_alignment == Alignment.TOP:
+        mount_flange_width = 2.5 * x_axis_belt_carriage_bridge_thickness
+        for lr in [Alignment.LEFT, Alignment.RIGHT]:
+            mount_flange_back = create_box(
+                mount_flange_width,
+                x_axis_belt_carriage_bridge_thickness,
+                bridge_height,
+            )
+            mount_flange_back = align(mount_flange_back, bridge, Alignment.BACK)
+            mount_flange_back = align(
+                mount_flange_back, tool_heead_mount_machined, Alignment.STACK_TOP
+            )
+            mount_flange_back = align(mount_flange_back, tool_heead_mount_machined, lr)
+
+            # mount_flange_back = fit_part_between(
+            #     mount_flange_back,
+            #     cut_normal=(0, 0, 1),
+            #     limiting_start_part=clamp_lfc_new,
+            # )
+
+            mount_flange_floor = create_box(
+                mount_flange_width,
+                20,
+                top_mount_flange_thickness,
+            )
+            mount_flange_floor = align(
+                mount_flange_floor, mount_flange_back, Alignment.CENTER
+            )
+            mount_flange_floor = align(
+                mount_flange_floor, mount_flange_back, Alignment.BOTTOM
+            )
+            mount_flange_floor = align(
+                mount_flange_floor, mount_flange_back, Alignment.BACK
+            )
+
+            mount_flange_floor = tool_heead_mount_machined.use_as_cutter_on(
+                mount_flange_floor
+            )
+
+            assembly = assembly.fuse(mount_flange_back).fuse(mount_flange_floor)
 
     return assembly

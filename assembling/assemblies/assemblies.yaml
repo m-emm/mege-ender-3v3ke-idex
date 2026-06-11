@@ -2766,10 +2766,12 @@ assemblies:
       - x_axis_lower_profile_assembly
       - x_axis_left_carriage_assembly
       - sprite_extruder_left_assembly
+      - tool_head_mount_machined_bottom_assembly
     inject_parts:
       carriage: x_axis_left_carriage_assembly
       axis_profile: x_axis_lower_profile_assembly
       sprite_extruder: sprite_extruder_left_assembly
+      tool_heead_mount_machined: tool_head_mount_machined_bottom_assembly
     parameters:
       drive_position: bottom
 
@@ -2800,10 +2802,12 @@ assemblies:
       - x_axis_top_profile_assembly
       - x_axis_right_carriage_assembly
       - sprite_extruder_right_assembly
+      - tool_head_mount_machined_top_assembly
     inject_parts:
       carriage: x_axis_right_carriage_assembly
       axis_profile: x_axis_top_profile_assembly
       sprite_extruder: sprite_extruder_right_assembly
+      tool_heead_mount_machined: tool_head_mount_machined_top_assembly
     parameters:
       drive_position: top
 

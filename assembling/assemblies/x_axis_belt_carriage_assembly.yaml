@@ -38,25 +38,31 @@ Builder:
         assembly: sprite_extruder
         artifact: non_production_parts
         name_template: "sprite_extruder_{name}"
+      - source: injected
+        assembly: tool_heead_mount_machined
+        artifact: leader
+        name: tool_head_mount_machined
   Production:
     parts:
       - source: self
         artifact: leader
         name: x_axis_belt_carriage
-      - source: self
-        artifact: followers
-        names:
-          - belt_clamp_left_base
-        name_template: "{name}"
-        prod_rotation_angle: -90
-        prod_rotation_axis: [0, 1, 0]
-      - source: self
-        artifact: followers
-        names:
-          - belt_clamp_right_base
-        name_template: "{name}"
-        prod_rotation_angle: 90
-        prod_rotation_axis: [0, 1, 0]
+        flip: true
+      # currently disabled, I have printed the clamps to satisfaction already and can use them
+      # - source: self
+      #   artifact: followers
+      #   names:
+      #     - belt_clamp_left_base
+      #   name_template: "{name}"
+      #   prod_rotation_angle: -90
+      #   prod_rotation_axis: [0, 1, 0]
+      # - source: self
+      #   artifact: followers
+      #   names:
+      #     - belt_clamp_right_base
+      #   name_template: "{name}"
+      #   prod_rotation_angle: 90
+      #   prod_rotation_axis: [0, 1, 0]
     arrange:
       export_individual_parts: false
       plates:
@@ -66,11 +72,13 @@ Builder:
             overrides:
               process_overrides:
                 support_type: tree(auto)
+                support_style: organic
+                support_threshold_angle: "25"
                 enable_support: "1"
           parts:
             - x_axis_belt_carriage
-            - belt_clamp_left_base
-            - belt_clamp_right_base
+            # - belt_clamp_left_base
+            # - belt_clamp_right_base
       auto_assign_plates: false
 
 Parameters:
