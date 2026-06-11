@@ -310,7 +310,7 @@ def create_x_axis_belt_carriage_assembly(
         )
         clamp_drill = align(clamp_drill, right_clamp, Alignment.CENTER)
 
-        threaded_inset_holder_radius = 4
+        threaded_inset_holder_radius = 3.5
 
         threaded_inset_holder = create_cylinder(
             threaded_inset_holder_radius, bridge_thickness, direction=(0, 1, 0)
@@ -329,7 +329,7 @@ def create_x_axis_belt_carriage_assembly(
         thread_inset = create_thread_inset_assembly(
             size="M3",
             thickness=6,
-            extra_radius=0.1,
+            extra_radius=0.01,
             clearance_type="close",
         )
         thread_inset = rotate(-90, axis=(1, 0, 0))(thread_inset)
@@ -375,7 +375,7 @@ def create_x_axis_belt_carriage_assembly(
         left_thread_inset = create_thread_inset_assembly(
             size="M3",
             thickness=6,
-            extra_radius=0.1,
+            extra_radius=0.01,
             clearance_type="close",
         )
         left_thread_inset = rotate(-90, axis=(1, 0, 0))(left_thread_inset)
