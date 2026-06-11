@@ -348,9 +348,9 @@ def create_x_axis_belt_carriage_assembly(
         )
         left_bridge_drill = align(left_bridge_drill, bridge, Alignment.CENTER)
 
-        left_bridge_drill = align(left_bridge_drill, right_clamp, Alignment.CENTER,axes=[2])
-
-        
+        left_bridge_drill = align(
+            left_bridge_drill, right_clamp, Alignment.CENTER, axes=[2]
+        )
 
         left_bridge_drill = align(
             left_bridge_drill, tool_heead_mount_machined, Alignment.LEFT

@@ -25,6 +25,7 @@ SHIELD_PARAMETER_NAMES = [
     "tool_head_cable_attach_shield_height",
     "tool_head_cable_attach_shield_thickness",
     "tool_head_cable_attach_shield_fillet_radius",
+    "tool_head_cable_attach_shield_plate_flange_overlap",
     "tool_head_cable_attach_shield_flange_width",
     "tool_head_cable_attach_shield_flange_depth",
     "tool_head_cable_attach_shield_flange_thickness",
@@ -63,10 +64,8 @@ def test_tool_head_cable_attach_shield_has_simple_mount_only_signature():
     assert "tool_head_mount_machined" in parameters
     assert "nitehawk_board" not in parameters
     assert "sprite_extruder" not in parameters
-    assert any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD
-        for parameter in parameters.values()
-    )
+    for parameter_name in SHIELD_PARAMETER_NAMES:
+        assert parameter_name in parameters
 
 
 def test_tool_head_cable_attach_shield_drills_grid_and_front_mount_holes():
@@ -88,12 +87,20 @@ def test_tool_head_cable_attach_shield_drills_grid_and_front_mount_holes():
         * DEFAULTS["tool_head_cable_attach_shield_hole_rows"]
     )
 
+    plate_hole_center_y = get_bounding_box_center(
+        shield.get_named_cutter("cable_tie_hole_0_0")
+    )[1]
     for side in ["left", "right"]:
         shield_hole = shield.get_named_cutter(f"flange_mount_hole_{side}")
         mount_hole = mount.get_named_cutter(f"hole_drill_{side.upper()}_FRONT")
         assert get_bounding_box_center(shield_hole) == pytest.approx(
             get_bounding_box_center(mount_hole)
         )
+        assert (
+            abs(get_bounding_box_center(shield_hole)[1] - plate_hole_center_y)
+            >= DEFAULTS["tool_head_cable_attach_shield_thickness"]
+        )
+        assert shield.get_named_non_production_part(f"flange_mount_screw_{side}")
 
     for cutter_name in cable_hole_names + [
         "flange_mount_hole_left",
@@ -126,6 +133,11 @@ def test_tool_head_cable_attach_shield_yaml_and_graph_wiring():
             "source": "self",
             "artifact": "leader",
             "name": "tool_head_cable_attach_shield",
+        },
+        {
+            "source": "self",
+            "artifact": "non_production_parts",
+            "name_template": "{name}",
         },
         {
             "source": "injected",
@@ -166,7 +178,7 @@ def test_tool_head_cable_attach_shield_yaml_and_graph_wiring():
     for assembly_name, (mount_name, alias) in expected.items():
         assembly = assemblies[assembly_name]
         assert assembly["resource_file"] == "tool_head_cable_attach_shield_assembly.yaml"
-        assert assembly["depends_on"] == [mount_name]
+        assert assembly["depends_on"] == ["x_axis_rail_assembly", mount_name]
         assert assembly["inject_parts"] == {"tool_head_mount_machined": mount_name}
         if alias is not None:
             assert assemblies["tool_heads_assembly"]["inject_parts"][alias] == assembly_name

@@ -2816,6 +2816,7 @@ assemblies:
 
     resource_file: tool_head_cable_attach_shield_assembly.yaml
     depends_on:
+      - x_axis_rail_assembly
       - tool_head_mount_machined_bottom_assembly
     inject_parts:
       tool_head_mount_machined: tool_head_mount_machined_bottom_assembly
@@ -2824,6 +2825,7 @@ assemblies:
 
     resource_file: tool_head_cable_attach_shield_assembly.yaml
     depends_on:
+      - x_axis_rail_assembly
       - tool_head_mount_machined_bottom_assembly
     inject_parts:
       tool_head_mount_machined: tool_head_mount_machined_bottom_assembly
@@ -2832,6 +2834,7 @@ assemblies:
 
     resource_file: tool_head_cable_attach_shield_assembly.yaml
     depends_on:
+      - x_axis_rail_assembly
       - tool_head_mount_machined_top_assembly
     inject_parts:
       tool_head_mount_machined: tool_head_mount_machined_top_assembly

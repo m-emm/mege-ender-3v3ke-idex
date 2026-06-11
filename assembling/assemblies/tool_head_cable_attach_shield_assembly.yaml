@@ -17,6 +17,9 @@ Builder:
       - source: self
         artifact: leader
         name: tool_head_cable_attach_shield
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
       - source: injected
         assembly: tool_head_mount_machined
         artifact: leader
@@ -45,6 +48,8 @@ Parameters:
   tool_head_cable_attach_shield_thickness:
     Type: Float
   tool_head_cable_attach_shield_fillet_radius:
+    Type: Float
+  tool_head_cable_attach_shield_plate_flange_overlap:
     Type: Float
   tool_head_cable_attach_shield_flange_width:
     Type: Float
