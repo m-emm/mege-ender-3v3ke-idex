@@ -689,6 +689,10 @@ placement:
     - part: x_axis_mcu_holder_fan_assembly
       to: x_axis_mcu_holder_assembly.followers.top_lid
       alignment: FRONT
+      post_translation:
+        - 0
+        - 1.2
+        - 0
 
     - rigid_group:
         - x_axis_mcu_holder_assembly

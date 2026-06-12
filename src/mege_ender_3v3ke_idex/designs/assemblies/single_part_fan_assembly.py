@@ -210,6 +210,7 @@ def create_single_part_fan_assembly(
     outlet_inner_duct = outlet_inner_duct.cut(outlet_inner_duct_cutter)
     outlet = outlet.fuse(outlet_inner_duct)
     retval.add_named_follower(outlet, "outlet")
+    retval.add_named_cutter(fan_hole, "fan_hole_cutter")
 
     _logger.info(f"Adding cutter")
     retval.add_named_cutter(fan_clearance_cutter, "fan_clearance_cutter")
