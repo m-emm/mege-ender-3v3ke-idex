@@ -667,19 +667,33 @@ placement:
         - x_axis_belt_carriage_top_assembly
       to: x_axis_rail_assembly
 
-    - part: x_axis_mcu_holder_assembly.followers.side_walls
-      to: x_axis_motor_mount_top_assembly.non_production_parts.axis_holding_counter_flange
-      alignment: FRONT
+    - part: x_axis_mcu_holder_fan_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 0, 1]
 
-    - part: x_axis_mcu_holder_assembly.followers.side_walls
-      to: x_axis_motor_mount_top_assembly.non_production_parts.axis_holding_counter_flange
-      alignment: STACK_LEFT
-      stack_gap:
-        $ref: x_axis_mcu_holder_motor_flange_gap
+    - part: x_axis_mcu_holder_fan_assembly
+      post_rotation:
+        angle: 90
+        axis: [1, 0, 0]
+
+    - part: x_axis_mcu_holder_fan_assembly
+      to: x_axis_mcu_holder_assembly
+      alignment: CENTER
+
+    - part: x_axis_mcu_holder_fan_assembly
+      to: x_axis_mcu_holder_assembly.followers.pico_board_board
+      alignment: CENTER
+      axes: [0]
+
+    - part: x_axis_mcu_holder_fan_assembly
+      to: x_axis_mcu_holder_assembly.followers.top_lid
+      alignment: FRONT
 
     - rigid_group:
         - x_axis_mcu_holder_assembly
         - x_axis_mcu_holder_with_fan_assembly
+        - x_axis_mcu_holder_fan_joined_assembly
       to: x_axis_motor_mount_top_assembly
 
     - rigid_group:
@@ -2679,7 +2693,6 @@ assemblies:
       part_fan_mount_plate_blow_direction_oversize: !Ref front_part_fan_mount_plate_blow_direction_oversize
       part_fan_mount_plate_cross_oversize: !Ref front_part_fan_mount_plate_cross_oversize
 
-
   - name: x_axis_mcu_holder_fan_assembly
 
     resource_file: single_part_fan_assembly.yaml
@@ -2695,7 +2708,7 @@ assemblies:
     resource_file: x_axis_mcu_holder_fan_joiner.yaml
     inject_parts:
       x_axis_mcu_holder: x_axis_mcu_holder_assembly
-      part_fan: x_axis_mcu_holder_fan_assembly
+      fan: x_axis_mcu_holder_fan_assembly
     outputs:
       x_axis_mcu_holder: x_axis_mcu_holder_with_fan_assembly
       part_fan: x_axis_mcu_holder_fan_joined_assembly
