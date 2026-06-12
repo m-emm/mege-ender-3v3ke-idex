@@ -37,20 +37,21 @@ This builds the `print_bed_undercarriage_assembly`, selects the `adjustment_whee
 
 ## Klipper Configuration
 
-The project includes Klipper configuration files for the IDEX conversion. Deployment uses a git-based workflow:
+The active Klipper configuration lives at `klipper_setup/klipper_config/printer.cfg`.
+That file is the source of truth for the active printer. Everything under
+`klipper_setup/klipper_config/archive/` is historical/reference material.
 
 ```bash
-# On the Klipper Raspberry Pi
-ssh pi@menderpi.local
-cd ~/mege-ender-3v3ke-idex
-git pull
-./klipper_setup/klipper_config/install_printer_cfg.sh
-sudo systemctl restart klipper
+# From the local checkout
+cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
+./update_menderpi.sh
 ```
 
-Configuration files are tracked in git under `klipper_setup/klipper_config/` and use descriptive names reflecting the hardware state (e.g., `toolhead_nitehawk_and_x_axis.cfg`). The install script deploys them as `printer.cfg` on the Raspberry Pi.
+The updater copies local `printer.cfg` to
+`pi@menderpi.local:~/printer_data/config/printer.cfg`, backs up the previous
+remote file, restarts Klipper, and prints the Klippy state.
 
-See `AGENTS.md` for detailed deployment workflow and configuration naming conventions.
+See `AGENTS.md` for the detailed deployment workflow.
 
 ## Development
 - Tests: `pytest`

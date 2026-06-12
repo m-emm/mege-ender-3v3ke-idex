@@ -6,7 +6,7 @@ CONFIG_PATH = (
     Path(__file__).resolve().parents[1]
     / "klipper_setup"
     / "klipper_config"
-    / "pico_w_btt_tmc2226_y_z_bringup.cfg"
+    / "printer.cfg"
 )
 
 
@@ -63,10 +63,10 @@ def test_idex_tool_offsets_are_current_machine_calibration():
 
     assert "variable_t0_x_offset: 0.0" in tool_state
     assert "variable_t0_y_offset: 0.0" in tool_state
-    assert "variable_t0_z_offset: 0.0" in tool_state
+    assert "variable_t0_z_offset: -0.2" in tool_state
     assert "variable_t1_x_offset: 0.0" in tool_state
-    assert "variable_t1_y_offset: 1.0" in tool_state
-    assert "variable_t1_z_offset: -0.6" in tool_state
+    assert "variable_t1_y_offset: -0.6" in tool_state
+    assert "variable_t1_z_offset: -0.2" in tool_state
 
 
 def test_idex_tool_parking_uses_full_speed_travel():

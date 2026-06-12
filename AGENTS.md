@@ -194,10 +194,10 @@ mege-ender-3v3ke-idex/
 │           └── assemblies/
 │               └── x_axis_assembly.py        # X-axis assembly generator
 ├── klipper_setup/
-│   ├── klipper_config/                  # Klipper configuration files
-│   │   ├── toolhead_nitehawk_and_x_axis.cfg  # Main config (Nitehawk 36 + X-axis)
-│   │   ├── x_axis_stepper_endstop_pico_w.cfg # X-axis MCU config
-│   │   └── install_printer_cfg.sh           # Deployment script
+│   ├── klipper_config/                  # Active Klipper config truth
+│   │   ├── printer.cfg                  # THE active printer config
+│   │   ├── update_menderpi.sh           # THE active deploy script
+│   │   └── archive/                     # Historical configs/scripts/docs only
 │   └── image_build/                     # Raspberry Pi image build system
 │       └── overlays/stage2/99-klipperpi/
 ├── resources/
@@ -209,65 +209,33 @@ mege-ender-3v3ke-idex/
 
 ## Klipper Configuration Deployment
 
-This project uses a git-based workflow for deploying Klipper configurations to the Raspberry Pi.
+`klipper_setup/klipper_config/printer.cfg` is THE active printer config. It is
+the local source of truth for `pi@menderpi.local:~/printer_data/config/printer.cfg`.
 
-### Configuration File Naming Convention
-
-Configuration files are named descriptively to reflect the actual hardware state:
-- `toolhead_nitehawk_and_x_axis.cfg` - **MAIN CONFIG - EDIT THIS** - Full config with calibrations
-- `x_axis_stepper_endstop_pico_w.cfg` - Minimal X-axis snippet (can be used as include)
-
-**⚠️ IMPORTANT:** `toolhead_nitehawk_and_x_axis.cfg` is the PRIMARY configuration file containing:
-- Calibrated thermistor values
-- PID-tuned heater settings  
-- Calibrated extruder rotation distance
-- All printer-specific settings
-
-Edit this file for configuration changes, then deploy using the install script.
-
-Avoid generic names like `printer.cfg` in the repository. The actual `printer.cfg` on the Raspberry Pi is generated/copied by the install script.
+The root of `klipper_setup/klipper_config/` should stay intentionally small:
+`README.md`, `printer.cfg`, `update_menderpi.sh`, and `archive/`. Files under
+`archive/` are historical/reference material only; do not edit archived files to
+change the active printer.
 
 ### Deployment Workflow
 
 ```bash
-# On your local machine: edit and commit
-cd /path/to/mege-ender-3v3ke-idex
-# Edit: klipper_setup/klipper_config/toolhead_nitehawk_and_x_axis.cfg
-git add klipper_setup/klipper_config/toolhead_nitehawk_and_x_axis.cfg
-git commit -m "Update Klipper config"
-git push
-
-# On the Klipper Raspberry Pi (e.g., menderpi.local)
-ssh pi@menderpi.local
-cd ~/mege-ender-3v3ke-idex
-git pull
-./klipper_setup/klipper_config/install_printer_cfg.sh  # Deploys main config
-sudo systemctl restart klipper
+cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
+# Edit printer.cfg
+./update_menderpi.sh
 ```
 
-### Install Script Pattern
-
-Install scripts follow this pattern:
-1. Locate the source configuration file in `klipper_setup/klipper_config/`
-2. Backup existing `printer.cfg` with timestamp
-3. Copy the source config to `~/printer_data/config/printer.cfg`
-4. Set proper permissions
-
-Example from `install_printer_cfg.sh`:
-```bash
-SOURCE_CFG="${SCRIPT_DIR}/toolhead_nitehawk_and_x_axis.cfg"
-TARGET_DIR="${KLIPPER_CONFIG_DIR:-${HOME}/printer_data/config}"
-MAIN_CFG="${TARGET_DIR}/printer.cfg"
-backup_file "${MAIN_CFG}"
-cp -a "${SOURCE_CFG}" "${MAIN_CFG}"
-```
+`update_menderpi.sh` copies local `printer.cfg` to the Pi, backs up the previous
+remote `printer.cfg`, restarts Klipper, and reports Moonraker/Klippy status.
 
 ### Git Tracking of Configuration Files
 
-Klipper `.cfg` files in `klipper_setup/klipper_config/` are tracked in git (see `.gitignore` exception rule) to enable version-controlled deployment. This allows:
+Klipper `.cfg` files in `klipper_setup/klipper_config/` and its archive are
+tracked in git (see `.gitignore` exception rules) to enable version-controlled
+deployment and historical rollback. This allows:
 - Configuration history and rollback
 - Collaborative development of printer settings
-- Deployment via simple `git pull` + install script
+- Direct deployment via `update_menderpi.sh`
 
 ## Common Tasks
 

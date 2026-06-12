@@ -6,6 +6,7 @@
 !.isort.cfg
 !setup.cfg
 !klipper_setup/klipper_config/*.cfg
+!klipper_setup/klipper_config/archive/**/*.cfg
 !klipper_setup/image_build/overlays/stage2/99-klipperpi/files/printer.cfg
 *.orig
 *.log
