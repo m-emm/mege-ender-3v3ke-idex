@@ -79,29 +79,30 @@ def create_offset_cross_materials():
 
     t1_collector = t1_collector.fuse(t1_bar)
 
-    radius_step = 2
+    if False:
+        radius_step = 2
 
-    t1_rings = PartCollector()
-    t2_rings = PartCollector()
-    for i in range(10):
-        cur_radius = (i + 2) * radius_step
-        ring = create_ring(cur_radius, cur_radius - radius_step, CALIBRATION_HEIGHT_MM)
+        t1_rings = PartCollector()
+        t2_rings = PartCollector()
+        for i in range(10):
+            cur_radius = (i + 2) * radius_step
+            ring = create_ring(cur_radius, cur_radius - radius_step, CALIBRATION_HEIGHT_MM)
 
-        if i % 2 == 0:
-            t1_rings = t1_rings.fuse(ring)
-        else:
-            t2_rings = t2_rings.fuse(ring)
+            if i % 2 == 0:
+                t1_rings = t1_rings.fuse(ring)
+            else:
+                t2_rings = t2_rings.fuse(ring)
 
-    rings_aligner = align_translation(t1_rings, all, Alignment.CENTER)
-    rings_aligner = align_translation(
-        t1_rings, all, Alignment.STACK_RIGHT, stack_gap=2 * ARM_WIDTH_MM
-    )
+        rings_aligner = align_translation(t1_rings, all, Alignment.CENTER)
+        rings_aligner = align_translation(
+            t1_rings, all, Alignment.STACK_RIGHT, stack_gap=2 * ARM_WIDTH_MM
+        )
 
-    t1_rings = rings_aligner(t1_rings)
-    t2_rings = rings_aligner(t2_rings)
+        t1_rings = rings_aligner(t1_rings)
+        t2_rings = rings_aligner(t2_rings)
 
-    t1_collector = t1_collector.fuse(t1_rings)
-    t0_collector = t0_collector.fuse(t2_rings)
+        t1_collector = t1_collector.fuse(t1_rings)
+        t0_collector = t0_collector.fuse(t2_rings)
 
     return t0_collector, t1_collector
 

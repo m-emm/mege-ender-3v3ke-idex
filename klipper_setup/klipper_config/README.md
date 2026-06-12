@@ -45,7 +45,7 @@ cd /Users/mege/git/mege-ender-3v3ke-idex
 The IDEX motion config uses normal `cartesian` kinematics with Klipper
 `[dual_carriage]` support so Mainsail and KlipperScreen can use standard `G28`
 homing and GUI jogging. X-left is carriage 0 with current travel `X-91..X244`;
-X-right is carriage 1 with current travel `X0..X335.1`; Klipper enforces a
+X-right is carriage 1 with current travel `X0..X345.1`; Klipper enforces a
 temporary `10` mm safe distance between them. Tool-switching is active, while
 copy and mirror modes remain deferred. The heatbed uses Klipper
 `sensor_type: Generic 3950` for the known 100k B3950 NTC. The left and right
@@ -162,7 +162,7 @@ MOTORS_OFF
 ```
 
 `G28 X` homes both IDEX carriages: X-left homes to the left-mounted endstop at
-`X0`, and X-right homes to the right-mounted endstop at `X340`. `IDEX_HOME_X`
+`X0`, and X-right homes to the right-mounted endstop at `X345.1`. `IDEX_HOME_X`
 runs `G28 X`, parks X-right, and leaves X-left active. `IDEX_SELECT_LEFT` parks
 X-right and activates X-left; `IDEX_SELECT_RIGHT` parks X-left and activates
 X-right. Both selection macros require X to be homed first.
