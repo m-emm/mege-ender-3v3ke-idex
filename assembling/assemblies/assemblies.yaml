@@ -679,6 +679,7 @@ placement:
 
     - rigid_group:
         - x_axis_mcu_holder_assembly
+        - x_axis_mcu_holder_with_fan_assembly
       to: x_axis_motor_mount_top_assembly
 
     - rigid_group:
@@ -1743,7 +1744,7 @@ assemblies:
       - x_axis_right_carriage_assembly
       - x_axis_endstop_left_assembly
       - x_axis_endstop_right_assembly
-      - x_axis_mcu_holder_assembly
+      - x_axis_mcu_holder_with_fan_assembly
       - umbilical_guide_assembly
     inject_parts:
       x_axis_lower_profile: x_axis_lower_profile_assembly
@@ -2421,7 +2422,7 @@ assemblies:
       - x_axis_right_carriage_assembly
       - x_axis_endstop_left_assembly
       - x_axis_endstop_right_assembly
-      - x_axis_mcu_holder_assembly
+      - x_axis_mcu_holder_with_fan_assembly
       - umbilical_guide_assembly
       - sprite_extruder_left_assembly
       - sprite_extruder_right_assembly
@@ -2481,7 +2482,7 @@ assemblies:
       x_axis_endstop_right: x_axis_endstop_right_assembly
       x_axis_left_carriage: x_axis_left_carriage_assembly
       x_axis_right_carriage: x_axis_right_carriage_assembly
-      x_axis_mcu_holder: x_axis_mcu_holder_assembly
+      x_axis_mcu_holder: x_axis_mcu_holder_with_fan_assembly
       umbilical_guide: umbilical_guide_assembly
       sprite_extruder_left: sprite_extruder_left_assembly
       sprite_extruder_right: sprite_extruder_right_assembly
@@ -2677,6 +2678,27 @@ assemblies:
       part_fan_mount_plate_blow_direction_offset: !Ref front_part_fan_mount_plate_blow_direction_offset
       part_fan_mount_plate_blow_direction_oversize: !Ref front_part_fan_mount_plate_blow_direction_oversize
       part_fan_mount_plate_cross_oversize: !Ref front_part_fan_mount_plate_cross_oversize
+
+
+  - name: x_axis_mcu_holder_fan_assembly
+
+    resource_file: single_part_fan_assembly.yaml
+    depends_on: []
+    parameters:
+      part_fan_mount_plate_blow_direction_offset: 0
+      part_fan_mount_plate_blow_direction_oversize: 5
+      part_fan_mount_plate_cross_oversize: 5
+
+  - name: x_axis_mcu_holder_with_fan_join
+
+    kind: join
+    resource_file: x_axis_mcu_holder_fan_joiner.yaml
+    inject_parts:
+      x_axis_mcu_holder: x_axis_mcu_holder_assembly
+      part_fan: x_axis_mcu_holder_fan_assembly
+    outputs:
+      x_axis_mcu_holder: x_axis_mcu_holder_with_fan_assembly
+      part_fan: x_axis_mcu_holder_fan_joined_assembly
 
   - name: single_part_fan_front_right_assembly
 

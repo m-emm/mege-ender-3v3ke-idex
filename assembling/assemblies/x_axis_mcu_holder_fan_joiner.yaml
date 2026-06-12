@@ -1,0 +1,82 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Joiner for the X-axis MCU holder and replacement part fan
+
+Builder:
+  Outputs:
+    x_axis_mcu_holder:
+      Visualization:
+        preview:
+          enabled: true
+          views:
+            - top
+            - left
+            - front
+            - isometric
+          width: 512
+          height: 512
+        parts:
+          - source: self
+            artifact: leader
+            name: board_holder
+          - source: self
+            artifact: followers
+            name_template: "{name}"
+          - source: self
+            artifact: non_production_parts
+            name_template: "{name}"
+
+    part_fan:
+      Visualization:
+        preview:
+          enabled: true
+          views:
+            - top
+            - left
+            - front
+            - isometric
+          width: 512
+          height: 512
+        parts:
+          - source: output
+            assembly: x_axis_mcu_holder
+            artifact: all
+            name_template: "x_axis_mcu_holder_{name}"
+          - source: self
+            artifact: leader
+            name: part_fan_body
+
+Parameters:
+  fan_rotation_angle:
+    Type: Float
+    Default: 0.0
+  fan_lid_y_offset:
+    Type: Float
+    Default: 0.0
+  fan_lid_stack_gap:
+    Type: Float
+    Default: 0.0
+  replacement_lid_thickness:
+    Type: Float
+    Default: 1.2
+  replacement_lid_clearance:
+    Type: Float
+    Default: 0.4
+
+Parts:
+  XAxisMcuHolderFanJoiner:
+    Type: Shellforgepy::AssemblyJoiner
+
+    Properties:
+      Joiner: mege_ender_3v3ke_idex.designs.assemblies.x_axis_mcu_holder_fan_joiner.join_x_axis_mcu_holder_with_fan
+      Properties:
+        fan_rotation_angle:
+          $ref: fan_rotation_angle
+        fan_lid_y_offset:
+          $ref: fan_lid_y_offset
+        fan_lid_stack_gap:
+          $ref: fan_lid_stack_gap
+        replacement_lid_thickness:
+          $ref: replacement_lid_thickness
+        replacement_lid_clearance:
+          $ref: replacement_lid_clearance

@@ -27,7 +27,7 @@ Builder:
         artifact: leader
         name: umbilical_guide
       - source: dependencies
-        assembly: x_axis_mcu_holder_assembly
+        assembly: x_axis_mcu_holder_with_fan_assembly
         artifact: all
         name_template: "x_axis_mcu_holder_{name}"
       - source: dependencies
