@@ -30,8 +30,12 @@ CANDIDATE_PITCH_MM = 10.0
 PATTERN_GAP_MM = 16.0
 LABEL_SIZE_MM = 4.5
 LABEL_STROKE_WIDTH_MM = 0.6
-LABEL_THICKNESS_MM = CALIBRATION_HEIGHT_MM
 LABEL_GAP_MM = 2.0
+LABEL_PAD_THICKNESS_MM = 0.4
+LABEL_TEXT_THICKNESS_MM = CALIBRATION_HEIGHT_MM - LABEL_PAD_THICKNESS_MM
+LABEL_PAD_MARGIN_MM = 1.5
+LABEL_PAD_CONNECTOR_WIDTH_MM = LINE_WIDTH_MM
+LABEL_PAD_CONNECTOR_OVERLAP_MM = 0.3
 SPINE_WIDTH_MM = LINE_WIDTH_MM
 
 OFFSET_STEP_MM = 0.1
@@ -135,30 +139,37 @@ def format_offset_label(offset_mm):
 
 
 def create_vector_label(text):
-    retval =  create_vector_text_object(
+    label = create_vector_text_object(
         text,
         size=LABEL_SIZE_MM,
-        thickness=LABEL_THICKNESS_MM,
+        thickness=LABEL_TEXT_THICKNESS_MM,
         stroke_width=LABEL_STROKE_WIDTH_MM,
     )
 
-    bb_center = get_bounding_box_center(retval)  
-    retval = rotate(45, center=bb_center)(retval)
-    return retval
+    bb_center = get_bounding_box_center(label)
+    return rotate(45, center=bb_center)(label)
 
 
 def create_label_below(text, center_x_mm, top_y_mm):
     label = create_vector_label(text)
     min_point, max_point = get_bounding_box(label)
     center_x = (min_point[0] + max_point[0]) / 2
-    return translate(center_x_mm - center_x, top_y_mm - max_point[1], 0)(label)
+    return translate(
+        center_x_mm - center_x,
+        top_y_mm - max_point[1],
+        LABEL_PAD_THICKNESS_MM,
+    )(label)
 
 
 def create_label_left(text, right_x_mm, center_y_mm):
     label = create_vector_label(text)
     min_point, max_point = get_bounding_box(label)
     center_y = (min_point[1] + max_point[1]) / 2
-    return translate(right_x_mm - max_point[0], center_y_mm - center_y, 0)(label)
+    return translate(
+        right_x_mm - max_point[0],
+        center_y_mm - center_y,
+        LABEL_PAD_THICKNESS_MM,
+    )(label)
 
 
 def create_vertical_segment(center_x_mm, start_y_mm, length_mm):
@@ -195,6 +206,75 @@ def create_vertical_spine(center_x_mm, start_y_mm, end_y_mm):
         CALIBRATION_HEIGHT_MM,
         origin=(center_x_mm - SPINE_WIDTH_MM / 2, start_y_mm, 0),
     )
+
+
+def create_label_slab(labels):
+    min_x = min(get_bounding_box(label)[0][0] for label in labels) - LABEL_PAD_MARGIN_MM
+    min_y = min(get_bounding_box(label)[0][1] for label in labels) - LABEL_PAD_MARGIN_MM
+    max_x = max(get_bounding_box(label)[1][0] for label in labels) + LABEL_PAD_MARGIN_MM
+    max_y = max(get_bounding_box(label)[1][1] for label in labels) + LABEL_PAD_MARGIN_MM
+
+    slab = create_box(
+        max_x - min_x,
+        max_y - min_y,
+        LABEL_PAD_THICKNESS_MM,
+        origin=(min_x, min_y, 0),
+    )
+    return slab, (min_x, min_y, max_x, max_y)
+
+
+def create_label_vertical_connector(center_x_mm, start_y_mm, end_y_mm):
+    min_y = min(start_y_mm, end_y_mm)
+    max_y = max(start_y_mm, end_y_mm)
+    return create_box(
+        LABEL_PAD_CONNECTOR_WIDTH_MM,
+        max_y - min_y,
+        LABEL_PAD_THICKNESS_MM,
+        origin=(center_x_mm - LABEL_PAD_CONNECTOR_WIDTH_MM / 2, min_y, 0),
+    )
+
+
+def create_label_horizontal_connector(start_x_mm, end_x_mm, center_y_mm):
+    min_x = min(start_x_mm, end_x_mm)
+    max_x = max(start_x_mm, end_x_mm)
+    return create_box(
+        max_x - min_x,
+        LABEL_PAD_CONNECTOR_WIDTH_MM,
+        LABEL_PAD_THICKNESS_MM,
+        origin=(min_x, center_y_mm - LABEL_PAD_CONNECTOR_WIDTH_MM / 2, 0),
+    )
+
+
+def fuse_x_label_slab(t0_collector, x_label_entries):
+    labels = [entry["label"] for entry in x_label_entries]
+    slab, (_, _, _, slab_max_y) = create_label_slab(labels)
+    t0_collector = t0_collector.fuse(slab)
+
+    for entry in x_label_entries:
+        connector = create_label_vertical_connector(
+            entry["center_x_mm"],
+            slab_max_y - LABEL_PAD_CONNECTOR_OVERLAP_MM,
+            entry["line_start_y_mm"] + LABEL_PAD_CONNECTOR_OVERLAP_MM,
+        )
+        t0_collector = t0_collector.fuse(connector)
+
+    return t0_collector
+
+
+def fuse_y_label_slab(t0_collector, y_label_entries):
+    labels = [entry["label"] for entry in y_label_entries]
+    slab, (_, _, slab_max_x, _) = create_label_slab(labels)
+    t0_collector = t0_collector.fuse(slab)
+
+    for entry in y_label_entries:
+        connector = create_label_horizontal_connector(
+            slab_max_x - LABEL_PAD_CONNECTOR_OVERLAP_MM,
+            entry["line_start_x_mm"] + LABEL_PAD_CONNECTOR_OVERLAP_MM,
+            entry["center_y_mm"],
+        )
+        t0_collector = t0_collector.fuse(connector)
+
+    return t0_collector
 
 
 def fuse_removal_spines(t0_collector, t1_collector):
@@ -284,6 +364,8 @@ def create_offset_line_materials(t1_x_offset_mm=None, t1_y_offset_mm=None):
     t0_collector = PartCollector()
     t1_collector = PartCollector()
     t0_collector, t1_collector = fuse_removal_spines(t0_collector, t1_collector)
+    x_label_entries = []
+    y_label_entries = []
 
     for index, offset_mm in enumerate(OFFSET_CANDIDATES_MM):
         segment_length_mm = LINE_SEGMENT_LENGTH_MM
@@ -317,7 +399,13 @@ def create_offset_line_materials(t1_x_offset_mm=None, t1_y_offset_mm=None):
             x_nominal_mm,
             X_PATTERN_Y_BOTTOM_MM - LABEL_GAP_MM,
         )
-        t0_collector = t0_collector.fuse(x_label)
+        x_label_entries.append(
+            {
+                "label": x_label,
+                "center_x_mm": x_nominal_mm,
+                "line_start_y_mm": t0_start_y_mm,
+            }
+        )
 
         y_nominal_mm = Y_PATTERN_Y_START_MM + index * CANDIDATE_PITCH_MM
         t0_start_x_mm = (
@@ -346,7 +434,19 @@ def create_offset_line_materials(t1_x_offset_mm=None, t1_y_offset_mm=None):
             Y_PATTERN_LEFT_MM - LABEL_GAP_MM,
             y_nominal_mm,
         )
-        t0_collector = t0_collector.fuse(y_label)
+        y_label_entries.append(
+            {
+                "label": y_label,
+                "center_y_mm": y_nominal_mm,
+                "line_start_x_mm": t0_start_x_mm,
+            }
+        )
+
+    t0_collector = fuse_x_label_slab(t0_collector, x_label_entries)
+    t0_collector = fuse_y_label_slab(t0_collector, y_label_entries)
+
+    for label_entry in x_label_entries + y_label_entries:
+        t1_collector = t1_collector.fuse(label_entry["label"])
 
     return t0_collector, t1_collector
 
