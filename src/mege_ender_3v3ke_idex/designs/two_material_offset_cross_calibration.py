@@ -79,7 +79,7 @@ def create_offset_cross_materials():
 
     t1_collector = t1_collector.fuse(t1_bar)
 
-    if False:
+    if True:
         radius_step = 2
 
         t1_rings = PartCollector()
