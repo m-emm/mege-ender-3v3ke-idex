@@ -1,4 +1,4 @@
-"""Two-material IDEX absolute X offset calibration against the painted bed grid.
+"""Two-material IDEX absolute X/Y calibration against the painted bed grid.
 
 Usage:
     cd <project_root> && ./run.sh path/to/two_material_offset_line_calibration_grid.py
@@ -29,6 +29,7 @@ CONFIG_PATH = (
     / "printer.cfg"
 )
 STEPPER_X_SECTION = "stepper_x"
+STEPPER_Y_SECTION = "stepper_y"
 DUAL_CARRIAGE_SECTION = "dual_carriage"
 TOOL_STATE_SECTION = "gcode_macro _IDEX_TOOL_STATE"
 
@@ -78,11 +79,18 @@ CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM = 0.3
 
 CALIBRATION_GRID_X_INDEX_MIN = -4
 CALIBRATION_GRID_X_INDEX_MAX = 4
+CALIBRATION_GRID_Y_INDEX_MIN = -4
+CALIBRATION_GRID_Y_INDEX_MAX = 4
 CALIBRATION_OFFSET_STEP_MM = 0.2
 CALIBRATION_OFFSET_CANDIDATES_MM = tuple(
     round(index * CALIBRATION_OFFSET_STEP_MM, 1)
     for index in range(CALIBRATION_GRID_X_INDEX_MIN, CALIBRATION_GRID_X_INDEX_MAX + 1)
 )
+
+X_T0_PART_NAME = "absolute_x_grid_alignment_t0"
+X_T1_PART_NAME = "absolute_x_grid_alignment_t1"
+Y_T0_PART_NAME = "absolute_y_grid_alignment_t0"
+Y_T1_PART_NAME = "absolute_y_grid_alignment_t1"
 
 T0_COLOR = (0.95, 0.08, 0.04)
 T1_COLOR = (0.0, 0.32, 1.0)
@@ -176,6 +184,24 @@ def parse_x_endstop_values(config_text):
 
 def read_x_endstop_values(config_path=CONFIG_PATH):
     return parse_x_endstop_values(config_path.read_text(encoding="utf-8"))
+
+
+def parse_y_calibration_values(config_text):
+    stepper_y = get_config_section(config_text, STEPPER_Y_SECTION)
+    tool_state = get_config_section(config_text, TOOL_STATE_SECTION)
+
+    return {
+        "t0_y_endstop": parse_config_float(
+            stepper_y,
+            STEPPER_Y_SECTION,
+            "position_endstop",
+        ),
+        "t1_y_offset": parse_tool_state_float(tool_state, "t1_y_offset"),
+    }
+
+
+def read_y_calibration_values(config_path=CONFIG_PATH):
+    return parse_y_calibration_values(config_path.read_text(encoding="utf-8"))
 
 
 def grid_coordinate(zero_mm, index):
@@ -438,12 +464,50 @@ def create_calibration_label_below(text, center_x_mm, top_y_mm):
     )(label)
 
 
+def create_calibration_label_left(
+    text,
+    right_x_mm,
+    center_y_mm,
+    *,
+    min_y_mm=None,
+    max_y_mm=None,
+):
+    label = create_calibration_vector_label(text)
+    min_point, max_point = get_bounding_box(label)
+    center_y = (min_point[1] + max_point[1]) / 2
+    label = translate(
+        right_x_mm - max_point[0],
+        center_y_mm - center_y,
+        0,
+    )(label)
+
+    min_point, max_point = get_bounding_box(label)
+    shift_y_mm = 0.0
+    if min_y_mm is not None and min_point[1] < min_y_mm:
+        shift_y_mm = max(shift_y_mm, min_y_mm - min_point[1])
+    if max_y_mm is not None and max_point[1] + shift_y_mm > max_y_mm:
+        shift_y_mm = min(shift_y_mm, max_y_mm - max_point[1])
+    if shift_y_mm:
+        label = translate(0, shift_y_mm, 0)(label)
+
+    return label
+
+
 def create_calibration_vertical_segment(center_x_mm, y_min_mm, y_max_mm):
     return create_box(
         CALIBRATION_LINE_WIDTH_MM,
         y_max_mm - y_min_mm,
         CALIBRATION_HEIGHT_MM,
         origin=(center_x_mm - CALIBRATION_LINE_WIDTH_MM / 2, y_min_mm, 0),
+    )
+
+
+def create_calibration_horizontal_segment(center_y_mm, x_min_mm, x_max_mm):
+    return create_box(
+        x_max_mm - x_min_mm,
+        CALIBRATION_LINE_WIDTH_MM,
+        CALIBRATION_HEIGHT_MM,
+        origin=(x_min_mm, center_y_mm - CALIBRATION_LINE_WIDTH_MM / 2, 0),
     )
 
 
@@ -482,6 +546,17 @@ def create_calibration_label_connector(center_x_mm, start_y_mm, end_y_mm):
         max_y - min_y,
         CALIBRATION_LABEL_PAD_THICKNESS_MM,
         origin=(center_x_mm - CALIBRATION_LABEL_CONNECTOR_WIDTH_MM / 2, min_y, 0),
+    )
+
+
+def create_calibration_label_horizontal_connector(start_x_mm, end_x_mm, center_y_mm):
+    min_x = min(start_x_mm, end_x_mm)
+    max_x = max(start_x_mm, end_x_mm)
+    return create_box(
+        max_x - min_x,
+        CALIBRATION_LABEL_CONNECTOR_WIDTH_MM,
+        CALIBRATION_LABEL_PAD_THICKNESS_MM,
+        origin=(min_x, center_y_mm - CALIBRATION_LABEL_CONNECTOR_WIDTH_MM / 2, 0),
     )
 
 
