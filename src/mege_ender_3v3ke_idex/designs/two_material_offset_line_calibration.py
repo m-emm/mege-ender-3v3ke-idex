@@ -44,6 +44,7 @@ OFFSET_CANDIDATES_MM = tuple(
     round((index - OFFSET_COUNT_EACH_SIDE) * OFFSET_STEP_MM, 1)
     for index in range(2 * OFFSET_COUNT_EACH_SIDE + 1)
 )
+ZERO_CANDIDATE_INDEX = OFFSET_COUNT_EACH_SIDE
 OFFSET_RANGE_MM = max(abs(offset) for offset in OFFSET_CANDIDATES_MM)
 
 X_PATTERN_WIDTH_MM = (
@@ -271,6 +272,12 @@ def x_t1_center_for_endpoint_delta(index, endpoint_delta_mm):
     return x_nominal_center_for_candidate(index) - endpoint_delta_mm
 
 
+def segment_length_for_candidate(index):
+    if index == ZERO_CANDIDATE_INDEX:
+        return ZERO_LINE_SEGMENT_LENGTH_MM
+    return LINE_SEGMENT_LENGTH_MM
+
+
 def create_label_slab(labels):
     min_x = min(get_bounding_box(label)[0][0] for label in labels) - LABEL_PAD_MARGIN_MM
     min_y = min(get_bounding_box(label)[0][1] for label in labels) - LABEL_PAD_MARGIN_MM
@@ -439,9 +446,7 @@ def create_offset_line_materials(right_x_endpoint_mm=None, t1_y_offset_mm=None):
     y_label_entries = []
 
     for index, offset_mm in enumerate(OFFSET_CANDIDATES_MM):
-        segment_length_mm = LINE_SEGMENT_LENGTH_MM
-        if offset_mm == 0.0:
-            segment_length_mm = ZERO_LINE_SEGMENT_LENGTH_MM
+        segment_length_mm = segment_length_for_candidate(index)
 
         x_nominal_mm = x_nominal_center_for_candidate(index)
         t0_start_y_mm = (

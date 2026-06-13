@@ -72,6 +72,43 @@ def test_idex_part_fan_pins_and_slicer_routing():
     assert "_IDEX_APPLY_PART_FAN TOOL=1" in _section(config_text, "gcode_macro T1")
 
 
+def test_mainsail_pause_resume_cancel_macros_are_defined():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+
+    pause = _section(config_text, "gcode_macro PAUSE")
+    assert "rename_existing: PAUSE_BASE" in pause
+    assert re.search(r"^\s*PAUSE_BASE\s*$", pause, flags=re.MULTILINE)
+
+    resume = _section(config_text, "gcode_macro RESUME")
+    assert "rename_existing: RESUME_BASE" in resume
+    assert "RESUME_BASE {rawparams}" in resume
+
+    cancel = _section(config_text, "gcode_macro CANCEL_PRINT")
+    assert "rename_existing: CANCEL_PRINT_BASE" in cancel
+    assert "M107" in cancel
+    assert "TURN_OFF_HEATERS" in cancel
+    assert "CLEAR_PAUSE" in cancel
+    assert "_IDEX_CANCEL_PARK" in cancel
+    assert cancel.rstrip().endswith("CANCEL_PRINT_BASE")
+    assert "M84" not in cancel
+
+
+def test_idex_cancel_park_is_homed_axis_guarded():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    cancel_park = _section(config_text, "gcode_macro _IDEX_CANCEL_PARK")
+
+    assert '"z" in homed' in cancel_park
+    assert '"x" in homed' in cancel_park
+    assert '"y" in homed' in cancel_park
+    assert "position.z|float + 5.0" in cancel_park
+    assert "axis_max.z|float" in cancel_park
+    assert "tool_state.active_tool|int == 0" in cancel_park
+    assert "IDEX_SELECT_LEFT" in cancel_park
+    assert "IDEX_SELECT_RIGHT" in cancel_park
+    assert "axis_max.y|float - 5.0" in cancel_park
+    assert "M84" not in cancel_park
+
+
 def test_idex_tool_offsets_are_current_machine_calibration():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     tool_state = _section(config_text, "gcode_macro _IDEX_TOOL_STATE")
@@ -84,15 +121,15 @@ def test_idex_tool_offsets_are_current_machine_calibration():
     assert "variable_t1_y_offset: -0.1" in tool_state
     assert "variable_t1_z_offset: -0.2" in tool_state
 
-    assert "position_endstop: 344.900" in dual_carriage
-    assert "position_max: 344.900" in dual_carriage
+    assert "position_endstop: 354.900" in dual_carriage
+    assert "position_max: 354.900" in dual_carriage
 
 
 def test_offset_line_calibration_parses_active_calibration_values():
     values = parse_idex_calibration_values(CONFIG_PATH.read_text(encoding="utf-8"))
 
     assert values == {
-        "right_x_endpoint": 344.9,
+        "right_x_endpoint": 354.9,
         "t0_y": 0.0,
         "t1_y": -0.1,
     }
@@ -123,8 +160,8 @@ def test_offset_line_calibration_rejects_x_tool_offsets():
 def test_offset_line_calibration_rejects_mismatched_right_endpoint_values():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     config_text = config_text.replace(
-        "position_endstop: 344.900\nposition_min: 0.000\nposition_max: 344.900",
-        "position_endstop: 344.900\nposition_min: 0.000\nposition_max: 345.000",
+        "position_endstop: 354.900\nposition_min: 0.000\nposition_max: 354.900",
+        "position_endstop: 354.900\nposition_min: 0.000\nposition_max: 355.000",
     )
 
     with pytest.raises(ValueError, match="position_endstop and position_max"):
