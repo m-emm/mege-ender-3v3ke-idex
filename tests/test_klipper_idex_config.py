@@ -4,10 +4,16 @@ from pathlib import Path
 import pytest
 
 from mege_ender_3v3ke_idex.designs.two_material_offset_line_calibration import (
+    LINE_SEGMENT_LENGTH_MM,
+    OFFSET_COUNT_EACH_SIDE,
     OFFSET_CANDIDATES_MM,
+    OFFSET_STEP_MM,
+    ZERO_CANDIDATE_INDEX,
+    ZERO_LINE_SEGMENT_LENGTH_MM,
     format_offset_label,
     format_right_endpoint_label,
     parse_idex_calibration_values,
+    segment_length_for_candidate,
     x_nominal_center_for_candidate,
     x_t1_center_for_endpoint_delta,
 )
@@ -139,9 +145,31 @@ def test_offset_line_calibration_formats_right_endpoint_labels():
     assert format_right_endpoint_label(345.4) == "5.4"
 
 
+def test_offset_line_calibration_candidates_are_centered_on_zero():
+    assert len(OFFSET_CANDIDATES_MM) == 2 * OFFSET_COUNT_EACH_SIDE + 1
+    assert OFFSET_CANDIDATES_MM[ZERO_CANDIDATE_INDEX] == 0.0
+    assert OFFSET_CANDIDATES_MM[0] == pytest.approx(
+        -OFFSET_STEP_MM * OFFSET_COUNT_EACH_SIDE
+    )
+    assert OFFSET_CANDIDATES_MM[-1] == pytest.approx(
+        OFFSET_STEP_MM * OFFSET_COUNT_EACH_SIDE
+    )
+
+    for index, candidate_offset in enumerate(OFFSET_CANDIDATES_MM):
+        mirror_index = 2 * ZERO_CANDIDATE_INDEX - index
+        assert OFFSET_CANDIDATES_MM[mirror_index] == pytest.approx(-candidate_offset)
+
+
+def test_offset_line_calibration_long_marker_is_center_zero_candidate():
+    for index in range(len(OFFSET_CANDIDATES_MM)):
+        if index == ZERO_CANDIDATE_INDEX:
+            assert segment_length_for_candidate(index) == ZERO_LINE_SEGMENT_LENGTH_MM
+        else:
+            assert segment_length_for_candidate(index) == LINE_SEGMENT_LENGTH_MM
+
+
 def test_offset_line_calibration_labels_active_current_offsets():
     values = parse_idex_calibration_values(CONFIG_PATH.read_text(encoding="utf-8"))
-    middle_index = len(OFFSET_CANDIDATES_MM) // 2
 
     x_labels = [
         format_right_endpoint_label(values["right_x_endpoint"] + candidate_offset)
@@ -152,12 +180,22 @@ def test_offset_line_calibration_labels_active_current_offsets():
         for candidate_offset in OFFSET_CANDIDATES_MM
     ]
 
-    assert x_labels[middle_index] == "4.9"
-    assert y_labels[middle_index] == "-0.1"
-    assert x_labels[0] == "4.4"
-    assert x_labels[-1] == "5.4"
-    assert y_labels[0] == "-0.6"
-    assert y_labels[-1] == "0.4"
+    assert x_labels[ZERO_CANDIDATE_INDEX] == format_right_endpoint_label(
+        values["right_x_endpoint"]
+    )
+    assert y_labels[ZERO_CANDIDATE_INDEX] == format_offset_label(values["t1_y"])
+    assert x_labels[0] == format_right_endpoint_label(
+        values["right_x_endpoint"] - OFFSET_STEP_MM * OFFSET_COUNT_EACH_SIDE
+    )
+    assert x_labels[-1] == format_right_endpoint_label(
+        values["right_x_endpoint"] + OFFSET_STEP_MM * OFFSET_COUNT_EACH_SIDE
+    )
+    assert y_labels[0] == format_offset_label(
+        values["t1_y"] - OFFSET_STEP_MM * OFFSET_COUNT_EACH_SIDE
+    )
+    assert y_labels[-1] == format_offset_label(
+        values["t1_y"] + OFFSET_STEP_MM * OFFSET_COUNT_EACH_SIDE
+    )
 
 
 def test_offset_line_calibration_x_endpoint_delta_moves_t1_opposite_direction():
