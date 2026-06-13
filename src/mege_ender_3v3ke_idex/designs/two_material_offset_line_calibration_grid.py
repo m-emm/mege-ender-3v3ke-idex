@@ -31,9 +31,9 @@ PAINTED_FRAME_INSET_MM = (ACTUAL_BED_WIDTH_MM - PAINTED_FRAME_SIZE_MM) / 2
 PAINTED_FRAME_ORIGIN_X_MM = -24.0
 ACTUAL_BED_ORIGIN_X_MM = PAINTED_FRAME_ORIGIN_X_MM - PAINTED_FRAME_INSET_MM
 
-# Y has not been measured against the printer coordinate system yet.
-ACTUAL_BED_ORIGIN_Y_MM = 0.0
-PAINTED_FRAME_ORIGIN_Y_MM = ACTUAL_BED_ORIGIN_Y_MM + PAINTED_FRAME_INSET_MM
+PAINTED_FRAME_BACK_Y_MM = 296.0
+PAINTED_FRAME_ORIGIN_Y_MM = PAINTED_FRAME_BACK_Y_MM - PAINTED_FRAME_SIZE_MM
+ACTUAL_BED_ORIGIN_Y_MM = PAINTED_FRAME_ORIGIN_Y_MM - PAINTED_FRAME_INSET_MM
 PAINTED_FRAME_LINE_WIDTH_MM = 0.9
 PAINTED_FRAME_FILLET_RADIUS_MM = 5.0
 PAINTED_FRAME_HEIGHT_MM = 0.25
@@ -45,10 +45,10 @@ GRID_LINE_HEIGHT_MM = 0.2
 GRID_LINE_COLOR = (0.72, 0.72, 0.68)
 GRID_LINE_OVERHANG_MM = GRID_PITCH_MM / 3
 GRID_CUTOUT_MARGIN_MM = 1.2
-GRID_X_INDEX_MIN = -3
-GRID_X_INDEX_MAX = 6
-GRID_Y_INDEX_MIN = -2
-GRID_Y_INDEX_MAX = 7
+GRID_X_INDEX_MIN = -4
+GRID_X_INDEX_MAX = 5
+GRID_Y_INDEX_MIN = -3
+GRID_Y_INDEX_MAX = 6
 
 PANEL_OUTLINE_WIDTH_MM = 0.6
 PANEL_OUTLINE_HEIGHT_MM = 0.24
@@ -115,35 +115,19 @@ def create_grid_cutouts(bed_grid_zero):
     return (
         {
             "name": "kingroon_logo_panel_outline",
-            "x_min": x(-2),
-            "x_max": x(5),
-            "y_min": y(2),
-            "y_max": y(4),
+            "x_min": x(-3),
+            "x_max": x(4),
+            "y_min": y(1),
+            "y_max": y(3),
             "fillet_radius": 7.0,
         },
         {
             "name": "z_guide_panel_outline",
-            "x_min": x(-3),
-            "x_max": x(6),
-            "y_min": y(-1.5),
-            "y_max": y(-0.5),
+            "x_min": x(-4),
+            "x_max": x(5),
+            "y_min": y(-2.5),
+            "y_max": y(-1.5),
             "fillet_radius": 7.0,
-        },
-        {
-            "name": "top_x_axis_label_clearance",
-            "x_min": x(3),
-            "x_max": x(6),
-            "y_min": y(6),
-            "y_max": y(7),
-            "fillet_radius": 0.0,
-        },
-        {
-            "name": "right_y_axis_label_clearance",
-            "x_min": x(6),
-            "x_max": x(7),
-            "y_min": y(3),
-            "y_max": y(7),
-            "fillet_radius": 0.0,
         },
     )
 
