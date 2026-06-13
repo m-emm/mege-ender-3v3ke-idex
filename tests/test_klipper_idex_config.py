@@ -109,6 +109,45 @@ def test_idex_cancel_park_is_homed_axis_guarded():
     assert "M84" not in cancel_park
 
 
+def test_idex_next_printable_corner_cycles_exact_safe_corners():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    corner_macro = _section(config_text, "gcode_macro IDEX_NEXT_PRINTABLE_CORNER")
+
+    assert "variable_corner_index: 0" in corner_macro
+    assert "variable_x_min: 0.0" in corner_macro
+    assert "variable_x_max: 244.0" in corner_macro
+    assert "variable_y_min: 0.0" in corner_macro
+    assert "variable_y_max: 290.0" in corner_macro
+    assert "variable_z_travel: 10.0" in corner_macro
+    assert "variable_z_touch: 0.0" in corner_macro
+    assert "variable_xy_move_speed:" in corner_macro
+    assert "variable_z_move_speed:" in corner_macro
+
+    assert '"x" not in homed' in corner_macro
+    assert '"y" not in homed' in corner_macro
+    assert '"z" not in homed' in corner_macro
+    assert "Home X, Y, and Z before running IDEX_NEXT_PRINTABLE_CORNER." in corner_macro
+
+    assert "front-left" in corner_macro
+    assert "front-right" in corner_macro
+    assert "back-right" in corner_macro
+    assert "back-left" in corner_macro
+    assert "next_index = (index + 1) % 4" in corner_macro
+    assert (
+        "SET_GCODE_VARIABLE MACRO=IDEX_NEXT_PRINTABLE_CORNER "
+        "VARIABLE=corner_index VALUE={next_index}"
+    ) in corner_macro
+
+    assert "tool_state.active_tool|int == 0" in corner_macro
+    assert "IDEX_SELECT_LEFT" in corner_macro
+    assert "IDEX_SELECT_RIGHT" in corner_macro
+
+    z_travel_index = corner_macro.index("G1 Z{z_travel|float}")
+    xy_index = corner_macro.index("G1 X{target_x} Y{target_y}")
+    z_touch_index = corner_macro.index("G1 Z{z_touch|float}")
+    assert z_travel_index < xy_index < z_touch_index
+
+
 def test_idex_tool_offsets_are_current_machine_calibration():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     tool_state = _section(config_text, "gcode_macro _IDEX_TOOL_STATE")

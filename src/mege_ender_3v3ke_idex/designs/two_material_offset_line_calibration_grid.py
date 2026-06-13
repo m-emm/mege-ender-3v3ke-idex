@@ -1,7 +1,8 @@
-"""Two-material IDEX absolute offset calibration grid preview.
+"""Two-material IDEX absolute X offset calibration against the painted bed grid.
 
 Usage:
     cd <project_root> && ./run.sh path/to/two_material_offset_line_calibration_grid.py
+    cd <project_root> && ./run.sh --slice path/to/two_material_offset_line_calibration_grid.py
 """
 
 import logging
@@ -9,9 +10,17 @@ import os
 import re
 from pathlib import Path
 
+from mege_3devops.process_data.mege_ender_3v3ke_idex import (
+    SAFE_BED_DEPTH_MM,
+    SAFE_BED_ORIGIN,
+    SAFE_BED_WIDTH_MM,
+    copy_dual_pla_04_offset_calibration_process_data,
+)
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
+
+PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
 CONFIG_PATH = (
     Path(__file__).resolve().parents[3]
@@ -19,6 +28,8 @@ CONFIG_PATH = (
     / "klipper_config"
     / "printer.cfg"
 )
+STEPPER_X_SECTION = "stepper_x"
+DUAL_CARRIAGE_SECTION = "dual_carriage"
 TOOL_STATE_SECTION = "gcode_macro _IDEX_TOOL_STATE"
 
 ACTUAL_BED_WIDTH_MM = 310.0
@@ -54,6 +65,28 @@ PANEL_OUTLINE_WIDTH_MM = 0.6
 PANEL_OUTLINE_HEIGHT_MM = 0.24
 PANEL_OUTLINE_COLOR = (0.72, 0.72, 0.68)
 
+CALIBRATION_HEIGHT_MM = 0.6
+CALIBRATION_LINE_WIDTH_MM = 0.7
+CALIBRATION_LABEL_SIZE_MM = 4.5
+CALIBRATION_LABEL_STROKE_WIDTH_MM = 0.6
+CALIBRATION_LABEL_TEXT_THICKNESS_MM = 0.2
+CALIBRATION_LABEL_PAD_THICKNESS_MM = 0.2
+CALIBRATION_LABEL_PAD_MARGIN_MM = 3.0
+CALIBRATION_LABEL_GAP_MM = 2.0
+CALIBRATION_LABEL_CONNECTOR_WIDTH_MM = CALIBRATION_LINE_WIDTH_MM
+CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM = 0.3
+
+CALIBRATION_GRID_X_INDEX_MIN = -4
+CALIBRATION_GRID_X_INDEX_MAX = 4
+CALIBRATION_OFFSET_STEP_MM = 0.2
+CALIBRATION_OFFSET_CANDIDATES_MM = tuple(
+    round(index * CALIBRATION_OFFSET_STEP_MM, 1)
+    for index in range(CALIBRATION_GRID_X_INDEX_MIN, CALIBRATION_GRID_X_INDEX_MAX + 1)
+)
+
+T0_COLOR = (0.95, 0.08, 0.04)
+T1_COLOR = (0.0, 0.32, 1.0)
+
 
 def get_config_section(config_text, section_name):
     match = re.search(
@@ -81,6 +114,23 @@ def parse_tool_state_float(tool_state_section, variable_name):
         raise ValueError(f"variable_{variable_name} must be numeric") from None
 
 
+def parse_config_float(section, section_name, setting_name):
+    match = re.search(
+        rf"^\s*{re.escape(setting_name)}\s*:\s*(?P<value>\S+)\s*$",
+        section,
+        flags=re.MULTILINE,
+    )
+    if match is None:
+        raise ValueError(f"Missing {setting_name} in [{section_name}]")
+
+    try:
+        return float(match.group("value"))
+    except ValueError:
+        raise ValueError(
+            f"{setting_name} in [{section_name}] must be numeric"
+        ) from None
+
+
 def parse_bed_grid_zero(config_text):
     tool_state = get_config_section(config_text, TOOL_STATE_SECTION)
     return (
@@ -91,6 +141,41 @@ def parse_bed_grid_zero(config_text):
 
 def read_bed_grid_zero(config_path=CONFIG_PATH):
     return parse_bed_grid_zero(config_path.read_text(encoding="utf-8"))
+
+
+def parse_x_endstop_values(config_text):
+    stepper_x = get_config_section(config_text, STEPPER_X_SECTION)
+    dual_carriage = get_config_section(config_text, DUAL_CARRIAGE_SECTION)
+
+    t0_x_endstop = parse_config_float(
+        stepper_x,
+        STEPPER_X_SECTION,
+        "position_endstop",
+    )
+    t1_x_endstop = parse_config_float(
+        dual_carriage,
+        DUAL_CARRIAGE_SECTION,
+        "position_endstop",
+    )
+    t1_x_max = parse_config_float(
+        dual_carriage,
+        DUAL_CARRIAGE_SECTION,
+        "position_max",
+    )
+    if abs(t1_x_endstop - t1_x_max) > 1e-9:
+        raise ValueError(
+            "[dual_carriage] position_endstop and position_max must stay equal "
+            "for right-endstop X calibration labels"
+        )
+
+    return {
+        "t0_x_endstop": t0_x_endstop,
+        "t1_x_endstop": t1_x_endstop,
+    }
+
+
+def read_x_endstop_values(config_path=CONFIG_PATH):
+    return parse_x_endstop_values(config_path.read_text(encoding="utf-8"))
 
 
 def grid_coordinate(zero_mm, index):
@@ -323,6 +408,210 @@ def create_panel_outline(cutout):
     )
 
 
+def format_endpoint_label(endpoint_mm):
+    rounded_endpoint_mm = round(endpoint_mm, 1)
+    if rounded_endpoint_mm == 0:
+        rounded_endpoint_mm = 0.0
+    return f"{rounded_endpoint_mm:.1f}"
+
+
+def create_calibration_vector_label(text):
+    label = create_vector_text_object(
+        text,
+        size=CALIBRATION_LABEL_SIZE_MM,
+        thickness=CALIBRATION_LABEL_TEXT_THICKNESS_MM,
+        stroke_width=CALIBRATION_LABEL_STROKE_WIDTH_MM,
+    )
+
+    bb_center = get_bounding_box_center(label)
+    return rotate(45, center=bb_center)(label)
+
+
+def create_calibration_label_below(text, center_x_mm, top_y_mm):
+    label = create_calibration_vector_label(text)
+    min_point, max_point = get_bounding_box(label)
+    center_x = (min_point[0] + max_point[0]) / 2
+    return translate(
+        center_x_mm - center_x,
+        top_y_mm - max_point[1],
+        0,
+    )(label)
+
+
+def create_calibration_vertical_segment(center_x_mm, y_min_mm, y_max_mm):
+    return create_box(
+        CALIBRATION_LINE_WIDTH_MM,
+        y_max_mm - y_min_mm,
+        CALIBRATION_HEIGHT_MM,
+        origin=(center_x_mm - CALIBRATION_LINE_WIDTH_MM / 2, y_min_mm, 0),
+    )
+
+
+def create_calibration_label_slab(labels):
+    min_x = (
+        min(get_bounding_box(label)[0][0] for label in labels)
+        - CALIBRATION_LABEL_PAD_MARGIN_MM
+    )
+    min_y = (
+        min(get_bounding_box(label)[0][1] for label in labels)
+        - CALIBRATION_LABEL_PAD_MARGIN_MM
+    )
+    max_x = (
+        max(get_bounding_box(label)[1][0] for label in labels)
+        + CALIBRATION_LABEL_PAD_MARGIN_MM
+    )
+    max_y = (
+        max(get_bounding_box(label)[1][1] for label in labels)
+        + CALIBRATION_LABEL_PAD_MARGIN_MM
+    )
+
+    slab = create_box(
+        max_x - min_x,
+        max_y - min_y,
+        CALIBRATION_LABEL_PAD_THICKNESS_MM,
+        origin=(min_x, min_y, 0),
+    )
+    return slab, (min_x, min_y, max_x, max_y)
+
+
+def create_calibration_label_connector(center_x_mm, start_y_mm, end_y_mm):
+    min_y = min(start_y_mm, end_y_mm)
+    max_y = max(start_y_mm, end_y_mm)
+    return create_box(
+        CALIBRATION_LABEL_CONNECTOR_WIDTH_MM,
+        max_y - min_y,
+        CALIBRATION_LABEL_PAD_THICKNESS_MM,
+        origin=(center_x_mm - CALIBRATION_LABEL_CONNECTOR_WIDTH_MM / 2, min_y, 0),
+    )
+
+
+def fuse_labels_stacked_on_slab(label_collector, labels, slab):
+    for label in labels:
+        label_collector = label_collector.fuse(align(label, slab, Alignment.STACK_TOP))
+    return label_collector
+
+
+def create_absolute_x_alignment_pattern(
+    *,
+    bed_grid_zero,
+    x_endstop_mm,
+    line_y_min_mm,
+    line_y_max_mm,
+    label_panel,
+):
+    zero_x_mm, _ = bed_grid_zero
+    label_top_y_mm = label_panel["y_max"] - CALIBRATION_LABEL_GAP_MM
+    base_collector = PartCollector()
+    label_collector = PartCollector()
+    label_entries = []
+
+    for grid_index, offset_mm in zip(
+        range(CALIBRATION_GRID_X_INDEX_MIN, CALIBRATION_GRID_X_INDEX_MAX + 1),
+        CALIBRATION_OFFSET_CANDIDATES_MM,
+    ):
+        painted_grid_x_mm = grid_coordinate(zero_x_mm, grid_index)
+        line_center_x_mm = painted_grid_x_mm - offset_mm
+        base_collector = base_collector.fuse(
+            create_calibration_vertical_segment(
+                line_center_x_mm,
+                line_y_min_mm,
+                line_y_max_mm,
+            )
+        )
+
+        label = create_calibration_label_below(
+            format_endpoint_label(x_endstop_mm + offset_mm),
+            line_center_x_mm,
+            label_top_y_mm,
+        )
+        label_entries.append(
+            {
+                "label": label,
+                "center_x_mm": line_center_x_mm,
+            }
+        )
+
+    labels = [entry["label"] for entry in label_entries]
+    slab, (_, _, _, slab_max_y) = create_calibration_label_slab(labels)
+    base_collector = base_collector.fuse(slab)
+    label_collector = fuse_labels_stacked_on_slab(label_collector, labels, slab)
+
+    for entry in label_entries:
+        base_collector = base_collector.fuse(
+            create_calibration_label_connector(
+                entry["center_x_mm"],
+                slab_max_y - CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM,
+                line_y_min_mm + CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM,
+            )
+        )
+
+    return base_collector, label_collector
+
+
+def create_absolute_x_alignment_materials(
+    bed_grid_zero=None,
+    x_endstop_values=None,
+):
+    if bed_grid_zero is None:
+        bed_grid_zero = read_bed_grid_zero()
+    if x_endstop_values is None:
+        x_endstop_values = read_x_endstop_values()
+
+    _, zero_y_mm = bed_grid_zero
+    grid_cutouts = create_grid_cutouts(bed_grid_zero)
+    logo_panel = next(
+        cutout for cutout in grid_cutouts if cutout["name"] == "kingroon_logo_panel_outline"
+    )
+    lower_panel = next(
+        cutout for cutout in grid_cutouts if cutout["name"] == "z_guide_panel_outline"
+    )
+
+    t0_pattern, t0_labels = create_absolute_x_alignment_pattern(
+        bed_grid_zero=bed_grid_zero,
+        x_endstop_mm=x_endstop_values["t0_x_endstop"],
+        line_y_min_mm=grid_coordinate(zero_y_mm, -1),
+        line_y_max_mm=grid_coordinate(zero_y_mm, 0),
+        label_panel=lower_panel,
+    )
+    t1_pattern, t1_labels = create_absolute_x_alignment_pattern(
+        bed_grid_zero=bed_grid_zero,
+        x_endstop_mm=x_endstop_values["t1_x_endstop"],
+        line_y_min_mm=grid_coordinate(zero_y_mm, 3),
+        line_y_max_mm=grid_coordinate(zero_y_mm, 4),
+        label_panel=logo_panel,
+    )
+
+    t0_material = PartCollector()
+    t0_material = t0_material.fuse(t0_pattern)
+    t0_material = t0_material.fuse(t1_labels)
+
+    t1_material = PartCollector()
+    t1_material = t1_material.fuse(t1_pattern)
+    t1_material = t1_material.fuse(t0_labels)
+
+    return t0_material, t1_material
+
+
+def assert_absolute_x_patterns_fit_dual_area(parts):
+    min_x = min(get_bounding_box(part)[0][0] for part in parts)
+    min_y = min(get_bounding_box(part)[0][1] for part in parts)
+    max_x = max(get_bounding_box(part)[1][0] for part in parts)
+    max_y = max(get_bounding_box(part)[1][1] for part in parts)
+    width = max_x - SAFE_BED_ORIGIN[0]
+    depth = max_y - SAFE_BED_ORIGIN[1]
+    if min_x < SAFE_BED_ORIGIN[0] or min_y < SAFE_BED_ORIGIN[1]:
+        raise ValueError(
+            "Absolute X alignment pattern starts outside the dual-safe area: "
+            f"min=({min_x}, {min_y}), origin={SAFE_BED_ORIGIN}"
+        )
+    if width > SAFE_BED_WIDTH_MM or depth > SAFE_BED_DEPTH_MM:
+        raise ValueError(
+            "Absolute X alignment pattern does not fit the dual-safe area: "
+            f"bounds=(({min_x}, {min_y}), ({max_x}, {max_y})), "
+            f"bed=({SAFE_BED_WIDTH_MM}, {SAFE_BED_DEPTH_MM})"
+        )
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     parts = PartList()
@@ -360,19 +649,50 @@ def main():
             skip_in_production=True,
         )
 
-    # This preview intentionally exports visualization-only parts.
-    os.environ["SHELLFORGEPY_PRODUCTION"] = "0"
+    t0_alignment, t1_alignment = create_absolute_x_alignment_materials(
+        bed_grid_zero=bed_grid_zero,
+    )
+    assert_absolute_x_patterns_fit_dual_area([t0_alignment, t1_alignment])
+    parts.add(
+        t0_alignment,
+        "absolute_x_grid_alignment_t0",
+        color=T0_COLOR,
+        obj_metadata={
+            "production_group": "absolute_x_grid_alignment",
+            "slicer_filament_id": 1,
+            "tool": "T0",
+        },
+    )
+    parts.add(
+        t1_alignment,
+        "absolute_x_grid_alignment_t1",
+        color=T1_COLOR,
+        obj_metadata={
+            "production_group": "absolute_x_grid_alignment",
+            "slicer_filament_id": 2,
+            "tool": "T1",
+        },
+    )
+
     arrange_and_export(
         parts.as_list(),
         script_file=__file__,
-        prod=False,
+        prod=PROD,
+        process_data=(
+            copy_dual_pla_04_offset_calibration_process_data() if PROD else None
+        ),
         prod_gap=4,
-        bed_width=ACTUAL_BED_WIDTH_MM,
-        bed_depth=ACTUAL_BED_DEPTH_MM,
-        prod_origin=(ACTUAL_BED_ORIGIN_X_MM, ACTUAL_BED_ORIGIN_Y_MM),
+        bed_width=SAFE_BED_WIDTH_MM if PROD else ACTUAL_BED_WIDTH_MM,
+        bed_depth=SAFE_BED_DEPTH_MM if PROD else ACTUAL_BED_DEPTH_MM,
+        prod_origin=(
+            SAFE_BED_ORIGIN
+            if PROD
+            else (ACTUAL_BED_ORIGIN_X_MM, ACTUAL_BED_ORIGIN_Y_MM)
+        ),
+        preserve_model_coordinates=PROD,
     )
 
-    _logger.info("two-material offset line calibration grid preview completed.")
+    _logger.info("two-material absolute X grid alignment calibration completed.")
 
 
 if __name__ == "__main__":
