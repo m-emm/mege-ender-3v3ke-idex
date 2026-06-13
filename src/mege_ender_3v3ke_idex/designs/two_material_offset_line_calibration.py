@@ -21,7 +21,7 @@ _logger = logging.getLogger(__name__)
 
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
-CALIBRATION_HEIGHT_MM = 0.8
+CALIBRATION_HEIGHT_MM = 0.6
 LINE_WIDTH_MM = 0.7
 LINE_SEGMENT_LENGTH_MM = 18.0
 ZERO_LINE_SEGMENT_LENGTH_MM = 26.0
@@ -31,14 +31,14 @@ PATTERN_GAP_MM = 16.0
 LABEL_SIZE_MM = 4.5
 LABEL_STROKE_WIDTH_MM = 0.6
 LABEL_GAP_MM = 2.0
-LABEL_PAD_THICKNESS_MM = 0.4
-LABEL_TEXT_THICKNESS_MM = CALIBRATION_HEIGHT_MM - LABEL_PAD_THICKNESS_MM
+LABEL_PAD_THICKNESS_MM = 0.2
+LABEL_TEXT_THICKNESS_MM = 0.2
 LABEL_PAD_MARGIN_MM = 1.5
 LABEL_PAD_CONNECTOR_WIDTH_MM = LINE_WIDTH_MM
 LABEL_PAD_CONNECTOR_OVERLAP_MM = 0.3
 SPINE_WIDTH_MM = LINE_WIDTH_MM
 
-OFFSET_STEP_MM = 0.1
+OFFSET_STEP_MM = 0.2
 OFFSET_COUNT_EACH_SIDE = 5
 OFFSET_CANDIDATES_MM = tuple(
     round((index - OFFSET_COUNT_EACH_SIDE) * OFFSET_STEP_MM, 1)
@@ -81,6 +81,7 @@ CONFIG_PATH = (
     / "printer.cfg"
 )
 TOOL_STATE_SECTION = "gcode_macro _IDEX_TOOL_STATE"
+DUAL_CARRIAGE_SECTION = "dual_carriage"
 
 
 def get_config_section(config_text, section_name):
@@ -109,26 +110,74 @@ def parse_tool_state_offset(tool_state_section, offset_name):
         raise ValueError(f"variable_{offset_name} must be a numeric offset") from None
 
 
-def parse_idex_tool_xy_offsets(config_text):
+def parse_config_float(section, section_name, setting_name):
+    match = re.search(
+        rf"^\s*{re.escape(setting_name)}\s*:\s*(?P<value>\S+)\s*$",
+        section,
+        flags=re.MULTILINE,
+    )
+    if match is None:
+        raise ValueError(f"Missing {setting_name} in [{section_name}]")
+
+    try:
+        return float(match.group("value"))
+    except ValueError:
+        raise ValueError(
+            f"{setting_name} in [{section_name}] must be numeric"
+        ) from None
+
+
+def reject_x_tool_offsets(tool_state_section):
+    for offset_name in ("t0_x_offset", "t1_x_offset"):
+        if re.search(
+            rf"^\s*variable_{re.escape(offset_name)}\s*:",
+            tool_state_section,
+            flags=re.MULTILINE,
+        ):
+            raise ValueError(
+                "IDEX X calibration uses [dual_carriage] position_endstop and "
+                f"position_max, not variable_{offset_name}"
+            )
+
+
+def parse_idex_calibration_values(config_text):
     tool_state = get_config_section(config_text, TOOL_STATE_SECTION)
-    offsets = {
-        "t0_x": parse_tool_state_offset(tool_state, "t0_x_offset"),
+    dual_carriage = get_config_section(config_text, DUAL_CARRIAGE_SECTION)
+    reject_x_tool_offsets(tool_state)
+
+    right_x_endpoint = parse_config_float(
+        dual_carriage,
+        DUAL_CARRIAGE_SECTION,
+        "position_endstop",
+    )
+    right_x_max = parse_config_float(
+        dual_carriage,
+        DUAL_CARRIAGE_SECTION,
+        "position_max",
+    )
+    if abs(right_x_endpoint - right_x_max) > 1e-9:
+        raise ValueError(
+            "[dual_carriage] position_endstop and position_max must stay equal "
+            "for right-endstop X calibration labels"
+        )
+
+    values = {
+        "right_x_endpoint": right_x_endpoint,
         "t0_y": parse_tool_state_offset(tool_state, "t0_y_offset"),
-        "t1_x": parse_tool_state_offset(tool_state, "t1_x_offset"),
         "t1_y": parse_tool_state_offset(tool_state, "t1_y_offset"),
     }
 
-    if offsets["t0_x"] != 0.0 or offsets["t0_y"] != 0.0:
+    if values["t0_y"] != 0.0:
         raise ValueError(
-            "T0 X/Y offsets must be 0.0 before generating T1 calibration labels: "
-            f"t0_x={offsets['t0_x']}, t0_y={offsets['t0_y']}"
+            "T0 Y offset must be 0.0 before generating T1 calibration labels: "
+            f"t0_y={values['t0_y']}"
         )
 
-    return offsets
+    return values
 
 
-def read_idex_tool_xy_offsets(config_path=CONFIG_PATH):
-    return parse_idex_tool_xy_offsets(config_path.read_text(encoding="utf-8"))
+def read_idex_calibration_values(config_path=CONFIG_PATH):
+    return parse_idex_calibration_values(config_path.read_text(encoding="utf-8"))
 
 
 def format_offset_label(offset_mm):
@@ -136,6 +185,12 @@ def format_offset_label(offset_mm):
     if rounded_offset_mm == 0:
         rounded_offset_mm = 0.0
     return f"{rounded_offset_mm:.1f}"
+
+
+def format_right_endpoint_label(endpoint_mm):
+    tenths = int(round(abs(endpoint_mm) * 10))
+    sign = "-" if endpoint_mm < 0 else ""
+    return f"{sign}{(tenths // 10) % 10}.{tenths % 10}"
 
 
 def create_vector_label(text):
@@ -157,7 +212,7 @@ def create_label_below(text, center_x_mm, top_y_mm):
     return translate(
         center_x_mm - center_x,
         top_y_mm - max_point[1],
-        LABEL_PAD_THICKNESS_MM,
+        0,
     )(label)
 
 
@@ -168,7 +223,7 @@ def create_label_left(text, right_x_mm, center_y_mm):
     return translate(
         right_x_mm - max_point[0],
         center_y_mm - center_y,
-        LABEL_PAD_THICKNESS_MM,
+        0,
     )(label)
 
 
@@ -206,6 +261,14 @@ def create_vertical_spine(center_x_mm, start_y_mm, end_y_mm):
         CALIBRATION_HEIGHT_MM,
         origin=(center_x_mm - SPINE_WIDTH_MM / 2, start_y_mm, 0),
     )
+
+
+def x_nominal_center_for_candidate(index):
+    return X_PATTERN_X_START_MM + index * CANDIDATE_PITCH_MM
+
+
+def x_t1_center_for_endpoint_delta(index, endpoint_delta_mm):
+    return x_nominal_center_for_candidate(index) - endpoint_delta_mm
 
 
 def create_label_slab(labels):
@@ -258,7 +321,7 @@ def fuse_x_label_slab(t0_collector, x_label_entries):
         )
         t0_collector = t0_collector.fuse(connector)
 
-    return t0_collector
+    return t0_collector, slab
 
 
 def fuse_y_label_slab(t0_collector, y_label_entries):
@@ -274,16 +337,24 @@ def fuse_y_label_slab(t0_collector, y_label_entries):
         )
         t0_collector = t0_collector.fuse(connector)
 
-    return t0_collector
+    return t0_collector, slab
+
+
+def fuse_labels_stacked_on_slab(t1_collector, label_entries, slab):
+    for entry in label_entries:
+        label = align(entry["label"], slab, Alignment.STACK_TOP)
+        t1_collector = t1_collector.fuse(label)
+
+    return t1_collector
 
 
 def fuse_removal_spines(t0_collector, t1_collector):
     x_nominal_centers = (
-        X_PATTERN_X_START_MM + index * CANDIDATE_PITCH_MM
+        x_nominal_center_for_candidate(index)
         for index in range(len(OFFSET_CANDIDATES_MM))
     )
     x_shifted_centers = (
-        X_PATTERN_X_START_MM + index * CANDIDATE_PITCH_MM + offset_mm
+        x_t1_center_for_endpoint_delta(index, offset_mm)
         for index, offset_mm in enumerate(OFFSET_CANDIDATES_MM)
     )
     x_nominal_centers = tuple(x_nominal_centers)
@@ -353,13 +424,13 @@ def fuse_removal_spines(t0_collector, t1_collector):
     return t0_collector, t1_collector
 
 
-def create_offset_line_materials(t1_x_offset_mm=None, t1_y_offset_mm=None):
-    if t1_x_offset_mm is None or t1_y_offset_mm is None:
-        current_offsets = read_idex_tool_xy_offsets()
-        if t1_x_offset_mm is None:
-            t1_x_offset_mm = current_offsets["t1_x"]
+def create_offset_line_materials(right_x_endpoint_mm=None, t1_y_offset_mm=None):
+    if right_x_endpoint_mm is None or t1_y_offset_mm is None:
+        current_values = read_idex_calibration_values()
+        if right_x_endpoint_mm is None:
+            right_x_endpoint_mm = current_values["right_x_endpoint"]
         if t1_y_offset_mm is None:
-            t1_y_offset_mm = current_offsets["t1_y"]
+            t1_y_offset_mm = current_values["t1_y"]
 
     t0_collector = PartCollector()
     t1_collector = PartCollector()
@@ -372,7 +443,7 @@ def create_offset_line_materials(t1_x_offset_mm=None, t1_y_offset_mm=None):
         if offset_mm == 0.0:
             segment_length_mm = ZERO_LINE_SEGMENT_LENGTH_MM
 
-        x_nominal_mm = X_PATTERN_X_START_MM + index * CANDIDATE_PITCH_MM
+        x_nominal_mm = x_nominal_center_for_candidate(index)
         t0_start_y_mm = (
             X_PATTERN_GAP_CENTER_Y_MM
             - INTER_MATERIAL_AIR_GAP_MM / 2
@@ -386,7 +457,7 @@ def create_offset_line_materials(t1_x_offset_mm=None, t1_y_offset_mm=None):
             segment_length_mm,
         )
         t1_vertical = create_vertical_segment(
-            x_nominal_mm + offset_mm,
+            x_t1_center_for_endpoint_delta(index, offset_mm),
             t1_start_y_mm,
             segment_length_mm,
         )
@@ -395,7 +466,7 @@ def create_offset_line_materials(t1_x_offset_mm=None, t1_y_offset_mm=None):
         t1_collector = t1_collector.fuse(t1_vertical)
 
         x_label = create_label_below(
-            format_offset_label(t1_x_offset_mm + offset_mm),
+            format_right_endpoint_label(right_x_endpoint_mm + offset_mm),
             x_nominal_mm,
             X_PATTERN_Y_BOTTOM_MM - LABEL_GAP_MM,
         )
@@ -442,11 +513,19 @@ def create_offset_line_materials(t1_x_offset_mm=None, t1_y_offset_mm=None):
             }
         )
 
-    t0_collector = fuse_x_label_slab(t0_collector, x_label_entries)
-    t0_collector = fuse_y_label_slab(t0_collector, y_label_entries)
+    t0_collector, x_label_slab = fuse_x_label_slab(t0_collector, x_label_entries)
+    t0_collector, y_label_slab = fuse_y_label_slab(t0_collector, y_label_entries)
 
-    for label_entry in x_label_entries + y_label_entries:
-        t1_collector = t1_collector.fuse(label_entry["label"])
+    t1_collector = fuse_labels_stacked_on_slab(
+        t1_collector,
+        x_label_entries,
+        x_label_slab,
+    )
+    t1_collector = fuse_labels_stacked_on_slab(
+        t1_collector,
+        y_label_entries,
+        y_label_slab,
+    )
 
     return t0_collector, t1_collector
 
