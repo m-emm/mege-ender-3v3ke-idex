@@ -79,8 +79,8 @@ CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM = 0.3
 
 CALIBRATION_GRID_X_INDEX_MIN = -4
 CALIBRATION_GRID_X_INDEX_MAX = 4
-CALIBRATION_GRID_Y_INDEX_MIN = -4
-CALIBRATION_GRID_Y_INDEX_MAX = 4
+CALIBRATION_GRID_Y_INDEX_MIN = -3
+CALIBRATION_GRID_Y_INDEX_MAX = 5
 CALIBRATION_OFFSET_STEP_MM = 0.2
 CALIBRATION_OFFSET_CANDIDATES_MM = tuple(
     round(index * CALIBRATION_OFFSET_STEP_MM, 1)
@@ -667,24 +667,174 @@ def create_absolute_x_alignment_materials(
     return t0_material, t1_material
 
 
-def assert_absolute_x_patterns_fit_dual_area(parts):
+def create_absolute_y_alignment_pattern(
+    *,
+    bed_grid_zero,
+    calibration_value_mm,
+    line_x_min_mm,
+    line_x_max_mm,
+    line_offset_sign,
+):
+    _, zero_y_mm = bed_grid_zero
+    label_right_x_mm = line_x_min_mm - CALIBRATION_LABEL_GAP_MM
+    label_min_y_mm = SAFE_BED_ORIGIN[1] + CALIBRATION_LABEL_PAD_MARGIN_MM
+    label_max_y_mm = (
+        SAFE_BED_ORIGIN[1] + SAFE_BED_DEPTH_MM - CALIBRATION_LABEL_PAD_MARGIN_MM
+    )
+    base_collector = PartCollector()
+    label_collector = PartCollector()
+    label_entries = []
+
+    for grid_index, offset_mm in zip(
+        range(CALIBRATION_GRID_Y_INDEX_MIN, CALIBRATION_GRID_Y_INDEX_MAX + 1),
+        CALIBRATION_OFFSET_CANDIDATES_MM,
+    ):
+        painted_grid_y_mm = grid_coordinate(zero_y_mm, grid_index)
+        line_center_y_mm = painted_grid_y_mm + line_offset_sign * offset_mm
+        base_collector = base_collector.fuse(
+            create_calibration_horizontal_segment(
+                line_center_y_mm,
+                line_x_min_mm,
+                line_x_max_mm,
+            )
+        )
+
+        label = create_calibration_label_left(
+            format_endpoint_label(calibration_value_mm + offset_mm),
+            label_right_x_mm,
+            line_center_y_mm,
+            min_y_mm=label_min_y_mm,
+            max_y_mm=label_max_y_mm,
+        )
+        label_entries.append(
+            {
+                "label": label,
+                "center_y_mm": line_center_y_mm,
+            }
+        )
+
+    labels = [entry["label"] for entry in label_entries]
+    slab, (_, _, slab_max_x, _) = create_calibration_label_slab(labels)
+    base_collector = base_collector.fuse(slab)
+    label_collector = fuse_labels_stacked_on_slab(label_collector, labels, slab)
+
+    for entry in label_entries:
+        base_collector = base_collector.fuse(
+            create_calibration_label_horizontal_connector(
+                slab_max_x - CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM,
+                line_x_min_mm + CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM,
+                entry["center_y_mm"],
+            )
+        )
+
+    return base_collector, label_collector
+
+
+def create_absolute_y_alignment_materials(
+    bed_grid_zero=None,
+    y_calibration_values=None,
+):
+    if bed_grid_zero is None:
+        bed_grid_zero = read_bed_grid_zero()
+    if y_calibration_values is None:
+        y_calibration_values = read_y_calibration_values()
+
+    zero_x_mm, _ = bed_grid_zero
+    t0_line_x_min_mm = grid_coordinate(zero_x_mm, -2)
+    t0_line_x_max_mm = grid_coordinate(zero_x_mm, -1)
+    t1_line_x_min_mm = grid_coordinate(zero_x_mm, 2)
+    t1_line_x_max_mm = grid_coordinate(zero_x_mm, 3)
+
+    t0_pattern, t0_labels = create_absolute_y_alignment_pattern(
+        bed_grid_zero=bed_grid_zero,
+        calibration_value_mm=y_calibration_values["t0_y_endstop"],
+        line_x_min_mm=t0_line_x_min_mm,
+        line_x_max_mm=t0_line_x_max_mm,
+        line_offset_sign=-1,
+    )
+    t1_pattern, t1_labels = create_absolute_y_alignment_pattern(
+        bed_grid_zero=bed_grid_zero,
+        calibration_value_mm=y_calibration_values["t1_y_offset"],
+        line_x_min_mm=t1_line_x_min_mm,
+        line_x_max_mm=t1_line_x_max_mm,
+        line_offset_sign=1,
+    )
+
+    t0_material = PartCollector()
+    t0_material = t0_material.fuse(t0_pattern)
+    t0_material = t0_material.fuse(t1_labels)
+
+    t1_material = PartCollector()
+    t1_material = t1_material.fuse(t1_pattern)
+    t1_material = t1_material.fuse(t0_labels)
+
+    return t0_material, t1_material
+
+
+def assert_absolute_patterns_fit_dual_area(parts):
+    tolerance_mm = 1e-6
     min_x = min(get_bounding_box(part)[0][0] for part in parts)
     min_y = min(get_bounding_box(part)[0][1] for part in parts)
     max_x = max(get_bounding_box(part)[1][0] for part in parts)
     max_y = max(get_bounding_box(part)[1][1] for part in parts)
     width = max_x - SAFE_BED_ORIGIN[0]
     depth = max_y - SAFE_BED_ORIGIN[1]
-    if min_x < SAFE_BED_ORIGIN[0] or min_y < SAFE_BED_ORIGIN[1]:
+    if (
+        min_x < SAFE_BED_ORIGIN[0] - tolerance_mm
+        or min_y < SAFE_BED_ORIGIN[1] - tolerance_mm
+    ):
         raise ValueError(
-            "Absolute X alignment pattern starts outside the dual-safe area: "
+            "Absolute alignment pattern starts outside the dual-safe area: "
             f"min=({min_x}, {min_y}), origin={SAFE_BED_ORIGIN}"
         )
-    if width > SAFE_BED_WIDTH_MM or depth > SAFE_BED_DEPTH_MM:
+    if (
+        width > SAFE_BED_WIDTH_MM + tolerance_mm
+        or depth > SAFE_BED_DEPTH_MM + tolerance_mm
+    ):
         raise ValueError(
-            "Absolute X alignment pattern does not fit the dual-safe area: "
+            "Absolute alignment pattern does not fit the dual-safe area: "
             f"bounds=(({min_x}, {min_y}), ({max_x}, {max_y})), "
             f"bed=({SAFE_BED_WIDTH_MM}, {SAFE_BED_DEPTH_MM})"
         )
+
+
+def add_painted_bed_preview_parts(parts, plate_prefix, bed_grid_zero, grid_cutouts):
+    preview_part_names = []
+
+    def add_preview_part(part, name, color):
+        preview_name = f"{plate_prefix}_{name}"
+        parts.add(
+            part,
+            preview_name,
+            color=color,
+            skip_in_production=True,
+        )
+        preview_part_names.append(preview_name)
+
+    add_preview_part(
+        create_bed_surface(),
+        "painted_bed_surface",
+        ACTUAL_BED_COLOR,
+    )
+    add_preview_part(
+        create_painted_bed_grid_lines(bed_grid_zero),
+        "painted_bed_grid_1in",
+        GRID_LINE_COLOR,
+    )
+    add_preview_part(
+        create_frame(),
+        "painted_bed_frame",
+        PAINTED_FRAME_COLOR,
+    )
+
+    for cutout in visible_panel_cutouts(grid_cutouts):
+        add_preview_part(
+            create_panel_outline(cutout),
+            cutout["name"],
+            PANEL_OUTLINE_COLOR,
+        )
+
+    return tuple(preview_part_names)
 
 
 def main():
@@ -692,45 +842,34 @@ def main():
     parts = PartList()
     bed_grid_zero = read_bed_grid_zero()
     grid_cutouts = create_grid_cutouts(bed_grid_zero)
-
-    parts.add(
-        create_bed_surface(),
-        "painted_bed_surface",
-        color=ACTUAL_BED_COLOR,
-        skip_in_production=True,
-    )
-
-    grid_lines = create_painted_bed_grid_lines(bed_grid_zero)
-    parts.add(
-        grid_lines,
-        "painted_bed_grid_1in",
-        color=GRID_LINE_COLOR,
-        skip_in_production=True,
-    )
-
-    frame = create_frame()
-    parts.add(
-        frame,
-        "painted_bed_frame",
-        color=PAINTED_FRAME_COLOR,
-        skip_in_production=True,
-    )
-
-    for cutout in visible_panel_cutouts(grid_cutouts):
-        parts.add(
-            create_panel_outline(cutout),
-            cutout["name"],
-            color=PANEL_OUTLINE_COLOR,
-            skip_in_production=True,
+    x_preview_part_names = ()
+    y_preview_part_names = ()
+    if not PROD:
+        x_preview_part_names = add_painted_bed_preview_parts(
+            parts,
+            "x_plate",
+            bed_grid_zero,
+            grid_cutouts,
+        )
+        y_preview_part_names = add_painted_bed_preview_parts(
+            parts,
+            "y_plate",
+            bed_grid_zero,
+            grid_cutouts,
         )
 
     t0_alignment, t1_alignment = create_absolute_x_alignment_materials(
         bed_grid_zero=bed_grid_zero,
     )
-    assert_absolute_x_patterns_fit_dual_area([t0_alignment, t1_alignment])
+    y_t0_alignment, y_t1_alignment = create_absolute_y_alignment_materials(
+        bed_grid_zero=bed_grid_zero,
+    )
+    assert_absolute_patterns_fit_dual_area(
+        [t0_alignment, t1_alignment, y_t0_alignment, y_t1_alignment]
+    )
     parts.add(
         t0_alignment,
-        "absolute_x_grid_alignment_t0",
+        X_T0_PART_NAME,
         color=T0_COLOR,
         obj_metadata={
             "production_group": "absolute_x_grid_alignment",
@@ -740,7 +879,7 @@ def main():
     )
     parts.add(
         t1_alignment,
-        "absolute_x_grid_alignment_t1",
+        X_T1_PART_NAME,
         color=T1_COLOR,
         obj_metadata={
             "production_group": "absolute_x_grid_alignment",
@@ -748,6 +887,45 @@ def main():
             "tool": "T1",
         },
     )
+    parts.add(
+        y_t0_alignment,
+        Y_T0_PART_NAME,
+        color=T0_COLOR,
+        obj_metadata={
+            "production_group": "absolute_y_grid_alignment",
+            "slicer_filament_id": 1,
+            "tool": "T0",
+        },
+    )
+    parts.add(
+        y_t1_alignment,
+        Y_T1_PART_NAME,
+        color=T1_COLOR,
+        obj_metadata={
+            "production_group": "absolute_y_grid_alignment",
+            "slicer_filament_id": 2,
+            "tool": "T1",
+        },
+    )
+
+    plates = [
+        {
+            "name": "absolute_x_grid_alignment",
+            "parts": [
+                *x_preview_part_names,
+                X_T0_PART_NAME,
+                X_T1_PART_NAME,
+            ],
+        },
+        {
+            "name": "absolute_y_grid_alignment",
+            "parts": [
+                *y_preview_part_names,
+                Y_T0_PART_NAME,
+                Y_T1_PART_NAME,
+            ],
+        },
+    ]
 
     arrange_and_export(
         parts.as_list(),
@@ -765,9 +943,10 @@ def main():
             else (ACTUAL_BED_ORIGIN_X_MM, ACTUAL_BED_ORIGIN_Y_MM)
         ),
         preserve_model_coordinates=PROD,
+        plates=plates,
     )
 
-    _logger.info("two-material absolute X grid alignment calibration completed.")
+    _logger.info("two-material absolute X/Y grid alignment calibration completed.")
 
 
 if __name__ == "__main__":
