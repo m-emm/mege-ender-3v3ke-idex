@@ -17,6 +17,14 @@
 - holders for filament spools
 - nozzle cleaning pads holders
 - idex alignment sensor
+- hv switchbox with ssr mount
+- z/y fine tuner
+
+## Electrical tasks
+
+- Thermal fuse for heatbed / whole printer
+- heatbed 250 V booster
+
 
 ## On Hold
 
