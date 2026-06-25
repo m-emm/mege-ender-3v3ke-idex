@@ -148,27 +148,42 @@ def test_idex_next_printable_corner_cycles_exact_safe_corners():
     assert z_travel_index < xy_index < z_touch_index
 
 
+def test_idex_tool_selection_resets_next_printable_corner():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    reset_counter = (
+        "SET_GCODE_VARIABLE MACRO=IDEX_NEXT_PRINTABLE_CORNER "
+        "VARIABLE=corner_index VALUE=0"
+    )
+
+    for macro_name in ["T0", "T1"]:
+        tool_macro = _section(config_text, f"gcode_macro {macro_name}")
+        assert reset_counter in tool_macro
+
+
 def test_idex_tool_offsets_are_current_machine_calibration():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     tool_state = _section(config_text, "gcode_macro _IDEX_TOOL_STATE")
     dual_carriage = _section(config_text, "dual_carriage")
+    stepper_z = _section(config_text, "stepper_z")
 
     assert "variable_t0_x_offset" not in tool_state
     assert "variable_t1_x_offset" not in tool_state
     assert "variable_t0_y_offset: 0.0" in tool_state
-    assert "variable_t0_z_offset: -0.25" in tool_state
+    assert "variable_t0_z_offset" not in tool_state
     assert "variable_t1_y_offset: -0.1" in tool_state
-    assert "variable_t1_z_offset: -0.2" in tool_state
+    assert "variable_t1_z_offset: 0.25" in tool_state
 
-    assert "position_endstop: 354.900" in dual_carriage
-    assert "position_max: 354.900" in dual_carriage
+    assert "position_endstop: 355.2" in dual_carriage
+    assert "position_max: 355.2" in dual_carriage
+    assert "position_endstop: 293.950" in stepper_z
+    assert "position_max: 293.950" in stepper_z
 
 
 def test_offset_line_calibration_parses_active_calibration_values():
     values = parse_idex_calibration_values(CONFIG_PATH.read_text(encoding="utf-8"))
 
     assert values == {
-        "right_x_endpoint": 354.9,
+        "right_x_endpoint": 355.2,
         "t0_y": 0.0,
         "t1_y": -0.1,
     }
@@ -199,8 +214,8 @@ def test_offset_line_calibration_rejects_x_tool_offsets():
 def test_offset_line_calibration_rejects_mismatched_right_endpoint_values():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     config_text = config_text.replace(
-        "position_endstop: 354.900\nposition_min: 0.000\nposition_max: 354.900",
-        "position_endstop: 354.900\nposition_min: 0.000\nposition_max: 355.000",
+        "position_endstop: 355.2\nposition_min: 0.000\nposition_max: 355.2",
+        "position_endstop: 355.2\nposition_min: 0.000\nposition_max: 355.0",
     )
 
     with pytest.raises(ValueError, match="position_endstop and position_max"):
@@ -312,7 +327,7 @@ def test_idex_tool_parking_uses_absolute_edges():
     assert "stepper_x.position_min|float" in select_right
 
 
-def test_idex_tool_offset_macro_clears_x_and_rejects_x_runtime_updates():
+def test_idex_tool_offset_macro_clears_x_and_rejects_t0_runtime_updates():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     apply_offset = _section(config_text, "gcode_macro _IDEX_APPLY_TOOL_OFFSET")
     set_offset = _section(config_text, "gcode_macro IDEX_SET_TOOL_OFFSET")
@@ -320,6 +335,11 @@ def test_idex_tool_offset_macro_clears_x_and_rejects_x_runtime_updates():
     assert "SET_GCODE_OFFSET X=0 Y={y} Z={z}" in apply_offset
     assert "t0_x_offset" not in apply_offset
     assert "t1_x_offset" not in apply_offset
+    assert "state.t0_z_offset" not in apply_offset
+    assert "{% set z = 0.0 %}" in apply_offset
+    assert "state.t1_z_offset|float" in apply_offset
     assert "params.X is defined" in set_offset
     assert "position_endstop and position_max together" in set_offset
+    assert "params.Z is defined and tool == 0" in set_offset
+    assert "T0 Z is calibrated mechanically" in set_offset
     assert "VARIABLE=t{tool}_x_offset" not in set_offset
