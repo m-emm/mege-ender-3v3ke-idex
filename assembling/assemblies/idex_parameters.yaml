@@ -407,6 +407,70 @@ globals:
   electric_switchboard_lid_screw_mount_block_size: 15
   electric_switchboard_lid_screw_mount_depth: 30
   electric_switchboard_frame_back_offset: 120
+  panasonic_ssr_width: 40
+  panasonic_ssr_length: 58
+  panasonic_ssr_height: 25.5
+  panasonic_ssr_corner_fillet_radius: 1.2
+  panasonic_ssr_mount_hole_diameter: 4.3
+  panasonic_ssr_mount_hole_pitch: 47.5
+  panasonic_ssr_terminal_screw_x_inset: 10.5
+  panasonic_ssr_output_terminal_y_inset: 7.5
+  panasonic_ssr_input_terminal_y_inset: 7.5
+  panasonic_ssr_output_terminal_screw_size: "M4"
+  panasonic_ssr_input_terminal_screw_size: "M3"
+  panasonic_ssr_terminal_screw_head_height: 1.0
+  panasonic_ssr_output_cover_depth: 15.5
+  panasonic_ssr_input_cover_depth: 15.5
+  panasonic_ssr_cover_recess_depth: 2.0
+  hv_switchbox_height: 110
+  hv_switchbox_width: 55
+  hv_switchbox_depth: 140
+  hv_switchbox_wall_thickness: !Ref electric_switchboard_wall_thickness
+  hv_switchbox_fuse_holder_top_y_offset: -45
+  hv_switchbox_terminal_rail_width: 14
+  hv_switchbox_terminal_rail_height: 14
+  hv_switchbox_terminal_screw_size: "M4"
+  hv_switchbox_terminal_screw_length: 12
+  hv_switchbox_terminal_num_spots: 6
+  hv_switchbox_terminal_rail_z_offset_from_bottom: 12
+  hv_switchbox_terminal_nut_pocket_clearance: 0.3
+  hv_switchbox_terminal_nut_pocket_sink_depth: 3.6
+  hv_switchbox_ssr_mount_screw_size: "M4"
+  hv_switchbox_ssr_mount_screw_length: 20
+  hv_switchbox_ssr_mount_boss_depth: 8
+  hv_switchbox_ssr_mount_boss_width: 15
+  hv_switchbox_ssr_mount_boss_height: 14
+  hv_switchbox_ssr_mount_nut_pocket_clearance: 0.3
+  hv_switchbox_ssr_mount_nut_pocket_sink_depth: 3.6
+  hv_switchbox_ssr_y_center: 82
+  hv_switchbox_ssr_z_center: 70
+  hv_switchbox_cable_cutout_width: 14
+  hv_switchbox_cable_cutout_height_ratio: 0.3
+  hv_switchbox_cable_cutout_fillet_radius: !Ref electric_switchboard_cable_cutout_fillet_radius
+  hv_switchbox_cable_cutout_cover_y_oversize: !Ref electric_switchboard_cable_cutout_cover_y_oversize
+  hv_switchbox_cable_cutout_cover_x_oversize: 4
+  hv_switchbox_cable_cutout_cover_thickness: !Ref electric_switchboard_cable_cutout_cover_thickness
+  hv_switchbox_cable_cutout_cover_flange_thickness: !Ref electric_switchboard_cable_cutout_cover_flange_thickness
+  hv_switchbox_cable_cutout_cover_clearance: !Ref electric_switchboard_cable_cutout_cover_clearance
+  hv_switchbox_cable_cutout_cover_mount_screw_size: !Ref electric_switchboard_cable_cutout_cover_mount_screw_size
+  hv_switchbox_cable_cutout_cover_mount_screw_length: !Ref electric_switchboard_cable_cutout_cover_mount_screw_length
+  hv_switchbox_cable_cutout_cover_mount_nut_clearance: !Ref electric_switchboard_cable_cutout_cover_mount_nut_clearance
+  hv_switchbox_cable_cutout_cover_mount_nut_pocket_sink_depth: !Ref electric_switchboard_cable_cutout_cover_mount_nut_pocket_sink_depth
+  hv_switchbox_mount_flange_screw_size: !Ref electric_switchboard_mount_flange_screw_size
+  hv_switchbox_mount_flange_width: !Ref electric_switchboard_mount_flange_width
+  hv_switchbox_mount_flange_length: !Ref electric_switchboard_mount_flange_length
+  hv_switchbox_mount_flange_thickness: !Ref electric_switchboard_mount_flange_thickness
+  hv_switchbox_mount_flange_fillet_radius: !Ref electric_switchboard_mount_flange_fillet_radius
+  hv_switchbox_corner_fillet_radius: !Ref electric_switchboard_corner_fillet_radius
+  hv_switchbox_lid_thickness: !Ref electric_switchboard_lid_thickness
+  hv_switchbox_lid_body_clearance: !Ref electric_switchboard_lid_body_clearance
+  hv_switchbox_lid_rim_depth: !Ref electric_switchboard_lid_rim_depth
+  hv_switchbox_lid_rim_thickness: !Ref hv_switchbox_wall_thickness
+  hv_switchbox_lid_rim_clearance: !Ref electric_switchboard_lid_rim_clearance
+  hv_switchbox_lid_screw_size: !Ref electric_switchboard_lid_screw_size
+  hv_switchbox_lid_screw_length: !Ref electric_switchboard_lid_screw_length
+  hv_switchbox_lid_screw_inset: !Ref electric_switchboard_lid_screw_inset
+  hv_switchbox_lid_screw_mount_block_size: !Ref electric_switchboard_lid_screw_mount_block_size
   heatbed_psu_housing_height: 45
   heatbed_psu_housing_width: 55
   heatbed_psu_housing_depth: 90
@@ -728,7 +792,7 @@ globals:
   x_axis_energy_chain_num_links: 29
   x_axis_energy_chain_plug_plate_width: 8.5
   x_axis_energy_chain_width: 15
-  y_axis_energy_chain_base_thickness: 3.5
+  y_axis_energy_chain_base_thickness: 5
   y_axis_energy_chain_channel_height: 3
   y_axis_energy_chain_channel_link_thickness: 0.4
   y_axis_energy_chain_channel_link_width: 1
@@ -743,7 +807,7 @@ globals:
   y_axis_energy_chain_link_connector_width: 2
   y_axis_energy_chain_link_length: 15
   y_axis_energy_chain_max_diameter_on_print_bed: 210
-  y_axis_energy_chain_num_links: 30
+  y_axis_energy_chain_num_links: 31
   y_axis_energy_chain_plug_plate_width: 8.5
   y_axis_energy_chain_start_fixture_length: 20
   y_axis_energy_chain_start_fixture_screw_hole_clearance_type: "loose"

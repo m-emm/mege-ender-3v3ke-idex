@@ -585,6 +585,73 @@ Builder:
         name_template: "electric_switchboard_{name}"
         color: [0.78, 0.78, 0.72]
       - source: injected
+        assembly: hv_switchbox
+        artifact: leader
+        name: hv_switchbox_box
+        color: [1, 1, 1]
+      - source: injected
+        assembly: hv_switchbox
+        artifact: followers
+        names:
+          - hv_switchbox_lid
+        name_template: "hv_switchbox_{name}"
+        color: [1, 1, 1]
+      - source: injected
+        assembly: hv_switchbox
+        artifact: followers
+        names:
+          - hv_switchbox_cable_cutout_cover
+        name_template: "hv_switchbox_{name}"
+        color: [0.78, 0.86, 0.82]
+      - source: injected
+        assembly: hv_switchbox
+        artifact: non_production_parts
+        names:
+          - panasonic_ssr_body
+          - panasonic_ssr_output_terminal_cover
+          - panasonic_ssr_input_terminal_cover
+          - panasonic_ssr_output_terminal_screws
+          - panasonic_ssr_input_terminal_screws
+        name_template: "hv_switchbox_{name}"
+        color: [0.55, 0.58, 0.62]
+      - source: injected
+        assembly: hv_switchbox
+        artifact: non_production_parts
+        names:
+          - fuse_holder_holder_body
+        name_template: "hv_switchbox_{name}"
+        color: [0.35, 0.45, 0.55]
+      - source: injected
+        assembly: hv_switchbox
+        artifact: non_production_parts
+        names:
+          - fuse_holder_mount_nut
+          - lid_mount_screw_*_screw
+          - lid_mount_screw_*_nut
+          - hv_switchbox_terminal_screws
+          - hv_switchbox_terminal_nuts
+          - ssr_mount_screws
+          - ssr_mount_nuts
+          - cable_cutout_cover_mount_screws
+          - cable_cutout_cover_mount_nuts
+        name_template: "hv_switchbox_{name}"
+        color: [0.78, 0.78, 0.72]
+      - source: injected
+        assembly: hv_switchbox
+        artifact: non_production_parts
+        names:
+          - fuse_holder_terminal_blades
+        name_template: "hv_switchbox_{name}"
+        color: [0.9, 0.86, 0.72]
+      - source: injected
+        assembly: hv_switchbox
+        artifact: non_production_parts
+        names:
+          - hv_switchbox_terminal_rail
+          - ssr_mount_bosses
+        name_template: "hv_switchbox_{name}"
+        color: [0.9, 0.9, 0.88]
+      - source: injected
         assembly: heatbed_psu_housing
         artifact: leader
         name: heatbed_psu_housing_box

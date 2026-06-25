@@ -816,6 +816,17 @@ placement:
         - $ref: electric_switchboard_frame_back_offset
         - 0
 
+    - part: hv_switchbox_assembly
+      to: printer_frame_assembly
+      alignment: STACK_TOP
+    - part: hv_switchbox_assembly
+      to: printer_frame_assembly
+      alignment: CENTER
+      axes: [0]
+    - part: hv_switchbox_assembly
+      to: printer_frame_assembly
+      alignment: BACK
+
     - part: heatbed_psu_housing_assembly
       post_rotation:
         angle: 90
@@ -1442,6 +1453,87 @@ assemblies:
       electric_switchboard_lid_screw_inset: !Ref electric_switchboard_lid_screw_inset
       electric_switchboard_lid_screw_mount_block_size: !Ref electric_switchboard_lid_screw_mount_block_size
       electric_switchboard_lid_screw_mount_depth: !Ref electric_switchboard_lid_screw_mount_depth
+
+  - name: panasonic_ssr_assembly
+
+    resource_file: panasonic_ssr_assembly.yaml
+    depends_on: []
+    parameters:
+      panasonic_ssr_width: !Ref panasonic_ssr_width
+      panasonic_ssr_length: !Ref panasonic_ssr_length
+      panasonic_ssr_height: !Ref panasonic_ssr_height
+      panasonic_ssr_corner_fillet_radius: !Ref panasonic_ssr_corner_fillet_radius
+      panasonic_ssr_mount_hole_diameter: !Ref panasonic_ssr_mount_hole_diameter
+      panasonic_ssr_mount_hole_pitch: !Ref panasonic_ssr_mount_hole_pitch
+      panasonic_ssr_terminal_screw_x_inset: !Ref panasonic_ssr_terminal_screw_x_inset
+      panasonic_ssr_output_terminal_y_inset: !Ref panasonic_ssr_output_terminal_y_inset
+      panasonic_ssr_input_terminal_y_inset: !Ref panasonic_ssr_input_terminal_y_inset
+      panasonic_ssr_output_terminal_screw_size: !Ref panasonic_ssr_output_terminal_screw_size
+      panasonic_ssr_input_terminal_screw_size: !Ref panasonic_ssr_input_terminal_screw_size
+      panasonic_ssr_terminal_screw_head_height: !Ref panasonic_ssr_terminal_screw_head_height
+      panasonic_ssr_output_cover_depth: !Ref panasonic_ssr_output_cover_depth
+      panasonic_ssr_input_cover_depth: !Ref panasonic_ssr_input_cover_depth
+      panasonic_ssr_cover_recess_depth: !Ref panasonic_ssr_cover_recess_depth
+
+  - name: hv_switchbox_assembly
+
+    resource_file: hv_switchbox_assembly.yaml
+    depends_on:
+      - fuse_holder_assembly
+      - panasonic_ssr_assembly
+    inject_parts:
+      fuse_holder: fuse_holder_assembly
+      panasonic_ssr: panasonic_ssr_assembly
+    parameters:
+      hv_switchbox_height: !Ref hv_switchbox_height
+      hv_switchbox_width: !Ref hv_switchbox_width
+      hv_switchbox_depth: !Ref hv_switchbox_depth
+      hv_switchbox_wall_thickness: !Ref hv_switchbox_wall_thickness
+      hv_switchbox_fuse_holder_top_y_offset: !Ref hv_switchbox_fuse_holder_top_y_offset
+      hv_switchbox_terminal_rail_width: !Ref hv_switchbox_terminal_rail_width
+      hv_switchbox_terminal_rail_height: !Ref hv_switchbox_terminal_rail_height
+      hv_switchbox_terminal_screw_size: !Ref hv_switchbox_terminal_screw_size
+      hv_switchbox_terminal_screw_length: !Ref hv_switchbox_terminal_screw_length
+      hv_switchbox_terminal_num_spots: !Ref hv_switchbox_terminal_num_spots
+      hv_switchbox_terminal_rail_z_offset_from_bottom: !Ref hv_switchbox_terminal_rail_z_offset_from_bottom
+      hv_switchbox_terminal_nut_pocket_clearance: !Ref hv_switchbox_terminal_nut_pocket_clearance
+      hv_switchbox_terminal_nut_pocket_sink_depth: !Ref hv_switchbox_terminal_nut_pocket_sink_depth
+      hv_switchbox_ssr_mount_screw_size: !Ref hv_switchbox_ssr_mount_screw_size
+      hv_switchbox_ssr_mount_screw_length: !Ref hv_switchbox_ssr_mount_screw_length
+      hv_switchbox_ssr_mount_boss_depth: !Ref hv_switchbox_ssr_mount_boss_depth
+      hv_switchbox_ssr_mount_boss_width: !Ref hv_switchbox_ssr_mount_boss_width
+      hv_switchbox_ssr_mount_boss_height: !Ref hv_switchbox_ssr_mount_boss_height
+      hv_switchbox_ssr_mount_nut_pocket_clearance: !Ref hv_switchbox_ssr_mount_nut_pocket_clearance
+      hv_switchbox_ssr_mount_nut_pocket_sink_depth: !Ref hv_switchbox_ssr_mount_nut_pocket_sink_depth
+      hv_switchbox_ssr_y_center: !Ref hv_switchbox_ssr_y_center
+      hv_switchbox_ssr_z_center: !Ref hv_switchbox_ssr_z_center
+      hv_switchbox_cable_cutout_width: !Ref hv_switchbox_cable_cutout_width
+      hv_switchbox_cable_cutout_height_ratio: !Ref hv_switchbox_cable_cutout_height_ratio
+      hv_switchbox_cable_cutout_fillet_radius: !Ref hv_switchbox_cable_cutout_fillet_radius
+      hv_switchbox_cable_cutout_cover_y_oversize: !Ref hv_switchbox_cable_cutout_cover_y_oversize
+      hv_switchbox_cable_cutout_cover_x_oversize: !Ref hv_switchbox_cable_cutout_cover_x_oversize
+      hv_switchbox_cable_cutout_cover_thickness: !Ref hv_switchbox_cable_cutout_cover_thickness
+      hv_switchbox_cable_cutout_cover_flange_thickness: !Ref hv_switchbox_cable_cutout_cover_flange_thickness
+      hv_switchbox_cable_cutout_cover_clearance: !Ref hv_switchbox_cable_cutout_cover_clearance
+      hv_switchbox_cable_cutout_cover_mount_screw_size: !Ref hv_switchbox_cable_cutout_cover_mount_screw_size
+      hv_switchbox_cable_cutout_cover_mount_screw_length: !Ref hv_switchbox_cable_cutout_cover_mount_screw_length
+      hv_switchbox_cable_cutout_cover_mount_nut_clearance: !Ref hv_switchbox_cable_cutout_cover_mount_nut_clearance
+      hv_switchbox_cable_cutout_cover_mount_nut_pocket_sink_depth: !Ref hv_switchbox_cable_cutout_cover_mount_nut_pocket_sink_depth
+      hv_switchbox_mount_flange_screw_size: !Ref hv_switchbox_mount_flange_screw_size
+      hv_switchbox_mount_flange_width: !Ref hv_switchbox_mount_flange_width
+      hv_switchbox_mount_flange_length: !Ref hv_switchbox_mount_flange_length
+      hv_switchbox_mount_flange_thickness: !Ref hv_switchbox_mount_flange_thickness
+      hv_switchbox_mount_flange_fillet_radius: !Ref hv_switchbox_mount_flange_fillet_radius
+      hv_switchbox_corner_fillet_radius: !Ref hv_switchbox_corner_fillet_radius
+      hv_switchbox_lid_thickness: !Ref hv_switchbox_lid_thickness
+      hv_switchbox_lid_body_clearance: !Ref hv_switchbox_lid_body_clearance
+      hv_switchbox_lid_rim_depth: !Ref hv_switchbox_lid_rim_depth
+      hv_switchbox_lid_rim_thickness: !Ref hv_switchbox_lid_rim_thickness
+      hv_switchbox_lid_rim_clearance: !Ref hv_switchbox_lid_rim_clearance
+      hv_switchbox_lid_screw_size: !Ref hv_switchbox_lid_screw_size
+      hv_switchbox_lid_screw_length: !Ref hv_switchbox_lid_screw_length
+      hv_switchbox_lid_screw_inset: !Ref hv_switchbox_lid_screw_inset
+      hv_switchbox_lid_screw_mount_block_size: !Ref hv_switchbox_lid_screw_mount_block_size
 
   - name: heatbed_psu_housing_assembly
 
@@ -2460,6 +2552,7 @@ assemblies:
       - printer_host_and_screen_assembly
       - raspberry_pi_assembly
       - electric_switchboard_assembly
+      - hv_switchbox_assembly
       - heatbed_psu_housing_assembly
     inject_parts:
       printer_frame: printer_frame_assembly
@@ -2521,6 +2614,7 @@ assemblies:
       printer_host_and_screen: printer_host_and_screen_assembly
       raspberry_pi: raspberry_pi_assembly
       electric_switchboard: electric_switchboard_assembly
+      hv_switchbox: hv_switchbox_assembly
       heatbed_psu_housing: heatbed_psu_housing_assembly
 
   - name: tool_heads_assembly
