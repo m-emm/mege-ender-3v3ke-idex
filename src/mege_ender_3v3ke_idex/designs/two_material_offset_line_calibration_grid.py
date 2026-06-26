@@ -79,7 +79,7 @@ CALIBRATION_GRID_X_INDEX_MIN = -4
 CALIBRATION_GRID_X_INDEX_MAX = 4
 CALIBRATION_GRID_Y_INDEX_MIN = -3
 CALIBRATION_GRID_Y_INDEX_MAX = 5
-CALIBRATION_OFFSET_STEP_MM = 0.3
+CALIBRATION_OFFSET_STEP_MM = 0.2
 CALIBRATION_OFFSET_CANDIDATES_MM = tuple(
     round(index * CALIBRATION_OFFSET_STEP_MM, 1)
     for index in range(CALIBRATION_GRID_X_INDEX_MIN, CALIBRATION_GRID_X_INDEX_MAX + 1)
@@ -534,8 +534,11 @@ def create_absolute_y_alignment_materials(
     slab, (slab_min_x, slab_min_y, slab_max_x, _) = create_calibration_label_slab(
         labels
     )
-    line_x_max_mm = slab_min_x + CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM
-    line_x_min_mm = line_x_max_mm - GRID_PITCH_MM
+    line_x_min_mm = max(
+        SAFE_BED_ORIGIN[0],
+        slab_min_x - 2 * GRID_PITCH_MM + CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM,
+    )
+    line_x_max_mm = line_x_min_mm + GRID_PITCH_MM
     base_collector = base_collector.fuse(slab)
     for label in labels:
         text_collector = text_collector.fuse(align(label, slab, Alignment.STACK_TOP))
