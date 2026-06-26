@@ -9,4 +9,4 @@ tools:
   t1:
     x_endstop: 355.200
     y_endstop: -14.800
-    z_endstop: 293.700
+    z_endstop: 293.650

@@ -257,11 +257,11 @@ def test_idex_tool_offsets_are_current_machine_calibration():
     assert _setting_float(stepper_z, "position_max") == pytest.approx(293.750)
 
     assert _macro_variable_float(tool_state, "t0_y_endstop") == pytest.approx(-14.300)
-    assert _macro_variable_float(tool_state, "t1_y_endstop") == pytest.approx(-14.600)
+    assert _macro_variable_float(tool_state, "t1_y_endstop") == pytest.approx(-14.800)
     assert _macro_variable_float(tool_state, "t0_z_endstop") == pytest.approx(293.750)
     assert _macro_variable_float(tool_state, "t1_z_endstop") == pytest.approx(293.700)
     assert _macro_variable_float(tool_state, "t0_y_offset") == pytest.approx(0.000)
-    assert _macro_variable_float(tool_state, "t1_y_offset") == pytest.approx(0.300)
+    assert _macro_variable_float(tool_state, "t1_y_offset") == pytest.approx(0.500)
     assert _macro_variable_float(tool_state, "t1_z_offset") == pytest.approx(0.050)
 
 
@@ -270,7 +270,7 @@ def test_grid_calibration_reads_absolute_y_values():
 
     assert values["bed_grid_zero"] == (113.300, 107.000)
     assert values["t0_y_endstop"] == pytest.approx(-14.300)
-    assert values["t1_y_endstop"] == pytest.approx(-14.600)
+    assert values["t1_y_endstop"] == pytest.approx(-14.800)
 
 
 def test_offset_line_calibration_parses_active_calibration_values():
@@ -279,7 +279,7 @@ def test_offset_line_calibration_parses_active_calibration_values():
     assert values == {
         "right_x_endpoint": 355.2,
         "t0_y": 0.0,
-        "t1_y": 0.3,
+        "t1_y": 0.5,
     }
 
 
