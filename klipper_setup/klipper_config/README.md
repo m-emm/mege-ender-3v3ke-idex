@@ -7,21 +7,27 @@ This directory has one active printer configuration:
 - `archive/` is historical/reference material only. Do not edit files there to
   change the active printer.
 
-Verify local and remote config hashes with:
+Check whether the generated local config is live on the printer with:
 
 ```bash
-shasum -a 256 klipper_setup/klipper_config/printer.cfg
-ssh pi@menderpi.local 'sha256sum ~/printer_data/config/printer.cfg'
+cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
+./update_menderpi.sh --check
 ```
 
 ## Daily Workflow
 
-Edit `printer.cfg`, then deploy it:
+Edit `calib.yaml` or `printer.cfg.template`, check the live printer config, then
+deploy when needed:
 
 ```bash
 cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
+./update_menderpi.sh --check
 ./update_menderpi.sh
 ```
+
+`update_menderpi.sh --check` verifies the generated local `printer.cfg`, the
+remote `~/printer_data/config/printer.cfg`, and the config Klippy has loaded via
+Moonraker without uploading files or restarting Klipper.
 
 `update_menderpi.sh` copies local `printer.cfg` to
 `~/printer_data/config/printer.cfg` on `pi@menderpi.local`, backs up the

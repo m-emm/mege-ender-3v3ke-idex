@@ -318,6 +318,12 @@ variable_offset_move_speed: 5.0
 variable_park_move_speed: 180.0
 gcode:
 
+[gcode_macro _IDEX_CONFIG_FINGERPRINT]
+description: Generated config identity used by update_menderpi.sh --check.
+variable_source_sha256: "${config_fingerprint}"
+gcode:
+    RESPOND TYPE=echo MSG="IDEX config fingerprint: {printer['gcode_macro _IDEX_CONFIG_FINGERPRINT'].source_sha256}"
+
 [gcode_macro _IDEX_PART_FAN_STATE]
 variable_speed: 0.0
 gcode:

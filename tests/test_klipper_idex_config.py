@@ -73,6 +73,24 @@ def _macro_variable_float(section: str, variable_name: str) -> float:
     return _setting_float(section, f"variable_{variable_name}")
 
 
+def _live_config_status(
+    fingerprint: str | None,
+    *,
+    state: str = "ready",
+    save_config_pending: bool = False,
+) -> dict:
+    macro_config = {}
+    if fingerprint is not None:
+        macro_config["variable_source_sha256"] = f'"{fingerprint}"'
+    return {
+        "webhooks": {"state": state},
+        "configfile": {
+            "save_config_pending": save_config_pending,
+            "config": {"gcode_macro _IDEX_CONFIG_FINGERPRINT": macro_config},
+        },
+    }
+
+
 def test_printer_cfg_is_generated_from_calibration_source():
     generator = _load_generator_module()
 
@@ -114,6 +132,101 @@ def test_printer_cfg_check_rejects_stale_output(tmp_path):
         )
         == 1
     )
+
+
+def test_printer_cfg_includes_generated_fingerprint_macro():
+    generator = _load_generator_module()
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    fingerprint = generator.compute_config_fingerprint(CALIB_PATH, TEMPLATE_PATH)
+    fingerprint_section = _section(config_text, "gcode_macro _IDEX_CONFIG_FINGERPRINT")
+
+    assert re.fullmatch(r"[0-9a-f]{64}", fingerprint)
+    assert f'variable_source_sha256: "{fingerprint}"' in fingerprint_section
+
+
+def test_config_fingerprint_changes_when_source_inputs_change(tmp_path):
+    generator = _load_generator_module()
+    calib = tmp_path / "calib.yaml"
+    template = tmp_path / "printer.cfg.template"
+    calib_text = CALIB_PATH.read_text(encoding="utf-8")
+    template_text = TEMPLATE_PATH.read_text(encoding="utf-8")
+    calib.write_text(calib_text, encoding="utf-8")
+    template.write_text(template_text, encoding="utf-8")
+
+    original = generator.compute_config_fingerprint(calib, template)
+    calib.write_text(f"{calib_text}\n# changed calibration source\n", encoding="utf-8")
+    assert generator.compute_config_fingerprint(calib, template) != original
+
+    calib.write_text(calib_text, encoding="utf-8")
+    template.write_text(f"{template_text}\n# changed template source\n", encoding="utf-8")
+    assert generator.compute_config_fingerprint(calib, template) != original
+
+
+def test_live_config_check_accepts_matching_ready_config():
+    generator = _load_generator_module()
+    fingerprint = "a" * 64
+
+    assert (
+        generator.live_config_check_errors(
+            local_sha256="b" * 64,
+            remote_sha256="b" * 64,
+            expected_fingerprint=fingerprint,
+            status=_live_config_status(fingerprint),
+        )
+        == []
+    )
+
+
+def test_live_config_check_rejects_remote_hash_mismatch():
+    generator = _load_generator_module()
+    errors = generator.live_config_check_errors(
+        local_sha256="a" * 64,
+        remote_sha256="b" * 64,
+        expected_fingerprint="c" * 64,
+        status=_live_config_status("c" * 64),
+    )
+
+    assert any("sha256 does not match" in error for error in errors)
+
+
+@pytest.mark.parametrize("live_fingerprint", [None, "d" * 64])
+def test_live_config_check_rejects_missing_or_different_live_fingerprint(
+    live_fingerprint,
+):
+    generator = _load_generator_module()
+    errors = generator.live_config_check_errors(
+        local_sha256="a" * 64,
+        remote_sha256="a" * 64,
+        expected_fingerprint="c" * 64,
+        status=_live_config_status(live_fingerprint),
+    )
+
+    assert errors
+    assert any("fingerprint" in error for error in errors)
+
+
+def test_live_config_check_rejects_non_ready_klippy_state():
+    generator = _load_generator_module()
+    errors = generator.live_config_check_errors(
+        local_sha256="a" * 64,
+        remote_sha256="a" * 64,
+        expected_fingerprint="c" * 64,
+        status=_live_config_status("c" * 64, state="startup"),
+    )
+
+    assert any("expected 'ready'" in error for error in errors)
+
+
+def test_live_config_check_rejects_pending_save_config():
+    generator = _load_generator_module()
+    errors = generator.live_config_check_errors(
+        local_sha256="a" * 64,
+        remote_sha256="a" * 64,
+        expected_fingerprint="c" * 64,
+        status=_live_config_status("c" * 64, save_config_pending=True),
+    )
+
+    assert any("save_config_pending" in error for error in errors)
 
 
 def test_idex_part_fan_pins_and_slicer_routing():

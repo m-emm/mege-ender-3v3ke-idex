@@ -44,8 +44,13 @@ That file is the source of truth for the active printer. Everything under
 ```bash
 # From the local checkout
 cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
+./update_menderpi.sh --check
 ./update_menderpi.sh
 ```
+
+`./update_menderpi.sh --check` verifies the generated local config, the remote
+file, and the active Klippy config without uploading files or restarting
+Klipper.
 
 The updater copies local `printer.cfg` to
 `pi@menderpi.local:~/printer_data/config/printer.cfg`, backs up the previous

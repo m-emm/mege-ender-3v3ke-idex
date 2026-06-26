@@ -4,9 +4,9 @@ bed_grid_zero:
 tools:
   t0:
     x_endstop: -80.400
-    y_endstop: -14.600
+    y_endstop: -14.800
     z_endstop: 293.750
   t1:
     x_endstop: 355.700
-    y_endstop: -15.400
+    y_endstop: -15.600
     z_endstop: 293.650

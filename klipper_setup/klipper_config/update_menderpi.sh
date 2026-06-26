@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "$#" -ne 0 ]]; then
-  echo "Usage: $0" >&2
+usage() {
+  echo "Usage: $0 [--check]" >&2
+}
+
+MODE="update"
+if [[ "$#" -eq 0 ]]; then
+  MODE="update"
+elif [[ "$#" -eq 1 && "$1" == "--check" ]]; then
+  MODE="check"
+else
+  usage
   exit 2
 fi
 
@@ -10,6 +19,132 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_CFG="${SCRIPT_DIR}/printer.cfg"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 REMOTE_TMP="/tmp/printer.cfg.$$"
+
+sha256_file() {
+  python3 - "$1" <<'PY'
+import hashlib
+import sys
+from pathlib import Path
+
+print(hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
+}
+
+check_live_config() {
+  echo "Checking ${REMOTE_HOST} for the active Klipper config..."
+  echo "  Source: ${SOURCE_CFG}"
+
+  python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --check
+
+  if [[ ! -f "${SOURCE_CFG}" ]]; then
+    echo "Error: source config not found: ${SOURCE_CFG}" >&2
+    exit 1
+  fi
+
+  local_sha256="$(sha256_file "${SOURCE_CFG}")"
+  expected_fingerprint="$(
+    python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --fingerprint
+  )"
+
+  if ! remote_payload="$(
+    ssh "${REMOTE_HOST}" "python3 -" <<'PY'
+import hashlib
+import json
+from pathlib import Path
+import sys
+import urllib.request
+
+main_cfg = Path.home() / "printer_data" / "config" / "printer.cfg"
+payload = {
+    "ok": False,
+    "remote_config_path": str(main_cfg),
+}
+
+try:
+    payload["remote_sha256"] = hashlib.sha256(main_cfg.read_bytes()).hexdigest()
+    url = "http://127.0.0.1:7125/printer/objects/query?webhooks&configfile"
+    with urllib.request.urlopen(url, timeout=10) as response:
+        payload["status"] = json.loads(response.read())["result"]["status"]
+    payload["ok"] = True
+except Exception as exc:
+    payload["error"] = f"{type(exc).__name__}: {exc}"
+
+json.dump(payload, sys.stdout)
+PY
+  )"; then
+    echo "Config check failed: could not SSH to ${REMOTE_HOST}." >&2
+    exit 1
+  fi
+
+  CHECK_EXPECTED_FINGERPRINT="${expected_fingerprint}" \
+  CHECK_LOCAL_SHA256="${local_sha256}" \
+  CHECK_REMOTE_HOST="${REMOTE_HOST}" \
+  CHECK_REMOTE_PAYLOAD="${remote_payload}" \
+    python3 - "${SCRIPT_DIR}/generate_printer_cfg.py" <<'PY'
+import importlib.util
+import json
+import os
+import sys
+
+generator_path = sys.argv[1]
+spec = importlib.util.spec_from_file_location("generate_printer_cfg", generator_path)
+if spec is None or spec.loader is None:
+    raise RuntimeError(f"Could not load {generator_path}")
+generator = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(generator)
+
+remote_host = os.environ["CHECK_REMOTE_HOST"]
+local_sha256 = os.environ["CHECK_LOCAL_SHA256"]
+expected_fingerprint = os.environ["CHECK_EXPECTED_FINGERPRINT"]
+remote_payload = json.loads(os.environ["CHECK_REMOTE_PAYLOAD"])
+
+print(f"  Host: {remote_host}")
+print(f"  Local sha256: {local_sha256}")
+
+remote_path = remote_payload.get("remote_config_path")
+if remote_path:
+    print(f"  Remote config: {remote_path}")
+
+if not remote_payload.get("ok"):
+    print(
+        "Config check failed: could not inspect remote config: "
+        f"{remote_payload.get('error', 'unknown error')}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+remote_sha256 = remote_payload.get("remote_sha256", "")
+status = remote_payload.get("status", {})
+webhooks = status.get("webhooks", {})
+configfile = status.get("configfile", {})
+live_fingerprint = generator.active_config_fingerprint(status)
+
+print(f"  Remote sha256: {remote_sha256}")
+print(f"  Klippy state: {webhooks.get('state')}")
+print(f"  save_config_pending: {configfile.get('save_config_pending')}")
+print(f"  Local fingerprint: {expected_fingerprint}")
+print(f"  Live fingerprint: {live_fingerprint}")
+
+errors = generator.live_config_check_errors(
+    local_sha256=local_sha256,
+    remote_sha256=remote_sha256,
+    expected_fingerprint=expected_fingerprint,
+    status=status,
+)
+if errors:
+    print("Config check failed:", file=sys.stderr)
+    for error in errors:
+        print(f"  - {error}", file=sys.stderr)
+    sys.exit(1)
+
+print("Config check passed: remote file matches and Klippy loaded this config.")
+PY
+}
+
+if [[ "${MODE}" == "check" ]]; then
+  check_live_config
+  exit 0
+fi
 
 python3 "${SCRIPT_DIR}/generate_printer_cfg.py"
 
