@@ -598,6 +598,33 @@ def test_absolute_grid_x_label_slab_has_writing_anchor():
     )
 
 
+def test_absolute_grid_x_materials_use_same_y_row_for_both_tools(monkeypatch):
+    calibration = grid_calibration.read_grid_calibration(CALIB_PATH)
+    calls = []
+
+    def create_pattern_spy(**kwargs):
+        calls.append(kwargs)
+        return object(), object()
+
+    monkeypatch.setattr(
+        x_grid_calibration,
+        "create_absolute_x_alignment_pattern",
+        create_pattern_spy,
+    )
+
+    x_grid_calibration.create_absolute_x_alignment_materials(calibration)
+
+    assert len(calls) == 2
+    assert calls[0]["line_y_min_mm"] == calls[1]["line_y_min_mm"] == pytest.approx(
+        grid_calibration.grid_coordinate(calibration["bed_grid_zero"][1], -1)
+    )
+    assert calls[0]["line_y_max_mm"] == calls[1]["line_y_max_mm"] == pytest.approx(
+        grid_calibration.grid_coordinate(calibration["bed_grid_zero"][1], 0)
+    )
+    assert calls[0]["label_panel"] is calls[1]["label_panel"]
+    assert calls[0]["label_panel"]["name"] == "z_guide_panel_outline"
+
+
 def test_absolute_grid_x_and_y_parts_fit_dual_area():
     calibration = grid_calibration.read_grid_calibration(CALIB_PATH)
     x_parts = x_grid_calibration.create_absolute_x_alignment_materials(calibration)

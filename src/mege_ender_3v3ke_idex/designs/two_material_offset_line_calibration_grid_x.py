@@ -133,28 +133,25 @@ def create_absolute_x_alignment_materials(calibration):
     bed_grid_zero = calibration["bed_grid_zero"]
     _, zero_y_mm = bed_grid_zero
     grid_cutouts = create_grid_cutouts(bed_grid_zero)
-    logo_panel = next(
-        cutout
-        for cutout in grid_cutouts
-        if cutout["name"] == "kingroon_logo_panel_outline"
-    )
     lower_panel = next(
         cutout for cutout in grid_cutouts if cutout["name"] == "z_guide_panel_outline"
     )
+    line_y_min_mm = grid_coordinate(zero_y_mm, -1)
+    line_y_max_mm = grid_coordinate(zero_y_mm, 0)
 
     t0_lines, t0_labels = create_absolute_x_alignment_pattern(
         bed_grid_zero=bed_grid_zero,
         x_endstop_mm=calibration["t0_x_endstop"],
-        line_y_min_mm=grid_coordinate(zero_y_mm, -1),
-        line_y_max_mm=grid_coordinate(zero_y_mm, 0),
+        line_y_min_mm=line_y_min_mm,
+        line_y_max_mm=line_y_max_mm,
         label_panel=lower_panel,
     )
     t1_lines, t1_labels = create_absolute_x_alignment_pattern(
         bed_grid_zero=bed_grid_zero,
         x_endstop_mm=calibration["t1_x_endstop"],
-        line_y_min_mm=grid_coordinate(zero_y_mm, 3),
-        line_y_max_mm=grid_coordinate(zero_y_mm, 4),
-        label_panel=logo_panel,
+        line_y_min_mm=line_y_min_mm,
+        line_y_max_mm=line_y_max_mm,
+        label_panel=lower_panel,
     )
 
     return t0_lines, t0_labels, t1_lines, t1_labels
