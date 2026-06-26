@@ -499,9 +499,7 @@ def create_absolute_y_alignment_materials(
     calibration_value_mm,
 ):
     zero_x_mm, zero_y_mm = bed_grid_zero
-    line_x_min_mm = grid_coordinate(zero_x_mm, -2)
-    line_x_max_mm = grid_coordinate(zero_x_mm, -1)
-    label_right_x_mm = line_x_min_mm - CALIBRATION_LABEL_GAP_MM
+    label_right_x_mm = grid_coordinate(zero_x_mm, -2) - CALIBRATION_LABEL_GAP_MM
     label_min_y_mm = SAFE_BED_ORIGIN[1] + CALIBRATION_LABEL_PAD_MARGIN_MM
     label_max_y_mm = (
         SAFE_BED_ORIGIN[1] + SAFE_BED_DEPTH_MM - CALIBRATION_LABEL_PAD_MARGIN_MM
@@ -518,18 +516,6 @@ def create_absolute_y_alignment_materials(
         line_center_y_mm = y_line_center_for_calibration_offset(
             painted_grid_y_mm,
             offset_mm,
-        )
-        base_collector = base_collector.fuse(
-            create_box(
-                line_x_max_mm - line_x_min_mm,
-                CALIBRATION_LINE_WIDTH_MM,
-                CALIBRATION_HEIGHT_MM,
-                origin=(
-                    line_x_min_mm,
-                    line_center_y_mm - CALIBRATION_LINE_WIDTH_MM / 2,
-                    0,
-                ),
-            )
         )
         label_entries.append(
             {
@@ -548,6 +534,8 @@ def create_absolute_y_alignment_materials(
     slab, (slab_min_x, slab_min_y, slab_max_x, _) = create_calibration_label_slab(
         labels
     )
+    line_x_max_mm = slab_min_x + CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM
+    line_x_min_mm = line_x_max_mm - GRID_PITCH_MM
     base_collector = base_collector.fuse(slab)
     for label in labels:
         text_collector = text_collector.fuse(align(label, slab, Alignment.STACK_TOP))
@@ -576,8 +564,20 @@ def create_absolute_y_alignment_materials(
     )
 
     for entry in label_entries:
-        connector_start_x_mm = slab_max_x - CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM
-        connector_end_x_mm = line_x_min_mm + CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM
+        base_collector = base_collector.fuse(
+            create_box(
+                line_x_max_mm - line_x_min_mm,
+                CALIBRATION_LINE_WIDTH_MM,
+                CALIBRATION_HEIGHT_MM,
+                origin=(
+                    line_x_min_mm,
+                    entry["center_y_mm"] - CALIBRATION_LINE_WIDTH_MM / 2,
+                    0,
+                ),
+            )
+        )
+        connector_start_x_mm = line_x_max_mm - CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM
+        connector_end_x_mm = slab_min_x + CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM
         start_x_mm = min(connector_start_x_mm, connector_end_x_mm)
         end_x_mm = max(connector_start_x_mm, connector_end_x_mm)
         base_collector = base_collector.fuse(

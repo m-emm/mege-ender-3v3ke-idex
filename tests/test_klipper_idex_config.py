@@ -468,6 +468,7 @@ def test_absolute_grid_y_label_slab_is_calibrated_tool_material():
     text_min, text_max = grid_calibration.get_bounding_box(text_material)
 
     assert base_min[0] < text_min[0]
+    assert text_min[0] - base_min[0] > grid_calibration.GRID_PITCH_MM
     assert text_min[1] < base_min[1]
     assert base_min[1] - text_min[1] == pytest.approx(
         grid_calibration.CALIBRATION_LABEL_GROUNDING_MARKER_GAP_MM
