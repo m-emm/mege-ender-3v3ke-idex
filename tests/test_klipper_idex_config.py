@@ -45,6 +45,10 @@ def _load_generator_module():
     return module
 
 
+def _calibration_source():
+    return _load_generator_module().load_calibration(CALIB_PATH)
+
+
 def _section(config_text: str, name: str) -> str:
     match = re.search(
         rf"^\[{re.escape(name)}\]\n(?P<body>.*?)(?=^\[|\Z)",
@@ -237,6 +241,9 @@ def test_idex_tool_selection_resets_next_printable_corner():
 
 def test_idex_tool_offsets_are_current_machine_calibration():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    calibration = _calibration_source()
+    t0 = calibration["tools"]["t0"]
+    t1 = calibration["tools"]["t1"]
     stepper_x = _section(config_text, "stepper_x")
     tool_state = _section(config_text, "gcode_macro _IDEX_TOOL_STATE")
     dual_carriage = _section(config_text, "dual_carriage")
@@ -247,40 +254,71 @@ def test_idex_tool_offsets_are_current_machine_calibration():
     assert "variable_t1_x_offset" not in tool_state
     assert "variable_t0_z_offset" not in tool_state
 
-    assert _setting_float(stepper_x, "position_endstop") == pytest.approx(-80.700)
-    assert _setting_float(stepper_x, "position_min") == pytest.approx(-80.700)
-    assert _setting_float(dual_carriage, "position_endstop") == pytest.approx(355.200)
-    assert _setting_float(dual_carriage, "position_max") == pytest.approx(355.200)
-    assert _setting_float(stepper_y, "position_endstop") == pytest.approx(-14.300)
-    assert _setting_float(stepper_y, "position_min") == pytest.approx(-14.300)
-    assert _setting_float(stepper_z, "position_endstop") == pytest.approx(293.750)
-    assert _setting_float(stepper_z, "position_max") == pytest.approx(293.750)
+    assert _setting_float(stepper_x, "position_endstop") == pytest.approx(
+        t0["x_endstop"]
+    )
+    assert _setting_float(stepper_x, "position_min") == pytest.approx(t0["x_endstop"])
+    assert _setting_float(dual_carriage, "position_endstop") == pytest.approx(
+        t1["x_endstop"]
+    )
+    assert _setting_float(dual_carriage, "position_max") == pytest.approx(
+        t1["x_endstop"]
+    )
+    assert _setting_float(stepper_y, "position_endstop") == pytest.approx(
+        t0["y_endstop"]
+    )
+    assert _setting_float(stepper_y, "position_min") == pytest.approx(t0["y_endstop"])
+    assert _setting_float(stepper_z, "position_endstop") == pytest.approx(
+        t0["z_endstop"]
+    )
+    assert _setting_float(stepper_z, "position_max") == pytest.approx(t0["z_endstop"])
 
-    assert _macro_variable_float(tool_state, "t0_y_endstop") == pytest.approx(-14.300)
-    assert _macro_variable_float(tool_state, "t1_y_endstop") == pytest.approx(-14.800)
-    assert _macro_variable_float(tool_state, "t0_z_endstop") == pytest.approx(293.750)
-    assert _macro_variable_float(tool_state, "t1_z_endstop") == pytest.approx(293.700)
+    assert _macro_variable_float(tool_state, "t0_y_endstop") == pytest.approx(
+        t0["y_endstop"]
+    )
+    assert _macro_variable_float(tool_state, "t1_y_endstop") == pytest.approx(
+        t1["y_endstop"]
+    )
+    assert _macro_variable_float(tool_state, "t0_z_endstop") == pytest.approx(
+        t0["z_endstop"]
+    )
+    assert _macro_variable_float(tool_state, "t1_z_endstop") == pytest.approx(
+        t1["z_endstop"]
+    )
     assert _macro_variable_float(tool_state, "t0_y_offset") == pytest.approx(0.000)
-    assert _macro_variable_float(tool_state, "t1_y_offset") == pytest.approx(0.500)
-    assert _macro_variable_float(tool_state, "t1_z_offset") == pytest.approx(0.050)
+    assert _macro_variable_float(tool_state, "t1_y_offset") == pytest.approx(
+        t0["y_endstop"] - t1["y_endstop"]
+    )
+    assert _macro_variable_float(tool_state, "t1_z_offset") == pytest.approx(
+        t0["z_endstop"] - t1["z_endstop"]
+    )
 
 
-def test_grid_calibration_reads_absolute_y_values():
+def test_grid_calibration_reads_current_calibration_source():
+    calibration = _calibration_source()
+    bed_grid_zero = calibration["bed_grid_zero"]
+    t0 = calibration["tools"]["t0"]
+    t1 = calibration["tools"]["t1"]
     values = grid_calibration.read_grid_calibration(CALIB_PATH)
 
-    assert values["bed_grid_zero"] == (113.300, 107.000)
-    assert values["t0_y_endstop"] == pytest.approx(-14.300)
-    assert values["t1_y_endstop"] == pytest.approx(-14.800)
+    assert values["bed_grid_zero"] == pytest.approx(
+        (bed_grid_zero["x"], bed_grid_zero["y"])
+    )
+    assert values["t0_x_endstop"] == pytest.approx(t0["x_endstop"])
+    assert values["t1_x_endstop"] == pytest.approx(t1["x_endstop"])
+    assert values["t0_y_endstop"] == pytest.approx(t0["y_endstop"])
+    assert values["t1_y_endstop"] == pytest.approx(t1["y_endstop"])
 
 
 def test_offset_line_calibration_parses_active_calibration_values():
+    calibration = _calibration_source()
+    t0 = calibration["tools"]["t0"]
+    t1 = calibration["tools"]["t1"]
     values = parse_idex_calibration_values(CONFIG_PATH.read_text(encoding="utf-8"))
 
-    assert values == {
-        "right_x_endpoint": 355.2,
-        "t0_y": 0.0,
-        "t1_y": 0.5,
-    }
+    assert values["right_x_endpoint"] == pytest.approx(t1["x_endstop"])
+    assert values["t0_y"] == pytest.approx(0.0)
+    assert values["t1_y"] == pytest.approx(t0["y_endstop"] - t1["y_endstop"])
 
 
 def test_offset_line_calibration_rejects_nonzero_t0_y_offset():
@@ -309,10 +347,17 @@ def test_offset_line_calibration_rejects_x_tool_offsets():
 
 def test_offset_line_calibration_rejects_mismatched_right_endpoint_values():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
-    config_text = config_text.replace(
-        "position_endstop: 355.200\nposition_min: 0.000\nposition_max: 355.200",
-        "position_endstop: 355.200\nposition_min: 0.000\nposition_max: 355.000",
+    dual_carriage = _section(config_text, "dual_carriage")
+    right_endpoint = _setting_float(dual_carriage, "position_endstop")
+    mismatched_max = right_endpoint - 0.2
+    modified_dual_carriage, replacement_count = re.subn(
+        r"(?m)^position_max: \S+",
+        f"position_max: {mismatched_max:.3f}",
+        dual_carriage,
+        count=1,
     )
+    assert replacement_count == 1
+    config_text = config_text.replace(dual_carriage, modified_dual_carriage, 1)
 
     with pytest.raises(ValueError, match="position_endstop and position_max"):
         parse_idex_calibration_values(config_text)
