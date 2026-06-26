@@ -11,6 +11,8 @@ SOURCE_CFG="${SCRIPT_DIR}/printer.cfg"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 REMOTE_TMP="/tmp/printer.cfg.$$"
 
+python3 "${SCRIPT_DIR}/generate_printer_cfg.py"
+
 if [[ ! -f "${SOURCE_CFG}" ]]; then
   echo "Error: source config not found: ${SOURCE_CFG}" >&2
   exit 1

@@ -34,6 +34,7 @@ def _copy_holder_without_old_lid_and_fan(x_axis_mcu_holder):
 
 BOARD_HOLDER_LID_THICKNESS = 1.2
 
+
 def join_x_axis_mcu_holder_with_fan(
     *,
     x_axis_mcu_holder,
@@ -62,8 +63,8 @@ def join_x_axis_mcu_holder_with_fan(
 
     fan_size = get_bounding_box_size(fan)
 
-    fan_plate = create_box(fan_size[0]+4, BOARD_HOLDER_LID_THICKNESS, fan_size[2]+4)
-    fan_plate = align(fan_plate, fan    , Alignment.CENTER)
+    fan_plate = create_box(fan_size[0] + 4, BOARD_HOLDER_LID_THICKNESS, fan_size[2] + 4)
+    fan_plate = align(fan_plate, fan, Alignment.CENTER)
     fan_plate = align(fan_plate, replacement_top_lid, Alignment.FRONT)
 
     replacement_top_lid = replacement_top_lid.fuse(fan_plate)
@@ -73,16 +74,16 @@ def join_x_axis_mcu_holder_with_fan(
     existing_fan_size = get_bounding_box_size(existing_fan)
 
     fan_hole_patch_plate = create_box(
-        existing_fan_size[0]+4,
+        existing_fan_size[0] + 4,
         BOARD_HOLDER_LID_THICKNESS,
-        existing_fan_size[2]+4,
+        existing_fan_size[2] + 4,
     )
     fan_hole_patch_plate = align(fan_hole_patch_plate, existing_fan, Alignment.CENTER)
-    fan_hole_patch_plate = align(fan_hole_patch_plate, replacement_top_lid, Alignment.FRONT)
+    fan_hole_patch_plate = align(
+        fan_hole_patch_plate, replacement_top_lid, Alignment.FRONT
+    )
 
     replacement_top_lid = replacement_top_lid.fuse(fan_hole_patch_plate)
-
-
 
     fan_hole_cutter = fan.get_named_cutter("fan_hole_cutter")
 

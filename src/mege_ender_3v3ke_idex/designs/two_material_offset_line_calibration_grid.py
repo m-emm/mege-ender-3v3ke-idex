@@ -10,6 +10,7 @@ import os
 import re
 from pathlib import Path
 
+import yaml
 from mege_3devops.process_data.mege_ender_3v3ke_idex import (
     SAFE_BED_DEPTH_MM,
     SAFE_BED_ORIGIN,
@@ -28,6 +29,7 @@ CONFIG_PATH = (
     / "klipper_config"
     / "printer.cfg"
 )
+CALIB_PATH = CONFIG_PATH.with_name("calib.yaml")
 STEPPER_X_SECTION = "stepper_x"
 STEPPER_Y_SECTION = "stepper_y"
 DUAL_CARRIAGE_SECTION = "dual_carriage"
@@ -139,6 +141,46 @@ def parse_config_float(section, section_name, setting_name):
         ) from None
 
 
+def require_mapping(value, path):
+    if not isinstance(value, dict):
+        raise ValueError(f"{path} must be a mapping")
+    return value
+
+
+def parse_calibration_float(mapping, key, path):
+    if key not in mapping:
+        raise ValueError(f"Missing {path}.{key}")
+
+    try:
+        return float(mapping[key])
+    except (TypeError, ValueError):
+        raise ValueError(f"{path}.{key} must be numeric") from None
+
+
+def read_absolute_calibration(calib_path=CALIB_PATH):
+    data = yaml.safe_load(calib_path.read_text(encoding="utf-8"))
+    data = require_mapping(data, "calib.yaml")
+    bed_grid_zero = require_mapping(data.get("bed_grid_zero"), "bed_grid_zero")
+    tools = require_mapping(data.get("tools"), "tools")
+    t0 = require_mapping(tools.get("t0"), "tools.t0")
+    t1 = require_mapping(tools.get("t1"), "tools.t1")
+
+    return {
+        "bed_grid_zero": (
+            parse_calibration_float(bed_grid_zero, "x", "bed_grid_zero"),
+            parse_calibration_float(bed_grid_zero, "y", "bed_grid_zero"),
+        ),
+        "x_endstop_values": {
+            "t0_x_endstop": parse_calibration_float(t0, "x_endstop", "tools.t0"),
+            "t1_x_endstop": parse_calibration_float(t1, "x_endstop", "tools.t1"),
+        },
+        "y_calibration_values": {
+            "t0_y_endstop": parse_calibration_float(t0, "y_endstop", "tools.t0"),
+            "t1_y_endstop": parse_calibration_float(t1, "y_endstop", "tools.t1"),
+        },
+    }
+
+
 def parse_bed_grid_zero(config_text):
     tool_state = get_config_section(config_text, TOOL_STATE_SECTION)
     return (
@@ -147,8 +189,8 @@ def parse_bed_grid_zero(config_text):
     )
 
 
-def read_bed_grid_zero(config_path=CONFIG_PATH):
-    return parse_bed_grid_zero(config_path.read_text(encoding="utf-8"))
+def read_bed_grid_zero(calib_path=CALIB_PATH):
+    return read_absolute_calibration(calib_path)["bed_grid_zero"]
 
 
 def parse_x_endstop_values(config_text):
@@ -182,8 +224,8 @@ def parse_x_endstop_values(config_text):
     }
 
 
-def read_x_endstop_values(config_path=CONFIG_PATH):
-    return parse_x_endstop_values(config_path.read_text(encoding="utf-8"))
+def read_x_endstop_values(calib_path=CALIB_PATH):
+    return read_absolute_calibration(calib_path)["x_endstop_values"]
 
 
 def parse_y_calibration_values(config_text):
@@ -196,12 +238,12 @@ def parse_y_calibration_values(config_text):
             STEPPER_Y_SECTION,
             "position_endstop",
         ),
-        "t1_y_offset": parse_tool_state_float(tool_state, "t1_y_offset"),
+        "t1_y_endstop": parse_tool_state_float(tool_state, "t1_y_endstop"),
     }
 
 
-def read_y_calibration_values(config_path=CONFIG_PATH):
-    return parse_y_calibration_values(config_path.read_text(encoding="utf-8"))
+def read_y_calibration_values(calib_path=CALIB_PATH):
+    return read_absolute_calibration(calib_path)["y_calibration_values"]
 
 
 def grid_coordinate(zero_mm, index):
@@ -635,7 +677,9 @@ def create_absolute_x_alignment_materials(
     _, zero_y_mm = bed_grid_zero
     grid_cutouts = create_grid_cutouts(bed_grid_zero)
     logo_panel = next(
-        cutout for cutout in grid_cutouts if cutout["name"] == "kingroon_logo_panel_outline"
+        cutout
+        for cutout in grid_cutouts
+        if cutout["name"] == "kingroon_logo_panel_outline"
     )
     lower_panel = next(
         cutout for cutout in grid_cutouts if cutout["name"] == "z_guide_panel_outline"
@@ -673,7 +717,6 @@ def create_absolute_y_alignment_pattern(
     calibration_value_mm,
     line_x_min_mm,
     line_x_max_mm,
-    line_offset_sign,
 ):
     _, zero_y_mm = bed_grid_zero
     label_right_x_mm = line_x_min_mm - CALIBRATION_LABEL_GAP_MM
@@ -690,7 +733,10 @@ def create_absolute_y_alignment_pattern(
         CALIBRATION_OFFSET_CANDIDATES_MM,
     ):
         painted_grid_y_mm = grid_coordinate(zero_y_mm, grid_index)
-        line_center_y_mm = painted_grid_y_mm + line_offset_sign * offset_mm
+        line_center_y_mm = y_line_center_for_calibration_offset(
+            painted_grid_y_mm,
+            offset_mm,
+        )
         base_collector = base_collector.fuse(
             create_calibration_horizontal_segment(
                 line_center_y_mm,
@@ -730,6 +776,10 @@ def create_absolute_y_alignment_pattern(
     return base_collector, label_collector
 
 
+def y_line_center_for_calibration_offset(painted_grid_y_mm, offset_mm):
+    return painted_grid_y_mm - offset_mm
+
+
 def create_absolute_y_alignment_materials(
     bed_grid_zero=None,
     y_calibration_values=None,
@@ -750,14 +800,12 @@ def create_absolute_y_alignment_materials(
         calibration_value_mm=y_calibration_values["t0_y_endstop"],
         line_x_min_mm=t0_line_x_min_mm,
         line_x_max_mm=t0_line_x_max_mm,
-        line_offset_sign=-1,
     )
     t1_pattern, t1_labels = create_absolute_y_alignment_pattern(
         bed_grid_zero=bed_grid_zero,
-        calibration_value_mm=y_calibration_values["t1_y_offset"],
+        calibration_value_mm=y_calibration_values["t1_y_endstop"],
         line_x_min_mm=t1_line_x_min_mm,
         line_x_max_mm=t1_line_x_max_mm,
-        line_offset_sign=1,
     )
 
     t0_material = PartCollector()

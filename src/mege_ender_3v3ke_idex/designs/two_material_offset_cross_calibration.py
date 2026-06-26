@@ -86,7 +86,9 @@ def create_offset_cross_materials():
         t2_rings = PartCollector()
         for i in range(10):
             cur_radius = (i + 2) * radius_step
-            ring = create_ring(cur_radius, cur_radius - radius_step, CALIBRATION_HEIGHT_MM)
+            ring = create_ring(
+                cur_radius, cur_radius - radius_step, CALIBRATION_HEIGHT_MM
+            )
 
             if i % 2 == 0:
                 t1_rings = t1_rings.fuse(ring)

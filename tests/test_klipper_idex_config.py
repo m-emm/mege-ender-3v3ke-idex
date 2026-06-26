@@ -1,8 +1,13 @@
+import importlib.util
 import re
 from pathlib import Path
 
 import pytest
 
+from mege_ender_3v3ke_idex.designs.two_material_offset_line_calibration_grid import (
+    parse_y_calibration_values,
+    y_line_center_for_calibration_offset,
+)
 from mege_ender_3v3ke_idex.designs.two_material_offset_line_calibration import (
     LINE_SEGMENT_LENGTH_MM,
     OFFSET_COUNT_EACH_SIDE,
@@ -19,12 +24,22 @@ from mege_ender_3v3ke_idex.designs.two_material_offset_line_calibration import (
 )
 
 
+KLIPPER_CONFIG_DIR = Path(__file__).resolve().parents[1] / "klipper_setup" / "klipper_config"
 CONFIG_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "klipper_setup"
-    / "klipper_config"
-    / "printer.cfg"
+    KLIPPER_CONFIG_DIR / "printer.cfg"
 )
+CALIB_PATH = KLIPPER_CONFIG_DIR / "calib.yaml"
+TEMPLATE_PATH = KLIPPER_CONFIG_DIR / "printer.cfg.template"
+GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_printer_cfg.py"
+
+
+def _load_generator_module():
+    spec = importlib.util.spec_from_file_location("generate_printer_cfg", GENERATOR_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _section(config_text: str, name: str) -> str:
@@ -35,6 +50,60 @@ def _section(config_text: str, name: str) -> str:
     )
     assert match is not None, f"Missing [{name}] section"
     return match.group("body")
+
+
+def _setting_float(section: str, setting_name: str) -> float:
+    match = re.search(
+        rf"^\s*{re.escape(setting_name)}\s*:\s*(?P<value>\S+)\s*$",
+        section,
+        flags=re.MULTILINE,
+    )
+    assert match is not None, f"Missing setting {setting_name}"
+    return float(match.group("value"))
+
+
+def _macro_variable_float(section: str, variable_name: str) -> float:
+    return _setting_float(section, f"variable_{variable_name}")
+
+
+def test_printer_cfg_is_generated_from_calibration_source():
+    generator = _load_generator_module()
+
+    assert generator.render_config(CALIB_PATH, TEMPLATE_PATH) == CONFIG_PATH.read_text(
+        encoding="utf-8"
+    )
+    assert generator.main(
+        [
+            "--check",
+            "--calib",
+            str(CALIB_PATH),
+            "--template",
+            str(TEMPLATE_PATH),
+            "--output",
+            str(CONFIG_PATH),
+        ]
+    ) == 0
+
+
+def test_printer_cfg_check_rejects_stale_output(tmp_path):
+    generator = _load_generator_module()
+    stale_cfg = tmp_path / "printer.cfg"
+    stale_cfg.write_text("# stale\n", encoding="utf-8")
+
+    assert (
+        generator.main(
+            [
+                "--check",
+                "--calib",
+                str(CALIB_PATH),
+                "--template",
+                str(TEMPLATE_PATH),
+                "--output",
+                str(stale_cfg),
+            ]
+        )
+        == 1
+    )
 
 
 def test_idex_part_fan_pins_and_slicer_routing():
@@ -162,21 +231,41 @@ def test_idex_tool_selection_resets_next_printable_corner():
 
 def test_idex_tool_offsets_are_current_machine_calibration():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    stepper_x = _section(config_text, "stepper_x")
     tool_state = _section(config_text, "gcode_macro _IDEX_TOOL_STATE")
     dual_carriage = _section(config_text, "dual_carriage")
+    stepper_y = _section(config_text, "stepper_y")
     stepper_z = _section(config_text, "stepper_z")
 
     assert "variable_t0_x_offset" not in tool_state
     assert "variable_t1_x_offset" not in tool_state
-    assert "variable_t0_y_offset: 0.0" in tool_state
     assert "variable_t0_z_offset" not in tool_state
-    assert "variable_t1_y_offset: -0.1" in tool_state
-    assert "variable_t1_z_offset: 0.25" in tool_state
 
-    assert "position_endstop: 355.2" in dual_carriage
-    assert "position_max: 355.2" in dual_carriage
-    assert "position_endstop: 293.950" in stepper_z
-    assert "position_max: 293.950" in stepper_z
+    assert _setting_float(stepper_x, "position_endstop") == pytest.approx(-80.700)
+    assert _setting_float(stepper_x, "position_min") == pytest.approx(-80.700)
+    assert _setting_float(dual_carriage, "position_endstop") == pytest.approx(355.200)
+    assert _setting_float(dual_carriage, "position_max") == pytest.approx(355.200)
+    assert _setting_float(stepper_y, "position_endstop") == pytest.approx(-14.300)
+    assert _setting_float(stepper_y, "position_min") == pytest.approx(-14.300)
+    assert _setting_float(stepper_z, "position_endstop") == pytest.approx(293.750)
+    assert _setting_float(stepper_z, "position_max") == pytest.approx(293.750)
+
+    assert _macro_variable_float(tool_state, "t0_y_endstop") == pytest.approx(-14.300)
+    assert _macro_variable_float(tool_state, "t1_y_endstop") == pytest.approx(-13.100)
+    assert _macro_variable_float(tool_state, "t0_z_endstop") == pytest.approx(293.750)
+    assert _macro_variable_float(tool_state, "t1_z_endstop") == pytest.approx(293.700)
+    assert _macro_variable_float(tool_state, "t0_y_offset") == pytest.approx(0.000)
+    assert _macro_variable_float(tool_state, "t1_y_offset") == pytest.approx(-1.200)
+    assert _macro_variable_float(tool_state, "t1_z_offset") == pytest.approx(0.050)
+
+
+def test_absolute_y_calibration_parses_generated_config():
+    values = parse_y_calibration_values(CONFIG_PATH.read_text(encoding="utf-8"))
+
+    assert values == {
+        "t0_y_endstop": -14.300,
+        "t1_y_endstop": -13.100,
+    }
 
 
 def test_offset_line_calibration_parses_active_calibration_values():
@@ -185,15 +274,16 @@ def test_offset_line_calibration_parses_active_calibration_values():
     assert values == {
         "right_x_endpoint": 355.2,
         "t0_y": 0.0,
-        "t1_y": -0.1,
+        "t1_y": -1.2,
     }
 
 
 def test_offset_line_calibration_rejects_nonzero_t0_y_offset():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
-    config_text = config_text.replace(
-        "variable_t0_y_offset: 0.0",
+    config_text = re.sub(
+        r"variable_t0_y_offset: \S+",
         "variable_t0_y_offset: 0.1",
+        config_text,
     )
 
     with pytest.raises(ValueError, match="T0 Y offset must be 0.0"):
@@ -202,9 +292,10 @@ def test_offset_line_calibration_rejects_nonzero_t0_y_offset():
 
 def test_offset_line_calibration_rejects_x_tool_offsets():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
-    config_text = config_text.replace(
-        "variable_t0_y_offset: 0.0",
+    config_text = re.sub(
+        r"variable_t0_y_offset: \S+",
         "variable_t0_x_offset: 0.0\nvariable_t0_y_offset: 0.0",
+        config_text,
     )
 
     with pytest.raises(ValueError, match="variable_t0_x_offset"):
@@ -214,8 +305,8 @@ def test_offset_line_calibration_rejects_x_tool_offsets():
 def test_offset_line_calibration_rejects_mismatched_right_endpoint_values():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     config_text = config_text.replace(
-        "position_endstop: 355.2\nposition_min: 0.000\nposition_max: 355.2",
-        "position_endstop: 355.2\nposition_min: 0.000\nposition_max: 355.0",
+        "position_endstop: 355.200\nposition_min: 0.000\nposition_max: 355.200",
+        "position_endstop: 355.200\nposition_min: 0.000\nposition_max: 355.000",
     )
 
     with pytest.raises(ValueError, match="position_endstop and position_max"):
@@ -298,6 +389,17 @@ def test_offset_line_calibration_x_endpoint_delta_moves_t1_opposite_direction():
     )
     assert x_t1_center_for_endpoint_delta(middle_index, -0.1) == pytest.approx(
         nominal_x + 0.1
+    )
+
+
+def test_absolute_y_calibration_candidates_move_same_direction():
+    painted_grid_y = 107.0
+
+    assert y_line_center_for_calibration_offset(painted_grid_y, 0.3) == pytest.approx(
+        106.7
+    )
+    assert y_line_center_for_calibration_offset(painted_grid_y, -0.3) == pytest.approx(
+        107.3
     )
 
 

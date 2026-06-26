@@ -1,0 +1,12 @@
+bed_grid_zero:
+  x: 113.300
+  y: 107.000
+tools:
+  t0:
+    x_endstop: -80.700
+    y_endstop: -14.300
+    z_endstop: 293.750
+  t1:
+    x_endstop: 355.200
+    y_endstop: -13.100
+    z_endstop: 293.700
