@@ -504,8 +504,8 @@ def create_absolute_y_alignment_materials(
     label_max_y_mm = (
         SAFE_BED_ORIGIN[1] + SAFE_BED_DEPTH_MM - CALIBRATION_LABEL_PAD_MARGIN_MM
     )
-    line_collector = PartCollector()
-    label_collector = PartCollector()
+    base_collector = PartCollector()
+    text_collector = PartCollector()
     label_entries = []
 
     for grid_index, offset_mm in zip(
@@ -517,7 +517,7 @@ def create_absolute_y_alignment_materials(
             painted_grid_y_mm,
             offset_mm,
         )
-        line_collector = line_collector.fuse(
+        base_collector = base_collector.fuse(
             create_box(
                 line_x_max_mm - line_x_min_mm,
                 CALIBRATION_LINE_WIDTH_MM,
@@ -544,16 +544,16 @@ def create_absolute_y_alignment_materials(
 
     labels = [entry["label"] for entry in label_entries]
     slab, (_, _, slab_max_x, _) = create_calibration_label_slab(labels)
-    label_collector = label_collector.fuse(slab)
+    base_collector = base_collector.fuse(slab)
     for label in labels:
-        label_collector = label_collector.fuse(align(label, slab, Alignment.STACK_TOP))
+        text_collector = text_collector.fuse(align(label, slab, Alignment.STACK_TOP))
 
     for entry in label_entries:
         connector_start_x_mm = slab_max_x - CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM
         connector_end_x_mm = line_x_min_mm + CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM
         start_x_mm = min(connector_start_x_mm, connector_end_x_mm)
         end_x_mm = max(connector_start_x_mm, connector_end_x_mm)
-        line_collector = line_collector.fuse(
+        base_collector = base_collector.fuse(
             create_box(
                 end_x_mm - start_x_mm,
                 CALIBRATION_LABEL_CONNECTOR_WIDTH_MM,
@@ -566,7 +566,7 @@ def create_absolute_y_alignment_materials(
             )
         )
 
-    return line_collector, label_collector
+    return base_collector, text_collector
 
 
 def assert_absolute_patterns_fit_dual_area(parts):

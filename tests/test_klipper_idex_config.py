@@ -432,7 +432,7 @@ def test_absolute_grid_plate_definitions_split_y_calibration():
     ]
 
 
-def test_absolute_grid_y_part_metadata_routes_lines_and_labels():
+def test_absolute_grid_y_part_metadata_routes_base_and_text_materials():
     metadata = grid_calibration.CALIBRATION_PART_METADATA
 
     assert metadata[grid_calibration.Y_T0_LINES_PART_NAME] == {
@@ -455,6 +455,19 @@ def test_absolute_grid_y_part_metadata_routes_lines_and_labels():
         "slicer_filament_id": 1,
         "tool": "T0",
     }
+
+
+def test_absolute_grid_y_label_slab_is_calibrated_tool_material():
+    calibration = grid_calibration.read_grid_calibration(CALIB_PATH)
+    base_material, text_material = grid_calibration.create_absolute_y_alignment_materials(
+        bed_grid_zero=calibration["bed_grid_zero"],
+        calibration_value_mm=calibration["t0_y_endstop"],
+    )
+
+    base_min_x = grid_calibration.get_bounding_box(base_material)[0][0]
+    text_min_x = grid_calibration.get_bounding_box(text_material)[0][0]
+
+    assert base_min_x < text_min_x
 
 
 def test_idex_tool_parking_uses_full_speed_travel():
