@@ -6,6 +6,8 @@ import pytest
 
 from mege_ender_3v3ke_idex.designs import (
     two_material_offset_line_calibration_grid as grid_calibration,
+    two_material_offset_line_calibration_grid_x as x_grid_calibration,
+    two_material_offset_line_calibration_grid_y as y_grid_calibration,
 )
 from mege_ender_3v3ke_idex.designs.two_material_offset_line_calibration import (
     LINE_SEGMENT_LENGTH_MM,
@@ -33,7 +35,9 @@ GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_printer_cfg.py"
 
 
 def _load_generator_module():
-    spec = importlib.util.spec_from_file_location("generate_printer_cfg", GENERATOR_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "generate_printer_cfg", GENERATOR_PATH
+    )
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -71,17 +75,20 @@ def test_printer_cfg_is_generated_from_calibration_source():
     assert generator.render_config(CALIB_PATH, TEMPLATE_PATH) == CONFIG_PATH.read_text(
         encoding="utf-8"
     )
-    assert generator.main(
-        [
-            "--check",
-            "--calib",
-            str(CALIB_PATH),
-            "--template",
-            str(TEMPLATE_PATH),
-            "--output",
-            str(CONFIG_PATH),
-        ]
-    ) == 0
+    assert (
+        generator.main(
+            [
+                "--check",
+                "--calib",
+                str(CALIB_PATH),
+                "--template",
+                str(TEMPLATE_PATH),
+                "--output",
+                str(CONFIG_PATH),
+            ]
+        )
+        == 0
+    )
 
 
 def test_printer_cfg_check_rejects_stale_output(tmp_path):
@@ -250,11 +257,11 @@ def test_idex_tool_offsets_are_current_machine_calibration():
     assert _setting_float(stepper_z, "position_max") == pytest.approx(293.750)
 
     assert _macro_variable_float(tool_state, "t0_y_endstop") == pytest.approx(-14.300)
-    assert _macro_variable_float(tool_state, "t1_y_endstop") == pytest.approx(-13.100)
+    assert _macro_variable_float(tool_state, "t1_y_endstop") == pytest.approx(-14.600)
     assert _macro_variable_float(tool_state, "t0_z_endstop") == pytest.approx(293.750)
     assert _macro_variable_float(tool_state, "t1_z_endstop") == pytest.approx(293.700)
     assert _macro_variable_float(tool_state, "t0_y_offset") == pytest.approx(0.000)
-    assert _macro_variable_float(tool_state, "t1_y_offset") == pytest.approx(-1.200)
+    assert _macro_variable_float(tool_state, "t1_y_offset") == pytest.approx(0.300)
     assert _macro_variable_float(tool_state, "t1_z_offset") == pytest.approx(0.050)
 
 
@@ -263,7 +270,7 @@ def test_grid_calibration_reads_absolute_y_values():
 
     assert values["bed_grid_zero"] == (113.300, 107.000)
     assert values["t0_y_endstop"] == pytest.approx(-14.300)
-    assert values["t1_y_endstop"] == pytest.approx(-13.100)
+    assert values["t1_y_endstop"] == pytest.approx(-14.600)
 
 
 def test_offset_line_calibration_parses_active_calibration_values():
@@ -272,7 +279,7 @@ def test_offset_line_calibration_parses_active_calibration_values():
     assert values == {
         "right_x_endpoint": 355.2,
         "t0_y": 0.0,
-        "t1_y": -1.2,
+        "t1_y": 0.3,
     }
 
 
@@ -393,65 +400,107 @@ def test_offset_line_calibration_x_endpoint_delta_moves_t1_opposite_direction():
 def test_absolute_y_calibration_candidates_move_same_direction():
     painted_grid_y = 107.0
 
-    assert grid_calibration.y_line_center_for_calibration_offset(
+    assert y_grid_calibration.y_line_center_for_calibration_offset(
         painted_grid_y, 0.3
     ) == pytest.approx(106.7)
-    assert grid_calibration.y_line_center_for_calibration_offset(
+    assert y_grid_calibration.y_line_center_for_calibration_offset(
         painted_grid_y, -0.3
     ) == pytest.approx(107.3)
 
 
 def test_absolute_grid_plate_definitions_split_y_calibration():
-    plate_definitions = grid_calibration.create_plate_definitions(
+    plate_definitions = y_grid_calibration.create_plate_definitions(
         {
-            grid_calibration.X_PLATE_NAME: ("x_preview",),
-            grid_calibration.Y_T0_PLATE_NAME: ("y_t0_preview",),
-            grid_calibration.Y_T1_PLATE_NAME: ("y_t1_preview",),
+            y_grid_calibration.Y_T0_PLATE_NAME: ("y_t0_preview",),
+            y_grid_calibration.Y_T1_PLATE_NAME: ("y_t1_preview",),
         }
     )
 
     assert [plate["name"] for plate in plate_definitions] == [
-        grid_calibration.X_PLATE_NAME,
-        grid_calibration.Y_T0_PLATE_NAME,
-        grid_calibration.Y_T1_PLATE_NAME,
+        y_grid_calibration.Y_T0_PLATE_NAME,
+        y_grid_calibration.Y_T1_PLATE_NAME,
     ]
     assert plate_definitions[0]["parts"] == [
-        "x_preview",
-        grid_calibration.X_T0_PART_NAME,
-        grid_calibration.X_T1_PART_NAME,
+        "y_t0_preview",
+        y_grid_calibration.Y_T0_LINES_PART_NAME,
+        y_grid_calibration.Y_T0_LABELS_PART_NAME,
     ]
     assert plate_definitions[1]["parts"] == [
-        "y_t0_preview",
-        grid_calibration.Y_T0_LINES_PART_NAME,
-        grid_calibration.Y_T0_LABELS_PART_NAME,
-    ]
-    assert plate_definitions[2]["parts"] == [
         "y_t1_preview",
-        grid_calibration.Y_T1_LINES_PART_NAME,
-        grid_calibration.Y_T1_LABELS_PART_NAME,
+        y_grid_calibration.Y_T1_LINES_PART_NAME,
+        y_grid_calibration.Y_T1_LABELS_PART_NAME,
+    ]
+
+
+def test_absolute_grid_plate_definitions_split_x_calibration():
+    plate_definitions = x_grid_calibration.create_plate_definitions(
+        {
+            x_grid_calibration.X_T0_PLATE_NAME: ("x_t0_preview",),
+            x_grid_calibration.X_T1_PLATE_NAME: ("x_t1_preview",),
+        }
+    )
+
+    assert [plate["name"] for plate in plate_definitions] == [
+        x_grid_calibration.X_T0_PLATE_NAME,
+        x_grid_calibration.X_T1_PLATE_NAME,
+    ]
+    assert plate_definitions[0]["parts"] == [
+        "x_t0_preview",
+        x_grid_calibration.X_T0_LINES_PART_NAME,
+        x_grid_calibration.X_T0_LABELS_PART_NAME,
+    ]
+    assert plate_definitions[1]["parts"] == [
+        "x_t1_preview",
+        x_grid_calibration.X_T1_LINES_PART_NAME,
+        x_grid_calibration.X_T1_LABELS_PART_NAME,
     ]
 
 
 def test_absolute_grid_y_part_metadata_routes_base_and_text_materials():
-    metadata = grid_calibration.CALIBRATION_PART_METADATA
+    metadata = y_grid_calibration.CALIBRATION_PART_METADATA
 
-    assert metadata[grid_calibration.Y_T0_LINES_PART_NAME] == {
-        "production_group": grid_calibration.Y_T0_PLATE_NAME,
+    assert metadata[y_grid_calibration.Y_T0_LINES_PART_NAME] == {
+        "production_group": y_grid_calibration.Y_T0_PLATE_NAME,
         "slicer_filament_id": 1,
         "tool": "T0",
     }
-    assert metadata[grid_calibration.Y_T0_LABELS_PART_NAME] == {
-        "production_group": grid_calibration.Y_T0_PLATE_NAME,
+    assert metadata[y_grid_calibration.Y_T0_LABELS_PART_NAME] == {
+        "production_group": y_grid_calibration.Y_T0_PLATE_NAME,
         "slicer_filament_id": 2,
         "tool": "T1",
     }
-    assert metadata[grid_calibration.Y_T1_LINES_PART_NAME] == {
-        "production_group": grid_calibration.Y_T1_PLATE_NAME,
+    assert metadata[y_grid_calibration.Y_T1_LINES_PART_NAME] == {
+        "production_group": y_grid_calibration.Y_T1_PLATE_NAME,
         "slicer_filament_id": 2,
         "tool": "T1",
     }
-    assert metadata[grid_calibration.Y_T1_LABELS_PART_NAME] == {
-        "production_group": grid_calibration.Y_T1_PLATE_NAME,
+    assert metadata[y_grid_calibration.Y_T1_LABELS_PART_NAME] == {
+        "production_group": y_grid_calibration.Y_T1_PLATE_NAME,
+        "slicer_filament_id": 1,
+        "tool": "T0",
+    }
+
+
+def test_absolute_grid_x_part_metadata_routes_base_and_text_materials():
+    metadata = x_grid_calibration.CALIBRATION_PART_METADATA
+
+    assert metadata[x_grid_calibration.X_T0_LINES_PART_NAME] == {
+        "production_group": x_grid_calibration.X_T0_PLATE_NAME,
+        "slicer_filament_id": 1,
+        "tool": "T0",
+    }
+    assert metadata[x_grid_calibration.X_T0_LABELS_PART_NAME] == {
+        "production_group": x_grid_calibration.X_T0_PLATE_NAME,
+        "slicer_filament_id": 2,
+        "tool": "T1",
+    }
+    assert metadata[x_grid_calibration.X_T1_LINES_PART_NAME] == {
+        "production_group": x_grid_calibration.X_T1_PLATE_NAME,
+        "slicer_filament_id": 2,
+        "tool": "T1",
+    }
+    assert metadata[x_grid_calibration.X_T1_LABELS_PART_NAME] == {
+        "production_group": x_grid_calibration.X_T1_PLATE_NAME,
         "slicer_filament_id": 1,
         "tool": "T0",
     }
@@ -459,9 +508,11 @@ def test_absolute_grid_y_part_metadata_routes_base_and_text_materials():
 
 def test_absolute_grid_y_label_slab_is_calibrated_tool_material():
     calibration = grid_calibration.read_grid_calibration(CALIB_PATH)
-    base_material, text_material = grid_calibration.create_absolute_y_alignment_materials(
-        bed_grid_zero=calibration["bed_grid_zero"],
-        calibration_value_mm=calibration["t0_y_endstop"],
+    base_material, text_material = (
+        y_grid_calibration.create_absolute_y_alignment_materials(
+            bed_grid_zero=calibration["bed_grid_zero"],
+            calibration_value_mm=calibration["t0_y_endstop"],
+        )
     )
 
     base_min, _ = grid_calibration.get_bounding_box(base_material)
@@ -478,6 +529,44 @@ def test_absolute_grid_y_label_slab_is_calibrated_tool_material():
     assert text_max[2] == pytest.approx(
         grid_calibration.CALIBRATION_LABEL_PAD_THICKNESS_MM
         + grid_calibration.CALIBRATION_LABEL_TEXT_THICKNESS_MM
+    )
+
+
+def test_absolute_grid_x_label_slab_has_writing_anchor():
+    calibration = grid_calibration.read_grid_calibration(CALIB_PATH)
+    base_material, text_material, _, _ = (
+        x_grid_calibration.create_absolute_x_alignment_materials(calibration)
+    )
+
+    base_min, _ = grid_calibration.get_bounding_box(base_material)
+    text_min, text_max = grid_calibration.get_bounding_box(text_material)
+
+    assert text_min[1] < base_min[1]
+    assert base_min[1] - text_min[1] == pytest.approx(
+        grid_calibration.CALIBRATION_LABEL_GROUNDING_MARKER_GAP_MM
+        + grid_calibration.CALIBRATION_LABEL_GROUNDING_MARKER_SIZE_MM
+    )
+    assert text_min[2] == pytest.approx(0.0)
+    assert text_max[2] == pytest.approx(
+        grid_calibration.CALIBRATION_LABEL_PAD_THICKNESS_MM
+        + grid_calibration.CALIBRATION_LABEL_TEXT_THICKNESS_MM
+    )
+
+
+def test_absolute_grid_x_and_y_parts_fit_dual_area():
+    calibration = grid_calibration.read_grid_calibration(CALIB_PATH)
+    x_parts = x_grid_calibration.create_absolute_x_alignment_materials(calibration)
+    y_t0_parts = y_grid_calibration.create_absolute_y_alignment_materials(
+        bed_grid_zero=calibration["bed_grid_zero"],
+        calibration_value_mm=calibration["t0_y_endstop"],
+    )
+    y_t1_parts = y_grid_calibration.create_absolute_y_alignment_materials(
+        bed_grid_zero=calibration["bed_grid_zero"],
+        calibration_value_mm=calibration["t1_y_endstop"],
+    )
+
+    grid_calibration.assert_absolute_patterns_fit_dual_area(
+        [*x_parts, *y_t0_parts, *y_t1_parts]
     )
 
 
