@@ -4,9 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from mege_ender_3v3ke_idex.designs.two_material_offset_line_calibration_grid import (
-    parse_y_calibration_values,
-    y_line_center_for_calibration_offset,
+from mege_ender_3v3ke_idex.designs import (
+    two_material_offset_line_calibration_grid as grid_calibration,
 )
 from mege_ender_3v3ke_idex.designs.two_material_offset_line_calibration import (
     LINE_SEGMENT_LENGTH_MM,
@@ -24,10 +23,10 @@ from mege_ender_3v3ke_idex.designs.two_material_offset_line_calibration import (
 )
 
 
-KLIPPER_CONFIG_DIR = Path(__file__).resolve().parents[1] / "klipper_setup" / "klipper_config"
-CONFIG_PATH = (
-    KLIPPER_CONFIG_DIR / "printer.cfg"
+KLIPPER_CONFIG_DIR = (
+    Path(__file__).resolve().parents[1] / "klipper_setup" / "klipper_config"
 )
+CONFIG_PATH = KLIPPER_CONFIG_DIR / "printer.cfg"
 CALIB_PATH = KLIPPER_CONFIG_DIR / "calib.yaml"
 TEMPLATE_PATH = KLIPPER_CONFIG_DIR / "printer.cfg.template"
 GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_printer_cfg.py"
@@ -259,13 +258,12 @@ def test_idex_tool_offsets_are_current_machine_calibration():
     assert _macro_variable_float(tool_state, "t1_z_offset") == pytest.approx(0.050)
 
 
-def test_absolute_y_calibration_parses_generated_config():
-    values = parse_y_calibration_values(CONFIG_PATH.read_text(encoding="utf-8"))
+def test_grid_calibration_reads_absolute_y_values():
+    values = grid_calibration.read_grid_calibration(CALIB_PATH)
 
-    assert values == {
-        "t0_y_endstop": -14.300,
-        "t1_y_endstop": -13.100,
-    }
+    assert values["bed_grid_zero"] == (113.300, 107.000)
+    assert values["t0_y_endstop"] == pytest.approx(-14.300)
+    assert values["t1_y_endstop"] == pytest.approx(-13.100)
 
 
 def test_offset_line_calibration_parses_active_calibration_values():
@@ -395,12 +393,68 @@ def test_offset_line_calibration_x_endpoint_delta_moves_t1_opposite_direction():
 def test_absolute_y_calibration_candidates_move_same_direction():
     painted_grid_y = 107.0
 
-    assert y_line_center_for_calibration_offset(painted_grid_y, 0.3) == pytest.approx(
-        106.7
+    assert grid_calibration.y_line_center_for_calibration_offset(
+        painted_grid_y, 0.3
+    ) == pytest.approx(106.7)
+    assert grid_calibration.y_line_center_for_calibration_offset(
+        painted_grid_y, -0.3
+    ) == pytest.approx(107.3)
+
+
+def test_absolute_grid_plate_definitions_split_y_calibration():
+    plate_definitions = grid_calibration.create_plate_definitions(
+        {
+            grid_calibration.X_PLATE_NAME: ("x_preview",),
+            grid_calibration.Y_T0_PLATE_NAME: ("y_t0_preview",),
+            grid_calibration.Y_T1_PLATE_NAME: ("y_t1_preview",),
+        }
     )
-    assert y_line_center_for_calibration_offset(painted_grid_y, -0.3) == pytest.approx(
-        107.3
-    )
+
+    assert [plate["name"] for plate in plate_definitions] == [
+        grid_calibration.X_PLATE_NAME,
+        grid_calibration.Y_T0_PLATE_NAME,
+        grid_calibration.Y_T1_PLATE_NAME,
+    ]
+    assert plate_definitions[0]["parts"] == [
+        "x_preview",
+        grid_calibration.X_T0_PART_NAME,
+        grid_calibration.X_T1_PART_NAME,
+    ]
+    assert plate_definitions[1]["parts"] == [
+        "y_t0_preview",
+        grid_calibration.Y_T0_LINES_PART_NAME,
+        grid_calibration.Y_T0_LABELS_PART_NAME,
+    ]
+    assert plate_definitions[2]["parts"] == [
+        "y_t1_preview",
+        grid_calibration.Y_T1_LINES_PART_NAME,
+        grid_calibration.Y_T1_LABELS_PART_NAME,
+    ]
+
+
+def test_absolute_grid_y_part_metadata_routes_lines_and_labels():
+    metadata = grid_calibration.CALIBRATION_PART_METADATA
+
+    assert metadata[grid_calibration.Y_T0_LINES_PART_NAME] == {
+        "production_group": grid_calibration.Y_T0_PLATE_NAME,
+        "slicer_filament_id": 1,
+        "tool": "T0",
+    }
+    assert metadata[grid_calibration.Y_T0_LABELS_PART_NAME] == {
+        "production_group": grid_calibration.Y_T0_PLATE_NAME,
+        "slicer_filament_id": 2,
+        "tool": "T1",
+    }
+    assert metadata[grid_calibration.Y_T1_LINES_PART_NAME] == {
+        "production_group": grid_calibration.Y_T1_PLATE_NAME,
+        "slicer_filament_id": 2,
+        "tool": "T1",
+    }
+    assert metadata[grid_calibration.Y_T1_LABELS_PART_NAME] == {
+        "production_group": grid_calibration.Y_T1_PLATE_NAME,
+        "slicer_filament_id": 1,
+        "tool": "T0",
+    }
 
 
 def test_idex_tool_parking_uses_full_speed_travel():

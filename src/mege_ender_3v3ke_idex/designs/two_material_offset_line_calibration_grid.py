@@ -7,7 +7,6 @@ Usage:
 
 import logging
 import os
-import re
 from pathlib import Path
 
 import yaml
@@ -23,17 +22,12 @@ _logger = logging.getLogger(__name__)
 
 PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
-CONFIG_PATH = (
+CALIB_PATH = (
     Path(__file__).resolve().parents[3]
     / "klipper_setup"
     / "klipper_config"
-    / "printer.cfg"
+    / "calib.yaml"
 )
-CALIB_PATH = CONFIG_PATH.with_name("calib.yaml")
-STEPPER_X_SECTION = "stepper_x"
-STEPPER_Y_SECTION = "stepper_y"
-DUAL_CARRIAGE_SECTION = "dual_carriage"
-TOOL_STATE_SECTION = "gcode_macro _IDEX_TOOL_STATE"
 
 ACTUAL_BED_WIDTH_MM = 310.0
 ACTUAL_BED_DEPTH_MM = 310.0
@@ -89,205 +83,95 @@ CALIBRATION_OFFSET_CANDIDATES_MM = tuple(
     for index in range(CALIBRATION_GRID_X_INDEX_MIN, CALIBRATION_GRID_X_INDEX_MAX + 1)
 )
 
+X_PLATE_NAME = "absolute_x_grid_alignment"
+Y_T0_PLATE_NAME = "absolute_y_t0_grid_alignment"
+Y_T1_PLATE_NAME = "absolute_y_t1_grid_alignment"
+
 X_T0_PART_NAME = "absolute_x_grid_alignment_t0"
 X_T1_PART_NAME = "absolute_x_grid_alignment_t1"
-Y_T0_PART_NAME = "absolute_y_grid_alignment_t0"
-Y_T1_PART_NAME = "absolute_y_grid_alignment_t1"
+Y_T0_LINES_PART_NAME = "absolute_y_t0_grid_alignment_t0_lines"
+Y_T0_LABELS_PART_NAME = "absolute_y_t0_grid_alignment_t1_labels"
+Y_T1_LINES_PART_NAME = "absolute_y_t1_grid_alignment_t1_lines"
+Y_T1_LABELS_PART_NAME = "absolute_y_t1_grid_alignment_t0_labels"
 
 T0_COLOR = (0.95, 0.08, 0.04)
 T1_COLOR = (0.0, 0.32, 1.0)
 
-
-def get_config_section(config_text, section_name):
-    match = re.search(
-        rf"^\[{re.escape(section_name)}\]\n(?P<body>.*?)(?=^\[|\Z)",
-        config_text,
-        flags=re.MULTILINE | re.DOTALL,
-    )
-    if match is None:
-        raise ValueError(f"Missing [{section_name}] section in Klipper config")
-    return match.group("body")
-
-
-def parse_tool_state_float(tool_state_section, variable_name):
-    match = re.search(
-        rf"^\s*variable_{re.escape(variable_name)}\s*:\s*(?P<value>\S+)\s*$",
-        tool_state_section,
-        flags=re.MULTILINE,
-    )
-    if match is None:
-        raise ValueError(f"Missing variable_{variable_name} in _IDEX_TOOL_STATE")
-
-    try:
-        return float(match.group("value"))
-    except ValueError:
-        raise ValueError(f"variable_{variable_name} must be numeric") from None
-
-
-def parse_config_float(section, section_name, setting_name):
-    match = re.search(
-        rf"^\s*{re.escape(setting_name)}\s*:\s*(?P<value>\S+)\s*$",
-        section,
-        flags=re.MULTILINE,
-    )
-    if match is None:
-        raise ValueError(f"Missing {setting_name} in [{section_name}]")
-
-    try:
-        return float(match.group("value"))
-    except ValueError:
-        raise ValueError(
-            f"{setting_name} in [{section_name}] must be numeric"
-        ) from None
+CALIBRATION_PART_METADATA = {
+    X_T0_PART_NAME: {
+        "production_group": X_PLATE_NAME,
+        "slicer_filament_id": 1,
+        "tool": "T0",
+    },
+    X_T1_PART_NAME: {
+        "production_group": X_PLATE_NAME,
+        "slicer_filament_id": 2,
+        "tool": "T1",
+    },
+    Y_T0_LINES_PART_NAME: {
+        "production_group": Y_T0_PLATE_NAME,
+        "slicer_filament_id": 1,
+        "tool": "T0",
+    },
+    Y_T0_LABELS_PART_NAME: {
+        "production_group": Y_T0_PLATE_NAME,
+        "slicer_filament_id": 2,
+        "tool": "T1",
+    },
+    Y_T1_LINES_PART_NAME: {
+        "production_group": Y_T1_PLATE_NAME,
+        "slicer_filament_id": 2,
+        "tool": "T1",
+    },
+    Y_T1_LABELS_PART_NAME: {
+        "production_group": Y_T1_PLATE_NAME,
+        "slicer_filament_id": 1,
+        "tool": "T0",
+    },
+}
 
 
-def require_mapping(value, path):
-    if not isinstance(value, dict):
-        raise ValueError(f"{path} must be a mapping")
-    return value
-
-
-def parse_calibration_float(mapping, key, path):
-    if key not in mapping:
-        raise ValueError(f"Missing {path}.{key}")
-
-    try:
-        return float(mapping[key])
-    except (TypeError, ValueError):
-        raise ValueError(f"{path}.{key} must be numeric") from None
-
-
-def read_absolute_calibration(calib_path=CALIB_PATH):
-    data = yaml.safe_load(calib_path.read_text(encoding="utf-8"))
-    data = require_mapping(data, "calib.yaml")
-    bed_grid_zero = require_mapping(data.get("bed_grid_zero"), "bed_grid_zero")
-    tools = require_mapping(data.get("tools"), "tools")
-    t0 = require_mapping(tools.get("t0"), "tools.t0")
-    t1 = require_mapping(tools.get("t1"), "tools.t1")
+def read_grid_calibration(calib_path=CALIB_PATH):
+    calibration = yaml.safe_load(calib_path.read_text(encoding="utf-8"))
+    tools = calibration["tools"]
+    t0 = tools["t0"]
+    t1 = tools["t1"]
 
     return {
         "bed_grid_zero": (
-            parse_calibration_float(bed_grid_zero, "x", "bed_grid_zero"),
-            parse_calibration_float(bed_grid_zero, "y", "bed_grid_zero"),
+            float(calibration["bed_grid_zero"]["x"]),
+            float(calibration["bed_grid_zero"]["y"]),
         ),
-        "x_endstop_values": {
-            "t0_x_endstop": parse_calibration_float(t0, "x_endstop", "tools.t0"),
-            "t1_x_endstop": parse_calibration_float(t1, "x_endstop", "tools.t1"),
-        },
-        "y_calibration_values": {
-            "t0_y_endstop": parse_calibration_float(t0, "y_endstop", "tools.t0"),
-            "t1_y_endstop": parse_calibration_float(t1, "y_endstop", "tools.t1"),
-        },
+        "t0_x_endstop": float(t0["x_endstop"]),
+        "t1_x_endstop": float(t1["x_endstop"]),
+        "t0_y_endstop": float(t0["y_endstop"]),
+        "t1_y_endstop": float(t1["y_endstop"]),
     }
-
-
-def parse_bed_grid_zero(config_text):
-    tool_state = get_config_section(config_text, TOOL_STATE_SECTION)
-    return (
-        parse_tool_state_float(tool_state, "bed_grid_zero_x"),
-        parse_tool_state_float(tool_state, "bed_grid_zero_y"),
-    )
-
-
-def read_bed_grid_zero(calib_path=CALIB_PATH):
-    return read_absolute_calibration(calib_path)["bed_grid_zero"]
-
-
-def parse_x_endstop_values(config_text):
-    stepper_x = get_config_section(config_text, STEPPER_X_SECTION)
-    dual_carriage = get_config_section(config_text, DUAL_CARRIAGE_SECTION)
-
-    t0_x_endstop = parse_config_float(
-        stepper_x,
-        STEPPER_X_SECTION,
-        "position_endstop",
-    )
-    t1_x_endstop = parse_config_float(
-        dual_carriage,
-        DUAL_CARRIAGE_SECTION,
-        "position_endstop",
-    )
-    t1_x_max = parse_config_float(
-        dual_carriage,
-        DUAL_CARRIAGE_SECTION,
-        "position_max",
-    )
-    if abs(t1_x_endstop - t1_x_max) > 1e-9:
-        raise ValueError(
-            "[dual_carriage] position_endstop and position_max must stay equal "
-            "for right-endstop X calibration labels"
-        )
-
-    return {
-        "t0_x_endstop": t0_x_endstop,
-        "t1_x_endstop": t1_x_endstop,
-    }
-
-
-def read_x_endstop_values(calib_path=CALIB_PATH):
-    return read_absolute_calibration(calib_path)["x_endstop_values"]
-
-
-def parse_y_calibration_values(config_text):
-    stepper_y = get_config_section(config_text, STEPPER_Y_SECTION)
-    tool_state = get_config_section(config_text, TOOL_STATE_SECTION)
-
-    return {
-        "t0_y_endstop": parse_config_float(
-            stepper_y,
-            STEPPER_Y_SECTION,
-            "position_endstop",
-        ),
-        "t1_y_endstop": parse_tool_state_float(tool_state, "t1_y_endstop"),
-    }
-
-
-def read_y_calibration_values(calib_path=CALIB_PATH):
-    return read_absolute_calibration(calib_path)["y_calibration_values"]
 
 
 def grid_coordinate(zero_mm, index):
     return round(zero_mm + index * GRID_PITCH_MM, 4)
 
 
-def grid_positions_by_index(zero_mm, first_index, last_index):
-    return tuple(
-        grid_coordinate(zero_mm, index) for index in range(first_index, last_index + 1)
-    )
-
-
 def create_grid_cutouts(bed_grid_zero):
     zero_x_mm, zero_y_mm = bed_grid_zero
-
-    def x(index):
-        return grid_coordinate(zero_x_mm, index)
-
-    def y(index):
-        return grid_coordinate(zero_y_mm, index)
-
     return (
         {
             "name": "kingroon_logo_panel_outline",
-            "x_min": x(-3),
-            "x_max": x(4),
-            "y_min": y(1),
-            "y_max": y(3),
+            "x_min": grid_coordinate(zero_x_mm, -3),
+            "x_max": grid_coordinate(zero_x_mm, 4),
+            "y_min": grid_coordinate(zero_y_mm, 1),
+            "y_max": grid_coordinate(zero_y_mm, 3),
             "fillet_radius": 7.0,
         },
         {
             "name": "z_guide_panel_outline",
-            "x_min": x(-4),
-            "x_max": x(5),
-            "y_min": y(-2.5),
-            "y_max": y(-1.5),
+            "x_min": grid_coordinate(zero_x_mm, -4),
+            "x_max": grid_coordinate(zero_x_mm, 5),
+            "y_min": grid_coordinate(zero_y_mm, -2.5),
+            "y_max": grid_coordinate(zero_y_mm, -1.5),
             "fillet_radius": 7.0,
         },
-    )
-
-
-def visible_panel_cutouts(grid_cutouts):
-    return tuple(
-        cutout for cutout in grid_cutouts if cutout["name"].endswith("_outline")
     )
 
 
@@ -315,52 +199,15 @@ def subtract_intervals(start_mm, end_mm, blocked_intervals):
     )
 
 
-def cutout_intersects_x(cutout, center_x_mm):
-    half_line_width_mm = GRID_LINE_WIDTH_MM / 2 + GRID_CUTOUT_MARGIN_MM
-    return (
-        cutout["x_min"] - half_line_width_mm
-        <= center_x_mm
-        <= cutout["x_max"] + half_line_width_mm
-    )
-
-
-def cutout_intersects_y(cutout, center_y_mm):
-    half_line_width_mm = GRID_LINE_WIDTH_MM / 2 + GRID_CUTOUT_MARGIN_MM
-    return (
-        cutout["y_min"] - half_line_width_mm
-        <= center_y_mm
-        <= cutout["y_max"] + half_line_width_mm
-    )
-
-
-def create_vertical_grid_line_segment(center_x_mm, min_y_mm, max_y_mm):
-    return create_box(
-        GRID_LINE_WIDTH_MM,
-        max_y_mm - min_y_mm,
-        GRID_LINE_HEIGHT_MM,
-        origin=(center_x_mm - GRID_LINE_WIDTH_MM / 2, min_y_mm, 0),
-    )
-
-
-def create_horizontal_grid_line_segment(center_y_mm, min_x_mm, max_x_mm):
-    return create_box(
-        max_x_mm - min_x_mm,
-        GRID_LINE_WIDTH_MM,
-        GRID_LINE_HEIGHT_MM,
-        origin=(min_x_mm, center_y_mm - GRID_LINE_WIDTH_MM / 2, 0),
-    )
-
-
-def create_painted_bed_grid_lines(bed_grid_zero=None):
-    if bed_grid_zero is None:
-        bed_grid_zero = read_bed_grid_zero()
-
+def create_painted_bed_grid_lines(bed_grid_zero):
     zero_x_mm, zero_y_mm = bed_grid_zero
-    x_positions_mm = grid_positions_by_index(
-        zero_x_mm, GRID_X_INDEX_MIN, GRID_X_INDEX_MAX
+    x_positions_mm = tuple(
+        grid_coordinate(zero_x_mm, index)
+        for index in range(GRID_X_INDEX_MIN, GRID_X_INDEX_MAX + 1)
     )
-    y_positions_mm = grid_positions_by_index(
-        zero_y_mm, GRID_Y_INDEX_MIN, GRID_Y_INDEX_MAX
+    y_positions_mm = tuple(
+        grid_coordinate(zero_y_mm, index)
+        for index in range(GRID_Y_INDEX_MIN, GRID_Y_INDEX_MAX + 1)
     )
     min_x_mm = min(x_positions_mm) - GRID_LINE_OVERHANG_MM
     min_y_mm = min(y_positions_mm) - GRID_LINE_OVERHANG_MM
@@ -370,57 +217,58 @@ def create_painted_bed_grid_lines(bed_grid_zero=None):
 
     collector = PartCollector()
     for x_mm in x_positions_mm:
+        half_width = GRID_LINE_WIDTH_MM / 2 + GRID_CUTOUT_MARGIN_MM
         blocked_intervals = (
             (
                 cutout["y_min"] - GRID_CUTOUT_MARGIN_MM,
                 cutout["y_max"] + GRID_CUTOUT_MARGIN_MM,
             )
             for cutout in grid_cutouts
-            if cutout_intersects_x(cutout, x_mm)
+            if cutout["x_min"] - half_width <= x_mm <= cutout["x_max"] + half_width
         )
         for segment_start_mm, segment_end_mm in subtract_intervals(
             min_y_mm, max_y_mm, blocked_intervals
         ):
             collector = collector.fuse(
-                create_vertical_grid_line_segment(
-                    x_mm, segment_start_mm, segment_end_mm
+                create_box(
+                    GRID_LINE_WIDTH_MM,
+                    segment_end_mm - segment_start_mm,
+                    GRID_LINE_HEIGHT_MM,
+                    origin=(
+                        x_mm - GRID_LINE_WIDTH_MM / 2,
+                        segment_start_mm,
+                        0,
+                    ),
                 )
             )
 
     for y_mm in y_positions_mm:
+        half_width = GRID_LINE_WIDTH_MM / 2 + GRID_CUTOUT_MARGIN_MM
         blocked_intervals = (
             (
                 cutout["x_min"] - GRID_CUTOUT_MARGIN_MM,
                 cutout["x_max"] + GRID_CUTOUT_MARGIN_MM,
             )
             for cutout in grid_cutouts
-            if cutout_intersects_y(cutout, y_mm)
+            if cutout["y_min"] - half_width <= y_mm <= cutout["y_max"] + half_width
         )
         for segment_start_mm, segment_end_mm in subtract_intervals(
             min_x_mm, max_x_mm, blocked_intervals
         ):
             collector = collector.fuse(
-                create_horizontal_grid_line_segment(
-                    y_mm, segment_start_mm, segment_end_mm
+                create_box(
+                    segment_end_mm - segment_start_mm,
+                    GRID_LINE_WIDTH_MM,
+                    GRID_LINE_HEIGHT_MM,
+                    origin=(
+                        segment_start_mm,
+                        y_mm - GRID_LINE_WIDTH_MM / 2,
+                        0,
+                    ),
                 )
             )
 
     return collector
-
-
-def create_bed_surface():
-    retval = create_box(
-        ACTUAL_BED_WIDTH_MM,
-        ACTUAL_BED_DEPTH_MM,
-        ACTUAL_BED_HEIGHT_MM,
-        origin=(
-            ACTUAL_BED_ORIGIN_X_MM,
-            ACTUAL_BED_ORIGIN_Y_MM,
-            -ACTUAL_BED_HEIGHT_MM,
-        ),
-    )
-    retval = translate(0, 0, -0.05)(retval)
-    return retval
 
 
 def create_filleted_outline(
@@ -439,41 +287,16 @@ def create_filleted_outline(
         fillet_radius=fillet_radius_mm,
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
-    inner_width_mm = width_mm - 2 * line_width_mm
-    inner_depth_mm = depth_mm - 2 * line_width_mm
-    inner_radius_mm = max(0.01, fillet_radius_mm - line_width_mm)
     frame_cutter = create_filleted_box(
-        inner_width_mm,
-        inner_depth_mm,
+        width_mm - 2 * line_width_mm,
+        depth_mm - 2 * line_width_mm,
         height_mm * 4,
-        fillet_radius=inner_radius_mm,
+        fillet_radius=max(0.01, fillet_radius_mm - line_width_mm),
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
     frame_cutter = align(frame_cutter, frame, Alignment.CENTER)
     frame = frame.cut(frame_cutter)
     return translate(origin[0], origin[1], origin[2])(frame)
-
-
-def create_frame():
-    return create_filleted_outline(
-        PAINTED_FRAME_SIZE_MM,
-        PAINTED_FRAME_SIZE_MM,
-        line_width_mm=PAINTED_FRAME_LINE_WIDTH_MM,
-        height_mm=PAINTED_FRAME_HEIGHT_MM,
-        fillet_radius_mm=PAINTED_FRAME_FILLET_RADIUS_MM,
-        origin=(PAINTED_FRAME_ORIGIN_X_MM, PAINTED_FRAME_ORIGIN_Y_MM, 0),
-    )
-
-
-def create_panel_outline(cutout):
-    return create_filleted_outline(
-        cutout["x_max"] - cutout["x_min"],
-        cutout["y_max"] - cutout["y_min"],
-        line_width_mm=PANEL_OUTLINE_WIDTH_MM,
-        height_mm=PANEL_OUTLINE_HEIGHT_MM,
-        fillet_radius_mm=cutout["fillet_radius"],
-        origin=(cutout["x_min"], cutout["y_min"], 0),
-    )
 
 
 def format_endpoint_label(endpoint_mm):
@@ -490,20 +313,14 @@ def create_calibration_vector_label(text):
         thickness=CALIBRATION_LABEL_TEXT_THICKNESS_MM,
         stroke_width=CALIBRATION_LABEL_STROKE_WIDTH_MM,
     )
-
-    bb_center = get_bounding_box_center(label)
-    return rotate(45, center=bb_center)(label)
+    return rotate(45, center=get_bounding_box_center(label))(label)
 
 
 def create_calibration_label_below(text, center_x_mm, top_y_mm):
     label = create_calibration_vector_label(text)
     min_point, max_point = get_bounding_box(label)
     center_x = (min_point[0] + max_point[0]) / 2
-    return translate(
-        center_x_mm - center_x,
-        top_y_mm - max_point[1],
-        0,
-    )(label)
+    return translate(center_x_mm - center_x, top_y_mm - max_point[1], 0)(label)
 
 
 def create_calibration_label_left(
@@ -517,11 +334,7 @@ def create_calibration_label_left(
     label = create_calibration_vector_label(text)
     min_point, max_point = get_bounding_box(label)
     center_y = (min_point[1] + max_point[1]) / 2
-    label = translate(
-        right_x_mm - max_point[0],
-        center_y_mm - center_y,
-        0,
-    )(label)
+    label = translate(right_x_mm - max_point[0], center_y_mm - center_y, 0)(label)
 
     min_point, max_point = get_bounding_box(label)
     shift_y_mm = 0.0
@@ -533,24 +346,6 @@ def create_calibration_label_left(
         label = translate(0, shift_y_mm, 0)(label)
 
     return label
-
-
-def create_calibration_vertical_segment(center_x_mm, y_min_mm, y_max_mm):
-    return create_box(
-        CALIBRATION_LINE_WIDTH_MM,
-        y_max_mm - y_min_mm,
-        CALIBRATION_HEIGHT_MM,
-        origin=(center_x_mm - CALIBRATION_LINE_WIDTH_MM / 2, y_min_mm, 0),
-    )
-
-
-def create_calibration_horizontal_segment(center_y_mm, x_min_mm, x_max_mm):
-    return create_box(
-        x_max_mm - x_min_mm,
-        CALIBRATION_LINE_WIDTH_MM,
-        CALIBRATION_HEIGHT_MM,
-        origin=(x_min_mm, center_y_mm - CALIBRATION_LINE_WIDTH_MM / 2, 0),
-    )
 
 
 def create_calibration_label_slab(labels):
@@ -570,42 +365,15 @@ def create_calibration_label_slab(labels):
         max(get_bounding_box(label)[1][1] for label in labels)
         + CALIBRATION_LABEL_PAD_MARGIN_MM
     )
-
-    slab = create_box(
-        max_x - min_x,
-        max_y - min_y,
-        CALIBRATION_LABEL_PAD_THICKNESS_MM,
-        origin=(min_x, min_y, 0),
+    return (
+        create_box(
+            max_x - min_x,
+            max_y - min_y,
+            CALIBRATION_LABEL_PAD_THICKNESS_MM,
+            origin=(min_x, min_y, 0),
+        ),
+        (min_x, min_y, max_x, max_y),
     )
-    return slab, (min_x, min_y, max_x, max_y)
-
-
-def create_calibration_label_connector(center_x_mm, start_y_mm, end_y_mm):
-    min_y = min(start_y_mm, end_y_mm)
-    max_y = max(start_y_mm, end_y_mm)
-    return create_box(
-        CALIBRATION_LABEL_CONNECTOR_WIDTH_MM,
-        max_y - min_y,
-        CALIBRATION_LABEL_PAD_THICKNESS_MM,
-        origin=(center_x_mm - CALIBRATION_LABEL_CONNECTOR_WIDTH_MM / 2, min_y, 0),
-    )
-
-
-def create_calibration_label_horizontal_connector(start_x_mm, end_x_mm, center_y_mm):
-    min_x = min(start_x_mm, end_x_mm)
-    max_x = max(start_x_mm, end_x_mm)
-    return create_box(
-        max_x - min_x,
-        CALIBRATION_LABEL_CONNECTOR_WIDTH_MM,
-        CALIBRATION_LABEL_PAD_THICKNESS_MM,
-        origin=(min_x, center_y_mm - CALIBRATION_LABEL_CONNECTOR_WIDTH_MM / 2, 0),
-    )
-
-
-def fuse_labels_stacked_on_slab(label_collector, labels, slab):
-    for label in labels:
-        label_collector = label_collector.fuse(align(label, slab, Alignment.STACK_TOP))
-    return label_collector
 
 
 def create_absolute_x_alignment_pattern(
@@ -629,21 +397,25 @@ def create_absolute_x_alignment_pattern(
         painted_grid_x_mm = grid_coordinate(zero_x_mm, grid_index)
         line_center_x_mm = painted_grid_x_mm - offset_mm
         base_collector = base_collector.fuse(
-            create_calibration_vertical_segment(
-                line_center_x_mm,
-                line_y_min_mm,
-                line_y_max_mm,
+            create_box(
+                CALIBRATION_LINE_WIDTH_MM,
+                line_y_max_mm - line_y_min_mm,
+                CALIBRATION_HEIGHT_MM,
+                origin=(
+                    line_center_x_mm - CALIBRATION_LINE_WIDTH_MM / 2,
+                    line_y_min_mm,
+                    0,
+                ),
             )
         )
 
-        label = create_calibration_label_below(
-            format_endpoint_label(x_endstop_mm + offset_mm),
-            line_center_x_mm,
-            label_top_y_mm,
-        )
         label_entries.append(
             {
-                "label": label,
+                "label": create_calibration_label_below(
+                    format_endpoint_label(x_endstop_mm + offset_mm),
+                    line_center_x_mm,
+                    label_top_y_mm,
+                ),
                 "center_x_mm": line_center_x_mm,
             }
         )
@@ -651,29 +423,33 @@ def create_absolute_x_alignment_pattern(
     labels = [entry["label"] for entry in label_entries]
     slab, (_, _, _, slab_max_y) = create_calibration_label_slab(labels)
     base_collector = base_collector.fuse(slab)
-    label_collector = fuse_labels_stacked_on_slab(label_collector, labels, slab)
+
+    for label in labels:
+        label_collector = label_collector.fuse(align(label, slab, Alignment.STACK_TOP))
 
     for entry in label_entries:
+        connector_start_y = slab_max_y - CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM
+        connector_end_y = line_y_min_mm + CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM
+        min_y = min(connector_start_y, connector_end_y)
+        max_y = max(connector_start_y, connector_end_y)
         base_collector = base_collector.fuse(
-            create_calibration_label_connector(
-                entry["center_x_mm"],
-                slab_max_y - CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM,
-                line_y_min_mm + CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM,
+            create_box(
+                CALIBRATION_LABEL_CONNECTOR_WIDTH_MM,
+                max_y - min_y,
+                CALIBRATION_LABEL_PAD_THICKNESS_MM,
+                origin=(
+                    entry["center_x_mm"] - CALIBRATION_LABEL_CONNECTOR_WIDTH_MM / 2,
+                    min_y,
+                    0,
+                ),
             )
         )
 
     return base_collector, label_collector
 
 
-def create_absolute_x_alignment_materials(
-    bed_grid_zero=None,
-    x_endstop_values=None,
-):
-    if bed_grid_zero is None:
-        bed_grid_zero = read_bed_grid_zero()
-    if x_endstop_values is None:
-        x_endstop_values = read_x_endstop_values()
-
+def create_absolute_x_alignment_materials(calibration):
+    bed_grid_zero = calibration["bed_grid_zero"]
     _, zero_y_mm = bed_grid_zero
     grid_cutouts = create_grid_cutouts(bed_grid_zero)
     logo_panel = next(
@@ -687,14 +463,14 @@ def create_absolute_x_alignment_materials(
 
     t0_pattern, t0_labels = create_absolute_x_alignment_pattern(
         bed_grid_zero=bed_grid_zero,
-        x_endstop_mm=x_endstop_values["t0_x_endstop"],
+        x_endstop_mm=calibration["t0_x_endstop"],
         line_y_min_mm=grid_coordinate(zero_y_mm, -1),
         line_y_max_mm=grid_coordinate(zero_y_mm, 0),
         label_panel=lower_panel,
     )
     t1_pattern, t1_labels = create_absolute_x_alignment_pattern(
         bed_grid_zero=bed_grid_zero,
-        x_endstop_mm=x_endstop_values["t1_x_endstop"],
+        x_endstop_mm=calibration["t1_x_endstop"],
         line_y_min_mm=grid_coordinate(zero_y_mm, 3),
         line_y_max_mm=grid_coordinate(zero_y_mm, 4),
         label_panel=logo_panel,
@@ -711,20 +487,24 @@ def create_absolute_x_alignment_materials(
     return t0_material, t1_material
 
 
-def create_absolute_y_alignment_pattern(
+def y_line_center_for_calibration_offset(painted_grid_y_mm, offset_mm):
+    return painted_grid_y_mm - offset_mm
+
+
+def create_absolute_y_alignment_materials(
     *,
     bed_grid_zero,
     calibration_value_mm,
-    line_x_min_mm,
-    line_x_max_mm,
 ):
-    _, zero_y_mm = bed_grid_zero
+    zero_x_mm, zero_y_mm = bed_grid_zero
+    line_x_min_mm = grid_coordinate(zero_x_mm, -2)
+    line_x_max_mm = grid_coordinate(zero_x_mm, -1)
     label_right_x_mm = line_x_min_mm - CALIBRATION_LABEL_GAP_MM
     label_min_y_mm = SAFE_BED_ORIGIN[1] + CALIBRATION_LABEL_PAD_MARGIN_MM
     label_max_y_mm = (
         SAFE_BED_ORIGIN[1] + SAFE_BED_DEPTH_MM - CALIBRATION_LABEL_PAD_MARGIN_MM
     )
-    base_collector = PartCollector()
+    line_collector = PartCollector()
     label_collector = PartCollector()
     label_entries = []
 
@@ -737,86 +517,56 @@ def create_absolute_y_alignment_pattern(
             painted_grid_y_mm,
             offset_mm,
         )
-        base_collector = base_collector.fuse(
-            create_calibration_horizontal_segment(
-                line_center_y_mm,
-                line_x_min_mm,
-                line_x_max_mm,
+        line_collector = line_collector.fuse(
+            create_box(
+                line_x_max_mm - line_x_min_mm,
+                CALIBRATION_LINE_WIDTH_MM,
+                CALIBRATION_HEIGHT_MM,
+                origin=(
+                    line_x_min_mm,
+                    line_center_y_mm - CALIBRATION_LINE_WIDTH_MM / 2,
+                    0,
+                ),
             )
-        )
-
-        label = create_calibration_label_left(
-            format_endpoint_label(calibration_value_mm + offset_mm),
-            label_right_x_mm,
-            line_center_y_mm,
-            min_y_mm=label_min_y_mm,
-            max_y_mm=label_max_y_mm,
         )
         label_entries.append(
             {
-                "label": label,
+                "label": create_calibration_label_left(
+                    format_endpoint_label(calibration_value_mm + offset_mm),
+                    label_right_x_mm,
+                    line_center_y_mm,
+                    min_y_mm=label_min_y_mm,
+                    max_y_mm=label_max_y_mm,
+                ),
                 "center_y_mm": line_center_y_mm,
             }
         )
 
     labels = [entry["label"] for entry in label_entries]
     slab, (_, _, slab_max_x, _) = create_calibration_label_slab(labels)
-    base_collector = base_collector.fuse(slab)
-    label_collector = fuse_labels_stacked_on_slab(label_collector, labels, slab)
+    label_collector = label_collector.fuse(slab)
+    for label in labels:
+        label_collector = label_collector.fuse(align(label, slab, Alignment.STACK_TOP))
 
     for entry in label_entries:
-        base_collector = base_collector.fuse(
-            create_calibration_label_horizontal_connector(
-                slab_max_x - CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM,
-                line_x_min_mm + CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM,
-                entry["center_y_mm"],
+        connector_start_x_mm = slab_max_x - CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM
+        connector_end_x_mm = line_x_min_mm + CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM
+        start_x_mm = min(connector_start_x_mm, connector_end_x_mm)
+        end_x_mm = max(connector_start_x_mm, connector_end_x_mm)
+        line_collector = line_collector.fuse(
+            create_box(
+                end_x_mm - start_x_mm,
+                CALIBRATION_LABEL_CONNECTOR_WIDTH_MM,
+                CALIBRATION_LABEL_PAD_THICKNESS_MM,
+                origin=(
+                    start_x_mm,
+                    entry["center_y_mm"] - CALIBRATION_LABEL_CONNECTOR_WIDTH_MM / 2,
+                    0,
+                ),
             )
         )
 
-    return base_collector, label_collector
-
-
-def y_line_center_for_calibration_offset(painted_grid_y_mm, offset_mm):
-    return painted_grid_y_mm - offset_mm
-
-
-def create_absolute_y_alignment_materials(
-    bed_grid_zero=None,
-    y_calibration_values=None,
-):
-    if bed_grid_zero is None:
-        bed_grid_zero = read_bed_grid_zero()
-    if y_calibration_values is None:
-        y_calibration_values = read_y_calibration_values()
-
-    zero_x_mm, _ = bed_grid_zero
-    t0_line_x_min_mm = grid_coordinate(zero_x_mm, -2)
-    t0_line_x_max_mm = grid_coordinate(zero_x_mm, -1)
-    t1_line_x_min_mm = grid_coordinate(zero_x_mm, 2)
-    t1_line_x_max_mm = grid_coordinate(zero_x_mm, 3)
-
-    t0_pattern, t0_labels = create_absolute_y_alignment_pattern(
-        bed_grid_zero=bed_grid_zero,
-        calibration_value_mm=y_calibration_values["t0_y_endstop"],
-        line_x_min_mm=t0_line_x_min_mm,
-        line_x_max_mm=t0_line_x_max_mm,
-    )
-    t1_pattern, t1_labels = create_absolute_y_alignment_pattern(
-        bed_grid_zero=bed_grid_zero,
-        calibration_value_mm=y_calibration_values["t1_y_endstop"],
-        line_x_min_mm=t1_line_x_min_mm,
-        line_x_max_mm=t1_line_x_max_mm,
-    )
-
-    t0_material = PartCollector()
-    t0_material = t0_material.fuse(t0_pattern)
-    t0_material = t0_material.fuse(t1_labels)
-
-    t1_material = PartCollector()
-    t1_material = t1_material.fuse(t1_pattern)
-    t1_material = t1_material.fuse(t0_labels)
-
-    return t0_material, t1_material
+    return line_collector, label_collector
 
 
 def assert_absolute_patterns_fit_dual_area(parts):
@@ -846,21 +596,26 @@ def assert_absolute_patterns_fit_dual_area(parts):
         )
 
 
-def add_painted_bed_preview_parts(parts, plate_prefix, bed_grid_zero, grid_cutouts):
+def add_painted_bed_preview_parts(parts, plate_prefix, bed_grid_zero):
     preview_part_names = []
 
     def add_preview_part(part, name, color):
         preview_name = f"{plate_prefix}_{name}"
-        parts.add(
-            part,
-            preview_name,
-            color=color,
-            skip_in_production=True,
-        )
+        parts.add(part, preview_name, color=color, skip_in_production=True)
         preview_part_names.append(preview_name)
 
+    bed_surface = create_box(
+        ACTUAL_BED_WIDTH_MM,
+        ACTUAL_BED_DEPTH_MM,
+        ACTUAL_BED_HEIGHT_MM,
+        origin=(
+            ACTUAL_BED_ORIGIN_X_MM,
+            ACTUAL_BED_ORIGIN_Y_MM,
+            -ACTUAL_BED_HEIGHT_MM,
+        ),
+    )
     add_preview_part(
-        create_bed_surface(),
+        translate(0, 0, -0.05)(bed_surface),
         "painted_bed_surface",
         ACTUAL_BED_COLOR,
     )
@@ -870,14 +625,30 @@ def add_painted_bed_preview_parts(parts, plate_prefix, bed_grid_zero, grid_cutou
         GRID_LINE_COLOR,
     )
     add_preview_part(
-        create_frame(),
+        create_filleted_outline(
+            PAINTED_FRAME_SIZE_MM,
+            PAINTED_FRAME_SIZE_MM,
+            line_width_mm=PAINTED_FRAME_LINE_WIDTH_MM,
+            height_mm=PAINTED_FRAME_HEIGHT_MM,
+            fillet_radius_mm=PAINTED_FRAME_FILLET_RADIUS_MM,
+            origin=(PAINTED_FRAME_ORIGIN_X_MM, PAINTED_FRAME_ORIGIN_Y_MM, 0),
+        ),
         "painted_bed_frame",
         PAINTED_FRAME_COLOR,
     )
 
-    for cutout in visible_panel_cutouts(grid_cutouts):
+    for cutout in create_grid_cutouts(bed_grid_zero):
+        if not cutout["name"].endswith("_outline"):
+            continue
         add_preview_part(
-            create_panel_outline(cutout),
+            create_filleted_outline(
+                cutout["x_max"] - cutout["x_min"],
+                cutout["y_max"] - cutout["y_min"],
+                line_width_mm=PANEL_OUTLINE_WIDTH_MM,
+                height_mm=PANEL_OUTLINE_HEIGHT_MM,
+                fillet_radius_mm=cutout["fillet_radius"],
+                origin=(cutout["x_min"], cutout["y_min"], 0),
+            ),
             cutout["name"],
             PANEL_OUTLINE_COLOR,
         )
@@ -885,95 +656,99 @@ def add_painted_bed_preview_parts(parts, plate_prefix, bed_grid_zero, grid_cutou
     return tuple(preview_part_names)
 
 
-def main():
-    logging.basicConfig(level=logging.INFO)
-    parts = PartList()
-    bed_grid_zero = read_bed_grid_zero()
-    grid_cutouts = create_grid_cutouts(bed_grid_zero)
-    x_preview_part_names = ()
-    y_preview_part_names = ()
-    if not PROD:
-        x_preview_part_names = add_painted_bed_preview_parts(
-            parts,
-            "x_plate",
-            bed_grid_zero,
-            grid_cutouts,
-        )
-        y_preview_part_names = add_painted_bed_preview_parts(
-            parts,
-            "y_plate",
-            bed_grid_zero,
-            grid_cutouts,
-        )
+def create_plate_definitions(preview_part_names_by_plate=None):
+    if preview_part_names_by_plate is None:
+        preview_part_names_by_plate = {}
 
-    t0_alignment, t1_alignment = create_absolute_x_alignment_materials(
-        bed_grid_zero=bed_grid_zero,
-    )
-    y_t0_alignment, y_t1_alignment = create_absolute_y_alignment_materials(
-        bed_grid_zero=bed_grid_zero,
-    )
-    assert_absolute_patterns_fit_dual_area(
-        [t0_alignment, t1_alignment, y_t0_alignment, y_t1_alignment]
-    )
-    parts.add(
-        t0_alignment,
-        X_T0_PART_NAME,
-        color=T0_COLOR,
-        obj_metadata={
-            "production_group": "absolute_x_grid_alignment",
-            "slicer_filament_id": 1,
-            "tool": "T0",
-        },
-    )
-    parts.add(
-        t1_alignment,
-        X_T1_PART_NAME,
-        color=T1_COLOR,
-        obj_metadata={
-            "production_group": "absolute_x_grid_alignment",
-            "slicer_filament_id": 2,
-            "tool": "T1",
-        },
-    )
-    parts.add(
-        y_t0_alignment,
-        Y_T0_PART_NAME,
-        color=T0_COLOR,
-        obj_metadata={
-            "production_group": "absolute_y_grid_alignment",
-            "slicer_filament_id": 1,
-            "tool": "T0",
-        },
-    )
-    parts.add(
-        y_t1_alignment,
-        Y_T1_PART_NAME,
-        color=T1_COLOR,
-        obj_metadata={
-            "production_group": "absolute_y_grid_alignment",
-            "slicer_filament_id": 2,
-            "tool": "T1",
-        },
-    )
-
-    plates = [
+    return [
         {
-            "name": "absolute_x_grid_alignment",
+            "name": X_PLATE_NAME,
             "parts": [
-                *x_preview_part_names,
+                *preview_part_names_by_plate.get(X_PLATE_NAME, ()),
                 X_T0_PART_NAME,
                 X_T1_PART_NAME,
             ],
         },
         {
-            "name": "absolute_y_grid_alignment",
+            "name": Y_T0_PLATE_NAME,
             "parts": [
-                *y_preview_part_names,
-                Y_T0_PART_NAME,
-                Y_T1_PART_NAME,
+                *preview_part_names_by_plate.get(Y_T0_PLATE_NAME, ()),
+                Y_T0_LINES_PART_NAME,
+                Y_T0_LABELS_PART_NAME,
+            ],
+        },
+        {
+            "name": Y_T1_PLATE_NAME,
+            "parts": [
+                *preview_part_names_by_plate.get(Y_T1_PLATE_NAME, ()),
+                Y_T1_LINES_PART_NAME,
+                Y_T1_LABELS_PART_NAME,
             ],
         },
     ]
+
+
+def add_calibration_part(parts, part, name, color):
+    parts.add(
+        part,
+        name,
+        color=color,
+        obj_metadata=CALIBRATION_PART_METADATA[name],
+    )
+
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+    parts = PartList()
+    calibration = read_grid_calibration()
+    bed_grid_zero = calibration["bed_grid_zero"]
+    preview_part_names_by_plate = {}
+
+    if not PROD:
+        preview_part_names_by_plate = {
+            X_PLATE_NAME: add_painted_bed_preview_parts(
+                parts,
+                "x_plate",
+                bed_grid_zero,
+            ),
+            Y_T0_PLATE_NAME: add_painted_bed_preview_parts(
+                parts,
+                "y_t0_plate",
+                bed_grid_zero,
+            ),
+            Y_T1_PLATE_NAME: add_painted_bed_preview_parts(
+                parts,
+                "y_t1_plate",
+                bed_grid_zero,
+            ),
+        }
+
+    x_t0_alignment, x_t1_alignment = create_absolute_x_alignment_materials(calibration)
+    y_t0_lines, y_t0_labels = create_absolute_y_alignment_materials(
+        bed_grid_zero=bed_grid_zero,
+        calibration_value_mm=calibration["t0_y_endstop"],
+    )
+    y_t1_lines, y_t1_labels = create_absolute_y_alignment_materials(
+        bed_grid_zero=bed_grid_zero,
+        calibration_value_mm=calibration["t1_y_endstop"],
+    )
+    assert_absolute_patterns_fit_dual_area(
+        [
+            x_t0_alignment,
+            x_t1_alignment,
+            y_t0_lines,
+            y_t0_labels,
+            y_t1_lines,
+            y_t1_labels,
+        ]
+    )
+
+    add_calibration_part(parts, x_t0_alignment, X_T0_PART_NAME, T0_COLOR)
+    add_calibration_part(parts, x_t1_alignment, X_T1_PART_NAME, T1_COLOR)
+    add_calibration_part(parts, y_t0_lines, Y_T0_LINES_PART_NAME, T0_COLOR)
+    add_calibration_part(parts, y_t0_labels, Y_T0_LABELS_PART_NAME, T1_COLOR)
+    add_calibration_part(parts, y_t1_lines, Y_T1_LINES_PART_NAME, T1_COLOR)
+    add_calibration_part(parts, y_t1_labels, Y_T1_LABELS_PART_NAME, T0_COLOR)
 
     arrange_and_export(
         parts.as_list(),
@@ -991,7 +766,7 @@ def main():
             else (ACTUAL_BED_ORIGIN_X_MM, ACTUAL_BED_ORIGIN_Y_MM)
         ),
         preserve_model_coordinates=PROD,
-        plates=plates,
+        plates=create_plate_definitions(preview_part_names_by_plate),
     )
 
     _logger.info("two-material absolute X/Y grid alignment calibration completed.")
