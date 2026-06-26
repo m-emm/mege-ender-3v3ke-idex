@@ -70,6 +70,8 @@ CALIBRATION_LABEL_TEXT_THICKNESS_MM = 0.2
 CALIBRATION_LABEL_PAD_THICKNESS_MM = 0.2
 CALIBRATION_LABEL_PAD_MARGIN_MM = 3.0
 CALIBRATION_LABEL_GAP_MM = 2.0
+CALIBRATION_LABEL_GROUNDING_MARKER_SIZE_MM = 1.0
+CALIBRATION_LABEL_GROUNDING_MARKER_GAP_MM = 1.0
 CALIBRATION_LABEL_CONNECTOR_WIDTH_MM = CALIBRATION_LINE_WIDTH_MM
 CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM = 0.3
 
@@ -543,10 +545,35 @@ def create_absolute_y_alignment_materials(
         )
 
     labels = [entry["label"] for entry in label_entries]
-    slab, (_, _, slab_max_x, _) = create_calibration_label_slab(labels)
+    slab, (slab_min_x, slab_min_y, slab_max_x, _) = create_calibration_label_slab(
+        labels
+    )
     base_collector = base_collector.fuse(slab)
     for label in labels:
         text_collector = text_collector.fuse(align(label, slab, Alignment.STACK_TOP))
+
+    grounding_marker_y_mm = (
+        slab_min_y
+        - CALIBRATION_LABEL_GROUNDING_MARKER_GAP_MM
+        - CALIBRATION_LABEL_GROUNDING_MARKER_SIZE_MM
+    )
+    if grounding_marker_y_mm < SAFE_BED_ORIGIN[1]:
+        raise ValueError(
+            "Y label grounding marker does not fit below the label slab: "
+            f"marker_y={grounding_marker_y_mm}, safe_y={SAFE_BED_ORIGIN[1]}"
+        )
+    text_collector = text_collector.fuse(
+        create_box(
+            CALIBRATION_LABEL_GROUNDING_MARKER_SIZE_MM,
+            CALIBRATION_LABEL_GROUNDING_MARKER_SIZE_MM,
+            CALIBRATION_LABEL_PAD_THICKNESS_MM,
+            origin=(
+                slab_min_x + CALIBRATION_LABEL_PAD_MARGIN_MM,
+                grounding_marker_y_mm,
+                0,
+            ),
+        )
+    )
 
     for entry in label_entries:
         connector_start_x_mm = slab_max_x - CALIBRATION_LABEL_CONNECTOR_OVERLAP_MM

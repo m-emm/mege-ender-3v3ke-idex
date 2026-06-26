@@ -464,10 +464,20 @@ def test_absolute_grid_y_label_slab_is_calibrated_tool_material():
         calibration_value_mm=calibration["t0_y_endstop"],
     )
 
-    base_min_x = grid_calibration.get_bounding_box(base_material)[0][0]
-    text_min_x = grid_calibration.get_bounding_box(text_material)[0][0]
+    base_min, _ = grid_calibration.get_bounding_box(base_material)
+    text_min, text_max = grid_calibration.get_bounding_box(text_material)
 
-    assert base_min_x < text_min_x
+    assert base_min[0] < text_min[0]
+    assert text_min[1] < base_min[1]
+    assert base_min[1] - text_min[1] == pytest.approx(
+        grid_calibration.CALIBRATION_LABEL_GROUNDING_MARKER_GAP_MM
+        + grid_calibration.CALIBRATION_LABEL_GROUNDING_MARKER_SIZE_MM
+    )
+    assert text_min[2] == pytest.approx(0.0)
+    assert text_max[2] == pytest.approx(
+        grid_calibration.CALIBRATION_LABEL_PAD_THICKNESS_MM
+        + grid_calibration.CALIBRATION_LABEL_TEXT_THICKNESS_MM
+    )
 
 
 def test_idex_tool_parking_uses_full_speed_travel():
