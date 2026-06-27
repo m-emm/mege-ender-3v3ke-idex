@@ -82,9 +82,6 @@ def _create_bracket_for_side(
 
     z_profile_size = 40
     top_profile_size = 20
-    wall_thickness = z_axis_top_profile_gusset_wall_thickness
-    fillet_radius = z_axis_top_profile_gusset_fillet_radius
-    profile_clearance = z_axis_top_profile_gusset_profile_clearance
 
     (
         z_profile_contact_reference,
@@ -99,9 +96,9 @@ def _create_bracket_for_side(
 
     z_mount_plate = create_filleted_box(
         z_axis_top_profile_gusset_z_mount_width,
-        wall_thickness,
+        z_axis_top_profile_gusset_wall_thickness,
         z_axis_top_profile_gusset_z_mount_height,
-        fillet_radius,
+        z_axis_top_profile_gusset_fillet_radius,
         no_fillets_at=[Alignment.FRONT, Alignment.TOP],
     )
     z_mount_plate = align(
@@ -121,7 +118,7 @@ def _create_bracket_for_side(
         z_axis_top_profile_gusset_top_eye_length,
         z_axis_top_profile_gusset_top_eye_width,
         z_axis_top_profile_gusset_top_eye_thickness,
-        fillet_radius,
+        z_axis_top_profile_gusset_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM],
     )
     top_profile_mount_plate = align(
@@ -134,35 +131,8 @@ def _create_bracket_for_side(
         top_profile_mount_plate,
         top_profile_contact_reference,
         Alignment.STACK_TOP,
-        stack_gap=profile_clearance,
+        stack_gap=z_axis_top_profile_gusset_profile_clearance,
     )
-
-    # top_profile_rear_plate = create_filleted_box(
-    #     z_axis_top_profile_gusset_top_eye_length,
-    #     wall_thickness,
-    #     top_profile_size
-    #     + z_axis_top_profile_gusset_top_eye_thickness
-    #     + profile_clearance,
-    #     fillet_radius,
-    #     no_fillets_at=[Alignment.FRONT],
-    # )
-    # top_profile_rear_plate = align(
-    #     top_profile_rear_plate,
-    #     top_profile_contact_reference,
-    #     Alignment.CENTER,
-    #     axes=[0],
-    # )
-    # top_profile_rear_plate = align(
-    #     top_profile_rear_plate,
-    #     top_profile_contact_reference,
-    #     Alignment.STACK_BACK,
-    #     stack_gap=profile_clearance,
-    # )
-    # top_profile_rear_plate = align(
-    #     top_profile_rear_plate,
-    #     top_profile_contact_reference,
-    #     Alignment.BOTTOM,
-    # )
 
     hollow_momentum_profile = create_hollow_profile_ring(
         z_axis_top_profile_gusset_profile_outer_diameter,
@@ -194,8 +164,8 @@ def _create_bracket_for_side(
     top_profile_bottom_lip = create_filleted_box(
         z_axis_top_profile_gusset_top_eye_length,
         z_axis_top_profile_gusset_top_eye_width,
-        wall_thickness,
-        fillet_radius,
+        z_axis_top_profile_gusset_wall_thickness,
+        z_axis_top_profile_gusset_fillet_radius,
         no_fillets_at=[Alignment.TOP],
     )
     top_profile_bottom_lip = align(
@@ -231,7 +201,7 @@ def _create_bracket_for_side(
     ):
         screw_axis_reference = create_cylinder(
             screw_hole_radius,
-            wall_thickness,
+            z_axis_top_profile_gusset_wall_thickness,
             direction=(0, 1, 0),
         )
         screw_axis_reference = align(
