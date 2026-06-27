@@ -397,6 +397,56 @@ placement:
     - rigid_group:
         - z_axis_threaded_rod_right_assembly
       to: z_axis_profile_right_assembly
+
+    - part: z_axis_top_bridge_profile_assembly
+      post_translation:
+        - 0
+        - $ref: z_axis_top_bridge_profile_back_offset
+        - $expr:
+            "$sub": "-1 * ${z_axis_top_bridge_profile_drop}"
+
+    - part: z_axis_top_profile_gusset_left_assembly.non_production_parts.z_profile_contact_reference
+      to: z_axis_profile_left_assembly
+      alignment: CENTER
+      axes: [0]
+    - part: z_axis_top_profile_gusset_left_assembly.non_production_parts.z_profile_contact_reference
+      to: z_axis_profile_left_assembly
+      alignment: BACK
+    - part: z_axis_top_profile_gusset_left_assembly.non_production_parts.z_profile_contact_reference
+      to: z_axis_profile_left_assembly
+      alignment: TOP
+    - part: z_axis_top_profile_gusset_left_assembly.non_production_parts.top_profile_contact_reference
+      to: z_axis_top_bridge_profile_assembly
+      alignment: LEFT
+    - part: z_axis_top_profile_gusset_left_assembly.non_production_parts.top_profile_contact_reference
+      to: z_axis_top_bridge_profile_assembly
+      alignment: CENTER
+      axes: [1]
+    - part: z_axis_top_profile_gusset_left_assembly.non_production_parts.top_profile_contact_reference
+      to: z_axis_top_bridge_profile_assembly
+      alignment: TOP
+
+    - part: z_axis_top_profile_gusset_right_assembly.non_production_parts.z_profile_contact_reference
+      to: z_axis_profile_right_assembly
+      alignment: CENTER
+      axes: [0]
+    - part: z_axis_top_profile_gusset_right_assembly.non_production_parts.z_profile_contact_reference
+      to: z_axis_profile_right_assembly
+      alignment: BACK
+    - part: z_axis_top_profile_gusset_right_assembly.non_production_parts.z_profile_contact_reference
+      to: z_axis_profile_right_assembly
+      alignment: TOP
+    - part: z_axis_top_profile_gusset_right_assembly.non_production_parts.top_profile_contact_reference
+      to: z_axis_top_bridge_profile_assembly
+      alignment: RIGHT
+    - part: z_axis_top_profile_gusset_right_assembly.non_production_parts.top_profile_contact_reference
+      to: z_axis_top_bridge_profile_assembly
+      alignment: CENTER
+      axes: [1]
+    - part: z_axis_top_profile_gusset_right_assembly.non_production_parts.top_profile_contact_reference
+      to: z_axis_top_bridge_profile_assembly
+      alignment: TOP
+
     - part: x_axis_assembly
       to: printer_frame_assembly
       alignment: CENTER
@@ -726,6 +776,8 @@ placement:
         - z_axis_profile_left_assembly
         - z_axis_profile_right_assembly
         - z_axis_top_bridge_profile_assembly
+        - z_axis_top_profile_gusset_left_assembly
+        - z_axis_top_profile_gusset_right_assembly
         - z_axis_bottom_support_left_assembly
         - z_axis_bottom_support_right_assembly
         - z_axis_motor_mount_left_assembly
@@ -2100,6 +2152,66 @@ assemblies:
       z_axis_profile_left: z_axis_profile_left_assembly
       z_axis_profile_right: z_axis_profile_right_assembly
 
+  - name: z_axis_top_profile_gusset_left_assembly
+
+    resource_file: z_axis_top_profile_gusset_assembly.yaml
+    depends_on:
+      - z_axis_profile_left_assembly
+      - z_axis_top_bridge_profile_assembly
+    parameters:
+      side: left
+      z_axis_top_bridge_profile_back_offset: !Ref z_axis_top_bridge_profile_back_offset
+      z_axis_top_bridge_profile_drop: !Ref z_axis_top_bridge_profile_drop
+      z_axis_top_profile_gusset_wall_thickness: !Ref z_axis_top_profile_gusset_wall_thickness
+      z_axis_top_profile_gusset_rib_thickness: !Ref z_axis_top_profile_gusset_rib_thickness
+      z_axis_top_profile_gusset_fillet_radius: !Ref z_axis_top_profile_gusset_fillet_radius
+      z_axis_top_profile_gusset_profile_clearance: !Ref z_axis_top_profile_gusset_profile_clearance
+      z_axis_top_profile_gusset_z_mount_width: !Ref z_axis_top_profile_gusset_z_mount_width
+      z_axis_top_profile_gusset_z_mount_height: !Ref z_axis_top_profile_gusset_z_mount_height
+      z_axis_top_profile_gusset_top_eye_length: !Ref z_axis_top_profile_gusset_top_eye_length
+      z_axis_top_profile_gusset_top_eye_width: !Ref z_axis_top_profile_gusset_top_eye_width
+      z_axis_top_profile_gusset_top_eye_thickness: !Ref z_axis_top_profile_gusset_top_eye_thickness
+      z_axis_top_profile_gusset_screw_size: !Ref z_axis_top_profile_gusset_screw_size
+      z_axis_top_profile_gusset_screw_length: !Ref z_axis_top_profile_gusset_screw_length
+      z_axis_top_profile_gusset_z_screw_inset: !Ref z_axis_top_profile_gusset_z_screw_inset
+      z_axis_top_profile_gusset_top_screw_inset: !Ref z_axis_top_profile_gusset_top_screw_inset
+      z_axis_top_profile_gusset_screw_head_clearance: !Ref z_axis_top_profile_gusset_screw_head_clearance
+
+  - name: z_axis_top_profile_gusset_right_assembly
+
+    resource_file: z_axis_top_profile_gusset_assembly.yaml
+    depends_on:
+      - z_axis_profile_right_assembly
+      - z_axis_top_bridge_profile_assembly
+    parameters:
+      side: right
+      z_axis_top_bridge_profile_back_offset: !Ref z_axis_top_bridge_profile_back_offset
+      z_axis_top_bridge_profile_drop: !Ref z_axis_top_bridge_profile_drop
+      z_axis_top_profile_gusset_wall_thickness: !Ref z_axis_top_profile_gusset_wall_thickness
+      z_axis_top_profile_gusset_rib_thickness: !Ref z_axis_top_profile_gusset_rib_thickness
+      z_axis_top_profile_gusset_fillet_radius: !Ref z_axis_top_profile_gusset_fillet_radius
+      z_axis_top_profile_gusset_profile_clearance: !Ref z_axis_top_profile_gusset_profile_clearance
+      z_axis_top_profile_gusset_z_mount_width: !Ref z_axis_top_profile_gusset_z_mount_width
+      z_axis_top_profile_gusset_z_mount_height: !Ref z_axis_top_profile_gusset_z_mount_height
+      z_axis_top_profile_gusset_top_eye_length: !Ref z_axis_top_profile_gusset_top_eye_length
+      z_axis_top_profile_gusset_top_eye_width: !Ref z_axis_top_profile_gusset_top_eye_width
+      z_axis_top_profile_gusset_top_eye_thickness: !Ref z_axis_top_profile_gusset_top_eye_thickness
+      z_axis_top_profile_gusset_screw_size: !Ref z_axis_top_profile_gusset_screw_size
+      z_axis_top_profile_gusset_screw_length: !Ref z_axis_top_profile_gusset_screw_length
+      z_axis_top_profile_gusset_z_screw_inset: !Ref z_axis_top_profile_gusset_z_screw_inset
+      z_axis_top_profile_gusset_top_screw_inset: !Ref z_axis_top_profile_gusset_top_screw_inset
+      z_axis_top_profile_gusset_screw_head_clearance: !Ref z_axis_top_profile_gusset_screw_head_clearance
+
+  - name: z_axis_top_profile_gussets_assembly
+
+    resource_file: z_axis_top_profile_gussets_assembly.yaml
+    depends_on:
+      - z_axis_profile_left_assembly
+      - z_axis_profile_right_assembly
+      - z_axis_top_bridge_profile_assembly
+      - z_axis_top_profile_gusset_left_assembly
+      - z_axis_top_profile_gusset_right_assembly
+
   - name: z_axis_profile_left_assembly
 
     resource_file: z_axis_profile_assembly.yaml
@@ -2561,6 +2673,8 @@ assemblies:
       - z_axis_carriage_left_assembly
       - z_axis_carriage_right_assembly
       - z_axis_top_bridge_profile_assembly
+      - z_axis_top_profile_gusset_left_assembly
+      - z_axis_top_profile_gusset_right_assembly
       - x_axis_assembly
       - x_axis_carriage_stopper_left_assembly
       - x_axis_carriage_stopper_right_assembly
@@ -2622,6 +2736,8 @@ assemblies:
       z_axis_carriage_left: z_axis_carriage_left_assembly
       z_axis_carriage_right: z_axis_carriage_right_assembly
       z_axis_top_bridge_profile: z_axis_top_bridge_profile_assembly
+      z_axis_top_profile_gusset_left: z_axis_top_profile_gusset_left_assembly
+      z_axis_top_profile_gusset_right: z_axis_top_profile_gusset_right_assembly
       x_axis: x_axis_assembly
       x_axis_lower_profile: x_axis_lower_profile_assembly
       x_axis_top_profile: x_axis_top_profile_assembly

@@ -1,0 +1,67 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Fast z-axis top profile gusset context visualization
+
+Builder:
+  Collection: true
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - back
+        - top
+        - left
+      width: 512
+      height: 512
+    parts:
+      - source: dependencies
+        assembly: z_axis_profile_left_assembly
+        artifact: leader
+        name: z_axis_profile_left
+        color: [0.55, 0.68, 0.82]
+      - source: dependencies
+        assembly: z_axis_profile_right_assembly
+        artifact: leader
+        name: z_axis_profile_right
+        color: [0.82, 0.46, 0.42]
+      - source: dependencies
+        assembly: z_axis_top_bridge_profile_assembly
+        artifact: leader
+        name: z_axis_top_bridge_profile
+        color: [0.78, 0.74, 0.45]
+      - source: dependencies
+        assembly: z_axis_top_profile_gusset_left_assembly
+        artifact: leader
+        name: z_axis_top_profile_gusset_left
+        color: [0.72, 0.86, 0.92]
+      - source: dependencies
+        assembly: z_axis_top_profile_gusset_left_assembly
+        artifact: non_production_parts
+        exclude_names:
+          - z_profile_contact_reference
+          - top_profile_contact_reference
+        name_template: "z_axis_top_profile_gusset_left_{name}"
+        color: [0.78, 0.78, 0.72]
+      - source: dependencies
+        assembly: z_axis_top_profile_gusset_right_assembly
+        artifact: leader
+        name: z_axis_top_profile_gusset_right
+        color: [0.72, 0.86, 0.92]
+      - source: dependencies
+        assembly: z_axis_top_profile_gusset_right_assembly
+        artifact: non_production_parts
+        exclude_names:
+          - z_profile_contact_reference
+          - top_profile_contact_reference
+        name_template: "z_axis_top_profile_gusset_right_{name}"
+        color: [0.78, 0.78, 0.72]
+  Production:
+    parts: []
+
+Parts:
+  ZAxisTopProfileGussetsAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_top_profile_gussets_assembly.create_z_axis_top_profile_gussets_assembly

@@ -141,6 +141,14 @@ Builder:
         assembly: z_axis_top_bridge_profile
         artifact: all
       - source: injected
+        assembly: z_axis_top_profile_gusset_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_top_profile_gusset_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
         assembly: z_axis_carriage_left
         artifact: all
         name_template: "{assembly_name}_{name}"

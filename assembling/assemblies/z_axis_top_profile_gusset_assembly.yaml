@@ -1,0 +1,98 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Rear-only printable gusset for one z-axis top bridge profile end
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - back
+        - top
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: leader
+        name: z_axis_top_profile_gusset
+        color: [0.72, 0.86, 0.92]
+      - source: self
+        artifact: non_production_parts
+        exclude_names:
+          - z_profile_contact_reference
+          - top_profile_contact_reference
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
+  Production:
+    process_data_preset: petgcf_max_strength_high_speed_06
+    process_data:
+      overrides:
+        process_overrides:
+          brim_type: outer_only
+          enable_support: "1"
+          support_type: tree(auto)
+          support_style: organic
+          support_on_build_plate_only: "1"
+          sparse_infill_density: "80%"
+          sparse_infill_pattern: cubic
+          wall_loops: "4"
+          top_shell_layers: "5"
+          bottom_shell_layers: "5"
+    parts:
+      - source: self
+        artifact: leader
+        name: z_axis_top_profile_gusset
+        prod_rotation_angle: 90
+        prod_rotation_axis: [1, 0, 0]
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: z_axis_top_profile_gusset
+          parts:
+            - z_axis_top_profile_gusset
+      auto_assign_plates: false
+
+Parameters:
+  side:
+    Type: String
+  z_axis_top_bridge_profile_back_offset:
+    Type: Float
+  z_axis_top_bridge_profile_drop:
+    Type: Float
+  z_axis_top_profile_gusset_wall_thickness:
+    Type: Float
+  z_axis_top_profile_gusset_rib_thickness:
+    Type: Float
+  z_axis_top_profile_gusset_fillet_radius:
+    Type: Float
+  z_axis_top_profile_gusset_profile_clearance:
+    Type: Float
+  z_axis_top_profile_gusset_z_mount_width:
+    Type: Float
+  z_axis_top_profile_gusset_z_mount_height:
+    Type: Float
+  z_axis_top_profile_gusset_top_eye_length:
+    Type: Float
+  z_axis_top_profile_gusset_top_eye_width:
+    Type: Float
+  z_axis_top_profile_gusset_top_eye_thickness:
+    Type: Float
+  z_axis_top_profile_gusset_screw_size:
+    Type: String
+  z_axis_top_profile_gusset_screw_length:
+    Type: Float
+  z_axis_top_profile_gusset_z_screw_inset:
+    Type: Float
+  z_axis_top_profile_gusset_top_screw_inset:
+    Type: Float
+  z_axis_top_profile_gusset_screw_head_clearance:
+    Type: Float
+
+Parts:
+  ZAxisTopProfileGussetAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_top_profile_gusset_assembly.create_z_axis_top_profile_gusset_assembly

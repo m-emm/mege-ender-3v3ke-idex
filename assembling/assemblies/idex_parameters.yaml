@@ -547,6 +547,22 @@ globals:
     $expr:
       "$sub": "${print_bed_vertical_gap_to_frame} - 43"
   z_axis_profile_length: 500
+  z_axis_top_bridge_profile_back_offset: 7
+  z_axis_top_bridge_profile_drop: 12
+  z_axis_top_profile_gusset_wall_thickness: 5
+  z_axis_top_profile_gusset_rib_thickness: 6
+  z_axis_top_profile_gusset_fillet_radius: 2
+  z_axis_top_profile_gusset_profile_clearance: 0.3
+  z_axis_top_profile_gusset_z_mount_width: 36
+  z_axis_top_profile_gusset_z_mount_height: 80
+  z_axis_top_profile_gusset_top_eye_length: 70
+  z_axis_top_profile_gusset_top_eye_width: 34
+  z_axis_top_profile_gusset_top_eye_thickness: 5
+  z_axis_top_profile_gusset_screw_size: "M5"
+  z_axis_top_profile_gusset_screw_length: 16
+  z_axis_top_profile_gusset_z_screw_inset: 18
+  z_axis_top_profile_gusset_top_screw_inset: 14
+  z_axis_top_profile_gusset_screw_head_clearance: 0.6
   z_axis_guide_rod_diameter: 8
   z_axis_guide_rod_length: 550
   z_axis_guide_rod_profile_distance: 50
