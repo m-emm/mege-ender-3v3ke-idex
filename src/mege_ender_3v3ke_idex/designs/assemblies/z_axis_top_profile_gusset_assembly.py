@@ -18,7 +18,6 @@ def create_z_axis_top_profile_gusset_assembly(
     side,
     BIG_THING,
     z_axis_top_bridge_profile_back_offset,
-    z_axis_top_bridge_profile_drop,
     z_axis_top_profile_gusset_wall_thickness,
     z_axis_top_profile_gusset_fillet_radius,
     z_axis_top_profile_gusset_profile_clearance,
@@ -63,23 +62,10 @@ def create_z_axis_top_profile_gusset_assembly(
     else:
         top_profile_x_origin = top_profile_side_x
 
-    top_profile_contact_reference = create_box(
-        z_axis_top_profile_gusset_top_eye_length,
-        top_profile_size,
-        top_profile_size,
-        origin=(
-            top_profile_x_origin,
-            z_axis_top_bridge_profile_back_offset,
-            -z_axis_top_bridge_profile_drop - top_profile_size,
-        ),
-    )
-
-    z_mount_plate = create_filleted_box(
+    z_mount_plate = create_box(
         z_axis_top_profile_gusset_z_mount_width,
         z_axis_top_profile_gusset_wall_thickness,
         z_axis_top_profile_gusset_z_mount_height,
-        z_axis_top_profile_gusset_fillet_radius,
-        no_fillets_at=[Alignment.FRONT, Alignment.TOP],
     )
     z_mount_plate = align(
         z_mount_plate,
@@ -121,19 +107,18 @@ def create_z_axis_top_profile_gusset_assembly(
         Alignment.STACK_BACK,
     )
 
-    top_profile_bottom_lip = create_filleted_box(
+    top_profile_bottom_lip = create_box(
         z_axis_top_profile_gusset_top_eye_length,
         z_axis_top_profile_gusset_top_eye_width,
-        z_axis_top_profile_gusset_wall_thickness,
-        z_axis_top_profile_gusset_fillet_radius,
-        no_fillets_at=[Alignment.TOP],
+        z_axis_top_profile_gusset_top_eye_thickness,
     )
-    top_profile_bottom_lip = align(
-        top_profile_bottom_lip,
-        top_profile_contact_reference,
-        Alignment.CENTER,
-        axes=[0, 1],
-    )
+    top_profile_bottom_lip = translate(
+        top_profile_x_origin,
+        z_axis_top_bridge_profile_back_offset
+        + top_profile_size / 2
+        - z_axis_top_profile_gusset_top_eye_width / 2,
+        0,
+    )(top_profile_bottom_lip)
     top_profile_bottom_lip = align(
         top_profile_bottom_lip,
         hollow_momentum_profile,
@@ -190,30 +175,25 @@ def create_z_axis_top_profile_gusset_assembly(
         screw_visual = translate(0, screw_spec.cylinder_head_height, 0)(screw_visual)
         screw_visuals.append((f"z_mount_screw_{screw_index}", screw_visual))
 
-    top_screw_y = z_axis_top_bridge_profile_back_offset + top_profile_size / 2
     top_screw_side_x = side_alignment.sign * z_profile_size / 2
-    for screw_index, screw_x in enumerate(
-        [
-            top_screw_side_x
-            - side_alignment.sign * z_axis_top_profile_gusset_top_screw_inset,
-            top_screw_side_x
-            - side_alignment.sign
-            * (
-                z_axis_top_profile_gusset_top_eye_length
-                - z_axis_top_profile_gusset_top_screw_inset
-            ),
-        ]
-    ):
+    top_screw_offsets_from_side = (
+        z_axis_top_profile_gusset_top_screw_inset,
+        z_axis_top_profile_gusset_top_eye_length
+        - z_axis_top_profile_gusset_top_screw_inset,
+    )
+    for screw_index, screw_offset_from_side in enumerate(top_screw_offsets_from_side):
+        screw_x = top_screw_side_x - side_alignment.sign * screw_offset_from_side
         screw_axis_reference = create_cylinder(
             screw_hole_radius,
             z_axis_top_profile_gusset_top_eye_thickness,
         )
         screw_axis_reference = align(
             screw_axis_reference,
-            z_mount_plate,
+            top_profile_bottom_lip,
             Alignment.CENTER,
+            axes=[1, 2],
         )
-        screw_axis_reference = translate(screw_x, top_screw_y, 0)(screw_axis_reference)
+        screw_axis_reference = translate(screw_x, 0, 0)(screw_axis_reference)
 
         screw_cutter = create_cylinder(screw_hole_radius, BIG_THING)
         screw_cutter = align(screw_cutter, screw_axis_reference, Alignment.CENTER)
@@ -223,18 +203,22 @@ def create_z_axis_top_profile_gusset_assembly(
             z_axis_top_profile_gusset_screw_size,
             z_axis_top_profile_gusset_screw_length,
         )
-        screw_visual = align(screw_visual, screw_axis_reference, Alignment.CENTER)
-        screw_visual = translate(0, 0, screw_spec.cylinder_head_height)(screw_visual)
+        screw_visual = rotate(180, axis=(1, 0, 0))(screw_visual)
+        screw_visual = align(
+            screw_visual,
+            screw_axis_reference,
+            Alignment.CENTER,
+            axes=[0, 1],
+        )
+        screw_visual = align(screw_visual, top_profile_bottom_lip, Alignment.BOTTOM)
+        screw_visual = translate(0, 0, -screw_spec.cylinder_head_height)(screw_visual)
         screw_visuals.append((f"top_profile_screw_{screw_index}", screw_visual))
 
     retval = LeaderFollowersCuttersPart(leader=gusset)
+    retval.add_named_follower(top_profile_bottom_lip, "top_profile_bottom_lip")
     retval.add_named_non_production_part(
         z_profile_contact_reference,
         "z_profile_contact_reference",
-    )
-    retval.add_named_non_production_part(
-        top_profile_contact_reference,
-        "top_profile_contact_reference",
     )
     for name, screw_visual in screw_visuals:
         retval.add_named_non_production_part(screw_visual, name)

@@ -40,7 +40,6 @@ Builder:
         artifact: non_production_parts
         exclude_names:
           - z_profile_contact_reference
-          - top_profile_contact_reference
         name_template: "z_axis_top_profile_gusset_left_{name}"
         color: [0.78, 0.78, 0.72]
       - source: dependencies
@@ -53,7 +52,6 @@ Builder:
         artifact: non_production_parts
         exclude_names:
           - z_profile_contact_reference
-          - top_profile_contact_reference
         name_template: "z_axis_top_profile_gusset_right_{name}"
         color: [0.78, 0.78, 0.72]
   Production:
