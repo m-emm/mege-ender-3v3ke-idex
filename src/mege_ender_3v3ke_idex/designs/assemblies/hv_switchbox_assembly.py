@@ -9,7 +9,7 @@ from shellforgepy.simple import *
 def create_hv_switchbox_assembly(
     *,
     fuse_holder,
-    panasonic_ssr,
+    ssr,
     hv_switchbox_height,
     hv_switchbox_width,
     hv_switchbox_depth,
@@ -115,9 +115,7 @@ def create_hv_switchbox_assembly(
     ssr_mount_nuts_list = []
     ssr_mount_holes_list = []
     ssr_mount_nut_pockets_list = []
-    ssr_mount_hole_pattern = panasonic_ssr.get_cutter_part_by_name(
-        "mounting_hole_pattern"
-    )
+    ssr_mount_hole_pattern = ssr.get_cutter_part_by_name("mounting_hole_pattern")
     ssr_mount_hole_pattern = rotate(90, axis=(0, 1, 0))(ssr_mount_hole_pattern)
     ssr_mount_translation = (
         ssr_mount_boss_left_x - get_bounding_box(ssr_mount_hole_pattern)[1][0],
@@ -127,9 +125,7 @@ def create_hv_switchbox_assembly(
     ssr_mount_hole_pattern = translate(*ssr_mount_translation)(ssr_mount_hole_pattern)
     ssr_mount_hole_y_positions = []
     for mounting_hole_name in ["mounting_hole_1", "mounting_hole_2"]:
-        ssr_mount_hole_reference = panasonic_ssr.get_cutter_part_by_name(
-            mounting_hole_name
-        )
+        ssr_mount_hole_reference = ssr.get_cutter_part_by_name(mounting_hole_name)
         ssr_mount_hole_reference = rotate(90, axis=(0, 1, 0))(ssr_mount_hole_reference)
         ssr_mount_hole_reference = translate(*ssr_mount_translation)(
             ssr_mount_hole_reference
@@ -138,7 +134,7 @@ def create_hv_switchbox_assembly(
             get_bounding_box_center(ssr_mount_hole_reference)[1]
         )
 
-    ssr_visual = rotate(90, axis=(0, 1, 0))(panasonic_ssr)
+    ssr_visual = rotate(90, axis=(0, 1, 0))(ssr)
     ssr_visual = translate(
         ssr_mount_boss_left_x - get_bounding_box(ssr_visual)[1][0],
         hv_switchbox_ssr_y_center - get_bounding_box_center(ssr_visual)[1],
@@ -719,12 +715,12 @@ def create_hv_switchbox_assembly(
         switchbox.add_named_non_production_part(part, f"fuse_holder_{name}")
 
     for name, part in ssr_visual.get_named_follower_items():
-        switchbox.add_named_non_production_part(part, f"panasonic_ssr_{name}")
+        switchbox.add_named_non_production_part(part, f"ssr_{name}")
 
     for name, part in ssr_visual.get_named_cutter_items():
-        switchbox.add_named_cutter(part, f"panasonic_ssr_{name}")
+        switchbox.add_named_cutter(part, f"ssr_{name}")
 
     for name, part in ssr_visual.get_named_non_production_part_items():
-        switchbox.add_named_non_production_part(part, f"panasonic_ssr_{name}")
+        switchbox.add_named_non_production_part(part, f"ssr_{name}")
 
     return switchbox

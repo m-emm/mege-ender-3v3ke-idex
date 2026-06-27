@@ -21,6 +21,23 @@ from shellforgepy.simple import get_bounding_box, get_bounding_box_size
 
 RESOURCE_FILE = ASSEMBLIES_DIR / "hv_switchbox_assembly.yaml"
 ASSEMBLIES_FILE = ASSEMBLIES_DIR / "assemblies.yaml"
+SSR_PARAMETER_SUFFIXES = (
+    "width",
+    "length",
+    "height",
+    "corner_fillet_radius",
+    "mount_hole_diameter",
+    "mount_hole_pitch",
+    "terminal_screw_x_inset",
+    "output_terminal_y_inset",
+    "input_terminal_y_inset",
+    "output_terminal_screw_size",
+    "input_terminal_screw_size",
+    "terminal_screw_head_height",
+    "output_cover_depth",
+    "input_cover_depth",
+    "cover_recess_depth",
+)
 
 
 @pytest.fixture(scope="module")
@@ -28,14 +45,20 @@ def hv_switchbox():
     fuse_holder = create_fuse_holder_assembly(
         **assembly_kwargs(create_fuse_holder_assembly)
     )
-    panasonic_ssr = create_panasonic_ssr_assembly(
-        **assembly_kwargs(create_panasonic_ssr_assembly)
+    ssr = create_panasonic_ssr_assembly(
+        **assembly_kwargs(
+            create_panasonic_ssr_assembly,
+            **{
+                f"panasonic_ssr_{suffix}": DEFAULTS[f"fotek_ssr_{suffix}"]
+                for suffix in SSR_PARAMETER_SUFFIXES
+            },
+        )
     )
     return create_hv_switchbox_assembly(
         **assembly_kwargs(
             create_hv_switchbox_assembly,
             fuse_holder=fuse_holder,
-            panasonic_ssr=panasonic_ssr,
+            ssr=ssr,
         )
     )
 
@@ -87,9 +110,23 @@ def test_hv_switchbox_exports_lid_cable_cover_fuse_holder_and_ssr(hv_switchbox):
     assert "hv_switchbox_cable_cutout_cover" in hv_switchbox.follower_indices_by_name
     assert "fuse_holder_holder_body" in names
     assert "fuse_holder_mount_hole" in names
-    assert "panasonic_ssr_body" in names
-    assert "panasonic_ssr_mounting_hole_pattern" in names
+    assert "ssr_body" in names
+    assert "ssr_mounting_hole_pattern" in names
     assert not any("emergency" in name.lower() for name in names)
+
+
+def test_hv_switchbox_uses_fotek_ssr_body_and_keeps_it_internal(hv_switchbox):
+    ssr_body = hv_switchbox.get_named_non_production_part("ssr_body")
+
+    assert get_bounding_box_size(ssr_body) == pytest.approx(
+        (
+            DEFAULTS["fotek_ssr_height"],
+            DEFAULTS["fotek_ssr_length"],
+            DEFAULTS["fotek_ssr_width"],
+        ),
+        abs=0.05,
+    )
+    _assert_inside_hv_inner_enclosure(ssr_body)
 
 
 def test_hv_switchbox_has_six_internal_m4_terminal_stations(hv_switchbox):
@@ -163,11 +200,11 @@ def test_hv_switchbox_is_registered_and_injected_into_whole_printer():
     assert hv_switchbox["resource_file"] == "hv_switchbox_assembly.yaml"
     assert hv_switchbox["depends_on"] == [
         "fuse_holder_assembly",
-        "panasonic_ssr_assembly",
+        "fotek_ssr_assembly",
     ]
     assert hv_switchbox["inject_parts"] == {
         "fuse_holder": "fuse_holder_assembly",
-        "panasonic_ssr": "panasonic_ssr_assembly",
+        "ssr": "fotek_ssr_assembly",
     }
 
     whole_printer = assemblies["whole_printer_assembly"]

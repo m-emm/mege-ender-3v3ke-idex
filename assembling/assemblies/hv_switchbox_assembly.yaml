@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: 250 V mains switchbox with fuse holder and internal Panasonic SSR
+Description: 250 V mains switchbox with fuse holder and internal SSR
 
 Builder:
   Visualization:
@@ -33,11 +33,11 @@ Builder:
       - source: self
         artifact: non_production_parts
         names:
-          - panasonic_ssr_body
-          - panasonic_ssr_output_terminal_cover
-          - panasonic_ssr_input_terminal_cover
-          - panasonic_ssr_output_terminal_screws
-          - panasonic_ssr_input_terminal_screws
+          - ssr_body
+          - ssr_output_terminal_cover
+          - ssr_input_terminal_cover
+          - ssr_output_terminal_screws
+          - ssr_input_terminal_screws
         name_template: "{name}"
         color: [0.55, 0.58, 0.62]
       - source: self

@@ -607,11 +607,11 @@ Builder:
         assembly: hv_switchbox
         artifact: non_production_parts
         names:
-          - panasonic_ssr_body
-          - panasonic_ssr_output_terminal_cover
-          - panasonic_ssr_input_terminal_cover
-          - panasonic_ssr_output_terminal_screws
-          - panasonic_ssr_input_terminal_screws
+          - ssr_body
+          - ssr_output_terminal_cover
+          - ssr_input_terminal_cover
+          - ssr_output_terminal_screws
+          - ssr_input_terminal_screws
         name_template: "hv_switchbox_{name}"
         color: [0.55, 0.58, 0.62]
       - source: injected

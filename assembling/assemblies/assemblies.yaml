@@ -1501,10 +1501,10 @@ assemblies:
     resource_file: hv_switchbox_assembly.yaml
     depends_on:
       - fuse_holder_assembly
-      - panasonic_ssr_assembly
+      - fotek_ssr_assembly
     inject_parts:
       fuse_holder: fuse_holder_assembly
-      panasonic_ssr: panasonic_ssr_assembly
+      ssr: fotek_ssr_assembly
     parameters:
       hv_switchbox_height: !Ref hv_switchbox_height
       hv_switchbox_width: !Ref hv_switchbox_width
