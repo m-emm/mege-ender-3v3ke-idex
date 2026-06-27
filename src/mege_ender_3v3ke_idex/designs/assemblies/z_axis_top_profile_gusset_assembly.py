@@ -13,52 +13,9 @@ def _side_alignment_from_name(side):
     raise ValueError(f"Unsupported z-axis top profile gusset side '{side}'")
 
 
-def _create_contact_references(
+def create_z_axis_top_profile_gusset_assembly(
     *,
-    side_alignment,
-    z_axis_top_bridge_profile_back_offset,
-    z_axis_top_bridge_profile_drop,
-    z_axis_top_profile_gusset_z_mount_height,
-    z_axis_top_profile_gusset_top_eye_length,
-):
-
-    z_profile_size = 40
-    top_profile_size = 20
-    reference_thickness = 0.2
-
-    z_profile_contact_reference = create_box(
-        z_profile_size,
-        reference_thickness,
-        z_axis_top_profile_gusset_z_mount_height,
-        origin=(
-            -z_profile_size / 2,
-            -reference_thickness,
-            -z_axis_top_profile_gusset_z_mount_height,
-        ),
-    )
-
-    top_profile_x_min = min(
-        side_alignment.sign * z_profile_size / 2,
-        side_alignment.sign * z_profile_size / 2
-        - side_alignment.sign * z_axis_top_profile_gusset_top_eye_length,
-    )
-    top_profile_contact_reference = create_box(
-        z_axis_top_profile_gusset_top_eye_length,
-        top_profile_size,
-        top_profile_size,
-        origin=(
-            top_profile_x_min,
-            z_axis_top_bridge_profile_back_offset,
-            -z_axis_top_bridge_profile_drop - top_profile_size,
-        ),
-    )
-
-    return z_profile_contact_reference, top_profile_contact_reference
-
-
-def _create_bracket_for_side(
-    *,
-    side_alignment,
+    side,
     BIG_THING,
     z_axis_top_bridge_profile_back_offset,
     z_axis_top_bridge_profile_drop,
@@ -78,20 +35,43 @@ def _create_bracket_for_side(
     z_axis_top_profile_gusset_screw_length,
     z_axis_top_profile_gusset_z_screw_inset,
     z_axis_top_profile_gusset_top_screw_inset,
+    z_axis_top_profile_gusset_screw_head_clearance,
 ):
+    """Create one side of the rear z-axis top profile bracket."""
 
+    side_alignment = _side_alignment_from_name(side)
     z_profile_size = 40
     top_profile_size = 20
+    reference_thickness = 0.2
 
-    (
-        z_profile_contact_reference,
-        top_profile_contact_reference,
-    ) = _create_contact_references(
-        side_alignment=side_alignment,
-        z_axis_top_bridge_profile_back_offset=z_axis_top_bridge_profile_back_offset,
-        z_axis_top_bridge_profile_drop=z_axis_top_bridge_profile_drop,
-        z_axis_top_profile_gusset_z_mount_height=z_axis_top_profile_gusset_z_mount_height,
-        z_axis_top_profile_gusset_top_eye_length=z_axis_top_profile_gusset_top_eye_length,
+    z_profile_contact_reference = create_box(
+        z_profile_size,
+        reference_thickness,
+        z_axis_top_profile_gusset_z_mount_height,
+        origin=(
+            -z_profile_size / 2,
+            -reference_thickness,
+            -z_axis_top_profile_gusset_z_mount_height,
+        ),
+    )
+
+    top_profile_side_x = side_alignment.sign * z_profile_size / 2
+    if side_alignment == Alignment.RIGHT:
+        top_profile_x_origin = (
+            top_profile_side_x - z_axis_top_profile_gusset_top_eye_length
+        )
+    else:
+        top_profile_x_origin = top_profile_side_x
+
+    top_profile_contact_reference = create_box(
+        z_axis_top_profile_gusset_top_eye_length,
+        top_profile_size,
+        top_profile_size,
+        origin=(
+            top_profile_x_origin,
+            z_axis_top_bridge_profile_back_offset,
+            -z_axis_top_bridge_profile_drop - top_profile_size,
+        ),
     )
 
     z_mount_plate = create_filleted_box(
@@ -268,69 +248,6 @@ def _create_bracket_for_side(
         screw_visual = align(screw_visual, top_profile_mount_plate, Alignment.TOP)
         screw_visual = translate(0, 0, screw_spec.cylinder_head_height)(screw_visual)
         screw_visuals.append((f"top_profile_screw_{screw_index}", screw_visual))
-
-    return (
-        gusset,
-        z_profile_contact_reference,
-        top_profile_contact_reference,
-        screw_visuals,
-    )
-
-
-def create_z_axis_top_profile_gusset_assembly(
-    *,
-    side,
-    BIG_THING,
-    z_axis_top_bridge_profile_back_offset,
-    z_axis_top_bridge_profile_drop,
-    z_axis_top_profile_gusset_wall_thickness,
-    z_axis_top_profile_gusset_fillet_radius,
-    z_axis_top_profile_gusset_profile_clearance,
-    z_axis_top_profile_gusset_z_mount_width,
-    z_axis_top_profile_gusset_z_mount_height,
-    z_axis_top_profile_gusset_top_eye_length,
-    z_axis_top_profile_gusset_top_eye_width,
-    z_axis_top_profile_gusset_top_eye_thickness,
-    z_axis_top_profile_gusset_profile_outer_diameter,
-    z_axis_top_profile_gusset_profile_width,
-    z_axis_top_profile_gusset_profile_wall,
-    z_axis_top_profile_gusset_profile_height,
-    z_axis_top_profile_gusset_screw_size,
-    z_axis_top_profile_gusset_screw_length,
-    z_axis_top_profile_gusset_z_screw_inset,
-    z_axis_top_profile_gusset_top_screw_inset,
-    z_axis_top_profile_gusset_screw_head_clearance,
-):
-    """Create one side of the rear z-axis top profile bracket."""
-
-    side_alignment = _side_alignment_from_name(side)
-    (
-        gusset,
-        z_profile_contact_reference,
-        top_profile_contact_reference,
-        screw_visuals,
-    ) = _create_bracket_for_side(
-        side_alignment=side_alignment,
-        BIG_THING=BIG_THING,
-        z_axis_top_bridge_profile_back_offset=z_axis_top_bridge_profile_back_offset,
-        z_axis_top_bridge_profile_drop=z_axis_top_bridge_profile_drop,
-        z_axis_top_profile_gusset_wall_thickness=z_axis_top_profile_gusset_wall_thickness,
-        z_axis_top_profile_gusset_fillet_radius=z_axis_top_profile_gusset_fillet_radius,
-        z_axis_top_profile_gusset_profile_clearance=z_axis_top_profile_gusset_profile_clearance,
-        z_axis_top_profile_gusset_z_mount_width=z_axis_top_profile_gusset_z_mount_width,
-        z_axis_top_profile_gusset_z_mount_height=z_axis_top_profile_gusset_z_mount_height,
-        z_axis_top_profile_gusset_top_eye_length=z_axis_top_profile_gusset_top_eye_length,
-        z_axis_top_profile_gusset_top_eye_width=z_axis_top_profile_gusset_top_eye_width,
-        z_axis_top_profile_gusset_top_eye_thickness=z_axis_top_profile_gusset_top_eye_thickness,
-        z_axis_top_profile_gusset_profile_outer_diameter=z_axis_top_profile_gusset_profile_outer_diameter,
-        z_axis_top_profile_gusset_profile_width=z_axis_top_profile_gusset_profile_width,
-        z_axis_top_profile_gusset_profile_wall=z_axis_top_profile_gusset_profile_wall,
-        z_axis_top_profile_gusset_profile_height=z_axis_top_profile_gusset_profile_height,
-        z_axis_top_profile_gusset_screw_size=z_axis_top_profile_gusset_screw_size,
-        z_axis_top_profile_gusset_screw_length=z_axis_top_profile_gusset_screw_length,
-        z_axis_top_profile_gusset_z_screw_inset=z_axis_top_profile_gusset_z_screw_inset,
-        z_axis_top_profile_gusset_top_screw_inset=z_axis_top_profile_gusset_top_screw_inset,
-    )
 
     retval = LeaderFollowersCuttersPart(leader=gusset)
     retval.add_named_non_production_part(
