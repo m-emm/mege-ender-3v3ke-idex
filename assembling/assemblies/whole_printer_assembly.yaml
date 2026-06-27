@@ -627,7 +627,7 @@ Builder:
         names:
           - fuse_holder_mount_nut
           - lid_mount_screw_*_screw
-          - lid_mount_screw_*_nut
+          - lid_mount_screw_*_thread_inset
           - hv_switchbox_terminal_screws
           - hv_switchbox_terminal_nuts
           - ssr_mount_screws

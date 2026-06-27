@@ -59,6 +59,7 @@ def create_hv_switchbox_assembly(
     hv_switchbox_lid_screw_length,
     hv_switchbox_lid_screw_inset,
     hv_switchbox_lid_screw_mount_block_size,
+    hv_switchbox_lid_thread_inset_extra_screw_depth,
 ):
     """Create a left-open mains switchbox with internal SSR and terminals."""
 
@@ -583,7 +584,7 @@ def create_hv_switchbox_assembly(
         hv_switchbox_lid_screw_size,
         hv_switchbox_lid_screw_length,
         screw_direction=Alignment.LEFT,
-        with_nut_cutter=True,
+        with_nut_cutter=False,
         flush_with_top=True,
         width_inset=hv_switchbox_lid_screw_inset,
         length_inset=hv_switchbox_lid_screw_inset,
@@ -601,6 +602,42 @@ def create_hv_switchbox_assembly(
         lid = lid.cut(lid_screw_mount_block_cutter)
 
     lid_screw_mount_blocks = lid_screw_mount.use_as_cutter_on(lid_screw_mount_blocks)
+    lid_thread_insets = None
+    lid_thread_inset_depth = (
+        MScrew.from_size(hv_switchbox_lid_screw_size).thread_inset_length
+        + hv_switchbox_lid_thread_inset_extra_screw_depth
+    )
+    for lid_screw_index in range(4):
+        lid_screw_hole = lid_screw_mount.get_named_cutter(
+            f"screw_{lid_screw_index}_hole_cutter"
+        )
+        lid_thread_inset = create_thread_inset_assembly(
+            size=hv_switchbox_lid_screw_size,
+            thickness=lid_thread_inset_depth,
+            extra_radius=0.01,
+            clearance_type="loose",
+        )
+        lid_thread_inset = rotate(90, axis=(0, 1, 0))(lid_thread_inset)
+        lid_thread_inset = align(
+            lid_thread_inset, lid_screw_hole, Alignment.CENTER, axes=[1, 2]
+        )
+        lid_thread_inset = align(
+            lid_thread_inset, lid_screw_mount_blocks, Alignment.LEFT
+        )
+
+        lid_screw_mount_blocks = lid_thread_inset.use_as_cutter_on(
+            lid_screw_mount_blocks
+        )
+        lid_screw_mount_blocks = lid_screw_mount_blocks.fuse(lid_thread_inset.leader)
+
+        named_lid_thread_inset = lid_thread_inset.prefixed_copy(
+            f"screw_{lid_screw_index}"
+        )
+        if lid_thread_insets is None:
+            lid_thread_insets = named_lid_thread_inset
+        else:
+            lid_thread_insets = lid_thread_insets.fuse(named_lid_thread_inset)
+
     switchbox_box = switchbox_box.fuse(lid_screw_mount_blocks)
     switchbox_box = lid_screw_mount.use_as_cutter_on(switchbox_box)
 
@@ -703,6 +740,9 @@ def create_hv_switchbox_assembly(
     )
     switchbox = switchbox.merge_except_leader(
         lid_screw_mount.prefixed_copy("lid_mount")
+    )
+    switchbox = switchbox.merge_except_leader(
+        lid_thread_insets.prefixed_copy("lid_mount")
     )
 
     for name, part in fuse_holder.get_named_follower_items():

@@ -1555,6 +1555,7 @@ assemblies:
       hv_switchbox_lid_screw_length: !Ref hv_switchbox_lid_screw_length
       hv_switchbox_lid_screw_inset: !Ref hv_switchbox_lid_screw_inset
       hv_switchbox_lid_screw_mount_block_size: !Ref hv_switchbox_lid_screw_mount_block_size
+      hv_switchbox_lid_thread_inset_extra_screw_depth: !Ref hv_switchbox_lid_thread_inset_extra_screw_depth
 
   - name: heatbed_psu_housing_assembly
 

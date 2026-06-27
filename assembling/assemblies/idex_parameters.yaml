@@ -486,6 +486,7 @@ globals:
   hv_switchbox_lid_screw_length: !Ref electric_switchboard_lid_screw_length
   hv_switchbox_lid_screw_inset: !Ref electric_switchboard_lid_screw_inset
   hv_switchbox_lid_screw_mount_block_size: !Ref electric_switchboard_lid_screw_mount_block_size
+  hv_switchbox_lid_thread_inset_extra_screw_depth: 4
   heatbed_psu_housing_height: 45
   heatbed_psu_housing_width: 55
   heatbed_psu_housing_depth: 90

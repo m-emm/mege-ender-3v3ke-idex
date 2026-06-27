@@ -17,6 +17,7 @@ from mege_ender_3v3ke_idex.designs.assemblies.panasonic_ssr_assembly import (
     create_panasonic_ssr_assembly,
 )
 from shellforgepy.simple import (
+    MScrew,
     get_bounding_box,
     get_bounding_box_center,
     get_bounding_box_size,
@@ -102,6 +103,19 @@ def _visualized_names(resource):
     return names
 
 
+def _visualized_names_for(resource, *, source=None, assembly=None):
+    names = set()
+    for part in resource["Builder"]["Visualization"]["parts"]:
+        if source is not None and part.get("source") != source:
+            continue
+        if assembly is not None and part.get("assembly") != assembly:
+            continue
+        names.update(part.get("names", []))
+        if "name" in part:
+            names.add(part["name"])
+    return names
+
+
 def test_hv_switchbox_reference_matches_requested_external_size(hv_switchbox):
     reference = hv_switchbox.get_named_non_production_part(
         "hv_switchbox_body_reference"
@@ -128,6 +142,11 @@ def test_hv_switchbox_exports_lid_cable_cover_fuse_holder_and_ssr(hv_switchbox):
     assert "ssr_mounting_hole_pattern" in names
     assert "hv_switchbox_terminal_rail" not in names
     assert "ssr_mount_bosses" not in names
+    assert "lid_mount_screw_0_thread_inset" in names
+    assert "lid_mount_screw_3_thread_inset" in names
+    assert not any(
+        name.startswith("lid_mount_screw_") and name.endswith("_nut") for name in names
+    )
     assert not any("emergency" in name.lower() for name in names)
 
 
@@ -251,6 +270,47 @@ def test_hv_switchbox_terminal_nut_pockets_open_to_rail_top(hv_switchbox):
         )
 
 
+def test_hv_switchbox_lid_screws_use_threaded_insets(hv_switchbox):
+    screw_spec = MScrew.from_size(DEFAULTS["hv_switchbox_lid_screw_size"])
+    inset_depth = (
+        screw_spec.thread_inset_length
+        + DEFAULTS["hv_switchbox_lid_thread_inset_extra_screw_depth"]
+    )
+
+    for lid_screw_index in range(4):
+        screw = hv_switchbox.get_named_non_production_part(
+            f"lid_mount_screw_{lid_screw_index}_screw"
+        )
+        hole = hv_switchbox.get_named_cutter(
+            f"lid_mount_screw_{lid_screw_index}_hole_cutter"
+        )
+        inset = hv_switchbox.get_named_non_production_part(
+            f"lid_mount_screw_{lid_screw_index}_thread_inset"
+        )
+        inset_cutter = hv_switchbox.get_named_cutter(
+            f"lid_mount_screw_{lid_screw_index}_assembly_cutter"
+        )
+
+        screw_center = get_bounding_box_center(screw)
+        hole_center = get_bounding_box_center(hole)
+        inset_center = get_bounding_box_center(inset)
+        inset_bbox = get_bounding_box(inset)
+        inset_cutter_bbox = get_bounding_box(inset_cutter)
+
+        assert inset_center[1:] == pytest.approx(hole_center[1:], abs=0.05)
+        assert screw_center[1:] == pytest.approx(hole_center[1:], abs=0.05)
+        assert inset_bbox[0][0] == pytest.approx(0, abs=0.05)
+        assert inset_cutter_bbox[0][0] == pytest.approx(0, abs=0.05)
+        assert get_bounding_box_size(inset)[0] == pytest.approx(
+            screw_spec.thread_inset_length,
+            abs=0.05,
+        )
+        assert get_bounding_box_size(inset_cutter)[0] == pytest.approx(
+            inset_depth,
+            abs=0.05,
+        )
+
+
 def test_hv_switchbox_resource_uses_petgcf_production_settings():
     resource = yaml.safe_load(RESOURCE_FILE.read_text())
     production = resource["Builder"]["Production"]
@@ -280,6 +340,22 @@ def test_hv_switchbox_resources_do_not_visualize_duplicate_fused_parts():
     assert _visualized_names(whole_printer_resource).isdisjoint(duplicate_names)
 
 
+def test_hv_switchbox_resources_visualize_lid_threaded_insets():
+    hv_resource = yaml.safe_load(RESOURCE_FILE.read_text())
+    whole_printer_resource = yaml.safe_load(WHOLE_PRINTER_RESOURCE_FILE.read_text())
+    hv_resource_names = _visualized_names(hv_resource)
+    whole_printer_hv_names = _visualized_names_for(
+        whole_printer_resource,
+        source="injected",
+        assembly="hv_switchbox",
+    )
+
+    assert "lid_mount_screw_*_thread_inset" in hv_resource_names
+    assert "lid_mount_screw_*_nut" not in hv_resource_names
+    assert "lid_mount_screw_*_thread_inset" in whole_printer_hv_names
+    assert "lid_mount_screw_*_nut" not in whole_printer_hv_names
+
+
 def test_hv_switchbox_is_registered_and_injected_into_whole_printer():
     config = yaml.load(ASSEMBLIES_FILE.read_text(), Loader=AssemblyDefaultsLoader)
     assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
@@ -294,6 +370,9 @@ def test_hv_switchbox_is_registered_and_injected_into_whole_printer():
         "fuse_holder": "fuse_holder_assembly",
         "ssr": "fotek_ssr_assembly",
     }
+    assert hv_switchbox["parameters"][
+        "hv_switchbox_lid_thread_inset_extra_screw_depth"
+    ] == {"$ref": "hv_switchbox_lid_thread_inset_extra_screw_depth"}
 
     whole_printer = assemblies["whole_printer_assembly"]
     assert "hv_switchbox_assembly" in whole_printer["depends_on"]
