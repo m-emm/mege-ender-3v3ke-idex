@@ -54,14 +54,6 @@ def create_z_axis_top_profile_gusset_assembly(
         ),
     )
 
-    top_profile_side_x = side_alignment.sign * z_profile_size / 2
-    if side_alignment == Alignment.RIGHT:
-        top_profile_x_origin = (
-            top_profile_side_x - z_axis_top_profile_gusset_top_eye_length
-        )
-    else:
-        top_profile_x_origin = top_profile_side_x
-
     z_mount_plate = create_box(
         z_axis_top_profile_gusset_z_mount_width,
         z_axis_top_profile_gusset_wall_thickness,
@@ -107,22 +99,41 @@ def create_z_axis_top_profile_gusset_assembly(
         Alignment.STACK_BACK,
     )
 
+    top_profile_footprint_reference = create_box(
+        z_axis_top_profile_gusset_top_eye_length,
+        top_profile_size,
+        top_profile_size,
+    )
+    top_profile_footprint_reference = align(
+        top_profile_footprint_reference,
+        z_profile_contact_reference,
+        side_alignment,
+    )
+    top_profile_footprint_reference = align(
+        top_profile_footprint_reference,
+        z_profile_contact_reference,
+        Alignment.STACK_BACK,
+        stack_gap=z_axis_top_bridge_profile_back_offset,
+    )
+
     top_profile_bottom_lip = create_box(
         z_axis_top_profile_gusset_top_eye_length,
         z_axis_top_profile_gusset_top_eye_width,
         z_axis_top_profile_gusset_top_eye_thickness,
     )
-    top_profile_bottom_lip = translate(
-        top_profile_x_origin,
-        z_axis_top_bridge_profile_back_offset
-        + top_profile_size / 2
-        - z_axis_top_profile_gusset_top_eye_width / 2,
-        0,
-    )(top_profile_bottom_lip)
+    top_profile_bottom_lip = align(
+        top_profile_bottom_lip,
+        top_profile_footprint_reference,
+        Alignment.CENTER,
+    )
     top_profile_bottom_lip = align(
         top_profile_bottom_lip,
         hollow_momentum_profile,
         Alignment.STACK_TOP,
+    )
+
+    top_profile_bottom_lip = align(
+        top_profile_bottom_lip, z_mount_plate, side_alignment
     )
 
     gusset = PartCollector()
@@ -213,6 +224,42 @@ def create_z_axis_top_profile_gusset_assembly(
         screw_visual = align(screw_visual, top_profile_bottom_lip, Alignment.BOTTOM)
         screw_visual = translate(0, 0, -screw_spec.cylinder_head_height)(screw_visual)
         screw_visuals.append((f"top_profile_screw_{screw_index}", screw_visual))
+
+    gusset_size = get_bounding_box_size(gusset)
+    side_walls = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+
+        wall = create_box(
+            z_axis_top_profile_gusset_wall_thickness,
+            gusset_size[1],
+            BIG_THING / 3,
+        )
+
+        wall = align(wall, z_mount_plate, Alignment.CENTER)
+        wall = align(wall, top_profile_bottom_lip, Alignment.STACK_BOTTOM)
+        wall = align(wall, gusset, Alignment.FRONT)
+        wall = align(wall, z_mount_plate, lr)
+
+        side_walls = side_walls.fuse(wall)
+
+    side_wall_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    side_wall_cutter = align(side_wall_cutter, z_mount_plate, Alignment.CENTER)
+
+    side_wall_cutter = align(side_wall_cutter, z_mount_plate, Alignment.STACK_BOTTOM)
+    side_walls = side_walls.cut(side_wall_cutter)
+
+    z_mount_plate_size = get_bounding_box_size(z_mount_plate)
+    bottom_wall = create_box(
+        z_mount_plate_size[0],
+        gusset_size[1],
+        z_axis_top_profile_gusset_wall_thickness,
+    )
+    bottom_wall = align(bottom_wall, z_mount_plate, Alignment.CENTER)
+    bottom_wall = align(bottom_wall, z_mount_plate, Alignment.BOTTOM)
+    bottom_wall = align(bottom_wall, z_mount_plate, Alignment.FRONT)
+
+    gusset = gusset.fuse(side_walls)
+    gusset = gusset.fuse(bottom_wall)
 
     retval = LeaderFollowersCuttersPart(leader=gusset)
     retval.add_named_follower(top_profile_bottom_lip, "top_profile_bottom_lip")

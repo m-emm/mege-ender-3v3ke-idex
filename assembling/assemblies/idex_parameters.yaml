@@ -553,10 +553,10 @@ globals:
   z_axis_top_profile_gusset_profile_clearance: 0.3
   z_axis_top_profile_gusset_z_mount_width: 36
   z_axis_top_profile_gusset_z_mount_height: 100
-  z_axis_top_profile_gusset_top_eye_length: 100
+  z_axis_top_profile_gusset_top_eye_length: 120
   z_axis_top_profile_gusset_top_eye_width: 34
   z_axis_top_profile_gusset_top_eye_thickness: 5
-  z_axis_top_profile_gusset_profile_outer_diameter: 70
+  z_axis_top_profile_gusset_profile_outer_diameter: 110
   z_axis_top_profile_gusset_profile_width: 18
   z_axis_top_profile_gusset_profile_wall: 2.4
   z_axis_top_profile_gusset_profile_height: 34
