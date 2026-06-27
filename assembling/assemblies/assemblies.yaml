@@ -2163,7 +2163,6 @@ assemblies:
       z_axis_top_bridge_profile_back_offset: !Ref z_axis_top_bridge_profile_back_offset
       z_axis_top_bridge_profile_drop: !Ref z_axis_top_bridge_profile_drop
       z_axis_top_profile_gusset_wall_thickness: !Ref z_axis_top_profile_gusset_wall_thickness
-      z_axis_top_profile_gusset_rib_thickness: !Ref z_axis_top_profile_gusset_rib_thickness
       z_axis_top_profile_gusset_fillet_radius: !Ref z_axis_top_profile_gusset_fillet_radius
       z_axis_top_profile_gusset_profile_clearance: !Ref z_axis_top_profile_gusset_profile_clearance
       z_axis_top_profile_gusset_z_mount_width: !Ref z_axis_top_profile_gusset_z_mount_width
@@ -2171,6 +2170,10 @@ assemblies:
       z_axis_top_profile_gusset_top_eye_length: !Ref z_axis_top_profile_gusset_top_eye_length
       z_axis_top_profile_gusset_top_eye_width: !Ref z_axis_top_profile_gusset_top_eye_width
       z_axis_top_profile_gusset_top_eye_thickness: !Ref z_axis_top_profile_gusset_top_eye_thickness
+      z_axis_top_profile_gusset_profile_outer_diameter: !Ref z_axis_top_profile_gusset_profile_outer_diameter
+      z_axis_top_profile_gusset_profile_width: !Ref z_axis_top_profile_gusset_profile_width
+      z_axis_top_profile_gusset_profile_wall: !Ref z_axis_top_profile_gusset_profile_wall
+      z_axis_top_profile_gusset_profile_height: !Ref z_axis_top_profile_gusset_profile_height
       z_axis_top_profile_gusset_screw_size: !Ref z_axis_top_profile_gusset_screw_size
       z_axis_top_profile_gusset_screw_length: !Ref z_axis_top_profile_gusset_screw_length
       z_axis_top_profile_gusset_z_screw_inset: !Ref z_axis_top_profile_gusset_z_screw_inset
@@ -2188,7 +2191,6 @@ assemblies:
       z_axis_top_bridge_profile_back_offset: !Ref z_axis_top_bridge_profile_back_offset
       z_axis_top_bridge_profile_drop: !Ref z_axis_top_bridge_profile_drop
       z_axis_top_profile_gusset_wall_thickness: !Ref z_axis_top_profile_gusset_wall_thickness
-      z_axis_top_profile_gusset_rib_thickness: !Ref z_axis_top_profile_gusset_rib_thickness
       z_axis_top_profile_gusset_fillet_radius: !Ref z_axis_top_profile_gusset_fillet_radius
       z_axis_top_profile_gusset_profile_clearance: !Ref z_axis_top_profile_gusset_profile_clearance
       z_axis_top_profile_gusset_z_mount_width: !Ref z_axis_top_profile_gusset_z_mount_width
@@ -2196,6 +2198,10 @@ assemblies:
       z_axis_top_profile_gusset_top_eye_length: !Ref z_axis_top_profile_gusset_top_eye_length
       z_axis_top_profile_gusset_top_eye_width: !Ref z_axis_top_profile_gusset_top_eye_width
       z_axis_top_profile_gusset_top_eye_thickness: !Ref z_axis_top_profile_gusset_top_eye_thickness
+      z_axis_top_profile_gusset_profile_outer_diameter: !Ref z_axis_top_profile_gusset_profile_outer_diameter
+      z_axis_top_profile_gusset_profile_width: !Ref z_axis_top_profile_gusset_profile_width
+      z_axis_top_profile_gusset_profile_wall: !Ref z_axis_top_profile_gusset_profile_wall
+      z_axis_top_profile_gusset_profile_height: !Ref z_axis_top_profile_gusset_profile_height
       z_axis_top_profile_gusset_screw_size: !Ref z_axis_top_profile_gusset_screw_size
       z_axis_top_profile_gusset_screw_length: !Ref z_axis_top_profile_gusset_screw_length
       z_axis_top_profile_gusset_z_screw_inset: !Ref z_axis_top_profile_gusset_z_screw_inset

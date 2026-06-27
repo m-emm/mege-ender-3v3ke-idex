@@ -63,8 +63,6 @@ Parameters:
     Type: Float
   z_axis_top_profile_gusset_wall_thickness:
     Type: Float
-  z_axis_top_profile_gusset_rib_thickness:
-    Type: Float
   z_axis_top_profile_gusset_fillet_radius:
     Type: Float
   z_axis_top_profile_gusset_profile_clearance:
@@ -78,6 +76,14 @@ Parameters:
   z_axis_top_profile_gusset_top_eye_width:
     Type: Float
   z_axis_top_profile_gusset_top_eye_thickness:
+    Type: Float
+  z_axis_top_profile_gusset_profile_outer_diameter:
+    Type: Float
+  z_axis_top_profile_gusset_profile_width:
+    Type: Float
+  z_axis_top_profile_gusset_profile_wall:
+    Type: Float
+  z_axis_top_profile_gusset_profile_height:
     Type: Float
   z_axis_top_profile_gusset_screw_size:
     Type: String

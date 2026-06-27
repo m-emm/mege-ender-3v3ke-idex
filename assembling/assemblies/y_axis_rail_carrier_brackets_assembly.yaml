@@ -4,6 +4,17 @@ Description: Assembly configuration for the y-axis rail carrier brackets
 
 Builder:
   Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - left
+        - front
+        - back
+        - bottom
+      width: 1024
+      height: 1024
     parts:
       - source: dependencies
         assembly: printer_frame_assembly
