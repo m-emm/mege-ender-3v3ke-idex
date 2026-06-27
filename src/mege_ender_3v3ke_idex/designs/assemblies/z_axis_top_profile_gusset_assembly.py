@@ -85,7 +85,6 @@ def create_z_axis_top_profile_gusset_assembly(
         z_mount_plate,
         z_profile_contact_reference,
         Alignment.CENTER,
-        axes=[0],
     )
     z_mount_plate = align(
         z_mount_plate,
@@ -93,26 +92,6 @@ def create_z_axis_top_profile_gusset_assembly(
         Alignment.STACK_BACK,
     )
     z_mount_plate = align(z_mount_plate, z_profile_contact_reference, Alignment.TOP)
-
-    top_profile_mount_plate = create_filleted_box(
-        z_axis_top_profile_gusset_top_eye_length,
-        z_axis_top_profile_gusset_top_eye_width,
-        z_axis_top_profile_gusset_top_eye_thickness,
-        z_axis_top_profile_gusset_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM],
-    )
-    top_profile_mount_plate = align(
-        top_profile_mount_plate,
-        top_profile_contact_reference,
-        Alignment.CENTER,
-        axes=[0, 1],
-    )
-    top_profile_mount_plate = align(
-        top_profile_mount_plate,
-        top_profile_contact_reference,
-        Alignment.STACK_TOP,
-        stack_gap=z_axis_top_profile_gusset_profile_clearance,
-    )
 
     hollow_momentum_profile = create_hollow_profile_ring(
         z_axis_top_profile_gusset_profile_outer_diameter,
@@ -127,9 +106,10 @@ def create_z_axis_top_profile_gusset_assembly(
 
     hollow_momentum_profile = align(
         hollow_momentum_profile,
-        top_profile_mount_plate,
+        z_mount_plate,
         Alignment.BOTTOM,
     )
+
     hollow_momentum_profile = align(
         hollow_momentum_profile,
         z_mount_plate,
@@ -230,9 +210,8 @@ def create_z_axis_top_profile_gusset_assembly(
         )
         screw_axis_reference = align(
             screw_axis_reference,
-            top_profile_mount_plate,
+            z_mount_plate,
             Alignment.CENTER,
-            axes=[2],
         )
         screw_axis_reference = translate(screw_x, top_screw_y, 0)(screw_axis_reference)
 
@@ -245,7 +224,6 @@ def create_z_axis_top_profile_gusset_assembly(
             z_axis_top_profile_gusset_screw_length,
         )
         screw_visual = align(screw_visual, screw_axis_reference, Alignment.CENTER)
-        screw_visual = align(screw_visual, top_profile_mount_plate, Alignment.TOP)
         screw_visual = translate(0, 0, screw_spec.cylinder_head_height)(screw_visual)
         screw_visuals.append((f"top_profile_screw_{screw_index}", screw_visual))
 
