@@ -548,8 +548,8 @@ globals:
       "$sub": "${print_bed_vertical_gap_to_frame} - 43"
   z_axis_profile_length: 500
   z_axis_top_bridge_profile_back_offset: 7
+  z_axis_top_bridge_profile_top_drop: 20
   z_axis_top_profile_gusset_wall_thickness: 5
-  z_axis_top_profile_gusset_fillet_radius: 2
   z_axis_top_profile_gusset_profile_clearance: 0.3
   z_axis_top_profile_gusset_z_mount_width: 36
   z_axis_top_profile_gusset_z_mount_height: 100

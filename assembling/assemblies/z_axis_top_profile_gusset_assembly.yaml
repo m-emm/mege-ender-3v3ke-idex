@@ -21,7 +21,8 @@ Builder:
       - source: self
         artifact: non_production_parts
         exclude_names:
-          - z_profile_contact_reference
+          - z_profile_to_align
+          - top_profile_to_align
         name_template: "{name}"
         color: [0.78, 0.78, 0.72]
   Production:
@@ -56,11 +57,7 @@ Builder:
 Parameters:
   side:
     Type: String
-  z_axis_top_bridge_profile_back_offset:
-    Type: Float
   z_axis_top_profile_gusset_wall_thickness:
-    Type: Float
-  z_axis_top_profile_gusset_fillet_radius:
     Type: Float
   z_axis_top_profile_gusset_profile_clearance:
     Type: Float

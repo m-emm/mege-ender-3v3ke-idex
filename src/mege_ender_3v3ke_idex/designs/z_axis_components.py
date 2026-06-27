@@ -511,7 +511,5 @@ def create_top_bridge_profile(positioned_z_axes):
     )
     bridge = rotate(90, axis=(0, 1, 0))(bridge)
     bridge = align(bridge, z_axis_profiles, Alignment.CENTER, axes=[0])
-    bridge = align(bridge, z_axis_profiles, Alignment.TOP)
-    bridge = align(bridge, z_axis_profiles, Alignment.STACK_BACK)
 
     return bridge

@@ -39,7 +39,8 @@ Builder:
         assembly: z_axis_top_profile_gusset_left_assembly
         artifact: non_production_parts
         exclude_names:
-          - z_profile_contact_reference
+          - z_profile_to_align
+          - top_profile_to_align
         name_template: "z_axis_top_profile_gusset_left_{name}"
         color: [0.78, 0.78, 0.72]
       - source: dependencies
@@ -51,7 +52,8 @@ Builder:
         assembly: z_axis_top_profile_gusset_right_assembly
         artifact: non_production_parts
         exclude_names:
-          - z_profile_contact_reference
+          - z_profile_to_align
+          - top_profile_to_align
         name_template: "z_axis_top_profile_gusset_right_{name}"
         color: [0.78, 0.78, 0.72]
   Production:

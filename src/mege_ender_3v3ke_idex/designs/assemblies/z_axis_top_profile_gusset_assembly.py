@@ -13,13 +13,17 @@ def _side_alignment_from_name(side):
     raise ValueError(f"Unsupported z-axis top profile gusset side '{side}'")
 
 
+def _get_leader_part(part_like):
+    return part_like.leader if hasattr(part_like, "leader") else part_like
+
+
 def create_z_axis_top_profile_gusset_assembly(
     *,
     side,
+    z_axis_profile,
+    z_axis_top_bridge_profile,
     BIG_THING,
-    z_axis_top_bridge_profile_back_offset,
     z_axis_top_profile_gusset_wall_thickness,
-    z_axis_top_profile_gusset_fillet_radius,
     z_axis_top_profile_gusset_profile_clearance,
     z_axis_top_profile_gusset_z_mount_width,
     z_axis_top_profile_gusset_z_mount_height,
@@ -39,20 +43,8 @@ def create_z_axis_top_profile_gusset_assembly(
     """Create one side of the rear z-axis top profile bracket."""
 
     side_alignment = _side_alignment_from_name(side)
-    z_profile_size = 40
-    top_profile_size = 20
-    reference_thickness = 0.2
-
-    z_profile_contact_reference = create_box(
-        z_profile_size,
-        reference_thickness,
-        z_axis_top_profile_gusset_z_mount_height,
-        origin=(
-            -z_profile_size / 2,
-            -reference_thickness,
-            -z_axis_top_profile_gusset_z_mount_height,
-        ),
-    )
+    z_profile_to_align = _get_leader_part(z_axis_profile)
+    top_profile_to_align = _get_leader_part(z_axis_top_bridge_profile)
 
     z_mount_plate = create_box(
         z_axis_top_profile_gusset_z_mount_width,
@@ -61,15 +53,16 @@ def create_z_axis_top_profile_gusset_assembly(
     )
     z_mount_plate = align(
         z_mount_plate,
-        z_profile_contact_reference,
+        z_profile_to_align,
         Alignment.CENTER,
+        axes=[0],
     )
     z_mount_plate = align(
         z_mount_plate,
-        z_profile_contact_reference,
+        z_profile_to_align,
         Alignment.STACK_BACK,
     )
-    z_mount_plate = align(z_mount_plate, z_profile_contact_reference, Alignment.TOP)
+    z_mount_plate = align(z_mount_plate, z_profile_to_align, Alignment.TOP)
 
     hollow_momentum_profile = create_hollow_profile_ring(
         z_axis_top_profile_gusset_profile_outer_diameter,
@@ -95,25 +88,8 @@ def create_z_axis_top_profile_gusset_assembly(
     )
     hollow_momentum_profile = align(
         hollow_momentum_profile,
-        z_profile_contact_reference,
+        z_profile_to_align,
         Alignment.STACK_BACK,
-    )
-
-    top_profile_footprint_reference = create_box(
-        z_axis_top_profile_gusset_top_eye_length,
-        top_profile_size,
-        top_profile_size,
-    )
-    top_profile_footprint_reference = align(
-        top_profile_footprint_reference,
-        z_profile_contact_reference,
-        side_alignment,
-    )
-    top_profile_footprint_reference = align(
-        top_profile_footprint_reference,
-        z_profile_contact_reference,
-        Alignment.STACK_BACK,
-        stack_gap=z_axis_top_bridge_profile_back_offset,
     )
 
     top_profile_bottom_lip = create_box(
@@ -123,13 +99,15 @@ def create_z_axis_top_profile_gusset_assembly(
     )
     top_profile_bottom_lip = align(
         top_profile_bottom_lip,
-        top_profile_footprint_reference,
+        top_profile_to_align,
         Alignment.CENTER,
+        axes=[1],
     )
     top_profile_bottom_lip = align(
         top_profile_bottom_lip,
-        hollow_momentum_profile,
-        Alignment.STACK_TOP,
+        top_profile_to_align,
+        Alignment.STACK_BOTTOM,
+        stack_gap=z_axis_top_profile_gusset_profile_clearance,
     )
 
     top_profile_bottom_lip = align(
@@ -148,13 +126,17 @@ def create_z_axis_top_profile_gusset_assembly(
     screw_hole_radius = screw_spec.clearance_hole_loose / 2
     screw_visuals = []
 
-    for screw_index, screw_z in enumerate(
-        [
-            -z_axis_top_profile_gusset_z_screw_inset,
-            -z_axis_top_profile_gusset_z_mount_height
-            + z_axis_top_profile_gusset_z_screw_inset,
-        ]
-    ):
+    z_mount_plate_bbox = get_bounding_box(z_mount_plate)
+    top_profile_bbox = get_bounding_box(top_profile_to_align)
+    upper_screw_z = max(
+        z_mount_plate_bbox[1][2] - z_axis_top_profile_gusset_z_screw_inset,
+        top_profile_bbox[1][2]
+        + screw_spec.cylinder_head_diameter / 2
+        + z_axis_top_profile_gusset_screw_head_clearance,
+    )
+    lower_screw_z = z_mount_plate_bbox[0][2] + z_axis_top_profile_gusset_z_screw_inset
+
+    for screw_index, screw_z in enumerate((upper_screw_z, lower_screw_z)):
         screw_axis_reference = create_cylinder(
             screw_hole_radius,
             z_axis_top_profile_gusset_wall_thickness,
@@ -164,7 +146,7 @@ def create_z_axis_top_profile_gusset_assembly(
             screw_axis_reference,
             z_mount_plate,
             Alignment.CENTER,
-            axes=[1],
+            axes=[0, 1],
         )
         screw_axis_reference = translate(0, 0, screw_z)(screw_axis_reference)
 
@@ -186,7 +168,8 @@ def create_z_axis_top_profile_gusset_assembly(
         screw_visual = translate(0, screw_spec.cylinder_head_height, 0)(screw_visual)
         screw_visuals.append((f"z_mount_screw_{screw_index}", screw_visual))
 
-    top_screw_side_x = side_alignment.sign * z_profile_size / 2
+    z_profile_bbox = get_bounding_box(z_profile_to_align)
+    top_screw_side_x = z_profile_bbox[1 if side_alignment == Alignment.RIGHT else 0][0]
     top_screw_offsets_from_side = (
         z_axis_top_profile_gusset_top_screw_inset,
         z_axis_top_profile_gusset_top_eye_length
@@ -262,10 +245,13 @@ def create_z_axis_top_profile_gusset_assembly(
     gusset = gusset.fuse(bottom_wall)
 
     retval = LeaderFollowersCuttersPart(leader=gusset)
-    retval.add_named_follower(top_profile_bottom_lip, "top_profile_bottom_lip")
     retval.add_named_non_production_part(
-        z_profile_contact_reference,
-        "z_profile_contact_reference",
+        z_profile_to_align.copy(),
+        "z_profile_to_align",
+    )
+    retval.add_named_non_production_part(
+        top_profile_to_align.copy(),
+        "top_profile_to_align",
     )
     for name, screw_visual in screw_visuals:
         retval.add_named_non_production_part(screw_visual, name)
