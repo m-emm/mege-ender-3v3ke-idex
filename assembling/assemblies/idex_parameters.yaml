@@ -437,9 +437,9 @@ globals:
   fotek_ssr_output_cover_depth: 15.5
   fotek_ssr_input_cover_depth: 15.5
   fotek_ssr_cover_recess_depth: 2.0
-  hv_switchbox_height: 110
+  hv_switchbox_height: 125
   hv_switchbox_width: 55
-  hv_switchbox_depth: 140
+  hv_switchbox_depth: 155
   hv_switchbox_wall_thickness: !Ref electric_switchboard_wall_thickness
   hv_switchbox_fuse_holder_top_y_offset: -45
   hv_switchbox_terminal_rail_width: 14
