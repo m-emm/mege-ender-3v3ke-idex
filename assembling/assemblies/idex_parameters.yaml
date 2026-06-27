@@ -522,6 +522,19 @@ globals:
   fuse_holder_mount_nut_thickness: 5
   fuse_holder_mount_hole_clearance: 0.5
   fuse_holder_body_clearance: 0.5
+  big_fuses_holder_thread_diameter: 12.3
+  big_fuses_holder_thread_length: 12
+  big_fuses_holder_total_cylinder_length: 50
+  big_fuses_holder_thin_cylinder_diameter: 11.5
+  big_fuses_holder_thin_cylinder_length: 15.35
+  big_fuses_holder_thicker_cylinder_diameter: 12.3
+  big_fuses_holder_thicker_cylinder_length: 9.66
+  big_fuses_holder_front_diameter: 16
+  big_fuses_holder_front_length: 12
+  big_fuses_holder_mount_nut_outer_diameter: 16
+  big_fuses_holder_mount_nut_thickness: 4.5
+  big_fuses_holder_mount_hole_clearance: !Ref fuse_holder_mount_hole_clearance
+  big_fuses_holder_body_clearance: !Ref fuse_holder_body_clearance
   endstop_holder_stack_gap: 30
   z_axis_guide_distance: 256
   z_axis_y_offset: 130

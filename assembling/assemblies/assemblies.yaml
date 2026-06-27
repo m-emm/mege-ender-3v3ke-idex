@@ -1500,10 +1500,10 @@ assemblies:
 
     resource_file: hv_switchbox_assembly.yaml
     depends_on:
-      - fuse_holder_assembly
+      - big_fuses_holder_assembly
       - fotek_ssr_assembly
     inject_parts:
-      fuse_holder: fuse_holder_assembly
+      fuse_holder: big_fuses_holder_assembly
       ssr: fotek_ssr_assembly
     parameters:
       hv_switchbox_height: !Ref hv_switchbox_height
@@ -1603,6 +1603,25 @@ assemblies:
       fuse_holder_mount_nut_thickness: !Ref fuse_holder_mount_nut_thickness
       fuse_holder_mount_hole_clearance: !Ref fuse_holder_mount_hole_clearance
       fuse_holder_body_clearance: !Ref fuse_holder_body_clearance
+
+  - name: big_fuses_holder_assembly
+
+    resource_file: fuse_holder_assembly.yaml
+    depends_on: []
+    parameters:
+      fuse_holder_thread_diameter: !Ref big_fuses_holder_thread_diameter
+      fuse_holder_thread_length: !Ref big_fuses_holder_thread_length
+      fuse_holder_total_cylinder_length: !Ref big_fuses_holder_total_cylinder_length
+      fuse_holder_thin_cylinder_diameter: !Ref big_fuses_holder_thin_cylinder_diameter
+      fuse_holder_thin_cylinder_length: !Ref big_fuses_holder_thin_cylinder_length
+      fuse_holder_thicker_cylinder_diameter: !Ref big_fuses_holder_thicker_cylinder_diameter
+      fuse_holder_thicker_cylinder_length: !Ref big_fuses_holder_thicker_cylinder_length
+      fuse_holder_front_diameter: !Ref big_fuses_holder_front_diameter
+      fuse_holder_front_length: !Ref big_fuses_holder_front_length
+      fuse_holder_mount_nut_outer_diameter: !Ref big_fuses_holder_mount_nut_outer_diameter
+      fuse_holder_mount_nut_thickness: !Ref big_fuses_holder_mount_nut_thickness
+      fuse_holder_mount_hole_clearance: !Ref big_fuses_holder_mount_hole_clearance
+      fuse_holder_body_clearance: !Ref big_fuses_holder_body_clearance
 
   - name: creality_endstop_holder_assembly
 

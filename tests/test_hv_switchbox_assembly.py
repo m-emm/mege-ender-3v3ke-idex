@@ -44,12 +44,33 @@ SSR_PARAMETER_SUFFIXES = (
     "input_cover_depth",
     "cover_recess_depth",
 )
+FUSE_HOLDER_PARAMETER_SUFFIXES = (
+    "thread_diameter",
+    "thread_length",
+    "total_cylinder_length",
+    "thin_cylinder_diameter",
+    "thin_cylinder_length",
+    "thicker_cylinder_diameter",
+    "thicker_cylinder_length",
+    "front_diameter",
+    "front_length",
+    "mount_nut_outer_diameter",
+    "mount_nut_thickness",
+    "mount_hole_clearance",
+    "body_clearance",
+)
 
 
 @pytest.fixture(scope="module")
 def hv_switchbox():
     fuse_holder = create_fuse_holder_assembly(
-        **assembly_kwargs(create_fuse_holder_assembly)
+        **assembly_kwargs(
+            create_fuse_holder_assembly,
+            **{
+                f"fuse_holder_{suffix}": DEFAULTS[f"big_fuses_holder_{suffix}"]
+                for suffix in FUSE_HOLDER_PARAMETER_SUFFIXES
+            },
+        )
     )
     ssr = create_panasonic_ssr_assembly(
         **assembly_kwargs(
@@ -162,6 +183,38 @@ def test_hv_switchbox_uses_fotek_ssr_body_and_keeps_it_internal(hv_switchbox):
         abs=0.05,
     )
     _assert_inside_hv_inner_enclosure(ssr_body)
+
+
+def test_hv_switchbox_uses_big_fuses_holder(hv_switchbox):
+    holder_body = hv_switchbox.get_named_non_production_part("fuse_holder_holder_body")
+    mount_nut = hv_switchbox.get_named_non_production_part("fuse_holder_mount_nut")
+    mount_hole = hv_switchbox.get_named_cutter("fuse_holder_mount_hole")
+
+    assert get_bounding_box_size(holder_body) == pytest.approx(
+        (
+            DEFAULTS["big_fuses_holder_front_diameter"],
+            DEFAULTS["big_fuses_holder_front_diameter"],
+            DEFAULTS["big_fuses_holder_total_cylinder_length"],
+        ),
+        abs=0.05,
+    )
+    assert get_bounding_box_size(mount_nut)[2] == pytest.approx(
+        DEFAULTS["big_fuses_holder_mount_nut_thickness"],
+        abs=0.05,
+    )
+    assert max(get_bounding_box_size(mount_nut)[:2]) == pytest.approx(
+        DEFAULTS["big_fuses_holder_mount_nut_outer_diameter"],
+        abs=0.05,
+    )
+    assert get_bounding_box_size(mount_hole)[:2] == pytest.approx(
+        (
+            DEFAULTS["big_fuses_holder_thread_diameter"]
+            + DEFAULTS["big_fuses_holder_mount_hole_clearance"],
+            DEFAULTS["big_fuses_holder_thread_diameter"]
+            + DEFAULTS["big_fuses_holder_mount_hole_clearance"],
+        ),
+        abs=0.05,
+    )
 
 
 def test_hv_switchbox_has_six_internal_m4_terminal_stations(hv_switchbox):
@@ -363,13 +416,26 @@ def test_hv_switchbox_is_registered_and_injected_into_whole_printer():
     hv_switchbox = assemblies["hv_switchbox_assembly"]
     assert hv_switchbox["resource_file"] == "hv_switchbox_assembly.yaml"
     assert hv_switchbox["depends_on"] == [
-        "fuse_holder_assembly",
+        "big_fuses_holder_assembly",
         "fotek_ssr_assembly",
     ]
     assert hv_switchbox["inject_parts"] == {
-        "fuse_holder": "fuse_holder_assembly",
+        "fuse_holder": "big_fuses_holder_assembly",
         "ssr": "fotek_ssr_assembly",
     }
+    assert "fuse_holder_assembly" in assemblies
+    assert "big_fuses_holder_assembly" in assemblies
+    assert (
+        assemblies["big_fuses_holder_assembly"]["resource_file"]
+        == "fuse_holder_assembly.yaml"
+    )
+    assert assemblies["electric_switchboard_assembly"]["depends_on"] == [
+        "emergency_button_assembly",
+        "fuse_holder_assembly",
+    ]
+    assert assemblies["electric_switchboard_assembly"]["inject_parts"][
+        "fuse_holder"
+    ] == ("fuse_holder_assembly")
     assert hv_switchbox["parameters"][
         "hv_switchbox_lid_thread_inset_extra_screw_depth"
     ] == {"$ref": "hv_switchbox_lid_thread_inset_extra_screw_depth"}

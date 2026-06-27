@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from assembly_defaults import DEFAULTS
 from mege_ender_3v3ke_idex.designs.assemblies.fuse_holder_assembly import (
     create_fuse_holder_assembly,
 )
@@ -30,6 +31,25 @@ FUSE_HOLDER_PARAMS = {
     "fuse_holder_mount_hole_clearance": 0.5,
     "fuse_holder_body_clearance": 0.5,
 }
+FUSE_HOLDER_PARAMETER_SUFFIXES = (
+    "thread_diameter",
+    "thread_length",
+    "total_cylinder_length",
+    "thin_cylinder_diameter",
+    "thin_cylinder_length",
+    "thicker_cylinder_diameter",
+    "thicker_cylinder_length",
+    "front_diameter",
+    "front_length",
+    "mount_nut_outer_diameter",
+    "mount_nut_thickness",
+    "mount_hole_clearance",
+    "body_clearance",
+)
+BIG_FUSES_HOLDER_PARAMS = {
+    f"fuse_holder_{suffix}": DEFAULTS[f"big_fuses_holder_{suffix}"]
+    for suffix in FUSE_HOLDER_PARAMETER_SUFFIXES
+}
 
 
 RESOURCE_FILE = (
@@ -42,6 +62,10 @@ RESOURCE_FILE = (
 
 def _build_fuse_holder():
     return create_fuse_holder_assembly(**FUSE_HOLDER_PARAMS)
+
+
+def _build_big_fuses_holder():
+    return create_fuse_holder_assembly(**BIG_FUSES_HOLDER_PARAMS)
 
 
 def _assert_segment_radius(body, mid_x, radius):
@@ -140,8 +164,8 @@ def test_fuse_holder_mount_nut_dimensions_and_bore_match_thread_clearance():
         direction=(1, 0, 0),
     )
 
-    assert mount_nut_bbox[0][0] == pytest.approx(35, abs=0.05)
-    assert mount_nut_bbox[1][0] == pytest.approx(40, abs=0.05)
+    assert mount_nut_bbox[0][0] == pytest.approx(33.2, abs=0.05)
+    assert mount_nut_bbox[1][0] == pytest.approx(38.2, abs=0.05)
     assert mount_nut_size[0] == pytest.approx(5, abs=0.05)
     assert max(mount_nut_size[1], mount_nut_size[2]) == pytest.approx(21, abs=0.05)
     assert mount_nut_volume - get_volume(
@@ -166,6 +190,38 @@ def test_fuse_holder_panel_reference_and_cutters_match_clearances():
     )
     assert get_bounding_box_size(body_clearance) == pytest.approx(
         (70, 17.4, 17.4), abs=0.05
+    )
+
+
+def test_big_fuses_holder_matches_hv_specific_dimensions():
+    fuse_holder = _build_big_fuses_holder()
+    holder_body = fuse_holder.get_follower_part_by_name("holder_body")
+    mount_nut = fuse_holder.get_follower_part_by_name("mount_nut")
+    mount_hole = fuse_holder.get_cutter_part_by_name("mount_hole")
+    body_clearance = fuse_holder.get_cutter_part_by_name("body_clearance")
+    shoulder_length = 50 - 15.35 - 9.66 - 12 - 12
+    expected_volume = (
+        math.pi * (11.5 / 2) ** 2 * 15.35
+        + math.pi * (12.3 / 2) ** 2 * 9.66
+        + math.pi * (12.3 / 2) ** 2 * shoulder_length
+        + math.pi * (12.3 / 2) ** 2 * 12
+        + math.pi * (16 / 2) ** 2 * 12
+    )
+
+    assert get_bounding_box_size(holder_body) == pytest.approx((50, 16, 16), abs=0.05)
+    assert get_volume(holder_body) == pytest.approx(expected_volume, rel=0.01)
+    _assert_segment_radius(holder_body, 15.35 / 2, 11.5 / 2)
+    _assert_segment_radius(holder_body, 15.35 + 9.66 / 2, 12.3 / 2)
+    _assert_segment_radius(holder_body, 50 - 12 - 12 / 2, 12.3 / 2)
+    _assert_segment_radius(holder_body, 50 - 12 / 2, 16 / 2)
+
+    assert get_bounding_box_size(mount_nut)[0] == pytest.approx(4.5, abs=0.05)
+    assert max(get_bounding_box_size(mount_nut)[1:]) == pytest.approx(16, abs=0.05)
+    assert get_bounding_box_size(mount_hole) == pytest.approx(
+        (70, 12.8, 12.8), abs=0.05
+    )
+    assert get_bounding_box_size(body_clearance) == pytest.approx(
+        (70, 16.5, 16.5), abs=0.05
     )
 
 
