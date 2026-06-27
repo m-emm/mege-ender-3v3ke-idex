@@ -31,7 +31,7 @@ def create_hv_switchbox_assembly(
     hv_switchbox_ssr_mount_nut_pocket_clearance,
     hv_switchbox_ssr_mount_nut_pocket_sink_depth,
     hv_switchbox_ssr_y_center,
-    hv_switchbox_ssr_z_center,
+    hv_switchbox_ssr_bottom_gap_above_terminal_rail,
     hv_switchbox_cable_cutout_width,
     hv_switchbox_cable_cutout_height_ratio,
     hv_switchbox_cable_cutout_fillet_radius,
@@ -116,12 +116,22 @@ def create_hv_switchbox_assembly(
     ssr_mount_nuts_list = []
     ssr_mount_holes_list = []
     ssr_mount_nut_pockets_list = []
+    rotated_ssr_body = rotate(90, axis=(0, 1, 0))(ssr.get_follower_part_by_name("body"))
+    terminal_rail_top_z = (
+        hv_switchbox_terminal_rail_z_offset_from_bottom
+        + hv_switchbox_terminal_rail_width
+    )
+    ssr_z_center = (
+        terminal_rail_top_z
+        + hv_switchbox_ssr_bottom_gap_above_terminal_rail
+        + get_bounding_box_size(rotated_ssr_body)[2] / 2
+    )
     ssr_mount_hole_pattern = ssr.get_cutter_part_by_name("mounting_hole_pattern")
     ssr_mount_hole_pattern = rotate(90, axis=(0, 1, 0))(ssr_mount_hole_pattern)
     ssr_mount_translation = (
         ssr_mount_boss_left_x - get_bounding_box(ssr_mount_hole_pattern)[1][0],
         hv_switchbox_ssr_y_center - get_bounding_box_center(ssr_mount_hole_pattern)[1],
-        hv_switchbox_ssr_z_center - get_bounding_box_center(ssr_mount_hole_pattern)[2],
+        ssr_z_center - get_bounding_box_center(ssr_mount_hole_pattern)[2],
     )
     ssr_mount_hole_pattern = translate(*ssr_mount_translation)(ssr_mount_hole_pattern)
     ssr_mount_hole_y_positions = []
@@ -139,7 +149,7 @@ def create_hv_switchbox_assembly(
     ssr_visual = translate(
         ssr_mount_boss_left_x - get_bounding_box(ssr_visual)[1][0],
         hv_switchbox_ssr_y_center - get_bounding_box_center(ssr_visual)[1],
-        hv_switchbox_ssr_z_center - get_bounding_box_center(ssr_visual)[2],
+        ssr_z_center - get_bounding_box_center(ssr_visual)[2],
     )(ssr_visual)
     ssr_visual_bbox = get_bounding_box(ssr_visual)
 
@@ -159,7 +169,7 @@ def create_hv_switchbox_assembly(
         ssr_mount_boss = translate(
             ssr_mount_boss_left_x,
             ssr_mount_y - hv_switchbox_ssr_mount_boss_width / 2,
-            hv_switchbox_ssr_z_center - hv_switchbox_ssr_mount_boss_height / 2,
+            ssr_z_center - hv_switchbox_ssr_mount_boss_height / 2,
         )(ssr_mount_boss)
 
         ssr_mount_hole = create_cylinder(
@@ -168,7 +178,7 @@ def create_hv_switchbox_assembly(
             origin=(
                 ssr_mount_boss_left_x + 0.4,
                 ssr_mount_y,
-                hv_switchbox_ssr_z_center,
+                ssr_z_center,
             ),
             direction=(1, 0, 0),
         )
@@ -201,7 +211,7 @@ def create_hv_switchbox_assembly(
             origin=(
                 ssr_visual_bbox[0][0],
                 ssr_mount_y,
-                hv_switchbox_ssr_z_center,
+                ssr_z_center,
             ),
             direction=(1, 0, 0),
         )
@@ -211,7 +221,7 @@ def create_hv_switchbox_assembly(
             origin=(
                 ssr_visual_bbox[0][0] - ssr_mount_screw_spec.cylinder_head_height,
                 ssr_mount_y,
-                hv_switchbox_ssr_z_center,
+                ssr_z_center,
             ),
             direction=(1, 0, 0),
         )

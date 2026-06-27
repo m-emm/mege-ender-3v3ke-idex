@@ -168,7 +168,7 @@ Parameters:
     Type: Float
   hv_switchbox_ssr_y_center:
     Type: Float
-  hv_switchbox_ssr_z_center:
+  hv_switchbox_ssr_bottom_gap_above_terminal_rail:
     Type: Float
   hv_switchbox_cable_cutout_width:
     Type: Float

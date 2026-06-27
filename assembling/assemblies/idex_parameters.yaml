@@ -458,7 +458,7 @@ globals:
   hv_switchbox_ssr_mount_nut_pocket_clearance: 0.3
   hv_switchbox_ssr_mount_nut_pocket_sink_depth: 3.6
   hv_switchbox_ssr_y_center: 82
-  hv_switchbox_ssr_z_center: 70
+  hv_switchbox_ssr_bottom_gap_above_terminal_rail: 40
   hv_switchbox_cable_cutout_width: 14
   hv_switchbox_cable_cutout_height_ratio: 0.3
   hv_switchbox_cable_cutout_fillet_radius: !Ref electric_switchboard_cable_cutout_fillet_radius

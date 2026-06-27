@@ -115,6 +115,21 @@ def _assert_inside_hv_inner_enclosure(part):
         assert bbox[1][axis] <= inner_bounds[1][axis] + 0.05
 
 
+def _terminal_rail_top_z():
+    return (
+        DEFAULTS["hv_switchbox_terminal_rail_z_offset_from_bottom"]
+        + DEFAULTS["hv_switchbox_terminal_rail_width"]
+    )
+
+
+def _expected_ssr_z_center():
+    return (
+        _terminal_rail_top_z()
+        + DEFAULTS["hv_switchbox_ssr_bottom_gap_above_terminal_rail"]
+        + DEFAULTS["fotek_ssr_width"] / 2
+    )
+
+
 def _visualized_names(resource):
     names = set()
     for part in resource["Builder"]["Visualization"]["parts"]:
@@ -180,6 +195,11 @@ def test_hv_switchbox_uses_fotek_ssr_body_and_keeps_it_internal(hv_switchbox):
             DEFAULTS["fotek_ssr_length"],
             DEFAULTS["fotek_ssr_width"],
         ),
+        abs=0.05,
+    )
+    assert get_bounding_box(ssr_body)[0][2] == pytest.approx(
+        _terminal_rail_top_z()
+        + DEFAULTS["hv_switchbox_ssr_bottom_gap_above_terminal_rail"],
         abs=0.05,
     )
     _assert_inside_hv_inner_enclosure(ssr_body)
@@ -256,14 +276,14 @@ def test_hv_switchbox_terminal_hardware_is_fully_internal(hv_switchbox):
 
 
 def test_hv_switchbox_ssr_mount_nut_pockets_open_to_boss_top(hv_switchbox):
+    expected_ssr_z_center = _expected_ssr_z_center()
     boss_center_x = (
         DEFAULTS["hv_switchbox_width"]
         - DEFAULTS["hv_switchbox_wall_thickness"]
         - DEFAULTS["hv_switchbox_ssr_mount_boss_depth"] / 2
     )
     boss_top_z = (
-        DEFAULTS["hv_switchbox_ssr_z_center"]
-        + DEFAULTS["hv_switchbox_ssr_mount_boss_height"] / 2
+        expected_ssr_z_center + DEFAULTS["hv_switchbox_ssr_mount_boss_height"] / 2
     )
 
     for mount_index in [1, 2]:
@@ -281,7 +301,7 @@ def test_hv_switchbox_ssr_mount_nut_pockets_open_to_boss_top(hv_switchbox):
             (
                 boss_center_x,
                 mount_hole_center[1],
-                DEFAULTS["hv_switchbox_ssr_z_center"],
+                expected_ssr_z_center,
             ),
             abs=0.05,
         )
@@ -439,6 +459,10 @@ def test_hv_switchbox_is_registered_and_injected_into_whole_printer():
     assert hv_switchbox["parameters"][
         "hv_switchbox_lid_thread_inset_extra_screw_depth"
     ] == {"$ref": "hv_switchbox_lid_thread_inset_extra_screw_depth"}
+    assert hv_switchbox["parameters"][
+        "hv_switchbox_ssr_bottom_gap_above_terminal_rail"
+    ] == {"$ref": "hv_switchbox_ssr_bottom_gap_above_terminal_rail"}
+    assert "hv_switchbox_ssr_z_center" not in hv_switchbox["parameters"]
 
     whole_printer = assemblies["whole_printer_assembly"]
     assert "hv_switchbox_assembly" in whole_printer["depends_on"]

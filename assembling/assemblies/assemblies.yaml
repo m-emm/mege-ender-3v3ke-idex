@@ -1527,7 +1527,7 @@ assemblies:
       hv_switchbox_ssr_mount_nut_pocket_clearance: !Ref hv_switchbox_ssr_mount_nut_pocket_clearance
       hv_switchbox_ssr_mount_nut_pocket_sink_depth: !Ref hv_switchbox_ssr_mount_nut_pocket_sink_depth
       hv_switchbox_ssr_y_center: !Ref hv_switchbox_ssr_y_center
-      hv_switchbox_ssr_z_center: !Ref hv_switchbox_ssr_z_center
+      hv_switchbox_ssr_bottom_gap_above_terminal_rail: !Ref hv_switchbox_ssr_bottom_gap_above_terminal_rail
       hv_switchbox_cable_cutout_width: !Ref hv_switchbox_cable_cutout_width
       hv_switchbox_cable_cutout_height_ratio: !Ref hv_switchbox_cable_cutout_height_ratio
       hv_switchbox_cable_cutout_fillet_radius: !Ref hv_switchbox_cable_cutout_fillet_radius
