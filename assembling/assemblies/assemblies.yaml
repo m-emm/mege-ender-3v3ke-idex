@@ -1475,6 +1475,27 @@ assemblies:
       panasonic_ssr_input_cover_depth: !Ref panasonic_ssr_input_cover_depth
       panasonic_ssr_cover_recess_depth: !Ref panasonic_ssr_cover_recess_depth
 
+  - name: fotek_ssr_assembly
+
+    resource_file: panasonic_ssr_assembly.yaml
+    depends_on: []
+    parameters:
+      panasonic_ssr_width: !Ref fotek_ssr_width
+      panasonic_ssr_length: !Ref fotek_ssr_length
+      panasonic_ssr_height: !Ref fotek_ssr_height
+      panasonic_ssr_corner_fillet_radius: !Ref fotek_ssr_corner_fillet_radius
+      panasonic_ssr_mount_hole_diameter: !Ref fotek_ssr_mount_hole_diameter
+      panasonic_ssr_mount_hole_pitch: !Ref fotek_ssr_mount_hole_pitch
+      panasonic_ssr_terminal_screw_x_inset: !Ref fotek_ssr_terminal_screw_x_inset
+      panasonic_ssr_output_terminal_y_inset: !Ref fotek_ssr_output_terminal_y_inset
+      panasonic_ssr_input_terminal_y_inset: !Ref fotek_ssr_input_terminal_y_inset
+      panasonic_ssr_output_terminal_screw_size: !Ref fotek_ssr_output_terminal_screw_size
+      panasonic_ssr_input_terminal_screw_size: !Ref fotek_ssr_input_terminal_screw_size
+      panasonic_ssr_terminal_screw_head_height: !Ref fotek_ssr_terminal_screw_head_height
+      panasonic_ssr_output_cover_depth: !Ref fotek_ssr_output_cover_depth
+      panasonic_ssr_input_cover_depth: !Ref fotek_ssr_input_cover_depth
+      panasonic_ssr_cover_recess_depth: !Ref fotek_ssr_cover_recess_depth
+
   - name: hv_switchbox_assembly
 
     resource_file: hv_switchbox_assembly.yaml

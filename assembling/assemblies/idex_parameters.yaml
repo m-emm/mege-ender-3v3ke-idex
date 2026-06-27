@@ -422,6 +422,21 @@ globals:
   panasonic_ssr_output_cover_depth: 15.5
   panasonic_ssr_input_cover_depth: 15.5
   panasonic_ssr_cover_recess_depth: 2.0
+  fotek_ssr_width: 45.3
+  fotek_ssr_length: 62.8
+  fotek_ssr_height: 23.45
+  fotek_ssr_corner_fillet_radius: 1.2
+  fotek_ssr_mount_hole_diameter: 4.3
+  fotek_ssr_mount_hole_pitch: 47.5
+  fotek_ssr_terminal_screw_x_inset: 10.5
+  fotek_ssr_output_terminal_y_inset: 7.5
+  fotek_ssr_input_terminal_y_inset: 7.5
+  fotek_ssr_output_terminal_screw_size: "M4"
+  fotek_ssr_input_terminal_screw_size: "M3"
+  fotek_ssr_terminal_screw_head_height: 1.0
+  fotek_ssr_output_cover_depth: 15.5
+  fotek_ssr_input_cover_depth: 15.5
+  fotek_ssr_cover_recess_depth: 2.0
   hv_switchbox_height: 110
   hv_switchbox_width: 55
   hv_switchbox_depth: 140
