@@ -175,27 +175,24 @@ def create_hv_switchbox_assembly(
         ssr_mount_holes = ssr_mount_holes.fuse(ssr_mount_hole)
         ssr_mount_holes_list.append(ssr_mount_hole)
 
-        ssr_mount_nut_pocket = create_nut(
+        ssr_mount_nut_pocket = create_hidden_nut_pocket_cutter(
             hv_switchbox_ssr_mount_screw_size,
-            height=hv_switchbox_ssr_mount_nut_pocket_sink_depth,
+            nut_height=hv_switchbox_ssr_mount_nut_pocket_sink_depth,
+            bottom_cutter_length=hv_switchbox_ssr_mount_boss_depth,
+            top_cutter_length=hv_switchbox_ssr_mount_boss_depth,
             slack=hv_switchbox_ssr_mount_nut_pocket_clearance,
-            no_hole=True,
         )
-        ssr_mount_nut_pocket = rotate(90, axis=(0, 1, 0))(ssr_mount_nut_pocket)
-        ssr_mount_nut_pocket = translate(
-            inner_right_x
-            - 0.6
-            - hv_switchbox_ssr_mount_nut_pocket_sink_depth
-            - get_bounding_box(ssr_mount_nut_pocket)[0][0],
-            ssr_mount_y - get_bounding_box_center(ssr_mount_nut_pocket)[1],
-            hv_switchbox_ssr_z_center
-            - get_bounding_box_center(ssr_mount_nut_pocket)[2],
-        )(ssr_mount_nut_pocket)
-        ssr_mount_boss = ssr_mount_boss.cut(ssr_mount_nut_pocket)
+        ssr_mount_nut_pocket = rotate(-90, axis=(0, 1, 0))(ssr_mount_nut_pocket)
+        ssr_mount_nut_pocket = rotate(90, axis=(1, 0, 0))(ssr_mount_nut_pocket)
+        ssr_mount_nut_pocket = align(
+            ssr_mount_nut_pocket, ssr_mount_boss, Alignment.CENTER
+        )
+        ssr_mount_boss = ssr_mount_nut_pocket.use_as_cutter_on(ssr_mount_boss)
+        ssr_mount_nut_pocket_cutter = ssr_mount_nut_pocket.cutters[0]
         ssr_mount_nut_pocket_cutters = ssr_mount_nut_pocket_cutters.fuse(
-            ssr_mount_nut_pocket
+            ssr_mount_nut_pocket_cutter
         )
-        ssr_mount_nut_pockets_list.append(ssr_mount_nut_pocket)
+        ssr_mount_nut_pockets_list.append(ssr_mount_nut_pocket_cutter)
 
         ssr_mount_screw_shaft = create_cylinder(
             float(hv_switchbox_ssr_mount_screw_size[1:]) / 2,
@@ -222,8 +219,11 @@ def create_hv_switchbox_assembly(
         ssr_mount_screws_list.append(ssr_mount_screw)
 
         ssr_mount_nut = create_nut(hv_switchbox_ssr_mount_screw_size)
-        ssr_mount_nut = rotate(90, axis=(0, 1, 0))(ssr_mount_nut)
-        ssr_mount_nut = align(ssr_mount_nut, ssr_mount_nut_pocket, Alignment.CENTER)
+        ssr_mount_nut = rotate(-90, axis=(0, 1, 0))(ssr_mount_nut)
+        ssr_mount_nut = rotate(90, axis=(1, 0, 0))(ssr_mount_nut)
+        ssr_mount_nut = align(
+            ssr_mount_nut, ssr_mount_nut_pocket.leader, Alignment.CENTER
+        )
         ssr_mount_nuts = ssr_mount_nuts.fuse(ssr_mount_nut)
         ssr_mount_nuts_list.append(ssr_mount_nut)
         ssr_mount_bosses = ssr_mount_bosses.fuse(ssr_mount_boss)
@@ -250,6 +250,7 @@ def create_hv_switchbox_assembly(
         hv_switchbox_terminal_num_spots + 1
     )
     terminal_rail_bbox = get_bounding_box(terminal_rail)
+    terminal_rail_center_y = get_bounding_box_center(terminal_rail)[1]
     terminal_screws = PartCollector()
     terminal_nuts = PartCollector()
     terminal_holes = PartCollector()
@@ -278,29 +279,29 @@ def create_hv_switchbox_assembly(
         terminal_holes = terminal_holes.fuse(terminal_hole)
         terminal_holes_list.append(terminal_hole)
 
-        terminal_nut_pocket = create_nut(
+        terminal_nut_pocket = create_hidden_nut_pocket_cutter(
             hv_switchbox_terminal_screw_size,
-            height=hv_switchbox_terminal_nut_pocket_sink_depth,
+            nut_height=hv_switchbox_terminal_nut_pocket_sink_depth,
+            bottom_cutter_length=hv_switchbox_terminal_rail_width,
+            top_cutter_length=hv_switchbox_terminal_rail_width,
             slack=hv_switchbox_terminal_nut_pocket_clearance,
-            no_hole=True,
         )
-        terminal_nut_pocket = rotate(90, axis=(0, 1, 0))(terminal_nut_pocket)
+        terminal_nut_pocket = rotate(-90, axis=(0, 1, 0))(terminal_nut_pocket)
+        terminal_nut_pocket = rotate(90, axis=(1, 0, 0))(terminal_nut_pocket)
         terminal_nut_pocket = align(
-            terminal_nut_pocket, terminal_rail, Alignment.CENTER, axes=[2]
+            terminal_nut_pocket, terminal_rail, Alignment.CENTER
         )
         terminal_nut_pocket = translate(
-            terminal_rail_bbox[1][0]
-            - 0.6
-            - hv_switchbox_terminal_nut_pocket_sink_depth
-            - get_bounding_box(terminal_nut_pocket)[0][0],
-            terminal_y - get_bounding_box_center(terminal_nut_pocket)[1],
+            0,
+            terminal_y - terminal_rail_center_y,
             0,
         )(terminal_nut_pocket)
-        terminal_rail = terminal_rail.cut(terminal_nut_pocket)
+        terminal_rail = terminal_nut_pocket.use_as_cutter_on(terminal_rail)
+        terminal_nut_pocket_cutter = terminal_nut_pocket.cutters[0]
         terminal_nut_pocket_cutters = terminal_nut_pocket_cutters.fuse(
-            terminal_nut_pocket
+            terminal_nut_pocket_cutter
         )
-        terminal_nut_pockets_list.append(terminal_nut_pocket)
+        terminal_nut_pockets_list.append(terminal_nut_pocket_cutter)
 
         terminal_screw_shaft = create_cylinder(
             float(hv_switchbox_terminal_screw_size[1:]) / 2,
@@ -327,8 +328,9 @@ def create_hv_switchbox_assembly(
         terminal_screws_list.append(terminal_screw)
 
         terminal_nut = create_nut(hv_switchbox_terminal_screw_size)
-        terminal_nut = rotate(90, axis=(0, 1, 0))(terminal_nut)
-        terminal_nut = align(terminal_nut, terminal_nut_pocket, Alignment.CENTER)
+        terminal_nut = rotate(-90, axis=(0, 1, 0))(terminal_nut)
+        terminal_nut = rotate(90, axis=(1, 0, 0))(terminal_nut)
+        terminal_nut = align(terminal_nut, terminal_nut_pocket.leader, Alignment.CENTER)
         terminal_nuts = terminal_nuts.fuse(terminal_nut)
         terminal_nuts_list.append(terminal_nut)
 
@@ -655,12 +657,10 @@ def create_hv_switchbox_assembly(
     switchbox.add_named_non_production_part(
         inner_space_cutter, "hv_switchbox_inner_space_reference"
     )
-    switchbox.add_named_non_production_part(terminal_rail, "hv_switchbox_terminal_rail")
     switchbox.add_named_non_production_part(
         terminal_screws, "hv_switchbox_terminal_screws"
     )
     switchbox.add_named_non_production_part(terminal_nuts, "hv_switchbox_terminal_nuts")
-    switchbox.add_named_non_production_part(ssr_mount_bosses, "ssr_mount_bosses")
     switchbox.add_named_non_production_part(ssr_mount_screws, "ssr_mount_screws")
     switchbox.add_named_non_production_part(ssr_mount_nuts, "ssr_mount_nuts")
     for ssr_mount_index, ssr_mount_screw in enumerate(ssr_mount_screws_list, start=1):

@@ -644,14 +644,6 @@ Builder:
         name_template: "hv_switchbox_{name}"
         color: [0.9, 0.86, 0.72]
       - source: injected
-        assembly: hv_switchbox
-        artifact: non_production_parts
-        names:
-          - hv_switchbox_terminal_rail
-          - ssr_mount_bosses
-        name_template: "hv_switchbox_{name}"
-        color: [0.9, 0.9, 0.88]
-      - source: injected
         assembly: heatbed_psu_housing
         artifact: leader
         name: heatbed_psu_housing_box

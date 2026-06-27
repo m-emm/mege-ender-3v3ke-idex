@@ -16,11 +16,16 @@ from mege_ender_3v3ke_idex.designs.assemblies.hv_switchbox_assembly import (
 from mege_ender_3v3ke_idex.designs.assemblies.panasonic_ssr_assembly import (
     create_panasonic_ssr_assembly,
 )
-from shellforgepy.simple import get_bounding_box, get_bounding_box_size
+from shellforgepy.simple import (
+    get_bounding_box,
+    get_bounding_box_center,
+    get_bounding_box_size,
+)
 
 
 RESOURCE_FILE = ASSEMBLIES_DIR / "hv_switchbox_assembly.yaml"
 ASSEMBLIES_FILE = ASSEMBLIES_DIR / "assemblies.yaml"
+WHOLE_PRINTER_RESOURCE_FILE = ASSEMBLIES_DIR / "whole_printer_assembly.yaml"
 SSR_PARAMETER_SUFFIXES = (
     "width",
     "length",
@@ -88,6 +93,15 @@ def _assert_inside_hv_inner_enclosure(part):
         assert bbox[1][axis] <= inner_bounds[1][axis] + 0.05
 
 
+def _visualized_names(resource):
+    names = set()
+    for part in resource["Builder"]["Visualization"]["parts"]:
+        names.update(part.get("names", []))
+        if "name" in part:
+            names.add(part["name"])
+    return names
+
+
 def test_hv_switchbox_reference_matches_requested_external_size(hv_switchbox):
     reference = hv_switchbox.get_named_non_production_part(
         "hv_switchbox_body_reference"
@@ -112,6 +126,8 @@ def test_hv_switchbox_exports_lid_cable_cover_fuse_holder_and_ssr(hv_switchbox):
     assert "fuse_holder_mount_hole" in names
     assert "ssr_body" in names
     assert "ssr_mounting_hole_pattern" in names
+    assert "hv_switchbox_terminal_rail" not in names
+    assert "ssr_mount_bosses" not in names
     assert not any("emergency" in name.lower() for name in names)
 
 
@@ -150,9 +166,6 @@ def test_hv_switchbox_ssr_mounting_hardware_is_fully_internal(hv_switchbox):
         _assert_inside_hv_inner_enclosure(
             hv_switchbox.get_named_cutter(f"ssr_mount_hole_{mount_index}")
         )
-        _assert_inside_hv_inner_enclosure(
-            hv_switchbox.get_named_cutter(f"ssr_mount_nut_pocket_{mount_index}")
-        )
 
 
 def test_hv_switchbox_terminal_hardware_is_fully_internal(hv_switchbox):
@@ -168,8 +181,73 @@ def test_hv_switchbox_terminal_hardware_is_fully_internal(hv_switchbox):
         _assert_inside_hv_inner_enclosure(
             hv_switchbox.get_named_cutter(f"terminal_hole_{terminal_index}")
         )
-        _assert_inside_hv_inner_enclosure(
-            hv_switchbox.get_named_cutter(f"terminal_nut_pocket_{terminal_index}")
+
+
+def test_hv_switchbox_ssr_mount_nut_pockets_open_to_boss_top(hv_switchbox):
+    boss_center_x = (
+        DEFAULTS["hv_switchbox_width"]
+        - DEFAULTS["hv_switchbox_wall_thickness"]
+        - DEFAULTS["hv_switchbox_ssr_mount_boss_depth"] / 2
+    )
+    boss_top_z = (
+        DEFAULTS["hv_switchbox_ssr_z_center"]
+        + DEFAULTS["hv_switchbox_ssr_mount_boss_height"] / 2
+    )
+
+    for mount_index in [1, 2]:
+        mount_hole = hv_switchbox.get_named_cutter(f"ssr_mount_hole_{mount_index}")
+        mount_nut = hv_switchbox.get_named_non_production_part(
+            f"ssr_mount_nut_{mount_index}"
+        )
+        mount_pocket = hv_switchbox.get_named_cutter(
+            f"ssr_mount_nut_pocket_{mount_index}"
+        )
+        mount_hole_center = get_bounding_box_center(mount_hole)
+
+        assert get_bounding_box(mount_pocket)[1][2] >= boss_top_z - 0.05
+        assert get_bounding_box_center(mount_nut) == pytest.approx(
+            (
+                boss_center_x,
+                mount_hole_center[1],
+                DEFAULTS["hv_switchbox_ssr_z_center"],
+            ),
+            abs=0.05,
+        )
+
+
+def test_hv_switchbox_terminal_nut_pockets_open_to_rail_top(hv_switchbox):
+    rail_center_x = (
+        DEFAULTS["hv_switchbox_width"]
+        - DEFAULTS["hv_switchbox_wall_thickness"]
+        - DEFAULTS["hv_switchbox_terminal_rail_height"] / 2
+    )
+    rail_center_z = (
+        DEFAULTS["hv_switchbox_terminal_rail_z_offset_from_bottom"]
+        + DEFAULTS["hv_switchbox_terminal_rail_width"] / 2
+    )
+    rail_top_z = (
+        DEFAULTS["hv_switchbox_terminal_rail_z_offset_from_bottom"]
+        + DEFAULTS["hv_switchbox_terminal_rail_width"]
+    )
+
+    for terminal_index in range(1, DEFAULTS["hv_switchbox_terminal_num_spots"] + 1):
+        terminal_hole = hv_switchbox.get_named_cutter(f"terminal_hole_{terminal_index}")
+        terminal_nut = hv_switchbox.get_named_non_production_part(
+            f"terminal_nut_{terminal_index}"
+        )
+        terminal_pocket = hv_switchbox.get_named_cutter(
+            f"terminal_nut_pocket_{terminal_index}"
+        )
+        terminal_hole_center = get_bounding_box_center(terminal_hole)
+
+        assert get_bounding_box(terminal_pocket)[1][2] >= rail_top_z - 0.05
+        assert get_bounding_box_center(terminal_nut) == pytest.approx(
+            (
+                rail_center_x,
+                terminal_hole_center[1],
+                rail_center_z,
+            ),
+            abs=0.05,
         )
 
 
@@ -190,6 +268,16 @@ def test_hv_switchbox_resource_uses_petgcf_production_settings():
         assert overrides["support_on_build_plate_only"] == "1"
         assert overrides["support_interface_spacing"] == "2"
         assert overrides["wall_loops"] == "3"
+
+
+def test_hv_switchbox_resources_do_not_visualize_duplicate_fused_parts():
+    duplicate_names = {"hv_switchbox_terminal_rail", "ssr_mount_bosses"}
+
+    hv_resource = yaml.safe_load(RESOURCE_FILE.read_text())
+    whole_printer_resource = yaml.safe_load(WHOLE_PRINTER_RESOURCE_FILE.read_text())
+
+    assert _visualized_names(hv_resource).isdisjoint(duplicate_names)
+    assert _visualized_names(whole_printer_resource).isdisjoint(duplicate_names)
 
 
 def test_hv_switchbox_is_registered_and_injected_into_whole_printer():
