@@ -439,9 +439,9 @@ globals:
   fotek_ssr_cover_recess_depth: 2.0
   hv_switchbox_height: 125
   hv_switchbox_width: 55
-  hv_switchbox_depth: 155
+  hv_switchbox_depth: 160
   hv_switchbox_wall_thickness: !Ref electric_switchboard_wall_thickness
-  hv_switchbox_fuse_holder_top_y_offset: -45
+  hv_switchbox_fuse_holder_top_y_offset: -55
   hv_switchbox_terminal_rail_width: 14
   hv_switchbox_terminal_rail_height: 14
   hv_switchbox_terminal_screw_size: "M4"
@@ -457,7 +457,7 @@ globals:
   hv_switchbox_ssr_mount_boss_height: 14
   hv_switchbox_ssr_mount_nut_pocket_clearance: 0.3
   hv_switchbox_ssr_mount_nut_pocket_sink_depth: 3.6
-  hv_switchbox_ssr_y_center: 82
+  hv_switchbox_ssr_y_center: 92
   hv_switchbox_ssr_bottom_gap_above_terminal_rail: 40
   hv_switchbox_cable_cutout_width: 14
   hv_switchbox_cable_cutout_height_ratio: 0.3

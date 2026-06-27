@@ -237,6 +237,22 @@ def test_hv_switchbox_uses_big_fuses_holder(hv_switchbox):
     )
 
 
+def test_hv_switchbox_keeps_cable_corridor_between_ssr_and_fuse_holder(
+    hv_switchbox,
+):
+    ssr_body_bbox = get_bounding_box(
+        hv_switchbox.get_named_non_production_part("ssr_body")
+    )
+    holder_body_bbox = get_bounding_box(
+        hv_switchbox.get_named_non_production_part("fuse_holder_holder_body")
+    )
+
+    assert ssr_body_bbox[0][1] - holder_body_bbox[1][1] == pytest.approx(
+        30,
+        abs=0.2,
+    )
+
+
 def test_hv_switchbox_has_six_internal_m4_terminal_stations(hv_switchbox):
     for terminal_index in range(1, DEFAULTS["hv_switchbox_terminal_num_spots"] + 1):
         hv_switchbox.get_named_non_production_part(f"terminal_screw_{terminal_index}")
