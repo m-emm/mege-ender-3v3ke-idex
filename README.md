@@ -35,6 +35,21 @@ This builds the `print_bed_undercarriage_assembly`, selects the `adjustment_whee
 - **NEMA motor demo:** visualize NEMA14/17/23/34 bodies and a plate cut with NEMA17 clearances  
   `./run.sh src/mege_ender_3v3ke_idex/designs/nema_motors.py`
 
+## Circuit Schematics
+
+The alignment-first circuit drawing DSL lives in
+`src/mege_ender_3v3ke_idex/circuit_schematics/`. It is for lightweight
+Schemdraw-based circuit diagrams that should live beside the printer hardware
+work.
+
+```bash
+src/mege_ender_3v3ke_idex/circuit_schematics/run.sh \
+  src/mege_ender_3v3ke_idex/circuit_schematics/examples/voltage_divider.py
+```
+
+See `src/mege_ender_3v3ke_idex/circuit_schematics/README.md` for the DSL guide
+and examples.
+
 ## Klipper Configuration
 
 The active Klipper configuration lives at `klipper_setup/klipper_config/printer.cfg`.
