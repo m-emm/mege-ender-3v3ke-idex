@@ -2,6 +2,7 @@ basename: pico_w_btt_tmc2226_y_z
 
 metadata:
   version_label: "Pico W + BTT TMC2226 (Y + dual Z)"
+  klipper_mcu: ""
   notes: |
     Three-driver wiring for Y, Z-left, and Z-right.
     Driver1 (Y): STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
@@ -259,15 +260,19 @@ wires:
 
   - from: PICO_GPIO_11
     to: TMC1_J1_STEP_7
+    klipper: stepper_y.step_pin
     type: clock
   - from: PICO_GPIO_10
     to: TMC1_J1_DIR_8
+    klipper: stepper_y.dir_pin
     type: data
   - from: PICO_GPIO_12
     to: TMC1_J1_EN_1
+    klipper: stepper_y.enable_pin
     type: data
   - from: PICO_GPIO_9
     to: TMC1_J1_UART_PDN_4
+    klipper: "tmc2209 stepper_y.uart_pin"
     type: data
     color: "#9ca3af"
   - from: PICO_GND_03
@@ -287,15 +292,19 @@ wires:
 
   - from: PICO_GPIO_7
     to: TMC2_J1_STEP_7
+    klipper: stepper_z.step_pin
     type: clock
   - from: PICO_GPIO_6
     to: TMC2_J1_DIR_8
+    klipper: stepper_z.dir_pin
     type: data
   - from: PICO_GPIO_8
     to: TMC2_J1_EN_1
+    klipper: stepper_z.enable_pin
     type: data
   - from: PICO_GPIO_5
     to: TMC2_J1_UART_PDN_4
+    klipper: "tmc2209 stepper_z.uart_pin"
     type: data
     color: "#9ca3af"
   - from: PICO_GND_18
@@ -315,15 +324,19 @@ wires:
 
   - from: PICO_GPIO_14
     to: TMC3_J1_STEP_7
+    klipper: stepper_z1.step_pin
     type: clock
   - from: PICO_GPIO_15
     to: TMC3_J1_DIR_8
+    klipper: stepper_z1.dir_pin
     type: data
   - from: PICO_GPIO_16_21
     to: TMC3_J1_EN_1
+    klipper: stepper_z1.enable_pin
     type: data
   - from: PICO_GPIO_13
     to: TMC3_J1_UART_PDN_4
+    klipper: "tmc2209 stepper_z1.uart_pin"
     type: data
     color: "#9ca3af"
   - from: PICO_GND_23
@@ -343,12 +356,15 @@ wires:
 
   - from: PICO_GPIO_4
     to: ENDSTOP_Y_NO
+    klipper: stepper_y.endstop_pin
     type: data
   - from: PICO_GPIO_22_29
     to: ENDSTOP_Z_LEFT_NO
+    klipper: stepper_z.endstop_pin
     type: data
   - from: PICO_GPIO_17_22
     to: ENDSTOP_Z_RIGHT_NO
+    klipper: stepper_z1.endstop_pin
     type: data
   - from: PWR_GND
     to: ENDSTOP_Y_GND
@@ -373,6 +389,7 @@ wires:
     type: ground
   - from: PICO_GPIO_26_ADC0_31
     to: HEATBED_THERM_SIGNAL
+    klipper: heater_bed.sensor_pin
     type: data
     color: "#9ca3af"
   - from: PICO_THREEV3_OUT_36
@@ -462,6 +479,7 @@ wires:
     type: ground
   - from: PICO_GPIO_21_27
     to: MOSFET_HEATBED_ON
+    klipper: heater_bed.heater_pin
     type: data
 
     

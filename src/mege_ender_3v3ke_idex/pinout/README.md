@@ -20,9 +20,13 @@ Example:
 
 ```bash
 shellforgepy-pinout \
-  src/mege_ender_3v3ke_idex/pinout/examples/pico_w_btt_tmc2226.yaml \
+  src/mege_ender_3v3ke_idex/pinout/examples/demo_pico_w_btt_tmc2226_single_driver.yaml \
   -o /tmp/pinout-demo
 ```
+
+The active printer wiring sources live under
+`klipper_setup/klipper_config/wiring/`. Files in this package `examples/`
+directory are demos for the pinout renderer only.
 
 Options:
 - `--basename NAME`: override output filename prefix

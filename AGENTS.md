@@ -195,9 +195,12 @@ mege-ender-3v3ke-idex/
 │               └── x_axis_assembly.py        # X-axis assembly generator
 ├── klipper_setup/
 │   ├── klipper_config/                  # Active Klipper config truth
-│   │   ├── printer.cfg                  # THE active printer config
+│   │   ├── printer.cfg                  # THE generated active printer config
+│   │   ├── printer.cfg.template         # THE active config template
+│   │   ├── calib.yaml                   # IDEX calibration input
+│   │   ├── wiring/                      # THE active Pico/TMC wiring truth
 │   │   ├── update_menderpi.sh           # THE active deploy script
-│   │   └── archive/                     # Historical configs/scripts/docs only
+│   │   └── archive/                     # Historical/reference helpers only
 │   └── image_build/                     # Raspberry Pi image build system
 │       └── overlays/stage2/99-klipperpi/
 ├── resources/
@@ -209,19 +212,24 @@ mege-ender-3v3ke-idex/
 
 ## Klipper Configuration Deployment
 
-`klipper_setup/klipper_config/printer.cfg` is THE active printer config. It is
-the local source of truth for `pi@menderpi.local:~/printer_data/config/printer.cfg`.
+`klipper_setup/klipper_config/printer.cfg` is THE generated active printer
+config. It is the local source of truth for
+`pi@menderpi.local:~/printer_data/config/printer.cfg`.
 
 The root of `klipper_setup/klipper_config/` should stay intentionally small:
-`README.md`, `printer.cfg`, `update_menderpi.sh`, and `archive/`. Files under
-`archive/` are historical/reference material only; do not edit archived files to
-change the active printer.
+`README.md`, `calib.yaml`, `generate_printer_cfg.py`, `printer.cfg`,
+`printer.cfg.template`, `update_menderpi.sh`, `wiring/`, and `archive/`.
+Active wiring lives under `wiring/`; files under `archive/` are
+historical/reference material only.
 
 ### Deployment Workflow
 
 ```bash
 cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
-# Edit printer.cfg
+# Edit calib.yaml, printer.cfg.template, or wiring/*.yaml
+python generate_printer_cfg.py --check
+wiring/generate_wiring_svgs.sh --check
+python wiring/validate_wiring.py
 ./update_menderpi.sh
 ```
 

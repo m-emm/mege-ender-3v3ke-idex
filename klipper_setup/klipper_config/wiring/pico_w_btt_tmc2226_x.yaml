@@ -2,6 +2,7 @@ basename: pico_w_btt_tmc2226_x
 
 metadata:
   version_label: "Pico W + BTT TMC2226 (X axis MCU)"
+  klipper_mcu: x_pico
   notes: |
     X-left: STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, NC endstop=GPIO4.
     X-right: STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5, NC endstop=GPIO22.
@@ -214,15 +215,19 @@ wires:
 
   - from: PICO_GPIO_11
     to: TMC1_J1_STEP_7
+    klipper: stepper_x.step_pin
     type: clock
   - from: PICO_GPIO_10
     to: TMC1_J1_DIR_8
+    klipper: stepper_x.dir_pin
     type: data
   - from: PICO_GPIO_12
     to: TMC1_J1_EN_1
+    klipper: stepper_x.enable_pin
     type: data
   - from: PICO_GPIO_9
     to: TMC1_J1_UART_PDN_4
+    klipper: "tmc2209 stepper_x.uart_pin"
     type: data
     color: "#9ca3af"
   - from: PICO_GND_03
@@ -245,15 +250,19 @@ wires:
 
   - from: PICO_GPIO_7
     to: TMC2_J1_STEP_7
+    klipper: dual_carriage.step_pin
     type: clock
   - from: PICO_GPIO_6
     to: TMC2_J1_DIR_8
+    klipper: dual_carriage.dir_pin
     type: data
   - from: PICO_GPIO_8
     to: TMC2_J1_EN_1
+    klipper: dual_carriage.enable_pin
     type: data
   - from: PICO_GPIO_5
     to: TMC2_J1_UART_PDN_4
+    klipper: "tmc2209 dual_carriage.uart_pin"
     type: data
     color: "#9ca3af"
   - from: PICO_GND_18
@@ -273,9 +282,11 @@ wires:
 
   - from: PICO_GPIO_4
     to: X_LEFT_ENDSTOP_NC
+    klipper: stepper_x.endstop_pin
     type: data
   - from: PICO_GPIO_22_29
     to: X_RIGHT_ENDSTOP_NC
+    klipper: dual_carriage.endstop_pin
     type: data
   - from: PWR_GND
     to: X_LEFT_ENDSTOP_GND

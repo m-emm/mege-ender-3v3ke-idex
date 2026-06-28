@@ -145,6 +145,9 @@ accel_chip: adxl345 left_toolhead
 probe_points:
     117.5, 117.5, 20
 
+# X-axis Pico wiring follows:
+# klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_x.yaml
+#
 # Primary IDEX carriage: X-left. Homes to the left-mounted endstop.
 [stepper_x]
 step_pin: x_pico:gpio11
@@ -196,7 +199,8 @@ run_current: 1.2
 sense_resistor: 0.110
 stealthchop_threshold: 0
 
-# Wiring follows pico_w_btt_tmc2226_y_z.yaml, Driver 1:
+# Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml,
+# Driver 1:
 # STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
 [stepper_y]
 step_pin: gpio11
@@ -221,7 +225,8 @@ run_current: 1.4
 sense_resistor: 0.110
 stealthchop_threshold: 0
 
-# Wiring follows pico_w_btt_tmc2226_y_z.yaml, Driver 2:
+# Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml,
+# Driver 2:
 # STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5, endstop=GPIO22.
 [stepper_z]
 step_pin: gpio7
@@ -245,7 +250,8 @@ run_current: 1.2
 sense_resistor: 0.110
 stealthchop_threshold: 0
 
-# Wiring follows pico_w_btt_tmc2226_y_z.yaml, Driver 3:
+# Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml,
+# Driver 3:
 # STEP=GPIO14, DIR=GPIO15, EN=GPIO16, UART=GPIO13, endstop=GPIO17.
 [stepper_z1]
 step_pin: gpio14
@@ -262,7 +268,8 @@ run_current: 1.2
 sense_resistor: 0.110
 stealthchop_threshold: 0
 
-# Heatbed wiring follows pico_w_btt_tmc2226_y_z.yaml:
+# Heatbed wiring follows
+# klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml:
 # MOSFET control on gpio21 and 100k B3950 NTC on gpio26 / ADC0.
 [heater_bed]
 heater_pin: gpio21

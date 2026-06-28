@@ -1,7 +1,7 @@
-basename: pico_w_btt_tmc2226
+basename: demo_pico_w_btt_tmc2226_single_driver
 
 metadata:
-  version_label: "Pico W + BTT TMC2226"
+  version_label: "Demo Pico W + BTT TMC2226 single driver"
   notes: |
     Orientation: board top view, USB side at top for Pico W.
     TMC2226 pin names follow BIGTREETECH EZ2226 interface labels (J1/J2).

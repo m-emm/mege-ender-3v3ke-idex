@@ -40,10 +40,15 @@ This builds the `print_bed_undercarriage_assembly`, selects the `adjustment_whee
 The active Klipper configuration lives at `klipper_setup/klipper_config/printer.cfg`.
 That file is the source of truth for the active printer. Everything under
 `klipper_setup/klipper_config/archive/` is historical/reference material.
+Active Pico/TMC wiring sources and generated SVG review artifacts live at
+`klipper_setup/klipper_config/wiring/`.
 
 ```bash
 # From the local checkout
 cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
+python generate_printer_cfg.py --check
+wiring/generate_wiring_svgs.sh --check
+python wiring/validate_wiring.py
 ./update_menderpi.sh --check
 ./update_menderpi.sh
 ```

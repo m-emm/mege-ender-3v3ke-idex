@@ -3,6 +3,8 @@
 This directory has one active printer configuration:
 
 - `printer.cfg` is THE config for the active printer.
+- `printer.cfg.template` plus `calib.yaml` generate `printer.cfg`.
+- `wiring/` is THE active wiring source for the custom Pico/TMC wiring.
 - `update_menderpi.sh` is THE script for copying it to `pi@menderpi.local`.
 - `archive/` is historical/reference material only. Do not edit files there to
   change the active printer.
@@ -16,11 +18,14 @@ cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
 
 ## Daily Workflow
 
-Edit `calib.yaml` or `printer.cfg.template`, check the live printer config, then
-deploy when needed:
+Edit `calib.yaml`, `printer.cfg.template`, or active wiring YAMLs, check the
+generated config and wiring consistency, then deploy when needed:
 
 ```bash
 cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
+python generate_printer_cfg.py --check
+wiring/generate_wiring_svgs.sh --check
+python wiring/validate_wiring.py
 ./update_menderpi.sh --check
 ./update_menderpi.sh
 ```
@@ -34,14 +39,27 @@ Moonraker without uploading files or restarting Klipper.
 previous remote file with a timestamp, restarts Klipper, and reports the
 Moonraker/Klippy state.
 
-No other root script or config is part of the active deployment path.
+No other root script or config is part of the active deployment path. The
+Raspberry Pi image build also contains a minimal `files/printer.cfg` boot stub;
+that file is only for first boot and is not the active printer config.
+
+## Wiring
+
+Active wiring lives in `wiring/`:
+
+- `wiring/pico_w_btt_tmc2226_x.yaml`
+- `wiring/pico_w_btt_tmc2226_y_z.yaml`
+- `wiring/diagrams/*.svg`
+
+The YAML files are the source for physical wiring and the SVGs are generated
+review artifacts. The `klipper:` tags in the YAML are checked against
+`printer.cfg.template` by `wiring/validate_wiring.py`.
 
 ## Archive
 
-The archive contains old bring-up configs, retired install scripts, snippets,
-wiring notes/diagrams, and resonance plotting helpers. Keep them for reference,
-but treat them as inactive unless they are deliberately restored into the root
-workflow.
+The archive contains unrelated historical/reference helpers such as resonance
+plotting. Active-looking legacy wiring files, install scripts, snippets, and
+bring-up configs were removed to avoid mistaken deployment paths.
 
 ## Useful Console Commands
 
