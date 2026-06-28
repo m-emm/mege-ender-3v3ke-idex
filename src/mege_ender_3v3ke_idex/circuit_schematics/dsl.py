@@ -16,6 +16,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from enum import Enum, auto
+from itertools import product
 from pathlib import Path
 
 import schemdraw
@@ -923,37 +924,21 @@ def compact_stripboard_connections_left(
     if not isinstance(strict, bool):
         raise TypeError("strict must be a bool.")
 
-    current = assignment
-    blockers = (
-        _stripboard_component_blockers(schema, current)
-        if use_component_blockers
-        else ()
+    marker_column_maps, blockers = _height_ordered_stripboard_marker_columns(
+        schema,
+        assignment,
+        use_component_blockers=use_component_blockers,
+        strict=strict,
     )
-    for _iteration in range(4):
-        marker_column_maps = _left_compacted_marker_column_maps(
-            current,
-            blockers,
-            strict=strict,
-        )
-        current = replace(
-            current,
-            marker_column_maps=marker_column_maps,
-            net_column_maps=_net_column_maps_from_marker_columns(
-                current,
-                marker_column_maps,
-            ),
-            blockers=blockers,
-        )
-        next_blockers = (
-            _stripboard_component_blockers(schema, current)
-            if use_component_blockers
-            else ()
-        )
-        if next_blockers == blockers:
-            break
-        blockers = next_blockers
-
-    current = replace(current, blockers=blockers)
+    current = replace(
+        assignment,
+        marker_column_maps=marker_column_maps,
+        net_column_maps=_net_column_maps_from_marker_columns(
+            assignment,
+            marker_column_maps,
+        ),
+        blockers=blockers,
+    )
     if trim_board:
         current = _trim_stripboard_assignment_width(current)
     return current
@@ -1887,6 +1872,331 @@ def _snap_schema_x_to_column(x, net_name, assignment, column_pitch):
     return int(_clamp(column, 0, assignment.stripboard.width_pitches - 1))
 
 
+def _height_ordered_stripboard_marker_columns(
+    schema,
+    assignment,
+    use_component_blockers,
+    strict,
+):
+    cut_positions = {(cut.row, cut.col) for cut in assignment.cuts}
+    blocker_positions = set()
+    blocker_keys = set()
+    blockers = []
+    marker_column_maps = {}
+    used_positions = set()
+
+    for item in _stripboard_placement_items(schema, assignment):
+        if item["kind"] == "loose":
+            entry = item["entries"][0]
+            column = _place_loose_stripboard_marker(
+                assignment,
+                entry,
+                used_positions,
+                cut_positions,
+                blocker_positions,
+                strict=strict,
+            )
+            marker_column_maps[entry["key"]] = column
+            used_positions.add((entry["row"], column))
+            continue
+
+        placed_columns, item_blockers = _place_stripboard_element_item(
+            assignment,
+            item,
+            used_positions,
+            cut_positions,
+            blocker_positions,
+            use_component_blockers=use_component_blockers,
+            strict=strict,
+        )
+        for entry in item["entries"]:
+            column = placed_columns[entry["key"]]
+            marker_column_maps[entry["key"]] = column
+            used_positions.add((entry["row"], column))
+        if not use_component_blockers:
+            continue
+        for blocker in item_blockers:
+            blocker_key = (blocker.row, blocker.col, blocker.element_name)
+            if blocker_key in blocker_keys:
+                continue
+            blocker_keys.add(blocker_key)
+            blocker_positions.add((blocker.row, blocker.col))
+            blockers.append(blocker)
+
+    return marker_column_maps, tuple(
+        sorted(
+            blockers,
+            key=lambda blocker: (blocker.row, blocker.col, blocker.element_name),
+        )
+    )
+
+
+def _stripboard_placement_items(schema, assignment):
+    marker_entries = _stripboard_assignment_marker_entries(assignment)
+    entries_by_key = {entry["key"]: entry for entry in marker_entries}
+    terminal_marker_keys = set()
+    items = []
+
+    for element in schema.elements:
+        element_entries = []
+        for terminal_name in element.terminal_nets:
+            key = _stripboard_terminal_marker_key(element.name, terminal_name)
+            entry = entries_by_key.get(key)
+            if entry is None:
+                continue
+            terminal_marker_keys.add(key)
+            element_entries.append(entry)
+        if not element_entries:
+            continue
+        rows = [entry["row"] for entry in element_entries]
+        columns = [entry["column"] for entry in element_entries]
+        items.append(
+            {
+                "kind": "element",
+                "name": str(element.name),
+                "entries": tuple(element_entries),
+                "vertical_span": max(rows) - min(rows),
+                "terminal_count": len(element_entries),
+                "horizontal_span": max(columns) - min(columns),
+                "type_rank": 1,
+            }
+        )
+
+    for entry in marker_entries:
+        if entry["key"] in terminal_marker_keys:
+            continue
+        items.append(
+            {
+                "kind": "loose",
+                "name": _stripboard_marker_key_label(entry["key"]),
+                "entries": (entry,),
+                "vertical_span": 0,
+                "terminal_count": 1,
+                "horizontal_span": 0,
+                "type_rank": 0,
+            }
+        )
+
+    return tuple(
+        sorted(
+            items,
+            key=lambda item: (
+                item["vertical_span"],
+                item["type_rank"],
+                item["terminal_count"],
+                item["horizontal_span"],
+                item["name"],
+            ),
+        )
+    )
+
+
+def _place_loose_stripboard_marker(
+    assignment,
+    entry,
+    used_positions,
+    cut_positions,
+    blocker_positions,
+    strict,
+):
+    row = entry["row"]
+    start_col, end_col = _stripboard_marker_allowed_span(assignment, entry)
+    for column in range(start_col, end_col + 1):
+        if _stripboard_hole_available(
+            row,
+            column,
+            used_positions,
+            cut_positions,
+            blocker_positions,
+        ):
+            return column
+
+    if not strict:
+        fallback_column = _non_strict_fallback_marker_column(
+            entry,
+            start_col,
+            end_col,
+            used_positions,
+            cut_positions,
+        )
+        if fallback_column is not None:
+            return fallback_column
+
+    raise ValueError(
+        "No legal stripboard hole remains for "
+        f"marker {entry['key']!r} on net {entry['net_name']!r} "
+        f"at row {row}."
+    )
+
+
+def _place_stripboard_element_item(
+    assignment,
+    item,
+    used_positions,
+    cut_positions,
+    blocker_positions,
+    use_component_blockers,
+    strict,
+):
+    placement = _best_stripboard_element_placement(
+        assignment,
+        item,
+        used_positions,
+        cut_positions,
+        blocker_positions,
+        use_component_blockers=use_component_blockers,
+    )
+    if placement is None and not strict:
+        placement = _best_stripboard_element_placement(
+            assignment,
+            item,
+            used_positions,
+            cut_positions,
+            blocker_positions,
+            use_component_blockers=use_component_blockers,
+            enforce_new_blockers=False,
+        )
+    if placement is None and not strict:
+        placement = _best_stripboard_element_placement(
+            assignment,
+            item,
+            used_positions,
+            cut_positions,
+            set(),
+            use_component_blockers=False,
+            enforce_new_blockers=False,
+        )
+    if placement is None:
+        marker_names = ", ".join(
+            _stripboard_marker_key_label(entry["key"]) for entry in item["entries"]
+        )
+        raise ValueError(
+            "No legal stripboard hole remains for "
+            f"element {item['name']!r} terminals: {marker_names}."
+        )
+    return placement
+
+
+def _best_stripboard_element_placement(
+    assignment,
+    item,
+    used_positions,
+    cut_positions,
+    blocker_positions,
+    use_component_blockers,
+    enforce_new_blockers=True,
+):
+    entries = item["entries"]
+    column_ranges = [
+        range(*_stripboard_marker_allowed_span_as_stop(assignment, entry))
+        for entry in entries
+    ]
+    best_score = None
+    best_columns = None
+    best_blockers = None
+
+    for columns in product(*column_ranges):
+        positions = tuple(
+            (entry["row"], column)
+            for entry, column in zip(entries, columns)
+        )
+        if len(set(positions)) != len(positions):
+            continue
+        if any(position in used_positions for position in positions):
+            continue
+        if any(position in cut_positions for position in positions):
+            continue
+        if any(position in blocker_positions for position in positions):
+            continue
+
+        blockers = ()
+        if use_component_blockers:
+            blockers = _stripboard_element_blockers_from_terminal_holes(
+                item["name"],
+                positions,
+            )
+            if enforce_new_blockers:
+                blocker_set = {(blocker.row, blocker.col) for blocker in blockers}
+                if blocker_set & used_positions:
+                    continue
+                if blocker_set & blocker_positions:
+                    continue
+
+        score = (
+            min(columns),
+            max(columns) - min(columns),
+            sum(
+                abs(column - entry["column"])
+                for entry, column in zip(entries, columns)
+            ),
+            columns,
+        )
+        if best_score is None or score < best_score:
+            best_score = score
+            best_columns = columns
+            best_blockers = blockers
+
+    if best_columns is None:
+        return None
+    return (
+        {
+            entry["key"]: column
+            for entry, column in zip(entries, best_columns)
+        },
+        best_blockers,
+    )
+
+
+def _stripboard_marker_allowed_span_as_stop(assignment, entry):
+    start_col, end_col = _stripboard_marker_allowed_span(assignment, entry)
+    return start_col, end_col + 1
+
+
+def _stripboard_hole_available(
+    row,
+    column,
+    used_positions,
+    cut_positions,
+    blocker_positions,
+):
+    position = (row, column)
+    return (
+        position not in used_positions
+        and position not in cut_positions
+        and position not in blocker_positions
+    )
+
+
+def _stripboard_marker_key_label(marker_key):
+    return ":".join(str(part) for part in marker_key)
+
+
+def _stripboard_element_blockers_from_terminal_holes(element_name, terminal_holes):
+    if len(terminal_holes) < 2:
+        return ()
+
+    terminal_hole_set = set(terminal_holes)
+    rows = [row for row, _column in terminal_holes]
+    columns = [column for _row, column in terminal_holes]
+    terminal_rows = set(rows)
+    spans_multiple_rows = min(rows) != max(rows)
+    blockers = []
+    for row in range(min(rows), max(rows) + 1):
+        if spans_multiple_rows and row in terminal_rows:
+            continue
+        for column in range(min(columns), max(columns) + 1):
+            if (row, column) in terminal_hole_set:
+                continue
+            blockers.append(
+                StripboardBlocker(
+                    row=row,
+                    col=column,
+                    element_name=element_name,
+                )
+            )
+    return tuple(blockers)
+
+
 def _stripboard_component_blockers(schema, assignment):
     blocker_keys = set()
     blockers = []
@@ -1901,31 +2211,15 @@ def _stripboard_component_blockers(schema, assignment):
                 continue
             terminal_holes.append((assignment.net_rows[net_name], column))
 
-        if len(terminal_holes) < 2:
-            continue
-
-        terminal_hole_set = set(terminal_holes)
-        rows = [row for row, _column in terminal_holes]
-        columns = [column for _row, column in terminal_holes]
-        terminal_rows = set(rows)
-        spans_multiple_rows = min(rows) != max(rows)
-        for row in range(min(rows), max(rows) + 1):
-            if spans_multiple_rows and row in terminal_rows:
+        for blocker in _stripboard_element_blockers_from_terminal_holes(
+            element.name,
+            terminal_holes,
+        ):
+            blocker_key = (blocker.row, blocker.col, blocker.element_name)
+            if blocker_key in blocker_keys:
                 continue
-            for column in range(min(columns), max(columns) + 1):
-                if (row, column) in terminal_hole_set:
-                    continue
-                blocker_key = (row, column, element.name)
-                if blocker_key in blocker_keys:
-                    continue
-                blocker_keys.add(blocker_key)
-                blockers.append(
-                    StripboardBlocker(
-                        row=row,
-                        col=column,
-                        element_name=element.name,
-                    )
-                )
+            blocker_keys.add(blocker_key)
+            blockers.append(blocker)
 
     return tuple(
         sorted(blockers, key=lambda blocker: (blocker.row, blocker.col, blocker.element_name))

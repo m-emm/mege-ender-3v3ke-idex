@@ -379,6 +379,38 @@ def _create_transistor_blocker_schema():
     return create_schema([collector, dummy_1, base, dummy_2, emitter], [transistor])
 
 
+def _create_short_and_tall_element_schema():
+    top_net = create_net("top")
+    middle_net = create_net("middle")
+    bottom_net = create_net("bottom")
+
+    top = create_node(Dot, "top_span", net=top_net, kind="schematic_junction")
+    middle = translate(0, -2)(
+        create_node(Dot, "middle_span", net=middle_net, kind="schematic_junction")
+    )
+    bottom = translate(0, -4)(
+        create_node(Dot, "bottom_span", net=bottom_net, kind="schematic_junction")
+    )
+    short = translate(5, -1)(create_element(Resistor, "Rshort", "1k", top, middle))
+    tall = translate(1, -2)(create_element(Resistor, "Rtall", "1k", top, bottom))
+
+    return create_schema([top, middle, bottom], [short, tall])
+
+
+def _create_same_row_element_schema():
+    net = create_net("same_row")
+
+    left = create_node(Dot, "same_row_left", net=net, kind="schematic_junction")
+    right = translate(4, 0)(
+        create_node(Dot, "same_row_right", net=net, kind="schematic_junction")
+    )
+    resistor = translate(2, 0)(
+        create_element(Resistor, "Rsame_row", "0R", left, right)
+    )
+
+    return create_schema([left, right], [resistor])
+
+
 def test_get_schema_net_visualizations_sorts_nets_by_representative_y():
     schema = _create_stripboard_mapping_schema()
 
@@ -538,9 +570,9 @@ def test_left_compaction_uses_component_blockers():
         strict=False,
     )
 
-    blocker = StripboardBlocker(row=1, col=1, element_name="Rblock")
+    assert assignment.marker_column_maps[("node", "middle_block")] == 1
+    blocker = StripboardBlocker(row=1, col=2, element_name="Rblock")
     assert blocker in assignment.blockers
-    assert assignment.marker_column_maps[("node", "middle_block")] == 2
 
     blocker_positions = {(blocker.row, blocker.col) for blocker in assignment.blockers}
     marker_rows = {}
@@ -559,6 +591,78 @@ def test_left_compaction_uses_component_blockers():
         if key in assignment.marker_column_maps
     }
     assert marker_positions.isdisjoint(blocker_positions)
+
+
+def test_left_compaction_places_loose_markers_before_elements():
+    schema = _create_vertical_blocker_schema(middle_x=8)
+    assignment = compact_stripboard_connections_left(
+        schema,
+        assign_schema_nets_to_stripboard(schema),
+        trim_board=False,
+    )
+
+    assert assignment.marker_column_maps[("node", "middle_block")] == 1
+    assert (1, 1) not in {
+        (blocker.row, blocker.col) for blocker in assignment.blockers
+    }
+
+
+def test_left_compaction_places_short_span_elements_before_tall_ones():
+    schema = _create_short_and_tall_element_schema()
+    assignment = compact_stripboard_connections_left(
+        schema,
+        assign_schema_nets_to_stripboard(schema),
+        trim_board=False,
+    )
+
+    short_columns = {
+        assignment.marker_column_maps[("terminal", "Rshort", "start")],
+        assignment.marker_column_maps[("terminal", "Rshort", "end")],
+    }
+    tall_columns = {
+        assignment.marker_column_maps[("terminal", "Rtall", "start")],
+        assignment.marker_column_maps[("terminal", "Rtall", "end")],
+    }
+    assert short_columns == {1}
+    assert min(tall_columns) > 1
+
+
+def test_left_compaction_places_element_terminals_atomically_and_compactly():
+    schema = _create_vertical_blocker_schema(middle_x=8)
+    assignment = compact_stripboard_connections_left(
+        schema,
+        assign_schema_nets_to_stripboard(schema),
+        trim_board=False,
+    )
+
+    assert assignment.marker_column_maps[("terminal", "Rblock", "start")] == 2
+    assert assignment.marker_column_maps[("terminal", "Rblock", "end")] == 2
+
+
+def test_left_compaction_keeps_same_row_element_terminals_distinct():
+    schema = _create_same_row_element_schema()
+    assignment = compact_stripboard_connections_left(
+        schema,
+        assign_schema_nets_to_stripboard(schema),
+        trim_board=False,
+    )
+
+    start_col = assignment.marker_column_maps[("terminal", "Rsame_row", "start")]
+    end_col = assignment.marker_column_maps[("terminal", "Rsame_row", "end")]
+    assert start_col != end_col
+    assert {start_col, end_col} == {1, 2}
+
+
+def test_left_compaction_allows_different_row_element_terminals_to_align():
+    schema = _create_duplicate_marker_stripboard_schema()
+    assignment = compact_stripboard_connections_left(
+        schema,
+        compact_sparse_stripboard_rows(assign_schema_nets_to_stripboard(schema)),
+        trim_board=False,
+    )
+
+    assert assignment.marker_column_maps[("terminal", "Rdup", "start")] == 2
+    assert assignment.marker_column_maps[("terminal", "Rdup", "end")] == 2
 
 
 def test_left_compaction_allows_all_element_types_to_block_holes():
