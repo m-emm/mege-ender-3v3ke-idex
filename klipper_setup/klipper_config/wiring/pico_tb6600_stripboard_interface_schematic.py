@@ -11,6 +11,7 @@ PNG_FILE = DIAGRAM_DIR / "pico_tb6600_stripboard_interface.png"
 
 
 TRANSISTOR_TYPE = "BC337"
+SCHEMATIC_JUNCTION = "schematic_junction"
 
 RAIL_LENGTH = 27.4
 RAIL_TO_RAIL_GAP = 8.8
@@ -118,9 +119,24 @@ def create_low_side_channel(
     gnd_rail,
     input_label,
 ):
-    base = create_node(Dot, f"{prefix}_base", net=base_net)
-    gnd_junction = create_node(Dot, f"{prefix}_gnd_junction", net=gnd_net)
-    pulldown_gnd = create_node(Dot, f"{prefix}_pulldown_gnd", net=gnd_net)
+    base = create_node(
+        Dot,
+        f"{prefix}_base",
+        net=base_net,
+        kind=SCHEMATIC_JUNCTION,
+    )
+    gnd_junction = create_node(
+        Dot,
+        f"{prefix}_gnd_junction",
+        net=gnd_net,
+        kind=SCHEMATIC_JUNCTION,
+    )
+    pulldown_gnd = create_node(
+        Dot,
+        f"{prefix}_pulldown_gnd",
+        net=gnd_net,
+        kind=SCHEMATIC_JUNCTION,
+    )
 
     transistor = create_element(
         BjtNpn,
@@ -217,6 +233,7 @@ def create_enable_channel(terminals, nets, gnd_rail):
         Dot,
         "ena_plus_junction",
         net=nets["ena_plus"],
+        kind=SCHEMATIC_JUNCTION,
     )
     ena_plus_junction = align(
         ena_plus_junction,
@@ -231,9 +248,24 @@ def create_enable_channel(terminals, nets, gnd_rail):
         stack_gap=ENA_JUNCTION_TO_TERMINAL_GAP,
     )
 
-    base = create_node(Dot, "ena_base", net=nets["ena_base"])
-    gnd_junction = create_node(Dot, "ena_gnd_junction", net=nets["gnd"])
-    pulldown_gnd = create_node(Dot, "ena_pulldown_gnd", net=nets["gnd"])
+    base = create_node(
+        Dot,
+        "ena_base",
+        net=nets["ena_base"],
+        kind=SCHEMATIC_JUNCTION,
+    )
+    gnd_junction = create_node(
+        Dot,
+        "ena_gnd_junction",
+        net=nets["gnd"],
+        kind=SCHEMATIC_JUNCTION,
+    )
+    pulldown_gnd = create_node(
+        Dot,
+        "ena_pulldown_gnd",
+        net=nets["gnd"],
+        kind=SCHEMATIC_JUNCTION,
+    )
 
     transistor = create_element(
         BjtNpn,

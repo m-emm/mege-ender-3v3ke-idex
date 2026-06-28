@@ -1,16 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="675" height="192" viewBox="-3.100 0 21.100 6.000">
+<svg xmlns="http://www.w3.org/2000/svg" width="675" height="288" viewBox="-3.100 0 21.100 9.000">
   <title>Stripboard Schematic Overlay</title>
-  <rect class="board" x="0" y="0" width="18.000" height="6.000" fill="#f7e48b" stroke="#e6ca70" stroke-width="0.035"/>
+  <rect class="board" x="0" y="0" width="18.000" height="9.000" fill="#f7e48b" stroke="#e6ca70" stroke-width="0.035"/>
+  <text class="overlay-net-label" data-row="0" data-net="v24" x="-0.180" y="0.635" font-size="0.340" font-weight="700" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">v24</text>
   <rect class="copper-strip" data-row="0" data-net="v24" x="0.250" y="0.225" width="17.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
-  <text class="overlay-net-label" data-row="1" data-net="v5" x="-0.180" y="1.635" font-size="0.420" font-weight="700" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">v5</text>
+  <text class="overlay-net-label" data-row="1" data-net="v5" x="-0.180" y="1.635" font-size="0.340" font-weight="700" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">v5</text>
   <rect class="copper-strip" data-row="1" data-net="v5" x="0.250" y="1.225" width="17.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
-  <text class="overlay-net-label" data-row="2" data-net="ena_plus" x="-0.180" y="2.635" font-size="0.420" font-weight="700" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">ena_plus</text>
+  <text class="overlay-net-label" data-row="2" data-net="ena_plus" x="-0.180" y="2.635" font-size="0.340" font-weight="700" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">ena_plus</text>
   <rect class="copper-strip" data-row="2" data-net="ena_plus" x="0.250" y="2.225" width="17.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
   <rect class="copper-strip" data-row="3" data-net="" x="0.250" y="3.225" width="17.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
   <rect class="copper-strip" data-row="4" data-net="" x="0.250" y="4.225" width="17.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
-  <text class="overlay-net-label" data-row="5" data-net="gnd" x="-0.180" y="5.635" font-size="0.420" font-weight="700" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">gnd</text>
-  <rect class="copper-strip" data-row="5" data-net="gnd" x="0.250" y="5.225" width="17.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <text class="overlay-net-label" data-row="5" data-net="ena_base" x="-0.180" y="5.635" font-size="0.340" font-weight="700" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">ena_base</text>
+  <rect class="copper-strip" data-row="5" data-net="ena_base" x="0.250" y="5.225" width="17.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <text class="overlay-net-label" data-row="6" data-net="step_base" x="-0.180" y="6.635" font-size="0.340" font-weight="700" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">step_base</text>
+  <rect class="copper-strip" data-row="6" data-net="step_base" x="0.250" y="6.225" width="17.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <text class="overlay-net-label" data-row="7" data-net="dir_base" x="-0.180" y="7.635" font-size="0.340" font-weight="700" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">dir_base</text>
+  <rect class="copper-strip" data-row="7" data-net="dir_base" x="0.250" y="7.225" width="17.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <text class="overlay-net-label" data-row="8" data-net="gnd" x="-0.180" y="8.635" font-size="0.340" font-weight="700" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">gnd</text>
+  <rect class="copper-strip" data-row="8" data-net="gnd" x="0.250" y="8.225" width="17.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
   <circle class="hole" data-col="0" data-row="0" cx="0.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
   <circle class="hole" data-col="1" data-row="0" cx="1.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
   <circle class="hole" data-col="2" data-row="0" cx="2.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
@@ -119,113 +126,151 @@
   <circle class="hole" data-col="15" data-row="5" cx="15.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
   <circle class="hole" data-col="16" data-row="5" cx="16.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
   <circle class="hole" data-col="17" data-row="5" cx="17.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <rect class="strip-run-block" data-row="0" data-net="v24" x="1.060" y="0.155" width="3.880" height="0.690" fill="none" stroke="#111111" stroke-width="0.085"/>
+  <circle class="hole" data-col="0" data-row="6" cx="0.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="1" data-row="6" cx="1.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="2" data-row="6" cx="2.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="3" data-row="6" cx="3.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="4" data-row="6" cx="4.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="5" data-row="6" cx="5.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="6" data-row="6" cx="6.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="7" data-row="6" cx="7.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="8" data-row="6" cx="8.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="9" data-row="6" cx="9.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="10" data-row="6" cx="10.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="11" data-row="6" cx="11.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="12" data-row="6" cx="12.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="13" data-row="6" cx="13.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="14" data-row="6" cx="14.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="15" data-row="6" cx="15.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="16" data-row="6" cx="16.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="17" data-row="6" cx="17.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="0" data-row="7" cx="0.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="1" data-row="7" cx="1.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="2" data-row="7" cx="2.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="3" data-row="7" cx="3.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="4" data-row="7" cx="4.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="5" data-row="7" cx="5.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="6" data-row="7" cx="6.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="7" data-row="7" cx="7.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="8" data-row="7" cx="8.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="9" data-row="7" cx="9.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="10" data-row="7" cx="10.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="11" data-row="7" cx="11.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="12" data-row="7" cx="12.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="13" data-row="7" cx="13.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="14" data-row="7" cx="14.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="15" data-row="7" cx="15.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="16" data-row="7" cx="16.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="17" data-row="7" cx="17.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="0" data-row="8" cx="0.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="1" data-row="8" cx="1.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="2" data-row="8" cx="2.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="3" data-row="8" cx="3.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="4" data-row="8" cx="4.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="5" data-row="8" cx="5.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="6" data-row="8" cx="6.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="7" data-row="8" cx="7.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="8" data-row="8" cx="8.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="9" data-row="8" cx="9.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="10" data-row="8" cx="10.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="11" data-row="8" cx="11.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="12" data-row="8" cx="12.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="13" data-row="8" cx="13.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="14" data-row="8" cx="14.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="15" data-row="8" cx="15.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="16" data-row="8" cx="16.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-col="17" data-row="8" cx="17.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
   <rect class="strip-run-block" data-row="3" data-net="ena_gpio" x="1.060" y="3.155" width="3.880" height="0.690" fill="none" stroke="#111111" stroke-width="0.085"/>
   <rect class="strip-run-block" data-row="3" data-net="step_gpio" x="6.060" y="3.155" width="3.880" height="0.690" fill="none" stroke="#111111" stroke-width="0.085"/>
   <rect class="strip-run-block" data-row="3" data-net="dir_gpio" x="11.060" y="3.155" width="3.880" height="0.690" fill="none" stroke="#111111" stroke-width="0.085"/>
-  <rect class="strip-run-block" data-row="4" data-net="ena_base" x="1.060" y="4.155" width="3.880" height="0.690" fill="none" stroke="#111111" stroke-width="0.085"/>
-  <rect class="strip-run-block" data-row="4" data-net="step_base" x="6.060" y="4.155" width="3.880" height="0.690" fill="none" stroke="#111111" stroke-width="0.085"/>
-  <rect class="strip-run-block" data-row="4" data-net="dir_base" x="11.060" y="4.155" width="3.880" height="0.690" fill="none" stroke="#111111" stroke-width="0.085"/>
-  <text class="overlay-net-run-label" data-row="0" data-net="v24" x="3.000" y="0.580" font-size="0.300" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 3.000 0.580)">v24</text>
-  <text class="overlay-net-run-label" data-row="3" data-net="ena_gpio" x="3.000" y="3.580" font-size="0.300" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 3.000 3.580)">ena_gpio</text>
-  <text class="overlay-net-run-label" data-row="3" data-net="step_gpio" x="8.000" y="3.580" font-size="0.300" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 8.000 3.580)">step_gpio</text>
-  <text class="overlay-net-run-label" data-row="3" data-net="dir_gpio" x="13.000" y="3.580" font-size="0.300" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 13.000 3.580)">dir_gpio</text>
-  <text class="overlay-net-run-label" data-row="4" data-net="ena_base" x="3.000" y="4.580" font-size="0.300" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 3.000 4.580)">ena_base</text>
-  <text class="overlay-net-run-label" data-row="4" data-net="step_base" x="8.000" y="4.580" font-size="0.300" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 8.000 4.580)">step_base</text>
-  <text class="overlay-net-run-label" data-row="4" data-net="dir_base" x="13.000" y="4.580" font-size="0.300" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 13.000 4.580)">dir_base</text>
-  <text class="overlay-local-point-label" data-row="3" data-net="step_pul_minus" x="15.500" y="3.580" font-size="0.300" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 15.500 3.580)">step_pul_minus</text>
-  <text class="overlay-local-point-label" data-row="3" data-net="dir_minus" x="16.500" y="3.580" font-size="0.300" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 16.500 3.580)">dir_minus</text>
-  <line class="overlay-element" data-element="C1" x1="2.500" y1="1.500" x2="2.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="2.500" y="3.320" font-size="0.320" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 2.500 3.320)">C1 100nF</text>
-  <line class="overlay-element" data-element="Q1" x1="10.167" y1="4.500" x2="8.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="overlay-element" data-element="Q1" x1="10.167" y1="4.500" x2="15.500" y2="3.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="overlay-element" data-element="Q1" x1="10.167" y1="4.500" x2="6.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="10.167" y="4.320" font-size="0.320" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 10.167 4.320)">Q1 BC337</text>
-  <line class="overlay-element" data-element="R1" x1="8.500" y1="3.500" x2="7.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="8.000" y="3.820" font-size="0.320" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 8.000 3.820)">R1 2k2</text>
-  <line class="overlay-element" data-element="R2" x1="7.500" y1="4.500" x2="4.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="6.000" y="4.820" font-size="0.320" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 6.000 4.820)">R2 47k</text>
-  <line class="overlay-element" data-element="Q2" x1="13.500" y1="4.500" x2="13.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="overlay-element" data-element="Q2" x1="13.500" y1="4.500" x2="16.500" y2="3.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="overlay-element" data-element="Q2" x1="13.500" y1="4.500" x2="10.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="13.500" y="4.320" font-size="0.320" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 13.500 4.320)">Q2 BC337</text>
-  <line class="overlay-element" data-element="R3" x1="13.500" y1="3.500" x2="12.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="13.000" y="3.820" font-size="0.320" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 13.000 3.820)">R3 2k2</text>
-  <line class="overlay-element" data-element="R4" x1="12.500" y1="4.500" x2="8.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="10.500" y="4.820" font-size="0.320" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 10.500 4.820)">R4 47k</text>
-  <line class="overlay-element" data-element="R5" x1="2.500" y1="0.500" x2="11.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="7.000" y="1.320" font-size="0.320" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 7.000 1.320)">R5 4k7 0.25W</text>
-  <line class="overlay-element" data-element="R6" x1="3.500" y1="0.500" x2="13.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="8.500" y="1.320" font-size="0.320" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 8.500 1.320)">R6 4k7 0.25W</text>
-  <line class="overlay-element" data-element="Q3" x1="11.500" y1="4.167" x2="3.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="overlay-element" data-element="Q3" x1="11.500" y1="4.167" x2="15.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="overlay-element" data-element="Q3" x1="11.500" y1="4.167" x2="15.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="11.500" y="3.987" font-size="0.320" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 11.500 3.987)">Q3 BC337</text>
-  <line class="overlay-element" data-element="R7" x1="3.500" y1="3.500" x2="2.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="3.000" y="3.820" font-size="0.320" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 3.000 3.820)">R7 2k2</text>
-  <line class="overlay-element" data-element="R8" x1="2.500" y1="4.500" x2="13.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="8.000" y="4.820" font-size="0.320" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 8.000 4.820)">R8 47k</text>
+  <rect class="strip-run-block" data-row="4" data-net="step_pul_minus" x="1.060" y="4.155" width="3.880" height="0.690" fill="none" stroke="#111111" stroke-width="0.085"/>
+  <rect class="strip-run-block" data-row="4" data-net="dir_minus" x="6.060" y="4.155" width="3.880" height="0.690" fill="none" stroke="#111111" stroke-width="0.085"/>
+  <text class="overlay-net-run-label" data-row="3" data-net="ena_gpio" x="3.000" y="3.580" font-size="0.200" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 3.000 3.580)">ena_gpio</text>
+  <text class="overlay-net-run-label" data-row="3" data-net="step_gpio" x="8.000" y="3.580" font-size="0.200" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 8.000 3.580)">step_gpio</text>
+  <text class="overlay-net-run-label" data-row="3" data-net="dir_gpio" x="13.000" y="3.580" font-size="0.200" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 13.000 3.580)">dir_gpio</text>
+  <text class="overlay-net-run-label" data-row="4" data-net="step_pul_minus" x="3.000" y="4.580" font-size="0.200" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 3.000 4.580)">step_pul_minus</text>
+  <text class="overlay-net-run-label" data-row="4" data-net="dir_minus" x="8.000" y="4.580" font-size="0.200" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 8.000 4.580)">dir_minus</text>
+  <line class="overlay-element" data-element="C1" x1="2.500" y1="1.500" x2="2.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="2.500" y="4.820" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 2.500 4.820)">C1 100nF</text>
+  <line class="overlay-element" data-element="Q1" x1="5.500" y1="6.500" x2="5.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="overlay-element" data-element="Q1" x1="5.500" y1="6.500" x2="4.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="overlay-element" data-element="Q1" x1="5.500" y1="6.500" x2="6.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="5.500" y="6.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 5.500 6.320)">Q1 BC337</text>
+  <line class="overlay-element" data-element="R1" x1="9.500" y1="3.500" x2="4.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="7.000" y="4.820" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 7.000 4.820)">R1 2k2</text>
+  <line class="overlay-element" data-element="R2" x1="3.500" y1="6.500" x2="4.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="4.000" y="7.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 4.000 7.320)">R2 47k</text>
+  <line class="overlay-element" data-element="Q2" x1="9.833" y1="6.833" x2="9.500" y2="7.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="overlay-element" data-element="Q2" x1="9.833" y1="6.833" x2="9.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="overlay-element" data-element="Q2" x1="9.833" y1="6.833" x2="10.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="9.833" y="6.653" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 9.833 6.653)">Q2 BC337</text>
+  <line class="overlay-element" data-element="R3" x1="14.500" y1="3.500" x2="8.500" y2="7.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="11.500" y="5.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 11.500 5.320)">R3 2k2</text>
+  <line class="overlay-element" data-element="R4" x1="7.500" y1="7.500" x2="8.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="8.000" y="7.820" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 8.000 7.820)">R4 47k</text>
+  <line class="overlay-element" data-element="R5" x1="10.500" y1="0.500" x2="11.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="11.000" y="1.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 11.000 1.320)">R5 4k7 0.25W</text>
+  <line class="overlay-element" data-element="R6" x1="13.500" y1="0.500" x2="13.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="13.500" y="1.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 13.500 1.320)">R6 4k7 0.25W</text>
+  <line class="overlay-element" data-element="Q3" x1="15.167" y1="5.500" x2="14.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="overlay-element" data-element="Q3" x1="15.167" y1="5.500" x2="15.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="overlay-element" data-element="Q3" x1="15.167" y1="5.500" x2="15.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="15.167" y="5.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 15.167 5.320)">Q3 BC337</text>
+  <line class="overlay-element" data-element="R7" x1="4.500" y1="3.500" x2="13.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="9.000" y="4.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 9.000 4.320)">R7 2k2</text>
+  <line class="overlay-element" data-element="R8" x1="12.500" y1="5.500" x2="13.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="13.000" y="6.820" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 13.000 6.820)">R8 47k</text>
   <circle class="overlay-terminal" data-net="v5" data-element="C1" data-terminal="start" cx="2.500" cy="1.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="C1" data-terminal="end" cx="2.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="step_base" data-element="Q1" data-terminal="base" cx="8.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="step_pul_minus" data-element="Q1" data-terminal="collector" cx="15.500" cy="3.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="Q1" data-terminal="emitter" cx="6.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="step_gpio" data-element="R1" data-terminal="start" cx="8.500" cy="3.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="step_base" data-element="R1" data-terminal="end" cx="7.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="step_base" data-element="R2" data-terminal="start" cx="7.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="R2" data-terminal="end" cx="4.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="dir_base" data-element="Q2" data-terminal="base" cx="13.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="dir_minus" data-element="Q2" data-terminal="collector" cx="16.500" cy="3.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="Q2" data-terminal="emitter" cx="10.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="dir_gpio" data-element="R3" data-terminal="start" cx="13.500" cy="3.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="dir_base" data-element="R3" data-terminal="end" cx="12.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="dir_base" data-element="R4" data-terminal="start" cx="12.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="R4" data-terminal="end" cx="8.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="v24" data-element="R5" data-terminal="start" cx="2.500" cy="0.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="C1" data-terminal="end" cx="2.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="step_base" data-element="Q1" data-terminal="base" cx="5.500" cy="6.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="step_pul_minus" data-element="Q1" data-terminal="collector" cx="4.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="Q1" data-terminal="emitter" cx="6.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="step_gpio" data-element="R1" data-terminal="start" cx="9.500" cy="3.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="step_base" data-element="R1" data-terminal="end" cx="4.500" cy="6.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="step_base" data-element="R2" data-terminal="start" cx="3.500" cy="6.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="R2" data-terminal="end" cx="4.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="dir_base" data-element="Q2" data-terminal="base" cx="9.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="dir_minus" data-element="Q2" data-terminal="collector" cx="9.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="Q2" data-terminal="emitter" cx="10.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="dir_gpio" data-element="R3" data-terminal="start" cx="14.500" cy="3.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="dir_base" data-element="R3" data-terminal="end" cx="8.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="dir_base" data-element="R4" data-terminal="start" cx="7.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="R4" data-terminal="end" cx="8.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="v24" data-element="R5" data-terminal="start" cx="10.500" cy="0.500" r="0.090" fill="#111827"/>
   <circle class="overlay-terminal" data-net="ena_plus" data-element="R5" data-terminal="end" cx="11.500" cy="2.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="v24" data-element="R6" data-terminal="start" cx="3.500" cy="0.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="v24" data-element="R6" data-terminal="start" cx="13.500" cy="0.500" r="0.090" fill="#111827"/>
   <circle class="overlay-terminal" data-net="ena_plus" data-element="R6" data-terminal="end" cx="13.500" cy="2.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="ena_base" data-element="Q3" data-terminal="base" cx="3.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="ena_base" data-element="Q3" data-terminal="base" cx="14.500" cy="5.500" r="0.090" fill="#111827"/>
   <circle class="overlay-terminal" data-net="ena_plus" data-element="Q3" data-terminal="collector" cx="15.500" cy="2.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="Q3" data-terminal="emitter" cx="15.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="ena_gpio" data-element="R7" data-terminal="start" cx="3.500" cy="3.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="ena_base" data-element="R7" data-terminal="end" cx="2.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="ena_base" data-element="R8" data-terminal="start" cx="2.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="R8" data-terminal="end" cx="13.500" cy="5.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="Q3" data-terminal="emitter" cx="15.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="ena_gpio" data-element="R7" data-terminal="start" cx="4.500" cy="3.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="ena_base" data-element="R7" data-terminal="end" cx="13.500" cy="5.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="ena_base" data-element="R8" data-terminal="start" cx="12.500" cy="5.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="R8" data-terminal="end" cx="13.500" cy="8.500" r="0.090" fill="#111827"/>
   <circle class="overlay-node" data-net="v5" data-node="v5_rail" cx="1.500" cy="1.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="1.680" y="1.340" font-size="0.280" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 1.680 1.340)">+5V rail</text>
-  <circle class="overlay-node" data-net="gnd" data-node="gnd_rail" cx="1.500" cy="5.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="1.680" y="5.340" font-size="0.280" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 1.680 5.340)">GND rail</text>
+  <text class="overlay-node-label" x="1.680" y="1.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 1.680 1.340)">+5V rail</text>
+  <circle class="overlay-node" data-net="gnd" data-node="gnd_rail" cx="1.500" cy="8.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="1.680" y="8.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 1.680 8.340)">GND rail</text>
   <circle class="overlay-node" data-net="v5" data-node="STEP_plus" cx="6.500" cy="1.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="6.680" y="1.340" font-size="0.280" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 6.680 1.340)">PUL+</text>
-  <circle class="overlay-node" data-net="step_pul_minus" data-node="STEP_minus" cx="15.500" cy="3.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="15.680" y="3.340" font-size="0.280" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 15.680 3.340)">PUL-</text>
+  <text class="overlay-node-label" x="6.680" y="1.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 6.680 1.340)">PUL+</text>
+  <circle class="overlay-node" data-net="step_pul_minus" data-node="STEP_minus" cx="1.500" cy="4.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="1.680" y="4.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 1.680 4.340)">PUL-</text>
   <circle class="overlay-node" data-net="v5" data-node="DIR_plus" cx="10.500" cy="1.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="10.680" y="1.340" font-size="0.280" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 10.680 1.340)">DIR+</text>
-  <circle class="overlay-node" data-net="dir_minus" data-node="DIR_minus" cx="16.500" cy="3.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="16.680" y="3.340" font-size="0.280" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 16.680 3.340)">DIR-</text>
+  <text class="overlay-node-label" x="10.680" y="1.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 10.680 1.340)">DIR+</text>
+  <circle class="overlay-node" data-net="dir_minus" data-node="DIR_minus" cx="6.500" cy="4.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="6.680" y="4.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 6.680 4.340)">DIR-</text>
   <circle class="overlay-node" data-net="ena_plus" data-node="ena_plus" cx="16.500" cy="2.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="16.680" y="2.340" font-size="0.280" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 16.680 2.340)">ENA+</text>
-  <circle class="overlay-node" data-net="gnd" data-node="ena_minus" cx="16.500" cy="5.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="16.680" y="5.340" font-size="0.280" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 16.680 5.340)">ENA-</text>
-  <circle class="overlay-node" data-net="step_gpio" data-node="STEP_gpio" cx="7.500" cy="3.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="7.680" y="3.340" font-size="0.280" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 7.680 3.340)">Pico STEP GPIO0</text>
-  <circle class="overlay-node" data-net="step_base" data-node="STEP_base" cx="7.500" cy="4.500" r="0.140" fill="#2563eb"/>
-  <circle class="overlay-node" data-net="gnd" data-node="STEP_gnd_junction" cx="6.500" cy="5.500" r="0.140" fill="#2563eb"/>
-  <circle class="overlay-node" data-net="gnd" data-node="STEP_pulldown_gnd" cx="4.500" cy="5.500" r="0.140" fill="#2563eb"/>
-  <circle class="overlay-node" data-net="dir_gpio" data-node="DIR_gpio" cx="12.500" cy="3.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="12.680" y="3.340" font-size="0.280" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 12.680 3.340)">Pico DIR GPIO1</text>
-  <circle class="overlay-node" data-net="dir_base" data-node="DIR_base" cx="12.500" cy="4.500" r="0.140" fill="#2563eb"/>
-  <circle class="overlay-node" data-net="gnd" data-node="DIR_gnd_junction" cx="10.500" cy="5.500" r="0.140" fill="#2563eb"/>
-  <circle class="overlay-node" data-net="gnd" data-node="DIR_pulldown_gnd" cx="8.500" cy="5.500" r="0.140" fill="#2563eb"/>
-  <circle class="overlay-node" data-net="v24" data-node="ena_v24" cx="2.500" cy="0.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="2.680" y="0.340" font-size="0.280" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 2.680 0.340)">+24V</text>
-  <circle class="overlay-node" data-net="ena_plus" data-node="ena_plus_junction" cx="15.500" cy="2.500" r="0.140" fill="#2563eb"/>
-  <circle class="overlay-node" data-net="ena_gpio" data-node="ena_gpio" cx="2.500" cy="3.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="2.680" y="3.340" font-size="0.280" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 2.680 3.340)">Pico ENABLE GPIO2</text>
-  <circle class="overlay-node" data-net="ena_base" data-node="ena_base" cx="2.500" cy="4.500" r="0.140" fill="#2563eb"/>
-  <circle class="overlay-node" data-net="gnd" data-node="ena_gnd_junction" cx="15.500" cy="5.500" r="0.140" fill="#2563eb"/>
-  <circle class="overlay-node" data-net="gnd" data-node="ena_pulldown_gnd" cx="13.500" cy="5.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="16.680" y="2.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 16.680 2.340)">ENA+</text>
+  <circle class="overlay-node" data-net="gnd" data-node="ena_minus" cx="16.500" cy="8.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="16.680" y="8.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 16.680 8.340)">ENA-</text>
+  <circle class="overlay-node" data-net="step_gpio" data-node="STEP_gpio" cx="6.500" cy="3.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="6.680" y="3.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 6.680 3.340)">Pico STEP GPIO0</text>
+  <circle class="overlay-node" data-net="dir_gpio" data-node="DIR_gpio" cx="11.500" cy="3.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="11.680" y="3.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 11.680 3.340)">Pico DIR GPIO1</text>
+  <circle class="overlay-node" data-net="v24" data-node="ena_v24" cx="11.500" cy="0.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="11.680" y="0.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 11.680 0.340)">+24V</text>
+  <circle class="overlay-node" data-net="ena_gpio" data-node="ena_gpio" cx="1.500" cy="3.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="1.680" y="3.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 1.680 3.340)">Pico ENABLE GPIO2</text>
   <circle class="strip-cut" data-row="3" data-col="5" cx="5.500" cy="3.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
   <line class="strip-cut-mark" data-row="3" data-col="5" x1="5.283" y1="3.283" x2="5.717" y2="3.717" stroke="#000000" stroke-width="0.140"/>
   <line class="strip-cut-mark" data-row="3" data-col="5" x1="5.283" y1="3.717" x2="5.717" y2="3.283" stroke="#000000" stroke-width="0.140"/>
@@ -235,7 +280,4 @@
   <circle class="strip-cut" data-row="4" data-col="5" cx="5.500" cy="4.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
   <line class="strip-cut-mark" data-row="4" data-col="5" x1="5.283" y1="4.283" x2="5.717" y2="4.717" stroke="#000000" stroke-width="0.140"/>
   <line class="strip-cut-mark" data-row="4" data-col="5" x1="5.283" y1="4.717" x2="5.717" y2="4.283" stroke="#000000" stroke-width="0.140"/>
-  <circle class="strip-cut" data-row="4" data-col="10" cx="10.500" cy="4.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
-  <line class="strip-cut-mark" data-row="4" data-col="10" x1="10.283" y1="4.283" x2="10.717" y2="4.717" stroke="#000000" stroke-width="0.140"/>
-  <line class="strip-cut-mark" data-row="4" data-col="10" x1="10.283" y1="4.717" x2="10.717" y2="4.283" stroke="#000000" stroke-width="0.140"/>
 </svg>

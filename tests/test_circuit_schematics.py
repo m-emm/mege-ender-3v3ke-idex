@@ -288,6 +288,41 @@ def _create_sparse_stripboard_schema():
     return create_schema([*dense_nodes, *sparse_a_nodes, *sparse_b_nodes, sparse_c], [])
 
 
+def _create_duplicate_marker_stripboard_schema():
+    dense_net = create_net("dense")
+    shared_net = create_net("shared")
+    other_net = create_net("other")
+
+    dense_nodes = [
+        translate(column, 0)(create_node(Dot, f"dense_dup_{column}", net=dense_net))
+        for column in range(6)
+    ]
+    shared = translate(2, -2)(
+        create_node(Dot, "shared_node", net=shared_net, label="shared")
+    )
+    other = translate(4, -4)(
+        create_node(Dot, "other_node", net=other_net, label="other")
+    )
+    resistor = translate(2, -3)(
+        create_element(Resistor, "Rdup", "1k", shared, other)
+    )
+
+    return create_schema([*dense_nodes, shared, other], [resistor])
+
+
+def _create_nonphysical_junction_stripboard_schema():
+    net = create_net("signal")
+    other_net = create_net("other")
+    signal = create_node(Dot, "signal", net=net, label="signal")
+    helper = translate(9, 0)(
+        create_node(Dot, "helper", net=net, kind="schematic_junction")
+    )
+    other = translate(2, -2)(create_node(Dot, "other", net=other_net, label="other"))
+    resistor = translate(1, -1)(create_element(Resistor, "Rhelper", "1k", signal, other))
+
+    return create_schema([signal, helper, other], [resistor])
+
+
 def test_get_schema_net_visualizations_sorts_nets_by_representative_y():
     schema = _create_stripboard_mapping_schema()
 
@@ -376,22 +411,66 @@ def test_compacted_sparse_rows_snap_markers_inside_runs_not_cuts():
         assign_schema_nets_to_stripboard(schema)
     )
 
-    assert assignment.net_column_maps["sparse_a"] == {0: 2, 1: 3}
-    assert assignment.net_column_maps["sparse_b"] == {4: 7, 5: 8}
+    assert assignment.net_column_maps["sparse_a"] == {0: 1, 1: 4}
+    assert assignment.net_column_maps["sparse_b"] == {4: 6, 5: 9}
     assert assignment.net_column_maps["sparse_c"] == {8: 10}
 
     snapped = snap_schema_to_stripboard(schema, assignment)
     positions = {node.name: node.position for node in snapped.node_views}
 
-    assert positions["sparse_a_0"] == pytest.approx((2.5, 1.5))
-    assert positions["sparse_a_1"] == pytest.approx((3.5, 1.5))
-    assert positions["sparse_b_4"] == pytest.approx((7.5, 1.5))
-    assert positions["sparse_b_5"] == pytest.approx((8.5, 1.5))
+    assert positions["sparse_a_0"] == pytest.approx((1.5, 1.5))
+    assert positions["sparse_a_1"] == pytest.approx((4.5, 1.5))
+    assert positions["sparse_b_4"] == pytest.approx((6.5, 1.5))
+    assert positions["sparse_b_5"] == pytest.approx((9.5, 1.5))
     assert positions["sparse_c"] == pytest.approx((10.5, 1.5))
     assert all(
         abs(position[0] - 5.5) > 1e-9 or abs(position[1] - 1.5) > 1e-9
         for position in positions.values()
     )
+
+
+def test_compacted_sparse_rows_give_duplicate_markers_separate_holes():
+    schema = _create_duplicate_marker_stripboard_schema()
+    assignment = compact_sparse_stripboard_rows(
+        assign_schema_nets_to_stripboard(schema)
+    )
+
+    shared_keys = [
+        ("node", "shared_node"),
+        ("terminal", "Rdup", "start"),
+    ]
+    shared_columns = [assignment.marker_column_maps[key] for key in shared_keys]
+    assert len(set(shared_columns)) == len(shared_columns)
+
+    marker_rows = {}
+    for visualization in assignment.net_visualizations:
+        row = assignment.net_rows[visualization.net_name]
+        for node_view in visualization.node_views:
+            marker_rows[("node", node_view.name)] = row
+        for terminal in visualization.terminal_points:
+            marker_rows[
+                ("terminal", terminal.element_name, terminal.terminal_name)
+            ] = row
+
+    occupied_holes = [
+        (assignment.marker_column_maps[key], marker_rows[key])
+        for key in marker_rows
+    ]
+    assert len(occupied_holes) == len(set(occupied_holes))
+
+
+def test_stripboard_assignment_ignores_nonphysical_schematic_junctions(tmp_path):
+    schema = _create_nonphysical_junction_stripboard_schema()
+    assignment = assign_schema_nets_to_stripboard(schema)
+
+    assert ("node", "helper") not in assignment.marker_column_maps
+    assert 9 not in assignment.used_source_columns
+
+    outfile = tmp_path / "overlay.svg"
+    render_stripboard_overlay(assignment.stripboard, assignment, schema, file=outfile)
+
+    svg = outfile.read_text(encoding="utf-8")
+    assert 'data-node="helper"' not in svg
 
 
 def test_snap_schema_to_stripboard_moves_node_views_onto_rows():

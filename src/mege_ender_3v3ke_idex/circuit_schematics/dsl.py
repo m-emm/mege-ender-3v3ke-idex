@@ -50,10 +50,10 @@ STRIPBOARD_OVERLAY_TEXT_HALO = "#ffffff"
 STRIPBOARD_OVERLAY_STROKE_WIDTH = 0.045
 STRIPBOARD_OVERLAY_NODE_RADIUS = 0.14
 STRIPBOARD_OVERLAY_TERMINAL_RADIUS = 0.09
-STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE = 0.32
-STRIPBOARD_OVERLAY_NODE_LABEL_SIZE = 0.28
-STRIPBOARD_OVERLAY_NET_LABEL_SIZE = 0.42
-STRIPBOARD_OVERLAY_RUN_LABEL_SIZE = 0.30
+STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE = 0.19
+STRIPBOARD_OVERLAY_NODE_LABEL_SIZE = 0.17
+STRIPBOARD_OVERLAY_NET_LABEL_SIZE = 0.34
+STRIPBOARD_OVERLAY_RUN_LABEL_SIZE = 0.20
 STRIPBOARD_OVERLAY_NET_LABEL_MARGIN = 3.1
 STRIPBOARD_OVERLAY_LABEL_ANGLE = -30.0
 STRIPBOARD_RUN_BLOCK_STROKE = "#111111"
@@ -61,6 +61,7 @@ STRIPBOARD_RUN_BLOCK_STROKE_WIDTH = 0.085
 STRIPBOARD_CUT_STROKE = "#000000"
 STRIPBOARD_CUT_RADIUS = 0.31
 STRIPBOARD_CUT_STROKE_WIDTH = 0.14
+STRIPBOARD_NON_PHYSICAL_NODE_KINDS = frozenset({"schematic_junction", "layout"})
 
 
 class NodeType(Enum):
@@ -196,6 +197,7 @@ class StripboardNetAssignment:
     cuts: tuple[StripboardCut, ...] = ()
     local_points: tuple[StripboardLocalPoint, ...] = ()
     net_column_maps: dict[str, dict[int, int]] = field(default_factory=dict)
+    marker_column_maps: dict[tuple[str, ...], int] = field(default_factory=dict)
 
 
 @dataclass
@@ -612,6 +614,16 @@ def assign_schema_nets_to_stripboard(
         raise ValueError("column_pitch must be positive.")
 
     net_visualizations = get_schema_net_visualizations(schema)
+    markers_by_net = _stripboard_markers_by_net(net_visualizations, column_pitch)
+    net_visualizations = tuple(
+        visualization
+        for visualization in net_visualizations
+        if markers_by_net.get(visualization.net_name)
+    )
+    markers_by_net = {
+        visualization.net_name: markers_by_net[visualization.net_name]
+        for visualization in net_visualizations
+    }
     if not net_visualizations:
         return StripboardNetAssignment(
             stripboard=create_stripboard(1, 1),
@@ -626,9 +638,15 @@ def assign_schema_nets_to_stripboard(
         )
 
     source_columns_by_net = {
-        visualization.net_name: _source_columns_for_visualization(
-            visualization,
-            column_pitch,
+        visualization.net_name: tuple(
+            sorted(
+                {
+                    source_column
+                    for _marker_key, source_column in markers_by_net[
+                        visualization.net_name
+                    ]
+                }
+            )
         )
         for visualization in net_visualizations
     }
@@ -641,13 +659,19 @@ def assign_schema_nets_to_stripboard(
             }
         )
     )
+    active_width = max(
+        len(used_source_columns),
+        max(len(markers) for markers in markers_by_net.values()),
+    )
     column_map = {
         source_column: left_margin_pitches + index
         for index, source_column in enumerate(used_source_columns)
     }
-    board_width = len(used_source_columns) + left_margin_pitches + right_margin_pitches
+    board_width = active_width + left_margin_pitches + right_margin_pitches
     board_height = len(net_visualizations)
     x_offset = left_margin_pitches - used_source_columns[0]
+    active_start = left_margin_pitches
+    active_end = board_width - right_margin_pitches - 1
 
     board_visualizations = tuple(reversed(net_visualizations))
     net_rows = {
@@ -671,6 +695,16 @@ def assign_schema_nets_to_stripboard(
         }
         for net_name, source_columns in source_columns_by_net.items()
     }
+    marker_column_maps = {
+        marker_key: column
+        for net_name, markers in markers_by_net.items()
+        for marker_key, column in _unique_marker_column_map(
+            markers,
+            net_column_maps.get(net_name, {}),
+            active_start,
+            active_end,
+        ).items()
+    }
 
     return StripboardNetAssignment(
         stripboard=create_stripboard(board_width, board_height),
@@ -684,6 +718,7 @@ def assign_schema_nets_to_stripboard(
         right_margin_pitches=right_margin_pitches,
         net_runs=net_runs,
         net_column_maps=net_column_maps,
+        marker_column_maps=marker_column_maps,
     )
 
 
@@ -720,12 +755,17 @@ def compact_sparse_stripboard_rows(
         run.net_name: tuple(run.source_columns)
         for run in assignment.net_runs
     }
+    markers_by_net = _stripboard_markers_by_net(
+        assignment.net_visualizations,
+        assignment.column_pitch,
+    )
 
     output_rows = []
     pending_sparse = []
     for run in sorted(assignment.net_runs, key=lambda item: (item.row, item.start_col)):
         source_columns = source_columns_by_net[run.net_name]
-        if len(source_columns) <= max_connections_per_sparse_net:
+        markers = markers_by_net.get(run.net_name, ())
+        if len(markers) <= max_connections_per_sparse_net:
             pending_sparse.append(run.net_name)
             continue
         if pending_sparse:
@@ -733,6 +773,7 @@ def compact_sparse_stripboard_rows(
                 _pack_sparse_stripboard_runs(
                     pending_sparse,
                     source_columns_by_net,
+                    markers_by_net,
                     active_start,
                     active_end,
                     min_run_holes,
@@ -761,6 +802,7 @@ def compact_sparse_stripboard_rows(
             _pack_sparse_stripboard_runs(
                 pending_sparse,
                 source_columns_by_net,
+                markers_by_net,
                 active_start,
                 active_end,
                 min_run_holes,
@@ -771,6 +813,7 @@ def compact_sparse_stripboard_rows(
     cuts = []
     local_points = []
     net_column_maps = {}
+    marker_column_maps = {}
     net_rows = {}
     net_visualizations = []
     for row, (row_runs, row_cuts, row_local_points) in enumerate(output_rows):
@@ -787,11 +830,32 @@ def compact_sparse_stripboard_rows(
             net_rows[placed_run.net_name] = row
             if placed_run.compacted:
                 net_column_maps[placed_run.net_name] = _run_column_map(placed_run)
+                marker_column_maps.update(
+                    _spread_marker_column_map(
+                        markers_by_net.get(placed_run.net_name, ()),
+                        placed_run.start_col,
+                        placed_run.end_col,
+                    )
+                )
             else:
                 net_column_maps[placed_run.net_name] = assignment.net_column_maps.get(
                     placed_run.net_name,
                     _run_column_map(placed_run),
                 )
+                if placed_run.net_name in markers_by_net:
+                    marker_column_maps.update(
+                        {
+                            marker_key: assignment.marker_column_maps.get(
+                                marker_key,
+                                column,
+                            )
+                            for marker_key, column in _spread_marker_column_map(
+                                markers_by_net[placed_run.net_name],
+                                active_start,
+                                active_end,
+                            ).items()
+                        }
+                    )
             net_visualizations.append(visualization_by_net[placed_run.net_name])
         for local_point in row_local_points:
             placed_point = StripboardLocalPoint(
@@ -805,6 +869,9 @@ def compact_sparse_stripboard_rows(
             net_column_maps[placed_point.net_name] = {
                 placed_point.source_column: placed_point.col
             }
+            markers = markers_by_net.get(placed_point.net_name, ())
+            if markers:
+                marker_column_maps[markers[0][0]] = placed_point.col
             net_visualizations.append(visualization_by_net[placed_point.net_name])
         for cut in row_cuts:
             cuts.append(StripboardCut(row=row, col=cut.col))
@@ -823,6 +890,7 @@ def compact_sparse_stripboard_rows(
         cuts=tuple(cuts),
         local_points=tuple(local_points),
         net_column_maps=net_column_maps,
+        marker_column_maps=marker_column_maps,
     )
 
 
@@ -1617,17 +1685,19 @@ def _stripboard_overlay_node_markers(schema, assignment):
     for node_view in schema.node_views:
         if node_view.net.name not in assignment.net_rows:
             continue
+        if not _is_stripboard_physical_node_view(node_view):
+            continue
         point = node_points.get(node_view.name, (node_view.position,))[0]
         markers.append(
             {
                 "node_name": node_view.name,
                 "net_name": node_view.net.name,
                 "label": node_view.label,
-                "position": _snap_schema_point_to_stripboard(
+                "position": _stripboard_marker_position(
+                    _stripboard_node_marker_key(node_view.name),
                     point,
                     node_view.net.name,
                     assignment,
-                    assignment.column_pitch,
                 ),
             }
         )
@@ -1645,11 +1715,11 @@ def _stripboard_overlay_terminals(schema, assignment):
                     "element_name": element.name,
                     "terminal_name": terminal_name,
                     "net_name": net_name,
-                    "position": _snap_schema_point_to_stripboard(
+                    "position": _stripboard_marker_position(
+                        _stripboard_terminal_marker_key(element.name, terminal_name),
                         element.anchor_position(terminal_name),
                         net_name,
                         assignment,
-                        assignment.column_pitch,
                     ),
                 }
             )
@@ -1664,11 +1734,11 @@ def _stripboard_overlay_elements(schema, assignment):
             if net_name not in assignment.net_rows:
                 continue
             positions.append(
-                _snap_schema_point_to_stripboard(
+                _stripboard_marker_position(
+                    _stripboard_terminal_marker_key(element.name, terminal_name),
                     element.anchor_position(terminal_name),
                     net_name,
                     assignment,
-                    assignment.column_pitch,
                 )
             )
         if not positions:
@@ -1685,6 +1755,19 @@ def _stripboard_overlay_elements(schema, assignment):
             }
         )
     return overlays
+
+
+def _stripboard_marker_position(marker_key, point, net_name, assignment):
+    column = assignment.marker_column_maps.get(marker_key)
+    if column is None:
+        return _snap_schema_point_to_stripboard(
+            point,
+            net_name,
+            assignment,
+            assignment.column_pitch,
+        )
+    row = assignment.net_rows[net_name]
+    return (STRIPBOARD_BOARD_MARGIN + column, STRIPBOARD_BOARD_MARGIN + row)
 
 
 def _snap_schema_point_to_stripboard(point, net_name, assignment, column_pitch):
@@ -1710,6 +1793,7 @@ def _snap_schema_x_to_column(x, net_name, assignment, column_pitch):
 def _pack_sparse_stripboard_runs(
     net_names,
     source_columns_by_net,
+    markers_by_net,
     active_start,
     active_end,
     min_run_holes,
@@ -1723,8 +1807,10 @@ def _pack_sparse_stripboard_runs(
 
     for net_name in net_names:
         source_columns = source_columns_by_net[net_name]
-        is_local_point = len(source_columns) == 1
-        item_length = 1 if is_local_point else max(min_run_holes, len(source_columns))
+        markers = markers_by_net.get(net_name, ())
+        marker_count = len(markers)
+        is_local_point = marker_count == 1
+        item_length = 1 if is_local_point else max(min_run_holes, marker_count)
         if item_length > active_width:
             raise ValueError(
                 f"Net {net_name!r} needs {item_length} holes, "
@@ -1753,7 +1839,7 @@ def _pack_sparse_stripboard_runs(
                     net_name=net_name,
                     row=0,
                     col=start_col,
-                    source_column=source_columns[0],
+                    source_column=markers[0][1],
                 )
             )
         else:
@@ -1780,11 +1866,104 @@ def _run_column_map(run):
     if not source_columns:
         return {}
     run_length = run.end_col - run.start_col + 1
-    block_start = run.start_col + max(0, (run_length - len(source_columns)) // 2)
+    if len(source_columns) == 1:
+        return {source_columns[0]: run.start_col + run_length // 2}
+    step = (run_length - 1) / (len(source_columns) - 1)
     return {
-        source_column: block_start + index
+        source_column: run.start_col + int(round(index * step))
         for index, source_column in enumerate(source_columns)
     }
+
+
+def _spread_marker_column_map(markers, start_col, end_col):
+    markers = tuple(markers)
+    if not markers:
+        return {}
+    available_columns = end_col - start_col + 1
+    if len(markers) > available_columns:
+        raise ValueError(
+            f"Need {len(markers)} unique holes but only {available_columns} "
+            "stripboard columns are available."
+        )
+    if len(markers) == 1:
+        return {markers[0][0]: start_col + available_columns // 2}
+
+    step = (available_columns - 1) / (len(markers) - 1)
+    return {
+        marker_key: start_col + int(round(index * step))
+        for index, (marker_key, _source_column) in enumerate(markers)
+    }
+
+
+def _unique_marker_column_map(markers, source_column_map, start_col, end_col):
+    marker_map = {}
+    used_columns = set()
+    for marker_key, source_column in markers:
+        preferred = source_column_map.get(source_column)
+        if preferred is None:
+            preferred = source_column
+        preferred = int(_clamp(preferred, start_col, end_col))
+        column = preferred
+        if column in used_columns:
+            column = _nearest_unused_column(preferred, used_columns, start_col, end_col)
+        marker_map[marker_key] = column
+        used_columns.add(column)
+    return marker_map
+
+
+def _nearest_unused_column(preferred, used_columns, start_col, end_col):
+    for distance in range(end_col - start_col + 1):
+        left = preferred - distance
+        if left >= start_col and left not in used_columns:
+            return left
+        right = preferred + distance
+        if right <= end_col and right not in used_columns:
+            return right
+    raise ValueError(
+        "Need more unique stripboard holes than the row has available columns."
+    )
+
+
+def _stripboard_markers_by_net(net_visualizations, column_pitch):
+    return {
+        visualization.net_name: tuple(
+            sorted(
+                _stripboard_markers_for_visualization(visualization, column_pitch),
+                key=lambda marker: (marker[1], marker[0]),
+            )
+        )
+        for visualization in net_visualizations
+    }
+
+
+def _stripboard_markers_for_visualization(visualization, column_pitch):
+    for node_view in visualization.node_views:
+        if not _is_stripboard_physical_node_view(node_view):
+            continue
+        yield (
+            _stripboard_node_marker_key(node_view.name),
+            int(round(node_view.position[0] / column_pitch)),
+        )
+    for terminal in visualization.terminal_points:
+        yield (
+            _stripboard_terminal_marker_key(
+                terminal.element_name,
+                terminal.terminal_name,
+            ),
+            int(round(terminal.position[0] / column_pitch)),
+        )
+
+
+def _stripboard_node_marker_key(node_name):
+    return ("node", str(node_name))
+
+
+def _is_stripboard_physical_node_view(node_view):
+    return node_view.kind not in STRIPBOARD_NON_PHYSICAL_NODE_KINDS
+
+
+def _stripboard_terminal_marker_key(element_name, terminal_name):
+    return ("terminal", str(element_name), str(terminal_name))
 
 
 def _source_columns_for_visualization(visualization, column_pitch):
