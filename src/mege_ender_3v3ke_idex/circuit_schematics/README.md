@@ -62,6 +62,15 @@ pul_plus = translate(4, 1)(pul_plus)
 feed = create_element(Wire, "", None, vcc, pul_plus)
 ```
 
+Use `point_at(...)` when an alignment should target a specific edge or endpoint
+of an object:
+
+```python
+gnd = create_node(Ground, "gnd", label="GND", label_alignment=Alignment.RIGHT)
+gnd = create_rail(gnd, Direction.VERTICAL, 8, anchor=Alignment.BOTTOM)
+gnd = align(point_at(gnd, Alignment.TOP), point_at(vcc, Alignment.TOP), Alignment.CENTER)
+```
+
 Run an example from the repository root:
 
 ```bash
@@ -79,6 +88,8 @@ The helper runs the script with the repository `src/` directory on
   nodes whose labels should face a specific way.
 - Rails are created from normal nodes with `create_rail`; connected terminals
   project onto the visible rail and render tap dots.
+- Use `point_at(obj, Alignment.TOP/RIGHT/...)` to align from a specific side or
+  endpoint while moving the original object.
 - Elements are connected to nodes with `create_element`.
 - `Wire` is a direct conductor between two nodes and does not need placement.
 - Layout is explicit and copy-returning: `align(...)`, `translate(...)`, and

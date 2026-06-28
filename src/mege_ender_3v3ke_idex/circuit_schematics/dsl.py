@@ -174,6 +174,24 @@ class Anchor:
 
 
 @dataclass
+class ReferencePoint:
+    owner: object
+    subject: object
+    alignment: Alignment
+
+    @property
+    def position(self):
+        return _aligned_point(self.subject, self.alignment)
+
+    def get_bounding_box(self):
+        x, y = self.position
+        return [[x, y], [x, y]]
+
+    def point(self):
+        return self.position
+
+
+@dataclass
 class Element:
     element_type: ElementType
     name: str
@@ -332,13 +350,33 @@ def rotate(angle, center=None):
     return retval
 
 
+def point_at(obj, alignment):
+    if alignment not in {
+        Alignment.CENTER,
+        Alignment.LEFT,
+        Alignment.RIGHT,
+        Alignment.TOP,
+        Alignment.BOTTOM,
+        Alignment.TOP_CENTER,
+        Alignment.BOTTOM_CENTER,
+        Alignment.LEFT_CENTER,
+        Alignment.RIGHT_CENTER,
+    }:
+        raise ValueError(
+            "point_at alignment must be CENTER, LEFT, RIGHT, TOP, BOTTOM, "
+            "TOP_CENTER, BOTTOM_CENTER, LEFT_CENTER, or RIGHT_CENTER."
+        )
+    owner = obj.owner if isinstance(obj, (Anchor, ReferencePoint)) else obj
+    return ReferencePoint(owner, obj, alignment)
+
+
 def align_translation(part, to, alignment, axes=None, stack_gap=0):
     dx, dy = _alignment_delta(part, to, alignment, axes=axes, stack_gap=stack_gap)
     return translate(dx, dy)
 
 
 def align(part, to, alignment, axes=None, stack_gap=0):
-    target = part.owner if isinstance(part, Anchor) else part
+    target = part.owner if isinstance(part, (Anchor, ReferencePoint)) else part
     return align_translation(part, to, alignment, axes=axes, stack_gap=stack_gap)(
         target
     )
@@ -694,7 +732,7 @@ def _validate_terminal_nodes(element_type, terminal_nodes):
 
 
 def _get_bounding_box(obj, padded=True):
-    if isinstance(obj, Anchor):
+    if isinstance(obj, (Anchor, ReferencePoint)):
         return obj.get_bounding_box()
     if isinstance(obj, Element):
         if padded:
@@ -805,6 +843,22 @@ def _padded_box(box, padding):
 
 def _box_center(box):
     return ((box[0][0] + box[1][0]) / 2.0, (box[0][1] + box[1][1]) / 2.0)
+
+
+def _aligned_point(obj, alignment):
+    box = _get_bounding_box(obj, padded=False)
+    center = _box_center(box)
+    if alignment is Alignment.CENTER:
+        return center
+    if alignment in (Alignment.LEFT, Alignment.LEFT_CENTER):
+        return (box[0][0], center[1])
+    if alignment in (Alignment.RIGHT, Alignment.RIGHT_CENTER):
+        return (box[1][0], center[1])
+    if alignment in (Alignment.TOP, Alignment.TOP_CENTER):
+        return (center[0], box[1][1])
+    if alignment in (Alignment.BOTTOM, Alignment.BOTTOM_CENTER):
+        return (center[0], box[0][1])
+    raise ValueError(f"Unsupported point alignment: {alignment}")
 
 
 def _point(value):

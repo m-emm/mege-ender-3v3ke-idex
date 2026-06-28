@@ -12,54 +12,30 @@ PNG_FILE = DIAGRAM_DIR / "pico_tb6600_stripboard_interface.png"
 
 TRANSISTOR_TYPE = "BC337"
 
-V5_RAIL_X = -3.0
-V5_RAIL_TOP_Y = 10.8
-V5_RAIL_BOTTOM_Y = 1.0
-V5_RAIL_LENGTH = V5_RAIL_TOP_Y - V5_RAIL_BOTTOM_Y
-
-GND_RAIL_X = 12.0
-GND_RAIL_TOP_Y = 10.8
-GND_RAIL_BOTTOM_Y = -13.0
-GND_RAIL_LENGTH = GND_RAIL_TOP_Y - GND_RAIL_BOTTOM_Y
-
-TB6600_TERMINAL_X = 9.8
-LOW_SIDE_TRANSISTOR_X = 8.5
-LOW_SIDE_BASE_X = 5.7
-ENABLE_TRANSISTOR_X = 8.8
-
 TERMINAL_PAIR_GAP = 1.2
+CHANNEL_GAP = 6.8
+ENABLE_TERMINAL_PAIR_GAP = 1.3
 
-STEP_LAYOUT = {
-    "terminal_y": 9.0,
-    "gpio_y": 5.8,
-    "transistor_y": 5.4,
-    "return_y": 3.2,
-    "base_resistor_x": 3.0,
-    "pulldown_y": 4.3,
-}
+RAIL_TOP_TO_FIRST_TERMINAL_GAP = 1.8
+V5_RAIL_LENGTH = RAIL_TOP_TO_FIRST_TERMINAL_GAP + TERMINAL_PAIR_GAP + CHANNEL_GAP
+GND_RAIL_LENGTH = 23.8
+V5_RAIL_TO_TERMINAL_GAP = 12.8
+TERMINAL_TO_GND_RAIL_GAP = 2.2
 
-DIR_LAYOUT = {
-    "terminal_y": 1.0,
-    "gpio_y": -2.2,
-    "transistor_y": -2.6,
-    "return_y": -4.8,
-    "base_resistor_x": 3.0,
-    "pulldown_y": -3.7,
-}
+TRANSISTOR_TO_TERMINAL_GAP = 0.95
+COLLECTOR_TO_TERMINAL_GAP = 1.7
+EMITTER_TO_RETURN_GAP = 1.1
 
-ENA_LAYOUT = {
-    "v24_y": -6.0,
-    "plus_y": -7.0,
-    "minus_y": -8.3,
-    "gpio_y": -10.6,
-    "transistor_y": -11.2,
-    "return_y": -13.0,
-    "feed_x": 2.4,
-    "feed_a_y": -5.8,
-    "feed_b_y": -7.9,
-    "base_resistor_x": 3.0,
-    "pulldown_y": -12.1,
-}
+PULLDOWN_TO_TRANSISTOR_GAP = 1.6
+GPIO_TO_BASE_RESISTOR_GAP = 2.4
+
+ENA_JUNCTION_TO_TERMINAL_GAP = 1.0
+ENA_COLLECTOR_TO_PLUS_GAP = 3.5
+ENA_FEED_TO_JUNCTION_GAP = 5.4
+ENA_FEED_TOP_GAP = 0.8
+PARALLEL_FEED_GAP = 0.5
+
+DECOUPLING_TO_V5_RAIL_GAP = 4.0
 
 REFDES = {
     "STEP": {
@@ -75,73 +51,160 @@ REFDES = {
 }
 
 
+def create_terminal_stack():
+    pul_plus = create_node(
+        Dot,
+        "STEP_plus",
+        label="PUL+",
+        label_alignment=Alignment.RIGHT,
+    )
+
+    pul_minus = create_node(
+        Dot,
+        "STEP_minus",
+        label="PUL-",
+        label_alignment=Alignment.RIGHT,
+    )
+    pul_minus = align(pul_minus, pul_plus, Alignment.CENTER)
+    pul_minus = align(
+        pul_minus,
+        pul_plus,
+        Alignment.STACK_BOTTOM,
+        stack_gap=TERMINAL_PAIR_GAP,
+    )
+
+    dir_plus = create_node(
+        Dot,
+        "DIR_plus",
+        label="DIR+",
+        label_alignment=Alignment.RIGHT,
+    )
+    dir_plus = align(dir_plus, pul_minus, Alignment.CENTER)
+    dir_plus = align(dir_plus, pul_minus, Alignment.STACK_BOTTOM, stack_gap=CHANNEL_GAP)
+
+    dir_minus = create_node(
+        Dot,
+        "DIR_minus",
+        label="DIR-",
+        label_alignment=Alignment.RIGHT,
+    )
+    dir_minus = align(dir_minus, dir_plus, Alignment.CENTER)
+    dir_minus = align(
+        dir_minus,
+        dir_plus,
+        Alignment.STACK_BOTTOM,
+        stack_gap=TERMINAL_PAIR_GAP,
+    )
+
+    ena_plus = create_node(
+        Dot,
+        "ena_plus",
+        label="ENA+",
+        label_alignment=Alignment.TOP,
+    )
+    ena_plus = align(ena_plus, dir_minus, Alignment.CENTER)
+    ena_plus = align(ena_plus, dir_minus, Alignment.STACK_BOTTOM, stack_gap=CHANNEL_GAP)
+
+    ena_minus = create_node(
+        Dot,
+        "ena_minus",
+        label="ENA-",
+        label_alignment=Alignment.BOTTOM,
+    )
+    ena_minus = align(ena_minus, ena_plus, Alignment.CENTER)
+    ena_minus = align(
+        ena_minus,
+        ena_plus,
+        Alignment.STACK_BOTTOM,
+        stack_gap=ENABLE_TERMINAL_PAIR_GAP,
+    )
+
+    return {
+        "pul_plus": pul_plus,
+        "pul_minus": pul_minus,
+        "dir_plus": dir_plus,
+        "dir_minus": dir_minus,
+        "ena_plus": ena_plus,
+        "ena_minus": ena_minus,
+    }
+
+
+def create_rails(terminals):
+    v5_rail = create_node(
+        Dot,
+        "v5_rail",
+        label="+5V rail",
+        label_alignment=Alignment.LEFT,
+    )
+    v5_rail = create_rail(
+        v5_rail,
+        Direction.VERTICAL,
+        V5_RAIL_LENGTH,
+        anchor=Alignment.TOP,
+    )
+    v5_rail = align(
+        v5_rail,
+        terminals["pul_plus"],
+        Alignment.STACK_LEFT,
+        stack_gap=V5_RAIL_TO_TERMINAL_GAP,
+    )
+    v5_rail = align(
+        point_at(v5_rail, Alignment.TOP),
+        terminals["pul_plus"],
+        Alignment.STACK_TOP,
+        stack_gap=RAIL_TOP_TO_FIRST_TERMINAL_GAP,
+    )
+
+    gnd_rail = create_node(
+        Ground,
+        "gnd_rail",
+        label="GND rail",
+        label_alignment=Alignment.RIGHT,
+    )
+    gnd_rail = create_rail(
+        gnd_rail,
+        Direction.VERTICAL,
+        GND_RAIL_LENGTH,
+        anchor=Alignment.BOTTOM,
+    )
+    gnd_rail = align(
+        gnd_rail,
+        terminals["pul_plus"],
+        Alignment.STACK_RIGHT,
+        stack_gap=TERMINAL_TO_GND_RAIL_GAP,
+    )
+    gnd_rail = align(
+        point_at(gnd_rail, Alignment.TOP),
+        point_at(v5_rail, Alignment.TOP),
+        Alignment.CENTER,
+        axes=["y"],
+    )
+
+    return {"v5": v5_rail, "gnd": gnd_rail}
+
+
 def create_low_side_channel(
     *,
     refdes,
     prefix,
-    layout,
+    plus,
+    minus,
     v5_rail,
     gnd_rail,
     input_label,
-    plus_label,
-    minus_label,
 ):
-    plus = create_node(
-        Dot,
-        f"{prefix}_plus",
-        label=plus_label,
-        label_alignment=Alignment.RIGHT,
-    )
-    plus = translate(TB6600_TERMINAL_X, layout["terminal_y"])(plus)
-
-    minus = create_node(
-        Dot,
-        f"{prefix}_minus",
-        label=minus_label,
-        label_alignment=Alignment.RIGHT,
-    )
-    minus = align(minus, plus, Alignment.CENTER)
-    minus = align(minus, plus, Alignment.STACK_BOTTOM, stack_gap=TERMINAL_PAIR_GAP)
-
-    gpio = create_node(
-        Dot,
-        f"{prefix}_gpio",
-        label=input_label,
-        label_alignment=Alignment.LEFT,
-    )
-    gpio = translate(0.0, layout["gpio_y"])(gpio)
-
     base = create_node(Dot, f"{prefix}_base")
-
     gnd_junction = create_node(Dot, f"{prefix}_gnd_junction")
-    gnd_junction = translate(LOW_SIDE_TRANSISTOR_X, layout["return_y"])(gnd_junction)
 
-    plus_feed = create_element(Wire, "", None, v5_rail, plus)
-    gnd_feed = create_element(Wire, "", None, gnd_junction, gnd_rail)
-
-    transistor = create_element(
-        BjtNpn,
-        refdes["transistor"],
-        TRANSISTOR_TYPE,
-        base=base,
-        collector=minus,
-        emitter=gnd_junction,
+    transistor = _placed_low_side_transistor(refdes, base, minus, gnd_junction)
+    gnd_junction = align(gnd_junction, transistor.emitter, Alignment.CENTER)
+    gnd_junction = align(
+        gnd_junction,
+        transistor.emitter,
+        Alignment.STACK_BOTTOM,
+        stack_gap=EMITTER_TO_RETURN_GAP,
     )
-    transistor = translate(LOW_SIDE_TRANSISTOR_X, layout["transistor_y"])(transistor)
-    transistor = modify_label_alignment(transistor, Alignment.RIGHT)
-
-    base_resistor = create_element(
-        Resistor,
-        refdes["base"],
-        "2k2",
-        gpio,
-        base,
-    )
-    base_resistor = rotate(90)(base_resistor)
-    base_resistor = translate(layout["base_resistor_x"], layout["gpio_y"])(
-        base_resistor
-    )
-    base_resistor = modify_label_alignment(base_resistor, Alignment.TOP)
+    transistor = _placed_low_side_transistor(refdes, base, minus, gnd_junction)
 
     pulldown = create_element(
         Resistor,
@@ -150,41 +213,136 @@ def create_low_side_channel(
         base,
         gnd_junction,
     )
-    pulldown = translate(LOW_SIDE_BASE_X, layout["pulldown_y"])(pulldown)
+    pulldown = align(
+        pulldown,
+        transistor,
+        Alignment.STACK_LEFT,
+        stack_gap=PULLDOWN_TO_TRANSISTOR_GAP,
+    )
+    pulldown = align(pulldown.start, transistor.base, Alignment.CENTER, axes=["y"])
     pulldown = modify_label_alignment(pulldown, Alignment.RIGHT)
 
-    return (
-        [plus, minus, gpio, base, gnd_junction],
-        [plus_feed, gnd_feed, transistor, base_resistor, pulldown],
-    )
-
-
-def create_enable_channel(gnd_rail):
-    v24 = create_node(Dot, "ena_v24", label="+24V", label_alignment=Alignment.LEFT)
-    v24 = translate(0.0, ENA_LAYOUT["v24_y"])(v24)
-
-    ena_plus_terminal = create_node(
+    gpio = create_node(
         Dot,
-        "ena_plus",
-        label="ENA+",
-        label_alignment=Alignment.TOP,
+        f"{prefix}_gpio",
+        label=input_label,
+        label_alignment=Alignment.LEFT,
     )
-    ena_plus_terminal = translate(TB6600_TERMINAL_X, ENA_LAYOUT["plus_y"])(
-        ena_plus_terminal
+    base_resistor = create_element(
+        Resistor,
+        refdes["base"],
+        "2k2",
+        gpio,
+        base,
     )
+    base_resistor = rotate(90)(base_resistor)
+    base_resistor = align(base_resistor.end, pulldown.start, Alignment.CENTER)
+    base_resistor = modify_label_alignment(base_resistor, Alignment.TOP)
+
+    gpio = align(gpio, base_resistor.start, Alignment.CENTER)
+    gpio = align(
+        gpio,
+        base_resistor.start,
+        Alignment.STACK_LEFT,
+        stack_gap=GPIO_TO_BASE_RESISTOR_GAP,
+    )
+    base_resistor = create_element(
+        Resistor,
+        refdes["base"],
+        "2k2",
+        gpio,
+        base,
+    )
+    base_resistor = rotate(90)(base_resistor)
+    base_resistor = align(base_resistor.end, pulldown.start, Alignment.CENTER)
+    base_resistor = modify_label_alignment(base_resistor, Alignment.TOP)
+
+    return (
+        [gpio, base, gnd_junction],
+        [
+            create_element(Wire, "", None, v5_rail, plus),
+            create_element(Wire, "", None, gnd_junction, gnd_rail),
+            transistor,
+            base_resistor,
+            pulldown,
+        ],
+    )
+
+
+def _placed_low_side_transistor(refdes, base, minus, gnd_junction):
+    transistor = create_element(
+        BjtNpn,
+        refdes["transistor"],
+        TRANSISTOR_TYPE,
+        base=base,
+        collector=minus,
+        emitter=gnd_junction,
+    )
+    transistor = align(
+        transistor,
+        minus,
+        Alignment.STACK_LEFT,
+        stack_gap=TRANSISTOR_TO_TERMINAL_GAP,
+    )
+    transistor = align(
+        transistor.collector,
+        minus,
+        Alignment.STACK_BOTTOM,
+        stack_gap=COLLECTOR_TO_TERMINAL_GAP,
+    )
+    return modify_label_alignment(transistor, Alignment.RIGHT)
+
+
+def create_enable_channel(terminals, gnd_rail):
+    v24 = create_node(Dot, "ena_v24", label="+24V", label_alignment=Alignment.LEFT)
 
     ena_plus_junction = create_node(Dot, "ena_plus_junction")
-    ena_plus_junction = translate(ENABLE_TRANSISTOR_X, ENA_LAYOUT["plus_y"])(
-        ena_plus_junction
+    ena_plus_junction = align(
+        ena_plus_junction,
+        terminals["ena_plus"],
+        Alignment.CENTER,
+    )
+    ena_plus_junction = align(
+        ena_plus_junction,
+        terminals["ena_plus"],
+        Alignment.STACK_LEFT,
+        stack_gap=ENA_JUNCTION_TO_TERMINAL_GAP,
     )
 
-    ena_minus = create_node(
-        Dot,
-        "ena_minus",
-        label="ENA-",
-        label_alignment=Alignment.BOTTOM,
+    base = create_node(Dot, "ena_base")
+    gnd_junction = create_node(Dot, "ena_gnd_junction")
+
+    transistor = _placed_enable_transistor(base, ena_plus_junction, gnd_junction)
+    gnd_junction = align(gnd_junction, transistor.emitter, Alignment.CENTER)
+    gnd_junction = align(
+        gnd_junction,
+        transistor.emitter,
+        Alignment.STACK_BOTTOM,
+        stack_gap=EMITTER_TO_RETURN_GAP,
     )
-    ena_minus = translate(TB6600_TERMINAL_X, ENA_LAYOUT["minus_y"])(ena_minus)
+    transistor = _placed_enable_transistor(base, ena_plus_junction, gnd_junction)
+
+    feed_a = create_element(Resistor, "R5", "4k7 0.25W", v24, ena_plus_junction)
+    feed_a = rotate(90)(feed_a)
+    feed_a = align(
+        feed_a,
+        ena_plus_junction,
+        Alignment.STACK_LEFT,
+        stack_gap=ENA_FEED_TO_JUNCTION_GAP,
+    )
+    feed_a = align(
+        feed_a,
+        ena_plus_junction,
+        Alignment.STACK_TOP,
+        stack_gap=ENA_FEED_TOP_GAP,
+    )
+    feed_a = modify_label_alignment(feed_a, Alignment.TOP)
+
+    feed_b = create_element(Resistor, "R6", "4k7 0.25W", v24, ena_plus_junction)
+    feed_b = rotate(90)(feed_b)
+    feed_b = align(feed_b, feed_a, Alignment.CENTER, axes=["x"])
+    feed_b = align(feed_b, feed_a, Alignment.STACK_BOTTOM, stack_gap=PARALLEL_FEED_GAP)
+    feed_b = modify_label_alignment(feed_b, Alignment.BOTTOM)
 
     gpio = create_node(
         Dot,
@@ -192,56 +350,38 @@ def create_enable_channel(gnd_rail):
         label="Pico ENABLE GPIO2",
         label_alignment=Alignment.LEFT,
     )
-    gpio = translate(0.0, ENA_LAYOUT["gpio_y"])(gpio)
 
-    base = create_node(Dot, "ena_base")
-
-    gnd_junction = create_node(Dot, "ena_gnd_junction")
-    gnd_junction = translate(ENABLE_TRANSISTOR_X, ENA_LAYOUT["return_y"])(gnd_junction)
-
-    feed_a = create_element(Resistor, "R5", "4k7 0.25W", v24, ena_plus_junction)
-    feed_a = rotate(90)(feed_a)
-    feed_a = translate(ENA_LAYOUT["feed_x"], ENA_LAYOUT["feed_a_y"])(feed_a)
-    feed_a = modify_label_alignment(feed_a, Alignment.TOP)
-
-    feed_b = create_element(Resistor, "R6", "4k7 0.25W", v24, ena_plus_junction)
-    feed_b = rotate(90)(feed_b)
-    feed_b = translate(ENA_LAYOUT["feed_x"], ENA_LAYOUT["feed_b_y"])(feed_b)
-    feed_b = modify_label_alignment(feed_b, Alignment.BOTTOM)
-
-    transistor = create_element(
-        BjtNpn,
-        "Q3",
-        TRANSISTOR_TYPE,
-        base=base,
-        collector=ena_plus_junction,
-        emitter=gnd_junction,
+    pulldown = create_element(Resistor, "R8", "47k", base, gnd_junction)
+    pulldown = align(
+        pulldown,
+        transistor,
+        Alignment.STACK_LEFT,
+        stack_gap=PULLDOWN_TO_TRANSISTOR_GAP,
     )
-    transistor = translate(ENABLE_TRANSISTOR_X, ENA_LAYOUT["transistor_y"])(transistor)
-    transistor = modify_label_alignment(transistor, Alignment.RIGHT)
+    pulldown = align(pulldown.start, transistor.base, Alignment.CENTER, axes=["y"])
+    pulldown = modify_label_alignment(pulldown, Alignment.RIGHT)
 
     base_resistor = create_element(Resistor, "R7", "2k2", gpio, base)
     base_resistor = rotate(90)(base_resistor)
-    base_resistor = translate(
-        ENA_LAYOUT["base_resistor_x"],
-        ENA_LAYOUT["gpio_y"],
-    )(base_resistor)
+    base_resistor = align(base_resistor.end, pulldown.start, Alignment.CENTER)
     base_resistor = modify_label_alignment(base_resistor, Alignment.TOP)
 
-    pulldown = create_element(Resistor, "R8", "47k", base, gnd_junction)
-    pulldown = translate(LOW_SIDE_BASE_X, ENA_LAYOUT["pulldown_y"])(pulldown)
-    pulldown = modify_label_alignment(pulldown, Alignment.RIGHT)
-
-    ena_plus_wire = create_element(Wire, "", None, ena_plus_junction, ena_plus_terminal)
-    ena_minus_wire = create_element(Wire, "", None, gnd_rail, ena_minus)
-    gnd_feed = create_element(Wire, "", None, gnd_junction, gnd_rail)
+    gpio = align(gpio, base_resistor.start, Alignment.CENTER)
+    gpio = align(
+        gpio,
+        base_resistor.start,
+        Alignment.STACK_LEFT,
+        stack_gap=GPIO_TO_BASE_RESISTOR_GAP,
+    )
+    base_resistor = create_element(Resistor, "R7", "2k2", gpio, base)
+    base_resistor = rotate(90)(base_resistor)
+    base_resistor = align(base_resistor.end, pulldown.start, Alignment.CENTER)
+    base_resistor = modify_label_alignment(base_resistor, Alignment.TOP)
 
     return (
         [
             v24,
-            ena_plus_terminal,
             ena_plus_junction,
-            ena_minus,
             gpio,
             base,
             gnd_junction,
@@ -252,78 +392,78 @@ def create_enable_channel(gnd_rail):
             transistor,
             base_resistor,
             pulldown,
-            ena_plus_wire,
-            ena_minus_wire,
-            gnd_feed,
+            create_element(Wire, "", None, ena_plus_junction, terminals["ena_plus"]),
+            create_element(Wire, "", None, gnd_rail, terminals["ena_minus"]),
+            create_element(Wire, "", None, gnd_junction, gnd_rail),
         ],
     )
+
+
+def _placed_enable_transistor(base, ena_plus_junction, gnd_junction):
+    transistor = create_element(
+        BjtNpn,
+        "Q3",
+        TRANSISTOR_TYPE,
+        base=base,
+        collector=ena_plus_junction,
+        emitter=gnd_junction,
+    )
+    transistor = align(transistor.collector, ena_plus_junction, Alignment.CENTER)
+    transistor = align(
+        transistor.collector,
+        ena_plus_junction,
+        Alignment.STACK_BOTTOM,
+        stack_gap=ENA_COLLECTOR_TO_PLUS_GAP,
+    )
+    return modify_label_alignment(transistor, Alignment.RIGHT)
 
 
 def create_decoupling(v5_rail, gnd_rail):
     capacitor = create_element(Capacitor, "C1", "100nF", v5_rail, gnd_rail)
     capacitor = rotate(90)(capacitor)
-    capacitor = translate(4.0, V5_RAIL_TOP_Y)(capacitor)
+    capacitor = align(
+        capacitor,
+        point_at(v5_rail, Alignment.TOP),
+        Alignment.CENTER,
+        axes=["y"],
+    )
+    capacitor = align(
+        capacitor,
+        point_at(v5_rail, Alignment.TOP),
+        Alignment.STACK_RIGHT,
+        stack_gap=DECOUPLING_TO_V5_RAIL_GAP,
+    )
     capacitor = modify_label_alignment(capacitor, Alignment.BOTTOM)
     return [], [capacitor]
 
 
-def create_rails():
-    v5_rail = create_node(
-        Dot,
-        "v5_rail",
-        label="+5V rail",
-        label_alignment=Alignment.LEFT,
-    )
-    v5_rail = translate(V5_RAIL_X, V5_RAIL_TOP_Y)(v5_rail)
-    v5_rail = create_rail(
-        v5_rail,
-        Direction.VERTICAL,
-        V5_RAIL_LENGTH,
-        anchor=Alignment.TOP,
-    )
-
-    gnd_rail = create_node(
-        Ground,
-        "gnd_rail",
-        label="GND rail",
-        label_alignment=Alignment.RIGHT,
-    )
-    gnd_rail = translate(GND_RAIL_X, GND_RAIL_BOTTOM_Y)(gnd_rail)
-    gnd_rail = create_rail(
-        gnd_rail,
-        Direction.VERTICAL,
-        GND_RAIL_LENGTH,
-        anchor=Alignment.BOTTOM,
-    )
-
-    return [v5_rail, gnd_rail], [], {"v5": v5_rail, "gnd": gnd_rail}
-
-
 def create_schema_for_tb6600_interface():
-    nodes, elements, rails = create_rails()
+    terminals = create_terminal_stack()
+    rails = create_rails(terminals)
+
+    nodes = [*terminals.values(), *rails.values()]
+    elements = []
 
     for channel_nodes, channel_elements in [
         create_low_side_channel(
             refdes=REFDES["STEP"],
             prefix="STEP",
-            layout=STEP_LAYOUT,
+            plus=terminals["pul_plus"],
+            minus=terminals["pul_minus"],
             v5_rail=rails["v5"],
             gnd_rail=rails["gnd"],
             input_label="Pico STEP GPIO0",
-            plus_label="PUL+",
-            minus_label="PUL-",
         ),
         create_low_side_channel(
             refdes=REFDES["DIR"],
             prefix="DIR",
-            layout=DIR_LAYOUT,
+            plus=terminals["dir_plus"],
+            minus=terminals["dir_minus"],
             v5_rail=rails["v5"],
             gnd_rail=rails["gnd"],
             input_label="Pico DIR GPIO1",
-            plus_label="DIR+",
-            minus_label="DIR-",
         ),
-        create_enable_channel(rails["gnd"]),
+        create_enable_channel(terminals, rails["gnd"]),
         create_decoupling(rails["v5"], rails["gnd"]),
     ]:
         nodes.extend(channel_nodes)

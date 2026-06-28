@@ -12,7 +12,9 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     create_node,
     create_rail,
     create_schema,
+    point_at,
     render_schemdraw,
+    rotate,
     translate,
 )
 
@@ -92,6 +94,39 @@ def test_vertical_rail_bounding_box_and_alignment():
 
     assert rail.get_bounding_box() == [[2.0, -3.0], [2.0, 3.0]]
     assert marker.position == (0.0, -3.0)
+
+
+def test_point_at_returns_rail_endpoint_points():
+    rail = create_node(Dot, "rail")
+    rail = translate(2, 3)(rail)
+    rail = create_rail(rail, Direction.VERTICAL, 6, anchor=Alignment.TOP)
+
+    assert point_at(rail, Alignment.TOP).position == (2.0, 3.0)
+    assert point_at(rail, Alignment.BOTTOM).position == (2.0, -3.0)
+
+
+def test_align_can_move_owner_by_reference_point():
+    start = create_node(Dot, "start")
+    end = create_node(Dot, "end")
+    end = translate(4, 0)(end)
+    resistor = create_element(Resistor, "R1", "1k", start, end)
+    resistor = rotate(90)(resistor)
+
+    placed = align(point_at(resistor, Alignment.RIGHT), end, Alignment.CENTER)
+
+    assert point_at(placed, Alignment.RIGHT).position == end.position
+
+
+def test_point_at_anchor_keeps_anchor_point_and_moves_owner():
+    start = create_node(Dot, "start")
+    end = create_node(Dot, "end")
+    target = translate(4, 0)(create_node(Dot, "target"))
+    resistor = create_element(Resistor, "R1", "1k", start, end)
+    resistor = rotate(90)(resistor)
+
+    placed = align(point_at(resistor.end, Alignment.CENTER), target, Alignment.CENTER)
+
+    assert placed.end.position == target.position
 
 
 def test_render_schemdraw_writes_rail_and_tap(tmp_path):
