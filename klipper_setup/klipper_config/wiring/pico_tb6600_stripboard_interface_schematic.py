@@ -12,14 +12,15 @@ PNG_FILE = DIAGRAM_DIR / "pico_tb6600_stripboard_interface.png"
 
 TRANSISTOR_TYPE = "BC337"
 
-RAIL_LENGTH = 44.0
-RAIL_TO_RAIL_GAP = 16.0
+RAIL_LENGTH = 36.5
+RAIL_TO_RAIL_GAP = 10.0
 
 DECOUPLING_FROM_RAIL_LEFT_GAP = 2.4
 FIRST_STAGE_GAP = 11.0
 STAGE_GAP = 11.0
 
-TERMINAL_PAIR_GAP = 2.1
+RAIL_TERMINAL_STEM_GAP = 2.6
+TERMINAL_PAIR_GAP = 1.4
 COLLECTOR_TO_TERMINAL_GAP = 1.2
 EMITTER_TO_RETURN_GAP = 1.0
 
@@ -27,7 +28,6 @@ PULLDOWN_TO_TRANSISTOR_GAP = 1.4
 GPIO_TO_BASE_RESISTOR_GAP = 2.4
 
 ENA_JUNCTION_TO_TERMINAL_GAP = 0.9
-ENA_PLUS_TO_LOW_SIDE_TERMINAL_GAP = 1.3
 ENA_COLLECTOR_TO_PLUS_GAP = 2.2
 ENA_FEED_TO_JUNCTION_GAP = 3.2
 PARALLEL_FEED_GAP = 0.5
@@ -364,14 +364,19 @@ def create_schema_for_tb6600_interface():
         "STEP_plus",
         net=nets["v5"],
         label="PUL+",
-        label_alignment=Alignment.TOP,
+        label_alignment=Alignment.RIGHT,
     )
-    pul_plus = align(pul_plus, rails["v5"], Alignment.CENTER, axes=["y"])
     pul_plus = align(
         pul_plus,
         point_at(rails["v5"], Alignment.LEFT),
         Alignment.STACK_RIGHT,
         stack_gap=FIRST_STAGE_GAP,
+    )
+    pul_plus = align(
+        pul_plus,
+        rails["v5"],
+        Alignment.STACK_BOTTOM,
+        stack_gap=RAIL_TERMINAL_STEM_GAP,
     )
 
     pul_minus = create_node(
@@ -394,14 +399,19 @@ def create_schema_for_tb6600_interface():
         "DIR_plus",
         net=nets["v5"],
         label="DIR+",
-        label_alignment=Alignment.TOP,
+        label_alignment=Alignment.RIGHT,
     )
-    dir_plus = align(dir_plus, rails["v5"], Alignment.CENTER, axes=["y"])
     dir_plus = align(
         dir_plus,
         pul_plus,
         Alignment.STACK_RIGHT,
         stack_gap=STAGE_GAP,
+    )
+    dir_plus = align(
+        dir_plus,
+        rails["v5"],
+        Alignment.STACK_BOTTOM,
+        stack_gap=RAIL_TERMINAL_STEM_GAP,
     )
 
     dir_minus = create_node(
@@ -432,12 +442,7 @@ def create_schema_for_tb6600_interface():
         Alignment.STACK_RIGHT,
         stack_gap=STAGE_GAP,
     )
-    ena_plus = align(
-        ena_plus,
-        dir_minus,
-        Alignment.STACK_BOTTOM,
-        stack_gap=ENA_PLUS_TO_LOW_SIDE_TERMINAL_GAP,
-    )
+    ena_plus = align(ena_plus, dir_plus, Alignment.CENTER, axes=["y"])
 
     ena_minus = create_node(
         Dot,
@@ -447,7 +452,12 @@ def create_schema_for_tb6600_interface():
         label_alignment=Alignment.RIGHT,
     )
     ena_minus = align(ena_minus, ena_plus, Alignment.CENTER, axes=["x"])
-    ena_minus = align(ena_minus, rails["gnd"], Alignment.CENTER, axes=["y"])
+    ena_minus = align(
+        ena_minus,
+        ena_plus,
+        Alignment.STACK_BOTTOM,
+        stack_gap=TERMINAL_PAIR_GAP,
+    )
 
     terminals = {
         "pul_plus": pul_plus,
