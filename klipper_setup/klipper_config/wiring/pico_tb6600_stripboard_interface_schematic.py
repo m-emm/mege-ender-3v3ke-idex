@@ -120,6 +120,7 @@ def create_low_side_channel(
 ):
     base = create_node(Dot, f"{prefix}_base", net=base_net)
     gnd_junction = create_node(Dot, f"{prefix}_gnd_junction", net=gnd_net)
+    pulldown_gnd = create_node(Dot, f"{prefix}_pulldown_gnd", net=gnd_net)
 
     transistor = create_element(
         BjtNpn,
@@ -151,7 +152,7 @@ def create_low_side_channel(
         refdes["pulldown"],
         "47k",
         base,
-        gnd_junction,
+        pulldown_gnd,
     )
     pulldown = align(
         pulldown,
@@ -163,6 +164,7 @@ def create_low_side_channel(
     pulldown = modify_label_alignment(pulldown, Alignment.RIGHT)
 
     base = align(base, pulldown.start, Alignment.CENTER)
+    pulldown_gnd = align(pulldown_gnd, pulldown.end, Alignment.CENTER)
 
     gpio = create_node(
         Dot,
@@ -190,10 +192,11 @@ def create_low_side_channel(
     )
 
     return (
-        [gpio, base, gnd_junction],
+        [gpio, base, gnd_junction, pulldown_gnd],
         [
             create_wire(v5_rail, plus),
             create_wire(gnd_junction, gnd_rail),
+            create_wire(pulldown_gnd, gnd_rail),
             transistor,
             base_resistor,
             pulldown,
@@ -230,6 +233,7 @@ def create_enable_channel(terminals, nets, gnd_rail):
 
     base = create_node(Dot, "ena_base", net=nets["ena_base"])
     gnd_junction = create_node(Dot, "ena_gnd_junction", net=nets["gnd"])
+    pulldown_gnd = create_node(Dot, "ena_pulldown_gnd", net=nets["gnd"])
 
     transistor = create_element(
         BjtNpn,
@@ -286,7 +290,7 @@ def create_enable_channel(terminals, nets, gnd_rail):
         label_alignment=Alignment.LEFT,
     )
 
-    pulldown = create_element(Resistor, "R8", "47k", base, gnd_junction)
+    pulldown = create_element(Resistor, "R8", "47k", base, pulldown_gnd)
     pulldown = align(
         pulldown,
         transistor,
@@ -297,6 +301,7 @@ def create_enable_channel(terminals, nets, gnd_rail):
     pulldown = modify_label_alignment(pulldown, Alignment.RIGHT)
 
     base = align(base, pulldown.start, Alignment.CENTER)
+    pulldown_gnd = align(pulldown_gnd, pulldown.end, Alignment.CENTER)
 
     base_resistor = create_element(Resistor, "R7", "2k2", gpio, base)
     base_resistor = align(base_resistor.end, base, Alignment.CENTER)
@@ -317,6 +322,7 @@ def create_enable_channel(terminals, nets, gnd_rail):
             gpio,
             base,
             gnd_junction,
+            pulldown_gnd,
         ],
         [
             feed_a,
@@ -327,6 +333,7 @@ def create_enable_channel(terminals, nets, gnd_rail):
             create_wire(ena_plus_junction, terminals["ena_plus"]),
             create_wire(gnd_rail, terminals["ena_minus"]),
             create_wire(gnd_junction, gnd_rail),
+            create_wire(pulldown_gnd, gnd_rail),
         ],
     )
 
