@@ -74,6 +74,35 @@ The first version renders horizontal stripboards. `strip_direction` is part of
 the API shape for future vertical-strip support, but non-horizontal rendering
 is not implemented yet.
 
+## Schematic To Stripboard Projection
+
+There is also a first diagnostic bridge from a logical schematic to a
+stripboard preview. It reads the visible positions of every net in a `Schema`,
+sorts those nets by ascending schematic y coordinate, assigns one full
+horizontal strip to each net, then overlays snapped node and terminal markers
+onto the hole grid.
+
+This is a layout aid, not an autorouter. It does not yet place real component
+footprints, add strip cuts, or add jumpers.
+
+```python
+schema = create_voltage_divider()
+assignment = assign_schema_nets_to_stripboard(schema)
+
+render_stripboard_overlay(
+    assignment.stripboard,
+    assignment,
+    schema,
+    file=Path("voltage_divider_stripboard.svg"),
+)
+render_stripboard_overlay(
+    assignment.stripboard,
+    assignment,
+    schema,
+    file=Path("voltage_divider_stripboard.png"),
+)
+```
+
 Rails are visible materializations of normal nodes. They are useful when many
 connections should visibly share one supply or ground rail:
 

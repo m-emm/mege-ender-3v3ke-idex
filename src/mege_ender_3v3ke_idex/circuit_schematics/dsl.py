@@ -11,6 +11,7 @@ The DSL keeps the electrical graph separate from the drawn layout:
 from __future__ import annotations
 
 import copy
+import html
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -41,6 +42,13 @@ STRIPBOARD_STRIP_FILL = "#d98b61"
 STRIPBOARD_STRIP_STROKE = "#b66d47"
 STRIPBOARD_HOLE_FILL = "#fbfbfb"
 STRIPBOARD_HOLE_STROKE = "#333333"
+STRIPBOARD_OVERLAY_NODE_FILL = "#2563eb"
+STRIPBOARD_OVERLAY_TERMINAL_FILL = "#111827"
+STRIPBOARD_OVERLAY_ELEMENT_STROKE = "#1f2937"
+STRIPBOARD_OVERLAY_TEXT_FILL = "#111827"
+STRIPBOARD_OVERLAY_STROKE_WIDTH = 0.045
+STRIPBOARD_OVERLAY_NODE_RADIUS = 0.14
+STRIPBOARD_OVERLAY_TERMINAL_RADIUS = 0.09
 
 
 class NodeType(Enum):
@@ -114,6 +122,36 @@ class Stripboard:
         if self.pitch_mm <= 0:
             raise ValueError("pitch_mm must be positive.")
         object.__setattr__(self, "pitch_mm", float(self.pitch_mm))
+
+
+@dataclass(frozen=True)
+class SchemaTerminalVisualization:
+    element_name: str
+    terminal_name: str
+    view_name: str
+    net_name: str
+    position: tuple[float, float]
+
+
+@dataclass(frozen=True)
+class SchemaNetVisualization:
+    net_name: str
+    node_views: tuple[NodeView, ...]
+    terminal_points: tuple[SchemaTerminalVisualization, ...]
+    representative_y: float
+    x_min: float
+    x_max: float
+
+
+@dataclass(frozen=True)
+class StripboardNetAssignment:
+    stripboard: Stripboard
+    net_visualizations: tuple[SchemaNetVisualization, ...]
+    net_rows: dict[str, int]
+    x_offset: int
+    column_pitch: float
+    left_margin_pitches: int
+    right_margin_pitches: int
 
 
 @dataclass
@@ -455,6 +493,171 @@ def create_schema(node_views, elements, wires=None):
     )
 
 
+def get_schema_net_visualizations(schema):
+    if not isinstance(schema, Schema):
+        raise TypeError("get_schema_net_visualizations expects a Schema object.")
+
+    node_views_by_name = _node_views_by_name(schema.node_views)
+    node_points = _schema_node_points(schema, node_views_by_name)
+    visual_nodes_by_net = {net.name: [] for net in schema.nets}
+    terminals_by_net = {net.name: [] for net in schema.nets}
+
+    for node_view in schema.node_views:
+        point = node_points.get(node_view.name, (node_view.position,))[0]
+        visual_node = copy.deepcopy(node_view)
+        visual_node.position = point
+        visual_node.placement_explicit = True
+        visual_nodes_by_net.setdefault(node_view.net.name, []).append(visual_node)
+
+    for element in schema.elements:
+        for terminal_name, view_name in element.terminal_views.items():
+            net_name = element.terminal_nets[terminal_name]
+            terminals_by_net.setdefault(net_name, []).append(
+                SchemaTerminalVisualization(
+                    element_name=element.name,
+                    terminal_name=terminal_name,
+                    view_name=view_name,
+                    net_name=net_name,
+                    position=element.anchor_position(terminal_name),
+                )
+            )
+
+    visualizations = []
+    for net in schema.nets:
+        node_views = tuple(visual_nodes_by_net.get(net.name, ()))
+        terminal_points = tuple(terminals_by_net.get(net.name, ()))
+        points = [
+            *[node_view.position for node_view in node_views],
+            *[terminal.position for terminal in terminal_points],
+        ]
+        if not points:
+            continue
+        visualizations.append(
+            SchemaNetVisualization(
+                net_name=net.name,
+                node_views=node_views,
+                terminal_points=terminal_points,
+                representative_y=_median(point[1] for point in points),
+                x_min=min(point[0] for point in points),
+                x_max=max(point[0] for point in points),
+            )
+        )
+
+    return tuple(
+        sorted(
+            visualizations,
+            key=lambda visualization: (
+                visualization.representative_y,
+                visualization.net_name,
+            ),
+        )
+    )
+
+
+def assign_schema_nets_to_stripboard(
+    schema,
+    left_margin_pitches=1,
+    right_margin_pitches=1,
+    column_pitch=1.0,
+):
+    _validate_nonnegative_integer(left_margin_pitches, "left_margin_pitches")
+    _validate_nonnegative_integer(right_margin_pitches, "right_margin_pitches")
+    if not isinstance(column_pitch, (int, float)) or isinstance(column_pitch, bool):
+        raise TypeError("column_pitch must be a positive number.")
+    if column_pitch <= 0:
+        raise ValueError("column_pitch must be positive.")
+
+    net_visualizations = get_schema_net_visualizations(schema)
+    if not net_visualizations:
+        return StripboardNetAssignment(
+            stripboard=create_stripboard(1, 1),
+            net_visualizations=(),
+            net_rows={},
+            x_offset=left_margin_pitches,
+            column_pitch=float(column_pitch),
+            left_margin_pitches=left_margin_pitches,
+            right_margin_pitches=right_margin_pitches,
+        )
+
+    min_col = math.floor(
+        min(visualization.x_min for visualization in net_visualizations) / column_pitch
+    )
+    max_col = math.ceil(
+        max(visualization.x_max for visualization in net_visualizations) / column_pitch
+    )
+    board_width = (
+        max_col
+        - min_col
+        + 1
+        + left_margin_pitches
+        + right_margin_pitches
+    )
+    board_height = len(net_visualizations)
+    x_offset = left_margin_pitches - min_col
+
+    return StripboardNetAssignment(
+        stripboard=create_stripboard(board_width, board_height),
+        net_visualizations=net_visualizations,
+        net_rows={
+            visualization.net_name: row
+            for row, visualization in enumerate(net_visualizations)
+        },
+        x_offset=x_offset,
+        column_pitch=float(column_pitch),
+        left_margin_pitches=left_margin_pitches,
+        right_margin_pitches=right_margin_pitches,
+    )
+
+
+def snap_schema_to_stripboard(schema, assignment, column_pitch=None):
+    if not isinstance(schema, Schema):
+        raise TypeError("snap_schema_to_stripboard expects a Schema object.")
+    if not isinstance(assignment, StripboardNetAssignment):
+        raise TypeError("assignment must be a StripboardNetAssignment.")
+
+    pitch = assignment.column_pitch if column_pitch is None else column_pitch
+    if not isinstance(pitch, (int, float)) or isinstance(pitch, bool):
+        raise TypeError("column_pitch must be a positive number.")
+    if pitch <= 0:
+        raise ValueError("column_pitch must be positive.")
+
+    snapped = copy.deepcopy(schema)
+    for node_view in snapped.node_views:
+        if node_view.net.name not in assignment.net_rows:
+            continue
+        node_view.position = _snap_schema_point_to_stripboard(
+            node_view.position,
+            node_view.net.name,
+            assignment,
+            pitch,
+        )
+        node_view.placement_explicit = True
+
+    for element in snapped.elements:
+        translations = []
+        for terminal_name, net_name in element.terminal_nets.items():
+            if net_name not in assignment.net_rows:
+                continue
+            source = element.anchor_position(terminal_name)
+            target = _snap_schema_point_to_stripboard(
+                source,
+                net_name,
+                assignment,
+                pitch,
+            )
+            translations.append((target[0] - source[0], target[1] - source[1]))
+        if translations:
+            element.position = _add_points(
+                element.position,
+                (
+                    _median(delta[0] for delta in translations),
+                    _median(delta[1] for delta in translations),
+                ),
+            )
+
+    return snapped
+
+
 def translate(x, y):
     def retval(obj):
         moved = copy.deepcopy(obj)
@@ -595,6 +798,32 @@ def render_stripboard(stripboard, file, scale=32):
         raise ValueError("Stripboard output file must end in .svg or .png.")
 
 
+def render_stripboard_overlay(stripboard, assignment, schema, file, scale=32):
+    if not isinstance(stripboard, Stripboard):
+        raise TypeError("render_stripboard_overlay expects a Stripboard object.")
+    if not isinstance(assignment, StripboardNetAssignment):
+        raise TypeError("assignment must be a StripboardNetAssignment.")
+    if not isinstance(schema, Schema):
+        raise TypeError("schema must be a Schema.")
+    if stripboard.strip_direction is not Direction.HORIZONTAL:
+        raise NotImplementedError("Only horizontal stripboards are supported for now.")
+    if (
+        stripboard.width_pitches != assignment.stripboard.width_pitches
+        or stripboard.height_pitches != assignment.stripboard.height_pitches
+        or stripboard.strip_direction is not assignment.stripboard.strip_direction
+    ):
+        raise ValueError("stripboard must match assignment.stripboard dimensions.")
+
+    path = Path(file)
+    suffix = path.suffix.lower()
+    if suffix == ".svg":
+        _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale)
+    elif suffix == ".png":
+        _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale)
+    else:
+        raise ValueError("Stripboard overlay output file must end in .svg or .png.")
+
+
 def _render_stripboard_svg(stripboard, path, scale):
     scale = _validate_render_scale(scale)
     width, height = _stripboard_size(stripboard)
@@ -680,6 +909,208 @@ def _render_stripboard_png(stripboard, path, scale):
     image.save(path)
 
 
+def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
+    scale = _validate_render_scale(scale)
+    width, height = _stripboard_size(stripboard)
+    width_px = width * scale
+    height_px = height * scale
+
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        (
+            f'<svg xmlns="http://www.w3.org/2000/svg" '
+            f'width="{width_px:.0f}" height="{height_px:.0f}" '
+            f'viewBox="0 0 {width:.3f} {height:.3f}">'
+        ),
+        "  <title>Stripboard Schematic Overlay</title>",
+        (
+            f'  <rect class="board" x="0" y="0" width="{width:.3f}" '
+            f'height="{height:.3f}" fill="{STRIPBOARD_BOARD_FILL}" '
+            f'stroke="{STRIPBOARD_BOARD_STROKE}" '
+            f'stroke-width="{STRIPBOARD_STROKE_WIDTH:.3f}"/>'
+        ),
+    ]
+
+    for row in range(stripboard.height_pitches):
+        x, y, strip_width, strip_height = _stripboard_strip_rect(stripboard, row)
+        net_name = _stripboard_row_net_name(assignment, row)
+        lines.append(
+            f'  <rect class="copper-strip" data-row="{row}" '
+            f'data-net="{_svg_attr(net_name)}" '
+            f'x="{x:.3f}" y="{y:.3f}" width="{strip_width:.3f}" '
+            f'height="{strip_height:.3f}" fill="{STRIPBOARD_STRIP_FILL}" '
+            f'stroke="{STRIPBOARD_STRIP_STROKE}" '
+            f'stroke-width="{STRIPBOARD_STROKE_WIDTH:.3f}"/>'
+        )
+
+    for col, row, x, y in _stripboard_holes(stripboard):
+        lines.append(
+            f'  <circle class="hole" data-col="{col}" data-row="{row}" '
+            f'cx="{x:.3f}" cy="{y:.3f}" r="{STRIPBOARD_HOLE_RADIUS:.3f}" '
+            f'fill="{STRIPBOARD_HOLE_FILL}" stroke="{STRIPBOARD_HOLE_STROKE}" '
+            f'stroke-width="{STRIPBOARD_STROKE_WIDTH:.3f}"/>'
+        )
+
+    for element_overlay in _stripboard_overlay_elements(schema, assignment):
+        positions = element_overlay["positions"]
+        center = element_overlay["center"]
+        if len(positions) == 2:
+            start, end = positions
+            lines.append(
+                f'  <line class="overlay-element" '
+                f'data-element="{_svg_attr(element_overlay["name"])}" '
+                f'x1="{start[0]:.3f}" y1="{start[1]:.3f}" '
+                f'x2="{end[0]:.3f}" y2="{end[1]:.3f}" '
+                f'stroke="{STRIPBOARD_OVERLAY_ELEMENT_STROKE}" '
+                f'stroke-width="{STRIPBOARD_OVERLAY_STROKE_WIDTH:.3f}"/>'
+            )
+        else:
+            for position in positions:
+                lines.append(
+                    f'  <line class="overlay-element" '
+                    f'data-element="{_svg_attr(element_overlay["name"])}" '
+                    f'x1="{center[0]:.3f}" y1="{center[1]:.3f}" '
+                    f'x2="{position[0]:.3f}" y2="{position[1]:.3f}" '
+                    f'stroke="{STRIPBOARD_OVERLAY_ELEMENT_STROKE}" '
+                    f'stroke-width="{STRIPBOARD_OVERLAY_STROKE_WIDTH:.3f}"/>'
+                )
+        lines.append(
+            f'  <text class="overlay-element-label" '
+            f'x="{center[0]:.3f}" y="{center[1] - 0.18:.3f}" '
+            f'font-size="0.28" text-anchor="middle" '
+            f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}">'
+            f'{_svg_text(element_overlay["label"])}</text>'
+        )
+
+    for terminal in _stripboard_overlay_terminals(schema, assignment):
+        x, y = terminal["position"]
+        lines.append(
+            f'  <circle class="overlay-terminal" '
+            f'data-net="{_svg_attr(terminal["net_name"])}" '
+            f'data-element="{_svg_attr(terminal["element_name"])}" '
+            f'data-terminal="{_svg_attr(terminal["terminal_name"])}" '
+            f'cx="{x:.3f}" cy="{y:.3f}" '
+            f'r="{STRIPBOARD_OVERLAY_TERMINAL_RADIUS:.3f}" '
+            f'fill="{STRIPBOARD_OVERLAY_TERMINAL_FILL}"/>'
+        )
+
+    for marker in _stripboard_overlay_node_markers(schema, assignment):
+        x, y = marker["position"]
+        lines.append(
+            f'  <circle class="overlay-node" '
+            f'data-net="{_svg_attr(marker["net_name"])}" '
+            f'data-node="{_svg_attr(marker["node_name"])}" '
+            f'cx="{x:.3f}" cy="{y:.3f}" '
+            f'r="{STRIPBOARD_OVERLAY_NODE_RADIUS:.3f}" '
+            f'fill="{STRIPBOARD_OVERLAY_NODE_FILL}"/>'
+        )
+        if marker["label"]:
+            lines.append(
+                f'  <text class="overlay-node-label" '
+                f'x="{x + 0.18:.3f}" y="{y - 0.16:.3f}" '
+                f'font-size="0.25" fill="{STRIPBOARD_OVERLAY_TEXT_FILL}">'
+                f'{_svg_text(marker["label"])}</text>'
+            )
+
+    lines.append("</svg>")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
+    scale = _validate_render_scale(scale)
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError as error:
+        raise RuntimeError(
+            "Pillow is required to render stripboard overlay PNG files."
+        ) from error
+
+    width, height = _stripboard_size(stripboard)
+    image_width = max(1, int(round(width * scale)))
+    image_height = max(1, int(round(height * scale)))
+    image = Image.new("RGB", (image_width, image_height), "white")
+    draw = ImageDraw.Draw(image)
+    _draw_stripboard_base_png(draw, stripboard, scale)
+
+    element_width = _px_overlay_stroke(scale)
+    for element_overlay in _stripboard_overlay_elements(schema, assignment):
+        positions = element_overlay["positions"]
+        center = element_overlay["center"]
+        if len(positions) == 2:
+            draw.line(
+                [_px_point(positions[0], scale), _px_point(positions[1], scale)],
+                fill=STRIPBOARD_OVERLAY_ELEMENT_STROKE,
+                width=element_width,
+            )
+        else:
+            for position in positions:
+                draw.line(
+                    [_px_point(center, scale), _px_point(position, scale)],
+                    fill=STRIPBOARD_OVERLAY_ELEMENT_STROKE,
+                    width=element_width,
+                )
+        draw.text(
+            _px_point((center[0] - 0.25, center[1] - 0.42), scale),
+            element_overlay["label"],
+            fill=STRIPBOARD_OVERLAY_TEXT_FILL,
+        )
+
+    for terminal in _stripboard_overlay_terminals(schema, assignment):
+        _draw_px_circle(
+            draw,
+            terminal["position"],
+            STRIPBOARD_OVERLAY_TERMINAL_RADIUS,
+            scale,
+            fill=STRIPBOARD_OVERLAY_TERMINAL_FILL,
+        )
+
+    for marker in _stripboard_overlay_node_markers(schema, assignment):
+        _draw_px_circle(
+            draw,
+            marker["position"],
+            STRIPBOARD_OVERLAY_NODE_RADIUS,
+            scale,
+            fill=STRIPBOARD_OVERLAY_NODE_FILL,
+        )
+        if marker["label"]:
+            x, y = marker["position"]
+            draw.text(
+                _px_point((x + 0.18, y - 0.35), scale),
+                marker["label"],
+                fill=STRIPBOARD_OVERLAY_TEXT_FILL,
+            )
+
+    image.save(path)
+
+
+def _draw_stripboard_base_png(draw, stripboard, scale):
+    width, height = _stripboard_size(stripboard)
+    draw.rectangle(
+        _px_rect(0, 0, width, height, scale),
+        fill=STRIPBOARD_BOARD_FILL,
+        outline=STRIPBOARD_BOARD_STROKE,
+        width=_px_stroke(scale),
+    )
+
+    for row in range(stripboard.height_pitches):
+        strip_rect = _stripboard_strip_rect(stripboard, row)
+        draw.rectangle(
+            _px_rect(*strip_rect, scale),
+            fill=STRIPBOARD_STRIP_FILL,
+            outline=STRIPBOARD_STRIP_STROKE,
+            width=_px_stroke(scale),
+        )
+
+    radius = STRIPBOARD_HOLE_RADIUS
+    for _, _, x, y in _stripboard_holes(stripboard):
+        draw.ellipse(
+            _px_rect(x - radius, y - radius, radius * 2, radius * 2, scale),
+            fill=STRIPBOARD_HOLE_FILL,
+            outline=STRIPBOARD_HOLE_STROKE,
+            width=_px_stroke(scale),
+        )
+
+
 def _stripboard_size(stripboard):
     return float(stripboard.width_pitches), float(stripboard.height_pitches)
 
@@ -702,6 +1133,107 @@ def _stripboard_holes(stripboard):
             )
 
 
+def _stripboard_overlay_node_markers(schema, assignment):
+    node_views_by_name = _node_views_by_name(schema.node_views)
+    node_points = _schema_node_points(schema, node_views_by_name)
+    markers = []
+    for node_view in schema.node_views:
+        if node_view.net.name not in assignment.net_rows:
+            continue
+        point = node_points.get(node_view.name, (node_view.position,))[0]
+        markers.append(
+            {
+                "node_name": node_view.name,
+                "net_name": node_view.net.name,
+                "label": node_view.label,
+                "position": _snap_schema_point_to_stripboard(
+                    point,
+                    node_view.net.name,
+                    assignment,
+                    assignment.column_pitch,
+                ),
+            }
+        )
+    return markers
+
+
+def _stripboard_overlay_terminals(schema, assignment):
+    terminals = []
+    for element in schema.elements:
+        for terminal_name, net_name in element.terminal_nets.items():
+            if net_name not in assignment.net_rows:
+                continue
+            terminals.append(
+                {
+                    "element_name": element.name,
+                    "terminal_name": terminal_name,
+                    "net_name": net_name,
+                    "position": _snap_schema_point_to_stripboard(
+                        element.anchor_position(terminal_name),
+                        net_name,
+                        assignment,
+                        assignment.column_pitch,
+                    ),
+                }
+            )
+    return terminals
+
+
+def _stripboard_overlay_elements(schema, assignment):
+    overlays = []
+    for element in schema.elements:
+        positions = []
+        for terminal_name, net_name in element.terminal_nets.items():
+            if net_name not in assignment.net_rows:
+                continue
+            positions.append(
+                _snap_schema_point_to_stripboard(
+                    element.anchor_position(terminal_name),
+                    net_name,
+                    assignment,
+                    assignment.column_pitch,
+                )
+            )
+        if not positions:
+            continue
+        label = element.name if element.value is None else f"{element.name} {element.value}"
+        overlays.append(
+            {
+                "name": element.name,
+                "label": label,
+                "positions": positions,
+                "center": _average_points(positions),
+            }
+        )
+    return overlays
+
+
+def _snap_schema_point_to_stripboard(point, net_name, assignment, column_pitch):
+    column = _snap_schema_x_to_column(point[0], assignment, column_pitch)
+    row = assignment.net_rows[net_name]
+    return (STRIPBOARD_BOARD_MARGIN + column, STRIPBOARD_BOARD_MARGIN + row)
+
+
+def _snap_schema_x_to_column(x, assignment, column_pitch):
+    column = int(round(x / column_pitch)) + assignment.x_offset
+    return int(_clamp(column, 0, assignment.stripboard.width_pitches - 1))
+
+
+def _stripboard_row_net_name(assignment, row):
+    for net_name, net_row in assignment.net_rows.items():
+        if net_row == row:
+            return net_name
+    return ""
+
+
+def _svg_attr(value):
+    return html.escape(str(value), quote=True)
+
+
+def _svg_text(value):
+    return html.escape(str(value), quote=False)
+
+
 def _px_rect(x, y, width, height, scale):
     return (
         int(round(x * scale)),
@@ -711,8 +1243,29 @@ def _px_rect(x, y, width, height, scale):
     )
 
 
+def _px_point(point, scale):
+    return (int(round(point[0] * scale)), int(round(point[1] * scale)))
+
+
 def _px_stroke(scale):
     return max(1, int(round(STRIPBOARD_STROKE_WIDTH * scale)))
+
+
+def _px_overlay_stroke(scale):
+    return max(1, int(round(STRIPBOARD_OVERLAY_STROKE_WIDTH * scale)))
+
+
+def _draw_px_circle(draw, center, radius, scale, fill):
+    draw.ellipse(
+        _px_rect(
+            center[0] - radius,
+            center[1] - radius,
+            radius * 2,
+            radius * 2,
+            scale,
+        ),
+        fill=fill,
+    )
 
 
 def _validate_positive_integer(value, name):
@@ -720,6 +1273,13 @@ def _validate_positive_integer(value, name):
         raise TypeError(f"{name} must be a positive integer.")
     if value <= 0:
         raise ValueError(f"{name} must be positive.")
+
+
+def _validate_nonnegative_integer(value, name):
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise TypeError(f"{name} must be a non-negative integer.")
+    if value < 0:
+        raise ValueError(f"{name} must be non-negative.")
 
 
 def _validate_render_scale(scale):

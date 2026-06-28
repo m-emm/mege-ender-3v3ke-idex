@@ -17,10 +17,14 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     create_schema,
     create_stripboard,
     create_wire,
+    assign_schema_nets_to_stripboard,
+    get_schema_net_visualizations,
     point_at,
     render_schemdraw,
     render_stripboard,
+    render_stripboard_overlay,
     rotate,
+    snap_schema_to_stripboard,
     translate,
 )
 import pytest
@@ -237,6 +241,109 @@ def test_create_schema_rejects_duplicate_node_names():
         assert "Duplicate node view name" in str(error)
     else:
         raise AssertionError("duplicate node view names should be rejected")
+
+
+def _create_stripboard_mapping_schema():
+    top_net = create_net("top")
+    middle_net = create_net("middle")
+    low_net = create_net("low")
+
+    top = create_node(Dot, "top", net=top_net, label="TOP")
+    middle = translate(2, -2)(create_node(Dot, "middle", net=middle_net))
+    low = translate(4, -4)(create_node(Dot, "low", net=low_net, label="LOW"))
+
+    r1 = translate(0, -1)(create_element(Resistor, "R1", "1k", top, middle))
+    r2 = translate(4, -3)(create_element(Resistor, "R2", "2k", middle, low))
+
+    return create_schema([top, middle, low], [r1, r2])
+
+
+def test_get_schema_net_visualizations_sorts_nets_by_representative_y():
+    schema = _create_stripboard_mapping_schema()
+
+    visualizations = get_schema_net_visualizations(schema)
+
+    assert [visualization.net_name for visualization in visualizations] == [
+        "low",
+        "middle",
+        "top",
+    ]
+    middle = visualizations[1]
+    assert [node.name for node in middle.node_views] == ["middle"]
+    assert {
+        (terminal.element_name, terminal.terminal_name)
+        for terminal in middle.terminal_points
+    } == {("R1", "end"), ("R2", "start")}
+    assert middle.representative_y == pytest.approx(-2.0)
+
+
+def test_get_schema_net_visualizations_includes_unconnected_views():
+    loose_net = create_net("loose")
+    loose = translate(3, 2)(create_node(Dot, "loose", net=loose_net))
+    schema = create_schema([loose], [])
+
+    visualizations = get_schema_net_visualizations(schema)
+
+    assert [visualization.net_name for visualization in visualizations] == ["loose"]
+    assert visualizations[0].node_views[0].position == (3.0, 2.0)
+    assert visualizations[0].terminal_points == ()
+
+
+def test_assign_schema_nets_to_stripboard_uses_one_row_per_net():
+    schema = _create_stripboard_mapping_schema()
+
+    assignment = assign_schema_nets_to_stripboard(schema)
+
+    assert assignment.stripboard.height_pitches == 3
+    assert assignment.net_rows == {"low": 0, "middle": 1, "top": 2}
+    assert assignment.stripboard.width_pitches >= 6
+
+
+def test_snap_schema_to_stripboard_moves_node_views_onto_rows():
+    schema = _create_stripboard_mapping_schema()
+    assignment = assign_schema_nets_to_stripboard(schema)
+
+    snapped = snap_schema_to_stripboard(schema, assignment)
+
+    for node_view in snapped.node_views:
+        expected_row = assignment.net_rows[node_view.net.name]
+        assert node_view.position[1] == pytest.approx(0.5 + expected_row)
+        assert (node_view.position[0] - 0.5).is_integer()
+
+
+def test_render_stripboard_overlay_writes_svg(tmp_path):
+    schema = _create_stripboard_mapping_schema()
+    assignment = assign_schema_nets_to_stripboard(schema)
+    outfile = tmp_path / "overlay.svg"
+
+    render_stripboard_overlay(
+        assignment.stripboard,
+        assignment,
+        schema,
+        file=outfile,
+    )
+
+    svg = outfile.read_text(encoding="utf-8")
+    assert "<svg" in svg
+    assert 'class="copper-strip"' in svg
+    assert 'class="hole"' in svg
+    assert 'class="overlay-node"' in svg
+
+
+def test_render_stripboard_overlay_writes_png(tmp_path):
+    schema = _create_stripboard_mapping_schema()
+    assignment = assign_schema_nets_to_stripboard(schema)
+    outfile = tmp_path / "overlay.png"
+
+    render_stripboard_overlay(
+        assignment.stripboard,
+        assignment,
+        schema,
+        file=outfile,
+    )
+
+    assert outfile.exists()
+    assert outfile.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_create_stripboard_has_expected_defaults():
