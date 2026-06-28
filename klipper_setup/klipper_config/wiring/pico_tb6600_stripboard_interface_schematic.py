@@ -178,9 +178,8 @@ def create_low_side_channel(
         gpio,
         base,
     )
-    base_resistor = rotate(90)(base_resistor)
     base_resistor = align(base_resistor.end, base, Alignment.CENTER)
-    base_resistor = modify_label_alignment(base_resistor, Alignment.TOP)
+    base_resistor = modify_label_alignment(base_resistor, Alignment.RIGHT)
 
     gpio = align(gpio, base_resistor.start, Alignment.CENTER)
     gpio = align(
@@ -258,7 +257,6 @@ def create_enable_channel(terminals, nets, gnd_rail):
     )
 
     feed_a = create_element(Resistor, "R5", "4k7 0.25W", v24, ena_plus_junction)
-    feed_a = rotate(90)(feed_a)
     feed_a = align(
         feed_a,
         ena_plus_junction,
@@ -266,18 +264,17 @@ def create_enable_channel(terminals, nets, gnd_rail):
         stack_gap=ENA_FEED_TO_JUNCTION_GAP,
     )
     feed_a = align(
-        feed_a,
+        feed_a.end,
         ena_plus_junction,
-        Alignment.STACK_TOP,
-        stack_gap=PARALLEL_FEED_GAP,
+        Alignment.CENTER,
+        axes=["y"],
     )
-    feed_a = modify_label_alignment(feed_a, Alignment.TOP)
+    feed_a = modify_label_alignment(feed_a, Alignment.LEFT)
 
     feed_b = create_element(Resistor, "R6", "4k7 0.25W", v24, ena_plus_junction)
-    feed_b = rotate(90)(feed_b)
-    feed_b = align(feed_b, feed_a, Alignment.CENTER, axes=["x"])
-    feed_b = align(feed_b, feed_a, Alignment.STACK_BOTTOM, stack_gap=PARALLEL_FEED_GAP)
-    feed_b = modify_label_alignment(feed_b, Alignment.BOTTOM)
+    feed_b = align(feed_b.end, ena_plus_junction, Alignment.CENTER, axes=["y"])
+    feed_b = align(feed_b, feed_a, Alignment.STACK_RIGHT, stack_gap=PARALLEL_FEED_GAP)
+    feed_b = modify_label_alignment(feed_b, Alignment.RIGHT)
 
     v24 = align(v24, feed_a.start, Alignment.CENTER)
 
@@ -302,9 +299,8 @@ def create_enable_channel(terminals, nets, gnd_rail):
     base = align(base, pulldown.start, Alignment.CENTER)
 
     base_resistor = create_element(Resistor, "R7", "2k2", gpio, base)
-    base_resistor = rotate(90)(base_resistor)
     base_resistor = align(base_resistor.end, base, Alignment.CENTER)
-    base_resistor = modify_label_alignment(base_resistor, Alignment.TOP)
+    base_resistor = modify_label_alignment(base_resistor, Alignment.RIGHT)
 
     gpio = align(gpio, base_resistor.start, Alignment.CENTER)
     gpio = align(
