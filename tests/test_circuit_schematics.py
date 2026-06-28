@@ -3,11 +3,13 @@ from mege_ender_3v3ke_idex.circuit_schematics.examples.voltage_divider import (
 )
 from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     Alignment,
+    BjtNpn,
     Direction,
     Dot,
     Ground,
     Resistor,
     Stripboard,
+    StripboardBlocker,
     Wire,
     align,
     create_element,
@@ -19,6 +21,7 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     create_wire,
     assign_schema_nets_to_stripboard,
     compact_sparse_stripboard_rows,
+    compact_stripboard_connections_left,
     get_schema_net_visualizations,
     point_at,
     render_schemdraw,
@@ -323,6 +326,59 @@ def _create_nonphysical_junction_stripboard_schema():
     return create_schema([signal, helper, other], [resistor])
 
 
+def _create_vertical_blocker_schema(middle_x=8, resistor_x=1):
+    top_net = create_net("top")
+    middle_net = create_net("middle")
+    bottom_net = create_net("bottom")
+
+    top = create_node(Dot, "top_block", net=top_net, kind="schematic_junction")
+    middle = translate(middle_x, -2)(
+        create_node(Dot, "middle_block", net=middle_net, label="middle")
+    )
+    bottom = translate(0, -4)(
+        create_node(Dot, "bottom_block", net=bottom_net, kind="schematic_junction")
+    )
+    resistor = translate(resistor_x, -2)(
+        create_element(Resistor, "Rblock", "1k", top, bottom)
+    )
+
+    return create_schema([top, middle, bottom], [resistor])
+
+
+def _create_transistor_blocker_schema():
+    collector_net = create_net("collector")
+    dummy_1_net = create_net("dummy_1")
+    base_net = create_net("base")
+    dummy_2_net = create_net("dummy_2")
+    emitter_net = create_net("emitter")
+
+    collector = translate(0, 0)(
+        create_node(Dot, "collector_pad", net=collector_net, kind="schematic_junction")
+    )
+    dummy_1 = translate(8, -2)(
+        create_node(Dot, "dummy_1", net=dummy_1_net, label="dummy 1")
+    )
+    base = translate(-2, -4)(
+        create_node(Dot, "base_pad", net=base_net, kind="schematic_junction")
+    )
+    dummy_2 = translate(9, -6)(
+        create_node(Dot, "dummy_2", net=dummy_2_net, label="dummy 2")
+    )
+    emitter = translate(0, -8)(
+        create_node(Dot, "emitter_pad", net=emitter_net, kind="schematic_junction")
+    )
+    transistor = create_element(
+        BjtNpn,
+        "Qblock",
+        "BC337",
+        base=base,
+        collector=collector,
+        emitter=emitter,
+    )
+
+    return create_schema([collector, dummy_1, base, dummy_2, emitter], [transistor])
+
+
 def test_get_schema_net_visualizations_sorts_nets_by_representative_y():
     schema = _create_stripboard_mapping_schema()
 
@@ -473,6 +529,76 @@ def test_stripboard_assignment_ignores_nonphysical_schematic_junctions(tmp_path)
     assert 'data-node="helper"' not in svg
 
 
+def test_left_compaction_uses_component_blockers():
+    schema = _create_vertical_blocker_schema(middle_x=8)
+    assignment = compact_stripboard_connections_left(
+        schema,
+        assign_schema_nets_to_stripboard(schema),
+        trim_board=False,
+        strict=False,
+    )
+
+    blocker = StripboardBlocker(row=1, col=1, element_name="Rblock")
+    assert blocker in assignment.blockers
+    assert assignment.marker_column_maps[("node", "middle_block")] == 2
+
+    blocker_positions = {(blocker.row, blocker.col) for blocker in assignment.blockers}
+    marker_rows = {}
+    for visualization in assignment.net_visualizations:
+        row = assignment.net_rows[visualization.net_name]
+        for node_view in visualization.node_views:
+            marker_rows[("node", node_view.name)] = row
+        for terminal in visualization.terminal_points:
+            marker_rows[
+                ("terminal", terminal.element_name, terminal.terminal_name)
+            ] = row
+
+    marker_positions = {
+        (row, assignment.marker_column_maps[key])
+        for key, row in marker_rows.items()
+        if key in assignment.marker_column_maps
+    }
+    assert marker_positions.isdisjoint(blocker_positions)
+
+
+def test_left_compaction_allows_all_element_types_to_block_holes():
+    schema = _create_transistor_blocker_schema()
+    assignment = compact_stripboard_connections_left(
+        schema,
+        assign_schema_nets_to_stripboard(schema),
+        trim_board=False,
+    )
+
+    assert any(blocker.element_name == "Qblock" for blocker in assignment.blockers)
+
+
+def test_left_compaction_raises_when_blockers_leave_no_hole():
+    schema = _create_vertical_blocker_schema(middle_x=0, resistor_x=0)
+
+    with pytest.raises(ValueError, match="No legal stripboard hole remains"):
+        compact_stripboard_connections_left(
+            schema,
+            assign_schema_nets_to_stripboard(schema),
+            trim_board=False,
+        )
+
+
+def test_left_compaction_trims_board_but_keeps_blocker_extent():
+    schema = _create_vertical_blocker_schema(middle_x=8)
+    assignment = compact_stripboard_connections_left(
+        schema,
+        assign_schema_nets_to_stripboard(schema),
+    )
+
+    rightmost_blocker = max(blocker.col for blocker in assignment.blockers)
+    assert assignment.stripboard.width_pitches >= (
+        rightmost_blocker + 1 + assignment.right_margin_pitches
+    )
+    for run in assignment.net_runs:
+        if not run.compacted and run.start_col == 0:
+            assert run.end_col == assignment.stripboard.width_pitches - 1
+
+
 def test_snap_schema_to_stripboard_moves_node_views_onto_rows():
     schema = _create_stripboard_mapping_schema()
     assignment = assign_schema_nets_to_stripboard(schema)
@@ -526,6 +652,35 @@ def test_render_compacted_stripboard_overlay_writes_cuts_and_run_labels(tmp_path
     assert 'class="overlay-local-point-label"' in svg
     assert ">sparse_a</text>" in svg
     assert ">sparse_c</text>" in svg
+
+
+def test_render_stripboard_overlay_writes_blockers(tmp_path):
+    schema = _create_vertical_blocker_schema(middle_x=8)
+    assignment = compact_stripboard_connections_left(
+        schema,
+        assign_schema_nets_to_stripboard(schema),
+        trim_board=False,
+    )
+    svg_outfile = tmp_path / "blockers.svg"
+    png_outfile = tmp_path / "blockers.png"
+
+    render_stripboard_overlay(
+        assignment.stripboard,
+        assignment,
+        schema,
+        file=svg_outfile,
+    )
+    render_stripboard_overlay(
+        assignment.stripboard,
+        assignment,
+        schema,
+        file=png_outfile,
+    )
+
+    svg = svg_outfile.read_text(encoding="utf-8")
+    assert 'class="stripboard-blocker"' in svg
+    assert 'data-element="Rblock"' in svg
+    assert png_outfile.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_render_stripboard_overlay_writes_png(tmp_path):

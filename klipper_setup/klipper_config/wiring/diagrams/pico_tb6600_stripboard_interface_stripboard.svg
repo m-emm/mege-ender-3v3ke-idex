@@ -180,6 +180,168 @@
   <circle class="hole" data-col="15" data-row="8" cx="15.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
   <circle class="hole" data-col="16" data-row="8" cx="16.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
   <circle class="hole" data-col="17" data-row="8" cx="17.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <rect class="stripboard-blocker" data-row="1" data-col="1" data-element="R5" x="1.360" y="1.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="1" data-col="3" data-element="R6" x="3.360" y="1.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="1" data-col="4" data-element="R6" x="4.360" y="1.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="1" data-col="5" data-element="R6" x="5.360" y="1.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="2" data-col="2" data-element="C1" x="2.360" y="2.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="2" data-col="3" data-element="C1" x="3.360" y="2.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="2" data-col="4" data-element="C1" x="4.360" y="2.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="2" data-col="5" data-element="C1" x="5.360" y="2.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="2" data-col="6" data-element="C1" x="6.360" y="2.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="2" data-element="C1" x="2.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="3" data-element="C1" x="3.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="4" data-element="C1" x="4.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="5" data-element="C1" x="5.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="6" data-element="C1" x="6.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="6" data-element="Q3" x="6.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="7" data-element="Q3" x="7.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="8" data-element="Q3" x="8.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="9" data-element="Q3" x="9.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="10" data-element="Q3" x="10.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="11" data-element="Q3" x="11.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="12" data-element="Q3" x="12.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="13" data-element="Q3" x="13.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="3" data-col="14" data-element="Q3" x="14.360" y="3.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="2" data-element="C1" x="2.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="3" data-element="C1" x="3.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="3" data-element="R7" x="3.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="4" data-element="C1" x="4.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="4" data-element="R7" x="4.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="5" data-element="C1" x="5.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="5" data-element="R7" x="5.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="6" data-element="C1" x="6.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="6" data-element="Q3" x="6.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="6" data-element="R7" x="6.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="7" data-element="Q3" x="7.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="7" data-element="R1" x="7.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="7" data-element="R3" x="7.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="7" data-element="R7" x="7.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="8" data-element="Q3" x="8.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="8" data-element="R1" x="8.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="8" data-element="R3" x="8.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="8" data-element="R7" x="8.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="9" data-element="Q3" x="9.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="9" data-element="R1" x="9.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="9" data-element="R3" x="9.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="9" data-element="R7" x="9.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="10" data-element="Q3" x="10.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="10" data-element="R1" x="10.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="10" data-element="R3" x="10.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="10" data-element="R7" x="10.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="11" data-element="Q3" x="11.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="11" data-element="R1" x="11.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="11" data-element="R3" x="11.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="11" data-element="R7" x="11.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="12" data-element="Q3" x="12.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="12" data-element="R1" x="12.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="12" data-element="R3" x="12.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="12" data-element="R7" x="12.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="13" data-element="Q3" x="13.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="13" data-element="R1" x="13.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="13" data-element="R7" x="13.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="14" data-element="Q3" x="14.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="14" data-element="R1" x="14.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="15" data-element="R1" x="15.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="4" data-col="16" data-element="R1" x="16.360" y="4.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="1" data-element="Q1" x="1.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="2" data-element="C1" x="2.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="2" data-element="Q1" x="2.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="3" data-element="C1" x="3.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="3" data-element="Q1" x="3.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="4" data-element="C1" x="4.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="4" data-element="Q1" x="4.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="5" data-element="C1" x="5.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="6" data-element="C1" x="6.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="6" data-element="Q2" x="6.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="7" data-element="Q2" x="7.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="7" data-element="R1" x="7.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="7" data-element="R3" x="7.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="8" data-element="Q2" x="8.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="8" data-element="R1" x="8.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="8" data-element="R3" x="8.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="9" data-element="Q2" x="9.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="9" data-element="R1" x="9.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="9" data-element="R3" x="9.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="10" data-element="R1" x="10.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="10" data-element="R3" x="10.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="11" data-element="R1" x="11.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="11" data-element="R3" x="11.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="12" data-element="R1" x="12.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="12" data-element="R3" x="12.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="13" data-element="R1" x="13.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="14" data-element="R1" x="14.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="15" data-element="R1" x="15.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="5" data-col="16" data-element="R1" x="16.360" y="5.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="1" data-element="R8" x="1.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="2" data-element="C1" x="2.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="2" data-element="R8" x="2.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="3" data-element="C1" x="3.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="3" data-element="R8" x="3.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="4" data-element="C1" x="4.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="4" data-element="R8" x="4.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="5" data-element="C1" x="5.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="5" data-element="R8" x="5.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="6" data-element="C1" x="6.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="6" data-element="Q2" x="6.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="6" data-element="Q3" x="6.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="6" data-element="R8" x="6.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="7" data-element="Q2" x="7.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="7" data-element="Q3" x="7.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="7" data-element="R3" x="7.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="7" data-element="R8" x="7.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="8" data-element="Q2" x="8.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="8" data-element="Q3" x="8.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="8" data-element="R3" x="8.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="9" data-element="Q2" x="9.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="9" data-element="Q3" x="9.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="9" data-element="R3" x="9.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="10" data-element="Q3" x="10.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="10" data-element="R3" x="10.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="11" data-element="Q3" x="11.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="11" data-element="R3" x="11.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="12" data-element="Q3" x="12.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="12" data-element="R3" x="12.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="13" data-element="Q3" x="13.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="6" data-col="14" data-element="Q3" x="14.360" y="6.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="1" data-element="Q1" x="1.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="1" data-element="R8" x="1.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="2" data-element="C1" x="2.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="2" data-element="Q1" x="2.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="2" data-element="R8" x="2.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="3" data-element="C1" x="3.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="3" data-element="Q1" x="3.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="3" data-element="R2" x="3.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="3" data-element="R8" x="3.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="4" data-element="C1" x="4.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="4" data-element="Q1" x="4.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="4" data-element="R2" x="4.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="4" data-element="R8" x="4.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="5" data-element="C1" x="5.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="5" data-element="R2" x="5.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="5" data-element="R8" x="5.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="6" data-element="C1" x="6.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="6" data-element="Q3" x="6.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="6" data-element="R2" x="6.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="6" data-element="R8" x="6.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="7" data-element="Q3" x="7.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="7" data-element="R2" x="7.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="7" data-element="R8" x="7.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="8" data-element="Q3" x="8.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="8" data-element="R2" x="8.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="9" data-element="Q3" x="9.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="9" data-element="R2" x="9.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="10" data-element="Q3" x="10.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="10" data-element="R2" x="10.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="11" data-element="Q3" x="11.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="11" data-element="R2" x="11.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="12" data-element="Q3" x="12.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="12" data-element="R2" x="12.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="13" data-element="Q3" x="13.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="13" data-element="R2" x="13.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="14" data-element="Q3" x="14.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="14" data-element="R2" x="14.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
+  <rect class="stripboard-blocker" data-row="7" data-col="15" data-element="R2" x="15.360" y="7.360" width="0.280" height="0.280" fill="#111827" opacity="0.240"/>
   <rect class="strip-run-block" data-row="3" data-net="ena_gpio" x="1.060" y="3.155" width="3.880" height="0.690" fill="none" stroke="#111111" stroke-width="0.085"/>
   <rect class="strip-run-block" data-row="3" data-net="step_gpio" x="6.060" y="3.155" width="3.880" height="0.690" fill="none" stroke="#111111" stroke-width="0.085"/>
   <rect class="strip-run-block" data-row="3" data-net="dir_gpio" x="11.060" y="3.155" width="3.880" height="0.690" fill="none" stroke="#111111" stroke-width="0.085"/>
@@ -190,85 +352,85 @@
   <text class="overlay-net-run-label" data-row="3" data-net="dir_gpio" x="13.000" y="3.580" font-size="0.200" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 13.000 3.580)">dir_gpio</text>
   <text class="overlay-net-run-label" data-row="4" data-net="step_pul_minus" x="3.000" y="4.580" font-size="0.200" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 3.000 4.580)">step_pul_minus</text>
   <text class="overlay-net-run-label" data-row="4" data-net="dir_minus" x="8.000" y="4.580" font-size="0.200" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 8.000 4.580)">dir_minus</text>
-  <line class="overlay-element" data-element="C1" x1="2.500" y1="1.500" x2="2.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="2.500" y="4.820" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 2.500 4.820)">C1 100nF</text>
-  <line class="overlay-element" data-element="Q1" x1="5.500" y1="6.500" x2="5.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="overlay-element" data-element="Q1" x1="5.500" y1="6.500" x2="4.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="overlay-element" data-element="Q1" x1="5.500" y1="6.500" x2="6.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="5.500" y="6.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 5.500 6.320)">Q1 BC337</text>
-  <line class="overlay-element" data-element="R1" x1="9.500" y1="3.500" x2="4.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="7.000" y="4.820" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 7.000 4.820)">R1 2k2</text>
-  <line class="overlay-element" data-element="R2" x1="3.500" y1="6.500" x2="4.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="4.000" y="7.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 4.000 7.320)">R2 47k</text>
-  <line class="overlay-element" data-element="Q2" x1="9.833" y1="6.833" x2="9.500" y2="7.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="overlay-element" data-element="Q2" x1="9.833" y1="6.833" x2="9.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="overlay-element" data-element="Q2" x1="9.833" y1="6.833" x2="10.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="9.833" y="6.653" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 9.833 6.653)">Q2 BC337</text>
-  <line class="overlay-element" data-element="R3" x1="14.500" y1="3.500" x2="8.500" y2="7.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="11.500" y="5.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 11.500 5.320)">R3 2k2</text>
-  <line class="overlay-element" data-element="R4" x1="7.500" y1="7.500" x2="8.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="8.000" y="7.820" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 8.000 7.820)">R4 47k</text>
-  <line class="overlay-element" data-element="R5" x1="10.500" y1="0.500" x2="11.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="11.000" y="1.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 11.000 1.320)">R5 4k7 0.25W</text>
-  <line class="overlay-element" data-element="R6" x1="13.500" y1="0.500" x2="13.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="13.500" y="1.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 13.500 1.320)">R6 4k7 0.25W</text>
-  <line class="overlay-element" data-element="Q3" x1="15.167" y1="5.500" x2="14.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="overlay-element" data-element="Q3" x1="15.167" y1="5.500" x2="15.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="overlay-element" data-element="Q3" x1="15.167" y1="5.500" x2="15.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="15.167" y="5.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 15.167 5.320)">Q3 BC337</text>
-  <line class="overlay-element" data-element="R7" x1="4.500" y1="3.500" x2="13.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="9.000" y="4.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 9.000 4.320)">R7 2k2</text>
-  <line class="overlay-element" data-element="R8" x1="12.500" y1="5.500" x2="13.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
-  <text class="overlay-element-label" x="13.000" y="6.820" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 13.000 6.820)">R8 47k</text>
-  <circle class="overlay-terminal" data-net="v5" data-element="C1" data-terminal="start" cx="2.500" cy="1.500" r="0.090" fill="#111827"/>
+  <line class="overlay-element" data-element="C1" x1="6.500" y1="1.500" x2="2.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="4.500" y="4.820" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 4.500 4.820)">C1 100nF</text>
+  <line class="overlay-element" data-element="Q1" x1="3.167" y1="6.500" x2="1.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="overlay-element" data-element="Q1" x1="3.167" y1="6.500" x2="3.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="overlay-element" data-element="Q1" x1="3.167" y1="6.500" x2="4.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="3.167" y="6.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 3.167 6.320)">Q1 BC337</text>
+  <line class="overlay-element" data-element="R1" x1="7.500" y1="3.500" x2="16.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="12.000" y="4.820" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 12.000 4.820)">R1 2k2</text>
+  <line class="overlay-element" data-element="R2" x1="15.500" y1="6.500" x2="3.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="9.500" y="7.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 9.500 7.320)">R2 47k</text>
+  <line class="overlay-element" data-element="Q2" x1="8.167" y1="6.833" x2="8.500" y2="7.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="overlay-element" data-element="Q2" x1="8.167" y1="6.833" x2="9.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="overlay-element" data-element="Q2" x1="8.167" y1="6.833" x2="6.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="8.167" y="6.653" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 8.167 6.653)">Q2 BC337</text>
+  <line class="overlay-element" data-element="R3" x1="12.500" y1="3.500" x2="7.500" y2="7.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="10.000" y="5.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 10.000 5.320)">R3 2k2</text>
+  <line class="overlay-element" data-element="R4" x1="16.500" y1="7.500" x2="5.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="11.000" y="7.820" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 11.000 7.820)">R4 47k</text>
+  <line class="overlay-element" data-element="R5" x1="1.500" y1="0.500" x2="1.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="1.500" y="1.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 1.500 1.320)">R5 4k7 0.25W</text>
+  <line class="overlay-element" data-element="R6" x1="3.500" y1="0.500" x2="5.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="4.500" y="1.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 4.500 1.320)">R6 4k7 0.25W</text>
+  <line class="overlay-element" data-element="Q3" x1="9.833" y1="5.500" x2="14.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="overlay-element" data-element="Q3" x1="9.833" y1="5.500" x2="6.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="overlay-element" data-element="Q3" x1="9.833" y1="5.500" x2="8.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="9.833" y="5.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 9.833 5.320)">Q3 BC337</text>
+  <line class="overlay-element" data-element="R7" x1="3.500" y1="3.500" x2="13.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="8.500" y="4.320" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 8.500 4.320)">R7 2k2</text>
+  <line class="overlay-element" data-element="R8" x1="1.500" y1="5.500" x2="7.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <text class="overlay-element-label" x="4.500" y="6.820" font-size="0.190" font-weight="700" text-anchor="middle" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 4.500 6.820)">R8 47k</text>
+  <circle class="overlay-terminal" data-net="v5" data-element="C1" data-terminal="start" cx="6.500" cy="1.500" r="0.090" fill="#111827"/>
   <circle class="overlay-terminal" data-net="gnd" data-element="C1" data-terminal="end" cx="2.500" cy="8.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="step_base" data-element="Q1" data-terminal="base" cx="5.500" cy="6.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="step_pul_minus" data-element="Q1" data-terminal="collector" cx="4.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="Q1" data-terminal="emitter" cx="6.500" cy="8.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="step_gpio" data-element="R1" data-terminal="start" cx="9.500" cy="3.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="step_base" data-element="R1" data-terminal="end" cx="4.500" cy="6.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="step_base" data-element="R2" data-terminal="start" cx="3.500" cy="6.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="R2" data-terminal="end" cx="4.500" cy="8.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="dir_base" data-element="Q2" data-terminal="base" cx="9.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="step_base" data-element="Q1" data-terminal="base" cx="1.500" cy="6.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="step_pul_minus" data-element="Q1" data-terminal="collector" cx="3.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="Q1" data-terminal="emitter" cx="4.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="step_gpio" data-element="R1" data-terminal="start" cx="7.500" cy="3.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="step_base" data-element="R1" data-terminal="end" cx="16.500" cy="6.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="step_base" data-element="R2" data-terminal="start" cx="15.500" cy="6.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="R2" data-terminal="end" cx="3.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="dir_base" data-element="Q2" data-terminal="base" cx="8.500" cy="7.500" r="0.090" fill="#111827"/>
   <circle class="overlay-terminal" data-net="dir_minus" data-element="Q2" data-terminal="collector" cx="9.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="Q2" data-terminal="emitter" cx="10.500" cy="8.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="dir_gpio" data-element="R3" data-terminal="start" cx="14.500" cy="3.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="dir_base" data-element="R3" data-terminal="end" cx="8.500" cy="7.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="dir_base" data-element="R4" data-terminal="start" cx="7.500" cy="7.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="R4" data-terminal="end" cx="8.500" cy="8.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="v24" data-element="R5" data-terminal="start" cx="10.500" cy="0.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="ena_plus" data-element="R5" data-terminal="end" cx="11.500" cy="2.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="v24" data-element="R6" data-terminal="start" cx="13.500" cy="0.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="ena_plus" data-element="R6" data-terminal="end" cx="13.500" cy="2.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="Q2" data-terminal="emitter" cx="6.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="dir_gpio" data-element="R3" data-terminal="start" cx="12.500" cy="3.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="dir_base" data-element="R3" data-terminal="end" cx="7.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="dir_base" data-element="R4" data-terminal="start" cx="16.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="R4" data-terminal="end" cx="5.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="v24" data-element="R5" data-terminal="start" cx="1.500" cy="0.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="ena_plus" data-element="R5" data-terminal="end" cx="1.500" cy="2.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="v24" data-element="R6" data-terminal="start" cx="3.500" cy="0.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="ena_plus" data-element="R6" data-terminal="end" cx="5.500" cy="2.500" r="0.090" fill="#111827"/>
   <circle class="overlay-terminal" data-net="ena_base" data-element="Q3" data-terminal="base" cx="14.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="ena_plus" data-element="Q3" data-terminal="collector" cx="15.500" cy="2.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="Q3" data-terminal="emitter" cx="15.500" cy="8.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="ena_gpio" data-element="R7" data-terminal="start" cx="4.500" cy="3.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="ena_plus" data-element="Q3" data-terminal="collector" cx="6.500" cy="2.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="Q3" data-terminal="emitter" cx="8.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="ena_gpio" data-element="R7" data-terminal="start" cx="3.500" cy="3.500" r="0.090" fill="#111827"/>
   <circle class="overlay-terminal" data-net="ena_base" data-element="R7" data-terminal="end" cx="13.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="ena_base" data-element="R8" data-terminal="start" cx="12.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-terminal" data-net="gnd" data-element="R8" data-terminal="end" cx="13.500" cy="8.500" r="0.090" fill="#111827"/>
-  <circle class="overlay-node" data-net="v5" data-node="v5_rail" cx="1.500" cy="1.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="1.680" y="1.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 1.680 1.340)">+5V rail</text>
+  <circle class="overlay-terminal" data-net="ena_base" data-element="R8" data-terminal="start" cx="1.500" cy="5.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-terminal" data-net="gnd" data-element="R8" data-terminal="end" cx="7.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="overlay-node" data-net="v5" data-node="v5_rail" cx="2.500" cy="1.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="2.680" y="1.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 2.680 1.340)">+5V rail</text>
   <circle class="overlay-node" data-net="gnd" data-node="gnd_rail" cx="1.500" cy="8.500" r="0.140" fill="#2563eb"/>
   <text class="overlay-node-label" x="1.680" y="8.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 1.680 8.340)">GND rail</text>
-  <circle class="overlay-node" data-net="v5" data-node="STEP_plus" cx="6.500" cy="1.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="6.680" y="1.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 6.680 1.340)">PUL+</text>
+  <circle class="overlay-node" data-net="v5" data-node="STEP_plus" cx="7.500" cy="1.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="7.680" y="1.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 7.680 1.340)">PUL+</text>
   <circle class="overlay-node" data-net="step_pul_minus" data-node="STEP_minus" cx="1.500" cy="4.500" r="0.140" fill="#2563eb"/>
   <text class="overlay-node-label" x="1.680" y="4.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 1.680 4.340)">PUL-</text>
-  <circle class="overlay-node" data-net="v5" data-node="DIR_plus" cx="10.500" cy="1.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="10.680" y="1.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 10.680 1.340)">DIR+</text>
+  <circle class="overlay-node" data-net="v5" data-node="DIR_plus" cx="8.500" cy="1.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="8.680" y="1.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 8.680 1.340)">DIR+</text>
   <circle class="overlay-node" data-net="dir_minus" data-node="DIR_minus" cx="6.500" cy="4.500" r="0.140" fill="#2563eb"/>
   <text class="overlay-node-label" x="6.680" y="4.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 6.680 4.340)">DIR-</text>
-  <circle class="overlay-node" data-net="ena_plus" data-node="ena_plus" cx="16.500" cy="2.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="16.680" y="2.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 16.680 2.340)">ENA+</text>
-  <circle class="overlay-node" data-net="gnd" data-node="ena_minus" cx="16.500" cy="8.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="16.680" y="8.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 16.680 8.340)">ENA-</text>
+  <circle class="overlay-node" data-net="ena_plus" data-node="ena_plus" cx="7.500" cy="2.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="7.680" y="2.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 7.680 2.340)">ENA+</text>
+  <circle class="overlay-node" data-net="gnd" data-node="ena_minus" cx="9.500" cy="8.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="9.680" y="8.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 9.680 8.340)">ENA-</text>
   <circle class="overlay-node" data-net="step_gpio" data-node="STEP_gpio" cx="6.500" cy="3.500" r="0.140" fill="#2563eb"/>
   <text class="overlay-node-label" x="6.680" y="3.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 6.680 3.340)">Pico STEP GPIO0</text>
   <circle class="overlay-node" data-net="dir_gpio" data-node="DIR_gpio" cx="11.500" cy="3.500" r="0.140" fill="#2563eb"/>
   <text class="overlay-node-label" x="11.680" y="3.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 11.680 3.340)">Pico DIR GPIO1</text>
-  <circle class="overlay-node" data-net="v24" data-node="ena_v24" cx="11.500" cy="0.500" r="0.140" fill="#2563eb"/>
-  <text class="overlay-node-label" x="11.680" y="0.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 11.680 0.340)">+24V</text>
+  <circle class="overlay-node" data-net="v24" data-node="ena_v24" cx="2.500" cy="0.500" r="0.140" fill="#2563eb"/>
+  <text class="overlay-node-label" x="2.680" y="0.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 2.680 0.340)">+24V</text>
   <circle class="overlay-node" data-net="ena_gpio" data-node="ena_gpio" cx="1.500" cy="3.500" r="0.140" fill="#2563eb"/>
   <text class="overlay-node-label" x="1.680" y="3.340" font-size="0.170" font-weight="700" fill="#b91c1c" stroke="#ffffff" stroke-width="0.070" paint-order="stroke" transform="rotate(-30.0 1.680 3.340)">Pico ENABLE GPIO2</text>
   <circle class="strip-cut" data-row="3" data-col="5" cx="5.500" cy="3.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>

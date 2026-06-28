@@ -14,7 +14,7 @@ import copy
 import html
 import math
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum, auto
 from pathlib import Path
 
@@ -61,6 +61,9 @@ STRIPBOARD_RUN_BLOCK_STROKE_WIDTH = 0.085
 STRIPBOARD_CUT_STROKE = "#000000"
 STRIPBOARD_CUT_RADIUS = 0.31
 STRIPBOARD_CUT_STROKE_WIDTH = 0.14
+STRIPBOARD_BLOCKER_FILL = "#111827"
+STRIPBOARD_BLOCKER_SIZE = 0.28
+STRIPBOARD_BLOCKER_OPACITY = 0.24
 STRIPBOARD_NON_PHYSICAL_NODE_KINDS = frozenset({"schematic_junction", "layout"})
 
 
@@ -183,6 +186,13 @@ class StripboardLocalPoint:
 
 
 @dataclass(frozen=True)
+class StripboardBlocker:
+    row: int
+    col: int
+    element_name: str
+
+
+@dataclass(frozen=True)
 class StripboardNetAssignment:
     stripboard: Stripboard
     net_visualizations: tuple[SchemaNetVisualization, ...]
@@ -198,6 +208,7 @@ class StripboardNetAssignment:
     local_points: tuple[StripboardLocalPoint, ...] = ()
     net_column_maps: dict[str, dict[int, int]] = field(default_factory=dict)
     marker_column_maps: dict[tuple[str, ...], int] = field(default_factory=dict)
+    blockers: tuple[StripboardBlocker, ...] = ()
 
 
 @dataclass
@@ -894,6 +905,60 @@ def compact_sparse_stripboard_rows(
     )
 
 
+def compact_stripboard_connections_left(
+    schema,
+    assignment,
+    trim_board=True,
+    use_component_blockers=True,
+    strict=True,
+):
+    if not isinstance(schema, Schema):
+        raise TypeError("compact_stripboard_connections_left expects a Schema object.")
+    if not isinstance(assignment, StripboardNetAssignment):
+        raise TypeError("assignment must be a StripboardNetAssignment.")
+    if not isinstance(trim_board, bool):
+        raise TypeError("trim_board must be a bool.")
+    if not isinstance(use_component_blockers, bool):
+        raise TypeError("use_component_blockers must be a bool.")
+    if not isinstance(strict, bool):
+        raise TypeError("strict must be a bool.")
+
+    current = assignment
+    blockers = (
+        _stripboard_component_blockers(schema, current)
+        if use_component_blockers
+        else ()
+    )
+    for _iteration in range(4):
+        marker_column_maps = _left_compacted_marker_column_maps(
+            current,
+            blockers,
+            strict=strict,
+        )
+        current = replace(
+            current,
+            marker_column_maps=marker_column_maps,
+            net_column_maps=_net_column_maps_from_marker_columns(
+                current,
+                marker_column_maps,
+            ),
+            blockers=blockers,
+        )
+        next_blockers = (
+            _stripboard_component_blockers(schema, current)
+            if use_component_blockers
+            else ()
+        )
+        if next_blockers == blockers:
+            break
+        blockers = next_blockers
+
+    current = replace(current, blockers=blockers)
+    if trim_board:
+        current = _trim_stripboard_assignment_width(current)
+    return current
+
+
 def snap_schema_to_stripboard(schema, assignment, column_pitch=None):
     if not isinstance(schema, Schema):
         raise TypeError("snap_schema_to_stripboard expects a Schema object.")
@@ -1253,6 +1318,17 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
             f'stroke-width="{STRIPBOARD_STROKE_WIDTH:.3f}"/>'
         )
 
+    for blocker in assignment.blockers:
+        x, y, size = _stripboard_blocker_rect(blocker)
+        lines.append(
+            f'  <rect class="stripboard-blocker" '
+            f'data-row="{blocker.row}" data-col="{blocker.col}" '
+            f'data-element="{_svg_attr(blocker.element_name)}" '
+            f'x="{x:.3f}" y="{y:.3f}" width="{size:.3f}" height="{size:.3f}" '
+            f'fill="{STRIPBOARD_BLOCKER_FILL}" '
+            f'opacity="{STRIPBOARD_BLOCKER_OPACITY:.3f}"/>'
+        )
+
     for run in _stripboard_compacted_runs(assignment, stripboard):
         x, y, width, height = _stripboard_run_block_rect(run)
         lines.append(
@@ -1443,6 +1519,9 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
 
     for run in _stripboard_compacted_runs(assignment, stripboard):
         _draw_stripboard_run_block_png(draw, run, label_margin, scale)
+
+    for blocker in assignment.blockers:
+        _draw_stripboard_blocker_png(draw, blocker, label_margin, scale)
 
     for run in _stripboard_compacted_runs(assignment, stripboard):
         _draw_png_text_rotated(
@@ -1643,6 +1722,13 @@ def _stripboard_run_block_rect(run):
     return x, y, width, height
 
 
+def _stripboard_blocker_rect(blocker):
+    size = STRIPBOARD_BLOCKER_SIZE
+    x = _stripboard_column_center(blocker.col) - size / 2.0
+    y = _stripboard_row_center(blocker.row) - size / 2.0
+    return x, y, size
+
+
 def _cut_cross_lines(x, y, radius):
     inset = radius * 0.7
     return (
@@ -1657,6 +1743,17 @@ def _draw_stripboard_run_block_png(draw, run, label_margin, scale):
         _px_rect(x + label_margin, y, width, height, scale),
         outline=STRIPBOARD_RUN_BLOCK_STROKE,
         width=max(1, int(round(STRIPBOARD_RUN_BLOCK_STROKE_WIDTH * scale))),
+    )
+
+
+def _draw_stripboard_blocker_png(draw, blocker, label_margin, scale):
+    x, y, size = _stripboard_blocker_rect(blocker)
+    x += label_margin
+    draw.rectangle(
+        _px_rect(x, y, size, size, scale),
+        fill="#c7cbd1",
+        outline=STRIPBOARD_BLOCKER_FILL,
+        width=max(1, int(round(0.025 * scale))),
     )
 
 
@@ -1788,6 +1885,250 @@ def _snap_schema_x_to_column(x, net_name, assignment, column_pitch):
             return column
     column = source_column + assignment.x_offset
     return int(_clamp(column, 0, assignment.stripboard.width_pitches - 1))
+
+
+def _stripboard_component_blockers(schema, assignment):
+    blocker_keys = set()
+    blockers = []
+    for element in schema.elements:
+        terminal_holes = []
+        for terminal_name, net_name in element.terminal_nets.items():
+            if net_name not in assignment.net_rows:
+                continue
+            marker_key = _stripboard_terminal_marker_key(element.name, terminal_name)
+            column = assignment.marker_column_maps.get(marker_key)
+            if column is None:
+                continue
+            terminal_holes.append((assignment.net_rows[net_name], column))
+
+        if len(terminal_holes) < 2:
+            continue
+
+        terminal_hole_set = set(terminal_holes)
+        rows = [row for row, _column in terminal_holes]
+        columns = [column for _row, column in terminal_holes]
+        terminal_rows = set(rows)
+        spans_multiple_rows = min(rows) != max(rows)
+        for row in range(min(rows), max(rows) + 1):
+            if spans_multiple_rows and row in terminal_rows:
+                continue
+            for column in range(min(columns), max(columns) + 1):
+                if (row, column) in terminal_hole_set:
+                    continue
+                blocker_key = (row, column, element.name)
+                if blocker_key in blocker_keys:
+                    continue
+                blocker_keys.add(blocker_key)
+                blockers.append(
+                    StripboardBlocker(
+                        row=row,
+                        col=column,
+                        element_name=element.name,
+                    )
+                )
+
+    return tuple(
+        sorted(blockers, key=lambda blocker: (blocker.row, blocker.col, blocker.element_name))
+    )
+
+
+def _left_compacted_marker_column_maps(assignment, blockers, strict=True):
+    blocker_positions = {(blocker.row, blocker.col) for blocker in blockers}
+    cut_positions = {(cut.row, cut.col) for cut in assignment.cuts}
+    used_by_row = {}
+    marker_column_maps = {}
+
+    marker_entries = sorted(
+        _stripboard_assignment_marker_entries(assignment),
+        key=lambda entry: (entry["row"], entry["column"], entry["key"]),
+    )
+    for entry in marker_entries:
+        row = entry["row"]
+        start_col, end_col = _stripboard_marker_allowed_span(assignment, entry)
+        used = used_by_row.setdefault(row, set())
+        for column in range(start_col, end_col + 1):
+            position = (row, column)
+            if position in used:
+                continue
+            if position in cut_positions:
+                continue
+            if position in blocker_positions:
+                continue
+            marker_column_maps[entry["key"]] = column
+            used.add(position)
+            break
+        else:
+            if not strict:
+                fallback_column = _non_strict_fallback_marker_column(
+                    entry,
+                    start_col,
+                    end_col,
+                    used,
+                    cut_positions,
+                )
+                if fallback_column is not None:
+                    marker_column_maps[entry["key"]] = fallback_column
+                    used.add((row, fallback_column))
+                    continue
+            raise ValueError(
+                "No legal stripboard hole remains for "
+                f"marker {entry['key']!r} on net {entry['net_name']!r} "
+                f"at row {row}."
+            )
+
+    return marker_column_maps
+
+
+def _non_strict_fallback_marker_column(entry, start_col, end_col, used, cut_positions):
+    preferred = entry["column"]
+    candidates = [preferred, *range(start_col, end_col + 1)]
+    seen = set()
+    for column in candidates:
+        if column in seen:
+            continue
+        seen.add(column)
+        if column < start_col or column > end_col:
+            continue
+        position = (entry["row"], column)
+        if position in used or position in cut_positions:
+            continue
+        return column
+    return None
+
+
+def _stripboard_assignment_marker_entries(assignment):
+    entries = []
+    markers_by_net = _stripboard_markers_by_net(
+        assignment.net_visualizations,
+        assignment.column_pitch,
+    )
+    for net_name, markers in markers_by_net.items():
+        if net_name not in assignment.net_rows:
+            continue
+        row = assignment.net_rows[net_name]
+        for marker_key, source_column in markers:
+            column = assignment.marker_column_maps.get(marker_key)
+            if column is None:
+                column = _snap_source_column_to_stripboard(
+                    source_column,
+                    net_name,
+                    assignment,
+                )
+            entries.append(
+                {
+                    "key": marker_key,
+                    "net_name": net_name,
+                    "row": row,
+                    "column": column,
+                    "source_column": source_column,
+                }
+            )
+    return entries
+
+
+def _snap_source_column_to_stripboard(source_column, net_name, assignment):
+    net_column_map = assignment.net_column_maps.get(net_name, {})
+    column = net_column_map.get(source_column)
+    if column is not None:
+        return column
+    column = assignment.column_map.get(source_column)
+    if column is not None:
+        return column
+    return int(
+        _clamp(
+            source_column + assignment.x_offset,
+            0,
+            assignment.stripboard.width_pitches - 1,
+        )
+    )
+
+
+def _stripboard_marker_allowed_span(assignment, entry):
+    active_start = assignment.left_margin_pitches
+    active_end = assignment.stripboard.width_pitches - assignment.right_margin_pitches - 1
+    active_end = max(active_start, active_end)
+    for run in assignment.net_runs:
+        if run.net_name != entry["net_name"]:
+            continue
+        if (
+            not run.compacted
+            and run.start_col == 0
+            and run.end_col == assignment.stripboard.width_pitches - 1
+        ):
+            return active_start, active_end
+        return run.start_col, run.end_col
+    return active_start, active_end
+
+
+def _net_column_maps_from_marker_columns(assignment, marker_column_maps):
+    net_column_maps = {}
+    for entry in _stripboard_assignment_marker_entries(assignment):
+        column = marker_column_maps.get(entry["key"])
+        if column is None:
+            continue
+        net_map = net_column_maps.setdefault(entry["net_name"], {})
+        source_column = entry["source_column"]
+        existing = net_map.get(source_column)
+        if existing is None or column < existing:
+            net_map[source_column] = column
+    return net_column_maps
+
+
+def _trim_stripboard_assignment_width(assignment):
+    old_width = assignment.stripboard.width_pitches
+    rightmost = max(
+        [
+            assignment.left_margin_pitches,
+            *assignment.marker_column_maps.values(),
+            *[cut.col for cut in assignment.cuts],
+            *[blocker.col for blocker in assignment.blockers],
+            *[
+                run.end_col
+                for run in assignment.net_runs
+                if run.compacted or run.start_col != 0 or run.end_col != old_width - 1
+            ],
+        ]
+    )
+    new_width = max(
+        rightmost + 1 + assignment.right_margin_pitches,
+        assignment.left_margin_pitches + assignment.right_margin_pitches + 1,
+    )
+    if new_width >= old_width:
+        return assignment
+
+    net_runs = tuple(
+        replace(run, end_col=new_width - 1)
+        if (
+            not run.compacted
+            and run.start_col == 0
+            and run.end_col == old_width - 1
+        )
+        else run
+        for run in assignment.net_runs
+    )
+    column_map = {
+        source_column: min(column, new_width - 1)
+        for source_column, column in assignment.column_map.items()
+    }
+    net_column_maps = {
+        net_name: {
+            source_column: min(column, new_width - 1)
+            for source_column, column in net_column_map.items()
+        }
+        for net_name, net_column_map in assignment.net_column_maps.items()
+    }
+    return replace(
+        assignment,
+        stripboard=create_stripboard(
+            new_width,
+            assignment.stripboard.height_pitches,
+            strip_direction=assignment.stripboard.strip_direction,
+            pitch_mm=assignment.stripboard.pitch_mm,
+        ),
+        net_runs=net_runs,
+        column_map=column_map,
+        net_column_maps=net_column_maps,
+    )
 
 
 def _pack_sparse_stripboard_runs(
