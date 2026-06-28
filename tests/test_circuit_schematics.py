@@ -3,14 +3,17 @@ from mege_ender_3v3ke_idex.circuit_schematics.examples.voltage_divider import (
 )
 from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     Alignment,
+    Direction,
     Dot,
     Resistor,
     Wire,
     align,
     create_element,
     create_node,
+    create_rail,
     create_schema,
     render_schemdraw,
+    translate,
 )
 
 
@@ -57,9 +60,13 @@ def test_render_schemdraw_writes_png(tmp_path):
 def test_wire_element_renders_without_a_label(tmp_path):
     vcc = create_node(Dot, "vcc", label="+5V")
     pul_plus = create_node(Dot, "pul_plus", label="PUL+")
+    pul_plus = translate(4, 0)(pul_plus)
     feed = create_element(Wire, "", None, vcc, pul_plus)
     schema = create_schema([vcc, pul_plus], [feed])
     outfile = tmp_path / "wire.svg"
+
+    assert feed.position == (0.0, 0.0)
+    assert feed.get_bounding_box() == [[0.0, 0.0], [4.0, 0.0]]
 
     render_schemdraw(schema, file=outfile)
 
@@ -67,6 +74,44 @@ def test_wire_element_renders_without_a_label(tmp_path):
     assert "<svg" in svg
     assert "PUL+" in svg
     assert ">W<" not in svg
+
+
+def test_create_node_accepts_label_alignment():
+    vcc = create_node(Dot, "vcc", label="+5V", label_alignment=Alignment.LEFT)
+
+    assert vcc.label_loc == "left"
+
+
+def test_vertical_rail_bounding_box_and_alignment():
+    rail = create_node(Dot, "rail")
+    rail = translate(2, 3)(rail)
+    rail = create_rail(rail, Direction.VERTICAL, 6, anchor=Alignment.TOP)
+
+    marker = create_node(Dot, "marker")
+    marker = align(marker, rail, Alignment.BOTTOM)
+
+    assert rail.get_bounding_box() == [[2.0, -3.0], [2.0, 3.0]]
+    assert marker.position == (0.0, -3.0)
+
+
+def test_render_schemdraw_writes_rail_and_tap(tmp_path):
+    rail = create_node(Dot, "rail", label="+5V", label_alignment=Alignment.LEFT)
+    rail = translate(0, 4)(rail)
+    rail = create_rail(rail, Direction.VERTICAL, 8, anchor=Alignment.TOP)
+
+    tap = create_node(Dot, "tap", label="PUL+")
+    tap = translate(4, 1)(tap)
+
+    feed = create_element(Wire, "", None, rail, tap)
+    schema = create_schema([rail, tap], [feed])
+    outfile = tmp_path / "rail.svg"
+
+    render_schemdraw(schema, file=outfile)
+
+    svg = outfile.read_text(encoding="utf-8")
+    assert "<svg" in svg
+    assert "+5V" in svg
+    assert "PUL+" in svg
 
 
 def test_create_schema_rejects_duplicate_node_names():

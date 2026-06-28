@@ -10,97 +10,114 @@ SVG_FILE = DIAGRAM_DIR / "pico_tb6600_stripboard_interface.svg"
 PNG_FILE = DIAGRAM_DIR / "pico_tb6600_stripboard_interface.png"
 
 
-LOW_SIDE_TRANSISTOR_X = 8.5
-LOW_SIDE_INPUT_X = 0.0
-LOW_SIDE_BASE_X = 5.7
 TRANSISTOR_TYPE = "BC337"
+
 V5_RAIL_X = -3.0
+V5_RAIL_TOP_Y = 10.8
+V5_RAIL_BOTTOM_Y = 1.0
+V5_RAIL_LENGTH = V5_RAIL_TOP_Y - V5_RAIL_BOTTOM_Y
+
 GND_RAIL_X = 12.0
+GND_RAIL_TOP_Y = 10.8
+GND_RAIL_BOTTOM_Y = -13.0
+GND_RAIL_LENGTH = GND_RAIL_TOP_Y - GND_RAIL_BOTTOM_Y
+
 TB6600_TERMINAL_X = 9.8
+LOW_SIDE_TRANSISTOR_X = 8.5
+LOW_SIDE_BASE_X = 5.7
 ENABLE_TRANSISTOR_X = 8.8
 
-REFDES = (
-    {
+TERMINAL_PAIR_GAP = 1.2
+
+STEP_LAYOUT = {
+    "terminal_y": 9.0,
+    "gpio_y": 5.8,
+    "transistor_y": 5.4,
+    "return_y": 3.2,
+    "base_resistor_x": 3.0,
+    "pulldown_y": 4.3,
+}
+
+DIR_LAYOUT = {
+    "terminal_y": 1.0,
+    "gpio_y": -2.2,
+    "transistor_y": -2.6,
+    "return_y": -4.8,
+    "base_resistor_x": 3.0,
+    "pulldown_y": -3.7,
+}
+
+ENA_LAYOUT = {
+    "v24_y": -6.0,
+    "plus_y": -7.0,
+    "minus_y": -8.3,
+    "gpio_y": -10.6,
+    "transistor_y": -11.2,
+    "return_y": -13.0,
+    "feed_x": 2.4,
+    "feed_a_y": -5.8,
+    "feed_b_y": -7.9,
+    "base_resistor_x": 3.0,
+    "pulldown_y": -12.1,
+}
+
+REFDES = {
+    "STEP": {
         "base": "R1",
         "pulldown": "R2",
         "transistor": "Q1",
     },
-    {
+    "DIR": {
         "base": "R3",
         "pulldown": "R4",
         "transistor": "Q2",
     },
-)
-
-
-def placed_node(node_type, name, label, x, y, alignment=Alignment.RIGHT):
-    node = create_node(node_type, name, label=label)
-    node = modify_label_alignment(node, alignment)
-    return translate(x, y)(node)
-
-
-def horizontal(element):
-    return rotate(90)(element)
-
-
-def wire_between(start, end):
-    element = create_element(Wire, "", None, start, end)
-    x1, y1 = start.position
-    x2, y2 = end.position
-    if abs(y1 - y2) < 1e-9:
-        element = horizontal(element)
-    return translate((x1 + x2) / 2.0, (y1 + y2) / 2.0)(element)
-
-
-def place(element, x, y, label_alignment=None):
-    element = translate(x, y)(element)
-    if label_alignment is not None:
-        element = modify_label_alignment(element, label_alignment)
-    return element
+}
 
 
 def create_low_side_channel(
     *,
     refdes,
     prefix,
-    y,
-    v5_tap,
-    gnd_tap,
+    layout,
+    v5_rail,
+    gnd_rail,
     input_label,
     plus_label,
     minus_label,
 ):
-    plus = placed_node(
-        Dot, f"{prefix}_plus", plus_label, TB6600_TERMINAL_X, y, Alignment.RIGHT
+    plus = create_node(
+        Dot,
+        f"{prefix}_plus",
+        label=plus_label,
+        label_alignment=Alignment.RIGHT,
     )
-    minus = placed_node(
+    plus = translate(TB6600_TERMINAL_X, layout["terminal_y"])(plus)
+
+    minus = create_node(
         Dot,
         f"{prefix}_minus",
-        minus_label,
-        TB6600_TERMINAL_X,
-        y - 1.2,
-        Alignment.RIGHT,
+        label=minus_label,
+        label_alignment=Alignment.RIGHT,
     )
-    gpio = placed_node(
+    minus = align(minus, plus, Alignment.CENTER)
+    minus = align(minus, plus, Alignment.STACK_BOTTOM, stack_gap=TERMINAL_PAIR_GAP)
+
+    gpio = create_node(
         Dot,
         f"{prefix}_gpio",
-        input_label,
-        LOW_SIDE_INPUT_X,
-        y - 3.2,
-        Alignment.LEFT,
+        label=input_label,
+        label_alignment=Alignment.LEFT,
     )
-    base = create_node(Dot, f"{prefix}_base")
-    gnd_junction = placed_node(
-        Dot,
-        f"{prefix}_gnd_junction",
-        None,
-        LOW_SIDE_TRANSISTOR_X,
-        gnd_tap.position[1],
-        Alignment.RIGHT,
-    )
+    gpio = translate(0.0, layout["gpio_y"])(gpio)
 
-    plus_feed = wire_between(v5_tap, plus)
-    gnd_feed = wire_between(gnd_junction, gnd_tap)
+    base = create_node(Dot, f"{prefix}_base")
+
+    gnd_junction = create_node(Dot, f"{prefix}_gnd_junction")
+    gnd_junction = translate(LOW_SIDE_TRANSISTOR_X, layout["return_y"])(gnd_junction)
+
+    plus_feed = create_element(Wire, "", None, v5_rail, plus)
+    gnd_feed = create_element(Wire, "", None, gnd_junction, gnd_rail)
 
     transistor = create_element(
         BjtNpn,
@@ -110,12 +127,8 @@ def create_low_side_channel(
         collector=minus,
         emitter=gnd_junction,
     )
-    transistor = place(
-        transistor,
-        LOW_SIDE_TRANSISTOR_X,
-        y - 3.6,
-        Alignment.RIGHT,
-    )
+    transistor = translate(LOW_SIDE_TRANSISTOR_X, layout["transistor_y"])(transistor)
+    transistor = modify_label_alignment(transistor, Alignment.RIGHT)
 
     base_resistor = create_element(
         Resistor,
@@ -124,7 +137,11 @@ def create_low_side_channel(
         gpio,
         base,
     )
-    base_resistor = place(horizontal(base_resistor), 3.0, y - 3.2, Alignment.TOP)
+    base_resistor = rotate(90)(base_resistor)
+    base_resistor = translate(layout["base_resistor_x"], layout["gpio_y"])(
+        base_resistor
+    )
+    base_resistor = modify_label_alignment(base_resistor, Alignment.TOP)
 
     pulldown = create_element(
         Resistor,
@@ -133,7 +150,8 @@ def create_low_side_channel(
         base,
         gnd_junction,
     )
-    pulldown = place(pulldown, LOW_SIDE_BASE_X, y - 4.7, Alignment.RIGHT)
+    pulldown = translate(LOW_SIDE_BASE_X, layout["pulldown_y"])(pulldown)
+    pulldown = modify_label_alignment(pulldown, Alignment.RIGHT)
 
     return (
         [plus, minus, gpio, base, gnd_junction],
@@ -141,46 +159,55 @@ def create_low_side_channel(
     )
 
 
-def create_enable_channel(gnd_tap, ena_minus_tap):
-    y = -6.0
-    v24 = placed_node(Dot, "ena_v24", "+24V", 0.0, y, Alignment.LEFT)
-    ena_plus_terminal = placed_node(
-        Dot, "ena_plus", "ENA+", TB6600_TERMINAL_X, y - 1.0, Alignment.TOP
-    )
-    ena_plus_junction = placed_node(
+def create_enable_channel(gnd_rail):
+    v24 = create_node(Dot, "ena_v24", label="+24V", label_alignment=Alignment.LEFT)
+    v24 = translate(0.0, ENA_LAYOUT["v24_y"])(v24)
+
+    ena_plus_terminal = create_node(
         Dot,
-        "ena_plus_junction",
-        None,
-        ENABLE_TRANSISTOR_X,
-        y - 1.0,
-        Alignment.RIGHT,
+        "ena_plus",
+        label="ENA+",
+        label_alignment=Alignment.TOP,
     )
-    ena_minus = placed_node(
-        Dot, "ena_minus", "ENA-", TB6600_TERMINAL_X, y - 2.3, Alignment.BOTTOM
+    ena_plus_terminal = translate(TB6600_TERMINAL_X, ENA_LAYOUT["plus_y"])(
+        ena_plus_terminal
     )
-    gpio = placed_node(
+
+    ena_plus_junction = create_node(Dot, "ena_plus_junction")
+    ena_plus_junction = translate(ENABLE_TRANSISTOR_X, ENA_LAYOUT["plus_y"])(
+        ena_plus_junction
+    )
+
+    ena_minus = create_node(
+        Dot,
+        "ena_minus",
+        label="ENA-",
+        label_alignment=Alignment.BOTTOM,
+    )
+    ena_minus = translate(TB6600_TERMINAL_X, ENA_LAYOUT["minus_y"])(ena_minus)
+
+    gpio = create_node(
         Dot,
         "ena_gpio",
-        "Pico ENABLE GPIO2",
-        0.0,
-        y - 4.6,
-        Alignment.LEFT,
+        label="Pico ENABLE GPIO2",
+        label_alignment=Alignment.LEFT,
     )
+    gpio = translate(0.0, ENA_LAYOUT["gpio_y"])(gpio)
+
     base = create_node(Dot, "ena_base")
-    gnd_junction = placed_node(
-        Dot,
-        "ena_gnd_junction",
-        None,
-        ENABLE_TRANSISTOR_X,
-        gnd_tap.position[1],
-        Alignment.RIGHT,
-    )
+
+    gnd_junction = create_node(Dot, "ena_gnd_junction")
+    gnd_junction = translate(ENABLE_TRANSISTOR_X, ENA_LAYOUT["return_y"])(gnd_junction)
 
     feed_a = create_element(Resistor, "R5", "4k7 0.25W", v24, ena_plus_junction)
-    feed_a = place(horizontal(feed_a), 2.4, y + 0.2, Alignment.TOP)
+    feed_a = rotate(90)(feed_a)
+    feed_a = translate(ENA_LAYOUT["feed_x"], ENA_LAYOUT["feed_a_y"])(feed_a)
+    feed_a = modify_label_alignment(feed_a, Alignment.TOP)
 
     feed_b = create_element(Resistor, "R6", "4k7 0.25W", v24, ena_plus_junction)
-    feed_b = place(horizontal(feed_b), 2.4, y - 1.9, Alignment.BOTTOM)
+    feed_b = rotate(90)(feed_b)
+    feed_b = translate(ENA_LAYOUT["feed_x"], ENA_LAYOUT["feed_b_y"])(feed_b)
+    feed_b = modify_label_alignment(feed_b, Alignment.BOTTOM)
 
     transistor = create_element(
         BjtNpn,
@@ -190,17 +217,24 @@ def create_enable_channel(gnd_tap, ena_minus_tap):
         collector=ena_plus_junction,
         emitter=gnd_junction,
     )
-    transistor = place(transistor, ENABLE_TRANSISTOR_X, y - 5.2, Alignment.RIGHT)
+    transistor = translate(ENABLE_TRANSISTOR_X, ENA_LAYOUT["transistor_y"])(transistor)
+    transistor = modify_label_alignment(transistor, Alignment.RIGHT)
 
     base_resistor = create_element(Resistor, "R7", "2k2", gpio, base)
-    base_resistor = place(horizontal(base_resistor), 3.0, y - 4.6, Alignment.TOP)
+    base_resistor = rotate(90)(base_resistor)
+    base_resistor = translate(
+        ENA_LAYOUT["base_resistor_x"],
+        ENA_LAYOUT["gpio_y"],
+    )(base_resistor)
+    base_resistor = modify_label_alignment(base_resistor, Alignment.TOP)
 
     pulldown = create_element(Resistor, "R8", "47k", base, gnd_junction)
-    pulldown = place(pulldown, LOW_SIDE_BASE_X, y - 6.1, Alignment.RIGHT)
+    pulldown = translate(LOW_SIDE_BASE_X, ENA_LAYOUT["pulldown_y"])(pulldown)
+    pulldown = modify_label_alignment(pulldown, Alignment.RIGHT)
 
-    ena_plus_wire = wire_between(ena_plus_junction, ena_plus_terminal)
-    ena_minus_wire = wire_between(ena_minus_tap, ena_minus)
-    gnd_feed = wire_between(gnd_junction, gnd_tap)
+    ena_plus_wire = create_element(Wire, "", None, ena_plus_junction, ena_plus_terminal)
+    ena_minus_wire = create_element(Wire, "", None, gnd_rail, ena_minus)
+    gnd_feed = create_element(Wire, "", None, gnd_junction, gnd_rail)
 
     return (
         [
@@ -225,98 +259,77 @@ def create_enable_channel(gnd_tap, ena_minus_tap):
     )
 
 
-def create_decoupling(v5_tap, gnd_tap):
-    capacitor = create_element(Capacitor, "C1", "100nF", v5_tap, gnd_tap)
-    capacitor = place(horizontal(capacitor), 4.0, 10.8, Alignment.BOTTOM)
+def create_decoupling(v5_rail, gnd_rail):
+    capacitor = create_element(Capacitor, "C1", "100nF", v5_rail, gnd_rail)
+    capacitor = rotate(90)(capacitor)
+    capacitor = translate(4.0, V5_RAIL_TOP_Y)(capacitor)
+    capacitor = modify_label_alignment(capacitor, Alignment.BOTTOM)
     return [], [capacitor]
 
 
 def create_rails():
-    v5_top = placed_node(Dot, "v5_top", "+5V rail", V5_RAIL_X, 10.8, Alignment.LEFT)
-    v5_step = placed_node(Dot, "v5_step", None, V5_RAIL_X, 9.0, Alignment.LEFT)
-    v5_dir = placed_node(Dot, "v5_dir", None, V5_RAIL_X, 1.0, Alignment.LEFT)
+    v5_rail = create_node(
+        Dot,
+        "v5_rail",
+        label="+5V rail",
+        label_alignment=Alignment.LEFT,
+    )
+    v5_rail = translate(V5_RAIL_X, V5_RAIL_TOP_Y)(v5_rail)
+    v5_rail = create_rail(
+        v5_rail,
+        Direction.VERTICAL,
+        V5_RAIL_LENGTH,
+        anchor=Alignment.TOP,
+    )
 
-    gnd_top = placed_node(Dot, "gnd_top", None, GND_RAIL_X, 10.8, Alignment.RIGHT)
-    gnd_step = placed_node(Dot, "gnd_step", None, GND_RAIL_X, 3.2, Alignment.RIGHT)
-    gnd_dir = placed_node(Dot, "gnd_dir", None, GND_RAIL_X, -4.8, Alignment.RIGHT)
-    gnd_ena_minus = placed_node(
-        Dot, "gnd_ena_minus", None, GND_RAIL_X, -8.3, Alignment.RIGHT
+    gnd_rail = create_node(
+        Ground,
+        "gnd_rail",
+        label="GND rail",
+        label_alignment=Alignment.RIGHT,
     )
-    gnd_ena = placed_node(
-        Ground, "gnd_ena", "GND rail", GND_RAIL_X, -13.0, Alignment.RIGHT
+    gnd_rail = translate(GND_RAIL_X, GND_RAIL_BOTTOM_Y)(gnd_rail)
+    gnd_rail = create_rail(
+        gnd_rail,
+        Direction.VERTICAL,
+        GND_RAIL_LENGTH,
+        anchor=Alignment.BOTTOM,
     )
 
-    rail_nodes = [
-        v5_top,
-        v5_step,
-        v5_dir,
-        gnd_top,
-        gnd_step,
-        gnd_dir,
-        gnd_ena_minus,
-        gnd_ena,
-    ]
-    rail_elements = [
-        wire_between(v5_top, v5_step),
-        wire_between(v5_step, v5_dir),
-        wire_between(gnd_top, gnd_step),
-        wire_between(gnd_step, gnd_dir),
-        wire_between(gnd_dir, gnd_ena_minus),
-        wire_between(gnd_ena_minus, gnd_ena),
-    ]
-    return (
-        rail_nodes,
-        rail_elements,
-        {
-            "v5_top": v5_top,
-            "v5_step": v5_step,
-            "v5_dir": v5_dir,
-            "gnd_top": gnd_top,
-            "gnd_step": gnd_step,
-            "gnd_dir": gnd_dir,
-            "gnd_ena_minus": gnd_ena_minus,
-            "gnd_ena": gnd_ena,
-        },
-    )
+    return [v5_rail, gnd_rail], [], {"v5": v5_rail, "gnd": gnd_rail}
 
 
 def create_schema_for_tb6600_interface():
     nodes, elements, rails = create_rails()
 
-    for channel in [
+    for channel_nodes, channel_elements in [
         create_low_side_channel(
-            refdes=REFDES[0],
+            refdes=REFDES["STEP"],
             prefix="STEP",
-            y=9.0,
-            v5_tap=rails["v5_step"],
-            gnd_tap=rails["gnd_step"],
+            layout=STEP_LAYOUT,
+            v5_rail=rails["v5"],
+            gnd_rail=rails["gnd"],
             input_label="Pico STEP GPIO0",
             plus_label="PUL+",
             minus_label="PUL-",
         ),
         create_low_side_channel(
-            refdes=REFDES[1],
+            refdes=REFDES["DIR"],
             prefix="DIR",
-            y=1.0,
-            v5_tap=rails["v5_dir"],
-            gnd_tap=rails["gnd_dir"],
+            layout=DIR_LAYOUT,
+            v5_rail=rails["v5"],
+            gnd_rail=rails["gnd"],
             input_label="Pico DIR GPIO1",
             plus_label="DIR+",
             minus_label="DIR-",
         ),
-        create_enable_channel(rails["gnd_ena"], rails["gnd_ena_minus"]),
-        create_decoupling(rails["v5_top"], rails["gnd_top"]),
+        create_enable_channel(rails["gnd"]),
+        create_decoupling(rails["v5"], rails["gnd"]),
     ]:
-        channel_nodes, channel_elements = channel
         nodes.extend(channel_nodes)
         elements.extend(channel_elements)
 
     return create_schema(nodes, elements)
-
-
-def strip_trailing_whitespace(path):
-    lines = path.read_text(encoding="utf-8").splitlines()
-    path.write_text("\n".join(line.rstrip() for line in lines) + "\n", encoding="utf-8")
 
 
 def main():
@@ -324,8 +337,6 @@ def main():
     schema = create_schema_for_tb6600_interface()
     for output_file in (SVG_FILE, PNG_FILE):
         render_schemdraw(schema, file=output_file)
-        if output_file.suffix == ".svg":
-            strip_trailing_whitespace(output_file)
         print(f"Wrote {output_file}")
 
 

@@ -48,6 +48,20 @@ Use a `.png` filename instead of `.svg` to render a PNG preview:
 render_schemdraw(schema, file=Path("voltage_divider.png"))
 ```
 
+Rails are visible materializations of normal nodes. They are useful when many
+connections should visibly share one supply or ground rail:
+
+```python
+vcc = create_node(Dot, "vcc", label="+5V", label_alignment=Alignment.LEFT)
+vcc = translate(0, 4)(vcc)
+vcc = create_rail(vcc, Direction.VERTICAL, 8, anchor=Alignment.TOP)
+
+pul_plus = create_node(Dot, "pul_plus", label="PUL+")
+pul_plus = translate(4, 1)(pul_plus)
+
+feed = create_element(Wire, "", None, vcc, pul_plus)
+```
+
 Run an example from the repository root:
 
 ```bash
@@ -61,7 +75,12 @@ The helper runs the script with the repository `src/` directory on
 ## Concepts
 
 - Nodes are electrical connection points created with `create_node`.
+- Use `label_alignment=Alignment.LEFT/RIGHT/TOP/BOTTOM` when creating labeled
+  nodes whose labels should face a specific way.
+- Rails are created from normal nodes with `create_rail`; connected terminals
+  project onto the visible rail and render tap dots.
 - Elements are connected to nodes with `create_element`.
+- `Wire` is a direct conductor between two nodes and does not need placement.
 - Layout is explicit and copy-returning: `align(...)`, `translate(...)`, and
   `rotate(...)` return placed copies.
 - Schemas group nodes and elements with `create_schema`.

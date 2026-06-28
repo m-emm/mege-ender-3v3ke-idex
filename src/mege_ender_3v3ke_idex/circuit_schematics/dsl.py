@@ -12,6 +12,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, auto
+from pathlib import Path
 
 import schemdraw
 import schemdraw.elements as elm
@@ -138,8 +139,17 @@ class Node:
     label_loc: str = "right"
     position: tuple[float, float] = (0.0, 0.0)
     placement_explicit: bool = False
+    rail_direction: Direction | None = None
+    rail_length: float | None = None
+    rail_anchor: Alignment = Alignment.CENTER
 
     def get_bounding_box(self):
+        if self.rail_direction is not None:
+            start, end = _rail_endpoints(self)
+            return [
+                [min(start[0], end[0]), min(start[1], end[1])],
+                [max(start[0], end[0]), max(start[1], end[1])],
+            ]
         return [
             [self.position[0], self.position[1]],
             [self.position[0], self.position[1]],
@@ -197,6 +207,13 @@ class Element:
         )
 
     def get_bounding_box(self):
+        if self.element_type is Wire:
+            boxes = [node.get_bounding_box() for node in self.terminal_nodes.values()]
+            return [
+                [min(box[0][0] for box in boxes), min(box[0][1] for box in boxes)],
+                [max(box[1][0] for box in boxes), max(box[1][1] for box in boxes)],
+            ]
+
         spec = _element_spec(self)
         corners = _box_corners(_padded_box(spec.local_bbox, spec.bbox_padding))
         points = [
@@ -226,17 +243,44 @@ class Schema:
         ]
 
 
-def create_node(node_type, name, label=None, kind=None, **kwargs):
+def create_node(node_type, name, label=None, kind=None, label_alignment=None, **kwargs):
     if node_type not in (Dot, Ground):
         raise ValueError("Only Dot and Ground nodes are supported in this DSL.")
     if kwargs:
         raise TypeError(f"Unsupported node arguments: {sorted(kwargs)}")
+    label_loc = "right"
+    if label_alignment is not None:
+        label_loc = _label_loc_from_alignment(label_alignment)
     return Node(
         node_type=node_type,
         name=name,
         label=label,
         kind=kind,
+        label_loc=label_loc,
     )
+
+
+def create_rail(node, direction, length, anchor=Alignment.CENTER):
+    if not isinstance(node, Node):
+        raise TypeError("create_rail expects a Node.")
+    if direction not in (Direction.HORIZONTAL, Direction.VERTICAL):
+        raise ValueError("Rail direction must be HORIZONTAL or VERTICAL.")
+    if length <= 0:
+        raise ValueError("Rail length must be positive.")
+    if anchor not in {
+        Alignment.CENTER,
+        Alignment.LEFT,
+        Alignment.RIGHT,
+        Alignment.TOP,
+        Alignment.BOTTOM,
+    }:
+        raise ValueError("Rail anchor must be CENTER, LEFT, RIGHT, TOP, or BOTTOM.")
+
+    modified = copy.deepcopy(node)
+    modified.rail_direction = direction
+    modified.rail_length = float(length)
+    modified.rail_anchor = anchor
+    return modified
 
 
 def create_element(
@@ -308,14 +352,29 @@ def modify_label_alignment(element, alignment):
 
 def render_schemdraw(schema, file, show=False):
     node_points = _schema_node_points(schema)
+    rail_taps = {
+        name: [] for name, (_, node, _) in node_points.items() if _is_rail(node)
+    }
 
     with schemdraw.Drawing(file=file, show=show) as drawing:
         drawing.config(unit=2.0, inches_per_unit=0.55, fontsize=10)
 
         for element in schema.elements:
+            if _is_wire(element):
+                start, end = _wire_endpoints(element, node_points)
+                _record_wire_rail_taps(element, node_points, rail_taps, start, end)
+                _add_wire(drawing, start, end, direct=True)
+                continue
+
             for anchor_name, node in element.terminal_nodes.items():
                 terminal = element.anchor_position(anchor_name)
-                node_point = node_points[node.name][0]
+                node_point = _node_connection_point(
+                    node,
+                    node_points[node.name][0],
+                    terminal,
+                )
+                if _is_rail(node):
+                    rail_taps[node.name].append(node_point)
                 _add_wire(
                     drawing,
                     terminal,
@@ -324,6 +383,8 @@ def render_schemdraw(schema, file, show=False):
                 )
 
         for element in schema.elements:
+            if _is_wire(element):
+                continue
             label = (
                 element.name
                 if element.value is None
@@ -335,18 +396,25 @@ def render_schemdraw(schema, file, show=False):
 
         for node_name in sorted(node_points):
             point, node, terminal_count = node_points[node_name]
-            if not _should_render_node(node, terminal_count):
-                continue
-            if node.node_type is Ground:
-                ground = elm.Ground().at(point)
-                if node.label:
-                    ground = ground.label(node.label, loc=node.label_loc)
-                drawing.add(ground)
-            else:
-                dot = elm.Dot().at(point)
-                if node.label:
-                    dot = dot.label(node.label, loc=node.label_loc)
-                drawing.add(dot)
+            if _is_rail(node):
+                drawing.add(elm.Line().endpoints(*_rail_endpoints(node)))
+            if _should_render_node(node, terminal_count):
+                if node.node_type is Ground:
+                    ground = elm.Ground().at(point)
+                    if node.label:
+                        ground = ground.label(node.label, loc=node.label_loc)
+                    drawing.add(ground)
+                else:
+                    dot = elm.Dot().at(point)
+                    if node.label:
+                        dot = dot.label(node.label, loc=node.label_loc)
+                    drawing.add(dot)
+            if _is_rail(node):
+                for tap in _unique_points(rail_taps.get(node_name, [])):
+                    drawing.add(elm.Dot().at(tap))
+
+    if Path(file).suffix == ".svg":
+        _strip_trailing_whitespace(file)
 
 
 def _alignment_delta(part, to, alignment, axes=None, stack_gap=0):
@@ -448,9 +516,11 @@ def _schema_node_points(schema):
                     "but that node is missing from the schema node list."
                 )
             used_node_names.add(node.name)
-            terminal_points_by_node.setdefault(node.name, []).append(
-                element.anchor_position(anchor_name)
-            )
+            if _is_wire(element):
+                terminal_point = node.position
+            else:
+                terminal_point = element.anchor_position(anchor_name)
+            terminal_points_by_node.setdefault(node.name, []).append(terminal_point)
 
     return {
         name: (
@@ -464,6 +534,8 @@ def _schema_node_points(schema):
 
 
 def _resolved_node_position(node, terminal_points):
+    if _is_rail(node):
+        return node.position
     if node.placement_explicit:
         return node.position
     if len(terminal_points) > 2:
@@ -472,6 +544,8 @@ def _resolved_node_position(node, terminal_points):
 
 
 def _should_render_node(node, terminal_count):
+    if _is_rail(node):
+        return bool(node.label) or node.node_type is Ground
     if node.node_type is Ground:
         return True
     if node.label:
@@ -508,6 +582,74 @@ def _schemdraw_element(element):
     if spec.positional_terminals == ("start", "end"):
         return placed.endpoints(element.start.point(), element.end.point())
     return placed.theta(element.angle).anchor("center").at(element.position)
+
+
+def _is_wire(element):
+    return element.element_type is Wire
+
+
+def _is_rail(node):
+    return node.rail_direction is not None
+
+
+def _wire_endpoints(element, node_points):
+    start_node = element.terminal_nodes["start"]
+    end_node = element.terminal_nodes["end"]
+    start_point = _node_connection_point(
+        start_node,
+        node_points[start_node.name][0],
+        node_points[end_node.name][0],
+    )
+    end_point = _node_connection_point(
+        end_node,
+        node_points[end_node.name][0],
+        start_point,
+    )
+    return start_point, end_point
+
+
+def _record_wire_rail_taps(element, node_points, rail_taps, start, end):
+    start_node = element.terminal_nodes["start"]
+    end_node = element.terminal_nodes["end"]
+    if _is_rail(start_node):
+        rail_taps[start_node.name].append(start)
+    if _is_rail(end_node):
+        rail_taps[end_node.name].append(end)
+
+
+def _node_connection_point(node, resolved_point, terminal_point):
+    if not _is_rail(node):
+        return resolved_point
+    return _project_point_to_rail(node, terminal_point)
+
+
+def _project_point_to_rail(node, point):
+    start, end = _rail_endpoints(node)
+    if node.rail_direction is Direction.VERTICAL:
+        return (
+            start[0],
+            _clamp(point[1], min(start[1], end[1]), max(start[1], end[1])),
+        )
+    return (_clamp(point[0], min(start[0], end[0]), max(start[0], end[0])), start[1])
+
+
+def _rail_endpoints(node):
+    x, y = node.position
+    length = float(node.rail_length)
+    anchor = node.rail_anchor
+
+    if node.rail_direction is Direction.HORIZONTAL:
+        if anchor is Alignment.LEFT:
+            return (x, y), (x + length, y)
+        if anchor is Alignment.RIGHT:
+            return (x - length, y), (x, y)
+        return (x - length / 2.0, y), (x + length / 2.0, y)
+
+    if anchor is Alignment.TOP:
+        return (x, y), (x, y - length)
+    if anchor is Alignment.BOTTOM:
+        return (x, y + length), (x, y)
+    return (x, y + length / 2.0), (x, y - length / 2.0)
 
 
 def _add_wire(drawing, start, end, direct=False):
@@ -604,6 +746,13 @@ def _label_loc_from_alignment(alignment):
 
 
 def _element_visual_bounding_box(element):
+    if _is_wire(element):
+        boxes = [node.get_bounding_box() for node in element.terminal_nodes.values()]
+        return [
+            [min(box[0][0] for box in boxes), min(box[0][1] for box in boxes)],
+            [max(box[1][0] for box in boxes), max(box[1][1] for box in boxes)],
+        ]
+
     corners = _box_corners(_element_spec(element).local_bbox)
     points = [
         _add_points(element.position, _rotate_point(corner, element.angle))
@@ -664,6 +813,24 @@ def _point(value):
 
 def _add_points(a, b):
     return (float(a[0]) + float(b[0]), float(a[1]) + float(b[1]))
+
+
+def _clamp(value, minimum, maximum):
+    return max(minimum, min(maximum, value))
+
+
+def _unique_points(points):
+    unique = []
+    for point in points:
+        if not any(_same_point(point, existing) for existing in unique):
+            unique.append(point)
+    return unique
+
+
+def _strip_trailing_whitespace(path):
+    path = Path(path)
+    lines = path.read_text(encoding="utf-8").splitlines()
+    path.write_text("\n".join(line.rstrip() for line in lines) + "\n", encoding="utf-8")
 
 
 def _rotate_point(point, angle):
