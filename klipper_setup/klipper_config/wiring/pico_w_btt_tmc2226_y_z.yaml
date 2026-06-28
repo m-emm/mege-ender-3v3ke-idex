@@ -12,6 +12,7 @@ metadata:
     Heatbed MOSFET: HEATBED_ON=GPIO21.
     Heatbed boost SSR: SSR_OUT=GPIO20 with Pico logic ground.
     Heatbed thermistor: SIGNAL=GPIO26_ADC0, GND=AGND, 4.7k pull-up REF-to-SIGNAL.
+    Heatbed thermistor damping: 100uF SIGNAL-to-GND; electrolytic positive to SIGNAL, negative to AGND/GND.
 
 color_map:
   power: "#ff0000" # red: VCC/5V
@@ -186,6 +187,12 @@ pin_sets:
     pins:
       - SIG
       - REF
+  - prefix: C_BED_THERM_DAMP_100UF_
+    origin: [31, -5]
+    direction: right
+    pins:
+      - POS
+      - NEG
   - prefix: ENDSTOP_Y_
     origin: [34, 20]
     direction: down
@@ -410,6 +417,13 @@ wires:
     to: HEATBED_THERM_SIGNAL
     type: data
     color: "#9ca3af"
+  - from: C_BED_THERM_DAMP_100UF_POS
+    to: HEATBED_THERM_SIGNAL
+    type: data
+    color: "#9ca3af"
+  - from: C_BED_THERM_DAMP_100UF_NEG
+    to: HEATBED_THERM_GND
+    type: ground
 
   - from: MOTOR_Y_A_PLUS
     to: TMC1_J2_A1_5

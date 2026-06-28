@@ -71,6 +71,16 @@ def test_generated_wiring_svgs_are_current():
     )
 
 
+def test_generated_yz_wiring_svg_includes_bed_thermistor_damping_capacitor():
+    for view in ("top", "bottom"):
+        svg_text = (
+            WIRING_DIR / "diagrams" / f"pico_w_btt_tmc2226_y_z_{view}.svg"
+        ).read_text()
+
+        assert "C_BED_THERM_DAMP_100UF_POS" in svg_text
+        assert "C_BED_THERM_DAMP_100UF_NEG" in svg_text
+
+
 def test_active_looking_legacy_wiring_paths_are_removed():
     assert not (KLIPPER_CONFIG_DIR / "archive" / "wiring").exists()
     assert not (KLIPPER_CONFIG_DIR / "archive" / "snippets").exists()
