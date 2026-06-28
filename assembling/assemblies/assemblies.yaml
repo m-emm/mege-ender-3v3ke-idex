@@ -1374,7 +1374,11 @@ assemblies:
       nitehawk_usb_dual_housing_lid_screw_boss_diameter: !Ref nitehawk_usb_dual_housing_lid_screw_boss_diameter
       nitehawk_usb_dual_housing_cable_slit_x_size: !Ref nitehawk_usb_dual_housing_cable_slit_x_size
       nitehawk_usb_dual_housing_cable_slit_y_margin: !Ref nitehawk_usb_dual_housing_cable_slit_y_margin
+      nitehawk_usb_dual_housing_cable_slit_z_size: !Ref nitehawk_usb_dual_housing_cable_slit_z_size
+      nitehawk_usb_dual_housing_cable_slit_floor_clearance: !Ref nitehawk_usb_dual_housing_cable_slit_floor_clearance
       nitehawk_usb_dual_housing_cable_slit_fillet_radius: !Ref nitehawk_usb_dual_housing_cable_slit_fillet_radius
+      nitehawk_usb_dual_housing_rear_connector_slit_x_size: !Ref nitehawk_usb_dual_housing_rear_connector_slit_x_size
+      nitehawk_usb_dual_housing_rear_connector_slit_y_margin: !Ref nitehawk_usb_dual_housing_rear_connector_slit_y_margin
       nitehawk_usb_dual_housing_cable_tie_slot_x_size: !Ref nitehawk_usb_dual_housing_cable_tie_slot_x_size
       nitehawk_usb_dual_housing_cable_tie_slot_y_size: !Ref nitehawk_usb_dual_housing_cable_tie_slot_y_size
       nitehawk_usb_dual_housing_cable_tie_slot_pair_spacing: !Ref nitehawk_usb_dual_housing_cable_tie_slot_pair_spacing

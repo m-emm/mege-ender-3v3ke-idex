@@ -121,7 +121,15 @@ Parameters:
     Type: Float
   nitehawk_usb_dual_housing_cable_slit_y_margin:
     Type: Float
+  nitehawk_usb_dual_housing_cable_slit_z_size:
+    Type: Float
+  nitehawk_usb_dual_housing_cable_slit_floor_clearance:
+    Type: Float
   nitehawk_usb_dual_housing_cable_slit_fillet_radius:
+    Type: Float
+  nitehawk_usb_dual_housing_rear_connector_slit_x_size:
+    Type: Float
+  nitehawk_usb_dual_housing_rear_connector_slit_y_margin:
     Type: Float
   nitehawk_usb_dual_housing_cable_tie_slot_x_size:
     Type: Float

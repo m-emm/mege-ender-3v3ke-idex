@@ -31,7 +31,11 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     nitehawk_usb_dual_housing_lid_screw_boss_diameter,
     nitehawk_usb_dual_housing_cable_slit_x_size,
     nitehawk_usb_dual_housing_cable_slit_y_margin,
+    nitehawk_usb_dual_housing_cable_slit_z_size,
+    nitehawk_usb_dual_housing_cable_slit_floor_clearance,
     nitehawk_usb_dual_housing_cable_slit_fillet_radius,
+    nitehawk_usb_dual_housing_rear_connector_slit_x_size,
+    nitehawk_usb_dual_housing_rear_connector_slit_y_margin,
     nitehawk_usb_dual_housing_cable_tie_slot_x_size,
     nitehawk_usb_dual_housing_cable_tie_slot_y_size,
     nitehawk_usb_dual_housing_cable_tie_slot_pair_spacing,
@@ -250,20 +254,69 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     cable_slit_length = housing_width - 2 * (
         wall + nitehawk_usb_dual_housing_cable_slit_y_margin
     )
-    cable_slit = create_filleted_box(
+    cable_slit_x = (
+        nitehawk_usb_dual_housing_lid_rim_depth
+        + nitehawk_usb_dual_housing_lid_body_clearance
+    )
+    cable_slit_x_size = min(
         nitehawk_usb_dual_housing_cable_slit_x_size,
+        housing_depth
+        - wall
+        - nitehawk_usb_dual_housing_cable_slit_floor_clearance
+        - cable_slit_x,
+    )
+    cable_slit = create_filleted_box(
+        cable_slit_x_size,
         cable_slit_length,
-        wall + 2,
-        fillet_radius=nitehawk_usb_dual_housing_cable_slit_fillet_radius,
+        nitehawk_usb_dual_housing_cable_slit_z_size,
+        fillet_radius=min(
+            nitehawk_usb_dual_housing_cable_slit_fillet_radius,
+            nitehawk_usb_dual_housing_cable_slit_z_size / 2 - 0.1,
+        ),
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
     cable_slit = translate(
-        nitehawk_usb_dual_housing_lid_rim_depth
-        + nitehawk_usb_dual_housing_lid_body_clearance,
+        cable_slit_x,
         wall + nitehawk_usb_dual_housing_cable_slit_y_margin,
         -1,
     )(cable_slit)
     housing_box = housing_box.cut(cable_slit)
+
+    rear_connector_slits = PartCollector()
+    rear_connector_slit_items = []
+    rear_connector_slit_z_size = wall + 2
+    for board_index, board in [(1, board_1), (2, board_2)]:
+        connector = board.get_follower_part_by_name(f"board_{board_index}_front_plug")
+        connector_bbox = get_bounding_box(connector)
+        connector_center = get_bounding_box_center(connector)
+        connector_slit_y_size = (
+            connector_bbox[1][1]
+            - connector_bbox[0][1]
+            + 2 * nitehawk_usb_dual_housing_rear_connector_slit_y_margin
+        )
+        connector_slit = create_filleted_box(
+            min(
+                nitehawk_usb_dual_housing_rear_connector_slit_x_size,
+                cable_slit_x_size,
+            ),
+            connector_slit_y_size,
+            rear_connector_slit_z_size,
+            fillet_radius=min(
+                nitehawk_usb_dual_housing_cable_slit_fillet_radius,
+                rear_connector_slit_z_size / 2 - 0.1,
+            ),
+            no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+        )
+        connector_slit = translate(
+            cable_slit_x,
+            connector_center[1] - connector_slit_y_size / 2,
+            housing_height - wall - 1,
+        )(connector_slit)
+        rear_connector_slits = rear_connector_slits.fuse(connector_slit)
+        rear_connector_slit_items.append(
+            (f"rear_connector_cable_slit_board_{board_index}", connector_slit)
+        )
+    housing_box = housing_box.cut(rear_connector_slits)
 
     cable_tie_slots = PartCollector()
     cable_tie_slot_items = []
@@ -418,6 +471,7 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     housing.add_named_cutter(lid_pilot_holes, "lid_mount_pilot_holes")
     housing.add_named_cutter(lid_clearance_holes, "lid_mount_clearance_holes")
     housing.add_named_cutter(cable_slit, "cable_slit")
+    housing.add_named_cutter(rear_connector_slits, "rear_connector_cable_slits")
     housing.add_named_cutter(cable_tie_slots, "cable_tie_slots")
     housing.add_named_cutter(profile_mount_holes, "profile_mount_holes")
 
@@ -429,6 +483,8 @@ def create_nitehawk_usb_dual_board_housing_assembly(
         housing.add_named_cutter(pilot_hole, f"lid_mount_pilot_hole_{index}")
         housing.add_named_cutter(clearance_hole, f"lid_mount_clearance_hole_{index}")
     for name, cutter in cable_tie_slot_items:
+        housing.add_named_cutter(cutter, name)
+    for name, cutter in rear_connector_slit_items:
         housing.add_named_cutter(cutter, name)
     for name, cutter in profile_mount_hole_items:
         housing.add_named_cutter(cutter, name)

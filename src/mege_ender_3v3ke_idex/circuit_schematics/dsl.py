@@ -50,13 +50,17 @@ STRIPBOARD_OVERLAY_TEXT_HALO = "#ffffff"
 STRIPBOARD_OVERLAY_STROKE_WIDTH = 0.045
 STRIPBOARD_OVERLAY_NODE_RADIUS = 0.14
 STRIPBOARD_OVERLAY_TERMINAL_RADIUS = 0.09
-STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE = 0.42
-STRIPBOARD_OVERLAY_NODE_LABEL_SIZE = 0.36
+STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE = 0.32
+STRIPBOARD_OVERLAY_NODE_LABEL_SIZE = 0.28
 STRIPBOARD_OVERLAY_NET_LABEL_SIZE = 0.42
+STRIPBOARD_OVERLAY_RUN_LABEL_SIZE = 0.30
 STRIPBOARD_OVERLAY_NET_LABEL_MARGIN = 3.1
-STRIPBOARD_CUT_STROKE = "#7f1d1d"
-STRIPBOARD_CUT_RADIUS = 0.24
-STRIPBOARD_CUT_STROKE_WIDTH = 0.075
+STRIPBOARD_OVERLAY_LABEL_ANGLE = -30.0
+STRIPBOARD_RUN_BLOCK_STROKE = "#111111"
+STRIPBOARD_RUN_BLOCK_STROKE_WIDTH = 0.085
+STRIPBOARD_CUT_STROKE = "#000000"
+STRIPBOARD_CUT_RADIUS = 0.31
+STRIPBOARD_CUT_STROKE_WIDTH = 0.14
 
 
 class NodeType(Enum):
@@ -1157,17 +1161,30 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
         )
 
     for run in _stripboard_compacted_runs(assignment, stripboard):
+        x, y, width, height = _stripboard_run_block_rect(run)
+        lines.append(
+            f'  <rect class="strip-run-block" data-row="{run.row}" '
+            f'data-net="{_svg_attr(run.net_name)}" '
+            f'x="{x:.3f}" y="{y:.3f}" width="{width:.3f}" '
+            f'height="{height:.3f}" fill="none" '
+            f'stroke="{STRIPBOARD_RUN_BLOCK_STROKE}" '
+            f'stroke-width="{STRIPBOARD_RUN_BLOCK_STROKE_WIDTH:.3f}"/>'
+        )
+
+    for run in _stripboard_compacted_runs(assignment, stripboard):
         x = _stripboard_run_center(run)
-        y = _stripboard_row_center(run.row) + 0.135
+        y = _stripboard_row_center(run.row) + 0.080
         lines.append(
             f'  <text class="overlay-net-run-label" '
             f'data-row="{run.row}" data-net="{_svg_attr(run.net_name)}" '
             f'x="{x:.3f}" y="{y:.3f}" '
-            f'font-size="{STRIPBOARD_OVERLAY_NET_LABEL_SIZE:.3f}" '
+            f'font-size="{STRIPBOARD_OVERLAY_RUN_LABEL_SIZE:.3f}" '
             f'font-weight="700" text-anchor="middle" '
             f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
             f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
-            f'paint-order="stroke">'
+            f'paint-order="stroke" '
+            f'transform="rotate({STRIPBOARD_OVERLAY_LABEL_ANGLE:.1f} '
+            f'{x:.3f} {y:.3f})">'
             f'{_svg_text(run.net_name)}</text>'
         )
 
@@ -1201,7 +1218,9 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
             f'font-weight="700" text-anchor="middle" '
             f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
             f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
-            f'paint-order="stroke">'
+            f'paint-order="stroke" '
+            f'transform="rotate({STRIPBOARD_OVERLAY_LABEL_ANGLE:.1f} '
+            f'{center[0]:.3f} {center[1] - 0.18:.3f})">'
             f'{_svg_text(element_overlay["label"])}</text>'
         )
 
@@ -1234,7 +1253,9 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
                 f'font-size="{STRIPBOARD_OVERLAY_NODE_LABEL_SIZE:.3f}" '
                 f'font-weight="700" fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
                 f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.070" '
-                f'paint-order="stroke">'
+                f'paint-order="stroke" '
+                f'transform="rotate({STRIPBOARD_OVERLAY_LABEL_ANGLE:.1f} '
+                f'{x + 0.18:.3f} {y - 0.16:.3f})">'
                 f'{_svg_text(marker["label"])}</text>'
             )
 
@@ -1290,6 +1311,7 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
     element_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE)
     node_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_NODE_LABEL_SIZE)
     net_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_NET_LABEL_SIZE)
+    run_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_RUN_LABEL_SIZE)
 
     for row in range(stripboard.height_pitches):
         net_name = _stripboard_full_row_label(assignment, stripboard, row)
@@ -1309,17 +1331,22 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
         )
 
     for run in _stripboard_compacted_runs(assignment, stripboard):
-        _draw_png_text_centered(
-            draw,
+        _draw_stripboard_run_block_png(draw, run, label_margin, scale)
+
+    for run in _stripboard_compacted_runs(assignment, stripboard):
+        _draw_png_text_rotated(
+            image,
             _offset_point(
-                (_stripboard_run_center(run), _stripboard_row_center(run.row) - 0.22),
+                (_stripboard_run_center(run), _stripboard_row_center(run.row) - 0.10),
                 label_margin,
                 0,
             ),
             run.net_name,
-            net_font,
+            run_font,
             scale,
             fill=STRIPBOARD_OVERLAY_TEXT_FILL,
+            angle=STRIPBOARD_OVERLAY_LABEL_ANGLE,
+            anchor="center",
         )
 
     element_width = _px_overlay_stroke(scale)
@@ -1345,14 +1372,15 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
                     fill=STRIPBOARD_OVERLAY_ELEMENT_STROKE,
                     width=element_width,
                 )
-        draw.text(
-            _px_point(
-                _offset_point((center[0] - 0.25, center[1] - 0.42), label_margin, 0),
-                scale,
-            ),
+        _draw_png_text_rotated(
+            image,
+            _offset_point((center[0], center[1] - 0.18), label_margin, 0),
             element_overlay["label"],
-            fill=STRIPBOARD_OVERLAY_TEXT_FILL,
             font=element_font,
+            scale=scale,
+            fill=STRIPBOARD_OVERLAY_TEXT_FILL,
+            angle=STRIPBOARD_OVERLAY_LABEL_ANGLE,
+            anchor="center",
         )
 
     for terminal in _stripboard_overlay_terminals(schema, assignment):
@@ -1374,11 +1402,15 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
         )
         if marker["label"]:
             x, y = marker["position"]
-            draw.text(
-                _px_point((x + label_margin + 0.18, y - 0.35), scale),
+            _draw_png_text_rotated(
+                image,
+                (x + label_margin + 0.18, y - 0.16),
                 marker["label"],
-                fill=STRIPBOARD_OVERLAY_TEXT_FILL,
                 font=node_font,
+                scale=scale,
+                fill=STRIPBOARD_OVERLAY_TEXT_FILL,
+                angle=STRIPBOARD_OVERLAY_LABEL_ANGLE,
+                anchor="left",
             )
 
     for cut in assignment.cuts:
@@ -1473,11 +1505,28 @@ def _stripboard_run_center(run):
     return STRIPBOARD_BOARD_MARGIN + (run.start_col + run.end_col) / 2.0
 
 
+def _stripboard_run_block_rect(run):
+    x = STRIPBOARD_BOARD_MARGIN + run.start_col - 0.44
+    y = _stripboard_row_center(run.row) - STRIPBOARD_STRIP_HEIGHT / 2.0 - 0.07
+    width = run.end_col - run.start_col + 0.88
+    height = STRIPBOARD_STRIP_HEIGHT + 0.14
+    return x, y, width, height
+
+
 def _cut_cross_lines(x, y, radius):
     inset = radius * 0.7
     return (
         (x - inset, y - inset, x + inset, y + inset),
         (x - inset, y + inset, x + inset, y - inset),
+    )
+
+
+def _draw_stripboard_run_block_png(draw, run, label_margin, scale):
+    x, y, width, height = _stripboard_run_block_rect(run)
+    draw.rectangle(
+        _px_rect(x + label_margin, y, width, height, scale),
+        outline=STRIPBOARD_RUN_BLOCK_STROKE,
+        width=max(1, int(round(STRIPBOARD_RUN_BLOCK_STROKE_WIDTH * scale))),
     )
 
 
@@ -1740,6 +1789,57 @@ def _draw_png_text_centered(draw, center, text, font, scale, fill):
     else:
         width, height = draw.textsize(text, font=font)
     draw.text((x - width // 2, y - height // 2), text, fill=fill, font=font)
+
+
+def _draw_png_text_rotated(
+    image,
+    anchor_point,
+    text,
+    font,
+    scale,
+    fill,
+    angle,
+    anchor="center",
+):
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError:
+        return
+
+    measure = Image.new("RGBA", (1, 1), (255, 255, 255, 0))
+    measure_draw = ImageDraw.Draw(measure)
+    if hasattr(measure_draw, "textbbox"):
+        box = measure_draw.textbbox((0, 0), text, font=font)
+        width = box[2] - box[0]
+        height = box[3] - box[1]
+    else:
+        width, height = measure_draw.textsize(text, font=font)
+    padding = max(3, int(round(0.10 * scale)))
+    text_image = Image.new(
+        "RGBA",
+        (width + padding * 2, height + padding * 2),
+        (255, 255, 255, 0),
+    )
+    text_draw = ImageDraw.Draw(text_image)
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            if dx or dy:
+                text_draw.text(
+                    (padding + dx, padding + dy),
+                    text,
+                    fill=STRIPBOARD_OVERLAY_TEXT_HALO,
+                    font=font,
+                )
+    text_draw.text((padding, padding), text, fill=fill, font=font)
+    resampling = getattr(getattr(Image, "Resampling", Image), "BICUBIC")
+    rotated = text_image.rotate(angle, expand=True, resample=resampling)
+
+    x, y = _px_point(anchor_point, scale)
+    if anchor == "left":
+        paste_at = (x, y - rotated.height // 2)
+    else:
+        paste_at = (x - rotated.width // 2, y - rotated.height // 2)
+    image.paste(rotated, paste_at, rotated)
 
 
 def _overlay_png_font(scale, size_units):
