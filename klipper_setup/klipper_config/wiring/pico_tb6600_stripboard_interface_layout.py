@@ -6,6 +6,7 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     assign_schema_nets_to_stripboard,
     compact_sparse_stripboard_rows,
     compact_stripboard_connections_left,
+    permute_stripboard_rows_for_element_span,
     render_stripboard_overlay,
 )
 from pico_tb6600_stripboard_interface_schematic import (
@@ -23,6 +24,11 @@ def create_stripboard_projection():
     assignment = assign_schema_nets_to_stripboard(schema)
     assignment = compact_sparse_stripboard_rows(assignment, schema=schema)
     assignment = compact_stripboard_connections_left(schema, assignment, strict=True)
+    assignment = permute_stripboard_rows_for_element_span(
+        schema,
+        assignment,
+        priority_element_names=("Q1", "Q2", "Q3"),
+    )
     return schema, assignment
 
 

@@ -29,6 +29,7 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     compact_stripboard_connections_left,
     get_schema_net_visualizations,
     point_at,
+    permute_stripboard_rows_for_element_span,
     render_schemdraw,
     render_stripboard,
     render_stripboard_overlay,
@@ -512,6 +513,21 @@ def _create_tb6600_strict_assignment():
     return schema, assignment
 
 
+def _create_tb6600_permuted_assignment():
+    schema, assignment = _create_tb6600_strict_assignment()
+    assignment = permute_stripboard_rows_for_element_span(
+        schema,
+        assignment,
+        priority_element_names=("Q1", "Q2", "Q3"),
+    )
+    return schema, assignment
+
+
+def _terminal_row_span(holes):
+    rows = [row for _terminal_name, row, _column in holes]
+    return max(rows) - min(rows)
+
+
 def test_get_schema_net_visualizations_sorts_nets_by_representative_y():
     schema = _create_stripboard_mapping_schema()
 
@@ -917,6 +933,136 @@ def test_tb6600_body_paths_do_not_cross_other_terminal_holes_or_bodies():
         seen_segments.extend(segments)
 
 
+def _row_groups(assignment):
+    groups = {}
+    for net_name, row in assignment.net_rows.items():
+        groups.setdefault(row, set()).add(net_name)
+    return tuple(
+        frozenset(net_names)
+        for _row, net_names in sorted(groups.items())
+    )
+
+
+def _row_remap_from_net_groups(before, after):
+    row_remap = {}
+    for before_row in range(before.stripboard.height_pitches):
+        net_names = [
+            net_name
+            for net_name, row in before.net_rows.items()
+            if row == before_row
+        ]
+        if not net_names:
+            row_remap[before_row] = before_row
+            continue
+        new_rows = {after.net_rows[net_name] for net_name in net_names}
+        assert len(new_rows) == 1
+        row_remap[before_row] = next(iter(new_rows))
+    return row_remap
+
+
+def test_permute_stripboard_rows_reduces_tb6600_priority_transistor_spans():
+    schema, strict_assignment = _create_tb6600_strict_assignment()
+    permuted = permute_stripboard_rows_for_element_span(
+        schema,
+        strict_assignment,
+        priority_element_names=("Q1", "Q2", "Q3"),
+    )
+
+    strict_holes = _terminal_holes_by_element(schema, strict_assignment)
+    permuted_holes = _terminal_holes_by_element(schema, permuted)
+
+    assert max(
+        _terminal_row_span(strict_holes[element_name])
+        for element_name in ("Q1", "Q2", "Q3")
+    ) > 3
+    assert {
+        element_name: _terminal_row_span(permuted_holes[element_name])
+        for element_name in ("Q1", "Q2", "Q3")
+    } == {"Q1": 3, "Q2": 2, "Q3": 3}
+
+
+def test_permute_stripboard_rows_preserves_columns_and_shared_row_groups():
+    schema, strict_assignment = _create_tb6600_strict_assignment()
+    permuted = permute_stripboard_rows_for_element_span(schema, strict_assignment)
+
+    assert permuted.marker_column_maps == strict_assignment.marker_column_maps
+    assert permuted.net_column_maps == strict_assignment.net_column_maps
+    assert set(_row_groups(permuted)) == set(_row_groups(strict_assignment))
+    assert any(len(group) > 1 for group in _row_groups(permuted))
+    assert permuted.net_rows != strict_assignment.net_rows
+
+
+def test_permute_stripboard_rows_remaps_artifacts_consistently():
+    schema, strict_assignment = _create_tb6600_strict_assignment()
+    permuted = permute_stripboard_rows_for_element_span(schema, strict_assignment)
+    row_remap = _row_remap_from_net_groups(strict_assignment, permuted)
+
+    assert {
+        (run.net_name, row_remap[run.row], run.start_col, run.end_col, run.compacted)
+        for run in strict_assignment.net_runs
+    } == {
+        (run.net_name, run.row, run.start_col, run.end_col, run.compacted)
+        for run in permuted.net_runs
+    }
+    assert {
+        (row_remap[cut.row], cut.col)
+        for cut in strict_assignment.cuts
+    } == {
+        (cut.row, cut.col)
+        for cut in permuted.cuts
+    }
+    assert {
+        (
+            local_point.net_name,
+            row_remap[local_point.row],
+            local_point.col,
+            local_point.source_column,
+        )
+        for local_point in strict_assignment.local_points
+    } == {
+        (
+            local_point.net_name,
+            local_point.row,
+            local_point.col,
+            local_point.source_column,
+        )
+        for local_point in permuted.local_points
+    }
+    assert {
+        (row_remap[blocker.row], blocker.col, blocker.element_name)
+        for blocker in strict_assignment.blockers
+    } == {
+        (blocker.row, blocker.col, blocker.element_name)
+        for blocker in permuted.blockers
+    }
+
+
+def test_permute_stripboard_rows_is_deterministic():
+    schema, strict_assignment = _create_tb6600_strict_assignment()
+
+    first = permute_stripboard_rows_for_element_span(schema, strict_assignment)
+    second = permute_stripboard_rows_for_element_span(schema, strict_assignment)
+
+    assert first.net_rows == second.net_rows
+    assert first.net_runs == second.net_runs
+    assert first.cuts == second.cuts
+    assert first.blockers == second.blockers
+
+
+def test_tb6600_permuted_projection_has_no_duplicate_marker_holes_or_terminals_on_blockers():
+    _schema, assignment = _create_tb6600_permuted_assignment()
+    marker_positions = _marker_positions_by_key(assignment)
+    terminal_positions = {
+        position
+        for key, position in marker_positions.items()
+        if key[0] == "terminal"
+    }
+    blocker_positions = {(blocker.row, blocker.col) for blocker in assignment.blockers}
+
+    assert len(marker_positions.values()) == len(set(marker_positions.values()))
+    assert terminal_positions.isdisjoint(blocker_positions)
+
+
 def test_left_compaction_allows_all_element_types_to_block_holes():
     schema = _create_transistor_blocker_schema()
     assignment = compact_stripboard_connections_left(
@@ -1008,9 +1154,12 @@ def test_render_compacted_stripboard_overlay_writes_cuts_and_run_labels(tmp_path
     assert 'class="overlay-local-point-label"' in svg
     assert ">sparse_a</text>" in svg
     assert ">sparse_c</text>" in svg
+    assert svg.index('class="strip-cut"') < svg.index(
+        'class="overlay-net-run-label"'
+    )
 
 
-def test_render_stripboard_overlay_writes_blockers(tmp_path):
+def test_render_stripboard_overlay_omits_internal_blockers(tmp_path):
     schema = _create_vertical_blocker_schema(middle_x=8)
     assignment = compact_stripboard_connections_left(
         schema,
@@ -1034,8 +1183,8 @@ def test_render_stripboard_overlay_writes_blockers(tmp_path):
     )
 
     svg = svg_outfile.read_text(encoding="utf-8")
-    assert 'class="stripboard-blocker"' in svg
-    assert 'data-element="Rblock"' in svg
+    assert any(blocker.element_name == "Rblock" for blocker in assignment.blockers)
+    assert 'class="stripboard-blocker"' not in svg
     assert png_outfile.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
 
 

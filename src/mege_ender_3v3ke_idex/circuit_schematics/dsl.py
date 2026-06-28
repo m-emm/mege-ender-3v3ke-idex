@@ -16,7 +16,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from enum import Enum, auto
-from itertools import product
+from itertools import permutations, product
 from pathlib import Path
 
 import schemdraw
@@ -62,9 +62,6 @@ STRIPBOARD_RUN_BLOCK_STROKE_WIDTH = 0.085
 STRIPBOARD_CUT_STROKE = "#000000"
 STRIPBOARD_CUT_RADIUS = 0.31
 STRIPBOARD_CUT_STROKE_WIDTH = 0.14
-STRIPBOARD_BLOCKER_FILL = "#111827"
-STRIPBOARD_BLOCKER_SIZE = 0.28
-STRIPBOARD_BLOCKER_OPACITY = 0.24
 STRIPBOARD_NON_PHYSICAL_NODE_KINDS = frozenset({"schematic_junction", "layout"})
 
 
@@ -1038,6 +1035,321 @@ def compact_stripboard_connections_left(
     return current
 
 
+def permute_stripboard_rows_for_element_span(
+    schema,
+    assignment,
+    priority_element_names=("Q1", "Q2", "Q3"),
+    max_exact_rows=9,
+    beam_width=512,
+):
+    if not isinstance(schema, Schema):
+        raise TypeError(
+            "permute_stripboard_rows_for_element_span expects a Schema object."
+        )
+    if not isinstance(assignment, StripboardNetAssignment):
+        raise TypeError("assignment must be a StripboardNetAssignment.")
+    _validate_positive_integer(max_exact_rows, "max_exact_rows")
+    _validate_positive_integer(beam_width, "beam_width")
+
+    row_count = assignment.stripboard.height_pitches
+    _validate_stripboard_assignment_rows(assignment)
+    if row_count <= 1:
+        return assignment
+
+    priority_element_names = frozenset(str(name) for name in priority_element_names)
+    row_order = _best_stripboard_row_order(
+        schema,
+        assignment,
+        priority_element_names,
+        max_exact_rows,
+        beam_width,
+    )
+    if row_order == tuple(range(row_count)):
+        return assignment
+    old_to_new = {old_row: new_row for new_row, old_row in enumerate(row_order)}
+    return _remap_stripboard_assignment_rows(assignment, old_to_new)
+
+
+def _best_stripboard_row_order(
+    schema,
+    assignment,
+    priority_element_names,
+    max_exact_rows,
+    beam_width,
+):
+    row_count = assignment.stripboard.height_pitches
+    row_ids = tuple(range(row_count))
+    if row_count <= max_exact_rows:
+        return min(
+            permutations(row_ids),
+            key=lambda row_order: _stripboard_row_order_score(
+                schema,
+                assignment,
+                row_order,
+                priority_element_names,
+            ),
+        )
+    return _beam_search_stripboard_row_order(
+        schema,
+        assignment,
+        priority_element_names,
+        beam_width,
+    )
+
+
+def _beam_search_stripboard_row_order(
+    schema,
+    assignment,
+    priority_element_names,
+    beam_width,
+):
+    row_count = assignment.stripboard.height_pitches
+    partial_orders = [()]
+    for _new_row in range(row_count):
+        candidates = []
+        for partial_order in partial_orders:
+            remaining = set(range(row_count)) - set(partial_order)
+            candidates.extend(
+                (*partial_order, old_row)
+                for old_row in sorted(remaining)
+            )
+        partial_orders = sorted(
+            candidates,
+            key=lambda row_order: _stripboard_row_order_prefix_score(
+                schema,
+                assignment,
+                row_order,
+                priority_element_names,
+            ),
+        )[:beam_width]
+    return min(
+        partial_orders,
+        key=lambda row_order: _stripboard_row_order_score(
+            schema,
+            assignment,
+            row_order,
+            priority_element_names,
+        ),
+    )
+
+
+def _stripboard_row_order_score(
+    schema,
+    assignment,
+    row_order,
+    priority_element_names,
+):
+    old_to_new = {old_row: new_row for new_row, old_row in enumerate(row_order)}
+    element_spans = _stripboard_element_row_spans(schema, assignment, old_to_new)
+    priority_spans = [
+        span
+        for element_name, span, _element_type in element_spans
+        if element_name in priority_element_names
+    ]
+    weighted_span = sum(
+        _stripboard_element_span_weight(element_type) * span
+        for _element_name, span, element_type in element_spans
+    )
+    movement = sum(
+        abs(old_row - new_row)
+        for new_row, old_row in enumerate(row_order)
+    )
+    return (
+        max(priority_spans, default=0),
+        sum(priority_spans),
+        weighted_span,
+        movement,
+        tuple(row_order),
+    )
+
+
+def _stripboard_row_order_prefix_score(
+    schema,
+    assignment,
+    row_order,
+    priority_element_names,
+):
+    old_to_new = {old_row: new_row for new_row, old_row in enumerate(row_order)}
+    element_spans = _stripboard_element_row_spans(
+        schema,
+        assignment,
+        old_to_new,
+        require_all_terminals_placed=True,
+    )
+    priority_spans = [
+        span
+        for element_name, span, _element_type in element_spans
+        if element_name in priority_element_names
+    ]
+    weighted_span = sum(
+        _stripboard_element_span_weight(element_type) * span
+        for _element_name, span, element_type in element_spans
+    )
+    movement = sum(
+        abs(old_row - new_row)
+        for new_row, old_row in enumerate(row_order)
+    )
+    return (
+        max(priority_spans, default=0),
+        sum(priority_spans),
+        weighted_span,
+        movement,
+        tuple(row_order),
+    )
+
+
+def _stripboard_element_row_spans(
+    schema,
+    assignment,
+    old_to_new,
+    require_all_terminals_placed=False,
+):
+    spans = []
+    for element in schema.elements:
+        rows = []
+        skipped = False
+        for net_name in element.terminal_nets.values():
+            old_row = assignment.net_rows.get(net_name)
+            if old_row is None:
+                skipped = True
+                continue
+            new_row = old_to_new.get(old_row)
+            if new_row is None:
+                skipped = True
+                continue
+            rows.append(new_row)
+        if require_all_terminals_placed and skipped:
+            continue
+        if len(rows) < 2:
+            continue
+        spans.append(
+            (
+                element.name,
+                max(rows) - min(rows),
+                element.element_type,
+            )
+        )
+    return tuple(spans)
+
+
+def _stripboard_element_span_weight(element_type):
+    if element_type in (BjtNpn, PMos):
+        return 10
+    if element_type in (Resistor, Fuse, Zener):
+        return 3
+    if element_type == Capacitor:
+        return 1
+    return 1
+
+
+def _validate_stripboard_assignment_rows(assignment):
+    row_count = assignment.stripboard.height_pitches
+    for net_name, row in assignment.net_rows.items():
+        _validate_stripboard_row(row, row_count, f"net {net_name!r}")
+    for run in assignment.net_runs:
+        _validate_stripboard_row(run.row, row_count, f"net run {run.net_name!r}")
+    for cut in assignment.cuts:
+        _validate_stripboard_row(cut.row, row_count, "stripboard cut")
+    for local_point in assignment.local_points:
+        _validate_stripboard_row(
+            local_point.row,
+            row_count,
+            f"local point {local_point.net_name!r}",
+        )
+    for blocker in assignment.blockers:
+        _validate_stripboard_row(
+            blocker.row,
+            row_count,
+            f"blocker {blocker.element_name!r}",
+        )
+
+
+def _validate_stripboard_row(row, row_count, label):
+    if row not in range(row_count):
+        raise ValueError(
+            f"Inconsistent stripboard assignment: {label} has row {row}, "
+            f"but valid rows are 0..{row_count - 1}."
+        )
+
+
+def _remap_stripboard_assignment_rows(assignment, old_to_new):
+    _validate_stripboard_row_map(assignment, old_to_new)
+    visualization_indexes = {
+        visualization.net_name: index
+        for index, visualization in enumerate(assignment.net_visualizations)
+    }
+    net_rows = {
+        net_name: old_to_new[row]
+        for net_name, row in assignment.net_rows.items()
+    }
+    return replace(
+        assignment,
+        net_visualizations=tuple(
+            sorted(
+                assignment.net_visualizations,
+                key=lambda visualization: (
+                    net_rows[visualization.net_name],
+                    visualization_indexes[visualization.net_name],
+                ),
+            )
+        ),
+        net_rows=net_rows,
+        net_runs=tuple(
+            sorted(
+                (
+                    replace(run, row=old_to_new[run.row])
+                    for run in assignment.net_runs
+                ),
+                key=lambda run: (run.row, run.start_col, run.net_name),
+            )
+        ),
+        cuts=tuple(
+            sorted(
+                (
+                    replace(cut, row=old_to_new[cut.row])
+                    for cut in assignment.cuts
+                ),
+                key=lambda cut: (cut.row, cut.col),
+            )
+        ),
+        local_points=tuple(
+            sorted(
+                (
+                    replace(local_point, row=old_to_new[local_point.row])
+                    for local_point in assignment.local_points
+                ),
+                key=lambda local_point: (
+                    local_point.row,
+                    local_point.col,
+                    local_point.net_name,
+                ),
+            )
+        ),
+        blockers=tuple(
+            sorted(
+                (
+                    replace(blocker, row=old_to_new[blocker.row])
+                    for blocker in assignment.blockers
+                ),
+                key=lambda blocker: (
+                    blocker.row,
+                    blocker.col,
+                    blocker.element_name,
+                ),
+            )
+        ),
+    )
+
+
+def _validate_stripboard_row_map(assignment, old_to_new):
+    row_ids = set(range(assignment.stripboard.height_pitches))
+    if set(old_to_new) != row_ids or set(old_to_new.values()) != row_ids:
+        raise ValueError(
+            "Inconsistent stripboard assignment: row permutation must map "
+            "every physical row exactly once."
+        )
+
+
 def snap_schema_to_stripboard(schema, assignment, column_pitch=None):
     if not isinstance(schema, Schema):
         raise TypeError("snap_schema_to_stripboard expects a Schema object.")
@@ -1397,17 +1709,6 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
             f'stroke-width="{STRIPBOARD_STROKE_WIDTH:.3f}"/>'
         )
 
-    for blocker in assignment.blockers:
-        x, y, size = _stripboard_blocker_rect(blocker)
-        lines.append(
-            f'  <rect class="stripboard-blocker" '
-            f'data-row="{blocker.row}" data-col="{blocker.col}" '
-            f'data-element="{_svg_attr(blocker.element_name)}" '
-            f'x="{x:.3f}" y="{y:.3f}" width="{size:.3f}" height="{size:.3f}" '
-            f'fill="{STRIPBOARD_BLOCKER_FILL}" '
-            f'opacity="{STRIPBOARD_BLOCKER_OPACITY:.3f}"/>'
-        )
-
     for run in _stripboard_compacted_runs(assignment, stripboard):
         x, y, width, height = _stripboard_run_block_rect(run)
         lines.append(
@@ -1418,6 +1719,25 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
             f'stroke="{STRIPBOARD_RUN_BLOCK_STROKE}" '
             f'stroke-width="{STRIPBOARD_RUN_BLOCK_STROKE_WIDTH:.3f}"/>'
         )
+
+    for cut in assignment.cuts:
+        x = _stripboard_column_center(cut.col)
+        y = _stripboard_row_center(cut.row)
+        radius = STRIPBOARD_CUT_RADIUS
+        lines.append(
+            f'  <circle class="strip-cut" data-row="{cut.row}" '
+            f'data-col="{cut.col}" cx="{x:.3f}" cy="{y:.3f}" '
+            f'r="{radius:.3f}" fill="none" stroke="{STRIPBOARD_CUT_STROKE}" '
+            f'stroke-width="{STRIPBOARD_CUT_STROKE_WIDTH:.3f}"/>'
+        )
+        for x1, y1, x2, y2 in _cut_cross_lines(x, y, radius):
+            lines.append(
+                f'  <line class="strip-cut-mark" data-row="{cut.row}" '
+                f'data-col="{cut.col}" x1="{x1:.3f}" y1="{y1:.3f}" '
+                f'x2="{x2:.3f}" y2="{y2:.3f}" '
+                f'stroke="{STRIPBOARD_CUT_STROKE}" '
+                f'stroke-width="{STRIPBOARD_CUT_STROKE_WIDTH:.3f}"/>'
+            )
 
     for run in _stripboard_compacted_runs(assignment, stripboard):
         x = _stripboard_run_center(run)
@@ -1513,25 +1833,6 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
                 f'{_svg_text(marker["label"])}</text>'
             )
 
-    for cut in assignment.cuts:
-        x = _stripboard_column_center(cut.col)
-        y = _stripboard_row_center(cut.row)
-        radius = STRIPBOARD_CUT_RADIUS
-        lines.append(
-            f'  <circle class="strip-cut" data-row="{cut.row}" '
-            f'data-col="{cut.col}" cx="{x:.3f}" cy="{y:.3f}" '
-            f'r="{radius:.3f}" fill="none" stroke="{STRIPBOARD_CUT_STROKE}" '
-            f'stroke-width="{STRIPBOARD_CUT_STROKE_WIDTH:.3f}"/>'
-        )
-        for x1, y1, x2, y2 in _cut_cross_lines(x, y, radius):
-            lines.append(
-                f'  <line class="strip-cut-mark" data-row="{cut.row}" '
-                f'data-col="{cut.col}" x1="{x1:.3f}" y1="{y1:.3f}" '
-                f'x2="{x2:.3f}" y2="{y2:.3f}" '
-                f'stroke="{STRIPBOARD_CUT_STROKE}" '
-                f'stroke-width="{STRIPBOARD_CUT_STROKE_WIDTH:.3f}"/>'
-            )
-
     lines.append("</svg>")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -1587,8 +1888,8 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
     for run in _stripboard_compacted_runs(assignment, stripboard):
         _draw_stripboard_run_block_png(draw, run, label_margin, scale)
 
-    for blocker in assignment.blockers:
-        _draw_stripboard_blocker_png(draw, blocker, label_margin, scale)
+    for cut in assignment.cuts:
+        _draw_stripboard_cut_png(draw, cut, label_margin, scale)
 
     for run in _stripboard_compacted_runs(assignment, stripboard):
         _draw_png_text_rotated(
@@ -1677,9 +1978,6 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
                 angle=STRIPBOARD_OVERLAY_LABEL_ANGLE,
                 anchor="left",
             )
-
-    for cut in assignment.cuts:
-        _draw_stripboard_cut_png(draw, cut, label_margin, scale)
 
     image.save(path)
 
@@ -1778,13 +2076,6 @@ def _stripboard_run_block_rect(run):
     return x, y, width, height
 
 
-def _stripboard_blocker_rect(blocker):
-    size = STRIPBOARD_BLOCKER_SIZE
-    x = _stripboard_column_center(blocker.col) - size / 2.0
-    y = _stripboard_row_center(blocker.row) - size / 2.0
-    return x, y, size
-
-
 def _cut_cross_lines(x, y, radius):
     inset = radius * 0.7
     return (
@@ -1799,17 +2090,6 @@ def _draw_stripboard_run_block_png(draw, run, label_margin, scale):
         _px_rect(x + label_margin, y, width, height, scale),
         outline=STRIPBOARD_RUN_BLOCK_STROKE,
         width=max(1, int(round(STRIPBOARD_RUN_BLOCK_STROKE_WIDTH * scale))),
-    )
-
-
-def _draw_stripboard_blocker_png(draw, blocker, label_margin, scale):
-    x, y, size = _stripboard_blocker_rect(blocker)
-    x += label_margin
-    draw.rectangle(
-        _px_rect(x, y, size, size, scale),
-        fill="#c7cbd1",
-        outline=STRIPBOARD_BLOCKER_FILL,
-        width=max(1, int(round(0.025 * scale))),
     )
 
 

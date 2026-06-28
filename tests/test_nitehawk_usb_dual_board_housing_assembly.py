@@ -9,6 +9,7 @@ from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_usb_dual_board_housing_as
     create_nitehawk_usb_dual_board_housing_assembly,
 )
 from shellforgepy.simple import (
+    MScrew,
     get_bounding_box,
     get_bounding_box_center,
     get_bounding_box_size,
@@ -103,6 +104,7 @@ def test_nitehawk_usb_dual_board_housing_exposes_stable_artifacts():
 
 def test_nitehawk_usb_dual_board_housing_uses_self_threading_screw_holes():
     housing = _housing()
+    screw = MScrew.from_size("M3")
 
     for board_index in [1, 2]:
         for hole_name in [
@@ -120,6 +122,34 @@ def test_nitehawk_usb_dual_board_housing_uses_self_threading_screw_holes():
         _assert_m3_self_threading_x_cutter(
             housing.get_cutter_part_by_name(f"lid_mount_pilot_hole_{index}")
         )
+        clearance_hole_size = get_bounding_box_size(
+            housing.get_cutter_part_by_name(f"lid_mount_clearance_hole_{index}")
+        )
+        assert clearance_hole_size[0] == pytest.approx(
+            DEFAULTS["nitehawk_usb_dual_housing_lid_thickness"] + 1
+        )
+        assert clearance_hole_size[1:] == pytest.approx(
+            [screw.clearance_hole_loose, screw.clearance_hole_loose]
+        )
+        assert clearance_hole_size[1] < screw.cylinder_head_diameter
+
+
+def test_nitehawk_usb_dual_board_housing_defaults_are_roomy_for_boards_and_lid_bosses():
+    screw = MScrew.from_size(DEFAULTS["nitehawk_usb_dual_housing_lid_screw_size"])
+
+    assert DEFAULTS["nitehawk_usb_dual_housing_board_side_margin"] == pytest.approx(12)
+    assert DEFAULTS["nitehawk_usb_dual_housing_board_bottom_margin"] == pytest.approx(
+        12
+    )
+    assert DEFAULTS["nitehawk_usb_dual_housing_board_top_margin"] == pytest.approx(12)
+    assert DEFAULTS["nitehawk_usb_dual_housing_board_gap"] == pytest.approx(16)
+    assert DEFAULTS["nitehawk_usb_dual_housing_component_clearance"] == pytest.approx(
+        4
+    )
+    assert (
+        DEFAULTS["nitehawk_usb_dual_housing_lid_screw_boss_diameter"]
+        - screw.clearance_hole_close
+    ) / 2 >= 2
 
 
 def test_nitehawk_usb_dual_board_housing_lid_does_not_cut_body():

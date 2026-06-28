@@ -104,6 +104,19 @@ short run is kept only if strict component placement still succeeds. Without a
 schema, the pass performs the pure geometric compaction and treats all nets
 with up to three markers as sparse.
 
+After component placement, physical rows can be permuted without changing any
+hole columns. This is useful when solderability matters more than preserving
+the schematic-like row order:
+
+```python
+assignment = compact_stripboard_connections_left(schema, assignment, strict=True)
+assignment = permute_stripboard_rows_for_element_span(
+    schema,
+    assignment,
+    priority_element_names=("Q1", "Q2", "Q3"),
+)
+```
+
 This is a layout aid, not an autorouter. It can show diagnostic strip cuts for
 compacted runs, but it does not yet place real component footprints, jumpers,
 or manufacturing-ready cut instructions.

@@ -227,10 +227,10 @@ def create_nitehawk_usb_dual_board_housing_assembly(
             lid_pilot_holes = lid_pilot_holes.fuse(lid_pilot_hole)
 
             lid_clearance_hole = create_cylinder(
-                lid_screw_record.clearance_hole_normal / 2,
-                nitehawk_usb_dual_housing_lid_thickness + 3,
+                lid_screw_record.clearance_hole_loose / 2,
+                nitehawk_usb_dual_housing_lid_thickness + 1,
                 origin=(
-                    lid_outer_x - 1,
+                    lid_outer_x - 0.5,
                     y,
                     z,
                 ),
