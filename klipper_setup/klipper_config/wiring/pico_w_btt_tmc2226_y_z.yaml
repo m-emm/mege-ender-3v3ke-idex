@@ -8,6 +8,8 @@ metadata:
     Driver1 (Y): STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
     Driver2 (Z-left): STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5.
     Driver3 (Z-right): STEP=GPIO14, DIR=GPIO15, EN=GPIO16, UART=GPIO13.
+    Planned TB6600 Y interface connector: STEP=GPIO0, DIR=GPIO1, EN=GPIO2, GND=PICO_GND_03.
+    TMC1 remains the active Y fallback now; mark it reserved only when activating the TB6600 draft config.
     Z endstops: Z-left=GPIO22, Z-right=GPIO17.
     Heatbed MOSFET: HEATBED_ON=GPIO21.
     Heatbed boost SSR: SSR_OUT=GPIO20 with Pico logic ground.
@@ -208,6 +210,14 @@ pin_sets:
       - A_MINUS
       - B_PLUS
       - B_MINUS
+  - prefix: Y_TB6600_IF_
+    origin: [12, 30]
+    direction: down
+    pins:
+      - GND
+      - DIR
+      - STEP
+      - ENABLE
   - prefix: ENDSTOP_Z_LEFT_
     origin: [34, 16]
     direction: down
@@ -271,6 +281,22 @@ wires:
     to: PICO_THREEV3_OUT_36
     type: lv_power
     color: "#9ca3af"
+
+  # Planned/non-live Y TB6600 stripboard control connector.
+  # No klipper tags yet: active Y control remains on TMC1 until the draft
+  # printer.cfg.template block is deliberately activated.
+  - from: PICO_GND_03
+    to: Y_TB6600_IF_GND
+    type: ground
+  - from: PICO_GPIO_1
+    to: Y_TB6600_IF_DIR
+    type: data
+  - from: PICO_GPIO_0
+    to: Y_TB6600_IF_STEP
+    type: clock
+  - from: PICO_GPIO_2
+    to: Y_TB6600_IF_ENABLE
+    type: data
 
   - from: PICO_GPIO_11
     to: TMC1_J1_STEP_7

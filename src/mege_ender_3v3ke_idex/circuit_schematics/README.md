@@ -42,6 +42,12 @@ schema = create_voltage_divider()
 render_schemdraw(schema, file=Path("voltage_divider.svg"))
 ```
 
+Use a `.png` filename instead of `.svg` to render a PNG preview:
+
+```python
+render_schemdraw(schema, file=Path("voltage_divider.png"))
+```
+
 Run an example from the repository root:
 
 ```bash
@@ -59,9 +65,10 @@ The helper runs the script with the repository `src/` directory on
 - Layout is explicit and copy-returning: `align(...)`, `translate(...)`, and
   `rotate(...)` return placed copies.
 - Schemas group nodes and elements with `create_schema`.
-- `render_schemdraw` turns the schema into a Schemdraw-backed SVG.
+- `render_schemdraw` turns the schema into a Schemdraw-backed SVG or PNG based
+  on the output filename extension.
 
 Supported node types are `Dot` and `Ground`. Supported element types are
-`Resistor`, `Fuse`, `Capacitor`, `PMos`, `BjtNpn`, and `Zener`.
+`Wire`, `Resistor`, `Fuse`, `Capacitor`, `PMos`, `BjtNpn`, and `Zener`.
 
 See `ALIGNMENT_BASED_SCHEMDRAW.md` for the design notes behind the DSL.

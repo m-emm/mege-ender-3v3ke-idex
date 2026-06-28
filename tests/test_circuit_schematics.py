@@ -5,6 +5,7 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     Alignment,
     Dot,
     Resistor,
+    Wire,
     align,
     create_element,
     create_node,
@@ -41,6 +42,31 @@ def test_render_schemdraw_writes_svg(tmp_path):
 
     assert outfile.exists()
     assert "<svg" in outfile.read_text(encoding="utf-8")
+
+
+def test_render_schemdraw_writes_png(tmp_path):
+    schema = create_voltage_divider()
+    outfile = tmp_path / "voltage_divider.png"
+
+    render_schemdraw(schema, file=outfile)
+
+    assert outfile.exists()
+    assert outfile.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_wire_element_renders_without_a_label(tmp_path):
+    vcc = create_node(Dot, "vcc", label="+5V")
+    pul_plus = create_node(Dot, "pul_plus", label="PUL+")
+    feed = create_element(Wire, "", None, vcc, pul_plus)
+    schema = create_schema([vcc, pul_plus], [feed])
+    outfile = tmp_path / "wire.svg"
+
+    render_schemdraw(schema, file=outfile)
+
+    svg = outfile.read_text(encoding="utf-8")
+    assert "<svg" in svg
+    assert "PUL+" in svg
+    assert ">W<" not in svg
 
 
 def test_create_schema_rejects_duplicate_node_names():

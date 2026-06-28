@@ -34,6 +34,7 @@ class NodeType(Enum):
 
 
 class ElementType(Enum):
+    WIRE = auto()
     RESISTOR = auto()
     FUSE = auto()
     CAPACITOR = auto()
@@ -49,6 +50,7 @@ Fuse = ElementType.FUSE
 Capacitor = ElementType.CAPACITOR
 PMos = ElementType.PMOS
 BjtNpn = ElementType.BJT_NPN
+Wire = ElementType.WIRE
 Zener = ElementType.ZENER
 
 
@@ -99,6 +101,7 @@ def _two_terminal_spec(factory, height=TWO_TERMINAL_HEIGHT):
 
 
 ELEMENT_SPECS = {
+    Wire: _two_terminal_spec(elm.Line),
     Resistor: _two_terminal_spec(elm.Resistor),
     Fuse: _two_terminal_spec(elm.Fuse),
     Capacitor: _two_terminal_spec(elm.Capacitor),
@@ -327,7 +330,8 @@ def render_schemdraw(schema, file, show=False):
                 else f"{element.name}\n{element.value}"
             )
             drawing.add(_schemdraw_element(element))
-            drawing.add(elm.Label(label).at(_element_label_position(element)))
+            if label:
+                drawing.add(elm.Label(label).at(_element_label_position(element)))
 
         for node_name in sorted(node_points):
             point, node, terminal_count = node_points[node_name]

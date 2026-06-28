@@ -225,6 +225,20 @@ run_current: 1.4
 sense_resistor: 0.110
 stealthchop_threshold: 0
 
+# Draft only: planned external TB6600-style Y driver interface.
+# Keep this commented until the stripboard interface is built, ENA polarity is
+# bench-verified, and TMC1 is deliberately reserved/disconnected for Y.
+# To switch live, update [stepper_y] with these pins/settings and disable or
+# remove [tmc2209 stepper_y].
+#
+# [stepper_y] TB6600 draft overrides:
+# step_pin: gpio0
+# dir_pin: !gpio1
+# enable_pin: gpio2
+# microsteps: 8
+# rotation_distance: 60
+# step_pulse_duration: 0.000005
+
 # Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml,
 # Driver 2:
 # STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5, endstop=GPIO22.

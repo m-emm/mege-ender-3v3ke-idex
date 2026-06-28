@@ -5,6 +5,8 @@ electronics used by the printer Klipper config.
 
 - `pico_w_btt_tmc2226_x.yaml` is the X-axis Pico wiring source.
 - `pico_w_btt_tmc2226_y_z.yaml` is the Y/Z/heatbed Pico wiring source.
+- `pico_tb6600_stripboard_interface.md` documents the planned non-live
+  external Y TB6600 interface connector and stripboard transistor schematic.
 - `diagrams/*.svg` are generated artifacts committed for review.
 - `../printer.cfg.template` is the active Klipper config source.
 
@@ -37,6 +39,9 @@ For the heatbed, both `heater_bed.heater_pin` and `heater_bed.boost_pin` are
 checked so the 24V MOSFET and SSR boost output cannot drift silently.
 The X-axis SFS and CR Touch wires are documented here as wired/reserved hardware,
 but they are not active Klipper config and intentionally have no `klipper:` tag.
+The Y-axis TB6600 interface connector follows the same planned/non-live pattern:
+it is documented in the pinout diagram, but active Y motion remains on TMC1
+until the commented Klipper draft is deliberately activated.
 
 The Nitehawk toolhead boards also have Klipper pins in `printer.cfg.template`,
 but they are not part of these custom Pico/TMC wiring diagrams.
