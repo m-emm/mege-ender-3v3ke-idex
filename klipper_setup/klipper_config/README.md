@@ -5,6 +5,7 @@ This directory has one active printer configuration:
 - `printer.cfg` is THE config for the active printer.
 - `printer.cfg.template` plus `calib.yaml` generate `printer.cfg`.
 - `wiring/` is THE active wiring source for the custom Pico/TMC wiring.
+- `../klipper_host/` is THE active custom Klipper host patch source.
 - `update_menderpi.sh` is THE script for copying it to `pi@menderpi.local`.
 - `archive/` is historical/reference material only. Do not edit files there to
   change the active printer.
@@ -31,13 +32,33 @@ python wiring/validate_wiring.py
 ```
 
 `update_menderpi.sh --check` verifies the generated local `printer.cfg`, the
-remote `~/printer_data/config/printer.cfg`, and the config Klippy has loaded via
+remote `~/printer_data/config/printer.cfg`, the patched remote
+`/opt/klipper/klippy/extras/heaters.py`, and the config Klippy has loaded via
 Moonraker without uploading files or restarting Klipper.
 
 `update_menderpi.sh` copies local `printer.cfg` to
 `~/printer_data/config/printer.cfg` on `pi@menderpi.local`, backs up the
-previous remote file with a timestamp, restarts Klipper, and reports the
-Moonraker/Klippy state.
+previous remote file with a timestamp, installs the custom Klipper host patch,
+restarts Klipper, and reports the Moonraker/Klippy state.
+
+## Boosted Heatbed
+
+The active bed remains `[heater_bed]` for normal Klipper and UI compatibility.
+The patched Klipper host code adds `boost_pin`, `primary_heater_power`, and
+`boost_heater_power` support:
+
+- `heater_pin: gpio21` drives the original 24V 240W bed MOSFET.
+- `boost_pin: gpio20` drives the 230V 500W SSR boost bed.
+- `pwm_cycle_time: 2.0` uses long software PWM for both outputs.
+
+The template stays in calibration-ready `watermark` mode until measured PID
+constants exist. To tune and deploy the final PID bed config while physically
+supervising the printer:
+
+```bash
+cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
+./calibrate_boosted_bed_pid.sh --target 80
+```
 
 No other root script or config is part of the active deployment path. The
 Raspberry Pi image build also contains a minimal `files/printer.cfg` boot stub;

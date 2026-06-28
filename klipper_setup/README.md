@@ -70,6 +70,8 @@ Or explicitly use the symlink:
 - `overlays/stage2/99-klipperpi/files/printer.cfg` — replace with your real printer config.
 - `overlays/stage2/99-klipperpi/files/moonraker.conf` — extend to match your setup.
 - `overlays/stage2/99-klipperpi/files/pitft43.conf` — adjust rotation if you mount the screen differently.
+- `../klipper_host/klippy/extras/heaters.py` — custom Klipper host patch
+  installed into `/opt/klipper` for the boosted heatbed.
 
 ## Raspberry Pi 3 USB note
 The image forces `dtoverlay=dwc2,dr_mode=host` under `[all]` because the legacy

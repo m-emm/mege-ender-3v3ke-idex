@@ -270,14 +270,22 @@ stealthchop_threshold: 0
 
 # Heatbed wiring follows
 # klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml:
-# MOSFET control on gpio21 and 100k B3950 NTC on gpio26 / ADC0.
+# 24V MOSFET control on gpio21, boost SSR control on gpio20,
+# and 100k B3950 NTC on gpio26 / ADC0.
 [heater_bed]
 heater_pin: gpio21
+boost_pin: gpio20
+primary_heater_power: 240.0
+boost_heater_power: 500.0
+pwm_cycle_time: 2.0
 sensor_type: Generic 3950
 sensor_pin: gpio26
 pullup_resistor: 4700
-control: watermark
-max_delta: 2.0
+# PID constants measured by calibrate_boosted_bed_pid.sh at 60C.
+control: pid
+pid_Kp: 32.150
+pid_Ki: 0.940
+pid_Kd: 274.882
 min_temp: 0
 max_temp: 130
 

@@ -229,6 +229,23 @@ def test_live_config_check_rejects_pending_save_config():
     assert any("save_config_pending" in error for error in errors)
 
 
+def test_boosted_heatbed_config_uses_measured_60c_pid():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    heater_bed = _section(config_text, "heater_bed")
+
+    assert "heater_pin: gpio21" in heater_bed
+    assert "boost_pin: gpio20" in heater_bed
+    assert _setting_float(heater_bed, "primary_heater_power") == pytest.approx(240.0)
+    assert _setting_float(heater_bed, "boost_heater_power") == pytest.approx(500.0)
+    assert _setting_float(heater_bed, "pwm_cycle_time") == pytest.approx(2.0)
+    assert "sensor_pin: gpio26" in heater_bed
+    assert "control: pid" in heater_bed
+    assert _setting_float(heater_bed, "pid_Kp") == pytest.approx(32.150)
+    assert _setting_float(heater_bed, "pid_Ki") == pytest.approx(0.940)
+    assert _setting_float(heater_bed, "pid_Kd") == pytest.approx(274.882)
+    assert "max_delta:" not in heater_bed
+
+
 def test_idex_part_fan_pins_and_slicer_routing():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
 

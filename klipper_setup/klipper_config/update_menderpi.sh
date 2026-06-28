@@ -17,8 +17,13 @@ fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_CFG="${SCRIPT_DIR}/printer.cfg"
+SOURCE_HEATERS="${SCRIPT_DIR}/../klipper_host/klippy/extras/heaters.py"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
-REMOTE_TMP="/tmp/printer.cfg.$$"
+REMOTE_KLIPPER_DIR="${MENDERPI_KLIPPER_DIR:-/opt/klipper}"
+REMOTE_TMP_CFG="/tmp/printer.cfg.$$"
+REMOTE_TMP_HEATERS="/tmp/heaters.py.$$"
+EXPECTED_KLIPPER_COMMIT="ca8230d505b7ba7fd225bfa6ed9655bc4520e805"
+EXPECTED_UPSTREAM_HEATERS_SHA256="a95d83be80296a7ff970ea6e1b73746d1a97a7d3e47ce621c02a89d80451ac9d"
 
 sha256_file() {
   python3 - "$1" <<'PY'
@@ -30,11 +35,31 @@ print(hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
 PY
 }
 
+check_local_support_files() {
+  "${SCRIPT_DIR}/wiring/generate_wiring_svgs.sh" --check
+  python3 "${SCRIPT_DIR}/wiring/validate_wiring.py"
+
+  if [[ ! -f "${SOURCE_HEATERS}" ]]; then
+    echo "Error: patched Klipper heaters.py not found: ${SOURCE_HEATERS}" >&2
+    exit 1
+  fi
+
+  python3 - "${SOURCE_HEATERS}" <<'PY'
+import ast
+import sys
+from pathlib import Path
+
+ast.parse(Path(sys.argv[1]).read_text(encoding="utf-8"))
+PY
+}
+
 check_live_config() {
   echo "Checking ${REMOTE_HOST} for the active Klipper config..."
   echo "  Source: ${SOURCE_CFG}"
+  echo "  Klipper host patch: ${SOURCE_HEATERS}"
 
   python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --check
+  check_local_support_files
 
   if [[ ! -f "${SOURCE_CFG}" ]]; then
     echo "Error: source config not found: ${SOURCE_CFG}" >&2
@@ -42,26 +67,39 @@ check_live_config() {
   fi
 
   local_sha256="$(sha256_file "${SOURCE_CFG}")"
+  local_heaters_sha256="$(sha256_file "${SOURCE_HEATERS}")"
   expected_fingerprint="$(
     python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --fingerprint
   )"
 
   if ! remote_payload="$(
-    ssh "${REMOTE_HOST}" "python3 -" <<'PY'
+    ssh "${REMOTE_HOST}" "REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' python3 -" <<'PY'
 import hashlib
 import json
+import os
 from pathlib import Path
+import subprocess
 import sys
 import urllib.request
 
 main_cfg = Path.home() / "printer_data" / "config" / "printer.cfg"
+klipper_dir = Path(os.environ.get("REMOTE_KLIPPER_DIR", "/opt/klipper"))
+heaters_py = klipper_dir / "klippy" / "extras" / "heaters.py"
 payload = {
     "ok": False,
     "remote_config_path": str(main_cfg),
+    "remote_heaters_path": str(heaters_py),
 }
 
 try:
     payload["remote_sha256"] = hashlib.sha256(main_cfg.read_bytes()).hexdigest()
+    payload["remote_heaters_sha256"] = hashlib.sha256(
+        heaters_py.read_bytes()
+    ).hexdigest()
+    payload["remote_klipper_commit"] = subprocess.check_output(
+        ["git", "-C", str(klipper_dir), "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
     url = "http://127.0.0.1:7125/printer/objects/query?webhooks&configfile"
     with urllib.request.urlopen(url, timeout=10) as response:
         payload["status"] = json.loads(response.read())["result"]["status"]
@@ -78,6 +116,8 @@ PY
 
   CHECK_EXPECTED_FINGERPRINT="${expected_fingerprint}" \
   CHECK_LOCAL_SHA256="${local_sha256}" \
+  CHECK_LOCAL_HEATERS_SHA256="${local_heaters_sha256}" \
+  CHECK_EXPECTED_KLIPPER_COMMIT="${EXPECTED_KLIPPER_COMMIT}" \
   CHECK_REMOTE_HOST="${REMOTE_HOST}" \
   CHECK_REMOTE_PAYLOAD="${remote_payload}" \
     python3 - "${SCRIPT_DIR}/generate_printer_cfg.py" <<'PY'
@@ -95,7 +135,9 @@ spec.loader.exec_module(generator)
 
 remote_host = os.environ["CHECK_REMOTE_HOST"]
 local_sha256 = os.environ["CHECK_LOCAL_SHA256"]
+local_heaters_sha256 = os.environ["CHECK_LOCAL_HEATERS_SHA256"]
 expected_fingerprint = os.environ["CHECK_EXPECTED_FINGERPRINT"]
+expected_klipper_commit = os.environ["CHECK_EXPECTED_KLIPPER_COMMIT"]
 remote_payload = json.loads(os.environ["CHECK_REMOTE_PAYLOAD"])
 
 print(f"  Host: {remote_host}")
@@ -114,12 +156,17 @@ if not remote_payload.get("ok"):
     sys.exit(1)
 
 remote_sha256 = remote_payload.get("remote_sha256", "")
+remote_heaters_sha256 = remote_payload.get("remote_heaters_sha256", "")
+remote_klipper_commit = remote_payload.get("remote_klipper_commit", "")
 status = remote_payload.get("status", {})
 webhooks = status.get("webhooks", {})
 configfile = status.get("configfile", {})
 live_fingerprint = generator.active_config_fingerprint(status)
 
 print(f"  Remote sha256: {remote_sha256}")
+print(f"  Local heaters.py sha256: {local_heaters_sha256}")
+print(f"  Remote heaters.py sha256: {remote_heaters_sha256}")
+print(f"  Remote Klipper commit: {remote_klipper_commit}")
 print(f"  Klippy state: {webhooks.get('state')}")
 print(f"  save_config_pending: {configfile.get('save_config_pending')}")
 print(f"  Local fingerprint: {expected_fingerprint}")
@@ -131,6 +178,40 @@ errors = generator.live_config_check_errors(
     expected_fingerprint=expected_fingerprint,
     status=status,
 )
+if remote_heaters_sha256 != local_heaters_sha256:
+    errors.append(
+        "remote Klipper heaters.py sha256 does not match local patched file "
+        f"({remote_heaters_sha256} != {local_heaters_sha256})"
+    )
+if remote_klipper_commit != expected_klipper_commit:
+    errors.append(
+        "remote Klipper commit does not match expected pinned commit "
+        f"({remote_klipper_commit} != {expected_klipper_commit})"
+    )
+
+settings = status.get("configfile", {}).get("settings", {})
+bed = settings.get("heater_bed", {})
+expected_bed_settings = {
+    "heater_pin": "gpio21",
+    "boost_pin": "gpio20",
+    "primary_heater_power": 240.0,
+    "boost_heater_power": 500.0,
+    "pwm_cycle_time": 2.0,
+}
+for key, expected in expected_bed_settings.items():
+    actual = bed.get(key)
+    if isinstance(expected, float):
+        try:
+            matches = abs(float(actual) - expected) < 1e-6
+        except (TypeError, ValueError):
+            matches = False
+    else:
+        matches = actual == expected
+    if not matches:
+        errors.append(
+            f"live heater_bed.{key} is {actual!r}, expected {expected!r}"
+        )
+
 if errors:
     print("Config check failed:", file=sys.stderr)
     for error in errors:
@@ -147,6 +228,7 @@ if [[ "${MODE}" == "check" ]]; then
 fi
 
 python3 "${SCRIPT_DIR}/generate_printer_cfg.py"
+check_local_support_files
 
 if [[ ! -f "${SOURCE_CFG}" ]]; then
   echo "Error: source config not found: ${SOURCE_CFG}" >&2
@@ -154,40 +236,130 @@ if [[ ! -f "${SOURCE_CFG}" ]]; then
 fi
 
 cleanup_remote_tmp() {
-  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP}'" >/dev/null 2>&1 || true
+  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}'" >/dev/null 2>&1 || true
 }
 trap cleanup_remote_tmp EXIT
 
-echo "Updating ${REMOTE_HOST} with THE active Klipper config..."
+local_heaters_sha256="$(sha256_file "${SOURCE_HEATERS}")"
+
+echo "Updating ${REMOTE_HOST} with THE active Klipper config and host patch..."
 echo "  Source: ${SOURCE_CFG}"
+echo "  Klipper host patch: ${SOURCE_HEATERS}"
 
-scp "${SOURCE_CFG}" "${REMOTE_HOST}:${REMOTE_TMP}"
+scp "${SOURCE_CFG}" "${REMOTE_HOST}:${REMOTE_TMP_CFG}"
+scp "${SOURCE_HEATERS}" "${REMOTE_HOST}:${REMOTE_TMP_HEATERS}"
 
-ssh "${REMOTE_HOST}" "REMOTE_TMP='${REMOTE_TMP}' bash -s" <<'REMOTE_SCRIPT'
+ssh "${REMOTE_HOST}" \
+  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' EXPECTED_PATCHED_HEATERS_SHA256='${local_heaters_sha256}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 MAIN_CFG="${HOME}/printer_data/config/printer.cfg"
+HEATERS_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/heaters.py"
 TS="$(date +%Y%m%d-%H%M%S)"
-BACKUP="${MAIN_CFG}.bak.${TS}"
+CFG_BACKUP="${MAIN_CFG}.bak.${TS}"
+HEATERS_BACKUP="${HEATERS_PY}.bak.${TS}"
 
-if [[ ! -f "${REMOTE_TMP}" ]]; then
-  echo "Error: uploaded config not found: ${REMOTE_TMP}" >&2
+if [[ ! -f "${REMOTE_TMP_CFG}" ]]; then
+  echo "Error: uploaded config not found: ${REMOTE_TMP_CFG}" >&2
   exit 1
 fi
+if [[ ! -f "${REMOTE_TMP_HEATERS}" ]]; then
+  echo "Error: uploaded heaters.py not found: ${REMOTE_TMP_HEATERS}" >&2
+  exit 1
+fi
+if [[ ! -f "${HEATERS_PY}" ]]; then
+  echo "Error: remote Klipper heaters.py not found: ${HEATERS_PY}" >&2
+  exit 1
+fi
+
+remote_commit="$(git -C "${REMOTE_KLIPPER_DIR}" rev-parse HEAD)"
+if [[ "${remote_commit}" != "${EXPECTED_KLIPPER_COMMIT}" ]]; then
+  echo "Error: remote Klipper commit ${remote_commit} does not match ${EXPECTED_KLIPPER_COMMIT}" >&2
+  exit 1
+fi
+
+current_heaters_sha="$(sha256sum "${HEATERS_PY}" | awk '{print $1}')"
+if [[ "${current_heaters_sha}" != "${EXPECTED_UPSTREAM_HEATERS_SHA256}" \
+      && "${current_heaters_sha}" != "${EXPECTED_PATCHED_HEATERS_SHA256}" ]]; then
+  echo "Error: remote heaters.py has unexpected sha256 ${current_heaters_sha}" >&2
+  echo "Expected upstream ${EXPECTED_UPSTREAM_HEATERS_SHA256} or patched ${EXPECTED_PATCHED_HEATERS_SHA256}" >&2
+  exit 1
+fi
+
+uploaded_heaters_sha="$(sha256sum "${REMOTE_TMP_HEATERS}" | awk '{print $1}')"
+if [[ "${uploaded_heaters_sha}" != "${EXPECTED_PATCHED_HEATERS_SHA256}" ]]; then
+  echo "Error: uploaded heaters.py sha256 ${uploaded_heaters_sha} does not match local ${EXPECTED_PATCHED_HEATERS_SHA256}" >&2
+  exit 1
+fi
+
+python3 - <<'PY'
+import json
+import sys
+import urllib.request
+
+url = "http://127.0.0.1:7125/printer/objects/query?print_stats&heater_bed"
+status = json.loads(urllib.request.urlopen(url, timeout=10).read())["result"]["status"]
+print_state = status.get("print_stats", {}).get("state")
+bed = status.get("heater_bed", {})
+if print_state not in {"standby", "complete", "error"}:
+    raise SystemExit(f"Refusing to restart Klipper while print_stats.state={print_state!r}")
+if bed.get("target", 0.0) not in {0, 0.0}:
+    raise SystemExit(f"Refusing to restart Klipper while heater_bed target={bed.get('target')!r}")
+print(f"Printer idle check passed: print_stats.state={print_state}, heater_bed target={bed.get('target')}")
+PY
+
+if [[ "${current_heaters_sha}" == "${EXPECTED_PATCHED_HEATERS_SHA256}" ]]; then
+  echo "Klipper host patch already installed: ${HEATERS_PY}"
+else
+  cp -a "${HEATERS_PY}" "${HEATERS_BACKUP}"
+  echo "Backed up: ${HEATERS_BACKUP}"
+  cp -a "${REMOTE_TMP_HEATERS}" "${HEATERS_PY}"
+  echo "Installed: ${HEATERS_PY}"
+fi
+rm -f "${REMOTE_TMP_HEATERS}"
 
 mkdir -p "$(dirname -- "${MAIN_CFG}")"
 
 if [[ -f "${MAIN_CFG}" ]]; then
-  cp -a "${MAIN_CFG}" "${BACKUP}"
-  echo "Backed up: ${BACKUP}"
+  cp -a "${MAIN_CFG}" "${CFG_BACKUP}"
+  echo "Backed up: ${CFG_BACKUP}"
 fi
 
-cp -a "${REMOTE_TMP}" "${MAIN_CFG}"
-rm -f "${REMOTE_TMP}"
+cp -a "${REMOTE_TMP_CFG}" "${MAIN_CFG}"
+rm -f "${REMOTE_TMP_CFG}"
 echo "Installed: ${MAIN_CFG}"
 
 sudo systemctl restart klipper
-sleep 4
+
+python3 - <<'PY'
+import json
+import time
+import urllib.request
+
+deadline = time.monotonic() + 60.0
+last_state = None
+last_message = None
+while time.monotonic() < deadline:
+    try:
+        url = "http://127.0.0.1:7125/printer/objects/query?webhooks"
+        status = json.loads(urllib.request.urlopen(url, timeout=5).read())[
+            "result"
+        ]["status"]
+        webhooks = status.get("webhooks", {})
+        last_state = webhooks.get("state")
+        last_message = webhooks.get("state_message")
+        if last_state == "ready":
+            print("Klippy reached ready state.")
+            break
+    except Exception as exc:
+        last_state = type(exc).__name__
+        last_message = str(exc)
+    time.sleep(2.0)
+else:
+    raise SystemExit(
+        f"Klippy did not reach ready state after restart: {last_state}: {last_message}"
+    )
+PY
 
 echo "Klipper service: $(systemctl is-active klipper)"
 
@@ -219,6 +391,17 @@ if right_x_current is not None:
 
 left_x = settings.get("stepper_x", {})
 right_x = settings.get("dual_carriage", {})
+bed = settings.get("heater_bed", {})
+for key in [
+    "heater_pin",
+    "boost_pin",
+    "primary_heater_power",
+    "boost_heater_power",
+    "pwm_cycle_time",
+    "control",
+]:
+    if key in bed:
+        print(f"heater_bed {key}: {bed[key]}")
 if left_x.get("position_min") is not None and left_x.get("position_max") is not None:
     print(
         "X-left range: "
@@ -234,5 +417,8 @@ if right_x.get("position_min") is not None and right_x.get("position_max") is no
     )
 PY
 REMOTE_SCRIPT
+
+echo "Verifying deployed config and host patch..."
+check_live_config
 
 echo "Update complete."

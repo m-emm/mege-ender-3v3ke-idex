@@ -9,7 +9,8 @@ electronics used by the printer Klipper config.
 - `../printer.cfg.template` is the active Klipper config source.
 
 The YAML files own physical wiring: Pico pins, driver pins, connector pins,
-motor coils, power rails, pull-ups, endstops, MOSFET, and thermistor wiring.
+motor coils, power rails, pull-ups, endstops, MOSFET, SSR boost output, and
+thermistor wiring.
 The Klipper template owns firmware modifiers such as `!` direction inversion
 and `^` pull-ups.
 
@@ -32,6 +33,8 @@ python klipper_setup/klipper_config/wiring/validate_wiring.py
 ```
 
 Only wires with `klipper:` metadata are checked against `printer.cfg.template`.
+For the heatbed, both `heater_bed.heater_pin` and `heater_bed.boost_pin` are
+checked so the 24V MOSFET and SSR boost output cannot drift silently.
 The X-axis SFS and CR Touch wires are documented here as wired/reserved hardware,
 but they are not active Klipper config and intentionally have no `klipper:` tag.
 

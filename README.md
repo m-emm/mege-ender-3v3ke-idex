@@ -59,7 +59,17 @@ Klipper.
 
 The updater copies local `printer.cfg` to
 `pi@menderpi.local:~/printer_data/config/printer.cfg`, backs up the previous
-remote file, restarts Klipper, and prints the Klippy state.
+remote file, installs the custom Klipper host patch from
+`klipper_setup/klipper_host/`, restarts Klipper, and prints the Klippy state.
+
+The boosted heatbed uses the normal `[heater_bed]` object with the 24V bed on
+`gpio21` and the SSR boost output on `gpio20`. Run the supervised calibration
+helper before changing the bed to PID operation:
+
+```bash
+cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
+./calibrate_boosted_bed_pid.sh --target 80
+```
 
 See `AGENTS.md` for the detailed deployment workflow.
 

@@ -36,6 +36,7 @@ EXPECTED_KLIPPER_TAGS = {
     "stepper_z1.endstop_pin",
     "tmc2209 stepper_z1.uart_pin",
     "heater_bed.heater_pin",
+    "heater_bed.boost_pin",
     "heater_bed.sensor_pin",
 }
 

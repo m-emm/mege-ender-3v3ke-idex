@@ -10,6 +10,7 @@ metadata:
     Driver3 (Z-right): STEP=GPIO14, DIR=GPIO15, EN=GPIO16, UART=GPIO13.
     Z endstops: Z-left=GPIO22, Z-right=GPIO17.
     Heatbed MOSFET: HEATBED_ON=GPIO21.
+    Heatbed boost SSR: SSR_OUT=GPIO20 with Pico logic ground.
     Heatbed thermistor: SIGNAL=GPIO26_ADC0, GND=AGND, 4.7k pull-up REF-to-SIGNAL.
 
 color_map:
@@ -246,6 +247,12 @@ pin_sets:
       - NC
       - HEATBED_ON
       - NC_2
+  - prefix: SSR_BOOST_
+    origin: [9, 4]
+    direction: right
+    pins:
+      - GND
+      - SSR_OUT
 
 
 wires:
@@ -480,6 +487,13 @@ wires:
   - from: PICO_GPIO_21_27
     to: MOSFET_HEATBED_ON
     klipper: heater_bed.heater_pin
+    type: data
+  - from: PICO_GND_28
+    to: SSR_BOOST_GND
+    type: ground
+  - from: PICO_GPIO_20_26
+    to: SSR_BOOST_SSR_OUT
+    klipper: heater_bed.boost_pin
     type: data
 
     
