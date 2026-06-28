@@ -10,11 +10,13 @@ from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_usb_dual_board_housing_as
 )
 from shellforgepy.simple import (
     MScrew,
+    create_cylinder,
     get_bounding_box,
     get_bounding_box_center,
     get_bounding_box_size,
     get_clearance_hole_diameter,
     get_volume,
+    materialize_bounding_box,
 )
 
 
@@ -137,14 +139,19 @@ def test_nitehawk_usb_dual_board_housing_uses_self_threading_screw_holes():
 def test_nitehawk_usb_dual_board_housing_defaults_are_roomy_for_boards_and_lid_bosses():
     screw = MScrew.from_size(DEFAULTS["nitehawk_usb_dual_housing_lid_screw_size"])
 
-    assert DEFAULTS["nitehawk_usb_dual_housing_board_side_margin"] == pytest.approx(12)
-    assert DEFAULTS["nitehawk_usb_dual_housing_board_bottom_margin"] == pytest.approx(
-        12
+    assert DEFAULTS["nitehawk_usb_dual_housing_board_side_margin"] == pytest.approx(
+        16
     )
-    assert DEFAULTS["nitehawk_usb_dual_housing_board_top_margin"] == pytest.approx(12)
-    assert DEFAULTS["nitehawk_usb_dual_housing_board_gap"] == pytest.approx(16)
+    assert DEFAULTS["nitehawk_usb_dual_housing_board_bottom_margin"] == pytest.approx(
+        16
+    )
+    assert DEFAULTS["nitehawk_usb_dual_housing_board_top_margin"] == pytest.approx(16)
+    assert DEFAULTS["nitehawk_usb_dual_housing_board_gap"] == pytest.approx(20)
     assert DEFAULTS["nitehawk_usb_dual_housing_component_clearance"] == pytest.approx(
-        4
+        5
+    )
+    assert DEFAULTS["nitehawk_usb_dual_housing_cable_slit_y_margin"] == pytest.approx(
+        10
     )
     assert (
         DEFAULTS["nitehawk_usb_dual_housing_lid_screw_boss_diameter"]
@@ -277,7 +284,9 @@ def test_nitehawk_usb_dual_board_housing_cable_slits_are_deep_and_aligned():
         - DEFAULTS["nitehawk_usb_dual_housing_cable_slit_floor_clearance"]
     )
 
-    cable_slit_bbox = get_bounding_box(housing.get_cutter_part_by_name("cable_slit"))
+    cable_slit_bbox = get_bounding_box(
+        housing.get_cutter_part_by_name("cable_slit")
+    )
     assert cable_slit_bbox[0][0] == pytest.approx(slit_start_x)
     assert cable_slit_bbox[1][0] == pytest.approx(slit_end_x)
     assert cable_slit_bbox[0][2] < body_bbox[0][2]
@@ -306,6 +315,64 @@ def test_nitehawk_usb_dual_board_housing_cable_slits_are_deep_and_aligned():
         )
         assert slit_bbox[0][2] < body_bbox[1][2]
         assert slit_bbox[1][2] > body_bbox[1][2] - wall
+
+
+def test_nitehawk_usb_dual_board_housing_cable_windows_clear_lid_bosses():
+    housing = _housing()
+    body_bbox = get_bounding_box(
+        housing.get_non_production_part_by_name(
+            "nitehawk_usb_dual_housing_body_reference"
+        )
+    )
+    wall = DEFAULTS["nitehawk_usb_dual_housing_wall_thickness"]
+    boss_radius = DEFAULTS["nitehawk_usb_dual_housing_lid_screw_boss_diameter"] / 2
+    boss_inset = DEFAULTS["nitehawk_usb_dual_housing_lid_screw_inset"]
+    keepout_margin = 2.0
+
+    front_boss_outer_y = body_bbox[0][1] + boss_inset + boss_radius
+    rear_boss_outer_y = body_bbox[1][1] - boss_inset - boss_radius
+    cable_slit_bbox = get_bounding_box(housing.get_cutter_part_by_name("cable_slit"))
+    assert cable_slit_bbox[0][1] >= front_boss_outer_y + keepout_margin - 1e-6
+    assert cable_slit_bbox[1][1] <= rear_boss_outer_y - keepout_margin + 1e-6
+
+    front_pilot_bbox = get_bounding_box(
+        housing.get_cutter_part_by_name("lid_mount_pilot_hole_1")
+    )
+    rear_pilot_bbox = get_bounding_box(
+        housing.get_cutter_part_by_name("lid_mount_pilot_hole_3")
+    )
+    assert cable_slit_bbox[0][1] - front_pilot_bbox[1][1] >= keepout_margin - 1e-6
+    assert rear_pilot_bbox[0][1] - cable_slit_bbox[1][1] >= keepout_margin - 1e-6
+
+    lid_boss_keepouts = []
+    for y in [boss_inset, body_bbox[1][1] - boss_inset]:
+        for z in [boss_inset, body_bbox[1][2] - boss_inset]:
+            lid_boss = create_cylinder(
+                boss_radius,
+                body_bbox[1][0] - wall,
+                origin=(body_bbox[0][0], y, z),
+                direction=(1, 0, 0),
+            )
+            lid_boss_keepouts.append(
+                materialize_bounding_box(
+                    lid_boss,
+                    x_enlargement=2 * keepout_margin,
+                    y_enlargement=2 * keepout_margin,
+                    z_enlargement=2 * keepout_margin,
+                )
+            )
+
+    for cutter_name in [
+        "rear_connector_cable_slit_board_1",
+        "rear_connector_cable_slit_board_2",
+    ]:
+        cutter = housing.get_cutter_part_by_name(cutter_name)
+        cutter_volume = get_volume(cutter)
+        for lid_boss_keepout in lid_boss_keepouts:
+            assert get_volume(cutter.cut(lid_boss_keepout)) == pytest.approx(
+                cutter_volume,
+                abs=0.001,
+            )
 
 
 def test_nitehawk_usb_dual_board_housing_profile_mount_holes_are_vertical_pair():
@@ -426,6 +493,7 @@ def test_nitehawk_usb_dual_board_housing_production_prints_on_one_plate():
     lid = next(part for part in production_parts if part.get("artifact") == "followers")
     plates = production["arrange"]["plates"]
 
+    assert production["process_data_preset"] == "petgcf_max_strength_high_speed_06"
     assert body["prod_rotation_angle"] == 90
     assert body["prod_rotation_axis"] == [0, 1, 0]
     assert lid["prod_rotation_angle"] == -90
@@ -433,12 +501,27 @@ def test_nitehawk_usb_dual_board_housing_production_prints_on_one_plate():
     assert plates == [
         {
             "name": "nitehawk_usb_dual_board_housing",
+            "process_data_preset": "petgcf_max_strength_high_speed_06",
+            "process_data": {
+                "overrides": {
+                    "process_overrides": {
+                        "brim_type": "no_brim",
+                        "enable_support": "1",
+                        "support_type": "tree(auto)",
+                        "support_style": "organic",
+                        "support_on_build_plate_only": "1",
+                        "support_interface_spacing": "2",
+                        "wall_loops": "3",
+                    },
+                },
+            },
             "parts": [
                 "nitehawk_usb_dual_board_housing",
                 "nitehawk_usb_dual_housing_lid",
             ],
         }
     ]
+    assert production["arrange"]["prod_gap"] == pytest.approx(12.0)
     assert production["arrange"]["auto_assign_plates"] is False
 
 

@@ -16,6 +16,7 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     StripboardBlocker,
     StripboardCut,
     Wire,
+    Zener,
     align,
     create_element,
     create_net,
@@ -1134,7 +1135,7 @@ def test_render_stripboard_overlay_writes_svg(tmp_path):
     assert ">top</text>" in svg
 
 
-def test_render_compacted_stripboard_overlay_writes_cuts_and_run_labels(tmp_path):
+def test_render_compacted_stripboard_overlay_writes_cuts_and_run_blocks(tmp_path):
     schema = _create_sparse_stripboard_schema()
     assignment = compact_sparse_stripboard_rows(
         assign_schema_nets_to_stripboard(schema)
@@ -1150,13 +1151,105 @@ def test_render_compacted_stripboard_overlay_writes_cuts_and_run_labels(tmp_path
 
     svg = outfile.read_text(encoding="utf-8")
     assert 'class="strip-cut"' in svg
-    assert 'class="overlay-net-run-label"' in svg
-    assert 'class="overlay-local-point-label"' in svg
-    assert ">sparse_a</text>" in svg
-    assert ">sparse_c</text>" in svg
-    assert svg.index('class="strip-cut"') < svg.index(
-        'class="overlay-net-run-label"'
+    assert 'class="strip-run-block"' in svg
+    assert 'class="overlay-net-run-label"' not in svg
+    assert 'class="overlay-local-point-label"' not in svg
+    assert ">sparse_a</text>" not in svg
+    assert ">sparse_c</text>" not in svg
+
+
+def test_render_stripboard_overlay_labels_transistor_terminals(tmp_path):
+    collector = create_node(Dot, "collector", net=create_net("collector"))
+    base = translate(1, -1)(create_node(Dot, "base", net=create_net("base")))
+    emitter = translate(2, -2)(create_node(Dot, "emitter", net=create_net("emitter")))
+    transistor = create_element(
+        BjtNpn,
+        "Qtest",
+        "BC337",
+        base=base,
+        collector=collector,
+        emitter=emitter,
     )
+    schema = create_schema([collector, base, emitter], [transistor])
+    assignment = assign_schema_nets_to_stripboard(schema)
+    outfile = tmp_path / "transistor_terminal_labels.svg"
+
+    render_stripboard_overlay(
+        assignment.stripboard,
+        assignment,
+        schema,
+        file=outfile,
+    )
+
+    terminal_label_lines = [
+        line
+        for line in outfile.read_text(encoding="utf-8").splitlines()
+        if 'class="overlay-terminal-label"' in line
+    ]
+    assert len(terminal_label_lines) == 3
+    assert any(
+        'data-terminal="base"' in line and ">B</text>" in line
+        for line in terminal_label_lines
+    )
+    assert any(
+        'data-terminal="collector"' in line and ">C</text>" in line
+        for line in terminal_label_lines
+    )
+    assert any(
+        'data-terminal="emitter"' in line and ">E</text>" in line
+        for line in terminal_label_lines
+    )
+
+
+def test_render_stripboard_overlay_labels_zener_terminals(tmp_path):
+    anode = create_node(Dot, "anode", net=create_net("anode"))
+    cathode = translate(0, -1)(create_node(Dot, "cathode", net=create_net("cathode")))
+    zener = create_element(Zener, "Dtest", "5V1", anode, cathode)
+    schema = create_schema([anode, cathode], [zener])
+    assignment = assign_schema_nets_to_stripboard(schema)
+    outfile = tmp_path / "zener_terminal_labels.svg"
+
+    render_stripboard_overlay(
+        assignment.stripboard,
+        assignment,
+        schema,
+        file=outfile,
+    )
+
+    terminal_label_lines = [
+        line
+        for line in outfile.read_text(encoding="utf-8").splitlines()
+        if 'class="overlay-terminal-label"' in line
+    ]
+    assert len(terminal_label_lines) == 2
+    assert any(
+        'data-terminal="start"' in line and ">A</text>" in line
+        for line in terminal_label_lines
+    )
+    assert any(
+        'data-terminal="end"' in line and ">K</text>" in line
+        for line in terminal_label_lines
+    )
+
+
+def test_render_stripboard_overlay_does_not_label_passive_terminals(tmp_path):
+    left = create_node(Dot, "left", net=create_net("left"))
+    right = translate(0, -1)(create_node(Dot, "right", net=create_net("right")))
+    resistor = create_element(Resistor, "Rtest", "1k", left, right)
+    schema = create_schema([left, right], [resistor])
+    assignment = assign_schema_nets_to_stripboard(schema)
+    outfile = tmp_path / "passive_terminal_labels.svg"
+
+    render_stripboard_overlay(
+        assignment.stripboard,
+        assignment,
+        schema,
+        file=outfile,
+    )
+
+    svg = outfile.read_text(encoding="utf-8")
+    assert 'class="overlay-terminal"' in svg
+    assert 'class="overlay-terminal-label"' not in svg
 
 
 def test_render_stripboard_overlay_omits_internal_blockers(tmp_path):

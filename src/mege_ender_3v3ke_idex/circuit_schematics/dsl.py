@@ -52,6 +52,7 @@ STRIPBOARD_OVERLAY_STROKE_WIDTH = 0.045
 STRIPBOARD_OVERLAY_NODE_RADIUS = 0.14
 STRIPBOARD_OVERLAY_TERMINAL_RADIUS = 0.09
 STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE = 0.19
+STRIPBOARD_OVERLAY_TERMINAL_LABEL_SIZE = 0.17
 STRIPBOARD_OVERLAY_NODE_LABEL_SIZE = 0.17
 STRIPBOARD_OVERLAY_NET_LABEL_SIZE = 0.34
 STRIPBOARD_OVERLAY_RUN_LABEL_SIZE = 0.20
@@ -217,9 +218,10 @@ class ElementSpec:
     schemdraw_factory: Callable[[], object]
     positional_terminals: tuple[str, ...] = ()
     bbox_padding: float = DEFAULT_ELEMENT_BBOX_PADDING
+    terminal_labels: dict[str, str] = field(default_factory=dict)
 
 
-def _two_terminal_spec(factory, height=TWO_TERMINAL_HEIGHT):
+def _two_terminal_spec(factory, height=TWO_TERMINAL_HEIGHT, terminal_labels=None):
     half_width = TWO_TERMINAL_WIDTH / 2.0
     half_height = height / 2.0
     return ElementSpec(
@@ -231,6 +233,7 @@ def _two_terminal_spec(factory, height=TWO_TERMINAL_HEIGHT):
         local_bbox=[[-half_width, -half_height], [half_width, half_height]],
         schemdraw_factory=factory,
         positional_terminals=("start", "end"),
+        terminal_labels={} if terminal_labels is None else dict(terminal_labels),
     )
 
 
@@ -239,7 +242,11 @@ ELEMENT_SPECS = {
     Resistor: _two_terminal_spec(elm.Resistor),
     Fuse: _two_terminal_spec(elm.Fuse),
     Capacitor: _two_terminal_spec(elm.Capacitor),
-    Zener: _two_terminal_spec(elm.Zener, height=ZENER_HEIGHT),
+    Zener: _two_terminal_spec(
+        elm.Zener,
+        height=ZENER_HEIGHT,
+        terminal_labels={"start": "A", "end": "K"},
+    ),
     PMos: ElementSpec(
         terminals=("source", "gate", "drain"),
         local_anchors={
@@ -249,6 +256,7 @@ ELEMENT_SPECS = {
         },
         local_bbox=[[-FET_DX, -FET_Y], [0.35, FET_Y]],
         schemdraw_factory=lambda: elm.PMos(diode=True),
+        terminal_labels={"source": "S", "gate": "G", "drain": "D"},
     ),
     BjtNpn: ElementSpec(
         terminals=("base", "collector", "emitter"),
@@ -259,6 +267,7 @@ ELEMENT_SPECS = {
         },
         local_bbox=[[-BJT_X, -0.72], [0.35, BJT_Y]],
         schemdraw_factory=lambda: elm.BjtNpn(circle=True),
+        terminal_labels={"base": "B", "collector": "C", "emitter": "E"},
     ),
 }
 
@@ -1739,41 +1748,6 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
                 f'stroke-width="{STRIPBOARD_CUT_STROKE_WIDTH:.3f}"/>'
             )
 
-    for run in _stripboard_compacted_runs(assignment, stripboard):
-        x = _stripboard_run_center(run)
-        y = _stripboard_row_center(run.row) + 0.080
-        lines.append(
-            f'  <text class="overlay-net-run-label" '
-            f'data-row="{run.row}" data-net="{_svg_attr(run.net_name)}" '
-            f'x="{x:.3f}" y="{y:.3f}" '
-            f'font-size="{STRIPBOARD_OVERLAY_RUN_LABEL_SIZE:.3f}" '
-            f'font-weight="700" text-anchor="middle" '
-            f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
-            f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
-            f'paint-order="stroke" '
-            f'transform="rotate({STRIPBOARD_OVERLAY_LABEL_ANGLE:.1f} '
-            f'{x:.3f} {y:.3f})">'
-            f'{_svg_text(run.net_name)}</text>'
-        )
-
-    for local_point in assignment.local_points:
-        x = _stripboard_column_center(local_point.col)
-        y = _stripboard_row_center(local_point.row) + 0.080
-        lines.append(
-            f'  <text class="overlay-local-point-label" '
-            f'data-row="{local_point.row}" '
-            f'data-net="{_svg_attr(local_point.net_name)}" '
-            f'x="{x:.3f}" y="{y:.3f}" '
-            f'font-size="{STRIPBOARD_OVERLAY_RUN_LABEL_SIZE:.3f}" '
-            f'font-weight="700" text-anchor="middle" '
-            f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
-            f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
-            f'paint-order="stroke" '
-            f'transform="rotate({STRIPBOARD_OVERLAY_LABEL_ANGLE:.1f} '
-            f'{x:.3f} {y:.3f})">'
-            f'{_svg_text(local_point.net_name)}</text>'
-        )
-
     for element_overlay in _stripboard_overlay_elements(schema, assignment):
         center = element_overlay["center"]
         for start, end in element_overlay["segments"]:
@@ -1833,6 +1807,26 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
                 f'{_svg_text(marker["label"])}</text>'
             )
 
+    for terminal in _stripboard_overlay_terminals(schema, assignment):
+        if not terminal["label"]:
+            continue
+        x, y = terminal["position"]
+        label_x = x + 0.155
+        label_y = y - 0.125
+        lines.append(
+            f'  <text class="overlay-terminal-label" '
+            f'data-net="{_svg_attr(terminal["net_name"])}" '
+            f'data-element="{_svg_attr(terminal["element_name"])}" '
+            f'data-terminal="{_svg_attr(terminal["terminal_name"])}" '
+            f'x="{label_x:.3f}" y="{label_y:.3f}" '
+            f'font-size="{STRIPBOARD_OVERLAY_TERMINAL_LABEL_SIZE:.3f}" '
+            f'font-weight="800" text-anchor="middle" '
+            f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
+            f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
+            f'paint-order="stroke">'
+            f'{_svg_text(terminal["label"])}</text>'
+        )
+
     lines.append("</svg>")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -1864,9 +1858,9 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
     image.paste(board_image, (int(round(label_margin * scale)), 0))
 
     element_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE)
+    terminal_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_TERMINAL_LABEL_SIZE)
     node_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_NODE_LABEL_SIZE)
     net_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_NET_LABEL_SIZE)
-    run_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_RUN_LABEL_SIZE)
 
     for row in range(stripboard.height_pitches):
         net_name = _stripboard_full_row_label(assignment, stripboard, row)
@@ -1890,41 +1884,6 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
 
     for cut in assignment.cuts:
         _draw_stripboard_cut_png(draw, cut, label_margin, scale)
-
-    for run in _stripboard_compacted_runs(assignment, stripboard):
-        _draw_png_text_rotated(
-            image,
-            _offset_point(
-                (_stripboard_run_center(run), _stripboard_row_center(run.row) - 0.10),
-                label_margin,
-                0,
-            ),
-            run.net_name,
-            run_font,
-            scale,
-            fill=STRIPBOARD_OVERLAY_TEXT_FILL,
-            angle=STRIPBOARD_OVERLAY_LABEL_ANGLE,
-            anchor="center",
-        )
-
-    for local_point in assignment.local_points:
-        _draw_png_text_rotated(
-            image,
-            _offset_point(
-                (
-                    _stripboard_column_center(local_point.col),
-                    _stripboard_row_center(local_point.row) - 0.10,
-                ),
-                label_margin,
-                0,
-            ),
-            local_point.net_name,
-            run_font,
-            scale,
-            fill=STRIPBOARD_OVERLAY_TEXT_FILL,
-            angle=STRIPBOARD_OVERLAY_LABEL_ANGLE,
-            anchor="center",
-        )
 
     element_width = _px_overlay_stroke(scale)
     for element_overlay in _stripboard_overlay_elements(schema, assignment):
@@ -1978,6 +1937,21 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
                 angle=STRIPBOARD_OVERLAY_LABEL_ANGLE,
                 anchor="left",
             )
+
+    for terminal in _stripboard_overlay_terminals(schema, assignment):
+        if not terminal["label"]:
+            continue
+        x, y = terminal["position"]
+        _draw_png_text_rotated(
+            image,
+            (x + label_margin + 0.155, y - 0.125),
+            terminal["label"],
+            font=terminal_font,
+            scale=scale,
+            fill=STRIPBOARD_OVERLAY_TEXT_FILL,
+            angle=0,
+            anchor="center",
+        )
 
     image.save(path)
 
@@ -2148,6 +2122,10 @@ def _stripboard_overlay_terminals(schema, assignment):
                     "element_name": element.name,
                     "terminal_name": terminal_name,
                     "net_name": net_name,
+                    "label": _stripboard_terminal_overlay_label(
+                        element,
+                        terminal_name,
+                    ),
                     "position": _stripboard_marker_position(
                         _stripboard_terminal_marker_key(element.name, terminal_name),
                         element.anchor_position(terminal_name),
@@ -2157,6 +2135,10 @@ def _stripboard_overlay_terminals(schema, assignment):
                 }
             )
     return terminals
+
+
+def _stripboard_terminal_overlay_label(element, terminal_name):
+    return _element_spec(element).terminal_labels.get(terminal_name, "")
 
 
 def _stripboard_overlay_elements(schema, assignment):

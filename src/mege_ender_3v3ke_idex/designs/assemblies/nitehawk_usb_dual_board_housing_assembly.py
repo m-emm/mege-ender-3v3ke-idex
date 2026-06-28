@@ -3,6 +3,7 @@
 from shellforgepy.simple import *
 
 BIG_THING = 500
+LID_BOSS_WINDOW_KEEPOUT_MARGIN = 2.0
 
 
 def create_nitehawk_usb_dual_board_housing_assembly(
@@ -254,6 +255,18 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     housing_box = housing_box.fuse(lid_screw_bosses)
     housing_box = housing_box.cut(lid_pilot_holes)
 
+    lid_boss_window_keepouts = PartCollector()
+    for lid_boss in lid_bosses:
+        lid_boss_window_keepout = materialize_bounding_box(
+            lid_boss,
+            x_enlargement=2 * LID_BOSS_WINDOW_KEEPOUT_MARGIN,
+            y_enlargement=2 * LID_BOSS_WINDOW_KEEPOUT_MARGIN,
+            z_enlargement=2 * LID_BOSS_WINDOW_KEEPOUT_MARGIN,
+        )
+        lid_boss_window_keepouts = lid_boss_window_keepouts.fuse(
+            lid_boss_window_keepout
+        )
+
     cable_slit_length = housing_width - 2 * (
         wall + nitehawk_usb_dual_housing_cable_slit_y_margin
     )
@@ -283,6 +296,7 @@ def create_nitehawk_usb_dual_board_housing_assembly(
         wall + nitehawk_usb_dual_housing_cable_slit_y_margin,
         -1,
     )(cable_slit)
+    cable_slit = cable_slit.cut(lid_boss_window_keepouts)
     housing_box = housing_box.cut(cable_slit)
 
     rear_connector_slits = PartCollector()
@@ -315,6 +329,7 @@ def create_nitehawk_usb_dual_board_housing_assembly(
             connector_center[1] - connector_slit_y_size / 2,
             housing_height - wall - 1,
         )(connector_slit)
+        connector_slit = connector_slit.cut(lid_boss_window_keepouts)
         rear_connector_slits = rear_connector_slits.fuse(connector_slit)
         rear_connector_slit_items.append(
             (f"rear_connector_cable_slit_board_{board_index}", connector_slit)
