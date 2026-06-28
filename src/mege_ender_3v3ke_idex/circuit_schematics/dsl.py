@@ -45,10 +45,15 @@ STRIPBOARD_HOLE_STROKE = "#333333"
 STRIPBOARD_OVERLAY_NODE_FILL = "#2563eb"
 STRIPBOARD_OVERLAY_TERMINAL_FILL = "#111827"
 STRIPBOARD_OVERLAY_ELEMENT_STROKE = "#1f2937"
-STRIPBOARD_OVERLAY_TEXT_FILL = "#111827"
+STRIPBOARD_OVERLAY_TEXT_FILL = "#b91c1c"
+STRIPBOARD_OVERLAY_TEXT_HALO = "#ffffff"
 STRIPBOARD_OVERLAY_STROKE_WIDTH = 0.045
 STRIPBOARD_OVERLAY_NODE_RADIUS = 0.14
 STRIPBOARD_OVERLAY_TERMINAL_RADIUS = 0.09
+STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE = 0.42
+STRIPBOARD_OVERLAY_NODE_LABEL_SIZE = 0.36
+STRIPBOARD_OVERLAY_NET_LABEL_SIZE = 0.42
+STRIPBOARD_OVERLAY_NET_LABEL_MARGIN = 3.1
 
 
 class NodeType(Enum):
@@ -595,12 +600,14 @@ def assign_schema_nets_to_stripboard(
     board_height = len(net_visualizations)
     x_offset = left_margin_pitches - min_col
 
+    board_visualizations = tuple(reversed(net_visualizations))
+
     return StripboardNetAssignment(
         stripboard=create_stripboard(board_width, board_height),
-        net_visualizations=net_visualizations,
+        net_visualizations=board_visualizations,
         net_rows={
             visualization.net_name: row
-            for row, visualization in enumerate(net_visualizations)
+            for row, visualization in enumerate(board_visualizations)
         },
         x_offset=x_offset,
         column_pitch=float(column_pitch),
@@ -912,7 +919,8 @@ def _render_stripboard_png(stripboard, path, scale):
 def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
     scale = _validate_render_scale(scale)
     width, height = _stripboard_size(stripboard)
-    width_px = width * scale
+    label_margin = STRIPBOARD_OVERLAY_NET_LABEL_MARGIN
+    width_px = (width + label_margin) * scale
     height_px = height * scale
 
     lines = [
@@ -920,7 +928,8 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
         (
             f'<svg xmlns="http://www.w3.org/2000/svg" '
             f'width="{width_px:.0f}" height="{height_px:.0f}" '
-            f'viewBox="0 0 {width:.3f} {height:.3f}">'
+            f'viewBox="{-label_margin:.3f} 0 '
+            f'{width + label_margin:.3f} {height:.3f}">'
         ),
         "  <title>Stripboard Schematic Overlay</title>",
         (
@@ -934,6 +943,18 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
     for row in range(stripboard.height_pitches):
         x, y, strip_width, strip_height = _stripboard_strip_rect(stripboard, row)
         net_name = _stripboard_row_net_name(assignment, row)
+        if net_name:
+            lines.append(
+                f'  <text class="overlay-net-label" '
+                f'data-row="{row}" data-net="{_svg_attr(net_name)}" '
+                f'x="-0.180" y="{STRIPBOARD_BOARD_MARGIN + row + 0.135:.3f}" '
+                f'font-size="{STRIPBOARD_OVERLAY_NET_LABEL_SIZE:.3f}" '
+                f'font-weight="700" text-anchor="end" '
+                f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
+                f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
+                f'paint-order="stroke">'
+                f'{_svg_text(net_name)}</text>'
+            )
         lines.append(
             f'  <rect class="copper-strip" data-row="{row}" '
             f'data-net="{_svg_attr(net_name)}" '
@@ -977,8 +998,11 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
         lines.append(
             f'  <text class="overlay-element-label" '
             f'x="{center[0]:.3f}" y="{center[1] - 0.18:.3f}" '
-            f'font-size="0.28" text-anchor="middle" '
-            f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}">'
+            f'font-size="{STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE:.3f}" '
+            f'font-weight="700" text-anchor="middle" '
+            f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
+            f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
+            f'paint-order="stroke">'
             f'{_svg_text(element_overlay["label"])}</text>'
         )
 
@@ -1008,7 +1032,10 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
             lines.append(
                 f'  <text class="overlay-node-label" '
                 f'x="{x + 0.18:.3f}" y="{y - 0.16:.3f}" '
-                f'font-size="0.25" fill="{STRIPBOARD_OVERLAY_TEXT_FILL}">'
+                f'font-size="{STRIPBOARD_OVERLAY_NODE_LABEL_SIZE:.3f}" '
+                f'font-weight="700" fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
+                f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.070" '
+                f'paint-order="stroke">'
                 f'{_svg_text(marker["label"])}</text>'
             )
 
@@ -1026,11 +1053,42 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
         ) from error
 
     width, height = _stripboard_size(stripboard)
-    image_width = max(1, int(round(width * scale)))
+    label_margin = STRIPBOARD_OVERLAY_NET_LABEL_MARGIN
+    image_width = max(1, int(round((width + label_margin) * scale)))
     image_height = max(1, int(round(height * scale)))
     image = Image.new("RGB", (image_width, image_height), "white")
     draw = ImageDraw.Draw(image)
-    _draw_stripboard_base_png(draw, stripboard, scale)
+    board_image = Image.new(
+        "RGB",
+        (
+            max(1, int(round(width * scale))),
+            image_height,
+        ),
+        "white",
+    )
+    _draw_stripboard_base_png(ImageDraw.Draw(board_image), stripboard, scale)
+    image.paste(board_image, (int(round(label_margin * scale)), 0))
+
+    element_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE)
+    node_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_NODE_LABEL_SIZE)
+    net_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_NET_LABEL_SIZE)
+
+    for row in range(stripboard.height_pitches):
+        net_name = _stripboard_row_net_name(assignment, row)
+        if not net_name:
+            continue
+        draw.text(
+            _px_point(
+                (
+                    label_margin - 0.2 - len(net_name) * 0.18,
+                    STRIPBOARD_BOARD_MARGIN + row - 0.22,
+                ),
+                scale,
+            ),
+            net_name,
+            fill=STRIPBOARD_OVERLAY_TEXT_FILL,
+            font=net_font,
+        )
 
     element_width = _px_overlay_stroke(scale)
     for element_overlay in _stripboard_overlay_elements(schema, assignment):
@@ -1038,27 +1096,37 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
         center = element_overlay["center"]
         if len(positions) == 2:
             draw.line(
-                [_px_point(positions[0], scale), _px_point(positions[1], scale)],
+                [
+                    _px_point(_offset_point(positions[0], label_margin, 0), scale),
+                    _px_point(_offset_point(positions[1], label_margin, 0), scale),
+                ],
                 fill=STRIPBOARD_OVERLAY_ELEMENT_STROKE,
                 width=element_width,
             )
         else:
             for position in positions:
                 draw.line(
-                    [_px_point(center, scale), _px_point(position, scale)],
+                    [
+                        _px_point(_offset_point(center, label_margin, 0), scale),
+                        _px_point(_offset_point(position, label_margin, 0), scale),
+                    ],
                     fill=STRIPBOARD_OVERLAY_ELEMENT_STROKE,
                     width=element_width,
                 )
         draw.text(
-            _px_point((center[0] - 0.25, center[1] - 0.42), scale),
+            _px_point(
+                _offset_point((center[0] - 0.25, center[1] - 0.42), label_margin, 0),
+                scale,
+            ),
             element_overlay["label"],
             fill=STRIPBOARD_OVERLAY_TEXT_FILL,
+            font=element_font,
         )
 
     for terminal in _stripboard_overlay_terminals(schema, assignment):
         _draw_px_circle(
             draw,
-            terminal["position"],
+            _offset_point(terminal["position"], label_margin, 0),
             STRIPBOARD_OVERLAY_TERMINAL_RADIUS,
             scale,
             fill=STRIPBOARD_OVERLAY_TERMINAL_FILL,
@@ -1067,7 +1135,7 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
     for marker in _stripboard_overlay_node_markers(schema, assignment):
         _draw_px_circle(
             draw,
-            marker["position"],
+            _offset_point(marker["position"], label_margin, 0),
             STRIPBOARD_OVERLAY_NODE_RADIUS,
             scale,
             fill=STRIPBOARD_OVERLAY_NODE_FILL,
@@ -1075,9 +1143,10 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
         if marker["label"]:
             x, y = marker["position"]
             draw.text(
-                _px_point((x + 0.18, y - 0.35), scale),
+                _px_point((x + label_margin + 0.18, y - 0.35), scale),
                 marker["label"],
                 fill=STRIPBOARD_OVERLAY_TEXT_FILL,
+                font=node_font,
             )
 
     image.save(path)
@@ -1266,6 +1335,25 @@ def _draw_px_circle(draw, center, radius, scale, fill):
         ),
         fill=fill,
     )
+
+
+def _overlay_png_font(scale, size_units):
+    try:
+        from PIL import ImageFont
+    except ImportError:
+        return None
+
+    size_px = max(10, int(round(size_units * scale)))
+    for font_name in (
+        "DejaVuSans-Bold.ttf",
+        "Arial Bold.ttf",
+        "Arial.ttf",
+    ):
+        try:
+            return ImageFont.truetype(font_name, size_px)
+        except OSError:
+            pass
+    return ImageFont.load_default()
 
 
 def _validate_positive_integer(value, name):
@@ -1773,6 +1861,10 @@ def _point(value):
 
 def _add_points(a, b):
     return (float(a[0]) + float(b[0]), float(a[1]) + float(b[1]))
+
+
+def _offset_point(point, dx, dy):
+    return (float(point[0]) + float(dx), float(point[1]) + float(dy))
 
 
 def _clamp(value, minimum, maximum):

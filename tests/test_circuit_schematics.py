@@ -295,7 +295,10 @@ def test_assign_schema_nets_to_stripboard_uses_one_row_per_net():
     assignment = assign_schema_nets_to_stripboard(schema)
 
     assert assignment.stripboard.height_pitches == 3
-    assert assignment.net_rows == {"low": 0, "middle": 1, "top": 2}
+    assert assignment.net_rows == {"top": 0, "middle": 1, "low": 2}
+    assert [
+        visualization.net_name for visualization in assignment.net_visualizations
+    ] == ["top", "middle", "low"]
     assert assignment.stripboard.width_pitches >= 6
 
 
@@ -327,7 +330,9 @@ def test_render_stripboard_overlay_writes_svg(tmp_path):
     assert "<svg" in svg
     assert 'class="copper-strip"' in svg
     assert 'class="hole"' in svg
+    assert 'class="overlay-net-label"' in svg
     assert 'class="overlay-node"' in svg
+    assert ">top</text>" in svg
 
 
 def test_render_stripboard_overlay_writes_png(tmp_path):

@@ -78,9 +78,10 @@ is not implemented yet.
 
 There is also a first diagnostic bridge from a logical schematic to a
 stripboard preview. It reads the visible positions of every net in a `Schema`,
-sorts those nets by ascending schematic y coordinate, assigns one full
-horizontal strip to each net, then overlays snapped node and terminal markers
-onto the hole grid.
+sorts those nets by schematic y coordinate, assigns one full horizontal strip
+to each net, then overlays snapped node and terminal markers onto the hole
+grid. The board projection maps the schematic top to the first stripboard row,
+so a bottom ground rail stays at the bottom of the rendered stripboard.
 
 This is a layout aid, not an autorouter. It does not yet place real component
 footprints, add strip cuts, or add jumpers.
