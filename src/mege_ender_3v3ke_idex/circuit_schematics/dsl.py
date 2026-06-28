@@ -1,8 +1,11 @@
 """Minimal alignment-first schematic DSL.
 
-This module intentionally keeps the public surface small: typed node/element
-tokens, pure placement helpers, schema creation from elements, and SVG
-rendering through Schemdraw.
+The DSL keeps the electrical graph separate from the drawn layout:
+
+- ``Net`` is the logical electrical node.
+- ``NodeView`` is a placed visual representation of a net.
+- ``Element`` stores stable terminal view ids and net names.
+- ``WireSegment`` draws a conductor between two views of the same net.
 """
 
 from __future__ import annotations
@@ -76,6 +79,11 @@ class Direction(Enum):
     VERTICAL = auto()
 
 
+@dataclass(frozen=True)
+class Net:
+    name: str
+
+
 @dataclass
 class ElementSpec:
     terminals: tuple[str, ...]
@@ -131,9 +139,10 @@ ELEMENT_SPECS = {
 
 
 @dataclass
-class Node:
+class NodeView:
     node_type: NodeType
     name: str
+    net: Net
     label: str | None = None
     kind: str | None = None
     label_loc: str = "right"
@@ -154,6 +163,9 @@ class Node:
             [self.position[0], self.position[1]],
             [self.position[0], self.position[1]],
         ]
+
+
+Node = NodeView
 
 
 @dataclass
@@ -196,7 +208,8 @@ class Element:
     element_type: ElementType
     name: str
     value: str | None
-    terminal_nodes: dict[str, Node]
+    terminal_views: dict[str, str]
+    terminal_nets: dict[str, str]
     label_loc: str = "auto"
     position: tuple[float, float] = (0.0, 0.0)
     angle: float = 0.0
@@ -225,13 +238,6 @@ class Element:
         )
 
     def get_bounding_box(self):
-        if self.element_type is Wire:
-            boxes = [node.get_bounding_box() for node in self.terminal_nodes.values()]
-            return [
-                [min(box[0][0] for box in boxes), min(box[0][1] for box in boxes)],
-                [max(box[1][0] for box in boxes), max(box[1][1] for box in boxes)],
-            ]
-
         spec = _element_spec(self)
         corners = _box_corners(_padded_box(spec.local_bbox, spec.bbox_padding))
         points = [
@@ -244,14 +250,34 @@ class Element:
 
 
 @dataclass
+class WireSegment:
+    start_view: str
+    end_view: str
+    net_name: str
+    name: str = ""
+
+    @property
+    def position(self):
+        return (0.0, 0.0)
+
+
+@dataclass
 class Schema:
-    nodes: list[Node]
+    nets: list[Net]
+    node_views: list[NodeView]
     elements: list[Element]
+    wires: list[WireSegment]
+
+    @property
+    def nodes(self):
+        return self.node_views
 
     def get_bounding_box(self):
+        node_views_by_name = _node_views_by_name(self.node_views)
         boxes = [
             *[element.get_bounding_box() for element in self.elements],
-            *[node.get_bounding_box() for node in self.nodes],
+            *[node.get_bounding_box() for node in self.node_views],
+            *[_wire_bounding_box(wire, node_views_by_name) for wire in self.wires],
         ]
         if not boxes:
             return [[0.0, 0.0], [0.0, 0.0]]
@@ -261,17 +287,30 @@ class Schema:
         ]
 
 
-def create_node(node_type, name, label=None, kind=None, label_alignment=None, **kwargs):
+def create_net(name):
+    return Net(name=str(name))
+
+
+def create_node(
+    node_type,
+    name,
+    label=None,
+    kind=None,
+    label_alignment=None,
+    net=None,
+    **kwargs,
+):
     if node_type not in (Dot, Ground):
-        raise ValueError("Only Dot and Ground nodes are supported in this DSL.")
+        raise ValueError("Only Dot and Ground node views are supported in this DSL.")
     if kwargs:
         raise TypeError(f"Unsupported node arguments: {sorted(kwargs)}")
     label_loc = "right"
     if label_alignment is not None:
         label_loc = _label_loc_from_alignment(label_alignment)
-    return Node(
+    return NodeView(
         node_type=node_type,
         name=name,
+        net=_coerce_net(net, default_name=name),
         label=label,
         kind=kind,
         label_loc=label_loc,
@@ -279,8 +318,8 @@ def create_node(node_type, name, label=None, kind=None, label_alignment=None, **
 
 
 def create_rail(node, direction, length, anchor=Alignment.CENTER):
-    if not isinstance(node, Node):
-        raise TypeError("create_rail expects a Node.")
+    if not isinstance(node, NodeView):
+        raise TypeError("create_rail expects a NodeView.")
     if direction not in (Direction.HORIZONTAL, Direction.VERTICAL):
         raise ValueError("Rail direction must be HORIZONTAL or VERTICAL.")
     if length <= 0:
@@ -304,6 +343,9 @@ def create_rail(node, direction, length, anchor=Alignment.CENTER):
 def create_element(
     element_type, name, value=None, *nodes, label_loc="auto", **terminal_nodes
 ):
+    if element_type is Wire:
+        return _create_wire_from_element_args(name, nodes, terminal_nodes)
+
     spec = _spec_for_type(element_type)
     if nodes and terminal_nodes:
         raise TypeError("Use either positional nodes or named terminal nodes.")
@@ -315,21 +357,56 @@ def create_element(
             )
         terminal_nodes = dict(zip(spec.positional_terminals, nodes))
 
-    terminal_nodes = _validate_terminal_nodes(element_type, terminal_nodes)
+    terminal_nodes = _validate_terminal_views(element_type, terminal_nodes)
     return Element(
         element_type=element_type,
         name=name,
         value=value,
-        terminal_nodes=terminal_nodes,
+        terminal_views={
+            terminal: node_view.name for terminal, node_view in terminal_nodes.items()
+        },
+        terminal_nets={
+            terminal: node_view.net.name
+            for terminal, node_view in terminal_nodes.items()
+        },
         label_loc=label_loc,
     )
 
 
-def create_schema(nodes, elements):
-    schema_nodes = list(nodes)
-    schema_elements = list(elements)
-    _validate_schema_items(schema_nodes, schema_elements)
-    return Schema(nodes=schema_nodes, elements=schema_elements)
+def create_wire(start, end, name=""):
+    if not isinstance(start, NodeView) or not isinstance(end, NodeView):
+        raise TypeError("create_wire endpoints must be NodeView objects.")
+    if start.net.name != end.net.name:
+        raise ValueError(
+            f"Wire endpoints must be views of the same net: "
+            f"{start.name!r} is {start.net.name!r}, "
+            f"{end.name!r} is {end.net.name!r}."
+        )
+    return WireSegment(
+        start_view=start.name,
+        end_view=end.name,
+        net_name=start.net.name,
+        name=name,
+    )
+
+
+def create_schema(node_views, elements, wires=None):
+    schema_node_views = list(node_views)
+    schema_elements = []
+    schema_wires = list(wires or [])
+    for item in elements:
+        if isinstance(item, WireSegment):
+            schema_wires.append(item)
+        else:
+            schema_elements.append(item)
+
+    nets = _validate_schema_items(schema_node_views, schema_elements, schema_wires)
+    return Schema(
+        nets=nets,
+        node_views=schema_node_views,
+        elements=schema_elements,
+        wires=schema_wires,
+    )
 
 
 def translate(x, y):
@@ -389,30 +466,33 @@ def modify_label_alignment(element, alignment):
 
 
 def render_schemdraw(schema, file, show=False):
-    node_points = _schema_node_points(schema)
+    node_views_by_name = _node_views_by_name(schema.node_views)
+    node_points = _schema_node_points(schema, node_views_by_name)
     rail_taps = {
-        name: [] for name, (_, node, _) in node_points.items() if _is_rail(node)
+        name: []
+        for name, (_, node_view, _) in node_points.items()
+        if _is_rail(node_view)
     }
 
     with schemdraw.Drawing(file=file, show=show) as drawing:
         drawing.config(unit=2.0, inches_per_unit=0.55, fontsize=10)
 
-        for element in schema.elements:
-            if _is_wire(element):
-                start, end = _wire_endpoints(element, node_points)
-                _record_wire_rail_taps(element, node_points, rail_taps, start, end)
-                _add_wire(drawing, start, end, direct=True)
-                continue
+        for wire in schema.wires:
+            start, end = _wire_endpoints(wire, node_points, node_views_by_name)
+            _record_wire_rail_taps(wire, node_views_by_name, rail_taps, start, end)
+            _add_wire(drawing, start, end, direct=True)
 
-            for anchor_name, node in element.terminal_nodes.items():
+        for element in schema.elements:
+            for anchor_name, view_name in element.terminal_views.items():
+                node_view = node_views_by_name[view_name]
                 terminal = element.anchor_position(anchor_name)
                 node_point = _node_connection_point(
-                    node,
-                    node_points[node.name][0],
+                    node_view,
+                    node_points[node_view.name][0],
                     terminal,
                 )
-                if _is_rail(node):
-                    rail_taps[node.name].append(node_point)
+                if _is_rail(node_view):
+                    rail_taps[node_view.name].append(node_point)
                 _add_wire(
                     drawing,
                     terminal,
@@ -421,8 +501,6 @@ def render_schemdraw(schema, file, show=False):
                 )
 
         for element in schema.elements:
-            if _is_wire(element):
-                continue
             label = (
                 element.name
                 if element.value is None
@@ -433,26 +511,49 @@ def render_schemdraw(schema, file, show=False):
                 drawing.add(elm.Label(label).at(_element_label_position(element)))
 
         for node_name in sorted(node_points):
-            point, node, terminal_count = node_points[node_name]
-            if _is_rail(node):
-                drawing.add(elm.Line().endpoints(*_rail_endpoints(node)))
-            if _should_render_node(node, terminal_count):
-                if node.node_type is Ground:
+            point, node_view, terminal_count = node_points[node_name]
+            if _is_rail(node_view):
+                drawing.add(elm.Line().endpoints(*_rail_endpoints(node_view)))
+            if _should_render_node(node_view, terminal_count):
+                if node_view.node_type is Ground:
                     ground = elm.Ground().at(point)
-                    if node.label:
-                        ground = ground.label(node.label, loc=node.label_loc)
+                    if node_view.label:
+                        ground = ground.label(node_view.label, loc=node_view.label_loc)
                     drawing.add(ground)
                 else:
                     dot = elm.Dot().at(point)
-                    if node.label:
-                        dot = dot.label(node.label, loc=node.label_loc)
+                    if node_view.label:
+                        dot = dot.label(node_view.label, loc=node_view.label_loc)
                     drawing.add(dot)
-            if _is_rail(node):
+            if _is_rail(node_view):
                 for tap in _unique_points(rail_taps.get(node_name, [])):
                     drawing.add(elm.Dot().at(tap))
 
     if Path(file).suffix == ".svg":
         _strip_trailing_whitespace(file)
+
+
+def _create_wire_from_element_args(name, nodes, terminal_nodes):
+    if nodes and terminal_nodes:
+        raise TypeError("Use either positional nodes or named wire endpoints.")
+    if nodes:
+        if len(nodes) != 2:
+            raise TypeError("Wire expects two positional endpoint views.")
+        return create_wire(nodes[0], nodes[1], name=name)
+    provided = set(terminal_nodes)
+    if provided != {"start", "end"}:
+        raise TypeError("Wire expects start and end endpoint views.")
+    return create_wire(terminal_nodes["start"], terminal_nodes["end"], name=name)
+
+
+def _coerce_net(net, default_name):
+    if net is None:
+        return create_net(default_name)
+    if isinstance(net, Net):
+        return net
+    if isinstance(net, str):
+        return create_net(net)
+    raise TypeError("net must be a Net, a net name string, or None.")
 
 
 def _alignment_delta(part, to, alignment, axes=None, stack_gap=0):
@@ -512,20 +613,20 @@ def _uses_padded_alignment_boxes(alignment):
 
 
 def _translate_in_place(obj, vector):
-    if isinstance(obj, Node):
+    if isinstance(obj, NodeView):
         obj.position = _add_points(obj.position, vector)
         obj.placement_explicit = True
     elif isinstance(obj, Element):
         obj.position = _add_points(obj.position, vector)
     elif isinstance(obj, Schema):
-        obj.nodes = [translate(*vector)(node) for node in obj.nodes]
+        obj.node_views = [translate(*vector)(node) for node in obj.node_views]
         obj.elements = [translate(*vector)(element) for element in obj.elements]
     else:
         raise TypeError(f"Cannot translate {type(obj).__name__}")
 
 
 def _rotate_in_place(obj, angle, center):
-    if isinstance(obj, Node):
+    if isinstance(obj, NodeView):
         if center is not None:
             obj.position = _rotate_around(obj.position, angle, _point(center))
             obj.placement_explicit = True
@@ -534,7 +635,7 @@ def _rotate_in_place(obj, angle, center):
             obj.position = _rotate_around(obj.position, angle, _point(center))
         obj.angle += angle
     elif isinstance(obj, Schema):
-        obj.nodes = [rotate(angle, center=center)(node) for node in obj.nodes]
+        obj.node_views = [rotate(angle, center=center)(node) for node in obj.node_views]
         obj.elements = [
             rotate(angle, center=center)(element) for element in obj.elements
         ]
@@ -542,76 +643,124 @@ def _rotate_in_place(obj, angle, center):
         raise TypeError(f"Cannot rotate {type(obj).__name__}")
 
 
-def _schema_node_points(schema):
-    nodes_by_name = _nodes_by_name(schema.nodes)
+def _schema_node_points(schema, node_views_by_name):
     terminal_points_by_node = {}
     used_node_names = set()
+
+    for wire in schema.wires:
+        for view_name in (wire.start_view, wire.end_view):
+            used_node_names.add(view_name)
+            node_view = node_views_by_name[view_name]
+            terminal_points_by_node.setdefault(view_name, []).append(node_view.position)
+
     for element in schema.elements:
-        for anchor_name, node in element.terminal_nodes.items():
-            if node.name not in nodes_by_name:
-                raise ValueError(
-                    f"Element {element.name!r} refers to node {node.name!r}, "
-                    "but that node is missing from the schema node list."
-                )
-            used_node_names.add(node.name)
-            if _is_wire(element):
-                terminal_point = node.position
-            else:
-                terminal_point = element.anchor_position(anchor_name)
-            terminal_points_by_node.setdefault(node.name, []).append(terminal_point)
+        for anchor_name, view_name in element.terminal_views.items():
+            used_node_names.add(view_name)
+            terminal_points_by_node.setdefault(view_name, []).append(
+                element.anchor_position(anchor_name)
+            )
 
     return {
         name: (
-            _resolved_node_position(node, terminal_points_by_node[name]),
-            node,
+            _resolved_node_position(node_view, terminal_points_by_node[name]),
+            node_view,
             len(terminal_points_by_node[name]),
         )
-        for name, node in nodes_by_name.items()
+        for name, node_view in node_views_by_name.items()
         if name in used_node_names
     }
 
 
-def _resolved_node_position(node, terminal_points):
-    if _is_rail(node):
-        return node.position
-    if node.placement_explicit:
-        return node.position
+def _resolved_node_position(node_view, terminal_points):
+    if _is_rail(node_view):
+        return node_view.position
+    if node_view.placement_explicit:
+        return node_view.position
     if len(terminal_points) > 2:
         return _median_point(terminal_points)
     return _average_points(terminal_points)
 
 
-def _should_render_node(node, terminal_count):
-    if _is_rail(node):
-        return bool(node.label) or node.node_type is Ground
-    if node.node_type is Ground:
+def _should_render_node(node_view, terminal_count):
+    if _is_rail(node_view):
+        return bool(node_view.label) or node_view.node_type is Ground
+    if node_view.node_type is Ground:
         return True
-    if node.label:
+    if node_view.label:
         return True
     return terminal_count > 2
 
 
-def _validate_schema_items(nodes, elements):
-    for node in nodes:
-        if not isinstance(node, Node):
+def _validate_schema_items(node_views, elements, wires):
+    for node_view in node_views:
+        if not isinstance(node_view, NodeView):
             raise TypeError(
-                f"Schema nodes must be Node objects, got {type(node).__name__}."
+                "Schema node_views must be NodeView objects, "
+                f"got {type(node_view).__name__}."
             )
+    node_views_by_name = _node_views_by_name(node_views)
+    nets_by_name = _nets_by_name(node_views)
+
     for element in elements:
         if not isinstance(element, Element):
             raise TypeError(
                 f"Schema elements must be Element objects, got {type(element).__name__}."
             )
-    _nodes_by_name(nodes)
+        for terminal, view_name in element.terminal_views.items():
+            node_view = _require_view(node_views_by_name, view_name, element.name)
+            expected_net = element.terminal_nets[terminal]
+            if node_view.net.name != expected_net:
+                raise ValueError(
+                    f"Element {element.name!r} terminal {terminal!r} refers to "
+                    f"view {view_name!r} as net {expected_net!r}, but the schema "
+                    f"view is on net {node_view.net.name!r}."
+                )
+
+    for wire in wires:
+        if not isinstance(wire, WireSegment):
+            raise TypeError(
+                f"Schema wires must be WireSegment objects, got {type(wire).__name__}."
+            )
+        start = _require_view(node_views_by_name, wire.start_view, wire.name or "wire")
+        end = _require_view(node_views_by_name, wire.end_view, wire.name or "wire")
+        if start.net.name != end.net.name:
+            raise ValueError(
+                f"Wire {wire.name!r} endpoints are on different nets: "
+                f"{start.net.name!r} and {end.net.name!r}."
+            )
+        if wire.net_name != start.net.name:
+            raise ValueError(
+                f"Wire {wire.name!r} was created for net {wire.net_name!r}, "
+                f"but its schema endpoints are on {start.net.name!r}."
+            )
+
+    return list(nets_by_name.values())
 
 
-def _nodes_by_name(nodes):
-    nodes_by_name = {}
-    for node in nodes:
-        if node.name in nodes_by_name:
-            raise ValueError(f"Duplicate schema node name: {node.name!r}")
-        nodes_by_name[node.name] = node
-    return nodes_by_name
+def _require_view(node_views_by_name, view_name, owner_name):
+    try:
+        return node_views_by_name[view_name]
+    except KeyError as error:
+        raise ValueError(
+            f"{owner_name!r} refers to node view {view_name!r}, "
+            "but that view is missing from the schema."
+        ) from error
+
+
+def _node_views_by_name(node_views):
+    node_views_by_name = {}
+    for node_view in node_views:
+        if node_view.name in node_views_by_name:
+            raise ValueError(f"Duplicate node view name: {node_view.name!r}")
+        node_views_by_name[node_view.name] = node_view
+    return node_views_by_name
+
+
+def _nets_by_name(node_views):
+    nets_by_name = {}
+    for node_view in node_views:
+        nets_by_name.setdefault(node_view.net.name, node_view.net)
+    return nets_by_name
 
 
 def _schemdraw_element(element):
@@ -622,48 +771,44 @@ def _schemdraw_element(element):
     return placed.theta(element.angle).anchor("center").at(element.position)
 
 
-def _is_wire(element):
-    return element.element_type is Wire
+def _is_rail(node_view):
+    return node_view.rail_direction is not None
 
 
-def _is_rail(node):
-    return node.rail_direction is not None
-
-
-def _wire_endpoints(element, node_points):
-    start_node = element.terminal_nodes["start"]
-    end_node = element.terminal_nodes["end"]
+def _wire_endpoints(wire, node_points, node_views_by_name):
+    start_view = node_views_by_name[wire.start_view]
+    end_view = node_views_by_name[wire.end_view]
     start_point = _node_connection_point(
-        start_node,
-        node_points[start_node.name][0],
-        node_points[end_node.name][0],
+        start_view,
+        node_points[start_view.name][0],
+        node_points[end_view.name][0],
     )
     end_point = _node_connection_point(
-        end_node,
-        node_points[end_node.name][0],
+        end_view,
+        node_points[end_view.name][0],
         start_point,
     )
     return start_point, end_point
 
 
-def _record_wire_rail_taps(element, node_points, rail_taps, start, end):
-    start_node = element.terminal_nodes["start"]
-    end_node = element.terminal_nodes["end"]
-    if _is_rail(start_node):
-        rail_taps[start_node.name].append(start)
-    if _is_rail(end_node):
-        rail_taps[end_node.name].append(end)
+def _record_wire_rail_taps(wire, node_views_by_name, rail_taps, start, end):
+    start_view = node_views_by_name[wire.start_view]
+    end_view = node_views_by_name[wire.end_view]
+    if _is_rail(start_view):
+        rail_taps[start_view.name].append(start)
+    if _is_rail(end_view):
+        rail_taps[end_view.name].append(end)
 
 
-def _node_connection_point(node, resolved_point, terminal_point):
-    if not _is_rail(node):
+def _node_connection_point(node_view, resolved_point, terminal_point):
+    if not _is_rail(node_view):
         return resolved_point
-    return _project_point_to_rail(node, terminal_point)
+    return _project_point_to_rail(node_view, terminal_point)
 
 
-def _project_point_to_rail(node, point):
-    start, end = _rail_endpoints(node)
-    if node.rail_direction is Direction.VERTICAL:
+def _project_point_to_rail(node_view, point):
+    start, end = _rail_endpoints(node_view)
+    if node_view.rail_direction is Direction.VERTICAL:
         return (
             start[0],
             _clamp(point[1], min(start[1], end[1]), max(start[1], end[1])),
@@ -671,12 +816,12 @@ def _project_point_to_rail(node, point):
     return (_clamp(point[0], min(start[0], end[0]), max(start[0], end[0])), start[1])
 
 
-def _rail_endpoints(node):
-    x, y = node.position
-    length = float(node.rail_length)
-    anchor = node.rail_anchor
+def _rail_endpoints(node_view):
+    x, y = node_view.position
+    length = float(node_view.rail_length)
+    anchor = node_view.rail_anchor
 
-    if node.rail_direction is Direction.HORIZONTAL:
+    if node_view.rail_direction is Direction.HORIZONTAL:
         if anchor is Alignment.LEFT:
             return (x, y), (x + length, y)
         if anchor is Alignment.RIGHT:
@@ -712,7 +857,7 @@ def _is_axis_aligned(angle):
     return min(abs(angle % 90.0), abs(90.0 - (angle % 90.0))) < EPS
 
 
-def _validate_terminal_nodes(element_type, terminal_nodes):
+def _validate_terminal_views(element_type, terminal_nodes):
     spec = _spec_for_type(element_type)
     provided = set(terminal_nodes)
     expected = set(spec.terminals)
@@ -725,9 +870,9 @@ def _validate_terminal_nodes(element_type, terminal_nodes):
         if unexpected:
             details.append(f"unexpected {sorted(unexpected)}")
         raise TypeError(f"{element_type.name} terminal mismatch: {', '.join(details)}")
-    for terminal, node in terminal_nodes.items():
-        if not isinstance(node, Node):
-            raise TypeError(f"Terminal {terminal!r} must be connected to a Node.")
+    for terminal, node_view in terminal_nodes.items():
+        if not isinstance(node_view, NodeView):
+            raise TypeError(f"Terminal {terminal!r} must connect to a NodeView.")
     return {terminal: terminal_nodes[terminal] for terminal in spec.terminals}
 
 
@@ -740,7 +885,7 @@ def _get_bounding_box(obj, padded=True):
         return _element_visual_bounding_box(obj)
     if isinstance(obj, Schema) and not padded:
         return _schema_visual_bounding_box(obj)
-    if isinstance(obj, (Node, Schema)):
+    if isinstance(obj, (NodeView, Schema)):
         return obj.get_bounding_box()
     if obj is None:
         return [[0.0, 0.0], [0.0, 0.0]]
@@ -784,13 +929,6 @@ def _label_loc_from_alignment(alignment):
 
 
 def _element_visual_bounding_box(element):
-    if _is_wire(element):
-        boxes = [node.get_bounding_box() for node in element.terminal_nodes.values()]
-        return [
-            [min(box[0][0] for box in boxes), min(box[0][1] for box in boxes)],
-            [max(box[1][0] for box in boxes), max(box[1][1] for box in boxes)],
-        ]
-
     corners = _box_corners(_element_spec(element).local_bbox)
     points = [
         _add_points(element.position, _rotate_point(corner, element.angle))
@@ -802,15 +940,26 @@ def _element_visual_bounding_box(element):
 
 
 def _schema_visual_bounding_box(schema):
+    node_views_by_name = _node_views_by_name(schema.node_views)
     boxes = [
         *[_element_visual_bounding_box(element) for element in schema.elements],
-        *[node.get_bounding_box() for node in schema.nodes],
+        *[node.get_bounding_box() for node in schema.node_views],
+        *[_wire_bounding_box(wire, node_views_by_name) for wire in schema.wires],
     ]
     if not boxes:
         return [[0.0, 0.0], [0.0, 0.0]]
     return [
         [min(box[0][0] for box in boxes), min(box[0][1] for box in boxes)],
         [max(box[1][0] for box in boxes), max(box[1][1] for box in boxes)],
+    ]
+
+
+def _wire_bounding_box(wire, node_views_by_name):
+    start = node_views_by_name[wire.start_view].get_bounding_box()
+    end = node_views_by_name[wire.end_view].get_bounding_box()
+    return [
+        [min(start[0][0], end[0][0]), min(start[0][1], end[0][1])],
+        [max(start[1][0], end[1][0]), max(start[1][1], end[1][1])],
     ]
 
 

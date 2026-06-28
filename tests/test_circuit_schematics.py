@@ -5,13 +5,16 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     Alignment,
     Direction,
     Dot,
+    Ground,
     Resistor,
     Wire,
     align,
     create_element,
+    create_net,
     create_node,
     create_rail,
     create_schema,
+    create_wire,
     point_at,
     render_schemdraw,
     rotate,
@@ -22,10 +25,13 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
 def test_voltage_divider_schema_has_expected_shape():
     schema = create_voltage_divider()
 
-    assert [node.name for node in schema.nodes] == ["vcc", "midpoint", "gnd"]
+    assert [node.name for node in schema.node_views] == ["vcc", "midpoint", "gnd"]
+    assert [net.name for net in schema.nets] == ["vcc", "midpoint", "gnd"]
     assert [element.name for element in schema.elements] == ["R1", "R2"]
-    assert schema.elements[0].terminal_nodes["start"].name == "vcc"
-    assert schema.elements[0].terminal_nodes["end"].name == "midpoint"
+    assert schema.elements[0].terminal_views["start"] == "vcc"
+    assert schema.elements[0].terminal_views["end"] == "midpoint"
+    assert schema.elements[0].terminal_nets["start"] == "vcc"
+    assert schema.elements[0].terminal_nets["end"] == "midpoint"
 
 
 def test_align_returns_placed_copy_without_mutating_original():
@@ -60,15 +66,17 @@ def test_render_schemdraw_writes_png(tmp_path):
 
 
 def test_wire_element_renders_without_a_label(tmp_path):
-    vcc = create_node(Dot, "vcc", label="+5V")
-    pul_plus = create_node(Dot, "pul_plus", label="PUL+")
+    v5 = create_net("v5")
+    vcc = create_node(Dot, "vcc", net=v5, label="+5V")
+    pul_plus = create_node(Dot, "pul_plus", net=v5, label="PUL+")
     pul_plus = translate(4, 0)(pul_plus)
-    feed = create_element(Wire, "", None, vcc, pul_plus)
+    feed = create_wire(vcc, pul_plus)
     schema = create_schema([vcc, pul_plus], [feed])
     outfile = tmp_path / "wire.svg"
 
     assert feed.position == (0.0, 0.0)
-    assert feed.get_bounding_box() == [[0.0, 0.0], [4.0, 0.0]]
+    assert schema.wires == [feed]
+    assert schema.get_bounding_box() == [[0.0, 0.0], [4.0, 0.0]]
 
     render_schemdraw(schema, file=outfile)
 
@@ -76,6 +84,18 @@ def test_wire_element_renders_without_a_label(tmp_path):
     assert "<svg" in svg
     assert "PUL+" in svg
     assert ">W<" not in svg
+
+
+def test_create_element_wire_compatibility_path():
+    v5 = create_net("v5")
+    rail = create_node(Dot, "rail", net=v5)
+    terminal = create_node(Dot, "terminal", net=v5)
+
+    wire = create_element(Wire, "", None, rail, terminal)
+
+    assert wire.start_view == "rail"
+    assert wire.end_view == "terminal"
+    assert wire.net_name == "v5"
 
 
 def test_create_node_accepts_label_alignment():
@@ -130,14 +150,15 @@ def test_point_at_anchor_keeps_anchor_point_and_moves_owner():
 
 
 def test_render_schemdraw_writes_rail_and_tap(tmp_path):
-    rail = create_node(Dot, "rail", label="+5V", label_alignment=Alignment.LEFT)
+    v5 = create_net("v5")
+    rail = create_node(Dot, "rail", net=v5, label="+5V", label_alignment=Alignment.LEFT)
     rail = translate(0, 4)(rail)
     rail = create_rail(rail, Direction.VERTICAL, 8, anchor=Alignment.TOP)
 
-    tap = create_node(Dot, "tap", label="PUL+")
+    tap = create_node(Dot, "tap", net=v5, label="PUL+")
     tap = translate(4, 1)(tap)
 
-    feed = create_element(Wire, "", None, rail, tap)
+    feed = create_wire(rail, tap)
     schema = create_schema([rail, tap], [feed])
     outfile = tmp_path / "rail.svg"
 
@@ -149,6 +170,59 @@ def test_render_schemdraw_writes_rail_and_tap(tmp_path):
     assert "PUL+" in svg
 
 
+def test_element_stores_terminal_view_names_and_net_names_not_view_objects():
+    signal = create_net("signal")
+    ground = create_net("ground")
+    sig_view = create_node(Dot, "sig_view", net=signal)
+    gnd_view = create_node(Ground, "gnd_view", net=ground)
+
+    resistor = create_element(Resistor, "R1", "1k", sig_view, gnd_view)
+
+    assert resistor.terminal_views == {"start": "sig_view", "end": "gnd_view"}
+    assert resistor.terminal_nets == {"start": "signal", "end": "ground"}
+
+
+def test_moving_node_view_after_element_creation_keeps_connectivity():
+    signal = create_net("signal")
+    ground = create_net("ground")
+    sig_view = create_node(Dot, "sig_view", net=signal)
+    gnd_view = create_node(Ground, "gnd_view", net=ground)
+    resistor = create_element(Resistor, "R1", "1k", sig_view, gnd_view)
+
+    sig_view = translate(4, 0)(sig_view)
+    schema = create_schema([sig_view, gnd_view], [resistor])
+
+    assert resistor.terminal_views["start"] == "sig_view"
+    assert resistor.terminal_nets["start"] == "signal"
+    assert schema.node_views[0].position == (4.0, 0.0)
+
+
+def test_multiple_node_views_can_represent_the_same_net():
+    v5 = create_net("v5")
+    rail = create_node(Dot, "v5_rail", net=v5)
+    terminal = create_node(Dot, "pul_plus", net=v5)
+
+    schema = create_schema([rail, terminal], [])
+
+    assert [net.name for net in schema.nets] == ["v5"]
+
+
+def test_create_wire_requires_same_net_views():
+    v5 = create_net("v5")
+    gnd = create_net("gnd")
+    rail = create_node(Dot, "v5_rail", net=v5)
+    terminal = create_node(Dot, "pul_plus", net=v5)
+    ground = create_node(Ground, "gnd", net=gnd)
+
+    assert create_wire(rail, terminal).net_name == "v5"
+    try:
+        create_wire(rail, ground)
+    except ValueError as error:
+        assert "same net" in str(error)
+    else:
+        raise AssertionError("wires should not connect different nets")
+
+
 def test_create_schema_rejects_duplicate_node_names():
     node_a = create_node(Dot, "same")
     node_b = create_node(Dot, "same")
@@ -156,6 +230,6 @@ def test_create_schema_rejects_duplicate_node_names():
     try:
         create_schema([node_a, node_b], [])
     except ValueError as error:
-        assert "Duplicate schema node name" in str(error)
+        assert "Duplicate node view name" in str(error)
     else:
-        raise AssertionError("duplicate node names should be rejected")
+        raise AssertionError("duplicate node view names should be rejected")

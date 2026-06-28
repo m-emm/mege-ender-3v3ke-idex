@@ -6,9 +6,13 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import *
 
 
 def create_voltage_divider():
-    vcc = create_node(Dot, "vcc", label="+5V")
-    midpoint = create_node(Dot, "midpoint", label="OUT")
-    gnd = create_node(Ground, "gnd")
+    vcc_net = create_net("vcc")
+    midpoint_net = create_net("midpoint")
+    gnd_net = create_net("gnd")
+
+    vcc = create_node(Dot, "vcc", net=vcc_net, label="+5V")
+    midpoint = create_node(Dot, "midpoint", net=midpoint_net, label="OUT")
+    gnd = create_node(Ground, "gnd", net=gnd_net)
 
     r1 = create_element(Resistor, "R1", "10K", vcc, midpoint)
     r2 = create_element(Resistor, "R2", "20K", midpoint, gnd)

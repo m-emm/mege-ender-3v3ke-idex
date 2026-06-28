@@ -2,9 +2,9 @@
 
 This package contains a small alignment-first DSL for drawing circuit
 schematics with Schemdraw. It follows the same value-style layout feel as the
-ShellForgePy geometry scripts in this repository: create nodes and elements,
-place them with `align`, `translate`, and `rotate`, then render the resulting
-schema.
+ShellForgePy geometry scripts in this repository: create nets, visual net
+views, and elements; place the views and elements with `align`, `translate`,
+and `rotate`; then render the resulting schema.
 
 Use it for lightweight circuit diagrams that should live beside the printer
 hardware and wiring work. For connector pin maps and harness views, keep using
@@ -19,9 +19,13 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import *
 
 
 def create_voltage_divider():
-    vcc = create_node(Dot, "vcc", label="+5V")
-    midpoint = create_node(Dot, "midpoint", label="OUT")
-    gnd = create_node(Ground, "gnd")
+    vcc_net = create_net("vcc")
+    midpoint_net = create_net("midpoint")
+    gnd_net = create_net("gnd")
+
+    vcc = create_node(Dot, "vcc", net=vcc_net, label="+5V")
+    midpoint = create_node(Dot, "midpoint", net=midpoint_net, label="OUT")
+    gnd = create_node(Ground, "gnd", net=gnd_net)
 
     r1 = create_element(Resistor, "R1", "10K", vcc, midpoint)
     r2 = create_element(Resistor, "R2", "20K", midpoint, gnd)
@@ -52,14 +56,16 @@ Rails are visible materializations of normal nodes. They are useful when many
 connections should visibly share one supply or ground rail:
 
 ```python
-vcc = create_node(Dot, "vcc", label="+5V", label_alignment=Alignment.LEFT)
+v5 = create_net("v5")
+
+vcc = create_node(Dot, "vcc", net=v5, label="+5V", label_alignment=Alignment.LEFT)
 vcc = translate(0, 4)(vcc)
 vcc = create_rail(vcc, Direction.VERTICAL, 8, anchor=Alignment.TOP)
 
-pul_plus = create_node(Dot, "pul_plus", label="PUL+")
+pul_plus = create_node(Dot, "pul_plus", net=v5, label="PUL+")
 pul_plus = translate(4, 1)(pul_plus)
 
-feed = create_element(Wire, "", None, vcc, pul_plus)
+feed = create_wire(vcc, pul_plus)
 ```
 
 Use `point_at(...)` when an alignment should target a specific edge or endpoint
@@ -83,18 +89,22 @@ The helper runs the script with the repository `src/` directory on
 
 ## Concepts
 
-- Nodes are electrical connection points created with `create_node`.
+- Nets are logical electrical connections created with `create_net`.
+- Node views are placed visual representations of nets created with
+  `create_node`. If `net=` is omitted, a same-named net is created implicitly.
 - Use `label_alignment=Alignment.LEFT/RIGHT/TOP/BOTTOM` when creating labeled
   nodes whose labels should face a specific way.
-- Rails are created from normal nodes with `create_rail`; connected terminals
+- Rails are created from node views with `create_rail`; connected terminals
   project onto the visible rail and render tap dots.
 - Use `point_at(obj, Alignment.TOP/RIGHT/...)` to align from a specific side or
   endpoint while moving the original object.
-- Elements are connected to nodes with `create_element`.
-- `Wire` is a direct conductor between two nodes and does not need placement.
+- Elements are connected to node views with `create_element`; internally they
+  store terminal view names and net names, not copies of the placed views.
+- `create_wire(...)` draws a direct conductor between two views of the same net.
 - Layout is explicit and copy-returning: `align(...)`, `translate(...)`, and
   `rotate(...)` return placed copies.
-- Schemas group nodes and elements with `create_schema`.
+- Schemas group node views, elements, inferred nets, and wires with
+  `create_schema`.
 - `render_schemdraw` turns the schema into a Schemdraw-backed SVG or PNG based
   on the output filename extension.
 
