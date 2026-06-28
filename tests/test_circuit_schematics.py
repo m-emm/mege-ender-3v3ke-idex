@@ -7,6 +7,7 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     Dot,
     Ground,
     Resistor,
+    Stripboard,
     Wire,
     align,
     create_element,
@@ -14,12 +15,15 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     create_node,
     create_rail,
     create_schema,
+    create_stripboard,
     create_wire,
     point_at,
     render_schemdraw,
+    render_stripboard,
     rotate,
     translate,
 )
+import pytest
 
 
 def test_voltage_divider_schema_has_expected_shape():
@@ -233,3 +237,73 @@ def test_create_schema_rejects_duplicate_node_names():
         assert "Duplicate node view name" in str(error)
     else:
         raise AssertionError("duplicate node view names should be rejected")
+
+
+def test_create_stripboard_has_expected_defaults():
+    board = create_stripboard(24, 12)
+
+    assert isinstance(board, Stripboard)
+    assert board.width_pitches == 24
+    assert board.height_pitches == 12
+    assert board.strip_direction is Direction.HORIZONTAL
+    assert board.pitch_mm == 2.54
+
+
+def test_create_stripboard_rejects_invalid_dimensions():
+    invalid_sizes = [
+        (0, 2),
+        (-1, 2),
+        (2, 0),
+        (2, -1),
+        (1.5, 2),
+        (True, 2),
+        (2, "3"),
+    ]
+
+    for width, height in invalid_sizes:
+        with pytest.raises((TypeError, ValueError)):
+            create_stripboard(width, height)
+
+
+def test_create_stripboard_rejects_invalid_pitch():
+    with pytest.raises((TypeError, ValueError)):
+        create_stripboard(4, 3, pitch_mm=0)
+
+    with pytest.raises((TypeError, ValueError)):
+        create_stripboard(4, 3, pitch_mm="2.54")
+
+
+def test_render_stripboard_writes_svg(tmp_path):
+    board = create_stripboard(4, 3)
+    outfile = tmp_path / "stripboard.svg"
+
+    render_stripboard(board, file=outfile)
+
+    svg = outfile.read_text(encoding="utf-8")
+    assert "<svg" in svg
+    assert svg.count('class="copper-strip"') == 3
+    assert svg.count('class="hole"') == 12
+
+
+def test_render_stripboard_writes_png(tmp_path):
+    board = create_stripboard(4, 3)
+    outfile = tmp_path / "stripboard.png"
+
+    render_stripboard(board, file=outfile)
+
+    assert outfile.exists()
+    assert outfile.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_render_stripboard_rejects_unsupported_suffix(tmp_path):
+    board = create_stripboard(4, 3)
+
+    with pytest.raises(ValueError, match="\\.svg or \\.png"):
+        render_stripboard(board, file=tmp_path / "stripboard.pdf")
+
+
+def test_render_stripboard_vertical_direction_is_not_implemented(tmp_path):
+    board = create_stripboard(4, 3, strip_direction=Direction.VERTICAL)
+
+    with pytest.raises(NotImplementedError, match="horizontal"):
+        render_stripboard(board, file=tmp_path / "stripboard.svg")

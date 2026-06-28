@@ -30,6 +30,17 @@ BJT_Y = 0.697
 DEFAULT_ELEMENT_BBOX_PADDING = 0.35
 LABEL_GAP = 0.16
 EPS = 1e-9
+STRIPBOARD_BOARD_MARGIN = 0.5
+STRIPBOARD_STRIP_INSET = 0.25
+STRIPBOARD_STRIP_HEIGHT = 0.55
+STRIPBOARD_HOLE_RADIUS = 0.22
+STRIPBOARD_STROKE_WIDTH = 0.035
+STRIPBOARD_BOARD_FILL = "#f7e48b"
+STRIPBOARD_BOARD_STROKE = "#e6ca70"
+STRIPBOARD_STRIP_FILL = "#d98b61"
+STRIPBOARD_STRIP_STROKE = "#b66d47"
+STRIPBOARD_HOLE_FILL = "#fbfbfb"
+STRIPBOARD_HOLE_STROKE = "#333333"
 
 
 class NodeType(Enum):
@@ -82,6 +93,27 @@ class Direction(Enum):
 @dataclass(frozen=True)
 class Net:
     name: str
+
+
+@dataclass(frozen=True)
+class Stripboard:
+    width_pitches: int
+    height_pitches: int
+    strip_direction: Direction = Direction.HORIZONTAL
+    pitch_mm: float = 2.54
+
+    def __post_init__(self):
+        _validate_positive_integer(self.width_pitches, "width_pitches")
+        _validate_positive_integer(self.height_pitches, "height_pitches")
+        if self.strip_direction not in (Direction.HORIZONTAL, Direction.VERTICAL):
+            raise ValueError("strip_direction must be Direction.HORIZONTAL or VERTICAL.")
+        if not isinstance(self.pitch_mm, (int, float)) or isinstance(
+            self.pitch_mm, bool
+        ):
+            raise TypeError("pitch_mm must be a positive number.")
+        if self.pitch_mm <= 0:
+            raise ValueError("pitch_mm must be positive.")
+        object.__setattr__(self, "pitch_mm", float(self.pitch_mm))
 
 
 @dataclass
@@ -289,6 +321,20 @@ class Schema:
 
 def create_net(name):
     return Net(name=str(name))
+
+
+def create_stripboard(
+    width_pitches,
+    height_pitches,
+    strip_direction=Direction.HORIZONTAL,
+    pitch_mm=2.54,
+):
+    return Stripboard(
+        width_pitches=width_pitches,
+        height_pitches=height_pitches,
+        strip_direction=strip_direction,
+        pitch_mm=pitch_mm,
+    )
 
 
 def create_node(
@@ -531,6 +577,157 @@ def render_schemdraw(schema, file, show=False):
 
     if Path(file).suffix == ".svg":
         _strip_trailing_whitespace(file)
+
+
+def render_stripboard(stripboard, file, scale=32):
+    if not isinstance(stripboard, Stripboard):
+        raise TypeError("render_stripboard expects a Stripboard object.")
+    if stripboard.strip_direction is not Direction.HORIZONTAL:
+        raise NotImplementedError("Only horizontal stripboards are supported for now.")
+
+    path = Path(file)
+    suffix = path.suffix.lower()
+    if suffix == ".svg":
+        _render_stripboard_svg(stripboard, path, scale=scale)
+    elif suffix == ".png":
+        _render_stripboard_png(stripboard, path, scale=scale)
+    else:
+        raise ValueError("Stripboard output file must end in .svg or .png.")
+
+
+def _render_stripboard_svg(stripboard, path, scale):
+    scale = _validate_render_scale(scale)
+    width, height = _stripboard_size(stripboard)
+    width_px = width * scale
+    height_px = height * scale
+
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        (
+            f'<svg xmlns="http://www.w3.org/2000/svg" '
+            f'width="{width_px:.0f}" height="{height_px:.0f}" '
+            f'viewBox="0 0 {width:.3f} {height:.3f}">'
+        ),
+        "  <title>Stripboard</title>",
+        (
+            f'  <rect class="board" x="0" y="0" width="{width:.3f}" '
+            f'height="{height:.3f}" fill="{STRIPBOARD_BOARD_FILL}" '
+            f'stroke="{STRIPBOARD_BOARD_STROKE}" '
+            f'stroke-width="{STRIPBOARD_STROKE_WIDTH:.3f}"/>'
+        ),
+    ]
+
+    for row in range(stripboard.height_pitches):
+        x, y, strip_width, strip_height = _stripboard_strip_rect(stripboard, row)
+        lines.append(
+            f'  <rect class="copper-strip" data-row="{row}" '
+            f'x="{x:.3f}" y="{y:.3f}" width="{strip_width:.3f}" '
+            f'height="{strip_height:.3f}" fill="{STRIPBOARD_STRIP_FILL}" '
+            f'stroke="{STRIPBOARD_STRIP_STROKE}" '
+            f'stroke-width="{STRIPBOARD_STROKE_WIDTH:.3f}"/>'
+        )
+
+    for col, row, x, y in _stripboard_holes(stripboard):
+        lines.append(
+            f'  <circle class="hole" data-col="{col}" data-row="{row}" '
+            f'cx="{x:.3f}" cy="{y:.3f}" r="{STRIPBOARD_HOLE_RADIUS:.3f}" '
+            f'fill="{STRIPBOARD_HOLE_FILL}" stroke="{STRIPBOARD_HOLE_STROKE}" '
+            f'stroke-width="{STRIPBOARD_STROKE_WIDTH:.3f}"/>'
+        )
+
+    lines.append("</svg>")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _render_stripboard_png(stripboard, path, scale):
+    scale = _validate_render_scale(scale)
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError as error:
+        raise RuntimeError("Pillow is required to render stripboard PNG files.") from error
+
+    width, height = _stripboard_size(stripboard)
+    image_width = max(1, int(round(width * scale)))
+    image_height = max(1, int(round(height * scale)))
+    image = Image.new("RGB", (image_width, image_height), "white")
+    draw = ImageDraw.Draw(image)
+
+    draw.rectangle(
+        _px_rect(0, 0, width, height, scale),
+        fill=STRIPBOARD_BOARD_FILL,
+        outline=STRIPBOARD_BOARD_STROKE,
+        width=_px_stroke(scale),
+    )
+
+    for row in range(stripboard.height_pitches):
+        strip_rect = _stripboard_strip_rect(stripboard, row)
+        draw.rectangle(
+            _px_rect(*strip_rect, scale),
+            fill=STRIPBOARD_STRIP_FILL,
+            outline=STRIPBOARD_STRIP_STROKE,
+            width=_px_stroke(scale),
+        )
+
+    radius = STRIPBOARD_HOLE_RADIUS
+    for _, _, x, y in _stripboard_holes(stripboard):
+        draw.ellipse(
+            _px_rect(x - radius, y - radius, radius * 2, radius * 2, scale),
+            fill=STRIPBOARD_HOLE_FILL,
+            outline=STRIPBOARD_HOLE_STROKE,
+            width=_px_stroke(scale),
+        )
+
+    image.save(path)
+
+
+def _stripboard_size(stripboard):
+    return float(stripboard.width_pitches), float(stripboard.height_pitches)
+
+
+def _stripboard_strip_rect(stripboard, row):
+    y = STRIPBOARD_BOARD_MARGIN + row - STRIPBOARD_STRIP_HEIGHT / 2.0
+    x = STRIPBOARD_STRIP_INSET
+    width = stripboard.width_pitches - 2 * STRIPBOARD_STRIP_INSET
+    return x, y, width, STRIPBOARD_STRIP_HEIGHT
+
+
+def _stripboard_holes(stripboard):
+    for row in range(stripboard.height_pitches):
+        for col in range(stripboard.width_pitches):
+            yield (
+                col,
+                row,
+                STRIPBOARD_BOARD_MARGIN + col,
+                STRIPBOARD_BOARD_MARGIN + row,
+            )
+
+
+def _px_rect(x, y, width, height, scale):
+    return (
+        int(round(x * scale)),
+        int(round(y * scale)),
+        int(round((x + width) * scale)),
+        int(round((y + height) * scale)),
+    )
+
+
+def _px_stroke(scale):
+    return max(1, int(round(STRIPBOARD_STROKE_WIDTH * scale)))
+
+
+def _validate_positive_integer(value, name):
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise TypeError(f"{name} must be a positive integer.")
+    if value <= 0:
+        raise ValueError(f"{name} must be positive.")
+
+
+def _validate_render_scale(scale):
+    if not isinstance(scale, (int, float)) or isinstance(scale, bool):
+        raise TypeError("scale must be a positive number.")
+    if scale <= 0:
+        raise ValueError("scale must be positive.")
+    return float(scale)
 
 
 def _create_wire_from_element_args(name, nodes, terminal_nodes):

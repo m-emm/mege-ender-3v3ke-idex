@@ -52,6 +52,28 @@ Use a `.png` filename instead of `.svg` to render a PNG preview:
 render_schemdraw(schema, file=Path("voltage_divider.png"))
 ```
 
+## Stripboard Renderer
+
+The package also includes a small stripboard renderer for physical board
+planning. This is separate from schematic `Schema` rendering: it draws the
+bare board, horizontal copper strips, and holes only. Components, strip cuts,
+and net-aware placement are intentionally left for later passes.
+
+```python
+from pathlib import Path
+
+from mege_ender_3v3ke_idex.circuit_schematics.simple import *
+
+
+board = create_stripboard(24, 12)
+render_stripboard(board, file=Path("stripboard.svg"))
+render_stripboard(board, file=Path("stripboard.png"))
+```
+
+The first version renders horizontal stripboards. `strip_direction` is part of
+the API shape for future vertical-strip support, but non-horizontal rendering
+is not implemented yet.
+
 Rails are visible materializations of normal nodes. They are useful when many
 connections should visibly share one supply or ground rail:
 
