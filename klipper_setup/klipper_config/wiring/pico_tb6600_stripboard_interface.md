@@ -52,9 +52,9 @@ Use three rails on the stripboard:
 GND           common ground
 ```
 
-The repeated `+5V rail` and `GND rail` symbols in the schematic are rail taps,
-not separate supplies. Build one +5 V logic rail and one common GND rail, then
-connect every matching tap to that rail.
+The schematic draws one +5 V logic rail and one common GND rail. Branches from
+those rails are the stripboard taps for PUL+, DIR+, the decoupling capacitor,
+the transistor emitters, the pulldowns, and ENA-.
 
 All grounds are tied together:
 
