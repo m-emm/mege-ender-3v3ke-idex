@@ -13,11 +13,11 @@ PNG_FILE = DIAGRAM_DIR / "pico_tb6600_stripboard_interface.png"
 LOW_SIDE_TRANSISTOR_X = 8.5
 LOW_SIDE_INPUT_X = 0.0
 LOW_SIDE_BASE_X = 5.7
-LOW_SIDE_GROUND_OFFSET_Y = -5.8
 TRANSISTOR_TYPE = "BC337"
 V5_RAIL_X = -3.0
 GND_RAIL_X = 12.0
 TB6600_TERMINAL_X = 9.8
+ENABLE_TRANSISTOR_X = 8.8
 
 REFDES = (
     {
@@ -90,8 +90,17 @@ def create_low_side_channel(
         Alignment.LEFT,
     )
     base = create_node(Dot, f"{prefix}_base")
+    gnd_junction = placed_node(
+        Dot,
+        f"{prefix}_gnd_junction",
+        None,
+        LOW_SIDE_TRANSISTOR_X,
+        gnd_tap.position[1],
+        Alignment.RIGHT,
+    )
 
     plus_feed = wire_between(v5_tap, plus)
+    gnd_feed = wire_between(gnd_junction, gnd_tap)
 
     transistor = create_element(
         BjtNpn,
@@ -99,7 +108,7 @@ def create_low_side_channel(
         TRANSISTOR_TYPE,
         base=base,
         collector=minus,
-        emitter=gnd_tap,
+        emitter=gnd_junction,
     )
     transistor = place(
         transistor,
@@ -122,21 +131,29 @@ def create_low_side_channel(
         refdes["pulldown"],
         "47k",
         base,
-        gnd_tap,
+        gnd_junction,
     )
     pulldown = place(pulldown, LOW_SIDE_BASE_X, y - 4.7, Alignment.RIGHT)
 
     return (
-        [plus, minus, gpio, base],
-        [plus_feed, transistor, base_resistor, pulldown],
+        [plus, minus, gpio, base, gnd_junction],
+        [plus_feed, gnd_feed, transistor, base_resistor, pulldown],
     )
 
 
 def create_enable_channel(gnd_tap, ena_minus_tap):
     y = -6.0
     v24 = placed_node(Dot, "ena_v24", "+24V", 0.0, y, Alignment.LEFT)
-    ena_plus = placed_node(
+    ena_plus_terminal = placed_node(
         Dot, "ena_plus", "ENA+", TB6600_TERMINAL_X, y - 1.0, Alignment.TOP
+    )
+    ena_plus_junction = placed_node(
+        Dot,
+        "ena_plus_junction",
+        None,
+        ENABLE_TRANSISTOR_X,
+        y - 1.0,
+        Alignment.RIGHT,
     )
     ena_minus = placed_node(
         Dot, "ena_minus", "ENA-", TB6600_TERMINAL_X, y - 2.3, Alignment.BOTTOM
@@ -150,11 +167,19 @@ def create_enable_channel(gnd_tap, ena_minus_tap):
         Alignment.LEFT,
     )
     base = create_node(Dot, "ena_base")
+    gnd_junction = placed_node(
+        Dot,
+        "ena_gnd_junction",
+        None,
+        ENABLE_TRANSISTOR_X,
+        gnd_tap.position[1],
+        Alignment.RIGHT,
+    )
 
-    feed_a = create_element(Resistor, "R5", "4k7 0.25W", v24, ena_plus)
+    feed_a = create_element(Resistor, "R5", "4k7 0.25W", v24, ena_plus_junction)
     feed_a = place(horizontal(feed_a), 2.4, y + 0.2, Alignment.TOP)
 
-    feed_b = create_element(Resistor, "R6", "4k7 0.25W", v24, ena_plus)
+    feed_b = create_element(Resistor, "R6", "4k7 0.25W", v24, ena_plus_junction)
     feed_b = place(horizontal(feed_b), 2.4, y - 1.9, Alignment.BOTTOM)
 
     transistor = create_element(
@@ -162,22 +187,41 @@ def create_enable_channel(gnd_tap, ena_minus_tap):
         "Q3",
         TRANSISTOR_TYPE,
         base=base,
-        collector=ena_plus,
-        emitter=gnd_tap,
+        collector=ena_plus_junction,
+        emitter=gnd_junction,
     )
-    transistor = place(transistor, 8.8, y - 5.2, Alignment.RIGHT)
+    transistor = place(transistor, ENABLE_TRANSISTOR_X, y - 5.2, Alignment.RIGHT)
 
     base_resistor = create_element(Resistor, "R7", "2k2", gpio, base)
     base_resistor = place(horizontal(base_resistor), 3.0, y - 4.6, Alignment.TOP)
 
-    pulldown = create_element(Resistor, "R8", "47k", base, gnd_tap)
+    pulldown = create_element(Resistor, "R8", "47k", base, gnd_junction)
     pulldown = place(pulldown, LOW_SIDE_BASE_X, y - 6.1, Alignment.RIGHT)
 
+    ena_plus_wire = wire_between(ena_plus_junction, ena_plus_terminal)
     ena_minus_wire = wire_between(ena_minus_tap, ena_minus)
+    gnd_feed = wire_between(gnd_junction, gnd_tap)
 
     return (
-        [v24, ena_plus, ena_minus, gpio, base],
-        [feed_a, feed_b, transistor, base_resistor, pulldown, ena_minus_wire],
+        [
+            v24,
+            ena_plus_terminal,
+            ena_plus_junction,
+            ena_minus,
+            gpio,
+            base,
+            gnd_junction,
+        ],
+        [
+            feed_a,
+            feed_b,
+            transistor,
+            base_resistor,
+            pulldown,
+            ena_plus_wire,
+            ena_minus_wire,
+            gnd_feed,
+        ],
     )
 
 
