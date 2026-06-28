@@ -281,11 +281,11 @@ pwm_cycle_time: 2.0
 sensor_type: Generic 3950
 sensor_pin: gpio26
 pullup_resistor: 4700
-# PID constants measured by calibrate_boosted_bed_pid.sh at 60C.
+# PID constants measured by calibrate_boosted_bed_pid.sh.
 control: pid
-pid_Kp: 32.150
-pid_Ki: 0.940
-pid_Kd: 274.882
+pid_Kp: 31.396
+pid_Ki: 0.337
+pid_Kd: 731.124
 min_temp: 0
 max_temp: 130
 
@@ -402,7 +402,7 @@ description: Cool the bed by parking T0 over bed center and running both part fa
 variable_target: 40.0
 variable_x_center: 122.0
 variable_y_center: 145.0
-variable_z_height: 10.0
+variable_z_height: 5.0
 variable_xy_move_speed: 60.0
 variable_z_move_speed: 20.0
 variable_fan_speed: 1.0
