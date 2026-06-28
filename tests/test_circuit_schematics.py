@@ -299,7 +299,9 @@ def test_assign_schema_nets_to_stripboard_uses_one_row_per_net():
     assert [
         visualization.net_name for visualization in assignment.net_visualizations
     ] == ["top", "middle", "low"]
-    assert assignment.stripboard.width_pitches >= 6
+    assert assignment.used_source_columns == (0, 2, 4)
+    assert assignment.column_map == {0: 1, 2: 2, 4: 3}
+    assert assignment.stripboard.width_pitches == 5
 
 
 def test_snap_schema_to_stripboard_moves_node_views_onto_rows():

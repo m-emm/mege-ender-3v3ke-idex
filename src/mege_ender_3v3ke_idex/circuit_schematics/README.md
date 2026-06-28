@@ -82,6 +82,8 @@ sorts those nets by schematic y coordinate, assigns one full horizontal strip
 to each net, then overlays snapped node and terminal markers onto the hole
 grid. The board projection maps the schematic top to the first stripboard row,
 so a bottom ground rail stays at the bottom of the rendered stripboard.
+Horizontally, only columns with snapped schematic node or terminal markers are
+kept; empty runs of holes between used columns are removed.
 
 This is a layout aid, not an autorouter. It does not yet place real component
 footprints, add strip cuts, or add jumpers.

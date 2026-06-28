@@ -153,6 +153,8 @@ class StripboardNetAssignment:
     stripboard: Stripboard
     net_visualizations: tuple[SchemaNetVisualization, ...]
     net_rows: dict[str, int]
+    used_source_columns: tuple[int, ...]
+    column_map: dict[int, int]
     x_offset: int
     column_pitch: float
     left_margin_pitches: int
@@ -578,27 +580,31 @@ def assign_schema_nets_to_stripboard(
             stripboard=create_stripboard(1, 1),
             net_visualizations=(),
             net_rows={},
+            used_source_columns=(),
+            column_map={},
             x_offset=left_margin_pitches,
             column_pitch=float(column_pitch),
             left_margin_pitches=left_margin_pitches,
             right_margin_pitches=right_margin_pitches,
         )
 
-    min_col = math.floor(
-        min(visualization.x_min for visualization in net_visualizations) / column_pitch
+    used_source_columns = tuple(
+        sorted(
+            {
+                int(round(point[0] / column_pitch))
+                for point in _schema_net_visualization_points(net_visualizations)
+            }
+        )
     )
-    max_col = math.ceil(
-        max(visualization.x_max for visualization in net_visualizations) / column_pitch
-    )
+    column_map = {
+        source_column: left_margin_pitches + index
+        for index, source_column in enumerate(used_source_columns)
+    }
     board_width = (
-        max_col
-        - min_col
-        + 1
-        + left_margin_pitches
-        + right_margin_pitches
+        len(used_source_columns) + left_margin_pitches + right_margin_pitches
     )
     board_height = len(net_visualizations)
-    x_offset = left_margin_pitches - min_col
+    x_offset = left_margin_pitches - used_source_columns[0]
 
     board_visualizations = tuple(reversed(net_visualizations))
 
@@ -609,6 +615,8 @@ def assign_schema_nets_to_stripboard(
             visualization.net_name: row
             for row, visualization in enumerate(board_visualizations)
         },
+        used_source_columns=used_source_columns,
+        column_map=column_map,
         x_offset=x_offset,
         column_pitch=float(column_pitch),
         left_margin_pitches=left_margin_pitches,
@@ -1284,8 +1292,21 @@ def _snap_schema_point_to_stripboard(point, net_name, assignment, column_pitch):
 
 
 def _snap_schema_x_to_column(x, assignment, column_pitch):
-    column = int(round(x / column_pitch)) + assignment.x_offset
+    source_column = int(round(x / column_pitch))
+    if abs(float(column_pitch) - assignment.column_pitch) < EPS:
+        column = assignment.column_map.get(source_column)
+        if column is not None:
+            return column
+    column = source_column + assignment.x_offset
     return int(_clamp(column, 0, assignment.stripboard.width_pitches - 1))
+
+
+def _schema_net_visualization_points(net_visualizations):
+    for visualization in net_visualizations:
+        for node_view in visualization.node_views:
+            yield node_view.position
+        for terminal in visualization.terminal_points:
+            yield terminal.position
 
 
 def _stripboard_row_net_name(assignment, row):
