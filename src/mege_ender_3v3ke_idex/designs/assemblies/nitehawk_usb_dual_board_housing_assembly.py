@@ -441,8 +441,8 @@ def create_nitehawk_usb_dual_board_housing_assembly(
         lid_boss_relief_cutter = materialize_bounding_box(
             lid_boss,
             x_enlargement=nitehawk_usb_dual_housing_lid_body_clearance + 0.2,
-            y_enlargement=0.2,
-            z_enlargement=0.2,
+            y_enlargement=nitehawk_usb_dual_housing_lid_screw_inset,
+            z_enlargement=nitehawk_usb_dual_housing_lid_screw_inset,
         )
         lid_rim = lid_rim.cut(lid_boss_relief_cutter)
     lid = lid.fuse(lid_rim)
