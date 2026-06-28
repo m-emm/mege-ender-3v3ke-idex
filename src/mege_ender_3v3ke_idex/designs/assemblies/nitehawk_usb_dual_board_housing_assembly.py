@@ -1,0 +1,438 @@
+"""Dual Nitehawk USB daughterboard wall housing assembly."""
+
+from shellforgepy.simple import *
+
+BIG_THING = 500
+
+
+def create_nitehawk_usb_dual_board_housing_assembly(
+    *,
+    nitehawk_usb_board,
+    nitehawk_usb_dual_housing_wall_thickness,
+    nitehawk_usb_dual_housing_corner_fillet_radius,
+    nitehawk_usb_dual_housing_board_gap,
+    nitehawk_usb_dual_housing_board_side_margin,
+    nitehawk_usb_dual_housing_board_bottom_margin,
+    nitehawk_usb_dual_housing_board_top_margin,
+    nitehawk_usb_dual_housing_board_standoff_height,
+    nitehawk_usb_dual_housing_board_boss_diameter,
+    nitehawk_usb_dual_housing_board_screw_size,
+    nitehawk_usb_dual_housing_board_screw_length,
+    nitehawk_usb_dual_housing_board_screw_pilot_diameter,
+    nitehawk_usb_dual_housing_component_clearance,
+    nitehawk_usb_dual_housing_lid_thickness,
+    nitehawk_usb_dual_housing_lid_body_clearance,
+    nitehawk_usb_dual_housing_lid_rim_depth,
+    nitehawk_usb_dual_housing_lid_rim_thickness,
+    nitehawk_usb_dual_housing_lid_rim_clearance,
+    nitehawk_usb_dual_housing_lid_screw_size,
+    nitehawk_usb_dual_housing_lid_screw_length,
+    nitehawk_usb_dual_housing_lid_screw_inset,
+    nitehawk_usb_dual_housing_lid_screw_boss_diameter,
+    nitehawk_usb_dual_housing_cable_slit_x_size,
+    nitehawk_usb_dual_housing_cable_slit_y_margin,
+    nitehawk_usb_dual_housing_cable_slit_fillet_radius,
+    nitehawk_usb_dual_housing_cable_tie_slot_x_size,
+    nitehawk_usb_dual_housing_cable_tie_slot_y_size,
+    nitehawk_usb_dual_housing_cable_tie_slot_pair_spacing,
+    nitehawk_usb_dual_housing_cable_tie_slot_x_offset_from_back,
+    nitehawk_usb_dual_housing_profile_mount_spine_width,
+    nitehawk_usb_dual_housing_profile_mount_spine_thickness,
+    nitehawk_usb_dual_housing_profile_mount_spine_height,
+    nitehawk_usb_dual_housing_profile_mount_screw_size,
+    nitehawk_usb_dual_housing_profile_mount_screw_length,
+    nitehawk_usb_dual_housing_profile_mount_hole_spacing,
+):
+    """Create a compact lidded housing for two Nitehawk USB daughterboards."""
+
+    board_1 = nitehawk_usb_board.prefixed_copy("board_1")
+    board_1 = rotate(-90, axis=(0, 1, 0))(board_1)
+    board_1 = rotate(-90, axis=(1, 0, 0))(board_1)
+
+    raw_board_bbox = get_bounding_box(board_1)
+    raw_board_size = get_bounding_box_size(board_1)
+    wall = nitehawk_usb_dual_housing_wall_thickness
+
+    housing_width = (
+        2 * raw_board_size[1]
+        + nitehawk_usb_dual_housing_board_gap
+        + 2 * wall
+        + 2 * nitehawk_usb_dual_housing_board_side_margin
+    )
+    housing_height = (
+        raw_board_size[2]
+        + 2 * wall
+        + nitehawk_usb_dual_housing_board_bottom_margin
+        + nitehawk_usb_dual_housing_board_top_margin
+    )
+    housing_depth = (
+        wall
+        + nitehawk_usb_dual_housing_board_standoff_height
+        + raw_board_size[0]
+        + nitehawk_usb_dual_housing_component_clearance
+        + nitehawk_usb_dual_housing_lid_rim_depth
+        + nitehawk_usb_dual_housing_lid_body_clearance
+    )
+
+    housing_reference = create_box(housing_depth, housing_width, housing_height)
+    housing_box = create_filleted_box(
+        housing_depth,
+        housing_width,
+        housing_height,
+        fillet_radius=nitehawk_usb_dual_housing_corner_fillet_radius,
+        no_fillets_at=[Alignment.LEFT, Alignment.RIGHT],
+    )
+    inner_space_cutter = create_box(
+        housing_depth - wall + 1,
+        housing_width - 2 * wall,
+        housing_height - 2 * wall,
+        origin=(-1, wall, wall),
+    )
+    housing_box = housing_box.cut(inner_space_cutter)
+
+    board_back_x = (
+        housing_depth - wall - nitehawk_usb_dual_housing_board_standoff_height
+    )
+    board_bottom_z = wall + nitehawk_usb_dual_housing_board_bottom_margin
+    board_1_y = wall + nitehawk_usb_dual_housing_board_side_margin
+    board_1 = translate(
+        board_back_x - raw_board_bbox[1][0],
+        board_1_y - raw_board_bbox[0][1],
+        board_bottom_z - raw_board_bbox[0][2],
+    )(board_1)
+
+    board_2 = nitehawk_usb_board.prefixed_copy("board_2")
+    board_2 = rotate(-90, axis=(0, 1, 0))(board_2)
+    board_2 = rotate(-90, axis=(1, 0, 0))(board_2)
+    board_2_bbox = get_bounding_box(board_2)
+    board_2_y = board_1_y + raw_board_size[1] + nitehawk_usb_dual_housing_board_gap
+    board_2 = translate(
+        board_back_x - board_2_bbox[1][0],
+        board_2_y - board_2_bbox[0][1],
+        board_bottom_z - board_2_bbox[0][2],
+    )(board_2)
+
+    board_bosses = PartCollector()
+    board_pilot_holes = PartCollector()
+    board_mount_screws = PartCollector()
+    board_mount_holes = []
+    board_mount_specs = [
+        (board_1, "board_1", "mounting_hole_front_left"),
+        (board_1, "board_1", "mounting_hole_back"),
+        (board_2, "board_2", "mounting_hole_front_right"),
+        (board_2, "board_2", "mounting_hole_back"),
+    ]
+    for board, board_name, hole_name in board_mount_specs:
+        board_hole = board.get_cutter_part_by_name(f"{board_name}_{hole_name}")
+        hole_center = get_bounding_box_center(board_hole)
+        boss = create_cylinder(
+            nitehawk_usb_dual_housing_board_boss_diameter / 2,
+            nitehawk_usb_dual_housing_board_standoff_height,
+            origin=(
+                board_back_x,
+                hole_center[1],
+                hole_center[2],
+            ),
+            direction=(1, 0, 0),
+        )
+        board_bosses = board_bosses.fuse(boss)
+
+        pilot_hole = create_cylinder(
+            nitehawk_usb_dual_housing_board_screw_pilot_diameter / 2,
+            nitehawk_usb_dual_housing_board_standoff_height + wall + 2,
+            origin=(
+                board_back_x - 1,
+                hole_center[1],
+                hole_center[2],
+            ),
+            direction=(1, 0, 0),
+        )
+        board_pilot_holes = board_pilot_holes.fuse(pilot_hole)
+        board_mount_holes.append((f"{board_name}_{hole_name}", pilot_hole))
+
+        screw = create_cylinder_screw(
+            nitehawk_usb_dual_housing_board_screw_size,
+            nitehawk_usb_dual_housing_board_screw_length,
+        )
+        screw = rotate(90, axis=(0, 1, 0))(screw)
+        screw = translate(
+            board_back_x - nitehawk_usb_dual_housing_board_screw_length,
+            hole_center[1],
+            hole_center[2],
+        )(screw)
+        board_mount_screws = board_mount_screws.fuse(screw)
+
+    housing_box = housing_box.fuse(board_bosses)
+    housing_box = housing_box.cut(board_pilot_holes)
+
+    lid_screw_bosses = PartCollector()
+    lid_pilot_holes = PartCollector()
+    lid_clearance_holes = PartCollector()
+    lid_screws = PartCollector()
+    lid_screw_positions = []
+    lid_screw_record = MScrew.from_size(nitehawk_usb_dual_housing_lid_screw_size)
+    for y_alignment in [Alignment.FRONT, Alignment.BACK]:
+        for z_alignment in [Alignment.BOTTOM, Alignment.TOP]:
+            y = (
+                nitehawk_usb_dual_housing_lid_screw_inset
+                if y_alignment == Alignment.FRONT
+                else housing_width - nitehawk_usb_dual_housing_lid_screw_inset
+            )
+            z = (
+                nitehawk_usb_dual_housing_lid_screw_inset
+                if z_alignment == Alignment.BOTTOM
+                else housing_height - nitehawk_usb_dual_housing_lid_screw_inset
+            )
+            lid_boss = create_cylinder(
+                nitehawk_usb_dual_housing_lid_screw_boss_diameter / 2,
+                housing_depth - wall,
+                origin=(0, y, z),
+                direction=(1, 0, 0),
+            )
+            lid_screw_bosses = lid_screw_bosses.fuse(lid_boss)
+
+            lid_pilot_hole = create_cylinder(
+                nitehawk_usb_dual_housing_board_screw_pilot_diameter / 2,
+                housing_depth + 2,
+                origin=(-1, y, z),
+                direction=(1, 0, 0),
+            )
+            lid_pilot_holes = lid_pilot_holes.fuse(lid_pilot_hole)
+
+            lid_clearance_hole = create_cylinder(
+                lid_screw_record.clearance_hole_normal / 2,
+                nitehawk_usb_dual_housing_lid_thickness + 3,
+                origin=(
+                    -nitehawk_usb_dual_housing_lid_thickness
+                    - nitehawk_usb_dual_housing_lid_body_clearance
+                    - 1,
+                    y,
+                    z,
+                ),
+                direction=(1, 0, 0),
+            )
+            lid_clearance_holes = lid_clearance_holes.fuse(lid_clearance_hole)
+            lid_screw_positions.append((y, z, lid_pilot_hole, lid_clearance_hole))
+
+            lid_screw = create_cylinder_screw(
+                nitehawk_usb_dual_housing_lid_screw_size,
+                nitehawk_usb_dual_housing_lid_screw_length,
+            )
+            lid_screw = rotate(90, axis=(0, 1, 0))(lid_screw)
+            lid_screw = translate(
+                -nitehawk_usb_dual_housing_lid_thickness
+                - nitehawk_usb_dual_housing_lid_body_clearance
+                - nitehawk_usb_dual_housing_lid_screw_length,
+                y,
+                z,
+            )(lid_screw)
+            lid_screws = lid_screws.fuse(lid_screw)
+
+    housing_box = housing_box.fuse(lid_screw_bosses)
+    housing_box = housing_box.cut(lid_pilot_holes)
+
+    cable_slit_length = housing_width - 2 * (
+        wall + nitehawk_usb_dual_housing_cable_slit_y_margin
+    )
+    cable_slit = create_filleted_box(
+        nitehawk_usb_dual_housing_cable_slit_x_size,
+        cable_slit_length,
+        wall + 2,
+        fillet_radius=nitehawk_usb_dual_housing_cable_slit_fillet_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+    )
+    cable_slit = translate(
+        nitehawk_usb_dual_housing_lid_rim_depth
+        + nitehawk_usb_dual_housing_lid_body_clearance,
+        wall + nitehawk_usb_dual_housing_cable_slit_y_margin,
+        -1,
+    )(cable_slit)
+    housing_box = housing_box.cut(cable_slit)
+
+    cable_tie_slots = PartCollector()
+    cable_tie_slot_items = []
+    cable_tie_x = (
+        housing_depth
+        - wall
+        - nitehawk_usb_dual_housing_cable_tie_slot_x_offset_from_back
+        - nitehawk_usb_dual_housing_cable_tie_slot_x_size / 2
+    )
+    for board_index, board_y_min in enumerate([board_1_y, board_2_y], start=1):
+        board_center_y = board_y_min + raw_board_size[1] / 2
+        for side, y_offset in [
+            ("front", -nitehawk_usb_dual_housing_cable_tie_slot_pair_spacing / 2),
+            ("back", nitehawk_usb_dual_housing_cable_tie_slot_pair_spacing / 2),
+        ]:
+            cable_tie_slot = create_box(
+                nitehawk_usb_dual_housing_cable_tie_slot_x_size,
+                nitehawk_usb_dual_housing_cable_tie_slot_y_size,
+                wall + 2,
+                origin=(
+                    cable_tie_x - nitehawk_usb_dual_housing_cable_tie_slot_x_size / 2,
+                    board_center_y
+                    + y_offset
+                    - nitehawk_usb_dual_housing_cable_tie_slot_y_size / 2,
+                    -1,
+                ),
+            )
+            cable_tie_slots = cable_tie_slots.fuse(cable_tie_slot)
+            cable_tie_slot_items.append(
+                (f"cable_tie_slot_board_{board_index}_{side}", cable_tie_slot)
+            )
+    housing_box = housing_box.cut(cable_tie_slots)
+
+    profile_mount_spine = create_filleted_box(
+        nitehawk_usb_dual_housing_profile_mount_spine_thickness,
+        nitehawk_usb_dual_housing_profile_mount_spine_width,
+        nitehawk_usb_dual_housing_profile_mount_spine_height,
+        fillet_radius=min(
+            nitehawk_usb_dual_housing_corner_fillet_radius,
+            nitehawk_usb_dual_housing_profile_mount_spine_width / 4,
+        ),
+        no_fillets_at=[Alignment.LEFT, Alignment.RIGHT],
+    )
+    profile_mount_spine = align(
+        profile_mount_spine, housing_reference, Alignment.CENTER, axes=[1, 2]
+    )
+    profile_mount_spine = align(
+        profile_mount_spine, housing_reference, Alignment.STACK_RIGHT
+    )
+    profile_mount_holes = PartCollector()
+    profile_mount_hole_items = []
+    profile_mount_screws = PartCollector()
+    profile_screw_record = MScrew.from_size(
+        nitehawk_usb_dual_housing_profile_mount_screw_size
+    )
+    for hole_name, z_offset in [
+        ("bottom", -nitehawk_usb_dual_housing_profile_mount_hole_spacing / 2),
+        ("top", nitehawk_usb_dual_housing_profile_mount_hole_spacing / 2),
+    ]:
+        hole = create_cylinder(
+            profile_screw_record.clearance_hole_normal / 2,
+            nitehawk_usb_dual_housing_profile_mount_spine_thickness + wall + 3,
+            origin=(
+                housing_depth - wall - 1,
+                get_bounding_box_center(profile_mount_spine)[1],
+                get_bounding_box_center(profile_mount_spine)[2] + z_offset,
+            ),
+            direction=(1, 0, 0),
+        )
+        profile_mount_holes = profile_mount_holes.fuse(hole)
+        profile_mount_hole_items.append((f"profile_mount_hole_{hole_name}", hole))
+
+        profile_mount_screw = create_cylinder_screw(
+            nitehawk_usb_dual_housing_profile_mount_screw_size,
+            nitehawk_usb_dual_housing_profile_mount_screw_length,
+        )
+        profile_mount_screw = rotate(90, axis=(0, 1, 0))(profile_mount_screw)
+        profile_mount_screw = translate(
+            housing_depth - wall - nitehawk_usb_dual_housing_profile_mount_screw_length,
+            get_bounding_box_center(profile_mount_spine)[1],
+            get_bounding_box_center(profile_mount_spine)[2] + z_offset,
+        )(profile_mount_screw)
+        profile_mount_screws = profile_mount_screws.fuse(profile_mount_screw)
+
+    housing_box = housing_box.fuse(profile_mount_spine)
+    housing_box = housing_box.cut(profile_mount_holes)
+
+    lid = create_filleted_box(
+        nitehawk_usb_dual_housing_lid_thickness,
+        housing_width,
+        housing_height,
+        fillet_radius=nitehawk_usb_dual_housing_corner_fillet_radius,
+        no_fillets_at=[Alignment.LEFT, Alignment.RIGHT],
+    )
+    lid = align(lid, housing_reference, Alignment.CENTER, axes=[1, 2])
+    lid = align(
+        lid,
+        housing_reference,
+        Alignment.STACK_LEFT,
+        stack_gap=nitehawk_usb_dual_housing_lid_body_clearance,
+    )
+
+    lid_rim_outer_width = (
+        housing_width - 2 * wall - 2 * nitehawk_usb_dual_housing_lid_rim_clearance
+    )
+    lid_rim_outer_height = (
+        housing_height - 2 * wall - 2 * nitehawk_usb_dual_housing_lid_rim_clearance
+    )
+    lid_rim_inner_width = lid_rim_outer_width - 2 * (
+        nitehawk_usb_dual_housing_lid_rim_thickness
+    )
+    lid_rim_inner_height = lid_rim_outer_height - 2 * (
+        nitehawk_usb_dual_housing_lid_rim_thickness
+    )
+    lid_rim = create_filleted_box(
+        nitehawk_usb_dual_housing_lid_body_clearance
+        + nitehawk_usb_dual_housing_lid_rim_depth,
+        lid_rim_outer_width,
+        lid_rim_outer_height,
+        fillet_radius=min(
+            nitehawk_usb_dual_housing_corner_fillet_radius,
+            nitehawk_usb_dual_housing_lid_rim_thickness / 2 - 0.1,
+        ),
+        no_fillets_at=[Alignment.LEFT, Alignment.RIGHT],
+    )
+    lid_rim_inner_cutter = create_box(
+        nitehawk_usb_dual_housing_lid_body_clearance
+        + nitehawk_usb_dual_housing_lid_rim_depth
+        + 2,
+        lid_rim_inner_width,
+        lid_rim_inner_height,
+    )
+    lid_rim_inner_cutter = align(lid_rim_inner_cutter, lid_rim, Alignment.CENTER)
+    lid_rim = lid_rim.cut(lid_rim_inner_cutter)
+    lid_rim = align(lid_rim, housing_reference, Alignment.CENTER, axes=[1, 2])
+    lid_rim = align(lid_rim, lid, Alignment.STACK_RIGHT)
+    lid = lid.fuse(lid_rim)
+    lid = lid.cut(lid_clearance_holes)
+
+    profile_mount_reference = create_box(
+        0.4,
+        nitehawk_usb_dual_housing_profile_mount_spine_width,
+        nitehawk_usb_dual_housing_profile_mount_spine_height,
+    )
+    profile_mount_reference = align(
+        profile_mount_reference, profile_mount_spine, Alignment.CENTER, axes=[1, 2]
+    )
+    profile_mount_reference = align(
+        profile_mount_reference, profile_mount_spine, Alignment.RIGHT
+    )
+
+    housing = LeaderFollowersCuttersPart(leader=housing_box)
+    housing.add_named_follower(lid, "nitehawk_usb_dual_housing_lid")
+    housing.add_named_cutter(inner_space_cutter, "inner_space")
+    housing.add_named_cutter(board_pilot_holes, "board_mount_pilot_holes")
+    housing.add_named_cutter(lid_pilot_holes, "lid_mount_pilot_holes")
+    housing.add_named_cutter(lid_clearance_holes, "lid_mount_clearance_holes")
+    housing.add_named_cutter(cable_slit, "cable_slit")
+    housing.add_named_cutter(cable_tie_slots, "cable_tie_slots")
+    housing.add_named_cutter(profile_mount_holes, "profile_mount_holes")
+
+    for name, cutter in board_mount_holes:
+        housing.add_named_cutter(cutter, f"{name}_pilot_hole")
+    for index, (_, _, pilot_hole, clearance_hole) in enumerate(
+        lid_screw_positions, start=1
+    ):
+        housing.add_named_cutter(pilot_hole, f"lid_mount_pilot_hole_{index}")
+        housing.add_named_cutter(clearance_hole, f"lid_mount_clearance_hole_{index}")
+    for name, cutter in cable_tie_slot_items:
+        housing.add_named_cutter(cutter, name)
+    for name, cutter in profile_mount_hole_items:
+        housing.add_named_cutter(cutter, name)
+
+    for board in [board_1, board_2]:
+        for name, part in board.get_named_follower_items():
+            housing.add_named_non_production_part(part, name)
+
+    housing.add_named_non_production_part(
+        housing_reference, "nitehawk_usb_dual_housing_body_reference"
+    )
+    housing.add_named_non_production_part(
+        profile_mount_reference, "profile_mount_reference"
+    )
+    housing.add_named_non_production_part(board_mount_screws, "board_mount_screws")
+    housing.add_named_non_production_part(lid_screws, "lid_mount_screws")
+    housing.add_named_non_production_part(profile_mount_screws, "profile_mount_screws")
+
+    return housing

@@ -119,7 +119,9 @@ class Stripboard:
         _validate_positive_integer(self.width_pitches, "width_pitches")
         _validate_positive_integer(self.height_pitches, "height_pitches")
         if self.strip_direction not in (Direction.HORIZONTAL, Direction.VERTICAL):
-            raise ValueError("strip_direction must be Direction.HORIZONTAL or VERTICAL.")
+            raise ValueError(
+                "strip_direction must be Direction.HORIZONTAL or VERTICAL."
+            )
         if not isinstance(self.pitch_mm, (int, float)) or isinstance(
             self.pitch_mm, bool
         ):
@@ -600,9 +602,7 @@ def assign_schema_nets_to_stripboard(
         source_column: left_margin_pitches + index
         for index, source_column in enumerate(used_source_columns)
     }
-    board_width = (
-        len(used_source_columns) + left_margin_pitches + right_margin_pitches
-    )
+    board_width = len(used_source_columns) + left_margin_pitches + right_margin_pitches
     board_height = len(net_visualizations)
     x_offset = left_margin_pitches - used_source_columns[0]
 
@@ -888,7 +888,9 @@ def _render_stripboard_png(stripboard, path, scale):
     try:
         from PIL import Image, ImageDraw
     except ImportError as error:
-        raise RuntimeError("Pillow is required to render stripboard PNG files.") from error
+        raise RuntimeError(
+            "Pillow is required to render stripboard PNG files."
+        ) from error
 
     width, height = _stripboard_size(stripboard)
     image_width = max(1, int(round(width * scale)))
@@ -961,7 +963,7 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
                 f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
                 f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
                 f'paint-order="stroke">'
-                f'{_svg_text(net_name)}</text>'
+                f"{_svg_text(net_name)}</text>"
             )
         lines.append(
             f'  <rect class="copper-strip" data-row="{row}" '
@@ -1273,7 +1275,9 @@ def _stripboard_overlay_elements(schema, assignment):
             )
         if not positions:
             continue
-        label = element.name if element.value is None else f"{element.name} {element.value}"
+        label = (
+            element.name if element.value is None else f"{element.name} {element.value}"
+        )
         overlays.append(
             {
                 "name": element.name,

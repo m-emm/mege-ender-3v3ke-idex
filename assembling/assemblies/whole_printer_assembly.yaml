@@ -512,6 +512,42 @@ Builder:
         artifact: all
         name_template: "{assembly_name}_{name}"
       - source: injected
+        assembly: nitehawk_usb_dual_board_housing
+        artifact: leader
+        name: nitehawk_usb_dual_board_housing
+        color: [1, 1, 1]
+      - source: injected
+        assembly: nitehawk_usb_dual_board_housing
+        artifact: followers
+        names:
+          - nitehawk_usb_dual_housing_lid
+        name_template: "nitehawk_usb_dual_board_housing_{name}"
+        color: [1, 1, 1]
+      - source: injected
+        assembly: nitehawk_usb_dual_board_housing
+        artifact: non_production_parts
+        names:
+          - board_1_board
+          - board_1_terminal_block
+          - board_1_usb_c_connector
+          - board_1_front_plug
+          - board_1_white_connector
+          - board_2_board
+          - board_2_terminal_block
+          - board_2_usb_c_connector
+          - board_2_front_plug
+          - board_2_white_connector
+        name_template: "nitehawk_usb_dual_board_housing_{name}"
+      - source: injected
+        assembly: nitehawk_usb_dual_board_housing
+        artifact: non_production_parts
+        names:
+          - board_mount_screws
+          - lid_mount_screws
+          - profile_mount_screws
+        name_template: "nitehawk_usb_dual_board_housing_{name}"
+        color: [0.78, 0.78, 0.72]
+      - source: injected
         assembly: printer_host_and_screen
         artifact: all
         name_template: "{assembly_name}_{name}"

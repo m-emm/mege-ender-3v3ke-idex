@@ -398,6 +398,14 @@ placement:
         - z_axis_threaded_rod_right_assembly
       to: z_axis_profile_right_assembly
 
+    - part: nitehawk_usb_dual_board_housing_assembly.non_production_parts.profile_mount_reference
+      to: z_axis_profile_left_assembly
+      alignment: CENTER
+      axes: [1, 2]
+    - part: nitehawk_usb_dual_board_housing_assembly.non_production_parts.profile_mount_reference
+      to: z_axis_profile_left_assembly
+      alignment: STACK_LEFT
+
     - part: z_axis_top_bridge_profile_assembly
       to: z_axis_profile_left_assembly
       alignment: STACK_BACK
@@ -779,6 +787,7 @@ placement:
         - z_axis_guide_rod_top_mount_left_assembly
         - z_axis_motor_mount_right_assembly
         - z_axis_guide_rod_top_mount_right_assembly
+        - nitehawk_usb_dual_board_housing_assembly
       to: x_axis_rail_assembly
 
     - part: sprite_extruder_left_assembly.non_production_parts.hotend
@@ -1333,6 +1342,49 @@ assemblies:
       nitehawk_usb_white_connector_height: !Ref nitehawk_usb_white_connector_height
       nitehawk_usb_white_connector_x: !Ref nitehawk_usb_white_connector_x
       nitehawk_usb_white_connector_y: !Ref nitehawk_usb_white_connector_y
+
+  - name: nitehawk_usb_dual_board_housing_assembly
+
+    resource_file: nitehawk_usb_dual_board_housing_assembly.yaml
+    depends_on:
+      - nitehawk_usb_board_assembly
+    inject_parts:
+      nitehawk_usb_board: nitehawk_usb_board_assembly
+    parameters:
+      nitehawk_usb_dual_housing_wall_thickness: !Ref nitehawk_usb_dual_housing_wall_thickness
+      nitehawk_usb_dual_housing_corner_fillet_radius: !Ref nitehawk_usb_dual_housing_corner_fillet_radius
+      nitehawk_usb_dual_housing_board_gap: !Ref nitehawk_usb_dual_housing_board_gap
+      nitehawk_usb_dual_housing_board_side_margin: !Ref nitehawk_usb_dual_housing_board_side_margin
+      nitehawk_usb_dual_housing_board_bottom_margin: !Ref nitehawk_usb_dual_housing_board_bottom_margin
+      nitehawk_usb_dual_housing_board_top_margin: !Ref nitehawk_usb_dual_housing_board_top_margin
+      nitehawk_usb_dual_housing_board_standoff_height: !Ref nitehawk_usb_dual_housing_board_standoff_height
+      nitehawk_usb_dual_housing_board_boss_diameter: !Ref nitehawk_usb_dual_housing_board_boss_diameter
+      nitehawk_usb_dual_housing_board_screw_size: !Ref nitehawk_usb_dual_housing_board_screw_size
+      nitehawk_usb_dual_housing_board_screw_length: !Ref nitehawk_usb_dual_housing_board_screw_length
+      nitehawk_usb_dual_housing_board_screw_pilot_diameter: !Ref nitehawk_usb_dual_housing_board_screw_pilot_diameter
+      nitehawk_usb_dual_housing_component_clearance: !Ref nitehawk_usb_dual_housing_component_clearance
+      nitehawk_usb_dual_housing_lid_thickness: !Ref nitehawk_usb_dual_housing_lid_thickness
+      nitehawk_usb_dual_housing_lid_body_clearance: !Ref nitehawk_usb_dual_housing_lid_body_clearance
+      nitehawk_usb_dual_housing_lid_rim_depth: !Ref nitehawk_usb_dual_housing_lid_rim_depth
+      nitehawk_usb_dual_housing_lid_rim_thickness: !Ref nitehawk_usb_dual_housing_lid_rim_thickness
+      nitehawk_usb_dual_housing_lid_rim_clearance: !Ref nitehawk_usb_dual_housing_lid_rim_clearance
+      nitehawk_usb_dual_housing_lid_screw_size: !Ref nitehawk_usb_dual_housing_lid_screw_size
+      nitehawk_usb_dual_housing_lid_screw_length: !Ref nitehawk_usb_dual_housing_lid_screw_length
+      nitehawk_usb_dual_housing_lid_screw_inset: !Ref nitehawk_usb_dual_housing_lid_screw_inset
+      nitehawk_usb_dual_housing_lid_screw_boss_diameter: !Ref nitehawk_usb_dual_housing_lid_screw_boss_diameter
+      nitehawk_usb_dual_housing_cable_slit_x_size: !Ref nitehawk_usb_dual_housing_cable_slit_x_size
+      nitehawk_usb_dual_housing_cable_slit_y_margin: !Ref nitehawk_usb_dual_housing_cable_slit_y_margin
+      nitehawk_usb_dual_housing_cable_slit_fillet_radius: !Ref nitehawk_usb_dual_housing_cable_slit_fillet_radius
+      nitehawk_usb_dual_housing_cable_tie_slot_x_size: !Ref nitehawk_usb_dual_housing_cable_tie_slot_x_size
+      nitehawk_usb_dual_housing_cable_tie_slot_y_size: !Ref nitehawk_usb_dual_housing_cable_tie_slot_y_size
+      nitehawk_usb_dual_housing_cable_tie_slot_pair_spacing: !Ref nitehawk_usb_dual_housing_cable_tie_slot_pair_spacing
+      nitehawk_usb_dual_housing_cable_tie_slot_x_offset_from_back: !Ref nitehawk_usb_dual_housing_cable_tie_slot_x_offset_from_back
+      nitehawk_usb_dual_housing_profile_mount_spine_width: !Ref nitehawk_usb_dual_housing_profile_mount_spine_width
+      nitehawk_usb_dual_housing_profile_mount_spine_thickness: !Ref nitehawk_usb_dual_housing_profile_mount_spine_thickness
+      nitehawk_usb_dual_housing_profile_mount_spine_height: !Ref nitehawk_usb_dual_housing_profile_mount_spine_height
+      nitehawk_usb_dual_housing_profile_mount_screw_size: !Ref nitehawk_usb_dual_housing_profile_mount_screw_size
+      nitehawk_usb_dual_housing_profile_mount_screw_length: !Ref nitehawk_usb_dual_housing_profile_mount_screw_length
+      nitehawk_usb_dual_housing_profile_mount_hole_spacing: !Ref nitehawk_usb_dual_housing_profile_mount_hole_spacing
 
   - name: nitehawk_board_assembly
 
@@ -2705,6 +2757,7 @@ assemblies:
       - x_axis_belt_carriage_bottom_assembly
       - x_axis_belt_carriage_top_assembly
       - y_z_axis_mcu_holder_assembly
+      - nitehawk_usb_dual_board_housing_assembly
       - printer_host_and_screen_assembly
       - raspberry_pi_assembly
       - electric_switchboard_assembly
@@ -2769,6 +2822,7 @@ assemblies:
       x_axis_belt_carriage_top: x_axis_belt_carriage_top_assembly
       creality_psu: creality_psu_assembly
       y_z_axis_mcu_holder: y_z_axis_mcu_holder_assembly
+      nitehawk_usb_dual_board_housing: nitehawk_usb_dual_board_housing_assembly
       printer_host_and_screen: printer_host_and_screen_assembly
       raspberry_pi: raspberry_pi_assembly
       electric_switchboard: electric_switchboard_assembly

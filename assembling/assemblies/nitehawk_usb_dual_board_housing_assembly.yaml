@@ -1,0 +1,152 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Lidded profile-mounted housing for two Nitehawk USB daughterboards
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - top
+        - left
+        - right
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: leader
+        name: nitehawk_usb_dual_board_housing
+        color: [1, 1, 1]
+      - source: self
+        artifact: followers
+        names:
+          - nitehawk_usb_dual_housing_lid
+        name_template: "{name}"
+        color: [1, 1, 1]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - board_1_board
+          - board_1_terminal_block
+          - board_1_usb_c_connector
+          - board_1_front_plug
+          - board_1_white_connector
+          - board_2_board
+          - board_2_terminal_block
+          - board_2_usb_c_connector
+          - board_2_front_plug
+          - board_2_white_connector
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        names:
+          - board_mount_screws
+          - lid_mount_screws
+          - profile_mount_screws
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
+
+  Production:
+    process_data_preset: petgcf_medium_strength_high_speed_06
+    parts:
+      - source: self
+        artifact: leader
+        name: nitehawk_usb_dual_board_housing
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        names:
+          - nitehawk_usb_dual_housing_lid
+        name_template: "{name}"
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: nitehawk_usb_dual_board_housing
+          parts:
+            - nitehawk_usb_dual_board_housing
+        - name: nitehawk_usb_dual_housing_lid
+          parts:
+            - nitehawk_usb_dual_housing_lid
+      auto_assign_plates: false
+
+Parameters:
+  nitehawk_usb_dual_housing_wall_thickness:
+    Type: Float
+  nitehawk_usb_dual_housing_corner_fillet_radius:
+    Type: Float
+  nitehawk_usb_dual_housing_board_gap:
+    Type: Float
+  nitehawk_usb_dual_housing_board_side_margin:
+    Type: Float
+  nitehawk_usb_dual_housing_board_bottom_margin:
+    Type: Float
+  nitehawk_usb_dual_housing_board_top_margin:
+    Type: Float
+  nitehawk_usb_dual_housing_board_standoff_height:
+    Type: Float
+  nitehawk_usb_dual_housing_board_boss_diameter:
+    Type: Float
+  nitehawk_usb_dual_housing_board_screw_size:
+    Type: String
+  nitehawk_usb_dual_housing_board_screw_length:
+    Type: Float
+  nitehawk_usb_dual_housing_board_screw_pilot_diameter:
+    Type: Float
+  nitehawk_usb_dual_housing_component_clearance:
+    Type: Float
+  nitehawk_usb_dual_housing_lid_thickness:
+    Type: Float
+  nitehawk_usb_dual_housing_lid_body_clearance:
+    Type: Float
+  nitehawk_usb_dual_housing_lid_rim_depth:
+    Type: Float
+  nitehawk_usb_dual_housing_lid_rim_thickness:
+    Type: Float
+  nitehawk_usb_dual_housing_lid_rim_clearance:
+    Type: Float
+  nitehawk_usb_dual_housing_lid_screw_size:
+    Type: String
+  nitehawk_usb_dual_housing_lid_screw_length:
+    Type: Float
+  nitehawk_usb_dual_housing_lid_screw_inset:
+    Type: Float
+  nitehawk_usb_dual_housing_lid_screw_boss_diameter:
+    Type: Float
+  nitehawk_usb_dual_housing_cable_slit_x_size:
+    Type: Float
+  nitehawk_usb_dual_housing_cable_slit_y_margin:
+    Type: Float
+  nitehawk_usb_dual_housing_cable_slit_fillet_radius:
+    Type: Float
+  nitehawk_usb_dual_housing_cable_tie_slot_x_size:
+    Type: Float
+  nitehawk_usb_dual_housing_cable_tie_slot_y_size:
+    Type: Float
+  nitehawk_usb_dual_housing_cable_tie_slot_pair_spacing:
+    Type: Float
+  nitehawk_usb_dual_housing_cable_tie_slot_x_offset_from_back:
+    Type: Float
+  nitehawk_usb_dual_housing_profile_mount_spine_width:
+    Type: Float
+  nitehawk_usb_dual_housing_profile_mount_spine_thickness:
+    Type: Float
+  nitehawk_usb_dual_housing_profile_mount_spine_height:
+    Type: Float
+  nitehawk_usb_dual_housing_profile_mount_screw_size:
+    Type: String
+  nitehawk_usb_dual_housing_profile_mount_screw_length:
+    Type: Float
+  nitehawk_usb_dual_housing_profile_mount_hole_spacing:
+    Type: Float
+
+Parts:
+  NitehawkUsbDualBoardHousingAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.nitehawk_usb_dual_board_housing_assembly.create_nitehawk_usb_dual_board_housing_assembly
