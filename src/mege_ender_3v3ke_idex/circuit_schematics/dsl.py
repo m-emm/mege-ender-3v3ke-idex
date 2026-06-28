@@ -737,10 +737,13 @@ def assign_schema_nets_to_stripboard(
 def compact_sparse_stripboard_rows(
     assignment,
     min_run_holes=4,
-    max_connections_per_sparse_net=2,
+    max_connections_per_sparse_net=3,
+    schema=None,
 ):
     if not isinstance(assignment, StripboardNetAssignment):
         raise TypeError("assignment must be a StripboardNetAssignment.")
+    if schema is not None and not isinstance(schema, Schema):
+        raise TypeError("schema must be a Schema object when provided.")
     _validate_positive_integer(min_run_holes, "min_run_holes")
     _validate_positive_integer(
         max_connections_per_sparse_net,
@@ -748,6 +751,41 @@ def compact_sparse_stripboard_rows(
     )
     if not assignment.net_runs:
         return assignment
+
+    markers_by_net = _stripboard_markers_by_net(
+        assignment.net_visualizations,
+        assignment.column_pitch,
+    )
+    if schema is None:
+        sparse_net_names = _sparse_stripboard_candidate_net_names(
+            assignment,
+            markers_by_net,
+            max_connections_per_sparse_net,
+        )
+    else:
+        sparse_net_names = _route_checked_sparse_stripboard_net_names(
+            schema,
+            assignment,
+            markers_by_net,
+            min_run_holes,
+            max_connections_per_sparse_net,
+        )
+
+    return _compact_sparse_stripboard_rows_for_net_names(
+        assignment,
+        min_run_holes,
+        sparse_net_names,
+        markers_by_net,
+    )
+
+
+def _compact_sparse_stripboard_rows_for_net_names(
+    assignment,
+    min_run_holes,
+    sparse_net_names,
+    markers_by_net=None,
+):
+    sparse_net_names = frozenset(sparse_net_names)
 
     width = assignment.stripboard.width_pitches
     active_start = assignment.left_margin_pitches
@@ -767,17 +805,17 @@ def compact_sparse_stripboard_rows(
         run.net_name: tuple(run.source_columns)
         for run in assignment.net_runs
     }
-    markers_by_net = _stripboard_markers_by_net(
-        assignment.net_visualizations,
-        assignment.column_pitch,
-    )
+    if markers_by_net is None:
+        markers_by_net = _stripboard_markers_by_net(
+            assignment.net_visualizations,
+            assignment.column_pitch,
+        )
 
     output_rows = []
     pending_sparse = []
     for run in sorted(assignment.net_runs, key=lambda item: (item.row, item.start_col)):
         source_columns = source_columns_by_net[run.net_name]
-        markers = markers_by_net.get(run.net_name, ())
-        if len(markers) <= max_connections_per_sparse_net:
+        if run.net_name in sparse_net_names:
             pending_sparse.append(run.net_name)
             continue
         if pending_sparse:
@@ -786,6 +824,7 @@ def compact_sparse_stripboard_rows(
                     pending_sparse,
                     source_columns_by_net,
                     markers_by_net,
+                    assignment.column_map,
                     active_start,
                     active_end,
                     min_run_holes,
@@ -815,6 +854,7 @@ def compact_sparse_stripboard_rows(
                 pending_sparse,
                 source_columns_by_net,
                 markers_by_net,
+                assignment.column_map,
                 active_start,
                 active_end,
                 min_run_holes,
@@ -904,6 +944,60 @@ def compact_sparse_stripboard_rows(
         net_column_maps=net_column_maps,
         marker_column_maps=marker_column_maps,
     )
+
+
+def _route_checked_sparse_stripboard_net_names(
+    schema,
+    assignment,
+    markers_by_net,
+    min_run_holes,
+    max_connections_per_sparse_net,
+):
+    accepted_net_names = set()
+    for net_name in _sparse_stripboard_candidate_net_names(
+        assignment,
+        markers_by_net,
+        max_connections_per_sparse_net,
+    ):
+        trial_net_names = {*accepted_net_names, net_name}
+        trial_assignment = _compact_sparse_stripboard_rows_for_net_names(
+            assignment,
+            min_run_holes,
+            trial_net_names,
+            markers_by_net,
+        )
+        if _stripboard_assignment_routes_strictly(schema, trial_assignment):
+            accepted_net_names.add(net_name)
+    return frozenset(accepted_net_names)
+
+
+def _sparse_stripboard_candidate_net_names(
+    assignment,
+    markers_by_net,
+    max_connections_per_sparse_net,
+):
+    return tuple(
+        run.net_name
+        for run in sorted(
+            assignment.net_runs,
+            key=lambda item: (item.row, item.start_col),
+        )
+        if len(markers_by_net.get(run.net_name, ()))
+        <= max_connections_per_sparse_net
+    )
+
+
+def _stripboard_assignment_routes_strictly(schema, assignment):
+    try:
+        compact_stripboard_connections_left(
+            schema,
+            assignment,
+            trim_board=False,
+            strict=True,
+        )
+    except ValueError:
+        return False
+    return True
 
 
 def compact_stripboard_connections_left(
@@ -1968,7 +2062,6 @@ def _stripboard_placement_items(schema, assignment):
                 "terminal_count": len(element_entries),
                 "horizontal_span": max(columns) - min(columns),
                 "source_left": min(columns),
-                "tall_rank": 1 if max(rows) - min(rows) > 4 else 0,
                 "type_rank": 1,
             }
         )
@@ -1985,7 +2078,6 @@ def _stripboard_placement_items(schema, assignment):
                 "terminal_count": 1,
                 "horizontal_span": 0,
                 "source_left": entry["column"],
-                "tall_rank": 0,
                 "type_rank": 0,
             }
         )
@@ -1995,11 +2087,10 @@ def _stripboard_placement_items(schema, assignment):
             items,
             key=lambda item: (
                 item["type_rank"],
-                item["tall_rank"],
-                item["source_left"],
-                -item["terminal_count"],
                 item["vertical_span"],
+                item["terminal_count"],
                 item["horizontal_span"],
+                item["source_left"],
                 item["name"],
             ),
         )
@@ -2150,8 +2241,6 @@ def _best_stripboard_element_placement(
             if enforce_new_blockers:
                 blocker_set = {(blocker.row, blocker.col) for blocker in blockers}
                 if blocker_set & used_positions:
-                    continue
-                if blocker_set & cut_positions:
                     continue
                 if blocker_set & blocker_positions:
                     continue
@@ -2573,6 +2662,7 @@ def _pack_sparse_stripboard_runs(
     net_names,
     source_columns_by_net,
     markers_by_net,
+    column_map,
     active_start,
     active_end,
     min_run_holes,
@@ -2584,7 +2674,14 @@ def _pack_sparse_stripboard_runs(
     row_local_points = []
     cursor = active_start
 
-    for net_name in net_names:
+    for net_name in sorted(
+        net_names,
+        key=lambda name: _sparse_stripboard_run_sort_key(
+            name,
+            source_columns_by_net,
+            markers_by_net,
+        ),
+    ):
         source_columns = source_columns_by_net[net_name]
         markers = markers_by_net.get(net_name, ())
         marker_count = len(markers)
@@ -2597,7 +2694,19 @@ def _pack_sparse_stripboard_runs(
             )
 
         cut_col = cursor if row_runs and not is_local_point else None
-        start_col = cursor + 1 if cut_col is not None else cursor
+        min_start_col = cursor + 1 if cut_col is not None else cursor
+        start_col = max(
+            min_start_col,
+            _preferred_sparse_run_start(
+                net_name,
+                item_length,
+                source_columns_by_net,
+                markers_by_net,
+                column_map,
+                active_start,
+                active_end,
+            ),
+        )
         end_col = start_col + item_length - 1
         if end_col > active_end:
             rows.append((row_runs, tuple(row_cuts), row_local_points))
@@ -2606,11 +2715,25 @@ def _pack_sparse_stripboard_runs(
             row_local_points = []
             cursor = active_start
             cut_col = None
-            start_col = cursor
+            min_start_col = cursor
+            start_col = max(
+                min_start_col,
+                _preferred_sparse_run_start(
+                    net_name,
+                    item_length,
+                    source_columns_by_net,
+                    markers_by_net,
+                    column_map,
+                    active_start,
+                    active_end,
+                ),
+            )
             end_col = start_col + item_length - 1
 
         if cut_col is not None:
             row_cuts.append(StripboardCut(row=0, col=cut_col))
+        if start_col > min_start_col:
+            row_cuts.append(StripboardCut(row=0, col=start_col - 1))
 
         if is_local_point:
             row_local_points.append(
@@ -2638,6 +2761,37 @@ def _pack_sparse_stripboard_runs(
         rows.append((row_runs, tuple(row_cuts), row_local_points))
 
     return rows
+
+
+def _preferred_sparse_run_start(
+    net_name,
+    item_length,
+    source_columns_by_net,
+    markers_by_net,
+    column_map,
+    active_start,
+    active_end,
+):
+    source_columns = tuple(source_columns_by_net.get(net_name, ()))
+    markers = tuple(markers_by_net.get(net_name, ()))
+    marker_columns = tuple(column for _marker_key, column in markers)
+    columns = marker_columns or source_columns
+    if not columns:
+        return active_start
+    mapped_columns = tuple(column_map.get(column, column) for column in columns)
+    preferred_center = _median(mapped_columns)
+    start_col = int(round(preferred_center - (item_length - 1) / 2))
+    return int(_clamp(start_col, active_start, active_end - item_length + 1))
+
+
+def _sparse_stripboard_run_sort_key(net_name, source_columns_by_net, markers_by_net):
+    source_columns = tuple(source_columns_by_net.get(net_name, ()))
+    markers = tuple(markers_by_net.get(net_name, ()))
+    marker_columns = tuple(column for _marker_key, column in markers)
+    columns = marker_columns or source_columns
+    if not columns:
+        return (0, net_name)
+    return (_median(columns), net_name)
 
 
 def _run_column_map(run):

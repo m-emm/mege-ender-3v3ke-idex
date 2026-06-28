@@ -14,6 +14,7 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     Resistor,
     Stripboard,
     StripboardBlocker,
+    StripboardCut,
     Wire,
     align,
     create_element,
@@ -295,6 +296,36 @@ def _create_sparse_stripboard_schema():
     return create_schema([*dense_nodes, *sparse_a_nodes, *sparse_b_nodes, sparse_c], [])
 
 
+def _create_three_marker_sparse_stripboard_schema():
+    four_marker_net = create_net("four_marker")
+    three_marker_net = create_net("three_marker")
+    two_marker_net = create_net("two_marker")
+
+    four_marker_nodes = [
+        translate(column, 0)(
+            create_node(Dot, f"four_marker_{column}", net=four_marker_net)
+        )
+        for column in (0, 2, 4, 6)
+    ]
+    three_marker_nodes = [
+        translate(column, -2)(
+            create_node(Dot, f"three_marker_{column}", net=three_marker_net)
+        )
+        for column in (1, 3, 5)
+    ]
+    two_marker_nodes = [
+        translate(column, -4)(
+            create_node(Dot, f"two_marker_{column}", net=two_marker_net)
+        )
+        for column in (7, 8)
+    ]
+
+    return create_schema(
+        [*four_marker_nodes, *three_marker_nodes, *two_marker_nodes],
+        [],
+    )
+
+
 def _create_duplicate_marker_stripboard_schema():
     dense_net = create_net("dense")
     shared_net = create_net("shared")
@@ -476,7 +507,7 @@ def _marker_positions_by_key(assignment):
 def _create_tb6600_strict_assignment():
     schema = _load_tb6600_schema_factory()()
     assignment = assign_schema_nets_to_stripboard(schema)
-    assignment = compact_sparse_stripboard_rows(assignment)
+    assignment = compact_sparse_stripboard_rows(assignment, schema=schema)
     assignment = compact_stripboard_connections_left(schema, assignment, strict=True)
     return schema, assignment
 
@@ -561,6 +592,45 @@ def test_compact_sparse_stripboard_rows_merges_only_sparse_rows():
     ) == ("sparse_c", 1, 10)
     assert len(compacted.cuts) == 1
     assert (compacted.cuts[0].row, compacted.cuts[0].col) == (1, 5)
+
+
+def test_compact_sparse_stripboard_rows_compacts_three_marker_nets_by_default():
+    schema = _create_three_marker_sparse_stripboard_schema()
+    assignment = assign_schema_nets_to_stripboard(schema)
+
+    compacted = compact_sparse_stripboard_rows(assignment)
+
+    four_marker_run = next(
+        run for run in compacted.net_runs if run.net_name == "four_marker"
+    )
+    three_marker_run = next(
+        run for run in compacted.net_runs if run.net_name == "three_marker"
+    )
+    two_marker_run = next(
+        run for run in compacted.net_runs if run.net_name == "two_marker"
+    )
+
+    assert four_marker_run.compacted is False
+    assert four_marker_run.start_col == 0
+    assert four_marker_run.end_col == compacted.stripboard.width_pitches - 1
+
+    assert three_marker_run.compacted is True
+    assert three_marker_run.end_col - three_marker_run.start_col + 1 == 4
+    assert compacted.net_column_maps["three_marker"] == {
+        1: three_marker_run.start_col,
+        3: three_marker_run.start_col + 2,
+        5: three_marker_run.end_col,
+    }
+
+    assert two_marker_run.compacted is True
+    if two_marker_run.row == three_marker_run.row:
+        assert two_marker_run.start_col == three_marker_run.end_col + 2
+        assert StripboardCut(
+            row=three_marker_run.row,
+            col=three_marker_run.end_col + 1,
+        ) in compacted.cuts
+    else:
+        assert two_marker_run.row > three_marker_run.row
 
 
 def test_compacted_sparse_rows_snap_markers_inside_runs_not_cuts():
@@ -731,8 +801,9 @@ def test_left_compaction_allows_different_row_element_terminals_to_align():
         trim_board=False,
     )
 
-    assert assignment.marker_column_maps[("terminal", "Rdup", "start")] == 2
-    assert assignment.marker_column_maps[("terminal", "Rdup", "end")] == 2
+    start_col = assignment.marker_column_maps[("terminal", "Rdup", "start")]
+    end_col = assignment.marker_column_maps[("terminal", "Rdup", "end")]
+    assert start_col == end_col
 
 
 def test_stripboard_body_blockers_follow_vertical_horizontal_and_diagonal_paths():
@@ -780,9 +851,11 @@ def test_left_compaction_prefers_compact_element_span_over_left_edge():
     schema, assignment = _create_tb6600_strict_assignment()
     holes = _terminal_holes_by_element(schema, assignment)
 
-    for element_name in ("Q1", "Q2", "Q3", "R1", "R2", "R3", "R4", "R7", "R8"):
+    for element_name in ("Q1", "Q2", "R1", "R2", "R3", "R4", "R7", "R8"):
         columns = [column for _terminal_name, _row, column in holes[element_name]]
         assert max(columns) - min(columns) == 0
+    q3_columns = [column for _terminal_name, _row, column in holes["Q3"]]
+    assert max(q3_columns) - min(q3_columns) <= 5
 
 
 def test_tb6600_strict_stripboard_projection_has_no_duplicate_marker_holes():

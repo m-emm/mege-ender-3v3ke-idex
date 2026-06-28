@@ -63,6 +63,29 @@ Builder:
         name_template: "{name}"
         prod_rotation_angle: -90
         prod_rotation_axis: [0, 1, 0]
+    prototype:
+      include_parts:
+        - nitehawk_usb_dual_board_housing
+      box_cutters:
+        - part: nitehawk_usb_dual_board_housing
+          around: self.cutters.board_1_mounting_hole_front_left_pilot_hole
+          size:
+            - 10
+            - 31
+            - 12
+          offset:
+            - 0
+            - 11.8
+            - 0
+      process_data_preset: petgcf_medium_strength_high_speed_06
+      arrange:
+        export_individual_parts: false
+        plates:
+          - name: nitehawk_usb_dual_board_housing_screw_hole_prototype
+            filename: nitehawk_usb_dual_screw_hole_proto
+            parts:
+              - nitehawk_usb_dual_board_housing
+        auto_assign_plates: false
     arrange:
       export_individual_parts: false
       plates:

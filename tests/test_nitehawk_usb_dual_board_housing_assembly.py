@@ -410,3 +410,30 @@ def test_nitehawk_usb_dual_board_housing_production_prints_on_one_plate():
         }
     ]
     assert production["arrange"]["auto_assign_plates"] is False
+
+
+def test_nitehawk_usb_dual_board_housing_declares_screw_hole_prototype():
+    resource = yaml.load(
+        (ASSEMBLIES_DIR / "nitehawk_usb_dual_board_housing_assembly.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+    prototype = resource["Builder"]["Production"]["prototype"]
+
+    assert prototype["process_data_preset"] == "petgcf_medium_strength_high_speed_06"
+    assert prototype["include_parts"] == ["nitehawk_usb_dual_board_housing"]
+    assert prototype["box_cutters"] == [
+        {
+            "part": "nitehawk_usb_dual_board_housing",
+            "around": "self.cutters.board_1_mounting_hole_front_left_pilot_hole",
+            "size": [10, 31, 12],
+            "offset": [0, 11.8, 0],
+        }
+    ]
+    assert prototype["arrange"]["plates"] == [
+        {
+            "name": "nitehawk_usb_dual_board_housing_screw_hole_prototype",
+            "filename": "nitehawk_usb_dual_screw_hole_proto",
+            "parts": ["nitehawk_usb_dual_board_housing"],
+        }
+    ]
+    assert prototype["arrange"]["auto_assign_plates"] is False

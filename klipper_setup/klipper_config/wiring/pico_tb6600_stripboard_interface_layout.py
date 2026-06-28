@@ -21,7 +21,7 @@ PNG_FILE = DIAGRAM_DIR / "pico_tb6600_stripboard_interface_stripboard.png"
 def create_stripboard_projection():
     schema = create_schema_for_tb6600_interface()
     assignment = assign_schema_nets_to_stripboard(schema)
-    assignment = compact_sparse_stripboard_rows(assignment)
+    assignment = compact_sparse_stripboard_rows(assignment, schema=schema)
     assignment = compact_stripboard_connections_left(schema, assignment, strict=True)
     return schema, assignment
 

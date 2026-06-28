@@ -94,9 +94,15 @@ assignment = assign_schema_nets_to_stripboard(schema)
 assignment = compact_sparse_stripboard_rows(
     assignment,
     min_run_holes=4,
-    max_connections_per_sparse_net=2,
+    max_connections_per_sparse_net=3,
+    schema=schema,
 )
 ```
+
+Passing `schema=` makes sparse compaction opportunistic: each candidate
+short run is kept only if strict component placement still succeeds. Without a
+schema, the pass performs the pure geometric compaction and treats all nets
+with up to three markers as sparse.
 
 This is a layout aid, not an autorouter. It can show diagnostic strip cuts for
 compacted runs, but it does not yet place real component footprints, jumpers,
