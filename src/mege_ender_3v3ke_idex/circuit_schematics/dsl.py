@@ -1361,10 +1361,8 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
         )
 
     for element_overlay in _stripboard_overlay_elements(schema, assignment):
-        positions = element_overlay["positions"]
         center = element_overlay["center"]
-        if len(positions) == 2:
-            start, end = positions
+        for start, end in element_overlay["segments"]:
             lines.append(
                 f'  <line class="overlay-element" '
                 f'data-element="{_svg_attr(element_overlay["name"])}" '
@@ -1373,16 +1371,6 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
                 f'stroke="{STRIPBOARD_OVERLAY_ELEMENT_STROKE}" '
                 f'stroke-width="{STRIPBOARD_OVERLAY_STROKE_WIDTH:.3f}"/>'
             )
-        else:
-            for position in positions:
-                lines.append(
-                    f'  <line class="overlay-element" '
-                    f'data-element="{_svg_attr(element_overlay["name"])}" '
-                    f'x1="{center[0]:.3f}" y1="{center[1]:.3f}" '
-                    f'x2="{position[0]:.3f}" y2="{position[1]:.3f}" '
-                    f'stroke="{STRIPBOARD_OVERLAY_ELEMENT_STROKE}" '
-                    f'stroke-width="{STRIPBOARD_OVERLAY_STROKE_WIDTH:.3f}"/>'
-                )
         lines.append(
             f'  <text class="overlay-element-label" '
             f'x="{center[0]:.3f}" y="{center[1] - 0.18:.3f}" '
@@ -1545,27 +1533,16 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
 
     element_width = _px_overlay_stroke(scale)
     for element_overlay in _stripboard_overlay_elements(schema, assignment):
-        positions = element_overlay["positions"]
         center = element_overlay["center"]
-        if len(positions) == 2:
+        for start, end in element_overlay["segments"]:
             draw.line(
                 [
-                    _px_point(_offset_point(positions[0], label_margin, 0), scale),
-                    _px_point(_offset_point(positions[1], label_margin, 0), scale),
+                    _px_point(_offset_point(start, label_margin, 0), scale),
+                    _px_point(_offset_point(end, label_margin, 0), scale),
                 ],
                 fill=STRIPBOARD_OVERLAY_ELEMENT_STROKE,
                 width=element_width,
             )
-        else:
-            for position in positions:
-                draw.line(
-                    [
-                        _px_point(_offset_point(center, label_margin, 0), scale),
-                        _px_point(_offset_point(position, label_margin, 0), scale),
-                    ],
-                    fill=STRIPBOARD_OVERLAY_ELEMENT_STROKE,
-                    width=element_width,
-                )
         _draw_png_text_rotated(
             image,
             _offset_point((center[0], center[1] - 0.18), label_margin, 0),
@@ -1811,32 +1788,61 @@ def _stripboard_overlay_terminals(schema, assignment):
 def _stripboard_overlay_elements(schema, assignment):
     overlays = []
     for element in schema.elements:
-        positions = []
+        terminal_holes = []
         for terminal_name, net_name in element.terminal_nets.items():
             if net_name not in assignment.net_rows:
                 continue
-            positions.append(
-                _stripboard_marker_position(
-                    _stripboard_terminal_marker_key(element.name, terminal_name),
-                    element.anchor_position(terminal_name),
+            marker_key = _stripboard_terminal_marker_key(element.name, terminal_name)
+            column = assignment.marker_column_maps.get(marker_key)
+            if column is None:
+                column = _snap_schema_x_to_column(
+                    element.anchor_position(terminal_name)[0],
                     net_name,
                     assignment,
+                    assignment.column_pitch,
                 )
-            )
-        if not positions:
+            terminal_holes.append((assignment.net_rows[net_name], column))
+        if not terminal_holes:
             continue
         label = (
             element.name if element.value is None else f"{element.name} {element.value}"
         )
+        segments = tuple(
+            (
+                _stripboard_hole_position(start),
+                _stripboard_hole_position(end),
+            )
+            for start, end in _stripboard_element_body_segments_from_terminal_holes(
+                terminal_holes,
+            )
+        )
+        if len(terminal_holes) == 1:
+            center = _stripboard_hole_position(terminal_holes[0])
+        elif len(terminal_holes) == 2:
+            center = _average_points(
+                tuple(_stripboard_hole_position(hole) for hole in terminal_holes)
+            )
+        else:
+            center = _stripboard_hole_position(
+                _stripboard_terminal_center_hole(terminal_holes)
+            )
         overlays.append(
             {
                 "name": element.name,
                 "label": label,
-                "positions": positions,
-                "center": _average_points(positions),
+                "segments": segments,
+                "center": center,
             }
         )
     return overlays
+
+
+def _stripboard_hole_position(hole):
+    row, column = hole
+    return (
+        STRIPBOARD_BOARD_MARGIN + column,
+        STRIPBOARD_BOARD_MARGIN + row,
+    )
 
 
 def _stripboard_marker_position(marker_key, point, net_name, assignment):
@@ -1884,6 +1890,7 @@ def _height_ordered_stripboard_marker_columns(
     blockers = []
     marker_column_maps = {}
     used_positions = set()
+    body_segments = []
 
     for item in _stripboard_placement_items(schema, assignment):
         if item["kind"] == "loose":
@@ -1900,12 +1907,13 @@ def _height_ordered_stripboard_marker_columns(
             used_positions.add((entry["row"], column))
             continue
 
-        placed_columns, item_blockers = _place_stripboard_element_item(
+        placed_columns, item_blockers, item_segments = _place_stripboard_element_item(
             assignment,
             item,
             used_positions,
             cut_positions,
             blocker_positions,
+            body_segments,
             use_component_blockers=use_component_blockers,
             strict=strict,
         )
@@ -1913,6 +1921,7 @@ def _height_ordered_stripboard_marker_columns(
             column = placed_columns[entry["key"]]
             marker_column_maps[entry["key"]] = column
             used_positions.add((entry["row"], column))
+        body_segments.extend(item_segments)
         if not use_component_blockers:
             continue
         for blocker in item_blockers:
@@ -1958,6 +1967,7 @@ def _stripboard_placement_items(schema, assignment):
                 "vertical_span": max(rows) - min(rows),
                 "terminal_count": len(element_entries),
                 "horizontal_span": max(columns) - min(columns),
+                "source_left": min(columns),
                 "type_rank": 1,
             }
         )
@@ -1973,6 +1983,7 @@ def _stripboard_placement_items(schema, assignment):
                 "vertical_span": 0,
                 "terminal_count": 1,
                 "horizontal_span": 0,
+                "source_left": entry["column"],
                 "type_rank": 0,
             }
         )
@@ -1983,6 +1994,7 @@ def _stripboard_placement_items(schema, assignment):
             key=lambda item: (
                 item["vertical_span"],
                 item["type_rank"],
+                item["source_left"],
                 item["terminal_count"],
                 item["horizontal_span"],
                 item["name"],
@@ -2035,6 +2047,7 @@ def _place_stripboard_element_item(
     used_positions,
     cut_positions,
     blocker_positions,
+    body_segments,
     use_component_blockers,
     strict,
 ):
@@ -2044,7 +2057,9 @@ def _place_stripboard_element_item(
         used_positions,
         cut_positions,
         blocker_positions,
+        body_segments,
         use_component_blockers=use_component_blockers,
+        reject_segment_intersections=strict,
     )
     if placement is None and not strict:
         placement = _best_stripboard_element_placement(
@@ -2053,8 +2068,10 @@ def _place_stripboard_element_item(
             used_positions,
             cut_positions,
             blocker_positions,
+            body_segments,
             use_component_blockers=use_component_blockers,
             enforce_new_blockers=False,
+            reject_segment_intersections=False,
         )
     if placement is None and not strict:
         placement = _best_stripboard_element_placement(
@@ -2063,8 +2080,10 @@ def _place_stripboard_element_item(
             used_positions,
             cut_positions,
             set(),
+            (),
             use_component_blockers=False,
             enforce_new_blockers=False,
+            reject_segment_intersections=False,
         )
     if placement is None:
         marker_names = ", ".join(
@@ -2083,8 +2102,10 @@ def _best_stripboard_element_placement(
     used_positions,
     cut_positions,
     blocker_positions,
+    body_segments,
     use_component_blockers,
     enforce_new_blockers=True,
+    reject_segment_intersections=True,
 ):
     entries = item["entries"]
     column_ranges = [
@@ -2094,6 +2115,7 @@ def _best_stripboard_element_placement(
     best_score = None
     best_columns = None
     best_blockers = None
+    best_segments = None
 
     for columns in product(*column_ranges):
         positions = tuple(
@@ -2109,6 +2131,13 @@ def _best_stripboard_element_placement(
         if any(position in blocker_positions for position in positions):
             continue
 
+        segments = _stripboard_element_body_segments_from_terminal_holes(positions)
+        if reject_segment_intersections and _stripboard_segments_intersect_any(
+            segments,
+            body_segments,
+        ):
+            continue
+
         blockers = ()
         if use_component_blockers:
             blockers = _stripboard_element_blockers_from_terminal_holes(
@@ -2119,12 +2148,15 @@ def _best_stripboard_element_placement(
                 blocker_set = {(blocker.row, blocker.col) for blocker in blockers}
                 if blocker_set & used_positions:
                     continue
+                if blocker_set & cut_positions:
+                    continue
                 if blocker_set & blocker_positions:
                     continue
 
         score = (
-            min(columns),
             max(columns) - min(columns),
+            _stripboard_terminal_cluster_score(columns),
+            min(columns),
             sum(
                 abs(column - entry["column"])
                 for entry, column in zip(entries, columns)
@@ -2135,6 +2167,7 @@ def _best_stripboard_element_placement(
             best_score = score
             best_columns = columns
             best_blockers = blockers
+            best_segments = segments
 
     if best_columns is None:
         return None
@@ -2144,6 +2177,7 @@ def _best_stripboard_element_placement(
             for entry, column in zip(entries, best_columns)
         },
         best_blockers,
+        best_segments,
     )
 
 
@@ -2171,30 +2205,137 @@ def _stripboard_marker_key_label(marker_key):
     return ":".join(str(part) for part in marker_key)
 
 
+def _stripboard_terminal_cluster_score(columns):
+    center = _median(columns)
+    return sum(abs(column - center) for column in columns)
+
+
+def _stripboard_element_body_segments_from_terminal_holes(terminal_holes):
+    if len(terminal_holes) < 2:
+        return ()
+
+    terminal_holes = tuple(terminal_holes)
+    if len(terminal_holes) == 2:
+        return ((terminal_holes[0], terminal_holes[1]),)
+
+    center = _stripboard_terminal_center_hole(terminal_holes)
+    return tuple(
+        (terminal_hole, center)
+        for terminal_hole in terminal_holes
+        if terminal_hole != center
+    )
+
+
+def _stripboard_terminal_center_hole(terminal_holes):
+    rows = [row for row, _column in terminal_holes]
+    columns = [column for _row, column in terminal_holes]
+    return (
+        int(round(sum(rows) / len(rows))),
+        int(round(sum(columns) / len(columns))),
+    )
+
+
 def _stripboard_element_blockers_from_terminal_holes(element_name, terminal_holes):
+    terminal_holes = tuple(terminal_holes)
     if len(terminal_holes) < 2:
         return ()
 
     terminal_hole_set = set(terminal_holes)
-    rows = [row for row, _column in terminal_holes]
-    columns = [column for _row, column in terminal_holes]
-    terminal_rows = set(rows)
-    spans_multiple_rows = min(rows) != max(rows)
-    blockers = []
-    for row in range(min(rows), max(rows) + 1):
-        if spans_multiple_rows and row in terminal_rows:
-            continue
-        for column in range(min(columns), max(columns) + 1):
-            if (row, column) in terminal_hole_set:
+    blocker_holes = set()
+    for segment in _stripboard_element_body_segments_from_terminal_holes(
+        terminal_holes,
+    ):
+        for hole in _stripboard_supercover_line_holes(*segment):
+            if hole in terminal_hole_set:
                 continue
-            blockers.append(
-                StripboardBlocker(
-                    row=row,
-                    col=column,
-                    element_name=element_name,
-                )
-            )
-    return tuple(blockers)
+            blocker_holes.add(hole)
+
+    return tuple(
+        StripboardBlocker(row=row, col=column, element_name=element_name)
+        for row, column in sorted(blocker_holes)
+    )
+
+
+def _stripboard_supercover_line_holes(start, end):
+    start_row, start_col = start
+    end_row, end_col = end
+    delta_row = end_row - start_row
+    delta_col = end_col - start_col
+    steps = max(abs(delta_row), abs(delta_col))
+    if steps == 0:
+        return (start,)
+
+    holes = []
+    seen = set()
+    samples = steps * 4
+    for index in range(samples + 1):
+        fraction = index / samples
+        row = int(round(start_row + delta_row * fraction))
+        col = int(round(start_col + delta_col * fraction))
+        hole = (row, col)
+        if hole in seen:
+            continue
+        seen.add(hole)
+        holes.append(hole)
+    return tuple(holes)
+
+
+def _stripboard_segments_intersect_any(segments, existing_segments):
+    for segment in segments:
+        for existing_segment in existing_segments:
+            if _stripboard_segments_intersect(segment, existing_segment):
+                return True
+    return False
+
+
+def _stripboard_segments_intersect(segment_a, segment_b):
+    a_start, a_end = segment_a
+    b_start, b_end = segment_b
+    a1 = _stripboard_hole_xy(a_start)
+    a2 = _stripboard_hole_xy(a_end)
+    b1 = _stripboard_hole_xy(b_start)
+    b2 = _stripboard_hole_xy(b_end)
+
+    orientations = (
+        _point_orientation(a1, a2, b1),
+        _point_orientation(a1, a2, b2),
+        _point_orientation(b1, b2, a1),
+        _point_orientation(b1, b2, a2),
+    )
+    o1, o2, o3, o4 = orientations
+    if o1 != o2 and o3 != o4:
+        return True
+    if o1 == 0 and _point_on_segment(a1, b1, a2):
+        return True
+    if o2 == 0 and _point_on_segment(a1, b2, a2):
+        return True
+    if o3 == 0 and _point_on_segment(b1, a1, b2):
+        return True
+    if o4 == 0 and _point_on_segment(b1, a2, b2):
+        return True
+    return False
+
+
+def _stripboard_hole_xy(hole):
+    row, col = hole
+    return (col, row)
+
+
+def _point_orientation(first, second, third):
+    value = (
+        (second[1] - first[1]) * (third[0] - second[0])
+        - (second[0] - first[0]) * (third[1] - second[1])
+    )
+    if value == 0:
+        return 0
+    return 1 if value > 0 else 2
+
+
+def _point_on_segment(first, point, second):
+    return (
+        min(first[0], second[0]) <= point[0] <= max(first[0], second[0])
+        and min(first[1], second[1]) <= point[1] <= max(first[1], second[1])
+    )
 
 
 def _stripboard_component_blockers(schema, assignment):

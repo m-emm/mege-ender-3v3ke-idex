@@ -8,7 +8,13 @@ from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_usb_board_assembly import
 from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_usb_dual_board_housing_assembly import (
     create_nitehawk_usb_dual_board_housing_assembly,
 )
-from shellforgepy.simple import get_bounding_box, get_bounding_box_center, get_volume
+from shellforgepy.simple import (
+    get_bounding_box,
+    get_bounding_box_center,
+    get_bounding_box_size,
+    get_clearance_hole_diameter,
+    get_volume,
+)
 
 
 def _board():
@@ -41,6 +47,15 @@ def _combined_bbox(parts):
     )
 
 
+def _assert_m3_self_threading_x_cutter(cutter):
+    size = get_bounding_box_size(cutter)
+    clearance = get_clearance_hole_diameter("M3", "close")
+
+    assert size[2] == pytest.approx(clearance)
+    assert size[1] < clearance
+    assert size[1] > clearance * 0.9
+
+
 def test_nitehawk_usb_dual_board_housing_exposes_stable_artifacts():
     housing = _housing()
 
@@ -67,7 +82,9 @@ def test_nitehawk_usb_dual_board_housing_exposes_stable_artifacts():
 
     for name in [
         "board_1_mounting_hole_front_left_pilot_hole",
+        "board_1_mounting_hole_front_right_pilot_hole",
         "board_1_mounting_hole_back_pilot_hole",
+        "board_2_mounting_hole_front_left_pilot_hole",
         "board_2_mounting_hole_front_right_pilot_hole",
         "board_2_mounting_hole_back_pilot_hole",
         "cable_slit",
@@ -82,6 +99,27 @@ def test_nitehawk_usb_dual_board_housing_exposes_stable_artifacts():
         "profile_mount_hole_top",
     ]:
         assert name in housing.cutter_indices_by_name
+
+
+def test_nitehawk_usb_dual_board_housing_uses_self_threading_screw_holes():
+    housing = _housing()
+
+    for board_index in [1, 2]:
+        for hole_name in [
+            "mounting_hole_front_left",
+            "mounting_hole_front_right",
+            "mounting_hole_back",
+        ]:
+            _assert_m3_self_threading_x_cutter(
+                housing.get_cutter_part_by_name(
+                    f"board_{board_index}_{hole_name}_pilot_hole"
+                )
+            )
+
+    for index in range(1, 5):
+        _assert_m3_self_threading_x_cutter(
+            housing.get_cutter_part_by_name(f"lid_mount_pilot_hole_{index}")
+        )
 
 
 def test_nitehawk_usb_dual_board_housing_places_two_boards_side_by_side():

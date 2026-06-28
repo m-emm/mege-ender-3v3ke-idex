@@ -352,15 +352,14 @@ globals:
   nitehawk_usb_white_connector_y: 10.5
   nitehawk_usb_dual_housing_wall_thickness: 1.6
   nitehawk_usb_dual_housing_corner_fillet_radius: 1.5
-  nitehawk_usb_dual_housing_board_gap: 10.0
-  nitehawk_usb_dual_housing_board_side_margin: 6.0
-  nitehawk_usb_dual_housing_board_bottom_margin: 6.0
-  nitehawk_usb_dual_housing_board_top_margin: 6.0
+  nitehawk_usb_dual_housing_board_gap: 12.0
+  nitehawk_usb_dual_housing_board_side_margin: 8.0
+  nitehawk_usb_dual_housing_board_bottom_margin: 8.0
+  nitehawk_usb_dual_housing_board_top_margin: 8.0
   nitehawk_usb_dual_housing_board_standoff_height: 4.0
   nitehawk_usb_dual_housing_board_boss_diameter: 6.5
   nitehawk_usb_dual_housing_board_screw_size: "M3"
   nitehawk_usb_dual_housing_board_screw_length: 8.0
-  nitehawk_usb_dual_housing_board_screw_pilot_diameter: 2.4
   nitehawk_usb_dual_housing_component_clearance: 2.2
   nitehawk_usb_dual_housing_lid_thickness: 1.2
   nitehawk_usb_dual_housing_lid_body_clearance: 0.35

@@ -18,7 +18,6 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     nitehawk_usb_dual_housing_board_boss_diameter,
     nitehawk_usb_dual_housing_board_screw_size,
     nitehawk_usb_dual_housing_board_screw_length,
-    nitehawk_usb_dual_housing_board_screw_pilot_diameter,
     nitehawk_usb_dual_housing_component_clearance,
     nitehawk_usb_dual_housing_lid_thickness,
     nitehawk_usb_dual_housing_lid_body_clearance,
@@ -136,7 +135,9 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     board_mount_holes = []
     board_mount_specs = [
         (board_1, "board_1", "mounting_hole_front_left"),
+        (board_1, "board_1", "mounting_hole_front_right"),
         (board_1, "board_1", "mounting_hole_back"),
+        (board_2, "board_2", "mounting_hole_front_left"),
         (board_2, "board_2", "mounting_hole_front_right"),
         (board_2, "board_2", "mounting_hole_back"),
     ]
@@ -157,16 +158,16 @@ def create_nitehawk_usb_dual_board_housing_assembly(
         )
         board_bosses = board_bosses.fuse(boss)
 
-        pilot_hole = create_cylinder(
-            nitehawk_usb_dual_housing_board_screw_pilot_diameter / 2,
+        pilot_hole = create_self_threading_hole_cutter(
+            nitehawk_usb_dual_housing_board_screw_size,
             housing_depth - board_pcb_bbox[0][0] + 2,
-            origin=(
-                board_pcb_bbox[0][0] - 1,
-                hole_center[1],
-                hole_center[2],
-            ),
-            direction=(1, 0, 0),
         )
+        pilot_hole = rotate(90, axis=(0, 1, 0))(pilot_hole)
+        pilot_hole = translate(
+            board_pcb_bbox[0][0] - 1,
+            hole_center[1],
+            hole_center[2],
+        )(pilot_hole)
         board_pilot_holes = board_pilot_holes.fuse(pilot_hole)
         board_mount_holes.append((f"{board_name}_{hole_name}", pilot_hole))
 
@@ -215,12 +216,12 @@ def create_nitehawk_usb_dual_board_housing_assembly(
             )
             lid_screw_bosses = lid_screw_bosses.fuse(lid_boss)
 
-            lid_pilot_hole = create_cylinder(
-                nitehawk_usb_dual_housing_board_screw_pilot_diameter / 2,
+            lid_pilot_hole = create_self_threading_hole_cutter(
+                nitehawk_usb_dual_housing_lid_screw_size,
                 housing_depth + 2,
-                origin=(-1, y, z),
-                direction=(1, 0, 0),
             )
+            lid_pilot_hole = rotate(90, axis=(0, 1, 0))(lid_pilot_hole)
+            lid_pilot_hole = translate(-1, y, z)(lid_pilot_hole)
             lid_pilot_holes = lid_pilot_holes.fuse(lid_pilot_hole)
 
             lid_clearance_hole = create_cylinder(

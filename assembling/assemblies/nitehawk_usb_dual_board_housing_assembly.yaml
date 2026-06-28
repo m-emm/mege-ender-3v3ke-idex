@@ -95,8 +95,6 @@ Parameters:
     Type: String
   nitehawk_usb_dual_housing_board_screw_length:
     Type: Float
-  nitehawk_usb_dual_housing_board_screw_pilot_diameter:
-    Type: Float
   nitehawk_usb_dual_housing_component_clearance:
     Type: Float
   nitehawk_usb_dual_housing_lid_thickness:

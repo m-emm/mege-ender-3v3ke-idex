@@ -1361,7 +1361,6 @@ assemblies:
       nitehawk_usb_dual_housing_board_boss_diameter: !Ref nitehawk_usb_dual_housing_board_boss_diameter
       nitehawk_usb_dual_housing_board_screw_size: !Ref nitehawk_usb_dual_housing_board_screw_size
       nitehawk_usb_dual_housing_board_screw_length: !Ref nitehawk_usb_dual_housing_board_screw_length
-      nitehawk_usb_dual_housing_board_screw_pilot_diameter: !Ref nitehawk_usb_dual_housing_board_screw_pilot_diameter
       nitehawk_usb_dual_housing_component_clearance: !Ref nitehawk_usb_dual_housing_component_clearance
       nitehawk_usb_dual_housing_lid_thickness: !Ref nitehawk_usb_dual_housing_lid_thickness
       nitehawk_usb_dual_housing_lid_body_clearance: !Ref nitehawk_usb_dual_housing_lid_body_clearance
