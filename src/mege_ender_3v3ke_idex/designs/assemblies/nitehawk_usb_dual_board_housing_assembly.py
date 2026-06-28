@@ -49,8 +49,16 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     board_1 = rotate(-90, axis=(0, 1, 0))(board_1)
     board_1 = rotate(-90, axis=(1, 0, 0))(board_1)
 
-    raw_board_bbox = get_bounding_box(board_1)
-    raw_board_size = get_bounding_box_size(board_1)
+    raw_board_bboxes = [
+        get_bounding_box(part) for _, part in board_1.get_named_follower_items()
+    ]
+    raw_board_bbox = (
+        tuple(min(bbox[0][axis] for bbox in raw_board_bboxes) for axis in range(3)),
+        tuple(max(bbox[1][axis] for bbox in raw_board_bboxes) for axis in range(3)),
+    )
+    raw_board_size = tuple(
+        raw_board_bbox[1][axis] - raw_board_bbox[0][axis] for axis in range(3)
+    )
     wall = nitehawk_usb_dual_housing_wall_thickness
 
     housing_width = (
@@ -104,7 +112,13 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     board_2 = nitehawk_usb_board.prefixed_copy("board_2")
     board_2 = rotate(-90, axis=(0, 1, 0))(board_2)
     board_2 = rotate(-90, axis=(1, 0, 0))(board_2)
-    board_2_bbox = get_bounding_box(board_2)
+    board_2_bboxes = [
+        get_bounding_box(part) for _, part in board_2.get_named_follower_items()
+    ]
+    board_2_bbox = (
+        tuple(min(bbox[0][axis] for bbox in board_2_bboxes) for axis in range(3)),
+        tuple(max(bbox[1][axis] for bbox in board_2_bboxes) for axis in range(3)),
+    )
     board_2_y = board_1_y + raw_board_size[1] + nitehawk_usb_dual_housing_board_gap
     board_2 = translate(
         board_back_x - board_2_bbox[1][0],
@@ -124,6 +138,8 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     ]
     for board, board_name, hole_name in board_mount_specs:
         board_hole = board.get_cutter_part_by_name(f"{board_name}_{hole_name}")
+        board_pcb = board.get_follower_part_by_name(f"{board_name}_board")
+        board_pcb_bbox = get_bounding_box(board_pcb)
         hole_center = get_bounding_box_center(board_hole)
         boss = create_cylinder(
             nitehawk_usb_dual_housing_board_boss_diameter / 2,
@@ -139,9 +155,9 @@ def create_nitehawk_usb_dual_board_housing_assembly(
 
         pilot_hole = create_cylinder(
             nitehawk_usb_dual_housing_board_screw_pilot_diameter / 2,
-            nitehawk_usb_dual_housing_board_standoff_height + wall + 2,
+            housing_depth - board_pcb_bbox[0][0] + 2,
             origin=(
-                board_back_x - 1,
+                board_pcb_bbox[0][0] - 1,
                 hole_center[1],
                 hole_center[2],
             ),
@@ -154,9 +170,9 @@ def create_nitehawk_usb_dual_board_housing_assembly(
             nitehawk_usb_dual_housing_board_screw_size,
             nitehawk_usb_dual_housing_board_screw_length,
         )
-        screw = rotate(90, axis=(0, 1, 0))(screw)
+        screw = rotate(-90, axis=(0, 1, 0))(screw)
         screw = translate(
-            board_back_x - nitehawk_usb_dual_housing_board_screw_length,
+            board_pcb_bbox[0][0] + nitehawk_usb_dual_housing_board_screw_length,
             hole_center[1],
             hole_center[2],
         )(screw)
@@ -170,6 +186,10 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     lid_clearance_holes = PartCollector()
     lid_screws = PartCollector()
     lid_screw_positions = []
+    lid_outer_x = (
+        -nitehawk_usb_dual_housing_lid_body_clearance
+        - nitehawk_usb_dual_housing_lid_thickness
+    )
     lid_screw_record = MScrew.from_size(nitehawk_usb_dual_housing_lid_screw_size)
     for y_alignment in [Alignment.FRONT, Alignment.BACK]:
         for z_alignment in [Alignment.BOTTOM, Alignment.TOP]:
@@ -203,9 +223,7 @@ def create_nitehawk_usb_dual_board_housing_assembly(
                 lid_screw_record.clearance_hole_normal / 2,
                 nitehawk_usb_dual_housing_lid_thickness + 3,
                 origin=(
-                    -nitehawk_usb_dual_housing_lid_thickness
-                    - nitehawk_usb_dual_housing_lid_body_clearance
-                    - 1,
+                    lid_outer_x - 1,
                     y,
                     z,
                 ),
@@ -218,11 +236,9 @@ def create_nitehawk_usb_dual_board_housing_assembly(
                 nitehawk_usb_dual_housing_lid_screw_size,
                 nitehawk_usb_dual_housing_lid_screw_length,
             )
-            lid_screw = rotate(90, axis=(0, 1, 0))(lid_screw)
+            lid_screw = rotate(-90, axis=(0, 1, 0))(lid_screw)
             lid_screw = translate(
-                -nitehawk_usb_dual_housing_lid_thickness
-                - nitehawk_usb_dual_housing_lid_body_clearance
-                - nitehawk_usb_dual_housing_lid_screw_length,
+                lid_outer_x + nitehawk_usb_dual_housing_lid_screw_length,
                 y,
                 z,
             )(lid_screw)
@@ -251,12 +267,8 @@ def create_nitehawk_usb_dual_board_housing_assembly(
 
     cable_tie_slots = PartCollector()
     cable_tie_slot_items = []
-    cable_tie_x = (
-        housing_depth
-        - wall
-        - nitehawk_usb_dual_housing_cable_tie_slot_x_offset_from_back
-        - nitehawk_usb_dual_housing_cable_tie_slot_x_size / 2
-    )
+    cable_tie_x = housing_depth - wall
+    cable_tie_z = wall + nitehawk_usb_dual_housing_cable_tie_slot_x_offset_from_back
     for board_index, board_y_min in enumerate([board_1_y, board_2_y], start=1):
         board_center_y = board_y_min + raw_board_size[1] / 2
         for side, y_offset in [
@@ -264,15 +276,15 @@ def create_nitehawk_usb_dual_board_housing_assembly(
             ("back", nitehawk_usb_dual_housing_cable_tie_slot_pair_spacing / 2),
         ]:
             cable_tie_slot = create_box(
-                nitehawk_usb_dual_housing_cable_tie_slot_x_size,
-                nitehawk_usb_dual_housing_cable_tie_slot_y_size,
                 wall + 2,
+                nitehawk_usb_dual_housing_cable_tie_slot_y_size,
+                nitehawk_usb_dual_housing_cable_tie_slot_x_size,
                 origin=(
-                    cable_tie_x - nitehawk_usb_dual_housing_cable_tie_slot_x_size / 2,
+                    cable_tie_x - 1,
                     board_center_y
                     + y_offset
                     - nitehawk_usb_dual_housing_cable_tie_slot_y_size / 2,
-                    -1,
+                    cable_tie_z - nitehawk_usb_dual_housing_cable_tie_slot_x_size / 2,
                 ),
             )
             cable_tie_slots = cable_tie_slots.fuse(cable_tie_slot)
@@ -324,9 +336,9 @@ def create_nitehawk_usb_dual_board_housing_assembly(
             nitehawk_usb_dual_housing_profile_mount_screw_size,
             nitehawk_usb_dual_housing_profile_mount_screw_length,
         )
-        profile_mount_screw = rotate(90, axis=(0, 1, 0))(profile_mount_screw)
+        profile_mount_screw = rotate(-90, axis=(0, 1, 0))(profile_mount_screw)
         profile_mount_screw = translate(
-            housing_depth - wall - nitehawk_usb_dual_housing_profile_mount_screw_length,
+            housing_depth - wall + nitehawk_usb_dual_housing_profile_mount_screw_length,
             get_bounding_box_center(profile_mount_spine)[1],
             get_bounding_box_center(profile_mount_spine)[2] + z_offset,
         )(profile_mount_screw)

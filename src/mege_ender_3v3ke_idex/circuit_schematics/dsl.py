@@ -14,7 +14,7 @@ import copy
 import html
 import math
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
 
@@ -54,6 +54,9 @@ STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE = 0.42
 STRIPBOARD_OVERLAY_NODE_LABEL_SIZE = 0.36
 STRIPBOARD_OVERLAY_NET_LABEL_SIZE = 0.42
 STRIPBOARD_OVERLAY_NET_LABEL_MARGIN = 3.1
+STRIPBOARD_CUT_STROKE = "#7f1d1d"
+STRIPBOARD_CUT_RADIUS = 0.24
+STRIPBOARD_CUT_STROKE_WIDTH = 0.075
 
 
 class NodeType(Enum):
@@ -151,6 +154,22 @@ class SchemaNetVisualization:
 
 
 @dataclass(frozen=True)
+class StripboardNetRun:
+    net_name: str
+    row: int
+    start_col: int
+    end_col: int
+    source_columns: tuple[int, ...]
+    compacted: bool = False
+
+
+@dataclass(frozen=True)
+class StripboardCut:
+    row: int
+    col: int
+
+
+@dataclass(frozen=True)
 class StripboardNetAssignment:
     stripboard: Stripboard
     net_visualizations: tuple[SchemaNetVisualization, ...]
@@ -161,6 +180,9 @@ class StripboardNetAssignment:
     column_pitch: float
     left_margin_pitches: int
     right_margin_pitches: int
+    net_runs: tuple[StripboardNetRun, ...] = ()
+    cuts: tuple[StripboardCut, ...] = ()
+    net_column_maps: dict[str, dict[int, int]] = field(default_factory=dict)
 
 
 @dataclass
@@ -590,11 +612,19 @@ def assign_schema_nets_to_stripboard(
             right_margin_pitches=right_margin_pitches,
         )
 
+    source_columns_by_net = {
+        visualization.net_name: _source_columns_for_visualization(
+            visualization,
+            column_pitch,
+        )
+        for visualization in net_visualizations
+    }
     used_source_columns = tuple(
         sorted(
             {
-                int(round(point[0] / column_pitch))
-                for point in _schema_net_visualization_points(net_visualizations)
+                column
+                for columns in source_columns_by_net.values()
+                for column in columns
             }
         )
     )
@@ -607,20 +637,163 @@ def assign_schema_nets_to_stripboard(
     x_offset = left_margin_pitches - used_source_columns[0]
 
     board_visualizations = tuple(reversed(net_visualizations))
+    net_rows = {
+        visualization.net_name: row
+        for row, visualization in enumerate(board_visualizations)
+    }
+    net_runs = tuple(
+        StripboardNetRun(
+            net_name=visualization.net_name,
+            row=net_rows[visualization.net_name],
+            start_col=0,
+            end_col=board_width - 1,
+            source_columns=source_columns_by_net[visualization.net_name],
+        )
+        for visualization in board_visualizations
+    )
+    net_column_maps = {
+        net_name: {
+            source_column: column_map[source_column]
+            for source_column in source_columns
+        }
+        for net_name, source_columns in source_columns_by_net.items()
+    }
 
     return StripboardNetAssignment(
         stripboard=create_stripboard(board_width, board_height),
         net_visualizations=board_visualizations,
-        net_rows={
-            visualization.net_name: row
-            for row, visualization in enumerate(board_visualizations)
-        },
+        net_rows=net_rows,
         used_source_columns=used_source_columns,
         column_map=column_map,
         x_offset=x_offset,
         column_pitch=float(column_pitch),
         left_margin_pitches=left_margin_pitches,
         right_margin_pitches=right_margin_pitches,
+        net_runs=net_runs,
+        net_column_maps=net_column_maps,
+    )
+
+
+def compact_sparse_stripboard_rows(
+    assignment,
+    min_run_holes=4,
+    max_connections_per_sparse_net=2,
+):
+    if not isinstance(assignment, StripboardNetAssignment):
+        raise TypeError("assignment must be a StripboardNetAssignment.")
+    _validate_positive_integer(min_run_holes, "min_run_holes")
+    _validate_positive_integer(
+        max_connections_per_sparse_net,
+        "max_connections_per_sparse_net",
+    )
+    if not assignment.net_runs:
+        return assignment
+
+    width = assignment.stripboard.width_pitches
+    active_start = assignment.left_margin_pitches
+    active_end = width - assignment.right_margin_pitches - 1
+    active_width = active_end - active_start + 1
+    if active_width < min_run_holes:
+        raise ValueError(
+            "Stripboard active width is too small for min_run_holes; "
+            f"active width is {active_width}, min_run_holes is {min_run_holes}."
+        )
+
+    visualization_by_net = {
+        visualization.net_name: visualization
+        for visualization in assignment.net_visualizations
+    }
+    source_columns_by_net = {
+        run.net_name: tuple(run.source_columns)
+        for run in assignment.net_runs
+    }
+
+    output_rows = []
+    pending_sparse = []
+    for run in sorted(assignment.net_runs, key=lambda item: (item.row, item.start_col)):
+        source_columns = source_columns_by_net[run.net_name]
+        if len(source_columns) <= max_connections_per_sparse_net:
+            pending_sparse.append(run.net_name)
+            continue
+        if pending_sparse:
+            output_rows.extend(
+                _pack_sparse_stripboard_runs(
+                    pending_sparse,
+                    source_columns_by_net,
+                    active_start,
+                    active_end,
+                    min_run_holes,
+                )
+            )
+            pending_sparse = []
+        output_rows.append(
+            (
+                [
+                    StripboardNetRun(
+                        net_name=run.net_name,
+                        row=0,
+                        start_col=0,
+                        end_col=width - 1,
+                        source_columns=source_columns,
+                        compacted=False,
+                    )
+                ],
+                (),
+            )
+        )
+
+    if pending_sparse:
+        output_rows.extend(
+            _pack_sparse_stripboard_runs(
+                pending_sparse,
+                source_columns_by_net,
+                active_start,
+                active_end,
+                min_run_holes,
+            )
+        )
+
+    net_runs = []
+    cuts = []
+    net_column_maps = {}
+    net_rows = {}
+    net_visualizations = []
+    for row, (row_runs, row_cuts) in enumerate(output_rows):
+        for run in row_runs:
+            placed_run = StripboardNetRun(
+                net_name=run.net_name,
+                row=row,
+                start_col=run.start_col,
+                end_col=run.end_col,
+                source_columns=run.source_columns,
+                compacted=run.compacted,
+            )
+            net_runs.append(placed_run)
+            net_rows[placed_run.net_name] = row
+            if placed_run.compacted:
+                net_column_maps[placed_run.net_name] = _run_column_map(placed_run)
+            else:
+                net_column_maps[placed_run.net_name] = assignment.net_column_maps.get(
+                    placed_run.net_name,
+                    _run_column_map(placed_run),
+                )
+            net_visualizations.append(visualization_by_net[placed_run.net_name])
+        for cut in row_cuts:
+            cuts.append(StripboardCut(row=row, col=cut.col))
+
+    return StripboardNetAssignment(
+        stripboard=create_stripboard(width, len(output_rows)),
+        net_visualizations=tuple(net_visualizations),
+        net_rows=net_rows,
+        used_source_columns=assignment.used_source_columns,
+        column_map=assignment.column_map,
+        x_offset=assignment.x_offset,
+        column_pitch=assignment.column_pitch,
+        left_margin_pitches=assignment.left_margin_pitches,
+        right_margin_pitches=assignment.right_margin_pitches,
+        net_runs=tuple(net_runs),
+        cuts=tuple(cuts),
+        net_column_maps=net_column_maps,
     )
 
 
@@ -952,22 +1125,23 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
 
     for row in range(stripboard.height_pitches):
         x, y, strip_width, strip_height = _stripboard_strip_rect(stripboard, row)
-        net_name = _stripboard_row_net_name(assignment, row)
-        if net_name:
+        row_net_name = _stripboard_row_net_name(assignment, row)
+        full_row_label = _stripboard_full_row_label(assignment, stripboard, row)
+        if full_row_label:
             lines.append(
                 f'  <text class="overlay-net-label" '
-                f'data-row="{row}" data-net="{_svg_attr(net_name)}" '
+                f'data-row="{row}" data-net="{_svg_attr(full_row_label)}" '
                 f'x="-0.180" y="{STRIPBOARD_BOARD_MARGIN + row + 0.135:.3f}" '
                 f'font-size="{STRIPBOARD_OVERLAY_NET_LABEL_SIZE:.3f}" '
                 f'font-weight="700" text-anchor="end" '
                 f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
                 f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
                 f'paint-order="stroke">'
-                f"{_svg_text(net_name)}</text>"
+                f"{_svg_text(full_row_label)}</text>"
             )
         lines.append(
             f'  <rect class="copper-strip" data-row="{row}" '
-            f'data-net="{_svg_attr(net_name)}" '
+            f'data-net="{_svg_attr(row_net_name)}" '
             f'x="{x:.3f}" y="{y:.3f}" width="{strip_width:.3f}" '
             f'height="{strip_height:.3f}" fill="{STRIPBOARD_STRIP_FILL}" '
             f'stroke="{STRIPBOARD_STRIP_STROKE}" '
@@ -980,6 +1154,21 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
             f'cx="{x:.3f}" cy="{y:.3f}" r="{STRIPBOARD_HOLE_RADIUS:.3f}" '
             f'fill="{STRIPBOARD_HOLE_FILL}" stroke="{STRIPBOARD_HOLE_STROKE}" '
             f'stroke-width="{STRIPBOARD_STROKE_WIDTH:.3f}"/>'
+        )
+
+    for run in _stripboard_compacted_runs(assignment, stripboard):
+        x = _stripboard_run_center(run)
+        y = _stripboard_row_center(run.row) + 0.135
+        lines.append(
+            f'  <text class="overlay-net-run-label" '
+            f'data-row="{run.row}" data-net="{_svg_attr(run.net_name)}" '
+            f'x="{x:.3f}" y="{y:.3f}" '
+            f'font-size="{STRIPBOARD_OVERLAY_NET_LABEL_SIZE:.3f}" '
+            f'font-weight="700" text-anchor="middle" '
+            f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
+            f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
+            f'paint-order="stroke">'
+            f'{_svg_text(run.net_name)}</text>'
         )
 
     for element_overlay in _stripboard_overlay_elements(schema, assignment):
@@ -1049,6 +1238,25 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
                 f'{_svg_text(marker["label"])}</text>'
             )
 
+    for cut in assignment.cuts:
+        x = _stripboard_column_center(cut.col)
+        y = _stripboard_row_center(cut.row)
+        radius = STRIPBOARD_CUT_RADIUS
+        lines.append(
+            f'  <circle class="strip-cut" data-row="{cut.row}" '
+            f'data-col="{cut.col}" cx="{x:.3f}" cy="{y:.3f}" '
+            f'r="{radius:.3f}" fill="none" stroke="{STRIPBOARD_CUT_STROKE}" '
+            f'stroke-width="{STRIPBOARD_CUT_STROKE_WIDTH:.3f}"/>'
+        )
+        for x1, y1, x2, y2 in _cut_cross_lines(x, y, radius):
+            lines.append(
+                f'  <line class="strip-cut-mark" data-row="{cut.row}" '
+                f'data-col="{cut.col}" x1="{x1:.3f}" y1="{y1:.3f}" '
+                f'x2="{x2:.3f}" y2="{y2:.3f}" '
+                f'stroke="{STRIPBOARD_CUT_STROKE}" '
+                f'stroke-width="{STRIPBOARD_CUT_STROKE_WIDTH:.3f}"/>'
+            )
+
     lines.append("</svg>")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -1084,7 +1292,7 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
     net_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_NET_LABEL_SIZE)
 
     for row in range(stripboard.height_pitches):
-        net_name = _stripboard_row_net_name(assignment, row)
+        net_name = _stripboard_full_row_label(assignment, stripboard, row)
         if not net_name:
             continue
         draw.text(
@@ -1098,6 +1306,20 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
             net_name,
             fill=STRIPBOARD_OVERLAY_TEXT_FILL,
             font=net_font,
+        )
+
+    for run in _stripboard_compacted_runs(assignment, stripboard):
+        _draw_png_text_centered(
+            draw,
+            _offset_point(
+                (_stripboard_run_center(run), _stripboard_row_center(run.row) - 0.22),
+                label_margin,
+                0,
+            ),
+            run.net_name,
+            net_font,
+            scale,
+            fill=STRIPBOARD_OVERLAY_TEXT_FILL,
         )
 
     element_width = _px_overlay_stroke(scale)
@@ -1159,6 +1381,9 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
                 font=node_font,
             )
 
+    for cut in assignment.cuts:
+        _draw_stripboard_cut_png(draw, cut, label_margin, scale)
+
     image.save(path)
 
 
@@ -1210,6 +1435,68 @@ def _stripboard_holes(stripboard):
                 STRIPBOARD_BOARD_MARGIN + col,
                 STRIPBOARD_BOARD_MARGIN + row,
             )
+
+
+def _stripboard_row_runs(assignment, row):
+    return tuple(run for run in assignment.net_runs if run.row == row)
+
+
+def _stripboard_full_row_label(assignment, stripboard, row):
+    runs = _stripboard_row_runs(assignment, row)
+    if len(runs) != 1:
+        return ""
+    run = runs[0]
+    if run.start_col == 0 and run.end_col == stripboard.width_pitches - 1:
+        return run.net_name
+    return ""
+
+
+def _stripboard_compacted_runs(assignment, stripboard):
+    return tuple(
+        run
+        for run in assignment.net_runs
+        if run.compacted
+        or run.start_col != 0
+        or run.end_col != stripboard.width_pitches - 1
+    )
+
+
+def _stripboard_column_center(col):
+    return STRIPBOARD_BOARD_MARGIN + col
+
+
+def _stripboard_row_center(row):
+    return STRIPBOARD_BOARD_MARGIN + row
+
+
+def _stripboard_run_center(run):
+    return STRIPBOARD_BOARD_MARGIN + (run.start_col + run.end_col) / 2.0
+
+
+def _cut_cross_lines(x, y, radius):
+    inset = radius * 0.7
+    return (
+        (x - inset, y - inset, x + inset, y + inset),
+        (x - inset, y + inset, x + inset, y - inset),
+    )
+
+
+def _draw_stripboard_cut_png(draw, cut, label_margin, scale):
+    x = _stripboard_column_center(cut.col) + label_margin
+    y = _stripboard_row_center(cut.row)
+    radius = STRIPBOARD_CUT_RADIUS
+    stroke = max(1, int(round(STRIPBOARD_CUT_STROKE_WIDTH * scale)))
+    draw.ellipse(
+        _px_rect(x - radius, y - radius, radius * 2, radius * 2, scale),
+        outline=STRIPBOARD_CUT_STROKE,
+        width=stroke,
+    )
+    for x1, y1, x2, y2 in _cut_cross_lines(x, y, radius):
+        draw.line(
+            [_px_point((x1, y1), scale), _px_point((x2, y2), scale)],
+            fill=STRIPBOARD_CUT_STROKE,
+            width=stroke,
+        )
 
 
 def _stripboard_overlay_node_markers(schema, assignment):
@@ -1290,19 +1577,101 @@ def _stripboard_overlay_elements(schema, assignment):
 
 
 def _snap_schema_point_to_stripboard(point, net_name, assignment, column_pitch):
-    column = _snap_schema_x_to_column(point[0], assignment, column_pitch)
+    column = _snap_schema_x_to_column(point[0], net_name, assignment, column_pitch)
     row = assignment.net_rows[net_name]
     return (STRIPBOARD_BOARD_MARGIN + column, STRIPBOARD_BOARD_MARGIN + row)
 
 
-def _snap_schema_x_to_column(x, assignment, column_pitch):
+def _snap_schema_x_to_column(x, net_name, assignment, column_pitch):
     source_column = int(round(x / column_pitch))
     if abs(float(column_pitch) - assignment.column_pitch) < EPS:
+        net_column_map = assignment.net_column_maps.get(net_name, {})
+        column = net_column_map.get(source_column)
+        if column is not None:
+            return column
         column = assignment.column_map.get(source_column)
         if column is not None:
             return column
     column = source_column + assignment.x_offset
     return int(_clamp(column, 0, assignment.stripboard.width_pitches - 1))
+
+
+def _pack_sparse_stripboard_runs(
+    net_names,
+    source_columns_by_net,
+    active_start,
+    active_end,
+    min_run_holes,
+):
+    active_width = active_end - active_start + 1
+    rows = []
+    row_runs = []
+    row_cuts = []
+    cursor = active_start
+
+    for net_name in net_names:
+        source_columns = source_columns_by_net[net_name]
+        run_length = max(min_run_holes, len(source_columns))
+        if run_length > active_width:
+            raise ValueError(
+                f"Net {net_name!r} needs a run of {run_length} holes, "
+                f"but the active strip width is {active_width}."
+            )
+
+        cut_col = cursor if row_runs else None
+        start_col = cursor + 1 if row_runs else cursor
+        end_col = start_col + run_length - 1
+        if end_col > active_end:
+            rows.append((row_runs, tuple(row_cuts)))
+            row_runs = []
+            row_cuts = []
+            cursor = active_start
+            cut_col = None
+            start_col = cursor
+            end_col = start_col + run_length - 1
+
+        if cut_col is not None:
+            row_cuts.append(StripboardCut(row=0, col=cut_col))
+
+        row_runs.append(
+            StripboardNetRun(
+                net_name=net_name,
+                row=0,
+                start_col=start_col,
+                end_col=end_col,
+                source_columns=source_columns,
+                compacted=True,
+            )
+        )
+        cursor = end_col + 1
+
+    if row_runs:
+        rows.append((row_runs, tuple(row_cuts)))
+
+    return rows
+
+
+def _run_column_map(run):
+    source_columns = tuple(run.source_columns)
+    if not source_columns:
+        return {}
+    run_length = run.end_col - run.start_col + 1
+    block_start = run.start_col + max(0, (run_length - len(source_columns)) // 2)
+    return {
+        source_column: block_start + index
+        for index, source_column in enumerate(source_columns)
+    }
+
+
+def _source_columns_for_visualization(visualization, column_pitch):
+    return tuple(
+        sorted(
+            {
+                int(round(point[0] / column_pitch))
+                for point in _schema_net_visualization_points((visualization,))
+            }
+        )
+    )
 
 
 def _schema_net_visualization_points(net_visualizations):
@@ -1314,9 +1683,9 @@ def _schema_net_visualization_points(net_visualizations):
 
 
 def _stripboard_row_net_name(assignment, row):
-    for net_name, net_row in assignment.net_rows.items():
-        if net_row == row:
-            return net_name
+    runs = _stripboard_row_runs(assignment, row)
+    if len(runs) == 1:
+        return runs[0].net_name
     return ""
 
 
@@ -1360,6 +1729,17 @@ def _draw_px_circle(draw, center, radius, scale, fill):
         ),
         fill=fill,
     )
+
+
+def _draw_png_text_centered(draw, center, text, font, scale, fill):
+    x, y = _px_point(center, scale)
+    if hasattr(draw, "textbbox"):
+        box = draw.textbbox((0, 0), text, font=font)
+        width = box[2] - box[0]
+        height = box[3] - box[1]
+    else:
+        width, height = draw.textsize(text, font=font)
+    draw.text((x - width // 2, y - height // 2), text, fill=fill, font=font)
 
 
 def _overlay_png_font(scale, size_units):

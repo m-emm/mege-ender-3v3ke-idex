@@ -85,8 +85,22 @@ so a bottom ground rail stays at the bottom of the rendered stripboard.
 Horizontally, only columns with snapped schematic node or terminal markers are
 kept; empty runs of holes between used columns are removed.
 
-This is a layout aid, not an autorouter. It does not yet place real component
-footprints, add strip cuts, or add jumpers.
+Sparse rows can be compacted as a second pass. This keeps the initial
+one-net-per-row assignment intact, then merges rows with few connections into
+cut-separated runs on shared physical strips:
+
+```python
+assignment = assign_schema_nets_to_stripboard(schema)
+assignment = compact_sparse_stripboard_rows(
+    assignment,
+    min_run_holes=4,
+    max_connections_per_sparse_net=2,
+)
+```
+
+This is a layout aid, not an autorouter. It can show diagnostic strip cuts for
+compacted runs, but it does not yet place real component footprints, jumpers,
+or manufacturing-ready cut instructions.
 
 ```python
 schema = create_voltage_divider()

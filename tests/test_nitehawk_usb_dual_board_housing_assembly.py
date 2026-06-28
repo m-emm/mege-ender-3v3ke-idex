@@ -8,7 +8,7 @@ from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_usb_board_assembly import
 from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_usb_dual_board_housing_assembly import (
     create_nitehawk_usb_dual_board_housing_assembly,
 )
-from shellforgepy.simple import get_bounding_box_center, get_volume
+from shellforgepy.simple import get_bounding_box, get_bounding_box_center, get_volume
 
 
 def _board():
@@ -92,6 +92,31 @@ def test_nitehawk_usb_dual_board_housing_places_two_boards_side_by_side():
     assert board_2_center[2] == pytest.approx(board_1_center[2])
 
 
+def test_nitehawk_usb_dual_board_housing_encloses_board_visuals():
+    housing = _housing()
+    housing_bbox = get_bounding_box(housing.leader)
+
+    board_visual_names = [
+        "board_1_board",
+        "board_1_terminal_block",
+        "board_1_usb_c_connector",
+        "board_1_front_plug",
+        "board_1_white_connector",
+        "board_2_board",
+        "board_2_terminal_block",
+        "board_2_usb_c_connector",
+        "board_2_front_plug",
+        "board_2_white_connector",
+    ]
+    for name in board_visual_names:
+        board_part_bbox = get_bounding_box(
+            housing.get_non_production_part_by_name(name)
+        )
+        for axis in range(3):
+            assert board_part_bbox[0][axis] >= housing_bbox[0][axis] - 1e-6
+            assert board_part_bbox[1][axis] <= housing_bbox[1][axis] + 1e-6
+
+
 def test_nitehawk_usb_dual_board_housing_profile_mount_holes_are_vertical_pair():
     housing = _housing()
 
@@ -106,6 +131,27 @@ def test_nitehawk_usb_dual_board_housing_profile_mount_holes_are_vertical_pair()
     assert top[1] == pytest.approx(bottom[1])
     assert top[2] - bottom[2] == pytest.approx(
         DEFAULTS["nitehawk_usb_dual_housing_profile_mount_hole_spacing"]
+    )
+
+
+def test_nitehawk_usb_dual_board_housing_slots_stay_on_backplate():
+    housing = _housing()
+    board_1 = get_bounding_box(housing.get_non_production_part_by_name("board_1_board"))
+    board_2 = get_bounding_box(housing.get_non_production_part_by_name("board_2_board"))
+
+    for name, board_bbox in [
+        ("cable_tie_slot_board_1_front", board_1),
+        ("cable_tie_slot_board_1_back", board_1),
+        ("cable_tie_slot_board_2_front", board_2),
+        ("cable_tie_slot_board_2_back", board_2),
+    ]:
+        slot_bbox = get_bounding_box(housing.get_cutter_part_by_name(name))
+        assert slot_bbox[0][0] > board_bbox[1][0]
+        assert slot_bbox[0][2] > DEFAULTS["nitehawk_usb_dual_housing_wall_thickness"]
+
+    assert not any(
+        name.startswith(("board_1_", "board_2_")) and "clearance" in name
+        for name in housing.cutter_indices_by_name.keys()
     )
 
 

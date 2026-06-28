@@ -18,6 +18,7 @@ from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     create_stripboard,
     create_wire,
     assign_schema_nets_to_stripboard,
+    compact_sparse_stripboard_rows,
     get_schema_net_visualizations,
     point_at,
     render_schemdraw,
@@ -258,6 +259,29 @@ def _create_stripboard_mapping_schema():
     return create_schema([top, middle, low], [r1, r2])
 
 
+def _create_sparse_stripboard_schema():
+    dense_net = create_net("dense")
+    sparse_a_net = create_net("sparse_a")
+    sparse_b_net = create_net("sparse_b")
+    sparse_c_net = create_net("sparse_c")
+
+    dense_nodes = [
+        translate(column, 0)(create_node(Dot, f"dense_{column}", net=dense_net))
+        for column in range(9)
+    ]
+    sparse_a = translate(0, -2)(
+        create_node(Dot, "sparse_a", net=sparse_a_net, label="A")
+    )
+    sparse_b = translate(4, -4)(
+        create_node(Dot, "sparse_b", net=sparse_b_net, label="B")
+    )
+    sparse_c = translate(8, -6)(
+        create_node(Dot, "sparse_c", net=sparse_c_net, label="C")
+    )
+
+    return create_schema([*dense_nodes, sparse_a, sparse_b, sparse_c], [])
+
+
 def test_get_schema_net_visualizations_sorts_nets_by_representative_y():
     schema = _create_stripboard_mapping_schema()
 
@@ -304,6 +328,59 @@ def test_assign_schema_nets_to_stripboard_uses_one_row_per_net():
     assert assignment.stripboard.width_pitches == 5
 
 
+def test_compact_sparse_stripboard_rows_merges_only_sparse_rows():
+    schema = _create_sparse_stripboard_schema()
+    assignment = assign_schema_nets_to_stripboard(schema)
+
+    compacted = compact_sparse_stripboard_rows(assignment)
+
+    assert assignment.stripboard.height_pitches == 4
+    assert compacted.stripboard.height_pitches == 3
+    assert compacted.stripboard.width_pitches == assignment.stripboard.width_pitches
+    assert compacted.net_rows == {
+        "dense": 0,
+        "sparse_a": 1,
+        "sparse_b": 1,
+        "sparse_c": 2,
+    }
+
+    dense_run = next(run for run in compacted.net_runs if run.net_name == "dense")
+    assert dense_run.compacted is False
+    assert dense_run.start_col == 0
+    assert dense_run.end_col == compacted.stripboard.width_pitches - 1
+
+    sparse_runs = [run for run in compacted.net_runs if run.compacted]
+    assert [(run.net_name, run.row, run.start_col, run.end_col) for run in sparse_runs] == [
+        ("sparse_a", 1, 1, 4),
+        ("sparse_b", 1, 6, 9),
+        ("sparse_c", 2, 1, 4),
+    ]
+    assert len(compacted.cuts) == 1
+    assert (compacted.cuts[0].row, compacted.cuts[0].col) == (1, 5)
+
+
+def test_compacted_sparse_rows_snap_markers_inside_runs_not_cuts():
+    schema = _create_sparse_stripboard_schema()
+    assignment = compact_sparse_stripboard_rows(
+        assign_schema_nets_to_stripboard(schema)
+    )
+
+    assert assignment.net_column_maps["sparse_a"] == {0: 2}
+    assert assignment.net_column_maps["sparse_b"] == {4: 7}
+    assert assignment.net_column_maps["sparse_c"] == {8: 2}
+
+    snapped = snap_schema_to_stripboard(schema, assignment)
+    positions = {node.name: node.position for node in snapped.node_views}
+
+    assert positions["sparse_a"] == pytest.approx((2.5, 1.5))
+    assert positions["sparse_b"] == pytest.approx((7.5, 1.5))
+    assert positions["sparse_c"] == pytest.approx((2.5, 2.5))
+    assert all(
+        abs(position[0] - 5.5) > 1e-9 or abs(position[1] - 1.5) > 1e-9
+        for position in positions.values()
+    )
+
+
 def test_snap_schema_to_stripboard_moves_node_views_onto_rows():
     schema = _create_stripboard_mapping_schema()
     assignment = assign_schema_nets_to_stripboard(schema)
@@ -337,10 +414,48 @@ def test_render_stripboard_overlay_writes_svg(tmp_path):
     assert ">top</text>" in svg
 
 
+def test_render_compacted_stripboard_overlay_writes_cuts_and_run_labels(tmp_path):
+    schema = _create_sparse_stripboard_schema()
+    assignment = compact_sparse_stripboard_rows(
+        assign_schema_nets_to_stripboard(schema)
+    )
+    outfile = tmp_path / "compacted_overlay.svg"
+
+    render_stripboard_overlay(
+        assignment.stripboard,
+        assignment,
+        schema,
+        file=outfile,
+    )
+
+    svg = outfile.read_text(encoding="utf-8")
+    assert 'class="strip-cut"' in svg
+    assert 'class="overlay-net-run-label"' in svg
+    assert ">sparse_a</text>" in svg
+
+
 def test_render_stripboard_overlay_writes_png(tmp_path):
     schema = _create_stripboard_mapping_schema()
     assignment = assign_schema_nets_to_stripboard(schema)
     outfile = tmp_path / "overlay.png"
+
+    render_stripboard_overlay(
+        assignment.stripboard,
+        assignment,
+        schema,
+        file=outfile,
+    )
+
+    assert outfile.exists()
+    assert outfile.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_render_compacted_stripboard_overlay_writes_png(tmp_path):
+    schema = _create_sparse_stripboard_schema()
+    assignment = compact_sparse_stripboard_rows(
+        assign_schema_nets_to_stripboard(schema)
+    )
+    outfile = tmp_path / "compacted_overlay.png"
 
     render_stripboard_overlay(
         assignment.stripboard,
