@@ -122,6 +122,19 @@ def test_nitehawk_usb_dual_board_housing_uses_self_threading_screw_holes():
         )
 
 
+def test_nitehawk_usb_dual_board_housing_lid_does_not_cut_body():
+    housing = _housing()
+    bottom_box = housing.leader
+    lid = housing.get_follower_part_by_name("nitehawk_usb_dual_housing_lid")
+
+    bottom_box_volume = get_volume(bottom_box)
+
+    assert get_volume(bottom_box.cut(lid)) == pytest.approx(
+        bottom_box_volume,
+        abs=0.001,
+    )
+
+
 def test_nitehawk_usb_dual_board_housing_places_two_boards_side_by_side():
     housing = _housing()
 

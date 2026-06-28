@@ -22,7 +22,7 @@ def create_stripboard_projection():
     schema = create_schema_for_tb6600_interface()
     assignment = assign_schema_nets_to_stripboard(schema)
     assignment = compact_sparse_stripboard_rows(assignment)
-    assignment = compact_stripboard_connections_left(schema, assignment, strict=False)
+    assignment = compact_stripboard_connections_left(schema, assignment, strict=True)
     return schema, assignment
 
 

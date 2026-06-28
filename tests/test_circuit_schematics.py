@@ -1,6 +1,10 @@
 from mege_ender_3v3ke_idex.circuit_schematics.examples.voltage_divider import (
     create_voltage_divider,
 )
+import importlib.util
+from pathlib import Path
+
+import mege_ender_3v3ke_idex.circuit_schematics.dsl as circuit_dsl
 from mege_ender_3v3ke_idex.circuit_schematics.simple import (
     Alignment,
     BjtNpn,
@@ -391,8 +395,8 @@ def _create_short_and_tall_element_schema():
     bottom = translate(0, -4)(
         create_node(Dot, "bottom_span", net=bottom_net, kind="schematic_junction")
     )
-    short = translate(5, -1)(create_element(Resistor, "Rshort", "1k", top, middle))
-    tall = translate(1, -2)(create_element(Resistor, "Rtall", "1k", top, bottom))
+    short = translate(1, -1)(create_element(Resistor, "Rshort", "1k", top, middle))
+    tall = translate(5, -2)(create_element(Resistor, "Rtall", "1k", top, bottom))
 
     return create_schema([top, middle, bottom], [short, tall])
 
@@ -409,6 +413,72 @@ def _create_same_row_element_schema():
     )
 
     return create_schema([left, right], [resistor])
+
+
+def _load_tb6600_schema_factory():
+    repo_root = Path(__file__).resolve().parents[1]
+    schematic_file = (
+        repo_root
+        / "klipper_setup"
+        / "klipper_config"
+        / "wiring"
+        / "pico_tb6600_stripboard_interface_schematic.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "tb6600_stripboard_test_schematic",
+        schematic_file,
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.create_schema_for_tb6600_interface
+
+
+def _terminal_holes_by_element(schema, assignment):
+    holes_by_element = {}
+    for element in schema.elements:
+        terminal_holes = []
+        for terminal_name, net_name in element.terminal_nets.items():
+            key = ("terminal", element.name, terminal_name)
+            if key not in assignment.marker_column_maps:
+                continue
+            if net_name not in assignment.net_rows:
+                continue
+            terminal_holes.append(
+                (
+                    terminal_name,
+                    assignment.net_rows[net_name],
+                    assignment.marker_column_maps[key],
+                )
+            )
+        if terminal_holes:
+            holes_by_element[element.name] = tuple(terminal_holes)
+    return holes_by_element
+
+
+def _marker_positions_by_key(assignment):
+    marker_rows = {}
+    for visualization in assignment.net_visualizations:
+        row = assignment.net_rows[visualization.net_name]
+        for node_view in visualization.node_views:
+            key = ("node", node_view.name)
+            if key in assignment.marker_column_maps:
+                marker_rows[key] = row
+        for terminal in visualization.terminal_points:
+            key = ("terminal", terminal.element_name, terminal.terminal_name)
+            if key in assignment.marker_column_maps:
+                marker_rows[key] = row
+    return {
+        key: (row, assignment.marker_column_maps[key])
+        for key, row in marker_rows.items()
+    }
+
+
+def _create_tb6600_strict_assignment():
+    schema = _load_tb6600_schema_factory()()
+    assignment = assign_schema_nets_to_stripboard(schema)
+    assignment = compact_sparse_stripboard_rows(assignment)
+    assignment = compact_stripboard_connections_left(schema, assignment, strict=True)
+    return schema, assignment
 
 
 def test_get_schema_net_visualizations_sorts_nets_by_representative_y():
@@ -663,6 +733,115 @@ def test_left_compaction_allows_different_row_element_terminals_to_align():
 
     assert assignment.marker_column_maps[("terminal", "Rdup", "start")] == 2
     assert assignment.marker_column_maps[("terminal", "Rdup", "end")] == 2
+
+
+def test_stripboard_body_blockers_follow_vertical_horizontal_and_diagonal_paths():
+    vertical = circuit_dsl._stripboard_element_blockers_from_terminal_holes(
+        "Rvertical",
+        ((0, 2), (3, 2)),
+    )
+    horizontal = circuit_dsl._stripboard_element_blockers_from_terminal_holes(
+        "Rhorizontal",
+        ((2, 1), (2, 4)),
+    )
+    diagonal = circuit_dsl._stripboard_element_blockers_from_terminal_holes(
+        "Rdiagonal",
+        ((0, 0), (2, 2)),
+    )
+
+    assert {(blocker.row, blocker.col) for blocker in vertical} == {
+        (1, 2),
+        (2, 2),
+    }
+    assert {(blocker.row, blocker.col) for blocker in horizontal} == {
+        (2, 2),
+        (2, 3),
+    }
+    diagonal_positions = {(blocker.row, blocker.col) for blocker in diagonal}
+    assert (1, 1) in diagonal_positions
+    assert (0, 0) not in diagonal_positions
+    assert (2, 2) not in diagonal_positions
+
+
+def test_stripboard_body_blockers_for_multi_terminal_star_paths():
+    blockers = circuit_dsl._stripboard_element_blockers_from_terminal_holes(
+        "Qstar",
+        ((0, 0), (2, 2), (4, 0)),
+    )
+
+    blocker_positions = {(blocker.row, blocker.col) for blocker in blockers}
+    assert (2, 1) in blocker_positions
+    assert (0, 0) not in blocker_positions
+    assert (2, 2) not in blocker_positions
+    assert (4, 0) not in blocker_positions
+
+
+def test_left_compaction_prefers_compact_element_span_over_left_edge():
+    schema, assignment = _create_tb6600_strict_assignment()
+    holes = _terminal_holes_by_element(schema, assignment)
+
+    for element_name in ("Q1", "Q2", "Q3", "R1", "R2", "R3", "R4", "R7", "R8"):
+        columns = [column for _terminal_name, _row, column in holes[element_name]]
+        assert max(columns) - min(columns) == 0
+
+
+def test_tb6600_strict_stripboard_projection_has_no_duplicate_marker_holes():
+    _schema, assignment = _create_tb6600_strict_assignment()
+    marker_positions = _marker_positions_by_key(assignment)
+
+    assert len(marker_positions.values()) == len(set(marker_positions.values()))
+
+
+def test_tb6600_strict_stripboard_projection_has_no_terminal_on_body_blocker():
+    _schema, assignment = _create_tb6600_strict_assignment()
+    marker_positions = _marker_positions_by_key(assignment)
+    terminal_positions = {
+        position
+        for key, position in marker_positions.items()
+        if key[0] == "terminal"
+    }
+    blocker_positions = {(blocker.row, blocker.col) for blocker in assignment.blockers}
+
+    assert terminal_positions.isdisjoint(blocker_positions)
+
+
+def test_tb6600_body_paths_do_not_cross_other_terminal_holes_or_bodies():
+    schema, assignment = _create_tb6600_strict_assignment()
+    holes_by_element = _terminal_holes_by_element(schema, assignment)
+    terminal_positions = {
+        (row, column)
+        for terminal_holes in holes_by_element.values()
+        for _terminal_name, row, column in terminal_holes
+    }
+    seen_segments = []
+
+    for element_name, terminal_holes in holes_by_element.items():
+        element_terminal_positions = {
+            (row, column) for _terminal_name, row, column in terminal_holes
+        }
+        blockers = circuit_dsl._stripboard_element_blockers_from_terminal_holes(
+            element_name,
+            tuple(
+                (row, column)
+                for _terminal_name, row, column in terminal_holes
+            ),
+        )
+        blocker_positions = {(blocker.row, blocker.col) for blocker in blockers}
+        assert blocker_positions.isdisjoint(
+            terminal_positions - element_terminal_positions
+        )
+
+        segments = circuit_dsl._stripboard_element_body_segments_from_terminal_holes(
+            tuple(
+                (row, column)
+                for _terminal_name, row, column in terminal_holes
+            ),
+        )
+        assert not circuit_dsl._stripboard_segments_intersect_any(
+            segments,
+            seen_segments,
+        )
+        seen_segments.extend(segments)
 
 
 def test_left_compaction_allows_all_element_types_to_block_holes():

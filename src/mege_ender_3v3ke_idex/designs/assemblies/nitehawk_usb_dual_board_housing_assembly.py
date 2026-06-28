@@ -190,6 +190,7 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     lid_pilot_holes = PartCollector()
     lid_clearance_holes = PartCollector()
     lid_screws = PartCollector()
+    lid_bosses = []
     lid_screw_positions = []
     lid_outer_x = (
         -nitehawk_usb_dual_housing_lid_body_clearance
@@ -215,6 +216,7 @@ def create_nitehawk_usb_dual_board_housing_assembly(
                 direction=(1, 0, 0),
             )
             lid_screw_bosses = lid_screw_bosses.fuse(lid_boss)
+            lid_bosses.append(lid_boss)
 
             lid_pilot_hole = create_self_threading_hole_cutter(
                 nitehawk_usb_dual_housing_lid_screw_size,
@@ -435,6 +437,14 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     lid_rim = lid_rim.cut(lid_rim_inner_cutter)
     lid_rim = align(lid_rim, housing_reference, Alignment.CENTER, axes=[1, 2])
     lid_rim = align(lid_rim, lid, Alignment.STACK_RIGHT)
+    for lid_boss in lid_bosses:
+        lid_boss_relief_cutter = materialize_bounding_box(
+            lid_boss,
+            x_enlargement=nitehawk_usb_dual_housing_lid_body_clearance + 0.2,
+            y_enlargement=0.2,
+            z_enlargement=0.2,
+        )
+        lid_rim = lid_rim.cut(lid_boss_relief_cutter)
     lid = lid.fuse(lid_rim)
     lid = lid.cut(lid_clearance_holes)
 

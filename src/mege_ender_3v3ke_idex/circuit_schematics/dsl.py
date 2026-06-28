@@ -1968,6 +1968,7 @@ def _stripboard_placement_items(schema, assignment):
                 "terminal_count": len(element_entries),
                 "horizontal_span": max(columns) - min(columns),
                 "source_left": min(columns),
+                "tall_rank": 1 if max(rows) - min(rows) > 4 else 0,
                 "type_rank": 1,
             }
         )
@@ -1984,6 +1985,7 @@ def _stripboard_placement_items(schema, assignment):
                 "terminal_count": 1,
                 "horizontal_span": 0,
                 "source_left": entry["column"],
+                "tall_rank": 0,
                 "type_rank": 0,
             }
         )
@@ -1992,10 +1994,11 @@ def _stripboard_placement_items(schema, assignment):
         sorted(
             items,
             key=lambda item: (
-                item["vertical_span"],
                 item["type_rank"],
+                item["tall_rank"],
                 item["source_left"],
-                item["terminal_count"],
+                -item["terminal_count"],
+                item["vertical_span"],
                 item["horizontal_span"],
                 item["name"],
             ),
