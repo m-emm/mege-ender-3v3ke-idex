@@ -346,22 +346,8 @@ def create_nitehawk_usb_dual_board_housing_assembly(
             )
     housing_box = housing_box.cut(cable_tie_slots)
 
-    profile_mount_spine = create_filleted_box(
-        nitehawk_usb_dual_housing_profile_mount_spine_thickness,
-        nitehawk_usb_dual_housing_profile_mount_spine_width,
-        nitehawk_usb_dual_housing_profile_mount_spine_height,
-        fillet_radius=min(
-            nitehawk_usb_dual_housing_corner_fillet_radius,
-            nitehawk_usb_dual_housing_profile_mount_spine_width / 4,
-        ),
-        no_fillets_at=[Alignment.LEFT, Alignment.RIGHT],
-    )
-    profile_mount_spine = align(
-        profile_mount_spine, housing_reference, Alignment.CENTER, axes=[1, 2]
-    )
-    profile_mount_spine = align(
-        profile_mount_spine, housing_reference, Alignment.STACK_RIGHT
-    )
+    profile_mount_center_y = housing_width / 2
+    profile_mount_center_z = housing_height / 2
     profile_mount_holes = PartCollector()
     profile_mount_hole_items = []
     profile_mount_screws = PartCollector()
@@ -374,11 +360,11 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     ]:
         hole = create_cylinder(
             profile_screw_record.clearance_hole_normal / 2,
-            nitehawk_usb_dual_housing_profile_mount_spine_thickness + wall + 3,
+            wall + 3,
             origin=(
                 housing_depth - wall - 1,
-                get_bounding_box_center(profile_mount_spine)[1],
-                get_bounding_box_center(profile_mount_spine)[2] + z_offset,
+                profile_mount_center_y,
+                profile_mount_center_z + z_offset,
             ),
             direction=(1, 0, 0),
         )
@@ -392,12 +378,11 @@ def create_nitehawk_usb_dual_board_housing_assembly(
         profile_mount_screw = rotate(-90, axis=(0, 1, 0))(profile_mount_screw)
         profile_mount_screw = translate(
             housing_depth - wall + nitehawk_usb_dual_housing_profile_mount_screw_length,
-            get_bounding_box_center(profile_mount_spine)[1],
-            get_bounding_box_center(profile_mount_spine)[2] + z_offset,
+            profile_mount_center_y,
+            profile_mount_center_z + z_offset,
         )(profile_mount_screw)
         profile_mount_screws = profile_mount_screws.fuse(profile_mount_screw)
 
-    housing_box = housing_box.fuse(profile_mount_spine)
     housing_box = housing_box.cut(profile_mount_holes)
 
     lid = create_filleted_box(
@@ -458,10 +443,10 @@ def create_nitehawk_usb_dual_board_housing_assembly(
         nitehawk_usb_dual_housing_profile_mount_spine_height,
     )
     profile_mount_reference = align(
-        profile_mount_reference, profile_mount_spine, Alignment.CENTER, axes=[1, 2]
+        profile_mount_reference, housing_reference, Alignment.CENTER, axes=[1, 2]
     )
     profile_mount_reference = align(
-        profile_mount_reference, profile_mount_spine, Alignment.RIGHT
+        profile_mount_reference, housing_reference, Alignment.RIGHT
     )
 
     housing = LeaderFollowersCuttersPart(leader=housing_box)

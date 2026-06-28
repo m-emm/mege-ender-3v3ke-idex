@@ -267,19 +267,25 @@ def _create_sparse_stripboard_schema():
 
     dense_nodes = [
         translate(column, 0)(create_node(Dot, f"dense_{column}", net=dense_net))
-        for column in range(9)
+        for column in range(10)
     ]
-    sparse_a = translate(0, -2)(
-        create_node(Dot, "sparse_a", net=sparse_a_net, label="A")
-    )
-    sparse_b = translate(4, -4)(
-        create_node(Dot, "sparse_b", net=sparse_b_net, label="B")
-    )
+    sparse_a_nodes = [
+        translate(column, -2)(
+            create_node(Dot, f"sparse_a_{column}", net=sparse_a_net, label="A")
+        )
+        for column in (0, 1)
+    ]
+    sparse_b_nodes = [
+        translate(column, -4)(
+            create_node(Dot, f"sparse_b_{column}", net=sparse_b_net, label="B")
+        )
+        for column in (4, 5)
+    ]
     sparse_c = translate(8, -6)(
         create_node(Dot, "sparse_c", net=sparse_c_net, label="C")
     )
 
-    return create_schema([*dense_nodes, sparse_a, sparse_b, sparse_c], [])
+    return create_schema([*dense_nodes, *sparse_a_nodes, *sparse_b_nodes, sparse_c], [])
 
 
 def test_get_schema_net_visualizations_sorts_nets_by_representative_y():
@@ -335,13 +341,13 @@ def test_compact_sparse_stripboard_rows_merges_only_sparse_rows():
     compacted = compact_sparse_stripboard_rows(assignment)
 
     assert assignment.stripboard.height_pitches == 4
-    assert compacted.stripboard.height_pitches == 3
+    assert compacted.stripboard.height_pitches == 2
     assert compacted.stripboard.width_pitches == assignment.stripboard.width_pitches
     assert compacted.net_rows == {
         "dense": 0,
         "sparse_a": 1,
         "sparse_b": 1,
-        "sparse_c": 2,
+        "sparse_c": 1,
     }
 
     dense_run = next(run for run in compacted.net_runs if run.net_name == "dense")
@@ -353,8 +359,13 @@ def test_compact_sparse_stripboard_rows_merges_only_sparse_rows():
     assert [(run.net_name, run.row, run.start_col, run.end_col) for run in sparse_runs] == [
         ("sparse_a", 1, 1, 4),
         ("sparse_b", 1, 6, 9),
-        ("sparse_c", 2, 1, 4),
     ]
+    assert len(compacted.local_points) == 1
+    assert (
+        compacted.local_points[0].net_name,
+        compacted.local_points[0].row,
+        compacted.local_points[0].col,
+    ) == ("sparse_c", 1, 10)
     assert len(compacted.cuts) == 1
     assert (compacted.cuts[0].row, compacted.cuts[0].col) == (1, 5)
 
@@ -365,16 +376,18 @@ def test_compacted_sparse_rows_snap_markers_inside_runs_not_cuts():
         assign_schema_nets_to_stripboard(schema)
     )
 
-    assert assignment.net_column_maps["sparse_a"] == {0: 2}
-    assert assignment.net_column_maps["sparse_b"] == {4: 7}
-    assert assignment.net_column_maps["sparse_c"] == {8: 2}
+    assert assignment.net_column_maps["sparse_a"] == {0: 2, 1: 3}
+    assert assignment.net_column_maps["sparse_b"] == {4: 7, 5: 8}
+    assert assignment.net_column_maps["sparse_c"] == {8: 10}
 
     snapped = snap_schema_to_stripboard(schema, assignment)
     positions = {node.name: node.position for node in snapped.node_views}
 
-    assert positions["sparse_a"] == pytest.approx((2.5, 1.5))
-    assert positions["sparse_b"] == pytest.approx((7.5, 1.5))
-    assert positions["sparse_c"] == pytest.approx((2.5, 2.5))
+    assert positions["sparse_a_0"] == pytest.approx((2.5, 1.5))
+    assert positions["sparse_a_1"] == pytest.approx((3.5, 1.5))
+    assert positions["sparse_b_4"] == pytest.approx((7.5, 1.5))
+    assert positions["sparse_b_5"] == pytest.approx((8.5, 1.5))
+    assert positions["sparse_c"] == pytest.approx((10.5, 1.5))
     assert all(
         abs(position[0] - 5.5) > 1e-9 or abs(position[1] - 1.5) > 1e-9
         for position in positions.values()
@@ -431,7 +444,9 @@ def test_render_compacted_stripboard_overlay_writes_cuts_and_run_labels(tmp_path
     svg = outfile.read_text(encoding="utf-8")
     assert 'class="strip-cut"' in svg
     assert 'class="overlay-net-run-label"' in svg
+    assert 'class="overlay-local-point-label"' in svg
     assert ">sparse_a</text>" in svg
+    assert ">sparse_c</text>" in svg
 
 
 def test_render_stripboard_overlay_writes_png(tmp_path):

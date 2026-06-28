@@ -190,9 +190,11 @@ def test_nitehawk_usb_dual_board_housing_cable_slits_are_deep_and_aligned():
         DEFAULTS["nitehawk_usb_dual_housing_lid_rim_depth"]
         + DEFAULTS["nitehawk_usb_dual_housing_lid_body_clearance"]
     )
-    slit_end_x = body_bbox[1][0] - wall - DEFAULTS[
-        "nitehawk_usb_dual_housing_cable_slit_floor_clearance"
-    ]
+    slit_end_x = (
+        body_bbox[1][0]
+        - wall
+        - DEFAULTS["nitehawk_usb_dual_housing_cable_slit_floor_clearance"]
+    )
 
     cable_slit_bbox = get_bounding_box(housing.get_cutter_part_by_name("cable_slit"))
     assert cable_slit_bbox[0][0] == pytest.approx(slit_start_x)
@@ -207,19 +209,19 @@ def test_nitehawk_usb_dual_board_housing_cable_slits_are_deep_and_aligned():
             housing.get_non_production_part_by_name(f"board_{index}_front_plug")
         )
         slit_bbox = get_bounding_box(
-            housing.get_cutter_part_by_name(
-                f"rear_connector_cable_slit_board_{index}"
-            )
+            housing.get_cutter_part_by_name(f"rear_connector_cable_slit_board_{index}")
         )
         assert slit_bbox[0][0] == pytest.approx(slit_start_x)
         assert slit_bbox[1][0] == pytest.approx(slit_end_x)
         assert slit_bbox[0][1] <= (
             connector_bbox[0][1]
             - DEFAULTS["nitehawk_usb_dual_housing_rear_connector_slit_y_margin"]
+            + 1e-6
         )
         assert slit_bbox[1][1] >= (
             connector_bbox[1][1]
             + DEFAULTS["nitehawk_usb_dual_housing_rear_connector_slit_y_margin"]
+            - 1e-6
         )
         assert slit_bbox[0][2] < body_bbox[1][2]
         assert slit_bbox[1][2] > body_bbox[1][2] - wall
@@ -239,6 +241,24 @@ def test_nitehawk_usb_dual_board_housing_profile_mount_holes_are_vertical_pair()
     assert top[1] == pytest.approx(bottom[1])
     assert top[2] - bottom[2] == pytest.approx(
         DEFAULTS["nitehawk_usb_dual_housing_profile_mount_hole_spacing"]
+    )
+
+
+def test_nitehawk_usb_dual_board_housing_has_no_external_profile_mount_boss():
+    housing = _housing()
+    body_reference_bbox = get_bounding_box(
+        housing.get_non_production_part_by_name(
+            "nitehawk_usb_dual_housing_body_reference"
+        )
+    )
+    housing_bbox = get_bounding_box(housing.leader)
+    profile_mount_reference_bbox = get_bounding_box(
+        housing.get_non_production_part_by_name("profile_mount_reference")
+    )
+
+    assert housing_bbox[1][0] == pytest.approx(body_reference_bbox[1][0])
+    assert profile_mount_reference_bbox[1][0] == pytest.approx(
+        body_reference_bbox[1][0]
     )
 
 

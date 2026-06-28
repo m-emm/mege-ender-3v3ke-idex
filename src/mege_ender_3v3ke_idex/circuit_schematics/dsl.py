@@ -174,6 +174,14 @@ class StripboardCut:
 
 
 @dataclass(frozen=True)
+class StripboardLocalPoint:
+    net_name: str
+    row: int
+    col: int
+    source_column: int
+
+
+@dataclass(frozen=True)
 class StripboardNetAssignment:
     stripboard: Stripboard
     net_visualizations: tuple[SchemaNetVisualization, ...]
@@ -186,6 +194,7 @@ class StripboardNetAssignment:
     right_margin_pitches: int
     net_runs: tuple[StripboardNetRun, ...] = ()
     cuts: tuple[StripboardCut, ...] = ()
+    local_points: tuple[StripboardLocalPoint, ...] = ()
     net_column_maps: dict[str, dict[int, int]] = field(default_factory=dict)
 
 
@@ -743,6 +752,7 @@ def compact_sparse_stripboard_rows(
                     )
                 ],
                 (),
+                (),
             )
         )
 
@@ -759,10 +769,11 @@ def compact_sparse_stripboard_rows(
 
     net_runs = []
     cuts = []
+    local_points = []
     net_column_maps = {}
     net_rows = {}
     net_visualizations = []
-    for row, (row_runs, row_cuts) in enumerate(output_rows):
+    for row, (row_runs, row_cuts, row_local_points) in enumerate(output_rows):
         for run in row_runs:
             placed_run = StripboardNetRun(
                 net_name=run.net_name,
@@ -782,6 +793,19 @@ def compact_sparse_stripboard_rows(
                     _run_column_map(placed_run),
                 )
             net_visualizations.append(visualization_by_net[placed_run.net_name])
+        for local_point in row_local_points:
+            placed_point = StripboardLocalPoint(
+                net_name=local_point.net_name,
+                row=row,
+                col=local_point.col,
+                source_column=local_point.source_column,
+            )
+            local_points.append(placed_point)
+            net_rows[placed_point.net_name] = row
+            net_column_maps[placed_point.net_name] = {
+                placed_point.source_column: placed_point.col
+            }
+            net_visualizations.append(visualization_by_net[placed_point.net_name])
         for cut in row_cuts:
             cuts.append(StripboardCut(row=row, col=cut.col))
 
@@ -797,6 +821,7 @@ def compact_sparse_stripboard_rows(
         right_margin_pitches=assignment.right_margin_pitches,
         net_runs=tuple(net_runs),
         cuts=tuple(cuts),
+        local_points=tuple(local_points),
         net_column_maps=net_column_maps,
     )
 
@@ -1188,6 +1213,24 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
             f'{_svg_text(run.net_name)}</text>'
         )
 
+    for local_point in assignment.local_points:
+        x = _stripboard_column_center(local_point.col)
+        y = _stripboard_row_center(local_point.row) + 0.080
+        lines.append(
+            f'  <text class="overlay-local-point-label" '
+            f'data-row="{local_point.row}" '
+            f'data-net="{_svg_attr(local_point.net_name)}" '
+            f'x="{x:.3f}" y="{y:.3f}" '
+            f'font-size="{STRIPBOARD_OVERLAY_RUN_LABEL_SIZE:.3f}" '
+            f'font-weight="700" text-anchor="middle" '
+            f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
+            f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
+            f'paint-order="stroke" '
+            f'transform="rotate({STRIPBOARD_OVERLAY_LABEL_ANGLE:.1f} '
+            f'{x:.3f} {y:.3f})">'
+            f'{_svg_text(local_point.net_name)}</text>'
+        )
+
     for element_overlay in _stripboard_overlay_elements(schema, assignment):
         positions = element_overlay["positions"]
         center = element_overlay["center"]
@@ -1342,6 +1385,25 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
                 0,
             ),
             run.net_name,
+            run_font,
+            scale,
+            fill=STRIPBOARD_OVERLAY_TEXT_FILL,
+            angle=STRIPBOARD_OVERLAY_LABEL_ANGLE,
+            anchor="center",
+        )
+
+    for local_point in assignment.local_points:
+        _draw_png_text_rotated(
+            image,
+            _offset_point(
+                (
+                    _stripboard_column_center(local_point.col),
+                    _stripboard_row_center(local_point.row) - 0.10,
+                ),
+                label_margin,
+                0,
+            ),
+            local_point.net_name,
             run_font,
             scale,
             fill=STRIPBOARD_OVERLAY_TEXT_FILL,
@@ -1656,46 +1718,59 @@ def _pack_sparse_stripboard_runs(
     rows = []
     row_runs = []
     row_cuts = []
+    row_local_points = []
     cursor = active_start
 
     for net_name in net_names:
         source_columns = source_columns_by_net[net_name]
-        run_length = max(min_run_holes, len(source_columns))
-        if run_length > active_width:
+        is_local_point = len(source_columns) == 1
+        item_length = 1 if is_local_point else max(min_run_holes, len(source_columns))
+        if item_length > active_width:
             raise ValueError(
-                f"Net {net_name!r} needs a run of {run_length} holes, "
+                f"Net {net_name!r} needs {item_length} holes, "
                 f"but the active strip width is {active_width}."
             )
 
-        cut_col = cursor if row_runs else None
-        start_col = cursor + 1 if row_runs else cursor
-        end_col = start_col + run_length - 1
+        cut_col = cursor if row_runs and not is_local_point else None
+        start_col = cursor + 1 if cut_col is not None else cursor
+        end_col = start_col + item_length - 1
         if end_col > active_end:
-            rows.append((row_runs, tuple(row_cuts)))
+            rows.append((row_runs, tuple(row_cuts), row_local_points))
             row_runs = []
             row_cuts = []
+            row_local_points = []
             cursor = active_start
             cut_col = None
             start_col = cursor
-            end_col = start_col + run_length - 1
+            end_col = start_col + item_length - 1
 
         if cut_col is not None:
             row_cuts.append(StripboardCut(row=0, col=cut_col))
 
-        row_runs.append(
-            StripboardNetRun(
-                net_name=net_name,
-                row=0,
-                start_col=start_col,
-                end_col=end_col,
-                source_columns=source_columns,
-                compacted=True,
+        if is_local_point:
+            row_local_points.append(
+                StripboardLocalPoint(
+                    net_name=net_name,
+                    row=0,
+                    col=start_col,
+                    source_column=source_columns[0],
+                )
             )
-        )
+        else:
+            row_runs.append(
+                StripboardNetRun(
+                    net_name=net_name,
+                    row=0,
+                    start_col=start_col,
+                    end_col=end_col,
+                    source_columns=source_columns,
+                    compacted=True,
+                )
+            )
         cursor = end_col + 1
 
-    if row_runs:
-        rows.append((row_runs, tuple(row_cuts)))
+    if row_runs or row_local_points:
+        rows.append((row_runs, tuple(row_cuts), row_local_points))
 
     return rows
 
