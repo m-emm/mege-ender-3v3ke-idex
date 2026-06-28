@@ -397,6 +397,39 @@ gcode:
     {% endif %}
     RESPOND TYPE=echo MSG="IDEX part fan direct test: TOOL={tool}, SPEED={speed}"
 
+[gcode_macro BED_COOLING]
+description: Cool the bed by parking T0 over bed center and running both part fans.
+variable_target: 40.0
+variable_x_center: 122.0
+variable_y_center: 145.0
+variable_z_height: 10.0
+variable_xy_move_speed: 60.0
+variable_z_move_speed: 20.0
+variable_fan_speed: 1.0
+gcode:
+    {% set target_temp = params.TARGET|default(target)|float %}
+    {% set x = params.X|default(x_center)|float %}
+    {% set y = params.Y|default(y_center)|float %}
+    {% set z = params.Z|default(z_height)|float %}
+    {% set xy_feed = xy_move_speed|float * 60.0 %}
+    {% set z_feed = z_move_speed|float * 60.0 %}
+    {% set homed = printer.toolhead.homed_axes %}
+    SET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=0
+    {% if "x" not in homed or "y" not in homed or "z" not in homed %}
+        G28
+    {% endif %}
+    SAVE_GCODE_STATE NAME=BED_COOLING_STATE
+    G90
+    T0
+    G1 Z{z} F{z_feed}
+    G1 X{x} Y{y} F{xy_feed}
+    IDEX_SET_PART_FAN TOOL=both SPEED={fan_speed}
+    RESPOND TYPE=echo MSG="Bed cooling until heater_bed <= {target_temp}C at X={x}, Y={y}, Z={z}."
+    TEMPERATURE_WAIT SENSOR=heater_bed MAXIMUM={target_temp}
+    M107
+    RESTORE_GCODE_STATE NAME=BED_COOLING_STATE
+    RESPOND TYPE=echo MSG="Bed cooling complete: heater_bed <= {target_temp}C."
+
 [gcode_macro _IDEX_APPLY_TOOL_OFFSET]
 description: Apply the configured g-code offset for TOOL=0 or TOOL=1.
 gcode:

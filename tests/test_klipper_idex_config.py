@@ -281,6 +281,30 @@ def test_idex_part_fan_pins_and_slicer_routing():
     assert "_IDEX_APPLY_PART_FAN TOOL=1" in _section(config_text, "gcode_macro T1")
 
 
+def test_bed_cooling_macro_moves_t0_to_center_and_waits_for_target():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    bed_cooling = _section(config_text, "gcode_macro BED_COOLING")
+
+    assert _macro_variable_float(bed_cooling, "target") == pytest.approx(40.0)
+    assert _macro_variable_float(bed_cooling, "x_center") == pytest.approx(122.0)
+    assert _macro_variable_float(bed_cooling, "y_center") == pytest.approx(145.0)
+    assert _macro_variable_float(bed_cooling, "z_height") == pytest.approx(10.0)
+    assert _macro_variable_float(bed_cooling, "xy_move_speed") == pytest.approx(60.0)
+    assert _macro_variable_float(bed_cooling, "z_move_speed") == pytest.approx(20.0)
+    assert _macro_variable_float(bed_cooling, "fan_speed") == pytest.approx(1.0)
+
+    assert "params.TARGET|default(target)|float" in bed_cooling
+    assert "SET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=0" in bed_cooling
+    assert '"x" not in homed or "y" not in homed or "z" not in homed' in bed_cooling
+    assert re.search(r"^\s*G28\s*$", bed_cooling, flags=re.MULTILINE)
+    assert re.search(r"^\s*T0\s*$", bed_cooling, flags=re.MULTILINE)
+    assert "G1 Z{z} F{z_feed}" in bed_cooling
+    assert "G1 X{x} Y{y} F{xy_feed}" in bed_cooling
+    assert "IDEX_SET_PART_FAN TOOL=both SPEED={fan_speed}" in bed_cooling
+    assert "TEMPERATURE_WAIT SENSOR=heater_bed MAXIMUM={target_temp}" in bed_cooling
+    assert re.search(r"^\s*M107\s*$", bed_cooling, flags=re.MULTILINE)
+
+
 def test_mainsail_pause_resume_cancel_macros_are_defined():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
 
