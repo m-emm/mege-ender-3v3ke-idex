@@ -61,7 +61,7 @@ Builder:
         names:
           - nitehawk_usb_dual_housing_lid
         name_template: "{name}"
-        prod_rotation_angle: 90
+        prod_rotation_angle: -90
         prod_rotation_axis: [0, 1, 0]
     arrange:
       export_individual_parts: false
@@ -69,8 +69,6 @@ Builder:
         - name: nitehawk_usb_dual_board_housing
           parts:
             - nitehawk_usb_dual_board_housing
-        - name: nitehawk_usb_dual_housing_lid
-          parts:
             - nitehawk_usb_dual_housing_lid
       auto_assign_plates: false
 

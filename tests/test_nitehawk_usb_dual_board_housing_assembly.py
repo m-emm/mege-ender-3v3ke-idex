@@ -382,3 +382,31 @@ def test_nitehawk_usb_dual_board_housing_yaml_and_whole_printer_wiring():
         and part.get("artifact") == "leader"
         for part in visualization_parts
     )
+
+
+def test_nitehawk_usb_dual_board_housing_production_prints_on_one_plate():
+    resource = yaml.load(
+        (ASSEMBLIES_DIR / "nitehawk_usb_dual_board_housing_assembly.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+    production = resource["Builder"]["Production"]
+    production_parts = production["parts"]
+
+    body = next(part for part in production_parts if part.get("artifact") == "leader")
+    lid = next(part for part in production_parts if part.get("artifact") == "followers")
+    plates = production["arrange"]["plates"]
+
+    assert body["prod_rotation_angle"] == 90
+    assert body["prod_rotation_axis"] == [0, 1, 0]
+    assert lid["prod_rotation_angle"] == -90
+    assert lid["prod_rotation_axis"] == [0, 1, 0]
+    assert plates == [
+        {
+            "name": "nitehawk_usb_dual_board_housing",
+            "parts": [
+                "nitehawk_usb_dual_board_housing",
+                "nitehawk_usb_dual_housing_lid",
+            ],
+        }
+    ]
+    assert production["arrange"]["auto_assign_plates"] is False
