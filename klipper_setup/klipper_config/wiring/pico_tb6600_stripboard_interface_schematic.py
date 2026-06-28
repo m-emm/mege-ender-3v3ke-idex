@@ -16,7 +16,8 @@ LOW_SIDE_BASE_X = 5.7
 LOW_SIDE_GROUND_OFFSET_Y = -5.8
 TRANSISTOR_TYPE = "BC337"
 V5_RAIL_X = -3.0
-GND_RAIL_X = 11.0
+GND_RAIL_X = 12.0
+TB6600_TERMINAL_X = 9.8
 
 REFDES = (
     {
@@ -69,12 +70,14 @@ def create_low_side_channel(
     plus_label,
     minus_label,
 ):
-    plus = placed_node(Dot, f"{prefix}_plus", plus_label, 4.0, y, Alignment.RIGHT)
+    plus = placed_node(
+        Dot, f"{prefix}_plus", plus_label, TB6600_TERMINAL_X, y, Alignment.RIGHT
+    )
     minus = placed_node(
         Dot,
         f"{prefix}_minus",
         minus_label,
-        LOW_SIDE_TRANSISTOR_X,
+        TB6600_TERMINAL_X,
         y - 1.2,
         Alignment.RIGHT,
     )
@@ -129,11 +132,15 @@ def create_low_side_channel(
     )
 
 
-def create_enable_channel(gnd_tap):
+def create_enable_channel(gnd_tap, ena_minus_tap):
     y = -6.0
     v24 = placed_node(Dot, "ena_v24", "+24V", 0.0, y, Alignment.LEFT)
-    ena_plus = placed_node(Dot, "ena_plus", "ENA+", 5.0, y - 1.0, Alignment.TOP)
-    ena_minus = placed_node(Dot, "ena_minus", "ENA-", 10.4, y - 7.0, Alignment.TOP)
+    ena_plus = placed_node(
+        Dot, "ena_plus", "ENA+", TB6600_TERMINAL_X, y - 1.0, Alignment.TOP
+    )
+    ena_minus = placed_node(
+        Dot, "ena_minus", "ENA-", TB6600_TERMINAL_X, y - 2.3, Alignment.BOTTOM
+    )
     gpio = placed_node(
         Dot,
         "ena_gpio",
@@ -166,7 +173,7 @@ def create_enable_channel(gnd_tap):
     pulldown = create_element(Resistor, "R8", "47k", base, gnd_tap)
     pulldown = place(pulldown, LOW_SIDE_BASE_X, y - 6.1, Alignment.RIGHT)
 
-    ena_minus_wire = wire_between(gnd_tap, ena_minus)
+    ena_minus_wire = wire_between(ena_minus_tap, ena_minus)
 
     return (
         [v24, ena_plus, ena_minus, gpio, base],
@@ -188,17 +195,30 @@ def create_rails():
     gnd_top = placed_node(Dot, "gnd_top", None, GND_RAIL_X, 10.8, Alignment.RIGHT)
     gnd_step = placed_node(Dot, "gnd_step", None, GND_RAIL_X, 3.2, Alignment.RIGHT)
     gnd_dir = placed_node(Dot, "gnd_dir", None, GND_RAIL_X, -4.8, Alignment.RIGHT)
+    gnd_ena_minus = placed_node(
+        Dot, "gnd_ena_minus", None, GND_RAIL_X, -8.3, Alignment.RIGHT
+    )
     gnd_ena = placed_node(
         Ground, "gnd_ena", "GND rail", GND_RAIL_X, -13.0, Alignment.RIGHT
     )
 
-    rail_nodes = [v5_top, v5_step, v5_dir, gnd_top, gnd_step, gnd_dir, gnd_ena]
+    rail_nodes = [
+        v5_top,
+        v5_step,
+        v5_dir,
+        gnd_top,
+        gnd_step,
+        gnd_dir,
+        gnd_ena_minus,
+        gnd_ena,
+    ]
     rail_elements = [
         wire_between(v5_top, v5_step),
         wire_between(v5_step, v5_dir),
         wire_between(gnd_top, gnd_step),
         wire_between(gnd_step, gnd_dir),
-        wire_between(gnd_dir, gnd_ena),
+        wire_between(gnd_dir, gnd_ena_minus),
+        wire_between(gnd_ena_minus, gnd_ena),
     ]
     return (
         rail_nodes,
@@ -210,6 +230,7 @@ def create_rails():
             "gnd_top": gnd_top,
             "gnd_step": gnd_step,
             "gnd_dir": gnd_dir,
+            "gnd_ena_minus": gnd_ena_minus,
             "gnd_ena": gnd_ena,
         },
     )
@@ -239,7 +260,7 @@ def create_schema_for_tb6600_interface():
             plus_label="DIR+",
             minus_label="DIR-",
         ),
-        create_enable_channel(rails["gnd_ena"]),
+        create_enable_channel(rails["gnd_ena"], rails["gnd_ena_minus"]),
         create_decoupling(rails["v5_top"], rails["gnd_top"]),
     ]:
         channel_nodes, channel_elements = channel
