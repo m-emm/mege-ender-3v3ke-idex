@@ -477,6 +477,36 @@ globals:
   fotek_ssr_output_cover_depth: 15.5
   fotek_ssr_input_cover_depth: 15.5
   fotek_ssr_cover_recess_depth: 2.0
+  cooleon_psu_length: 205
+  cooleon_psu_width: 50.2
+  cooleon_psu_thickness: 23
+  cooleon_psu_corner_fillet_radius: 1.2
+  cooleon_psu_end_flange_length: 18
+  cooleon_psu_end_flange_lip_width: 2.0
+  cooleon_psu_end_flange_lip_height: 3.5
+  cooleon_psu_terminal_block_length: 18
+  cooleon_psu_terminal_block_width: 34
+  cooleon_psu_terminal_block_height: 7
+  cooleon_psu_terminal_cover_height: 3.2
+  cooleon_psu_terminal_cover_overhang: 1.2
+  cooleon_psu_terminal_screw_diameter: 5.6
+  cooleon_psu_terminal_screw_head_height: 0.9
+  cooleon_psu_input_terminal_count: 4
+  cooleon_psu_output_terminal_count: 3
+  cooleon_psu_mount_slot_length: 15
+  cooleon_psu_mount_slot_width: 6
+  cooleon_psu_mount_slot_end_inset: 7
+  cooleon_psu_mount_slot_y_offset: 0
+  cooleon_psu_top_vent_panel_length: 116
+  cooleon_psu_top_vent_panel_width: 31
+  cooleon_psu_top_vent_hole_radius: 1.45
+  cooleon_psu_top_vent_x_spacing: 6.0
+  cooleon_psu_top_vent_y_spacing: 5.4
+  cooleon_psu_side_vent_length: 4.0
+  cooleon_psu_side_vent_height: 1.4
+  cooleon_psu_side_vent_x_spacing: 7.2
+  cooleon_psu_label_plate_length: 42
+  cooleon_psu_label_plate_width: 18
   hv_switchbox_height: 125
   hv_switchbox_width: 55
   hv_switchbox_depth: 160

@@ -1601,6 +1601,42 @@ assemblies:
       panasonic_ssr_input_cover_depth: !Ref fotek_ssr_input_cover_depth
       panasonic_ssr_cover_recess_depth: !Ref fotek_ssr_cover_recess_depth
 
+  - name: cooleon_psu_assembly
+
+    resource_file: cooleon_psu_assembly.yaml
+    depends_on: []
+    parameters:
+      cooleon_psu_length: !Ref cooleon_psu_length
+      cooleon_psu_width: !Ref cooleon_psu_width
+      cooleon_psu_thickness: !Ref cooleon_psu_thickness
+      cooleon_psu_corner_fillet_radius: !Ref cooleon_psu_corner_fillet_radius
+      cooleon_psu_end_flange_length: !Ref cooleon_psu_end_flange_length
+      cooleon_psu_end_flange_lip_width: !Ref cooleon_psu_end_flange_lip_width
+      cooleon_psu_end_flange_lip_height: !Ref cooleon_psu_end_flange_lip_height
+      cooleon_psu_terminal_block_length: !Ref cooleon_psu_terminal_block_length
+      cooleon_psu_terminal_block_width: !Ref cooleon_psu_terminal_block_width
+      cooleon_psu_terminal_block_height: !Ref cooleon_psu_terminal_block_height
+      cooleon_psu_terminal_cover_height: !Ref cooleon_psu_terminal_cover_height
+      cooleon_psu_terminal_cover_overhang: !Ref cooleon_psu_terminal_cover_overhang
+      cooleon_psu_terminal_screw_diameter: !Ref cooleon_psu_terminal_screw_diameter
+      cooleon_psu_terminal_screw_head_height: !Ref cooleon_psu_terminal_screw_head_height
+      cooleon_psu_input_terminal_count: !Ref cooleon_psu_input_terminal_count
+      cooleon_psu_output_terminal_count: !Ref cooleon_psu_output_terminal_count
+      cooleon_psu_mount_slot_length: !Ref cooleon_psu_mount_slot_length
+      cooleon_psu_mount_slot_width: !Ref cooleon_psu_mount_slot_width
+      cooleon_psu_mount_slot_end_inset: !Ref cooleon_psu_mount_slot_end_inset
+      cooleon_psu_mount_slot_y_offset: !Ref cooleon_psu_mount_slot_y_offset
+      cooleon_psu_top_vent_panel_length: !Ref cooleon_psu_top_vent_panel_length
+      cooleon_psu_top_vent_panel_width: !Ref cooleon_psu_top_vent_panel_width
+      cooleon_psu_top_vent_hole_radius: !Ref cooleon_psu_top_vent_hole_radius
+      cooleon_psu_top_vent_x_spacing: !Ref cooleon_psu_top_vent_x_spacing
+      cooleon_psu_top_vent_y_spacing: !Ref cooleon_psu_top_vent_y_spacing
+      cooleon_psu_side_vent_length: !Ref cooleon_psu_side_vent_length
+      cooleon_psu_side_vent_height: !Ref cooleon_psu_side_vent_height
+      cooleon_psu_side_vent_x_spacing: !Ref cooleon_psu_side_vent_x_spacing
+      cooleon_psu_label_plate_length: !Ref cooleon_psu_label_plate_length
+      cooleon_psu_label_plate_width: !Ref cooleon_psu_label_plate_width
+
   - name: hv_switchbox_assembly
 
     resource_file: hv_switchbox_assembly.yaml

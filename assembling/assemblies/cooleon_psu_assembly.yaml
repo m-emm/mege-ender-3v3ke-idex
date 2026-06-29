@@ -1,0 +1,139 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Cooleon 24 V slim PSU reference mock for housing design
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - front
+        - right
+        - back
+      width: 1024
+      height: 1024
+    parts:
+      - source: self
+        artifact: followers
+        names:
+          - body
+          - side_flange_rails
+          - end_flange_lines
+        name_template: "{name}"
+        color: [0.18, 0.55, 0.68]
+      - source: self
+        artifact: followers
+        names:
+          - input_terminal_block
+        name_template: "{name}"
+        color: [0.18, 0.52, 0.9]
+      - source: self
+        artifact: followers
+        names:
+          - output_terminal_block
+        name_template: "{name}"
+        color: [0.9, 0.14, 0.14]
+      - source: self
+        artifact: followers
+        names:
+          - input_terminal_cover
+        name_template: "{name}"
+        color: [0.7, 0.88, 1.0]
+      - source: self
+        artifact: followers
+        names:
+          - output_terminal_cover
+        name_template: "{name}"
+        color: [1.0, 0.65, 0.65]
+      - source: self
+        artifact: followers
+        names:
+          - terminal_screws
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
+      - source: self
+        artifact: followers
+        names:
+          - mount_slot_left
+          - mount_slot_right
+          - vent_panels
+          - label_markings
+        name_template: "{name}"
+        color: [0.04, 0.06, 0.08]
+      - source: self
+        artifact: followers
+        names:
+          - label_plate
+        name_template: "{name}"
+        color: [0.88, 0.84, 0.72]
+
+Parameters:
+  cooleon_psu_length:
+    Type: Float
+  cooleon_psu_width:
+    Type: Float
+  cooleon_psu_thickness:
+    Type: Float
+  cooleon_psu_corner_fillet_radius:
+    Type: Float
+  cooleon_psu_end_flange_length:
+    Type: Float
+  cooleon_psu_end_flange_lip_width:
+    Type: Float
+  cooleon_psu_end_flange_lip_height:
+    Type: Float
+  cooleon_psu_terminal_block_length:
+    Type: Float
+  cooleon_psu_terminal_block_width:
+    Type: Float
+  cooleon_psu_terminal_block_height:
+    Type: Float
+  cooleon_psu_terminal_cover_height:
+    Type: Float
+  cooleon_psu_terminal_cover_overhang:
+    Type: Float
+  cooleon_psu_terminal_screw_diameter:
+    Type: Float
+  cooleon_psu_terminal_screw_head_height:
+    Type: Float
+  cooleon_psu_input_terminal_count:
+    Type: Integer
+  cooleon_psu_output_terminal_count:
+    Type: Integer
+  cooleon_psu_mount_slot_length:
+    Type: Float
+  cooleon_psu_mount_slot_width:
+    Type: Float
+  cooleon_psu_mount_slot_end_inset:
+    Type: Float
+  cooleon_psu_mount_slot_y_offset:
+    Type: Float
+  cooleon_psu_top_vent_panel_length:
+    Type: Float
+  cooleon_psu_top_vent_panel_width:
+    Type: Float
+  cooleon_psu_top_vent_hole_radius:
+    Type: Float
+  cooleon_psu_top_vent_x_spacing:
+    Type: Float
+  cooleon_psu_top_vent_y_spacing:
+    Type: Float
+  cooleon_psu_side_vent_length:
+    Type: Float
+  cooleon_psu_side_vent_height:
+    Type: Float
+  cooleon_psu_side_vent_x_spacing:
+    Type: Float
+  cooleon_psu_label_plate_length:
+    Type: Float
+  cooleon_psu_label_plate_width:
+    Type: Float
+
+Parts:
+  CooleonPsuAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.cooleon_psu_assembly.create_cooleon_psu_assembly

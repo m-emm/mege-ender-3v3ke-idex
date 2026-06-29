@@ -3,18 +3,20 @@
 
 ## Current issues
 
-- missing umbilical cable holder on cage
-- fan / cage flanges too weak
-- x belt carriage not fitting to machined toolhead holder
+- cables floating around
+- fan covers for mcus too flimsy / not fitting / noisy
+
 
 ## Mechanical Design tasks
 
-- housing for nitehawk usb connector boards (in progress)
-- fan cover for x axis mcu
+- heatbed psu housing
+- cable management around the printer
+- y axis energy chain consolidation / improvement
+- holders for filament sensors
+- covers for bottoms of mcus
+- filament guidance
 - holders for heatbed PSU
 - toolhead alignment mechanism
-- holders for filament sensors
-- filament guidance
 - nozzle cleaning pads holders
 - idex alignment sensor
 - z/y fine tuner
