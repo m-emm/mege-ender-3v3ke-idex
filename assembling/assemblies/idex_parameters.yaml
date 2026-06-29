@@ -490,11 +490,12 @@ globals:
   cooleon_psu_mount_slot_side_inset: 6
   cooleon_psu_mount_screw_size: "M3"
   cooleon_psu_mount_screw_length: 10
-  cooleon_psu_back_to_back_gap: 4
+  cooleon_psu_back_to_back_gap: 12
   cooleon_pair_housing_clearance: 1.5
   cooleon_pair_housing_wall_thickness: 2.0
+  cooleon_pair_housing_input_terminal_extra_space: 20
   cooleon_pair_housing_mount_rib_length: 24
-  cooleon_pair_housing_mount_rib_thickness: 3.0
+  cooleon_pair_housing_mount_rib_thickness: 10.0
   cooleon_pair_housing_mount_rib_end_inset: 18
   cooleon_pair_housing_vent_diamond_size: 10
   cooleon_pair_housing_vent_pitch: 14
@@ -513,6 +514,17 @@ globals:
   cooleon_pair_housing_lid_screw_boss_diameter: !Ref nitehawk_usb_dual_housing_lid_screw_boss_diameter
   cooleon_pair_housing_self_threading_core_radius_adjustment: !Ref nitehawk_usb_dual_housing_self_threading_core_radius_adjustment
   cooleon_pair_housing_self_threading_lead_in: !Ref nitehawk_usb_dual_housing_self_threading_lead_in
+  cooleon_pair_housing_input_cable_hole_diameter: 9
+  cooleon_pair_housing_input_cable_clamp_hole_diameter: 5
+  cooleon_pair_housing_input_cable_clamp_slit_width: 2.5
+  cooleon_pair_housing_input_cable_clamp_arm_width: 3.5
+  cooleon_pair_housing_input_cable_clamp_arm_depth: 22
+  cooleon_pair_housing_input_cable_clamp_arm_thickness: 7
+  cooleon_pair_housing_input_cable_clamp_clearance: 1.2
+  cooleon_pair_housing_input_cable_clamp_screw_size: "M3"
+  cooleon_pair_housing_input_cable_clamp_screw_length: 10
+  cooleon_pair_housing_output_cable_hole_diameter: 8
+  cooleon_pair_housing_psu_mount_thread_inset_extra_radius: 0.01
   hv_switchbox_height: 125
   hv_switchbox_width: 55
   hv_switchbox_depth: 160
