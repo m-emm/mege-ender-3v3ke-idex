@@ -15,6 +15,21 @@ builder_defaults:
 
 placement:
   alignments:
+    - part: cooleon_psu_2
+      post_rotation:
+        angle: 180
+        axis: [1, 0, 0]
+        center: cooleon_psu_2.CENTER
+    - part: cooleon_psu_2
+      to: cooleon_psu_1
+      alignment: CENTER
+      axes: [0, 1]
+    - part: cooleon_psu_2
+      to: cooleon_psu_1
+      alignment: STACK_BOTTOM
+      stack_gap:
+        $ref: cooleon_psu_back_to_back_gap
+
     - part: x_axis_lower_profile_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_front
       alignment: CENTER
@@ -1619,6 +1634,54 @@ assemblies:
       cooleon_psu_mount_slot_side_inset: !Ref cooleon_psu_mount_slot_side_inset
       cooleon_psu_mount_screw_size: !Ref cooleon_psu_mount_screw_size
       cooleon_psu_mount_screw_length: !Ref cooleon_psu_mount_screw_length
+
+  - name: cooleon_psu_1
+
+    resource_file: cooleon_psu_assembly.yaml
+    depends_on: []
+    parameters:
+      cooleon_psu_length: !Ref cooleon_psu_length
+      cooleon_psu_width: !Ref cooleon_psu_width
+      cooleon_psu_thickness: !Ref cooleon_psu_thickness
+      cooleon_psu_base_plate_thickness: !Ref cooleon_psu_base_plate_thickness
+      cooleon_psu_side_wall_width: !Ref cooleon_psu_side_wall_width
+      cooleon_psu_terminal_block_length: !Ref cooleon_psu_terminal_block_length
+      cooleon_psu_terminal_block_width: !Ref cooleon_psu_terminal_block_width
+      cooleon_psu_terminal_block_height: !Ref cooleon_psu_terminal_block_height
+      cooleon_psu_mount_slot_length: !Ref cooleon_psu_mount_slot_length
+      cooleon_psu_mount_slot_width: !Ref cooleon_psu_mount_slot_width
+      cooleon_psu_mount_slot_side_inset: !Ref cooleon_psu_mount_slot_side_inset
+      cooleon_psu_mount_screw_size: !Ref cooleon_psu_mount_screw_size
+      cooleon_psu_mount_screw_length: !Ref cooleon_psu_mount_screw_length
+
+  - name: cooleon_psu_2
+
+    resource_file: cooleon_psu_assembly.yaml
+    depends_on: []
+    parameters:
+      cooleon_psu_length: !Ref cooleon_psu_length
+      cooleon_psu_width: !Ref cooleon_psu_width
+      cooleon_psu_thickness: !Ref cooleon_psu_thickness
+      cooleon_psu_base_plate_thickness: !Ref cooleon_psu_base_plate_thickness
+      cooleon_psu_side_wall_width: !Ref cooleon_psu_side_wall_width
+      cooleon_psu_terminal_block_length: !Ref cooleon_psu_terminal_block_length
+      cooleon_psu_terminal_block_width: !Ref cooleon_psu_terminal_block_width
+      cooleon_psu_terminal_block_height: !Ref cooleon_psu_terminal_block_height
+      cooleon_psu_mount_slot_length: !Ref cooleon_psu_mount_slot_length
+      cooleon_psu_mount_slot_width: !Ref cooleon_psu_mount_slot_width
+      cooleon_psu_mount_slot_side_inset: !Ref cooleon_psu_mount_slot_side_inset
+      cooleon_psu_mount_screw_size: !Ref cooleon_psu_mount_screw_size
+      cooleon_psu_mount_screw_length: !Ref cooleon_psu_mount_screw_length
+
+  - name: cooleon_psu_pair_assembly
+
+    resource_file: cooleon_psu_pair_assembly.yaml
+    depends_on:
+      - cooleon_psu_1
+      - cooleon_psu_2
+    inject_parts:
+      cooleon_psu_1: cooleon_psu_1
+      cooleon_psu_2: cooleon_psu_2
 
   - name: hv_switchbox_assembly
 

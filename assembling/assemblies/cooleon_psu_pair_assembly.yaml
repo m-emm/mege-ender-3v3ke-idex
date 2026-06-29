@@ -1,0 +1,30 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: YAML-only back-to-back visualization of two Cooleon PSU mocks
+
+Builder:
+  Collection: true
+
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - right
+        - top
+        - bottom
+      width: 1024
+      height: 1024
+    parts:
+      - source: injected
+        assembly: cooleon_psu_1
+        artifact: all
+        name_template: "cooleon_psu_1_{name}"
+      - source: injected
+        assembly: cooleon_psu_2
+        artifact: all
+        name_template: "cooleon_psu_2_{name}"
+
+  Production:
+    parts: []

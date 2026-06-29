@@ -490,6 +490,7 @@ globals:
   cooleon_psu_mount_slot_side_inset: 6
   cooleon_psu_mount_screw_size: "M3"
   cooleon_psu_mount_screw_length: 10
+  cooleon_psu_back_to_back_gap: 4
   hv_switchbox_height: 125
   hv_switchbox_width: 55
   hv_switchbox_depth: 160
