@@ -23,6 +23,9 @@ This is a hardware design project that uses ShellForgePy to create parametric 3D
 
 This project follows ShellForgePy best practices. For comprehensive guidance on ShellForgePy patterns, see the companion guide in `shellforgepy-meges-workshop/AGENTS.md` or the main ShellForgePy repository.
 
+But one hint: In a geometry building / assembly builder script, watch the ratio of align calls to translate calls. Most translate calls use
+complex coordinate math to translate to the right place. align calls are human readable. Prefer align calls over translate calls, make the ratio align / translate as high as possible. translates cannot always be avoided, but often.
+
 ### Key Patterns Used in This Project
 
 #### 1. Assembly-First Builder Workflow
@@ -171,6 +174,7 @@ For support tuning, interpret `support_threshold_angle` carefully: higher values
 - Do not duplicate assembly structure in Python when the same concern belongs in `*_assembly.yaml`
 - Do not import or call another assembly generator from inside an assembly generator; model that relationship in YAML dependencies and use the injected assembly instead
 - Do not use dark colors for visualization - they hide the shape. Use ample lightness and bright colors.
+- Always perfer align() calls over translate() calls using complex coordinate calculations
 
 ## Testing
 
@@ -281,6 +285,8 @@ Do not use `--open` in routine agent verification runs. Reserve `--open` for int
 ```bash
 python -m shellforgepy build assembling/assemblies/assemblies.yaml --assembly print_bed_undercarriage_assembly --production --slice --visualize --open --plate adjustment_wheel_single
 ```
+
+Use the generated previews to asess if the design you created or modified is correct and fitting the requirements.
 
 ### Assembly File Roles
 

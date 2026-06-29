@@ -14,6 +14,21 @@ Builder:
         - bottom
       width: 1024
       height: 1024
+      variants:
+        - name: no_lid
+          hide:
+            - cooleon_pair_housing_lid
+            - lid_mount_screws
+        - name: no_lid_no_psus
+          views:
+            - isometric
+            - right
+            - top
+          hide:
+            - cooleon_pair_housing_lid
+            - lid_mount_screws
+            - cooleon_psu_1_
+            - cooleon_psu_2_
     parts:
       - source: self
         artifact: leader
@@ -23,9 +38,14 @@ Builder:
         artifact: followers
         names:
           - cooleon_pair_housing_lid
-          - cooleon_pair_housing_input_cable_clamp
         name_template: "{name}"
         color: [0.92, 0.96, 1.0]
+      - source: self
+        artifact: followers
+        names:
+          - cooleon_pair_housing_input_cable_clamp
+        name_template: "{name}"
+        color: [0.82, 0.68, 0.32]
       - source: self
         artifact: non_production_parts
         names:
