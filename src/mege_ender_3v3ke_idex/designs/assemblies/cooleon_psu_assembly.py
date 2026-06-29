@@ -17,11 +17,16 @@ def create_cooleon_psu_assembly(
     cooleon_psu_mount_slot_width,
     cooleon_psu_mount_slot_side_inset,
 ):
+
+    mount_screw_size = "M3"
+    mount_screw_length = 10
     base_plate = create_box(
         cooleon_psu_length,
         cooleon_psu_width,
         cooleon_psu_base_plate_thickness,
     )
+
+    mount_screws = []
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         fb = [
@@ -48,6 +53,19 @@ def create_cooleon_psu_assembly(
         )(mount_slot_cutter)
 
         base_plate = base_plate.cut(mount_slot_cutter)
+
+        mount_screw = create_cylinder_screw(mount_screw_size, mount_screw_length)
+
+        mount_screw = align(mount_screw, mount_slot_cutter, Alignment.CENTER)
+        mount_screw = align(mount_screw, mount_slot_cutter, lr.opposite)
+        mount_screw = align(
+            mount_screw,
+            base_plate,
+            Alignment.STACK_BOTTOM,
+            stack_gap=-MScrew.from_size(mount_screw_size).cylinder_head_height
+            - cooleon_psu_base_plate_thickness,
+        )
+        mount_screws.append(mount_screw)
 
     body = create_box(
         cooleon_psu_length - 2 * cooleon_psu_thickness,
@@ -108,5 +126,8 @@ def create_cooleon_psu_assembly(
         output_terminal_block,
         "output_terminal_block",
     )
+
+    for i, mount_screw in enumerate(mount_screws):
+        assembly.add_named_non_production_part(mount_screw, f"mount_screw_{i}")
 
     return assembly
