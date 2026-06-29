@@ -1,6 +1,5 @@
 import pytest
 import yaml
-
 from assembly_defaults import ASSEMBLIES_DIR, DEFAULTS, AssemblyDefaultsLoader
 from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_usb_board_assembly import (
     create_nitehawk_usb_board_assembly,
@@ -8,6 +7,7 @@ from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_usb_board_assembly import
 from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_usb_dual_board_housing_assembly import (
     create_nitehawk_usb_dual_board_housing_assembly,
 )
+from shellforgepy.geometry.m_screws import get_core_hole_diameter
 from shellforgepy.simple import (
     MScrew,
     create_cylinder,
@@ -53,10 +53,16 @@ def _combined_bbox(parts):
 def _assert_m3_self_threading_x_cutter(cutter):
     size = get_bounding_box_size(cutter)
     clearance = get_clearance_hole_diameter("M3", "close")
+    adjusted_core_radius = (
+        get_core_hole_diameter("M3") / 2
+        + DEFAULTS["nitehawk_usb_dual_housing_self_threading_core_radius_adjustment"]
+    )
 
-    assert size[2] == pytest.approx(clearance)
-    assert size[1] < clearance
-    assert size[1] > clearance * 0.9
+    assert size[1:] == pytest.approx([clearance, clearance])
+    assert get_volume(cutter) < get_volume(create_cylinder(clearance / 2, size[0]))
+    assert get_volume(cutter) > get_volume(
+        create_cylinder(adjusted_core_radius, size[0])
+    )
 
 
 def test_nitehawk_usb_dual_board_housing_exposes_stable_artifacts():
@@ -136,20 +142,78 @@ def test_nitehawk_usb_dual_board_housing_uses_self_threading_screw_holes():
         assert clearance_hole_size[1] < screw.cylinder_head_diameter
 
 
+def test_nitehawk_usb_dual_board_housing_lid_pilot_lead_ins_start_at_boss_face():
+    housing = _housing()
+    body_bbox = get_bounding_box(
+        housing.get_non_production_part_by_name(
+            "nitehawk_usb_dual_housing_body_reference"
+        )
+    )
+    boss_inset = DEFAULTS["nitehawk_usb_dual_housing_lid_screw_inset"]
+
+    expected_centers = [
+        (boss_inset, boss_inset),
+        (boss_inset, body_bbox[1][2] - boss_inset),
+        (body_bbox[1][1] - boss_inset, boss_inset),
+        (body_bbox[1][1] - boss_inset, body_bbox[1][2] - boss_inset),
+    ]
+
+    for index, (expected_y, expected_z) in enumerate(expected_centers, start=1):
+        pilot_hole = housing.get_cutter_part_by_name(
+            f"lid_mount_pilot_hole_{index}"
+        )
+        pilot_bbox = get_bounding_box(pilot_hole)
+        pilot_center = get_bounding_box_center(pilot_hole)
+
+        assert pilot_bbox[0][0] == pytest.approx(body_bbox[0][0])
+        assert pilot_bbox[1][0] > body_bbox[1][0]
+        assert pilot_center[1] == pytest.approx(expected_y)
+        assert pilot_center[2] == pytest.approx(expected_z)
+
+
+def test_nitehawk_usb_dual_board_housing_board_pilot_lead_ins_start_at_standoffs():
+    housing = _housing()
+    body_bbox = get_bounding_box(
+        housing.get_non_production_part_by_name(
+            "nitehawk_usb_dual_housing_body_reference"
+        )
+    )
+
+    for board_index in [1, 2]:
+        board_bbox = get_bounding_box(
+            housing.get_non_production_part_by_name(f"board_{board_index}_board")
+        )
+        for hole_name in [
+            "mounting_hole_front_left",
+            "mounting_hole_front_right",
+            "mounting_hole_back",
+        ]:
+            pilot_hole = housing.get_cutter_part_by_name(
+                f"board_{board_index}_{hole_name}_pilot_hole"
+            )
+            pilot_bbox = get_bounding_box(pilot_hole)
+            pilot_center = get_bounding_box_center(pilot_hole)
+
+            assert pilot_bbox[0][0] == pytest.approx(board_bbox[1][0])
+            assert pilot_bbox[1][0] > body_bbox[1][0]
+            assert board_bbox[0][1] <= pilot_center[1] <= board_bbox[1][1]
+            assert board_bbox[0][2] <= pilot_center[2] <= board_bbox[1][2]
+
+
 def test_nitehawk_usb_dual_board_housing_defaults_are_roomy_for_boards_and_lid_bosses():
     screw = MScrew.from_size(DEFAULTS["nitehawk_usb_dual_housing_lid_screw_size"])
 
-    assert DEFAULTS["nitehawk_usb_dual_housing_board_side_margin"] == pytest.approx(
-        16
-    )
+    assert DEFAULTS["nitehawk_usb_dual_housing_board_side_margin"] == pytest.approx(16)
     assert DEFAULTS["nitehawk_usb_dual_housing_board_bottom_margin"] == pytest.approx(
         16
     )
     assert DEFAULTS["nitehawk_usb_dual_housing_board_top_margin"] == pytest.approx(16)
     assert DEFAULTS["nitehawk_usb_dual_housing_board_gap"] == pytest.approx(20)
-    assert DEFAULTS["nitehawk_usb_dual_housing_component_clearance"] == pytest.approx(
-        5
-    )
+    assert DEFAULTS[
+        "nitehawk_usb_dual_housing_self_threading_core_radius_adjustment"
+    ] == pytest.approx(-0.15)
+    assert DEFAULTS["nitehawk_usb_dual_housing_self_threading_lead_in"] is True
+    assert DEFAULTS["nitehawk_usb_dual_housing_component_clearance"] == pytest.approx(5)
     assert DEFAULTS["nitehawk_usb_dual_housing_cable_slit_y_margin"] == pytest.approx(
         10
     )
@@ -284,9 +348,7 @@ def test_nitehawk_usb_dual_board_housing_cable_slits_are_deep_and_aligned():
         - DEFAULTS["nitehawk_usb_dual_housing_cable_slit_floor_clearance"]
     )
 
-    cable_slit_bbox = get_bounding_box(
-        housing.get_cutter_part_by_name("cable_slit")
-    )
+    cable_slit_bbox = get_bounding_box(housing.get_cutter_part_by_name("cable_slit"))
     assert cable_slit_bbox[0][0] == pytest.approx(slit_start_x)
     assert cable_slit_bbox[1][0] == pytest.approx(slit_end_x)
     assert cable_slit_bbox[0][2] < body_bbox[0][2]
@@ -446,6 +508,12 @@ def test_nitehawk_usb_dual_board_housing_yaml_and_whole_printer_wiring():
     assert housing_entry["inject_parts"] == {
         "nitehawk_usb_board": "nitehawk_usb_board_assembly"
     }
+    assert housing_entry["parameters"][
+        "nitehawk_usb_dual_housing_self_threading_core_radius_adjustment"
+    ] == {"$ref": "nitehawk_usb_dual_housing_self_threading_core_radius_adjustment"}
+    assert housing_entry["parameters"][
+        "nitehawk_usb_dual_housing_self_threading_lead_in"
+    ] == {"$ref": "nitehawk_usb_dual_housing_self_threading_lead_in"}
 
     whole_printer = assemblies["whole_printer_assembly"]
     assert "nitehawk_usb_dual_board_housing_assembly" in whole_printer["depends_on"]

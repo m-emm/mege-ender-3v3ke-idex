@@ -19,6 +19,8 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     nitehawk_usb_dual_housing_board_boss_diameter,
     nitehawk_usb_dual_housing_board_screw_size,
     nitehawk_usb_dual_housing_board_screw_length,
+    nitehawk_usb_dual_housing_self_threading_core_radius_adjustment,
+    nitehawk_usb_dual_housing_self_threading_lead_in,
     nitehawk_usb_dual_housing_component_clearance,
     nitehawk_usb_dual_housing_lid_thickness,
     nitehawk_usb_dual_housing_lid_body_clearance,
@@ -159,16 +161,18 @@ def create_nitehawk_usb_dual_board_housing_assembly(
         )
         board_bosses = board_bosses.fuse(boss)
 
+        pilot_hole_length = housing_depth - board_pcb_bbox[0][0] + 2
         pilot_hole = create_self_threading_hole_cutter(
             nitehawk_usb_dual_housing_board_screw_size,
-            housing_depth - board_pcb_bbox[0][0] + 2,
+            pilot_hole_length,
+            core_radius_adjustment=(
+                nitehawk_usb_dual_housing_self_threading_core_radius_adjustment
+            ),
+            lead_in=nitehawk_usb_dual_housing_self_threading_lead_in,
         )
-        pilot_hole = rotate(90, axis=(0, 1, 0))(pilot_hole)
-        pilot_hole = translate(
-            board_pcb_bbox[0][0] - 1,
-            hole_center[1],
-            hole_center[2],
-        )(pilot_hole)
+        pilot_hole = rotate(-90, axis=(0, 1, 0))(pilot_hole)
+        pilot_hole = align(pilot_hole, boss, Alignment.CENTER, axes=[1, 2])
+        pilot_hole = align(pilot_hole, boss, Alignment.LEFT)
         board_pilot_holes = board_pilot_holes.fuse(pilot_hole)
         board_mount_holes.append((f"{board_name}_{hole_name}", pilot_hole))
 
@@ -222,9 +226,16 @@ def create_nitehawk_usb_dual_board_housing_assembly(
             lid_pilot_hole = create_self_threading_hole_cutter(
                 nitehawk_usb_dual_housing_lid_screw_size,
                 housing_depth + 2,
+                core_radius_adjustment=(
+                    nitehawk_usb_dual_housing_self_threading_core_radius_adjustment
+                ),
+                lead_in=nitehawk_usb_dual_housing_self_threading_lead_in,
             )
-            lid_pilot_hole = rotate(90, axis=(0, 1, 0))(lid_pilot_hole)
-            lid_pilot_hole = translate(-1, y, z)(lid_pilot_hole)
+            lid_pilot_hole = rotate(-90, axis=(0, 1, 0))(lid_pilot_hole)
+            lid_pilot_hole = align(
+                lid_pilot_hole, lid_boss, Alignment.CENTER, axes=[1, 2]
+            )
+            lid_pilot_hole = align(lid_pilot_hole, lid_boss, Alignment.LEFT)
             lid_pilot_holes = lid_pilot_holes.fuse(lid_pilot_hole)
 
             lid_clearance_hole = create_cylinder(

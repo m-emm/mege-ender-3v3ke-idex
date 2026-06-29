@@ -135,6 +135,10 @@ Parameters:
     Type: String
   nitehawk_usb_dual_housing_board_screw_length:
     Type: Float
+  nitehawk_usb_dual_housing_self_threading_core_radius_adjustment:
+    Type: Float
+  nitehawk_usb_dual_housing_self_threading_lead_in:
+    Type: Boolean
   nitehawk_usb_dual_housing_component_clearance:
     Type: Float
   nitehawk_usb_dual_housing_lid_thickness:
