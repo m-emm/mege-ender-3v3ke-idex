@@ -31,24 +31,6 @@ Builder:
           - output_terminal_block
         name_template: "{name}"
         color: [0.9, 0.14, 0.14]
-      - source: self
-        artifact: non_production_parts
-        names:
-          - input_terminal_cover
-        name_template: "{name}"
-        color: [0.7, 0.88, 1.0]
-      - source: self
-        artifact: non_production_parts
-        names:
-          - output_terminal_cover
-        name_template: "{name}"
-        color: [1.0, 0.65, 0.65]
-      - source: self
-        artifact: non_production_parts
-        names:
-          - terminal_screws
-        name_template: "{name}"
-        color: [0.78, 0.78, 0.72]
 
 Parameters:
   cooleon_psu_length:
@@ -57,21 +39,9 @@ Parameters:
     Type: Float
   cooleon_psu_thickness:
     Type: Float
-  cooleon_psu_corner_fillet_radius:
-    Type: Float
   cooleon_psu_base_plate_thickness:
     Type: Float
-  cooleon_psu_top_cover_side_inset:
-    Type: Float
-  cooleon_psu_top_cover_height:
-    Type: Float
   cooleon_psu_side_wall_width:
-    Type: Float
-  cooleon_psu_side_wall_height:
-    Type: Float
-  cooleon_psu_side_wall_fillet_radius:
-    Type: Float
-  cooleon_psu_end_flange_length:
     Type: Float
   cooleon_psu_terminal_block_length:
     Type: Float
@@ -79,23 +49,9 @@ Parameters:
     Type: Float
   cooleon_psu_terminal_block_height:
     Type: Float
-  cooleon_psu_terminal_cover_height:
-    Type: Float
-  cooleon_psu_terminal_cover_overhang:
-    Type: Float
-  cooleon_psu_terminal_screw_diameter:
-    Type: Float
-  cooleon_psu_terminal_screw_head_height:
-    Type: Float
-  cooleon_psu_input_terminal_count:
-    Type: Integer
-  cooleon_psu_output_terminal_count:
-    Type: Integer
   cooleon_psu_mount_slot_length:
     Type: Float
   cooleon_psu_mount_slot_width:
-    Type: Float
-  cooleon_psu_mount_slot_end_inset:
     Type: Float
   cooleon_psu_mount_slot_side_inset:
     Type: Float

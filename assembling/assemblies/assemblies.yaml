@@ -1609,26 +1609,13 @@ assemblies:
       cooleon_psu_length: !Ref cooleon_psu_length
       cooleon_psu_width: !Ref cooleon_psu_width
       cooleon_psu_thickness: !Ref cooleon_psu_thickness
-      cooleon_psu_corner_fillet_radius: !Ref cooleon_psu_corner_fillet_radius
       cooleon_psu_base_plate_thickness: !Ref cooleon_psu_base_plate_thickness
-      cooleon_psu_top_cover_side_inset: !Ref cooleon_psu_top_cover_side_inset
-      cooleon_psu_top_cover_height: !Ref cooleon_psu_top_cover_height
       cooleon_psu_side_wall_width: !Ref cooleon_psu_side_wall_width
-      cooleon_psu_side_wall_height: !Ref cooleon_psu_side_wall_height
-      cooleon_psu_side_wall_fillet_radius: !Ref cooleon_psu_side_wall_fillet_radius
-      cooleon_psu_end_flange_length: !Ref cooleon_psu_end_flange_length
       cooleon_psu_terminal_block_length: !Ref cooleon_psu_terminal_block_length
       cooleon_psu_terminal_block_width: !Ref cooleon_psu_terminal_block_width
       cooleon_psu_terminal_block_height: !Ref cooleon_psu_terminal_block_height
-      cooleon_psu_terminal_cover_height: !Ref cooleon_psu_terminal_cover_height
-      cooleon_psu_terminal_cover_overhang: !Ref cooleon_psu_terminal_cover_overhang
-      cooleon_psu_terminal_screw_diameter: !Ref cooleon_psu_terminal_screw_diameter
-      cooleon_psu_terminal_screw_head_height: !Ref cooleon_psu_terminal_screw_head_height
-      cooleon_psu_input_terminal_count: !Ref cooleon_psu_input_terminal_count
-      cooleon_psu_output_terminal_count: !Ref cooleon_psu_output_terminal_count
       cooleon_psu_mount_slot_length: !Ref cooleon_psu_mount_slot_length
       cooleon_psu_mount_slot_width: !Ref cooleon_psu_mount_slot_width
-      cooleon_psu_mount_slot_end_inset: !Ref cooleon_psu_mount_slot_end_inset
       cooleon_psu_mount_slot_side_inset: !Ref cooleon_psu_mount_slot_side_inset
 
   - name: hv_switchbox_assembly

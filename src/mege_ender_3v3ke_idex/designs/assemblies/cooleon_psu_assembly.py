@@ -8,26 +8,13 @@ def create_cooleon_psu_assembly(
     cooleon_psu_length,
     cooleon_psu_width,
     cooleon_psu_thickness,
-    cooleon_psu_corner_fillet_radius,
     cooleon_psu_base_plate_thickness,
-    cooleon_psu_top_cover_side_inset,
-    cooleon_psu_top_cover_height,
     cooleon_psu_side_wall_width,
-    cooleon_psu_side_wall_height,
-    cooleon_psu_side_wall_fillet_radius,
-    cooleon_psu_end_flange_length,
     cooleon_psu_terminal_block_length,
     cooleon_psu_terminal_block_width,
     cooleon_psu_terminal_block_height,
-    cooleon_psu_terminal_cover_height,
-    cooleon_psu_terminal_cover_overhang,
-    cooleon_psu_terminal_screw_diameter,
-    cooleon_psu_terminal_screw_head_height,
-    cooleon_psu_input_terminal_count,
-    cooleon_psu_output_terminal_count,
     cooleon_psu_mount_slot_length,
     cooleon_psu_mount_slot_width,
-    cooleon_psu_mount_slot_end_inset,
     cooleon_psu_mount_slot_side_inset,
 ):
     base_plate = create_box(
@@ -40,7 +27,7 @@ def create_cooleon_psu_assembly(
         fb = [
             a
             for a in Alignment.__members__.values()
-            if a.axis == 1 and a.sign == - lr.sign
+            if a.axis == 1 and a.sign == -lr.sign
         ][0]
 
         mount_slot_cutter = create_rounded_slab(

@@ -480,26 +480,13 @@ globals:
   cooleon_psu_length: 205
   cooleon_psu_width: 50.2
   cooleon_psu_thickness: 23
-  cooleon_psu_corner_fillet_radius: 1.2
   cooleon_psu_base_plate_thickness: 1.4
-  cooleon_psu_top_cover_side_inset: 7.8
-  cooleon_psu_top_cover_height: 21.6
   cooleon_psu_side_wall_width: 2.6
-  cooleon_psu_side_wall_height: 23
-  cooleon_psu_side_wall_fillet_radius: 0.8
-  cooleon_psu_end_flange_length: 18
   cooleon_psu_terminal_block_length: 18
   cooleon_psu_terminal_block_width: 28
   cooleon_psu_terminal_block_height: 7
-  cooleon_psu_terminal_cover_height: 3.2
-  cooleon_psu_terminal_cover_overhang: 1.2
-  cooleon_psu_terminal_screw_diameter: 5.6
-  cooleon_psu_terminal_screw_head_height: 0.9
-  cooleon_psu_input_terminal_count: 4
-  cooleon_psu_output_terminal_count: 3
   cooleon_psu_mount_slot_length: 9
   cooleon_psu_mount_slot_width: 3.7
-  cooleon_psu_mount_slot_end_inset: 7
   cooleon_psu_mount_slot_side_inset: 6
   hv_switchbox_height: 125
   hv_switchbox_width: 55
