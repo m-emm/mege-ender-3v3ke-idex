@@ -7,6 +7,8 @@ electronics used by the printer Klipper config.
 - `pico_w_btt_tmc2226_y_z.yaml` is the Y/Z/heatbed Pico wiring source.
 - `pico_tb6600_stripboard_interface.md` documents the planned non-live
   external Y TB6600 interface connector and stripboard transistor schematic.
+  The schematic/stripboard source example now lives in
+  [`mege-circuits`](https://github.com/m-emm/mege-circuits).
 - `diagrams/*.svg` are generated artifacts committed for review.
 - `../printer.cfg.template` is the active Klipper config source.
 

@@ -37,18 +37,13 @@ This builds the `print_bed_undercarriage_assembly`, selects the `adjustment_whee
 
 ## Circuit Schematics
 
-The alignment-first circuit drawing DSL lives in
-`src/mege_ender_3v3ke_idex/circuit_schematics/`. It is for lightweight
-Schemdraw-based circuit diagrams that should live beside the printer hardware
-work.
+The alignment-first circuit drawing and stripboard preview DSL has moved to
+the standalone open-source project
+[`mege-circuits`](https://github.com/m-emm/mege-circuits).
 
-```bash
-src/mege_ender_3v3ke_idex/circuit_schematics/run.sh \
-  src/mege_ender_3v3ke_idex/circuit_schematics/examples/voltage_divider.py
-```
-
-See `src/mege_ender_3v3ke_idex/circuit_schematics/README.md` for the DSL guide
-and examples.
+The checked-in TB6600 interface diagrams in
+`klipper_setup/klipper_config/wiring/diagrams/` are kept here as printer wiring
+reference artifacts. Their source example now lives in `mege-circuits`.
 
 ## Klipper Configuration
 

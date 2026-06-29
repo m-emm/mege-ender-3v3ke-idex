@@ -9,21 +9,20 @@
 
 ## Mechanical Design tasks
 
-- housing for nitehawk usb connector boards
+- housing for nitehawk usb connector boards (in progress)
 - fan cover for x axis mcu
 - holders for heatbed PSU
 - toolhead alignment mechanism
 - holders for filament sensors
-- holders for filament spools
+- filament guidance
 - nozzle cleaning pads holders
 - idex alignment sensor
-- hv switchbox with ssr mount
 - z/y fine tuner
+- voron tap?
 
 ## Electrical tasks
 
 - Thermal fuse for heatbed / whole printer
-- heatbed 250 V booster
 
 
 ## On Hold
