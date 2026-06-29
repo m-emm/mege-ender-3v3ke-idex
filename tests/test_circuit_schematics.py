@@ -529,6 +529,16 @@ def _terminal_row_span(holes):
     return max(rows) - min(rows)
 
 
+def _assert_no_label_bbox_overlaps(labels):
+    for index, left in enumerate(labels):
+        for right in labels[index + 1 :]:
+            assert not circuit_dsl._stripboard_rectangles_overlap(
+                left.bbox,
+                right.bbox,
+                padding=circuit_dsl.STRIPBOARD_OVERLAY_LABEL_COLLISION_PADDING,
+            ), (left.text, right.text, left.bbox, right.bbox)
+
+
 def test_get_schema_net_visualizations_sorts_nets_by_representative_y():
     schema = _create_stripboard_mapping_schema()
 
@@ -1250,6 +1260,131 @@ def test_render_stripboard_overlay_does_not_label_passive_terminals(tmp_path):
     svg = outfile.read_text(encoding="utf-8")
     assert 'class="overlay-terminal"' in svg
     assert 'class="overlay-terminal-label"' not in svg
+
+
+def test_stripboard_label_collision_resolver_moves_overlapping_label():
+    fixed = circuit_dsl._StripboardOverlayLabel(
+        class_name="fixed",
+        text="fixed",
+        x=0.0,
+        y=0.0,
+        font_size=0.25,
+        font_weight="700",
+        text_anchor="start",
+        collision_priority=0,
+    )
+    movable = circuit_dsl._StripboardOverlayLabel(
+        class_name="movable",
+        text="movable",
+        x=0.0,
+        y=0.0,
+        font_size=0.25,
+        font_weight="700",
+        text_anchor="start",
+        collision_priority=1,
+        candidates=(
+            circuit_dsl._StripboardOverlayLabelCandidate(0.0, 0.0, "start", 0.0),
+            circuit_dsl._StripboardOverlayLabelCandidate(0.0, 0.7, "start", 0.0),
+        ),
+    )
+
+    resolved = circuit_dsl._resolve_stripboard_overlay_label_collisions(
+        (fixed, movable)
+    )
+
+    assert (resolved[1].x, resolved[1].y) == (0.0, 0.7)
+    _assert_no_label_bbox_overlaps(resolved)
+
+
+def test_stripboard_label_collision_resolver_preserves_clear_preferred_position():
+    first = circuit_dsl._StripboardOverlayLabel(
+        class_name="first",
+        text="left",
+        x=0.0,
+        y=0.0,
+        font_size=0.20,
+        font_weight="700",
+        text_anchor="start",
+        collision_priority=0,
+    )
+    second = circuit_dsl._StripboardOverlayLabel(
+        class_name="second",
+        text="right",
+        x=2.0,
+        y=0.0,
+        font_size=0.20,
+        font_weight="700",
+        text_anchor="start",
+        collision_priority=1,
+        candidates=(
+            circuit_dsl._StripboardOverlayLabelCandidate(2.0, 0.0, "start", 0.0),
+            circuit_dsl._StripboardOverlayLabelCandidate(2.0, 0.6, "start", 0.0),
+        ),
+    )
+
+    resolved = circuit_dsl._resolve_stripboard_overlay_label_collisions(
+        (first, second)
+    )
+
+    assert (resolved[1].x, resolved[1].y) == (2.0, 0.0)
+    _assert_no_label_bbox_overlaps(resolved)
+
+
+def test_stripboard_label_collision_resolver_moves_lower_priority_element_label():
+    element = circuit_dsl._StripboardOverlayLabel(
+        class_name="overlay-element-label",
+        text="Q3 BC337",
+        x=0.0,
+        y=0.0,
+        font_size=0.20,
+        font_weight="700",
+        text_anchor="middle",
+        collision_priority=3,
+        candidates=(
+            circuit_dsl._StripboardOverlayLabelCandidate(0.0, 0.0, "middle", 0.0),
+            circuit_dsl._StripboardOverlayLabelCandidate(0.0, 0.7, "middle", 0.0),
+        ),
+    )
+    terminal = circuit_dsl._StripboardOverlayLabel(
+        class_name="overlay-terminal-label",
+        text="B",
+        x=0.0,
+        y=0.0,
+        font_size=0.20,
+        font_weight="800",
+        text_anchor="middle",
+        collision_priority=1,
+    )
+
+    resolved = circuit_dsl._resolve_stripboard_overlay_label_collisions(
+        (element, terminal)
+    )
+
+    assert (resolved[1].x, resolved[1].y) == (0.0, 0.0)
+    assert (resolved[0].x, resolved[0].y) == (0.0, 0.7)
+    _assert_no_label_bbox_overlaps(resolved)
+
+
+def test_tb6600_permuted_stripboard_overlay_labels_do_not_overlap():
+    schema, assignment = _create_tb6600_permuted_assignment()
+    labels = circuit_dsl._placed_stripboard_overlay_labels(
+        assignment.stripboard,
+        assignment,
+        schema,
+    )
+    main_labels = tuple(
+        label
+        for label in labels
+        if label.class_name
+        in {
+            "overlay-element-label",
+            "overlay-net-label",
+            "overlay-node-label",
+            "overlay-terminal-label",
+        }
+    )
+
+    _assert_no_label_bbox_overlaps(main_labels)
 
 
 def test_render_stripboard_overlay_omits_internal_blockers(tmp_path):

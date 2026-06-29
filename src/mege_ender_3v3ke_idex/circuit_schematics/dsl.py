@@ -58,6 +58,7 @@ STRIPBOARD_OVERLAY_NET_LABEL_SIZE = 0.34
 STRIPBOARD_OVERLAY_RUN_LABEL_SIZE = 0.20
 STRIPBOARD_OVERLAY_NET_LABEL_MARGIN = 3.1
 STRIPBOARD_OVERLAY_LABEL_ANGLE = -30.0
+STRIPBOARD_OVERLAY_LABEL_COLLISION_PADDING = 0.035
 STRIPBOARD_RUN_BLOCK_STROKE = "#111111"
 STRIPBOARD_RUN_BLOCK_STROKE_WIDTH = 0.085
 STRIPBOARD_CUT_STROKE = "#000000"
@@ -219,6 +220,30 @@ class ElementSpec:
     positional_terminals: tuple[str, ...] = ()
     bbox_padding: float = DEFAULT_ELEMENT_BBOX_PADDING
     terminal_labels: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class _StripboardOverlayLabelCandidate:
+    x: float
+    y: float
+    text_anchor: str
+    rotation_degrees: float
+
+
+@dataclass(frozen=True)
+class _StripboardOverlayLabel:
+    class_name: str
+    text: str
+    x: float
+    y: float
+    font_size: float
+    font_weight: str
+    text_anchor: str
+    rotation_degrees: float = 0.0
+    data_attrs: tuple[tuple[str, str], ...] = ()
+    collision_priority: int = 0
+    candidates: tuple[_StripboardOverlayLabelCandidate, ...] = ()
+    bbox: tuple[float, float, float, float] | None = None
 
 
 def _two_terminal_spec(factory, height=TWO_TERMINAL_HEIGHT, terminal_labels=None):
@@ -1665,6 +1690,7 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
     scale = _validate_render_scale(scale)
     width, height = _stripboard_size(stripboard)
     label_margin = STRIPBOARD_OVERLAY_NET_LABEL_MARGIN
+    overlay_labels = _placed_stripboard_overlay_labels(stripboard, assignment, schema)
     width_px = (width + label_margin) * scale
     height_px = height * scale
 
@@ -1688,19 +1714,6 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
     for row in range(stripboard.height_pitches):
         x, y, strip_width, strip_height = _stripboard_strip_rect(stripboard, row)
         row_net_name = _stripboard_row_net_name(assignment, row)
-        full_row_label = _stripboard_full_row_label(assignment, stripboard, row)
-        if full_row_label:
-            lines.append(
-                f'  <text class="overlay-net-label" '
-                f'data-row="{row}" data-net="{_svg_attr(full_row_label)}" '
-                f'x="-0.180" y="{STRIPBOARD_BOARD_MARGIN + row + 0.135:.3f}" '
-                f'font-size="{STRIPBOARD_OVERLAY_NET_LABEL_SIZE:.3f}" '
-                f'font-weight="700" text-anchor="end" '
-                f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
-                f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
-                f'paint-order="stroke">'
-                f"{_svg_text(full_row_label)}</text>"
-            )
         lines.append(
             f'  <rect class="copper-strip" data-row="{row}" '
             f'data-net="{_svg_attr(row_net_name)}" '
@@ -1749,7 +1762,6 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
             )
 
     for element_overlay in _stripboard_overlay_elements(schema, assignment):
-        center = element_overlay["center"]
         for start, end in element_overlay["segments"]:
             lines.append(
                 f'  <line class="overlay-element" '
@@ -1759,18 +1771,6 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
                 f'stroke="{STRIPBOARD_OVERLAY_ELEMENT_STROKE}" '
                 f'stroke-width="{STRIPBOARD_OVERLAY_STROKE_WIDTH:.3f}"/>'
             )
-        lines.append(
-            f'  <text class="overlay-element-label" '
-            f'x="{center[0]:.3f}" y="{center[1] - 0.18:.3f}" '
-            f'font-size="{STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE:.3f}" '
-            f'font-weight="700" text-anchor="middle" '
-            f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
-            f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
-            f'paint-order="stroke" '
-            f'transform="rotate({STRIPBOARD_OVERLAY_LABEL_ANGLE:.1f} '
-            f'{center[0]:.3f} {center[1] - 0.18:.3f})">'
-            f'{_svg_text(element_overlay["label"])}</text>'
-        )
 
     for terminal in _stripboard_overlay_terminals(schema, assignment):
         x, y = terminal["position"]
@@ -1794,38 +1794,9 @@ def _render_stripboard_overlay_svg(stripboard, assignment, schema, path, scale):
             f'r="{STRIPBOARD_OVERLAY_NODE_RADIUS:.3f}" '
             f'fill="{STRIPBOARD_OVERLAY_NODE_FILL}"/>'
         )
-        if marker["label"]:
-            lines.append(
-                f'  <text class="overlay-node-label" '
-                f'x="{x + 0.18:.3f}" y="{y - 0.16:.3f}" '
-                f'font-size="{STRIPBOARD_OVERLAY_NODE_LABEL_SIZE:.3f}" '
-                f'font-weight="700" fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
-                f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.070" '
-                f'paint-order="stroke" '
-                f'transform="rotate({STRIPBOARD_OVERLAY_LABEL_ANGLE:.1f} '
-                f'{x + 0.18:.3f} {y - 0.16:.3f})">'
-                f'{_svg_text(marker["label"])}</text>'
-            )
 
-    for terminal in _stripboard_overlay_terminals(schema, assignment):
-        if not terminal["label"]:
-            continue
-        x, y = terminal["position"]
-        label_x = x + 0.155
-        label_y = y - 0.125
-        lines.append(
-            f'  <text class="overlay-terminal-label" '
-            f'data-net="{_svg_attr(terminal["net_name"])}" '
-            f'data-element="{_svg_attr(terminal["element_name"])}" '
-            f'data-terminal="{_svg_attr(terminal["terminal_name"])}" '
-            f'x="{label_x:.3f}" y="{label_y:.3f}" '
-            f'font-size="{STRIPBOARD_OVERLAY_TERMINAL_LABEL_SIZE:.3f}" '
-            f'font-weight="800" text-anchor="middle" '
-            f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
-            f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
-            f'paint-order="stroke">'
-            f'{_svg_text(terminal["label"])}</text>'
-        )
+    for label in overlay_labels:
+        lines.append(_svg_stripboard_overlay_label(label))
 
     lines.append("</svg>")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -1842,6 +1813,7 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
 
     width, height = _stripboard_size(stripboard)
     label_margin = STRIPBOARD_OVERLAY_NET_LABEL_MARGIN
+    overlay_labels = _placed_stripboard_overlay_labels(stripboard, assignment, schema)
     image_width = max(1, int(round((width + label_margin) * scale)))
     image_height = max(1, int(round(height * scale)))
     image = Image.new("RGB", (image_width, image_height), "white")
@@ -1857,28 +1829,6 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
     _draw_stripboard_base_png(ImageDraw.Draw(board_image), stripboard, scale)
     image.paste(board_image, (int(round(label_margin * scale)), 0))
 
-    element_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE)
-    terminal_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_TERMINAL_LABEL_SIZE)
-    node_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_NODE_LABEL_SIZE)
-    net_font = _overlay_png_font(scale, STRIPBOARD_OVERLAY_NET_LABEL_SIZE)
-
-    for row in range(stripboard.height_pitches):
-        net_name = _stripboard_full_row_label(assignment, stripboard, row)
-        if not net_name:
-            continue
-        draw.text(
-            _px_point(
-                (
-                    label_margin - 0.2 - len(net_name) * 0.18,
-                    STRIPBOARD_BOARD_MARGIN + row - 0.22,
-                ),
-                scale,
-            ),
-            net_name,
-            fill=STRIPBOARD_OVERLAY_TEXT_FILL,
-            font=net_font,
-        )
-
     for run in _stripboard_compacted_runs(assignment, stripboard):
         _draw_stripboard_run_block_png(draw, run, label_margin, scale)
 
@@ -1887,7 +1837,6 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
 
     element_width = _px_overlay_stroke(scale)
     for element_overlay in _stripboard_overlay_elements(schema, assignment):
-        center = element_overlay["center"]
         for start, end in element_overlay["segments"]:
             draw.line(
                 [
@@ -1897,16 +1846,6 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
                 fill=STRIPBOARD_OVERLAY_ELEMENT_STROKE,
                 width=element_width,
             )
-        _draw_png_text_rotated(
-            image,
-            _offset_point((center[0], center[1] - 0.18), label_margin, 0),
-            element_overlay["label"],
-            font=element_font,
-            scale=scale,
-            fill=STRIPBOARD_OVERLAY_TEXT_FILL,
-            angle=STRIPBOARD_OVERLAY_LABEL_ANGLE,
-            anchor="center",
-        )
 
     for terminal in _stripboard_overlay_terminals(schema, assignment):
         _draw_px_circle(
@@ -1925,33 +1864,9 @@ def _render_stripboard_overlay_png(stripboard, assignment, schema, path, scale):
             scale,
             fill=STRIPBOARD_OVERLAY_NODE_FILL,
         )
-        if marker["label"]:
-            x, y = marker["position"]
-            _draw_png_text_rotated(
-                image,
-                (x + label_margin + 0.18, y - 0.16),
-                marker["label"],
-                font=node_font,
-                scale=scale,
-                fill=STRIPBOARD_OVERLAY_TEXT_FILL,
-                angle=STRIPBOARD_OVERLAY_LABEL_ANGLE,
-                anchor="left",
-            )
 
-    for terminal in _stripboard_overlay_terminals(schema, assignment):
-        if not terminal["label"]:
-            continue
-        x, y = terminal["position"]
-        _draw_png_text_rotated(
-            image,
-            (x + label_margin + 0.155, y - 0.125),
-            terminal["label"],
-            font=terminal_font,
-            scale=scale,
-            fill=STRIPBOARD_OVERLAY_TEXT_FILL,
-            angle=0,
-            anchor="center",
-        )
+    for label in overlay_labels:
+        _draw_stripboard_overlay_label_png(image, label, label_margin, scale)
 
     image.save(path)
 
@@ -2083,6 +1998,320 @@ def _draw_stripboard_cut_png(draw, cut, label_margin, scale):
             fill=STRIPBOARD_CUT_STROKE,
             width=stroke,
         )
+
+
+def _placed_stripboard_overlay_labels(stripboard, assignment, schema):
+    labels = []
+
+    for row in range(stripboard.height_pitches):
+        full_row_label = _stripboard_full_row_label(assignment, stripboard, row)
+        if not full_row_label:
+            continue
+        x = -0.180
+        y = STRIPBOARD_BOARD_MARGIN + row + 0.135
+        labels.append(
+            _StripboardOverlayLabel(
+                class_name="overlay-net-label",
+                text=full_row_label,
+                x=x,
+                y=y,
+                font_size=STRIPBOARD_OVERLAY_NET_LABEL_SIZE,
+                font_weight="700",
+                text_anchor="end",
+                data_attrs=(
+                    ("data-row", str(row)),
+                    ("data-net", full_row_label),
+                ),
+                collision_priority=0,
+            )
+        )
+
+    for terminal in _stripboard_overlay_terminals(schema, assignment):
+        if not terminal["label"]:
+            continue
+        x, y = terminal["position"]
+        labels.append(
+            _StripboardOverlayLabel(
+                class_name="overlay-terminal-label",
+                text=terminal["label"],
+                x=x + 0.155,
+                y=y - 0.125,
+                font_size=STRIPBOARD_OVERLAY_TERMINAL_LABEL_SIZE,
+                font_weight="800",
+                text_anchor="middle",
+                data_attrs=(
+                    ("data-net", terminal["net_name"]),
+                    ("data-element", terminal["element_name"]),
+                    ("data-terminal", terminal["terminal_name"]),
+                ),
+                collision_priority=1,
+                candidates=_stripboard_terminal_label_candidates(x, y),
+            )
+        )
+
+    for marker in _stripboard_overlay_node_markers(schema, assignment):
+        if not marker["label"]:
+            continue
+        x, y = marker["position"]
+        labels.append(
+            _StripboardOverlayLabel(
+                class_name="overlay-node-label",
+                text=marker["label"],
+                x=x + 0.18,
+                y=y - 0.16,
+                font_size=STRIPBOARD_OVERLAY_NODE_LABEL_SIZE,
+                font_weight="700",
+                text_anchor="start",
+                rotation_degrees=STRIPBOARD_OVERLAY_LABEL_ANGLE,
+                data_attrs=(
+                    ("data-net", marker["net_name"]),
+                    ("data-node", marker["node_name"]),
+                ),
+                collision_priority=2,
+                candidates=_stripboard_node_label_candidates(x, y),
+            )
+        )
+
+    for element_overlay in _stripboard_overlay_elements(schema, assignment):
+        center = element_overlay["center"]
+        labels.append(
+            _StripboardOverlayLabel(
+                class_name="overlay-element-label",
+                text=element_overlay["label"],
+                x=center[0],
+                y=center[1] - 0.18,
+                font_size=STRIPBOARD_OVERLAY_ELEMENT_LABEL_SIZE,
+                font_weight="700",
+                text_anchor="middle",
+                rotation_degrees=STRIPBOARD_OVERLAY_LABEL_ANGLE,
+                data_attrs=(("data-element", element_overlay["name"]),),
+                collision_priority=3,
+                candidates=_stripboard_element_label_candidates(center),
+            )
+        )
+
+    return _resolve_stripboard_overlay_label_collisions(tuple(labels))
+
+
+def _stripboard_terminal_label_candidates(x, y):
+    return (
+        _StripboardOverlayLabelCandidate(x + 0.155, y - 0.125, "middle", 0.0),
+        _StripboardOverlayLabelCandidate(x - 0.155, y - 0.125, "middle", 0.0),
+        _StripboardOverlayLabelCandidate(x + 0.155, y + 0.230, "middle", 0.0),
+        _StripboardOverlayLabelCandidate(x - 0.155, y + 0.230, "middle", 0.0),
+        _StripboardOverlayLabelCandidate(x, y - 0.310, "middle", 0.0),
+        _StripboardOverlayLabelCandidate(x, y + 0.360, "middle", 0.0),
+    )
+
+
+def _stripboard_node_label_candidates(x, y):
+    angle = STRIPBOARD_OVERLAY_LABEL_ANGLE
+    return (
+        _StripboardOverlayLabelCandidate(x + 0.18, y - 0.16, "start", angle),
+        _StripboardOverlayLabelCandidate(x + 0.18, y - 0.38, "start", angle),
+        _StripboardOverlayLabelCandidate(x + 0.18, y + 0.12, "start", angle),
+        _StripboardOverlayLabelCandidate(x - 0.18, y - 0.16, "end", angle),
+        _StripboardOverlayLabelCandidate(x - 0.18, y - 0.38, "end", angle),
+        _StripboardOverlayLabelCandidate(x + 0.42, y - 0.24, "start", angle),
+        _StripboardOverlayLabelCandidate(x - 0.42, y - 0.24, "end", angle),
+    )
+
+
+def _stripboard_element_label_candidates(center):
+    x, y = center
+    angle = STRIPBOARD_OVERLAY_LABEL_ANGLE
+    offsets = (
+        (0.00, -0.18),
+        (0.00, -0.44),
+        (0.00, 0.14),
+        (-0.36, -0.24),
+        (0.36, -0.24),
+        (-0.58, 0.08),
+        (0.58, 0.08),
+        (0.00, -0.70),
+        (0.00, 0.40),
+        (-0.82, -0.06),
+        (0.82, -0.06),
+        (0.00, -0.96),
+        (0.00, 0.72),
+        (0.00, 1.00),
+        (-1.10, -0.32),
+        (1.10, -0.32),
+        (-1.10, 0.28),
+        (1.10, 0.28),
+        (-1.35, -0.60),
+        (1.35, -0.60),
+        (-1.35, 0.58),
+        (1.35, 0.58),
+    )
+    return tuple(
+        _StripboardOverlayLabelCandidate(x + dx, y + dy, "middle", angle)
+        for dx, dy in offsets
+    )
+
+
+def _resolve_stripboard_overlay_label_collisions(labels):
+    occupied_rectangles = []
+    resolved_by_index = {}
+    for index, label in sorted(
+        enumerate(labels),
+        key=lambda item: (item[1].collision_priority, item[0]),
+    ):
+        placed_label, bbox = _select_stripboard_overlay_label_candidate(
+            label,
+            occupied_rectangles,
+        )
+        occupied_rectangles.append(bbox)
+        resolved_by_index[index] = replace(placed_label, bbox=bbox)
+    return tuple(resolved_by_index[index] for index in range(len(labels)))
+
+
+def _select_stripboard_overlay_label_candidate(label, occupied_rectangles):
+    candidates = label.candidates or (
+        _StripboardOverlayLabelCandidate(
+            label.x,
+            label.y,
+            label.text_anchor,
+            label.rotation_degrees,
+        ),
+    )
+    best_candidate = candidates[0]
+    best_bbox = _stripboard_overlay_label_bbox(label, best_candidate)
+    best_score = _stripboard_overlay_label_collision_score(
+        best_bbox,
+        occupied_rectangles,
+    )
+
+    for candidate in candidates:
+        bbox = _stripboard_overlay_label_bbox(label, candidate)
+        score = _stripboard_overlay_label_collision_score(bbox, occupied_rectangles)
+        if score == 0:
+            return _stripboard_label_with_candidate(label, candidate), bbox
+        if score < best_score:
+            best_candidate = candidate
+            best_bbox = bbox
+            best_score = score
+
+    return _stripboard_label_with_candidate(label, best_candidate), best_bbox
+
+
+def _stripboard_label_with_candidate(label, candidate):
+    return replace(
+        label,
+        x=candidate.x,
+        y=candidate.y,
+        text_anchor=candidate.text_anchor,
+        rotation_degrees=candidate.rotation_degrees,
+    )
+
+
+def _stripboard_overlay_label_bbox(label, candidate):
+    return _estimate_stripboard_text_bbox(
+        label.text,
+        x=candidate.x,
+        y=candidate.y,
+        font_size=label.font_size,
+        text_anchor=candidate.text_anchor,
+        rotation_degrees=candidate.rotation_degrees,
+    )
+
+
+def _stripboard_overlay_label_collision_score(bbox, occupied_rectangles):
+    return sum(
+        1
+        for rectangle in occupied_rectangles
+        if _stripboard_rectangles_overlap(
+            bbox,
+            rectangle,
+            padding=STRIPBOARD_OVERLAY_LABEL_COLLISION_PADDING,
+        )
+    )
+
+
+def _estimate_stripboard_text_bbox(
+    content,
+    *,
+    x,
+    y,
+    font_size,
+    text_anchor,
+    rotation_degrees=0.0,
+):
+    width = max(len(str(content)), 1) * font_size * 0.62
+    ascent = font_size * 0.82
+    descent = font_size * 0.28
+
+    if text_anchor in ("start", "left"):
+        left = x
+        right = x + width
+    elif text_anchor in ("end", "right"):
+        left = x - width
+        right = x
+    else:
+        left = x - (width / 2.0)
+        right = x + (width / 2.0)
+
+    top = y - ascent
+    bottom = y + descent
+    corners = (
+        (left, top),
+        (right, top),
+        (right, bottom),
+        (left, bottom),
+    )
+    if rotation_degrees:
+        corners = tuple(
+            _rotate_around(corner, rotation_degrees, (x, y)) for corner in corners
+        )
+
+    xs = [point[0] for point in corners]
+    ys = [point[1] for point in corners]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _stripboard_rectangles_overlap(left, right, *, padding=0.0):
+    return not (
+        left[2] + padding <= right[0]
+        or right[2] + padding <= left[0]
+        or left[3] + padding <= right[1]
+        or right[3] + padding <= left[1]
+    )
+
+
+def _svg_stripboard_overlay_label(label):
+    data_attrs = "".join(
+        f' {name}="{_svg_attr(value)}"' for name, value in label.data_attrs
+    )
+    transform = ""
+    if label.rotation_degrees:
+        transform = (
+            f' transform="rotate({label.rotation_degrees:.1f} '
+            f'{label.x:.3f} {label.y:.3f})"'
+        )
+    return (
+        f'  <text class="{label.class_name}"{data_attrs} '
+        f'x="{label.x:.3f}" y="{label.y:.3f}" '
+        f'font-size="{label.font_size:.3f}" '
+        f'font-weight="{_svg_attr(label.font_weight)}" '
+        f'text-anchor="{_svg_attr(label.text_anchor)}" '
+        f'fill="{STRIPBOARD_OVERLAY_TEXT_FILL}" '
+        f'stroke="{STRIPBOARD_OVERLAY_TEXT_HALO}" stroke-width="0.075" '
+        f'paint-order="stroke"{transform}>'
+        f'{_svg_text(label.text)}</text>'
+    )
+
+
+def _draw_stripboard_overlay_label_png(image, label, label_margin, scale):
+    _draw_png_text_rotated(
+        image,
+        (label.x + label_margin, label.y),
+        label.text,
+        font=_overlay_png_font(scale, label.font_size),
+        scale=scale,
+        fill=STRIPBOARD_OVERLAY_TEXT_FILL,
+        angle=label.rotation_degrees,
+        anchor=label.text_anchor,
+    )
 
 
 def _stripboard_overlay_node_markers(schema, assignment):
@@ -3284,8 +3513,10 @@ def _draw_png_text_rotated(
     rotated = text_image.rotate(angle, expand=True, resample=resampling)
 
     x, y = _px_point(anchor_point, scale)
-    if anchor == "left":
+    if anchor in ("left", "start"):
         paste_at = (x, y - rotated.height // 2)
+    elif anchor in ("right", "end"):
+        paste_at = (x - rotated.width, y - rotated.height // 2)
     else:
         paste_at = (x - rotated.width // 2, y - rotated.height // 2)
     image.paste(rotated, paste_at, rotated)
