@@ -1366,6 +1366,7 @@ assemblies:
       nitehawk_usb_dual_housing_component_clearance: !Ref nitehawk_usb_dual_housing_component_clearance
       nitehawk_usb_dual_housing_lid_thickness: !Ref nitehawk_usb_dual_housing_lid_thickness
       nitehawk_usb_dual_housing_lid_body_clearance: !Ref nitehawk_usb_dual_housing_lid_body_clearance
+      nitehawk_usb_dual_housing_lid_outer_overhang: !Ref nitehawk_usb_dual_housing_lid_outer_overhang
       nitehawk_usb_dual_housing_lid_rim_depth: !Ref nitehawk_usb_dual_housing_lid_rim_depth
       nitehawk_usb_dual_housing_lid_rim_thickness: !Ref nitehawk_usb_dual_housing_lid_rim_thickness
       nitehawk_usb_dual_housing_lid_rim_clearance: !Ref nitehawk_usb_dual_housing_lid_rim_clearance

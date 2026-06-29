@@ -145,6 +145,8 @@ Parameters:
     Type: Float
   nitehawk_usb_dual_housing_lid_body_clearance:
     Type: Float
+  nitehawk_usb_dual_housing_lid_outer_overhang:
+    Type: Float
   nitehawk_usb_dual_housing_lid_rim_depth:
     Type: Float
   nitehawk_usb_dual_housing_lid_rim_thickness:

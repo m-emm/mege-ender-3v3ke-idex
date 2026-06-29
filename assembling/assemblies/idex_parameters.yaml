@@ -365,6 +365,7 @@ globals:
   nitehawk_usb_dual_housing_component_clearance: 5.0
   nitehawk_usb_dual_housing_lid_thickness: 1.2
   nitehawk_usb_dual_housing_lid_body_clearance: 0.35
+  nitehawk_usb_dual_housing_lid_outer_overhang: 2.5
   nitehawk_usb_dual_housing_lid_rim_depth: 3.0
   nitehawk_usb_dual_housing_lid_rim_thickness: 1.2
   nitehawk_usb_dual_housing_lid_rim_clearance: 0.25

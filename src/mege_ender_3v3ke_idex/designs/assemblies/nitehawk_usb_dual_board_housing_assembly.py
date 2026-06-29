@@ -24,6 +24,7 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     nitehawk_usb_dual_housing_component_clearance,
     nitehawk_usb_dual_housing_lid_thickness,
     nitehawk_usb_dual_housing_lid_body_clearance,
+    nitehawk_usb_dual_housing_lid_outer_overhang,
     nitehawk_usb_dual_housing_lid_rim_depth,
     nitehawk_usb_dual_housing_lid_rim_thickness,
     nitehawk_usb_dual_housing_lid_rim_clearance,
@@ -414,16 +415,19 @@ def create_nitehawk_usb_dual_board_housing_assembly(
 
     housing_box = housing_box.cut(profile_mount_holes)
 
-    lid = create_filleted_box(
+    lid_width = housing_width + 2 * nitehawk_usb_dual_housing_lid_outer_overhang
+    lid_height = housing_height + 2 * nitehawk_usb_dual_housing_lid_outer_overhang
+
+    lid_base = create_filleted_box(
         nitehawk_usb_dual_housing_lid_thickness,
-        housing_width,
-        housing_height,
+        lid_width,
+        lid_height,
         fillet_radius=nitehawk_usb_dual_housing_corner_fillet_radius,
         no_fillets_at=[Alignment.LEFT, Alignment.RIGHT],
     )
-    lid = align(lid, housing_reference, Alignment.CENTER, axes=[1, 2])
-    lid = align(
-        lid,
+    lid_base = align(lid_base, housing_reference, Alignment.CENTER, axes=[1, 2])
+    lid_base = align(
+        lid_base,
         housing_reference,
         Alignment.STACK_LEFT,
         stack_gap=nitehawk_usb_dual_housing_lid_body_clearance,
@@ -441,15 +445,16 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     lid_rim_inner_height = lid_rim_outer_height - 2 * (
         nitehawk_usb_dual_housing_lid_rim_thickness
     )
+    lid_rim_fillet_radius = min(
+        nitehawk_usb_dual_housing_corner_fillet_radius,
+        nitehawk_usb_dual_housing_lid_rim_thickness / 2 - 0.1,
+    )
     lid_rim = create_filleted_box(
         nitehawk_usb_dual_housing_lid_body_clearance
         + nitehawk_usb_dual_housing_lid_rim_depth,
         lid_rim_outer_width,
         lid_rim_outer_height,
-        fillet_radius=min(
-            nitehawk_usb_dual_housing_corner_fillet_radius,
-            nitehawk_usb_dual_housing_lid_rim_thickness / 2 - 0.1,
-        ),
+        fillet_radius=lid_rim_fillet_radius,
         no_fillets_at=[Alignment.LEFT, Alignment.RIGHT],
     )
     lid_rim_inner_cutter = create_box(
@@ -462,7 +467,7 @@ def create_nitehawk_usb_dual_board_housing_assembly(
     lid_rim_inner_cutter = align(lid_rim_inner_cutter, lid_rim, Alignment.CENTER)
     lid_rim = lid_rim.cut(lid_rim_inner_cutter)
     lid_rim = align(lid_rim, housing_reference, Alignment.CENTER, axes=[1, 2])
-    lid_rim = align(lid_rim, lid, Alignment.STACK_RIGHT)
+    lid_rim = align(lid_rim, lid_base, Alignment.STACK_RIGHT)
     for lid_boss in lid_bosses:
         lid_boss_relief_cutter = materialize_bounding_box(
             lid_boss,
@@ -471,7 +476,43 @@ def create_nitehawk_usb_dual_board_housing_assembly(
             z_enlargement=nitehawk_usb_dual_housing_lid_screw_inset,
         )
         lid_rim = lid_rim.cut(lid_boss_relief_cutter)
-    lid = lid.fuse(lid_rim)
+
+    lid_outer_lip_inner_width = (
+        housing_width + 2 * nitehawk_usb_dual_housing_lid_rim_clearance
+    )
+    lid_outer_lip_inner_height = (
+        housing_height + 2 * nitehawk_usb_dual_housing_lid_rim_clearance
+    )
+    lid_outer_lip_outer_width = lid_outer_lip_inner_width + 2 * (
+        nitehawk_usb_dual_housing_lid_rim_thickness
+    )
+    lid_outer_lip_outer_height = lid_outer_lip_inner_height + 2 * (
+        nitehawk_usb_dual_housing_lid_rim_thickness
+    )
+    lid_outer_lip = create_filleted_box(
+        nitehawk_usb_dual_housing_lid_body_clearance
+        + nitehawk_usb_dual_housing_lid_rim_depth,
+        lid_outer_lip_outer_width,
+        lid_outer_lip_outer_height,
+        fillet_radius=lid_rim_fillet_radius,
+        no_fillets_at=[Alignment.LEFT, Alignment.RIGHT],
+    )
+    lid_outer_lip_inner_cutter = create_box(
+        nitehawk_usb_dual_housing_lid_body_clearance
+        + nitehawk_usb_dual_housing_lid_rim_depth
+        + 2,
+        lid_outer_lip_inner_width,
+        lid_outer_lip_inner_height,
+    )
+    lid_outer_lip_inner_cutter = align(
+        lid_outer_lip_inner_cutter, lid_outer_lip, Alignment.CENTER
+    )
+    lid_outer_lip = lid_outer_lip.cut(lid_outer_lip_inner_cutter)
+    lid_outer_lip = align(
+        lid_outer_lip, housing_reference, Alignment.CENTER, axes=[1, 2]
+    )
+    lid_outer_lip = align(lid_outer_lip, lid_base, Alignment.STACK_RIGHT)
+    lid = lid_base.fuse(lid_rim).fuse(lid_outer_lip)
     lid = lid.cut(lid_clearance_holes)
 
     profile_mount_reference = create_box(
