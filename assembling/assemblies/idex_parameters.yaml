@@ -501,8 +501,6 @@ globals:
   cooleon_psu_mount_slot_width: 6
   cooleon_psu_mount_slot_end_inset: 7
   cooleon_psu_mount_slot_side_inset: 5.8
-  cooleon_psu_label_plate_length: 42
-  cooleon_psu_label_plate_width: 18
   hv_switchbox_height: 125
   hv_switchbox_width: 55
   hv_switchbox_depth: 160

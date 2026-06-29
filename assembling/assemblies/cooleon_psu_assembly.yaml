@@ -49,18 +49,6 @@ Builder:
           - terminal_screws
         name_template: "{name}"
         color: [0.78, 0.78, 0.72]
-      - source: self
-        artifact: non_production_parts
-        names:
-          - label_markings
-        name_template: "{name}"
-        color: [0.04, 0.06, 0.08]
-      - source: self
-        artifact: non_production_parts
-        names:
-          - label_plate
-        name_template: "{name}"
-        color: [0.88, 0.84, 0.72]
 
 Parameters:
   cooleon_psu_length:
@@ -110,10 +98,6 @@ Parameters:
   cooleon_psu_mount_slot_end_inset:
     Type: Float
   cooleon_psu_mount_slot_side_inset:
-    Type: Float
-  cooleon_psu_label_plate_length:
-    Type: Float
-  cooleon_psu_label_plate_width:
     Type: Float
 
 Parts:

@@ -29,8 +29,6 @@ def create_cooleon_psu_assembly(
     cooleon_psu_mount_slot_width,
     cooleon_psu_mount_slot_end_inset,
     cooleon_psu_mount_slot_side_inset,
-    cooleon_psu_label_plate_length,
-    cooleon_psu_label_plate_width,
 ):
     base_plate = create_box(
         cooleon_psu_length,
@@ -104,16 +102,36 @@ def create_cooleon_psu_assembly(
     )(top_cover)
 
     side_walls = PartCollector()
-    for side_y in [0, cooleon_psu_width - cooleon_psu_side_wall_width]:
-        side_wall = create_filleted_box(
+    side_wall_web_height = (
+        cooleon_psu_side_wall_height - cooleon_psu_side_wall_fillet_radius
+    )
+    for side_y, lip_center_y in [
+        (
+            0,
+            cooleon_psu_side_wall_fillet_radius,
+        ),
+        (
+            cooleon_psu_width - cooleon_psu_side_wall_width,
+            cooleon_psu_width - cooleon_psu_side_wall_fillet_radius,
+        ),
+    ]:
+        side_wall_web = create_box(
             cooleon_psu_length,
             cooleon_psu_side_wall_width,
-            cooleon_psu_side_wall_height,
-            fillet_radius=cooleon_psu_side_wall_fillet_radius,
-            no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+            side_wall_web_height,
+            origin=(0, side_y, 0),
         )
-        side_wall = translate(0, side_y, 0)(side_wall)
-        side_walls = side_walls.fuse(side_wall)
+        side_wall_lip = create_cylinder(
+            cooleon_psu_side_wall_fillet_radius,
+            cooleon_psu_length,
+            origin=(
+                0,
+                lip_center_y,
+                side_wall_web_height,
+            ),
+            direction=(1, 0, 0),
+        )
+        side_walls = side_walls.fuse(side_wall_web).fuse(side_wall_lip)
 
     end_flange_lines = PartCollector()
     for end_x in [
@@ -142,7 +160,35 @@ def create_cooleon_psu_assembly(
         - cooleon_psu_terminal_cover_overhang
     )
     terminal_y = (cooleon_psu_width - cooleon_psu_terminal_block_width) / 2
-    terminal_z = cooleon_psu_thickness
+    terminal_z = cooleon_psu_base_plate_thickness
+    terminal_well_width = (
+        cooleon_psu_terminal_block_width + 2 * cooleon_psu_terminal_cover_overhang
+    )
+    terminal_well_length = (
+        cooleon_psu_terminal_block_length + 2 * cooleon_psu_terminal_cover_overhang
+    )
+    terminal_well_height = cooleon_psu_thickness - cooleon_psu_base_plate_thickness + 1
+    input_terminal_well = create_box(
+        terminal_well_length,
+        terminal_well_width,
+        terminal_well_height,
+        origin=(
+            0,
+            terminal_y - cooleon_psu_terminal_cover_overhang,
+            cooleon_psu_base_plate_thickness,
+        ),
+    )
+    output_terminal_well = create_box(
+        terminal_well_length,
+        terminal_well_width,
+        terminal_well_height,
+        origin=(
+            cooleon_psu_length - terminal_well_length,
+            terminal_y - cooleon_psu_terminal_cover_overhang,
+            cooleon_psu_base_plate_thickness,
+        ),
+    )
+    psu_body = psu_body.cut(input_terminal_well).cut(output_terminal_well)
 
     input_terminal_block = create_box(
         cooleon_psu_terminal_block_length,
@@ -209,34 +255,6 @@ def create_cooleon_psu_assembly(
                 )
             )
 
-    label_plate = create_box(
-        cooleon_psu_label_plate_length,
-        cooleon_psu_label_plate_width,
-        0.18,
-        origin=(
-            cooleon_psu_end_flange_length + 5,
-            (cooleon_psu_width - cooleon_psu_label_plate_width) / 2,
-            cooleon_psu_thickness + 0.04,
-        ),
-    )
-
-    label_markings = PartCollector()
-    for label_line_index in range(5):
-        label_markings = label_markings.fuse(
-            create_box(
-                cooleon_psu_label_plate_length - 6,
-                0.45,
-                0.2,
-                origin=(
-                    cooleon_psu_end_flange_length + 8,
-                    (cooleon_psu_width - cooleon_psu_label_plate_width) / 2
-                    + 3
-                    + label_line_index * 2.2,
-                    cooleon_psu_thickness + 0.24,
-                ),
-            )
-        )
-
     assembly = LeaderFollowersCuttersPart(leader=psu_body)
     for slot_name, slot_cutter in mount_slots:
         assembly.add_named_cutter(slot_cutter, slot_name)
@@ -251,7 +269,5 @@ def create_cooleon_psu_assembly(
         "output_terminal_cover",
     )
     assembly.add_named_non_production_part(terminal_screws, "terminal_screws")
-    assembly.add_named_non_production_part(label_plate, "label_plate")
-    assembly.add_named_non_production_part(label_markings, "label_markings")
 
     return assembly
