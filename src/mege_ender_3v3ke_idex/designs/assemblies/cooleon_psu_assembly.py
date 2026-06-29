@@ -16,10 +16,12 @@ def create_cooleon_psu_assembly(
     cooleon_psu_mount_slot_length,
     cooleon_psu_mount_slot_width,
     cooleon_psu_mount_slot_side_inset,
+    cooleon_psu_mount_screw_size,
+    cooleon_psu_mount_screw_length,
 ):
 
-    mount_screw_size = "M3"
-    mount_screw_length = 10
+    mount_screw_size = cooleon_psu_mount_screw_size
+    mount_screw_length = cooleon_psu_mount_screw_length
     base_plate = create_box(
         cooleon_psu_length,
         cooleon_psu_width,

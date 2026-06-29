@@ -1617,6 +1617,8 @@ assemblies:
       cooleon_psu_mount_slot_length: !Ref cooleon_psu_mount_slot_length
       cooleon_psu_mount_slot_width: !Ref cooleon_psu_mount_slot_width
       cooleon_psu_mount_slot_side_inset: !Ref cooleon_psu_mount_slot_side_inset
+      cooleon_psu_mount_screw_size: !Ref cooleon_psu_mount_screw_size
+      cooleon_psu_mount_screw_length: !Ref cooleon_psu_mount_screw_length
 
   - name: hv_switchbox_assembly
 
