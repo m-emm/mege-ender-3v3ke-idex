@@ -36,10 +36,36 @@ def create_cooleon_psu_assembly(
         cooleon_psu_base_plate_thickness,
     )
 
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        fb = [
+            a
+            for a in Alignment.__members__.values()
+            if a.axis == 1 and a.sign == - lr.sign
+        ][0]
+
+        mount_slot_cutter = create_rounded_slab(
+            cooleon_psu_mount_slot_length,
+            cooleon_psu_mount_slot_width,
+            100,
+            cooleon_psu_mount_slot_width / 2,
+        )
+
+        mount_slot_cutter = align(mount_slot_cutter, base_plate, Alignment.CENTER)
+        mount_slot_cutter = align(mount_slot_cutter, base_plate, fb)
+        mount_slot_cutter = align(mount_slot_cutter, base_plate, lr)
+
+        mount_slot_cutter = translate(
+            lr.sign * cooleon_psu_mount_slot_width,
+            -fb.sign * cooleon_psu_mount_slot_side_inset,
+            0,
+        )(mount_slot_cutter)
+
+        base_plate = base_plate.cut(mount_slot_cutter)
+
     body = create_box(
-        cooleon_psu_length - 2 * cooleon_psu_terminal_block_length,
+        cooleon_psu_length - 2 * cooleon_psu_thickness,
         cooleon_psu_width,
-        cooleon_psu_top_cover_height,
+        cooleon_psu_thickness,
     )
 
     body = align(body, base_plate, Alignment.CENTER)
@@ -76,7 +102,7 @@ def create_cooleon_psu_assembly(
 
     input_terminal_block = align(input_terminal_block, base_plate, Alignment.CENTER)
     input_terminal_block = align(input_terminal_block, base_plate, Alignment.STACK_TOP)
-    input_terminal_block = align(input_terminal_block, base_plate, Alignment.RIGHT)
+    input_terminal_block = align(input_terminal_block, body, Alignment.STACK_RIGHT)
     output_terminal_block = create_box(
         cooleon_psu_terminal_block_length,
         cooleon_psu_terminal_block_width,
@@ -86,7 +112,7 @@ def create_cooleon_psu_assembly(
     output_terminal_block = align(
         output_terminal_block, base_plate, Alignment.STACK_TOP
     )
-    output_terminal_block = align(output_terminal_block, base_plate, Alignment.LEFT)
+    output_terminal_block = align(output_terminal_block, body, Alignment.STACK_LEFT)
 
     assembly = LeaderFollowersCuttersPart(leader=psu_body)
 
