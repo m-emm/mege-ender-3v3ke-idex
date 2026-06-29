@@ -41,6 +41,33 @@ def create_trellis_plate(
 ):
 
     base = create_box(length, width, thickness)
+    trellis_cutters = create_trellis_cutters(
+        length=length,
+        width=width,
+        thickness=thickness,
+        x_border_width=x_border_width,
+        y_border_width=y_border_width,
+        band_width=band_width,
+        band_pitch=band_pitch,
+        hole_fillet_radius=hole_fillet_radius,
+    )
+
+    base = base.cut(trellis_cutters)
+
+    return base
+
+
+def create_trellis_cutters(
+    length,
+    width,
+    thickness,
+    x_border_width,
+    y_border_width,
+    band_width,
+    band_pitch,
+    hole_fillet_radius=None,
+    cutter_depth=BIG_THING,
+):
 
     cutter_template_size = band_pitch - band_width
     if hole_fillet_radius is not None:
@@ -48,7 +75,7 @@ def create_trellis_plate(
         trellis_cutter_template = create_filleted_box(
             cutter_template_size,
             cutter_template_size,
-            BIG_THING,
+            cutter_depth,
             fillet_radius=hole_fillet_radius,
             no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
         )
@@ -56,7 +83,7 @@ def create_trellis_plate(
         trellis_cutter_template = create_box(
             cutter_template_size,
             cutter_template_size,
-            BIG_THING,
+            cutter_depth,
         )
 
     trellis_cutter_template = rotate(45)(trellis_cutter_template)
@@ -81,27 +108,26 @@ def create_trellis_plate(
             )(trellis_cutter_template)
             trellis_cutters = trellis_cutters.fuse(cutter_offset)
 
+    base = create_box(length, width, thickness)
     trellis_cutters = align(trellis_cutters, base, alignment=Alignment.CENTER)
 
     inner_cutter = create_box(
         length - 2 * x_border_width,
         width - 2 * y_border_width,
-        BIG_THING,
+        cutter_depth,
     )
     inner_cutter = align(inner_cutter, base, alignment=Alignment.CENTER)
     border_cutter = create_box(
         length + 2 * BIG_THING,
         width + 2 * BIG_THING,
-        BIG_THING,
+        cutter_depth,
     )
     border_cutter = align(border_cutter, base, alignment=Alignment.CENTER)
     border_cutter = border_cutter.cut(inner_cutter)
 
     trellis_cutters = trellis_cutters.cut(border_cutter)
 
-    base = base.cut(trellis_cutters)
-
-    return base
+    return trellis_cutters
 
 
 def main():

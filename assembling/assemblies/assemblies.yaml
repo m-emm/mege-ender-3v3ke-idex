@@ -15,18 +15,23 @@ builder_defaults:
 
 placement:
   alignments:
+    - part: cooleon_psu_1
+      post_rotation:
+        angle: 90
+        axis: [1, 0, 0]
+        center: cooleon_psu_1.CENTER
     - part: cooleon_psu_2
       post_rotation:
-        angle: 180
+        angle: -90
         axis: [1, 0, 0]
         center: cooleon_psu_2.CENTER
     - part: cooleon_psu_2
       to: cooleon_psu_1
       alignment: CENTER
-      axes: [0, 1]
+      axes: [0, 2]
     - part: cooleon_psu_2
       to: cooleon_psu_1
-      alignment: STACK_BOTTOM
+      alignment: STACK_BACK
       stack_gap:
         $ref: cooleon_psu_back_to_back_gap
 
@@ -1682,6 +1687,39 @@ assemblies:
     inject_parts:
       cooleon_psu_1: cooleon_psu_1
       cooleon_psu_2: cooleon_psu_2
+
+  - name: cooleon_pair_housing_assembly
+
+    resource_file: cooleon_pair_housing_assembly.yaml
+    depends_on:
+      - cooleon_psu_1
+      - cooleon_psu_2
+    inject_parts:
+      cooleon_psu_1: cooleon_psu_1
+      cooleon_psu_2: cooleon_psu_2
+    parameters:
+      cooleon_pair_housing_clearance: !Ref cooleon_pair_housing_clearance
+      cooleon_pair_housing_wall_thickness: !Ref cooleon_pair_housing_wall_thickness
+      cooleon_pair_housing_mount_rib_length: !Ref cooleon_pair_housing_mount_rib_length
+      cooleon_pair_housing_mount_rib_thickness: !Ref cooleon_pair_housing_mount_rib_thickness
+      cooleon_pair_housing_mount_rib_end_inset: !Ref cooleon_pair_housing_mount_rib_end_inset
+      cooleon_pair_housing_vent_diamond_size: !Ref cooleon_pair_housing_vent_diamond_size
+      cooleon_pair_housing_vent_pitch: !Ref cooleon_pair_housing_vent_pitch
+      cooleon_pair_housing_vent_end_inset: !Ref cooleon_pair_housing_vent_end_inset
+      cooleon_pair_housing_vent_height: !Ref cooleon_pair_housing_vent_height
+      cooleon_pair_housing_vent_row_z: !Ref cooleon_pair_housing_vent_row_z
+      cooleon_pair_housing_lid_thickness: !Ref cooleon_pair_housing_lid_thickness
+      cooleon_pair_housing_lid_body_clearance: !Ref cooleon_pair_housing_lid_body_clearance
+      cooleon_pair_housing_lid_outer_overhang: !Ref cooleon_pair_housing_lid_outer_overhang
+      cooleon_pair_housing_lid_rim_depth: !Ref cooleon_pair_housing_lid_rim_depth
+      cooleon_pair_housing_lid_rim_thickness: !Ref cooleon_pair_housing_lid_rim_thickness
+      cooleon_pair_housing_lid_rim_clearance: !Ref cooleon_pair_housing_lid_rim_clearance
+      cooleon_pair_housing_lid_screw_size: !Ref cooleon_pair_housing_lid_screw_size
+      cooleon_pair_housing_lid_screw_length: !Ref cooleon_pair_housing_lid_screw_length
+      cooleon_pair_housing_lid_screw_inset: !Ref cooleon_pair_housing_lid_screw_inset
+      cooleon_pair_housing_lid_screw_boss_diameter: !Ref cooleon_pair_housing_lid_screw_boss_diameter
+      cooleon_pair_housing_self_threading_core_radius_adjustment: !Ref cooleon_pair_housing_self_threading_core_radius_adjustment
+      cooleon_pair_housing_self_threading_lead_in: !Ref cooleon_pair_housing_self_threading_lead_in
 
   - name: hv_switchbox_assembly
 

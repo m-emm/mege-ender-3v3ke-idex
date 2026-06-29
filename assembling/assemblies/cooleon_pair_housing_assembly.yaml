@@ -1,0 +1,105 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Open-top tray housing for a back-to-back Cooleon PSU pair
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - right
+        - top
+        - bottom
+      width: 1024
+      height: 1024
+    parts:
+      - source: self
+        artifact: leader
+        name: cooleon_pair_housing
+        color: [0.92, 0.96, 1.0]
+      - source: self
+        artifact: followers
+        names:
+          - cooleon_pair_housing_lid
+        name_template: "{name}"
+        color: [0.92, 0.96, 1.0]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - lid_mount_screws
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
+      - source: injected
+        assembly: cooleon_psu_1
+        artifact: all
+        name_template: "cooleon_psu_1_{name}"
+      - source: injected
+        assembly: cooleon_psu_2
+        artifact: all
+        name_template: "cooleon_psu_2_{name}"
+
+  Production:
+    parts:
+      - source: self
+        artifact: leader
+        name: cooleon_pair_housing
+      - source: self
+        artifact: followers
+        names:
+          - cooleon_pair_housing_lid
+        name_template: "{name}"
+
+Parameters:
+  cooleon_pair_housing_clearance:
+    Type: Float
+  cooleon_pair_housing_wall_thickness:
+    Type: Float
+  cooleon_pair_housing_mount_rib_length:
+    Type: Float
+  cooleon_pair_housing_mount_rib_thickness:
+    Type: Float
+  cooleon_pair_housing_mount_rib_end_inset:
+    Type: Float
+  cooleon_pair_housing_vent_diamond_size:
+    Type: Float
+  cooleon_pair_housing_vent_pitch:
+    Type: Float
+  cooleon_pair_housing_vent_end_inset:
+    Type: Float
+  cooleon_pair_housing_vent_height:
+    Type: Float
+  cooleon_pair_housing_vent_row_z:
+    Type: Float
+  cooleon_pair_housing_lid_thickness:
+    Type: Float
+  cooleon_pair_housing_lid_body_clearance:
+    Type: Float
+  cooleon_pair_housing_lid_outer_overhang:
+    Type: Float
+  cooleon_pair_housing_lid_rim_depth:
+    Type: Float
+  cooleon_pair_housing_lid_rim_thickness:
+    Type: Float
+  cooleon_pair_housing_lid_rim_clearance:
+    Type: Float
+  cooleon_pair_housing_lid_screw_size:
+    Type: String
+  cooleon_pair_housing_lid_screw_length:
+    Type: Float
+  cooleon_pair_housing_lid_screw_inset:
+    Type: Float
+  cooleon_pair_housing_lid_screw_boss_diameter:
+    Type: Float
+  cooleon_pair_housing_self_threading_core_radius_adjustment:
+    Type: Float
+  cooleon_pair_housing_self_threading_lead_in:
+    Type: Boolean
+
+Parts:
+  CooleonPairHousingAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.cooleon_pair_housing_assembly.create_cooleon_pair_housing_assembly
