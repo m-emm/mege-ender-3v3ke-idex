@@ -1726,6 +1726,14 @@ assemblies:
       cooleon_pair_housing_vent_end_inset: !Ref cooleon_pair_housing_vent_end_inset
       cooleon_pair_housing_vent_height: !Ref cooleon_pair_housing_vent_height
       cooleon_pair_housing_vent_row_z: !Ref cooleon_pair_housing_vent_row_z
+      cooleon_pair_housing_hatch_width: !Ref cooleon_pair_housing_hatch_width
+      cooleon_pair_housing_hatch_height: !Ref cooleon_pair_housing_hatch_height
+      cooleon_pair_housing_hatch_clearance: !Ref cooleon_pair_housing_hatch_clearance
+      cooleon_pair_housing_hatch_end_inset: !Ref cooleon_pair_housing_hatch_end_inset
+      cooleon_pair_housing_hatch_frame_width: !Ref cooleon_pair_housing_hatch_frame_width
+      cooleon_pair_housing_hatch_frame_depth: !Ref cooleon_pair_housing_hatch_frame_depth
+      cooleon_pair_housing_hatch_lip_width: !Ref cooleon_pair_housing_hatch_lip_width
+      cooleon_pair_housing_hatch_lip_depth: !Ref cooleon_pair_housing_hatch_lip_depth
       cooleon_pair_housing_lid_thickness: !Ref cooleon_pair_housing_lid_thickness
       cooleon_pair_housing_lid_body_clearance: !Ref cooleon_pair_housing_lid_body_clearance
       cooleon_pair_housing_lid_outer_overhang: !Ref cooleon_pair_housing_lid_outer_overhang

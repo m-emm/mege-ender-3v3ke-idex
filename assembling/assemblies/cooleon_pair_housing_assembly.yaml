@@ -49,6 +49,14 @@ Builder:
           - cooleon_pair_housing_input_cable_clamp
         name_template: "{name}"
       - source: self
+        artifact: followers
+        names:
+          - cooleon_pair_housing_front_left_hatch
+          - cooleon_pair_housing_front_right_hatch
+          - cooleon_pair_housing_back_left_hatch
+          - cooleon_pair_housing_back_right_hatch
+        name_template: "{name}"
+      - source: self
         artifact: non_production_parts
         names:
           - lid_mount_screws
@@ -90,6 +98,22 @@ Builder:
         name_template: "{name}"
         prod_rotation_angle: -90
         prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        names:
+          - cooleon_pair_housing_front_left_hatch
+          - cooleon_pair_housing_front_right_hatch
+        name_template: "{name}"
+        prod_rotation_angle: 90
+        prod_rotation_axis: [1, 0, 0]
+      - source: self
+        artifact: followers
+        names:
+          - cooleon_pair_housing_back_left_hatch
+          - cooleon_pair_housing_back_right_hatch
+        name_template: "{name}"
+        prod_rotation_angle: -90
+        prod_rotation_axis: [1, 0, 0]
     arrange:
       export_individual_parts: false
       prod_gap: 12.0
@@ -139,6 +163,10 @@ Builder:
             - cooleon_pair_housing_lid_left
             - cooleon_pair_housing_lid_right
             - cooleon_pair_housing_input_cable_clamp
+            - cooleon_pair_housing_front_left_hatch
+            - cooleon_pair_housing_front_right_hatch
+            - cooleon_pair_housing_back_left_hatch
+            - cooleon_pair_housing_back_right_hatch
       auto_assign_plates: false
 
 Parameters:
@@ -165,6 +193,22 @@ Parameters:
   cooleon_pair_housing_vent_height:
     Type: Float
   cooleon_pair_housing_vent_row_z:
+    Type: Float
+  cooleon_pair_housing_hatch_width:
+    Type: Float
+  cooleon_pair_housing_hatch_height:
+    Type: Float
+  cooleon_pair_housing_hatch_clearance:
+    Type: Float
+  cooleon_pair_housing_hatch_end_inset:
+    Type: Float
+  cooleon_pair_housing_hatch_frame_width:
+    Type: Float
+  cooleon_pair_housing_hatch_frame_depth:
+    Type: Float
+  cooleon_pair_housing_hatch_lip_width:
+    Type: Float
+  cooleon_pair_housing_hatch_lip_depth:
     Type: Float
   cooleon_pair_housing_lid_thickness:
     Type: Float
