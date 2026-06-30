@@ -26,7 +26,6 @@ def create_cooleon_pair_housing_assembly(
     cooleon_pair_housing_vent_row_z,
     cooleon_pair_housing_hatch_width,
     cooleon_pair_housing_hatch_height,
-    cooleon_pair_housing_hatch_clearance,
     cooleon_pair_housing_hatch_end_inset,
     cooleon_pair_housing_hatch_frame_width,
     cooleon_pair_housing_lid_thickness,
@@ -464,19 +463,6 @@ def create_cooleon_pair_housing_assembly(
     hatch_flat_frames = PartCollector()
     hatch_specs = []
     hatch_wall_keep_depth = wall_thickness + 4
-    hatch_clearance_size = 2 * cooleon_pair_housing_hatch_clearance
-    hatch_frame_outer_width = (
-        cooleon_pair_housing_hatch_width + cooleon_pair_housing_hatch_frame_width
-    )
-    hatch_frame_outer_height = (
-        cooleon_pair_housing_hatch_height + cooleon_pair_housing_hatch_frame_width
-    )
-    hatch_frame_inner_width = (
-        cooleon_pair_housing_hatch_width - cooleon_pair_housing_hatch_frame_width
-    )
-    hatch_frame_inner_height = (
-        cooleon_pair_housing_hatch_height - cooleon_pair_housing_hatch_frame_width
-    )
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         lr_name = "left" if lr.sign < 0 else "right"
         hatch_end_spacer = create_box(
@@ -499,47 +485,87 @@ def create_cooleon_pair_housing_assembly(
         for fb in [Alignment.FRONT, Alignment.BACK]:
             fb_name = "front" if fb.sign < 0 else "back"
 
-            hatch_target = create_box(
+            hatch_lower_band = create_box(
                 cooleon_pair_housing_hatch_width,
                 hatch_wall_keep_depth,
                 cooleon_pair_housing_hatch_height,
             )
-            hatch_target = align(
-                hatch_target,
+            hatch_lower_band = align(
+                hatch_lower_band,
                 hatch_end_spacer,
                 lr.opposite.stack_alignment,
             )
-            hatch_target = align(
-                hatch_target,
+            hatch_lower_band = align(
+                hatch_lower_band,
                 vent_vertical_reference,
                 Alignment.CENTER,
                 axes=[2],
             )
+            hatch_lower_band = align(hatch_lower_band, housing_box, fb)
+            hatch_target_height = (
+                outer_max[2] - get_bounding_box(hatch_lower_band)[0][2]
+            )
+            hatch_target = create_box(
+                cooleon_pair_housing_hatch_width,
+                hatch_wall_keep_depth,
+                hatch_target_height,
+            )
+            hatch_target = align(
+                hatch_target,
+                hatch_lower_band,
+                Alignment.CENTER,
+                axes=[0, 1],
+            )
+            hatch_target = align(hatch_target, hatch_lower_band, Alignment.BOTTOM)
             hatch_target = align(hatch_target, housing_box, fb)
 
-            hatch_flat_frame = create_box(
-                hatch_frame_outer_width,
+            hatch_flat_frame = PartCollector()
+            hatch_target_size = get_bounding_box_size(hatch_target)
+            for side in [Alignment.LEFT, Alignment.RIGHT]:
+                side_frame = create_box(
+                    cooleon_pair_housing_hatch_frame_width,
+                    wall_thickness,
+                    hatch_target_size[2],
+                )
+                side_frame = align(
+                    side_frame,
+                    hatch_target,
+                    side.edge_alignment,
+                )
+                side_frame = align(side_frame, housing_box, fb)
+                hatch_flat_frame = hatch_flat_frame.fuse(side_frame)
+            bottom_frame = create_box(
+                hatch_target_size[0] + cooleon_pair_housing_hatch_frame_width,
                 wall_thickness,
-                hatch_frame_outer_height,
+                cooleon_pair_housing_hatch_frame_width,
             )
-            hatch_flat_frame = align(
-                hatch_flat_frame,
+            bottom_frame = align(
+                bottom_frame,
                 hatch_target,
                 Alignment.CENTER,
-                axes=[0, 2],
+                axes=[0],
             )
-            hatch_flat_frame = align(hatch_flat_frame, housing_box, fb)
-            hatch_flat_frame_inner_cutter = create_box(
-                hatch_frame_inner_width,
-                wall_thickness + 2,
-                hatch_frame_inner_height,
+            bottom_frame = align(
+                bottom_frame,
+                hatch_target,
+                Alignment.EDGE_BOTTOM,
             )
-            hatch_flat_frame_inner_cutter = align(
-                hatch_flat_frame_inner_cutter,
-                hatch_flat_frame,
+            bottom_frame = align(bottom_frame, housing_box, fb)
+            hatch_flat_frame = hatch_flat_frame.fuse(bottom_frame)
+            top_frame = create_box(
+                hatch_target_size[0],
+                wall_thickness,
+                cooleon_pair_housing_hatch_frame_width,
+            )
+            top_frame = align(
+                top_frame,
+                hatch_target,
                 Alignment.CENTER,
+                axes=[0],
             )
-            hatch_flat_frame = hatch_flat_frame.cut(hatch_flat_frame_inner_cutter)
+            top_frame = align(top_frame, hatch_target, Alignment.TOP)
+            top_frame = align(top_frame, housing_box, fb)
+            hatch_flat_frame = hatch_flat_frame.fuse(top_frame)
             hatch_flat_frames = hatch_flat_frames.fuse(hatch_flat_frame)
             hatch_specs.append(
                 (
@@ -550,10 +576,11 @@ def create_cooleon_pair_housing_assembly(
 
     framed_housing_box = housing_box.fuse(hatch_flat_frames)
     for hatch_name, hatch_target in hatch_specs:
+        hatch_target_size = get_bounding_box_size(hatch_target)
         hatch_keep_volume = create_box_hole_cutter(
-            cooleon_pair_housing_hatch_width,
-            hatch_wall_keep_depth,
-            cooleon_pair_housing_hatch_height,
+            hatch_target_size[0],
+            hatch_target_size[1],
+            hatch_target_size[2],
         )
         hatch_keep_volume = align(
             hatch_keep_volume,
@@ -562,34 +589,7 @@ def create_cooleon_pair_housing_assembly(
         )
         hatch = hatch_keep_volume.use_as_cutter_on(framed_housing_box)
 
-        hatch_clearance_window = create_box(
-            cooleon_pair_housing_hatch_width + hatch_clearance_size,
-            hatch_wall_keep_depth,
-            cooleon_pair_housing_hatch_height + hatch_clearance_size,
-        )
-        hatch_clearance_window = align(
-            hatch_clearance_window,
-            hatch_target,
-            Alignment.CENTER,
-        )
-        hatch_target_top = get_bounding_box(hatch_target)[1][2]
-        hatch_top_slide_cutter = create_box(
-            cooleon_pair_housing_hatch_width + hatch_clearance_size,
-            hatch_wall_keep_depth,
-            outer_max[2] - hatch_target_top + 2,
-        )
-        hatch_top_slide_cutter = align(
-            hatch_top_slide_cutter,
-            hatch_clearance_window,
-            Alignment.CENTER,
-            axes=[0, 1],
-        )
-        hatch_top_slide_cutter = align(
-            hatch_top_slide_cutter,
-            framed_housing_box,
-            Alignment.TOP,
-        )
-        hatch_opening_cutter = hatch_clearance_window.fuse(hatch_top_slide_cutter)
+        hatch_opening_cutter = materialize_bounding_box(hatch_target)
         hatch_opening_cutters = hatch_opening_cutters.fuse(hatch_opening_cutter)
 
         hatch_followers.append(

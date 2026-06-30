@@ -198,8 +198,6 @@ Parameters:
     Type: Float
   cooleon_pair_housing_hatch_height:
     Type: Float
-  cooleon_pair_housing_hatch_clearance:
-    Type: Float
   cooleon_pair_housing_hatch_end_inset:
     Type: Float
   cooleon_pair_housing_hatch_frame_width:

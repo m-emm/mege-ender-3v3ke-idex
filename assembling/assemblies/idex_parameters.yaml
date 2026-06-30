@@ -505,7 +505,6 @@ globals:
   cooleon_pair_housing_vent_row_z: 0.5
   cooleon_pair_housing_hatch_width: 50
   cooleon_pair_housing_hatch_height: 34
-  cooleon_pair_housing_hatch_clearance: 0.3
   cooleon_pair_housing_hatch_end_inset: 20
   cooleon_pair_housing_hatch_frame_width: 4
   cooleon_pair_housing_lid_thickness: !Ref nitehawk_usb_dual_housing_lid_thickness
