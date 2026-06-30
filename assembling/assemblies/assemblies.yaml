@@ -1736,6 +1736,16 @@ assemblies:
       cooleon_pair_housing_lid_screw_length: !Ref cooleon_pair_housing_lid_screw_length
       cooleon_pair_housing_lid_screw_inset: !Ref cooleon_pair_housing_lid_screw_inset
       cooleon_pair_housing_lid_screw_boss_diameter: !Ref cooleon_pair_housing_lid_screw_boss_diameter
+      cooleon_pair_housing_lid_split_gap: !Ref cooleon_pair_housing_lid_split_gap
+      cooleon_pair_housing_lid_split_bridge_anchor_length: !Ref cooleon_pair_housing_lid_split_bridge_anchor_length
+      cooleon_pair_housing_lid_split_bridge_overlap_length: !Ref cooleon_pair_housing_lid_split_bridge_overlap_length
+      cooleon_pair_housing_lid_split_bridge_width: !Ref cooleon_pair_housing_lid_split_bridge_width
+      cooleon_pair_housing_lid_split_bridge_thickness: !Ref cooleon_pair_housing_lid_split_bridge_thickness
+      cooleon_pair_housing_lid_split_bridge_vertical_clearance: !Ref cooleon_pair_housing_lid_split_bridge_vertical_clearance
+      cooleon_pair_housing_lid_split_bridge_fillet_radius: !Ref cooleon_pair_housing_lid_split_bridge_fillet_radius
+      cooleon_pair_housing_lid_split_bridge_screw_size: !Ref cooleon_pair_housing_lid_split_bridge_screw_size
+      cooleon_pair_housing_lid_split_bridge_screw_length: !Ref cooleon_pair_housing_lid_split_bridge_screw_length
+      cooleon_pair_housing_lid_split_bridge_screw_y_inset: !Ref cooleon_pair_housing_lid_split_bridge_screw_y_inset
       cooleon_pair_housing_self_threading_core_radius_adjustment: !Ref cooleon_pair_housing_self_threading_core_radius_adjustment
       cooleon_pair_housing_self_threading_lead_in: !Ref cooleon_pair_housing_self_threading_lead_in
       cooleon_pair_housing_input_cable_hole_diameter: !Ref cooleon_pair_housing_input_cable_hole_diameter

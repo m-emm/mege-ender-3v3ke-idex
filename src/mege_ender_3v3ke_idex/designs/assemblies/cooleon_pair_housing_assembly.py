@@ -34,6 +34,16 @@ def create_cooleon_pair_housing_assembly(
     cooleon_pair_housing_lid_screw_length,
     cooleon_pair_housing_lid_screw_inset,
     cooleon_pair_housing_lid_screw_boss_diameter,
+    cooleon_pair_housing_lid_split_gap,
+    cooleon_pair_housing_lid_split_bridge_anchor_length,
+    cooleon_pair_housing_lid_split_bridge_overlap_length,
+    cooleon_pair_housing_lid_split_bridge_width,
+    cooleon_pair_housing_lid_split_bridge_thickness,
+    cooleon_pair_housing_lid_split_bridge_vertical_clearance,
+    cooleon_pair_housing_lid_split_bridge_fillet_radius,
+    cooleon_pair_housing_lid_split_bridge_screw_size,
+    cooleon_pair_housing_lid_split_bridge_screw_length,
+    cooleon_pair_housing_lid_split_bridge_screw_y_inset,
     cooleon_pair_housing_self_threading_core_radius_adjustment,
     cooleon_pair_housing_self_threading_lead_in,
     cooleon_pair_housing_input_cable_hole_diameter,
@@ -103,6 +113,25 @@ def create_cooleon_pair_housing_assembly(
     )
 
     inner_reference = inner_core.fuse(input_service_space).fuse(output_service_space)
+    inner_reference_size = get_bounding_box_size(inner_reference)
+    lid_split_bridge_clearance_space = create_box(
+        inner_reference_size[0],
+        inner_reference_size[1],
+        cooleon_pair_housing_lid_split_bridge_thickness
+        + cooleon_pair_housing_lid_split_bridge_vertical_clearance,
+    )
+    lid_split_bridge_clearance_space = align(
+        lid_split_bridge_clearance_space,
+        inner_reference,
+        Alignment.CENTER,
+        axes=[0, 1],
+    )
+    lid_split_bridge_clearance_space = align(
+        lid_split_bridge_clearance_space,
+        inner_reference,
+        Alignment.STACK_TOP,
+    )
+    inner_reference = inner_reference.fuse(lid_split_bridge_clearance_space)
     inner_reference_size = get_bounding_box_size(inner_reference)
 
     housing_box = create_box(
@@ -681,10 +710,175 @@ def create_cooleon_pair_housing_assembly(
         lid,
         cut_point=split_cut_point,
         cut_normal=(1, 0, 0),
+        cut_thickness=cooleon_pair_housing_lid_split_gap,
     )
 
+    lid_split_bridge_length = (
+        cooleon_pair_housing_lid_split_bridge_anchor_length
+        + cooleon_pair_housing_lid_split_bridge_overlap_length
+    )
+    lid_split_bridge_anchor_reference = create_box(
+        cooleon_pair_housing_lid_split_bridge_anchor_length,
+        cooleon_pair_housing_lid_split_bridge_width,
+        cooleon_pair_housing_lid_split_bridge_thickness,
+    )
+    lid_split_bridge_anchor_reference = align(
+        lid_split_bridge_anchor_reference,
+        cooleon_pair_housing_lid_right,
+        Alignment.LEFT,
+    )
+    lid_split_bridge_anchor_reference = align(
+        lid_split_bridge_anchor_reference,
+        lid_base_reference,
+        Alignment.CENTER,
+        axes=[1],
+    )
+    lid_split_bridge_anchor_reference = align(
+        lid_split_bridge_anchor_reference,
+        lid_base_reference,
+        Alignment.STACK_BOTTOM,
+    )
+    lid_split_bridge = create_filleted_box(
+        lid_split_bridge_length,
+        cooleon_pair_housing_lid_split_bridge_width,
+        cooleon_pair_housing_lid_split_bridge_thickness,
+        fillet_radius=cooleon_pair_housing_lid_split_bridge_fillet_radius,
+        no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
+    )
+    lid_split_bridge = align(
+        lid_split_bridge,
+        lid_split_bridge_anchor_reference,
+        Alignment.RIGHT,
+    )
+    lid_split_bridge = align(
+        lid_split_bridge,
+        lid_split_bridge_anchor_reference,
+        Alignment.CENTER,
+        axes=[1, 2],
+    )
+    lid_split_bridge_overlap_reference = create_box(
+        cooleon_pair_housing_lid_split_bridge_overlap_length,
+        cooleon_pair_housing_lid_split_bridge_width,
+        cooleon_pair_housing_lid_split_bridge_thickness,
+    )
+    lid_split_bridge_overlap_reference = align(
+        lid_split_bridge_overlap_reference,
+        cooleon_pair_housing_lid_right,
+        Alignment.STACK_LEFT,
+    )
+    lid_split_bridge_overlap_reference = align(
+        lid_split_bridge_overlap_reference,
+        lid_split_bridge,
+        Alignment.CENTER,
+        axes=[1, 2],
+    )
+
+    lid_split_join_screw_record = MScrew.from_size(
+        cooleon_pair_housing_lid_split_bridge_screw_size
+    )
+    lid_split_bridge_screw_frame = create_box(
+        cooleon_pair_housing_lid_split_bridge_overlap_length,
+        cooleon_pair_housing_lid_split_bridge_width
+        - 2 * cooleon_pair_housing_lid_split_bridge_screw_y_inset,
+        cooleon_pair_housing_lid_split_bridge_thickness,
+    )
+    lid_split_bridge_screw_frame = align(
+        lid_split_bridge_screw_frame,
+        lid_split_bridge_overlap_reference,
+        Alignment.CENTER,
+    )
+    lid_split_bridge_pilot_holes = PartCollector()
+    lid_split_bridge_clearance_holes = PartCollector()
+    lid_split_join_screws = PartCollector()
+    for y_alignment in [Alignment.FRONT, Alignment.BACK]:
+        lid_split_bridge_screw_target = create_box(
+            0.1,
+            0.1,
+            cooleon_pair_housing_lid_split_bridge_thickness,
+        )
+        lid_split_bridge_screw_target = align(
+            lid_split_bridge_screw_target,
+            lid_split_bridge_screw_frame,
+            Alignment.CENTER,
+            axes=[0, 2],
+        )
+        lid_split_bridge_screw_target = align(
+            lid_split_bridge_screw_target,
+            lid_split_bridge_screw_frame,
+            y_alignment,
+        )
+
+        lid_split_bridge_pilot_hole = create_self_threading_hole_cutter(
+            cooleon_pair_housing_lid_split_bridge_screw_size,
+            cooleon_pair_housing_lid_split_bridge_thickness + 2,
+            core_radius_adjustment=(
+                cooleon_pair_housing_self_threading_core_radius_adjustment
+            ),
+            lead_in=cooleon_pair_housing_self_threading_lead_in,
+        )
+        lid_split_bridge_pilot_hole = align(
+            lid_split_bridge_pilot_hole,
+            lid_split_bridge_screw_target,
+            Alignment.CENTER,
+            axes=[0, 1],
+        )
+        lid_split_bridge_pilot_hole = align(
+            lid_split_bridge_pilot_hole,
+            lid_split_bridge,
+            Alignment.TOP,
+        )
+        lid_split_bridge_pilot_holes = lid_split_bridge_pilot_holes.fuse(
+            lid_split_bridge_pilot_hole
+        )
+
+        lid_split_bridge_clearance_hole = create_cylinder(
+            lid_split_join_screw_record.clearance_hole_loose / 2,
+            cooleon_pair_housing_lid_thickness + 2,
+        )
+        lid_split_bridge_clearance_hole = align(
+            lid_split_bridge_clearance_hole,
+            lid_split_bridge_screw_target,
+            Alignment.CENTER,
+            axes=[0, 1],
+        )
+        lid_split_bridge_clearance_hole = align(
+            lid_split_bridge_clearance_hole,
+            lid_base_reference,
+            Alignment.CENTER,
+            axes=[2],
+        )
+        lid_split_bridge_clearance_holes = lid_split_bridge_clearance_holes.fuse(
+            lid_split_bridge_clearance_hole
+        )
+
+        lid_split_join_screw = create_cylinder_screw(
+            cooleon_pair_housing_lid_split_bridge_screw_size,
+            cooleon_pair_housing_lid_split_bridge_screw_length,
+        )
+        lid_split_join_screw = align(
+            lid_split_join_screw,
+            lid_split_bridge_screw_target,
+            Alignment.CENTER,
+            axes=[0, 1],
+        )
+        lid_split_join_screw = align(
+            lid_split_join_screw,
+            lid_base_reference,
+            Alignment.STACK_TOP,
+            stack_gap=-cooleon_pair_housing_lid_split_bridge_screw_length,
+        )
+        lid_split_join_screws = lid_split_join_screws.fuse(lid_split_join_screw)
+
+    cooleon_pair_housing_lid_right = cooleon_pair_housing_lid_right.fuse(
+        lid_split_bridge
+    )
+    cooleon_pair_housing_lid_right = cooleon_pair_housing_lid_right.cut(
+        lid_split_bridge_pilot_holes
+    )
+    cooleon_pair_housing_lid_left = cooleon_pair_housing_lid_left.cut(
+        lid_split_bridge_clearance_holes
+    )
     housing = LeaderFollowersCuttersPart(leader=housing_box)
-    housing.add_named_follower(lid, "cooleon_pair_housing_lid")
     housing.add_named_follower(
         cooleon_pair_housing_left_body,
         "cooleon_pair_housing_left_body",
@@ -720,6 +914,14 @@ def create_cooleon_pair_housing_assembly(
     )
     housing.add_named_cutter(lid_pilot_holes, "lid_mount_pilot_holes")
     housing.add_named_cutter(lid_clearance_holes, "lid_mount_clearance_holes")
+    housing.add_named_cutter(
+        lid_split_bridge_pilot_holes,
+        "lid_split_bridge_pilot_holes",
+    )
+    housing.add_named_cutter(
+        lid_split_bridge_clearance_holes,
+        "lid_split_bridge_clearance_holes",
+    )
     for index, (pilot_hole, clearance_hole) in enumerate(lid_screw_positions, start=1):
         housing.add_named_cutter(pilot_hole, f"lid_mount_pilot_hole_{index}")
         housing.add_named_cutter(clearance_hole, f"lid_mount_clearance_hole_{index}")
@@ -737,5 +939,9 @@ def create_cooleon_pair_housing_assembly(
         "input_cable_clamp_screw",
     )
     housing.add_named_non_production_part(split_join_hardware, "split_join_hardware")
+    housing.add_named_non_production_part(
+        lid_split_join_screws,
+        "lid_split_join_screws",
+    )
 
     return housing

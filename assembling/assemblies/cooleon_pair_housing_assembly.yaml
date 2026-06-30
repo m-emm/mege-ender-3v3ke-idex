@@ -17,35 +17,37 @@ Builder:
       variants:
         - name: no_lid
           hide:
-            - cooleon_pair_housing_lid
+            - cooleon_pair_housing_lid_left
+            - cooleon_pair_housing_lid_right
             - lid_mount_screws
+            - lid_split_join_screws
         - name: no_lid_no_psus
           views:
             - isometric
             - right
             - top
           hide:
-            - cooleon_pair_housing_lid
+            - cooleon_pair_housing_lid_left
+            - cooleon_pair_housing_lid_right
             - lid_mount_screws
+            - lid_split_join_screws
             - cooleon_psu_1_
             - cooleon_psu_2_
     parts:
       - source: self
         artifact: leader
         name: cooleon_pair_housing
-        color: [0.92, 0.96, 1.0]
       - source: self
         artifact: followers
         names:
-          - cooleon_pair_housing_lid
+          - cooleon_pair_housing_lid_left
+          - cooleon_pair_housing_lid_right
         name_template: "{name}"
-        color: [0.92, 0.96, 1.0]
       - source: self
         artifact: followers
         names:
           - cooleon_pair_housing_input_cable_clamp
         name_template: "{name}"
-        color: [0.82, 0.68, 0.32]
       - source: self
         artifact: non_production_parts
         names:
@@ -53,8 +55,8 @@ Builder:
           - psu_mount_thread_insets
           - input_cable_clamp_screw
           - split_join_hardware
+          - lid_split_join_screws
         name_template: "{name}"
-        color: [0.78, 0.78, 0.72]
       - source: injected
         assembly: cooleon_psu_1
         artifact: all
@@ -86,6 +88,8 @@ Builder:
         names:
           - cooleon_pair_housing_input_cable_clamp
         name_template: "{name}"
+        prod_rotation_angle: -90
+        prod_rotation_axis: [0, 1, 0]
     arrange:
       export_individual_parts: false
       prod_gap: 12.0
@@ -181,6 +185,26 @@ Parameters:
   cooleon_pair_housing_lid_screw_inset:
     Type: Float
   cooleon_pair_housing_lid_screw_boss_diameter:
+    Type: Float
+  cooleon_pair_housing_lid_split_gap:
+    Type: Float
+  cooleon_pair_housing_lid_split_bridge_anchor_length:
+    Type: Float
+  cooleon_pair_housing_lid_split_bridge_overlap_length:
+    Type: Float
+  cooleon_pair_housing_lid_split_bridge_width:
+    Type: Float
+  cooleon_pair_housing_lid_split_bridge_thickness:
+    Type: Float
+  cooleon_pair_housing_lid_split_bridge_vertical_clearance:
+    Type: Float
+  cooleon_pair_housing_lid_split_bridge_fillet_radius:
+    Type: Float
+  cooleon_pair_housing_lid_split_bridge_screw_size:
+    Type: String
+  cooleon_pair_housing_lid_split_bridge_screw_length:
+    Type: Float
+  cooleon_pair_housing_lid_split_bridge_screw_y_inset:
     Type: Float
   cooleon_pair_housing_self_threading_core_radius_adjustment:
     Type: Float
