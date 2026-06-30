@@ -211,7 +211,7 @@ pin_sets:
       - B_PLUS
       - B_MINUS
   - prefix: Y_TB6600_IF_
-    origin: [12, 30]
+    origin: [-4, 30]
     direction: down
     pins:
       - GND

@@ -5,10 +5,10 @@ electronics used by the printer Klipper config.
 
 - `pico_w_btt_tmc2226_x.yaml` is the X-axis Pico wiring source.
 - `pico_w_btt_tmc2226_y_z.yaml` is the Y/Z/heatbed Pico wiring source.
-- `pico_tb6600_stripboard_interface.md` documents the planned non-live
-  external Y TB6600 interface connector and stripboard transistor schematic.
-  The schematic/stripboard source example now lives in
-  [`mege-circuits`](https://github.com/m-emm/mege-circuits).
+- `pico_tb6600_stripboard_interface.py` and
+  `pico_tb6600_stripboard_layout.py` generate the planned non-live external Y
+  TB6600 interface schematic and verified stripboard assembly.
+- `pico_tb6600_stripboard_interface.md` documents that planned interface.
 - `diagrams/*.svg` are generated artifacts committed for review.
 - `../printer.cfg.template` is the active Klipper config source.
 
@@ -17,7 +17,8 @@ motor coils, power rails, pull-ups, endstops, MOSFET, SSR boost output, and
 thermistor wiring.
 The generic pinout renderer is provided by
 [`mege-circuits`](https://github.com/m-emm/mege-circuits); this repository owns
-only the Ender-specific wiring sources and generated review artifacts.
+the Ender-specific wiring sources, including the IDEX TB6600 interface source,
+and generated review artifacts.
 The Klipper template owns firmware modifiers such as `!` direction inversion
 and `^` pull-ups.
 

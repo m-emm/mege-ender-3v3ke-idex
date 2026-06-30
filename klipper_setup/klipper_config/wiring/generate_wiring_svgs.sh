@@ -80,10 +80,30 @@ if ((${#YAML_FILES[@]} == 0)); then
   exit 1
 fi
 
+RUN_TB6600=0
+if ((${#REQUESTED_FILES[@]} == 0)); then
+  RUN_TB6600=1
+fi
+
 run_pinout() {
   local yaml_file="$1"
   local output_dir="$2"
   python3 -m mege_circuits.pinout "${yaml_file}" -o "${output_dir}"
+}
+
+run_tb6600() {
+  local output_dir="$1"
+  PYTHONPATH="${SCRIPT_DIR}${PYTHONPATH:+:${PYTHONPATH}}" python3 - "${output_dir}" <<'PY'
+from pathlib import Path
+import sys
+
+from pico_tb6600_stripboard_interface import render_tb6600_schematic
+from pico_tb6600_stripboard_layout import render_tb6600_stripboard_build
+
+output_dir = Path(sys.argv[1])
+render_tb6600_schematic(output_dir)
+render_tb6600_stripboard_build(output_dir)
+PY
 }
 
 pinout_basename() {
@@ -99,17 +119,38 @@ print(str(data.get("basename", "pinout")))
 PY
 }
 
+require_nonempty() {
+  local path="$1"
+  if [[ ! -s "${path}" ]]; then
+    echo "Expected generated artifact is missing or empty: ${path}" >&2
+    exit 1
+  fi
+}
+
 if [[ "${MODE}" == "check" ]]; then
   TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/idex-wiring-svgs.XXXXXX")"
   trap 'rm -rf "${TMP_DIR}"' EXIT
   for yaml_file in "${YAML_FILES[@]}"; do
     run_pinout "${yaml_file}" "${TMP_DIR}"
   done
+  if [[ "${RUN_TB6600}" == "1" ]]; then
+    run_tb6600 "${TMP_DIR}"
+  fi
   for yaml_file in "${YAML_FILES[@]}"; do
     base_name="$(pinout_basename "${yaml_file}")"
     diff -u "${OUTPUT_DIR}/${base_name}_top.svg" "${TMP_DIR}/${base_name}_top.svg"
     diff -u "${OUTPUT_DIR}/${base_name}_bottom.svg" "${TMP_DIR}/${base_name}_bottom.svg"
   done
+  if [[ "${RUN_TB6600}" == "1" ]]; then
+    for stem in \
+      pico_tb6600_stripboard_interface \
+      pico_tb6600_stripboard_interface_stripboard
+    do
+      diff -u "${OUTPUT_DIR}/${stem}.svg" "${TMP_DIR}/${stem}.svg"
+      require_nonempty "${OUTPUT_DIR}/${stem}.png"
+      require_nonempty "${TMP_DIR}/${stem}.png"
+    done
+  fi
   echo "Wiring SVG check passed."
   exit 0
 fi
@@ -118,3 +159,6 @@ mkdir -p "${OUTPUT_DIR}"
 for yaml_file in "${YAML_FILES[@]}"; do
   run_pinout "${yaml_file}" "${OUTPUT_DIR}"
 done
+if [[ "${RUN_TB6600}" == "1" ]]; then
+  run_tb6600 "${OUTPUT_DIR}"
+fi

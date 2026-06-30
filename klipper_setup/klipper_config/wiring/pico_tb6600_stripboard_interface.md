@@ -18,10 +18,10 @@ The schematic script also generates
 `diagrams/pico_tb6600_stripboard_interface.png` for quick IDE or image-viewer
 inspection.
 
-The source for this schematic and the stripboard projection moved to the
-standalone [`mege-circuits`](https://github.com/m-emm/mege-circuits) project as
-the TB6600 integration example. The SVG/PNG files remain checked in here as
-printer wiring reference artifacts.
+The source for this schematic and the verified stripboard assembly lives in
+this wiring directory. `mege-circuits` provides the reusable renderer/planner
+library and keeps a TB6600 regression/demo copy, but the IDEX wiring source of
+truth is this repository.
 
 The active printer wiring still uses the Y-axis TMC2226 driver. This TB6600
 interface is a planned parallel connector so the machine can keep running on
