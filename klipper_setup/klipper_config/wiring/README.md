@@ -15,6 +15,9 @@ electronics used by the printer Klipper config.
 The YAML files own physical wiring: Pico pins, driver pins, connector pins,
 motor coils, power rails, pull-ups, endstops, MOSFET, SSR boost output, and
 thermistor wiring.
+The generic pinout renderer is provided by
+[`mege-circuits`](https://github.com/m-emm/mege-circuits); this repository owns
+only the Ender-specific wiring sources and generated review artifacts.
 The Klipper template owns firmware modifiers such as `!` direction inversion
 and `^` pull-ups.
 

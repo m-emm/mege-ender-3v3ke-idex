@@ -52,6 +52,8 @@ That file is the source of truth for the active printer. Everything under
 `klipper_setup/klipper_config/archive/` is historical/reference material.
 Active Pico/TMC wiring sources and generated SVG review artifacts live at
 `klipper_setup/klipper_config/wiring/`.
+The generic pinout renderer used for those wiring diagrams now lives in
+[`mege-circuits`](https://github.com/m-emm/mege-circuits).
 
 ```bash
 # From the local checkout

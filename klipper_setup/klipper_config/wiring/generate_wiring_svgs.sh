@@ -83,8 +83,7 @@ fi
 run_pinout() {
   local yaml_file="$1"
   local output_dir="$2"
-  PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 -m mege_ender_3v3ke_idex.pinout "${yaml_file}" -o "${output_dir}"
+  python3 -m mege_circuits.pinout "${yaml_file}" -o "${output_dir}"
 }
 
 pinout_basename() {

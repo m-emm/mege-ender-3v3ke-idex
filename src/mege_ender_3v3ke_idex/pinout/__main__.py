@@ -1,4 +1,4 @@
-"""Module runner for `python -m mege_ender_3v3ke_idex.pinout`."""
+"""Deprecated runner forwarding to `python -m mege_circuits.pinout`."""
 
 from .cli import main
 
