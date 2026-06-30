@@ -532,6 +532,12 @@ def create_cooleon_pair_housing_assembly(
                     hatch_target,
                     side.edge_alignment,
                 )
+                side_frame = align(
+                    side_frame,
+                    hatch_target,
+                    Alignment.CENTER,
+                    axes=[2],
+                )
                 side_frame = align(side_frame, housing_box, fb)
                 hatch_flat_frame = hatch_flat_frame.fuse(side_frame)
             bottom_frame = create_box(
