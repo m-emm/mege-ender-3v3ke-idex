@@ -55,20 +55,6 @@ Builder:
           - cooleon_pair_housing_input_cable_clamp
         name_template: "{name}"
       - source: self
-        artifact: followers
-        names:
-          - cooleon_pair_housing_front_left_hatch
-          - cooleon_pair_housing_front_right_hatch
-          - cooleon_pair_housing_back_left_hatch
-          - cooleon_pair_housing_back_right_hatch
-        name_template: "{name}"
-        animation:
-          cooleon_pair_housing_access_open:
-            - 0
-            - 0
-            - $expr:
-                $sub: "2 * ${cooleon_pair_housing_hatch_height}"
-      - source: self
         artifact: non_production_parts
         names:
           - lid_mount_screws
@@ -110,39 +96,45 @@ Builder:
         name_template: "{name}"
         prod_rotation_angle: -90
         prod_rotation_axis: [0, 1, 0]
-      - source: self
-        artifact: followers
-        names:
-          - cooleon_pair_housing_front_left_hatch
-          - cooleon_pair_housing_front_right_hatch
-        name_template: "{name}"
-        prod_rotation_angle: 90
-        prod_rotation_axis: [1, 0, 0]
-      - source: self
-        artifact: followers
-        names:
-          - cooleon_pair_housing_back_left_hatch
-          - cooleon_pair_housing_back_right_hatch
-        name_template: "{name}"
-        prod_rotation_angle: -90
-        prod_rotation_axis: [1, 0, 0]
     arrange:
       export_individual_parts: false
       prod_gap: 6.0
       plates:
-        - name: cooleon_pair_housing
+        - name: cooleon_pair_housing_right
           process_data_preset: petgcf_max_strength_high_speed_06
           process_data:
             overrides:
               process_overrides:
                 brim_type: no_brim
-                enable_support: "1"
+                enable_support: "0"
                 support_type: tree(auto)
                 support_style: organic
                 support_on_build_plate_only: "1"
                 support_top_z_distance: "0.47"
-                max_bridge_length: "0"
-                bridge_no_support: "0"
+                max_bridge_length: "20"
+                bridge_no_support: "1"
+                support_remove_small_overhang: "0"
+                support_interface_top_layers: "2"
+                support_interface_spacing: "0.8"
+                support_object_xy_distance: "0.8"
+                support_bottom_z_distance: "0.2"
+                wall_loops: "3"
+          parts:
+            - cooleon_pair_housing_right_body
+
+        - name: cooleon_pair_housing_left
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                brim_type: no_brim
+                enable_support: "0"
+                support_type: tree(auto)
+                support_style: organic
+                support_on_build_plate_only: "1"
+                support_top_z_distance: "0.47"
+                max_bridge_length: "20"
+                bridge_no_support: "1"
                 support_remove_small_overhang: "0"
                 support_interface_top_layers: "2"
                 support_interface_spacing: "0.8"
@@ -151,7 +143,7 @@ Builder:
                 wall_loops: "3"
           parts:
             - cooleon_pair_housing_left_body
-            - cooleon_pair_housing_right_body
+
         - name: cooleon_pair_housing_lid_and_clamp
           process_data_preset: petgcf_max_strength_high_speed_06
           process_data:
@@ -163,8 +155,8 @@ Builder:
                 support_style: organic
                 support_on_build_plate_only: "1"
                 support_top_z_distance: "0.47"
-                max_bridge_length: "0"
-                bridge_no_support: "0"
+                max_bridge_length: "20"
+                bridge_no_support: "1"
                 support_remove_small_overhang: "0"
                 support_interface_top_layers: "2"
                 support_interface_spacing: "0.8"
@@ -175,10 +167,6 @@ Builder:
             - cooleon_pair_housing_lid_left
             - cooleon_pair_housing_lid_right
             - cooleon_pair_housing_input_cable_clamp
-            - cooleon_pair_housing_front_left_hatch
-            - cooleon_pair_housing_front_right_hatch
-            - cooleon_pair_housing_back_left_hatch
-            - cooleon_pair_housing_back_right_hatch
       auto_assign_plates: false
 
 Parameters:
