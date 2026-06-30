@@ -3,7 +3,10 @@
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_four_screws_mount_assembly,
 )
-from mege_ender_3v3ke_idex.designs.trellis_plate import BIG_THING, create_trellis_cutters
+from mege_ender_3v3ke_idex.designs.trellis_plate import (
+    BIG_THING,
+    create_trellis_cutters,
+)
 from shellforgepy.simple import *
 
 BIG_THING = 500
@@ -511,6 +514,7 @@ def create_cooleon_pair_housing_assembly(
     )
 
     lid_lip_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+    lid_lip_cutter = align(lid_lip_cutter, housing_box, Alignment.CENTER)
     lid_lip_cutter = align(
         lid_lip_cutter, housing_box, Alignment.STACK_TOP, stack_gap=-lid_drop_depth
     )
@@ -655,10 +659,7 @@ def create_cooleon_pair_housing_assembly(
         lid_length,
         lid_width,
         cooleon_pair_housing_lid_thickness,
-        fillet_radius=min(
-            cooleon_pair_housing_wall_thickness,
-            cooleon_pair_housing_lid_outer_overhang,
-        ),
+        fillet_radius=cooleon_pair_housing_wall_thickness,
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
     lid_base = align(lid_base, lid_base_reference, Alignment.CENTER)

@@ -491,9 +491,9 @@ globals:
   cooleon_psu_mount_screw_size: "M3"
   cooleon_psu_mount_screw_length: 10
   cooleon_psu_back_to_back_gap: 12
-  cooleon_pair_housing_clearance: 1.5
+  cooleon_pair_housing_clearance: 2.5
   cooleon_pair_housing_front_back_clearance: 3
-  cooleon_pair_housing_wall_thickness: 2.0
+  cooleon_pair_housing_wall_thickness: 2.4
   cooleon_pair_housing_input_terminal_extra_space: 35
   cooleon_pair_housing_output_terminal_extra_space: 20
   cooleon_pair_housing_mount_rib_length: 24
@@ -505,14 +505,14 @@ globals:
   cooleon_pair_housing_vent_height: 34
   cooleon_pair_housing_vent_row_z: 0.5
   cooleon_pair_housing_hatch_width: 50
-  cooleon_pair_housing_hatch_height: 44
+  cooleon_pair_housing_hatch_height: 51
   cooleon_pair_housing_hatch_end_inset: 20
   cooleon_pair_housing_hatch_frame_width: 4
   cooleon_pair_housing_hatch_groove_wall_thickness: 1.2
   cooleon_pair_housing_hatch_groove_clearance: 0.4
   cooleon_pair_housing_lid_thickness: !Ref nitehawk_usb_dual_housing_lid_thickness
   cooleon_pair_housing_lid_body_clearance: !Ref nitehawk_usb_dual_housing_lid_body_clearance
-  cooleon_pair_housing_lid_outer_overhang: !Ref nitehawk_usb_dual_housing_lid_outer_overhang
+  cooleon_pair_housing_lid_outer_overhang: 0
   cooleon_pair_housing_lid_rim_depth: !Ref nitehawk_usb_dual_housing_lid_rim_depth
   cooleon_pair_housing_lid_rim_thickness: !Ref nitehawk_usb_dual_housing_lid_rim_thickness
   cooleon_pair_housing_lid_rim_clearance: !Ref nitehawk_usb_dual_housing_lid_rim_clearance

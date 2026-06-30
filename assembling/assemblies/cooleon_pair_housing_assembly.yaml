@@ -43,6 +43,12 @@ Builder:
           - cooleon_pair_housing_lid_left
           - cooleon_pair_housing_lid_right
         name_template: "{name}"
+        animation:
+          cooleon_pair_housing_access_open:
+            - 0
+            - 0
+            - $expr:
+                $sub: "2 * ${cooleon_pair_housing_hatch_height}"
       - source: self
         artifact: followers
         names:
@@ -56,6 +62,12 @@ Builder:
           - cooleon_pair_housing_back_left_hatch
           - cooleon_pair_housing_back_right_hatch
         name_template: "{name}"
+        animation:
+          cooleon_pair_housing_access_open:
+            - 0
+            - 0
+            - $expr:
+                $sub: "2 * ${cooleon_pair_housing_hatch_height}"
       - source: self
         artifact: non_production_parts
         names:
