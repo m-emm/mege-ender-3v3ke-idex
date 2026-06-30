@@ -36,6 +36,11 @@ def create_cooleon_pair_housing_assembly(
     cooleon_pair_housing_input_cable_hole_diameter,
     cooleon_pair_housing_output_cable_hole_diameter,
     cooleon_pair_housing_psu_mount_thread_inset_extra_radius,
+    cooleon_pair_housing_mount_flange_screw_size,
+    cooleon_pair_housing_mount_flange_width,
+    cooleon_pair_housing_mount_flange_length,
+    cooleon_pair_housing_mount_flange_thickness,
+    cooleon_pair_housing_mount_flange_fillet_radius,
 ):
     """Create a lidded open-top tray around the placed Cooleon PSU bodies."""
 
@@ -565,6 +570,54 @@ def create_cooleon_pair_housing_assembly(
     lid = lid_base.fuse(lid_rim).fuse(lid_outer_lip)
     lid = lid.cut(lid_clearance_holes)
 
+    mount_flange_screw_hole_diameter = MScrew.from_size(
+        cooleon_pair_housing_mount_flange_screw_size
+    ).clearance_hole_normal
+    mount_flanges = PartCollector()
+    mount_flange_screw_holes = PartCollector()
+    housing_without_mount_flanges = housing_box
+    for side in [Alignment.LEFT, Alignment.RIGHT]:
+        mount_flange = create_filleted_box(
+            cooleon_pair_housing_mount_flange_length,
+            cooleon_pair_housing_mount_flange_width,
+            cooleon_pair_housing_mount_flange_thickness,
+            fillet_radius=cooleon_pair_housing_mount_flange_fillet_radius,
+            no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, side.opposite],
+        )
+        mount_flange = align(
+            mount_flange,
+            housing_without_mount_flanges,
+            Alignment.CENTER,
+            axes=[1],
+        )
+        mount_flange = align(
+            mount_flange,
+            housing_without_mount_flanges,
+            side.stack_alignment,
+        )
+        mount_flange = align(
+            mount_flange,
+            housing_without_mount_flanges,
+            Alignment.BOTTOM,
+        )
+        mount_flanges = mount_flanges.fuse(mount_flange)
+
+        mount_flange_screw_hole = create_cylinder(
+            mount_flange_screw_hole_diameter / 2,
+            cooleon_pair_housing_mount_flange_thickness + 2,
+        )
+        mount_flange_screw_hole = align(
+            mount_flange_screw_hole,
+            mount_flange,
+            Alignment.CENTER,
+        )
+        mount_flange_screw_holes = mount_flange_screw_holes.fuse(
+            mount_flange_screw_hole
+        )
+
+    housing_box = housing_box.fuse(mount_flanges)
+    housing_box = housing_box.cut(mount_flange_screw_holes)
+
     housing = LeaderFollowersCuttersPart(leader=housing_box)
     housing.add_named_follower(lid, "cooleon_pair_housing_lid")
     housing.add_named_follower(
@@ -579,6 +632,7 @@ def create_cooleon_pair_housing_assembly(
         "input_cable_clamp_clearance_pocket",
     )
     housing.add_named_cutter(output_cable_holes, "output_cable_holes")
+    housing.add_named_cutter(mount_flange_screw_holes, "mount_flange_screw_holes")
     housing.add_named_cutter(
         psu_mount_thread_insert_cutters,
         "psu_mount_thread_inset_cutters",

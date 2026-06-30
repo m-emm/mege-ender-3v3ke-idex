@@ -1741,6 +1741,11 @@ assemblies:
       cooleon_pair_housing_input_cable_hole_diameter: !Ref cooleon_pair_housing_input_cable_hole_diameter
       cooleon_pair_housing_output_cable_hole_diameter: !Ref cooleon_pair_housing_output_cable_hole_diameter
       cooleon_pair_housing_psu_mount_thread_inset_extra_radius: !Ref cooleon_pair_housing_psu_mount_thread_inset_extra_radius
+      cooleon_pair_housing_mount_flange_screw_size: !Ref cooleon_pair_housing_mount_flange_screw_size
+      cooleon_pair_housing_mount_flange_width: !Ref cooleon_pair_housing_mount_flange_width
+      cooleon_pair_housing_mount_flange_length: !Ref cooleon_pair_housing_mount_flange_length
+      cooleon_pair_housing_mount_flange_thickness: !Ref cooleon_pair_housing_mount_flange_thickness
+      cooleon_pair_housing_mount_flange_fillet_radius: !Ref cooleon_pair_housing_mount_flange_fillet_radius
 
   - name: hv_switchbox_assembly
 
