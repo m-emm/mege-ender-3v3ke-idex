@@ -204,12 +204,6 @@ Parameters:
     Type: Float
   cooleon_pair_housing_hatch_frame_width:
     Type: Float
-  cooleon_pair_housing_hatch_frame_depth:
-    Type: Float
-  cooleon_pair_housing_hatch_lip_width:
-    Type: Float
-  cooleon_pair_housing_hatch_lip_depth:
-    Type: Float
   cooleon_pair_housing_lid_thickness:
     Type: Float
   cooleon_pair_housing_lid_body_clearance:
