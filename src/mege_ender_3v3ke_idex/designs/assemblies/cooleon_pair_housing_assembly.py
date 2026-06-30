@@ -301,7 +301,13 @@ def create_cooleon_pair_housing_assembly(
                 ),
                 lead_in=cooleon_pair_housing_self_threading_lead_in,
             )
-            lid_pilot_hole = align(lid_pilot_hole, lid_boss, Alignment.CENTER)
+            lid_pilot_hole = align(
+                lid_pilot_hole,
+                lid_boss,
+                Alignment.CENTER,
+                axes=[0, 1],
+            )
+            lid_pilot_hole = align(lid_pilot_hole, lid_boss, Alignment.TOP)
             lid_pilot_holes = lid_pilot_holes.fuse(lid_pilot_hole)
 
             lid_clearance_hole = create_cylinder(
