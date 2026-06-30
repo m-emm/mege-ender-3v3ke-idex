@@ -544,6 +544,7 @@ globals:
   cooleon_pair_housing_split_join_flange_length: 16
   cooleon_pair_housing_split_join_flange_depth: 10
   cooleon_pair_housing_split_join_flange_fillet_radius: !Ref electric_switchboard_mount_flange_fillet_radius
+  cooleon_pair_housing_split_join_flange_lid_clearance: 0.5
   cooleon_pair_housing_split_join_screw_size: !Ref print_bed_undercarriage_joining_screw_size
   cooleon_pair_housing_split_join_screw_length: !Ref print_bed_undercarriage_joining_screw_length
   cooleon_pair_housing_split_join_screw_nut_clearance: !Ref print_bed_undercarriage_joining_screw_nut_clearance

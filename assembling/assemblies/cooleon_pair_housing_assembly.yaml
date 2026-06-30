@@ -232,6 +232,8 @@ Parameters:
     Type: Float
   cooleon_pair_housing_split_join_flange_fillet_radius:
     Type: Float
+  cooleon_pair_housing_split_join_flange_lid_clearance:
+    Type: Float
   cooleon_pair_housing_split_join_screw_size:
     Type: String
   cooleon_pair_housing_split_join_screw_length:

@@ -57,6 +57,7 @@ def create_cooleon_pair_housing_assembly(
     cooleon_pair_housing_split_join_flange_length,
     cooleon_pair_housing_split_join_flange_depth,
     cooleon_pair_housing_split_join_flange_fillet_radius,
+    cooleon_pair_housing_split_join_flange_lid_clearance,
     cooleon_pair_housing_split_join_screw_size,
     cooleon_pair_housing_split_join_screw_length,
     cooleon_pair_housing_split_join_screw_nut_clearance,
@@ -612,12 +613,17 @@ def create_cooleon_pair_housing_assembly(
     lid = lid.cut(lid_clearance_holes)
 
     split_cut_point = get_bounding_box_center(housing_box)
+    split_join_flange_height = (
+        get_bounding_box_size(housing_box)[2]
+        - lid_drop_depth
+        - cooleon_pair_housing_split_join_flange_lid_clearance
+    )
     split_join_flanges = PartCollector()
     for side in [Alignment.FRONT, Alignment.BACK]:
         split_join_flange = create_filleted_box(
             cooleon_pair_housing_split_join_flange_length,
             cooleon_pair_housing_split_join_flange_depth,
-            get_bounding_box_size(housing_box)[2],
+            split_join_flange_height,
             fillet_radius=cooleon_pair_housing_split_join_flange_fillet_radius,
             no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, side.opposite],
         )
