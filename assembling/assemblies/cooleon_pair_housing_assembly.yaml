@@ -52,6 +52,7 @@ Builder:
           - lid_mount_screws
           - psu_mount_thread_insets
           - input_cable_clamp_screw
+          - split_join_hardware
         name_template: "{name}"
         color: [0.78, 0.78, 0.72]
       - source: injected
@@ -64,16 +65,77 @@ Builder:
         name_template: "cooleon_psu_2_{name}"
 
   Production:
+    process_data_preset: petgcf_max_strength_high_speed_06
     parts:
-      - source: self
-        artifact: leader
-        name: cooleon_pair_housing
       - source: self
         artifact: followers
         names:
-          - cooleon_pair_housing_lid
+          - cooleon_pair_housing_left_body
+          - cooleon_pair_housing_right_body
+        name_template: "{name}"
+      - source: self
+        artifact: followers
+        names:
+          - cooleon_pair_housing_lid_left
+          - cooleon_pair_housing_lid_right
+        name_template: "{name}"
+        prod_rotation_angle: 180
+        prod_rotation_axis: [1, 0, 0]
+      - source: self
+        artifact: followers
+        names:
           - cooleon_pair_housing_input_cable_clamp
         name_template: "{name}"
+    arrange:
+      export_individual_parts: false
+      prod_gap: 12.0
+      plates:
+        - name: cooleon_pair_housing
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                brim_type: no_brim
+                enable_support: "1"
+                support_type: tree(auto)
+                support_style: organic
+                support_on_build_plate_only: "1"
+                support_top_z_distance: "0.47"
+                max_bridge_length: "0"
+                bridge_no_support: "0"
+                support_remove_small_overhang: "0"
+                support_interface_top_layers: "2"
+                support_interface_spacing: "0.8"
+                support_object_xy_distance: "0.8"
+                support_bottom_z_distance: "0.2"
+                wall_loops: "3"
+          parts:
+            - cooleon_pair_housing_left_body
+            - cooleon_pair_housing_right_body
+        - name: cooleon_pair_housing_lid_and_clamp
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                brim_type: no_brim
+                enable_support: "1"
+                support_type: tree(auto)
+                support_style: organic
+                support_on_build_plate_only: "1"
+                support_top_z_distance: "0.47"
+                max_bridge_length: "0"
+                bridge_no_support: "0"
+                support_remove_small_overhang: "0"
+                support_interface_top_layers: "2"
+                support_interface_spacing: "0.8"
+                support_object_xy_distance: "0.8"
+                support_bottom_z_distance: "0.2"
+                wall_loops: "3"
+          parts:
+            - cooleon_pair_housing_lid_left
+            - cooleon_pair_housing_lid_right
+            - cooleon_pair_housing_input_cable_clamp
+      auto_assign_plates: false
 
 Parameters:
   cooleon_pair_housing_clearance:
@@ -140,6 +202,24 @@ Parameters:
     Type: Float
   cooleon_pair_housing_mount_flange_fillet_radius:
     Type: Float
+  cooleon_pair_housing_split_join_flange_length:
+    Type: Float
+  cooleon_pair_housing_split_join_flange_depth:
+    Type: Float
+  cooleon_pair_housing_split_join_flange_fillet_radius:
+    Type: Float
+  cooleon_pair_housing_split_join_screw_size:
+    Type: String
+  cooleon_pair_housing_split_join_screw_length:
+    Type: Float
+  cooleon_pair_housing_split_join_screw_nut_clearance:
+    Type: Float
+  cooleon_pair_housing_split_join_screw_cylinder_head_clearance:
+    Type: Float
+  cooleon_pair_housing_split_join_screw_inset:
+    Type: Float
+  cooleon_pair_housing_split_join_screw_mount_clearance_type:
+    Type: String
 
 Parts:
   CooleonPairHousingAssembly:

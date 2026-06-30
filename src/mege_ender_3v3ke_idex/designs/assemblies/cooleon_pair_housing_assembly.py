@@ -1,5 +1,8 @@
 """Open-top housing with lid for a back-to-back Cooleon PSU pair."""
 
+from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
+    create_four_screws_mount_assembly,
+)
 from mege_ender_3v3ke_idex.designs.trellis_plate import create_trellis_cutters
 from shellforgepy.simple import *
 
@@ -41,6 +44,15 @@ def create_cooleon_pair_housing_assembly(
     cooleon_pair_housing_mount_flange_length,
     cooleon_pair_housing_mount_flange_thickness,
     cooleon_pair_housing_mount_flange_fillet_radius,
+    cooleon_pair_housing_split_join_flange_length,
+    cooleon_pair_housing_split_join_flange_depth,
+    cooleon_pair_housing_split_join_flange_fillet_radius,
+    cooleon_pair_housing_split_join_screw_size,
+    cooleon_pair_housing_split_join_screw_length,
+    cooleon_pair_housing_split_join_screw_nut_clearance,
+    cooleon_pair_housing_split_join_screw_cylinder_head_clearance,
+    cooleon_pair_housing_split_join_screw_inset,
+    cooleon_pair_housing_split_join_screw_mount_clearance_type,
 ):
     """Create a lidded open-top tray around the placed Cooleon PSU bodies."""
 
@@ -570,6 +582,48 @@ def create_cooleon_pair_housing_assembly(
     lid = lid_base.fuse(lid_rim).fuse(lid_outer_lip)
     lid = lid.cut(lid_clearance_holes)
 
+    split_cut_point = get_bounding_box_center(housing_box)
+    split_join_flanges = PartCollector()
+    for side in [Alignment.FRONT, Alignment.BACK]:
+        split_join_flange = create_filleted_box(
+            cooleon_pair_housing_split_join_flange_length,
+            cooleon_pair_housing_split_join_flange_depth,
+            get_bounding_box_size(housing_box)[2],
+            fillet_radius=cooleon_pair_housing_split_join_flange_fillet_radius,
+            no_fillets_at=[Alignment.TOP, Alignment.BOTTOM, side.opposite],
+        )
+        split_join_flange = align(
+            split_join_flange,
+            housing_box,
+            Alignment.CENTER,
+            axes=[0],
+        )
+        split_join_flange = align(
+            split_join_flange,
+            housing_box,
+            side.stack_alignment,
+        )
+        split_join_flange = align(split_join_flange, housing_box, Alignment.BOTTOM)
+        split_join_flanges = split_join_flanges.fuse(split_join_flange)
+
+    split_join_screw_mount = create_four_screws_mount_assembly(
+        split_join_flanges,
+        screw_size=cooleon_pair_housing_split_join_screw_size,
+        screw_length=cooleon_pair_housing_split_join_screw_length,
+        screw_direction=Alignment.RIGHT,
+        with_nut_cutter=True,
+        nut_cutter_clearance=cooleon_pair_housing_split_join_screw_nut_clearance,
+        cylinder_head_cutter_clearance=(
+            cooleon_pair_housing_split_join_screw_cylinder_head_clearance
+        ),
+        width_inset=cooleon_pair_housing_split_join_screw_inset,
+        length_inset=cooleon_pair_housing_split_join_screw_inset,
+        clearance_type=cooleon_pair_housing_split_join_screw_mount_clearance_type,
+    )
+    housing_box = housing_box.fuse(split_join_flanges)
+    housing_box = split_join_screw_mount.use_as_cutter_on(housing_box)
+    split_join_hardware = split_join_screw_mount.get_non_production_parts_fused()
+
     mount_flange_screw_hole_diameter = MScrew.from_size(
         cooleon_pair_housing_mount_flange_screw_size
     ).clearance_hole_normal
@@ -618,8 +672,35 @@ def create_cooleon_pair_housing_assembly(
     housing_box = housing_box.fuse(mount_flanges)
     housing_box = housing_box.cut(mount_flange_screw_holes)
 
+    cooleon_pair_housing_right_body, cooleon_pair_housing_left_body = cut_in_two(
+        housing_box,
+        cut_point=split_cut_point,
+        cut_normal=(1, 0, 0),
+    )
+    cooleon_pair_housing_lid_right, cooleon_pair_housing_lid_left = cut_in_two(
+        lid,
+        cut_point=split_cut_point,
+        cut_normal=(1, 0, 0),
+    )
+
     housing = LeaderFollowersCuttersPart(leader=housing_box)
     housing.add_named_follower(lid, "cooleon_pair_housing_lid")
+    housing.add_named_follower(
+        cooleon_pair_housing_left_body,
+        "cooleon_pair_housing_left_body",
+    )
+    housing.add_named_follower(
+        cooleon_pair_housing_right_body,
+        "cooleon_pair_housing_right_body",
+    )
+    housing.add_named_follower(
+        cooleon_pair_housing_lid_left,
+        "cooleon_pair_housing_lid_left",
+    )
+    housing.add_named_follower(
+        cooleon_pair_housing_lid_right,
+        "cooleon_pair_housing_lid_right",
+    )
     housing.add_named_follower(
         input_cable_clamp.leader,
         "cooleon_pair_housing_input_cable_clamp",
@@ -655,5 +736,6 @@ def create_cooleon_pair_housing_assembly(
         input_cable_clamp.get_named_non_production_part("tightening_screw"),
         "input_cable_clamp_screw",
     )
+    housing.add_named_non_production_part(split_join_hardware, "split_join_hardware")
 
     return housing
