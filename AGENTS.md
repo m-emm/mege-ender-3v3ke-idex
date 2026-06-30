@@ -157,11 +157,13 @@ For support tuning, interpret `support_threshold_angle` carefully: higher values
 ### Design Patterns
 - Avoid local internal helpers in assembly generator modules, use straight scripts telling the story of constructing the part in a linear way. shellforgepy is a DSL, use it directly and do not wrap it in local wrappers
 - Separate reusable components into their own functions (e.g., `create_motor_with_mount()`, `create_idler_cage()`)
-- Use `PartCollector` for accumulating multiple parts before fusing
+- Use `PartCollector` for accumulating multiple parts in a loop before fusing. However for normal fusing of two known parts, they are not necessary.
 - Prefer assembly manifests plus builder configuration for composition, export, and visualization
 - Use `LeaderFollowersCuttersPart` for complex assemblies with visual references and stable named artifacts
 - Align parts relative to each other using the `align()` function with `Alignment` enums; do not use align_translation, unless absolutely necessary to move multiple parts together
 - For symmetric corner hardware, prefer a nested `left/right` x `front/back` loop over copy-pasted per-corner code. Use an outer loop like `("left", Alignment.LEFT)` / `("right", Alignment.RIGHT)` and an inner loop over `Alignment.FRONT` and `Alignment.BACK`; then derive placement from `side_alignment.opposite.stack_alignment`, `front_back_alignment.stack_alignment`, and `front_back_alignment.opposite` instead of manual sign math.
+- Stack gaps are a great feature to space parts apart, but also to sink one part into another. align(...,stack_gap=my_stack_gap) allows positive (gap) and negative (sink into) values for my_stack_gap
+- Often initial align calls use `Alignment.CENTER`. Even though this supports `axes=[..]` this is often not necessary, because the subsequent LEFT or FRONT or other alignments will completely define the alignment along other axes, so leaving it out in the inital call will yield the same geometry but reduce code noise.
 - Prefer named `followers` / `non_production_parts` that are easy to reference from YAML `Builder.Visualization.parts` and `Builder.Production.parts`
 - Prefer wiring process data, production flips, rotations, prototype selections, and plate arrangement in YAML instead of embedding that export logic in Python
 

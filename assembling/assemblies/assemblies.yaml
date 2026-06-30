@@ -1688,15 +1688,31 @@ assemblies:
       cooleon_psu_1: cooleon_psu_1
       cooleon_psu_2: cooleon_psu_2
 
+  - name: cooleon_input_cable_clamp_assembly
+
+    resource_file: cable_clamp_assembly.yaml
+    depends_on: []
+    parameters:
+      cable_clamp_hole_diameter: !Ref cooleon_pair_housing_input_cable_clamp_hole_diameter
+      cable_clamp_slit_width: !Ref cooleon_pair_housing_input_cable_clamp_slit_width
+      cable_clamp_arm_width: !Ref cooleon_pair_housing_input_cable_clamp_arm_width
+      cable_clamp_arm_depth: !Ref cooleon_pair_housing_input_cable_clamp_arm_depth
+      cable_clamp_arm_thickness: !Ref cooleon_pair_housing_input_cable_clamp_arm_thickness
+      cable_clamp_clearance: !Ref cooleon_pair_housing_input_cable_clamp_clearance
+      cable_clamp_screw_size: !Ref cooleon_pair_housing_input_cable_clamp_screw_size
+      cable_clamp_screw_length: !Ref cooleon_pair_housing_input_cable_clamp_screw_length
+
   - name: cooleon_pair_housing_assembly
 
     resource_file: cooleon_pair_housing_assembly.yaml
     depends_on:
       - cooleon_psu_1
       - cooleon_psu_2
+      - cooleon_input_cable_clamp_assembly
     inject_parts:
       cooleon_psu_1: cooleon_psu_1
       cooleon_psu_2: cooleon_psu_2
+      input_cable_clamp: cooleon_input_cable_clamp_assembly
     parameters:
       cooleon_pair_housing_clearance: !Ref cooleon_pair_housing_clearance
       cooleon_pair_housing_wall_thickness: !Ref cooleon_pair_housing_wall_thickness
@@ -1723,14 +1739,6 @@ assemblies:
       cooleon_pair_housing_self_threading_core_radius_adjustment: !Ref cooleon_pair_housing_self_threading_core_radius_adjustment
       cooleon_pair_housing_self_threading_lead_in: !Ref cooleon_pair_housing_self_threading_lead_in
       cooleon_pair_housing_input_cable_hole_diameter: !Ref cooleon_pair_housing_input_cable_hole_diameter
-      cooleon_pair_housing_input_cable_clamp_hole_diameter: !Ref cooleon_pair_housing_input_cable_clamp_hole_diameter
-      cooleon_pair_housing_input_cable_clamp_slit_width: !Ref cooleon_pair_housing_input_cable_clamp_slit_width
-      cooleon_pair_housing_input_cable_clamp_arm_width: !Ref cooleon_pair_housing_input_cable_clamp_arm_width
-      cooleon_pair_housing_input_cable_clamp_arm_depth: !Ref cooleon_pair_housing_input_cable_clamp_arm_depth
-      cooleon_pair_housing_input_cable_clamp_arm_thickness: !Ref cooleon_pair_housing_input_cable_clamp_arm_thickness
-      cooleon_pair_housing_input_cable_clamp_clearance: !Ref cooleon_pair_housing_input_cable_clamp_clearance
-      cooleon_pair_housing_input_cable_clamp_screw_size: !Ref cooleon_pair_housing_input_cable_clamp_screw_size
-      cooleon_pair_housing_input_cable_clamp_screw_length: !Ref cooleon_pair_housing_input_cable_clamp_screw_length
       cooleon_pair_housing_output_cable_hole_diameter: !Ref cooleon_pair_housing_output_cable_hole_diameter
       cooleon_pair_housing_psu_mount_thread_inset_extra_radius: !Ref cooleon_pair_housing_psu_mount_thread_inset_extra_radius
 

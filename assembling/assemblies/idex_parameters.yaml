@@ -516,11 +516,11 @@ globals:
   cooleon_pair_housing_self_threading_core_radius_adjustment: !Ref nitehawk_usb_dual_housing_self_threading_core_radius_adjustment
   cooleon_pair_housing_self_threading_lead_in: !Ref nitehawk_usb_dual_housing_self_threading_lead_in
   cooleon_pair_housing_input_cable_hole_diameter: 9
-  cooleon_pair_housing_input_cable_clamp_hole_diameter: 9
+  cooleon_pair_housing_input_cable_clamp_hole_diameter: 5
   cooleon_pair_housing_input_cable_clamp_slit_width: 2.5
-  cooleon_pair_housing_input_cable_clamp_arm_width: 6.5
+  cooleon_pair_housing_input_cable_clamp_arm_width: 3.5
   cooleon_pair_housing_input_cable_clamp_arm_depth: 22
-  cooleon_pair_housing_input_cable_clamp_arm_thickness: 13
+  cooleon_pair_housing_input_cable_clamp_arm_thickness: 7
   cooleon_pair_housing_input_cable_clamp_clearance: 1.2
   cooleon_pair_housing_input_cable_clamp_screw_size: "M3"
   cooleon_pair_housing_input_cable_clamp_screw_length: 10

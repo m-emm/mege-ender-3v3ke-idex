@@ -1,0 +1,57 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Generic reusable cable clamp
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - right
+        - top
+      width: 1024
+      height: 1024
+    parts:
+      - source: self
+        artifact: leader
+        name: cable_clamp
+        color: [0.82, 0.68, 0.32]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - tightening_screw
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
+
+  Production:
+    parts:
+      - source: self
+        artifact: leader
+        name: cable_clamp
+
+Parameters:
+  cable_clamp_hole_diameter:
+    Type: Float
+  cable_clamp_slit_width:
+    Type: Float
+  cable_clamp_arm_width:
+    Type: Float
+  cable_clamp_arm_depth:
+    Type: Float
+  cable_clamp_arm_thickness:
+    Type: Float
+  cable_clamp_clearance:
+    Type: Float
+  cable_clamp_screw_size:
+    Type: String
+  cable_clamp_screw_length:
+    Type: Float
+
+Parts:
+  CableClampAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.cable_clamp_assembly.create_cable_clamp_assembly

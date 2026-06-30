@@ -126,22 +126,6 @@ Parameters:
     Type: Boolean
   cooleon_pair_housing_input_cable_hole_diameter:
     Type: Float
-  cooleon_pair_housing_input_cable_clamp_hole_diameter:
-    Type: Float
-  cooleon_pair_housing_input_cable_clamp_slit_width:
-    Type: Float
-  cooleon_pair_housing_input_cable_clamp_arm_width:
-    Type: Float
-  cooleon_pair_housing_input_cable_clamp_arm_depth:
-    Type: Float
-  cooleon_pair_housing_input_cable_clamp_arm_thickness:
-    Type: Float
-  cooleon_pair_housing_input_cable_clamp_clearance:
-    Type: Float
-  cooleon_pair_housing_input_cable_clamp_screw_size:
-    Type: String
-  cooleon_pair_housing_input_cable_clamp_screw_length:
-    Type: Float
   cooleon_pair_housing_output_cable_hole_diameter:
     Type: Float
   cooleon_pair_housing_psu_mount_thread_inset_extra_radius:
