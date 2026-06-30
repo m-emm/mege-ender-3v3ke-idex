@@ -14,6 +14,7 @@ def create_cooleon_pair_housing_assembly(
     cooleon_pair_housing_clearance,
     cooleon_pair_housing_wall_thickness,
     cooleon_pair_housing_input_terminal_extra_space,
+    cooleon_pair_housing_output_terminal_extra_space,
     cooleon_pair_housing_mount_rib_length,
     cooleon_pair_housing_mount_rib_thickness,
     cooleon_pair_housing_mount_rib_end_inset,
@@ -54,7 +55,11 @@ def create_cooleon_pair_housing_assembly(
     psu_1_min, psu_1_max = get_bounding_box(cooleon_psu_1.leader)
     psu_2_min, psu_2_max = get_bounding_box(cooleon_psu_2.leader)
 
-    inner_min_x = psu_pair_min[0] - cooleon_pair_housing_clearance
+    inner_min_x = (
+        psu_pair_min[0]
+        - cooleon_pair_housing_clearance
+        - cooleon_pair_housing_output_terminal_extra_space
+    )
     inner_min_y = psu_pair_min[1] - cooleon_pair_housing_clearance
     inner_min_z = psu_pair_min[2] - cooleon_pair_housing_clearance
     inner_max_x = (
@@ -323,39 +328,45 @@ def create_cooleon_pair_housing_assembly(
         cooleon_pair_housing_input_cable_clamp_hole_diameter
         + 2 * cooleon_pair_housing_input_cable_clamp_arm_width
     )
+    input_cable_center_y = sum(center[1] for center in input_terminal_centers) / len(
+        input_terminal_centers
+    )
+    input_cable_center_z = (inner_min_z + inner_max_z) / 2
     input_cable_clamp_y_target = create_box(
         1,
-        cooleon_pair_housing_input_cable_clamp_arm_depth,
+        input_cable_clamp_width,
         1,
         origin=(
             inner_max_x,
-            sum(center[1] for center in input_terminal_centers)
-            / len(input_terminal_centers)
-            - cooleon_pair_housing_input_cable_clamp_arm_depth / 2,
+            input_cable_center_y - input_cable_clamp_width / 2,
             inner_min_z,
         ),
     )
     input_cable_clamp_x_target = create_box(
-        input_cable_clamp_width,
+        cooleon_pair_housing_input_cable_clamp_arm_depth,
         1,
         1,
         origin=(
             inner_max_x
-            - cooleon_pair_housing_input_cable_clamp_clearance
-            - input_cable_clamp_width,
+            - cooleon_pair_housing_input_cable_clamp_arm_depth,
             inner_min_y,
             inner_min_z,
         ),
     )
-    input_cable_clamp_floor_clearance = create_box(
+    input_cable_clamp_z_target = create_box(
         1,
         1,
-        cooleon_pair_housing_input_cable_clamp_clearance,
-        origin=(inner_max_x, inner_min_y, inner_min_z),
+        cooleon_pair_housing_input_cable_clamp_arm_thickness,
+        origin=(
+            inner_max_x,
+            inner_min_y,
+            input_cable_center_z
+            - cooleon_pair_housing_input_cable_clamp_arm_thickness / 2,
+        ),
     )
     input_cable_clamp = create_box(
-        input_cable_clamp_width,
         cooleon_pair_housing_input_cable_clamp_arm_depth,
+        input_cable_clamp_width,
         cooleon_pair_housing_input_cable_clamp_arm_thickness,
     )
     input_cable_clamp = align(
@@ -372,21 +383,23 @@ def create_cooleon_pair_housing_assembly(
     )
     input_cable_clamp = align(
         input_cable_clamp,
-        input_cable_clamp_floor_clearance,
-        Alignment.STACK_TOP,
+        input_cable_clamp_z_target,
+        Alignment.CENTER,
+        axes=[2],
     )
 
     input_cable_hole = create_cylinder(
         cooleon_pair_housing_input_cable_hole_diameter / 2,
         wall_thickness + 2,
+        direction=(1, 0, 0),
     )
     input_cable_hole = align(
         input_cable_hole,
         input_cable_clamp,
         Alignment.CENTER,
-        axes=[0, 1],
+        axes=[1, 2],
     )
-    input_cable_hole = align(input_cable_hole, housing_box, Alignment.BOTTOM)
+    input_cable_hole = align(input_cable_hole, housing_box, Alignment.RIGHT)
     housing_box = housing_box.cut(input_cable_hole)
 
     output_cable_holes = PartCollector()
@@ -418,25 +431,26 @@ def create_cooleon_pair_housing_assembly(
 
     input_cable_clamp_cable_hole_cutter = create_cylinder(
         cooleon_pair_housing_input_cable_clamp_hole_diameter / 2,
-        cooleon_pair_housing_input_cable_clamp_arm_thickness + 2,
+        cooleon_pair_housing_input_cable_clamp_arm_depth + 2,
+        direction=(1, 0, 0),
     )
     input_cable_clamp_cable_hole_cutter = align(
         input_cable_clamp_cable_hole_cutter,
         input_cable_hole,
         Alignment.CENTER,
-        axes=[0, 1],
+        axes=[1, 2],
     )
     input_cable_clamp_cable_hole_cutter = align(
         input_cable_clamp_cable_hole_cutter,
         input_cable_clamp,
         Alignment.CENTER,
-        axes=[2],
+        axes=[0],
     )
     input_cable_clamp = input_cable_clamp.cut(input_cable_clamp_cable_hole_cutter)
 
     input_cable_clamp_slit_cutter = create_filleted_box(
-        cooleon_pair_housing_input_cable_clamp_slit_width,
         cooleon_pair_housing_input_cable_clamp_arm_depth + 2,
+        cooleon_pair_housing_input_cable_clamp_slit_width,
         cooleon_pair_housing_input_cable_clamp_arm_thickness + 2,
         fillet_radius=cooleon_pair_housing_input_cable_clamp_slit_width / 3,
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
@@ -449,7 +463,7 @@ def create_cooleon_pair_housing_assembly(
     input_cable_clamp_slit_cutter = align(
         input_cable_clamp_slit_cutter,
         input_cable_clamp,
-        Alignment.STACK_BACK,
+        Alignment.STACK_RIGHT,
         stack_gap=(
             -cooleon_pair_housing_input_cable_clamp_arm_depth
             + cooleon_pair_housing_input_cable_clamp_hole_diameter / 2
@@ -458,8 +472,8 @@ def create_cooleon_pair_housing_assembly(
     input_cable_clamp = input_cable_clamp.cut(input_cable_clamp_slit_cutter)
 
     input_cable_clamp_screw_reference = create_box(
-        input_cable_clamp_width,
         2 * cooleon_pair_housing_input_cable_clamp_hole_diameter,
+        cooleon_pair_housing_input_cable_clamp_arm_width,
         cooleon_pair_housing_input_cable_clamp_arm_thickness,
     )
     input_cable_clamp_screw_reference = align(
@@ -470,13 +484,18 @@ def create_cooleon_pair_housing_assembly(
     input_cable_clamp_screw_reference = align(
         input_cable_clamp_screw_reference,
         input_cable_clamp,
+        Alignment.RIGHT,
+    )
+    input_cable_clamp_screw_reference = align(
+        input_cable_clamp_screw_reference,
+        input_cable_clamp,
         Alignment.BACK,
     )
     input_cable_clamp_screw_assembly = create_screw_mount_assembly(
         input_cable_clamp_screw_reference,
         cooleon_pair_housing_input_cable_clamp_screw_size,
         cooleon_pair_housing_input_cable_clamp_screw_length,
-        Alignment.RIGHT,
+        Alignment.TOP,
         flush_with_top=True,
     )
     input_cable_clamp = input_cable_clamp_screw_assembly.use_as_cutter_on(
@@ -485,6 +504,29 @@ def create_cooleon_pair_housing_assembly(
     input_cable_clamp_screw = (
         input_cable_clamp_screw_assembly.get_named_non_production_part("screw")
     )
+    input_cable_clamp_min, input_cable_clamp_max = get_bounding_box(
+        input_cable_clamp
+    )
+    input_cable_clamp_clearance_pocket = create_box(
+        input_cable_clamp_max[0]
+        - input_cable_clamp_min[0]
+        + cooleon_pair_housing_input_cable_clamp_clearance,
+        input_cable_clamp_max[1]
+        - input_cable_clamp_min[1]
+        + 2 * cooleon_pair_housing_input_cable_clamp_clearance,
+        input_cable_clamp_max[2]
+        - input_cable_clamp_min[2]
+        + 2 * cooleon_pair_housing_input_cable_clamp_clearance,
+        origin=(
+            input_cable_clamp_min[0]
+            - cooleon_pair_housing_input_cable_clamp_clearance,
+            input_cable_clamp_min[1]
+            - cooleon_pair_housing_input_cable_clamp_clearance,
+            input_cable_clamp_min[2]
+            - cooleon_pair_housing_input_cable_clamp_clearance,
+        ),
+    )
+    housing_box = housing_box.cut(input_cable_clamp_clearance_pocket)
 
     lid_length = outer_max_x - outer_min_x + 2 * cooleon_pair_housing_lid_outer_overhang
     lid_width = outer_max_y - outer_min_y + 2 * cooleon_pair_housing_lid_outer_overhang
@@ -623,6 +665,10 @@ def create_cooleon_pair_housing_assembly(
     housing.add_named_cutter(inner_space_cutter, "inner_space")
     housing.add_named_cutter(vent_cutters, "side_vent_diamond_cutters")
     housing.add_named_cutter(input_cable_hole, "input_cable_hole")
+    housing.add_named_cutter(
+        input_cable_clamp_clearance_pocket,
+        "input_cable_clamp_clearance_pocket",
+    )
     housing.add_named_cutter(output_cable_holes, "output_cable_holes")
     housing.add_named_cutter(
         psu_mount_thread_insert_cutters,

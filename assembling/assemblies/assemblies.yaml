@@ -1701,6 +1701,7 @@ assemblies:
       cooleon_pair_housing_clearance: !Ref cooleon_pair_housing_clearance
       cooleon_pair_housing_wall_thickness: !Ref cooleon_pair_housing_wall_thickness
       cooleon_pair_housing_input_terminal_extra_space: !Ref cooleon_pair_housing_input_terminal_extra_space
+      cooleon_pair_housing_output_terminal_extra_space: !Ref cooleon_pair_housing_output_terminal_extra_space
       cooleon_pair_housing_mount_rib_length: !Ref cooleon_pair_housing_mount_rib_length
       cooleon_pair_housing_mount_rib_thickness: !Ref cooleon_pair_housing_mount_rib_thickness
       cooleon_pair_housing_mount_rib_end_inset: !Ref cooleon_pair_housing_mount_rib_end_inset

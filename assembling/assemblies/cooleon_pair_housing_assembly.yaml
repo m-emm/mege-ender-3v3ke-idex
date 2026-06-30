@@ -82,6 +82,8 @@ Parameters:
     Type: Float
   cooleon_pair_housing_input_terminal_extra_space:
     Type: Float
+  cooleon_pair_housing_output_terminal_extra_space:
+    Type: Float
   cooleon_pair_housing_mount_rib_length:
     Type: Float
   cooleon_pair_housing_mount_rib_thickness:
