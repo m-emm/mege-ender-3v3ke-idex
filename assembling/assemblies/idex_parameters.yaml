@@ -360,7 +360,7 @@ globals:
   nitehawk_usb_dual_housing_board_boss_diameter: 6.5
   nitehawk_usb_dual_housing_board_screw_size: "M3"
   nitehawk_usb_dual_housing_board_screw_length: 8.0
-  nitehawk_usb_dual_housing_self_threading_core_radius_adjustment: -0.5
+  nitehawk_usb_dual_housing_self_threading_core_radius_adjustment: -0.35
   nitehawk_usb_dual_housing_self_threading_lead_in: true
   nitehawk_usb_dual_housing_component_clearance: 5.0
   nitehawk_usb_dual_housing_lid_thickness: 1.2
