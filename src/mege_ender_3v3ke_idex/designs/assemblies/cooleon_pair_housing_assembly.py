@@ -7,12 +7,46 @@ from mege_ender_3v3ke_idex.designs.trellis_plate import create_trellis_cutters
 from shellforgepy.simple import *
 
 
+def _create_open_top_hatch_frame(
+    hatch_target,
+    wall_reference,
+    *,
+    frame_band_width,
+    frame_depth,
+    frame_height,
+):
+    hatch_target_size = get_bounding_box_size(hatch_target)
+    frame = PartCollector()
+    for side in [Alignment.LEFT, Alignment.RIGHT]:
+        side_frame = create_box(
+            frame_band_width,
+            frame_depth,
+            frame_height,
+        )
+        side_frame = align(side_frame, hatch_target, side.edge_alignment)
+        side_frame = align(side_frame, hatch_target, Alignment.BOTTOM)
+        side_frame = align(side_frame, wall_reference, Alignment.CENTER, axes=[1])
+        frame = frame.fuse(side_frame)
+
+    bottom_frame = create_box(
+        hatch_target_size[0] + frame_band_width,
+        frame_depth,
+        frame_band_width,
+    )
+    bottom_frame = align(bottom_frame, hatch_target, Alignment.CENTER, axes=[0])
+    bottom_frame = align(bottom_frame, hatch_target, Alignment.EDGE_BOTTOM)
+    bottom_frame = align(bottom_frame, wall_reference, Alignment.CENTER, axes=[1])
+    frame = frame.fuse(bottom_frame)
+    return frame
+
+
 def create_cooleon_pair_housing_assembly(
     *,
     cooleon_psu_1,
     cooleon_psu_2,
     input_cable_clamp,
     cooleon_pair_housing_clearance,
+    cooleon_pair_housing_front_back_clearance,
     cooleon_pair_housing_wall_thickness,
     cooleon_pair_housing_input_terminal_extra_space,
     cooleon_pair_housing_output_terminal_extra_space,
@@ -28,6 +62,8 @@ def create_cooleon_pair_housing_assembly(
     cooleon_pair_housing_hatch_height,
     cooleon_pair_housing_hatch_end_inset,
     cooleon_pair_housing_hatch_frame_width,
+    cooleon_pair_housing_hatch_groove_wall_thickness,
+    cooleon_pair_housing_hatch_groove_clearance,
     cooleon_pair_housing_lid_thickness,
     cooleon_pair_housing_lid_body_clearance,
     cooleon_pair_housing_lid_outer_overhang,
@@ -78,7 +114,7 @@ def create_cooleon_pair_housing_assembly(
     inner_core = materialize_bounding_box(
         psu_pair_reference,
         x_enlargement=2 * cooleon_pair_housing_clearance,
-        y_enlargement=2 * cooleon_pair_housing_clearance,
+        y_enlargement=2 * cooleon_pair_housing_front_back_clearance,
         z_enlargement=2 * cooleon_pair_housing_clearance,
     )
     inner_core_size = get_bounding_box_size(inner_core)
@@ -458,11 +494,23 @@ def create_cooleon_pair_housing_assembly(
         vent_cutters = vent_cutters.fuse(side_vent_cutters)
     housing_box = housing_box.cut(vent_cutters)
 
+    lid_drop_depth = (
+        cooleon_pair_housing_lid_body_clearance + cooleon_pair_housing_lid_rim_depth
+    )
     hatch_followers = []
     hatch_opening_cutters = PartCollector()
     hatch_flat_frames = PartCollector()
+    hatch_groove_frames = PartCollector()
     hatch_specs = []
     hatch_wall_keep_depth = wall_thickness + 4
+    hatch_groove_frame_width = (
+        cooleon_pair_housing_hatch_frame_width
+        + 2 * cooleon_pair_housing_hatch_groove_wall_thickness
+        + 2 * cooleon_pair_housing_hatch_groove_clearance
+    )
+    hatch_groove_depth = (
+        wall_thickness + 2 * cooleon_pair_housing_hatch_groove_wall_thickness
+    )
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         lr_name = "left" if lr.sign < 0 else "right"
         hatch_end_spacer = create_box(
@@ -519,69 +567,67 @@ def create_cooleon_pair_housing_assembly(
             hatch_target = align(hatch_target, hatch_lower_band, Alignment.BOTTOM)
             hatch_target = align(hatch_target, housing_box, fb)
 
-            hatch_flat_frame = PartCollector()
             hatch_target_size = get_bounding_box_size(hatch_target)
-            for side in [Alignment.LEFT, Alignment.RIGHT]:
-                side_frame = create_box(
-                    cooleon_pair_housing_hatch_frame_width,
-                    wall_thickness,
-                    hatch_target_size[2],
-                )
-                side_frame = align(
-                    side_frame,
-                    hatch_target,
-                    side.edge_alignment,
-                )
-                side_frame = align(
-                    side_frame,
-                    hatch_target,
-                    Alignment.CENTER,
-                    axes=[2],
-                )
-                side_frame = align(side_frame, housing_box, fb)
-                hatch_flat_frame = hatch_flat_frame.fuse(side_frame)
-            bottom_frame = create_box(
-                hatch_target_size[0] + cooleon_pair_housing_hatch_frame_width,
-                wall_thickness,
-                cooleon_pair_housing_hatch_frame_width,
-            )
-            bottom_frame = align(
-                bottom_frame,
-                hatch_target,
-                Alignment.CENTER,
-                axes=[0],
-            )
-            bottom_frame = align(
-                bottom_frame,
-                hatch_target,
-                Alignment.EDGE_BOTTOM,
-            )
-            bottom_frame = align(bottom_frame, housing_box, fb)
-            hatch_flat_frame = hatch_flat_frame.fuse(bottom_frame)
-            top_frame = create_box(
+            hatch_wall_reference = create_box(
                 hatch_target_size[0],
                 wall_thickness,
-                cooleon_pair_housing_hatch_frame_width,
+                hatch_target_size[2],
             )
-            top_frame = align(
-                top_frame,
+            hatch_wall_reference = align(
+                hatch_wall_reference,
                 hatch_target,
                 Alignment.CENTER,
-                axes=[0],
+                axes=[0, 2],
             )
-            top_frame = align(top_frame, hatch_target, Alignment.TOP)
-            top_frame = align(top_frame, housing_box, fb)
-            hatch_flat_frame = hatch_flat_frame.fuse(top_frame)
+            hatch_wall_reference = align(hatch_wall_reference, housing_box, fb)
+            groove_cutter = materialize_bounding_box(
+                hatch_target,
+                x_enlargement=2 * cooleon_pair_housing_hatch_groove_clearance,
+                y_enlargement=2 * cooleon_pair_housing_hatch_groove_clearance,
+                z_enlargement=2 * cooleon_pair_housing_hatch_groove_clearance,
+            )
+            hatch_flat_frame = _create_open_top_hatch_frame(
+                hatch_target,
+                hatch_wall_reference,
+                frame_band_width=cooleon_pair_housing_hatch_frame_width,
+                frame_depth=wall_thickness,
+                frame_height=hatch_target_size[2],
+            )
+            hatch_groove_frame_height = (
+                hatch_target_size[2]
+                - lid_drop_depth
+                - cooleon_pair_housing_split_join_flange_lid_clearance
+            )
+            hatch_groove_frame = _create_open_top_hatch_frame(
+                hatch_target,
+                hatch_wall_reference,
+                frame_band_width=hatch_groove_frame_width,
+                frame_depth=hatch_groove_depth,
+                frame_height=hatch_groove_frame_height,
+            )
+            hatch_groove_frame = align(
+                hatch_groove_frame,
+                hatch_flat_frame,
+                Alignment.CENTER,
+                axes=[0, 1],
+            )
+            hatch_groove_frame = align(
+                hatch_groove_frame,
+                hatch_flat_frame,
+                Alignment.BOTTOM,
+            )
             hatch_flat_frames = hatch_flat_frames.fuse(hatch_flat_frame)
+            hatch_groove_frames = hatch_groove_frames.fuse(hatch_groove_frame)
             hatch_specs.append(
                 (
                     f"cooleon_pair_housing_{fb_name}_{lr_name}_hatch",
                     hatch_target,
+                    groove_cutter,
                 )
             )
 
     framed_housing_box = housing_box.fuse(hatch_flat_frames)
-    for hatch_name, hatch_target in hatch_specs:
+    for hatch_name, hatch_target, hatch_opening_cutter in hatch_specs:
         hatch_target_size = get_bounding_box_size(hatch_target)
         hatch_keep_volume = create_box_hole_cutter(
             hatch_target_size[0],
@@ -595,7 +641,6 @@ def create_cooleon_pair_housing_assembly(
         )
         hatch = hatch_keep_volume.use_as_cutter_on(framed_housing_box)
 
-        hatch_opening_cutter = materialize_bounding_box(hatch_target)
         hatch_opening_cutters = hatch_opening_cutters.fuse(hatch_opening_cutter)
 
         hatch_followers.append(
@@ -662,6 +707,8 @@ def create_cooleon_pair_housing_assembly(
         output_cable_holes = output_cable_holes.fuse(output_cable_hole)
     housing_box = housing_box.cut(output_cable_holes)
 
+    plain_lid_housing_reference = housing_box
+
     lid_length = get_bounding_box_size(lid_base_reference)[0]
     lid_width = get_bounding_box_size(lid_base_reference)[1]
 
@@ -677,9 +724,6 @@ def create_cooleon_pair_housing_assembly(
     )
     lid_base = align(lid_base, lid_base_reference, Alignment.CENTER)
 
-    lid_drop_depth = (
-        cooleon_pair_housing_lid_body_clearance + cooleon_pair_housing_lid_rim_depth
-    )
     lid_rim_outer_length = (
         inner_reference_size[0] - 2 * cooleon_pair_housing_lid_rim_clearance
     )
@@ -718,11 +762,11 @@ def create_cooleon_pair_housing_assembly(
     lid_rim = lid_rim.cut(lid_rim_inner_cutter)
 
     lid_outer_lip_inner_length = (
-        get_bounding_box_size(housing_box)[0]
+        get_bounding_box_size(plain_lid_housing_reference)[0]
         + 2 * cooleon_pair_housing_lid_rim_clearance
     )
     lid_outer_lip_inner_width = (
-        get_bounding_box_size(housing_box)[1]
+        get_bounding_box_size(plain_lid_housing_reference)[1]
         + 2 * cooleon_pair_housing_lid_rim_clearance
     )
     lid_outer_lip_outer_length = lid_outer_lip_inner_length + 2 * (
@@ -738,7 +782,12 @@ def create_cooleon_pair_housing_assembly(
         fillet_radius=lid_ring_fillet,
         no_fillets_at=[Alignment.TOP, Alignment.BOTTOM],
     )
-    lid_outer_lip = align(lid_outer_lip, housing_box, Alignment.CENTER, axes=[0, 1])
+    lid_outer_lip = align(
+        lid_outer_lip,
+        plain_lid_housing_reference,
+        Alignment.CENTER,
+        axes=[0, 1],
+    )
     lid_outer_lip = align(lid_outer_lip, lid_base_reference, Alignment.STACK_BOTTOM)
     lid_outer_lip_inner_cutter = create_box(
         lid_outer_lip_inner_length,
@@ -764,6 +813,9 @@ def create_cooleon_pair_housing_assembly(
 
     lid = lid_base.fuse(lid_rim).fuse(lid_outer_lip)
     lid = lid.cut(lid_clearance_holes)
+
+    housing_box = housing_box.fuse(hatch_groove_frames)
+    housing_box = housing_box.cut(hatch_opening_cutters)
 
     split_cut_point = get_bounding_box_center(housing_box)
     split_join_flange_height = (

@@ -195,7 +195,7 @@ L 975.348 113.608
     <path d="M 898.128 34.408
 L 858.528 34.408
 L 818.928 34.408
-" clip-path="url(#idex_clip_0)" style="fill: none; stroke: #ff0000; stroke-width: 2; stroke-linecap: round"/>
+" clip-path="url(#idex_clip_0)" style="fill: none; stroke: #8b4513; stroke-width: 2; stroke-linecap: round"/>
    </g>
    <g id="line2d_22">
     <path d="M 898.128 113.608
@@ -1717,11 +1717,11 @@ C 816.270938 32.864848 815.958 33.620347 815.958 34.408
 C 815.958 35.195653 816.270938 35.951152 816.827893 36.508107
 C 817.384848 37.065062 818.140347 37.378 818.928 37.378
 z
-" clip-path="url(#idex_clip_0)" style="fill: #ff0000; stroke: #ff0000; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#idex_clip_0)" style="fill: #8b4513; stroke: #8b4513; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="text_23">
     <!-- +24V -->
-    <g style="fill: #ff0000" transform="translate(784.052688 37.167375) scale(0.1 -0.1)">
+    <g style="fill: #8b4513" transform="translate(784.052688 37.167375) scale(0.1 -0.1)">
      <defs>
       <path id="DejaVuSans-56" d="M 1831 0
 L 50 4666

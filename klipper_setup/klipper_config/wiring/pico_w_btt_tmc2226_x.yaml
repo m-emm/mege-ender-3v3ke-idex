@@ -12,6 +12,7 @@ metadata:
 
 color_map:
   power: "#ff0000" # red: VCC/5V
+  hazard_power: "#8b4513" # brown: 24V motor supply
   lv_power: "#9ca3af" # white wire shown as gray for visibility (3.3V)
   ground: "#000000" # black: GND
   clock: "#0057d8" # blue: clock-like signals
@@ -373,10 +374,10 @@ wires:
 
   - from: PWR_V24
     to: TMC1_J2_VM_1
-    type: power
+    type: hazard_power
   - from: PWR_V24
     to: TMC2_J2_VM_1
-    type: power
+    type: hazard_power
   - from: PWR_GND
     to: TMC1_J2_GND_VM_2
     type: ground

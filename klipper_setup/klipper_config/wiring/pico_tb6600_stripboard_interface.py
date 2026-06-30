@@ -13,6 +13,7 @@ SCHEMATIC_ARTIFACT_STEM = "pico_tb6600_stripboard_interface"
 
 IDEX_KIND_COLOR_MAP = {
     "power": "#ff0000",
+    "hazard_power": "#8b4513",
     "lv_power": "#9ca3af",
     "ground": "#000000",
     "clock": "#0057d8",
@@ -60,7 +61,7 @@ REFDES = {
 def create_tb6600_nets():
     net_kinds = {
         "v5": "power",
-        "v24": "power",
+        "v24": "hazard_power",
         "gnd": "ground",
         "step_pul_minus": "clock",
         "step_base": "clock",

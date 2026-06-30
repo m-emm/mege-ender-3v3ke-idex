@@ -1715,6 +1715,7 @@ assemblies:
       input_cable_clamp: cooleon_input_cable_clamp_assembly
     parameters:
       cooleon_pair_housing_clearance: !Ref cooleon_pair_housing_clearance
+      cooleon_pair_housing_front_back_clearance: !Ref cooleon_pair_housing_front_back_clearance
       cooleon_pair_housing_wall_thickness: !Ref cooleon_pair_housing_wall_thickness
       cooleon_pair_housing_input_terminal_extra_space: !Ref cooleon_pair_housing_input_terminal_extra_space
       cooleon_pair_housing_output_terminal_extra_space: !Ref cooleon_pair_housing_output_terminal_extra_space
@@ -1730,6 +1731,8 @@ assemblies:
       cooleon_pair_housing_hatch_height: !Ref cooleon_pair_housing_hatch_height
       cooleon_pair_housing_hatch_end_inset: !Ref cooleon_pair_housing_hatch_end_inset
       cooleon_pair_housing_hatch_frame_width: !Ref cooleon_pair_housing_hatch_frame_width
+      cooleon_pair_housing_hatch_groove_wall_thickness: !Ref cooleon_pair_housing_hatch_groove_wall_thickness
+      cooleon_pair_housing_hatch_groove_clearance: !Ref cooleon_pair_housing_hatch_groove_clearance
       cooleon_pair_housing_lid_thickness: !Ref cooleon_pair_housing_lid_thickness
       cooleon_pair_housing_lid_body_clearance: !Ref cooleon_pair_housing_lid_body_clearance
       cooleon_pair_housing_lid_outer_overhang: !Ref cooleon_pair_housing_lid_outer_overhang
