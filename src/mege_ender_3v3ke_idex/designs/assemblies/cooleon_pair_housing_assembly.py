@@ -254,6 +254,11 @@ def create_cooleon_pair_housing_assembly(
         mount_screw_items[: len(mount_screw_items) // 2],
         mount_screw_items[len(mount_screw_items) // 2 :],
     ]
+
+    separator_wall_enhancer_cross_thickness = 0.15
+    separator_wall_enhancer_cross_clearance = 1
+    separator_wall_list = []
+
     for mount_screw_group in mount_screw_groups:
         mount_screw_reference = mount_screw_group[0][1].fuse(mount_screw_group[1][1])
         separator_wall = create_box(
@@ -261,6 +266,41 @@ def create_cooleon_pair_housing_assembly(
             cooleon_pair_housing_mount_rib_thickness,
             rib_height,
         )
+
+        enhancer_crosses = PartCollector()
+
+        for enhancer_lr in [Alignment.LEFT, Alignment.RIGHT]:
+
+            enhancer_cross_a = create_box(
+                cooleon_pair_housing_mount_rib_thickness
+                - 2 * separator_wall_enhancer_cross_clearance,
+                separator_wall_enhancer_cross_thickness,
+                rib_height * 2,
+            )
+            enhancer_cross_b = rotate(90)(enhancer_cross_a)
+            enhancer_cross_b = align(
+                enhancer_cross_b, enhancer_cross_a, Alignment.CENTER
+            )
+
+            enhancer_cross = enhancer_cross_a.fuse(enhancer_cross_b)
+
+            enhancer_cross = align(enhancer_cross, separator_wall, Alignment.CENTER)
+            enhancer_cross = align(enhancer_cross, separator_wall, enhancer_lr)
+            enhancer_cross = align(enhancer_cross, separator_wall, Alignment.TOP)
+
+            enhancer_cross = translate(
+                -enhancer_lr.sign * separator_wall_enhancer_cross_clearance,
+                0,
+                -rib_height / 2,
+            )(enhancer_cross)
+
+            enhancer_crosses = enhancer_crosses.fuse(enhancer_cross)
+
+        separator_wall = LeaderFollowersCuttersPart(separator_wall)
+        separator_wall.add_named_cutter(enhancer_crosses, "enhancer_cross_cutter")
+
+        separator_wall = separator_wall.cut(enhancer_crosses)
+
         separator_wall = align(
             separator_wall,
             mount_screw_reference,
@@ -274,9 +314,12 @@ def create_cooleon_pair_housing_assembly(
             axes=[1],
         )
         separator_wall = align(separator_wall, inner_reference, Alignment.BOTTOM)
-        separator_wall_targets.append((separator_wall, mount_screw_group))
-        separator_walls = separator_walls.fuse(separator_wall)
+        separator_wall_targets.append((separator_wall.leader, mount_screw_group))
+        separator_walls = separator_walls.fuse(separator_wall.leader)
+        separator_wall_list.append(separator_wall)
     housing_box = housing_box.fuse(separator_walls)
+    for separator_wall in separator_wall_list:
+        housing_box = separator_wall.use_as_cutter_on(housing_box)
 
     psu_mount_thread_insert_cutters = PartCollector()
     psu_mount_thread_insets = PartCollector()
