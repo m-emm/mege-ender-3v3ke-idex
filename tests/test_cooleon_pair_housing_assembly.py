@@ -181,3 +181,4 @@ def test_cooleon_pair_housing_generator_fuses_hatches_into_lids():
     }
     assert HATCH_NAMES.isdisjoint(housing.follower_indices_by_name)
     assert "maintenance_hatch_openings" in housing.cutter_indices_by_name
+    assert "top_lid_vent_diamond_cutters" in housing.cutter_indices_by_name

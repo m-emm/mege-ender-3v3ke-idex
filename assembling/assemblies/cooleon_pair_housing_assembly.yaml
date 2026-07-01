@@ -57,12 +57,22 @@ Builder:
       - source: self
         artifact: non_production_parts
         names:
-          - lid_mount_screws
           - psu_mount_thread_insets
           - input_cable_clamp_screw
           - split_join_hardware
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        names:
+          - lid_mount_screws
           - lid_split_join_screws
         name_template: "{name}"
+        animation:
+          cooleon_pair_housing_access_open:
+            - 0
+            - 0
+            - $expr:
+                $sub: "2 * ${cooleon_pair_housing_hatch_height}"
       - source: injected
         assembly: cooleon_psu_1
         artifact: all

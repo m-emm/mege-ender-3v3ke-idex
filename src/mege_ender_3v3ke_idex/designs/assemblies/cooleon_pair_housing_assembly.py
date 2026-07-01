@@ -907,6 +907,40 @@ def create_cooleon_pair_housing_assembly(
         cut_thickness=cooleon_pair_housing_lid_split_gap,
     )
 
+    top_lid_vent_cutters = PartCollector()
+    lid_vent_y_border_width = (
+        cooleon_pair_housing_lid_screw_inset + boss_radius + vent_band_width
+    )
+    trellised_lids = []
+    for lid_half in [cooleon_pair_housing_lid_right, cooleon_pair_housing_lid_left]:
+        lid_half_size = get_bounding_box_size(lid_half)
+        lid_half_vent_cutters = create_trellis_cutters(
+            length=lid_half_size[0],
+            width=lid_half_size[1],
+            thickness=cooleon_pair_housing_lid_thickness,
+            x_border_width=cooleon_pair_housing_vent_end_inset,
+            y_border_width=lid_vent_y_border_width,
+            band_width=vent_band_width,
+            band_pitch=cooleon_pair_housing_vent_pitch,
+            cutter_depth=cooleon_pair_housing_lid_thickness,
+        )
+        lid_half_vent_cutters = align(
+            lid_half_vent_cutters,
+            lid_half,
+            Alignment.CENTER,
+            axes=[0, 1],
+        )
+        lid_half_vent_cutters = align(
+            lid_half_vent_cutters,
+            lid_base_reference,
+            Alignment.CENTER,
+            axes=[2],
+        )
+        top_lid_vent_cutters = top_lid_vent_cutters.fuse(lid_half_vent_cutters)
+        trellised_lids.append(lid_half.cut(lid_half_vent_cutters))
+
+    cooleon_pair_housing_lid_right, cooleon_pair_housing_lid_left = trellised_lids
+
     lid_split_bridge_length = (
         cooleon_pair_housing_lid_split_bridge_anchor_length
         + cooleon_pair_housing_lid_split_bridge_overlap_length
@@ -1095,6 +1129,7 @@ def create_cooleon_pair_housing_assembly(
     )
     housing.add_named_cutter(inner_space_cutter, "inner_space")
     housing.add_named_cutter(vent_cutters, "side_vent_diamond_cutters")
+    housing.add_named_cutter(top_lid_vent_cutters, "top_lid_vent_diamond_cutters")
     housing.add_named_cutter(hatch_opening_cutters, "maintenance_hatch_openings")
     housing.add_named_cutter(input_cable_hole, "input_cable_hole")
     housing.add_named_cutter(
