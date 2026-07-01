@@ -9,9 +9,10 @@
 
 ## Mechanical Design tasks
 
+- y axis energy chain consolidation / improvement
+- y axis stepper driver high-power
 - heatbed psu housing
 - cable management around the printer
-- y axis energy chain consolidation / improvement
 - holders for filament sensors
 - covers for bottoms of mcus
 - filament guidance
