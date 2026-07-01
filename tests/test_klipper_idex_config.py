@@ -144,6 +144,18 @@ def test_printer_cfg_includes_generated_fingerprint_macro():
     assert f'variable_source_sha256: "{fingerprint}"' in fingerprint_section
 
 
+def test_printer_motion_limits_match_proven_idex_axes():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    printer = _section(config_text, "printer")
+
+    assert _setting_float(printer, "max_velocity") == pytest.approx(500.0)
+    assert _setting_float(printer, "max_accel") == pytest.approx(8000.0)
+    assert _setting_float(printer, "max_z_velocity") == pytest.approx(30.0)
+    assert _setting_float(printer, "max_z_accel") == pytest.approx(300.0)
+    assert _setting_float(printer, "square_corner_velocity") == pytest.approx(10.0)
+    assert "[force_move]" not in config_text
+
+
 def test_config_fingerprint_changes_when_source_inputs_change(tmp_path):
     generator = _load_generator_module()
     calib = tmp_path / "calib.yaml"
@@ -240,9 +252,9 @@ def test_boosted_heatbed_config_uses_measured_60c_pid():
     assert _setting_float(heater_bed, "pwm_cycle_time") == pytest.approx(2.0)
     assert "sensor_pin: gpio26" in heater_bed
     assert "control: pid" in heater_bed
-    assert _setting_float(heater_bed, "pid_Kp") == pytest.approx(32.150)
-    assert _setting_float(heater_bed, "pid_Ki") == pytest.approx(0.940)
-    assert _setting_float(heater_bed, "pid_Kd") == pytest.approx(274.882)
+    assert _setting_float(heater_bed, "pid_Kp") == pytest.approx(31.396)
+    assert _setting_float(heater_bed, "pid_Ki") == pytest.approx(0.337)
+    assert _setting_float(heater_bed, "pid_Kd") == pytest.approx(731.124)
     assert "max_delta:" not in heater_bed
 
 
@@ -288,7 +300,7 @@ def test_bed_cooling_macro_moves_t0_to_center_and_waits_for_target():
     assert _macro_variable_float(bed_cooling, "target") == pytest.approx(40.0)
     assert _macro_variable_float(bed_cooling, "x_center") == pytest.approx(122.0)
     assert _macro_variable_float(bed_cooling, "y_center") == pytest.approx(145.0)
-    assert _macro_variable_float(bed_cooling, "z_height") == pytest.approx(10.0)
+    assert _macro_variable_float(bed_cooling, "z_height") == pytest.approx(5.0)
     assert _macro_variable_float(bed_cooling, "xy_move_speed") == pytest.approx(60.0)
     assert _macro_variable_float(bed_cooling, "z_move_speed") == pytest.approx(20.0)
     assert _macro_variable_float(bed_cooling, "fan_speed") == pytest.approx(1.0)

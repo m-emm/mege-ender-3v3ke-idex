@@ -939,6 +939,21 @@ process_data_presets:
         support_object_first_layer_gap: "2.5"
         xy_contour_compensation: "-0.3" # Calibrated for the high-speed PETG-CF 0.6 profile family.
         xy_hole_compensation: "0.4" # Calibrated for the high-speed PETG-CF 0.6 profile family.
+        z_hop: "0.45"
+        retract_lift_above: "0"
+        retract_lift_below: "0"
+        retract_lift_enforce: "All Surfaces"
+        wipe: "0"
+        travel_speed: "350"
+        travel_acceleration: "5000"
+        default_acceleration: "5000"
+        initial_layer_acceleration: "5000"
+        travel_jerk: "8"
+        default_jerk: "8"
+        initial_layer_jerk: "8"
+        top_surface_acceleration: "2650"
+        internal_solid_infill_acceleration: "4240"
+        sparse_infill_acceleration: "4240"
 
   petgcf_medium_strength_high_speed_06:
     generator: mege3devops_parametric
@@ -955,6 +970,21 @@ process_data_presets:
         support_object_first_layer_gap: "2.5"
         xy_contour_compensation: "-0.3" # This is a carefully calibrated value, measured at 2026-04-14 using  assembling/assemblies/calibration_assembly.yaml for the petgcf_medium_strength_high_speed_06 preset
         xy_hole_compensation: "0.4" # This is a carefully calibrated value, measured at 2026-04-14 using  assembling/assemblies/calibration_assembly.yaml for the petgcf_medium_strength_high_speed_06 preset
+        z_hop: "0.45"
+        retract_lift_above: "0"
+        retract_lift_below: "0"
+        retract_lift_enforce: "All Surfaces"
+        wipe: "0"
+        travel_speed: "350"
+        travel_acceleration: "5000"
+        default_acceleration: "5000"
+        initial_layer_acceleration: "5000"
+        travel_jerk: "8"
+        default_jerk: "8"
+        initial_layer_jerk: "8"
+        top_surface_acceleration: "2650"
+        internal_solid_infill_acceleration: "4240"
+        sparse_infill_acceleration: "4240"
 
   petgcf_max_strength_high_speed_06:
     generator: mege3devops_parametric
@@ -971,6 +1001,21 @@ process_data_presets:
         support_object_first_layer_gap: "2.5"
         xy_contour_compensation: "-0.3" # This is a carefully calibrated value, measured at 2026-04-14
         xy_hole_compensation: "0.4" # This is a carefully calibrated value, measured at 2026-04-14
+        z_hop: "0.45"
+        retract_lift_above: "0"
+        retract_lift_below: "0"
+        retract_lift_enforce: "All Surfaces"
+        wipe: "0"
+        travel_speed: "350"
+        travel_acceleration: "5000"
+        default_acceleration: "5000"
+        initial_layer_acceleration: "5000"
+        travel_jerk: "8"
+        default_jerk: "8"
+        initial_layer_jerk: "8"
+        top_surface_acceleration: "2650"
+        internal_solid_infill_acceleration: "4240"
+        sparse_infill_acceleration: "4240"
 
   petgcf_medium_strength_max_quality_06:
     generator: mege3devops_parametric
@@ -985,6 +1030,21 @@ process_data_presets:
       process_overrides:
         sparse_infill_pattern: "cubic"
         support_object_first_layer_gap: "2.5"
+        z_hop: "0.45"
+        retract_lift_above: "0"
+        retract_lift_below: "0"
+        retract_lift_enforce: "All Surfaces"
+        wipe: "0"
+        travel_speed: "350"
+        travel_acceleration: "5000"
+        default_acceleration: "5000"
+        initial_layer_acceleration: "5000"
+        travel_jerk: "8"
+        default_jerk: "8"
+        initial_layer_jerk: "8"
+        top_surface_acceleration: "2650"
+        internal_solid_infill_acceleration: "4240"
+        sparse_infill_acceleration: "4240"
 
   petgcf_medium_strength_medium_quality_06:
     generator: mege3devops_parametric
@@ -999,6 +1059,21 @@ process_data_presets:
       process_overrides:
         sparse_infill_pattern: "cubic"
         support_object_first_layer_gap: "2.5"
+        z_hop: "0.45"
+        retract_lift_above: "0"
+        retract_lift_below: "0"
+        retract_lift_enforce: "All Surfaces"
+        wipe: "0"
+        travel_speed: "350"
+        travel_acceleration: "5000"
+        default_acceleration: "5000"
+        initial_layer_acceleration: "5000"
+        travel_jerk: "8"
+        default_jerk: "8"
+        initial_layer_jerk: "8"
+        top_surface_acceleration: "2650"
+        internal_solid_infill_acceleration: "4240"
+        sparse_infill_acceleration: "4240"
 
   tpu_minimal_quality_minimal_strength_06:
     generator: mege3devops_parametric
