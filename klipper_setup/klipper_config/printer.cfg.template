@@ -35,6 +35,11 @@ max_accel: 2000
 max_z_velocity: 8
 max_z_accel: 30
 
+[force_move]
+# Temporary TB6600 Y bring-up aid. Remove after direction, distance, and homing
+# are verified on the live printer.
+enable_force_move: True
+
 # Custom thermistor calibration for the left Micro Swiss FlowTech toolhead.
 # Values retained from the same calibrated Micro Swiss hotend assembly.
 [thermistor microswiss_calibrated]
@@ -199,45 +204,27 @@ run_current: 1.2
 sense_resistor: 0.110
 stealthchop_threshold: 0
 
-# Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml,
-# Driver 1:
-# STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
+# Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml.
+# Live Y now uses the external TB6600-style driver stripboard interface:
+# STEP=GPIO0, DIR=GPIO1, EN=GPIO2, endstop=GPIO4.
+# TB6600 DIP switch must match this Klipper setting.
 [stepper_y]
-step_pin: gpio11
-dir_pin: !gpio10
-enable_pin: !gpio12
+step_pin: gpio0
+dir_pin: !gpio1
+enable_pin: gpio2
 microsteps: 16
 rotation_distance: 60
+step_pulse_duration: 0.000005
 endstop_pin: ^!gpio4
 position_endstop: ${t0_y_endstop}
 position_min: ${t0_y_endstop}
 position_max: 296.000
 homing_positive_dir: false
-homing_speed: 25
-second_homing_speed: 10
+homing_speed: 10
+second_homing_speed: 3
 homing_retract_dist: 5
 
-# BTT TMC2226 V1.0 uses the tmc2209 driver in Klipper.
-[tmc2209 stepper_y]
-uart_pin: gpio9
-uart_address: 0
-run_current: 1.4
-sense_resistor: 0.110
-stealthchop_threshold: 0
-
-# Draft only: planned external TB6600-style Y driver interface.
-# Keep this commented until the stripboard interface is built, ENA polarity is
-# bench-verified, and TMC1 is deliberately reserved/disconnected for Y.
-# To switch live, update [stepper_y] with these pins/settings and disable or
-# remove [tmc2209 stepper_y].
-#
-# [stepper_y] TB6600 draft overrides:
-# step_pin: gpio0
-# dir_pin: !gpio1
-# enable_pin: gpio2
-# microsteps: 8
-# rotation_distance: 60
-# step_pulse_duration: 0.000005
+# TMC1 is physically disconnected/reserved while Y is on the TB6600.
 
 # Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml,
 # Driver 2:
@@ -574,43 +561,77 @@ gcode:
     _IDEX_APPLY_PART_FAN TOOL=1
     M117 T1 right extruder
 
-[gcode_macro Y_TEST_TRAVEL_100]
-description: Run three 100mm Y travel cycles at 550mm/s and 4500mm/s^2, then re-home Y.
+[gcode_macro TEST_Y_TRAVEL]
+description: Alias for TEST_Y_TRAVEL_ACCEL_FOURK.
+gcode:
+    TEST_Y_TRAVEL_ACCEL_FOURK
+
+[gcode_macro TEST_Y_TRAVEL_ACCEL_FOURK]
+description: Run three 100mm Y travel cycles at 550mm/s and 4000mm/s^2, then re-home Y.
+gcode:
+    _TEST_Y_TRAVEL_RUN ACCEL=4000 LABEL=FOURK
+
+[gcode_macro TEST_Y_TRAVEL_ACCEL_FIVEK]
+description: Run three 100mm Y travel cycles at 550mm/s and 5000mm/s^2, then re-home Y.
+gcode:
+    _TEST_Y_TRAVEL_RUN ACCEL=5000 LABEL=FIVEK
+
+[gcode_macro TEST_Y_TRAVEL_ACCEL_SIXK]
+description: Run three 100mm Y travel cycles at 550mm/s and 6000mm/s^2, then re-home Y.
+gcode:
+    _TEST_Y_TRAVEL_RUN ACCEL=6000 LABEL=SIXK
+
+[gcode_macro TEST_Y_TRAVEL_ACCEL_SEVENK]
+description: Run three 100mm Y travel cycles at 550mm/s and 7000mm/s^2, then re-home Y.
+gcode:
+    _TEST_Y_TRAVEL_RUN ACCEL=7000 LABEL=SEVENK
+
+[gcode_macro TEST_Y_TRAVEL_ACCEL_EIGHTK]
+description: Run three 100mm Y travel cycles at 550mm/s and 8000mm/s^2, then re-home Y.
+gcode:
+    _TEST_Y_TRAVEL_RUN ACCEL=8000 LABEL=EIGHTK
+
+[gcode_macro _TEST_Y_TRAVEL_RUN]
 gcode:
     {% set distance = 100.0 %}
     {% set cycles = 3 %}
     {% set test_velocity = 550.0 %}
-    {% set test_accel = 4500.0 %}
+    {% set test_accel = params.ACCEL|float %}
+    {% set test_label = params.LABEL|default("CUSTOM") %}
+    {% set accel_label = test_accel|round(0)|int %}
     {% set test_scv = 11.0 %}
     {% set verify_velocity = 20.0 %}
     {% set verify_accel = 500.0 %}
-    {% set y = printer.toolhead.position.y|float %}
     {% set y_min = printer.toolhead.axis_minimum.y|float %}
     {% set y_max = printer.toolhead.axis_maximum.y|float %}
+    {% set y_mid = (y_min + y_max) / 2.0 %}
     {% set old_velocity = printer.toolhead.max_velocity|float %}
     {% set old_accel = printer.toolhead.max_accel|float %}
     {% set old_scv = printer.toolhead.square_corner_velocity|float %}
     {% if "y" not in printer.toolhead.homed_axes %}
-        { action_raise_error("Home Y first with G28 Y before running Y_TEST_TRAVEL_100.") }
-    {% elif y + distance <= y_max %}
-        {% set target = y + distance %}
-    {% elif y - distance >= y_min %}
-        {% set target = y - distance %}
+        { action_raise_error("Home Y first with G28 Y before running TEST_Y_TRAVEL_ACCEL_" ~ test_label ~ ".") }
+    {% elif y_mid + distance <= y_max %}
+        {% set target = y_mid + distance %}
+    {% elif y_mid - distance >= y_min %}
+        {% set target = y_mid - distance %}
     {% else %}
-        { action_raise_error("Y_TEST_TRAVEL_100 needs 100mm free travel from the current Y position.") }
+        { action_raise_error("TEST_Y_TRAVEL needs 100mm free travel from the current Y position.") }
     {% endif %}
-    {% if y >= target %}
-        {% set verify_start = y %}
+    {% if y_mid >= target %}
+        {% set verify_start = y_mid %}
     {% else %}
         {% set verify_start = target %}
     {% endif %}
-    RESPOND TYPE=echo MSG="Y travel test: {cycles} cycles from Y={y|round(2)} to Y={target|round(2)} at 550mm/s, accel 4500mm/s^2, SCV 11."
-    SAVE_GCODE_STATE NAME=Y_TEST_TRAVEL_100_STATE
+    RESPOND TYPE=echo MSG="Y travel test {test_label}: first centering to Y={y_mid|round(2)}, then {cycles} cycles to Y={target|round(2)} at 550mm/s, accel {accel_label}mm/s^2, SCV 11."
+    SAVE_GCODE_STATE NAME=TEST_Y_TRAVEL_STATE
     G90
+    SET_VELOCITY_LIMIT VELOCITY={verify_velocity} ACCEL={verify_accel} SQUARE_CORNER_VELOCITY={old_scv}
+    G1 Y{y_mid} F{verify_velocity * 60.0}
+    M400
     SET_VELOCITY_LIMIT VELOCITY={test_velocity} ACCEL={test_accel} SQUARE_CORNER_VELOCITY={test_scv}
     {% for _ in range(cycles) %}
         G1 Y{target} F{test_velocity * 60.0}
-        G1 Y{y} F{test_velocity * 60.0}
+        G1 Y{y_mid} F{test_velocity * 60.0}
     {% endfor %}
     M400
     G1 Y{verify_start} F{test_velocity * 60.0}
@@ -619,7 +640,7 @@ gcode:
     SET_VELOCITY_LIMIT VELOCITY={verify_velocity} ACCEL={verify_accel} SQUARE_CORNER_VELOCITY={old_scv}
     G28 Y
     SET_VELOCITY_LIMIT VELOCITY={old_velocity} ACCEL={old_accel} SQUARE_CORNER_VELOCITY={old_scv}
-    RESTORE_GCODE_STATE NAME=Y_TEST_TRAVEL_100_STATE
+    RESTORE_GCODE_STATE NAME=TEST_Y_TRAVEL_STATE
 
 [gcode_macro MOTORS_OFF]
 description: Disable all configured motors.

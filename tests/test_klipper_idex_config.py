@@ -305,6 +305,36 @@ def test_bed_cooling_macro_moves_t0_to_center_and_waits_for_target():
     assert re.search(r"^\s*M107\s*$", bed_cooling, flags=re.MULTILINE)
 
 
+def test_y_travel_test_macros_are_gui_safe_and_center_before_testing():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    expected_macros = [
+        ("TEST_Y_TRAVEL_ACCEL_FOURK", 4000),
+        ("TEST_Y_TRAVEL_ACCEL_FIVEK", 5000),
+        ("TEST_Y_TRAVEL_ACCEL_SIXK", 6000),
+        ("TEST_Y_TRAVEL_ACCEL_SEVENK", 7000),
+        ("TEST_Y_TRAVEL_ACCEL_EIGHTK", 8000),
+    ]
+
+    alias = _section(config_text, "gcode_macro TEST_Y_TRAVEL")
+    assert "TEST_Y_TRAVEL_ACCEL_FOURK" in alias
+
+    for macro_name, accel in expected_macros:
+        macro = _section(config_text, f"gcode_macro {macro_name}")
+        assert f"_TEST_Y_TRAVEL_RUN ACCEL={accel}" in macro
+
+    runner = _section(config_text, "gcode_macro _TEST_Y_TRAVEL_RUN")
+    assert "(y_min + y_max) / 2.0" in runner
+    assert "G1 Y{y_mid} F{verify_velocity * 60.0}" in runner
+    assert "G1 Y{target} F{test_velocity * 60.0}" in runner
+    assert "G1 Y{y_mid} F{test_velocity * 60.0}" in runner
+    assert "SAVE_GCODE_STATE NAME=TEST_Y_TRAVEL_STATE" in runner
+    assert "RESTORE_GCODE_STATE NAME=TEST_Y_TRAVEL_STATE" in runner
+    assert "SET_GCODE_VARIABLE" not in runner
+
+    assert "gcode_macro Y_TEST_TRAVEL_100" not in config_text
+    assert "Y_TEST_TRAVEL_100_A4000" not in config_text
+
+
 def test_mainsail_pause_resume_cancel_macros_are_defined():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
 
