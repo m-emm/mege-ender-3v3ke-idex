@@ -27,6 +27,20 @@ The active printer wiring still uses the Y-axis TMC2226 driver. This TB6600
 interface is a planned parallel connector so the machine can keep running on
 TMC1 until the external driver is built and bench-tested.
 
+## Bench validation
+
+Bench test completed on 2026-07-01 19:49:08 CEST with an Adafruit FT232H, this
+stripboard interface, the TB6600-style driver box, and a loose desk stepper.
+STEP, DIR, and ENA all worked through the soldered board. At the 8 microstep
+bench setting, the motor ran quietly and reliably at the 500 mm/s Y-axis
+equivalent STEP rate, about 13.333 kHz for the current
+`rotation_distance: 60` reference. Verified ENA polarity: GPIO low disables the
+driver and frees the motor; GPIO high enables the driver and restores holding
+torque.
+
+Detailed commands, setup notes, and debug findings are recorded in
+`bench_tests/TEST_LOG.md`.
+
 ## Assumptions
 
 The circuit below assumes the usual TB6600-clone convention:

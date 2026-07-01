@@ -2,129 +2,129 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="579" height="288" viewBox="-7.090 0 18.090 9.000">
   <title>Manual Stripboard Layout</title>
   <rect class="board" x="0" y="0" width="11.000" height="9.000" fill="#f7e48b" stroke="#e6ca70" stroke-width="0.035"/>
-  <rect class="copper-strip" data-row="0" x="0.250" y="0.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
-  <rect class="copper-strip" data-row="1" x="0.250" y="1.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
-  <rect class="copper-strip" data-row="2" x="0.250" y="2.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
-  <rect class="copper-strip" data-row="3" x="0.250" y="3.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
-  <rect class="copper-strip" data-row="4" x="0.250" y="4.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
-  <rect class="copper-strip" data-row="5" x="0.250" y="5.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
-  <rect class="copper-strip" data-row="6" x="0.250" y="6.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
-  <rect class="copper-strip" data-row="7" x="0.250" y="7.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
-  <rect class="copper-strip" data-row="8" x="0.250" y="8.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
-  <circle class="hole" data-col="0" data-row="0" cx="0.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="1" data-row="0" cx="1.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="2" data-row="0" cx="2.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="3" data-row="0" cx="3.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="4" data-row="0" cx="4.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="5" data-row="0" cx="5.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="6" data-row="0" cx="6.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="7" data-row="0" cx="7.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="8" data-row="0" cx="8.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="9" data-row="0" cx="9.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="10" data-row="0" cx="10.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="0" data-row="1" cx="0.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="1" data-row="1" cx="1.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="2" data-row="1" cx="2.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="3" data-row="1" cx="3.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="4" data-row="1" cx="4.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="5" data-row="1" cx="5.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="6" data-row="1" cx="6.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="7" data-row="1" cx="7.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="8" data-row="1" cx="8.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="9" data-row="1" cx="9.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="10" data-row="1" cx="10.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="0" data-row="2" cx="0.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="1" data-row="2" cx="1.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="2" data-row="2" cx="2.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="3" data-row="2" cx="3.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="4" data-row="2" cx="4.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="5" data-row="2" cx="5.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="6" data-row="2" cx="6.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="7" data-row="2" cx="7.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="8" data-row="2" cx="8.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="9" data-row="2" cx="9.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="10" data-row="2" cx="10.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="0" data-row="3" cx="0.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="1" data-row="3" cx="1.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="2" data-row="3" cx="2.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="3" data-row="3" cx="3.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="4" data-row="3" cx="4.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="5" data-row="3" cx="5.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="6" data-row="3" cx="6.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="7" data-row="3" cx="7.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="8" data-row="3" cx="8.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="9" data-row="3" cx="9.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="10" data-row="3" cx="10.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="0" data-row="4" cx="0.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="1" data-row="4" cx="1.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="2" data-row="4" cx="2.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="3" data-row="4" cx="3.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="4" data-row="4" cx="4.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="5" data-row="4" cx="5.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="6" data-row="4" cx="6.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="7" data-row="4" cx="7.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="8" data-row="4" cx="8.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="9" data-row="4" cx="9.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="10" data-row="4" cx="10.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="0" data-row="5" cx="0.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="1" data-row="5" cx="1.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="2" data-row="5" cx="2.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="3" data-row="5" cx="3.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="4" data-row="5" cx="4.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="5" data-row="5" cx="5.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="6" data-row="5" cx="6.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="7" data-row="5" cx="7.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="8" data-row="5" cx="8.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="9" data-row="5" cx="9.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="10" data-row="5" cx="10.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="0" data-row="6" cx="0.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="1" data-row="6" cx="1.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="2" data-row="6" cx="2.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="3" data-row="6" cx="3.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="4" data-row="6" cx="4.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="5" data-row="6" cx="5.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="6" data-row="6" cx="6.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="7" data-row="6" cx="7.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="8" data-row="6" cx="8.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="9" data-row="6" cx="9.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="10" data-row="6" cx="10.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="0" data-row="7" cx="0.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="1" data-row="7" cx="1.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="2" data-row="7" cx="2.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="3" data-row="7" cx="3.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="4" data-row="7" cx="4.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="5" data-row="7" cx="5.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="6" data-row="7" cx="6.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="7" data-row="7" cx="7.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="8" data-row="7" cx="8.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="9" data-row="7" cx="9.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="10" data-row="7" cx="10.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="0" data-row="8" cx="0.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="1" data-row="8" cx="1.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="2" data-row="8" cx="2.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="3" data-row="8" cx="3.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="4" data-row="8" cx="4.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="5" data-row="8" cx="5.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="6" data-row="8" cx="6.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="7" data-row="8" cx="7.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="8" data-row="8" cx="8.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="9" data-row="8" cx="9.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="hole" data-col="10" data-row="8" cx="10.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
-  <circle class="strip-cut" data-row="3" data-col="3" cx="3.500" cy="3.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
-  <line class="strip-cut-mark" data-row="3" data-col="3" x1="3.283" y1="3.283" x2="3.717" y2="3.717" stroke="#000000" stroke-width="0.140"/>
-  <line class="strip-cut-mark" data-row="3" data-col="3" x1="3.283" y1="3.717" x2="3.717" y2="3.283" stroke="#000000" stroke-width="0.140"/>
-  <circle class="strip-cut" data-row="6" data-col="4" cx="4.500" cy="6.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
-  <line class="strip-cut-mark" data-row="6" data-col="4" x1="4.283" y1="6.283" x2="4.717" y2="6.717" stroke="#000000" stroke-width="0.140"/>
-  <line class="strip-cut-mark" data-row="6" data-col="4" x1="4.283" y1="6.717" x2="4.717" y2="6.283" stroke="#000000" stroke-width="0.140"/>
-  <circle class="strip-cut" data-row="7" data-col="4" cx="4.500" cy="7.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
-  <line class="strip-cut-mark" data-row="7" data-col="4" x1="4.283" y1="7.283" x2="4.717" y2="7.717" stroke="#000000" stroke-width="0.140"/>
-  <line class="strip-cut-mark" data-row="7" data-col="4" x1="4.283" y1="7.717" x2="4.717" y2="7.283" stroke="#000000" stroke-width="0.140"/>
-  <circle class="strip-cut" data-row="7" data-col="7" cx="7.500" cy="7.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
-  <line class="strip-cut-mark" data-row="7" data-col="7" x1="7.283" y1="7.283" x2="7.717" y2="7.717" stroke="#000000" stroke-width="0.140"/>
-  <line class="strip-cut-mark" data-row="7" data-col="7" x1="7.283" y1="7.717" x2="7.717" y2="7.283" stroke="#000000" stroke-width="0.140"/>
-  <line class="layout-jumper" data-net="step_base" data-start-row="6" data-start-col="5" data-end-row="7" data-end-col="2" x1="5.500" y1="6.500" x2="2.500" y2="7.500" stroke="#dc2626" stroke-width="0.055" stroke-linecap="round"/>
-  <circle class="layout-jumper-endpoint" data-net="step_base" data-row="6" data-col="5" cx="5.500" cy="6.500" r="0.115" fill="#ffffff" stroke="#dc2626" stroke-width="0.055"/>
-  <circle class="layout-jumper-endpoint" data-net="step_base" data-row="7" data-col="2" cx="2.500" cy="7.500" r="0.115" fill="#ffffff" stroke="#dc2626" stroke-width="0.055"/>
+  <rect class="copper-strip" data-y="0" x="0.250" y="8.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <rect class="copper-strip" data-y="1" x="0.250" y="7.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <rect class="copper-strip" data-y="2" x="0.250" y="6.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <rect class="copper-strip" data-y="3" x="0.250" y="5.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <rect class="copper-strip" data-y="4" x="0.250" y="4.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <rect class="copper-strip" data-y="5" x="0.250" y="3.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <rect class="copper-strip" data-y="6" x="0.250" y="2.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <rect class="copper-strip" data-y="7" x="0.250" y="1.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <rect class="copper-strip" data-y="8" x="0.250" y="0.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
+  <circle class="hole" data-x="0" data-y="0" cx="0.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="1" data-y="0" cx="1.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="2" data-y="0" cx="2.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="3" data-y="0" cx="3.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="4" data-y="0" cx="4.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="5" data-y="0" cx="5.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="6" data-y="0" cx="6.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="7" data-y="0" cx="7.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="8" data-y="0" cx="8.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="9" data-y="0" cx="9.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="10" data-y="0" cx="10.500" cy="8.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="0" data-y="1" cx="0.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="1" data-y="1" cx="1.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="2" data-y="1" cx="2.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="3" data-y="1" cx="3.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="4" data-y="1" cx="4.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="5" data-y="1" cx="5.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="6" data-y="1" cx="6.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="7" data-y="1" cx="7.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="8" data-y="1" cx="8.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="9" data-y="1" cx="9.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="10" data-y="1" cx="10.500" cy="7.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="0" data-y="2" cx="0.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="1" data-y="2" cx="1.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="2" data-y="2" cx="2.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="3" data-y="2" cx="3.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="4" data-y="2" cx="4.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="5" data-y="2" cx="5.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="6" data-y="2" cx="6.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="7" data-y="2" cx="7.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="8" data-y="2" cx="8.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="9" data-y="2" cx="9.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="10" data-y="2" cx="10.500" cy="6.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="0" data-y="3" cx="0.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="1" data-y="3" cx="1.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="2" data-y="3" cx="2.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="3" data-y="3" cx="3.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="4" data-y="3" cx="4.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="5" data-y="3" cx="5.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="6" data-y="3" cx="6.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="7" data-y="3" cx="7.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="8" data-y="3" cx="8.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="9" data-y="3" cx="9.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="10" data-y="3" cx="10.500" cy="5.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="0" data-y="4" cx="0.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="1" data-y="4" cx="1.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="2" data-y="4" cx="2.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="3" data-y="4" cx="3.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="4" data-y="4" cx="4.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="5" data-y="4" cx="5.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="6" data-y="4" cx="6.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="7" data-y="4" cx="7.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="8" data-y="4" cx="8.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="9" data-y="4" cx="9.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="10" data-y="4" cx="10.500" cy="4.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="0" data-y="5" cx="0.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="1" data-y="5" cx="1.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="2" data-y="5" cx="2.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="3" data-y="5" cx="3.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="4" data-y="5" cx="4.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="5" data-y="5" cx="5.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="6" data-y="5" cx="6.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="7" data-y="5" cx="7.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="8" data-y="5" cx="8.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="9" data-y="5" cx="9.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="10" data-y="5" cx="10.500" cy="3.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="0" data-y="6" cx="0.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="1" data-y="6" cx="1.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="2" data-y="6" cx="2.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="3" data-y="6" cx="3.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="4" data-y="6" cx="4.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="5" data-y="6" cx="5.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="6" data-y="6" cx="6.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="7" data-y="6" cx="7.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="8" data-y="6" cx="8.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="9" data-y="6" cx="9.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="10" data-y="6" cx="10.500" cy="2.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="0" data-y="7" cx="0.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="1" data-y="7" cx="1.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="2" data-y="7" cx="2.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="3" data-y="7" cx="3.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="4" data-y="7" cx="4.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="5" data-y="7" cx="5.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="6" data-y="7" cx="6.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="7" data-y="7" cx="7.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="8" data-y="7" cx="8.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="9" data-y="7" cx="9.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="10" data-y="7" cx="10.500" cy="1.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="0" data-y="8" cx="0.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="1" data-y="8" cx="1.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="2" data-y="8" cx="2.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="3" data-y="8" cx="3.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="4" data-y="8" cx="4.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="5" data-y="8" cx="5.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="6" data-y="8" cx="6.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="7" data-y="8" cx="7.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="8" data-y="8" cx="8.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="9" data-y="8" cx="9.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="hole" data-x="10" data-y="8" cx="10.500" cy="0.500" r="0.220" fill="#fbfbfb" stroke="#333333" stroke-width="0.035"/>
+  <circle class="strip-cut" data-y="5" data-x="3" cx="3.500" cy="3.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
+  <line class="strip-cut-mark" data-y="5" data-x="3" x1="3.283" y1="3.283" x2="3.717" y2="3.717" stroke="#000000" stroke-width="0.140"/>
+  <line class="strip-cut-mark" data-y="5" data-x="3" x1="3.283" y1="3.717" x2="3.717" y2="3.283" stroke="#000000" stroke-width="0.140"/>
+  <circle class="strip-cut" data-y="1" data-x="4" cx="4.500" cy="7.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
+  <line class="strip-cut-mark" data-y="1" data-x="4" x1="4.283" y1="7.283" x2="4.717" y2="7.717" stroke="#000000" stroke-width="0.140"/>
+  <line class="strip-cut-mark" data-y="1" data-x="4" x1="4.283" y1="7.717" x2="4.717" y2="7.283" stroke="#000000" stroke-width="0.140"/>
+  <circle class="strip-cut" data-y="2" data-x="4" cx="4.500" cy="6.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
+  <line class="strip-cut-mark" data-y="2" data-x="4" x1="4.283" y1="6.283" x2="4.717" y2="6.717" stroke="#000000" stroke-width="0.140"/>
+  <line class="strip-cut-mark" data-y="2" data-x="4" x1="4.283" y1="6.717" x2="4.717" y2="6.283" stroke="#000000" stroke-width="0.140"/>
+  <circle class="strip-cut" data-y="1" data-x="7" cx="7.500" cy="7.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
+  <line class="strip-cut-mark" data-y="1" data-x="7" x1="7.283" y1="7.283" x2="7.717" y2="7.717" stroke="#000000" stroke-width="0.140"/>
+  <line class="strip-cut-mark" data-y="1" data-x="7" x1="7.283" y1="7.717" x2="7.717" y2="7.283" stroke="#000000" stroke-width="0.140"/>
+  <line class="layout-jumper" data-net="step_base" data-start-x="5" data-start-y="2" data-end-x="2" data-end-y="1" x1="5.500" y1="6.500" x2="2.500" y2="7.500" stroke="#dc2626" stroke-width="0.055" stroke-linecap="round"/>
+  <circle class="layout-jumper-endpoint" data-net="step_base" data-x="5" data-y="2" cx="5.500" cy="6.500" r="0.115" fill="#ffffff" stroke="#dc2626" stroke-width="0.055"/>
+  <circle class="layout-jumper-endpoint" data-net="step_base" data-x="2" data-y="1" cx="2.500" cy="7.500" r="0.115" fill="#ffffff" stroke="#dc2626" stroke-width="0.055"/>
   <line class="layout-component" data-element="C1" data-footprint="yaml_C1" x1="3.500" y1="4.500" x2="3.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
   <line class="layout-component" data-element="Q1" data-footprint="yaml_Q1" x1="6.500" y1="7.500" x2="6.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
   <line class="layout-component" data-element="Q1" data-footprint="yaml_Q1" x1="6.500" y1="4.500" x2="6.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
@@ -152,54 +152,54 @@
   <circle class="layout-component-body" data-element="R6" data-value="4k7 0.25W" data-label="R6" data-footprint="yaml_R6" cx="0.500" cy="1.000" r="0.165" fill="#111827"/>
   <circle class="layout-component-body" data-element="R7" data-value="2k2" data-label="R7" data-footprint="yaml_R7" cx="6.500" cy="3.000" r="0.165" fill="#111827"/>
   <circle class="layout-component-body" data-element="R8" data-value="47k" data-label="R8" data-footprint="yaml_R8" cx="4.500" cy="3.500" r="0.165" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="C1" data-terminal="end" data-footprint="yaml_C1" data-row="4" data-col="3" cx="3.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="v5" data-element="C1" data-terminal="start" data-footprint="yaml_C1" data-row="8" data-col="3" cx="3.500" cy="8.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="step_base" data-element="Q1" data-terminal="base" data-footprint="yaml_Q1" data-row="6" data-col="6" cx="6.500" cy="6.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="step_pul_minus" data-element="Q1" data-terminal="collector" data-footprint="yaml_Q1" data-row="7" data-col="6" cx="6.500" cy="7.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="Q1" data-terminal="emitter" data-footprint="yaml_Q1" data-row="4" data-col="6" cx="6.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="dir_base" data-element="Q2" data-terminal="base" data-footprint="yaml_Q2" data-row="5" data-col="2" cx="2.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="dir_minus" data-element="Q2" data-terminal="collector" data-footprint="yaml_Q2" data-row="3" data-col="2" cx="2.500" cy="3.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="Q2" data-terminal="emitter" data-footprint="yaml_Q2" data-row="4" data-col="2" cx="2.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_base" data-element="Q3" data-terminal="base" data-footprint="yaml_Q3" data-row="2" data-col="5" cx="5.500" cy="2.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_plus" data-element="Q3" data-terminal="collector" data-footprint="yaml_Q3" data-row="1" data-col="5" cx="5.500" cy="1.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="Q3" data-terminal="emitter" data-footprint="yaml_Q3" data-row="4" data-col="5" cx="5.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="step_base" data-element="R1" data-terminal="end" data-footprint="yaml_R1" data-row="7" data-col="0" cx="0.500" cy="7.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="step_gpio" data-element="R1" data-terminal="start" data-footprint="yaml_R1" data-row="6" data-col="0" cx="0.500" cy="6.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="R2" data-terminal="end" data-footprint="yaml_R2" data-row="4" data-col="1" cx="1.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="step_base" data-element="R2" data-terminal="start" data-footprint="yaml_R2" data-row="7" data-col="1" cx="1.500" cy="7.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="dir_base" data-element="R3" data-terminal="end" data-footprint="yaml_R3" data-row="5" data-col="8" cx="8.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="dir_gpio" data-element="R3" data-terminal="start" data-footprint="yaml_R3" data-row="7" data-col="8" cx="8.500" cy="7.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="R4" data-terminal="end" data-footprint="yaml_R4" data-row="4" data-col="0" cx="0.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="dir_base" data-element="R4" data-terminal="start" data-footprint="yaml_R4" data-row="5" data-col="0" cx="0.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_plus" data-element="R5" data-terminal="end" data-footprint="yaml_R5" data-row="1" data-col="1" cx="1.500" cy="1.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="v24" data-element="R5" data-terminal="start" data-footprint="yaml_R5" data-row="0" data-col="1" cx="1.500" cy="0.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_plus" data-element="R6" data-terminal="end" data-footprint="yaml_R6" data-row="1" data-col="0" cx="0.500" cy="1.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="v24" data-element="R6" data-terminal="start" data-footprint="yaml_R6" data-row="0" data-col="0" cx="0.500" cy="0.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_base" data-element="R7" data-terminal="end" data-footprint="yaml_R7" data-row="2" data-col="6" cx="6.500" cy="2.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_gpio" data-element="R7" data-terminal="start" data-footprint="yaml_R7" data-row="3" data-col="6" cx="6.500" cy="3.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="R8" data-terminal="end" data-footprint="yaml_R8" data-row="4" data-col="4" cx="4.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_base" data-element="R8" data-terminal="start" data-footprint="yaml_R8" data-row="2" data-col="4" cx="4.500" cy="2.500" r="0.090" fill="#111827"/>
-  <circle class="layout-connector" data-net="dir_gpio" data-connector="DIR_gpio" data-kind="nail" data-net-kind="data" data-color="#ffd400" data-row="7" data-col="9" cx="9.500" cy="7.500" r="0.135" fill="#ffd400" stroke="#ffffff" stroke-width="0.055"/>
-  <circle class="layout-connector" data-net="dir_minus" data-connector="DIR_minus" data-kind="nail" data-net-kind="data" data-color="#ffd400" data-row="3" data-col="0" cx="0.500" cy="3.500" r="0.135" fill="#ffd400" stroke="#ffffff" stroke-width="0.055"/>
-  <circle class="layout-connector" data-net="v5" data-connector="DIR_plus" data-kind="nail" data-net-kind="power" data-color="#ff0000" data-row="8" data-col="2" cx="2.500" cy="8.500" r="0.135" fill="#ff0000" stroke="#ffffff" stroke-width="0.055"/>
-  <circle class="layout-connector" data-net="step_gpio" data-connector="STEP_gpio" data-kind="nail" data-net-kind="clock" data-color="#0057d8" data-row="6" data-col="2" cx="2.500" cy="6.500" r="0.135" fill="#0057d8" stroke="#ffffff" stroke-width="0.055"/>
-  <circle class="layout-connector" data-net="step_pul_minus" data-connector="STEP_minus" data-kind="nail" data-net-kind="clock" data-color="#0057d8" data-row="7" data-col="5" cx="5.500" cy="7.500" r="0.135" fill="#0057d8" stroke="#ffffff" stroke-width="0.055"/>
-  <circle class="layout-connector" data-net="v5" data-connector="STEP_plus" data-kind="nail" data-net-kind="power" data-color="#ff0000" data-row="8" data-col="1" cx="1.500" cy="8.500" r="0.135" fill="#ff0000" stroke="#ffffff" stroke-width="0.055"/>
-  <circle class="layout-connector" data-net="ena_gpio" data-connector="ena_gpio" data-kind="nail" data-net-kind="data" data-color="#ffd400" data-row="3" data-col="7" cx="7.500" cy="3.500" r="0.135" fill="#ffd400" stroke="#ffffff" stroke-width="0.055"/>
-  <circle class="layout-connector" data-net="gnd" data-connector="ena_minus" data-kind="nail" data-net-kind="ground" data-color="#000000" data-row="4" data-col="8" cx="8.500" cy="4.500" r="0.135" fill="#000000" stroke="#ffffff" stroke-width="0.055"/>
-  <circle class="layout-connector" data-net="ena_plus" data-connector="ena_plus" data-kind="nail" data-net-kind="data" data-color="#ffd400" data-row="1" data-col="2" cx="2.500" cy="1.500" r="0.135" fill="#ffd400" stroke="#ffffff" stroke-width="0.055"/>
-  <circle class="layout-connector" data-net="v24" data-connector="ena_v24" data-kind="nail" data-net-kind="hazard_power" data-color="#8b4513" data-row="0" data-col="2" cx="2.500" cy="0.500" r="0.135" fill="#8b4513" stroke="#ffffff" stroke-width="0.055"/>
-  <circle class="layout-connector" data-net="gnd" data-connector="gnd_rail" data-kind="nail" data-net-kind="ground" data-color="#000000" data-row="4" data-col="7" cx="7.500" cy="4.500" r="0.135" fill="#000000" stroke="#ffffff" stroke-width="0.055"/>
-  <circle class="layout-connector" data-net="v5" data-connector="v5_rail" data-kind="nail" data-net-kind="power" data-color="#ff0000" data-row="8" data-col="0" cx="0.500" cy="8.500" r="0.135" fill="#ff0000" stroke="#ffffff" stroke-width="0.055"/>
-  <text class="layout-terminal-hole-label" data-net="step_base" data-element="Q1" data-terminal="base" data-row="6" data-col="6" x="6.500" y="6.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">B</text>
-  <text class="layout-terminal-hole-label" data-net="step_pul_minus" data-element="Q1" data-terminal="collector" data-row="7" data-col="6" x="6.500" y="7.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">C</text>
-  <text class="layout-terminal-hole-label" data-net="gnd" data-element="Q1" data-terminal="emitter" data-row="4" data-col="6" x="6.500" y="4.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">E</text>
-  <text class="layout-terminal-hole-label" data-net="dir_base" data-element="Q2" data-terminal="base" data-row="5" data-col="2" x="2.500" y="5.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">B</text>
-  <text class="layout-terminal-hole-label" data-net="dir_minus" data-element="Q2" data-terminal="collector" data-row="3" data-col="2" x="2.500" y="3.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">C</text>
-  <text class="layout-terminal-hole-label" data-net="gnd" data-element="Q2" data-terminal="emitter" data-row="4" data-col="2" x="2.500" y="4.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">E</text>
-  <text class="layout-terminal-hole-label" data-net="ena_base" data-element="Q3" data-terminal="base" data-row="2" data-col="5" x="5.500" y="2.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">B</text>
-  <text class="layout-terminal-hole-label" data-net="ena_plus" data-element="Q3" data-terminal="collector" data-row="1" data-col="5" x="5.500" y="1.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">C</text>
-  <text class="layout-terminal-hole-label" data-net="gnd" data-element="Q3" data-terminal="emitter" data-row="4" data-col="5" x="5.500" y="4.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">E</text>
+  <circle class="layout-pin" data-net="gnd" data-element="C1" data-terminal="end" data-footprint="yaml_C1" data-y="4" data-x="3" cx="3.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="v5" data-element="C1" data-terminal="start" data-footprint="yaml_C1" data-y="0" data-x="3" cx="3.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="step_base" data-element="Q1" data-terminal="base" data-footprint="yaml_Q1" data-y="2" data-x="6" cx="6.500" cy="6.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="step_pul_minus" data-element="Q1" data-terminal="collector" data-footprint="yaml_Q1" data-y="1" data-x="6" cx="6.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="Q1" data-terminal="emitter" data-footprint="yaml_Q1" data-y="4" data-x="6" cx="6.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="dir_base" data-element="Q2" data-terminal="base" data-footprint="yaml_Q2" data-y="3" data-x="2" cx="2.500" cy="5.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="dir_minus" data-element="Q2" data-terminal="collector" data-footprint="yaml_Q2" data-y="5" data-x="2" cx="2.500" cy="3.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="Q2" data-terminal="emitter" data-footprint="yaml_Q2" data-y="4" data-x="2" cx="2.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_base" data-element="Q3" data-terminal="base" data-footprint="yaml_Q3" data-y="6" data-x="5" cx="5.500" cy="2.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_plus" data-element="Q3" data-terminal="collector" data-footprint="yaml_Q3" data-y="7" data-x="5" cx="5.500" cy="1.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="Q3" data-terminal="emitter" data-footprint="yaml_Q3" data-y="4" data-x="5" cx="5.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="step_base" data-element="R1" data-terminal="end" data-footprint="yaml_R1" data-y="1" data-x="0" cx="0.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="step_gpio" data-element="R1" data-terminal="start" data-footprint="yaml_R1" data-y="2" data-x="0" cx="0.500" cy="6.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="R2" data-terminal="end" data-footprint="yaml_R2" data-y="4" data-x="1" cx="1.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="step_base" data-element="R2" data-terminal="start" data-footprint="yaml_R2" data-y="1" data-x="1" cx="1.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="dir_base" data-element="R3" data-terminal="end" data-footprint="yaml_R3" data-y="3" data-x="8" cx="8.500" cy="5.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="dir_gpio" data-element="R3" data-terminal="start" data-footprint="yaml_R3" data-y="1" data-x="8" cx="8.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="R4" data-terminal="end" data-footprint="yaml_R4" data-y="4" data-x="0" cx="0.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="dir_base" data-element="R4" data-terminal="start" data-footprint="yaml_R4" data-y="3" data-x="0" cx="0.500" cy="5.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_plus" data-element="R5" data-terminal="end" data-footprint="yaml_R5" data-y="7" data-x="1" cx="1.500" cy="1.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="v24" data-element="R5" data-terminal="start" data-footprint="yaml_R5" data-y="8" data-x="1" cx="1.500" cy="0.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_plus" data-element="R6" data-terminal="end" data-footprint="yaml_R6" data-y="7" data-x="0" cx="0.500" cy="1.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="v24" data-element="R6" data-terminal="start" data-footprint="yaml_R6" data-y="8" data-x="0" cx="0.500" cy="0.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_base" data-element="R7" data-terminal="end" data-footprint="yaml_R7" data-y="6" data-x="6" cx="6.500" cy="2.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_gpio" data-element="R7" data-terminal="start" data-footprint="yaml_R7" data-y="5" data-x="6" cx="6.500" cy="3.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="R8" data-terminal="end" data-footprint="yaml_R8" data-y="4" data-x="4" cx="4.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_base" data-element="R8" data-terminal="start" data-footprint="yaml_R8" data-y="6" data-x="4" cx="4.500" cy="2.500" r="0.090" fill="#111827"/>
+  <circle class="layout-connector" data-net="dir_gpio" data-connector="DIR_gpio" data-kind="nail" data-net-kind="data" data-color="#ffd400" data-y="1" data-x="9" cx="9.500" cy="7.500" r="0.135" fill="#ffd400" stroke="#ffffff" stroke-width="0.055"/>
+  <circle class="layout-connector" data-net="dir_minus" data-connector="DIR_minus" data-kind="nail" data-net-kind="data" data-color="#ffd400" data-y="5" data-x="0" cx="0.500" cy="3.500" r="0.135" fill="#ffd400" stroke="#ffffff" stroke-width="0.055"/>
+  <circle class="layout-connector" data-net="v5" data-connector="DIR_plus" data-kind="nail" data-net-kind="power" data-color="#ff0000" data-y="0" data-x="2" cx="2.500" cy="8.500" r="0.135" fill="#ff0000" stroke="#ffffff" stroke-width="0.055"/>
+  <circle class="layout-connector" data-net="step_gpio" data-connector="STEP_gpio" data-kind="nail" data-net-kind="clock" data-color="#0057d8" data-y="2" data-x="2" cx="2.500" cy="6.500" r="0.135" fill="#0057d8" stroke="#ffffff" stroke-width="0.055"/>
+  <circle class="layout-connector" data-net="step_pul_minus" data-connector="STEP_minus" data-kind="nail" data-net-kind="clock" data-color="#0057d8" data-y="1" data-x="5" cx="5.500" cy="7.500" r="0.135" fill="#0057d8" stroke="#ffffff" stroke-width="0.055"/>
+  <circle class="layout-connector" data-net="v5" data-connector="STEP_plus" data-kind="nail" data-net-kind="power" data-color="#ff0000" data-y="0" data-x="1" cx="1.500" cy="8.500" r="0.135" fill="#ff0000" stroke="#ffffff" stroke-width="0.055"/>
+  <circle class="layout-connector" data-net="ena_gpio" data-connector="ena_gpio" data-kind="nail" data-net-kind="data" data-color="#ffd400" data-y="5" data-x="7" cx="7.500" cy="3.500" r="0.135" fill="#ffd400" stroke="#ffffff" stroke-width="0.055"/>
+  <circle class="layout-connector" data-net="gnd" data-connector="ena_minus" data-kind="nail" data-net-kind="ground" data-color="#000000" data-y="4" data-x="8" cx="8.500" cy="4.500" r="0.135" fill="#000000" stroke="#ffffff" stroke-width="0.055"/>
+  <circle class="layout-connector" data-net="ena_plus" data-connector="ena_plus" data-kind="nail" data-net-kind="data" data-color="#ffd400" data-y="7" data-x="2" cx="2.500" cy="1.500" r="0.135" fill="#ffd400" stroke="#ffffff" stroke-width="0.055"/>
+  <circle class="layout-connector" data-net="v24" data-connector="ena_v24" data-kind="nail" data-net-kind="hazard_power" data-color="#8b4513" data-y="8" data-x="2" cx="2.500" cy="0.500" r="0.135" fill="#8b4513" stroke="#ffffff" stroke-width="0.055"/>
+  <circle class="layout-connector" data-net="gnd" data-connector="gnd_rail" data-kind="nail" data-net-kind="ground" data-color="#000000" data-y="4" data-x="7" cx="7.500" cy="4.500" r="0.135" fill="#000000" stroke="#ffffff" stroke-width="0.055"/>
+  <circle class="layout-connector" data-net="v5" data-connector="v5_rail" data-kind="nail" data-net-kind="power" data-color="#ff0000" data-y="0" data-x="0" cx="0.500" cy="8.500" r="0.135" fill="#ff0000" stroke="#ffffff" stroke-width="0.055"/>
+  <text class="layout-terminal-hole-label" data-net="step_base" data-element="Q1" data-terminal="base" data-y="2" data-x="6" x="6.500" y="6.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">B</text>
+  <text class="layout-terminal-hole-label" data-net="step_pul_minus" data-element="Q1" data-terminal="collector" data-y="1" data-x="6" x="6.500" y="7.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">C</text>
+  <text class="layout-terminal-hole-label" data-net="gnd" data-element="Q1" data-terminal="emitter" data-y="4" data-x="6" x="6.500" y="4.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">E</text>
+  <text class="layout-terminal-hole-label" data-net="dir_base" data-element="Q2" data-terminal="base" data-y="3" data-x="2" x="2.500" y="5.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">B</text>
+  <text class="layout-terminal-hole-label" data-net="dir_minus" data-element="Q2" data-terminal="collector" data-y="5" data-x="2" x="2.500" y="3.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">C</text>
+  <text class="layout-terminal-hole-label" data-net="gnd" data-element="Q2" data-terminal="emitter" data-y="4" data-x="2" x="2.500" y="4.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">E</text>
+  <text class="layout-terminal-hole-label" data-net="ena_base" data-element="Q3" data-terminal="base" data-y="6" data-x="5" x="5.500" y="2.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">B</text>
+  <text class="layout-terminal-hole-label" data-net="ena_plus" data-element="Q3" data-terminal="collector" data-y="7" data-x="5" x="5.500" y="1.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">C</text>
+  <text class="layout-terminal-hole-label" data-net="gnd" data-element="Q3" data-terminal="emitter" data-y="4" data-x="5" x="5.500" y="4.545" font-size="0.145" font-weight="800" text-anchor="middle" fill="#ffffff">E</text>
   <text class="layout-component-body-label" data-element="C1" data-value="100nF" data-label="C1" x="3.500" y="6.555" font-size="0.165" font-weight="800" text-anchor="middle" fill="#ffffff">C1</text>
   <text class="layout-component-body-label" data-element="Q1" data-value="BC337" data-label="Q1" x="6.880" y="6.555" font-size="0.210" font-weight="800" text-anchor="middle" fill="#ffffff">Q1</text>
   <text class="layout-component-body-label" data-element="Q2" data-value="BC337" data-label="Q2" x="2.880" y="4.555" font-size="0.210" font-weight="800" text-anchor="middle" fill="#ffffff">Q2</text>
@@ -212,15 +212,15 @@
   <text class="layout-component-body-label" data-element="R6" data-value="4k7 0.25W" data-label="R6" x="0.500" y="1.055" font-size="0.165" font-weight="800" text-anchor="middle" fill="#ffffff">R6</text>
   <text class="layout-component-body-label" data-element="R7" data-value="2k2" data-label="R7" x="6.500" y="3.055" font-size="0.165" font-weight="800" text-anchor="middle" fill="#ffffff">R7</text>
   <text class="layout-component-body-label" data-element="R8" data-value="47k" data-label="R8" x="4.500" y="3.555" font-size="0.165" font-weight="800" text-anchor="middle" fill="#ffffff">R8</text>
-  <text class="layout-row-label" data-row="0" data-net="v24" x="-0.220" y="0.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">v24</text>
-  <text class="layout-row-label" data-row="1" data-net="ena_plus" x="-0.220" y="1.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">ena_plus</text>
-  <text class="layout-row-label" data-row="2" data-net="ena_base" x="-0.220" y="2.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">ena_base</text>
-  <text class="layout-row-label" data-row="3" data-net="dir_minus / ena_gpio" x="-0.220" y="3.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">dir_minus / ena_gpio</text>
-  <text class="layout-row-label" data-row="4" data-net="gnd" x="-0.220" y="4.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">gnd</text>
-  <text class="layout-row-label" data-row="5" data-net="dir_base" x="-0.220" y="5.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">dir_base</text>
-  <text class="layout-row-label" data-row="6" data-net="step_base / step_gpio" x="-0.220" y="6.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">step_base / step_gpio</text>
-  <text class="layout-row-label" data-row="7" data-net="dir_gpio / step_base / step_pul_minus" x="-0.220" y="7.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">dir_gpio / step_base / step_pul_minus</text>
-  <text class="layout-row-label" data-row="8" data-net="v5" x="-0.220" y="8.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">v5</text>
+  <text class="layout-y-label" data-y="0" data-net="v5" x="-0.220" y="8.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">v5</text>
+  <text class="layout-y-label" data-y="1" data-net="dir_gpio / step_base / step_pul_minus" x="-0.220" y="7.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">dir_gpio / step_base / step_pul_minus</text>
+  <text class="layout-y-label" data-y="2" data-net="step_base / step_gpio" x="-0.220" y="6.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">step_base / step_gpio</text>
+  <text class="layout-y-label" data-y="3" data-net="dir_base" x="-0.220" y="5.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">dir_base</text>
+  <text class="layout-y-label" data-y="4" data-net="gnd" x="-0.220" y="4.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">gnd</text>
+  <text class="layout-y-label" data-y="5" data-net="dir_minus / ena_gpio" x="-0.220" y="3.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">dir_minus / ena_gpio</text>
+  <text class="layout-y-label" data-y="6" data-net="ena_base" x="-0.220" y="2.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">ena_base</text>
+  <text class="layout-y-label" data-y="7" data-net="ena_plus" x="-0.220" y="1.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">ena_plus</text>
+  <text class="layout-y-label" data-y="8" data-net="v24" x="-0.220" y="0.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">v24</text>
   <text class="layout-connector-label" data-net="dir_gpio" data-connector="DIR_gpio" x="9.680" y="7.340" font-size="0.170" font-weight="800" text-anchor="start" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 9.680 7.340)">Pico DIR GPIO1</text>
   <text class="layout-connector-label" data-net="dir_minus" data-connector="DIR_minus" x="0.680" y="3.340" font-size="0.170" font-weight="800" text-anchor="start" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 0.680 3.340)">DIR-</text>
   <text class="layout-connector-label" data-net="v5" data-connector="DIR_plus" x="2.680" y="8.340" font-size="0.170" font-weight="800" text-anchor="start" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 2.680 8.340)">DIR+</text>

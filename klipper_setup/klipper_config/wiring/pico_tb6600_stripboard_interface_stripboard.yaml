@@ -15,38 +15,44 @@ color_map:
   clock: '#0057d8'
   data: '#ffd400'
   default: '#808080'
+################
+# Note on the coordinate system:
+# The origin (0,0) is at the bottom-left corner
+# coordinates are [ X, Y ]
+# X increasing to the right
+# Y increasing upwards
+# ##############
 board: {size: [11, 9], pitch_mm: 2.54}
 components:
-  C1: [[8, 3], [4, 3]]
-  Q1: {c: [7, 6], b: [6, 6], e: [4, 6]}
-  Q2: {c: [3, 2], b: [5, 2], e: [4, 2]}
-  Q3: {c: [1, 5], b: [2, 5], e: [4, 5]}
-  R1: [[6, 0], [7, 0]]
-  R2: [[7, 1], [4, 1]]
-  R3: [[7, 8], [5, 8]]
-  R4: [[5, 0], [4, 0]]
-  R5: [[0, 1], [1, 1]]
-  R6: [[0, 0], [1, 0]]
-  R7: [[3, 6], [2, 6]]
-  R8: [[2, 4], [4, 4]]
+  C1: [[3, 0], [3, 4]]
+  Q1: {c: [6, 1], b: [6, 2], e: [6, 4]}
+  Q2: {c: [2, 5], b: [2, 3], e: [2, 4]}
+  Q3: {c: [5, 7], b: [5, 6], e: [5, 4]}
+  R1: [[0, 2], [0, 1]]
+  R2: [[1, 1], [1, 4]]
+  R3: [[8, 1], [8, 3]]
+  R4: [[0, 3], [0, 4]]
+  R5: [[1, 8], [1, 7]]
+  R6: [[0, 8], [0, 7]]
+  R7: [[6, 5], [6, 6]]
+  R8: [[4, 6], [4, 4]]
 cuts:
-  - [3, 3]
-  - [6, 4]
-  - [7, 7]
-  - [7, 4]
+  - [3, 5]
+  - [4, 2]
+  - [7, 1]
+  - [4, 1]
 connectors:
-  - {name: DIR_gpio, at: [7, 9], net: dir_gpio, label: Pico DIR GPIO1, type: data}
-  - {name: DIR_minus, at: [3, 0], net: dir_minus, label: DIR-, type: data}
-  - {name: DIR_plus, at: [8, 2], net: v5, label: DIR+, type: power}
-  - {name: STEP_gpio, at: [6, 2], net: step_gpio, label: Pico STEP GPIO0, type: clock}
-  - {name: STEP_minus, at: [7, 5], net: step_pul_minus, label: PUL-, type: clock}
-  - {name: STEP_plus, at: [8, 1], net: v5, label: PUL+, type: power}
-  - {name: ena_gpio, at: [3, 7], net: ena_gpio, label: Pico ENABLE GPIO2, type: data}
-  - {name: ena_minus, at: [4, 8], net: gnd, label: ENA-, type: ground}
-  - {name: ena_plus, at: [1, 2], net: ena_plus, label: ENA+, type: data}
-  - {name: ena_v24, at: [0, 2], net: v24, label: +24V, type: hazard_power}
-  - {name: gnd_rail, at: [4, 7], net: gnd, label: GND rail, type: ground}
-  - {name: v5_rail, at: [8, 0], net: v5, label: +5V rail, type: power}
+  - {name: DIR_gpio, at: [9, 1], net: dir_gpio, label: Pico DIR GPIO1, type: data}
+  - {name: DIR_minus, at: [0, 5], net: dir_minus, label: DIR-, type: data}
+  - {name: DIR_plus, at: [2, 0], net: v5, label: DIR+, type: power}
+  - {name: STEP_gpio, at: [2, 2], net: step_gpio, label: Pico STEP GPIO0, type: clock}
+  - {name: STEP_minus, at: [5, 1], net: step_pul_minus, label: PUL-, type: clock}
+  - {name: STEP_plus, at: [1, 0], net: v5, label: PUL+, type: power}
+  - {name: ena_gpio, at: [7, 5], net: ena_gpio, label: Pico ENABLE GPIO2, type: data}
+  - {name: ena_minus, at: [8, 4], net: gnd, label: ENA-, type: ground}
+  - {name: ena_plus, at: [2, 7], net: ena_plus, label: ENA+, type: data}
+  - {name: ena_v24, at: [2, 8], net: v24, label: +24V, type: hazard_power}
+  - {name: gnd_rail, at: [7, 4], net: gnd, label: GND rail, type: ground}
+  - {name: v5_rail, at: [0, 0], net: v5, label: +5V rail, type: power}
 jumpers:
-  - {from: [6, 5], to: [7, 2], net: step_base}
-
+  - {from: [5, 2], to: [2, 1], net: step_base}
