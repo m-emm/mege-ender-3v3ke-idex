@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="552" height="288" viewBox="-6.240 0 17.240 9.000">
+<svg xmlns="http://www.w3.org/2000/svg" width="579" height="288" viewBox="-7.090 0 18.090 9.000">
   <title>Manual Stripboard Layout</title>
   <rect class="board" x="0" y="0" width="11.000" height="9.000" fill="#f7e48b" stroke="#e6ca70" stroke-width="0.035"/>
   <rect class="copper-strip" data-row="0" x="0.250" y="0.225" width="10.500" height="0.550" fill="#d98b61" stroke="#b66d47" stroke-width="0.035"/>
@@ -116,70 +116,70 @@
   <circle class="strip-cut" data-row="6" data-col="4" cx="4.500" cy="6.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
   <line class="strip-cut-mark" data-row="6" data-col="4" x1="4.283" y1="6.283" x2="4.717" y2="6.717" stroke="#000000" stroke-width="0.140"/>
   <line class="strip-cut-mark" data-row="6" data-col="4" x1="4.283" y1="6.717" x2="4.717" y2="6.283" stroke="#000000" stroke-width="0.140"/>
-  <circle class="strip-cut" data-row="6" data-col="7" cx="7.500" cy="6.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
-  <line class="strip-cut-mark" data-row="6" data-col="7" x1="7.283" y1="6.283" x2="7.717" y2="6.717" stroke="#000000" stroke-width="0.140"/>
-  <line class="strip-cut-mark" data-row="6" data-col="7" x1="7.283" y1="6.717" x2="7.717" y2="6.283" stroke="#000000" stroke-width="0.140"/>
   <circle class="strip-cut" data-row="7" data-col="4" cx="4.500" cy="7.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
   <line class="strip-cut-mark" data-row="7" data-col="4" x1="4.283" y1="7.283" x2="4.717" y2="7.717" stroke="#000000" stroke-width="0.140"/>
   <line class="strip-cut-mark" data-row="7" data-col="4" x1="4.283" y1="7.717" x2="4.717" y2="7.283" stroke="#000000" stroke-width="0.140"/>
+  <circle class="strip-cut" data-row="7" data-col="7" cx="7.500" cy="7.500" r="0.310" fill="none" stroke="#000000" stroke-width="0.140"/>
+  <line class="strip-cut-mark" data-row="7" data-col="7" x1="7.283" y1="7.283" x2="7.717" y2="7.717" stroke="#000000" stroke-width="0.140"/>
+  <line class="strip-cut-mark" data-row="7" data-col="7" x1="7.283" y1="7.717" x2="7.717" y2="7.283" stroke="#000000" stroke-width="0.140"/>
   <line class="layout-jumper" data-net="step_base" data-start-row="6" data-start-col="5" data-end-row="7" data-end-col="2" x1="5.500" y1="6.500" x2="2.500" y2="7.500" stroke="#dc2626" stroke-width="0.055" stroke-linecap="round"/>
   <circle class="layout-jumper-endpoint" data-net="step_base" data-row="6" data-col="5" cx="5.500" cy="6.500" r="0.115" fill="#ffffff" stroke="#dc2626" stroke-width="0.055"/>
   <circle class="layout-jumper-endpoint" data-net="step_base" data-row="7" data-col="2" cx="2.500" cy="7.500" r="0.115" fill="#ffffff" stroke="#dc2626" stroke-width="0.055"/>
-  <line class="layout-component" data-element="C1" data-footprint="capacitor_2pin_span4" x1="3.500" y1="4.500" x2="3.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="Q1" data-footprint="to92_cbe_staggered_013" x1="6.500" y1="7.500" x2="6.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="Q1" data-footprint="to92_cbe_staggered_013" x1="6.500" y1="4.500" x2="6.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="Q2" data-footprint="to92_ceb_compact" x1="2.500" y1="5.500" x2="2.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="Q2" data-footprint="to92_ceb_compact" x1="2.500" y1="3.500" x2="2.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="Q3" data-footprint="to92_cbe_staggered_013" x1="5.500" y1="1.500" x2="5.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="Q3" data-footprint="to92_cbe_staggered_013" x1="5.500" y1="4.500" x2="5.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="R1" data-footprint="axial_2pin_span1" x1="0.500" y1="7.500" x2="0.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="R2" data-footprint="axial_2pin_span3" x1="1.500" y1="4.500" x2="1.500" y2="7.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="R3" data-footprint="axial_2pin_span1" x1="8.500" y1="5.500" x2="8.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="R4" data-footprint="axial_2pin_span1" x1="0.500" y1="4.500" x2="0.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="R5" data-footprint="axial_2pin_span1" x1="1.500" y1="1.500" x2="1.500" y2="0.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="R6" data-footprint="axial_2pin_span1" x1="0.500" y1="1.500" x2="0.500" y2="0.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="R7" data-footprint="axial_2pin_span1" x1="6.500" y1="2.500" x2="6.500" y2="3.500" stroke="#1f2937" stroke-width="0.045"/>
-  <line class="layout-component" data-element="R8" data-footprint="axial_2pin_span2" x1="4.500" y1="4.500" x2="4.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
-  <circle class="layout-component-body" data-element="C1" data-value="100nF" data-label="C1" data-footprint="capacitor_2pin_span4" cx="3.500" cy="6.500" r="0.165" fill="#111827"/>
-  <circle class="layout-component-body" data-element="Q1" data-value="BC337" data-label="Q1" data-footprint="to92_cbe_staggered_013" cx="6.880" cy="6.500" r="0.300" fill="#111827"/>
-  <circle class="layout-component-body" data-element="Q2" data-value="BC337" data-label="Q2" data-footprint="to92_ceb_compact" cx="2.880" cy="4.500" r="0.300" fill="#111827"/>
-  <circle class="layout-component-body" data-element="Q3" data-value="BC337" data-label="Q3" data-footprint="to92_cbe_staggered_013" cx="5.880" cy="2.500" r="0.300" fill="#111827"/>
-  <circle class="layout-component-body" data-element="R1" data-value="2k2" data-label="R1" data-footprint="axial_2pin_span1" cx="0.500" cy="7.000" r="0.165" fill="#111827"/>
-  <circle class="layout-component-body" data-element="R2" data-value="47k" data-label="R2" data-footprint="axial_2pin_span3" cx="1.500" cy="6.000" r="0.165" fill="#111827"/>
-  <circle class="layout-component-body" data-element="R3" data-value="2k2" data-label="R3" data-footprint="axial_2pin_span1" cx="8.500" cy="6.000" r="0.165" fill="#111827"/>
-  <circle class="layout-component-body" data-element="R4" data-value="47k" data-label="R4" data-footprint="axial_2pin_span1" cx="0.500" cy="5.000" r="0.165" fill="#111827"/>
-  <circle class="layout-component-body" data-element="R5" data-value="4k7 0.25W" data-label="R5" data-footprint="axial_2pin_span1" cx="1.500" cy="1.000" r="0.165" fill="#111827"/>
-  <circle class="layout-component-body" data-element="R6" data-value="4k7 0.25W" data-label="R6" data-footprint="axial_2pin_span1" cx="0.500" cy="1.000" r="0.165" fill="#111827"/>
-  <circle class="layout-component-body" data-element="R7" data-value="2k2" data-label="R7" data-footprint="axial_2pin_span1" cx="6.500" cy="3.000" r="0.165" fill="#111827"/>
-  <circle class="layout-component-body" data-element="R8" data-value="47k" data-label="R8" data-footprint="axial_2pin_span2" cx="4.500" cy="3.500" r="0.165" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="C1" data-terminal="end" data-footprint="capacitor_2pin_span4" data-row="4" data-col="3" cx="3.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="v5" data-element="C1" data-terminal="start" data-footprint="capacitor_2pin_span4" data-row="8" data-col="3" cx="3.500" cy="8.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="step_base" data-element="Q1" data-terminal="base" data-footprint="to92_cbe_staggered_013" data-row="6" data-col="6" cx="6.500" cy="6.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="step_pul_minus" data-element="Q1" data-terminal="collector" data-footprint="to92_cbe_staggered_013" data-row="7" data-col="6" cx="6.500" cy="7.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="Q1" data-terminal="emitter" data-footprint="to92_cbe_staggered_013" data-row="4" data-col="6" cx="6.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="dir_base" data-element="Q2" data-terminal="base" data-footprint="to92_ceb_compact" data-row="5" data-col="2" cx="2.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="dir_minus" data-element="Q2" data-terminal="collector" data-footprint="to92_ceb_compact" data-row="3" data-col="2" cx="2.500" cy="3.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="Q2" data-terminal="emitter" data-footprint="to92_ceb_compact" data-row="4" data-col="2" cx="2.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_base" data-element="Q3" data-terminal="base" data-footprint="to92_cbe_staggered_013" data-row="2" data-col="5" cx="5.500" cy="2.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_plus" data-element="Q3" data-terminal="collector" data-footprint="to92_cbe_staggered_013" data-row="1" data-col="5" cx="5.500" cy="1.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="Q3" data-terminal="emitter" data-footprint="to92_cbe_staggered_013" data-row="4" data-col="5" cx="5.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="step_base" data-element="R1" data-terminal="end" data-footprint="axial_2pin_span1" data-row="7" data-col="0" cx="0.500" cy="7.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="step_gpio" data-element="R1" data-terminal="start" data-footprint="axial_2pin_span1" data-row="6" data-col="0" cx="0.500" cy="6.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="R2" data-terminal="end" data-footprint="axial_2pin_span3" data-row="4" data-col="1" cx="1.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="step_base" data-element="R2" data-terminal="start" data-footprint="axial_2pin_span3" data-row="7" data-col="1" cx="1.500" cy="7.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="dir_base" data-element="R3" data-terminal="end" data-footprint="axial_2pin_span1" data-row="5" data-col="8" cx="8.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="dir_gpio" data-element="R3" data-terminal="start" data-footprint="axial_2pin_span1" data-row="6" data-col="8" cx="8.500" cy="6.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="R4" data-terminal="end" data-footprint="axial_2pin_span1" data-row="4" data-col="0" cx="0.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="dir_base" data-element="R4" data-terminal="start" data-footprint="axial_2pin_span1" data-row="5" data-col="0" cx="0.500" cy="5.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_plus" data-element="R5" data-terminal="end" data-footprint="axial_2pin_span1" data-row="1" data-col="1" cx="1.500" cy="1.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="v24" data-element="R5" data-terminal="start" data-footprint="axial_2pin_span1" data-row="0" data-col="1" cx="1.500" cy="0.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_plus" data-element="R6" data-terminal="end" data-footprint="axial_2pin_span1" data-row="1" data-col="0" cx="0.500" cy="1.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="v24" data-element="R6" data-terminal="start" data-footprint="axial_2pin_span1" data-row="0" data-col="0" cx="0.500" cy="0.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_base" data-element="R7" data-terminal="end" data-footprint="axial_2pin_span1" data-row="2" data-col="6" cx="6.500" cy="2.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_gpio" data-element="R7" data-terminal="start" data-footprint="axial_2pin_span1" data-row="3" data-col="6" cx="6.500" cy="3.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="gnd" data-element="R8" data-terminal="end" data-footprint="axial_2pin_span2" data-row="4" data-col="4" cx="4.500" cy="4.500" r="0.090" fill="#111827"/>
-  <circle class="layout-pin" data-net="ena_base" data-element="R8" data-terminal="start" data-footprint="axial_2pin_span2" data-row="2" data-col="4" cx="4.500" cy="2.500" r="0.090" fill="#111827"/>
-  <circle class="layout-connector" data-net="dir_gpio" data-connector="DIR_gpio" data-kind="nail" data-net-kind="data" data-color="#ffd400" data-row="6" data-col="9" cx="9.500" cy="6.500" r="0.135" fill="#ffd400" stroke="#ffffff" stroke-width="0.055"/>
+  <line class="layout-component" data-element="C1" data-footprint="yaml_C1" x1="3.500" y1="4.500" x2="3.500" y2="8.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="Q1" data-footprint="yaml_Q1" x1="6.500" y1="7.500" x2="6.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="Q1" data-footprint="yaml_Q1" x1="6.500" y1="4.500" x2="6.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="Q2" data-footprint="yaml_Q2" x1="2.500" y1="5.500" x2="2.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="Q2" data-footprint="yaml_Q2" x1="2.500" y1="3.500" x2="2.500" y2="4.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="Q3" data-footprint="yaml_Q3" x1="5.500" y1="1.500" x2="5.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="Q3" data-footprint="yaml_Q3" x1="5.500" y1="4.500" x2="5.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="R1" data-footprint="yaml_R1" x1="0.500" y1="7.500" x2="0.500" y2="6.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="R2" data-footprint="yaml_R2" x1="1.500" y1="4.500" x2="1.500" y2="7.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="R3" data-footprint="yaml_R3" x1="8.500" y1="5.500" x2="8.500" y2="7.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="R4" data-footprint="yaml_R4" x1="0.500" y1="4.500" x2="0.500" y2="5.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="R5" data-footprint="yaml_R5" x1="1.500" y1="1.500" x2="1.500" y2="0.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="R6" data-footprint="yaml_R6" x1="0.500" y1="1.500" x2="0.500" y2="0.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="R7" data-footprint="yaml_R7" x1="6.500" y1="2.500" x2="6.500" y2="3.500" stroke="#1f2937" stroke-width="0.045"/>
+  <line class="layout-component" data-element="R8" data-footprint="yaml_R8" x1="4.500" y1="4.500" x2="4.500" y2="2.500" stroke="#1f2937" stroke-width="0.045"/>
+  <circle class="layout-component-body" data-element="C1" data-value="100nF" data-label="C1" data-footprint="yaml_C1" cx="3.500" cy="6.500" r="0.165" fill="#111827"/>
+  <circle class="layout-component-body" data-element="Q1" data-value="BC337" data-label="Q1" data-footprint="yaml_Q1" cx="6.880" cy="6.500" r="0.300" fill="#111827"/>
+  <circle class="layout-component-body" data-element="Q2" data-value="BC337" data-label="Q2" data-footprint="yaml_Q2" cx="2.880" cy="4.500" r="0.300" fill="#111827"/>
+  <circle class="layout-component-body" data-element="Q3" data-value="BC337" data-label="Q3" data-footprint="yaml_Q3" cx="5.880" cy="2.500" r="0.300" fill="#111827"/>
+  <circle class="layout-component-body" data-element="R1" data-value="2k2" data-label="R1" data-footprint="yaml_R1" cx="0.500" cy="7.000" r="0.165" fill="#111827"/>
+  <circle class="layout-component-body" data-element="R2" data-value="47k" data-label="R2" data-footprint="yaml_R2" cx="1.500" cy="6.000" r="0.165" fill="#111827"/>
+  <circle class="layout-component-body" data-element="R3" data-value="2k2" data-label="R3" data-footprint="yaml_R3" cx="8.500" cy="6.500" r="0.165" fill="#111827"/>
+  <circle class="layout-component-body" data-element="R4" data-value="47k" data-label="R4" data-footprint="yaml_R4" cx="0.500" cy="5.000" r="0.165" fill="#111827"/>
+  <circle class="layout-component-body" data-element="R5" data-value="4k7 0.25W" data-label="R5" data-footprint="yaml_R5" cx="1.500" cy="1.000" r="0.165" fill="#111827"/>
+  <circle class="layout-component-body" data-element="R6" data-value="4k7 0.25W" data-label="R6" data-footprint="yaml_R6" cx="0.500" cy="1.000" r="0.165" fill="#111827"/>
+  <circle class="layout-component-body" data-element="R7" data-value="2k2" data-label="R7" data-footprint="yaml_R7" cx="6.500" cy="3.000" r="0.165" fill="#111827"/>
+  <circle class="layout-component-body" data-element="R8" data-value="47k" data-label="R8" data-footprint="yaml_R8" cx="4.500" cy="3.500" r="0.165" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="C1" data-terminal="end" data-footprint="yaml_C1" data-row="4" data-col="3" cx="3.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="v5" data-element="C1" data-terminal="start" data-footprint="yaml_C1" data-row="8" data-col="3" cx="3.500" cy="8.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="step_base" data-element="Q1" data-terminal="base" data-footprint="yaml_Q1" data-row="6" data-col="6" cx="6.500" cy="6.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="step_pul_minus" data-element="Q1" data-terminal="collector" data-footprint="yaml_Q1" data-row="7" data-col="6" cx="6.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="Q1" data-terminal="emitter" data-footprint="yaml_Q1" data-row="4" data-col="6" cx="6.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="dir_base" data-element="Q2" data-terminal="base" data-footprint="yaml_Q2" data-row="5" data-col="2" cx="2.500" cy="5.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="dir_minus" data-element="Q2" data-terminal="collector" data-footprint="yaml_Q2" data-row="3" data-col="2" cx="2.500" cy="3.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="Q2" data-terminal="emitter" data-footprint="yaml_Q2" data-row="4" data-col="2" cx="2.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_base" data-element="Q3" data-terminal="base" data-footprint="yaml_Q3" data-row="2" data-col="5" cx="5.500" cy="2.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_plus" data-element="Q3" data-terminal="collector" data-footprint="yaml_Q3" data-row="1" data-col="5" cx="5.500" cy="1.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="Q3" data-terminal="emitter" data-footprint="yaml_Q3" data-row="4" data-col="5" cx="5.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="step_base" data-element="R1" data-terminal="end" data-footprint="yaml_R1" data-row="7" data-col="0" cx="0.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="step_gpio" data-element="R1" data-terminal="start" data-footprint="yaml_R1" data-row="6" data-col="0" cx="0.500" cy="6.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="R2" data-terminal="end" data-footprint="yaml_R2" data-row="4" data-col="1" cx="1.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="step_base" data-element="R2" data-terminal="start" data-footprint="yaml_R2" data-row="7" data-col="1" cx="1.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="dir_base" data-element="R3" data-terminal="end" data-footprint="yaml_R3" data-row="5" data-col="8" cx="8.500" cy="5.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="dir_gpio" data-element="R3" data-terminal="start" data-footprint="yaml_R3" data-row="7" data-col="8" cx="8.500" cy="7.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="R4" data-terminal="end" data-footprint="yaml_R4" data-row="4" data-col="0" cx="0.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="dir_base" data-element="R4" data-terminal="start" data-footprint="yaml_R4" data-row="5" data-col="0" cx="0.500" cy="5.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_plus" data-element="R5" data-terminal="end" data-footprint="yaml_R5" data-row="1" data-col="1" cx="1.500" cy="1.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="v24" data-element="R5" data-terminal="start" data-footprint="yaml_R5" data-row="0" data-col="1" cx="1.500" cy="0.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_plus" data-element="R6" data-terminal="end" data-footprint="yaml_R6" data-row="1" data-col="0" cx="0.500" cy="1.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="v24" data-element="R6" data-terminal="start" data-footprint="yaml_R6" data-row="0" data-col="0" cx="0.500" cy="0.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_base" data-element="R7" data-terminal="end" data-footprint="yaml_R7" data-row="2" data-col="6" cx="6.500" cy="2.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_gpio" data-element="R7" data-terminal="start" data-footprint="yaml_R7" data-row="3" data-col="6" cx="6.500" cy="3.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="gnd" data-element="R8" data-terminal="end" data-footprint="yaml_R8" data-row="4" data-col="4" cx="4.500" cy="4.500" r="0.090" fill="#111827"/>
+  <circle class="layout-pin" data-net="ena_base" data-element="R8" data-terminal="start" data-footprint="yaml_R8" data-row="2" data-col="4" cx="4.500" cy="2.500" r="0.090" fill="#111827"/>
+  <circle class="layout-connector" data-net="dir_gpio" data-connector="DIR_gpio" data-kind="nail" data-net-kind="data" data-color="#ffd400" data-row="7" data-col="9" cx="9.500" cy="7.500" r="0.135" fill="#ffd400" stroke="#ffffff" stroke-width="0.055"/>
   <circle class="layout-connector" data-net="dir_minus" data-connector="DIR_minus" data-kind="nail" data-net-kind="data" data-color="#ffd400" data-row="3" data-col="0" cx="0.500" cy="3.500" r="0.135" fill="#ffd400" stroke="#ffffff" stroke-width="0.055"/>
   <circle class="layout-connector" data-net="v5" data-connector="DIR_plus" data-kind="nail" data-net-kind="power" data-color="#ff0000" data-row="8" data-col="2" cx="2.500" cy="8.500" r="0.135" fill="#ff0000" stroke="#ffffff" stroke-width="0.055"/>
   <circle class="layout-connector" data-net="step_gpio" data-connector="STEP_gpio" data-kind="nail" data-net-kind="clock" data-color="#0057d8" data-row="6" data-col="2" cx="2.500" cy="6.500" r="0.135" fill="#0057d8" stroke="#ffffff" stroke-width="0.055"/>
@@ -206,7 +206,7 @@
   <text class="layout-component-body-label" data-element="Q3" data-value="BC337" data-label="Q3" x="5.880" y="2.555" font-size="0.210" font-weight="800" text-anchor="middle" fill="#ffffff">Q3</text>
   <text class="layout-component-body-label" data-element="R1" data-value="2k2" data-label="R1" x="0.500" y="7.055" font-size="0.165" font-weight="800" text-anchor="middle" fill="#ffffff">R1</text>
   <text class="layout-component-body-label" data-element="R2" data-value="47k" data-label="R2" x="1.500" y="6.055" font-size="0.165" font-weight="800" text-anchor="middle" fill="#ffffff">R2</text>
-  <text class="layout-component-body-label" data-element="R3" data-value="2k2" data-label="R3" x="8.500" y="6.055" font-size="0.165" font-weight="800" text-anchor="middle" fill="#ffffff">R3</text>
+  <text class="layout-component-body-label" data-element="R3" data-value="2k2" data-label="R3" x="8.500" y="6.555" font-size="0.165" font-weight="800" text-anchor="middle" fill="#ffffff">R3</text>
   <text class="layout-component-body-label" data-element="R4" data-value="47k" data-label="R4" x="0.500" y="5.055" font-size="0.165" font-weight="800" text-anchor="middle" fill="#ffffff">R4</text>
   <text class="layout-component-body-label" data-element="R5" data-value="4k7 0.25W" data-label="R5" x="1.500" y="1.055" font-size="0.165" font-weight="800" text-anchor="middle" fill="#ffffff">R5</text>
   <text class="layout-component-body-label" data-element="R6" data-value="4k7 0.25W" data-label="R6" x="0.500" y="1.055" font-size="0.165" font-weight="800" text-anchor="middle" fill="#ffffff">R6</text>
@@ -218,10 +218,10 @@
   <text class="layout-row-label" data-row="3" data-net="dir_minus / ena_gpio" x="-0.220" y="3.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">dir_minus / ena_gpio</text>
   <text class="layout-row-label" data-row="4" data-net="gnd" x="-0.220" y="4.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">gnd</text>
   <text class="layout-row-label" data-row="5" data-net="dir_base" x="-0.220" y="5.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">dir_base</text>
-  <text class="layout-row-label" data-row="6" data-net="dir_gpio / step_base / step_gpio" x="-0.220" y="6.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">dir_gpio / step_base / step_gpio</text>
-  <text class="layout-row-label" data-row="7" data-net="step_base / step_pul_minus" x="-0.220" y="7.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">step_base / step_pul_minus</text>
+  <text class="layout-row-label" data-row="6" data-net="step_base / step_gpio" x="-0.220" y="6.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">step_base / step_gpio</text>
+  <text class="layout-row-label" data-row="7" data-net="dir_gpio / step_base / step_pul_minus" x="-0.220" y="7.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">dir_gpio / step_base / step_pul_minus</text>
   <text class="layout-row-label" data-row="8" data-net="v5" x="-0.220" y="8.615" font-size="0.170" font-weight="800" text-anchor="end" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke">v5</text>
-  <text class="layout-connector-label" data-net="dir_gpio" data-connector="DIR_gpio" x="9.680" y="6.340" font-size="0.170" font-weight="800" text-anchor="start" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 9.680 6.340)">Pico DIR GPIO1</text>
+  <text class="layout-connector-label" data-net="dir_gpio" data-connector="DIR_gpio" x="9.680" y="7.340" font-size="0.170" font-weight="800" text-anchor="start" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 9.680 7.340)">Pico DIR GPIO1</text>
   <text class="layout-connector-label" data-net="dir_minus" data-connector="DIR_minus" x="0.680" y="3.340" font-size="0.170" font-weight="800" text-anchor="start" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 0.680 3.340)">DIR-</text>
   <text class="layout-connector-label" data-net="v5" data-connector="DIR_plus" x="2.680" y="8.340" font-size="0.170" font-weight="800" text-anchor="start" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 2.680 8.340)">DIR+</text>
   <text class="layout-connector-label" data-net="step_gpio" data-connector="STEP_gpio" x="2.680" y="6.340" font-size="0.170" font-weight="800" text-anchor="start" fill="#b91c1c" stroke="#ffffff" stroke-width="0.075" paint-order="stroke" transform="rotate(-30.0 2.680 6.340)">Pico STEP GPIO0</text>

@@ -9,6 +9,11 @@ DEFAULT_YAML_FILES=(
   "${SCRIPT_DIR}/pico_w_btt_tmc2226_y_z.yaml"
 )
 
+MEGE_CIRCUITS_SRC="${REPO_ROOT}/../mege-circuits/src"
+if [[ -d "${MEGE_CIRCUITS_SRC}" ]]; then
+  export PYTHONPATH="${MEGE_CIRCUITS_SRC}${PYTHONPATH:+:${PYTHONPATH}}"
+fi
+
 usage() {
   cat >&2 <<'EOF'
 Usage:
@@ -16,6 +21,7 @@ Usage:
 
 Without --check, generate SVGs into wiring/diagrams/.
 With --check, regenerate into a temporary directory and fail if committed SVGs differ.
+Run with no YAML arguments to generate all active wiring diagrams.
 EOF
 }
 

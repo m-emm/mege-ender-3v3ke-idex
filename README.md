@@ -56,13 +56,12 @@ The generic pinout renderer used for those wiring diagrams now lives in
 [`mege-circuits`](https://github.com/m-emm/mege-circuits).
 
 ```bash
-# From the local checkout
-cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
-python generate_printer_cfg.py --check
-wiring/generate_wiring_svgs.sh --check
-python wiring/validate_wiring.py
-./update_menderpi.sh --check
-./update_menderpi.sh
+# From the repo root
+python klipper_setup/klipper_config/generate_printer_cfg.py --check
+./klipper_setup/klipper_config/wiring/generate_wiring_svgs.sh --check
+python klipper_setup/klipper_config/wiring/validate_wiring.py
+klipper_setup/klipper_config/update_menderpi.sh --check
+klipper_setup/klipper_config/update_menderpi.sh
 ```
 
 `./update_menderpi.sh --check` verifies the generated local config, the remote

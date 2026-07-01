@@ -23,7 +23,7 @@ components:
   Q3: {c: [1, 5], b: [2, 5], e: [4, 5]}
   R1: [[6, 0], [7, 0]]
   R2: [[7, 1], [4, 1]]
-  R3: [[6, 8], [5, 8]]
+  R3: [[7, 8], [5, 8]]
   R4: [[5, 0], [4, 0]]
   R5: [[0, 1], [1, 1]]
   R6: [[0, 0], [1, 0]]
@@ -32,10 +32,10 @@ components:
 cuts:
   - [3, 3]
   - [6, 4]
-  - [6, 7]
+  - [7, 7]
   - [7, 4]
 connectors:
-  - {name: DIR_gpio, at: [6, 9], net: dir_gpio, label: Pico DIR GPIO1, type: data}
+  - {name: DIR_gpio, at: [7, 9], net: dir_gpio, label: Pico DIR GPIO1, type: data}
   - {name: DIR_minus, at: [3, 0], net: dir_minus, label: DIR-, type: data}
   - {name: DIR_plus, at: [8, 2], net: v5, label: DIR+, type: power}
   - {name: STEP_gpio, at: [6, 2], net: step_gpio, label: Pico STEP GPIO0, type: clock}

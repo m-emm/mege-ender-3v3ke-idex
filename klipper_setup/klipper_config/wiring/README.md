@@ -25,9 +25,9 @@ and `^` pull-ups.
 ## Generate Diagrams
 
 ```bash
-cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config/wiring
-./generate_wiring_svgs.sh
-./generate_wiring_svgs.sh --check
+cd /Users/mege/git/mege-ender-3v3ke-idex
+./klipper_setup/klipper_config/wiring/generate_wiring_svgs.sh
+./klipper_setup/klipper_config/wiring/generate_wiring_svgs.sh --check
 ```
 
 `--check` regenerates into a temporary directory and diffs the result against
