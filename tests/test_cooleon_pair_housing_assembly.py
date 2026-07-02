@@ -169,7 +169,7 @@ def test_cooleon_pair_housing_yaml_does_not_export_standalone_hatches():
     assert plate_names.isdisjoint(HATCH_NAMES)
 
 
-def test_cooleon_pair_housing_routes_only_lid_and_clamp_plate_to_idex():
+def test_cooleon_pair_housing_routes_all_plates_to_stock_printer():
     resource = _load_resource()
     production = resource["Builder"]["Production"]
     plates = {
@@ -178,18 +178,14 @@ def test_cooleon_pair_housing_routes_only_lid_and_clamp_plate_to_idex():
     }
 
     assert production["process_data_preset"] == "petgcf_max_strength_high_speed_06"
-    assert (
-        plates["cooleon_pair_housing_right"]["process_data_preset"]
-        == "petgcf_max_strength_high_speed_06"
-    )
-    assert (
-        plates["cooleon_pair_housing_left"]["process_data_preset"]
-        == "petgcf_max_strength_high_speed_06"
-    )
-    assert (
-        plates["cooleon_pair_housing_lid_and_clamp"]["process_data_preset"]
-        == "petgcf_max_strength_high_speed_06_idex"
-    )
+    assert set(plates) == {
+        "cooleon_pair_housing_right",
+        "cooleon_pair_housing_left",
+        "cooleon_pair_housing_lid_and_clamp",
+    }
+    for plate in plates.values():
+        assert plate["process_data_preset"] == "petgcf_max_strength_high_speed_06"
+        assert not plate["process_data_preset"].endswith("_idex")
 
 
 def test_cooleon_pair_housing_generator_fuses_hatches_into_lids():
