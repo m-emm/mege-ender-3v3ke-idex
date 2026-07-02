@@ -1,5 +1,7 @@
 import importlib.util
 import re
+import sys
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -32,6 +34,7 @@ CONFIG_PATH = KLIPPER_CONFIG_DIR / "printer.cfg"
 CALIB_PATH = KLIPPER_CONFIG_DIR / "calib.yaml"
 TEMPLATE_PATH = KLIPPER_CONFIG_DIR / "printer.cfg.template"
 GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_printer_cfg.py"
+Y_STEP_LOSS_GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_y_step_loss_test_gcode.py"
 
 
 def _load_generator_module():
@@ -41,6 +44,19 @@ def _load_generator_module():
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_y_step_loss_generator_module():
+    spec = importlib.util.spec_from_file_location(
+        "generate_y_step_loss_test_gcode", Y_STEP_LOSS_GENERATOR_PATH
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -175,6 +191,69 @@ def test_stepper_y_uses_tb6600_20t_gt2_pulley_config():
     assert _setting_value(stepper_y, "enable_pin") == "gpio2"
     assert _setting_float(stepper_y, "microsteps") == pytest.approx(16.0)
     assert _setting_float(stepper_y, "rotation_distance") == pytest.approx(40.0)
+
+
+def test_y_step_loss_assert_macro_checks_stepper_y_endstop():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    macro = _section(config_text, "gcode_macro Y_STEP_LOSS_ASSERT_ENDSTOP")
+
+    assert 'printer.query_endstops.last_query["stepper_y"]' in macro
+    assert "action_raise_error" in macro
+    assert "Re-home Y before normal printing" in macro
+
+
+def test_y_step_loss_generator_emits_forty_focused_endstop_checks(tmp_path):
+    generator = _load_y_step_loss_generator_module()
+    axis = generator.load_y_axis_config(CONFIG_PATH)
+    gcode = generator.generate_gcode(axis)
+    output = tmp_path / "y_step_loss_characterization.gcode"
+
+    assert generator.main(["--config", str(CONFIG_PATH), "--output", str(output)]) == 0
+    assert output.read_text(encoding="utf-8") == gcode
+
+    lines = [line.strip() for line in gcode.splitlines() if line.strip()]
+    assert "; Endstop verification key: stepper_y" in lines
+    assert "; Y away distance: 90.000" in lines
+    assert "; Total endstop checks: 40" in lines
+    assert gcode.count("Y_STEP_LOSS_ASSERT_ENDSTOP") == 40
+
+    assertion_lines = [
+        line for line in lines if line.startswith("Y_STEP_LOSS_ASSERT_ENDSTOP ")
+    ]
+    accel_values = [
+        int(re.search(r"\bACCEL=(\d+)\b", line).group(1))
+        for line in assertion_lines
+    ]
+    assert sorted(set(accel_values)) == [7000, 8000]
+    assert {accel: accel_values.count(accel) for accel in set(accel_values)} == {
+        accel: 20 for accel in set(accel_values)
+    }
+
+    for index, line in enumerate(lines):
+        if line.startswith("Y_STEP_LOSS_ASSERT_ENDSTOP "):
+            assert lines[index - 1] == "QUERY_ENDSTOPS"
+
+    stepper_y = _section(CONFIG_PATH.read_text(encoding="utf-8"), "stepper_y")
+    y_min = _setting_float(stepper_y, "position_min")
+    y_max = _setting_float(stepper_y, "position_max")
+    y_targets = [
+        float(match.group(1))
+        for match in re.finditer(r"^G1 Y(-?\d+(?:\.\d+)?)\b", gcode, re.MULTILINE)
+    ]
+    assert y_targets
+    assert min(y_targets) >= y_min - 1e-9
+    assert max(y_targets) <= y_max + 1e-9
+
+
+def test_y_step_loss_generator_default_output_path_is_timestamped(tmp_path):
+    generator = _load_y_step_loss_generator_module()
+
+    output_path = generator.timestamped_output_path(
+        tmp_path,
+        now=datetime(2026, 7, 2, 10, 1, 58),
+    )
+
+    assert output_path == tmp_path / "y_step_loss_characterization_20260702_100158.gcode"
 
 
 def test_config_fingerprint_changes_when_source_inputs_change(tmp_path):
