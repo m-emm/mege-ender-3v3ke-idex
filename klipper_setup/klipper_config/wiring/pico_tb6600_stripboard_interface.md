@@ -23,20 +23,19 @@ this wiring directory. `mege-circuits` provides the reusable renderer/planner
 library and keeps a TB6600 regression/demo copy, but the IDEX wiring source of
 truth is this repository.
 
-The active printer wiring still uses the Y-axis TMC2226 driver. This TB6600
-interface is a planned parallel connector so the machine can keep running on
-TMC1 until the external driver is built and bench-tested.
+The active printer wiring now uses this external TB6600-style driver interface
+for Y through the Pico GPIO0/1/2 connector.
 
 ## Bench validation
 
 Bench test completed on 2026-07-01 19:49:08 CEST with an Adafruit FT232H, this
 stripboard interface, the TB6600-style driver box, and a loose desk stepper.
 STEP, DIR, and ENA all worked through the soldered board. At the 8 microstep
-bench setting, the motor ran quietly and reliably at the 500 mm/s Y-axis
-equivalent STEP rate, about 13.333 kHz for the current
-`rotation_distance: 60` reference. Verified ENA polarity: GPIO low disables the
-driver and frees the motor; GPIO high enables the driver and restores holding
-torque.
+bench setting, the motor ran quietly and reliably at the original 500 mm/s
+Y-axis equivalent STEP rate. The live printer now uses a 20T GT2 pulley with
+`rotation_distance: 40` and 16 microsteps, so the same 500 mm/s target is about
+40 kHz STEP. Verified ENA polarity: GPIO low disables the driver and frees the
+motor; GPIO high enables the driver and restores holding torque.
 
 Detailed commands, setup notes, and debug findings are recorded in
 `bench_tests/TEST_LOG.md`.
@@ -210,7 +209,7 @@ dir_pin: !gpio1
 enable_pin: gpio2
 
 microsteps: 8
-rotation_distance: 60
+rotation_distance: 40
 full_steps_per_rotation: 200
 
 # Conservative pulse width for clone drivers with optocoupler inputs:

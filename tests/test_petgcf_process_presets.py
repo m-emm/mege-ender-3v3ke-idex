@@ -21,6 +21,22 @@ PETGCF_06_ANTI_SHIFT_OVERRIDES = {
     "sparse_infill_acceleration": "4240",
 }
 
+PETGCF_06_IDEX_RETRY_MOTION_OVERRIDES = {
+    "travel_acceleration": "3500",
+    "default_acceleration": "3500",
+    "initial_layer_acceleration": "3500",
+    "inner_wall_acceleration": "3500",
+    "internal_solid_infill_acceleration": "3500",
+    "sparse_infill_acceleration": "3500",
+    "travel_jerk": "5",
+    "default_jerk": "5",
+    "initial_layer_jerk": "5",
+    "outer_wall_jerk": "5",
+    "inner_wall_jerk": "5",
+    "infill_jerk": "5",
+    "top_surface_jerk": "5",
+}
+
 
 def test_petgcf_06_presets_include_anti_shift_motion_overrides():
     config = yaml.load(
@@ -44,3 +60,34 @@ def test_petgcf_06_presets_include_anti_shift_motion_overrides():
         overrides = presets[preset_name]["overrides"]["process_overrides"]
         for key, value in PETGCF_06_ANTI_SHIFT_OVERRIDES.items():
             assert overrides[key] == value
+
+
+def test_petgcf_06_idex_one_off_preset_keeps_stock_petgcf_tuning():
+    config = yaml.load(
+        (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+
+    preset = config["process_data_presets"]["petgcf_max_strength_high_speed_06_idex"]
+
+    assert preset["generator"] == "mege3devops_idex_parametric"
+    assert preset["arguments"] == {
+        "material_name": "petg_cf_generic",
+        "nozzle_diameter_mm": 0.6,
+        "nozzle_hardened": True,
+        "nozzle_high_flow": True,
+        "strength_factor": 0.9,
+        "quality_factor": 0.5,
+    }
+    overrides = preset["overrides"]["process_overrides"]
+    assert overrides["sparse_infill_pattern"] == "cubic"
+    assert overrides["support_object_first_layer_gap"] == "2.5"
+    assert overrides["xy_contour_compensation"] == "-0.3"
+    assert overrides["xy_hole_compensation"] == "0.4"
+    assert overrides["top_surface_acceleration"] == "2650"
+    for key, value in PETGCF_06_ANTI_SHIFT_OVERRIDES.items():
+        if key in PETGCF_06_IDEX_RETRY_MOTION_OVERRIDES:
+            continue
+        assert overrides[key] == value
+    for key, value in PETGCF_06_IDEX_RETRY_MOTION_OVERRIDES.items():
+        assert overrides[key] == value

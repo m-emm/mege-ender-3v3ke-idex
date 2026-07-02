@@ -69,6 +69,16 @@ def _setting_float(section: str, setting_name: str) -> float:
     return float(match.group("value"))
 
 
+def _setting_value(section: str, setting_name: str) -> str:
+    match = re.search(
+        rf"^\s*{re.escape(setting_name)}\s*:\s*(?P<value>\S+)\s*$",
+        section,
+        flags=re.MULTILINE,
+    )
+    assert match is not None, f"Missing setting {setting_name}"
+    return match.group("value")
+
+
 def _macro_variable_float(section: str, variable_name: str) -> float:
     return _setting_float(section, f"variable_{variable_name}")
 
@@ -154,6 +164,17 @@ def test_printer_motion_limits_match_proven_idex_axes():
     assert _setting_float(printer, "max_z_accel") == pytest.approx(300.0)
     assert _setting_float(printer, "square_corner_velocity") == pytest.approx(10.0)
     assert "[force_move]" not in config_text
+
+
+def test_stepper_y_uses_tb6600_20t_gt2_pulley_config():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    stepper_y = _section(config_text, "stepper_y")
+
+    assert _setting_value(stepper_y, "step_pin") == "gpio0"
+    assert _setting_value(stepper_y, "dir_pin") == "!gpio1"
+    assert _setting_value(stepper_y, "enable_pin") == "gpio2"
+    assert _setting_float(stepper_y, "microsteps") == pytest.approx(16.0)
+    assert _setting_float(stepper_y, "rotation_distance") == pytest.approx(40.0)
 
 
 def test_config_fingerprint_changes_when_source_inputs_change(tmp_path):

@@ -209,7 +209,7 @@ step_pin: gpio0
 dir_pin: !gpio1
 enable_pin: gpio2
 microsteps: 16
-rotation_distance: 60
+rotation_distance: 40
 step_pulse_duration: 0.000005
 endstop_pin: ^!gpio4
 position_endstop: ${t0_y_endstop}
