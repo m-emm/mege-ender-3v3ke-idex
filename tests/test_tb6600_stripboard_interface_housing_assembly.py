@@ -322,6 +322,21 @@ def test_tb6600_stripboard_interface_housing_production_plate_contains_body_and_
     production = resource["Builder"]["Production"]
 
     assert production["process_data_preset"] == "petgcf_max_strength_high_speed_06_idex"
+    assert production["parts"] == [
+        {
+            "source": "self",
+            "artifact": "leader",
+            "name": "tb6600_stripboard_interface_housing",
+        },
+        {
+            "source": "self",
+            "artifact": "followers",
+            "names": ["tb6600_stripboard_interface_housing_lid"],
+            "name_template": "{name}",
+            "prod_rotation_angle": 180,
+            "prod_rotation_axis": [1, 0, 0],
+        },
+    ]
     assert production["arrange"]["auto_assign_plates"] is False
     assert production["arrange"]["plates"] == [
         {

@@ -44,6 +44,8 @@ Builder:
         names:
           - tb6600_stripboard_interface_housing_lid
         name_template: "{name}"
+        prod_rotation_angle: 180
+        prod_rotation_axis: [1, 0, 0]
     arrange:
       export_individual_parts: false
       prod_gap: 12.0
