@@ -1976,6 +1976,46 @@ assemblies:
       heatbed_psu_housing_lid_screw_inset: !Ref heatbed_psu_housing_lid_screw_inset
       heatbed_psu_housing_lid_screw_mount_block_size: !Ref heatbed_psu_housing_lid_screw_mount_block_size
 
+  - name: tb6600_stripboard_interface_housing_assembly
+
+    resource_file: tb6600_stripboard_interface_housing_assembly.yaml
+    depends_on: []
+    parameters:
+      tb6600_stripboard_interface_housing_board_columns: !Ref tb6600_stripboard_interface_housing_board_columns
+      tb6600_stripboard_interface_housing_board_rows: !Ref tb6600_stripboard_interface_housing_board_rows
+      tb6600_stripboard_interface_housing_board_pitch: !Ref tb6600_stripboard_interface_housing_board_pitch
+      tb6600_stripboard_interface_housing_board_clearance: !Ref tb6600_stripboard_interface_housing_board_clearance
+      tb6600_stripboard_interface_housing_front_cable_corridor: !Ref tb6600_stripboard_interface_housing_front_cable_corridor
+      tb6600_stripboard_interface_housing_internal_height: !Ref tb6600_stripboard_interface_housing_internal_height
+      tb6600_stripboard_interface_housing_wall_thickness: !Ref tb6600_stripboard_interface_housing_wall_thickness
+      tb6600_stripboard_interface_housing_corner_fillet_radius: !Ref tb6600_stripboard_interface_housing_corner_fillet_radius
+      tb6600_stripboard_interface_housing_lid_thickness: !Ref tb6600_stripboard_interface_housing_lid_thickness
+      tb6600_stripboard_interface_housing_lid_body_clearance: !Ref tb6600_stripboard_interface_housing_lid_body_clearance
+      tb6600_stripboard_interface_housing_lid_outer_overhang: !Ref tb6600_stripboard_interface_housing_lid_outer_overhang
+      tb6600_stripboard_interface_housing_lid_rim_depth: !Ref tb6600_stripboard_interface_housing_lid_rim_depth
+      tb6600_stripboard_interface_housing_lid_rim_thickness: !Ref tb6600_stripboard_interface_housing_lid_rim_thickness
+      tb6600_stripboard_interface_housing_lid_rim_clearance: !Ref tb6600_stripboard_interface_housing_lid_rim_clearance
+      tb6600_stripboard_interface_housing_lid_screw_size: !Ref tb6600_stripboard_interface_housing_lid_screw_size
+      tb6600_stripboard_interface_housing_lid_screw_length: !Ref tb6600_stripboard_interface_housing_lid_screw_length
+      tb6600_stripboard_interface_housing_lid_screw_inset: !Ref tb6600_stripboard_interface_housing_lid_screw_inset
+      tb6600_stripboard_interface_housing_lid_screw_mount_block_size: !Ref tb6600_stripboard_interface_housing_lid_screw_mount_block_size
+      tb6600_stripboard_interface_housing_lid_thread_inset_extra_screw_depth: !Ref tb6600_stripboard_interface_housing_lid_thread_inset_extra_screw_depth
+      tb6600_stripboard_interface_housing_cable_exit_width: !Ref tb6600_stripboard_interface_housing_cable_exit_width
+      tb6600_stripboard_interface_housing_cable_exit_height: !Ref tb6600_stripboard_interface_housing_cable_exit_height
+      tb6600_stripboard_interface_housing_cable_exit_floor_bridge: !Ref tb6600_stripboard_interface_housing_cable_exit_floor_bridge
+      tb6600_stripboard_interface_housing_cable_exit_fillet_radius: !Ref tb6600_stripboard_interface_housing_cable_exit_fillet_radius
+      tb6600_stripboard_interface_housing_cable_tie_slot_length: !Ref tb6600_stripboard_interface_housing_cable_tie_slot_length
+      tb6600_stripboard_interface_housing_cable_tie_slot_width: !Ref tb6600_stripboard_interface_housing_cable_tie_slot_width
+      tb6600_stripboard_interface_housing_cable_tie_slot_pair_spacing: !Ref tb6600_stripboard_interface_housing_cable_tie_slot_pair_spacing
+      tb6600_stripboard_interface_housing_cable_tie_pair_x_spacing: !Ref tb6600_stripboard_interface_housing_cable_tie_pair_x_spacing
+      tb6600_stripboard_interface_housing_cable_tie_slot_y_center_from_front_inside: !Ref tb6600_stripboard_interface_housing_cable_tie_slot_y_center_from_front_inside
+      tb6600_stripboard_interface_housing_mount_flange_screw_size: !Ref tb6600_stripboard_interface_housing_mount_flange_screw_size
+      tb6600_stripboard_interface_housing_mount_flange_screw_length: !Ref tb6600_stripboard_interface_housing_mount_flange_screw_length
+      tb6600_stripboard_interface_housing_mount_flange_width: !Ref tb6600_stripboard_interface_housing_mount_flange_width
+      tb6600_stripboard_interface_housing_mount_flange_length: !Ref tb6600_stripboard_interface_housing_mount_flange_length
+      tb6600_stripboard_interface_housing_mount_flange_thickness: !Ref tb6600_stripboard_interface_housing_mount_flange_thickness
+      tb6600_stripboard_interface_housing_mount_flange_fillet_radius: !Ref tb6600_stripboard_interface_housing_mount_flange_fillet_radius
+
   - name: fuse_holder_assembly
 
     resource_file: fuse_holder_assembly.yaml

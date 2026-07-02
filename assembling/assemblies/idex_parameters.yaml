@@ -630,6 +630,40 @@ globals:
   heatbed_psu_housing_lid_screw_length: !Ref electric_switchboard_lid_screw_length
   heatbed_psu_housing_lid_screw_inset: !Ref electric_switchboard_lid_screw_inset
   heatbed_psu_housing_lid_screw_mount_block_size: !Ref electric_switchboard_lid_screw_mount_block_size
+  tb6600_stripboard_interface_housing_board_columns: 13
+  tb6600_stripboard_interface_housing_board_rows: 9
+  tb6600_stripboard_interface_housing_board_pitch: 2.54
+  tb6600_stripboard_interface_housing_board_clearance: 5.0
+  tb6600_stripboard_interface_housing_front_cable_corridor: 10.0
+  tb6600_stripboard_interface_housing_internal_height: 35.0
+  tb6600_stripboard_interface_housing_wall_thickness: 3.2
+  tb6600_stripboard_interface_housing_corner_fillet_radius: 3.0
+  tb6600_stripboard_interface_housing_lid_thickness: 4.0
+  tb6600_stripboard_interface_housing_lid_body_clearance: 0.4
+  tb6600_stripboard_interface_housing_lid_outer_overhang: 0.0
+  tb6600_stripboard_interface_housing_lid_rim_depth: 3.0
+  tb6600_stripboard_interface_housing_lid_rim_thickness: 3.2
+  tb6600_stripboard_interface_housing_lid_rim_clearance: 0.3
+  tb6600_stripboard_interface_housing_lid_screw_size: "M3"
+  tb6600_stripboard_interface_housing_lid_screw_length: 30.0
+  tb6600_stripboard_interface_housing_lid_screw_inset: 10.7
+  tb6600_stripboard_interface_housing_lid_screw_mount_block_size: 15.0
+  tb6600_stripboard_interface_housing_lid_thread_inset_extra_screw_depth: 4.0
+  tb6600_stripboard_interface_housing_cable_exit_width: 36.0
+  tb6600_stripboard_interface_housing_cable_exit_height: 20.0
+  tb6600_stripboard_interface_housing_cable_exit_floor_bridge: 5.0
+  tb6600_stripboard_interface_housing_cable_exit_fillet_radius: 2.0
+  tb6600_stripboard_interface_housing_cable_tie_slot_length: 8.0
+  tb6600_stripboard_interface_housing_cable_tie_slot_width: 2.6
+  tb6600_stripboard_interface_housing_cable_tie_slot_pair_spacing: 11.0
+  tb6600_stripboard_interface_housing_cable_tie_pair_x_spacing: 22.0
+  tb6600_stripboard_interface_housing_cable_tie_slot_y_center_from_front_inside: 13.0
+  tb6600_stripboard_interface_housing_mount_flange_screw_size: "M5"
+  tb6600_stripboard_interface_housing_mount_flange_screw_length: 12.0
+  tb6600_stripboard_interface_housing_mount_flange_width: 15.0
+  tb6600_stripboard_interface_housing_mount_flange_length: 18.0
+  tb6600_stripboard_interface_housing_mount_flange_thickness: 4.0
+  tb6600_stripboard_interface_housing_mount_flange_fillet_radius: 3.0
   fuse_holder_thread_diameter: 14.85
   fuse_holder_thread_length: 8.5
   fuse_holder_total_cylinder_length: 50
