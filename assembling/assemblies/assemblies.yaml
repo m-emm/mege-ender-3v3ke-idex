@@ -834,6 +834,10 @@ placement:
       to: printer_frame_assembly
       alignment: BACK
 
+    - rigid_group:
+        - y_z_axis_mcu_holder_fan_joined_assembly
+      to: y_z_axis_mcu_holder_assembly
+
     - part: y_z_axis_mcu_holder_assembly
       post_rotation:
         angle: -90

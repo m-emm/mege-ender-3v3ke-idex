@@ -302,6 +302,10 @@ def test_y_z_axis_mcu_holder_big_fan_is_joined_output_in_assembly_graph():
         "y_z_axis_mcu_holder": "y_z_axis_mcu_holder_assembly",
         "part_fan": "y_z_axis_mcu_holder_fan_joined_assembly",
     }
+    assert {
+        "rigid_group": ["y_z_axis_mcu_holder_fan_joined_assembly"],
+        "to": "y_z_axis_mcu_holder_assembly",
+    } in config["placement"]["alignments"]
 
     joiner = yaml.load(
         (ASSEMBLIES_DIR / "y_z_axis_mcu_holder_fan_joiner.yaml").read_text(),
