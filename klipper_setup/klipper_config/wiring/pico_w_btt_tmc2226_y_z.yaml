@@ -5,10 +5,10 @@ metadata:
   klipper_mcu: ""
   notes: |
     Three-driver wiring for Y, Z-left, and Z-right.
-    Driver1 (TMC1): reserved/disconnected while live Y uses the TB6600 interface.
+    Driver1 (Y): STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
     Driver2 (Z-left): STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5.
     Driver3 (Z-right): STEP=GPIO14, DIR=GPIO15, EN=GPIO16, UART=GPIO13.
-    Live TB6600 Y interface connector: STEP=GPIO0, DIR=GPIO1, EN=GPIO2, GND=PICO_GND_03.
+    TB6600 Y interface connector is inactive/reference wiring only; it has no active Klipper tags.
     Z endstops: Z-left=GPIO22, Z-right=GPIO17.
     Heatbed MOSFET: HEATBED_ON=GPIO21.
     Heatbed boost SSR: SSR_OUT=GPIO20 with Pico logic ground.
@@ -282,35 +282,36 @@ wires:
     type: lv_power
     color: "#9ca3af"
 
-  # Live Y TB6600 stripboard control connector.
+  # Inactive/reference Y TB6600 stripboard control connector.
   - from: PICO_GND_03
     to: Y_TB6600_IF_GND
     type: ground
   - from: PICO_GPIO_1
     to: Y_TB6600_IF_DIR
-    klipper: stepper_y.dir_pin
     type: data
   - from: PICO_GPIO_0
     to: Y_TB6600_IF_STEP
-    klipper: stepper_y.step_pin
     type: clock
   - from: PICO_GPIO_2
     to: Y_TB6600_IF_ENABLE
-    klipper: stepper_y.enable_pin
     type: data
 
-  # TMC1 remains wired on the board, but is not the active Y driver now.
+  # Live Y TMC2226 driver.
   - from: PICO_GPIO_11
     to: TMC1_J1_STEP_7
+    klipper: stepper_y.step_pin
     type: clock
   - from: PICO_GPIO_10
     to: TMC1_J1_DIR_8
+    klipper: stepper_y.dir_pin
     type: data
   - from: PICO_GPIO_12
     to: TMC1_J1_EN_1
+    klipper: stepper_y.enable_pin
     type: data
   - from: PICO_GPIO_9
     to: TMC1_J1_UART_PDN_4
+    klipper: "tmc2209 stepper_y.uart_pin"
     type: data
     color: "#9ca3af"
   - from: PICO_GND_03

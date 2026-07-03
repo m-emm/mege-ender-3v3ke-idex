@@ -200,17 +200,15 @@ run_current: 1.4
 sense_resistor: 0.110
 stealthchop_threshold: 0
 
-# Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml.
-# Live Y now uses the external TB6600-style driver stripboard interface:
-# STEP=GPIO0, DIR=GPIO1, EN=GPIO2, endstop=GPIO4.
-# TB6600 DIP switch must match this Klipper setting.
+# Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml,
+# Driver 1:
+# STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
 [stepper_y]
-step_pin: gpio0
-dir_pin: !gpio1
-enable_pin: gpio2
+step_pin: gpio11
+dir_pin: !gpio10
+enable_pin: !gpio12
 microsteps: 16
 rotation_distance: 40
-step_pulse_duration: 0.000005
 endstop_pin: ^!gpio4
 position_endstop: ${t0_y_endstop}
 position_min: ${t0_y_endstop}
@@ -220,7 +218,13 @@ homing_speed: 10
 second_homing_speed: 3
 homing_retract_dist: 5
 
-# TMC1 is physically disconnected/reserved while Y is on the TB6600.
+# BTT TMC2226 V1.0 uses the tmc2209 driver in Klipper.
+[tmc2209 stepper_y]
+uart_pin: gpio9
+uart_address: 0
+run_current: 1.6
+sense_resistor: 0.110
+stealthchop_threshold: 0
 
 # Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml,
 # Driver 2:

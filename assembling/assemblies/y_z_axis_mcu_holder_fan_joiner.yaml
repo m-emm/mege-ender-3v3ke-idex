@@ -85,7 +85,7 @@ Builder:
               parts:
                 - side_walls
             - name: y_z_axis_mcu_holder_top_lid
-              process_data_preset: petgcf_max_strength_high_speed_06_idex
+              process_data_preset: petgcf_max_strength_high_speed_06
               process_data:
                 overrides:
                   process_overrides:
@@ -102,34 +102,6 @@ Builder:
                     support_object_xy_distance: "0.8"
                     support_bottom_z_distance: "0.2"
                     wall_loops: "3"
-                    travel_speed: "150"
-                    initial_layer_travel_speed: "120"
-                    outer_wall_speed: "45"
-                    inner_wall_speed: "60"
-                    top_surface_speed: "45"
-                    sparse_infill_speed: "70"
-                    internal_solid_infill_speed: "60"
-                    solid_infill_speed: "60"
-                    gap_infill_speed: "35"
-                    bridge_speed: "25"
-                    initial_layer_speed: "25"
-                    initial_layer_infill_speed: "35"
-                    default_acceleration: "1500"
-                    travel_acceleration: "1200"
-                    initial_layer_acceleration: "800"
-                    outer_wall_acceleration: "900"
-                    inner_wall_acceleration: "1200"
-                    top_surface_acceleration: "900"
-                    sparse_infill_acceleration: "1200"
-                    internal_solid_infill_acceleration: "1200"
-                    bridge_acceleration: "800"
-                    default_jerk: "4"
-                    travel_jerk: "3"
-                    initial_layer_jerk: "3"
-                    outer_wall_jerk: "3"
-                    inner_wall_jerk: "4"
-                    top_surface_jerk: "3"
-                    infill_jerk: "4"
               parts:
                 - top_lid
             - name: y_z_axis_mcu_holder_bottom_lid

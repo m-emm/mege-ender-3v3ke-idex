@@ -24,6 +24,7 @@ EXPECTED_KLIPPER_TAGS = {
     "stepper_y.dir_pin",
     "stepper_y.enable_pin",
     "stepper_y.endstop_pin",
+    "tmc2209 stepper_y.uart_pin",
     "stepper_z.step_pin",
     "stepper_z.dir_pin",
     "stepper_z.enable_pin",

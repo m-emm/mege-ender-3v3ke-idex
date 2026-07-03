@@ -216,15 +216,21 @@ def test_printer_motion_limits_match_proven_idex_axes():
     assert "[force_move]" not in config_text
 
 
-def test_stepper_y_has_external_driver_klipper_shape():
+def test_stepper_y_uses_tmc_driver_with_raised_current():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     stepper_y = _section(config_text, "stepper_y")
+    tmc_y = _section(config_text, "tmc2209 stepper_y")
 
-    assert _setting_value(stepper_y, "step_pin")
-    assert _setting_value(stepper_y, "dir_pin").lstrip("!")
-    assert _setting_value(stepper_y, "enable_pin").lstrip("!")
-    assert _setting_float(stepper_y, "microsteps") > 0.0
-    assert _setting_float(stepper_y, "rotation_distance") > 0.0
+    assert _setting_value(stepper_y, "step_pin") == "gpio11"
+    assert _setting_value(stepper_y, "dir_pin") == "!gpio10"
+    assert _setting_value(stepper_y, "enable_pin") == "!gpio12"
+    assert _setting_float(stepper_y, "microsteps") == pytest.approx(16.0)
+    assert _setting_float(stepper_y, "rotation_distance") == pytest.approx(40.0)
+    assert _setting_value(tmc_y, "uart_pin") == "gpio9"
+    assert _setting_float(tmc_y, "run_current") == pytest.approx(1.6)
+    assert _setting_float(tmc_y, "sense_resistor") == pytest.approx(0.110)
+    assert _setting_float(tmc_y, "stealthchop_threshold") == pytest.approx(0.0)
+    assert "step_pulse_duration" not in stepper_y
 
 
 def test_y_step_loss_assert_macro_checks_stepper_y_endstop():
@@ -962,6 +968,7 @@ def test_absolute_grid_x_part_metadata_routes_base_and_text_materials():
 def test_absolute_xy_calibration_uses_dual_pla_process_structure():
     process_data = xy_grid_calibration.copy_xy_offset_calibration_process_data()
     overrides = process_data["process_overrides"]
+    outer_wall_line_width = float(overrides["outer_wall_line_width"])
 
     assert len(process_data["filaments"]) == 2
     assert process_data["filaments"][0] == process_data["filament"]
@@ -969,9 +976,16 @@ def test_absolute_xy_calibration_uses_dual_pla_process_structure():
     assert overrides["enable_prime_tower"] == "1"
     assert overrides["wipe_tower_x"] == "105"
     assert overrides["wipe_tower_y"] == "220"
-    assert float(overrides["line_width"]) >= float(overrides["outer_wall_line_width"])
+    assert float(overrides["line_width"]) >= outer_wall_line_width
     assert float(overrides["initial_layer_line_width"]) >= float(
         overrides["outer_wall_line_width"]
+    )
+    assert (
+        grid_calibration.CALIBRATION_LABEL_STROKE_WIDTH_MM
+        >= outer_wall_line_width * 1.5
+    )
+    assert grid_calibration.CALIBRATION_LABEL_TEXT_THICKNESS_MM >= float(
+        overrides["layer_height"]
     )
 
 
