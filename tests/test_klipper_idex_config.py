@@ -976,6 +976,10 @@ def test_absolute_xy_calibration_uses_dual_pla_process_structure():
     assert overrides["enable_prime_tower"] == "1"
     assert overrides["wipe_tower_x"] == "105"
     assert overrides["wipe_tower_y"] == "220"
+    assert overrides["z_hop"] == ["0.6", "0.6"]
+    assert overrides["z_hop_types"] == ["Normal Lift", "Normal Lift"]
+    assert overrides["filament_z_hop"] == "0.6"
+    assert overrides["filament_z_hop_types"] == "retract_lift"
     assert float(overrides["line_width"]) >= outer_wall_line_width
     assert float(overrides["initial_layer_line_width"]) >= float(
         overrides["outer_wall_line_width"]
