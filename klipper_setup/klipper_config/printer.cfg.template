@@ -702,9 +702,9 @@ gcode:
     {% set cycle = params.CYCLE|default("unknown") %}
     {% set step = params.STEP|default("unknown") %}
     {% if not printer.query_endstops.last_query["stepper_y"] %}
-        { action_raise_error("Y print-motif characterization failed: stepper_y endstop not triggered after profile=" ~ profile ~ ", velocity=" ~ velocity ~ ", accel=" ~ accel ~ ", scv=" ~ scv ~ ", cycle=" ~ cycle ~ ", step=" ~ step ~ ". Re-home Y before normal printing.") }
+        { action_raise_error("Y hot dry-run characterization failed: stepper_y endstop not triggered after profile=" ~ profile ~ ", velocity=" ~ velocity ~ ", accel=" ~ accel ~ ", scv=" ~ scv ~ ", cycle=" ~ cycle ~ ", step=" ~ step ~ ". Heaters may still be on; inspect, cool down if needed, then re-home Y before normal printing.") }
     {% endif %}
-    RESPOND TYPE=echo MSG="Y endstop verified: profile={profile}, velocity={velocity}, accel={accel}, scv={scv}, cycle={cycle}, step={step}"
+    RESPOND TYPE=echo MSG="Y hot dry-run endstop verified: profile={profile}, velocity={velocity}, accel={accel}, scv={scv}, cycle={cycle}, step={step}"
 
 [gcode_macro MOTORS_OFF]
 description: Disable all configured motors.

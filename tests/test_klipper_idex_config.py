@@ -201,10 +201,12 @@ def test_y_step_loss_assert_macro_checks_stepper_y_endstop():
     assert "action_raise_error" in macro
     assert "profile=" in macro
     assert "velocity=" in macro
-    assert "Re-home Y before normal printing" in macro
+    assert "Y hot dry-run characterization failed" in macro
+    assert "Heaters may still be on" in macro
+    assert "re-home Y before normal printing" in macro
 
 
-def test_y_step_loss_generator_emits_print_motif_endstop_checks(tmp_path):
+def test_y_step_loss_generator_emits_hot_dry_run_hammer_checks(tmp_path):
     generator = _load_y_step_loss_generator_module()
     printer = generator.load_printer_config(CONFIG_PATH)
     gcode = generator.generate_gcode(printer)
@@ -217,38 +219,48 @@ def test_y_step_loss_generator_emits_print_motif_endstop_checks(tmp_path):
 
     lines = [line.strip() for line in gcode.splitlines() if line.strip()]
     assert "; Endstop verification key: stepper_y" in lines
-    assert "; Z characterization height: 10.000" in lines
-    assert "; Total endstop checks: 90" in lines
+    assert "; Z characterization height: 0.770" in lines
+    assert "; Bed temperature: 80" in lines
+    assert "; Nozzle temperature: 265" in lines
+    assert "; Stress profiles: hammer_hot_dry" in lines
+    assert "; Cycles per profile: 20" in lines
+    assert "; Total endstop checks: 20" in lines
+    assert "M140 S80" in lines
+    assert "M104 S265 T0" in lines
+    assert "M190 S80" in lines
+    assert "M109 S265" in lines
     assert "G28 X Y Z" in lines
-    assert "G1 Z10.000 F600" in lines
+    assert "G1 Z0.770 F600" in lines
     assert "G28 Y" not in lines
     assert "Y away distance" not in gcode
+    assert "accel_2500" not in gcode
+    assert "speed_400" not in gcode
+    assert "scv_8" not in gcode
+    assert not re.search(r"^G[01]\b.*\bE-?\d", gcode, flags=re.MULTILINE)
 
     assertion_lines = [
         line for line in lines if line.startswith("Y_STEP_LOSS_ASSERT_ENDSTOP ")
     ]
-    assert len(assertion_lines) == 90
+    assert len(assertion_lines) == 20
     profile_names = [
         re.search(r"\bPROFILE=(\S+)\b", line).group(1) for line in assertion_lines
     ]
-    assert sorted(set(profile_names)) == [
-        "accel_2500",
-        "accel_3500",
-        "accel_4500",
-        "scv_3",
-        "scv_5",
-        "scv_8",
-        "speed_300",
-        "speed_350",
-        "speed_400",
-    ]
+    assert set(profile_names) == {"hammer_hot_dry"}
     assert {name: profile_names.count(name) for name in set(profile_names)} == {
-        name: 10 for name in set(profile_names)
+        "hammer_hot_dry": 20
     }
     accel_values = [
         int(re.search(r"\bACCEL=(\d+)\b", line).group(1)) for line in assertion_lines
     ]
-    assert sorted(set(accel_values)) == [2500, 3500, 4500]
+    velocity_values = [
+        int(re.search(r"\bVELOCITY=(\d+)\b", line).group(1)) for line in assertion_lines
+    ]
+    scv_values = [
+        int(re.search(r"\bSCV=(\d+)\b", line).group(1)) for line in assertion_lines
+    ]
+    assert set(accel_values) == {6000}
+    assert set(velocity_values) == {400}
+    assert set(scv_values) == {10}
 
     for index, line in enumerate(lines):
         if line.startswith("Y_STEP_LOSS_ASSERT_ENDSTOP "):
@@ -265,6 +277,11 @@ def test_y_step_loss_generator_emits_print_motif_endstop_checks(tmp_path):
         in line
         for line in lines
     )
+    prelude_start_index = next(
+        index for index, line in enumerate(lines) if "X61.406" in line
+    )
+    anchor_index = next(index for index, line in enumerate(lines) if "X100.985" in line)
+    assert "M400" not in lines[prelude_start_index:anchor_index]
 
     stepper_x = _section(CONFIG_PATH.read_text(encoding="utf-8"), "stepper_x")
     stepper_y = _section(CONFIG_PATH.read_text(encoding="utf-8"), "stepper_y")

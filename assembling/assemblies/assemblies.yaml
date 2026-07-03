@@ -2267,7 +2267,7 @@ assemblies:
       x_axis_mcu_holder: x_axis_mcu_holder_assembly
       resistor_box: resistor_box_assembly
 
-  - name: y_z_axis_mcu_holder_assembly
+  - name: y_z_axis_mcu_holder_base_assembly
 
     resource_file: board_holder_assembly.yaml
     depends_on:
@@ -3356,6 +3356,26 @@ assemblies:
     outputs:
       x_axis_mcu_holder: x_axis_mcu_holder_with_fan_assembly
       part_fan: x_axis_mcu_holder_fan_joined_assembly
+
+  - name: y_z_axis_mcu_holder_fan_assembly
+
+    resource_file: single_part_fan_assembly.yaml
+    depends_on: []
+    parameters:
+      part_fan_mount_plate_blow_direction_offset: 0
+      part_fan_mount_plate_blow_direction_oversize: 5
+      part_fan_mount_plate_cross_oversize: 5
+
+  - name: y_z_axis_mcu_holder_fan_join
+
+    kind: join
+    resource_file: y_z_axis_mcu_holder_fan_joiner.yaml
+    inject_parts:
+      y_z_axis_mcu_holder: y_z_axis_mcu_holder_base_assembly
+      fan: y_z_axis_mcu_holder_fan_assembly
+    outputs:
+      y_z_axis_mcu_holder: y_z_axis_mcu_holder_assembly
+      part_fan: y_z_axis_mcu_holder_fan_joined_assembly
 
   - name: single_part_fan_front_right_assembly
 
