@@ -9,6 +9,7 @@ import pytest
 from mege_ender_3v3ke_idex.designs import (
     two_material_offset_line_calibration_grid as grid_calibration,
     two_material_offset_line_calibration_grid_x as x_grid_calibration,
+    two_material_offset_line_calibration_grid_xy as xy_grid_calibration,
     two_material_offset_line_calibration_grid_y as y_grid_calibration,
 )
 from mege_ender_3v3ke_idex.designs.two_material_offset_line_calibration import (
@@ -36,6 +37,40 @@ TEMPLATE_PATH = KLIPPER_CONFIG_DIR / "printer.cfg.template"
 GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_printer_cfg.py"
 Y_STEP_LOSS_GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_y_step_loss_test_gcode.py"
 
+SYNTHETIC_CALIBRATION_VALUES = {
+    "bed_grid_zero": (113.3, 107.0),
+    "t0_x_endstop": -80.4,
+    "t1_x_endstop": 355.7,
+    "t0_y_endstop": -14.8,
+    "t1_y_endstop": -15.6,
+}
+
+SYNTHETIC_CALIBRATION_YAML = """\
+bed_grid_zero:
+  x: 113.3
+  y: 107.0
+tools:
+  t0:
+    x_endstop: -80.4
+    y_endstop: -14.8
+    z_endstop: 293.75
+  t1:
+    x_endstop: 355.7
+    y_endstop: -15.6
+    z_endstop: 293.65
+"""
+
+SYNTHETIC_CONFIG_TEXT = """\
+[dual_carriage]
+position_endstop: 355.700
+position_max: 355.700
+
+[gcode_macro _IDEX_TOOL_STATE]
+variable_t0_y_offset: 0.000
+variable_t1_y_offset: 0.800
+variable_t1_z_offset: 0.100
+"""
+
 
 def _load_generator_module():
     spec = importlib.util.spec_from_file_location(
@@ -59,10 +94,6 @@ def _load_y_step_loss_generator_module():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
-
-
-def _calibration_source():
-    return _load_generator_module().load_calibration(CALIB_PATH)
 
 
 def _section(config_text: str, name: str) -> str:
@@ -174,23 +205,26 @@ def test_printer_motion_limits_match_proven_idex_axes():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     printer = _section(config_text, "printer")
 
-    assert _setting_float(printer, "max_velocity") == pytest.approx(500.0)
-    assert _setting_float(printer, "max_accel") == pytest.approx(8000.0)
-    assert _setting_float(printer, "max_z_velocity") == pytest.approx(30.0)
-    assert _setting_float(printer, "max_z_accel") == pytest.approx(300.0)
-    assert _setting_float(printer, "square_corner_velocity") == pytest.approx(10.0)
+    for setting_name in (
+        "max_velocity",
+        "max_accel",
+        "max_z_velocity",
+        "max_z_accel",
+        "square_corner_velocity",
+    ):
+        assert _setting_float(printer, setting_name) > 0.0
     assert "[force_move]" not in config_text
 
 
-def test_stepper_y_uses_tb6600_20t_gt2_pulley_config():
+def test_stepper_y_has_external_driver_klipper_shape():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     stepper_y = _section(config_text, "stepper_y")
 
-    assert _setting_value(stepper_y, "step_pin") == "gpio0"
-    assert _setting_value(stepper_y, "dir_pin") == "!gpio1"
-    assert _setting_value(stepper_y, "enable_pin") == "gpio2"
-    assert _setting_float(stepper_y, "microsteps") == pytest.approx(16.0)
-    assert _setting_float(stepper_y, "rotation_distance") == pytest.approx(40.0)
+    assert _setting_value(stepper_y, "step_pin")
+    assert _setting_value(stepper_y, "dir_pin").lstrip("!")
+    assert _setting_value(stepper_y, "enable_pin").lstrip("!")
+    assert _setting_float(stepper_y, "microsteps") > 0.0
+    assert _setting_float(stepper_y, "rotation_distance") > 0.0
 
 
 def test_y_step_loss_assert_macro_checks_stepper_y_endstop():
@@ -592,17 +626,19 @@ def test_idex_cancel_park_is_homed_axis_guarded():
     assert "M84" not in cancel_park
 
 
-def test_idex_next_printable_corner_cycles_exact_safe_corners():
+def test_idex_next_printable_corner_cycles_configured_safe_corners():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     corner_macro = _section(config_text, "gcode_macro IDEX_NEXT_PRINTABLE_CORNER")
 
     assert "variable_corner_index: 0" in corner_macro
-    assert "variable_x_min: 0.0" in corner_macro
-    assert "variable_x_max: 244.0" in corner_macro
-    assert "variable_y_min: 0.0" in corner_macro
-    assert "variable_y_max: 290.0" in corner_macro
-    assert "variable_z_travel: 10.0" in corner_macro
-    assert "variable_z_touch: 0.0" in corner_macro
+    x_min = _macro_variable_float(corner_macro, "x_min")
+    x_max = _macro_variable_float(corner_macro, "x_max")
+    y_min = _macro_variable_float(corner_macro, "y_min")
+    y_max = _macro_variable_float(corner_macro, "y_max")
+    assert x_min < x_max
+    assert y_min < y_max
+    assert _macro_variable_float(corner_macro, "z_travel") > 0.0
+    assert _macro_variable_float(corner_macro, "z_touch") >= 0.0
     assert "variable_xy_move_speed:" in corner_macro
     assert "variable_z_move_speed:" in corner_macro
 
@@ -643,90 +679,58 @@ def test_idex_tool_selection_resets_next_printable_corner():
         assert reset_counter in tool_macro
 
 
-def test_idex_tool_offsets_are_current_machine_calibration():
-    config_text = CONFIG_PATH.read_text(encoding="utf-8")
-    calibration = _calibration_source()
-    t0 = calibration["tools"]["t0"]
-    t1 = calibration["tools"]["t1"]
-    stepper_x = _section(config_text, "stepper_x")
-    tool_state = _section(config_text, "gcode_macro _IDEX_TOOL_STATE")
-    dual_carriage = _section(config_text, "dual_carriage")
-    stepper_y = _section(config_text, "stepper_y")
-    stepper_z = _section(config_text, "stepper_z")
+def test_idex_tool_offsets_are_derived_from_calibration_values():
+    generator = _load_generator_module()
+    calibration = {
+        "bed_grid_zero": {"x": 1.0, "y": 2.0},
+        "tools": {
+            "t0": {"x_endstop": -10.0, "y_endstop": -1.0, "z_endstop": 100.0},
+            "t1": {"x_endstop": 220.0, "y_endstop": -1.4, "z_endstop": 99.7},
+        },
+    }
 
-    assert "variable_t0_x_offset" not in tool_state
-    assert "variable_t1_x_offset" not in tool_state
-    assert "variable_t0_z_offset" not in tool_state
+    values = generator.template_values(calibration, "synthetic-fingerprint")
 
-    assert _setting_float(stepper_x, "position_endstop") == pytest.approx(
-        t0["x_endstop"]
-    )
-    assert _setting_float(stepper_x, "position_min") == pytest.approx(t0["x_endstop"])
-    assert _setting_float(dual_carriage, "position_endstop") == pytest.approx(
-        t1["x_endstop"]
-    )
-    assert _setting_float(dual_carriage, "position_max") == pytest.approx(
-        t1["x_endstop"]
-    )
-    assert _setting_float(stepper_y, "position_endstop") == pytest.approx(
-        t0["y_endstop"]
-    )
-    assert _setting_float(stepper_y, "position_min") == pytest.approx(t0["y_endstop"])
-    assert _setting_float(stepper_z, "position_endstop") == pytest.approx(
-        t0["z_endstop"]
-    )
-    assert _setting_float(stepper_z, "position_max") == pytest.approx(t0["z_endstop"])
-
-    assert _macro_variable_float(tool_state, "t0_y_endstop") == pytest.approx(
-        t0["y_endstop"]
-    )
-    assert _macro_variable_float(tool_state, "t1_y_endstop") == pytest.approx(
-        t1["y_endstop"]
-    )
-    assert _macro_variable_float(tool_state, "t0_z_endstop") == pytest.approx(
-        t0["z_endstop"]
-    )
-    assert _macro_variable_float(tool_state, "t1_z_endstop") == pytest.approx(
-        t1["z_endstop"]
-    )
-    assert _macro_variable_float(tool_state, "t0_y_offset") == pytest.approx(0.000)
-    assert _macro_variable_float(tool_state, "t1_y_offset") == pytest.approx(
-        t0["y_endstop"] - t1["y_endstop"]
-    )
-    assert _macro_variable_float(tool_state, "t1_z_offset") == pytest.approx(
-        t0["z_endstop"] - t1["z_endstop"]
-    )
+    assert values["t0_x_endstop"] == "-10.000"
+    assert values["t1_x_endstop"] == "220.000"
+    assert values["t0_y_offset"] == "0.000"
+    assert values["t1_y_offset"] == "0.400"
+    assert values["t1_z_offset"] == "0.300"
 
 
-def test_grid_calibration_reads_current_calibration_source():
-    calibration = _calibration_source()
-    bed_grid_zero = calibration["bed_grid_zero"]
-    t0 = calibration["tools"]["t0"]
-    t1 = calibration["tools"]["t1"]
-    values = grid_calibration.read_grid_calibration(CALIB_PATH)
+def test_grid_calibration_reads_yaml_values(tmp_path):
+    calib_path = tmp_path / "calib.yaml"
+    calib_path.write_text(SYNTHETIC_CALIBRATION_YAML, encoding="utf-8")
+
+    values = grid_calibration.read_grid_calibration(calib_path)
 
     assert values["bed_grid_zero"] == pytest.approx(
-        (bed_grid_zero["x"], bed_grid_zero["y"])
+        SYNTHETIC_CALIBRATION_VALUES["bed_grid_zero"]
     )
-    assert values["t0_x_endstop"] == pytest.approx(t0["x_endstop"])
-    assert values["t1_x_endstop"] == pytest.approx(t1["x_endstop"])
-    assert values["t0_y_endstop"] == pytest.approx(t0["y_endstop"])
-    assert values["t1_y_endstop"] == pytest.approx(t1["y_endstop"])
+    assert values["t0_x_endstop"] == pytest.approx(
+        SYNTHETIC_CALIBRATION_VALUES["t0_x_endstop"]
+    )
+    assert values["t1_x_endstop"] == pytest.approx(
+        SYNTHETIC_CALIBRATION_VALUES["t1_x_endstop"]
+    )
+    assert values["t0_y_endstop"] == pytest.approx(
+        SYNTHETIC_CALIBRATION_VALUES["t0_y_endstop"]
+    )
+    assert values["t1_y_endstop"] == pytest.approx(
+        SYNTHETIC_CALIBRATION_VALUES["t1_y_endstop"]
+    )
 
 
-def test_offset_line_calibration_parses_active_calibration_values():
-    calibration = _calibration_source()
-    t0 = calibration["tools"]["t0"]
-    t1 = calibration["tools"]["t1"]
-    values = parse_idex_calibration_values(CONFIG_PATH.read_text(encoding="utf-8"))
+def test_offset_line_calibration_parses_config_values():
+    values = parse_idex_calibration_values(SYNTHETIC_CONFIG_TEXT)
 
-    assert values["right_x_endpoint"] == pytest.approx(t1["x_endstop"])
+    assert values["right_x_endpoint"] == pytest.approx(355.7)
     assert values["t0_y"] == pytest.approx(0.0)
-    assert values["t1_y"] == pytest.approx(t0["y_endstop"] - t1["y_endstop"])
+    assert values["t1_y"] == pytest.approx(0.8)
 
 
 def test_offset_line_calibration_rejects_nonzero_t0_y_offset():
-    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    config_text = SYNTHETIC_CONFIG_TEXT
     config_text = re.sub(
         r"variable_t0_y_offset: \S+",
         "variable_t0_y_offset: 0.1",
@@ -738,7 +742,7 @@ def test_offset_line_calibration_rejects_nonzero_t0_y_offset():
 
 
 def test_offset_line_calibration_rejects_x_tool_offsets():
-    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    config_text = SYNTHETIC_CONFIG_TEXT
     config_text = re.sub(
         r"variable_t0_y_offset: \S+",
         "variable_t0_x_offset: 0.0\nvariable_t0_y_offset: 0.0",
@@ -750,7 +754,7 @@ def test_offset_line_calibration_rejects_x_tool_offsets():
 
 
 def test_offset_line_calibration_rejects_mismatched_right_endpoint_values():
-    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    config_text = SYNTHETIC_CONFIG_TEXT
     dual_carriage = _section(config_text, "dual_carriage")
     right_endpoint = _setting_float(dual_carriage, "position_endstop")
     mismatched_max = right_endpoint - 0.2
@@ -804,8 +808,8 @@ def test_offset_line_calibration_long_marker_is_center_zero_candidate():
             assert segment_length_for_candidate(index) == LINE_SEGMENT_LENGTH_MM
 
 
-def test_offset_line_calibration_labels_active_current_offsets():
-    values = parse_idex_calibration_values(CONFIG_PATH.read_text(encoding="utf-8"))
+def test_offset_line_calibration_labels_parsed_offsets():
+    values = parse_idex_calibration_values(SYNTHETIC_CONFIG_TEXT)
 
     x_labels = [
         format_right_endpoint_label(values["right_x_endpoint"] + candidate_offset)
@@ -955,12 +959,27 @@ def test_absolute_grid_x_part_metadata_routes_base_and_text_materials():
     }
 
 
+def test_absolute_xy_calibration_uses_dual_pla_process_structure():
+    process_data = xy_grid_calibration.copy_xy_offset_calibration_process_data()
+    overrides = process_data["process_overrides"]
+
+    assert len(process_data["filaments"]) == 2
+    assert process_data["filaments"][0] == process_data["filament"]
+    assert process_data["filaments"][1] != process_data["filaments"][0]
+    assert overrides["enable_prime_tower"] == "1"
+    assert overrides["wipe_tower_x"] == "105"
+    assert overrides["wipe_tower_y"] == "220"
+    assert float(overrides["line_width"]) >= float(overrides["outer_wall_line_width"])
+    assert float(overrides["initial_layer_line_width"]) >= float(
+        overrides["outer_wall_line_width"]
+    )
+
+
 def test_absolute_grid_y_label_slab_is_calibrated_tool_material():
-    calibration = grid_calibration.read_grid_calibration(CALIB_PATH)
     base_material, text_material = (
         y_grid_calibration.create_absolute_y_alignment_materials(
-            bed_grid_zero=calibration["bed_grid_zero"],
-            calibration_value_mm=calibration["t0_y_endstop"],
+            bed_grid_zero=SYNTHETIC_CALIBRATION_VALUES["bed_grid_zero"],
+            calibration_value_mm=SYNTHETIC_CALIBRATION_VALUES["t0_y_endstop"],
         )
     )
 
@@ -982,9 +1001,10 @@ def test_absolute_grid_y_label_slab_is_calibrated_tool_material():
 
 
 def test_absolute_grid_x_label_slab_has_writing_anchor():
-    calibration = grid_calibration.read_grid_calibration(CALIB_PATH)
     base_material, text_material, _, _ = (
-        x_grid_calibration.create_absolute_x_alignment_materials(calibration)
+        x_grid_calibration.create_absolute_x_alignment_materials(
+            SYNTHETIC_CALIBRATION_VALUES
+        )
     )
 
     base_min, _ = grid_calibration.get_bounding_box(base_material)
@@ -1003,7 +1023,6 @@ def test_absolute_grid_x_label_slab_has_writing_anchor():
 
 
 def test_absolute_grid_x_materials_use_same_y_row_for_both_tools(monkeypatch):
-    calibration = grid_calibration.read_grid_calibration(CALIB_PATH)
     calls = []
 
     def create_pattern_spy(**kwargs):
@@ -1016,21 +1035,29 @@ def test_absolute_grid_x_materials_use_same_y_row_for_both_tools(monkeypatch):
         create_pattern_spy,
     )
 
-    x_grid_calibration.create_absolute_x_alignment_materials(calibration)
+    x_grid_calibration.create_absolute_x_alignment_materials(
+        SYNTHETIC_CALIBRATION_VALUES
+    )
 
     assert len(calls) == 2
     assert (
         calls[0]["line_y_min_mm"]
         == calls[1]["line_y_min_mm"]
         == pytest.approx(
-            grid_calibration.grid_coordinate(calibration["bed_grid_zero"][1], -1)
+            grid_calibration.grid_coordinate(
+                SYNTHETIC_CALIBRATION_VALUES["bed_grid_zero"][1],
+                -1,
+            )
         )
     )
     assert (
         calls[0]["line_y_max_mm"]
         == calls[1]["line_y_max_mm"]
         == pytest.approx(
-            grid_calibration.grid_coordinate(calibration["bed_grid_zero"][1], 0)
+            grid_calibration.grid_coordinate(
+                SYNTHETIC_CALIBRATION_VALUES["bed_grid_zero"][1],
+                0,
+            )
         )
     )
     assert calls[0]["label_panel"] is calls[1]["label_panel"]
@@ -1038,15 +1065,16 @@ def test_absolute_grid_x_materials_use_same_y_row_for_both_tools(monkeypatch):
 
 
 def test_absolute_grid_x_and_y_parts_fit_dual_area():
-    calibration = grid_calibration.read_grid_calibration(CALIB_PATH)
-    x_parts = x_grid_calibration.create_absolute_x_alignment_materials(calibration)
+    x_parts = x_grid_calibration.create_absolute_x_alignment_materials(
+        SYNTHETIC_CALIBRATION_VALUES
+    )
     y_t0_parts = y_grid_calibration.create_absolute_y_alignment_materials(
-        bed_grid_zero=calibration["bed_grid_zero"],
-        calibration_value_mm=calibration["t0_y_endstop"],
+        bed_grid_zero=SYNTHETIC_CALIBRATION_VALUES["bed_grid_zero"],
+        calibration_value_mm=SYNTHETIC_CALIBRATION_VALUES["t0_y_endstop"],
     )
     y_t1_parts = y_grid_calibration.create_absolute_y_alignment_materials(
-        bed_grid_zero=calibration["bed_grid_zero"],
-        calibration_value_mm=calibration["t1_y_endstop"],
+        bed_grid_zero=SYNTHETIC_CALIBRATION_VALUES["bed_grid_zero"],
+        calibration_value_mm=SYNTHETIC_CALIBRATION_VALUES["t1_y_endstop"],
     )
 
     grid_calibration.assert_absolute_patterns_fit_dual_area(

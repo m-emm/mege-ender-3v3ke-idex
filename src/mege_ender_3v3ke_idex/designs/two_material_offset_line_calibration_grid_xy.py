@@ -18,7 +18,7 @@ from mege_3devops.process_data.mege_ender_3v3ke_idex import (
     SAFE_BED_DEPTH_MM,
     SAFE_BED_ORIGIN,
     SAFE_BED_WIDTH_MM,
-    copy_dual_pla_04_offset_calibration_process_data,
+    copy_dual_pla_06_offset_calibration_process_data,
 )
 from mege_ender_3v3ke_idex.designs.two_material_offset_line_calibration_grid import *
 
@@ -51,7 +51,7 @@ CALIBRATION_PART_METADATA = {
 
 
 def copy_xy_offset_calibration_process_data():
-    process_data = copy_dual_pla_04_offset_calibration_process_data()
+    process_data = copy_dual_pla_06_offset_calibration_process_data()
     process_data["process_overrides"]["wipe_tower_x"] = "105"
     process_data["process_overrides"]["wipe_tower_y"] = "220"
     return process_data
