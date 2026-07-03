@@ -27,8 +27,7 @@ Builder:
       - source: self
         artifact: non_production_parts
         names:
-          - lid_mount_screw_*_screw
-          - lid_mount_screw_*_thread_inset
+          - lid_mount_screws
           - mount_flange_screw
         name_template: "{name}"
         color: [0.78, 0.78, 0.72]
@@ -110,8 +109,12 @@ Parameters:
     Type: Float
   tb6600_stripboard_interface_housing_lid_screw_mount_block_size:
     Type: Float
-  tb6600_stripboard_interface_housing_lid_thread_inset_extra_screw_depth:
+  tb6600_stripboard_interface_housing_lid_screw_boss_diameter:
     Type: Float
+  tb6600_stripboard_interface_housing_self_threading_core_radius_adjustment:
+    Type: Float
+  tb6600_stripboard_interface_housing_self_threading_lead_in:
+    Type: Boolean
   tb6600_stripboard_interface_housing_cable_exit_width:
     Type: Float
   tb6600_stripboard_interface_housing_cable_exit_height:

@@ -10,8 +10,10 @@ from assembly_defaults import (
 from mege_ender_3v3ke_idex.designs.assemblies.tb6600_stripboard_interface_housing_assembly import (
     create_tb6600_stripboard_interface_housing_assembly,
 )
+from shellforgepy.geometry.m_screws import get_core_hole_diameter
 from shellforgepy.simple import get_bounding_box, get_bounding_box_center
-from shellforgepy.simple import get_bounding_box_size, get_volume
+from shellforgepy.simple import create_cylinder, get_bounding_box_size
+from shellforgepy.simple import get_clearance_hole_diameter, get_volume
 from shellforgepy.simple import MScrew
 
 
@@ -44,6 +46,23 @@ def _tb6600_assembly_entry():
     )
 
 
+def _assert_m3_self_threading_z_cutter(cutter):
+    size = get_bounding_box_size(cutter)
+    clearance = get_clearance_hole_diameter("M3", "close")
+    adjusted_core_radius = (
+        get_core_hole_diameter("M3") / 2
+        + DEFAULTS[
+            "tb6600_stripboard_interface_housing_self_threading_core_radius_adjustment"
+        ]
+    )
+
+    assert size[:2] == pytest.approx([clearance, clearance])
+    assert get_volume(cutter) < get_volume(create_cylinder(clearance / 2, size[2]))
+    assert get_volume(cutter) > get_volume(
+        create_cylinder(adjusted_core_radius, size[2])
+    )
+
+
 def test_tb6600_stripboard_interface_housing_exports_stable_artifacts():
     housing = _build_housing()
 
@@ -61,24 +80,28 @@ def test_tb6600_stripboard_interface_housing_exports_stable_artifacts():
         "cable_tie_slot_right_front",
         "cable_tie_slot_right_back",
         "mount_flange_screw_hole",
+        "lid_mount_pilot_holes",
+        "lid_mount_clearance_holes",
     }
+    expected_cutters.update({f"lid_mount_pilot_hole_{index}" for index in range(1, 5)})
     expected_cutters.update(
-        {f"lid_mount_screw_{index}_hole_cutter" for index in range(4)}
-    )
-    expected_cutters.update(
-        {f"lid_mount_screw_{index}_cylinder_head_cutter" for index in range(4)}
+        {f"lid_mount_clearance_hole_{index}" for index in range(1, 5)}
     )
     assert expected_cutters <= set(housing.cutter_indices_by_name)
 
-    expected_non_production = {"tb6600_stripboard_interface_housing_body_reference"}
-    expected_non_production.update(
-        {f"lid_mount_screw_{index}_screw" for index in range(4)}
-    )
-    expected_non_production.update(
-        {f"lid_mount_screw_{index}_thread_inset" for index in range(4)}
-    )
-    expected_non_production.add("mount_flange_screw")
+    expected_non_production = {
+        "tb6600_stripboard_interface_housing_body_reference",
+        "lid_mount_screws",
+        "mount_flange_screw",
+    }
     assert set(housing.non_production_indices_by_name) == expected_non_production
+
+    exported_names = (
+        set(housing.follower_indices_by_name)
+        | set(housing.cutter_indices_by_name)
+        | set(housing.non_production_indices_by_name)
+    )
+    assert not any("thread_inset" in name for name in exported_names)
 
 
 def test_tb6600_stripboard_interface_housing_does_not_model_the_board():
@@ -120,6 +143,15 @@ def test_tb6600_stripboard_interface_housing_is_roomy_for_real_stripboard():
 
     assert DEFAULTS["tb6600_stripboard_interface_housing_board_columns"] == 13
     assert DEFAULTS["tb6600_stripboard_interface_housing_board_rows"] == 9
+    assert (
+        DEFAULTS["tb6600_stripboard_interface_housing_lid_screw_boss_diameter"] == 8.0
+    )
+    assert DEFAULTS[
+        "tb6600_stripboard_interface_housing_self_threading_core_radius_adjustment"
+    ] == pytest.approx(-0.35)
+    assert (
+        DEFAULTS["tb6600_stripboard_interface_housing_self_threading_lead_in"] is True
+    )
     assert board_width == pytest.approx(33.02)
     assert board_depth == pytest.approx(22.86)
     assert body_size[2] - wall == pytest.approx(35.0)
@@ -202,53 +234,65 @@ def test_tb6600_stripboard_interface_housing_cable_exit_and_flange_orientation()
     )
 
 
-def test_tb6600_stripboard_interface_housing_lid_screws_use_hv_style_threaded_insets():
+def test_tb6600_stripboard_interface_housing_lid_screws_use_self_threading_bosses():
     housing = _build_housing()
     screw_spec = MScrew.from_size(
         DEFAULTS["tb6600_stripboard_interface_housing_lid_screw_size"]
     )
-    inset_depth = (
-        screw_spec.thread_inset_length
-        + DEFAULTS[
-            "tb6600_stripboard_interface_housing_lid_thread_inset_extra_screw_depth"
-        ]
+    body_reference = housing.get_non_production_part_by_name(
+        "tb6600_stripboard_interface_housing_body_reference"
     )
+    body_bbox = get_bounding_box(body_reference)
 
     assert DEFAULTS["tb6600_stripboard_interface_housing_lid_screw_size"] == "M3"
     assert DEFAULTS[
-        "tb6600_stripboard_interface_housing_lid_thread_inset_extra_screw_depth"
-    ] == pytest.approx(4.0)
+        "tb6600_stripboard_interface_housing_lid_screw_boss_diameter"
+    ] == pytest.approx(8.0)
+    assert DEFAULTS[
+        "tb6600_stripboard_interface_housing_self_threading_core_radius_adjustment"
+    ] == pytest.approx(-0.35)
+    assert (
+        DEFAULTS["tb6600_stripboard_interface_housing_self_threading_lead_in"] is True
+    )
 
-    for lid_screw_index in range(4):
-        screw = housing.get_named_non_production_part(
-            f"lid_mount_screw_{lid_screw_index}_screw"
+    pilot_centers = []
+    clearance_centers = []
+    for lid_screw_index in range(1, 5):
+        pilot_hole = housing.get_cutter_part_by_name(
+            f"lid_mount_pilot_hole_{lid_screw_index}"
         )
-        hole = housing.get_named_cutter(
-            f"lid_mount_screw_{lid_screw_index}_hole_cutter"
-        )
-        inset = housing.get_named_non_production_part(
-            f"lid_mount_screw_{lid_screw_index}_thread_inset"
-        )
-        inset_cutter = housing.get_named_cutter(
-            f"lid_mount_screw_{lid_screw_index}_assembly_cutter"
+        clearance_hole = housing.get_cutter_part_by_name(
+            f"lid_mount_clearance_hole_{lid_screw_index}"
         )
 
-        screw_center = get_bounding_box_center(screw)
-        hole_center = get_bounding_box_center(hole)
-        inset_center = get_bounding_box_center(inset)
-        inset_size = get_bounding_box_size(inset)
-        inset_cutter_size = get_bounding_box_size(inset_cutter)
+        _assert_m3_self_threading_z_cutter(pilot_hole)
+        pilot_bbox = get_bounding_box(pilot_hole)
+        pilot_center = get_bounding_box_center(pilot_hole)
+        clearance_center = get_bounding_box_center(clearance_hole)
+        clearance_size = get_bounding_box_size(clearance_hole)
 
-        assert screw_center[:2] == pytest.approx(hole_center[:2], abs=0.05)
-        assert inset_center[:2] == pytest.approx(hole_center[:2], abs=0.05)
-        assert inset_size[2] == pytest.approx(
-            screw_spec.thread_inset_length,
-            abs=0.05,
+        assert pilot_bbox[1][2] == pytest.approx(body_bbox[1][2], abs=0.05)
+        assert pilot_center[:2] == pytest.approx(clearance_center[:2], abs=0.05)
+        assert clearance_size[:2] == pytest.approx(
+            [screw_spec.clearance_hole_loose, screw_spec.clearance_hole_loose]
         )
-        assert inset_cutter_size[2] == pytest.approx(
-            inset_depth,
-            abs=0.05,
+        assert clearance_size[0] < screw_spec.cylinder_head_diameter
+        assert clearance_size[2] == pytest.approx(
+            DEFAULTS["tb6600_stripboard_interface_housing_lid_thickness"] + 2
         )
+        pilot_centers.append(pilot_center)
+        clearance_centers.append(clearance_center)
+
+    assert len({round(center[0], 2) for center in pilot_centers}) == 2
+    assert len({round(center[1], 2) for center in pilot_centers}) == 2
+
+    lid_screws = housing.get_named_non_production_part("lid_mount_screws")
+    screw_center = get_bounding_box_center(lid_screws)
+    centers_center = [
+        sum(center[axis] for center in clearance_centers) / len(clearance_centers)
+        for axis in range(3)
+    ]
+    assert screw_center[:2] == pytest.approx(centers_center[:2], abs=0.05)
 
 
 def test_tb6600_stripboard_interface_housing_cable_tie_slots_cut_the_floor():
@@ -306,13 +350,15 @@ def test_tb6600_stripboard_interface_housing_visualization_exports_only_real_par
         visual_names.update(part.get("names", []))
 
     assert "mount_flange_screw" in visual_names
-    assert "lid_mount_screw_*_screw" in visual_names
-    assert "lid_mount_screw_*_thread_inset" in visual_names
+    assert "lid_mount_screws" in visual_names
+    assert not any("thread_inset" in name for name in visual_names)
 
     hole_only_names = {
         "cable_exit",
         "cable_tie_slots",
         "mount_flange_screw_hole",
+        "lid_mount_pilot_holes",
+        "lid_mount_clearance_holes",
     }
     assert visual_names.isdisjoint(hole_only_names)
 

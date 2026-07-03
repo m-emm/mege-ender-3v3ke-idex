@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a Y-axis step-loss characterization G-code file."""
+"""Generate a Y-axis print-motif step-loss characterization G-code file."""
 
 from __future__ import annotations
 
@@ -16,28 +16,73 @@ OUTPUT_FILENAME_PREFIX = "y_step_loss_characterization"
 
 
 @dataclass(frozen=True)
-class YAxisConfig:
-    position_endstop: float
+class AxisRange:
     position_min: float
     position_max: float
+
+
+@dataclass(frozen=True)
+class PrinterConfig:
+    x: AxisRange
+    y: AxisRange
+    z: AxisRange
+    y_position_endstop: float
     max_velocity: float
     max_accel: float
     square_corner_velocity: float
 
 
 @dataclass(frozen=True)
+class StressProfile:
+    name: str
+    velocity_mm_s: float
+    accel_mm_s2: float
+    square_corner_velocity: float
+
+
+@dataclass(frozen=True)
 class TestPlan:
-    accel_levels: tuple[int, ...] = (7000, 8000)
-    cycles_per_level: int = 20
-    away_distance_mm: float = 90.0
+    cycles_per_profile: int = 10
     endstop_gap_mm: float = 5.0
-    away_velocity_mm_s: float = 350.0
-    away_accel_mm_s2: float = 1000.0
-    test_velocity_mm_s: float = 500.0
+    z_height_mm: float = 10.0
+    reset_velocity_mm_s: float = 350.0
+    reset_accel_mm_s2: float = 1000.0
+    reset_square_corner_velocity: float = 5.0
     creep_velocity_mm_s: float = 20.0
     creep_accel_mm_s2: float = 500.0
     dwell_ms: int = 100
     endstop_key: str = "stepper_y"
+    stress_profiles: tuple[StressProfile, ...] = (
+        StressProfile("accel_2500", 350.0, 2500.0, 5.0),
+        StressProfile("accel_3500", 350.0, 3500.0, 5.0),
+        StressProfile("accel_4500", 350.0, 4500.0, 5.0),
+        StressProfile("speed_300", 300.0, 3500.0, 5.0),
+        StressProfile("speed_350", 350.0, 3500.0, 5.0),
+        StressProfile("speed_400", 400.0, 3500.0, 5.0),
+        StressProfile("scv_3", 350.0, 3500.0, 3.0),
+        StressProfile("scv_5", 350.0, 3500.0, 5.0),
+        StressProfile("scv_8", 350.0, 3500.0, 8.0),
+    )
+
+
+@dataclass(frozen=True)
+class Point:
+    x: float
+    y: float
+
+
+# From the observed failing TB6600 housing print travel around lines 1776..1784.
+# The large negative-Y diagonal ends at PRINT_MOTIF_ENDSTOP_GAP_ANCHOR_INDEX.
+PRINT_MOTIF_POINTS: tuple[Point, ...] = (
+    Point(59.860, 156.474),
+    Point(59.860, 157.368),
+    Point(70.528, 155.615),
+    Point(70.528, 139.368),
+    Point(100.985, 62.632),
+    Point(100.025, 62.632),
+    Point(100.025, 63.524),
+)
+PRINT_MOTIF_ENDSTOP_GAP_ANCHOR_INDEX = 4
 
 
 def _section(config_text: str, name: str) -> str:
@@ -62,14 +107,24 @@ def _setting_float(section: str, setting_name: str) -> float:
     return float(match.group("value"))
 
 
-def load_y_axis_config(config_path: Path = DEFAULT_CONFIG_PATH) -> YAxisConfig:
+def _axis_range(section: str) -> AxisRange:
+    return AxisRange(
+        position_min=_setting_float(section, "position_min"),
+        position_max=_setting_float(section, "position_max"),
+    )
+
+
+def load_printer_config(config_path: Path = DEFAULT_CONFIG_PATH) -> PrinterConfig:
     config_text = config_path.read_text(encoding="utf-8")
     printer = _section(config_text, "printer")
+    stepper_x = _section(config_text, "stepper_x")
     stepper_y = _section(config_text, "stepper_y")
-    return YAxisConfig(
-        position_endstop=_setting_float(stepper_y, "position_endstop"),
-        position_min=_setting_float(stepper_y, "position_min"),
-        position_max=_setting_float(stepper_y, "position_max"),
+    stepper_z = _section(config_text, "stepper_z")
+    return PrinterConfig(
+        x=_axis_range(stepper_x),
+        y=_axis_range(stepper_y),
+        z=_axis_range(stepper_z),
+        y_position_endstop=_setting_float(stepper_y, "position_endstop"),
         max_velocity=_setting_float(printer, "max_velocity"),
         max_accel=_setting_float(printer, "max_accel"),
         square_corner_velocity=_setting_float(printer, "square_corner_velocity"),
@@ -92,106 +147,161 @@ def timestamped_output_path(
     return output_dir / f"{OUTPUT_FILENAME_PREFIX}_{current_time:%Y%m%d_%H%M%S}.gcode"
 
 
-def _validate_plan(axis: YAxisConfig, plan: TestPlan) -> None:
-    if plan.cycles_per_level <= 0:
-        raise ValueError("cycles_per_level must be positive")
-    if not plan.accel_levels:
-        raise ValueError("accel_levels must not be empty")
-    if sorted(plan.accel_levels) != list(plan.accel_levels):
-        raise ValueError("accel_levels must be sorted ascending")
+def transformed_print_motif_points(
+    printer: PrinterConfig,
+    plan: TestPlan = TestPlan(),
+) -> tuple[Point, ...]:
+    anchor = PRINT_MOTIF_POINTS[PRINT_MOTIF_ENDSTOP_GAP_ANCHOR_INDEX]
+    y_shift = printer.y_position_endstop + plan.endstop_gap_mm - anchor.y
+    return tuple(Point(point.x, point.y + y_shift) for point in PRINT_MOTIF_POINTS)
+
+
+def _validate_axis_target(axis_name: str, axis: AxisRange, value: float) -> None:
+    if not axis.position_min <= value <= axis.position_max:
+        raise ValueError(
+            f"{axis_name} target {value:.3f} is outside configured "
+            f"{axis_name} range {axis.position_min:.3f}..{axis.position_max:.3f}"
+        )
+
+
+def _validate_plan(printer: PrinterConfig, plan: TestPlan) -> None:
+    if plan.cycles_per_profile <= 0:
+        raise ValueError("cycles_per_profile must be positive")
     if plan.endstop_gap_mm <= 0:
         raise ValueError("endstop_gap_mm must be positive")
-    if plan.away_distance_mm <= plan.endstop_gap_mm:
-        raise ValueError("away_distance_mm must be greater than endstop_gap_mm")
+    if not plan.stress_profiles:
+        raise ValueError("stress_profiles must not be empty")
+    _validate_axis_target("Z", printer.z, plan.z_height_mm)
 
-    y_endstop = axis.position_endstop
-    y_gap = y_endstop + plan.endstop_gap_mm
-    y_away = y_endstop + plan.away_distance_mm
-    for label, y in (
-        ("endstop", y_endstop),
-        ("gap", y_gap),
-        ("away", y_away),
-    ):
-        if not axis.position_min <= y <= axis.position_max:
-            raise ValueError(
-                f"{label} Y target {y:.3f} is outside configured Y range "
-                f"{axis.position_min:.3f}..{axis.position_max:.3f}"
-            )
+    motif_points = transformed_print_motif_points(printer, plan)
+    for point in motif_points:
+        _validate_axis_target("X", printer.x, point.x)
+        _validate_axis_target("Y", printer.y, point.y)
+    _validate_axis_target("Y", printer.y, printer.y_position_endstop)
+
+    anchor = motif_points[PRINT_MOTIF_ENDSTOP_GAP_ANCHOR_INDEX]
+    expected_anchor_y = printer.y_position_endstop + plan.endstop_gap_mm
+    if abs(anchor.y - expected_anchor_y) > 1e-9:
+        raise ValueError("transformed print motif does not land at the endstop gap")
 
 
-def generate_gcode(axis: YAxisConfig, plan: TestPlan = TestPlan()) -> str:
-    _validate_plan(axis, plan)
+def _set_velocity_limit(
+    *,
+    velocity: float,
+    accel: float,
+    square_corner_velocity: float,
+) -> str:
+    return (
+        "SET_VELOCITY_LIMIT "
+        f"VELOCITY={velocity:g} "
+        f"ACCEL={accel:g} "
+        f"SQUARE_CORNER_VELOCITY={square_corner_velocity:g}"
+    )
 
-    y_endstop = axis.position_endstop
-    y_gap = y_endstop + plan.endstop_gap_mm
-    y_away = y_endstop + plan.away_distance_mm
-    total_checks = len(plan.accel_levels) * plan.cycles_per_level
+
+def generate_gcode(printer: PrinterConfig, plan: TestPlan = TestPlan()) -> str:
+    _validate_plan(printer, plan)
+
+    motif_points = transformed_print_motif_points(printer, plan)
+    y_endstop = printer.y_position_endstop
+    total_checks = len(plan.stress_profiles) * plan.cycles_per_profile
 
     lines = [
-        "; Y step-loss characterization generated by generate_y_step_loss_test_gcode.py",
+        "; Y print-motif step-loss characterization generated by generate_y_step_loss_test_gcode.py",
+        "; Source motif: TB6600 housing travel near the observed Y offset failure",
         f"; Endstop verification key: {plan.endstop_key}",
+        f"; Z characterization height: {_format_float(plan.z_height_mm)}",
         f"; Y endstop: {_format_float(y_endstop)}",
-        f"; Y away distance: {_format_float(plan.away_distance_mm)}",
-        f"; Y away target: {_format_float(y_away)}",
-        f"; Y high-accel return target: {_format_float(y_gap)}",
-        f"; Accel levels: {', '.join(str(accel) for accel in plan.accel_levels)}",
-        f"; Cycles per level: {plan.cycles_per_level}",
+        f"; Y high-stress anchor target: {_format_float(motif_points[PRINT_MOTIF_ENDSTOP_GAP_ANCHOR_INDEX].y)}",
+        f"; Stress profiles: {', '.join(profile.name for profile in plan.stress_profiles)}",
+        f"; Cycles per profile: {plan.cycles_per_profile}",
         f"; Total endstop checks: {total_checks}",
-        "M117 Y step-loss characterization",
-        f'RESPOND TYPE=echo MSG="Y step-loss characterization: homing Y, then running {total_checks} endstop checks."',
+        "M117 Y print-motif characterization",
+        f'RESPOND TYPE=echo MSG="Y print-motif characterization: homing XYZ, moving to Z{_format_float(plan.z_height_mm)}, then running {total_checks} checks."',
+        "T0",
         "G90",
         "M400",
-        "G28 Y",
+        "G28 X Y Z",
+        "M400",
+        f"G1 Z{_format_float(plan.z_height_mm)} F{_feedrate(10.0)}",
         "M400",
     ]
 
     check_index = 0
-    for accel in plan.accel_levels:
+    for profile in plan.stress_profiles:
         lines.extend(
             [
-                f'RESPOND TYPE=echo MSG="Y step-loss level: accel {accel} mm/s^2, {plan.cycles_per_level} cycles."',
                 (
-                    "SET_VELOCITY_LIMIT "
-                    f"VELOCITY={plan.away_velocity_mm_s:g} "
-                    f"ACCEL={plan.away_accel_mm_s2:g} "
-                    f"SQUARE_CORNER_VELOCITY={axis.square_corner_velocity:g}"
+                    f'RESPOND TYPE=echo MSG="Y print-motif profile {profile.name}: '
+                    f"velocity {profile.velocity_mm_s:g} mm/s, "
+                    f"accel {profile.accel_mm_s2:g} mm/s^2, "
+                    f"SCV {profile.square_corner_velocity:g}, "
+                    f'{plan.cycles_per_profile} cycles."'
                 ),
             ]
         )
-        for cycle in range(1, plan.cycles_per_level + 1):
+        for cycle in range(1, plan.cycles_per_profile + 1):
             check_index += 1
+            first_point = motif_points[0]
             lines.extend(
                 [
-                    f"; Check {check_index}/{total_checks}: accel={accel} cycle={cycle}",
-                    f"G1 Y{_format_float(y_away)} F{_feedrate(plan.away_velocity_mm_s)}",
-                    "M400",
                     (
-                        "SET_VELOCITY_LIMIT "
-                        f"VELOCITY={plan.test_velocity_mm_s:g} "
-                        f"ACCEL={accel:g} "
-                        f"SQUARE_CORNER_VELOCITY={axis.square_corner_velocity:g}"
+                        f"; Check {check_index}/{total_checks}: "
+                        f"profile={profile.name} "
+                        f"velocity={profile.velocity_mm_s:g} "
+                        f"accel={profile.accel_mm_s2:g} "
+                        f"scv={profile.square_corner_velocity:g} "
+                        f"cycle={cycle}"
                     ),
-                    f"G1 Y{_format_float(y_gap)} F{_feedrate(plan.test_velocity_mm_s)}",
-                    "M400",
+                    _set_velocity_limit(
+                        velocity=plan.reset_velocity_mm_s,
+                        accel=plan.reset_accel_mm_s2,
+                        square_corner_velocity=plan.reset_square_corner_velocity,
+                    ),
                     (
-                        "SET_VELOCITY_LIMIT "
-                        f"VELOCITY={plan.creep_velocity_mm_s:g} "
-                        f"ACCEL={plan.creep_accel_mm_s2:g} "
-                        f"SQUARE_CORNER_VELOCITY={axis.square_corner_velocity:g}"
+                        f"G1 X{_format_float(first_point.x)} "
+                        f"Y{_format_float(first_point.y)} "
+                        f"Z{_format_float(plan.z_height_mm)} "
+                        f"F{_feedrate(plan.reset_velocity_mm_s)}"
                     ),
-                    f"G1 Y{_format_float(y_endstop)} F{_feedrate(plan.creep_velocity_mm_s)}",
+                    "M400",
+                    _set_velocity_limit(
+                        velocity=profile.velocity_mm_s,
+                        accel=profile.accel_mm_s2,
+                        square_corner_velocity=profile.square_corner_velocity,
+                    ),
+                ]
+            )
+            for point in motif_points[1:]:
+                lines.append(
+                    f"G1 X{_format_float(point.x)} "
+                    f"Y{_format_float(point.y)} "
+                    f"F{_feedrate(profile.velocity_mm_s)}"
+                )
+            last_point = motif_points[-1]
+            lines.extend(
+                [
+                    "M400",
+                    _set_velocity_limit(
+                        velocity=plan.creep_velocity_mm_s,
+                        accel=plan.creep_accel_mm_s2,
+                        square_corner_velocity=profile.square_corner_velocity,
+                    ),
+                    (
+                        f"G1 X{_format_float(last_point.x)} "
+                        f"Y{_format_float(y_endstop)} "
+                        f"F{_feedrate(plan.creep_velocity_mm_s)}"
+                    ),
                     "M400",
                     f"G4 P{plan.dwell_ms}",
                     "QUERY_ENDSTOPS",
                     (
                         "Y_STEP_LOSS_ASSERT_ENDSTOP "
-                        f"ACCEL={accel} CYCLE={cycle} STEP={check_index}"
-                    ),
-                    (
-                        "SET_VELOCITY_LIMIT "
-                        f"VELOCITY={plan.away_velocity_mm_s:g} "
-                        f"ACCEL={plan.away_accel_mm_s2:g} "
-                        f"SQUARE_CORNER_VELOCITY={axis.square_corner_velocity:g}"
+                        f"PROFILE={profile.name} "
+                        f"VELOCITY={profile.velocity_mm_s:g} "
+                        f"ACCEL={profile.accel_mm_s2:g} "
+                        f"SCV={profile.square_corner_velocity:g} "
+                        f"CYCLE={cycle} STEP={check_index}"
                     ),
                 ]
             )
@@ -199,14 +309,13 @@ def generate_gcode(axis: YAxisConfig, plan: TestPlan = TestPlan()) -> str:
     lines.extend(
         [
             "M400",
-            (
-                "SET_VELOCITY_LIMIT "
-                f"VELOCITY={axis.max_velocity:g} "
-                f"ACCEL={axis.max_accel:g} "
-                f"SQUARE_CORNER_VELOCITY={axis.square_corner_velocity:g}"
+            _set_velocity_limit(
+                velocity=printer.max_velocity,
+                accel=printer.max_accel,
+                square_corner_velocity=printer.square_corner_velocity,
             ),
-            f'RESPOND TYPE=echo MSG="Y step-loss characterization passed: {total_checks} endstop checks completed."',
-            "M117 Y step-loss passed",
+            f'RESPOND TYPE=echo MSG="Y print-motif characterization passed: {total_checks} endstop checks completed."',
+            "M117 Y print-motif passed",
             "",
         ]
     )
@@ -215,7 +324,7 @@ def generate_gcode(axis: YAxisConfig, plan: TestPlan = TestPlan()) -> str:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate a Y-axis step-loss characterization G-code file."
+        description="Generate a print-motif Y-axis step-loss characterization G-code file."
     )
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument(
@@ -235,8 +344,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    axis = load_y_axis_config(args.config)
-    gcode = generate_gcode(axis)
+    printer = load_printer_config(args.config)
+    gcode = generate_gcode(printer)
     output_path = args.output or timestamped_output_path(args.output_dir)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(gcode, encoding="utf-8")

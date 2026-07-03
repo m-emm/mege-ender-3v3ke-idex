@@ -1,8 +1,5 @@
 """TB6600 stripboard interface housing assembly."""
 
-from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
-    create_four_screws_mount_assembly,
-)
 from shellforgepy.simple import *
 
 
@@ -26,7 +23,9 @@ def create_tb6600_stripboard_interface_housing_assembly(
     tb6600_stripboard_interface_housing_lid_screw_length,
     tb6600_stripboard_interface_housing_lid_screw_inset,
     tb6600_stripboard_interface_housing_lid_screw_mount_block_size,
-    tb6600_stripboard_interface_housing_lid_thread_inset_extra_screw_depth,
+    tb6600_stripboard_interface_housing_lid_screw_boss_diameter,
+    tb6600_stripboard_interface_housing_self_threading_core_radius_adjustment,
+    tb6600_stripboard_interface_housing_self_threading_lead_in,
     tb6600_stripboard_interface_housing_cable_exit_width,
     tb6600_stripboard_interface_housing_cable_exit_height,
     tb6600_stripboard_interface_housing_cable_exit_floor_bridge,
@@ -83,33 +82,6 @@ def create_tb6600_stripboard_interface_housing_assembly(
         origin=(wall, wall, wall),
     )
     housing_box = housing_box.cut(inner_space_cutter)
-
-    lid_screw_mount_blocks = PartCollector()
-    post_centers_x = [
-        wall + screw_block / 2,
-        housing_width - wall - screw_block / 2,
-    ]
-    post_centers_y = [
-        wall + screw_block / 2,
-        housing_depth - wall - screw_block / 2,
-    ]
-    for x_center in post_centers_x:
-        for y_center in post_centers_y:
-            screw_mount_block = create_filleted_box(
-                screw_block,
-                screw_block,
-                housing_height,
-                fillet_radius=min(
-                    tb6600_stripboard_interface_housing_corner_fillet_radius,
-                    screw_block / 4,
-                ),
-            )
-            screw_mount_block = translate(
-                x_center - screw_block / 2,
-                y_center - screw_block / 2,
-                0,
-            )(screw_mount_block)
-            lid_screw_mount_blocks = lid_screw_mount_blocks.fuse(screw_mount_block)
 
     mount_flange = create_filleted_box(
         tb6600_stripboard_interface_housing_mount_flange_width,
@@ -264,60 +236,103 @@ def create_tb6600_stripboard_interface_housing_assembly(
     lid_rim = align(lid_rim, lid_base, Alignment.STACK_BOTTOM)
     lid = lid_base.fuse(lid_rim)
 
-    lid_screw_span_reference = housing_reference.fuse(lid)
-    lid_screw_mount = create_four_screws_mount_assembly(
-        lid_screw_span_reference,
-        tb6600_stripboard_interface_housing_lid_screw_size,
-        tb6600_stripboard_interface_housing_lid_screw_length,
-        screw_direction=Alignment.TOP,
-        with_nut_cutter=False,
-        flush_with_top=True,
-        width_inset=tb6600_stripboard_interface_housing_lid_screw_inset,
-        length_inset=tb6600_stripboard_interface_housing_lid_screw_inset,
-        clearance_type="loose",
+    lid_screw_record = MScrew.from_size(
+        tb6600_stripboard_interface_housing_lid_screw_size
     )
-    lid = lid_screw_mount.use_as_cutter_on(lid)
-
-    lid_screw_mount_blocks = lid_screw_mount.use_as_cutter_on(lid_screw_mount_blocks)
-    lid_thread_insets = None
-    lid_thread_inset_depth = (
-        MScrew.from_size(
-            tb6600_stripboard_interface_housing_lid_screw_size
-        ).thread_inset_length
-        + tb6600_stripboard_interface_housing_lid_thread_inset_extra_screw_depth
+    lid_screw_bosses = PartCollector()
+    lid_pilot_holes = PartCollector()
+    lid_clearance_holes = PartCollector()
+    lid_screws = PartCollector()
+    lid_screw_positions = []
+    boss_radius = tb6600_stripboard_interface_housing_lid_screw_boss_diameter / 2
+    boss_placement_frame = create_box(
+        housing_width
+        - 2 * tb6600_stripboard_interface_housing_lid_screw_inset
+        + 2 * boss_radius,
+        housing_depth
+        - 2 * tb6600_stripboard_interface_housing_lid_screw_inset
+        + 2 * boss_radius,
+        housing_height,
     )
-    for lid_screw_index in range(4):
-        lid_screw_hole = lid_screw_mount.get_named_cutter(
-            f"screw_{lid_screw_index}_hole_cutter"
-        )
-        lid_thread_inset = create_thread_inset_assembly(
-            size=tb6600_stripboard_interface_housing_lid_screw_size,
-            thickness=lid_thread_inset_depth,
-            extra_radius=0.01,
-            clearance_type="loose",
-        )
-        lid_thread_inset = align(
-            lid_thread_inset, lid_screw_hole, Alignment.CENTER, axes=[0, 1]
-        )
-        lid_thread_inset = align(
-            lid_thread_inset, lid_screw_mount_blocks, Alignment.TOP
-        )
+    boss_placement_frame = align(
+        boss_placement_frame,
+        housing_reference,
+        Alignment.CENTER,
+    )
+    boss_placement_frame = align(
+        boss_placement_frame,
+        housing_reference,
+        Alignment.BOTTOM,
+    )
 
-        lid_screw_mount_blocks = lid_thread_inset.use_as_cutter_on(
-            lid_screw_mount_blocks
-        )
-        lid_screw_mount_blocks = lid_screw_mount_blocks.fuse(lid_thread_inset.leader)
+    for x_alignment in [Alignment.LEFT, Alignment.RIGHT]:
+        for y_alignment in [Alignment.FRONT, Alignment.BACK]:
+            lid_boss = create_cylinder(
+                boss_radius,
+                housing_height,
+            )
+            lid_boss = align(lid_boss, boss_placement_frame, x_alignment)
+            lid_boss = align(lid_boss, boss_placement_frame, y_alignment)
+            lid_boss = align(lid_boss, housing_reference, Alignment.BOTTOM)
+            lid_screw_bosses = lid_screw_bosses.fuse(lid_boss)
 
-        named_lid_thread_inset = lid_thread_inset.prefixed_copy(
-            f"screw_{lid_screw_index}"
-        )
-        if lid_thread_insets is None:
-            lid_thread_insets = named_lid_thread_inset
-        else:
-            lid_thread_insets = lid_thread_insets.fuse(named_lid_thread_inset)
+            lid_pilot_hole = create_self_threading_hole_cutter(
+                tb6600_stripboard_interface_housing_lid_screw_size,
+                housing_height + 2,
+                core_radius_adjustment=(
+                    tb6600_stripboard_interface_housing_self_threading_core_radius_adjustment
+                ),
+                lead_in=tb6600_stripboard_interface_housing_self_threading_lead_in,
+            )
+            lid_pilot_hole = align(
+                lid_pilot_hole,
+                lid_boss,
+                Alignment.CENTER,
+                axes=[0, 1],
+            )
+            lid_pilot_hole = align(lid_pilot_hole, lid_boss, Alignment.TOP)
+            lid_pilot_holes = lid_pilot_holes.fuse(lid_pilot_hole)
 
-    housing_box = housing_box.fuse(lid_screw_mount_blocks)
-    housing_box = lid_screw_mount.use_as_cutter_on(housing_box)
+            lid_clearance_hole = create_cylinder(
+                lid_screw_record.clearance_hole_loose / 2,
+                tb6600_stripboard_interface_housing_lid_thickness + 2,
+            )
+            lid_clearance_hole = align(
+                lid_clearance_hole,
+                lid_boss,
+                Alignment.CENTER,
+                axes=[0, 1],
+            )
+            lid_clearance_hole = align(
+                lid_clearance_hole,
+                lid_base,
+                Alignment.CENTER,
+                axes=[2],
+            )
+            lid_clearance_holes = lid_clearance_holes.fuse(lid_clearance_hole)
+            lid_screw_positions.append((lid_pilot_hole, lid_clearance_hole))
+
+            lid_screw = create_cylinder_screw(
+                tb6600_stripboard_interface_housing_lid_screw_size,
+                tb6600_stripboard_interface_housing_lid_screw_length,
+            )
+            lid_screw = align(
+                lid_screw,
+                lid_boss,
+                Alignment.CENTER,
+                axes=[0, 1],
+            )
+            lid_screw = align(
+                lid_screw,
+                lid_base,
+                Alignment.STACK_TOP,
+                stack_gap=-tb6600_stripboard_interface_housing_lid_screw_length,
+            )
+            lid_screws = lid_screws.fuse(lid_screw)
+
+    housing_box = housing_box.fuse(lid_screw_bosses)
+    housing_box = housing_box.cut(lid_pilot_holes)
+    lid = lid.cut(lid_clearance_holes)
 
     housing = LeaderFollowersCuttersPart(leader=housing_box)
     housing.add_named_follower(lid, "tb6600_stripboard_interface_housing_lid")
@@ -325,13 +340,17 @@ def create_tb6600_stripboard_interface_housing_assembly(
     housing.add_named_cutter(cable_exit, "cable_exit")
     housing.add_named_cutter(cable_tie_slots, "cable_tie_slots")
     housing.add_named_cutter(mount_flange_screw_hole, "mount_flange_screw_hole")
+    housing.add_named_cutter(lid_pilot_holes, "lid_mount_pilot_holes")
+    housing.add_named_cutter(lid_clearance_holes, "lid_mount_clearance_holes")
+    for index, (pilot_hole, clearance_hole) in enumerate(lid_screw_positions, start=1):
+        housing.add_named_cutter(pilot_hole, f"lid_mount_pilot_hole_{index}")
+        housing.add_named_cutter(clearance_hole, f"lid_mount_clearance_hole_{index}")
     for name, cable_tie_slot in cable_tie_slot_items:
         housing.add_named_cutter(cable_tie_slot, name)
     housing.add_named_non_production_part(
         housing_reference, "tb6600_stripboard_interface_housing_body_reference"
     )
+    housing.add_named_non_production_part(lid_screws, "lid_mount_screws")
     housing.add_named_non_production_part(mount_flange_screw, "mount_flange_screw")
-    housing = housing.merge_except_leader(lid_screw_mount.prefixed_copy("lid_mount"))
-    housing = housing.merge_except_leader(lid_thread_insets.prefixed_copy("lid_mount"))
 
     return housing

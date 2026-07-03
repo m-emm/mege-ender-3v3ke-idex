@@ -199,50 +199,100 @@ def test_y_step_loss_assert_macro_checks_stepper_y_endstop():
 
     assert 'printer.query_endstops.last_query["stepper_y"]' in macro
     assert "action_raise_error" in macro
+    assert "profile=" in macro
+    assert "velocity=" in macro
     assert "Re-home Y before normal printing" in macro
 
 
-def test_y_step_loss_generator_emits_forty_focused_endstop_checks(tmp_path):
+def test_y_step_loss_generator_emits_print_motif_endstop_checks(tmp_path):
     generator = _load_y_step_loss_generator_module()
-    axis = generator.load_y_axis_config(CONFIG_PATH)
-    gcode = generator.generate_gcode(axis)
+    printer = generator.load_printer_config(CONFIG_PATH)
+    gcode = generator.generate_gcode(printer)
     output = tmp_path / "y_step_loss_characterization.gcode"
 
     assert generator.main(["--config", str(CONFIG_PATH), "--output", str(output)]) == 0
     assert output.read_text(encoding="utf-8") == gcode
+    assert not hasattr(generator, "load_y_axis_config")
+    assert "--mode" not in generator.build_parser().format_help()
 
     lines = [line.strip() for line in gcode.splitlines() if line.strip()]
     assert "; Endstop verification key: stepper_y" in lines
-    assert "; Y away distance: 90.000" in lines
-    assert "; Total endstop checks: 40" in lines
-    assert gcode.count("Y_STEP_LOSS_ASSERT_ENDSTOP") == 40
+    assert "; Z characterization height: 10.000" in lines
+    assert "; Total endstop checks: 90" in lines
+    assert "G28 X Y Z" in lines
+    assert "G1 Z10.000 F600" in lines
+    assert "G28 Y" not in lines
+    assert "Y away distance" not in gcode
 
     assertion_lines = [
         line for line in lines if line.startswith("Y_STEP_LOSS_ASSERT_ENDSTOP ")
     ]
-    accel_values = [
-        int(re.search(r"\bACCEL=(\d+)\b", line).group(1))
-        for line in assertion_lines
+    assert len(assertion_lines) == 90
+    profile_names = [
+        re.search(r"\bPROFILE=(\S+)\b", line).group(1) for line in assertion_lines
     ]
-    assert sorted(set(accel_values)) == [7000, 8000]
-    assert {accel: accel_values.count(accel) for accel in set(accel_values)} == {
-        accel: 20 for accel in set(accel_values)
+    assert sorted(set(profile_names)) == [
+        "accel_2500",
+        "accel_3500",
+        "accel_4500",
+        "scv_3",
+        "scv_5",
+        "scv_8",
+        "speed_300",
+        "speed_350",
+        "speed_400",
+    ]
+    assert {name: profile_names.count(name) for name in set(profile_names)} == {
+        name: 10 for name in set(profile_names)
     }
+    accel_values = [
+        int(re.search(r"\bACCEL=(\d+)\b", line).group(1)) for line in assertion_lines
+    ]
+    assert sorted(set(accel_values)) == [2500, 3500, 4500]
 
     for index, line in enumerate(lines):
         if line.startswith("Y_STEP_LOSS_ASSERT_ENDSTOP "):
             assert lines[index - 1] == "QUERY_ENDSTOPS"
 
+    motif_points = generator.transformed_print_motif_points(printer)
+    high_stress_anchor = motif_points[generator.PRINT_MOTIF_ENDSTOP_GAP_ANCHOR_INDEX]
+    assert high_stress_anchor.y == pytest.approx(printer.y_position_endstop + 5.0)
+    assert any(
+        (
+            f"X{generator._format_float(high_stress_anchor.x)} "
+            f"Y{generator._format_float(high_stress_anchor.y)}"
+        )
+        in line
+        for line in lines
+    )
+
+    stepper_x = _section(CONFIG_PATH.read_text(encoding="utf-8"), "stepper_x")
     stepper_y = _section(CONFIG_PATH.read_text(encoding="utf-8"), "stepper_y")
+    stepper_z = _section(CONFIG_PATH.read_text(encoding="utf-8"), "stepper_z")
+    x_min = _setting_float(stepper_x, "position_min")
+    x_max = _setting_float(stepper_x, "position_max")
     y_min = _setting_float(stepper_y, "position_min")
     y_max = _setting_float(stepper_y, "position_max")
-    y_targets = [
-        float(match.group(1))
-        for match in re.finditer(r"^G1 Y(-?\d+(?:\.\d+)?)\b", gcode, re.MULTILINE)
+    z_min = _setting_float(stepper_z, "position_min")
+    z_max = _setting_float(stepper_z, "position_max")
+    x_targets = [
+        float(match.group(1)) for match in re.finditer(r"\bX(-?\d+(?:\.\d+)?)\b", gcode)
     ]
+    y_targets = [
+        float(match.group(1)) for match in re.finditer(r"\bY(-?\d+(?:\.\d+)?)\b", gcode)
+    ]
+    z_targets = [
+        float(match.group(1)) for match in re.finditer(r"\bZ(-?\d+(?:\.\d+)?)\b", gcode)
+    ]
+    assert x_targets
     assert y_targets
+    assert z_targets
+    assert min(x_targets) >= x_min - 1e-9
+    assert max(x_targets) <= x_max + 1e-9
     assert min(y_targets) >= y_min - 1e-9
     assert max(y_targets) <= y_max + 1e-9
+    assert min(z_targets) >= z_min - 1e-9
+    assert max(z_targets) <= z_max + 1e-9
 
 
 def test_y_step_loss_generator_default_output_path_is_timestamped(tmp_path):
@@ -253,7 +303,9 @@ def test_y_step_loss_generator_default_output_path_is_timestamped(tmp_path):
         now=datetime(2026, 7, 2, 10, 1, 58),
     )
 
-    assert output_path == tmp_path / "y_step_loss_characterization_20260702_100158.gcode"
+    assert (
+        output_path == tmp_path / "y_step_loss_characterization_20260702_100158.gcode"
+    )
 
 
 def test_config_fingerprint_changes_when_source_inputs_change(tmp_path):
@@ -270,7 +322,9 @@ def test_config_fingerprint_changes_when_source_inputs_change(tmp_path):
     assert generator.compute_config_fingerprint(calib, template) != original
 
     calib.write_text(calib_text, encoding="utf-8")
-    template.write_text(f"{template_text}\n# changed template source\n", encoding="utf-8")
+    template.write_text(
+        f"{template_text}\n# changed template source\n", encoding="utf-8"
+    )
     assert generator.compute_config_fingerprint(calib, template) != original
 
 
@@ -948,11 +1002,19 @@ def test_absolute_grid_x_materials_use_same_y_row_for_both_tools(monkeypatch):
     x_grid_calibration.create_absolute_x_alignment_materials(calibration)
 
     assert len(calls) == 2
-    assert calls[0]["line_y_min_mm"] == calls[1]["line_y_min_mm"] == pytest.approx(
-        grid_calibration.grid_coordinate(calibration["bed_grid_zero"][1], -1)
+    assert (
+        calls[0]["line_y_min_mm"]
+        == calls[1]["line_y_min_mm"]
+        == pytest.approx(
+            grid_calibration.grid_coordinate(calibration["bed_grid_zero"][1], -1)
+        )
     )
-    assert calls[0]["line_y_max_mm"] == calls[1]["line_y_max_mm"] == pytest.approx(
-        grid_calibration.grid_coordinate(calibration["bed_grid_zero"][1], 0)
+    assert (
+        calls[0]["line_y_max_mm"]
+        == calls[1]["line_y_max_mm"]
+        == pytest.approx(
+            grid_calibration.grid_coordinate(calibration["bed_grid_zero"][1], 0)
+        )
     )
     assert calls[0]["label_panel"] is calls[1]["label_panel"]
     assert calls[0]["label_panel"]["name"] == "z_guide_panel_outline"

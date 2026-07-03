@@ -695,13 +695,16 @@ gcode:
 [gcode_macro Y_STEP_LOSS_ASSERT_ENDSTOP]
 description: Fail if the latest QUERY_ENDSTOPS did not report Y as triggered.
 gcode:
+    {% set profile = params.PROFILE|default("unknown") %}
+    {% set velocity = params.VELOCITY|default("unknown") %}
     {% set accel = params.ACCEL|default("unknown") %}
+    {% set scv = params.SCV|default("unknown") %}
     {% set cycle = params.CYCLE|default("unknown") %}
     {% set step = params.STEP|default("unknown") %}
     {% if not printer.query_endstops.last_query["stepper_y"] %}
-        { action_raise_error("Y step-loss characterization failed: stepper_y endstop not triggered after accel=" ~ accel ~ ", cycle=" ~ cycle ~ ", step=" ~ step ~ ". Re-home Y before normal printing.") }
+        { action_raise_error("Y print-motif characterization failed: stepper_y endstop not triggered after profile=" ~ profile ~ ", velocity=" ~ velocity ~ ", accel=" ~ accel ~ ", scv=" ~ scv ~ ", cycle=" ~ cycle ~ ", step=" ~ step ~ ". Re-home Y before normal printing.") }
     {% endif %}
-    RESPOND TYPE=echo MSG="Y endstop verified: accel={accel}, cycle={cycle}, step={step}"
+    RESPOND TYPE=echo MSG="Y endstop verified: profile={profile}, velocity={velocity}, accel={accel}, scv={scv}, cycle={cycle}, step={step}"
 
 [gcode_macro MOTORS_OFF]
 description: Disable all configured motors.

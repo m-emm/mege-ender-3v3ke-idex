@@ -648,7 +648,9 @@ globals:
   tb6600_stripboard_interface_housing_lid_screw_length: 30.0
   tb6600_stripboard_interface_housing_lid_screw_inset: 10.7
   tb6600_stripboard_interface_housing_lid_screw_mount_block_size: 15.0
-  tb6600_stripboard_interface_housing_lid_thread_inset_extra_screw_depth: 4.0
+  tb6600_stripboard_interface_housing_lid_screw_boss_diameter: 8.0
+  tb6600_stripboard_interface_housing_self_threading_core_radius_adjustment: -0.35
+  tb6600_stripboard_interface_housing_self_threading_lead_in: true
   tb6600_stripboard_interface_housing_cable_exit_width: 36.0
   tb6600_stripboard_interface_housing_cable_exit_height: 20.0
   tb6600_stripboard_interface_housing_cable_exit_floor_bridge: 5.0
