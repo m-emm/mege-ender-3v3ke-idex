@@ -37,7 +37,7 @@ globals:
   print_bed_damper_diameter: 15
   y_axis_rail_spacing: 285
 
-  printer_foot_height: 37
+  printer_foot_height: 60
   printer_foot_base_size: 40
   printer_foot_top_size: 35
   printer_foot_screw_length: 30

@@ -9,6 +9,22 @@ Builder:
         assembly: printer_frame_assembly
         artifact: leader
         name: printer_frame
+      - source: dependencies
+        assembly: printer_foot_left_front_assembly
+        artifact: leader
+        name: printer_foot_left_front
+      - source: dependencies
+        assembly: printer_foot_left_back_assembly
+        artifact: leader
+        name: printer_foot_left_back
+      - source: dependencies
+        assembly: printer_foot_right_front_assembly
+        artifact: leader
+        name: printer_foot_right_front
+      - source: dependencies
+        assembly: printer_foot_right_back_assembly
+        artifact: leader
+        name: printer_foot_right_back
       - source: self
         artifact: leader
         name: motor_mount_plate
