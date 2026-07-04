@@ -29,8 +29,11 @@ $(ls -la /home/*/. ssh/authorized_keys 2>&1 || echo "No authorized_keys found")
 --- Network Interfaces ---
 $(ip addr show 2>&1)
 
+--- Video Devices ---
+$(ls -l /dev/video* /dev/v4l/by-id/* 2>&1 || echo "No video devices found")
+
 --- Enabled Services ---
-$(systemctl list-unit-files --state=enabled | grep -E 'ssh|avahi|klipper|moonraker|nginx' || echo "None found")
+$(systemctl list-unit-files --state=enabled | grep -E 'ssh|avahi|klipper|moonraker|nginx|crowsnest|vision-capture' || echo "None found")
 
 EOF
 

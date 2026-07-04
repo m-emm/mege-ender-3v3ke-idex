@@ -34,6 +34,16 @@ from mege_ender_3v3ke_idex.designs.two_material_offset_line_calibration import (
 KLIPPER_CONFIG_DIR = (
     Path(__file__).resolve().parents[1] / "klipper_setup" / "klipper_config"
 )
+IMAGE_BUILD_FILES_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "klipper_setup"
+    / "image_build"
+    / "overlays"
+    / "stage2"
+    / "99-klipperpi"
+    / "files"
+)
+IMAGE_BUILD_STAGE_DIR = IMAGE_BUILD_FILES_DIR.parent
 CONFIG_PATH = KLIPPER_CONFIG_DIR / "printer.cfg"
 CALIB_PATH = KLIPPER_CONFIG_DIR / "calib.yaml"
 TEMPLATE_PATH = KLIPPER_CONFIG_DIR / "printer.cfg.template"
@@ -326,6 +336,56 @@ def test_y_tmc_diag_button_and_status_macro_are_diagnostic_only():
     assert "G1 Y260 F30000" in move_test
     assert "SET_VELOCITY_LIMIT VELOCITY={old_velocity} ACCEL={old_accel}" in move_test
     assert len(re.findall(r"^\s*G28 Y\s*$", move_test, flags=re.MULTILINE)) >= 2
+
+
+def test_vision_capture_macro_and_host_files_exist():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    macro = _section(config_text, "gcode_macro VISION_CAPTURE")
+    crowsnest = (IMAGE_BUILD_FILES_DIR / "crowsnest.conf").read_text(encoding="utf-8")
+    moonraker = (IMAGE_BUILD_FILES_DIR / "moonraker.conf").read_text(encoding="utf-8")
+    nginx = (IMAGE_BUILD_FILES_DIR / "nginx-mainsail.conf").read_text(encoding="utf-8")
+    image_packages = (IMAGE_BUILD_STAGE_DIR / "00-packages").read_text(
+        encoding="utf-8"
+    )
+    image_install = (IMAGE_BUILD_STAGE_DIR / "01-run-chroot.sh").read_text(
+        encoding="utf-8"
+    )
+    live_deploy = (KLIPPER_CONFIG_DIR / "deploy_webcam_vision.sh").read_text(
+        encoding="utf-8"
+    )
+    capture_service = (IMAGE_BUILD_FILES_DIR / "vision-capture.service").read_text(
+        encoding="utf-8"
+    )
+    capture_script = (IMAGE_BUILD_FILES_DIR / "vision_capture.py").read_text(
+        encoding="utf-8"
+    )
+    runner_script = (IMAGE_BUILD_FILES_DIR / "vision_runner.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'action_call_remote_method("vision_capture"' in macro
+    assert "printer.toolhead.position" in macro
+    assert 'RESPOND TYPE=echo MSG="Vision capture requested' in macro
+    assert "mode: ustreamer" in crowsnest
+    assert "resolution: 1280x720" in crowsnest
+    assert "max_fps: 15" in crowsnest
+    assert "usb-Aukey-PC-LM1E_Camera" in crowsnest
+    assert "[webcam Printer Camera]" in moonraker
+    assert "stream_url: /webcam/?action=stream" in moonraker
+    assert "snapshot_url: /webcam/?action=snapshot" in moonraker
+    assert "[update_manager crowsnest]" in moonraker
+    assert "location /webcam/" in nginx
+    assert "location /vision/" in nginx
+    assert "ExecStart=/usr/local/bin/vision_capture.py --daemon" in capture_service
+    assert "register_remote_method" in capture_script
+    assert "1920, 1080" in capture_script
+    assert "1280, 720" in capture_script
+    assert "vision_capture.py\", \"--capture-once\"" in runner_script
+    assert "acl\n" in image_packages
+    assert "setfacl -m u:www-data:--x" in image_install
+    assert "setfacl -m u:www-data:--x" in live_deploy
+    assert "ln -sfn /opt/crowsnest" in image_install
+    assert "ln -sfn /opt/crowsnest" in live_deploy
 
 
 def test_y_tmc_stallguard_runner_streams_live_samples_and_keeps_aggressive_opt_in():

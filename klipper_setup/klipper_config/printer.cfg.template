@@ -37,6 +37,18 @@ max_z_velocity: 30
 max_z_accel: 300
 square_corner_velocity: 5
 
+# Webcam preview and high-resolution vision captures are host-side services:
+# Crowsnest streams the dashboard view, and vision-capture registers the
+# remote method used by this macro.
+[gcode_macro VISION_CAPTURE]
+description: Request a high-resolution webcam frame through the Pi vision-capture service.
+gcode:
+    {% set name = params.NAME|default("manual") %}
+    {% set reason = params.REASON|default("gcode") %}
+    {% set pos = printer.toolhead.position %}
+    RESPOND TYPE=echo MSG="Vision capture requested: {name}"
+    {action_call_remote_method("vision_capture", name=name, reason=reason, x=pos[0], y=pos[1], z=pos[2], e=pos[3])}
+
 # Custom thermistor calibration for the left Micro Swiss FlowTech toolhead.
 # Values retained from the same calibrated Micro Swiss hotend assembly.
 [thermistor microswiss_calibrated]

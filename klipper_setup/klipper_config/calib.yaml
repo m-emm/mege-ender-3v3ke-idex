@@ -7,6 +7,6 @@ tools:
     y_endstop: -14.800
     z_endstop: 293.750
   t1:
-    x_endstop: 355.700
+    x_endstop: 355.850
     y_endstop: -15.600
     z_endstop: 293.650

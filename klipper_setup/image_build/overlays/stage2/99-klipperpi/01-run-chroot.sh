@@ -165,9 +165,13 @@ apt-get install -y --no-install-recommends \
   wget \
   unzip \
   git \
+  acl \
+  sudo \
   openssh-server \
   avahi-daemon \
   nginx \
+  crudini \
+  v4l-utils \
   python3 \
   python3-venv \
   python3-pip \
@@ -178,6 +182,14 @@ apt-get install -y --no-install-recommends \
   libatlas-base-dev \
   libopenblas-dev \
   libsodium23
+
+# Webcam streaming dependencies. Crowsnest will prefer Mainsail's apt streamer
+# packages when available and falls back to building ustreamer locally.
+apt-get install -y --no-install-recommends \
+  libevent-dev \
+  libjpeg-dev \
+  libbsd-dev \
+  pkg-config
 
 # You install these later; keeping them separate is fine, but installing here makes it deterministic.
 # If you want to keep image smaller, move dev packages into a conditional section.
@@ -351,13 +363,16 @@ log "Creating printer_data layout under ${PRINTER_DATA}"
 
 require_file "${FILES_DIR}/printer.cfg"
 require_file "${FILES_DIR}/moonraker.conf"
+require_file "${FILES_DIR}/crowsnest.conf"
 require_file "${FILES_DIR}/resonance/run_resonance_plot.py"
 
 install -d -m 0755 -o "${USERNAME}" -g "${USERNAME}" \
-  "${CONFIG_DIR}" "${CONFIG_DIR}/resonance" "${LOG_DIR}" "${COMMS_DIR}"
+  "${CONFIG_DIR}" "${CONFIG_DIR}/resonance" "${LOG_DIR}" "${COMMS_DIR}" \
+  "${PRINTER_DATA}/systemd" "${PRINTER_DATA}/vision"
 
 install -m 0644 "${FILES_DIR}/printer.cfg" "${CONFIG_DIR}/printer.cfg"
 install -m 0644 "${FILES_DIR}/moonraker.conf" "${CONFIG_DIR}/moonraker.conf"
+install -m 0644 "${FILES_DIR}/crowsnest.conf" "${CONFIG_DIR}/crowsnest.conf"
 install -m 0755 \
   "${FILES_DIR}/resonance/run_resonance_plot.py" \
   "${CONFIG_DIR}/resonance/run_resonance_plot.py"
@@ -438,14 +453,21 @@ log "Installing systemd units"
 
 require_file "${FILES_DIR}/klipper.service"
 require_file "${FILES_DIR}/moonraker.service"
+require_file "${FILES_DIR}/vision-capture.service"
+require_file "${FILES_DIR}/vision_capture.py"
+require_file "${FILES_DIR}/vision_runner.py"
 require_file "${FILES_DIR}/klipperpi-expand-rootfs.service"
 require_file "${FILES_DIR}/klipperpi-expand-rootfs-once.sh"
 # Note: klipperscreen.service not needed - LightDM handles KlipperScreen
 
 install -m 0644 "${FILES_DIR}/klipper.service" /etc/systemd/system/klipper.service
 install -m 0644 "${FILES_DIR}/moonraker.service" /etc/systemd/system/moonraker.service
+install -m 0644 "${FILES_DIR}/vision-capture.service" /etc/systemd/system/vision-capture.service
 install -m 0644 "${FILES_DIR}/klipperpi-expand-rootfs.service" /etc/systemd/system/klipperpi-expand-rootfs.service
 install -m 0755 "${FILES_DIR}/klipperpi-expand-rootfs-once.sh" /usr/local/sbin/klipperpi-expand-rootfs-once.sh
+install -m 0755 "${FILES_DIR}/vision_capture.py" /usr/local/bin/vision_capture.py
+install -m 0755 "${FILES_DIR}/vision_runner.py" /usr/local/bin/vision_runner.py
+setfacl -m u:www-data:--x "${USER_HOME}"
 
 # Replace __USER__ placeholder
 sed -i "s/__USER__/${USERNAME}/g" \
@@ -458,6 +480,7 @@ systemctl daemon-reload
 systemctl_enable_safe klipperpi-expand-rootfs
 systemctl_enable_safe klipper
 systemctl_enable_safe moonraker
+systemctl_enable_safe vision-capture
 # Note: klipperscreen runs via LightDM, not as a systemd service
 
 # --- Display overlay (optional) ---------------------------------------------
@@ -523,8 +546,8 @@ fi
 
 # --- User groups -------------------------------------------------------------
 
-log "Ensuring user groups for serial/MCU access"
-usermod -a -G tty,dialout "${USERNAME}" || true
+log "Ensuring user groups for serial/MCU and camera access"
+usermod -a -G tty,dialout,video "${USERNAME}" || true
 
 # --- Klipper + Moonraker -----------------------------------------------------
 
@@ -559,6 +582,22 @@ python3 -m venv /opt/moonraker-env
 /opt/moonraker-env/bin/pip install --upgrade pip wheel
 /opt/moonraker-env/bin/pip install -r /opt/moonraker/scripts/moonraker-requirements.txt
 chown -R "${USERNAME}:${USERNAME}" /opt/moonraker /opt/moonraker-env
+
+# --- Crowsnest webcam streaming ---------------------------------------------
+
+log "Setting up Crowsnest webcam streaming"
+clone_repo https://github.com/mainsail-crew/crowsnest.git /opt/crowsnest "${CROWSNEST_COMMIT:-v5}"
+chown -R "${USERNAME}:${USERNAME}" /opt/crowsnest
+SUDO_USER="${USERNAME}" \
+BASE_USER="${USERNAME}" \
+CROWSNEST_UNATTENDED=1 \
+CROWSNEST_ADD_CROWSNEST_MOONRAKER=0 \
+CROWSNEST_SKIP_REBOOT_PROMPT=1 \
+  make -C /opt/crowsnest install
+ln -sfn /opt/crowsnest "${USER_HOME}/crowsnest"
+chown -h "${USERNAME}:${USERNAME}" "${USER_HOME}/crowsnest"
+install -m 0644 "${FILES_DIR}/crowsnest.conf" "${CONFIG_DIR}/crowsnest.conf"
+chown -R "${USERNAME}:${USERNAME}" /opt/crowsnest "${USER_HOME}/crowsnest-env" "${PRINTER_DATA}"
 
 # --- Mainsail ----------------------------------------------------------------
 
@@ -640,6 +679,8 @@ systemctl_enable_safe nginx
 systemctl_enable_safe klipperpi-expand-rootfs
 systemctl_enable_safe klipper
 systemctl_enable_safe moonraker
+systemctl_enable_safe crowsnest
+systemctl_enable_safe vision-capture
 # Note: klipperscreen runs via LightDM session, not as a systemd service
 
 # Optional: record build info for later debugging
@@ -651,6 +692,7 @@ log "Writing build info"
   echo "klipper_host_patch=boosted_heatbed_heaters.py"
   echo "moonraker_commit=${MOONRAKER_COMMIT:-}"
   echo "mainsail_version=${MAINSAIL_VERSION}"
+  echo "crowsnest_commit=${CROWSNEST_COMMIT:-v5}"
   echo "build_time_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } >/etc/klipperpi-buildinfo
 

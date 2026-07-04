@@ -1,0 +1,13 @@
+[Unit]
+Description=Vision-grade high-resolution webcam capture bridge
+After=klipper.service moonraker.service
+Wants=klipper.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vision_capture.py --daemon
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
