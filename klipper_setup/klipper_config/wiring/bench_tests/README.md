@@ -59,26 +59,26 @@ sleeping once per edge in Python:
   --armed --mode stream --steps 16000 --rate-hz 40000 --direction 0
 ```
 
-The live Y-axis config currently uses a 20T GT2 Y pulley,
-`rotation_distance: 40`, and 16 microsteps:
+The live Y-axis config currently uses the larger 30T-style Y pulley,
+`rotation_distance: 60`, and 16 microsteps:
 
 ```text
-steps_per_mm = 200 full_steps/rev * 16 microsteps / 40 mm = 80 steps/mm
-500 mm/s = 40,000 STEP pulses/s
+steps_per_mm = 200 full_steps/rev * 16 microsteps / 60 mm = 53.333 steps/mm
+500 mm/s = 26,667 STEP pulses/s
 ```
 
-At 8 microsteps the same 500 mm/s travel move needs 20 kHz STEP; at 32
-microsteps it needs 80 kHz STEP. Stream mode is useful for fixed-frequency bench
-bursts through the stripboard and driver, not for production motion planning
-with acceleration.
+At 8 microsteps the same 500 mm/s travel move needs about 13.3 kHz STEP; at 32
+microsteps it needs about 53.3 kHz STEP. Stream mode is useful for
+fixed-frequency bench bursts through the stripboard and driver, not for
+production motion planning with acceleration.
 
 To move roughly 200 mm equivalent in each direction at the 500 mm/s target:
 
 ```bash
 ./klipper_setup/klipper_config/wiring/bench_tests/run_ft232h_stepper_jog.sh \
-  --armed --mode stream --steps 16000 --rate-hz 40000 --direction 0
+  --armed --mode stream --steps 10667 --rate-hz 26666.667 --direction 0
 ./klipper_setup/klipper_config/wiring/bench_tests/run_ft232h_stepper_jog.sh \
-  --armed --mode stream --steps 16000 --rate-hz 40000 --direction 1
+  --armed --mode stream --steps 10667 --rate-hz 26666.667 --direction 1
 ```
 
 ## GPIO Scope Wiggle

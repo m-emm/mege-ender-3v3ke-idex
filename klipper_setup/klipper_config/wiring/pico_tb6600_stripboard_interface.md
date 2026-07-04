@@ -32,10 +32,11 @@ Bench test completed on 2026-07-01 19:49:08 CEST with an Adafruit FT232H, this
 stripboard interface, the TB6600-style driver box, and a loose desk stepper.
 STEP, DIR, and ENA all worked through the soldered board. At the 8 microstep
 bench setting, the motor ran quietly and reliably at the original 500 mm/s
-Y-axis equivalent STEP rate. The live printer now uses a 20T GT2 pulley with
-`rotation_distance: 40` and 16 microsteps, so the same 500 mm/s target is about
-40 kHz STEP. Verified ENA polarity: GPIO low disables the driver and frees the
-motor; GPIO high enables the driver and restores holding torque.
+Y-axis equivalent STEP rate. The live printer is now back on the larger
+30T-style Y pulley with `rotation_distance: 60` and 16 microsteps, so the same
+500 mm/s target is about 26.7 kHz STEP. Verified ENA polarity: GPIO low disables
+the driver and frees the motor; GPIO high enables the driver and restores
+holding torque.
 
 Detailed commands, setup notes, and debug findings are recorded in
 `bench_tests/TEST_LOG.md`.

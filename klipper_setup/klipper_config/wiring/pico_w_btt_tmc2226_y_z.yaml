@@ -6,6 +6,7 @@ metadata:
   notes: |
     Three-driver wiring for Y, Z-left, and Z-right.
     Driver1 (Y): STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
+    Driver1 (Y) DIAG: TMC top DIAG pad to GPIO3 through 1.2k series resistor.
     Driver2 (Z-left): STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5.
     Driver3 (Z-right): STEP=GPIO14, DIR=GPIO15, EN=GPIO16, UART=GPIO13.
     TB6600 Y interface connector is inactive/reference wiring only; it has no active Klipper tags.
@@ -104,6 +105,11 @@ pin_sets:
       - A2_6
       - VIO_7
       - GND_LOGIC_8
+  - prefix: TMC1_TOP_
+    origin: [18, 26]
+    direction: right
+    pins:
+      - DIAG
   - prefix: TMC2_J1_
     origin: [20, 18]
     direction: down
@@ -158,6 +164,12 @@ pin_sets:
     pins:
       - "1"
       - "2"
+  - prefix: R_Y_DIAG_1K2_
+    origin: [10, 26]
+    direction: right
+    pins:
+      - PICO
+      - TMC
   - prefix: TMC2_10K_PULL_UP_
     origin: [21, 10]
     direction: right
@@ -312,6 +324,15 @@ wires:
   - from: PICO_GPIO_9
     to: TMC1_J1_UART_PDN_4
     klipper: "tmc2209 stepper_y.uart_pin"
+    type: data
+    color: "#9ca3af"
+  - from: PICO_GPIO_3
+    to: R_Y_DIAG_1K2_PICO
+    klipper: "gcode_button y_tmc_diag.pin"
+    type: data
+    color: "#9ca3af"
+  - from: R_Y_DIAG_1K2_TMC
+    to: TMC1_TOP_DIAG
     type: data
     color: "#9ca3af"
   - from: PICO_GND_03

@@ -40,9 +40,9 @@ Debug notes:
 - The motor initially held poorly until the driver current was raised to about
   1.5 A.
 
-Later live-printer note: Y now uses a standard 20T GT2 pulley with
-`rotation_distance: 40` and the TB6600 DIP set to 16 microsteps, so the 500 mm/s
-target is about 40 kHz STEP.
+Later live-printer note: Y is back on the larger 30T-style pulley with
+`rotation_distance: 60` and 16 microsteps, so the 500 mm/s target is about
+26.7 kHz STEP.
 
 Representative commands from the successful session:
 
