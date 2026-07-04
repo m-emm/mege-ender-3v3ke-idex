@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from mege_3devops.process_data.mege_ender_3v3ke_idex import (
-    copy_dual_pla_06_standard_process_data,
+    copy_dual_petgcf_tpu95a_06_demo_process_data,
 )
 from mege_ender_3v3ke_idex.designs import (
     two_material_offset_line_calibration_grid as grid_calibration,
@@ -1086,22 +1086,26 @@ def test_absolute_grid_x_part_metadata_routes_base_and_text_materials():
     }
 
 
-def test_absolute_xy_calibration_uses_dual_pla_process_structure():
+def test_absolute_xy_calibration_uses_petgcf_tpu_process_structure():
     source = Path(xy_grid_calibration.__file__).read_text(encoding="utf-8")
-    process_data = copy_dual_pla_06_standard_process_data()
+    process_data = copy_dual_petgcf_tpu95a_06_demo_process_data()
     overrides = process_data["process_overrides"]
     outer_wall_line_width = float(overrides["outer_wall_line_width"])
 
-    assert "copy_dual_pla_06_standard_process_data" in source
+    assert "copy_dual_petgcf_tpu95a_06_demo_process_data" in source
+    assert "copy_dual_pla_06_standard_process_data" not in source
     assert "copy_xy_offset_calibration_process_data" not in source
     assert "wipe_tower_x" not in source
     assert "wipe_tower_y" not in source
     assert len(process_data["filaments"]) == 2
     assert process_data["filaments"][0] == process_data["filament"]
     assert process_data["filaments"][1] != process_data["filaments"][0]
+    assert process_data["filaments"] == ["FilamentPETGCF", "FilamenteSunTPU95A"]
     assert overrides["enable_prime_tower"] == "1"
     assert overrides["wipe_tower_x"] == "200"
     assert overrides["wipe_tower_y"] == "15"
+    assert overrides["hot_plate_temp"] == "55"
+    assert overrides["hot_plate_temp_initial_layer"] == "55"
     assert float(overrides["travel_speed"]) <= 300.0
     for key in (
         "default_acceleration",
