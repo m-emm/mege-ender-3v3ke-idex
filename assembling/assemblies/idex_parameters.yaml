@@ -944,6 +944,21 @@ globals:
   y_axis_drive_use_toothed_belt_visuals: false
   y_axis_drive_tensioner_travel: 25
   y_axis_drive_tensioner_screw_z_offset: 3.5
+  y_axis_nema23_motor_body_length: 76
+  y_axis_nema23_motor_axle_diameter: 8
+  y_axis_nema23_motor_axle_length: 20
+  y_axis_nema23_motor_mount_screw_size: "M5"
+  y_axis_nema23_motor_mount_screw_length: 12
+  y_axis_nema23_bracket_width: 65
+  y_axis_nema23_bracket_motor_face_depth: 68
+  y_axis_nema23_bracket_frame_face_height: 68
+  y_axis_nema23_bracket_thickness: 3
+  y_axis_nema23_bracket_fillet_radius: 1
+  y_axis_nema23_bracket_mount_slot_width: 6
+  y_axis_nema23_bracket_mount_slot_length: 36
+  y_axis_nema23_bracket_mount_slot_center_spacing: 40
+  y_axis_nema23_bracket_mount_screw_size: "M5"
+  y_axis_nema23_bracket_mount_screw_length: 20
   y_axis_rail_carrier_bracket_outer_diameter: 95
   y_axis_rail_carrier_bracket_height: 40
   y_axis_rail_carrier_bracket_profile_width: 20

@@ -1,0 +1,61 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: NEMA23 y-axis motor and purchased metal angle bracket reference
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - front_angle
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: leader
+        name: bracket
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+
+Parameters:
+  y_axis_nema23_motor_body_length:
+    Type: Float
+  y_axis_nema23_motor_axle_diameter:
+    Type: Float
+  y_axis_nema23_motor_axle_length:
+    Type: Float
+  y_axis_nema23_motor_mount_screw_size:
+    Type: String
+  y_axis_nema23_motor_mount_screw_length:
+    Type: Float
+  y_axis_nema23_bracket_width:
+    Type: Float
+  y_axis_nema23_bracket_motor_face_depth:
+    Type: Float
+  y_axis_nema23_bracket_frame_face_height:
+    Type: Float
+  y_axis_nema23_bracket_thickness:
+    Type: Float
+  y_axis_nema23_bracket_fillet_radius:
+    Type: Float
+  y_axis_nema23_bracket_mount_slot_width:
+    Type: Float
+  y_axis_nema23_bracket_mount_slot_length:
+    Type: Float
+  y_axis_nema23_bracket_mount_slot_center_spacing:
+    Type: Float
+  y_axis_nema23_bracket_mount_screw_size:
+    Type: String
+  y_axis_nema23_bracket_mount_screw_length:
+    Type: Float
+
+Parts:
+  YAxisNema23MotorBracketAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.y_axis_nema23_motor_bracket_assembly.create_y_axis_nema23_motor_bracket_assembly

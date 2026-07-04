@@ -1196,11 +1196,16 @@ assemblies:
       damper_right_front: print_bed_assembly.non_production_parts.damper_right_front
       damper_right_back: print_bed_assembly.non_production_parts.damper_right_back
 
+  - name: y_axis_nema23_motor_bracket_assembly
+
+    depends_on: []
+
   - name: y_axis_drive_assembly
 
     depends_on:
       - printer_frame_assembly
       - print_bed_undercarriage_assembly
+      - y_axis_nema23_motor_bracket_assembly
     parameters:
       y_axis_drive_motor_pulley_teeth: !Ref y_axis_drive_motor_pulley_teeth
       y_axis_drive_idler_teeth: !Ref y_axis_drive_idler_teeth
@@ -1209,6 +1214,7 @@ assemblies:
       frame_front_profile: printer_frame_assembly.non_production_parts.frame_profile_front
       back_belt_reference: print_bed_undercarriage_assembly.cutters.belt_path_cutter_back
       front_belt_reference: print_bed_undercarriage_assembly.cutters.belt_path_cutter_front
+      y_axis_nema23_motor_bracket_assembly: y_axis_nema23_motor_bracket_assembly
 
   - name: y_axis_assembly
 

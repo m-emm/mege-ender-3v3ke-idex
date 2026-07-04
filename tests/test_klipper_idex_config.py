@@ -6,6 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from mege_3devops.process_data.mege_ender_3v3ke_idex import (
+    copy_dual_pla_06_standard_process_data,
+)
 from mege_ender_3v3ke_idex.designs import (
     two_material_offset_line_calibration_grid as grid_calibration,
     two_material_offset_line_calibration_grid_x as x_grid_calibration,
@@ -36,9 +39,7 @@ CALIB_PATH = KLIPPER_CONFIG_DIR / "calib.yaml"
 TEMPLATE_PATH = KLIPPER_CONFIG_DIR / "printer.cfg.template"
 GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_printer_cfg.py"
 Y_STEP_LOSS_GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_y_step_loss_test_gcode.py"
-Y_TMC_STALLGUARD_RUNNER_PATH = (
-    KLIPPER_CONFIG_DIR / "run_y_tmc_stallguard_diagnostic.py"
-)
+Y_TMC_STALLGUARD_RUNNER_PATH = KLIPPER_CONFIG_DIR / "run_y_tmc_stallguard_diagnostic.py"
 
 SYNTHETIC_CALIBRATION_VALUES = {
     "bed_grid_zero": (113.3, 107.0),
@@ -208,6 +209,9 @@ def test_printer_motion_limits_match_proven_idex_axes():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     printer = _section(config_text, "printer")
 
+    assert _setting_float(printer, "max_velocity") == pytest.approx(300.0)
+    assert _setting_float(printer, "max_accel") == pytest.approx(3500.0)
+    assert _setting_float(printer, "square_corner_velocity") == pytest.approx(5.0)
     for setting_name in (
         "max_velocity",
         "max_accel",
@@ -243,9 +247,7 @@ def test_y_tmc_diag_button_and_status_macro_are_diagnostic_only():
     stepper_y = _section(config_text, "stepper_y")
     tmc_y = _section(config_text, "tmc2209 stepper_y")
     diag_button = _section(config_text, "gcode_button y_tmc_diag")
-    stallguard_state = _section(
-        config_text, "gcode_macro _Y_TMC_STALLGUARD_STATE"
-    )
+    stallguard_state = _section(config_text, "gcode_macro _Y_TMC_STALLGUARD_STATE")
     status_macro = _section(config_text, "gcode_macro Y_TMC_STATUS")
     thermal_macro = _section(config_text, "gcode_macro Y_TMC_THERMAL_STATUS")
     arm_macro = _section(config_text, "gcode_macro Y_TMC_STALLGUARD_ARM")
@@ -258,7 +260,7 @@ def test_y_tmc_diag_button_and_status_macro_are_diagnostic_only():
     assert _setting_value(diag_button, "pin") == "^gpio3"
     assert "Y TMC2226 DIAG asserted" in diag_button
     assert 'printer["gcode_macro _Y_TMC_STALLGUARD_STATE"]' in diag_button
-    assert "print_state == \"printing\"" in diag_button
+    assert 'print_state == "printing"' in diag_button
     assert re.search(r"^\s*PAUSE\s*$", diag_button, flags=re.MULTILINE)
     assert "variable_armed: 0" in stallguard_state
     assert "variable_threshold: 0" in stallguard_state
@@ -289,18 +291,28 @@ def test_y_tmc_diag_button_and_status_macro_are_diagnostic_only():
     assert "SET_TMC_FIELD STEPPER=stepper_y FIELD=en_spreadcycle VALUE=0" in arm_macro
     assert "SET_TMC_FIELD STEPPER=stepper_y FIELD=TCOOLTHRS VALUE=1048575" in arm_macro
     assert "SET_TMC_FIELD STEPPER=stepper_y FIELD=SEMIN VALUE=0" in arm_macro
-    assert "SET_GCODE_VARIABLE MACRO=_Y_TMC_STALLGUARD_STATE VARIABLE=armed VALUE=1" in arm_macro
+    assert (
+        "SET_GCODE_VARIABLE MACRO=_Y_TMC_STALLGUARD_STATE VARIABLE=armed VALUE=1"
+        in arm_macro
+    )
     assert "SG_RESULT <= {threshold * 2}" in arm_macro
     for register in ("GCONF", "TCOOLTHRS", "TPWMTHRS", "SGTHRS"):
         assert f"DUMP_TMC STEPPER=stepper_y REGISTER={register}" in arm_macro
 
     assert "INIT_TMC STEPPER=stepper_y" in disarm_macro
     assert "SET_TMC_FIELD STEPPER=stepper_y FIELD=SGTHRS VALUE=0" in disarm_macro
-    assert "SET_TMC_FIELD STEPPER=stepper_y FIELD=TPWMTHRS VALUE=1048575" in disarm_macro
-    assert "SET_TMC_FIELD STEPPER=stepper_y FIELD=en_spreadcycle VALUE=0" in disarm_macro
+    assert (
+        "SET_TMC_FIELD STEPPER=stepper_y FIELD=TPWMTHRS VALUE=1048575" in disarm_macro
+    )
+    assert (
+        "SET_TMC_FIELD STEPPER=stepper_y FIELD=en_spreadcycle VALUE=0" in disarm_macro
+    )
     assert "SET_TMC_FIELD STEPPER=stepper_y FIELD=TCOOLTHRS VALUE=0" in disarm_macro
     assert "SET_TMC_FIELD STEPPER=stepper_y FIELD=SEMIN VALUE=0" in disarm_macro
-    assert "SET_GCODE_VARIABLE MACRO=_Y_TMC_STALLGUARD_STATE VARIABLE=armed VALUE=0" in disarm_macro
+    assert (
+        "SET_GCODE_VARIABLE MACRO=_Y_TMC_STALLGUARD_STATE VARIABLE=armed VALUE=0"
+        in disarm_macro
+    )
     assert "Y_TMC_STATUS" in disarm_macro
 
     assert "G28 Y" in move_test
@@ -325,14 +337,19 @@ def test_y_tmc_stallguard_runner_streams_live_samples_and_keeps_aggressive_opt_i
     assert "SET_TMC_CURRENT STEPPER=stepper_y CURRENT=2.0" in source
     assert "threshold_compare={compare_value}" in source
     assert "thermal_bucket" in source
-    assert "parser.add_argument(\"--threshold\", type=int, default=4)" in source
-    assert "parser.add_argument(\"--accel-sweep\", action=\"store_true\")" in source
-    assert "parser.add_argument(\"--sweep-accels\", default=\"1000,2500,4000,6000,8000\")" in source
-    assert "parser.add_argument(\"--sweep-velocity\", type=float, default=500.0)" in source
+    assert 'parser.add_argument("--threshold", type=int, default=4)' in source
+    assert 'parser.add_argument("--accel-sweep", action="store_true")' in source
+    assert (
+        'parser.add_argument("--sweep-accels", default="1000,2500,4000,6000,8000")'
+        in source
+    )
+    assert (
+        'parser.add_argument("--sweep-velocity", type=float, default=500.0)' in source
+    )
     assert "run_accel_sweep(api, args)" in source
     assert "Stopping acceleration sweep after first StallGuard/DIAG trigger" in source
-    assert "result[\"triggered\"]" in source
-    assert "parser.add_argument(\"--aggressive\", action=\"store_true\")" in source
+    assert 'result["triggered"]' in source
+    assert 'parser.add_argument("--aggressive", action="store_true")' in source
     assert "if args.aggressive:" in source
     assert "Aggressive leg skipped" in source
 
@@ -1070,16 +1087,34 @@ def test_absolute_grid_x_part_metadata_routes_base_and_text_materials():
 
 
 def test_absolute_xy_calibration_uses_dual_pla_process_structure():
-    process_data = xy_grid_calibration.copy_xy_offset_calibration_process_data()
+    source = Path(xy_grid_calibration.__file__).read_text(encoding="utf-8")
+    process_data = copy_dual_pla_06_standard_process_data()
     overrides = process_data["process_overrides"]
     outer_wall_line_width = float(overrides["outer_wall_line_width"])
 
+    assert "copy_dual_pla_06_standard_process_data" in source
+    assert "copy_xy_offset_calibration_process_data" not in source
+    assert "wipe_tower_x" not in source
+    assert "wipe_tower_y" not in source
     assert len(process_data["filaments"]) == 2
     assert process_data["filaments"][0] == process_data["filament"]
     assert process_data["filaments"][1] != process_data["filaments"][0]
     assert overrides["enable_prime_tower"] == "1"
-    assert overrides["wipe_tower_x"] == "105"
-    assert overrides["wipe_tower_y"] == "220"
+    assert overrides["wipe_tower_x"] == "200"
+    assert overrides["wipe_tower_y"] == "15"
+    assert float(overrides["travel_speed"]) <= 300.0
+    for key in (
+        "default_acceleration",
+        "initial_layer_acceleration",
+        "outer_wall_acceleration",
+        "inner_wall_acceleration",
+        "top_surface_acceleration",
+        "travel_acceleration",
+        "sparse_infill_acceleration",
+        "internal_solid_infill_acceleration",
+        "bridge_acceleration",
+    ):
+        assert float(overrides[key]) <= 3500.0
     assert overrides["z_hop"] == ["0.6", "0.6"]
     assert overrides["z_hop_types"] == ["Normal Lift", "Normal Lift"]
     assert overrides["filament_z_hop"] == "0.6"

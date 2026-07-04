@@ -10,7 +10,7 @@ from mege_3devops.process_data.mege_ender_3v3ke_idex import (
     SAFE_BED_DEPTH_MM,
     SAFE_BED_ORIGIN,
     SAFE_BED_WIDTH_MM,
-    copy_dual_pla_04_offset_calibration_process_data,
+    copy_dual_pla_04_standard_process_data,
 )
 from mege_ender_3v3ke_idex.designs.two_material_offset_line_calibration_grid import *
 
@@ -247,9 +247,7 @@ def main():
         parts.as_list(),
         script_file=__file__,
         prod=PROD,
-        process_data=(
-            copy_dual_pla_04_offset_calibration_process_data() if PROD else None
-        ),
+        process_data=(copy_dual_pla_04_standard_process_data() if PROD else None),
         prod_gap=4,
         bed_width=SAFE_BED_WIDTH_MM if PROD else ACTUAL_BED_WIDTH_MM,
         bed_depth=SAFE_BED_DEPTH_MM if PROD else ACTUAL_BED_DEPTH_MM,

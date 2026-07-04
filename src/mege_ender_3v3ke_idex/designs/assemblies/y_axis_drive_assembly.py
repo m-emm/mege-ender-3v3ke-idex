@@ -1,5 +1,6 @@
 """Declarative y-axis drive assembly."""
 
+import copy
 import logging
 import math
 from dataclasses import dataclass
@@ -13,7 +14,6 @@ from mege_ender_3v3ke_idex.designs.gt2belt import (
     gt2_width,
 )
 from mege_ender_3v3ke_idex.designs.idler_cage import create_idler_cage
-from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
@@ -227,27 +227,102 @@ def _create_y_axis_profile_mount_hole_drills(cfg, num_holes=2, screw_inset=None)
     return hole_drills
 
 
-def _create_y_axis_motor_mount(frame_back_profile, belt_reference, cfg):
-    motor = create_nema_composite(
-        axle_length=cfg.x_axis_motor_axle_length,
-        axle_clearance=cfg.motor_mount_axle_clearance,
-        boss_clearance=cfg.motor_mount_boss_clearance,
-        boss_clearance_z=cfg.motor_mount_boss_clearance_z,
+def _create_y_axis_motor_bracket_adapter(frame_back_profile, motor_bracket, cfg):
+    frame_center_z = get_bounding_box_center(frame_back_profile)[2]
+    profile_half_height = cfg.y_axis_drive_profile_mount_plate_height / 2
+    slot_bbox = get_bounding_box(
+        motor_bracket.get_cutter_part_by_name("frame_mount_slots")
+    )
+    slot_z_clearance = max(6.0, 2 * cfg.motor_mount_plate_fillet_radius)
+    adapter_z_min = min(
+        frame_center_z - profile_half_height,
+        slot_bbox[0][2] - slot_z_clearance,
+    )
+    adapter_z_max = max(
+        frame_center_z + profile_half_height,
+        slot_bbox[1][2] + slot_z_clearance,
+    )
+    adapter_height = adapter_z_max - adapter_z_min
+
+    adapter = create_filleted_box(
+        cfg.y_axis_drive_profile_mount_plate_width,
+        cfg.y_axis_drive_profile_mount_plate_thickness,
+        adapter_height,
+        cfg.motor_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.FRONT, Alignment.BACK, Alignment.TOP],
+    )
+    adapter = align(adapter, motor_bracket.leader, Alignment.CENTER, axes=[0])
+    adapter = align(adapter, motor_bracket.leader, Alignment.STACK_BACK)
+
+    adapter_center_z = get_bounding_box_center(adapter)[2]
+    adapter = translate(
+        0,
+        0,
+        (adapter_z_min + adapter_z_max) / 2 - adapter_center_z,
+    )(adapter)
+
+    adapter = adapter.cut(motor_bracket.get_cutter_part_by_name("frame_mount_slots"))
+
+    hole_drill_diameter = MScrew.from_size(
+        cfg.y_axis_drive_mount_screw_size
+    ).clearance_hole_loose
+
+    screws = []
+    screw_names = []
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        hole = create_cylinder(
+            hole_drill_diameter / 2,
+            cfg.big_thing,
+            direction=(0, 1, 0),
+        )
+        hole = align(hole, adapter, Alignment.CENTER, axes=[1])
+        hole = align(hole, adapter, lr.edge_alignment)
+        hole = translate(-lr.sign * cfg.y_axis_drive_mount_screw_inset, 0, 0)(hole)
+        hole_center_z = get_bounding_box_center(hole)[2]
+        hole = translate(0, 0, frame_center_z - hole_center_z)(hole)
+        adapter = adapter.cut(hole)
+
+        screw = create_cylinder_screw(
+            cfg.y_axis_drive_mount_screw_size,
+            cfg.y_axis_drive_mount_screw_length,
+        )
+        screw = rotate(90, axis=(1, 0, 0))(screw)
+        screw = align(screw, hole, Alignment.CENTER)
+        screw = align(screw, adapter, Alignment.FRONT)
+        screw = translate(
+            0,
+            -MScrew.from_size(cfg.y_axis_drive_mount_screw_size).cylinder_head_height,
+            0,
+        )(screw)
+
+        screws.append(screw)
+        screw_names.append(f"profile_mount_screw_{lr.name.lower()}")
+
+    return LeaderFollowersCuttersPart(
+        leader=adapter,
+        non_production_parts=screws,
+        non_production_names=screw_names,
     )
 
-    motor_mount_plate = create_filleted_box(
-        cfg.y_axis_drive_motor_plate_width,
-        cfg.y_axis_drive_motor_plate_depth,
-        cfg.motor_mount_plate_thickness,
-        cfg.motor_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.BACK],
-    )
+
+def _create_y_axis_motor_mount(
+    frame_back_profile,
+    belt_reference,
+    y_axis_nema23_motor_bracket_assembly,
+    cfg,
+):
+    motor_bracket = copy.deepcopy(y_axis_nema23_motor_bracket_assembly)
 
     pulley = create_gt2_pulley(
         num_teeth=cfg.y_axis_drive_motor_pulley_teeth,
         belt_width=gt2_width,
     )
-    pulley = align(pulley, motor_mount_plate, Alignment.CENTER, axes=[1])
+    pulley = align(
+        pulley,
+        motor_bracket.get_follower_part_by_name("axle"),
+        Alignment.CENTER,
+        axes=[1],
+    )
     pulley_running_surface = _create_gt2_pulley_running_surface_reference(
         cfg.y_axis_drive_motor_pulley_teeth
     )
@@ -259,57 +334,39 @@ def _create_y_axis_motor_mount(frame_back_profile, belt_reference, cfg):
         cfg,
     )
 
-    motor = motor.aligned_from_follower("axle", pulley, Alignment.CENTER)
-
-    motor_body = motor.get_follower_part_by_name("body")
-    motor_mount_plate = align(motor_mount_plate, pulley, Alignment.CENTER, axes=[0])
-    motor_mount_plate = align(motor_mount_plate, motor_body, Alignment.STACK_TOP)
-
-    side_walls = PartCollector()
-    for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        side_wall = create_box(
-            cfg.y_axis_motor_holder_side_wall_thickness,
-            cfg.y_axis_motor_holder_side_wall_depth,
-            cfg.y_axis_motor_holder_side_wall_height,
-        )
-        side_wall = align(side_wall, motor_mount_plate, Alignment.CENTER)
-        side_wall = align(side_wall, motor_mount_plate, Alignment.BACK)
-        side_wall = align(side_wall, motor_mount_plate, lr)
-        side_wall = align(side_wall, motor_mount_plate, Alignment.STACK_BOTTOM)
-        side_walls = side_walls.fuse(side_wall)
-
-    motor_mount_plate = motor_mount_plate.fuse(side_walls)
-    motor_mount_plate = motor.use_as_cutter_on(motor_mount_plate)
-
-    profile_mount_plate = _create_y_axis_profile_mount_plate(cfg).prefixed_copy("motor")
-    profile_mount_plate = align(
-        profile_mount_plate,
-        motor_mount_plate,
+    motor_bracket = motor_bracket.aligned_from_follower(
+        "axle",
+        pulley,
         Alignment.CENTER,
-        axes=[0],
     )
-    profile_mount_plate = align(
-        profile_mount_plate, motor_mount_plate, Alignment.STACK_BACK
-    )
-    profile_mount_plate = align(
-        profile_mount_plate,
+    motor_mount_plate = _create_y_axis_motor_bracket_adapter(
         frame_back_profile,
-        Alignment.CENTER,
-        axes=[2],
+        motor_bracket,
+        cfg,
     )
 
-    motor_mount_plate = motor_mount_plate.fuse(profile_mount_plate.leader)
-
+    motor_visual_items = [("motor_bracket", motor_bracket.leader)]
     motor_visual_items = [
-        (f"motor_{name}", part)
-        for name, part in motor.get_named_follower_items()
-        if name != "coupler"
+        *motor_visual_items,
+        *[
+            ("motor_axle" if name == "axle" else name, part)
+            for name, part in motor_bracket.get_named_follower_items()
+        ],
     ]
-    mount_visual_items = list(profile_mount_plate.get_named_non_production_part_items())
+    motor_visual_items.extend(
+        [
+            (f"motor_bracket_{name}", part)
+            for name, part in motor_bracket.get_named_non_production_part_items()
+        ]
+    )
+    mount_visual_items = [
+        (f"motor_{name}", part)
+        for name, part in motor_mount_plate.get_named_non_production_part_items()
+    ]
     visual_items = motor_visual_items + mount_visual_items + [("motor_pulley", pulley)]
 
     retval = LeaderFollowersCuttersPart(
-        leader=motor_mount_plate,
+        leader=motor_mount_plate.leader,
         non_production_parts=[part for _, part in visual_items],
         non_production_names=[name for name, _ in visual_items],
     )
@@ -697,6 +754,7 @@ def create_y_axis_drive_assembly(
     frame_front_profile,
     back_belt_reference,
     front_belt_reference,
+    y_axis_nema23_motor_bracket_assembly,
     x_axis_motor_axle_length,
     motor_mount_axle_clearance,
     motor_mount_boss_clearance,
@@ -796,7 +854,10 @@ def create_y_axis_drive_assembly(
     )
 
     motor_mount = _create_y_axis_motor_mount(
-        frame_back_profile, back_belt_reference, cfg
+        frame_back_profile,
+        back_belt_reference,
+        y_axis_nema23_motor_bracket_assembly,
+        cfg,
     )
     idler_mount = _create_y_axis_idler_mount(
         frame_front_profile,
