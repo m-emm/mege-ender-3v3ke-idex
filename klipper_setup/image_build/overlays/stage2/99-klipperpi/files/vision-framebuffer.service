@@ -1,0 +1,13 @@
+[Unit]
+Description=High-resolution RAM-buffered webcam still-frame service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vision_framebuffer.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

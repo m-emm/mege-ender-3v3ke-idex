@@ -453,20 +453,28 @@ log "Installing systemd units"
 
 require_file "${FILES_DIR}/klipper.service"
 require_file "${FILES_DIR}/moonraker.service"
+require_file "${FILES_DIR}/vision-framebuffer.service"
 require_file "${FILES_DIR}/vision-capture.service"
+require_file "${FILES_DIR}/vision_framebuffer.py"
 require_file "${FILES_DIR}/vision_capture.py"
+require_file "${FILES_DIR}/vision_nozzle_align.py"
 require_file "${FILES_DIR}/vision_runner.py"
+require_file "${FILES_DIR}/webcam_health_probe.py"
 require_file "${FILES_DIR}/klipperpi-expand-rootfs.service"
 require_file "${FILES_DIR}/klipperpi-expand-rootfs-once.sh"
 # Note: klipperscreen.service not needed - LightDM handles KlipperScreen
 
 install -m 0644 "${FILES_DIR}/klipper.service" /etc/systemd/system/klipper.service
 install -m 0644 "${FILES_DIR}/moonraker.service" /etc/systemd/system/moonraker.service
+install -m 0644 "${FILES_DIR}/vision-framebuffer.service" /etc/systemd/system/vision-framebuffer.service
 install -m 0644 "${FILES_DIR}/vision-capture.service" /etc/systemd/system/vision-capture.service
 install -m 0644 "${FILES_DIR}/klipperpi-expand-rootfs.service" /etc/systemd/system/klipperpi-expand-rootfs.service
 install -m 0755 "${FILES_DIR}/klipperpi-expand-rootfs-once.sh" /usr/local/sbin/klipperpi-expand-rootfs-once.sh
+install -m 0755 "${FILES_DIR}/vision_framebuffer.py" /usr/local/bin/vision_framebuffer.py
 install -m 0755 "${FILES_DIR}/vision_capture.py" /usr/local/bin/vision_capture.py
+install -m 0755 "${FILES_DIR}/vision_nozzle_align.py" /usr/local/bin/vision_nozzle_align.py
 install -m 0755 "${FILES_DIR}/vision_runner.py" /usr/local/bin/vision_runner.py
+install -m 0755 "${FILES_DIR}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py
 setfacl -m u:www-data:--x "${USER_HOME}"
 
 # Replace __USER__ placeholder
@@ -480,6 +488,7 @@ systemctl daemon-reload
 systemctl_enable_safe klipperpi-expand-rootfs
 systemctl_enable_safe klipper
 systemctl_enable_safe moonraker
+systemctl_enable_safe vision-framebuffer
 systemctl_enable_safe vision-capture
 # Note: klipperscreen runs via LightDM, not as a systemd service
 
@@ -679,7 +688,8 @@ systemctl_enable_safe nginx
 systemctl_enable_safe klipperpi-expand-rootfs
 systemctl_enable_safe klipper
 systemctl_enable_safe moonraker
-systemctl_enable_safe crowsnest
+systemctl disable crowsnest >/dev/null 2>&1 || true
+systemctl_enable_safe vision-framebuffer
 systemctl_enable_safe vision-capture
 # Note: klipperscreen runs via LightDM session, not as a systemd service
 

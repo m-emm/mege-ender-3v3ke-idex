@@ -1,7 +1,7 @@
 [Unit]
 Description=Vision-grade high-resolution webcam capture bridge
-After=klipper.service moonraker.service
-Wants=klipper.service
+After=klipper.service moonraker.service vision-framebuffer.service
+Wants=klipper.service vision-framebuffer.service
 
 [Service]
 Type=simple
