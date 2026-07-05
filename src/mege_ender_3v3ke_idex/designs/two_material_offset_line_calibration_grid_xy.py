@@ -36,6 +36,8 @@ XY_T0_X_GRID_INDICES = (-4, -3, -2, -1, 0)
 XY_T1_X_GRID_INDICES = (1, 2, 3, 4, 5)
 XY_Y_GRID_INDICES = (2, 3, 4, 5, 6)
 
+XY_LINE_GROUNDING_MARKER_SIZE_MM = 6.0
+
 CALIBRATION_PART_METADATA = {
     XY_T0_MATERIAL_PART_NAME: {
         "production_group": XY_PLATE_NAME,
@@ -106,6 +108,35 @@ def create_calibration_label_right(
     )
 
 
+def create_line_grounding_marker(
+    line,
+    stack_alignment,
+    *,
+    min_x_mm=None,
+    max_x_mm=None,
+    max_y_mm=None,
+):
+    marker = create_box(
+        XY_LINE_GROUNDING_MARKER_SIZE_MM,
+        XY_LINE_GROUNDING_MARKER_SIZE_MM,
+        CALIBRATION_HEIGHT_MM,
+    )
+    marker = rotate(45)(marker)
+    marker = align(marker, line, Alignment.CENTER)
+    marker = align(
+        marker,
+        line,
+        stack_alignment,
+        stack_gap=-CALIBRATION_LINE_WIDTH_MM / 2,
+    )
+    return shift_part_inside_bounds(
+        marker,
+        min_x_mm=min_x_mm,
+        max_x_mm=max_x_mm,
+        max_y_mm=max_y_mm,
+    )
+
+
 def create_vertical_x_alignment_group(
     *,
     bed_grid_zero,
@@ -123,16 +154,24 @@ def create_vertical_x_alignment_group(
     for grid_index, offset_mm in zip(grid_indices, XY_OFFSET_CANDIDATES_MM):
         painted_grid_x_mm = grid_coordinate(zero_x_mm, grid_index)
         line_center_x_mm = painted_grid_x_mm - offset_mm
+        line = create_box(
+            CALIBRATION_LINE_WIDTH_MM,
+            line_y_max_mm - line_y_min_mm,
+            CALIBRATION_HEIGHT_MM,
+            origin=(
+                line_center_x_mm - CALIBRATION_LINE_WIDTH_MM / 2,
+                line_y_min_mm,
+                0,
+            ),
+        )
+        base_collector = base_collector.fuse(line)
         base_collector = base_collector.fuse(
-            create_box(
-                CALIBRATION_LINE_WIDTH_MM,
-                line_y_max_mm - line_y_min_mm,
-                CALIBRATION_HEIGHT_MM,
-                origin=(
-                    line_center_x_mm - CALIBRATION_LINE_WIDTH_MM / 2,
-                    line_y_min_mm,
-                    0,
-                ),
+            create_line_grounding_marker(
+                line,
+                Alignment.STACK_BACK,
+                min_x_mm=SAFE_BED_ORIGIN[0],
+                max_x_mm=SAFE_BED_ORIGIN[0] + SAFE_BED_WIDTH_MM,
+                max_y_mm=SAFE_BED_ORIGIN[1] + SAFE_BED_DEPTH_MM,
             )
         )
         label_entries.append(
@@ -193,16 +232,27 @@ def create_horizontal_y_alignment_group(
     for grid_index, offset_mm in zip(XY_Y_GRID_INDICES, XY_OFFSET_CANDIDATES_MM):
         painted_grid_y_mm = grid_coordinate(zero_y_mm, grid_index)
         line_center_y_mm = painted_grid_y_mm - offset_mm
+        line = create_box(
+            line_x_max_mm - line_x_min_mm,
+            CALIBRATION_LINE_WIDTH_MM,
+            CALIBRATION_HEIGHT_MM,
+            origin=(
+                line_x_min_mm,
+                line_center_y_mm - CALIBRATION_LINE_WIDTH_MM / 2,
+                0,
+            ),
+        )
+        base_collector = base_collector.fuse(line)
+        if label_side == "right":
+            marker_stack_alignment = Alignment.STACK_LEFT
+        else:
+            marker_stack_alignment = Alignment.STACK_RIGHT
         base_collector = base_collector.fuse(
-            create_box(
-                line_x_max_mm - line_x_min_mm,
-                CALIBRATION_LINE_WIDTH_MM,
-                CALIBRATION_HEIGHT_MM,
-                origin=(
-                    line_x_min_mm,
-                    line_center_y_mm - CALIBRATION_LINE_WIDTH_MM / 2,
-                    0,
-                ),
+            create_line_grounding_marker(
+                line,
+                marker_stack_alignment,
+                min_x_mm=SAFE_BED_ORIGIN[0],
+                max_x_mm=SAFE_BED_ORIGIN[0] + SAFE_BED_WIDTH_MM,
             )
         )
 

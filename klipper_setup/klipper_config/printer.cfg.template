@@ -68,12 +68,12 @@ gcode:
     {action_call_remote_method("idex_nozzle_vision_check", name=name, x=x, y=y, z=z, restore=restore)}
 
 [gcode_macro IDEX_NOZZLE_VISION_SWEEP]
-description: Report-only six-image T0/T1 nozzle sweep with a browser contact sheet.
+description: Report-only multi-position T0/T1 nozzle sweep with a browser contact sheet.
 gcode:
-    {% set x = params.X|default(196.0)|float %}
+    {% set x = params.X|default(195.0)|float %}
     {% set y = params.Y|default(-14.8)|float %}
     {% set z = params.Z|default(20.0)|float %}
-    {% set dx = params.DX|default("0,2,4") %}
+    {% set dx = params.DX|default("0,3,6,9,12") %}
     {% set name = params.NAME|default("manual") %}
     {% set restore = params.RESTORE|default(1)|int %}
     {% set print_state = printer.print_stats.state %}

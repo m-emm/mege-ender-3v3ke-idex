@@ -67,7 +67,7 @@ NOZZLE_GLOBAL_MATCH_MARGIN_1080 = float(
     os.environ.get("VISION_NOZZLE_SWEEP_GLOBAL_MARGIN_1080", "36")
 )
 NOZZLE_GLOBAL_MATCH_SEARCH_1080 = float(
-    os.environ.get("VISION_NOZZLE_SWEEP_MATCH_SEARCH_1080", "52")
+    os.environ.get("VISION_NOZZLE_SWEEP_MATCH_SEARCH_1080", "150")
 )
 PUBLIC_BASE_URL = os.environ.get("VISION_PUBLIC_BASE_URL", "http://menderpi.local")
 NAME_REPLACEMENTS = str.maketrans({c: "_" for c in " /\\:;|?*[]{}()<>'\"`$&!"})
@@ -836,6 +836,14 @@ def fit_global_roi_cross_match(
             "rejection_reason": "need at least four readable frames for cross-match",
         }
 
+    dx_values = sorted({float(item["frame"]["dx"]) for item in items})
+    dx_steps = [
+        dx_values[index + 1] - dx_values[index]
+        for index in range(len(dx_values) - 1)
+        if dx_values[index + 1] > dx_values[index]
+    ]
+    max_cross_tool_command_delta = min(dx_steps) if dx_steps else 0.0
+
     candidates = []
     for mode in ("gray", "grad"):
         pairwise_rows = []
@@ -863,7 +871,12 @@ def fit_global_roi_cross_match(
                 )
                 same_tool = source_frame["tool"] == target_frame["tool"]
                 threshold = 0.42 if same_tool else 0.16
-                used = match["correlation"] >= threshold
+                command_delta = abs(float(target_frame["dx"]) - float(source_frame["dx"]))
+                useful_cross_tool_pair = (
+                    same_tool
+                    or command_delta <= max_cross_tool_command_delta + 1.0e-6
+                )
+                used = match["correlation"] >= threshold and useful_cross_tool_pair
                 if used:
                     record = {
                         "source": source_frame["prefix"],
@@ -1352,11 +1365,11 @@ def write_contact_sheet(
     import numpy as np
 
     tile_w, tile_h = 540, 405
-    cols, rows = 3, 2
+    dx_labels = [dx_label(float(dx)) for dx in analysis["dx_values"]]
+    cols, rows = max(1, len(dx_labels)), 2
     summary_h = 345
     sheet = np.full((rows * tile_h + summary_h, cols * tile_w, 3), 255, dtype=np.uint8)
     frame_by_key = {(frame["tool"], frame["dx_label"]): frame for frame in frames}
-    dx_labels = [dx_label(float(dx)) for dx in analysis["dx_values"]]
     for row, tool in enumerate(("t0", "t1")):
         for col, label in enumerate(dx_labels):
             frame = frame_by_key.get((tool, label))
@@ -1879,10 +1892,10 @@ def main() -> int:
     parser.add_argument("--moonraker-url", default=DEFAULT_MOONRAKER_URL)
     parser.add_argument("--name", default="manual")
     parser.add_argument("--sweep", action="store_true")
-    parser.add_argument("--x", type=float, default=196.0)
+    parser.add_argument("--x", type=float, default=195.0)
     parser.add_argument("--y", type=float, default=-14.8)
     parser.add_argument("--z", type=float)
-    parser.add_argument("--dx", default="0,2,4")
+    parser.add_argument("--dx", default="0,3,6,9,12")
     parser.add_argument("--feedrate", type=float, default=3600.0)
     parser.add_argument("--settle-time", type=float, default=0.75)
     parser.add_argument("--ready-timeout", type=float, default=30.0)

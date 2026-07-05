@@ -482,7 +482,7 @@ class KlippyRemoteCaptureDaemon:
             "--name",
             sanitize_name(params.get("name", "manual")),
             "--x",
-            str(float(params.get("x", 196.0))),
+            str(float(params.get("x", 195.0))),
             "--y",
             str(float(params.get("y", -14.8))),
             "--z",
@@ -514,7 +514,7 @@ class KlippyRemoteCaptureDaemon:
             "--z",
             str(float(params.get("z", 20.0))),
             "--dx",
-            str(params.get("dx", "0,1,2")),
+            str(params.get("dx", "0,3,6,9,12")),
             "--no-manage-crowsnest",
         ]
         if int(params.get("restore", 1)) == 0:

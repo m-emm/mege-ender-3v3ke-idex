@@ -48,6 +48,9 @@ CONFIG_PATH = KLIPPER_CONFIG_DIR / "printer.cfg"
 CALIB_PATH = KLIPPER_CONFIG_DIR / "calib.yaml"
 TEMPLATE_PATH = KLIPPER_CONFIG_DIR / "printer.cfg.template"
 GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_printer_cfg.py"
+NOZZLE_VISION_CALIBRATION_PATH = (
+    KLIPPER_CONFIG_DIR / "apply_nozzle_vision_calibration.py"
+)
 Y_STEP_LOSS_GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_y_step_loss_test_gcode.py"
 Y_TMC_STALLGUARD_RUNNER_PATH = KLIPPER_CONFIG_DIR / "run_y_tmc_stallguard_diagnostic.py"
 
@@ -385,8 +388,9 @@ def test_vision_capture_macro_and_host_files_exist():
     assert 'action_call_remote_method("idex_nozzle_vision_sweep"' in nozzle_sweep_macro
     assert "print_stats.state" in nozzle_sweep_macro
     assert "requires X/Y/Z homed" in nozzle_sweep_macro
+    assert "195.0" in nozzle_sweep_macro
     assert "20.0" in nozzle_sweep_macro
-    assert '"0,2,4"' in nozzle_sweep_macro
+    assert '"0,3,6,9,12"' in nozzle_sweep_macro
     assert "dx=dx" in nozzle_sweep_macro
     assert "mode: ustreamer" in crowsnest
     assert "usb-Aukey-PC-LM1E_Camera" in crowsnest
@@ -424,6 +428,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "pairwise_match_matrix" in nozzle_script
     assert "global_roi_cross_match" in nozzle_script
     assert "perpendicular_mm_approx" in nozzle_script
+    assert "cols, rows = max(1, len(dx_labels)), 2" in nozzle_script
     assert "fit_points_by_dx" in nozzle_script
     assert "choose_motion_consistent_nozzle" in nozzle_script
     assert "contact_sheet.jpg" in nozzle_script
@@ -432,6 +437,10 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "IDEX nozzle sweep report" in nozzle_script
     assert "offsets_applied" in nozzle_script
     assert "IDEX_SET_TOOL_OFFSET" not in nozzle_script
+    helper = NOZZLE_VISION_CALIBRATION_PATH.read_text(encoding="utf-8")
+    assert "old_x + along_x_mm" in helper
+    assert "new_y_offset = current_y_offset - perpendicular_mm" in helper
+    assert "--update-y" in helper
     assert "vision_capture.py\", \"--capture-once\"" in runner_script
     assert "acl\n" in image_packages
     assert "python3-opencv" in image_packages
