@@ -59,16 +59,16 @@ sleeping once per edge in Python:
   --armed --mode stream --steps 16000 --rate-hz 40000 --direction 0
 ```
 
-The live Y-axis config currently uses the larger 30T-style Y pulley,
-`rotation_distance: 60`, and 16 microsteps:
+The live Y-axis config currently uses a 20T GT2 pulley,
+`rotation_distance: 40`, and 8 microsteps:
 
 ```text
-steps_per_mm = 200 full_steps/rev * 16 microsteps / 60 mm = 53.333 steps/mm
-500 mm/s = 26,667 STEP pulses/s
+steps_per_mm = 200 full_steps/rev * 8 microsteps / 40 mm = 40 steps/mm
+500 mm/s = 20,000 STEP pulses/s
 ```
 
-At 8 microsteps the same 500 mm/s travel move needs about 13.3 kHz STEP; at 32
-microsteps it needs about 53.3 kHz STEP. Stream mode is useful for
+At 16 microsteps the same 500 mm/s travel move needs about 40 kHz STEP; at 32
+microsteps it needs about 80 kHz STEP. Stream mode is useful for
 fixed-frequency bench bursts through the stripboard and driver, not for
 production motion planning with acceleration.
 

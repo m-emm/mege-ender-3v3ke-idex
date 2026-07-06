@@ -1,4 +1,4 @@
-# IDEX motion bring-up config for Raspberry Pi Pico W + BTT TMC2226.
+# IDEX motion bring-up config for Raspberry Pi Pico W + TB6600 Y + BTT TMC2226 Z.
 #
 # Generated from printer.cfg.template and calib.yaml. Edit calib.yaml for
 # IDEX calibration values, then run generate_printer_cfg.py.
@@ -30,7 +30,7 @@ serial: /dev/serial/by-id/usb-Klipper_rp2040_3232323236198418-if00
 
 [printer]
 kinematics: cartesian
-# Temporary Y-safe motion ceiling from July 2026 TMC2226 stall testing.
+# Temporary Y-safe motion ceiling from July 2026 Y driver transition testing.
 max_velocity: 300
 max_accel: 3500
 max_z_velocity: 30
@@ -281,175 +281,185 @@ run_current: 1.4
 sense_resistor: 0.110
 stealthchop_threshold: 0
 
-# Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml,
-# Driver 1:
-# STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
+# Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml.
+# Y is currently driven by the external TB6600-style interface:
+# STEP=GPIO0, DIR=GPIO1, EN=GPIO2, endstop=GPIO4.
 [stepper_y]
-step_pin: gpio11
-dir_pin: !gpio10
-enable_pin: !gpio12
-microsteps: 16
-rotation_distance: 60
+step_pin: gpio0
+dir_pin: !gpio1
+enable_pin: gpio2
+microsteps: 8
+rotation_distance: 40
+full_steps_per_rotation: 200
+step_pulse_duration: 0.000005
 endstop_pin: ^!gpio4
 position_endstop: ${t0_y_endstop}
 position_min: ${t0_y_endstop}
-position_max: 296.000
+position_max: 276.000
 homing_positive_dir: false
 homing_speed: 10
 second_homing_speed: 3
 homing_retract_dist: 5
 
+# Reserved Y TMC2226 rollback config. Keep this commented while TB6600 is live.
+# To switch back: restore the STEP/DIR/EN/UART/DIAG wiring tags in
+# pico_w_btt_tmc2226_y_z.yaml, comment the TB6600 [stepper_y] above, then
+# uncomment this block.
+#
+# [stepper_y]
+# step_pin: gpio11
+# dir_pin: !gpio10
+# enable_pin: !gpio12
+# microsteps: 16
+# rotation_distance: 60
+# endstop_pin: ^!gpio4
+# position_endstop: ${t0_y_endstop}
+# position_min: ${t0_y_endstop}
+# position_max: 296.000
+# homing_positive_dir: false
+# homing_speed: 10
+# second_homing_speed: 3
+# homing_retract_dist: 5
+#
 # BTT TMC2226 V1.0 uses the tmc2209 driver in Klipper.
-[tmc2209 stepper_y]
-uart_pin: gpio9
-uart_address: 0
-run_current: 2.0
-sense_resistor: 0.110
-stealthchop_threshold: 0
-driver_SGTHRS: 0
-
-# Y TMC2226 DIAG is wired to GPIO3 through a 1.2k series resistor for
+# [tmc2209 stepper_y]
+# uart_pin: gpio9
+# uart_address: 0
+# run_current: 2.0
+# sense_resistor: 0.110
+# stealthchop_threshold: 0
+# driver_SGTHRS: 0
+#
+# Y TMC2226 DIAG was wired to GPIO3 through a 1.2k series resistor for
 # diagnostics only. Normal Y homing remains on the physical endstop.
 #
-# TMC2226 StallGuard4 is a StealthChop diagnostic feature. Normal Y motion
-# stays in the high-torque spreadCycle-style configuration above, so always-on
-# print-time DIAG behavior is not assumed. Use Y_TMC_STALLGUARD_ARM for
-# controlled StallGuard tuning; it temporarily switches the driver into the
-# datasheet-required StallGuard4 window:
-#   TCOOLTHRS >= TSTEP > TPWMTHRS, stall when SG_RESULT <= SGTHRS*2.
+# [gcode_macro _Y_TMC_STALLGUARD_STATE]
+# description: Internal state for the Y TMC2226 StallGuard diagnostic mode.
+# variable_armed: 0
+# variable_threshold: 0
+# gcode:
+#     {% set state = printer["gcode_macro _Y_TMC_STALLGUARD_STATE"] %}
+#     RESPOND TYPE=echo MSG="Y TMC StallGuard state: armed={state.armed|int}, threshold={state.threshold|int}."
 #
-# Future sensorless-homing experiment:
-# - remove [gcode_button y_tmc_diag] so GPIO3 is not claimed twice
-# - add diag_pin: ^gpio3 and a tuned driver_SGTHRS here
-# - change [stepper_y] endstop_pin to tmc2209_stepper_y:virtual_endstop
-# - set homing_retract_dist: 0 while tuning
-[gcode_macro _Y_TMC_STALLGUARD_STATE]
-description: Internal state for the Y TMC2226 StallGuard diagnostic mode.
-variable_armed: 0
-variable_threshold: 0
-gcode:
-    {% set state = printer["gcode_macro _Y_TMC_STALLGUARD_STATE"] %}
-    RESPOND TYPE=echo MSG="Y TMC StallGuard state: armed={state.armed|int}, threshold={state.threshold|int}."
-
-[gcode_button y_tmc_diag]
-pin: ^gpio3
-press_gcode:
-    {% set state = printer["gcode_macro _Y_TMC_STALLGUARD_STATE"] %}
-    {% set armed = state.armed|int %}
-    {% set print_state = printer.print_stats.state|string %}
-    RESPOND TYPE=echo MSG="Y TMC2226 DIAG asserted; armed={armed}, print_state={print_state}. Run Y_TMC_STATUS and inspect Y position before continuing."
-    {% if armed and print_state == "printing" %}
-        RESPOND TYPE=error MSG="Y TMC2226 DIAG asserted during armed print; pausing."
-        PAUSE
-    {% endif %}
-
-[gcode_macro Y_TMC_STATUS]
-description: Report the Y TMC2226 DIAG input and key driver registers.
-gcode:
-    QUERY_BUTTON BUTTON=y_tmc_diag
-    DUMP_TMC STEPPER=stepper_y REGISTER=IOIN
-    DUMP_TMC STEPPER=stepper_y REGISTER=DRV_STATUS
-    DUMP_TMC STEPPER=stepper_y REGISTER=SG_RESULT
-    DUMP_TMC STEPPER=stepper_y REGISTER=SGTHRS
-    Y_TMC_THERMAL_STATUS
-
-[gcode_macro Y_TMC_THERMAL_STATUS]
-description: Report Y TMC2226 thermal comparator bucket and raw DRV_STATUS.
-gcode:
-    {% set drv = printer["tmc2209 stepper_y"].drv_status %}
-    {% set t120 = 1 if drv and "t120" in drv else 0 %}
-    {% set t143 = 1 if drv and "t143" in drv else 0 %}
-    {% set t150 = 1 if drv and "t150" in drv else 0 %}
-    {% set t157 = 1 if drv and "t157" in drv else 0 %}
-    {% set otpw = 1 if drv and "otpw" in drv else 0 %}
-    {% set ot = 1 if drv and "ot" in drv else 0 %}
-    {% set cs_actual = drv["cs_actual"] if drv and "cs_actual" in drv else 0 %}
-    {% if t157 %}
-        {% set temp_bucket = ">=157C" %}
-    {% elif t150 %}
-        {% set temp_bucket = "about 150-156C" %}
-    {% elif t143 %}
-        {% set temp_bucket = "about 143-149C" %}
-    {% elif t120 %}
-        {% set temp_bucket = "about 120-142C" %}
-    {% else %}
-        {% set temp_bucket = "<120C typical junction comparator" %}
-    {% endif %}
-    RESPOND TYPE=echo MSG="Y TMC2226 thermal estimate: {temp_bucket}; bits t120={t120}, t143={t143}, t150={t150}, t157={t157}, otpw={otpw}, ot={ot}, cs_actual={cs_actual}. This is a comparator bucket, not an exact temperature."
-    DUMP_TMC STEPPER=stepper_y REGISTER=DRV_STATUS
-
-[gcode_macro Y_TMC_STALLGUARD_ARM]
-description: Arm Y TMC2226 StallGuard4 diagnostic mode with THRESHOLD=<0..255>.
-gcode:
-    {% set threshold = params.THRESHOLD|default(4)|int %}
-    {% if threshold < 0 or threshold > 255 %}
-        {action_raise_error("Y_TMC_STALLGUARD_ARM THRESHOLD must be between 0 and 255.")}
-    {% endif %}
-    M400
-    SET_TMC_FIELD STEPPER=stepper_y FIELD=SGTHRS VALUE={threshold}
-    SET_TMC_FIELD STEPPER=stepper_y FIELD=TPWMTHRS VALUE=0
-    SET_TMC_FIELD STEPPER=stepper_y FIELD=en_spreadcycle VALUE=0
-    SET_TMC_FIELD STEPPER=stepper_y FIELD=TCOOLTHRS VALUE=1048575
-    SET_TMC_FIELD STEPPER=stepper_y FIELD=SEMIN VALUE=0
-    SET_GCODE_VARIABLE MACRO=_Y_TMC_STALLGUARD_STATE VARIABLE=armed VALUE=1
-    SET_GCODE_VARIABLE MACRO=_Y_TMC_STALLGUARD_STATE VARIABLE=threshold VALUE={threshold}
-    RESPOND TYPE=echo MSG="Y TMC2226 StallGuard armed: SGTHRS={threshold}, DIAG asserts when SG_RESULT <= {threshold * 2}; TPWMTHRS=0, en_spreadcycle=0, TCOOLTHRS=1048575, SEMIN=0."
-    DUMP_TMC STEPPER=stepper_y REGISTER=GCONF
-    DUMP_TMC STEPPER=stepper_y REGISTER=TCOOLTHRS
-    DUMP_TMC STEPPER=stepper_y REGISTER=TPWMTHRS
-    DUMP_TMC STEPPER=stepper_y REGISTER=SGTHRS
-
-[gcode_macro Y_TMC_STALLGUARD_DISARM]
-description: Restore Y TMC2226 configured register state after StallGuard diagnostics.
-gcode:
-    M400
-    SET_TMC_FIELD STEPPER=stepper_y FIELD=SGTHRS VALUE=0
-    SET_TMC_FIELD STEPPER=stepper_y FIELD=TPWMTHRS VALUE=1048575
-    SET_TMC_FIELD STEPPER=stepper_y FIELD=en_spreadcycle VALUE=0
-    SET_TMC_FIELD STEPPER=stepper_y FIELD=TCOOLTHRS VALUE=0
-    SET_TMC_FIELD STEPPER=stepper_y FIELD=SEMIN VALUE=0
-    SET_GCODE_VARIABLE MACRO=_Y_TMC_STALLGUARD_STATE VARIABLE=armed VALUE=0
-    SET_GCODE_VARIABLE MACRO=_Y_TMC_STALLGUARD_STATE VARIABLE=threshold VALUE=0
-    INIT_TMC STEPPER=stepper_y
-    RESPOND TYPE=echo MSG="Y TMC2226 StallGuard disarmed; restored SGTHRS=0, TPWMTHRS=1048575, en_spreadcycle=0, TCOOLTHRS=0, SEMIN=0."
-    Y_TMC_STATUS
-
-[gcode_macro Y_TMC_DIAG_MOVE_TEST]
-description: Home Y, run a normal Y move, and optionally run the aggressive DIAG test with AGGRESSIVE=1.
-gcode:
-    {% set aggressive = params.AGGRESSIVE|default(0)|int %}
-    {% set old_velocity = printer.toolhead.max_velocity|float %}
-    {% set old_accel = printer.toolhead.max_accel|float %}
-    {% set old_scv = printer.toolhead.square_corner_velocity|float %}
-    RESPOND TYPE=echo MSG="Y TMC DIAG move test: homing Y, then moving Y20 gentle and Y120 normal. Aggressive Y260 leg runs only with AGGRESSIVE=1."
-    G90
-    G28 Y
-    QUERY_BUTTON BUTTON=y_tmc_diag
-    SET_VELOCITY_LIMIT VELOCITY=60 ACCEL=500 SQUARE_CORNER_VELOCITY=5
-    G1 Y20 F3600
-    M400
-    RESPOND TYPE=echo MSG="Y TMC DIAG move test: after gentle Y20."
-    Y_TMC_STATUS
-    SET_VELOCITY_LIMIT VELOCITY=100 ACCEL=1000 SQUARE_CORNER_VELOCITY=5
-    G1 Y120 F6000
-    M400
-    RESPOND TYPE=echo MSG="Y TMC DIAG move test: after normal Y120 at 100mm/s, 1000mm/s^2."
-    Y_TMC_STATUS
-    {% if aggressive == 1 %}
-        RESPOND TYPE=echo MSG="Y TMC DIAG move test: running aggressive Y260 at 500mm/s, 8000mm/s^2."
-        SET_VELOCITY_LIMIT VELOCITY=500 ACCEL=8000 SQUARE_CORNER_VELOCITY=10
-        G1 Y260 F30000
-        M400
-        RESPOND TYPE=echo MSG="Y TMC DIAG move test: after aggressive Y260 at 500mm/s, 8000mm/s^2."
-        Y_TMC_STATUS
-        RESPOND TYPE=echo MSG="Y TMC DIAG move test: re-homing Y after aggressive move."
-    {% else %}
-        RESPOND TYPE=echo MSG="Y TMC DIAG move test: aggressive leg skipped; rerun with AGGRESSIVE=1 only when intentionally testing stall behavior."
-    {% endif %}
-    SET_VELOCITY_LIMIT VELOCITY=60 ACCEL=500 SQUARE_CORNER_VELOCITY=5
-    G28 Y
-    SET_VELOCITY_LIMIT VELOCITY={old_velocity} ACCEL={old_accel} SQUARE_CORNER_VELOCITY={old_scv}
-    RESPOND TYPE=echo MSG="Y TMC DIAG move test complete; original velocity limits restored."
+# [gcode_button y_tmc_diag]
+# pin: ^gpio3
+# press_gcode:
+#     {% set state = printer["gcode_macro _Y_TMC_STALLGUARD_STATE"] %}
+#     {% set armed = state.armed|int %}
+#     {% set print_state = printer.print_stats.state|string %}
+#     RESPOND TYPE=echo MSG="Y TMC2226 DIAG asserted; armed={armed}, print_state={print_state}. Run Y_TMC_STATUS and inspect Y position before continuing."
+#     {% if armed and print_state == "printing" %}
+#         RESPOND TYPE=error MSG="Y TMC2226 DIAG asserted during armed print; pausing."
+#         PAUSE
+#     {% endif %}
+#
+# [gcode_macro Y_TMC_STATUS]
+# description: Report the Y TMC2226 DIAG input and key driver registers.
+# gcode:
+#     QUERY_BUTTON BUTTON=y_tmc_diag
+#     DUMP_TMC STEPPER=stepper_y REGISTER=IOIN
+#     DUMP_TMC STEPPER=stepper_y REGISTER=DRV_STATUS
+#     DUMP_TMC STEPPER=stepper_y REGISTER=SG_RESULT
+#     DUMP_TMC STEPPER=stepper_y REGISTER=SGTHRS
+#     Y_TMC_THERMAL_STATUS
+#
+# [gcode_macro Y_TMC_THERMAL_STATUS]
+# description: Report Y TMC2226 thermal comparator bucket and raw DRV_STATUS.
+# gcode:
+#     {% set drv = printer["tmc2209 stepper_y"].drv_status %}
+#     {% set t120 = 1 if drv and "t120" in drv else 0 %}
+#     {% set t143 = 1 if drv and "t143" in drv else 0 %}
+#     {% set t150 = 1 if drv and "t150" in drv else 0 %}
+#     {% set t157 = 1 if drv and "t157" in drv else 0 %}
+#     {% set otpw = 1 if drv and "otpw" in drv else 0 %}
+#     {% set ot = 1 if drv and "ot" in drv else 0 %}
+#     {% set cs_actual = drv["cs_actual"] if drv and "cs_actual" in drv else 0 %}
+#     {% if t157 %}
+#         {% set temp_bucket = ">=157C" %}
+#     {% elif t150 %}
+#         {% set temp_bucket = "about 150-156C" %}
+#     {% elif t143 %}
+#         {% set temp_bucket = "about 143-149C" %}
+#     {% elif t120 %}
+#         {% set temp_bucket = "about 120-142C" %}
+#     {% else %}
+#         {% set temp_bucket = "<120C typical junction comparator" %}
+#     {% endif %}
+#     RESPOND TYPE=echo MSG="Y TMC2226 thermal estimate: {temp_bucket}; bits t120={t120}, t143={t143}, t150={t150}, t157={t157}, otpw={otpw}, ot={ot}, cs_actual={cs_actual}. This is a comparator bucket, not an exact temperature."
+#     DUMP_TMC STEPPER=stepper_y REGISTER=DRV_STATUS
+#
+# [gcode_macro Y_TMC_STALLGUARD_ARM]
+# description: Arm Y TMC2226 StallGuard4 diagnostic mode with THRESHOLD=<0..255>.
+# gcode:
+#     {% set threshold = params.THRESHOLD|default(4)|int %}
+#     {% if threshold < 0 or threshold > 255 %}
+#         {action_raise_error("Y_TMC_STALLGUARD_ARM THRESHOLD must be between 0 and 255.")}
+#     {% endif %}
+#     M400
+#     SET_TMC_FIELD STEPPER=stepper_y FIELD=SGTHRS VALUE={threshold}
+#     SET_TMC_FIELD STEPPER=stepper_y FIELD=TPWMTHRS VALUE=0
+#     SET_TMC_FIELD STEPPER=stepper_y FIELD=en_spreadcycle VALUE=0
+#     SET_TMC_FIELD STEPPER=stepper_y FIELD=TCOOLTHRS VALUE=1048575
+#     SET_TMC_FIELD STEPPER=stepper_y FIELD=SEMIN VALUE=0
+#     SET_GCODE_VARIABLE MACRO=_Y_TMC_STALLGUARD_STATE VARIABLE=armed VALUE=1
+#     SET_GCODE_VARIABLE MACRO=_Y_TMC_STALLGUARD_STATE VARIABLE=threshold VALUE={threshold}
+#     RESPOND TYPE=echo MSG="Y TMC2226 StallGuard armed: SGTHRS={threshold}, DIAG asserts when SG_RESULT <= {threshold * 2}; TPWMTHRS=0, en_spreadcycle=0, TCOOLTHRS=1048575, SEMIN=0."
+#     DUMP_TMC STEPPER=stepper_y REGISTER=GCONF
+#     DUMP_TMC STEPPER=stepper_y REGISTER=TCOOLTHRS
+#     DUMP_TMC STEPPER=stepper_y REGISTER=TPWMTHRS
+#     DUMP_TMC STEPPER=stepper_y REGISTER=SGTHRS
+#
+# [gcode_macro Y_TMC_STALLGUARD_DISARM]
+# description: Restore Y TMC2226 configured register state after StallGuard diagnostics.
+# gcode:
+#     M400
+#     SET_TMC_FIELD STEPPER=stepper_y FIELD=SGTHRS VALUE=0
+#     SET_TMC_FIELD STEPPER=stepper_y FIELD=TPWMTHRS VALUE=1048575
+#     SET_TMC_FIELD STEPPER=stepper_y FIELD=en_spreadcycle VALUE=0
+#     SET_TMC_FIELD STEPPER=stepper_y FIELD=TCOOLTHRS VALUE=0
+#     SET_TMC_FIELD STEPPER=stepper_y FIELD=SEMIN VALUE=0
+#     SET_GCODE_VARIABLE MACRO=_Y_TMC_STALLGUARD_STATE VARIABLE=armed VALUE=0
+#     SET_GCODE_VARIABLE MACRO=_Y_TMC_STALLGUARD_STATE VARIABLE=threshold VALUE=0
+#     INIT_TMC STEPPER=stepper_y
+#     RESPOND TYPE=echo MSG="Y TMC2226 StallGuard disarmed; restored SGTHRS=0, TPWMTHRS=1048575, en_spreadcycle=0, TCOOLTHRS=0, SEMIN=0."
+#     Y_TMC_STATUS
+#
+# [gcode_macro Y_TMC_DIAG_MOVE_TEST]
+# description: Home Y, run a normal Y move, and optionally run the aggressive DIAG test with AGGRESSIVE=1.
+# gcode:
+#     {% set aggressive = params.AGGRESSIVE|default(0)|int %}
+#     {% set old_velocity = printer.toolhead.max_velocity|float %}
+#     {% set old_accel = printer.toolhead.max_accel|float %}
+#     {% set old_scv = printer.toolhead.square_corner_velocity|float %}
+#     RESPOND TYPE=echo MSG="Y TMC DIAG move test: homing Y, then moving Y20 gentle and Y120 normal. Aggressive Y260 leg runs only with AGGRESSIVE=1."
+#     G90
+#     G28 Y
+#     QUERY_BUTTON BUTTON=y_tmc_diag
+#     SET_VELOCITY_LIMIT VELOCITY=60 ACCEL=500 SQUARE_CORNER_VELOCITY=5
+#     G1 Y20 F3600
+#     M400
+#     RESPOND TYPE=echo MSG="Y TMC DIAG move test: after gentle Y20."
+#     Y_TMC_STATUS
+#     SET_VELOCITY_LIMIT VELOCITY=100 ACCEL=1000 SQUARE_CORNER_VELOCITY=5
+#     G1 Y120 F6000
+#     M400
+#     RESPOND TYPE=echo MSG="Y TMC DIAG move test: after normal Y120 at 100mm/s, 1000mm/s^2."
+#     Y_TMC_STATUS
+#     {% if aggressive == 1 %}
+#         RESPOND TYPE=echo MSG="Y TMC DIAG move test: running aggressive Y260 at 500mm/s, 8000mm/s^2."
+#         SET_VELOCITY_LIMIT VELOCITY=500 ACCEL=8000 SQUARE_CORNER_VELOCITY=10
+#         G1 Y260 F30000
+#         M400
+#         RESPOND TYPE=echo MSG="Y TMC DIAG move test: after aggressive Y260 at 500mm/s, 8000mm/s^2."
+#         Y_TMC_STATUS
+#         RESPOND TYPE=echo MSG="Y TMC DIAG move test: re-homing Y after aggressive move."
+#     {% else %}
+#         RESPOND TYPE=echo MSG="Y TMC DIAG move test: aggressive leg skipped; rerun with AGGRESSIVE=1 only when intentionally testing stall behavior."
+#     {% endif %}
+#     SET_VELOCITY_LIMIT VELOCITY=60 ACCEL=500 SQUARE_CORNER_VELOCITY=5
+#     G28 Y
+#     SET_VELOCITY_LIMIT VELOCITY={old_velocity} ACCEL={old_accel} SQUARE_CORNER_VELOCITY={old_scv}
+#     RESPOND TYPE=echo MSG="Y TMC DIAG move test complete; original velocity limits restored."
 
 # Wiring follows klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_y_z.yaml,
 # Driver 2:

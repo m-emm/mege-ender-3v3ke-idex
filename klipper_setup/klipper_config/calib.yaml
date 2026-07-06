@@ -4,9 +4,9 @@ bed_grid_zero:
 tools:
   t0:
     x_endstop: -80.400
-    y_endstop: -14.800
+    y_endstop: 0  # in the past, -14.800, but with new y motor, less space
     z_endstop: 293.750
   t1:
     x_endstop: 357.532
-    y_endstop: -15.820
+    y_endstop: 0 # in the past,  -15.820, but with new y motor, less space
     z_endstop: 293.650

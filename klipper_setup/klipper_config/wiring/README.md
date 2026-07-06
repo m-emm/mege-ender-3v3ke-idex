@@ -1,14 +1,15 @@
 # Active Wiring Diagrams
 
-This directory is the active wiring source for the custom Pico W + BTT TMC2226
-electronics used by the printer Klipper config.
+This directory is the active wiring source for the custom Pico W, external
+TB6600-style Y driver, and BTT TMC2226 Z electronics used by the printer
+Klipper config.
 
 - `pico_w_btt_tmc2226_x.yaml` is the X-axis Pico wiring source.
 - `pico_w_btt_tmc2226_y_z.yaml` is the Y/Z/heatbed Pico wiring source.
 - `pico_tb6600_stripboard_interface.py` and
-  `pico_tb6600_stripboard_layout.py` generate the planned non-live external Y
+  `pico_tb6600_stripboard_layout.py` generate the live external Y
   TB6600 interface schematic and verified stripboard assembly.
-- `pico_tb6600_stripboard_interface.md` documents that planned interface.
+- `pico_tb6600_stripboard_interface.md` documents that interface.
 - `diagrams/*.svg` are generated artifacts committed for review.
 - `../printer.cfg.template` is the active Klipper config source.
 
@@ -45,9 +46,9 @@ For the heatbed, both `heater_bed.heater_pin` and `heater_bed.boost_pin` are
 checked so the 24V MOSFET and SSR boost output cannot drift silently.
 The X-axis SFS and CR Touch wires are documented here as wired/reserved hardware,
 but they are not active Klipper config and intentionally have no `klipper:` tag.
-The Y-axis TB6600 interface connector follows the same planned/non-live pattern:
-it is documented in the pinout diagram, but active Y motion remains on TMC1
-until the commented Klipper draft is deliberately activated.
+The Y-axis TB6600 interface connector is the active Y motion path. TMC1 remains
+documented as a reserved rollback path, but its Klipper tags are intentionally
+inactive while TB6600 is live.
 
 The Nitehawk toolhead boards also have Klipper pins in `printer.cfg.template`,
 but they are not part of these custom Pico/TMC wiring diagrams.

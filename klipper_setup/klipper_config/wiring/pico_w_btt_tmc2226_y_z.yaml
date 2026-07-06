@@ -1,15 +1,15 @@
 basename: pico_w_btt_tmc2226_y_z
 
 metadata:
-  version_label: "Pico W + BTT TMC2226 (Y + dual Z)"
+  version_label: "Pico W + TB6600 Y + BTT TMC2226 dual Z"
   klipper_mcu: ""
   notes: |
-    Three-driver wiring for Y, Z-left, and Z-right.
-    Driver1 (Y): STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9, endstop=GPIO4.
-    Driver1 (Y) DIAG: TMC top DIAG pad to GPIO3 through 1.2k series resistor.
+    Active Y uses the external TB6600-style interface: STEP=GPIO0, DIR=GPIO1, EN=GPIO2, endstop=GPIO4.
+    TMC1 is reserved as the Y fallback: STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9.
+    TMC1 fallback DIAG: TMC top DIAG pad to GPIO3 through 1.2k series resistor.
     Driver2 (Z-left): STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5.
     Driver3 (Z-right): STEP=GPIO14, DIR=GPIO15, EN=GPIO16, UART=GPIO13.
-    TB6600 Y interface connector is inactive/reference wiring only; it has no active Klipper tags.
+    Live Y motor phases are on the external TB6600 driver; the local TMC1 motor wiring is reserved for rollback.
     Z endstops: Z-left=GPIO22, Z-right=GPIO17.
     Heatbed MOSFET: HEATBED_ON=GPIO21.
     Heatbed boost SSR: SSR_OUT=GPIO20 with Pico logic ground.
@@ -327,41 +327,39 @@ wires:
     klipper: "dotstar vision_light.data_pin"
     type: data
 
-  # Inactive/reference Y TB6600 stripboard control connector.
+  # Live Y TB6600 stripboard control connector.
   - from: PICO_GND_03
     to: Y_TB6600_IF_GND
     type: ground
   - from: PICO_GPIO_1
     to: Y_TB6600_IF_DIR
+    klipper: stepper_y.dir_pin
     type: data
   - from: PICO_GPIO_0
     to: Y_TB6600_IF_STEP
+    klipper: stepper_y.step_pin
     type: clock
   - from: PICO_GPIO_2
     to: Y_TB6600_IF_ENABLE
+    klipper: stepper_y.enable_pin
     type: data
 
-  # Live Y TMC2226 driver.
+  # Reserved Y TMC2226 fallback driver.
   - from: PICO_GPIO_11
     to: TMC1_J1_STEP_7
-    klipper: stepper_y.step_pin
     type: clock
   - from: PICO_GPIO_10
     to: TMC1_J1_DIR_8
-    klipper: stepper_y.dir_pin
     type: data
   - from: PICO_GPIO_12
     to: TMC1_J1_EN_1
-    klipper: stepper_y.enable_pin
     type: data
   - from: PICO_GPIO_9
     to: TMC1_J1_UART_PDN_4
-    klipper: "tmc2209 stepper_y.uart_pin"
     type: data
     color: "#9ca3af"
   - from: PICO_GPIO_3
     to: R_Y_DIAG_1K2_PICO
-    klipper: "gcode_button y_tmc_diag.pin"
     type: data
     color: "#9ca3af"
   - from: R_Y_DIAG_1K2_TMC
@@ -504,6 +502,8 @@ wires:
     to: HEATBED_THERM_GND
     type: ground
 
+  # Reserved TMC1 Y motor wiring. Live Y motor phases are on the external
+  # TB6600 driver while the TB6600 interface is active.
   - from: MOTOR_Y_A_PLUS
     to: TMC1_J2_A1_5
     type: default
@@ -555,6 +555,7 @@ wires:
     type: default
     color: "#0057d8"
 
+  # Reserved TMC1 motor supply for Y rollback.
   - from: PWR_V24
     to: TMC1_J2_VM_1
     type: hazard_power

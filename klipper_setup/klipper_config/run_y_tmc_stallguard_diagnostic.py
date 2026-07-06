@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Run a Y TMC2226 StallGuard diagnostic over Klipper's API socket.
+"""Run a rollback-only Y TMC2226 StallGuard diagnostic over Klipper's API socket.
 
 By default this script sends itself to menderpi over SSH and runs against the
 printer's local Klipper API socket. Use --local to connect to a local socket.
+It requires the commented TMC2226 rollback config in printer.cfg.template to be
+active; it is not compatible with the live TB6600 Y configuration.
 """
 
 from __future__ import annotations
@@ -438,7 +440,10 @@ def run_remote(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Stream Y TMC2226 StallGuard data while running guarded Y moves."
+        description=(
+            "Stream Y TMC2226 StallGuard data while running guarded Y moves. "
+            "Requires the TMC2226 rollback Y config, not the live TB6600 config."
+        )
     )
     parser.add_argument("--remote", default=DEFAULT_REMOTE)
     parser.add_argument("--uds", default=DEFAULT_UDS)
