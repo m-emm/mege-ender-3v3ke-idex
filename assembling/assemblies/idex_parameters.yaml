@@ -913,7 +913,7 @@ globals:
   y_axis_motor_holder_side_wall_thickness: 6
   y_axis_motor_holder_side_wall_height: 25
   y_axis_motor_holder_side_wall_depth: 40
-  y_axis_drive_mount_screw_inset: 5
+  y_axis_drive_mount_screw_inset: 7
   y_axis_drive_mount_screw_size: "M5"
   y_axis_drive_mount_screw_length: 16
   y_axis_drive_motor_plate_width: 70

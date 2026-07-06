@@ -1,0 +1,46 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Single TPU production plate for four identical printer feet
+
+Builder:
+  Collection: true
+
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - front
+        - right
+      width: 512
+      height: 512
+    parts:
+      - source: injected
+        assembly: printer_foot
+        artifact: leader
+        name: printer_foot
+
+  Production:
+    process_data:
+      source: mege_3devops.process_data.mender3.process_data_06_high_speed.PROCESS_DATA_TPU_06_HS
+      overrides:
+        process_overrides:
+          brim_type: no_brim
+    parts:
+      - source: injected
+        assembly: printer_foot
+        artifact: leader
+        name: printer_foot
+        num_copies: 4
+        transform:
+          function: orient_max_planar_area
+          kwargs:
+            optimize_bed_adhesion_area: true
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: printer_feet_tpu
+          parts:
+            - printer_foot
+      auto_assign_plates: false

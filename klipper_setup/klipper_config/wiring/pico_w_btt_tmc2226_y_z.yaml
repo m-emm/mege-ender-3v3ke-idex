@@ -15,6 +15,9 @@ metadata:
     Heatbed boost SSR: SSR_OUT=GPIO20 with Pico logic ground.
     Heatbed thermistor: SIGNAL=GPIO26_ADC0, GND=AGND, 4.7k pull-up REF-to-SIGNAL.
     Heatbed thermistor damping: 100uF SIGNAL-to-GND; electrolytic positive to SIGNAL, negative to AGND/GND.
+    Vision APA102 helper header: 5V=VBUS for small-strip test use, 3.3V=level-shifter LV reference,
+    GND=common ground, CLOCK=GPIO18, DATA=GPIO19. Shifted outputs go to strip CI/DI input side.
+    Nine APA102 pixels at full white may approach USB-test power limits; use fused external 5V if unstable.
 
 color_map:
   power: "#ff0000" # red: VCC/5V
@@ -207,6 +210,15 @@ pin_sets:
     pins:
       - POS
       - NEG
+  - prefix: VISION_APA102_
+    origin: [-4, 24]
+    direction: down
+    pins:
+      - FIVE_V
+      - THREEV3
+      - GND
+      - CLOCK
+      - DATA
   - prefix: ENDSTOP_Y_
     origin: [34, 20]
     direction: down
@@ -293,6 +305,27 @@ wires:
     to: PICO_THREEV3_OUT_36
     type: lv_power
     color: "#9ca3af"
+
+  # APA102/DotStar vision light helper header for a 3.3V-to-5V level shifter.
+  # VBUS is intended for small-strip testing; use fused external 5V with common
+  # ground if the nine-pixel strip browns out the Pico or the rail sags.
+  - from: PICO_VBUS_40
+    to: VISION_APA102_FIVE_V
+    type: power
+  - from: PICO_THREEV3_OUT_36
+    to: VISION_APA102_THREEV3
+    type: lv_power
+  - from: PICO_GND_13
+    to: VISION_APA102_GND
+    type: ground
+  - from: PICO_GPIO_18_24
+    to: VISION_APA102_CLOCK
+    klipper: "dotstar vision_light.clock_pin"
+    type: clock
+  - from: PICO_GPIO_19_25
+    to: VISION_APA102_DATA
+    klipper: "dotstar vision_light.data_pin"
+    type: data
 
   # Inactive/reference Y TB6600 stripboard control connector.
   - from: PICO_GND_03

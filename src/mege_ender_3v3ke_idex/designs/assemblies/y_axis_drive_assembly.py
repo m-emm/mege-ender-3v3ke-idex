@@ -249,7 +249,7 @@ def _create_y_axis_motor_bracket_adapter(frame_back_profile, motor_bracket, cfg)
         cfg.y_axis_drive_profile_mount_plate_thickness,
         adapter_height,
         cfg.motor_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.FRONT, Alignment.BACK, Alignment.TOP],
+        no_fillets_at=[Alignment.FRONT, Alignment.BACK],
     )
     adapter = align(adapter, motor_bracket.leader, Alignment.CENTER, axes=[0])
     adapter = align(adapter, motor_bracket.leader, Alignment.STACK_BACK)

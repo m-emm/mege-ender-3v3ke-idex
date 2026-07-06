@@ -1158,6 +1158,14 @@ assemblies:
     resource_file: printer_foot_assembly.yaml
     depends_on: []
 
+  - name: printer_feet_production_assembly
+
+    resource_file: printer_feet_production_assembly.yaml
+    depends_on:
+      - printer_foot_left_front_assembly
+    inject_parts:
+      printer_foot: printer_foot_left_front_assembly
+
   - name: resistor_box_assembly
 
     resource_file: component_box_assembly.yaml

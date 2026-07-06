@@ -255,6 +255,27 @@ def test_stepper_y_uses_tmc_driver_with_raised_current():
     assert "step_pulse_duration" not in stepper_y
 
 
+def test_vision_light_dotstar_and_macros():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    dotstar = _section(config_text, "dotstar vision_light")
+    light_macro = _section(config_text, "gcode_macro VISION_LIGHT")
+    off_macro = _section(config_text, "gcode_macro VISION_LIGHT_OFF")
+
+    assert _setting_value(dotstar, "data_pin") == "gpio19"
+    assert _setting_value(dotstar, "clock_pin") == "gpio18"
+    assert _setting_float(dotstar, "chain_count") == pytest.approx(9.0)
+    assert _setting_float(dotstar, "initial_RED") == pytest.approx(0.0)
+    assert _setting_float(dotstar, "initial_GREEN") == pytest.approx(0.0)
+    assert _setting_float(dotstar, "initial_BLUE") == pytest.approx(0.0)
+    assert "default_channel = params.R|default(1.0)|float" in light_macro
+    assert "green = params.G|default(default_channel)|float" in light_macro
+    assert "blue = params.B|default(default_channel)|float" in light_macro
+    assert "index = params.INDEX|default(0)|int" in light_macro
+    assert "SET_LED LED=vision_light INDEX={index}" in light_macro
+    assert "SET_LED LED=vision_light RED={red} GREEN={green} BLUE={blue}" in light_macro
+    assert "SET_LED LED=vision_light RED=0 GREEN=0 BLUE=0" in off_macro
+
+
 def test_y_tmc_diag_button_and_status_macro_are_diagnostic_only():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     stepper_y = _section(config_text, "stepper_y")

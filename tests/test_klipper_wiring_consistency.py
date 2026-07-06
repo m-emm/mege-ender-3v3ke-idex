@@ -26,6 +26,8 @@ EXPECTED_KLIPPER_TAGS = {
     "stepper_y.endstop_pin",
     "tmc2209 stepper_y.uart_pin",
     "gcode_button y_tmc_diag.pin",
+    "dotstar vision_light.clock_pin",
+    "dotstar vision_light.data_pin",
     "stepper_z.step_pin",
     "stepper_z.dir_pin",
     "stepper_z.enable_pin",
@@ -80,6 +82,19 @@ def test_generated_yz_wiring_svg_includes_bed_thermistor_damping_capacitor():
 
         assert "C_BED_THERM_DAMP_100UF_POS" in svg_text
         assert "C_BED_THERM_DAMP_100UF_NEG" in svg_text
+
+
+def test_generated_yz_wiring_svg_includes_vision_light_header():
+    for view in ("top", "bottom"):
+        svg_text = (
+            WIRING_DIR / "diagrams" / f"pico_w_btt_tmc2226_y_z_{view}.svg"
+        ).read_text()
+
+        assert "VISION_APA102_FIVE_V" in svg_text
+        assert "VISION_APA102_THREEV3" in svg_text
+        assert "VISION_APA102_GND" in svg_text
+        assert "VISION_APA102_CLOCK" in svg_text
+        assert "VISION_APA102_DATA" in svg_text
 
 
 def test_active_looking_legacy_wiring_paths_are_removed():
