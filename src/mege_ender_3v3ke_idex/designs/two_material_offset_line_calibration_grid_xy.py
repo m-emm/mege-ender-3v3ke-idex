@@ -422,9 +422,7 @@ def main():
         parts.as_list(),
         script_file=__file__,
         prod=PROD,
-        process_data=(
-            copy_dual_petgcf_tpu95a_06_demo_process_data() if PROD else None
-        ),
+        process_data=(copy_dual_petgcf_tpu95a_06_demo_process_data() if PROD else None),
         prod_gap=4,
         bed_width=SAFE_BED_WIDTH_MM if PROD else ACTUAL_BED_WIDTH_MM,
         bed_depth=SAFE_BED_DEPTH_MM if PROD else ACTUAL_BED_DEPTH_MM,

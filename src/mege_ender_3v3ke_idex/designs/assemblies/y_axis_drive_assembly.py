@@ -23,6 +23,8 @@ Y_AXIS_DRIVE_LEADER_NAME = "motor_mount_plate"
 _GT2_IDLER_RUNNING_SURFACE_DIAMETER_FACTOR = (
     1.061032953945969  # TODO: Remove this magic number.
 )
+_GT2_MOTOR_PULLEY_TOP_DISK_THICKNESS = 1.5
+_GT2_MOTOR_PULLEY_BOTTOM_DISK_THICKNESS = 5.0
 
 
 @dataclass(frozen=True)
@@ -110,6 +112,31 @@ def _create_gt2_pulley_running_surface_reference(num_teeth, belt_width=gt2_width
         (num_teeth * gt2_pitch) / math.pi - gt2_thickness + gt2_teeth_thickness
     )
     return create_cylinder(pulley_running_surface_diameter / 2, belt_width)
+
+
+def _create_gt2_motor_pulley(num_teeth, belt_width=gt2_width):
+    return create_gt2_pulley(
+        num_teeth=num_teeth,
+        belt_width=belt_width,
+        top_disk_thickness=_GT2_MOTOR_PULLEY_TOP_DISK_THICKNESS,
+        bottom_disk_thickness=_GT2_MOTOR_PULLEY_BOTTOM_DISK_THICKNESS,
+    )
+
+
+def _create_gt2_motor_pulley_running_surface_reference(
+    num_teeth,
+    belt_width=gt2_width,
+):
+    return _create_gt2_pulley_running_surface_reference(
+        num_teeth,
+        belt_width=belt_width,
+    )
+
+
+def _align_gt2_motor_pulley_running_surface_to_pulley(running_surface, pulley):
+    running_surface = align(running_surface, pulley, Alignment.CENTER, axes=[0, 1])
+    running_surface = align(running_surface, pulley, Alignment.TOP)
+    return translate(0, 0, -_GT2_MOTOR_PULLEY_TOP_DISK_THICKNESS)(running_surface)
 
 
 def _create_gt2_idler_running_surface_reference(num_teeth, belt_width=gt2_width):
@@ -313,20 +340,20 @@ def _create_y_axis_motor_mount(
 ):
     motor_bracket = copy.deepcopy(y_axis_nema23_motor_bracket_assembly)
 
-    pulley = create_gt2_pulley(
-        num_teeth=cfg.y_axis_drive_motor_pulley_teeth,
-        belt_width=gt2_width,
-    )
+    pulley = _create_gt2_motor_pulley(cfg.y_axis_drive_motor_pulley_teeth)
     pulley = align(
         pulley,
         motor_bracket.get_follower_part_by_name("axle"),
         Alignment.CENTER,
         axes=[1],
     )
-    pulley_running_surface = _create_gt2_pulley_running_surface_reference(
+    pulley_running_surface = _create_gt2_motor_pulley_running_surface_reference(
         cfg.y_axis_drive_motor_pulley_teeth
     )
-    pulley_running_surface = align(pulley_running_surface, pulley, Alignment.CENTER)
+    pulley_running_surface = _align_gt2_motor_pulley_running_surface_to_pulley(
+        pulley_running_surface,
+        pulley,
+    )
     pulley = _align_part_from_belt_contact_surface(
         pulley,
         pulley_running_surface,
@@ -338,6 +365,12 @@ def _create_y_axis_motor_mount(
         "axle",
         pulley,
         Alignment.CENTER,
+        axes=[0, 1],
+    )
+    motor_bracket = motor_bracket.aligned_from_follower(
+        "axle",
+        pulley,
+        Alignment.TOP,
     )
     motor_mount_plate = _create_y_axis_motor_bracket_adapter(
         frame_back_profile,
@@ -720,10 +753,13 @@ def _create_y_axis_drive_belt_sections(
 
     belt_sections = []
     right_belt_reference = back_belt_reference
-    pulley_running_surface = _create_gt2_pulley_running_surface_reference(
+    pulley_running_surface = _create_gt2_motor_pulley_running_surface_reference(
         cfg.y_axis_drive_motor_pulley_teeth
     )
-    pulley_running_surface = align(pulley_running_surface, pulley, Alignment.CENTER)
+    pulley_running_surface = _align_gt2_motor_pulley_running_surface_to_pulley(
+        pulley_running_surface,
+        pulley,
+    )
 
     for side, rotation_angle in (
         (Alignment.LEFT, 90),
@@ -732,7 +768,7 @@ def _create_y_axis_drive_belt_sections(
         belt = _create_y_axis_belt_visual(num_teeth, cfg)
         belt = rotate(rotation_angle)(belt)
         belt = _translate_part_center_to_axis_value(belt, 1, belt_center_y)
-        belt = align(belt, right_belt_reference, Alignment.CENTER, axes=[2])
+        belt = align(belt, pulley_running_surface, Alignment.CENTER, axes=[2])
 
         if side == cfg.y_axis_drive_clamped_run_side:
             belt = align(belt, right_belt_reference, Alignment.CENTER, axes=[0])
