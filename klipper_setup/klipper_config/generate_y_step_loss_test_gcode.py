@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a hot dry-run Y-axis step-loss characterization G-code file."""
+"""Generate a cold quick Y-axis step-loss characterization G-code file."""
 
 from __future__ import annotations
 
@@ -40,52 +40,45 @@ class StressProfile:
     square_corner_velocity: float
 
 
+DEFAULT_ACCEL_LADDER_MM_S2: tuple[float, ...] = (
+    3500.0,
+    4000.0,
+    4500.0,
+    5000.0,
+    5500.0,
+    6000.0,
+    6500.0,
+    7000.0,
+    7500.0,
+    8000.0,
+)
+DEFAULT_STRESS_PROFILES: tuple[StressProfile, ...] = tuple(
+    StressProfile(f"accel_{accel:g}", 500.0, accel, 5.0)
+    for accel in DEFAULT_ACCEL_LADDER_MM_S2
+)
+
+
 @dataclass(frozen=True)
 class TestPlan:
-    cycles_per_profile: int = 20
-    endstop_gap_mm: float = 5.0
-    z_height_mm: float = 0.77
-    bed_temperature_c: float = 80.0
-    nozzle_temperature_c: float = 265.0
-    reset_velocity_mm_s: float = 350.0
+    cycles_per_profile: int = 2
+    x_position_mm: float = 100.0
+    z_height_mm: float = 10.0
+    reset_y_mm: float = 260.0
+    stress_y_mm: float = 5.0
+    reset_velocity_mm_s: float = 200.0
     reset_accel_mm_s2: float = 1000.0
     reset_square_corner_velocity: float = 5.0
     creep_velocity_mm_s: float = 20.0
     creep_accel_mm_s2: float = 500.0
     dwell_ms: int = 100
     endstop_key: str = "stepper_y"
-    stress_profiles: tuple[StressProfile, ...] = (
-        StressProfile("hammer_hot_dry", 400.0, 6000.0, 10.0),
-    )
+    stress_profiles: tuple[StressProfile, ...] = DEFAULT_STRESS_PROFILES
 
 
 @dataclass(frozen=True)
 class Point:
     x: float
     y: float
-
-
-# From the observed failing TB6600 housing print around lines 1769..1784:
-# a short pre-failure contour immediately followed by the travel that appeared
-# to coincide with the Y offset. The large negative-Y diagonal ends at
-# PRINT_MOTIF_ENDSTOP_GAP_ANCHOR_INDEX.
-PRINT_MOTIF_POINTS: tuple[Point, ...] = (
-    Point(59.232, 154.017),
-    Point(61.406, 156.191),
-    Point(60.491, 156.191),
-    Point(59.232, 154.932),
-    Point(59.232, 155.631),
-    Point(59.284, 155.851),
-    Point(59.397, 156.012),
-    Point(59.860, 156.474),
-    Point(59.860, 157.368),
-    Point(70.528, 155.615),
-    Point(70.528, 139.368),
-    Point(100.985, 62.632),
-    Point(100.025, 62.632),
-    Point(100.025, 63.524),
-)
-PRINT_MOTIF_ENDSTOP_GAP_ANCHOR_INDEX = 11
 
 
 def _section(config_text: str, name: str) -> str:
@@ -150,15 +143,6 @@ def timestamped_output_path(
     return output_dir / f"{OUTPUT_FILENAME_PREFIX}_{current_time:%Y%m%d_%H%M%S}.gcode"
 
 
-def transformed_print_motif_points(
-    printer: PrinterConfig,
-    plan: TestPlan = TestPlan(),
-) -> tuple[Point, ...]:
-    anchor = PRINT_MOTIF_POINTS[PRINT_MOTIF_ENDSTOP_GAP_ANCHOR_INDEX]
-    y_shift = printer.y_position_endstop + plan.endstop_gap_mm - anchor.y
-    return tuple(Point(point.x, point.y + y_shift) for point in PRINT_MOTIF_POINTS)
-
-
 def _validate_axis_target(axis_name: str, axis: AxisRange, value: float) -> None:
     if not axis.position_min <= value <= axis.position_max:
         raise ValueError(
@@ -170,22 +154,16 @@ def _validate_axis_target(axis_name: str, axis: AxisRange, value: float) -> None
 def _validate_plan(printer: PrinterConfig, plan: TestPlan) -> None:
     if plan.cycles_per_profile <= 0:
         raise ValueError("cycles_per_profile must be positive")
-    if plan.endstop_gap_mm <= 0:
-        raise ValueError("endstop_gap_mm must be positive")
     if not plan.stress_profiles:
         raise ValueError("stress_profiles must not be empty")
+    _validate_axis_target("X", printer.x, plan.x_position_mm)
     _validate_axis_target("Z", printer.z, plan.z_height_mm)
-
-    motif_points = transformed_print_motif_points(printer, plan)
-    for point in motif_points:
-        _validate_axis_target("X", printer.x, point.x)
-        _validate_axis_target("Y", printer.y, point.y)
+    _validate_axis_target("Y", printer.y, plan.reset_y_mm)
+    _validate_axis_target("Y", printer.y, plan.stress_y_mm)
     _validate_axis_target("Y", printer.y, printer.y_position_endstop)
 
-    anchor = motif_points[PRINT_MOTIF_ENDSTOP_GAP_ANCHOR_INDEX]
-    expected_anchor_y = printer.y_position_endstop + plan.endstop_gap_mm
-    if abs(anchor.y - expected_anchor_y) > 1e-9:
-        raise ValueError("transformed print motif does not land at the endstop gap")
+    if not printer.y_position_endstop < plan.stress_y_mm < plan.reset_y_mm:
+        raise ValueError("Y targets must satisfy endstop < stress_y_mm < reset_y_mm")
 
 
 def _set_velocity_limit(
@@ -205,40 +183,42 @@ def _set_velocity_limit(
 def generate_gcode(printer: PrinterConfig, plan: TestPlan = TestPlan()) -> str:
     _validate_plan(printer, plan)
 
-    motif_points = transformed_print_motif_points(printer, plan)
     y_endstop = printer.y_position_endstop
     total_checks = len(plan.stress_profiles) * plan.cycles_per_profile
 
     lines = [
-        "; Y hot dry-run step-loss characterization generated by generate_y_step_loss_test_gcode.py",
-        "; Source motif: TB6600 housing first-layer contour/travel near the observed Y offset failure",
-        "; This file heats like PETG-CF, moves near the bed, and emits no extrusion moves.",
+        "; Y cold quick step-loss characterization generated by generate_y_step_loss_test_gcode.py",
+        "; This file keeps heaters off and performs Y-only linear moves.",
         f"; Endstop verification key: {plan.endstop_key}",
         f"; Z characterization height: {_format_float(plan.z_height_mm)}",
-        f"; Bed temperature: {plan.bed_temperature_c:g}",
-        f"; Nozzle temperature: {plan.nozzle_temperature_c:g}",
+        (
+            f"; Y configured range: {_format_float(printer.y.position_min)}.."
+            f"{_format_float(printer.y.position_max)}"
+        ),
         f"; Y endstop: {_format_float(y_endstop)}",
-        f"; Y high-stress anchor target: {_format_float(motif_points[PRINT_MOTIF_ENDSTOP_GAP_ANCHOR_INDEX].y)}",
+        f"; Y reset target: {_format_float(plan.reset_y_mm)}",
+        f"; Y stress target: {_format_float(plan.stress_y_mm)}",
         f"; Stress profiles: {', '.join(profile.name for profile in plan.stress_profiles)}",
         f"; Cycles per profile: {plan.cycles_per_profile}",
         f"; Total endstop checks: {total_checks}",
-        "M117 Y hot dry-run characterization",
+        "M117 Y cold quick characterization",
         (
-            'RESPOND TYPE=echo MSG="Y hot dry-run characterization: '
-            f"heating bed to {plan.bed_temperature_c:g}C and nozzle to "
-            f"{plan.nozzle_temperature_c:g}C, then running {total_checks} "
-            'near-bed checks with no extrusion."'
+            'RESPOND TYPE=echo MSG="Y cold quick characterization: '
+            f"heaters off, then running {total_checks} Y-only endstop checks." '"'
         ),
-        f"M140 S{plan.bed_temperature_c:g}",
-        f"M104 S{plan.nozzle_temperature_c:g} T0",
+        "M104 S0",
+        "M140 S0",
         "T0",
         "G90",
         "M400",
         "G28 X Y Z",
         "M400",
-        f"M190 S{plan.bed_temperature_c:g}",
-        f"M109 S{plan.nozzle_temperature_c:g}",
         f"G1 Z{_format_float(plan.z_height_mm)} F{_feedrate(10.0)}",
+        (
+            f"G1 X{_format_float(plan.x_position_mm)} "
+            f"Y{_format_float(plan.reset_y_mm)} "
+            f"F{_feedrate(plan.reset_velocity_mm_s)}"
+        ),
         "M400",
     ]
 
@@ -247,7 +227,7 @@ def generate_gcode(printer: PrinterConfig, plan: TestPlan = TestPlan()) -> str:
         lines.extend(
             [
                 (
-                    f'RESPOND TYPE=echo MSG="Y hot dry-run profile {profile.name}: '
+                    f'RESPOND TYPE=echo MSG="Y cold quick profile {profile.name}: '
                     f"velocity {profile.velocity_mm_s:g} mm/s, "
                     f"accel {profile.accel_mm_s2:g} mm/s^2, "
                     f"SCV {profile.square_corner_velocity:g}, "
@@ -257,7 +237,6 @@ def generate_gcode(printer: PrinterConfig, plan: TestPlan = TestPlan()) -> str:
         )
         for cycle in range(1, plan.cycles_per_profile + 1):
             check_index += 1
-            first_point = motif_points[0]
             lines.extend(
                 [
                     (
@@ -274,8 +253,8 @@ def generate_gcode(printer: PrinterConfig, plan: TestPlan = TestPlan()) -> str:
                         square_corner_velocity=plan.reset_square_corner_velocity,
                     ),
                     (
-                        f"G1 X{_format_float(first_point.x)} "
-                        f"Y{_format_float(first_point.y)} "
+                        f"G1 X{_format_float(plan.x_position_mm)} "
+                        f"Y{_format_float(plan.reset_y_mm)} "
                         f"Z{_format_float(plan.z_height_mm)} "
                         f"F{_feedrate(plan.reset_velocity_mm_s)}"
                     ),
@@ -285,15 +264,13 @@ def generate_gcode(printer: PrinterConfig, plan: TestPlan = TestPlan()) -> str:
                         accel=profile.accel_mm_s2,
                         square_corner_velocity=profile.square_corner_velocity,
                     ),
+                    (
+                        f"G1 X{_format_float(plan.x_position_mm)} "
+                        f"Y{_format_float(plan.stress_y_mm)} "
+                        f"F{_feedrate(profile.velocity_mm_s)}"
+                    ),
                 ]
             )
-            for point in motif_points[1:]:
-                lines.append(
-                    f"G1 X{_format_float(point.x)} "
-                    f"Y{_format_float(point.y)} "
-                    f"F{_feedrate(profile.velocity_mm_s)}"
-                )
-            last_point = motif_points[-1]
             lines.extend(
                 [
                     "M400",
@@ -303,7 +280,7 @@ def generate_gcode(printer: PrinterConfig, plan: TestPlan = TestPlan()) -> str:
                         square_corner_velocity=profile.square_corner_velocity,
                     ),
                     (
-                        f"G1 X{_format_float(last_point.x)} "
+                        f"G1 X{_format_float(plan.x_position_mm)} "
                         f"Y{_format_float(y_endstop)} "
                         f"F{_feedrate(plan.creep_velocity_mm_s)}"
                     ),
@@ -329,10 +306,8 @@ def generate_gcode(printer: PrinterConfig, plan: TestPlan = TestPlan()) -> str:
                 accel=printer.max_accel,
                 square_corner_velocity=printer.square_corner_velocity,
             ),
-            "M104 S0",
-            "M140 S0",
-            f'RESPOND TYPE=echo MSG="Y hot dry-run characterization passed: {total_checks} endstop checks completed."',
-            "M117 Y hot dry-run passed",
+            f'RESPOND TYPE=echo MSG="Y cold quick characterization passed: {total_checks} endstop checks completed."',
+            "M117 Y cold quick passed",
             "",
         ]
     )
@@ -341,7 +316,7 @@ def generate_gcode(printer: PrinterConfig, plan: TestPlan = TestPlan()) -> str:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate a hot dry-run Y-axis step-loss characterization G-code file."
+        description="Generate a cold quick Y-axis step-loss characterization G-code file."
     )
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument(

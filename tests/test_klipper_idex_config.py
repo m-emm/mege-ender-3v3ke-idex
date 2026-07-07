@@ -519,11 +519,14 @@ def test_y_step_loss_assert_macro_checks_stepper_y_endstop():
     assert "re-home Y before normal printing" in macro
 
 
-def test_y_step_loss_generator_emits_hot_dry_run_hammer_checks(tmp_path):
+def test_y_step_loss_generator_emits_cold_quick_accel_ladder_checks(tmp_path):
     generator = _load_y_step_loss_generator_module()
     printer = generator.load_printer_config(CONFIG_PATH)
     gcode = generator.generate_gcode(printer)
     output = tmp_path / "y_step_loss_characterization.gcode"
+    expected_profile_names = [
+        f"accel_{int(accel)}" for accel in generator.DEFAULT_ACCEL_LADDER_MM_S2
+    ]
 
     assert generator.main(["--config", str(CONFIG_PATH), "--output", str(output)]) == 0
     assert output.read_text(encoding="utf-8") == gcode
@@ -532,20 +535,31 @@ def test_y_step_loss_generator_emits_hot_dry_run_hammer_checks(tmp_path):
 
     lines = [line.strip() for line in gcode.splitlines() if line.strip()]
     assert "; Endstop verification key: stepper_y" in lines
-    assert "; Z characterization height: 0.770" in lines
-    assert "; Bed temperature: 80" in lines
-    assert "; Nozzle temperature: 265" in lines
-    assert "; Stress profiles: hammer_hot_dry" in lines
-    assert "; Cycles per profile: 20" in lines
+    assert "; Z characterization height: 10.000" in lines
+    assert (
+        f"; Y configured range: {generator._format_float(printer.y.position_min)}.."
+        f"{generator._format_float(printer.y.position_max)}"
+    ) in lines
+    assert "; Y reset target: 260.000" in lines
+    assert "; Y stress target: 5.000" in lines
+    assert f"; Stress profiles: {', '.join(expected_profile_names)}" in lines
+    assert "; Cycles per profile: 2" in lines
     assert "; Total endstop checks: 20" in lines
-    assert "M140 S80" in lines
-    assert "M104 S265 T0" in lines
-    assert "M190 S80" in lines
-    assert "M109 S265" in lines
+    assert "M104 S0" in lines
+    assert "M140 S0" in lines
+    assert "M190" not in gcode
+    assert "M109" not in gcode
+    assert not re.search(r"^M104\s+S(?!0\b)", gcode, flags=re.MULTILINE)
+    assert not re.search(r"^M140\s+S(?!0\b)", gcode, flags=re.MULTILINE)
     assert "G28 X Y Z" in lines
-    assert "G1 Z0.770 F600" in lines
+    assert "G1 Z10.000 F600" in lines
+    assert "G1 X100.000 Y260.000 F12000" in lines
+    assert "G1 X100.000 Y5.000 F18000" in lines
+    assert "G1 X100.000 Y0.000 F1200" in lines
     assert "G28 Y" not in lines
+    assert "hot" not in gcode
     assert "Y away distance" not in gcode
+    assert "hammer_hot_dry" not in gcode
     assert "accel_2500" not in gcode
     assert "speed_400" not in gcode
     assert "scv_8" not in gcode
@@ -558,9 +572,9 @@ def test_y_step_loss_generator_emits_hot_dry_run_hammer_checks(tmp_path):
     profile_names = [
         re.search(r"\bPROFILE=(\S+)\b", line).group(1) for line in assertion_lines
     ]
-    assert set(profile_names) == {"hammer_hot_dry"}
+    assert set(profile_names) == set(expected_profile_names)
     assert {name: profile_names.count(name) for name in set(profile_names)} == {
-        "hammer_hot_dry": 20
+        name: 2 for name in expected_profile_names
     }
     accel_values = [
         int(re.search(r"\bACCEL=(\d+)\b", line).group(1)) for line in assertion_lines
@@ -571,30 +585,15 @@ def test_y_step_loss_generator_emits_hot_dry_run_hammer_checks(tmp_path):
     scv_values = [
         int(re.search(r"\bSCV=(\d+)\b", line).group(1)) for line in assertion_lines
     ]
-    assert set(accel_values) == {6000}
-    assert set(velocity_values) == {400}
-    assert set(scv_values) == {10}
+    assert set(accel_values) == {
+        int(accel) for accel in generator.DEFAULT_ACCEL_LADDER_MM_S2
+    }
+    assert set(velocity_values) == {500}
+    assert set(scv_values) == {5}
 
     for index, line in enumerate(lines):
         if line.startswith("Y_STEP_LOSS_ASSERT_ENDSTOP "):
             assert lines[index - 1] == "QUERY_ENDSTOPS"
-
-    motif_points = generator.transformed_print_motif_points(printer)
-    high_stress_anchor = motif_points[generator.PRINT_MOTIF_ENDSTOP_GAP_ANCHOR_INDEX]
-    assert high_stress_anchor.y == pytest.approx(printer.y_position_endstop + 5.0)
-    assert any(
-        (
-            f"X{generator._format_float(high_stress_anchor.x)} "
-            f"Y{generator._format_float(high_stress_anchor.y)}"
-        )
-        in line
-        for line in lines
-    )
-    prelude_start_index = next(
-        index for index, line in enumerate(lines) if "X61.406" in line
-    )
-    anchor_index = next(index for index, line in enumerate(lines) if "X100.985" in line)
-    assert "M400" not in lines[prelude_start_index:anchor_index]
 
     stepper_x = _section(CONFIG_PATH.read_text(encoding="utf-8"), "stepper_x")
     stepper_y = _section(CONFIG_PATH.read_text(encoding="utf-8"), "stepper_y")
