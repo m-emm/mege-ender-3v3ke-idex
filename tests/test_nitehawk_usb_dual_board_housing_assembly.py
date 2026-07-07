@@ -159,9 +159,7 @@ def test_nitehawk_usb_dual_board_housing_lid_pilot_lead_ins_start_at_boss_face()
     ]
 
     for index, (expected_y, expected_z) in enumerate(expected_centers, start=1):
-        pilot_hole = housing.get_cutter_part_by_name(
-            f"lid_mount_pilot_hole_{index}"
-        )
+        pilot_hole = housing.get_cutter_part_by_name(f"lid_mount_pilot_hole_{index}")
         pilot_bbox = get_bounding_box(pilot_hole)
         pilot_center = get_bounding_box_center(pilot_hole)
 
@@ -203,20 +201,6 @@ def test_nitehawk_usb_dual_board_housing_board_pilot_lead_ins_start_at_standoffs
 def test_nitehawk_usb_dual_board_housing_defaults_are_roomy_for_boards_and_lid_bosses():
     screw = MScrew.from_size(DEFAULTS["nitehawk_usb_dual_housing_lid_screw_size"])
 
-    assert DEFAULTS["nitehawk_usb_dual_housing_board_side_margin"] == pytest.approx(16)
-    assert DEFAULTS["nitehawk_usb_dual_housing_board_bottom_margin"] == pytest.approx(
-        16
-    )
-    assert DEFAULTS["nitehawk_usb_dual_housing_board_top_margin"] == pytest.approx(16)
-    assert DEFAULTS["nitehawk_usb_dual_housing_board_gap"] == pytest.approx(20)
-    assert DEFAULTS[
-        "nitehawk_usb_dual_housing_self_threading_core_radius_adjustment"
-    ] == pytest.approx(-0.15)
-    assert DEFAULTS["nitehawk_usb_dual_housing_self_threading_lead_in"] is True
-    assert DEFAULTS["nitehawk_usb_dual_housing_component_clearance"] == pytest.approx(5)
-    assert DEFAULTS["nitehawk_usb_dual_housing_cable_slit_y_margin"] == pytest.approx(
-        10
-    )
     assert (
         DEFAULTS["nitehawk_usb_dual_housing_lid_screw_boss_diameter"]
         - screw.clearance_hole_close

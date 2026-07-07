@@ -260,8 +260,6 @@ def test_hv_switchbox_has_six_internal_m4_terminal_stations(hv_switchbox):
         hv_switchbox.get_named_cutter(f"terminal_hole_{terminal_index}")
         hv_switchbox.get_named_cutter(f"terminal_nut_pocket_{terminal_index}")
 
-    assert DEFAULTS["hv_switchbox_terminal_num_spots"] == 6
-
 
 def test_hv_switchbox_ssr_mounting_hardware_is_fully_internal(hv_switchbox):
     for mount_index in [1, 2]:

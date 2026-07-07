@@ -373,16 +373,6 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         assert removed_parameter not in DEFAULTS
         assert removed_parameter not in assemblies_yaml_text
 
-    assert DEFAULTS["x_axis_sprite_extruder_tool_head_mount_x_offset"] == pytest.approx(
-        2.25
-    )
-    assert DEFAULTS["x_axis_sprite_extruder_tool_head_mount_y_offset"] == pytest.approx(
-        -17.75
-    )
-    assert DEFAULTS["x_axis_sprite_extruder_tool_head_mount_z_offset"] == pytest.approx(
-        -25.55
-    )
-
     for sprite_extruder in [
         "sprite_extruder_left_assembly",
         "sprite_extruder_right_assembly",

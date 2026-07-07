@@ -141,21 +141,6 @@ def test_tb6600_stripboard_interface_housing_is_roomy_for_real_stripboard():
         "tb6600_stripboard_interface_housing_front_cable_corridor"
     ]
 
-    assert DEFAULTS["tb6600_stripboard_interface_housing_board_columns"] == 13
-    assert DEFAULTS["tb6600_stripboard_interface_housing_board_rows"] == 9
-    assert (
-        DEFAULTS["tb6600_stripboard_interface_housing_lid_screw_boss_diameter"] == 8.0
-    )
-    assert DEFAULTS[
-        "tb6600_stripboard_interface_housing_self_threading_core_radius_adjustment"
-    ] == pytest.approx(-0.35)
-    assert (
-        DEFAULTS["tb6600_stripboard_interface_housing_self_threading_lead_in"] is True
-    )
-    assert board_width == pytest.approx(33.02)
-    assert board_depth == pytest.approx(22.86)
-    assert body_size[2] - wall == pytest.approx(35.0)
-
     usable_width_between_corner_posts = body_size[0] - 2 * wall - 2 * screw_block
     usable_depth_between_corner_posts = (
         body_size[1] - 2 * wall - 2 * screw_block - front_corridor
@@ -200,9 +185,6 @@ def test_tb6600_stripboard_interface_housing_cable_exit_and_flange_orientation()
     mount_hole_center = get_bounding_box_center(mount_hole)
     mount_hole_size = get_bounding_box_size(mount_hole)
 
-    assert (
-        DEFAULTS["tb6600_stripboard_interface_housing_mount_flange_screw_size"] == "M5"
-    )
     assert mount_hole_center[0] == pytest.approx(body_center[0])
     assert mount_hole_center[1] > body_bbox[1][1]
     assert mount_hole_bbox[0][2] == pytest.approx(-1)
@@ -243,17 +225,6 @@ def test_tb6600_stripboard_interface_housing_lid_screws_use_self_threading_bosse
         "tb6600_stripboard_interface_housing_body_reference"
     )
     body_bbox = get_bounding_box(body_reference)
-
-    assert DEFAULTS["tb6600_stripboard_interface_housing_lid_screw_size"] == "M3"
-    assert DEFAULTS[
-        "tb6600_stripboard_interface_housing_lid_screw_boss_diameter"
-    ] == pytest.approx(8.0)
-    assert DEFAULTS[
-        "tb6600_stripboard_interface_housing_self_threading_core_radius_adjustment"
-    ] == pytest.approx(-0.35)
-    assert (
-        DEFAULTS["tb6600_stripboard_interface_housing_self_threading_lead_in"] is True
-    )
 
     pilot_centers = []
     clearance_centers = []

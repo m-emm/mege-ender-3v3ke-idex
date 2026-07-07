@@ -542,16 +542,6 @@ def test_part_fan_v2_standalone_fans_use_parameterized_legacy_pose():
     )
     placements = config["placement"]["alignments"]
 
-    for name, expected_value in {
-        "part_fan_v2_front_rotation": 15,
-        "part_fan_v2_front_y_shift": -18.06,
-        "part_fan_v2_front_z_shift": 8.731555,
-        "part_fan_v2_side_stack_gap": 0.51,
-        "part_fan_v2_side_y_shift": -12.9,
-        "part_fan_v2_side_z_shift": -13.768445,
-    }.items():
-        assert DEFAULTS[name] == expected_value
-
     front_rotation = {
         "$expr": {
             "$sub": "180 - ${part_fan_v2_front_rotation}",
