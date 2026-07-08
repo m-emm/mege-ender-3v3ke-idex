@@ -211,17 +211,18 @@ def create_vision_light_mount_assembly(
         fillet_radius=vision_light_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.TOP],
     )
-    bottom_wall = align(bottom_wall, front_spar_keepout, Alignment.CENTER, axes=[0, 1])
+    bottom_wall = align(bottom_wall, front_spar_keepout, Alignment.CENTER)
     bottom_wall = align(bottom_wall, front_spar_keepout, Alignment.STACK_BOTTOM)
+    bottom_wall = align(bottom_wall, plate, Alignment.LEFT)
 
     front_wall = create_filleted_box(
         vision_light_mount_clamp_width,
         vision_light_mount_u_wall_thickness,
         u_outer_height,
         fillet_radius=vision_light_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.BACK],
+        no_fillets_at=[Alignment.BACK, Alignment.FRONT],
     )
-    front_wall = align(front_wall, front_spar_keepout, Alignment.CENTER, axes=[0])
+    front_wall = align(front_wall, bottom_wall, Alignment.CENTER)
     front_wall = align(front_wall, front_spar_keepout, Alignment.STACK_FRONT)
     front_wall = align(front_wall, bottom_wall, Alignment.BOTTOM)
 
@@ -230,9 +231,9 @@ def create_vision_light_mount_assembly(
         vision_light_mount_u_wall_thickness,
         u_outer_height,
         fillet_radius=vision_light_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.FRONT],
+        no_fillets_at=[Alignment.FRONT, Alignment.BACK],
     )
-    back_wall = align(back_wall, front_spar_keepout, Alignment.CENTER, axes=[0])
+    back_wall = align(back_wall, bottom_wall, Alignment.CENTER)
     back_wall = align(back_wall, front_spar_keepout, Alignment.STACK_BACK)
     back_wall = align(back_wall, bottom_wall, Alignment.BOTTOM)
 
@@ -264,9 +265,9 @@ def create_vision_light_mount_assembly(
     screw_x_span = align(screw_x_span, screw_z_reference, Alignment.CENTER, axes=[2])
 
     screw_mounts = None
-    for side_name, side_alignment in (
-        ("left", Alignment.LEFT),
-        ("right", Alignment.RIGHT),
+    for side_alignment in (
+        Alignment.LEFT,
+        Alignment.RIGHT,
     ):
         screw_target = create_box(0.1, u_outer_depth, 0.1)
         screw_target = align(screw_target, screw_x_span, side_alignment)
@@ -284,13 +285,13 @@ def create_vision_light_mount_assembly(
             screw_direction=Alignment.FRONT,
             with_nut_cutter=True,
             nut_cutter_clearance=vision_light_mount_clamp_nut_clearance,
-            flush_with_top=True,
+            flush_with_top=False,
             cylinder_head_cutter_clearance=(
                 vision_light_mount_clamp_cylinder_head_clearance
             ),
             clearance_type=vision_light_mount_screw_mount_clearance_type,
         )
-        screw_mount = screw_mount.prefixed_copy(f"pinch_{side_name}")
+        screw_mount = screw_mount.prefixed_copy(f"pinch_{side_alignment.name.lower()}_")
         screw_mounts = screw_mount if screw_mounts is None else screw_mounts.fuse(
             screw_mount
         )
