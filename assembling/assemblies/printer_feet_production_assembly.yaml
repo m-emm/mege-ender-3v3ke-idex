@@ -20,6 +20,12 @@ Builder:
         assembly: printer_foot
         artifact: leader
         name: printer_foot
+      - source: injected
+        assembly: printer_foot
+        artifact: non_production_parts
+        names:
+          - stablization_slits
+        name_template: "{name}"
 
   Production:
     process_data:
