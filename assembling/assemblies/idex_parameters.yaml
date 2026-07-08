@@ -106,6 +106,41 @@ globals:
   print_bed_mount_tower_screw_size: "M5"
   print_bed_mount_tower_size: 20
 
+  vision_light_mount_apa_strip_density: "D60pm"
+  vision_light_mount_apa_strip_num_leds: 2
+  vision_light_mount_apa_strip_with_hull: false
+  vision_light_mount_aperture_size: 30
+  vision_light_mount_apa_strip_width: 10
+  vision_light_mount_apa_strip_length:
+    $expr:
+      "$sub": "${vision_light_mount_apa_strip_num_leds} * 1000 / 60"
+  vision_light_mount_strip_side_x_offset:
+    $expr:
+      "$sub": "0.5 * (${vision_light_mount_aperture_size} + ${vision_light_mount_apa_strip_width})"
+  vision_light_mount_strip_side_y_overlap:
+    $expr:
+      "$sub": "0.5 * (${vision_light_mount_apa_strip_length} - ${vision_light_mount_aperture_size})"
+  vision_light_mount_led_bed_gap: 2.0
+  vision_light_mount_front_gap: 5.0
+  vision_light_mount_plate_thickness: 3.2
+  vision_light_mount_plate_border: 5.0
+  vision_light_mount_plate_fillet_radius: 1.4
+  vision_light_mount_aperture_clearance: 0.0
+  vision_light_mount_strip_pocket_clearance: 0.35
+  vision_light_mount_strip_pocket_depth: 0.45
+  vision_light_mount_vertical_plate_thickness: 3.0
+  vision_light_mount_clamp_x_oversize: 4.0
+  vision_light_mount_clamp_height: 34.0
+  vision_light_mount_clamp_jaw_thickness: 4.0
+  vision_light_mount_clamp_span_y: 16.0
+  vision_light_mount_clamp_clearance: 0.6
+  vision_light_mount_clamp_screw_size: "M3"
+  vision_light_mount_clamp_screw_length: 30.0
+  vision_light_mount_clamp_screw_inset: 7.0
+  vision_light_mount_clamp_nut_clearance: 0.35
+  vision_light_mount_clamp_cylinder_head_clearance: 0.5
+  vision_light_mount_screw_mount_clearance_type: "loose"
+
   psu_mount_screw_length: 20
   psu_mount_screw_cylinder_head_clearance: 0.6
   psu_mount_wall_thickness: 3

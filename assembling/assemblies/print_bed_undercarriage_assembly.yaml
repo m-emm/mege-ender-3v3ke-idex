@@ -4,6 +4,15 @@ Description: Assembly configuration for the print bed undercarriage
 
 Builder:
   Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - front
+        - left
+      width: 512
+      height: 512
     parts:
       - source: dependencies
         assembly: print_bed_assembly

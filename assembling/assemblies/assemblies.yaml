@@ -130,6 +130,72 @@ placement:
       alignment: CENTER
       axes: [1]
 
+    - part: apa_strip_front_assembly
+      to: print_bed_assembly.non_production_parts.print_bed_foil
+      alignment: CENTER
+      axes: [0]
+    - part: apa_strip_front_assembly
+      to: print_bed_assembly.non_production_parts.print_bed_foil
+      alignment: STACK_BOTTOM
+      stack_gap:
+        $ref: vision_light_mount_led_bed_gap
+    - part: apa_strip_front_assembly
+      to: print_bed_assembly.non_production_parts.print_bed_foil
+      alignment: STACK_FRONT
+      stack_gap:
+        $ref: vision_light_mount_front_gap
+
+    - part: apa_strip_back_assembly
+      to: apa_strip_front_assembly
+      alignment: CENTER
+      axes: [0, 2]
+    - part: apa_strip_back_assembly
+      to: apa_strip_front_assembly
+      alignment: STACK_BACK
+      stack_gap:
+        $ref: vision_light_mount_aperture_size
+
+    - part: apa_strip_left_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 0, 1]
+        center: apa_strip_left_assembly.CENTER
+    - part: apa_strip_left_assembly
+      to: apa_strip_front_assembly
+      alignment: CENTER
+      axes: [0, 2]
+      post_translation:
+        - $expr:
+            "$sub": "-1 * ${vision_light_mount_strip_side_x_offset}"
+        - 0
+        - 0
+    - part: apa_strip_left_assembly
+      to: apa_strip_front_assembly
+      alignment: STACK_BACK
+      stack_gap:
+        $expr:
+          "$sub": "-1 * ${vision_light_mount_strip_side_y_overlap}"
+
+    - part: apa_strip_right_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 0, 1]
+        center: apa_strip_right_assembly.CENTER
+    - part: apa_strip_right_assembly
+      to: apa_strip_front_assembly
+      alignment: CENTER
+      axes: [0, 2]
+      post_translation:
+        - $ref: vision_light_mount_strip_side_x_offset
+        - 0
+        - 0
+    - part: apa_strip_right_assembly
+      to: apa_strip_front_assembly
+      alignment: STACK_BACK
+      stack_gap:
+        $expr:
+          "$sub": "-1 * ${vision_light_mount_strip_side_y_overlap}"
+
     - part: y_axis_rail_carrier_brackets_assembly.non_production_parts.profile_side_mount_plate_left_front
       to: y_axis_assembly.non_production_parts.profile_right
       alignment: CENTER
@@ -1203,6 +1269,69 @@ assemblies:
       damper_left_back: print_bed_assembly.non_production_parts.damper_left_back
       damper_right_front: print_bed_assembly.non_production_parts.damper_right_front
       damper_right_back: print_bed_assembly.non_production_parts.damper_right_back
+
+  - name: apa_strip_assembly
+
+    resource_file: apa_strip_assembly.yaml
+    depends_on: []
+    parameters:
+      apa_strip_density: !Ref vision_light_mount_apa_strip_density
+      apa_strip_num_leds: !Ref vision_light_mount_apa_strip_num_leds
+      apa_strip_with_hull: !Ref vision_light_mount_apa_strip_with_hull
+
+  - name: apa_strip_front_assembly
+
+    resource_file: apa_strip_assembly.yaml
+    depends_on: []
+    parameters:
+      apa_strip_density: !Ref vision_light_mount_apa_strip_density
+      apa_strip_num_leds: !Ref vision_light_mount_apa_strip_num_leds
+      apa_strip_with_hull: !Ref vision_light_mount_apa_strip_with_hull
+
+  - name: apa_strip_back_assembly
+
+    resource_file: apa_strip_assembly.yaml
+    depends_on: []
+    parameters:
+      apa_strip_density: !Ref vision_light_mount_apa_strip_density
+      apa_strip_num_leds: !Ref vision_light_mount_apa_strip_num_leds
+      apa_strip_with_hull: !Ref vision_light_mount_apa_strip_with_hull
+
+  - name: apa_strip_left_assembly
+
+    resource_file: apa_strip_assembly.yaml
+    depends_on: []
+    parameters:
+      apa_strip_density: !Ref vision_light_mount_apa_strip_density
+      apa_strip_num_leds: !Ref vision_light_mount_apa_strip_num_leds
+      apa_strip_with_hull: !Ref vision_light_mount_apa_strip_with_hull
+
+  - name: apa_strip_right_assembly
+
+    resource_file: apa_strip_assembly.yaml
+    depends_on: []
+    parameters:
+      apa_strip_density: !Ref vision_light_mount_apa_strip_density
+      apa_strip_num_leds: !Ref vision_light_mount_apa_strip_num_leds
+      apa_strip_with_hull: !Ref vision_light_mount_apa_strip_with_hull
+
+  - name: vision_light_mount_assembly
+
+    resource_file: vision_light_mount_assembly.yaml
+    depends_on:
+      - print_bed_assembly
+      - print_bed_undercarriage_assembly
+      - apa_strip_front_assembly
+      - apa_strip_back_assembly
+      - apa_strip_left_assembly
+      - apa_strip_right_assembly
+    inject_parts:
+      print_bed: print_bed_assembly
+      print_bed_undercarriage: print_bed_undercarriage_assembly
+      apa_strip_front: apa_strip_front_assembly
+      apa_strip_back: apa_strip_back_assembly
+      apa_strip_left: apa_strip_left_assembly
+      apa_strip_right: apa_strip_right_assembly
 
   - name: y_axis_nema23_motor_bracket_assembly
 

@@ -1,0 +1,139 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Clamp-on below-bed APA102 vision light mount
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - front
+        - left
+      width: 512
+      height: 512
+    parts:
+      - source: injected
+        assembly: print_bed
+        artifact: all
+        name_template: "print_bed_{name}"
+      - source: injected
+        assembly: print_bed_undercarriage
+        artifact: all
+        name_template: "print_bed_undercarriage_{name}"
+      - source: self
+        artifact: leader
+        name: vision_light_mount
+        color: [0.92, 0.92, 0.88]
+      - source: self
+        artifact: followers
+        names:
+          - vision_light_mount_clamp_cap
+        name_template: "{name}"
+        color: [0.92, 0.92, 0.88]
+      - source: injected
+        assembly: apa_strip_front
+        artifact: all
+        name_template: "apa_strip_front_{name}"
+      - source: injected
+        assembly: apa_strip_back
+        artifact: all
+        name_template: "apa_strip_back_{name}"
+      - source: injected
+        assembly: apa_strip_left
+        artifact: all
+        name_template: "apa_strip_left_{name}"
+      - source: injected
+        assembly: apa_strip_right
+        artifact: all
+        name_template: "apa_strip_right_{name}"
+      - source: self
+        artifact: non_production_parts
+        names:
+          - clamp_screws
+          - clamp_nuts
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
+
+  Production:
+    process_data_preset: petgcf_max_strength_high_speed_06
+    parts:
+      - source: self
+        artifact: leader
+        name: vision_light_mount
+      - source: self
+        artifact: followers
+        names:
+          - vision_light_mount_clamp_cap
+        name_template: "{name}"
+    arrange:
+      export_individual_parts: false
+      prod_gap: 12.0
+      plates:
+        - name: vision_light_mount
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                brim_type: no_brim
+                enable_support: "1"
+                support_type: tree(auto)
+                support_style: organic
+                support_on_build_plate_only: "1"
+                support_top_z_distance: "0.47"
+                support_interface_top_layers: "2"
+                support_interface_spacing: "0.8"
+                support_object_xy_distance: "0.8"
+                wall_loops: "3"
+          parts:
+            - vision_light_mount
+            - vision_light_mount_clamp_cap
+      auto_assign_plates: false
+
+Parameters:
+  vision_light_mount_plate_thickness:
+    Type: Float
+  vision_light_mount_plate_border:
+    Type: Float
+  vision_light_mount_plate_fillet_radius:
+    Type: Float
+  vision_light_mount_aperture_clearance:
+    Type: Float
+  vision_light_mount_strip_pocket_clearance:
+    Type: Float
+  vision_light_mount_strip_pocket_depth:
+    Type: Float
+  vision_light_mount_vertical_plate_thickness:
+    Type: Float
+  vision_light_mount_clamp_x_oversize:
+    Type: Float
+  vision_light_mount_clamp_height:
+    Type: Float
+  vision_light_mount_clamp_jaw_thickness:
+    Type: Float
+  vision_light_mount_clamp_span_y:
+    Type: Float
+  vision_light_mount_clamp_clearance:
+    Type: Float
+  vision_light_mount_clamp_screw_size:
+    Type: String
+  vision_light_mount_clamp_screw_length:
+    Type: Float
+  vision_light_mount_clamp_screw_inset:
+    Type: Float
+  vision_light_mount_clamp_nut_clearance:
+    Type: Float
+  vision_light_mount_clamp_cylinder_head_clearance:
+    Type: Float
+  vision_light_mount_screw_mount_clearance_type:
+    Type: String
+  BIG_THING:
+    Type: Float
+
+Parts:
+  VisionLightMountAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.vision_light_mount_assembly.create_vision_light_mount_assembly
