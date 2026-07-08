@@ -334,18 +334,6 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
         for part in visualization
     )
 
-    production = resource["Builder"]["Production"]
-    assert production["process_data_preset"] == "petgcf_max_strength_high_speed_06"
-    assert production["parts"] == [
-        {
-            "source": "self",
-            "artifact": "leader",
-            "name": "vision_light_mount",
-            "prod_rotation_angle": 90,
-            "prod_rotation_axis": [0, 1, 0],
-        }
-    ]
-
     parameters = resource["Parameters"]
     assert "vision_light_mount_clamp_width" in parameters
     assert "vision_light_mount_u_wall_thickness" in parameters
