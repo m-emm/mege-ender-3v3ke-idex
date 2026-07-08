@@ -227,6 +227,9 @@ def test_vision_light_mount_u_channel_uses_clean_spar_reference():
     keepout = mount.get_named_cutter("front_spar_keepout")
     keepout_bbox = get_bounding_box(keepout)
     keepout_size = get_bounding_box_size(keepout)
+    screw_holes_center = get_bounding_box_center(
+        mount.get_named_cutter("clamp_screw_holes")
+    )
 
     assert leader_bbox[0][1] < keepout_bbox[0][1]
     assert leader_bbox[1][1] > keepout_bbox[1][1]
@@ -239,6 +242,11 @@ def test_vision_light_mount_u_channel_uses_clean_spar_reference():
     assert keepout_size[1] == pytest.approx(
         16 + 2 * DEFAULTS["vision_light_mount_u_spar_clearance_y"],
         abs=0.05,
+    )
+    assert screw_holes_center[2] - keepout_bbox[1][2] == pytest.approx(
+        DEFAULTS["vision_light_mount_u_screw_gap_above_spar"]
+        - DEFAULTS["vision_light_mount_u_spar_clearance_z"] / 2,
+        abs=0.2,
     )
 
 
@@ -253,14 +261,40 @@ def test_vision_light_mount_is_offset_right_and_below_bed():
     bed_center = get_bounding_box_center(print_bed.leader)
     bed_bbox = get_bounding_box(print_bed.leader)
     mount_bbox = get_bounding_box(mount.leader)
+    led_bbox = get_bounding_box(
+        placed_strips["apa_strip_front"].get_named_follower("apa_led_1")
+    )
 
     assert aperture_center[0] - bed_center[0] == pytest.approx(
         DEFAULTS["vision_light_mount_x_offset"],
         abs=0.05,
     )
-    assert mount_bbox[1][2] <= bed_bbox[0][2] - DEFAULTS[
-        "vision_light_mount_bed_clearance"
-    ] + 0.05
+    assert bed_bbox[0][2] - led_bbox[1][2] == pytest.approx(
+        DEFAULTS["vision_light_mount_bed_clearance"],
+        abs=0.05,
+    )
+    assert mount_bbox[1][2] <= bed_bbox[0][2] - 0.05
+
+
+def test_vision_light_mount_uses_horizontal_bridge_without_vertical_connector():
+    mount = _build_mount()
+    leader_bbox = get_bounding_box(mount.leader)
+    aperture_bbox = get_bounding_box(mount.get_named_cutter("aperture"))
+    keepout_bbox = get_bounding_box(mount.get_named_cutter("front_spar_keepout"))
+
+    assert leader_bbox[0][1] < keepout_bbox[0][1]
+    assert leader_bbox[1][1] >= aperture_bbox[0][1] - 0.05
+
+    generator_source = (
+        ASSEMBLIES_DIR.parents[1]
+        / "src/mege_ender_3v3ke_idex/designs/assemblies/"
+        / "vision_light_mount_assembly.py"
+    ).read_text()
+    assert "vertical_neck" not in generator_source
+    assert "vertical_reference" not in generator_source
+    assert "vision_light_mount_vertical_plate_thickness" not in generator_source
+    assert "vision_light_mount_bridge_thickness" in generator_source
+    assert "vision_light_mount_bridge_overlap" in generator_source
 
 
 def test_vision_light_mount_yaml_wiring_and_preview_context():
@@ -313,6 +347,9 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
     parameters = resource["Parameters"]
     assert "vision_light_mount_clamp_width" in parameters
     assert "vision_light_mount_u_wall_thickness" in parameters
+    assert "vision_light_mount_bridge_thickness" in parameters
+    assert "vision_light_mount_bridge_overlap" in parameters
+    assert "vision_light_mount_vertical_plate_thickness" not in parameters
     assert "vision_light_mount_clamp_x_oversize" not in parameters
 
     alignments = config["placement"]["alignments"]

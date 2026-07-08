@@ -92,7 +92,9 @@ Parameters:
     Type: Float
   vision_light_mount_strip_pocket_depth:
     Type: Float
-  vision_light_mount_vertical_plate_thickness:
+  vision_light_mount_bridge_thickness:
+    Type: Float
+  vision_light_mount_bridge_overlap:
     Type: Float
   vision_light_mount_clamp_width:
     Type: Float

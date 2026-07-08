@@ -20,7 +20,8 @@ def create_vision_light_mount_assembly(
     vision_light_mount_aperture_clearance,
     vision_light_mount_strip_pocket_clearance,
     vision_light_mount_strip_pocket_depth,
-    vision_light_mount_vertical_plate_thickness,
+    vision_light_mount_bridge_thickness,
+    vision_light_mount_bridge_overlap,
     vision_light_mount_clamp_width,
     vision_light_mount_u_wall_thickness,
     vision_light_mount_u_bottom_thickness,
@@ -157,6 +158,8 @@ def create_vision_light_mount_assembly(
         pocket = align(pocket, pocket_top_reference, Alignment.TOP)
         strip_pockets = strip_pockets.fuse(pocket)
     plate = plate.cut(strip_pockets)
+    plate_bbox = get_bounding_box(plate)
+    aperture_bbox = get_bounding_box(aperture)
 
     front_spar_reference = print_bed_undercarriage.get_named_non_production_part(
         "front_spar_profile_reference"
@@ -179,15 +182,26 @@ def create_vision_light_mount_assembly(
         Alignment.CENTER,
         axes=[1, 2],
     )
+    front_spar_keepout_bbox = get_bounding_box(front_spar_keepout)
 
     u_outer_depth = (
         get_bounding_box_size(front_spar_keepout)[1]
         + 2 * vision_light_mount_u_wall_thickness
     )
-    u_outer_height = (
+    configured_u_outer_height = (
         get_bounding_box_size(front_spar_keepout)[2]
         + vision_light_mount_u_bottom_thickness
         + vision_light_mount_u_ear_height_above_spar
+    )
+    u_bottom_z = front_spar_keepout_bbox[0][2] - vision_light_mount_u_bottom_thickness
+    bridge_u_overlap_z = min(
+        vision_light_mount_bridge_overlap,
+        vision_light_mount_bridge_thickness / 2,
+    )
+    bridge_bottom_z = plate_bbox[0][2]
+    u_outer_height = max(
+        configured_u_outer_height,
+        bridge_bottom_z + bridge_u_overlap_z - u_bottom_z,
     )
 
     bottom_wall = create_filleted_box(
@@ -283,51 +297,44 @@ def create_vision_light_mount_assembly(
 
     u_channel = screw_mounts.use_as_cutter_on(u_channel)
 
-    plate_bbox = get_bounding_box(plate)
-    aperture_bbox = get_bounding_box(aperture)
     u_bbox = get_bounding_box(u_channel)
-    connector_front_part = plate if plate_bbox[0][1] <= u_bbox[0][1] else u_channel
-    connector_front_y = min(plate_bbox[0][1], u_bbox[0][1])
-    connector_depth = aperture_bbox[0][1] - connector_front_y
+    bridge_front_part = plate if plate_bbox[0][1] <= u_bbox[0][1] else u_channel
+    bridge_front_y = min(plate_bbox[0][1], u_bbox[0][1])
+    bridge_depth = aperture_bbox[0][1] - bridge_front_y
 
     leader = plate.fuse(u_channel)
-    if connector_depth > 0:
-        horizontal_neck = create_box(
+    if bridge_depth > 0:
+        bridge = create_box(
             vision_light_mount_clamp_width,
-            connector_depth,
-            vision_light_mount_vertical_plate_thickness,
+            bridge_depth,
+            vision_light_mount_bridge_thickness,
         )
-        horizontal_neck = align(horizontal_neck, u_channel, Alignment.CENTER, axes=[0])
-        horizontal_neck = align(
-            horizontal_neck,
-            connector_front_part,
+        bridge = align(bridge, u_channel, Alignment.CENTER, axes=[0])
+        bridge = align(
+            bridge,
+            bridge_front_part,
             Alignment.FRONT,
         )
-        horizontal_neck = align(horizontal_neck, plate, Alignment.STACK_BOTTOM)
+        bridge = align(bridge, plate, Alignment.BOTTOM)
 
-        vertical_z_min = min(plate_bbox[0][2], u_bbox[0][2])
-        vertical_z_max = max(plate_bbox[1][2], u_bbox[1][2])
-        vertical_reference = create_box(1, 1, vertical_z_max - vertical_z_min)
-        if plate_bbox[0][2] <= u_bbox[0][2]:
-            vertical_reference = align(vertical_reference, plate, Alignment.BOTTOM)
-        else:
-            vertical_reference = align(vertical_reference, u_channel, Alignment.BOTTOM)
-
-        vertical_neck = create_box(
+        bridge_plate_overlap = create_box(
             vision_light_mount_clamp_width,
-            vision_light_mount_vertical_plate_thickness,
-            vertical_z_max - vertical_z_min,
+            vision_light_mount_bridge_overlap,
+            vision_light_mount_bridge_thickness,
         )
-        vertical_neck = align(vertical_neck, u_channel, Alignment.CENTER, axes=[0])
-        vertical_neck = align(vertical_neck, connector_front_part, Alignment.FRONT)
-        vertical_neck = align(
-            vertical_neck,
-            vertical_reference,
+        bridge_plate_overlap = align(
+            bridge_plate_overlap,
+            bridge,
             Alignment.CENTER,
-            axes=[2],
+            axes=[0, 2],
+        )
+        bridge_plate_overlap = align(
+            bridge_plate_overlap,
+            aperture,
+            Alignment.STACK_FRONT,
         )
 
-        leader = leader.fuse(horizontal_neck).fuse(vertical_neck)
+        leader = leader.fuse(bridge).fuse(bridge_plate_overlap)
 
     clamp_screw_holes = PartCollector()
     for _name, cutter in screw_mounts.get_named_cutter_items():

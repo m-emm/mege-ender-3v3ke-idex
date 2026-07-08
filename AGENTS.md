@@ -258,7 +258,7 @@ deployment and historical rollback. This allows:
 ### Running Declarative Assemblies
 
 Use the repository's pyenv-selected Python directly from the repo root. Do not create or activate an ad-hoc `venv` here.
-**Do not use** `--force` unless absolutely necessary for shellforgepy development - the caching mechanism works reliably.
+**Do not use** `U--force` unless absolutely necessary for shellforgepy development - the caching mechanism works reliably.
 
 ```bash
 # Visualize the x-axis assembly
