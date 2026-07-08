@@ -43,13 +43,14 @@ def create_vision_light_mount_assembly(
     _ = BIG_THING
 
     strip_leaders = {
-        "front": apa_strip_front.leader,
-        "back": apa_strip_back.leader,
-        "left": apa_strip_left.leader,
-        "right": apa_strip_right.leader,
+        Alignment.FRONT: apa_strip_front.leader,
+        Alignment.BACK: apa_strip_back.leader,
+        Alignment.LEFT: apa_strip_left.leader,
+        Alignment.RIGHT: apa_strip_right.leader,
     }
     strip_bboxes = {
-        name: get_bounding_box(strip) for name, strip in strip_leaders.items()
+        alignment: get_bounding_box(strip)
+        for alignment, strip in strip_leaders.items()
     }
 
     strip_min_x = min(bbox[0][0] for bbox in strip_bboxes.values())
@@ -77,20 +78,26 @@ def create_vision_light_mount_assembly(
     strip_reference = align(strip_reference, strip_min_y_part, Alignment.FRONT)
     strip_reference = align(strip_reference, strip_min_z_part, Alignment.BOTTOM)
 
-    aperture_x_gap = strip_bboxes["right"][0][0] - strip_bboxes["left"][1][0]
-    aperture_y_gap = strip_bboxes["back"][0][1] - strip_bboxes["front"][1][1]
+    aperture_x_gap = (
+        strip_bboxes[Alignment.RIGHT][0][0]
+        - strip_bboxes[Alignment.LEFT][1][0]
+    )
+    aperture_y_gap = (
+        strip_bboxes[Alignment.BACK][0][1]
+        - strip_bboxes[Alignment.FRONT][1][1]
+    )
     if aperture_x_gap <= 0 or aperture_y_gap <= 0:
         raise ValueError("APA strips do not leave a positive aperture")
 
     raw_aperture_reference = create_box(aperture_x_gap, aperture_y_gap, 1)
     raw_aperture_reference = align(
         raw_aperture_reference,
-        strip_leaders["left"],
+        strip_leaders[Alignment.LEFT],
         Alignment.STACK_RIGHT,
     )
     raw_aperture_reference = align(
         raw_aperture_reference,
-        strip_leaders["front"],
+        strip_leaders[Alignment.FRONT],
         Alignment.STACK_BACK,
     )
     aperture_size = max(
@@ -144,17 +151,16 @@ def create_vision_light_mount_assembly(
     pocket_top_reference = align(pocket_top_reference, plate, Alignment.STACK_TOP)
     strip_pockets = PartCollector()
     for strip in strip_leaders.values():
-        strip_bbox = get_bounding_box(strip)
-        pocket = create_box(
-            strip_bbox[1][0]
-            - strip_bbox[0][0]
-            + 2 * vision_light_mount_strip_pocket_clearance,
-            strip_bbox[1][1]
-            - strip_bbox[0][1]
-            + 2 * vision_light_mount_strip_pocket_clearance,
-            vision_light_mount_strip_pocket_depth + 0.2,
+        pocket = materialize_bounding_box(
+            strip,
+            x_enlargement=2 * vision_light_mount_strip_pocket_clearance,
+            y_enlargement=2 * vision_light_mount_strip_pocket_clearance,
+            z_enlargement=(
+                vision_light_mount_strip_pocket_depth
+                + 0.2
+                - get_bounding_box_size(strip)[2]
+            ),
         )
-        pocket = align(pocket, strip, Alignment.CENTER, axes=[0, 1])
         pocket = align(pocket, pocket_top_reference, Alignment.TOP)
         strip_pockets = strip_pockets.fuse(pocket)
     plate = plate.cut(strip_pockets)
