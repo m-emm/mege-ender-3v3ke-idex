@@ -263,9 +263,7 @@ def test_vision_capture_macro_and_host_files_exist():
     crowsnest = (IMAGE_BUILD_FILES_DIR / "crowsnest.conf").read_text(encoding="utf-8")
     moonraker = (IMAGE_BUILD_FILES_DIR / "moonraker.conf").read_text(encoding="utf-8")
     nginx = (IMAGE_BUILD_FILES_DIR / "nginx-mainsail.conf").read_text(encoding="utf-8")
-    image_packages = (IMAGE_BUILD_STAGE_DIR / "00-packages").read_text(
-        encoding="utf-8"
-    )
+    image_packages = (IMAGE_BUILD_STAGE_DIR / "00-packages").read_text(encoding="utf-8")
     image_install = (IMAGE_BUILD_STAGE_DIR / "01-run-chroot.sh").read_text(
         encoding="utf-8"
     )
@@ -324,7 +322,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert '"--sweep"' in capture_script
     assert "FRAMEBUFFER_LATEST_IMAGE" in capture_script
     assert "wait_for_buffered_frame" in capture_script
-    assert "capture_source\": \"vision_framebuffer" in capture_script
+    assert 'capture_source": "vision_framebuffer' in capture_script
     assert "NOZZLE_ALIGN_DIR" in nozzle_script
     assert "NOZZLE_SWEEP_DIR" in nozzle_script
     assert "--fresh-after-utc" in nozzle_script
@@ -350,7 +348,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "old_x + along_x_mm" in helper
     assert "new_y_offset = current_y_offset - perpendicular_mm" in helper
     assert "--update-y" in helper
-    assert "vision_capture.py\", \"--capture-once\"" in runner_script
+    assert 'vision_capture.py", "--capture-once"' in runner_script
     assert "acl\n" in image_packages
     assert "python3-opencv" in image_packages
     assert "vision_framebuffer.py" in image_install
@@ -413,9 +411,7 @@ def test_y_step_loss_generator_emits_cold_quick_accel_ladder_checks(tmp_path):
     plan = generator.TestPlan()
     gcode = generator.generate_gcode(printer, plan)
     output = tmp_path / "y_step_loss_characterization.gcode"
-    expected_profile_names = [
-        profile.name for profile in plan.stress_profiles
-    ]
+    expected_profile_names = [profile.name for profile in plan.stress_profiles]
 
     assert generator.main(["--config", str(CONFIG_PATH), "--output", str(output)]) == 0
     assert output.read_text(encoding="utf-8") == gcode
@@ -424,7 +420,6 @@ def test_y_step_loss_generator_emits_cold_quick_accel_ladder_checks(tmp_path):
 
     lines = [line.strip() for line in gcode.splitlines() if line.strip()]
     assert "; Endstop verification key: stepper_y" in lines
-    assert f"; Z characterization height: {generator._format_float(plan.z_height_mm)}" in lines
     assert (
         f"; Y configured range: {generator._format_float(printer.y.position_min)}.."
         f"{generator._format_float(printer.y.position_max)}"
@@ -441,31 +436,27 @@ def test_y_step_loss_generator_emits_cold_quick_accel_ladder_checks(tmp_path):
     assert "M109" not in gcode
     assert not re.search(r"^M104\s+S(?!0\b)", gcode, flags=re.MULTILINE)
     assert not re.search(r"^M140\s+S(?!0\b)", gcode, flags=re.MULTILINE)
-    assert "G28 X Y Z" in lines
+    assert "T0" not in lines
+    assert "G28 Y" in lines
+    assert "G28 X Y Z" not in lines
     assert (
-        f"G1 Z{generator._format_float(plan.z_height_mm)} "
-        f"F{generator._feedrate(10.0)}"
-    ) in lines
-    assert (
-        f"G1 X{generator._format_float(plan.x_position_mm)} "
-        f"Y{generator._format_float(plan.reset_y_mm)} "
+        f"G1 Y{generator._format_float(plan.reset_y_mm)} "
         f"F{generator._feedrate(plan.reset_velocity_mm_s)}"
     ) in lines
     assert (
-        f"G1 X{generator._format_float(plan.x_position_mm)} "
-        f"Y{generator._format_float(plan.stress_y_mm)} "
+        f"G1 Y{generator._format_float(plan.stress_y_mm)} "
         f"F{generator._feedrate(plan.stress_profiles[0].velocity_mm_s)}"
     ) in lines
     assert (
-        f"G1 X{generator._format_float(plan.x_position_mm)} "
-        f"Y{generator._format_float(printer.y_position_endstop)} "
+        f"G1 Y{generator._format_float(printer.y_position_endstop)} "
         f"F{generator._feedrate(plan.creep_velocity_mm_s)}"
     ) in lines
-    assert "G28 Y" not in lines
     assert "hot" not in gcode
     assert "Y away distance" not in gcode
     assert "hammer_hot_dry" not in gcode
     assert not re.search(r"^G[01]\b.*\bE-?\d", gcode, flags=re.MULTILINE)
+    assert not re.search(r"^G[01]\b.*\bX-?\d", gcode, flags=re.MULTILINE)
+    assert not re.search(r"^G[01]\b.*\bZ-?\d", gcode, flags=re.MULTILINE)
 
     assertion_lines = [
         line for line in lines if line.startswith("Y_STEP_LOSS_ASSERT_ENDSTOP ")
@@ -501,15 +492,9 @@ def test_y_step_loss_generator_emits_cold_quick_accel_ladder_checks(tmp_path):
         if line.startswith("Y_STEP_LOSS_ASSERT_ENDSTOP "):
             assert lines[index - 1] == "QUERY_ENDSTOPS"
 
-    stepper_x = _section(CONFIG_PATH.read_text(encoding="utf-8"), "stepper_x")
     stepper_y = _section(CONFIG_PATH.read_text(encoding="utf-8"), "stepper_y")
-    stepper_z = _section(CONFIG_PATH.read_text(encoding="utf-8"), "stepper_z")
-    x_min = _setting_float(stepper_x, "position_min")
-    x_max = _setting_float(stepper_x, "position_max")
     y_min = _setting_float(stepper_y, "position_min")
     y_max = _setting_float(stepper_y, "position_max")
-    z_min = _setting_float(stepper_z, "position_min")
-    z_max = _setting_float(stepper_z, "position_max")
     x_targets = [
         float(match.group(1)) for match in re.finditer(r"\bX(-?\d+(?:\.\d+)?)\b", gcode)
     ]
@@ -519,15 +504,11 @@ def test_y_step_loss_generator_emits_cold_quick_accel_ladder_checks(tmp_path):
     z_targets = [
         float(match.group(1)) for match in re.finditer(r"\bZ(-?\d+(?:\.\d+)?)\b", gcode)
     ]
-    assert x_targets
+    assert not x_targets
     assert y_targets
-    assert z_targets
-    assert min(x_targets) >= x_min - 1e-9
-    assert max(x_targets) <= x_max + 1e-9
+    assert not z_targets
     assert min(y_targets) >= y_min - 1e-9
     assert max(y_targets) <= y_max + 1e-9
-    assert min(z_targets) >= z_min - 1e-9
-    assert max(z_targets) <= z_max + 1e-9
 
 
 def test_y_step_loss_generator_default_output_path_is_timestamped(tmp_path):

@@ -48,6 +48,7 @@ class _DriveConfig:
     y_axis_drive_motor_plate_width: float
     y_axis_drive_motor_plate_depth: float
     y_axis_drive_idler_plate_width: float
+    y_axis_motor_bracket_lowering: float
     y_axis_drive_motor_pulley_teeth: int
     y_axis_drive_idler_teeth: int
     y_axis_drive_belt_clear_span_extra: float
@@ -332,6 +333,29 @@ def _create_y_axis_motor_bracket_adapter(frame_back_profile, motor_bracket, cfg)
     )
 
 
+def _lower_y_axis_motor_bracket_visual_item(name, part, cfg):
+    lowering = cfg.y_axis_motor_bracket_lowering
+    if lowering == 0:
+        return part
+
+    if name == "motor_axle":
+        bbox = get_bounding_box(part)
+        radius = max(bbox[1][0] - bbox[0][0], bbox[1][1] - bbox[0][1]) / 2
+        length = bbox[1][2] - bbox[0][2] + lowering
+        extended_axle = create_cylinder(radius, length)
+        extended_axle = align(extended_axle, part, Alignment.CENTER, axes=[0, 1])
+        return align(extended_axle, part, Alignment.TOP)
+
+    lowered_names = {
+        "motor_bracket",
+        "motor_body",
+    }
+    if name in lowered_names or name.startswith("motor_bracket_motor_mount_screw_"):
+        return translate(0, 0, -lowering)(part)
+
+    return part
+
+
 def _create_y_axis_motor_mount(
     frame_back_profile,
     belt_reference,
@@ -397,6 +421,10 @@ def _create_y_axis_motor_mount(
         for name, part in motor_mount_plate.get_named_non_production_part_items()
     ]
     visual_items = motor_visual_items + mount_visual_items + [("motor_pulley", pulley)]
+    visual_items = [
+        (name, _lower_y_axis_motor_bracket_visual_item(name, part, cfg))
+        for name, part in visual_items
+    ]
 
     retval = LeaderFollowersCuttersPart(
         leader=motor_mount_plate.leader,
@@ -810,6 +838,7 @@ def create_y_axis_drive_assembly(
     y_axis_drive_motor_plate_width,
     y_axis_drive_motor_plate_depth,
     y_axis_drive_idler_plate_width,
+    y_axis_motor_bracket_lowering,
     y_axis_drive_motor_pulley_teeth,
     y_axis_drive_idler_teeth,
     y_axis_drive_belt_clear_span_extra,
@@ -860,6 +889,7 @@ def create_y_axis_drive_assembly(
         y_axis_drive_motor_plate_width=y_axis_drive_motor_plate_width,
         y_axis_drive_motor_plate_depth=y_axis_drive_motor_plate_depth,
         y_axis_drive_idler_plate_width=y_axis_drive_idler_plate_width,
+        y_axis_motor_bracket_lowering=y_axis_motor_bracket_lowering,
         y_axis_drive_motor_pulley_teeth=y_axis_drive_motor_pulley_teeth,
         y_axis_drive_idler_teeth=y_axis_drive_idler_teeth,
         y_axis_drive_belt_clear_span_extra=y_axis_drive_belt_clear_span_extra,
