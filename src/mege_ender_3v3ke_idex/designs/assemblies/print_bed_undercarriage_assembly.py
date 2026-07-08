@@ -855,6 +855,26 @@ def create_print_bed_undercarriage_assembly(
     retval.add_named_follower(back_left_uc.leader, "back_left_uc")
     retval.add_named_follower(back_right_uc.leader, "back_right_uc")
 
+    front_spar_profile_reference = create_box(
+        print_bed_mount_hole_pitch - print_bed_mount_tower_size,
+        print_bed_undercarriage_profiles_width,
+        print_bed_undercarriage_profiles_height,
+    )
+    front_spar_profile_reference = align(
+        front_spar_profile_reference,
+        central_annulus,
+        Alignment.CENTER,
+    )
+    front_spar_profile_reference = align(
+        front_spar_profile_reference,
+        mount_square_placeholder,
+        Alignment.EDGE_FRONT,
+    )
+    retval.add_named_non_production_part(
+        front_spar_profile_reference,
+        "front_spar_profile_reference",
+    )
+
     if record_metrics:
         _record_print_bed_undercarriage_weight_metrics(retval)
 

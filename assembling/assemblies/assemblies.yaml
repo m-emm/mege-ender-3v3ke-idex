@@ -134,11 +134,15 @@ placement:
       to: print_bed_assembly.non_production_parts.print_bed_foil
       alignment: CENTER
       axes: [0]
-    - part: apa_strip_front_assembly
+      post_translation:
+        - $ref: vision_light_mount_x_offset
+        - 0
+        - 0
+    - part: apa_strip_front_assembly.followers.apa_led_1
       to: print_bed_assembly.non_production_parts.print_bed_foil
       alignment: STACK_BOTTOM
       stack_gap:
-        $ref: vision_light_mount_led_bed_gap
+        $ref: vision_light_mount_bed_clearance
     - part: apa_strip_front_assembly
       to: print_bed_assembly.non_production_parts.print_bed_foil
       alignment: STACK_FRONT

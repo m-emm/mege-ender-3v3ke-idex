@@ -26,12 +26,6 @@ Builder:
         artifact: leader
         name: vision_light_mount
         color: [0.92, 0.92, 0.88]
-      - source: self
-        artifact: followers
-        names:
-          - vision_light_mount_clamp_cap
-        name_template: "{name}"
-        color: [0.92, 0.92, 0.88]
       - source: injected
         assembly: apa_strip_front
         artifact: all
@@ -62,11 +56,6 @@ Builder:
       - source: self
         artifact: leader
         name: vision_light_mount
-      - source: self
-        artifact: followers
-        names:
-          - vision_light_mount_clamp_cap
-        name_template: "{name}"
     arrange:
       export_individual_parts: false
       prod_gap: 12.0
@@ -88,7 +77,6 @@ Builder:
                 wall_loops: "3"
           parts:
             - vision_light_mount
-            - vision_light_mount_clamp_cap
       auto_assign_plates: false
 
 Parameters:
@@ -106,15 +94,19 @@ Parameters:
     Type: Float
   vision_light_mount_vertical_plate_thickness:
     Type: Float
-  vision_light_mount_clamp_x_oversize:
+  vision_light_mount_clamp_width:
     Type: Float
-  vision_light_mount_clamp_height:
+  vision_light_mount_u_wall_thickness:
     Type: Float
-  vision_light_mount_clamp_jaw_thickness:
+  vision_light_mount_u_bottom_thickness:
     Type: Float
-  vision_light_mount_clamp_span_y:
+  vision_light_mount_u_spar_clearance_y:
     Type: Float
-  vision_light_mount_clamp_clearance:
+  vision_light_mount_u_spar_clearance_z:
+    Type: Float
+  vision_light_mount_u_ear_height_above_spar:
+    Type: Float
+  vision_light_mount_u_screw_gap_above_spar:
     Type: Float
   vision_light_mount_clamp_screw_size:
     Type: String

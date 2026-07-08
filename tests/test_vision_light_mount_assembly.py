@@ -21,6 +21,7 @@ from shellforgepy.simple import (
     align,
     create_box,
     get_bounding_box,
+    get_bounding_box_center,
     get_bounding_box_size,
     get_volume,
     rotate,
@@ -51,7 +52,7 @@ def _create_strip(density="D60pm", num_leds=2):
     )
 
 
-def _placed_strip_ring(aperture_size=30.0):
+def _placed_strip_ring(aperture_size=30.0, x_offset=0.0):
     aperture_reference = create_box(aperture_size, aperture_size, 0.1)
     aperture_reference = align(
         aperture_reference,
@@ -59,6 +60,19 @@ def _placed_strip_ring(aperture_size=30.0):
         Alignment.CENTER,
         axes=[0, 1],
     )
+    if x_offset:
+        offset_reference = create_box(2 * abs(x_offset) + aperture_size, 1, 0.1)
+        offset_reference = align(
+            offset_reference,
+            None,
+            Alignment.CENTER,
+            axes=[0, 1],
+        )
+        aperture_reference = align(
+            aperture_reference,
+            offset_reference,
+            Alignment.RIGHT if x_offset > 0 else Alignment.LEFT,
+        )
 
     front = align(_create_strip(), None, Alignment.CENTER, axes=[0, 1])
     front = align(front, aperture_reference, Alignment.STACK_FRONT)
@@ -81,36 +95,82 @@ def _placed_strip_ring(aperture_size=30.0):
         "apa_strip_back": back,
         "apa_strip_left": left,
         "apa_strip_right": right,
+        "aperture_reference": aperture_reference,
     }
 
 
-def _print_bed_reference():
+def _print_bed_reference(front_strip):
     bed = create_box(90, 90, 3)
     bed = align(bed, None, Alignment.CENTER, axes=[0, 1])
+    bed = align(
+        bed,
+        front_strip.get_named_follower("apa_led_1"),
+        Alignment.STACK_TOP,
+        stack_gap=DEFAULTS["vision_light_mount_bed_clearance"],
+    )
     return LeaderFollowersCuttersPart(bed)
 
 
-def _undercarriage_reference():
-    front_left = create_box(30, 16, 20)
-    front_left = align(front_left, None, Alignment.CENTER, axes=[1])
+def _undercarriage_reference(aperture_reference, print_bed):
+    spar_reference = create_box(120, 16, 20)
+    spar_reference = align(
+        spar_reference,
+        aperture_reference,
+        Alignment.CENTER,
+        axes=[0],
+    )
+    spar_reference = align(spar_reference, aperture_reference, Alignment.STACK_FRONT)
+    spar_reference = align(
+        spar_reference,
+        print_bed.leader,
+        Alignment.STACK_BOTTOM,
+        stack_gap=18,
+    )
 
-    front_right = create_box(30, 16, 20)
-    front_right = align(front_right, front_left, Alignment.STACK_RIGHT)
+    front_left = create_box(70, 30, 32)
+    front_left = align(front_left, spar_reference, Alignment.CENTER, axes=[1, 2])
+    front_left = align(front_left, spar_reference, Alignment.LEFT)
 
-    leader = front_left.fuse(front_right)
+    front_right = create_box(70, 30, 32)
+    front_right = align(front_right, spar_reference, Alignment.CENTER, axes=[1, 2])
+    front_right = align(front_right, spar_reference, Alignment.RIGHT)
+
+    protrusion = create_box(20, 12, 46)
+    protrusion = align(protrusion, front_right, Alignment.RIGHT)
+    protrusion = align(protrusion, front_right, Alignment.STACK_FRONT)
+    protrusion = align(protrusion, front_right, Alignment.BOTTOM)
+
+    leader = front_left.fuse(front_right).fuse(protrusion)
     undercarriage = LeaderFollowersCuttersPart(leader)
     undercarriage.add_named_follower(front_left, "front_left_uc")
     undercarriage.add_named_follower(front_right, "front_right_uc")
+    undercarriage.add_named_non_production_part(
+        spar_reference,
+        "front_spar_profile_reference",
+    )
     return undercarriage
 
 
 def _build_mount():
+    placed_strips = _placed_strip_ring(
+        x_offset=DEFAULTS["vision_light_mount_x_offset"]
+    )
+    print_bed = _print_bed_reference(placed_strips["apa_strip_front"])
+    undercarriage = _undercarriage_reference(
+        placed_strips["aperture_reference"],
+        print_bed,
+    )
+    strip_kwargs = {
+        name: part
+        for name, part in placed_strips.items()
+        if name.startswith("apa_strip_")
+    }
     return create_vision_light_mount_assembly(
         **assembly_kwargs(
             create_vision_light_mount_assembly,
-            print_bed=_print_bed_reference(),
-            print_bed_undercarriage=_undercarriage_reference(),
-            **_placed_strip_ring(),
+            print_bed=print_bed,
+            print_bed_undercarriage=undercarriage,
+            **strip_kwargs,
         )
     )
 
@@ -144,12 +204,12 @@ def test_vision_light_mount_derives_aperture_and_exports_only_own_references():
     mount = _build_mount()
 
     assert get_volume(mount.leader) > 0
-    assert set(mount.follower_indices_by_name) == {"vision_light_mount_clamp_cap"}
+    assert set(mount.follower_indices_by_name) == set()
     assert set(mount.non_production_indices_by_name) == {"clamp_screws", "clamp_nuts"}
     assert {
         "aperture",
         "strip_pockets",
-        "undercarriage_keepout",
+        "front_spar_keepout",
         "clamp_screw_holes",
     } <= set(mount.cutter_indices_by_name)
 
@@ -160,18 +220,47 @@ def test_vision_light_mount_derives_aperture_and_exports_only_own_references():
     )
 
 
-def test_vision_light_mount_saddle_brackets_front_spar_keepout():
+def test_vision_light_mount_u_channel_uses_clean_spar_reference():
     mount = _build_mount()
 
     leader_bbox = get_bounding_box(mount.leader)
-    cap_bbox = get_bounding_box(mount.get_named_follower("vision_light_mount_clamp_cap"))
-    keepout_bbox = get_bounding_box(mount.get_named_cutter("undercarriage_keepout"))
+    keepout = mount.get_named_cutter("front_spar_keepout")
+    keepout_bbox = get_bounding_box(keepout)
+    keepout_size = get_bounding_box_size(keepout)
 
     assert leader_bbox[0][1] < keepout_bbox[0][1]
-    assert leader_bbox[1][1] >= keepout_bbox[1][1]
+    assert leader_bbox[1][1] > keepout_bbox[1][1]
     assert leader_bbox[0][2] < keepout_bbox[0][2]
     assert leader_bbox[1][2] > keepout_bbox[1][2]
-    assert cap_bbox[0][1] >= keepout_bbox[1][1] - 0.05
+    assert keepout_size[0] == pytest.approx(
+        DEFAULTS["vision_light_mount_clamp_width"],
+        abs=0.05,
+    )
+    assert keepout_size[1] == pytest.approx(
+        16 + 2 * DEFAULTS["vision_light_mount_u_spar_clearance_y"],
+        abs=0.05,
+    )
+
+
+def test_vision_light_mount_is_offset_right_and_below_bed():
+    placed_strips = _placed_strip_ring(
+        x_offset=DEFAULTS["vision_light_mount_x_offset"]
+    )
+    print_bed = _print_bed_reference(placed_strips["apa_strip_front"])
+    mount = _build_mount()
+
+    aperture_center = get_bounding_box_center(mount.get_named_cutter("aperture"))
+    bed_center = get_bounding_box_center(print_bed.leader)
+    bed_bbox = get_bounding_box(print_bed.leader)
+    mount_bbox = get_bounding_box(mount.leader)
+
+    assert aperture_center[0] - bed_center[0] == pytest.approx(
+        DEFAULTS["vision_light_mount_x_offset"],
+        abs=0.05,
+    )
+    assert mount_bbox[1][2] <= bed_bbox[0][2] - DEFAULTS[
+        "vision_light_mount_bed_clearance"
+    ] + 0.05
 
 
 def test_vision_light_mount_yaml_wiring_and_preview_context():
@@ -218,14 +307,29 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
             "source": "self",
             "artifact": "leader",
             "name": "vision_light_mount",
-        },
-        {
-            "source": "self",
-            "artifact": "followers",
-            "names": ["vision_light_mount_clamp_cap"],
-            "name_template": "{name}",
-        },
+        }
     ]
+
+    parameters = resource["Parameters"]
+    assert "vision_light_mount_clamp_width" in parameters
+    assert "vision_light_mount_u_wall_thickness" in parameters
+    assert "vision_light_mount_clamp_x_oversize" not in parameters
+
+    alignments = config["placement"]["alignments"]
+    assert any(
+        step.get("part") == "apa_strip_front_assembly.followers.apa_led_1"
+        and step.get("stack_gap") == {"$ref": "vision_light_mount_bed_clearance"}
+        for step in alignments
+    )
+    assert any(
+        step.get("part") == "apa_strip_front_assembly"
+        and step.get("post_translation") == [
+            {"$ref": "vision_light_mount_x_offset"},
+            0,
+            0,
+        ]
+        for step in alignments
+    )
 
 
 def test_undercarriage_preview_exists_and_whole_printer_is_unmodified():
@@ -233,6 +337,21 @@ def test_undercarriage_preview_exists_and_whole_printer_is_unmodified():
     preview = undercarriage_resource["Builder"]["Visualization"]["preview"]
     assert preview["enabled"] is True
     assert {"isometric", "top", "front"} <= set(preview["views"])
+    assert any(
+        part.get("source") == "self" and part.get("artifact") == "non_production_parts"
+        for part in undercarriage_resource["Builder"]["Visualization"]["parts"]
+    )
+    assert not any(
+        part.get("artifact") == "non_production_parts"
+        for part in undercarriage_resource["Builder"]["Production"]["parts"]
+    )
+
+    undercarriage_source = (
+        ASSEMBLIES_DIR.parents[1]
+        / "src/mege_ender_3v3ke_idex/designs/assemblies/"
+        / "print_bed_undercarriage_assembly.py"
+    ).read_text()
+    assert "front_spar_profile_reference" in undercarriage_source
 
     config = _load_assemblies_config()
     whole_printer = {
@@ -243,7 +362,9 @@ def test_undercarriage_preview_exists_and_whole_printer_is_unmodified():
 
     whole_printer_resource = _load_yaml(WHOLE_PRINTER_RESOURCE_FILE)
     visualization = whole_printer_resource["Builder"]["Visualization"]["parts"]
-    assert not any(part.get("assembly") == "vision_light_mount" for part in visualization)
+    assert not any(
+        part.get("assembly") == "vision_light_mount" for part in visualization
+    )
     assert not any(
         part.get("assembly", "").startswith("apa_strip_") for part in visualization
     )
