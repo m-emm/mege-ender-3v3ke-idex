@@ -341,6 +341,8 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
             "source": "self",
             "artifact": "leader",
             "name": "vision_light_mount",
+            "prod_rotation_angle": 90,
+            "prod_rotation_axis": [0, 1, 0],
         }
     ]
 

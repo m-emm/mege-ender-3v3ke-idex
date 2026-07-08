@@ -56,6 +56,8 @@ Builder:
       - source: self
         artifact: leader
         name: vision_light_mount
+        prod_rotation_angle: -90
+        prod_rotation_axis: [0, 1, 0]
     arrange:
       export_individual_parts: false
       prod_gap: 12.0
