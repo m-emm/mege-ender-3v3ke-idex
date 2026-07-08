@@ -182,7 +182,7 @@ For support tuning, interpret `support_threshold_angle` carefully: higher values
 ## Testing
 
 - Prefer creating proper pytest tests in `tests/` directory
-- Do not assert that tunable values from `idex_parameters.yaml` equal specific literals; tests should use explicit test-local overrides or derive expectations from the current parameters so tuning defaults does not require test edits.
+- Do not assert that configurable calibration, Klipper, process data, slicer profile, machine limit, purge path, bed temperature, support, filament, or other visually tuned defaults equal specific literals. Tests should verify consistency, valid structure, generated outputs matching their sources, positive/ranged values, derived relationships, or explicit test-local fixtures so calibration and process tuning do not require test edits.
 - Run tests: `pytest` from repo root
 - For visual verification: `./run.sh src/mege_ender_3v3ke_idex/designs/<design_file>.py`
 - Production exports: `SHELLFORGEPY_PRODUCTION=1 ./run.sh <design_file>.py`
