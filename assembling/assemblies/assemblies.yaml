@@ -149,7 +149,7 @@ placement:
       alignment: STACK_FRONT
       stack_gap:
         $expr:
-          "$sub": "${vision_light_mount_plate_border} + ${vision_light_mount_u_spar_clearance_y}"
+          "$sub": "${vision_light_mount_plate_border} + ${vision_light_mount_u_spar_clearance_y} + ${vision_light_mount_u_wall_thickness}"
 
     - part: apa_strip_left_assembly
       post_rotation:

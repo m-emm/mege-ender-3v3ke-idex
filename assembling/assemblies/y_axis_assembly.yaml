@@ -13,61 +13,28 @@ Builder:
     parts:
       - source: dependencies
         assembly: printer_frame_assembly
-        artifact: leader
-        name: printer_frame
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
       - source: dependencies
         assembly: printer_foot_left_front_assembly
-        artifact: leader
-        name: printer_foot_left_front
-      - source: dependencies
-        assembly: printer_foot_left_front_assembly
-        artifact: non_production_parts
-        names:
-          - screw
-        name: printer_foot_screw_left_front
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
       - source: dependencies
         assembly: printer_foot_left_back_assembly
-        artifact: leader
-        name: printer_foot_left_back
-      - source: dependencies
-        assembly: printer_foot_left_back_assembly
-        artifact: non_production_parts
-        names:
-          - screw
-        name: printer_foot_screw_left_back
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
       - source: dependencies
         assembly: printer_foot_right_front_assembly
-        artifact: leader
-        name: printer_foot_right_front
-      - source: dependencies
-        assembly: printer_foot_right_front_assembly
-        artifact: non_production_parts
-        names:
-          - screw
-        name: printer_foot_screw_right_front
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
       - source: dependencies
         assembly: printer_foot_right_back_assembly
-        artifact: leader
-        name: printer_foot_right_back
-      - source: dependencies
-        assembly: printer_foot_right_back_assembly
-        artifact: non_production_parts
-        names:
-          - screw
-        name: printer_foot_screw_right_back
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
       - source: dependencies
         assembly: print_bed_assembly
-        artifact: leader
-        name: print_bed
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: print_bed_assembly
-        artifact: non_production_parts
-        name_template: "print_bed_{name}"
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
         animation:
           bed_y:
             - 0
@@ -76,7 +43,7 @@ Builder:
       - source: dependencies
         assembly: print_bed_undercarriage_assembly
         artifact: followers
-        name_template: "print_bed_undercarriage_{name}"
+        name_template: "{assembly_name}_{artifact}_{default_name}"
         animation:
           bed_y:
             - 0
@@ -85,7 +52,7 @@ Builder:
       - source: dependencies
         assembly: print_bed_undercarriage_assembly
         artifact: non_production_parts
-        name_template: "print_bed_undercarriage_{name}"
+        name_template: "{assembly_name}_{artifact}_{default_name}"
         animation:
           bed_y:
             - 0
@@ -93,30 +60,8 @@ Builder:
             - 0
       - source: dependencies
         assembly: apa_strip_front_assembly
-        artifact: leader
-        name: apa_strip_front_pcb
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: apa_strip_front_assembly
-        artifact: followers
-        names:
-          - apa_led_*
-        name_template: "apa_strip_front_{name}"
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: apa_strip_front_assembly
-        artifact: followers
-        names:
-          - apa_pad_*
-        name_template: "apa_strip_front_{name}"
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
         animation:
           bed_y:
             - 0
@@ -124,30 +69,8 @@ Builder:
             - 0
       - source: dependencies
         assembly: apa_strip_back_assembly
-        artifact: leader
-        name: apa_strip_back_pcb
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: apa_strip_back_assembly
-        artifact: followers
-        names:
-          - apa_led_*
-        name_template: "apa_strip_back_{name}"
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: apa_strip_back_assembly
-        artifact: followers
-        names:
-          - apa_pad_*
-        name_template: "apa_strip_back_{name}"
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
         animation:
           bed_y:
             - 0
@@ -155,31 +78,8 @@ Builder:
             - 0
       - source: dependencies
         assembly: apa_strip_left_assembly
-        artifact: leader
-        name: apa_strip_left_pcb
-        color: [0.08, 0.32, 0.16]
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: apa_strip_left_assembly
-        artifact: followers
-        names:
-          - apa_led_*
-        name_template: "apa_strip_left_{name}"
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: apa_strip_left_assembly
-        artifact: followers
-        names:
-          - apa_pad_*
-        name_template: "apa_strip_left_{name}"
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
         animation:
           bed_y:
             - 0
@@ -187,30 +87,8 @@ Builder:
             - 0
       - source: dependencies
         assembly: apa_strip_right_assembly
-        artifact: leader
-        name: apa_strip_right_pcb
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: apa_strip_right_assembly
-        artifact: followers
-        names:
-          - apa_led_*
-        name_template: "apa_strip_right_{name}"
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: apa_strip_right_assembly
-        artifact: followers
-        names:
-          - apa_pad_*
-        name_template: "apa_strip_right_{name}"
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
         animation:
           bed_y:
             - 0
@@ -218,42 +96,8 @@ Builder:
             - 0
       - source: dependencies
         assembly: vision_light_mount_assembly
-        artifact: leader
-        name: vision_light_mount
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: vision_light_mount_assembly
-        artifact: non_production_parts
-        names:
-          - clamp_screws
-          - clamp_nuts
-        name_template: "vision_light_mount_{name}"
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: vision_light_mount_assembly
-        artifact: non_production_parts
-        names:
-          - xh_connector_*_housing
-        name_template: "vision_light_mount_{name}"
-        animation:
-          bed_y:
-            - 0
-            - { $ref: print_bed_y_travel }
-            - 0
-      - source: dependencies
-        assembly: vision_light_mount_assembly
-        artifact: non_production_parts
-        names:
-          - xh_connector_*_pins
-        name_template: "vision_light_mount_{name}"
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
         animation:
           bed_y:
             - 0
@@ -261,24 +105,12 @@ Builder:
             - 0
       - source: dependencies
         assembly: y_axis_drive_assembly
-        artifact: leader
-        name: y_axis_drive
-      - source: dependencies
-        assembly: y_axis_drive_assembly
-        artifact: followers
-        name_template: "y_axis_drive_{name}"
-      - source: dependencies
-        assembly: y_axis_drive_assembly
-        artifact: non_production_parts
-        name_template: "y_axis_drive_{name}"
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
       - source: dependencies
         assembly: y_axis_endstop_holder_assembly
-        artifact: leader
-        name: y_axis_endstop_holder
-      - source: dependencies
-        assembly: y_axis_endstop_holder_assembly
-        artifact: non_production_parts
-        name_template: "y_axis_endstop_{name}"
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
       - source: self
         artifact: leader
         name: y_axis

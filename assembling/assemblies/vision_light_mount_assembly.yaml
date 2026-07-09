@@ -70,6 +70,12 @@ Builder:
         name: vision_light_mount
         prod_rotation_angle: -90
         prod_rotation_axis: [0, 1, 0]
+      - source: self
+        artifact: followers
+        flip: true
+        names:
+         - cover          
+        name_template: "{name}"
     arrange:
       export_individual_parts: false
       prod_gap: 12.0
@@ -91,6 +97,7 @@ Builder:
                 wall_loops: "3"
           parts:
             - vision_light_mount
+            - cover
       auto_assign_plates: false
 
 Parameters:

@@ -320,10 +320,87 @@ def create_vision_light_mount_assembly(
     leader = leader.cut(connecctor_cutters)
 
 
-    cover = materialize_bounding_box(
-        leader)
-
+    cover = create_filleted_box(
+        plate_width,
+        plate_depth,
+        vision_light_mount_bridge_thickness,
+        fillet_radius=vision_light_mount_plate_fillet_radius,
+        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
+    )
+    
+    cover = align(cover, plate, Alignment.CENTER)
     cover = align(cover, connector_visual_parts[0][1], Alignment.STACK_TOP)
+
+
+    cover_bbox = get_bounding_box(cover)
+    plate_bbox = get_bounding_box(plate)
+
+    strip_downholder = create_box(
+        plate_width,
+        3,
+        cover_bbox[1][2] - plate_bbox[1][2],
+    )
+    strip_downholder_rotated = create_box(
+        3,
+        plate_depth,
+        cover_bbox[1][2] - plate_bbox[1][2],
+    )
+
+    strip_downholder_rotated = align(
+        strip_downholder_rotated, strip_downholder, Alignment.CENTER)
+    
+    strip_downholder = strip_downholder.fuse(strip_downholder_rotated)
+
+    strip_downholder = align(strip_downholder, cover, Alignment.CENTER)
+    strip_downholder = align(strip_downholder, cover, Alignment.TOP)
+
+    for strip in strip_leaders.values():
+        strip_cutter = materialize_bounding_box(
+            strip,
+            x_enlargement=2 * vision_light_mount_strip_pocket_clearance,
+            y_enlargement=2 * vision_light_mount_strip_pocket_clearance,
+            z_enlargement=500,
+        )
+        cover = cover.cut(strip_cutter)
+
+    cover = cover.fuse(strip_downholder)
+
+    cover = cover.cut(aperture)
+
+
+
+    cover_screw_size ="M2.5"
+    cover_screw_inset = 3.5
+    cover_screw_length = 10
+    cover_screw_mounts = None
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+
+            target = create_cylinder(1, 5)
+            target = align(target, cover, Alignment.CENTER)
+            target = align(target, cover, lr.edge_alignment)
+            target = align(target, cover, fb.edge_alignment)
+
+            target = translate(-lr.sign *cover_screw_inset, -fb.sign * cover_screw_inset, 0)(target)
+                           
+
+            mount_screw_assembly = create_screw_mount_assembly(
+                target,
+                screw_size=cover_screw_size,
+                screw_length=cover_screw_length,
+                screw_direction=Alignment.TOP,
+                with_nut_cutter=False)
+        
+            mount_screw_assembly = mount_screw_assembly.prefixed_copy(f"cover_{lr.name.lower()}_{fb.name.lower()}_")
+            cover_screw_mounts = mount_screw_assembly if cover_screw_mounts is None else cover_screw_mounts.fuse(mount_screw_assembly)
+
+
+            
+
+
+
+
+
 
     clamp_screw_holes = PartCollector()
     for _name, cutter in screw_mounts.get_named_cutter_items():
@@ -337,6 +414,12 @@ def create_vision_light_mount_assembly(
         elif name.endswith("_nut"):
             clamp_nuts = clamp_nuts.fuse(part)
 
+
+    cover_mount_screws = PartCollector()
+    for name, part in cover_screw_mounts.get_named_non_production_part_items():
+        if name.endswith("_screw"):
+            cover_mount_screws = cover_mount_screws.fuse(part)
+
     assembly = LeaderFollowersCuttersPart(leader)
     assembly.add_named_cutter(aperture, "aperture")
     assembly.add_named_cutter(strip_pockets, "strip_pockets")
@@ -344,6 +427,7 @@ def create_vision_light_mount_assembly(
     assembly.add_named_cutter(clamp_screw_holes, "clamp_screw_holes")
     assembly.add_named_non_production_part(clamp_screws, "clamp_screws")
     assembly.add_named_non_production_part(clamp_nuts, "clamp_nuts")
+    assembly.add_named_non_production_part(cover_mount_screws, "cover_mount_screws")
     assembly.add_named_follower(cover, "cover")
     for name, part in connector_visual_parts:
         assembly.add_named_non_production_part(part, name)

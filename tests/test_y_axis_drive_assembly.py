@@ -333,18 +333,19 @@ def test_y_axis_drive_visualizes_printer_foot_mount_screws():
 def test_y_axis_visualizes_printer_feet_and_mount_screws():
     resource = yaml.safe_load((ASSEMBLIES_DIR / "y_axis_assembly.yaml").read_text())
     visualization_parts = resource["Builder"]["Visualization"]["parts"]
+    all_name_template = "{assembly_name}_{artifact}_{default_name}"
 
     for corner in ("left_front", "left_back", "right_front", "right_back"):
-        assert {
+        expected = {
             "source": "dependencies",
             "assembly": f"printer_foot_{corner}_assembly",
-            "artifact": "leader",
-            "name": f"printer_foot_{corner}",
-        } in visualization_parts
-        assert {
-            "source": "dependencies",
-            "assembly": f"printer_foot_{corner}_assembly",
-            "artifact": "non_production_parts",
-            "names": ["screw"],
-            "name": f"printer_foot_screw_{corner}",
-        } in visualization_parts
+            "artifact": "all",
+            "name_template": all_name_template,
+        }
+        assert expected in visualization_parts
+        assert [
+            part
+            for part in visualization_parts
+            if part.get("source") == "dependencies"
+            and part.get("assembly") == f"printer_foot_{corner}_assembly"
+        ] == [expected]

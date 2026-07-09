@@ -221,7 +221,7 @@ def test_vision_light_mount_derives_aperture_and_exports_only_own_references():
     mount = _build_mount()
 
     assert get_volume(mount.leader) > 0
-    assert set(mount.follower_indices_by_name) == set()
+    assert set(mount.follower_indices_by_name) == {"cover"}
     assert set(mount.non_production_indices_by_name) == {
         "clamp_screws",
         "clamp_nuts",
@@ -438,89 +438,52 @@ def test_y_axis_visualizes_vision_light_mount_context():
     resource = _load_yaml(Y_AXIS_RESOURCE_FILE)
     visualization = resource["Builder"]["Visualization"]["parts"]
     bed_y_animation = {"bed_y": [0, {"$ref": "print_bed_y_travel"}, 0]}
+    all_name_template = "{assembly_name}_{artifact}_{default_name}"
 
-    for strip_assembly in (
+    for moving_all_assembly in (
+        "print_bed_assembly",
         "apa_strip_front_assembly",
         "apa_strip_back_assembly",
         "apa_strip_left_assembly",
         "apa_strip_right_assembly",
+        "vision_light_mount_assembly",
     ):
-        strip_prefix = strip_assembly.removesuffix("_assembly")
         assert _has_visualization_part(
             visualization,
             {
                 "source": "dependencies",
-                "assembly": strip_assembly,
-                "artifact": "leader",
-                "name": f"{strip_prefix}_pcb",
-                "animation": bed_y_animation,
-            },
-        )
-        assert _has_visualization_part(
-            visualization,
-            {
-                "source": "dependencies",
-                "assembly": strip_assembly,
-                "artifact": "followers",
-                "names": ["apa_led_*"],
-                "name_template": f"{strip_prefix}_{{name}}",
-                "animation": bed_y_animation,
-            },
-        )
-        assert _has_visualization_part(
-            visualization,
-            {
-                "source": "dependencies",
-                "assembly": strip_assembly,
-                "artifact": "followers",
-                "names": ["apa_pad_*"],
-                "name_template": f"{strip_prefix}_{{name}}",
+                "assembly": moving_all_assembly,
+                "artifact": "all",
+                "name_template": all_name_template,
                 "animation": bed_y_animation,
             },
         )
 
-    assert _has_visualization_part(
-        visualization,
-        {
-            "source": "dependencies",
-            "assembly": "vision_light_mount_assembly",
-            "artifact": "leader",
-            "name": "vision_light_mount",
-            "animation": bed_y_animation,
-        },
-    )
-    assert _has_visualization_part(
-        visualization,
-        {
-            "source": "dependencies",
-            "assembly": "vision_light_mount_assembly",
-            "artifact": "non_production_parts",
-            "names": ["xh_connector_*_housing"],
-            "name_template": "vision_light_mount_{name}",
-            "animation": bed_y_animation,
-        },
-    )
-    assert _has_visualization_part(
-        visualization,
-        {
-            "source": "dependencies",
-            "assembly": "vision_light_mount_assembly",
-            "artifact": "non_production_parts",
-            "names": ["xh_connector_*_pins"],
-            "name_template": "vision_light_mount_{name}",
-            "animation": bed_y_animation,
-        },
-    )
-    assert _has_visualization_part(
-        visualization,
-        {
-            "source": "dependencies",
-            "assembly": "vision_light_mount_assembly",
-            "artifact": "non_production_parts",
-            "names": ["clamp_screws", "clamp_nuts"],
-            "name_template": "vision_light_mount_{name}",
-            "animation": bed_y_animation,
-        },
+    for undercarriage_artifact in ("followers", "non_production_parts"):
+        assert _has_visualization_part(
+            visualization,
+            {
+                "source": "dependencies",
+                "assembly": "print_bed_undercarriage_assembly",
+                "artifact": undercarriage_artifact,
+                "name_template": all_name_template,
+                "animation": bed_y_animation,
+            },
+        )
+
+    undercarriage_parts = [
+        part
+        for part in visualization
+        if part.get("source") == "dependencies"
+        and part.get("assembly") == "print_bed_undercarriage_assembly"
+    ]
+    assert not any(part.get("artifact") in {"leader", "all"} for part in undercarriage_parts)
+    assert not any("names" in part for part in undercarriage_parts)
+
+    assert not any(
+        "color" in part
+        for part in visualization
+        if part.get("source") == "dependencies"
     )
 
 
