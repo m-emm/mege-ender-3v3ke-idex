@@ -70,7 +70,7 @@ Builder:
         
 
   Production:
-    process_data_preset: petgcf_max_strength_high_speed_06_idex
+    process_data_preset: petgcf_max_strength_high_speed_06
     parts:
       - source: self
         artifact: leader
@@ -88,7 +88,7 @@ Builder:
       prod_gap: 12.0
       plates:
         - name: vision_light_mount
-          process_data_preset: petgcf_max_strength_high_speed_06_idex
+          process_data_preset: petgcf_max_strength_high_speed_06
           process_data:
             overrides:
               process_overrides:
@@ -97,10 +97,7 @@ Builder:
                 support_type: tree(auto)
                 support_style: organic
                 support_on_build_plate_only: "1"
-                support_top_z_distance: "0.47"
-                support_interface_top_layers: "2"
-                support_interface_spacing: "0.8"
-                support_object_xy_distance: "0.8"
+                support_interface_spacing: "2"
                 wall_loops: "3"
           parts:
             - vision_light_mount
