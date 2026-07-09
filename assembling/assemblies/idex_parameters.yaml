@@ -135,8 +135,7 @@ globals:
   vision_light_mount_aperture_clearance: 2.0
   vision_light_mount_strip_pocket_clearance: 0.35
   vision_light_mount_strip_pocket_depth: 0.45
-  vision_light_mount_bridge_thickness: 3.0
-  vision_light_mount_bridge_overlap: 2.0
+  vision_light_mount_cover_thickness: 3.0
   vision_light_mount_clamp_width: 24.0
   vision_light_mount_u_wall_thickness: 4.0
   vision_light_mount_u_bottom_thickness: 3.0

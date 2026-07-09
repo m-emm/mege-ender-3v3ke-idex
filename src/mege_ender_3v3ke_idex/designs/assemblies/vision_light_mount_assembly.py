@@ -21,8 +21,7 @@ def create_vision_light_mount_assembly(
     vision_light_mount_aperture_clearance,
     vision_light_mount_strip_pocket_clearance,
     vision_light_mount_strip_pocket_depth,
-    vision_light_mount_bridge_thickness,
-    vision_light_mount_bridge_overlap,
+    vision_light_mount_cover_thickness,
     vision_light_mount_clamp_width,
     vision_light_mount_u_wall_thickness,
     vision_light_mount_u_bottom_thickness,
@@ -100,9 +99,6 @@ def create_vision_light_mount_assembly(
         pocket = align(pocket, pocket_top_reference, Alignment.TOP)
         strip_pockets = strip_pockets.fuse(pocket)
     plate = plate.cut(strip_pockets)
-    plate_bbox = get_bounding_box(plate)
-    aperture_bbox = get_bounding_box(aperture)
-
     front_spar_reference = print_bed_undercarriage.get_named_non_production_part(
         "front_spar_profile_reference"
     )
@@ -124,8 +120,6 @@ def create_vision_light_mount_assembly(
         Alignment.CENTER,
         axes=[1, 2],
     )
-    front_spar_keepout_bbox = get_bounding_box(front_spar_keepout)
-
     u_outer_depth = (
         get_bounding_box_size(front_spar_keepout)[1]
         + 2 * vision_light_mount_u_wall_thickness
@@ -135,16 +129,7 @@ def create_vision_light_mount_assembly(
         + vision_light_mount_u_bottom_thickness
         + vision_light_mount_u_ear_height_above_spar
     )
-    u_bottom_z = front_spar_keepout_bbox[0][2] - vision_light_mount_u_bottom_thickness
-    bridge_u_overlap_z = min(
-        vision_light_mount_bridge_overlap,
-        vision_light_mount_bridge_thickness / 2,
-    )
-    bridge_bottom_z = plate_bbox[0][2]
-    u_outer_height = max(
-        configured_u_outer_height,
-        bridge_bottom_z + bridge_u_overlap_z - u_bottom_z,
-    )
+    u_outer_height = configured_u_outer_height
 
     bottom_wall = create_filleted_box(
         vision_light_mount_clamp_width,
@@ -287,7 +272,7 @@ def create_vision_light_mount_assembly(
     cover = create_filleted_box(
         plate_width,
         plate_depth,
-        vision_light_mount_bridge_thickness,
+        vision_light_mount_cover_thickness,
         fillet_radius=vision_light_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )

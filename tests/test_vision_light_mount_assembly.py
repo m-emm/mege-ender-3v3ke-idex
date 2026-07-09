@@ -345,14 +345,12 @@ def test_vision_light_mount_is_offset_right_and_below_bed():
     assert mount_bbox[1][2] <= bed_bbox[0][2] - 0.05
 
 
-def test_vision_light_mount_uses_horizontal_bridge_without_vertical_connector():
+def test_vision_light_mount_has_no_legacy_bridge_or_vertical_connector():
     mount = _build_mount()
     leader_bbox = get_bounding_box(mount.leader)
-    aperture_bbox = get_bounding_box(mount.get_named_cutter("aperture"))
     keepout_bbox = get_bounding_box(mount.get_named_cutter("front_spar_keepout"))
 
     assert leader_bbox[0][1] < keepout_bbox[0][1]
-    assert leader_bbox[1][1] >= aperture_bbox[0][1] - 0.05
 
     generator_source = (
         ASSEMBLIES_DIR.parents[1]
@@ -362,8 +360,8 @@ def test_vision_light_mount_uses_horizontal_bridge_without_vertical_connector():
     assert "vertical_neck" not in generator_source
     assert "vertical_reference" not in generator_source
     assert "vision_light_mount_vertical_plate_thickness" not in generator_source
-    assert "vision_light_mount_bridge_thickness" in generator_source
-    assert "vision_light_mount_bridge_overlap" in generator_source
+    assert "vision_light_mount_bridge" not in generator_source
+    assert "vision_light_mount_cover_thickness" in generator_source
 
 
 def test_vision_light_mount_places_side_xh_connector_visuals_on_plate():
@@ -395,8 +393,8 @@ def test_vision_light_mount_places_side_xh_connector_visuals_on_plate():
         right_housing_bbox[0][2],
         abs=0.05,
     )
-    assert left_housing_bbox[0][2] > strip_pockets_bbox[0][2]
-    assert right_housing_bbox[0][2] > strip_pockets_bbox[0][2]
+    assert left_housing_bbox[1][2] > strip_pockets_bbox[1][2]
+    assert right_housing_bbox[1][2] > strip_pockets_bbox[1][2]
     assert left_pins_bbox[0][2] > strip_pockets_bbox[0][2]
     assert right_pins_bbox[0][2] > strip_pockets_bbox[0][2]
     assert left_pins_bbox[1][1] > left_housing_bbox[1][1]
@@ -435,6 +433,12 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
         "apa_strip_left",
         "apa_strip_right",
     } <= injected
+    assert any(
+        part.get("source") == "self"
+        and part.get("artifact") == "followers"
+        and part.get("names") == ["cover"]
+        for part in visualization
+    )
     assert any(
         part.get("source") == "self"
         and part.get("artifact") == "non_production_parts"
@@ -480,8 +484,9 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
     parameters = resource["Parameters"]
     assert "vision_light_mount_clamp_width" in parameters
     assert "vision_light_mount_u_wall_thickness" in parameters
-    assert "vision_light_mount_bridge_thickness" in parameters
-    assert "vision_light_mount_bridge_overlap" in parameters
+    assert "vision_light_mount_cover_thickness" in parameters
+    assert "vision_light_mount_bridge_thickness" not in parameters
+    assert "vision_light_mount_bridge_overlap" not in parameters
     assert "vision_light_mount_vertical_plate_thickness" not in parameters
     assert "vision_light_mount_clamp_x_oversize" not in parameters
 
