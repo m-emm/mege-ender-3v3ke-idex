@@ -150,6 +150,17 @@ globals:
   vision_light_mount_clamp_cylinder_head_clearance: 0.5
   vision_light_mount_screw_mount_clearance_type: "loose"
 
+  aukey_webcam_body_width: 103.0
+  aukey_webcam_body_depth: 23.1
+  aukey_webcam_body_height: 22.5
+  aukey_webcam_lens_diameter: 16.8
+  aukey_webcam_lens_depth: 2.0
+  aukey_webcam_holder_front_width: 44.6
+  aukey_webcam_holder_back_width: 36.1
+  aukey_webcam_holder_thickness: 17.7
+  aukey_webcam_holder_depth: 50.0
+  aukey_webcam_body_to_holder_gap: 0.0
+
   psu_mount_screw_length: 20
   psu_mount_screw_cylinder_head_clearance: 0.6
   psu_mount_wall_thickness: 3

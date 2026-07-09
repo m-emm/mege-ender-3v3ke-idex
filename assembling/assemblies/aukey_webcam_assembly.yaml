@@ -1,0 +1,53 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Standalone Aukey webcam reference mock
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - left
+        - top
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: all
+
+  Production:
+    parts:
+      - source: self
+        artifact: leader
+        name: aukey_webcam_top_body
+
+Parameters:
+  aukey_webcam_body_width:
+    Type: Float
+  aukey_webcam_body_depth:
+    Type: Float
+  aukey_webcam_body_height:
+    Type: Float
+  aukey_webcam_lens_diameter:
+    Type: Float
+  aukey_webcam_lens_depth:
+    Type: Float
+  aukey_webcam_holder_front_width:
+    Type: Float
+  aukey_webcam_holder_back_width:
+    Type: Float
+  aukey_webcam_holder_thickness:
+    Type: Float
+  aukey_webcam_holder_depth:
+    Type: Float
+  aukey_webcam_body_to_holder_gap:
+    Type: Float
+
+Parts:
+  AukeyWebcamAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.aukey_webcam_assembly.create_aukey_webcam_assembly

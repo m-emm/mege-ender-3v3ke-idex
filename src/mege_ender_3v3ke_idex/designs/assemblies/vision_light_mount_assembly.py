@@ -284,9 +284,7 @@ def create_vision_light_mount_assembly(
     leader = leader.cut(connecctor_cutters)
 
     cover_screw = MScrew.from_size(cover_screw_size)
-    additional_pins_side_inset = (
-        cover_screw_inset 
-    )
+    additional_pins_side_inset = cover_screw_inset
     additional_pins_holders = PartCollector()
     additional_pins_base_plate_cutters = PartCollector()
     additional_pins_visual_parts = []
@@ -332,7 +330,8 @@ def create_vision_light_mount_assembly(
             additional_pins_visual_parts.append((name, part))
 
         pin_cutters = pin_cutters.fuse(
-            positioned_pins.get_cutter_part_by_name("pin_cutters"))
+            positioned_pins.get_cutter_part_by_name("pin_cutters")
+        )
 
     leader = leader.cut(additional_pins_base_plate_cutters)
     leader = leader.fuse(additional_pins_holders)

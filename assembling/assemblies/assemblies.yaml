@@ -1339,7 +1339,7 @@ assemblies:
       x_axis_mcu_top_pin_length: !Ref x_axis_mcu_top_pin_length
       board_holder_additional_pins_num_pins: 5
       board_holder_additional_pins_base_plate_length: !Ref board_holder_additional_pins_base_plate_length
-      board_holder_base_plate_thickness:  3.6
+      board_holder_base_plate_thickness: 3.6
 
   - name: vision_light_mount_assembly
 
@@ -1362,6 +1362,11 @@ assemblies:
       apa_strip_right: apa_strip_right_assembly
       xh_b4b_xh_a: xh_b4b_xh_a_assembly
       vision_lights_mount_additional_pins: vision_lights_mount_additional_pins_assembly
+
+  - name: aukey_webcam_assembly
+
+    resource_file: aukey_webcam_assembly.yaml
+    depends_on: []
 
   - name: xh_connector_assembly
 
