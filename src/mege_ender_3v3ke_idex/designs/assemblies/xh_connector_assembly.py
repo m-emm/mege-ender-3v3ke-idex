@@ -5,7 +5,6 @@ from mege_ender_3v3ke_idex.designs.assemblies.pin_header_board_helpers import (
 )
 from shellforgepy.simple import *
 
-
 XH_CONNECTOR_PITCH = 2.5
 XH_CONNECTOR_BODY_WIDTH_EXTRA = 4.9
 XH_CONNECTOR_HOUSING_DEPTH = 5.75

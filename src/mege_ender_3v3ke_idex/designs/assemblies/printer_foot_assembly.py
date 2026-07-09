@@ -24,6 +24,7 @@ PROD = os.environ.get("SHELLFORGEPY_PRODUCTION", "0") == "1"
 
 stablilization_slit_thickness = 0.1
 
+
 def create_printer_foot_assembly(
     *,
     printer_foot_height,
@@ -49,10 +50,6 @@ def create_printer_foot_assembly(
         printer_foot_top_size,
         printer_foot_height,
     )
-
-    
-    
-    
 
     foot = rotate(180, axis=(1, 0, 0))(foot)
 
@@ -91,29 +88,41 @@ def create_printer_foot_assembly(
         slit = translate(0, 0, -tpu_slit_clearance)(slit)
         foot = foot.cut(slit)
 
-
-    stablization_slit_cutter = create_box(printer_foot_base_size / 7, stablilization_slit_thickness, printer_foot_height - 4)
+    stablization_slit_cutter = create_box(
+        printer_foot_base_size / 7,
+        stablilization_slit_thickness,
+        printer_foot_height - 4,
+    )
     stablization_slit_turned = rotate(90)(stablization_slit_cutter)
-    stablization_slit_turned = align(stablization_slit_turned, stablization_slit_cutter, Alignment.CENTER)
+    stablization_slit_turned = align(
+        stablization_slit_turned, stablization_slit_cutter, Alignment.CENTER
+    )
 
     stablization_slit_cutter = stablization_slit_cutter.fuse(stablization_slit_turned)
     stablization_slit_cutter = rotate(45)(stablization_slit_cutter)
 
-
     slit_cutters = PartCollector()
-    for slit_alignment in [Alignment.STACK_FRONT, Alignment.STACK_BACK, Alignment.STACK_LEFT, Alignment.STACK_RIGHT]:
+    for slit_alignment in [
+        Alignment.STACK_FRONT,
+        Alignment.STACK_BACK,
+        Alignment.STACK_LEFT,
+        Alignment.STACK_RIGHT,
+    ]:
         slit_cutter = align(stablization_slit_cutter, foot, Alignment.CENTER)
-        slit_cutter = align(slit_cutter, screw_mount_assembly.cutters[0], slit_alignment, stack_gap= 3)
+        slit_cutter = align(
+            slit_cutter, screw_mount_assembly.cutters[0], slit_alignment, stack_gap=3
+        )
 
-        slit_cutter_limiter = create_cylinder (MScrew.from_size(printer_foot_mount_screw_size).clearance_hole_loose / 2 + 3,500)
+        slit_cutter_limiter = create_cylinder(
+            MScrew.from_size(printer_foot_mount_screw_size).clearance_hole_loose / 2
+            + 3,
+            500,
+        )
         slit_cutter_limiter = align(slit_cutter_limiter, foot, Alignment.CENTER)
         slit_cutter = slit_cutter.cut(slit_cutter_limiter)
-                                                                        
 
         foot = foot.cut(slit_cutter)
         slit_cutters = slit_cutters.fuse(slit_cutter)
-
-        
 
     ratio = ((printer_foot_base_size - printer_foot_top_size) / 2) / printer_foot_height
 

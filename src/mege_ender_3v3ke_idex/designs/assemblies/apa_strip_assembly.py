@@ -2,7 +2,6 @@
 
 from shellforgepy.simple import *
 
-
 APA_STRIP_INFO = {
     "D60pm": {
         "leds_per_meter": 60,
@@ -106,7 +105,9 @@ def create_apa_strip_assembly(
             if previous_pad is None:
                 pad = align(pad, pad_column, Alignment.FRONT)
             else:
-                pad = align(pad, previous_pad, Alignment.STACK_BACK, stack_gap=pad_stack_gap)
+                pad = align(
+                    pad, previous_pad, Alignment.STACK_BACK, stack_gap=pad_stack_gap
+                )
             pad = align(pad, pad_column, Alignment.CENTER, axes=[2])
             assembly.add_named_follower(
                 pad,
