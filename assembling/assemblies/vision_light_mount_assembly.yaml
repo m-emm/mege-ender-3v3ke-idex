@@ -145,6 +145,8 @@ Parameters:
     Type: Float
   vision_light_mount_screw_mount_clearance_type:
     Type: String
+  vision_light_mount_strip_gap:
+    Type: Float
   BIG_THING:
     Type: Float
 

@@ -4,7 +4,7 @@ from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_screw_mount_assembly,
 )
 from shellforgepy.simple import *
-
+import numpy as np
 
 def create_vision_light_mount_assembly(
     *,
@@ -35,12 +35,20 @@ def create_vision_light_mount_assembly(
     vision_light_mount_clamp_nut_clearance,
     vision_light_mount_clamp_cylinder_head_clearance,
     vision_light_mount_screw_mount_clearance_type,
+    vision_light_mount_strip_gap,
     BIG_THING,
 ):
     """Build a PETG-CF mount using the bed/undercarriage as references."""
 
     _ = print_bed.leader
     _ = BIG_THING
+
+
+    cover_screw_size = "M2.5" # TODO: make all these parameters with proper prefix, and add to idex_parameters.yaml
+    cover_screw_inset = 3.5
+    cover_screw_length = 10
+    cover_screw_cylinder_head_clearance = 0.1
+
 
     strip_leaders = {
         Alignment.FRONT: apa_strip_front.leader,
@@ -256,7 +264,7 @@ def create_vision_light_mount_assembly(
 
         connector_cutter = materialize_bounding_box(
             connector,
-            x_enlargement=1.0,
+            x_enlargement=1.5,
             y_enlargement=20,
             z_enlargement=0.5,
         )
@@ -278,21 +286,22 @@ def create_vision_light_mount_assembly(
     )
     
     cover = align(cover, plate, Alignment.CENTER)
-    cover = align(cover, connector_visual_parts[0][1], Alignment.STACK_TOP)
+    cover = align(cover, connector_visual_parts[0][1], Alignment.STACK_TOP, stack_gap=1)
 
 
     cover_bbox = get_bounding_box(cover)
     plate_bbox = get_bounding_box(plate)
+    strips_bbox = get_bounding_box(strip_leaders_fused)
 
     strip_downholder = create_box(
         plate_width,
         3,
-        cover_bbox[1][2] - plate_bbox[1][2],
+        cover_bbox[1][2] - strips_bbox[1][2],
     )
     strip_downholder_rotated = create_box(
         3,
         plate_depth,
-        cover_bbox[1][2] - plate_bbox[1][2],
+        cover_bbox[1][2] - strips_bbox[1][2],
     )
 
     strip_downholder_rotated = align(
@@ -302,6 +311,27 @@ def create_vision_light_mount_assembly(
 
     strip_downholder = align(strip_downholder, cover, Alignment.CENTER)
     strip_downholder = align(strip_downholder, cover, Alignment.TOP)
+
+
+    downholder_border_cutter = create_box_hole_cutter(plate_width - 2*vision_light_mount_plate_border - 2*vision_light_mount_strip_pocket_clearance, plate_depth - 2*vision_light_mount_plate_border - 2*vision_light_mount_strip_pocket_clearance, 500)
+    downholder_border_cutter = align(downholder_border_cutter, strip_downholder, Alignment.CENTER)
+    
+
+    downholder_border_cutter = downholder_border_cutter.cutters[0]
+
+    downholder_border_cutter_shaver = create_box(BIG_THING, BIG_THING, BIG_THING)
+
+    downholder_border_cutter_shaver = align(downholder_border_cutter_shaver, cover, Alignment.CENTER)
+    downholder_border_cutter_shaver = align(downholder_border_cutter_shaver, cover, Alignment.BOTTOM)
+    downholder_border_cutter = downholder_border_cutter.cut(downholder_border_cutter_shaver)
+
+    strip_downholder = strip_downholder.cut(downholder_border_cutter)
+
+    strip_downholder_inner_cutter = materialize_bounding_box(aperture, x_enlargement=2*vision_light_mount_strip_gap, y_enlargement=2*vision_light_mount_strip_gap, z_enlargement=500)
+        
+
+    strip_downholder_inner_cutter = align(strip_downholder_inner_cutter, cover, Alignment.STACK_BOTTOM)
+    strip_downholder = strip_downholder.cut(strip_downholder_inner_cutter)
 
     for strip in strip_leaders.values():
         strip_cutter = materialize_bounding_box(
@@ -318,17 +348,78 @@ def create_vision_light_mount_assembly(
 
 
 
-    cover_screw_size = "M2.5"
-    cover_screw_inset = 3.5
-    cover_screw_length = 10
-    cover_screw_cylinder_head_clearance = 0.1
     cover_screw_target_height = get_bounding_box_size(cover)[2]
     cover_mount_clearance_holes = PartCollector()
     cover_mount_cylinder_head_cutters = PartCollector()
     cover_mount_self_threading_holes = PartCollector()
     cover_screw_mounts = None
+
+    edge_map = {
+
+        (Alignment.LEFT, Alignment.FRONT): Alignment.EDGE_LEFT,
+        (Alignment.LEFT, Alignment.BACK): Alignment.EDGE_BACK,
+        (Alignment.RIGHT, Alignment.FRONT): Alignment.EDGE_RIGHT,
+        (Alignment.RIGHT, Alignment.BACK): Alignment.EDGE_FRONT,
+    }
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         for fb in [Alignment.FRONT, Alignment.BACK]:
+
+            for i in [0,1]:
+
+
+                target = create_cylinder(1, cover_screw_target_height)
+                target = align(target, cover, Alignment.CENTER)
+                target = align(target, cover, lr.edge_alignment)
+                target = align(target, cover, fb.edge_alignment)
+                target = translate(
+                    -lr.sign * cover_screw_inset,
+                    -fb.sign * cover_screw_inset,
+                    0,
+                )(target)
+
+                # if i == 1, then we "rotate"  to the center of the edge in the clockwise direction, so that we additionally have a screw on the edge center
+
+
+                if i == 1:
+                    edge = edge_map[(lr, fb)]
+
+                    target = align(target, cover, Alignment.CENTER)
+                    target = align(target, cover, edge)
+                    translate_vector = np.array([ 1 if edge.axis == i else 0 for i in range(3)])    * (cover_screw_inset*-edge.sign)
+
+                    target = translate(*translate_vector)(target)
+
+
+
+
+
+
+                mount_screw_assembly = create_screw_mount_assembly(
+                    target,
+                    screw_size=cover_screw_size,
+                    screw_length=cover_screw_length,
+                    screw_direction=Alignment.TOP,
+                    with_nut_cutter=False,
+                    flush_with_top=True,
+                    cylinder_head_cutter_clearance=cover_screw_cylinder_head_clearance,
+                    clearance_type="loose",
+                )
+                cover_mount_clearance_holes = cover_mount_clearance_holes.fuse(
+                    mount_screw_assembly.get_named_cutter("hole_cutter")
+                )
+                cover_mount_cylinder_head_cutters = (
+                    cover_mount_cylinder_head_cutters.fuse(
+                        mount_screw_assembly.get_named_cutter("cylinder_head_cutter")
+                    )
+                )
+                mount_screw_assembly = mount_screw_assembly.prefixed_copy(
+                    f"cover_{lr.name.lower()}_{fb.name.lower()}_{i}_"
+                )
+                cover_screw_mounts = (
+                    mount_screw_assembly
+                    if cover_screw_mounts is None
+                    else cover_screw_mounts.fuse(mount_screw_assembly)
+                )
             target = create_cylinder(1, cover_screw_target_height)
             target = align(target, cover, Alignment.CENTER)
             target = align(target, cover, lr.edge_alignment)
