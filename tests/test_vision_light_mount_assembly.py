@@ -225,6 +225,7 @@ def test_vision_light_mount_derives_aperture_and_exports_only_own_references():
     assert set(mount.non_production_indices_by_name) == {
         "clamp_screws",
         "clamp_nuts",
+        "cover_mount_screws",
         "xh_connector_left_housing",
         "xh_connector_left_pins",
         "xh_connector_right_housing",
@@ -235,6 +236,9 @@ def test_vision_light_mount_derives_aperture_and_exports_only_own_references():
         "strip_pockets",
         "front_spar_keepout",
         "clamp_screw_holes",
+        "cover_mount_clearance_holes",
+        "cover_mount_cylinder_head_cutters",
+        "cover_mount_self_threading_holes",
     } <= set(mount.cutter_indices_by_name)
 
     aperture_size = get_bounding_box_size(mount.get_named_cutter("aperture"))
@@ -243,6 +247,54 @@ def test_vision_light_mount_derives_aperture_and_exports_only_own_references():
     assert aperture_size[1] > 0
     assert aperture_size[0] < pocket_size[0]
     assert aperture_size[1] < pocket_size[1]
+
+
+def test_vision_light_mount_cover_screws_are_flush_and_cut_cover_and_base():
+    mount = _build_mount()
+    cover = mount.get_named_follower("cover")
+    cover_mount_screws = mount.get_named_non_production_part("cover_mount_screws")
+    clearance_holes = mount.get_named_cutter("cover_mount_clearance_holes")
+    cylinder_head_cutters = mount.get_named_cutter(
+        "cover_mount_cylinder_head_cutters"
+    )
+    self_threading_holes = mount.get_named_cutter(
+        "cover_mount_self_threading_holes"
+    )
+
+    cover_bbox = get_bounding_box(cover)
+    cover_mount_screws_bbox = get_bounding_box(cover_mount_screws)
+    clearance_bbox = get_bounding_box(clearance_holes)
+    cylinder_head_bbox = get_bounding_box(cylinder_head_cutters)
+    self_threading_bbox = get_bounding_box(self_threading_holes)
+    clearance_center = get_bounding_box_center(clearance_holes)
+    self_threading_center = get_bounding_box_center(self_threading_holes)
+
+    assert cover_mount_screws_bbox[1][2] <= cover_bbox[1][2] + 0.05
+    assert clearance_bbox[0][2] <= cover_bbox[0][2] + 0.05
+    assert clearance_bbox[1][2] >= cover_bbox[0][2] + 0.05
+    assert cylinder_head_bbox[0][2] < cover_bbox[1][2]
+    assert cylinder_head_bbox[1][2] >= cover_bbox[1][2] - 0.05
+    assert cylinder_head_bbox[0][2] <= clearance_bbox[1][2] + 0.05
+    assert cylinder_head_bbox[0][0] < clearance_bbox[0][0]
+    assert cylinder_head_bbox[1][0] > clearance_bbox[1][0]
+    assert cylinder_head_bbox[0][1] < clearance_bbox[0][1]
+    assert cylinder_head_bbox[1][1] > clearance_bbox[1][1]
+    assert self_threading_center[:2] == pytest.approx(
+        clearance_center[:2],
+        abs=0.05,
+    )
+    assert self_threading_bbox[1][2] == pytest.approx(
+        cover_bbox[0][2],
+        abs=0.05,
+    )
+
+    generator_source = (
+        ASSEMBLIES_DIR.parents[1]
+        / "src/mege_ender_3v3ke_idex/designs/assemblies/"
+        / "vision_light_mount_assembly.py"
+    ).read_text()
+    assert "flush_with_top=True" in generator_source
+    assert "lead_in=True" in generator_source
 
 
 def test_vision_light_mount_u_channel_uses_clean_spar_reference():
@@ -316,7 +368,6 @@ def test_vision_light_mount_uses_horizontal_bridge_without_vertical_connector():
 
 def test_vision_light_mount_places_side_xh_connector_visuals_on_plate():
     mount = _build_mount()
-    leader_bbox = get_bounding_box(mount.leader)
     left_housing = mount.get_named_non_production_part("xh_connector_left_housing")
     right_housing = mount.get_named_non_production_part("xh_connector_right_housing")
     left_pins = mount.get_named_non_production_part("xh_connector_left_pins")
@@ -327,15 +378,19 @@ def test_vision_light_mount_places_side_xh_connector_visuals_on_plate():
     left_pins_bbox = get_bounding_box(left_pins)
     right_pins_bbox = get_bounding_box(right_pins)
     strip_pockets_bbox = get_bounding_box(mount.get_named_cutter("strip_pockets"))
+    left_housing_center = get_bounding_box_center(left_housing)
+    right_housing_center = get_bounding_box_center(right_housing)
     left_housing_size = get_bounding_box_size(left_housing)
     right_housing_size = get_bounding_box_size(right_housing)
 
-    assert left_housing_size[0] == pytest.approx(XH_CONNECTOR_HOUSING_HEIGHT)
+    assert left_housing_size[0] > left_housing_size[1]
+    assert left_housing_size[1] == pytest.approx(XH_CONNECTOR_HOUSING_HEIGHT)
     assert left_housing_size[2] == pytest.approx(XH_CONNECTOR_HOUSING_DEPTH)
-    assert right_housing_size[0] == pytest.approx(XH_CONNECTOR_HOUSING_HEIGHT)
+    assert right_housing_size[0] == pytest.approx(left_housing_size[0])
+    assert right_housing_size[1] == pytest.approx(XH_CONNECTOR_HOUSING_HEIGHT)
     assert right_housing_size[2] == pytest.approx(XH_CONNECTOR_HOUSING_DEPTH)
-    assert left_housing_bbox[0][0] == pytest.approx(leader_bbox[0][0], abs=0.05)
-    assert right_housing_bbox[1][0] == pytest.approx(leader_bbox[1][0], abs=0.05)
+    assert left_housing_center[0] < right_housing_center[0]
+    assert left_housing_center[1] == pytest.approx(right_housing_center[1], abs=0.05)
     assert left_housing_bbox[0][2] == pytest.approx(
         right_housing_bbox[0][2],
         abs=0.05,
@@ -344,8 +399,8 @@ def test_vision_light_mount_places_side_xh_connector_visuals_on_plate():
     assert right_housing_bbox[0][2] > strip_pockets_bbox[0][2]
     assert left_pins_bbox[0][2] > strip_pockets_bbox[0][2]
     assert right_pins_bbox[0][2] > strip_pockets_bbox[0][2]
-    assert left_pins_bbox[1][0] > left_housing_bbox[1][0]
-    assert right_pins_bbox[0][0] < right_housing_bbox[0][0]
+    assert left_pins_bbox[1][1] > left_housing_bbox[1][1]
+    assert right_pins_bbox[1][1] > right_housing_bbox[1][1]
 
 
 def test_vision_light_mount_yaml_wiring_and_preview_context():
@@ -383,6 +438,13 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
     assert any(
         part.get("source") == "self"
         and part.get("artifact") == "non_production_parts"
+        and part.get("names")
+        == ["clamp_screws", "clamp_nuts", "cover_mount_screws"]
+        for part in visualization
+    )
+    assert any(
+        part.get("source") == "self"
+        and part.get("artifact") == "non_production_parts"
         and part.get("names") == ["xh_connector_*_housing"]
         for part in visualization
     )
@@ -399,6 +461,13 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
             "name": "vision_light_mount",
             "prod_rotation_angle": -90,
             "prod_rotation_axis": [0, 1, 0],
+        },
+        {
+            "source": "self",
+            "artifact": "followers",
+            "flip": True,
+            "names": ["cover"],
+            "name_template": "{name}",
         }
     ]
     assert not any(

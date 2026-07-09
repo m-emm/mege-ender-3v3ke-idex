@@ -240,44 +240,8 @@ def create_vision_light_mount_assembly(
 
     u_channel = screw_mounts.use_as_cutter_on(u_channel)
 
-    u_bbox = get_bounding_box(u_channel)
-    bridge_front_part = plate if plate_bbox[0][1] <= u_bbox[0][1] else u_channel
-    bridge_front_y = min(plate_bbox[0][1], u_bbox[0][1])
-    bridge_depth = aperture_bbox[0][1] - bridge_front_y
 
     leader = plate.fuse(u_channel)
-    if bridge_depth > 0:
-        bridge = create_box(
-            vision_light_mount_clamp_width,
-            bridge_depth,
-            vision_light_mount_bridge_thickness,
-        )
-        bridge = align(bridge, u_channel, Alignment.CENTER, axes=[0])
-        bridge = align(
-            bridge,
-            bridge_front_part,
-            Alignment.FRONT,
-        )
-        bridge = align(bridge, plate, Alignment.BOTTOM)
-
-        bridge_plate_overlap = create_box(
-            vision_light_mount_clamp_width,
-            vision_light_mount_bridge_overlap,
-            vision_light_mount_bridge_thickness,
-        )
-        bridge_plate_overlap = align(
-            bridge_plate_overlap,
-            bridge,
-            Alignment.CENTER,
-            axes=[0, 2],
-        )
-        bridge_plate_overlap = align(
-            bridge_plate_overlap,
-            aperture,
-            Alignment.STACK_FRONT,
-        )
-
-        leader = leader.fuse(bridge).fuse(bridge_plate_overlap)
 
     connector_visual_parts = []
     connecctor_cutters = PartCollector()
@@ -369,36 +333,73 @@ def create_vision_light_mount_assembly(
 
 
 
-    cover_screw_size ="M2.5"
+    cover_screw_size = "M2.5"
     cover_screw_inset = 3.5
     cover_screw_length = 10
+    cover_screw_cylinder_head_clearance = 0.1
+    cover_screw_target_height = get_bounding_box_size(cover)[2]
+    cover_mount_clearance_holes = PartCollector()
+    cover_mount_cylinder_head_cutters = PartCollector()
+    cover_mount_self_threading_holes = PartCollector()
     cover_screw_mounts = None
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         for fb in [Alignment.FRONT, Alignment.BACK]:
-
-            target = create_cylinder(1, 5)
+            target = create_cylinder(1, cover_screw_target_height)
             target = align(target, cover, Alignment.CENTER)
             target = align(target, cover, lr.edge_alignment)
             target = align(target, cover, fb.edge_alignment)
-
-            target = translate(-lr.sign *cover_screw_inset, -fb.sign * cover_screw_inset, 0)(target)
-                           
+            target = translate(
+                -lr.sign * cover_screw_inset,
+                -fb.sign * cover_screw_inset,
+                0,
+            )(target)
 
             mount_screw_assembly = create_screw_mount_assembly(
                 target,
                 screw_size=cover_screw_size,
                 screw_length=cover_screw_length,
                 screw_direction=Alignment.TOP,
-                with_nut_cutter=False)
-        
-            mount_screw_assembly = mount_screw_assembly.prefixed_copy(f"cover_{lr.name.lower()}_{fb.name.lower()}_")
-            cover_screw_mounts = mount_screw_assembly if cover_screw_mounts is None else cover_screw_mounts.fuse(mount_screw_assembly)
+                with_nut_cutter=False,
+                flush_with_top=True,
+                cylinder_head_cutter_clearance=cover_screw_cylinder_head_clearance,
+                clearance_type="loose",
+            )
+            cover_mount_clearance_holes = cover_mount_clearance_holes.fuse(
+                mount_screw_assembly.get_named_cutter("hole_cutter")
+            )
+            cover_mount_cylinder_head_cutters = (
+                cover_mount_cylinder_head_cutters.fuse(
+                    mount_screw_assembly.get_named_cutter("cylinder_head_cutter")
+                )
+            )
+            mount_screw_assembly = mount_screw_assembly.prefixed_copy(
+                f"cover_{lr.name.lower()}_{fb.name.lower()}_"
+            )
+            cover_screw_mounts = (
+                mount_screw_assembly
+                if cover_screw_mounts is None
+                else cover_screw_mounts.fuse(mount_screw_assembly)
+            )
 
+            self_threading_hole = create_self_threading_hole_cutter(
+                cover_screw_size,
+                vision_light_mount_plate_thickness + 2,
+                lead_in=True,
+            )
+            self_threading_hole = align(
+                self_threading_hole,
+                target,
+                Alignment.CENTER,
+                axes=[0, 1],
+            )
+            self_threading_hole = align(self_threading_hole, plate, Alignment.TOP)
+            cover_mount_self_threading_holes = (
+                cover_mount_self_threading_holes.fuse(self_threading_hole)
+            )
 
-            
-
-
-
+    cover = cover.cut(cover_mount_clearance_holes)
+    cover = cover.cut(cover_mount_cylinder_head_cutters)
+    leader = leader.cut(cover_mount_self_threading_holes)
 
 
 
@@ -425,6 +426,18 @@ def create_vision_light_mount_assembly(
     assembly.add_named_cutter(strip_pockets, "strip_pockets")
     assembly.add_named_cutter(front_spar_keepout, "front_spar_keepout")
     assembly.add_named_cutter(clamp_screw_holes, "clamp_screw_holes")
+    assembly.add_named_cutter(
+        cover_mount_clearance_holes,
+        "cover_mount_clearance_holes",
+    )
+    assembly.add_named_cutter(
+        cover_mount_cylinder_head_cutters,
+        "cover_mount_cylinder_head_cutters",
+    )
+    assembly.add_named_cutter(
+        cover_mount_self_threading_holes,
+        "cover_mount_self_threading_holes",
+    )
     assembly.add_named_non_production_part(clamp_screws, "clamp_screws")
     assembly.add_named_non_production_part(clamp_nuts, "clamp_nuts")
     assembly.add_named_non_production_part(cover_mount_screws, "cover_mount_screws")

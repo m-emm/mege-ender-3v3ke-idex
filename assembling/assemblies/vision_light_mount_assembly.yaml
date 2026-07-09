@@ -47,6 +47,7 @@ Builder:
         names:
           - clamp_screws
           - clamp_nuts
+          - cover_mount_screws
         name_template: "{name}"
         color: [0.78, 0.78, 0.72]
       - source: self
