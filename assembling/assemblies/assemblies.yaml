@@ -1337,6 +1337,7 @@ assemblies:
       - apa_strip_back_assembly
       - apa_strip_left_assembly
       - apa_strip_right_assembly
+      - xh_b4b_xh_a_assembly
     inject_parts:
       print_bed: print_bed_assembly
       print_bed_undercarriage: print_bed_undercarriage_assembly
@@ -1344,6 +1345,7 @@ assemblies:
       apa_strip_back: apa_strip_back_assembly
       apa_strip_left: apa_strip_left_assembly
       apa_strip_right: apa_strip_right_assembly
+      xh_b4b_xh_a: xh_b4b_xh_a_assembly
 
   - name: xh_connector_assembly
 

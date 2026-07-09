@@ -14,6 +14,7 @@ def create_vision_light_mount_assembly(
     apa_strip_back,
     apa_strip_left,
     apa_strip_right,
+    xh_b4b_xh_a,
     vision_light_mount_plate_thickness,
     vision_light_mount_plate_border,
     vision_light_mount_plate_fillet_radius,
@@ -278,6 +279,52 @@ def create_vision_light_mount_assembly(
 
         leader = leader.fuse(bridge).fuse(bridge_plate_overlap)
 
+    connector_visual_parts = []
+    connecctor_cutters = PartCollector()
+    for connector_alignment in [Alignment.LEFT, Alignment.RIGHT]:
+        strip_to_align = strip_leaders[connector_alignment]
+        connector_name = connector_alignment.name.lower()
+        connector = rotate(-90, axis=(0, 1, 0))(
+            xh_b4b_xh_a
+        )
+        connector = rotate(90)(connector)
+        connector = align(connector, strip_to_align, Alignment.CENTER)
+        connector = align(connector, strip_to_align, Alignment.STACK_FRONT,stack_gap=0.5)
+
+        connector = connector.aligned_from_non_production_part("pins", strip_to_align, Alignment.STACK_TOP)
+
+        connector_visual_parts.append(
+            (f"xh_connector_{connector_name}_housing", connector.leader)
+        )
+        for name, part in connector.get_named_follower_items():
+            connector_visual_parts.append(
+                (f"xh_connector_{connector_name}_{name}", part)
+            )
+        for name, part in connector.get_named_non_production_part_items():
+            connector_visual_parts.append(
+                (f"xh_connector_{connector_name}_{name}", part)
+            )
+
+        connector_cutter = materialize_bounding_box(
+            connector,
+            x_enlargement=1.0,
+            y_enlargement=20,
+            z_enlargement=0.5,
+        )
+        connector_cutter = align(connector_cutter, connector, Alignment.BACK)
+        connector_cutter = translate(0, -0.5, 0)(connector_cutter)
+
+        connecctor_cutters = connecctor_cutters.fuse(connector_cutter)
+
+
+    leader = leader.cut(connecctor_cutters)
+
+
+    cover = materialize_bounding_box(
+        leader)
+
+    cover = align(cover, connector_visual_parts[0][1], Alignment.STACK_TOP)
+
     clamp_screw_holes = PartCollector()
     for _name, cutter in screw_mounts.get_named_cutter_items():
         clamp_screw_holes = clamp_screw_holes.fuse(cutter)
@@ -297,5 +344,8 @@ def create_vision_light_mount_assembly(
     assembly.add_named_cutter(clamp_screw_holes, "clamp_screw_holes")
     assembly.add_named_non_production_part(clamp_screws, "clamp_screws")
     assembly.add_named_non_production_part(clamp_nuts, "clamp_nuts")
+    assembly.add_named_follower(cover, "cover")
+    for name, part in connector_visual_parts:
+        assembly.add_named_non_production_part(part, name)
 
     return assembly

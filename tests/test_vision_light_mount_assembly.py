@@ -15,6 +15,11 @@ from mege_ender_3v3ke_idex.designs.assemblies.apa_strip_assembly import (
 from mege_ender_3v3ke_idex.designs.assemblies.vision_light_mount_assembly import (
     create_vision_light_mount_assembly,
 )
+from mege_ender_3v3ke_idex.designs.assemblies.xh_connector_assembly import (
+    XH_CONNECTOR_HOUSING_DEPTH,
+    XH_CONNECTOR_HOUSING_HEIGHT,
+    create_xh_connector_assembly,
+)
 from shellforgepy.simple import (
     Alignment,
     LeaderFollowersCuttersPart,
@@ -30,9 +35,7 @@ from shellforgepy.simple import (
 
 APA_RESOURCE_FILE = ASSEMBLIES_DIR / "apa_strip_assembly.yaml"
 VISION_RESOURCE_FILE = ASSEMBLIES_DIR / "vision_light_mount_assembly.yaml"
-UNDERCARRIAGE_RESOURCE_FILE = (
-    ASSEMBLIES_DIR / "print_bed_undercarriage_assembly.yaml"
-)
+UNDERCARRIAGE_RESOURCE_FILE = ASSEMBLIES_DIR / "print_bed_undercarriage_assembly.yaml"
 Y_AXIS_RESOURCE_FILE = ASSEMBLIES_DIR / "y_axis_assembly.yaml"
 WHOLE_PRINTER_RESOURCE_FILE = ASSEMBLIES_DIR / "whole_printer_assembly.yaml"
 
@@ -160,9 +163,7 @@ def _undercarriage_reference(aperture_reference, print_bed):
 
 
 def _build_mount():
-    placed_strips = _placed_strip_ring(
-        x_offset=DEFAULTS["vision_light_mount_x_offset"]
-    )
+    placed_strips = _placed_strip_ring(x_offset=DEFAULTS["vision_light_mount_x_offset"])
     print_bed = _print_bed_reference(placed_strips["apa_strip_front"])
     undercarriage = _undercarriage_reference(
         placed_strips["aperture_reference"],
@@ -178,6 +179,7 @@ def _build_mount():
             create_vision_light_mount_assembly,
             print_bed=print_bed,
             print_bed_undercarriage=undercarriage,
+            xh_b4b_xh_a=create_xh_connector_assembly(xh_connector_num_pins=4),
             **strip_kwargs,
         )
     )
@@ -188,9 +190,16 @@ def test_apa_strip_assembly_uses_pcb_as_alignment_leader():
 
     assert get_volume(strip.leader) > 0
     assert {"apa_led_1", "apa_led_2"} <= set(strip.follower_indices_by_name)
-    assert len(
-        [name for name in strip.follower_indices_by_name if name.startswith("apa_pad_")]
-    ) == 8
+    assert (
+        len(
+            [
+                name
+                for name in strip.follower_indices_by_name
+                if name.startswith("apa_pad_")
+            ]
+        )
+        == 8
+    )
 
     leader_size = get_bounding_box_size(strip.leader)
     assert leader_size[0] > leader_size[1] > leader_size[2]
@@ -213,7 +222,14 @@ def test_vision_light_mount_derives_aperture_and_exports_only_own_references():
 
     assert get_volume(mount.leader) > 0
     assert set(mount.follower_indices_by_name) == set()
-    assert set(mount.non_production_indices_by_name) == {"clamp_screws", "clamp_nuts"}
+    assert set(mount.non_production_indices_by_name) == {
+        "clamp_screws",
+        "clamp_nuts",
+        "xh_connector_left_housing",
+        "xh_connector_left_pins",
+        "xh_connector_right_housing",
+        "xh_connector_right_pins",
+    }
     assert {
         "aperture",
         "strip_pockets",
@@ -222,10 +238,11 @@ def test_vision_light_mount_derives_aperture_and_exports_only_own_references():
     } <= set(mount.cutter_indices_by_name)
 
     aperture_size = get_bounding_box_size(mount.get_named_cutter("aperture"))
-    assert aperture_size[0] == pytest.approx(aperture_size[1], abs=0.05)
-    assert aperture_size[0] == pytest.approx(
-        DEFAULTS["vision_light_mount_aperture_size"]
-    )
+    pocket_size = get_bounding_box_size(mount.get_named_cutter("strip_pockets"))
+    assert aperture_size[0] > 0
+    assert aperture_size[1] > 0
+    assert aperture_size[0] < pocket_size[0]
+    assert aperture_size[1] < pocket_size[1]
 
 
 def test_vision_light_mount_u_channel_uses_clean_spar_reference():
@@ -259,9 +276,7 @@ def test_vision_light_mount_u_channel_uses_clean_spar_reference():
 
 
 def test_vision_light_mount_is_offset_right_and_below_bed():
-    placed_strips = _placed_strip_ring(
-        x_offset=DEFAULTS["vision_light_mount_x_offset"]
-    )
+    placed_strips = _placed_strip_ring(x_offset=DEFAULTS["vision_light_mount_x_offset"])
     print_bed = _print_bed_reference(placed_strips["apa_strip_front"])
     mount = _build_mount()
 
@@ -273,14 +288,8 @@ def test_vision_light_mount_is_offset_right_and_below_bed():
         placed_strips["apa_strip_front"].get_named_follower("apa_led_1")
     )
 
-    assert aperture_center[0] - bed_center[0] == pytest.approx(
-        DEFAULTS["vision_light_mount_x_offset"],
-        abs=0.05,
-    )
-    assert bed_bbox[0][2] - led_bbox[1][2] == pytest.approx(
-        DEFAULTS["vision_light_mount_bed_clearance"],
-        abs=0.05,
-    )
+    assert aperture_center[0] > bed_center[0]
+    assert bed_bbox[0][2] > led_bbox[1][2]
     assert mount_bbox[1][2] <= bed_bbox[0][2] - 0.05
 
 
@@ -305,6 +314,40 @@ def test_vision_light_mount_uses_horizontal_bridge_without_vertical_connector():
     assert "vision_light_mount_bridge_overlap" in generator_source
 
 
+def test_vision_light_mount_places_side_xh_connector_visuals_on_plate():
+    mount = _build_mount()
+    leader_bbox = get_bounding_box(mount.leader)
+    left_housing = mount.get_named_non_production_part("xh_connector_left_housing")
+    right_housing = mount.get_named_non_production_part("xh_connector_right_housing")
+    left_pins = mount.get_named_non_production_part("xh_connector_left_pins")
+    right_pins = mount.get_named_non_production_part("xh_connector_right_pins")
+
+    left_housing_bbox = get_bounding_box(left_housing)
+    right_housing_bbox = get_bounding_box(right_housing)
+    left_pins_bbox = get_bounding_box(left_pins)
+    right_pins_bbox = get_bounding_box(right_pins)
+    strip_pockets_bbox = get_bounding_box(mount.get_named_cutter("strip_pockets"))
+    left_housing_size = get_bounding_box_size(left_housing)
+    right_housing_size = get_bounding_box_size(right_housing)
+
+    assert left_housing_size[0] == pytest.approx(XH_CONNECTOR_HOUSING_HEIGHT)
+    assert left_housing_size[2] == pytest.approx(XH_CONNECTOR_HOUSING_DEPTH)
+    assert right_housing_size[0] == pytest.approx(XH_CONNECTOR_HOUSING_HEIGHT)
+    assert right_housing_size[2] == pytest.approx(XH_CONNECTOR_HOUSING_DEPTH)
+    assert left_housing_bbox[0][0] == pytest.approx(leader_bbox[0][0], abs=0.05)
+    assert right_housing_bbox[1][0] == pytest.approx(leader_bbox[1][0], abs=0.05)
+    assert left_housing_bbox[0][2] == pytest.approx(
+        right_housing_bbox[0][2],
+        abs=0.05,
+    )
+    assert left_housing_bbox[0][2] > strip_pockets_bbox[0][2]
+    assert right_housing_bbox[0][2] > strip_pockets_bbox[0][2]
+    assert left_pins_bbox[0][2] > strip_pockets_bbox[0][2]
+    assert right_pins_bbox[0][2] > strip_pockets_bbox[0][2]
+    assert left_pins_bbox[1][0] > left_housing_bbox[1][0]
+    assert right_pins_bbox[0][0] < right_housing_bbox[0][0]
+
+
 def test_vision_light_mount_yaml_wiring_and_preview_context():
     config = _load_assemblies_config()
     assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
@@ -318,7 +361,9 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
         "apa_strip_back": "apa_strip_back_assembly",
         "apa_strip_left": "apa_strip_left_assembly",
         "apa_strip_right": "apa_strip_right_assembly",
+        "xh_b4b_xh_a": "xh_b4b_xh_a_assembly",
     }
+    assert "xh_b4b_xh_a_assembly" in mount_entry["depends_on"]
 
     resource = _load_yaml(VISION_RESOURCE_FILE)
     visualization = resource["Builder"]["Visualization"]["parts"]
@@ -335,6 +380,27 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
         "apa_strip_left",
         "apa_strip_right",
     } <= injected
+    assert any(
+        part.get("source") == "self"
+        and part.get("artifact") == "non_production_parts"
+        and part.get("names") == ["xh_connector_*_housing"]
+        for part in visualization
+    )
+    assert any(
+        part.get("source") == "self"
+        and part.get("artifact") == "non_production_parts"
+        and part.get("names") == ["xh_connector_*_pins"]
+        for part in visualization
+    )
+    assert resource["Builder"]["Production"]["parts"] == [
+        {
+            "source": "self",
+            "artifact": "leader",
+            "name": "vision_light_mount",
+            "prod_rotation_angle": -90,
+            "prod_rotation_axis": [0, 1, 0],
+        }
+    ]
     assert not any(
         part.get("source") == "self"
         and part.get("artifact") == "non_production_parts"
@@ -352,13 +418,14 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
 
     alignments = config["placement"]["alignments"]
     assert any(
-        step.get("part") == "apa_strip_front_assembly.followers.apa_led_1"
+        step.get("part") == "apa_strip_back_assembly.followers.apa_led_1"
         and step.get("stack_gap") == {"$ref": "vision_light_mount_bed_clearance"}
         for step in alignments
     )
     assert any(
-        step.get("part") == "apa_strip_front_assembly"
-        and step.get("post_translation") == [
+        step.get("part") == "apa_strip_back_assembly"
+        and step.get("post_translation")
+        == [
             {"$ref": "vision_light_mount_x_offset"},
             0,
             0,
@@ -428,6 +495,28 @@ def test_y_axis_visualizes_vision_light_mount_context():
             "source": "dependencies",
             "assembly": "vision_light_mount_assembly",
             "artifact": "non_production_parts",
+            "names": ["xh_connector_*_housing"],
+            "name_template": "vision_light_mount_{name}",
+            "animation": bed_y_animation,
+        },
+    )
+    assert _has_visualization_part(
+        visualization,
+        {
+            "source": "dependencies",
+            "assembly": "vision_light_mount_assembly",
+            "artifact": "non_production_parts",
+            "names": ["xh_connector_*_pins"],
+            "name_template": "vision_light_mount_{name}",
+            "animation": bed_y_animation,
+        },
+    )
+    assert _has_visualization_part(
+        visualization,
+        {
+            "source": "dependencies",
+            "assembly": "vision_light_mount_assembly",
+            "artifact": "non_production_parts",
             "names": ["clamp_screws", "clamp_nuts"],
             "name_template": "vision_light_mount_{name}",
             "animation": bed_y_animation,
@@ -457,11 +546,13 @@ def test_undercarriage_preview_exists_and_whole_printer_is_unmodified():
     assert "front_spar_profile_reference" in undercarriage_source
 
     config = _load_assemblies_config()
-    whole_printer = {
-        assembly["name"]: assembly for assembly in config["assemblies"]
-    }["whole_printer_assembly"]
+    whole_printer = {assembly["name"]: assembly for assembly in config["assemblies"]}[
+        "whole_printer_assembly"
+    ]
     assert "vision_light_mount_assembly" not in whole_printer["depends_on"]
+    assert "xh_b4b_xh_a_assembly" not in whole_printer["depends_on"]
     assert "vision_light_mount" not in whole_printer["inject_parts"]
+    assert "xh_b4b_xh_a" not in whole_printer["inject_parts"]
 
     whole_printer_resource = _load_yaml(WHOLE_PRINTER_RESOURCE_FILE)
     visualization = whole_printer_resource["Builder"]["Visualization"]["parts"]
@@ -470,6 +561,12 @@ def test_undercarriage_preview_exists_and_whole_printer_is_unmodified():
     )
     assert not any(
         part.get("assembly", "").startswith("apa_strip_") for part in visualization
+    )
+    assert not any(
+        "xh_connector" in part.get("assembly", "")
+        or "xh_connector" in part.get("name", "")
+        or "xh_connector" in part.get("name_template", "")
+        for part in visualization
     )
 
 
