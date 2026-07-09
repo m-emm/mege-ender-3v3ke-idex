@@ -1345,6 +1345,20 @@ assemblies:
       apa_strip_left: apa_strip_left_assembly
       apa_strip_right: apa_strip_right_assembly
 
+  - name: xh_connector_assembly
+
+    resource_file: xh_connector_assembly.yaml
+    depends_on: []
+    parameters:
+      xh_connector_num_pins: 4
+
+  - name: xh_b4b_xh_a_assembly
+
+    resource_file: xh_connector_assembly.yaml
+    depends_on: []
+    parameters:
+      xh_connector_num_pins: 4
+
   - name: y_axis_nema23_motor_bracket_assembly
 
     depends_on: []

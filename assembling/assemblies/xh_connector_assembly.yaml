@@ -1,0 +1,40 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Parameterized JST XH top-entry connector reference
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - top
+        - front
+        - isometric
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: leader
+        name: xh_connector_housing
+        color: [0.92, 0.92, 0.86]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - pins
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
+
+  Production:
+    parts: []
+
+Parameters:
+  xh_connector_num_pins:
+    Type: Integer
+    Default: 4
+
+Parts:
+  XhConnectorAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.xh_connector_assembly.create_xh_connector_assembly
