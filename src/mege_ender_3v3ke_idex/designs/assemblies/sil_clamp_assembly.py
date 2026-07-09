@@ -82,5 +82,6 @@ def create_sil_clamp_assembly(
         pins.get_follower_part_by_name("top_pins"),
         "top_pins",
     )
+    retval.add_named_cutter(pins.get_cutter_part_by_name("pin_cutters"), "pin_cutters")
 
     return retval

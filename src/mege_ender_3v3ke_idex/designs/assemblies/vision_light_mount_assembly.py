@@ -16,6 +16,7 @@ def create_vision_light_mount_assembly(
     apa_strip_left,
     apa_strip_right,
     xh_b4b_xh_a,
+    vision_lights_mount_additional_pins,
     vision_light_mount_plate_thickness,
     vision_light_mount_plate_border,
     vision_light_mount_plate_fillet_radius,
@@ -48,6 +49,7 @@ def create_vision_light_mount_assembly(
     cover_screw_inset = 3.5
     cover_screw_length = 10
     cover_screw_cylinder_head_clearance = 0.1
+    additional_pins_inset = 7
 
     strip_leaders = {
         Alignment.FRONT: apa_strip_front.leader,
@@ -281,6 +283,60 @@ def create_vision_light_mount_assembly(
 
     leader = leader.cut(connecctor_cutters)
 
+    cover_screw = MScrew.from_size(cover_screw_size)
+    additional_pins_side_inset = (
+        cover_screw_inset 
+    )
+    additional_pins_holders = PartCollector()
+    additional_pins_base_plate_cutters = PartCollector()
+    additional_pins_visual_parts = []
+    pin_cutters = PartCollector()
+    for side_alignment in [Alignment.LEFT, Alignment.RIGHT]:
+        positioned_pins = vision_lights_mount_additional_pins.copy()
+        positioned_pins = rotate(180, axis=(0, 1, 0))(positioned_pins)
+        positioned_pins = rotate(-90, axis=(0, 0, 1))(positioned_pins)
+        # positioned_pins = positioned_pins.aligned_from_follower(
+        #     "additional_pins_base_plate",
+        #     plate,
+        #     Alignment.BOTTOM,
+        # )
+        positioned_pins = align(positioned_pins, plate, Alignment.BOTTOM)
+
+        positioned_pins = positioned_pins.aligned_from_follower(
+            "additional_pins_base_plate",
+            plate,
+            Alignment.BACK,
+        )
+        positioned_pins = positioned_pins.aligned_from_follower(
+            "additional_pins_base_plate",
+            plate,
+            side_alignment,
+        )
+        positioned_pins = translate(
+            -side_alignment.sign * additional_pins_side_inset,
+            -additional_pins_inset,
+            0,
+        )(positioned_pins)
+
+        additional_pins_holders = additional_pins_holders.fuse(positioned_pins.leader)
+        additional_pins_base_plate = positioned_pins.get_follower_part_by_name(
+            "additional_pins_base_plate"
+        )
+        additional_pins_base_plate_cutters = additional_pins_base_plate_cutters.fuse(
+            materialize_bounding_box(additional_pins_base_plate, z_enlargement=500)
+        )
+
+        prefix = f"vision_lights_mount_additional_pins_{side_alignment.name.lower()}"
+        prefixed_pins = positioned_pins.prefixed_copy(prefix)
+        for name, part in prefixed_pins.get_named_non_production_part_items():
+            additional_pins_visual_parts.append((name, part))
+
+        pin_cutters = pin_cutters.fuse(
+            positioned_pins.get_cutter_part_by_name("pin_cutters"))
+
+    leader = leader.cut(additional_pins_base_plate_cutters)
+    leader = leader.fuse(additional_pins_holders)
+
     cover_plate = create_filleted_box(
         plate_width,
         plate_depth,
@@ -505,6 +561,7 @@ def create_vision_light_mount_assembly(
 
     cover = cover.cut(cover_mount_clearance_holes)
     cover = cover.cut(cover_mount_cylinder_head_cutters)
+    cover = cover.cut(pin_cutters)
 
     leader = leader.cut(cover_mount_self_threading_holes)
 
@@ -547,6 +604,8 @@ def create_vision_light_mount_assembly(
     assembly.add_named_non_production_part(cover_mount_screws, "cover_mount_screws")
     assembly.add_named_follower(cover, "cover")
     for name, part in connector_visual_parts:
+        assembly.add_named_non_production_part(part, name)
+    for name, part in additional_pins_visual_parts:
         assembly.add_named_non_production_part(part, name)
 
     return assembly

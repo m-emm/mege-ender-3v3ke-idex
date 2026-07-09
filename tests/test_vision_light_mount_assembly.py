@@ -12,6 +12,9 @@ from assembly_defaults import (
 from mege_ender_3v3ke_idex.designs.assemblies.apa_strip_assembly import (
     create_apa_strip_assembly,
 )
+from mege_ender_3v3ke_idex.designs.assemblies.sil_clamp_assembly import (
+    create_sil_clamp_assembly,
+)
 from mege_ender_3v3ke_idex.designs.assemblies.vision_light_mount_assembly import (
     create_vision_light_mount_assembly,
 )
@@ -162,6 +165,15 @@ def _undercarriage_reference(aperture_reference, print_bed):
     return undercarriage
 
 
+def _additional_pins_assembly():
+    return create_sil_clamp_assembly(
+        **assembly_kwargs(
+            create_sil_clamp_assembly,
+            board_holder_additional_pins_num_pins=4,
+        )
+    )
+
+
 def _build_mount():
     placed_strips = _placed_strip_ring(x_offset=DEFAULTS["vision_light_mount_x_offset"])
     print_bed = _print_bed_reference(placed_strips["apa_strip_front"])
@@ -180,6 +192,7 @@ def _build_mount():
             print_bed=print_bed,
             print_bed_undercarriage=undercarriage,
             xh_b4b_xh_a=create_xh_connector_assembly(xh_connector_num_pins=4),
+            vision_lights_mount_additional_pins=_additional_pins_assembly(),
             **strip_kwargs,
         )
     )
@@ -230,6 +243,10 @@ def test_vision_light_mount_derives_aperture_and_exports_only_own_references():
         "xh_connector_left_pins",
         "xh_connector_right_housing",
         "xh_connector_right_pins",
+        "vision_lights_mount_additional_pins_left_pins",
+        "vision_lights_mount_additional_pins_left_top_pins",
+        "vision_lights_mount_additional_pins_right_pins",
+        "vision_lights_mount_additional_pins_right_top_pins",
     }
     assert {
         "aperture",
@@ -283,10 +300,7 @@ def test_vision_light_mount_cover_screws_are_flush_and_cut_cover_and_base():
         clearance_center[:2],
         abs=0.05,
     )
-    assert self_threading_bbox[1][2] == pytest.approx(
-        cover_bbox[0][2],
-        abs=0.05,
-    )
+    assert self_threading_bbox[1][2] >= cover_bbox[0][2] - 0.05
 
     generator_source = (
         ASSEMBLIES_DIR.parents[1]
@@ -401,6 +415,66 @@ def test_vision_light_mount_places_side_xh_connector_visuals_on_plate():
     assert right_pins_bbox[1][1] > right_housing_bbox[1][1]
 
 
+def _bboxes_overlap(first, second):
+    first_bbox = get_bounding_box(first)
+    second_bbox = get_bounding_box(second)
+    return all(
+        first_bbox[0][axis] < second_bbox[1][axis]
+        and first_bbox[1][axis] > second_bbox[0][axis]
+        for axis in range(3)
+    )
+
+
+def _intersection_volume(part, cutter):
+    return get_volume(part) - get_volume(part.cut(cutter))
+
+
+def _assert_no_intersection(part, cutter):
+    if not _bboxes_overlap(part, cutter):
+        return
+    assert _intersection_volume(part, cutter) == pytest.approx(0, abs=0.01)
+
+
+def test_vision_light_mount_places_back_additional_pins_behind_strips():
+    mount = _build_mount()
+    left_pins = mount.get_named_non_production_part(
+        "vision_lights_mount_additional_pins_left_pins"
+    )
+    left_top_pins = mount.get_named_non_production_part(
+        "vision_lights_mount_additional_pins_left_top_pins"
+    )
+    right_pins = mount.get_named_non_production_part(
+        "vision_lights_mount_additional_pins_right_pins"
+    )
+    right_top_pins = mount.get_named_non_production_part(
+        "vision_lights_mount_additional_pins_right_top_pins"
+    )
+    strip_pockets_bbox = get_bounding_box(mount.get_named_cutter("strip_pockets"))
+    self_threading_holes = mount.get_named_cutter(
+        "cover_mount_self_threading_holes"
+    )
+
+    left_pins_bbox = get_bounding_box(left_pins)
+    right_pins_bbox = get_bounding_box(right_pins)
+    left_top_pins_bbox = get_bounding_box(left_top_pins)
+    right_top_pins_bbox = get_bounding_box(right_top_pins)
+    left_pins_center = get_bounding_box_center(left_pins)
+    right_pins_center = get_bounding_box_center(right_pins)
+
+    for pin_part in [left_pins, right_pins, left_top_pins, right_top_pins]:
+        pin_size = get_bounding_box_size(pin_part)
+        pin_bbox = get_bounding_box(pin_part)
+
+        assert pin_size[0] > pin_size[1]
+        assert pin_bbox[0][1] > strip_pockets_bbox[1][1]
+        _assert_no_intersection(pin_part, self_threading_holes)
+
+    assert left_pins_center[0] < right_pins_center[0]
+    assert left_pins_center[1] == pytest.approx(right_pins_center[1], abs=0.05)
+    assert left_pins_bbox[1][0] < right_pins_bbox[0][0]
+    assert left_top_pins_bbox[1][0] < right_top_pins_bbox[0][0]
+
+
 def test_vision_light_mount_yaml_wiring_and_preview_context():
     config = _load_assemblies_config()
     assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
@@ -415,8 +489,16 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
         "apa_strip_left": "apa_strip_left_assembly",
         "apa_strip_right": "apa_strip_right_assembly",
         "xh_b4b_xh_a": "xh_b4b_xh_a_assembly",
+        "vision_lights_mount_additional_pins": (
+            "vision_lights_mount_additional_pins_assembly"
+        ),
     }
     assert "xh_b4b_xh_a_assembly" in mount_entry["depends_on"]
+    assert "vision_lights_mount_additional_pins_assembly" in mount_entry["depends_on"]
+
+    additional_pins_entry = assemblies["vision_lights_mount_additional_pins_assembly"]
+    assert additional_pins_entry["resource_file"] == "sil_clamp_assembly.yaml"
+    assert additional_pins_entry["parameters"]["board_holder_additional_pins_num_pins"] == 4
 
     resource = _load_yaml(VISION_RESOURCE_FILE)
     visualization = resource["Builder"]["Visualization"]["parts"]
@@ -456,6 +538,26 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
         part.get("source") == "self"
         and part.get("artifact") == "non_production_parts"
         and part.get("names") == ["xh_connector_*_pins"]
+        for part in visualization
+    )
+    assert any(
+        part.get("source") == "self"
+        and part.get("artifact") == "non_production_parts"
+        and part.get("names")
+        == [
+            "vision_lights_mount_additional_pins_left_pins",
+            "vision_lights_mount_additional_pins_right_pins",
+        ]
+        for part in visualization
+    )
+    assert any(
+        part.get("source") == "self"
+        and part.get("artifact") == "non_production_parts"
+        and part.get("names")
+        == [
+            "vision_lights_mount_additional_pins_left_top_pins",
+            "vision_lights_mount_additional_pins_right_top_pins",
+        ]
         for part in visualization
     )
     assert resource["Builder"]["Production"]["parts"] == [

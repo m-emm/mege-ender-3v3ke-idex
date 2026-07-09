@@ -1327,6 +1327,20 @@ assemblies:
       apa_strip_num_leds: !Ref vision_light_mount_apa_strip_num_leds
       apa_strip_with_hull: !Ref vision_light_mount_apa_strip_with_hull
 
+  - name: vision_lights_mount_additional_pins_assembly
+
+    resource_file: sil_clamp_assembly.yaml
+    parameters:
+      x_axis_mcu_dil_pitch: !Ref x_axis_mcu_dil_pitch
+      x_axis_mcu_wire_wrap_pin_side: !Ref x_axis_mcu_wire_wrap_pin_side
+      x_axis_mcu_wire_wrap_pin_length: !Ref x_axis_mcu_wire_wrap_pin_length
+      x_axis_mcu_wire_wrap_pin_base_thickness: !Ref x_axis_mcu_wire_wrap_pin_base_thickness
+      x_axis_mcu_wire_wrap_pin_base_width: !Ref x_axis_mcu_wire_wrap_pin_base_width
+      x_axis_mcu_top_pin_length: !Ref x_axis_mcu_top_pin_length
+      board_holder_additional_pins_num_pins: 5
+      board_holder_additional_pins_base_plate_length: !Ref board_holder_additional_pins_base_plate_length
+      board_holder_base_plate_thickness:  3.6
+
   - name: vision_light_mount_assembly
 
     resource_file: vision_light_mount_assembly.yaml
@@ -1338,6 +1352,7 @@ assemblies:
       - apa_strip_left_assembly
       - apa_strip_right_assembly
       - xh_b4b_xh_a_assembly
+      - vision_lights_mount_additional_pins_assembly
     inject_parts:
       print_bed: print_bed_assembly
       print_bed_undercarriage: print_bed_undercarriage_assembly
@@ -1346,6 +1361,7 @@ assemblies:
       apa_strip_left: apa_strip_left_assembly
       apa_strip_right: apa_strip_right_assembly
       xh_b4b_xh_a: xh_b4b_xh_a_assembly
+      vision_lights_mount_additional_pins: vision_lights_mount_additional_pins_assembly
 
   - name: xh_connector_assembly
 
