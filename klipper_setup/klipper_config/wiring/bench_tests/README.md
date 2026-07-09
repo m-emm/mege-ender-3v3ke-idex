@@ -4,10 +4,19 @@ Small local hardware probes for wiring experiments.
 
 ## Current FT232H Bench Wiring
 
+Stepper/TB6600 bench wiring:
+
 - `D4` -> stripboard `STEP_gpio`
 - `D5` -> stripboard `DIR_gpio`
 - `D6` -> stripboard `ENA_gpio`
 - FT232H `GND` -> stripboard/control `GND`
+
+Vision-light bench wiring:
+
+- `D4` -> level-shifter clock input -> APA102 `CI`
+- `D5` -> level-shifter data input -> APA102 `DI`
+- FT232H `GND` -> level-shifter/APA102 common `GND`
+- 5V strip power -> APA102 `5V`, with a common ground to the FT232H side
 
 The FT232H `C8`/`C9` pins are CBUS pins on this board. The detected EEPROM
 configuration has `C8=DRIVE1` and `C9=DRIVE0`, so they are fixed-function pins
@@ -116,4 +125,43 @@ Verified enable polarity for the tested stripboard/TB6600 setup:
 ```text
 D6 low  = driver disabled, motor free
 D6 high = driver enabled, motor holding
+```
+
+## Vision Light APA102 Pattern
+
+For an 8-pixel APA102/DotStar vision-light strip with clock on `D4` and data
+on `D5`, run a dry check:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_ft232h_vision_light.sh
+```
+
+Then light the strip:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_ft232h_vision_light.sh --armed
+```
+
+The default pattern is:
+
+```text
+green, red, blue, white, green, red, blue, white
+```
+
+To set all 8 LEDs to the same color:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_ft232h_vision_light.sh \
+  --armed --all-color green
+```
+
+Named colors are `red`, `green`, `blue`, `white`, `off`, and `black`.
+`#RRGGBB` values are also accepted.
+
+The script defaults to `--intensity 0.25` for bench power margin. Use a higher
+intensity only when the 5V supply is stable:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_ft232h_vision_light.sh \
+  --armed --intensity 1.0
 ```
