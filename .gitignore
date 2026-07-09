@@ -81,6 +81,10 @@ klipper_setup/image_build/pi-gen/deploy/
 klipper_setup/image_build/pi-gen/work/
 klipper_setup/image_build/pi-gen/export-image/
 
+# Generated Klipper diagnostic G-code
+klipper_setup/klipper_config/generated_gcode/
+klipper_setup/klipper_config/*.gcode
+
 # RP2040 firmware build artifacts
 klipper_setup/rp2040_firmware/klipper/
 klipper_setup/rp2040_firmware/katapult/

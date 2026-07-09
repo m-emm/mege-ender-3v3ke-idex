@@ -21,20 +21,24 @@ PETGCF_06_ANTI_SHIFT_OVERRIDES = {
     "sparse_infill_acceleration": "4240",
 }
 
-PETGCF_06_IDEX_RETRY_MOTION_OVERRIDES = {
-    "travel_acceleration": "3500",
-    "default_acceleration": "3500",
-    "initial_layer_acceleration": "3500",
-    "inner_wall_acceleration": "3500",
-    "internal_solid_infill_acceleration": "3500",
-    "sparse_infill_acceleration": "3500",
-    "travel_jerk": "5",
-    "default_jerk": "5",
-    "initial_layer_jerk": "5",
-    "outer_wall_jerk": "5",
-    "inner_wall_jerk": "5",
-    "infill_jerk": "5",
-    "top_surface_jerk": "5",
+PETGCF_06_IDEX_SLOW_MOTION_OVERRIDES = {
+    "travel_speed": "200",
+    "travel_acceleration": "2000",
+    "default_acceleration": "2000",
+    "initial_layer_acceleration": "2000",
+    "outer_wall_acceleration": "2000",
+    "inner_wall_acceleration": "2000",
+    "top_surface_acceleration": "2000",
+    "internal_solid_infill_acceleration": "2000",
+    "sparse_infill_acceleration": "2000",
+    "bridge_acceleration": "2000",
+    "travel_jerk": "2",
+    "default_jerk": "2",
+    "initial_layer_jerk": "2",
+    "outer_wall_jerk": "2",
+    "inner_wall_jerk": "2",
+    "infill_jerk": "2",
+    "top_surface_jerk": "2",
 }
 
 
@@ -62,7 +66,7 @@ def test_petgcf_06_presets_include_anti_shift_motion_overrides():
             assert overrides[key] == value
 
 
-def test_petgcf_06_idex_one_off_preset_keeps_stock_petgcf_tuning():
+def test_petgcf_06_idex_one_off_preset_keeps_stock_petgcf_tuning_slowly():
     config = yaml.load(
         (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
         Loader=AssemblyDefaultsLoader,
@@ -84,10 +88,9 @@ def test_petgcf_06_idex_one_off_preset_keeps_stock_petgcf_tuning():
     assert overrides["support_object_first_layer_gap"] == "2.5"
     assert overrides["xy_contour_compensation"] == "-0.3"
     assert overrides["xy_hole_compensation"] == "0.4"
-    assert overrides["top_surface_acceleration"] == "2650"
     for key, value in PETGCF_06_ANTI_SHIFT_OVERRIDES.items():
-        if key in PETGCF_06_IDEX_RETRY_MOTION_OVERRIDES:
+        if key in PETGCF_06_IDEX_SLOW_MOTION_OVERRIDES:
             continue
         assert overrides[key] == value
-    for key, value in PETGCF_06_IDEX_RETRY_MOTION_OVERRIDES.items():
+    for key, value in PETGCF_06_IDEX_SLOW_MOTION_OVERRIDES.items():
         assert overrides[key] == value
