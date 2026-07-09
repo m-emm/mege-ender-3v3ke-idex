@@ -92,6 +92,165 @@ Builder:
             - { $ref: print_bed_y_travel }
             - 0
       - source: dependencies
+        assembly: apa_strip_front_assembly
+        artifact: leader
+        name: apa_strip_front_pcb
+        color: [0.08, 0.32, 0.16]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: apa_strip_front_assembly
+        artifact: followers
+        names:
+          - apa_led_*
+        name_template: "apa_strip_front_{name}"
+        color: [0.92, 0.90, 0.82]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: apa_strip_front_assembly
+        artifact: followers
+        names:
+          - apa_pad_*
+        name_template: "apa_strip_front_{name}"
+        color: [0.95, 0.72, 0.22]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: apa_strip_back_assembly
+        artifact: leader
+        name: apa_strip_back_pcb
+        color: [0.08, 0.32, 0.16]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: apa_strip_back_assembly
+        artifact: followers
+        names:
+          - apa_led_*
+        name_template: "apa_strip_back_{name}"
+        color: [0.92, 0.90, 0.82]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: apa_strip_back_assembly
+        artifact: followers
+        names:
+          - apa_pad_*
+        name_template: "apa_strip_back_{name}"
+        color: [0.95, 0.72, 0.22]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: apa_strip_left_assembly
+        artifact: leader
+        name: apa_strip_left_pcb
+        color: [0.08, 0.32, 0.16]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: apa_strip_left_assembly
+        artifact: followers
+        names:
+          - apa_led_*
+        name_template: "apa_strip_left_{name}"
+        color: [0.92, 0.90, 0.82]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: apa_strip_left_assembly
+        artifact: followers
+        names:
+          - apa_pad_*
+        name_template: "apa_strip_left_{name}"
+        color: [0.95, 0.72, 0.22]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: apa_strip_right_assembly
+        artifact: leader
+        name: apa_strip_right_pcb
+        color: [0.08, 0.32, 0.16]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: apa_strip_right_assembly
+        artifact: followers
+        names:
+          - apa_led_*
+        name_template: "apa_strip_right_{name}"
+        color: [0.92, 0.90, 0.82]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: apa_strip_right_assembly
+        artifact: followers
+        names:
+          - apa_pad_*
+        name_template: "apa_strip_right_{name}"
+        color: [0.95, 0.72, 0.22]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: vision_light_mount_assembly
+        artifact: leader
+        name: vision_light_mount
+        color: [0.92, 0.92, 0.88]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: vision_light_mount_assembly
+        artifact: non_production_parts
+        names:
+          - clamp_screws
+          - clamp_nuts
+        name_template: "vision_light_mount_{name}"
+        color: [0.78, 0.78, 0.72]
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
         assembly: y_axis_drive_assembly
         artifact: leader
         name: y_axis_drive

@@ -130,7 +130,7 @@ placement:
       alignment: CENTER
       axes: [1]
 
-    - part: apa_strip_front_assembly
+    - part: apa_strip_back_assembly
       to: print_bed_assembly.non_production_parts.print_bed_foil
       alignment: CENTER
       axes: [0]
@@ -138,16 +138,18 @@ placement:
         - $ref: vision_light_mount_x_offset
         - 0
         - 0
-    - part: apa_strip_front_assembly.followers.apa_led_1
+
+    - part: apa_strip_back_assembly.followers.apa_led_1
       to: print_bed_assembly.non_production_parts.print_bed_foil
       alignment: STACK_BOTTOM
       stack_gap:
         $ref: vision_light_mount_bed_clearance
-    - part: apa_strip_front_assembly
-      to: print_bed_assembly.non_production_parts.print_bed_foil
+    - part: apa_strip_back_assembly
+      to: print_bed_undercarriage_assembly.non_production_parts.front_spar_profile_reference
       alignment: STACK_FRONT
       stack_gap:
-        $ref: vision_light_mount_front_gap
+        $expr:
+          "$sub": "${vision_light_mount_plate_border} + ${vision_light_mount_u_spar_clearance_y}"
 
     - part: apa_strip_left_assembly
       post_rotation:
@@ -155,17 +157,17 @@ placement:
         axis: [0, 0, 1]
         center: apa_strip_left_assembly.CENTER
     - part: apa_strip_left_assembly
-      to: apa_strip_front_assembly
+      to: apa_strip_back_assembly
       alignment: CENTER
     - part: apa_strip_left_assembly
-      to: apa_strip_front_assembly
-      alignment: STACK_BACK
+      to: apa_strip_back_assembly
+      alignment: STACK_FRONT
       stack_gap:
         $expr:
           "$sub": "${vision_light_mount_strip_gap}"
 
     - part: apa_strip_left_assembly
-      to: apa_strip_front_assembly
+      to: apa_strip_back_assembly
       alignment: STACK_LEFT
       stack_gap:
         $expr:
@@ -177,34 +179,32 @@ placement:
         axis: [0, 0, 1]
         center: apa_strip_right_assembly.CENTER
     - part: apa_strip_right_assembly
-      to: apa_strip_front_assembly
+      to: apa_strip_back_assembly
       alignment: CENTER
     - part: apa_strip_right_assembly
-      to: apa_strip_front_assembly
-      alignment: STACK_BACK
+      to: apa_strip_back_assembly
+      alignment: STACK_FRONT
       stack_gap:
         $expr:
           "$sub": "${vision_light_mount_strip_gap}"
 
-
     - part: apa_strip_right_assembly
-      to: apa_strip_front_assembly
+      to: apa_strip_back_assembly
       alignment: STACK_RIGHT
       stack_gap:
         $expr:
           "$sub": "${vision_light_mount_strip_gap}"
 
-
-    - part: apa_strip_back_assembly
-      to: apa_strip_front_assembly
+    - part: apa_strip_front_assembly
+      to: apa_strip_back_assembly
       alignment: CENTER
-    - part: apa_strip_back_assembly
-      to: apa_strip_right_assembly
-      alignment: STACK_BACK
+
+    - part: apa_strip_front_assembly
+      to: apa_strip_left_assembly
+      alignment: STACK_FRONT
       stack_gap:
-        $ref: vision_light_mount_strip_gap
-
-
+        $expr:
+          "$sub": "${vision_light_mount_strip_gap}"
 
     - part: y_axis_rail_carrier_brackets_assembly.non_production_parts.profile_side_mount_plate_left_front
       to: y_axis_assembly.non_production_parts.profile_right

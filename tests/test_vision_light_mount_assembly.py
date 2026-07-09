@@ -33,6 +33,7 @@ VISION_RESOURCE_FILE = ASSEMBLIES_DIR / "vision_light_mount_assembly.yaml"
 UNDERCARRIAGE_RESOURCE_FILE = (
     ASSEMBLIES_DIR / "print_bed_undercarriage_assembly.yaml"
 )
+Y_AXIS_RESOURCE_FILE = ASSEMBLIES_DIR / "y_axis_assembly.yaml"
 WHOLE_PRINTER_RESOURCE_FILE = ASSEMBLIES_DIR / "whole_printer_assembly.yaml"
 
 
@@ -42,6 +43,13 @@ def _load_yaml(path):
 
 def _load_assemblies_config():
     return _load_yaml(ASSEMBLIES_DIR / "assemblies.yaml")
+
+
+def _has_visualization_part(visualization, expected):
+    return any(
+        all(part.get(key) == value for key, value in expected.items())
+        for part in visualization
+    )
 
 
 def _create_strip(density="D60pm", num_leds=2):
@@ -356,6 +364,74 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
             0,
         ]
         for step in alignments
+    )
+
+
+def test_y_axis_visualizes_vision_light_mount_context():
+    resource = _load_yaml(Y_AXIS_RESOURCE_FILE)
+    visualization = resource["Builder"]["Visualization"]["parts"]
+    bed_y_animation = {"bed_y": [0, {"$ref": "print_bed_y_travel"}, 0]}
+
+    for strip_assembly in (
+        "apa_strip_front_assembly",
+        "apa_strip_back_assembly",
+        "apa_strip_left_assembly",
+        "apa_strip_right_assembly",
+    ):
+        strip_prefix = strip_assembly.removesuffix("_assembly")
+        assert _has_visualization_part(
+            visualization,
+            {
+                "source": "dependencies",
+                "assembly": strip_assembly,
+                "artifact": "leader",
+                "name": f"{strip_prefix}_pcb",
+                "animation": bed_y_animation,
+            },
+        )
+        assert _has_visualization_part(
+            visualization,
+            {
+                "source": "dependencies",
+                "assembly": strip_assembly,
+                "artifact": "followers",
+                "names": ["apa_led_*"],
+                "name_template": f"{strip_prefix}_{{name}}",
+                "animation": bed_y_animation,
+            },
+        )
+        assert _has_visualization_part(
+            visualization,
+            {
+                "source": "dependencies",
+                "assembly": strip_assembly,
+                "artifact": "followers",
+                "names": ["apa_pad_*"],
+                "name_template": f"{strip_prefix}_{{name}}",
+                "animation": bed_y_animation,
+            },
+        )
+
+    assert _has_visualization_part(
+        visualization,
+        {
+            "source": "dependencies",
+            "assembly": "vision_light_mount_assembly",
+            "artifact": "leader",
+            "name": "vision_light_mount",
+            "animation": bed_y_animation,
+        },
+    )
+    assert _has_visualization_part(
+        visualization,
+        {
+            "source": "dependencies",
+            "assembly": "vision_light_mount_assembly",
+            "artifact": "non_production_parts",
+            "names": ["clamp_screws", "clamp_nuts"],
+            "name_template": "vision_light_mount_{name}",
+            "animation": bed_y_animation,
+        },
     )
 
 

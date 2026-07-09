@@ -48,85 +48,20 @@ def create_vision_light_mount_assembly(
         Alignment.LEFT: apa_strip_left.leader,
         Alignment.RIGHT: apa_strip_right.leader,
     }
-    strip_bboxes = {
-        alignment: get_bounding_box(strip)
-        for alignment, strip in strip_leaders.items()
-    }
 
-    strip_min_x = min(bbox[0][0] for bbox in strip_bboxes.values())
-    strip_max_x = max(bbox[1][0] for bbox in strip_bboxes.values())
-    strip_min_y = min(bbox[0][1] for bbox in strip_bboxes.values())
-    strip_max_y = max(bbox[1][1] for bbox in strip_bboxes.values())
-    strip_min_z = min(bbox[0][2] for bbox in strip_bboxes.values())
-    strip_max_z = max(bbox[1][2] for bbox in strip_bboxes.values())
+    strip_front_size = get_bounding_box_size(strip_leaders[Alignment.FRONT])
+    
+    strip_leaders_fused = PartCollector()
+    for strip in strip_leaders.values():
+        strip_leaders_fused = strip_leaders_fused.fuse(strip)
 
-    strip_min_x_part = min(
-        strip_leaders.values(), key=lambda part: get_bounding_box(part)[0][0]
-    )
-    strip_min_y_part = min(
-        strip_leaders.values(), key=lambda part: get_bounding_box(part)[0][1]
-    )
-    strip_min_z_part = min(
-        strip_leaders.values(), key=lambda part: get_bounding_box(part)[0][2]
-    )
-    strip_reference = create_box(
-        strip_max_x - strip_min_x,
-        strip_max_y - strip_min_y,
-        strip_max_z - strip_min_z,
-    )
-    strip_reference = align(strip_reference, strip_min_x_part, Alignment.LEFT)
-    strip_reference = align(strip_reference, strip_min_y_part, Alignment.FRONT)
-    strip_reference = align(strip_reference, strip_min_z_part, Alignment.BOTTOM)
+    strip_leaders_size = get_bounding_box_size(strip_leaders_fused)
 
-    aperture_x_gap = (
-        strip_bboxes[Alignment.RIGHT][0][0]
-        - strip_bboxes[Alignment.LEFT][1][0]
-    )
-    aperture_y_gap = (
-        strip_bboxes[Alignment.BACK][0][1]
-        - strip_bboxes[Alignment.FRONT][1][1]
-    )
-    if aperture_x_gap <= 0 or aperture_y_gap <= 0:
-        raise ValueError("APA strips do not leave a positive aperture")
+    
+    
+    plate_width =  strip_leaders_size[0] + 2 * vision_light_mount_plate_border
+    plate_depth = strip_leaders_size[1] + 2 * vision_light_mount_plate_border
 
-    raw_aperture_reference = create_box(aperture_x_gap, aperture_y_gap, 1)
-    raw_aperture_reference = align(
-        raw_aperture_reference,
-        strip_leaders[Alignment.LEFT],
-        Alignment.STACK_RIGHT,
-    )
-    raw_aperture_reference = align(
-        raw_aperture_reference,
-        strip_leaders[Alignment.FRONT],
-        Alignment.STACK_BACK,
-    )
-    aperture_size = max(
-        aperture_x_gap + vision_light_mount_aperture_clearance,
-        aperture_y_gap + vision_light_mount_aperture_clearance,
-    )
-    aperture_reference = create_box(aperture_size, aperture_size, 1)
-    aperture_reference = align(
-        aperture_reference,
-        raw_aperture_reference,
-        Alignment.CENTER,
-        axes=[0, 1],
-    )
-
-    plate_width = strip_max_x - strip_min_x + 2 * vision_light_mount_plate_border
-    plate_depth = strip_max_y - strip_min_y + 2 * vision_light_mount_plate_border
-
-    pocket_depth_reference = create_box(1, 1, vision_light_mount_strip_pocket_depth)
-    pocket_depth_reference = align(
-        pocket_depth_reference,
-        strip_reference,
-        Alignment.CENTER,
-        axes=[0, 1],
-    )
-    pocket_depth_reference = align(
-        pocket_depth_reference,
-        strip_reference,
-        Alignment.BOTTOM,
-    )
 
     plate = create_filleted_box(
         plate_width,
@@ -135,16 +70,16 @@ def create_vision_light_mount_assembly(
         fillet_radius=vision_light_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
-    plate = align(plate, strip_reference, Alignment.CENTER, axes=[0, 1])
-    plate = align(plate, pocket_depth_reference, Alignment.TOP)
+    plate = align(plate, strip_leaders_fused, Alignment.CENTER)
+    plate = align(plate, strip_leaders_fused, Alignment.STACK_BOTTOM, stack_gap=-vision_light_mount_strip_pocket_depth)
 
-    aperture = create_box(
-        aperture_size,
-        aperture_size,
-        vision_light_mount_plate_thickness + 2,
-    )
-    aperture = align(aperture, aperture_reference, Alignment.CENTER, axes=[0, 1])
-    aperture = align(aperture, plate, Alignment.CENTER, axes=[2])
+    aperture_boundary_width =  2*strip_front_size[1]+ 2 * vision_light_mount_aperture_clearance
+
+    aperture = materialize_bounding_box(
+        strip_leaders_fused,
+        x_enlargement=- aperture_boundary_width,
+        y_enlargement=-aperture_boundary_width,z_enlargement=500)
+    aperture = align(aperture, strip_leaders_fused, Alignment.CENTER)    
     plate = plate.cut(aperture)
 
     pocket_top_reference = create_box(1, 1, 0.1)
@@ -178,7 +113,7 @@ def create_vision_light_mount_assembly(
     )
     front_spar_keepout = align(
         front_spar_keepout,
-        aperture_reference,
+        aperture,
         Alignment.CENTER,
         axes=[0],
     )
