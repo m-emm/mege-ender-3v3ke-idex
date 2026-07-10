@@ -28,6 +28,31 @@ Builder:
 
       - source: self
         artifact: followers
+        names:
+          - cover
+        name_template: "{name}"
+        animation:
+          cover_lift:
+            - 0
+            - 0
+            - 30
+
+      - source: self
+        artifact: followers
+        names:
+          - strip_cover_*
+        name_template: "{name}"
+        animation:
+          strip_covers_lift:
+            - 0
+            - 0
+            - 30
+
+      - source: self
+        artifact: followers
+        exclude_names:
+          - cover
+          - strip_cover_*
         name_template: "{name}"
 
       - source: injected

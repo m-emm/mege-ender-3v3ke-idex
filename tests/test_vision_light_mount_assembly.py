@@ -234,7 +234,13 @@ def test_vision_light_mount_derives_aperture_and_exports_only_own_references():
     mount = _build_mount()
 
     assert get_volume(mount.leader) > 0
-    assert set(mount.follower_indices_by_name) == {"cover"}
+    assert set(mount.follower_indices_by_name) == {
+        "cover",
+        "strip_cover_0",
+        "strip_cover_1",
+        "strip_cover_2",
+        "strip_cover_3",
+    }
     assert set(mount.non_production_indices_by_name) == {
         "clamp_screws",
         "clamp_nuts",
@@ -518,6 +524,21 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
     assert {
         "source": "self",
         "artifact": "followers",
+        "names": ["cover"],
+        "name_template": "{name}",
+        "animation": {"cover_lift": [0, 0, 30]},
+    } in visualization
+    assert {
+        "source": "self",
+        "artifact": "followers",
+        "names": ["strip_cover_*"],
+        "name_template": "{name}",
+        "animation": {"strip_covers_lift": [0, 0, 30]},
+    } in visualization
+    assert {
+        "source": "self",
+        "artifact": "followers",
+        "exclude_names": ["cover", "strip_cover_*"],
         "name_template": "{name}",
     } in visualization
     assert {
@@ -527,8 +548,8 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
     } in visualization
     assert not any(
         part.get("source") == "self"
+        and part.get("artifact") == "non_production_parts"
         and "names" in part
-        and part.get("artifact") in {"followers", "non_production_parts"}
         for part in visualization
     )
     assert resource["Builder"]["Production"]["parts"] == [
