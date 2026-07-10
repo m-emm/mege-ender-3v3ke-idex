@@ -4,6 +4,7 @@ import numpy as np
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_screw_mount_assembly,
 )
+
 from shellforgepy.simple import *
 
 
@@ -50,6 +51,13 @@ def create_vision_light_mount_assembly(
     cover_screw_length = 10
     cover_screw_cylinder_head_clearance = 0.1
     additional_pins_inset = 7
+    
+    connector_clamp_screw_size = "M2.5"
+    connector_clamp_screw_length = 4
+    connector_sink = 1.5
+
+    connector_to_strip_gap = 10
+
 
     strip_leaders = {
         Alignment.FRONT: apa_strip_front.leader,
@@ -244,6 +252,8 @@ def create_vision_light_mount_assembly(
 
     connector_visual_parts = []
     connecctor_cutters = PartCollector()
+    connector_clamp_screw_mounts = None
+
     for connector_angle in [0, -90]:
 
         turn_alignment = rotate_alignment(connector_angle)
@@ -255,11 +265,60 @@ def create_vision_light_mount_assembly(
         connector = rotate(90)(connector)
         connector = rotate(connector_angle)(connector)
         connector = align(connector, strip_to_align, turn_alignment(Alignment.LEFT))
-        connector = align(connector, strip_to_align, turn_alignment(Alignment.STACK_FRONT), stack_gap=7)
+        connector = align(connector, strip_to_align, turn_alignment(Alignment.STACK_FRONT), stack_gap=connector_to_strip_gap)
 
         connector = align(connector, plate, Alignment.TOP)
 
-#         connector = translate(0, 2 * cover_screw_inset, -2)(connector)
+        connector = translate(0, 0, -connector_sink)(connector)
+
+        connector_clamp_screw_mount = create_screw_mount_assembly(
+            connector,
+            screw_size=connector_clamp_screw_size,
+            screw_length=connector_clamp_screw_length,
+            screw_direction=turn_alignment(Alignment.RIGHT),
+            with_nut_cutter=False,
+            flush_with_top=True,
+        )
+
+
+
+        connector_clamp_screw_mount = connector_clamp_screw_mount.aligned_from_cutter("cylinder_head_cutter", plate, turn_alignment(Alignment.RIGHT))
+
+        connector_clamp_screw_mount = connector_clamp_screw_mount.aligned_from_cutter("cylinder_head_cutter", plate, Alignment.CENTER, axes=[2])
+
+
+        connector_clamp_screw = connector_clamp_screw_mount.get_named_non_production_part("screw")
+
+        connector = align(connector, connector_clamp_screw, turn_alignment(Alignment.STACK_LEFT))
+
+        cylinder_head_cutter = connector_clamp_screw_mount.get_named_cutter("cylinder_head_cutter")
+
+
+        self_threading_hole = create_self_threading_hole_cutter(
+            size=connector_clamp_screw_size,
+            length=connector_clamp_screw_length+ 3,
+                    
+                    lead_in=True,
+                )
+        
+        self_threading_hole = rotate(90, axis=(0, 1, 0))(self_threading_hole)
+        self_threading_hole = rotate(connector_angle)(self_threading_hole)
+        self_threading_hole = align(self_threading_hole, cylinder_head_cutter, Alignment.CENTER)
+        self_threading_hole = align(self_threading_hole, cylinder_head_cutter, turn_alignment(Alignment.STACK_LEFT))
+        
+
+
+
+
+
+
+        connector_clamp_screw_mount = connector_clamp_screw_mount.prefixed_copy(f"xh_connector_{connector_name}_clamp_screw_mount_")
+
+        connector_clamp_screw_mounts = (
+            connector_clamp_screw_mount
+            if connector_clamp_screw_mounts is None
+            else connector_clamp_screw_mounts.fuse(connector_clamp_screw_mount)
+        )
 
         connector_visual_parts.append(
             (f"xh_connector_{connector_name}_housing", connector.leader)
@@ -280,11 +339,18 @@ def create_vision_light_mount_assembly(
             z_enlargement=0.0,
         )
 
+
+        connector_cutter = connector_cutter.fuse(cylinder_head_cutter)
+        connector_cutter = connector_cutter.fuse(self_threading_hole)
+
+
         pins_window_cutter = materialize_bounding_box(
             connector.get_named_non_production_part("pins"),
             x_enlargement=2,
             y_enlargement=2,
+            z_enlargement=50,
         )
+        pins_window_cutter = align(pins_window_cutter, connector, Alignment.STACK_TOP)
         connector_cutter = connector_cutter.fuse(pins_window_cutter)
         connecctor_cutters = connecctor_cutters.fuse(connector_cutter)
 
@@ -310,12 +376,12 @@ def create_vision_light_mount_assembly(
         positioned_pins = rotate(angle)(positioned_pins)
 
 
-        # positioned_pins = positioned_pins.aligned_from_follower(
-        #     "additional_pins_base_plate",
-        #     plate,
-        #     Alignment.BOTTOM,
-        # )
-        positioned_pins = align(positioned_pins, plate, Alignment.BOTTOM)
+#        positioned_pins = align(positioned_pins, plate, Alignment.BOTTOM)
+
+        positioned_pins = positioned_pins.aligned_from_non_production_part(
+            "top_pins", plate, Alignment.BOTTOM)
+        
+
 
         positioned_pins = positioned_pins.aligned_from_follower(
             "additional_pins_base_plate",
@@ -347,9 +413,17 @@ def create_vision_light_mount_assembly(
         additional_pins_base_plate = positioned_pins.get_follower_part_by_name(
             "additional_pins_base_plate"
         )
-        additional_pins_base_plate_cutters = additional_pins_base_plate_cutters.fuse(
-            materialize_bounding_box(additional_pins_base_plate, z_enlargement=500)
-        )
+
+        other_pins = positioned_pins.get_named_non_production_part("top_pins")
+        other_pins_cutter = materialize_bounding_box(other_pins, x_enlargement=0.2, y_enlargement=0.2, z_enlargement=0.2)
+        other_pins_cutter = align(other_pins_cutter, other_pins, Alignment.BOTTOM)
+        additional_pins_base_plate_cutters = additional_pins_base_plate_cutters.fuse(other_pins_cutter)
+
+        top_pins = positioned_pins.get_named_non_production_part("pins")
+        pins_top_cutter = materialize_bounding_box(top_pins, x_enlargement=0.2, y_enlargement=0.2)
+        pins_top_cutter = align(pins_top_cutter, other_pins_cutter, Alignment.STACK_TOP)
+        additional_pins_base_plate_cutters = additional_pins_base_plate_cutters.fuse(pins_top_cutter)
+
 
         prefix = f"vision_lights_mount_additional_pins_{turn_alignment(Alignment.LEFT).name.lower()}"
         prefixed_pins = positioned_pins.prefixed_copy(prefix)
@@ -361,7 +435,7 @@ def create_vision_light_mount_assembly(
         )
 
     leader = leader.cut(additional_pins_base_plate_cutters)
-    leader = leader.fuse(additional_pins_holders)
+    # leader = leader.fuse(additional_pins_holders)
 
     cover_plate = create_filleted_box(
         plate_width,
@@ -606,6 +680,11 @@ def create_vision_light_mount_assembly(
         if name.endswith("_screw"):
             cover_mount_screws = cover_mount_screws.fuse(part)
 
+    connector_clamp_screws = PartCollector()
+    for name, part in connector_clamp_screw_mounts.get_named_non_production_part_items():
+        connector_clamp_screws = connector_clamp_screws.fuse(part)
+
+
     assembly = LeaderFollowersCuttersPart(leader)
     assembly.add_named_cutter(aperture, "aperture")
     assembly.add_named_cutter(strip_pockets, "strip_pockets")
@@ -626,6 +705,8 @@ def create_vision_light_mount_assembly(
     assembly.add_named_non_production_part(clamp_screws, "clamp_screws")
     assembly.add_named_non_production_part(clamp_nuts, "clamp_nuts")
     assembly.add_named_non_production_part(cover_mount_screws, "cover_mount_screws")
+
+    assembly.add_named_non_production_part(connector_clamp_screws, "connector_clamp_screws")
     assembly.add_named_follower(cover, "cover")
     for name, part in connector_visual_parts:
         assembly.add_named_non_production_part(part, name)
