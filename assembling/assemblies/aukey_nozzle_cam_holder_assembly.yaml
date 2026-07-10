@@ -1,0 +1,48 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Prototype holder plate for a placed Aukey nozzle camera
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - left
+        - top
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: all
+      - source: injected
+        assembly: nozzle_cam
+        artifact: all
+        name_template: "nozzle_cam_{name}"
+      - source: injected
+        assembly: y_axis
+        artifact: non_production_parts
+        names:
+          - profile_right
+        name_template: "y_axis_{name}"
+
+  Production:
+    parts: []
+
+Parameters:
+  aukey_nozzle_cam_holder_profile_gap:
+    Type: Float
+  aukey_nozzle_cam_holder_base_plate_margin:
+    Type: Float
+  aukey_nozzle_cam_holder_base_plate_thickness:
+    Type: Float
+  aukey_nozzle_cam_holder_base_plate_fillet_radius:
+    Type: Float
+
+Parts:
+  AukeyNozzleCamHolderAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.aukey_nozzle_cam_holder_assembly.create_aukey_nozzle_cam_holder_assembly

@@ -118,6 +118,26 @@ placement:
       to: printer_frame_assembly
       alignment: CENTER
       axes: [2]
+    - part: nozzle_cam_assembly
+      post_rotation:
+        angle: -90
+        axis: [1, 0, 0]
+        center: nozzle_cam_assembly.CENTER
+    - part: nozzle_cam_assembly
+      to: y_axis_assembly.non_production_parts.profile_right
+      alignment: TOP
+    - part: nozzle_cam_assembly
+      to: y_axis_assembly.non_production_parts.profile_right
+      alignment: STACK_LEFT
+      stack_gap:
+        $ref: aukey_nozzle_cam_holder_profile_gap
+    - part: nozzle_cam_assembly
+      to: y_axis_assembly.non_production_parts.profile_right
+      alignment: CENTER
+      axes: [1]
+    - rigid_group:
+        - aukey_nozzle_cam_holder_assembly
+      to: nozzle_cam_assembly
     - part: y_axis_assembly.non_production_parts.carriages_fused
       to: print_bed_undercarriage_assembly
       alignment: STACK_BOTTOM
@@ -1368,6 +1388,11 @@ assemblies:
     resource_file: aukey_webcam_assembly.yaml
     depends_on: []
 
+  - name: nozzle_cam_assembly
+
+    resource_file: aukey_webcam_assembly.yaml
+    depends_on: []
+
   - name: xh_connector_assembly
 
     resource_file: xh_connector_assembly.yaml
@@ -1413,6 +1438,16 @@ assemblies:
       - y_axis_carriage_stopper_assembly
     inject_parts:
       y_axis_carriage_stopper_assembly: y_axis_carriage_stopper_assembly
+
+  - name: aukey_nozzle_cam_holder_assembly
+
+    resource_file: aukey_nozzle_cam_holder_assembly.yaml
+    depends_on:
+      - nozzle_cam_assembly
+      - y_axis_assembly
+    inject_parts:
+      nozzle_cam: nozzle_cam_assembly
+      y_axis: y_axis_assembly
 
   - name: y_axis_carriage_stopper_assembly
 
