@@ -89,6 +89,12 @@ Builder:
         names:
           - cover
         name_template: "{name}"
+      - source: self
+        artifact: followers
+        flip: true
+        names:
+          - strip_cover_*
+        name_template: "{name}"
     arrange:
       export_individual_parts: false
       prod_gap: 12.0
@@ -108,6 +114,10 @@ Builder:
           parts:
             - vision_light_mount
             - cover
+            - strip_cover_0
+            - strip_cover_1
+            - strip_cover_2
+            - strip_cover_3
       auto_assign_plates: false
 
 Parameters:

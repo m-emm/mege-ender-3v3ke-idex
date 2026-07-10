@@ -566,7 +566,22 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
             "flip": True,
             "names": ["cover"],
             "name_template": "{name}",
-        }
+        },
+        {
+            "source": "self",
+            "artifact": "followers",
+            "flip": True,
+            "names": ["strip_cover_*"],
+            "name_template": "{name}",
+        },
+    ]
+    assert resource["Builder"]["Production"]["arrange"]["plates"][0]["parts"] == [
+        "vision_light_mount",
+        "cover",
+        "strip_cover_0",
+        "strip_cover_1",
+        "strip_cover_2",
+        "strip_cover_3",
     ]
     assert not any(
         part.get("source") == "self"

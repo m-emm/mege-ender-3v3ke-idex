@@ -797,7 +797,7 @@ def create_vision_light_mount_assembly(
             )
 
             mount_eye_diameter = (
-                MScrew.from_size(cover_screw_size).cylinder_head_diameter + 0.5
+                MScrew.from_size(cover_screw_size).cylinder_head_diameter + 1.5
             )
             mount_eye = create_rounded_slab(
                 2 * mount_eye_diameter,
