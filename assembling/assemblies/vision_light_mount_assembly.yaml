@@ -28,8 +28,6 @@ Builder:
 
       - source: self
         artifact: followers
-        names:
-          - cover
         name_template: "{name}"
 
       - source: injected
@@ -50,36 +48,6 @@ Builder:
         name_template: "apa_strip_right_{name}"
       - source: self
         artifact: non_production_parts
-        names:
-          - clamp_screws
-          - clamp_nuts
-          - cover_mount_screws
-        name_template: "{name}"
-
-      - source: self
-        artifact: non_production_parts
-        names:
-          - xh_connector_*_housing
-        name_template: "{name}"
-
-      - source: self
-        artifact: non_production_parts
-        names:
-          - xh_connector_*_pins
-        name_template: "{name}"
-
-      - source: self
-        artifact: non_production_parts
-        names:
-          - vision_lights_mount_additional_pins_left_pins
-          - vision_lights_mount_additional_pins_right_pins
-        name_template: "{name}"
-
-      - source: self
-        artifact: non_production_parts
-        names:
-          - vision_lights_mount_additional_pins_left_top_pins
-          - vision_lights_mount_additional_pins_right_top_pins
         name_template: "{name}"
 
   Production:

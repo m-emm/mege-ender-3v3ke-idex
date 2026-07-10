@@ -515,49 +515,20 @@ def test_vision_light_mount_yaml_wiring_and_preview_context():
         "apa_strip_left",
         "apa_strip_right",
     } <= injected
-    assert any(
+    assert {
+        "source": "self",
+        "artifact": "followers",
+        "name_template": "{name}",
+    } in visualization
+    assert {
+        "source": "self",
+        "artifact": "non_production_parts",
+        "name_template": "{name}",
+    } in visualization
+    assert not any(
         part.get("source") == "self"
-        and part.get("artifact") == "followers"
-        and part.get("names") == ["cover"]
-        for part in visualization
-    )
-    assert any(
-        part.get("source") == "self"
-        and part.get("artifact") == "non_production_parts"
-        and part.get("names")
-        == ["clamp_screws", "clamp_nuts", "cover_mount_screws"]
-        for part in visualization
-    )
-    assert any(
-        part.get("source") == "self"
-        and part.get("artifact") == "non_production_parts"
-        and part.get("names") == ["xh_connector_*_housing"]
-        for part in visualization
-    )
-    assert any(
-        part.get("source") == "self"
-        and part.get("artifact") == "non_production_parts"
-        and part.get("names") == ["xh_connector_*_pins"]
-        for part in visualization
-    )
-    assert any(
-        part.get("source") == "self"
-        and part.get("artifact") == "non_production_parts"
-        and part.get("names")
-        == [
-            "vision_lights_mount_additional_pins_left_pins",
-            "vision_lights_mount_additional_pins_right_pins",
-        ]
-        for part in visualization
-    )
-    assert any(
-        part.get("source") == "self"
-        and part.get("artifact") == "non_production_parts"
-        and part.get("names")
-        == [
-            "vision_lights_mount_additional_pins_left_top_pins",
-            "vision_lights_mount_additional_pins_right_top_pins",
-        ]
+        and "names" in part
+        and part.get("artifact") in {"followers", "non_production_parts"}
         for part in visualization
     )
     assert resource["Builder"]["Production"]["parts"] == [

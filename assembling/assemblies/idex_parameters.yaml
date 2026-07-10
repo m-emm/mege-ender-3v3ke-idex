@@ -125,7 +125,7 @@ globals:
   vision_light_mount_strip_side_x_offset:
     $expr:
       "$sub": "0.5 * (${vision_light_mount_aperture_size} + ${vision_light_mount_apa_strip_width})"
-  vision_light_mount_strip_gap: 3
+  vision_light_mount_strip_gap: 6
   vision_light_mount_x_offset: 55
   vision_light_mount_bed_clearance: 25
   vision_light_mount_front_gap: 20
