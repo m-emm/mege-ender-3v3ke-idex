@@ -244,17 +244,22 @@ def create_vision_light_mount_assembly(
 
     connector_visual_parts = []
     connecctor_cutters = PartCollector()
-    for connector_alignment in [Alignment.LEFT, Alignment.RIGHT]:
+    for connector_angle in [0, -90]:
+
+        turn_alignment = rotate_alignment(connector_angle)
+
+        connector_alignment = turn_alignment(Alignment.RIGHT)
         strip_to_align = strip_leaders[connector_alignment]
         connector_name = connector_alignment.name.lower()
         connector = rotate(180, axis=(0, 1, 0))(xh_b4b_xh_a)
         connector = rotate(90)(connector)
-        connector = align(connector, strip_to_align, Alignment.CENTER)
-        connector = align(connector, plate, Alignment.FRONT)
+        connector = rotate(connector_angle)(connector)
+        connector = align(connector, strip_to_align, turn_alignment(Alignment.LEFT))
+        connector = align(connector, strip_to_align, turn_alignment(Alignment.STACK_FRONT), stack_gap=7)
 
         connector = align(connector, plate, Alignment.TOP)
 
-        connector = translate(0, 2 * cover_screw_inset, -2)(connector)
+#         connector = translate(0, 2 * cover_screw_inset, -2)(connector)
 
         connector_visual_parts.append(
             (f"xh_connector_{connector_name}_housing", connector.leader)
@@ -291,10 +296,20 @@ def create_vision_light_mount_assembly(
     additional_pins_base_plate_cutters = PartCollector()
     additional_pins_visual_parts = []
     pin_cutters = PartCollector()
-    for side_alignment in [Alignment.LEFT, Alignment.RIGHT]:
+    for i in range(4):
+
+        
+        angle = i * 90
+        turn_alignment = rotate_alignment(angle)
+
+        strip_to_align = strip_leaders[turn_alignment(Alignment.LEFT)]
+
         positioned_pins = vision_lights_mount_additional_pins.copy()
         positioned_pins = rotate(180, axis=(0, 1, 0))(positioned_pins)
         positioned_pins = rotate(-90, axis=(0, 0, 1))(positioned_pins)
+        positioned_pins = rotate(angle)(positioned_pins)
+
+
         # positioned_pins = positioned_pins.aligned_from_follower(
         #     "additional_pins_base_plate",
         #     plate,
@@ -304,19 +319,29 @@ def create_vision_light_mount_assembly(
 
         positioned_pins = positioned_pins.aligned_from_follower(
             "additional_pins_base_plate",
-            plate,
-            Alignment.BACK,
+            strip_to_align,
+            turn_alignment(Alignment.STACK_BACK),
         )
         positioned_pins = positioned_pins.aligned_from_follower(
             "additional_pins_base_plate",
-            plate,
-            side_alignment,
+            strip_to_align,
+            turn_alignment(Alignment.RIGHT),
         )
-        positioned_pins = translate(
-            -side_alignment.sign * additional_pins_side_inset,
-            -additional_pins_inset,
-            0,
-        )(positioned_pins)
+
+        # translation_vector_raw = np.array([ -additional_pins_side_inset-cover_screw_inset , -additional_pins_side_inset-cover_screw_inset, 0 ])
+
+        # rotation_matrix = np.array(
+        #     [
+        #         [np.cos(np.radians(angle)), -np.sin(np.radians(angle)), 0],
+        #         [np.sin(np.radians(angle)), np.cos(np.radians(angle)), 0],
+        #         [0, 0, 1],
+        #     ]
+
+        # )
+        # translation_vector_rotated = rotation_matrix @ translation_vector_raw
+
+
+        # positioned_pins = translate(*translation_vector_rotated)(positioned_pins)
 
         additional_pins_holders = additional_pins_holders.fuse(positioned_pins.leader)
         additional_pins_base_plate = positioned_pins.get_follower_part_by_name(
@@ -326,7 +351,7 @@ def create_vision_light_mount_assembly(
             materialize_bounding_box(additional_pins_base_plate, z_enlargement=500)
         )
 
-        prefix = f"vision_lights_mount_additional_pins_{side_alignment.name.lower()}"
+        prefix = f"vision_lights_mount_additional_pins_{turn_alignment(Alignment.LEFT).name.lower()}"
         prefixed_pins = positioned_pins.prefixed_copy(prefix)
         for name, part in prefixed_pins.get_named_non_production_part_items():
             additional_pins_visual_parts.append((name, part))
