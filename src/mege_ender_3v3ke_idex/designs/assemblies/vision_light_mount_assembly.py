@@ -60,7 +60,7 @@ def create_vision_light_mount_assembly(
     connector_sink = 1.5
 
     connector_to_strip_gap = 15
-    strip_cover_thickness = 1.5
+    strip_cover_thickness = 1.8
     strip_cover_boundary = 2
 
     strip_cover_length_boundary = 4
@@ -742,6 +742,65 @@ def create_vision_light_mount_assembly(
             y_enlargement=enlargement_vector[1],
         )
         strip_cover = strip_cover.cut(pins_cutter)
+
+
+
+        wire_hole_cutters = PartCollector()
+        wire_hole_diaamter = 0.8
+        num_wire_holes = 10        
+        last_wire_hole_cutter = None
+        wire_hole_pitch = 1.5
+
+        cross_wire_hole_cutters = PartCollector()
+        last_cross_wire_hole_cutter = None
+        cross_wire_hole_pitch = 3
+
+        
+        for i in range(num_wire_holes):
+            wire_hole_cutter = create_cylinder(wire_hole_diaamter / 2, 500)
+            wire_hole_cutter = rotate(90, axis=(1, 0, 0))(wire_hole_cutter)
+            wire_hole_cutter = rotate(angle)(wire_hole_cutter)
+            if last_wire_hole_cutter is not None:
+                wire_hole_cutter = align(
+                    wire_hole_cutter,
+                    last_wire_hole_cutter,
+                    turn_alignment(Alignment.STACK_RIGHT),
+                    stack_gap=wire_hole_pitch
+                )
+            
+
+            wire_hole_cutters = wire_hole_cutters.fuse(wire_hole_cutter)
+
+            last_wire_hole_cutter = wire_hole_cutter
+
+            cross_wire_hole_cutter = create_cylinder(wire_hole_diaamter / 2, 500)
+            cross_wire_hole_cutter = rotate(90, axis=(0, 1, 0))(cross_wire_hole_cutter)
+            cross_wire_hole_cutter = rotate(angle)(cross_wire_hole_cutter)
+            if last_cross_wire_hole_cutter is not None:
+                cross_wire_hole_cutter = align(
+                    cross_wire_hole_cutter,
+                    last_cross_wire_hole_cutter,
+                    turn_alignment(Alignment.STACK_BACK),
+                    stack_gap=cross_wire_hole_pitch
+                )
+            cross_wire_hole_cutters = cross_wire_hole_cutters.fuse(cross_wire_hole_cutter)
+            last_cross_wire_hole_cutter = cross_wire_hole_cutter
+
+        wire_hole_cutters = align(wire_hole_cutters, strip_cover, Alignment.CENTER)
+        wire_hole_cutters = align(wire_hole_cutters, strip_cover, Alignment.EDGE_BOTTOM)
+
+
+        strip_cover = strip_cover.cut(wire_hole_cutters)
+
+        cross_wire_hole_cutters = align(cross_wire_hole_cutters, strip_cover, Alignment.CENTER)
+        cross_wire_hole_cutters = align(cross_wire_hole_cutters, strip_cover, Alignment.EDGE_BOTTOM)
+
+        strip_cover = strip_cover.cut(cross_wire_hole_cutters)
+ 
+
+        
+
+
 
         mount_eyes = PartCollector()
 
