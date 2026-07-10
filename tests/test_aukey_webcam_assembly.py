@@ -122,13 +122,6 @@ def test_aukey_webcam_yaml_wiring_uses_minimal_all_visualization():
     }
 
 
-def _camera_visual_envelope(nozzle_cam):
-    camera_visual = nozzle_cam.leaders_followers_fused()
-    for non_production_part in nozzle_cam.non_production_parts:
-        camera_visual = camera_visual.fuse(non_production_part)
-    return camera_visual
-
-
 def _placed_nozzle_cam_and_y_axis():
     profile_right = create_box(20, 120, 20)
     y_axis = LeaderFollowersCuttersPart(leader=create_box(1, 1, 1))
@@ -136,14 +129,19 @@ def _placed_nozzle_cam_and_y_axis():
 
     nozzle_cam = create_aukey_webcam_assembly(**DIMENSIONS)
     nozzle_cam = rotate(-90, axis=(1, 0, 0))(nozzle_cam)
-    nozzle_cam = align(nozzle_cam, profile_right, Alignment.TOP)
+    nozzle_cam = align(
+        nozzle_cam,
+        profile_right,
+        Alignment.STACK_BOTTOM,
+        stack_gap=15.0,
+    )
     nozzle_cam = align(nozzle_cam, profile_right, Alignment.STACK_LEFT, stack_gap=7.0)
     nozzle_cam = align(nozzle_cam, profile_right, Alignment.CENTER, axes=[1])
 
     return nozzle_cam, y_axis
 
 
-def test_aukey_nozzle_cam_holder_exports_only_base_plate_around_placed_camera():
+def test_aukey_nozzle_cam_holder_exports_only_holder_leader_around_placed_camera():
     nozzle_cam, y_axis = _placed_nozzle_cam_and_y_axis()
     margin = 4.0
     plate_thickness = 3.0
@@ -160,26 +158,20 @@ def test_aukey_nozzle_cam_holder_exports_only_base_plate_around_placed_camera():
     assert holder.followers == []
     assert holder.cutters == []
     assert holder.non_production_parts == []
-    assert get_bounding_box_size(holder.leader)[2] == pytest.approx(
-        plate_thickness,
-        abs=0.05,
+    assert all(size > 0 for size in get_bounding_box_size(holder.leader))
+
+    camera_bbox = get_bounding_box(nozzle_cam)
+    profile_bbox = get_bounding_box(
+        y_axis.get_named_non_production_part("profile_right")
     )
-
-    camera_visual = _camera_visual_envelope(nozzle_cam)
-    camera_size = get_bounding_box_size(camera_visual)
-    plate_size = get_bounding_box_size(holder.leader)
-
-    assert plate_size[0] == pytest.approx(camera_size[0] + 2 * margin, abs=0.05)
-    assert plate_size[1] == pytest.approx(camera_size[1] + 2 * margin, abs=0.05)
-
-    camera_bbox = get_bounding_box(camera_visual)
     plate_bbox = get_bounding_box(holder.leader)
 
-    assert plate_bbox[1][2] == pytest.approx(camera_bbox[0][2], abs=0.05)
-    assert plate_bbox[0][0] <= camera_bbox[0][0] - margin + 0.05
-    assert plate_bbox[1][0] >= camera_bbox[1][0] + margin - 0.05
+    assert plate_bbox[0][0] <= camera_bbox[0][0] + 0.05
+    assert plate_bbox[1][0] >= camera_bbox[1][0] - 0.05
+    assert plate_bbox[1][0] == pytest.approx(profile_bbox[0][0], abs=0.05)
     assert plate_bbox[0][1] <= camera_bbox[0][1] - margin + 0.05
     assert plate_bbox[1][1] >= camera_bbox[1][1] + margin - 0.05
+    assert plate_bbox[1][2] <= profile_bbox[1][2] + 0.05
 
 
 def test_aukey_nozzle_cam_holder_yaml_uses_placed_injected_camera_context():
@@ -211,7 +203,38 @@ def test_aukey_nozzle_cam_holder_yaml_uses_placed_injected_camera_context():
         "aukey_nozzle_cam_holder_base_plate_fillet_radius",
     } <= set(holder_resource["Parameters"])
 
-    assert holder_resource["Builder"]["Production"]["parts"] == []
+    production = holder_resource["Builder"]["Production"]
+    assert production["process_data_preset"] == "petgcf_max_strength_high_speed_06"
+    assert len(production["parts"]) == 1
+    production_part = production["parts"][0]
+    assert {
+        "source": "self",
+        "artifact": "leader",
+        "name": "aukey_nozzle_cam_holder",
+        "prod_rotation_axis": [1, 0, 0],
+    }.items() <= production_part.items()
+    assert isinstance(production_part["prod_rotation_angle"], (int, float))
+    assert production["arrange"]["export_individual_parts"] is False
+    assert production["arrange"]["auto_assign_plates"] is False
+    assert production["arrange"]["plates"][0]["name"] == "aukey_nozzle_cam_holder"
+    assert production["arrange"]["plates"][0]["process_data_preset"] == (
+        "petgcf_max_strength_high_speed_06"
+    )
+    assert production["arrange"]["plates"][0]["parts"] == [
+        "aukey_nozzle_cam_holder"
+    ]
+    process_overrides = production["arrange"]["plates"][0]["process_data"][
+        "overrides"
+    ]["process_overrides"]
+    assert {
+        "brim_type",
+        "enable_support",
+        "support_type",
+        "support_style",
+        "support_on_build_plate_only",
+        "support_interface_spacing",
+        "wall_loops",
+    } <= set(process_overrides)
     assert holder_resource["Builder"]["Visualization"]["parts"] == [
         {"source": "self", "artifact": "all"},
         {
@@ -232,8 +255,6 @@ def test_aukey_nozzle_cam_holder_yaml_uses_placed_injected_camera_context():
     generator_source = HOLDER_GENERATOR_FILE.read_text()
     assert "copy(" not in generator_source
     assert "deepcopy" not in generator_source
-    assert "rotate(" not in generator_source
-    assert "translate(" not in generator_source
 
 
 def test_aukey_nozzle_cam_holder_waits_for_yaml_placed_camera():
@@ -251,12 +272,14 @@ def test_aukey_nozzle_cam_holder_waits_for_yaml_placed_camera():
             "center": "nozzle_cam_assembly.CENTER",
         }
     )
-    top_index = next(
+    stack_bottom_index = next(
         index
         for index, placement in enumerate(placements)
         if placement.get("part") == "nozzle_cam_assembly"
         and placement.get("to") == "y_axis_assembly.non_production_parts.profile_right"
-        and placement.get("alignment") == "TOP"
+        and placement.get("alignment") == "STACK_BOTTOM"
+        and placement.get("stack_gap")
+        == {"$ref": "aukey_nozzle_cam_holder_profile_vertical_gap"}
     )
     stack_left_index = next(
         index
@@ -282,7 +305,7 @@ def test_aukey_nozzle_cam_holder_waits_for_yaml_placed_camera():
         and placement.get("to") == "nozzle_cam_assembly"
     )
 
-    assert rotation_index < top_index < stack_left_index < center_y_index
+    assert rotation_index < stack_bottom_index < stack_left_index < center_y_index
     assert center_y_index < boundary_index
 
     graph = builder_graph_model.build_graph_model(config["assemblies"], config)

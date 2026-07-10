@@ -28,7 +28,32 @@ Builder:
         name_template: "y_axis_{name}"
 
   Production:
-    parts: []
+    process_data_preset: petgcf_max_strength_high_speed_06
+    parts:
+      - source: self
+        artifact: leader
+        name: aukey_nozzle_cam_holder
+        prod_rotation_angle: -45
+        prod_rotation_axis: [1, 0, 0]
+    arrange:
+      export_individual_parts: false
+      prod_gap: 12.0
+      plates:
+        - name: aukey_nozzle_cam_holder
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                brim_type: no_brim
+                enable_support: "1"
+                support_type: tree(auto)
+                support_style: organic
+                support_on_build_plate_only: "1"
+                support_interface_spacing: "2"
+                wall_loops: "3"
+          parts:
+            - aukey_nozzle_cam_holder
+      auto_assign_plates: false
 
 Parameters:
   aukey_nozzle_cam_holder_profile_gap:
