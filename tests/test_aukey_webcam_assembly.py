@@ -27,6 +27,7 @@ from shellforgepy.simple import (
 
 RESOURCE_FILE = ASSEMBLIES_DIR / "aukey_webcam_assembly.yaml"
 HOLDER_RESOURCE_FILE = ASSEMBLIES_DIR / "aukey_nozzle_cam_holder_assembly.yaml"
+Y_AXIS_RESOURCE_FILE = ASSEMBLIES_DIR / "y_axis_assembly.yaml"
 HOLDER_GENERATOR_FILE = (
     ASSEMBLIES_DIR.parents[1]
     / "src/mege_ender_3v3ke_idex/designs/assemblies/"
@@ -289,3 +290,35 @@ def test_aukey_nozzle_cam_holder_waits_for_yaml_placed_camera():
         graph.placement_build_dependencies["aukey_nozzle_cam_holder_assembly"]
     )
     assert {"nozzle_cam_assembly", "y_axis_assembly"} <= placement_dependencies
+
+
+def test_y_axis_visualizes_nozzle_cam_and_holder_context():
+    resource = yaml.load(Y_AXIS_RESOURCE_FILE.read_text(), Loader=AssemblyDefaultsLoader)
+    visualization = resource["Builder"]["Visualization"]["parts"]
+    name_template = "{assembly_name}_{artifact}_{default_name}"
+
+    expected_context = [
+        {
+            "source": "dependencies",
+            "assembly": "nozzle_cam_assembly",
+            "artifact": "all",
+            "name_template": name_template,
+        },
+        {
+            "source": "dependencies",
+            "assembly": "aukey_nozzle_cam_holder_assembly",
+            "artifact": "all",
+            "name_template": name_template,
+        },
+    ]
+
+    for expected_part in expected_context:
+        assert expected_part in visualization
+
+    for part in visualization:
+        if part.get("assembly") in {
+            "nozzle_cam_assembly",
+            "aukey_nozzle_cam_holder_assembly",
+        }:
+            assert "color" not in part
+            assert "animation" not in part

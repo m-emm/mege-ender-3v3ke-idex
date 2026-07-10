@@ -164,9 +164,10 @@ globals:
   aukey_webcam_holder_back_offset: 7.4
   aukey_webcam_holder_link_cylinder_diameter: 17.3
   aukey_webcam_holder_link_cylinder_height: 10.0
-  aukey_nozzle_cam_holder_profile_gap: 10.0
-  aukey_nozzle_cam_holder_base_plate_margin: 5.0
-  aukey_nozzle_cam_holder_base_plate_thickness: 3.0
+  aukey_nozzle_cam_holder_profile_gap: 25
+  aukey_nozzle_cam_holder_profile_vertical_gap: 15
+  aukey_nozzle_cam_holder_base_plate_margin: 6.0
+  aukey_nozzle_cam_holder_base_plate_thickness: 3.5
   aukey_nozzle_cam_holder_base_plate_fillet_radius: 2.0
 
   psu_mount_screw_length: 20

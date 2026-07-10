@@ -104,6 +104,14 @@ Builder:
             - { $ref: print_bed_y_travel }
             - 0
       - source: dependencies
+        assembly: nozzle_cam_assembly
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
+      - source: dependencies
+        assembly: aukey_nozzle_cam_holder_assembly
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
+      - source: dependencies
         assembly: y_axis_drive_assembly
         artifact: all
         name_template: "{assembly_name}_{artifact}_{default_name}"

@@ -125,7 +125,9 @@ placement:
         center: nozzle_cam_assembly.CENTER
     - part: nozzle_cam_assembly
       to: y_axis_assembly.non_production_parts.profile_right
-      alignment: TOP
+      alignment: STACK_BOTTOM
+      stack_gap:
+        $ref: aukey_nozzle_cam_holder_profile_vertical_gap
     - part: nozzle_cam_assembly
       to: y_axis_assembly.non_production_parts.profile_right
       alignment: STACK_LEFT
@@ -135,6 +137,12 @@ placement:
       to: y_axis_assembly.non_production_parts.profile_right
       alignment: CENTER
       axes: [1]
+
+    - rigid_group:
+        - nozzle_cam_assembly
+      to: y_axis_assembly.non_production_parts.profile_right
+
+
     - rigid_group:
         - aukey_nozzle_cam_holder_assembly
       to: nozzle_cam_assembly
