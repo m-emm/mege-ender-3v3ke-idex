@@ -17,12 +17,11 @@ def create_aukey_webcam_assembly(
     aukey_webcam_holder_thickness,
     aukey_webcam_holder_depth,
     aukey_webcam_body_to_holder_gap,
+    aukey_webcam_body_cutter_angle,
+    aukey_webcam_holder_back_offset,
+    aukey_webcam_holder_link_cylinder_diameter,
+    aukey_webcam_holder_link_cylinder_height,
 ):
-    cutter_angle = 20
-    bottom_holder_back_offset = 7.4
-    bottom_holder_link_cylinder_diameter = 17.3
-    bottom_holder_link_cylinder_height = 10
-
     body = create_rounded_slab(
         aukey_webcam_body_width,
         2 * aukey_webcam_body_depth,
@@ -39,7 +38,8 @@ def create_aukey_webcam_assembly(
         aukey_webcam_body_width,
         aukey_webcam_body_height,
         aukey_webcam_body_height
-        - (aukey_webcam_body_depth) * math.tan(math.radians(cutter_angle)),
+        - (aukey_webcam_body_depth)
+        * math.tan(math.radians(aukey_webcam_body_cutter_angle)),
         aukey_webcam_body_depth,
     )
 
@@ -75,10 +75,11 @@ def create_aukey_webcam_assembly(
     )
 
     bottom_holder = align(bottom_holder, body, Alignment.FRONT)
-    bottom_holder = translate(0, bottom_holder_back_offset, 0)(bottom_holder)
+    bottom_holder = translate(0, aukey_webcam_holder_back_offset, 0)(bottom_holder)
 
     bottom_holder_link_cylinder = create_cylinder(
-        bottom_holder_link_cylinder_diameter / 2, bottom_holder_link_cylinder_height
+        aukey_webcam_holder_link_cylinder_diameter / 2,
+        aukey_webcam_holder_link_cylinder_height,
     )
 
     bottom_holder_link_cylinder = align(

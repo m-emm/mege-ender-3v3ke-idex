@@ -247,16 +247,14 @@ def create_vision_light_mount_assembly(
     for connector_alignment in [Alignment.LEFT, Alignment.RIGHT]:
         strip_to_align = strip_leaders[connector_alignment]
         connector_name = connector_alignment.name.lower()
-        connector = rotate(-90, axis=(0, 1, 0))(xh_b4b_xh_a)
+        connector = rotate(180, axis=(0, 1, 0))(xh_b4b_xh_a)
         connector = rotate(90)(connector)
         connector = align(connector, strip_to_align, Alignment.CENTER)
-        connector = align(
-            connector, strip_to_align, Alignment.STACK_FRONT, stack_gap=0.5
-        )
+        connector = align(connector, plate, Alignment.FRONT)
 
-        connector = connector.aligned_from_non_production_part(
-            "pins", strip_to_align, Alignment.STACK_TOP
-        )
+        connector = align(connector, plate, Alignment.TOP)
+
+        connector = translate(0, 2 * cover_screw_inset, -2)(connector)
 
         connector_visual_parts.append(
             (f"xh_connector_{connector_name}_housing", connector.leader)
@@ -273,12 +271,16 @@ def create_vision_light_mount_assembly(
         connector_cutter = materialize_bounding_box(
             connector,
             x_enlargement=1.5,
-            y_enlargement=20,
-            z_enlargement=0.5,
+            y_enlargement=0.5,
+            z_enlargement=0.0,
         )
-        connector_cutter = align(connector_cutter, connector, Alignment.BACK)
-        connector_cutter = translate(0, -0.5, 0)(connector_cutter)
 
+        pins_window_cutter = materialize_bounding_box(
+            connector.get_named_non_production_part("pins"),
+            x_enlargement=2,
+            y_enlargement=2,
+        )
+        connector_cutter = connector_cutter.fuse(pins_window_cutter)
         connecctor_cutters = connecctor_cutters.fuse(connector_cutter)
 
     leader = leader.cut(connecctor_cutters)
@@ -345,9 +347,7 @@ def create_vision_light_mount_assembly(
     )
 
     cover_plate = align(cover_plate, plate, Alignment.CENTER)
-    cover_plate = align(
-        cover_plate, connector_visual_parts[0][1], Alignment.STACK_TOP, stack_gap=1
-    )
+    cover_plate = align(cover_plate, plate, Alignment.STACK_TOP, stack_gap=5)
 
     cover_bbox = get_bounding_box(cover_plate)
     plate_bbox = get_bounding_box(plate)

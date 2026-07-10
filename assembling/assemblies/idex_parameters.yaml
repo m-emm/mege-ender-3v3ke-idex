@@ -160,6 +160,10 @@ globals:
   aukey_webcam_holder_thickness: 17.7
   aukey_webcam_holder_depth: 50.0
   aukey_webcam_body_to_holder_gap: 0.0
+  aukey_webcam_body_cutter_angle: 20.0
+  aukey_webcam_holder_back_offset: 7.4
+  aukey_webcam_holder_link_cylinder_diameter: 17.3
+  aukey_webcam_holder_link_cylinder_height: 10.0
 
   psu_mount_screw_length: 20
   psu_mount_screw_cylinder_head_clearance: 0.6

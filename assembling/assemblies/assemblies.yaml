@@ -1337,7 +1337,7 @@ assemblies:
       x_axis_mcu_wire_wrap_pin_base_thickness: !Ref x_axis_mcu_wire_wrap_pin_base_thickness
       x_axis_mcu_wire_wrap_pin_base_width: !Ref x_axis_mcu_wire_wrap_pin_base_width
       x_axis_mcu_top_pin_length: !Ref x_axis_mcu_top_pin_length
-      board_holder_additional_pins_num_pins: 5
+      board_holder_additional_pins_num_pins: 4
       board_holder_additional_pins_base_plate_length: !Ref board_holder_additional_pins_base_plate_length
       board_holder_base_plate_thickness: 3.6
 

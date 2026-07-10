@@ -44,6 +44,14 @@ Parameters:
     Type: Float
   aukey_webcam_body_to_holder_gap:
     Type: Float
+  aukey_webcam_body_cutter_angle:
+    Type: Float
+  aukey_webcam_holder_back_offset:
+    Type: Float
+  aukey_webcam_holder_link_cylinder_diameter:
+    Type: Float
+  aukey_webcam_holder_link_cylinder_height:
+    Type: Float
 
 Parts:
   AukeyWebcamAssembly:

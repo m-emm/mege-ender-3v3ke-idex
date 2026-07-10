@@ -28,6 +28,10 @@ DIMENSIONS = {
     "aukey_webcam_holder_thickness": 17.7,
     "aukey_webcam_holder_depth": 50.0,
     "aukey_webcam_body_to_holder_gap": 0.8,
+    "aukey_webcam_body_cutter_angle": 20.0,
+    "aukey_webcam_holder_back_offset": 7.4,
+    "aukey_webcam_holder_link_cylinder_diameter": 17.3,
+    "aukey_webcam_holder_link_cylinder_height": 10.0,
 }
 
 
@@ -61,7 +65,8 @@ def test_aukey_webcam_uses_top_body_leader_and_visual_context_parts():
         (
             DIMENSIONS["aukey_webcam_holder_front_width"],
             DIMENSIONS["aukey_webcam_holder_depth"],
-            DIMENSIONS["aukey_webcam_holder_thickness"],
+            DIMENSIONS["aukey_webcam_holder_thickness"]
+            + DIMENSIONS["aukey_webcam_holder_link_cylinder_height"] / 2,
         ),
         abs=0.05,
     )
@@ -77,6 +82,12 @@ def test_aukey_webcam_yaml_wiring_uses_minimal_all_visualization():
     assert resource["Builder"]["Visualization"]["parts"] == [
         {"source": "self", "artifact": "all"}
     ]
+    assert {
+        "aukey_webcam_body_cutter_angle",
+        "aukey_webcam_holder_back_offset",
+        "aukey_webcam_holder_link_cylinder_diameter",
+        "aukey_webcam_holder_link_cylinder_height",
+    } <= set(resource["Parameters"])
     assert resource["Builder"]["Production"]["parts"] == [
         {
             "source": "self",
