@@ -219,8 +219,19 @@ def main() -> int:
     try:
         clock_pin = parse_pin(args.clock_pin, url=args.url)
         data_pin = parse_pin(args.data_pin, url=args.url)
+
+        num_pixels = args.pixel_count
+
         if args.all_color is None:
             pixels = parse_pattern(args.pattern)
+            if len(pixels) < num_pixels:
+                # repeat the pattern to fill the pixel count
+                pixels = (pixels * ((num_pixels + len(pixels) - 1) // len(pixels)))[:num_pixels]
+            elif len(pixels) > num_pixels:
+                pixels = pixels[:num_pixels]
+        
+
+
             pattern_label = args.pattern
         else:
             pixels = repeated_color(args.all_color, args.pixel_count)
