@@ -266,19 +266,17 @@ def create_vision_light_mount_assembly(
             thread_inset_assembly,
             screw_hole,
             Alignment.CENTER,
-            axes=[0, 2],
         )
         thread_inset_assembly = align(
             thread_inset_assembly,
             u_channel,
             Alignment.STACK_BACK,
+            stack_gap=-vision_light_mount_u_wall_thickness,
         )
 
         thread_inset_boss = thread_inset_assembly.get_named_cutter("assembly_cutter")
         thread_inset_cutter = thread_inset_boss.cut(thread_inset_assembly.leader)
-        clamp_thread_inset_bosses = clamp_thread_inset_bosses.fuse(
-            thread_inset_boss
-        )
+        clamp_thread_inset_bosses = clamp_thread_inset_bosses.fuse(thread_inset_boss)
         clamp_thread_inset_cutters = clamp_thread_inset_cutters.fuse(
             thread_inset_cutter
         )
