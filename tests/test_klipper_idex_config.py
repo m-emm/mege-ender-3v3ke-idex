@@ -241,10 +241,14 @@ def test_vision_light_dotstar_and_macros():
     dotstar = _section(config_text, "dotstar vision_light")
     light_macro = _section(config_text, "gcode_macro VISION_LIGHT")
     off_macro = _section(config_text, "gcode_macro VISION_LIGHT_OFF")
+    analysis_light_macro = _section(config_text, "gcode_macro NOZZLE_CAM_ANALYSIS_LIGHT")
+    startup_light = _section(
+        config_text, "delayed_gcode _NOZZLE_CAM_ANALYSIS_LIGHT_ON_STARTUP"
+    )
 
     assert _setting_value(dotstar, "data_pin")
     assert _setting_value(dotstar, "clock_pin")
-    assert _setting_float(dotstar, "chain_count") > 0.0
+    assert _setting_float(dotstar, "chain_count") == 8.0
     for channel in ("initial_RED", "initial_GREEN", "initial_BLUE"):
         assert _setting_float(dotstar, channel) >= 0.0
     assert "default_channel = params.R|default(1.0)|float" in light_macro
@@ -254,6 +258,18 @@ def test_vision_light_dotstar_and_macros():
     assert "SET_LED LED=vision_light INDEX={index}" in light_macro
     assert "SET_LED LED=vision_light RED={red} GREEN={green} BLUE={blue}" in light_macro
     assert "SET_LED LED=vision_light RED=0 GREEN=0 BLUE=0" in off_macro
+    assert set(re.findall(r"INDEX=(\d+)", analysis_light_macro)) == {
+        "1",
+        "2",
+        "5",
+        "6",
+        "7",
+        "8",
+    }
+    assert "INDEX=3" not in analysis_light_macro
+    assert "INDEX=4" not in analysis_light_macro
+    assert "INDEX=9" not in analysis_light_macro
+    assert "NOZZLE_CAM_ANALYSIS_LIGHT" in startup_light
 
 
 def test_vision_capture_macro_and_host_files_exist():
@@ -261,6 +277,9 @@ def test_vision_capture_macro_and_host_files_exist():
     macro = _section(config_text, "gcode_macro VISION_CAPTURE")
     nozzle_capture_macro = _section(config_text, "gcode_macro NOZZLE_CAM_CAPTURE")
     nozzle_profile_macro = _section(config_text, "gcode_macro NOZZLE_CAM_PROFILE")
+    nozzle_analysis_capture_macro = _section(
+        config_text, "gcode_macro NOZZLE_CAM_ANALYSIS_CAPTURE"
+    )
     nozzle_macro = _section(config_text, "gcode_macro IDEX_NOZZLE_VISION_CHECK")
     nozzle_sweep_macro = _section(config_text, "gcode_macro IDEX_NOZZLE_VISION_SWEEP")
     moonraker = (IMAGE_BUILD_FILES_DIR / "moonraker.conf").read_text(encoding="utf-8")
@@ -307,11 +326,20 @@ def test_vision_capture_macro_and_host_files_exist():
     assert (
         'RESPOND TYPE=echo MSG="Nozzle camera capture requested' in nozzle_capture_macro
     )
-    assert 'params.PROFILE|default("vision")' in nozzle_capture_macro
+    assert 'params.PROFILE|default("analysis")' in nozzle_capture_macro
     assert "profile=profile" in nozzle_capture_macro
     assert 'action_call_remote_method("nozzle_cam_profile"' in nozzle_profile_macro
     assert (
         'RESPOND TYPE=echo MSG="Nozzle camera profile requested' in nozzle_profile_macro
+    )
+    assert 'params.PROFILE|default("analysis")' in nozzle_profile_macro
+    assert "NOZZLE_CAM_PROFILE PROFILE=analysis" in nozzle_analysis_capture_macro
+    assert "NOZZLE_CAM_ANALYSIS_LIGHT" in nozzle_analysis_capture_macro
+    assert "NOZZLE_CAM_CAPTURE NAME={name} REASON=nozzle_analysis PROFILE=analysis" in (
+        nozzle_analysis_capture_macro
+    )
+    assert "keep_light = params.KEEP_LIGHT|default(1)|int" in (
+        nozzle_analysis_capture_macro
     )
     assert 'action_call_remote_method("idex_nozzle_vision_check"' in nozzle_macro
     assert "print_stats.state" in nozzle_macro
@@ -341,7 +369,7 @@ def test_vision_capture_macro_and_host_files_exist():
         "VISION_CAMERA_PROFILE_FILE=/usr/local/share/vision/nozzle_cam_profiles.json"
         in nozzle_framebuffer_service
     )
-    assert "VISION_CAMERA_DEFAULT_PROFILE=vision" in nozzle_framebuffer_service
+    assert "VISION_CAMERA_DEFAULT_PROFILE=analysis" in nozzle_framebuffer_service
     assert (
         "VISION_CAMERA_PROFILE_REQUEST_FILE=/run/vision-preview-nozzle_cam/profile_request.json"
         in nozzle_framebuffer_service
@@ -379,7 +407,7 @@ def test_vision_capture_macro_and_host_files_exist():
         "VISION_CAMERA_PROFILE_REQUEST_FILE=/run/vision-preview-nozzle_cam/profile_request.json"
         in nozzle_capture_service
     )
-    assert "VISION_CAPTURE_DEFAULT_PROFILE=vision" in nozzle_capture_service
+    assert "VISION_CAPTURE_DEFAULT_PROFILE=analysis" in nozzle_capture_service
     assert "VISION_PROFILE_REMOTE_METHOD=nozzle_cam_profile" in nozzle_capture_service
     assert "vision-framebuffer-nozzle-cam.service" in nozzle_capture_service
     assert "register_remote_method" in capture_script
@@ -443,6 +471,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "vision-capture-nozzle-cam.service" in live_deploy
     assert "nozzle_cam_profiles.json" in live_deploy
     assert "vision_nozzle_align.py" in live_deploy
+    assert "/run/vision-preview-nozzle_cam/profile_request.json" in live_deploy
     assert "setfacl -m u:www-data:--x" in image_install
     assert "setfacl -m u:www-data:--x" in live_deploy
     assert "github.com/mainsail-crew/crowsnest" not in image_install
@@ -458,6 +487,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert '"target_fps": "1"' in live_deploy
 
     assert nozzle_profiles["aliases"] == {
+        "analysis": "nozzle_cam_analysis",
         "auto": "nozzle_cam_auto",
         "baseline": "nozzle_cam_baseline",
         "vision": "nozzle_cam_vision",
@@ -466,7 +496,7 @@ def test_vision_capture_macro_and_host_files_exist():
         name: {control["name"]: control["value"] for control in profile["controls"]}
         for name, profile in nozzle_profiles["profiles"].items()
     }
-    for name in ("nozzle_cam_vision", "nozzle_cam_baseline"):
+    for name in ("nozzle_cam_vision", "nozzle_cam_baseline", "nozzle_cam_analysis"):
         control_names = [
             control["name"] for control in nozzle_profiles["profiles"][name]["controls"]
         ]
@@ -482,6 +512,11 @@ def test_vision_capture_macro_and_host_files_exist():
         profile_controls["nozzle_cam_vision"]["exposure_time_absolute"]
         > profile_controls["nozzle_cam_baseline"]["exposure_time_absolute"]
     )
+    assert (
+        profile_controls["nozzle_cam_analysis"]["exposure_time_absolute"]
+        < profile_controls["nozzle_cam_vision"]["exposure_time_absolute"]
+    )
+    assert profile_controls["nozzle_cam_analysis"]["brightness"] <= 0
     assert profile_controls["nozzle_cam_auto"]["auto_exposure"] == 3
     assert profile_controls["nozzle_cam_auto"]["white_balance_automatic"] == 1
 

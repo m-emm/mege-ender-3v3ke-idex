@@ -139,6 +139,8 @@ sudo install -m 0644 "${REMOTE_TMP}/vision-framebuffer-nozzle-cam.service" /etc/
 sudo install -m 0644 "${REMOTE_TMP}/vision-capture.service" /etc/systemd/system/vision-capture.service
 sudo install -m 0644 "${REMOTE_TMP}/vision-capture-nozzle-cam.service" /etc/systemd/system/vision-capture-nozzle-cam.service
 sudo usermod -a -G video "${USERNAME}" || true
+sudo rm -f /run/vision-preview/profile_request.json \
+  /run/vision-preview-nozzle_cam/profile_request.json
 
 echo "Restarting services..."
 sudo systemctl daemon-reload

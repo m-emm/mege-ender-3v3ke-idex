@@ -2,6 +2,7 @@
   "aliases": {
     "auto": "nozzle_cam_auto",
     "baseline": "nozzle_cam_baseline",
+    "analysis": "nozzle_cam_analysis",
     "vision": "nozzle_cam_vision"
   },
   "profiles": {
@@ -34,6 +35,22 @@
         {"name": "sharpness", "value": 7}
       ],
       "description": "Manual baseline close to the current nozzle camera defaults."
+    },
+    "nozzle_cam_analysis": {
+      "controls": [
+        {"name": "auto_exposure", "value": 1},
+        {"name": "exposure_time_absolute", "value": 1200},
+        {"name": "white_balance_automatic", "value": 0},
+        {"name": "white_balance_temperature", "value": 6500},
+        {"name": "power_line_frequency", "value": 1},
+        {"name": "brightness", "value": 0},
+        {"name": "contrast", "value": 12},
+        {"name": "saturation", "value": 9},
+        {"name": "hue", "value": 0},
+        {"name": "gamma", "value": 188},
+        {"name": "sharpness", "value": 7}
+      ],
+      "description": "Default nozzle analysis profile for the tuned 8-pixel ring light."
     },
     "nozzle_cam_vision": {
       "controls": [
