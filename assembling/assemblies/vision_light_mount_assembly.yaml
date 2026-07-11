@@ -163,6 +163,38 @@ Parameters:
     Type: String
   vision_light_mount_strip_gap:
     Type: Float
+  vision_light_mount_cover_screw_size:
+    Type: String
+  vision_light_mount_cover_screw_inset:
+    Type: Float
+  vision_light_mount_cover_screw_length:
+    Type: Float
+  vision_light_mount_cover_screw_cylinder_head_clearance:
+    Type: Float
+  vision_light_mount_strip_cover_mount_eye_diameter_clearance:
+    Type: Float
+  vision_light_mount_additional_pins_inset:
+    Type: Float
+  vision_light_mount_connector_clamp_screw_size:
+    Type: String
+  vision_light_mount_connector_clamp_screw_length:
+    Type: Float
+  vision_light_mount_connector_sink:
+    Type: Float
+  vision_light_mount_connector_to_strip_gap:
+    Type: Float
+  vision_light_mount_strip_cover_thickness:
+    Type: Float
+  vision_light_mount_strip_cover_boundary:
+    Type: Float
+  vision_light_mount_strip_cover_length_boundary:
+    Type: Float
+  vision_light_mount_downholder_outside_border:
+    Type: Float
+  vision_light_mount_m25_core_radius_adjustment:
+    Type: Float
+  vision_light_mount_connector_cutter_clearance:
+    Type: Float
   BIG_THING:
     Type: Float
 

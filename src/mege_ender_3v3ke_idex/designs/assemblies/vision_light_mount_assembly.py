@@ -42,6 +42,22 @@ def create_vision_light_mount_assembly(
     vision_light_mount_clamp_cylinder_head_clearance,
     vision_light_mount_screw_mount_clearance_type,
     vision_light_mount_strip_gap,
+    vision_light_mount_cover_screw_size,
+    vision_light_mount_cover_screw_inset,
+    vision_light_mount_cover_screw_length,
+    vision_light_mount_cover_screw_cylinder_head_clearance,
+    vision_light_mount_strip_cover_mount_eye_diameter_clearance,
+    vision_light_mount_additional_pins_inset,
+    vision_light_mount_connector_clamp_screw_size,
+    vision_light_mount_connector_clamp_screw_length,
+    vision_light_mount_connector_sink,
+    vision_light_mount_connector_to_strip_gap,
+    vision_light_mount_strip_cover_thickness,
+    vision_light_mount_strip_cover_boundary,
+    vision_light_mount_strip_cover_length_boundary,
+    vision_light_mount_downholder_outside_border,
+    vision_light_mount_m25_core_radius_adjustment,
+    vision_light_mount_connector_cutter_clearance,
     BIG_THING,
 ):
     """Build a PETG-CF mount using the bed/undercarriage as references."""
@@ -49,23 +65,7 @@ def create_vision_light_mount_assembly(
     _ = print_bed.leader
     _ = BIG_THING
 
-    cover_screw_size = "M2.5"  # TODO: make all these parameters with proper prefix, and add to idex_parameters.yaml
-    cover_screw_inset = 3.5
-    cover_screw_length = 10
-    cover_screw_cylinder_head_clearance = 0.1
-    additional_pins_inset = 7
-
-    connector_clamp_screw_size = "M2.5"
-    connector_clamp_screw_length = 4
-    connector_sink = 1.5
-
-    connector_to_strip_gap = 15
-    strip_cover_thickness = 1.8
-    strip_cover_boundary = 2
-
-    strip_cover_length_boundary = 4
-
-    downholder_outside_border = 2
+    _ = vision_light_mount_additional_pins_inset
 
     strip_leaders = {
         Alignment.FRONT: apa_strip_front.leader,
@@ -108,7 +108,7 @@ def create_vision_light_mount_assembly(
         strip_leaders_fused,
         x_enlargement=-aperture_boundary_width,
         y_enlargement=-aperture_boundary_width,
-        z_enlargement=500,
+        z_enlargement=BIG_THING,
     )
     aperture = align(aperture, strip_leaders_fused, Alignment.CENTER)
     plate = plate.cut(aperture)
@@ -277,17 +277,17 @@ def create_vision_light_mount_assembly(
             connector,
             strip_to_align,
             turn_alignment(Alignment.STACK_FRONT),
-            stack_gap=connector_to_strip_gap,
+            stack_gap=vision_light_mount_connector_to_strip_gap,
         )
 
         connector = align(connector, plate, Alignment.TOP)
 
-        connector = translate(0, 0, -connector_sink)(connector)
+        connector = translate(0, 0, -vision_light_mount_connector_sink)(connector)
 
         connector_clamp_screw_mount = create_screw_mount_assembly(
             connector,
-            screw_size=connector_clamp_screw_size,
-            screw_length=connector_clamp_screw_length,
+            screw_size=vision_light_mount_connector_clamp_screw_size,
+            screw_length=vision_light_mount_connector_clamp_screw_length,
             screw_direction=turn_alignment(Alignment.RIGHT),
             with_nut_cutter=False,
             flush_with_top=True,
@@ -314,9 +314,10 @@ def create_vision_light_mount_assembly(
         )
 
         self_threading_hole = create_self_threading_hole_cutter(
-            size=connector_clamp_screw_size,
-            length=connector_clamp_screw_length + 3,
+            size=vision_light_mount_connector_clamp_screw_size,
+            length=vision_light_mount_connector_clamp_screw_length + 3,
             lead_in=True,
+            core_radius_adjustment=vision_light_mount_m25_core_radius_adjustment,
         )
 
         self_threading_hole = rotate(90, axis=(0, 1, 0))(self_threading_hole)
@@ -354,8 +355,8 @@ def create_vision_light_mount_assembly(
 
         connector_cutter = materialize_bounding_box(
             connector,
-            x_enlargement=1.5,
-            y_enlargement=0.5,
+            x_enlargement=vision_light_mount_connector_cutter_clearance,
+            y_enlargement=vision_light_mount_connector_cutter_clearance,
             z_enlargement=0.0,
         )
 
@@ -374,8 +375,8 @@ def create_vision_light_mount_assembly(
 
     leader = leader.cut(connecctor_cutters)
 
-    cover_screw = MScrew.from_size(cover_screw_size)
-    additional_pins_side_inset = cover_screw_inset
+    cover_screw = MScrew.from_size(vision_light_mount_cover_screw_size)
+    additional_pins_side_inset = vision_light_mount_cover_screw_inset
     additional_pins_holders = PartCollector()
     additional_pins_base_plate_cutters = PartCollector()
     additional_pins_visual_parts = []
@@ -497,12 +498,12 @@ def create_vision_light_mount_assembly(
         plate_width
         - 2 * vision_light_mount_plate_border
         - 2 * vision_light_mount_strip_pocket_clearance
-        - 2 * downholder_outside_border,
+        - 2 * vision_light_mount_downholder_outside_border,
         plate_depth
         - 2 * vision_light_mount_plate_border
         - 2 * vision_light_mount_strip_pocket_clearance
-        - 2 * downholder_outside_border,
-        500,
+        - 2 * vision_light_mount_downholder_outside_border,
+        BIG_THING,
     )
     downholder_border_cutter = align(
         downholder_border_cutter, strip_downholder, Alignment.CENTER
@@ -528,7 +529,7 @@ def create_vision_light_mount_assembly(
         aperture,
         x_enlargement=2 * vision_light_mount_strip_gap,
         y_enlargement=2 * vision_light_mount_strip_gap,
-        z_enlargement=500,
+        z_enlargement=BIG_THING,
     )
 
     strip_downholder_inner_cutter = align(
@@ -584,7 +585,7 @@ def create_vision_light_mount_assembly(
             strip,
             x_enlargement=2 * vision_light_mount_strip_pocket_clearance,
             y_enlargement=2 * vision_light_mount_strip_pocket_clearance,
-            z_enlargement=500,
+            z_enlargement=BIG_THING,
         )
         cover_plate = cover_plate.cut(strip_cutter)
         cover_inner_walls = cover_inner_walls.cut(strip_cutter)
@@ -615,8 +616,8 @@ def create_vision_light_mount_assembly(
                 target = align(target, cover_plate, lr.edge_alignment)
                 target = align(target, cover_plate, fb.edge_alignment)
                 target = translate(
-                    -lr.sign * cover_screw_inset,
-                    -fb.sign * cover_screw_inset,
+                    -lr.sign * vision_light_mount_cover_screw_inset,
+                    -fb.sign * vision_light_mount_cover_screw_inset,
                     0,
                 )(target)
 
@@ -629,7 +630,7 @@ def create_vision_light_mount_assembly(
                     target = align(target, cover_plate, edge)
                     translate_vector = np.array(
                         [1 if edge.axis == i else 0 for i in range(3)]
-                    ) * (cover_screw_inset * -edge.sign)
+                    ) * (vision_light_mount_cover_screw_inset * -edge.sign)
 
                     target = translate(*translate_vector)(target)
 
@@ -637,12 +638,12 @@ def create_vision_light_mount_assembly(
 
                 mount_screw_assembly = create_screw_mount_assembly(
                     target,
-                    screw_size=cover_screw_size,
-                    screw_length=cover_screw_length,
+                    screw_size=vision_light_mount_cover_screw_size,
+                    screw_length=vision_light_mount_cover_screw_length,
                     screw_direction=Alignment.TOP,
                     with_nut_cutter=False,
                     flush_with_top=True,
-                    cylinder_head_cutter_clearance=cover_screw_cylinder_head_clearance,
+                    cylinder_head_cutter_clearance=vision_light_mount_cover_screw_cylinder_head_clearance,
                     clearance_type="loose",
                 )
                 cover_mount_clearance_holes = cover_mount_clearance_holes.fuse(
@@ -663,9 +664,10 @@ def create_vision_light_mount_assembly(
                 )
 
                 self_threading_hole = create_self_threading_hole_cutter(
-                    cover_screw_size,
+                    vision_light_mount_cover_screw_size,
                     vision_light_mount_plate_thickness + 2,
                     lead_in=True,
+                    core_radius_adjustment=vision_light_mount_m25_core_radius_adjustment,
                 )
                 self_threading_hole = align(
                     self_threading_hole,
@@ -699,8 +701,8 @@ def create_vision_light_mount_assembly(
         back_vector = np.array(turn_alignment(Alignment.BACK).vector)
 
         enlargement_vector = np.abs(
-            2 * strip_cover_boundary * right_vector
-            + 2 * strip_cover_length_boundary * back_vector
+            2 * vision_light_mount_strip_cover_boundary * right_vector
+            + 2 * vision_light_mount_strip_cover_length_boundary * back_vector
         )
 
         _logger.info(f"enlargement_vector: {enlargement_vector}")
@@ -708,22 +710,25 @@ def create_vision_light_mount_assembly(
             strip_to_align,
             x_enlargement=enlargement_vector[0],
             y_enlargement=enlargement_vector[1],
-            z_size=strip_cover_thickness,
+            z_size=vision_light_mount_strip_cover_thickness,
         )
 
         strip_cover = align(strip_cover, strip_to_align, turn_alignment(Alignment.BACK))
 
         shift_vector = (
-            np.array(turn_alignment(Alignment.BACK).vector) * strip_cover_boundary
+            np.array(turn_alignment(Alignment.BACK).vector)
+            * vision_light_mount_strip_cover_boundary
         )
 
         strip_cover = translate(*shift_vector)(strip_cover)
 
-        diminuation_vector = -np.abs(strip_cover_boundary * right_vector)
+        diminuation_vector = -np.abs(
+            vision_light_mount_strip_cover_boundary * right_vector
+        )
 
         strip_cover_cutter = materialize_bounding_box(
             strip_to_align,
-            z_enlargement=500,
+            z_enlargement=BIG_THING,
             x_enlargement=diminuation_vector[0],
             y_enlargement=diminuation_vector[1],
         )
@@ -743,11 +748,9 @@ def create_vision_light_mount_assembly(
         )
         strip_cover = strip_cover.cut(pins_cutter)
 
-
-
         wire_hole_cutters = PartCollector()
         wire_hole_diaamter = 0.8
-        num_wire_holes = 10        
+        num_wire_holes = 10
         last_wire_hole_cutter = None
         wire_hole_pitch = 1.5
 
@@ -755,9 +758,8 @@ def create_vision_light_mount_assembly(
         last_cross_wire_hole_cutter = None
         cross_wire_hole_pitch = 3
 
-        
         for i in range(num_wire_holes):
-            wire_hole_cutter = create_cylinder(wire_hole_diaamter / 2, 500)
+            wire_hole_cutter = create_cylinder(wire_hole_diaamter / 2, BIG_THING)
             wire_hole_cutter = rotate(90, axis=(1, 0, 0))(wire_hole_cutter)
             wire_hole_cutter = rotate(angle)(wire_hole_cutter)
             if last_wire_hole_cutter is not None:
@@ -765,15 +767,14 @@ def create_vision_light_mount_assembly(
                     wire_hole_cutter,
                     last_wire_hole_cutter,
                     turn_alignment(Alignment.STACK_RIGHT),
-                    stack_gap=wire_hole_pitch
+                    stack_gap=wire_hole_pitch,
                 )
-            
 
             wire_hole_cutters = wire_hole_cutters.fuse(wire_hole_cutter)
 
             last_wire_hole_cutter = wire_hole_cutter
 
-            cross_wire_hole_cutter = create_cylinder(wire_hole_diaamter / 2, 500)
+            cross_wire_hole_cutter = create_cylinder(wire_hole_diaamter / 2, BIG_THING)
             cross_wire_hole_cutter = rotate(90, axis=(0, 1, 0))(cross_wire_hole_cutter)
             cross_wire_hole_cutter = rotate(angle)(cross_wire_hole_cutter)
             if last_cross_wire_hole_cutter is not None:
@@ -781,45 +782,46 @@ def create_vision_light_mount_assembly(
                     cross_wire_hole_cutter,
                     last_cross_wire_hole_cutter,
                     turn_alignment(Alignment.STACK_BACK),
-                    stack_gap=cross_wire_hole_pitch
+                    stack_gap=cross_wire_hole_pitch,
                 )
-            cross_wire_hole_cutters = cross_wire_hole_cutters.fuse(cross_wire_hole_cutter)
+            cross_wire_hole_cutters = cross_wire_hole_cutters.fuse(
+                cross_wire_hole_cutter
+            )
             last_cross_wire_hole_cutter = cross_wire_hole_cutter
 
         wire_hole_cutters = align(wire_hole_cutters, strip_cover, Alignment.CENTER)
         wire_hole_cutters = align(wire_hole_cutters, strip_cover, Alignment.EDGE_BOTTOM)
 
-
         strip_cover = strip_cover.cut(wire_hole_cutters)
 
-        cross_wire_hole_cutters = align(cross_wire_hole_cutters, strip_cover, Alignment.CENTER)
-        cross_wire_hole_cutters = align(cross_wire_hole_cutters, strip_cover, Alignment.EDGE_BOTTOM)
+        cross_wire_hole_cutters = align(
+            cross_wire_hole_cutters, strip_cover, Alignment.CENTER
+        )
+        cross_wire_hole_cutters = align(
+            cross_wire_hole_cutters, strip_cover, Alignment.EDGE_BOTTOM
+        )
 
         strip_cover = strip_cover.cut(cross_wire_hole_cutters)
- 
-
-        
-
-
 
         mount_eyes = PartCollector()
 
         for fb in [Alignment.FRONT, Alignment.BACK]:
 
             cover_screw_cylnder_head_diameter = MScrew.from_size(
-                cover_screw_size
+                vision_light_mount_cover_screw_size
             ).cylinder_head_diameter
 
             target = create_cylinder(
-                cover_screw_cylnder_head_diameter / 2 + 0.5, strip_cover_thickness
+                cover_screw_cylnder_head_diameter / 2 + 0.5,
+                vision_light_mount_strip_cover_thickness,
             )
             target = align(target, strip_cover, Alignment.CENTER)
             target = align(target, strip_cover, turn_alignment(fb).stack_alignment)
 
             mount_screw_assembly = create_screw_mount_assembly(
                 target,
-                screw_size=cover_screw_size,
-                screw_length=cover_screw_length,
+                screw_size=vision_light_mount_cover_screw_size,
+                screw_length=vision_light_mount_cover_screw_length,
                 screw_direction=Alignment.TOP,
                 with_nut_cutter=False,
                 flush_with_top=False,
@@ -836,9 +838,10 @@ def create_vision_light_mount_assembly(
             )
 
             self_threading_hole = create_self_threading_hole_cutter(
-                cover_screw_size,
+                vision_light_mount_cover_screw_size,
                 vision_light_mount_plate_thickness + 2,
                 lead_in=True,
+                core_radius_adjustment=vision_light_mount_m25_core_radius_adjustment,
             )
             self_threading_hole = align(
                 self_threading_hole,
@@ -856,12 +859,15 @@ def create_vision_light_mount_assembly(
             )
 
             mount_eye_diameter = (
-                MScrew.from_size(cover_screw_size).cylinder_head_diameter + 1.5
+                MScrew.from_size(
+                    vision_light_mount_cover_screw_size
+                ).cylinder_head_diameter
+                + vision_light_mount_strip_cover_mount_eye_diameter_clearance
             )
             mount_eye = create_rounded_slab(
                 2 * mount_eye_diameter,
                 mount_eye_diameter,
-                strip_cover_thickness,
+                vision_light_mount_strip_cover_thickness,
                 mount_eye_diameter / 2,
             )
 

@@ -142,7 +142,6 @@ placement:
         - nozzle_cam_assembly
       to: y_axis_assembly.non_production_parts.profile_right
 
-
     - rigid_group:
         - aukey_nozzle_cam_holder_assembly
       to: nozzle_cam_assembly

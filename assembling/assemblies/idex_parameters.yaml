@@ -125,11 +125,11 @@ globals:
   vision_light_mount_strip_side_x_offset:
     $expr:
       "$sub": "0.5 * (${vision_light_mount_aperture_size} + ${vision_light_mount_apa_strip_width})"
-  vision_light_mount_strip_gap: 6
+  vision_light_mount_strip_gap: 6.8
   vision_light_mount_x_offset: 55
   vision_light_mount_bed_clearance: 25
   vision_light_mount_front_gap: 20
-  vision_light_mount_plate_thickness: 5.5
+  vision_light_mount_plate_thickness: 7.8
   vision_light_mount_plate_border: 8
   vision_light_mount_plate_fillet_radius: 1.4
   vision_light_mount_aperture_clearance: 2.0
@@ -149,6 +149,22 @@ globals:
   vision_light_mount_clamp_nut_clearance: 0.35
   vision_light_mount_clamp_cylinder_head_clearance: 0.5
   vision_light_mount_screw_mount_clearance_type: "loose"
+  vision_light_mount_cover_screw_size: "M2.5"
+  vision_light_mount_cover_screw_inset: 3.5
+  vision_light_mount_cover_screw_length: 10
+  vision_light_mount_cover_screw_cylinder_head_clearance: 0.1
+  vision_light_mount_strip_cover_mount_eye_diameter_clearance: 2.0
+  vision_light_mount_additional_pins_inset: 7
+  vision_light_mount_connector_clamp_screw_size: "M2.5"
+  vision_light_mount_connector_clamp_screw_length: 4
+  vision_light_mount_connector_sink: 1.5
+  vision_light_mount_connector_to_strip_gap: 15
+  vision_light_mount_strip_cover_thickness: 2.1
+  vision_light_mount_strip_cover_boundary: 2
+  vision_light_mount_strip_cover_length_boundary: 4
+  vision_light_mount_downholder_outside_border: 2
+  vision_light_mount_m25_core_radius_adjustment: -0.25
+  vision_light_mount_connector_cutter_clearance: 0.6
 
   aukey_webcam_body_width: 103.0
   aukey_webcam_body_depth: 23.1
