@@ -127,7 +127,7 @@ globals:
       "$sub": "0.5 * (${vision_light_mount_aperture_size} + ${vision_light_mount_apa_strip_width})"
   vision_light_mount_strip_gap: 6.8
   vision_light_mount_x_offset: 55
-  vision_light_mount_bed_clearance: 25
+  vision_light_mount_bed_clearance: 27
   vision_light_mount_front_gap: 20
   vision_light_mount_plate_thickness: 7.8
   vision_light_mount_plate_border: 8
@@ -144,10 +144,12 @@ globals:
   vision_light_mount_u_ear_height_above_spar: 12.0
   vision_light_mount_u_screw_gap_above_spar: 6.0
   vision_light_mount_clamp_screw_size: "M3"
-  vision_light_mount_clamp_screw_length: 20
+  vision_light_mount_clamp_screw_length: 35
   vision_light_mount_clamp_screw_inset: 5.0
   vision_light_mount_clamp_nut_clearance: 0.35
   vision_light_mount_clamp_cylinder_head_clearance: 0.5
+  vision_light_mount_clamp_thread_inset_holder_thickness: 7.5
+  vision_light_mount_clamp_thread_inset_extra_radius: 1.5
   vision_light_mount_screw_mount_clearance_type: "loose"
   vision_light_mount_cover_screw_size: "M2.5"
   vision_light_mount_cover_screw_inset: 3.5

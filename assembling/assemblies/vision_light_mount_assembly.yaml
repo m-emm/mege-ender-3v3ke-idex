@@ -13,6 +13,29 @@ Builder:
         - left
       width: 512
       height: 512
+      variants:
+        - name: u_clamp_only
+          views:
+            - isometric
+            - front
+            - back
+            - top
+          width: 1024
+          height: 1024
+          hide:
+            - vision_light_mount
+            - print_bed_
+            - print_bed_undercarriage_
+            - apa_strip_front_
+            - apa_strip_back_
+            - apa_strip_left_
+            - apa_strip_right_
+            - cover
+            - strip_cover_
+            - strip_
+            - xh_connector_
+            - vision_lights_mount_additional_pins_
+            - connector_clamp_screws
     parts:
       - source: injected
         assembly: print_bed
@@ -158,6 +181,10 @@ Parameters:
   vision_light_mount_clamp_nut_clearance:
     Type: Float
   vision_light_mount_clamp_cylinder_head_clearance:
+    Type: Float
+  vision_light_mount_clamp_thread_inset_holder_thickness:
+    Type: Float
+  vision_light_mount_clamp_thread_inset_extra_radius:
     Type: Float
   vision_light_mount_screw_mount_clearance_type:
     Type: String

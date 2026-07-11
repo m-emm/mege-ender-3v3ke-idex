@@ -40,6 +40,8 @@ def create_vision_light_mount_assembly(
     vision_light_mount_clamp_screw_inset,
     vision_light_mount_clamp_nut_clearance,
     vision_light_mount_clamp_cylinder_head_clearance,
+    vision_light_mount_clamp_thread_inset_holder_thickness,
+    vision_light_mount_clamp_thread_inset_extra_radius,
     vision_light_mount_screw_mount_clearance_type,
     vision_light_mount_strip_gap,
     vision_light_mount_cover_screw_size,
@@ -66,6 +68,7 @@ def create_vision_light_mount_assembly(
     _ = BIG_THING
 
     _ = vision_light_mount_additional_pins_inset
+    _ = vision_light_mount_clamp_nut_clearance
 
     strip_leaders = {
         Alignment.FRONT: apa_strip_front.leader,
@@ -223,6 +226,9 @@ def create_vision_light_mount_assembly(
     screw_x_span = align(screw_x_span, screw_z_reference, Alignment.CENTER, axes=[2])
 
     screw_mounts = None
+    clamp_thread_inset_bosses = PartCollector()
+    clamp_thread_inset_cutters = PartCollector()
+    clamp_thread_insets = PartCollector()
     for side_alignment in (
         Alignment.LEFT,
         Alignment.RIGHT,
@@ -241,21 +247,55 @@ def create_vision_light_mount_assembly(
             screw_size=vision_light_mount_clamp_screw_size,
             screw_length=vision_light_mount_clamp_screw_length,
             screw_direction=Alignment.FRONT,
-            with_nut_cutter=True,
-            nut_cutter_clearance=vision_light_mount_clamp_nut_clearance,
+            with_nut_cutter=False,
             flush_with_top=False,
             cylinder_head_cutter_clearance=(
                 vision_light_mount_clamp_cylinder_head_clearance
             ),
             clearance_type=vision_light_mount_screw_mount_clearance_type,
         )
-        screw_mount = screw_mount.prefixed_copy(f"pinch_{side_alignment.name.lower()}_")
+        screw_hole = screw_mount.get_named_cutter("hole_cutter")
+        thread_inset_assembly = create_thread_inset_assembly(
+            size=vision_light_mount_clamp_screw_size,
+            thickness=vision_light_mount_clamp_thread_inset_holder_thickness,
+            extra_radius=vision_light_mount_clamp_thread_inset_extra_radius,
+            clearance_type=vision_light_mount_screw_mount_clearance_type,
+        )
+        thread_inset_assembly = rotate(90, axis=(1, 0, 0))(thread_inset_assembly)
+        thread_inset_assembly = align(
+            thread_inset_assembly,
+            screw_hole,
+            Alignment.CENTER,
+            axes=[0, 2],
+        )
+        thread_inset_assembly = align(
+            thread_inset_assembly,
+            u_channel,
+            Alignment.STACK_BACK,
+        )
+
+        thread_inset_boss = thread_inset_assembly.get_named_cutter("assembly_cutter")
+        thread_inset_cutter = thread_inset_boss.cut(thread_inset_assembly.leader)
+        clamp_thread_inset_bosses = clamp_thread_inset_bosses.fuse(
+            thread_inset_boss
+        )
+        clamp_thread_inset_cutters = clamp_thread_inset_cutters.fuse(
+            thread_inset_cutter
+        )
+        clamp_thread_insets = clamp_thread_insets.fuse(
+            thread_inset_assembly.get_named_non_production_part("thread_inset")
+        )
+
+        screw_mount = screw_mount.prefixed_copy(f"pinch_{side_alignment.name.lower()}")
         screw_mounts = (
             screw_mount if screw_mounts is None else screw_mounts.fuse(screw_mount)
         )
 
+    u_channel = u_channel.fuse(clamp_thread_inset_bosses)
+    u_channel = u_channel.cut(clamp_thread_inset_cutters)
     u_channel = screw_mounts.use_as_cutter_on(u_channel)
 
+    u_clamp_preview = u_channel
     leader = plate.fuse(u_channel)
 
     connector_visual_parts = []
@@ -883,12 +923,9 @@ def create_vision_light_mount_assembly(
         clamp_screw_holes = clamp_screw_holes.fuse(cutter)
 
     clamp_screws = PartCollector()
-    clamp_nuts = PartCollector()
     for name, part in screw_mounts.get_named_non_production_part_items():
         if name.endswith("_screw"):
             clamp_screws = clamp_screws.fuse(part)
-        elif name.endswith("_nut"):
-            clamp_nuts = clamp_nuts.fuse(part)
 
     cover_mount_screws = PartCollector()
     for name, part in cover_screw_mounts.get_named_non_production_part_items():
@@ -908,6 +945,10 @@ def create_vision_light_mount_assembly(
     assembly.add_named_cutter(front_spar_keepout, "front_spar_keepout")
     assembly.add_named_cutter(clamp_screw_holes, "clamp_screw_holes")
     assembly.add_named_cutter(
+        clamp_thread_inset_cutters,
+        "clamp_thread_inset_cutters",
+    )
+    assembly.add_named_cutter(
         cover_mount_clearance_holes,
         "cover_mount_clearance_holes",
     )
@@ -920,7 +961,11 @@ def create_vision_light_mount_assembly(
         "cover_mount_self_threading_holes",
     )
     assembly.add_named_non_production_part(clamp_screws, "clamp_screws")
-    assembly.add_named_non_production_part(clamp_nuts, "clamp_nuts")
+    assembly.add_named_non_production_part(
+        clamp_thread_insets,
+        "clamp_thread_insets",
+    )
+    assembly.add_named_non_production_part(u_clamp_preview, "u_clamp_preview")
     assembly.add_named_non_production_part(cover_mount_screws, "cover_mount_screws")
 
     assembly.add_named_non_production_part(
