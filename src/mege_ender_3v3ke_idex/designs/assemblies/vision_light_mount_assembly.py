@@ -375,8 +375,6 @@ def create_vision_light_mount_assembly(
 
     leader = leader.cut(connecctor_cutters)
 
-    cover_screw = MScrew.from_size(vision_light_mount_cover_screw_size)
-    additional_pins_side_inset = vision_light_mount_cover_screw_inset
     additional_pins_holders = PartCollector()
     additional_pins_base_plate_cutters = PartCollector()
     additional_pins_visual_parts = []
@@ -410,24 +408,7 @@ def create_vision_light_mount_assembly(
             axes=[turn_alignment(Alignment.RIGHT).axis],
         )
 
-        # translation_vector_raw = np.array([ -additional_pins_side_inset-cover_screw_inset , -additional_pins_side_inset-cover_screw_inset, 0 ])
-
-        # rotation_matrix = np.array(
-        #     [
-        #         [np.cos(np.radians(angle)), -np.sin(np.radians(angle)), 0],
-        #         [np.sin(np.radians(angle)), np.cos(np.radians(angle)), 0],
-        #         [0, 0, 1],
-        #     ]
-
-        # )
-        # translation_vector_rotated = rotation_matrix @ translation_vector_raw
-
-        # positioned_pins = translate(*translation_vector_rotated)(positioned_pins)
-
         additional_pins_holders = additional_pins_holders.fuse(positioned_pins.leader)
-        additional_pins_base_plate = positioned_pins.get_follower_part_by_name(
-            "additional_pins_base_plate"
-        )
 
         other_pins = positioned_pins.get_named_non_production_part("top_pins")
         other_pins_cutter = materialize_bounding_box(
@@ -471,7 +452,6 @@ def create_vision_light_mount_assembly(
     cover_plate = align(cover_plate, plate, Alignment.STACK_TOP, stack_gap=5)
 
     cover_bbox = get_bounding_box(cover_plate)
-    plate_bbox = get_bounding_box(plate)
     strips_bbox = get_bounding_box(strip_leaders_fused)
 
     strip_downholder = create_box(
