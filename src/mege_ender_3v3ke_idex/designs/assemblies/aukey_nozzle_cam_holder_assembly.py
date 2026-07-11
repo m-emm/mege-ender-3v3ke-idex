@@ -69,6 +69,8 @@ def create_aukey_nozzle_cam_holder_assembly(
         limiting_end_part=right_profile,
     )
 
+    base_plate_with_extension = base_plate.fuse(base_plate_right_extension)
+
     lens = nozzle_cam.get_named_non_production_part("lens")
 
     lens_cutout_diameter = get_bounding_box_size(lens)[0] + lens_cutout_margin
@@ -152,6 +154,61 @@ def create_aukey_nozzle_cam_holder_assembly(
 
     mount_plate = mount_plate.cut(drills)
 
+
+    bottom_mount_plate = create_filleted_box(
+        profile_size[0],
+        core_base_plate_depth,
+        aukey_nozzle_cam_holder_base_plate_thickness,
+        fillet_radius=aukey_nozzle_cam_holder_base_plate_fillet_radius,
+        no_fillets_at=[Alignment.LEFT, Alignment.TOP, Alignment.BOTTOM]
+    )
+
+    bottom_mount_plate = align(bottom_mount_plate, mount_plate, Alignment.CENTER)
+    bottom_mount_plate = align(bottom_mount_plate, mount_plate, Alignment.STACK_RIGHT)
+    bottom_mount_plate = align(bottom_mount_plate, right_profile, Alignment.STACK_BOTTOM)
+
+    vertical_drills = rotate(90, axis=(0, 1, 0))(drills)
+    vertical_drills = align(vertical_drills, bottom_mount_plate, Alignment.CENTER)
+    vertical_drills = align(vertical_drills, right_profile, Alignment.CENTER, axes=[0])
+
+    bottom_mount_plate = bottom_mount_plate.cut(vertical_drills)
+
+    mount_plate = mount_plate.fuse(bottom_mount_plate)
+    
+
+
+
+
     base_plate = base_plate.fuse(mount_plate)
+
+
+
+    base_plate_with_extension_size = get_bounding_box_size(base_plate_with_extension)
+
+    enhancement_dome = create_ring(
+      base_plate_with_extension_size[1]/2,
+      base_plate_with_extension_size[1]/2-wall_thickness,
+
+        base_plate_with_extension_size[0]*0.4
+    )
+    
+
+    
+
+
+    enhancement_dome = rotate(90, axis=(0, 1, 0))(enhancement_dome)
+    enhancement_dome = align(enhancement_dome, base_plate_with_extension, Alignment.CENTER)
+    enhancement_dome = align(enhancement_dome, base_plate_with_extension, Alignment.RIGHT)
+    enhancement_dome_cutter = create_box(500, 500, 500)
+    enhancement_dome_cutter = align(enhancement_dome_cutter, base_plate_with_extension, Alignment.CENTER)
+    enhancement_dome_cutter = align(enhancement_dome_cutter, base_plate_with_extension, Alignment.TOP)
+
+    enhancement_dome = enhancement_dome.cut(enhancement_dome_cutter)
+
+
+
+
+    base_plate = base_plate.fuse(enhancement_dome)
+
 
     return LeaderFollowersCuttersPart(leader=base_plate)

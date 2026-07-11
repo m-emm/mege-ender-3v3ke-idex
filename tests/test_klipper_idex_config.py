@@ -258,9 +258,9 @@ def test_vision_light_dotstar_and_macros():
 def test_vision_capture_macro_and_host_files_exist():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     macro = _section(config_text, "gcode_macro VISION_CAPTURE")
+    nozzle_capture_macro = _section(config_text, "gcode_macro NOZZLE_CAM_CAPTURE")
     nozzle_macro = _section(config_text, "gcode_macro IDEX_NOZZLE_VISION_CHECK")
     nozzle_sweep_macro = _section(config_text, "gcode_macro IDEX_NOZZLE_VISION_SWEEP")
-    crowsnest = (IMAGE_BUILD_FILES_DIR / "crowsnest.conf").read_text(encoding="utf-8")
     moonraker = (IMAGE_BUILD_FILES_DIR / "moonraker.conf").read_text(encoding="utf-8")
     nginx = (IMAGE_BUILD_FILES_DIR / "nginx-mainsail.conf").read_text(encoding="utf-8")
     image_packages = (IMAGE_BUILD_STAGE_DIR / "00-packages").read_text(encoding="utf-8")
@@ -275,6 +275,12 @@ def test_vision_capture_macro_and_host_files_exist():
     )
     framebuffer_service = (
         IMAGE_BUILD_FILES_DIR / "vision-framebuffer.service"
+    ).read_text(encoding="utf-8")
+    nozzle_framebuffer_service = (
+        IMAGE_BUILD_FILES_DIR / "vision-framebuffer-nozzle-cam.service"
+    ).read_text(encoding="utf-8")
+    nozzle_capture_service = (
+        IMAGE_BUILD_FILES_DIR / "vision-capture-nozzle-cam.service"
     ).read_text(encoding="utf-8")
     framebuffer_script = (IMAGE_BUILD_FILES_DIR / "vision_framebuffer.py").read_text(
         encoding="utf-8"
@@ -292,6 +298,8 @@ def test_vision_capture_macro_and_host_files_exist():
     assert 'action_call_remote_method("vision_capture"' in macro
     assert "printer.toolhead.position" in macro
     assert 'RESPOND TYPE=echo MSG="Vision capture requested' in macro
+    assert 'action_call_remote_method("nozzle_cam_capture"' in nozzle_capture_macro
+    assert 'RESPOND TYPE=echo MSG="Nozzle camera capture requested' in nozzle_capture_macro
     assert 'action_call_remote_method("idex_nozzle_vision_check"' in nozzle_macro
     assert "print_stats.state" in nozzle_macro
     assert "requires X/Y/Z homed" in nozzle_macro
@@ -299,22 +307,37 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "print_stats.state" in nozzle_sweep_macro
     assert "requires X/Y/Z homed" in nozzle_sweep_macro
     assert "dx=dx" in nozzle_sweep_macro
-    assert "mode: ustreamer" in crowsnest
-    assert "usb-Aukey-PC-LM1E_Camera" in crowsnest
+    assert not (IMAGE_BUILD_FILES_DIR / "crowsnest.conf").exists()
     assert "[webcam Printer Camera]" not in moonraker
     assert "[update_manager crowsnest]" not in moonraker
     assert "location /webcam/" in nginx
+    assert "location /nozzle_cam/" in nginx
+    assert "proxy_pass http://127.0.0.1:8081/" in nginx
     assert "location /vision/" in nginx
     assert "ExecStart=/usr/local/bin/vision_framebuffer.py" in framebuffer_service
+    assert "VISION_FRAMEBUFFER_PORT=8081" in nozzle_framebuffer_service
+    assert "VISION_FRAMEBUFFER_DIR=/run/vision-preview-nozzle_cam" in nozzle_framebuffer_service
+    assert "VISION_FRAMEBUFFER_PUBLIC_SNAPSHOT_URL=/nozzle_cam/?action=snapshot" in nozzle_framebuffer_service
+    assert "usb-Vimicro_corp._PC-LM1E_Camera_PC-LM1E_Audio-video-index0" in nozzle_framebuffer_service
     assert "ThreadingHTTPServer" in framebuffer_script
     assert "RUN_DIR = Path" in framebuffer_script
     assert "latest.jpg" in framebuffer_script
     assert "RING_DIR" in framebuffer_script
     assert "1920" in framebuffer_script
     assert "1080" in framebuffer_script
+    assert "FALLBACK_FPS" not in framebuffer_script
+    assert "Falling back to capture profile" not in framebuffer_script
     assert "ExecStart=/usr/local/bin/vision_capture.py --daemon" in capture_service
+    assert "VISION_REGISTER_NOZZLE_METHODS=0" in capture_service
     assert "vision-framebuffer.service" in capture_service
+    assert "VISION_CAPTURE_REMOTE_METHOD=nozzle_cam_capture" in nozzle_capture_service
+    assert "VISION_OUTPUT_DIR=/home/pi/printer_data/vision/nozzle_cam" in nozzle_capture_service
+    assert "VISION_WEBCAM_SNAPSHOT_URL=http://127.0.0.1/nozzle_cam/?action=snapshot" in nozzle_capture_service
+    assert "VISION_REGISTER_NOZZLE_METHODS=1" in nozzle_capture_service
+    assert "vision-framebuffer-nozzle-cam.service" in nozzle_capture_service
     assert "register_remote_method" in capture_script
+    assert 'REMOTE_METHOD = os.environ.get("VISION_CAPTURE_REMOTE_METHOD"' in capture_script
+    assert "REGISTER_NOZZLE_METHODS" in capture_script
     assert "idex_nozzle_vision_check" in capture_script
     assert "idex_nozzle_vision_sweep" in capture_script
     assert "run_idex_nozzle_vision_sweep" in capture_script
@@ -325,6 +348,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert 'capture_source": "vision_framebuffer' in capture_script
     assert "NOZZLE_ALIGN_DIR" in nozzle_script
     assert "NOZZLE_SWEEP_DIR" in nozzle_script
+    assert "VISION_OUTPUT_URL_PREFIX" in nozzle_script
     assert "--fresh-after-utc" in nozzle_script
     assert "vision_framebuffer" in nozzle_script
     assert "cv2.HoughCircles" in nozzle_script
@@ -340,7 +364,6 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "choose_motion_consistent_nozzle" in nozzle_script
     assert "contact_sheet.jpg" in nozzle_script
     assert "latest_contact_sheet.jpg" in nozzle_script
-    assert "/vision/nozzle_sweep/" in nozzle_script
     assert "IDEX nozzle sweep report" in nozzle_script
     assert "offsets_applied" in nozzle_script
     assert "IDEX_SET_TOOL_OFFSET" not in nozzle_script
@@ -351,18 +374,31 @@ def test_vision_capture_macro_and_host_files_exist():
     assert 'vision_capture.py", "--capture-once"' in runner_script
     assert "acl\n" in image_packages
     assert "python3-opencv" in image_packages
+    assert "libevent-dev" not in image_packages
+    assert "libjpeg-dev" not in image_packages
+    assert "libbsd-dev" not in image_packages
     assert "vision_framebuffer.py" in image_install
     assert "vision-framebuffer.service" in image_install
+    assert "vision-framebuffer-nozzle-cam.service" in image_install
+    assert "vision-capture-nozzle-cam.service" in image_install
     assert "vision_nozzle_align.py" in image_install
     assert "vision_framebuffer.py" in live_deploy
     assert "vision-framebuffer.service" in live_deploy
+    assert "vision-framebuffer-nozzle-cam.service" in live_deploy
+    assert "vision-capture-nozzle-cam.service" in live_deploy
     assert "vision_nozzle_align.py" in live_deploy
     assert "setfacl -m u:www-data:--x" in image_install
     assert "setfacl -m u:www-data:--x" in live_deploy
-    assert "ln -sfn /opt/crowsnest" in image_install
-    assert "ln -sfn /opt/crowsnest" in live_deploy
+    assert "github.com/mainsail-crew/crowsnest" not in image_install
+    assert "github.com/mainsail-crew/crowsnest" not in live_deploy
+    assert "ln -sfn /opt/crowsnest" not in image_install
+    assert "ln -sfn /opt/crowsnest" not in live_deploy
     assert "systemctl disable crowsnest" in image_install
     assert "systemctl disable --now crowsnest" in live_deploy
+    assert '"name": "Printer Camera"' in live_deploy
+    assert '"name": "nozzle_cam"' in live_deploy
+    assert '"/nozzle_cam/?action=stream"' in live_deploy
+    assert "--state-url http://127.0.0.1:8081/state" in live_deploy
     assert '"target_fps": "1"' in live_deploy
 
 

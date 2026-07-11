@@ -28,6 +28,7 @@ DEFAULT_MOONRAKER_URL = "http://127.0.0.1:7125"
 VISION_DIR = Path(os.environ.get("VISION_OUTPUT_DIR", "/home/pi/printer_data/vision"))
 NOZZLE_ALIGN_DIR = VISION_DIR / "nozzle_align"
 NOZZLE_SWEEP_DIR = VISION_DIR / "nozzle_sweep"
+VISION_URL_PREFIX = os.environ.get("VISION_OUTPUT_URL_PREFIX", "/vision").rstrip("/")
 CAPTURE_BIN = os.environ.get("VISION_CAPTURE_BIN", "/usr/local/bin/vision_capture.py")
 CROWSNEST_SERVICE = os.environ.get("VISION_CROWSNEST_SERVICE", "crowsnest")
 CROWSNEST_HOST = os.environ.get("VISION_CROWSNEST_HOST", "127.0.0.1")
@@ -78,8 +79,14 @@ def sanitize_name(value: Any) -> str:
     return (text or "nozzle_align")[:80]
 
 
+def prefixed_vision_url(relative_path: str) -> str:
+    if not VISION_URL_PREFIX:
+        return "/" + relative_path.lstrip("/")
+    return VISION_URL_PREFIX + "/" + relative_path.lstrip("/")
+
+
 def vision_url(path: Path) -> str:
-    return "/vision/" + path.relative_to(VISION_DIR).as_posix()
+    return prefixed_vision_url(path.relative_to(VISION_DIR).as_posix())
 
 
 def public_url(path_or_url: Path | str) -> str:
@@ -249,8 +256,8 @@ def copy_capture_artifacts(metadata: dict[str, Any], run_dir: Path, prefix: str)
     return {
         "image_path": str(image_target),
         "metadata_path": str(meta_target),
-        "image_url": f"/vision/nozzle_align/{run_dir.name}/{image_target.name}",
-        "metadata_url": f"/vision/nozzle_align/{run_dir.name}/{meta_target.name}",
+        "image_url": vision_url(image_target),
+        "metadata_url": vision_url(meta_target),
     }
 
 
@@ -461,7 +468,7 @@ def analyze_image(image_path: Path, overlay_path: Path) -> dict[str, Any]:
         "rejection_reason": rejection_reason,
         "candidates": candidates[:8],
         "overlay_path": str(overlay_path),
-        "overlay_url": f"/vision/nozzle_align/{overlay_path.parent.name}/{overlay_path.name}",
+        "overlay_url": vision_url(overlay_path),
     }
 
 
@@ -1622,8 +1629,8 @@ def run_alignment(args: argparse.Namespace) -> dict[str, Any]:
         "camera_source": "vision_framebuffer",
         "crowsnest_managed": False,
         "run_dir": str(run_dir),
-        "run_url": f"/vision/nozzle_align/{run_name}/",
-        "latest_result_url": "/vision/nozzle_align/latest_result.json",
+        "run_url": vision_url(run_dir) + "/",
+        "latest_result_url": vision_url(NOZZLE_ALIGN_DIR / "latest_result.json"),
     }
 
     try:
@@ -1697,9 +1704,7 @@ def run_alignment(args: argparse.Namespace) -> dict[str, Any]:
             if t0_overlay is not None and t1_overlay is not None:
                 cv2.imwrite(str(combined_overlay_path), cv2.hconcat([t0_overlay, t1_overlay]))
                 result["combined_overlay_path"] = str(combined_overlay_path)
-                result[
-                    "combined_overlay_url"
-                ] = f"/vision/nozzle_align/{run_name}/{combined_overlay_path.name}"
+                result["combined_overlay_url"] = vision_url(combined_overlay_path)
         except Exception as exc:
             result["combined_overlay_error"] = str(exc)
 
@@ -1759,9 +1764,11 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
         "result_url": vision_url(result_path),
         "contact_sheet_url": vision_url(contact_sheet_path),
         "contact_sheet_public_url": public_url(contact_sheet_path),
-        "latest_contact_sheet_url": "/vision/nozzle_sweep/latest_contact_sheet.jpg",
+        "latest_contact_sheet_url": vision_url(
+            NOZZLE_SWEEP_DIR / "latest_contact_sheet.jpg"
+        ),
         "latest_contact_sheet_public_url": public_url(
-            "/vision/nozzle_sweep/latest_contact_sheet.jpg"
+            vision_url(NOZZLE_SWEEP_DIR / "latest_contact_sheet.jpg")
         ),
     }
 
@@ -1876,7 +1883,7 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
             console_respond(
                 args.moonraker_url,
                 "Latest nozzle sweep report: "
-                f"{public_url('/vision/nozzle_sweep/latest_contact_sheet.jpg')}",
+                f"{public_url(vision_url(NOZZLE_SWEEP_DIR / 'latest_contact_sheet.jpg'))}",
             )
         elif result.get("error"):
             console_respond(

@@ -33,7 +33,7 @@ $(ip addr show 2>&1)
 $(ls -l /dev/video* /dev/v4l/by-id/* 2>&1 || echo "No video devices found")
 
 --- Enabled Services ---
-$(systemctl list-unit-files --state=enabled | grep -E 'ssh|avahi|klipper|moonraker|nginx|crowsnest|vision-capture' || echo "None found")
+$(systemctl list-unit-files --state=enabled | grep -E 'ssh|avahi|klipper|moonraker|nginx|vision-framebuffer|vision-capture' || echo "None found")
 
 EOF
 

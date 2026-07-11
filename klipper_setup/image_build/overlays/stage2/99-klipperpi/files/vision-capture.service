@@ -5,6 +5,7 @@ Wants=klipper.service vision-framebuffer.service
 
 [Service]
 Type=simple
+Environment=VISION_REGISTER_NOZZLE_METHODS=0
 ExecStart=/usr/local/bin/vision_capture.py --daemon
 Restart=always
 RestartSec=5

@@ -17,9 +17,6 @@ build-essential
 libatlas-base-dev
 libopenblas-dev
 libffi-dev
-libevent-dev
-libjpeg-dev
-libbsd-dev
 libcairo2-dev
 libgirepository1.0-dev
 libglib2.0-dev

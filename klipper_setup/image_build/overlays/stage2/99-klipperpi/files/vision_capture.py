@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """High-resolution camera capture bridge for Klipper vision work.
 
-The daemon mode registers a Klipper remote method named ``vision_capture``.
+The daemon mode registers a configurable Klipper remote capture method.
 Klipper macros can call it with ``action_call_remote_method`` without blocking
 the printer motion queue on the actual image capture.
 """
@@ -38,11 +38,15 @@ CROWSNEST_SERVICE = os.environ.get("VISION_CROWSNEST_SERVICE", "crowsnest")
 WEBCAM_SNAPSHOT_URL = os.environ.get(
     "VISION_WEBCAM_SNAPSHOT_URL", "http://127.0.0.1/webcam/?action=snapshot"
 )
+PUBLIC_SNAPSHOT_URL = os.environ.get(
+    "VISION_PUBLIC_SNAPSHOT_URL", "/webcam/?action=snapshot"
+)
+OUTPUT_URL_PREFIX = os.environ.get("VISION_OUTPUT_URL_PREFIX", "/vision").rstrip("/")
 CROWSNEST_HOST = os.environ.get("VISION_CROWSNEST_HOST", "127.0.0.1")
 CROWSNEST_PORT = int(os.environ.get("VISION_CROWSNEST_PORT", "8080"))
 WEBCAM_READY_TIMEOUT = float(os.environ.get("VISION_WEBCAM_READY_TIMEOUT", "25"))
-REMOTE_METHOD = "vision_capture"
-REMOTE_ACTION = "run_vision_capture"
+REMOTE_METHOD = os.environ.get("VISION_CAPTURE_REMOTE_METHOD", "vision_capture")
+REMOTE_ACTION = os.environ.get("VISION_CAPTURE_REMOTE_ACTION", f"run_{REMOTE_METHOD}")
 NOZZLE_ALIGN_REMOTE_METHOD = "idex_nozzle_vision_check"
 NOZZLE_ALIGN_REMOTE_ACTION = "run_idex_nozzle_vision_check"
 NOZZLE_SWEEP_REMOTE_METHOD = "idex_nozzle_vision_sweep"
@@ -57,6 +61,9 @@ HIGH_RES_MIN_HEIGHT = int(os.environ.get("VISION_HIGH_RES_MIN_HEIGHT", "1080"))
 DEFAULT_FRAME_FRESH_TIMEOUT = float(os.environ.get("VISION_FRAME_FRESH_TIMEOUT", "10"))
 DEFAULT_FRAME_MAX_AGE = float(os.environ.get("VISION_FRAME_MAX_AGE", "10"))
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
+REGISTER_NOZZLE_METHODS = os.environ.get(
+    "VISION_REGISTER_NOZZLE_METHODS", "1"
+).strip().lower() not in ("0", "false", "no", "off", "")
 
 
 class CaptureError(RuntimeError):
@@ -364,6 +371,12 @@ def update_latest_symlinks(image_path: Path, metadata_path: Path) -> None:
         os.replace(tmp, latest)
 
 
+def output_url(name: str) -> str:
+    if not OUTPUT_URL_PREFIX:
+        return f"/{name}"
+    return f"{OUTPUT_URL_PREFIX}/{name}"
+
+
 def capture_frame(params: dict[str, Any] | None = None) -> dict[str, Any]:
     params = params or {}
     require_high_res = bool(params.get("require_high_res"))
@@ -431,9 +444,9 @@ def capture_frame(params: dict[str, Any] | None = None) -> dict[str, Any]:
                 "ok": True,
                 "image_path": str(image_path),
                 "metadata_path": str(metadata_path),
-                "url": f"/vision/{image_path.name}",
-                "latest_url": "/vision/latest.jpg",
-                "source_latest_url": "/webcam/?action=snapshot",
+                "url": output_url(image_path.name),
+                "latest_url": output_url("latest.jpg"),
+                "source_latest_url": PUBLIC_SNAPSHOT_URL,
                 "width": captured_width,
                 "height": captured_height,
                 "size_bytes": image_path.stat().st_size,
@@ -554,20 +567,22 @@ class KlippyRemoteCaptureDaemon:
 
     def _register(self, sock: socket.socket) -> None:
         self._register_remote_method(sock, REMOTE_METHOD, REMOTE_ACTION)
-        self._register_remote_method(
-            sock, NOZZLE_ALIGN_REMOTE_METHOD, NOZZLE_ALIGN_REMOTE_ACTION
-        )
-        self._register_remote_method(
-            sock, NOZZLE_SWEEP_REMOTE_METHOD, NOZZLE_SWEEP_REMOTE_ACTION
-        )
+        if REGISTER_NOZZLE_METHODS:
+            self._register_remote_method(
+                sock, NOZZLE_ALIGN_REMOTE_METHOD, NOZZLE_ALIGN_REMOTE_ACTION
+            )
+            self._register_remote_method(
+                sock, NOZZLE_SWEEP_REMOTE_METHOD, NOZZLE_SWEEP_REMOTE_ACTION
+            )
 
     def _handle_message(self, message: dict[str, Any]) -> None:
         action = message.get("action")
-        if action not in (
-            REMOTE_ACTION,
-            NOZZLE_ALIGN_REMOTE_ACTION,
-            NOZZLE_SWEEP_REMOTE_ACTION,
-        ):
+        valid_actions = {REMOTE_ACTION}
+        if REGISTER_NOZZLE_METHODS:
+            valid_actions.update(
+                (NOZZLE_ALIGN_REMOTE_ACTION, NOZZLE_SWEEP_REMOTE_ACTION)
+            )
+        if action not in valid_actions:
             return
         params = message.get("params") or {}
         if not isinstance(params, dict):

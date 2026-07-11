@@ -1,0 +1,18 @@
+[Unit]
+Description=Nozzle camera RAM-buffered still-frame service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=VISION_CAMERA_DEVICE=/dev/v4l/by-id/usb-Vimicro_corp._PC-LM1E_Camera_PC-LM1E_Audio-video-index0
+Environment=VISION_FRAMEBUFFER_DIR=/run/vision-preview-nozzle_cam
+Environment=VISION_FRAMEBUFFER_PORT=8081
+Environment=VISION_FRAMEBUFFER_PUBLIC_SNAPSHOT_URL=/nozzle_cam/?action=snapshot
+Environment=VISION_FRAMEBUFFER_SERVICE_NAME=vision-framebuffer-nozzle-cam
+ExecStart=/usr/local/bin/vision_framebuffer.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

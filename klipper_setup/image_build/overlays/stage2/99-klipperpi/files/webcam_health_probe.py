@@ -106,18 +106,19 @@ def collect_process_snapshot() -> dict[str, Any]:
                 "systemctl",
                 "is-active",
                 "vision-framebuffer",
+                "vision-framebuffer-nozzle-cam",
                 "nginx",
                 "moonraker",
                 "vision-capture",
-                "crowsnest",
+                "vision-capture-nozzle-cam",
             ],
             timeout=10,
         ),
         "load": run_command(["uptime"], timeout=5),
         "throttled": run_command(["vcgencmd", "get_throttled"], timeout=5),
         "temperature": run_command(["vcgencmd", "measure_temp"], timeout=5),
-        "ustreamer_process": run_command(
-            ["sh", "-c", "ps -o pid,ppid,pcpu,pmem,stat,etime,args -p $(pgrep -f '/usr/bin/ustreamer' | head -1)"],
+        "vision_framebuffer_processes": run_command(
+            ["sh", "-c", "ps -o pid,ppid,pcpu,pmem,stat,etime,args -p $(pgrep -f 'vision_framebuffer.py' | paste -sd, -)"],
             timeout=5,
         ),
     }

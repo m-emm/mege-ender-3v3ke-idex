@@ -35,11 +35,14 @@ HTTP_PORT = int(os.environ.get("VISION_FRAMEBUFFER_PORT", "8080"))
 TARGET_WIDTH = int(os.environ.get("VISION_FRAMEBUFFER_WIDTH", "1920"))
 TARGET_HEIGHT = int(os.environ.get("VISION_FRAMEBUFFER_HEIGHT", "1080"))
 TARGET_FPS = float(os.environ.get("VISION_FRAMEBUFFER_FPS", "1.0"))
-FALLBACK_FPS = float(os.environ.get("VISION_FRAMEBUFFER_FALLBACK_FPS", "0.5"))
 STREAM_FPS = float(os.environ.get("VISION_FRAMEBUFFER_STREAM_FPS", str(TARGET_FPS)))
 RING_SIZE = int(os.environ.get("VISION_FRAMEBUFFER_RING_SIZE", "30"))
 CAPTURE_TIMEOUT = float(os.environ.get("VISION_FRAMEBUFFER_CAPTURE_TIMEOUT", "8"))
 STALE_AFTER = float(os.environ.get("VISION_FRAMEBUFFER_STALE_AFTER", "5"))
+PUBLIC_SNAPSHOT_URL = os.environ.get(
+    "VISION_FRAMEBUFFER_PUBLIC_SNAPSHOT_URL", "/webcam/?action=snapshot"
+)
+SERVICE_NAME = os.environ.get("VISION_FRAMEBUFFER_SERVICE_NAME", "vision-framebuffer")
 NAME_REPLACEMENTS = str.maketrans({c: "_" for c in " /\\:;|?*[]{}()<>'\"`$&!"})
 
 
@@ -226,33 +229,30 @@ class CaptureThread(threading.Thread):
     def __init__(self, state: FrameState) -> None:
         super().__init__(daemon=True)
         self.state = state
-        self.profiles = [
-            (TARGET_WIDTH, TARGET_HEIGHT, TARGET_FPS),
-            (TARGET_WIDTH, TARGET_HEIGHT, FALLBACK_FPS),
-            (1280, 720, min(1.0, TARGET_FPS)),
-        ]
-        self.profile_index = 0
 
     def run(self) -> None:
         RUN_DIR.mkdir(parents=True, exist_ok=True)
         RING_DIR.mkdir(parents=True, exist_ok=True)
         while not self.state.stop_requested.is_set():
-            width, height, target_fps = self.profiles[self.profile_index]
-            self.state.update_profile(width=width, height=height, target_fps=target_fps)
+            self.state.update_profile(
+                width=TARGET_WIDTH, height=TARGET_HEIGHT, target_fps=TARGET_FPS
+            )
             start = time.monotonic()
             tmp_path = RUN_DIR / ".capture.jpg.tmp"
             try:
                 if tmp_path.exists():
                     tmp_path.unlink()
-                capture_info = capture_mjpeg_frame(CAMERA_DEVICE, tmp_path, width, height)
+                capture_info = capture_mjpeg_frame(
+                    CAMERA_DEVICE, tmp_path, TARGET_WIDTH, TARGET_HEIGHT
+                )
                 frame = tmp_path.read_bytes()
                 self.state.frame_id += 1
                 timestamp = datetime.now(timezone.utc)
                 stamp = timestamp.strftime("%Y%m%dT%H%M%S.%fZ")
                 image_path = RING_DIR / f"frame_{self.state.frame_id:08d}_{stamp}.jpg"
                 meta_path = image_path.with_suffix(".json")
-                actual_width = int(capture_info.get("width") or width)
-                actual_height = int(capture_info.get("height") or height)
+                actual_width = int(capture_info.get("width") or TARGET_WIDTH)
+                actual_height = int(capture_info.get("height") or TARGET_HEIGHT)
                 meta = {
                     "frame_id": self.state.frame_id,
                     "timestamp_utc": timestamp.isoformat(),
@@ -260,14 +260,14 @@ class CaptureThread(threading.Thread):
                     "camera_device": CAMERA_DEVICE,
                     "width": actual_width,
                     "height": actual_height,
-                    "requested_width": width,
-                    "requested_height": height,
-                    "target_fps": target_fps,
+                    "requested_width": TARGET_WIDTH,
+                    "requested_height": TARGET_HEIGHT,
+                    "target_fps": TARGET_FPS,
                     "capture_source": "vision_framebuffer_v4l2_mjpg",
                     "size_bytes": len(frame),
                     "ring_image_path": str(image_path),
                     "ring_metadata_path": str(meta_path),
-                    "latest_url": "/webcam/?action=snapshot",
+                    "latest_url": PUBLIC_SNAPSHOT_URL,
                     "capture_info": capture_info,
                 }
                 atomic_write_bytes(image_path, frame)
@@ -279,14 +279,10 @@ class CaptureThread(threading.Thread):
                 message = str(exc)
                 self.state.update_error(message)
                 log(f"Capture failed: {message}")
-                if self.state.consecutive_errors >= 5 and self.profile_index < len(self.profiles) - 1:
-                    self.profile_index += 1
-                    self.state.consecutive_errors = 0
-                    log(f"Falling back to capture profile {self.profiles[self.profile_index]}")
             finally:
                 tmp_path.unlink(missing_ok=True)
 
-            interval = 1.0 / max(0.1, float(self.profiles[self.profile_index][2]))
+            interval = 1.0 / max(0.1, TARGET_FPS)
             elapsed = time.monotonic() - start
             self.state.stop_requested.wait(max(0.05, interval - elapsed))
 
@@ -390,7 +386,7 @@ class Handler(BaseHTTPRequestHandler):
         elif parsed.path in ("/latest.json", "/metadata"):
             self.send_metadata()
         elif parsed.path == "/":
-            self.send_json({"service": "vision-framebuffer", "state_url": "/state"})
+            self.send_json({"service": SERVICE_NAME, "state_url": "/state"})
         else:
             self.send_error(HTTPStatus.NOT_FOUND, "Unknown vision framebuffer endpoint")
 
