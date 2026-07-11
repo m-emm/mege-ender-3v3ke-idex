@@ -43,6 +43,18 @@ PUBLIC_SNAPSHOT_URL = os.environ.get(
     "VISION_FRAMEBUFFER_PUBLIC_SNAPSHOT_URL", "/webcam/?action=snapshot"
 )
 SERVICE_NAME = os.environ.get("VISION_FRAMEBUFFER_SERVICE_NAME", "vision-framebuffer")
+CAMERA_PROFILE_FILE_ENV = os.environ.get("VISION_CAMERA_PROFILE_FILE", "").strip()
+CAMERA_PROFILE_FILE = Path(CAMERA_PROFILE_FILE_ENV) if CAMERA_PROFILE_FILE_ENV else None
+CAMERA_DEFAULT_PROFILE = os.environ.get("VISION_CAMERA_DEFAULT_PROFILE", "").strip()
+CAMERA_PROFILE_REQUEST_FILE_ENV = os.environ.get(
+    "VISION_CAMERA_PROFILE_REQUEST_FILE", ""
+).strip()
+CAMERA_PROFILE_REQUEST_FILE = (
+    Path(CAMERA_PROFILE_REQUEST_FILE_ENV) if CAMERA_PROFILE_REQUEST_FILE_ENV else None
+)
+CAMERA_PROFILE_APPLY_TIMEOUT = float(
+    os.environ.get("VISION_CAMERA_PROFILE_APPLY_TIMEOUT", "5")
+)
 NAME_REPLACEMENTS = str.maketrans({c: "_" for c in " /\\:;|?*[]{}()<>'\"`$&!"})
 
 
@@ -51,7 +63,11 @@ class FramebufferError(RuntimeError):
 
 
 def log(message: str) -> None:
-    print(f"{datetime.now(timezone.utc).isoformat()} {message}", file=sys.stderr, flush=True)
+    print(
+        f"{datetime.now(timezone.utc).isoformat()} {message}",
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 def run_command(command: list[str], *, timeout: float) -> subprocess.CompletedProcess:
@@ -105,7 +121,7 @@ def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
-def capture_mjpeg_frame(device: str, path: Path, width: int, height: int) -> dict[str, Any]:
+def set_mjpeg_format(device: str, width: int, height: int) -> dict[str, Any]:
     fmt = f"width={width},height={height},pixelformat=MJPG"
     result = run_command(
         [
@@ -113,6 +129,31 @@ def capture_mjpeg_frame(device: str, path: Path, width: int, height: int) -> dic
             "-d",
             device,
             f"--set-fmt-video={fmt}",
+        ],
+        timeout=CAPTURE_TIMEOUT,
+    )
+    if result.returncode != 0:
+        raise FramebufferError(
+            result.stderr.strip()
+            or result.stdout.strip()
+            or "v4l2 format selection failed"
+        )
+    return {
+        "requested_width": width,
+        "requested_height": height,
+        "stdout": result.stdout.strip(),
+        "stderr": result.stderr.strip(),
+    }
+
+
+def capture_mjpeg_frame(
+    device: str, path: Path, width: int, height: int
+) -> dict[str, Any]:
+    result = run_command(
+        [
+            "v4l2-ctl",
+            "-d",
+            device,
             "--stream-mmap",
             "--stream-count=1",
             f"--stream-to={path}",
@@ -130,9 +171,170 @@ def capture_mjpeg_frame(device: str, path: Path, width: int, height: int) -> dic
         "requested_height": height,
         "width": actual_width,
         "height": actual_height,
-        "stdout": result.stdout.strip(),
-        "stderr": result.stderr.strip(),
+        "stream_stdout": result.stdout.strip(),
+        "stream_stderr": result.stderr.strip(),
     }
+
+
+class CameraProfileManager:
+    def __init__(
+        self,
+        *,
+        profile_file: Path | None,
+        default_profile: str,
+        request_file: Path | None,
+    ) -> None:
+        self.profile_file = profile_file
+        self.default_profile = default_profile
+        self.request_file = request_file
+        self.aliases: dict[str, str] = {}
+        self.profiles: dict[str, list[dict[str, Any]]] = {}
+        self.requested_profile = default_profile
+        self.request_key: tuple[int, int] | None = None
+        self.last_request: dict[str, Any] | None = None
+        self.last_state: dict[str, Any] = {
+            "enabled": profile_file is not None,
+            "profile_file": str(profile_file) if profile_file else None,
+            "request_file": str(request_file) if request_file else None,
+            "requested_profile": default_profile or None,
+            "active_profile": None,
+            "profile_names": [],
+            "applied_controls": [],
+            "control_errors": [],
+        }
+        if profile_file is not None:
+            self._load_profiles(profile_file)
+
+    def _load_profiles(self, profile_file: Path) -> None:
+        payload = json.loads(profile_file.read_text())
+        aliases = payload.get("aliases") or {}
+        profiles = payload.get("profiles") or {}
+        if not isinstance(aliases, dict) or not isinstance(profiles, dict):
+            raise FramebufferError(f"{profile_file} must contain aliases and profiles")
+        parsed_profiles: dict[str, list[dict[str, Any]]] = {}
+        for profile_name, profile_payload in profiles.items():
+            controls = (
+                profile_payload.get("controls")
+                if isinstance(profile_payload, dict)
+                else None
+            )
+            if not isinstance(controls, list) or not controls:
+                raise FramebufferError(
+                    f"{profile_file}: profile {profile_name} has no controls"
+                )
+            parsed_controls = []
+            for control in controls:
+                if (
+                    not isinstance(control, dict)
+                    or "name" not in control
+                    or "value" not in control
+                ):
+                    raise FramebufferError(
+                        f"{profile_file}: profile {profile_name} has an invalid control"
+                    )
+                parsed_controls.append(
+                    {"name": str(control["name"]), "value": control["value"]}
+                )
+            parsed_profiles[str(profile_name)] = parsed_controls
+        self.aliases = {str(alias): str(target) for alias, target in aliases.items()}
+        self.profiles = parsed_profiles
+
+    def _resolve(self, requested_profile: str) -> tuple[str, list[dict[str, Any]]]:
+        active_profile = self.aliases.get(requested_profile, requested_profile)
+        controls = self.profiles.get(active_profile)
+        if controls is None:
+            known = ", ".join(sorted(set(self.aliases) | set(self.profiles)))
+            raise FramebufferError(
+                f"Unknown camera profile {requested_profile!r}; known profiles: {known}"
+            )
+        return active_profile, controls
+
+    def _update_request(self) -> None:
+        if self.request_file is None or not self.request_file.exists():
+            return
+        stat = self.request_file.stat()
+        request_key = (stat.st_mtime_ns, stat.st_size)
+        if request_key == self.request_key:
+            return
+        payload = json.loads(self.request_file.read_text())
+        requested_profile = str(payload.get("profile") or "").strip()
+        if requested_profile:
+            self.requested_profile = requested_profile
+            self.last_request = payload
+            self.request_key = request_key
+
+    def state(self) -> dict[str, Any]:
+        return json.loads(json.dumps(self.last_state))
+
+    def apply(self, device: str) -> dict[str, Any]:
+        if self.profile_file is None:
+            self.last_state = {
+                "enabled": False,
+                "profile_file": None,
+                "request_file": str(self.request_file) if self.request_file else None,
+                "requested_profile": None,
+                "active_profile": None,
+                "profile_names": [],
+                "applied_controls": [],
+                "control_errors": [],
+            }
+            return self.state()
+
+        self._update_request()
+        requested_profile = self.requested_profile or self.default_profile
+        if not requested_profile:
+            raise FramebufferError(
+                "Camera profile file configured but no profile selected"
+            )
+        active_profile, controls = self._resolve(requested_profile)
+
+        applied_controls: list[dict[str, Any]] = []
+        control_errors: list[dict[str, Any]] = []
+        for control in controls:
+            name = str(control["name"])
+            value = control["value"]
+            if isinstance(value, bool):
+                value = int(value)
+            result = run_command(
+                [
+                    "v4l2-ctl",
+                    "-d",
+                    device,
+                    f"--set-ctrl={name}={value}",
+                ],
+                timeout=CAMERA_PROFILE_APPLY_TIMEOUT,
+            )
+            record = {
+                "name": name,
+                "value": value,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+                "returncode": result.returncode,
+            }
+            if result.returncode != 0:
+                control_errors.append(record)
+                break
+            applied_controls.append(record)
+
+        self.last_state = {
+            "enabled": True,
+            "profile_file": str(self.profile_file),
+            "request_file": str(self.request_file) if self.request_file else None,
+            "requested_profile": requested_profile,
+            "active_profile": active_profile,
+            "profile_names": sorted({requested_profile, active_profile}),
+            "applied_controls": applied_controls,
+            "control_errors": control_errors,
+            "last_request": self.last_request,
+        }
+        if control_errors:
+            failed = control_errors[0]
+            raise FramebufferError(
+                "Could not apply camera profile "
+                f"{requested_profile!r} control {failed['name']}={failed['value']}: "
+                f"{failed['stderr'] or failed['stdout'] or failed['returncode']}"
+            )
+        return self.state()
 
 
 class FrameState:
@@ -152,6 +354,20 @@ class FrameState:
             "height": TARGET_HEIGHT,
             "target_fps": TARGET_FPS,
         }
+        self.camera_profile = {
+            "enabled": CAMERA_PROFILE_FILE is not None,
+            "profile_file": str(CAMERA_PROFILE_FILE) if CAMERA_PROFILE_FILE else None,
+            "request_file": (
+                str(CAMERA_PROFILE_REQUEST_FILE)
+                if CAMERA_PROFILE_REQUEST_FILE
+                else None
+            ),
+            "requested_profile": CAMERA_DEFAULT_PROFILE or None,
+            "active_profile": None,
+            "profile_names": [],
+            "applied_controls": [],
+            "control_errors": [],
+        }
         self.stop_requested = threading.Event()
 
     def update_profile(self, *, width: int, height: int, target_fps: float) -> None:
@@ -159,7 +375,14 @@ class FrameState:
             self.profile = {"width": width, "height": height, "target_fps": target_fps}
             self.condition.notify_all()
 
-    def update_frame(self, frame: bytes, meta: dict[str, Any], image_path: Path, meta_path: Path) -> None:
+    def update_camera_profile(self, camera_profile: dict[str, Any]) -> None:
+        with self.condition:
+            self.camera_profile = dict(camera_profile)
+            self.condition.notify_all()
+
+    def update_frame(
+        self, frame: bytes, meta: dict[str, Any], image_path: Path, meta_path: Path
+    ) -> None:
         with self.condition:
             while len(self.ring) >= self.ring.maxlen:
                 old_image, old_meta = self.ring.popleft()
@@ -221,6 +444,7 @@ class FrameState:
                 "total_errors": self.total_errors,
                 "last_error": self.last_error,
                 "profile": dict(self.profile),
+                "camera_profile": dict(self.camera_profile),
                 "stale_after_s": STALE_AFTER,
             }
 
@@ -229,6 +453,11 @@ class CaptureThread(threading.Thread):
     def __init__(self, state: FrameState) -> None:
         super().__init__(daemon=True)
         self.state = state
+        self.profile_manager = CameraProfileManager(
+            profile_file=CAMERA_PROFILE_FILE,
+            default_profile=CAMERA_DEFAULT_PROFILE,
+            request_file=CAMERA_PROFILE_REQUEST_FILE,
+        )
 
     def run(self) -> None:
         RUN_DIR.mkdir(parents=True, exist_ok=True)
@@ -242,9 +471,15 @@ class CaptureThread(threading.Thread):
             try:
                 if tmp_path.exists():
                     tmp_path.unlink()
+                format_info = set_mjpeg_format(
+                    CAMERA_DEVICE, TARGET_WIDTH, TARGET_HEIGHT
+                )
+                camera_profile = self.profile_manager.apply(CAMERA_DEVICE)
+                self.state.update_camera_profile(camera_profile)
                 capture_info = capture_mjpeg_frame(
                     CAMERA_DEVICE, tmp_path, TARGET_WIDTH, TARGET_HEIGHT
                 )
+                capture_info["format"] = format_info
                 frame = tmp_path.read_bytes()
                 self.state.frame_id += 1
                 timestamp = datetime.now(timezone.utc)
@@ -269,6 +504,7 @@ class CaptureThread(threading.Thread):
                     "ring_metadata_path": str(meta_path),
                     "latest_url": PUBLIC_SNAPSHOT_URL,
                     "capture_info": capture_info,
+                    "camera_profile": camera_profile,
                 }
                 atomic_write_bytes(image_path, frame)
                 atomic_write_json(meta_path, meta)
@@ -277,6 +513,7 @@ class CaptureThread(threading.Thread):
                 self.state.update_frame(frame, meta, image_path, meta_path)
             except Exception as exc:
                 message = str(exc)
+                self.state.update_camera_profile(self.profile_manager.state())
                 self.state.update_error(message)
                 log(f"Capture failed: {message}")
             finally:
@@ -305,7 +542,9 @@ class Handler(BaseHTTPRequestHandler):
     def send_snapshot(self) -> None:
         latest = self.server.state.wait_for_frame(timeout=10)
         if latest is None:
-            self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, "No camera frame available yet")
+            self.send_error(
+                HTTPStatus.SERVICE_UNAVAILABLE, "No camera frame available yet"
+            )
             return
         frame, meta = latest
         self.send_response(200)
@@ -321,7 +560,9 @@ class Handler(BaseHTTPRequestHandler):
         state = self.server.state.snapshot()
         latest = state.get("last_frame")
         if not latest:
-            self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, "No camera frame available yet")
+            self.send_error(
+                HTTPStatus.SERVICE_UNAVAILABLE, "No camera frame available yet"
+            )
             return
         self.send_json(latest)
 
@@ -338,7 +579,9 @@ class Handler(BaseHTTPRequestHandler):
     def send_stream(self) -> None:
         boundary = b"vision-frame"
         self.send_response(200)
-        self.send_header("Content-Type", f"multipart/x-mixed-replace; boundary={boundary.decode()}")
+        self.send_header(
+            "Content-Type", f"multipart/x-mixed-replace; boundary={boundary.decode()}"
+        )
         self.send_header("Cache-Control", "no-store")
         self.send_header("Connection", "close")
         self.end_headers()
@@ -371,7 +614,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         finally:
             with self.server.state.condition:
-                self.server.state.stream_clients = max(0, self.server.state.stream_clients - 1)
+                self.server.state.stream_clients = max(
+                    0, self.server.state.stream_clients - 1
+                )
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)

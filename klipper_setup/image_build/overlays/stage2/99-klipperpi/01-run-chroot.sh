@@ -452,6 +452,7 @@ require_file "${FILES_DIR}/vision_capture.py"
 require_file "${FILES_DIR}/vision_nozzle_align.py"
 require_file "${FILES_DIR}/vision_runner.py"
 require_file "${FILES_DIR}/webcam_health_probe.py"
+require_file "${FILES_DIR}/nozzle_cam_profiles.json"
 require_file "${FILES_DIR}/klipperpi-expand-rootfs.service"
 require_file "${FILES_DIR}/klipperpi-expand-rootfs-once.sh"
 # Note: klipperscreen.service not needed - LightDM handles KlipperScreen
@@ -469,6 +470,8 @@ install -m 0755 "${FILES_DIR}/vision_capture.py" /usr/local/bin/vision_capture.p
 install -m 0755 "${FILES_DIR}/vision_nozzle_align.py" /usr/local/bin/vision_nozzle_align.py
 install -m 0755 "${FILES_DIR}/vision_runner.py" /usr/local/bin/vision_runner.py
 install -m 0755 "${FILES_DIR}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py
+install -d -m 0755 /usr/local/share/vision
+install -m 0644 "${FILES_DIR}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json
 setfacl -m u:www-data:--x "${USER_HOME}"
 
 # Replace __USER__ placeholder

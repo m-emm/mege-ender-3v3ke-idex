@@ -7,6 +7,8 @@ FILES_DIR="${REPO_ROOT}/klipper_setup/image_build/overlays/stage2/99-klipperpi/f
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 PRIMARY_CAMERA_DEVICE="${VISION_CAMERA_DEVICE:-/dev/v4l/by-id/usb-Aukey-PC-LM1E_Camera_Aukey-PC-LM1E_Camera-video-index0}"
 NOZZLE_CAMERA_DEVICE="${NOZZLE_CAMERA_DEVICE:-/dev/v4l/by-id/usb-Vimicro_corp._PC-LM1E_Camera_PC-LM1E_Audio-video-index0}"
+WEBCAM_HEALTH_DURATION="${WEBCAM_HEALTH_DURATION:-10}"
+WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES="${WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES:-2}"
 
 required_files=(
   moonraker.conf
@@ -16,6 +18,7 @@ required_files=(
   vision_nozzle_align.py
   vision_runner.py
   webcam_health_probe.py
+  nozzle_cam_profiles.json
   vision-framebuffer.service
   vision-framebuffer-nozzle-cam.service
   vision-capture.service
@@ -32,6 +35,7 @@ done
 echo "Checking cameras on ${REMOTE_HOST}:"
 echo "  primary: ${PRIMARY_CAMERA_DEVICE}"
 echo "  nozzle_cam: ${NOZZLE_CAMERA_DEVICE}"
+echo "  health probe duration: ${WEBCAM_HEALTH_DURATION}s"
 ssh "${REMOTE_HOST}" \
   "PRIMARY_CAMERA_DEVICE='${PRIMARY_CAMERA_DEVICE}' NOZZLE_CAMERA_DEVICE='${NOZZLE_CAMERA_DEVICE}' bash -s" <<'REMOTE_CHECK'
 set -euo pipefail
@@ -65,6 +69,7 @@ scp \
   "${FILES_DIR}/vision_nozzle_align.py" \
   "${FILES_DIR}/vision_runner.py" \
   "${FILES_DIR}/webcam_health_probe.py" \
+  "${FILES_DIR}/nozzle_cam_profiles.json" \
   "${FILES_DIR}/vision-framebuffer.service" \
   "${FILES_DIR}/vision-framebuffer-nozzle-cam.service" \
   "${FILES_DIR}/vision-capture.service" \
@@ -72,7 +77,7 @@ scp \
   "${REMOTE_HOST}:${remote_tmp}/"
 
 ssh "${REMOTE_HOST}" \
-  "REMOTE_TMP='${remote_tmp}' PRIMARY_CAMERA_DEVICE='${PRIMARY_CAMERA_DEVICE}' NOZZLE_CAMERA_DEVICE='${NOZZLE_CAMERA_DEVICE}' bash -s" <<'REMOTE_SCRIPT'
+  "REMOTE_TMP='${remote_tmp}' PRIMARY_CAMERA_DEVICE='${PRIMARY_CAMERA_DEVICE}' NOZZLE_CAMERA_DEVICE='${NOZZLE_CAMERA_DEVICE}' WEBCAM_HEALTH_DURATION='${WEBCAM_HEALTH_DURATION}' WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES='${WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 USERNAME="$(id -un)"
@@ -104,6 +109,7 @@ sudo apt-get install -y --no-install-recommends \
 echo "Installing tracked configs and services..."
 sudo install -d -m 0755 -o "${USERNAME}" -g "${USERNAME}" \
   "${CONFIG_DIR}" "${LOG_DIR}" "${PRINTER_DATA}/systemd" "${VISION_DIR}" "${VISION_DIR}/nozzle_cam"
+sudo install -d -m 0755 /usr/local/share/vision
 sudo setfacl -m u:www-data:--x "${USER_HOME}"
 
 backup_if_exists "${CONFIG_DIR}/crowsnest.conf"
@@ -127,6 +133,7 @@ sudo install -m 0755 "${REMOTE_TMP}/vision_capture.py" /usr/local/bin/vision_cap
 sudo install -m 0755 "${REMOTE_TMP}/vision_nozzle_align.py" /usr/local/bin/vision_nozzle_align.py
 sudo install -m 0755 "${REMOTE_TMP}/vision_runner.py" /usr/local/bin/vision_runner.py
 sudo install -m 0755 "${REMOTE_TMP}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py
+sudo install -m 0644 "${REMOTE_TMP}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json
 sudo install -m 0644 "${REMOTE_TMP}/vision-framebuffer.service" /etc/systemd/system/vision-framebuffer.service
 sudo install -m 0644 "${REMOTE_TMP}/vision-framebuffer-nozzle-cam.service" /etc/systemd/system/vision-framebuffer-nozzle-cam.service
 sudo install -m 0644 "${REMOTE_TMP}/vision-capture.service" /etc/systemd/system/vision-capture.service
@@ -284,7 +291,7 @@ curl -fsS http://127.0.0.1:7125/server/webcams/list || true
 
 echo "Primary webcam stream health:"
 if ! /usr/local/bin/webcam_health_probe.py \
-  --duration 90 \
+  --duration "${WEBCAM_HEALTH_DURATION}" \
   --state-url http://127.0.0.1:8080/state \
   --stream-url 'http://127.0.0.1:8080/?action=stream' \
   --snapshot-url 'http://127.0.0.1/webcam/?action=snapshot' \
@@ -293,7 +300,7 @@ if ! /usr/local/bin/webcam_health_probe.py \
   --min-median-queued-fps 0.4 \
   --max-zero-samples 1 \
   --max-consecutive-zero 1 \
-  --ignore-initial-samples 6 \
+  --ignore-initial-samples "${WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES}" \
   --max-snapshot-p95 2.5 \
   --json-output "${VISION_DIR}/webcam_health_latest.json"; then
   echo "Webcam preview stream health check failed." >&2
@@ -303,7 +310,7 @@ fi
 
 echo "Nozzle camera stream health:"
 if ! /usr/local/bin/webcam_health_probe.py \
-  --duration 90 \
+  --duration "${WEBCAM_HEALTH_DURATION}" \
   --state-url http://127.0.0.1:8081/state \
   --stream-url 'http://127.0.0.1:8081/?action=stream' \
   --snapshot-url 'http://127.0.0.1/nozzle_cam/?action=snapshot' \
@@ -312,7 +319,7 @@ if ! /usr/local/bin/webcam_health_probe.py \
   --min-median-queued-fps 0.4 \
   --max-zero-samples 1 \
   --max-consecutive-zero 1 \
-  --ignore-initial-samples 6 \
+  --ignore-initial-samples "${WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES}" \
   --max-snapshot-p95 2.5 \
   --json-output "${VISION_DIR}/nozzle_cam/webcam_health_latest.json"; then
   echo "Nozzle camera preview stream health check failed." >&2

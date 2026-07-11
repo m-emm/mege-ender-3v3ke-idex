@@ -10,6 +10,9 @@ Environment=VISION_FRAMEBUFFER_DIR=/run/vision-preview-nozzle_cam
 Environment=VISION_FRAMEBUFFER_PORT=8081
 Environment=VISION_FRAMEBUFFER_PUBLIC_SNAPSHOT_URL=/nozzle_cam/?action=snapshot
 Environment=VISION_FRAMEBUFFER_SERVICE_NAME=vision-framebuffer-nozzle-cam
+Environment=VISION_CAMERA_PROFILE_FILE=/usr/local/share/vision/nozzle_cam_profiles.json
+Environment=VISION_CAMERA_DEFAULT_PROFILE=vision
+Environment=VISION_CAMERA_PROFILE_REQUEST_FILE=/run/vision-preview-nozzle_cam/profile_request.json
 ExecStart=/usr/local/bin/vision_framebuffer.py
 Restart=always
 RestartSec=2

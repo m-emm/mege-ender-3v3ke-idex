@@ -1,0 +1,55 @@
+{
+  "aliases": {
+    "auto": "nozzle_cam_auto",
+    "baseline": "nozzle_cam_baseline",
+    "vision": "nozzle_cam_vision"
+  },
+  "profiles": {
+    "nozzle_cam_auto": {
+      "controls": [
+        {"name": "auto_exposure", "value": 3},
+        {"name": "white_balance_automatic", "value": 1},
+        {"name": "power_line_frequency", "value": 1},
+        {"name": "brightness", "value": 0},
+        {"name": "contrast", "value": 16},
+        {"name": "saturation", "value": 9},
+        {"name": "hue", "value": 0},
+        {"name": "gamma", "value": 188},
+        {"name": "sharpness", "value": 7}
+      ],
+      "description": "Diagnostic automatic exposure and white-balance profile."
+    },
+    "nozzle_cam_baseline": {
+      "controls": [
+        {"name": "auto_exposure", "value": 1},
+        {"name": "exposure_time_absolute", "value": 512},
+        {"name": "white_balance_automatic", "value": 0},
+        {"name": "white_balance_temperature", "value": 6500},
+        {"name": "power_line_frequency", "value": 1},
+        {"name": "brightness", "value": 0},
+        {"name": "contrast", "value": 16},
+        {"name": "saturation", "value": 9},
+        {"name": "hue", "value": 0},
+        {"name": "gamma", "value": 188},
+        {"name": "sharpness", "value": 7}
+      ],
+      "description": "Manual baseline close to the current nozzle camera defaults."
+    },
+    "nozzle_cam_vision": {
+      "controls": [
+        {"name": "auto_exposure", "value": 1},
+        {"name": "exposure_time_absolute", "value": 5000},
+        {"name": "white_balance_automatic", "value": 0},
+        {"name": "white_balance_temperature", "value": 6500},
+        {"name": "power_line_frequency", "value": 1},
+        {"name": "brightness", "value": 6},
+        {"name": "contrast", "value": 12},
+        {"name": "saturation", "value": 9},
+        {"name": "hue", "value": 0},
+        {"name": "gamma", "value": 200},
+        {"name": "sharpness", "value": 7}
+      ],
+      "description": "Very bright manual nozzle vision profile; clipped light spot is acceptable."
+    }
+  }
+}

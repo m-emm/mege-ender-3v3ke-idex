@@ -31,6 +31,14 @@ OUTPUT_DIR = Path(os.environ.get("VISION_OUTPUT_DIR", "/home/pi/printer_data/vis
 FRAMEBUFFER_DIR = Path(os.environ.get("VISION_FRAMEBUFFER_DIR", "/run/vision-preview"))
 FRAMEBUFFER_LATEST_IMAGE = FRAMEBUFFER_DIR / "latest.jpg"
 FRAMEBUFFER_LATEST_METADATA = FRAMEBUFFER_DIR / "latest.json"
+FRAMEBUFFER_PROFILE_REQUEST_FILE_ENV = os.environ.get(
+    "VISION_CAMERA_PROFILE_REQUEST_FILE", ""
+).strip()
+FRAMEBUFFER_PROFILE_REQUEST_FILE = (
+    Path(FRAMEBUFFER_PROFILE_REQUEST_FILE_ENV)
+    if FRAMEBUFFER_PROFILE_REQUEST_FILE_ENV
+    else None
+)
 KLIPPY_SOCKET = os.environ.get(
     "VISION_KLIPPY_SOCKET", "/home/pi/printer_data/comms/klippy.sock"
 )
@@ -51,6 +59,12 @@ NOZZLE_ALIGN_REMOTE_METHOD = "idex_nozzle_vision_check"
 NOZZLE_ALIGN_REMOTE_ACTION = "run_idex_nozzle_vision_check"
 NOZZLE_SWEEP_REMOTE_METHOD = "idex_nozzle_vision_sweep"
 NOZZLE_SWEEP_REMOTE_ACTION = "run_idex_nozzle_vision_sweep"
+NOZZLE_PROFILE_REMOTE_METHOD = os.environ.get(
+    "VISION_PROFILE_REMOTE_METHOD", "nozzle_cam_profile"
+)
+NOZZLE_PROFILE_REMOTE_ACTION = os.environ.get(
+    "VISION_PROFILE_REMOTE_ACTION", "run_nozzle_cam_profile"
+)
 NOZZLE_ALIGN_BIN = os.environ.get(
     "VISION_NOZZLE_ALIGN_BIN", "/usr/local/bin/vision_nozzle_align.py"
 )
@@ -60,6 +74,7 @@ HIGH_RES_MIN_WIDTH = int(os.environ.get("VISION_HIGH_RES_MIN_WIDTH", "1920"))
 HIGH_RES_MIN_HEIGHT = int(os.environ.get("VISION_HIGH_RES_MIN_HEIGHT", "1080"))
 DEFAULT_FRAME_FRESH_TIMEOUT = float(os.environ.get("VISION_FRAME_FRESH_TIMEOUT", "10"))
 DEFAULT_FRAME_MAX_AGE = float(os.environ.get("VISION_FRAME_MAX_AGE", "10"))
+DEFAULT_CAMERA_PROFILE = os.environ.get("VISION_CAPTURE_DEFAULT_PROFILE", "").strip()
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 REGISTER_NOZZLE_METHODS = os.environ.get(
     "VISION_REGISTER_NOZZLE_METHODS", "1"
@@ -71,10 +86,16 @@ class CaptureError(RuntimeError):
 
 
 def log(message: str) -> None:
-    print(f"{datetime.now(timezone.utc).isoformat()} {message}", file=sys.stderr, flush=True)
+    print(
+        f"{datetime.now(timezone.utc).isoformat()} {message}",
+        file=sys.stderr,
+        flush=True,
+    )
 
 
-def run_command(command: list[str], *, timeout: float = 30.0) -> subprocess.CompletedProcess:
+def run_command(
+    command: list[str], *, timeout: float = 30.0
+) -> subprocess.CompletedProcess:
     return subprocess.run(
         command,
         check=False,
@@ -88,6 +109,11 @@ def run_command(command: list[str], *, timeout: float = 30.0) -> subprocess.Comp
 def sanitize_name(name: Any) -> str:
     cleaned = NAME_RE.sub("_", str(name or "capture")).strip("._-")
     return (cleaned or "capture")[:80]
+
+
+def sanitize_profile(name: Any) -> str:
+    cleaned = NAME_RE.sub("_", str(name or "")).strip("._-")
+    return cleaned[:80]
 
 
 def as_bool(value: Any, default: bool = False) -> bool:
@@ -204,11 +230,51 @@ def read_framebuffer_metadata() -> dict[str, Any]:
     return json.loads(FRAMEBUFFER_LATEST_METADATA.read_text())
 
 
+def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    os.replace(tmp, path)
+
+
+def request_framebuffer_profile(
+    profile: str, params: dict[str, Any] | None = None
+) -> datetime | None:
+    if FRAMEBUFFER_PROFILE_REQUEST_FILE is None:
+        return None
+    if not profile:
+        return None
+    requested_at = datetime.now(timezone.utc)
+    atomic_write_json(
+        FRAMEBUFFER_PROFILE_REQUEST_FILE,
+        {
+            "profile": profile,
+            "requested_at_utc": requested_at.isoformat(),
+            "source": "vision_capture",
+            "params": params or {},
+        },
+    )
+    return requested_at
+
+
+def metadata_matches_profile(metadata: dict[str, Any], profile: str | None) -> bool:
+    if not profile:
+        return True
+    camera_profile = metadata.get("camera_profile") or {}
+    names = set(camera_profile.get("profile_names") or [])
+    for key in ("requested_profile", "active_profile"):
+        value = camera_profile.get(key)
+        if value:
+            names.add(str(value))
+    return profile in names
+
+
 def wait_for_buffered_frame(
     *,
     fresh_after_utc: datetime | None,
     timeout: float,
     max_age: float,
+    required_profile: str | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     deadline = time.monotonic() + timeout
     last_error: Exception | None = None
@@ -235,6 +301,14 @@ def wait_for_buffered_frame(
                 )
                 time.sleep(0.1)
                 continue
+            if not metadata_matches_profile(metadata, required_profile):
+                camera_profile = metadata.get("camera_profile") or {}
+                last_error = CaptureError(
+                    "latest buffered frame has profile "
+                    f"{camera_profile.get('profile_names')} but needs {required_profile}"
+                )
+                time.sleep(0.1)
+                continue
             verify_jpeg(FRAMEBUFFER_LATEST_IMAGE)
             return FRAMEBUFFER_LATEST_IMAGE, metadata
         except Exception as exc:
@@ -243,7 +317,9 @@ def wait_for_buffered_frame(
     raise CaptureError(f"Timed out waiting for buffered frame: {last_error}")
 
 
-def capture_with_resolution(device: str, image_path: Path, width: int, height: int) -> dict[str, Any]:
+def capture_with_resolution(
+    device: str, image_path: Path, width: int, height: int
+) -> dict[str, Any]:
     fmt = f"width={width},height={height},pixelformat=MJPG"
     warmup = run_command(
         [
@@ -323,9 +399,7 @@ def capture_with_opencv_resolution(
                 "OpenCV decoded lower resolution than requested: "
                 f"{frame_width}x{frame_height}, requested {width}x{height}"
             )
-        ok, encoded = cv2.imencode(
-            ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 95]
-        )
+        ok, encoded = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
         if not ok:
             raise CaptureError("OpenCV could not encode JPEG frame")
         image_path.write_bytes(encoded.tobytes())
@@ -385,6 +459,10 @@ def capture_frame(params: dict[str, Any] | None = None) -> dict[str, Any]:
     max_age = float(params.get("max_age") or DEFAULT_FRAME_MAX_AGE)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+    requested_profile = sanitize_profile(
+        params.get("profile") or DEFAULT_CAMERA_PROFILE
+    )
+    profile_request_time = request_framebuffer_profile(requested_profile, params)
     timestamp = datetime.now(timezone.utc)
     timestamp_name = timestamp.strftime("%Y%m%dT%H%M%SZ")
     requested_name = sanitize_name(params.get("name"))
@@ -393,7 +471,7 @@ def capture_frame(params: dict[str, Any] | None = None) -> dict[str, Any]:
     tmp_path = image_path.with_suffix(".jpg.tmp")
     fresh_after = parse_utc_timestamp(params.get("fresh_after_utc"))
     if fresh and fresh_after is None:
-        fresh_after = timestamp
+        fresh_after = profile_request_time or timestamp
 
     metadata: dict[str, Any] = {
         "timestamp_utc": timestamp.isoformat(),
@@ -407,6 +485,15 @@ def capture_frame(params: dict[str, Any] | None = None) -> dict[str, Any]:
         "fresh_after_utc": fresh_after.isoformat() if fresh_after else None,
         "fresh_timeout": fresh_timeout,
         "max_age": max_age,
+        "requested_camera_profile": requested_profile or None,
+        "profile_request_utc": (
+            profile_request_time.isoformat() if profile_request_time else None
+        ),
+        "framebuffer_profile_request_file": (
+            str(FRAMEBUFFER_PROFILE_REQUEST_FILE)
+            if FRAMEBUFFER_PROFILE_REQUEST_FILE
+            else None
+        ),
         "attempts": [],
     }
 
@@ -415,6 +502,7 @@ def capture_frame(params: dict[str, Any] | None = None) -> dict[str, Any]:
             fresh_after_utc=fresh_after,
             timeout=fresh_timeout,
             max_age=max_age,
+            required_profile=requested_profile or None,
         )
         captured_width = int(source_metadata.get("width") or 0)
         captured_height = int(source_metadata.get("height") or 0)
@@ -452,6 +540,7 @@ def capture_frame(params: dict[str, Any] | None = None) -> dict[str, Any]:
                 "size_bytes": image_path.stat().st_size,
                 "capture_source": "vision_framebuffer",
                 "source_frame": source_metadata,
+                "camera_profile": source_metadata.get("camera_profile"),
             }
         )
     finally:
@@ -482,6 +571,8 @@ class KlippyRemoteCaptureDaemon:
                     self._run_nozzle_alignment(params)
                 elif job_kind == NOZZLE_SWEEP_REMOTE_ACTION:
                     self._run_nozzle_sweep(params)
+                elif job_kind == NOZZLE_PROFILE_REMOTE_ACTION:
+                    self._request_nozzle_profile(params)
                 else:
                     log(f"Unknown vision job kind: {job_kind}")
             except Exception as exc:
@@ -544,6 +635,17 @@ class KlippyRemoteCaptureDaemon:
                 or "nozzle vision sweep failed"
             )
 
+    def _request_nozzle_profile(self, params: dict[str, Any]) -> None:
+        profile = sanitize_profile(params.get("profile") or DEFAULT_CAMERA_PROFILE)
+        if not profile:
+            raise CaptureError("No nozzle camera profile requested")
+        requested_at = request_framebuffer_profile(profile, params)
+        if requested_at is None:
+            raise CaptureError("No framebuffer profile request file is configured")
+        log(
+            f"Requested nozzle camera profile {profile!r} at {requested_at.isoformat()}"
+        )
+
     def _send(self, sock: socket.socket, payload: dict[str, Any]) -> None:
         sock.sendall(json.dumps(payload, separators=(",", ":")).encode() + b"\x03")
 
@@ -574,13 +676,20 @@ class KlippyRemoteCaptureDaemon:
             self._register_remote_method(
                 sock, NOZZLE_SWEEP_REMOTE_METHOD, NOZZLE_SWEEP_REMOTE_ACTION
             )
+            self._register_remote_method(
+                sock, NOZZLE_PROFILE_REMOTE_METHOD, NOZZLE_PROFILE_REMOTE_ACTION
+            )
 
     def _handle_message(self, message: dict[str, Any]) -> None:
         action = message.get("action")
         valid_actions = {REMOTE_ACTION}
         if REGISTER_NOZZLE_METHODS:
             valid_actions.update(
-                (NOZZLE_ALIGN_REMOTE_ACTION, NOZZLE_SWEEP_REMOTE_ACTION)
+                (
+                    NOZZLE_ALIGN_REMOTE_ACTION,
+                    NOZZLE_SWEEP_REMOTE_ACTION,
+                    NOZZLE_PROFILE_REMOTE_ACTION,
+                )
             )
         if action not in valid_actions:
             return
@@ -623,8 +732,11 @@ def main() -> int:
     parser.add_argument("--capture-once", metavar="NAME")
     parser.add_argument("--require-high-res", action="store_true")
     parser.add_argument("--fresh-after-utc")
-    parser.add_argument("--fresh-timeout", type=float, default=DEFAULT_FRAME_FRESH_TIMEOUT)
+    parser.add_argument(
+        "--fresh-timeout", type=float, default=DEFAULT_FRAME_FRESH_TIMEOUT
+    )
     parser.add_argument("--max-age", type=float, default=DEFAULT_FRAME_MAX_AGE)
+    parser.add_argument("--profile", default=DEFAULT_CAMERA_PROFILE)
     parser.add_argument(
         "--no-fresh",
         action="store_true",
@@ -649,6 +761,7 @@ def main() -> int:
                 "fresh_after_utc": args.fresh_after_utc,
                 "fresh_timeout": args.fresh_timeout,
                 "max_age": args.max_age,
+                "profile": args.profile,
                 "manage_crowsnest": False,
             }
         )

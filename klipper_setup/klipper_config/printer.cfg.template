@@ -85,9 +85,17 @@ description: Request a high-resolution nozzle camera frame through the Pi vision
 gcode:
     {% set name = params.NAME|default("manual") %}
     {% set reason = params.REASON|default("gcode") %}
+    {% set profile = params.PROFILE|default("vision") %}
     {% set pos = printer.toolhead.position %}
-    RESPOND TYPE=echo MSG="Nozzle camera capture requested: {name}"
-    {action_call_remote_method("nozzle_cam_capture", name=name, reason=reason, x=pos[0], y=pos[1], z=pos[2], e=pos[3])}
+    RESPOND TYPE=echo MSG="Nozzle camera capture requested: {name}, PROFILE={profile}"
+    {action_call_remote_method("nozzle_cam_capture", name=name, reason=reason, profile=profile, x=pos[0], y=pos[1], z=pos[2], e=pos[3])}
+
+[gcode_macro NOZZLE_CAM_PROFILE]
+description: Request a reproducible nozzle camera V4L2 profile.
+gcode:
+    {% set profile = params.PROFILE|default("vision") %}
+    RESPOND TYPE=echo MSG="Nozzle camera profile requested: {profile}"
+    {action_call_remote_method("nozzle_cam_profile", profile=profile)}
 
 [gcode_macro IDEX_NOZZLE_VISION_CHECK]
 description: Report-only T0/T1 nozzle image alignment check through the Pi vision service.

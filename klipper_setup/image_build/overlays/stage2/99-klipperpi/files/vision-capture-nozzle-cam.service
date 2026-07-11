@@ -14,6 +14,10 @@ Environment=VISION_OUTPUT_URL_PREFIX=/vision/nozzle_cam
 Environment=VISION_CAPTURE_REMOTE_METHOD=nozzle_cam_capture
 Environment=VISION_CAPTURE_REMOTE_ACTION=run_nozzle_cam_capture
 Environment=VISION_REGISTER_NOZZLE_METHODS=1
+Environment=VISION_CAMERA_PROFILE_REQUEST_FILE=/run/vision-preview-nozzle_cam/profile_request.json
+Environment=VISION_CAPTURE_DEFAULT_PROFILE=vision
+Environment=VISION_PROFILE_REMOTE_METHOD=nozzle_cam_profile
+Environment=VISION_PROFILE_REMOTE_ACTION=run_nozzle_cam_profile
 ExecStart=/usr/local/bin/vision_capture.py --daemon
 Restart=always
 RestartSec=5

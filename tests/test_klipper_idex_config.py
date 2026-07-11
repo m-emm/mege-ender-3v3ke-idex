@@ -1,3 +1,4 @@
+import json
 import importlib.util
 import re
 import sys
@@ -259,6 +260,7 @@ def test_vision_capture_macro_and_host_files_exist():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     macro = _section(config_text, "gcode_macro VISION_CAPTURE")
     nozzle_capture_macro = _section(config_text, "gcode_macro NOZZLE_CAM_CAPTURE")
+    nozzle_profile_macro = _section(config_text, "gcode_macro NOZZLE_CAM_PROFILE")
     nozzle_macro = _section(config_text, "gcode_macro IDEX_NOZZLE_VISION_CHECK")
     nozzle_sweep_macro = _section(config_text, "gcode_macro IDEX_NOZZLE_VISION_SWEEP")
     moonraker = (IMAGE_BUILD_FILES_DIR / "moonraker.conf").read_text(encoding="utf-8")
@@ -294,12 +296,23 @@ def test_vision_capture_macro_and_host_files_exist():
     runner_script = (IMAGE_BUILD_FILES_DIR / "vision_runner.py").read_text(
         encoding="utf-8"
     )
+    nozzle_profiles = json.loads(
+        (IMAGE_BUILD_FILES_DIR / "nozzle_cam_profiles.json").read_text(encoding="utf-8")
+    )
 
     assert 'action_call_remote_method("vision_capture"' in macro
     assert "printer.toolhead.position" in macro
     assert 'RESPOND TYPE=echo MSG="Vision capture requested' in macro
     assert 'action_call_remote_method("nozzle_cam_capture"' in nozzle_capture_macro
-    assert 'RESPOND TYPE=echo MSG="Nozzle camera capture requested' in nozzle_capture_macro
+    assert (
+        'RESPOND TYPE=echo MSG="Nozzle camera capture requested' in nozzle_capture_macro
+    )
+    assert 'params.PROFILE|default("vision")' in nozzle_capture_macro
+    assert "profile=profile" in nozzle_capture_macro
+    assert 'action_call_remote_method("nozzle_cam_profile"' in nozzle_profile_macro
+    assert (
+        'RESPOND TYPE=echo MSG="Nozzle camera profile requested' in nozzle_profile_macro
+    )
     assert 'action_call_remote_method("idex_nozzle_vision_check"' in nozzle_macro
     assert "print_stats.state" in nozzle_macro
     assert "requires X/Y/Z homed" in nozzle_macro
@@ -316,13 +329,35 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "location /vision/" in nginx
     assert "ExecStart=/usr/local/bin/vision_framebuffer.py" in framebuffer_service
     assert "VISION_FRAMEBUFFER_PORT=8081" in nozzle_framebuffer_service
-    assert "VISION_FRAMEBUFFER_DIR=/run/vision-preview-nozzle_cam" in nozzle_framebuffer_service
-    assert "VISION_FRAMEBUFFER_PUBLIC_SNAPSHOT_URL=/nozzle_cam/?action=snapshot" in nozzle_framebuffer_service
-    assert "usb-Vimicro_corp._PC-LM1E_Camera_PC-LM1E_Audio-video-index0" in nozzle_framebuffer_service
+    assert (
+        "VISION_FRAMEBUFFER_DIR=/run/vision-preview-nozzle_cam"
+        in nozzle_framebuffer_service
+    )
+    assert (
+        "VISION_FRAMEBUFFER_PUBLIC_SNAPSHOT_URL=/nozzle_cam/?action=snapshot"
+        in nozzle_framebuffer_service
+    )
+    assert (
+        "VISION_CAMERA_PROFILE_FILE=/usr/local/share/vision/nozzle_cam_profiles.json"
+        in nozzle_framebuffer_service
+    )
+    assert "VISION_CAMERA_DEFAULT_PROFILE=vision" in nozzle_framebuffer_service
+    assert (
+        "VISION_CAMERA_PROFILE_REQUEST_FILE=/run/vision-preview-nozzle_cam/profile_request.json"
+        in nozzle_framebuffer_service
+    )
+    assert (
+        "usb-Vimicro_corp._PC-LM1E_Camera_PC-LM1E_Audio-video-index0"
+        in nozzle_framebuffer_service
+    )
     assert "ThreadingHTTPServer" in framebuffer_script
     assert "RUN_DIR = Path" in framebuffer_script
     assert "latest.jpg" in framebuffer_script
     assert "RING_DIR" in framebuffer_script
+    assert "CameraProfileManager" in framebuffer_script
+    assert "VISION_CAMERA_PROFILE_FILE" in framebuffer_script
+    assert "--set-ctrl=" in framebuffer_script
+    assert '"camera_profile": camera_profile' in framebuffer_script
     assert "1920" in framebuffer_script
     assert "1080" in framebuffer_script
     assert "FALLBACK_FPS" not in framebuffer_script
@@ -331,15 +366,34 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "VISION_REGISTER_NOZZLE_METHODS=0" in capture_service
     assert "vision-framebuffer.service" in capture_service
     assert "VISION_CAPTURE_REMOTE_METHOD=nozzle_cam_capture" in nozzle_capture_service
-    assert "VISION_OUTPUT_DIR=/home/pi/printer_data/vision/nozzle_cam" in nozzle_capture_service
-    assert "VISION_WEBCAM_SNAPSHOT_URL=http://127.0.0.1/nozzle_cam/?action=snapshot" in nozzle_capture_service
+    assert (
+        "VISION_OUTPUT_DIR=/home/pi/printer_data/vision/nozzle_cam"
+        in nozzle_capture_service
+    )
+    assert (
+        "VISION_WEBCAM_SNAPSHOT_URL=http://127.0.0.1/nozzle_cam/?action=snapshot"
+        in nozzle_capture_service
+    )
     assert "VISION_REGISTER_NOZZLE_METHODS=1" in nozzle_capture_service
+    assert (
+        "VISION_CAMERA_PROFILE_REQUEST_FILE=/run/vision-preview-nozzle_cam/profile_request.json"
+        in nozzle_capture_service
+    )
+    assert "VISION_CAPTURE_DEFAULT_PROFILE=vision" in nozzle_capture_service
+    assert "VISION_PROFILE_REMOTE_METHOD=nozzle_cam_profile" in nozzle_capture_service
     assert "vision-framebuffer-nozzle-cam.service" in nozzle_capture_service
     assert "register_remote_method" in capture_script
-    assert 'REMOTE_METHOD = os.environ.get("VISION_CAPTURE_REMOTE_METHOD"' in capture_script
+    assert (
+        'REMOTE_METHOD = os.environ.get("VISION_CAPTURE_REMOTE_METHOD"'
+        in capture_script
+    )
     assert "REGISTER_NOZZLE_METHODS" in capture_script
+    assert "NOZZLE_PROFILE_REMOTE_METHOD" in capture_script
+    assert "request_framebuffer_profile" in capture_script
+    assert "metadata_matches_profile" in capture_script
     assert "idex_nozzle_vision_check" in capture_script
     assert "idex_nozzle_vision_sweep" in capture_script
+    assert "run_nozzle_cam_profile" in capture_script
     assert "run_idex_nozzle_vision_sweep" in capture_script
     assert "vision_nozzle_align.py" in capture_script
     assert '"--sweep"' in capture_script
@@ -381,11 +435,13 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "vision-framebuffer.service" in image_install
     assert "vision-framebuffer-nozzle-cam.service" in image_install
     assert "vision-capture-nozzle-cam.service" in image_install
+    assert "nozzle_cam_profiles.json" in image_install
     assert "vision_nozzle_align.py" in image_install
     assert "vision_framebuffer.py" in live_deploy
     assert "vision-framebuffer.service" in live_deploy
     assert "vision-framebuffer-nozzle-cam.service" in live_deploy
     assert "vision-capture-nozzle-cam.service" in live_deploy
+    assert "nozzle_cam_profiles.json" in live_deploy
     assert "vision_nozzle_align.py" in live_deploy
     assert "setfacl -m u:www-data:--x" in image_install
     assert "setfacl -m u:www-data:--x" in live_deploy
@@ -400,6 +456,34 @@ def test_vision_capture_macro_and_host_files_exist():
     assert '"/nozzle_cam/?action=stream"' in live_deploy
     assert "--state-url http://127.0.0.1:8081/state" in live_deploy
     assert '"target_fps": "1"' in live_deploy
+
+    assert nozzle_profiles["aliases"] == {
+        "auto": "nozzle_cam_auto",
+        "baseline": "nozzle_cam_baseline",
+        "vision": "nozzle_cam_vision",
+    }
+    profile_controls = {
+        name: {control["name"]: control["value"] for control in profile["controls"]}
+        for name, profile in nozzle_profiles["profiles"].items()
+    }
+    for name in ("nozzle_cam_vision", "nozzle_cam_baseline"):
+        control_names = [
+            control["name"] for control in nozzle_profiles["profiles"][name]["controls"]
+        ]
+        assert control_names[:4] == [
+            "auto_exposure",
+            "exposure_time_absolute",
+            "white_balance_automatic",
+            "white_balance_temperature",
+        ]
+        assert profile_controls[name]["auto_exposure"] == 1
+        assert profile_controls[name]["white_balance_automatic"] == 0
+    assert (
+        profile_controls["nozzle_cam_vision"]["exposure_time_absolute"]
+        > profile_controls["nozzle_cam_baseline"]["exposure_time_absolute"]
+    )
+    assert profile_controls["nozzle_cam_auto"]["auto_exposure"] == 3
+    assert profile_controls["nozzle_cam_auto"]["white_balance_automatic"] == 1
 
 
 def test_y_tmc_stallguard_runner_streams_live_samples_and_keeps_aggressive_opt_in():
