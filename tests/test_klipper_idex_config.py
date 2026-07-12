@@ -467,7 +467,12 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "NOZZLE_ALIGN_DIR" not in nozzle_script
     assert "NOZZLE_SWEEP_DIR" in nozzle_script
     assert "VISION_OUTPUT_URL_PREFIX" in nozzle_script
+    assert "--run-acquisition-job" in nozzle_script
+    assert "--start-prepared-job" in nozzle_script
+    assert "--virtual-sd-root" in nozzle_script
+    assert "SDCARD_PRINT_FILE FILENAME=" in nozzle_script
     assert "--fresh-after-utc" in nozzle_script
+    assert '"--sweep"' in nozzle_script
     assert "vision_framebuffer" in nozzle_script
     assert "cv2.HoughCircles" in nozzle_script
     assert "dark_contour" in nozzle_script

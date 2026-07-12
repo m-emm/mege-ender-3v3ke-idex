@@ -35,6 +35,12 @@ NOZZLE_CAMERA_VISION_DIR = (
 NOZZLE_JOB_ROOT = Path(
     os.environ.get("VISION_NOZZLE_JOB_ROOT", str(NOZZLE_CAMERA_VISION_DIR / "jobs"))
 )
+DEFAULT_VIRTUAL_SD_ROOT = Path(
+    os.environ.get("VISION_VIRTUAL_SD_ROOT", "/home/pi/printer_data/gcodes")
+)
+DEFAULT_VIRTUAL_SD_SUBDIR = os.environ.get(
+    "VISION_VIRTUAL_SD_SUBDIR", "vision_jobs"
+)
 VISION_URL_PREFIX = os.environ.get("VISION_OUTPUT_URL_PREFIX", "/vision").rstrip("/")
 CAPTURE_BIN = os.environ.get("VISION_CAPTURE_BIN", "/usr/local/bin/vision_capture.py")
 CROWSNEST_SERVICE = os.environ.get("VISION_CROWSNEST_SERVICE", "crowsnest")
@@ -492,6 +498,455 @@ def load_job_frames_for_analysis(manifest_path: Path) -> list[dict[str, Any]]:
             }
         )
     return frames
+
+
+def read_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def append_job_event(job_dir: Path, event: str, payload: dict[str, Any]) -> None:
+    manifest = read_json(job_dir / "manifest.json")
+    record = {
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "job_id": manifest["job_id"],
+        "event": event,
+        **payload,
+    }
+    with (job_dir / "events.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+
+def job_dir_from_root(job_root: Path, job_id: str) -> Path:
+    return Path(job_root) / sanitize_name(job_id)
+
+
+def active_job_lock_path(job_root: Path) -> Path:
+    return Path(job_root) / ".active_job.json"
+
+
+def active_job_from_lock(job_root: Path) -> str | None:
+    path = active_job_lock_path(job_root)
+    if not path.exists():
+        return None
+    try:
+        payload = read_json(path)
+        return str(payload.get("job") or "")
+    except Exception:
+        return str(path)
+
+
+def clear_active_job_lock_if_matches(job_root: Path, job_id: str) -> None:
+    path = active_job_lock_path(job_root)
+    if not path.exists():
+        return
+    try:
+        payload = read_json(path)
+        active_job = str(payload.get("job") or "")
+    except Exception:
+        active_job = ""
+    if active_job == sanitize_name(job_id):
+        path.unlink(missing_ok=True)
+
+
+def safe_vision_url(path: Path) -> str:
+    try:
+        return vision_url(path)
+    except ValueError:
+        return str(path)
+
+
+def verify_jpeg_header(path: Path) -> None:
+    data = path.read_bytes()[:4]
+    if len(data) < 2 or data[:2] != b"\xff\xd8":
+        raise RuntimeError(f"{path} is not a JPEG frame")
+
+
+def verify_prepared_job_integrity(job_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    manifest_path = job_dir / "manifest.json"
+    state_path = job_dir / "state.json"
+    gcode_path = job_dir / "acquisition.gcode"
+    manifest = read_json(manifest_path)
+    state = read_json(state_path)
+    if manifest.get("schema_version") != VISION_JOB_SCHEMA_VERSION:
+        raise RuntimeError(
+            f"Unsupported manifest schema_version={manifest.get('schema_version')!r}"
+        )
+    if state.get("schema_version") != VISION_JOB_SCHEMA_VERSION:
+        raise RuntimeError(
+            f"Unsupported state schema_version={state.get('schema_version')!r}"
+        )
+    if manifest.get("job_id") != state.get("job_id"):
+        raise RuntimeError(
+            f"manifest job_id {manifest.get('job_id')!r} does not match "
+            f"state job_id {state.get('job_id')!r}"
+        )
+    if manifest.get("manifest_hash") != compute_manifest_hash(manifest):
+        raise RuntimeError("manifest hash does not match manifest contents")
+    if state.get("manifest_hash") != manifest.get("manifest_hash"):
+        raise RuntimeError("state manifest_hash does not match manifest")
+    if state.get("gcode_hash") != manifest.get("gcode_hash"):
+        raise RuntimeError("state gcode_hash does not match manifest")
+    if not gcode_path.exists():
+        raise RuntimeError(f"missing acquisition G-code: {gcode_path}")
+    if compute_gcode_hash(gcode_path.read_text(encoding="utf-8")) != manifest.get(
+        "gcode_hash"
+    ):
+        raise RuntimeError("acquisition G-code hash does not match manifest")
+    return manifest, state
+
+
+def required_homed_axes(manifest: dict[str, Any]) -> str:
+    preconditions = manifest.get("preconditions") or {}
+    return str(preconditions.get("required_homed_axes") or "xyz")
+
+
+def ensure_job_poses_inside_limits(
+    manifest: dict[str, Any], status: dict[str, Any]
+) -> None:
+    toolhead = status.get("toolhead") or {}
+    axis_min = toolhead.get("axis_minimum") or []
+    axis_max = toolhead.get("axis_maximum") or []
+    if len(axis_min) < 3 or len(axis_max) < 3:
+        raise RuntimeError("Moonraker toolhead status has no XYZ axis limits")
+    for frame in manifest.get("frames") or []:
+        pose = frame.get("pose") or {}
+        for axis, index in (("x", 0), ("y", 1), ("z", 2)):
+            value = float(pose[axis])
+            if value < float(axis_min[index]) - 1e-6 or value > float(axis_max[index]) + 1e-6:
+                raise RuntimeError(
+                    f"frame {frame.get('frame')} {axis.upper()}={value:.4f} is outside "
+                    f"Klipper limits {axis_min[index]}..{axis_max[index]}"
+                )
+
+
+def preflight_prepared_job(
+    *,
+    job_dir: Path,
+    job_root: Path,
+    moonraker_url: str,
+    ready_timeout: float,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    manifest, state = verify_prepared_job_integrity(job_dir)
+    if state.get("state") != "prepared":
+        raise RuntimeError(
+            f"vision job {manifest.get('job_id')} is {state.get('state')!r}, "
+            "expected 'prepared'"
+        )
+    active_job = active_job_from_lock(job_root)
+    if active_job:
+        raise RuntimeError(f"another vision job is active: {active_job}")
+    status = wait_ready_and_idle(moonraker_url, ready_timeout)
+    homed_axes = set(str(status.get("toolhead", {}).get("homed_axes") or ""))
+    missing_axes = sorted(set(required_homed_axes(manifest)) - homed_axes)
+    if missing_axes:
+        raise RuntimeError(f"required axes are not homed: {''.join(missing_axes)}")
+    ensure_job_poses_inside_limits(manifest, status)
+    return manifest, state, status
+
+
+def normalized_virtual_sd_subdir(value: str) -> Path:
+    subdir = Path(str(value or "."))
+    if subdir.is_absolute() or ".." in subdir.parts:
+        raise RuntimeError(f"virtual SD subdir must be relative and safe: {value!r}")
+    return subdir
+
+
+def stage_job_gcode_to_virtual_sd(
+    *,
+    job_dir: Path,
+    manifest: dict[str, Any],
+    virtual_sd_root: Path,
+    virtual_sd_subdir: str,
+) -> dict[str, Any]:
+    source = job_dir / str(manifest.get("gcode_file") or "acquisition.gcode")
+    subdir = normalized_virtual_sd_subdir(virtual_sd_subdir)
+    target_dir = Path(virtual_sd_root) / subdir
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / f"{manifest['job_id']}.gcode"
+    source_bytes = source.read_bytes()
+    reused = False
+    if target.exists():
+        if target.read_bytes() != source_bytes:
+            raise RuntimeError(f"refusing to overwrite existing virtual SD file: {target}")
+        reused = True
+    else:
+        tmp = target.with_name(f".{target.name}.tmp")
+        tmp.write_bytes(source_bytes)
+        os.replace(tmp, target)
+    copied_gcode_hash = compute_gcode_hash(target.read_text(encoding="utf-8"))
+    if copied_gcode_hash != manifest.get("gcode_hash"):
+        raise RuntimeError(
+            f"copied G-code hash {copied_gcode_hash} does not match "
+            f"manifest {manifest.get('gcode_hash')}"
+        )
+    virtual_sd_filename = (subdir / target.name).as_posix()
+    return {
+        "virtual_sd_root": str(virtual_sd_root),
+        "virtual_sd_filename": virtual_sd_filename,
+        "virtual_sd_path": str(target),
+        "virtual_sd_reused": reused,
+        "virtual_sd_gcode_hash": copied_gcode_hash,
+        "virtual_sd_file_sha256": sha256_prefixed(target.read_bytes()),
+    }
+
+
+def record_job_start_request(
+    *,
+    job_dir: Path,
+    state: dict[str, Any],
+    moonraker_url: str,
+    virtual_sd: dict[str, Any],
+) -> dict[str, Any]:
+    updated = dict(state)
+    requested_at = datetime.now(timezone.utc).isoformat()
+    updated.update(
+        {
+            "moonraker_url": moonraker_url,
+            "started_by": "vision_nozzle_align.py",
+            "start_requested_at_utc": requested_at,
+            "updated_at_utc": requested_at,
+            **virtual_sd,
+        }
+    )
+    atomic_write_json(job_dir / "state.json", updated)
+    append_job_event(
+        job_dir,
+        "start_requested",
+        {
+            "state": updated.get("state"),
+            "virtual_sd_filename": virtual_sd["virtual_sd_filename"],
+            "virtual_sd_gcode_hash": virtual_sd["virtual_sd_gcode_hash"],
+        },
+    )
+    return updated
+
+
+def mark_job_terminal(
+    *,
+    job_dir: Path,
+    job_root: Path,
+    state_name: str,
+    reason: str,
+    event: str,
+) -> dict[str, Any]:
+    state = read_json(job_dir / "state.json")
+    if state.get("state") in ("acquired", "completed", "failed", "abandoned"):
+        return state
+    now = datetime.now(timezone.utc).isoformat()
+    state.update({"state": state_name, "updated_at_utc": now})
+    if state_name == "failed":
+        state.update({"failure": reason, "failed_at_utc": now})
+    elif state_name == "abandoned":
+        state.update({"abandoned_reason": reason, "abandoned_at_utc": now})
+    atomic_write_json(job_dir / "state.json", state)
+    append_job_event(job_dir, event, {"state": state_name, "reason": reason})
+    clear_active_job_lock_if_matches(job_root, str(state.get("job_id") or ""))
+    return state
+
+
+def verify_acquired_job_frames(
+    manifest: dict[str, Any], job_dir: Path
+) -> list[dict[str, Any]]:
+    frame_records: list[dict[str, Any]] = []
+    for frame in manifest.get("frames") or []:
+        frame_id = str(frame["frame"])
+        image_path = job_dir / "frames" / f"{frame_id}.jpg"
+        metadata_path = job_dir / "frames" / f"{frame_id}.json"
+        if not image_path.exists():
+            raise RuntimeError(f"missing acquired frame image: {image_path}")
+        if not metadata_path.exists():
+            raise RuntimeError(f"missing acquired frame sidecar: {metadata_path}")
+        verify_jpeg_header(image_path)
+        metadata = read_json(metadata_path)
+        if int(metadata.get("job_seq", -1)) != int(frame["seq"]):
+            raise RuntimeError(f"sidecar job_seq mismatch for frame {frame_id}")
+        frame_records.append(
+            {
+                "seq": int(frame["seq"]),
+                "frame": frame_id,
+                "tool": frame.get("tool"),
+                "image_path": str(image_path),
+                "metadata_path": str(metadata_path),
+                "image_url": safe_vision_url(image_path),
+                "metadata_url": safe_vision_url(metadata_path),
+                "framebuffer_seq": metadata.get("framebuffer_seq"),
+                "image_sha256": metadata.get("image_sha256"),
+            }
+        )
+    return frame_records
+
+
+def job_execution_summary(
+    *,
+    job_dir: Path,
+    manifest: dict[str, Any] | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
+    if manifest is None:
+        manifest = read_json(job_dir / "manifest.json")
+    state = read_json(job_dir / "state.json")
+    frames: list[dict[str, Any]] = []
+    if state.get("state") == "acquired":
+        frames = verify_acquired_job_frames(manifest, job_dir)
+    summary = {
+        "ok": state.get("state") == "acquired" and error is None,
+        "job_id": manifest.get("job_id"),
+        "job_dir": str(job_dir),
+        "manifest_path": str(job_dir / "manifest.json"),
+        "gcode_path": str(job_dir / str(manifest.get("gcode_file") or "acquisition.gcode")),
+        "state_path": str(job_dir / "state.json"),
+        "events_path": str(job_dir / "events.jsonl"),
+        "state": state.get("state"),
+        "final_state": state.get("state"),
+        "frame_count": manifest.get("frame_count"),
+        "committed_frame_count": state.get("committed_frame_count", 0),
+        "manifest_hash": manifest.get("manifest_hash"),
+        "gcode_hash": manifest.get("gcode_hash"),
+        "virtual_sd_filename": state.get("virtual_sd_filename"),
+        "frames": frames,
+    }
+    if error:
+        summary["error"] = error
+    if state.get("failure"):
+        summary["failure"] = state.get("failure")
+    if state.get("abandoned_reason"):
+        summary["abandoned_reason"] = state.get("abandoned_reason")
+    return summary
+
+
+def monitor_acquisition_job(
+    *,
+    job_dir: Path,
+    job_root: Path,
+    manifest: dict[str, Any],
+    moonraker_url: str,
+    timeout: float,
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    last_print_state = None
+    while time.monotonic() < deadline:
+        state = read_json(job_dir / "state.json")
+        if state.get("state") == "failed":
+            return job_execution_summary(job_dir=job_dir, manifest=manifest)
+        if state.get("state") == "abandoned":
+            return job_execution_summary(job_dir=job_dir, manifest=manifest)
+        status = query_status(moonraker_url)
+        webhooks = status.get("webhooks") or {}
+        print_stats = status.get("print_stats") or {}
+        print_state = str(print_stats.get("state") or "")
+        last_print_state = print_state
+        if webhooks.get("state") != "ready":
+            state = mark_job_terminal(
+                job_dir=job_dir,
+                job_root=job_root,
+                state_name="abandoned",
+                reason=f"Moonraker/Klipper left ready state: {webhooks.get('state')}",
+                event="abandoned",
+            )
+            return job_execution_summary(
+                job_dir=job_dir,
+                manifest=manifest,
+                error=state.get("abandoned_reason")
+                or f"Moonraker/Klipper left ready state: {webhooks.get('state')}",
+            )
+        if print_state == "complete":
+            state = read_json(job_dir / "state.json")
+            if state.get("state") == "acquired":
+                return job_execution_summary(job_dir=job_dir, manifest=manifest)
+            reason = (
+                "virtual SD print completed but vision job state is "
+                f"{state.get('state')!r}"
+            )
+            state = mark_job_terminal(
+                job_dir=job_dir,
+                job_root=job_root,
+                state_name="failed",
+                reason=reason,
+                event="failed",
+            )
+            return job_execution_summary(
+                job_dir=job_dir, manifest=manifest, error=state.get("failure")
+            )
+        if print_state in ("cancelled", "error"):
+            state = read_json(job_dir / "state.json")
+            if state.get("state") == "failed":
+                return job_execution_summary(job_dir=job_dir, manifest=manifest)
+            reason = (
+                f"virtual SD print ended in {print_state}: "
+                f"{print_stats.get('message') or 'no Moonraker message'}"
+            )
+            state = mark_job_terminal(
+                job_dir=job_dir,
+                job_root=job_root,
+                state_name="abandoned",
+                reason=reason,
+                event="abandoned",
+            )
+            return job_execution_summary(
+                job_dir=job_dir,
+                manifest=manifest,
+                error=state.get("abandoned_reason") or reason,
+            )
+        time.sleep(0.5)
+    reason = (
+        f"timed out after {timeout:.1f}s waiting for acquisition job; "
+        f"last print_stats.state={last_print_state!r}"
+    )
+    state = mark_job_terminal(
+        job_dir=job_dir,
+        job_root=job_root,
+        state_name="failed",
+        reason=reason,
+        event="failed",
+    )
+    return job_execution_summary(
+        job_dir=job_dir, manifest=manifest, error=state.get("failure") or reason
+    )
+
+
+def start_prepared_job(args: argparse.Namespace) -> dict[str, Any]:
+    job_id = sanitize_name(args.start_prepared_job or args.job_id)
+    if not job_id:
+        raise RuntimeError("--start-prepared-job requires a job id")
+    job_root = Path(args.job_root)
+    job_dir = job_dir_from_root(job_root, job_id)
+    manifest, state, _status = preflight_prepared_job(
+        job_dir=job_dir,
+        job_root=job_root,
+        moonraker_url=args.moonraker_url,
+        ready_timeout=float(args.ready_timeout),
+    )
+    virtual_sd = stage_job_gcode_to_virtual_sd(
+        job_dir=job_dir,
+        manifest=manifest,
+        virtual_sd_root=Path(args.virtual_sd_root),
+        virtual_sd_subdir=str(args.virtual_sd_subdir),
+    )
+    record_job_start_request(
+        job_dir=job_dir,
+        state=state,
+        moonraker_url=args.moonraker_url,
+        virtual_sd=virtual_sd,
+    )
+    run_gcode(
+        args.moonraker_url,
+        f"SDCARD_PRINT_FILE FILENAME={virtual_sd['virtual_sd_filename']}",
+        timeout=30,
+    )
+    return monitor_acquisition_job(
+        job_dir=job_dir,
+        job_root=job_root,
+        manifest=manifest,
+        moonraker_url=args.moonraker_url,
+        timeout=float(args.monitor_timeout),
+    )
+
+
+def run_acquisition_job(args: argparse.Namespace) -> dict[str, Any]:
+    summary = prepare_nozzle_sweep_job(args)
+    start_args = argparse.Namespace(**vars(args))
+    start_args.start_prepared_job = summary["job_id"]
+    return start_prepared_job(start_args)
 
 
 def moonraker_get(base_url: str, path: str) -> dict[str, Any]:
@@ -1996,6 +2451,16 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Generate an immutable prepared vision job without moving the printer.",
     )
+    mode.add_argument(
+        "--start-prepared-job",
+        metavar="JOB_ID",
+        help="Start and monitor an existing prepared vision job through virtual SD.",
+    )
+    mode.add_argument(
+        "--run-acquisition-job",
+        action="store_true",
+        help="Prepare, start, and monitor an acquisition-only virtual SD vision job.",
+    )
     parser.add_argument("--x", type=float, default=195.0)
     parser.add_argument("--y", type=float, default=-14.8)
     parser.add_argument("--z", type=float)
@@ -2007,6 +2472,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--camera", default=VISION_JOB_CAMERA)
     parser.add_argument("--profile", default=VISION_JOB_PROFILE)
     parser.add_argument("--ready-timeout", type=float, default=30.0)
+    parser.add_argument("--virtual-sd-root", type=Path, default=DEFAULT_VIRTUAL_SD_ROOT)
+    parser.add_argument("--virtual-sd-subdir", default=DEFAULT_VIRTUAL_SD_SUBDIR)
+    parser.add_argument("--monitor-timeout", type=float, default=180.0)
     parser.add_argument("--restore", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument(
         "--manage-crowsnest",
@@ -2015,14 +2483,37 @@ def main(argv: list[str] | None = None) -> int:
         help="Compatibility no-op; nozzle vision uses the RAM framebuffer.",
     )
     args = parser.parse_args(argv)
-    if not args.sweep and not args.prepare_job:
-        parser.error("single-image nozzle vision check was removed; use --sweep or --prepare-job")
+    if (
+        not args.sweep
+        and not args.prepare_job
+        and not args.start_prepared_job
+        and not args.run_acquisition_job
+    ):
+        parser.error(
+            "single-image nozzle vision check was removed; use --sweep, "
+            "--prepare-job, --start-prepared-job, or --run-acquisition-job"
+        )
     if args.z is None:
         args.z = 20.0
     if args.prepare_job:
         summary = prepare_nozzle_sweep_job(args)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
+    if args.start_prepared_job or args.run_acquisition_job:
+        try:
+            result = (
+                run_acquisition_job(args)
+                if args.run_acquisition_job
+                else start_prepared_job(args)
+            )
+        except Exception as exc:
+            result = {
+                "ok": False,
+                "error": str(exc),
+                "job_id": args.start_prepared_job or args.job_id,
+            }
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0 if result.get("ok") else 1
     result = run_sweep(args)
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result.get("ok") else 1
