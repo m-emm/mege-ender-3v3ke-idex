@@ -568,11 +568,15 @@ python3 -m venv /opt/klipper-env
 /opt/klipper-env/bin/pip install "matplotlib<3.11"
 /opt/klipper-env/bin/python -c 'import numpy, matplotlib'
 
-log "Installing custom Klipper boosted heatbed host patch"
+log "Installing custom Klipper host extras"
 require_file "${FILES_DIR}/klipper_host/klippy/extras/heaters.py"
+require_file "${FILES_DIR}/klipper_host/klippy/extras/vision.py"
 install -m 0644 \
   "${FILES_DIR}/klipper_host/klippy/extras/heaters.py" \
   /opt/klipper/klippy/extras/heaters.py
+install -m 0644 \
+  "${FILES_DIR}/klipper_host/klippy/extras/vision.py" \
+  /opt/klipper/klippy/extras/vision.py
 
 chown -R "${USERNAME}:${USERNAME}" /opt/klipper /opt/klipper-env
 
@@ -684,7 +688,7 @@ log "Writing build info"
   echo "hostname=${HOSTNAME}"
   echo "username=${USERNAME}"
   echo "klipper_commit=${KLIPPER_COMMIT:-}"
-  echo "klipper_host_patch=boosted_heatbed_heaters.py"
+  echo "klipper_host_patches=boosted_heatbed_heaters.py,vision.py"
   echo "moonraker_commit=${MOONRAKER_COMMIT:-}"
   echo "mainsail_version=${MAINSAIL_VERSION}"
   echo "build_time_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

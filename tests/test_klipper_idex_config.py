@@ -274,6 +274,8 @@ def test_vision_light_dotstar_and_macros():
 
 def test_vision_capture_macro_and_host_files_exist():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    template_text = TEMPLATE_PATH.read_text(encoding="utf-8")
+    vision_section = _section(config_text, "vision")
     macro = _section(config_text, "gcode_macro VISION_CAPTURE")
     nozzle_capture_macro = _section(config_text, "gcode_macro NOZZLE_CAM_CAPTURE")
     nozzle_profile_macro = _section(config_text, "gcode_macro NOZZLE_CAM_PROFILE")
@@ -285,6 +287,9 @@ def test_vision_capture_macro_and_host_files_exist():
     nginx = (IMAGE_BUILD_FILES_DIR / "nginx-mainsail.conf").read_text(encoding="utf-8")
     image_packages = (IMAGE_BUILD_STAGE_DIR / "00-packages").read_text(encoding="utf-8")
     image_install = (IMAGE_BUILD_STAGE_DIR / "01-run-chroot.sh").read_text(
+        encoding="utf-8"
+    )
+    live_klipper_deploy = (KLIPPER_CONFIG_DIR / "update_menderpi.sh").read_text(
         encoding="utf-8"
     )
     live_deploy = (KLIPPER_CONFIG_DIR / "deploy_webcam_vision.sh").read_text(
@@ -308,6 +313,17 @@ def test_vision_capture_macro_and_host_files_exist():
     capture_script = (IMAGE_BUILD_FILES_DIR / "vision_capture.py").read_text(
         encoding="utf-8"
     )
+    klipper_vision_extra = (
+        Path(__file__).resolve().parents[1]
+        / "klipper_setup"
+        / "klipper_host"
+        / "klippy"
+        / "extras"
+        / "vision.py"
+    ).read_text(encoding="utf-8")
+    image_klipper_vision_extra = (
+        IMAGE_BUILD_FILES_DIR / "klipper_host" / "klippy" / "extras" / "vision.py"
+    ).read_text(encoding="utf-8")
     nozzle_script = (IMAGE_BUILD_FILES_DIR / "vision_nozzle_align.py").read_text(
         encoding="utf-8"
     )
@@ -318,6 +334,9 @@ def test_vision_capture_macro_and_host_files_exist():
         (IMAGE_BUILD_FILES_DIR / "nozzle_cam_profiles.json").read_text(encoding="utf-8")
     )
 
+    assert "socket_path: /run/vision-capture-nozzle_cam/visiond.sock" in vision_section
+    assert "timeout: 15.0" in vision_section
+    assert "[vision]" in template_text
     assert 'action_call_remote_method("vision_capture"' in macro
     assert "printer.toolhead.position" in macro
     assert 'RESPOND TYPE=echo MSG="Vision capture requested' in macro
@@ -388,8 +407,11 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "1080" in framebuffer_script
     assert "FALLBACK_FPS" not in framebuffer_script
     assert "Falling back to capture profile" not in framebuffer_script
+    assert '"frame_seq": self.state.frame_seq' in framebuffer_script
+    assert '"frame_seq": self.frame_seq' in framebuffer_script
     assert "ExecStart=/usr/local/bin/vision_capture.py --daemon" in capture_service
     assert "VISION_REGISTER_NOZZLE_METHODS=0" in capture_service
+    assert "VISIOND_SOCKET_ENABLED=0" in capture_service
     assert "vision-framebuffer.service" in capture_service
     assert "VISION_CAPTURE_REMOTE_METHOD=nozzle_cam_capture" in nozzle_capture_service
     assert (
@@ -407,6 +429,13 @@ def test_vision_capture_macro_and_host_files_exist():
     )
     assert "VISION_CAPTURE_DEFAULT_PROFILE=analysis" in nozzle_capture_service
     assert "VISION_PROFILE_REMOTE_METHOD=nozzle_cam_profile" in nozzle_capture_service
+    assert "RuntimeDirectory=vision-capture-nozzle_cam" in nozzle_capture_service
+    assert "VISIOND_SOCKET=/run/vision-capture-nozzle_cam/visiond.sock" in (
+        nozzle_capture_service
+    )
+    assert "VISION_JOB_ROOT=/home/pi/printer_data/vision/nozzle_cam/jobs" in (
+        nozzle_capture_service
+    )
     assert "vision-framebuffer-nozzle-cam.service" in nozzle_capture_service
     assert "register_remote_method" in capture_script
     assert (
@@ -425,7 +454,16 @@ def test_vision_capture_macro_and_host_files_exist():
     assert '"--sweep"' in capture_script
     assert "FRAMEBUFFER_LATEST_IMAGE" in capture_script
     assert "wait_for_buffered_frame" in capture_script
+    assert "VisionJobApi" in capture_script
+    assert "wait_for_buffered_frame_seq_after" in capture_script
+    assert "framebuffer_seq" in capture_script
+    assert "VISIOND_SOCKET" in capture_script
     assert 'capture_source": "vision_framebuffer' in capture_script
+    assert "VISION_JOB_BEGIN" in klipper_vision_extra
+    assert "VISION_CAPTURE_SYNC" in klipper_vision_extra
+    assert "wait_moves()" in klipper_vision_extra
+    assert "socket.AF_UNIX" in klipper_vision_extra
+    assert image_klipper_vision_extra == klipper_vision_extra
     assert "NOZZLE_ALIGN_DIR" not in nozzle_script
     assert "NOZZLE_SWEEP_DIR" in nozzle_script
     assert "VISION_OUTPUT_URL_PREFIX" in nozzle_script
@@ -459,6 +497,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "libjpeg-dev" not in image_packages
     assert "libbsd-dev" not in image_packages
     assert "vision_framebuffer.py" in image_install
+    assert "klipper_host/klippy/extras/vision.py" in image_install
     assert "vision-framebuffer.service" in image_install
     assert "vision-framebuffer-nozzle-cam.service" in image_install
     assert "vision-capture-nozzle-cam.service" in image_install
@@ -470,6 +509,9 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "vision-capture-nozzle-cam.service" in live_deploy
     assert "nozzle_cam_profiles.json" in live_deploy
     assert "vision_nozzle_align.py" in live_deploy
+    assert "SOURCE_VISION" in live_klipper_deploy
+    assert "REMOTE_TMP_VISION" in live_klipper_deploy
+    assert "vision.py" in live_klipper_deploy
     assert "/run/vision-preview-nozzle_cam/profile_request.json" in live_deploy
     assert "setfacl -m u:www-data:--x" in image_install
     assert "setfacl -m u:www-data:--x" in live_deploy

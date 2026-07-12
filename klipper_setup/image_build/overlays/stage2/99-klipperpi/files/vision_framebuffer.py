@@ -343,6 +343,7 @@ class FrameState:
         self.latest_bytes: bytes | None = None
         self.latest_meta: dict[str, Any] | None = None
         self.frame_id = 0
+        self.frame_seq = 0
         self.frame_times: deque[float] = deque(maxlen=120)
         self.ring: deque[tuple[Path, Path]] = deque(maxlen=max(2, RING_SIZE))
         self.stream_clients = 0
@@ -392,6 +393,7 @@ class FrameState:
             self.latest_bytes = frame
             self.latest_meta = meta
             self.frame_id = int(meta["frame_id"])
+            self.frame_seq = int(meta["frame_seq"])
             self.frame_times.append(time.monotonic())
             self.consecutive_errors = 0
             self.last_error = None
@@ -434,6 +436,7 @@ class FrameState:
                 "ring_size": self.ring.maxlen,
                 "ring_count": len(self.ring),
                 "frame_count": self.frame_id,
+                "frame_seq": self.frame_seq,
                 "last_frame": last_meta,
                 "last_frame_age_s": round(age, 3) if age is not None else None,
                 "captured_fps": round(captured_fps, 3),
@@ -482,6 +485,7 @@ class CaptureThread(threading.Thread):
                 capture_info["format"] = format_info
                 frame = tmp_path.read_bytes()
                 self.state.frame_id += 1
+                self.state.frame_seq += 1
                 timestamp = datetime.now(timezone.utc)
                 stamp = timestamp.strftime("%Y%m%dT%H%M%S.%fZ")
                 image_path = RING_DIR / f"frame_{self.state.frame_id:08d}_{stamp}.jpg"
@@ -490,6 +494,7 @@ class CaptureThread(threading.Thread):
                 actual_height = int(capture_info.get("height") or TARGET_HEIGHT)
                 meta = {
                     "frame_id": self.state.frame_id,
+                    "frame_seq": self.state.frame_seq,
                     "timestamp_utc": timestamp.isoformat(),
                     "monotonic_s": time.monotonic(),
                     "camera_device": CAMERA_DEVICE,

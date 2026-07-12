@@ -84,6 +84,10 @@ initial_duration: 2.0
 gcode:
     NOZZLE_CAM_ANALYSIS_LIGHT
 
+[vision]
+socket_path: /run/vision-capture-nozzle_cam/visiond.sock
+timeout: 15.0
+
 # Webcam preview and high-resolution vision captures are host-side services:
 # vision-framebuffer owns the camera and serves the dashboard view from RAM,
 # while vision-capture persists buffered frames requested by this macro.

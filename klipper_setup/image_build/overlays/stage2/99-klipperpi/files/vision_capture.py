@@ -9,6 +9,7 @@ the printer motion queue on the actual image capture.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import queue
@@ -74,8 +75,24 @@ DEFAULT_FRAME_FRESH_TIMEOUT = float(os.environ.get("VISION_FRAME_FRESH_TIMEOUT",
 DEFAULT_FRAME_MAX_AGE = float(os.environ.get("VISION_FRAME_MAX_AGE", "10"))
 DEFAULT_CAMERA_PROFILE = os.environ.get("VISION_CAPTURE_DEFAULT_PROFILE", "").strip()
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
+HASHED_GCODE_TOKEN_RE = re.compile(
+    r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+"
+)
+VISION_HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
+VISION_JOB_SCHEMA_VERSION = 1
+VISIOND_CAMERA = os.environ.get("VISIOND_CAMERA", "nozzle_cam")
+VISIOND_SOCKET = Path(
+    os.environ.get("VISIOND_SOCKET", "/run/vision-capture-nozzle_cam/visiond.sock")
+)
+VISION_JOB_ROOT = Path(os.environ.get("VISION_JOB_ROOT", str(OUTPUT_DIR / "jobs")))
+VISIOND_SOCKET_REQUEST_TIMEOUT = float(
+    os.environ.get("VISIOND_SOCKET_REQUEST_TIMEOUT", "30")
+)
 REGISTER_NOZZLE_METHODS = os.environ.get(
     "VISION_REGISTER_NOZZLE_METHODS", "1"
+).strip().lower() not in ("0", "false", "no", "off", "")
+VISIOND_SOCKET_ENABLED = os.environ.get(
+    "VISIOND_SOCKET_ENABLED", "1" if REGISTER_NOZZLE_METHODS else "0"
 ).strip().lower() not in ("0", "false", "no", "off", "")
 
 
@@ -235,6 +252,49 @@ def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+def atomic_write_bytes(path: Path, payload: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_bytes(payload)
+    os.replace(tmp, path)
+
+
+def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True) + "\n")
+
+
+def sha256_prefixed(data: bytes) -> str:
+    return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def canonical_json_bytes(payload: dict[str, Any]) -> bytes:
+    return (
+        json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+        + "\n"
+    ).encode("utf-8")
+
+
+def canonicalize_gcode_for_hash(gcode: str) -> str:
+    normalized = gcode.replace("\r\n", "\n").replace("\r", "\n")
+
+    def replace_token(match: re.Match[str]) -> str:
+        return f"{match.group('name')}={VISION_HASH_PLACEHOLDER}"
+
+    return HASHED_GCODE_TOKEN_RE.sub(replace_token, normalized)
+
+
+def compute_gcode_hash(gcode: str) -> str:
+    return sha256_prefixed(canonicalize_gcode_for_hash(gcode).encode("utf-8"))
+
+
+def compute_manifest_hash(manifest: dict[str, Any]) -> str:
+    canonical = dict(manifest)
+    canonical["manifest_hash"] = VISION_HASH_PLACEHOLDER
+    return sha256_prefixed(canonical_json_bytes(canonical))
+
+
 def request_framebuffer_profile(
     profile: str, params: dict[str, Any] | None = None
 ) -> datetime | None:
@@ -313,6 +373,76 @@ def wait_for_buffered_frame(
             last_error = exc
             time.sleep(0.1)
     raise CaptureError(f"Timed out waiting for buffered frame: {last_error}")
+
+
+def framebuffer_seq(metadata: dict[str, Any]) -> int:
+    value = metadata.get("frame_seq")
+    if value is None:
+        raise CaptureError("buffered frame metadata has no frame_seq")
+    return int(value)
+
+
+def wait_for_buffered_frame_seq_after(
+    *,
+    previous_frame_seq: int,
+    timeout: float,
+    required_profile: str | None = None,
+) -> tuple[Path, dict[str, Any]]:
+    deadline = time.monotonic() + timeout
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            if not FRAMEBUFFER_LATEST_IMAGE.exists():
+                raise CaptureError(f"{FRAMEBUFFER_LATEST_IMAGE} does not exist")
+            if not FRAMEBUFFER_LATEST_METADATA.exists():
+                raise CaptureError(f"{FRAMEBUFFER_LATEST_METADATA} does not exist")
+            metadata = read_framebuffer_metadata()
+            seq = framebuffer_seq(metadata)
+            if seq <= previous_frame_seq:
+                last_error = CaptureError(
+                    f"latest buffered frame_seq {seq} has not advanced past "
+                    f"{previous_frame_seq}"
+                )
+                time.sleep(0.05)
+                continue
+            if not metadata_matches_profile(metadata, required_profile):
+                camera_profile = metadata.get("camera_profile") or {}
+                last_error = CaptureError(
+                    "latest buffered frame has profile "
+                    f"{camera_profile.get('profile_names')} but needs {required_profile}"
+                )
+                time.sleep(0.05)
+                continue
+            verify_jpeg(FRAMEBUFFER_LATEST_IMAGE)
+            return FRAMEBUFFER_LATEST_IMAGE, metadata
+        except Exception as exc:
+            last_error = exc
+            time.sleep(0.05)
+    raise CaptureError(
+        "Timed out waiting for buffered frame_seq advancement: "
+        f"{last_error}"
+    )
+
+
+def wait_for_active_profile(profile: str, *, timeout: float) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            if not FRAMEBUFFER_LATEST_METADATA.exists():
+                raise CaptureError(f"{FRAMEBUFFER_LATEST_METADATA} does not exist")
+            metadata = read_framebuffer_metadata()
+            if metadata_matches_profile(metadata, profile):
+                return metadata
+            camera_profile = metadata.get("camera_profile") or {}
+            last_error = CaptureError(
+                "active framebuffer profile is "
+                f"{camera_profile.get('profile_names')} but needs {profile}"
+            )
+        except Exception as exc:
+            last_error = exc
+        time.sleep(0.05)
+    raise CaptureError(f"Timed out waiting for camera profile {profile!r}: {last_error}")
 
 
 def capture_with_resolution(
@@ -551,12 +681,542 @@ def capture_frame(params: dict[str, Any] | None = None) -> dict[str, Any]:
     return metadata
 
 
+class VisionJobApi:
+    def __init__(
+        self,
+        *,
+        job_root: Path = VISION_JOB_ROOT,
+        camera: str = VISIOND_CAMERA,
+        request_timeout: float = VISIOND_SOCKET_REQUEST_TIMEOUT,
+    ) -> None:
+        self.job_root = job_root
+        self.camera = camera
+        self.request_timeout = request_timeout
+        self.lock_path = job_root / ".active_job.json"
+
+    def handle(self, request: dict[str, Any]) -> dict[str, Any]:
+        try:
+            action = str(request.get("action") or "")
+            params = request.get("params") or {}
+            if not isinstance(params, dict):
+                raise CaptureError("request params must be an object")
+            if action == "job_begin":
+                result = self.job_begin(params)
+            elif action == "profile":
+                result = self.profile(params)
+            elif action == "capture":
+                result = self.capture(params)
+            elif action == "job_end":
+                result = self.job_end(params)
+            else:
+                raise CaptureError(f"unknown request action {action!r}")
+            return {"ok": True, "result": result}
+        except Exception as exc:
+            self._record_failure_if_active(request, exc)
+            return {"ok": False, "error": str(exc)}
+
+    def _job_dir(self, job_id: Any) -> Path:
+        job = sanitize_name(job_id)
+        if not job:
+            raise CaptureError("JOB is required")
+        return self.job_root / job
+
+    def _manifest_path(self, job_id: Any) -> Path:
+        return self._job_dir(job_id) / "manifest.json"
+
+    def _state_path(self, job_id: Any) -> Path:
+        return self._job_dir(job_id) / "state.json"
+
+    def _events_path(self, job_id: Any) -> Path:
+        return self._job_dir(job_id) / "events.jsonl"
+
+    def _frames_dir(self, job_id: Any) -> Path:
+        return self._job_dir(job_id) / "frames"
+
+    def _load_manifest(self, job_id: Any) -> dict[str, Any]:
+        path = self._manifest_path(job_id)
+        if not path.exists():
+            raise CaptureError(f"missing vision job manifest: {path}")
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        if int(manifest.get("schema_version") or 0) != VISION_JOB_SCHEMA_VERSION:
+            raise CaptureError(
+                f"unsupported vision job schema_version {manifest.get('schema_version')}"
+            )
+        if str(manifest.get("job_id")) != sanitize_name(job_id):
+            raise CaptureError(
+                f"manifest job_id {manifest.get('job_id')!r} does not match JOB={job_id!r}"
+            )
+        if str(manifest.get("camera")) != self.camera:
+            raise CaptureError(
+                f"manifest camera {manifest.get('camera')!r} does not match {self.camera!r}"
+            )
+        return manifest
+
+    def _load_state(self, job_id: Any) -> dict[str, Any]:
+        path = self._state_path(job_id)
+        if not path.exists():
+            raise CaptureError(f"missing vision job state: {path}")
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def _write_state(self, job_id: Any, state: dict[str, Any]) -> None:
+        state["updated_at_utc"] = datetime.now(timezone.utc).isoformat()
+        atomic_write_json(self._state_path(job_id), state)
+
+    def _append_event(self, job_id: Any, event: str, payload: dict[str, Any]) -> None:
+        append_jsonl(
+            self._events_path(job_id),
+            {
+                "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                "job_id": sanitize_name(job_id),
+                "event": event,
+                **payload,
+            },
+        )
+
+    def _verify_hashes(
+        self,
+        manifest: dict[str, Any],
+        *,
+        expected_manifest_hash: str,
+        expected_gcode_hash: str,
+    ) -> None:
+        manifest_hash = str(manifest.get("manifest_hash") or "")
+        gcode_hash = str(manifest.get("gcode_hash") or "")
+        if manifest_hash != expected_manifest_hash:
+            raise CaptureError(
+                f"manifest hash mismatch: {manifest_hash} != {expected_manifest_hash}"
+            )
+        if gcode_hash != expected_gcode_hash:
+            raise CaptureError(
+                f"manifest gcode_hash mismatch: {gcode_hash} != {expected_gcode_hash}"
+            )
+
+        gcode_file = str(manifest.get("gcode_file") or "acquisition.gcode")
+        gcode_path = self._job_dir(manifest["job_id"]) / gcode_file
+        if not gcode_path.exists():
+            raise CaptureError(f"missing acquisition G-code: {gcode_path}")
+        computed_gcode_hash = compute_gcode_hash(gcode_path.read_text(encoding="utf-8"))
+        computed_manifest_hash = compute_manifest_hash(manifest)
+        if computed_gcode_hash != expected_gcode_hash:
+            raise CaptureError(
+                f"acquisition G-code hash mismatch: {computed_gcode_hash} != "
+                f"{expected_gcode_hash}"
+            )
+        if computed_manifest_hash != expected_manifest_hash:
+            raise CaptureError(
+                f"manifest content hash mismatch: {computed_manifest_hash} != "
+                f"{expected_manifest_hash}"
+            )
+
+    def _active_job(self) -> str | None:
+        if not self.lock_path.exists():
+            return None
+        try:
+            payload = json.loads(self.lock_path.read_text(encoding="utf-8"))
+            return str(payload.get("job") or "")
+        except Exception:
+            return ""
+
+    def _acquire_lock(self, job_id: str) -> None:
+        self.job_root.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "job": job_id,
+            "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            with self.lock_path.open("x", encoding="utf-8") as handle:
+                handle.write(json.dumps(payload, sort_keys=True) + "\n")
+        except FileExistsError:
+            raise CaptureError(
+                f"another vision job is active: {self._active_job() or self.lock_path}"
+            ) from None
+
+    def _release_lock(self, job_id: str) -> None:
+        active = self._active_job()
+        if active and active != job_id:
+            raise CaptureError(f"active job lock belongs to {active!r}, not {job_id!r}")
+        self.lock_path.unlink(missing_ok=True)
+
+    def _require_active(self, job_id: str) -> None:
+        active = self._active_job()
+        if active != job_id:
+            raise CaptureError(f"active job is {active!r}, not {job_id!r}")
+
+    def _frame_by_seq(self, manifest: dict[str, Any], seq: int) -> dict[str, Any]:
+        for frame in manifest.get("frames") or []:
+            if int(frame.get("seq")) == seq:
+                return frame
+        raise CaptureError(f"manifest has no frame with seq={seq}")
+
+    def _completed_frame_ids(self, job_id: str, manifest: dict[str, Any]) -> list[str]:
+        completed: list[str] = []
+        frames_dir = self._frames_dir(job_id)
+        for frame in manifest.get("frames") or []:
+            frame_id = str(frame.get("frame") or "")
+            image = frames_dir / f"{frame_id}.jpg"
+            sidecar = frames_dir / f"{frame_id}.json"
+            if image.exists() or sidecar.exists():
+                if not image.exists() or not sidecar.exists():
+                    raise CaptureError(f"incomplete committed frame artifacts for {frame_id}")
+                verify_jpeg(image)
+                json.loads(sidecar.read_text(encoding="utf-8"))
+                completed.append(frame_id)
+        return completed
+
+    def job_begin(self, params: dict[str, Any]) -> dict[str, Any]:
+        job_id = sanitize_name(params.get("job"))
+        manifest = self._load_manifest(job_id)
+        state = self._load_state(job_id)
+        if state.get("state") != "prepared":
+            raise CaptureError(
+                f"vision job {job_id} is {state.get('state')!r}, expected 'prepared'"
+            )
+        self._verify_hashes(
+            manifest,
+            expected_manifest_hash=str(params.get("manifest_hash") or ""),
+            expected_gcode_hash=str(params.get("gcode_hash") or ""),
+        )
+        completed = self._completed_frame_ids(job_id, manifest)
+        if completed:
+            raise CaptureError(
+                f"prepared vision job already has committed frames: {completed}"
+            )
+        self._acquire_lock(job_id)
+        state.update(
+            {
+                "state": "acquiring",
+                "started_at_utc": datetime.now(timezone.utc).isoformat(),
+                "committed_frame_count": 0,
+                "next_seq": 0,
+                "active_camera": self.camera,
+            }
+        )
+        self._write_state(job_id, state)
+        self._append_event(
+            job_id,
+            "acquiring",
+            {
+                "state": "acquiring",
+                "manifest_hash": manifest["manifest_hash"],
+                "gcode_hash": manifest["gcode_hash"],
+            },
+        )
+        return {
+            "job": job_id,
+            "state": "acquiring",
+            "frame_count": int(manifest.get("frame_count") or 0),
+        }
+
+    def profile(self, params: dict[str, Any]) -> dict[str, Any]:
+        camera = sanitize_name(params.get("camera"))
+        profile = sanitize_profile(params.get("profile"))
+        if camera != self.camera:
+            raise CaptureError(f"VISION_PROFILE CAMERA={camera!r} is not {self.camera!r}")
+        if not profile:
+            raise CaptureError("VISION_PROFILE PROFILE is required")
+        requested_at = request_framebuffer_profile(profile, params)
+        if requested_at is None:
+            raise CaptureError("No framebuffer profile request file is configured")
+        metadata = wait_for_active_profile(profile, timeout=self.request_timeout)
+        return {
+            "camera": camera,
+            "profile": profile,
+            "profile_request_utc": requested_at.isoformat(),
+            "framebuffer_seq": framebuffer_seq(metadata),
+            "camera_profile": metadata.get("camera_profile"),
+        }
+
+    def capture(self, params: dict[str, Any]) -> dict[str, Any]:
+        job_id = sanitize_name(params.get("job"))
+        seq = int(params.get("seq"))
+        frame_id = sanitize_name(params.get("frame"))
+        camera = sanitize_name(params.get("camera"))
+        profile = sanitize_profile(params.get("profile"))
+        if camera != self.camera:
+            raise CaptureError(f"VISION_CAPTURE_SYNC CAMERA={camera!r} is not {self.camera!r}")
+        if not profile:
+            raise CaptureError("VISION_CAPTURE_SYNC PROFILE is required")
+        self._require_active(job_id)
+        manifest = self._load_manifest(job_id)
+        state = self._load_state(job_id)
+        if state.get("state") != "acquiring":
+            raise CaptureError(
+                f"vision job {job_id} is {state.get('state')!r}, expected 'acquiring'"
+            )
+        expected_seq = int(state.get("next_seq", state.get("committed_frame_count", 0)))
+        if seq != expected_seq:
+            raise CaptureError(f"expected job seq {expected_seq}, got {seq}")
+        manifest_frame = self._frame_by_seq(manifest, seq)
+        if str(manifest_frame.get("frame")) != frame_id:
+            raise CaptureError(
+                f"manifest seq {seq} frame is {manifest_frame.get('frame')!r}, "
+                f"got {frame_id!r}"
+            )
+        if str(manifest_frame.get("camera")) != camera:
+            raise CaptureError(
+                f"manifest seq {seq} camera is {manifest_frame.get('camera')!r}, "
+                f"got {camera!r}"
+            )
+        if str(manifest_frame.get("profile")) != profile:
+            raise CaptureError(
+                f"manifest seq {seq} profile is {manifest_frame.get('profile')!r}, "
+                f"got {profile!r}"
+            )
+
+        image_path = self._frames_dir(job_id) / f"{frame_id}.jpg"
+        sidecar_path = self._frames_dir(job_id) / f"{frame_id}.json"
+        if image_path.exists() or sidecar_path.exists():
+            raise CaptureError(f"refusing to overwrite committed frame {frame_id}")
+
+        try:
+            previous_seq = framebuffer_seq(read_framebuffer_metadata())
+        except Exception:
+            previous_seq = -1
+        source_image, source_metadata = wait_for_buffered_frame_seq_after(
+            previous_frame_seq=previous_seq,
+            timeout=self.request_timeout,
+            required_profile=profile,
+        )
+        captured_width = int(source_metadata.get("width") or 0)
+        captured_height = int(source_metadata.get("height") or 0)
+        if not captured_width or not captured_height:
+            captured_width, captured_height = jpeg_dimensions(source_image)
+        image_bytes = source_image.read_bytes()
+        image_sha256 = sha256_prefixed(image_bytes)
+        framebuffer_frame_seq = framebuffer_seq(source_metadata)
+        sidecar = {
+            "schema_version": VISION_JOB_SCHEMA_VERSION,
+            "job_id": job_id,
+            "job_seq": seq,
+            "frame": frame_id,
+            "camera": camera,
+            "profile": profile,
+            "tool": params.get("tool"),
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+            "image_path": str(image_path),
+            "metadata_path": str(sidecar_path),
+            "image_sha256": image_sha256,
+            "width": captured_width,
+            "height": captured_height,
+            "size_bytes": len(image_bytes),
+            "manifest_frame": manifest_frame,
+            "klipper": {
+                "tool": params.get("tool"),
+                "toolhead_position": params.get("toolhead_position"),
+                "gcode_position": params.get("gcode_position"),
+                "homed_axes": params.get("homed_axes"),
+                "camera": camera,
+                "profile": profile,
+                "job_seq": seq,
+                "framebuffer_seq": framebuffer_frame_seq,
+            },
+            "framebuffer_seq": framebuffer_frame_seq,
+            "source_frame": source_metadata,
+        }
+        self._commit_frame(image_path, sidecar_path, image_bytes, sidecar)
+
+        completed_count = int(state.get("committed_frame_count") or 0) + 1
+        state.update(
+            {
+                "committed_frame_count": completed_count,
+                "next_seq": seq + 1,
+                "last_committed_frame": frame_id,
+                "last_framebuffer_seq": framebuffer_frame_seq,
+            }
+        )
+        self._write_state(job_id, state)
+        self._append_event(
+            job_id,
+            "frame_committed",
+            {
+                "state": "acquiring",
+                "seq": seq,
+                "frame": frame_id,
+                "framebuffer_seq": framebuffer_frame_seq,
+                "image_sha256": image_sha256,
+            },
+        )
+        return {
+            "job": job_id,
+            "seq": seq,
+            "frame": frame_id,
+            "framebuffer_seq": framebuffer_frame_seq,
+            "committed_frame_count": completed_count,
+        }
+
+    def _commit_frame(
+        self,
+        image_path: Path,
+        sidecar_path: Path,
+        image_bytes: bytes,
+        sidecar: dict[str, Any],
+    ) -> None:
+        if image_path.exists() or sidecar_path.exists():
+            raise CaptureError(f"refusing to overwrite {image_path} / {sidecar_path}")
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_tmp = image_path.with_name(f".{image_path.name}.tmp")
+        sidecar_tmp = sidecar_path.with_name(f".{sidecar_path.name}.tmp")
+        image_tmp.unlink(missing_ok=True)
+        sidecar_tmp.unlink(missing_ok=True)
+        try:
+            image_tmp.write_bytes(image_bytes)
+            verify_jpeg(image_tmp)
+            sidecar_tmp.write_text(
+                json.dumps(sidecar, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            json.loads(sidecar_tmp.read_text(encoding="utf-8"))
+            os.replace(image_tmp, image_path)
+            os.replace(sidecar_tmp, sidecar_path)
+            verify_jpeg(image_path)
+            json.loads(sidecar_path.read_text(encoding="utf-8"))
+        except Exception:
+            image_tmp.unlink(missing_ok=True)
+            sidecar_tmp.unlink(missing_ok=True)
+            image_path.unlink(missing_ok=True)
+            sidecar_path.unlink(missing_ok=True)
+            raise
+
+    def job_end(self, params: dict[str, Any]) -> dict[str, Any]:
+        job_id = sanitize_name(params.get("job"))
+        expected_frames = int(params.get("expected_frames"))
+        self._require_active(job_id)
+        manifest = self._load_manifest(job_id)
+        state = self._load_state(job_id)
+        manifest_frame_count = int(manifest.get("frame_count") or 0)
+        if expected_frames != manifest_frame_count:
+            raise CaptureError(
+                f"VISION_JOB_END EXPECTED_FRAMES={expected_frames} does not match "
+                f"manifest frame_count={manifest_frame_count}"
+            )
+        completed = self._completed_frame_ids(job_id, manifest)
+        if len(completed) != expected_frames:
+            raise CaptureError(
+                f"vision job {job_id} has {len(completed)} committed frames, "
+                f"expected {expected_frames}"
+            )
+        if int(state.get("committed_frame_count") or 0) != expected_frames:
+            raise CaptureError(
+                f"state committed_frame_count={state.get('committed_frame_count')} "
+                f"does not match expected {expected_frames}"
+            )
+        state.update(
+            {
+                "state": "acquired",
+                "acquired_at_utc": datetime.now(timezone.utc).isoformat(),
+                "committed_frame_count": expected_frames,
+            }
+        )
+        self._write_state(job_id, state)
+        self._append_event(
+            job_id,
+            "acquired",
+            {
+                "state": "acquired",
+                "expected_frames": expected_frames,
+                "frames": completed,
+            },
+        )
+        self._release_lock(job_id)
+        return {
+            "job": job_id,
+            "state": "acquired",
+            "committed_frame_count": expected_frames,
+        }
+
+    def _record_failure_if_active(
+        self, request: dict[str, Any], exc: Exception
+    ) -> None:
+        params = request.get("params") if isinstance(request, dict) else None
+        if not isinstance(params, dict):
+            return
+        job_id = sanitize_name(params.get("job"))
+        if not job_id:
+            return
+        if self._active_job() != job_id:
+            return
+        try:
+            state = self._load_state(job_id)
+            state.update(
+                {
+                    "state": "failed",
+                    "failure": str(exc),
+                    "failed_at_utc": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            self._write_state(job_id, state)
+            self._append_event(
+                job_id,
+                "failed",
+                {
+                    "state": "failed",
+                    "action": request.get("action"),
+                    "error": str(exc),
+                },
+            )
+        except Exception as failure_record_exc:
+            log(f"Could not record vision job failure for {job_id}: {failure_record_exc}")
+        try:
+            self._release_lock(job_id)
+        except Exception as release_exc:
+            log(f"Could not release vision job lock for {job_id}: {release_exc}")
+
+
+class VisiondJobSocketServer(threading.Thread):
+    def __init__(
+        self,
+        *,
+        socket_path: Path = VISIOND_SOCKET,
+        api: VisionJobApi | None = None,
+    ) -> None:
+        super().__init__(daemon=True)
+        self.socket_path = socket_path
+        self.api = api or VisionJobApi()
+
+    def run(self) -> None:
+        self.socket_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.socket_path.exists():
+            self.socket_path.unlink()
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+            server.bind(str(self.socket_path))
+            os.chmod(self.socket_path, 0o666)
+            server.listen(8)
+            log(f"Serving synchronous vision job socket: {self.socket_path}")
+            while True:
+                conn, _addr = server.accept()
+                threading.Thread(
+                    target=self._handle_connection, args=(conn,), daemon=True
+                ).start()
+
+    def _handle_connection(self, conn: socket.socket) -> None:
+        with conn:
+            try:
+                conn.settimeout(VISIOND_SOCKET_REQUEST_TIMEOUT)
+                raw = b""
+                while b"\n" not in raw:
+                    chunk = conn.recv(65536)
+                    if not chunk:
+                        break
+                    raw += chunk
+                line = raw.split(b"\n", 1)[0]
+                if not line:
+                    raise CaptureError("empty visiond socket request")
+                request = json.loads(line.decode("utf-8"))
+                if not isinstance(request, dict):
+                    raise CaptureError("visiond socket request must be an object")
+                response = self.api.handle(request)
+            except Exception as exc:
+                response = {"ok": False, "error": str(exc)}
+            conn.sendall(json.dumps(response, separators=(",", ":")).encode() + b"\n")
+
+
 class KlippyRemoteCaptureDaemon:
     def __init__(self) -> None:
         self.capture_queue: queue.Queue[tuple[str, dict[str, Any]]] = queue.Queue(
             maxsize=20
         )
         self.worker = threading.Thread(target=self._capture_worker, daemon=True)
+        self.job_socket = VisiondJobSocketServer() if VISIOND_SOCKET_ENABLED else None
         self.next_id = 1
 
     def _capture_worker(self) -> None:
@@ -671,6 +1331,8 @@ class KlippyRemoteCaptureDaemon:
 
     def run(self) -> None:
         self.worker.start()
+        if self.job_socket is not None:
+            self.job_socket.start()
         while True:
             try:
                 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:

@@ -18,10 +18,12 @@ fi
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_CFG="${SCRIPT_DIR}/printer.cfg"
 SOURCE_HEATERS="${SCRIPT_DIR}/../klipper_host/klippy/extras/heaters.py"
+SOURCE_VISION="${SCRIPT_DIR}/../klipper_host/klippy/extras/vision.py"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 REMOTE_KLIPPER_DIR="${MENDERPI_KLIPPER_DIR:-/opt/klipper}"
 REMOTE_TMP_CFG="/tmp/printer.cfg.$$"
 REMOTE_TMP_HEATERS="/tmp/heaters.py.$$"
+REMOTE_TMP_VISION="/tmp/vision.py.$$"
 EXPECTED_KLIPPER_COMMIT="ca8230d505b7ba7fd225bfa6ed9655bc4520e805"
 EXPECTED_UPSTREAM_HEATERS_SHA256="a95d83be80296a7ff970ea6e1b73746d1a97a7d3e47ce621c02a89d80451ac9d"
 
@@ -43,13 +45,18 @@ check_local_support_files() {
     echo "Error: patched Klipper heaters.py not found: ${SOURCE_HEATERS}" >&2
     exit 1
   fi
+  if [[ ! -f "${SOURCE_VISION}" ]]; then
+    echo "Error: Klipper vision.py extra not found: ${SOURCE_VISION}" >&2
+    exit 1
+  fi
 
-  python3 - "${SOURCE_HEATERS}" <<'PY'
+  python3 - "${SOURCE_HEATERS}" "${SOURCE_VISION}" <<'PY'
 import ast
 import sys
 from pathlib import Path
 
-ast.parse(Path(sys.argv[1]).read_text(encoding="utf-8"))
+for path_arg in sys.argv[1:]:
+    ast.parse(Path(path_arg).read_text(encoding="utf-8"))
 PY
 }
 
@@ -57,6 +64,7 @@ check_live_config() {
   echo "Checking ${REMOTE_HOST} for the active Klipper config..."
   echo "  Source: ${SOURCE_CFG}"
   echo "  Klipper host patch: ${SOURCE_HEATERS}"
+  echo "  Klipper vision extra: ${SOURCE_VISION}"
 
   python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --check
   check_local_support_files
@@ -68,6 +76,7 @@ check_live_config() {
 
   local_sha256="$(sha256_file "${SOURCE_CFG}")"
   local_heaters_sha256="$(sha256_file "${SOURCE_HEATERS}")"
+  local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
   expected_fingerprint="$(
     python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --fingerprint
   )"
@@ -85,16 +94,21 @@ import urllib.request
 main_cfg = Path.home() / "printer_data" / "config" / "printer.cfg"
 klipper_dir = Path(os.environ.get("REMOTE_KLIPPER_DIR", "/opt/klipper"))
 heaters_py = klipper_dir / "klippy" / "extras" / "heaters.py"
+vision_py = klipper_dir / "klippy" / "extras" / "vision.py"
 payload = {
     "ok": False,
     "remote_config_path": str(main_cfg),
     "remote_heaters_path": str(heaters_py),
+    "remote_vision_path": str(vision_py),
 }
 
 try:
     payload["remote_sha256"] = hashlib.sha256(main_cfg.read_bytes()).hexdigest()
     payload["remote_heaters_sha256"] = hashlib.sha256(
         heaters_py.read_bytes()
+    ).hexdigest()
+    payload["remote_vision_sha256"] = hashlib.sha256(
+        vision_py.read_bytes()
     ).hexdigest()
     payload["remote_klipper_commit"] = subprocess.check_output(
         ["git", "-C", str(klipper_dir), "rev-parse", "HEAD"],
@@ -117,6 +131,7 @@ PY
   CHECK_EXPECTED_FINGERPRINT="${expected_fingerprint}" \
   CHECK_LOCAL_SHA256="${local_sha256}" \
   CHECK_LOCAL_HEATERS_SHA256="${local_heaters_sha256}" \
+  CHECK_LOCAL_VISION_SHA256="${local_vision_sha256}" \
   CHECK_EXPECTED_KLIPPER_COMMIT="${EXPECTED_KLIPPER_COMMIT}" \
   CHECK_REMOTE_HOST="${REMOTE_HOST}" \
   CHECK_REMOTE_PAYLOAD="${remote_payload}" \
@@ -136,6 +151,7 @@ spec.loader.exec_module(generator)
 remote_host = os.environ["CHECK_REMOTE_HOST"]
 local_sha256 = os.environ["CHECK_LOCAL_SHA256"]
 local_heaters_sha256 = os.environ["CHECK_LOCAL_HEATERS_SHA256"]
+local_vision_sha256 = os.environ["CHECK_LOCAL_VISION_SHA256"]
 expected_fingerprint = os.environ["CHECK_EXPECTED_FINGERPRINT"]
 expected_klipper_commit = os.environ["CHECK_EXPECTED_KLIPPER_COMMIT"]
 remote_payload = json.loads(os.environ["CHECK_REMOTE_PAYLOAD"])
@@ -157,6 +173,7 @@ if not remote_payload.get("ok"):
 
 remote_sha256 = remote_payload.get("remote_sha256", "")
 remote_heaters_sha256 = remote_payload.get("remote_heaters_sha256", "")
+remote_vision_sha256 = remote_payload.get("remote_vision_sha256", "")
 remote_klipper_commit = remote_payload.get("remote_klipper_commit", "")
 status = remote_payload.get("status", {})
 webhooks = status.get("webhooks", {})
@@ -166,6 +183,8 @@ live_fingerprint = generator.active_config_fingerprint(status)
 print(f"  Remote sha256: {remote_sha256}")
 print(f"  Local heaters.py sha256: {local_heaters_sha256}")
 print(f"  Remote heaters.py sha256: {remote_heaters_sha256}")
+print(f"  Local vision.py sha256: {local_vision_sha256}")
+print(f"  Remote vision.py sha256: {remote_vision_sha256}")
 print(f"  Remote Klipper commit: {remote_klipper_commit}")
 print(f"  Klippy state: {webhooks.get('state')}")
 print(f"  save_config_pending: {configfile.get('save_config_pending')}")
@@ -182,6 +201,11 @@ if remote_heaters_sha256 != local_heaters_sha256:
     errors.append(
         "remote Klipper heaters.py sha256 does not match local patched file "
         f"({remote_heaters_sha256} != {local_heaters_sha256})"
+    )
+if remote_vision_sha256 != local_vision_sha256:
+    errors.append(
+        "remote Klipper vision.py sha256 does not match local extra "
+        f"({remote_vision_sha256} != {local_vision_sha256})"
     )
 if remote_klipper_commit != expected_klipper_commit:
     errors.append(
@@ -236,28 +260,33 @@ if [[ ! -f "${SOURCE_CFG}" ]]; then
 fi
 
 cleanup_remote_tmp() {
-  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}'" >/dev/null 2>&1 || true
+  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}' '${REMOTE_TMP_VISION}'" >/dev/null 2>&1 || true
 }
 trap cleanup_remote_tmp EXIT
 
 local_heaters_sha256="$(sha256_file "${SOURCE_HEATERS}")"
+local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
 
 echo "Updating ${REMOTE_HOST} with THE active Klipper config and host patch..."
 echo "  Source: ${SOURCE_CFG}"
 echo "  Klipper host patch: ${SOURCE_HEATERS}"
+echo "  Klipper vision extra: ${SOURCE_VISION}"
 
 scp "${SOURCE_CFG}" "${REMOTE_HOST}:${REMOTE_TMP_CFG}"
 scp "${SOURCE_HEATERS}" "${REMOTE_HOST}:${REMOTE_TMP_HEATERS}"
+scp "${SOURCE_VISION}" "${REMOTE_HOST}:${REMOTE_TMP_VISION}"
 
 ssh "${REMOTE_HOST}" \
-  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' EXPECTED_PATCHED_HEATERS_SHA256='${local_heaters_sha256}' bash -s" <<'REMOTE_SCRIPT'
+  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' EXPECTED_PATCHED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 MAIN_CFG="${HOME}/printer_data/config/printer.cfg"
 HEATERS_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/heaters.py"
+VISION_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/vision.py"
 TS="$(date +%Y%m%d-%H%M%S)"
 CFG_BACKUP="${MAIN_CFG}.bak.${TS}"
 HEATERS_BACKUP="${HEATERS_PY}.bak.${TS}"
+VISION_BACKUP="${VISION_PY}.bak.${TS}"
 
 if [[ ! -f "${REMOTE_TMP_CFG}" ]]; then
   echo "Error: uploaded config not found: ${REMOTE_TMP_CFG}" >&2
@@ -265,6 +294,10 @@ if [[ ! -f "${REMOTE_TMP_CFG}" ]]; then
 fi
 if [[ ! -f "${REMOTE_TMP_HEATERS}" ]]; then
   echo "Error: uploaded heaters.py not found: ${REMOTE_TMP_HEATERS}" >&2
+  exit 1
+fi
+if [[ ! -f "${REMOTE_TMP_VISION}" ]]; then
+  echo "Error: uploaded vision.py not found: ${REMOTE_TMP_VISION}" >&2
   exit 1
 fi
 if [[ ! -f "${HEATERS_PY}" ]]; then
@@ -289,6 +322,12 @@ fi
 uploaded_heaters_sha="$(sha256sum "${REMOTE_TMP_HEATERS}" | awk '{print $1}')"
 if [[ "${uploaded_heaters_sha}" != "${EXPECTED_PATCHED_HEATERS_SHA256}" ]]; then
   echo "Error: uploaded heaters.py sha256 ${uploaded_heaters_sha} does not match local ${EXPECTED_PATCHED_HEATERS_SHA256}" >&2
+  exit 1
+fi
+
+uploaded_vision_sha="$(sha256sum "${REMOTE_TMP_VISION}" | awk '{print $1}')"
+if [[ "${uploaded_vision_sha}" != "${EXPECTED_VISION_SHA256}" ]]; then
+  echo "Error: uploaded vision.py sha256 ${uploaded_vision_sha} does not match local ${EXPECTED_VISION_SHA256}" >&2
   exit 1
 fi
 
@@ -317,6 +356,24 @@ else
   echo "Installed: ${HEATERS_PY}"
 fi
 rm -f "${REMOTE_TMP_HEATERS}"
+
+if [[ -f "${VISION_PY}" ]]; then
+  current_vision_sha="$(sha256sum "${VISION_PY}" | awk '{print $1}')"
+else
+  current_vision_sha=""
+fi
+if [[ "${current_vision_sha}" == "${EXPECTED_VISION_SHA256}" ]]; then
+  echo "Klipper vision extra already installed: ${VISION_PY}"
+else
+  mkdir -p "$(dirname -- "${VISION_PY}")"
+  if [[ -f "${VISION_PY}" ]]; then
+    cp -a "${VISION_PY}" "${VISION_BACKUP}"
+    echo "Backed up: ${VISION_BACKUP}"
+  fi
+  cp -a "${REMOTE_TMP_VISION}" "${VISION_PY}"
+  echo "Installed: ${VISION_PY}"
+fi
+rm -f "${REMOTE_TMP_VISION}"
 
 mkdir -p "$(dirname -- "${MAIN_CFG}")"
 
