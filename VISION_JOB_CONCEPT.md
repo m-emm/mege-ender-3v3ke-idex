@@ -883,10 +883,14 @@ where it belongs.
 - Generate `/vision/index.html` and `/vision/jobs.json` for queue/history.
 - Generate one job detail page per job with status, raw frames, sidecars,
   overlays, contact sheets, result JSON, facts JSON, and failure diagnostics.
-- Add a small local API for mutating actions: create prepared job, start job,
-  abandon prepared/active job where safe.
-- Keep observation mostly static-file based so pages remain useful after daemon
-  restarts.
+- Implement the first UI slice as read-only generated static HTML/JSON. The
+  browser entrypoint is `http://menderpi.local/vision/`, backed by:
+  `/home/pi/printer_data/vision/index.html`,
+  `/home/pi/printer_data/vision/jobs.json`, and
+  `/home/pi/printer_data/vision/nozzle_cam/jobs/<job_id>/index.html`.
+- Defer mutating browser actions such as create/start/abandon to a later local
+  API stage. Stage 6 must not add hidden motion, homing, parking, cleanup, or
+  calibration-application behavior.
 
 ### Stage 7: generalize measurements
 

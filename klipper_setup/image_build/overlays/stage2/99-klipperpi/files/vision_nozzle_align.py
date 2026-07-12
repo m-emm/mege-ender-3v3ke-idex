@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import html
 import json
 import math
 import os
@@ -28,6 +29,7 @@ from typing import Any
 
 DEFAULT_MOONRAKER_URL = "http://127.0.0.1:7125"
 VISION_DIR = Path(os.environ.get("VISION_OUTPUT_DIR", "/home/pi/printer_data/vision"))
+VISION_ROOT_DIR = VISION_DIR.parent if VISION_DIR.name == "nozzle_cam" else VISION_DIR
 NOZZLE_SWEEP_DIR = VISION_DIR / "nozzle_sweep"
 NOZZLE_CAMERA_VISION_DIR = (
     VISION_DIR if VISION_DIR.name == "nozzle_cam" else VISION_DIR / "nozzle_cam"
@@ -42,6 +44,11 @@ DEFAULT_VIRTUAL_SD_SUBDIR = os.environ.get(
     "VISION_VIRTUAL_SD_SUBDIR", "vision_jobs"
 )
 VISION_URL_PREFIX = os.environ.get("VISION_OUTPUT_URL_PREFIX", "/vision").rstrip("/")
+VISION_ROOT_URL_PREFIX = (
+    VISION_URL_PREFIX[: -len("/nozzle_cam")]
+    if VISION_URL_PREFIX.endswith("/nozzle_cam")
+    else VISION_URL_PREFIX
+)
 CAPTURE_BIN = os.environ.get("VISION_CAPTURE_BIN", "/usr/local/bin/vision_capture.py")
 CROWSNEST_SERVICE = os.environ.get("VISION_CROWSNEST_SERVICE", "crowsnest")
 CROWSNEST_HOST = os.environ.get("VISION_CROWSNEST_HOST", "127.0.0.1")
@@ -146,19 +153,34 @@ def sanitize_name(value: Any) -> str:
     return (text or "nozzle_align")[:80]
 
 
-def prefixed_vision_url(relative_path: str) -> str:
-    if not VISION_URL_PREFIX:
+def prefixed_url(prefix: str, relative_path: str) -> str:
+    if not prefix:
         return "/" + relative_path.lstrip("/")
-    return VISION_URL_PREFIX + "/" + relative_path.lstrip("/")
+    return prefix + "/" + relative_path.lstrip("/")
+
+
+def prefixed_vision_url(relative_path: str) -> str:
+    return prefixed_url(VISION_URL_PREFIX, relative_path)
+
+
+def prefixed_root_vision_url(relative_path: str) -> str:
+    return prefixed_url(VISION_ROOT_URL_PREFIX, relative_path)
 
 
 def vision_url(path: Path) -> str:
     return prefixed_vision_url(path.relative_to(VISION_DIR).as_posix())
 
 
+def root_vision_url(path: Path) -> str:
+    return prefixed_root_vision_url(path.relative_to(VISION_ROOT_DIR).as_posix())
+
+
 def public_url(path_or_url: Path | str) -> str:
     if isinstance(path_or_url, Path):
-        relative_url = vision_url(path_or_url)
+        try:
+            relative_url = vision_url(path_or_url)
+        except ValueError:
+            relative_url = str(path_or_url)
     else:
         relative_url = path_or_url
     return PUBLIC_BASE_URL.rstrip("/") + "/" + relative_url.lstrip("/")
@@ -495,6 +517,8 @@ def load_job_frames_for_analysis(manifest_path: Path) -> list[dict[str, Any]]:
                 "capture": capture,
                 "image_path": str(image_path),
                 "metadata_path": str(metadata_path),
+                "image_url": safe_vision_url(image_path),
+                "metadata_url": safe_vision_url(metadata_path),
             }
         )
     return frames
@@ -553,6 +577,13 @@ def safe_vision_url(path: Path) -> str:
         return vision_url(path)
     except ValueError:
         return str(path)
+
+
+def safe_root_vision_url(path: Path) -> str:
+    try:
+        return root_vision_url(path)
+    except ValueError:
+        return safe_vision_url(path)
 
 
 def verify_jpeg_header(path: Path) -> None:
@@ -947,6 +978,953 @@ def run_acquisition_job(args: argparse.Namespace) -> dict[str, Any]:
     start_args = argparse.Namespace(**vars(args))
     start_args.start_prepared_job = summary["job_id"]
     return start_prepared_job(start_args)
+
+
+def job_analysis_paths(job_dir: Path) -> dict[str, Path]:
+    analysis_dir = job_dir / "analysis"
+    return {
+        "analysis_dir": analysis_dir,
+        "overlays_dir": analysis_dir / "overlays",
+        "raw_contact_sheet": analysis_dir / "raw_contact_sheet.jpg",
+        "overlay_contact_sheet": analysis_dir / "overlay_contact_sheet.jpg",
+        "result": analysis_dir / "result.json",
+        "facts": analysis_dir / "facts.json",
+    }
+
+
+def assert_analysis_outputs_absent(paths: dict[str, Path]) -> None:
+    for key in ("raw_contact_sheet", "overlay_contact_sheet", "result", "facts"):
+        if paths[key].exists():
+            raise RuntimeError(
+                f"refusing to overwrite existing analysis artifact: {paths[key]}"
+            )
+    overlays_dir = paths["overlays_dir"]
+    if overlays_dir.exists() and any(overlays_dir.iterdir()):
+        raise RuntimeError(
+            f"refusing to overwrite existing analysis overlays in {overlays_dir}"
+        )
+
+
+def mark_job_analysing(job_dir: Path) -> dict[str, Any]:
+    state = read_json(job_dir / "state.json")
+    if state.get("state") != "acquired":
+        raise RuntimeError(
+            f"vision job {state.get('job_id')} is {state.get('state')!r}, "
+            "expected 'acquired' before analysis"
+        )
+    now = datetime.now(timezone.utc).isoformat()
+    state.update(
+        {
+            "state": "analysing",
+            "analysis_started_at_utc": now,
+            "updated_at_utc": now,
+        }
+    )
+    atomic_write_json(job_dir / "state.json", state)
+    append_job_event(job_dir, "analysing", {"state": "analysing"})
+    return state
+
+
+def finish_job_analysis(
+    *,
+    job_dir: Path,
+    accepted: bool,
+    result_path: Path,
+    facts_path: Path,
+    raw_contact_sheet_path: Path | None,
+    overlay_contact_sheet_path: Path | None,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    state = read_json(job_dir / "state.json")
+    now = datetime.now(timezone.utc).isoformat()
+    state_name = "completed" if accepted else "failed"
+    state.update(
+        {
+            "state": state_name,
+            "analysis_completed_at_utc": now,
+            "updated_at_utc": now,
+            "analysis_result_path": str(result_path),
+            "analysis_result_url": safe_vision_url(result_path),
+            "analysis_facts_path": str(facts_path),
+            "analysis_facts_url": safe_vision_url(facts_path),
+        }
+    )
+    if raw_contact_sheet_path and raw_contact_sheet_path.exists():
+        state.update(
+            {
+                "raw_contact_sheet_path": str(raw_contact_sheet_path),
+                "raw_contact_sheet_url": safe_vision_url(raw_contact_sheet_path),
+            }
+        )
+    if overlay_contact_sheet_path and overlay_contact_sheet_path.exists():
+        state.update(
+            {
+                "overlay_contact_sheet_path": str(overlay_contact_sheet_path),
+                "overlay_contact_sheet_url": safe_vision_url(
+                    overlay_contact_sheet_path
+                ),
+            }
+        )
+    if accepted:
+        state.pop("failure", None)
+    else:
+        state["failure"] = reason or "analysis rejected the measurement"
+        state["failed_at_utc"] = now
+    atomic_write_json(job_dir / "state.json", state)
+    append_job_event(
+        job_dir,
+        state_name,
+        {
+            "state": state_name,
+            "accepted": accepted,
+            "reason": reason,
+            "result_path": str(result_path),
+            "facts_path": str(facts_path),
+        },
+    )
+    return state
+
+
+def unique_dx_values_from_manifest(manifest: dict[str, Any]) -> list[float]:
+    values: list[float] = []
+    seen: set[str] = set()
+    for frame in manifest.get("frames") or []:
+        value = float(frame["dx"])
+        label = dx_label(value)
+        if label not in seen:
+            values.append(value)
+            seen.add(label)
+    return values
+
+
+def write_raw_contact_sheet(
+    frames: list[dict[str, Any]], analysis: dict[str, Any], contact_sheet_path: Path
+) -> None:
+    raw_frames = []
+    for frame in frames:
+        raw = dict(frame)
+        raw["overlay_path"] = raw["image_path"]
+        raw_frames.append(raw)
+    write_contact_sheet(raw_frames, analysis, contact_sheet_path)
+
+
+def build_idex_nozzle_sweep_facts(
+    *, manifest: dict[str, Any], analysis: dict[str, Any], result_path: Path
+) -> dict[str, Any]:
+    accepted = bool(analysis.get("ok"))
+    return {
+        "schema_version": VISION_JOB_SCHEMA_VERSION,
+        "job_id": manifest.get("job_id"),
+        "kind": manifest.get("kind"),
+        "camera": manifest.get("camera"),
+        "profile": manifest.get("profile"),
+        "manifest_hash": manifest.get("manifest_hash"),
+        "gcode_hash": manifest.get("gcode_hash"),
+        "measurement": "idex_nozzle_relative_offset",
+        "accepted": accepted,
+        "ok": accepted,
+        "source_result": result_path.name,
+        "nozzle_delta_t1_minus_t0": (
+            analysis.get("nozzle_delta_t1_minus_t0") if accepted else None
+        ),
+        "red_marker_delta_t1_minus_t0": analysis.get(
+            "red_marker_delta_t1_minus_t0"
+        ),
+        "quality": {
+            "cross_match": analysis.get("cross_match"),
+            "red_marker_fits": analysis.get("red_marker_fits"),
+            "red_axis_vector_px_per_mm": analysis.get("red_axis_vector_px_per_mm"),
+            "red_axis_px_per_mm": analysis.get("red_axis_px_per_mm"),
+            "red_axis_angle_deg": analysis.get("red_axis_angle_deg"),
+        },
+        "hard_failures": analysis.get("hard_failures") or [],
+    }
+
+
+def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
+    job_id = sanitize_name(args.analyze_job or args.job_id)
+    if not job_id:
+        raise RuntimeError("--analyze-job requires a job id")
+    job_root = Path(args.job_root)
+    job_dir = job_dir_from_root(job_root, job_id)
+    manifest, state = verify_prepared_job_integrity(job_dir)
+    if state.get("state") != "acquired":
+        raise RuntimeError(
+            f"vision job {manifest.get('job_id')} is {state.get('state')!r}, "
+            "expected 'acquired'"
+        )
+    verify_acquired_job_frames(manifest, job_dir)
+    paths = job_analysis_paths(job_dir)
+    assert_analysis_outputs_absent(paths)
+    paths["analysis_dir"].mkdir(parents=True, exist_ok=True)
+    paths["overlays_dir"].mkdir(parents=True, exist_ok=True)
+    mark_job_analysing(job_dir)
+
+    result: dict[str, Any] = {
+        "ok": False,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "job_id": manifest["job_id"],
+        "kind": manifest["kind"],
+        "state": "analysing",
+        "manifest_path": str(job_dir / "manifest.json"),
+        "gcode_path": str(
+            job_dir / str(manifest.get("gcode_file") or "acquisition.gcode")
+        ),
+        "state_path": str(job_dir / "state.json"),
+        "events_path": str(job_dir / "events.jsonl"),
+        "manifest_hash": manifest["manifest_hash"],
+        "gcode_hash": manifest["gcode_hash"],
+        "dx_values": unique_dx_values_from_manifest(manifest),
+        "analysis_dir": str(paths["analysis_dir"]),
+        "analysis_url": safe_vision_url(paths["analysis_dir"]),
+        "raw_contact_sheet_path": str(paths["raw_contact_sheet"]),
+        "raw_contact_sheet_url": safe_vision_url(paths["raw_contact_sheet"]),
+        "overlay_contact_sheet_path": str(paths["overlay_contact_sheet"]),
+        "overlay_contact_sheet_url": safe_vision_url(paths["overlay_contact_sheet"]),
+        "result_path": str(paths["result"]),
+        "result_url": safe_vision_url(paths["result"]),
+        "facts_path": str(paths["facts"]),
+        "facts_url": safe_vision_url(paths["facts"]),
+    }
+    try:
+        frames = load_job_frames_for_analysis(job_dir / "manifest.json")
+        analysis = analyze_sweep_frames(
+            frames, paths["analysis_dir"], overlay_dir=paths["overlays_dir"]
+        )
+        analysis.update(
+            {
+                "run_name": manifest["job_id"],
+                "dx_values": result["dx_values"],
+                "job_id": manifest["job_id"],
+            }
+        )
+        if frames:
+            write_raw_contact_sheet(frames, analysis, paths["raw_contact_sheet"])
+            if all("overlay_path" in frame for frame in frames):
+                write_contact_sheet(frames, analysis, paths["overlay_contact_sheet"])
+        facts = build_idex_nozzle_sweep_facts(
+            manifest=manifest, analysis=analysis, result_path=paths["result"]
+        )
+        result.update(
+            {
+                "ok": bool(analysis.get("ok")),
+                "accepted": bool(analysis.get("ok")),
+                "proxy_only": bool(analysis.get("proxy_only")),
+                "message": analysis.get("message"),
+                "frames": frames,
+                "analysis": analysis,
+                "facts": facts,
+            }
+        )
+        atomic_write_json(paths["facts"], facts)
+        final_state = finish_job_analysis(
+            job_dir=job_dir,
+            accepted=bool(analysis.get("ok")),
+            result_path=paths["result"],
+            facts_path=paths["facts"],
+            raw_contact_sheet_path=paths["raw_contact_sheet"],
+            overlay_contact_sheet_path=paths["overlay_contact_sheet"],
+            reason=analysis.get("message"),
+        )
+        result["state"] = final_state.get("state")
+        result["final_state"] = final_state.get("state")
+    except Exception as exc:
+        result.update(
+            {
+                "ok": False,
+                "accepted": False,
+                "error": str(exc),
+                "message": "Nozzle vision job analysis failed before completion.",
+            }
+        )
+        facts = {
+            "schema_version": VISION_JOB_SCHEMA_VERSION,
+            "job_id": manifest.get("job_id"),
+            "kind": manifest.get("kind"),
+            "accepted": False,
+            "ok": False,
+            "hard_failures": [str(exc)],
+        }
+        atomic_write_json(paths["facts"], facts)
+        final_state = finish_job_analysis(
+            job_dir=job_dir,
+            accepted=False,
+            result_path=paths["result"],
+            facts_path=paths["facts"],
+            raw_contact_sheet_path=paths["raw_contact_sheet"],
+            overlay_contact_sheet_path=paths["overlay_contact_sheet"],
+            reason=str(exc),
+        )
+        result["state"] = final_state.get("state")
+        result["final_state"] = final_state.get("state")
+    finally:
+        atomic_write_json(paths["result"], result)
+    return result
+
+
+def run_full_job(args: argparse.Namespace) -> dict[str, Any]:
+    acquisition = run_acquisition_job(args)
+    if not acquisition.get("ok"):
+        return {
+            **acquisition,
+            "ok": False,
+            "analysis_started": False,
+            "message": acquisition.get("error")
+            or acquisition.get("failure")
+            or "acquisition failed before analysis",
+        }
+    analyze_args = argparse.Namespace(**vars(args))
+    analyze_args.analyze_job = acquisition["job_id"]
+    result = analyze_acquired_job(analyze_args)
+    result["acquisition"] = {
+        "ok": acquisition.get("ok"),
+        "state": acquisition.get("state"),
+        "virtual_sd_filename": acquisition.get("virtual_sd_filename"),
+        "committed_frame_count": acquisition.get("committed_frame_count"),
+    }
+    return result
+
+
+def html_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return html.escape(str(value), quote=True)
+
+
+def html_link(path: Path, label: str | None = None, *, root: bool = True) -> str:
+    url = safe_root_vision_url(path) if root else safe_vision_url(path)
+    text = label or path.name
+    return f'<a href="{html_text(url)}">{html_text(text)}</a>'
+
+
+def html_optional_link(path: Path, label: str | None = None) -> str:
+    if path.exists() or path.is_symlink():
+        return html_link(path, label)
+    return '<span class="muted">not available</span>'
+
+
+def read_json_optional(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        return read_json(path)
+    except Exception as exc:
+        return {"_read_error": str(exc)}
+
+
+def format_report_number(value: Any, digits: int = 3) -> str:
+    if value is None or value == "":
+        return "n/a"
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    text = f"{number:.{digits}f}".rstrip("0").rstrip(".")
+    return "0" if text == "-0" else text
+
+
+def format_report_value(value: Any, unit: str, digits: int = 3) -> str:
+    text = format_report_number(value, digits)
+    return text if text == "n/a" else f"{text} {unit}"
+
+
+def render_measurement_result(facts_path: Path, state: dict[str, Any]) -> str:
+    facts = read_json_optional(facts_path)
+    if not facts:
+        return (
+            '<section class="measurement"><h2>Measurement Result</h2>'
+            '<p class="muted">Analysis has not produced measurement facts yet.</p>'
+            "</section>"
+        )
+    if facts.get("_read_error"):
+        return (
+            '<section class="measurement"><h2>Measurement Result</h2>'
+            f'<p class="failure">Could not read facts.json: '
+            f'{html_text(facts.get("_read_error"))}</p></section>'
+        )
+
+    accepted = bool(facts.get("accepted") or facts.get("ok"))
+    hard_failures = facts.get("hard_failures") or []
+    delta = facts.get("nozzle_delta_t1_minus_t0") or {}
+    quality = facts.get("quality") or {}
+    cross = quality.get("cross_match") or {}
+    status_text = "accepted" if accepted else "rejected"
+    status_class = "result-ok" if accepted else "result-bad"
+    source = delta.get("measurement_source") or cross.get("measurement_source") or "n/a"
+    quality_parts = [
+        f"{format_report_number(cross.get('usable_pair_count'), 0)} pairs",
+        f"rms {format_report_value(cross.get('residual_rms_px'), 'px')}",
+    ]
+    if cross.get("correlation_median") is not None:
+        quality_parts.append(
+            f"corr median {format_report_number(cross.get('correlation_median'), 3)}"
+        )
+    if cross.get("feature_mode"):
+        quality_parts.append(f"mode {cross.get('feature_mode')}")
+
+    rows = [
+        (
+            "Status",
+            f'<span class="{status_class}">{html_text(status_text)}</span>',
+            html_text(state.get("reason") or "; ".join(str(item) for item in hard_failures)),
+        ),
+        (
+            "T1 - T0 along X",
+            html_text(format_report_value(delta.get("along_x_mm_approx"), "mm")),
+            html_text(format_report_value(delta.get("along_x_px"), "px")),
+        ),
+        (
+            "T1 - T0 perpendicular",
+            html_text(format_report_value(delta.get("perpendicular_mm_approx"), "mm")),
+            html_text(format_report_value(delta.get("perpendicular_px"), "px")),
+        ),
+        (
+            "Image delta",
+            "dx "
+            + html_text(format_report_value(delta.get("dx"), "px"))
+            + ", dy "
+            + html_text(format_report_value(delta.get("dy"), "px")),
+            html_text(source),
+        ),
+        (
+            "Cross-match quality",
+            html_text(", ".join(quality_parts)),
+            "axis "
+            + html_text(format_report_value(cross.get("axis_px_per_mm"), "px/mm"))
+            + ", angle "
+            + html_text(format_report_value(cross.get("axis_angle_deg"), "deg")),
+        ),
+    ]
+    empty_note = '<span class="muted">n/a</span>'
+    row_html = "\n".join(
+        "<tr>"
+        f"<th>{html_text(label)}</th>"
+        f"<td>{value}</td>"
+        f"<td>{note or empty_note}</td>"
+        "</tr>"
+        for label, value, note in rows
+    )
+    return (
+        '<section class="measurement"><h2>Measurement Result</h2>'
+        "<table><thead><tr><th>Metric</th><th>Value</th><th>Check</th></tr>"
+        f"</thead><tbody>{row_html}</tbody></table></section>"
+    )
+
+
+def job_sort_timestamp(summary: dict[str, Any]) -> str:
+    for key in (
+        "updated_at_utc",
+        "analysis_completed_at_utc",
+        "start_requested_at_utc",
+        "created_at_utc",
+    ):
+        if summary.get(key):
+            return str(summary[key])
+    return ""
+
+
+def job_artifact_record(path: Path) -> dict[str, Any]:
+    return {
+        "path": str(path),
+        "url": safe_root_vision_url(path),
+        "exists": path.exists() or path.is_symlink(),
+    }
+
+
+def summarize_ui_job(job_dir: Path) -> dict[str, Any] | None:
+    manifest_path = job_dir / "manifest.json"
+    state_path = job_dir / "state.json"
+    if not manifest_path.exists() or not state_path.exists():
+        return None
+    manifest = read_json_optional(manifest_path)
+    state = read_json_optional(state_path)
+    if manifest.get("_read_error") or state.get("_read_error"):
+        return {
+            "job_id": job_dir.name,
+            "job_dir": str(job_dir),
+            "job_url": safe_root_vision_url(job_dir),
+            "page_url": safe_root_vision_url(job_dir / "index.html"),
+            "state": "failed",
+            "failure": manifest.get("_read_error") or state.get("_read_error"),
+        }
+
+    job_id = str(manifest.get("job_id") or state.get("job_id") or job_dir.name)
+    state_name = str(state.get("state") or manifest.get("state") or "unknown")
+    paths = job_analysis_paths(job_dir)
+    gcode_path = job_dir / str(manifest.get("gcode_file") or "acquisition.gcode")
+    result = read_json_optional(paths["result"])
+    failure = (
+        state.get("failure")
+        or state.get("abandoned_reason")
+        or result.get("error")
+        or result.get("message")
+        if state_name in ("failed", "abandoned")
+        else None
+    )
+    summary = {
+        "job_id": job_id,
+        "kind": manifest.get("kind"),
+        "camera": manifest.get("camera"),
+        "profile": manifest.get("profile"),
+        "state": state_name,
+        "created_at_utc": manifest.get("created_at_utc") or state.get("created_at_utc"),
+        "updated_at_utc": state.get("updated_at_utc"),
+        "start_requested_at_utc": state.get("start_requested_at_utc"),
+        "analysis_completed_at_utc": state.get("analysis_completed_at_utc"),
+        "frame_count": manifest.get("frame_count", len(manifest.get("frames") or [])),
+        "committed_frame_count": state.get("committed_frame_count", 0),
+        "manifest_hash": manifest.get("manifest_hash"),
+        "gcode_hash": manifest.get("gcode_hash"),
+        "failure": failure,
+        "job_dir": str(job_dir),
+        "job_url": safe_root_vision_url(job_dir),
+        "page_url": safe_root_vision_url(job_dir / "index.html"),
+        "state_url": safe_root_vision_url(state_path),
+        "manifest_url": safe_root_vision_url(manifest_path),
+        "gcode_url": safe_root_vision_url(gcode_path),
+        "events_url": safe_root_vision_url(job_dir / "events.jsonl"),
+        "virtual_sd_filename": state.get("virtual_sd_filename"),
+        "artifacts": {
+            "result": job_artifact_record(paths["result"]),
+            "facts": job_artifact_record(paths["facts"]),
+            "raw_contact_sheet": job_artifact_record(paths["raw_contact_sheet"]),
+            "overlay_contact_sheet": job_artifact_record(
+                paths["overlay_contact_sheet"]
+            ),
+        },
+    }
+    return summary
+
+
+def discover_ui_jobs(job_root: Path) -> list[dict[str, Any]]:
+    if not job_root.exists():
+        return []
+    jobs: list[dict[str, Any]] = []
+    for job_dir in sorted(path for path in job_root.iterdir() if path.is_dir()):
+        summary = summarize_ui_job(job_dir)
+        if summary:
+            jobs.append(summary)
+    jobs.sort(key=job_sort_timestamp, reverse=True)
+    return jobs
+
+
+def job_counts_by_state(jobs: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for job in jobs:
+        state = str(job.get("state") or "unknown")
+        counts[state] = counts.get(state, 0) + 1
+    return counts
+
+
+def active_ui_job(job_root: Path, jobs: list[dict[str, Any]]) -> dict[str, Any] | None:
+    active_job_id = active_job_from_lock(job_root)
+    if active_job_id:
+        for job in jobs:
+            if job.get("job_id") == active_job_id:
+                return job
+        return {"job_id": active_job_id, "state": "active-lock"}
+    for job in jobs:
+        if job.get("state") in ("acquiring", "analysing"):
+            return job
+    return None
+
+
+def ui_jobs_payload(job_root: Path, jobs: list[dict[str, Any]]) -> dict[str, Any]:
+    active = active_ui_job(job_root, jobs)
+    return {
+        "schema_version": VISION_JOB_SCHEMA_VERSION,
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "entrypoint_url": prefixed_root_vision_url(""),
+        "counts_by_state": job_counts_by_state(jobs),
+        "active_job": active,
+        "jobs": jobs,
+    }
+
+
+def render_html_page(title: str, body: str, *, poll_script: str = "") -> str:
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{html_text(title)}</title>
+  <style>
+    :root {{
+      color-scheme: light;
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --text: #17202a;
+      --muted: #607080;
+      --line: #d9dee7;
+      --accent: #0b6bcb;
+      --bad: #b42318;
+      --ok: #087443;
+      --warn: #9a6700;
+    }}
+    body {{
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.4;
+    }}
+    main {{
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 24px;
+    }}
+    h1, h2 {{
+      margin: 0 0 14px;
+      letter-spacing: 0;
+    }}
+    h1 {{ font-size: 28px; }}
+    h2 {{ font-size: 18px; margin-top: 26px; }}
+    a {{ color: var(--accent); }}
+    code {{
+      background: #eef1f5;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 2px 5px;
+    }}
+    pre {{
+      overflow: auto;
+      background: #101820;
+      color: #f4f7fb;
+      padding: 12px;
+      border-radius: 6px;
+    }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      margin: 10px 0 22px;
+    }}
+    th, td {{
+      border-bottom: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }}
+    th {{
+      background: #edf1f6;
+      color: #263442;
+      font-weight: 650;
+    }}
+    tr:last-child td {{ border-bottom: 0; }}
+    .summary {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin: 14px 0 24px;
+    }}
+    .metric {{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px 12px;
+    }}
+    .metric span {{
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+    }}
+    .state-completed {{ color: var(--ok); font-weight: 700; }}
+    .state-failed, .state-abandoned {{ color: var(--bad); font-weight: 700; }}
+    .state-prepared, .state-acquired {{ color: var(--warn); font-weight: 700; }}
+    .state-acquiring, .state-analysing {{ color: var(--accent); font-weight: 700; }}
+    .result-ok {{ color: var(--ok); font-weight: 700; }}
+    .result-bad {{ color: var(--bad); font-weight: 700; }}
+    .muted {{ color: var(--muted); }}
+    .failure {{
+      border-left: 4px solid var(--bad);
+      background: #fff4f2;
+      padding: 10px 12px;
+      margin: 14px 0 18px;
+    }}
+    .thumb {{
+      max-width: 220px;
+      max-height: 150px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }}
+    .sheet {{
+      max-width: min(100%, 900px);
+      border: 1px solid var(--line);
+      background: #fff;
+      display: block;
+      margin: 8px 0 18px;
+    }}
+    .measurement table {{ margin-top: 8px; }}
+    .nowrap {{ white-space: nowrap; }}
+  </style>
+</head>
+<body>
+<main>
+{body}
+</main>
+{poll_script}
+</body>
+</html>
+"""
+
+
+def state_class(state: Any) -> str:
+    state_name = sanitize_name(state or "unknown").replace("_", "-")
+    return f"state-{state_name}"
+
+
+def render_job_rows(jobs: list[dict[str, Any]]) -> str:
+    if not jobs:
+        return '<p class="muted">No jobs in this group.</p>'
+    rows = []
+    for job in jobs:
+        state = str(job.get("state") or "unknown")
+        failure = job.get("failure") or ""
+        rows.append(
+            "<tr>"
+            f"<td>{html_link(Path(str(job['job_dir'])) / 'index.html', job['job_id'])}</td>"
+            f'<td class="{html_text(state_class(state))}">{html_text(state)}</td>'
+            f"<td>{html_text(job.get('kind'))}</td>"
+            f"<td>{html_text(job.get('created_at_utc'))}</td>"
+            f"<td>{html_text(job.get('updated_at_utc'))}</td>"
+            f"<td>{html_text(job.get('committed_frame_count'))}/"
+            f"{html_text(job.get('frame_count'))}</td>"
+            f"<td>{html_text(failure)}</td>"
+            "</tr>"
+        )
+    return (
+        "<table><thead><tr><th>Job</th><th>State</th><th>Kind</th>"
+        "<th>Created</th><th>Updated</th><th>Frames</th><th>Reason</th>"
+        "</tr></thead><tbody>"
+        + "\n".join(rows)
+        + "</tbody></table>"
+    )
+
+
+def render_global_vision_index(payload: dict[str, Any]) -> str:
+    jobs = payload["jobs"]
+    active = payload.get("active_job")
+    prepared = [job for job in jobs if job.get("state") == "prepared"]
+    history = [
+        job
+        for job in jobs
+        if job.get("state") in ("completed", "failed", "abandoned", "acquired")
+    ]
+    active_jobs = (
+        [active]
+        if active and active.get("job_id")
+        else [job for job in jobs if job.get("state") in ("acquiring", "analysing")]
+    )
+    counts = payload.get("counts_by_state") or {}
+    count_text = ", ".join(
+        f"{html_text(state)}={html_text(count)}" for state, count in sorted(counts.items())
+    ) or "none"
+    body = f"""
+<h1>Vision Jobs</h1>
+<p class="muted">Canonical browser URL: <a href="{html_text(prefixed_root_vision_url(''))}">{html_text(public_url(prefixed_root_vision_url('')))}</a></p>
+<div class="summary">
+  <div class="metric"><span>Generated</span><strong id="generated-at">{html_text(payload.get('generated_at_utc'))}</strong></div>
+  <div class="metric"><span>Jobs</span><strong>{html_text(len(jobs))}</strong></div>
+  <div class="metric"><span>States</span><strong>{count_text}</strong></div>
+  <div class="metric"><span>Data</span>{html_link(VISION_ROOT_DIR / 'jobs.json', 'jobs.json')}</div>
+</div>
+<h2>Commands</h2>
+<pre>/usr/local/bin/vision_nozzle_align.py --refresh-ui
+/usr/local/bin/vision_nozzle_align.py --run-job --name nozzle_sweep --x 195 --y -14.8 --z 20 --dx 0,3,6,9,12</pre>
+<h2>Active</h2>
+{render_job_rows([job for job in active_jobs if job])}
+<h2>Prepared</h2>
+{render_job_rows(prepared)}
+<h2>History</h2>
+{render_job_rows(history)}
+"""
+    poll_script = """
+<script>
+async function pollJobs() {
+  try {
+    const response = await fetch('jobs.json?ts=' + Date.now(), {cache: 'no-store'});
+    if (!response.ok) return;
+    const payload = await response.json();
+    const generated = document.getElementById('generated-at');
+    if (generated) generated.textContent = payload.generated_at_utc || '';
+  } catch (_err) {}
+}
+setInterval(pollJobs, 5000);
+</script>
+"""
+    return render_html_page("Vision Jobs", body, poll_script=poll_script)
+
+
+def frame_capture_time(metadata: dict[str, Any]) -> Any:
+    source = metadata.get("source_frame") or {}
+    return metadata.get("timestamp_utc") or source.get("timestamp_utc")
+
+
+def render_job_frame_rows(
+    manifest: dict[str, Any], job_dir: Path, paths: dict[str, Path]
+) -> str:
+    rows = []
+    for frame in manifest.get("frames") or []:
+        frame_id = str(frame.get("frame"))
+        image_path = job_dir / "frames" / f"{frame_id}.jpg"
+        sidecar_path = job_dir / "frames" / f"{frame_id}.json"
+        overlay_path = paths["overlays_dir"] / f"{frame_id}_overlay.jpg"
+        metadata = read_json_optional(sidecar_path)
+        pose = frame.get("pose") or {}
+        thumbnail = (
+            f'<a href="{html_text(safe_root_vision_url(image_path))}">'
+            f'<img class="thumb" src="{html_text(safe_root_vision_url(image_path))}" '
+            f'alt="{html_text(frame_id)} raw"></a>'
+            if image_path.exists()
+            else '<span class="muted">missing</span>'
+        )
+        overlay = (
+            html_link(overlay_path, "overlay")
+            if overlay_path.exists()
+            else '<span class="muted">pending</span>'
+        )
+        rows.append(
+            "<tr>"
+            f"<td>{html_text(frame.get('seq'))}</td>"
+            f"<td>{html_text(frame_id)}</td>"
+            f"<td>{html_text(frame.get('tool'))}</td>"
+            f"<td>X{html_text(pose.get('x'))} Y{html_text(pose.get('y'))} "
+            f"Z{html_text(pose.get('z'))}</td>"
+            f"<td>{html_text(frame.get('profile'))}</td>"
+            f"<td>{html_text(frame_capture_time(metadata))}</td>"
+            f"<td>{html_text(metadata.get('framebuffer_seq'))}</td>"
+            f"<td>{thumbnail}</td>"
+            f"<td>{html_optional_link(sidecar_path, 'sidecar')}</td>"
+            f"<td>{overlay}</td>"
+            "</tr>"
+        )
+    return (
+        "<table><thead><tr><th>Seq</th><th>Frame</th><th>Tool</th>"
+        "<th>Pose</th><th>Profile</th><th>Captured</th><th>Framebuffer</th>"
+        "<th>Raw</th><th>Sidecar</th><th>Overlay</th></tr></thead><tbody>"
+        + "\n".join(rows)
+        + "</tbody></table>"
+    )
+
+
+def render_job_detail_page(job_dir: Path) -> str:
+    manifest = read_json(job_dir / "manifest.json")
+    state = read_json(job_dir / "state.json")
+    paths = job_analysis_paths(job_dir)
+    state_name = str(state.get("state") or manifest.get("state") or "unknown")
+    failure = state.get("failure") or state.get("abandoned_reason")
+    gcode_path = job_dir / str(manifest.get("gcode_file") or "acquisition.gcode")
+    raw_sheet = paths["raw_contact_sheet"]
+    overlay_sheet = paths["overlay_contact_sheet"]
+    result_path = paths["result"]
+    facts_path = paths["facts"]
+    measurement_result = render_measurement_result(facts_path, state)
+    failure_block = (
+        f'<div class="failure"><strong>Failure:</strong> {html_text(failure)}</div>'
+        if failure
+        else ""
+    )
+    contact_sheets = ""
+    if raw_sheet.exists():
+        contact_sheets += (
+            f'<h2>Raw Contact Sheet</h2><a href="{html_text(safe_root_vision_url(raw_sheet))}">'
+            f'<img class="sheet" src="{html_text(safe_root_vision_url(raw_sheet))}" '
+            'alt="raw contact sheet"></a>'
+        )
+    if overlay_sheet.exists():
+        contact_sheets += (
+            f'<h2>Overlay Contact Sheet</h2><a href="{html_text(safe_root_vision_url(overlay_sheet))}">'
+            f'<img class="sheet" src="{html_text(safe_root_vision_url(overlay_sheet))}" '
+            'alt="overlay contact sheet"></a>'
+        )
+    body = f"""
+<p>{html_link(VISION_ROOT_DIR / 'index.html', 'Vision Jobs')}</p>
+<h1>{html_text(manifest.get('job_id') or job_dir.name)}</h1>
+<div class="summary">
+  <div class="metric"><span>State</span><strong id="job-state" class="{html_text(state_class(state_name))}">{html_text(state_name)}</strong></div>
+  <div class="metric"><span>Frames</span><strong id="job-progress">{html_text(state.get('committed_frame_count', 0))}/{html_text(manifest.get('frame_count'))}</strong></div>
+  <div class="metric"><span>Kind</span><strong>{html_text(manifest.get('kind'))}</strong></div>
+  <div class="metric"><span>Virtual SD</span><strong>{html_text(state.get('virtual_sd_filename'))}</strong></div>
+</div>
+{failure_block}
+{measurement_result}
+<h2>Artifacts</h2>
+<table><tbody>
+  <tr><th>Manifest</th><td>{html_optional_link(job_dir / 'manifest.json', 'manifest.json')}</td></tr>
+  <tr><th>G-code</th><td>{html_optional_link(gcode_path, gcode_path.name)}</td></tr>
+  <tr><th>State</th><td>{html_optional_link(job_dir / 'state.json', 'state.json')}</td></tr>
+  <tr><th>Events</th><td>{html_optional_link(job_dir / 'events.jsonl', 'events.jsonl')}</td></tr>
+  <tr><th>Result</th><td>{html_optional_link(result_path, 'result.json')}</td></tr>
+  <tr><th>Facts</th><td>{html_optional_link(facts_path, 'facts.json')}</td></tr>
+</tbody></table>
+<h2>Hashes</h2>
+<table><tbody>
+  <tr><th>Manifest hash</th><td><code>{html_text(manifest.get('manifest_hash'))}</code></td></tr>
+  <tr><th>G-code hash</th><td><code>{html_text(manifest.get('gcode_hash'))}</code></td></tr>
+</tbody></table>
+{contact_sheets}
+<h2>Frames</h2>
+{render_job_frame_rows(manifest, job_dir, paths)}
+"""
+    poll_script = """
+<script>
+async function pollState() {
+  try {
+    const response = await fetch('state.json?ts=' + Date.now(), {cache: 'no-store'});
+    if (!response.ok) return;
+    const state = await response.json();
+    const stateNode = document.getElementById('job-state');
+    const progressNode = document.getElementById('job-progress');
+    if (stateNode) stateNode.textContent = state.state || '';
+    if (progressNode) progressNode.textContent =
+      String(state.committed_frame_count || 0) + '/' + String(state.frame_count || '');
+  } catch (_err) {}
+}
+setInterval(pollState, 4000);
+</script>
+"""
+    return render_html_page(
+        f"Vision Job {manifest.get('job_id') or job_dir.name}",
+        body,
+        poll_script=poll_script,
+    )
+
+
+def refresh_vision_ui(job_root: Path | None = None) -> dict[str, Any]:
+    resolved_job_root = Path(job_root or NOZZLE_JOB_ROOT)
+    VISION_ROOT_DIR.mkdir(parents=True, exist_ok=True)
+    jobs = discover_ui_jobs(resolved_job_root)
+    for job in jobs:
+        job_dir = Path(str(job["job_dir"]))
+        if (job_dir / "manifest.json").exists() and (job_dir / "state.json").exists():
+            atomic_write_text(job_dir / "index.html", render_job_detail_page(job_dir))
+    payload = ui_jobs_payload(resolved_job_root, jobs)
+    jobs_path = VISION_ROOT_DIR / "jobs.json"
+    index_path = VISION_ROOT_DIR / "index.html"
+    atomic_write_json(jobs_path, payload)
+    atomic_write_text(index_path, render_global_vision_index(payload))
+    return {
+        "ok": True,
+        "entrypoint_path": str(index_path),
+        "entrypoint_url": prefixed_root_vision_url(""),
+        "entrypoint_public_url": public_url(prefixed_root_vision_url("")),
+        "index_url": safe_root_vision_url(index_path),
+        "jobs_path": str(jobs_path),
+        "jobs_url": safe_root_vision_url(jobs_path),
+        "job_count": len(jobs),
+        "counts_by_state": payload["counts_by_state"],
+    }
+
+
+def attach_ui_refresh(result: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
+    try:
+        result["ui"] = refresh_vision_ui(Path(args.job_root))
+    except Exception as exc:
+        result["ui_error"] = str(exc)
+    return result
 
 
 def moonraker_get(base_url: str, path: str) -> dict[str, Any]:
@@ -2102,11 +3080,13 @@ def update_sweep_latest_links(
         tmp = NOZZLE_SWEEP_DIR / f".{name}.tmp"
         if tmp.exists() or tmp.is_symlink():
             tmp.unlink()
-        os.symlink(target.relative_to(NOZZLE_SWEEP_DIR), tmp)
+        os.symlink(os.path.relpath(target, NOZZLE_SWEEP_DIR), tmp)
         os.replace(tmp, latest)
 
 
-def analyze_sweep_frames(frames: list[dict[str, Any]], run_dir: Path) -> dict[str, Any]:
+def analyze_sweep_frames(
+    frames: list[dict[str, Any]], run_dir: Path, overlay_dir: Path | None = None
+) -> dict[str, Any]:
     try:
         import cv2
     except Exception as exc:  # pragma: no cover - depends on Pi package install
@@ -2223,10 +3203,12 @@ def analyze_sweep_frames(frames: list[dict[str, Any]], run_dir: Path) -> dict[st
         if image is None:
             continue
         overlay = annotate_sweep_frame(image, frame, cross_match, red_axis_vector)
-        overlay_path = run_dir / f"{frame['prefix']}_overlay.jpg"
+        overlay_root = overlay_dir or run_dir
+        overlay_root.mkdir(parents=True, exist_ok=True)
+        overlay_path = overlay_root / f"{frame['prefix']}_overlay.jpg"
         cv2.imwrite(str(overlay_path), overlay, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
         frame["overlay_path"] = str(overlay_path)
-        frame["overlay_url"] = vision_url(overlay_path)
+        frame["overlay_url"] = safe_vision_url(overlay_path)
 
     red_delta = None
     if red_marker_fits.get("t0", {}).get("ok") and red_marker_fits.get("t1", {}).get("ok"):
@@ -2461,6 +3443,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Prepare, start, and monitor an acquisition-only virtual SD vision job.",
     )
+    mode.add_argument(
+        "--analyze-job",
+        metavar="JOB_ID",
+        help="Analyze an acquired vision job and write job-local report artifacts.",
+    )
+    mode.add_argument(
+        "--run-job",
+        action="store_true",
+        help="Prepare, acquire, analyze, and report a complete nozzle vision job.",
+    )
+    mode.add_argument(
+        "--refresh-ui",
+        action="store_true",
+        help="Regenerate static vision job HTML and jobs.json without printer motion.",
+    )
     parser.add_argument("--x", type=float, default=195.0)
     parser.add_argument("--y", type=float, default=-14.8)
     parser.add_argument("--z", type=float)
@@ -2488,17 +3485,26 @@ def main(argv: list[str] | None = None) -> int:
         and not args.prepare_job
         and not args.start_prepared_job
         and not args.run_acquisition_job
+        and not args.analyze_job
+        and not args.run_job
+        and not args.refresh_ui
     ):
         parser.error(
             "single-image nozzle vision check was removed; use --sweep, "
-            "--prepare-job, --start-prepared-job, or --run-acquisition-job"
+            "--prepare-job, --start-prepared-job, --run-acquisition-job, "
+            "--analyze-job, --run-job, or --refresh-ui"
         )
     if args.z is None:
         args.z = 20.0
-    if args.prepare_job:
-        summary = prepare_nozzle_sweep_job(args)
+    if args.refresh_ui:
+        summary = refresh_vision_ui(Path(args.job_root))
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
+    if args.prepare_job:
+        summary = prepare_nozzle_sweep_job(args)
+        attach_ui_refresh(summary, args)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0 if summary.get("ok") else 1
     if args.start_prepared_job or args.run_acquisition_job:
         try:
             result = (
@@ -2512,6 +3518,19 @@ def main(argv: list[str] | None = None) -> int:
                 "error": str(exc),
                 "job_id": args.start_prepared_job or args.job_id,
             }
+        attach_ui_refresh(result, args)
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0 if result.get("ok") else 1
+    if args.analyze_job or args.run_job:
+        try:
+            result = run_full_job(args) if args.run_job else analyze_acquired_job(args)
+        except Exception as exc:
+            result = {
+                "ok": False,
+                "error": str(exc),
+                "job_id": args.analyze_job or args.job_id,
+            }
+        attach_ui_refresh(result, args)
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0 if result.get("ok") else 1
     result = run_sweep(args)

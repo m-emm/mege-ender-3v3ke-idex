@@ -47,6 +47,8 @@ IMAGE_BUILD_FILES_DIR = (
     / "files"
 )
 IMAGE_BUILD_STAGE_DIR = IMAGE_BUILD_FILES_DIR.parent
+README_PATH = Path(__file__).resolve().parents[1] / "README.md"
+VISION_JOB_CONCEPT_PATH = Path(__file__).resolve().parents[1] / "VISION_JOB_CONCEPT.md"
 CONFIG_PATH = KLIPPER_CONFIG_DIR / "printer.cfg"
 CALIB_PATH = KLIPPER_CONFIG_DIR / "calib.yaml"
 TEMPLATE_PATH = KLIPPER_CONFIG_DIR / "printer.cfg.template"
@@ -372,6 +374,9 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "location /nozzle_cam/" in nginx
     assert "proxy_pass http://127.0.0.1:8081/" in nginx
     assert "location /vision/" in nginx
+    assert "location = /home/pi/printer_data/vision/index.html" in nginx
+    assert "return 302 /vision/" in nginx
+    assert "return 302 /vision/$1" in nginx
     assert "ExecStart=/usr/local/bin/vision_framebuffer.py" in framebuffer_service
     assert "VISION_FRAMEBUFFER_PORT=8081" in nozzle_framebuffer_service
     assert (
@@ -469,8 +474,16 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "VISION_OUTPUT_URL_PREFIX" in nozzle_script
     assert "--run-acquisition-job" in nozzle_script
     assert "--start-prepared-job" in nozzle_script
+    assert "--analyze-job" in nozzle_script
+    assert "--run-job" in nozzle_script
+    assert "--refresh-ui" in nozzle_script
     assert "--virtual-sd-root" in nozzle_script
     assert "SDCARD_PRINT_FILE FILENAME=" in nozzle_script
+    assert "index.html" in nozzle_script
+    assert "jobs.json" in nozzle_script
+    assert "raw_contact_sheet.jpg" in nozzle_script
+    assert "overlay_contact_sheet.jpg" in nozzle_script
+    assert "facts.json" in nozzle_script
     assert "--fresh-after-utc" in nozzle_script
     assert '"--sweep"' in nozzle_script
     assert "vision_framebuffer" in nozzle_script
@@ -498,6 +511,14 @@ def test_vision_capture_macro_and_host_files_exist():
     assert 'vision_capture.py", "--capture-once"' in runner_script
     assert "acl\n" in image_packages
     assert "python3-opencv" in image_packages
+    readme = README_PATH.read_text(encoding="utf-8")
+    concept = VISION_JOB_CONCEPT_PATH.read_text(encoding="utf-8")
+    assert "http://menderpi.local/vision/" in readme
+    assert "do not paste the filesystem path" in readme
+    assert "vision_nozzle_align.py --refresh-ui" in readme
+    assert "vision_nozzle_align.py --run-job" in readme
+    assert "/home/pi/printer_data/vision/index.html" in readme
+    assert "read-only generated static HTML/JSON" in concept
     assert "libevent-dev" not in image_packages
     assert "libjpeg-dev" not in image_packages
     assert "libbsd-dev" not in image_packages
@@ -514,6 +535,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "vision-capture-nozzle-cam.service" in live_deploy
     assert "nozzle_cam_profiles.json" in live_deploy
     assert "vision_nozzle_align.py" in live_deploy
+    assert "vision_nozzle_align.py --refresh-ui" in live_deploy
     assert "SOURCE_VISION" in live_klipper_deploy
     assert "REMOTE_TMP_VISION" in live_klipper_deploy
     assert "vision.py" in live_klipper_deploy

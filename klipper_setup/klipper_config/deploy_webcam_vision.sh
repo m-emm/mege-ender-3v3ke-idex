@@ -156,6 +156,12 @@ sudo systemctl restart vision-framebuffer-nozzle-cam
 sudo systemctl restart vision-capture
 sudo systemctl restart vision-capture-nozzle-cam
 
+echo "Regenerating static vision UI..."
+sudo -u "${USERNAME}" env \
+  VISION_OUTPUT_DIR="${VISION_DIR}" \
+  VISION_OUTPUT_URL_PREFIX=/vision \
+  /usr/local/bin/vision_nozzle_align.py --refresh-ui
+
 echo "Waiting for RAM-buffered webcam endpoints..."
 python3 - <<'PY'
 import socket

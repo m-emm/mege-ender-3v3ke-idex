@@ -41,6 +41,82 @@ mgn_12ca_height = 10
 mgn_12ca_screw_hole_depth = 3.5
 mgn_12ca_h1 = 3.4
 
+mgn_7h_rail_width = 7
+mgn_7h_rail_height = 4.8
+mgn_7h_rail_mount_hole_pitch = 15
+mgn_7h_rail_mount_hole_end_offset = 7.5
+mgn_7h_rail_mount_hole_diameter = 2.4
+mgn_7h_rail_mount_counterbore_diameter = 4.2
+mgn_7h_rail_mount_counterbore_depth = 2.4
+mgn_7h_rail_mount_screw_size = "M2"
+
+mgn_7h_carriage_length = 30.8
+mgn_7h_carriage_width = 17
+mgn_7h_carriage_height = 8
+mgn_7h_carriage_h1 = 1.5
+mgn_7h_carriage_screw_hole_pitch_x = 20
+mgn_7h_carriage_screw_hole_pitch_y = 8
+mgn_7h_carriage_screw_hole_depth = 3
+mgn_7h_carriage_mount_screw_size = "M2"
+
+
+def create_mgn7h_carriage(
+    *,
+    carriage_length=mgn_7h_carriage_length,
+    carriage_width=mgn_7h_carriage_width,
+    carriage_height=mgn_7h_carriage_height,
+    carriage_h1_offset=mgn_7h_carriage_h1,
+    carriage_mount_hole_pitch_x=mgn_7h_carriage_screw_hole_pitch_x,
+    carriage_mount_hole_pitch_y=mgn_7h_carriage_screw_hole_pitch_y,
+    carriage_mount_hole_depth=mgn_7h_carriage_screw_hole_depth,
+    carriage_mount_screw_size=mgn_7h_carriage_mount_screw_size,
+):
+    """Create an MGN7H carriage reference part."""
+
+    screw_hole_diameter = MScrew.from_size(
+        carriage_mount_screw_size
+    ).clearance_hole_normal
+
+    carriage = create_box(carriage_length, carriage_width, carriage_height)
+
+    holes = PartCollector()
+    individual_holes = []
+    for x in [-carriage_mount_hole_pitch_x / 2, carriage_mount_hole_pitch_x / 2]:
+        for y in [-carriage_mount_hole_pitch_y / 2, carriage_mount_hole_pitch_y / 2]:
+            hole = create_cylinder(screw_hole_diameter / 2, carriage_height)
+            hole = translate(x, y, 0)(hole)
+            individual_holes.append(hole)
+            holes = holes.fuse(hole)
+
+    holes = align(holes, carriage, Alignment.CENTER)
+    holes = align(
+        holes,
+        carriage,
+        Alignment.STACK_TOP,
+        stack_gap=-carriage_mount_hole_depth,
+    )
+    holes_aligner_xy = align_translation(holes, carriage, Alignment.CENTER)
+    holes_aligner_z = align_translation(
+        holes,
+        carriage,
+        Alignment.STACK_TOP,
+        stack_gap=-carriage_mount_hole_depth,
+    )
+    individual_holes = [holes_aligner_xy(hole) for hole in individual_holes]
+    individual_holes = [holes_aligner_z(hole) for hole in individual_holes]
+
+    carriage = carriage.cut(holes)
+
+    carriage = LeaderFollowersCuttersPart(carriage, cutters=[holes])
+    carriage.add_named_cutter(holes, "mount_holes")
+    for index, hole in enumerate(individual_holes):
+        carriage.add_named_cutter(hole, f"mount_hole_{index + 1}")
+    carriage.add_named_follower(carriage.leader, "body")
+
+    carriage = translate(0, 0, carriage_h1_offset)(carriage)
+
+    return carriage
+
 
 def create_mgn12h_carriage():
     """Create the MGN12H carriage part."""
@@ -176,6 +252,111 @@ def create_mgn12h_rail(length_mm: float):
             rail = rail.cut(hole)
 
     return LeaderFollowersCuttersPart(rail, cutters=holes_aligned)
+
+
+def create_mgn7h_rail(
+    *,
+    length_mm: float,
+    rail_width=mgn_7h_rail_width,
+    rail_height=mgn_7h_rail_height,
+    rail_mount_hole_pitch=mgn_7h_rail_mount_hole_pitch,
+    rail_mount_hole_diameter=mgn_7h_rail_mount_hole_diameter,
+    rail_mount_counterbore_diameter=mgn_7h_rail_mount_counterbore_diameter,
+    rail_mount_counterbore_depth=mgn_7h_rail_mount_counterbore_depth,
+):
+    """Create an MGN7H rail reference part."""
+
+    rail = create_box(length_mm, rail_width, rail_height)
+
+    num_holes = int(length_mm // rail_mount_hole_pitch)
+    holes_aligned = []
+
+    if num_holes > 0:
+        holes = PartCollector()
+        holes_list = []
+        for i in range(num_holes):
+            x = i * rail_mount_hole_pitch
+            top_hole = create_cylinder(
+                rail_mount_counterbore_diameter / 2,
+                rail_mount_counterbore_depth,
+            )
+            top_hole = translate(x, 0, 0)(top_hole)
+            top_hole = align(top_hole, rail, Alignment.TOP)
+
+            current_hole = top_hole
+            holes = holes.fuse(top_hole)
+            bottom_hole = create_cylinder(rail_mount_hole_diameter / 2, rail_height)
+            bottom_hole = translate(x, 0, 0)(bottom_hole)
+            bottom_hole = align(bottom_hole, rail, Alignment.BOTTOM)
+            holes = holes.fuse(bottom_hole)
+            current_hole = current_hole.fuse(bottom_hole)
+            holes_list.append(current_hole)
+
+        holes_align_translation = align_translation(
+            holes, rail, Alignment.CENTER, axes=[0, 1]
+        )
+
+        holes_aligned = [holes_align_translation(hole) for hole in holes_list]
+
+        for hole in holes_aligned:
+            rail = rail.cut(hole)
+
+    rail = LeaderFollowersCuttersPart(rail, cutters=holes_aligned)
+    rail.add_named_follower(rail.leader, "rail_body")
+    for index, hole in enumerate(holes_aligned):
+        rail.add_named_cutter(hole, f"mounting_hole_{index + 1}")
+
+    return rail
+
+
+def create_mgn7h_rail_with_carriage(
+    *,
+    length_mm: float,
+    carriage_offset=0,
+    rail_width=mgn_7h_rail_width,
+    rail_height=mgn_7h_rail_height,
+    rail_mount_hole_pitch=mgn_7h_rail_mount_hole_pitch,
+    rail_mount_hole_diameter=mgn_7h_rail_mount_hole_diameter,
+    rail_mount_counterbore_diameter=mgn_7h_rail_mount_counterbore_diameter,
+    rail_mount_counterbore_depth=mgn_7h_rail_mount_counterbore_depth,
+    carriage_length=mgn_7h_carriage_length,
+    carriage_width=mgn_7h_carriage_width,
+    carriage_height=mgn_7h_carriage_height,
+    carriage_h1_offset=mgn_7h_carriage_h1,
+    carriage_mount_hole_pitch_x=mgn_7h_carriage_screw_hole_pitch_x,
+    carriage_mount_hole_pitch_y=mgn_7h_carriage_screw_hole_pitch_y,
+    carriage_mount_hole_depth=mgn_7h_carriage_screw_hole_depth,
+    carriage_mount_screw_size=mgn_7h_carriage_mount_screw_size,
+):
+    """Create an MGN7H rail assembly with a built-in carriage follower."""
+
+    rail = create_mgn7h_rail(
+        length_mm=length_mm,
+        rail_width=rail_width,
+        rail_height=rail_height,
+        rail_mount_hole_pitch=rail_mount_hole_pitch,
+        rail_mount_hole_diameter=rail_mount_hole_diameter,
+        rail_mount_counterbore_diameter=rail_mount_counterbore_diameter,
+        rail_mount_counterbore_depth=rail_mount_counterbore_depth,
+    )
+    carriage = create_mgn7h_carriage(
+        carriage_length=carriage_length,
+        carriage_width=carriage_width,
+        carriage_height=carriage_height,
+        carriage_h1_offset=carriage_h1_offset,
+        carriage_mount_hole_pitch_x=carriage_mount_hole_pitch_x,
+        carriage_mount_hole_pitch_y=carriage_mount_hole_pitch_y,
+        carriage_mount_hole_depth=carriage_mount_hole_depth,
+        carriage_mount_screw_size=carriage_mount_screw_size,
+    )
+    carriage = align(carriage, rail.leader, Alignment.CENTER, axes=[0, 1])
+    carriage = translate(carriage_offset, 0, 0)(carriage)
+    carriage = carriage.prefixed_copy("carriage")
+
+    rail.add_named_follower(carriage.leader, name="carriage")
+    rail = rail.merge_except_leader(carriage)
+
+    return rail
 
 
 def create_mgn12h_rail_with_carriages(

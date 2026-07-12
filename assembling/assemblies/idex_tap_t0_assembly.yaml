@@ -1,0 +1,107 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Fixed frame for the T0 Voron-Tap-style IDEX extension
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - back
+        - top
+        - left
+        - right
+      width: 700
+      height: 700
+    parts:
+      - source: self
+        artifact: leader
+        name: idex_tap_fixed_frame
+        color: [0.92, 0.94, 0.9]
+      - source: self
+        artifact: followers
+        names:
+          - idex_tap_sensor_bracket
+          - idex_tap_down_stop
+          - idex_tap_overtravel_stop
+          - idex_tap_magnet_retainers
+        name_template: "{name}"
+        color: [0.82, 0.88, 0.86]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - magnets
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
+  Production:
+    parts:
+      - source: self
+        artifact: leader
+        name: idex_tap_fixed_frame
+      - source: self
+        artifact: followers
+        names:
+          - idex_tap_sensor_bracket
+          - idex_tap_magnet_retainers
+        name_template: "{name}"
+
+Parameters:
+  mgn7h_rail_length:
+    Type: Float
+  mgn7h_rail_width:
+    Type: Float
+  mgn7h_rail_mount_hole_pitch:
+    Type: Float
+  mgn7h_rail_mount_hole_end_offset:
+    Type: Float
+  mgn7h_rail_mount_hole_diameter:
+    Type: Float
+  idex_tap_frame_width:
+    Type: Float
+  idex_tap_frame_height:
+    Type: Float
+  idex_tap_frame_thickness:
+    Type: Float
+  idex_tap_frame_mount_flange_depth:
+    Type: Float
+  idex_tap_frame_mount_flange_thickness:
+    Type: Float
+  idex_tap_frame_mount_screw_size:
+    Type: String
+  idex_tap_shuttle_height:
+    Type: Float
+  idex_tap_total_travel:
+    Type: Float
+  idex_tap_down_stop_contact_diameter:
+    Type: Float
+  idex_tap_overtravel_stop_contact_diameter:
+    Type: Float
+  idex_tap_sensor_bracket_width:
+    Type: Float
+  idex_tap_sensor_bracket_height:
+    Type: Float
+  idex_tap_sensor_bracket_thickness:
+    Type: Float
+  idex_tap_sensor_bracket_x_offset:
+    Type: Float
+  idex_tap_sensor_bracket_z_offset:
+    Type: Float
+  idex_tap_magnet_diameter:
+    Type: Float
+  idex_tap_magnet_height:
+    Type: Float
+  idex_tap_magnet_count:
+    Type: Integer
+  idex_tap_magnet_center_spacing:
+    Type: Float
+  idex_tap_magnet_retainer_thickness:
+    Type: Float
+
+Parts:
+  IdexTapT0Assembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t0_assembly.create_idex_tap_t0_assembly

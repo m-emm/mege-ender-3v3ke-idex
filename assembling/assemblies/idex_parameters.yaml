@@ -1306,6 +1306,92 @@ globals:
   tool_head_mount_machined_sprite_mount_hole_front_y_inset: 5
   tool_head_mount_machined_sprite_mount_hole_primary_y_pitch: 39.7
   tool_head_mount_machined_sprite_mount_hole_secondary_y_pitch: 11.8
+
+  mgn7h_rail_length: 60
+  mgn7h_rail_width: 7
+  mgn7h_rail_height: 4.8
+  mgn7h_rail_mount_hole_pitch: 15
+  mgn7h_rail_mount_hole_end_offset: 7.5
+  mgn7h_rail_mount_hole_diameter: 2.4
+  mgn7h_rail_mount_counterbore_diameter: 4.2
+  mgn7h_rail_mount_counterbore_depth: 2.4
+  mgn7h_rail_mount_screw_size: "M2"
+  mgn7h_carriage_length: 30.8
+  mgn7h_carriage_width: 17
+  mgn7h_carriage_height: 8
+  mgn7h_carriage_h1_offset: 1.5
+  mgn7h_carriage_mount_hole_pitch_x: 20
+  mgn7h_carriage_mount_hole_pitch_y: 8
+  mgn7h_carriage_mount_hole_depth: 3
+  mgn7h_carriage_mount_screw_size: "M2"
+  mgn7h_carriage_rest_offset_on_rail: 0
+
+  opb991t11z_body_width: 18.47
+  opb991t11z_body_depth: 6.35
+  opb991t11z_body_height: 10.8
+  opb991t11z_base_height: 2.54
+  opb991t11z_slot_width: 3.18
+  opb991t11z_slot_depth: 8.76
+  opb991t11z_aperture_width: 0.25
+  opb991t11z_optical_center_z: 8.76
+  opb991t11z_mount_tab_width: 24.63
+  opb991t11z_mount_hole_diameter: 3.18
+  opb991t11z_mount_hole_pitch: 19.05
+  opb991t11z_wire_exit_width: 10.03
+  opb991t11z_wire_exit_depth: 2.79
+  opb991t11z_wire_diameter: 0.55
+  opb991t11z_wire_length: 24
+
+  idex_tap_frame_width: 72
+  idex_tap_frame_height: 58
+  idex_tap_frame_thickness: 6
+  idex_tap_frame_mount_flange_depth: 34
+  idex_tap_frame_mount_flange_thickness: 5
+  idex_tap_frame_mount_screw_size: "M3"
+  idex_tap_frame_mount_hole_x_spacing: 60
+  idex_tap_frame_mount_hole_y_spacing: 22
+  idex_tap_frame_mount_screw_head_clearance: 0.4
+  idex_tap_shuttle_width: 34
+  idex_tap_shuttle_height: 30
+  idex_tap_shuttle_thickness: 8
+  idex_tap_shuttle_carriage_screw_size: "M2"
+  idex_tap_shuttle_carriage_screw_head_clearance: 0.3
+  idex_tap_frame_to_mount_clearance: 0.2
+  idex_tap_trigger_lift: 0.4
+  idex_tap_total_travel: 1.4
+  idex_tap_overtravel_clearance: 1.0
+  idex_tap_down_stop_screw_size: "M2"
+  idex_tap_down_stop_contact_diameter: 4.0
+  idex_tap_down_stop_material_clearance: 0.2
+  idex_tap_overtravel_stop_screw_size: "M2"
+  idex_tap_overtravel_stop_contact_diameter: 4.0
+  idex_tap_trigger_flag_thickness: 0.8
+  idex_tap_trigger_flag_width: 3.0
+  idex_tap_trigger_flag_slot_clearance: 0.8
+  idex_tap_trigger_flag_sensor_overlap_at_rest: 6.0
+  idex_tap_trigger_flag_sensor_overlap_at_trigger: 5.6
+  idex_tap_sensor_mount_screw_size: "M2"
+  idex_tap_sensor_mount_bushing_outer_diameter: 3.2
+  idex_tap_sensor_mount_slop_compensation: 0.4
+  idex_tap_sensor_bracket_width: 18
+  idex_tap_sensor_bracket_height: 24
+  idex_tap_sensor_bracket_thickness: 4
+  idex_tap_sensor_bracket_x_offset: 3
+  idex_tap_sensor_bracket_z_offset: 6
+  idex_tap_wire_exit_clearance: 4
+  idex_tap_service_screw_access_clearance: 5
+  idex_tap_magnet_diameter: 6
+  idex_tap_magnet_height: 3
+  idex_tap_magnet_count: 2
+  idex_tap_magnet_center_spacing: 28
+  idex_tap_magnet_pocket_clearance_radial: 0.2
+  idex_tap_magnet_pocket_clearance_axial: 0.15
+  idex_tap_magnet_retainer_thickness: 1.2
+  idex_tap_magnet_gap_at_rest: 0.4
+  idex_tap_magnet_gap_at_trigger: 0.8
+  idex_tap_magnet_target_screw_size: "M2"
+  idex_tap_magnet_target_screw_head_diameter: 3.8
+
   tool_head_mount_carriage_mount_l_profile_thickness: 3.2
   tool_head_mount_carriage_mount_l_profile_outer_size: 30
   tool_head_mount_clamp_base_cutter_clearance: 0.8

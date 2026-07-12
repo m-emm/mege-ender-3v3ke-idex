@@ -1,0 +1,77 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: OPB991T11Z wired optical interrupter reference assembly
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - back
+        - top
+        - left
+        - right
+      width: 700
+      height: 700
+    parts:
+      - source: self
+        artifact: leader
+        name: body
+        color: [0.82, 0.84, 0.78]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - slot_keepout
+          - optical_center
+        name_template: "{name}"
+        color: [0.62, 0.86, 1.0]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - wire_exit
+          - wire_bundle
+        name_template: "{name}"
+        color: [0.72, 0.72, 0.68]
+  Production:
+    parts: []
+
+Parameters:
+  opb991t11z_body_width:
+    Type: Float
+  opb991t11z_body_depth:
+    Type: Float
+  opb991t11z_body_height:
+    Type: Float
+  opb991t11z_base_height:
+    Type: Float
+  opb991t11z_slot_width:
+    Type: Float
+  opb991t11z_slot_depth:
+    Type: Float
+  opb991t11z_aperture_width:
+    Type: Float
+  opb991t11z_optical_center_z:
+    Type: Float
+  opb991t11z_mount_tab_width:
+    Type: Float
+  opb991t11z_mount_hole_diameter:
+    Type: Float
+  opb991t11z_mount_hole_pitch:
+    Type: Float
+  opb991t11z_wire_exit_width:
+    Type: Float
+  opb991t11z_wire_exit_depth:
+    Type: Float
+  opb991t11z_wire_diameter:
+    Type: Float
+  opb991t11z_wire_length:
+    Type: Float
+
+Parts:
+  Opb991t11zSensorAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.opb991t11z_sensor_assembly.create_opb991t11z_sensor_assembly

@@ -1,0 +1,91 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Moving shuttle for the T0 Tap mechanism
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - back
+        - top
+        - left
+        - right
+      width: 700
+      height: 700
+    parts:
+      - source: self
+        artifact: leader
+        name: idex_tap_moving_shuttle
+        color: [1.0, 0.42, 0.22]
+      - source: self
+        artifact: followers
+        names:
+          - idex_tap_trigger_flag
+        name_template: "{name}"
+        color: [1.0, 0.54, 0.34]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - moving_magnet_targets
+        name_template: "{name}"
+        color: [0.9, 0.86, 0.72]
+  Production:
+    parts:
+      - source: self
+        artifact: leader
+        name: idex_tap_moving_shuttle
+      - source: self
+        artifact: followers
+        names:
+          - idex_tap_trigger_flag
+        name_template: "{name}"
+
+Parameters:
+  mgn7h_carriage_mount_hole_pitch_x:
+    Type: Float
+  mgn7h_carriage_mount_hole_pitch_y:
+    Type: Float
+  tool_head_mount_machined_cutout_width:
+    Type: Float
+  tool_head_mount_machined_sprite_mount_hole_primary_y_pitch:
+    Type: Float
+  tool_head_mount_machined_sprite_mount_hole_front_y_inset:
+    Type: Float
+  idex_tap_frame_height:
+    Type: Float
+  idex_tap_shuttle_width:
+    Type: Float
+  idex_tap_shuttle_height:
+    Type: Float
+  idex_tap_shuttle_thickness:
+    Type: Float
+  idex_tap_shuttle_carriage_screw_size:
+    Type: String
+  idex_tap_trigger_flag_thickness:
+    Type: Float
+  idex_tap_trigger_flag_width:
+    Type: Float
+  idex_tap_trigger_flag_sensor_overlap_at_rest:
+    Type: Float
+  idex_tap_total_travel:
+    Type: Float
+  idex_tap_magnet_height:
+    Type: Float
+  idex_tap_magnet_count:
+    Type: Integer
+  idex_tap_magnet_center_spacing:
+    Type: Float
+  idex_tap_magnet_gap_at_rest:
+    Type: Float
+  idex_tap_magnet_target_screw_head_diameter:
+    Type: Float
+
+Parts:
+  IdexTapT0ShuttleAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t0_shuttle_assembly.create_idex_tap_t0_shuttle_assembly

@@ -10,11 +10,13 @@ Builder:
       views:
         - isometric
         - front
+        - back
         - top
         - left
+        - right
         - bottom
-      width: 512
-      height: 512
+      width: 700
+      height: 700
     parts:
       - source: injected
         assembly: printer_frame
@@ -424,6 +426,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift }
       - source: injected
         assembly: nitehawk_board_right
         artifact: followers
@@ -437,6 +443,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift }
       - source: injected
         assembly: extruder_cage_right
         artifact: all
@@ -450,6 +460,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift }
       - source: injected
         assembly: part_fan_right
         artifact: all
@@ -463,10 +477,177 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift }
       - source: injected
         assembly: tool_head_mount_machined_top
         artifact: all
         name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: idex_tap_t0
+        artifact: leader
+        name: idex_tap_t0_fixed_frame
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: idex_tap_t0
+        artifact: followers
+        names:
+          - idex_tap_sensor_bracket
+          - idex_tap_down_stop
+          - idex_tap_overtravel_stop
+          - idex_tap_magnet_retainers
+        name_template: "idex_tap_t0_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: idex_tap_t0
+        artifact: non_production_parts
+        names:
+          - magnets
+        name_template: "idex_tap_t0_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: idex_tap_t0_shuttle
+        artifact: leader
+        name: idex_tap_t0_moving_shuttle
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift }
+      - source: injected
+        assembly: idex_tap_t0_shuttle
+        artifact: followers
+        names:
+          - idex_tap_trigger_flag
+        name_template: "idex_tap_t0_shuttle_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift }
+      - source: injected
+        assembly: idex_tap_t0_shuttle
+        artifact: non_production_parts
+        names:
+          - moving_magnet_targets
+        name_template: "idex_tap_t0_shuttle_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift }
+      - source: injected
+        assembly: mgn7h_rail_with_carriage
+        artifact: leader
+        name: mgn7h_rail
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: mgn7h_rail_with_carriage
+        artifact: followers
+        names:
+          - carriage
+        name_template: "mgn7h_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift }
+      - source: injected
+        assembly: opb991t11z_sensor
+        artifact: leader
+        name: opb991t11z_body
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: opb991t11z_sensor
+        artifact: non_production_parts
+        names:
+          - slot_keepout
+          - optical_center
+          - wire_bundle
+        name_template: "opb991t11z_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -716,4 +897,6 @@ Parameters:
   x_axis_x_travel_negative:
     Type: Float
   z_axis_z_travel:
+    Type: Float
+  idex_tap_trigger_lift:
     Type: Float

@@ -1,0 +1,73 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Standalone MGN7H rail with one built-in carriage follower
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - back
+        - top
+        - left
+        - right
+      width: 700
+      height: 700
+    parts:
+      - source: self
+        artifact: leader
+        name: rail
+        color: [0.74, 0.78, 0.82]
+      - source: self
+        artifact: followers
+        names:
+          - carriage
+        name_template: "{name}"
+        color: [0.8, 0.84, 0.88]
+  Production:
+    parts: []
+
+Parameters:
+  mgn7h_rail_length:
+    Type: Float
+  mgn7h_rail_width:
+    Type: Float
+  mgn7h_rail_height:
+    Type: Float
+  mgn7h_rail_mount_hole_pitch:
+    Type: Float
+  mgn7h_rail_mount_hole_diameter:
+    Type: Float
+  mgn7h_rail_mount_counterbore_diameter:
+    Type: Float
+  mgn7h_rail_mount_counterbore_depth:
+    Type: Float
+  mgn7h_rail_mount_screw_size:
+    Type: String
+  mgn7h_carriage_length:
+    Type: Float
+  mgn7h_carriage_width:
+    Type: Float
+  mgn7h_carriage_height:
+    Type: Float
+  mgn7h_carriage_h1_offset:
+    Type: Float
+  mgn7h_carriage_mount_hole_pitch_x:
+    Type: Float
+  mgn7h_carriage_mount_hole_pitch_y:
+    Type: Float
+  mgn7h_carriage_mount_hole_depth:
+    Type: Float
+  mgn7h_carriage_mount_screw_size:
+    Type: String
+  mgn7h_carriage_rest_offset_on_rail:
+    Type: Float
+
+Parts:
+  Mgn7hRailWithCarriageAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.mgn7h_rail_with_carriage_assembly.create_mgn7h_rail_with_carriage_assembly

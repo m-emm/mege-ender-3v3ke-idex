@@ -73,6 +73,34 @@ The updater copies local `printer.cfg` to
 remote file, installs the custom Klipper host patch from
 `klipper_setup/klipper_host/`, restarts Klipper, and prints the Klippy state.
 
+### Vision Job UI
+
+The generated nozzle-vision job UI is available on the printer at:
+
+```text
+http://menderpi.local/vision/
+```
+
+Use that `/vision/` URL in the browser; do not paste the filesystem path into
+the address bar. It is a read-only static UI in this stage. Regenerate it from
+existing vision artifacts with:
+
+```bash
+vision_nozzle_align.py --refresh-ui
+```
+
+Run a full IDEX nozzle acquisition and analysis job with:
+
+```bash
+vision_nozzle_align.py --run-job --name nozzle_sweep --x 195 --y -14.8 --z 20 --dx 0,3,6,9,12
+```
+
+The generated files live at:
+
+- `/home/pi/printer_data/vision/index.html`
+- `/home/pi/printer_data/vision/jobs.json`
+- `/home/pi/printer_data/vision/nozzle_cam/jobs/<job_id>/index.html`
+
 The boosted heatbed uses the normal `[heater_bed]` object with the 24V bed on
 `gpio21` and the SSR boost output on `gpio20`. Run the supervised calibration
 helper before changing the bed to PID operation:
