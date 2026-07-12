@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Manual IDEX nozzle vision feasibility runner.
+"""Manual IDEX nozzle vision sweep runner.
 
 This is intentionally report-only. It captures fresh buffered T0 and T1 frames
-at the same displayed G-code pose, tries a constrained OpenCV nozzle-center
-detection, and writes debug artifacts under
-/home/pi/printer_data/vision/nozzle_align/.
+across a small commanded X sweep, runs the same analysis path for every image,
+and writes debug artifacts under /home/pi/printer_data/vision/nozzle_sweep/.
 """
 
 from __future__ import annotations
@@ -26,7 +25,6 @@ from typing import Any
 
 DEFAULT_MOONRAKER_URL = "http://127.0.0.1:7125"
 VISION_DIR = Path(os.environ.get("VISION_OUTPUT_DIR", "/home/pi/printer_data/vision"))
-NOZZLE_ALIGN_DIR = VISION_DIR / "nozzle_align"
 NOZZLE_SWEEP_DIR = VISION_DIR / "nozzle_sweep"
 VISION_URL_PREFIX = os.environ.get("VISION_OUTPUT_URL_PREFIX", "/vision").rstrip("/")
 CAPTURE_BIN = os.environ.get("VISION_CAPTURE_BIN", "/usr/local/bin/vision_capture.py")
@@ -37,32 +35,19 @@ WEBCAM_SNAPSHOT_URL = os.environ.get(
     "VISION_WEBCAM_SNAPSHOT_URL", "http://127.0.0.1/webcam/?action=snapshot"
 )
 WEBCAM_READY_TIMEOUT = float(os.environ.get("VISION_WEBCAM_READY_TIMEOUT", "25"))
-BASE_WIDTH = 1280.0
-BASE_HEIGHT = 720.0
-# Coordinates are expressed for a 1280x720 reference frame and scaled to the
-# captured image. Keep this narrow: the useful nozzle pose only needs room for a
-# small T0/T1 offset, while the lower foreground rail produces strong false
-# circular candidates.
-BASE_ROI = tuple(
-    float(v)
-    for v in os.environ.get("VISION_NOZZLE_ROI_720", "465,375,130,95").split(",")
-)
-BASE_EXPECTED = tuple(
-    float(v) for v in os.environ.get("VISION_NOZZLE_EXPECTED_720", "527,423").split(",")
-)
 RED_BASE_WIDTH = 1920.0
 RED_BASE_HEIGHT = 1080.0
 RED_MARKER_ROI_1080 = tuple(
     float(v)
-    for v in os.environ.get("VISION_NOZZLE_RED_ROI_1080", "760,520,320,270").split(",")
+    for v in os.environ.get("VISION_NOZZLE_RED_ROI_1080", "920,330,260,190").split(",")
 )
 NOZZLE_FEATURE_OFFSET_1080 = tuple(
     float(v)
-    for v in os.environ.get("VISION_NOZZLE_SWEEP_FEATURE_OFFSET_1080", "8,150").split(",")
+    for v in os.environ.get("VISION_NOZZLE_SWEEP_FEATURE_OFFSET_1080", "25,100").split(",")
 )
 NOZZLE_ROI_SIZE_1080 = tuple(
     float(v)
-    for v in os.environ.get("VISION_NOZZLE_SWEEP_ROI_SIZE_1080", "100,78").split(",")
+    for v in os.environ.get("VISION_NOZZLE_SWEEP_ROI_SIZE_1080", "120,96").split(",")
 )
 NOZZLE_GLOBAL_MATCH_MARGIN_1080 = float(
     os.environ.get("VISION_NOZZLE_SWEEP_GLOBAL_MARGIN_1080", "36")
@@ -246,21 +231,6 @@ def capture_once(name: str, fresh_after_utc: str) -> dict[str, Any]:
     return json.loads(result.stdout)
 
 
-def copy_capture_artifacts(metadata: dict[str, Any], run_dir: Path, prefix: str) -> dict[str, str]:
-    image_source = Path(metadata["image_path"])
-    meta_source = Path(metadata["metadata_path"])
-    image_target = run_dir / f"{prefix}.jpg"
-    meta_target = run_dir / f"{prefix}_capture.json"
-    shutil.copy2(image_source, image_target)
-    shutil.copy2(meta_source, meta_target)
-    return {
-        "image_path": str(image_target),
-        "metadata_path": str(meta_target),
-        "image_url": vision_url(image_target),
-        "metadata_url": vision_url(meta_target),
-    }
-
-
 def copy_capture_artifacts_to_run(
     metadata: dict[str, Any], run_dir: Path, prefix: str
 ) -> dict[str, str]:
@@ -275,200 +245,6 @@ def copy_capture_artifacts_to_run(
         "metadata_path": str(meta_target),
         "image_url": vision_url(image_target),
         "metadata_url": vision_url(meta_target),
-    }
-
-
-def scaled_roi(width: int, height: int) -> tuple[int, int, int, int]:
-    scale_x = width / BASE_WIDTH
-    scale_y = height / BASE_HEIGHT
-    x, y, w, h = BASE_ROI
-    return (
-        int(round(x * scale_x)),
-        int(round(y * scale_y)),
-        int(round(w * scale_x)),
-        int(round(h * scale_y)),
-    )
-
-
-def scaled_expected(width: int, height: int) -> tuple[float, float]:
-    return (BASE_EXPECTED[0] * width / BASE_WIDTH, BASE_EXPECTED[1] * height / BASE_HEIGHT)
-
-
-def candidate_score(
-    candidate: dict[str, Any],
-    expected: tuple[float, float],
-    target_radius: float,
-    support_count: int,
-) -> float:
-    distance = math.hypot(candidate["cx"] - expected[0], candidate["cy"] - expected[1])
-    darkness = 255.0 - candidate.get("mean_inside", 128.0)
-    radius_error = abs(candidate["r"] - target_radius)
-    return 120.0 + 0.25 * darkness - 2.0 * distance - 1.3 * radius_error + 22.0 * support_count
-
-
-def support_for_candidate(
-    candidate: dict[str, Any], candidates: list[dict[str, Any]], radius: float
-) -> set[str]:
-    sources = set()
-    for other in candidates:
-        distance = math.hypot(candidate["cx"] - other["cx"], candidate["cy"] - other["cy"])
-        if distance <= radius:
-            sources.add(other["source"])
-    return sources
-
-
-def analyze_image(image_path: Path, overlay_path: Path) -> dict[str, Any]:
-    try:
-        import cv2
-        import numpy as np
-    except Exception as exc:  # pragma: no cover - depends on Pi package install
-        return {
-            "accepted": False,
-            "confidence": 0.0,
-            "error": f"OpenCV import failed: {exc}",
-        }
-
-    image = cv2.imread(str(image_path))
-    if image is None:
-        return {"accepted": False, "confidence": 0.0, "error": f"Could not read {image_path}"}
-
-    height, width = image.shape[:2]
-    roi = scaled_roi(width, height)
-    expected = scaled_expected(width, height)
-    x, y, w, h = roi
-    crop = image[y : y + h, x : x + w]
-    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (7, 7), 1.5)
-    scale = (width / BASE_WIDTH + height / BASE_HEIGHT) / 2.0
-    min_radius = max(8, int(round(12 * scale)))
-    max_radius = max(20, int(round(48 * scale)))
-    target_radius = 34.0 * scale
-    candidates: list[dict[str, Any]] = []
-
-    circles = cv2.HoughCircles(
-        blur,
-        cv2.HOUGH_GRADIENT,
-        dp=1.2,
-        minDist=max(18, int(round(25 * scale))),
-        param1=80,
-        param2=18,
-        minRadius=min_radius,
-        maxRadius=max_radius,
-    )
-    if circles is not None:
-        for cx, cy, radius in np.round(circles[0, :]).astype(int):
-            mask = np.zeros(gray.shape, dtype=np.uint8)
-            cv2.circle(mask, (int(cx), int(cy)), max(int(radius) - 3, 1), 255, -1)
-            candidates.append(
-                {
-                    "source": "hough",
-                    "cx": int(cx + x),
-                    "cy": int(cy + y),
-                    "r": int(radius),
-                    "mean_inside": float(cv2.mean(gray, mask=mask)[0]),
-                }
-            )
-
-    _, dark = cv2.threshold(blur, 70, 255, cv2.THRESH_BINARY_INV)
-    kernel = np.ones((3, 3), np.uint8)
-    dark = cv2.morphologyEx(dark, cv2.MORPH_OPEN, kernel)
-    dark = cv2.morphologyEx(dark, cv2.MORPH_CLOSE, kernel)
-    contours, _ = cv2.findContours(dark, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    for contour in contours:
-        area = float(cv2.contourArea(contour))
-        if area < 70 * scale * scale or area > 8000 * scale * scale:
-            continue
-        perimeter = float(cv2.arcLength(contour, True))
-        if perimeter <= 0:
-            continue
-        circularity = 4.0 * math.pi * area / (perimeter * perimeter)
-        (cx, cy), radius = cv2.minEnclosingCircle(contour)
-        if radius < min_radius or radius > max_radius:
-            continue
-        mask = np.zeros(gray.shape, dtype=np.uint8)
-        cv2.drawContours(mask, [contour], -1, 255, -1)
-        candidates.append(
-            {
-                "source": "dark_contour",
-                "cx": float(cx + x),
-                "cy": float(cy + y),
-                "r": float(radius),
-                "mean_inside": float(cv2.mean(gray, mask=mask)[0]),
-                "area": area,
-                "circularity": circularity,
-            }
-        )
-
-    for candidate in candidates:
-        support = support_for_candidate(candidate, candidates, 35.0 * scale)
-        candidate["support_sources"] = sorted(support)
-        candidate["score"] = candidate_score(
-            candidate, expected, target_radius, max(0, len(support) - 1)
-        )
-
-    candidates.sort(key=lambda c: c["score"], reverse=True)
-    best = candidates[0] if candidates else None
-    confidence = 0.0
-    accepted = False
-    rejection_reason = "no candidates"
-    if best:
-        support_sources = set(best.get("support_sources") or [])
-        distance = math.hypot(best["cx"] - expected[0], best["cy"] - expected[1])
-        confidence = max(0.0, min(1.0, 0.72 - distance / (150.0 * scale)))
-        if len(support_sources) >= 2:
-            confidence = min(1.0, confidence + 0.18)
-        if distance <= 65.0 * scale and confidence >= 0.45:
-            accepted = True
-            rejection_reason = ""
-        else:
-            rejection_reason = (
-                f"best candidate too far from expected nozzle region: {distance:.1f}px"
-            )
-
-    overlay = image.copy()
-    cv2.rectangle(overlay, (x, y), (x + w, y + h), (255, 180, 0), 2)
-    cv2.drawMarker(
-        overlay,
-        (int(round(expected[0])), int(round(expected[1]))),
-        (255, 0, 255),
-        markerType=cv2.MARKER_CROSS,
-        markerSize=24,
-        thickness=2,
-    )
-    for candidate in candidates[:8]:
-        center = (int(round(candidate["cx"])), int(round(candidate["cy"])))
-        radius = int(round(candidate["r"]))
-        color = (0, 255, 0) if candidate is best else (0, 180, 255)
-        cv2.circle(overlay, center, radius, color, 2)
-        cv2.circle(overlay, center, 2, (0, 0, 255), 3)
-    label = "accepted" if accepted else "low confidence"
-    cv2.putText(
-        overlay,
-        f"{label} conf={confidence:.2f}",
-        (20, 40),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        1.0,
-        (255, 255, 255),
-        2,
-    )
-    cv2.imwrite(str(overlay_path), overlay)
-
-    return {
-        "accepted": accepted,
-        "confidence": round(confidence, 4),
-        "image_width": width,
-        "image_height": height,
-        "roi": list(roi),
-        "expected_center_px": [round(expected[0], 2), round(expected[1], 2)],
-        "chosen_center_px": (
-            [round(best["cx"], 2), round(best["cy"], 2)] if best else None
-        ),
-        "chosen_radius_px": round(best["r"], 2) if best else None,
-        "method": "constrained_hough_dark_contour_score",
-        "rejection_reason": rejection_reason,
-        "candidates": candidates[:8],
-        "overlay_path": str(overlay_path),
-        "overlay_url": vision_url(overlay_path),
     }
 
 
@@ -559,9 +335,14 @@ def detect_red_marker(image: Any) -> dict[str, Any]:
     }
 
 
-def derive_nozzle_roi(red_marker: dict[str, Any], width: int, height: int) -> tuple[int, int, int, int]:
+def derive_nozzle_roi(
+    red_marker: dict[str, Any], width: int, height: int
+) -> tuple[int, int, int, int]:
     if not red_marker.get("accepted"):
-        return scaled_roi(width, height)
+        raise RuntimeError(
+            "Cannot derive nozzle ROI because red marker detection was not accepted: "
+            f"{red_marker.get('rejection_reason', 'unknown red marker failure')}"
+        )
     center_x, center_y = red_marker["center_px"]
     offset_x = NOZZLE_FEATURE_OFFSET_1080[0] * width / RED_BASE_WIDTH
     offset_y = NOZZLE_FEATURE_OFFSET_1080[1] * height / RED_BASE_HEIGHT
@@ -658,12 +439,12 @@ def detect_nozzle_candidates(image: Any, roi: tuple[int, int, int, int]) -> list
     return candidates[:12]
 
 
-def derive_global_nozzle_roi(frames: list[dict[str, Any]], width: int, height: int) -> tuple[int, int, int, int]:
+def derive_global_nozzle_roi(
+    frames: list[dict[str, Any]], width: int, height: int
+) -> tuple[int, int, int, int]:
     feature_boxes = []
     for frame in frames:
         red = frame.get("red_marker", {})
-        if not red.get("accepted"):
-            continue
         feature_roi = derive_nozzle_roi(red, width, height)
         frame["feature_roi"] = list(feature_roi)
         fx, fy, fw, fh = feature_roi
@@ -673,7 +454,7 @@ def derive_global_nozzle_roi(frames: list[dict[str, Any]], width: int, height: i
         ]
         feature_boxes.append(feature_roi)
     if not feature_boxes:
-        return scaled_roi(width, height)
+        raise RuntimeError("Cannot derive global nozzle ROI because no feature ROIs exist")
     margin = NOZZLE_GLOBAL_MATCH_MARGIN_1080 * (
         width / RED_BASE_WIDTH + height / RED_BASE_HEIGHT
     ) / 2.0
@@ -1226,7 +1007,7 @@ def annotate_sweep_frame(
     import cv2
 
     overlay = image.copy()
-    red = frame["red_marker"]
+    red = frame.get("red_marker", {})
     red_roi = red.get("roi")
     if red_roi:
         x, y, w, h = red_roi
@@ -1246,8 +1027,10 @@ def annotate_sweep_frame(
     if frame.get("global_nozzle_roi"):
         gx, gy, gw, gh = frame["global_nozzle_roi"]
         cv2.rectangle(overlay, (gx, gy), (gx + gw, gy + gh), (0, 220, 255), 2)
-    nx, ny, nw, nh = frame.get("feature_roi", frame["nozzle_roi"])
-    cv2.rectangle(overlay, (nx, ny), (nx + nw, ny + nh), (255, 255, 0), 2)
+    nozzle_roi = frame.get("feature_roi") or frame.get("nozzle_roi")
+    if nozzle_roi:
+        nx, ny, nw, nh = nozzle_roi
+        cv2.rectangle(overlay, (nx, ny), (nx + nw, ny + nh), (255, 255, 0), 2)
     expected = frame.get("expected_nozzle_feature_center_px")
     if expected:
         cv2.drawMarker(
@@ -1300,13 +1083,19 @@ def annotate_sweep_frame(
 def crop_for_contact_tile(image: Any, frame: dict[str, Any]) -> Any:
     height, width = image.shape[:2]
     boxes = []
-    red = frame["red_marker"]
+    red = frame.get("red_marker", {})
     if red.get("accepted"):
         boxes.append(red["bbox"])
-    boxes.append(frame.get("feature_roi", frame["nozzle_roi"]))
+    nozzle_roi = frame.get("feature_roi") or frame.get("nozzle_roi")
+    if nozzle_roi:
+        boxes.append(nozzle_roi)
     if frame.get("global_nozzle_roi"):
         boxes.append(frame["global_nozzle_roi"])
-    boxes.append(red.get("roi", frame["nozzle_roi"]))
+    red_roi = red.get("roi")
+    if red_roi:
+        boxes.append(red_roi)
+    if not boxes:
+        boxes.append((0, 0, width, height))
     left = min(box[0] for box in boxes)
     top = min(box[1] for box in boxes)
     right = max(box[0] + box[2] for box in boxes)
@@ -1442,7 +1231,8 @@ def write_contact_sheet(
         f"perp={nozzle_delta.get('perpendicular_mm_approx')}mm"
     )
     if not analysis.get("ok"):
-        summary_lines.append(f"STATUS: low confidence; {cross.get('rejection_reason', '')}")
+        failures = analysis.get("hard_failures") or [cross.get("rejection_reason", "rejected")]
+        summary_lines.append(f"STATUS: FAILED; {'; '.join(str(item) for item in failures[:3])}")
     else:
         summary_lines.append("STATUS: global ROI cross-match accepted.")
 
@@ -1478,20 +1268,39 @@ def analyze_sweep_frames(frames: list[dict[str, Any]], run_dir: Path) -> dict[st
             "error": f"OpenCV import failed: {exc}",
         }
 
+    hard_failures: list[str] = []
     for frame in frames:
         image = cv2.imread(frame["image_path"])
         if image is None:
             frame["analysis_error"] = f"Could not read {frame['image_path']}"
+            hard_failures.append(
+                f"{frame['tool']} dx={frame['dx']}: {frame['analysis_error']}"
+            )
             continue
         height, width = image.shape[:2]
         frame["image_width"] = width
         frame["image_height"] = height
         red = detect_red_marker(image)
         frame["red_marker"] = red
-        nozzle_roi = derive_nozzle_roi(red, width, height)
+        if not red.get("accepted"):
+            reason = red.get("rejection_reason", "red marker detection failed")
+            frame["analysis_error"] = reason
+            hard_failures.append(f"{frame['tool']} dx={frame['dx']}: {reason}")
+            continue
+        try:
+            nozzle_roi = derive_nozzle_roi(red, width, height)
+        except RuntimeError as exc:
+            frame["analysis_error"] = str(exc)
+            hard_failures.append(f"{frame['tool']} dx={frame['dx']}: {exc}")
+            continue
         frame["nozzle_roi"] = list(nozzle_roi)
         frame["feature_roi"] = list(nozzle_roi)
-        frame["nozzle_candidates"] = detect_nozzle_candidates(image, nozzle_roi)
+        candidates = detect_nozzle_candidates(image, nozzle_roi)
+        frame["nozzle_candidates"] = candidates
+        if not candidates:
+            reason = "no nozzle candidates found in red-marker-derived ROI"
+            frame["analysis_error"] = reason
+            hard_failures.append(f"{frame['tool']} dx={frame['dx']}: {reason}")
 
     red_marker_fits: dict[str, dict[str, Any]] = {}
     for tool in ("t0", "t1"):
@@ -1504,8 +1313,15 @@ def analyze_sweep_frames(frames: list[dict[str, Any]], run_dir: Path) -> dict[st
             if frame["tool"] == tool
         ]
         red_marker_fits[tool] = fit_points_by_dx(samples)
+        if not red_marker_fits[tool].get("ok"):
+            hard_failures.append(
+                f"{tool}: red marker fit failed: "
+                f"{red_marker_fits[tool].get('rejection_reason', 'unknown fit failure')}"
+            )
 
     red_axis_vector = average_axis_vector(red_marker_fits)
+    if red_axis_vector is None:
+        hard_failures.append("red marker image X axis could not be fit for both tools")
     red_axis_px_per_mm = math.hypot(*(red_axis_vector or (0.0, 0.0)))
     red_axis_angle = (
         math.degrees(math.atan2(red_axis_vector[1], red_axis_vector[0]))
@@ -1513,31 +1329,46 @@ def analyze_sweep_frames(frames: list[dict[str, Any]], run_dir: Path) -> dict[st
         else None
     )
 
-    readable_frames = [
+    analysis_frames = [
         frame
         for frame in frames
-        if frame.get("image_width") and frame.get("image_height") and frame.get("red_marker")
+        if frame.get("image_width")
+        and frame.get("image_height")
+        and frame.get("red_marker", {}).get("accepted")
+        and frame.get("nozzle_candidates")
     ]
-    if readable_frames:
-        global_roi = derive_global_nozzle_roi(
-            readable_frames,
-            int(readable_frames[0]["image_width"]),
-            int(readable_frames[0]["image_height"]),
-        )
+    global_roi = None
+    if analysis_frames:
+        try:
+            global_roi = derive_global_nozzle_roi(
+                analysis_frames,
+                int(analysis_frames[0]["image_width"]),
+                int(analysis_frames[0]["image_height"]),
+            )
+        except RuntimeError as exc:
+            hard_failures.append(str(exc))
     else:
-        global_roi = None
+        hard_failures.append("no readable frames passed red marker and nozzle-candidate gates")
     if global_roi:
-        for frame in readable_frames:
+        for frame in analysis_frames:
             frame["global_nozzle_roi"] = list(global_roi)
 
-    cross_match = (
-        fit_global_roi_cross_match(readable_frames, global_roi, red_axis_vector)
-        if global_roi
-        else {
+    if hard_failures:
+        cross_match = {
             "accepted": False,
-            "rejection_reason": "no global ROI could be derived from red markers",
+            "rejection_reason": "; ".join(hard_failures),
         }
-    )
+    elif global_roi and red_axis_vector:
+        cross_match = fit_global_roi_cross_match(analysis_frames, global_roi, red_axis_vector)
+        if not cross_match.get("accepted"):
+            hard_failures.append(
+                "global ROI cross-match failed: "
+                f"{cross_match.get('rejection_reason', 'unknown cross-match failure')}"
+            )
+    else:
+        reason = "no global ROI or red marker axis could be derived"
+        hard_failures.append(reason)
+        cross_match = {"accepted": False, "rejection_reason": reason}
 
     for frame in frames:
         image = cv2.imread(frame["image_path"])
@@ -1579,9 +1410,19 @@ def analyze_sweep_frames(frames: list[dict[str, Any]], run_dir: Path) -> dict[st
             "measurement_source": "global_roi_cross_match",
         }
 
+    if nozzle_delta:
+        message = "Global ROI cross-match accepted."
+    else:
+        message = (
+            "Nozzle vision sweep failed hard: " + "; ".join(hard_failures)
+            if hard_failures
+            else "Nozzle vision sweep rejected: global ROI cross-match was not reliable enough."
+        )
+
     return {
         "ok": bool(nozzle_delta),
         "proxy_only": not bool(nozzle_delta),
+        "hard_failures": hard_failures,
         "red_marker_fits": red_marker_fits,
         "red_axis_vector_px_per_mm": [round(red_axis_vector[0], 3), round(red_axis_vector[1], 3)] if red_axis_vector else None,
         "red_axis_px_per_mm": round(red_axis_px_per_mm, 3) if red_axis_vector else None,
@@ -1590,155 +1431,8 @@ def analyze_sweep_frames(frames: list[dict[str, Any]], run_dir: Path) -> dict[st
         "cross_match": cross_match,
         "red_marker_delta_t1_minus_t0": red_delta,
         "nozzle_delta_t1_minus_t0": nozzle_delta,
-        "message": (
-            "Global ROI cross-match accepted."
-            if nozzle_delta
-            else "Low-confidence result: global ROI cross-match was not reliable enough."
-        ),
+        "message": message,
     }
-
-
-def update_latest_links(run_dir: Path, result_path: Path, combined_overlay_path: Path | None) -> None:
-    NOZZLE_ALIGN_DIR.mkdir(parents=True, exist_ok=True)
-    links = [(result_path, "latest_result.json"), (run_dir, "latest")]
-    if combined_overlay_path:
-        links.append((combined_overlay_path, "latest_overlay.jpg"))
-    for target, name in links:
-        latest = NOZZLE_ALIGN_DIR / name
-        tmp = NOZZLE_ALIGN_DIR / f".{name}.tmp"
-        if tmp.exists() or tmp.is_symlink():
-            tmp.unlink()
-        os.symlink(target.relative_to(NOZZLE_ALIGN_DIR), tmp)
-        os.replace(tmp, latest)
-
-
-def run_alignment(args: argparse.Namespace) -> dict[str, Any]:
-    timestamp = datetime.now(timezone.utc)
-    run_name = f"{timestamp.strftime('%Y%m%dT%H%M%SZ')}_{sanitize_name(args.name)}"
-    run_dir = NOZZLE_ALIGN_DIR / run_name
-    run_dir.mkdir(parents=True, exist_ok=True)
-    result_path = run_dir / "result.json"
-    combined_overlay_path = run_dir / "overlay.jpg"
-    result: dict[str, Any] = {
-        "ok": False,
-        "timestamp_utc": timestamp.isoformat(),
-        "run_name": run_name,
-        "target_gcode_position": {"x": args.x, "y": args.y, "z": args.z},
-        "report_only": True,
-        "offsets_applied": False,
-        "camera_source": "vision_framebuffer",
-        "crowsnest_managed": False,
-        "run_dir": str(run_dir),
-        "run_url": vision_url(run_dir) + "/",
-        "latest_result_url": vision_url(NOZZLE_ALIGN_DIR / "latest_result.json"),
-    }
-
-    try:
-        status = wait_ready_and_idle(args.moonraker_url, args.ready_timeout)
-        if "x" not in status["toolhead"].get("homed_axes", ""):
-            raise RuntimeError("X is not homed")
-        if "y" not in status["toolhead"].get("homed_axes", ""):
-            raise RuntimeError("Y is not homed")
-        if "z" not in status["toolhead"].get("homed_axes", ""):
-            raise RuntimeError("Z is not homed")
-
-        original_extruder = status["toolhead"].get("extruder", "extruder")
-        original_position = status["gcode_move"].get("gcode_position", [args.x, args.y, args.z, 0])
-        result["original"] = {
-            "extruder": original_extruder,
-            "gcode_position": original_position,
-        }
-
-        result["crowsnest_was_active"] = service_is_active(CROWSNEST_SERVICE)
-
-        captures: dict[str, Any] = {}
-        for tool, macro in (("t0", "T0"), ("t1", "T1")):
-            run_gcode(
-                args.moonraker_url,
-                (
-                    f"{macro}\n"
-                    "G90\n"
-                    f"G1 X{args.x:.3f} Y{args.y:.3f} Z{args.z:.3f} F{args.feedrate:.0f}\n"
-                    "M400"
-                ),
-            )
-            time.sleep(0.75)
-            fresh_after_utc = datetime.now(timezone.utc).isoformat()
-            capture_name = f"{run_name}_{tool}"
-            capture = capture_once(capture_name, fresh_after_utc)
-            artifacts = copy_capture_artifacts(capture, run_dir, tool)
-            overlay_path = run_dir / f"{tool}_overlay.jpg"
-            detection = analyze_image(Path(artifacts["image_path"]), overlay_path)
-            captures[tool] = {
-                "capture": capture,
-                "artifacts": artifacts,
-                "detection": detection,
-            }
-
-        result["captures"] = captures
-        t0 = captures["t0"]["detection"]
-        t1 = captures["t1"]["detection"]
-        if t0.get("chosen_center_px") and t1.get("chosen_center_px"):
-            dx = t1["chosen_center_px"][0] - t0["chosen_center_px"][0]
-            dy = t1["chosen_center_px"][1] - t0["chosen_center_px"][1]
-            result["pixel_delta_t1_minus_t0"] = {
-                "dx": round(dx, 3),
-                "dy": round(dy, 3),
-                "distance": round(math.hypot(dx, dy), 3),
-            }
-        result["confidence"] = round(
-            min(float(t0.get("confidence", 0.0)), float(t1.get("confidence", 0.0))),
-            4,
-        )
-        result["ok"] = bool(t0.get("accepted") and t1.get("accepted"))
-        if not result["ok"]:
-            result["message"] = "Nozzle detections were low-confidence; inspect overlays."
-        else:
-            result["message"] = "Nozzle detections accepted; report-only delta computed."
-
-        try:
-            import cv2
-
-            t0_overlay = cv2.imread(str(run_dir / "t0_overlay.jpg"))
-            t1_overlay = cv2.imread(str(run_dir / "t1_overlay.jpg"))
-            if t0_overlay is not None and t1_overlay is not None:
-                cv2.imwrite(str(combined_overlay_path), cv2.hconcat([t0_overlay, t1_overlay]))
-                result["combined_overlay_path"] = str(combined_overlay_path)
-                result["combined_overlay_url"] = vision_url(combined_overlay_path)
-        except Exception as exc:
-            result["combined_overlay_error"] = str(exc)
-
-    except Exception as exc:
-        result["error"] = str(exc)
-        result["message"] = "Nozzle vision check failed before producing a complete result."
-    finally:
-        if args.restore and result.get("original"):
-            try:
-                original = result["original"]
-                macro = "T1" if original.get("extruder") == "extruder1" else "T0"
-                pos = original.get("gcode_position") or [args.x, args.y, args.z]
-                run_gcode(
-                    args.moonraker_url,
-                    (
-                        f"{macro}\n"
-                        "G90\n"
-                        f"G1 X{float(pos[0]):.3f} Y{float(pos[1]):.3f} "
-                        f"Z{float(pos[2]):.3f} F{args.feedrate:.0f}\n"
-                        "M400"
-                    ),
-                )
-                result["restore"] = {"ok": True, "tool": macro, "gcode_position": pos[:3]}
-            except Exception as exc:
-                result["restore"] = {"ok": False, "error": str(exc)}
-
-        result_path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
-        update_latest_links(
-            run_dir,
-            result_path,
-            combined_overlay_path if combined_overlay_path.exists() else None,
-        )
-
-    return result
 
 
 def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
@@ -1898,7 +1592,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--moonraker-url", default=DEFAULT_MOONRAKER_URL)
     parser.add_argument("--name", default="manual")
-    parser.add_argument("--sweep", action="store_true")
+    parser.add_argument(
+        "--sweep",
+        action="store_true",
+        help="Required. The single-image nozzle check path was removed.",
+    )
     parser.add_argument("--x", type=float, default=195.0)
     parser.add_argument("--y", type=float, default=-14.8)
     parser.add_argument("--z", type=float)
@@ -1914,11 +1612,13 @@ def main() -> int:
         help="Compatibility no-op; nozzle vision uses the RAM framebuffer.",
     )
     args = parser.parse_args()
+    if not args.sweep:
+        parser.error("single-image nozzle vision check was removed; use --sweep")
     if args.z is None:
-        args.z = 20.0 if args.sweep else 2.0
-    result = run_sweep(args) if args.sweep else run_alignment(args)
+        args.z = 20.0
+    result = run_sweep(args)
     print(json.dumps(result, indent=2, sort_keys=True))
-    return 0 if result.get("ok") or "captures" in result or "frames" in result else 1
+    return 0 if result.get("ok") else 1
 
 
 if __name__ == "__main__":

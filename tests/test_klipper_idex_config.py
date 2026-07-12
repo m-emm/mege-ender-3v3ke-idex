@@ -280,7 +280,6 @@ def test_vision_capture_macro_and_host_files_exist():
     nozzle_analysis_capture_macro = _section(
         config_text, "gcode_macro NOZZLE_CAM_ANALYSIS_CAPTURE"
     )
-    nozzle_macro = _section(config_text, "gcode_macro IDEX_NOZZLE_VISION_CHECK")
     nozzle_sweep_macro = _section(config_text, "gcode_macro IDEX_NOZZLE_VISION_SWEEP")
     moonraker = (IMAGE_BUILD_FILES_DIR / "moonraker.conf").read_text(encoding="utf-8")
     nginx = (IMAGE_BUILD_FILES_DIR / "nginx-mainsail.conf").read_text(encoding="utf-8")
@@ -341,9 +340,8 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "keep_light = params.KEEP_LIGHT|default(1)|int" in (
         nozzle_analysis_capture_macro
     )
-    assert 'action_call_remote_method("idex_nozzle_vision_check"' in nozzle_macro
-    assert "print_stats.state" in nozzle_macro
-    assert "requires X/Y/Z homed" in nozzle_macro
+    assert "IDEX_NOZZLE_VISION_CHECK" not in config_text
+    assert "idex_nozzle_vision_check" not in config_text
     assert 'action_call_remote_method("idex_nozzle_vision_sweep"' in nozzle_sweep_macro
     assert "print_stats.state" in nozzle_sweep_macro
     assert "requires X/Y/Z homed" in nozzle_sweep_macro
@@ -419,7 +417,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "NOZZLE_PROFILE_REMOTE_METHOD" in capture_script
     assert "request_framebuffer_profile" in capture_script
     assert "metadata_matches_profile" in capture_script
-    assert "idex_nozzle_vision_check" in capture_script
+    assert "idex_nozzle_vision_check" not in capture_script
     assert "idex_nozzle_vision_sweep" in capture_script
     assert "run_nozzle_cam_profile" in capture_script
     assert "run_idex_nozzle_vision_sweep" in capture_script
@@ -428,7 +426,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "FRAMEBUFFER_LATEST_IMAGE" in capture_script
     assert "wait_for_buffered_frame" in capture_script
     assert 'capture_source": "vision_framebuffer' in capture_script
-    assert "NOZZLE_ALIGN_DIR" in nozzle_script
+    assert "NOZZLE_ALIGN_DIR" not in nozzle_script
     assert "NOZZLE_SWEEP_DIR" in nozzle_script
     assert "VISION_OUTPUT_URL_PREFIX" in nozzle_script
     assert "--fresh-after-utc" in nozzle_script
@@ -437,6 +435,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "dark_contour" in nozzle_script
     assert "detect_red_marker" in nozzle_script
     assert "derive_global_nozzle_roi" in nozzle_script
+    assert "single-image nozzle vision check was removed" in nozzle_script
     assert "fit_global_roi_cross_match" in nozzle_script
     assert "pairwise_match_matrix" in nozzle_script
     assert "global_roi_cross_match" in nozzle_script
