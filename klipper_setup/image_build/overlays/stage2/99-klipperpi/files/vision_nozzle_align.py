@@ -9,9 +9,11 @@ and writes debug artifacts under /home/pi/printer_data/vision/nozzle_sweep/.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -19,6 +21,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -26,6 +29,12 @@ from typing import Any
 DEFAULT_MOONRAKER_URL = "http://127.0.0.1:7125"
 VISION_DIR = Path(os.environ.get("VISION_OUTPUT_DIR", "/home/pi/printer_data/vision"))
 NOZZLE_SWEEP_DIR = VISION_DIR / "nozzle_sweep"
+NOZZLE_CAMERA_VISION_DIR = (
+    VISION_DIR if VISION_DIR.name == "nozzle_cam" else VISION_DIR / "nozzle_cam"
+)
+NOZZLE_JOB_ROOT = Path(
+    os.environ.get("VISION_NOZZLE_JOB_ROOT", str(NOZZLE_CAMERA_VISION_DIR / "jobs"))
+)
 VISION_URL_PREFIX = os.environ.get("VISION_OUTPUT_URL_PREFIX", "/vision").rstrip("/")
 CAPTURE_BIN = os.environ.get("VISION_CAPTURE_BIN", "/usr/local/bin/vision_capture.py")
 CROWSNEST_SERVICE = os.environ.get("VISION_CROWSNEST_SERVICE", "crowsnest")
@@ -57,6 +66,73 @@ NOZZLE_GLOBAL_MATCH_SEARCH_1080 = float(
 )
 PUBLIC_BASE_URL = os.environ.get("VISION_PUBLIC_BASE_URL", "http://menderpi.local")
 NAME_REPLACEMENTS = str.maketrans({c: "_" for c in " /\\:;|?*[]{}()<>'\"`$&!"})
+VISION_JOB_SCHEMA_VERSION = 1
+VISION_JOB_KIND = "idex_nozzle_sweep"
+VISION_JOB_CAMERA = "nozzle_cam"
+VISION_JOB_PROFILE = "analysis"
+VISION_JOB_LIGHTING = "NOZZLE_CAM_ANALYSIS_LIGHT"
+VISION_HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
+HASHED_GCODE_TOKEN_RE = re.compile(
+    r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+"
+)
+
+
+@dataclass(frozen=True)
+class VisionJobFrame:
+    seq: int
+    frame: str
+    tool: str
+    dx: float
+    x: float
+    y: float
+    z: float
+    feedrate: float
+    settle_ms: int
+    lighting: str
+    camera: str
+    profile: str
+
+    @property
+    def tool_key(self) -> str:
+        return self.tool.lower()
+
+    def manifest_record(self) -> dict[str, Any]:
+        return {
+            "seq": self.seq,
+            "frame": self.frame,
+            "tool": self.tool,
+            "dx": self.dx,
+            "pose": {
+                "x": round(self.x, 4),
+                "y": round(self.y, 4),
+                "z": round(self.z, 4),
+            },
+            "feedrate": round(self.feedrate, 3),
+            "settle_ms": self.settle_ms,
+            "lighting": self.lighting,
+            "camera": self.camera,
+            "profile": self.profile,
+            "capture_command": "VISION_CAPTURE_SYNC",
+        }
+
+
+@dataclass(frozen=True)
+class VisionJob:
+    job_id: str
+    kind: str
+    created_at_utc: str
+    camera: str
+    profile: str
+    job_dir: Path
+    manifest_path: Path
+    gcode_path: Path
+    state_path: Path
+    events_path: Path
+    frames_dir: Path
+    analysis_dir: Path
+    frames: tuple[VisionJobFrame, ...]
+    manifest_hash: str = VISION_HASH_PLACEHOLDER
+    gcode_hash: str = VISION_HASH_PLACEHOLDER
 
 
 def sanitize_name(value: Any) -> str:
@@ -99,6 +175,323 @@ def parse_dx_values(value: str) -> list[float]:
 
 def dx_label(dx: float) -> str:
     return str(dx).replace("-", "m").replace(".", "p")
+
+
+def gcode_float(value: float) -> str:
+    return f"{value:.3f}"
+
+
+def settle_time_to_ms(settle_time_s: float) -> int:
+    return max(0, int(round(settle_time_s * 1000.0)))
+
+
+def sha256_prefixed(data: bytes) -> str:
+    return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def canonical_json_bytes(payload: dict[str, Any]) -> bytes:
+    return (
+        json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+        + "\n"
+    ).encode("utf-8")
+
+
+def canonicalize_gcode_for_hash(gcode: str) -> str:
+    normalized = gcode.replace("\r\n", "\n").replace("\r", "\n")
+
+    def replace_token(match: re.Match[str]) -> str:
+        return f"{match.group('name')}={VISION_HASH_PLACEHOLDER}"
+
+    return HASHED_GCODE_TOKEN_RE.sub(replace_token, normalized)
+
+
+def compute_gcode_hash(gcode: str) -> str:
+    return sha256_prefixed(canonicalize_gcode_for_hash(gcode).encode("utf-8"))
+
+
+def compute_manifest_hash(manifest: dict[str, Any]) -> str:
+    canonical = dict(manifest)
+    canonical["manifest_hash"] = VISION_HASH_PLACEHOLDER
+    return sha256_prefixed(canonical_json_bytes(canonical))
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    atomic_write_text(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def generated_job_id(name: str, timestamp: datetime) -> str:
+    timestamp_part = timestamp.strftime("%Y%m%dT%H%M%SZ")
+    return f"{VISION_JOB_KIND}_{timestamp_part}_{sanitize_name(name)}"
+
+
+def build_nozzle_sweep_job_frames(
+    *,
+    x: float,
+    y: float,
+    z: float,
+    dx_values: list[float],
+    feedrate: float,
+    settle_ms: int,
+    camera: str,
+    profile: str,
+) -> tuple[VisionJobFrame, ...]:
+    frames: list[VisionJobFrame] = []
+    for tool in ("T0", "T1"):
+        for dx in dx_values:
+            frame_id = f"{tool.lower()}_dx{dx_label(dx)}"
+            frames.append(
+                VisionJobFrame(
+                    seq=len(frames),
+                    frame=frame_id,
+                    tool=tool,
+                    dx=dx,
+                    x=x + dx,
+                    y=y,
+                    z=z,
+                    feedrate=feedrate,
+                    settle_ms=settle_ms,
+                    lighting=VISION_JOB_LIGHTING,
+                    camera=camera,
+                    profile=profile,
+                )
+            )
+    return tuple(frames)
+
+
+def build_vision_job(
+    *,
+    name: str,
+    job_root: Path,
+    job_id: str | None,
+    x: float,
+    y: float,
+    z: float,
+    dx_values: list[float],
+    feedrate: float,
+    settle_time: float,
+    camera: str,
+    profile: str,
+    now: datetime | None = None,
+) -> VisionJob:
+    timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    resolved_job_id = (
+        sanitize_name(job_id) if job_id else generated_job_id(name, timestamp)
+    )
+    job_dir = job_root / resolved_job_id
+    frames = build_nozzle_sweep_job_frames(
+        x=x,
+        y=y,
+        z=z,
+        dx_values=dx_values,
+        feedrate=feedrate,
+        settle_ms=settle_time_to_ms(settle_time),
+        camera=camera,
+        profile=profile,
+    )
+    return VisionJob(
+        job_id=resolved_job_id,
+        kind=VISION_JOB_KIND,
+        created_at_utc=timestamp.isoformat(),
+        camera=camera,
+        profile=profile,
+        job_dir=job_dir,
+        manifest_path=job_dir / "manifest.json",
+        gcode_path=job_dir / "acquisition.gcode",
+        state_path=job_dir / "state.json",
+        events_path=job_dir / "events.jsonl",
+        frames_dir=job_dir / "frames",
+        analysis_dir=job_dir / "analysis",
+        frames=frames,
+    )
+
+
+def render_acquisition_gcode(
+    job: VisionJob,
+    *,
+    manifest_hash: str,
+    gcode_hash: str,
+) -> str:
+    lines = [
+        f"; generated vision job: {job.job_id}",
+        f"; kind: {job.kind}",
+        f"; run dir: {job.job_dir}",
+        "",
+        "G90",
+        (
+            f"VISION_JOB_BEGIN JOB={job.job_id} "
+            f"MANIFEST_HASH={manifest_hash} GCODE_HASH={gcode_hash}"
+        ),
+        f"VISION_PROFILE CAMERA={job.camera} PROFILE={job.profile}",
+        VISION_JOB_LIGHTING,
+        "",
+    ]
+    active_tool: str | None = None
+    for frame in job.frames:
+        if frame.tool != active_tool:
+            lines.append(frame.tool)
+            active_tool = frame.tool
+        lines.extend(
+            [
+                (
+                    f"G1 X{gcode_float(frame.x)} Y{gcode_float(frame.y)} "
+                    f"Z{gcode_float(frame.z)} F{frame.feedrate:.0f}"
+                ),
+                "M400",
+                f"G4 P{frame.settle_ms}",
+                (
+                    f"VISION_CAPTURE_SYNC JOB={job.job_id} SEQ={frame.seq} "
+                    f"FRAME={frame.frame} CAMERA={frame.camera} "
+                    f"PROFILE={frame.profile} TOOL={frame.tool}"
+                ),
+                "",
+            ]
+        )
+    lines.append(f"VISION_JOB_END JOB={job.job_id} EXPECTED_FRAMES={len(job.frames)}")
+    return "\n".join(lines) + "\n"
+
+
+def build_manifest(job: VisionJob) -> dict[str, Any]:
+    return {
+        "schema_version": VISION_JOB_SCHEMA_VERSION,
+        "job_id": job.job_id,
+        "kind": job.kind,
+        "camera": job.camera,
+        "profile": job.profile,
+        "created_at_utc": job.created_at_utc,
+        "manifest_hash": job.manifest_hash,
+        "gcode_file": job.gcode_path.name,
+        "gcode_hash": job.gcode_hash,
+        "frame_count": len(job.frames),
+        "state": "prepared",
+        "preconditions": {
+            "required_homed_axes": "xyz",
+            "require_idle": True,
+        },
+        "frames": [frame.manifest_record() for frame in job.frames],
+    }
+
+
+def job_with_hashes(job: VisionJob) -> VisionJob:
+    canonical_gcode = render_acquisition_gcode(
+        job,
+        manifest_hash=VISION_HASH_PLACEHOLDER,
+        gcode_hash=VISION_HASH_PLACEHOLDER,
+    )
+    gcode_hash = compute_gcode_hash(canonical_gcode)
+    manifest_for_hash = build_manifest(
+        replace(job, manifest_hash=VISION_HASH_PLACEHOLDER, gcode_hash=gcode_hash)
+    )
+    manifest_hash = compute_manifest_hash(manifest_for_hash)
+    return replace(job, manifest_hash=manifest_hash, gcode_hash=gcode_hash)
+
+
+def prepare_nozzle_sweep_job(args: argparse.Namespace) -> dict[str, Any]:
+    job = build_vision_job(
+        name=args.name,
+        job_root=Path(args.job_root),
+        job_id=args.job_id,
+        x=float(args.x),
+        y=float(args.y),
+        z=float(args.z),
+        dx_values=parse_dx_values(args.dx),
+        feedrate=float(args.feedrate),
+        settle_time=float(args.settle_time),
+        camera=sanitize_name(args.camera),
+        profile=sanitize_name(args.profile),
+    )
+    if job.job_dir.exists():
+        raise FileExistsError(f"Vision job directory already exists: {job.job_dir}")
+    job = job_with_hashes(job)
+    manifest = build_manifest(job)
+    gcode = render_acquisition_gcode(
+        job,
+        manifest_hash=job.manifest_hash,
+        gcode_hash=job.gcode_hash,
+    )
+    state = {
+        "schema_version": VISION_JOB_SCHEMA_VERSION,
+        "job_id": job.job_id,
+        "kind": job.kind,
+        "state": "prepared",
+        "created_at_utc": job.created_at_utc,
+        "updated_at_utc": job.created_at_utc,
+        "frame_count": len(job.frames),
+        "committed_frame_count": 0,
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+    event = {
+        "timestamp_utc": job.created_at_utc,
+        "job_id": job.job_id,
+        "event": "prepared",
+        "state": "prepared",
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+
+    job.frames_dir.mkdir(parents=True)
+    job.analysis_dir.mkdir(parents=True)
+    atomic_write_json(job.manifest_path, manifest)
+    atomic_write_text(job.gcode_path, gcode)
+    atomic_write_json(job.state_path, state)
+    atomic_write_text(job.events_path, json.dumps(event, sort_keys=True) + "\n")
+
+    return {
+        "ok": True,
+        "job_id": job.job_id,
+        "job_dir": str(job.job_dir),
+        "manifest_path": str(job.manifest_path),
+        "gcode_path": str(job.gcode_path),
+        "state_path": str(job.state_path),
+        "events_path": str(job.events_path),
+        "state": "prepared",
+        "frame_count": len(job.frames),
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+
+
+def load_job_frames_for_analysis(manifest_path: Path) -> list[dict[str, Any]]:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    job_dir = manifest_path.parent
+    frames: list[dict[str, Any]] = []
+    for frame in manifest["frames"]:
+        frame_id = frame["frame"]
+        image_path = job_dir / "frames" / f"{frame_id}.jpg"
+        metadata_path = job_dir / "frames" / f"{frame_id}.json"
+        if not image_path.exists():
+            raise FileNotFoundError(f"Missing committed job frame image: {image_path}")
+        if not metadata_path.exists():
+            raise FileNotFoundError(
+                f"Missing committed job frame sidecar: {metadata_path}"
+            )
+        pose = frame["pose"]
+        capture = json.loads(metadata_path.read_text(encoding="utf-8"))
+        frames.append(
+            {
+                "tool": str(frame["tool"]).lower(),
+                "macro": str(frame["tool"]).upper(),
+                "dx": float(frame["dx"]),
+                "dx_label": dx_label(float(frame["dx"])),
+                "prefix": frame_id,
+                "target_gcode_position": {
+                    "x": float(pose["x"]),
+                    "y": float(pose["y"]),
+                    "z": float(pose["z"]),
+                },
+                "capture": capture,
+                "image_path": str(image_path),
+                "metadata_path": str(metadata_path),
+            }
+        )
+    return frames
 
 
 def moonraker_get(base_url: str, path: str) -> dict[str, Any]:
@@ -1588,14 +1981,20 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
     return result
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--moonraker-url", default=DEFAULT_MOONRAKER_URL)
     parser.add_argument("--name", default="manual")
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--sweep",
         action="store_true",
         help="Required. The single-image nozzle check path was removed.",
+    )
+    mode.add_argument(
+        "--prepare-job",
+        action="store_true",
+        help="Generate an immutable prepared vision job without moving the printer.",
     )
     parser.add_argument("--x", type=float, default=195.0)
     parser.add_argument("--y", type=float, default=-14.8)
@@ -1603,6 +2002,10 @@ def main() -> int:
     parser.add_argument("--dx", default="0,3,6,9,12")
     parser.add_argument("--feedrate", type=float, default=3600.0)
     parser.add_argument("--settle-time", type=float, default=0.75)
+    parser.add_argument("--job-root", type=Path, default=NOZZLE_JOB_ROOT)
+    parser.add_argument("--job-id")
+    parser.add_argument("--camera", default=VISION_JOB_CAMERA)
+    parser.add_argument("--profile", default=VISION_JOB_PROFILE)
     parser.add_argument("--ready-timeout", type=float, default=30.0)
     parser.add_argument("--restore", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument(
@@ -1611,11 +2014,15 @@ def main() -> int:
         default=False,
         help="Compatibility no-op; nozzle vision uses the RAM framebuffer.",
     )
-    args = parser.parse_args()
-    if not args.sweep:
-        parser.error("single-image nozzle vision check was removed; use --sweep")
+    args = parser.parse_args(argv)
+    if not args.sweep and not args.prepare_job:
+        parser.error("single-image nozzle vision check was removed; use --sweep or --prepare-job")
     if args.z is None:
         args.z = 20.0
+    if args.prepare_job:
+        summary = prepare_nozzle_sweep_job(args)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
     result = run_sweep(args)
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result.get("ok") else 1

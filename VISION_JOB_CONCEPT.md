@@ -486,13 +486,14 @@ the `manifest_hash` field omitted or set to a fixed placeholder. The same hash
 is passed to `VISION_JOB_BEGIN`.
 
 The G-code hash should be computed over a canonical byte representation of the
-generated acquisition file with every `GCODE_HASH=...` token replaced by the
-literal token `GCODE_HASH=sha256:PLACEHOLDER`. The final file may then embed the
-real `GCODE_HASH` value in `VISION_JOB_BEGIN`. `VISION_JOB_BEGIN` verifies the
-supplied `GCODE_HASH` against the immutable value in the manifest. In v1, this
-does not depend on Klipper exposing the currently running virtual SD filename or
-file hash; the orchestrator records the uploaded filename and hash externally
-when starting the job.
+generated acquisition file with every `MANIFEST_HASH=...` token replaced by
+`MANIFEST_HASH=sha256:PLACEHOLDER` and every `GCODE_HASH=...` token replaced by
+`GCODE_HASH=sha256:PLACEHOLDER`. The final file may then embed the real
+`MANIFEST_HASH` and `GCODE_HASH` values in `VISION_JOB_BEGIN`. `VISION_JOB_BEGIN`
+verifies the supplied `GCODE_HASH` against the immutable value in the manifest.
+In v1, this does not depend on Klipper exposing the currently running virtual SD
+filename or file hash; the orchestrator records the uploaded filename and hash
+externally when starting the job.
 
 ## Per-frame Metadata
 
