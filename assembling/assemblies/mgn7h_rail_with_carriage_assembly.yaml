@@ -24,6 +24,16 @@ Builder:
           pixels_per_mm: 66
           hide:
             - carriage
+            - printable_mockup
+        - name: rail_mockup_printable_only
+          views:
+            - top
+          width: 900
+          height: 700
+          pixels_per_mm: 66
+          hide:
+            - rail
+            - carriage
     parts:
       - source: self
         artifact: leader
@@ -35,6 +45,12 @@ Builder:
           - carriage
         name_template: "{name}"
         color: [0.8, 0.84, 0.88]
+      - source: self
+        artifact: followers
+        names:
+          - rail_mockup_printable
+        name: printable_mockup
+        color: [0.55, 0.72, 0.68]
   Production:
     parts:
       - source: self

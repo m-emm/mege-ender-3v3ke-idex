@@ -50,8 +50,8 @@ mgn_7h_rail_mount_counterbore_diameter = 4.2
 mgn_7h_rail_mount_counterbore_depth = 2.4
 mgn_7h_rail_mount_screw_size = "M2"
 mgn_7h_rail_groove_z_center = 2.8
-mgn_7h_rail_groove_v_height = 2.0
-mgn_7h_rail_groove_v_depth = 0.55
+mgn_7h_rail_groove_v_height = 1.25
+mgn_7h_rail_groove_v_depth = 0.625
 mgn_7h_rail_groove_slot_height = 0.65
 mgn_7h_rail_groove_slot_depth = 0.95
 mgn_7h_rail_top_fillet_radius = 0.18
@@ -356,16 +356,24 @@ def create_mgn7h_rail(
             rail = rail.cut(hole)
 
     if rail_groove_v_depth > 0 and rail_groove_v_height > 0:
-        z_min = rail_groove_z_center - rail_groove_v_height / 2
-        z_max = rail_groove_z_center + rail_groove_v_height / 2
+        groove_v_convergence_depth = rail_groove_v_depth
+        if rail_groove_slot_depth > 0 and rail_groove_slot_height > 0:
+            # A 90-degree side V converges on the rounded slot end-circle center.
+            groove_v_convergence_depth = max(
+                0,
+                rail_groove_slot_depth - rail_groove_slot_height / 2,
+            )
+
+        z_min = rail_groove_z_center - groove_v_convergence_depth
+        z_max = rail_groove_z_center + groove_v_convergence_depth
         front_groove_v = create_triangular_prism(
             [
                 (cutter_x_min, 0, z_min),
                 (cutter_x_min, 0, z_max),
-                (cutter_x_min, rail_groove_v_depth, rail_groove_z_center),
+                (cutter_x_min, groove_v_convergence_depth, rail_groove_z_center),
                 (cutter_x_max, 0, z_min),
                 (cutter_x_max, 0, z_max),
-                (cutter_x_max, rail_groove_v_depth, rail_groove_z_center),
+                (cutter_x_max, groove_v_convergence_depth, rail_groove_z_center),
             ]
         )
         back_groove_v = create_triangular_prism(
@@ -374,14 +382,14 @@ def create_mgn7h_rail(
                 (cutter_x_min, rail_width, z_max),
                 (
                     cutter_x_min,
-                    rail_width - rail_groove_v_depth,
+                    rail_width - groove_v_convergence_depth,
                     rail_groove_z_center,
                 ),
                 (cutter_x_max, rail_width, z_min),
                 (cutter_x_max, rail_width, z_max),
                 (
                     cutter_x_max,
-                    rail_width - rail_groove_v_depth,
+                    rail_width - groove_v_convergence_depth,
                     rail_groove_z_center,
                 ),
             ]
