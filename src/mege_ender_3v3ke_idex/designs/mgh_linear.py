@@ -58,26 +58,16 @@ mgn_7h_rail_top_fillet_radius = 0.18
 mgn_7h_rail_bottom_chamfer_width = 0.32
 mgn_7h_rail_bottom_chamfer_height = 0.35
 
-mgn_7h_carriage_length = 30.8
-mgn_7h_carriage_width = 17
-mgn_7h_carriage_height = 8
-mgn_7h_carriage_h1 = 1.5
-mgn_7h_carriage_screw_hole_pitch_x = 20
-mgn_7h_carriage_screw_hole_pitch_y = 8
-mgn_7h_carriage_screw_hole_depth = 3
-mgn_7h_carriage_mount_screw_size = "M2"
-
-
 def create_mgn7h_carriage(
     *,
-    carriage_length=mgn_7h_carriage_length,
-    carriage_width=mgn_7h_carriage_width,
-    carriage_height=mgn_7h_carriage_height,
-    carriage_h1_offset=mgn_7h_carriage_h1,
-    carriage_mount_hole_pitch_x=mgn_7h_carriage_screw_hole_pitch_x,
-    carriage_mount_hole_pitch_y=mgn_7h_carriage_screw_hole_pitch_y,
-    carriage_mount_hole_depth=mgn_7h_carriage_screw_hole_depth,
-    carriage_mount_screw_size=mgn_7h_carriage_mount_screw_size,
+    carriage_length,
+    carriage_width,
+    carriage_height,
+    carriage_h1_offset,
+    carriage_mount_hole_pitch_x,
+    carriage_mount_hole_pitch_y,
+    carriage_mount_hole_depth,
+    carriage_mount_screw_size,
 ):
     """Create an MGN7H carriage reference part."""
 
@@ -452,7 +442,7 @@ def create_mgn7h_rail_with_carriage(
     rail_mock_top_clearance,
     rail_mock_groove_clearance,
     rail_mock_groove_height_clearance,
-    carriage_offset=0,
+    carriage_offset,
     rail_width=mgn_7h_rail_width,
     rail_height=mgn_7h_rail_height,
     rail_mount_hole_pitch=mgn_7h_rail_mount_hole_pitch,
@@ -468,14 +458,14 @@ def create_mgn7h_rail_with_carriage(
     rail_top_fillet_radius=mgn_7h_rail_top_fillet_radius,
     rail_bottom_chamfer_width=mgn_7h_rail_bottom_chamfer_width,
     rail_bottom_chamfer_height=mgn_7h_rail_bottom_chamfer_height,
-    carriage_length=mgn_7h_carriage_length,
-    carriage_width=mgn_7h_carriage_width,
-    carriage_height=mgn_7h_carriage_height,
-    carriage_h1_offset=mgn_7h_carriage_h1,
-    carriage_mount_hole_pitch_x=mgn_7h_carriage_screw_hole_pitch_x,
-    carriage_mount_hole_pitch_y=mgn_7h_carriage_screw_hole_pitch_y,
-    carriage_mount_hole_depth=mgn_7h_carriage_screw_hole_depth,
-    carriage_mount_screw_size=mgn_7h_carriage_mount_screw_size,
+    carriage_length,
+    carriage_width,
+    carriage_height,
+    carriage_h1_offset,
+    carriage_mount_hole_pitch_x,
+    carriage_mount_hole_pitch_y,
+    carriage_mount_hole_depth,
+    carriage_mount_screw_size,
 ):
     """Create an MGN7H rail assembly with a built-in carriage follower."""
 

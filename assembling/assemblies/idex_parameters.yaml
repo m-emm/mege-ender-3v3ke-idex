@@ -1330,8 +1330,8 @@ globals:
   rail_mock_groove_clearance: 0.16
   rail_mock_groove_height_clearance: 0.05
   mgn7h_carriage_length: 30.8
-  mgn7h_carriage_width: 17
-  mgn7h_carriage_height: 8
+  mgn7h_carriage_width: 16.65
+  mgn7h_carriage_height: 6.5
   mgn7h_carriage_h1_offset: 1.5
   mgn7h_carriage_mount_hole_pitch_x: 20
   mgn7h_carriage_mount_hole_pitch_y: 8

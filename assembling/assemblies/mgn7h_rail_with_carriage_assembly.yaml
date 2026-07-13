@@ -34,6 +34,14 @@ Builder:
           hide:
             - rail
             - carriage
+        - name: rail_with_carriage_cross_section
+          views:
+            - bottom
+          width: 1600
+          height: 900
+          pixels_per_mm: 66
+          hide:
+            - printable_mockup
     parts:
       - source: self
         artifact: leader
