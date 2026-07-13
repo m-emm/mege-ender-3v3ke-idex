@@ -1325,10 +1325,10 @@ globals:
   mgn7h_rail_bottom_chamfer_width: 0.32
   mgn7h_rail_bottom_chamfer_height: 0.35
   rail_mock_clearance: 0.15
-  rail_mock_side_clearance: 0.15
-  rail_mock_top_clearance: 0.15
-  rail_mock_groove_clearance: 0.06
-  rail_mock_groove_height_clearance: 0.0
+  rail_mock_side_clearance: 0.20
+  rail_mock_top_clearance: 0.25
+  rail_mock_groove_clearance: 0.16
+  rail_mock_groove_height_clearance: 0.05
   mgn7h_carriage_length: 30.8
   mgn7h_carriage_width: 17
   mgn7h_carriage_height: 8

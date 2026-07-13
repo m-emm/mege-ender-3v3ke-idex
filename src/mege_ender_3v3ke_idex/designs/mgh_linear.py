@@ -57,11 +57,6 @@ mgn_7h_rail_groove_slot_depth = 0.95
 mgn_7h_rail_top_fillet_radius = 0.18
 mgn_7h_rail_bottom_chamfer_width = 0.32
 mgn_7h_rail_bottom_chamfer_height = 0.35
-mgn_7h_rail_mock_clearance = 0.15
-mgn_7h_rail_mock_side_clearance = 0.15
-mgn_7h_rail_mock_top_clearance = 0.15
-mgn_7h_rail_mock_groove_clearance = 0.06
-mgn_7h_rail_mock_groove_height_clearance = 0.0
 
 mgn_7h_carriage_length = 30.8
 mgn_7h_carriage_width = 17
@@ -452,6 +447,11 @@ def create_mgn7h_rail(
 def create_mgn7h_rail_with_carriage(
     *,
     length_mm: float,
+    rail_mock_clearance,
+    rail_mock_side_clearance,
+    rail_mock_top_clearance,
+    rail_mock_groove_clearance,
+    rail_mock_groove_height_clearance,
     carriage_offset=0,
     rail_width=mgn_7h_rail_width,
     rail_height=mgn_7h_rail_height,
@@ -468,11 +468,6 @@ def create_mgn7h_rail_with_carriage(
     rail_top_fillet_radius=mgn_7h_rail_top_fillet_radius,
     rail_bottom_chamfer_width=mgn_7h_rail_bottom_chamfer_width,
     rail_bottom_chamfer_height=mgn_7h_rail_bottom_chamfer_height,
-    rail_mock_clearance=mgn_7h_rail_mock_clearance,
-    rail_mock_side_clearance=mgn_7h_rail_mock_side_clearance,
-    rail_mock_top_clearance=mgn_7h_rail_mock_top_clearance,
-    rail_mock_groove_clearance=mgn_7h_rail_mock_groove_clearance,
-    rail_mock_groove_height_clearance=mgn_7h_rail_mock_groove_height_clearance,
     carriage_length=mgn_7h_carriage_length,
     carriage_width=mgn_7h_carriage_width,
     carriage_height=mgn_7h_carriage_height,
