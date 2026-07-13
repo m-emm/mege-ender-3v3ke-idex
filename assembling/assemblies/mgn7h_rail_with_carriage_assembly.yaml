@@ -15,6 +15,15 @@ Builder:
         - right
       width: 700
       height: 700
+      variants:
+        - name: rail_cross_section_only
+          views:
+            - top
+          width: 900
+          height: 700
+          pixels_per_mm: 66
+          hide:
+            - carriage
     parts:
       - source: self
         artifact: leader
@@ -29,7 +38,9 @@ Builder:
   Production:
     parts:
       - source: self
-        artifact: leader
+        artifact: followers
+        names:
+          - rail_mockup_printable
         name: mgn7h_rail_mockup
     arrange:
       export_individual_parts: false
@@ -41,6 +52,7 @@ Builder:
             overrides:
               process_overrides:
                 enable_support: "0"
+                brim_type: "no_brim"
           parts:
             - mgn7h_rail_mockup
       auto_assign_plates: false
@@ -67,6 +79,10 @@ Parameters:
   mgn7h_rail_side_relief_depth:
     Type: Float
   mgn7h_rail_side_relief_height:
+    Type: Float
+  rail_mock_clearance:
+    Type: Float
+  rail_mock_groove_clearance:
     Type: Float
   mgn7h_carriage_length:
     Type: Float

@@ -49,8 +49,10 @@ mgn_7h_rail_mount_hole_diameter = 2.4
 mgn_7h_rail_mount_counterbore_diameter = 4.2
 mgn_7h_rail_mount_counterbore_depth = 2.4
 mgn_7h_rail_mount_screw_size = "M2"
-mgn_7h_rail_side_relief_depth = 0.6
-mgn_7h_rail_side_relief_height = 1.2
+mgn_7h_rail_side_relief_depth = 0.55
+mgn_7h_rail_side_relief_height = 1.7
+mgn_7h_rail_mock_clearance = 0.15
+mgn_7h_rail_mock_groove_clearance = 0.06
 
 mgn_7h_carriage_length = 30.8
 mgn_7h_carriage_width = 17
@@ -357,6 +359,8 @@ def create_mgn7h_rail_with_carriage(
     rail_mount_counterbore_depth=mgn_7h_rail_mount_counterbore_depth,
     rail_side_relief_depth=mgn_7h_rail_side_relief_depth,
     rail_side_relief_height=mgn_7h_rail_side_relief_height,
+    rail_mock_clearance=mgn_7h_rail_mock_clearance,
+    rail_mock_groove_clearance=mgn_7h_rail_mock_groove_clearance,
     carriage_length=mgn_7h_carriage_length,
     carriage_width=mgn_7h_carriage_width,
     carriage_height=mgn_7h_carriage_height,
@@ -380,6 +384,23 @@ def create_mgn7h_rail_with_carriage(
         rail_side_relief_depth=rail_side_relief_depth,
         rail_side_relief_height=rail_side_relief_height,
     )
+    printable_rail = create_mgn7h_rail(
+        length_mm=length_mm,
+        rail_width=rail_width - 2 * rail_mock_clearance,
+        rail_height=rail_height - 2 * rail_mock_clearance,
+        rail_mount_hole_pitch=rail_mount_hole_pitch,
+        rail_mount_hole_end_offset=rail_mount_hole_end_offset,
+        rail_mount_hole_diameter=rail_mount_hole_diameter,
+        rail_mount_counterbore_diameter=rail_mount_counterbore_diameter,
+        rail_mount_counterbore_depth=rail_mount_counterbore_depth,
+        rail_side_relief_depth=rail_side_relief_depth + rail_mock_groove_clearance,
+        rail_side_relief_height=rail_side_relief_height,
+    )
+    printable_rail = translate(0, rail_mock_clearance, rail_mock_clearance)(
+        printable_rail
+    )
+    rail.add_named_follower(printable_rail.leader, "rail_mockup_printable")
+
     carriage = create_mgn7h_carriage(
         carriage_length=carriage_length,
         carriage_width=carriage_width,

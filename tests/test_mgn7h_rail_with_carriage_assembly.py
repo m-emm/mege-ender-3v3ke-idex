@@ -12,6 +12,7 @@ from mege_ender_3v3ke_idex.designs.assemblies.mgn7h_rail_with_carriage_assembly 
     create_mgn7h_rail_with_carriage_assembly,
 )
 from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn7h_rail
+from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn7h_rail_with_carriage
 from shellforgepy.simple import (
     get_bounding_box_center,
     get_bounding_box_size,
@@ -33,6 +34,8 @@ MGN7H_PARAMETER_NAMES = [
     "mgn7h_rail_mount_screw_size",
     "mgn7h_rail_side_relief_depth",
     "mgn7h_rail_side_relief_height",
+    "rail_mock_clearance",
+    "rail_mock_groove_clearance",
     "mgn7h_carriage_length",
     "mgn7h_carriage_width",
     "mgn7h_carriage_height",
@@ -87,7 +90,8 @@ def test_mgn7h_rail_production_exports_single_pla_mockup_rail():
     assert production["parts"] == [
         {
             "source": "self",
-            "artifact": "leader",
+            "artifact": "followers",
+            "names": ["rail_mockup_printable"],
             "name": "mgn7h_rail_mockup",
         }
     ]
@@ -99,7 +103,12 @@ def test_mgn7h_rail_production_exports_single_pla_mockup_rail():
             "filename": "mgn7h_rail_mockup",
             "process_data_preset": "pla_medium_strength_max_quality_06",
             "process_data": {
-                "overrides": {"process_overrides": {"enable_support": "0"}}
+                "overrides": {
+                    "process_overrides": {
+                        "enable_support": "0",
+                        "brim_type": "no_brim",
+                    }
+                }
             },
             "parts": ["mgn7h_rail_mockup"],
         }
@@ -116,8 +125,8 @@ def test_mgn7h_rail_geometry_preserves_envelope_and_adds_printable_reliefs():
         "rail_mount_hole_diameter": 2.4,
         "rail_mount_counterbore_diameter": 4.2,
         "rail_mount_counterbore_depth": 2.4,
-        "rail_side_relief_depth": 0.6,
-        "rail_side_relief_height": 1.2,
+        "rail_side_relief_depth": 0.55,
+        "rail_side_relief_height": 1.7,
     }
 
     relieved_rail = create_mgn7h_rail(**rail_kwargs)
@@ -170,7 +179,74 @@ def test_mgn7h_rail_mount_hole_centers_follow_end_offset_and_pitch():
     assert [center[1] for center in hole_centers] == pytest.approx([3.5] * 4)
 
 
-def test_mgn7h_assembly_keeps_carriage_for_visual_context_only():
+def test_mgn7h_printable_mockup_follower_is_clearance_adjusted():
+    rail_width = 7
+    rail_height = 4.8
+    rail_mock_clearance = 0.15
+    rail_side_relief_depth = 0.55
+    rail_side_relief_height = 1.7
+    rail_mock_groove_clearance = 0.06
+    rail_kwargs = {
+        "length_mm": 60,
+        "rail_width": rail_width,
+        "rail_height": rail_height,
+        "rail_mount_hole_pitch": 15,
+        "rail_mount_hole_end_offset": 7.5,
+        "rail_mount_hole_diameter": 2.4,
+        "rail_mount_counterbore_diameter": 4.2,
+        "rail_mount_counterbore_depth": 2.4,
+        "rail_side_relief_depth": rail_side_relief_depth,
+        "rail_side_relief_height": rail_side_relief_height,
+    }
+
+    assembly = create_mgn7h_rail_with_carriage(
+        **rail_kwargs,
+        rail_mock_clearance=rail_mock_clearance,
+        rail_mock_groove_clearance=rail_mock_groove_clearance,
+    )
+    printable = assembly.get_named_follower("rail_mockup_printable")
+    expected_width = rail_width - 2 * rail_mock_clearance
+    expected_height = rail_height - 2 * rail_mock_clearance
+
+    assert get_bounding_box_size(printable) == pytest.approx(
+        (rail_kwargs["length_mm"], expected_width, expected_height)
+    )
+    assert get_bounding_box_center(printable) == pytest.approx(
+        get_bounding_box_center(assembly.leader)
+    )
+
+    expected_printable = create_mgn7h_rail(
+        **{
+            **rail_kwargs,
+            "rail_width": expected_width,
+            "rail_height": expected_height,
+            "rail_side_relief_depth": rail_side_relief_depth
+            + rail_mock_groove_clearance,
+        }
+    )
+    baseline_printable = create_mgn7h_rail(
+        **{
+            **rail_kwargs,
+            "rail_width": expected_width,
+            "rail_height": expected_height,
+        }
+    )
+
+    assert get_volume(printable) == pytest.approx(get_volume(expected_printable.leader))
+    assert get_volume(printable) < get_volume(baseline_printable.leader)
+
+    hole_centers = [
+        get_bounding_box_center(
+            expected_printable.get_named_cutter(f"mounting_hole_{index}")
+        )
+        for index in range(1, 5)
+    ]
+    assert [center[0] for center in hole_centers] == pytest.approx(
+        [7.5, 22.5, 37.5, 52.5]
+    )
+
+
+def test_mgn7h_assembly_keeps_carriage_context_and_printable_mockup():
     assembly = create_mgn7h_rail_with_carriage_assembly(
         **assembly_kwargs(
             create_mgn7h_rail_with_carriage_assembly,
@@ -180,4 +256,5 @@ def test_mgn7h_assembly_keeps_carriage_for_visual_context_only():
 
     assert get_volume(assembly.leader) > 0
     assert assembly.get_named_follower("carriage")
+    assert assembly.get_named_follower("rail_mockup_printable")
     assert "rail_body" in assembly.follower_indices_by_name
