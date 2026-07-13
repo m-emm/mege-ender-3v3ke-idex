@@ -167,6 +167,102 @@ def test_prepare_job_cli_generates_immutable_manifest_and_gcode(tmp_path, capsys
     )
 
 
+def test_prepare_bed_y_job_cli_generates_immutable_manifest_and_gcode(
+    tmp_path, capsys
+):
+    module = _load_vision_nozzle_align_module()
+    job_root = tmp_path / "jobs"
+
+    assert (
+        module.main(
+            [
+                "--prepare-bed-y-job",
+                "--job-root",
+                str(job_root),
+                "--job-id",
+                "test_bed_y_job",
+                "--name",
+                "bed_y",
+                "--x",
+                "-80.4",
+                "--y",
+                "-14.8",
+                "--z",
+                "293.75",
+                "--y-offsets",
+                "0,5,10,15,20",
+                "--settle-time",
+                "0.25",
+            ]
+        )
+        == 0
+    )
+
+    summary = json.loads(capsys.readouterr().out)
+    job_dir = Path(summary["job_dir"])
+    manifest_path = Path(summary["manifest_path"])
+    gcode_path = Path(summary["gcode_path"])
+    state_path = Path(summary["state_path"])
+
+    assert summary["ok"] is True
+    assert summary["state"] == "prepared"
+    assert summary["frame_count"] == 5
+    assert job_dir == job_root / "test_bed_y_job"
+    assert manifest_path.exists()
+    assert gcode_path.exists()
+    assert state_path.exists()
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    gcode = gcode_path.read_text(encoding="utf-8")
+    lines = [line.strip() for line in gcode.splitlines() if line.strip()]
+
+    assert manifest["kind"] == "nozzle_cam_bed_y_sweep"
+    assert manifest["frame_count"] == len(manifest["frames"]) == 5
+    assert manifest["measurement_parameters"]["lighting"] == "NOZZLE_CAM_Y_FEATURE_LIGHT"
+    assert manifest["measurement_parameters"]["y_offsets"] == [0.0, 5.0, 10.0, 15.0, 20.0]
+    sequences = [frame["seq"] for frame in manifest["frames"]]
+    frame_ids = [frame["frame"] for frame in manifest["frames"]]
+    assert sequences == list(range(5))
+    assert frame_ids == ["bed_y_0p0", "bed_y_5p0", "bed_y_10p0", "bed_y_15p0", "bed_y_20p0"]
+    assert len(frame_ids) == len(set(frame_ids))
+    assert [frame["phase"] for frame in manifest["frames"]] == ["bed_y_sweep"] * 5
+    assert [frame["target"] for frame in manifest["frames"]] == ["bed_features"] * 5
+    assert [frame["y_offset"] for frame in manifest["frames"]] == [0.0, 5.0, 10.0, 15.0, 20.0]
+    assert all(frame["lighting"] == "NOZZLE_CAM_Y_FEATURE_LIGHT" for frame in manifest["frames"])
+    assert all(frame["capture_command"] == "VISION_CAPTURE_SYNC" for frame in manifest["frames"])
+
+    capture_lines = [
+        line for line in lines if line.startswith("VISION_CAPTURE_SYNC ")
+    ]
+    assert sum(line.startswith("VISION_JOB_BEGIN ") for line in lines) == 1
+    assert sum(line.startswith("VISION_JOB_END ") for line in lines) == 1
+    assert len(capture_lines) == manifest["frame_count"]
+    assert "NOZZLE_CAM_Y_FEATURE_LIGHT" in lines
+    assert "NOZZLE_CAM_ANALYSIS_LIGHT" not in lines
+    assert not re.search(r"^G28\b", gcode, flags=re.MULTILINE)
+    assert not re.search(r"^NOZZLE_CAM_CAPTURE\b", gcode, flags=re.MULTILINE)
+    assert not re.search(r"^VISION_CAPTURE\b", gcode, flags=re.MULTILINE)
+    assert "restore" not in gcode.lower()
+    assert "park" not in gcode.lower()
+    assert "sha256:PLACEHOLDER" not in gcode
+
+    recomputed_gcode_hash = _sha256_prefixed(
+        _canonicalize_gcode_for_hash(gcode).encode("utf-8")
+    )
+    manifest_for_hash = copy.deepcopy(manifest)
+    manifest_for_hash["manifest_hash"] = "sha256:PLACEHOLDER"
+    recomputed_manifest_hash = _sha256_prefixed(
+        _canonical_json_bytes(manifest_for_hash)
+    )
+    assert manifest["gcode_hash"] == recomputed_gcode_hash
+    assert manifest["manifest_hash"] == recomputed_manifest_hash
+    assert summary["gcode_hash"] == manifest["gcode_hash"] == state["gcode_hash"]
+    assert (
+        summary["manifest_hash"] == manifest["manifest_hash"] == state["manifest_hash"]
+    )
+
+
 def test_prepared_job_frames_can_be_adapted_for_later_analysis(tmp_path, capsys):
     module = _load_vision_nozzle_align_module()
     job_root = tmp_path / "jobs"

@@ -6,7 +6,6 @@ from shellforgepy.simple import *
 def create_idex_tap_t1_assembly(
     *,
     fixed_tool_head_mount,
-    sprite_extruder,
     x_axis_profile,
     x_axis_carriage,
     mgn7h_rail_length,
@@ -41,12 +40,6 @@ def create_idex_tap_t1_assembly(
     _ = x_axis_profile
 
     fixed_tool_head_mount_size = get_bounding_box_size(fixed_tool_head_mount.leader)
-    sprite_keepout_reference = materialize_bounding_box(
-        sprite_extruder,
-        x_enlargement=2,
-        y_enlargement=2,
-        z_enlargement=2,
-    )
     mount_flange = create_box(
         fixed_tool_head_mount_size[0],
         idex_tap_frame_mount_flange_depth,
@@ -195,9 +188,5 @@ def create_idex_tap_t1_assembly(
     tap.add_named_cutter(frame_mount_holes, "frame_mount_holes")
     tap.add_named_cutter(rail_mount_holes, "rail_mount_holes")
     tap.add_named_non_production_part(magnets, "magnets")
-    tap.add_named_non_production_part(
-        sprite_keepout_reference,
-        "sprite_keepout_reference",
-    )
 
     return tap

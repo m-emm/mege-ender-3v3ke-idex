@@ -58,6 +58,8 @@ REMOTE_METHOD = os.environ.get("VISION_CAPTURE_REMOTE_METHOD", "vision_capture")
 REMOTE_ACTION = os.environ.get("VISION_CAPTURE_REMOTE_ACTION", f"run_{REMOTE_METHOD}")
 NOZZLE_SWEEP_REMOTE_METHOD = "idex_nozzle_vision_sweep"
 NOZZLE_SWEEP_REMOTE_ACTION = "run_idex_nozzle_vision_sweep"
+BED_Y_REMOTE_METHOD = "idex_bed_y_vision_sweep"
+BED_Y_REMOTE_ACTION = "run_idex_bed_y_vision_sweep"
 NOZZLE_PROFILE_REMOTE_METHOD = os.environ.get(
     "VISION_PROFILE_REMOTE_METHOD", "nozzle_cam_profile"
 )
@@ -1227,6 +1229,8 @@ class KlippyRemoteCaptureDaemon:
                     capture_frame(params)
                 elif job_kind == NOZZLE_SWEEP_REMOTE_ACTION:
                     self._run_nozzle_sweep(params)
+                elif job_kind == BED_Y_REMOTE_ACTION:
+                    self._run_bed_y_sweep(params)
                 elif job_kind == NOZZLE_PROFILE_REMOTE_ACTION:
                     self._request_nozzle_profile(params)
                 else:
@@ -1264,6 +1268,34 @@ class KlippyRemoteCaptureDaemon:
                 result.stderr.strip()
                 or result.stdout.strip()
                 or "nozzle vision sweep failed"
+            )
+
+    def _run_bed_y_sweep(self, params: dict[str, Any]) -> None:
+        command = [
+            NOZZLE_ALIGN_BIN,
+            "--run-bed-y-job",
+            "--name",
+            sanitize_name(params.get("name", "bed_y")),
+            "--x",
+            str(float(params.get("x", -80.4))),
+            "--y",
+            str(float(params.get("y", -14.8))),
+            "--z",
+            str(float(params.get("z", 293.75))),
+            "--y-offsets",
+            str(params.get("y_offsets", "0,5,10,15,20")),
+            "--no-manage-crowsnest",
+        ]
+        result = run_command(command, timeout=420)
+        if result.stdout.strip():
+            log(f"Bed Y vision sweep result: {result.stdout.strip()}")
+        if result.stderr.strip():
+            log(f"Bed Y vision sweep stderr: {result.stderr.strip()}")
+        if result.returncode != 0:
+            raise CaptureError(
+                result.stderr.strip()
+                or result.stdout.strip()
+                or "bed Y vision sweep failed"
             )
 
     def _request_nozzle_profile(self, params: dict[str, Any]) -> None:
@@ -1304,6 +1336,7 @@ class KlippyRemoteCaptureDaemon:
             self._register_remote_method(
                 sock, NOZZLE_SWEEP_REMOTE_METHOD, NOZZLE_SWEEP_REMOTE_ACTION
             )
+            self._register_remote_method(sock, BED_Y_REMOTE_METHOD, BED_Y_REMOTE_ACTION)
             self._register_remote_method(
                 sock, NOZZLE_PROFILE_REMOTE_METHOD, NOZZLE_PROFILE_REMOTE_ACTION
             )
@@ -1315,6 +1348,7 @@ class KlippyRemoteCaptureDaemon:
             valid_actions.update(
                 (
                     NOZZLE_SWEEP_REMOTE_ACTION,
+                    BED_Y_REMOTE_ACTION,
                     NOZZLE_PROFILE_REMOTE_ACTION,
                 )
             )

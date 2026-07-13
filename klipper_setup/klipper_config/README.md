@@ -41,6 +41,47 @@ Moonraker without uploading files or restarting Klipper.
 previous remote file with a timestamp, installs the custom Klipper host patch,
 restarts Klipper, and reports the Moonraker/Klippy state.
 
+## Nozzle Camera Bed Y Sweep
+
+`nozzle_cam_bed_y_sweep` is a report-only first-stage vision job. It moves the
+printer Y axis away from the endstop and measures how fixed bed/fixture features
+move in nozzle-camera image space. It does not update `calib.yaml` and it does
+not solve nozzle Z height.
+
+Run the default tested pose from SSH with:
+
+```bash
+ssh pi@menderpi.local '/usr/local/bin/vision_nozzle_align.py --run-bed-y-job --name bed_y --x -80.4 --y -14.8 --z 293.75 --y-offsets 0,5,10,15,20'
+```
+
+Or queue the same job from Mainsail/Klipper with:
+
+```gcode
+IDEX_BED_Y_VISION_SWEEP NAME=bed_y X=-80.4 Y=-14.8 Z=293.75 Y_OFFSETS=0,5,10,15,20
+```
+
+Use the browser index for progress and history:
+
+- Browser index: `http://menderpi.local/vision/`
+- Per-job page: `http://menderpi.local/vision/nozzle_cam/jobs/<job_id>/`
+- Live progress: `state.json`, `events.jsonl`, and the frame count on the job
+  page.
+- Results: `analysis/facts.json`, `analysis/result.json`,
+  `analysis/raw_contact_sheet.jpg`, and `analysis/overlay_contact_sheet.jpg`.
+
+The stable fact names are:
+
+- `bed_y_axis_vector_px_per_mm`: image-space movement for +1 mm printer Y.
+  Image +Y is downward; negative image Y means the feature moves upward in the
+  camera image as printer Y increases.
+- `bed_y_scale_px_per_mm` and `bed_y_mm_per_px`: local bed-feature image scale.
+- `bed_y_axis_angle_deg`: direction in image coordinates.
+- `bed_y_cross_axis_px_per_mm`: X drift component during commanded Y motion.
+- `bed_y_fit_residual_rms_px`, `bed_y_correlation_min`, and
+  `bed_y_correlation_median`: template-match quality.
+- `bed_y_parallax_spread`: variation between accepted bed-feature ROIs. This is
+  local perspective variation, not a full Z-height solve.
+
 ## Boosted Heatbed
 
 The active bed remains `[heater_bed]` for normal Klipper and UI compatibility.

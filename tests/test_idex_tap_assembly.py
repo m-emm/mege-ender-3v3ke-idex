@@ -12,6 +12,7 @@ STALE_T0_TAP_TOKENS = (
     "IdexTap" + "T" + "0",
     "create_" + STALE_TAP_PREFIX + T0_SUFFIX,
 )
+REMOVED_SPRITE_KEEP_OUT_REFERENCE = "sprite_" + "keepout_reference"
 
 
 def _load_assemblies():
@@ -20,6 +21,13 @@ def _load_assemblies():
         Loader=AssemblyDefaultsLoader,
     )
     return {assembly["name"]: assembly for assembly in config["assemblies"]}
+
+
+def _load_resource(resource_file):
+    return yaml.load(
+        (ASSEMBLIES_DIR / resource_file).read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
 
 
 def test_idex_tap_assemblies_are_t1_named_in_builder_contract():
@@ -60,6 +68,33 @@ def test_idex_tap_assemblies_are_t1_named_in_builder_contract():
     assert "idex_tap_t1_assembly" in shuttle["depends_on"]
     assert shuttle["inject_parts"]["idex_tap_t1"] == "idex_tap_t1_assembly"
 
+    fixed_tap = assemblies["idex_tap_t1_assembly"]
+    assert "sprite_extruder_right_assembly" not in fixed_tap["depends_on"]
+    assert "sprite_extruder" not in fixed_tap["inject_parts"]
+
+
+def test_idex_tap_t1_shuttle_visualizes_right_toolhead_context():
+    assemblies = _load_assemblies()
+    shuttle = assemblies["idex_tap_t1_shuttle_assembly"]
+
+    assert "sprite_extruder_right_assembly" in shuttle["depends_on"]
+    assert "extruder_cage_right_assembly" not in shuttle["depends_on"]
+    assert "sprite_extruder_right" not in shuttle.get("inject_parts", {})
+    assert "extruder_cage_right" not in shuttle.get("inject_parts", {})
+    assert "extruder_cage_right_joined_assembly" not in shuttle["depends_on"]
+    assert "part_fan_right_joined_assembly" not in shuttle["depends_on"]
+
+    resource = _load_resource("idex_tap_t1_shuttle_assembly.yaml")
+    visualized_dependencies = {
+        part["assembly"]
+        for part in resource["Builder"]["Visualization"]["parts"]
+        if part["source"] == "dependencies"
+    }
+    assert "sprite_extruder_right_assembly" in visualized_dependencies
+    assert "extruder_cage_right_assembly" in visualized_dependencies
+    assert "extruder_cage_right_joined_assembly" not in visualized_dependencies
+    assert "part_fan_right_joined_assembly" not in visualized_dependencies
+
 
 def test_active_idex_tap_files_have_no_t0_prototype_symbols():
     active_paths = [
@@ -90,3 +125,21 @@ def test_active_idex_tap_files_have_no_t0_prototype_symbols():
         text = path.read_text()
         for stale_token in STALE_T0_TAP_TOKENS:
             assert stale_token not in text, f"{path} still contains {stale_token}"
+
+
+def test_idex_tap_t1_does_not_emit_removed_sprite_reference_box():
+    active_paths = [
+        REPO_ROOT / "MEGE_IDEX_TAP_CONCEPT.md",
+        ASSEMBLIES_DIR / "idex_tap_t1_assembly.yaml",
+        Path(
+            REPO_ROOT,
+            "src/mege_ender_3v3ke_idex/designs/assemblies/idex_tap_t1_assembly.py",
+        ),
+    ]
+
+    for path in active_paths:
+        assert REMOVED_SPRITE_KEEP_OUT_REFERENCE not in path.read_text()
+
+    resource = _load_resource("idex_tap_t1_assembly.yaml")
+    for part in resource["Builder"]["Visualization"]["parts"]:
+        assert REMOVED_SPRITE_KEEP_OUT_REFERENCE not in part.get("names", [])

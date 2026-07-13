@@ -33,13 +33,9 @@ Builder:
         artifact: non_production_parts
         names:
           - magnets
-          - sprite_keepout_reference
         name_template: "{name}"
       - source: injected
         assembly: fixed_tool_head_mount
-        artifact: all
-      - source: injected
-        assembly: sprite_extruder
         artifact: all
       - source: injected
         assembly: x_axis_profile

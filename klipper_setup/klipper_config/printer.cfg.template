@@ -79,6 +79,12 @@ gcode:
     SET_LED LED=vision_light INDEX=7 RED=0.30 GREEN=0.30 BLUE=0.30
     SET_LED LED=vision_light INDEX=8 RED=0.30 GREEN=0.30 BLUE=0.30
 
+[gcode_macro NOZZLE_CAM_Y_FEATURE_LIGHT]
+description: Set nozzle camera bed Y feature illumination.
+gcode:
+    VISION_LIGHT_OFF
+    SET_LED LED=vision_light INDEX=2 RED=0.450 GREEN=0.450 BLUE=0.450
+
 [delayed_gcode _NOZZLE_CAM_ANALYSIS_LIGHT_ON_STARTUP]
 initial_duration: 2.0
 gcode:
@@ -151,6 +157,24 @@ gcode:
     {% endif %}
     RESPOND TYPE=echo MSG="IDEX nozzle vision sweep queued: X={x}, Y={y}, Z={z}, DX={dx}, NAME={name}"
     {action_call_remote_method("idex_nozzle_vision_sweep", name=name, x=x, y=y, z=z, dx=dx, restore=restore)}
+
+[gcode_macro IDEX_BED_Y_VISION_SWEEP]
+description: Report-only nozzle-camera bed Y motion sweep.
+gcode:
+    {% set x = params.X|default(-80.4)|float %}
+    {% set y = params.Y|default(-14.8)|float %}
+    {% set z = params.Z|default(293.75)|float %}
+    {% set y_offsets = params.Y_OFFSETS|default("0,5,10,15,20") %}
+    {% set name = params.NAME|default("bed_y") %}
+    {% set print_state = printer.print_stats.state %}
+    {% if print_state not in ["standby", "complete"] %}
+        { action_raise_error("IDEX_BED_Y_VISION_SWEEP requires an idle printer; print_stats.state=" ~ print_state) }
+    {% endif %}
+    {% if "x" not in printer.toolhead.homed_axes or "y" not in printer.toolhead.homed_axes or "z" not in printer.toolhead.homed_axes %}
+        { action_raise_error("IDEX_BED_Y_VISION_SWEEP requires X/Y/Z homed.") }
+    {% endif %}
+    RESPOND TYPE=echo MSG="IDEX bed Y vision sweep queued: X={x}, Y={y}, Z={z}, Y_OFFSETS={y_offsets}, NAME={name}"
+    {action_call_remote_method("idex_bed_y_vision_sweep", name=name, x=x, y=y, z=z, y_offsets=y_offsets)}
 
 # Custom thermistor calibration for the left Micro Swiss FlowTech toolhead.
 # Values retained from the same calibrated Micro Swiss hotend assembly.

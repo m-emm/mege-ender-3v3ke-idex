@@ -76,6 +76,103 @@ def _prepare_acquired_job(module, tmp_path, *, job_id="analysis_job", dx="0,3"):
     return job_root, job_dir, manifest
 
 
+def _prepare_acquired_bed_y_job(
+    module, tmp_path, *, job_id="bed_y_analysis_job", y_offsets="0,5,10,15,20"
+):
+    job_root = tmp_path / "jobs"
+    summary = module.prepare_bed_y_sweep_job(
+        SimpleNamespace(
+            name="bed_y",
+            job_root=job_root,
+            job_id=job_id,
+            x=-80.4,
+            y=-14.8,
+            z=293.75,
+            y_offsets=y_offsets,
+            feedrate=3600.0,
+            settle_time=0.2,
+            camera="nozzle_cam",
+            profile="analysis",
+        )
+    )
+    job_dir = Path(summary["job_dir"])
+    manifest = json.loads(Path(summary["manifest_path"]).read_text(encoding="utf-8"))
+    state = json.loads(Path(summary["state_path"]).read_text(encoding="utf-8"))
+    state.update(
+        {
+            "state": "acquired",
+            "committed_frame_count": manifest["frame_count"],
+            "updated_at_utc": "2026-07-12T00:00:00+00:00",
+        }
+    )
+    module.atomic_write_json(Path(summary["state_path"]), state)
+    return job_root, job_dir, manifest
+
+
+def _write_bed_y_synthetic_frames(job_dir, manifest, *, vector=(-0.2, -10.5)):
+    cv2 = pytest.importorskip("cv2")
+    np = pytest.importorskip("numpy")
+
+    rng = np.random.default_rng(123)
+    base = np.full((1080, 1920, 3), 28, dtype=np.uint8)
+    x, y, w, h = 690, 438, 300, 125
+    texture = rng.integers(70, 185, size=(h, w, 1), dtype=np.uint8)
+    base[y : y + h, x : x + w] = np.repeat(texture, 3, axis=2)
+    cv2.line(base, (700, 492), (970, 492), (238, 238, 238), 4, cv2.LINE_AA)
+    cv2.line(base, (718, 528), (962, 528), (34, 34, 34), 2, cv2.LINE_AA)
+    cv2.circle(base, (842, 471), 11, (220, 220, 220), -1, cv2.LINE_AA)
+
+    for frame in manifest["frames"]:
+        y_offset = float(frame["y_offset"])
+        dx = vector[0] * y_offset
+        dy = vector[1] * y_offset
+        transform = np.float32([[1, 0, dx], [0, 1, dy]])
+        image = cv2.warpAffine(
+            base,
+            transform,
+            (base.shape[1], base.shape[0]),
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=(18, 18, 18),
+        )
+        frame_id = frame["frame"]
+        assert cv2.imwrite(
+            str(job_dir / "frames" / f"{frame_id}.jpg"),
+            image,
+            [int(cv2.IMWRITE_JPEG_QUALITY), 95],
+        )
+        (job_dir / "frames" / f"{frame_id}.json").write_text(
+            json.dumps(
+                {
+                    "job_seq": frame["seq"],
+                    "framebuffer_seq": 500 + frame["seq"],
+                    "image_sha256": "sha256:" + str(frame["seq"]).zfill(64),
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+
+def _write_bed_y_blank_frames(job_dir, manifest):
+    cv2 = pytest.importorskip("cv2")
+    np = pytest.importorskip("numpy")
+
+    image = np.full((1080, 1920, 3), 28, dtype=np.uint8)
+    for frame in manifest["frames"]:
+        frame_id = frame["frame"]
+        assert cv2.imwrite(
+            str(job_dir / "frames" / f"{frame_id}.jpg"),
+            image,
+            [int(cv2.IMWRITE_JPEG_QUALITY), 95],
+        )
+        (job_dir / "frames" / f"{frame_id}.json").write_text(
+            json.dumps({"job_seq": frame["seq"], "framebuffer_seq": 600 + frame["seq"]})
+            + "\n",
+            encoding="utf-8",
+        )
+
+
 def _install_fake_reporters(monkeypatch, module, *, accepted=True):
     def fake_analyze(frames, _run_dir, overlay_dir=None):
         overlay_root = Path(overlay_dir)
@@ -177,6 +274,80 @@ def test_analyze_acquired_job_rejection_writes_diagnostics_and_fails(
     assert facts["accepted"] is False
     assert facts["nozzle_delta_t1_minus_t0"] is None
     assert (analysis_dir / "result.json").exists()
+    assert (analysis_dir / "overlay_contact_sheet.jpg").exists()
+
+
+def test_analyze_bed_y_job_recovers_synthetic_motion(tmp_path):
+    module = _load_module()
+    job_root, job_dir, manifest = _prepare_acquired_bed_y_job(module, tmp_path)
+    _write_bed_y_synthetic_frames(job_dir, manifest)
+
+    result = module.analyze_acquired_job(
+        _analyze_args(job_root, manifest["job_id"])
+    )
+
+    analysis_dir = job_dir / "analysis"
+    facts = json.loads((analysis_dir / "facts.json").read_text(encoding="utf-8"))
+    assert result["ok"] is True
+    assert result["state"] == "completed"
+    assert facts["measurement"] == "nozzle_cam_bed_y_motion"
+    assert facts["accepted"] is True
+    vector = facts["bed_y_axis_vector_px_per_mm"]
+    assert vector[0] == pytest.approx(-0.2, abs=0.2)
+    assert vector[1] == pytest.approx(-10.5, abs=0.35)
+    assert facts["bed_y_scale_px_per_mm"] == pytest.approx(10.5, abs=0.4)
+    assert facts["bed_y_mm_per_px"] == pytest.approx(1 / 10.5, abs=0.005)
+    assert facts["bed_y_axis_angle_deg"] < -80
+    assert facts["bed_y_cross_axis_px_per_mm"] == pytest.approx(vector[0], abs=1e-6)
+    assert facts["bed_y_fit_residual_rms_px"] < 0.45
+    assert facts["bed_y_correlation_min"] > 0.7
+    assert facts["bed_y_correlation_median"] > 0.8
+    assert facts["bed_y_parallax_spread"]["accepted_roi_count"] >= 1
+    assert facts["lighting"] == "NOZZLE_CAM_Y_FEATURE_LIGHT"
+    for key in (
+        "bed_y_axis_vector_px_per_mm",
+        "bed_y_scale_px_per_mm",
+        "bed_y_mm_per_px",
+        "bed_y_axis_angle_deg",
+        "bed_y_cross_axis_px_per_mm",
+        "bed_y_fit_residual_rms_px",
+        "bed_y_correlation_min",
+        "bed_y_correlation_median",
+        "bed_y_parallax_spread",
+    ):
+        assert key in facts
+    assert (analysis_dir / "result.json").exists()
+    assert (analysis_dir / "raw_contact_sheet.jpg").exists()
+    assert (analysis_dir / "overlay_contact_sheet.jpg").exists()
+    assert all(
+        (analysis_dir / "overlays" / f"{frame['frame']}_overlay.jpg").exists()
+        for frame in manifest["frames"]
+    )
+
+
+def test_analyze_bed_y_job_rejection_still_writes_artifacts(tmp_path):
+    module = _load_module()
+    job_root, job_dir, manifest = _prepare_acquired_bed_y_job(module, tmp_path)
+    _write_bed_y_blank_frames(job_dir, manifest)
+
+    result = module.analyze_acquired_job(
+        _analyze_args(job_root, manifest["job_id"])
+    )
+
+    analysis_dir = job_dir / "analysis"
+    state = json.loads((job_dir / "state.json").read_text(encoding="utf-8"))
+    facts = json.loads((analysis_dir / "facts.json").read_text(encoding="utf-8"))
+    assert result["ok"] is False
+    assert result["state"] == "failed"
+    assert state["state"] == "failed"
+    assert facts["measurement"] == "nozzle_cam_bed_y_motion"
+    assert facts["accepted"] is False
+    assert facts["bed_y_axis_vector_px_per_mm"] is None
+    assert facts["bed_y_scale_px_per_mm"] is None
+    assert facts["hard_failures"]
+    assert (analysis_dir / "result.json").exists()
+    assert (analysis_dir / "facts.json").exists()
+    assert (analysis_dir / "raw_contact_sheet.jpg").exists()
     assert (analysis_dir / "overlay_contact_sheet.jpg").exists()
 
 

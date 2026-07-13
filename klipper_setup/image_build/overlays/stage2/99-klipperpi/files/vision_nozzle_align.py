@@ -81,9 +81,20 @@ PUBLIC_BASE_URL = os.environ.get("VISION_PUBLIC_BASE_URL", "http://menderpi.loca
 NAME_REPLACEMENTS = str.maketrans({c: "_" for c in " /\\:;|?*[]{}()<>'\"`$&!"})
 VISION_JOB_SCHEMA_VERSION = 1
 VISION_JOB_KIND = "idex_nozzle_sweep"
+BED_Y_JOB_KIND = "nozzle_cam_bed_y_sweep"
+BED_Y_MEASUREMENT = "nozzle_cam_bed_y_motion"
 VISION_JOB_CAMERA = "nozzle_cam"
 VISION_JOB_PROFILE = "analysis"
 VISION_JOB_LIGHTING = "NOZZLE_CAM_ANALYSIS_LIGHT"
+BED_Y_JOB_LIGHTING = "NOZZLE_CAM_Y_FEATURE_LIGHT"
+BED_Y_ROIS_1080 = {
+    "marked_line_tight": (690.0, 438.0, 300.0, 125.0),
+    "marked_line_context": (690.0, 420.0, 570.0, 185.0),
+}
+BED_Y_FEATURE_MODES = ("gray_norm", "clahe", "grad_y", "grad_mag")
+BED_Y_SEARCH_X_PAD_1080 = 95.0
+BED_Y_SEARCH_UP_1080 = 330.0
+BED_Y_SEARCH_DOWN_1080 = 120.0
 VISION_HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
 HASHED_GCODE_TOKEN_RE = re.compile(
     r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+"
@@ -104,13 +115,18 @@ class VisionJobFrame:
     lighting: str
     camera: str
     profile: str
+    phase: str | None = None
+    target: str | None = None
+    y_offset: float | None = None
+    x_offset: float | None = None
+    z_sample: float | None = None
 
     @property
     def tool_key(self) -> str:
         return self.tool.lower()
 
     def manifest_record(self) -> dict[str, Any]:
-        return {
+        record = {
             "seq": self.seq,
             "frame": self.frame,
             "tool": self.tool,
@@ -127,6 +143,17 @@ class VisionJobFrame:
             "profile": self.profile,
             "capture_command": "VISION_CAPTURE_SYNC",
         }
+        if self.phase is not None:
+            record["phase"] = self.phase
+        if self.target is not None:
+            record["target"] = self.target
+        if self.y_offset is not None:
+            record["y_offset"] = round(self.y_offset, 4)
+        if self.x_offset is not None:
+            record["x_offset"] = round(self.x_offset, 4)
+        if self.z_sample is not None:
+            record["z_sample"] = round(self.z_sample, 4)
+        return record
 
 
 @dataclass(frozen=True)
@@ -144,6 +171,7 @@ class VisionJob:
     frames_dir: Path
     analysis_dir: Path
     frames: tuple[VisionJobFrame, ...]
+    measurement_parameters: dict[str, Any] | None = None
     manifest_hash: str = VISION_HASH_PLACEHOLDER
     gcode_hash: str = VISION_HASH_PLACEHOLDER
 
@@ -198,6 +226,13 @@ def parse_dx_values(value: str) -> list[float]:
     values = [float(part.strip()) for part in value.split(",") if part.strip()]
     if not values:
         raise ValueError("DX list is empty")
+    return values
+
+
+def parse_y_offsets(value: str) -> list[float]:
+    values = [float(part.strip()) for part in value.split(",") if part.strip()]
+    if not values:
+        raise ValueError("Y offset list is empty")
     return values
 
 
@@ -259,6 +294,11 @@ def generated_job_id(name: str, timestamp: datetime) -> str:
     return f"{VISION_JOB_KIND}_{timestamp_part}_{sanitize_name(name)}"
 
 
+def generated_job_id_for_kind(kind: str, name: str, timestamp: datetime) -> str:
+    timestamp_part = timestamp.strftime("%Y%m%dT%H%M%SZ")
+    return f"{kind}_{timestamp_part}_{sanitize_name(name)}"
+
+
 def build_nozzle_sweep_job_frames(
     *,
     x: float,
@@ -290,6 +330,42 @@ def build_nozzle_sweep_job_frames(
                     profile=profile,
                 )
             )
+    return tuple(frames)
+
+
+def build_bed_y_sweep_job_frames(
+    *,
+    x: float,
+    y: float,
+    z: float,
+    y_offsets: list[float],
+    feedrate: float,
+    settle_ms: int,
+    camera: str,
+    profile: str,
+) -> tuple[VisionJobFrame, ...]:
+    frames: list[VisionJobFrame] = []
+    for y_offset in y_offsets:
+        frame_id = f"bed_y_{dx_label(y_offset)}"
+        frames.append(
+            VisionJobFrame(
+                seq=len(frames),
+                frame=frame_id,
+                tool="T0",
+                dx=0.0,
+                x=x,
+                y=y + y_offset,
+                z=z,
+                feedrate=feedrate,
+                settle_ms=settle_ms,
+                lighting=BED_Y_JOB_LIGHTING,
+                camera=camera,
+                profile=profile,
+                phase="bed_y_sweep",
+                target="bed_features",
+                y_offset=y_offset,
+            )
+        )
     return tuple(frames)
 
 
@@ -340,6 +416,62 @@ def build_vision_job(
     )
 
 
+def build_bed_y_vision_job(
+    *,
+    name: str,
+    job_root: Path,
+    job_id: str | None,
+    x: float,
+    y: float,
+    z: float,
+    y_offsets: list[float],
+    feedrate: float,
+    settle_time: float,
+    camera: str,
+    profile: str,
+    now: datetime | None = None,
+) -> VisionJob:
+    timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    resolved_job_id = (
+        sanitize_name(job_id)
+        if job_id
+        else generated_job_id_for_kind(BED_Y_JOB_KIND, name, timestamp)
+    )
+    job_dir = job_root / resolved_job_id
+    frames = build_bed_y_sweep_job_frames(
+        x=x,
+        y=y,
+        z=z,
+        y_offsets=y_offsets,
+        feedrate=feedrate,
+        settle_ms=settle_time_to_ms(settle_time),
+        camera=camera,
+        profile=profile,
+    )
+    return VisionJob(
+        job_id=resolved_job_id,
+        kind=BED_Y_JOB_KIND,
+        created_at_utc=timestamp.isoformat(),
+        camera=camera,
+        profile=profile,
+        job_dir=job_dir,
+        manifest_path=job_dir / "manifest.json",
+        gcode_path=job_dir / "acquisition.gcode",
+        state_path=job_dir / "state.json",
+        events_path=job_dir / "events.jsonl",
+        frames_dir=job_dir / "frames",
+        analysis_dir=job_dir / "analysis",
+        frames=frames,
+        measurement_parameters={
+            "base_x": round(x, 4),
+            "base_y": round(y, 4),
+            "z": round(z, 4),
+            "y_offsets": [round(value, 4) for value in y_offsets],
+            "lighting": BED_Y_JOB_LIGHTING,
+        },
+    )
+
+
 def render_acquisition_gcode(
     job: VisionJob,
     *,
@@ -357,7 +489,7 @@ def render_acquisition_gcode(
             f"MANIFEST_HASH={manifest_hash} GCODE_HASH={gcode_hash}"
         ),
         f"VISION_PROFILE CAMERA={job.camera} PROFILE={job.profile}",
-        VISION_JOB_LIGHTING,
+        job.frames[0].lighting if job.frames else VISION_JOB_LIGHTING,
         "",
     ]
     active_tool: str | None = None
@@ -386,7 +518,7 @@ def render_acquisition_gcode(
 
 
 def build_manifest(job: VisionJob) -> dict[str, Any]:
-    return {
+    manifest = {
         "schema_version": VISION_JOB_SCHEMA_VERSION,
         "job_id": job.job_id,
         "kind": job.kind,
@@ -404,6 +536,9 @@ def build_manifest(job: VisionJob) -> dict[str, Any]:
         },
         "frames": [frame.manifest_record() for frame in job.frames],
     }
+    if job.measurement_parameters is not None:
+        manifest["measurement_parameters"] = job.measurement_parameters
+    return manifest
 
 
 def job_with_hashes(job: VisionJob) -> VisionJob:
@@ -429,6 +564,72 @@ def prepare_nozzle_sweep_job(args: argparse.Namespace) -> dict[str, Any]:
         y=float(args.y),
         z=float(args.z),
         dx_values=parse_dx_values(args.dx),
+        feedrate=float(args.feedrate),
+        settle_time=float(args.settle_time),
+        camera=sanitize_name(args.camera),
+        profile=sanitize_name(args.profile),
+    )
+    if job.job_dir.exists():
+        raise FileExistsError(f"Vision job directory already exists: {job.job_dir}")
+    job = job_with_hashes(job)
+    manifest = build_manifest(job)
+    gcode = render_acquisition_gcode(
+        job,
+        manifest_hash=job.manifest_hash,
+        gcode_hash=job.gcode_hash,
+    )
+    state = {
+        "schema_version": VISION_JOB_SCHEMA_VERSION,
+        "job_id": job.job_id,
+        "kind": job.kind,
+        "state": "prepared",
+        "created_at_utc": job.created_at_utc,
+        "updated_at_utc": job.created_at_utc,
+        "frame_count": len(job.frames),
+        "committed_frame_count": 0,
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+    event = {
+        "timestamp_utc": job.created_at_utc,
+        "job_id": job.job_id,
+        "event": "prepared",
+        "state": "prepared",
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+
+    job.frames_dir.mkdir(parents=True)
+    job.analysis_dir.mkdir(parents=True)
+    atomic_write_json(job.manifest_path, manifest)
+    atomic_write_text(job.gcode_path, gcode)
+    atomic_write_json(job.state_path, state)
+    atomic_write_text(job.events_path, json.dumps(event, sort_keys=True) + "\n")
+
+    return {
+        "ok": True,
+        "job_id": job.job_id,
+        "job_dir": str(job.job_dir),
+        "manifest_path": str(job.manifest_path),
+        "gcode_path": str(job.gcode_path),
+        "state_path": str(job.state_path),
+        "events_path": str(job.events_path),
+        "state": "prepared",
+        "frame_count": len(job.frames),
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+
+
+def prepare_bed_y_sweep_job(args: argparse.Namespace) -> dict[str, Any]:
+    job = build_bed_y_vision_job(
+        name=args.name,
+        job_root=Path(args.job_root),
+        job_id=args.job_id,
+        x=float(args.x),
+        y=float(args.y),
+        z=float(args.z),
+        y_offsets=parse_y_offsets(args.y_offsets),
         feedrate=float(args.feedrate),
         settle_time=float(args.settle_time),
         camera=sanitize_name(args.camera),
@@ -514,6 +715,48 @@ def load_job_frames_for_analysis(manifest_path: Path) -> list[dict[str, Any]]:
                     "y": float(pose["y"]),
                     "z": float(pose["z"]),
                 },
+                "capture": capture,
+                "image_path": str(image_path),
+                "metadata_path": str(metadata_path),
+                "image_url": safe_vision_url(image_path),
+                "metadata_url": safe_vision_url(metadata_path),
+            }
+        )
+    return frames
+
+
+def load_bed_y_job_frames_for_analysis(manifest_path: Path) -> list[dict[str, Any]]:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    job_dir = manifest_path.parent
+    frames: list[dict[str, Any]] = []
+    for frame in manifest["frames"]:
+        if frame.get("phase") != "bed_y_sweep":
+            continue
+        frame_id = frame["frame"]
+        image_path = job_dir / "frames" / f"{frame_id}.jpg"
+        metadata_path = job_dir / "frames" / f"{frame_id}.json"
+        if not image_path.exists():
+            raise FileNotFoundError(f"Missing committed job frame image: {image_path}")
+        if not metadata_path.exists():
+            raise FileNotFoundError(
+                f"Missing committed job frame sidecar: {metadata_path}"
+            )
+        pose = frame["pose"]
+        capture = json.loads(metadata_path.read_text(encoding="utf-8"))
+        frames.append(
+            {
+                "tool": str(frame.get("tool") or "T0").lower(),
+                "macro": str(frame.get("tool") or "T0").upper(),
+                "phase": frame.get("phase"),
+                "target": frame.get("target"),
+                "y_offset": float(frame["y_offset"]),
+                "prefix": frame_id,
+                "target_gcode_position": {
+                    "x": float(pose["x"]),
+                    "y": float(pose["y"]),
+                    "z": float(pose["z"]),
+                },
+                "lighting": frame.get("lighting"),
                 "capture": capture,
                 "image_path": str(image_path),
                 "metadata_path": str(metadata_path),
@@ -980,6 +1223,13 @@ def run_acquisition_job(args: argparse.Namespace) -> dict[str, Any]:
     return start_prepared_job(start_args)
 
 
+def run_bed_y_acquisition_job(args: argparse.Namespace) -> dict[str, Any]:
+    summary = prepare_bed_y_sweep_job(args)
+    start_args = argparse.Namespace(**vars(args))
+    start_args.start_prepared_job = summary["job_id"]
+    return start_prepared_job(start_args)
+
+
 def job_analysis_paths(job_dir: Path) -> dict[str, Path]:
     analysis_dir = job_dir / "analysis"
     return {
@@ -1141,6 +1391,673 @@ def build_idex_nozzle_sweep_facts(
     }
 
 
+def round_float(value: Any, digits: int = 4) -> float | None:
+    if value is None:
+        return None
+    return round(float(value), digits)
+
+
+def round_vector(vector: Any, digits: int = 4) -> list[float] | None:
+    if vector is None:
+        return None
+    return [round(float(value), digits) for value in vector]
+
+
+def median_float(values: list[float]) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(float(value) for value in values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2.0
+
+
+def subpixel_peak_offset(response: Any, max_loc: tuple[int, int]) -> tuple[float, float]:
+    x, y = max_loc
+    height, width = response.shape[:2]
+
+    def axis_offset(v0: float, v_minus: float, v_plus: float) -> float:
+        denominator = v_minus - 2.0 * v0 + v_plus
+        if abs(denominator) < 1.0e-9:
+            return 0.0
+        offset = 0.5 * (v_minus - v_plus) / denominator
+        return max(-1.0, min(1.0, float(offset)))
+
+    center = float(response[y, x])
+    dx = 0.0
+    dy = 0.0
+    if 0 < x < width - 1:
+        dx = axis_offset(center, float(response[y, x - 1]), float(response[y, x + 1]))
+    if 0 < y < height - 1:
+        dy = axis_offset(center, float(response[y - 1, x]), float(response[y + 1, x]))
+    return dx, dy
+
+
+def bed_y_preprocess_image(image: Any, mode: str) -> Any:
+    import cv2
+    import numpy as np
+
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    if mode == "gray_norm":
+        feature = gray.astype("float32")
+    else:
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
+        if mode == "clahe":
+            feature = clahe.astype("float32")
+        elif mode == "grad_y":
+            feature = cv2.Sobel(clahe, cv2.CV_32F, 0, 1, ksize=3)
+        elif mode == "grad_mag":
+            grad_x = cv2.Sobel(clahe, cv2.CV_32F, 1, 0, ksize=3)
+            grad_y = cv2.Sobel(clahe, cv2.CV_32F, 0, 1, ksize=3)
+            feature = cv2.magnitude(grad_x, grad_y)
+        else:
+            raise ValueError(f"unknown bed-Y feature mode: {mode}")
+    feature = feature.astype("float32")
+    std = float(feature.std())
+    if std <= 1.0e-6:
+        return np.zeros(feature.shape, dtype="float32")
+    return (feature - float(feature.mean())) / std
+
+
+def bed_y_search_rect(
+    roi: tuple[int, int, int, int], width: int, height: int
+) -> tuple[int, int, int, int]:
+    x, y, w, h = roi
+    pad_x = BED_Y_SEARCH_X_PAD_1080 * width / RED_BASE_WIDTH
+    search_up = BED_Y_SEARCH_UP_1080 * height / RED_BASE_HEIGHT
+    search_down = BED_Y_SEARCH_DOWN_1080 * height / RED_BASE_HEIGHT
+    return clamp_rect(
+        x - pad_x,
+        y - search_up,
+        w + 2.0 * pad_x,
+        h + search_up + search_down,
+        width,
+        height,
+    )
+
+
+def fit_bed_y_displacements(matches: list[dict[str, Any]]) -> dict[str, Any]:
+    import numpy as np
+
+    usable = [match for match in matches if match.get("accepted")]
+    if len(usable) < 3:
+        return {"ok": False, "rejection_reason": "need at least three usable frames"}
+    offsets = np.array([float(match["y_offset"]) for match in usable], dtype=float)
+    if float(offsets.max() - offsets.min()) <= 1.0e-9:
+        return {"ok": False, "rejection_reason": "Y offsets do not vary"}
+    observed = np.array(
+        [[float(match["dx"]), float(match["dy"])] for match in usable],
+        dtype=float,
+    )
+    weights = np.array(
+        [max(0.01, float(match.get("correlation") or 0.01)) for match in usable],
+        dtype=float,
+    )
+    design = np.column_stack((offsets, np.ones(len(offsets))))
+    weighted_design = design * np.sqrt(weights)[:, None]
+    weighted_observed = observed * np.sqrt(weights)[:, None]
+    solution = np.linalg.lstsq(weighted_design, weighted_observed, rcond=None)[0]
+    vector = solution[0]
+    intercept = solution[1]
+    predicted = design @ solution
+    residual_vectors = observed - predicted
+    residual_distances = np.linalg.norm(residual_vectors, axis=1)
+    rms = math.sqrt(float(np.mean(residual_distances * residual_distances)))
+    correlations = [float(match.get("correlation") or 0.0) for match in usable]
+    return {
+        "ok": True,
+        "usable_frame_count": len(usable),
+        "axis_vector_px_per_mm": [float(vector[0]), float(vector[1])],
+        "intercept_px": [float(intercept[0]), float(intercept[1])],
+        "residual_rms_px": rms,
+        "residuals": [
+            {
+                "frame": match["frame"],
+                "y_offset": round(float(match["y_offset"]), 4),
+                "observed_dx": round(float(match["dx"]), 4),
+                "observed_dy": round(float(match["dy"]), 4),
+                "predicted_dx": round(float(predicted[index, 0]), 4),
+                "predicted_dy": round(float(predicted[index, 1]), 4),
+                "residual_px": round(float(residual_distances[index]), 4),
+                "correlation": round(float(match.get("correlation") or 0.0), 4),
+            }
+            for index, match in enumerate(usable)
+        ],
+        "correlation_min": min(correlations) if correlations else None,
+        "correlation_median": median_float(correlations),
+    }
+
+
+def match_bed_y_roi_mode(
+    *,
+    frames: list[dict[str, Any]],
+    images: dict[str, Any],
+    reference_frame: dict[str, Any],
+    roi_name: str,
+    roi_1080: tuple[float, float, float, float],
+    mode: str,
+) -> dict[str, Any]:
+    import cv2
+
+    reference_image = images[reference_frame["prefix"]]
+    height, width = reference_image.shape[:2]
+    roi = scale_rect_1080(roi_1080, width, height)
+    search_rect = bed_y_search_rect(roi, width, height)
+    features = {
+        frame["prefix"]: bed_y_preprocess_image(images[frame["prefix"]], mode)
+        for frame in frames
+        if frame["prefix"] in images
+    }
+    rx, ry, rw, rh = roi
+    sx, sy, sw, sh = search_rect
+    reference_feature = features[reference_frame["prefix"]]
+    template = reference_feature[ry : ry + rh, rx : rx + rw]
+    texture_std = float(template.std())
+    matches: list[dict[str, Any]] = []
+    if texture_std <= 0.015:
+        return {
+            "roi_name": roi_name,
+            "feature_mode": mode,
+            "accepted": False,
+            "rejection_reason": (
+                f"reference ROI has too little texture for template matching "
+                f"(std={texture_std:.5f})"
+            ),
+            "roi": list(roi),
+            "search_roi": list(search_rect),
+            "matches": [],
+            "score": 1.0e9,
+        }
+
+    for frame in frames:
+        prefix = frame["prefix"]
+        if prefix not in features:
+            continue
+        feature = features[prefix]
+        if prefix == reference_frame["prefix"]:
+            matches.append(
+                {
+                    "frame": prefix,
+                    "y_offset": float(frame["y_offset"]),
+                    "dx": 0.0,
+                    "dy": 0.0,
+                    "correlation": 1.0,
+                    "roi": list(roi),
+                    "search_roi": list(search_rect),
+                    "match_roi": list(roi),
+                    "accepted": True,
+                }
+            )
+            continue
+        search = feature[sy : sy + sh, sx : sx + sw]
+        if search.shape[0] < template.shape[0] or search.shape[1] < template.shape[1]:
+            matches.append(
+                {
+                    "frame": prefix,
+                    "y_offset": float(frame["y_offset"]),
+                    "accepted": False,
+                    "rejection_reason": "search window is smaller than template",
+                }
+            )
+            continue
+        response = cv2.matchTemplate(
+            search.astype("float32"),
+            template.astype("float32"),
+            cv2.TM_CCOEFF_NORMED,
+        )
+        _min_value, max_value, _min_loc, max_loc = cv2.minMaxLoc(response)
+        sub_dx, sub_dy = subpixel_peak_offset(response, max_loc)
+        matched_x = float(sx + max_loc[0]) + sub_dx
+        matched_y = float(sy + max_loc[1]) + sub_dy
+        dx = matched_x - float(rx)
+        dy = matched_y - float(ry)
+        matches.append(
+            {
+                "frame": prefix,
+                "y_offset": float(frame["y_offset"]),
+                "dx": dx,
+                "dy": dy,
+                "correlation": float(max_value),
+                "roi": list(roi),
+                "search_roi": list(search_rect),
+                "match_roi": [
+                    round(matched_x, 3),
+                    round(matched_y, 3),
+                    rw,
+                    rh,
+                ],
+                "accepted": True,
+            }
+        )
+
+    fit = fit_bed_y_displacements(matches)
+    if not fit.get("ok"):
+        return {
+            "roi_name": roi_name,
+            "feature_mode": mode,
+            "accepted": False,
+            "rejection_reason": fit.get("rejection_reason", "fit failed"),
+            "roi": list(roi),
+            "search_roi": list(search_rect),
+            "matches": matches,
+            "fit": fit,
+            "texture_std": round(texture_std, 6),
+            "score": 1.0e9,
+        }
+    vector = fit["axis_vector_px_per_mm"]
+    scale = math.hypot(float(vector[0]), float(vector[1]))
+    angle = math.degrees(math.atan2(float(vector[1]), float(vector[0]))) if scale else None
+    corr_min = float(fit.get("correlation_min") or 0.0)
+    corr_threshold = 0.72 if mode.startswith("grad") else 0.82
+    hard_failures: list[str] = []
+    if fit["usable_frame_count"] < 4:
+        hard_failures.append("fewer than four usable Y sweep frames")
+    if corr_min < corr_threshold:
+        hard_failures.append(
+            f"correlation_min {corr_min:.3f} below {corr_threshold:.3f}"
+        )
+    if float(fit["residual_rms_px"]) > 1.2:
+        hard_failures.append(f"residual RMS {float(fit['residual_rms_px']):.3f}px too high")
+    if not (7.0 <= scale <= 14.5):
+        hard_failures.append(f"scale {scale:.3f}px/mm outside expected local range")
+    if abs(float(vector[0])) > 1.5:
+        hard_failures.append(f"cross-axis drift {float(vector[0]):.3f}px/mm too high")
+    if float(vector[1]) >= 0:
+        hard_failures.append("image Y component is not negative")
+    score = (
+        float(fit["residual_rms_px"])
+        + 0.2 * abs(float(vector[0]))
+        + max(0.0, corr_threshold - corr_min) * 4.0
+        + (0.03 if mode != "grad_y" else 0.0)
+        + (0.04 if roi_name != "marked_line_tight" else 0.0)
+    )
+    return {
+        "roi_name": roi_name,
+        "feature_mode": mode,
+        "accepted": not hard_failures,
+        "rejection_reason": "; ".join(hard_failures),
+        "hard_failures": hard_failures,
+        "roi": list(roi),
+        "search_roi": list(search_rect),
+        "matches": matches,
+        "fit": fit,
+        "texture_std": round(texture_std, 6),
+        "bed_y_axis_vector_px_per_mm": round_vector(vector),
+        "bed_y_scale_px_per_mm": round(scale, 4),
+        "bed_y_mm_per_px": round(1.0 / scale, 6) if scale > 0 else None,
+        "bed_y_axis_angle_deg": round(angle, 4) if angle is not None else None,
+        "bed_y_cross_axis_px_per_mm": round(float(vector[0]), 4),
+        "bed_y_fit_residual_rms_px": round(float(fit["residual_rms_px"]), 4),
+        "bed_y_correlation_min": round(corr_min, 4),
+        "bed_y_correlation_median": round_float(fit.get("correlation_median"), 4),
+        "score": round(score, 6),
+    }
+
+
+def bed_y_parallax_spread(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    accepted_by_roi: dict[str, dict[str, Any]] = {}
+    for candidate in candidates:
+        if not candidate.get("accepted"):
+            continue
+        roi_name = str(candidate.get("roi_name"))
+        current = accepted_by_roi.get(roi_name)
+        if current is None or float(candidate.get("score", 1.0e9)) < float(
+            current.get("score", 1.0e9)
+        ):
+            accepted_by_roi[roi_name] = candidate
+    selected = list(accepted_by_roi.values())
+    vectors = [
+        tuple(float(value) for value in candidate["bed_y_axis_vector_px_per_mm"])
+        for candidate in selected
+        if candidate.get("bed_y_axis_vector_px_per_mm")
+    ]
+    scales = [
+        float(candidate["bed_y_scale_px_per_mm"])
+        for candidate in selected
+        if candidate.get("bed_y_scale_px_per_mm") is not None
+    ]
+    angles = [
+        float(candidate["bed_y_axis_angle_deg"])
+        for candidate in selected
+        if candidate.get("bed_y_axis_angle_deg") is not None
+    ]
+    vector_spread = 0.0
+    for index, first in enumerate(vectors):
+        for second in vectors[index + 1 :]:
+            vector_spread = max(vector_spread, point_distance(first, second))
+    scale_spread = max(scales) - min(scales) if len(scales) >= 2 else 0.0
+    scale_median = median_float(scales) or 0.0
+    angle_spread = max(angles) - min(angles) if len(angles) >= 2 else 0.0
+    return {
+        "accepted_roi_count": len(selected),
+        "accepted_rois": [candidate.get("roi_name") for candidate in selected],
+        "axis_vector_spread_px_per_mm": round(vector_spread, 4),
+        "scale_spread_px_per_mm": round(scale_spread, 4),
+        "scale_spread_percent": round(100.0 * scale_spread / scale_median, 4)
+        if scale_median > 0
+        else None,
+        "angle_spread_deg": round(angle_spread, 4),
+        "meaning": "local perspective variation between accepted bed-feature ROIs; not a full Z-height solve",
+    }
+
+
+def annotate_bed_y_frame(
+    image: Any, frame: dict[str, Any], selected: dict[str, Any] | None
+) -> Any:
+    import cv2
+
+    overlay = image.copy()
+    match_by_frame = {
+        match.get("frame"): match for match in (selected or {}).get("matches", [])
+    }
+    match = match_by_frame.get(frame["prefix"])
+    if match:
+        for key, color in (
+            ("search_roi", (80, 80, 80)),
+            ("roi", (255, 190, 0)),
+            ("match_roi", (0, 255, 0)),
+        ):
+            rect = match.get(key)
+            if rect:
+                x, y, w, h = [int(round(float(value))) for value in rect]
+                cv2.rectangle(overlay, (x, y), (x + w, y + h), color, 2)
+    label = (
+        f"bed Y {float(frame['y_offset']):.3g}mm "
+        f"{(selected or {}).get('roi_name', 'no ROI')} "
+        f"{(selected or {}).get('feature_mode', 'no mode')}"
+    )
+    if match and match.get("correlation") is not None:
+        label += f" corr={float(match['correlation']):.3f}"
+    cv2.rectangle(overlay, (0, 0), (900, 48), (0, 0, 0), -1)
+    cv2.putText(
+        overlay,
+        label,
+        (18, 34),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.9,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+    return overlay
+
+
+def crop_for_bed_y_contact_tile(image: Any, frame: dict[str, Any]) -> Any:
+    height, width = image.shape[:2]
+    boxes = []
+    for key in ("bed_y_match_roi", "bed_y_reference_roi", "bed_y_search_roi"):
+        if frame.get(key):
+            boxes.append(frame[key])
+    if not boxes:
+        boxes = [scale_rect_1080(BED_Y_ROIS_1080["marked_line_context"], width, height)]
+    left = min(float(box[0]) for box in boxes)
+    top = min(float(box[1]) for box in boxes)
+    right = max(float(box[0]) + float(box[2]) for box in boxes)
+    bottom = max(float(box[1]) + float(box[3]) for box in boxes)
+    pad_x = 120.0 * width / RED_BASE_WIDTH
+    pad_y = 85.0 * height / RED_BASE_HEIGHT
+    x, y, w, h = clamp_rect(
+        left - pad_x,
+        top - pad_y,
+        (right - left) + 2.0 * pad_x,
+        (bottom - top) + 2.0 * pad_y,
+        width,
+        height,
+    )
+    return image[y : y + h, x : x + w]
+
+
+def write_bed_y_contact_sheet(
+    frames: list[dict[str, Any]],
+    analysis: dict[str, Any],
+    contact_sheet_path: Path,
+    *,
+    use_overlays: bool,
+) -> None:
+    import cv2
+    import numpy as np
+
+    tile_w, tile_h = 430, 300
+    cols = max(1, len(frames))
+    summary_h = 285
+    sheet = np.full((tile_h + summary_h, cols * tile_w, 3), 255, dtype=np.uint8)
+    for col, frame in enumerate(frames):
+        path = frame.get("overlay_path") if use_overlays else frame.get("image_path")
+        image = cv2.imread(str(path)) if path else None
+        if image is None and frame.get("image_path"):
+            image = cv2.imread(frame["image_path"])
+        if image is None:
+            continue
+        crop = crop_for_bed_y_contact_tile(image, frame)
+        tile = letterbox(crop, tile_w, tile_h)
+        x = col * tile_w
+        sheet[0:tile_h, x : x + tile_w] = tile
+        cv2.rectangle(sheet, (x, 0), (x + tile_w - 1, tile_h - 1), (80, 80, 80), 2)
+        cv2.putText(
+            sheet,
+            f"Y+{float(frame['y_offset']):.3g}mm",
+            (x + 16, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.68,
+            (0, 0, 0),
+            2,
+            cv2.LINE_AA,
+        )
+
+    summary_lines = [
+        f"Nozzle camera bed Y sweep: {analysis.get('run_name')}",
+        f"report: {public_url(contact_sheet_path)}",
+        "negative image Y means the feature moves upward in the camera image as printer Y increases",
+    ]
+    if analysis.get("ok"):
+        vector = analysis.get("bed_y_axis_vector_px_per_mm") or [None, None]
+        summary_lines.extend(
+            [
+                "selected: "
+                f"roi={analysis.get('selected_roi')} mode={analysis.get('feature_mode')}",
+                "bed Y image vector: "
+                f"dx={vector[0]}px/mm dy={vector[1]}px/mm "
+                f"scale={analysis.get('bed_y_scale_px_per_mm')}px/mm "
+                f"angle={analysis.get('bed_y_axis_angle_deg')}deg",
+                "quality: "
+                f"rms={analysis.get('bed_y_fit_residual_rms_px')}px "
+                f"corr_min={analysis.get('bed_y_correlation_min')} "
+                f"corr_median={analysis.get('bed_y_correlation_median')}",
+            ]
+        )
+    else:
+        failures = analysis.get("hard_failures") or [analysis.get("message")]
+        summary_lines.append(f"STATUS: FAILED; {'; '.join(str(item) for item in failures[:3])}")
+    spread = analysis.get("bed_y_parallax_spread") or {}
+    summary_lines.append(
+        "local parallax spread: "
+        f"vectors={spread.get('axis_vector_spread_px_per_mm')}px/mm "
+        f"scale={spread.get('scale_spread_px_per_mm')}px/mm"
+    )
+    cv2.rectangle(sheet, (0, tile_h), (sheet.shape[1], sheet.shape[0]), (238, 238, 238), -1)
+    draw_text_lines(sheet, summary_lines, (24, tile_h + 36), line_height=27, scale=0.58)
+    cv2.imwrite(str(contact_sheet_path), sheet, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+
+
+def analyze_bed_y_sweep_frames(
+    frames: list[dict[str, Any]], run_dir: Path, overlay_dir: Path | None = None
+) -> dict[str, Any]:
+    try:
+        import cv2
+    except Exception as exc:  # pragma: no cover - depends on Pi package install
+        return {
+            "ok": False,
+            "proxy_only": True,
+            "measurement": BED_Y_MEASUREMENT,
+            "error": f"OpenCV import failed: {exc}",
+            "hard_failures": [f"OpenCV import failed: {exc}"],
+        }
+
+    hard_failures: list[str] = []
+    images: dict[str, Any] = {}
+    for frame in frames:
+        image = cv2.imread(frame["image_path"])
+        if image is None:
+            frame["analysis_error"] = f"Could not read {frame['image_path']}"
+            hard_failures.append(frame["analysis_error"])
+            continue
+        height, width = image.shape[:2]
+        frame["image_width"] = width
+        frame["image_height"] = height
+        images[frame["prefix"]] = image
+    analysis_frames = [frame for frame in frames if frame["prefix"] in images]
+    if len(analysis_frames) < 3:
+        message = "Bed Y sweep needs at least three readable frames."
+        hard_failures.append(message)
+        selected = None
+        candidates: list[dict[str, Any]] = []
+    else:
+        reference_frame = min(
+            analysis_frames, key=lambda frame: abs(float(frame.get("y_offset", 0.0)))
+        )
+        candidates = []
+        for roi_name, roi_1080 in BED_Y_ROIS_1080.items():
+            for mode in BED_Y_FEATURE_MODES:
+                candidates.append(
+                    match_bed_y_roi_mode(
+                        frames=analysis_frames,
+                        images=images,
+                        reference_frame=reference_frame,
+                        roi_name=roi_name,
+                        roi_1080=roi_1080,
+                        mode=mode,
+                    )
+                )
+        accepted_candidates = [
+            candidate for candidate in candidates if candidate.get("accepted")
+        ]
+        selected = min(
+            accepted_candidates or candidates,
+            key=lambda candidate: float(candidate.get("score", 1.0e9)),
+        )
+        if not accepted_candidates:
+            hard_failures.append(
+                selected.get("rejection_reason") or "no accepted bed Y template fit"
+            )
+
+    match_by_frame = {
+        match.get("frame"): match for match in (selected or {}).get("matches", [])
+    }
+    for frame in frames:
+        image = images.get(frame["prefix"])
+        if image is None:
+            continue
+        match = match_by_frame.get(frame["prefix"])
+        if match:
+            if match.get("roi"):
+                frame["bed_y_reference_roi"] = match["roi"]
+            if match.get("search_roi"):
+                frame["bed_y_search_roi"] = match["search_roi"]
+            if match.get("match_roi"):
+                frame["bed_y_match_roi"] = match["match_roi"]
+        overlay = annotate_bed_y_frame(image, frame, selected)
+        overlay_root = overlay_dir or run_dir
+        overlay_root.mkdir(parents=True, exist_ok=True)
+        overlay_path = overlay_root / f"{frame['prefix']}_overlay.jpg"
+        cv2.imwrite(str(overlay_path), overlay, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+        frame["overlay_path"] = str(overlay_path)
+        frame["overlay_url"] = safe_vision_url(overlay_path)
+
+    spread = bed_y_parallax_spread(candidates)
+    ok = bool(selected and selected.get("accepted"))
+    message = (
+        "Bed Y feature motion accepted."
+        if ok
+        else "Bed Y feature motion rejected: " + "; ".join(str(item) for item in hard_failures)
+    )
+    return {
+        "ok": ok,
+        "proxy_only": not ok,
+        "measurement": BED_Y_MEASUREMENT,
+        "hard_failures": hard_failures,
+        "selected_roi": selected.get("roi_name") if selected else None,
+        "feature_mode": selected.get("feature_mode") if selected else None,
+        "selected_result": selected,
+        "roi_results": candidates,
+        "accepted_roi_results": [
+            candidate for candidate in candidates if candidate.get("accepted")
+        ],
+        "bed_y_axis_vector_px_per_mm": selected.get("bed_y_axis_vector_px_per_mm")
+        if selected and ok
+        else None,
+        "bed_y_scale_px_per_mm": selected.get("bed_y_scale_px_per_mm")
+        if selected and ok
+        else None,
+        "bed_y_mm_per_px": selected.get("bed_y_mm_per_px") if selected and ok else None,
+        "bed_y_axis_angle_deg": selected.get("bed_y_axis_angle_deg")
+        if selected and ok
+        else None,
+        "bed_y_cross_axis_px_per_mm": selected.get("bed_y_cross_axis_px_per_mm")
+        if selected and ok
+        else None,
+        "bed_y_fit_residual_rms_px": selected.get("bed_y_fit_residual_rms_px")
+        if selected
+        else None,
+        "bed_y_correlation_min": selected.get("bed_y_correlation_min")
+        if selected
+        else None,
+        "bed_y_correlation_median": selected.get("bed_y_correlation_median")
+        if selected
+        else None,
+        "bed_y_parallax_spread": spread,
+        "lighting": frames[0].get("lighting") if frames else BED_Y_JOB_LIGHTING,
+        "reference_frame": (
+            reference_frame["prefix"] if "reference_frame" in locals() else None
+        ),
+        "reference_y_offset": (
+            round(float(reference_frame["y_offset"]), 4)
+            if "reference_frame" in locals()
+            else None
+        ),
+        "message": message,
+    }
+
+
+def build_bed_y_motion_facts(
+    *, manifest: dict[str, Any], analysis: dict[str, Any], result_path: Path
+) -> dict[str, Any]:
+    accepted = bool(analysis.get("ok"))
+    return {
+        "schema_version": VISION_JOB_SCHEMA_VERSION,
+        "job_id": manifest.get("job_id"),
+        "kind": manifest.get("kind"),
+        "camera": manifest.get("camera"),
+        "profile": manifest.get("profile"),
+        "manifest_hash": manifest.get("manifest_hash"),
+        "gcode_hash": manifest.get("gcode_hash"),
+        "measurement": BED_Y_MEASUREMENT,
+        "accepted": accepted,
+        "ok": accepted,
+        "source_result": result_path.name,
+        "bed_y_axis_vector_px_per_mm": analysis.get("bed_y_axis_vector_px_per_mm"),
+        "bed_y_scale_px_per_mm": analysis.get("bed_y_scale_px_per_mm"),
+        "bed_y_mm_per_px": analysis.get("bed_y_mm_per_px"),
+        "bed_y_axis_angle_deg": analysis.get("bed_y_axis_angle_deg"),
+        "bed_y_cross_axis_px_per_mm": analysis.get("bed_y_cross_axis_px_per_mm"),
+        "bed_y_fit_residual_rms_px": analysis.get("bed_y_fit_residual_rms_px"),
+        "bed_y_correlation_min": analysis.get("bed_y_correlation_min"),
+        "bed_y_correlation_median": analysis.get("bed_y_correlation_median"),
+        "bed_y_parallax_spread": analysis.get("bed_y_parallax_spread"),
+        "lighting": analysis.get("lighting"),
+        "quality": {
+            "selected_roi": analysis.get("selected_roi"),
+            "feature_mode": analysis.get("feature_mode"),
+            "reference_frame": analysis.get("reference_frame"),
+            "reference_y_offset": analysis.get("reference_y_offset"),
+            "fit_residual_rms_px": analysis.get("bed_y_fit_residual_rms_px"),
+            "correlation_min": analysis.get("bed_y_correlation_min"),
+            "correlation_median": analysis.get("bed_y_correlation_median"),
+        },
+        "hard_failures": analysis.get("hard_failures") or [],
+    }
+
+
 def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
     job_id = sanitize_name(args.analyze_job or args.job_id)
     if not job_id:
@@ -1174,7 +2091,6 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
         "events_path": str(job_dir / "events.jsonl"),
         "manifest_hash": manifest["manifest_hash"],
         "gcode_hash": manifest["gcode_hash"],
-        "dx_values": unique_dx_values_from_manifest(manifest),
         "analysis_dir": str(paths["analysis_dir"]),
         "analysis_url": safe_vision_url(paths["analysis_dir"]),
         "raw_contact_sheet_path": str(paths["raw_contact_sheet"]),
@@ -1186,25 +2102,62 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
         "facts_path": str(paths["facts"]),
         "facts_url": safe_vision_url(paths["facts"]),
     }
+    if manifest.get("kind") == BED_Y_JOB_KIND:
+        result["y_offsets"] = [
+            float(frame["y_offset"])
+            for frame in manifest.get("frames") or []
+            if frame.get("phase") == "bed_y_sweep"
+        ]
+    else:
+        result["dx_values"] = unique_dx_values_from_manifest(manifest)
     try:
-        frames = load_job_frames_for_analysis(job_dir / "manifest.json")
-        analysis = analyze_sweep_frames(
-            frames, paths["analysis_dir"], overlay_dir=paths["overlays_dir"]
-        )
-        analysis.update(
-            {
-                "run_name": manifest["job_id"],
-                "dx_values": result["dx_values"],
-                "job_id": manifest["job_id"],
-            }
-        )
-        if frames:
-            write_raw_contact_sheet(frames, analysis, paths["raw_contact_sheet"])
-            if all("overlay_path" in frame for frame in frames):
-                write_contact_sheet(frames, analysis, paths["overlay_contact_sheet"])
-        facts = build_idex_nozzle_sweep_facts(
-            manifest=manifest, analysis=analysis, result_path=paths["result"]
-        )
+        if manifest.get("kind") == BED_Y_JOB_KIND:
+            frames = load_bed_y_job_frames_for_analysis(job_dir / "manifest.json")
+            analysis = analyze_bed_y_sweep_frames(
+                frames, paths["analysis_dir"], overlay_dir=paths["overlays_dir"]
+            )
+            analysis.update(
+                {
+                    "run_name": manifest["job_id"],
+                    "y_offsets": result["y_offsets"],
+                    "job_id": manifest["job_id"],
+                }
+            )
+            if frames:
+                write_bed_y_contact_sheet(
+                    frames,
+                    analysis,
+                    paths["raw_contact_sheet"],
+                    use_overlays=False,
+                )
+                write_bed_y_contact_sheet(
+                    frames,
+                    analysis,
+                    paths["overlay_contact_sheet"],
+                    use_overlays=True,
+                )
+            facts = build_bed_y_motion_facts(
+                manifest=manifest, analysis=analysis, result_path=paths["result"]
+            )
+        else:
+            frames = load_job_frames_for_analysis(job_dir / "manifest.json")
+            analysis = analyze_sweep_frames(
+                frames, paths["analysis_dir"], overlay_dir=paths["overlays_dir"]
+            )
+            analysis.update(
+                {
+                    "run_name": manifest["job_id"],
+                    "dx_values": result["dx_values"],
+                    "job_id": manifest["job_id"],
+                }
+            )
+            if frames:
+                write_raw_contact_sheet(frames, analysis, paths["raw_contact_sheet"])
+                if all("overlay_path" in frame for frame in frames):
+                    write_contact_sheet(frames, analysis, paths["overlay_contact_sheet"])
+            facts = build_idex_nozzle_sweep_facts(
+                manifest=manifest, analysis=analysis, result_path=paths["result"]
+            )
         result.update(
             {
                 "ok": bool(analysis.get("ok")),
@@ -1241,6 +2194,11 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
             "schema_version": VISION_JOB_SCHEMA_VERSION,
             "job_id": manifest.get("job_id"),
             "kind": manifest.get("kind"),
+            "measurement": (
+                BED_Y_MEASUREMENT
+                if manifest.get("kind") == BED_Y_JOB_KIND
+                else "idex_nozzle_relative_offset"
+            ),
             "accepted": False,
             "ok": False,
             "hard_failures": [str(exc)],
@@ -1272,6 +2230,29 @@ def run_full_job(args: argparse.Namespace) -> dict[str, Any]:
             "message": acquisition.get("error")
             or acquisition.get("failure")
             or "acquisition failed before analysis",
+        }
+    analyze_args = argparse.Namespace(**vars(args))
+    analyze_args.analyze_job = acquisition["job_id"]
+    result = analyze_acquired_job(analyze_args)
+    result["acquisition"] = {
+        "ok": acquisition.get("ok"),
+        "state": acquisition.get("state"),
+        "virtual_sd_filename": acquisition.get("virtual_sd_filename"),
+        "committed_frame_count": acquisition.get("committed_frame_count"),
+    }
+    return result
+
+
+def run_bed_y_full_job(args: argparse.Namespace) -> dict[str, Any]:
+    acquisition = run_bed_y_acquisition_job(args)
+    if not acquisition.get("ok"):
+        return {
+            **acquisition,
+            "ok": False,
+            "analysis_started": False,
+            "message": acquisition.get("error")
+            or acquisition.get("failure")
+            or "bed Y acquisition failed before analysis",
         }
     analyze_args = argparse.Namespace(**vars(args))
     analyze_args.analyze_job = acquisition["job_id"]
@@ -1328,6 +2309,93 @@ def format_report_value(value: Any, unit: str, digits: int = 3) -> str:
     return text if text == "n/a" else f"{text} {unit}"
 
 
+def render_bed_y_motion_result(facts: dict[str, Any], state: dict[str, Any]) -> str:
+    accepted = bool(facts.get("accepted") or facts.get("ok"))
+    hard_failures = facts.get("hard_failures") or []
+    quality = facts.get("quality") or {}
+    spread = facts.get("bed_y_parallax_spread") or {}
+    vector = facts.get("bed_y_axis_vector_px_per_mm") or [None, None]
+    status_text = "accepted" if accepted else "rejected"
+    status_class = "result-ok" if accepted else "result-bad"
+    spread_text = (
+        "vector spread "
+        + format_report_value(spread.get("axis_vector_spread_px_per_mm"), "px/mm")
+        + ", scale spread "
+        + format_report_value(spread.get("scale_spread_px_per_mm"), "px/mm")
+    )
+    if spread.get("scale_spread_percent") is not None:
+        spread_text += (
+            ", "
+            + format_report_value(spread.get("scale_spread_percent"), "%")
+        )
+    quality_text = (
+        "rms "
+        + format_report_value(facts.get("bed_y_fit_residual_rms_px"), "px")
+        + ", corr min "
+        + format_report_number(facts.get("bed_y_correlation_min"), 3)
+        + ", corr median "
+        + format_report_number(facts.get("bed_y_correlation_median"), 3)
+    )
+    rows = [
+        (
+            "Status",
+            f'<span class="{status_class}">{html_text(status_text)}</span>',
+            html_text(state.get("failure") or "; ".join(str(item) for item in hard_failures)),
+        ),
+        (
+            "Bed Y scale",
+            html_text(format_report_value(facts.get("bed_y_scale_px_per_mm"), "px/mm")),
+            html_text(format_report_value(facts.get("bed_y_mm_per_px"), "mm/px", 5)),
+        ),
+        (
+            "Image vector",
+            "dx "
+            + html_text(format_report_value(vector[0], "px/mm"))
+            + ", dy "
+            + html_text(format_report_value(vector[1], "px/mm")),
+            "image +Y is downward; negative image Y means the feature moves upward in the camera image as printer Y increases",
+        ),
+        (
+            "Direction",
+            html_text(format_report_value(facts.get("bed_y_axis_angle_deg"), "deg")),
+            "cross-axis drift "
+            + html_text(format_report_value(facts.get("bed_y_cross_axis_px_per_mm"), "px/mm")),
+        ),
+        (
+            "Parallax spread",
+            html_text(spread_text),
+            html_text(spread.get("meaning") or "local ROI variation only"),
+        ),
+        (
+            "Quality",
+            html_text(quality_text),
+            "roi "
+            + html_text(quality.get("selected_roi"))
+            + ", mode "
+            + html_text(quality.get("feature_mode")),
+        ),
+        (
+            "Lighting",
+            html_text(facts.get("lighting")),
+            "primary bed Y feature light",
+        ),
+    ]
+    empty_note = '<span class="muted">n/a</span>'
+    row_html = "\n".join(
+        "<tr>"
+        f"<th>{html_text(label)}</th>"
+        f"<td>{value}</td>"
+        f"<td>{note or empty_note}</td>"
+        "</tr>"
+        for label, value, note in rows
+    )
+    return (
+        '<section class="measurement"><h2>Nozzle Camera Bed Y Sweep</h2>'
+        "<table><thead><tr><th>Metric</th><th>Value</th><th>Meaning</th></tr>"
+        f"</thead><tbody>{row_html}</tbody></table></section>"
+    )
+
+
 def render_measurement_result(facts_path: Path, state: dict[str, Any]) -> str:
     facts = read_json_optional(facts_path)
     if not facts:
@@ -1342,6 +2410,8 @@ def render_measurement_result(facts_path: Path, state: dict[str, Any]) -> str:
             f'<p class="failure">Could not read facts.json: '
             f'{html_text(facts.get("_read_error"))}</p></section>'
         )
+    if facts.get("measurement") == BED_Y_MEASUREMENT:
+        return render_bed_y_motion_result(facts, state)
 
     accepted = bool(facts.get("accepted") or facts.get("ok"))
     hard_failures = facts.get("hard_failures") or []
@@ -1733,7 +2803,8 @@ def render_global_vision_index(payload: dict[str, Any]) -> str:
 </div>
 <h2>Commands</h2>
 <pre>/usr/local/bin/vision_nozzle_align.py --refresh-ui
-/usr/local/bin/vision_nozzle_align.py --run-job --name nozzle_sweep --x 195 --y -14.8 --z 20 --dx 0,3,6,9,12</pre>
+/usr/local/bin/vision_nozzle_align.py --run-job --name nozzle_sweep --x 195 --y -14.8 --z 20 --dx 0,3,6,9,12
+/usr/local/bin/vision_nozzle_align.py --run-bed-y-job --name bed_y --x -80.4 --y -14.8 --z 293.75 --y-offsets 0,5,10,15,20</pre>
 <h2>Active</h2>
 {render_job_rows([job for job in active_jobs if job])}
 <h2>Prepared</h2>
@@ -3434,6 +4505,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Generate an immutable prepared vision job without moving the printer.",
     )
     mode.add_argument(
+        "--prepare-bed-y-job",
+        action="store_true",
+        help="Generate an immutable prepared bed Y feature sweep job.",
+    )
+    mode.add_argument(
         "--start-prepared-job",
         metavar="JOB_ID",
         help="Start and monitor an existing prepared vision job through virtual SD.",
@@ -3454,6 +4530,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Prepare, acquire, analyze, and report a complete nozzle vision job.",
     )
     mode.add_argument(
+        "--run-bed-y-job",
+        action="store_true",
+        help="Prepare, acquire, analyze, and report a complete bed Y feature sweep.",
+    )
+    mode.add_argument(
         "--refresh-ui",
         action="store_true",
         help="Regenerate static vision job HTML and jobs.json without printer motion.",
@@ -3462,6 +4543,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--y", type=float, default=-14.8)
     parser.add_argument("--z", type=float)
     parser.add_argument("--dx", default="0,3,6,9,12")
+    parser.add_argument("--y-offsets", default="0,5,10,15,20")
     parser.add_argument("--feedrate", type=float, default=3600.0)
     parser.add_argument("--settle-time", type=float, default=0.75)
     parser.add_argument("--job-root", type=Path, default=NOZZLE_JOB_ROOT)
@@ -3483,16 +4565,19 @@ def main(argv: list[str] | None = None) -> int:
     if (
         not args.sweep
         and not args.prepare_job
+        and not args.prepare_bed_y_job
         and not args.start_prepared_job
         and not args.run_acquisition_job
         and not args.analyze_job
         and not args.run_job
+        and not args.run_bed_y_job
         and not args.refresh_ui
     ):
         parser.error(
             "single-image nozzle vision check was removed; use --sweep, "
-            "--prepare-job, --start-prepared-job, --run-acquisition-job, "
-            "--analyze-job, --run-job, or --refresh-ui"
+            "--prepare-job, --prepare-bed-y-job, --start-prepared-job, "
+            "--run-acquisition-job, --analyze-job, --run-job, "
+            "--run-bed-y-job, or --refresh-ui"
         )
     if args.z is None:
         args.z = 20.0
@@ -3502,6 +4587,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.prepare_job:
         summary = prepare_nozzle_sweep_job(args)
+        attach_ui_refresh(summary, args)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0 if summary.get("ok") else 1
+    if args.prepare_bed_y_job:
+        summary = prepare_bed_y_sweep_job(args)
         attach_ui_refresh(summary, args)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0 if summary.get("ok") else 1
@@ -3521,9 +4611,12 @@ def main(argv: list[str] | None = None) -> int:
         attach_ui_refresh(result, args)
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0 if result.get("ok") else 1
-    if args.analyze_job or args.run_job:
+    if args.analyze_job or args.run_job or args.run_bed_y_job:
         try:
-            result = run_full_job(args) if args.run_job else analyze_acquired_job(args)
+            if args.run_bed_y_job:
+                result = run_bed_y_full_job(args)
+            else:
+                result = run_full_job(args) if args.run_job else analyze_acquired_job(args)
         except Exception as exc:
             result = {
                 "ok": False,

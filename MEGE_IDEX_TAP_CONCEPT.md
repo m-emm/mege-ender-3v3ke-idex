@@ -308,12 +308,13 @@ study, the required injected context is the already-placed environment:
 
 - `x_axis_right_carriage`: the right/top carriage reference.
 - `fixed_tool_head_mount`: `tool_head_mount_machined_top_assembly`, unchanged.
-- `sprite_extruder`: `sprite_extruder_right_assembly`, placed where it is today.
 - `x_axis_belt_carriage`: `x_axis_belt_carriage_top_assembly`, placed where it
   is today.
 - Optional but useful collision context:
-  `nitehawk_board_right_assembly`, `extruder_cage_right_joined_assembly`,
-  `part_fan_right_joined_assembly`, and `tool_head_cable_attach_shield_right_assembly`.
+  `sprite_extruder_right_assembly`, `nitehawk_board_right_assembly`,
+  `extruder_cage_right_joined_assembly`, `part_fan_right_joined_assembly`, and
+  `tool_head_cable_attach_shield_right_assembly`. Keep these as placed external
+  context unless a generator genuinely consumes their geometry.
 - `mgn7h_rail_with_carriage`: injected MGN7H rail assembly with built-in
   `carriage` follower.
 - `opb991t11z_sensor`: standalone injected OPB991T11Z sensor assembly.
@@ -430,7 +431,6 @@ Helpful reference artifacts to add or preserve for clean placement:
 - `rail_mount_reference`: fixed-frame datum for the MGN7H rail.
 - `sensor_mount_reference`: fixed-frame datum for the OPB991T11Z sensor.
 - `sensor_optical_center_reference`: fixed-frame optical line target.
-- `sprite_keepout_reference`: placed Sprite envelope reference.
 - `belt_carriage_keepout_reference`: placed top belt carriage envelope reference.
 - `future_toolhead_mount_reference`: moving-shuttle datum reserved for the later
   load-path rework, not used for placement in the first T1 packaging pass.

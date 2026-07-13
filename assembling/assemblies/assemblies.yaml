@@ -3853,14 +3853,12 @@ assemblies:
     resource_file: idex_tap_t1_assembly.yaml
     depends_on:
       - tool_head_mount_machined_top_assembly
-      - sprite_extruder_right_assembly
       - x_axis_top_profile_assembly
       - x_axis_rail_assembly
       - x_axis_right_carriage_assembly
 
     inject_parts:
       fixed_tool_head_mount: tool_head_mount_machined_top_assembly
-      sprite_extruder: sprite_extruder_right_assembly
       x_axis_profile: x_axis_top_profile_assembly
       x_axis_carriage: x_axis_right_carriage_assembly
 
@@ -3873,6 +3871,7 @@ assemblies:
       - idex_tap_t1_assembly
       - x_axis_rail_assembly
       - x_axis_right_carriage_assembly
+      - sprite_extruder_right_assembly
 
     inject_parts:
       fixed_tool_head_mount: tool_head_mount_machined_top_assembly

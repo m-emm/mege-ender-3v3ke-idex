@@ -244,6 +244,9 @@ def test_vision_light_dotstar_and_macros():
     light_macro = _section(config_text, "gcode_macro VISION_LIGHT")
     off_macro = _section(config_text, "gcode_macro VISION_LIGHT_OFF")
     analysis_light_macro = _section(config_text, "gcode_macro NOZZLE_CAM_ANALYSIS_LIGHT")
+    y_feature_light_macro = _section(
+        config_text, "gcode_macro NOZZLE_CAM_Y_FEATURE_LIGHT"
+    )
     startup_light = _section(
         config_text, "delayed_gcode _NOZZLE_CAM_ANALYSIS_LIGHT_ON_STARTUP"
     )
@@ -271,6 +274,9 @@ def test_vision_light_dotstar_and_macros():
     assert "INDEX=3" not in analysis_light_macro
     assert "INDEX=4" not in analysis_light_macro
     assert "INDEX=9" not in analysis_light_macro
+    assert "VISION_LIGHT_OFF" in y_feature_light_macro
+    assert "INDEX=2 RED=0.450 GREEN=0.450 BLUE=0.450" in y_feature_light_macro
+    assert "INDEX=1" not in y_feature_light_macro
     assert "NOZZLE_CAM_ANALYSIS_LIGHT" in startup_light
 
 
@@ -285,6 +291,7 @@ def test_vision_capture_macro_and_host_files_exist():
         config_text, "gcode_macro NOZZLE_CAM_ANALYSIS_CAPTURE"
     )
     nozzle_sweep_macro = _section(config_text, "gcode_macro IDEX_NOZZLE_VISION_SWEEP")
+    bed_y_sweep_macro = _section(config_text, "gcode_macro IDEX_BED_Y_VISION_SWEEP")
     moonraker = (IMAGE_BUILD_FILES_DIR / "moonraker.conf").read_text(encoding="utf-8")
     nginx = (IMAGE_BUILD_FILES_DIR / "nginx-mainsail.conf").read_text(encoding="utf-8")
     image_packages = (IMAGE_BUILD_STAGE_DIR / "00-packages").read_text(encoding="utf-8")
@@ -367,6 +374,11 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "print_stats.state" in nozzle_sweep_macro
     assert "requires X/Y/Z homed" in nozzle_sweep_macro
     assert "dx=dx" in nozzle_sweep_macro
+    assert 'action_call_remote_method("idex_bed_y_vision_sweep"' in bed_y_sweep_macro
+    assert "Y_OFFSETS" in bed_y_sweep_macro
+    assert "y_offsets=y_offsets" in bed_y_sweep_macro
+    assert "print_stats.state" in bed_y_sweep_macro
+    assert "requires X/Y/Z homed" in bed_y_sweep_macro
     assert not (IMAGE_BUILD_FILES_DIR / "crowsnest.conf").exists()
     assert "[webcam Printer Camera]" not in moonraker
     assert "[update_manager crowsnest]" not in moonraker
@@ -453,10 +465,13 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "metadata_matches_profile" in capture_script
     assert "idex_nozzle_vision_check" not in capture_script
     assert "idex_nozzle_vision_sweep" in capture_script
+    assert "idex_bed_y_vision_sweep" in capture_script
     assert "run_nozzle_cam_profile" in capture_script
     assert "run_idex_nozzle_vision_sweep" in capture_script
+    assert "run_idex_bed_y_vision_sweep" in capture_script
     assert "vision_nozzle_align.py" in capture_script
     assert '"--sweep"' in capture_script
+    assert '"--run-bed-y-job"' in capture_script
     assert "FRAMEBUFFER_LATEST_IMAGE" in capture_script
     assert "wait_for_buffered_frame" in capture_script
     assert "VisionJobApi" in capture_script
@@ -476,6 +491,13 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "--start-prepared-job" in nozzle_script
     assert "--analyze-job" in nozzle_script
     assert "--run-job" in nozzle_script
+    assert "--prepare-bed-y-job" in nozzle_script
+    assert "--run-bed-y-job" in nozzle_script
+    assert "nozzle_cam_bed_y_sweep" in nozzle_script
+    assert "nozzle_cam_bed_y_motion" in nozzle_script
+    assert "bed_y_axis_vector_px_per_mm" in nozzle_script
+    assert "bed_y_scale_px_per_mm" in nozzle_script
+    assert "bed_y_parallax_spread" in nozzle_script
     assert "--refresh-ui" in nozzle_script
     assert "--virtual-sd-root" in nozzle_script
     assert "SDCARD_PRINT_FILE FILENAME=" in nozzle_script
@@ -512,12 +534,19 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "acl\n" in image_packages
     assert "python3-opencv" in image_packages
     readme = README_PATH.read_text(encoding="utf-8")
+    klipper_readme = (KLIPPER_CONFIG_DIR / "README.md").read_text(encoding="utf-8")
     concept = VISION_JOB_CONCEPT_PATH.read_text(encoding="utf-8")
     assert "http://menderpi.local/vision/" in readme
     assert "do not paste the filesystem path" in readme
     assert "vision_nozzle_align.py --refresh-ui" in readme
     assert "vision_nozzle_align.py --run-job" in readme
     assert "/home/pi/printer_data/vision/index.html" in readme
+    assert "Nozzle Camera Bed Y Sweep" in klipper_readme
+    assert "vision_nozzle_align.py --run-bed-y-job --name bed_y" in klipper_readme
+    assert "IDEX_BED_Y_VISION_SWEEP NAME=bed_y" in klipper_readme
+    assert "http://menderpi.local/vision/nozzle_cam/jobs/<job_id>/" in klipper_readme
+    assert "bed_y_axis_vector_px_per_mm" in klipper_readme
+    assert "negative image Y means the feature moves upward" in klipper_readme
     assert "read-only generated static HTML/JSON" in concept
     assert "libevent-dev" not in image_packages
     assert "libjpeg-dev" not in image_packages

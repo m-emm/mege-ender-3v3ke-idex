@@ -68,6 +68,31 @@ def _prepare_job(module, job_root, *, job_id, dx="0", created=None):
     return summary
 
 
+def _prepare_bed_y_job(module, job_root, *, job_id, created=None):
+    summary = module.prepare_bed_y_sweep_job(
+        SimpleNamespace(
+            name="bed_y",
+            job_root=job_root,
+            job_id=job_id,
+            x=-80.4,
+            y=-14.8,
+            z=293.75,
+            y_offsets="0,5,10,15,20",
+            feedrate=3600.0,
+            settle_time=0.2,
+            camera="nozzle_cam",
+            profile="analysis",
+        )
+    )
+    state_path = Path(summary["state_path"])
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    if created:
+        state["created_at_utc"] = created
+        state["updated_at_utc"] = created
+        module.atomic_write_json(state_path, state)
+    return summary
+
+
 def _commit_frames(module, summary):
     job_dir = Path(summary["job_dir"])
     manifest = json.loads(Path(summary["manifest_path"]).read_text(encoding="utf-8"))
@@ -148,6 +173,61 @@ def _write_analysis_artifacts(module, summary):
         )
 
 
+def _write_bed_y_analysis_artifacts(module, summary):
+    job_dir = Path(summary["job_dir"])
+    manifest = json.loads(Path(summary["manifest_path"]).read_text(encoding="utf-8"))
+    paths = module.job_analysis_paths(job_dir)
+    paths["overlays_dir"].mkdir(parents=True, exist_ok=True)
+    paths["raw_contact_sheet"].write_bytes(b"\xff\xd8\xff\xd9")
+    paths["overlay_contact_sheet"].write_bytes(b"\xff\xd8\xff\xd9")
+    paths["result"].write_text(
+        json.dumps({"ok": True, "message": "Bed Y feature motion accepted."}) + "\n",
+        encoding="utf-8",
+    )
+    paths["facts"].write_text(
+        json.dumps(
+            {
+                "accepted": True,
+                "ok": True,
+                "job_id": manifest["job_id"],
+                "kind": "nozzle_cam_bed_y_sweep",
+                "measurement": "nozzle_cam_bed_y_motion",
+                "bed_y_axis_vector_px_per_mm": [-0.2, -10.5],
+                "bed_y_scale_px_per_mm": 10.502,
+                "bed_y_mm_per_px": 0.09522,
+                "bed_y_axis_angle_deg": -91.091,
+                "bed_y_cross_axis_px_per_mm": -0.2,
+                "bed_y_fit_residual_rms_px": 0.123,
+                "bed_y_correlation_min": 0.8123,
+                "bed_y_correlation_median": 0.9345,
+                "bed_y_parallax_spread": {
+                    "accepted_roi_count": 2,
+                    "accepted_rois": ["marked_line_tight", "marked_line_context"],
+                    "axis_vector_spread_px_per_mm": 0.08,
+                    "scale_spread_px_per_mm": 0.05,
+                    "scale_spread_percent": 0.48,
+                    "angle_spread_deg": 0.2,
+                    "meaning": "local perspective variation between accepted bed-feature ROIs; not a full Z-height solve",
+                },
+                "lighting": "NOZZLE_CAM_Y_FEATURE_LIGHT",
+                "quality": {
+                    "selected_roi": "marked_line_tight",
+                    "feature_mode": "grad_y",
+                    "reference_frame": "bed_y_0p0",
+                    "reference_y_offset": 0.0,
+                },
+                "hard_failures": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    for frame in manifest["frames"]:
+        (paths["overlays_dir"] / f"{frame['frame']}_overlay.jpg").write_bytes(
+            b"\xff\xd8\xff\xd9"
+        )
+
+
 def test_prepare_job_generates_static_ui(monkeypatch, tmp_path, capsys):
     module = _load_module()
     root, job_root = _configure_ui_paths(monkeypatch, module, tmp_path)
@@ -208,6 +288,37 @@ def test_completed_job_page_links_analysis_and_frames(monkeypatch, tmp_path):
         assert f"{frame['frame']}.json" in page
     jobs = json.loads((root / "jobs.json").read_text(encoding="utf-8"))
     assert jobs["counts_by_state"] == {"completed": 1}
+    assert jobs["jobs"][0]["artifacts"]["facts"]["exists"] is True
+
+
+def test_completed_bed_y_job_page_renders_bed_y_facts(monkeypatch, tmp_path):
+    module = _load_module()
+    root, job_root = _configure_ui_paths(monkeypatch, module, tmp_path)
+    summary = _prepare_bed_y_job(module, job_root, job_id="ui_bed_y_completed")
+    manifest = _commit_frames(module, summary)
+    _write_bed_y_analysis_artifacts(module, summary)
+
+    ui = module.refresh_vision_ui(job_root)
+
+    assert ui["ok"] is True
+    page = (job_root / "ui_bed_y_completed" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert "Nozzle Camera Bed Y Sweep" in page
+    assert "Bed Y scale" in page
+    assert "Image vector" in page
+    assert "negative image Y means the feature moves upward" in page
+    assert "NOZZLE_CAM_Y_FEATURE_LIGHT" in page
+    assert "Parallax spread" in page
+    assert "marked_line_tight" in page
+    assert "T1 - T0 along X" not in page
+    assert "result.json" in page
+    assert "facts.json" in page
+    assert "raw_contact_sheet.jpg" in page
+    assert "overlay_contact_sheet.jpg" in page
+    assert f"{manifest['frames'][0]['frame']}_overlay.jpg" in page
+    jobs = json.loads((root / "jobs.json").read_text(encoding="utf-8"))
+    assert jobs["jobs"][0]["kind"] == "nozzle_cam_bed_y_sweep"
     assert jobs["jobs"][0]["artifacts"]["facts"]["exists"] is True
 
 
