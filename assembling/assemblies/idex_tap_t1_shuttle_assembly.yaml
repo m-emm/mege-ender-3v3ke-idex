@@ -36,7 +36,7 @@ Builder:
         assembly: mgn7h_rail_with_carriage
         artifact: all
       - source: injected
-        assembly: idex_tap_t0
+        assembly: idex_tap_t1
         artifact: all
 
       - source: dependencies
@@ -100,8 +100,8 @@ Parameters:
     Type: Float
 
 Parts:
-  IdexTapT0ShuttleAssembly:
+  IdexTapT1ShuttleAssembly:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t0_shuttle_assembly.create_idex_tap_t0_shuttle_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t1_shuttle_assembly.create_idex_tap_t1_shuttle_assembly

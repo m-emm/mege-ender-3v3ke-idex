@@ -180,43 +180,43 @@ Builder:
             - 0
             - 0
       - source: injected
-        assembly: idex_tap_t0
+        assembly: idex_tap_t1
         artifact: leader
-        name: idex_tap_t0_fixed_frame
+        name: idex_tap_t1_fixed_frame
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
             - 0
             - 0
       - source: injected
-        assembly: idex_tap_t0
+        assembly: idex_tap_t1
         artifact: followers
         names:
           - idex_tap_sensor_bracket
           - idex_tap_down_stop
           - idex_tap_overtravel_stop
           - idex_tap_magnet_retainers
-        name_template: "idex_tap_t0_{name}"
+        name_template: "idex_tap_t1_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
             - 0
             - 0
       - source: injected
-        assembly: idex_tap_t0
+        assembly: idex_tap_t1
         artifact: non_production_parts
         names:
           - magnets
-        name_template: "idex_tap_t0_{name}"
+        name_template: "idex_tap_t1_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
             - 0
             - 0
       - source: injected
-        assembly: idex_tap_t0_shuttle
+        assembly: idex_tap_t1_shuttle
         artifact: leader
-        name: idex_tap_t0_moving_shuttle
+        name: idex_tap_t1_moving_shuttle
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -227,11 +227,11 @@ Builder:
             - 0
             - { $ref: idex_tap_trigger_lift }
       - source: injected
-        assembly: idex_tap_t0_shuttle
+        assembly: idex_tap_t1_shuttle
         artifact: followers
         names:
           - idex_tap_trigger_flag
-        name_template: "idex_tap_t0_shuttle_{name}"
+        name_template: "idex_tap_t1_shuttle_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -242,11 +242,11 @@ Builder:
             - 0
             - { $ref: idex_tap_trigger_lift }
       - source: injected
-        assembly: idex_tap_t0_shuttle
+        assembly: idex_tap_t1_shuttle
         artifact: non_production_parts
         names:
           - moving_magnet_targets
-        name_template: "idex_tap_t0_shuttle_{name}"
+        name_template: "idex_tap_t1_shuttle_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }

@@ -42,7 +42,7 @@ def create_mgn7h_rail_with_carriage_assembly(
 
     _ = mgn7h_rail_mount_screw_size
 
-    record_length_metric("linear_rail", "MGN7H", "idex_tap_t0", mgn7h_rail_length)
+    record_length_metric("linear_rail", "MGN7H", "idex_tap_t1", mgn7h_rail_length)
 
     return create_mgn7h_rail_with_carriage(
         length_mm=mgn7h_rail_length,

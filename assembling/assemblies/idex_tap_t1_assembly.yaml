@@ -118,8 +118,8 @@ Parameters:
     Type: Float
 
 Parts:
-  IdexTapT0Assembly:
+  IdexTapT1Assembly:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t0_assembly.create_idex_tap_t0_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t1_assembly.create_idex_tap_t1_assembly

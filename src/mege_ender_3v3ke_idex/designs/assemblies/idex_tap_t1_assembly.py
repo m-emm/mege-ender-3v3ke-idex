@@ -3,7 +3,7 @@
 from shellforgepy.simple import *
 
 
-def create_idex_tap_t0_assembly(
+def create_idex_tap_t1_assembly(
     *,
     fixed_tool_head_mount,
     sprite_extruder,

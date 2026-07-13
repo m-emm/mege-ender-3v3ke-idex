@@ -59,23 +59,22 @@ Useful references:
 
 ## Current Assembly Checkpoint
 
-The repository already contains exploratory Tap-related assemblies. They are
-useful geometry and builder prototypes, but their names still reflect the older
-T0-first idea and should not be treated as the final side choice:
+The repository already contains exploratory Tap-related assemblies. They started
+as older T0-first prototypes, but the active assembly contract is now explicitly
+named for the T1/right/top packaging study:
 
 - `opb991t11z_sensor_assembly` models the wired optical interrupter as a
   reusable hardware-reference assembly.
 - `mgn7h_rail_with_carriage_assembly` models the short MGN7H rail as leader and
   the carriage as a named follower.
-- `idex_tap_t0_assembly` currently represents a fixed Tap frame prototype with
+- `idex_tap_t1_assembly` currently represents a fixed Tap frame prototype with
   rail plate, sensor bracket, magnet retainers, and stop features.
-- `idex_tap_t0_shuttle_assembly` currently represents a moving shuttle prototype
+- `idex_tap_t1_shuttle_assembly` currently represents a moving shuttle prototype
   with carriage screw holes and trigger flag.
-- `idex_tap_t0_stack_assembly` is a focused visualization prototype.
+- `idex_tap_t1_stack_assembly` is a focused visualization prototype.
 
-Future T1-first implementation should either introduce clearly named T1 Tap
-assemblies or rename/split the prototypes before they become production routing.
-Do not silently reuse `idex_tap_t0_*` names for final T1 semantics.
+If these prototypes later split into production and exploratory variants, keep
+the T1 side semantics explicit instead of introducing side-ambiguous names.
 
 ## Mechanical Stack
 
@@ -288,22 +287,20 @@ Hardware to represent:
 
 Current exploratory assembly files:
 
-- `assembling/assemblies/idex_tap_t0_assembly.yaml`
-- `src/mege_ender_3v3ke_idex/designs/assemblies/idex_tap_t0_assembly.py`
-- `assembling/assemblies/idex_tap_t0_shuttle_assembly.yaml`
-- `src/mege_ender_3v3ke_idex/designs/assemblies/idex_tap_t0_shuttle_assembly.py`
-- `assembling/assemblies/idex_tap_t0_stack_assembly.yaml`
-- `src/mege_ender_3v3ke_idex/designs/assemblies/idex_tap_t0_stack_assembly.py`
+- `assembling/assemblies/idex_tap_t1_assembly.yaml`
+- `src/mege_ender_3v3ke_idex/designs/assemblies/idex_tap_t1_assembly.py`
+- `assembling/assemblies/idex_tap_t1_shuttle_assembly.yaml`
+- `src/mege_ender_3v3ke_idex/designs/assemblies/idex_tap_t1_shuttle_assembly.py`
+- `assembling/assemblies/idex_tap_t1_stack_assembly.yaml`
+- `src/mege_ender_3v3ke_idex/designs/assemblies/idex_tap_t1_stack_assembly.py`
 - `assembling/assemblies/mgn7h_rail_with_carriage_assembly.yaml`
 - `src/mege_ender_3v3ke_idex/designs/assemblies/mgn7h_rail_with_carriage_assembly.py`
 - `assembling/assemblies/opb991t11z_sensor_assembly.yaml`
 - `src/mege_ender_3v3ke_idex/designs/assemblies/opb991t11z_sensor_assembly.py`
 
 These files prove the reusable hardware and split Tap-frame/shuttle shape are
-already underway. The next implementation should not make those T0 names the
-final public contract for a T1-first design. Prefer either a new T1-focused
-assembly contract or an explicit rename/migration once the packaging direction
-is chosen.
+already underway. The active contract is now T1-named; future refactors should
+preserve that side choice explicitly unless a separate T0 design is added.
 
 The T1-first Tap generator should not import another assembly generator
 directly. It should consume injected dependencies from YAML. For the packaging
@@ -419,7 +416,7 @@ existing toolhead stack stays put first; Tap geometry is designed around it.
 Tap-internal artifact ownership:
 
 - Author moving-shuttle candidate geometry as Tap-owned geometry, whether it
-  remains in the current split `idex_tap_t0_shuttle_assembly` prototype or moves
+  remains in the current split `idex_tap_t1_shuttle_assembly` prototype or moves
   into a future T1-named assembly.
 - Keep fixed-frame details as Tap-owned geometry: the rail plate, sensor bracket,
   fixed magnet pockets/retainers, fixed hard-stop pads or screws, and fixed
@@ -498,9 +495,9 @@ split by assembly:
 - MGN7H rail and carriage dimensions belong to
   `mgn7h_rail_with_carriage_assembly.yaml`.
 - Tap-frame dimensions, travel, clearances, magnet pockets, and hard stops
-  belong to the current `idex_tap_t0_assembly.yaml` prototype or to a future
-  T1-named Tap assembly after the rename/split decision. Do not treat the
-  current T0 filename as final semantics.
+  belong to the current `idex_tap_t1_assembly.yaml` prototype or to a future
+  T1-named Tap assembly after any production/exploration split. Do not let
+  deferred T0/left/bottom concerns leak into the T1 contract.
 - Part-to-part placement offsets should live in `assemblies.yaml` placements
   whenever possible, not as hidden transforms inside Python generators.
 
@@ -663,22 +660,22 @@ Deferred calibration decision points:
   or the current firmware Z-reference model.
 - The T0 bottom belt-carriage conflict remains unresolved and may need a
   different mechanism or layout.
-- Existing `idex_tap_t0_*` prototype names can mislead integration if they are
-  silently reused for T1/right/top semantics.
+- The `idex_tap_t1_*` prototype names are intentionally T1/right/top-specific;
+  future T0/left/bottom work should copy or split them under clear T0 names.
 
 ## Implementation Order
 
-1. Use this document as the checkpoint: no code, YAML, or public API changes are
-   implied by the concept update itself.
-2. Build a T1-focused placement/collision visualization that keeps
+1. Use this document as the checkpoint after the T1 rename: active Tap assembly
+   names are `idex_tap_t1_*`, and T0/left/bottom remains deferred.
+2. Continue the T1-focused placement/collision visualization that keeps
    `x_axis_right_carriage_assembly`, `tool_head_mount_machined_top_assembly`,
    `sprite_extruder_right_assembly`, `x_axis_belt_carriage_top_assembly`, and
    the right cage/fan/Nitehawk stack where they are today.
 3. Overlay the existing exploratory Tap hardware and frame/shuttle candidates in
    that placed T1 environment to identify real clearances, collisions, and
    service-access problems.
-4. Decide whether to introduce new `idex_tap_t1_*` assemblies or explicitly
-   rename/split the current `idex_tap_t0_*` prototypes before production routing.
+4. Split the current `idex_tap_t1_*` prototypes only when production routing
+   needs a separate stable contract.
 5. Rework the Tap assembly contract so generators consume injected placed
    context for collision and clearance, instead of moving or replacing the
    existing Sprite/mount/belt-carriage relationship.
