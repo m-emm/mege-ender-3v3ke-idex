@@ -40,9 +40,7 @@ NOZZLE_JOB_ROOT = Path(
 DEFAULT_VIRTUAL_SD_ROOT = Path(
     os.environ.get("VISION_VIRTUAL_SD_ROOT", "/home/pi/printer_data/gcodes")
 )
-DEFAULT_VIRTUAL_SD_SUBDIR = os.environ.get(
-    "VISION_VIRTUAL_SD_SUBDIR", "vision_jobs"
-)
+DEFAULT_VIRTUAL_SD_SUBDIR = os.environ.get("VISION_VIRTUAL_SD_SUBDIR", "vision_jobs")
 VISION_URL_PREFIX = os.environ.get("VISION_OUTPUT_URL_PREFIX", "/vision").rstrip("/")
 VISION_ROOT_URL_PREFIX = (
     VISION_URL_PREFIX[: -len("/nozzle_cam")]
@@ -65,7 +63,9 @@ RED_MARKER_ROI_1080 = tuple(
 )
 NOZZLE_FEATURE_OFFSET_1080 = tuple(
     float(v)
-    for v in os.environ.get("VISION_NOZZLE_SWEEP_FEATURE_OFFSET_1080", "25,100").split(",")
+    for v in os.environ.get("VISION_NOZZLE_SWEEP_FEATURE_OFFSET_1080", "25,100").split(
+        ","
+    )
 )
 NOZZLE_ROI_SIZE_1080 = tuple(
     float(v)
@@ -77,16 +77,41 @@ NOZZLE_GLOBAL_MATCH_MARGIN_1080 = float(
 NOZZLE_GLOBAL_MATCH_SEARCH_1080 = float(
     os.environ.get("VISION_NOZZLE_SWEEP_MATCH_SEARCH_1080", "150")
 )
+NOZZLE_Z_TIP_ROI_1080 = tuple(
+    float(v)
+    for v in os.environ.get("VISION_NOZZLE_Z_TIP_ROI_1080", "620,250,820,650").split(
+        ","
+    )
+)
 PUBLIC_BASE_URL = os.environ.get("VISION_PUBLIC_BASE_URL", "http://menderpi.local")
 NAME_REPLACEMENTS = str.maketrans({c: "_" for c in " /\\:;|?*[]{}()<>'\"`$&!"})
 VISION_JOB_SCHEMA_VERSION = 1
 VISION_JOB_KIND = "idex_nozzle_sweep"
 BED_Y_JOB_KIND = "nozzle_cam_bed_y_sweep"
 BED_Y_MEASUREMENT = "nozzle_cam_bed_y_motion"
+NOZZLE_Z_JOB_KIND = "nozzle_cam_nozzle_z_sweep"
+NOZZLE_Z_MEASUREMENT = "nozzle_cam_nozzle_z_offsets"
 VISION_JOB_CAMERA = "nozzle_cam"
 VISION_JOB_PROFILE = "analysis"
 VISION_JOB_LIGHTING = "NOZZLE_CAM_ANALYSIS_LIGHT"
 BED_Y_JOB_LIGHTING = "NOZZLE_CAM_Y_FEATURE_LIGHT"
+NOZZLE_Z_TOOL_LIGHTING = VISION_JOB_LIGHTING
+VISION_LIGHTING_SETTLE_MS = 750
+DEFAULT_NOZZLE_Z_BED_FEATURE_Z_MM = -0.1
+DEFAULT_T0_Z_ENDSTOP = 293.75
+DEFAULT_T1_Z_ENDSTOP = 293.65
+NOZZLE_Z_MAX_PER_Z_X_FIT_RESIDUAL_PX = float(
+    os.environ.get("VISION_NOZZLE_Z_MAX_PER_Z_X_FIT_RESIDUAL_PX", "4.0")
+)
+NOZZLE_Z_MAX_SCALE_FIT_RESIDUAL_PX_PER_MM = float(
+    os.environ.get("VISION_NOZZLE_Z_MAX_SCALE_FIT_RESIDUAL_PX_PER_MM", "0.35")
+)
+NOZZLE_Z_MIN_SCALE_SLOPE_ABS = float(
+    os.environ.get("VISION_NOZZLE_Z_MIN_SCALE_SLOPE_ABS", "0.05")
+)
+NOZZLE_Z_MAX_TOOL_SLOPE_RELATIVE_SPREAD = float(
+    os.environ.get("VISION_NOZZLE_Z_MAX_TOOL_SLOPE_RELATIVE_SPREAD", "0.75")
+)
 BED_Y_ROIS_1080 = {
     "marked_line_tight": (690.0, 438.0, 300.0, 125.0),
     "marked_line_context": (690.0, 420.0, 570.0, 185.0),
@@ -96,9 +121,7 @@ BED_Y_SEARCH_X_PAD_1080 = 95.0
 BED_Y_SEARCH_UP_1080 = 330.0
 BED_Y_SEARCH_DOWN_1080 = 120.0
 VISION_HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
-HASHED_GCODE_TOKEN_RE = re.compile(
-    r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+"
-)
+HASHED_GCODE_TOKEN_RE = re.compile(r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+")
 
 
 @dataclass(frozen=True)
@@ -236,6 +259,20 @@ def parse_y_offsets(value: str) -> list[float]:
     return values
 
 
+def parse_float_list(value: str, label: str) -> list[float]:
+    values = [float(part.strip()) for part in value.split(",") if part.strip()]
+    if not values:
+        raise ValueError(f"{label} list is empty")
+    return values
+
+
+def z_values_high_to_low(values: list[float]) -> list[float]:
+    unique: dict[str, float] = {}
+    for value in values:
+        unique[dx_label(value)] = float(value)
+    return sorted(unique.values(), reverse=True)
+
+
 def dx_label(dx: float) -> str:
     return str(dx).replace("-", "m").replace(".", "p")
 
@@ -369,6 +406,60 @@ def build_bed_y_sweep_job_frames(
     return tuple(frames)
 
 
+def build_nozzle_z_sweep_job_frames(
+    *,
+    bed_y_x: float,
+    bed_y_y: float,
+    bed_y_z: float,
+    tool_x: float,
+    tool_y: float,
+    y_offsets: list[float],
+    x_offsets: list[float],
+    z_values: list[float],
+    feedrate: float,
+    settle_ms: int,
+    camera: str,
+    profile: str,
+) -> tuple[VisionJobFrame, ...]:
+    frames: list[VisionJobFrame] = list(
+        build_bed_y_sweep_job_frames(
+            x=bed_y_x,
+            y=bed_y_y,
+            z=bed_y_z,
+            y_offsets=y_offsets,
+            feedrate=feedrate,
+            settle_ms=settle_ms,
+            camera=camera,
+            profile=profile,
+        )
+    )
+    for tool in ("T0", "T1"):
+        for x_offset in x_offsets:
+            for z_sample in z_values_high_to_low(z_values):
+                frame_id = f"{tool.lower()}_x{dx_label(x_offset)}_z{dx_label(z_sample)}"
+                frames.append(
+                    VisionJobFrame(
+                        seq=len(frames),
+                        frame=frame_id,
+                        tool=tool,
+                        dx=x_offset,
+                        x=tool_x + x_offset,
+                        y=tool_y,
+                        z=z_sample,
+                        feedrate=feedrate,
+                        settle_ms=settle_ms,
+                        lighting=NOZZLE_Z_TOOL_LIGHTING,
+                        camera=camera,
+                        profile=profile,
+                        phase="tool_xz_sweep",
+                        target="nozzle_tip",
+                        x_offset=x_offset,
+                        z_sample=z_sample,
+                    )
+                )
+    return tuple(frames)
+
+
 def build_vision_job(
     *,
     name: str,
@@ -472,6 +563,95 @@ def build_bed_y_vision_job(
     )
 
 
+def build_nozzle_z_vision_job(
+    *,
+    name: str,
+    job_root: Path,
+    job_id: str | None,
+    bed_y_x: float,
+    bed_y_y: float,
+    bed_y_z: float,
+    tool_x: float,
+    tool_y: float,
+    travel_z: float,
+    y_offsets: list[float],
+    x_offsets: list[float],
+    z_values: list[float],
+    bed_feature_z_mm: float,
+    current_t0_z_endstop: float,
+    current_t1_z_endstop: float,
+    feedrate: float,
+    settle_time: float,
+    camera: str,
+    profile: str,
+    now: datetime | None = None,
+) -> VisionJob:
+    timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    resolved_job_id = (
+        sanitize_name(job_id)
+        if job_id
+        else generated_job_id_for_kind(NOZZLE_Z_JOB_KIND, name, timestamp)
+    )
+    job_dir = job_root / resolved_job_id
+    z_capture_order = z_values_high_to_low(z_values)
+    frames = build_nozzle_z_sweep_job_frames(
+        bed_y_x=bed_y_x,
+        bed_y_y=bed_y_y,
+        bed_y_z=bed_y_z,
+        tool_x=tool_x,
+        tool_y=tool_y,
+        y_offsets=y_offsets,
+        x_offsets=x_offsets,
+        z_values=z_capture_order,
+        feedrate=feedrate,
+        settle_ms=settle_time_to_ms(settle_time),
+        camera=camera,
+        profile=profile,
+    )
+    return VisionJob(
+        job_id=resolved_job_id,
+        kind=NOZZLE_Z_JOB_KIND,
+        created_at_utc=timestamp.isoformat(),
+        camera=camera,
+        profile=profile,
+        job_dir=job_dir,
+        manifest_path=job_dir / "manifest.json",
+        gcode_path=job_dir / "acquisition.gcode",
+        state_path=job_dir / "state.json",
+        events_path=job_dir / "events.jsonl",
+        frames_dir=job_dir / "frames",
+        analysis_dir=job_dir / "analysis",
+        frames=frames,
+        measurement_parameters={
+            "bed_y_pose": {
+                "x": round(bed_y_x, 4),
+                "y": round(bed_y_y, 4),
+                "z": round(bed_y_z, 4),
+            },
+            "tool_pose": {
+                "x": round(tool_x, 4),
+                "y": round(tool_y, 4),
+                "travel_z": round(travel_z, 4),
+            },
+            "y_offsets": [round(value, 4) for value in y_offsets],
+            "x_offsets": [round(value, 4) for value in x_offsets],
+            "z_values": [round(value, 4) for value in z_values],
+            "z_capture_order": [round(value, 4) for value in z_capture_order],
+            "bed_feature_z_mm": round(bed_feature_z_mm, 4),
+            "current_calib_yaml": {
+                "tools": {
+                    "t0": {"z_endstop": round(current_t0_z_endstop, 4)},
+                    "t1": {"z_endstop": round(current_t1_z_endstop, 4)},
+                }
+            },
+            "lighting": {
+                "bed_y_sweep": {"macro": BED_Y_JOB_LIGHTING},
+                "tool_xz_sweep": {"macro": NOZZLE_Z_TOOL_LIGHTING},
+            },
+        },
+    )
+
+
 def render_acquisition_gcode(
     job: VisionJob,
     *,
@@ -489,14 +669,56 @@ def render_acquisition_gcode(
             f"MANIFEST_HASH={manifest_hash} GCODE_HASH={gcode_hash}"
         ),
         f"VISION_PROFILE CAMERA={job.camera} PROFILE={job.profile}",
-        job.frames[0].lighting if job.frames else VISION_JOB_LIGHTING,
         "",
     ]
     active_tool: str | None = None
+    active_lighting: str | None = None
+    active_profile = job.profile
+    previous_tool_frame: VisionJobFrame | None = None
+    travel_z = None
+    if job.kind == NOZZLE_Z_JOB_KIND:
+        parameters = job.measurement_parameters or {}
+        tool_pose = parameters.get("tool_pose") or {}
+        try:
+            travel_z = float(tool_pose.get("travel_z"))
+        except (TypeError, ValueError):
+            travel_z = None
     for frame in job.frames:
+        if frame.profile != active_profile:
+            lines.append(
+                f"VISION_PROFILE CAMERA={frame.camera} PROFILE={frame.profile}"
+            )
+            active_profile = frame.profile
+        if frame.lighting != active_lighting:
+            lines.append(frame.lighting)
+            lines.append(f"G4 P{VISION_LIGHTING_SETTLE_MS}")
+            lines.append("")
+            active_lighting = frame.lighting
         if frame.tool != active_tool:
             lines.append(frame.tool)
             active_tool = frame.tool
+        if (
+            job.kind == NOZZLE_Z_JOB_KIND
+            and frame.phase == "tool_xz_sweep"
+            and previous_tool_frame is not None
+            and (
+                frame.tool != previous_tool_frame.tool
+                or abs(frame.x - previous_tool_frame.x) > 1.0e-6
+                or abs(frame.y - previous_tool_frame.y) > 1.0e-6
+            )
+            and travel_z is not None
+        ):
+            lines.extend(
+                [
+                    f"G1 Z{gcode_float(travel_z)} F{frame.feedrate:.0f}",
+                    "M400",
+                    (
+                        f"G1 X{gcode_float(frame.x)} Y{gcode_float(frame.y)} "
+                        f"Z{gcode_float(travel_z)} F{frame.feedrate:.0f}"
+                    ),
+                    "M400",
+                ]
+            )
         lines.extend(
             [
                 (
@@ -513,6 +735,8 @@ def render_acquisition_gcode(
                 "",
             ]
         )
+        if frame.phase == "tool_xz_sweep":
+            previous_tool_frame = frame
     lines.append(f"VISION_JOB_END JOB={job.job_id} EXPECTED_FRAMES={len(job.frames)}")
     return "\n".join(lines) + "\n"
 
@@ -687,6 +911,80 @@ def prepare_bed_y_sweep_job(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def prepare_nozzle_z_sweep_job(args: argparse.Namespace) -> dict[str, Any]:
+    job = build_nozzle_z_vision_job(
+        name=args.name,
+        job_root=Path(args.job_root),
+        job_id=args.job_id,
+        bed_y_x=float(args.bed_y_x),
+        bed_y_y=float(args.bed_y_y),
+        bed_y_z=float(args.bed_y_z),
+        tool_x=float(args.tool_x),
+        tool_y=float(args.tool_y),
+        travel_z=float(args.travel_z),
+        y_offsets=parse_y_offsets(args.y_offsets),
+        x_offsets=parse_float_list(args.x_offsets, "X offset"),
+        z_values=parse_float_list(args.z_values, "Z sample"),
+        bed_feature_z_mm=float(args.bed_feature_z_mm),
+        current_t0_z_endstop=float(args.current_t0_z_endstop),
+        current_t1_z_endstop=float(args.current_t1_z_endstop),
+        feedrate=float(args.feedrate),
+        settle_time=float(args.settle_time),
+        camera=sanitize_name(args.camera),
+        profile=sanitize_name(args.profile),
+    )
+    if job.job_dir.exists():
+        raise FileExistsError(f"Vision job directory already exists: {job.job_dir}")
+    job = job_with_hashes(job)
+    manifest = build_manifest(job)
+    gcode = render_acquisition_gcode(
+        job,
+        manifest_hash=job.manifest_hash,
+        gcode_hash=job.gcode_hash,
+    )
+    state = {
+        "schema_version": VISION_JOB_SCHEMA_VERSION,
+        "job_id": job.job_id,
+        "kind": job.kind,
+        "state": "prepared",
+        "created_at_utc": job.created_at_utc,
+        "updated_at_utc": job.created_at_utc,
+        "frame_count": len(job.frames),
+        "committed_frame_count": 0,
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+    event = {
+        "timestamp_utc": job.created_at_utc,
+        "job_id": job.job_id,
+        "event": "prepared",
+        "state": "prepared",
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+
+    job.frames_dir.mkdir(parents=True)
+    job.analysis_dir.mkdir(parents=True)
+    atomic_write_json(job.manifest_path, manifest)
+    atomic_write_text(job.gcode_path, gcode)
+    atomic_write_json(job.state_path, state)
+    atomic_write_text(job.events_path, json.dumps(event, sort_keys=True) + "\n")
+
+    return {
+        "ok": True,
+        "job_id": job.job_id,
+        "job_dir": str(job.job_dir),
+        "manifest_path": str(job.manifest_path),
+        "gcode_path": str(job.gcode_path),
+        "state_path": str(job.state_path),
+        "events_path": str(job.events_path),
+        "state": "prepared",
+        "frame_count": len(job.frames),
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+
+
 def load_job_frames_for_analysis(manifest_path: Path) -> list[dict[str, Any]]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     job_dir = manifest_path.parent
@@ -767,6 +1065,54 @@ def load_bed_y_job_frames_for_analysis(manifest_path: Path) -> list[dict[str, An
     return frames
 
 
+def load_nozzle_z_job_frames_for_analysis(manifest_path: Path) -> list[dict[str, Any]]:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    job_dir = manifest_path.parent
+    frames: list[dict[str, Any]] = []
+    for frame in manifest["frames"]:
+        frame_id = frame["frame"]
+        image_path = job_dir / "frames" / f"{frame_id}.jpg"
+        metadata_path = job_dir / "frames" / f"{frame_id}.json"
+        if not image_path.exists():
+            raise FileNotFoundError(f"Missing committed job frame image: {image_path}")
+        if not metadata_path.exists():
+            raise FileNotFoundError(
+                f"Missing committed job frame sidecar: {metadata_path}"
+            )
+        pose = frame["pose"]
+        capture = json.loads(metadata_path.read_text(encoding="utf-8"))
+        record = {
+            "tool": str(frame.get("tool") or "T0").lower(),
+            "macro": str(frame.get("tool") or "T0").upper(),
+            "dx": float(frame.get("dx", 0.0)),
+            "dx_label": dx_label(float(frame.get("dx", 0.0))),
+            "phase": frame.get("phase"),
+            "target": frame.get("target"),
+            "prefix": frame_id,
+            "target_gcode_position": {
+                "x": float(pose["x"]),
+                "y": float(pose["y"]),
+                "z": float(pose["z"]),
+            },
+            "lighting": frame.get("lighting"),
+            "camera": frame.get("camera"),
+            "profile": frame.get("profile"),
+            "capture": capture,
+            "image_path": str(image_path),
+            "metadata_path": str(metadata_path),
+            "image_url": safe_vision_url(image_path),
+            "metadata_url": safe_vision_url(metadata_path),
+        }
+        if frame.get("y_offset") is not None:
+            record["y_offset"] = float(frame["y_offset"])
+        if frame.get("x_offset") is not None:
+            record["x_offset"] = float(frame["x_offset"])
+        if frame.get("z_sample") is not None:
+            record["z_sample"] = float(frame["z_sample"])
+        frames.append(record)
+    return frames
+
+
 def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -835,7 +1181,9 @@ def verify_jpeg_header(path: Path) -> None:
         raise RuntimeError(f"{path} is not a JPEG frame")
 
 
-def verify_prepared_job_integrity(job_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def verify_prepared_job_integrity(
+    job_dir: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     manifest_path = job_dir / "manifest.json"
     state_path = job_dir / "state.json"
     gcode_path = job_dir / "acquisition.gcode"
@@ -886,7 +1234,10 @@ def ensure_job_poses_inside_limits(
         pose = frame.get("pose") or {}
         for axis, index in (("x", 0), ("y", 1), ("z", 2)):
             value = float(pose[axis])
-            if value < float(axis_min[index]) - 1e-6 or value > float(axis_max[index]) + 1e-6:
+            if (
+                value < float(axis_min[index]) - 1e-6
+                or value > float(axis_max[index]) + 1e-6
+            ):
                 raise RuntimeError(
                     f"frame {frame.get('frame')} {axis.upper()}={value:.4f} is outside "
                     f"Klipper limits {axis_min[index]}..{axis_max[index]}"
@@ -941,7 +1292,9 @@ def stage_job_gcode_to_virtual_sd(
     reused = False
     if target.exists():
         if target.read_bytes() != source_bytes:
-            raise RuntimeError(f"refusing to overwrite existing virtual SD file: {target}")
+            raise RuntimeError(
+                f"refusing to overwrite existing virtual SD file: {target}"
+            )
         reused = True
     else:
         tmp = target.with_name(f".{target.name}.tmp")
@@ -1067,7 +1420,9 @@ def job_execution_summary(
         "job_id": manifest.get("job_id"),
         "job_dir": str(job_dir),
         "manifest_path": str(job_dir / "manifest.json"),
-        "gcode_path": str(job_dir / str(manifest.get("gcode_file") or "acquisition.gcode")),
+        "gcode_path": str(
+            job_dir / str(manifest.get("gcode_file") or "acquisition.gcode")
+        ),
         "state_path": str(job_dir / "state.json"),
         "events_path": str(job_dir / "events.jsonl"),
         "state": state.get("state"),
@@ -1230,6 +1585,13 @@ def run_bed_y_acquisition_job(args: argparse.Namespace) -> dict[str, Any]:
     return start_prepared_job(start_args)
 
 
+def run_nozzle_z_acquisition_job(args: argparse.Namespace) -> dict[str, Any]:
+    summary = prepare_nozzle_z_sweep_job(args)
+    start_args = argparse.Namespace(**vars(args))
+    start_args.start_prepared_job = summary["job_id"]
+    return start_prepared_job(start_args)
+
+
 def job_analysis_paths(job_dir: Path) -> dict[str, Path]:
     analysis_dir = job_dir / "analysis"
     return {
@@ -1257,10 +1619,11 @@ def assert_analysis_outputs_absent(paths: dict[str, Path]) -> None:
 
 def mark_job_analysing(job_dir: Path) -> dict[str, Any]:
     state = read_json(job_dir / "state.json")
-    if state.get("state") != "acquired":
+    state_name = state.get("state")
+    if state_name not in {"acquired", "completed", "failed"}:
         raise RuntimeError(
-            f"vision job {state.get('job_id')} is {state.get('state')!r}, "
-            "expected 'acquired' before analysis"
+            f"vision job {state.get('job_id')} is {state_name!r}, "
+            "expected 'acquired', 'completed', or 'failed' before analysis"
         )
     now = datetime.now(timezone.utc).isoformat()
     state.update(
@@ -1377,9 +1740,7 @@ def build_idex_nozzle_sweep_facts(
         "nozzle_delta_t1_minus_t0": (
             analysis.get("nozzle_delta_t1_minus_t0") if accepted else None
         ),
-        "red_marker_delta_t1_minus_t0": analysis.get(
-            "red_marker_delta_t1_minus_t0"
-        ),
+        "red_marker_delta_t1_minus_t0": analysis.get("red_marker_delta_t1_minus_t0"),
         "quality": {
             "cross_match": analysis.get("cross_match"),
             "red_marker_fits": analysis.get("red_marker_fits"),
@@ -1413,7 +1774,9 @@ def median_float(values: list[float]) -> float | None:
     return (ordered[middle - 1] + ordered[middle]) / 2.0
 
 
-def subpixel_peak_offset(response: Any, max_loc: tuple[int, int]) -> tuple[float, float]:
+def subpixel_peak_offset(
+    response: Any, max_loc: tuple[int, int]
+) -> tuple[float, float]:
     x, y = max_loc
     height, width = response.shape[:2]
 
@@ -1647,7 +2010,9 @@ def match_bed_y_roi_mode(
         }
     vector = fit["axis_vector_px_per_mm"]
     scale = math.hypot(float(vector[0]), float(vector[1]))
-    angle = math.degrees(math.atan2(float(vector[1]), float(vector[0]))) if scale else None
+    angle = (
+        math.degrees(math.atan2(float(vector[1]), float(vector[0]))) if scale else None
+    )
     corr_min = float(fit.get("correlation_min") or 0.0)
     corr_threshold = 0.72 if mode.startswith("grad") else 0.82
     hard_failures: list[str] = []
@@ -1658,7 +2023,9 @@ def match_bed_y_roi_mode(
             f"correlation_min {corr_min:.3f} below {corr_threshold:.3f}"
         )
     if float(fit["residual_rms_px"]) > 1.2:
-        hard_failures.append(f"residual RMS {float(fit['residual_rms_px']):.3f}px too high")
+        hard_failures.append(
+            f"residual RMS {float(fit['residual_rms_px']):.3f}px too high"
+        )
     if not (7.0 <= scale <= 14.5):
         hard_failures.append(f"scale {scale:.3f}px/mm outside expected local range")
     if abs(float(vector[0])) > 1.5:
@@ -1734,9 +2101,9 @@ def bed_y_parallax_spread(candidates: list[dict[str, Any]]) -> dict[str, Any]:
         "accepted_rois": [candidate.get("roi_name") for candidate in selected],
         "axis_vector_spread_px_per_mm": round(vector_spread, 4),
         "scale_spread_px_per_mm": round(scale_spread, 4),
-        "scale_spread_percent": round(100.0 * scale_spread / scale_median, 4)
-        if scale_median > 0
-        else None,
+        "scale_spread_percent": (
+            round(100.0 * scale_spread / scale_median, 4) if scale_median > 0 else None
+        ),
         "angle_spread_deg": round(angle_spread, 4),
         "meaning": "local perspective variation between accepted bed-feature ROIs; not a full Z-height solve",
     }
@@ -1868,14 +2235,18 @@ def write_bed_y_contact_sheet(
         )
     else:
         failures = analysis.get("hard_failures") or [analysis.get("message")]
-        summary_lines.append(f"STATUS: FAILED; {'; '.join(str(item) for item in failures[:3])}")
+        summary_lines.append(
+            f"STATUS: FAILED; {'; '.join(str(item) for item in failures[:3])}"
+        )
     spread = analysis.get("bed_y_parallax_spread") or {}
     summary_lines.append(
         "local parallax spread: "
         f"vectors={spread.get('axis_vector_spread_px_per_mm')}px/mm "
         f"scale={spread.get('scale_spread_px_per_mm')}px/mm"
     )
-    cv2.rectangle(sheet, (0, tile_h), (sheet.shape[1], sheet.shape[0]), (238, 238, 238), -1)
+    cv2.rectangle(
+        sheet, (0, tile_h), (sheet.shape[1], sheet.shape[0]), (238, 238, 238), -1
+    )
     draw_text_lines(sheet, summary_lines, (24, tile_h + 36), line_height=27, scale=0.58)
     cv2.imwrite(str(contact_sheet_path), sheet, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
 
@@ -1969,7 +2340,8 @@ def analyze_bed_y_sweep_frames(
     message = (
         "Bed Y feature motion accepted."
         if ok
-        else "Bed Y feature motion rejected: " + "; ".join(str(item) for item in hard_failures)
+        else "Bed Y feature motion rejected: "
+        + "; ".join(str(item) for item in hard_failures)
     )
     return {
         "ok": ok,
@@ -1983,28 +2355,28 @@ def analyze_bed_y_sweep_frames(
         "accepted_roi_results": [
             candidate for candidate in candidates if candidate.get("accepted")
         ],
-        "bed_y_axis_vector_px_per_mm": selected.get("bed_y_axis_vector_px_per_mm")
-        if selected and ok
-        else None,
-        "bed_y_scale_px_per_mm": selected.get("bed_y_scale_px_per_mm")
-        if selected and ok
-        else None,
+        "bed_y_axis_vector_px_per_mm": (
+            selected.get("bed_y_axis_vector_px_per_mm") if selected and ok else None
+        ),
+        "bed_y_scale_px_per_mm": (
+            selected.get("bed_y_scale_px_per_mm") if selected and ok else None
+        ),
         "bed_y_mm_per_px": selected.get("bed_y_mm_per_px") if selected and ok else None,
-        "bed_y_axis_angle_deg": selected.get("bed_y_axis_angle_deg")
-        if selected and ok
-        else None,
-        "bed_y_cross_axis_px_per_mm": selected.get("bed_y_cross_axis_px_per_mm")
-        if selected and ok
-        else None,
-        "bed_y_fit_residual_rms_px": selected.get("bed_y_fit_residual_rms_px")
-        if selected
-        else None,
-        "bed_y_correlation_min": selected.get("bed_y_correlation_min")
-        if selected
-        else None,
-        "bed_y_correlation_median": selected.get("bed_y_correlation_median")
-        if selected
-        else None,
+        "bed_y_axis_angle_deg": (
+            selected.get("bed_y_axis_angle_deg") if selected and ok else None
+        ),
+        "bed_y_cross_axis_px_per_mm": (
+            selected.get("bed_y_cross_axis_px_per_mm") if selected and ok else None
+        ),
+        "bed_y_fit_residual_rms_px": (
+            selected.get("bed_y_fit_residual_rms_px") if selected else None
+        ),
+        "bed_y_correlation_min": (
+            selected.get("bed_y_correlation_min") if selected else None
+        ),
+        "bed_y_correlation_median": (
+            selected.get("bed_y_correlation_median") if selected else None
+        ),
         "bed_y_parallax_spread": spread,
         "lighting": frames[0].get("lighting") if frames else BED_Y_JOB_LIGHTING,
         "reference_frame": (
@@ -2058,6 +2430,642 @@ def build_bed_y_motion_facts(
     }
 
 
+def linear_fit_xy(xs: list[float], ys: list[float]) -> dict[str, Any]:
+    if len(xs) != len(ys) or len(xs) < 2:
+        return {"ok": False, "rejection_reason": "need at least two samples"}
+    mean_x = sum(xs) / len(xs)
+    mean_y = sum(ys) / len(ys)
+    denom = sum((value - mean_x) ** 2 for value in xs)
+    if denom <= 0:
+        return {"ok": False, "rejection_reason": "sample x values do not vary"}
+    slope = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys)) / denom
+    intercept = mean_y - slope * mean_x
+    residuals = [y - (intercept + slope * x) for x, y in zip(xs, ys)]
+    rms = math.sqrt(sum(value * value for value in residuals) / len(residuals))
+    return {
+        "ok": True,
+        "count": len(xs),
+        "slope": slope,
+        "intercept": intercept,
+        "residual_rms": rms,
+        "residuals": residuals,
+    }
+
+
+def detect_nozzle_z_tip(image: Any, frame: dict[str, Any]) -> dict[str, Any]:
+    height, width = image.shape[:2]
+    attempts: list[dict[str, Any]] = []
+    red = detect_red_marker(image)
+    frame["red_marker"] = red
+    if red.get("accepted"):
+        try:
+            red_roi = derive_nozzle_roi(red, width, height)
+            candidates = detect_nozzle_candidates(image, red_roi)
+            attempts.append(
+                {
+                    "source": "red_marker_roi",
+                    "roi": list(red_roi),
+                    "candidate_count": len(candidates),
+                }
+            )
+            if candidates:
+                best = candidates[0]
+                return {
+                    "accepted": True,
+                    "source": "red_marker_roi",
+                    "roi": list(red_roi),
+                    "center_px": [round(best["cx"], 3), round(best["cy"], 3)],
+                    "candidate": best,
+                    "candidates": candidates[:6],
+                    "attempts": attempts,
+                }
+        except RuntimeError as exc:
+            attempts.append({"source": "red_marker_roi", "error": str(exc)})
+
+    generic_roi = scale_rect_1080(NOZZLE_Z_TIP_ROI_1080, width, height)
+    candidates = detect_nozzle_candidates(image, generic_roi)
+    attempts.append(
+        {
+            "source": "generic_nozzle_z_roi",
+            "roi": list(generic_roi),
+            "candidate_count": len(candidates),
+        }
+    )
+    if candidates:
+        best = candidates[0]
+        return {
+            "accepted": True,
+            "source": "generic_nozzle_z_roi",
+            "roi": list(generic_roi),
+            "center_px": [round(best["cx"], 3), round(best["cy"], 3)],
+            "candidate": best,
+            "candidates": candidates[:6],
+            "attempts": attempts,
+        }
+    return {
+        "accepted": False,
+        "roi": list(generic_roi),
+        "rejection_reason": "no nozzle tip candidate found",
+        "attempts": attempts,
+        "candidates": [],
+    }
+
+
+def annotate_nozzle_z_frame(
+    image: Any, frame: dict[str, Any], detection: dict[str, Any]
+) -> Any:
+    import cv2
+
+    overlay = image.copy()
+    red = frame.get("red_marker") or {}
+    if red.get("roi"):
+        x, y, w, h = red["roi"]
+        cv2.rectangle(overlay, (x, y), (x + w, y + h), (255, 180, 0), 2)
+    if red.get("accepted"):
+        bx, by, bw, bh = red["bbox"]
+        cx, cy = red["center_px"]
+        cv2.rectangle(overlay, (bx, by), (bx + bw, by + bh), (0, 0, 255), 2)
+        cv2.drawMarker(
+            overlay,
+            (int(round(cx)), int(round(cy))),
+            (0, 0, 255),
+            markerType=cv2.MARKER_CROSS,
+            markerSize=24,
+            thickness=2,
+        )
+    roi = detection.get("roi")
+    if roi:
+        x, y, w, h = roi
+        cv2.rectangle(overlay, (x, y), (x + w, y + h), (0, 220, 255), 2)
+    for candidate in detection.get("candidates") or []:
+        cv2.circle(
+            overlay,
+            (int(round(candidate["cx"])), int(round(candidate["cy"]))),
+            int(round(candidate.get("r") or 10)),
+            (255, 255, 0),
+            1,
+            cv2.LINE_AA,
+        )
+    if detection.get("accepted"):
+        cx, cy = detection["center_px"]
+        cv2.drawMarker(
+            overlay,
+            (int(round(cx)), int(round(cy))),
+            (0, 255, 0),
+            markerType=cv2.MARKER_TILTED_CROSS,
+            markerSize=30,
+            thickness=2,
+        )
+    label = (
+        f"{frame['tool'].upper()} x={frame.get('x_offset', frame.get('dx')):.3g} "
+        f"z={frame.get('z_sample'):.3g} "
+        f"{detection.get('source') if detection.get('accepted') else 'rejected'}"
+    )
+    cv2.rectangle(overlay, (0, 0), (860, 48), (0, 0, 0), -1)
+    cv2.putText(
+        overlay,
+        label,
+        (18, 34),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.82,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+    return overlay
+
+
+def analyze_tool_xz_sweep_frames(
+    frames: list[dict[str, Any]], run_dir: Path, overlay_dir: Path | None = None
+) -> dict[str, Any]:
+    try:
+        import cv2
+    except Exception as exc:  # pragma: no cover - depends on Pi package install
+        return {
+            "ok": False,
+            "proxy_only": True,
+            "error": f"OpenCV import failed: {exc}",
+            "hard_failures": [f"OpenCV import failed: {exc}"],
+        }
+
+    hard_failures: list[str] = []
+    accepted_samples: list[dict[str, Any]] = []
+    for frame in frames:
+        image = cv2.imread(frame["image_path"])
+        if image is None:
+            reason = f"Could not read {frame['image_path']}"
+            frame["analysis_error"] = reason
+            hard_failures.append(reason)
+            continue
+        height, width = image.shape[:2]
+        frame["image_width"] = width
+        frame["image_height"] = height
+        detection = detect_nozzle_z_tip(image, frame)
+        frame["nozzle_z_detection"] = detection
+        if detection.get("accepted"):
+            center = detection["center_px"]
+            frame["point_px"] = center
+            accepted_samples.append(
+                {
+                    "tool": frame["tool"],
+                    "x_offset": float(frame.get("x_offset", frame.get("dx", 0.0))),
+                    "z_sample": float(frame["z_sample"]),
+                    "point_px": center,
+                    "frame": frame["prefix"],
+                }
+            )
+        else:
+            hard_failures.append(
+                f"{frame['prefix']}: {detection.get('rejection_reason')}"
+            )
+        overlay = annotate_nozzle_z_frame(image, frame, detection)
+        overlay_root = overlay_dir or run_dir
+        overlay_root.mkdir(parents=True, exist_ok=True)
+        overlay_path = overlay_root / f"{frame['prefix']}_overlay.jpg"
+        cv2.imwrite(str(overlay_path), overlay, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+        frame["overlay_path"] = str(overlay_path)
+        frame["overlay_url"] = safe_vision_url(overlay_path)
+
+    fits_by_tool: dict[str, dict[str, Any]] = {"t0": {}, "t1": {}}
+    all_vectors: list[tuple[float, float]] = []
+    for tool in ("t0", "t1"):
+        z_values = sorted(
+            {
+                sample["z_sample"]
+                for sample in accepted_samples
+                if sample["tool"] == tool
+            },
+            reverse=True,
+        )
+        for z_sample in z_values:
+            group = [
+                {"dx": sample["x_offset"], "point_px": sample["point_px"]}
+                for sample in accepted_samples
+                if sample["tool"] == tool and sample["z_sample"] == z_sample
+            ]
+            fit = fit_points_by_dx(group)
+            fit["z_sample"] = z_sample
+            fit["sample_count"] = len(group)
+            fits_by_tool[tool][dx_label(z_sample)] = fit
+            if fit.get("ok") and fit.get("px_per_mm", 0) > 0:
+                vector = fit["vector_px_per_mm"]
+                all_vectors.append((float(vector[0]), float(vector[1])))
+
+    if not all_vectors:
+        hard_failures.append("no per-Z X-scale fits could be computed")
+        axis_unit = None
+    else:
+        avg_vector = (
+            sum(vector[0] for vector in all_vectors) / len(all_vectors),
+            sum(vector[1] for vector in all_vectors) / len(all_vectors),
+        )
+        axis_len = math.hypot(avg_vector[0], avg_vector[1])
+        axis_unit = (
+            (avg_vector[0] / axis_len, avg_vector[1] / axis_len)
+            if axis_len > 0
+            else None
+        )
+        if axis_unit is None:
+            hard_failures.append("average image X axis has zero length")
+
+    scale_samples_by_tool: dict[str, list[dict[str, Any]]] = {"t0": [], "t1": []}
+    scale_fit_by_tool: dict[str, dict[str, Any]] = {}
+    if axis_unit:
+        ux, uy = axis_unit
+        for tool in ("t0", "t1"):
+            for fit in fits_by_tool[tool].values():
+                if not fit.get("ok"):
+                    continue
+                vector = fit["vector_px_per_mm"]
+                projected_scale = float(vector[0]) * ux + float(vector[1]) * uy
+                scale_samples_by_tool[tool].append(
+                    {
+                        "z_sample": float(fit["z_sample"]),
+                        "scale_px_per_mm": projected_scale,
+                        "fit_residual_rms_px": fit.get("residual_rms_px"),
+                        "sample_count": fit.get("sample_count"),
+                    }
+                )
+            samples = scale_samples_by_tool[tool]
+            if len(samples) < 3:
+                scale_fit_by_tool[tool] = {
+                    "ok": False,
+                    "rejection_reason": "need at least three Z samples",
+                }
+                hard_failures.append(f"{tool.upper()}: need at least three Z samples")
+                continue
+            fit = linear_fit_xy(
+                [float(sample["z_sample"]) for sample in samples],
+                [float(sample["scale_px_per_mm"]) for sample in samples],
+            )
+            if fit.get("ok"):
+                scale_residual = float(fit["residual_rms"])
+                scale_quality_ok = (
+                    scale_residual <= NOZZLE_Z_MAX_SCALE_FIT_RESIDUAL_PX_PER_MM
+                )
+                fit.update(
+                    {
+                        "slope_px_per_mm2": round(float(fit["slope"]), 6),
+                        "intercept_px_per_mm": round(float(fit["intercept"]), 6),
+                        "residual_rms_px_per_mm": round(scale_residual, 6),
+                        "accepted": scale_quality_ok,
+                        "samples": [
+                            {
+                                "z_sample": round(float(sample["z_sample"]), 4),
+                                "scale_px_per_mm": round(
+                                    float(sample["scale_px_per_mm"]), 6
+                                ),
+                                "fit_residual_rms_px": sample.get(
+                                    "fit_residual_rms_px"
+                                ),
+                                "sample_count": sample.get("sample_count"),
+                            }
+                            for sample in samples
+                        ],
+                    }
+                )
+                noisy_x_fits = [
+                    sample
+                    for sample in samples
+                    if sample.get("fit_residual_rms_px") is None
+                    or float(sample["fit_residual_rms_px"])
+                    > NOZZLE_Z_MAX_PER_Z_X_FIT_RESIDUAL_PX
+                ]
+                if noisy_x_fits:
+                    fit["accepted"] = False
+                    details = ", ".join(
+                        f"Z={float(sample['z_sample']):.3g} "
+                        f"rms={float(sample.get('fit_residual_rms_px') or 0):.3f}px"
+                        for sample in noisy_x_fits
+                    )
+                    hard_failures.append(
+                        f"{tool.upper()}: per-Z X fit residual too high ({details})"
+                    )
+                if not scale_quality_ok:
+                    hard_failures.append(
+                        f"{tool.upper()}: scale-vs-Z residual "
+                        f"{scale_residual:.3f}px/mm too high"
+                    )
+            else:
+                hard_failures.append(f"{tool.upper()}: {fit.get('rejection_reason')}")
+            scale_fit_by_tool[tool] = fit
+
+    slope_values = [
+        float(fit["slope"]) for fit in scale_fit_by_tool.values() if fit.get("ok")
+    ]
+    common_slope = sum(slope_values) / len(slope_values) if slope_values else None
+    if common_slope is None or abs(common_slope) < NOZZLE_Z_MIN_SCALE_SLOPE_ABS:
+        hard_failures.append("tool X image scale does not vary enough with Z")
+    if len(slope_values) == 2:
+        first_slope, second_slope = slope_values
+        if abs(first_slope) < NOZZLE_Z_MIN_SCALE_SLOPE_ABS:
+            hard_failures.append(
+                f"T0: scale-vs-Z slope {first_slope:.6f}px/mm^2 too small"
+            )
+        if abs(second_slope) < NOZZLE_Z_MIN_SCALE_SLOPE_ABS:
+            hard_failures.append(
+                f"T1: scale-vs-Z slope {second_slope:.6f}px/mm^2 too small"
+            )
+        if first_slope * second_slope <= 0:
+            hard_failures.append(
+                "T0/T1 scale-vs-Z slopes disagree in sign "
+                f"({first_slope:.6f}, {second_slope:.6f})"
+            )
+        elif common_slope is not None and abs(common_slope) > 0:
+            relative_spread = abs(first_slope - second_slope) / abs(common_slope)
+            if relative_spread > NOZZLE_Z_MAX_TOOL_SLOPE_RELATIVE_SPREAD:
+                hard_failures.append(
+                    "T0/T1 scale-vs-Z slopes disagree too much "
+                    f"(relative spread {relative_spread:.3f})"
+                )
+
+    ok = (
+        len(slope_values) == 2
+        and common_slope is not None
+        and abs(common_slope) >= NOZZLE_Z_MIN_SCALE_SLOPE_ABS
+        and all(scale_fit_by_tool.get(tool, {}).get("ok") for tool in ("t0", "t1"))
+        and all(
+            scale_fit_by_tool.get(tool, {}).get("accepted") for tool in ("t0", "t1")
+        )
+        and not hard_failures
+    )
+    if ok:
+        message = "Tool X/Z image-scale fits accepted."
+    else:
+        message = "Tool X/Z image-scale fits rejected: " + "; ".join(hard_failures)
+
+    return {
+        "ok": ok,
+        "proxy_only": not ok,
+        "hard_failures": hard_failures,
+        "accepted_sample_count": len(accepted_samples),
+        "frame_count": len(frames),
+        "x_axis_unit_vector_px": (
+            [
+                round(axis_unit[0], 6),
+                round(axis_unit[1], 6),
+            ]
+            if axis_unit
+            else None
+        ),
+        "per_z_x_fits": fits_by_tool,
+        "scale_samples_by_tool": scale_samples_by_tool,
+        "scale_fit_by_tool": scale_fit_by_tool,
+        "common_scale_slope_px_per_mm2": (
+            round(common_slope, 6) if common_slope is not None else None
+        ),
+        "lighting": frames[0].get("lighting") if frames else NOZZLE_Z_TOOL_LIGHTING,
+        "message": message,
+    }
+
+
+def phase_lighting_from_manifest(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    lighting: dict[str, dict[str, Any]] = {}
+    parameters = manifest.get("measurement_parameters") or {}
+    parameter_lighting = parameters.get("lighting")
+    if isinstance(parameter_lighting, dict):
+        for phase, value in parameter_lighting.items():
+            if isinstance(value, dict):
+                lighting[str(phase)] = dict(value)
+            else:
+                lighting[str(phase)] = {"macro": value}
+    for frame in manifest.get("frames") or []:
+        phase = frame.get("phase")
+        macro = frame.get("lighting")
+        if phase and macro:
+            lighting.setdefault(str(phase), {"macro": macro})
+    return lighting
+
+
+def build_nozzle_z_offsets_facts(
+    *, manifest: dict[str, Any], analysis: dict[str, Any], result_path: Path
+) -> dict[str, Any]:
+    bed_analysis = analysis.get("bed_y_sweep") or {}
+    tool_analysis = analysis.get("tool_xz_sweep") or {}
+    parameters = manifest.get("measurement_parameters") or {}
+    current = parameters.get("current_calib_yaml") or {}
+    current_tools = current.get("tools") or {}
+    current_t0 = float(
+        ((current_tools.get("t0") or {}).get("z_endstop") or DEFAULT_T0_Z_ENDSTOP)
+    )
+    current_t1 = float(
+        ((current_tools.get("t1") or {}).get("z_endstop") or DEFAULT_T1_Z_ENDSTOP)
+    )
+    bed_feature_z_mm = float(
+        parameters.get("bed_feature_z_mm", DEFAULT_NOZZLE_Z_BED_FEATURE_Z_MM)
+    )
+    bed_scale = bed_analysis.get("bed_y_scale_px_per_mm")
+    common_slope = tool_analysis.get("common_scale_slope_px_per_mm2")
+    tool_zero_error: dict[str, Any] = {"T0": None, "T1": None}
+    tool_to_bed_feature: dict[str, Any] = {"T0": None, "T1": None}
+    suggested_calib = {
+        "tools": {
+            "t0": {"z_endstop": None},
+            "t1": {"z_endstop": None},
+        }
+    }
+    suggested_runtime_t1_z_offset = None
+    calibration_inputs_accepted = bool(
+        bed_analysis.get("ok") and tool_analysis.get("ok")
+    )
+    if (
+        calibration_inputs_accepted
+        and bed_scale is not None
+        and common_slope not in (None, 0)
+    ):
+        scale_fit_by_tool = tool_analysis.get("scale_fit_by_tool") or {}
+        for tool_key, public_tool, current_value in (
+            ("t0", "T0", current_t0),
+            ("t1", "T1", current_t1),
+        ):
+            fit = scale_fit_by_tool.get(tool_key) or {}
+            if fit.get("ok") and fit.get("intercept") is not None:
+                z_to_bed = (float(fit["intercept"]) - float(bed_scale)) / float(
+                    common_slope
+                )
+                zero_error = bed_feature_z_mm + z_to_bed
+                tool_to_bed_feature[public_tool] = round(z_to_bed, 6)
+                tool_zero_error[public_tool] = round(zero_error, 6)
+                suggested_calib["tools"][tool_key]["z_endstop"] = round(
+                    current_value + zero_error, 3
+                )
+        t0_new = suggested_calib["tools"]["t0"]["z_endstop"]
+        t1_new = suggested_calib["tools"]["t1"]["z_endstop"]
+        if t0_new is not None and t1_new is not None:
+            suggested_runtime_t1_z_offset = round(float(t0_new) - float(t1_new), 3)
+    delta = None
+    if tool_zero_error["T0"] is not None and tool_zero_error["T1"] is not None:
+        delta = round(float(tool_zero_error["T1"]) - float(tool_zero_error["T0"]), 6)
+    accepted = bool(analysis.get("ok"))
+    hard_failures = analysis.get("hard_failures") or []
+    return {
+        "schema_version": VISION_JOB_SCHEMA_VERSION,
+        "job_id": manifest.get("job_id"),
+        "kind": manifest.get("kind"),
+        "camera": manifest.get("camera"),
+        "profile": manifest.get("profile"),
+        "manifest_hash": manifest.get("manifest_hash"),
+        "gcode_hash": manifest.get("gcode_hash"),
+        "measurement": NOZZLE_Z_MEASUREMENT,
+        "accepted": accepted,
+        "ok": accepted,
+        "source_result": result_path.name,
+        "bed_feature_z_mm": bed_feature_z_mm,
+        "bed_y_axis_vector_px_per_mm": bed_analysis.get("bed_y_axis_vector_px_per_mm"),
+        "bed_y_scale_px_per_mm": bed_scale,
+        "tool_zero_error_mm": tool_zero_error,
+        "tool_z_to_bed_feature_at_command_0_mm": tool_to_bed_feature,
+        "tool_delta_t1_minus_t0_z_mm": delta,
+        "suggested_calib_yaml": suggested_calib,
+        "suggested_runtime_t1_z_offset": suggested_runtime_t1_z_offset,
+        "lighting": phase_lighting_from_manifest(manifest),
+        "quality": {
+            "bed_y_sweep": {
+                "accepted": bool(bed_analysis.get("ok")),
+                "selected_roi": bed_analysis.get("selected_roi"),
+                "feature_mode": bed_analysis.get("feature_mode"),
+                "fit_residual_rms_px": bed_analysis.get("bed_y_fit_residual_rms_px"),
+                "correlation_min": bed_analysis.get("bed_y_correlation_min"),
+                "correlation_median": bed_analysis.get("bed_y_correlation_median"),
+                "parallax_spread": bed_analysis.get("bed_y_parallax_spread"),
+            },
+            "tool_xz_sweep": {
+                "accepted": bool(tool_analysis.get("ok")),
+                "accepted_sample_count": tool_analysis.get("accepted_sample_count"),
+                "frame_count": tool_analysis.get("frame_count"),
+                "common_scale_slope_px_per_mm2": common_slope,
+                "scale_fit_by_tool": tool_analysis.get("scale_fit_by_tool"),
+                "x_axis_unit_vector_px": tool_analysis.get("x_axis_unit_vector_px"),
+            },
+        },
+        "hard_failures": hard_failures,
+        "rejection_reasons": hard_failures,
+    }
+
+
+def write_nozzle_z_contact_sheet(
+    frames: list[dict[str, Any]],
+    analysis: dict[str, Any],
+    contact_sheet_path: Path,
+    *,
+    use_overlays: bool,
+) -> None:
+    import cv2
+    import numpy as np
+
+    tile_w, tile_h = 260, 195
+    cols = 9
+    rows = max(1, math.ceil(len(frames) / cols))
+    summary_h = 285
+    sheet = np.full((rows * tile_h + summary_h, cols * tile_w, 3), 255, dtype=np.uint8)
+    for index, frame in enumerate(frames):
+        source_path = (
+            frame.get("overlay_path") if use_overlays else frame.get("image_path")
+        )
+        image = cv2.imread(str(source_path or frame.get("image_path")))
+        if image is None:
+            continue
+        tile = letterbox(image, tile_w, tile_h)
+        row = index // cols
+        col = index % cols
+        x = col * tile_w
+        y = row * tile_h
+        sheet[y : y + tile_h, x : x + tile_w] = tile
+        cv2.rectangle(sheet, (x, y), (x + tile_w - 1, y + tile_h - 1), (80, 80, 80), 1)
+        label = frame["prefix"]
+        cv2.rectangle(sheet, (x, y), (x + tile_w, y + 28), (0, 0, 0), -1)
+        cv2.putText(
+            sheet,
+            label[:32],
+            (x + 6, y + 20),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.48,
+            (255, 255, 255),
+            1,
+            cv2.LINE_AA,
+        )
+
+    facts = analysis.get("facts_preview") or {}
+    summary_lines = [
+        f"Nozzle camera one-run Z sweep: {analysis.get('run_name')}",
+        f"report: {public_url(contact_sheet_path)}",
+        "phases: bed_y_sweep uses NOZZLE_CAM_Y_FEATURE_LIGHT; tool_xz_sweep uses NOZZLE_CAM_ANALYSIS_LIGHT",
+    ]
+    if analysis.get("ok"):
+        zero = facts.get("tool_zero_error_mm") or {}
+        suggested = facts.get("suggested_calib_yaml", {}).get("tools", {})
+        summary_lines.extend(
+            [
+                "status: accepted",
+                f"T0 zero error={zero.get('T0')}mm, suggested z_endstop={suggested.get('t0', {}).get('z_endstop')}",
+                f"T1 zero error={zero.get('T1')}mm, suggested z_endstop={suggested.get('t1', {}).get('z_endstop')}",
+                f"suggested runtime t1_z_offset={facts.get('suggested_runtime_t1_z_offset')}",
+            ]
+        )
+    else:
+        failures = analysis.get("hard_failures") or [analysis.get("message")]
+        summary_lines.append(
+            f"STATUS: FAILED; {'; '.join(str(item) for item in failures[:3])}"
+        )
+    y0 = rows * tile_h
+    cv2.rectangle(sheet, (0, y0), (sheet.shape[1], sheet.shape[0]), (238, 238, 238), -1)
+    draw_text_lines(sheet, summary_lines, (24, y0 + 36), line_height=27, scale=0.55)
+    cv2.imwrite(str(contact_sheet_path), sheet, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+
+
+def analyze_nozzle_z_sweep_frames(
+    frames: list[dict[str, Any]],
+    run_dir: Path,
+    overlay_dir: Path | None,
+    manifest: dict[str, Any],
+    result_path: Path,
+) -> dict[str, Any]:
+    bed_frames = [frame for frame in frames if frame.get("phase") == "bed_y_sweep"]
+    tool_frames = [frame for frame in frames if frame.get("phase") == "tool_xz_sweep"]
+    bed_analysis = analyze_bed_y_sweep_frames(
+        bed_frames, run_dir, overlay_dir=overlay_dir
+    )
+    tool_analysis = analyze_tool_xz_sweep_frames(
+        tool_frames, run_dir, overlay_dir=overlay_dir
+    )
+    hard_failures: list[str] = []
+    if not bed_analysis.get("ok"):
+        hard_failures.extend(
+            "bed_y_sweep: " + str(item)
+            for item in (bed_analysis.get("hard_failures") or ["rejected"])
+        )
+    if not tool_analysis.get("ok"):
+        hard_failures.extend(
+            "tool_xz_sweep: " + str(item)
+            for item in (tool_analysis.get("hard_failures") or ["rejected"])
+        )
+    ok = bool(bed_analysis.get("ok") and tool_analysis.get("ok"))
+    analysis = {
+        "ok": ok,
+        "proxy_only": not ok,
+        "measurement": NOZZLE_Z_MEASUREMENT,
+        "hard_failures": hard_failures,
+        "bed_y_sweep": bed_analysis,
+        "tool_xz_sweep": tool_analysis,
+        "lighting": phase_lighting_from_manifest(manifest),
+        "phase_frame_counts": {
+            "bed_y_sweep": len(bed_frames),
+            "tool_xz_sweep": len(tool_frames),
+        },
+        "message": (
+            "Nozzle camera one-run Z calibration accepted."
+            if ok
+            else "Nozzle camera one-run Z calibration rejected: "
+            + "; ".join(hard_failures)
+        ),
+    }
+    facts_preview = build_nozzle_z_offsets_facts(
+        manifest=manifest, analysis=analysis, result_path=result_path
+    )
+    analysis["facts_preview"] = facts_preview
+    return analysis
+
+
 def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
     job_id = sanitize_name(args.analyze_job or args.job_id)
     if not job_id:
@@ -2065,14 +3073,16 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
     job_root = Path(args.job_root)
     job_dir = job_dir_from_root(job_root, job_id)
     manifest, state = verify_prepared_job_integrity(job_dir)
-    if state.get("state") != "acquired":
+    state_name = state.get("state")
+    if state_name not in {"acquired", "completed", "failed"}:
         raise RuntimeError(
-            f"vision job {manifest.get('job_id')} is {state.get('state')!r}, "
-            "expected 'acquired'"
+            f"vision job {manifest.get('job_id')} is {state_name!r}, "
+            "expected 'acquired', 'completed', or 'failed'"
         )
     verify_acquired_job_frames(manifest, job_dir)
     paths = job_analysis_paths(job_dir)
-    assert_analysis_outputs_absent(paths)
+    if state_name == "acquired":
+        assert_analysis_outputs_absent(paths)
     paths["analysis_dir"].mkdir(parents=True, exist_ok=True)
     paths["overlays_dir"].mkdir(parents=True, exist_ok=True)
     mark_job_analysing(job_dir)
@@ -2108,6 +3118,34 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
             for frame in manifest.get("frames") or []
             if frame.get("phase") == "bed_y_sweep"
         ]
+    elif manifest.get("kind") == NOZZLE_Z_JOB_KIND:
+        result["phase_frame_counts"] = {
+            phase: sum(
+                1
+                for frame in manifest.get("frames") or []
+                if frame.get("phase") == phase
+            )
+            for phase in ("bed_y_sweep", "tool_xz_sweep")
+        }
+        result["y_offsets"] = [
+            float(frame["y_offset"])
+            for frame in manifest.get("frames") or []
+            if frame.get("phase") == "bed_y_sweep"
+        ]
+        result["x_offsets"] = sorted(
+            {
+                float(frame["x_offset"])
+                for frame in manifest.get("frames") or []
+                if frame.get("phase") == "tool_xz_sweep"
+            }
+        )
+        result["z_values"] = sorted(
+            {
+                float(frame["z_sample"])
+                for frame in manifest.get("frames") or []
+                if frame.get("phase") == "tool_xz_sweep"
+            }
+        )
     else:
         result["dx_values"] = unique_dx_values_from_manifest(manifest)
     try:
@@ -2139,6 +3177,38 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
             facts = build_bed_y_motion_facts(
                 manifest=manifest, analysis=analysis, result_path=paths["result"]
             )
+        elif manifest.get("kind") == NOZZLE_Z_JOB_KIND:
+            frames = load_nozzle_z_job_frames_for_analysis(job_dir / "manifest.json")
+            analysis = analyze_nozzle_z_sweep_frames(
+                frames,
+                paths["analysis_dir"],
+                overlay_dir=paths["overlays_dir"],
+                manifest=manifest,
+                result_path=paths["result"],
+            )
+            analysis.update(
+                {
+                    "run_name": manifest["job_id"],
+                    "job_id": manifest["job_id"],
+                }
+            )
+            facts = build_nozzle_z_offsets_facts(
+                manifest=manifest, analysis=analysis, result_path=paths["result"]
+            )
+            analysis["facts_preview"] = facts
+            if frames:
+                write_nozzle_z_contact_sheet(
+                    frames,
+                    analysis,
+                    paths["raw_contact_sheet"],
+                    use_overlays=False,
+                )
+                write_nozzle_z_contact_sheet(
+                    frames,
+                    analysis,
+                    paths["overlay_contact_sheet"],
+                    use_overlays=True,
+                )
         else:
             frames = load_job_frames_for_analysis(job_dir / "manifest.json")
             analysis = analyze_sweep_frames(
@@ -2154,7 +3224,9 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
             if frames:
                 write_raw_contact_sheet(frames, analysis, paths["raw_contact_sheet"])
                 if all("overlay_path" in frame for frame in frames):
-                    write_contact_sheet(frames, analysis, paths["overlay_contact_sheet"])
+                    write_contact_sheet(
+                        frames, analysis, paths["overlay_contact_sheet"]
+                    )
             facts = build_idex_nozzle_sweep_facts(
                 manifest=manifest, analysis=analysis, result_path=paths["result"]
             )
@@ -2197,7 +3269,11 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
             "measurement": (
                 BED_Y_MEASUREMENT
                 if manifest.get("kind") == BED_Y_JOB_KIND
-                else "idex_nozzle_relative_offset"
+                else (
+                    NOZZLE_Z_MEASUREMENT
+                    if manifest.get("kind") == NOZZLE_Z_JOB_KIND
+                    else "idex_nozzle_relative_offset"
+                )
             ),
             "accepted": False,
             "ok": False,
@@ -2253,6 +3329,29 @@ def run_bed_y_full_job(args: argparse.Namespace) -> dict[str, Any]:
             "message": acquisition.get("error")
             or acquisition.get("failure")
             or "bed Y acquisition failed before analysis",
+        }
+    analyze_args = argparse.Namespace(**vars(args))
+    analyze_args.analyze_job = acquisition["job_id"]
+    result = analyze_acquired_job(analyze_args)
+    result["acquisition"] = {
+        "ok": acquisition.get("ok"),
+        "state": acquisition.get("state"),
+        "virtual_sd_filename": acquisition.get("virtual_sd_filename"),
+        "committed_frame_count": acquisition.get("committed_frame_count"),
+    }
+    return result
+
+
+def run_nozzle_z_full_job(args: argparse.Namespace) -> dict[str, Any]:
+    acquisition = run_nozzle_z_acquisition_job(args)
+    if not acquisition.get("ok"):
+        return {
+            **acquisition,
+            "ok": False,
+            "analysis_started": False,
+            "message": acquisition.get("error")
+            or acquisition.get("failure")
+            or "nozzle Z acquisition failed before analysis",
         }
     analyze_args = argparse.Namespace(**vars(args))
     analyze_args.analyze_job = acquisition["job_id"]
@@ -2324,9 +3423,8 @@ def render_bed_y_motion_result(facts: dict[str, Any], state: dict[str, Any]) -> 
         + format_report_value(spread.get("scale_spread_px_per_mm"), "px/mm")
     )
     if spread.get("scale_spread_percent") is not None:
-        spread_text += (
-            ", "
-            + format_report_value(spread.get("scale_spread_percent"), "%")
+        spread_text += ", " + format_report_value(
+            spread.get("scale_spread_percent"), "%"
         )
     quality_text = (
         "rms "
@@ -2340,7 +3438,9 @@ def render_bed_y_motion_result(facts: dict[str, Any], state: dict[str, Any]) -> 
         (
             "Status",
             f'<span class="{status_class}">{html_text(status_text)}</span>',
-            html_text(state.get("failure") or "; ".join(str(item) for item in hard_failures)),
+            html_text(
+                state.get("failure") or "; ".join(str(item) for item in hard_failures)
+            ),
         ),
         (
             "Bed Y scale",
@@ -2359,7 +3459,9 @@ def render_bed_y_motion_result(facts: dict[str, Any], state: dict[str, Any]) -> 
             "Direction",
             html_text(format_report_value(facts.get("bed_y_axis_angle_deg"), "deg")),
             "cross-axis drift "
-            + html_text(format_report_value(facts.get("bed_y_cross_axis_px_per_mm"), "px/mm")),
+            + html_text(
+                format_report_value(facts.get("bed_y_cross_axis_px_per_mm"), "px/mm")
+            ),
         ),
         (
             "Parallax spread",
@@ -2396,6 +3498,127 @@ def render_bed_y_motion_result(facts: dict[str, Any], state: dict[str, Any]) -> 
     )
 
 
+def render_nozzle_z_offsets_result(facts: dict[str, Any], state: dict[str, Any]) -> str:
+    accepted = bool(facts.get("accepted") or facts.get("ok"))
+    hard_failures = facts.get("hard_failures") or facts.get("rejection_reasons") or []
+    zero = facts.get("tool_zero_error_mm") or {}
+    to_feature = facts.get("tool_z_to_bed_feature_at_command_0_mm") or {}
+    suggested = facts.get("suggested_calib_yaml", {}).get("tools", {})
+    lighting = facts.get("lighting") or {}
+    quality = facts.get("quality") or {}
+    bed_quality = quality.get("bed_y_sweep") or {}
+    tool_quality = quality.get("tool_xz_sweep") or {}
+    status_text = "accepted" if accepted else "rejected"
+    status_class = "result-ok" if accepted else "result-bad"
+    lighting_text = ", ".join(
+        f"{phase}: {(value or {}).get('macro')}"
+        for phase, value in sorted(lighting.items())
+    )
+    rows = [
+        (
+            "Status",
+            f'<span class="{status_class}">{html_text(status_text)}</span>',
+            html_text(
+                state.get("failure") or "; ".join(str(item) for item in hard_failures)
+            ),
+        ),
+        (
+            "Bed feature Z",
+            html_text(format_report_value(facts.get("bed_feature_z_mm"), "mm")),
+            "relative to print-surface Z=0",
+        ),
+        (
+            "Bed Y scale",
+            html_text(format_report_value(facts.get("bed_y_scale_px_per_mm"), "px/mm")),
+            "from bed_y_sweep fixed-feature motion",
+        ),
+        (
+            "T0 zero error",
+            html_text(format_report_value(zero.get("T0"), "mm")),
+            "to bed feature at commanded Z=0: "
+            + html_text(format_report_value(to_feature.get("T0"), "mm")),
+        ),
+        (
+            "T1 zero error",
+            html_text(format_report_value(zero.get("T1"), "mm")),
+            "to bed feature at commanded Z=0: "
+            + html_text(format_report_value(to_feature.get("T1"), "mm")),
+        ),
+        (
+            "Suggested calib.yaml",
+            "t0.z_endstop "
+            + html_text(
+                format_report_number((suggested.get("t0") or {}).get("z_endstop"), 3)
+            )
+            + ", t1.z_endstop "
+            + html_text(
+                format_report_number((suggested.get("t1") or {}).get("z_endstop"), 3)
+            ),
+            "measurement job is report-only; apply separately",
+        ),
+        (
+            "Runtime T1 Z offset",
+            html_text(
+                format_report_value(facts.get("suggested_runtime_t1_z_offset"), "mm")
+            ),
+            "generated as t0.z_endstop - t1.z_endstop",
+        ),
+        (
+            "T1 - T0 Z delta",
+            html_text(
+                format_report_value(facts.get("tool_delta_t1_minus_t0_z_mm"), "mm")
+            ),
+            "positive means T1 zero error is higher than T0",
+        ),
+        (
+            "Tool X/Z quality",
+            "samples "
+            + html_text(
+                format_report_number(tool_quality.get("accepted_sample_count"), 0)
+            )
+            + "/"
+            + html_text(format_report_number(tool_quality.get("frame_count"), 0))
+            + ", slope "
+            + html_text(
+                format_report_value(
+                    tool_quality.get("common_scale_slope_px_per_mm2"),
+                    "px/mm^2",
+                    6,
+                )
+            ),
+            "per-tool X image scale fitted against commanded Z",
+        ),
+        (
+            "Bed Y quality",
+            "roi "
+            + html_text(bed_quality.get("selected_roi"))
+            + ", mode "
+            + html_text(bed_quality.get("feature_mode")),
+            "corr median "
+            + html_text(format_report_number(bed_quality.get("correlation_median"), 3)),
+        ),
+        (
+            "Lighting",
+            html_text(lighting_text or "n/a"),
+            "phase-specific macros recorded in manifest and facts",
+        ),
+    ]
+    empty_note = '<span class="muted">n/a</span>'
+    row_html = "\n".join(
+        "<tr>"
+        f"<th>{html_text(label)}</th>"
+        f"<td>{value}</td>"
+        f"<td>{note or empty_note}</td>"
+        "</tr>"
+        for label, value, note in rows
+    )
+    return (
+        '<section class="measurement"><h2>Nozzle Camera Z Calibration</h2>'
+        "<table><thead><tr><th>Metric</th><th>Value</th><th>Meaning</th></tr>"
+        f"</thead><tbody>{row_html}</tbody></table></section>"
+    )
+
+
 def render_measurement_result(facts_path: Path, state: dict[str, Any]) -> str:
     facts = read_json_optional(facts_path)
     if not facts:
@@ -2412,6 +3635,8 @@ def render_measurement_result(facts_path: Path, state: dict[str, Any]) -> str:
         )
     if facts.get("measurement") == BED_Y_MEASUREMENT:
         return render_bed_y_motion_result(facts, state)
+    if facts.get("measurement") == NOZZLE_Z_MEASUREMENT:
+        return render_nozzle_z_offsets_result(facts, state)
 
     accepted = bool(facts.get("accepted") or facts.get("ok"))
     hard_failures = facts.get("hard_failures") or []
@@ -2436,7 +3661,9 @@ def render_measurement_result(facts_path: Path, state: dict[str, Any]) -> str:
         (
             "Status",
             f'<span class="{status_class}">{html_text(status_text)}</span>',
-            html_text(state.get("reason") or "; ".join(str(item) for item in hard_failures)),
+            html_text(
+                state.get("reason") or "; ".join(str(item) for item in hard_failures)
+            ),
         ),
         (
             "T1 - T0 along X",
@@ -2542,6 +3769,20 @@ def summarize_ui_job(job_dir: Path) -> dict[str, Any] | None:
         "start_requested_at_utc": state.get("start_requested_at_utc"),
         "analysis_completed_at_utc": state.get("analysis_completed_at_utc"),
         "frame_count": manifest.get("frame_count", len(manifest.get("frames") or [])),
+        "phase_frame_counts": {
+            str(phase): sum(
+                1
+                for frame in manifest.get("frames") or []
+                if frame.get("phase") == phase
+            )
+            for phase in sorted(
+                {
+                    frame.get("phase")
+                    for frame in manifest.get("frames") or []
+                    if frame.get("phase")
+                }
+            )
+        },
         "committed_frame_count": state.get("committed_frame_count", 0),
         "manifest_hash": manifest.get("manifest_hash"),
         "gcode_hash": manifest.get("gcode_hash"),
@@ -2768,9 +4009,7 @@ def render_job_rows(jobs: list[dict[str, Any]]) -> str:
     return (
         "<table><thead><tr><th>Job</th><th>State</th><th>Kind</th>"
         "<th>Created</th><th>Updated</th><th>Frames</th><th>Reason</th>"
-        "</tr></thead><tbody>"
-        + "\n".join(rows)
-        + "</tbody></table>"
+        "</tr></thead><tbody>" + "\n".join(rows) + "</tbody></table>"
     )
 
 
@@ -2789,9 +4028,13 @@ def render_global_vision_index(payload: dict[str, Any]) -> str:
         else [job for job in jobs if job.get("state") in ("acquiring", "analysing")]
     )
     counts = payload.get("counts_by_state") or {}
-    count_text = ", ".join(
-        f"{html_text(state)}={html_text(count)}" for state, count in sorted(counts.items())
-    ) or "none"
+    count_text = (
+        ", ".join(
+            f"{html_text(state)}={html_text(count)}"
+            for state, count in sorted(counts.items())
+        )
+        or "none"
+    )
     body = f"""
 <h1>Vision Jobs</h1>
 <p class="muted">Canonical browser URL: <a href="{html_text(prefixed_root_vision_url(''))}">{html_text(public_url(prefixed_root_vision_url('')))}</a></p>
@@ -2804,7 +4047,8 @@ def render_global_vision_index(payload: dict[str, Any]) -> str:
 <h2>Commands</h2>
 <pre>/usr/local/bin/vision_nozzle_align.py --refresh-ui
 /usr/local/bin/vision_nozzle_align.py --run-job --name nozzle_sweep --x 195 --y -14.8 --z 20 --dx 0,3,6,9,12
-/usr/local/bin/vision_nozzle_align.py --run-bed-y-job --name bed_y --x -80.4 --y -14.8 --z 293.75 --y-offsets 0,5,10,15,20</pre>
+/usr/local/bin/vision_nozzle_align.py --run-bed-y-job --name bed_y --x -80.4 --y -14.8 --z 293.75 --y-offsets 0,5,10,15,20
+/usr/local/bin/vision_nozzle_align.py --run-nozzle-z-job --name nozzle_z --bed-y-x -80.4 --bed-y-y -14.8 --bed-y-z 293.75 --tool-x 195 --tool-y -14.8 --travel-z 20 --y-offsets 0,5,10,15,20 --x-offsets 0,3,6,9,12 --z-values 1,2,4,8 --bed-feature-z-mm -0.1</pre>
 <h2>Active</h2>
 {render_job_rows([job for job in active_jobs if job])}
 <h2>Prepared</h2>
@@ -2861,6 +4105,8 @@ def render_job_frame_rows(
             "<tr>"
             f"<td>{html_text(frame.get('seq'))}</td>"
             f"<td>{html_text(frame_id)}</td>"
+            f"<td>{html_text(frame.get('phase'))}</td>"
+            f"<td>{html_text(frame.get('target'))}</td>"
             f"<td>{html_text(frame.get('tool'))}</td>"
             f"<td>X{html_text(pose.get('x'))} Y{html_text(pose.get('y'))} "
             f"Z{html_text(pose.get('z'))}</td>"
@@ -2873,8 +4119,9 @@ def render_job_frame_rows(
             "</tr>"
         )
     return (
-        "<table><thead><tr><th>Seq</th><th>Frame</th><th>Tool</th>"
-        "<th>Pose</th><th>Profile</th><th>Captured</th><th>Framebuffer</th>"
+        "<table><thead><tr><th>Seq</th><th>Frame</th><th>Phase</th>"
+        "<th>Target</th><th>Tool</th><th>Pose</th><th>Profile</th>"
+        "<th>Captured</th><th>Framebuffer</th>"
         "<th>Raw</th><th>Sidecar</th><th>Overlay</th></tr></thead><tbody>"
         + "\n".join(rows)
         + "</tbody></table>"
@@ -2990,7 +4237,9 @@ def refresh_vision_ui(job_root: Path | None = None) -> dict[str, Any]:
     }
 
 
-def attach_ui_refresh(result: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
+def attach_ui_refresh(
+    result: dict[str, Any], args: argparse.Namespace
+) -> dict[str, Any]:
     try:
         result["ui"] = refresh_vision_ui(Path(args.job_root))
     except Exception as exc:
@@ -3003,7 +4252,9 @@ def moonraker_get(base_url: str, path: str) -> dict[str, Any]:
         return json.loads(response.read())
 
 
-def run_command(command: list[str], *, timeout: float = 30.0) -> subprocess.CompletedProcess:
+def run_command(
+    command: list[str], *, timeout: float = 30.0
+) -> subprocess.CompletedProcess:
     return subprocess.run(
         command,
         check=False,
@@ -3062,7 +4313,9 @@ def start_preview_service() -> dict[str, Any]:
     reset_failed_service(CROWSNEST_SERVICE)
     result = run_command(["systemctl", "start", CROWSNEST_SERVICE], timeout=15)
     if result.returncode != 0:
-        raise RuntimeError(f"Could not start {CROWSNEST_SERVICE}: {result.stderr.strip()}")
+        raise RuntimeError(
+            f"Could not start {CROWSNEST_SERVICE}: {result.stderr.strip()}"
+        )
     return {
         "tcp_ready_after_s": wait_for_tcp(
             CROWSNEST_HOST, CROWSNEST_PORT, WEBCAM_READY_TIMEOUT
@@ -3250,7 +4503,9 @@ def derive_nozzle_roi(
     return clamp_rect(start_x, start_y, roi_w, roi_h, width, height)
 
 
-def detect_nozzle_candidates(image: Any, roi: tuple[int, int, int, int]) -> list[dict[str, Any]]:
+def detect_nozzle_candidates(
+    image: Any, roi: tuple[int, int, int, int]
+) -> list[dict[str, Any]]:
     import cv2
     import numpy as np
 
@@ -3288,7 +4543,9 @@ def detect_nozzle_candidates(image: Any, roi: tuple[int, int, int, int]) -> list
                     "cy": float(cy + y),
                     "r": float(radius),
                     "mean_inside": round(mean_inside, 3),
-                    "base_score": round(0.35 * darkness - 1.7 * abs(radius - target_radius), 3),
+                    "base_score": round(
+                        0.35 * darkness - 1.7 * abs(radius - target_radius), 3
+                    ),
                 }
             )
 
@@ -3351,10 +4608,14 @@ def derive_global_nozzle_roi(
         ]
         feature_boxes.append(feature_roi)
     if not feature_boxes:
-        raise RuntimeError("Cannot derive global nozzle ROI because no feature ROIs exist")
-    margin = NOZZLE_GLOBAL_MATCH_MARGIN_1080 * (
-        width / RED_BASE_WIDTH + height / RED_BASE_HEIGHT
-    ) / 2.0
+        raise RuntimeError(
+            "Cannot derive global nozzle ROI because no feature ROIs exist"
+        )
+    margin = (
+        NOZZLE_GLOBAL_MATCH_MARGIN_1080
+        * (width / RED_BASE_WIDTH + height / RED_BASE_HEIGHT)
+        / 2.0
+    )
     left = min(box[0] for box in feature_boxes) - margin
     top = min(box[1] for box in feature_boxes) - margin
     right = max(box[0] + box[2] for box in feature_boxes) + margin
@@ -3362,7 +4623,9 @@ def derive_global_nozzle_roi(
     return clamp_rect(left, top, right - left, bottom - top, width, height)
 
 
-def normalized_registration_feature(image: Any, roi: tuple[int, int, int, int], mode: str) -> Any:
+def normalized_registration_feature(
+    image: Any, roi: tuple[int, int, int, int], mode: str
+) -> Any:
     import cv2
 
     x, y, w, h = roi
@@ -3379,7 +4642,9 @@ def normalized_registration_feature(image: Any, roi: tuple[int, int, int, int], 
     return (feature - mean) / (std + 1.0e-6)
 
 
-def match_registration_features(source_feature: Any, target_feature: Any, search_px: int) -> dict[str, Any]:
+def match_registration_features(
+    source_feature: Any, target_feature: Any, search_px: int
+) -> dict[str, Any]:
     import cv2
 
     padded = cv2.copyMakeBorder(
@@ -3422,9 +4687,8 @@ def solve_pairwise_registration(
         command_delta = float(record["target_command_dx"]) - float(
             record["source_command_dx"]
         )
-        tool_delta = (
-            (1.0 if record["target_tool"] == "t1" else 0.0)
-            - (1.0 if record["source_tool"] == "t1" else 0.0)
+        tool_delta = (1.0 if record["target_tool"] == "t1" else 0.0) - (
+            1.0 if record["source_tool"] == "t1" else 0.0
         )
         rows.append([command_delta, 0.0, tool_delta, 0.0])
         values.append(observed_dx)
@@ -3435,7 +4699,9 @@ def solve_pairwise_registration(
     matrix = np.array(rows, dtype=float)
     vector = np.array(values, dtype=float)
     weight_matrix = np.diag(np.sqrt(np.array(weights, dtype=float)))
-    solution = np.linalg.lstsq(weight_matrix @ matrix, weight_matrix @ vector, rcond=None)[0]
+    solution = np.linalg.lstsq(
+        weight_matrix @ matrix, weight_matrix @ vector, rcond=None
+    )[0]
 
     residuals = []
     weighted_sum = 0.0
@@ -3448,9 +4714,8 @@ def solve_pairwise_registration(
         command_delta = float(record["target_command_dx"]) - float(
             record["source_command_dx"]
         )
-        tool_delta = (
-            (1.0 if record["target_tool"] == "t1" else 0.0)
-            - (1.0 if record["source_tool"] == "t1" else 0.0)
+        tool_delta = (1.0 if record["target_tool"] == "t1" else 0.0) - (
+            1.0 if record["source_tool"] == "t1" else 0.0
         )
         predicted = (
             command_delta * float(solution[0]) + tool_delta * float(solution[2]),
@@ -3490,18 +4755,21 @@ def fit_global_roi_cross_match(
 
     search_px = max(
         8,
-        int(
-            round(
-                NOZZLE_GLOBAL_MATCH_SEARCH_1080
-                * (
-                    frames[0].get("image_width", RED_BASE_WIDTH) / RED_BASE_WIDTH
-                    + frames[0].get("image_height", RED_BASE_HEIGHT) / RED_BASE_HEIGHT
+        (
+            int(
+                round(
+                    NOZZLE_GLOBAL_MATCH_SEARCH_1080
+                    * (
+                        frames[0].get("image_width", RED_BASE_WIDTH) / RED_BASE_WIDTH
+                        + frames[0].get("image_height", RED_BASE_HEIGHT)
+                        / RED_BASE_HEIGHT
+                    )
+                    / 2.0
                 )
-                / 2.0
             )
-        )
-        if frames
-        else int(round(NOZZLE_GLOBAL_MATCH_SEARCH_1080)),
+            if frames
+            else int(round(NOZZLE_GLOBAL_MATCH_SEARCH_1080))
+        ),
     )
     items = []
     for frame in frames:
@@ -3556,10 +4824,11 @@ def fit_global_roi_cross_match(
                 )
                 same_tool = source_frame["tool"] == target_frame["tool"]
                 threshold = 0.42 if same_tool else 0.16
-                command_delta = abs(float(target_frame["dx"]) - float(source_frame["dx"]))
+                command_delta = abs(
+                    float(target_frame["dx"]) - float(source_frame["dx"])
+                )
                 useful_cross_tool_pair = (
-                    same_tool
-                    or command_delta <= max_cross_tool_command_delta + 1.0e-6
+                    same_tool or command_delta <= max_cross_tool_command_delta + 1.0e-6
                 )
                 used = match["correlation"] >= threshold and useful_cross_tool_pair
                 if used:
@@ -3617,7 +4886,11 @@ def fit_global_roi_cross_match(
             )
             correlations = [float(record["correlation"]) for record in usable_records]
             correlations_sorted = sorted(correlations)
-            median_corr = correlations_sorted[len(correlations_sorted) // 2] if correlations else 0.0
+            median_corr = (
+                correlations_sorted[len(correlations_sorted) // 2]
+                if correlations
+                else 0.0
+            )
             candidates.append(
                 {
                     **fit,
@@ -3630,9 +4903,14 @@ def fit_global_roi_cross_match(
                     "usable_pair_count": len(usable_records),
                     "usable_same_tool_pair_count": usable_same_tool,
                     "usable_cross_tool_pair_count": usable_cross_tool,
-                    "rejected_pair_count": len(items) * (len(items) - 1) - len(usable_records),
-                    "correlation_min": round(min(correlations), 4) if correlations else None,
-                    "correlation_median": round(median_corr, 4) if correlations else None,
+                    "rejected_pair_count": len(items) * (len(items) - 1)
+                    - len(usable_records),
+                    "correlation_min": (
+                        round(min(correlations), 4) if correlations else None
+                    ),
+                    "correlation_median": (
+                        round(median_corr, 4) if correlations else None
+                    ),
                     "pairwise_match_matrix": pairwise_rows,
                 }
             )
@@ -3672,8 +4950,12 @@ def fit_global_roi_cross_match(
         tool_index = 1.0 if frame["tool"] == "t1" else 0.0
         reference_points.append(
             (
-                float(expected[0]) - float(frame["dx"]) * axis[0] - tool_index * delta[0],
-                float(expected[1]) - float(frame["dx"]) * axis[1] - tool_index * delta[1],
+                float(expected[0])
+                - float(frame["dx"]) * axis[0]
+                - tool_index * delta[0],
+                float(expected[1])
+                - float(frame["dx"]) * axis[1]
+                - tool_index * delta[1],
             )
         )
     reference_center = None
@@ -3685,8 +4967,12 @@ def fit_global_roi_cross_match(
         for frame in frames:
             tool_index = 1.0 if frame["tool"] == "t1" else 0.0
             predicted = (
-                reference_center[0] + float(frame["dx"]) * axis[0] + tool_index * delta[0],
-                reference_center[1] + float(frame["dx"]) * axis[1] + tool_index * delta[1],
+                reference_center[0]
+                + float(frame["dx"]) * axis[0]
+                + tool_index * delta[0],
+                reference_center[1]
+                + float(frame["dx"]) * axis[1]
+                + tool_index * delta[1],
             )
             frame["registration_prediction_center_px"] = [
                 round(predicted[0], 3),
@@ -3707,19 +4993,23 @@ def fit_global_roi_cross_match(
         "search_px": search_px,
         "axis_vector_px_per_mm": [round(axis[0], 4), round(axis[1], 4)],
         "axis_px_per_mm": round(axis_len, 4),
-        "axis_angle_deg": round(math.degrees(math.atan2(axis[1], axis[0])), 4)
-        if axis_len > 0
-        else None,
+        "axis_angle_deg": (
+            round(math.degrees(math.atan2(axis[1], axis[0])), 4)
+            if axis_len > 0
+            else None
+        ),
         "t1_minus_t0_pixels": [round(delta[0], 4), round(delta[1], 4)],
         "along_x_px": round(along_x_px, 4),
         "along_x_mm_approx": round(along_x_px / axis_len, 5) if axis_len > 0 else None,
         "perpendicular_px": round(perpendicular_px, 4),
-        "perpendicular_mm_approx": round(perpendicular_px / axis_len, 5)
-        if axis_len > 0
-        else None,
-        "reference_center_px": [round(reference_center[0], 4), round(reference_center[1], 4)]
-        if reference_center
-        else None,
+        "perpendicular_mm_approx": (
+            round(perpendicular_px / axis_len, 5) if axis_len > 0 else None
+        ),
+        "reference_center_px": (
+            [round(reference_center[0], 4), round(reference_center[1], 4)]
+            if reference_center
+            else None
+        ),
         "residual_rms_px": round(float(best["residual_rms_px"]), 4),
         "measurement_source": "global_roi_cross_match",
     }
@@ -3823,11 +5113,9 @@ def choose_motion_consistent_nozzle(
         distinct_dx = {member["dx_label"] for member in cluster}
         if len(distinct_dx) < 2:
             continue
-        score = (
-            130.0 * len(distinct_dx)
-            + sum(float(member["candidate"].get("base_score", 0.0)) for member in cluster)
-            / max(1, len(cluster))
-        )
+        score = 130.0 * len(distinct_dx) + sum(
+            float(member["candidate"].get("base_score", 0.0)) for member in cluster
+        ) / max(1, len(cluster))
         if score > best_score:
             best_score = score
             best_cluster = cluster
@@ -3960,7 +5248,10 @@ def annotate_sweep_frame(
             thickness=2,
         )
     label = f"{frame['tool'].upper()} dx={frame['dx']:.3g}mm"
-    if nozzle_result and nozzle_result.get("measurement_source") == "global_roi_cross_match":
+    if (
+        nozzle_result
+        and nozzle_result.get("measurement_source") == "global_roi_cross_match"
+    ):
         label += " global-ROI cross-match"
     else:
         label += " nozzle=rejected"
@@ -4076,7 +5367,9 @@ def write_contact_sheet(
             y = row * tile_h
             x = col * tile_w
             sheet[y : y + tile_h, x : x + tile_w] = tile
-            cv2.rectangle(sheet, (x, y), (x + tile_w - 1, y + tile_h - 1), (80, 80, 80), 2)
+            cv2.rectangle(
+                sheet, (x, y), (x + tile_w - 1, y + tile_h - 1), (80, 80, 80), 2
+            )
 
     summary_lines = [
         f"IDEX nozzle vision sweep: {analysis['run_name']}",
@@ -4128,13 +5421,19 @@ def write_contact_sheet(
         f"perp={nozzle_delta.get('perpendicular_mm_approx')}mm"
     )
     if not analysis.get("ok"):
-        failures = analysis.get("hard_failures") or [cross.get("rejection_reason", "rejected")]
-        summary_lines.append(f"STATUS: FAILED; {'; '.join(str(item) for item in failures[:3])}")
+        failures = analysis.get("hard_failures") or [
+            cross.get("rejection_reason", "rejected")
+        ]
+        summary_lines.append(
+            f"STATUS: FAILED; {'; '.join(str(item) for item in failures[:3])}"
+        )
     else:
         summary_lines.append("STATUS: global ROI cross-match accepted.")
 
     summary_y = rows * tile_h + 35
-    cv2.rectangle(sheet, (0, rows * tile_h), (cols * tile_w, sheet.shape[0]), (238, 238, 238), -1)
+    cv2.rectangle(
+        sheet, (0, rows * tile_h), (cols * tile_w, sheet.shape[0]), (238, 238, 238), -1
+    )
     draw_text_lines(sheet, summary_lines, (24, summary_y), line_height=27, scale=0.58)
     cv2.imwrite(str(contact_sheet_path), sheet, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
 
@@ -4247,7 +5546,9 @@ def analyze_sweep_frames(
         except RuntimeError as exc:
             hard_failures.append(str(exc))
     else:
-        hard_failures.append("no readable frames passed red marker and nozzle-candidate gates")
+        hard_failures.append(
+            "no readable frames passed red marker and nozzle-candidate gates"
+        )
     if global_roi:
         for frame in analysis_frames:
             frame["global_nozzle_roi"] = list(global_roi)
@@ -4258,7 +5559,9 @@ def analyze_sweep_frames(
             "rejection_reason": "; ".join(hard_failures),
         }
     elif global_roi and red_axis_vector:
-        cross_match = fit_global_roi_cross_match(analysis_frames, global_roi, red_axis_vector)
+        cross_match = fit_global_roi_cross_match(
+            analysis_frames, global_roi, red_axis_vector
+        )
         if not cross_match.get("accepted"):
             hard_failures.append(
                 "global ROI cross-match failed: "
@@ -4282,12 +5585,18 @@ def analyze_sweep_frames(
         frame["overlay_url"] = safe_vision_url(overlay_path)
 
     red_delta = None
-    if red_marker_fits.get("t0", {}).get("ok") and red_marker_fits.get("t1", {}).get("ok"):
+    if red_marker_fits.get("t0", {}).get("ok") and red_marker_fits.get("t1", {}).get(
+        "ok"
+    ):
         t0 = red_marker_fits["t0"]["intercept_px"]
         t1 = red_marker_fits["t1"]["intercept_px"]
         dx = float(t1[0]) - float(t0[0])
         dy = float(t1[1]) - float(t0[1])
-        red_delta = {"dx": round(dx, 3), "dy": round(dy, 3), "distance": round(math.hypot(dx, dy), 3)}
+        red_delta = {
+            "dx": round(dx, 3),
+            "dy": round(dy, 3),
+            "distance": round(math.hypot(dx, dy), 3),
+        }
         if red_axis_vector and red_axis_px_per_mm > 0:
             ux, uy = (
                 red_axis_vector[0] / red_axis_px_per_mm,
@@ -4325,9 +5634,15 @@ def analyze_sweep_frames(
         "proxy_only": not bool(nozzle_delta),
         "hard_failures": hard_failures,
         "red_marker_fits": red_marker_fits,
-        "red_axis_vector_px_per_mm": [round(red_axis_vector[0], 3), round(red_axis_vector[1], 3)] if red_axis_vector else None,
+        "red_axis_vector_px_per_mm": (
+            [round(red_axis_vector[0], 3), round(red_axis_vector[1], 3)]
+            if red_axis_vector
+            else None
+        ),
         "red_axis_px_per_mm": round(red_axis_px_per_mm, 3) if red_axis_vector else None,
-        "red_axis_angle_deg": round(red_axis_angle, 3) if red_axis_angle is not None else None,
+        "red_axis_angle_deg": (
+            round(red_axis_angle, 3) if red_axis_angle is not None else None
+        ),
         "global_nozzle_roi": list(global_roi) if global_roi else None,
         "cross_match": cross_match,
         "red_marker_delta_t1_minus_t0": red_delta,
@@ -4441,7 +5756,9 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
 
     except Exception as exc:
         result["error"] = str(exc)
-        result["message"] = "Nozzle vision sweep failed before producing a complete result."
+        result["message"] = (
+            "Nozzle vision sweep failed before producing a complete result."
+        )
         if frames:
             result["frames"] = frames
     finally:
@@ -4460,7 +5777,11 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
                         "M400"
                     ),
                 )
-                result["restore"] = {"ok": True, "tool": macro, "gcode_position": pos[:3]}
+                result["restore"] = {
+                    "ok": True,
+                    "tool": macro,
+                    "gcode_position": pos[:3],
+                }
             except Exception as exc:
                 result["restore"] = {"ok": False, "error": str(exc)}
 
@@ -4510,6 +5831,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Generate an immutable prepared bed Y feature sweep job.",
     )
     mode.add_argument(
+        "--prepare-nozzle-z-job",
+        action="store_true",
+        help="Generate one immutable bed-Y plus nozzle X/Z calibration job.",
+    )
+    mode.add_argument(
         "--start-prepared-job",
         metavar="JOB_ID",
         help="Start and monitor an existing prepared vision job through virtual SD.",
@@ -4518,6 +5844,11 @@ def main(argv: list[str] | None = None) -> int:
         "--run-acquisition-job",
         action="store_true",
         help="Prepare, start, and monitor an acquisition-only virtual SD vision job.",
+    )
+    mode.add_argument(
+        "--run-nozzle-z-acquisition-job",
+        action="store_true",
+        help="Prepare, start, and monitor one combined nozzle Z acquisition job.",
     )
     mode.add_argument(
         "--analyze-job",
@@ -4535,6 +5866,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Prepare, acquire, analyze, and report a complete bed Y feature sweep.",
     )
     mode.add_argument(
+        "--run-nozzle-z-job",
+        action="store_true",
+        help="Prepare, acquire, analyze, and report a complete nozzle Z sweep.",
+    )
+    mode.add_argument(
         "--refresh-ui",
         action="store_true",
         help="Regenerate static vision job HTML and jobs.json without printer motion.",
@@ -4544,6 +5880,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--z", type=float)
     parser.add_argument("--dx", default="0,3,6,9,12")
     parser.add_argument("--y-offsets", default="0,5,10,15,20")
+    parser.add_argument("--x-offsets", default="0,3,6,9,12")
+    parser.add_argument("--z-values", default="1,2,4,8")
+    parser.add_argument("--bed-y-x", type=float, default=-80.4)
+    parser.add_argument("--bed-y-y", type=float, default=-14.8)
+    parser.add_argument("--bed-y-z", type=float, default=DEFAULT_T0_Z_ENDSTOP)
+    parser.add_argument("--tool-x", type=float, default=195.0)
+    parser.add_argument("--tool-y", type=float, default=-14.8)
+    parser.add_argument("--travel-z", type=float, default=20.0)
+    parser.add_argument(
+        "--bed-feature-z-mm",
+        type=float,
+        default=DEFAULT_NOZZLE_Z_BED_FEATURE_Z_MM,
+    )
+    parser.add_argument(
+        "--current-t0-z-endstop",
+        type=float,
+        default=DEFAULT_T0_Z_ENDSTOP,
+    )
+    parser.add_argument(
+        "--current-t1-z-endstop",
+        type=float,
+        default=DEFAULT_T1_Z_ENDSTOP,
+    )
     parser.add_argument("--feedrate", type=float, default=3600.0)
     parser.add_argument("--settle-time", type=float, default=0.75)
     parser.add_argument("--job-root", type=Path, default=NOZZLE_JOB_ROOT)
@@ -4554,7 +5913,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--virtual-sd-root", type=Path, default=DEFAULT_VIRTUAL_SD_ROOT)
     parser.add_argument("--virtual-sd-subdir", default=DEFAULT_VIRTUAL_SD_SUBDIR)
     parser.add_argument("--monitor-timeout", type=float, default=180.0)
-    parser.add_argument("--restore", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--restore", action=argparse.BooleanOptionalAction, default=True
+    )
     parser.add_argument(
         "--manage-crowsnest",
         action=argparse.BooleanOptionalAction,
@@ -4566,18 +5927,22 @@ def main(argv: list[str] | None = None) -> int:
         not args.sweep
         and not args.prepare_job
         and not args.prepare_bed_y_job
+        and not args.prepare_nozzle_z_job
         and not args.start_prepared_job
         and not args.run_acquisition_job
+        and not args.run_nozzle_z_acquisition_job
         and not args.analyze_job
         and not args.run_job
         and not args.run_bed_y_job
+        and not args.run_nozzle_z_job
         and not args.refresh_ui
     ):
         parser.error(
             "single-image nozzle vision check was removed; use --sweep, "
-            "--prepare-job, --prepare-bed-y-job, --start-prepared-job, "
-            "--run-acquisition-job, --analyze-job, --run-job, "
-            "--run-bed-y-job, or --refresh-ui"
+            "--prepare-job, --prepare-bed-y-job, --prepare-nozzle-z-job, "
+            "--start-prepared-job, --run-acquisition-job, "
+            "--run-nozzle-z-acquisition-job, --analyze-job, --run-job, "
+            "--run-bed-y-job, --run-nozzle-z-job, or --refresh-ui"
         )
     if args.z is None:
         args.z = 20.0
@@ -4595,13 +5960,23 @@ def main(argv: list[str] | None = None) -> int:
         attach_ui_refresh(summary, args)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0 if summary.get("ok") else 1
-    if args.start_prepared_job or args.run_acquisition_job:
+    if args.prepare_nozzle_z_job:
+        summary = prepare_nozzle_z_sweep_job(args)
+        attach_ui_refresh(summary, args)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0 if summary.get("ok") else 1
+    if (
+        args.start_prepared_job
+        or args.run_acquisition_job
+        or args.run_nozzle_z_acquisition_job
+    ):
         try:
-            result = (
-                run_acquisition_job(args)
-                if args.run_acquisition_job
-                else start_prepared_job(args)
-            )
+            if args.run_nozzle_z_acquisition_job:
+                result = run_nozzle_z_acquisition_job(args)
+            elif args.run_acquisition_job:
+                result = run_acquisition_job(args)
+            else:
+                result = start_prepared_job(args)
         except Exception as exc:
             result = {
                 "ok": False,
@@ -4611,12 +5986,16 @@ def main(argv: list[str] | None = None) -> int:
         attach_ui_refresh(result, args)
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0 if result.get("ok") else 1
-    if args.analyze_job or args.run_job or args.run_bed_y_job:
+    if args.analyze_job or args.run_job or args.run_bed_y_job or args.run_nozzle_z_job:
         try:
             if args.run_bed_y_job:
                 result = run_bed_y_full_job(args)
+            elif args.run_nozzle_z_job:
+                result = run_nozzle_z_full_job(args)
             else:
-                result = run_full_job(args) if args.run_job else analyze_acquired_job(args)
+                result = (
+                    run_full_job(args) if args.run_job else analyze_acquired_job(args)
+                )
         except Exception as exc:
             result = {
                 "ok": False,

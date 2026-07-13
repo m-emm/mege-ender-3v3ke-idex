@@ -258,6 +258,151 @@ def test_prepare_bed_y_job_cli_generates_immutable_manifest_and_gcode(
     assert manifest["gcode_hash"] == recomputed_gcode_hash
     assert manifest["manifest_hash"] == recomputed_manifest_hash
     assert summary["gcode_hash"] == manifest["gcode_hash"] == state["gcode_hash"]
+
+
+def test_prepare_nozzle_z_job_cli_generates_two_phase_manifest_and_gcode(
+    tmp_path, capsys
+):
+    module = _load_vision_nozzle_align_module()
+    job_root = tmp_path / "jobs"
+
+    assert (
+        module.main(
+            [
+                "--prepare-nozzle-z-job",
+                "--job-root",
+                str(job_root),
+                "--job-id",
+                "test_nozzle_z_job",
+                "--name",
+                "nozzle_z",
+                "--bed-y-x",
+                "-80.4",
+                "--bed-y-y",
+                "-14.8",
+                "--bed-y-z",
+                "293.75",
+                "--tool-x",
+                "195",
+                "--tool-y",
+                "-14.8",
+                "--travel-z",
+                "20",
+                "--y-offsets",
+                "0,5,10,15,20",
+                "--x-offsets",
+                "0,3,6,9,12",
+                "--z-values",
+                "1,2,4,8",
+                "--bed-feature-z-mm",
+                "-0.1",
+                "--settle-time",
+                "0.25",
+            ]
+        )
+        == 0
+    )
+
+    summary = json.loads(capsys.readouterr().out)
+    job_dir = Path(summary["job_dir"])
+    manifest_path = Path(summary["manifest_path"])
+    gcode_path = Path(summary["gcode_path"])
+    state_path = Path(summary["state_path"])
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    gcode = gcode_path.read_text(encoding="utf-8")
+    lines = [line.strip() for line in gcode.splitlines() if line.strip()]
+
+    assert summary["ok"] is True
+    assert summary["state"] == "prepared"
+    assert summary["frame_count"] == 45
+    assert job_dir == job_root / "test_nozzle_z_job"
+    assert manifest["kind"] == "nozzle_cam_nozzle_z_sweep"
+    assert manifest["frame_count"] == len(manifest["frames"]) == 45
+    assert state["state"] == "prepared"
+    assert manifest["measurement_parameters"]["bed_feature_z_mm"] == -0.1
+    assert manifest["measurement_parameters"]["z_capture_order"] == [8.0, 4.0, 2.0, 1.0]
+    assert manifest["measurement_parameters"]["lighting"] == {
+        "bed_y_sweep": {"macro": "NOZZLE_CAM_Y_FEATURE_LIGHT"},
+        "tool_xz_sweep": {"macro": "NOZZLE_CAM_ANALYSIS_LIGHT"},
+    }
+
+    sequences = [frame["seq"] for frame in manifest["frames"]]
+    frame_ids = [frame["frame"] for frame in manifest["frames"]]
+    assert sequences == list(range(45))
+    assert len(frame_ids) == len(set(frame_ids))
+    assert [frame["phase"] for frame in manifest["frames"][:5]] == ["bed_y_sweep"] * 5
+    assert [frame["phase"] for frame in manifest["frames"][5:]] == ["tool_xz_sweep"] * 40
+    assert all(
+        frame["lighting"] == "NOZZLE_CAM_Y_FEATURE_LIGHT"
+        for frame in manifest["frames"][:5]
+    )
+    assert all(
+        frame["lighting"] == "NOZZLE_CAM_ANALYSIS_LIGHT"
+        for frame in manifest["frames"][5:]
+    )
+    assert [frame["z_sample"] for frame in manifest["frames"][5:9]] == [
+        8.0,
+        4.0,
+        2.0,
+        1.0,
+    ]
+    assert [frame["capture_command"] for frame in manifest["frames"]] == [
+        "VISION_CAPTURE_SYNC"
+    ] * 45
+
+    capture_lines = [
+        line for line in lines if line.startswith("VISION_CAPTURE_SYNC ")
+    ]
+    assert sum(line.startswith("VISION_JOB_BEGIN ") for line in lines) == 1
+    assert sum(line.startswith("VISION_JOB_END ") for line in lines) == 1
+    assert len(capture_lines) == manifest["frame_count"]
+    first_bed_capture = next(
+        index
+        for index, line in enumerate(lines)
+        if line.startswith("VISION_CAPTURE_SYNC ") and "FRAME=bed_y_0p0" in line
+    )
+    last_bed_capture = max(
+        index
+        for index, line in enumerate(lines)
+        if line.startswith("VISION_CAPTURE_SYNC ") and "FRAME=bed_y_" in line
+    )
+    first_tool_capture = next(
+        index
+        for index, line in enumerate(lines)
+        if line.startswith("VISION_CAPTURE_SYNC ") and "FRAME=t0_x0p0_z8p0" in line
+    )
+    y_light = lines.index("NOZZLE_CAM_Y_FEATURE_LIGHT")
+    tool_light = lines.index("NOZZLE_CAM_ANALYSIS_LIGHT")
+    assert y_light < first_bed_capture
+    assert last_bed_capture < tool_light < first_tool_capture
+    assert lines[y_light + 1] == "G4 P750"
+    assert lines[tool_light + 1] == "G4 P750"
+    assert "G1 X198.000 Y-14.800 Z20.000 F3600" in lines
+
+    for index, line in enumerate(lines):
+        if line.startswith("VISION_CAPTURE_SYNC "):
+            assert lines[index - 2] == "M400"
+            assert lines[index - 1] == "G4 P250"
+
+    assert not re.search(r"^G28\b", gcode, flags=re.MULTILINE)
+    assert not re.search(r"^NOZZLE_CAM_CAPTURE\b", gcode, flags=re.MULTILINE)
+    assert not re.search(r"^VISION_CAPTURE\b", gcode, flags=re.MULTILINE)
+    assert "restore" not in gcode.lower()
+    assert "park" not in gcode.lower()
+    assert "sha256:PLACEHOLDER" not in gcode
+
+    recomputed_gcode_hash = _sha256_prefixed(
+        _canonicalize_gcode_for_hash(gcode).encode("utf-8")
+    )
+    manifest_for_hash = copy.deepcopy(manifest)
+    manifest_for_hash["manifest_hash"] = "sha256:PLACEHOLDER"
+    recomputed_manifest_hash = _sha256_prefixed(
+        _canonical_json_bytes(manifest_for_hash)
+    )
+    assert manifest["gcode_hash"] == recomputed_gcode_hash
+    assert manifest["manifest_hash"] == recomputed_manifest_hash
+    assert summary["gcode_hash"] == manifest["gcode_hash"] == state["gcode_hash"]
     assert (
         summary["manifest_hash"] == manifest["manifest_hash"] == state["manifest_hash"]
     )

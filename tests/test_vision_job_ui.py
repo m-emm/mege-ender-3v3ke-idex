@@ -93,6 +93,39 @@ def _prepare_bed_y_job(module, job_root, *, job_id, created=None):
     return summary
 
 
+def _prepare_nozzle_z_job(module, job_root, *, job_id, created=None):
+    summary = module.prepare_nozzle_z_sweep_job(
+        SimpleNamespace(
+            name="nozzle_z",
+            job_root=job_root,
+            job_id=job_id,
+            bed_y_x=-80.4,
+            bed_y_y=-14.8,
+            bed_y_z=293.75,
+            tool_x=195.0,
+            tool_y=-14.8,
+            travel_z=20.0,
+            y_offsets="0,5,10,15,20",
+            x_offsets="0,3,6,9,12",
+            z_values="1,2,4,8",
+            bed_feature_z_mm=-0.1,
+            current_t0_z_endstop=293.75,
+            current_t1_z_endstop=293.65,
+            feedrate=3600.0,
+            settle_time=0.2,
+            camera="nozzle_cam",
+            profile="analysis",
+        )
+    )
+    state_path = Path(summary["state_path"])
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    if created:
+        state["created_at_utc"] = created
+        state["updated_at_utc"] = created
+        module.atomic_write_json(state_path, state)
+    return summary
+
+
 def _commit_frames(module, summary):
     job_dir = Path(summary["job_dir"])
     manifest = json.loads(Path(summary["manifest_path"]).read_text(encoding="utf-8"))
@@ -228,6 +261,64 @@ def _write_bed_y_analysis_artifacts(module, summary):
         )
 
 
+def _write_nozzle_z_analysis_artifacts(module, summary):
+    job_dir = Path(summary["job_dir"])
+    manifest = json.loads(Path(summary["manifest_path"]).read_text(encoding="utf-8"))
+    paths = module.job_analysis_paths(job_dir)
+    paths["overlays_dir"].mkdir(parents=True, exist_ok=True)
+    paths["raw_contact_sheet"].write_bytes(b"\xff\xd8\xff\xd9")
+    paths["overlay_contact_sheet"].write_bytes(b"\xff\xd8\xff\xd9")
+    facts = {
+        "accepted": True,
+        "ok": True,
+        "job_id": manifest["job_id"],
+        "kind": "nozzle_cam_nozzle_z_sweep",
+        "measurement": "nozzle_cam_nozzle_z_offsets",
+        "bed_feature_z_mm": -0.1,
+        "bed_y_axis_vector_px_per_mm": [-0.2, -10.5],
+        "bed_y_scale_px_per_mm": 10.502,
+        "tool_zero_error_mm": {"T0": 0.052, "T1": -0.071},
+        "tool_z_to_bed_feature_at_command_0_mm": {"T0": 0.152, "T1": 0.029},
+        "tool_delta_t1_minus_t0_z_mm": -0.123,
+        "suggested_calib_yaml": {
+            "tools": {
+                "t0": {"z_endstop": 293.802},
+                "t1": {"z_endstop": 293.579},
+            }
+        },
+        "suggested_runtime_t1_z_offset": 0.223,
+        "lighting": {
+            "bed_y_sweep": {"macro": "NOZZLE_CAM_Y_FEATURE_LIGHT"},
+            "tool_xz_sweep": {"macro": "NOZZLE_CAM_ANALYSIS_LIGHT"},
+        },
+        "quality": {
+            "bed_y_sweep": {
+                "accepted": True,
+                "selected_roi": "marked_line_tight",
+                "feature_mode": "grad_y",
+                "correlation_median": 0.9345,
+            },
+            "tool_xz_sweep": {
+                "accepted": True,
+                "accepted_sample_count": 40,
+                "frame_count": 40,
+                "common_scale_slope_px_per_mm2": 0.22,
+            },
+        },
+        "hard_failures": [],
+    }
+    paths["result"].write_text(
+        json.dumps({"ok": True, "message": "Nozzle camera one-run Z calibration accepted."})
+        + "\n",
+        encoding="utf-8",
+    )
+    paths["facts"].write_text(json.dumps(facts) + "\n", encoding="utf-8")
+    for frame in manifest["frames"]:
+        (paths["overlays_dir"] / f"{frame['frame']}_overlay.jpg").write_bytes(
+            b"\xff\xd8\xff\xd9"
+        )
+
+
 def test_prepare_job_generates_static_ui(monkeypatch, tmp_path, capsys):
     module = _load_module()
     root, job_root = _configure_ui_paths(monkeypatch, module, tmp_path)
@@ -319,6 +410,43 @@ def test_completed_bed_y_job_page_renders_bed_y_facts(monkeypatch, tmp_path):
     assert f"{manifest['frames'][0]['frame']}_overlay.jpg" in page
     jobs = json.loads((root / "jobs.json").read_text(encoding="utf-8"))
     assert jobs["jobs"][0]["kind"] == "nozzle_cam_bed_y_sweep"
+    assert jobs["jobs"][0]["artifacts"]["facts"]["exists"] is True
+
+
+def test_completed_nozzle_z_job_page_renders_z_calibration_facts(
+    monkeypatch, tmp_path
+):
+    module = _load_module()
+    root, job_root = _configure_ui_paths(monkeypatch, module, tmp_path)
+    summary = _prepare_nozzle_z_job(module, job_root, job_id="ui_nozzle_z_completed")
+    manifest = _commit_frames(module, summary)
+    _write_nozzle_z_analysis_artifacts(module, summary)
+
+    ui = module.refresh_vision_ui(job_root)
+
+    assert ui["ok"] is True
+    page = (job_root / "ui_nozzle_z_completed" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert "Nozzle Camera Z Calibration" in page
+    assert "T0 zero error" in page
+    assert "T1 zero error" in page
+    assert "Suggested calib.yaml" in page
+    assert "t0.z_endstop 293.802" in page
+    assert "t1.z_endstop 293.579" in page
+    assert "Runtime T1 Z offset" in page
+    assert "NOZZLE_CAM_Y_FEATURE_LIGHT" in page
+    assert "NOZZLE_CAM_ANALYSIS_LIGHT" in page
+    assert "bed_y_sweep" in page
+    assert "tool_xz_sweep" in page
+    assert "T1 - T0 along X" not in page
+    assert f"{manifest['frames'][0]['frame']}_overlay.jpg" in page
+    jobs = json.loads((root / "jobs.json").read_text(encoding="utf-8"))
+    assert jobs["jobs"][0]["kind"] == "nozzle_cam_nozzle_z_sweep"
+    assert jobs["jobs"][0]["phase_frame_counts"] == {
+        "bed_y_sweep": 5,
+        "tool_xz_sweep": 40,
+    }
     assert jobs["jobs"][0]["artifacts"]["facts"]["exists"] is True
 
 

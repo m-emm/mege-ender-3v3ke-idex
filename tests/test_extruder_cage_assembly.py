@@ -11,6 +11,9 @@ from assembly_defaults import (
 from mege_ender_3v3ke_idex.designs.assemblies.extruder_cage_assembly import (
     create_extruder_cage_assembly,
 )
+from mege_ender_3v3ke_idex.designs.assemblies.extruder_cage_right_assembly import (
+    create_extruder_cage_right_assembly,
+)
 from mege_ender_3v3ke_idex.designs.assemblies.nitehawk_board_assembly import (
     create_nitehawk_board_assembly,
 )
@@ -92,6 +95,7 @@ def _create_machined_mount():
 
 def test_extruder_cage_signature_uses_cage_owned_mount_dimensions():
     parameters = inspect.signature(create_extruder_cage_assembly).parameters
+    right_parameters = inspect.signature(create_extruder_cage_right_assembly).parameters
 
     assert "nitehawk_board" in parameters
     assert "tool_head_mount_machined" in parameters
@@ -99,6 +103,7 @@ def test_extruder_cage_signature_uses_cage_owned_mount_dimensions():
     assert "carriage" not in parameters
     assert "extruder_cage_mount_plate_fillet_radius" in parameters
     assert "extruder_cage_top_right_bridge_clearance" in parameters
+    assert list(right_parameters) == list(parameters)
     for parameter_name in REMOVED_CAGE_PARAMETERS:
         assert parameter_name not in parameters
 
@@ -264,7 +269,7 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         Loader=AssemblyDefaultsLoader,
     )
     right_cage_resource = yaml.load(
-        (ASSEMBLIES_DIR / "extruder_cage_assembly.yaml").read_text(),
+        (ASSEMBLIES_DIR / "extruder_cage_right_assembly.yaml").read_text(),
         Loader=AssemblyDefaultsLoader,
     )
     left_cage_resource = yaml.load(
@@ -304,11 +309,18 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         },
         "right": {
             "resource": right_cage_resource,
-            "resource_file": "extruder_cage_assembly.yaml",
+            "resource_file": "extruder_cage_right_assembly.yaml",
             "tool_head_mount_machined": "tool_head_mount_machined_top_assembly",
             "carriage": "x_axis_right_carriage_assembly",
         },
     }
+
+    assert right_cage_resource["Parts"]["ExtruderCageAssembly"]["Properties"][
+        "Generator"
+    ] == (
+        "mege_ender_3v3ke_idex.designs.assemblies.extruder_cage_right_assembly"
+        ".create_extruder_cage_right_assembly"
+    )
 
     assert assemblies["extruder_cage_assembly"]["inject_parts"] == {
         "sprite_extruder": "sprite_extruder_assembly",

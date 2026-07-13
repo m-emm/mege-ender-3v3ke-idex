@@ -82,6 +82,66 @@ The stable fact names are:
 - `bed_y_parallax_spread`: variation between accepted bed-feature ROIs. This is
   local perspective variation, not a full Z-height solve.
 
+## Nozzle Camera Z Calibration Sweep
+
+`nozzle_cam_nozzle_z_sweep` is a report-only one-run calibration job. It first
+captures the bed-feature Y sweep for local scale, then captures T0 and T1 nozzle
+frames at multiple X offsets and Z samples in the same acquisition G-code file.
+No older job is used as input, and the measurement job does not edit
+`calib.yaml`.
+
+Run the default one-run acquisition and analysis from SSH with:
+
+```bash
+ssh pi@menderpi.local '/usr/local/bin/vision_nozzle_align.py --run-nozzle-z-job --name nozzle_z --bed-y-x -80.4 --bed-y-y -14.8 --bed-y-z 293.75 --tool-x 195 --tool-y -14.8 --travel-z 20 --y-offsets 0,5,10,15,20 --x-offsets 0,3,6,9,12 --z-values 1,2,4,8 --bed-feature-z-mm -0.1'
+```
+
+Or queue it from Mainsail/Klipper with:
+
+```gcode
+IDEX_NOZZLE_Z_VISION_SWEEP NAME=nozzle_z BED_Y_X=-80.4 BED_Y_Y=-14.8 BED_Y_Z=293.75 TOOL_X=195 TOOL_Y=-14.8 TRAVEL_Z=20 Y_OFFSETS=0,5,10,15,20 X_OFFSETS=0,3,6,9,12 Z_VALUES=1,2,4,8 BED_FEATURE_Z=-0.1
+```
+
+The generated `acquisition.gcode` explicitly switches lighting by phase:
+
+- `bed_y_sweep`: `NOZZLE_CAM_Y_FEATURE_LIGHT`
+- `tool_xz_sweep`: `NOZZLE_CAM_ANALYSIS_LIGHT`
+
+Use the same browser locations for progress and results:
+
+- Browser index: `http://menderpi.local/vision/`
+- Per-job page: `http://menderpi.local/vision/nozzle_cam/jobs/<job_id>/`
+- Live progress: `state.json`, `events.jsonl`, and frame count by phase on the
+  job page.
+- Results: `analysis/facts.json`, `analysis/result.json`,
+  `analysis/raw_contact_sheet.jpg`, and `analysis/overlay_contact_sheet.jpg`.
+
+Stable Z-calibration fact names include:
+
+- `measurement: "nozzle_cam_nozzle_z_offsets"`
+- `bed_feature_z_mm`: configured feature plane relative to print-surface `Z=0`.
+- `bed_y_axis_vector_px_per_mm` and `bed_y_scale_px_per_mm`: bed-feature image
+  scale from the first phase.
+- `tool_zero_error_mm.T0` and `tool_zero_error_mm.T1`: per-tool commanded
+  `Z=0` error relative to the print surface.
+- `tool_z_to_bed_feature_at_command_0_mm`: per-tool distance to the configured
+  bed feature plane at commanded `Z=0`.
+- `tool_delta_t1_minus_t0_z_mm`: T1 zero error minus T0 zero error.
+- `suggested_calib_yaml.tools.t0.z_endstop` and
+  `suggested_calib_yaml.tools.t1.z_endstop`: report-only values that can be
+  applied later.
+- `suggested_runtime_t1_z_offset`: generated as
+  `t0.z_endstop - t1.z_endstop`.
+- `lighting.bed_y_sweep.macro` and `lighting.tool_xz_sweep.macro`: phase
+  lighting used for the run.
+
+Apply accepted Z facts only as an explicit follow-up:
+
+```bash
+python apply_nozzle_vision_calibration.py --dry-run --update-z /path/to/facts.json
+python apply_nozzle_vision_calibration.py --update-z /path/to/facts.json
+```
+
 ## Boosted Heatbed
 
 The active bed remains `[heater_bed]` for normal Klipper and UI compatibility.

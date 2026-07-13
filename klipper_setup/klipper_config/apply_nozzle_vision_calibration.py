@@ -16,6 +16,7 @@ import yaml
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_CALIB_PATH = SCRIPT_DIR / "calib.yaml"
+NOZZLE_Z_MEASUREMENT = "nozzle_cam_nozzle_z_offsets"
 
 
 def _load_json_source(source: str) -> dict[str, Any]:
@@ -34,10 +35,45 @@ def _number(value: Any, label: str) -> float:
         raise ValueError(f"{label} must be numeric, got {value!r}") from None
 
 
-def extract_measurement(payload: dict[str, Any], source: str) -> dict[str, float]:
+def extract_measurement(payload: dict[str, Any], source: str) -> dict[str, Any]:
     analysis = payload.get("analysis", payload)
     if not payload.get("ok", analysis.get("ok")):
         raise ValueError(f"{source}: result is not ok")
+    measurement = payload.get("measurement") or analysis.get("measurement")
+    if measurement == NOZZLE_Z_MEASUREMENT:
+        suggested = payload.get("suggested_calib_yaml") or analysis.get(
+            "suggested_calib_yaml"
+        )
+        if suggested is None:
+            suggested = (
+                payload.get("facts")
+                or analysis.get("facts")
+                or analysis.get("facts_preview")
+                or {}
+            ).get("suggested_calib_yaml")
+        tools = (suggested or {}).get("tools") or {}
+        t0 = tools.get("t0") or {}
+        t1 = tools.get("t1") or {}
+        return {
+            "measurement": NOZZLE_Z_MEASUREMENT,
+            "t0_z_endstop": _number(
+                t0.get("z_endstop"), f"{source}: suggested t0.z_endstop"
+            ),
+            "t1_z_endstop": _number(
+                t1.get("z_endstop"), f"{source}: suggested t1.z_endstop"
+            ),
+            "suggested_runtime_t1_z_offset": _number(
+                payload.get("suggested_runtime_t1_z_offset")
+                or analysis.get("suggested_runtime_t1_z_offset")
+                or (
+                    payload.get("facts")
+                    or analysis.get("facts")
+                    or analysis.get("facts_preview")
+                    or {}
+                ).get("suggested_runtime_t1_z_offset"),
+                f"{source}: suggested_runtime_t1_z_offset",
+            ),
+        }
 
     cross_match = analysis.get("cross_match", {})
     if not cross_match.get("accepted"):
@@ -49,6 +85,7 @@ def extract_measurement(payload: dict[str, Any], source: str) -> dict[str, float
         or cross_match
     )
     return {
+        "measurement": "idex_nozzle_relative_offset",
         "along_x_mm": _number(
             nozzle_delta.get("along_x_mm_approx")
             or cross_match.get("along_x_mm_approx"),
@@ -112,6 +149,15 @@ def apply_measurement(
     return calib
 
 
+def apply_z_measurement(
+    calib: dict[str, Any], *, t0_z_endstop: float, t1_z_endstop: float, update_z: bool
+) -> dict[str, Any]:
+    if update_z:
+        calib["tools"]["t0"]["z_endstop"] = round(t0_z_endstop, 3)
+        calib["tools"]["t1"]["z_endstop"] = round(t1_z_endstop, 3)
+    return calib
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Apply accepted IDEX nozzle vision sweep results to calib.yaml."
@@ -122,6 +168,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--update-y",
         action="store_true",
         help="Also apply one provisional T1 Y correction from perpendicular_mm_approx.",
+    )
+    parser.add_argument(
+        "--update-z",
+        action="store_true",
+        help="Apply accepted nozzle_cam_nozzle_z_offsets facts to both Z endstops.",
     )
     parser.add_argument(
         "--dry-run",
@@ -136,6 +187,47 @@ def main() -> int:
     measurements = [
         extract_measurement(_load_json_source(source), source) for source in args.results
     ]
+    measurement_names = {str(item["measurement"]) for item in measurements}
+    if len(measurement_names) != 1:
+        raise ValueError(f"Cannot mix measurement types: {sorted(measurement_names)}")
+    measurement = measurements[0]["measurement"]
+    if measurement == NOZZLE_Z_MEASUREMENT:
+        t0_z_endstop = statistics.fmean(item["t0_z_endstop"] for item in measurements)
+        t1_z_endstop = statistics.fmean(item["t1_z_endstop"] for item in measurements)
+        runtime_t1_z_offset = statistics.fmean(
+            item["suggested_runtime_t1_z_offset"] for item in measurements
+        )
+        calib = load_calib(args.calib)
+        old_t0 = dict(calib["tools"]["t0"])
+        old_t1 = dict(calib["tools"]["t1"])
+        apply_z_measurement(
+            calib,
+            t0_z_endstop=t0_z_endstop,
+            t1_z_endstop=t1_z_endstop,
+            update_z=args.update_z,
+        )
+        new_t0 = calib["tools"]["t0"]
+        new_t1 = calib["tools"]["t1"]
+        print(f"accepted_results: {len(measurements)}")
+        print(f"avg_t0_z_endstop: {t0_z_endstop:.5f}")
+        print(f"avg_t1_z_endstop: {t1_z_endstop:.5f}")
+        print(f"suggested_runtime_t1_z_offset: {runtime_t1_z_offset:.5f}")
+        if args.update_z:
+            print(
+                "t0.z_endstop: "
+                f"{float(old_t0['z_endstop']):.3f} -> {float(new_t0['z_endstop']):.3f}"
+            )
+            print(
+                "t1.z_endstop: "
+                f"{float(old_t1['z_endstop']):.3f} -> {float(new_t1['z_endstop']):.3f}"
+            )
+        else:
+            print("t0.z_endstop: unchanged (--update-z not set)")
+            print("t1.z_endstop: unchanged (--update-z not set)")
+        if args.update_z and not args.dry_run:
+            write_calib(args.calib, calib)
+        return 0
+
     along_x_mm = statistics.fmean(item["along_x_mm"] for item in measurements)
     perpendicular_mm = statistics.fmean(item["perpendicular_mm"] for item in measurements)
 

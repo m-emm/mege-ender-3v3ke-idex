@@ -176,6 +176,31 @@ gcode:
     RESPOND TYPE=echo MSG="IDEX bed Y vision sweep queued: X={x}, Y={y}, Z={z}, Y_OFFSETS={y_offsets}, NAME={name}"
     {action_call_remote_method("idex_bed_y_vision_sweep", name=name, x=x, y=y, z=z, y_offsets=y_offsets)}
 
+[gcode_macro IDEX_NOZZLE_Z_VISION_SWEEP]
+description: Report-only one-run nozzle-camera Z calibration sweep.
+gcode:
+    {% set bed_y_x = params.BED_Y_X|default(-80.4)|float %}
+    {% set bed_y_y = params.BED_Y_Y|default(-14.8)|float %}
+    {% set bed_y_z = params.BED_Y_Z|default(293.75)|float %}
+    {% set tool_x = params.TOOL_X|default(195.0)|float %}
+    {% set tool_y = params.TOOL_Y|default(-14.8)|float %}
+    {% set travel_z = params.TRAVEL_Z|default(20.0)|float %}
+    {% set y_offsets = params.Y_OFFSETS|default("0,5,10,15,20") %}
+    {% set x_offsets = params.X_OFFSETS|default("0,3,6,9,12") %}
+    {% set z_values = params.Z_VALUES|default("1,2,4,8") %}
+    {% set bed_feature_z = params.BED_FEATURE_Z|default(params.BED_FEATURE_Z_MM|default(-0.1))|float %}
+    {% set name = params.NAME|default("nozzle_z") %}
+    {% set print_state = printer.print_stats.state %}
+    {% set state = printer["gcode_macro _IDEX_TOOL_STATE"] %}
+    {% if print_state not in ["standby", "complete"] %}
+        { action_raise_error("IDEX_NOZZLE_Z_VISION_SWEEP requires an idle printer; print_stats.state=" ~ print_state) }
+    {% endif %}
+    {% if "x" not in printer.toolhead.homed_axes or "y" not in printer.toolhead.homed_axes or "z" not in printer.toolhead.homed_axes %}
+        { action_raise_error("IDEX_NOZZLE_Z_VISION_SWEEP requires X/Y/Z homed.") }
+    {% endif %}
+    RESPOND TYPE=echo MSG="IDEX nozzle Z vision sweep queued: BED_Y_X={bed_y_x}, BED_Y_Y={bed_y_y}, BED_Y_Z={bed_y_z}, TOOL_X={tool_x}, TOOL_Y={tool_y}, TRAVEL_Z={travel_z}, Y_OFFSETS={y_offsets}, X_OFFSETS={x_offsets}, Z_VALUES={z_values}, BED_FEATURE_Z={bed_feature_z}, NAME={name}"
+    {action_call_remote_method("idex_nozzle_z_vision_sweep", name=name, bed_y_x=bed_y_x, bed_y_y=bed_y_y, bed_y_z=bed_y_z, tool_x=tool_x, tool_y=tool_y, travel_z=travel_z, y_offsets=y_offsets, x_offsets=x_offsets, z_values=z_values, bed_feature_z_mm=bed_feature_z, current_t0_z_endstop=state.t0_z_endstop, current_t1_z_endstop=state.t1_z_endstop)}
+
 # Custom thermistor calibration for the left Micro Swiss FlowTech toolhead.
 # Values retained from the same calibrated Micro Swiss hotend assembly.
 [thermistor microswiss_calibrated]

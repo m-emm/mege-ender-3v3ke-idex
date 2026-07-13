@@ -118,6 +118,18 @@ def _load_y_step_loss_generator_module():
     return module
 
 
+def _load_nozzle_vision_calibration_module():
+    spec = importlib.util.spec_from_file_location(
+        "apply_nozzle_vision_calibration", NOZZLE_VISION_CALIBRATION_PATH
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def _section(config_text: str, name: str) -> str:
     match = re.search(
         rf"^\[{re.escape(name)}\]\n(?P<body>.*?)(?=^\[|\Z)",
@@ -292,6 +304,9 @@ def test_vision_capture_macro_and_host_files_exist():
     )
     nozzle_sweep_macro = _section(config_text, "gcode_macro IDEX_NOZZLE_VISION_SWEEP")
     bed_y_sweep_macro = _section(config_text, "gcode_macro IDEX_BED_Y_VISION_SWEEP")
+    nozzle_z_sweep_macro = _section(
+        config_text, "gcode_macro IDEX_NOZZLE_Z_VISION_SWEEP"
+    )
     moonraker = (IMAGE_BUILD_FILES_DIR / "moonraker.conf").read_text(encoding="utf-8")
     nginx = (IMAGE_BUILD_FILES_DIR / "nginx-mainsail.conf").read_text(encoding="utf-8")
     image_packages = (IMAGE_BUILD_STAGE_DIR / "00-packages").read_text(encoding="utf-8")
@@ -379,6 +394,17 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "y_offsets=y_offsets" in bed_y_sweep_macro
     assert "print_stats.state" in bed_y_sweep_macro
     assert "requires X/Y/Z homed" in bed_y_sweep_macro
+    assert (
+        'action_call_remote_method("idex_nozzle_z_vision_sweep"'
+        in nozzle_z_sweep_macro
+    )
+    assert "BED_FEATURE_Z" in nozzle_z_sweep_macro
+    assert "X_OFFSETS" in nozzle_z_sweep_macro
+    assert "Z_VALUES" in nozzle_z_sweep_macro
+    assert "current_t0_z_endstop=state.t0_z_endstop" in nozzle_z_sweep_macro
+    assert "current_t1_z_endstop=state.t1_z_endstop" in nozzle_z_sweep_macro
+    assert "print_stats.state" in nozzle_z_sweep_macro
+    assert "requires X/Y/Z homed" in nozzle_z_sweep_macro
     assert not (IMAGE_BUILD_FILES_DIR / "crowsnest.conf").exists()
     assert "[webcam Printer Camera]" not in moonraker
     assert "[update_manager crowsnest]" not in moonraker
@@ -466,12 +492,15 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "idex_nozzle_vision_check" not in capture_script
     assert "idex_nozzle_vision_sweep" in capture_script
     assert "idex_bed_y_vision_sweep" in capture_script
+    assert "idex_nozzle_z_vision_sweep" in capture_script
     assert "run_nozzle_cam_profile" in capture_script
     assert "run_idex_nozzle_vision_sweep" in capture_script
     assert "run_idex_bed_y_vision_sweep" in capture_script
+    assert "run_idex_nozzle_z_vision_sweep" in capture_script
     assert "vision_nozzle_align.py" in capture_script
     assert '"--sweep"' in capture_script
     assert '"--run-bed-y-job"' in capture_script
+    assert '"--run-nozzle-z-job"' in capture_script
     assert "FRAMEBUFFER_LATEST_IMAGE" in capture_script
     assert "wait_for_buffered_frame" in capture_script
     assert "VisionJobApi" in capture_script
@@ -493,11 +522,20 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "--run-job" in nozzle_script
     assert "--prepare-bed-y-job" in nozzle_script
     assert "--run-bed-y-job" in nozzle_script
+    assert "--prepare-nozzle-z-job" in nozzle_script
+    assert "--run-nozzle-z-acquisition-job" in nozzle_script
+    assert "--run-nozzle-z-job" in nozzle_script
     assert "nozzle_cam_bed_y_sweep" in nozzle_script
     assert "nozzle_cam_bed_y_motion" in nozzle_script
+    assert "nozzle_cam_nozzle_z_sweep" in nozzle_script
+    assert "nozzle_cam_nozzle_z_offsets" in nozzle_script
     assert "bed_y_axis_vector_px_per_mm" in nozzle_script
     assert "bed_y_scale_px_per_mm" in nozzle_script
     assert "bed_y_parallax_spread" in nozzle_script
+    assert "tool_zero_error_mm" in nozzle_script
+    assert "suggested_calib_yaml" in nozzle_script
+    assert "NOZZLE_CAM_Y_FEATURE_LIGHT" in nozzle_script
+    assert "NOZZLE_CAM_ANALYSIS_LIGHT" in nozzle_script
     assert "--refresh-ui" in nozzle_script
     assert "--virtual-sd-root" in nozzle_script
     assert "SDCARD_PRINT_FILE FILENAME=" in nozzle_script
@@ -530,6 +568,8 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "old_x + along_x_mm" in helper
     assert "new_y_offset = current_y_offset - perpendicular_mm" in helper
     assert "--update-y" in helper
+    assert "--update-z" in helper
+    assert "nozzle_cam_nozzle_z_offsets" in helper
     assert 'vision_capture.py", "--capture-once"' in runner_script
     assert "acl\n" in image_packages
     assert "python3-opencv" in image_packages
@@ -547,6 +587,11 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "http://menderpi.local/vision/nozzle_cam/jobs/<job_id>/" in klipper_readme
     assert "bed_y_axis_vector_px_per_mm" in klipper_readme
     assert "negative image Y means the feature moves upward" in klipper_readme
+    assert "Nozzle Camera Z Calibration Sweep" in klipper_readme
+    assert "vision_nozzle_align.py --run-nozzle-z-job --name nozzle_z" in klipper_readme
+    assert "IDEX_NOZZLE_Z_VISION_SWEEP NAME=nozzle_z" in klipper_readme
+    assert "tool_zero_error_mm.T0" in klipper_readme
+    assert "suggested_runtime_t1_z_offset" in klipper_readme
     assert "read-only generated static HTML/JSON" in concept
     assert "libevent-dev" not in image_packages
     assert "libjpeg-dev" not in image_packages
@@ -568,6 +613,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "SOURCE_VISION" in live_klipper_deploy
     assert "REMOTE_TMP_VISION" in live_klipper_deploy
     assert "vision.py" in live_klipper_deploy
+
     assert "/run/vision-preview-nozzle_cam/profile_request.json" in live_deploy
     assert "setfacl -m u:www-data:--x" in image_install
     assert "setfacl -m u:www-data:--x" in live_deploy
@@ -616,6 +662,46 @@ def test_vision_capture_macro_and_host_files_exist():
     assert profile_controls["nozzle_cam_analysis"]["brightness"] <= 0
     assert profile_controls["nozzle_cam_auto"]["auto_exposure"] == 3
     assert profile_controls["nozzle_cam_auto"]["white_balance_automatic"] == 1
+
+
+def test_nozzle_z_apply_helper_requires_explicit_update_z(tmp_path):
+    helper = _load_nozzle_vision_calibration_module()
+    payload = {
+        "ok": True,
+        "measurement": "nozzle_cam_nozzle_z_offsets",
+        "suggested_calib_yaml": {
+            "tools": {
+                "t0": {"z_endstop": 293.812},
+                "t1": {"z_endstop": 293.577},
+            }
+        },
+        "suggested_runtime_t1_z_offset": 0.235,
+    }
+    measurement = helper.extract_measurement(payload, "facts.json")
+    assert measurement["measurement"] == "nozzle_cam_nozzle_z_offsets"
+    assert measurement["t0_z_endstop"] == pytest.approx(293.812)
+    assert measurement["t1_z_endstop"] == pytest.approx(293.577)
+
+    calib_path = tmp_path / "calib.yaml"
+    calib_path.write_text(SYNTHETIC_CALIBRATION_YAML, encoding="utf-8")
+    calib = helper.load_calib(calib_path)
+    helper.apply_z_measurement(
+        calib,
+        t0_z_endstop=measurement["t0_z_endstop"],
+        t1_z_endstop=measurement["t1_z_endstop"],
+        update_z=False,
+    )
+    assert calib["tools"]["t0"]["z_endstop"] == pytest.approx(293.75)
+    assert calib["tools"]["t1"]["z_endstop"] == pytest.approx(293.65)
+
+    helper.apply_z_measurement(
+        calib,
+        t0_z_endstop=measurement["t0_z_endstop"],
+        t1_z_endstop=measurement["t1_z_endstop"],
+        update_z=True,
+    )
+    assert calib["tools"]["t0"]["z_endstop"] == pytest.approx(293.812)
+    assert calib["tools"]["t1"]["z_endstop"] == pytest.approx(293.577)
 
 
 def test_y_tmc_stallguard_runner_streams_live_samples_and_keeps_aggressive_opt_in():

@@ -8,6 +8,10 @@ def create_idex_tap_t1_assembly(
     fixed_tool_head_mount,
     x_axis_profile,
     x_axis_carriage,
+    sprite_extruder_right,
+    extruder_cage_right,
+    mgn7h_rail_with_carriage,
+    opb991t11z_sensor,
     mgn7h_rail_length,
     mgn7h_rail_width,
     mgn7h_rail_mount_hole_pitch,
@@ -37,7 +41,14 @@ def create_idex_tap_t1_assembly(
     """Create a loose fixed Tap frame around the placed right-side context."""
 
     idex_tap_magnet_retainer_clearance = 0.1
-    _ = x_axis_profile
+    # Future Tap geometry will build around this placed right toolhead context.
+    _ = (
+        x_axis_profile,
+        sprite_extruder_right,
+        extruder_cage_right,
+        mgn7h_rail_with_carriage,
+        opb991t11z_sensor,
+    )
 
     fixed_tool_head_mount_size = get_bounding_box_size(fixed_tool_head_mount.leader)
     mount_flange = create_box(
@@ -60,7 +71,7 @@ def create_idex_tap_t1_assembly(
     rail_plate = align(rail_plate, mount_flange, Alignment.STACK_BOTTOM)
     rail_plate = align(rail_plate, mount_flange, Alignment.BACK)
 
-    fixed_frame = mount_flange.fuse(rail_plate)
+    fixed_frame = mount_flange # .fuse(rail_plate)
 
     fixed_mount_center = get_bounding_box_center(fixed_tool_head_mount.leader)
     frame_mount_holes = PartCollector()

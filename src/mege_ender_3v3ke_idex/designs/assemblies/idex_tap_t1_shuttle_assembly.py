@@ -8,6 +8,8 @@ def create_idex_tap_t1_shuttle_assembly(
     fixed_tool_head_mount,
     mgn7h_rail_with_carriage,
     idex_tap_t1,
+    sprite_extruder_right,
+    extruder_cage_right,
     mgn7h_carriage_mount_hole_pitch_x,
     mgn7h_carriage_mount_hole_pitch_y,
     tool_head_mount_machined_cutout_width,
@@ -29,6 +31,9 @@ def create_idex_tap_t1_shuttle_assembly(
     idex_tap_magnet_target_screw_head_diameter,
 ):
     """Create the printed moving stack that rides on the MGN7H carriage."""
+
+    # Future shuttle geometry will build around this placed right toolhead context.
+    _ = fixed_tool_head_mount, idex_tap_t1, sprite_extruder_right, extruder_cage_right
 
     carriage = mgn7h_rail_with_carriage.get_named_follower("carriage")
     _ = get_bounding_box_size(carriage)
@@ -99,5 +104,8 @@ def create_idex_tap_t1_shuttle_assembly(
     #     moving_magnet_targets,
     #     "moving_magnet_targets",
     # )
+
+    shuttle_part = align(shuttle_part, carriage, Alignment.CENTER)
+    shuttle_part = align(shuttle_part, carriage, Alignment.STACK_FRONT)
 
     return shuttle_part

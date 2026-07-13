@@ -1,7 +1,14 @@
+import inspect
 from pathlib import Path
 
 import yaml
 from assembly_defaults import ASSEMBLIES_DIR, AssemblyDefaultsLoader
+from mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t1_assembly import (
+    create_idex_tap_t1_assembly,
+)
+from mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t1_shuttle_assembly import (
+    create_idex_tap_t1_shuttle_assembly,
+)
 
 
 REPO_ROOT = ASSEMBLIES_DIR.parents[1]
@@ -70,7 +77,16 @@ def test_idex_tap_assemblies_are_t1_named_in_builder_contract():
 
     fixed_tap = assemblies["idex_tap_t1_assembly"]
     assert "sprite_extruder_right_assembly" not in fixed_tap["depends_on"]
+    assert "extruder_cage_right_assembly" not in fixed_tap["depends_on"]
     assert "sprite_extruder" not in fixed_tap["inject_parts"]
+    assert (
+        fixed_tap["inject_parts"]["sprite_extruder_right"]
+        == "sprite_extruder_right_assembly"
+    )
+    assert (
+        fixed_tap["inject_parts"]["extruder_cage_right"]
+        == "extruder_cage_right_assembly"
+    )
 
 
 def test_idex_tap_t1_shuttle_visualizes_right_toolhead_context():
@@ -79,8 +95,14 @@ def test_idex_tap_t1_shuttle_visualizes_right_toolhead_context():
 
     assert "sprite_extruder_right_assembly" in shuttle["depends_on"]
     assert "extruder_cage_right_assembly" not in shuttle["depends_on"]
-    assert "sprite_extruder_right" not in shuttle.get("inject_parts", {})
-    assert "extruder_cage_right" not in shuttle.get("inject_parts", {})
+    assert (
+        shuttle["inject_parts"]["sprite_extruder_right"]
+        == "sprite_extruder_right_assembly"
+    )
+    assert (
+        shuttle["inject_parts"]["extruder_cage_right"]
+        == "extruder_cage_right_assembly"
+    )
     assert "extruder_cage_right_joined_assembly" not in shuttle["depends_on"]
     assert "part_fan_right_joined_assembly" not in shuttle["depends_on"]
 
@@ -94,6 +116,16 @@ def test_idex_tap_t1_shuttle_visualizes_right_toolhead_context():
     assert "extruder_cage_right_assembly" in visualized_dependencies
     assert "extruder_cage_right_joined_assembly" not in visualized_dependencies
     assert "part_fan_right_joined_assembly" not in visualized_dependencies
+
+
+def test_idex_tap_t1_generators_accept_unused_right_toolhead_context():
+    for generator in [
+        create_idex_tap_t1_assembly,
+        create_idex_tap_t1_shuttle_assembly,
+    ]:
+        parameters = inspect.signature(generator).parameters
+        assert "sprite_extruder_right" in parameters
+        assert "extruder_cage_right" in parameters
 
 
 def test_active_idex_tap_files_have_no_t0_prototype_symbols():
