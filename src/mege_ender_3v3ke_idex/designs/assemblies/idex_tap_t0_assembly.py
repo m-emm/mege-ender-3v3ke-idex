@@ -6,6 +6,8 @@ from shellforgepy.simple import *
 def create_idex_tap_t0_assembly(
     *,
     fixed_tool_head_mount,
+    x_axis_lower_profile,
+    x_axis_carriage,
     mgn7h_rail_length,
     mgn7h_rail_width,
     mgn7h_rail_mount_hole_pitch,
@@ -34,13 +36,19 @@ def create_idex_tap_t0_assembly(
 ):
     """Create the fixed Tap frame that mounts under the machined T0 mount."""
 
-    fixed_mount_size = get_bounding_box_size(fixed_tool_head_mount.leader)
+    idex_tap_magnet_retainer_clearance = 0.1
 
+    fixed_tool_head_mount_size = get_bounding_box_size(fixed_tool_head_mount.leader)
     mount_flange = create_box(
-        max(idex_tap_frame_width, fixed_mount_size[0]),
-        max(idex_tap_frame_mount_flange_depth, fixed_mount_size[1]),
+        fixed_tool_head_mount_size[0],
+        idex_tap_frame_mount_flange_depth,
         idex_tap_frame_mount_flange_thickness,
     )
+
+    mount_flange = align(mount_flange, fixed_tool_head_mount, Alignment.CENTER)
+    mount_flange = align(mount_flange, fixed_tool_head_mount, Alignment.STACK_BOTTOM)
+    mount_flange = align(mount_flange, x_axis_carriage, Alignment.STACK_FRONT)
+
     rail_plate_width = max(idex_tap_shuttle_height, mgn7h_rail_width + 16)
     rail_plate = create_box(
         rail_plate_width,
@@ -49,6 +57,7 @@ def create_idex_tap_t0_assembly(
     )
     rail_plate = align(rail_plate, mount_flange, Alignment.CENTER, axes=[0, 1])
     rail_plate = align(rail_plate, mount_flange, Alignment.STACK_BOTTOM)
+    rail_plate = align(rail_plate, mount_flange, Alignment.BACK)
 
     fixed_frame = mount_flange.fuse(rail_plate)
 
@@ -129,37 +138,32 @@ def create_idex_tap_t0_assembly(
 
     magnet_retainers = PartCollector()
     magnets = PartCollector()
-    magnet_stations = max(1, int(idex_tap_magnet_count))
-    for station_index in range(magnet_stations):
-        x_offset = (station_index - (magnet_stations - 1) / 2) * (
-            idex_tap_magnet_center_spacing
-        )
-        retainer = create_cylinder(
-            idex_tap_magnet_diameter / 2 + idex_tap_magnet_retainer_thickness,
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        retainer = create_box(
+            idex_tap_magnet_diameter + idex_tap_magnet_retainer_thickness,
+            idex_tap_magnet_diameter + idex_tap_magnet_retainer_thickness,
             idex_tap_magnet_height + idex_tap_magnet_retainer_thickness,
-            direction=(0, 1, 0),
         )
-        retainer = align(retainer, rail_plate, Alignment.CENTER, axes=[0, 2])
+        retainer = align(retainer, rail_plate, Alignment.BOTTOM)
         retainer = align(retainer, rail_plate, Alignment.STACK_FRONT)
-        retainer = translate(x_offset, 0, -idex_tap_shuttle_height * 0.42)(retainer)
-        magnet_retainers = magnet_retainers.fuse(retainer)
+        retainer = align(retainer, rail_plate, lr)
 
         magnet = create_cylinder(
             idex_tap_magnet_diameter / 2,
             idex_tap_magnet_height,
-            direction=(0, 1, 0),
         )
         magnet = align(magnet, retainer, Alignment.CENTER)
+        magnet = align(magnet, retainer, Alignment.BOTTOM)
         magnets = magnets.fuse(magnet)
 
-    down_stop = create_cylinder(
-        idex_tap_down_stop_contact_diameter / 2,
-        idex_tap_frame_thickness,
-        direction=(0, 1, 0),
-    )
-    down_stop = align(down_stop, rail_plate, Alignment.CENTER, axes=[0, 2])
-    down_stop = align(down_stop, rail_plate, Alignment.STACK_FRONT)
-    down_stop = translate(0, 0, -idex_tap_shuttle_height / 2)(down_stop)
+        magnet_cutter = create_cylinder(
+            idex_tap_magnet_diameter / 2 + idex_tap_magnet_retainer_clearance,
+            idex_tap_magnet_height,
+        )
+
+        magnet_cutter = align(magnet_cutter, magnet, Alignment.CENTER)
+        retainer = retainer.cut(magnet_cutter)
+        magnet_retainers = magnet_retainers.fuse(retainer)
 
     overtravel_stop = create_cylinder(
         idex_tap_overtravel_stop_contact_diameter / 2,
@@ -168,6 +172,7 @@ def create_idex_tap_t0_assembly(
     )
     overtravel_stop = align(overtravel_stop, rail_plate, Alignment.CENTER, axes=[0, 2])
     overtravel_stop = align(overtravel_stop, rail_plate, Alignment.STACK_FRONT)
+    overtravel_stop = align(overtravel_stop, rail_plate, Alignment.LEFT)
     overtravel_stop = translate(
         0,
         0,
@@ -177,7 +182,6 @@ def create_idex_tap_t0_assembly(
     tap = LeaderFollowersCuttersPart(leader=fixed_frame)
     tap.add_named_follower(rail_plate, "idex_tap_rail_plate")
     tap.add_named_follower(sensor_bracket, "idex_tap_sensor_bracket")
-    tap.add_named_follower(down_stop, "idex_tap_down_stop")
     tap.add_named_follower(overtravel_stop, "idex_tap_overtravel_stop")
     tap.add_named_follower(magnet_retainers, "idex_tap_magnet_retainers")
     tap.add_named_cutter(frame_mount_holes, "frame_mount_holes")

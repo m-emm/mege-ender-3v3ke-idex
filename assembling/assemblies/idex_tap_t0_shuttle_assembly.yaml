@@ -19,19 +19,35 @@ Builder:
       - source: self
         artifact: leader
         name: idex_tap_moving_shuttle
-        color: [1.0, 0.42, 0.22]
       - source: self
         artifact: followers
         names:
           - idex_tap_trigger_flag
         name_template: "{name}"
-        color: [1.0, 0.54, 0.34]
       - source: self
         artifact: non_production_parts
         names:
           - moving_magnet_targets
         name_template: "{name}"
-        color: [0.9, 0.86, 0.72]
+      - source: injected
+        assembly: fixed_tool_head_mount
+        artifact: all
+      - source: injected
+        assembly: mgn7h_rail_with_carriage
+        artifact: all
+      - source: injected
+        assembly: idex_tap_t0
+        artifact: all
+
+      - source: dependencies
+        assembly: x_axis_rail_assembly
+        artifact: all
+        name_template: "{default_name}"
+      - source: dependencies
+        assembly: x_axis_left_carriage_assembly
+        artifact: leader
+        name: carriage
+
   Production:
     parts:
       - source: self

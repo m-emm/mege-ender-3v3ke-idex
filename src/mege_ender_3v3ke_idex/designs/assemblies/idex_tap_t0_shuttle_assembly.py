@@ -7,6 +7,7 @@ def create_idex_tap_t0_shuttle_assembly(
     *,
     fixed_tool_head_mount,
     mgn7h_rail_with_carriage,
+    idex_tap_t0,
     mgn7h_carriage_mount_hole_pitch_x,
     mgn7h_carriage_mount_hole_pitch_y,
     tool_head_mount_machined_cutout_width,

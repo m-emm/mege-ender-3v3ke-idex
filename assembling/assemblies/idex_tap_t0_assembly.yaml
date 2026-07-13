@@ -19,7 +19,7 @@ Builder:
       - source: self
         artifact: leader
         name: idex_tap_fixed_frame
-        color: [0.92, 0.94, 0.9]
+
       - source: self
         artifact: followers
         names:
@@ -28,13 +28,27 @@ Builder:
           - idex_tap_overtravel_stop
           - idex_tap_magnet_retainers
         name_template: "{name}"
-        color: [0.82, 0.88, 0.86]
+
       - source: self
         artifact: non_production_parts
         names:
           - magnets
         name_template: "{name}"
-        color: [0.78, 0.78, 0.72]
+      - source: injected
+        assembly: fixed_tool_head_mount
+        artifact: all
+      - source: injected
+        assembly: x_axis_lower_profile
+        artifact: all
+      - source: dependencies
+        assembly: x_axis_rail_assembly
+        artifact: all
+        name_template: "{default_name}"
+      - source: dependencies
+        assembly: x_axis_left_carriage_assembly
+        artifact: leader
+        name: carriage
+
   Production:
     parts:
       - source: self

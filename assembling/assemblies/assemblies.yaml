@@ -401,16 +401,9 @@ placement:
         - tool_head_mount_machined_top_assembly
       to: x_axis_right_carriage_assembly
 
-    - part: idex_tap_t0_assembly
-      to: tool_head_mount_machined_top_assembly
-      alignment: CENTER
-      axes: [0, 1]
-    - part: idex_tap_t0_assembly
-      to: tool_head_mount_machined_top_assembly
-      alignment: STACK_BOTTOM
     - rigid_group:
         - idex_tap_t0_assembly
-      to: tool_head_mount_machined_top_assembly
+      to: tool_head_mount_machined_bottom_assembly
 
     - part: mgn7h_rail_with_carriage_assembly
       post_rotation:
@@ -419,11 +412,11 @@ placement:
         center: mgn7h_rail_with_carriage_assembly.CENTER
     - part: mgn7h_rail_with_carriage_assembly
       post_rotation:
-        angle: -90
+        angle: 90
         axis: [0, 0, 1]
         center: mgn7h_rail_with_carriage_assembly.CENTER
     - part: mgn7h_rail_with_carriage_assembly
-      to: idex_tap_t0_assembly.followers.idex_tap_rail_plate
+      to: idex_tap_t0_assembly
       alignment: CENTER
       axes: [0, 2]
     - part: mgn7h_rail_with_carriage_assembly
@@ -3853,9 +3846,15 @@ assemblies:
 
     resource_file: idex_tap_t0_assembly.yaml
     depends_on:
-      - tool_head_mount_machined_top_assembly
+      - tool_head_mount_machined_bottom_assembly
+      - x_axis_lower_profile_assembly
+      - x_axis_rail_assembly
+      - x_axis_right_carriage_assembly
+
     inject_parts:
-      fixed_tool_head_mount: tool_head_mount_machined_top_assembly
+      fixed_tool_head_mount: tool_head_mount_machined_bottom_assembly
+      x_axis_lower_profile: x_axis_lower_profile_assembly
+      x_axis_carriage: x_axis_left_carriage_assembly
 
   - name: idex_tap_t0_shuttle_assembly
 
@@ -3863,9 +3862,15 @@ assemblies:
     depends_on:
       - tool_head_mount_machined_top_assembly
       - mgn7h_rail_with_carriage_assembly
+      - idex_tap_t0_assembly
+      - x_axis_lower_profile_assembly
+      - x_axis_rail_assembly
+      - x_axis_right_carriage_assembly
+
     inject_parts:
-      fixed_tool_head_mount: tool_head_mount_machined_top_assembly
+      fixed_tool_head_mount: tool_head_mount_machined_bottom_assembly
       mgn7h_rail_with_carriage: mgn7h_rail_with_carriage_assembly
+      idex_tap_t0: idex_tap_t0_assembly
 
   - name: idex_tap_t0_stack_assembly
 

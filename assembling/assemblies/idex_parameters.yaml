@@ -1307,7 +1307,7 @@ globals:
   tool_head_mount_machined_sprite_mount_hole_primary_y_pitch: 39.7
   tool_head_mount_machined_sprite_mount_hole_secondary_y_pitch: 11.8
 
-  mgn7h_rail_length: 60
+  mgn7h_rail_length: 40
   mgn7h_rail_width: 7
   mgn7h_rail_height: 4.8
   mgn7h_rail_mount_hole_pitch: 15
