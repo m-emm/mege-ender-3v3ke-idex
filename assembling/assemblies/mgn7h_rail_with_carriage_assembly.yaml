@@ -110,6 +110,10 @@ Parameters:
     Type: Float
   rail_mock_clearance:
     Type: Float
+  rail_mock_side_clearance:
+    Type: Float
+  rail_mock_top_clearance:
+    Type: Float
   rail_mock_groove_clearance:
     Type: Float
   rail_mock_groove_height_clearance:

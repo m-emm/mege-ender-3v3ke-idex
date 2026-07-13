@@ -58,6 +58,8 @@ mgn_7h_rail_top_fillet_radius = 0.18
 mgn_7h_rail_bottom_chamfer_width = 0.32
 mgn_7h_rail_bottom_chamfer_height = 0.35
 mgn_7h_rail_mock_clearance = 0.15
+mgn_7h_rail_mock_side_clearance = 0.15
+mgn_7h_rail_mock_top_clearance = 0.15
 mgn_7h_rail_mock_groove_clearance = 0.06
 mgn_7h_rail_mock_groove_height_clearance = 0.0
 
@@ -467,6 +469,8 @@ def create_mgn7h_rail_with_carriage(
     rail_bottom_chamfer_width=mgn_7h_rail_bottom_chamfer_width,
     rail_bottom_chamfer_height=mgn_7h_rail_bottom_chamfer_height,
     rail_mock_clearance=mgn_7h_rail_mock_clearance,
+    rail_mock_side_clearance=mgn_7h_rail_mock_side_clearance,
+    rail_mock_top_clearance=mgn_7h_rail_mock_top_clearance,
     rail_mock_groove_clearance=mgn_7h_rail_mock_groove_clearance,
     rail_mock_groove_height_clearance=mgn_7h_rail_mock_groove_height_clearance,
     carriage_length=mgn_7h_carriage_length,
@@ -500,8 +504,8 @@ def create_mgn7h_rail_with_carriage(
     )
     printable_rail = create_mgn7h_rail(
         length_mm=length_mm,
-        rail_width=rail_width - 2 * rail_mock_clearance,
-        rail_height=rail_height - 2 * rail_mock_clearance,
+        rail_width=rail_width - 2 * (rail_mock_clearance + rail_mock_side_clearance),
+        rail_height=rail_height - 2 * rail_mock_clearance - rail_mock_top_clearance,
         rail_mount_hole_pitch=rail_mount_hole_pitch,
         rail_mount_hole_end_offset=rail_mount_hole_end_offset,
         rail_mount_hole_diameter=rail_mount_hole_diameter,
@@ -518,9 +522,11 @@ def create_mgn7h_rail_with_carriage(
         rail_bottom_chamfer_width=rail_bottom_chamfer_width,
         rail_bottom_chamfer_height=rail_bottom_chamfer_height,
     )
-    printable_rail = translate(0, rail_mock_clearance, rail_mock_clearance)(
-        printable_rail
-    )
+    printable_rail = translate(
+        0,
+        rail_mock_clearance + rail_mock_side_clearance,
+        rail_mock_clearance,
+    )(printable_rail)
     rail.add_named_follower(printable_rail.leader, "rail_mockup_printable")
 
     carriage = create_mgn7h_carriage(
