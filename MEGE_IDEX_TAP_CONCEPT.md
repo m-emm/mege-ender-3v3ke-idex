@@ -2,9 +2,11 @@
 
 Status: concept draft.
 
-Goal: add a Voron Tap style nozzle contact probe to the MEGE IDEX, first for
-T0 only. T1 remains a normal rigid toolhead for now; its Z offset is handled by
-vision calibration today and may later be corrected by a stepper/cam mechanism.
+Goal: add a Voron Tap style nozzle contact probe to the MEGE IDEX, first as a
+T1/right/top toolhead packaging study. T0/left/bottom is explicitly deferred:
+the bottom belt carriage sits behind the extruder in the same volume a Tap
+mechanism wants to occupy, while the top/right T1 toolhead has meaningfully more
+usable space around the Sprite, machined mount, and belt carriage.
 
 The core idea is not to copy Voron Tap geometry directly. The idea is to reuse
 the mechanical pattern: the nozzle/toolhead stack is allowed to move a small,
@@ -34,63 +36,88 @@ Useful references:
 
 ## Non-Negotiable Constraints
 
-- Build Tap for T0 first.
+- Build the first Tap concept around T1/right/top, not T0/left/bottom.
+- Treat T0/left/bottom as a later packaging problem because the bottom belt
+  carriage behind the extruder consumes the most promising Tap volume.
 - Do not modify `tool_head_mount_machined_top_assembly.leader`. It is treated as
-  an existing machined part and a fixed attachment datum.
+  an existing machined part and a fixed attachment datum for the first T1 study.
 - Add the Tap mechanism around the existing machined mount instead of changing
   the machined mount generator.
+- Keep the existing T1 Sprite, machined mount, belt carriage, cage, fans, and
+  Nitehawk placement as the current environment. The Tap study must fit into
+  that environment before it replaces any load path.
 - Use a vertical MGN7H linear guide for the Tap motion.
 - Use M2 screws for the rail, carriage-side hardware, sensor bracket, and small
   retainers where practical.
 - Model the OPB991T11Z wired optical interrupter and include it in the Tap
   assembly visualization.
 - Model magnets and make their preload/reset role visible in the assembly.
-- Keep T1 out of this scope except for documenting the future Z-offset path.
+- Do not connect the Tap shuttle to the Sprite/toolhead stack in this phase.
+  First model the available T1 space and collision envelope.
 - Use the assembly-first builder flow: YAML assembly contract first, generator
   as implementation behind that contract.
 
-Current repo checkpoint: firmware currently treats `T0` as the left carriage and
-mechanically calibrated Z, while `T1` carries the runtime Z offset. The concept
-also has the explicit CAD anchor `tool_head_mount_machined_top_assembly.leader`.
-Before CAD work starts, reconcile that naming: either T0's Tap really attaches
-to the top/right machined mount, or the top mount name is the required geometry
-anchor even though the first probed tool is firmware T0. Do not silently infer
-left/right from the tool number inside the generator.
+## Current Assembly Checkpoint
+
+The repository already contains exploratory Tap-related assemblies. They are
+useful geometry and builder prototypes, but their names still reflect the older
+T0-first idea and should not be treated as the final side choice:
+
+- `opb991t11z_sensor_assembly` models the wired optical interrupter as a
+  reusable hardware-reference assembly.
+- `mgn7h_rail_with_carriage_assembly` models the short MGN7H rail as leader and
+  the carriage as a named follower.
+- `idex_tap_t0_assembly` currently represents a fixed Tap frame prototype with
+  rail plate, sensor bracket, magnet retainers, and stop features.
+- `idex_tap_t0_shuttle_assembly` currently represents a moving shuttle prototype
+  with carriage screw holes and trigger flag.
+- `idex_tap_t0_stack_assembly` is a focused visualization prototype.
+
+Future T1-first implementation should either introduce clearly named T1 Tap
+assemblies or rename/split the prototypes before they become production routing.
+Do not silently reuse `idex_tap_t0_*` names for final T1 semantics.
 
 ## Mechanical Stack
 
-Baseline stack, from fixed to moving:
+Baseline T1 packaging stack, from fixed environment to candidate Tap geometry:
 
 1. Fixed datum:
-   `tool_head_mount_machined_top_assembly.leader`, unchanged.
-2. Fixed Tap frame:
-   A printed or machined adapter plate bolts to the existing machined mount
-   holes/faces. This part carries the MGN7 rail, the stationary sensor body, the
-   fixed-side magnets, and hard stops.
-3. Vertical guide:
-   A short MGN7 rail is mounted vertically on the fixed Tap frame. The carriage
-   moves with the toolhead stack. If packaging later proves better with the rail
-   moving and carriage fixed, that can be considered, but the first concept
-   should prefer fixed rail and moving carriage because sensor and wire routing
-   are simpler.
-4. Moving shuttle:
-   A compact shuttle bolts to the MGN7H carriage and carries the toolhead
-   mount/extruder-side load. The current direct attachment from toolhead mount
-   to the machined carriage plate is replaced by this shuttle path.
-5. Trigger flag:
+   `x_axis_right_carriage_assembly` and
+   `tool_head_mount_machined_top_assembly.leader`, placed as they are today.
+2. Existing toolhead context:
+   `sprite_extruder_right_assembly`, `x_axis_belt_carriage_top_assembly`,
+   `nitehawk_board_right_assembly`, `extruder_cage_right_joined_assembly`, and
+   `part_fan_right_joined_assembly`, also placed as they are today. These parts
+   define the collision envelope for the first Tap study.
+3. Fixed Tap candidate:
+   A printed or machined frame is explored around the existing top machined
+   mount and right Sprite environment. This frame may carry the MGN7 rail,
+   stationary sensor body, fixed-side magnets, and hard stops, but it must first
+   prove that those features fit in the right/top space.
+4. Vertical guide candidate:
+   A short MGN7 rail is mounted vertically in the candidate fixed frame. The
+   first concept should prefer fixed rail and moving carriage because sensor and
+   wire routing are simpler, but the packaging study may compare fixed-carriage
+   alternatives if they fit the T1 space better.
+5. Moving shuttle candidate:
+   A compact shuttle bolts to the MGN7H carriage and represents the future
+   moving Tap member. In this phase it is not yet the structural connection to
+   the Sprite/toolhead stack.
+6. Trigger flag:
    A thin opaque blade on the moving shuttle passes through the OPB991T11Z slot.
    The sensor should trigger early in the upward travel, not at the mechanical
    overtravel stop.
-6. Magnetic return:
+7. Magnetic return:
    Magnets preload the moving shuttle downward against a hard stop. The hard
    stop defines the printing position; the magnets only seat the mechanism
    there. They must not be the precision datum by themselves.
 
-During normal printing, the shuttle is seated down against the hard stop and the
-toolhead behaves as rigidly as possible. During probing, nozzle contact pushes
-the toolhead/shuttle upward in +Z relative to the fixed mount. The optical flag
-changes sensor state after a small lift, and the remaining travel is reserved as
-overtravel/crash margin.
+The eventual mechanism will let nozzle contact push the moving toolhead/shuttle
+upward in +Z relative to the fixed mount, then trip the optical flag after a
+small lift. That final load path is deliberately out of scope for the first
+T1 packaging pass. First prove that the fixed frame, rail, shuttle, sensor, flag,
+magnets, stops, and service access can coexist with the current T1 toolhead
+placement.
 
 Initial geometry controls to model as YAML parameters, not hard-coded constants:
 
@@ -259,38 +286,47 @@ Hardware to represent:
 
 ## Assembly Builder Shape
 
-Proposed new assembly files:
+Current exploratory assembly files:
 
 - `assembling/assemblies/idex_tap_t0_assembly.yaml`
 - `src/mege_ender_3v3ke_idex/designs/assemblies/idex_tap_t0_assembly.py`
+- `assembling/assemblies/idex_tap_t0_shuttle_assembly.yaml`
+- `src/mege_ender_3v3ke_idex/designs/assemblies/idex_tap_t0_shuttle_assembly.py`
+- `assembling/assemblies/idex_tap_t0_stack_assembly.yaml`
+- `src/mege_ender_3v3ke_idex/designs/assemblies/idex_tap_t0_stack_assembly.py`
 - `assembling/assemblies/mgn7h_rail_with_carriage_assembly.yaml`
 - `src/mege_ender_3v3ke_idex/designs/assemblies/mgn7h_rail_with_carriage_assembly.py`
 - `assembling/assemblies/opb991t11z_sensor_assembly.yaml`
 - `src/mege_ender_3v3ke_idex/designs/assemblies/opb991t11z_sensor_assembly.py`
 
-The new generator should not import another assembly generator directly. It
-should consume injected dependencies from YAML. At minimum:
+These files prove the reusable hardware and split Tap-frame/shuttle shape are
+already underway. The next implementation should not make those T0 names the
+final public contract for a T1-first design. Prefer either a new T1-focused
+assembly contract or an explicit rename/migration once the packaging direction
+is chosen.
 
-- `fixed_tool_head_mount`: the unchanged
-  `tool_head_mount_machined_top_assembly`
+The T1-first Tap generator should not import another assembly generator
+directly. It should consume injected dependencies from YAML. For the packaging
+study, the required injected context is the already-placed environment:
+
+- `x_axis_right_carriage`: the right/top carriage reference.
+- `fixed_tool_head_mount`: `tool_head_mount_machined_top_assembly`, unchanged.
+- `sprite_extruder`: `sprite_extruder_right_assembly`, placed where it is today.
+- `x_axis_belt_carriage`: `x_axis_belt_carriage_top_assembly`, placed where it
+  is today.
+- Optional but useful collision context:
+  `nitehawk_board_right_assembly`, `extruder_cage_right_joined_assembly`,
+  `part_fan_right_joined_assembly`, and `tool_head_cable_attach_shield_right_assembly`.
 - `mgn7h_rail_with_carriage`: injected MGN7H rail assembly with built-in
-  `carriage` follower
-- `opb991t11z_sensor`: standalone injected OPB991T11Z sensor assembly
-- moving toolhead context for collision checks and visualization
-- optional fan/cage/Nitehawk context if those parts constrain the Tap envelope
+  `carriage` follower.
+- `opb991t11z_sensor`: standalone injected OPB991T11Z sensor assembly.
 
-Prefer YAML-based placement in `assembling/assemblies/assemblies.yaml` whenever
-the builder can express the relationship. Place the MGN7H rail-with-carriage
-assembly relative to the fixed Tap frame, place the OPB991T11Z sensor relative
-to the sensor bracket, and place the tapped external toolhead assemblies
-relative to the Tap moving-shuttle reference in YAML. Use the rail assembly's
-built-in `carriage` follower as the rest-position reference for the
-moving-shuttle geometry and Tap animation; do not introduce a separate carriage
-assembly. The Tap Python generator may create adapter geometry, expose
-cutters/keepouts, and use injected hardware for derived clearances, but it
-should not re-export or manually arrange the reusable hardware assemblies just
-to make them visible. Visualization and scene composition should come from
-builder dependencies, injected parts, and top-level placement rules.
+The Tap Python generator may create candidate adapter geometry, reference
+surfaces, cutters, and keepouts from this context. It should not move the
+existing Sprite/mount/belt-carriage relationship, and it should not re-export or
+manually arrange reusable hardware assemblies just to make them visible.
+Visualization and scene composition should come from builder dependencies,
+injected parts, and top-level placement rules.
 
 Stable artifact names to expose:
 
@@ -311,8 +347,12 @@ Stable artifact names to expose:
   - `moving_stack_triggered`
 
 Builder visualization should show both nominal and triggered states. The
-triggered state can be a ghosted copy of the moving shuttle/toolhead lifted by
+triggered state can be a ghosted copy of the moving shuttle candidate lifted by
 `idex_tap_trigger_lift`, with a second ghost at total overtravel if useful.
+For the first T1 packaging pass, also show a "clearance environment" scene where
+the existing Sprite, machined mount, belt carriage, cage/fans, and Nitehawk are
+opaque enough to inspect collisions. Do not imply the Tap shuttle is already the
+Sprite load path.
 
 Production output should include only the printable or machinable Tap adapter
 parts. It should not export the machined mount, MGN rail, sensor, magnets, or
@@ -345,76 +385,58 @@ Tap should follow the same builder-owned placement style. Python should create
 reference geometry and named artifacts; `assemblies.yaml` should decide where
 those artifacts sit in the real printer scene.
 
-Proposed nominal placement sequence:
+Proposed T1 packaging placement sequence:
 
-1. Place the existing X rail, X carriage, and unchanged machined mount exactly as
-   today. This keeps the machined mount as the fixed datum.
-2. Place `idex_tap_t0_assembly.leader` fixed frame against
-   `tool_head_mount_machined_top_assembly.leader` or the chosen T0 fixed mount
-   after the T0/top mapping checkpoint is resolved. Use normal YAML placement:
-   align the Tap frame to the machined mount with `CENTER`, stack it with
-   `STACK_BOTTOM`, and add a `post_translation` only if clearance or service
-   access needs a tuned offset.
-3. Add a `rigid_group` from `idex_tap_t0_assembly` to the selected machined
-   mount after the frame is aligned. This is the same assembly-to-assembly
-   pattern already used for `tool_head_mount_machined_top_assembly` to
-   `x_axis_right_carriage_assembly` and for `sprite_extruder_right_assembly` to
-   `tool_head_mount_machined_top_assembly`; it is not a list of Tap-internal
-   features.
-4. Rotate/place `mgn7h_rail_with_carriage_assembly` so its travel axis is local
-   Z. Align its rail centerline to
-   `idex_tap_t0_assembly.followers.rail_mount_reference`, stack it onto the
-   fixed frame face, and add a `rigid_group` from
-   `mgn7h_rail_with_carriage_assembly` to `idex_tap_t0_assembly`.
-   The assembly's built-in `followers.carriage` is already positioned at the
-   nominal seated/rest position relative to the rail; do not create or place a
-   separate MGN carriage assembly.
-5. Place `opb991t11z_sensor_assembly` to the sensor bracket in YAML. Align the
-   sensor slot/optical center to a named `sensor_slot_reference` or
-   `optical_center_reference` on the bracket, then add a `rigid_group` from
-   `opb991t11z_sensor_assembly` to `idex_tap_t0_assembly`. The sensor should
-   not receive Tap trigger animation.
-6. Place the Sprite/toolhead stack for the tapped tool to the moving shuttle,
-   not directly to the machined mount. Reuse the existing Sprite-to-mount
-   offsets where they still represent the Sprite interface, but target
-   `idex_tap_t0_assembly.followers.toolhead_mount_reference` instead of
-   `tool_head_mount_machined_top_assembly`. For the current top/right side this
-   means aligning and then rigidly grouping
-   `sprite_extruder_right_assembly`, `nitehawk_board_right_assembly`,
-   `extruder_cage_right_joined_assembly`, and `part_fan_right_joined_assembly`
-   to the moving-shuttle/toolhead reference. If the firmware T0 mapping resolves
-   to the bottom/left side instead, use the corresponding left assemblies:
-   `sprite_extruder_left_assembly`, `nitehawk_board_left_assembly`,
-   `extruder_cage_left_joined_assembly`, and `part_fan_left_joined_assembly`.
-7. Cable shields and strain relief need an explicit decision. Existing
-   `tool_head_cable_attach_shield_right_assembly` or
-   `tool_head_cable_attach_shield_left_assembly` stays rigid to the machined
-   mount if it is bolted there, or is re-placed and rigidly grouped to the
-   moving shuttle if it becomes an extruder-side cable support. The
-   visualization should make this split visible so wire service loops can be
-   checked.
+1. Place the existing X rail and right X carriage exactly as today.
+2. Place `tool_head_mount_machined_top_assembly` exactly as today, rigid to
+   `x_axis_right_carriage_assembly`.
+3. Place `sprite_extruder_right_assembly` exactly as today, centered on
+   `tool_head_mount_machined_top_assembly` with the existing
+   `x_axis_sprite_extruder_tool_head_mount_*_offset` parameters, then rigid to
+   the machined mount.
+4. Place `x_axis_belt_carriage_top_assembly` exactly as today, using the current
+   top belt-carriage generator and placement. This part is part of the fixed
+   clearance environment for the T1 Tap study.
+5. Place the right Nitehawk board, part fans, blower ring, joined fan/cage, and
+   cable shield exactly as today. These are collision and service-loop context,
+   not Tap-owned parts.
+6. Build or place the T1 Tap candidate geometry into this already-placed
+   environment. Candidate fixed frame, rail, shuttle, sensor, magnets, and stops
+   may reference the placed machined mount, Sprite, belt carriage, and cage/fan
+   envelope for clearances.
+7. Place `mgn7h_rail_with_carriage_assembly` and `opb991t11z_sensor_assembly`
+   relative to Tap candidate reference artifacts when the builder can express
+   the relationship cleanly. Keep their reusable hardware identities separate
+   from Tap printable geometry.
+8. Explicitly defer the mechanical connection between the Tap shuttle and
+   `sprite_extruder_right_assembly`. The first pass is a fit study, not a load
+   path replacement.
+
+This is intentionally different from the older plan where the Sprite/toolhead
+stack was placed to a Tap moving-shuttle reference. For T1-first work, the
+existing toolhead stack stays put first; Tap geometry is designed around it.
 
 Tap-internal artifact ownership:
 
-- Author the moving-shuttle geometry inside `idex_tap_t0_assembly` against
-  `mgn7h_rail_with_carriage_assembly.followers.carriage`. The Tap assembly
-  should expose `idex_tap_moving_shuttle`, `idex_tap_trigger_flag`, the moving
-  magnet targets, the moving stop target, and `toolhead_mount_reference` as
-  followers or named artifacts. Because these are Tap-internal artifacts, they
-  do not need `rigid_group` entries; they need to be selected together only in
-  visualization animation.
-- Keep fixed-frame details inside `idex_tap_t0_assembly`: the sensor bracket,
+- Author moving-shuttle candidate geometry as Tap-owned geometry, whether it
+  remains in the current split `idex_tap_t0_shuttle_assembly` prototype or moves
+  into a future T1-named assembly.
+- Keep fixed-frame details as Tap-owned geometry: the rail plate, sensor bracket,
   fixed magnet pockets/retainers, fixed hard-stop pads or screws, and fixed
-  reference cutters. These are not placement-sequence entries unless one of them
-  is split into its own assembly later.
+  reference cutters.
+- External T1 assemblies remain external. The Tap generator can use them for
+  collision and clearance, but should not absorb them as followers or production
+  parts.
 
-Helpful reference artifacts to add to `idex_tap_t0_assembly` for clean
-placement:
+Helpful reference artifacts to add or preserve for clean placement:
 
 - `rail_mount_reference`: fixed-frame datum for the MGN7H rail.
 - `sensor_mount_reference`: fixed-frame datum for the OPB991T11Z sensor.
 - `sensor_optical_center_reference`: fixed-frame optical line target.
-- `toolhead_mount_reference`: moving-shuttle datum for the Sprite/toolhead stack.
+- `sprite_keepout_reference`: placed Sprite envelope reference.
+- `belt_carriage_keepout_reference`: placed top belt carriage envelope reference.
+- `future_toolhead_mount_reference`: moving-shuttle datum reserved for the later
+  load-path rework, not used for placement in the first T1 packaging pass.
 
 Internal/debug artifacts that should be exposed for visualization and checks,
 but not treated as top-level placement steps:
@@ -427,49 +449,41 @@ but not treated as top-level placement steps:
 
 Rigid group summary:
 
-- `idex_tap_t0_assembly` rigid to the selected fixed machined mount:
-  `tool_head_mount_machined_top_assembly` or
-  `tool_head_mount_machined_bottom_assembly` after the T0/top mapping is
-  resolved.
-- `mgn7h_rail_with_carriage_assembly` rigid to `idex_tap_t0_assembly`. The rail
-  leader is fixed; its built-in `followers.carriage` is the only rail-assembly
-  artifact that participates in Tap trigger animation.
-- `opb991t11z_sensor_assembly` rigid to `idex_tap_t0_assembly`. It is fixed and
-  does not participate in Tap trigger animation.
-- The tapped toolhead's separate external assemblies rigid to
-  `idex_tap_t0_assembly.followers.toolhead_mount_reference`: the selected
-  `sprite_extruder_*_assembly`, `nitehawk_board_*_assembly`,
-  `extruder_cage_*_joined_assembly`, `part_fan_*_joined_assembly`, and any
-  cable-shield assembly that is physically bolted to the moving shuttle.
+- Existing T1 toolhead rigid groups stay as they are: top machined mount to
+  right carriage, right Sprite to top machined mount, and right downstream
+  assemblies to the right Sprite.
+- Candidate Tap fixed frame may become rigid to
+  `tool_head_mount_machined_top_assembly` for visualization once its placement
+  is chosen.
+- MGN7H rail hardware may become rigid to the candidate Tap fixed frame.
+- OPB991T11Z sensor hardware may become rigid to the candidate Tap fixed frame.
+- Do not rigid-group `sprite_extruder_right_assembly` or right joined fan/cage
+  assemblies to a Tap shuttle in this phase.
 - No `rigid_group` entries for `idex_tap_sensor_bracket`,
   `idex_tap_trigger_flag`, fixed magnet retainers, moving magnet targets, or
-  stop references when they are followers/non-production artifacts of
-  `idex_tap_t0_assembly`. Their rigidity is already part of the generated Tap
-  assembly.
+  stop references when they are followers/non-production artifacts of a Tap
+  assembly. Their rigidity is already part of the generated Tap assembly.
 
 Animation should make the mechanism understandable:
 
 - Add `idex_tap_trigger_lift` as a small local-Z animation on the moving Tap
-  artifacts only. In the standalone Tap/toolhead visualization, this should move
+  artifacts only. In the standalone Tap visualization, this should move
   `mgn7h_rail_with_carriage_assembly.followers.carriage`,
-  `idex_tap_t0_assembly.followers.idex_tap_moving_shuttle`,
-  `idex_tap_t0_assembly.followers.idex_tap_trigger_flag`, any explicitly named
-  moving magnet/stop artifacts, and the tapped external toolhead assemblies.
-  It should not move the MGN7 rail leader, the OPB991T11Z sensor assembly, or
-  fixed-frame Tap followers.
+  the moving shuttle, the trigger flag, and any explicitly named moving
+  magnet/stop artifacts. It should not move the MGN7 rail leader, the OPB991T11Z
+  sensor assembly, fixed-frame Tap followers, or the existing right Sprite stack
+  in the first packaging pass.
 - Add an optional `idex_tap_overtravel` animation using
   `idex_tap_total_travel` to show crash margin and verify that the sensor flag
   is not the overtravel stop.
-- In `tool_heads_assembly.yaml`, the fixed Tap assembly, MGN7 rail leader,
-  OPB991T11Z sensor assembly, MGN7 carriage follower, moving shuttle followers,
-  and tapped external toolhead assemblies should receive the same `x_carriage_1`
-  or `x_carriage_2` animation as the rest of that toolhead. Add
-  `idex_tap_trigger_lift` only to the MGN7 carriage follower, moving shuttle
-  followers, and tapped external toolhead assemblies.
-- In `whole_printer_assembly.yaml`, those same tapped-tool parts should receive
-  `z_axis` plus the selected X-carriage animation. Add the Tap trigger
-  animation only to the same moving artifact selection used in
-  `tool_heads_assembly.yaml`.
+- In `tool_heads_assembly.yaml`, any T1 Tap packaging scene parts should receive
+  `x_carriage_2` if they are physically mounted to the right/top toolhead. Add
+  `idex_tap_trigger_lift` only to Tap moving artifacts, not to the fixed T1
+  environment.
+- In `whole_printer_assembly.yaml`, those same T1 Tap packaging scene parts
+  should receive `z_axis` plus `x_carriage_2` if they are physically mounted to
+  the right/top toolhead. Add Tap trigger animation only to the same moving Tap
+  artifact selection used in `tool_heads_assembly.yaml`.
 - Use light, contrasting colors: fixed frame/rail/sensor in light neutral
   colors, moving shuttle/flag in a distinct bright color, and ghosted trigger or
   overtravel states with translucent/light coloring if the builder supports it.
@@ -484,7 +498,9 @@ split by assembly:
 - MGN7H rail and carriage dimensions belong to
   `mgn7h_rail_with_carriage_assembly.yaml`.
 - Tap-frame dimensions, travel, clearances, magnet pockets, and hard stops
-  belong to `idex_tap_t0_assembly.yaml`.
+  belong to the current `idex_tap_t0_assembly.yaml` prototype or to a future
+  T1-named Tap assembly after the rename/split decision. Do not treat the
+  current T0 filename as final semantics.
 - Part-to-part placement offsets should live in `assemblies.yaml` placements
   whenever possible, not as hidden transforms inside Python generators.
 
@@ -566,15 +582,22 @@ Magnet geometry parameters:
 
 Placement inputs for `assemblies.yaml`:
 
-- fixed-frame placement relative to `tool_head_mount_machined_top_assembly`
-- MGN7H rail-with-carriage assembly placement relative to the fixed frame
+- candidate fixed-frame placement relative to
+  `tool_head_mount_machined_top_assembly` and the already-placed right carriage
+- Sprite, joined cage/fan, Nitehawk, cable shield, and top belt-carriage keepout
+  references derived from their current T1 placements
+- MGN7H rail-with-carriage assembly placement relative to the candidate fixed
+  frame's `rail_mount_reference`
 - moving-shuttle rest alignment against the rail assembly's built-in
   `followers.carriage` reference
-- OPB991T11Z sensor placement relative to the sensor bracket
-- external tapped-toolhead assembly placement relative to
-  `idex_tap_t0_assembly.followers.toolhead_mount_reference`
-- trigger-state ghost offset: normally `idex_tap_trigger_lift` in local Z
-- overtravel-state ghost offset: normally `idex_tap_total_travel` in local Z
+- OPB991T11Z sensor placement relative to the candidate fixed frame's
+  `sensor_mount_reference` and `sensor_optical_center_reference`
+- trigger-state ghost offset for Tap moving artifacts only: normally
+  `idex_tap_trigger_lift` in local Z
+- overtravel-state ghost offset for Tap moving artifacts only: normally
+  `idex_tap_total_travel` in local Z
+- a reserved future shuttle-to-toolhead datum, explicitly unused for first-pass
+  T1 placement
 
 Derived validation targets, not primary CAD parameters:
 
@@ -590,35 +613,41 @@ production exports do not accidentally include reference hardware.
 
 ## Firmware And Calibration Concept
 
-Stage firmware integration conservatively:
+Stage firmware integration conservatively. The first T1/right/top work is a
+mechanical packaging and visualization study, not a firmware authority change:
 
 1. Model and bench-test the OPB991T11Z as an input before making it the Z
    authority.
-2. Add wiring truth for the selected input pin and regenerate the wiring
-   diagrams.
+2. Add wiring truth for the selected input pin only after the target toolhead
+   board input and safe pull-up voltage are chosen.
 3. Add a Klipper diagnostic macro that reports raw Tap sensor state while the
    current Z homing remains unchanged.
-4. Run repeatability tests by manually lifting the T0 toolhead and then probing
-   against a controlled surface.
-5. Only after the sensor and mechanics are proven, choose whether Tap becomes a
-   `[probe]` used after normal Z homing or the actual `probe:z_virtual_endstop`
-   for Z homing.
+4. For the T1 packaging prototype, run repeatability checks by manually lifting
+   only the Tap moving artifacts or a controlled bench fixture before any
+   Sprite/toolhead load path is attached.
+5. Only after the sensor, mechanics, and actual shuttle-to-toolhead connection
+   are proven, choose whether Tap becomes a diagnostic probe, a `[probe]` used
+   after normal Z homing, or a future `probe:z_virtual_endstop`.
 
-The current IDEX config intentionally rejects runtime T0 Z offsets: T0 Z is the
-mechanical reference, while T1 Z is a derived offset. This fits the Tap concept
-well. Tap should become the way T0 establishes the real nozzle/bed reference;
-T1 remains an offset against that reference until the future vision or cam
-system closes the loop.
+The current IDEX config intentionally rejects runtime T0 Z offsets: the
+T0/left/bottom toolhead is the mechanical Z reference, while T1/right/top
+carries a derived offset. A T1-first Tap is therefore not an immediate
+replacement for the current Z authority. It is the first sane packaging target
+because it has more physical space. Later calibration work must decide whether
+the final probing strategy is a migrated T0 Tap, a second T0 mechanism, a T1
+diagnostic/reference probe, or a larger IDEX Z-authority change.
 
-Calibration flow target:
+Deferred calibration decision points:
 
-- Home axes using the current safe sequence.
-- Select T0.
-- Probe bed with the T0 Tap.
-- Store or apply T0 Z reference through the normal Klipper/probe mechanism.
-- Use vision to measure T1 relative to T0, or apply the existing T1 Z offset.
-- Later: replace manual/vision-only T1 correction with a stepper/cam adjuster
-  that drives T1 to zero relative Z offset.
+- Keep the current safe homing sequence unchanged during the packaging pass.
+- Select T1 only for raw sensor-state diagnostics and controlled repeatability
+  experiments; do not store it as the bed Z reference yet.
+- Compare any T1 Tap measurements against the existing T0 baseline before using
+  them for printer calibration.
+- Decide the final probe authority only after the mechanical connection between
+  Tap shuttle and Sprite/toolhead exists and is repeatable.
+- Later: replace manual/vision-only T1 correction with a stepper/cam adjuster if
+  the design still needs active T1 relative-Z correction.
 
 ## Risks
 
@@ -630,36 +659,44 @@ Calibration flow target:
 - Wiring can become fragile if the moving stack has no explicit service loop.
 - Heat from the hotend may soften printed sensor/flag/magnet retainers.
 - If the trigger flag is the crash stop, the sensor will eventually lose.
-- If the top/bottom or T0/T1 naming is resolved incorrectly, the design can be
-  mechanically right but integrated on the wrong carriage.
+- A successful T1 package does not by itself solve T0/left/bottom nozzle probing
+  or the current firmware Z-reference model.
+- The T0 bottom belt-carriage conflict remains unresolved and may need a
+  different mechanism or layout.
+- Existing `idex_tap_t0_*` prototype names can mislead integration if they are
+  silently reused for T1/right/top semantics.
 
 ## Implementation Order
 
-1. Confirm the T0/top-mount mapping and choose the exact injected fixed mount.
-2. Add `opb991t11z_sensor_assembly` as a reusable hardware-reference assembly
-   with its own YAML parameters and named artifacts.
-3. Extend/copy the existing MGN12 rail/carriage code in `mgh_linear.py` to add
-   an MGN7H rail/carriage model with the same leader/follower and named-cutter
-   conventions.
-4. Add standalone `mgn7h_rail_with_carriage_assembly` wrapper with rail as
-   leader, carriage as a named follower, visualization output, and no production
-   parts.
-5. Create `idex_tap_t0_assembly.yaml` with injected fixed mount, injected
-   hardware-reference assemblies, and visual context.
-6. Use `assembling/assemblies/assemblies.yaml` placement rules to position the
-   rail-with-carriage assembly, sensor, external tapped-toolhead assemblies, and
-   cross-assembly rigid groups whenever possible.
-7. Create the fixed frame and moving shuttle with named artifacts.
-8. Add sensor bracket, trigger flag, magnets, hard stops, and wire keep-outs.
-9. Add production rules for only the new Tap printable/machined parts.
-10. Visualize the assembly in nominal, triggered, and overtravel states.
-11. Add focused tests for assembly wiring, artifact names, positive dimensions,
-    trigger travel ordering, and production/reference-part separation.
-12. After CAD fit looks sane, add wiring truth and firmware diagnostics.
+1. Use this document as the checkpoint: no code, YAML, or public API changes are
+   implied by the concept update itself.
+2. Build a T1-focused placement/collision visualization that keeps
+   `x_axis_right_carriage_assembly`, `tool_head_mount_machined_top_assembly`,
+   `sprite_extruder_right_assembly`, `x_axis_belt_carriage_top_assembly`, and
+   the right cage/fan/Nitehawk stack where they are today.
+3. Overlay the existing exploratory Tap hardware and frame/shuttle candidates in
+   that placed T1 environment to identify real clearances, collisions, and
+   service-access problems.
+4. Decide whether to introduce new `idex_tap_t1_*` assemblies or explicitly
+   rename/split the current `idex_tap_t0_*` prototypes before production routing.
+5. Rework the Tap assembly contract so generators consume injected placed
+   context for collision and clearance, instead of moving or replacing the
+   existing Sprite/mount/belt-carriage relationship.
+6. Iterate the candidate fixed frame, MGN7H rail placement, OPB991T11Z sensor
+   placement, moving shuttle, trigger flag, magnets, stops, and wire keepouts in
+   the T1 envelope.
+7. Visualize nominal, triggered, and overtravel states with only Tap moving
+   artifacts animated.
+8. Only after the fit study is clean, design the mechanical connection between
+   the Tap shuttle and the Sprite/toolhead stack.
+9. Add production routing, focused assembly tests, wiring truth, and firmware
+   diagnostics after the T1 mechanical package and naming contract are stable.
 
 ## Out Of Scope For This Draft
 
 - T1 stepper/cam Z adjuster.
+- T0/left/bottom Tap implementation.
+- Mechanical connection between the T1 Tap shuttle and Sprite/toolhead stack.
 - Final Klipper probe configuration.
 - Detailed magnet force calculation.
 - Final MGN7H vendor-specific rail dimensions.

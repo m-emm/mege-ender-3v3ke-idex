@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Focused visualization of the T0 Tap machined mount, fixed frame, MGN7H rail, and moving shuttle
+Description: Focused visualization of the T1/right/top Tap packaging study
 
 Builder:
   Collection: true
@@ -90,11 +90,6 @@ Builder:
         assembly: sprite_extruder_right_assembly
         artifact: all
         name_template: "sprite_extruder_right_{name}"
-        animation:
-          idex_tap_total_travel:
-            - 0
-            - 0
-            - { $ref: idex_tap_total_travel }
   Production:
     parts: []
 

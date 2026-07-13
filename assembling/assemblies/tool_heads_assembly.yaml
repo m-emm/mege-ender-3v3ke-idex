@@ -143,10 +143,6 @@ Builder:
             - { $ref: x_axis_x_travel_negative }
             - 0
             - 0
-          idex_tap_trigger_lift:
-            - 0
-            - 0
-            - { $ref: idex_tap_trigger_lift }
       - source: injected
         assembly: nitehawk_board_right
         artifact: followers
@@ -156,10 +152,6 @@ Builder:
             - { $ref: x_axis_x_travel_negative }
             - 0
             - 0
-          idex_tap_trigger_lift:
-            - 0
-            - 0
-            - { $ref: idex_tap_trigger_lift }
       - source: injected
         assembly: extruder_cage_right
         artifact: all
@@ -169,10 +161,6 @@ Builder:
             - { $ref: x_axis_x_travel_negative }
             - 0
             - 0
-          idex_tap_trigger_lift:
-            - 0
-            - 0
-            - { $ref: idex_tap_trigger_lift }
       - source: injected
         assembly: part_fan_right
         artifact: all
@@ -182,10 +170,6 @@ Builder:
             - { $ref: x_axis_x_travel_negative }
             - 0
             - 0
-          idex_tap_trigger_lift:
-            - 0
-            - 0
-            - { $ref: idex_tap_trigger_lift }
       - source: injected
         assembly: tool_head_mount_machined_top
         artifact: all

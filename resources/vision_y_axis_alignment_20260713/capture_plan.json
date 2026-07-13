@@ -1,0 +1,582 @@
+{
+  "base_url": "http://127.0.0.1:7125",
+  "camera": "nozzle_cam",
+  "camera_profile": "analysis",
+  "captured_at_utc": "2026-07-13T16:32:16.707525+00:00",
+  "captures": [
+    {
+      "gcode_position": [
+        -80.4,
+        -14.8,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163218Z_analysis_light_y0p0.jpg",
+      "lighting": "analysis_light",
+      "lighting_description": "Current tuned NOZZLE_CAM_ANALYSIS_LIGHT macro.",
+      "lighting_gcode": "NOZZLE_CAM_ANALYSIS_LIGHT",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163218Z_analysis_light_y0p0.json",
+      "name": "analysis_light_y0p0",
+      "source_frame_seq": 855,
+      "toolhead_position": [
+        -80.4,
+        -14.8,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": -14.8,
+      "y_offset": 0.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        -9.8,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163222Z_analysis_light_y5p0.jpg",
+      "lighting": "analysis_light",
+      "lighting_description": "Current tuned NOZZLE_CAM_ANALYSIS_LIGHT macro.",
+      "lighting_gcode": "NOZZLE_CAM_ANALYSIS_LIGHT",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163222Z_analysis_light_y5p0.json",
+      "name": "analysis_light_y5p0",
+      "source_frame_seq": 856,
+      "toolhead_position": [
+        -80.4,
+        -9.8,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": -9.8,
+      "y_offset": 5.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        -4.8,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163226Z_analysis_light_y10p0.jpg",
+      "lighting": "analysis_light",
+      "lighting_description": "Current tuned NOZZLE_CAM_ANALYSIS_LIGHT macro.",
+      "lighting_gcode": "NOZZLE_CAM_ANALYSIS_LIGHT",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163226Z_analysis_light_y10p0.json",
+      "name": "analysis_light_y10p0",
+      "source_frame_seq": 857,
+      "toolhead_position": [
+        -80.4,
+        -4.8,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": -4.8,
+      "y_offset": 10.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        0.2,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163231Z_analysis_light_y15p0.jpg",
+      "lighting": "analysis_light",
+      "lighting_description": "Current tuned NOZZLE_CAM_ANALYSIS_LIGHT macro.",
+      "lighting_gcode": "NOZZLE_CAM_ANALYSIS_LIGHT",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163231Z_analysis_light_y15p0.json",
+      "name": "analysis_light_y15p0",
+      "source_frame_seq": 858,
+      "toolhead_position": [
+        -80.4,
+        0.2,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": 0.2,
+      "y_offset": 15.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        5.2,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163233Z_analysis_light_y20p0.jpg",
+      "lighting": "analysis_light",
+      "lighting_description": "Current tuned NOZZLE_CAM_ANALYSIS_LIGHT macro.",
+      "lighting_gcode": "NOZZLE_CAM_ANALYSIS_LIGHT",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163233Z_analysis_light_y20p0.json",
+      "name": "analysis_light_y20p0",
+      "source_frame_seq": 860,
+      "toolhead_position": [
+        -80.4,
+        5.2,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": 5.2,
+      "y_offset": 20.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        -14.8,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163237Z_dim_uniform_white_y0p0.jpg",
+      "lighting": "dim_uniform_white",
+      "lighting_description": "Uniform low white ring light, all configured APA102 pixels at 10 percent.",
+      "lighting_gcode": "VISION_LIGHT R=0.10 G=0.10 B=0.10",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163237Z_dim_uniform_white_y0p0.json",
+      "name": "dim_uniform_white_y0p0",
+      "source_frame_seq": 864,
+      "toolhead_position": [
+        -80.4,
+        -14.8,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": -14.8,
+      "y_offset": 0.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        -9.8,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163239Z_dim_uniform_white_y5p0.jpg",
+      "lighting": "dim_uniform_white",
+      "lighting_description": "Uniform low white ring light, all configured APA102 pixels at 10 percent.",
+      "lighting_gcode": "VISION_LIGHT R=0.10 G=0.10 B=0.10",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163239Z_dim_uniform_white_y5p0.json",
+      "name": "dim_uniform_white_y5p0",
+      "source_frame_seq": 865,
+      "toolhead_position": [
+        -80.4,
+        -9.8,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": -9.8,
+      "y_offset": 5.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        -4.8,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163241Z_dim_uniform_white_y10p0.jpg",
+      "lighting": "dim_uniform_white",
+      "lighting_description": "Uniform low white ring light, all configured APA102 pixels at 10 percent.",
+      "lighting_gcode": "VISION_LIGHT R=0.10 G=0.10 B=0.10",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163241Z_dim_uniform_white_y10p0.json",
+      "name": "dim_uniform_white_y10p0",
+      "source_frame_seq": 866,
+      "toolhead_position": [
+        -80.4,
+        -4.8,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": -4.8,
+      "y_offset": 10.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        0.2,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163243Z_dim_uniform_white_y15p0.jpg",
+      "lighting": "dim_uniform_white",
+      "lighting_description": "Uniform low white ring light, all configured APA102 pixels at 10 percent.",
+      "lighting_gcode": "VISION_LIGHT R=0.10 G=0.10 B=0.10",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163243Z_dim_uniform_white_y15p0.json",
+      "name": "dim_uniform_white_y15p0",
+      "source_frame_seq": 868,
+      "toolhead_position": [
+        -80.4,
+        0.2,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": 0.2,
+      "y_offset": 15.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        5.2,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163246Z_dim_uniform_white_y20p0.jpg",
+      "lighting": "dim_uniform_white",
+      "lighting_description": "Uniform low white ring light, all configured APA102 pixels at 10 percent.",
+      "lighting_gcode": "VISION_LIGHT R=0.10 G=0.10 B=0.10",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163246Z_dim_uniform_white_y20p0.json",
+      "name": "dim_uniform_white_y20p0",
+      "source_frame_seq": 870,
+      "toolhead_position": [
+        -80.4,
+        5.2,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": 5.2,
+      "y_offset": 20.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        -14.8,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163250Z_uniform_green_y0p0.jpg",
+      "lighting": "uniform_green",
+      "lighting_description": "Uniform green light, testing whether the faint horizontal bed line gains contrast.",
+      "lighting_gcode": "VISION_LIGHT R=0.00 G=0.35 B=0.00",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163250Z_uniform_green_y0p0.json",
+      "name": "uniform_green_y0p0",
+      "source_frame_seq": 872,
+      "toolhead_position": [
+        -80.4,
+        -14.8,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": -14.8,
+      "y_offset": 0.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        -9.8,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163254Z_uniform_green_y5p0.jpg",
+      "lighting": "uniform_green",
+      "lighting_description": "Uniform green light, testing whether the faint horizontal bed line gains contrast.",
+      "lighting_gcode": "VISION_LIGHT R=0.00 G=0.35 B=0.00",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163254Z_uniform_green_y5p0.json",
+      "name": "uniform_green_y5p0",
+      "source_frame_seq": 874,
+      "toolhead_position": [
+        -80.4,
+        -9.8,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": -9.8,
+      "y_offset": 5.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        -4.8,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163256Z_uniform_green_y10p0.jpg",
+      "lighting": "uniform_green",
+      "lighting_description": "Uniform green light, testing whether the faint horizontal bed line gains contrast.",
+      "lighting_gcode": "VISION_LIGHT R=0.00 G=0.35 B=0.00",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163256Z_uniform_green_y10p0.json",
+      "name": "uniform_green_y10p0",
+      "source_frame_seq": 876,
+      "toolhead_position": [
+        -80.4,
+        -4.8,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": -4.8,
+      "y_offset": 10.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        0.2,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163258Z_uniform_green_y15p0.jpg",
+      "lighting": "uniform_green",
+      "lighting_description": "Uniform green light, testing whether the faint horizontal bed line gains contrast.",
+      "lighting_gcode": "VISION_LIGHT R=0.00 G=0.35 B=0.00",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163258Z_uniform_green_y15p0.json",
+      "name": "uniform_green_y15p0",
+      "source_frame_seq": 878,
+      "toolhead_position": [
+        -80.4,
+        0.2,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": 0.2,
+      "y_offset": 15.0
+    },
+    {
+      "gcode_position": [
+        -80.4,
+        5.2,
+        293.75,
+        0.0
+      ],
+      "height": 1080,
+      "image_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163300Z_uniform_green_y20p0.jpg",
+      "lighting": "uniform_green",
+      "lighting_description": "Uniform green light, testing whether the faint horizontal bed line gains contrast.",
+      "lighting_gcode": "VISION_LIGHT R=0.00 G=0.35 B=0.00",
+      "metadata_path": "/tmp/vision_y_axis_alignment_20260713/20260713T163300Z_uniform_green_y20p0.json",
+      "name": "uniform_green_y20p0",
+      "source_frame_seq": 880,
+      "toolhead_position": [
+        -80.4,
+        5.2,
+        293.75,
+        0.0
+      ],
+      "width": 1920,
+      "y": 5.2,
+      "y_offset": 20.0
+    }
+  ],
+  "final_status": {
+    "gcode_move": {
+      "absolute_coordinates": true,
+      "absolute_extrude": true,
+      "axis_map": {
+        "E": 3,
+        "X": 0,
+        "Y": 1,
+        "Z": 2
+      },
+      "extrude_factor": 1.0,
+      "gcode_position": [
+        -80.4,
+        -14.8,
+        293.75,
+        0.0
+      ],
+      "homing_origin": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "position": [
+        -80.4,
+        -14.8,
+        293.75,
+        0.0
+      ],
+      "speed": 1800.0,
+      "speed_factor": 1.0
+    },
+    "print_stats": {
+      "filament_used": 0.0,
+      "filename": "",
+      "info": {
+        "current_layer": null,
+        "total_layer": null
+      },
+      "message": "",
+      "print_duration": 0.0,
+      "state": "standby",
+      "total_duration": 0.0
+    },
+    "toolhead": {
+      "axis_maximum": [
+        244.0,
+        296.0,
+        293.75,
+        0
+      ],
+      "axis_minimum": [
+        -80.4,
+        -14.8,
+        -1.0,
+        0
+      ],
+      "estimated_print_time": 1159.4732075,
+      "extra_axes": {
+        "extruder": 3
+      },
+      "extruder": "extruder",
+      "homed_axes": "xyz",
+      "max_accel": 6000.0,
+      "max_velocity": 500.0,
+      "minimum_cruise_ratio": 0.5,
+      "position": [
+        -80.4,
+        -14.8,
+        293.75,
+        0.0
+      ],
+      "print_time": 1159.50009325,
+      "square_corner_velocity": 5.0,
+      "stalls": 0
+    },
+    "webhooks": {
+      "state": "ready",
+      "state_message": "Printer is ready"
+    }
+  },
+  "initial_status": {
+    "gcode_move": {
+      "absolute_coordinates": true,
+      "absolute_extrude": true,
+      "axis_map": {
+        "E": 3,
+        "X": 0,
+        "Y": 1,
+        "Z": 2
+      },
+      "extrude_factor": 1.0,
+      "gcode_position": [
+        -80.4,
+        -14.8,
+        293.75,
+        0.0
+      ],
+      "homing_origin": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "position": [
+        -80.4,
+        -14.8,
+        293.75,
+        0.0
+      ],
+      "speed": 1800.0,
+      "speed_factor": 1.0
+    },
+    "print_stats": {
+      "filament_used": 0.0,
+      "filename": "",
+      "info": {
+        "current_layer": null,
+        "total_layer": null
+      },
+      "message": "",
+      "print_duration": 0.0,
+      "state": "standby",
+      "total_duration": 0.0
+    },
+    "toolhead": {
+      "axis_maximum": [
+        244.0,
+        296.0,
+        293.75,
+        0
+      ],
+      "axis_minimum": [
+        -80.4,
+        -14.8,
+        -1.0,
+        0
+      ],
+      "estimated_print_time": 1112.8331210833333,
+      "extra_axes": {
+        "extruder": 3
+      },
+      "extruder": "extruder",
+      "homed_axes": "xyz",
+      "max_accel": 6000.0,
+      "max_velocity": 500.0,
+      "minimum_cruise_ratio": 0.5,
+      "position": [
+        -80.4,
+        -14.8,
+        293.75,
+        0.0
+      ],
+      "print_time": 1054.3991485833335,
+      "square_corner_velocity": 5.0,
+      "stalls": 0
+    },
+    "webhooks": {
+      "state": "ready",
+      "state_message": "Printer is ready"
+    }
+  },
+  "lighting_profiles": [
+    {
+      "description": "Current tuned NOZZLE_CAM_ANALYSIS_LIGHT macro.",
+      "gcode": "NOZZLE_CAM_ANALYSIS_LIGHT",
+      "name": "analysis_light"
+    },
+    {
+      "description": "Uniform low white ring light, all configured APA102 pixels at 10 percent.",
+      "gcode": "VISION_LIGHT R=0.10 G=0.10 B=0.10",
+      "name": "dim_uniform_white"
+    },
+    {
+      "description": "Uniform green light, testing whether the faint horizontal bed line gains contrast.",
+      "gcode": "VISION_LIGHT R=0.00 G=0.35 B=0.00",
+      "name": "uniform_green"
+    }
+  ],
+  "move_feedrate": 1800.0,
+  "profile_note": "Profile forced once per lighting series through VISION_PROFILE; one-shot captures did not write profile_request.json because that runtime file is root-owned.",
+  "remote_dir": "/tmp/vision_y_axis_alignment_20260713",
+  "settle_ms": 900,
+  "y_max": 296.0,
+  "y_min": -14.8,
+  "y_offsets": [
+    0.0,
+    5.0,
+    10.0,
+    15.0,
+    20.0
+  ],
+  "y_values": [
+    -14.8,
+    -9.8,
+    -4.8,
+    0.2,
+    5.2
+  ]
+}

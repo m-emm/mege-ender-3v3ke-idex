@@ -545,12 +545,17 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         "left": {
             "part_fans": "part_fan_left_assembly",
             "extruder_cage": "extruder_cage_left_assembly",
+            "extra_inject_parts": {
+                "belt_carriage": "x_axis_belt_carriage_bottom_assembly",
+                "sprite_extruder": "sprite_extruder_left_assembly",
+            },
             "part_fans_output": "part_fan_left_joined_assembly",
             "extruder_cage_output": "extruder_cage_left_joined_assembly",
         },
         "right": {
             "part_fans": "part_fan_right_assembly",
             "extruder_cage": "extruder_cage_right_assembly",
+            "extra_inject_parts": {},
             "part_fans_output": "part_fan_right_joined_assembly",
             "extruder_cage_output": "extruder_cage_right_joined_assembly",
         },
@@ -562,6 +567,7 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         assert join_entry["inject_parts"] == {
             "part_fans": expected_join["part_fans"],
             "extruder_cage": expected_join["extruder_cage"],
+            **expected_join["extra_inject_parts"],
         }
         assert join_entry["outputs"] == {
             "part_fans": expected_join["part_fans_output"],

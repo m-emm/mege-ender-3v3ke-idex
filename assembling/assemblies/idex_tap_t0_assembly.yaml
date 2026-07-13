@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Fixed frame for the T0 Voron-Tap-style IDEX extension
+Description: Exploratory fixed frame for the T1/right/top Tap packaging study
 
 Builder:
   Visualization:
@@ -33,19 +33,23 @@ Builder:
         artifact: non_production_parts
         names:
           - magnets
+          - sprite_keepout_reference
         name_template: "{name}"
       - source: injected
         assembly: fixed_tool_head_mount
         artifact: all
       - source: injected
-        assembly: x_axis_lower_profile
+        assembly: sprite_extruder
+        artifact: all
+      - source: injected
+        assembly: x_axis_profile
         artifact: all
       - source: dependencies
         assembly: x_axis_rail_assembly
         artifact: all
         name_template: "{default_name}"
-      - source: dependencies
-        assembly: x_axis_left_carriage_assembly
+      - source: injected
+        assembly: x_axis_carriage
         artifact: leader
         name: carriage
 

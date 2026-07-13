@@ -401,9 +401,16 @@ placement:
         - tool_head_mount_machined_top_assembly
       to: x_axis_right_carriage_assembly
 
+    - part: idex_tap_t0_assembly
+      to: tool_head_mount_machined_top_assembly
+      alignment: CENTER
+      axes: [0, 1]
+    - part: idex_tap_t0_assembly
+      to: tool_head_mount_machined_top_assembly
+      alignment: STACK_BOTTOM
     - rigid_group:
         - idex_tap_t0_assembly
-      to: tool_head_mount_machined_bottom_assembly
+      to: tool_head_mount_machined_top_assembly
 
     - part: mgn7h_rail_with_carriage_assembly
       post_rotation:
@@ -464,6 +471,17 @@ placement:
     - rigid_group:
         - sprite_extruder_left_assembly
       to: tool_head_mount_machined_bottom_assembly
+
+    - part: sprite_extruder_right_assembly
+      to: tool_head_mount_machined_top_assembly
+      alignment: CENTER
+      post_translation:
+        - $ref: x_axis_sprite_extruder_tool_head_mount_x_offset
+        - $ref: x_axis_sprite_extruder_tool_head_mount_y_offset
+        - $ref: x_axis_sprite_extruder_tool_head_mount_z_offset
+    - rigid_group:
+        - sprite_extruder_right_assembly
+      to: tool_head_mount_machined_top_assembly
 
     - part: z_axis_profile_left_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left
@@ -3834,15 +3852,17 @@ assemblies:
 
     resource_file: idex_tap_t0_assembly.yaml
     depends_on:
-      - tool_head_mount_machined_bottom_assembly
-      - x_axis_lower_profile_assembly
+      - tool_head_mount_machined_top_assembly
+      - sprite_extruder_right_assembly
+      - x_axis_top_profile_assembly
       - x_axis_rail_assembly
       - x_axis_right_carriage_assembly
 
     inject_parts:
-      fixed_tool_head_mount: tool_head_mount_machined_bottom_assembly
-      x_axis_lower_profile: x_axis_lower_profile_assembly
-      x_axis_carriage: x_axis_left_carriage_assembly
+      fixed_tool_head_mount: tool_head_mount_machined_top_assembly
+      sprite_extruder: sprite_extruder_right_assembly
+      x_axis_profile: x_axis_top_profile_assembly
+      x_axis_carriage: x_axis_right_carriage_assembly
 
   - name: idex_tap_t0_shuttle_assembly
 
@@ -3851,12 +3871,11 @@ assemblies:
       - tool_head_mount_machined_top_assembly
       - mgn7h_rail_with_carriage_assembly
       - idex_tap_t0_assembly
-      - x_axis_lower_profile_assembly
       - x_axis_rail_assembly
       - x_axis_right_carriage_assembly
 
     inject_parts:
-      fixed_tool_head_mount: tool_head_mount_machined_bottom_assembly
+      fixed_tool_head_mount: tool_head_mount_machined_top_assembly
       mgn7h_rail_with_carriage: mgn7h_rail_with_carriage_assembly
       idex_tap_t0: idex_tap_t0_assembly
 

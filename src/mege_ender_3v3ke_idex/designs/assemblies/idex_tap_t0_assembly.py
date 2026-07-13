@@ -1,4 +1,4 @@
-"""Fixed frame for the T0 Voron-Tap-style IDEX toolhead extension."""
+"""Exploratory fixed frame for the T1/right/top Tap packaging study."""
 
 from shellforgepy.simple import *
 
@@ -6,7 +6,8 @@ from shellforgepy.simple import *
 def create_idex_tap_t0_assembly(
     *,
     fixed_tool_head_mount,
-    x_axis_lower_profile,
+    sprite_extruder,
+    x_axis_profile,
     x_axis_carriage,
     mgn7h_rail_length,
     mgn7h_rail_width,
@@ -34,11 +35,18 @@ def create_idex_tap_t0_assembly(
     idex_tap_magnet_center_spacing,
     idex_tap_magnet_retainer_thickness,
 ):
-    """Create the fixed Tap frame that mounts under the machined T0 mount."""
+    """Create a loose fixed Tap frame around the placed right-side context."""
 
     idex_tap_magnet_retainer_clearance = 0.1
+    _ = x_axis_profile
 
     fixed_tool_head_mount_size = get_bounding_box_size(fixed_tool_head_mount.leader)
+    sprite_keepout_reference = materialize_bounding_box(
+        sprite_extruder,
+        x_enlargement=2,
+        y_enlargement=2,
+        z_enlargement=2,
+    )
     mount_flange = create_box(
         fixed_tool_head_mount_size[0],
         idex_tap_frame_mount_flange_depth,
@@ -187,5 +195,9 @@ def create_idex_tap_t0_assembly(
     tap.add_named_cutter(frame_mount_holes, "frame_mount_holes")
     tap.add_named_cutter(rail_mount_holes, "rail_mount_holes")
     tap.add_named_non_production_part(magnets, "magnets")
+    tap.add_named_non_production_part(
+        sprite_keepout_reference,
+        "sprite_keepout_reference",
+    )
 
     return tap
