@@ -1,3 +1,4 @@
+import pytest
 import yaml
 from assembly_defaults import ASSEMBLIES_DIR, AssemblyDefaultsLoader, assembly_kwargs
 from mege_ender_3v3ke_idex.designs.assemblies.mgn7h_rail_with_carriage_assembly import (
@@ -36,10 +37,22 @@ def test_mgn7h_production_smoke_routes_printable_mockup():
 
 
 def test_mgn7h_assembly_smoke_builds_visible_and_printable_parts():
-    assembly = create_mgn7h_rail_with_carriage_assembly(
-        **assembly_kwargs(create_mgn7h_rail_with_carriage_assembly)
-    )
+    kwargs = assembly_kwargs(create_mgn7h_rail_with_carriage_assembly)
+    assembly = create_mgn7h_rail_with_carriage_assembly(**kwargs)
 
     assert get_volume(assembly.leader) > 0
     assert get_volume(assembly.get_named_follower("carriage")) > 0
     assert get_volume(assembly.get_named_follower("rail_mockup_printable")) > 0
+
+    hole_span = (
+        kwargs["mgn7h_rail_length"] - 2 * kwargs["mgn7h_rail_mount_hole_end_offset"]
+    )
+    pitch_steps = hole_span / kwargs["mgn7h_rail_mount_hole_pitch"]
+    assert pitch_steps == pytest.approx(round(pitch_steps))
+
+    mounting_hole_names = [
+        name
+        for name, _part in assembly.get_named_cutter_items()
+        if name.startswith("mounting_hole_")
+    ]
+    assert len(mounting_hole_names) == int(round(pitch_steps)) + 1

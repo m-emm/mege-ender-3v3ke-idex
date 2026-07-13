@@ -44,7 +44,7 @@ mgn_12ca_h1 = 3.4
 mgn_7h_rail_width = 7
 mgn_7h_rail_height = 4.8
 mgn_7h_rail_mount_hole_pitch = 15
-mgn_7h_rail_mount_hole_end_offset = 7.5
+mgn_7h_rail_mount_hole_end_offset = 5
 mgn_7h_rail_mount_hole_diameter = 2.4
 mgn_7h_rail_mount_counterbore_diameter = 4.2
 mgn_7h_rail_mount_counterbore_depth = 2.4
@@ -57,6 +57,7 @@ mgn_7h_rail_groove_slot_depth = 0.95
 mgn_7h_rail_top_fillet_radius = 0.18
 mgn_7h_rail_bottom_chamfer_width = 0.32
 mgn_7h_rail_bottom_chamfer_height = 0.35
+
 
 def create_mgn7h_carriage(
     *,

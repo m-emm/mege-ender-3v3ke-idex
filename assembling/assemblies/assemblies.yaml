@@ -437,11 +437,10 @@ placement:
         - opb991t11z_sensor_assembly
       to: idex_tap_t0_assembly
 
-    - part: idex_tap_t0_shuttle_assembly.followers.idex_tap_carriage_plate
+    - part: idex_tap_t0_shuttle_assembly
       to: mgn7h_rail_with_carriage_assembly.followers.carriage
       alignment: CENTER
-      axes: [0, 2]
-    - part: idex_tap_t0_shuttle_assembly.followers.idex_tap_carriage_plate
+    - part: idex_tap_t0_shuttle_assembly
       to: mgn7h_rail_with_carriage_assembly.followers.carriage
       alignment: STACK_FRONT
     - rigid_group:
@@ -465,17 +464,6 @@ placement:
     - rigid_group:
         - sprite_extruder_left_assembly
       to: tool_head_mount_machined_bottom_assembly
-
-    - part: sprite_extruder_right_assembly
-      to: idex_tap_t0_shuttle_assembly.followers.sprite_mount_face
-      alignment: CENTER
-      post_translation:
-        - $ref: x_axis_sprite_extruder_tool_head_mount_x_offset
-        - $ref: x_axis_sprite_extruder_tool_head_mount_y_offset
-        - $ref: x_axis_sprite_extruder_tool_head_mount_z_offset
-    - rigid_group:
-        - sprite_extruder_right_assembly
-      to: idex_tap_t0_shuttle_assembly
 
     - part: z_axis_profile_left_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left

@@ -1311,7 +1311,7 @@ globals:
   mgn7h_rail_width: 7
   mgn7h_rail_height: 4.8
   mgn7h_rail_mount_hole_pitch: 15
-  mgn7h_rail_mount_hole_end_offset: 7.5
+  mgn7h_rail_mount_hole_end_offset: 5
   mgn7h_rail_mount_hole_diameter: 2.4
   mgn7h_rail_mount_counterbore_diameter: 4.2
   mgn7h_rail_mount_counterbore_depth: 2.4
@@ -1366,7 +1366,7 @@ globals:
   idex_tap_frame_mount_screw_head_clearance: 0.4
   idex_tap_shuttle_width: 34
   idex_tap_shuttle_height: 30
-  idex_tap_shuttle_thickness: 8
+  idex_tap_shuttle_thickness: 4.5
   idex_tap_shuttle_carriage_screw_size: "M2"
   idex_tap_shuttle_carriage_screw_head_clearance: 0.3
   idex_tap_frame_to_mount_clearance: 0.2
