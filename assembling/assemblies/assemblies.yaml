@@ -1087,6 +1087,19 @@ process_data_generators:
     function: mege_3devops.process_data.mege_ender_3v3ke_idex.resolve_idex_process_data_from_parameters
 
 process_data_presets:
+  pla_medium_strength_max_quality_06:
+    generator: mege3devops_parametric
+    arguments:
+      material_name: creality_pla_hs
+      nozzle_diameter_mm: 0.6
+      nozzle_hardened: false
+      nozzle_high_flow: true
+      strength_factor: 0.5
+      quality_factor: 1.0
+    overrides:
+      process_overrides:
+        sparse_infill_pattern: "cubic"
+
   petgcf_low_strength_high_speed_06:
     generator: mege3devops_parametric
     arguments:

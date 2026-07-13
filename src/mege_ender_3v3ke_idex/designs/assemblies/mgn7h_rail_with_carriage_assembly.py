@@ -1,8 +1,6 @@
 """Declarative standalone MGN7H rail-with-carriage assembly."""
 
-from mege_ender_3v3ke_idex.designs.mgh_linear import (
-    create_mgn7h_rail_with_carriage,
-)
+from mege_ender_3v3ke_idex.designs.mgh_linear import create_mgn7h_rail_with_carriage
 from shellforgepy.metrics import record_length_metric
 
 
@@ -12,10 +10,13 @@ def create_mgn7h_rail_with_carriage_assembly(
     mgn7h_rail_width,
     mgn7h_rail_height,
     mgn7h_rail_mount_hole_pitch,
+    mgn7h_rail_mount_hole_end_offset,
     mgn7h_rail_mount_hole_diameter,
     mgn7h_rail_mount_counterbore_diameter,
     mgn7h_rail_mount_counterbore_depth,
     mgn7h_rail_mount_screw_size,
+    mgn7h_rail_side_relief_depth,
+    mgn7h_rail_side_relief_height,
     mgn7h_carriage_length,
     mgn7h_carriage_width,
     mgn7h_carriage_height,
@@ -38,9 +39,12 @@ def create_mgn7h_rail_with_carriage_assembly(
         rail_width=mgn7h_rail_width,
         rail_height=mgn7h_rail_height,
         rail_mount_hole_pitch=mgn7h_rail_mount_hole_pitch,
+        rail_mount_hole_end_offset=mgn7h_rail_mount_hole_end_offset,
         rail_mount_hole_diameter=mgn7h_rail_mount_hole_diameter,
         rail_mount_counterbore_diameter=mgn7h_rail_mount_counterbore_diameter,
         rail_mount_counterbore_depth=mgn7h_rail_mount_counterbore_depth,
+        rail_side_relief_depth=mgn7h_rail_side_relief_depth,
+        rail_side_relief_height=mgn7h_rail_side_relief_height,
         carriage_length=mgn7h_carriage_length,
         carriage_width=mgn7h_carriage_width,
         carriage_height=mgn7h_carriage_height,

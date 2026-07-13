@@ -49,6 +49,8 @@ mgn_7h_rail_mount_hole_diameter = 2.4
 mgn_7h_rail_mount_counterbore_diameter = 4.2
 mgn_7h_rail_mount_counterbore_depth = 2.4
 mgn_7h_rail_mount_screw_size = "M2"
+mgn_7h_rail_side_relief_depth = 0.6
+mgn_7h_rail_side_relief_height = 1.2
 
 mgn_7h_carriage_length = 30.8
 mgn_7h_carriage_width = 17
@@ -260,51 +262,84 @@ def create_mgn7h_rail(
     rail_width=mgn_7h_rail_width,
     rail_height=mgn_7h_rail_height,
     rail_mount_hole_pitch=mgn_7h_rail_mount_hole_pitch,
+    rail_mount_hole_end_offset=mgn_7h_rail_mount_hole_end_offset,
     rail_mount_hole_diameter=mgn_7h_rail_mount_hole_diameter,
     rail_mount_counterbore_diameter=mgn_7h_rail_mount_counterbore_diameter,
     rail_mount_counterbore_depth=mgn_7h_rail_mount_counterbore_depth,
+    rail_side_relief_depth=mgn_7h_rail_side_relief_depth,
+    rail_side_relief_height=mgn_7h_rail_side_relief_height,
 ):
     """Create an MGN7H rail reference part."""
 
     rail = create_box(length_mm, rail_width, rail_height)
 
-    num_holes = int(length_mm // rail_mount_hole_pitch)
+    last_hole_x = length_mm - rail_mount_hole_end_offset
+    hole_x = rail_mount_hole_end_offset
     holes_aligned = []
 
-    if num_holes > 0:
-        holes = PartCollector()
+    if last_hole_x >= hole_x:
         holes_list = []
-        for i in range(num_holes):
-            x = i * rail_mount_hole_pitch
+        while hole_x <= last_hole_x + 1e-6:
             top_hole = create_cylinder(
                 rail_mount_counterbore_diameter / 2,
                 rail_mount_counterbore_depth,
             )
-            top_hole = translate(x, 0, 0)(top_hole)
+            top_hole = translate(hole_x, rail_width / 2, 0)(top_hole)
             top_hole = align(top_hole, rail, Alignment.TOP)
 
             current_hole = top_hole
-            holes = holes.fuse(top_hole)
             bottom_hole = create_cylinder(rail_mount_hole_diameter / 2, rail_height)
-            bottom_hole = translate(x, 0, 0)(bottom_hole)
+            bottom_hole = translate(hole_x, rail_width / 2, 0)(bottom_hole)
             bottom_hole = align(bottom_hole, rail, Alignment.BOTTOM)
-            holes = holes.fuse(bottom_hole)
             current_hole = current_hole.fuse(bottom_hole)
             holes_list.append(current_hole)
+            hole_x += rail_mount_hole_pitch
 
-        holes_align_translation = align_translation(
-            holes, rail, Alignment.CENTER, axes=[0, 1]
-        )
-
-        holes_aligned = [holes_align_translation(hole) for hole in holes_list]
+        holes_aligned = holes_list
 
         for hole in holes_aligned:
             rail = rail.cut(hole)
 
-    rail = LeaderFollowersCuttersPart(rail, cutters=holes_aligned)
+    side_relief_cutters = []
+    if rail_side_relief_depth > 0 and rail_side_relief_height > 0:
+        z_center = rail_height / 2
+        z_min = z_center - rail_side_relief_height / 2
+        z_max = z_center + rail_side_relief_height / 2
+        x_min = -0.1
+        x_max = length_mm + 0.1
+        front_relief = create_triangular_prism(
+            [
+                (x_min, 0, z_min),
+                (x_min, 0, z_max),
+                (x_min, rail_side_relief_depth, z_center),
+                (x_max, 0, z_min),
+                (x_max, 0, z_max),
+                (x_max, rail_side_relief_depth, z_center),
+            ]
+        )
+        back_relief = create_triangular_prism(
+            [
+                (x_min, rail_width, z_min),
+                (x_min, rail_width, z_max),
+                (x_min, rail_width - rail_side_relief_depth, z_center),
+                (x_max, rail_width, z_min),
+                (x_max, rail_width, z_max),
+                (x_max, rail_width - rail_side_relief_depth, z_center),
+            ]
+        )
+        for side_relief in [front_relief, back_relief]:
+            rail = rail.cut(side_relief)
+            side_relief_cutters.append(side_relief)
+
+    rail = LeaderFollowersCuttersPart(rail, cutters=holes_aligned + side_relief_cutters)
     rail.add_named_follower(rail.leader, "rail_body")
     for index, hole in enumerate(holes_aligned):
         rail.add_named_cutter(hole, f"mounting_hole_{index + 1}")
+    for name, side_relief in zip(
+        ["side_relief_front", "side_relief_back"],
+        side_relief_cutters,
+    ):
+        rail.add_named_cutter(side_relief, name)
 
     return rail
 
@@ -316,9 +351,12 @@ def create_mgn7h_rail_with_carriage(
     rail_width=mgn_7h_rail_width,
     rail_height=mgn_7h_rail_height,
     rail_mount_hole_pitch=mgn_7h_rail_mount_hole_pitch,
+    rail_mount_hole_end_offset=mgn_7h_rail_mount_hole_end_offset,
     rail_mount_hole_diameter=mgn_7h_rail_mount_hole_diameter,
     rail_mount_counterbore_diameter=mgn_7h_rail_mount_counterbore_diameter,
     rail_mount_counterbore_depth=mgn_7h_rail_mount_counterbore_depth,
+    rail_side_relief_depth=mgn_7h_rail_side_relief_depth,
+    rail_side_relief_height=mgn_7h_rail_side_relief_height,
     carriage_length=mgn_7h_carriage_length,
     carriage_width=mgn_7h_carriage_width,
     carriage_height=mgn_7h_carriage_height,
@@ -335,9 +373,12 @@ def create_mgn7h_rail_with_carriage(
         rail_width=rail_width,
         rail_height=rail_height,
         rail_mount_hole_pitch=rail_mount_hole_pitch,
+        rail_mount_hole_end_offset=rail_mount_hole_end_offset,
         rail_mount_hole_diameter=rail_mount_hole_diameter,
         rail_mount_counterbore_diameter=rail_mount_counterbore_diameter,
         rail_mount_counterbore_depth=rail_mount_counterbore_depth,
+        rail_side_relief_depth=rail_side_relief_depth,
+        rail_side_relief_height=rail_side_relief_height,
     )
     carriage = create_mgn7h_carriage(
         carriage_length=carriage_length,

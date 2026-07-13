@@ -1,6 +1,7 @@
 import yaml
 
 from assembly_defaults import ASSEMBLIES_DIR, AssemblyDefaultsLoader
+from mege_3devops.process_data.parametric import load_material_spec
 
 
 PETGCF_06_ANTI_SHIFT_OVERRIDES = {
@@ -94,3 +95,22 @@ def test_petgcf_06_idex_one_off_preset_keeps_stock_petgcf_tuning_slowly():
         assert overrides[key] == value
     for key, value in PETGCF_06_IDEX_SLOW_MOTION_OVERRIDES.items():
         assert overrides[key] == value
+
+
+def test_plain_pla_06_preset_uses_medium_strength_max_quality_intent():
+    config = yaml.load(
+        (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+
+    preset = config["process_data_presets"]["pla_medium_strength_max_quality_06"]
+    arguments = preset["arguments"]
+    material = load_material_spec(arguments["material_name"])
+
+    assert preset["generator"] == "mege3devops_parametric"
+    assert material.family == "PLA"
+    assert arguments["nozzle_diameter_mm"] == 0.6
+    assert arguments["nozzle_hardened"] is False
+    assert 0.45 <= arguments["strength_factor"] <= 0.55
+    assert arguments["quality_factor"] > arguments["strength_factor"]
+    assert arguments["quality_factor"] >= 0.9

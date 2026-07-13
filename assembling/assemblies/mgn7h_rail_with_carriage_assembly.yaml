@@ -27,7 +27,23 @@ Builder:
         name_template: "{name}"
         color: [0.8, 0.84, 0.88]
   Production:
-    parts: []
+    parts:
+      - source: self
+        artifact: leader
+        name: mgn7h_rail_mockup
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: mgn7h_rail_mockup
+          filename: mgn7h_rail_mockup
+          process_data_preset: pla_medium_strength_max_quality_06
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "0"
+          parts:
+            - mgn7h_rail_mockup
+      auto_assign_plates: false
 
 Parameters:
   mgn7h_rail_length:
@@ -38,6 +54,8 @@ Parameters:
     Type: Float
   mgn7h_rail_mount_hole_pitch:
     Type: Float
+  mgn7h_rail_mount_hole_end_offset:
+    Type: Float
   mgn7h_rail_mount_hole_diameter:
     Type: Float
   mgn7h_rail_mount_counterbore_diameter:
@@ -46,6 +64,10 @@ Parameters:
     Type: Float
   mgn7h_rail_mount_screw_size:
     Type: String
+  mgn7h_rail_side_relief_depth:
+    Type: Float
+  mgn7h_rail_side_relief_height:
+    Type: Float
   mgn7h_carriage_length:
     Type: Float
   mgn7h_carriage_width:
