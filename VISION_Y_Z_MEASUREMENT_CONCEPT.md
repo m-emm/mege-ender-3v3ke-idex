@@ -127,7 +127,7 @@ Each frame record should include explicit phase and sweep coordinates:
   "x_offset": null,
   "z_sample": null,
   "pose": {"x": 195.0, "y": -14.8, "z": 20.0},
-  "lighting": "NOZZLE_CAM_ANALYSIS_LIGHT",
+  "lighting": "NOZZLE_CAM_Y_FEATURE_LIGHT",
   "camera": "nozzle_cam",
   "profile": "analysis",
   "capture_command": "VISION_CAPTURE_SYNC"
@@ -164,18 +164,20 @@ Default acquisition order:
 1. `G90`
 2. `VISION_JOB_BEGIN ...`
 3. `VISION_PROFILE CAMERA=nozzle_cam PROFILE=analysis`
-4. `NOZZLE_CAM_ANALYSIS_LIGHT`
+4. `NOZZLE_CAM_Y_FEATURE_LIGHT`
 5. Select a known tool, normally `T0`.
 6. Move to `travel_z`, then the base X/Y.
 7. Capture the bed-feature Y sweep.
 8. Return Y to the endstop/base Y.
-9. For each tool, for each X position:
+9. Switch back to `NOZZLE_CAM_ANALYSIS_LIGHT` or another nozzle-tip profile
+   if the tool-tip frames need different illumination.
+10. For each tool, for each X position:
    - select tool if needed
    - lift to `travel_z`
    - move X/Y at safe height
    - capture Z values from high to low, for example `8,5,2,1`
    - lift to `travel_z` before the next X move
-10. `VISION_JOB_END ...`
+11. `VISION_JOB_END ...`
 
 Example skeleton:
 
@@ -186,7 +188,7 @@ Example skeleton:
 G90
 VISION_JOB_BEGIN JOB=... MANIFEST_HASH=sha256:... GCODE_HASH=sha256:...
 VISION_PROFILE CAMERA=nozzle_cam PROFILE=analysis
-NOZZLE_CAM_ANALYSIS_LIGHT
+NOZZLE_CAM_Y_FEATURE_LIGHT
 
 T0
 G1 Z20.000 F3600
@@ -205,6 +207,8 @@ VISION_CAPTURE_SYNC JOB=... SEQ=1 FRAME=bed_y_5p0 CAMERA=nozzle_cam PROFILE=anal
 ; ...
 
 G1 Y-14.800 F3600
+
+NOZZLE_CAM_ANALYSIS_LIGHT
 
 T0
 G1 Z20.000 F3600
@@ -229,9 +233,9 @@ the job captures `5 + 2 * 5 * 4 = 45` frames. A smaller first bring-up can use
 
 Motion rules:
 
-- Resolve the default base Y from live Klipper limits when possible. On the
-  current machine the Y minimum/endstop is `-14.8`, so a 20 mm sweep ends near
-  `5.2`.
+- Resolve the default base Y from live Klipper limits when possible. In the
+  2026-07-13 captures the Y minimum/endstop was `-14.8`, so a 20 mm sweep ended
+  near `5.2`.
 - Keep XY travel at `travel_z`; only descend for the fixed-position Z stack.
 - Capture Z stacks from high to low, then lift before moving X.
 - Use conservative Z feedrates near the bed.
@@ -269,14 +273,146 @@ Add specialized helpers for this job:
 
 Use only `phase == "bed_y_sweep"` frames.
 
-The simplest robust approach is pairwise template registration over one or more
-bed-feature ROIs:
+The 2026-07-13 feasibility capture shows that the user-marked faint horizontal
+line is usable if it is treated as a local template with context, not as a
+standalone infinite line. The capture set lives in:
+
+```text
+resources/vision_y_axis_alignment_20260713/
+```
+
+It contains 15 raw frames plus sidecars:
+
+- Y positions: `-14.8`, `-9.8`, `-4.8`, `0.2`, `5.2`
+- Y offsets: `0`, `5`, `10`, `15`, `20` mm
+- X/Z left untouched during the Y-only capture
+- camera profile: `analysis`
+- lighting profiles:
+  - `analysis_light`: `NOZZLE_CAM_ANALYSIS_LIGHT`
+  - `dim_uniform_white`: `VISION_LIGHT R=0.10 G=0.10 B=0.10`
+  - `uniform_green`: `VISION_LIGHT R=0.00 G=0.35 B=0.00`
+- OpenCV artifacts:
+  - `analysis/roi_reference.jpg`
+  - `analysis/opencv_y_alignment_results.json`
+  - `analysis/overlays/*.jpg`
+
+The best ROI was `marked_line_tight`, rectangle `[690, 438, 300, 125]` in the
+1920x1080 frames. Across all three lighting profiles it fitted essentially the
+same Y axis:
+
+```json
+{
+  "axis_vector_px_per_mm": [-0.26, -10.50],
+  "axis_px_per_mm": 10.50,
+  "axis_angle_deg": -91.4
+}
+```
+
+The strongest correlation was the existing analysis light with CLAHE
+preprocessing: minimum correlation `0.974`, median `0.984`, Y residual `0.37`
+px. The lowest residual came from dim uniform white or uniform green with
+gradient-magnitude preprocessing: Y residual `0.24` px, but with lower minimum
+correlation (`0.794` for dim white and `0.750` for green). Uniform green made
+the feature more visible by eye, but it also added glow and saturation; it is
+not a clear improvement over the current analysis light.
+
+A second white-only LED-pattern capture was made on the same date to test which
+of the eight APA102 LEDs best illuminates the marked Y feature. That capture
+set lives in:
+
+```text
+resources/vision_y_axis_led_pattern_20260713/
+```
+
+It contains 40 raw frames plus sidecars:
+
+- eight patterns, `white_led_1` through `white_led_8`
+- each pattern used exactly one LED index at white level `0.45`
+- G-code per pattern:
+  `VISION_LIGHT_OFF`, then
+  `SET_LED LED=vision_light INDEX=<1..8> RED=0.450 GREEN=0.450 BLUE=0.450`
+- same Y offsets as the first experiment: `0`, `5`, `10`, `15`, `20` mm
+- same Y positions: `-14.8`, `-9.8`, `-4.8`, `0.2`, `5.2`
+- camera profile: `analysis`
+- OpenCV artifacts:
+  - `analysis/led_index_y0_contact_sheet.jpg`
+  - `analysis/roi_reference.jpg`
+  - `analysis/opencv_y_led_pattern_results.json`
+  - `analysis/overlays/*.jpg`
+
+The single-LED result is clearer than the color experiment:
+
+- LED index 2 is the best first default. On the wider marked-line context ROI
+  it produced `[-0.26, -10.40] px/mm`, minimum correlation `0.985`, and the
+  best overall score. On the tight marked-line ROI it tied the best residual:
+  `[-0.20, -10.50] px/mm`, Y residual `0.245 px`, minimum correlation `0.855`.
+- LED index 1 is the first single-LED fallback candidate. It tied the
+  tight-line residual with `[-0.20, -10.46] px/mm`, Y residual `0.245 px`, and
+  had the strongest tight-line vertical-gradient contrast.
+- LEDs 3 and 4 register other plate/body features but emphasize lower glare and
+  are weaker on the marked line.
+- LEDs 5 and 6 still register the line but with lower contrast.
+- LEDs 7 and 8 are poor choices for this Y feature.
+
+The first implementation should therefore add a dedicated Y-feature lighting
+profile rather than reusing nozzle-tip lighting for every phase. A good initial
+macro is:
+
+```gcode
+[gcode_macro NOZZLE_CAM_Y_FEATURE_LIGHT]
+gcode:
+  VISION_LIGHT_OFF
+  SET_LED LED=vision_light INDEX=2 RED=0.450 GREEN=0.450 BLUE=0.450
+```
+
+The combined lower-current fallback was captured after the single-LED sweep.
+That capture set lives in:
+
+```text
+resources/vision_y_axis_led_mix_20260713/
+```
+
+It contains 5 raw frames plus sidecars for a white LED `1+2` mix:
+
+```gcode
+VISION_LIGHT_OFF
+SET_LED LED=vision_light INDEX=1 RED=0.300 GREEN=0.300 BLUE=0.300
+SET_LED LED=vision_light INDEX=2 RED=0.300 GREEN=0.300 BLUE=0.300
+```
+
+The mix is usable: on `marked_line_tight` with gradient-Y preprocessing it
+produced `[-0.20, -10.46] px/mm`, Y residual `0.245 px`, and minimum
+correlation `0.841`. On `marked_line_context` with gray-normalized
+preprocessing it produced `[-0.20, -10.46] px/mm`, Y residual `0.245 px`, and
+minimum correlation `0.991`. It did not clearly beat LED index 2 alone because
+LED 2 still has the cleaner wider-context residual while tying the tight-line
+residual.
+
+The measured recommendation is therefore:
+
+- primary Y-feature light: LED index 2, white level `0.45`
+- validated fallback: LED indices 1 and 2 together, white level `0.30`
+
+Do not use the fallback unless the primary LED 2 image degrades after mechanical
+or camera changes. The fallback is documented so the implementation can expose
+it as a configurable alternate without treating it as the default.
+
+The simplest robust approach is therefore pairwise template registration over
+one or more bed-feature ROIs:
 
 1. Pick stable bed/fixture texture regions that are visible in every Y-sweep
    frame. Avoid the nozzle itself and avoid saturated ring-light reflections.
-2. For each ROI, compute normalized gray and gradient features.
-3. Match every Y-sweep frame against the Y=0 reference frame.
-4. Fit image displacement as a function of commanded `y_offset`.
+2. Start with the `marked_line_tight` ROI above as the primary feature. Keep a
+   wider context ROI around the same line as a secondary cross-check. LED index
+   2 is especially strong on this wider context ROI.
+3. For each ROI, compute normalized gray, CLAHE, horizontal-edge, and
+   gradient-magnitude features.
+4. Match every Y-sweep frame against the Y=0 reference frame with
+   `cv2.matchTemplate` in a vertically expanded search window. The feasibility
+   experiment used roughly `x +/- 95 px`, `y - 330 px`, and `y + 120 px`.
+5. Fit image displacement as a function of commanded `y_offset`.
+6. Accept the fit only when the primary line ROI and at least one contextual ROI
+   agree on axis direction and scale.
 
 Output:
 
@@ -284,10 +420,10 @@ Output:
 {
   "bed_y_fit": {
     "accepted": true,
-    "axis_vector_px_per_mm": [0.42, 7.51],
-    "axis_px_per_mm": 7.52,
-    "axis_angle_deg": 86.8,
-    "residual_rms_px": 0.9,
+    "axis_vector_px_per_mm": [-0.26, -10.50],
+    "axis_px_per_mm": 10.50,
+    "axis_angle_deg": -91.4,
+    "residual_rms_px": 0.3,
     "usable_pair_count": 12,
     "rois": [[...]]
   }
@@ -298,6 +434,27 @@ This fit represents the image scale and direction of physical Y motion at the
 height of the bed features. If several ROIs are used, also record whether the
 Y vector changes across the image; that local variation is the useful
 perspective/parallax signal for the bed plane.
+
+Recommended first-pass Y-fit acceptance thresholds from the manual data:
+
+- at least 5 requested Y frames, with at least 4 usable matches
+- primary ROI minimum correlation `>= 0.75` for gradient features or `>= 0.90`
+  for CLAHE
+- primary ROI Y residual RMS `<= 1.0 px`
+- contextual ROI Y residual RMS `<= 2.5 px`
+- fitted Y scale between `8` and `13 px/mm` for this camera pose
+- fitted X component magnitude below `1 px/mm`
+- fitted Y component must be negative for increasing printer Y in this camera
+  orientation
+
+These threshold values are implementation starting points from one capture
+session, not calibration constants. Keep them configurable and report their
+observed values in `result.json`.
+
+Lighting should also be reported in `result.json`. At minimum, record the
+active macro name, LED indices, RGB levels, and whether the Y fit used the
+primary or fallback lighting pattern. This keeps future lighting changes
+auditable instead of silently changing the scale/parallax fit.
 
 ### B. Fit Tool X Motion And Z Parallax
 
@@ -410,12 +567,22 @@ analysis/overlays/<frame>_overlay.jpg
   "kind": "idex_nozzle_yz_sweep",
   "camera": "nozzle_cam",
   "profile": "analysis",
+  "lighting": {
+    "bed_y_sweep": {
+      "macro": "NOZZLE_CAM_Y_FEATURE_LIGHT",
+      "led_indices": [2],
+      "rgb": [0.45, 0.45, 0.45]
+    },
+    "tool_xz_sweep": {
+      "macro": "NOZZLE_CAM_ANALYSIS_LIGHT"
+    }
+  },
   "manifest_hash": "sha256:...",
   "gcode_hash": "sha256:...",
   "bed_y_axis": {
-    "axis_vector_px_per_mm": [0.42, 7.51],
-    "axis_px_per_mm": 7.52,
-    "residual_rms_px": 0.9
+    "axis_vector_px_per_mm": [-0.26, -10.50],
+    "axis_px_per_mm": 10.50,
+    "residual_rms_px": 0.3
   },
   "tool_xz_fit": {
     "x_axis_vector_px_per_mm": [7.78, -0.02],
@@ -488,22 +655,33 @@ defaults or visually tuned threshold values as brittle literals.
 
 ## Bring-Up Plan
 
-1. Add the new manifest/frame builder and `--prepare-yz-job` CLI path. Verify
+1. Keep the manual capture folder
+   `resources/vision_y_axis_alignment_20260713/` as the first fixture dataset
+   for local OpenCV experiments. Keep
+   `resources/vision_y_axis_led_pattern_20260713/` as the lighting fixture for
+   the dedicated Y-feature light profile.
+2. Add the new manifest/frame builder and `--prepare-yz-job` CLI path. Verify
    generated manifests and G-code locally without moving the printer.
-2. Add `--run-yz-acquisition-job` using the existing virtual-SD staging and
+3. Add `--run-yz-acquisition-job` using the existing virtual-SD staging and
    monitor path.
-3. Run one reduced acquisition job, for example 3 Y frames, 3 X positions, and
+4. Implement `fit_bed_y_motion()` against the saved manual Y-sweep frames before
+   touching the full tool X/Z sweep.
+5. Run one reduced acquisition job, for example 3 Y frames, 3 X positions, and
    Z values `8,5,2`. Inspect raw frames and overlays before enabling `Z=1`.
-4. Implement bed-feature Y registration and write diagnostic overlays.
-5. Implement nozzle X/Z fitting and report rejected diagnostics first.
-6. Add acceptance thresholds and stable `facts.json`.
-7. Add UI rendering for the new job.
-8. Only after repeated accepted measurements, add a separate apply script for
+6. Implement bed-feature Y registration and write diagnostic overlays.
+7. Implement nozzle X/Z fitting and report rejected diagnostics first.
+8. Add acceptance thresholds and stable `facts.json`.
+9. Add UI rendering for the new job.
+10. Only after repeated accepted measurements, add a separate apply script for
    the T1 Z offset recommendation.
 
-## Notes From Current Machine State
+## Notes From Capture Machine State
 
-The live printer reports Klipper ready, idle, and homed. Current limits include
-Y minimum `-14.8`, Y maximum `296.0`, Z minimum `-1.0`, and Z maximum `293.75`.
-Those values should not be hard-coded; the job preflight should read live
-Moonraker limits and validate the generated frame poses before starting.
+During the manual captures on 2026-07-13, the printer reported Klipper ready,
+idle, and homed. The observed limits included Y minimum `-14.8`, Y maximum
+`296.0`, Z minimum `-1.0`, and Z maximum `293.75`. The capture sweeps used
+Y positions from `-14.8` through `5.2`.
+
+Those values are observations from this machine state, not constants. The job
+preflight should read live Moonraker limits and validate the generated frame
+poses before starting.

@@ -1,0 +1,3956 @@
+{
+  "all_results": [
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.09539,
+      "axis_px_per_mm": 10.46191,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 67.526,
+        "gray_std": 60.59,
+        "p05": 33.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 4.502,
+        "vertical_gradient_p95": 14.0
+      },
+      "correlation_median": 0.99336,
+      "correlation_min": 0.99055,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            420
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.99594,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            368
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.99336,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            316
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.991337,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            263
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.990546,
+          "displacement_px": [
+            -4.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            211
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "gray_norm",
+      "overlay_path": "analysis/overlays/overlay_white_led_1_2_level_0p30_marked_line_context_gray_norm.jpg",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_context",
+      "roi_rect": [
+        690,
+        420,
+        570,
+        185
+      ],
+      "score": 0.24495,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.09539,
+      "axis_px_per_mm": 10.46191,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.89499,
+      "correlation_min": 0.84146,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            438
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.916858,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            386
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.894991,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            334
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.882445,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            281
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.841459,
+          "displacement_px": [
+            -4.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            229
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_y",
+      "overlay_path": "analysis/overlays/overlay_white_led_1_2_level_0p30_marked_line_tight_grad_y.jpg",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "roi_rect": [
+        690,
+        438,
+        300,
+        125
+      ],
+      "score": 0.24495,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.09539,
+      "axis_px_per_mm": 10.46191,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 67.526,
+        "gray_std": 60.59,
+        "p05": 33.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 4.502,
+        "vertical_gradient_p95": 14.0
+      },
+      "correlation_median": 0.84807,
+      "correlation_min": 0.80849,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            420
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.874572,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            368
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.848073,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            316
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.829845,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            263
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.808491,
+          "displacement_px": [
+            -4.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            211
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_y",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_context",
+      "roi_rect": [
+        690,
+        420,
+        570,
+        185
+      ],
+      "score": 0.24495,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.42388,
+      "axis_px_per_mm": 10.46323,
+      "axis_vector_px_per_mm": [
+        -0.26,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.99571,
+      "correlation_min": 0.99453,
+      "dx_residual_rms_px": 0.24495,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            438
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.996685,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            386
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.99571,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            334
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.995309,
+          "displacement_px": [
+            -4.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            686,
+            281
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.994527,
+          "displacement_px": [
+            -5.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            685,
+            229
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "gray_norm",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "roi_rect": [
+        690,
+        438,
+        300,
+        125
+      ],
+      "score": 0.33068,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.42388,
+      "axis_px_per_mm": 10.46323,
+      "axis_vector_px_per_mm": [
+        -0.26,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.99516,
+      "correlation_min": 0.99423,
+      "dx_residual_rms_px": 0.24495,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            438
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.996239,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            386
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.995158,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            334
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.994226,
+          "displacement_px": [
+            -4.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            686,
+            281
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.994626,
+          "displacement_px": [
+            -5.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            685,
+            229
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "clahe",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "roi_rect": [
+        690,
+        438,
+        300,
+        125
+      ],
+      "score": 0.33068,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.09122,
+      "axis_px_per_mm": 10.5019,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.5
+      ],
+      "contrast": {
+        "gray_mean": 67.526,
+        "gray_std": 60.59,
+        "p05": 33.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 4.502,
+        "vertical_gradient_p95": 14.0
+      },
+      "correlation_median": 0.84279,
+      "correlation_min": 0.79708,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.37417,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            420
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.881248,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            368
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.842786,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            316
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.820132,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            263
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.797076,
+          "displacement_px": [
+            -4.0,
+            -210.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            210
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_mag",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_context",
+      "roi_rect": [
+        690,
+        420,
+        570,
+        185
+      ],
+      "score": 0.37417,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.31691,
+      "axis_px_per_mm": 10.44276,
+      "axis_vector_px_per_mm": [
+        -0.24,
+        -10.44
+      ],
+      "contrast": {
+        "gray_mean": 67.526,
+        "gray_std": 60.59,
+        "p05": 33.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 4.502,
+        "vertical_gradient_p95": 14.0
+      },
+      "correlation_median": 0.98811,
+      "correlation_min": 0.98734,
+      "dx_residual_rms_px": 0.28284,
+      "dy_residual_rms_px": 0.28284,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            420
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.992598,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            368
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.988114,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            316
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.987344,
+          "displacement_px": [
+            -3.0,
+            -156.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            264
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.987922,
+          "displacement_px": [
+            -5.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            685,
+            211
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "clahe",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_context",
+      "roi_rect": [
+        690,
+        420,
+        570,
+        185
+      ],
+      "score": 0.38184,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.41846,
+      "axis_px_per_mm": 10.50322,
+      "axis_vector_px_per_mm": [
+        -0.26,
+        -10.5
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.88402,
+      "correlation_min": 0.82392,
+      "dx_residual_rms_px": 0.24495,
+      "dy_residual_rms_px": 0.37417,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            438
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.919371,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            386
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.884018,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            334
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.859584,
+          "displacement_px": [
+            -4.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            686,
+            281
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.823922,
+          "displacement_px": [
+            -5.0,
+            -210.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            685,
+            228
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_mag",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "roi_rect": [
+        690,
+        438,
+        300,
+        125
+      ],
+      "score": 0.4599,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.0933,
+      "axis_px_per_mm": 10.48191,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.48
+      ],
+      "contrast": {
+        "gray_mean": 106.611,
+        "gray_std": 72.218,
+        "p05": 36.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 11.986,
+        "vertical_gradient_p95": 48.0
+      },
+      "correlation_median": 0.97777,
+      "correlation_min": 0.95945,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.4899,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            470
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.987409,
+          "displacement_px": [
+            -1.0,
+            -53.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            417
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.977766,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            366
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.968385,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            313
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.959451,
+          "displacement_px": [
+            -4.0,
+            -210.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            260
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "gray_norm",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "left_plate_body",
+      "roi_rect": [
+        690,
+        470,
+        330,
+        190
+      ],
+      "score": 0.4899,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.0933,
+      "axis_px_per_mm": 10.48191,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.48
+      ],
+      "contrast": {
+        "gray_mean": 106.611,
+        "gray_std": 72.218,
+        "p05": 36.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 11.986,
+        "vertical_gradient_p95": 48.0
+      },
+      "correlation_median": 0.97191,
+      "correlation_min": 0.94911,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.4899,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            470
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.984519,
+          "displacement_px": [
+            -1.0,
+            -53.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            417
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.971907,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            366
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.96135,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            313
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.949107,
+          "displacement_px": [
+            -4.0,
+            -210.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            260
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "clahe",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "left_plate_body",
+      "roi_rect": [
+        690,
+        470,
+        330,
+        190
+      ],
+      "score": 0.4899,
+      "white_level": 0.3
+    },
+    {
+      "accepted": false,
+      "axis_angle_deg": -91.09122,
+      "axis_px_per_mm": 10.5019,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.5
+      ],
+      "contrast": {
+        "gray_mean": 106.611,
+        "gray_std": 72.218,
+        "p05": 36.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 11.986,
+        "vertical_gradient_p95": 48.0
+      },
+      "correlation_median": 0.70736,
+      "correlation_min": 0.59603,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.37417,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            470
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.749712,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            418
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.707363,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            366
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.643424,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            313
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.59603,
+          "displacement_px": [
+            -4.0,
+            -210.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            260
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_mag",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "left_plate_body",
+      "roi_rect": [
+        690,
+        470,
+        330,
+        190
+      ],
+      "score": 0.68211,
+      "white_level": 0.3
+    },
+    {
+      "accepted": false,
+      "axis_angle_deg": -91.09539,
+      "axis_px_per_mm": 10.46191,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 106.611,
+        "gray_std": 72.218,
+        "p05": 36.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 11.986,
+        "vertical_gradient_p95": 48.0
+      },
+      "correlation_median": 0.57182,
+      "correlation_min": 0.49255,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            470
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.632803,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            418
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.571821,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            366
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.53413,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            313
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.492551,
+          "displacement_px": [
+            -4.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            261
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_y",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "left_plate_body",
+      "roi_rect": [
+        690,
+        470,
+        330,
+        190
+      ],
+      "score": 0.75985,
+      "white_level": 0.3
+    },
+    {
+      "accepted": false,
+      "axis_angle_deg": -90.0,
+      "axis_px_per_mm": 11.72,
+      "axis_vector_px_per_mm": [
+        0.0,
+        -11.72
+      ],
+      "contrast": {
+        "gray_mean": 93.649,
+        "gray_std": 54.745,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 15.978,
+        "vertical_gradient_p95": 66.0
+      },
+      "correlation_median": 0.97094,
+      "correlation_min": 0.90874,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 1.29615,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            610
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.982138,
+          "displacement_px": [
+            0.0,
+            -57.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            690,
+            553
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.970938,
+          "displacement_px": [
+            0.0,
+            -115.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            690,
+            495
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.956672,
+          "displacement_px": [
+            0.0,
+            -173.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            690,
+            437
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.908737,
+          "displacement_px": [
+            0.0,
+            -235.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            690,
+            375
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "gray_norm",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "lower_lip",
+      "roi_rect": [
+        690,
+        610,
+        610,
+        115
+      ],
+      "score": 1.29615,
+      "white_level": 0.3
+    },
+    {
+      "accepted": false,
+      "axis_angle_deg": -89.80445,
+      "axis_px_per_mm": 11.72007,
+      "axis_vector_px_per_mm": [
+        0.04,
+        -11.72
+      ],
+      "contrast": {
+        "gray_mean": 93.649,
+        "gray_std": 54.745,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 15.978,
+        "vertical_gradient_p95": 66.0
+      },
+      "correlation_median": 0.95992,
+      "correlation_min": 0.87385,
+      "dx_residual_rms_px": 0.28284,
+      "dy_residual_rms_px": 1.29615,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            610
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.976433,
+          "displacement_px": [
+            0.0,
+            -57.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            690,
+            553
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.959922,
+          "displacement_px": [
+            0.0,
+            -115.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            690,
+            495
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.941725,
+          "displacement_px": [
+            0.0,
+            -173.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            690,
+            437
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.873849,
+          "displacement_px": [
+            1.0,
+            -235.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            691,
+            375
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "clahe",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "lower_lip",
+      "roi_rect": [
+        690,
+        610,
+        610,
+        115
+      ],
+      "score": 1.39514,
+      "white_level": 0.3
+    },
+    {
+      "accepted": false,
+      "axis_angle_deg": -101.90014,
+      "axis_px_per_mm": 10.28095,
+      "axis_vector_px_per_mm": [
+        -2.12,
+        -10.06
+      ],
+      "contrast": {
+        "gray_mean": 35.743,
+        "gray_std": 3.298,
+        "p05": 33.0,
+        "p95": 39.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 2.017,
+        "vertical_gradient_p95": 7.0
+      },
+      "correlation_median": 0.20778,
+      "correlation_min": 0.20095,
+      "dx_residual_rms_px": 13.35066,
+      "dy_residual_rms_px": 5.51906,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            930,
+            380
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.34478,
+          "displacement_px": [
+            -45.0,
+            -55.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            885,
+            325
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.200946,
+          "displacement_px": [
+            -53.0,
+            -90.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            877,
+            290
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.207779,
+          "displacement_px": [
+            -51.0,
+            -148.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            879,
+            232
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.20239,
+          "displacement_px": [
+            -50.0,
+            -205.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            880,
+            175
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_y",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "right_context",
+      "roi_rect": [
+        930,
+        380,
+        330,
+        250
+      ],
+      "score": 11.28989,
+      "white_level": 0.3
+    },
+    {
+      "accepted": false,
+      "axis_angle_deg": -87.15652,
+      "axis_px_per_mm": 12.09489,
+      "axis_vector_px_per_mm": [
+        0.6,
+        -12.08
+      ],
+      "contrast": {
+        "gray_mean": 35.743,
+        "gray_std": 3.298,
+        "p05": 33.0,
+        "p95": 39.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 2.017,
+        "vertical_gradient_p95": 7.0
+      },
+      "correlation_median": 0.27513,
+      "correlation_min": 0.27008,
+      "dx_residual_rms_px": 6.17738,
+      "dy_residual_rms_px": 44.28453,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 0.999997,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            930,
+            380
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.275132,
+          "displacement_px": [
+            0.0,
+            -44.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            930,
+            336
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.278756,
+          "displacement_px": [
+            15.0,
+            -217.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            945,
+            163
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.270333,
+          "displacement_px": [
+            18.0,
+            -216.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            948,
+            164
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.270081,
+          "displacement_px": [
+            6.0,
+            -216.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            936,
+            164
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "gray_norm",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "right_context",
+      "roi_rect": [
+        930,
+        380,
+        330,
+        250
+      ],
+      "score": 47.40645,
+      "white_level": 0.3
+    },
+    {
+      "accepted": false,
+      "axis_angle_deg": -90.15982,
+      "axis_px_per_mm": 14.34006,
+      "axis_vector_px_per_mm": [
+        -0.04,
+        -14.34
+      ],
+      "contrast": {
+        "gray_mean": 93.649,
+        "gray_std": 54.745,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 15.978,
+        "vertical_gradient_p95": 66.0
+      },
+      "correlation_median": 0.59029,
+      "correlation_min": 0.35029,
+      "dx_residual_rms_px": 0.74833,
+      "dy_residual_rms_px": 53.29221,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            610
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.646972,
+          "displacement_px": [
+            0.0,
+            -58.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            690,
+            552
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.590288,
+          "displacement_px": [
+            -1.0,
+            -115.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            689,
+            495
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.448788,
+          "displacement_px": [
+            -2.0,
+            -315.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            688,
+            295
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.350286,
+          "displacement_px": [
+            0.0,
+            -230.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            690,
+            380
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_mag",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "lower_lip",
+      "roi_rect": [
+        690,
+        610,
+        610,
+        115
+      ],
+      "score": 54.35356,
+      "white_level": 0.3
+    },
+    {
+      "accepted": false,
+      "axis_angle_deg": -71.91125,
+      "axis_px_per_mm": 8.37386,
+      "axis_vector_px_per_mm": [
+        2.6,
+        -7.96
+      ],
+      "contrast": {
+        "gray_mean": 35.743,
+        "gray_std": 3.298,
+        "p05": 33.0,
+        "p95": 39.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 2.017,
+        "vertical_gradient_p95": 7.0
+      },
+      "correlation_median": 0.15049,
+      "correlation_min": 0.10997,
+      "dx_residual_rms_px": 18.38478,
+      "dy_residual_rms_px": 53.26462,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            930,
+            380
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.28754,
+          "displacement_px": [
+            0.0,
+            -39.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            930,
+            341
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.150492,
+          "displacement_px": [
+            0.0,
+            -19.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            930,
+            361
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.109974,
+          "displacement_px": [
+            0.0,
+            -17.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            930,
+            363
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.116251,
+          "displacement_px": [
+            65.0,
+            -210.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            995,
+            170
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_mag",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "right_context",
+      "roi_rect": [
+        930,
+        380,
+        330,
+        250
+      ],
+      "score": 60.97935,
+      "white_level": 0.3
+    },
+    {
+      "accepted": false,
+      "axis_angle_deg": -72.24817,
+      "axis_px_per_mm": 12.20093,
+      "axis_vector_px_per_mm": [
+        3.72,
+        -11.62
+      ],
+      "contrast": {
+        "gray_mean": 93.649,
+        "gray_std": 54.745,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 15.978,
+        "vertical_gradient_p95": 66.0
+      },
+      "correlation_median": 0.46319,
+      "correlation_min": 0.27722,
+      "dx_residual_rms_px": 28.01857,
+      "dy_residual_rms_px": 68.99551,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            610
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.547244,
+          "displacement_px": [
+            0.0,
+            -58.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            690,
+            552
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.463187,
+          "displacement_px": [
+            0.0,
+            -115.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            690,
+            495
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.434652,
+          "displacement_px": [
+            -4.0,
+            -315.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            686,
+            295
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.277219,
+          "displacement_px": [
+            95.0,
+            -162.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            785,
+            448
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_y",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "lower_lip",
+      "roi_rect": [
+        690,
+        610,
+        610,
+        115
+      ],
+      "score": 79.74757,
+      "white_level": 0.3
+    },
+    {
+      "accepted": false,
+      "axis_angle_deg": -88.78757,
+      "axis_px_per_mm": 11.34254,
+      "axis_vector_px_per_mm": [
+        0.24,
+        -11.34
+      ],
+      "contrast": {
+        "gray_mean": 35.743,
+        "gray_std": 3.298,
+        "p05": 33.0,
+        "p95": 39.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 2.017,
+        "vertical_gradient_p95": 7.0
+      },
+      "correlation_median": 0.55584,
+      "correlation_min": 0.4258,
+      "dx_residual_rms_px": 30.80519,
+      "dy_residual_rms_px": 94.576,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            930,
+            380
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.564792,
+          "displacement_px": [
+            0.0,
+            -49.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            930,
+            331
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.425797,
+          "displacement_px": [
+            -75.0,
+            120.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            855,
+            500
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.555837,
+          "displacement_px": [
+            4.0,
+            -196.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            934,
+            184
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.529752,
+          "displacement_px": [
+            4.0,
+            -210.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            934,
+            170
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "clahe",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "right_context",
+      "roi_rect": [
+        930,
+        380,
+        330,
+        250
+      ],
+      "score": 106.00623,
+      "white_level": 0.3
+    }
+  ],
+  "analysis_dir": "resources/vision_y_axis_led_mix_20260713/analysis",
+  "capture_count": 5,
+  "comparison_to_single_led_dataset": {
+    "mix_best_overall": {
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 67.526,
+        "gray_std": 60.59,
+        "p05": 33.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 4.502,
+        "vertical_gradient_p95": 14.0
+      },
+      "correlation_median": 0.99336,
+      "correlation_min": 0.99055,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "mode": "gray_norm",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_context",
+      "score": 0.24495,
+      "white_level": 0.3
+    },
+    "mix_best_primary": {
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.89499,
+      "correlation_min": 0.84146,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "mode": "grad_y",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "score": 0.24495,
+      "white_level": 0.3
+    },
+    "previous_best_overall": {
+      "accepted": true,
+      "axis_angle_deg": -91.4321,
+      "axis_px_per_mm": 10.40325,
+      "axis_vector_px_per_mm": [
+        -0.26,
+        -10.4
+      ],
+      "correlation_median": 0.98944,
+      "correlation_min": 0.98495,
+      "indices": [
+        2
+      ],
+      "mode": "clahe",
+      "overlay_path": "analysis/overlays/overlay_white_led_2_marked_line_context_clahe.jpg",
+      "pattern": "white_led_2",
+      "roi": "marked_line_context",
+      "score": 0.08573
+    },
+    "previous_led1_primary": {
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 67.866,
+        "gray_std": 40.642,
+        "p05": 35.0,
+        "p95": 149.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 15.803,
+        "vertical_gradient_p95": 49.0
+      },
+      "correlation_median": 0.90359,
+      "correlation_min": 0.81813,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1
+      ],
+      "mode": "grad_y",
+      "overlay_path": "analysis/overlays/overlay_white_led_1_marked_line_tight_grad_y.jpg",
+      "pattern": "white_led_1",
+      "score": 0.24495
+    },
+    "previous_led2_primary": {
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.5
+      ],
+      "contrast": {
+        "gray_mean": 101.285,
+        "gray_std": 72.846,
+        "p05": 36.0,
+        "p95": 221.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 12.831,
+        "vertical_gradient_p95": 45.0
+      },
+      "correlation_median": 0.86657,
+      "correlation_min": 0.855,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        2
+      ],
+      "mode": "grad_y",
+      "overlay_path": "analysis/overlays/overlay_white_led_2_marked_line_tight_grad_y.jpg",
+      "pattern": "white_led_2",
+      "score": 0.24495
+    }
+  },
+  "dataset_dir": "resources/vision_y_axis_led_mix_20260713",
+  "pattern": {
+    "description": "APA102 vision LED indices 1 and 2 on together, white 0.30 each.",
+    "gcode": "VISION_LIGHT_OFF\nSET_LED LED=vision_light INDEX=1 RED=0.300 GREEN=0.300 BLUE=0.300\nSET_LED LED=vision_light INDEX=2 RED=0.300 GREEN=0.300 BLUE=0.300",
+    "indices": [
+      1,
+      2
+    ],
+    "level": 0.3,
+    "name": "white_led_1_2_level_0p30"
+  },
+  "preprocessing_modes": [
+    "gray_norm",
+    "clahe",
+    "grad_y",
+    "grad_mag"
+  ],
+  "primary_marked_line_rank": [
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.09539,
+      "axis_px_per_mm": 10.46191,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.89499,
+      "correlation_min": 0.84146,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            438
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.916858,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            386
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.894991,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            334
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.882445,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            281
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.841459,
+          "displacement_px": [
+            -4.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            229
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_y",
+      "overlay_path": "analysis/overlays/overlay_white_led_1_2_level_0p30_marked_line_tight_grad_y.jpg",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "roi_rect": [
+        690,
+        438,
+        300,
+        125
+      ],
+      "score": 0.24495,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.42388,
+      "axis_px_per_mm": 10.46323,
+      "axis_vector_px_per_mm": [
+        -0.26,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.99571,
+      "correlation_min": 0.99453,
+      "dx_residual_rms_px": 0.24495,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            438
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.996685,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            386
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.99571,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            334
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.995309,
+          "displacement_px": [
+            -4.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            686,
+            281
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.994527,
+          "displacement_px": [
+            -5.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            685,
+            229
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "gray_norm",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "roi_rect": [
+        690,
+        438,
+        300,
+        125
+      ],
+      "score": 0.33068,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.42388,
+      "axis_px_per_mm": 10.46323,
+      "axis_vector_px_per_mm": [
+        -0.26,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.99516,
+      "correlation_min": 0.99423,
+      "dx_residual_rms_px": 0.24495,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            438
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.996239,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            386
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.995158,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            334
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.994226,
+          "displacement_px": [
+            -4.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            686,
+            281
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.994626,
+          "displacement_px": [
+            -5.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            685,
+            229
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "clahe",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "roi_rect": [
+        690,
+        438,
+        300,
+        125
+      ],
+      "score": 0.33068,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.41846,
+      "axis_px_per_mm": 10.50322,
+      "axis_vector_px_per_mm": [
+        -0.26,
+        -10.5
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.88402,
+      "correlation_min": 0.82392,
+      "dx_residual_rms_px": 0.24495,
+      "dy_residual_rms_px": 0.37417,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            438
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.919371,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            386
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.884018,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            334
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.859584,
+          "displacement_px": [
+            -4.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            686,
+            281
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.823922,
+          "displacement_px": [
+            -5.0,
+            -210.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            685,
+            228
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_mag",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "roi_rect": [
+        690,
+        438,
+        300,
+        125
+      ],
+      "score": 0.4599,
+      "white_level": 0.3
+    }
+  ],
+  "recommendation": {
+    "best_measured_y_feature_light": "white_led_2 at 0.45 remains the primary default",
+    "gcode": "VISION_LIGHT_OFF\nSET_LED LED=vision_light INDEX=2 RED=0.450 GREEN=0.450 BLUE=0.450",
+    "reason": "The 1+2 mix is usable, but it does not clearly beat LED 2 alone. Tight-line residual is effectively tied, tight-line correlation is essentially the same, and LED 2 alone keeps the cleaner wider-context residual.",
+    "validated_fallback": "white_led_1_2_level_0p30",
+    "validated_fallback_gcode": "VISION_LIGHT_OFF\nSET_LED LED=vision_light INDEX=1 RED=0.300 GREEN=0.300 BLUE=0.300\nSET_LED LED=vision_light INDEX=2 RED=0.300 GREEN=0.300 BLUE=0.300"
+  },
+  "rois": {
+    "left_plate_body": [
+      690,
+      470,
+      330,
+      190
+    ],
+    "lower_lip": [
+      690,
+      610,
+      610,
+      115
+    ],
+    "marked_line_context": [
+      690,
+      420,
+      570,
+      185
+    ],
+    "marked_line_tight": [
+      690,
+      438,
+      300,
+      125
+    ],
+    "right_context": [
+      930,
+      380,
+      330,
+      250
+    ]
+  },
+  "same_code_comparison": {
+    "led1_2_mix_0p30": {
+      "best_marked_line_context": {
+        "axis_vector_px_per_mm": [
+          -0.2,
+          -10.46
+        ],
+        "contrast": {
+          "gray_mean": 67.526,
+          "gray_std": 60.59,
+          "p05": 33.0,
+          "p95": 223.0,
+          "saturated_fraction": 0.0,
+          "vertical_gradient_mean": 4.502,
+          "vertical_gradient_p95": 14.0
+        },
+        "correlation_median": 0.99336,
+        "correlation_min": 0.99055,
+        "dx_residual_rms_px": 0.0,
+        "dy_residual_rms_px": 0.24495,
+        "mode": "gray_norm",
+        "roi": "marked_line_context",
+        "score": 0.24495
+      },
+      "best_marked_line_tight": {
+        "axis_vector_px_per_mm": [
+          -0.2,
+          -10.46
+        ],
+        "contrast": {
+          "gray_mean": 97.235,
+          "gray_std": 73.917,
+          "p05": 35.0,
+          "p95": 223.0,
+          "saturated_fraction": 0.0,
+          "vertical_gradient_mean": 8.136,
+          "vertical_gradient_p95": 27.0
+        },
+        "correlation_median": 0.89499,
+        "correlation_min": 0.84146,
+        "dx_residual_rms_px": 0.0,
+        "dy_residual_rms_px": 0.24495,
+        "mode": "grad_y",
+        "roi": "marked_line_tight",
+        "score": 0.24495
+      },
+      "best_overall": {
+        "axis_vector_px_per_mm": [
+          -0.2,
+          -10.46
+        ],
+        "contrast": {
+          "gray_mean": 67.526,
+          "gray_std": 60.59,
+          "p05": 33.0,
+          "p95": 223.0,
+          "saturated_fraction": 0.0,
+          "vertical_gradient_mean": 4.502,
+          "vertical_gradient_p95": 14.0
+        },
+        "correlation_median": 0.99336,
+        "correlation_min": 0.99055,
+        "dx_residual_rms_px": 0.0,
+        "dy_residual_rms_px": 0.24495,
+        "mode": "gray_norm",
+        "roi": "marked_line_context",
+        "score": 0.24495
+      }
+    },
+    "led1_single_0p45": {
+      "best_marked_line_context": {
+        "axis_vector_px_per_mm": [
+          -0.3,
+          -10.46
+        ],
+        "contrast": {
+          "gray_mean": 51.102,
+          "gray_std": 29.157,
+          "p05": 33.0,
+          "p95": 126.0,
+          "saturated_fraction": 0.0,
+          "vertical_gradient_mean": 5.125,
+          "vertical_gradient_p95": 15.0
+        },
+        "correlation_median": 0.97121,
+        "correlation_min": 0.96989,
+        "dx_residual_rms_px": 0.24495,
+        "dy_residual_rms_px": 0.24495,
+        "mode": "gray_norm",
+        "roi": "marked_line_context",
+        "score": 0.33068
+      },
+      "best_marked_line_tight": {
+        "axis_vector_px_per_mm": [
+          -0.3,
+          -10.46
+        ],
+        "contrast": {
+          "gray_mean": 67.866,
+          "gray_std": 40.642,
+          "p05": 35.0,
+          "p95": 149.0,
+          "saturated_fraction": 0.0,
+          "vertical_gradient_mean": 8.826,
+          "vertical_gradient_p95": 29.0
+        },
+        "correlation_median": 0.99105,
+        "correlation_min": 0.98122,
+        "dx_residual_rms_px": 0.24495,
+        "dy_residual_rms_px": 0.24495,
+        "mode": "gray_norm",
+        "roi": "marked_line_tight",
+        "score": 0.33068
+      },
+      "best_overall": {
+        "axis_vector_px_per_mm": [
+          -0.3,
+          -10.46
+        ],
+        "contrast": {
+          "gray_mean": 67.866,
+          "gray_std": 40.642,
+          "p05": 35.0,
+          "p95": 149.0,
+          "saturated_fraction": 0.0,
+          "vertical_gradient_mean": 8.826,
+          "vertical_gradient_p95": 29.0
+        },
+        "correlation_median": 0.99105,
+        "correlation_min": 0.98122,
+        "dx_residual_rms_px": 0.24495,
+        "dy_residual_rms_px": 0.24495,
+        "mode": "gray_norm",
+        "roi": "marked_line_tight",
+        "score": 0.33068
+      }
+    },
+    "led2_single_0p45": {
+      "best_marked_line_context": {
+        "axis_vector_px_per_mm": [
+          -0.26,
+          -10.4
+        ],
+        "contrast": {
+          "gray_mean": 70.761,
+          "gray_std": 61.767,
+          "p05": 33.0,
+          "p95": 221.0,
+          "saturated_fraction": 0.0,
+          "vertical_gradient_mean": 4.103,
+          "vertical_gradient_p95": 13.0
+        },
+        "correlation_median": 0.98849,
+        "correlation_min": 0.98495,
+        "dx_residual_rms_px": 0.24495,
+        "dy_residual_rms_px": 0.0,
+        "mode": "clahe",
+        "roi": "marked_line_context",
+        "score": 0.08573
+      },
+      "best_marked_line_tight": {
+        "axis_vector_px_per_mm": [
+          -0.2,
+          -10.5
+        ],
+        "contrast": {
+          "gray_mean": 101.285,
+          "gray_std": 72.846,
+          "p05": 36.0,
+          "p95": 221.0,
+          "saturated_fraction": 0.0,
+          "vertical_gradient_mean": 7.964,
+          "vertical_gradient_p95": 28.0
+        },
+        "correlation_median": 0.87184,
+        "correlation_min": 0.8425,
+        "dx_residual_rms_px": 0.0,
+        "dy_residual_rms_px": 0.24495,
+        "mode": "grad_y",
+        "roi": "marked_line_tight",
+        "score": 0.24495
+      },
+      "best_overall": {
+        "axis_vector_px_per_mm": [
+          -0.26,
+          -10.4
+        ],
+        "contrast": {
+          "gray_mean": 70.761,
+          "gray_std": 61.767,
+          "p05": 33.0,
+          "p95": 221.0,
+          "saturated_fraction": 0.0,
+          "vertical_gradient_mean": 4.103,
+          "vertical_gradient_p95": 13.0
+        },
+        "correlation_median": 0.98849,
+        "correlation_min": 0.98495,
+        "dx_residual_rms_px": 0.24495,
+        "dy_residual_rms_px": 0.0,
+        "mode": "clahe",
+        "roi": "marked_line_context",
+        "score": 0.08573
+      }
+    }
+  },
+  "top_results": [
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.09539,
+      "axis_px_per_mm": 10.46191,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 67.526,
+        "gray_std": 60.59,
+        "p05": 33.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 4.502,
+        "vertical_gradient_p95": 14.0
+      },
+      "correlation_median": 0.99336,
+      "correlation_min": 0.99055,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            420
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.99594,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            368
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.99336,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            316
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.991337,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            263
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.990546,
+          "displacement_px": [
+            -4.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            211
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "gray_norm",
+      "overlay_path": "analysis/overlays/overlay_white_led_1_2_level_0p30_marked_line_context_gray_norm.jpg",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_context",
+      "roi_rect": [
+        690,
+        420,
+        570,
+        185
+      ],
+      "score": 0.24495,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.09539,
+      "axis_px_per_mm": 10.46191,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.89499,
+      "correlation_min": 0.84146,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            438
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.916858,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            386
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.894991,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            334
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.882445,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            281
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.841459,
+          "displacement_px": [
+            -4.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            229
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_y",
+      "overlay_path": "analysis/overlays/overlay_white_led_1_2_level_0p30_marked_line_tight_grad_y.jpg",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "roi_rect": [
+        690,
+        438,
+        300,
+        125
+      ],
+      "score": 0.24495,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.09539,
+      "axis_px_per_mm": 10.46191,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 67.526,
+        "gray_std": 60.59,
+        "p05": 33.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 4.502,
+        "vertical_gradient_p95": 14.0
+      },
+      "correlation_median": 0.84807,
+      "correlation_min": 0.80849,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            420
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.874572,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            368
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.848073,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            316
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.829845,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            263
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.808491,
+          "displacement_px": [
+            -4.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            211
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_y",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_context",
+      "roi_rect": [
+        690,
+        420,
+        570,
+        185
+      ],
+      "score": 0.24495,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.42388,
+      "axis_px_per_mm": 10.46323,
+      "axis_vector_px_per_mm": [
+        -0.26,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.99571,
+      "correlation_min": 0.99453,
+      "dx_residual_rms_px": 0.24495,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            438
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.996685,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            386
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.99571,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            334
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.995309,
+          "displacement_px": [
+            -4.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            686,
+            281
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.994527,
+          "displacement_px": [
+            -5.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            685,
+            229
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "gray_norm",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "roi_rect": [
+        690,
+        438,
+        300,
+        125
+      ],
+      "score": 0.33068,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.42388,
+      "axis_px_per_mm": 10.46323,
+      "axis_vector_px_per_mm": [
+        -0.26,
+        -10.46
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.99516,
+      "correlation_min": 0.99423,
+      "dx_residual_rms_px": 0.24495,
+      "dy_residual_rms_px": 0.24495,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            438
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.996239,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            386
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.995158,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            334
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.994226,
+          "displacement_px": [
+            -4.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            686,
+            281
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.994626,
+          "displacement_px": [
+            -5.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            685,
+            229
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "clahe",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "roi_rect": [
+        690,
+        438,
+        300,
+        125
+      ],
+      "score": 0.33068,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.09122,
+      "axis_px_per_mm": 10.5019,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.5
+      ],
+      "contrast": {
+        "gray_mean": 67.526,
+        "gray_std": 60.59,
+        "p05": 33.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 4.502,
+        "vertical_gradient_p95": 14.0
+      },
+      "correlation_median": 0.84279,
+      "correlation_min": 0.79708,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.37417,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            420
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.881248,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            368
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.842786,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            316
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.820132,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            263
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.797076,
+          "displacement_px": [
+            -4.0,
+            -210.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            210
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_mag",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_context",
+      "roi_rect": [
+        690,
+        420,
+        570,
+        185
+      ],
+      "score": 0.37417,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.31691,
+      "axis_px_per_mm": 10.44276,
+      "axis_vector_px_per_mm": [
+        -0.24,
+        -10.44
+      ],
+      "contrast": {
+        "gray_mean": 67.526,
+        "gray_std": 60.59,
+        "p05": 33.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 4.502,
+        "vertical_gradient_p95": 14.0
+      },
+      "correlation_median": 0.98811,
+      "correlation_min": 0.98734,
+      "dx_residual_rms_px": 0.28284,
+      "dy_residual_rms_px": 0.28284,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            420
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.992598,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            368
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.988114,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            316
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.987344,
+          "displacement_px": [
+            -3.0,
+            -156.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            264
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.987922,
+          "displacement_px": [
+            -5.0,
+            -209.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            685,
+            211
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "clahe",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_context",
+      "roi_rect": [
+        690,
+        420,
+        570,
+        185
+      ],
+      "score": 0.38184,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.41846,
+      "axis_px_per_mm": 10.50322,
+      "axis_vector_px_per_mm": [
+        -0.26,
+        -10.5
+      ],
+      "contrast": {
+        "gray_mean": 97.235,
+        "gray_std": 73.917,
+        "p05": 35.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 8.136,
+        "vertical_gradient_p95": 27.0
+      },
+      "correlation_median": 0.88402,
+      "correlation_min": 0.82392,
+      "dx_residual_rms_px": 0.24495,
+      "dy_residual_rms_px": 0.37417,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            438
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.919371,
+          "displacement_px": [
+            -1.0,
+            -52.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            386
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.884018,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            334
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.859584,
+          "displacement_px": [
+            -4.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            686,
+            281
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.823922,
+          "displacement_px": [
+            -5.0,
+            -210.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            685,
+            228
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "grad_mag",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "marked_line_tight",
+      "roi_rect": [
+        690,
+        438,
+        300,
+        125
+      ],
+      "score": 0.4599,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.0933,
+      "axis_px_per_mm": 10.48191,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.48
+      ],
+      "contrast": {
+        "gray_mean": 106.611,
+        "gray_std": 72.218,
+        "p05": 36.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 11.986,
+        "vertical_gradient_p95": 48.0
+      },
+      "correlation_median": 0.97777,
+      "correlation_min": 0.95945,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.4899,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            470
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.987409,
+          "displacement_px": [
+            -1.0,
+            -53.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            417
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.977766,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            366
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.968385,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            313
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.959451,
+          "displacement_px": [
+            -4.0,
+            -210.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            260
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "gray_norm",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "left_plate_body",
+      "roi_rect": [
+        690,
+        470,
+        330,
+        190
+      ],
+      "score": 0.4899,
+      "white_level": 0.3
+    },
+    {
+      "accepted": true,
+      "axis_angle_deg": -91.0933,
+      "axis_px_per_mm": 10.48191,
+      "axis_vector_px_per_mm": [
+        -0.2,
+        -10.48
+      ],
+      "contrast": {
+        "gray_mean": 106.611,
+        "gray_std": 72.218,
+        "p05": 36.0,
+        "p95": 223.0,
+        "saturated_fraction": 0.0,
+        "vertical_gradient_mean": 11.986,
+        "vertical_gradient_p95": 48.0
+      },
+      "correlation_median": 0.97191,
+      "correlation_min": 0.94911,
+      "dx_residual_rms_px": 0.0,
+      "dy_residual_rms_px": 0.4899,
+      "indices": [
+        1,
+        2
+      ],
+      "matches": [
+        {
+          "correlation": 1.0,
+          "displacement_px": [
+            0.0,
+            0.0
+          ],
+          "frame": "20260713T174022Z_white_led_1_2_level_0p30_y0p0.jpg",
+          "match_top_left": [
+            690,
+            470
+          ],
+          "y_offset": 0.0
+        },
+        {
+          "correlation": 0.984519,
+          "displacement_px": [
+            -1.0,
+            -53.0
+          ],
+          "frame": "20260713T174027Z_white_led_1_2_level_0p30_y5p0.jpg",
+          "match_top_left": [
+            689,
+            417
+          ],
+          "y_offset": 5.0
+        },
+        {
+          "correlation": 0.971907,
+          "displacement_px": [
+            -2.0,
+            -104.0
+          ],
+          "frame": "20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+          "match_top_left": [
+            688,
+            366
+          ],
+          "y_offset": 10.0
+        },
+        {
+          "correlation": 0.96135,
+          "displacement_px": [
+            -3.0,
+            -157.0
+          ],
+          "frame": "20260713T174035Z_white_led_1_2_level_0p30_y15p0.jpg",
+          "match_top_left": [
+            687,
+            313
+          ],
+          "y_offset": 15.0
+        },
+        {
+          "correlation": 0.949107,
+          "displacement_px": [
+            -4.0,
+            -210.0
+          ],
+          "frame": "20260713T174039Z_white_led_1_2_level_0p30_y20p0.jpg",
+          "match_top_left": [
+            686,
+            260
+          ],
+          "y_offset": 20.0
+        }
+      ],
+      "mode": "clahe",
+      "pattern": "white_led_1_2_level_0p30",
+      "roi": "left_plate_body",
+      "roi_rect": [
+        690,
+        470,
+        330,
+        190
+      ],
+      "score": 0.4899,
+      "white_level": 0.3
+    }
+  ],
+  "y_offsets": [
+    0.0,
+    5.0,
+    10.0,
+    15.0,
+    20.0
+  ],
+  "y_values": [
+    -14.8,
+    -9.8,
+    -4.8,
+    0.2,
+    5.2
+  ]
+}

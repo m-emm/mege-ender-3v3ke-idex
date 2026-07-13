@@ -1,0 +1,429 @@
+{
+  "attempts": [
+    {
+      "ok": true,
+      "source": "vision_framebuffer",
+      "source_metadata": {
+        "camera_device": "/dev/v4l/by-id/usb-Vimicro_corp._PC-LM1E_Camera_PC-LM1E_Audio-video-index0",
+        "camera_profile": {
+          "active_profile": "nozzle_cam_analysis",
+          "applied_controls": [
+            {
+              "name": "auto_exposure",
+              "returncode": 0,
+              "stderr": "",
+              "stdout": "",
+              "value": 1
+            },
+            {
+              "name": "exposure_time_absolute",
+              "returncode": 0,
+              "stderr": "",
+              "stdout": "",
+              "value": 1200
+            },
+            {
+              "name": "white_balance_automatic",
+              "returncode": 0,
+              "stderr": "",
+              "stdout": "",
+              "value": 0
+            },
+            {
+              "name": "white_balance_temperature",
+              "returncode": 0,
+              "stderr": "",
+              "stdout": "",
+              "value": 6500
+            },
+            {
+              "name": "power_line_frequency",
+              "returncode": 0,
+              "stderr": "",
+              "stdout": "",
+              "value": 1
+            },
+            {
+              "name": "brightness",
+              "returncode": 0,
+              "stderr": "",
+              "stdout": "",
+              "value": 0
+            },
+            {
+              "name": "contrast",
+              "returncode": 0,
+              "stderr": "",
+              "stdout": "",
+              "value": 12
+            },
+            {
+              "name": "saturation",
+              "returncode": 0,
+              "stderr": "",
+              "stdout": "",
+              "value": 9
+            },
+            {
+              "name": "hue",
+              "returncode": 0,
+              "stderr": "",
+              "stdout": "",
+              "value": 0
+            },
+            {
+              "name": "gamma",
+              "returncode": 0,
+              "stderr": "",
+              "stdout": "",
+              "value": 188
+            },
+            {
+              "name": "sharpness",
+              "returncode": 0,
+              "stderr": "",
+              "stdout": "",
+              "value": 7
+            }
+          ],
+          "control_errors": [],
+          "enabled": true,
+          "last_request": {
+            "params": {
+              "camera": "nozzle_cam",
+              "profile": "analysis"
+            },
+            "profile": "analysis",
+            "requested_at_utc": "2026-07-13T17:40:17.814023+00:00",
+            "source": "vision_capture"
+          },
+          "profile_file": "/usr/local/share/vision/nozzle_cam_profiles.json",
+          "profile_names": [
+            "analysis",
+            "nozzle_cam_analysis"
+          ],
+          "request_file": "/run/vision-preview-nozzle_cam/profile_request.json",
+          "requested_profile": "analysis"
+        },
+        "capture_info": {
+          "format": {
+            "requested_height": 1080,
+            "requested_width": 1920,
+            "stderr": "",
+            "stdout": ""
+          },
+          "height": 1080,
+          "requested_height": 1080,
+          "requested_width": 1920,
+          "stream_stderr": "<",
+          "stream_stdout": "",
+          "width": 1920
+        },
+        "capture_source": "vision_framebuffer_v4l2_mjpg",
+        "frame_id": 315,
+        "frame_seq": 315,
+        "height": 1080,
+        "latest_url": "/nozzle_cam/?action=snapshot",
+        "monotonic_s": 414.27473692,
+        "requested_height": 1080,
+        "requested_width": 1920,
+        "ring_image_path": "/run/vision-preview-nozzle_cam/ring/frame_00000315_20260713T174031.192968Z.jpg",
+        "ring_metadata_path": "/run/vision-preview-nozzle_cam/ring/frame_00000315_20260713T174031.192968Z.json",
+        "size_bytes": 339744,
+        "target_fps": 1.0,
+        "timestamp_utc": "2026-07-13T17:40:31.192968+00:00",
+        "width": 1920
+      }
+    }
+  ],
+  "camera_profile": {
+    "active_profile": "nozzle_cam_analysis",
+    "applied_controls": [
+      {
+        "name": "auto_exposure",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 1
+      },
+      {
+        "name": "exposure_time_absolute",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 1200
+      },
+      {
+        "name": "white_balance_automatic",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 0
+      },
+      {
+        "name": "white_balance_temperature",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 6500
+      },
+      {
+        "name": "power_line_frequency",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 1
+      },
+      {
+        "name": "brightness",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 0
+      },
+      {
+        "name": "contrast",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 12
+      },
+      {
+        "name": "saturation",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 9
+      },
+      {
+        "name": "hue",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 0
+      },
+      {
+        "name": "gamma",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 188
+      },
+      {
+        "name": "sharpness",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 7
+      }
+    ],
+    "control_errors": [],
+    "enabled": true,
+    "last_request": {
+      "params": {
+        "camera": "nozzle_cam",
+        "profile": "analysis"
+      },
+      "profile": "analysis",
+      "requested_at_utc": "2026-07-13T17:40:17.814023+00:00",
+      "source": "vision_capture"
+    },
+    "profile_file": "/usr/local/share/vision/nozzle_cam_profiles.json",
+    "profile_names": [
+      "analysis",
+      "nozzle_cam_analysis"
+    ],
+    "request_file": "/run/vision-preview-nozzle_cam/profile_request.json",
+    "requested_profile": "analysis"
+  },
+  "capture_source": "vision_framebuffer",
+  "framebuffer_dir": "/run/vision-preview-nozzle_cam",
+  "framebuffer_latest_image": "/run/vision-preview-nozzle_cam/latest.jpg",
+  "framebuffer_latest_metadata": "/run/vision-preview-nozzle_cam/latest.json",
+  "framebuffer_profile_request_file": "/run/vision-preview-nozzle_cam/profile_request.json",
+  "fresh": true,
+  "fresh_after_utc": "2026-07-13T17:40:31.060415+00:00",
+  "fresh_timeout": 14.0,
+  "gcode": "VISION_LIGHT_OFF\nSET_LED LED=vision_light INDEX=1 RED=0.300 GREEN=0.300 BLUE=0.300\nSET_LED LED=vision_light INDEX=2 RED=0.300 GREEN=0.300 BLUE=0.300",
+  "gcode_position": [
+    -80.4,
+    -4.8,
+    293.75,
+    0.0
+  ],
+  "height": 1080,
+  "image_path": "/tmp/vision_y_axis_led_mix_20260713/20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+  "indices": [
+    1,
+    2
+  ],
+  "latest_url": "/vision/latest.jpg",
+  "max_age": 10.0,
+  "metadata_path": "/tmp/vision_y_axis_led_mix_20260713/20260713T174031Z_white_led_1_2_level_0p30_y10p0.json",
+  "name": "white_led_1_2_level_0p30_y10p0",
+  "ok": true,
+  "params": {
+    "fresh": true,
+    "fresh_after_utc": null,
+    "fresh_timeout": 14.0,
+    "manage_crowsnest": false,
+    "max_age": 10.0,
+    "name": "white_led_1_2_level_0p30_y10p0",
+    "profile": "",
+    "reason": "capture_once",
+    "require_high_res": true,
+    "retries": 3
+  },
+  "pattern": "white_led_1_2_level_0p30",
+  "pattern_description": "APA102 vision LED indices 1 and 2 on together, white 0.30 each.",
+  "profile_request_utc": null,
+  "requested_camera_profile": null,
+  "requested_name": "white_led_1_2_level_0p30_y10p0",
+  "require_high_res": true,
+  "size_bytes": 339744,
+  "source_frame": {
+    "camera_device": "/dev/v4l/by-id/usb-Vimicro_corp._PC-LM1E_Camera_PC-LM1E_Audio-video-index0",
+    "camera_profile": {
+      "active_profile": "nozzle_cam_analysis",
+      "applied_controls": [
+        {
+          "name": "auto_exposure",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "value": 1
+        },
+        {
+          "name": "exposure_time_absolute",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "value": 1200
+        },
+        {
+          "name": "white_balance_automatic",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "value": 0
+        },
+        {
+          "name": "white_balance_temperature",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "value": 6500
+        },
+        {
+          "name": "power_line_frequency",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "value": 1
+        },
+        {
+          "name": "brightness",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "value": 0
+        },
+        {
+          "name": "contrast",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "value": 12
+        },
+        {
+          "name": "saturation",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "value": 9
+        },
+        {
+          "name": "hue",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "value": 0
+        },
+        {
+          "name": "gamma",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "value": 188
+        },
+        {
+          "name": "sharpness",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "value": 7
+        }
+      ],
+      "control_errors": [],
+      "enabled": true,
+      "last_request": {
+        "params": {
+          "camera": "nozzle_cam",
+          "profile": "analysis"
+        },
+        "profile": "analysis",
+        "requested_at_utc": "2026-07-13T17:40:17.814023+00:00",
+        "source": "vision_capture"
+      },
+      "profile_file": "/usr/local/share/vision/nozzle_cam_profiles.json",
+      "profile_names": [
+        "analysis",
+        "nozzle_cam_analysis"
+      ],
+      "request_file": "/run/vision-preview-nozzle_cam/profile_request.json",
+      "requested_profile": "analysis"
+    },
+    "capture_info": {
+      "format": {
+        "requested_height": 1080,
+        "requested_width": 1920,
+        "stderr": "",
+        "stdout": ""
+      },
+      "height": 1080,
+      "requested_height": 1080,
+      "requested_width": 1920,
+      "stream_stderr": "<",
+      "stream_stdout": "",
+      "width": 1920
+    },
+    "capture_source": "vision_framebuffer_v4l2_mjpg",
+    "frame_id": 315,
+    "frame_seq": 315,
+    "height": 1080,
+    "latest_url": "/nozzle_cam/?action=snapshot",
+    "monotonic_s": 414.27473692,
+    "requested_height": 1080,
+    "requested_width": 1920,
+    "ring_image_path": "/run/vision-preview-nozzle_cam/ring/frame_00000315_20260713T174031.192968Z.jpg",
+    "ring_metadata_path": "/run/vision-preview-nozzle_cam/ring/frame_00000315_20260713T174031.192968Z.json",
+    "size_bytes": 339744,
+    "target_fps": 1.0,
+    "timestamp_utc": "2026-07-13T17:40:31.192968+00:00",
+    "width": 1920
+  },
+  "source_frame_seq": 315,
+  "source_latest_url": "/nozzle_cam/?action=snapshot",
+  "timestamp_utc": "2026-07-13T17:40:31.060415+00:00",
+  "toolhead_position": [
+    -80.4,
+    -4.8,
+    293.75,
+    0.0
+  ],
+  "url": "/vision/20260713T174031Z_white_led_1_2_level_0p30_y10p0.jpg",
+  "white_level": 0.3,
+  "width": 1920,
+  "y": -4.8,
+  "y_offset": 10.0
+}
