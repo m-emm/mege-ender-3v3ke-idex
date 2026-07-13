@@ -46,7 +46,7 @@ Builder:
       - source: dependencies
         assembly: x_axis_left_carriage_assembly
         artifact: leader
-        name: carriage
+        name: x_axis_left_carriage
 
   Production:
     parts:
