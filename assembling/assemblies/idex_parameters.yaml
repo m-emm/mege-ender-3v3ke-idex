@@ -1316,10 +1316,17 @@ globals:
   mgn7h_rail_mount_counterbore_diameter: 4.2
   mgn7h_rail_mount_counterbore_depth: 2.4
   mgn7h_rail_mount_screw_size: "M2"
-  mgn7h_rail_side_relief_depth: 0.55
-  mgn7h_rail_side_relief_height: 1.7
+  mgn7h_rail_groove_z_center: 2.8
+  mgn7h_rail_groove_v_height: 2.0
+  mgn7h_rail_groove_v_depth: 0.55
+  mgn7h_rail_groove_slot_height: 0.65
+  mgn7h_rail_groove_slot_depth: 0.95
+  mgn7h_rail_top_fillet_radius: 0.18
+  mgn7h_rail_bottom_chamfer_width: 0.32
+  mgn7h_rail_bottom_chamfer_height: 0.35
   rail_mock_clearance: 0.15
   rail_mock_groove_clearance: 0.06
+  rail_mock_groove_height_clearance: 0.0
   mgn7h_carriage_length: 30.8
   mgn7h_carriage_width: 17
   mgn7h_carriage_height: 8

@@ -49,10 +49,17 @@ mgn_7h_rail_mount_hole_diameter = 2.4
 mgn_7h_rail_mount_counterbore_diameter = 4.2
 mgn_7h_rail_mount_counterbore_depth = 2.4
 mgn_7h_rail_mount_screw_size = "M2"
-mgn_7h_rail_side_relief_depth = 0.55
-mgn_7h_rail_side_relief_height = 1.7
+mgn_7h_rail_groove_z_center = 2.8
+mgn_7h_rail_groove_v_height = 2.0
+mgn_7h_rail_groove_v_depth = 0.55
+mgn_7h_rail_groove_slot_height = 0.65
+mgn_7h_rail_groove_slot_depth = 0.95
+mgn_7h_rail_top_fillet_radius = 0.18
+mgn_7h_rail_bottom_chamfer_width = 0.32
+mgn_7h_rail_bottom_chamfer_height = 0.35
 mgn_7h_rail_mock_clearance = 0.15
 mgn_7h_rail_mock_groove_clearance = 0.06
+mgn_7h_rail_mock_groove_height_clearance = 0.0
 
 mgn_7h_carriage_length = 30.8
 mgn_7h_carriage_width = 17
@@ -268,12 +275,58 @@ def create_mgn7h_rail(
     rail_mount_hole_diameter=mgn_7h_rail_mount_hole_diameter,
     rail_mount_counterbore_diameter=mgn_7h_rail_mount_counterbore_diameter,
     rail_mount_counterbore_depth=mgn_7h_rail_mount_counterbore_depth,
-    rail_side_relief_depth=mgn_7h_rail_side_relief_depth,
-    rail_side_relief_height=mgn_7h_rail_side_relief_height,
+    rail_groove_z_center=mgn_7h_rail_groove_z_center,
+    rail_groove_v_height=mgn_7h_rail_groove_v_height,
+    rail_groove_v_depth=mgn_7h_rail_groove_v_depth,
+    rail_groove_slot_height=mgn_7h_rail_groove_slot_height,
+    rail_groove_slot_depth=mgn_7h_rail_groove_slot_depth,
+    rail_top_fillet_radius=mgn_7h_rail_top_fillet_radius,
+    rail_bottom_chamfer_width=mgn_7h_rail_bottom_chamfer_width,
+    rail_bottom_chamfer_height=mgn_7h_rail_bottom_chamfer_height,
 ):
     """Create an MGN7H rail reference part."""
 
     rail = create_box(length_mm, rail_width, rail_height)
+    if rail_top_fillet_radius > 0:
+        rail = apply_fillet_by_alignment(
+            rail,
+            rail_top_fillet_radius,
+            fillets_at=[Alignment.TOP],
+        )
+
+    profile_cutters = []
+    profile_cutter_names = []
+    cutter_x_min = -0.1
+    cutter_x_max = length_mm + 0.1
+
+    if rail_bottom_chamfer_width > 0 and rail_bottom_chamfer_height > 0:
+        front_chamfer = create_triangular_prism(
+            [
+                (cutter_x_min, 0, 0),
+                (cutter_x_min, rail_bottom_chamfer_width, 0),
+                (cutter_x_min, 0, rail_bottom_chamfer_height),
+                (cutter_x_max, 0, 0),
+                (cutter_x_max, rail_bottom_chamfer_width, 0),
+                (cutter_x_max, 0, rail_bottom_chamfer_height),
+            ]
+        )
+        back_chamfer = create_triangular_prism(
+            [
+                (cutter_x_min, rail_width, 0),
+                (cutter_x_min, rail_width - rail_bottom_chamfer_width, 0),
+                (cutter_x_min, rail_width, rail_bottom_chamfer_height),
+                (cutter_x_max, rail_width, 0),
+                (cutter_x_max, rail_width - rail_bottom_chamfer_width, 0),
+                (cutter_x_max, rail_width, rail_bottom_chamfer_height),
+            ]
+        )
+        for name, chamfer in [
+            ("bottom_chamfer_front", front_chamfer),
+            ("bottom_chamfer_back", back_chamfer),
+        ]:
+            rail = rail.cut(chamfer)
+            profile_cutters.append(chamfer)
+            profile_cutter_names.append(name)
 
     last_hole_x = length_mm - rail_mount_hole_end_offset
     hole_x = rail_mount_hole_end_offset
@@ -302,46 +355,86 @@ def create_mgn7h_rail(
         for hole in holes_aligned:
             rail = rail.cut(hole)
 
-    side_relief_cutters = []
-    if rail_side_relief_depth > 0 and rail_side_relief_height > 0:
-        z_center = rail_height / 2
-        z_min = z_center - rail_side_relief_height / 2
-        z_max = z_center + rail_side_relief_height / 2
-        x_min = -0.1
-        x_max = length_mm + 0.1
-        front_relief = create_triangular_prism(
+    if rail_groove_v_depth > 0 and rail_groove_v_height > 0:
+        z_min = rail_groove_z_center - rail_groove_v_height / 2
+        z_max = rail_groove_z_center + rail_groove_v_height / 2
+        front_groove_v = create_triangular_prism(
             [
-                (x_min, 0, z_min),
-                (x_min, 0, z_max),
-                (x_min, rail_side_relief_depth, z_center),
-                (x_max, 0, z_min),
-                (x_max, 0, z_max),
-                (x_max, rail_side_relief_depth, z_center),
+                (cutter_x_min, 0, z_min),
+                (cutter_x_min, 0, z_max),
+                (cutter_x_min, rail_groove_v_depth, rail_groove_z_center),
+                (cutter_x_max, 0, z_min),
+                (cutter_x_max, 0, z_max),
+                (cutter_x_max, rail_groove_v_depth, rail_groove_z_center),
             ]
         )
-        back_relief = create_triangular_prism(
+        back_groove_v = create_triangular_prism(
             [
-                (x_min, rail_width, z_min),
-                (x_min, rail_width, z_max),
-                (x_min, rail_width - rail_side_relief_depth, z_center),
-                (x_max, rail_width, z_min),
-                (x_max, rail_width, z_max),
-                (x_max, rail_width - rail_side_relief_depth, z_center),
+                (cutter_x_min, rail_width, z_min),
+                (cutter_x_min, rail_width, z_max),
+                (
+                    cutter_x_min,
+                    rail_width - rail_groove_v_depth,
+                    rail_groove_z_center,
+                ),
+                (cutter_x_max, rail_width, z_min),
+                (cutter_x_max, rail_width, z_max),
+                (
+                    cutter_x_max,
+                    rail_width - rail_groove_v_depth,
+                    rail_groove_z_center,
+                ),
             ]
         )
-        for side_relief in [front_relief, back_relief]:
-            rail = rail.cut(side_relief)
-            side_relief_cutters.append(side_relief)
+        for name, groove_v in [
+            ("groove_v_front", front_groove_v),
+            ("groove_v_back", back_groove_v),
+        ]:
+            rail = rail.cut(groove_v)
+            profile_cutters.append(groove_v)
+            profile_cutter_names.append(name)
 
-    rail = LeaderFollowersCuttersPart(rail, cutters=holes_aligned + side_relief_cutters)
+    if rail_groove_slot_depth > 0 and rail_groove_slot_height > 0:
+        slot_overshoot = 0.1
+        groove_slot = create_rounded_slab(
+            rail_groove_slot_depth + slot_overshoot,
+            rail_groove_slot_height,
+            length_mm + 2 * slot_overshoot,
+            rail_groove_slot_height / 2,
+        )
+        groove_slot = rotate(90, axis=(0, 1, 0))(groove_slot)
+        groove_slot = rotate(-90, axis=(1, 0, 0))(groove_slot)
+        groove_slot = translate(
+            -slot_overshoot,
+            0,
+            rail_groove_z_center + rail_groove_slot_height / 2,
+        )(groove_slot)
+        front_groove_slot = align(
+            groove_slot,
+            rail,
+            Alignment.STACK_FRONT,
+            stack_gap=-rail_groove_slot_depth,
+        )
+        back_groove_slot = align(
+            groove_slot,
+            rail,
+            Alignment.STACK_BACK,
+            stack_gap=-rail_groove_slot_depth,
+        )
+        for name, groove_slot_cutter in [
+            ("groove_slot_front", front_groove_slot),
+            ("groove_slot_back", back_groove_slot),
+        ]:
+            rail = rail.cut(groove_slot_cutter)
+            profile_cutters.append(groove_slot_cutter)
+            profile_cutter_names.append(name)
+
+    rail = LeaderFollowersCuttersPart(rail, cutters=holes_aligned + profile_cutters)
     rail.add_named_follower(rail.leader, "rail_body")
     for index, hole in enumerate(holes_aligned):
         rail.add_named_cutter(hole, f"mounting_hole_{index + 1}")
-    for name, side_relief in zip(
-        ["side_relief_front", "side_relief_back"],
-        side_relief_cutters,
-    ):
-        rail.add_named_cutter(side_relief, name)
+    for name, profile_cutter in zip(profile_cutter_names, profile_cutters):
+        rail.add_named_cutter(profile_cutter, name)
 
     return rail
 
@@ -357,10 +450,17 @@ def create_mgn7h_rail_with_carriage(
     rail_mount_hole_diameter=mgn_7h_rail_mount_hole_diameter,
     rail_mount_counterbore_diameter=mgn_7h_rail_mount_counterbore_diameter,
     rail_mount_counterbore_depth=mgn_7h_rail_mount_counterbore_depth,
-    rail_side_relief_depth=mgn_7h_rail_side_relief_depth,
-    rail_side_relief_height=mgn_7h_rail_side_relief_height,
+    rail_groove_z_center=mgn_7h_rail_groove_z_center,
+    rail_groove_v_height=mgn_7h_rail_groove_v_height,
+    rail_groove_v_depth=mgn_7h_rail_groove_v_depth,
+    rail_groove_slot_height=mgn_7h_rail_groove_slot_height,
+    rail_groove_slot_depth=mgn_7h_rail_groove_slot_depth,
+    rail_top_fillet_radius=mgn_7h_rail_top_fillet_radius,
+    rail_bottom_chamfer_width=mgn_7h_rail_bottom_chamfer_width,
+    rail_bottom_chamfer_height=mgn_7h_rail_bottom_chamfer_height,
     rail_mock_clearance=mgn_7h_rail_mock_clearance,
     rail_mock_groove_clearance=mgn_7h_rail_mock_groove_clearance,
+    rail_mock_groove_height_clearance=mgn_7h_rail_mock_groove_height_clearance,
     carriage_length=mgn_7h_carriage_length,
     carriage_width=mgn_7h_carriage_width,
     carriage_height=mgn_7h_carriage_height,
@@ -381,8 +481,14 @@ def create_mgn7h_rail_with_carriage(
         rail_mount_hole_diameter=rail_mount_hole_diameter,
         rail_mount_counterbore_diameter=rail_mount_counterbore_diameter,
         rail_mount_counterbore_depth=rail_mount_counterbore_depth,
-        rail_side_relief_depth=rail_side_relief_depth,
-        rail_side_relief_height=rail_side_relief_height,
+        rail_groove_z_center=rail_groove_z_center,
+        rail_groove_v_height=rail_groove_v_height,
+        rail_groove_v_depth=rail_groove_v_depth,
+        rail_groove_slot_height=rail_groove_slot_height,
+        rail_groove_slot_depth=rail_groove_slot_depth,
+        rail_top_fillet_radius=rail_top_fillet_radius,
+        rail_bottom_chamfer_width=rail_bottom_chamfer_width,
+        rail_bottom_chamfer_height=rail_bottom_chamfer_height,
     )
     printable_rail = create_mgn7h_rail(
         length_mm=length_mm,
@@ -393,8 +499,16 @@ def create_mgn7h_rail_with_carriage(
         rail_mount_hole_diameter=rail_mount_hole_diameter,
         rail_mount_counterbore_diameter=rail_mount_counterbore_diameter,
         rail_mount_counterbore_depth=rail_mount_counterbore_depth,
-        rail_side_relief_depth=rail_side_relief_depth + rail_mock_groove_clearance,
-        rail_side_relief_height=rail_side_relief_height,
+        rail_groove_z_center=rail_groove_z_center - rail_mock_clearance,
+        rail_groove_v_height=rail_groove_v_height
+        + 2 * rail_mock_groove_height_clearance,
+        rail_groove_v_depth=rail_groove_v_depth + rail_mock_groove_clearance,
+        rail_groove_slot_height=rail_groove_slot_height
+        + 2 * rail_mock_groove_height_clearance,
+        rail_groove_slot_depth=rail_groove_slot_depth + rail_mock_groove_clearance,
+        rail_top_fillet_radius=rail_top_fillet_radius,
+        rail_bottom_chamfer_width=rail_bottom_chamfer_width,
+        rail_bottom_chamfer_height=rail_bottom_chamfer_height,
     )
     printable_rail = translate(0, rail_mock_clearance, rail_mock_clearance)(
         printable_rail

@@ -76,13 +76,27 @@ Parameters:
     Type: Float
   mgn7h_rail_mount_screw_size:
     Type: String
-  mgn7h_rail_side_relief_depth:
+  mgn7h_rail_groove_z_center:
     Type: Float
-  mgn7h_rail_side_relief_height:
+  mgn7h_rail_groove_v_height:
+    Type: Float
+  mgn7h_rail_groove_v_depth:
+    Type: Float
+  mgn7h_rail_groove_slot_height:
+    Type: Float
+  mgn7h_rail_groove_slot_depth:
+    Type: Float
+  mgn7h_rail_top_fillet_radius:
+    Type: Float
+  mgn7h_rail_bottom_chamfer_width:
+    Type: Float
+  mgn7h_rail_bottom_chamfer_height:
     Type: Float
   rail_mock_clearance:
     Type: Float
   rail_mock_groove_clearance:
+    Type: Float
+  rail_mock_groove_height_clearance:
     Type: Float
   mgn7h_carriage_length:
     Type: Float
