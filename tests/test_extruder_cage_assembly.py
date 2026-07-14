@@ -568,6 +568,7 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
             "part_fans": "part_fan_right_assembly",
             "extruder_cage": "extruder_cage_right_assembly",
             "extra_inject_parts": {
+                "mgn7h_rail_with_carriage": "mgn7h_rail_with_carriage_assembly",
                 "idex_tap_t1": "idex_tap_t1_assembly",
             },
             "part_fans_output": "part_fan_right_joined_assembly",
@@ -611,6 +612,7 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         for assembly_name in generation
     }
     for side, injected_context in expected_true_inputs.items():
+        expected_join = expected_joins[side]
         machined_mount = injected_context["tool_head_mount_machined"]
         sprite_extruder = injected_context["sprite_extruder"]
         cage = f"extruder_cage_{side}_assembly"

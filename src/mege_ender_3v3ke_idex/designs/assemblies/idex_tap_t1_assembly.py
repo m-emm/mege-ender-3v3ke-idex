@@ -228,7 +228,7 @@ def create_idex_tap_t1_assembly(
             tap.add_named_non_production_part(inset, name)
 
     for name, cutter in mgn7h_rail_with_carriage.get_named_cutter_items():
-        if name.startswith("carriage_mount_hole"):
+        if name.startswith("carriage_mount_hole_"):
 
             mount_screw = create_cylinder_screw("M2", carriage_mount_screw_length)
             mount_screw = rotate(-90, axis=[1, 0, 0])(mount_screw)

@@ -392,14 +392,47 @@ def join_part_fans_with_extruder_cage(
             )
             magnet_screw.add_named_cutter(magnet_screw_top_cutter, "top_cutter")
 
+            magnet_diameter = 6
+            magnet_height = 3
             magnet = create_cylinder(
-                6 / 2, 3
+                magnet_diameter / 2, magnet_height
             )  # cylindrical magnet, 6mm diameter, 3mm height
 
             magnet = align(magnet, magnet_screw, Alignment.CENTER)
-            magnet = align(magnet, magnet_screw, Alignment.STACK_TOP)
+            magnet = align(magnet, magnet_screw, Alignment.STACK_TOP,stack_gap=0.3)
 
             magnet_screw.add_named_non_production_part(magnet, "magnet")
+
+            magnet_holder = create_box(10, 10, 6.5)
+
+            magnet_holder_clearance = 0.1
+
+            magnet_holder_cutter = create_box(
+                magnet_diameter + 2*magnet_holder_clearance,
+                magnet_diameter + 2*magnet_holder_clearance,
+                magnet_height + 4*magnet_holder_clearance,
+            )
+
+            magnet_holder_cutter = align(magnet_holder_cutter, magnet_holder, Alignment.CENTER)
+            magnet_holder_cutter = align(magnet_holder_cutter, magnet_holder, Alignment.BOTTOM)
+
+            magnet_holder = magnet_holder.cut(magnet_holder_cutter)
+
+            magnet_holder = align(magnet_holder, magnet, Alignment.CENTER)
+            magnet_holder = align(magnet_holder, magnet, Alignment.BOTTOM)
+
+            magnet_screw.add_named_non_production_part(magnet_holder, "magnet_holder")
+
+            magnet_holder_cutter = materialize_bounding_box(
+                magnet_holder)
+            
+            magnet_screw.add_named_non_production_part(magnet_holder_cutter, "magnet_holder_cutter")
+
+
+
+
+
+
 
             magnet_screw = rotate(180 + 45, axis=[1, 0, 0])(magnet_screw)
 
@@ -411,7 +444,7 @@ def join_part_fans_with_extruder_cage(
                 magnet_screw, carriage, lr.stack_alignment, stack_gap=4
             )
 
-            magnet_screw = translate(0, 0, -4)(magnet_screw)
+            magnet_screw = translate(0, -0.5, -5)(magnet_screw)
 
             joined_extruder_cage.add_named_non_production_part(
                 magnet_screw.leader, f"magnet_screw_{lr.name}"
@@ -436,6 +469,15 @@ def join_part_fans_with_extruder_cage(
                     magnet_screw.get_named_non_production_part("magnet"),
                     f"magnet_{lr.name}",
                 )
+
+                magnet_screw_holder_cutter = magnet_screw.get_named_non_production_part(
+                    "magnet_holder_cutter"
+                )
+
+                joined_idex_tap_t1 = joined_idex_tap_t1.cut(magnet_screw_holder_cutter)
+                magnet_holder = magnet_screw.get_named_non_production_part("magnet_holder")
+                joined_idex_tap_t1 = joined_idex_tap_t1.fuse(magnet_holder)
+
 
     result = {
         "part_fans": joined_part_fans,
