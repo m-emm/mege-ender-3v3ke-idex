@@ -280,7 +280,7 @@ def join_part_fans_with_extruder_cage(
 
     if mgn7h_rail_with_carriage is not None:
         back_plate = materialize_bounding_box(
-            mgn7h_rail_with_carriage, y_size=2, x_enlargement=5
+            mgn7h_rail_with_carriage, y_size=3, x_enlargement=5
         )
         back_plate = align(back_plate, mgn7h_rail_with_carriage, Alignment.STACK_FRONT)
         joined_extruder_cage = joined_extruder_cage.cut(back_plate)
@@ -308,14 +308,21 @@ def join_part_fans_with_extruder_cage(
                 _logger.info(
                     f"Cutting extruder cage with {name}, bbox: {point_string(cutter_bbox[0])} to {point_string(cutter_bbox[1])}"
                 )
-                # joined_extruder_cage = joined_extruder_cage.cut(cutter)
                 back_plate = back_plate.cut(cutter)
 
-                joined_extruder_bbox_size_after_cut = get_bounding_box_size(
-                    joined_extruder_cage
-                )
-                _logger.info(
-                    f"Joined extruder cage bbox size after cut: {joined_extruder_bbox_size_after_cut}"
+                m2_nut_cutter = create_nut("M2", slack=0.3, no_hole=True)
+                m2_nut_cutter = rotate(90, axis=[1, 0, 0])(m2_nut_cutter)
+                m2_nut_cutter = align(m2_nut_cutter, cutter, Alignment.CENTER)
+                m2_nut_cutter = align(m2_nut_cutter, back_plate, Alignment.FRONT)
+                back_plate = back_plate.cut(m2_nut_cutter)
+
+                m2_nut = create_nut("M2")
+                m2_nut = rotate(90, axis=[1, 0, 0])(m2_nut)
+                m2_nut = align(m2_nut, m2_nut_cutter, Alignment.CENTER)
+                m2_nut = align(m2_nut, back_plate, Alignment.FRONT)
+
+                joined_extruder_cage.add_named_non_production_part(
+                    m2_nut, f"m2_nut_{name}"
                 )
 
             else:
