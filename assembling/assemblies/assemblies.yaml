@@ -423,7 +423,7 @@ placement:
     - part: mgn7h_rail_with_carriage_assembly
       to: sprite_extruder_right_assembly.non_production_parts.hotend
       alignment: STACK_TOP
-      stack_gap: -5
+      stack_gap: -1.5
 
     - rigid_group:
         - mgn7h_rail_with_carriage_assembly

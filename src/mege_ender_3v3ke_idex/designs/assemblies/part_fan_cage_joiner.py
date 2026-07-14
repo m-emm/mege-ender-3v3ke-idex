@@ -292,12 +292,14 @@ def join_part_fans_with_extruder_cage(
             z_enlargement=0.1,
         )
 
+        carriage = mgn7h_rail_with_carriage.get_named_follower("carriage")
+        carriage_size = get_bounding_box_size(carriage)
         joined_extruder_cage = joined_extruder_cage.cut(full_bbox_cutter)
         carriage_cutter = materialize_bounding_box(
-            mgn7h_rail_with_carriage.get_named_follower("carriage"),
-            x_enlargement=0.1,
-            y_enlargement=0.5,
-            z_enlargement=20,
+            carriage,
+            x_enlargement=0.8,
+            y_enlargement=0.6,
+            z_enlargement=18,
         )
         joined_extruder_cage = joined_extruder_cage.cut(carriage_cutter)
         for name, cutter in mgn7h_rail_with_carriage.get_named_cutter_items():
@@ -319,6 +321,12 @@ def join_part_fans_with_extruder_cage(
             else:
                 _logger.info(f"Skipping cutting extruder cage with {name}")
         joined_extruder_cage = joined_extruder_cage.fuse(back_plate)
+
+        bottom_stopper = materialize_bounding_box(
+            mgn7h_rail_with_carriage, z_size=2, y_enlargement=0.5,x_size=carriage_size[0] )
+        
+        bottom_stopper = align(bottom_stopper, mgn7h_rail_with_carriage, Alignment.STACK_BOTTOM)
+        joined_extruder_cage = joined_extruder_cage.fuse(bottom_stopper)
 
     return {
         "part_fans": joined_part_fans,
