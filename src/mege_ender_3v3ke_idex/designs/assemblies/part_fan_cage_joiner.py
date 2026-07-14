@@ -283,7 +283,12 @@ def join_part_fans_with_extruder_cage(
         joined_extruder_cage = joined_extruder_cage.cut(cutter)
         carriage_cutter = materialize_bounding_box(mgn7h_rail_with_carriage.get_named_follower("carriage"), x_enlargement=0.1, y_enlargement=0.1, z_enlargement=2)
         joined_extruder_cage = joined_extruder_cage.cut(carriage_cutter)
-        joined_extruder_cage = mgn7h_rail_with_carriage.use_as_cutter_on(joined_extruder_cage)
+        for name, cutter in mgn7h_rail_with_carriage.get_named_cutter_items():
+            if name.startswith("mount_hole_"):
+                joined_extruder_cage = joined_extruder_cage.cut(cutter)            
+    
+
+
 
     return {
         "part_fans": joined_part_fans,

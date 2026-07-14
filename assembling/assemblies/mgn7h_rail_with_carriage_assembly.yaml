@@ -46,19 +46,17 @@ Builder:
       - source: self
         artifact: leader
         name: rail
-        color: [0.74, 0.78, 0.82]
       - source: self
         artifact: followers
         names:
           - carriage
         name_template: "{name}"
-        color: [0.8, 0.84, 0.88]
       - source: self
         artifact: followers
         names:
           - rail_mockup_printable
         name: printable_mockup
-        color: [0.55, 0.72, 0.68]
+
   Production:
     parts:
       - source: self
@@ -84,64 +82,18 @@ Builder:
 Parameters:
   mgn7h_rail_length:
     Type: Float
-  mgn7h_rail_width:
+  mgn7h_rail_mount_hole_drill_extra_length:
     Type: Float
-  mgn7h_rail_height:
+  mgn7h_rail_mock_clearance:
     Type: Float
-  mgn7h_rail_mount_hole_pitch:
+  mgn7h_rail_mock_side_clearance:
     Type: Float
-  mgn7h_rail_mount_hole_end_offset:
+  mgn7h_rail_mock_top_clearance:
     Type: Float
-  mgn7h_rail_mount_hole_diameter:
+  mgn7h_rail_mock_groove_clearance:
     Type: Float
-  mgn7h_rail_mount_counterbore_diameter:
+  mgn7h_rail_mock_groove_height_clearance:
     Type: Float
-  mgn7h_rail_mount_counterbore_depth:
-    Type: Float
-  mgn7h_rail_mount_screw_size:
-    Type: String
-  mgn7h_rail_groove_z_center:
-    Type: Float
-  mgn7h_rail_groove_v_height:
-    Type: Float
-  mgn7h_rail_groove_v_depth:
-    Type: Float
-  mgn7h_rail_groove_slot_height:
-    Type: Float
-  mgn7h_rail_groove_slot_depth:
-    Type: Float
-  mgn7h_rail_top_fillet_radius:
-    Type: Float
-  mgn7h_rail_bottom_chamfer_width:
-    Type: Float
-  mgn7h_rail_bottom_chamfer_height:
-    Type: Float
-  rail_mock_clearance:
-    Type: Float
-  rail_mock_side_clearance:
-    Type: Float
-  rail_mock_top_clearance:
-    Type: Float
-  rail_mock_groove_clearance:
-    Type: Float
-  rail_mock_groove_height_clearance:
-    Type: Float
-  mgn7h_carriage_length:
-    Type: Float
-  mgn7h_carriage_width:
-    Type: Float
-  mgn7h_carriage_height:
-    Type: Float
-  mgn7h_carriage_h1_offset:
-    Type: Float
-  mgn7h_carriage_mount_hole_pitch_x:
-    Type: Float
-  mgn7h_carriage_mount_hole_pitch_y:
-    Type: Float
-  mgn7h_carriage_mount_hole_depth:
-    Type: Float
-  mgn7h_carriage_mount_screw_size:
-    Type: String
   mgn7h_carriage_rest_offset_on_rail:
     Type: Float
 

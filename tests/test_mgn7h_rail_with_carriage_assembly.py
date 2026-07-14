@@ -1,8 +1,12 @@
+import inspect
+
 import pytest
 import yaml
 from assembly_defaults import ASSEMBLIES_DIR, AssemblyDefaultsLoader, assembly_kwargs
 from mege_ender_3v3ke_idex.designs.assemblies.mgn7h_rail_with_carriage_assembly import (
     create_mgn7h_rail_with_carriage_assembly,
+    mgn_7h_rail_mount_hole_end_offset,
+    mgn_7h_rail_mount_hole_pitch,
 )
 from shellforgepy.simple import get_volume
 
@@ -36,6 +40,15 @@ def test_mgn7h_production_smoke_routes_printable_mockup():
     assert overrides["brim_type"] == "no_brim"
 
 
+def test_mgn7h_resource_parameters_match_generator_contract():
+    resource_parameters = set(_load_resource()["Parameters"])
+    generator_parameters = set(
+        inspect.signature(create_mgn7h_rail_with_carriage_assembly).parameters
+    )
+
+    assert resource_parameters == generator_parameters
+
+
 def test_mgn7h_assembly_smoke_builds_visible_and_printable_parts():
     kwargs = assembly_kwargs(create_mgn7h_rail_with_carriage_assembly)
     assembly = create_mgn7h_rail_with_carriage_assembly(**kwargs)
@@ -44,10 +57,8 @@ def test_mgn7h_assembly_smoke_builds_visible_and_printable_parts():
     assert get_volume(assembly.get_named_follower("carriage")) > 0
     assert get_volume(assembly.get_named_follower("rail_mockup_printable")) > 0
 
-    hole_span = (
-        kwargs["mgn7h_rail_length"] - 2 * kwargs["mgn7h_rail_mount_hole_end_offset"]
-    )
-    pitch_steps = hole_span / kwargs["mgn7h_rail_mount_hole_pitch"]
+    hole_span = kwargs["mgn7h_rail_length"] - 2 * mgn_7h_rail_mount_hole_end_offset
+    pitch_steps = hole_span / mgn_7h_rail_mount_hole_pitch
     assert pitch_steps == pytest.approx(round(pitch_steps))
 
     mounting_hole_names = [
