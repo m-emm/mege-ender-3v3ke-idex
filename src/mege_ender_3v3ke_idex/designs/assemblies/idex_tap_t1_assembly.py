@@ -67,10 +67,11 @@ def create_idex_tap_t1_assembly(
         idex_tap_frame_thickness,
         idex_tap_frame_height,
     )
-    rail_plate = align(rail_plate, mount_flange, Alignment.CENTER, axes=[0, 1])
-    rail_plate = align(rail_plate, mount_flange, Alignment.STACK_BOTTOM)
-    rail_plate = align(rail_plate, mgn7h_rail_with_carriage, Alignment.STACK_FRONT)
+    rail_plate = align(rail_plate, mgn7h_rail_with_carriage, Alignment.CENTER)
+    rail_plate = align(rail_plate, fixed_tool_head_mount, Alignment.STACK_BOTTOM)
+    rail_plate = align(rail_plate, mgn7h_rail_with_carriage, Alignment.STACK_BACK)
 
+    rail_plate = mgn7h_rail_with_carriage.use_as_cutter_on(rail_plate)
     fixed_frame = mount_flange # .fuse(rail_plate)
 
     fixed_mount_center = get_bounding_box_center(fixed_tool_head_mount.leader)
@@ -134,56 +135,11 @@ def create_idex_tap_t1_assembly(
         rail_mount_holes = rail_mount_holes.fuse(rail_hole)
         rail_mount_hole_z += mgn7h_rail_mount_hole_pitch
 
-    sensor_bracket = create_box(
-        idex_tap_sensor_bracket_width,
-        idex_tap_sensor_bracket_thickness,
-        idex_tap_sensor_bracket_height,
-    )
-    sensor_bracket = align(sensor_bracket, rail_plate, Alignment.CENTER, axes=[2])
-    sensor_bracket = align(sensor_bracket, rail_plate, Alignment.STACK_RIGHT)
-    sensor_bracket = align(sensor_bracket, rail_plate, Alignment.STACK_FRONT)
-    sensor_bracket = translate(
-        idex_tap_sensor_bracket_x_offset,
-        0,
-        idex_tap_sensor_bracket_z_offset,
-    )(sensor_bracket)
-
-    magnet_retainers = PartCollector()
-    magnets = PartCollector()
-    for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        retainer = create_box(
-            idex_tap_magnet_diameter + idex_tap_magnet_retainer_thickness,
-            idex_tap_magnet_diameter + idex_tap_magnet_retainer_thickness,
-            idex_tap_magnet_height + idex_tap_magnet_retainer_thickness,
-        )
-        retainer = align(retainer, rail_plate, Alignment.BOTTOM)
-        retainer = align(retainer, rail_plate, Alignment.STACK_FRONT)
-        retainer = align(retainer, rail_plate, lr)
-
-        magnet = create_cylinder(
-            idex_tap_magnet_diameter / 2,
-            idex_tap_magnet_height,
-        )
-        magnet = align(magnet, retainer, Alignment.CENTER)
-        magnet = align(magnet, retainer, Alignment.BOTTOM)
-        magnets = magnets.fuse(magnet)
-
-        magnet_cutter = create_cylinder(
-            idex_tap_magnet_diameter / 2 + idex_tap_magnet_retainer_clearance,
-            idex_tap_magnet_height,
-        )
-
-        magnet_cutter = align(magnet_cutter, magnet, Alignment.CENTER)
-        retainer = retainer.cut(magnet_cutter)
-        magnet_retainers = magnet_retainers.fuse(retainer)
 
 
     tap = LeaderFollowersCuttersPart(leader=fixed_frame)
     tap.add_named_follower(rail_plate, "idex_tap_rail_plate")
-    tap.add_named_follower(sensor_bracket, "idex_tap_sensor_bracket")
-    tap.add_named_follower(magnet_retainers, "idex_tap_magnet_retainers")
     tap.add_named_cutter(frame_mount_holes, "frame_mount_holes")
     tap.add_named_cutter(rail_mount_holes, "rail_mount_holes")
-    tap.add_named_non_production_part(magnets, "magnets")
 
     return tap

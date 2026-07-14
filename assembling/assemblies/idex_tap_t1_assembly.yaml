@@ -21,19 +21,10 @@ Builder:
         name: idex_tap_fixed_frame
 
       - source: self
-        artifact: followers
-        names:
-          - idex_tap_sensor_bracket
-          - idex_tap_down_stop
-          - idex_tap_overtravel_stop
-          - idex_tap_magnet_retainers
-        name_template: "{name}"
-
-      - source: self
-        artifact: non_production_parts
-        names:
-          - magnets
-        name_template: "{name}"
+        artifact: all
+        
+        name_template: "{default_name}_{name}"
+      
       - source: injected
         assembly: fixed_tool_head_mount
         artifact: all
@@ -48,6 +39,9 @@ Builder:
         assembly: x_axis_carriage
         artifact: leader
         name: carriage
+      - source: injected
+        assembly: mgn7h_rail_with_carriage
+        artifact: all        
 
   Production:
     parts:

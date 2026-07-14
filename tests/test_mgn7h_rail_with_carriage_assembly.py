@@ -61,9 +61,23 @@ def test_mgn7h_assembly_smoke_builds_visible_and_printable_parts():
     pitch_steps = hole_span / mgn_7h_rail_mount_hole_pitch
     assert pitch_steps == pytest.approx(round(pitch_steps))
 
-    mounting_hole_names = [
+    cutter_names = {name for name, _part in assembly.get_named_cutter_items()}
+
+    rail_mount_hole_names = [
         name
-        for name, _part in assembly.get_named_cutter_items()
-        if name.startswith("mounting_hole_")
+        for name in cutter_names
+        if name.startswith("rail_mount_hole_")
     ]
-    assert len(mounting_hole_names) == int(round(pitch_steps)) + 1
+    carriage_mount_hole_names = [
+        name
+        for name in cutter_names
+        if name.startswith("carriage_mount_hole_")
+    ]
+
+    assert "rail_mount_holes" in cutter_names
+    assert "carriage_mount_holes" in cutter_names
+    assert len(rail_mount_hole_names) == int(round(pitch_steps)) + 1
+    assert len(carriage_mount_hole_names) == 4
+    assert not any(
+        name.startswith(("mounting_hole_", "mount_hole_")) for name in cutter_names
+    )

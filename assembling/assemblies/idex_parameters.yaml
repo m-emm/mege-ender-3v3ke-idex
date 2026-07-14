@@ -1358,7 +1358,7 @@ globals:
 
   idex_tap_frame_width: 72
   idex_tap_frame_height: 58
-  idex_tap_frame_thickness: 6
+  idex_tap_frame_thickness: 4
   idex_tap_frame_mount_flange_depth: 34
   idex_tap_frame_mount_flange_thickness: 5
   idex_tap_frame_mount_screw_size: "M3"

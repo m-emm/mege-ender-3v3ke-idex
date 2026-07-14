@@ -47,11 +47,12 @@ def create_extruder_cage_right_assembly(
     tool_head_mount_machined_bbox = get_bounding_box(tool_head_mount_machined)
     tool_head_mount_machined_max_x = tool_head_mount_machined_bbox[1][0]
     tool_head_mount_machined_min_x = tool_head_mount_machined_bbox[0][0]
+    sprite_extruder_min_x = sprite_extruder_bbox[0][0]
 
     sprite_extruder_max_x = sprite_extruder_bbox[1][0]
     sprite_mount_base_plate_width = (
         sprite_extruder_max_x
-        - tool_head_mount_machined_min_x
+        - sprite_extruder_min_x
         + extruder_cage_flange_thickness
     )
 
@@ -61,35 +62,7 @@ def create_extruder_cage_right_assembly(
         tool_head_mount_base_plate_height,
     )
 
-    cutter_size = tool_head_mount_base_plate_height * 0.7
-    sprite_mount_base_plate_cutter = create_right_triangle(
-        cutter_size,
-        cutter_size,
-        2 * extruder_mount_base_plate_thickness,
-        extrusion_direction=(0, 1, 0),
-        a_normal=(-1, 0, 0),
-        b_normal=(0, 0, 1),
-    )
 
-    sprite_mount_base_plate_cutter = align(
-        sprite_mount_base_plate_cutter,
-        sprite_mount_base_plate,
-        Alignment.CENTER,
-    )
-    sprite_mount_base_plate_cutter = align(
-        sprite_mount_base_plate_cutter,
-        sprite_mount_base_plate,
-        Alignment.LEFT,
-    )
-    sprite_mount_base_plate_cutter = align(
-        sprite_mount_base_plate_cutter,
-        sprite_mount_base_plate,
-        Alignment.BOTTOM,
-    )
-
-    sprite_mount_base_plate = sprite_mount_base_plate.cut(
-        sprite_mount_base_plate_cutter
-    )
 
     sprite_mount_base_plate = align(
         sprite_mount_base_plate,
@@ -109,7 +82,7 @@ def create_extruder_cage_right_assembly(
 
     sprite_mount_base_plate = align(
         sprite_mount_base_plate,
-        tool_head_mount_machined,
+        sprite_extruder,
         Alignment.LEFT,
     )
     sprite_mount_base_plate = sprite_extruder.use_as_cutter_on(sprite_mount_base_plate)
@@ -569,7 +542,7 @@ def create_extruder_cage_right_assembly(
     
     flange_part = flange_part.cut(flange_top_cutter)
 
-    cage_leader = cage_leader.fuse(flange_part)
+    # cage_leader = cage_leader.fuse(flange_part)
 
     cage_leader = sprite_extruder.use_as_cutter_on(cage_leader)
     for cutter in nitehawk_cutters.values():

@@ -45,18 +45,22 @@ def create_mgn7h_carriage():
     )
 
     holes = LeaderFollowersCuttersPart(PartCollector())
-    for x in [
-        -mgn_7h_carriage_mount_hole_pitch_x / 2,
-        mgn_7h_carriage_mount_hole_pitch_x / 2,
-    ]:
+    mount_hole_positions = [
+        (x, y)
+        for x in [
+            -mgn_7h_carriage_mount_hole_pitch_x / 2,
+            mgn_7h_carriage_mount_hole_pitch_x / 2,
+        ]
         for y in [
             -mgn_7h_carriage_mount_hole_pitch_y / 2,
             mgn_7h_carriage_mount_hole_pitch_y / 2,
-        ]:
-            hole = create_cylinder(screw_hole_diameter / 2, mgn_7h_carriage_height)
-            hole = translate(x, y, 0)(hole)
-            holes.add_named_follower(hole, f"mount_hole_{x}_{y}")
-            holes = holes.fuse(hole)
+        ]
+    ]
+    for index, (x, y) in enumerate(mount_hole_positions, start=1):
+        hole = create_cylinder(screw_hole_diameter / 2, mgn_7h_carriage_height)
+        hole = translate(x, y, 0)(hole)
+        holes.add_named_follower(hole, f"carriage_mount_hole_{index}")
+        holes = holes.fuse(hole)
 
     holes = align(holes, carriage, Alignment.CENTER)
     holes = align(
@@ -66,15 +70,13 @@ def create_mgn7h_carriage():
         stack_gap=-mgn_7h_carriage_mount_hole_depth,
     )
 
-    individual_holes = [follower for _, follower in holes.get_named_follower_items()]
-
     carriage = carriage.cut(holes.leader)
 
     carriage = LeaderFollowersCuttersPart(carriage)
-    carriage.add_named_cutter(holes.leader, "mount_holes")
-    for index, hole in enumerate(individual_holes):
-        carriage.add_named_cutter(hole, f"mount_hole_{index + 1}")
-    carriage.add_named_follower(carriage.leader, "body")
+    carriage.add_named_cutter(holes.leader, "carriage_mount_holes")
+    for name, hole in holes.get_named_follower_items():
+        carriage.add_named_cutter(hole, name)
+    carriage.add_named_follower(carriage.leader, "carriage_body")
 
     carriage = translate(0, 0, mgn_7h_carriage_h1_offset)(carriage)
 
@@ -140,12 +142,12 @@ def create_mgn7h_rail(
             profile_cutters.append(chamfer)
             profile_cutter_names.append(name)
 
-    holes_fused = PartCollector()
-    holes_list = []
-    last_hole_x = length_mm - mgn_7h_rail_mount_hole_end_offset
-    hole_x = mgn_7h_rail_mount_hole_end_offset
+    holes = LeaderFollowersCuttersPart(PartCollector())
+    rail_mount_hole_span = length_mm - 2 * mgn_7h_rail_mount_hole_end_offset
+    hole_x = 0
+    hole_index = 1
 
-    while hole_x <= last_hole_x + 1e-6:
+    while hole_x <= rail_mount_hole_span + 1e-6:
         top_hole = create_cylinder(
             mgn_7h_rail_mount_counterbore_diameter / 2,
             mgn_7h_rail_mount_counterbore_depth,
@@ -162,27 +164,17 @@ def create_mgn7h_rail(
         bottom_hole = align(bottom_hole, top_hole, Alignment.STACK_BOTTOM)
 
         current_hole = top_hole.fuse(bottom_hole)
-        holes_list.append(current_hole)
-        holes_fused = holes_fused.fuse(current_hole)
+        holes.add_named_follower(current_hole, f"rail_mount_hole_{hole_index}")
+        holes = holes.fuse(current_hole)
         hole_x += mgn_7h_rail_mount_hole_pitch
+        hole_index += 1
 
-    holes_aligned = []
-    if holes_list:
-        hole_aligner = align_translation(holes_fused, rail, Alignment.CENTER)
-        holes_aligned = [hole_aligner(hole) for hole in holes_list]
-        holes_aligned_fused = PartCollector()
-        for hole in holes_aligned:
-            holes_aligned_fused = holes_aligned_fused.fuse(hole)
-
-        holes_top_aligner = align_translation(
-            holes_aligned_fused,
-            rail,
-            Alignment.TOP,
-        )
-        holes_aligned = [holes_top_aligner(hole) for hole in holes_aligned]
-
-        for hole in holes_aligned:
-            rail = rail.cut(hole)
+    rail_mount_holes = []
+    if hole_index > 1:
+        holes = align(holes, rail, Alignment.CENTER, axes=[0, 1])
+        holes = align(holes, rail, Alignment.TOP)
+        rail = rail.cut(holes.leader)
+        rail_mount_holes = holes.get_named_follower_items()
 
     if rail_groove_v_depth > 0 and rail_groove_v_height > 0:
         groove_v_convergence_depth = rail_groove_v_depth
@@ -268,8 +260,10 @@ def create_mgn7h_rail(
 
     rail = LeaderFollowersCuttersPart(rail)
     rail.add_named_follower(rail.leader, "rail_body")
-    for index, hole in enumerate(holes_aligned):
-        rail.add_named_cutter(hole, f"mounting_hole_{index + 1}")
+    if rail_mount_holes:
+        rail.add_named_cutter(holes.leader, "rail_mount_holes")
+    for name, hole in rail_mount_holes:
+        rail.add_named_cutter(hole, name)
     return rail
 
 
@@ -288,7 +282,9 @@ def create_mgn7h_rail_with_carriage(
 
     rail = create_mgn7h_rail(
         length_mm=length_mm,
-        mgn7h_rail_mount_hole_drill_extra_length=mgn7h_rail_mount_hole_drill_extra_length
+        mgn7h_rail_mount_hole_drill_extra_length=(
+            mgn7h_rail_mount_hole_drill_extra_length
+        ),
     )
     printable_rail = create_mgn7h_rail(
         length_mm=length_mm,
@@ -321,7 +317,6 @@ def create_mgn7h_rail_with_carriage(
     carriage = create_mgn7h_carriage()
     carriage = align(carriage, rail, Alignment.CENTER, axes=[0, 1])
     carriage = translate(carriage_offset, 0, 0)(carriage)
-    carriage = carriage.prefixed_copy("carriage")
 
     rail.add_named_follower(carriage.leader, name="carriage")
     rail = rail.merge_except_leader(carriage)
