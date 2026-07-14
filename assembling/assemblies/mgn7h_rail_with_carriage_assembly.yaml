@@ -56,6 +56,9 @@ Builder:
         names:
           - rail_mockup_printable
         name: printable_mockup
+      - source: self
+        artifact: cutters
+        name_template: "{name}"
 
   Production:
     parts:
@@ -93,6 +96,8 @@ Parameters:
   mgn7h_rail_mock_groove_clearance:
     Type: Float
   mgn7h_rail_mock_groove_height_clearance:
+    Type: Float
+  mgn7h_carriage_mount_hole_drill_extra_length:
     Type: Float
   mgn7h_carriage_rest_offset_on_rail:
     Type: Float

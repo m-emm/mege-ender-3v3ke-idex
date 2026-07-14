@@ -3,7 +3,6 @@
 from shellforgepy.metrics import record_length_metric
 from shellforgepy.simple import *
 
-
 mgn_7h_rail_width = 7
 mgn_7h_rail_height = 4.8
 mgn_7h_rail_mount_hole_pitch = 15
@@ -31,7 +30,7 @@ mgn_7h_carriage_mount_hole_depth = 3
 mgn_7h_carriage_mount_screw_size = "M2"
 
 
-def create_mgn7h_carriage():
+def create_mgn7h_carriage(*, mgn7h_carriage_mount_hole_drill_extra_length):
     """Create an MGN7H carriage reference part."""
 
     screw_hole_diameter = MScrew.from_size(
@@ -57,7 +56,10 @@ def create_mgn7h_carriage():
         ]
     ]
     for index, (x, y) in enumerate(mount_hole_positions, start=1):
-        hole = create_cylinder(screw_hole_diameter / 2, mgn_7h_carriage_height)
+        hole = create_cylinder(
+            screw_hole_diameter / 2,
+            mgn_7h_carriage_height + mgn7h_carriage_mount_hole_drill_extra_length,
+        )
         hole = translate(x, y, 0)(hole)
         holes.add_named_follower(hole, f"carriage_mount_hole_{index}")
         holes = holes.fuse(hole)
@@ -276,6 +278,7 @@ def create_mgn7h_rail_with_carriage(
     mgn7h_rail_mock_top_clearance,
     mgn7h_rail_mock_groove_clearance,
     mgn7h_rail_mock_groove_height_clearance,
+    mgn7h_carriage_mount_hole_drill_extra_length,
     carriage_offset,
 ):
     """Create an MGN7H rail assembly with a built-in carriage follower."""
@@ -296,8 +299,7 @@ def create_mgn7h_rail_with_carriage(
         rail_height=mgn_7h_rail_height
         - 2 * mgn7h_rail_mock_clearance
         - mgn7h_rail_mock_top_clearance,
-        rail_groove_z_center=mgn_7h_rail_groove_z_center
-        - mgn7h_rail_mock_clearance,
+        rail_groove_z_center=mgn_7h_rail_groove_z_center - mgn7h_rail_mock_clearance,
         rail_groove_v_height=mgn_7h_rail_groove_v_height
         + 2 * mgn7h_rail_mock_groove_height_clearance,
         rail_groove_v_depth=mgn_7h_rail_groove_v_depth
@@ -314,7 +316,11 @@ def create_mgn7h_rail_with_carriage(
     )(printable_rail)
     rail.add_named_follower(printable_rail.leader, "rail_mockup_printable")
 
-    carriage = create_mgn7h_carriage()
+    carriage = create_mgn7h_carriage(
+        mgn7h_carriage_mount_hole_drill_extra_length=(
+            mgn7h_carriage_mount_hole_drill_extra_length
+        ),
+    )
     carriage = align(carriage, rail, Alignment.CENTER, axes=[0, 1])
     carriage = translate(carriage_offset, 0, 0)(carriage)
 
@@ -333,6 +339,7 @@ def create_mgn7h_rail_with_carriage_assembly(
     mgn7h_rail_mock_top_clearance,
     mgn7h_rail_mock_groove_clearance,
     mgn7h_rail_mock_groove_height_clearance,
+    mgn7h_carriage_mount_hole_drill_extra_length,
     mgn7h_carriage_rest_offset_on_rail,
 ):
     """Create an MGN7H rail leader with a named built-in carriage follower."""
@@ -351,5 +358,8 @@ def create_mgn7h_rail_with_carriage_assembly(
         mgn7h_rail_mock_groove_clearance=mgn7h_rail_mock_groove_clearance,
         mgn7h_rail_mock_groove_height_clearance=(
             mgn7h_rail_mock_groove_height_clearance
+        ),
+        mgn7h_carriage_mount_hole_drill_extra_length=(
+            mgn7h_carriage_mount_hole_drill_extra_length
         ),
     )

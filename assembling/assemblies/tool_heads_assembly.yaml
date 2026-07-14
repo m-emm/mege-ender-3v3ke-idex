@@ -252,7 +252,7 @@ Builder:
             - { $ref: x_axis_x_travel_negative }
             - 0
             - 0
-        
+
         name_template: "{default_name}_{name}"
         # animation:
         #   x_carriage_2:

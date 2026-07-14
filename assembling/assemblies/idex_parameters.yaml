@@ -306,7 +306,7 @@ globals:
   x_axis_carriage_z_offset:
     $ref: x_axis_carriage_height
   x_axis_sprite_extruder_tool_head_mount_x_offset: 4.25
-  x_axis_sprite_extruder_tool_head_mount_y_offset: -20
+  x_axis_sprite_extruder_tool_head_mount_y_offset: -22
   x_axis_sprite_extruder_tool_head_mount_z_offset: -25.55
   x_axis_carriage_stopper_width: 12
   x_axis_carriage_stopper_thickness: 8
@@ -1337,6 +1337,7 @@ globals:
   mgn7h_carriage_mount_hole_pitch_x: 20
   mgn7h_carriage_mount_hole_pitch_y: 8
   mgn7h_carriage_mount_hole_depth: 3
+  mgn7h_carriage_mount_hole_drill_extra_length: 20
   mgn7h_carriage_mount_screw_size: "M2"
   mgn7h_carriage_rest_offset_on_rail: 0
 
@@ -1365,7 +1366,7 @@ globals:
   idex_tap_shuttle_height: 30
   idex_tap_shuttle_thickness: 2.3
   idex_tap_shuttle_carriage_screw_size: "M2"
-  idex_tap_trigger_lift: 0.4
+  idex_tap_trigger_lift: 1.0
   idex_tap_total_travel: 1.4
   idex_tap_trigger_flag_thickness: 0.8
   idex_tap_trigger_flag_width: 3.0

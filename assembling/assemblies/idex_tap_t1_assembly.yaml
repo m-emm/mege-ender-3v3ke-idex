@@ -22,9 +22,9 @@ Builder:
 
       - source: self
         artifact: all
-        
+
         name_template: "{default_name}_{name}"
-      
+
       - source: injected
         assembly: fixed_tool_head_mount
         artifact: all
@@ -41,7 +41,7 @@ Builder:
         name: carriage
       - source: injected
         assembly: mgn7h_rail_with_carriage
-        artifact: all        
+        artifact: all
 
   Production:
     parts:

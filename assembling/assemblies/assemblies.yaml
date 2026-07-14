@@ -419,7 +419,7 @@ placement:
       to: sprite_extruder_right_assembly
       alignment: STACK_BACK
       stack_gap: 2
-      
+
     - part: mgn7h_rail_with_carriage_assembly
       to: sprite_extruder_right_assembly.non_production_parts.hotend
       alignment: STACK_TOP
@@ -428,7 +428,6 @@ placement:
     - rigid_group:
         - mgn7h_rail_with_carriage_assembly
       to: sprite_extruder_right_assembly
-
 
     - part: opb991t11z_sensor_assembly
       to: mgn7h_rail_with_carriage_assembly

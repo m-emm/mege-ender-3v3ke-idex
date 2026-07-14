@@ -33,7 +33,6 @@ def create_extruder_cage_right_assembly(
 
     _ = tool_head_mount_machined
 
-
     tap_top_travel = 1.2
 
     extruder_size = get_bounding_box_size(sprite_extruder)
@@ -51,18 +50,16 @@ def create_extruder_cage_right_assembly(
 
     sprite_extruder_max_x = sprite_extruder_bbox[1][0]
     sprite_mount_base_plate_width = (
-        sprite_extruder_max_x
-        - sprite_extruder_min_x
-        + extruder_cage_flange_thickness
+        sprite_extruder_max_x - sprite_extruder_min_x + extruder_cage_flange_thickness
     )
 
-    sprite_mount_base_plate = create_box(
+    sprite_mount_base_plate = create_filleted_box(
         sprite_mount_base_plate_width,
         extruder_mount_base_plate_thickness,
         tool_head_mount_base_plate_height,
+        fillet_radius=8,
+        no_fillets_at=[Alignment.FRONT, Alignment.BACK, Alignment.BOTTOM],
     )
-
-
 
     sprite_mount_base_plate = align(
         sprite_mount_base_plate,
@@ -532,14 +529,17 @@ def create_extruder_cage_right_assembly(
     cage_leader = cage_leader.fuse(right_mount_plate)
     cage_leader = cage_leader.fuse(back_strips)
 
-
     flange_part = flange_connector.fuse(left_flange).fuse(right_flange)
 
-
-    flange_top_cutter = create_box(BIG_THING, BIG_THING,BIG_THING)
+    flange_top_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
     flange_top_cutter = align(flange_top_cutter, sprite_extruder, Alignment.CENTER)
-    flange_top_cutter = align(flange_top_cutter, sprite_extruder, Alignment.STACK_TOP, stack_gap=tap_top_travel)
-    
+    flange_top_cutter = align(
+        flange_top_cutter,
+        sprite_extruder,
+        Alignment.STACK_TOP,
+        stack_gap=tap_top_travel,
+    )
+
     flange_part = flange_part.cut(flange_top_cutter)
 
     # cage_leader = cage_leader.fuse(flange_part)

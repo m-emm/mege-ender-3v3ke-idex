@@ -47,7 +47,6 @@ def create_idex_tap_t1_shuttle_assembly(
     shuttle = align(shuttle, carriage, Alignment.CENTER)
     shuttle = align(shuttle, carriage, Alignment.STACK_BACK)
 
-
     shuttle_mount_screw = MScrew.from_size(idex_tap_shuttle_carriage_screw_size)
     shuttle_holes = PartCollector()
     for x_offset in [
@@ -68,7 +67,6 @@ def create_idex_tap_t1_shuttle_assembly(
             shuttle = shuttle.cut(shuttle_hole)
             shuttle_holes = shuttle_holes.fuse(shuttle_hole)
 
-
     shuttle_part = LeaderFollowersCuttersPart(leader=shuttle)
     # shuttle_part.add_named_follower(carriage_plate, "idex_tap_carriage_plate")
     shuttle_part.add_named_cutter(shuttle_holes, "shuttle_carriage_mount_holes")
@@ -76,6 +74,5 @@ def create_idex_tap_t1_shuttle_assembly(
     #     moving_magnet_targets,
     #     "moving_magnet_targets",
     # )
-
 
     return shuttle_part

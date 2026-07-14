@@ -136,7 +136,7 @@ def join_part_fans_with_extruder_cage(
     screw_size="M3",
     clearance_type="loose",
     fillet_radius=0.0,
-    mgn7h_rail_with_carriage=None
+    mgn7h_rail_with_carriage=None,
 ):
     """Return joined output assemblies for a part fan and extruder cage pair."""
 
@@ -279,31 +279,46 @@ def join_part_fans_with_extruder_cage(
         joined_extruder_cage = joined_extruder_cage.fuse(left_bridge_mount_eye)
 
     if mgn7h_rail_with_carriage is not None:
-        back_plate = materialize_bounding_box(mgn7h_rail_with_carriage, y_size = 2, x_enlargement=5)
+        back_plate = materialize_bounding_box(
+            mgn7h_rail_with_carriage, y_size=2, x_enlargement=5
+        )
         back_plate = align(back_plate, mgn7h_rail_with_carriage, Alignment.STACK_FRONT)
         joined_extruder_cage = joined_extruder_cage.cut(back_plate)
 
-        full_bbox_cutter = materialize_bounding_box(mgn7h_rail_with_carriage, x_enlargement=0.1, y_enlargement=0.1, z_enlargement=0.1)
+        full_bbox_cutter = materialize_bounding_box(
+            mgn7h_rail_with_carriage,
+            x_enlargement=0.1,
+            y_enlargement=0.1,
+            z_enlargement=0.1,
+        )
 
         joined_extruder_cage = joined_extruder_cage.cut(full_bbox_cutter)
-        carriage_cutter = materialize_bounding_box(mgn7h_rail_with_carriage.get_named_follower("carriage"), x_enlargement=0.1, y_enlargement=0.5, z_enlargement=20)
+        carriage_cutter = materialize_bounding_box(
+            mgn7h_rail_with_carriage.get_named_follower("carriage"),
+            x_enlargement=0.1,
+            y_enlargement=0.5,
+            z_enlargement=20,
+        )
         joined_extruder_cage = joined_extruder_cage.cut(carriage_cutter)
         for name, cutter in mgn7h_rail_with_carriage.get_named_cutter_items():
             if name.startswith("rail_mount_hole_"):
                 cutter_bbox = get_bounding_box(cutter)
-                _logger.info(f"Cutting extruder cage with {name}, bbox: {point_string(cutter_bbox[0])} to {point_string(cutter_bbox[1])}")
+                _logger.info(
+                    f"Cutting extruder cage with {name}, bbox: {point_string(cutter_bbox[0])} to {point_string(cutter_bbox[1])}"
+                )
                 # joined_extruder_cage = joined_extruder_cage.cut(cutter)
                 back_plate = back_plate.cut(cutter)
 
-                joined_extruder_bbox_size_after_cut = get_bounding_box_size(joined_extruder_cage)
-                _logger.info(f"Joined extruder cage bbox size after cut: {joined_extruder_bbox_size_after_cut}")
+                joined_extruder_bbox_size_after_cut = get_bounding_box_size(
+                    joined_extruder_cage
+                )
+                _logger.info(
+                    f"Joined extruder cage bbox size after cut: {joined_extruder_bbox_size_after_cut}"
+                )
 
             else:
                 _logger.info(f"Skipping cutting extruder cage with {name}")
         joined_extruder_cage = joined_extruder_cage.fuse(back_plate)
-
-
-
 
     return {
         "part_fans": joined_part_fans,
