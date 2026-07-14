@@ -389,6 +389,15 @@ def join_part_fans_with_extruder_cage(
             )
             magnet_screw.add_named_cutter(magnet_screw_top_cutter, "top_cutter")
 
+            magnet = create_cylinder(
+                6 / 2, 3
+            )  # cylindrical magnet, 6mm diameter, 3mm height
+
+            magnet = align(magnet, magnet_screw, Alignment.CENTER)
+            magnet = align(magnet, magnet_screw, Alignment.STACK_TOP)
+
+            magnet_screw.add_named_non_production_part(magnet, "magnet")
+
             magnet_screw = rotate(180 + 45, axis=[1, 0, 0])(magnet_screw)
 
             magnet_screw = align(magnet_screw, carriage, Alignment.CENTER)
@@ -420,6 +429,10 @@ def join_part_fans_with_extruder_cage(
                 if name in ["thread_hole_cutter"]:
                     joined_extruder_cage = joined_extruder_cage.cut(cutter)
 
+            joined_extruder_cage.add_named_non_production_part(
+                magnet_screw.get_named_non_production_part("magnet"),
+                f"magnet_{lr.name}",
+            )
     return {
         "part_fans": joined_part_fans,
         "extruder_cage": joined_extruder_cage,
