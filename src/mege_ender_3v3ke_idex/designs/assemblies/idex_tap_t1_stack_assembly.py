@@ -1,4 +1,4 @@
-"""Focused inspection scene for the T1 Tap fixed frame, rail, and shuttle."""
+"""Focused inspection scene for the T1 Tap fixed frame, rail, and joined Tap."""
 
 from shellforgepy.simple import *
 

@@ -429,14 +429,6 @@ placement:
         - mgn7h_rail_with_carriage_assembly
       to: sprite_extruder_right_assembly
 
-    - part: opb991t11z_sensor_assembly
-      to: mgn7h_rail_with_carriage_assembly
-      alignment: CENTER
-      axes: [0, 2]
-    - part: opb991t11z_sensor_assembly
-      to: mgn7h_rail_with_carriage_assembly
-      alignment: STACK_FRONT
-
     - rigid_group:
         - tool_head_cable_attach_shield_left_assembly
       to: tool_head_mount_machined_bottom_assembly
@@ -870,9 +862,11 @@ placement:
       to: sprite_extruder_right_assembly
 
     - rigid_group:
-        - opb991t11z_sensor_assembly
         - idex_tap_t1_assembly
-        - idex_tap_t1_shuttle_assembly
+      to: sprite_extruder_right_assembly
+
+    - rigid_group:
+        - idex_tap_t1_joined_assembly
       to: sprite_extruder_right_assembly
 
     - rigid_group:
@@ -3383,10 +3377,8 @@ assemblies:
       - part_fan_right_joined_assembly
       - tool_head_mount_machined_bottom_assembly
       - tool_head_mount_machined_top_assembly
-      - idex_tap_t1_assembly
-      - idex_tap_t1_shuttle_assembly
+      - idex_tap_t1_joined_assembly
       - mgn7h_rail_with_carriage_assembly
-      - opb991t11z_sensor_assembly
       - tool_head_cable_attach_shield_left_assembly
       - tool_head_cable_attach_shield_right_assembly
       - x_axis_belt_carriage_bottom_assembly
@@ -3457,10 +3449,8 @@ assemblies:
       part_fan_right: part_fan_right_joined_assembly
       tool_head_mount_machined_bottom: tool_head_mount_machined_bottom_assembly
       tool_head_mount_machined_top: tool_head_mount_machined_top_assembly
-      idex_tap_t1: idex_tap_t1_assembly
-      idex_tap_t1_shuttle: idex_tap_t1_shuttle_assembly
+      idex_tap_t1: idex_tap_t1_joined_assembly
       mgn7h_rail_with_carriage: mgn7h_rail_with_carriage_assembly
-      opb991t11z_sensor: opb991t11z_sensor_assembly
       tool_head_cable_attach_shield_left: tool_head_cable_attach_shield_left_assembly
       tool_head_cable_attach_shield_right: tool_head_cable_attach_shield_right_assembly
       x_axis_belt_carriage_bottom: x_axis_belt_carriage_bottom_assembly
@@ -3493,10 +3483,8 @@ assemblies:
       - part_fan_right_joined_assembly
       - tool_head_mount_machined_bottom_assembly
       - tool_head_mount_machined_top_assembly
-      - idex_tap_t1_assembly
-      - idex_tap_t1_shuttle_assembly
+      - idex_tap_t1_joined_assembly
       - mgn7h_rail_with_carriage_assembly
-      - opb991t11z_sensor_assembly
       - tool_head_cable_attach_shield_left_assembly
       - tool_head_cable_attach_shield_right_assembly
       - x_axis_belt_carriage_bottom_assembly
@@ -3521,10 +3509,8 @@ assemblies:
       part_fan_right: part_fan_right_joined_assembly
       tool_head_mount_machined_bottom: tool_head_mount_machined_bottom_assembly
       tool_head_mount_machined_top: tool_head_mount_machined_top_assembly
-      idex_tap_t1: idex_tap_t1_assembly
-      idex_tap_t1_shuttle: idex_tap_t1_shuttle_assembly
+      idex_tap_t1: idex_tap_t1_joined_assembly
       mgn7h_rail_with_carriage: mgn7h_rail_with_carriage_assembly
-      opb991t11z_sensor: opb991t11z_sensor_assembly
       tool_head_cable_attach_shield_left: tool_head_cable_attach_shield_left_assembly
       tool_head_cable_attach_shield_right: tool_head_cable_attach_shield_right_assembly
       x_axis_belt_carriage_bottom: x_axis_belt_carriage_bottom_assembly
@@ -3794,10 +3780,12 @@ assemblies:
       part_fans: part_fan_right_assembly
       extruder_cage: extruder_cage_right_assembly
       mgn7h_rail_with_carriage: mgn7h_rail_with_carriage_assembly
+      idex_tap_t1: idex_tap_t1_assembly
 
     outputs:
       part_fans: part_fan_right_joined_assembly
       extruder_cage: extruder_cage_right_joined_assembly
+      idex_tap_t1: idex_tap_t1_joined_assembly
 
   - name: x_axis_belt_carriage_bottom_assembly
 
@@ -3860,33 +3848,13 @@ assemblies:
       x_axis_carriage: x_axis_right_carriage_assembly
       mgn7h_rail_with_carriage: mgn7h_rail_with_carriage_assembly
 
-  - name: idex_tap_t1_shuttle_assembly
-
-    resource_file: idex_tap_t1_shuttle_assembly.yaml
-    depends_on:
-      - tool_head_mount_machined_top_assembly
-      - mgn7h_rail_with_carriage_assembly
-      - idex_tap_t1_assembly
-      - x_axis_rail_assembly
-      - x_axis_right_carriage_assembly
-      - sprite_extruder_right_assembly
-      - extruder_cage_right_assembly
-
-    inject_parts:
-      fixed_tool_head_mount: tool_head_mount_machined_top_assembly
-      mgn7h_rail_with_carriage: mgn7h_rail_with_carriage_assembly
-      idex_tap_t1: idex_tap_t1_assembly
-      sprite_extruder_right: sprite_extruder_right_assembly
-      extruder_cage_right: extruder_cage_right_assembly
-
   - name: idex_tap_t1_stack_assembly
 
     resource_file: idex_tap_t1_stack_assembly.yaml
     depends_on:
       - tool_head_mount_machined_top_assembly
-      - idex_tap_t1_assembly
+      - idex_tap_t1_joined_assembly
       - mgn7h_rail_with_carriage_assembly
-      - idex_tap_t1_shuttle_assembly
       - sprite_extruder_right_assembly
     parameters:
       idex_tap_total_travel: !Ref idex_tap_total_travel

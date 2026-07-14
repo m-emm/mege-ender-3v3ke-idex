@@ -6,9 +6,6 @@ from assembly_defaults import ASSEMBLIES_DIR, AssemblyDefaultsLoader, assembly_k
 from mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t1_assembly import (
     create_idex_tap_t1_assembly,
 )
-from mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t1_shuttle_assembly import (
-    create_idex_tap_t1_shuttle_assembly,
-)
 from mege_ender_3v3ke_idex.designs.assemblies.mgn7h_rail_with_carriage_assembly import (
     create_mgn7h_rail_with_carriage_assembly,
 )
@@ -30,14 +27,22 @@ STALE_T0_TAP_TOKENS = (
     "create_" + STALE_TAP_PREFIX + T0_SUFFIX,
 )
 REMOVED_SPRITE_KEEP_OUT_REFERENCE = "sprite_" + "keepout_reference"
+JOINED_TAP_ASSEMBLY = "idex_tap_t1_joined_assembly"
+RETIRED_SHUTTLE_ASSEMBLY = "idex_tap_t1_shuttle_assembly"
+PARKED_OPB_ASSEMBLY = "opb991t11z_sensor_assembly"
 
 
 def _load_assemblies():
+    config = _load_config()
+    return {assembly["name"]: assembly for assembly in config["assemblies"]}
+
+
+def _load_config():
     config = yaml.load(
         (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
         Loader=AssemblyDefaultsLoader,
     )
-    return {assembly["name"]: assembly for assembly in config["assemblies"]}
+    return config
 
 
 def _load_resource(resource_file):
@@ -75,8 +80,8 @@ def test_idex_tap_assemblies_are_t1_named_in_builder_contract():
 
     expected_resource_files = {
         "idex_tap_t1_assembly": "idex_tap_t1_assembly.yaml",
-        "idex_tap_t1_shuttle_assembly": "idex_tap_t1_shuttle_assembly.yaml",
         "idex_tap_t1_stack_assembly": "idex_tap_t1_stack_assembly.yaml",
+        PARKED_OPB_ASSEMBLY: "opb991t11z_sensor_assembly.yaml",
     }
     for assembly_name, resource_file in expected_resource_files.items():
         assert assembly_name in assemblies
@@ -86,63 +91,51 @@ def test_idex_tap_assemblies_are_t1_named_in_builder_contract():
         STALE_TAP_PREFIX + T0_SUFFIX + "_assembly",
         STALE_TAP_PREFIX + T0_SUFFIX + "_shuttle_assembly",
         STALE_TAP_PREFIX + T0_SUFFIX + "_stack_assembly",
+        RETIRED_SHUTTLE_ASSEMBLY,
     ):
         assert old_assembly_name not in assemblies
 
     for top_level_name in ("tool_heads_assembly", "whole_printer_assembly"):
         top_level = assemblies[top_level_name]
-        assert "idex_tap_t1_assembly" in top_level["depends_on"]
-        assert "idex_tap_t1_shuttle_assembly" in top_level["depends_on"]
-        assert top_level["inject_parts"]["idex_tap_t1"] == "idex_tap_t1_assembly"
-        assert (
-            top_level["inject_parts"]["idex_tap_t1_shuttle"]
-            == "idex_tap_t1_shuttle_assembly"
-        )
+        assert JOINED_TAP_ASSEMBLY in top_level["depends_on"]
+        assert "idex_tap_t1_assembly" not in top_level["depends_on"]
+        assert RETIRED_SHUTTLE_ASSEMBLY not in top_level["depends_on"]
+        assert PARKED_OPB_ASSEMBLY not in top_level["depends_on"]
+        assert top_level["inject_parts"]["idex_tap_t1"] == JOINED_TAP_ASSEMBLY
+        assert "idex_tap_t1_shuttle" not in top_level["inject_parts"]
+        assert "opb991t11z_sensor" not in top_level["inject_parts"]
         assert STALE_TAP_PREFIX + T0_SUFFIX not in top_level["inject_parts"]
         assert (
             STALE_TAP_PREFIX + T0_SUFFIX + "_shuttle" not in top_level["inject_parts"]
         )
 
-    shuttle = assemblies["idex_tap_t1_shuttle_assembly"]
-    assert "idex_tap_t1_assembly" in shuttle["depends_on"]
-    assert shuttle["inject_parts"]["idex_tap_t1"] == "idex_tap_t1_assembly"
-
     fixed_tap = assemblies["idex_tap_t1_assembly"]
     assert "sprite_extruder_right_assembly" not in fixed_tap["depends_on"]
     assert "extruder_cage_right_assembly" not in fixed_tap["depends_on"]
-    assert "opb991t11z_sensor_assembly" not in fixed_tap["depends_on"]
+    assert PARKED_OPB_ASSEMBLY not in fixed_tap["depends_on"]
     assert "sprite_extruder" not in fixed_tap["inject_parts"]
     assert "sprite_extruder_right" not in fixed_tap["inject_parts"]
     assert "extruder_cage_right" not in fixed_tap["inject_parts"]
     assert "opb991t11z_sensor" not in fixed_tap["inject_parts"]
 
 
-def test_idex_tap_t1_shuttle_visualizes_right_toolhead_context():
+def test_opb991t11z_sensor_is_standalone_only_for_now():
+    config = _load_config()
     assemblies = _load_assemblies()
-    shuttle = assemblies["idex_tap_t1_shuttle_assembly"]
 
-    assert "sprite_extruder_right_assembly" in shuttle["depends_on"]
-    assert "extruder_cage_right_assembly" in shuttle["depends_on"]
-    assert (
-        shuttle["inject_parts"]["sprite_extruder_right"]
-        == "sprite_extruder_right_assembly"
+    assert assemblies[PARKED_OPB_ASSEMBLY]["resource_file"] == (
+        "opb991t11z_sensor_assembly.yaml"
     )
-    assert (
-        shuttle["inject_parts"]["extruder_cage_right"] == "extruder_cage_right_assembly"
-    )
-    assert "extruder_cage_right_joined_assembly" not in shuttle["depends_on"]
-    assert "part_fan_right_joined_assembly" not in shuttle["depends_on"]
+    for assembly_name, assembly in assemblies.items():
+        if assembly_name == PARKED_OPB_ASSEMBLY:
+            continue
+        assert PARKED_OPB_ASSEMBLY not in assembly.get("depends_on", [])
+        assert PARKED_OPB_ASSEMBLY not in assembly.get("inject_parts", {}).values()
 
-    resource = _load_resource("idex_tap_t1_shuttle_assembly.yaml")
-    visualized_dependencies = {
-        part["assembly"]
-        for part in resource["Builder"]["Visualization"]["parts"]
-        if part["source"] == "dependencies"
-    }
-    assert "sprite_extruder_right_assembly" in visualized_dependencies
-    assert "extruder_cage_right_assembly" in visualized_dependencies
-    assert "extruder_cage_right_joined_assembly" not in visualized_dependencies
-    assert "part_fan_right_joined_assembly" not in visualized_dependencies
+    assert not any(
+        PARKED_OPB_ASSEMBLY in str(placement)
+        for placement in config["placement"]["alignments"]
+    )
 
 
 def test_idex_tap_t1_fixed_generator_drops_unused_right_toolhead_context():
@@ -153,14 +146,9 @@ def test_idex_tap_t1_fixed_generator_drops_unused_right_toolhead_context():
         "sprite_extruder_right",
         "extruder_cage_right",
         "opb991t11z_sensor",
+        "idex_tap_shuttle_height",
     ):
         assert removed_parameter not in parameters
-
-    shuttle_parameters = inspect.signature(
-        create_idex_tap_t1_shuttle_assembly
-    ).parameters
-    assert "sprite_extruder_right" in shuttle_parameters
-    assert "extruder_cage_right" in shuttle_parameters
 
 
 def test_idex_tap_t1_lower_mount_strips_include_threaded_insert_visuals():
@@ -185,16 +173,10 @@ def test_active_idex_tap_files_have_no_t0_prototype_symbols():
         ASSEMBLIES_DIR / "tool_heads_assembly.yaml",
         ASSEMBLIES_DIR / "whole_printer_assembly.yaml",
         ASSEMBLIES_DIR / "idex_tap_t1_assembly.yaml",
-        ASSEMBLIES_DIR / "idex_tap_t1_shuttle_assembly.yaml",
         ASSEMBLIES_DIR / "idex_tap_t1_stack_assembly.yaml",
         Path(
             REPO_ROOT,
             "src/mege_ender_3v3ke_idex/designs/assemblies/idex_tap_t1_assembly.py",
-        ),
-        Path(
-            REPO_ROOT,
-            "src/mege_ender_3v3ke_idex/designs/assemblies/"
-            "idex_tap_t1_shuttle_assembly.py",
         ),
         Path(
             REPO_ROOT,
@@ -207,6 +189,17 @@ def test_active_idex_tap_files_have_no_t0_prototype_symbols():
         text = path.read_text()
         for stale_token in STALE_T0_TAP_TOKENS:
             assert stale_token not in text, f"{path} still contains {stale_token}"
+
+    retired_paths = [
+        ASSEMBLIES_DIR / "idex_tap_t1_shuttle_assembly.yaml",
+        Path(
+            REPO_ROOT,
+            "src/mege_ender_3v3ke_idex/designs/assemblies/"
+            "idex_tap_t1_shuttle_assembly.py",
+        ),
+    ]
+    for path in retired_paths:
+        assert not path.exists()
 
 
 def test_idex_tap_t1_does_not_emit_removed_sprite_reference_box():

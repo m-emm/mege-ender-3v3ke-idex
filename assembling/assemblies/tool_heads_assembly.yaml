@@ -254,65 +254,6 @@ Builder:
             - 0
 
         name_template: "{default_name}_{name}"
-        # animation:
-        #   x_carriage_2:
-        #     - { $ref: x_axis_x_travel_negative }
-        #     - 0
-        #     - 0
-      # - source: injected
-      #   assembly: idex_tap_t1
-      #   artifact: non_production_parts
-      #   names:
-      #     - magnets
-      #   name_template: "idex_tap_t1_{name}"
-      #   animation:
-      #     x_carriage_2:
-      #       - { $ref: x_axis_x_travel_negative }
-      #       - 0
-      #       - 0
-      # - source: injected
-      #   assembly: idex_tap_t1_shuttle
-      #   artifact: leader
-      #   name: idex_tap_t1_moving_shuttle
-      #   animation:
-      #     x_carriage_2:
-      #       - { $ref: x_axis_x_travel_negative }
-      #       - 0
-      #       - 0
-      #     idex_tap_trigger_lift_right:
-      #       - 0
-      #       - 0
-      #       - { $ref: idex_tap_trigger_lift_right }
-      # - source: injected
-      #   assembly: idex_tap_t1_shuttle
-      #   artifact: followers
-      #   names:
-      #     - idex_tap_trigger_flag
-      #   name_template: "idex_tap_t1_shuttle_{name}"
-      #   animation:
-      #     x_carriage_2:
-      #       - { $ref: x_axis_x_travel_negative }
-      #       - 0
-      #       - 0
-      #     idex_tap_trigger_lift_right:
-      #       - 0
-      #       - 0
-      #       - { $ref: idex_tap_trigger_lift_right }
-      # - source: injected
-      #   assembly: idex_tap_t1_shuttle
-      #   artifact: non_production_parts
-      #   names:
-      #     - moving_magnet_targets
-      #   name_template: "idex_tap_t1_shuttle_{name}"
-      #   animation:
-      #     x_carriage_2:
-      #       - { $ref: x_axis_x_travel_negative }
-      #       - 0
-      #       - 0
-      #     idex_tap_trigger_lift_right:
-      #       - 0
-      #       - 0
-      #       - { $ref: idex_tap_trigger_lift_right }
       - source: injected
         assembly: mgn7h_rail_with_carriage
         artifact: leader
@@ -333,28 +274,6 @@ Builder:
         names:
           - carriage
         name_template: "mgn7h_{name}"
-        animation:
-          x_carriage_2:
-            - { $ref: x_axis_x_travel_negative }
-            - 0
-            - 0
-      - source: injected
-        assembly: opb991t11z_sensor
-        artifact: leader
-        name: opb991t11z_body
-        animation:
-          x_carriage_2:
-            - { $ref: x_axis_x_travel_negative }
-            - 0
-            - 0
-      - source: injected
-        assembly: opb991t11z_sensor
-        artifact: non_production_parts
-        names:
-          - slot_keepout
-          - optical_center
-          - wire_bundle
-        name_template: "opb991t11z_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }

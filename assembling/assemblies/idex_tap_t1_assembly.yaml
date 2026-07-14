@@ -70,8 +70,6 @@ Parameters:
     Type: Float
   idex_tap_frame_mount_screw_size:
     Type: String
-  idex_tap_shuttle_height:
-    Type: Float
 
 Parts:
   IdexTapT1Assembly:

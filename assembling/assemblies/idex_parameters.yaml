@@ -1362,10 +1362,6 @@ globals:
   idex_tap_frame_mount_flange_depth: 34
   idex_tap_frame_mount_flange_thickness: 5
   idex_tap_frame_mount_screw_size: "M3"
-  idex_tap_shuttle_width: 34
-  idex_tap_shuttle_height: 30
-  idex_tap_shuttle_thickness: 2.3
-  idex_tap_shuttle_carriage_screw_size: "M2"
   idex_tap_trigger_lift: 1.0
   idex_tap_total_travel: 1.4
   idex_tap_trigger_flag_thickness: 0.8

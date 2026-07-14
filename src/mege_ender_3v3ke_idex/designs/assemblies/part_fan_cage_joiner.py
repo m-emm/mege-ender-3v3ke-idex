@@ -137,6 +137,7 @@ def join_part_fans_with_extruder_cage(
     clearance_type="loose",
     fillet_radius=0.0,
     mgn7h_rail_with_carriage=None,
+    idex_tap_t1=None,
 ):
     """Return joined output assemblies for a part fan and extruder cage pair."""
 
@@ -192,6 +193,8 @@ def join_part_fans_with_extruder_cage(
         if name in [anchor_name for anchor_name, _ in flange_specs]:
             continue
         joined_extruder_cage.add_named_cutter(cutter.copy(), name)
+
+    joined_idex_tap_t1 = idex_tap_t1.copy() if idex_tap_t1 is not None else None
 
     for bottom_flange in bottom_flanges:
         joined_part_fans.leader = joined_part_fans.leader.fuse(bottom_flange)
@@ -422,18 +425,23 @@ def join_part_fans_with_extruder_cage(
             magnet_screw_holder = translate(0, -0.5, 0)(magnet_screw_holder)
 
             magnet_screw_holder = magnet_screw.use_as_cutter_on(magnet_screw_holder)
-
             joined_extruder_cage = joined_extruder_cage.fuse(magnet_screw_holder)
 
             for name, cutter in magnet_screw.get_named_cutter_items():
                 if name in ["thread_hole_cutter"]:
                     joined_extruder_cage = joined_extruder_cage.cut(cutter)
 
-            joined_extruder_cage.add_named_non_production_part(
-                magnet_screw.get_named_non_production_part("magnet"),
-                f"magnet_{lr.name}",
-            )
-    return {
+            if joined_idex_tap_t1 is not None:
+                joined_idex_tap_t1.add_named_non_production_part(
+                    magnet_screw.get_named_non_production_part("magnet"),
+                    f"magnet_{lr.name}",
+                )
+
+    result = {
         "part_fans": joined_part_fans,
         "extruder_cage": joined_extruder_cage,
     }
+    if joined_idex_tap_t1 is not None:
+        result["idex_tap_t1"] = joined_idex_tap_t1
+
+    return result

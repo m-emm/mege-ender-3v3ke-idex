@@ -18,7 +18,6 @@ def create_idex_tap_t1_assembly(
     idex_tap_frame_mount_flange_depth,
     idex_tap_frame_mount_flange_thickness,
     idex_tap_frame_mount_screw_size,
-    idex_tap_shuttle_height,
 ):
     """Create a loose fixed Tap frame around the placed right-side context."""
 
