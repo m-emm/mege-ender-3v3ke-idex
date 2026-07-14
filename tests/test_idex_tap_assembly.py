@@ -2,13 +2,23 @@ import inspect
 from pathlib import Path
 
 import yaml
-from assembly_defaults import ASSEMBLIES_DIR, AssemblyDefaultsLoader
+from assembly_defaults import ASSEMBLIES_DIR, AssemblyDefaultsLoader, assembly_kwargs
 from mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t1_assembly import (
     create_idex_tap_t1_assembly,
 )
 from mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t1_shuttle_assembly import (
     create_idex_tap_t1_shuttle_assembly,
 )
+from mege_ender_3v3ke_idex.designs.assemblies.mgn7h_rail_with_carriage_assembly import (
+    create_mgn7h_rail_with_carriage_assembly,
+)
+from mege_ender_3v3ke_idex.designs.assemblies.tool_head_mount_machined_assembly import (
+    create_tool_head_mount_machined_assembly,
+)
+from mege_ender_3v3ke_idex.designs.assemblies.x_axis_carriage_assembly import (
+    create_x_axis_carriage_assembly,
+)
+from shellforgepy.simple import get_volume
 
 
 REPO_ROOT = ASSEMBLIES_DIR.parents[1]
@@ -34,6 +44,29 @@ def _load_resource(resource_file):
     return yaml.load(
         (ASSEMBLIES_DIR / resource_file).read_text(),
         Loader=AssemblyDefaultsLoader,
+    )
+
+
+def _build_idex_tap_t1_assembly():
+    x_axis_carriage = create_x_axis_carriage_assembly()
+    fixed_tool_head_mount = create_tool_head_mount_machined_assembly(
+        **assembly_kwargs(
+            create_tool_head_mount_machined_assembly,
+            carriage=x_axis_carriage,
+            drive_position="top",
+        )
+    )
+    mgn7h_rail_with_carriage = create_mgn7h_rail_with_carriage_assembly(
+        **assembly_kwargs(create_mgn7h_rail_with_carriage_assembly)
+    )
+
+    return create_idex_tap_t1_assembly(
+        **assembly_kwargs(
+            create_idex_tap_t1_assembly,
+            fixed_tool_head_mount=fixed_tool_head_mount,
+            x_axis_carriage=x_axis_carriage,
+            mgn7h_rail_with_carriage=mgn7h_rail_with_carriage,
+        )
     )
 
 
@@ -67,8 +100,7 @@ def test_idex_tap_assemblies_are_t1_named_in_builder_contract():
         )
         assert STALE_TAP_PREFIX + T0_SUFFIX not in top_level["inject_parts"]
         assert (
-            STALE_TAP_PREFIX + T0_SUFFIX + "_shuttle"
-            not in top_level["inject_parts"]
+            STALE_TAP_PREFIX + T0_SUFFIX + "_shuttle" not in top_level["inject_parts"]
         )
 
     shuttle = assemblies["idex_tap_t1_shuttle_assembly"]
@@ -96,8 +128,7 @@ def test_idex_tap_t1_shuttle_visualizes_right_toolhead_context():
         == "sprite_extruder_right_assembly"
     )
     assert (
-        shuttle["inject_parts"]["extruder_cage_right"]
-        == "extruder_cage_right_assembly"
+        shuttle["inject_parts"]["extruder_cage_right"] == "extruder_cage_right_assembly"
     )
     assert "extruder_cage_right_joined_assembly" not in shuttle["depends_on"]
     assert "part_fan_right_joined_assembly" not in shuttle["depends_on"]
@@ -130,6 +161,21 @@ def test_idex_tap_t1_fixed_generator_drops_unused_right_toolhead_context():
     ).parameters
     assert "sprite_extruder_right" in shuttle_parameters
     assert "extruder_cage_right" in shuttle_parameters
+
+
+def test_idex_tap_t1_lower_mount_strips_include_threaded_insert_visuals():
+    tap = _build_idex_tap_t1_assembly()
+
+    expected_thread_inset_names = {
+        "lower_mount_strip_thread_inset_left_front_thread_inset",
+        "lower_mount_strip_thread_inset_left_back_thread_inset",
+        "lower_mount_strip_thread_inset_right_front_thread_inset",
+        "lower_mount_strip_thread_inset_right_back_thread_inset",
+    }
+
+    assert get_volume(tap.leader) > 0
+    for name in expected_thread_inset_names:
+        assert get_volume(tap.get_named_non_production_part(name)) > 0
 
 
 def test_active_idex_tap_files_have_no_t0_prototype_symbols():

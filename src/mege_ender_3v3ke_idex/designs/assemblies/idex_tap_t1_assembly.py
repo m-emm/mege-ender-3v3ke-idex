@@ -28,8 +28,18 @@ def create_idex_tap_t1_assembly(
     carriage_mount_plate_thickness = 4
     side_wall_thickness = 4
     carriage_mount_screw_length = 8
+    lower_mount_strip_thread_inset_size = "M3"
+    lower_mount_strip_thread_inset_top_material_thickness = 1
+    lower_mount_strip_thread_inset_holder_thickness = (
+        MScrew.from_size(lower_mount_strip_thread_inset_size).thread_inset_length
+        + lower_mount_strip_thread_inset_top_material_thickness
+    )
+    lower_mount_strip_thread_inset_extra_radius = 1.5
 
     lower_mount_strips = PartCollector()
+    lower_mount_strip_thread_inset_bosses = PartCollector()
+    lower_mount_strip_thread_inset_cutters = PartCollector()
+    lower_mount_strip_thread_insets = []
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
         lower_mount_strip = create_box(
@@ -47,6 +57,40 @@ def create_idex_tap_t1_assembly(
         )
 
         lower_mount_strip = align(lower_mount_strip, fixed_tool_head_mount, lr)
+
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+            drill_name = f"hole_drill_{lr.name}_{fb.name}"
+            drill = fixed_tool_head_mount.get_named_cutter(drill_name)
+            lower_mount_strip = lower_mount_strip.cut(drill)
+
+            thread_inset = create_thread_inset_assembly(
+                size=lower_mount_strip_thread_inset_size,
+                thickness=lower_mount_strip_thread_inset_holder_thickness,
+                extra_radius=lower_mount_strip_thread_inset_extra_radius,
+                clearance_type="close",
+            )
+            thread_inset = align(thread_inset, drill, Alignment.CENTER)
+            thread_inset = align(
+                thread_inset,
+                lower_mount_strip,
+                Alignment.STACK_BOTTOM,
+                stack_gap=-lower_mount_strip_thickness,
+            )
+
+            thread_inset_boss = thread_inset.get_named_cutter("assembly_cutter")
+            thread_inset_cutter = thread_inset_boss.cut(thread_inset.leader)
+            lower_mount_strip_thread_inset_bosses = (
+                lower_mount_strip_thread_inset_bosses.fuse(thread_inset_boss)
+            )
+            lower_mount_strip_thread_inset_cutters = (
+                lower_mount_strip_thread_inset_cutters.fuse(thread_inset_cutter)
+            )
+
+            lower_mount_strip_thread_insets.append(
+                thread_inset.prefixed_copy(
+                    f"lower_mount_strip_thread_inset_{lr.name.lower()}_{fb.name.lower()}"
+                )
+            )
 
         lower_mount_strips = lower_mount_strips.fuse(lower_mount_strip)
 
@@ -120,8 +164,13 @@ def create_idex_tap_t1_assembly(
     part = part.fuse(side_wall_left)
 
     part = mgn7h_rail_with_carriage.use_as_cutter_on(part)
+    part = part.fuse(lower_mount_strip_thread_inset_bosses)
+    part = part.cut(lower_mount_strip_thread_inset_cutters)
 
     tap = LeaderFollowersCuttersPart(leader=part)
+    for thread_inset in lower_mount_strip_thread_insets:
+        for name, inset in thread_inset.get_named_non_production_part_items():
+            tap.add_named_non_production_part(inset, name)
 
     for name, cutter in mgn7h_rail_with_carriage.get_named_cutter_items():
         if name.startswith("carriage_mount_hole"):
