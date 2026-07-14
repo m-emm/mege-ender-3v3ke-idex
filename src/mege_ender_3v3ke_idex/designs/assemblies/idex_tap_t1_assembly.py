@@ -22,8 +22,8 @@ def create_idex_tap_t1_assembly(
 ):
     """Create a loose fixed Tap frame around the placed right-side context."""
 
-    lower_mount_strip_width = 9
-    lower_mount_strip_length = 50
+    lower_mount_strip_width = 7.8
+    lower_mount_strip_length = 55
     lower_mount_strip_thickness = 5
     carriage_mount_plate_thickness = 4
     side_wall_thickness = 4
@@ -36,10 +36,13 @@ def create_idex_tap_t1_assembly(
     )
     lower_mount_strip_thread_inset_extra_radius = 1.5
 
+    inset_boss_cutter_diameter = 10
+
     lower_mount_strips = PartCollector()
     lower_mount_strip_thread_inset_bosses = PartCollector()
     lower_mount_strip_thread_inset_cutters = PartCollector()
     lower_mount_strip_thread_insets = []
+    inset_boss_cutters = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
         lower_mount_strip = create_box(
@@ -92,6 +95,17 @@ def create_idex_tap_t1_assembly(
                 )
             )
 
+            if fb == Alignment.BACK:
+                inset_boss_cutter = create_cylinder(inset_boss_cutter_diameter / 2, 100)
+                inset_boss_cutter = rotate(90, axis=[0, 1, 0])(inset_boss_cutter)
+                inset_boss_cutter = align(
+                    inset_boss_cutter, thread_inset_boss, Alignment.CENTER
+                )
+                inset_boss_cutter = align(
+                    inset_boss_cutter, thread_inset_boss, Alignment.EDGE_BOTTOM
+                )
+                inset_boss_cutters = inset_boss_cutters.fuse(inset_boss_cutter)
+
         lower_mount_strips = lower_mount_strips.fuse(lower_mount_strip)
 
     lower_mount_strips = fixed_tool_head_mount.use_as_cutter_on(lower_mount_strips)
@@ -116,7 +130,7 @@ def create_idex_tap_t1_assembly(
     back_mount_plate_bbox = get_bounding_box(back_mount_plate)
     lower_mount_strips_bbox = get_bounding_box(lower_mount_strips)
 
-    back_factor = 0.5
+    front_pos_factor = 0.2
     back_mount_plate_min_y = back_mount_plate_bbox[0][1]
     back_mount_plate_min_z = back_mount_plate_bbox[0][2]
     back_mount_plate_max_z = back_mount_plate_bbox[1][2]
@@ -124,15 +138,34 @@ def create_idex_tap_t1_assembly(
     lower_mount_strip_max_y = lower_mount_strips_bbox[1][1]
     lower_mount_strip_min_z = lower_mount_strips_bbox[0][2]
 
-    new_front_y = (lower_mount_strip_min_y + lower_mount_strip_max_y) * back_factor
-    new_back_y = (back_mount_plate_min_y + lower_mount_strip_min_y) * back_factor
+    new_front_y = (
+        lower_mount_strip_min_y * (1 - front_pos_factor)
+        + lower_mount_strip_max_y * front_pos_factor
+    )
+
+    back_pos_factor = 0.0
+    new_top_back_y = (
+        lower_mount_strip_max_y * (1 - back_pos_factor)
+        + lower_mount_strip_min_y * back_pos_factor
+    )
+    mid_y_factor = 0.5
+    mid_y = (
+        back_mount_plate_min_y * (1 - mid_y_factor)
+        + lower_mount_strip_min_y * mid_y_factor
+    )
+
+    mid_z_factor = 0.6
+    mid_z = (
+        back_mount_plate_min_z * (1 - mid_z_factor)
+        + back_mount_plate_max_z * mid_z_factor
+    )
 
     new_points = [
         (back_mount_plate_min_y, back_mount_plate_min_z),
         (back_mount_plate_min_y, back_mount_plate_max_z),
-        (lower_mount_strip_max_y, lower_mount_strip_min_z),
+        (new_top_back_y, lower_mount_strip_min_z),
         (new_front_y, lower_mount_strip_min_z),
-        (new_back_y, (back_mount_plate_min_z + back_mount_plate_max_z) / 2),
+        (mid_y, mid_z),
     ]
 
     part = back_mount_plate.fuse(lower_mount_strips)
@@ -157,11 +190,12 @@ def create_idex_tap_t1_assembly(
     side_wall = align(side_wall, lower_mount_strips, Alignment.RIGHT)
     side_wall = align(side_wall, lower_mount_strips, Alignment.STACK_BOTTOM)
 
-    part = part.fuse(side_wall)
-
     side_wall_left = align(side_wall, lower_mount_strips, Alignment.LEFT)
+    side_walls = side_wall.fuse(side_wall_left)
 
-    part = part.fuse(side_wall_left)
+    side_walls = side_walls.cut(inset_boss_cutters)
+
+    part = part.fuse(side_walls)
 
     part = mgn7h_rail_with_carriage.use_as_cutter_on(part)
     part = part.fuse(lower_mount_strip_thread_inset_bosses)
