@@ -3854,19 +3854,12 @@ assemblies:
       - x_axis_top_profile_assembly
       - x_axis_rail_assembly
       - x_axis_right_carriage_assembly
-      - sprite_extruder_right_assembly
-      - extruder_cage_right_assembly
       - mgn7h_rail_with_carriage_assembly
-      - opb991t11z_sensor_assembly
 
     inject_parts:
       fixed_tool_head_mount: tool_head_mount_machined_top_assembly
-      x_axis_profile: x_axis_top_profile_assembly
       x_axis_carriage: x_axis_right_carriage_assembly
-      sprite_extruder_right: sprite_extruder_right_assembly
-      extruder_cage_right: extruder_cage_right_assembly
       mgn7h_rail_with_carriage: mgn7h_rail_with_carriage_assembly
-      opb991t11z_sensor: opb991t11z_sensor_assembly
 
   - name: idex_tap_t1_shuttle_assembly
 

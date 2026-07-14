@@ -6,49 +6,21 @@ from shellforgepy.simple import *
 def create_idex_tap_t1_assembly(
     *,
     fixed_tool_head_mount,
-    x_axis_profile,
     x_axis_carriage,
-    sprite_extruder_right,
-    extruder_cage_right,
     mgn7h_rail_with_carriage,
-    opb991t11z_sensor,
     mgn7h_rail_length,
     mgn7h_rail_width,
     mgn7h_rail_mount_hole_pitch,
     mgn7h_rail_mount_hole_end_offset,
     mgn7h_rail_mount_hole_diameter,
-    idex_tap_frame_width,
     idex_tap_frame_height,
     idex_tap_frame_thickness,
     idex_tap_frame_mount_flange_depth,
     idex_tap_frame_mount_flange_thickness,
     idex_tap_frame_mount_screw_size,
     idex_tap_shuttle_height,
-    idex_tap_total_travel,
-    idex_tap_down_stop_contact_diameter,
-    idex_tap_overtravel_stop_contact_diameter,
-    idex_tap_sensor_bracket_width,
-    idex_tap_sensor_bracket_height,
-    idex_tap_sensor_bracket_thickness,
-    idex_tap_sensor_bracket_x_offset,
-    idex_tap_sensor_bracket_z_offset,
-    idex_tap_magnet_diameter,
-    idex_tap_magnet_height,
-    idex_tap_magnet_count,
-    idex_tap_magnet_center_spacing,
-    idex_tap_magnet_retainer_thickness,
 ):
     """Create a loose fixed Tap frame around the placed right-side context."""
-
-    idex_tap_magnet_retainer_clearance = 0.1
-    # Future Tap geometry will build around this placed right toolhead context.
-    _ = (
-        x_axis_profile,
-        sprite_extruder_right,
-        extruder_cage_right,
-        mgn7h_rail_with_carriage,
-        opb991t11z_sensor,
-    )
 
     fixed_tool_head_mount_size = get_bounding_box_size(fixed_tool_head_mount.leader)
     mount_flange = create_box(
@@ -72,7 +44,7 @@ def create_idex_tap_t1_assembly(
     rail_plate = align(rail_plate, mgn7h_rail_with_carriage, Alignment.STACK_BACK)
 
     rail_plate = mgn7h_rail_with_carriage.use_as_cutter_on(rail_plate)
-    fixed_frame = mount_flange # .fuse(rail_plate)
+    fixed_frame = mount_flange  # .fuse(rail_plate)
 
     fixed_mount_center = get_bounding_box_center(fixed_tool_head_mount.leader)
     frame_mount_holes = PartCollector()
@@ -134,8 +106,6 @@ def create_idex_tap_t1_assembly(
         fixed_frame = fixed_frame.cut(rail_hole)
         rail_mount_holes = rail_mount_holes.fuse(rail_hole)
         rail_mount_hole_z += mgn7h_rail_mount_hole_pitch
-
-
 
     tap = LeaderFollowersCuttersPart(leader=fixed_frame)
     tap.add_named_follower(rail_plate, "idex_tap_rail_plate")

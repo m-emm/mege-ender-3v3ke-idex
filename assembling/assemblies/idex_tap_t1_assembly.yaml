@@ -28,8 +28,8 @@ Builder:
       - source: injected
         assembly: fixed_tool_head_mount
         artifact: all
-      - source: injected
-        assembly: x_axis_profile
+      - source: dependencies
+        assembly: x_axis_top_profile_assembly
         artifact: all
       - source: dependencies
         assembly: x_axis_rail_assembly
@@ -48,12 +48,6 @@ Builder:
       - source: self
         artifact: leader
         name: idex_tap_fixed_frame
-      - source: self
-        artifact: followers
-        names:
-          - idex_tap_sensor_bracket
-          - idex_tap_magnet_retainers
-        name_template: "{name}"
 
 Parameters:
   mgn7h_rail_length:
@@ -66,8 +60,6 @@ Parameters:
     Type: Float
   mgn7h_rail_mount_hole_diameter:
     Type: Float
-  idex_tap_frame_width:
-    Type: Float
   idex_tap_frame_height:
     Type: Float
   idex_tap_frame_thickness:
@@ -79,32 +71,6 @@ Parameters:
   idex_tap_frame_mount_screw_size:
     Type: String
   idex_tap_shuttle_height:
-    Type: Float
-  idex_tap_total_travel:
-    Type: Float
-  idex_tap_down_stop_contact_diameter:
-    Type: Float
-  idex_tap_overtravel_stop_contact_diameter:
-    Type: Float
-  idex_tap_sensor_bracket_width:
-    Type: Float
-  idex_tap_sensor_bracket_height:
-    Type: Float
-  idex_tap_sensor_bracket_thickness:
-    Type: Float
-  idex_tap_sensor_bracket_x_offset:
-    Type: Float
-  idex_tap_sensor_bracket_z_offset:
-    Type: Float
-  idex_tap_magnet_diameter:
-    Type: Float
-  idex_tap_magnet_height:
-    Type: Float
-  idex_tap_magnet_count:
-    Type: Integer
-  idex_tap_magnet_center_spacing:
-    Type: Float
-  idex_tap_magnet_retainer_thickness:
     Type: Float
 
 Parts:

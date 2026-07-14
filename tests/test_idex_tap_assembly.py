@@ -78,15 +78,11 @@ def test_idex_tap_assemblies_are_t1_named_in_builder_contract():
     fixed_tap = assemblies["idex_tap_t1_assembly"]
     assert "sprite_extruder_right_assembly" not in fixed_tap["depends_on"]
     assert "extruder_cage_right_assembly" not in fixed_tap["depends_on"]
+    assert "opb991t11z_sensor_assembly" not in fixed_tap["depends_on"]
     assert "sprite_extruder" not in fixed_tap["inject_parts"]
-    assert (
-        fixed_tap["inject_parts"]["sprite_extruder_right"]
-        == "sprite_extruder_right_assembly"
-    )
-    assert (
-        fixed_tap["inject_parts"]["extruder_cage_right"]
-        == "extruder_cage_right_assembly"
-    )
+    assert "sprite_extruder_right" not in fixed_tap["inject_parts"]
+    assert "extruder_cage_right" not in fixed_tap["inject_parts"]
+    assert "opb991t11z_sensor" not in fixed_tap["inject_parts"]
 
 
 def test_idex_tap_t1_shuttle_visualizes_right_toolhead_context():
@@ -94,7 +90,7 @@ def test_idex_tap_t1_shuttle_visualizes_right_toolhead_context():
     shuttle = assemblies["idex_tap_t1_shuttle_assembly"]
 
     assert "sprite_extruder_right_assembly" in shuttle["depends_on"]
-    assert "extruder_cage_right_assembly" not in shuttle["depends_on"]
+    assert "extruder_cage_right_assembly" in shuttle["depends_on"]
     assert (
         shuttle["inject_parts"]["sprite_extruder_right"]
         == "sprite_extruder_right_assembly"
@@ -118,14 +114,22 @@ def test_idex_tap_t1_shuttle_visualizes_right_toolhead_context():
     assert "part_fan_right_joined_assembly" not in visualized_dependencies
 
 
-def test_idex_tap_t1_generators_accept_unused_right_toolhead_context():
-    for generator in [
-        create_idex_tap_t1_assembly,
-        create_idex_tap_t1_shuttle_assembly,
-    ]:
-        parameters = inspect.signature(generator).parameters
-        assert "sprite_extruder_right" in parameters
-        assert "extruder_cage_right" in parameters
+def test_idex_tap_t1_fixed_generator_drops_unused_right_toolhead_context():
+    parameters = inspect.signature(create_idex_tap_t1_assembly).parameters
+
+    for removed_parameter in (
+        "x_axis_profile",
+        "sprite_extruder_right",
+        "extruder_cage_right",
+        "opb991t11z_sensor",
+    ):
+        assert removed_parameter not in parameters
+
+    shuttle_parameters = inspect.signature(
+        create_idex_tap_t1_shuttle_assembly
+    ).parameters
+    assert "sprite_extruder_right" in shuttle_parameters
+    assert "extruder_cage_right" in shuttle_parameters
 
 
 def test_active_idex_tap_files_have_no_t0_prototype_symbols():
