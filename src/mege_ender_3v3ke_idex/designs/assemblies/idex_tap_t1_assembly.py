@@ -58,7 +58,7 @@ def create_idex_tap_t1_assembly(
     )
 
     mount_flange = align(mount_flange, fixed_tool_head_mount, Alignment.CENTER)
-    mount_flange = align(mount_flange, fixed_tool_head_mount, Alignment.STACK_BOTTOM)
+    mount_flange = align(mount_flange, fixed_tool_head_mount, Alignment.STACK_TOP)
     mount_flange = align(mount_flange, x_axis_carriage, Alignment.STACK_FRONT)
 
     rail_plate_width = max(idex_tap_shuttle_height, mgn7h_rail_width + 16)
@@ -69,7 +69,7 @@ def create_idex_tap_t1_assembly(
     )
     rail_plate = align(rail_plate, mount_flange, Alignment.CENTER, axes=[0, 1])
     rail_plate = align(rail_plate, mount_flange, Alignment.STACK_BOTTOM)
-    rail_plate = align(rail_plate, mount_flange, Alignment.BACK)
+    rail_plate = align(rail_plate, mgn7h_rail_with_carriage, Alignment.STACK_FRONT)
 
     fixed_frame = mount_flange # .fuse(rail_plate)
 
@@ -177,24 +177,10 @@ def create_idex_tap_t1_assembly(
         retainer = retainer.cut(magnet_cutter)
         magnet_retainers = magnet_retainers.fuse(retainer)
 
-    overtravel_stop = create_cylinder(
-        idex_tap_overtravel_stop_contact_diameter / 2,
-        idex_tap_frame_thickness,
-        direction=(0, 1, 0),
-    )
-    overtravel_stop = align(overtravel_stop, rail_plate, Alignment.CENTER, axes=[0, 2])
-    overtravel_stop = align(overtravel_stop, rail_plate, Alignment.STACK_FRONT)
-    overtravel_stop = align(overtravel_stop, rail_plate, Alignment.LEFT)
-    overtravel_stop = translate(
-        0,
-        0,
-        idex_tap_shuttle_height / 2 + idex_tap_total_travel,
-    )(overtravel_stop)
 
     tap = LeaderFollowersCuttersPart(leader=fixed_frame)
     tap.add_named_follower(rail_plate, "idex_tap_rail_plate")
     tap.add_named_follower(sensor_bracket, "idex_tap_sensor_bracket")
-    tap.add_named_follower(overtravel_stop, "idex_tap_overtravel_stop")
     tap.add_named_follower(magnet_retainers, "idex_tap_magnet_retainers")
     tap.add_named_cutter(frame_mount_holes, "frame_mount_holes")
     tap.add_named_cutter(rail_mount_holes, "rail_mount_holes")

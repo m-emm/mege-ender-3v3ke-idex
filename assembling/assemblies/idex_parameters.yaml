@@ -306,7 +306,7 @@ globals:
   x_axis_carriage_z_offset:
     $ref: x_axis_carriage_height
   x_axis_sprite_extruder_tool_head_mount_x_offset: 4.25
-  x_axis_sprite_extruder_tool_head_mount_y_offset: -17.75
+  x_axis_sprite_extruder_tool_head_mount_y_offset: -20
   x_axis_sprite_extruder_tool_head_mount_z_offset: -25.55
   x_axis_carriage_stopper_width: 12
   x_axis_carriage_stopper_thickness: 8
@@ -1366,7 +1366,7 @@ globals:
   idex_tap_frame_mount_screw_head_clearance: 0.4
   idex_tap_shuttle_width: 34
   idex_tap_shuttle_height: 30
-  idex_tap_shuttle_thickness: 4.5
+  idex_tap_shuttle_thickness: 2.3
   idex_tap_shuttle_carriage_screw_size: "M2"
   idex_tap_shuttle_carriage_screw_head_clearance: 0.3
   idex_tap_frame_to_mount_clearance: 0.2

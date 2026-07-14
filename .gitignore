@@ -74,6 +74,7 @@ output
 runs
 build
 resources/tmp/
+resources/vision_datasets/
 klipper_setup/image_build/out/
 klipper_setup/image_build/secrets/
 klipper_setup/image_build/pi-gen/

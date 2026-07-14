@@ -136,6 +136,7 @@ def join_part_fans_with_extruder_cage(
     screw_size="M3",
     clearance_type="loose",
     fillet_radius=0.0,
+    mgn7h_rail_with_carriage=None
 ):
     """Return joined output assemblies for a part fan and extruder cage pair."""
 
@@ -276,6 +277,13 @@ def join_part_fans_with_extruder_cage(
 
         left_bridge_mount_eye = left_bridge_mount_eye.cut(left_bridge_hole_drill)
         joined_extruder_cage = joined_extruder_cage.fuse(left_bridge_mount_eye)
+
+    if mgn7h_rail_with_carriage is not None:
+        cutter = materialize_bounding_box(mgn7h_rail_with_carriage, x_enlargement=0.1, y_enlargement=0.1, z_enlargement=0.1)
+        joined_extruder_cage = joined_extruder_cage.cut(cutter)
+        carriage_cutter = materialize_bounding_box(mgn7h_rail_with_carriage.get_named_follower("carriage"), x_enlargement=0.1, y_enlargement=0.1, z_enlargement=2)
+        joined_extruder_cage = joined_extruder_cage.cut(carriage_cutter)
+        joined_extruder_cage = mgn7h_rail_with_carriage.use_as_cutter_on(joined_extruder_cage)
 
     return {
         "part_fans": joined_part_fans,

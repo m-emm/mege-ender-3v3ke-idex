@@ -97,6 +97,24 @@ Builder:
             - { $ref: x_axis_x_travel }
             - 0
             - 0
+      - source: dependencies
+        assembly: single_part_fan_front_left_assembly
+        artifact: leader
+        name: part_fan_left_front_body
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: dependencies
+        assembly: single_part_fan_side_left_assembly
+        artifact: leader
+        name: part_fan_left_side_body
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
       - source: injected
         assembly: tool_head_mount_machined_bottom
         artifact: all
@@ -173,6 +191,32 @@ Builder:
         assembly: part_fan_right
         artifact: all
         name_template: "part_fan_right_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          idex_tap_trigger_lift_right:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_right }
+      - source: dependencies
+        assembly: single_part_fan_front_right_assembly
+        artifact: leader
+        name: part_fan_right_front_body
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          idex_tap_trigger_lift_right:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_right }
+      - source: dependencies
+        assembly: single_part_fan_side_right_assembly
+        artifact: leader
+        name: part_fan_right_side_body
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }

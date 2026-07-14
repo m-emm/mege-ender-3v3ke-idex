@@ -19,19 +19,19 @@ The existing implementation already has the important infrastructure:
 - The current T0/T1 nozzle sweep measures image-space X motion and derives the
   T1-minus-T0 nozzle offset in the X/perpendicular directions.
 
-The new measurement should be a sibling job kind, not a one-off macro or a
+The implemented measurement is a sibling job kind, not a one-off macro or a
 pose-by-pose Moonraker script.
 
 ## Goal
 
-Add a job kind named something like `idex_nozzle_yz_sweep` that captures two
-sets of images:
+Use the job kind `nozzle_cam_nozzle_z_sweep`, with facts measurement
+`nozzle_cam_nozzle_z_offsets`, to capture two sets of images in one immutable
+acquisition run:
 
 1. A bed-feature Y sweep: 3-5 frames with the Y axis moving away from the
    endstop by up to about 20 mm.
 2. A tool X/Z sweep: with Y back at the endstop, capture both T0 and T1 at
-   3-5 X positions and 3-5 Z positions, with default Z samples
-   `1,2,5,8`.
+   3-5 X positions and 4 Z positions, with default Z samples `1,2,4,8`.
 
 The analysis should fit a small local camera/parallax model:
 
@@ -43,8 +43,8 @@ The analysis should fit a small local camera/parallax model:
 - Combining both fits yields the Z height of T0 and T1 relative to each other
   and relative to the bed-feature plane.
 
-The result remains report-only. Applying a new T1 Z offset or changing
-`calib.yaml` should be a separate explicit action, following the existing
+The result remains report-only. Applying new Z endstop values or changing
+`calib.yaml` stays a separate explicit action, following the existing
 `apply_nozzle_vision_calibration.py` pattern.
 
 ## Files To Extend
@@ -72,7 +72,7 @@ command is required.
 
 Optional user-facing convenience:
 
-- Add a thin macro such as `IDEX_NOZZLE_YZ_VISION_SWEEP` only if console
+- Add a thin macro such as `IDEX_NOZZLE_Z_VISION_SWEEP` only if console
   launch from Klipper/Mainsail is useful. The preferred path should stay the
   existing job orchestrator/UI flow: prepare manifest, generate G-code, start
   virtual-SD job, then analyze after acquisition.
@@ -96,7 +96,7 @@ Use the same `schema_version`, hash fields, and state machine. Add a new
 
 ```json
 {
-  "kind": "idex_nozzle_yz_sweep",
+  "kind": "nozzle_cam_nozzle_z_sweep",
   "camera": "nozzle_cam",
   "profile": "analysis",
   "preconditions": {
@@ -109,7 +109,8 @@ Use the same `schema_version`, hash fields, and state machine. Add a new
     "travel_z": 20.0,
     "y_offsets": [0.0, 5.0, 10.0, 15.0, 20.0],
     "x_offsets": [0.0, 3.0, 6.0, 9.0, 12.0],
-    "z_values": [1.0, 2.0, 5.0, 8.0]
+    "z_values": [1.0, 2.0, 4.0, 8.0],
+    "bed_feature_z_mm": -0.1
   }
 }
 ```
@@ -139,14 +140,14 @@ Tool frames use the same record shape:
 ```json
 {
   "seq": 17,
-  "frame": "t0_x6p0_z5p0",
+  "frame": "t0_x6p0_z4p0",
   "phase": "tool_xz_sweep",
   "target": "nozzle_tip",
   "tool": "T0",
   "y_offset": 0.0,
   "x_offset": 6.0,
-  "z_sample": 5.0,
-  "pose": {"x": 201.0, "y": -14.8, "z": 5.0}
+  "z_sample": 4.0,
+  "pose": {"x": 201.0, "y": -14.8, "z": 4.0}
 }
 ```
 
@@ -175,15 +176,15 @@ Default acquisition order:
    - select tool if needed
    - lift to `travel_z`
    - move X/Y at safe height
-   - capture Z values from high to low, for example `8,5,2,1`
+   - capture Z values from high to low, for example `8,4,2,1`
    - lift to `travel_z` before the next X move
 11. `VISION_JOB_END ...`
 
 Example skeleton:
 
 ```gcode
-; generated vision job: idex_nozzle_yz_sweep_...
-; kind: idex_nozzle_yz_sweep
+; generated vision job: nozzle_cam_nozzle_z_sweep_...
+; kind: nozzle_cam_nozzle_z_sweep
 
 G90
 VISION_JOB_BEGIN JOB=... MANIFEST_HASH=sha256:... GCODE_HASH=sha256:...
@@ -217,10 +218,10 @@ G1 Z8.000 F1200
 M400
 G4 P750
 VISION_CAPTURE_SYNC JOB=... SEQ=5 FRAME=t0_x0p0_z8p0 CAMERA=nozzle_cam PROFILE=analysis TOOL=T0
-G1 Z5.000 F1200
+G1 Z4.000 F1200
 M400
 G4 P750
-VISION_CAPTURE_SYNC JOB=... SEQ=6 FRAME=t0_x0p0_z5p0 CAMERA=nozzle_cam PROFILE=analysis TOOL=T0
+VISION_CAPTURE_SYNC JOB=... SEQ=6 FRAME=t0_x0p0_z4p0 CAMERA=nozzle_cam PROFILE=analysis TOOL=T0
 
 ; ...
 
@@ -248,7 +249,7 @@ Motion rules:
 Implement the analysis as a new function, for example:
 
 ```python
-analyze_yz_sweep_frames(frames, run_dir, overlay_dir=None)
+analyze_nozzle_z_sweep_frames(frames, run_dir, overlay_dir, manifest, result_path)
 ```
 
 Reuse the existing image helpers where possible:
@@ -261,13 +262,14 @@ Reuse the existing image helpers where possible:
 
 Add specialized helpers for this job:
 
-- `load_yz_job_frames_for_analysis(manifest_path)`
+- `load_nozzle_z_job_frames_for_analysis(manifest_path)`
 - `fit_bed_y_motion(frames)`
 - `detect_or_match_bed_features(frames)`
-- `detect_nozzle_tip_for_yz(frame)`
-- `fit_tool_xz_motion(frames, bed_fit)`
+- `track_nozzle_z_roi_group(group_frames, features, width, height)`
+- `match_nozzle_z_roi_pair(...)`
+- `analyze_tool_xz_sweep_frames(frames, run_dir, overlay_dir=None)`
 - `solve_tool_heights(bed_fit, tool_fit)`
-- `write_yz_contact_sheet(...)`
+- `write_nozzle_z_contact_sheet(...)`
 
 ### A. Fit Bed-Plane Y Motion
 
@@ -460,69 +462,130 @@ auditable instead of silently changing the scale/parallax fit.
 
 Use `phase == "tool_xz_sweep"` frames.
 
-For each tool and Z sample:
+Do not use Hough/circle detection as the calibration-grade nozzle-Z signal.
+The live images contain circular dark hotend/body features that are easy to
+find but not stable representations of the nozzle tip. A circle winner can look
+plausible in one frame while fitting the wrong physical feature across X and Z.
+The production analysis should therefore use cross-alignment of textured ROIs.
 
-1. Detect the nozzle tip center. Start from the existing nozzle candidate
-   detector and global ROI cross-match. The current red-marker-derived ROI is
-   useful, but this job should also support a manually configured or learned
-   global nozzle ROI because low-Z images may crop differently.
-2. Register the visible bed features in the same frame back to the Y=0 bed
-   reference. This separates bed/camera registration from nozzle-tip motion.
-3. Fit nozzle image position against commanded X and Z.
+The current two-stage algorithm is:
 
-The core model can start as a local affine/parallax fit:
+1. Preprocess every tool frame with grayscale conversion, CLAHE, and normalized
+   floating-point template data.
+2. Group frames by `(tool, z_sample)` and sort each group by `x_offset`.
+3. Coarsely track a robust moving hotend/body ROI between subsequent X samples
+   at the same Z:
+   - ROI in 1920x1080 coordinates: `[960, 360, 160, 150]`
+   - search pad: `75 px`
+   - acceptance: minimum correlation `>= 0.80`
+4. Use the coarse pair displacement as the prediction for a smaller nozzle-local
+   ROI:
+   - ROI in 1920x1080 coordinates: `[1030, 500, 95, 80]`
+   - search pad: `45 px` (configurable in the `35-50 px` range)
+   - acceptance: minimum correlation `>= 0.85`
+5. Use subpixel quadratic peak refinement on each `cv2.matchTemplate` response.
+6. Treat the center of the refined ROI as the observed image point for that
+   frame, then fit refined point position against commanded `x_offset` for each
+   `(tool, z_sample)` group.
+7. Project each per-Z X vector onto the average image X axis and fit
+   `scale_px_per_mm` against commanded Z for T0 and T1.
+8. Combine the tool scale-vs-Z fits with the bed-feature Y scale and the
+   configured `bed_feature_z_mm` to produce the existing calib-ready facts.
+
+This is intentionally a relative-position algorithm. It does not need to know
+the absolute nozzle center in the first frame. It only needs stable tracked
+motion across X at each Z, because the Z solve uses how X scale changes with Z.
+
+Read-only OpenCV experiments on the downloaded local dataset support the ROI
+choice:
 
 ```text
-nozzle_px(tool, x, z) =
-    reference_px
-  + x_axis_vector_px_per_mm * x_offset
-  + z_parallax_vector_px_per_mm * z_sample
-  + tool_xy_offset_px(tool)
-  + tool_z_height_mm(tool) * z_parallax_vector_px_per_mm
-  + residual
+resources/vision_datasets/nozzle_cam_nozzle_z_sweep_20260713T192358Z_nozzle_z/
 ```
 
-In practice the fit should be implemented as a weighted least-squares solve
-with robust rejection:
+Observed results from that dataset:
 
-- same-tool/same-Z X pairs constrain `x_axis_vector_px_per_mm`
-- same-tool/same-X Z pairs constrain `z_parallax_vector_px_per_mm`
-- cross-tool pairs at the same commanded X/Z constrain relative T1-minus-T0
-  displacement
-- the bed Y fit constrains the bed-plane basis and helps separate XY
-  displacement from Z-parallax displacement
+- coarse ROI `[960,360,160,150]`: minimum correlation `0.918`, maximum per-Z
+  X-fit residual `0.38 px`
+- refined ROI `[1030,500,95,80]`: minimum correlation `0.948`, maximum per-Z
+  X-fit residual `0.62 px`
+- refined scale-vs-Z slopes from the experiment: T0 `-0.10042`, T1 `-0.10104`
+  `px/mm^2`, with residuals around `0.006 px/mm`
 
-Record both direct nozzle-center detections and template-match registrations.
-The current X/Y implementation became reliable when it moved from single
-candidate selection to global ROI cross-match; this measurement should follow
-that lesson and prefer a global fit over per-frame winner-picking.
+After implementation, re-analyzing the same acquired job accepted the full
+one-run calibration with:
+
+- bed-Y scale `10.4498 px/mm`, bed-Y vector `[-0.2452, -10.4469] px/mm`
+- coarse correlation minimum `0.9177`
+- refined correlation minimum `0.9484`
+- common scale-vs-Z slope `-0.105443 px/mm^2`
+- scale-vs-Z residuals: T0 `0.040631 px/mm`, T1 `0.007005 px/mm`
+
+The suggested Z endstop values from that run are useful for software plumbing
+validation, but they depend directly on the configured `bed_feature_z_mm`
+default of `-0.1`. Treat them as report-only until the real bed-feature plane Z
+is measured more carefully.
+
+Acceptance gates for the tool X/Z phase:
+
+- coarse minimum correlation `>= 0.80`
+- refined minimum correlation `>= 0.85`
+- per-Z X-fit residual `<= 1.25 px`
+- scale-vs-Z residual `<= 0.08 px/mm`
+- T0/T1 scale-vs-Z slopes have the same sign
+- T0/T1 scale-vs-Z relative slope spread `<= 0.25`
+
+Record the ROI coordinates, per-pair correlations, per-Z X-fit residuals,
+scale-vs-Z residuals, and rejection reasons in `result.json` and in the stable
+`quality.tool_xz_sweep` section of `facts.json`.
 
 ### C. Solve Tool Heights
 
 The height solve should produce:
 
-- `t0_z_to_bed_features_mm`
-- `t1_z_to_bed_features_mm`
-- `t1_minus_t0_z_mm`
+- `tool_zero_error_mm.T0`
+- `tool_zero_error_mm.T1`
+- `tool_z_to_bed_feature_at_command_0_mm`
+- `tool_delta_t1_minus_t0_z_mm`
+- `suggested_calib_yaml.tools.t0.z_endstop`
+- `suggested_calib_yaml.tools.t1.z_endstop`
+- `suggested_runtime_t1_z_offset`
 - quality metrics and residuals
 
-The important interpretation is:
+The current implementation solves Z from the way image X scale changes with
+commanded Z:
 
 ```text
-tool_z_height_mm(tool) =
-    fitted physical Z of the nozzle tip relative to the visible bed-feature
-    plane, after accounting for commanded Z motion and the fitted image-space
-    Z parallax vector.
+scale_px_per_mm(tool, z_command) =
+    scale_intercept_px_per_mm(tool)
+  + scale_slope_px_per_mm2(tool) * z_command
+
+common_scale_slope_px_per_mm2 =
+    average accepted T0/T1 scale_slope_px_per_mm2
+
+tool_z_to_bed_feature_at_command_0_mm(tool) =
+    (scale_intercept_px_per_mm(tool) - bed_y_scale_px_per_mm)
+  / common_scale_slope_px_per_mm2
+
+tool_zero_error_mm(tool) =
+    bed_feature_z_mm + tool_z_to_bed_feature_at_command_0_mm(tool)
 ```
 
-The first version should report this as an observed measurement, not as an
-automatic correction. It can also emit a suggested T1 Z offset adjustment:
+`bed_feature_z_mm` is configurable and defaults to `-0.1`, meaning the visible
+feature plane is estimated to sit 0.1 mm below the print-surface `Z=0` plane.
+Once the physical feature plane is measured, changing that value will shift the
+absolute zero-error result without changing the image tracking facts.
+
+The suggested `calib.yaml` values are computed as:
 
 ```text
-suggested_t1_z_offset_delta_mm = -t1_minus_t0_z_mm
+new_t0_z_endstop = current_t0_z_endstop + tool_zero_error_mm.T0
+new_t1_z_endstop = current_t1_z_endstop + tool_zero_error_mm.T1
+suggested_runtime_t1_z_offset = new_t0_z_endstop - new_t1_z_endstop
 ```
 
-but applying it must remain explicit.
+The first version reports these as observed measurements and suggestions only.
+Applying them must remain explicit.
 
 ### Ambiguity And Acceptance Criteria
 
@@ -562,16 +625,15 @@ analysis/overlays/<frame>_overlay.jpg
 {
   "schema_version": 1,
   "accepted": true,
-  "measurement": "idex_nozzle_yz_height",
-  "job_id": "idex_nozzle_yz_sweep_...",
-  "kind": "idex_nozzle_yz_sweep",
+  "measurement": "nozzle_cam_nozzle_z_offsets",
+  "job_id": "nozzle_cam_nozzle_z_sweep_...",
+  "kind": "nozzle_cam_nozzle_z_sweep",
   "camera": "nozzle_cam",
   "profile": "analysis",
+  "bed_feature_z_mm": -0.1,
   "lighting": {
     "bed_y_sweep": {
-      "macro": "NOZZLE_CAM_Y_FEATURE_LIGHT",
-      "led_indices": [2],
-      "rgb": [0.45, 0.45, 0.45]
+      "macro": "NOZZLE_CAM_Y_FEATURE_LIGHT"
     },
     "tool_xz_sweep": {
       "macro": "NOZZLE_CAM_ANALYSIS_LIGHT"
@@ -579,25 +641,33 @@ analysis/overlays/<frame>_overlay.jpg
   },
   "manifest_hash": "sha256:...",
   "gcode_hash": "sha256:...",
-  "bed_y_axis": {
-    "axis_vector_px_per_mm": [-0.26, -10.50],
-    "axis_px_per_mm": 10.50,
-    "residual_rms_px": 0.3
+  "bed_y_axis_vector_px_per_mm": [-0.2452, -10.4469],
+  "bed_y_scale_px_per_mm": 10.4498,
+  "tool_zero_error_mm": {
+    "T0": 7.296165,
+    "T1": 7.609225
   },
-  "tool_xz_fit": {
-    "x_axis_vector_px_per_mm": [7.78, -0.02],
-    "z_parallax_vector_px_per_mm": [-0.35, 4.80],
-    "residual_rms_px": 1.4
+  "tool_z_to_bed_feature_at_command_0_mm": {
+    "T0": 7.396165,
+    "T1": 7.709225
   },
-  "tool_heights": {
-    "T0": {"z_to_bed_features_mm": 0.03},
-    "T1": {"z_to_bed_features_mm": -0.08}
+  "tool_delta_t1_minus_t0_z_mm": 0.31306,
+  "suggested_calib_yaml": {
+    "tools": {
+      "t0": {"z_endstop": 301.046},
+      "t1": {"z_endstop": 301.259}
+    }
   },
-  "tool_delta_t1_minus_t0": {
-    "z_mm": -0.11
-  },
-  "suggested_offsets": {
-    "t1_z_offset_delta_mm": 0.11
+  "suggested_runtime_t1_z_offset": -0.213,
+  "quality": {
+    "tool_xz_sweep": {
+      "alignment_method": "iterative_roi_cross_alignment",
+      "coarse_roi_1080": [960.0, 360.0, 160.0, 150.0],
+      "refined_roi_1080": [1030.0, 500.0, 95.0, 80.0],
+      "coarse_correlation_min": 0.9177,
+      "refined_correlation_min": 0.9484,
+      "common_scale_slope_px_per_mm2": -0.105443
+    }
   }
 }
 ```
@@ -606,8 +676,8 @@ analysis/overlays/<frame>_overlay.jpg
 
 - every frame record after analysis
 - bed feature matches
-- nozzle candidates
-- pairwise match matrices
+- ROI cross-alignment matches
+- pairwise correlation and residual tables
 - fit residual tables
 - accepted/rejected reason
 - links to overlays/contact sheets
@@ -617,7 +687,8 @@ analysis/overlays/<frame>_overlay.jpg
 The static vision UI already discovers jobs from `manifest.json` and
 `state.json`. Extend the rendering to understand the new `kind`:
 
-- show job kind as `IDEX nozzle Y/Z sweep`
+- show job kind as `Nozzle camera nozzle Z sweep`
+- show measurement as `Nozzle camera nozzle Z offsets`
 - show frame count split by phase
 - show bed Y fit summary
 - show T0/T1 heights and T1-minus-T0 Z delta when accepted
@@ -631,7 +702,7 @@ workflow can call a dedicated script once the measurement has been validated.
 Add focused pytest coverage without asserting tuned calibration literals:
 
 - job generation:
-  - manifest `kind == "idex_nozzle_yz_sweep"`
+  - manifest `kind == "nozzle_cam_nozzle_z_sweep"`
   - frame sequences are contiguous and unique
   - frame count follows `len(y_offsets) + 2 * len(x_offsets) * len(z_values)`
   - generated G-code contains exactly one `VISION_JOB_BEGIN` and
@@ -660,14 +731,14 @@ defaults or visually tuned threshold values as brittle literals.
    for local OpenCV experiments. Keep
    `resources/vision_y_axis_led_pattern_20260713/` as the lighting fixture for
    the dedicated Y-feature light profile.
-2. Add the new manifest/frame builder and `--prepare-yz-job` CLI path. Verify
-   generated manifests and G-code locally without moving the printer.
-3. Add `--run-yz-acquisition-job` using the existing virtual-SD staging and
-   monitor path.
+2. Add the new manifest/frame builder and `--prepare-nozzle-z-job` CLI path.
+   Verify generated manifests and G-code locally without moving the printer.
+3. Add `--run-nozzle-z-acquisition-job` using the existing virtual-SD staging
+   and monitor path.
 4. Implement `fit_bed_y_motion()` against the saved manual Y-sweep frames before
    touching the full tool X/Z sweep.
 5. Run one reduced acquisition job, for example 3 Y frames, 3 X positions, and
-   Z values `8,5,2`. Inspect raw frames and overlays before enabling `Z=1`.
+   Z values `8,4,2`. Inspect raw frames and overlays before enabling `Z=1`.
 6. Implement bed-feature Y registration and write diagnostic overlays.
 7. Implement nozzle X/Z fitting and report rejected diagnostics first.
 8. Add acceptance thresholds and stable `facts.json`.

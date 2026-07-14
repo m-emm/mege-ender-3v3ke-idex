@@ -418,6 +418,7 @@ placement:
     - part: mgn7h_rail_with_carriage_assembly
       to: sprite_extruder_right_assembly
       alignment: STACK_BACK
+      stack_gap: 2
       
     - part: mgn7h_rail_with_carriage_assembly
       to: sprite_extruder_right_assembly.non_production_parts.hotend
@@ -3793,6 +3794,8 @@ assemblies:
     inject_parts:
       part_fans: part_fan_right_assembly
       extruder_cage: extruder_cage_right_assembly
+      mgn7h_rail_with_carriage: mgn7h_rail_with_carriage_assembly
+
     outputs:
       part_fans: part_fan_right_joined_assembly
       extruder_cage: extruder_cage_right_joined_assembly

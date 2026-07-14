@@ -83,6 +83,30 @@ NOZZLE_Z_TIP_ROI_1080 = tuple(
         ","
     )
 )
+NOZZLE_Z_COARSE_ROI_1080 = tuple(
+    float(v)
+    for v in os.environ.get("VISION_NOZZLE_Z_COARSE_ROI_1080", "960,360,160,150").split(
+        ","
+    )
+)
+NOZZLE_Z_REFINED_ROI_1080 = tuple(
+    float(v)
+    for v in os.environ.get("VISION_NOZZLE_Z_REFINED_ROI_1080", "1030,500,95,80").split(
+        ","
+    )
+)
+NOZZLE_Z_COARSE_SEARCH_PAD_1080 = float(
+    os.environ.get("VISION_NOZZLE_Z_COARSE_SEARCH_PAD_1080", "75")
+)
+NOZZLE_Z_REFINED_SEARCH_PAD_1080 = float(
+    os.environ.get("VISION_NOZZLE_Z_REFINED_SEARCH_PAD_1080", "45")
+)
+NOZZLE_Z_COARSE_MIN_CORRELATION = float(
+    os.environ.get("VISION_NOZZLE_Z_COARSE_MIN_CORRELATION", "0.80")
+)
+NOZZLE_Z_REFINED_MIN_CORRELATION = float(
+    os.environ.get("VISION_NOZZLE_Z_REFINED_MIN_CORRELATION", "0.85")
+)
 PUBLIC_BASE_URL = os.environ.get("VISION_PUBLIC_BASE_URL", "http://menderpi.local")
 NAME_REPLACEMENTS = str.maketrans({c: "_" for c in " /\\:;|?*[]{}()<>'\"`$&!"})
 VISION_JOB_SCHEMA_VERSION = 1
@@ -101,16 +125,16 @@ DEFAULT_NOZZLE_Z_BED_FEATURE_Z_MM = -0.1
 DEFAULT_T0_Z_ENDSTOP = 293.75
 DEFAULT_T1_Z_ENDSTOP = 293.65
 NOZZLE_Z_MAX_PER_Z_X_FIT_RESIDUAL_PX = float(
-    os.environ.get("VISION_NOZZLE_Z_MAX_PER_Z_X_FIT_RESIDUAL_PX", "4.0")
+    os.environ.get("VISION_NOZZLE_Z_MAX_PER_Z_X_FIT_RESIDUAL_PX", "1.25")
 )
 NOZZLE_Z_MAX_SCALE_FIT_RESIDUAL_PX_PER_MM = float(
-    os.environ.get("VISION_NOZZLE_Z_MAX_SCALE_FIT_RESIDUAL_PX_PER_MM", "0.35")
+    os.environ.get("VISION_NOZZLE_Z_MAX_SCALE_FIT_RESIDUAL_PX_PER_MM", "0.08")
 )
 NOZZLE_Z_MIN_SCALE_SLOPE_ABS = float(
     os.environ.get("VISION_NOZZLE_Z_MIN_SCALE_SLOPE_ABS", "0.05")
 )
 NOZZLE_Z_MAX_TOOL_SLOPE_RELATIVE_SPREAD = float(
-    os.environ.get("VISION_NOZZLE_Z_MAX_TOOL_SLOPE_RELATIVE_SPREAD", "0.75")
+    os.environ.get("VISION_NOZZLE_Z_MAX_TOOL_SLOPE_RELATIVE_SPREAD", "0.25")
 )
 BED_Y_ROIS_1080 = {
     "marked_line_tight": (690.0, 438.0, 300.0, 125.0),
@@ -1617,6 +1641,36 @@ def assert_analysis_outputs_absent(paths: dict[str, Path]) -> None:
         )
 
 
+def reset_interrupted_analysis(job_dir: Path, paths: dict[str, Path]) -> None:
+    for key in ("result", "facts"):
+        if paths[key].exists():
+            raise RuntimeError(
+                f"refusing to retry interrupted analysis because {paths[key]} exists"
+            )
+    analysis_dir = paths["analysis_dir"]
+    if analysis_dir.exists():
+        shutil.rmtree(analysis_dir)
+    state = read_json(job_dir / "state.json")
+    now = datetime.now(timezone.utc).isoformat()
+    state.update(
+        {
+            "state": "acquired",
+            "analysis_retry_at_utc": now,
+            "updated_at_utc": now,
+        }
+    )
+    state.pop("analysis_result_path", None)
+    state.pop("analysis_result_url", None)
+    state.pop("analysis_facts_path", None)
+    state.pop("analysis_facts_url", None)
+    atomic_write_json(job_dir / "state.json", state)
+    append_job_event(
+        job_dir,
+        "analysis_retry",
+        {"state": "acquired", "reason": "previous analysis was interrupted"},
+    )
+
+
 def mark_job_analysing(job_dir: Path) -> dict[str, Any]:
     state = read_json(job_dir / "state.json")
     state_name = state.get("state")
@@ -2452,6 +2506,345 @@ def linear_fit_xy(xs: list[float], ys: list[float]) -> dict[str, Any]:
     }
 
 
+def scaled_nozzle_z_pixels_1080(value: float, width: int, height: int) -> int:
+    scale = (width / RED_BASE_WIDTH + height / RED_BASE_HEIGHT) / 2.0
+    return max(1, int(round(float(value) * scale)))
+
+
+def nozzle_z_preprocess_image(image: Any) -> Any:
+    import cv2
+    import numpy as np
+
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
+    feature = clahe.astype("float32")
+    std = float(feature.std())
+    if std <= 1.0e-6:
+        return np.zeros(feature.shape, dtype="float32")
+    return (feature - float(feature.mean())) / std
+
+
+def match_nozzle_z_roi_pair(
+    *,
+    source_feature: Any,
+    target_feature: Any,
+    source_roi: tuple[int, int, int, int],
+    predicted_delta: tuple[float, float],
+    search_pad_px: int,
+    width: int,
+    height: int,
+) -> dict[str, Any]:
+    import cv2
+
+    x, y, w, h = source_roi
+    template = source_feature[y : y + h, x : x + w]
+    if template.shape[0] != h or template.shape[1] != w:
+        return {
+            "accepted": False,
+            "rejection_reason": "template ROI is outside the source image",
+            "roi": list(source_roi),
+        }
+    texture_std = float(template.std())
+    if texture_std <= 0.015:
+        return {
+            "accepted": False,
+            "rejection_reason": (
+                "template ROI has too little texture for cross-alignment "
+                f"(std={texture_std:.5f})"
+            ),
+            "roi": list(source_roi),
+        }
+
+    predicted_x = float(x) + float(predicted_delta[0])
+    predicted_y = float(y) + float(predicted_delta[1])
+    pad = max(1, int(round(search_pad_px)))
+    search_roi = clamp_rect(
+        predicted_x - pad,
+        predicted_y - pad,
+        float(w + 2 * pad),
+        float(h + 2 * pad),
+        width,
+        height,
+    )
+    sx, sy, sw, sh = search_roi
+    search = target_feature[sy : sy + sh, sx : sx + sw]
+    if search.shape[0] < h or search.shape[1] < w:
+        return {
+            "accepted": False,
+            "rejection_reason": "search window is smaller than template",
+            "roi": list(source_roi),
+            "search_roi": list(search_roi),
+        }
+
+    response = cv2.matchTemplate(
+        search.astype("float32"),
+        template.astype("float32"),
+        cv2.TM_CCOEFF_NORMED,
+    )
+    _min_value, max_value, _min_loc, max_loc = cv2.minMaxLoc(response)
+    sub_dx, sub_dy = subpixel_peak_offset(response, max_loc)
+    matched_x = float(sx + max_loc[0]) + sub_dx
+    matched_y = float(sy + max_loc[1]) + sub_dy
+    dx = matched_x - float(x)
+    dy = matched_y - float(y)
+    return {
+        "accepted": True,
+        "dx": dx,
+        "dy": dy,
+        "correlation": float(max_value),
+        "roi": list(source_roi),
+        "search_roi": list(search_roi),
+        "match_roi": [round(matched_x, 3), round(matched_y, 3), w, h],
+        "matched_origin_px": [matched_x, matched_y],
+        "predicted_origin_px": [round(predicted_x, 3), round(predicted_y, 3)],
+        "texture_std": round(texture_std, 5),
+    }
+
+
+def track_nozzle_z_roi_group(
+    *,
+    group_frames: list[dict[str, Any]],
+    features: dict[str, Any],
+    width: int,
+    height: int,
+) -> dict[str, Any]:
+    ordered = sorted(
+        group_frames,
+        key=lambda frame: float(frame.get("x_offset", frame.get("dx", 0.0))),
+    )
+    tool = str(ordered[0].get("tool", "")).lower() if ordered else ""
+    z_sample = float(ordered[0]["z_sample"]) if ordered else None
+    coarse_roi = scale_rect_1080(NOZZLE_Z_COARSE_ROI_1080, width, height)
+    refined_roi = scale_rect_1080(NOZZLE_Z_REFINED_ROI_1080, width, height)
+    coarse_pad = scaled_nozzle_z_pixels_1080(
+        NOZZLE_Z_COARSE_SEARCH_PAD_1080, width, height
+    )
+    refined_pad = scaled_nozzle_z_pixels_1080(
+        NOZZLE_Z_REFINED_SEARCH_PAD_1080, width, height
+    )
+    failures: list[str] = []
+    detections: dict[str, dict[str, Any]] = {}
+    samples: list[dict[str, Any]] = []
+    pairwise: list[dict[str, Any]] = []
+
+    if len(ordered) < 2:
+        reason = "need at least two X samples at the same Z"
+        return {
+            "ok": False,
+            "tool": tool,
+            "z_sample": z_sample,
+            "rejection_reason": reason,
+            "hard_failures": [reason],
+            "samples": [],
+            "diagnostic_samples": [],
+            "detections": detections,
+            "pairwise": pairwise,
+            "fit": {"ok": False, "rejection_reason": reason},
+        }
+
+    current_coarse_roi = coarse_roi
+    current_refined_roi = refined_roi
+    first = ordered[0]
+    rx, ry, rw, rh = current_refined_roi
+    first_point = [float(rx + rw / 2.0), float(ry + rh / 2.0)]
+    samples.append(
+        {
+            "tool": tool,
+            "x_offset": float(first.get("x_offset", first.get("dx", 0.0))),
+            "z_sample": float(first["z_sample"]),
+            "point_px": first_point,
+            "frame": first["prefix"],
+        }
+    )
+    detections[first["prefix"]] = {
+        "accepted": True,
+        "source": "roi_cross_alignment_reference",
+        "point_px": [round(first_point[0], 3), round(first_point[1], 3)],
+        "coarse_roi": list(current_coarse_roi),
+        "refined_roi": list(current_refined_roi),
+    }
+
+    for index in range(1, len(ordered)):
+        source_frame = ordered[index - 1]
+        target_frame = ordered[index]
+        source_prefix = source_frame["prefix"]
+        target_prefix = target_frame["prefix"]
+        coarse_match = match_nozzle_z_roi_pair(
+            source_feature=features[source_prefix],
+            target_feature=features[target_prefix],
+            source_roi=current_coarse_roi,
+            predicted_delta=(0.0, 0.0),
+            search_pad_px=coarse_pad,
+            width=width,
+            height=height,
+        )
+        pair_record = {
+            "source": source_prefix,
+            "target": target_prefix,
+            "source_x_offset": float(
+                source_frame.get("x_offset", source_frame.get("dx", 0.0))
+            ),
+            "target_x_offset": float(
+                target_frame.get("x_offset", target_frame.get("dx", 0.0))
+            ),
+            "coarse": coarse_match,
+        }
+        coarse_ok = (
+            bool(coarse_match.get("accepted"))
+            and float(coarse_match.get("correlation") or 0.0)
+            >= NOZZLE_Z_COARSE_MIN_CORRELATION
+        )
+        if not coarse_ok:
+            reason = (
+                f"{target_prefix}: coarse ROI correlation "
+                f"{float(coarse_match.get('correlation') or 0.0):.3f} below "
+                f"{NOZZLE_Z_COARSE_MIN_CORRELATION:.2f}"
+            )
+            if coarse_match.get("rejection_reason"):
+                reason = f"{target_prefix}: {coarse_match['rejection_reason']}"
+            failures.append(reason)
+            detections[target_prefix] = {
+                "accepted": False,
+                "source": "roi_cross_alignment",
+                "rejection_reason": reason,
+                "coarse_roi": list(current_coarse_roi),
+                "refined_roi": list(current_refined_roi),
+                "coarse_pair": coarse_match,
+            }
+            pairwise.append(pair_record)
+            break
+
+        refined_match = match_nozzle_z_roi_pair(
+            source_feature=features[source_prefix],
+            target_feature=features[target_prefix],
+            source_roi=current_refined_roi,
+            predicted_delta=(float(coarse_match["dx"]), float(coarse_match["dy"])),
+            search_pad_px=refined_pad,
+            width=width,
+            height=height,
+        )
+        pair_record["refined"] = refined_match
+        refined_ok = (
+            bool(refined_match.get("accepted"))
+            and float(refined_match.get("correlation") or 0.0)
+            >= NOZZLE_Z_REFINED_MIN_CORRELATION
+        )
+        if not refined_ok:
+            reason = (
+                f"{target_prefix}: refined ROI correlation "
+                f"{float(refined_match.get('correlation') or 0.0):.3f} below "
+                f"{NOZZLE_Z_REFINED_MIN_CORRELATION:.2f}"
+            )
+            if refined_match.get("rejection_reason"):
+                reason = f"{target_prefix}: {refined_match['rejection_reason']}"
+            failures.append(reason)
+            detections[target_prefix] = {
+                "accepted": False,
+                "source": "roi_cross_alignment",
+                "rejection_reason": reason,
+                "coarse_roi": list(current_coarse_roi),
+                "refined_roi": list(current_refined_roi),
+                "coarse_pair": coarse_match,
+                "refined_pair": refined_match,
+            }
+            pairwise.append(pair_record)
+            break
+
+        cx, cy = coarse_match["matched_origin_px"]
+        rx, ry = refined_match["matched_origin_px"]
+        cw, ch = current_coarse_roi[2], current_coarse_roi[3]
+        rw, rh = current_refined_roi[2], current_refined_roi[3]
+        current_coarse_roi = clamp_rect(cx, cy, cw, ch, width, height)
+        current_refined_roi = clamp_rect(rx, ry, rw, rh, width, height)
+        point = [float(rx + rw / 2.0), float(ry + rh / 2.0)]
+        samples.append(
+            {
+                "tool": tool,
+                "x_offset": float(
+                    target_frame.get("x_offset", target_frame.get("dx", 0.0))
+                ),
+                "z_sample": float(target_frame["z_sample"]),
+                "point_px": point,
+                "frame": target_prefix,
+            }
+        )
+        detections[target_prefix] = {
+            "accepted": True,
+            "source": "roi_cross_alignment",
+            "point_px": [round(point[0], 3), round(point[1], 3)],
+            "coarse_roi": list(current_coarse_roi),
+            "refined_roi": list(current_refined_roi),
+            "coarse_pair": coarse_match,
+            "refined_pair": refined_match,
+        }
+        pairwise.append(pair_record)
+
+    for frame in ordered:
+        detections.setdefault(
+            frame["prefix"],
+            {
+                "accepted": False,
+                "source": "roi_cross_alignment",
+                "rejection_reason": "not analyzed after an earlier pair failure",
+                "coarse_roi": list(current_coarse_roi),
+                "refined_roi": list(current_refined_roi),
+            },
+        )
+
+    fit = fit_points_by_dx(
+        [
+            {"dx": sample["x_offset"], "point_px": sample["point_px"]}
+            for sample in samples
+        ]
+    )
+    fit["z_sample"] = z_sample
+    fit["sample_count"] = len(samples)
+    if failures:
+        fit["accepted"] = False
+        if fit.get("ok"):
+            fit["rejection_reason"] = "; ".join(failures)
+    elif fit.get("ok"):
+        fit["accepted"] = True
+    else:
+        failures.append(str(fit.get("rejection_reason") or "per-Z fit failed"))
+
+    coarse_correlations = [
+        float(match["coarse"].get("correlation"))
+        for match in pairwise
+        if match.get("coarse", {}).get("correlation") is not None
+    ]
+    refined_correlations = [
+        float(match["refined"].get("correlation"))
+        for match in pairwise
+        if match.get("refined", {}).get("correlation") is not None
+    ]
+    ok = bool(not failures and fit.get("ok") and fit.get("accepted"))
+    return {
+        "ok": ok,
+        "tool": tool,
+        "z_sample": z_sample,
+        "rejection_reason": "; ".join(failures) if failures else "",
+        "hard_failures": failures,
+        "samples": samples if ok else [],
+        "diagnostic_samples": samples,
+        "detections": detections,
+        "pairwise": pairwise,
+        "fit": fit,
+        "coarse_roi": list(coarse_roi),
+        "refined_roi": list(refined_roi),
+        "coarse_search_pad_px": coarse_pad,
+        "refined_search_pad_px": refined_pad,
+        "coarse_correlation_min": (
+            min(coarse_correlations) if coarse_correlations else None
+        ),
+        "coarse_correlation_median": median_float(coarse_correlations),
+        "refined_correlation_min": (
+            min(refined_correlations) if refined_correlations else None
+        ),
+        "refined_correlation_median": median_float(refined_correlations),
+    }
+
+
 def detect_nozzle_z_tip(image: Any, frame: dict[str, Any]) -> dict[str, Any]:
     height, width = image.shape[:2]
     attempts: list[dict[str, Any]] = []
@@ -2517,6 +2910,13 @@ def annotate_nozzle_z_frame(
     import cv2
 
     overlay = image.copy()
+
+    def draw_rect(rect: Any, color: tuple[int, int, int], thickness: int) -> None:
+        if not rect:
+            return
+        x, y, w, h = [int(round(float(value))) for value in rect]
+        cv2.rectangle(overlay, (x, y), (x + w, y + h), color, thickness)
+
     red = frame.get("red_marker") or {}
     if red.get("roi"):
         x, y, w, h = red["roi"]
@@ -2537,6 +2937,14 @@ def annotate_nozzle_z_frame(
     if roi:
         x, y, w, h = roi
         cv2.rectangle(overlay, (x, y), (x + w, y + h), (0, 220, 255), 2)
+    coarse_pair = detection.get("coarse_pair") or {}
+    refined_pair = detection.get("refined_pair") or {}
+    draw_rect(coarse_pair.get("search_roi"), (120, 80, 255), 1)
+    draw_rect(coarse_pair.get("match_roi"), (0, 220, 255), 1)
+    draw_rect(detection.get("coarse_roi"), (0, 180, 255), 2)
+    draw_rect(refined_pair.get("search_roi"), (255, 90, 180), 1)
+    draw_rect(refined_pair.get("match_roi"), (80, 255, 80), 1)
+    draw_rect(detection.get("refined_roi"), (0, 255, 0), 2)
     for candidate in detection.get("candidates") or []:
         cv2.circle(
             overlay,
@@ -2546,8 +2954,9 @@ def annotate_nozzle_z_frame(
             1,
             cv2.LINE_AA,
         )
-    if detection.get("accepted"):
-        cx, cy = detection["center_px"]
+    point = detection.get("point_px") or detection.get("center_px")
+    if detection.get("accepted") and point:
+        cx, cy = point
         cv2.drawMarker(
             overlay,
             (int(round(cx)), int(round(cy))),
@@ -2556,10 +2965,16 @@ def annotate_nozzle_z_frame(
             markerSize=30,
             thickness=2,
         )
+    corr_label = ""
+    if refined_pair.get("correlation") is not None:
+        corr_label = f" r={float(refined_pair['correlation']):.3f}"
+    elif coarse_pair.get("correlation") is not None:
+        corr_label = f" c={float(coarse_pair['correlation']):.3f}"
     label = (
         f"{frame['tool'].upper()} x={frame.get('x_offset', frame.get('dx')):.3g} "
         f"z={frame.get('z_sample'):.3g} "
         f"{detection.get('source') if detection.get('accepted') else 'rejected'}"
+        f"{corr_label}"
     )
     cv2.rectangle(overlay, (0, 0), (860, 48), (0, 0, 0), -1)
     cv2.putText(
@@ -2589,65 +3004,201 @@ def analyze_tool_xz_sweep_frames(
         }
 
     hard_failures: list[str] = []
-    accepted_samples: list[dict[str, Any]] = []
+    groups: dict[tuple[str, float], list[dict[str, Any]]] = {}
     for frame in frames:
-        image = cv2.imread(frame["image_path"])
-        if image is None:
-            reason = f"Could not read {frame['image_path']}"
-            frame["analysis_error"] = reason
-            hard_failures.append(reason)
-            continue
-        height, width = image.shape[:2]
-        frame["image_width"] = width
-        frame["image_height"] = height
-        detection = detect_nozzle_z_tip(image, frame)
-        frame["nozzle_z_detection"] = detection
-        if detection.get("accepted"):
-            center = detection["center_px"]
-            frame["point_px"] = center
-            accepted_samples.append(
-                {
-                    "tool": frame["tool"],
-                    "x_offset": float(frame.get("x_offset", frame.get("dx", 0.0))),
-                    "z_sample": float(frame["z_sample"]),
-                    "point_px": center,
-                    "frame": frame["prefix"],
-                }
-            )
-        else:
+        tool = str(frame.get("tool", "")).lower()
+        if tool not in {"t0", "t1"}:
             hard_failures.append(
-                f"{frame['prefix']}: {detection.get('rejection_reason')}"
+                f"{frame['prefix']}: unsupported tool {frame.get('tool')!r}"
             )
-        overlay = annotate_nozzle_z_frame(image, frame, detection)
-        overlay_root = overlay_dir or run_dir
-        overlay_root.mkdir(parents=True, exist_ok=True)
-        overlay_path = overlay_root / f"{frame['prefix']}_overlay.jpg"
-        cv2.imwrite(str(overlay_path), overlay, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
-        frame["overlay_path"] = str(overlay_path)
-        frame["overlay_url"] = safe_vision_url(overlay_path)
+            continue
+        z_sample = float(frame["z_sample"])
+        groups.setdefault((tool, z_sample), []).append(frame)
 
+    image_shape: tuple[int, int] | None = None
     fits_by_tool: dict[str, dict[str, Any]] = {"t0": {}, "t1": {}}
-    all_vectors: list[tuple[float, float]] = []
+    alignment_by_tool_z: dict[str, dict[str, Any]] = {"t0": {}, "t1": {}}
+    frame_detections: dict[str, dict[str, Any]] = {}
+    accepted_samples: list[dict[str, Any]] = []
+    coarse_correlations: list[float] = []
+    refined_correlations: list[float] = []
+    overlay_root = overlay_dir or run_dir
+    overlay_root.mkdir(parents=True, exist_ok=True)
     for tool in ("t0", "t1"):
         z_values = sorted(
-            {
-                sample["z_sample"]
-                for sample in accepted_samples
-                if sample["tool"] == tool
-            },
+            {key[1] for key in groups if key[0] == tool},
             reverse=True,
         )
         for z_sample in z_values:
-            group = [
-                {"dx": sample["x_offset"], "point_px": sample["point_px"]}
-                for sample in accepted_samples
-                if sample["tool"] == tool and sample["z_sample"] == z_sample
-            ]
-            fit = fit_points_by_dx(group)
-            fit["z_sample"] = z_sample
-            fit["sample_count"] = len(group)
-            fits_by_tool[tool][dx_label(z_sample)] = fit
-            if fit.get("ok") and fit.get("px_per_mm", 0) > 0:
+            group_frames = groups[(tool, z_sample)]
+            group_images: dict[str, Any] = {}
+            group_features: dict[str, Any] = {}
+            group_failures: list[str] = []
+            for frame in group_frames:
+                image = cv2.imread(frame["image_path"])
+                if image is None:
+                    reason = f"Could not read {frame['image_path']}"
+                    frame["analysis_error"] = reason
+                    group_failures.append(reason)
+                    continue
+                frame_height, frame_width = image.shape[:2]
+                if image_shape is None:
+                    image_shape = (frame_width, frame_height)
+                elif image_shape != (frame_width, frame_height):
+                    reason = (
+                        f"{frame['prefix']}: image size "
+                        f"{frame_width}x{frame_height} does not match first tool "
+                        f"frame size {image_shape[0]}x{image_shape[1]}"
+                    )
+                    frame["analysis_error"] = reason
+                    group_failures.append(reason)
+                    continue
+                frame["image_width"] = frame_width
+                frame["image_height"] = frame_height
+                group_images[frame["prefix"]] = image
+                group_features[frame["prefix"]] = nozzle_z_preprocess_image(image)
+
+            width = image_shape[0] if image_shape else RED_BASE_WIDTH
+            height = image_shape[1] if image_shape else RED_BASE_HEIGHT
+            if group_failures:
+                coarse_roi = scale_rect_1080(NOZZLE_Z_COARSE_ROI_1080, width, height)
+                refined_roi = scale_rect_1080(NOZZLE_Z_REFINED_ROI_1080, width, height)
+                group_result = {
+                    "ok": False,
+                    "tool": tool,
+                    "z_sample": z_sample,
+                    "hard_failures": group_failures,
+                    "rejection_reason": "; ".join(group_failures),
+                    "samples": [],
+                    "diagnostic_samples": [],
+                    "detections": {
+                        frame["prefix"]: {
+                            "accepted": False,
+                            "source": "roi_cross_alignment",
+                            "rejection_reason": (
+                                frame.get("analysis_error")
+                                or "group contained unreadable frames"
+                            ),
+                            "coarse_roi": list(coarse_roi),
+                            "refined_roi": list(refined_roi),
+                        }
+                        for frame in group_frames
+                    },
+                    "pairwise": [],
+                    "fit": {
+                        "ok": False,
+                        "accepted": False,
+                        "z_sample": z_sample,
+                        "sample_count": 0,
+                        "rejection_reason": "; ".join(group_failures),
+                    },
+                    "coarse_roi": list(coarse_roi),
+                    "refined_roi": list(refined_roi),
+                }
+            else:
+                group_result = track_nozzle_z_roi_group(
+                    group_frames=group_frames,
+                    features=group_features,
+                    width=width,
+                    height=height,
+                )
+            label = dx_label(z_sample)
+            fit = group_result.get("fit") or {}
+            fits_by_tool[tool][label] = fit
+            frame_detections.update(group_result.get("detections") or {})
+            if group_result.get("ok"):
+                accepted_samples.extend(group_result.get("samples") or [])
+            else:
+                hard_failures.extend(
+                    f"{tool.upper()} Z={z_sample:g}: {failure}"
+                    for failure in (
+                        group_result.get("hard_failures")
+                        or [group_result.get("rejection_reason") or "rejected"]
+                    )
+                )
+            for pair in group_result.get("pairwise") or []:
+                coarse = pair.get("coarse") or {}
+                refined = pair.get("refined") or {}
+                if coarse.get("correlation") is not None:
+                    coarse_correlations.append(float(coarse["correlation"]))
+                if refined.get("correlation") is not None:
+                    refined_correlations.append(float(refined["correlation"]))
+            alignment_by_tool_z[tool][label] = {
+                "accepted": bool(group_result.get("ok")),
+                "z_sample": z_sample,
+                "fit": fit,
+                "coarse_roi": group_result.get("coarse_roi"),
+                "refined_roi": group_result.get("refined_roi"),
+                "coarse_search_pad_px": group_result.get("coarse_search_pad_px"),
+                "refined_search_pad_px": group_result.get("refined_search_pad_px"),
+                "coarse_correlation_min": group_result.get("coarse_correlation_min"),
+                "coarse_correlation_median": group_result.get(
+                    "coarse_correlation_median"
+                ),
+                "refined_correlation_min": group_result.get("refined_correlation_min"),
+                "refined_correlation_median": group_result.get(
+                    "refined_correlation_median"
+                ),
+                "samples": group_result.get("diagnostic_samples") or [],
+                "pairwise": group_result.get("pairwise") or [],
+                "rejection_reason": group_result.get("rejection_reason") or "",
+            }
+
+            for frame in group_frames:
+                image = group_images.get(frame["prefix"])
+                if image is None:
+                    continue
+                width = frame.get("image_width") or (
+                    image_shape[0] if image_shape else RED_BASE_WIDTH
+                )
+                height = frame.get("image_height") or (
+                    image_shape[1] if image_shape else RED_BASE_HEIGHT
+                )
+                detection = frame_detections.get(
+                    frame["prefix"],
+                    {
+                        "accepted": False,
+                        "source": "roi_cross_alignment",
+                        "rejection_reason": (
+                            frame.get("analysis_error")
+                            or "frame was not part of a complete tool/Z group"
+                        ),
+                        "coarse_roi": list(
+                            scale_rect_1080(
+                                NOZZLE_Z_COARSE_ROI_1080,
+                                int(width),
+                                int(height),
+                            )
+                        ),
+                        "refined_roi": list(
+                            scale_rect_1080(
+                                NOZZLE_Z_REFINED_ROI_1080,
+                                int(width),
+                                int(height),
+                            )
+                        ),
+                    },
+                )
+                frame["nozzle_z_alignment"] = detection
+                frame["nozzle_z_detection"] = detection
+                if detection.get("accepted") and detection.get("point_px"):
+                    frame["point_px"] = detection["point_px"]
+                overlay = annotate_nozzle_z_frame(image, frame, detection)
+                overlay_path = overlay_root / f"{frame['prefix']}_overlay.jpg"
+                cv2.imwrite(
+                    str(overlay_path), overlay, [int(cv2.IMWRITE_JPEG_QUALITY), 92]
+                )
+                frame["overlay_path"] = str(overlay_path)
+                frame["overlay_url"] = safe_vision_url(overlay_path)
+
+    all_vectors: list[tuple[float, float]] = []
+    for tool in ("t0", "t1"):
+        for fit in fits_by_tool[tool].values():
+            if (
+                fit.get("ok")
+                and fit.get("accepted", True)
+                and fit.get("px_per_mm", 0) > 0
+            ):
                 vector = fit["vector_px_per_mm"]
                 all_vectors.append((float(vector[0]), float(vector[1])))
 
@@ -2674,7 +3225,7 @@ def analyze_tool_xz_sweep_frames(
         ux, uy = axis_unit
         for tool in ("t0", "t1"):
             for fit in fits_by_tool[tool].values():
-                if not fit.get("ok"):
+                if not fit.get("ok") or not fit.get("accepted", True):
                     continue
                 vector = fit["vector_px_per_mm"]
                 projected_scale = float(vector[0]) * ux + float(vector[1]) * uy
@@ -2798,6 +3349,21 @@ def analyze_tool_xz_sweep_frames(
         "ok": ok,
         "proxy_only": not ok,
         "hard_failures": hard_failures,
+        "alignment_method": "iterative_roi_cross_alignment",
+        "coarse_roi_1080": list(NOZZLE_Z_COARSE_ROI_1080),
+        "refined_roi_1080": list(NOZZLE_Z_REFINED_ROI_1080),
+        "coarse_search_pad_1080": NOZZLE_Z_COARSE_SEARCH_PAD_1080,
+        "refined_search_pad_1080": NOZZLE_Z_REFINED_SEARCH_PAD_1080,
+        "coarse_min_correlation_threshold": NOZZLE_Z_COARSE_MIN_CORRELATION,
+        "refined_min_correlation_threshold": NOZZLE_Z_REFINED_MIN_CORRELATION,
+        "coarse_correlation_min": (
+            min(coarse_correlations) if coarse_correlations else None
+        ),
+        "coarse_correlation_median": median_float(coarse_correlations),
+        "refined_correlation_min": (
+            min(refined_correlations) if refined_correlations else None
+        ),
+        "refined_correlation_median": median_float(refined_correlations),
         "accepted_sample_count": len(accepted_samples),
         "frame_count": len(frames),
         "x_axis_unit_vector_px": (
@@ -2809,6 +3375,7 @@ def analyze_tool_xz_sweep_frames(
             else None
         ),
         "per_z_x_fits": fits_by_tool,
+        "pairwise_alignment_by_tool_z": alignment_by_tool_z,
         "scale_samples_by_tool": scale_samples_by_tool,
         "scale_fit_by_tool": scale_fit_by_tool,
         "common_scale_slope_px_per_mm2": (
@@ -2931,10 +3498,24 @@ def build_nozzle_z_offsets_facts(
             },
             "tool_xz_sweep": {
                 "accepted": bool(tool_analysis.get("ok")),
+                "alignment_method": tool_analysis.get("alignment_method"),
+                "coarse_roi_1080": tool_analysis.get("coarse_roi_1080"),
+                "refined_roi_1080": tool_analysis.get("refined_roi_1080"),
+                "coarse_correlation_min": tool_analysis.get("coarse_correlation_min"),
+                "coarse_correlation_median": tool_analysis.get(
+                    "coarse_correlation_median"
+                ),
+                "refined_correlation_min": tool_analysis.get("refined_correlation_min"),
+                "refined_correlation_median": tool_analysis.get(
+                    "refined_correlation_median"
+                ),
                 "accepted_sample_count": tool_analysis.get("accepted_sample_count"),
                 "frame_count": tool_analysis.get("frame_count"),
                 "common_scale_slope_px_per_mm2": common_slope,
                 "scale_fit_by_tool": tool_analysis.get("scale_fit_by_tool"),
+                "pairwise_alignment_by_tool_z": tool_analysis.get(
+                    "pairwise_alignment_by_tool_z"
+                ),
                 "x_axis_unit_vector_px": tool_analysis.get("x_axis_unit_vector_px"),
             },
         },
@@ -3074,13 +3655,16 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
     job_dir = job_dir_from_root(job_root, job_id)
     manifest, state = verify_prepared_job_integrity(job_dir)
     state_name = state.get("state")
+    paths = job_analysis_paths(job_dir)
+    if state_name == "analysing":
+        reset_interrupted_analysis(job_dir, paths)
+        state_name = "acquired"
     if state_name not in {"acquired", "completed", "failed"}:
         raise RuntimeError(
             f"vision job {manifest.get('job_id')} is {state_name!r}, "
             "expected 'acquired', 'completed', or 'failed'"
         )
     verify_acquired_job_frames(manifest, job_dir)
-    paths = job_analysis_paths(job_dir)
     if state_name == "acquired":
         assert_analysis_outputs_absent(paths)
     paths["analysis_dir"].mkdir(parents=True, exist_ok=True)

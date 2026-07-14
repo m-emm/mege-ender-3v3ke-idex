@@ -44,6 +44,10 @@ def create_idex_tap_t1_shuttle_assembly(
         idex_tap_shuttle_height,
     )
 
+    shuttle = align(shuttle, carriage, Alignment.CENTER)
+    shuttle = align(shuttle, carriage, Alignment.STACK_BACK)
+
+
     shuttle_mount_screw = MScrew.from_size(idex_tap_shuttle_carriage_screw_size)
     shuttle_holes = PartCollector()
     for x_offset in [
@@ -64,48 +68,14 @@ def create_idex_tap_t1_shuttle_assembly(
             shuttle = shuttle.cut(shuttle_hole)
             shuttle_holes = shuttle_holes.fuse(shuttle_hole)
 
-    trigger_flag_height = (
-        idex_tap_trigger_flag_sensor_overlap_at_rest + idex_tap_total_travel + 4
-    )
-    trigger_flag = create_box(
-        idex_tap_trigger_flag_width,
-        idex_tap_trigger_flag_thickness,
-        trigger_flag_height,
-    )
-    trigger_flag = align(trigger_flag, shuttle, Alignment.CENTER, axes=[2])
-    trigger_flag = align(trigger_flag, shuttle, Alignment.STACK_RIGHT)
-    trigger_flag = align(trigger_flag, shuttle, Alignment.STACK_FRONT)
-
-    moving_magnet_targets = PartCollector()
-    magnet_stations = max(1, int(idex_tap_magnet_count))
-    # for station_index in range(magnet_stations):
-    #     x_offset = (station_index - (magnet_stations - 1) / 2) * (
-    #         idex_tap_magnet_center_spacing
-    #     )
-    #     target = create_cylinder(
-    #         idex_tap_magnet_target_screw_head_diameter / 2,
-    #         idex_tap_magnet_height,
-    #         direction=(0, 1, 0),
-    #     )
-    #     target = align(target, carriage_plate, Alignment.CENTER, axes=[0, 2])
-    #     target = align(target, carriage_plate, Alignment.STACK_BACK)
-    #     target = translate(
-    #         x_offset,
-    #         -idex_tap_magnet_gap_at_rest,
-    #         -idex_tap_shuttle_height * 0.42,
-    #     )(target)
-    #     moving_magnet_targets = moving_magnet_targets.fuse(target)
 
     shuttle_part = LeaderFollowersCuttersPart(leader=shuttle)
     # shuttle_part.add_named_follower(carriage_plate, "idex_tap_carriage_plate")
-    shuttle_part.add_named_follower(trigger_flag, "idex_tap_trigger_flag")
     shuttle_part.add_named_cutter(shuttle_holes, "shuttle_carriage_mount_holes")
     # shuttle_part.add_named_non_production_part(
     #     moving_magnet_targets,
     #     "moving_magnet_targets",
     # )
 
-    shuttle_part = align(shuttle_part, carriage, Alignment.CENTER)
-    shuttle_part = align(shuttle_part, carriage, Alignment.STACK_FRONT)
 
     return shuttle_part

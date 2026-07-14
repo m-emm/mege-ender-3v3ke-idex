@@ -143,4 +143,5 @@ Parts:
         clearance_type:
           $ref: clearance_type
         fillet_radius:
-          $ref: fillet_radius
+          $ref: fillet_radius        
+        

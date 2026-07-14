@@ -204,7 +204,9 @@ def _write_nozzle_z_synthetic_frames(
     scale_slope=1.2,
     t0_zero_error=0.4,
     t1_zero_error=-0.35,
+    t1_scale_slope=None,
     tool_fit_wobble_px=0.0,
+    draw_decoy_circle=True,
 ):
     cv2 = pytest.importorskip("cv2")
     np = pytest.importorskip("numpy")
@@ -217,6 +219,47 @@ def _write_nozzle_z_synthetic_frames(
     cv2.line(bed_base, (700, 492), (970, 492), (238, 238, 238), 4, cv2.LINE_AA)
     cv2.line(bed_base, (718, 528), (962, 528), (34, 34, 34), 2, cv2.LINE_AA)
     cv2.circle(bed_base, (842, 471), 11, (220, 220, 220), -1, cv2.LINE_AA)
+    coarse_roi = (960, 360, 160, 150)
+    refined_roi = (1030, 500, 95, 80)
+    coarse_texture = rng.integers(
+        55, 205, size=(coarse_roi[3], coarse_roi[2], 1), dtype=np.uint8
+    )
+    coarse_texture = np.repeat(coarse_texture, 3, axis=2)
+    refined_texture = rng.integers(
+        35, 225, size=(refined_roi[3], refined_roi[2], 1), dtype=np.uint8
+    )
+    refined_texture = np.repeat(refined_texture, 3, axis=2)
+    cv2.line(
+        coarse_texture,
+        (8, 36),
+        (coarse_roi[2] - 10, 104),
+        (232, 232, 232),
+        5,
+        cv2.LINE_AA,
+    )
+    cv2.rectangle(refined_texture, (12, 10), (72, 58), (20, 20, 20), -1)
+    cv2.line(
+        refined_texture,
+        (4, 67),
+        (refined_roi[2] - 8, 22),
+        (238, 238, 238),
+        3,
+        cv2.LINE_AA,
+    )
+
+    def paste_patch(image, patch, origin_x, origin_y):
+        x0 = int(round(float(origin_x)))
+        y0 = int(round(float(origin_y)))
+        h, w = patch.shape[:2]
+        x1 = max(0, x0)
+        y1 = max(0, y0)
+        x2 = min(image.shape[1], x0 + w)
+        y2 = min(image.shape[0], y0 + h)
+        if x2 <= x1 or y2 <= y1:
+            return
+        px1 = x1 - x0
+        py1 = y1 - y0
+        image[y1:y2, x1:x2] = patch[py1 : py1 + (y2 - y1), px1 : px1 + (x2 - x1)]
 
     bed_feature_z = float(manifest["measurement_parameters"]["bed_feature_z_mm"])
     for frame in manifest["frames"]:
@@ -240,9 +283,14 @@ def _write_nozzle_z_synthetic_frames(
         elif not blank_tool:
             tool = str(frame["tool"]).lower()
             zero_error = t0_zero_error if tool == "t0" else t1_zero_error
+            tool_scale_slope = (
+                scale_slope
+                if tool == "t0" or t1_scale_slope is None
+                else float(t1_scale_slope)
+            )
             z_sample = float(frame["z_sample"])
             x_offset = float(frame["x_offset"])
-            image_scale = bed_scale + scale_slope * (
+            image_scale = bed_scale + tool_scale_slope * (
                 z_sample + zero_error - bed_feature_z
             )
             wobble = float(tool_fit_wobble_px) * {
@@ -252,16 +300,31 @@ def _write_nozzle_z_synthetic_frames(
                 9.0: 1.0,
                 12.0: 0.0,
             }.get(round(x_offset, 3), 0.0)
-            center_x = 820.0 + x_offset * image_scale + wobble
-            center_y = 560.0 + (0 if tool == "t0" else 38.0) + 1.5 * z_sample
-            cv2.circle(
+            dx_motion = x_offset * image_scale + wobble
+            dy_motion = 0.035 * x_offset
+            paste_patch(
                 image,
-                (int(round(center_x)), int(round(center_y))),
-                18,
-                (18, 18, 18),
-                -1,
-                cv2.LINE_AA,
+                coarse_texture,
+                coarse_roi[0] + dx_motion,
+                coarse_roi[1] + dy_motion,
             )
+            paste_patch(
+                image,
+                refined_texture,
+                refined_roi[0] + dx_motion,
+                refined_roi[1] + dy_motion,
+            )
+            if draw_decoy_circle:
+                decoy_x = 820.0 + 2.0 * x_offset
+                decoy_y = 560.0 + (6.0 if tool == "t1" else 0.0)
+                cv2.circle(
+                    image,
+                    (int(round(decoy_x)), int(round(decoy_y))),
+                    18,
+                    (18, 18, 18),
+                    -1,
+                    cv2.LINE_AA,
+                )
         else:
             image = np.full((1080, 1920, 3), 165, dtype=np.uint8)
         frame_id = frame["frame"]
@@ -501,7 +564,26 @@ def test_analyze_nozzle_z_job_recovers_synthetic_z_offsets(tmp_path):
     }
     assert facts["quality"]["bed_y_sweep"]["accepted"] is True
     assert facts["quality"]["tool_xz_sweep"]["accepted"] is True
+    assert (
+        facts["quality"]["tool_xz_sweep"]["alignment_method"]
+        == "iterative_roi_cross_alignment"
+    )
+    assert facts["quality"]["tool_xz_sweep"]["coarse_roi_1080"] == [
+        960.0,
+        360.0,
+        160.0,
+        150.0,
+    ]
+    assert facts["quality"]["tool_xz_sweep"]["refined_roi_1080"] == [
+        1030.0,
+        500.0,
+        95.0,
+        80.0,
+    ]
+    assert facts["quality"]["tool_xz_sweep"]["coarse_correlation_min"] >= 0.80
+    assert facts["quality"]["tool_xz_sweep"]["refined_correlation_min"] >= 0.85
     assert facts["quality"]["tool_xz_sweep"]["accepted_sample_count"] == 40
+    assert facts["quality"]["tool_xz_sweep"]["pairwise_alignment_by_tool_z"]["t0"]
     assert (analysis_dir / "result.json").exists()
     assert (analysis_dir / "raw_contact_sheet.jpg").exists()
     assert (analysis_dir / "overlay_contact_sheet.jpg").exists()
@@ -509,6 +591,38 @@ def test_analyze_nozzle_z_job_recovers_synthetic_z_offsets(tmp_path):
         (analysis_dir / "overlays" / f"{frame['frame']}_overlay.jpg").exists()
         for frame in manifest["frames"]
     )
+
+
+def test_analyze_nozzle_z_job_retries_interrupted_analysis(tmp_path):
+    module = _load_module()
+    job_root, job_dir, manifest = _prepare_acquired_nozzle_z_job(
+        module, tmp_path, job_id="nozzle_z_interrupted_analysis"
+    )
+    _write_nozzle_z_synthetic_frames(job_dir, manifest)
+    analysis_dir = job_dir / "analysis"
+    partial_overlay_dir = analysis_dir / "overlays"
+    partial_overlay_dir.mkdir(parents=True)
+    (partial_overlay_dir / "partial_overlay.jpg").write_bytes(b"partial")
+    state_path = job_dir / "state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state.update(
+        {
+            "state": "analysing",
+            "analysis_started_at_utc": "2026-07-13T20:42:15+00:00",
+            "updated_at_utc": "2026-07-13T20:42:15+00:00",
+        }
+    )
+    module.atomic_write_json(state_path, state)
+
+    result = module.analyze_acquired_job(_analyze_args(job_root, manifest["job_id"]))
+
+    facts = json.loads((analysis_dir / "facts.json").read_text(encoding="utf-8"))
+    events = (job_dir / "events.jsonl").read_text(encoding="utf-8")
+    assert result["ok"] is True
+    assert result["state"] == "completed"
+    assert facts["accepted"] is True
+    assert "analysis_retry" in events
+    assert not (partial_overlay_dir / "partial_overlay.jpg").exists()
 
 
 def test_analyze_nozzle_z_job_rejects_failed_bed_phase_but_writes_artifacts(tmp_path):
@@ -533,6 +647,33 @@ def test_analyze_nozzle_z_job_rejects_failed_bed_phase_but_writes_artifacts(tmp_
     assert (analysis_dir / "facts.json").exists()
     assert (analysis_dir / "raw_contact_sheet.jpg").exists()
     assert (analysis_dir / "overlay_contact_sheet.jpg").exists()
+
+
+def test_analyze_nozzle_z_job_rejects_opposite_tool_parallax_slope(tmp_path):
+    module = _load_module()
+    job_root, job_dir, manifest = _prepare_acquired_nozzle_z_job(
+        module, tmp_path, job_id="nozzle_z_opposite_tool_slope"
+    )
+    _write_nozzle_z_synthetic_frames(
+        job_dir,
+        manifest,
+        t1_scale_slope=-1.2,
+    )
+
+    result = module.analyze_acquired_job(_analyze_args(job_root, manifest["job_id"]))
+
+    analysis_dir = job_dir / "analysis"
+    facts = json.loads((analysis_dir / "facts.json").read_text(encoding="utf-8"))
+    failures = "\n".join(facts["rejection_reasons"])
+    assert result["ok"] is False
+    assert result["state"] == "failed"
+    assert facts["accepted"] is False
+    assert facts["quality"]["bed_y_sweep"]["accepted"] is True
+    assert facts["quality"]["tool_xz_sweep"]["accepted"] is False
+    assert "scale-vs-Z slopes disagree in sign" in failures
+    assert facts["tool_zero_error_mm"] == {"T0": None, "T1": None}
+    assert (analysis_dir / "result.json").exists()
+    assert (analysis_dir / "facts.json").exists()
 
 
 def test_analyze_nozzle_z_job_rejects_failed_tool_phase_but_writes_artifacts(tmp_path):
@@ -567,7 +708,7 @@ def test_analyze_nozzle_z_job_rejects_noisy_tool_x_fits(tmp_path):
     _write_nozzle_z_synthetic_frames(
         job_dir,
         manifest,
-        tool_fit_wobble_px=18.0,
+        tool_fit_wobble_px=10.0,
     )
 
     result = module.analyze_acquired_job(_analyze_args(job_root, manifest["job_id"]))
