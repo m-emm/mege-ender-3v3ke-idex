@@ -418,6 +418,23 @@ def create_extruder_cage_right_assembly(
         limiting_end_part=sprite_mount_base_plate,
     )
 
+    right_mount_plate_connector = create_box(
+        8 * nitehawk_plate_depth,
+        nitehawk_plate_depth,
+        tool_head_additional_mount_plate_depth,
+    )
+    right_mount_plate_connector = align(
+        right_mount_plate_connector, right_mount_plate, Alignment.CENTER
+    )
+
+    right_mount_plate_connector = align(
+        right_mount_plate_connector, right_mount_plate, Alignment.RIGHT
+    )
+
+    right_mount_plate_connector = align(
+        right_mount_plate_connector, right_mount_plate, Alignment.FRONT
+    )
+
     back_strips = PartCollector()
     back_strip_inset = 1.5
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
@@ -528,6 +545,8 @@ def create_extruder_cage_right_assembly(
     cage_leader = cage_leader.fuse(nitehawk_rear_mount_plate)
     cage_leader = cage_leader.fuse(right_mount_plate)
     cage_leader = cage_leader.fuse(back_strips)
+
+    cage_leader = cage_leader.fuse(right_mount_plate_connector)
 
     flange_part = flange_connector.fuse(left_flange).fuse(right_flange)
 

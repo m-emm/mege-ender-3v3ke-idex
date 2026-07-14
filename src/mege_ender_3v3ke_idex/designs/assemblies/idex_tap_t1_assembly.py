@@ -38,11 +38,16 @@ def create_idex_tap_t1_assembly(
 
     inset_boss_cutter_diameter = 10
 
+    tool_head_rest_width = 60
+    tool_head_rest_depth = 4
+    tool_head_rest_height = 10
+
     lower_mount_strips = PartCollector()
     lower_mount_strip_thread_inset_bosses = PartCollector()
     lower_mount_strip_thread_inset_cutters = PartCollector()
     lower_mount_strip_thread_insets = []
     inset_boss_cutters = PartCollector()
+    top_screw_drills = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
         lower_mount_strip = create_box(
@@ -64,6 +69,8 @@ def create_idex_tap_t1_assembly(
         for fb in [Alignment.FRONT, Alignment.BACK]:
             drill_name = f"hole_drill_{lr.name}_{fb.name}"
             drill = fixed_tool_head_mount.get_named_cutter(drill_name)
+            top_screw_drills = top_screw_drills.fuse(drill)
+
             lower_mount_strip = lower_mount_strip.cut(drill)
 
             thread_inset = create_thread_inset_assembly(
@@ -108,7 +115,7 @@ def create_idex_tap_t1_assembly(
 
         lower_mount_strips = lower_mount_strips.fuse(lower_mount_strip)
 
-    lower_mount_strips = fixed_tool_head_mount.use_as_cutter_on(lower_mount_strips)
+    lower_mount_strips = lower_mount_strips.cut(top_screw_drills)
 
     carriage = mgn7h_rail_with_carriage.get_named_follower("carriage")
 
@@ -196,6 +203,21 @@ def create_idex_tap_t1_assembly(
     side_walls = side_walls.cut(inset_boss_cutters)
 
     part = part.fuse(side_walls)
+    tool_head_rest = create_box(
+        tool_head_rest_width,
+        tool_head_rest_depth,
+        tool_head_rest_height,
+    )
+
+    tool_head_rest = align(tool_head_rest, back_mount_plate, Alignment.CENTER)
+    tool_head_rest = align(tool_head_rest, back_mount_plate, Alignment.TOP)
+    tool_head_rest = align(tool_head_rest, back_mount_plate, Alignment.STACK_FRONT)
+    carriage_cutter = materialize_bounding_box(
+        carriage, z_enlargement=50, x_enlargement=2, y_enlargement=50
+    )
+    tool_head_rest = tool_head_rest.cut(carriage_cutter)
+
+    part = part.fuse(tool_head_rest)
 
     part = mgn7h_rail_with_carriage.use_as_cutter_on(part)
     part = part.fuse(lower_mount_strip_thread_inset_bosses)
