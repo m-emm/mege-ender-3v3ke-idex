@@ -391,18 +391,22 @@ def join_part_fans_with_extruder_cage(
 
             magnet_screw = rotate(180 + 45, axis=[1, 0, 0])(magnet_screw)
 
+            magnet_screw = align(magnet_screw, carriage, Alignment.CENTER)
+
             magnet_screw = align(magnet_screw, carriage, Alignment.BACK)
 
             magnet_screw = align(
                 magnet_screw, carriage, lr.stack_alignment, stack_gap=4
             )
 
+            magnet_screw = translate(0, 0, -4)(magnet_screw)
+
             joined_extruder_cage.add_named_non_production_part(
                 magnet_screw.leader, f"magnet_screw_{lr.name}"
             )
 
             magnet_screw_holder = materialize_bounding_box(
-                magnet_screw, x_enlargement=1, y_enlargement=1, z_enlargement=1
+                magnet_screw, x_enlargement=1, y_enlargement=3, z_enlargement=2
             )
 
             magnet_screw_holder = align(magnet_screw_holder, carriage, Alignment.BACK)
@@ -411,6 +415,10 @@ def join_part_fans_with_extruder_cage(
             magnet_screw_holder = magnet_screw.use_as_cutter_on(magnet_screw_holder)
 
             joined_extruder_cage = joined_extruder_cage.fuse(magnet_screw_holder)
+
+            for name, cutter in magnet_screw.get_named_cutter_items():
+                if name in ["thread_hole_cutter"]:
+                    joined_extruder_cage = joined_extruder_cage.cut(cutter)
 
     return {
         "part_fans": joined_part_fans,
