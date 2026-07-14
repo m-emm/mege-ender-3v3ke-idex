@@ -82,14 +82,11 @@ def create_mgn7h_carriage(
 
 def create_mgn7h_rail(
     *,
+
     length_mm: float,
+    mount_hole_drill_extra_length,
     rail_width=mgn_7h_rail_width,
     rail_height=mgn_7h_rail_height,
-    rail_mount_hole_pitch=mgn_7h_rail_mount_hole_pitch,
-    rail_mount_hole_end_offset=mgn_7h_rail_mount_hole_end_offset,
-    rail_mount_hole_diameter=mgn_7h_rail_mount_hole_diameter,
-    rail_mount_counterbore_diameter=mgn_7h_rail_mount_counterbore_diameter,
-    rail_mount_counterbore_depth=mgn_7h_rail_mount_counterbore_depth,
     rail_groove_z_center=mgn_7h_rail_groove_z_center,
     rail_groove_v_height=mgn_7h_rail_groove_v_height,
     rail_groove_v_depth=mgn_7h_rail_groove_v_depth,
@@ -143,33 +140,49 @@ def create_mgn7h_rail(
             profile_cutters.append(chamfer)
             profile_cutter_names.append(name)
 
-    last_hole_x = length_mm - rail_mount_hole_end_offset
-    hole_x = rail_mount_hole_end_offset
-    holes_aligned = []
 
-    if last_hole_x >= hole_x:
-        holes_list = []
-        while hole_x <= last_hole_x + 1e-6:
-            top_hole = create_cylinder(
-                rail_mount_counterbore_diameter / 2,
-                rail_mount_counterbore_depth,
-            )
-            top_hole = translate(hole_x, rail_width / 2, 0)(top_hole)
-            top_hole = align(top_hole, rail, Alignment.TOP)
+    num_holes = int((length_mm / mgn_7h_rail_mount_hole_pitch) + 1)
 
-            current_hole = top_hole
-            bottom_hole = create_cylinder(rail_mount_hole_diameter / 2, rail_height)
-            bottom_hole = translate(hole_x, rail_width / 2, 0)(bottom_hole)
-            bottom_hole = align(bottom_hole, rail, Alignment.BOTTOM)
-            current_hole = current_hole.fuse(bottom_hole)
-            holes_list.append(current_hole)
-            hole_x += rail_mount_hole_pitch
+    holes_fused = PartCollector()
+    holes_list = []
+    for i in range(num_holes):
+        hole_x = mgn_7h_rail_mount_hole_end_offset + i * mgn_7h_rail_mount_hole_pitch
 
-        holes_aligned = holes_list
+        top_hole = create_cylinder(
+            mgn_7h_rail_mount_counterbore_diameter / 2,
+            mgn_7h_rail_mount_counterbore_depth,
+        )
+        top_hole = translate(hole_x, 0,  0)(top_hole)
+        
 
-        for hole in holes_aligned:
-            rail = rail.cut(hole)
+        
+        bottom_hole = create_cylinder(mgn_7h_rail_mount_hole_diameter / 2, rail_height- mgn_7h_rail_mount_counterbore_depth +mount_hole_drill_extra_length)
+        bottom_hole = align(bottom_hole, top_hole, Alignment.CENTER)
+        bottom_hole = align(bottom_hole, top_hole, Alignment.STACK_BOTTOM)
 
+
+
+        current_hole = top_hole.fuse(bottom_hole)
+        holes_list.append(current_hole)
+
+        holes_fused = holes_fused.fuse(current_hole)
+
+
+    
+    hole_aligner = align_translation(holes_fused, rail, Alignment.CENTER)
+    holes_aligned = [hole_aligner(hole) for hole in holes_list]
+    holes_aligned_fused = PartCollector()
+    for hole in holes_aligned:
+        holes_aligned_fused = holes_aligned_fused.fuse(hole)
+    
+    holes_top_aligner = align_translation(
+        holes_aligned_fused, rail, Alignment.TOP)
+
+    holes_aligned = [holes_top_aligner(hole) for hole in holes_aligned]
+
+        
+
+        
     if rail_groove_v_depth > 0 and rail_groove_v_height > 0:
         groove_v_convergence_depth = rail_groove_v_depth
         if rail_groove_slot_depth > 0 and rail_groove_slot_height > 0:
@@ -252,7 +265,9 @@ def create_mgn7h_rail(
             profile_cutters.append(groove_slot_cutter)
             profile_cutter_names.append(name)
 
-    rail = LeaderFollowersCuttersPart(rail, cutters=holes_aligned + profile_cutters)
+    rail = LeaderFollowersCuttersPart(rail, profile_cutters)
+    for index, hole in enumerate(holes_aligned):
+        rail.add_named_cutter(hole, f"mounting_hole_{index + 1}")
     rail.add_named_follower(rail.leader, "rail_body")
     for index, hole in enumerate(holes_aligned):
         rail.add_named_cutter(hole, f"mounting_hole_{index + 1}")
@@ -265,75 +280,30 @@ def create_mgn7h_rail(
 def create_mgn7h_rail_with_carriage(
     *,
     length_mm: float,
+    mount_hole_drill_extra_length=0,
     rail_mock_clearance,
     rail_mock_side_clearance,
     rail_mock_top_clearance,
     rail_mock_groove_clearance,
     rail_mock_groove_height_clearance,
     carriage_offset,
-    rail_width=mgn_7h_rail_width,
-    rail_height=mgn_7h_rail_height,
-    rail_mount_hole_pitch=mgn_7h_rail_mount_hole_pitch,
-    rail_mount_hole_end_offset=mgn_7h_rail_mount_hole_end_offset,
-    rail_mount_hole_diameter=mgn_7h_rail_mount_hole_diameter,
-    rail_mount_counterbore_diameter=mgn_7h_rail_mount_counterbore_diameter,
-    rail_mount_counterbore_depth=mgn_7h_rail_mount_counterbore_depth,
-    rail_groove_z_center=mgn_7h_rail_groove_z_center,
-    rail_groove_v_height=mgn_7h_rail_groove_v_height,
-    rail_groove_v_depth=mgn_7h_rail_groove_v_depth,
-    rail_groove_slot_height=mgn_7h_rail_groove_slot_height,
-    rail_groove_slot_depth=mgn_7h_rail_groove_slot_depth,
-    rail_top_fillet_radius=mgn_7h_rail_top_fillet_radius,
-    rail_bottom_chamfer_width=mgn_7h_rail_bottom_chamfer_width,
-    rail_bottom_chamfer_height=mgn_7h_rail_bottom_chamfer_height,
-    carriage_length,
-    carriage_width,
-    carriage_height,
-    carriage_h1_offset,
-    carriage_mount_hole_pitch_x,
-    carriage_mount_hole_pitch_y,
-    carriage_mount_hole_depth,
-    carriage_mount_screw_size,
 ):
     """Create an MGN7H rail assembly with a built-in carriage follower."""
 
     rail = create_mgn7h_rail(
         length_mm=length_mm,
-        rail_width=rail_width,
-        rail_height=rail_height,
-        rail_mount_hole_pitch=rail_mount_hole_pitch,
-        rail_mount_hole_end_offset=rail_mount_hole_end_offset,
-        rail_mount_hole_diameter=rail_mount_hole_diameter,
-        rail_mount_counterbore_diameter=rail_mount_counterbore_diameter,
-        rail_mount_counterbore_depth=rail_mount_counterbore_depth,
-        rail_groove_z_center=rail_groove_z_center,
-        rail_groove_v_height=rail_groove_v_height,
-        rail_groove_v_depth=rail_groove_v_depth,
-        rail_groove_slot_height=rail_groove_slot_height,
-        rail_groove_slot_depth=rail_groove_slot_depth,
-        rail_top_fillet_radius=rail_top_fillet_radius,
-        rail_bottom_chamfer_width=rail_bottom_chamfer_width,
-        rail_bottom_chamfer_height=rail_bottom_chamfer_height,
     )
     printable_rail = create_mgn7h_rail(
         length_mm=length_mm,
-        rail_width=rail_width - 2 * (rail_mock_clearance + rail_mock_side_clearance),
-        rail_height=rail_height - 2 * rail_mock_clearance - rail_mock_top_clearance,
-        rail_mount_hole_pitch=rail_mount_hole_pitch,
-        rail_mount_hole_end_offset=rail_mount_hole_end_offset,
-        rail_mount_hole_diameter=rail_mount_hole_diameter,
-        rail_mount_counterbore_diameter=rail_mount_counterbore_diameter,
-        rail_mount_counterbore_depth=rail_mount_counterbore_depth,
-        rail_groove_z_center=rail_groove_z_center - rail_mock_clearance,
-        rail_groove_v_height=rail_groove_v_height
+        mount_hole_drill_extra_length=mount_hole_drill_extra_length,
+        rail_width=mgn_7h_rail_width - 2 * (rail_mock_clearance + rail_mock_side_clearance),
+        rail_height=mgn_7h_rail_height - 2 * rail_mock_clearance - rail_mock_top_clearance,
+        rail_groove_z_center=mgn_7h_rail_groove_z_center - rail_mock_clearance,
+        rail_groove_v_height=mgn_7h_rail_groove_v_height + 2 * rail_mock_groove_height_clearance,        
+        rail_groove_v_depth=mgn_7h_rail_groove_v_depth + rail_mock_groove_clearance,
+        rail_groove_slot_height=mgn_7h_rail_groove_slot_height
         + 2 * rail_mock_groove_height_clearance,
-        rail_groove_v_depth=rail_groove_v_depth + rail_mock_groove_clearance,
-        rail_groove_slot_height=rail_groove_slot_height
-        + 2 * rail_mock_groove_height_clearance,
-        rail_groove_slot_depth=rail_groove_slot_depth + rail_mock_groove_clearance,
-        rail_top_fillet_radius=rail_top_fillet_radius,
-        rail_bottom_chamfer_width=rail_bottom_chamfer_width,
-        rail_bottom_chamfer_height=rail_bottom_chamfer_height,
+        rail_groove_slot_depth=mgn_7h_rail_groove_slot_depth + rail_mock_groove_clearance,
     )
     printable_rail = translate(
         0,
@@ -343,14 +313,6 @@ def create_mgn7h_rail_with_carriage(
     rail.add_named_follower(printable_rail.leader, "rail_mockup_printable")
 
     carriage = create_mgn7h_carriage(
-        carriage_length=carriage_length,
-        carriage_width=carriage_width,
-        carriage_height=carriage_height,
-        carriage_h1_offset=carriage_h1_offset,
-        carriage_mount_hole_pitch_x=carriage_mount_hole_pitch_x,
-        carriage_mount_hole_pitch_y=carriage_mount_hole_pitch_y,
-        carriage_mount_hole_depth=carriage_mount_hole_depth,
-        carriage_mount_screw_size=carriage_mount_screw_size,
     )
     carriage = align(carriage, rail.leader, Alignment.CENTER, axes=[0, 1])
     carriage = translate(carriage_offset, 0, 0)(carriage)
@@ -365,72 +327,23 @@ def create_mgn7h_rail_with_carriage(
 def create_mgn7h_rail_with_carriage_assembly(
     *,
     mgn7h_rail_length,
-    mgn7h_rail_width,
-    mgn7h_rail_height,
-    mgn7h_rail_mount_hole_pitch,
-    mgn7h_rail_mount_hole_end_offset,
-    mgn7h_rail_mount_hole_diameter,
-    mgn7h_rail_mount_counterbore_diameter,
-    mgn7h_rail_mount_counterbore_depth,
-    mgn7h_rail_mount_screw_size,
-    mgn7h_rail_groove_z_center,
-    mgn7h_rail_groove_v_height,
-    mgn7h_rail_groove_v_depth,
-    mgn7h_rail_groove_slot_height,
-    mgn7h_rail_groove_slot_depth,
-    mgn7h_rail_top_fillet_radius,
-    mgn7h_rail_bottom_chamfer_width,
-    mgn7h_rail_bottom_chamfer_height,
     rail_mock_clearance,
     rail_mock_side_clearance,
     rail_mock_top_clearance,
     rail_mock_groove_clearance,
     rail_mock_groove_height_clearance,
-    mgn7h_carriage_length,
-    mgn7h_carriage_width,
-    mgn7h_carriage_height,
-    mgn7h_carriage_h1_offset,
-    mgn7h_carriage_mount_hole_pitch_x,
-    mgn7h_carriage_mount_hole_pitch_y,
-    mgn7h_carriage_mount_hole_depth,
-    mgn7h_carriage_mount_screw_size,
     mgn7h_carriage_rest_offset_on_rail,
 ):
     """Create an MGN7H rail leader with a named built-in carriage follower."""
-
-    _ = mgn7h_rail_mount_screw_size
 
     record_length_metric("linear_rail", "MGN7H", "idex_tap_t1", mgn7h_rail_length)
 
     return create_mgn7h_rail_with_carriage(
         length_mm=mgn7h_rail_length,
         carriage_offset=mgn7h_carriage_rest_offset_on_rail,
-        rail_width=mgn7h_rail_width,
-        rail_height=mgn7h_rail_height,
-        rail_mount_hole_pitch=mgn7h_rail_mount_hole_pitch,
-        rail_mount_hole_end_offset=mgn7h_rail_mount_hole_end_offset,
-        rail_mount_hole_diameter=mgn7h_rail_mount_hole_diameter,
-        rail_mount_counterbore_diameter=mgn7h_rail_mount_counterbore_diameter,
-        rail_mount_counterbore_depth=mgn7h_rail_mount_counterbore_depth,
-        rail_groove_z_center=mgn7h_rail_groove_z_center,
-        rail_groove_v_height=mgn7h_rail_groove_v_height,
-        rail_groove_v_depth=mgn7h_rail_groove_v_depth,
-        rail_groove_slot_height=mgn7h_rail_groove_slot_height,
-        rail_groove_slot_depth=mgn7h_rail_groove_slot_depth,
-        rail_top_fillet_radius=mgn7h_rail_top_fillet_radius,
-        rail_bottom_chamfer_width=mgn7h_rail_bottom_chamfer_width,
-        rail_bottom_chamfer_height=mgn7h_rail_bottom_chamfer_height,
         rail_mock_clearance=rail_mock_clearance,
         rail_mock_side_clearance=rail_mock_side_clearance,
         rail_mock_top_clearance=rail_mock_top_clearance,
         rail_mock_groove_clearance=rail_mock_groove_clearance,
         rail_mock_groove_height_clearance=rail_mock_groove_height_clearance,
-        carriage_length=mgn7h_carriage_length,
-        carriage_width=mgn7h_carriage_width,
-        carriage_height=mgn7h_carriage_height,
-        carriage_h1_offset=mgn7h_carriage_h1_offset,
-        carriage_mount_hole_pitch_x=mgn7h_carriage_mount_hole_pitch_x,
-        carriage_mount_hole_pitch_y=mgn7h_carriage_mount_hole_pitch_y,
-        carriage_mount_hole_depth=mgn7h_carriage_mount_hole_depth,
-        carriage_mount_screw_size=mgn7h_carriage_mount_screw_size,
     )
