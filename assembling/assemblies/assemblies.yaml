@@ -432,22 +432,11 @@ placement:
     - rigid_group:
         - tool_head_cable_attach_shield_left_assembly
       to: tool_head_mount_machined_bottom_assembly
-    - rigid_group:
-        - tool_head_cable_attach_shield_right_assembly
-      to: tool_head_mount_machined_top_assembly
 
     - part: opb991t11z_sensor_assembly
-      to: tool_head_mount_machined_top_assembly
-      alignment: CENTER
-    - part: opb991t11z_sensor_assembly
-      to: tool_head_mount_machined_top_assembly
-      alignment: STACK_TOP
-    - part: opb991t11z_sensor_assembly
-      to: tool_head_mount_machined_top_assembly
-      alignment: RIGHT
-    - rigid_group:
-        - opb991t11z_sensor_assembly
-      to: tool_head_mount_machined_top_assembly
+      post_rotation:
+        angle: -90
+        axis: [1, 0, 0]
 
     - part: sprite_extruder_left_assembly
       to: tool_head_mount_machined_bottom_assembly
@@ -858,6 +847,33 @@ placement:
         - extruder_cage_left_assembly
         - part_fan_left_assembly
       to: sprite_extruder_left_assembly
+
+    - part: opb991t11z_sensor_assembly
+      to: tool_head_mount_machined_top_assembly
+      alignment: CENTER
+    - part: opb991t11z_sensor_assembly
+      to: sprite_extruder_right_assembly
+      alignment: RIGHT
+      post_translation:
+        - -5
+        - 0
+        - 0
+
+    - part: opb991t11z_sensor_assembly.non_production_parts.mount_tab_reference
+      to: sprite_extruder_right_assembly
+      alignment: FRONT
+
+    - part: opb991t11z_sensor_assembly
+      to: sprite_extruder_right_assembly
+      alignment: STACK_TOP
+
+    - rigid_group:
+        - opb991t11z_sensor_assembly
+      to: sprite_extruder_right_assembly
+
+    - rigid_group:
+        - tool_head_cable_attach_shield_right_assembly
+      to: tool_head_mount_machined_top_assembly
 
     - rigid_group:
         - extruder_cage_right_assembly
@@ -3794,8 +3810,10 @@ assemblies:
     inject_parts:
       part_fans: part_fan_right_assembly
       extruder_cage: extruder_cage_right_assembly
+      sprite_extruder: sprite_extruder_right_assembly
       mgn7h_rail_with_carriage: mgn7h_rail_with_carriage_assembly
       idex_tap_t1: idex_tap_t1_assembly
+      opb991t11z_sensor: opb991t11z_sensor_assembly
 
     outputs:
       part_fans: part_fan_right_joined_assembly
@@ -3898,8 +3916,10 @@ assemblies:
     depends_on:
       - x_axis_rail_assembly
       - tool_head_mount_machined_top_assembly
+      - opb991t11z_sensor_assembly
     inject_parts:
       tool_head_mount_machined: tool_head_mount_machined_top_assembly
+      light_barrier_assembly: opb991t11z_sensor_assembly
 
   - name: x_axis_belt_carriage_top_assembly
 

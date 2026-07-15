@@ -244,6 +244,11 @@ Builder:
             - { $ref: x_axis_x_travel_negative }
             - 0
             - 0
+          idex_tap_trigger_lift_right:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_right }
+
       - source: injected
         assembly: idex_tap_t1
         artifact: leader

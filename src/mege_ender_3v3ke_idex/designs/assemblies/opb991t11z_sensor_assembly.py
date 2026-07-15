@@ -54,6 +54,10 @@ def create_opb991t11z_sensor_assembly(
     two_towers = align(two_towers, tab, Alignment.CENTER)
     two_towers = align(two_towers, tab, Alignment.STACK_TOP)
 
+    light = create_cylinder(0.05, opb991t11z_both_tower_width)
+    light = rotate(90, axis=(0, 1, 0))(light)
+    light = align(light, two_towers, Alignment.CENTER)
+
     connector_towers = create_box(
         opb991t11z_connector_towers_width,
         opb991t11z_connector_towers_depth,
@@ -128,5 +132,12 @@ def create_opb991t11z_sensor_assembly(
     sensor = LeaderFollowersCuttersPart(leader=leader)
     for name, hole in hole_drills.get_named_cutter_items():
         sensor.add_named_cutter(hole, name)
+
+    sensor.add_named_non_production_part(tab, "mount_tab_reference")
+    sensor.add_named_non_production_part(light, "light_reference")
+    connector_towers_cutter = materialize_bounding_box(
+        connector_towers, x_enlargement=1, y_enlargement=1, z_enlargement=1
+    )
+    sensor.add_named_cutter(connector_towers_cutter, "connector_towers_cutter")
 
     return sensor

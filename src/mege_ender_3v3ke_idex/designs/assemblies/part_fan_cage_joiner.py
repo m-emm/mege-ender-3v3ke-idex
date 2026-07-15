@@ -138,6 +138,7 @@ def join_part_fans_with_extruder_cage(
     fillet_radius=0.0,
     mgn7h_rail_with_carriage=None,
     idex_tap_t1=None,
+    opb991t11z_sensor=None,
 ):
     """Return joined output assemblies for a part fan and extruder cage pair."""
 
@@ -545,6 +546,16 @@ def join_part_fans_with_extruder_cage(
 
                 joined_idex_tap_t1 = joined_idex_tap_t1.cut(magnet_screw_holder_cutter)
                 joined_idex_tap_t1 = joined_idex_tap_t1.fuse(magnet_holder)
+
+    if opb991t11z_sensor is not None:
+
+        holder = materialize_bounding_box(
+            opb991t11z_sensor, x_enlargement=1, y_size=3.5, z_enlargement=1
+        )
+        holder = align(holder, sprite_extruder, Alignment.STACK_FRONT, stack_gap=0.5)
+        holder = opb991t11z_sensor.use_as_cutter_on(holder)
+
+        joined_extruder_cage = joined_extruder_cage.fuse(holder)
 
     result = {
         "part_fans": joined_part_fans,

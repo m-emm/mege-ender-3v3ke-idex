@@ -29,21 +29,33 @@ Builder:
         assembly: mgn7h_rail_with_carriage_assembly
         artifact: leader
         name: mgn7h_rail
+        animation:
+          idex_tap_total_travel:
+            - 0
+            - 0
+            - { $ref: idex_tap_total_travel }
+
       - source: dependencies
         assembly: mgn7h_rail_with_carriage_assembly
         artifact: followers
         names:
           - carriage
         name: mgn7h_carriage
+      - source: dependencies
+        assembly: sprite_extruder_right_assembly
+        artifact: all
+        name_template: "sprite_extruder_right_{name}"
         animation:
           idex_tap_total_travel:
             - 0
             - 0
             - { $ref: idex_tap_total_travel }
+
       - source: dependencies
-        assembly: sprite_extruder_right_assembly
+        assembly: opb991t11z_sensor_assembly
         artifact: all
-        name_template: "sprite_extruder_right_{name}"
+        name_template: "opb991t11z_sensor_{name}"
+
   Production:
     parts: []
 
