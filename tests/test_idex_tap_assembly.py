@@ -100,14 +100,20 @@ def test_idex_tap_assemblies_are_t1_named_in_builder_contract():
         assert JOINED_TAP_ASSEMBLY in top_level["depends_on"]
         assert "idex_tap_t1_assembly" not in top_level["depends_on"]
         assert RETIRED_SHUTTLE_ASSEMBLY not in top_level["depends_on"]
-        assert PARKED_OPB_ASSEMBLY not in top_level["depends_on"]
         assert top_level["inject_parts"]["idex_tap_t1"] == JOINED_TAP_ASSEMBLY
         assert "idex_tap_t1_shuttle" not in top_level["inject_parts"]
-        assert "opb991t11z_sensor" not in top_level["inject_parts"]
         assert STALE_TAP_PREFIX + T0_SUFFIX not in top_level["inject_parts"]
         assert (
             STALE_TAP_PREFIX + T0_SUFFIX + "_shuttle" not in top_level["inject_parts"]
         )
+
+    tool_heads = assemblies["tool_heads_assembly"]
+    assert PARKED_OPB_ASSEMBLY in tool_heads["depends_on"]
+    assert tool_heads["inject_parts"]["opb991t11z_sensor"] == PARKED_OPB_ASSEMBLY
+
+    whole_printer = assemblies["whole_printer_assembly"]
+    assert PARKED_OPB_ASSEMBLY not in whole_printer["depends_on"]
+    assert "opb991t11z_sensor" not in whole_printer["inject_parts"]
 
     fixed_tap = assemblies["idex_tap_t1_assembly"]
     assert "sprite_extruder_right_assembly" not in fixed_tap["depends_on"]
@@ -119,23 +125,94 @@ def test_idex_tap_assemblies_are_t1_named_in_builder_contract():
     assert "opb991t11z_sensor" not in fixed_tap["inject_parts"]
 
 
-def test_opb991t11z_sensor_is_standalone_only_for_now():
+def test_opb991t11z_sensor_is_tool_heads_reference_only_for_now():
     config = _load_config()
     assemblies = _load_assemblies()
 
     assert assemblies[PARKED_OPB_ASSEMBLY]["resource_file"] == (
         "opb991t11z_sensor_assembly.yaml"
     )
-    for assembly_name, assembly in assemblies.items():
-        if assembly_name == PARKED_OPB_ASSEMBLY:
-            continue
-        assert PARKED_OPB_ASSEMBLY not in assembly.get("depends_on", [])
-        assert PARKED_OPB_ASSEMBLY not in assembly.get("inject_parts", {}).values()
+    consumers = {
+        assembly_name
+        for assembly_name, assembly in assemblies.items()
+        if assembly_name != PARKED_OPB_ASSEMBLY
+        and (
+            PARKED_OPB_ASSEMBLY in assembly.get("depends_on", [])
+            or PARKED_OPB_ASSEMBLY in assembly.get("inject_parts", {}).values()
+        )
+    }
+    assert consumers == {"tool_heads_assembly"}
 
-    assert not any(
-        PARKED_OPB_ASSEMBLY in str(placement)
-        for placement in config["placement"]["alignments"]
-    )
+    for inactive_consumer_name in (
+        "whole_printer_assembly",
+        "idex_tap_t1_assembly",
+        "idex_tap_t1_stack_assembly",
+        "part_fan_cage_right_join",
+    ):
+        inactive_consumer = assemblies[inactive_consumer_name]
+        assert PARKED_OPB_ASSEMBLY not in inactive_consumer.get("depends_on", [])
+        assert PARKED_OPB_ASSEMBLY not in inactive_consumer.get(
+            "inject_parts", {}
+        ).values()
+
+    top_mount = "tool_head_mount_machined_top_assembly"
+    placements = config["placement"]["alignments"]
+    assert [
+        placement
+        for placement in placements
+        if placement.get("part") == PARKED_OPB_ASSEMBLY
+    ] == [
+        {
+            "part": PARKED_OPB_ASSEMBLY,
+            "to": top_mount,
+            "alignment": "CENTER",
+        },
+        {
+            "part": PARKED_OPB_ASSEMBLY,
+            "to": top_mount,
+            "alignment": "STACK_TOP",
+        },
+        {
+            "part": PARKED_OPB_ASSEMBLY,
+            "to": top_mount,
+            "alignment": "RIGHT",
+        },
+    ]
+    assert {
+        "rigid_group": [PARKED_OPB_ASSEMBLY],
+        "to": top_mount,
+    } in placements
+
+    tool_heads_resource = _load_resource("tool_heads_assembly.yaml")
+    assert [
+        part
+        for part in tool_heads_resource["Builder"]["Visualization"]["parts"]
+        if part.get("assembly") == "opb991t11z_sensor"
+    ] == [
+        {
+            "source": "injected",
+            "assembly": "opb991t11z_sensor",
+            "artifact": "all",
+            "name_template": "opb991t11z_sensor_{name}",
+            "animation": {
+                "x_carriage_2": [{"$ref": "x_axis_x_travel_negative"}, 0, 0]
+            },
+        }
+    ]
+
+    idex_tap_resource = _load_resource("idex_tap_t1_assembly.yaml")
+    assert [
+        part
+        for part in idex_tap_resource["Builder"]["Visualization"]["parts"]
+        if part.get("assembly") == PARKED_OPB_ASSEMBLY
+    ] == [
+        {
+            "source": "dependencies",
+            "assembly": PARKED_OPB_ASSEMBLY,
+            "artifact": "all",
+            "name_template": "opb991t11z_sensor_{name}",
+        }
+    ]
 
 
 def test_idex_tap_t1_fixed_generator_drops_unused_right_toolhead_context():

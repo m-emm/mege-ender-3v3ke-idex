@@ -29,6 +29,10 @@ Builder:
         assembly: fixed_tool_head_mount
         artifact: all
       - source: dependencies
+        assembly: opb991t11z_sensor_assembly
+        artifact: all
+        name_template: "opb991t11z_sensor_{name}"
+      - source: dependencies
         assembly: x_axis_top_profile_assembly
         artifact: all
       - source: dependencies

@@ -236,6 +236,15 @@ Builder:
             - 0
             - 0
       - source: injected
+        assembly: opb991t11z_sensor
+        artifact: all
+        name_template: "opb991t11z_sensor_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
         assembly: idex_tap_t1
         artifact: leader
         name: idex_tap_t1_fixed_frame

@@ -436,6 +436,19 @@ placement:
         - tool_head_cable_attach_shield_right_assembly
       to: tool_head_mount_machined_top_assembly
 
+    - part: opb991t11z_sensor_assembly
+      to: tool_head_mount_machined_top_assembly
+      alignment: CENTER
+    - part: opb991t11z_sensor_assembly
+      to: tool_head_mount_machined_top_assembly
+      alignment: STACK_TOP
+    - part: opb991t11z_sensor_assembly
+      to: tool_head_mount_machined_top_assembly
+      alignment: RIGHT
+    - rigid_group:
+        - opb991t11z_sensor_assembly
+      to: tool_head_mount_machined_top_assembly
+
     - part: sprite_extruder_left_assembly
       to: tool_head_mount_machined_bottom_assembly
       alignment: CENTER
@@ -3483,6 +3496,7 @@ assemblies:
       - part_fan_right_joined_assembly
       - tool_head_mount_machined_bottom_assembly
       - tool_head_mount_machined_top_assembly
+      - opb991t11z_sensor_assembly
       - idex_tap_t1_joined_assembly
       - mgn7h_rail_with_carriage_assembly
       - tool_head_cable_attach_shield_left_assembly
@@ -3509,6 +3523,7 @@ assemblies:
       part_fan_right: part_fan_right_joined_assembly
       tool_head_mount_machined_bottom: tool_head_mount_machined_bottom_assembly
       tool_head_mount_machined_top: tool_head_mount_machined_top_assembly
+      opb991t11z_sensor: opb991t11z_sensor_assembly
       idex_tap_t1: idex_tap_t1_joined_assembly
       mgn7h_rail_with_carriage: mgn7h_rail_with_carriage_assembly
       tool_head_cable_attach_shield_left: tool_head_cable_attach_shield_left_assembly
