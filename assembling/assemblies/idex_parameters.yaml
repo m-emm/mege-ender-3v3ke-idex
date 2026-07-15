@@ -1343,19 +1343,19 @@ globals:
 
   opb991t11z_body_width: 18.47
   opb991t11z_body_depth: 6.35
-  opb991t11z_body_height: 10.8
   opb991t11z_base_height: 2.54
   opb991t11z_slot_width: 3.18
-  opb991t11z_slot_depth: 8.76
-  opb991t11z_aperture_width: 0.25
-  opb991t11z_optical_center_z: 8.76
   opb991t11z_mount_tab_width: 24.63
+  opb991t11z_mount_tab_depth: 6.5
+  opb991t11z_mount_tab_thickness: 2.6
+  opb991t11z_both_tower_width: 12.3
+  opb991t11z_tower_height: 9.6
+  opb991t11z_connector_towers_width: 9.9
+  opb991t11z_connector_towers_depth: 4.81
+  opb991t11z_connector_towers_height: 4.6
+  opb991t11z_connector_towers_gap: 3.11
   opb991t11z_mount_hole_diameter: 3.18
   opb991t11z_mount_hole_pitch: 19.05
-  opb991t11z_wire_exit_width: 10.03
-  opb991t11z_wire_exit_depth: 2.79
-  opb991t11z_wire_diameter: 0.55
-  opb991t11z_wire_length: 24
 
   idex_tap_frame_height: 58
   idex_tap_frame_thickness: 4
