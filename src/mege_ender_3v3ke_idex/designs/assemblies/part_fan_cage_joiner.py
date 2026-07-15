@@ -550,7 +550,7 @@ def join_part_fans_with_extruder_cage(
     if opb991t11z_sensor is not None:
 
         holder = materialize_bounding_box(
-            opb991t11z_sensor, x_enlargement=1, y_size=3.5, z_enlargement=1
+            opb991t11z_sensor, x_enlargement=1, y_size=3.2, z_enlargement=1.5
         )
         holder = align(holder, sprite_extruder, Alignment.STACK_FRONT, stack_gap=0.5)
         holder = opb991t11z_sensor.use_as_cutter_on(holder)
