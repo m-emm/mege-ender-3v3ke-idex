@@ -302,7 +302,10 @@ def join_part_fans_with_extruder_cage(
             carriage,
             x_enlargement=0.8,
             y_enlargement=0.6,
-            z_enlargement=18,
+            z_enlargement=40,
+        )
+        carriage_cutter = align(
+            carriage_cutter, mgn7h_rail_with_carriage, Alignment.BOTTOM
         )
         joined_extruder_cage = joined_extruder_cage.cut(carriage_cutter)
         for name, cutter in mgn7h_rail_with_carriage.get_named_cutter_items():
@@ -343,6 +346,57 @@ def join_part_fans_with_extruder_cage(
             bottom_stopper, mgn7h_rail_with_carriage, Alignment.STACK_BOTTOM
         )
         joined_extruder_cage = joined_extruder_cage.fuse(bottom_stopper)
+
+        for lr in [Alignment.LEFT, Alignment.RIGHT]:
+
+            top_stopper_screw = create_cylinder_screw("M2", 4)
+
+            top_stopper_screw = LeaderFollowersCuttersPart(top_stopper_screw)
+
+            self_thread_hole_cutter = create_self_threading_hole_cutter(
+                "M2", 6, core_radius_adjustment=-0.35, lead_in=True
+            )
+            self_thread_hole_cutter = align(
+                self_thread_hole_cutter, top_stopper_screw, Alignment.CENTER
+            )
+            self_thread_hole_cutter = align(
+                self_thread_hole_cutter, top_stopper_screw, Alignment.TOP
+            )
+            self_thread_hole_cutter = translate(
+                0, 0, -MScrew.from_size("M2").cylinder_head_height
+            )(self_thread_hole_cutter)
+
+            top_stopper_screw.add_named_cutter(
+                self_thread_hole_cutter, "self_thread_hole_cutter"
+            )
+
+            top_stopper_screw = rotate(-90, axis=[1, 0, 0])(top_stopper_screw)
+            top_stopper_screw = align(
+                top_stopper_screw, mgn7h_rail_with_carriage, Alignment.CENTER
+            )
+            top_stopper_screw = align(
+                top_stopper_screw, mgn7h_rail_with_carriage, Alignment.STACK_TOP
+            )
+            top_stopper_screw = align(
+                top_stopper_screw,
+                mgn7h_rail_with_carriage,
+                lr.stack_alignment,
+                stack_gap=0.3,
+            )
+            top_stopper_screw = align(
+                top_stopper_screw, carriage_cutter, Alignment.STACK_FRONT
+            )
+            top_stopper_screw = translate(
+                0, MScrew.from_size("M2").cylinder_head_height, 0
+            )(top_stopper_screw)
+
+            joined_extruder_cage.add_named_non_production_part(
+                top_stopper_screw.leader, f"top_stopper_screw_{lr.name}"
+            )
+
+            joined_extruder_cage = joined_extruder_cage.cut(
+                top_stopper_screw.get_named_cutter("self_thread_hole_cutter")
+            )
 
         for lr in [Alignment.LEFT, Alignment.RIGHT]:
             magnet_screw_length = 6
@@ -399,22 +453,30 @@ def join_part_fans_with_extruder_cage(
             )  # cylindrical magnet, 6mm diameter, 3mm height
 
             magnet = align(magnet, magnet_screw, Alignment.CENTER)
-            magnet = align(magnet, magnet_screw, Alignment.STACK_TOP,stack_gap=0.3)
+            magnet = align(magnet, magnet_screw, Alignment.STACK_TOP, stack_gap=0.3)
 
             magnet_screw.add_named_non_production_part(magnet, "magnet")
 
-            magnet_holder = create_box(10, 10, 6.5)
-
-            magnet_holder_clearance = 0.1
-
-            magnet_holder_cutter = create_box(
-                magnet_diameter + 2*magnet_holder_clearance,
-                magnet_diameter + 2*magnet_holder_clearance,
-                magnet_height + 4*magnet_holder_clearance,
+            magnet_holder_size = 7.5
+            magnet_holder_height = 6.5
+            magnet_holder = create_box(
+                magnet_holder_size, magnet_holder_size, magnet_holder_height
             )
 
-            magnet_holder_cutter = align(magnet_holder_cutter, magnet_holder, Alignment.CENTER)
-            magnet_holder_cutter = align(magnet_holder_cutter, magnet_holder, Alignment.BOTTOM)
+            magnet_holder_clearance = 0.0
+
+            magnet_holder_cutter = create_box(
+                magnet_diameter + 2 * magnet_holder_clearance,
+                magnet_diameter + 2 * magnet_holder_clearance,
+                magnet_height + 4 * magnet_holder_clearance,
+            )
+
+            magnet_holder_cutter = align(
+                magnet_holder_cutter, magnet_holder, Alignment.CENTER
+            )
+            magnet_holder_cutter = align(
+                magnet_holder_cutter, magnet_holder, Alignment.BOTTOM
+            )
 
             magnet_holder = magnet_holder.cut(magnet_holder_cutter)
 
@@ -423,16 +485,11 @@ def join_part_fans_with_extruder_cage(
 
             magnet_screw.add_named_non_production_part(magnet_holder, "magnet_holder")
 
-            magnet_holder_cutter = materialize_bounding_box(
-                magnet_holder)
-            
-            magnet_screw.add_named_non_production_part(magnet_holder_cutter, "magnet_holder_cutter")
+            magnet_holder_cutter = materialize_bounding_box(magnet_holder)
 
-
-
-
-
-
+            magnet_screw.add_named_non_production_part(
+                magnet_holder_cutter, "magnet_holder_cutter"
+            )
 
             magnet_screw = rotate(180 + 45, axis=[1, 0, 0])(magnet_screw)
 
@@ -473,11 +530,21 @@ def join_part_fans_with_extruder_cage(
                 magnet_screw_holder_cutter = magnet_screw.get_named_non_production_part(
                     "magnet_holder_cutter"
                 )
+                magnet_holder = magnet_screw.get_named_non_production_part(
+                    "magnet_holder"
+                )
+
+                back_cutter = create_box(100, 100, 100)
+                back_cutter = align(back_cutter, magnet_holder, Alignment.CENTER)
+                back_cutter = align(
+                    back_cutter, joined_idex_tap_t1, Alignment.STACK_BACK
+                )
+
+                magnet_screw_holder_cutter = magnet_screw_holder_cutter.cut(back_cutter)
+                magnet_holder = magnet_holder.cut(back_cutter)
 
                 joined_idex_tap_t1 = joined_idex_tap_t1.cut(magnet_screw_holder_cutter)
-                magnet_holder = magnet_screw.get_named_non_production_part("magnet_holder")
                 joined_idex_tap_t1 = joined_idex_tap_t1.fuse(magnet_holder)
-
 
     result = {
         "part_fans": joined_part_fans,

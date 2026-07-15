@@ -171,13 +171,6 @@ def create_mgn7h_rail(
         hole_x += mgn_7h_rail_mount_hole_pitch
         hole_index += 1
 
-    rail_mount_holes = []
-    if hole_index > 1:
-        holes = align(holes, rail, Alignment.CENTER, axes=[0, 1])
-        holes = align(holes, rail, Alignment.TOP)
-        rail = rail.cut(holes.leader)
-        rail_mount_holes = holes.get_named_follower_items()
-
     if rail_groove_v_depth > 0 and rail_groove_v_height > 0:
         groove_v_convergence_depth = rail_groove_v_depth
         if rail_groove_slot_depth > 0 and rail_groove_slot_height > 0:
@@ -260,10 +253,20 @@ def create_mgn7h_rail(
             profile_cutters.append(groove_slot_cutter)
             profile_cutter_names.append(name)
 
+    rail_without_holes = rail
+
+    rail_mount_holes = []
+    if hole_index > 1:
+        holes = align(holes, rail, Alignment.CENTER, axes=[0, 1])
+        holes = align(holes, rail, Alignment.TOP)
+        rail = rail.cut(holes.leader)
+        rail_mount_holes = holes.get_named_follower_items()
+
     rail = LeaderFollowersCuttersPart(rail)
     rail.add_named_follower(rail.leader, "rail_body")
     if rail_mount_holes:
         rail.add_named_cutter(holes.leader, "rail_mount_holes")
+    rail.add_named_cutter(rail_without_holes, "rail_without_holes")
     for name, hole in rail_mount_holes:
         rail.add_named_cutter(hole, name)
     return rail
@@ -323,6 +326,8 @@ def create_mgn7h_rail_with_carriage(
     )
     carriage = align(carriage, rail, Alignment.CENTER, axes=[0, 1])
     carriage = translate(carriage_offset, 0, 0)(carriage)
+
+    carriage = carriage.cut(rail.get_named_cutter("rail_without_holes"))
 
     rail.add_named_follower(carriage.leader, name="carriage")
     rail = rail.merge_except_leader(carriage)
