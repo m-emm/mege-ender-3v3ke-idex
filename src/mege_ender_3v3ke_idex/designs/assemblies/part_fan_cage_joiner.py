@@ -488,74 +488,6 @@ def join_part_fans_with_extruder_cage(
             )
             magnet_holder = magnet_holder.cut(magnet_holder_inner_cutter)
 
-            magnet_holder_clamp_screw = create_cylinder_screw("M2", 5)
-
-            magnet_holder_clamp_screw = rotate(90, axis=[1, 0, 0])(
-                magnet_holder_clamp_screw
-            )
-
-            magnet_holder_clamp_screw = align(
-                magnet_holder_clamp_screw, magnet_holder, Alignment.CENTER
-            )
-
-            magnet_holder_clamp_screw = align(
-                magnet_holder_clamp_screw, magnet_holder, Alignment.FRONT
-            )
-
-            magnet_holder_clamp_screw = align(
-                magnet_holder_clamp_screw, magnet_holder, Alignment.EDGE_BOTTOM
-            )
-
-            magnet_holder_clamp_screw = translate(
-                0, -MScrew.from_size("M2").cylinder_head_height, 1.8
-            )(magnet_holder_clamp_screw)
-
-            magnet_screw.add_named_non_production_part(
-                magnet_holder_clamp_screw, "magnet_holder_clamp_screw"
-            )
-            clamp_screw_access_cutter = create_cylinder(
-                MScrew.from_size("M2").cylinder_head_diameter / 2 + 0.2, 100
-            )
-            clamp_screw_access_cutter = rotate(90, axis=[1, 0, 0])(
-                clamp_screw_access_cutter
-            )
-            clamp_screw_access_cutter = align(
-                clamp_screw_access_cutter, magnet_holder_clamp_screw, Alignment.CENTER
-            )
-            clamp_screw_access_cutter = align(
-                clamp_screw_access_cutter,
-                magnet_holder_clamp_screw,
-                Alignment.STACK_FRONT,
-                stack_gap=-MScrew.from_size("M2").cylinder_head_height,
-            )
-
-            clamp_screw_self_thrading_hole_cutter = create_self_threading_hole_cutter(
-                "M2", 5, core_radius_adjustment=-0.35, lead_in=True
-            )
-            clamp_screw_self_thrading_hole_cutter = rotate(90, axis=[1, 0, 0])(
-                clamp_screw_self_thrading_hole_cutter
-            )
-            clamp_screw_self_thrading_hole_cutter = align(
-                clamp_screw_self_thrading_hole_cutter,
-                clamp_screw_access_cutter,
-                Alignment.CENTER,
-            )
-            clamp_screw_self_thrading_hole_cutter = align(
-                clamp_screw_self_thrading_hole_cutter,
-                clamp_screw_access_cutter,
-                Alignment.STACK_BACK,
-            )
-
-            clamp_screw_access_cutter = clamp_screw_access_cutter.fuse(
-                clamp_screw_self_thrading_hole_cutter
-            )
-
-            magnet_holder = magnet_holder.cut(clamp_screw_access_cutter)
-
-            magnet_screw.add_named_cutter(
-                clamp_screw_access_cutter, "clamp_screw_access_cutter"
-            )
-
             magnet_screw.add_named_non_production_part(
                 magnet_holder.leader, "magnet_holder"
             )
@@ -576,25 +508,120 @@ def join_part_fans_with_extruder_cage(
                 magnet_screw, carriage, lr.stack_alignment, stack_gap=4
             )
 
-            magnet_screw = translate(0, -0.5, -5)(magnet_screw)
+            magnet_screw = translate(0, 1.7, -5)(magnet_screw)
 
             joined_extruder_cage.add_named_non_production_part(
                 magnet_screw.leader, f"magnet_screw_{lr.name.lower()}"
             )
 
-            magnet_screw_holder = materialize_bounding_box(
+            magnet_screw_holder_cage_side = materialize_bounding_box(
                 magnet_screw, x_enlargement=1, y_enlargement=3, z_enlargement=2
             )
 
-            magnet_screw_holder = align(magnet_screw_holder, carriage, Alignment.BACK)
-            magnet_screw_holder = translate(0, -0.5, 0)(magnet_screw_holder)
+            magnet_screw_holder_cage_side = align(
+                magnet_screw_holder_cage_side, carriage, Alignment.BACK
+            )
+            magnet_screw_holder_cage_side = translate(0, -0.5, 0)(
+                magnet_screw_holder_cage_side
+            )
 
-            magnet_screw_holder = magnet_screw.use_as_cutter_on(magnet_screw_holder)
-            joined_extruder_cage = joined_extruder_cage.fuse(magnet_screw_holder)
+            magnet_screw_holder_cage_side = magnet_screw.use_as_cutter_on(
+                magnet_screw_holder_cage_side
+            )
+            joined_extruder_cage = joined_extruder_cage.fuse(
+                magnet_screw_holder_cage_side
+            )
 
             for name, cutter in magnet_screw.get_named_cutter_items():
                 if name in ["thread_hole_cutter"]:
                     joined_extruder_cage = joined_extruder_cage.cut(cutter)
+
+            clamp_srew_length = 18
+
+            magnet_holder_translated = magnet_screw.get_named_non_production_part(
+                "magnet_holder"
+            )
+
+            magnet_holder_clamp_screw_size = "M2"
+            magnet_holder_clamp_screw = create_cylinder_screw(
+                magnet_holder_clamp_screw_size, clamp_srew_length
+            )
+
+            clamp_screw_access_cutter = create_cylinder(
+                MScrew.from_size(magnet_holder_clamp_screw_size).cylinder_head_diameter
+                / 2
+                + 0.2,
+                100,
+            )
+            clamp_screw_access_cutter = align(
+                clamp_screw_access_cutter, magnet_holder_clamp_screw, Alignment.CENTER
+            )
+            clamp_screw_access_cutter = align(
+                clamp_screw_access_cutter,
+                magnet_holder_clamp_screw,
+                Alignment.STACK_TOP,
+                stack_gap=-MScrew.from_size(
+                    magnet_holder_clamp_screw_size
+                ).cylinder_head_height,
+            )
+
+            clamp_screw_self_thrading_hole_cutter = create_self_threading_hole_cutter(
+                magnet_holder_clamp_screw_size,
+                clamp_srew_length,
+                core_radius_adjustment=-0.35,
+                lead_in=True,
+            )
+            clamp_screw_self_thrading_hole_cutter = align(
+                clamp_screw_self_thrading_hole_cutter,
+                clamp_screw_access_cutter,
+                Alignment.CENTER,
+            )
+            clamp_screw_self_thrading_hole_cutter = align(
+                clamp_screw_self_thrading_hole_cutter,
+                magnet_holder_clamp_screw,
+                Alignment.TOP,
+            )
+            clamp_screw_self_thrading_hole_cutter = translate(
+                0,
+                0,
+                -MScrew.from_size(magnet_holder_clamp_screw_size).cylinder_head_height,
+            )(clamp_screw_self_thrading_hole_cutter)
+
+            clamp_screw_access_cutter = clamp_screw_access_cutter.fuse(
+                clamp_screw_self_thrading_hole_cutter
+            )
+
+            magnet_holder_clamp_screw = LeaderFollowersCuttersPart(
+                magnet_holder_clamp_screw
+            )
+            magnet_holder_clamp_screw.add_named_cutter(
+                clamp_screw_access_cutter, "clamp_screw_access_cutter"
+            )
+
+            magnet_holder_clamp_screw = rotate(lr.sign * 90, axis=[0, 1, 0])(
+                magnet_holder_clamp_screw
+            )
+
+            magnet_holder_clamp_screw = align(
+                magnet_holder_clamp_screw, magnet_holder_translated, Alignment.CENTER
+            )
+
+            magnet_holder_clamp_screw = align(
+                magnet_holder_clamp_screw, joined_idex_tap_t1, Alignment.BACK
+            )
+
+            magnet_holder_clamp_screw = align(
+                magnet_holder_clamp_screw, joined_idex_tap_t1, lr
+            )
+
+            magnet_screw.add_named_non_production_part(
+                magnet_holder_clamp_screw.leader, "magnet_holder_clamp_screw"
+            )
+
+            magnet_screw.add_named_cutter(
+                magnet_holder_clamp_screw.get_named_cutter("clamp_screw_access_cutter"),
+                "clamp_screw_access_cutter",
+            )
 
             if joined_idex_tap_t1 is not None:
                 joined_idex_tap_t1.add_named_non_production_part(
