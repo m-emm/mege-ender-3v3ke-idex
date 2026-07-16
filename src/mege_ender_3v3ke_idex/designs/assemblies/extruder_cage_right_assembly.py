@@ -97,37 +97,6 @@ def create_extruder_cage_right_assembly(
             "Sprite extruder mount hole cutter bbox does not match a NEMA17 pattern"
         )
 
-    mount_hole_radius = mount_hole_diameter / 2
-    top_mount_hole_center_z = mount_hole_cutter_bbox[1][2] - mount_hole_radius
-    sprite_mount_screws = []
-    for side_name, mount_hole_center_x in zip(
-        ["left", "right"],
-        [
-            mount_hole_cutter_bbox[0][0] + mount_hole_radius,
-            mount_hole_cutter_bbox[1][0] - mount_hole_radius,
-        ],
-    ):
-        hole_guide = create_cylinder(
-            mount_hole_radius,
-            mount_hole_cutter_size[1],
-            direction=(0, 1, 0),
-        )
-        hole_guide = align(hole_guide, mount_hole_cutter, Alignment.CENTER)
-        hole_guide = translate(
-            mount_hole_center_x - mount_hole_cutter_center[0],
-            0,
-            top_mount_hole_center_z - mount_hole_cutter_center[2],
-        )(hole_guide)
-
-        screw = create_cylinder_screw(
-            extruder_cage_screw_size,
-            tool_head_mount_sprite_mount_screw_length,
-        )
-        screw = rotate(-90, axis=(1, 0, 0))(screw)
-        screw = align(screw, hole_guide, Alignment.CENTER)
-        screw = align(screw, sprite_mount_base_plate, Alignment.BACK)
-        screw = translate(0, screw_record.cylinder_head_height, 0)(screw)
-        sprite_mount_screws.append((side_name, screw))
 
     duct_back_mount_plate_width = sprite_extruder_body_size[0]
     part_fan_back_mount_plate = create_filleted_box(
@@ -178,6 +147,41 @@ def create_extruder_cage_right_assembly(
     part_fan_back_mount_plate = sprite_extruder.use_as_cutter_on(
         part_fan_back_mount_plate
     )
+
+
+
+    mount_hole_radius = mount_hole_diameter / 2
+    top_mount_hole_center_z = mount_hole_cutter_bbox[1][2] - mount_hole_radius
+    sprite_mount_screws = []
+
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for tb in [Alignment.TOP, Alignment.BOTTOM]:
+            hole_guide = create_cylinder(
+                mount_hole_radius,
+                mount_hole_cutter_size[1],
+                direction=(0, 1, 0),
+            )
+            hole_guide = align(hole_guide, mount_hole_cutter, Alignment.CENTER)
+
+            hole_guide = align(hole_guide, mount_hole_cutter, lr.edge_alignment)
+            hole_guide = align(hole_guide, mount_hole_cutter, tb.edge_alignment)
+
+            hole_guide = translate(-lr.sign*mount_hole_radius, 0, -tb.sign*mount_hole_radius)(hole_guide)
+
+            screw = create_cylinder_screw(
+                extruder_cage_screw_size,
+                tool_head_mount_sprite_mount_screw_length,
+            )
+            screw = rotate(-90, axis=(1, 0, 0))(screw)
+            screw = align(screw, hole_guide, Alignment.CENTER)
+            if tb == Alignment.TOP:
+                screw = align(screw, sprite_mount_base_plate, Alignment.BACK)
+            else:
+                screw = align(screw, part_fan_back_mount_plate, Alignment.BACK)
+            
+            screw = translate(0, screw_record.cylinder_head_height, 0)(screw)
+            sprite_mount_screws.append((f"{lr.name.lower()}_{tb.name.lower()}", screw))
+
 
     nitehawk_pcb = nitehawk_board.get_named_follower("pcb")
     nitehawk_board_holes = sorted(
