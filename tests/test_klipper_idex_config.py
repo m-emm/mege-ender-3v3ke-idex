@@ -359,7 +359,8 @@ def test_vision_capture_macro_and_host_files_exist():
     )
 
     assert "socket_path: /run/vision-capture-nozzle_cam/visiond.sock" in vision_section
-    assert "timeout: 15.0" in vision_section
+    assert "timeout: 20.0" in vision_section
+    assert "bed_y_calibrated:" in vision_section
     assert "[vision]" in template_text
     assert 'action_call_remote_method("vision_capture"' in macro
     assert "printer.toolhead.position" in macro
@@ -510,6 +511,8 @@ def test_vision_capture_macro_and_host_files_exist():
     assert 'capture_source": "vision_framebuffer' in capture_script
     assert "VISION_JOB_BEGIN" in klipper_vision_extra
     assert "VISION_CAPTURE_SYNC" in klipper_vision_extra
+    assert "VISION_MEASURE_BED_Y" in klipper_vision_extra
+    assert "last_bed_y_measurement" in klipper_vision_extra
     assert "wait_moves()" in klipper_vision_extra
     assert "socket.AF_UNIX" in klipper_vision_extra
     assert image_klipper_vision_extra == klipper_vision_extra
@@ -532,6 +535,7 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "bed_y_axis_vector_px_per_mm" in nozzle_script
     assert "bed_y_scale_px_per_mm" in nozzle_script
     assert "bed_y_parallax_spread" in nozzle_script
+    assert "calibration_candidate" in nozzle_script
     assert "tool_zero_error_mm" in nozzle_script
     assert "suggested_calib_yaml" in nozzle_script
     assert "NOZZLE_CAM_Y_FEATURE_LIGHT" in nozzle_script
@@ -569,6 +573,8 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "new_y_offset = current_y_offset - perpendicular_mm" in helper
     assert "--update-y" in helper
     assert "--update-z" in helper
+    assert "--update-bed-y" in helper
+    assert "--reference-y-offset" in helper
     assert "nozzle_cam_nozzle_z_offsets" in helper
     assert 'vision_capture.py", "--capture-once"' in runner_script
     assert "acl\n" in image_packages
@@ -603,16 +609,19 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "vision-capture-nozzle-cam.service" in image_install
     assert "nozzle_cam_profiles.json" in image_install
     assert "vision_nozzle_align.py" in image_install
+    assert "vision_bed_y.py" in image_install
     assert "vision_framebuffer.py" in live_deploy
     assert "vision-framebuffer.service" in live_deploy
     assert "vision-framebuffer-nozzle-cam.service" in live_deploy
     assert "vision-capture-nozzle-cam.service" in live_deploy
     assert "nozzle_cam_profiles.json" in live_deploy
     assert "vision_nozzle_align.py" in live_deploy
+    assert "vision_bed_y.py" in live_deploy
     assert "vision_nozzle_align.py --refresh-ui" in live_deploy
     assert "SOURCE_VISION" in live_klipper_deploy
     assert "REMOTE_TMP_VISION" in live_klipper_deploy
     assert "vision.py" in live_klipper_deploy
+    assert "SOURCE_BED_Y_TEMPLATE" in live_klipper_deploy
 
     assert "/run/vision-preview-nozzle_cam/profile_request.json" in live_deploy
     assert "setfacl -m u:www-data:--x" in image_install
@@ -1343,6 +1352,77 @@ def test_idex_tool_offsets_are_derived_from_calibration_values():
     assert values["t0_y_offset"] == "0.000"
     assert values["t1_y_offset"] == "0.400"
     assert values["t1_z_offset"] == "0.300"
+
+
+def test_camera_repeatability_generator_is_y_only_and_defaults_to_one_safe_profile():
+    generator = _load_y_step_loss_generator_module()
+    printer = generator.PrinterConfig(
+        x=generator.AxisRange(-80.4, 244.0),
+        y=generator.AxisRange(-14.8, 296.0),
+        z=generator.AxisRange(-1.0, 293.75),
+        y_position_endstop=-14.8,
+        max_velocity=500.0,
+        max_accel=6000.0,
+        square_corner_velocity=5.0,
+        bed_y_calibrated=True,
+        bed_y_reference_y_mm=-4.8,
+        bed_y_profile="analysis",
+    )
+    plan = generator.CameraRepeatabilityPlan(run_id="test_camera_repeatability")
+    gcode = generator.generate_camera_repeatability_gcode(printer, plan)
+    lines = gcode.splitlines()
+
+    measure_lines = [line for line in lines if line.startswith("VISION_MEASURE_BED_Y ")]
+    assert len(measure_lines) == 21
+    assert sum(line == "G28 Y" for line in lines) == 1
+    assert "QUERY_ENDSTOPS" not in gcode
+    assert "Y_STEP_LOSS_ASSERT_ENDSTOP" not in gcode
+    assert "M104 S0" in lines
+    assert "M140 S0" in lines
+    motion_lines = [line for line in lines if re.match(r"^G[01]\s", line)]
+    assert all(" X" not in line and " Z" not in line for line in motion_lines)
+    assert not any(line in {"T0", "T1"} for line in lines)
+    assert gcode.count("profile=accel_1000") == 20
+    restore = "SET_VELOCITY_LIMIT VELOCITY=500 ACCEL=6000 SQUARE_CORNER_VELOCITY=5"
+    for index, line in enumerate(lines):
+        if line.startswith("VISION_MEASURE_BED_Y "):
+            assert restore in lines[max(0, index - 5) : index]
+
+
+def test_camera_repeatability_acceleration_ladder_is_cli_configurable():
+    generator = _load_y_step_loss_generator_module()
+    printer = generator.PrinterConfig(
+        x=generator.AxisRange(-80.4, 244.0),
+        y=generator.AxisRange(-14.8, 296.0),
+        z=generator.AxisRange(-1.0, 293.75),
+        y_position_endstop=-14.8,
+        max_velocity=500.0,
+        max_accel=6000.0,
+        square_corner_velocity=5.0,
+        bed_y_calibrated=True,
+        bed_y_reference_y_mm=-4.8,
+        bed_y_profile="analysis",
+    )
+    plan = generator.CameraRepeatabilityPlan(
+        checks_per_profile=2,
+        velocity_mm_s=500.0,
+        accel_start_mm_s2=3500.0,
+        accel_stop_mm_s2=4500.0,
+        accel_step_mm_s2=500.0,
+    )
+    profiles = generator.camera_stress_profiles(plan)
+    assert [profile.accel_mm_s2 for profile in profiles] == [3500.0, 4000.0, 4500.0]
+    gcode = generator.generate_camera_repeatability_gcode(printer, plan)
+    assert gcode.count("VISION_MEASURE_BED_Y ") == 7
+
+    with pytest.raises(ValueError, match="step must be positive"):
+        generator.camera_stress_profiles(
+            generator.CameraRepeatabilityPlan(
+                accel_start_mm_s2=1000.0,
+                accel_stop_mm_s2=2000.0,
+                accel_step_mm_s2=0.0,
+            )
+        )
 
 
 def test_grid_calibration_reads_yaml_values(tmp_path):

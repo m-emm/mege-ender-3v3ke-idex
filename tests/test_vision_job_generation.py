@@ -218,6 +218,7 @@ def test_prepare_bed_y_job_cli_generates_immutable_manifest_and_gcode(
     lines = [line.strip() for line in gcode.splitlines() if line.strip()]
 
     assert manifest["kind"] == "nozzle_cam_bed_y_sweep"
+    assert manifest["preconditions"]["required_homed_axes"] == "y"
     assert manifest["frame_count"] == len(manifest["frames"]) == 5
     assert manifest["measurement_parameters"]["lighting"] == "NOZZLE_CAM_Y_FEATURE_LIGHT"
     assert manifest["measurement_parameters"]["y_offsets"] == [0.0, 5.0, 10.0, 15.0, 20.0]
@@ -246,6 +247,11 @@ def test_prepare_bed_y_job_cli_generates_immutable_manifest_and_gcode(
     assert "restore" not in gcode.lower()
     assert "park" not in gcode.lower()
     assert "sha256:PLACEHOLDER" not in gcode
+    motion_lines = [line for line in lines if line.startswith("G1 ")]
+    assert motion_lines
+    assert all(re.fullmatch(r"G1 Y-?\d+(?:\.\d+)? F\d+", line) for line in motion_lines)
+    assert "T0" not in lines
+    assert "T1" not in lines
 
     recomputed_gcode_hash = _sha256_prefixed(
         _canonicalize_gcode_for_hash(gcode).encode("utf-8")

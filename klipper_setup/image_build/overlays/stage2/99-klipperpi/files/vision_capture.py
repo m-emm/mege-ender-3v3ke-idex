@@ -20,9 +20,19 @@ import sys
 import threading
 import time
 import urllib.request
+import statistics
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
+from vision_bed_y import expected_pixel_for_y
+from vision_bed_y import match_template as match_bed_y_template
+from vision_bed_y import project_pixel_to_y
+from vision_bed_y import sha256_file
 
 CAMERA_DEVICE = os.environ.get(
     "VISION_CAMERA_DEVICE",
@@ -89,6 +99,9 @@ VISIOND_SOCKET = Path(
     os.environ.get("VISIOND_SOCKET", "/run/vision-capture-nozzle_cam/visiond.sock")
 )
 VISION_JOB_ROOT = Path(os.environ.get("VISION_JOB_ROOT", str(OUTPUT_DIR / "jobs")))
+BED_Y_CHECK_ROOT = Path(
+    os.environ.get("VISION_BED_Y_CHECK_ROOT", str(OUTPUT_DIR / "bed_y_checks"))
+)
 VISIOND_SOCKET_REQUEST_TIMEOUT = float(
     os.environ.get("VISIOND_SOCKET_REQUEST_TIMEOUT", "30")
 )
@@ -712,6 +725,8 @@ class VisionJobApi:
                 result = self.capture(params)
             elif action == "job_end":
                 result = self.job_end(params)
+            elif action == "measure_bed_y":
+                result = self.measure_bed_y(params)
             else:
                 raise CaptureError(f"unknown request action {action!r}")
             return {"ok": True, "result": result}
@@ -929,6 +944,206 @@ class VisionJobApi:
             "framebuffer_seq": framebuffer_seq(metadata),
             "camera_profile": metadata.get("camera_profile"),
         }
+
+    def _measure_bed_y_attempt(
+        self, params: dict[str, Any], *, attempt: int
+    ) -> dict[str, Any]:
+        import cv2
+        import numpy as np
+
+        profile = sanitize_profile(params.get("profile"))
+        template_path = Path(str(params.get("template_path") or ""))
+        if not template_path.is_file():
+            raise CaptureError(f"bed-Y template does not exist: {template_path}")
+        expected_template_hash = str(params.get("template_sha256") or "")
+        actual_template_hash = sha256_file(template_path)
+        if actual_template_hash != expected_template_hash:
+            raise CaptureError(
+                "bed-Y template hash mismatch: "
+                f"{actual_template_hash} != {expected_template_hash}"
+            )
+        template = cv2.imread(str(template_path))
+        if template is None:
+            raise CaptureError(f"could not read bed-Y template: {template_path}")
+        expected_template_size = (
+            int(params.get("template_width")),
+            int(params.get("template_height")),
+        )
+        if (template.shape[1], template.shape[0]) != expected_template_size:
+            raise CaptureError(
+                "bed-Y template dimensions do not match calibration: "
+                f"{template.shape[1]}x{template.shape[0]} != "
+                f"{expected_template_size[0]}x{expected_template_size[1]}"
+            )
+
+        try:
+            previous_seq = framebuffer_seq(read_framebuffer_metadata())
+        except Exception:
+            previous_seq = -1
+        source_image, source_metadata = wait_for_buffered_frame_seq_after(
+            previous_frame_seq=previous_seq,
+            timeout=self.request_timeout,
+            required_profile=profile,
+        )
+        image_bytes = source_image.read_bytes()
+        image = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+        if image is None:
+            raise CaptureError("could not decode fresh bed-Y framebuffer image")
+        expected_size = (
+            int(params.get("image_width")),
+            int(params.get("image_height")),
+        )
+        if (image.shape[1], image.shape[0]) != expected_size:
+            raise CaptureError(
+                "bed-Y frame dimensions do not match calibration: "
+                f"{image.shape[1]}x{image.shape[0]} != "
+                f"{expected_size[0]}x{expected_size[1]}"
+            )
+
+        expected_y = float(params.get("expected_y_mm"))
+        reference_y = float(params.get("reference_y_mm"))
+        reference_pixel = (
+            float(params.get("reference_pixel_x")),
+            float(params.get("reference_pixel_y")),
+        )
+        axis_vector = (
+            float(params.get("axis_vector_x")),
+            float(params.get("axis_vector_y")),
+        )
+        expected_anchor = expected_pixel_for_y(
+            expected_y_mm=expected_y,
+            reference_y_mm=reference_y,
+            reference_pixel=reference_pixel,
+            axis_vector_px_per_mm=axis_vector,
+        )
+        match = match_bed_y_template(
+            image=image,
+            template_image=template,
+            expected_anchor_px=expected_anchor,
+            axis_vector_px_per_mm=axis_vector,
+            feature_mode=str(params.get("feature_mode")),
+            search_radius_mm=float(params.get("search_radius_mm")),
+            cross_axis_margin_px=float(params.get("max_cross_axis_px")) * 2.0,
+        )
+        projection = project_pixel_to_y(
+            pixel=tuple(match["anchor_px"]),
+            reference_pixel=reference_pixel,
+            reference_y_mm=reference_y,
+            axis_vector_px_per_mm=axis_vector,
+        )
+        measured_y = float(projection["measured_y_mm"])
+        error_mm = measured_y - expected_y
+        correlation = float(match["correlation"])
+        cross_axis_px = float(projection["cross_axis_px"])
+        quality_ok = (
+            correlation >= float(params.get("min_correlation"))
+            and abs(cross_axis_px) <= float(params.get("max_cross_axis_px"))
+        )
+        within_tolerance = abs(error_mm) <= float(params.get("tolerance_mm"))
+        failures = []
+        if correlation < float(params.get("min_correlation")):
+            failures.append(
+                f"correlation {correlation:.4f} below "
+                f"{float(params.get('min_correlation')):.4f}"
+            )
+        if abs(cross_axis_px) > float(params.get("max_cross_axis_px")):
+            failures.append(
+                f"cross-axis error {cross_axis_px:+.3f}px exceeds "
+                f"{float(params.get('max_cross_axis_px')):.3f}px"
+            )
+        if not within_tolerance:
+            failures.append(
+                f"Y error {error_mm:+.4f}mm exceeds "
+                f"{float(params.get('tolerance_mm')):.4f}mm"
+            )
+        return {
+            "attempt": attempt,
+            "accepted": quality_ok and within_tolerance,
+            "quality_ok": quality_ok,
+            "within_tolerance": within_tolerance,
+            "measured_y_mm": round(measured_y, 6),
+            "expected_y_mm": round(expected_y, 6),
+            "error_mm": round(error_mm, 6),
+            "correlation": round(correlation, 6),
+            "cross_axis_px": round(cross_axis_px, 6),
+            "anchor_px": [round(float(value), 4) for value in match["anchor_px"]],
+            "match_roi": [round(float(value), 4) for value in match["match_roi"]],
+            "search_roi": match["search_roi"],
+            "framebuffer_seq": framebuffer_seq(source_metadata),
+            "failure_reason": "; ".join(failures),
+            "_image_bytes": image_bytes,
+        }
+
+    def _record_bed_y_measurement(
+        self, params: dict[str, Any], result: dict[str, Any], image_bytes: bytes
+    ) -> dict[str, Any]:
+        run_id = sanitize_name(params.get("run") or "manual")
+        run_dir = BED_Y_CHECK_ROOT / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        step = int(params.get("step") or 0)
+        if not result.get("accepted"):
+            suspect_path = run_dir / f"step_{step:04d}_suspect.jpg"
+            suspect_path.write_bytes(image_bytes)
+            result["suspect_frame_path"] = str(suspect_path)
+        log_path = run_dir / "measurements.jsonl"
+        record = {
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+            "run": run_id,
+            "step": step,
+            **result,
+        }
+        append_jsonl(log_path, record)
+        records = []
+        for line in log_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                records.append(json.loads(line))
+        errors = [float(item["error_mm"]) for item in records]
+        summary = {
+            "run": run_id,
+            "updated_at_utc": datetime.now(timezone.utc).isoformat(),
+            "measurement_count": len(records),
+            "accepted_count": sum(bool(item.get("accepted")) for item in records),
+            "failure_count": sum(not bool(item.get("accepted")) for item in records),
+            "retry_count": sum(bool(item.get("retry_used")) for item in records),
+            "mean_error_mm": round(statistics.fmean(errors), 6),
+            "min_error_mm": round(min(errors), 6),
+            "max_error_mm": round(max(errors), 6),
+            "peak_to_peak_error_mm": round(max(errors) - min(errors), 6),
+            "max_abs_error_mm": round(max(abs(value) for value in errors), 6),
+        }
+        summary_path = run_dir / "summary.json"
+        atomic_write_json(summary_path, summary)
+        result["run"] = run_id
+        result["step"] = step
+        result["log_path"] = str(log_path)
+        result["summary_path"] = str(summary_path)
+        return result
+
+    def measure_bed_y(self, params: dict[str, Any]) -> dict[str, Any]:
+        camera = sanitize_name(params.get("camera"))
+        if camera != self.camera:
+            raise CaptureError(f"bed-Y CAMERA={camera!r} is not {self.camera!r}")
+        if "y" not in str(params.get("homed_axes") or ""):
+            raise CaptureError("bed-Y camera measurement requires Y homed")
+        if self._active_job():
+            raise CaptureError(
+                f"cannot measure bed Y while vision job {self._active_job()!r} is active"
+            )
+        attempts = []
+        final = None
+        confirm = int(params.get("confirm") or 0)
+        for attempt_index in range(confirm + 1):
+            attempt = self._measure_bed_y_attempt(params, attempt=attempt_index + 1)
+            image_bytes = attempt.pop("_image_bytes")
+            attempts.append(attempt)
+            final = dict(attempt)
+            if attempt.get("accepted"):
+                break
+        assert final is not None
+        final["attempts"] = attempts
+        final["retry_used"] = len(attempts) > 1
+        final["confirmation_count"] = len(attempts) - 1
+        return self._record_bed_y_measurement(params, final, image_bytes)
 
     def capture(self, params: dict[str, Any]) -> dict[str, Any]:
         job_id = sanitize_name(params.get("job"))

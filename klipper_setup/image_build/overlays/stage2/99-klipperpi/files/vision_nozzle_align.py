@@ -27,6 +27,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
+from vision_bed_y import preprocess_image as shared_bed_y_preprocess_image
+from vision_bed_y import subpixel_peak_offset as shared_subpixel_peak_offset
+
 DEFAULT_MOONRAKER_URL = "http://127.0.0.1:7125"
 VISION_DIR = Path(os.environ.get("VISION_OUTPUT_DIR", "/home/pi/printer_data/vision"))
 VISION_ROOT_DIR = VISION_DIR.parent if VISION_DIR.name == "nozzle_cam" else VISION_DIR
@@ -144,6 +151,7 @@ BED_Y_FEATURE_MODES = ("gray_norm", "clahe", "grad_y", "grad_mag")
 BED_Y_SEARCH_X_PAD_1080 = 95.0
 BED_Y_SEARCH_UP_1080 = 330.0
 BED_Y_SEARCH_DOWN_1080 = 120.0
+BED_Y_CALIBRATION_REFERENCE_OFFSET_MM = 10.0
 VISION_HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
 HASHED_GCODE_TOKEN_RE = re.compile(r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+")
 
@@ -718,7 +726,7 @@ def render_acquisition_gcode(
             lines.append(f"G4 P{VISION_LIGHTING_SETTLE_MS}")
             lines.append("")
             active_lighting = frame.lighting
-        if frame.tool != active_tool:
+        if job.kind != BED_Y_JOB_KIND and frame.tool != active_tool:
             lines.append(frame.tool)
             active_tool = frame.tool
         if (
@@ -743,12 +751,17 @@ def render_acquisition_gcode(
                     "M400",
                 ]
             )
+        motion_line = (
+            f"G1 Y{gcode_float(frame.y)} F{frame.feedrate:.0f}"
+            if job.kind == BED_Y_JOB_KIND
+            else (
+                f"G1 X{gcode_float(frame.x)} Y{gcode_float(frame.y)} "
+                f"Z{gcode_float(frame.z)} F{frame.feedrate:.0f}"
+            )
+        )
         lines.extend(
             [
-                (
-                    f"G1 X{gcode_float(frame.x)} Y{gcode_float(frame.y)} "
-                    f"Z{gcode_float(frame.z)} F{frame.feedrate:.0f}"
-                ),
+                motion_line,
                 "M400",
                 f"G4 P{frame.settle_ms}",
                 (
@@ -779,7 +792,7 @@ def build_manifest(job: VisionJob) -> dict[str, Any]:
         "frame_count": len(job.frames),
         "state": "prepared",
         "preconditions": {
-            "required_homed_axes": "xyz",
+            "required_homed_axes": "y" if job.kind == BED_Y_JOB_KIND else "xyz",
             "require_idle": True,
         },
         "frames": [frame.manifest_record() for frame in job.frames],
@@ -1831,50 +1844,11 @@ def median_float(values: list[float]) -> float | None:
 def subpixel_peak_offset(
     response: Any, max_loc: tuple[int, int]
 ) -> tuple[float, float]:
-    x, y = max_loc
-    height, width = response.shape[:2]
-
-    def axis_offset(v0: float, v_minus: float, v_plus: float) -> float:
-        denominator = v_minus - 2.0 * v0 + v_plus
-        if abs(denominator) < 1.0e-9:
-            return 0.0
-        offset = 0.5 * (v_minus - v_plus) / denominator
-        return max(-1.0, min(1.0, float(offset)))
-
-    center = float(response[y, x])
-    dx = 0.0
-    dy = 0.0
-    if 0 < x < width - 1:
-        dx = axis_offset(center, float(response[y, x - 1]), float(response[y, x + 1]))
-    if 0 < y < height - 1:
-        dy = axis_offset(center, float(response[y - 1, x]), float(response[y + 1, x]))
-    return dx, dy
+    return shared_subpixel_peak_offset(response, max_loc)
 
 
 def bed_y_preprocess_image(image: Any, mode: str) -> Any:
-    import cv2
-    import numpy as np
-
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    if mode == "gray_norm":
-        feature = gray.astype("float32")
-    else:
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
-        if mode == "clahe":
-            feature = clahe.astype("float32")
-        elif mode == "grad_y":
-            feature = cv2.Sobel(clahe, cv2.CV_32F, 0, 1, ksize=3)
-        elif mode == "grad_mag":
-            grad_x = cv2.Sobel(clahe, cv2.CV_32F, 1, 0, ksize=3)
-            grad_y = cv2.Sobel(clahe, cv2.CV_32F, 0, 1, ksize=3)
-            feature = cv2.magnitude(grad_x, grad_y)
-        else:
-            raise ValueError(f"unknown bed-Y feature mode: {mode}")
-    feature = feature.astype("float32")
-    std = float(feature.std())
-    if std <= 1.0e-6:
-        return np.zeros(feature.shape, dtype="float32")
-    return (feature - float(feature.mean())) / std
+    return shared_bed_y_preprocess_image(image, mode)
 
 
 def bed_y_search_rect(
@@ -2305,6 +2279,64 @@ def write_bed_y_contact_sheet(
     cv2.imwrite(str(contact_sheet_path), sheet, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
 
 
+def build_bed_y_calibration_candidate(
+    frames: list[dict[str, Any]],
+    selected: dict[str, Any] | None,
+    *,
+    reference_y_offset_mm: float = BED_Y_CALIBRATION_REFERENCE_OFFSET_MM,
+) -> dict[str, Any] | None:
+    if not selected or not selected.get("accepted"):
+        return None
+    reference_frame = min(
+        frames,
+        key=lambda frame: abs(float(frame.get("y_offset", 0.0)) - reference_y_offset_mm),
+    )
+    if abs(float(reference_frame["y_offset"]) - reference_y_offset_mm) > 1.0e-6:
+        return None
+    match = next(
+        (
+            item
+            for item in selected.get("matches") or []
+            if item.get("frame") == reference_frame.get("prefix")
+            and item.get("accepted")
+        ),
+        None,
+    )
+    if not match or not match.get("match_roi"):
+        return None
+    match_roi = [float(value) for value in match["match_roi"]]
+    anchor = [
+        match_roi[0] + match_roi[2] / 2.0,
+        match_roi[1] + match_roi[3] / 2.0,
+    ]
+    capture = reference_frame.get("capture") or {}
+    return {
+        "reference_y_offset_mm": round(reference_y_offset_mm, 4),
+        "reference_printer_y_mm": round(
+            float(reference_frame["target_gcode_position"]["y"]), 4
+        ),
+        "reference_pixel_px": [round(value, 4) for value in anchor],
+        "template_roi_px": [round(value, 4) for value in match_roi],
+        "template_size_px": {
+            "width": int(round(match_roi[2])),
+            "height": int(round(match_roi[3])),
+        },
+        "source_frame": reference_frame["prefix"],
+        "source_image_sha256": capture.get("image_sha256"),
+        "image_size_px": {
+            "width": int(reference_frame["image_width"]),
+            "height": int(reference_frame["image_height"]),
+        },
+        "capture_pose": dict(reference_frame["target_gcode_position"]),
+        "feature_mode": selected.get("feature_mode"),
+        "selected_roi": selected.get("roi_name"),
+        "axis_vector_px_per_mm": selected.get("bed_y_axis_vector_px_per_mm"),
+        "fit_residual_rms_px": selected.get("bed_y_fit_residual_rms_px"),
+        "correlation_min": selected.get("bed_y_correlation_min"),
+        "correlation_median": selected.get("bed_y_correlation_median"),
+    }
+
+
 def analyze_bed_y_sweep_frames(
     frames: list[dict[str, Any]], run_dir: Path, overlay_dir: Path | None = None
 ) -> dict[str, Any]:
@@ -2391,6 +2423,14 @@ def analyze_bed_y_sweep_frames(
 
     spread = bed_y_parallax_spread(candidates)
     ok = bool(selected and selected.get("accepted"))
+    calibration_candidate = build_bed_y_calibration_candidate(
+        analysis_frames, selected
+    )
+    if ok and calibration_candidate is None:
+        hard_failures.append(
+            "accepted bed-Y sweep has no exact 10 mm calibration reference frame"
+        )
+        ok = False
     message = (
         "Bed Y feature motion accepted."
         if ok
@@ -2432,6 +2472,7 @@ def analyze_bed_y_sweep_frames(
             selected.get("bed_y_correlation_median") if selected else None
         ),
         "bed_y_parallax_spread": spread,
+        "calibration_candidate": calibration_candidate,
         "lighting": frames[0].get("lighting") if frames else BED_Y_JOB_LIGHTING,
         "reference_frame": (
             reference_frame["prefix"] if "reference_frame" in locals() else None
@@ -2470,6 +2511,7 @@ def build_bed_y_motion_facts(
         "bed_y_correlation_min": analysis.get("bed_y_correlation_min"),
         "bed_y_correlation_median": analysis.get("bed_y_correlation_median"),
         "bed_y_parallax_spread": analysis.get("bed_y_parallax_spread"),
+        "calibration_candidate": analysis.get("calibration_candidate"),
         "lighting": analysis.get("lighting"),
         "quality": {
             "selected_roi": analysis.get("selected_roi"),

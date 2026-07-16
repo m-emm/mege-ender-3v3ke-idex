@@ -17,6 +17,33 @@ class Vision:
             "socket_path", "/run/vision-capture-nozzle_cam/visiond.sock"
         )
         self.timeout = config.getfloat("timeout", 15.0, above=0.0)
+        self.bed_y_calibrated = config.getboolean("bed_y_calibrated", False)
+        self.bed_y_calibration = {
+            "camera": config.get("bed_y_camera", "nozzle_cam"),
+            "profile": config.get("bed_y_profile", "analysis"),
+            "image_width": config.getint("bed_y_image_width", 1, minval=1),
+            "image_height": config.getint("bed_y_image_height", 1, minval=1),
+            "reference_y_mm": config.getfloat("bed_y_reference_y", 0.0),
+            "reference_pixel_x": config.getfloat("bed_y_reference_pixel_x", 0.0),
+            "reference_pixel_y": config.getfloat("bed_y_reference_pixel_y", 0.0),
+            "axis_vector_x": config.getfloat("bed_y_axis_vector_x", 0.0),
+            "axis_vector_y": config.getfloat("bed_y_axis_vector_y", 1.0),
+            "template_path": config.get("bed_y_template_path", ""),
+            "template_sha256": config.get("bed_y_template_sha256", ""),
+            "template_width": config.getint("bed_y_template_width", 1, minval=1),
+            "template_height": config.getint("bed_y_template_height", 1, minval=1),
+            "feature_mode": config.get("bed_y_feature_mode", "gray_norm"),
+            "min_correlation": config.getfloat(
+                "bed_y_min_correlation", 0.95, minval=0.0, maxval=1.0
+            ),
+            "max_cross_axis_px": config.getfloat(
+                "bed_y_max_cross_axis_px", 3.0, minval=0.0
+            ),
+            "search_radius_mm": config.getfloat(
+                "bed_y_search_radius_mm", 5.0, above=0.0
+            ),
+        }
+        self.last_bed_y_measurement = None
         self.gcode = self.printer.lookup_object("gcode")
         self.gcode.register_command(
             "VISION_JOB_BEGIN",
@@ -38,6 +65,17 @@ class Vision:
             self.cmd_VISION_JOB_END,
             desc="Finish and verify a synchronous vision acquisition job.",
         )
+        self.gcode.register_command(
+            "VISION_MEASURE_BED_Y",
+            self.cmd_VISION_MEASURE_BED_Y,
+            desc="Synchronously measure physical bed Y with the nozzle camera.",
+        )
+
+    def get_status(self, eventtime):
+        return {
+            "bed_y_calibrated": self.bed_y_calibrated,
+            "last_bed_y_measurement": self.last_bed_y_measurement,
+        }
 
     def _wait_moves(self):
         self.printer.lookup_object("toolhead").wait_moves()
@@ -197,6 +235,63 @@ class Vision:
                 "expected_frames": gcmd.get_int("EXPECTED_FRAMES", minval=0),
             },
         )
+
+    def cmd_VISION_MEASURE_BED_Y(self, gcmd):
+        if not self.bed_y_calibrated:
+            raise gcmd.error(
+                "VISION_MEASURE_BED_Y requires cameras.nozzle_cam calibration"
+            )
+        self._wait_moves()
+        params = dict(self.bed_y_calibration)
+        params.update(
+            {
+                "expected_y_mm": gcmd.get_float("EXPECTED_Y"),
+                "tolerance_mm": gcmd.get_float(
+                    "TOLERANCE", 0.25, above=0.0
+                ),
+                "confirm": gcmd.get_int("CONFIRM", 1, minval=0, maxval=2),
+                "assert_position": bool(
+                    gcmd.get_int("ASSERT", 1, minval=0, maxval=1)
+                ),
+                "run": gcmd.get("RUN", "manual"),
+                "step": gcmd.get_int("STEP", 0, minval=0),
+                "toolhead_position": self._toolhead_position(),
+                "gcode_position": self._gcode_position(),
+                "homed_axes": self._homed_axes(),
+            }
+        )
+        try:
+            response = self._request_visiond("measure_bed_y", params)
+            result = response.get("result") or {}
+            self.last_bed_y_measurement = result
+        finally:
+            try:
+                self.gcode.run_script_from_command("VISION_LIGHT_OFF")
+            except Exception:
+                pass
+        measured = result.get("measured_y_mm")
+        error = result.get("error_mm")
+        correlation = result.get("correlation")
+        retry = result.get("retry_used")
+        gcmd.respond_info(
+            "Bed Y camera measurement: measured=%.4f expected=%.4f "
+            "error=%+.4f correlation=%.4f retry=%s run=%s step=%s"
+            % (
+                float(measured),
+                float(params["expected_y_mm"]),
+                float(error),
+                float(correlation),
+                retry,
+                params["run"],
+                params["step"],
+            )
+        )
+        if params["assert_position"] and not result.get("accepted"):
+            raise gcmd.error(
+                "Bed Y camera check failed: %s"
+                % result.get("failure_reason", "measurement rejected")
+            )
+        return result
 
 
 def load_config(config):

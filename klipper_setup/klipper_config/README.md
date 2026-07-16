@@ -33,8 +33,9 @@ python wiring/validate_wiring.py
 
 `update_menderpi.sh --check` verifies the generated local `printer.cfg`, the
 remote `~/printer_data/config/printer.cfg`, the patched remote
-`/opt/klipper/klippy/extras/heaters.py`, and the config Klippy has loaded via
-Moonraker without uploading files or restarting Klipper.
+`/opt/klipper/klippy/extras/heaters.py`, the bed-Y calibration template when
+configured, and the config Klippy has loaded via Moonraker without uploading
+files or restarting Klipper.
 
 `update_menderpi.sh` copies local `printer.cfg` to
 `~/printer_data/config/printer.cfg` on `pi@menderpi.local`, backs up the
@@ -81,6 +82,41 @@ The stable fact names are:
   `bed_y_correlation_median`: template-match quality.
 - `bed_y_parallax_spread`: variation between accepted bed-feature ROIs. This is
   local perspective variation, not a full Z-height solve.
+
+Persist one accepted sweep as the nozzle-camera Y mapping by copying the whole
+job directory locally and applying its `facts.json`. The default reference is
+the exact 10 mm sweep frame:
+
+```bash
+scp -r pi@menderpi.local:/home/pi/printer_data/vision/nozzle_cam/jobs/<job_id> /tmp/
+python apply_nozzle_vision_calibration.py --dry-run --update-bed-y --reference-y-offset 10 /tmp/<job_id>/analysis/facts.json
+python apply_nozzle_vision_calibration.py --update-bed-y --reference-y-offset 10 /tmp/<job_id>/analysis/facts.json
+python generate_printer_cfg.py
+./update_menderpi.sh
+```
+
+This writes `cameras.nozzle_cam` in `calib.yaml` and a lossless reference crop
+under `vision_calibration/`. The generated mapping is:
+`pixel(y) = reference_pixel + y_axis_px_per_mm * (y - reference_y)`.
+
+After deployment, measure at the calibrated safe point without homing or moving
+X/Z:
+
+```gcode
+IDEX_MEASURE_BED_Y
+IDEX_MEASURE_BED_Y ASSERT=0 RUN=manual STEP=0
+```
+
+Generate the initial 20-check conservative repeatability file with:
+
+```bash
+python generate_y_step_loss_test_gcode.py --pattern camera-repeatability --camera-run-id camera_repeatability_YYYYMMDD
+```
+
+The default is one `100 mm/s`, `1000 mm/s^2` profile. A later acceleration
+ladder is enabled only by explicit arguments such as
+`--camera-velocity 500 --camera-accel-start 3500 --camera-accel-stop 8000
+--camera-accel-step 500 --camera-checks-per-profile 2`.
 
 ## Nozzle Camera Z Calibration Sweep
 

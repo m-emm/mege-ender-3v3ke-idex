@@ -92,7 +92,53 @@ gcode:
 
 [vision]
 socket_path: /run/vision-capture-nozzle_cam/visiond.sock
-timeout: 15.0
+timeout: 20.0
+bed_y_calibrated: ${bed_y_calibrated}
+bed_y_camera: nozzle_cam
+bed_y_profile: ${bed_y_profile}
+bed_y_image_width: ${bed_y_image_width}
+bed_y_image_height: ${bed_y_image_height}
+bed_y_reference_y: ${bed_y_reference_y}
+bed_y_reference_pixel_x: ${bed_y_reference_pixel_x}
+bed_y_reference_pixel_y: ${bed_y_reference_pixel_y}
+bed_y_axis_vector_x: ${bed_y_axis_vector_x}
+bed_y_axis_vector_y: ${bed_y_axis_vector_y}
+bed_y_template_path: ${bed_y_template_path}
+bed_y_template_sha256: ${bed_y_template_sha256}
+bed_y_template_width: ${bed_y_template_width}
+bed_y_template_height: ${bed_y_template_height}
+bed_y_feature_mode: ${bed_y_feature_mode}
+bed_y_min_correlation: 0.95
+bed_y_max_cross_axis_px: 3.0
+bed_y_search_radius_mm: 5.0
+
+[gcode_macro IDEX_MEASURE_BED_Y]
+description: Move Y to the calibrated camera checkpoint and measure physical bed Y.
+gcode:
+    {% set expected_y = ${bed_y_reference_y}|float %}
+    {% set tolerance = params.TOLERANCE|default(0.25)|float %}
+    {% set confirm = params.CONFIRM|default(1)|int %}
+    {% set assert_position = params.ASSERT|default(1)|int %}
+    {% set run = params.RUN|default("manual") %}
+    {% set step = params.STEP|default(0)|int %}
+    {% set old_velocity = printer.toolhead.max_velocity|float %}
+    {% set old_accel = printer.toolhead.max_accel|float %}
+    {% set old_scv = printer.toolhead.square_corner_velocity|float %}
+    {% if not ${bed_y_calibrated} %}
+        { action_raise_error("IDEX_MEASURE_BED_Y requires cameras.nozzle_cam calibration in calib.yaml.") }
+    {% endif %}
+    {% if "y" not in printer.toolhead.homed_axes %}
+        { action_raise_error("IDEX_MEASURE_BED_Y requires Y homed; it will not home automatically.") }
+    {% endif %}
+    G90
+    SET_VELOCITY_LIMIT VELOCITY=20 ACCEL=500 SQUARE_CORNER_VELOCITY={old_scv}
+    G1 Y{expected_y} F1200
+    M400
+    SET_VELOCITY_LIMIT VELOCITY={old_velocity} ACCEL={old_accel} SQUARE_CORNER_VELOCITY={old_scv}
+    VISION_PROFILE CAMERA=nozzle_cam PROFILE=${bed_y_profile}
+    NOZZLE_CAM_Y_FEATURE_LIGHT
+    G4 P750
+    VISION_MEASURE_BED_Y EXPECTED_Y={expected_y} TOLERANCE={tolerance} CONFIRM={confirm} ASSERT={assert_position} RUN={run} STEP={step}
 
 # Webcam preview and high-resolution vision captures are host-side services:
 # vision-framebuffer owns the camera and serves the dashboard view from RAM,

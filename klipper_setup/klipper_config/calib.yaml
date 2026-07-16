@@ -10,3 +10,38 @@ tools:
     x_endstop: 357.532
     y_endstop: -15.820
     z_endstop: 293.650
+cameras:
+  nozzle_cam:
+    image:
+      width_px: 1920
+      height_px: 1080
+      profile: analysis
+    printer_to_image:
+      reference:
+        printer_y_mm: -4.8
+        pixel_x: 838.0
+        pixel_y: 396.5
+      axes_px_per_mm:
+        y:
+          x: -0.2463
+          y: -10.4024
+    bed_y_feature:
+      template_file: vision_calibration/nozzle_cam_bed_y_reference.png
+      template_sha256: 44677093e04df479bc7cbcaeeb2e55ad2e74559ce25feff10331b3c9f99184d4
+      template_width_px: 300
+      template_height_px: 125
+      feature_mode: gray_norm
+      selected_roi: marked_line_tight
+      quality:
+        fit_residual_rms_px: 0.1591
+        correlation_min: 0.99
+        correlation_median: 0.9938
+      source:
+        job_id: nozzle_cam_bed_y_sweep_20260716T122023Z_bed_y_camera_calibration
+        frame: bed_y_10p0
+        manifest_sha256: sha256:19246bc18b674820944a1f6b73a1f45729b3520f61438ddb255d1425e25dd2a3
+        image_sha256: sha256:587c2e5089e4afb6db7f5b074494de18662d72b38287c110867a13d44ee52e64
+        capture_pose:
+          x: -80.4
+          y: -4.8
+          z: 293.75

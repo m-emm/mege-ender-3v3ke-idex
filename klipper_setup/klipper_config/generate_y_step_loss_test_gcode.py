@@ -31,6 +31,9 @@ class PrinterConfig:
     max_velocity: float
     max_accel: float
     square_corner_velocity: float
+    bed_y_calibrated: bool
+    bed_y_reference_y_mm: float
+    bed_y_profile: str
 
 
 @dataclass(frozen=True)
@@ -96,6 +99,24 @@ class PrintReplayYPlan:
 
 
 @dataclass(frozen=True)
+class CameraRepeatabilityPlan:
+    checks_per_profile: int = 20
+    reset_y_mm: float = 260.0
+    stress_y_mm: float = 5.0
+    velocity_mm_s: float = 100.0
+    accel_start_mm_s2: float = 1000.0
+    accel_stop_mm_s2: float = 1000.0
+    accel_step_mm_s2: float = 0.0
+    square_corner_velocity: float = 2.0
+    approach_velocity_mm_s: float = 20.0
+    approach_accel_mm_s2: float = 500.0
+    tolerance_mm: float = 0.25
+    confirm: int = 1
+    settle_ms: int = 750
+    run_id: str = "camera_repeatability"
+
+
+@dataclass(frozen=True)
 class Point:
     x: float
     y: float
@@ -123,6 +144,17 @@ def _setting_float(section: str, setting_name: str) -> float:
     return float(match.group("value"))
 
 
+def _setting_value(section: str, setting_name: str) -> str:
+    match = re.search(
+        rf"^\s*{re.escape(setting_name)}\s*:\s*(?P<value>\S+)\s*$",
+        section,
+        flags=re.MULTILINE,
+    )
+    if match is None:
+        raise ValueError(f"Missing setting {setting_name}")
+    return match.group("value")
+
+
 def _axis_range(section: str) -> AxisRange:
     return AxisRange(
         position_min=_setting_float(section, "position_min"),
@@ -136,6 +168,7 @@ def load_printer_config(config_path: Path = DEFAULT_CONFIG_PATH) -> PrinterConfi
     stepper_x = _section(config_text, "stepper_x")
     stepper_y = _section(config_text, "stepper_y")
     stepper_z = _section(config_text, "stepper_z")
+    vision = _section(config_text, "vision")
     return PrinterConfig(
         x=_axis_range(stepper_x),
         y=_axis_range(stepper_y),
@@ -144,6 +177,10 @@ def load_printer_config(config_path: Path = DEFAULT_CONFIG_PATH) -> PrinterConfi
         max_velocity=_setting_float(printer, "max_velocity"),
         max_accel=_setting_float(printer, "max_accel"),
         square_corner_velocity=_setting_float(printer, "square_corner_velocity"),
+        bed_y_calibrated=_setting_value(vision, "bed_y_calibrated").lower()
+        in ("true", "1", "yes", "on"),
+        bed_y_reference_y_mm=_setting_float(vision, "bed_y_reference_y"),
+        bed_y_profile=_setting_value(vision, "bed_y_profile"),
     )
 
 
@@ -199,6 +236,60 @@ def _validate_print_replay_y_plan(
 
     if not printer.y_position_endstop < plan.low_y_mm < plan.high_y_mm:
         raise ValueError("Y targets must satisfy endstop < low_y_mm < high_y_mm")
+
+
+def camera_stress_profiles(plan: CameraRepeatabilityPlan) -> tuple[StressProfile, ...]:
+    start = float(plan.accel_start_mm_s2)
+    stop = float(plan.accel_stop_mm_s2)
+    step = float(plan.accel_step_mm_s2)
+    if start <= 0.0 or stop <= 0.0:
+        raise ValueError("camera acceleration values must be positive")
+    if stop < start:
+        raise ValueError("camera accel stop must be >= start")
+    if stop == start:
+        values = [start]
+    else:
+        if step <= 0.0:
+            raise ValueError("camera accel step must be positive when stop > start")
+        values = []
+        value = start
+        while value <= stop + 1.0e-9:
+            values.append(value)
+            value += step
+        if abs(values[-1] - stop) > 1.0e-6:
+            raise ValueError("camera acceleration step must land exactly on stop")
+    return tuple(
+        StressProfile(
+            name=f"accel_{accel:g}",
+            velocity_mm_s=float(plan.velocity_mm_s),
+            accel_mm_s2=accel,
+            square_corner_velocity=float(plan.square_corner_velocity),
+        )
+        for accel in values
+    )
+
+
+def _validate_camera_repeatability_plan(
+    printer: PrinterConfig, plan: CameraRepeatabilityPlan
+) -> tuple[StressProfile, ...]:
+    if not printer.bed_y_calibrated:
+        raise ValueError("camera-repeatability requires calibrated bed Y vision")
+    if plan.checks_per_profile <= 0:
+        raise ValueError("camera checks per profile must be positive")
+    if plan.velocity_mm_s <= 0.0 or plan.approach_velocity_mm_s <= 0.0:
+        raise ValueError("camera motion velocities must be positive")
+    if plan.approach_accel_mm_s2 <= 0.0 or plan.tolerance_mm <= 0.0:
+        raise ValueError("camera approach accel and tolerance must be positive")
+    if plan.confirm not in (0, 1, 2):
+        raise ValueError("camera confirmation count must be 0, 1, or 2")
+    reference_y = printer.bed_y_reference_y_mm
+    for value in (reference_y, plan.reset_y_mm, plan.stress_y_mm):
+        _validate_axis_target("Y", printer.y, value)
+    if not printer.y_position_endstop < reference_y < plan.stress_y_mm < plan.reset_y_mm:
+        raise ValueError(
+            "camera Y targets must satisfy endstop < reference < stress < reset"
+        )
+    return camera_stress_profiles(plan)
 
 
 def _set_velocity_limit(
@@ -464,6 +555,132 @@ def generate_print_replay_y_gcode(
     return "\n".join(lines)
 
 
+def _camera_measurement_lines(
+    *,
+    printer: PrinterConfig,
+    plan: CameraRepeatabilityPlan,
+    step: int,
+) -> list[str]:
+    return [
+        f"VISION_PROFILE CAMERA=nozzle_cam PROFILE={printer.bed_y_profile}",
+        "NOZZLE_CAM_Y_FEATURE_LIGHT",
+        f"G4 P{plan.settle_ms}",
+        (
+            "VISION_MEASURE_BED_Y "
+            f"EXPECTED_Y={_format_float(printer.bed_y_reference_y_mm)} "
+            f"TOLERANCE={plan.tolerance_mm:g} "
+            f"CONFIRM={plan.confirm} ASSERT=1 "
+            f"RUN={plan.run_id} STEP={step}"
+        ),
+    ]
+
+
+def generate_camera_repeatability_gcode(
+    printer: PrinterConfig,
+    plan: CameraRepeatabilityPlan = CameraRepeatabilityPlan(),
+) -> str:
+    profiles = _validate_camera_repeatability_plan(printer, plan)
+    total_checks = len(profiles) * plan.checks_per_profile
+    reference_y = printer.bed_y_reference_y_mm
+    lines = [
+        "; Y camera repeatability characterization generated by generate_y_step_loss_test_gcode.py",
+        "; One initial G28 Y is followed only by camera checks at the calibrated safe point.",
+        "; This file keeps heaters off and performs Y-only linear moves.",
+        f"; Camera reference Y: {_format_float(reference_y)}",
+        f"; Reset Y: {_format_float(plan.reset_y_mm)}",
+        f"; Stress Y: {_format_float(plan.stress_y_mm)}",
+        f"; Profiles: {', '.join(profile.name for profile in profiles)}",
+        f"; Checks per profile: {plan.checks_per_profile}",
+        f"; Total post-motion checks: {total_checks}",
+        f"; Position tolerance: {plan.tolerance_mm:g} mm",
+        "M117 Y camera repeatability",
+        "M104 S0",
+        "M140 S0",
+        "G90",
+        "M400",
+        "G28 Y",
+        "M400",
+        _set_velocity_limit(
+            velocity=plan.approach_velocity_mm_s,
+            accel=plan.approach_accel_mm_s2,
+            square_corner_velocity=printer.square_corner_velocity,
+        ),
+        f"G1 Y{_format_float(reference_y)} F{_feedrate(plan.approach_velocity_mm_s)}",
+        "M400",
+        _set_velocity_limit(
+            velocity=printer.max_velocity,
+            accel=printer.max_accel,
+            square_corner_velocity=printer.square_corner_velocity,
+        ),
+        'RESPOND TYPE=echo MSG="Y camera repeatability baseline check."',
+    ]
+    lines.extend(_camera_measurement_lines(printer=printer, plan=plan, step=0))
+
+    check_index = 0
+    for profile in profiles:
+        lines.append(
+            'RESPOND TYPE=echo MSG="Y camera profile '
+            f"{profile.name}: velocity {profile.velocity_mm_s:g} mm/s, "
+            f"accel {profile.accel_mm_s2:g} mm/s^2, "
+            f"SCV {profile.square_corner_velocity:g}, "
+            f'{plan.checks_per_profile} checks."'
+        )
+        for cycle in range(1, plan.checks_per_profile + 1):
+            check_index += 1
+            lines.extend(
+                [
+                    (
+                        f"; Camera check {check_index}/{total_checks}: "
+                        f"profile={profile.name} cycle={cycle}"
+                    ),
+                    _set_velocity_limit(
+                        velocity=profile.velocity_mm_s,
+                        accel=profile.accel_mm_s2,
+                        square_corner_velocity=profile.square_corner_velocity,
+                    ),
+                    f"G1 Y{_format_float(plan.reset_y_mm)} F{_feedrate(profile.velocity_mm_s)}",
+                    f"G1 Y{_format_float(plan.stress_y_mm)} F{_feedrate(profile.velocity_mm_s)}",
+                    "M400",
+                    _set_velocity_limit(
+                        velocity=plan.approach_velocity_mm_s,
+                        accel=plan.approach_accel_mm_s2,
+                        square_corner_velocity=profile.square_corner_velocity,
+                    ),
+                    f"G1 Y{_format_float(reference_y)} F{_feedrate(plan.approach_velocity_mm_s)}",
+                    "M400",
+                    _set_velocity_limit(
+                        velocity=printer.max_velocity,
+                        accel=printer.max_accel,
+                        square_corner_velocity=printer.square_corner_velocity,
+                    ),
+                ]
+            )
+            lines.extend(
+                _camera_measurement_lines(
+                    printer=printer, plan=plan, step=check_index
+                )
+            )
+
+    lines.extend(
+        [
+            "M400",
+            _set_velocity_limit(
+                velocity=printer.max_velocity,
+                accel=printer.max_accel,
+                square_corner_velocity=printer.square_corner_velocity,
+            ),
+            "VISION_LIGHT_OFF",
+            (
+                'RESPOND TYPE=echo MSG="Y camera repeatability passed: baseline plus '
+                f'{total_checks} post-motion checks completed."'
+            ),
+            "M117 Y camera repeatability passed",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Generate a cold quick Y-axis step-loss characterization G-code file."
@@ -471,7 +688,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument(
         "--pattern",
-        choices=("cold-quick", "print-replay-y"),
+        choices=("cold-quick", "print-replay-y", "camera-repeatability"),
         default="cold-quick",
         help=(
             "Motion pattern to generate. cold-quick preserves the existing "
@@ -479,6 +696,19 @@ def build_parser() -> argparse.ArgumentParser:
             "travel leg."
         ),
     )
+    parser.add_argument("--camera-reset-y", type=float, default=260.0)
+    parser.add_argument("--camera-stress-y", type=float, default=5.0)
+    parser.add_argument("--camera-velocity", type=float, default=100.0)
+    parser.add_argument("--camera-accel-start", type=float, default=1000.0)
+    parser.add_argument("--camera-accel-stop", type=float, default=1000.0)
+    parser.add_argument("--camera-accel-step", type=float, default=0.0)
+    parser.add_argument("--camera-scv", type=float, default=2.0)
+    parser.add_argument("--camera-checks-per-profile", type=int, default=20)
+    parser.add_argument("--camera-approach-velocity", type=float, default=20.0)
+    parser.add_argument("--camera-approach-accel", type=float, default=500.0)
+    parser.add_argument("--camera-tolerance", type=float, default=0.25)
+    parser.add_argument("--camera-confirm", type=int, default=1)
+    parser.add_argument("--camera-run-id", default="camera_repeatability")
     parser.add_argument(
         "--output",
         type=Path,
@@ -499,6 +729,25 @@ def main(argv: list[str] | None = None) -> int:
     printer = load_printer_config(args.config)
     if args.pattern == "print-replay-y":
         gcode = generate_print_replay_y_gcode(printer)
+    elif args.pattern == "camera-repeatability":
+        gcode = generate_camera_repeatability_gcode(
+            printer,
+            CameraRepeatabilityPlan(
+                checks_per_profile=args.camera_checks_per_profile,
+                reset_y_mm=args.camera_reset_y,
+                stress_y_mm=args.camera_stress_y,
+                velocity_mm_s=args.camera_velocity,
+                accel_start_mm_s2=args.camera_accel_start,
+                accel_stop_mm_s2=args.camera_accel_stop,
+                accel_step_mm_s2=args.camera_accel_step,
+                square_corner_velocity=args.camera_scv,
+                approach_velocity_mm_s=args.camera_approach_velocity,
+                approach_accel_mm_s2=args.camera_approach_accel,
+                tolerance_mm=args.camera_tolerance,
+                confirm=args.camera_confirm,
+                run_id=args.camera_run_id,
+            ),
+        )
     else:
         gcode = generate_gcode(printer)
     output_path = args.output or timestamped_output_path(args.output_dir)

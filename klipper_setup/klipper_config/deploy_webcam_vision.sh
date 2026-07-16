@@ -15,6 +15,7 @@ required_files=(
   nginx-mainsail.conf
   vision_framebuffer.py
   vision_capture.py
+  vision_bed_y.py
   vision_nozzle_align.py
   vision_runner.py
   webcam_health_probe.py
@@ -66,6 +67,7 @@ scp \
   "${FILES_DIR}/nginx-mainsail.conf" \
   "${FILES_DIR}/vision_framebuffer.py" \
   "${FILES_DIR}/vision_capture.py" \
+  "${FILES_DIR}/vision_bed_y.py" \
   "${FILES_DIR}/vision_nozzle_align.py" \
   "${FILES_DIR}/vision_runner.py" \
   "${FILES_DIR}/webcam_health_probe.py" \
@@ -130,6 +132,7 @@ sudo rm -f /etc/nginx/sites-enabled/default
 
 sudo install -m 0755 "${REMOTE_TMP}/vision_framebuffer.py" /usr/local/bin/vision_framebuffer.py
 sudo install -m 0755 "${REMOTE_TMP}/vision_capture.py" /usr/local/bin/vision_capture.py
+sudo install -m 0644 "${REMOTE_TMP}/vision_bed_y.py" /usr/local/bin/vision_bed_y.py
 sudo install -m 0755 "${REMOTE_TMP}/vision_nozzle_align.py" /usr/local/bin/vision_nozzle_align.py
 sudo install -m 0755 "${REMOTE_TMP}/vision_runner.py" /usr/local/bin/vision_runner.py
 sudo install -m 0755 "${REMOTE_TMP}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py

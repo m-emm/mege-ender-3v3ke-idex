@@ -488,6 +488,12 @@ def test_analyze_bed_y_job_recovers_synthetic_motion(tmp_path):
     assert facts["bed_y_correlation_median"] > 0.8
     assert facts["bed_y_parallax_spread"]["accepted_roi_count"] >= 1
     assert facts["lighting"] == "NOZZLE_CAM_Y_FEATURE_LIGHT"
+    candidate = facts["calibration_candidate"]
+    assert candidate["reference_y_offset_mm"] == pytest.approx(10.0)
+    assert candidate["reference_printer_y_mm"] == pytest.approx(-4.8)
+    assert candidate["source_frame"] == "bed_y_10p0"
+    assert candidate["template_size_px"]["width"] > 0
+    assert candidate["image_size_px"]["width"] > candidate["template_size_px"]["width"]
     for key in (
         "bed_y_axis_vector_px_per_mm",
         "bed_y_scale_px_per_mm",

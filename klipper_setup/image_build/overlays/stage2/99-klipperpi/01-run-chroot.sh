@@ -449,6 +449,7 @@ require_file "${FILES_DIR}/vision-capture.service"
 require_file "${FILES_DIR}/vision-capture-nozzle-cam.service"
 require_file "${FILES_DIR}/vision_framebuffer.py"
 require_file "${FILES_DIR}/vision_capture.py"
+require_file "${FILES_DIR}/vision_bed_y.py"
 require_file "${FILES_DIR}/vision_nozzle_align.py"
 require_file "${FILES_DIR}/vision_runner.py"
 require_file "${FILES_DIR}/webcam_health_probe.py"
@@ -467,6 +468,7 @@ install -m 0644 "${FILES_DIR}/klipperpi-expand-rootfs.service" /etc/systemd/syst
 install -m 0755 "${FILES_DIR}/klipperpi-expand-rootfs-once.sh" /usr/local/sbin/klipperpi-expand-rootfs-once.sh
 install -m 0755 "${FILES_DIR}/vision_framebuffer.py" /usr/local/bin/vision_framebuffer.py
 install -m 0755 "${FILES_DIR}/vision_capture.py" /usr/local/bin/vision_capture.py
+install -m 0644 "${FILES_DIR}/vision_bed_y.py" /usr/local/bin/vision_bed_y.py
 install -m 0755 "${FILES_DIR}/vision_nozzle_align.py" /usr/local/bin/vision_nozzle_align.py
 install -m 0755 "${FILES_DIR}/vision_runner.py" /usr/local/bin/vision_runner.py
 install -m 0755 "${FILES_DIR}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py
