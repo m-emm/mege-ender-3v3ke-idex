@@ -1116,6 +1116,32 @@ def test_idex_part_fan_pins_and_slicer_routing():
     assert "_IDEX_APPLY_PART_FAN TOOL=1" in _section(config_text, "gcode_macro T1")
 
 
+def test_t1_tap_light_barrier_button_is_notification_only():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    button = _section(config_text, "gcode_button tap_t1_light_barrier")
+
+    assert "pin: ^!right_nitehawk:gpio10" in button
+    assert 'RESPOND TYPE=echo MSG="T1 Tap light barrier triggered"' in button
+    assert 'RESPOND TYPE=echo MSG="T1 Tap light barrier untriggered"' in button
+
+    pin_refs = re.findall(
+        r"^\s*(?P<setting>[A-Za-z0-9_]*pin)\s*:\s*(?P<pin>[^\n#]+)",
+        config_text,
+        flags=re.MULTILINE,
+    )
+    right_gpio10_refs = [
+        (setting, pin.strip())
+        for setting, pin in pin_refs
+        if "right_nitehawk:gpio10" in pin
+    ]
+    assert right_gpio10_refs == [("pin", "^!right_nitehawk:gpio10")]
+
+    for forbidden_section in ("probe", "bltouch", "dockable_probe"):
+        assert f"[{forbidden_section}]" not in config_text
+    assert "right_nitehawk:gpio10" not in _section(config_text, "stepper_x")
+    assert "right_nitehawk:gpio10" not in _section(config_text, "dual_carriage")
+
+
 def test_bed_cooling_macro_moves_t0_to_center_and_waits_for_target():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     bed_cooling = _section(config_text, "gcode_macro BED_COOLING")
