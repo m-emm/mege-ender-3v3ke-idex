@@ -115,20 +115,7 @@ Builder:
           process_data:
             overrides:
               process_overrides:
-                brim_type: no_brim
                 enable_support: "0"
-                support_type: tree(auto)
-                support_style: organic
-                support_on_build_plate_only: "1"
-                support_top_z_distance: "0.47"
-                max_bridge_length: "20"
-                bridge_no_support: "1"
-                support_remove_small_overhang: "0"
-                support_interface_top_layers: "2"
-                support_interface_spacing: "0.8"
-                support_object_xy_distance: "0.8"
-                support_bottom_z_distance: "0.2"
-                wall_loops: "3"
           parts:
             - cooleon_pair_housing_right_body
 
@@ -137,20 +124,7 @@ Builder:
           process_data:
             overrides:
               process_overrides:
-                brim_type: no_brim
                 enable_support: "0"
-                support_type: tree(auto)
-                support_style: organic
-                support_on_build_plate_only: "1"
-                support_top_z_distance: "0.47"
-                max_bridge_length: "20"
-                bridge_no_support: "1"
-                support_remove_small_overhang: "0"
-                support_interface_top_layers: "2"
-                support_interface_spacing: "0.8"
-                support_object_xy_distance: "0.8"
-                support_bottom_z_distance: "0.2"
-                wall_loops: "3"
           parts:
             - cooleon_pair_housing_left_body
 
@@ -159,20 +133,7 @@ Builder:
           process_data:
             overrides:
               process_overrides:
-                brim_type: no_brim
                 enable_support: "1"
-                support_type: tree(auto)
-                support_style: organic
-                support_on_build_plate_only: "1"
-                support_top_z_distance: "0.47"
-                max_bridge_length: "20"
-                bridge_no_support: "1"
-                support_remove_small_overhang: "0"
-                support_interface_top_layers: "2"
-                support_interface_spacing: "0.8"
-                support_object_xy_distance: "0.8"
-                support_bottom_z_distance: "0.2"
-                wall_loops: "3"
           parts:
             - cooleon_pair_housing_lid_left
             - cooleon_pair_housing_lid_right

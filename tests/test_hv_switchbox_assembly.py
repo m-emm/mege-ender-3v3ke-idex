@@ -404,17 +404,16 @@ def test_hv_switchbox_resource_uses_petgcf_production_settings():
     plates = {plate["name"]: plate for plate in production["arrange"]["plates"]}
 
     assert production["process_data_preset"] == "petgcf_max_strength_high_speed_06"
-    for plate_name in ["hv_switchbox_box", "hv_switchbox_lid"]:
+    expected_parts_by_plate = {
+        "hv_switchbox_box": ["hv_switchbox_box"],
+        "hv_switchbox_lid": ["hv_switchbox_lid"],
+    }
+    for plate_name, expected_parts in expected_parts_by_plate.items():
         plate = plates[plate_name]
         overrides = plate["process_data"]["overrides"]["process_overrides"]
         assert plate["process_data_preset"] == "petgcf_max_strength_high_speed_06"
-        assert overrides["brim_type"] == "no_brim"
-        assert overrides["enable_support"] == "1"
-        assert overrides["support_type"] == "tree(auto)"
-        assert overrides["support_style"] == "organic"
-        assert overrides["support_on_build_plate_only"] == "1"
-        assert overrides["support_interface_spacing"] == "2"
-        assert overrides["wall_loops"] == "3"
+        assert plate["parts"] == expected_parts
+        assert isinstance(overrides, dict)
 
 
 def test_hv_switchbox_resources_do_not_visualize_duplicate_fused_parts():

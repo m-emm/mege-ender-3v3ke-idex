@@ -89,19 +89,7 @@ Builder:
               process_data:
                 overrides:
                   process_overrides:
-                    brim_type: no_brim
                     enable_support: "1"
-                    support_type: tree(auto)
-                    support_style: organic
-                    support_on_build_plate_only: "1"
-                    support_top_z_distance: "0.47"
-                    max_bridge_length: "0"
-                    bridge_no_support: "0"
-                    support_interface_top_layers: "2"
-                    support_interface_spacing: "0.8"
-                    support_object_xy_distance: "0.8"
-                    support_bottom_z_distance: "0.2"
-                    wall_loops: "3"
               parts:
                 - top_lid
             - name: y_z_axis_mcu_holder_bottom_lid

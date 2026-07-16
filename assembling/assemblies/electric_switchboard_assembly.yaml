@@ -108,13 +108,7 @@ Builder:
           process_data:
             overrides:
               process_overrides:
-                brim_type: no_brim
                 enable_support: "1"
-                support_type: tree(auto)
-                support_style: organic
-                support_on_build_plate_only: "1"
-                support_interface_spacing: "2"
-                wall_loops: "3"
           parts:
             - electric_switchboard_box
         - name: electric_switchboard_lid
@@ -122,13 +116,7 @@ Builder:
           process_data:
             overrides:
               process_overrides:
-                brim_type: no_brim
                 enable_support: "1"
-                support_type: tree(auto)
-                support_style: organic
-                support_on_build_plate_only: "1"
-                support_interface_spacing: "2"
-                wall_loops: "3"
           parts:
             - electric_switchboard_lid
         - name: electric_switchboard_cable_cutout_cover

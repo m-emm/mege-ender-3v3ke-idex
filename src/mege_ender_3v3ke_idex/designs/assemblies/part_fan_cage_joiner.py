@@ -458,7 +458,7 @@ def join_part_fans_with_extruder_cage(
 
             magnet_screw.add_named_non_production_part(magnet, "magnet")
 
-            magnet_holder_size = 7.5
+            magnet_holder_size = 10
             magnet_holder_height = 6.5
             magnet_holder = create_box(
                 magnet_holder_size, magnet_holder_size, magnet_holder_height

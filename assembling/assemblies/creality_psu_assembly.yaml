@@ -55,10 +55,7 @@ Builder:
           process_data:
             overrides:
               process_overrides:
-                brim_type: no_brim
                 enable_support: "1"
-                support_type: tree(auto)
-                support_on_build_plate_only: "1"
           parts:
             - psu_electrics_box
             - cable_holder

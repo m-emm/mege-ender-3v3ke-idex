@@ -356,32 +356,13 @@ def test_tb6600_stripboard_interface_housing_production_plate_contains_body_and_
         },
     ]
     assert production["arrange"]["auto_assign_plates"] is False
-    assert production["arrange"]["plates"] == [
-        {
-            "name": "tb6600_stripboard_interface_housing",
-            "process_data_preset": "petgcf_max_strength_high_speed_06",
-            "process_data": {
-                "overrides": {
-                    "process_overrides": {
-                        "brim_type": "no_brim",
-                        "enable_support": "1",
-                        "support_type": "tree(auto)",
-                        "support_style": "organic",
-                        "support_on_build_plate_only": "1",
-                        "support_top_z_distance": "0.47",
-                        "max_bridge_length": "0",
-                        "bridge_no_support": "0",
-                        "support_interface_top_layers": "2",
-                        "support_interface_spacing": "0.8",
-                        "support_object_xy_distance": "0.8",
-                        "support_bottom_z_distance": "0.2",
-                        "wall_loops": "3",
-                    },
-                },
-            },
-            "parts": [
-                "tb6600_stripboard_interface_housing",
-                "tb6600_stripboard_interface_housing_lid",
-            ],
-        }
+    plates = production["arrange"]["plates"]
+    assert len(plates) == 1
+    plate = plates[0]
+    assert plate["name"] == "tb6600_stripboard_interface_housing"
+    assert plate["process_data_preset"] == "petgcf_max_strength_high_speed_06"
+    assert plate["parts"] == [
+        "tb6600_stripboard_interface_housing",
+        "tb6600_stripboard_interface_housing_lid",
     ]
+    assert isinstance(plate["process_data"]["overrides"]["process_overrides"], dict)

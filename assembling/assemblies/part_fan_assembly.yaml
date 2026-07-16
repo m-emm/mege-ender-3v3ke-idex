@@ -55,10 +55,7 @@ Builder:
       overrides:
         process_overrides:
           enable_support: "1"
-          support_type: tree(auto)
-          support_style: organic
           support_threshold_angle: "25"
-          brim_type: no_brim
     parts:
       - source: self
         artifact: leader

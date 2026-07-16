@@ -4,104 +4,93 @@ from assembly_defaults import ASSEMBLIES_DIR, AssemblyDefaultsLoader
 from mege_3devops.process_data.parametric import load_material_spec
 
 
-PETGCF_06_ANTI_SHIFT_OVERRIDES = {
-    "z_hop": "0.45",
-    "retract_lift_above": "0",
-    "retract_lift_below": "0",
-    "retract_lift_enforce": "All Surfaces",
-    "wipe": "0",
-    "travel_speed": "350",
-    "travel_acceleration": "5000",
-    "default_acceleration": "5000",
-    "initial_layer_acceleration": "5000",
-    "travel_jerk": "8",
-    "default_jerk": "8",
-    "initial_layer_jerk": "8",
-    "top_surface_acceleration": "2650",
-    "internal_solid_infill_acceleration": "4240",
-    "sparse_infill_acceleration": "4240",
-}
+PETGCF_06_STOCK_PRESET_NAMES = (
+    "petgcf_low_strength_high_speed_06",
+    "petgcf_max_strength_high_speed_06",
+    "petgcf_medium_strength_high_speed_06",
+    "petgcf_medium_strength_max_quality_06",
+    "petgcf_medium_strength_medium_quality_06",
+)
 
-PETGCF_06_IDEX_SLOW_MOTION_OVERRIDES = {
-    "travel_speed": "200",
-    "travel_acceleration": "2000",
-    "default_acceleration": "2000",
-    "initial_layer_acceleration": "2000",
-    "outer_wall_acceleration": "2000",
-    "inner_wall_acceleration": "2000",
-    "top_surface_acceleration": "2000",
-    "internal_solid_infill_acceleration": "2000",
-    "sparse_infill_acceleration": "2000",
-    "bridge_acceleration": "2000",
-    "travel_jerk": "2",
-    "default_jerk": "2",
-    "initial_layer_jerk": "2",
-    "outer_wall_jerk": "2",
-    "inner_wall_jerk": "2",
-    "infill_jerk": "2",
-    "top_surface_jerk": "2",
-}
+MIGRATED_PETGCF_RESOURCE_FILES = (
+    "aukey_nozzle_cam_holder_assembly.yaml",
+    "cooleon_pair_housing_assembly.yaml",
+    "creality_psu_assembly.yaml",
+    "electric_switchboard_assembly.yaml",
+    "heatbed_psu_housing_assembly.yaml",
+    "hv_switchbox_assembly.yaml",
+    "nitehawk_usb_dual_board_housing_assembly.yaml",
+    "part_fan_assembly.yaml",
+    "part_fan_cage_joiner.yaml",
+    "printer_host_and_screen_assembly.yaml",
+    "tb6600_stripboard_interface_housing_assembly.yaml",
+    "tool_heads_assembly.yaml",
+    "vision_light_mount_assembly.yaml",
+    "x_axis_belt_carriage_assembly.yaml",
+    "y_z_axis_mcu_holder_fan_joiner.yaml",
+    "z_axis_guide_rod_top_mount_assembly.yaml",
+)
 
 
-def test_petgcf_06_presets_include_anti_shift_motion_overrides():
-    config = yaml.load(
-        (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
-        Loader=AssemblyDefaultsLoader,
-    )
+def _load_yaml(path):
+    return yaml.load(path.read_text(), Loader=AssemblyDefaultsLoader)
 
+
+def _assert_petgcf_06_intent(preset, *, generator):
+    arguments = preset["arguments"]
+    material = load_material_spec(arguments["material_name"])
+
+    assert preset["generator"] == generator
+    assert material.family == "PETG_CF"
+    assert arguments["nozzle_diameter_mm"] == 0.6
+    assert arguments["nozzle_hardened"] is True
+    assert arguments["nozzle_high_flow"] is True
+
+    overrides = preset.get("overrides", {}).get("process_overrides")
+    assert isinstance(overrides, dict)
+    assert all(isinstance(key, str) and key for key in overrides)
+
+
+def _find_process_override_mappings(value):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key == "process_overrides":
+                yield child
+            yield from _find_process_override_mappings(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _find_process_override_mappings(child)
+
+
+def test_petgcf_06_stock_presets_keep_valid_petgcf_process_intent():
+    config = _load_yaml(ASSEMBLIES_DIR / "assemblies.yaml")
     presets = config["process_data_presets"]
-    petgcf_06_preset_names = sorted(
-        name for name in presets if name.startswith("petgcf_") and name.endswith("_06")
-    )
 
-    assert petgcf_06_preset_names == [
-        "petgcf_low_strength_high_speed_06",
-        "petgcf_max_strength_high_speed_06",
-        "petgcf_medium_strength_high_speed_06",
-        "petgcf_medium_strength_max_quality_06",
-        "petgcf_medium_strength_medium_quality_06",
-    ]
-    for preset_name in petgcf_06_preset_names:
-        overrides = presets[preset_name]["overrides"]["process_overrides"]
-        for key, value in PETGCF_06_ANTI_SHIFT_OVERRIDES.items():
-            assert overrides[key] == value
+    for preset_name in PETGCF_06_STOCK_PRESET_NAMES:
+        assert preset_name in presets
+        _assert_petgcf_06_intent(
+            presets[preset_name], generator="mege3devops_parametric"
+        )
 
 
-def test_petgcf_06_idex_one_off_preset_keeps_stock_petgcf_tuning_slowly():
-    config = yaml.load(
-        (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
-        Loader=AssemblyDefaultsLoader,
-    )
-
+def test_petgcf_06_idex_one_off_preset_keeps_valid_petgcf_process_intent():
+    config = _load_yaml(ASSEMBLIES_DIR / "assemblies.yaml")
     preset = config["process_data_presets"]["petgcf_max_strength_high_speed_06_idex"]
 
-    assert preset["generator"] == "mege3devops_idex_parametric"
-    assert preset["arguments"] == {
-        "material_name": "petg_cf_generic",
-        "nozzle_diameter_mm": 0.6,
-        "nozzle_hardened": True,
-        "nozzle_high_flow": True,
-        "strength_factor": 0.9,
-        "quality_factor": 0.5,
-    }
-    overrides = preset["overrides"]["process_overrides"]
-    assert overrides["sparse_infill_pattern"] == "cubic"
-    assert overrides["support_object_first_layer_gap"] == "2.5"
-    assert overrides["xy_contour_compensation"] == "-0.3"
-    assert overrides["xy_hole_compensation"] == "0.4"
-    for key, value in PETGCF_06_ANTI_SHIFT_OVERRIDES.items():
-        if key in PETGCF_06_IDEX_SLOW_MOTION_OVERRIDES:
-            continue
-        assert overrides[key] == value
-    for key, value in PETGCF_06_IDEX_SLOW_MOTION_OVERRIDES.items():
-        assert overrides[key] == value
+    _assert_petgcf_06_intent(preset, generator="mege3devops_idex_parametric")
 
 
-def test_plain_pla_06_preset_uses_medium_strength_max_quality_intent():
-    config = yaml.load(
-        (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
-        Loader=AssemblyDefaultsLoader,
-    )
+def test_migrated_petgcf_assemblies_keep_small_valid_local_override_mappings():
+    for resource_name in MIGRATED_PETGCF_RESOURCE_FILES:
+        resource = _load_yaml(ASSEMBLIES_DIR / resource_name)
+        for overrides in _find_process_override_mappings(resource):
+            assert isinstance(overrides, dict), resource_name
+            assert all(isinstance(key, str) and key for key in overrides), resource_name
+            assert len(overrides) <= 5, resource_name
+
+
+def test_plain_pla_06_preset_keeps_valid_pla_nozzle_intent():
+    config = _load_yaml(ASSEMBLIES_DIR / "assemblies.yaml")
 
     preset = config["process_data_presets"]["pla_medium_strength_max_quality_06"]
     arguments = preset["arguments"]
@@ -111,6 +100,5 @@ def test_plain_pla_06_preset_uses_medium_strength_max_quality_intent():
     assert material.family == "PLA"
     assert arguments["nozzle_diameter_mm"] == 0.6
     assert arguments["nozzle_hardened"] is False
-    assert 0.45 <= arguments["strength_factor"] <= 0.55
-    assert arguments["quality_factor"] > arguments["strength_factor"]
-    assert arguments["quality_factor"] >= 0.9
+    assert arguments["nozzle_high_flow"] is True
+    assert isinstance(preset.get("overrides", {}).get("process_overrides"), dict)

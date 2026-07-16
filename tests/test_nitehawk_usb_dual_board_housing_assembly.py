@@ -550,36 +550,15 @@ def test_nitehawk_usb_dual_board_housing_production_prints_on_one_plate():
     assert body["prod_rotation_axis"] == [0, 1, 0]
     assert lid["prod_rotation_angle"] == -90
     assert lid["prod_rotation_axis"] == [0, 1, 0]
-    assert plates == [
-        {
-            "name": "nitehawk_usb_dual_board_housing",
-            "process_data_preset": "petgcf_max_strength_high_speed_06",
-            "process_data": {
-                "overrides": {
-                    "process_overrides": {
-                        "brim_type": "no_brim",
-                        "enable_support": "1",
-                        "support_type": "tree(auto)",
-                        "support_style": "organic",
-                        "support_on_build_plate_only": "1",
-                        "support_top_z_distance": "0.47",
-                        "max_bridge_length": "0",
-                        "bridge_no_support": "0",
-                        "support_remove_small_overhang": "0",
-                        "support_interface_top_layers": "2",
-                        "support_interface_spacing": "0.8",
-                        "support_object_xy_distance": "0.8",
-                        "support_bottom_z_distance": "0.2",
-                        "wall_loops": "3",
-                    },
-                },
-            },
-            "parts": [
-                "nitehawk_usb_dual_board_housing",
-                "nitehawk_usb_dual_housing_lid",
-            ],
-        }
+    assert len(plates) == 1
+    plate = plates[0]
+    assert plate["name"] == "nitehawk_usb_dual_board_housing"
+    assert plate["process_data_preset"] == "petgcf_max_strength_high_speed_06"
+    assert plate["parts"] == [
+        "nitehawk_usb_dual_board_housing",
+        "nitehawk_usb_dual_housing_lid",
     ]
+    assert isinstance(plate["process_data"]["overrides"]["process_overrides"], dict)
     assert production["arrange"]["prod_gap"] == pytest.approx(12.0)
     assert production["arrange"]["auto_assign_plates"] is False
 

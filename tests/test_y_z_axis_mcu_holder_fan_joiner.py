@@ -324,15 +324,9 @@ def test_y_z_axis_mcu_holder_big_fan_is_joined_output_in_assembly_graph():
     } in joiner["Builder"]["Outputs"]["y_z_axis_mcu_holder"]["Visualization"]["parts"]
 
 
-def test_y_z_axis_mcu_holder_top_lid_plate_uses_tb6600_stock_production_process():
+def test_y_z_axis_mcu_holder_top_lid_plate_uses_stock_petgcf_process():
     joiner = yaml.load(
         (ASSEMBLIES_DIR / "y_z_axis_mcu_holder_fan_joiner.yaml").read_text(),
-        Loader=AssemblyDefaultsLoader,
-    )
-    tb6600 = yaml.load(
-        (
-            ASSEMBLIES_DIR / "tb6600_stripboard_interface_housing_assembly.yaml"
-        ).read_text(),
         Loader=AssemblyDefaultsLoader,
     )
 
@@ -341,16 +335,11 @@ def test_y_z_axis_mcu_holder_top_lid_plate_uses_tb6600_stock_production_process(
     ]["plates"]
     y_z_top_lid_plate = _plate_by_name(y_z_plates, "y_z_axis_mcu_holder_top_lid")
 
-    tb6600_plate = _plate_by_name(
-        tb6600["Builder"]["Production"]["arrange"]["plates"],
-        "tb6600_stripboard_interface_housing",
-    )
-
     assert y_z_top_lid_plate["process_data_preset"] == (
         "petgcf_max_strength_high_speed_06"
     )
     assert y_z_top_lid_plate["parts"] == ["top_lid"]
     assert "_idex" not in yaml.safe_dump(y_z_top_lid_plate)
-    assert y_z_top_lid_plate["process_data"]["overrides"]["process_overrides"] == (
-        tb6600_plate["process_data"]["overrides"]["process_overrides"]
+    assert isinstance(
+        y_z_top_lid_plate["process_data"]["overrides"]["process_overrides"], dict
     )

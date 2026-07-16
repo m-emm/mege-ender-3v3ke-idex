@@ -1186,6 +1186,12 @@ process_data_presets:
       process_overrides:
         sparse_infill_pattern: "cubic"
         support_object_first_layer_gap: "2.5"
+        brim_type: no_brim
+        support_type: tree(auto)
+        support_style: organic
+        support_on_build_plate_only: "1"
+        support_interface_spacing: "2"
+        wall_loops: "3"
         xy_contour_compensation: "-0.3" # This is a carefully calibrated value, measured at 2026-04-14
         xy_hole_compensation: "0.4" # This is a carefully calibrated value, measured at 2026-04-14
         z_hop: "0.45"

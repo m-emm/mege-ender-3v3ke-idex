@@ -24,8 +24,8 @@ mgn_7h_carriage_length = 30.8
 mgn_7h_carriage_width = 16.65
 mgn_7h_carriage_height = 6.5
 mgn_7h_carriage_h1_offset = 1.5
-mgn_7h_carriage_mount_hole_pitch_x = 20
-mgn_7h_carriage_mount_hole_pitch_y = 8
+mgn_7h_carriage_mount_hole_pitch_lengthwise = 13
+mgn_7h_carriage_mount_hole_pitch_width_wise = 12
 mgn_7h_carriage_mount_hole_depth = 3
 mgn_7h_carriage_mount_screw_size = "M2"
 
@@ -47,12 +47,12 @@ def create_mgn7h_carriage(*, mgn7h_carriage_mount_hole_drill_extra_length):
     mount_hole_positions = [
         (x, y)
         for x in [
-            -mgn_7h_carriage_mount_hole_pitch_x / 2,
-            mgn_7h_carriage_mount_hole_pitch_x / 2,
+            -mgn_7h_carriage_mount_hole_pitch_lengthwise / 2,
+            mgn_7h_carriage_mount_hole_pitch_lengthwise / 2,
         ]
         for y in [
-            -mgn_7h_carriage_mount_hole_pitch_y / 2,
-            mgn_7h_carriage_mount_hole_pitch_y / 2,
+            -mgn_7h_carriage_mount_hole_pitch_width_wise / 2,
+            mgn_7h_carriage_mount_hole_pitch_width_wise / 2,
         ]
     ]
     for index, (x, y) in enumerate(mount_hole_positions, start=1):
