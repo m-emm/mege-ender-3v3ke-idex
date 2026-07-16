@@ -33,7 +33,7 @@ def create_idex_tap_t1_assembly(
         MScrew.from_size(lower_mount_strip_thread_inset_size).thread_inset_length
         + lower_mount_strip_thread_inset_top_material_thickness
     )
-    lower_mount_strip_thread_inset_extra_radius = 1.5
+    lower_mount_strip_thread_inset_extra_radius = 2.2
 
     inset_boss_cutter_diameter = 10
 
