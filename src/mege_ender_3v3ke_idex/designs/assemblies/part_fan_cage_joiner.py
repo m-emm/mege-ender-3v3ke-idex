@@ -405,6 +405,8 @@ def join_part_fans_with_extruder_cage(
                 top_stopper_screw.get_named_cutter("self_thread_hole_cutter")
             )
 
+
+        joined_idex_tap_t1_additions = None
         for lr in [Alignment.LEFT, Alignment.RIGHT]:
             magnet_screw_length = 6
             magnet_screw = create_conical_head_screw("M3", magnet_screw_length)
@@ -454,7 +456,7 @@ def join_part_fans_with_extruder_cage(
             magnet_screw.add_named_cutter(magnet_screw_top_cutter, "top_cutter")
 
             magnet_diameter = 5
-            magnet_height = 25
+            magnet_height = 12.5# 25
             magnet = create_cylinder(
                 magnet_diameter / 2, magnet_height
             )  # cylindrical magnet, 6mm diameter, 3mm height
@@ -470,7 +472,7 @@ def join_part_fans_with_extruder_cage(
                 magnet_holder_size, magnet_holder_size, magnet_holder_height
             )
 
-            magnet_holder_clearance = 0.2
+            magnet_holder_clearance = 0.05
             magnet_holder__vertical_clearance = 0.7
 
             magnet_holder = LeaderFollowersCuttersPart(magnet_holder)
@@ -644,7 +646,7 @@ def join_part_fans_with_extruder_cage(
                 back_cutter = create_box(100, 100, 100)
                 back_cutter = align(back_cutter, magnet_holder, Alignment.CENTER)
                 back_cutter = align(
-                    back_cutter, joined_idex_tap_t1, Alignment.STACK_BACK
+                    back_cutter, joined_idex_tap_t1, Alignment.STACK_BACK, stack_gap=1
                 )
 
                 bottom_cutter = create_box(100, 100, 100)
@@ -662,7 +664,16 @@ def join_part_fans_with_extruder_cage(
                 joined_idex_tap_t1 = joined_idex_tap_t1.cut(
                     rotated_magnet_holder_cutter
                 )
-                joined_idex_tap_t1 = joined_idex_tap_t1.fuse(magnet_holder)
+
+                if joined_idex_tap_t1_additions is None:
+                    joined_idex_tap_t1_additions = magnet_holder
+                else :
+                    joined_idex_tap_t1_additions = joined_idex_tap_t1_additions.fuse(
+                        magnet_holder
+                    )
+                
+
+
                 joined_idex_tap_t1.add_named_non_production_part(
                     magnet_screw.get_named_non_production_part(
                         "magnet_holder_clamp_screw"
@@ -674,6 +685,8 @@ def join_part_fans_with_extruder_cage(
                     "clamp_screw_access_cutter"
                 )
                 joined_idex_tap_t1 = joined_idex_tap_t1.cut(clamp_screw_access_cutter)
+        if joined_idex_tap_t1_additions is not None:
+            joined_idex_tap_t1 = joined_idex_tap_t1.fuse(joined_idex_tap_t1_additions)
 
     if opb991t11z_sensor is not None:
 
