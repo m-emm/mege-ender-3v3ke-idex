@@ -292,7 +292,7 @@ def join_part_fans_with_extruder_cage(
         full_bbox_cutter = materialize_bounding_box(
             mgn7h_rail_with_carriage,
             x_enlargement=0.1,
-            y_enlargement=0.1,
+            y_enlargement=2,
             z_enlargement=0.1,
         )
 
@@ -317,10 +317,12 @@ def join_part_fans_with_extruder_cage(
                 )
 
                 clearance_cutter = create_cylinder(
-                    MScrew.from_size("M2").clearance_hole_close / 2, 20
+                    MScrew.from_size("M2").clearance_hole_close / 2, 50
                 )
                 clearance_cutter = rotate(90, axis=[1, 0, 0])(clearance_cutter)
                 clearance_cutter = align(clearance_cutter, cutter, Alignment.CENTER)
+                clearance_cutter = align(clearance_cutter, back_plate, Alignment.CENTER, axes=[1])
+
                 back_plate = back_plate.cut(clearance_cutter)
 
                 m2_nut_cutter = create_nut("M2", slack=0.3, no_hole=True)
@@ -456,7 +458,15 @@ def join_part_fans_with_extruder_cage(
             magnet_screw.add_named_cutter(magnet_screw_top_cutter, "top_cutter")
 
             magnet_diameter = 5
-            magnet_height = 12.5# 25
+            magnet_height = 25
+            magnet_holder_size = 10
+            magnet_holder_height = 15
+            magnet_holder_clearance = 0.05
+            magnet_holder__vertical_clearance = 0.7
+
+            clamp_srew_length = 18
+
+
             magnet = create_cylinder(
                 magnet_diameter / 2, magnet_height
             )  # cylindrical magnet, 6mm diameter, 3mm height
@@ -466,14 +476,10 @@ def join_part_fans_with_extruder_cage(
 
             magnet_screw.add_named_non_production_part(magnet, "magnet")
 
-            magnet_holder_size = 10
-            magnet_holder_height = 15
             magnet_holder = create_box(
                 magnet_holder_size, magnet_holder_size, magnet_holder_height
             )
 
-            magnet_holder_clearance = 0.05
-            magnet_holder__vertical_clearance = 0.7
 
             magnet_holder = LeaderFollowersCuttersPart(magnet_holder)
 
@@ -538,7 +544,6 @@ def join_part_fans_with_extruder_cage(
                 if name in ["thread_hole_cutter"]:
                     joined_extruder_cage = joined_extruder_cage.cut(cutter)
 
-            clamp_srew_length = 18
 
             magnet_holder_translated = magnet_screw.get_named_non_production_part(
                 "magnet_holder"
@@ -691,7 +696,7 @@ def join_part_fans_with_extruder_cage(
     if opb991t11z_sensor is not None:
 
         holder = materialize_bounding_box(
-            opb991t11z_sensor, x_enlargement=1, y_size=3.2, z_enlargement=1.5
+            opb991t11z_sensor, x_enlargement=1.5, y_size=3.2, z_enlargement=2.0
         )
         holder = align(holder, sprite_extruder, Alignment.STACK_FRONT, stack_gap=0.5)
         holder = opb991t11z_sensor.use_as_cutter_on(holder)
