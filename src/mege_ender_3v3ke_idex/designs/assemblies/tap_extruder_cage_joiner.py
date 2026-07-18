@@ -11,6 +11,8 @@ from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
 
+magnet_holder_slit_thickness = 1
+
 
 def create_magnet_screw_assembly():
     magnet_screw_length = 6
@@ -67,12 +69,7 @@ def create_magnet_screw_assembly():
     magnet_holder_clearance = 0.05
     magnet_to_screw_head_stack_gap = 0.3
 
-    magnet_holder_slit_thickness = 1
     magnet_holder_slit_enlargement = 10
-    magnet_holder_clamp_screw_material_thickness = 2
-    magnet_clamp_screw_length = 8
-    magnet_clamp_screw_vertical_inset = 3
-    magnet_clamp_screw_horizontal_inset = 1.8
     magnet = create_cylinder(magnet_diameter / 2, magnet_height)
     magnet = align(magnet, magnet_screw, Alignment.CENTER)
     magnet = align(
@@ -112,66 +109,6 @@ def create_magnet_screw_assembly():
     )
     slit_cutter = align(slit_cutter, magnet_holder, Alignment.CENTER)
 
-    # slit_cutter, _ = cut_in_two(slit_cutter, cut_normal=[1, 0, 0])
-
-    magnet_clamp_screw = create_complete_screw_assembly(
-        "M2",
-        magnet_clamp_screw_length,
-        ScrewType.CYLINDER_HEAD,
-        hole_type=HoleType.SELF_THREADING,
-        core_radius_adjustment=-0.35,
-        lead_in=True,
-        hole_distance_from_head=magnet_holder_clamp_screw_material_thickness
-        + magnet_holder_slit_thickness,
-        with_access_hole=True,
-        extra_access_hole_length=10,
-        access_hole_clearance=0.3,
-    )
-
-    clearance_hole_top_cutter = create_cylinder(
-        MScrew.from_size("M2").clearance_hole_loose / 2,
-        magnet_holder_clamp_screw_material_thickness + magnet_holder_slit_thickness,
-    )
-
-    clearance_hole_top_cutter = align(
-        clearance_hole_top_cutter, magnet_clamp_screw, Alignment.CENTER
-    )
-    clearance_hole_top_cutter = align(
-        clearance_hole_top_cutter, magnet_clamp_screw, Alignment.TOP
-    )
-
-    magnet_clamp_screw.add_named_cutter(
-        clearance_hole_top_cutter, "clearance_hole_top_cutter"
-    )
-
-    magnet_clamp_screw = rotate(180, axis=[1, 0, 0])(magnet_clamp_screw)
-
-    magnet_clamp_screw = rotate(90, axis=[1, 0, 0])(magnet_clamp_screw)
-    magnet_clamp_screw = align(magnet_clamp_screw, magnet_holder, Alignment.CENTER)
-    magnet_clamp_screw = magnet_clamp_screw.aligned_from_non_production_part(
-        "complete_screw", magnet_holder, Alignment.BACK
-    )  # align(magnet_clamp_screw, magnet_holder, Alignment.BACK)
-    magnet_clamp_screw = align(magnet_clamp_screw, magnet_holder, Alignment.EDGE_RIGHT)
-    magnet_clamp_screw = align(magnet_clamp_screw, magnet_holder, Alignment.EDGE_BOTTOM)
-    magnet_clamp_screw = translate(
-        -magnet_clamp_screw_horizontal_inset, 0, magnet_clamp_screw_vertical_inset
-    )(magnet_clamp_screw)
-
-    magnet_clamp_screw = magnet_clamp_screw.prefixed_copy("magnet_clamp_screw")
-
-    magnet_holder = magnet_clamp_screw.use_as_cutter_on(magnet_holder)
-
-    # magnet_screw = magnet_screw.merge_except_leader(magnet_clamp_screw)
-
-    magnet_screw.add_named_non_production_part(
-        magnet_clamp_screw.get_named_non_production_part(
-            "magnet_clamp_screw_complete_screw"
-        ),
-        "magnet_clamp_screw",
-    )
-    for name, cutter in magnet_clamp_screw.get_named_cutter_items():
-        magnet_screw.add_named_cutter(cutter, f"magnet_clamp_screw_{name}")
-
     magnet_holder = magnet_holder.cut(slit_cutter)
 
     magnet_screw.add_named_non_production_part(magnet_holder.leader, "magnet_holder")
@@ -192,6 +129,7 @@ def add_magnet_screw_holders(*, extruder_cage, idex_tap, carriage):
     joined_extruder_cage = extruder_cage
     joined_idex_tap = idex_tap
     joined_idex_tap_additions = None
+    joined_idex_tap_cutters = None
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
@@ -234,10 +172,6 @@ def add_magnet_screw_holders(*, extruder_cage, idex_tap, carriage):
             f"magnet_{lr.name}",
         )
 
-        joined_idex_tap.add_named_non_production_part(
-            magnet_screw.get_named_non_production_part("magnet_clamp_screw"),
-            f"magnet_clamp_screw_{lr.name}",
-        )
         rotated_magnet_holder_cutter = magnet_screw.get_named_cutter(
             "magnet_holder_cutter"
         )
@@ -280,14 +214,101 @@ def add_magnet_screw_holders(*, extruder_cage, idex_tap, carriage):
             magnet_holder_path_cutter
         )
 
-        for name, cutter in magnet_screw.get_named_cutter_items():
-            if "clamp_screw" in name:
-                _logger.info(f"Cutting idex_tap with {name}")
-                joined_idex_tap = joined_idex_tap.cut(cutter)
-                joined_idex_tap_additions = joined_idex_tap_additions.cut(cutter)
+        magnet_clamp_screw_length = 10
+        magnet_clamp_screw_y_offset = -1.2
+        magnet_clamp_screw_horizontal_inset = 6
+        magnet_holder_clamp_screw_material_thickness = 2
+        clearance_hole_top_cutter_length = 7
+        magnet_clamp_screw_extra_hole_length = 2
+
+        magnet_clamp_screw = create_complete_screw_assembly(
+            "M2",
+            magnet_clamp_screw_length,
+            ScrewType.CYLINDER_HEAD,
+            hole_type=HoleType.SELF_THREADING,
+            core_radius_adjustment=-0.35,
+            extra_hole_length=magnet_clamp_screw_extra_hole_length,
+            lead_in=True,
+            hole_distance_from_head=clearance_hole_top_cutter_length,
+            with_access_hole=True,
+            extra_access_hole_length=10,
+            access_hole_clearance=0.3,
+        )
+
+        clearance_hole_top_cutter = create_cylinder(
+            MScrew.from_size("M2").clearance_hole_loose / 2,
+            clearance_hole_top_cutter_length,
+        )
+
+        clearance_hole_top_cutter = align(
+            clearance_hole_top_cutter, magnet_clamp_screw, Alignment.CENTER
+        )
+        clearance_hole_top_cutter = align(
+            clearance_hole_top_cutter, magnet_clamp_screw, Alignment.TOP
+        )
+
+        magnet_clamp_screw.add_named_cutter(
+            clearance_hole_top_cutter, "clearance_hole_top_cutter"
+        )
+
+        magnet_clamp_screw = rotate(180, axis=[1, 0, 0])(magnet_clamp_screw)
+
+        magnet_clamp_screw = align(magnet_clamp_screw, magnet_holder, Alignment.CENTER)
+        magnet_clamp_screw = align(magnet_clamp_screw, joined_idex_tap, Alignment.BACK)
+        magnet_clamp_screw = align(
+            magnet_clamp_screw, joined_idex_tap, Alignment.BOTTOM
+        )
+
+        magnet_clamp_screw = translate(
+            magnet_clamp_screw_horizontal_inset * lr.sign,
+            magnet_clamp_screw_y_offset,
+            0,
+        )(magnet_clamp_screw)
+
+        complete_magnet_clamp_screw = magnet_clamp_screw.get_named_non_production_part(
+            "complete_screw"
+        )
+
+        joined_idex_tap.add_named_non_production_part(
+            complete_magnet_clamp_screw, f"magnet_clamp_screw_{lr.name.lower()}"
+        )
+
+        magnet_clamp_screw_tube = create_cylinder(
+            MScrew.from_size("M2").cylinder_head_diameter / 2 + 1,
+            magnet_clamp_screw_length + magnet_clamp_screw_extra_hole_length,
+        )
+
+        magnet_clamp_screw_tube = align(
+            magnet_clamp_screw_tube, magnet_clamp_screw, Alignment.CENTER
+        )
+        magnet_clamp_screw_tube = magnet_clamp_screw.use_as_cutter_on(
+            magnet_clamp_screw_tube
+        )
+        magnet_clamp_screw_tube = magnet_clamp_screw_tube.cut(
+            magnet_screw.get_named_cutter("magnet_holder_cutter")
+        )
+
+        joined_idex_tap_additions = joined_idex_tap_additions.fuse(
+            magnet_clamp_screw_tube
+        )
+
+        joined_idex_tap = magnet_clamp_screw.use_as_cutter_on(joined_idex_tap)
+
+        clamp_screw_cutters = PartCollector()
+        for _, cutter in magnet_clamp_screw.get_named_cutter_items():
+            clamp_screw_cutters = clamp_screw_cutters.fuse(cutter)
+
+        if joined_idex_tap_cutters is None:
+
+            joined_idex_tap_cutters = clamp_screw_cutters
+        else:
+            joined_idex_tap_cutters = joined_idex_tap_cutters.fuse(clamp_screw_cutters)
 
     if joined_idex_tap_additions is not None:
         joined_idex_tap = joined_idex_tap.fuse(joined_idex_tap_additions)
+
+    if joined_idex_tap_cutters is not None:
+        joined_idex_tap = joined_idex_tap.cut(joined_idex_tap_cutters)
 
     return {
         "extruder_cage": joined_extruder_cage,
