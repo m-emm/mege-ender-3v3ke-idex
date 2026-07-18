@@ -117,10 +117,6 @@ Parameters:
   clearance_type:
     Type: String
     Default: loose
-  fillet_radius:
-    Type: Float
-    Default: 0.0
-
 Parts:
   PartFanCageJoiner:
     Type: Shellforgepy::AssemblyJoiner
@@ -136,5 +132,3 @@ Parts:
           $ref: screw_size
         clearance_type:
           $ref: clearance_type
-        fillet_radius:
-          $ref: fillet_radius

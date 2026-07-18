@@ -709,7 +709,6 @@ def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
         flange_half_height=3.0,
         screw_size="M3",
         clearance_type="loose",
-        fillet_radius=0.0,
     )
     side_mount_plate_depth = get_bounding_box_size(side_mount_plate)[1]
 

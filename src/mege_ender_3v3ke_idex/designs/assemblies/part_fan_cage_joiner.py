@@ -1,4 +1,9 @@
-"""Join part fan and extruder cage assemblies with a shared flange."""
+"""Join part fan and extruder cage assemblies with a shared flange.
+
+Run the isolated flange demo with::
+
+    ./run.sh src/mege_ender_3v3ke_idex/designs/assemblies/part_fan_cage_joiner.py
+"""
 
 import logging
 
@@ -7,98 +12,46 @@ from shellforgepy.simple import *
 _logger = logging.getLogger(__name__)
 
 
-def _create_flange_block(width, depth, height, fillet_radius, attachment_alignment):
-    if fillet_radius > 0:
-        return create_filleted_box(
-            width,
-            depth,
-            height,
-            fillet_radius=fillet_radius,
-            no_fillets_at=[attachment_alignment, Alignment.TOP, Alignment.BOTTOM],
-        )
-    return create_box(width, depth, height)
-
-
-def _flange_layout(anchor_part, extension_alignment, flange_extension):
-    anchor_size = get_bounding_box_size(anchor_part)
-    if extension_alignment == Alignment.STACK_LEFT:
-        return {
-            "flange_size": (anchor_size[0] + flange_extension, anchor_size[1]),
-            "tab_size": (flange_extension, anchor_size[1]),
-            "attachment_alignment": Alignment.RIGHT,
-            "center_axes": [1],
-        }
-    if extension_alignment == Alignment.STACK_RIGHT:
-        return {
-            "flange_size": (anchor_size[0] + flange_extension, anchor_size[1]),
-            "tab_size": (flange_extension, anchor_size[1]),
-            "attachment_alignment": Alignment.LEFT,
-            "center_axes": [1],
-        }
-    if extension_alignment == Alignment.STACK_BACK:
-        return {
-            "flange_size": (anchor_size[0], anchor_size[1] + flange_extension),
-            "tab_size": (anchor_size[0], flange_extension),
-            "attachment_alignment": Alignment.FRONT,
-            "center_axes": [0],
-        }
-    if extension_alignment == Alignment.STACK_FRONT:
-        return {
-            "flange_size": (anchor_size[0], anchor_size[1] + flange_extension),
-            "tab_size": (anchor_size[0], flange_extension),
-            "attachment_alignment": Alignment.BACK,
-            "center_axes": [0],
-        }
-    raise ValueError(f"Unsupported flange extension alignment: {extension_alignment}")
-
-
 def _create_join_flange_halves(
     *,
     anchor_part=None,
     side_mount_plate=None,
-    extension_alignment=Alignment.STACK_LEFT,
+    extension_alignment=Alignment.LEFT,
     flange_extension,
     flange_half_height,
     screw_size,
     clearance_type,
-    fillet_radius,
 ):
     if anchor_part is None:
         anchor_part = side_mount_plate
-    layout = _flange_layout(
-        anchor_part,
-        extension_alignment,
-        flange_extension,
-    )
-    flange_width, flange_depth = layout["flange_size"]
-    tab_width, tab_depth = layout["tab_size"]
-    attachment_alignment = layout["attachment_alignment"]
-    center_axes = layout["center_axes"]
 
-    bottom_flange = _create_flange_block(
+    flange_size = list(get_bounding_box_size(anchor_part)[:2])
+    tab_size = flange_size.copy()
+    flange_size[extension_alignment.axis] += flange_extension
+    tab_size[extension_alignment.axis] = flange_extension
+    attachment_alignment = extension_alignment.opposite
+    flange_width, flange_depth = flange_size
+    tab_width, tab_depth = tab_size
+
+    bottom_flange = create_box(
         flange_width,
         flange_depth,
         flange_half_height,
-        fillet_radius,
-        attachment_alignment,
     )
     bottom_flange = align(
         bottom_flange,
         anchor_part,
         Alignment.CENTER,
-        axes=center_axes,
     )
     bottom_flange = align(bottom_flange, anchor_part, attachment_alignment)
     bottom_flange = align(bottom_flange, anchor_part, Alignment.TOP)
 
-    top_flange = _create_flange_block(
+    top_flange = create_box(
         flange_width,
         flange_depth,
         flange_half_height,
-        fillet_radius,
-        attachment_alignment,
     )
-    top_flange = align(top_flange, bottom_flange, Alignment.CENTER, axes=[0, 1])
+    top_flange = align(top_flange, bottom_flange, Alignment.CENTER)
     top_flange = align(top_flange, bottom_flange, Alignment.STACK_TOP)
 
     tab_reference = create_box(tab_width, tab_depth, flange_half_height)
@@ -106,9 +59,12 @@ def _create_join_flange_halves(
         tab_reference,
         anchor_part,
         Alignment.CENTER,
-        axes=center_axes,
     )
-    tab_reference = align(tab_reference, anchor_part, extension_alignment)
+    tab_reference = align(
+        tab_reference,
+        anchor_part,
+        extension_alignment.stack_alignment,
+    )
     tab_reference = align(tab_reference, anchor_part, Alignment.TOP)
 
     flange_stack = bottom_flange.fuse(top_flange)
@@ -135,13 +91,12 @@ def join_part_fans_with_extruder_cage(
     flange_half_height=3.0,
     screw_size="M3",
     clearance_type="loose",
-    fillet_radius=0.0,
 ):
     """Return joined output assemblies for a part fan and extruder cage pair."""
 
     flange_specs = [
-        ("side_mount_plate", Alignment.STACK_LEFT),
-        ("duct_back_mount_plate_connector", Alignment.STACK_BACK),
+        ("side_mount_plate", Alignment.LEFT),
+        ("duct_back_mount_plate_connector", Alignment.BACK),
     ]
 
     bottom_flanges = []
@@ -159,7 +114,6 @@ def join_part_fans_with_extruder_cage(
             flange_half_height=flange_half_height,
             screw_size=screw_size,
             clearance_type=clearance_type,
-            fillet_radius=fillet_radius,
         )
         bottom_flanges.append(bottom_flange)
         top_flanges.append(top_flange)
@@ -281,3 +235,57 @@ def join_part_fans_with_extruder_cage(
         "part_fans": joined_part_fans,
         "extruder_cage": joined_extruder_cage,
     }
+
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+
+    target_plate_thickness = 3
+    target_plate_depth = 10
+    target_plate_height = 10
+
+    lower_target = create_box(
+        target_plate_thickness,
+        target_plate_depth,
+        target_plate_height,
+    )
+    upper_target = create_box(
+        target_plate_thickness,
+        target_plate_depth,
+        target_plate_height,
+    )
+    upper_target = align(upper_target, lower_target, Alignment.CENTER, axes=[0, 1])
+    upper_target = align(upper_target, lower_target, Alignment.STACK_TOP)
+
+    bottom_flange, top_flange, _ = _create_join_flange_halves(
+        anchor_part=lower_target,
+        extension_alignment=Alignment.LEFT,
+        flange_extension=8,
+        flange_half_height=3,
+        screw_size="M3",
+        clearance_type="loose",
+    )
+
+    parts = PartList()
+    parts.add(
+        lower_target.fuse(bottom_flange),
+        "lower_target_with_flange",
+        flip=False,
+    )
+    parts.add(
+        upper_target.fuse(top_flange),
+        "upper_target_with_flange",
+        flip=False,
+    )
+
+    arrange_and_export(
+        parts.as_list(),
+        script_file=__file__,
+        prod=False,
+    )
+
+    _logger.info("Part fan cage join flange demo created successfully")
+
+
+if __name__ == "__main__":
+    main()
