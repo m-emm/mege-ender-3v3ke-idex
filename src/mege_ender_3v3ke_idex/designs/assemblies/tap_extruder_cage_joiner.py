@@ -281,6 +281,10 @@ def add_magnet_screw_holders(*, extruder_cage, idex_tap, carriage):
         magnet_clamp_screw_tube = align(
             magnet_clamp_screw_tube, magnet_clamp_screw, Alignment.CENTER
         )
+        magnet_clamp_screw_tube = align(
+            magnet_clamp_screw_tube, magnet_clamp_screw, Alignment.BOTTOM
+        )
+
         magnet_clamp_screw_tube = magnet_clamp_screw.use_as_cutter_on(
             magnet_clamp_screw_tube
         )
