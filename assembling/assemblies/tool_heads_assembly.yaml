@@ -321,23 +321,25 @@ Builder:
         name: extruder_cage_right_joined
         prod_rotation_angle: 135
         prod_rotation_axis: [0, 1, 0]
-      # - source: dependencies
-      #   assembly: idex_tap_t1_joined_assembly
-      #   artifact: leader
-      #   name: idex_tap_t1_joined
-      #   prod_rotation_angle: 29
-      #   prod_rotation_axis: [1, 0, 0]
-      # - source: dependencies
-      #   assembly: tool_head_cable_attach_shield_right_assembly
-      #   artifact: leader
-      #   name: tool_head_cable_attach_shield_right
-      #   prod_rotation_angle: 90
-      #   prod_rotation_axis: [1, 0, 0]
+      - source: dependencies
+        assembly: idex_tap_t1_joined_assembly
+        artifact: leader
+        name: idex_tap_t1_joined
+        prod_rotation_angle: 29
+        prod_rotation_axis: [1, 0, 0]
+      - source: dependencies
+        assembly: tool_head_cable_attach_shield_right_assembly
+        artifact: leader
+        name: tool_head_cable_attach_shield_right
+        prod_rotation_angle: 90
+        prod_rotation_axis: [1, 0, 0]
+      - source: dependencies
+        assembly: part_fan_right_joined_assembly
+        artifact: leader
+        name: part_fan_right_joined
+        prod_rotation_angle: 45
+        prod_rotation_axis: [1, 0, 0]
 
-      # - source: dependencies
-      #   assembly: tool_head_mount_machined_top_assembly
-      #   artifact: leader
-      #   name: tool_head_mount_machined_top
     arrange:
       export_individual_parts: false
       prod_gap: 6.0
@@ -351,9 +353,10 @@ Builder:
                 enable_support: "1"
           parts:
             - extruder_cage_right_joined
-            # - idex_tap_t1_joined
-            # - tool_head_cable_attach_shield_right
-            # - tool_head_mount_machined_top
+            - idex_tap_t1_joined
+            - tool_head_cable_attach_shield_right
+            - part_fan_right_joined
+
       auto_assign_plates: false
 
 Parameters:
