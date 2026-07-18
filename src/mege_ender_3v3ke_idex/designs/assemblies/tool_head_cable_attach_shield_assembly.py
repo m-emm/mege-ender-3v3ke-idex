@@ -99,7 +99,12 @@ def create_tool_head_cable_attach_shield_assembly(
 
         shield = shield.cut(light_barrier_cutter)
 
-        tap_flag = create_box(1.5, 8, 10)
+        flag_thickness = 2.25
+        flag_depth = 8
+        flag_height = 10
+        flag_holder_size = 11
+
+        tap_flag = create_box(flag_thickness, flag_depth, flag_height)
         tap_flag = align(tap_flag, light_barrier_assembly, Alignment.CENTER)
         tap_flag = align(tap_flag, plate, Alignment.STACK_BACK)
 
@@ -110,6 +115,18 @@ def create_tool_head_cable_attach_shield_assembly(
         )(tap_flag)
 
         shield = shield.fuse(tap_flag)
+
+        tap_flag_holder = create_pyramid_stump(flag_holder_size, flag_thickness, flag_height/2, flag_height/2, flag_depth)
+        tap_flag_holder = rotate(-90, axis=[1, 0, 0])(tap_flag_holder)
+
+        tap_flag_holder = align(tap_flag_holder, tap_flag, Alignment.CENTER)
+        tap_flag_holder = align(tap_flag_holder, plate, Alignment.BOTTOM)
+        tap_flag_holder = align(tap_flag_holder, plate, Alignment.STACK_BACK)
+
+        shield = shield.fuse(tap_flag_holder)
+
+
+
 
     shield_part = LeaderFollowersCuttersPart(shield)
     for name, cutter in cutters.items():
