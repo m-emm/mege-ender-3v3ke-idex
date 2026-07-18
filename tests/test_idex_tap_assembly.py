@@ -125,7 +125,7 @@ def test_idex_tap_assemblies_are_t1_named_in_builder_contract():
     assert "opb991t11z_sensor" not in fixed_tap["inject_parts"]
 
 
-def test_opb991t11z_sensor_is_tool_heads_reference_only_for_now():
+def test_opb991t11z_sensor_consumers_match_active_toolhead_wiring():
     config = _load_config()
     assemblies = _load_assemblies()
 
@@ -141,7 +141,11 @@ def test_opb991t11z_sensor_is_tool_heads_reference_only_for_now():
             or PARKED_OPB_ASSEMBLY in assembly.get("inject_parts", {}).values()
         )
     }
-    assert consumers == {"tool_heads_assembly"}
+    assert consumers == {
+        "tap_extruder_cage_right_join",
+        "tool_head_cable_attach_shield_right_assembly",
+        "tool_heads_assembly",
+    }
 
     for inactive_consumer_name in (
         "whole_printer_assembly",
@@ -151,11 +155,11 @@ def test_opb991t11z_sensor_is_tool_heads_reference_only_for_now():
     ):
         inactive_consumer = assemblies[inactive_consumer_name]
         assert PARKED_OPB_ASSEMBLY not in inactive_consumer.get("depends_on", [])
-        assert PARKED_OPB_ASSEMBLY not in inactive_consumer.get(
-            "inject_parts", {}
-        ).values()
+        assert (
+            PARKED_OPB_ASSEMBLY
+            not in inactive_consumer.get("inject_parts", {}).values()
+        )
 
-    top_mount = "tool_head_mount_machined_top_assembly"
     placements = config["placement"]["alignments"]
     assert [
         placement
@@ -164,23 +168,28 @@ def test_opb991t11z_sensor_is_tool_heads_reference_only_for_now():
     ] == [
         {
             "part": PARKED_OPB_ASSEMBLY,
-            "to": top_mount,
+            "post_rotation": {"angle": -90, "axis": [1, 0, 0]},
+        },
+        {
+            "part": PARKED_OPB_ASSEMBLY,
+            "to": "tool_head_mount_machined_top_assembly",
             "alignment": "CENTER",
         },
         {
             "part": PARKED_OPB_ASSEMBLY,
-            "to": top_mount,
-            "alignment": "STACK_TOP",
+            "to": "sprite_extruder_right_assembly",
+            "alignment": "RIGHT",
+            "post_translation": [-5, 0, 0],
         },
         {
             "part": PARKED_OPB_ASSEMBLY,
-            "to": top_mount,
-            "alignment": "RIGHT",
+            "to": "sprite_extruder_right_assembly",
+            "alignment": "STACK_TOP",
         },
     ]
     assert {
         "rigid_group": [PARKED_OPB_ASSEMBLY],
-        "to": top_mount,
+        "to": "sprite_extruder_right_assembly",
     } in placements
 
     tool_heads_resource = _load_resource("tool_heads_assembly.yaml")
@@ -195,7 +204,12 @@ def test_opb991t11z_sensor_is_tool_heads_reference_only_for_now():
             "artifact": "all",
             "name_template": "opb991t11z_sensor_{name}",
             "animation": {
-                "x_carriage_2": [{"$ref": "x_axis_x_travel_negative"}, 0, 0]
+                "x_carriage_2": [{"$ref": "x_axis_x_travel_negative"}, 0, 0],
+                "idex_tap_trigger_lift_right": [
+                    0,
+                    0,
+                    {"$ref": "idex_tap_trigger_lift_right"},
+                ],
             },
         }
     ]

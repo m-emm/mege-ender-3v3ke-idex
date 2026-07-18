@@ -406,11 +406,7 @@ def create_extruder_cage_right_assembly(
         sprite_mount_base_plate,
         Alignment.STACK_FRONT,
     )
-    right_mount_plate = align(
-        right_mount_plate,
-        sprite_extruder,
-        Alignment.TOP
-    )
+    right_mount_plate = align(right_mount_plate, sprite_extruder, Alignment.TOP)
 
     nitehawk_rear_mount_plate_shifted = translate(0, -nitehawk_plate_depth, 0)(
         nitehawk_rear_mount_plate

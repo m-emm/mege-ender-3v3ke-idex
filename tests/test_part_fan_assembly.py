@@ -749,48 +749,9 @@ def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
     )
 
 
-def test_part_fan_cage_joiner_returns_joined_tap_with_magnet_counterparts():
-    part_fans = _create_part_fans_with_origin()
-    extruder_cage = LeaderFollowersCuttersPart(
-        translate(100, 100, 100)(create_box(5, 5, 5))
-    )
-    mgn7h_rail_with_carriage = LeaderFollowersCuttersPart(create_box(8, 3, 30))
-    mgn7h_rail_with_carriage.add_named_follower(
-        translate(0, 0, 4)(create_box(6, 2, 8)),
-        "carriage",
-    )
-    idex_tap_t1 = LeaderFollowersCuttersPart(create_box(12, 4, 16))
+def test_part_fan_cage_joiner_signature_has_no_tap_dependencies():
+    parameters = inspect.signature(join_part_fans_with_extruder_cage).parameters
 
-    original_tap_volume = get_volume(idex_tap_t1.leader)
-    original_tap_non_production_names = dict(
-        idex_tap_t1.non_production_indices_by_name
-    )
-
-    result = join_part_fans_with_extruder_cage(
-        part_fans=part_fans,
-        extruder_cage=extruder_cage,
-        mgn7h_rail_with_carriage=mgn7h_rail_with_carriage,
-        idex_tap_t1=idex_tap_t1,
-    )
-
-    assert set(result) == {"part_fans", "extruder_cage", "idex_tap_t1"}
-    assert result["idex_tap_t1"] is not idex_tap_t1
-    assert get_volume(idex_tap_t1.leader) == pytest.approx(original_tap_volume)
-    assert (
-        idex_tap_t1.non_production_indices_by_name
-        == original_tap_non_production_names
-    )
-
-    joined_extruder_cage = result["extruder_cage"]
-    joined_idex_tap_t1 = result["idex_tap_t1"]
-    assert get_volume(joined_idex_tap_t1.leader) == pytest.approx(
-        original_tap_volume
-    )
-
-    for side in ["LEFT", "RIGHT"]:
-        assert (
-            f"magnet_screw_{side}"
-            in joined_extruder_cage.non_production_indices_by_name
-        )
-        assert f"magnet_{side}" not in joined_extruder_cage.non_production_indices_by_name
-        assert f"magnet_{side}" in joined_idex_tap_t1.non_production_indices_by_name
+    assert "mgn7h_rail_with_carriage" not in parameters
+    assert "idex_tap_t1" not in parameters
+    assert "opb991t11z_sensor" not in parameters

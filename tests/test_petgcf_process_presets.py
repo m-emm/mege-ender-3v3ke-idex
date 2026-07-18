@@ -23,6 +23,7 @@ MIGRATED_PETGCF_RESOURCE_FILES = (
     "part_fan_assembly.yaml",
     "part_fan_cage_joiner.yaml",
     "printer_host_and_screen_assembly.yaml",
+    "tap_extruder_cage_joiner.yaml",
     "tb6600_stripboard_interface_housing_assembly.yaml",
     "tool_heads_assembly.yaml",
     "vision_light_mount_assembly.yaml",

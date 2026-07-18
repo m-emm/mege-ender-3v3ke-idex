@@ -280,6 +280,10 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         (ASSEMBLIES_DIR / "part_fan_cage_joiner.yaml").read_text(),
         Loader=AssemblyDefaultsLoader,
     )
+    tap_joiner_resource = yaml.load(
+        (ASSEMBLIES_DIR / "tap_extruder_cage_joiner.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
 
     assert assemblies["nitehawk_board_left_assembly"]["resource_file"] == (
         "nitehawk_board_assembly.yaml"
@@ -416,6 +420,9 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         cage = f"extruder_cage_{side}_assembly"
         part_fan = f"part_fan_{side}_assembly"
         joined_cage = f"extruder_cage_{side}_joined_assembly"
+        fan_joined_cage = (
+            joined_cage if side == "left" else "extruder_cage_right_fan_joined_assembly"
+        )
         joined_part_fan = f"part_fan_{side}_joined_assembly"
         board = injected_context["nitehawk_board"]
 
@@ -480,7 +487,7 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
             index
             for index, placement in enumerate(placements)
             if placement.get("to") == sprite_extruder
-            and {joined_cage, joined_part_fan}.issubset(
+            and {fan_joined_cage, joined_part_fan}.issubset(
                 set(placement.get("rigid_group", []))
             )
         ]
@@ -491,7 +498,7 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
             index
             for index, placement in enumerate(placements)
             if placement.get("to") == sprite_extruder
-            and joined_cage in placement.get("rigid_group", [])
+            and fan_joined_cage in placement.get("rigid_group", [])
         ]
         assert cage_group_indices == downstream_sprite_group_indices
 
@@ -567,13 +574,9 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         "right": {
             "part_fans": "part_fan_right_assembly",
             "extruder_cage": "extruder_cage_right_assembly",
-            "extra_inject_parts": {
-                "mgn7h_rail_with_carriage": "mgn7h_rail_with_carriage_assembly",
-                "idex_tap_t1": "idex_tap_t1_assembly",
-            },
+            "extra_inject_parts": {},
             "part_fans_output": "part_fan_right_joined_assembly",
-            "extruder_cage_output": "extruder_cage_right_joined_assembly",
-            "idex_tap_t1_output": "idex_tap_t1_joined_assembly",
+            "extruder_cage_output": "extruder_cage_right_fan_joined_assembly",
         },
     }
     for side, expected_join in expected_joins.items():
@@ -589,17 +592,41 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
             "part_fans": expected_join["part_fans_output"],
             "extruder_cage": expected_join["extruder_cage_output"],
         }
-        if "idex_tap_t1_output" in expected_join:
-            expected_outputs["idex_tap_t1"] = expected_join["idex_tap_t1_output"]
         assert join_entry["outputs"] == expected_outputs
+
+    assert tap_joiner_resource["Parts"]["TapExtruderCageJoiner"]["Type"] == (
+        "Shellforgepy::AssemblyJoiner"
+    )
+    assert set(tap_joiner_resource["Builder"]["Outputs"]) == {
+        "extruder_cage",
+        "idex_tap_t1",
+    }
+    tap_join_entry = assemblies["tap_extruder_cage_right_join"]
+    assert tap_join_entry == {
+        "name": "tap_extruder_cage_right_join",
+        "kind": "join",
+        "resource_file": "tap_extruder_cage_joiner.yaml",
+        "inject_parts": {
+            "extruder_cage": "extruder_cage_right_fan_joined_assembly",
+            "sprite_extruder": "sprite_extruder_right_assembly",
+            "mgn7h_rail_with_carriage": "mgn7h_rail_with_carriage_assembly",
+            "idex_tap_t1": "idex_tap_t1_assembly",
+            "opb991t11z_sensor": "opb991t11z_sensor_assembly",
+        },
+        "outputs": {
+            "extruder_cage": "extruder_cage_right_joined_assembly",
+            "idex_tap_t1": "idex_tap_t1_joined_assembly",
+        },
+    }
 
     graph_model = builder_graph_model.build_graph_model(config["assemblies"], config)
     for side, expected_join in expected_joins.items():
         assert f"part_fan_cage_{side}_join" not in graph_model.assemblies_by_name
         assert expected_join["part_fans_output"] in graph_model.assemblies_by_name
         assert expected_join["extruder_cage_output"] in graph_model.assemblies_by_name
-        if "idex_tap_t1_output" in expected_join:
-            assert expected_join["idex_tap_t1_output"] in graph_model.assemblies_by_name
+    assert "tap_extruder_cage_right_join" not in graph_model.assemblies_by_name
+    assert "extruder_cage_right_joined_assembly" in graph_model.assemblies_by_name
+    assert "idex_tap_t1_joined_assembly" in graph_model.assemblies_by_name
 
     generation_index = {
         assembly_name: index
@@ -618,18 +645,13 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
         cage = f"extruder_cage_{side}_assembly"
         part_fan = f"part_fan_{side}_assembly"
         join_node = f"join:part_fan_cage_{side}_join"
-        joined_cage = f"extruder_cage_{side}_joined_assembly"
+        joined_cage = expected_join["extruder_cage_output"]
         joined_part_fan = f"part_fan_{side}_joined_assembly"
         assert generation_index[machined_mount] < generation_index[cage]
         assert generation_index[cage] < generation_index[join_node]
         assert generation_index[part_fan] < generation_index[join_node]
         assert generation_index[join_node] < generation_index[joined_cage]
         assert generation_index[join_node] < generation_index[joined_part_fan]
-        if "idex_tap_t1_output" in expected_join:
-            raw_tap = expected_join["extra_inject_parts"]["idex_tap_t1"]
-            joined_tap = expected_join["idex_tap_t1_output"]
-            assert generation_index[raw_tap] < generation_index[join_node]
-            assert generation_index[join_node] < generation_index[joined_tap]
 
         placement_deps = set(graph_model.placement_build_dependencies[machined_mount])
         assert not placement_deps & {
@@ -639,6 +661,7 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
             "part_fan_right_assembly",
             "extruder_cage_left_joined_assembly",
             "extruder_cage_right_joined_assembly",
+            "extruder_cage_right_fan_joined_assembly",
             "part_fan_left_joined_assembly",
             "part_fan_right_joined_assembly",
         }
@@ -661,22 +684,36 @@ def test_extruder_cage_side_variants_use_placed_mount_before_downstream_parts():
                 graph_model.first_involved_alignment_index[joined_output]
                 == joined_group_index
             )
-        if "idex_tap_t1_output" in expected_join:
-            joined_tap = expected_join["idex_tap_t1_output"]
-            joined_tap_group_index = next(
-                index
-                for index, placement in enumerate(placements)
-                if placement.get("to") == sprite_extruder
-                and placement.get("rigid_group") == [joined_tap]
-            )
-            joined_tap_group_step = graph_model.placement_steps[
-                joined_tap_group_index
-            ]
-            assert joined_tap_group_step.affected_assembly_names == (joined_tap,)
-            assert (
-                graph_model.first_involved_alignment_index[joined_tap]
-                == joined_tap_group_index
-            )
+
+    tap_join_node = "join:tap_extruder_cage_right_join"
+    intermediate_cage = "extruder_cage_right_fan_joined_assembly"
+    final_cage = "extruder_cage_right_joined_assembly"
+    raw_tap = "idex_tap_t1_assembly"
+    joined_tap = "idex_tap_t1_joined_assembly"
+    assert generation_index[intermediate_cage] < generation_index[tap_join_node]
+    assert generation_index[raw_tap] < generation_index[tap_join_node]
+    assert generation_index[tap_join_node] < generation_index[final_cage]
+    assert generation_index[tap_join_node] < generation_index[joined_tap]
+
+    final_cage_group_index = next(
+        index
+        for index, placement in enumerate(placements)
+        if placement.get("rigid_group") == [final_cage]
+        and placement.get("to") == "sprite_extruder_right_assembly"
+    )
+    joined_tap_group_index = next(
+        index
+        for index, placement in enumerate(placements)
+        if placement.get("rigid_group") == [joined_tap]
+        and placement.get("to") == "sprite_extruder_right_assembly"
+    )
+    assert final_cage_group_index < joined_tap_group_index
+    assert graph_model.first_involved_alignment_index[final_cage] == (
+        final_cage_group_index
+    )
+    assert graph_model.first_involved_alignment_index[joined_tap] == (
+        joined_tap_group_index
+    )
 
     assert not (ASSEMBLIES_DIR / "tool_head_assembly.yaml").exists()
     for side in ["left", "right"]:

@@ -886,12 +886,16 @@ placement:
       to: sprite_extruder_left_assembly
 
     - rigid_group:
-        - extruder_cage_right_joined_assembly
+        - extruder_cage_right_fan_joined_assembly
         - part_fan_right_joined_assembly
       to: sprite_extruder_right_assembly
 
     - rigid_group:
         - idex_tap_t1_assembly
+      to: sprite_extruder_right_assembly
+
+    - rigid_group:
+        - extruder_cage_right_joined_assembly
       to: sprite_extruder_right_assembly
 
     - rigid_group:
@@ -3816,13 +3820,23 @@ assemblies:
     inject_parts:
       part_fans: part_fan_right_assembly
       extruder_cage: extruder_cage_right_assembly
+
+    outputs:
+      part_fans: part_fan_right_joined_assembly
+      extruder_cage: extruder_cage_right_fan_joined_assembly
+
+  - name: tap_extruder_cage_right_join
+
+    kind: join
+    resource_file: tap_extruder_cage_joiner.yaml
+    inject_parts:
+      extruder_cage: extruder_cage_right_fan_joined_assembly
       sprite_extruder: sprite_extruder_right_assembly
       mgn7h_rail_with_carriage: mgn7h_rail_with_carriage_assembly
       idex_tap_t1: idex_tap_t1_assembly
       opb991t11z_sensor: opb991t11z_sensor_assembly
 
     outputs:
-      part_fans: part_fan_right_joined_assembly
       extruder_cage: extruder_cage_right_joined_assembly
       idex_tap_t1: idex_tap_t1_joined_assembly
 

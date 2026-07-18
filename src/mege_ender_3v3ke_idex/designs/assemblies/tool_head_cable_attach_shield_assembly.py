@@ -116,7 +116,13 @@ def create_tool_head_cable_attach_shield_assembly(
 
         shield = shield.fuse(tap_flag)
 
-        tap_flag_holder = create_pyramid_stump(flag_holder_size, flag_thickness, flag_height/2, flag_height/2, flag_depth)
+        tap_flag_holder = create_pyramid_stump(
+            flag_holder_size,
+            flag_thickness,
+            flag_height / 2,
+            flag_height / 2,
+            flag_depth,
+        )
         tap_flag_holder = rotate(-90, axis=[1, 0, 0])(tap_flag_holder)
 
         tap_flag_holder = align(tap_flag_holder, tap_flag, Alignment.CENTER)
@@ -124,9 +130,6 @@ def create_tool_head_cable_attach_shield_assembly(
         tap_flag_holder = align(tap_flag_holder, plate, Alignment.STACK_BACK)
 
         shield = shield.fuse(tap_flag_holder)
-
-
-
 
     shield_part = LeaderFollowersCuttersPart(shield)
     for name, cutter in cutters.items():

@@ -107,9 +107,8 @@ def create_idex_tap_t1_assembly(
             if fb == Alignment.BACK:
 
                 inset_boss_cutter = create_box(
-                    100,
-                    inset_boss_cutter_diameter,
-                    inset_boss_cutter_height)
+                    100, inset_boss_cutter_diameter, inset_boss_cutter_height
+                )
                 inset_boss_cutter = align(
                     inset_boss_cutter, thread_inset_boss, Alignment.CENTER
                 )

@@ -177,13 +177,28 @@ def test_tool_head_cable_attach_shield_yaml_and_graph_wiring():
     }
     for assembly_name, (mount_name, alias) in expected.items():
         assembly = assemblies[assembly_name]
-        assert assembly["resource_file"] == "tool_head_cable_attach_shield_assembly.yaml"
-        assert assembly["depends_on"] == ["x_axis_rail_assembly", mount_name]
-        assert assembly["inject_parts"] == {"tool_head_mount_machined": mount_name}
+        assert (
+            assembly["resource_file"] == "tool_head_cable_attach_shield_assembly.yaml"
+        )
+        expected_dependencies = ["x_axis_rail_assembly", mount_name]
+        expected_injected_parts = {"tool_head_mount_machined": mount_name}
+        if assembly_name == "tool_head_cable_attach_shield_right_assembly":
+            expected_dependencies.append("opb991t11z_sensor_assembly")
+            expected_injected_parts["light_barrier_assembly"] = (
+                "opb991t11z_sensor_assembly"
+            )
+        assert assembly["depends_on"] == expected_dependencies
+        assert assembly["inject_parts"] == expected_injected_parts
         if alias is not None:
-            assert assemblies["tool_heads_assembly"]["inject_parts"][alias] == assembly_name
+            assert (
+                assemblies["tool_heads_assembly"]["inject_parts"][alias]
+                == assembly_name
+            )
             assert assembly_name in assemblies["tool_heads_assembly"]["depends_on"]
-            assert assemblies["whole_printer_assembly"]["inject_parts"][alias] == assembly_name
+            assert (
+                assemblies["whole_printer_assembly"]["inject_parts"][alias]
+                == assembly_name
+            )
             assert assembly_name in assemblies["whole_printer_assembly"]["depends_on"]
 
     placements = config["placement"]["alignments"]
