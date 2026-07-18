@@ -296,7 +296,9 @@ def test_blower_ring_assembly_is_registered_as_standalone():
 
 def test_part_fan_assembly_fuses_and_consumes_selected_injected_artifacts():
     sprite_extruder, front_part_fan, side_part_fan, blower_ring = (
-        _create_part_fan_inputs(sprite_extruder=create_box(1, 1, 1))
+        _create_part_fan_inputs(
+            sprite_extruder=LeaderFollowersCuttersPart(create_box(1, 1, 1))
+        )
     )
     side_outlet = side_part_fan.get_named_follower("outlet")
     side_outlet_bbox = get_bounding_box(side_outlet)
@@ -343,6 +345,7 @@ def test_part_fan_assembly_fuses_and_consumes_selected_injected_artifacts():
         "single_part_fan_side_left_assembly.followers.mount_plate",
         "single_part_fan_side_left_assembly.followers.outlet",
         "blower_ring_left_assembly.leader",
+        "blower_ring_left_assembly.followers.feeder_ring",
     ]
 
 
@@ -555,7 +558,7 @@ def test_part_fan_v2_standalone_fans_use_parameterized_legacy_pose():
     side_translation = [
         0,
         {"$ref": "part_fan_v2_side_y_shift"},
-        {"$ref": "part_fan_v2_side_z_shift"},
+        0,
     ]
     blower_ring_translation = [
         0,
@@ -613,7 +616,6 @@ def test_part_fan_v2_standalone_fans_use_parameterized_legacy_pose():
         ]
         assert [step["alignment"] for step in mount_plate_steps] == [
             "FRONT",
-            "BOTTOM",
             "STACK_RIGHT",
         ]
         assert mount_plate_steps[-1]["stack_gap"] == {

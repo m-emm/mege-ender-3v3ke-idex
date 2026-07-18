@@ -10,7 +10,10 @@ Klipper config.
   `pico_tb6600_stripboard_layout.py` generate the live external Y
   TB6600 interface schematic and verified stripboard assembly.
 - `pico_tb6600_stripboard_interface.md` documents that interface.
-- `diagrams/*.svg` are generated artifacts committed for review.
+- `tmc5160t_plus_power_sequencing.py` generates the standalone TMC5160T Plus
+  driver-before-logic concept-review schematic. It is not active printer wiring.
+- `diagrams/*.svg` and selected `diagrams/*.png` files are generated artifacts
+  committed for review.
 - `../printer.cfg.template` is the active Klipper config source.
 
 The YAML files own physical wiring: Pico pins, driver pins, connector pins,

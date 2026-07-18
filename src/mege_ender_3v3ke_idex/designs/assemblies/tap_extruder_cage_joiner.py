@@ -186,12 +186,12 @@ def create_magnet_screw_assembly():
     return magnet_screw
 
 
-def add_magnet_screw_holders(*, extruder_cage, idex_tap_t1, carriage):
+def add_magnet_screw_holders(*, extruder_cage, idex_tap, carriage):
     """Add the paired magnet screw holders, clamp hardware, and Tap slits."""
 
     joined_extruder_cage = extruder_cage
-    joined_idex_tap_t1 = idex_tap_t1
-    joined_idex_tap_t1_additions = None
+    joined_idex_tap = idex_tap
+    joined_idex_tap_additions = None
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
 
@@ -229,44 +229,42 @@ def add_magnet_screw_holders(*, extruder_cage, idex_tap_t1, carriage):
             magnet_screw.get_named_cutter("thread_hole_cutter")
         )
 
-        joined_idex_tap_t1.add_named_non_production_part(
+        joined_idex_tap.add_named_non_production_part(
             magnet_screw.get_named_non_production_part("magnet"),
             f"magnet_{lr.name}",
         )
 
-        joined_idex_tap_t1.add_named_non_production_part(
+        joined_idex_tap.add_named_non_production_part(
             magnet_screw.get_named_non_production_part("magnet_clamp_screw"),
             f"magnet_clamp_screw_{lr.name}",
         )
         rotated_magnet_holder_cutter = magnet_screw.get_named_cutter(
             "magnet_holder_cutter"
         )
-        joined_idex_tap_t1 = joined_idex_tap_t1.cut(rotated_magnet_holder_cutter)
+        joined_idex_tap = joined_idex_tap.cut(rotated_magnet_holder_cutter)
 
         magnet_holder = magnet_screw.get_named_non_production_part("magnet_holder")
 
         back_cutter = create_box(100, 100, 100)
         back_cutter = align(back_cutter, magnet_holder, Alignment.CENTER)
         back_cutter = align(
-            back_cutter, joined_idex_tap_t1, Alignment.STACK_BACK, stack_gap=1
+            back_cutter, joined_idex_tap, Alignment.STACK_BACK, stack_gap=1
         )
 
         bottom_cutter = create_box(100, 100, 100)
         bottom_cutter = align(bottom_cutter, magnet_holder, Alignment.CENTER)
-        bottom_cutter = align(bottom_cutter, joined_idex_tap_t1, Alignment.STACK_BOTTOM)
+        bottom_cutter = align(bottom_cutter, joined_idex_tap, Alignment.STACK_BOTTOM)
 
         rotated_magnet_holder_cutter = rotated_magnet_holder_cutter.cut(back_cutter)
         magnet_holder = magnet_holder.cut(back_cutter)
         magnet_holder = magnet_holder.cut(bottom_cutter)
 
-        joined_idex_tap_t1 = joined_idex_tap_t1.cut(rotated_magnet_holder_cutter)
+        joined_idex_tap = joined_idex_tap.cut(rotated_magnet_holder_cutter)
 
-        if joined_idex_tap_t1_additions is None:
-            joined_idex_tap_t1_additions = magnet_holder
+        if joined_idex_tap_additions is None:
+            joined_idex_tap_additions = magnet_holder
         else:
-            joined_idex_tap_t1_additions = joined_idex_tap_t1_additions.fuse(
-                magnet_holder
-            )
+            joined_idex_tap_additions = joined_idex_tap_additions.fuse(magnet_holder)
 
         magnet_holder_path_cutter = materialize_bounding_box(
             magnet_screw.leader, x_enlargement=1, y_enlargement=1, z_size=5
@@ -277,23 +275,23 @@ def add_magnet_screw_holders(*, extruder_cage, idex_tap_t1, carriage):
             Alignment.STACK_TOP,
         )
         magnet_holder_path_cutter = translate(0, 0, -2)(magnet_holder_path_cutter)
-        joined_idex_tap_t1 = joined_idex_tap_t1.cut(magnet_holder_path_cutter)
-        joined_idex_tap_t1_additions = joined_idex_tap_t1_additions.cut(
+        joined_idex_tap = joined_idex_tap.cut(magnet_holder_path_cutter)
+        joined_idex_tap_additions = joined_idex_tap_additions.cut(
             magnet_holder_path_cutter
         )
 
         for name, cutter in magnet_screw.get_named_cutter_items():
             if "clamp_screw" in name:
-                _logger.info(f"Cutting idex_tap_t1 with {name}")
-                joined_idex_tap_t1 = joined_idex_tap_t1.cut(cutter)
-                joined_idex_tap_t1_additions = joined_idex_tap_t1_additions.cut(cutter)
+                _logger.info(f"Cutting idex_tap with {name}")
+                joined_idex_tap = joined_idex_tap.cut(cutter)
+                joined_idex_tap_additions = joined_idex_tap_additions.cut(cutter)
 
-    if joined_idex_tap_t1_additions is not None:
-        joined_idex_tap_t1 = joined_idex_tap_t1.fuse(joined_idex_tap_t1_additions)
+    if joined_idex_tap_additions is not None:
+        joined_idex_tap = joined_idex_tap.fuse(joined_idex_tap_additions)
 
     return {
         "extruder_cage": joined_extruder_cage,
-        "idex_tap_t1": joined_idex_tap_t1,
+        "idex_tap": joined_idex_tap,
     }
 
 
@@ -302,13 +300,13 @@ def join_tap_with_extruder_cage(
     extruder_cage,
     sprite_extruder,
     mgn7h_rail_with_carriage,
-    idex_tap_t1,
+    idex_tap,
     opb991t11z_sensor,
 ):
     """Return the final extruder cage and Tap assemblies."""
 
     joined_extruder_cage = extruder_cage.copy()
-    joined_idex_tap_t1 = idex_tap_t1.copy()
+    joined_idex_tap = idex_tap.copy()
 
     if mgn7h_rail_with_carriage is not None:
         back_plate = materialize_bounding_box(
@@ -439,11 +437,11 @@ def join_tap_with_extruder_cage(
 
         magnet_holder_outputs = add_magnet_screw_holders(
             extruder_cage=joined_extruder_cage,
-            idex_tap_t1=joined_idex_tap_t1,
+            idex_tap=joined_idex_tap,
             carriage=carriage,
         )
         joined_extruder_cage = magnet_holder_outputs["extruder_cage"]
-        joined_idex_tap_t1 = magnet_holder_outputs["idex_tap_t1"]
+        joined_idex_tap = magnet_holder_outputs["idex_tap"]
 
     if opb991t11z_sensor is not None:
 
@@ -457,7 +455,7 @@ def join_tap_with_extruder_cage(
 
     return {
         "extruder_cage": joined_extruder_cage,
-        "idex_tap_t1": joined_idex_tap_t1,
+        "idex_tap": joined_idex_tap,
     }
 
 
@@ -469,7 +467,7 @@ def main():
     tap_shield = create_box(60, 4, 30.8)
     tap_shield = align(tap_shield, carriage, Alignment.CENTER)
     tap_shield = align(tap_shield, carriage, Alignment.STACK_BACK)
-    idex_tap_t1 = LeaderFollowersCuttersPart(tap_shield)
+    idex_tap = LeaderFollowersCuttersPart(tap_shield)
 
     cage_shield = create_box(60, 3, 34)
     cage_shield = align(cage_shield, carriage, Alignment.CENTER)
@@ -478,26 +476,26 @@ def main():
 
     outputs = add_magnet_screw_holders(
         extruder_cage=extruder_cage,
-        idex_tap_t1=idex_tap_t1,
+        idex_tap=idex_tap,
         carriage=carriage,
     )
 
     parts = PartList()
     if True:
         parts.add(outputs["extruder_cage"].leader, "extruder_cage_shield", flip=False)
-        parts.add(outputs["idex_tap_t1"].leader, "tap_shield", flip=False)
+        parts.add(outputs["idex_tap"].leader, "tap_shield", flip=False)
         for name, part in outputs[
             "extruder_cage"
         ].get_named_non_production_part_items():
             parts.add(part, f"extruder_cage_{name}", flip=False)
-        for name, part in outputs["idex_tap_t1"].get_named_non_production_part_items():
+        for name, part in outputs["idex_tap"].get_named_non_production_part_items():
             parts.add(part, f"tap_{name}", flip=False)
 
     magnet_srew_stack = create_magnet_screw_assembly()
 
     magnet_srew_stack = align(
         magnet_srew_stack,
-        outputs["idex_tap_t1"].leader,
+        outputs["idex_tap"].leader,
         Alignment.STACK_RIGHT,
         stack_gap=50,
     )

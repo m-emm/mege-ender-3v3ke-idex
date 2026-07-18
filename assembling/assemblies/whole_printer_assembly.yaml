@@ -335,6 +335,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
       - source: injected
         assembly: nitehawk_board_left
         artifact: followers
@@ -361,6 +365,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
       - source: injected
         assembly: part_fan_left
         artifact: all
@@ -374,6 +382,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
       - source: dependencies
         assembly: single_part_fan_front_left_assembly
         artifact: leader
@@ -387,6 +399,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
       - source: dependencies
         assembly: single_part_fan_side_left_assembly
         artifact: leader
@@ -400,6 +416,10 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
       - source: injected
         assembly: tool_head_mount_machined_bottom
         artifact: all
@@ -427,9 +447,84 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: injected
-        assembly: x_axis_belt_carriage_bottom
+        assembly: opb991t11z_sensor_left
         artifact: all
         name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
+      - source: injected
+        assembly: idex_tap_t0
+        artifact: leader
+        name: idex_tap_t0_fixed_frame
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: idex_tap_t0
+        artifact: followers
+        name_template: "idex_tap_t0_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: idex_tap_t0
+        artifact: non_production_parts
+        name_template: "idex_tap_t0_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: mgn7h_rail_with_carriage_left
+        artifact: leader
+        name: mgn7h_left_rail
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
+      - source: injected
+        assembly: mgn7h_rail_with_carriage_left
+        artifact: followers
+        names:
+          - carriage
+        name_template: "mgn7h_left_{name}"
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
@@ -551,6 +646,23 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: injected
+        assembly: opb991t11z_sensor_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+          idex_tap_trigger_lift_right:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_right }
+      - source: injected
         assembly: idex_tap_t1
         artifact: leader
         name: idex_tap_t1_fixed_frame
@@ -597,9 +709,9 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: injected
-        assembly: mgn7h_rail_with_carriage
+        assembly: mgn7h_rail_with_carriage_right
         artifact: leader
-        name: mgn7h_rail
+        name: mgn7h_right_rail
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -610,11 +722,11 @@ Builder:
             - 0
             - { $ref: z_axis_z_travel }
       - source: injected
-        assembly: mgn7h_rail_with_carriage
+        assembly: mgn7h_rail_with_carriage_right
         artifact: followers
         names:
           - carriage
-        name_template: "mgn7h_{name}"
+        name_template: "mgn7h_right_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -868,6 +980,8 @@ Parameters:
   x_axis_x_travel_negative:
     Type: Float
   z_axis_z_travel:
+    Type: Float
+  idex_tap_trigger_lift_left:
     Type: Float
   idex_tap_trigger_lift_right:
     Type: Float

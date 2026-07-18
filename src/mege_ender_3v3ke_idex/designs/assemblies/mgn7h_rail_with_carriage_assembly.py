@@ -349,7 +349,7 @@ def create_mgn7h_rail_with_carriage_assembly(
 ):
     """Create an MGN7H rail leader with a named built-in carriage follower."""
 
-    record_length_metric("linear_rail", "MGN7H", "idex_tap_t1", mgn7h_rail_length)
+    record_length_metric("linear_rail", "MGN7H", "idex_tap", mgn7h_rail_length)
 
     return create_mgn7h_rail_with_carriage(
         length_mm=mgn7h_rail_length,

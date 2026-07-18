@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Exploratory fixed frame for the T1/right/top Tap packaging study
+Description: Shared fixed Tap frame for the T0 and T1 toolheads
 
 Builder:
   Visualization:
@@ -28,17 +28,6 @@ Builder:
       - source: injected
         assembly: fixed_tool_head_mount
         artifact: all
-      - source: dependencies
-        assembly: opb991t11z_sensor_assembly
-        artifact: all
-        name_template: "opb991t11z_sensor_{name}"
-      - source: dependencies
-        assembly: x_axis_top_profile_assembly
-        artifact: all
-      - source: dependencies
-        assembly: x_axis_rail_assembly
-        artifact: all
-        name_template: "{default_name}"
       - source: injected
         assembly: x_axis_carriage
         artifact: leader
@@ -76,8 +65,8 @@ Parameters:
     Type: String
 
 Parts:
-  IdexTapT1Assembly:
+  IdexTapAssembly:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t1_assembly.create_idex_tap_t1_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.idex_tap_assembly.create_idex_tap_assembly

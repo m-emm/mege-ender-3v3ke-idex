@@ -1,9 +1,9 @@
-"""Exploratory fixed frame for the T1/right/top Tap packaging study."""
+"""Shared fixed-frame Tap assembly for T0 and T1."""
 
 from shellforgepy.simple import *
 
 
-def create_idex_tap_t1_assembly(
+def create_idex_tap_assembly(
     *,
     fixed_tool_head_mount,
     x_axis_carriage,
@@ -19,7 +19,7 @@ def create_idex_tap_t1_assembly(
     idex_tap_frame_mount_flange_thickness,
     idex_tap_frame_mount_screw_size,
 ):
-    """Create a loose fixed Tap frame around the placed right-side context."""
+    """Create the shared fixed Tap frame around the injected side context."""
 
     lower_mount_strip_width = 7.8
     lower_mount_strip_length = 55

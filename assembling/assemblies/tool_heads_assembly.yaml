@@ -34,7 +34,9 @@ Builder:
             - tool_head_mount_machined_bottom
             - tool_head_cable_attach_shield_left
             - x_axis_left_carriage
-            - x_axis_belt_carriage_bottom
+            - idex_tap_t0_fixed_frame
+            - opb991t11z_sensor_left
+            - mgn7h_left_rail
             - x_axis_lower_profile
             - x_axis_top_profile
             - x_axis_rail
@@ -70,6 +72,10 @@ Builder:
             - { $ref: x_axis_x_travel }
             - 0
             - 0
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
       - source: injected
         assembly: nitehawk_board_left
         artifact: followers
@@ -88,6 +94,10 @@ Builder:
             - { $ref: x_axis_x_travel }
             - 0
             - 0
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
       - source: injected
         assembly: part_fan_left
         artifact: all
@@ -97,6 +107,10 @@ Builder:
             - { $ref: x_axis_x_travel }
             - 0
             - 0
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
       - source: dependencies
         assembly: single_part_fan_front_left_assembly
         artifact: leader
@@ -106,6 +120,10 @@ Builder:
             - { $ref: x_axis_x_travel }
             - 0
             - 0
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
       - source: dependencies
         assembly: single_part_fan_side_left_assembly
         artifact: leader
@@ -115,6 +133,10 @@ Builder:
             - { $ref: x_axis_x_travel }
             - 0
             - 0
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
       - source: injected
         assembly: tool_head_mount_machined_bottom
         artifact: all
@@ -134,9 +156,64 @@ Builder:
             - 0
             - 0
       - source: injected
-        assembly: x_axis_belt_carriage_bottom
+        assembly: opb991t11z_sensor_left
         artifact: all
-        name_template: "x_axis_belt_carriage_bottom_{name}"
+        name_template: "opb991t11z_sensor_left_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
+      - source: injected
+        assembly: idex_tap_t0
+        artifact: leader
+        name: idex_tap_t0_fixed_frame
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: idex_tap_t0
+        artifact: followers
+        name_template: "idex_tap_t0_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: idex_tap_t0
+        artifact: non_production_parts
+        name_template: "idex_tap_t0_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: mgn7h_rail_with_carriage_left
+        artifact: leader
+        name: mgn7h_left_rail
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          idex_tap_trigger_lift_left:
+            - 0
+            - 0
+            - { $ref: idex_tap_trigger_lift_left }
+      - source: injected
+        assembly: mgn7h_rail_with_carriage_left
+        artifact: followers
+        names:
+          - carriage
+        name_template: "mgn7h_left_{name}"
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
@@ -236,9 +313,9 @@ Builder:
             - 0
             - 0
       - source: injected
-        assembly: opb991t11z_sensor
+        assembly: opb991t11z_sensor_right
         artifact: all
-        name_template: "opb991t11z_sensor_{name}"
+        name_template: "opb991t11z_sensor_right_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -269,9 +346,9 @@ Builder:
 
         name_template: "{default_name}_{name}"
       - source: injected
-        assembly: mgn7h_rail_with_carriage
+        assembly: mgn7h_rail_with_carriage_right
         artifact: leader
-        name: mgn7h_rail
+        name: mgn7h_right_rail
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -283,11 +360,11 @@ Builder:
             - { $ref: idex_tap_trigger_lift_right }
 
       - source: injected
-        assembly: mgn7h_rail_with_carriage
+        assembly: mgn7h_rail_with_carriage_right
         artifact: followers
         names:
           - carriage
-        name_template: "mgn7h_{name}"
+        name_template: "mgn7h_right_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }
@@ -316,6 +393,30 @@ Builder:
     process_data_preset: petgcf_max_strength_high_speed_06
     parts:
       - source: dependencies
+        assembly: extruder_cage_left_joined_assembly
+        artifact: leader
+        name: extruder_cage_left_joined
+        prod_rotation_angle: 135
+        prod_rotation_axis: [0, 1, 0]
+      - source: dependencies
+        assembly: idex_tap_t0_joined_assembly
+        artifact: leader
+        name: idex_tap_t0_joined
+        prod_rotation_angle: 29
+        prod_rotation_axis: [1, 0, 0]
+      - source: dependencies
+        assembly: tool_head_cable_attach_shield_left_assembly
+        artifact: leader
+        name: tool_head_cable_attach_shield_left
+        prod_rotation_angle: 90
+        prod_rotation_axis: [1, 0, 0]
+      - source: dependencies
+        assembly: part_fan_left_joined_assembly
+        artifact: leader
+        name: part_fan_left_joined
+        prod_rotation_angle: 50
+        prod_rotation_axis: [1, 0, 0]
+      - source: dependencies
         assembly: extruder_cage_right_joined_assembly
         artifact: leader
         name: extruder_cage_right_joined
@@ -340,8 +441,6 @@ Builder:
         prod_rotation_angle: 50
         prod_rotation_axis: [1, 0, 0]
 
-
-
     arrange:
       export_individual_parts: false
       prod_gap: 6.0
@@ -359,12 +458,27 @@ Builder:
             - tool_head_cable_attach_shield_right
             - part_fan_right_joined
 
+        - name: tool_heads_left_tap_petgcf
+          filename: tool_heads_left_tap_petgcf
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "1"
+          parts:
+            - extruder_cage_left_joined
+            - idex_tap_t0_joined
+            - tool_head_cable_attach_shield_left
+            - part_fan_left_joined
+
       auto_assign_plates: false
 
 Parameters:
   x_axis_x_travel:
     Type: Float
   x_axis_x_travel_negative:
+    Type: Float
+  idex_tap_trigger_lift_left:
     Type: Float
   idex_tap_trigger_lift_right:
     Type: Float

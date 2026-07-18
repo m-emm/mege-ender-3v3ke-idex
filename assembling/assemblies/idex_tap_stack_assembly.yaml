@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Focused visualization of the T1/right/top Tap packaging study
+Description: Focused visualization of one injected Tap toolhead stack
 
 Builder:
   Collection: true
@@ -17,16 +17,16 @@ Builder:
       width: 700
       height: 700
     parts:
-      - source: dependencies
-        assembly: tool_head_mount_machined_top_assembly
+      - source: injected
+        assembly: tool_head_mount_machined
         artifact: leader
-        name: tool_head_mount_machined_top
-      - source: dependencies
-        assembly: idex_tap_t1_joined_assembly
+        name: tool_head_mount_machined
+      - source: injected
+        assembly: idex_tap
         artifact: all
-        name_template: "idex_tap_t1_{name}"
-      - source: dependencies
-        assembly: mgn7h_rail_with_carriage_assembly
+        name_template: "idex_tap_{name}"
+      - source: injected
+        assembly: mgn7h_rail_with_carriage
         artifact: leader
         name: mgn7h_rail
         animation:
@@ -35,24 +35,24 @@ Builder:
             - 0
             - { $ref: idex_tap_total_travel }
 
-      - source: dependencies
-        assembly: mgn7h_rail_with_carriage_assembly
+      - source: injected
+        assembly: mgn7h_rail_with_carriage
         artifact: followers
         names:
           - carriage
         name: mgn7h_carriage
-      - source: dependencies
-        assembly: sprite_extruder_right_assembly
+      - source: injected
+        assembly: sprite_extruder
         artifact: all
-        name_template: "sprite_extruder_right_{name}"
+        name_template: "sprite_extruder_{name}"
         animation:
           idex_tap_total_travel:
             - 0
             - 0
             - { $ref: idex_tap_total_travel }
 
-      - source: dependencies
-        assembly: opb991t11z_sensor_assembly
+      - source: injected
+        assembly: opb991t11z_sensor
         artifact: all
         name_template: "opb991t11z_sensor_{name}"
 
@@ -64,8 +64,8 @@ Parameters:
     Type: Float
 
 Parts:
-  IdexTapT1StackAssembly:
+  IdexTapStackAssembly:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.idex_tap_t1_stack_assembly.create_idex_tap_t1_stack_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.idex_tap_stack_assembly.create_idex_tap_stack_assembly
