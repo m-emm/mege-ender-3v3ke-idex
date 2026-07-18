@@ -32,6 +32,7 @@ def create_extruder_cage_right_assembly(
     """Create the right/T1 cage around the injected Sprite extruder."""
 
     _ = tool_head_mount_machined
+    tool_head_right_mount_plate_height = 13
 
     tap_top_travel = 1.2
 
@@ -68,11 +69,6 @@ def create_extruder_cage_right_assembly(
     )
     sprite_mount_base_plate = align(
         sprite_mount_base_plate,
-        tool_head_mount_machined,
-        Alignment.STACK_BOTTOM,
-    )
-    sprite_mount_base_plate = align(
-        sprite_mount_base_plate,
         sprite_extruder,
         Alignment.STACK_BACK,
     )
@@ -82,6 +78,12 @@ def create_extruder_cage_right_assembly(
         sprite_extruder,
         Alignment.LEFT,
     )
+    sprite_mount_base_plate = align(
+        sprite_mount_base_plate,
+        sprite_extruder,
+        Alignment.TOP,
+    )
+
     sprite_mount_base_plate = sprite_extruder.use_as_cutter_on(sprite_mount_base_plate)
     for name, cutter in tool_head_mount_machined.get_named_cutter_items():
         if "hole_drill_" in name:
@@ -384,13 +386,14 @@ def create_extruder_cage_right_assembly(
     right_mount_plate = create_box(
         extruder_cage_mount_plate_thickness,
         BIG_THING,
-        tool_head_additional_mount_plate_depth,
+        tool_head_right_mount_plate_height,
     )
     right_mount_plate = align(
         right_mount_plate,
         sprite_mount_base_plate,
         Alignment.CENTER,
     )
+
     right_mount_plate = align(
         right_mount_plate,
         sprite_extruder,
@@ -405,8 +408,8 @@ def create_extruder_cage_right_assembly(
     )
     right_mount_plate = align(
         right_mount_plate,
-        sprite_mount_base_plate,
-        Alignment.BOTTOM,
+        sprite_extruder,
+        Alignment.TOP
     )
 
     nitehawk_rear_mount_plate_shifted = translate(0, -nitehawk_plate_depth, 0)(

@@ -307,7 +307,7 @@ globals:
     $ref: x_axis_carriage_height
   x_axis_sprite_extruder_tool_head_mount_x_offset: 4.25
   x_axis_sprite_extruder_tool_head_mount_y_offset: -23
-  x_axis_sprite_extruder_tool_head_mount_z_offset: -25.55
+  x_axis_sprite_extruder_tool_head_mount_z_offset: -27.8
   x_axis_carriage_stopper_width: 12
   x_axis_carriage_stopper_thickness: 8
   x_axis_carriage_stopper_depth: 25

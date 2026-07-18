@@ -28,14 +28,16 @@ def create_idex_tap_t1_assembly(
     side_wall_thickness = 4
     carriage_mount_screw_length = 8
     lower_mount_strip_thread_inset_size = "M3"
-    lower_mount_strip_thread_inset_top_material_thickness = 1
+    lower_mount_strip_thread_inset_top_material_thickness = 2
     lower_mount_strip_thread_inset_holder_thickness = (
         MScrew.from_size(lower_mount_strip_thread_inset_size).thread_inset_length
         + lower_mount_strip_thread_inset_top_material_thickness
     )
+    thread_inset_hole_radius_adjustment = -0.15
     lower_mount_strip_thread_inset_extra_radius = 2.2
 
     inset_boss_cutter_diameter = 10
+    inset_boss_cutter_height = 25
 
     tool_head_rest_width = 60
     tool_head_rest_depth = 4
@@ -77,6 +79,7 @@ def create_idex_tap_t1_assembly(
                 thickness=lower_mount_strip_thread_inset_holder_thickness,
                 extra_radius=lower_mount_strip_thread_inset_extra_radius,
                 clearance_type="close",
+                thread_inset_hole_radius_adjustment=thread_inset_hole_radius_adjustment,
             )
             thread_inset = align(thread_inset, drill, Alignment.CENTER)
             thread_inset = align(
@@ -102,8 +105,11 @@ def create_idex_tap_t1_assembly(
             )
 
             if fb == Alignment.BACK:
-                inset_boss_cutter = create_cylinder(inset_boss_cutter_diameter / 2, 100)
-                inset_boss_cutter = rotate(90, axis=[0, 1, 0])(inset_boss_cutter)
+
+                inset_boss_cutter = create_box(
+                    100,
+                    inset_boss_cutter_diameter,
+                    inset_boss_cutter_height)
                 inset_boss_cutter = align(
                     inset_boss_cutter, thread_inset_boss, Alignment.CENTER
                 )

@@ -36,6 +36,9 @@ def create_sprite_extruder_assembly(
 ):
     """Create the sprite extruder assembly."""
 
+
+    fan_top_protrusion_height = 2.7
+
     big_thing = BIG_THING
     hotend_length = hotend_overall_length - nozzle_length - nozzle_screw_length
 
@@ -278,6 +281,7 @@ def create_sprite_extruder_assembly(
     fan_size = 30
     fan = create_box(fan_thickness, fan_size, front_size[2])
 
+
     fan_hole_diameter = 28
     fan_hole_top_distance = 1.5
     fan_hole_cutter = create_cylinder(
@@ -295,6 +299,8 @@ def create_sprite_extruder_assembly(
     fan = align(fan, front, Alignment.CENTER)
     fan = align(fan, front, Alignment.BACK)
     fan = align(fan, front, Alignment.STACK_LEFT)
+
+    fan = translate(0, 0, fan_top_protrusion_height)(fan)
     retval.add_named_non_production_part(fan, "fan")
     retval.add_named_cutter(mount_hole_cutter, "mount_hole_cutter")
 
