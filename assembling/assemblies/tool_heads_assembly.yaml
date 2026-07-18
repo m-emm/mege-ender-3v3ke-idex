@@ -463,6 +463,8 @@ Builder:
             overrides:
               process_overrides:
                 enable_support: "1"
+                support_type: normal(auto)
+                support_style: default
           parts:
             - idex_tap_t1_joined
 

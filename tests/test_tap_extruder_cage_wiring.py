@@ -243,3 +243,35 @@ def test_left_tap_production_plate_contains_exactly_four_rotated_leaders():
         "tool_head_cable_attach_shield_left": (90, [1, 0, 0]),
         "part_fan_left_joined": (50, [1, 0, 0]),
     }
+
+
+def test_only_right_tap_plate_overrides_support_type_without_distance_tuning():
+    resource = _load_resource("tool_heads_assembly.yaml")
+    plates = {
+        plate["name"]: plate
+        for plate in resource["Builder"]["Production"]["arrange"]["plates"]
+    }
+    right_tap_overrides = plates["tool_head_right_tap"]["process_data"]["overrides"][
+        "process_overrides"
+    ]
+
+    assert right_tap_overrides["support_type"] == "normal(auto)"
+    assert right_tap_overrides["support_style"] == "default"
+    assert {
+        "support_top_z_distance",
+        "support_bottom_z_distance",
+        "support_object_xy_distance",
+        "support_object_first_layer_gap",
+        "support_interface_spacing",
+        "support_bottom_interface_spacing",
+    }.isdisjoint(right_tap_overrides)
+
+    for sibling_plate_name in (
+        "tool_head_right_petgcf",
+        "tool_heads_left_tap_petgcf",
+    ):
+        sibling_overrides = plates[sibling_plate_name]["process_data"]["overrides"][
+            "process_overrides"
+        ]
+        assert "support_type" not in sibling_overrides
+        assert "support_style" not in sibling_overrides

@@ -292,6 +292,8 @@ def add_magnet_screw_holders(*, extruder_cage, idex_tap, carriage):
             magnet_screw.get_named_cutter("magnet_holder_cutter")
         )
 
+        magnet_clamp_screw_tube = magnet_clamp_screw_tube.cut(magnet_holder_path_cutter)
+
         joined_idex_tap_additions = joined_idex_tap_additions.fuse(
             magnet_clamp_screw_tube
         )
