@@ -12,6 +12,98 @@ from shellforgepy.simple import *
 _logger = logging.getLogger(__name__)
 
 
+def create_magnet_screw_assembly(lr):
+    magnet_screw_length = 6
+    magnet_screw = create_conical_head_screw("M3", magnet_screw_length)
+
+    magnet_screw = LeaderFollowersCuttersPart(magnet_screw)
+
+    magnet_screw_thread_hole_cutter = create_self_threading_hole_cutter(
+        "M3",
+        magnet_screw_length + 2,
+        core_radius_adjustment=-0.35,
+        lead_in=True,
+    )
+
+    magnet_screw_thread_hole_cutter = align(
+        magnet_screw_thread_hole_cutter, magnet_screw, Alignment.CENTER
+    )
+    magnet_screw_thread_hole_cutter = align(
+        magnet_screw_thread_hole_cutter, magnet_screw, Alignment.TOP
+    )
+    magnet_screw_thread_hole_cutter = translate(
+        0, 0, -MScrew.from_size("M3").conical_head_height
+    )(magnet_screw_thread_hole_cutter)
+
+    magnet_screw.add_named_cutter(magnet_screw_thread_hole_cutter, "thread_hole_cutter")
+
+    magnet_screw_head_cutter = create_cone(
+        radius1=3 / 2,
+        radius2=MScrew.from_size("M3").conical_head_diameter / 2 + 0.2,
+        height=MScrew.from_size("M3").conical_head_height + 0.1,
+    )
+    magnet_screw_head_cutter = align(
+        magnet_screw_head_cutter, magnet_screw, Alignment.CENTER
+    )
+    magnet_screw_head_cutter = align(
+        magnet_screw_head_cutter, magnet_screw, Alignment.TOP
+    )
+    magnet_screw.add_named_cutter(magnet_screw_head_cutter, "head_cutter")
+
+    magnet_screw_top_cutter = create_box(50, 50, 50)
+    magnet_screw_top_cutter = align(
+        magnet_screw_top_cutter, magnet_screw, Alignment.CENTER
+    )
+    magnet_screw_top_cutter = align(
+        magnet_screw_top_cutter, magnet_screw, Alignment.STACK_TOP
+    )
+    magnet_screw.add_named_cutter(magnet_screw_top_cutter, "top_cutter")
+
+    magnet_diameter = 5
+    magnet_height = 25
+    magnet_holder_size = 10
+    magnet_holder_height = 15
+    magnet_holder_clearance = 0.05
+
+    clamp_screw_length = 16 if lr == Alignment.RIGHT else 25
+
+    magnet = create_cylinder(magnet_diameter / 2, magnet_height)
+    magnet = align(magnet, magnet_screw, Alignment.CENTER)
+    magnet = align(magnet, magnet_screw, Alignment.STACK_TOP, stack_gap=0.3)
+    magnet_screw.add_named_non_production_part(magnet, "magnet")
+
+    magnet_holder = create_box(
+        magnet_holder_size, magnet_holder_size, magnet_holder_height
+    )
+    magnet_holder = LeaderFollowersCuttersPart(magnet_holder)
+    magnet_holder = align(magnet_holder, magnet, Alignment.CENTER)
+    magnet_holder = align(magnet_holder, magnet, Alignment.BOTTOM)
+    magnet_holder = translate(0, 0, -0.3)(magnet_holder)
+
+    magnet_holder_inner_cutter = create_cylinder(
+        magnet_diameter / 2 + magnet_holder_clearance, 100
+    )
+    magnet_holder_inner_cutter = align(
+        magnet_holder_inner_cutter, magnet, Alignment.CENTER
+    )
+    magnet_holder_inner_cutter = align(
+        magnet_holder_inner_cutter, magnet, Alignment.BOTTOM
+    )
+    magnet_holder = magnet_holder.cut(magnet_holder_inner_cutter)
+
+    magnet_screw.add_named_non_production_part(magnet_holder.leader, "magnet_holder")
+    magnet_screw.add_named_cutter(
+        magnet_holder_inner_cutter, "magnet_holder_magnet_clearance_cutter"
+    )
+
+    magnet_holder_cutter = materialize_bounding_box(magnet_holder)
+    magnet_screw.add_named_non_production_part(
+        magnet_holder_cutter, "magnet_holder_cutter"
+    )
+
+    return magnet_screw, clamp_screw_length
+
+
 def add_magnet_screw_holders(*, extruder_cage, idex_tap_t1, carriage):
     """Add the paired magnet screw holders, clamp hardware, and Tap slits."""
 
@@ -20,97 +112,8 @@ def add_magnet_screw_holders(*, extruder_cage, idex_tap_t1, carriage):
     joined_idex_tap_t1_additions = None
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        magnet_screw_length = 6
-        magnet_screw = create_conical_head_screw("M3", magnet_screw_length)
 
-        magnet_screw = LeaderFollowersCuttersPart(magnet_screw)
-
-        magnet_screw_thread_hole_cutter = create_self_threading_hole_cutter(
-            "M3",
-            magnet_screw_length + 2,
-            core_radius_adjustment=-0.35,
-            lead_in=True,
-        )
-
-        magnet_screw_thread_hole_cutter = align(
-            magnet_screw_thread_hole_cutter, magnet_screw, Alignment.CENTER
-        )
-        magnet_screw_thread_hole_cutter = align(
-            magnet_screw_thread_hole_cutter, magnet_screw, Alignment.TOP
-        )
-        magnet_screw_thread_hole_cutter = translate(
-            0, 0, -MScrew.from_size("M3").conical_head_height
-        )(magnet_screw_thread_hole_cutter)
-
-        magnet_screw.add_named_cutter(
-            magnet_screw_thread_hole_cutter, "thread_hole_cutter"
-        )
-
-        magnet_screw_head_cutter = create_cone(
-            radius1=3 / 2,
-            radius2=MScrew.from_size("M3").conical_head_diameter / 2 + 0.2,
-            height=MScrew.from_size("M3").conical_head_height + 0.1,
-        )
-        magnet_screw_head_cutter = align(
-            magnet_screw_head_cutter, magnet_screw, Alignment.CENTER
-        )
-        magnet_screw_head_cutter = align(
-            magnet_screw_head_cutter, magnet_screw, Alignment.TOP
-        )
-        magnet_screw.add_named_cutter(magnet_screw_head_cutter, "head_cutter")
-
-        magnet_screw_top_cutter = create_box(50, 50, 50)
-        magnet_screw_top_cutter = align(
-            magnet_screw_top_cutter, magnet_screw, Alignment.CENTER
-        )
-        magnet_screw_top_cutter = align(
-            magnet_screw_top_cutter, magnet_screw, Alignment.STACK_TOP
-        )
-        magnet_screw.add_named_cutter(magnet_screw_top_cutter, "top_cutter")
-
-        magnet_diameter = 5
-        magnet_height = 25
-        magnet_holder_size = 10
-        magnet_holder_height = 15
-        magnet_holder_clearance = 0.05
-
-        clamp_screw_length = 16 if lr == Alignment.RIGHT else 25
-
-        magnet = create_cylinder(magnet_diameter / 2, magnet_height)
-        magnet = align(magnet, magnet_screw, Alignment.CENTER)
-        magnet = align(magnet, magnet_screw, Alignment.STACK_TOP, stack_gap=0.3)
-        magnet_screw.add_named_non_production_part(magnet, "magnet")
-
-        magnet_holder = create_box(
-            magnet_holder_size, magnet_holder_size, magnet_holder_height
-        )
-        magnet_holder = LeaderFollowersCuttersPart(magnet_holder)
-        magnet_holder = align(magnet_holder, magnet, Alignment.CENTER)
-        magnet_holder = align(magnet_holder, magnet, Alignment.BOTTOM)
-        magnet_holder = translate(0, 0, -0.3)(magnet_holder)
-
-        magnet_holder_inner_cutter = create_cylinder(
-            magnet_diameter / 2 + magnet_holder_clearance, 100
-        )
-        magnet_holder_inner_cutter = align(
-            magnet_holder_inner_cutter, magnet, Alignment.CENTER
-        )
-        magnet_holder_inner_cutter = align(
-            magnet_holder_inner_cutter, magnet, Alignment.BOTTOM
-        )
-        magnet_holder = magnet_holder.cut(magnet_holder_inner_cutter)
-
-        magnet_screw.add_named_non_production_part(
-            magnet_holder.leader, "magnet_holder"
-        )
-        magnet_screw.add_named_cutter(
-            magnet_holder_inner_cutter, "magnet_holder_magnet_clearance_cutter"
-        )
-
-        magnet_holder_cutter = materialize_bounding_box(magnet_holder)
-        magnet_screw.add_named_non_production_part(
-            magnet_holder_cutter, "magnet_holder_cutter"
-        )
+        magnet_screw, clamp_screw_length = create_magnet_screw_assembly(lr)
 
         magnet_screw = rotate(180 + 45, axis=[1, 0, 0])(magnet_screw)
         magnet_screw = align(magnet_screw, carriage, Alignment.CENTER)
@@ -539,6 +542,17 @@ def main():
         parts.add(part, f"extruder_cage_{name}", flip=False)
     for name, part in outputs["idex_tap_t1"].get_named_non_production_part_items():
         parts.add(part, f"tap_{name}", flip=False)
+
+
+    magnet_srew_stack = create_magnet_screw_assembly(Alignment.LEFT)[0]
+
+    magnet_srew_stack = align(magnet_srew_stack, outputs["idex_tap_t1"].leader, Alignment.STACK_RIGHT, stack_gap=50)
+
+    parts.add(magnet_srew_stack.leader, "magnet_screw_stack", flip=False)
+    for name, part in magnet_srew_stack.get_named_non_production_part_items():
+        parts.add(part, f"magnet_screw_stack_{name}", flip=False)
+    
+
 
     arrange_and_export(
         parts.as_list(),
