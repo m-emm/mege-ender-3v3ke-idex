@@ -11,7 +11,8 @@ Klipper config.
   TB6600 interface schematic and verified stripboard assembly.
 - `pico_tb6600_stripboard_interface.md` documents that interface.
 - `tmc5160t_plus_power_sequencing.py` generates the standalone TMC5160T Plus
-  driver-before-logic concept-review schematic. It is not active printer wiring.
+  driver-before-logic concept-review schematic, including the sequenced-VIO
+  SN7407N open-collector interface. It is not active printer wiring.
 - `diagrams/*.svg` and selected `diagrams/*.png` files are generated artifacts
   committed for review.
 - `../printer.cfg.template` is the active Klipper config source.

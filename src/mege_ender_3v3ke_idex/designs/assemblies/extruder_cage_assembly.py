@@ -34,15 +34,16 @@ def create_extruder_cage_assembly(
     tool_head_right_mount_plate_height = 13
     fixed_mount_strip_width = 7.8
     fixed_mount_strip_length = 55
-    fixed_mount_strip_thickness = 5
+    fixed_mount_strip_thickness = 4
     fixed_mount_strip_thread_inset_size = "M3"
     fixed_mount_strip_thread_inset_top_material_thickness = 2
+    mount_strip_front_bridge_depth = 5
     fixed_mount_strip_thread_inset_holder_thickness = (
         MScrew.from_size(fixed_mount_strip_thread_inset_size).thread_inset_length
         + fixed_mount_strip_thread_inset_top_material_thickness
     )
     fixed_mount_strip_thread_inset_extra_radius = 2.2
-    fixed_mount_strip_thread_inset_hole_radius_adjustment = -0.15
+    fixed_mount_strip_thread_inset_hole_radius_adjustment = -0.2
 
     fixed_mount_strips = PartCollector()
     fixed_mount_strip_thread_inset_bosses = PartCollector()
@@ -51,8 +52,12 @@ def create_extruder_cage_assembly(
     fixed_mount_strip_thread_insets = []
     fixed_mount_strip_hole_drills = PartCollector()
     for left_right_alignment in [Alignment.LEFT, Alignment.RIGHT]:
+
+        curent_mount_strip_width = fixed_mount_strip_width
+        if left_right_alignment == Alignment.RIGHT:
+            curent_mount_strip_width += 4
         fixed_mount_strip = create_box(
-            fixed_mount_strip_width,
+            curent_mount_strip_width,
             fixed_mount_strip_length,
             fixed_mount_strip_thickness,
         )
@@ -74,8 +79,13 @@ def create_extruder_cage_assembly(
             drill = tool_head_mount_machined.get_named_cutter(
                 f"hole_drill_{left_right_alignment.name}_{front_back_alignment.name}"
             )
-            fixed_mount_strip_hole_drills = fixed_mount_strip_hole_drills.fuse(drill)
-            fixed_mount_strip = fixed_mount_strip.cut(drill)
+
+            adjusted_drill = create_cylinder(MScrew.from_size(fixed_mount_strip_thread_inset_size).clearance_hole_close / 2, BIG_THING)
+
+            adjusted_drill = align(adjusted_drill, drill, Alignment.CENTER)
+
+            fixed_mount_strip_hole_drills = fixed_mount_strip_hole_drills.fuse(adjusted_drill)
+            fixed_mount_strip = fixed_mount_strip.cut(adjusted_drill)
 
             thread_inset = create_thread_inset_assembly(
                 size=fixed_mount_strip_thread_inset_size,
@@ -91,7 +101,7 @@ def create_extruder_cage_assembly(
                 thread_inset,
                 fixed_mount_strip,
                 Alignment.STACK_BOTTOM,
-                stack_gap=-fixed_mount_strip_thickness,
+                stack_gap=-fixed_mount_strip_thickness+fixed_mount_strip_thread_inset_top_material_thickness,
             )
 
             thread_inset_boss = thread_inset.get_named_cutter("assembly_cutter")
@@ -113,7 +123,28 @@ def create_extruder_cage_assembly(
 
         fixed_mount_strips = fixed_mount_strips.fuse(fixed_mount_strip)
 
+    fixed_mount_strip_front_bridge = materialize_bounding_box(fixed_mount_strips, z_size=fixed_mount_strip_thickness, y_size=mount_strip_front_bridge_depth)
+
+    fixed_mount_strip_front_bridge = align(
+        fixed_mount_strip_front_bridge, fixed_mount_strips, Alignment.STACK_FRONT
+    )
+
+    fixed_mount_strip_front_bridge = align(
+        fixed_mount_strip_front_bridge, fixed_mount_strips, Alignment.TOP
+    )
+
+    fixed_mount_strip_back_bridge = align(fixed_mount_strip_front_bridge, sprite_extruder, Alignment.STACK_BACK,stack_gap=extruder_cage_top_right_bridge_clearance)
+
+    fixed_mount_strip_bridges = fixed_mount_strip_front_bridge.fuse(fixed_mount_strip_back_bridge)
+
+    extruder_cutter = materialize_bounding_box(sprite_extruder, z_size=200, y_enlargement = 0.3)
+
+    fixed_mount_strip_bridges = fixed_mount_strip_bridges.cut(extruder_cutter)
+
+    fixed_mount_strips = fixed_mount_strips.fuse(fixed_mount_strip_bridges)
+
     fixed_mount_strips = fixed_mount_strips.cut(fixed_mount_strip_hole_drills)
+
 
     extruder_size = get_bounding_box_size(sprite_extruder)
     screw_record = MScrew.from_size(extruder_cage_screw_size)
