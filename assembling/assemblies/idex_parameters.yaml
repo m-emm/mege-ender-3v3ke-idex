@@ -306,8 +306,8 @@ globals:
   x_axis_carriage_z_offset:
     $ref: x_axis_carriage_height
   x_axis_sprite_extruder_tool_head_mount_x_offset: 4.25
-  x_axis_sprite_extruder_tool_head_mount_y_offset: -23
-  x_axis_sprite_extruder_tool_head_mount_z_offset: -27.8
+  x_axis_sprite_extruder_tool_head_mount_y_offset: -17.75
+  x_axis_sprite_extruder_tool_head_mount_z_offset: -25.55
   x_axis_carriage_stopper_width: 12
   x_axis_carriage_stopper_thickness: 8
   x_axis_carriage_stopper_depth: 25
@@ -1307,40 +1307,6 @@ globals:
   tool_head_mount_machined_sprite_mount_hole_primary_y_pitch: 39.7
   tool_head_mount_machined_sprite_mount_hole_secondary_y_pitch: 11.8
 
-  mgn7h_rail_length: 40
-  mgn7h_rail_width: 7
-  mgn7h_rail_height: 4.8
-  mgn7h_rail_mount_hole_pitch: 15
-  mgn7h_rail_mount_hole_end_offset: 5
-  mgn7h_rail_mount_hole_diameter: 2.4
-  mgn7h_rail_mount_counterbore_diameter: 4.2
-  mgn7h_rail_mount_counterbore_depth: 2.4
-  mgn7h_rail_mount_screw_size: "M2"
-  mgn7h_rail_groove_z_center: 2.8
-  mgn7h_rail_groove_v_height: 1.25
-  mgn7h_rail_groove_v_depth: 0.625
-  mgn7h_rail_groove_slot_height: 0.65
-  mgn7h_rail_groove_slot_depth: 0.95
-  mgn7h_rail_top_fillet_radius: 0.18
-  mgn7h_rail_bottom_chamfer_width: 0.32
-  mgn7h_rail_bottom_chamfer_height: 0.35
-  mgn7h_rail_mount_hole_drill_extra_length: 100
-  mgn7h_rail_mock_clearance: 0.15
-  mgn7h_rail_mock_side_clearance: 0.20
-  mgn7h_rail_mock_top_clearance: 0.25
-  mgn7h_rail_mock_groove_clearance: 0.16
-  mgn7h_rail_mock_groove_height_clearance: 0.05
-  mgn7h_carriage_length: 30.8
-  mgn7h_carriage_width: 16.65
-  mgn7h_carriage_height: 6.5
-  mgn7h_carriage_h1_offset: 1.5
-  mgn7h_carriage_mount_hole_pitch_x: 20
-  mgn7h_carriage_mount_hole_pitch_y: 8
-  mgn7h_carriage_mount_hole_depth: 3
-  mgn7h_carriage_mount_hole_drill_extra_length: 20
-  mgn7h_carriage_mount_screw_size: "M2"
-  mgn7h_carriage_rest_offset_on_rail: 0
-
   opb991t11z_body_width: 18.47
   opb991t11z_body_depth: 6.35
   opb991t11z_base_height: 2.54
@@ -1356,22 +1322,6 @@ globals:
   opb991t11z_connector_towers_gap: 3.11
   opb991t11z_mount_hole_diameter: 3.18
   opb991t11z_mount_hole_pitch: 19.05
-
-  idex_tap_frame_height: 58
-  idex_tap_frame_thickness: 4
-  idex_tap_frame_mount_flange_depth: 34
-  idex_tap_frame_mount_flange_thickness: 5
-  idex_tap_frame_mount_screw_size: "M3"
-  idex_tap_trigger_lift: 1.0
-  idex_tap_total_travel: 1.4
-  idex_tap_trigger_flag_thickness: 0.8
-  idex_tap_trigger_flag_width: 3.0
-  idex_tap_trigger_flag_sensor_overlap_at_rest: 6.0
-  idex_tap_magnet_height: 3
-  idex_tap_magnet_count: 2
-  idex_tap_magnet_center_spacing: 28
-  idex_tap_magnet_gap_at_rest: 0.4
-  idex_tap_magnet_target_screw_head_diameter: 3.8
 
   tool_head_mount_carriage_mount_l_profile_thickness: 3.2
   tool_head_mount_carriage_mount_l_profile_outer_size: 30

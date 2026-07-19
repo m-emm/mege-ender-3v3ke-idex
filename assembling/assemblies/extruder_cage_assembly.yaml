@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for the shared Tap-compatible extruder cage
+Description: Assembly configuration for the shared extruder cage
 
 Builder:
   Visualization:

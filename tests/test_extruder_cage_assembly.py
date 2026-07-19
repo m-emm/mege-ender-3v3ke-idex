@@ -27,6 +27,7 @@ from shellforgepy.builder import graph_model as builder_graph_model
 from shellforgepy.simple import (
     Alignment,
     align,
+    create_box,
     get_bounding_box,
     get_bounding_box_center,
     get_bounding_box_size,
@@ -79,32 +80,19 @@ def _place_nitehawk_board_like_graph(nitehawk_board, sprite_extruder):
     )(nitehawk_board)
 
 
-def _create_machined_mount():
+def _create_machined_mount(drive_position):
     carriage = create_x_axis_carriage_assembly()
     return create_tool_head_mount_machined_assembly(
         **assembly_kwargs(
             create_tool_head_mount_machined_assembly,
             carriage=carriage,
-            drive_position="bottom",
+            drive_position=drive_position,
         )
     )
 
 
-def test_extruder_cage_signature_uses_cage_owned_mount_dimensions():
-    parameters = inspect.signature(create_extruder_cage_assembly).parameters
-
-    assert "nitehawk_board" in parameters
-    assert "tool_head_mount_machined" in parameters
-    assert parameters["tool_head_mount_machined"].default is inspect.Parameter.empty
-    assert "carriage" not in parameters
-    assert "extruder_cage_mount_plate_fillet_radius" in parameters
-    assert "extruder_cage_top_right_bridge_clearance" in parameters
-    for parameter_name in REMOVED_CAGE_PARAMETERS:
-        assert parameter_name not in parameters
-
-
-def test_extruder_cage_exposes_shared_tap_mounting_interfaces_and_hardware():
-    tool_head_mount_machined = _create_machined_mount()
+def _create_extruder_cage(drive_position):
+    tool_head_mount_machined = _create_machined_mount(drive_position)
     sprite_extruder = create_sprite_extruder_assembly(
         **assembly_kwargs(create_sprite_extruder_assembly)
     )
@@ -130,6 +118,25 @@ def test_extruder_cage_exposes_shared_tap_mounting_interfaces_and_hardware():
             tool_head_mount_machined=tool_head_mount_machined,
         )
     )
+    return cage, tool_head_mount_machined
+
+
+def test_extruder_cage_signature_uses_cage_owned_mount_dimensions():
+    parameters = inspect.signature(create_extruder_cage_assembly).parameters
+
+    assert "nitehawk_board" in parameters
+    assert "tool_head_mount_machined" in parameters
+    assert parameters["tool_head_mount_machined"].default is inspect.Parameter.empty
+    assert "carriage" not in parameters
+    assert "extruder_cage_mount_plate_fillet_radius" in parameters
+    assert "extruder_cage_top_right_bridge_clearance" in parameters
+    for parameter_name in REMOVED_CAGE_PARAMETERS:
+        assert parameter_name not in parameters
+
+
+@pytest.mark.parametrize("drive_position", ["bottom", "top"])
+def test_extruder_cage_builds_mount_strips_and_insert_hardware(drive_position):
+    cage, tool_head_mount_machined = _create_extruder_cage(drive_position)
 
     assert get_volume(cage.leader) > 0
     assert cage.follower_indices_by_name == {}
@@ -152,8 +159,69 @@ def test_extruder_cage_exposes_shared_tap_mounting_interfaces_and_hardware():
     ):
         assert _recut_delta(cage.leader, cage.get_named_cutter(cutter_name)) < 0.01
 
+    interface_names = {
+        *cage.follower_indices_by_name,
+        *cage.cutter_indices_by_name,
+        *cage.non_production_indices_by_name,
+    }
+    assert all("tap" not in name.lower() for name in interface_names)
 
-def test_extruder_cage_sides_share_resource_and_follow_ordered_join_chains():
+    for side in ("left", "right"):
+        front_drill = tool_head_mount_machined.get_named_cutter(
+            f"hole_drill_{side.upper()}_FRONT"
+        )
+        back_drill = tool_head_mount_machined.get_named_cutter(
+            f"hole_drill_{side.upper()}_BACK"
+        )
+        strip_probe = create_box(1, 1, 1)
+        strip_probe = align(
+            strip_probe,
+            front_drill.fuse(back_drill),
+            Alignment.CENTER,
+            axes=[0, 1],
+        )
+        strip_probe = align(
+            strip_probe,
+            tool_head_mount_machined,
+            Alignment.STACK_BOTTOM,
+        )
+        assert _recut_delta(cage.leader, strip_probe) > 0.5
+
+        for front_back in ("front", "back"):
+            position = f"{side}_{front_back}"
+            inset = cage.get_named_non_production_part(
+                f"fixed_mount_strip_thread_inset_{position}_thread_inset"
+            )
+            cavity = cage.get_named_cutter(
+                f"fixed_mount_strip_thread_inset_cutter_{position}"
+            )
+
+            assert get_volume(inset) > 0
+            assert get_volume(cavity) > 0
+            assert _recut_delta(cage.leader, cavity) < 0.01
+
+            retained_material_probe = create_box(0.5, 0.5, 0.5)
+            retained_material_probe = align(
+                retained_material_probe,
+                inset,
+                Alignment.CENTER,
+                axes=[1],
+            )
+            retained_material_probe = align(
+                retained_material_probe,
+                inset,
+                Alignment.STACK_RIGHT,
+                stack_gap=0.25,
+            )
+            retained_material_probe = align(
+                retained_material_probe,
+                inset,
+                Alignment.STACK_TOP,
+            )
+            assert _recut_delta(cage.leader, retained_material_probe) > 0.05
+
+
+def test_extruder_cage_sides_share_resource_and_join_directly_to_final_outputs():
     config = yaml.load(
         (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
         Loader=AssemblyDefaultsLoader,
@@ -178,24 +246,15 @@ def test_extruder_cage_sides_share_resource_and_follow_ordered_join_chains():
             "sprite_extruder": "sprite_extruder_left_assembly",
             "nitehawk_board": "nitehawk_board_left_assembly",
             "tool_head_mount_machined": "tool_head_mount_machined_bottom_assembly",
-            "rail": "mgn7h_rail_with_carriage_left_assembly",
-            "sensor": "opb991t11z_sensor_left_assembly",
-            "raw_tap": "idex_tap_t0_assembly",
-            "fan_cage": "extruder_cage_left_fan_joined_assembly",
             "final_cage": "extruder_cage_left_joined_assembly",
-            "cage_tap": "idex_tap_t0_cage_joined_assembly",
-            "final_tap": "idex_tap_t0_joined_assembly",
+            "final_fans": "part_fan_left_joined_assembly",
         },
         "right": {
             "sprite_extruder": "sprite_extruder_right_assembly",
             "nitehawk_board": "nitehawk_board_right_assembly",
             "tool_head_mount_machined": "tool_head_mount_machined_top_assembly",
-            "rail": "mgn7h_rail_with_carriage_right_assembly",
-            "sensor": "opb991t11z_sensor_right_assembly",
-            "raw_tap": "idex_tap_t1_assembly",
-            "fan_cage": "extruder_cage_right_fan_joined_assembly",
             "final_cage": "extruder_cage_right_joined_assembly",
-            "final_tap": "idex_tap_t1_joined_assembly",
+            "final_fans": "part_fan_right_joined_assembly",
         },
     }
 
@@ -216,24 +275,12 @@ def test_extruder_cage_sides_share_resource_and_follow_ordered_join_chains():
             "part_fans": f"part_fan_{side}_assembly",
             "extruder_cage": f"extruder_cage_{side}_assembly",
         }
-        assert fan_join["outputs"]["extruder_cage"] == expected["fan_cage"]
+        assert fan_join["outputs"]["extruder_cage"] == expected["final_cage"]
+        assert fan_join["outputs"]["part_fans"] == expected["final_fans"]
 
-        tap_join = assemblies[f"tap_extruder_cage_{side}_join"]
-        assert tap_join["inject_parts"] == {
-            "extruder_cage": expected["fan_cage"],
-            "sprite_extruder": expected["sprite_extruder"],
-            "mgn7h_rail_with_carriage": expected["rail"],
-            "idex_tap": expected["raw_tap"],
-            "opb991t11z_sensor": expected["sensor"],
-        }
-        assert tap_join["outputs"]["extruder_cage"] == expected["final_cage"]
-
-    belt_join = assemblies["tap_belt_carriage_left_join"]
-    assert belt_join["inject_parts"] == {
-        "idex_tap": side_context["left"]["cage_tap"],
-        "belt_carriage": "x_axis_belt_carriage_bottom_assembly",
-    }
-    assert belt_join["outputs"]["idex_tap"] == side_context["left"]["final_tap"]
+    assembly_names = set(assemblies)
+    assert not any("fan_joined_assembly" in name for name in assembly_names)
+    assert not any("tap" in name.lower() for name in assembly_names)
 
     graph = builder_graph_model.build_graph_model(config["assemblies"], config)
     generations = builder_graph_model.resolve_build_generation_names(
@@ -244,18 +291,35 @@ def test_extruder_cage_sides_share_resource_and_follow_ordered_join_chains():
         for index, generation in enumerate(generations)
         for name in generation
     }
-    assert (
-        generation_index["join:part_fan_cage_left_join"]
-        < generation_index["join:tap_extruder_cage_left_join"]
+    for side, expected in side_context.items():
+        assert (
+            generation_index[f"join:part_fan_cage_{side}_join"]
+            < generation_index[expected["final_cage"]]
+            < generation_index["tool_heads_assembly"]
+        )
+
+    tool_heads_resource = yaml.load(
+        (ASSEMBLIES_DIR / "tool_heads_assembly.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
     )
-    assert (
-        generation_index["join:tap_extruder_cage_left_join"]
-        < generation_index["join:tap_belt_carriage_left_join"]
-    )
-    assert (
-        generation_index["join:tap_belt_carriage_left_join"]
-        < generation_index["idex_tap_t0_joined_assembly"]
-    )
+    production = tool_heads_resource["Builder"]["Production"]
+    production_parts = {part["name"] for part in production["parts"]}
+    assert production_parts == {
+        "extruder_cage_left_joined",
+        "tool_head_cable_attach_shield_left",
+        "part_fan_left_joined",
+        "extruder_cage_right_joined",
+        "tool_head_cable_attach_shield_right",
+        "part_fan_right_joined",
+    }
+    plates = {plate["name"]: plate for plate in production["arrange"]["plates"]}
+    assert set(plates) == {"tool_head_left_petgcf", "tool_head_right_petgcf"}
+    for side in ("left", "right"):
+        assert plates[f"tool_head_{side}_petgcf"]["parts"] == [
+            f"extruder_cage_{side}_joined",
+            f"tool_head_cable_attach_shield_{side}",
+            f"part_fan_{side}_joined",
+        ]
 
 
 def test_tool_head_mount_machined_assemblies_use_side_drive_context_without_belts():

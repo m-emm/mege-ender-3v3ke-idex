@@ -21,7 +21,6 @@
 - nozzle cleaning pads holders
 - idex alignment sensor
 - z/y fine tuner
-- voron tap?
 
 ## Electrical tasks
 

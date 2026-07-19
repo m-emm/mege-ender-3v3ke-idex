@@ -677,12 +677,26 @@ def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
     extruder_cage = LeaderFollowersCuttersPart(
         translate(100, 100, 100)(create_box(5, 5, 5))
     )
+    cage_hardware_reference = translate(100, 100, 100)(create_box(1, 1, 1))
+    cage_hardware_cavity = translate(101, 101, 101)(create_box(1, 1, 1))
+    extruder_cage.add_named_non_production_part(
+        cage_hardware_reference,
+        "fixed_mount_strip_thread_inset_left_front_thread_inset",
+    )
+    extruder_cage.add_named_cutter(
+        cage_hardware_cavity,
+        "fixed_mount_strip_thread_inset_cutter_left_front",
+    )
 
     original_part_fan_volume = get_volume(part_fans.leader)
     original_cage_volume = get_volume(extruder_cage.leader)
     original_part_fan_non_production_names = dict(
         part_fans.non_production_indices_by_name
     )
+    original_cage_non_production_names = dict(
+        extruder_cage.non_production_indices_by_name
+    )
+    original_cage_cutter_names = dict(extruder_cage.cutter_indices_by_name)
 
     result = join_part_fans_with_extruder_cage(
         part_fans=part_fans,
@@ -698,9 +712,29 @@ def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
         part_fans.non_production_indices_by_name
         == original_part_fan_non_production_names
     )
+    assert (
+        extruder_cage.non_production_indices_by_name
+        == original_cage_non_production_names
+    )
+    assert extruder_cage.cutter_indices_by_name == original_cage_cutter_names
 
     joined_part_fans = result["part_fans"]
     joined_extruder_cage = result["extruder_cage"]
+    assert (
+        joined_extruder_cage.non_production_indices_by_name
+        == original_cage_non_production_names
+    )
+    assert joined_extruder_cage.cutter_indices_by_name == original_cage_cutter_names
+    assert get_volume(
+        joined_extruder_cage.get_named_non_production_part(
+            "fixed_mount_strip_thread_inset_left_front_thread_inset"
+        )
+    ) == pytest.approx(get_volume(cage_hardware_reference))
+    assert get_volume(
+        joined_extruder_cage.get_named_cutter(
+            "fixed_mount_strip_thread_inset_cutter_left_front"
+        )
+    ) == pytest.approx(get_volume(cage_hardware_cavity))
     assert get_volume(joined_part_fans.leader) > original_part_fan_volume
     assert get_volume(joined_extruder_cage.leader) > original_cage_volume
 
@@ -750,9 +784,14 @@ def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
     )
 
 
-def test_part_fan_cage_joiner_signature_has_no_tap_dependencies():
+def test_part_fan_cage_joiner_signature_stays_generic():
     parameters = inspect.signature(join_part_fans_with_extruder_cage).parameters
 
-    assert "mgn7h_rail_with_carriage" not in parameters
-    assert "idex_tap_t1" not in parameters
-    assert "opb991t11z_sensor" not in parameters
+    assert set(parameters) == {
+        "part_fans",
+        "extruder_cage",
+        "flange_extension",
+        "flange_half_height",
+        "screw_size",
+        "clearance_type",
+    }

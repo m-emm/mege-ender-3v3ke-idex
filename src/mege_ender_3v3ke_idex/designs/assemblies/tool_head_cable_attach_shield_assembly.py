@@ -9,7 +9,6 @@ MOUNT_SCREW_LENGTH = 12
 def create_tool_head_cable_attach_shield_assembly(
     *,
     tool_head_mount_machined,
-    light_barrier_assembly=None,
     tool_head_cable_attach_shield_height,
     tool_head_cable_attach_shield_thickness,
     tool_head_cable_attach_shield_fillet_radius,
@@ -89,47 +88,6 @@ def create_tool_head_cable_attach_shield_assembly(
 
     for cutter in cutters.values():
         shield = shield.cut(cutter)
-
-    if light_barrier_assembly is not None:
-        light_barrier_cutter = materialize_bounding_box(
-            light_barrier_assembly, x_enlargement=2, y_enlargement=1, z_enlargement=4
-        )
-
-        light_barrier_bbox_center = get_bounding_box_center(light_barrier_cutter)
-
-        shield = shield.cut(light_barrier_cutter)
-
-        flag_thickness = 2.25
-        flag_depth = 8
-        flag_height = 10
-        flag_holder_size = 11
-
-        tap_flag = create_box(flag_thickness, flag_depth, flag_height)
-        tap_flag = align(tap_flag, light_barrier_assembly, Alignment.CENTER)
-        tap_flag = align(tap_flag, plate, Alignment.STACK_BACK)
-
-        tap_flag = align(tap_flag, light_barrier_assembly, Alignment.BOTTOM)
-        top_flag_bbox = get_bounding_box(tap_flag)
-        tap_flag = translate(
-            0, 0, light_barrier_bbox_center[2] - top_flag_bbox[0][2] + 0.2
-        )(tap_flag)
-
-        shield = shield.fuse(tap_flag)
-
-        tap_flag_holder = create_pyramid_stump(
-            flag_holder_size,
-            flag_thickness,
-            flag_height / 2,
-            flag_height / 2,
-            flag_depth,
-        )
-        tap_flag_holder = rotate(-90, axis=[1, 0, 0])(tap_flag_holder)
-
-        tap_flag_holder = align(tap_flag_holder, tap_flag, Alignment.CENTER)
-        tap_flag_holder = align(tap_flag_holder, plate, Alignment.BOTTOM)
-        tap_flag_holder = align(tap_flag_holder, plate, Alignment.STACK_BACK)
-
-        shield = shield.fuse(tap_flag_holder)
 
     shield_part = LeaderFollowersCuttersPart(shield)
     for name, cutter in cutters.items():

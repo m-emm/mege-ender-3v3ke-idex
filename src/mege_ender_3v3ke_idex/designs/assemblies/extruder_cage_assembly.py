@@ -1,4 +1,4 @@
-"""Shared Tap-compatible extruder cage assembly."""
+"""Shared extruder cage assembly."""
 
 from mege_ender_3v3ke_idex.designs.nema_motors import NemaSizes
 from shellforgepy.simple import *
@@ -29,12 +29,91 @@ def create_extruder_cage_assembly(
     nitehawk_nut_cutter_slack,
     BIG_THING,
 ):
-    """Create the shared Tap-compatible cage around the injected Sprite."""
+    """Create the shared cage around the injected Sprite."""
 
-    _ = tool_head_mount_machined
     tool_head_right_mount_plate_height = 13
+    fixed_mount_strip_width = 7.8
+    fixed_mount_strip_length = 55
+    fixed_mount_strip_thickness = 5
+    fixed_mount_strip_thread_inset_size = "M3"
+    fixed_mount_strip_thread_inset_top_material_thickness = 2
+    fixed_mount_strip_thread_inset_holder_thickness = (
+        MScrew.from_size(fixed_mount_strip_thread_inset_size).thread_inset_length
+        + fixed_mount_strip_thread_inset_top_material_thickness
+    )
+    fixed_mount_strip_thread_inset_extra_radius = 2.2
+    fixed_mount_strip_thread_inset_hole_radius_adjustment = -0.15
 
-    tap_top_travel = 1.2
+    fixed_mount_strips = PartCollector()
+    fixed_mount_strip_thread_inset_bosses = PartCollector()
+    fixed_mount_strip_thread_inset_cutters = PartCollector()
+    fixed_mount_strip_thread_inset_cutter_items = []
+    fixed_mount_strip_thread_insets = []
+    fixed_mount_strip_hole_drills = PartCollector()
+    for left_right_alignment in [Alignment.LEFT, Alignment.RIGHT]:
+        fixed_mount_strip = create_box(
+            fixed_mount_strip_width,
+            fixed_mount_strip_length,
+            fixed_mount_strip_thickness,
+        )
+        fixed_mount_strip = align(
+            fixed_mount_strip, tool_head_mount_machined, Alignment.FRONT
+        )
+        fixed_mount_strip = align(
+            fixed_mount_strip, tool_head_mount_machined, Alignment.STACK_BOTTOM
+        )
+        fixed_mount_strip = align(
+            fixed_mount_strip, tool_head_mount_machined, left_right_alignment
+        )
+
+        for front_back_alignment in [Alignment.FRONT, Alignment.BACK]:
+            position_name = (
+                f"{left_right_alignment.name.lower()}_"
+                f"{front_back_alignment.name.lower()}"
+            )
+            drill = tool_head_mount_machined.get_named_cutter(
+                f"hole_drill_{left_right_alignment.name}_{front_back_alignment.name}"
+            )
+            fixed_mount_strip_hole_drills = fixed_mount_strip_hole_drills.fuse(drill)
+            fixed_mount_strip = fixed_mount_strip.cut(drill)
+
+            thread_inset = create_thread_inset_assembly(
+                size=fixed_mount_strip_thread_inset_size,
+                thickness=fixed_mount_strip_thread_inset_holder_thickness,
+                extra_radius=fixed_mount_strip_thread_inset_extra_radius,
+                clearance_type="close",
+                thread_inset_hole_radius_adjustment=(
+                    fixed_mount_strip_thread_inset_hole_radius_adjustment
+                ),
+            )
+            thread_inset = align(thread_inset, drill, Alignment.CENTER)
+            thread_inset = align(
+                thread_inset,
+                fixed_mount_strip,
+                Alignment.STACK_BOTTOM,
+                stack_gap=-fixed_mount_strip_thickness,
+            )
+
+            thread_inset_boss = thread_inset.get_named_cutter("assembly_cutter")
+            thread_inset_cutter = thread_inset_boss.cut(thread_inset.leader)
+            fixed_mount_strip_thread_inset_bosses = (
+                fixed_mount_strip_thread_inset_bosses.fuse(thread_inset_boss)
+            )
+            fixed_mount_strip_thread_inset_cutters = (
+                fixed_mount_strip_thread_inset_cutters.fuse(thread_inset_cutter)
+            )
+            fixed_mount_strip_thread_inset_cutter_items.append(
+                (position_name, thread_inset_cutter)
+            )
+            fixed_mount_strip_thread_insets.append(
+                thread_inset.prefixed_copy(
+                    f"fixed_mount_strip_thread_inset_{position_name}"
+                )
+            )
+
+        fixed_mount_strips = fixed_mount_strips.fuse(fixed_mount_strip)
+
+    fixed_mount_strips = fixed_mount_strips.cut(fixed_mount_strip_hole_drills)
 
     extruder_size = get_bounding_box_size(sprite_extruder)
     screw_record = MScrew.from_size(extruder_cage_screw_size)
@@ -44,9 +123,6 @@ def create_extruder_cage_assembly(
     mount_hole_cutter = sprite_extruder.get_named_cutter("mount_hole_cutter")
 
     extruder_mount_base_plate_thickness = extruder_cage_mount_plate_thickness + 2
-    tool_head_mount_machined_bbox = get_bounding_box(tool_head_mount_machined)
-    tool_head_mount_machined_max_x = tool_head_mount_machined_bbox[1][0]
-    tool_head_mount_machined_min_x = tool_head_mount_machined_bbox[0][0]
     sprite_extruder_min_x = sprite_extruder_bbox[0][0]
 
     sprite_extruder_max_x = sprite_extruder_bbox[1][0]
@@ -463,83 +539,6 @@ def create_extruder_cage_assembly(
         back_strip = translate(-lr.sign * back_strip_inset, 0, 0)(back_strip)
         back_strips = back_strips.fuse(back_strip)
 
-    top_strip_size = get_bounding_box_size(right_mount_plate)
-
-    top_strip_bbox_min_x = get_bounding_box(right_mount_plate)[0][0]
-
-    left_flange_width = tool_head_mount_machined_max_x - top_strip_bbox_min_x
-
-    right_flange = create_box(left_flange_width, top_strip_size[1], BIG_THING)
-    right_flange = align(right_flange, right_mount_plate, Alignment.CENTER)
-    right_flange = align(right_flange, right_mount_plate, Alignment.LEFT)
-
-    right_flange = fit_part_between(
-        right_flange,
-        cut_normal=(0, 0, 1),
-        limiting_start_part=tool_head_mount_machined,
-        limiting_end_part=right_mount_plate,
-    )
-    right_flange = tool_head_mount_machined.use_as_cutter_on(right_flange)
-
-    left_mount_plate_bbox = get_bounding_box(left_mount_plate)
-    left_mount_plate_bbox_size = get_bounding_box_size(left_mount_plate)
-    left_mount_plate_max_x = left_mount_plate_bbox[1][0]
-
-    left_flange_width = left_mount_plate_max_x - tool_head_mount_machined_min_x
-
-    left_flange = create_box(
-        left_flange_width,
-        left_mount_plate_bbox_size[1] + extruder_cage_mount_plate_thickness,
-        BIG_THING,
-    )
-    left_flange = align(left_flange, left_mount_plate, Alignment.CENTER)
-    left_flange = align(left_flange, left_mount_plate, Alignment.BACK)
-    left_flange = align(left_flange, left_mount_plate, Alignment.RIGHT)
-
-    left_flange = fit_part_between(
-        left_flange,
-        cut_normal=(0, 0, 1),
-        limiting_start_part=right_mount_plate,
-        limiting_end_part=tool_head_mount_machined,
-    )
-
-    left_flange = tool_head_mount_machined.use_as_cutter_on(left_flange)
-
-    flange_size = get_bounding_box_size(left_flange)
-
-    left_flange_min_x = get_bounding_box(left_flange)[0][0]
-    right_flange_max_x = get_bounding_box(right_flange)[1][0]
-
-    flange_connector_width = right_flange_max_x - left_flange_min_x
-
-    flange_connector = create_box(
-        flange_connector_width, extruder_cage_mount_plate_thickness, flange_size[2]
-    )
-    flange_connector = align(flange_connector, left_flange, Alignment.LEFT)
-
-    flange_connector = align(flange_connector, left_flange, Alignment.FRONT)
-    flange_connector = align(
-        flange_connector, tool_head_mount_machined, Alignment.STACK_BOTTOM
-    )
-
-    extruder_fan = sprite_extruder.get_named_non_production_part("fan")
-    extruder_fan_bbox = get_bounding_box(extruder_fan)
-    extruder_fan_min_x = extruder_fan_bbox[0][0]
-
-    back_left_flange_width = extruder_fan_min_x - tool_head_mount_machined_min_x - 1
-    back_left_flange = create_box(
-        back_left_flange_width,
-        extruder_size[1] + extruder_mount_base_plate_thickness,
-        flange_size[2] / 2,
-    )
-
-    back_left_flange = align(back_left_flange, sprite_extruder, Alignment.FRONT)
-    back_left_flange = align(back_left_flange, left_flange, Alignment.LEFT)
-    back_left_flange = align(back_left_flange, left_flange, Alignment.TOP)
-
-    left_flange = left_flange.fuse(back_left_flange)
-    left_flange = tool_head_mount_machined.use_as_cutter_on(left_flange)
-
     cage_leader = sprite_mount_base_plate
     cage_leader = cage_leader.fuse(left_mount_plate)
     cage_leader = cage_leader.fuse(part_fan_back_mount_plate)
@@ -549,26 +548,13 @@ def create_extruder_cage_assembly(
 
     cage_leader = cage_leader.fuse(right_mount_plate_connector)
 
-    flange_part = flange_connector.fuse(left_flange).fuse(right_flange)
-
-    flange_top_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
-    flange_top_cutter = align(flange_top_cutter, sprite_extruder, Alignment.CENTER)
-    flange_top_cutter = align(
-        flange_top_cutter,
-        sprite_extruder,
-        Alignment.STACK_TOP,
-        stack_gap=tap_top_travel,
-    )
-
-    flange_part = flange_part.cut(flange_top_cutter)
-
-    # cage_leader = cage_leader.fuse(flange_part)
-
     cage_leader = sprite_extruder.use_as_cutter_on(cage_leader)
     for cutter in nitehawk_cutters.values():
         cage_leader = cage_leader.cut(cutter)
 
-    cage_leader = cage_leader.cut(flange_top_cutter)
+    cage_leader = cage_leader.fuse(fixed_mount_strips)
+    cage_leader = cage_leader.fuse(fixed_mount_strip_thread_inset_bosses)
+    cage_leader = cage_leader.cut(fixed_mount_strip_thread_inset_cutters)
     cage = LeaderFollowersCuttersPart(cage_leader)
 
     for side_name, screw in sprite_mount_screws:
@@ -583,8 +569,17 @@ def create_extruder_cage_assembly(
             f"nitehawk_mount_screw_{index}",
         )
 
+    for thread_inset in fixed_mount_strip_thread_insets:
+        for name, inset in thread_inset.get_named_non_production_part_items():
+            cage.add_named_non_production_part(inset, name)
+
     cage.add_named_cutter(mount_hole_cutter, "mount_hole_cutter")
     for name, cutter in nitehawk_cutters.items():
         cage.add_named_cutter(cutter, name)
+    for position_name, cutter in fixed_mount_strip_thread_inset_cutter_items:
+        cage.add_named_cutter(
+            cutter,
+            f"fixed_mount_strip_thread_inset_cutter_{position_name}",
+        )
 
     return cage

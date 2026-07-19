@@ -165,28 +165,24 @@ def test_tool_head_cable_attach_shield_yaml_and_graph_wiring():
         "tool_head_cable_attach_shield_assembly": (
             "tool_head_mount_machined_bottom_assembly",
             None,
-            "opb991t11z_sensor_left_assembly",
         ),
         "tool_head_cable_attach_shield_left_assembly": (
             "tool_head_mount_machined_bottom_assembly",
             "tool_head_cable_attach_shield_left",
-            "opb991t11z_sensor_left_assembly",
         ),
         "tool_head_cable_attach_shield_right_assembly": (
             "tool_head_mount_machined_top_assembly",
             "tool_head_cable_attach_shield_right",
-            "opb991t11z_sensor_right_assembly",
         ),
     }
-    for assembly_name, (mount_name, alias, sensor_name) in expected.items():
+    for assembly_name, (mount_name, alias) in expected.items():
         assembly = assemblies[assembly_name]
         assert (
             assembly["resource_file"] == "tool_head_cable_attach_shield_assembly.yaml"
         )
-        expected_dependencies = ["x_axis_rail_assembly", mount_name, sensor_name]
+        expected_dependencies = ["x_axis_rail_assembly", mount_name]
         expected_injected_parts = {
             "tool_head_mount_machined": mount_name,
-            "light_barrier_assembly": sensor_name,
         }
         assert assembly["depends_on"] == expected_dependencies
         assert assembly["inject_parts"] == expected_injected_parts
