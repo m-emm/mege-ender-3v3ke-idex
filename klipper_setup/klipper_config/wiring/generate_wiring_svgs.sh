@@ -128,6 +128,19 @@ print(str(data.get("basename", "pinout")))
 PY
 }
 
+pinout_has_discrete_view() {
+  local yaml_file="$1"
+  python3 - "${yaml_file}" <<'PY'
+from pathlib import Path
+import sys
+import yaml
+
+path = Path(sys.argv[1])
+data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+print("1" if data.get("component_placements") else "0")
+PY
+}
+
 require_nonempty() {
   local path="$1"
   if [[ ! -s "${path}" ]]; then
@@ -149,6 +162,11 @@ if [[ "${MODE}" == "check" ]]; then
     base_name="$(pinout_basename "${yaml_file}")"
     diff -u "${OUTPUT_DIR}/${base_name}_top.svg" "${TMP_DIR}/${base_name}_top.svg"
     diff -u "${OUTPUT_DIR}/${base_name}_bottom.svg" "${TMP_DIR}/${base_name}_bottom.svg"
+    if [[ "$(pinout_has_discrete_view "${yaml_file}")" == "1" ]]; then
+      diff -u \
+        "${OUTPUT_DIR}/${base_name}_top_discrete.svg" \
+        "${TMP_DIR}/${base_name}_top_discrete.svg"
+    fi
   done
   if [[ "${RUN_CUSTOM_GENERATORS}" == "1" ]]; then
     for stem in \

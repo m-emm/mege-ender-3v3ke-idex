@@ -54,9 +54,11 @@ color_map:
 # Coordinate system: origin at bottom-left; X increases right; Y increases up.
 pin_sets:
   # RP2040-Plus, using the Pico-compatible 40-pin header numbering.
-  - prefix: PICO_
+  - id: pico_left
+    prefix: PICO_
     origin: [0, 36]
     direction: down
+    discrete_pin_numbers: {start: 1, step: 1}
     pins:
       - GPIO_0
       - GPIO_1
@@ -78,9 +80,11 @@ pin_sets:
       - GND_18
       - GPIO_14
       - GPIO_15
-  - prefix: PICO_
+  - id: pico_right
+    prefix: PICO_
     origin: [8, 36]
     direction: down
+    discrete_pin_numbers: {start: 40, step: -1}
     pins:
       - VBUS_40
       - VSYS_39
@@ -104,9 +108,11 @@ pin_sets:
       - GPIO_16_21
 
   # U1 SN7407N: top view, notch at the top.
-  - prefix: U1_
+  - id: u1_left
+    prefix: U1_
     origin: [16, 36]
     direction: down
+    discrete_pin_numbers: {start: 1, step: 1}
     pins:
       - 01_1A_STEP
       - 02_1Y_STEP
@@ -115,9 +121,11 @@ pin_sets:
       - 05_3A_ENABLE
       - 06_3Y_ENABLE
       - 07_GND
-  - prefix: U1_
+  - id: u1_right
+    prefix: U1_
     origin: [19, 36]
     direction: down
+    discrete_pin_numbers: {start: 14, step: -1}
     pins:
       - 14_VCC
       - 13_6A_MOSI
@@ -128,9 +136,11 @@ pin_sets:
       - 08_4Y_CS
 
   # Ordinary StepStick-format adapter, matching the existing TMC1 layout pattern.
-  - prefix: TMC1_J1_
+  - id: tmc1_j1
+    prefix: TMC1_J1_
     origin: [36, 36]
     direction: down
+    discrete_pin_numbers: {start: 1, step: 1}
     pins:
       - EN_1
       - MOSI_CFG1_2
@@ -140,9 +150,11 @@ pin_sets:
       - CLK_NC_6
       - STEP_7
       - DIR_8
-  - prefix: TMC1_J2_
+  - id: tmc1_j2
+    prefix: TMC1_J2_
     origin: [40, 36]
     direction: down
+    discrete_pin_numbers: {start: 1, step: 1}
     pins:
       - VM_1
       - GND_MOTOR_2
@@ -152,13 +164,15 @@ pin_sets:
       - A2_NC_6
       - VIO_7
       - GND_LOGIC_8
-  - prefix: TMC1_TOP_
+  - id: tmc1_top
+    prefix: TMC1_TOP_
     origin: [37, 37]
     direction: right
     pins:
       - DIAG
 
-  - prefix: ENDSTOP_Y_
+  - id: endstop_y
+    prefix: ENDSTOP_Y_
     origin: [-3, 34]
     direction: down
     pins:
@@ -167,9 +181,11 @@ pin_sets:
       - VCC
 
   # AR20 socket A: VBUS switch/VIO regulator plus Q1 on one side.
-  - prefix: A
+  - id: socket_a_left
+    prefix: A
     origin: [12, 49]
     direction: down
+    discrete_pin_numbers: {start: 1, step: 1}
     pins:
       - 01_C1_VIO
       - 02_C2_VBUS
@@ -181,9 +197,11 @@ pin_sets:
       - 08_Q1_C
       - 09_Q1_B
       - 10_Q1_E
-  - prefix: A
+  - id: socket_a_right
+    prefix: A
     origin: [15, 49]
     direction: down
+    discrete_pin_numbers: {start: 20, step: -1}
     pins:
       - 20_C1_GND
       - 19_C2_GND
@@ -197,9 +215,11 @@ pin_sets:
       - 11_NC
 
   # AR20 socket B: power-good/input pulls, signal pulls, and capacitors.
-  - prefix: B
+  - id: socket_b_left
+    prefix: B
     origin: [3, 48]
     direction: down
+    discrete_pin_numbers: {start: 1, step: 1}
     pins:
       - 01_NC
       - 02_R6_3V3
@@ -211,9 +231,11 @@ pin_sets:
       - 08_R9_3V3
       - 09_NC
       - 10_NC
-  - prefix: B
+  - id: socket_b_right
+    prefix: B
     origin: [6, 48]
     direction: down
+    discrete_pin_numbers: {start: 20, step: -1}
     pins:
       - 20_NC
       - 19_R6_PWR_OK
@@ -227,9 +249,11 @@ pin_sets:
       - 11_NC
 
   # AR20 socket C: collector pull-ups and protected return paths.
-  - prefix: C
+  - id: socket_c_left
+    prefix: C
     origin: [25, 36]
     direction: down
+    discrete_pin_numbers: {start: 1, step: 1}
     pins:
       - 01_R15_VIO
       - 02_R18_VIO
@@ -241,9 +265,11 @@ pin_sets:
       - 08_R14_VIO
       - 09_R21_PICO_MISO
       - 10_R22_PICO_DIAG
-  - prefix: C
+  - id: socket_c_right
+    prefix: C
     origin: [28, 36]
     direction: down
+    discrete_pin_numbers: {start: 20, step: -1}
     pins:
       - 20_R15_ENABLE
       - 19_R18_MOSI
@@ -258,9 +284,11 @@ pin_sets:
 
   # Dedicated switched-24V detector carrier. U2 occupies the first four
   # contacts on each side. Three empty positions form a guard gap before R1/DZ1/D1.
-  - prefix: HV
+  - id: socket_hv_left
+    prefix: HV
     origin: [20, 49]
     direction: down
+    discrete_pin_numbers: {start: 1, step: 1}
     pins:
       - 01_U2P1_LEDA_A
       - 02_U2P2_LEDA_K
@@ -272,9 +300,11 @@ pin_sets:
       - 08_R1_24V
       - 09_DZ1_K
       - 10_D1_K
-  - prefix: HV
+  - id: socket_hv_right
+    prefix: HV
     origin: [23, 49]
     direction: down
+    discrete_pin_numbers: {start: 20, step: -1}
     pins:
       - 20_U2P8_E_A
       - 19_U2P7_C_A
@@ -288,7 +318,8 @@ pin_sets:
       - 11_D1_A
 
   # Actual driver screw terminals; motor conductors land directly on pins 1-4.
-  - prefix: TMC5160_HV_
+  - id: tmc5160_hv
+    prefix: TMC5160_HV_
     origin: [32, 44]
     direction: right
     pins:
@@ -298,18 +329,221 @@ pin_sets:
       - 2A
       - GND
       - HVIN_8_60V
-  - prefix: F1_5A_
+  - id: f1
+    prefix: F1_5A_
     origin: [40, 44]
     direction: right
     pins:
       - OUT
       - IN
-  - prefix: PWR_
+  - id: power_input
+    prefix: PWR_
     origin: [44, 44]
     direction: down
     pins:
       - V24_SW
       - GND
+
+component_placements:
+  - ref: U1
+    kind: dip
+    value: SN7407N
+    terminals:
+      1: U1_01_1A_STEP
+      2: U1_02_1Y_STEP
+      3: U1_03_2A_DIR
+      4: U1_04_2Y_DIR
+      5: U1_05_3A_ENABLE
+      6: U1_06_3Y_ENABLE
+      7: U1_07_GND
+      8: U1_08_4Y_CS
+      9: U1_09_4A_CS
+      10: U1_10_5Y_SCLK
+      11: U1_11_5A_SCLK
+      12: U1_12_6Y_MOSI
+      13: U1_13_6A_MOSI
+      14: U1_14_VCC
+  - ref: U2
+    kind: dip
+    value: ILD74
+    terminals:
+      1: HV01_U2P1_LEDA_A
+      2: HV02_U2P2_LEDA_K
+      3: HV03_U2P3_LEDB_K
+      4: HV04_U2P4_LEDB_A
+      5: HV17_U2P5_E_B
+      6: HV18_U2P6_C_B
+      7: HV19_U2P7_C_A
+      8: HV20_U2P8_E_A
+  - ref: C1
+    kind: capacitor
+    value: 100nF ceramic
+    terminals: {start: A01_C1_VIO, end: A20_C1_GND}
+  - ref: C2
+    kind: capacitor
+    value: 100nF ceramic
+    terminals: {start: A02_C2_VBUS, end: A19_C2_GND}
+  - ref: R2
+    kind: resistor
+    value: 47k
+    terminals: {start: A03_R2_VBUS, end: A18_R2_BASE}
+  - ref: R3
+    kind: resistor
+    value: 2.7k
+    terminals: {start: A04_R3_BASE, end: A17_R3_U2A}
+  - ref: R4
+    kind: resistor
+    value: 39R / 0.5W
+    terminals: {start: A05_R4_Q1C, end: A16_R4_VIO}
+  - ref: R5
+    kind: resistor
+    value: 2.2k
+    terminals: {start: A06_R5_VIO, end: A15_R5_GND}
+  - ref: DZ2
+    kind: zener
+    value: 3.3V / 0.5W
+    terminals: {anode: A14_DZ2_A, cathode: A07_DZ2_K}
+  - ref: Q1
+    kind: bjt_pnp
+    value: BC327 PNP
+    terminals: {collector: A08_Q1_C, base: A09_Q1_B, emitter: A10_Q1_E}
+  - ref: R6
+    kind: resistor
+    value: 4.7k
+    terminals: {start: B02_R6_3V3, end: B19_R6_PWR_OK}
+  - ref: R12
+    kind: resistor
+    value: 10k
+    terminals: {start: B03_R12_3V3, end: B18_R12_MOSI}
+  - ref: R7
+    kind: resistor
+    value: 10k
+    terminals: {start: B04_R7_3V3, end: B17_R7_STEP}
+  - ref: R11
+    kind: resistor
+    value: 10k
+    terminals: {start: B05_R11_3V3, end: B16_R11_SCLK}
+  - ref: R8
+    kind: resistor
+    value: 10k
+    terminals: {start: B06_R8_3V3, end: B15_R8_DIR}
+  - ref: R10
+    kind: resistor
+    value: 10k
+    terminals: {start: B07_R10_3V3, end: B14_R10_CS}
+  - ref: R9
+    kind: resistor
+    value: 10k
+    terminals: {start: B08_R9_3V3, end: B13_R9_ENABLE}
+  - ref: R15
+    kind: resistor
+    value: 4.7k
+    terminals: {start: C01_R15_VIO, end: C20_R15_ENABLE}
+  - ref: R18
+    kind: resistor
+    value: 2.2k
+    terminals: {start: C02_R18_VIO, end: C19_R18_MOSI}
+  - ref: R17
+    kind: resistor
+    value: 2.2k
+    terminals: {start: C03_R17_VIO, end: C18_R17_SCLK}
+  - ref: R16
+    kind: resistor
+    value: 2.2k
+    terminals: {start: C04_R16_VIO, end: C17_R16_CS}
+  - ref: R19
+    kind: resistor
+    value: 1k
+    terminals: {start: C05_R19_PICO_MISO, end: C16_R19_TMC_MISO}
+  - ref: R20
+    kind: resistor
+    value: 1k
+    terminals: {start: C06_R20_PICO_DIAG, end: C15_R20_TMC_DIAG}
+  - ref: R13
+    kind: resistor
+    value: 4.7k
+    terminals: {start: C07_R13_VIO, end: C14_R13_STEP}
+  - ref: R14
+    kind: resistor
+    value: 4.7k
+    terminals: {start: C08_R14_VIO, end: C13_R14_DIR}
+  - ref: R21
+    kind: resistor
+    value: 47k
+    terminals: {start: C09_R21_PICO_MISO, end: C12_R21_GND}
+  - ref: R22
+    kind: resistor
+    value: 47k
+    terminals: {start: C10_R22_PICO_DIAG, end: C11_R22_GND}
+  - ref: R1
+    kind: resistor
+    value: 620R / 0.5W
+    terminals: {start: HV08_R1_24V, end: HV13_R1_DZ1}
+  - ref: DZ1
+    kind: zener
+    value: 12V / 0.5W
+    terminals: {anode: HV12_DZ1_A, cathode: HV09_DZ1_K}
+  - ref: D1
+    kind: diode
+    value: 1N4148
+    terminals: {anode: HV11_D1_A, cathode: HV10_D1_K}
+
+discrete_view:
+  title: RP2040-Plus / TMC5160T Plus component placement — top side
+  notes: |
+    TOP / COMPONENT SIDE: insert the shown parts here; wire-wrap conductors are omitted.
+    Then flip the board and use rp2040plus_btt_tmc5160t_plus_y_bottom.svg for wrapping.
+    Diodes: K is the cathode/band. U1/U2: align the notch and pin-1 marker.
+    Q1: C/B/E are shown; verify the actual BC327 flat-side lead order before insertion.
+    HV socket: leave positions 5-7 and 14-16 empty as the detector guard gap.
+  groups:
+    - id: pico
+      label: RP2040-Plus
+      pin_sets: [pico_left, pico_right]
+    - id: u1
+      label: U1 socket — SN7407N DIP-14
+      pin_sets: [u1_left, u1_right]
+    - id: tmc_adapter
+      label: TMC5160T Plus StepStick adapter
+      pin_sets: [tmc1_j1, tmc1_j2, tmc1_top]
+    - id: endstop
+      label: Y endstop
+      pin_sets: [endstop_y]
+    - id: socket_a
+      label: Socket A — AR20
+      pin_sets: [socket_a_left, socket_a_right]
+    - id: socket_b
+      label: Socket B — AR20
+      pin_sets: [socket_b_left, socket_b_right]
+    - id: socket_c
+      label: Socket C — AR20
+      pin_sets: [socket_c_left, socket_c_right]
+    - id: socket_hv
+      label: HV detector socket — AR20
+      pin_sets: [socket_hv_left, socket_hv_right]
+    - id: high_current
+      label: TMC5160T Plus screw terminals
+      pin_sets: [tmc5160_hv]
+    - id: fused_input
+      label: Fused switched-24V input
+      pin_sets: [f1, power_input]
+  anchor_labels:
+    PICO_GPIO_0: "1"
+    PICO_VBUS_40: "40"
+    TMC1_J1_EN_1: J1-1
+    TMC1_J2_VM_1: J2-1
+    TMC1_TOP_DIAG: DIAG
+    ENDSTOP_Y_NO: "NO"
+    ENDSTOP_Y_GND: GND
+    ENDSTOP_Y_VCC: VCC
+    B01_NC: "1"
+    B20_NC: "20"
+    TMC5160_HV_1B: 1B
+    TMC5160_HV_HVIN_8_60V: HVIN
+    F1_5A_OUT: OUT
+    F1_5A_IN: IN
+    PWR_V24_SW: 24V
+    PWR_GND: GND
 wires:
   # High-current wiring: these conductors do not use the wire-wrap carrier.
   - from: PWR_V24_SW

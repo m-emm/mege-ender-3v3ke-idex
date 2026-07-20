@@ -1,8 +1,10 @@
 import importlib.util
+import math
 import os
 import subprocess
 import sys
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import yaml
 
@@ -110,10 +112,61 @@ def test_tmc5160_review_wiring_loads_and_renders_with_mege_circuits(tmp_path):
         check=True,
     )
 
-    for view in ("top", "bottom"):
+    for view in ("top", "top_discrete", "bottom"):
         svg = tmp_path / f"rp2040plus_btt_tmc5160t_plus_y_{view}.svg"
         assert svg.is_file()
         assert svg.stat().st_size > 0
+
+
+def test_tmc5160_review_wiring_declares_discrete_component_placements():
+    wiring = _load_tmc5160_review_wiring()
+    placements = {
+        placement["ref"]: placement for placement in wiring["component_placements"]
+    }
+
+    assert set(placements) == {
+        "U1",
+        "U2",
+        "Q1",
+        "C1",
+        "C2",
+        "D1",
+        "DZ1",
+        "DZ2",
+        *(f"R{number}" for number in range(1, 23)),
+    }
+    assert placements["U1"]["terminals"][1] == "U1_01_1A_STEP"
+    assert placements["U1"]["terminals"][14] == "U1_14_VCC"
+    assert placements["U2"]["terminals"] == {
+        1: "HV01_U2P1_LEDA_A",
+        2: "HV02_U2P2_LEDA_K",
+        3: "HV03_U2P3_LEDB_K",
+        4: "HV04_U2P4_LEDB_A",
+        5: "HV17_U2P5_E_B",
+        6: "HV18_U2P6_C_B",
+        7: "HV19_U2P7_C_A",
+        8: "HV20_U2P8_E_A",
+    }
+    assert placements["Q1"]["terminals"] == {
+        "collector": "A08_Q1_C",
+        "base": "A09_Q1_B",
+        "emitter": "A10_Q1_E",
+    }
+    assert placements["DZ1"]["terminals"] == {
+        "anode": "HV12_DZ1_A",
+        "cathode": "HV09_DZ1_K",
+    }
+    assert placements["D1"]["terminals"] == {
+        "anode": "HV11_D1_A",
+        "cathode": "HV10_D1_K",
+    }
+    assert len(
+        {
+            pin_name
+            for placement in placements.values()
+            for pin_name in placement["terminals"].values()
+        }
+    ) == sum(len(placement["terminals"]) for placement in placements.values())
 
 
 def test_tmc5160_review_wiring_uses_stepstick_spi_adapter_pattern():
@@ -223,8 +276,7 @@ def test_tmc5160_review_wiring_has_four_true_2x10_component_carriers():
         "HV16_NC",
     }
     assert all(
-        not hv_guard_contacts & {wire["from"], wire["to"]}
-        for wire in wiring["wires"]
+        not hv_guard_contacts & {wire["from"], wire["to"]} for wire in wiring["wires"]
     )
 
 
@@ -355,13 +407,100 @@ def test_generated_tmc5160_review_svgs_include_physical_boundaries():
 
     for view in ("top", "bottom"):
         svg_text = (
-            WIRING_DIR
-            / "diagrams"
-            / f"rp2040plus_btt_tmc5160t_plus_y_{view}.svg"
+            WIRING_DIR / "diagrams" / f"rp2040plus_btt_tmc5160t_plus_y_{view}.svg"
         ).read_text(encoding="utf-8")
         for label in expected_labels:
             assert label in svg_text
         assert "NC_Q1" not in svg_text
+
+
+def test_generated_tmc5160_discrete_top_is_an_assembly_view_without_wires():
+    wiring = _load_tmc5160_review_wiring()
+    svg_path = (
+        WIRING_DIR / "diagrams" / "rp2040plus_btt_tmc5160t_plus_y_top_discrete.svg"
+    )
+    root = ET.fromstring(svg_path.read_text(encoding="utf-8"))
+    namespace = "{http://www.w3.org/2000/svg}"
+
+    component_refs = {
+        node.attrib["data-component"]
+        for node in root.iter()
+        if node.attrib.get("class") == "discrete-component"
+    }
+    assert component_refs == {
+        placement["ref"] for placement in wiring["component_placements"]
+    }
+    assert len(
+        [
+            node
+            for node in root.iter(f"{namespace}circle")
+            if node.attrib.get("class") == "discrete-pin"
+        ]
+    ) == sum(len(pin_set["pins"]) for pin_set in wiring["pin_sets"])
+
+    text_values = {
+        node.text for node in root.iter(f"{namespace}text") if node.text is not None
+    }
+    assert "RP2040-Plus" in text_values
+    assert "Socket A — AR20" in text_values
+    assert "HV detector socket — AR20" in text_values
+    assert "SN7407N" in text_values
+    assert "ILD74" in text_values
+    assert "PICO_THREEV3_EN_37" not in text_values
+    assert any(node.attrib.get("class") == "cathode-band" for node in root.iter())
+    assert any(node.attrib.get("class") == "dip-pin-one-marker" for node in root.iter())
+    assert any(
+        node.attrib.get("class") == "transistor-terminal-label" for node in root.iter()
+    )
+    assert all(
+        "stroke" not in node.attrib or node.attrib.get("class")
+        for node in root.iter(f"{namespace}line")
+    )
+
+    pin_positions = {
+        node.attrib["data-pin"]: (
+            float(node.attrib["cx"]),
+            float(node.attrib["cy"]),
+        )
+        for node in root.iter(f"{namespace}circle")
+        if node.attrib.get("class") == "discrete-pin"
+    }
+    placements = {
+        placement["ref"]: placement for placement in wiring["component_placements"]
+    }
+    for ref in ("D1", "DZ1", "DZ2"):
+        terminals = placements[ref]["terminals"]
+        anode_position = pin_positions[terminals["anode"]]
+        cathode_position = pin_positions[terminals["cathode"]]
+        band = next(
+            node
+            for node in root.iter(f"{namespace}line")
+            if node.attrib.get("class") == "cathode-band"
+            and node.attrib.get("data-component") == ref
+        )
+        band_center = (
+            (float(band.attrib["x1"]) + float(band.attrib["x2"])) / 2.0,
+            (float(band.attrib["y1"]) + float(band.attrib["y2"])) / 2.0,
+        )
+        assert math.dist(band_center, cathode_position) < math.dist(
+            band_center, anode_position
+        )
+
+        polarity_labels = {
+            node.attrib["data-terminal"]: (
+                float(node.attrib["x"]),
+                float(node.attrib["y"]),
+            )
+            for node in root.iter(f"{namespace}text")
+            if node.attrib.get("class") == "polarity-label"
+            and node.attrib.get("data-component") == ref
+        }
+        assert math.dist(polarity_labels["anode"], anode_position) < math.dist(
+            polarity_labels["anode"], cathode_position
+        )
+        assert math.dist(polarity_labels["cathode"], cathode_position) < math.dist(
+            polarity_labels["cathode"], anode_position
+        )
 
 
 def test_generated_yz_wiring_svg_includes_bed_thermistor_damping_capacitor():

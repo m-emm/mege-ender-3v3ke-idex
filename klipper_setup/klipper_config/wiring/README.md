@@ -8,11 +8,11 @@ Klipper config.
 - `pico_w_btt_tmc2226_y_z.yaml` is the Y/Z/heatbed Pico wiring source.
 - `rp2040plus_btt_tmc5160t_plus_y.yaml` is the review-only physical wiring
   source for the proposed RP2040-Plus/TMC5160T Plus Y controller. Its generated
-  top and underside SVGs model the adapter boundary, four AR20 wire-wrap
-  carriers, and the isolated high-current terminal zone. One AR20 is dedicated
-  to the ILD74 and switched-24V detector, with an unused three-position guard
-  gap before its detector passives. The artifact is not registered as active
-  Klipper wiring.
+  top, discrete-component top, and underside SVGs model the adapter boundary,
+  four AR20 wire-wrap carriers, and the isolated high-current terminal zone.
+  One AR20 is dedicated to the ILD74 and switched-24V detector, with an unused
+  three-position guard gap before its detector passives. The artifact is not
+  registered as active Klipper wiring.
 - `pico_tb6600_stripboard_interface.py` and
   `pico_tb6600_stripboard_layout.py` generate the live external Y
   TB6600 interface schematic and verified stripboard assembly.
@@ -44,6 +44,13 @@ cd /Users/mege/git/mege-ender-3v3ke-idex
 
 `--check` regenerates into a temporary directory and diffs the result against
 the committed SVGs.
+
+For the TMC5160T Plus review board, use
+`rp2040plus_btt_tmc5160t_plus_y_top_discrete.svg` from the component side to
+select and insert U1/U2, Q1, resistors, capacitors, diodes, and zener diodes.
+It intentionally shows all contact dots but only compact group and orientation
+labels; wire-wrap conductors are omitted. After insertion, turn the board over
+and use `rp2040plus_btt_tmc5160t_plus_y_bottom.svg` for wire wrapping.
 
 ## Check Klipper Consistency
 
