@@ -13,8 +13,8 @@ metadata:
     TMC1 J2: auxiliary 24V, two grounds, B2/B1/A1/A2 N/C, sequenced VIO.
     U1 is SN7407N DIP-14. U2 is ILD74 DIP-8. Both use the shown top-view pin numbering.
     A/B/C/HV are AR20-HZW/TN 20-pin, 0.3-inch DIL wire-wrap sockets with spring contacts.
-    Physical layout: Pico at the left; Socket B above U1; Socket A above Socket C;
-    then the HV socket, TMC adapter, endstop/fused input, and the full driver footprint.
+    Physical layout: Pico at the left; Socket A above U1; the HV socket above Socket C;
+    the endstop/fused input below the TMC adapter; then the full driver footprint.
     Top-row parts align with the Pico USB edge. Keep the area above that edge clear.
     Insert each passive across its labeled opposite contact pair; the passive itself joins the pair.
     Socket HV contacts 1-4 and 20-17 hold U2 pins 1-4 and 8-5; positions 8-10 hold R1, DZ1, D1.
@@ -61,7 +61,7 @@ boxes:
       64 x 57 mm
       25.197 x 22.441 raster units
       Screw-terminal spacing illustrative
-    top_left: [49, 36.45]
+    top_left: [42, 36.45]
     size_pitches: [25.1968503937, 22.4409448819]
 
 # Coordinate system: origin at bottom-left; X increases right; Y increases up.
@@ -123,7 +123,7 @@ pin_sets:
   # U1 SN7407N: top view, notch at the top.
   - id: u1_left
     prefix: U1_
-    origin: [12, 23]
+    origin: [19, 23]
     direction: down
     discrete_pin_numbers: {start: 1, step: 1}
     pins:
@@ -136,7 +136,7 @@ pin_sets:
       - 07_GND
   - id: u1_right
     prefix: U1_
-    origin: [15, 23]
+    origin: [22, 23]
     direction: down
     discrete_pin_numbers: {start: 14, step: -1}
     pins:
@@ -186,7 +186,7 @@ pin_sets:
 
   - id: endstop_y
     prefix: ENDSTOP_Y_
-    origin: [41, 36]
+    origin: [33, 23]
     direction: down
     pins:
       - "NO"
@@ -264,7 +264,7 @@ pin_sets:
   # AR20 socket C: collector pull-ups and protected return paths.
   - id: socket_c_left
     prefix: C
-    origin: [19, 23]
+    origin: [26, 23]
     direction: down
     discrete_pin_numbers: {start: 1, step: 1}
     pins:
@@ -280,7 +280,7 @@ pin_sets:
       - 10_R22_PICO_DIAG
   - id: socket_c_right
     prefix: C
-    origin: [22, 23]
+    origin: [29, 23]
     direction: down
     discrete_pin_numbers: {start: 20, step: -1}
     pins:
@@ -333,7 +333,7 @@ pin_sets:
   # Actual driver screw terminals; motor conductors land directly on pins 1-4.
   - id: tmc5160_hv
     prefix: TMC5160_HV_
-    origin: [59.0984251969, 36]
+    origin: [52.0984251969, 36]
     direction: right
     pins:
       - 1B
@@ -344,14 +344,14 @@ pin_sets:
       - HVIN_8_60V
   - id: f1
     prefix: F1_5A_
-    origin: [41, 30]
+    origin: [33, 17]
     direction: right
     pins:
       - OUT
       - IN
   - id: power_input
     prefix: PWR_
-    origin: [45, 30]
+    origin: [38, 17]
     direction: down
     pins:
       - V24_SW
