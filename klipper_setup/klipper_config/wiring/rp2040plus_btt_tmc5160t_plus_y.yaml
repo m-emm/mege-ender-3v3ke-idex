@@ -1,0 +1,575 @@
+basename: rp2040plus_btt_tmc5160t_plus_y
+
+metadata:
+  version_label: "RP2040-Plus + BTT TMC5160T Plus Y concept review"
+  klipper_mcu: y_pico
+  notes: |
+    REVIEW ONLY: not active printer wiring. Bench-validate before construction.
+    Pico: STEP=GPIO0, DIR=GPIO1, ENABLE=GPIO2, DIAG1=GPIO3, endstop=GPIO4,
+    PWR_OK_N=GPIO5, MISO=GPIO8, CS=GPIO9, SCLK=GPIO10, MOSI=GPIO11.
+    TMC1_J1/J2/TOP model the ordinary StepStick-format adapter and supplied ribbon as one boundary.
+    Continuity-check the received adapter/ribbon and mark pin 1 before applying power.
+    TMC1 J1: EN, MOSI/CFG1, SCK/CFG2, CS/CFG3, MISO/CFG0, CLK N/C, STEP, DIR.
+    TMC1 J2: auxiliary 24V, two grounds, B2/B1/A1/A2 N/C, sequenced VIO.
+    U1 is SN7407N DIP-14. U2 is ILD74 DIP-8. Both use the shown top-view pin numbering.
+    A/B/C are AR20-HZW/TN 20-pin, 0.3-inch DIL wire-wrap sockets with spring contacts.
+    Socket B is rotated 90 degrees clockwise, with its notch toward the TMC side.
+    Insert each passive across its labeled opposite contact pair; the passive itself joins the pair.
+    Socket A positions 1-7: R1-R5, DZ1, DZ2. A08/A09/A10: Q1 C/B/E on one side.
+    A13/A12/A11 remain empty. Verify the actual BC327 lead order before inserting Q1.
+    Socket B positions 1-10: D1, R6-R12, C1, C2.
+    Socket C positions 1-10: R15, R18, R17, R16, R19, R20, R13, R14, R21, R22.
+    DZ1/DZ2 contacts marked K/A are cathode/anode. D1 K goes to U2 pin 1; D1 A to U2 pin 3.
+    R1=620R/0.5W; R2=47k; R3=2.7k; R4=39R/0.5W; R5=2.2k; R6=4.7k.
+    R7-R12=10k; R13-R15=4.7k; R16-R18=2.2k; R19-R20=1k; R21-R22=47k.
+    DZ1=12V/0.5W; DZ2=3.3V/0.5W; D1=1N4148; C1=C2=100nF ceramic.
+    PWR_OK_N is active-low: LOW means switched 24V is valid; it is a reporting input only.
+    Wire colors: red=positive power; black=ground; blue=STEP/SCLK; yellow=all other signals;
+    grey on the drawing=physical white wire for Pico 3.3V and sequenced VIO.
+    U1 collectors are pulled up only from sequenced TMC_VIO. Initial SPI speed is 500kHz.
+    Logic, detector, and VIO conductors are low-current wire-wrap class only.
+    High-current 24V bypasses all Pico, DIL-socket, and wire-wrap conductors.
+    Land the four Y-motor conductors directly on the driver's 1B/2B/1A/2A screw terminals.
+    F1 is a dedicated serviceable 5A branch fuse. Size all high-current wiring above the fuse rating.
+    TMC_FAN is the on-driver 24V fan-header boundary; its connection is internal to the driver.
+
+color_map:
+  power: "#ff0000"
+  hazard_power: "#ff0000"
+  lv_power: "#9ca3af"
+  ground: "#000000"
+  clock: "#0057d8"
+  data: "#d9a900"
+  control: "#d9a900"
+  return: "#d9a900"
+  power_good: "#d9a900"
+  default: "#d9a900"
+
+# Coordinate system: origin at bottom-left; X increases right; Y increases up.
+pin_sets:
+  # RP2040-Plus, using the Pico-compatible 40-pin header numbering.
+  - prefix: PICO_
+    origin: [0, 36]
+    direction: down
+    pins:
+      - GPIO_0
+      - GPIO_1
+      - GND_03
+      - GPIO_2
+      - GPIO_3
+      - GPIO_4
+      - GPIO_5
+      - GND_08
+      - GPIO_6
+      - GPIO_7
+      - GPIO_8
+      - GPIO_9
+      - GND_13
+      - GPIO_10
+      - GPIO_11
+      - GPIO_12
+      - GPIO_13
+      - GND_18
+      - GPIO_14
+      - GPIO_15
+  - prefix: PICO_
+    origin: [8, 36]
+    direction: down
+    pins:
+      - VBUS_40
+      - VSYS_39
+      - GND_38
+      - THREEV3_EN_37
+      - THREEV3_OUT_36
+      - ADC_VREF_35
+      - GPIO_28_ADC2_34
+      - AGND_33
+      - GPIO_27_ADC1_32
+      - GPIO_26_ADC0_31
+      - RUN_30
+      - GPIO_22_29
+      - GND_28
+      - GPIO_21_27
+      - GPIO_20_26
+      - GPIO_19_25
+      - GPIO_18_24
+      - GND_23
+      - GPIO_17_22
+      - GPIO_16_21
+
+  # U1 SN7407N: top view, notch at the top.
+  - prefix: U1_
+    origin: [16, 36]
+    direction: down
+    pins:
+      - 01_1A_STEP
+      - 02_1Y_STEP
+      - 03_2A_DIR
+      - 04_2Y_DIR
+      - 05_3A_ENABLE
+      - 06_3Y_ENABLE
+      - 07_GND
+  - prefix: U1_
+    origin: [19, 36]
+    direction: down
+    pins:
+      - 14_VCC
+      - 13_6A_MOSI
+      - 12_6Y_MOSI
+      - 11_5A_SCLK
+      - 10_5Y_SCLK
+      - 09_4A_CS
+      - 08_4Y_CS
+
+  # Ordinary StepStick-format adapter, matching the existing TMC1 layout pattern.
+  - prefix: TMC1_J1_
+    origin: [36, 36]
+    direction: down
+    pins:
+      - EN_1
+      - MOSI_CFG1_2
+      - SCK_CFG2_3
+      - CS_CFG3_4
+      - MISO_CFG0_5
+      - CLK_NC_6
+      - STEP_7
+      - DIR_8
+  - prefix: TMC1_J2_
+    origin: [40, 36]
+    direction: down
+    pins:
+      - VM_1
+      - GND_MOTOR_2
+      - B2_NC_3
+      - B1_NC_4
+      - A1_NC_5
+      - A2_NC_6
+      - VIO_7
+      - GND_LOGIC_8
+  - prefix: TMC1_TOP_
+    origin: [37, 37]
+    direction: right
+    pins:
+      - DIAG
+
+  - prefix: ENDSTOP_Y_
+    origin: [-3, 34]
+    direction: down
+    pins:
+      - "NO"
+      - GND
+      - VCC
+
+  # U2 ILD74: top view, notch at the top.
+  - prefix: U2_
+    origin: [20, 47]
+    direction: down
+    pins:
+      - 01_LED_A_ANODE
+      - 02_LED_A_CATHODE
+      - 03_LED_B_CATHODE
+      - 04_LED_B_ANODE
+  - prefix: U2_
+    origin: [23, 47]
+    direction: down
+    pins:
+      - 08_EMITTER_A
+      - 07_COLLECTOR_A
+      - 06_COLLECTOR_B
+      - 05_EMITTER_B
+
+  # AR20 socket A: power detector/regulator plus Q1 on one side.
+  - prefix: A_
+    origin: [12, 47]
+    direction: down
+    pins:
+      - 01_R1_24V
+      - 02_DZ1_K
+      - 03_R2_VBUS
+      - 04_R3_BASE
+      - 05_R4_Q1C
+      - 06_R5_VIO
+      - 07_DZ2_K
+      - 08_Q1_C
+      - 09_Q1_B
+      - 10_Q1_E
+  - prefix: A_
+    origin: [15, 47]
+    direction: down
+    pins:
+      - 20_R1_DZ1
+      - 19_DZ1_A
+      - 18_R2_BASE
+      - 17_R3_U2A
+      - 16_R4_VIO
+      - 15_R5_GND
+      - 14_DZ2_A
+      - 13_NC
+      - 12_NC
+      - 11_NC
+
+  # AR20 socket B: reverse protection, power-good/input pulls, and capacitors.
+  - prefix: B_
+    origin: [9, 47]
+    direction: left
+    pins:
+      - 01_D1_K
+      - 02_R6_3V3
+      - 03_R7_3V3
+      - 04_R8_3V3
+      - 05_R9_3V3
+      - 06_R10_3V3
+      - 07_R11_3V3
+      - 08_R12_3V3
+      - 09_C1_VIO
+      - 10_C2_VBUS
+  - prefix: B_
+    origin: [9, 44]
+    direction: left
+    pins:
+      - 20_D1_A
+      - 19_R6_PWR_OK
+      - 18_R7_STEP
+      - 17_R8_DIR
+      - 16_R9_ENABLE
+      - 15_R10_CS
+      - 14_R11_SCLK
+      - 13_R12_MOSI
+      - 12_C1_GND
+      - 11_C2_GND
+
+  # AR20 socket C: collector pull-ups and protected return paths.
+  - prefix: C_
+    origin: [25, 36]
+    direction: down
+    pins:
+      - 01_R15_VIO
+      - 02_R18_VIO
+      - 03_R17_VIO
+      - 04_R16_VIO
+      - 05_R19_PICO_MISO
+      - 06_R20_PICO_DIAG
+      - 07_R13_VIO
+      - 08_R14_VIO
+      - 09_R21_PICO_MISO
+      - 10_R22_PICO_DIAG
+  - prefix: C_
+    origin: [28, 36]
+    direction: down
+    pins:
+      - 20_R15_ENABLE
+      - 19_R18_MOSI
+      - 18_R17_SCLK
+      - 17_R16_CS
+      - 16_R19_TMC_MISO
+      - 15_R20_TMC_DIAG
+      - 14_R13_STEP
+      - 13_R14_DIR
+      - 12_R21_GND
+      - 11_R22_GND
+
+  # Actual driver screw terminals; motor conductors land directly on pins 1-4.
+  - prefix: TMC5160_HV_
+    origin: [32, 44]
+    direction: right
+    pins:
+      - 1B
+      - 2B
+      - 1A
+      - 2A
+      - GND
+      - HVIN_8_60V
+  - prefix: F1_5A_
+    origin: [40, 44]
+    direction: right
+    pins:
+      - OUT
+      - IN
+  - prefix: PWR_
+    origin: [44, 44]
+    direction: down
+    pins:
+      - V24_SW
+      - GND
+  - prefix: TMC_FAN_
+    origin: [56, 44]
+    direction: down
+    pins:
+      - 24V
+      - GND
+
+wires:
+  # High-current wiring: these conductors do not use the wire-wrap carrier.
+  - from: PWR_V24_SW
+    to: F1_5A_IN
+    type: hazard_power
+  - from: F1_5A_OUT
+    to: TMC5160_HV_HVIN_8_60V
+    type: hazard_power
+  - from: PWR_GND
+    to: TMC5160_HV_GND
+    type: ground
+
+  # Fused switched 24V also supplies the low-current detector and adapter auxiliary input.
+  - from: F1_5A_OUT
+    to: A_01_R1_24V
+    type: hazard_power
+  - from: F1_5A_OUT
+    to: TMC1_J2_VM_1
+    type: hazard_power
+
+  # Common ground. The lower chain keeps motor current out of logic wiring; the
+  # upper analog contacts form a short left-to-right bus fed once from U1 ground.
+  - from: PWR_GND
+    to: TMC1_J2_GND_MOTOR_2
+    type: ground
+  - from: TMC1_J2_GND_MOTOR_2
+    to: TMC1_J2_GND_LOGIC_8
+    type: ground
+  - from: TMC1_J2_GND_LOGIC_8
+    to: C_11_R22_GND
+    type: ground
+  - from: C_11_R22_GND
+    to: C_12_R21_GND
+    type: ground
+  - from: C_12_R21_GND
+    to: U1_07_GND
+    type: ground
+  - from: U1_07_GND
+    to: PICO_GND_28
+    type: ground
+  - from: U1_07_GND
+    to: A_14_DZ2_A
+    type: ground
+  - from: B_11_C2_GND
+    to: B_12_C1_GND
+    type: ground
+  - from: B_12_C1_GND
+    to: B_20_D1_A
+    type: ground
+  - from: B_20_D1_A
+    to: A_15_R5_GND
+    type: ground
+  - from: A_15_R5_GND
+    to: A_14_DZ2_A
+    type: ground
+  - from: A_14_DZ2_A
+    to: U2_03_LED_B_CATHODE
+    type: ground
+  - from: U2_03_LED_B_CATHODE
+    to: U2_05_EMITTER_B
+    type: ground
+  - from: U2_05_EMITTER_B
+    to: U2_08_EMITTER_A
+    type: ground
+  - from: PICO_GND_03
+    to: ENDSTOP_Y_GND
+    type: ground
+
+  # Pico USB VBUS powers U1 and the switched VIO regulator input.
+  - from: PICO_VBUS_40
+    to: U1_14_VCC
+    type: power
+  - from: U1_14_VCC
+    to: A_10_Q1_E
+    type: power
+  - from: A_10_Q1_E
+    to: A_03_R2_VBUS
+    type: power
+  - from: A_03_R2_VBUS
+    to: B_10_C2_VBUS
+    type: power
+
+  # Pico 3.3V safe-state and power-good pull-ups.
+  - from: PICO_THREEV3_OUT_36
+    to: B_02_R6_3V3
+    type: lv_power
+  - from: B_02_R6_3V3
+    to: B_03_R7_3V3
+    type: lv_power
+  - from: B_03_R7_3V3
+    to: B_04_R8_3V3
+    type: lv_power
+  - from: B_04_R8_3V3
+    to: B_05_R9_3V3
+    type: lv_power
+  - from: B_05_R9_3V3
+    to: B_06_R10_3V3
+    type: lv_power
+  - from: B_06_R10_3V3
+    to: B_07_R11_3V3
+    type: lv_power
+  - from: B_07_R11_3V3
+    to: B_08_R12_3V3
+    type: lv_power
+  - from: PICO_THREEV3_OUT_36
+    to: ENDSTOP_Y_VCC
+    type: lv_power
+
+  # Switched-24V threshold detector: R1, DZ1, two ILD74 LEDs in series, and D1.
+  - from: A_20_R1_DZ1
+    to: A_02_DZ1_K
+    type: hazard_power
+  - from: A_19_DZ1_A
+    to: U2_01_LED_A_ANODE
+    type: hazard_power
+  - from: U2_02_LED_A_CATHODE
+    to: U2_04_LED_B_ANODE
+    type: hazard_power
+  - from: B_01_D1_K
+    to: U2_01_LED_A_ANODE
+    type: hazard_power
+  # U2A drives the BC327 VBUS high-side switch.
+  - from: A_18_R2_BASE
+    to: A_04_R3_BASE
+    type: control
+  - from: A_04_R3_BASE
+    to: A_09_Q1_B
+    type: control
+  - from: A_17_R3_U2A
+    to: U2_07_COLLECTOR_A
+    type: control
+  - from: A_08_Q1_C
+    to: A_05_R4_Q1C
+    type: power
+
+  # Sequenced VIO shunt regulator and all collector pull-up supply contacts.
+  - from: A_16_R4_VIO
+    to: A_06_R5_VIO
+    type: lv_power
+  - from: A_06_R5_VIO
+    to: A_07_DZ2_K
+    type: lv_power
+  - from: A_07_DZ2_K
+    to: B_09_C1_VIO
+    type: lv_power
+  - from: B_09_C1_VIO
+    to: C_01_R15_VIO
+    type: lv_power
+  - from: C_01_R15_VIO
+    to: C_02_R18_VIO
+    type: lv_power
+  - from: C_02_R18_VIO
+    to: C_03_R17_VIO
+    type: lv_power
+  - from: C_03_R17_VIO
+    to: C_04_R16_VIO
+    type: lv_power
+  - from: C_04_R16_VIO
+    to: C_07_R13_VIO
+    type: lv_power
+  - from: C_07_R13_VIO
+    to: C_08_R14_VIO
+    type: lv_power
+  - from: C_08_R14_VIO
+    to: TMC1_J2_VIO_7
+    type: lv_power
+
+  # Active-low power-good reporting from U2B to Pico GPIO5.
+  - from: B_19_R6_PWR_OK
+    to: U2_06_COLLECTOR_B
+    type: power_good
+  - from: U2_06_COLLECTOR_B
+    to: PICO_GPIO_5
+    type: power_good
+
+  # U1 inputs and their 10k Pico-3.3V default-high resistors.
+  - from: PICO_GPIO_0
+    to: U1_01_1A_STEP
+    type: clock
+  - from: U1_01_1A_STEP
+    to: B_18_R7_STEP
+    type: clock
+  - from: PICO_GPIO_1
+    to: U1_03_2A_DIR
+    type: data
+  - from: U1_03_2A_DIR
+    to: B_17_R8_DIR
+    type: data
+  - from: PICO_GPIO_2
+    to: U1_05_3A_ENABLE
+    type: control
+  - from: U1_05_3A_ENABLE
+    to: B_16_R9_ENABLE
+    type: control
+  - from: PICO_GPIO_9
+    to: U1_09_4A_CS
+    type: control
+  - from: U1_09_4A_CS
+    to: B_15_R10_CS
+    type: control
+  - from: PICO_GPIO_10
+    to: U1_11_5A_SCLK
+    type: clock
+  - from: U1_11_5A_SCLK
+    to: B_14_R11_SCLK
+    type: clock
+  - from: PICO_GPIO_11
+    to: U1_13_6A_MOSI
+    type: data
+  - from: U1_13_6A_MOSI
+    to: B_13_R12_MOSI
+    type: data
+
+  # U1 open-collector outputs and VIO-side pull-ups to the adapter.
+  - from: U1_02_1Y_STEP
+    to: C_14_R13_STEP
+    type: clock
+  - from: C_14_R13_STEP
+    to: TMC1_J1_STEP_7
+    type: clock
+  - from: U1_04_2Y_DIR
+    to: C_13_R14_DIR
+    type: data
+  - from: C_13_R14_DIR
+    to: TMC1_J1_DIR_8
+    type: data
+  - from: U1_06_3Y_ENABLE
+    to: C_20_R15_ENABLE
+    type: control
+  - from: C_20_R15_ENABLE
+    to: TMC1_J1_EN_1
+    type: control
+  - from: U1_08_4Y_CS
+    to: C_17_R16_CS
+    type: control
+  - from: C_17_R16_CS
+    to: TMC1_J1_CS_CFG3_4
+    type: control
+  - from: U1_10_5Y_SCLK
+    to: C_18_R17_SCLK
+    type: clock
+  - from: C_18_R17_SCLK
+    to: TMC1_J1_SCK_CFG2_3
+    type: clock
+  - from: U1_12_6Y_MOSI
+    to: C_19_R18_MOSI
+    type: data
+  - from: C_19_R18_MOSI
+    to: TMC1_J1_MOSI_CFG1_2
+    type: data
+
+  # Protected adapter-to-Pico MISO and DIAG1 returns.
+  - from: TMC1_J1_MISO_CFG0_5
+    to: C_16_R19_TMC_MISO
+    type: return
+  - from: C_05_R19_PICO_MISO
+    to: C_09_R21_PICO_MISO
+    type: return
+  - from: C_09_R21_PICO_MISO
+    to: PICO_GPIO_8
+    type: return
+  - from: TMC1_TOP_DIAG
+    to: C_15_R20_TMC_DIAG
+    type: return
+  - from: C_06_R20_PICO_DIAG
+    to: C_10_R22_PICO_DIAG
+    type: return
+  - from: C_10_R22_PICO_DIAG
+    to: PICO_GPIO_3
+    type: return
+
+  # Physical Y endstop remains authoritative for production homing.
+  - from: PICO_GPIO_4
+    to: ENDSTOP_Y_NO
+    type: data

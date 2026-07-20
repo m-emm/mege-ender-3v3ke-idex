@@ -7,6 +7,7 @@ OUTPUT_DIR="${SCRIPT_DIR}/diagrams"
 DEFAULT_YAML_FILES=(
   "${SCRIPT_DIR}/pico_w_btt_tmc2226_x.yaml"
   "${SCRIPT_DIR}/pico_w_btt_tmc2226_y_z.yaml"
+  "${SCRIPT_DIR}/rp2040plus_btt_tmc5160t_plus_y.yaml"
 )
 
 MEGE_CIRCUITS_SRC="${REPO_ROOT}/../mege-circuits/src"

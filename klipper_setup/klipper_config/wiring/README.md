@@ -6,6 +6,11 @@ Klipper config.
 
 - `pico_w_btt_tmc2226_x.yaml` is the X-axis Pico wiring source.
 - `pico_w_btt_tmc2226_y_z.yaml` is the Y/Z/heatbed Pico wiring source.
+- `rp2040plus_btt_tmc5160t_plus_y.yaml` is the review-only physical wiring
+  source for the proposed RP2040-Plus/TMC5160T Plus Y controller. Its generated
+  top and underside SVGs model the adapter boundary, three AR20 wire-wrap
+  carriers, and the isolated high-current terminal zone; it is not registered
+  as active Klipper wiring.
 - `pico_tb6600_stripboard_interface.py` and
   `pico_tb6600_stripboard_layout.py` generate the live external Y
   TB6600 interface schematic and verified stripboard assembly.
