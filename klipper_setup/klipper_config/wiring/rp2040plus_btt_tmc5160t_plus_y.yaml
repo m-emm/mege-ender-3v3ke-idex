@@ -24,6 +24,8 @@ metadata:
     Socket B positions 2-8 hold R6, R12, R7, R11, R8, R10, R9 in that order;
     positions 1, 9, and 10 remain empty.
     Socket C positions 1-10: R15, R18, R17, R16, R19, R20, R13, R14, R21, R22.
+    HV optocoupler labels use U2P=ILD74 pin, LEDA/LEDB=channel, A/K=anode/cathode,
+    and C/E=collector/emitter.
     DZ1/DZ2 contacts marked K/A are cathode/anode. D1 K goes to U2 pin 1; D1 A to U2 pin 3.
     R1=620R/0.5W; R2=47k; R3=2.7k; R4=39R/0.5W; R5=2.2k; R6=4.7k.
     R7-R12=10k; R13-R15=4.7k; R16-R18=2.2k; R19-R20=1k; R21-R22=47k.
@@ -165,7 +167,7 @@ pin_sets:
       - VCC
 
   # AR20 socket A: VBUS switch/VIO regulator plus Q1 on one side.
-  - prefix: A_
+  - prefix: A
     origin: [12, 49]
     direction: down
     pins:
@@ -179,7 +181,7 @@ pin_sets:
       - 08_Q1_C
       - 09_Q1_B
       - 10_Q1_E
-  - prefix: A_
+  - prefix: A
     origin: [15, 49]
     direction: down
     pins:
@@ -195,7 +197,7 @@ pin_sets:
       - 11_NC
 
   # AR20 socket B: power-good/input pulls, signal pulls, and capacitors.
-  - prefix: B_
+  - prefix: B
     origin: [3, 48]
     direction: down
     pins:
@@ -209,7 +211,7 @@ pin_sets:
       - 08_R9_3V3
       - 09_NC
       - 10_NC
-  - prefix: B_
+  - prefix: B
     origin: [6, 48]
     direction: down
     pins:
@@ -225,7 +227,7 @@ pin_sets:
       - 11_NC
 
   # AR20 socket C: collector pull-ups and protected return paths.
-  - prefix: C_
+  - prefix: C
     origin: [25, 36]
     direction: down
     pins:
@@ -239,7 +241,7 @@ pin_sets:
       - 08_R14_VIO
       - 09_R21_PICO_MISO
       - 10_R22_PICO_DIAG
-  - prefix: C_
+  - prefix: C
     origin: [28, 36]
     direction: down
     pins:
@@ -256,28 +258,28 @@ pin_sets:
 
   # Dedicated switched-24V detector carrier. U2 occupies the first four
   # contacts on each side. Three empty positions form a guard gap before R1/DZ1/D1.
-  - prefix: HV_
+  - prefix: HV
     origin: [20, 49]
     direction: down
     pins:
-      - 01_U2_01_LED_A_ANODE
-      - 02_U2_02_LED_A_CATHODE
-      - 03_U2_03_LED_B_CATHODE
-      - 04_U2_04_LED_B_ANODE
+      - 01_U2P1_LEDA_A
+      - 02_U2P2_LEDA_K
+      - 03_U2P3_LEDB_K
+      - 04_U2P4_LEDB_A
       - 05_NC
       - 06_NC
       - 07_NC
       - 08_R1_24V
       - 09_DZ1_K
       - 10_D1_K
-  - prefix: HV_
+  - prefix: HV
     origin: [23, 49]
     direction: down
     pins:
-      - 20_U2_08_EMITTER_A
-      - 19_U2_07_COLLECTOR_A
-      - 18_U2_06_COLLECTOR_B
-      - 17_U2_05_EMITTER_B
+      - 20_U2P8_E_A
+      - 19_U2P7_C_A
+      - 18_U2P6_C_B
+      - 17_U2P5_E_B
       - 16_NC
       - 15_NC
       - 14_NC
@@ -322,7 +324,7 @@ wires:
 
   # Fused switched 24V also supplies the low-current detector and adapter auxiliary input.
   - from: F1_5A_OUT
-    to: HV_08_R1_24V
+    to: HV08_R1_24V
     type: hazard_power
   - from: F1_5A_OUT
     to: TMC1_J2_VM_1
@@ -337,40 +339,40 @@ wires:
     to: TMC1_J2_GND_LOGIC_8
     type: ground
   - from: TMC1_J2_GND_LOGIC_8
-    to: C_11_R22_GND
+    to: C11_R22_GND
     type: ground
-  - from: C_11_R22_GND
-    to: C_12_R21_GND
+  - from: C11_R22_GND
+    to: C12_R21_GND
     type: ground
-  - from: C_12_R21_GND
+  - from: C12_R21_GND
     to: U1_07_GND
     type: ground
   - from: U1_07_GND
     to: PICO_GND_28
     type: ground
   - from: U1_07_GND
-    to: A_14_DZ2_A
+    to: A14_DZ2_A
     type: ground
-  - from: A_20_C1_GND
-    to: A_19_C2_GND
+  - from: A20_C1_GND
+    to: A19_C2_GND
     type: ground
-  - from: A_19_C2_GND
-    to: A_15_R5_GND
+  - from: A19_C2_GND
+    to: A15_R5_GND
     type: ground
-  - from: A_15_R5_GND
-    to: A_14_DZ2_A
+  - from: A15_R5_GND
+    to: A14_DZ2_A
     type: ground
-  - from: A_14_DZ2_A
-    to: HV_11_D1_A
+  - from: A14_DZ2_A
+    to: HV11_D1_A
     type: ground
-  - from: HV_11_D1_A
-    to: HV_03_U2_03_LED_B_CATHODE
+  - from: HV11_D1_A
+    to: HV03_U2P3_LEDB_K
     type: ground
-  - from: HV_03_U2_03_LED_B_CATHODE
-    to: HV_17_U2_05_EMITTER_B
+  - from: HV03_U2P3_LEDB_K
+    to: HV17_U2P5_E_B
     type: ground
-  - from: HV_17_U2_05_EMITTER_B
-    to: HV_20_U2_08_EMITTER_A
+  - from: HV17_U2P5_E_B
+    to: HV20_U2P8_E_A
     type: ground
   - from: PICO_GND_03
     to: ENDSTOP_Y_GND
@@ -381,105 +383,105 @@ wires:
     to: U1_14_VCC
     type: power
   - from: U1_14_VCC
-    to: A_10_Q1_E
+    to: A10_Q1_E
     type: power
-  - from: A_10_Q1_E
-    to: A_03_R2_VBUS
+  - from: A10_Q1_E
+    to: A03_R2_VBUS
     type: power
-  - from: A_03_R2_VBUS
-    to: A_02_C2_VBUS
+  - from: A03_R2_VBUS
+    to: A02_C2_VBUS
     type: power
 
   # Pico 3.3V safe-state and power-good pull-ups.
   - from: PICO_THREEV3_OUT_36
-    to: B_02_R6_3V3
+    to: B02_R6_3V3
     type: lv_power
-  - from: B_02_R6_3V3
-    to: B_03_R12_3V3
+  - from: B02_R6_3V3
+    to: B03_R12_3V3
     type: lv_power
-  - from: B_03_R12_3V3
-    to: B_04_R7_3V3
+  - from: B03_R12_3V3
+    to: B04_R7_3V3
     type: lv_power
-  - from: B_04_R7_3V3
-    to: B_05_R11_3V3
+  - from: B04_R7_3V3
+    to: B05_R11_3V3
     type: lv_power
-  - from: B_05_R11_3V3
-    to: B_06_R8_3V3
+  - from: B05_R11_3V3
+    to: B06_R8_3V3
     type: lv_power
-  - from: B_06_R8_3V3
-    to: B_07_R10_3V3
+  - from: B06_R8_3V3
+    to: B07_R10_3V3
     type: lv_power
-  - from: B_07_R10_3V3
-    to: B_08_R9_3V3
+  - from: B07_R10_3V3
+    to: B08_R9_3V3
     type: lv_power
   - from: PICO_THREEV3_OUT_36
     to: ENDSTOP_Y_VCC
     type: lv_power
 
   # Switched-24V threshold detector: R1, DZ1, two ILD74 LEDs in series, and D1.
-  - from: HV_13_R1_DZ1
-    to: HV_09_DZ1_K
+  - from: HV13_R1_DZ1
+    to: HV09_DZ1_K
     type: hazard_power
-  - from: HV_12_DZ1_A
-    to: HV_01_U2_01_LED_A_ANODE
+  - from: HV12_DZ1_A
+    to: HV01_U2P1_LEDA_A
     type: hazard_power
-  - from: HV_02_U2_02_LED_A_CATHODE
-    to: HV_04_U2_04_LED_B_ANODE
+  - from: HV02_U2P2_LEDA_K
+    to: HV04_U2P4_LEDB_A
     type: hazard_power
-  - from: HV_10_D1_K
-    to: HV_01_U2_01_LED_A_ANODE
+  - from: HV10_D1_K
+    to: HV01_U2P1_LEDA_A
     type: hazard_power
   # U2A drives the BC327 VBUS high-side switch.
-  - from: A_18_R2_BASE
-    to: A_04_R3_BASE
+  - from: A18_R2_BASE
+    to: A04_R3_BASE
     type: control
-  - from: A_04_R3_BASE
-    to: A_09_Q1_B
+  - from: A04_R3_BASE
+    to: A09_Q1_B
     type: control
-  - from: A_17_R3_U2A
-    to: HV_19_U2_07_COLLECTOR_A
+  - from: A17_R3_U2A
+    to: HV19_U2P7_C_A
     type: control
-  - from: A_08_Q1_C
-    to: A_05_R4_Q1C
+  - from: A08_Q1_C
+    to: A05_R4_Q1C
     type: power
 
   # Sequenced VIO shunt regulator and all collector pull-up supply contacts.
-  - from: A_16_R4_VIO
-    to: A_06_R5_VIO
+  - from: A16_R4_VIO
+    to: A06_R5_VIO
     type: lv_power
-  - from: A_06_R5_VIO
-    to: A_07_DZ2_K
+  - from: A06_R5_VIO
+    to: A07_DZ2_K
     type: lv_power
-  - from: A_07_DZ2_K
-    to: A_01_C1_VIO
+  - from: A07_DZ2_K
+    to: A01_C1_VIO
     type: lv_power
-  - from: A_01_C1_VIO
-    to: C_01_R15_VIO
+  - from: A01_C1_VIO
+    to: C01_R15_VIO
     type: lv_power
-  - from: C_01_R15_VIO
-    to: C_02_R18_VIO
+  - from: C01_R15_VIO
+    to: C02_R18_VIO
     type: lv_power
-  - from: C_02_R18_VIO
-    to: C_03_R17_VIO
+  - from: C02_R18_VIO
+    to: C03_R17_VIO
     type: lv_power
-  - from: C_03_R17_VIO
-    to: C_04_R16_VIO
+  - from: C03_R17_VIO
+    to: C04_R16_VIO
     type: lv_power
-  - from: C_04_R16_VIO
-    to: C_07_R13_VIO
+  - from: C04_R16_VIO
+    to: C07_R13_VIO
     type: lv_power
-  - from: C_07_R13_VIO
-    to: C_08_R14_VIO
+  - from: C07_R13_VIO
+    to: C08_R14_VIO
     type: lv_power
-  - from: C_08_R14_VIO
+  - from: C08_R14_VIO
     to: TMC1_J2_VIO_7
     type: lv_power
 
   # Active-low power-good reporting from U2B to Pico GPIO5.
-  - from: B_19_R6_PWR_OK
-    to: HV_18_U2_06_COLLECTOR_B
+  - from: B19_R6_PWR_OK
+    to: HV18_U2P6_C_B
     type: lv_power
-  - from: HV_18_U2_06_COLLECTOR_B
+  - from: HV18_U2P6_C_B
     to: PICO_GPIO_5
     type: power_good
 
@@ -488,94 +490,94 @@ wires:
     to: U1_01_1A_STEP
     type: clock
   - from: U1_01_1A_STEP
-    to: B_17_R7_STEP
+    to: B17_R7_STEP
     type: lv_power
   - from: PICO_GPIO_1
     to: U1_03_2A_DIR
     type: data
   - from: U1_03_2A_DIR
-    to: B_15_R8_DIR
+    to: B15_R8_DIR
     type: lv_power
   - from: PICO_GPIO_2
     to: U1_05_3A_ENABLE
     type: control
   - from: U1_05_3A_ENABLE
-    to: B_13_R9_ENABLE
+    to: B13_R9_ENABLE
     type: lv_power
   - from: PICO_GPIO_9
     to: U1_09_4A_CS
     type: control
   - from: U1_09_4A_CS
-    to: B_14_R10_CS
+    to: B14_R10_CS
     type: lv_power
   - from: PICO_GPIO_10
     to: U1_11_5A_SCLK
     type: clock
   - from: U1_11_5A_SCLK
-    to: B_16_R11_SCLK
+    to: B16_R11_SCLK
     type: lv_power
   - from: PICO_GPIO_11
     to: U1_13_6A_MOSI
     type: data
   - from: U1_13_6A_MOSI
-    to: B_18_R12_MOSI
+    to: B18_R12_MOSI
     type: lv_power
 
   # U1 open-collector outputs and VIO-side pull-ups to the adapter.
   - from: U1_02_1Y_STEP
-    to: C_14_R13_STEP
+    to: C14_R13_STEP
     type: clock
-  - from: C_14_R13_STEP
+  - from: C14_R13_STEP
     to: TMC1_J1_STEP_7
     type: clock
   - from: U1_04_2Y_DIR
-    to: C_13_R14_DIR
+    to: C13_R14_DIR
     type: data
-  - from: C_13_R14_DIR
+  - from: C13_R14_DIR
     to: TMC1_J1_DIR_8
     type: data
   - from: U1_06_3Y_ENABLE
-    to: C_20_R15_ENABLE
+    to: C20_R15_ENABLE
     type: control
-  - from: C_20_R15_ENABLE
+  - from: C20_R15_ENABLE
     to: TMC1_J1_EN_1
     type: control
   - from: U1_08_4Y_CS
-    to: C_17_R16_CS
+    to: C17_R16_CS
     type: control
-  - from: C_17_R16_CS
+  - from: C17_R16_CS
     to: TMC1_J1_CS_CFG3_4
     type: control
   - from: U1_10_5Y_SCLK
-    to: C_18_R17_SCLK
+    to: C18_R17_SCLK
     type: clock
-  - from: C_18_R17_SCLK
+  - from: C18_R17_SCLK
     to: TMC1_J1_SCK_CFG2_3
     type: clock
   - from: U1_12_6Y_MOSI
-    to: C_19_R18_MOSI
+    to: C19_R18_MOSI
     type: data
-  - from: C_19_R18_MOSI
+  - from: C19_R18_MOSI
     to: TMC1_J1_MOSI_CFG1_2
     type: data
 
   # Protected adapter-to-Pico MISO and DIAG1 returns.
   - from: TMC1_J1_MISO_CFG0_5
-    to: C_16_R19_TMC_MISO
+    to: C16_R19_TMC_MISO
     type: return
-  - from: C_05_R19_PICO_MISO
-    to: C_09_R21_PICO_MISO
+  - from: C05_R19_PICO_MISO
+    to: C09_R21_PICO_MISO
     type: return
-  - from: C_09_R21_PICO_MISO
+  - from: C09_R21_PICO_MISO
     to: PICO_GPIO_8
     type: return
   - from: TMC1_TOP_DIAG
-    to: C_15_R20_TMC_DIAG
+    to: C15_R20_TMC_DIAG
     type: return
-  - from: C_06_R20_PICO_DIAG
-    to: C_10_R22_PICO_DIAG
+  - from: C06_R20_PICO_DIAG
+    to: C10_R22_PICO_DIAG
     type: return
-  - from: C_10_R22_PICO_DIAG
+  - from: C10_R22_PICO_DIAG
     to: PICO_GPIO_3
     type: return
 
