@@ -12,12 +12,17 @@ metadata:
     TMC1 J1: EN, MOSI/CFG1, SCK/CFG2, CS/CFG3, MISO/CFG0, CLK N/C, STEP, DIR.
     TMC1 J2: auxiliary 24V, two grounds, B2/B1/A1/A2 N/C, sequenced VIO.
     U1 is SN7407N DIP-14. U2 is ILD74 DIP-8. Both use the shown top-view pin numbering.
-    A/B/C are AR20-HZW/TN 20-pin, 0.3-inch DIL wire-wrap sockets with spring contacts.
-    Socket B is rotated 90 degrees clockwise, with its notch toward the TMC side.
+    A/B/C/HV are AR20-HZW/TN 20-pin, 0.3-inch DIL wire-wrap sockets with spring contacts.
+    Socket B is vertical beside Socket A, with contacts 1/20 at the top and three pitches lower.
     Insert each passive across its labeled opposite contact pair; the passive itself joins the pair.
-    Socket A positions 1-7: R1-R5, DZ1, DZ2. A08/A09/A10: Q1 C/B/E on one side.
+    Socket HV contacts 1-4 and 20-17 hold U2 pins 1-4 and 8-5; positions 8-10 hold R1, DZ1, D1.
+    HV positions 5-7 remain empty as a physical guard gap between U2 and the detector passives.
+    Do not use those spare HV contacts for low-voltage circuitry.
+    Socket A positions 1-2 hold C1/C2; positions 3-7 hold R2-R5 and DZ2.
+    A08/A09/A10 hold Q1 C/B/E on one side.
     A13/A12/A11 remain empty. Verify the actual BC327 lead order before inserting Q1.
-    Socket B positions 1-10: D1, R6-R12, C1, C2.
+    Socket B positions 2-8 hold R6, R12, R7, R11, R8, R10, R9 in that order;
+    positions 1, 9, and 10 remain empty.
     Socket C positions 1-10: R15, R18, R17, R16, R19, R20, R13, R14, R21, R22.
     DZ1/DZ2 contacts marked K/A are cathode/anode. D1 K goes to U2 pin 1; D1 A to U2 pin 3.
     R1=620R/0.5W; R2=47k; R3=2.7k; R4=39R/0.5W; R5=2.2k; R6=4.7k.
@@ -31,7 +36,6 @@ metadata:
     High-current 24V bypasses all Pico, DIL-socket, and wire-wrap conductors.
     Land the four Y-motor conductors directly on the driver's 1B/2B/1A/2A screw terminals.
     F1 is a dedicated serviceable 5A branch fuse. Size all high-current wiring above the fuse rating.
-    TMC_FAN is the on-driver 24V fan-header boundary; its connection is internal to the driver.
 
 color_map:
   power: "#ff0000"
@@ -160,31 +164,13 @@ pin_sets:
       - GND
       - VCC
 
-  # U2 ILD74: top view, notch at the top.
-  - prefix: U2_
-    origin: [20, 47]
-    direction: down
-    pins:
-      - 01_LED_A_ANODE
-      - 02_LED_A_CATHODE
-      - 03_LED_B_CATHODE
-      - 04_LED_B_ANODE
-  - prefix: U2_
-    origin: [23, 47]
-    direction: down
-    pins:
-      - 08_EMITTER_A
-      - 07_COLLECTOR_A
-      - 06_COLLECTOR_B
-      - 05_EMITTER_B
-
-  # AR20 socket A: power detector/regulator plus Q1 on one side.
+  # AR20 socket A: VBUS switch/VIO regulator plus Q1 on one side.
   - prefix: A_
-    origin: [12, 47]
+    origin: [12, 49]
     direction: down
     pins:
-      - 01_R1_24V
-      - 02_DZ1_K
+      - 01_C1_VIO
+      - 02_C2_VBUS
       - 03_R2_VBUS
       - 04_R3_BASE
       - 05_R4_Q1C
@@ -194,11 +180,11 @@ pin_sets:
       - 09_Q1_B
       - 10_Q1_E
   - prefix: A_
-    origin: [15, 47]
+    origin: [15, 49]
     direction: down
     pins:
-      - 20_R1_DZ1
-      - 19_DZ1_A
+      - 20_C1_GND
+      - 19_C2_GND
       - 18_R2_BASE
       - 17_R3_U2A
       - 16_R4_VIO
@@ -208,35 +194,35 @@ pin_sets:
       - 12_NC
       - 11_NC
 
-  # AR20 socket B: reverse protection, power-good/input pulls, and capacitors.
+  # AR20 socket B: power-good/input pulls, signal pulls, and capacitors.
   - prefix: B_
-    origin: [9, 47]
-    direction: left
+    origin: [3, 48]
+    direction: down
     pins:
-      - 01_D1_K
+      - 01_NC
       - 02_R6_3V3
-      - 03_R7_3V3
-      - 04_R8_3V3
-      - 05_R9_3V3
-      - 06_R10_3V3
-      - 07_R11_3V3
-      - 08_R12_3V3
-      - 09_C1_VIO
-      - 10_C2_VBUS
+      - 03_R12_3V3
+      - 04_R7_3V3
+      - 05_R11_3V3
+      - 06_R8_3V3
+      - 07_R10_3V3
+      - 08_R9_3V3
+      - 09_NC
+      - 10_NC
   - prefix: B_
-    origin: [9, 44]
-    direction: left
+    origin: [6, 48]
+    direction: down
     pins:
-      - 20_D1_A
+      - 20_NC
       - 19_R6_PWR_OK
-      - 18_R7_STEP
-      - 17_R8_DIR
-      - 16_R9_ENABLE
-      - 15_R10_CS
-      - 14_R11_SCLK
-      - 13_R12_MOSI
-      - 12_C1_GND
-      - 11_C2_GND
+      - 18_R12_MOSI
+      - 17_R7_STEP
+      - 16_R11_SCLK
+      - 15_R8_DIR
+      - 14_R10_CS
+      - 13_R9_ENABLE
+      - 12_NC
+      - 11_NC
 
   # AR20 socket C: collector pull-ups and protected return paths.
   - prefix: C_
@@ -268,6 +254,37 @@ pin_sets:
       - 12_R21_GND
       - 11_R22_GND
 
+  # Dedicated switched-24V detector carrier. U2 occupies the first four
+  # contacts on each side. Three empty positions form a guard gap before R1/DZ1/D1.
+  - prefix: HV_
+    origin: [20, 49]
+    direction: down
+    pins:
+      - 01_U2_01_LED_A_ANODE
+      - 02_U2_02_LED_A_CATHODE
+      - 03_U2_03_LED_B_CATHODE
+      - 04_U2_04_LED_B_ANODE
+      - 05_NC
+      - 06_NC
+      - 07_NC
+      - 08_R1_24V
+      - 09_DZ1_K
+      - 10_D1_K
+  - prefix: HV_
+    origin: [23, 49]
+    direction: down
+    pins:
+      - 20_U2_08_EMITTER_A
+      - 19_U2_07_COLLECTOR_A
+      - 18_U2_06_COLLECTOR_B
+      - 17_U2_05_EMITTER_B
+      - 16_NC
+      - 15_NC
+      - 14_NC
+      - 13_R1_DZ1
+      - 12_DZ1_A
+      - 11_D1_A
+
   # Actual driver screw terminals; motor conductors land directly on pins 1-4.
   - prefix: TMC5160_HV_
     origin: [32, 44]
@@ -291,13 +308,6 @@ pin_sets:
     pins:
       - V24_SW
       - GND
-  - prefix: TMC_FAN_
-    origin: [56, 44]
-    direction: down
-    pins:
-      - 24V
-      - GND
-
 wires:
   # High-current wiring: these conductors do not use the wire-wrap carrier.
   - from: PWR_V24_SW
@@ -312,7 +322,7 @@ wires:
 
   # Fused switched 24V also supplies the low-current detector and adapter auxiliary input.
   - from: F1_5A_OUT
-    to: A_01_R1_24V
+    to: HV_08_R1_24V
     type: hazard_power
   - from: F1_5A_OUT
     to: TMC1_J2_VM_1
@@ -341,26 +351,26 @@ wires:
   - from: U1_07_GND
     to: A_14_DZ2_A
     type: ground
-  - from: B_11_C2_GND
-    to: B_12_C1_GND
+  - from: A_20_C1_GND
+    to: A_19_C2_GND
     type: ground
-  - from: B_12_C1_GND
-    to: B_20_D1_A
-    type: ground
-  - from: B_20_D1_A
+  - from: A_19_C2_GND
     to: A_15_R5_GND
     type: ground
   - from: A_15_R5_GND
     to: A_14_DZ2_A
     type: ground
   - from: A_14_DZ2_A
-    to: U2_03_LED_B_CATHODE
+    to: HV_11_D1_A
     type: ground
-  - from: U2_03_LED_B_CATHODE
-    to: U2_05_EMITTER_B
+  - from: HV_11_D1_A
+    to: HV_03_U2_03_LED_B_CATHODE
     type: ground
-  - from: U2_05_EMITTER_B
-    to: U2_08_EMITTER_A
+  - from: HV_03_U2_03_LED_B_CATHODE
+    to: HV_17_U2_05_EMITTER_B
+    type: ground
+  - from: HV_17_U2_05_EMITTER_B
+    to: HV_20_U2_08_EMITTER_A
     type: ground
   - from: PICO_GND_03
     to: ENDSTOP_Y_GND
@@ -377,7 +387,7 @@ wires:
     to: A_03_R2_VBUS
     type: power
   - from: A_03_R2_VBUS
-    to: B_10_C2_VBUS
+    to: A_02_C2_VBUS
     type: power
 
   # Pico 3.3V safe-state and power-good pull-ups.
@@ -385,39 +395,39 @@ wires:
     to: B_02_R6_3V3
     type: lv_power
   - from: B_02_R6_3V3
-    to: B_03_R7_3V3
+    to: B_03_R12_3V3
     type: lv_power
-  - from: B_03_R7_3V3
-    to: B_04_R8_3V3
+  - from: B_03_R12_3V3
+    to: B_04_R7_3V3
     type: lv_power
-  - from: B_04_R8_3V3
-    to: B_05_R9_3V3
+  - from: B_04_R7_3V3
+    to: B_05_R11_3V3
     type: lv_power
-  - from: B_05_R9_3V3
-    to: B_06_R10_3V3
+  - from: B_05_R11_3V3
+    to: B_06_R8_3V3
     type: lv_power
-  - from: B_06_R10_3V3
-    to: B_07_R11_3V3
+  - from: B_06_R8_3V3
+    to: B_07_R10_3V3
     type: lv_power
-  - from: B_07_R11_3V3
-    to: B_08_R12_3V3
+  - from: B_07_R10_3V3
+    to: B_08_R9_3V3
     type: lv_power
   - from: PICO_THREEV3_OUT_36
     to: ENDSTOP_Y_VCC
     type: lv_power
 
   # Switched-24V threshold detector: R1, DZ1, two ILD74 LEDs in series, and D1.
-  - from: A_20_R1_DZ1
-    to: A_02_DZ1_K
+  - from: HV_13_R1_DZ1
+    to: HV_09_DZ1_K
     type: hazard_power
-  - from: A_19_DZ1_A
-    to: U2_01_LED_A_ANODE
+  - from: HV_12_DZ1_A
+    to: HV_01_U2_01_LED_A_ANODE
     type: hazard_power
-  - from: U2_02_LED_A_CATHODE
-    to: U2_04_LED_B_ANODE
+  - from: HV_02_U2_02_LED_A_CATHODE
+    to: HV_04_U2_04_LED_B_ANODE
     type: hazard_power
-  - from: B_01_D1_K
-    to: U2_01_LED_A_ANODE
+  - from: HV_10_D1_K
+    to: HV_01_U2_01_LED_A_ANODE
     type: hazard_power
   # U2A drives the BC327 VBUS high-side switch.
   - from: A_18_R2_BASE
@@ -427,7 +437,7 @@ wires:
     to: A_09_Q1_B
     type: control
   - from: A_17_R3_U2A
-    to: U2_07_COLLECTOR_A
+    to: HV_19_U2_07_COLLECTOR_A
     type: control
   - from: A_08_Q1_C
     to: A_05_R4_Q1C
@@ -441,9 +451,9 @@ wires:
     to: A_07_DZ2_K
     type: lv_power
   - from: A_07_DZ2_K
-    to: B_09_C1_VIO
+    to: A_01_C1_VIO
     type: lv_power
-  - from: B_09_C1_VIO
+  - from: A_01_C1_VIO
     to: C_01_R15_VIO
     type: lv_power
   - from: C_01_R15_VIO
@@ -467,9 +477,9 @@ wires:
 
   # Active-low power-good reporting from U2B to Pico GPIO5.
   - from: B_19_R6_PWR_OK
-    to: U2_06_COLLECTOR_B
-    type: power_good
-  - from: U2_06_COLLECTOR_B
+    to: HV_18_U2_06_COLLECTOR_B
+    type: lv_power
+  - from: HV_18_U2_06_COLLECTOR_B
     to: PICO_GPIO_5
     type: power_good
 
@@ -478,38 +488,38 @@ wires:
     to: U1_01_1A_STEP
     type: clock
   - from: U1_01_1A_STEP
-    to: B_18_R7_STEP
-    type: clock
+    to: B_17_R7_STEP
+    type: lv_power
   - from: PICO_GPIO_1
     to: U1_03_2A_DIR
     type: data
   - from: U1_03_2A_DIR
-    to: B_17_R8_DIR
-    type: data
+    to: B_15_R8_DIR
+    type: lv_power
   - from: PICO_GPIO_2
     to: U1_05_3A_ENABLE
     type: control
   - from: U1_05_3A_ENABLE
-    to: B_16_R9_ENABLE
-    type: control
+    to: B_13_R9_ENABLE
+    type: lv_power
   - from: PICO_GPIO_9
     to: U1_09_4A_CS
     type: control
   - from: U1_09_4A_CS
-    to: B_15_R10_CS
-    type: control
+    to: B_14_R10_CS
+    type: lv_power
   - from: PICO_GPIO_10
     to: U1_11_5A_SCLK
     type: clock
   - from: U1_11_5A_SCLK
-    to: B_14_R11_SCLK
-    type: clock
+    to: B_16_R11_SCLK
+    type: lv_power
   - from: PICO_GPIO_11
     to: U1_13_6A_MOSI
     type: data
   - from: U1_13_6A_MOSI
-    to: B_13_R12_MOSI
-    type: data
+    to: B_18_R12_MOSI
+    type: lv_power
 
   # U1 open-collector outputs and VIO-side pull-ups to the adapter.
   - from: U1_02_1Y_STEP

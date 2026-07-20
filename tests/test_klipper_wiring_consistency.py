@@ -145,12 +145,12 @@ def test_tmc5160_review_wiring_uses_stepstick_spi_adapter_pattern():
     assert top["origin"] == [j1["origin"][0] + 1, j1["origin"][1] + 1]
 
 
-def test_tmc5160_review_wiring_has_three_true_2x10_component_carriers():
+def test_tmc5160_review_wiring_has_four_true_2x10_component_carriers():
     wiring = _load_tmc5160_review_wiring()
     expected_pairs = {
         "A_": [
-            ("01_R1_24V", "20_R1_DZ1"),
-            ("02_DZ1_K", "19_DZ1_A"),
+            ("01_C1_VIO", "20_C1_GND"),
+            ("02_C2_VBUS", "19_C2_GND"),
             ("03_R2_VBUS", "18_R2_BASE"),
             ("04_R3_BASE", "17_R3_U2A"),
             ("05_R4_Q1C", "16_R4_VIO"),
@@ -161,16 +161,16 @@ def test_tmc5160_review_wiring_has_three_true_2x10_component_carriers():
             ("10_Q1_E", "11_NC"),
         ],
         "B_": [
-            ("01_D1_K", "20_D1_A"),
+            ("01_NC", "20_NC"),
             ("02_R6_3V3", "19_R6_PWR_OK"),
-            ("03_R7_3V3", "18_R7_STEP"),
-            ("04_R8_3V3", "17_R8_DIR"),
-            ("05_R9_3V3", "16_R9_ENABLE"),
-            ("06_R10_3V3", "15_R10_CS"),
-            ("07_R11_3V3", "14_R11_SCLK"),
-            ("08_R12_3V3", "13_R12_MOSI"),
-            ("09_C1_VIO", "12_C1_GND"),
-            ("10_C2_VBUS", "11_C2_GND"),
+            ("03_R12_3V3", "18_R12_MOSI"),
+            ("04_R7_3V3", "17_R7_STEP"),
+            ("05_R11_3V3", "16_R11_SCLK"),
+            ("06_R8_3V3", "15_R8_DIR"),
+            ("07_R10_3V3", "14_R10_CS"),
+            ("08_R9_3V3", "13_R9_ENABLE"),
+            ("09_NC", "12_NC"),
+            ("10_NC", "11_NC"),
         ],
         "C_": [
             ("01_R15_VIO", "20_R15_ENABLE"),
@@ -184,10 +184,22 @@ def test_tmc5160_review_wiring_has_three_true_2x10_component_carriers():
             ("09_R21_PICO_MISO", "12_R21_GND"),
             ("10_R22_PICO_DIAG", "11_R22_GND"),
         ],
+        "HV_": [
+            ("01_U2_01_LED_A_ANODE", "20_U2_08_EMITTER_A"),
+            ("02_U2_02_LED_A_CATHODE", "19_U2_07_COLLECTOR_A"),
+            ("03_U2_03_LED_B_CATHODE", "18_U2_06_COLLECTOR_B"),
+            ("04_U2_04_LED_B_ANODE", "17_U2_05_EMITTER_B"),
+            ("05_NC", "16_NC"),
+            ("06_NC", "15_NC"),
+            ("07_NC", "14_NC"),
+            ("08_R1_24V", "13_R1_DZ1"),
+            ("09_DZ1_K", "12_DZ1_A"),
+            ("10_D1_K", "11_D1_A"),
+        ],
     }
 
-    row_offsets = {"A_": (3, 0), "B_": (0, -3), "C_": (3, 0)}
-    row_directions = {"A_": "down", "B_": "left", "C_": "down"}
+    row_offsets = {"A_": (3, 0), "B_": (3, 0), "C_": (3, 0), "HV_": (3, 0)}
+    row_directions = {"A_": "down", "B_": "down", "C_": "down", "HV_": "down"}
     for prefix, pairs in expected_pairs.items():
         rows = _pin_sets_with_prefix(wiring, prefix)
         assert len(rows) == 2
@@ -200,6 +212,20 @@ def test_tmc5160_review_wiring_has_three_true_2x10_component_carriers():
 
     socket_a_left = _pin_sets_with_prefix(wiring, "A_")[0]["pins"]
     assert socket_a_left[7:] == ["08_Q1_C", "09_Q1_B", "10_Q1_E"]
+    assert _pin_sets_with_prefix(wiring, "U2_") == []
+
+    hv_guard_contacts = {
+        "HV_05_NC",
+        "HV_06_NC",
+        "HV_07_NC",
+        "HV_14_NC",
+        "HV_15_NC",
+        "HV_16_NC",
+    }
+    assert all(
+        not hv_guard_contacts & {wire["from"], wire["to"]}
+        for wire in wiring["wires"]
+    )
 
 
 def test_tmc5160_review_wiring_has_official_high_current_terminal_order():
@@ -214,6 +240,7 @@ def test_tmc5160_review_wiring_has_official_high_current_terminal_order():
         "HVIN_8_60V",
     ]
     assert _pin_sets_with_prefix(wiring, "MOTOR_Y_") == []
+    assert _pin_sets_with_prefix(wiring, "TMC_FAN_") == []
     assert all(
         not wire[endpoint].startswith("MOTOR_Y_")
         for wire in wiring["wires"]
@@ -232,13 +259,19 @@ def test_tmc5160_review_wiring_stays_out_of_active_klipper_validation():
     assert ("PICO_THREEV3_OUT_36", "ENDSTOP_Y_VCC") in wire_pairs
     assert all("PICO_GND_13" not in pair for pair in wire_pairs)
     assert ("U1_07_GND", "PICO_GND_28") in wire_pairs
-    assert ("B_11_C2_GND", "B_12_C1_GND") in wire_pairs
-    assert ("B_12_C1_GND", "B_20_D1_A") in wire_pairs
-    assert ("B_20_D1_A", "A_15_R5_GND") in wire_pairs
+    assert ("A_20_C1_GND", "A_19_C2_GND") in wire_pairs
+    assert ("A_19_C2_GND", "A_15_R5_GND") in wire_pairs
     assert ("A_15_R5_GND", "A_14_DZ2_A") in wire_pairs
-    assert ("A_14_DZ2_A", "U2_03_LED_B_CATHODE") in wire_pairs
-    assert ("U2_03_LED_B_CATHODE", "U2_05_EMITTER_B") in wire_pairs
-    assert ("U2_05_EMITTER_B", "U2_08_EMITTER_A") in wire_pairs
+    assert ("A_14_DZ2_A", "HV_11_D1_A") in wire_pairs
+    assert ("HV_11_D1_A", "HV_03_U2_03_LED_B_CATHODE") in wire_pairs
+    assert (
+        "HV_03_U2_03_LED_B_CATHODE",
+        "HV_17_U2_05_EMITTER_B",
+    ) in wire_pairs
+    assert (
+        "HV_17_U2_05_EMITTER_B",
+        "HV_20_U2_08_EMITTER_A",
+    ) in wire_pairs
 
 
 def test_tmc5160_review_wiring_uses_only_available_wire_colors():
@@ -268,12 +301,12 @@ def test_tmc5160_review_wiring_uses_only_available_wire_colors():
 
     pull_up_supply_contacts = {
         "B_02_R6_3V3",
-        "B_03_R7_3V3",
-        "B_04_R8_3V3",
-        "B_05_R9_3V3",
-        "B_06_R10_3V3",
-        "B_07_R11_3V3",
-        "B_08_R12_3V3",
+        "B_03_R12_3V3",
+        "B_04_R7_3V3",
+        "B_05_R11_3V3",
+        "B_06_R8_3V3",
+        "B_07_R10_3V3",
+        "B_08_R9_3V3",
         "C_01_R15_VIO",
         "C_02_R18_VIO",
         "C_03_R17_VIO",
@@ -285,6 +318,21 @@ def test_tmc5160_review_wiring_uses_only_available_wire_colors():
         if pull_up_supply_contacts & {wire["from"], wire["to"]}:
             assert wire["type"] == "lv_power"
 
+    pull_up_branch_pairs = {
+        ("B_19_R6_PWR_OK", "HV_18_U2_06_COLLECTOR_B"),
+        ("U1_01_1A_STEP", "B_17_R7_STEP"),
+        ("U1_03_2A_DIR", "B_15_R8_DIR"),
+        ("U1_05_3A_ENABLE", "B_13_R9_ENABLE"),
+        ("U1_09_4A_CS", "B_14_R10_CS"),
+        ("U1_11_5A_SCLK", "B_16_R11_SCLK"),
+        ("U1_13_6A_MOSI", "B_18_R12_MOSI"),
+    }
+    assert {
+        (wire["from"], wire["to"])
+        for wire in wiring["wires"]
+        if wire["type"] == "lv_power"
+    }.issuperset(pull_up_branch_pairs)
+
 
 def test_generated_tmc5160_review_svgs_include_physical_boundaries():
     expected_labels = {
@@ -294,11 +342,15 @@ def test_generated_tmc5160_review_svgs_include_physical_boundaries():
         "TMC1_TOP_DIAG",
         "A_08_Q1_C",
         "A_13_NC",
-        "B_01_D1_K",
+        "B_01_NC",
         "C_14_R13_STEP",
+        "HV_01_U2_01_LED_A_ANODE",
+        "HV_20_U2_08_EMITTER_A",
+        "HV_08_R1_24V",
+        "HV_09_DZ1_K",
+        "HV_10_D1_K",
         "TMC5160_HV_1B",
         "TMC5160_HV_HVIN_8_60V",
-        "TMC_FAN_24V",
     }
 
     for view in ("top", "bottom"):
