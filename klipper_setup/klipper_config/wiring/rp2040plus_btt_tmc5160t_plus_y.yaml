@@ -13,7 +13,9 @@ metadata:
     TMC1 J2: auxiliary 24V, two grounds, B2/B1/A1/A2 N/C, sequenced VIO.
     U1 is SN7407N DIP-14. U2 is ILD74 DIP-8. Both use the shown top-view pin numbering.
     A/B/C/HV are AR20-HZW/TN 20-pin, 0.3-inch DIL wire-wrap sockets with spring contacts.
-    Socket B is vertical beside Socket A, with contacts 1/20 at the top and three pitches lower.
+    Physical layout: Pico at the left; Socket B above U1; Socket A above Socket C;
+    then the HV socket, TMC adapter, endstop/fused input, and the full driver footprint.
+    Top-row parts align with the Pico USB edge. Keep the area above that edge clear.
     Insert each passive across its labeled opposite contact pair; the passive itself joins the pair.
     Socket HV contacts 1-4 and 20-17 hold U2 pins 1-4 and 8-5; positions 8-10 hold R1, DZ1, D1.
     HV positions 5-7 remain empty as a physical guard gap between U2 and the detector passives.
@@ -37,6 +39,7 @@ metadata:
     Logic, detector, and VIO conductors are low-current wire-wrap class only.
     High-current 24V bypasses all Pico, DIL-socket, and wire-wrap conductors.
     Land the four Y-motor conductors directly on the driver's 1B/2B/1A/2A screw terminals.
+    The 64x57mm driver box is exact; screw-terminal spacing within it is illustrative.
     F1 is a dedicated serviceable 5A branch fuse. Size all high-current wiring above the fuse rating.
 
 color_map:
@@ -50,6 +53,16 @@ color_map:
   return: "#d9a900"
   power_good: "#d9a900"
   default: "#d9a900"
+
+boxes:
+  - id: tmc5160t_plus_driver
+    label: |
+      TMC5160T Plus
+      64 x 57 mm
+      25.197 x 22.441 raster units
+      Screw-terminal spacing illustrative
+    top_left: [49, 36.45]
+    size_pitches: [25.1968503937, 22.4409448819]
 
 # Coordinate system: origin at bottom-left; X increases right; Y increases up.
 pin_sets:
@@ -110,7 +123,7 @@ pin_sets:
   # U1 SN7407N: top view, notch at the top.
   - id: u1_left
     prefix: U1_
-    origin: [16, 36]
+    origin: [12, 23]
     direction: down
     discrete_pin_numbers: {start: 1, step: 1}
     pins:
@@ -123,7 +136,7 @@ pin_sets:
       - 07_GND
   - id: u1_right
     prefix: U1_
-    origin: [19, 36]
+    origin: [15, 23]
     direction: down
     discrete_pin_numbers: {start: 14, step: -1}
     pins:
@@ -138,7 +151,7 @@ pin_sets:
   # Ordinary StepStick-format adapter, matching the existing TMC1 layout pattern.
   - id: tmc1_j1
     prefix: TMC1_J1_
-    origin: [36, 36]
+    origin: [33, 36]
     direction: down
     discrete_pin_numbers: {start: 1, step: 1}
     pins:
@@ -152,7 +165,7 @@ pin_sets:
       - DIR_8
   - id: tmc1_j2
     prefix: TMC1_J2_
-    origin: [40, 36]
+    origin: [37, 36]
     direction: down
     discrete_pin_numbers: {start: 1, step: 1}
     pins:
@@ -166,14 +179,14 @@ pin_sets:
       - GND_LOGIC_8
   - id: tmc1_top
     prefix: TMC1_TOP_
-    origin: [37, 37]
+    origin: [34, 36]
     direction: right
     pins:
       - DIAG
 
   - id: endstop_y
     prefix: ENDSTOP_Y_
-    origin: [-3, 34]
+    origin: [41, 36]
     direction: down
     pins:
       - "NO"
@@ -183,7 +196,7 @@ pin_sets:
   # AR20 socket A: VBUS switch/VIO regulator plus Q1 on one side.
   - id: socket_a_left
     prefix: A
-    origin: [12, 49]
+    origin: [19, 36]
     direction: down
     discrete_pin_numbers: {start: 1, step: 1}
     pins:
@@ -199,7 +212,7 @@ pin_sets:
       - 10_Q1_E
   - id: socket_a_right
     prefix: A
-    origin: [15, 49]
+    origin: [22, 36]
     direction: down
     discrete_pin_numbers: {start: 20, step: -1}
     pins:
@@ -217,7 +230,7 @@ pin_sets:
   # AR20 socket B: power-good/input pulls, signal pulls, and capacitors.
   - id: socket_b_left
     prefix: B
-    origin: [3, 48]
+    origin: [12, 36]
     direction: down
     discrete_pin_numbers: {start: 1, step: 1}
     pins:
@@ -233,7 +246,7 @@ pin_sets:
       - 10_NC
   - id: socket_b_right
     prefix: B
-    origin: [6, 48]
+    origin: [15, 36]
     direction: down
     discrete_pin_numbers: {start: 20, step: -1}
     pins:
@@ -251,7 +264,7 @@ pin_sets:
   # AR20 socket C: collector pull-ups and protected return paths.
   - id: socket_c_left
     prefix: C
-    origin: [25, 36]
+    origin: [19, 23]
     direction: down
     discrete_pin_numbers: {start: 1, step: 1}
     pins:
@@ -267,7 +280,7 @@ pin_sets:
       - 10_R22_PICO_DIAG
   - id: socket_c_right
     prefix: C
-    origin: [28, 36]
+    origin: [22, 23]
     direction: down
     discrete_pin_numbers: {start: 20, step: -1}
     pins:
@@ -286,7 +299,7 @@ pin_sets:
   # contacts on each side. Three empty positions form a guard gap before R1/DZ1/D1.
   - id: socket_hv_left
     prefix: HV
-    origin: [20, 49]
+    origin: [26, 36]
     direction: down
     discrete_pin_numbers: {start: 1, step: 1}
     pins:
@@ -302,7 +315,7 @@ pin_sets:
       - 10_D1_K
   - id: socket_hv_right
     prefix: HV
-    origin: [23, 49]
+    origin: [29, 36]
     direction: down
     discrete_pin_numbers: {start: 20, step: -1}
     pins:
@@ -320,7 +333,7 @@ pin_sets:
   # Actual driver screw terminals; motor conductors land directly on pins 1-4.
   - id: tmc5160_hv
     prefix: TMC5160_HV_
-    origin: [32, 44]
+    origin: [59.0984251969, 36]
     direction: right
     pins:
       - 1B
@@ -331,14 +344,14 @@ pin_sets:
       - HVIN_8_60V
   - id: f1
     prefix: F1_5A_
-    origin: [40, 44]
+    origin: [41, 30]
     direction: right
     pins:
       - OUT
       - IN
   - id: power_input
     prefix: PWR_
-    origin: [44, 44]
+    origin: [45, 30]
     direction: down
     pins:
       - V24_SW
@@ -492,13 +505,14 @@ discrete_view:
   title: RP2040-Plus / TMC5160T Plus component placement — top side
   notes: |
     TOP / COMPONENT SIDE: insert the shown parts here; wire-wrap conductors are omitted.
+    Pico USB exits above the aligned top edge; keep that entire edge clear.
     Then flip the board and use rp2040plus_btt_tmc5160t_plus_y_bottom.svg for wrapping.
     Diodes: K is the cathode/band. U1/U2: align the notch and pin-1 marker.
     Q1: C/B/E are shown; verify the actual BC327 flat-side lead order before insertion.
     HV socket: leave positions 5-7 and 14-16 empty as the detector guard gap.
   groups:
     - id: pico
-      label: RP2040-Plus
+      label: RP2040-Plus — USB / BOARD TOP
       pin_sets: [pico_left, pico_right]
     - id: u1
       label: U1 socket — SN7407N DIP-14

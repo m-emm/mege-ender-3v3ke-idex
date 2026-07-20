@@ -9,7 +9,9 @@ Klipper config.
 - `rp2040plus_btt_tmc5160t_plus_y.yaml` is the review-only physical wiring
   source for the proposed RP2040-Plus/TMC5160T Plus Y controller. Its generated
   top, discrete-component top, and underside SVGs model the adapter boundary,
-  four AR20 wire-wrap carriers, and the isolated high-current terminal zone.
+  four AR20 wire-wrap carriers, the isolated high-current terminal zone, and
+  the exact 64x57mm driver outline. All three views use one shared set of YAML
+  coordinates; the underside view mirrors that same physical arrangement.
   One AR20 is dedicated to the ILD74 and switched-24V detector, with an unused
   three-position guard gap before its detector passives. The artifact is not
   registered as active Klipper wiring.

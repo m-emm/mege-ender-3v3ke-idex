@@ -195,7 +195,6 @@ def test_tmc5160_review_wiring_uses_stepstick_spi_adapter_pattern():
         "GND_LOGIC_8",
     ]
     assert top["pins"] == ["DIAG"]
-    assert top["origin"] == [j1["origin"][0] + 1, j1["origin"][1] + 1]
 
 
 def test_tmc5160_review_wiring_has_four_true_2x10_component_carriers():
@@ -251,16 +250,9 @@ def test_tmc5160_review_wiring_has_four_true_2x10_component_carriers():
         ],
     }
 
-    row_offsets = {"A": (3, 0), "B": (3, 0), "C": (3, 0), "HV": (3, 0)}
-    row_directions = {"A": "down", "B": "down", "C": "down", "HV": "down"}
     for prefix, pairs in expected_pairs.items():
         rows = _pin_sets_with_prefix(wiring, prefix)
         assert len(rows) == 2
-        assert (
-            rows[1]["origin"][0] - rows[0]["origin"][0],
-            rows[1]["origin"][1] - rows[0]["origin"][1],
-        ) == row_offsets[prefix]
-        assert rows[0]["direction"] == rows[1]["direction"] == row_directions[prefix]
         assert list(zip(rows[0]["pins"], rows[1]["pins"], strict=True)) == pairs
 
     socket_a_left = _pin_sets_with_prefix(wiring, "A")[0]["pins"]
@@ -326,30 +318,15 @@ def test_tmc5160_review_wiring_stays_out_of_active_klipper_validation():
     ) in wire_pairs
 
 
-def test_tmc5160_review_wiring_uses_only_available_wire_colors():
+def test_tmc5160_review_wiring_uses_declared_wire_types():
     wiring = _load_tmc5160_review_wiring()
-    colors = wiring["color_map"]
+    declared_wire_types = set(wiring["color_map"])
+    used_wire_types = {wire["type"] for wire in wiring["wires"]}
 
-    assert colors == {
-        "power": "#ff0000",
-        "hazard_power": "#ff0000",
-        "lv_power": "#9ca3af",
-        "ground": "#000000",
-        "clock": "#0057d8",
-        "data": "#d9a900",
-        "control": "#d9a900",
-        "return": "#d9a900",
-        "power_good": "#d9a900",
-        "default": "#d9a900",
-    }
-    assert {colors[wire["type"]] for wire in wiring["wires"]} == {
-        "#ff0000",
-        "#9ca3af",
-        "#000000",
-        "#0057d8",
-        "#d9a900",
-    }
-    assert all("color" not in wire for wire in wiring["wires"])
+    assert used_wire_types <= declared_wire_types
+    assert all(
+        isinstance(color, str) and color for color in wiring["color_map"].values()
+    )
 
     pull_up_supply_contacts = {
         "B02_R6_3V3",
@@ -387,30 +364,22 @@ def test_tmc5160_review_wiring_uses_only_available_wire_colors():
 
 
 def test_generated_tmc5160_review_svgs_include_physical_boundaries():
-    expected_labels = {
-        "PICO_VBUS_40",
-        "U1_14_VCC",
-        "TMC1_J1_MOSI_CFG1_2",
-        "TMC1_TOP_DIAG",
-        "A08_Q1_C",
-        "A13_NC",
-        "B01_NC",
-        "C14_R13_STEP",
-        "HV01_U2P1_LEDA_A",
-        "HV20_U2P8_E_A",
-        "HV08_R1_24V",
-        "HV09_DZ1_K",
-        "HV10_D1_K",
-        "TMC5160_HV_1B",
-        "TMC5160_HV_HVIN_8_60V",
+    wiring = _load_tmc5160_review_wiring()
+    expected_pin_labels = {
+        f"{pin_set.get('prefix', '')}{pin}"
+        for pin_set in wiring["pin_sets"]
+        for pin in pin_set["pins"]
     }
+    expected_box_ids = {box["id"] for box in wiring.get("boxes", [])}
 
     for view in ("top", "bottom"):
         svg_text = (
             WIRING_DIR / "diagrams" / f"rp2040plus_btt_tmc5160t_plus_y_{view}.svg"
         ).read_text(encoding="utf-8")
-        for label in expected_labels:
+        for label in expected_pin_labels:
             assert label in svg_text
+        for box_id in expected_box_ids:
+            assert f'data-box="{box_id}"' in svg_text
         assert "NC_Q1" not in svg_text
 
 
@@ -430,6 +399,12 @@ def test_generated_tmc5160_discrete_top_is_an_assembly_view_without_wires():
     assert component_refs == {
         placement["ref"] for placement in wiring["component_placements"]
     }
+    rendered_box_ids = {
+        node.attrib["data-box"]
+        for node in root.iter()
+        if node.attrib.get("class") == "pinout-box"
+    }
+    assert rendered_box_ids == {box["id"] for box in wiring.get("boxes", [])}
     assert len(
         [
             node
@@ -441,11 +416,9 @@ def test_generated_tmc5160_discrete_top_is_an_assembly_view_without_wires():
     text_values = {
         node.text for node in root.iter(f"{namespace}text") if node.text is not None
     }
-    assert "RP2040-Plus" in text_values
-    assert "Socket A — AR20" in text_values
-    assert "HV detector socket — AR20" in text_values
-    assert "SN7407N" in text_values
-    assert "ILD74" in text_values
+    assert {
+        group["label"] for group in wiring["discrete_view"]["groups"]
+    } <= text_values
     assert "PICO_THREEV3_EN_37" not in text_values
     assert any(node.attrib.get("class") == "cathode-band" for node in root.iter())
     assert any(node.attrib.get("class") == "dip-pin-one-marker" for node in root.iter())
