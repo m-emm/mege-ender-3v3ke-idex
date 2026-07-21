@@ -43,6 +43,7 @@ class Vision:
                 "bed_y_search_radius_mm", 5.0, above=0.0
             ),
         }
+        self.last_bed_y_reference = None
         self.last_bed_y_measurement = None
         self.gcode = self.printer.lookup_object("gcode")
         self.gcode.register_command(
@@ -70,10 +71,26 @@ class Vision:
             self.cmd_VISION_MEASURE_BED_Y,
             desc="Synchronously measure physical bed Y with the nozzle camera.",
         )
+        self.gcode.register_command(
+            "VISION_BED_Y_REFERENCE",
+            self.cmd_VISION_BED_Y_REFERENCE,
+            desc="Capture a fresh run-local bed Y reference.",
+        )
+        self.gcode.register_command(
+            "VISION_VALIDATE_BED_Y_REFERENCE",
+            self.cmd_VISION_VALIDATE_BED_Y_REFERENCE,
+            desc="Validate a run-local bed Y reference with a known move.",
+        )
+        self.gcode.register_command(
+            "VISION_MEASURE_BED_Y_RELATIVE",
+            self.cmd_VISION_MEASURE_BED_Y_RELATIVE,
+            desc="Measure bed Y against the validated run-local reference.",
+        )
 
     def get_status(self, eventtime):
         return {
             "bed_y_calibrated": self.bed_y_calibrated,
+            "last_bed_y_reference": self.last_bed_y_reference,
             "last_bed_y_measurement": self.last_bed_y_measurement,
         }
 
@@ -236,6 +253,165 @@ class Vision:
             },
         )
 
+    def _bed_y_common_params(self, gcmd):
+        params = dict(self.bed_y_calibration)
+        params.update(
+            {
+                "run": gcmd.get("RUN", "manual"),
+                "step": gcmd.get_int("STEP", 0, minval=0),
+                "toolhead_position": self._toolhead_position(),
+                "gcode_position": self._gcode_position(),
+                "homed_axes": self._homed_axes(),
+            }
+        )
+        return params
+
+    def _bed_y_light_off(self):
+        try:
+            self.gcode.run_script_from_command("VISION_LIGHT_OFF")
+        except Exception:
+            pass
+
+    def _respond_bed_y_measurement(self, gcmd, result, params, label):
+        gcmd.respond_info(
+            "%s: measured=%.4f expected=%.4f error=%+.4f "
+            "correlation=%.4f retry=%s run=%s step=%s"
+            % (
+                label,
+                float(result.get("measured_y_mm")),
+                float(result.get("expected_y_mm")),
+                float(result.get("error_mm")),
+                float(result.get("correlation")),
+                result.get("retry_used"),
+                params["run"],
+                params["step"],
+            )
+        )
+
+    def _require_bed_y_reference(self, gcmd, run):
+        reference = self.last_bed_y_reference
+        if reference is None:
+            raise gcmd.error(
+                "Run-local bed Y measurement requires VISION_BED_Y_REFERENCE"
+            )
+        if reference.get("run") != run:
+            raise gcmd.error(
+                "Run-local bed Y reference RUN=%s does not match RUN=%s"
+                % (reference.get("run"), run)
+            )
+        return reference
+
+    def cmd_VISION_BED_Y_REFERENCE(self, gcmd):
+        if not self.bed_y_calibrated:
+            raise gcmd.error(
+                "VISION_BED_Y_REFERENCE requires cameras.nozzle_cam calibration"
+            )
+        self._wait_moves()
+        params = self._bed_y_common_params(gcmd)
+        params["run_reference_y_mm"] = gcmd.get_float("REFERENCE_Y")
+        try:
+            response = self._request_visiond("bed_y_reference", params)
+            result = response.get("result") or {}
+            self.last_bed_y_reference = result
+            self.last_bed_y_measurement = None
+        finally:
+            self._bed_y_light_off()
+        gcmd.respond_info(
+            "Run-local bed Y reference: Y=%.4f anchor=(%.3f, %.3f) "
+            "correlation=%.4f run=%s session=%s"
+            % (
+                float(result["reference_y_mm"]),
+                float(result["reference_anchor_px"][0]),
+                float(result["reference_anchor_px"][1]),
+                float(result["bootstrap_correlation"]),
+                result["run"],
+                result["session_id"],
+            )
+        )
+        return result
+
+    def cmd_VISION_VALIDATE_BED_Y_REFERENCE(self, gcmd):
+        if not self.bed_y_calibrated:
+            raise gcmd.error(
+                "VISION_VALIDATE_BED_Y_REFERENCE requires cameras.nozzle_cam calibration"
+            )
+        self._wait_moves()
+        params = self._bed_y_common_params(gcmd)
+        reference = self._require_bed_y_reference(gcmd, params["run"])
+        params.update(
+            {
+                "session_id": reference["session_id"],
+                "expected_delta_mm": gcmd.get_float("EXPECTED_DELTA"),
+                "tolerance_mm": gcmd.get_float("TOLERANCE", 0.1, above=0.0),
+                "confirm": gcmd.get_int("CONFIRM", 1, minval=0, maxval=2),
+                "phase": gcmd.get("PHASE", "startup_validation"),
+            }
+        )
+        try:
+            response = self._request_visiond("validate_bed_y_reference", params)
+            result = response.get("result") or {}
+            self.last_bed_y_measurement = result
+            if result.get("accepted"):
+                updated = dict(reference)
+                updated["validated"] = True
+                updated["live_axis_vector_px_per_mm"] = result.get(
+                    "live_axis_vector_px_per_mm"
+                )
+                self.last_bed_y_reference = updated
+        finally:
+            self._bed_y_light_off()
+        self._respond_bed_y_measurement(
+            gcmd, result, params, "Run-local bed Y 1 mm validation"
+        )
+        if not result.get("accepted"):
+            raise gcmd.error(
+                "Run-local bed Y 1 mm validation failed: %s"
+                % result.get("failure_reason", "measurement rejected")
+            )
+        gcmd.respond_info(
+            "Run-local bed Y pixel vector: (%.6f, %.6f) px/mm"
+            % tuple(float(value) for value in result["live_axis_vector_px_per_mm"])
+        )
+        return result
+
+    def cmd_VISION_MEASURE_BED_Y_RELATIVE(self, gcmd):
+        if not self.bed_y_calibrated:
+            raise gcmd.error(
+                "VISION_MEASURE_BED_Y_RELATIVE requires cameras.nozzle_cam calibration"
+            )
+        self._wait_moves()
+        params = self._bed_y_common_params(gcmd)
+        reference = self._require_bed_y_reference(gcmd, params["run"])
+        if not reference.get("validated"):
+            raise gcmd.error(
+                "Run-local bed Y reference has not passed its 1 mm validation"
+            )
+        params.update(
+            {
+                "session_id": reference["session_id"],
+                "expected_delta_mm": gcmd.get_float("EXPECTED_DELTA", 0.0),
+                "tolerance_mm": gcmd.get_float("TOLERANCE", 0.25, above=0.0),
+                "confirm": gcmd.get_int("CONFIRM", 1, minval=0, maxval=2),
+                "assert_position": bool(gcmd.get_int("ASSERT", 1, minval=0, maxval=1)),
+                "phase": gcmd.get("PHASE", "repeatability"),
+            }
+        )
+        try:
+            response = self._request_visiond("measure_bed_y_relative", params)
+            result = response.get("result") or {}
+            self.last_bed_y_measurement = result
+        finally:
+            self._bed_y_light_off()
+        self._respond_bed_y_measurement(
+            gcmd, result, params, "Run-local bed Y measurement"
+        )
+        if params["assert_position"] and not result.get("accepted"):
+            raise gcmd.error(
+                "Run-local bed Y check failed: %s"
+                % result.get("failure_reason", "measurement rejected")
+            )
+        return result
+
     def cmd_VISION_MEASURE_BED_Y(self, gcmd):
         if not self.bed_y_calibrated:
             raise gcmd.error(
@@ -246,13 +422,9 @@ class Vision:
         params.update(
             {
                 "expected_y_mm": gcmd.get_float("EXPECTED_Y"),
-                "tolerance_mm": gcmd.get_float(
-                    "TOLERANCE", 0.25, above=0.0
-                ),
+                "tolerance_mm": gcmd.get_float("TOLERANCE", 0.25, above=0.0),
                 "confirm": gcmd.get_int("CONFIRM", 1, minval=0, maxval=2),
-                "assert_position": bool(
-                    gcmd.get_int("ASSERT", 1, minval=0, maxval=1)
-                ),
+                "assert_position": bool(gcmd.get_int("ASSERT", 1, minval=0, maxval=1)),
                 "run": gcmd.get("RUN", "manual"),
                 "step": gcmd.get_int("STEP", 0, minval=0),
                 "toolhead_position": self._toolhead_position(),

@@ -113,10 +113,30 @@ Generate the initial 20-check conservative repeatability file with:
 python generate_y_step_loss_test_gcode.py --pattern camera-repeatability --camera-run-id camera_repeatability_YYYYMMDD
 ```
 
+Each execution homes Y, moves to a checkpoint `10 mm` from the configured
+endstop, and captures a fresh run-local reference. It then moves `1 mm` toward
+home and requires the camera alignment to report `1.00 +/- 0.10 mm`. A passing
+validation supplies the pixel-per-mm vector for that run. The test returns to
+the checkpoint, verifies the reference again, and only then starts the stress
+moves. The persisted calibration template is used only to locate the bed
+feature in the first frame; its old absolute pixel position is not used as the
+repeatability reference. Every execution gets a separate result-session
+directory even when the same G-code file is run again.
+
 The default is one `100 mm/s`, `1000 mm/s^2` profile. A later acceleration
 ladder is enabled only by explicit arguments such as
 `--camera-velocity 500 --camera-accel-start 3500 --camera-accel-stop 8000
 --camera-accel-step 500 --camera-checks-per-profile 2`.
+
+If a high-quality camera measurement exceeds the Y tolerance, the generated
+test verifies the physical endstop before stopping. It predicts the shifted
+commanded endstop as `configured_endstop - camera_error`, moves at `2 mm/s` and
+`50 mm/s^2` to `0.5 mm` before that point, and requires the switch to remain
+open. It then checks the predicted point and, if still open, checks once more
+`0.1 mm` farther toward the endstop. The terminal error reports whether the
+camera prediction and physical switch agree. Untrusted camera matches and
+runtime targets outside the configured Y range abort without making these
+verification moves.
 
 ## Nozzle Camera Z Calibration Sweep
 

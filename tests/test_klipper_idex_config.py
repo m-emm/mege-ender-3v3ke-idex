@@ -1347,8 +1347,29 @@ def test_camera_repeatability_generator_is_y_only_and_defaults_to_one_safe_profi
     gcode = generator.generate_camera_repeatability_gcode(printer, plan)
     lines = gcode.splitlines()
 
-    measure_lines = [line for line in lines if line.startswith("VISION_MEASURE_BED_Y ")]
+    reference_lines = [
+        line for line in lines if line.startswith("VISION_BED_Y_REFERENCE ")
+    ]
+    validation_lines = [
+        line for line in lines if line.startswith("VISION_VALIDATE_BED_Y_REFERENCE ")
+    ]
+    measure_lines = [
+        line for line in lines if line.startswith("VISION_MEASURE_BED_Y_RELATIVE ")
+    ]
+    diagnostic_lines = [
+        line for line in lines if line.startswith("Y_CAMERA_VERIFY_SHIFTED_ENDSTOP ")
+    ]
+    assert len(reference_lines) == 1
+    assert "REFERENCE_Y=-4.800" in reference_lines[0]
+    assert len(validation_lines) == 1
+    assert "EXPECTED_DELTA=-1.000" in validation_lines[0]
+    assert "TOLERANCE=0.1" in validation_lines[0]
     assert len(measure_lines) == 21
+    assert len(diagnostic_lines) == 20
+    assert "ASSERT=1" in measure_lines[0]
+    assert "PHASE=startup_return" in measure_lines[0]
+    assert all("ASSERT=0" in line for line in measure_lines[1:])
+    assert all("PHASE=stress" in line for line in measure_lines[1:])
     assert sum(line == "G28 Y" for line in lines) == 1
     assert "QUERY_ENDSTOPS" not in gcode
     assert "Y_STEP_LOSS_ASSERT_ENDSTOP" not in gcode
@@ -1360,8 +1381,62 @@ def test_camera_repeatability_generator_is_y_only_and_defaults_to_one_safe_profi
     assert gcode.count("profile=accel_1000") == 20
     restore = "SET_VELOCITY_LIMIT VELOCITY=500 ACCEL=6000 SQUARE_CORNER_VELOCITY=5"
     for index, line in enumerate(lines):
-        if line.startswith("VISION_MEASURE_BED_Y "):
+        if line.startswith("VISION_MEASURE_BED_Y_RELATIVE "):
             assert restore in lines[max(0, index - 5) : index]
+            if "PHASE=stress" in line:
+                assert lines[index + 1].startswith("Y_CAMERA_VERIFY_SHIFTED_ENDSTOP ")
+    expected_diagnostic_parameters = (
+        f"CLEARANCE={plan.endstop_clearance_mm:g} "
+        f"EXTRA={plan.endstop_extra_mm:g} "
+        f"VELOCITY={plan.endstop_velocity_mm_s:g} "
+        f"ACCEL={plan.endstop_accel_mm_s2:g}"
+    )
+    assert all(expected_diagnostic_parameters in line for line in diagnostic_lines)
+
+
+def test_camera_shifted_endstop_verification_is_bounded_and_stops_with_result():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    entry = _section(config_text, "gcode_macro Y_CAMERA_VERIFY_SHIFTED_ENDSTOP")
+    start = _section(config_text, "gcode_macro _Y_CAMERA_SHIFTED_ENDSTOP_CHECK_START")
+    near = _section(config_text, "gcode_macro _Y_CAMERA_SHIFTED_ENDSTOP_CHECK_NEAR")
+    predicted = _section(
+        config_text, "gcode_macro _Y_CAMERA_SHIFTED_ENDSTOP_CHECK_PREDICTED"
+    )
+    extra = _section(config_text, "gcode_macro _Y_CAMERA_SHIFTED_ENDSTOP_CHECK_EXTRA")
+    stop = _section(config_text, "gcode_macro _Y_CAMERA_SHIFTED_ENDSTOP_STOP")
+
+    assert 'not measurement["accepted"]' in entry
+    assert 'not measurement["quality_ok"]' in entry
+    assert "configured_endstop - error" in entry
+    assert "predicted + clearance" in entry
+    assert "predicted - extra" in entry
+    assert "position_min" in entry
+    assert "position_max" in entry
+    assert "QUERY_ENDSTOPS" in entry
+    assert "_Y_CAMERA_SHIFTED_ENDSTOP_CHECK_START" in entry
+
+    assert 'printer.query_endstops.last_query["stepper_y"]' in start
+    assert "G1 Y{params.NEAR}" in start
+    assert "QUERY_ENDSTOPS" in start
+    assert "_Y_CAMERA_SHIFTED_ENDSTOP_CHECK_NEAR" in start
+
+    assert 'printer.query_endstops.last_query["stepper_y"]' in near
+    assert "G1 Y{params.PREDICTED}" in near
+    assert "QUERY_ENDSTOPS" in near
+    assert "_Y_CAMERA_SHIFTED_ENDSTOP_CHECK_PREDICTED" in near
+
+    assert 'printer.query_endstops.last_query["stepper_y"]' in predicted
+    assert "G1 Y{params.EXTRA_TARGET}" in predicted
+    assert "QUERY_ENDSTOPS" in predicted
+    assert "_Y_CAMERA_SHIFTED_ENDSTOP_CHECK_EXTRA" in predicted
+
+    assert "SET_VELOCITY_LIMIT" in extra
+    assert "OUTCOME=EXTRA_TRIGGERED" in extra
+    assert "OUTCOME=EXTRA_OPEN" in extra
+    assert "action_raise_error" in stop
+    assert "AGREE:" in stop
+    assert "AGREE WITHIN" in stop
+    assert "DISAGREE:" in stop
 
 
 def test_camera_repeatability_acceleration_ladder_is_cli_configurable():
@@ -1388,7 +1463,9 @@ def test_camera_repeatability_acceleration_ladder_is_cli_configurable():
     profiles = generator.camera_stress_profiles(plan)
     assert [profile.accel_mm_s2 for profile in profiles] == [3500.0, 4000.0, 4500.0]
     gcode = generator.generate_camera_repeatability_gcode(printer, plan)
-    assert gcode.count("VISION_MEASURE_BED_Y ") == 7
+    assert gcode.count("VISION_MEASURE_BED_Y_RELATIVE ") == 7
+    assert gcode.count("VISION_BED_Y_REFERENCE ") == 1
+    assert gcode.count("VISION_VALIDATE_BED_Y_REFERENCE ") == 1
 
     with pytest.raises(ValueError, match="step must be positive"):
         generator.camera_stress_profiles(

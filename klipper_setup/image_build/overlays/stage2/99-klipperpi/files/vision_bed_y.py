@@ -174,5 +174,56 @@ def match_template(
         "anchor_px": [float(anchor[0]), float(anchor[1])],
         "match_roi": [matched_x, matched_y, template_width, template_height],
         "search_roi": [x0, y0, x1 - x0, y1 - y0],
+        "search_boundary_hit": bool(
+            max_loc[0] in (0, response.shape[1] - 1)
+            or max_loc[1] in (0, response.shape[0] - 1)
+        ),
+        "texture_std": texture_std,
+    }
+
+
+def match_template_full_image(
+    *,
+    image: Any,
+    template_image: Any,
+    feature_mode: str,
+) -> dict[str, Any]:
+    """Locate a bootstrap template without relying on its calibrated anchor."""
+    import cv2
+
+    image_feature = preprocess_image(image, feature_mode)
+    template_feature = preprocess_image(template_image, feature_mode)
+    image_height, image_width = image_feature.shape[:2]
+    template_height, template_width = template_feature.shape[:2]
+    texture_std = float(template_feature.std())
+    if texture_std <= 0.015:
+        raise ValueError(
+            "bed-Y reference template has too little texture "
+            f"(std={texture_std:.5f})"
+        )
+    if template_height > image_height or template_width > image_width:
+        raise ValueError("bed-Y template is larger than the camera frame")
+
+    response = cv2.matchTemplate(
+        image_feature.astype("float32"),
+        template_feature.astype("float32"),
+        cv2.TM_CCOEFF_NORMED,
+    )
+    _min_value, max_value, _min_loc, max_loc = cv2.minMaxLoc(response)
+    sub_x, sub_y = subpixel_peak_offset(response, max_loc)
+    matched_x = float(max_loc[0]) + sub_x
+    matched_y = float(max_loc[1]) + sub_y
+    return {
+        "correlation": float(max_value),
+        "anchor_px": [
+            matched_x + template_width / 2.0,
+            matched_y + template_height / 2.0,
+        ],
+        "match_roi": [matched_x, matched_y, template_width, template_height],
+        "search_roi": [0, 0, image_width, image_height],
+        "search_boundary_hit": bool(
+            max_loc[0] in (0, response.shape[1] - 1)
+            or max_loc[1] in (0, response.shape[0] - 1)
+        ),
         "texture_std": texture_std,
     }

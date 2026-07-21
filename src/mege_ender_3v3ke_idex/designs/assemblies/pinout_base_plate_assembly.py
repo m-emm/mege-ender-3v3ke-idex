@@ -7,6 +7,7 @@ from typing import Any, Mapping
 
 from mege_circuits.simple import PinoutDownholderKind, load_pinout_config
 from mege_ender_3v3ke_idex.designs.assemblies.pin_header_board_helpers import (
+    create_sil_header,
     create_sil_pin_line_clamp,
 )
 from shellforgepy.simple import *
@@ -303,6 +304,8 @@ def create_pinout_base_plate_assembly(
     pin_pass_through_centers_mm: list[dict[str, Any]] = []
     individual_pin_pass_through_metadata: list[dict[str, Any]] = []
     pin_row_slot_metadata: list[dict[str, Any]] = []
+    pin_row_slot_parts = {}
+    positioned_pin_headers = []
     row_slot_count = 0
     individual_hole_count = 0
     for component in pinout_project.physical_components:
@@ -434,6 +437,7 @@ def create_pinout_base_plate_assembly(
                 ),
             )
             pin_row_slots = pin_row_slots.fuse(pin_row_slot)
+            pin_row_slot_parts[(component.id, pin_set_id)] = pin_row_slot
             pin_row_slot_metadata.append(
                 {
                     "component_id": component.id,
@@ -448,6 +452,45 @@ def create_pinout_base_plate_assembly(
                 }
             )
             row_slot_count += 1
+
+            if component.downholder is PinoutDownholderKind.PIN_LINE_CLAMP:
+                continue
+
+            if len(source_coordinates) == 1:
+                angle_degrees = 0
+            else:
+                delta_x = source_coordinates[1][0] - source_coordinates[0][0]
+                delta_y = source_coordinates[1][1] - source_coordinates[0][1]
+                angle_degrees = {
+                    (0.0, 1.0): 0,
+                    (1.0, 0.0): -90,
+                    (0.0, -1.0): 180,
+                    (-1.0, 0.0): 90,
+                }[(delta_x, delta_y)]
+
+            pin_header = create_sil_header(
+                num_y_pins=len(pin_names),
+                dil_pitch=raster_pitch_mm,
+                wire_wrap_pin_side=pin_tail_width_mm,
+                wire_wrap_pin_length=wire_wrap_pin_length_mm,
+                wire_wrap_pin_base_thickness=wire_wrap_pin_base_thickness_mm,
+                wire_wrap_pin_base_width=pin_row_base_width_mm,
+                top_pin_length=top_pin_length_mm,
+                pin_cutter_slack=pin_clearance_mm,
+            )
+            pin_header = rotate(angle_degrees)(pin_header)
+            pin_header = pin_header.aligned_from_cutter(
+                "pin_cutters",
+                pin_row_slot,
+                Alignment.CENTER,
+                axes=[0, 1],
+            )
+            pin_header = align(
+                pin_header,
+                base_plate,
+                Alignment.TOP,
+            )
+            positioned_pin_headers.append((component.id, pin_set_id, pin_header))
 
     pin_line_clamp_recesses = PartCollector()
     pin_line_clamp_recess_count = 0
@@ -502,24 +545,12 @@ def create_pinout_base_plate_assembly(
             slit_width=pin_line_clamp_slit_width_mm,
         )
         pin_line_clamp = rotate(angle_degrees)(pin_line_clamp)
-
-        angle_radians = math.radians(angle_degrees)
-        local_first_x_mm = -raster_pitch_mm / 2
-        local_first_y_mm = raster_pitch_mm / 2
-        rotated_first_x_mm = local_first_x_mm * math.cos(
-            angle_radians
-        ) - local_first_y_mm * math.sin(angle_radians)
-        rotated_first_y_mm = local_first_x_mm * math.sin(
-            angle_radians
-        ) + local_first_y_mm * math.cos(angle_radians)
-        first_source_x, first_source_y = source_coordinates[0]
-        first_center_x_mm = first_source_x * raster_pitch_mm - plate_source_minimum_x_mm
-        first_center_y_mm = first_source_y * raster_pitch_mm - plate_source_minimum_y_mm
-        pin_line_clamp = translate(
-            first_center_x_mm - rotated_first_x_mm,
-            first_center_y_mm - rotated_first_y_mm,
-            0,
-        )(pin_line_clamp)
+        pin_line_clamp = pin_line_clamp.aligned_from_cutter(
+            "pin_cutters",
+            pin_row_slot_parts[(component.id, pin_set_id)],
+            Alignment.CENTER,
+            axes=[0, 1],
+        )
         pin_line_clamp = pin_line_clamp.aligned_from_follower(
             "additional_pins_base_plate",
             base_plate,
@@ -564,6 +595,17 @@ def create_pinout_base_plate_assembly(
         assembly.add_named_non_production_part(
             pin_line_clamp.get_named_non_production_part("top_pins"),
             f"pin_line_{component_id}_top_pins",
+        )
+
+    for component_id, pin_set_id, pin_header in positioned_pin_headers:
+        preview_name = f"pin_header_{component_id}_{pin_set_id}"
+        assembly.add_named_non_production_part(
+            pin_header.leader,
+            f"{preview_name}_pins",
+        )
+        assembly.add_named_non_production_part(
+            pin_header.get_follower_part_by_name("top_pins"),
+            f"{preview_name}_top_pins",
         )
 
     normalized_envelopes: dict[str, dict[str, Any]] = {}

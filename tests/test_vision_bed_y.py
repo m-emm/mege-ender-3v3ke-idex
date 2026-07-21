@@ -106,6 +106,30 @@ def test_template_matching_recovers_subpixel_axis_translation():
     assert match["anchor_px"][1] == pytest.approx(reference_anchor[1] - 31.7, abs=0.35)
 
 
+def test_full_frame_template_matching_bootstraps_after_camera_translation():
+    module = _load(BED_Y_PATH, "vision_bed_y_full_match_test")
+    image = _textured_image()
+    template = image[190:290, 230:410]
+    shifted = cv2.warpAffine(
+        image,
+        np.float32([[1.0, 0.0, -3.0], [0.0, 1.0, -53.0]]),
+        (image.shape[1], image.shape[0]),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_REFLECT,
+    )
+
+    match = module.match_template_full_image(
+        image=shifted,
+        template_image=template,
+        feature_mode="gray_norm",
+    )
+
+    assert match["correlation"] > 0.95
+    assert match["anchor_px"][0] == pytest.approx(317.0, abs=0.4)
+    assert match["anchor_px"][1] == pytest.approx(187.0, abs=0.4)
+    assert match["search_boundary_hit"] is False
+
+
 def _load_capture(monkeypatch, tmp_path):
     output = tmp_path / "vision" / "nozzle_cam"
     framebuffer = tmp_path / "framebuffer"
@@ -155,9 +179,7 @@ def test_runtime_rejects_template_hash_and_frame_resolution(monkeypatch, tmp_pat
     api = module.VisionJobApi(job_root=tmp_path / "jobs", request_timeout=0.2)
 
     with pytest.raises(module.CaptureError, match="template hash mismatch"):
-        api._measure_bed_y_attempt(
-            {**params, "template_sha256": "0" * 64}, attempt=1
-        )
+        api._measure_bed_y_attempt({**params, "template_sha256": "0" * 64}, attempt=1)
 
     frame_path = tmp_path / "frame.jpg"
     cv2.imwrite(str(frame_path), image)
@@ -252,7 +274,9 @@ def test_runtime_confirms_suspicious_measurement_and_writes_summary(
             },
         ]
     )
-    monkeypatch.setattr(api, "_measure_bed_y_attempt", lambda *_args, **_kwargs: next(attempts))
+    monkeypatch.setattr(
+        api, "_measure_bed_y_attempt", lambda *_args, **_kwargs: next(attempts)
+    )
     result = api.measure_bed_y(params)
     assert result["accepted"] is True
     assert result["retry_used"] is True
@@ -261,6 +285,89 @@ def test_runtime_confirms_suspicious_measurement_and_writes_summary(
     assert summary["measurement_count"] == 1
     assert summary["accepted_count"] == 1
     assert summary["retry_count"] == 1
+
+
+def test_run_local_reference_validates_one_mm_and_uses_live_vector(
+    monkeypatch, tmp_path
+):
+    module = _load_capture(monkeypatch, tmp_path)
+    api = module.VisionJobApi(job_root=tmp_path / "jobs", request_timeout=0.2)
+    original = _textured_image()
+    template_path = tmp_path / "template.png"
+    cv2.imwrite(str(template_path), original[190:290, 230:410])
+    params = _measurement_params(template_path)
+    params.update(
+        {
+            "run": "dynamic_reference",
+            "run_reference_y_mm": -4.8,
+            "confirm": 0,
+        }
+    )
+
+    baseline = cv2.warpAffine(
+        original,
+        np.float32([[1.0, 0.0, -3.0], [0.0, 1.0, -53.0]]),
+        (original.shape[1], original.shape[0]),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_REFLECT,
+    )
+    validation = cv2.warpAffine(
+        baseline,
+        np.float32([[1.0, 0.0, 0.0], [0.0, 1.0, 10.0]]),
+        (original.shape[1], original.shape[0]),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_REFLECT,
+    )
+    frame_paths = []
+    for name, image in (
+        ("baseline", baseline),
+        ("validation", validation),
+        ("return", baseline),
+    ):
+        frame_path = tmp_path / f"{name}.jpg"
+        cv2.imwrite(str(frame_path), image)
+        frame_paths.append(frame_path)
+    frames = iter(
+        (path, {"frame_seq": index + 2}) for index, path in enumerate(frame_paths)
+    )
+    monkeypatch.setattr(module, "read_framebuffer_metadata", lambda: {"frame_seq": 1})
+    monkeypatch.setattr(
+        module,
+        "wait_for_buffered_frame_seq_after",
+        lambda **_kwargs: next(frames),
+    )
+
+    reference = api.bed_y_reference(params)
+    assert reference["bootstrap_correlation"] > 0.95
+    assert reference["validated"] is False
+    session_params = {
+        **params,
+        "session_id": reference["session_id"],
+        "expected_delta_mm": -1.0,
+        "tolerance_mm": 0.1,
+        "phase": "startup_validation",
+    }
+    validation_result = api.validate_bed_y_reference(session_params)
+    assert validation_result["accepted"] is True, validation_result
+    assert validation_result["measured_delta_mm"] == pytest.approx(-1.0, abs=0.1)
+    assert validation_result["live_axis_vector_px_per_mm"][0] == pytest.approx(
+        -0.25, abs=0.5
+    )
+    assert validation_result["live_axis_vector_px_per_mm"][1] == pytest.approx(
+        -10.5, abs=0.6
+    )
+
+    return_result = api.measure_bed_y_relative(
+        {
+            **session_params,
+            "expected_delta_mm": 0.0,
+            "phase": "startup_return",
+        }
+    )
+    assert return_result["accepted"] is True, return_result
+    assert return_result["error_mm"] == pytest.approx(0.0, abs=0.1)
+    assert return_result["session_id"] == reference["session_id"]
+    assert Path(return_result["summary_path"]).parent.name == reference["session_id"]
 
 
 def test_bed_y_calibration_import_writes_valid_yaml_and_template(tmp_path):

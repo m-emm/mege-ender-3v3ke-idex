@@ -31,6 +31,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 from vision_bed_y import expected_pixel_for_y
 from vision_bed_y import match_template as match_bed_y_template
+from vision_bed_y import match_template_full_image as match_bed_y_template_full_image
 from vision_bed_y import project_pixel_to_y
 from vision_bed_y import sha256_file
 
@@ -89,9 +90,7 @@ DEFAULT_FRAME_FRESH_TIMEOUT = float(os.environ.get("VISION_FRAME_FRESH_TIMEOUT",
 DEFAULT_FRAME_MAX_AGE = float(os.environ.get("VISION_FRAME_MAX_AGE", "10"))
 DEFAULT_CAMERA_PROFILE = os.environ.get("VISION_CAPTURE_DEFAULT_PROFILE", "").strip()
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
-HASHED_GCODE_TOKEN_RE = re.compile(
-    r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+"
-)
+HASHED_GCODE_TOKEN_RE = re.compile(r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+")
 VISION_HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
 VISION_JOB_SCHEMA_VERSION = 1
 VISIOND_CAMERA = os.environ.get("VISIOND_CAMERA", "nozzle_cam")
@@ -436,8 +435,7 @@ def wait_for_buffered_frame_seq_after(
             last_error = exc
             time.sleep(0.05)
     raise CaptureError(
-        "Timed out waiting for buffered frame_seq advancement: "
-        f"{last_error}"
+        "Timed out waiting for buffered frame_seq advancement: " f"{last_error}"
     )
 
 
@@ -459,7 +457,9 @@ def wait_for_active_profile(profile: str, *, timeout: float) -> dict[str, Any]:
         except Exception as exc:
             last_error = exc
         time.sleep(0.05)
-    raise CaptureError(f"Timed out waiting for camera profile {profile!r}: {last_error}")
+    raise CaptureError(
+        f"Timed out waiting for camera profile {profile!r}: {last_error}"
+    )
 
 
 def capture_with_resolution(
@@ -727,6 +727,12 @@ class VisionJobApi:
                 result = self.job_end(params)
             elif action == "measure_bed_y":
                 result = self.measure_bed_y(params)
+            elif action == "bed_y_reference":
+                result = self.bed_y_reference(params)
+            elif action == "validate_bed_y_reference":
+                result = self.validate_bed_y_reference(params)
+            elif action == "measure_bed_y_relative":
+                result = self.measure_bed_y_relative(params)
             else:
                 raise CaptureError(f"unknown request action {action!r}")
             return {"ok": True, "result": result}
@@ -876,7 +882,9 @@ class VisionJobApi:
             sidecar = frames_dir / f"{frame_id}.json"
             if image.exists() or sidecar.exists():
                 if not image.exists() or not sidecar.exists():
-                    raise CaptureError(f"incomplete committed frame artifacts for {frame_id}")
+                    raise CaptureError(
+                        f"incomplete committed frame artifacts for {frame_id}"
+                    )
                 verify_jpeg(image)
                 json.loads(sidecar.read_text(encoding="utf-8"))
                 completed.append(frame_id)
@@ -930,7 +938,9 @@ class VisionJobApi:
         camera = sanitize_name(params.get("camera"))
         profile = sanitize_profile(params.get("profile"))
         if camera != self.camera:
-            raise CaptureError(f"VISION_PROFILE CAMERA={camera!r} is not {self.camera!r}")
+            raise CaptureError(
+                f"VISION_PROFILE CAMERA={camera!r} is not {self.camera!r}"
+            )
         if not profile:
             raise CaptureError("VISION_PROFILE PROFILE is required")
         requested_at = request_framebuffer_profile(profile, params)
@@ -944,6 +954,375 @@ class VisionJobApi:
             "framebuffer_seq": framebuffer_seq(metadata),
             "camera_profile": metadata.get("camera_profile"),
         }
+
+    def _load_bed_y_template(self, params: dict[str, Any]) -> Any:
+        import cv2
+
+        template_path = Path(str(params.get("template_path") or ""))
+        if not template_path.is_file():
+            raise CaptureError(f"bed-Y template does not exist: {template_path}")
+        expected_template_hash = str(params.get("template_sha256") or "")
+        actual_template_hash = sha256_file(template_path)
+        if actual_template_hash != expected_template_hash:
+            raise CaptureError(
+                "bed-Y template hash mismatch: "
+                f"{actual_template_hash} != {expected_template_hash}"
+            )
+        template = cv2.imread(str(template_path))
+        if template is None:
+            raise CaptureError(f"could not read bed-Y template: {template_path}")
+        expected_template_size = (
+            int(params.get("template_width")),
+            int(params.get("template_height")),
+        )
+        if (template.shape[1], template.shape[0]) != expected_template_size:
+            raise CaptureError(
+                "bed-Y template dimensions do not match calibration: "
+                f"{template.shape[1]}x{template.shape[0]} != "
+                f"{expected_template_size[0]}x{expected_template_size[1]}"
+            )
+        return template
+
+    def _fresh_bed_y_frame(
+        self, params: dict[str, Any]
+    ) -> tuple[bytes, Any, dict[str, Any]]:
+        import cv2
+        import numpy as np
+
+        profile = sanitize_profile(params.get("profile"))
+        try:
+            previous_seq = framebuffer_seq(read_framebuffer_metadata())
+        except Exception:
+            previous_seq = -1
+        source_image, source_metadata = wait_for_buffered_frame_seq_after(
+            previous_frame_seq=previous_seq,
+            timeout=self.request_timeout,
+            required_profile=profile,
+        )
+        image_bytes = source_image.read_bytes()
+        image = cv2.imdecode(
+            np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR
+        )
+        if image is None:
+            raise CaptureError("could not decode fresh bed-Y framebuffer image")
+        expected_size = (
+            int(params.get("image_width")),
+            int(params.get("image_height")),
+        )
+        if (image.shape[1], image.shape[0]) != expected_size:
+            raise CaptureError(
+                "bed-Y frame dimensions do not match calibration: "
+                f"{image.shape[1]}x{image.shape[0]} != "
+                f"{expected_size[0]}x{expected_size[1]}"
+            )
+        return image_bytes, image, source_metadata
+
+    def _bed_y_reference_dir(self, params: dict[str, Any]) -> Path:
+        run_id = sanitize_name(params.get("run") or "manual")
+        session_value = str(params.get("session_id") or "").strip()
+        if not session_value:
+            raise CaptureError("run-local bed-Y measurement requires SESSION_ID")
+        session_id = sanitize_name(session_value)
+        return BED_Y_CHECK_ROOT / run_id / session_id
+
+    def _load_run_bed_y_reference(self, params: dict[str, Any]) -> dict[str, Any]:
+        reference_path = self._bed_y_reference_dir(params) / "reference.json"
+        if not reference_path.is_file():
+            raise CaptureError(
+                f"run-local bed-Y reference does not exist: {reference_path}"
+            )
+        reference = json.loads(reference_path.read_text(encoding="utf-8"))
+        if reference.get("run") != sanitize_name(params.get("run") or "manual"):
+            raise CaptureError("run-local bed-Y reference RUN does not match")
+        if reference.get("session_id") != sanitize_name(params.get("session_id")):
+            raise CaptureError("run-local bed-Y reference SESSION_ID does not match")
+        return reference
+
+    def bed_y_reference(self, params: dict[str, Any]) -> dict[str, Any]:
+        import cv2
+
+        camera = sanitize_name(params.get("camera"))
+        if camera != self.camera:
+            raise CaptureError(f"bed-Y CAMERA={camera!r} is not {self.camera!r}")
+        if "y" not in str(params.get("homed_axes") or ""):
+            raise CaptureError("bed-Y camera reference requires Y homed")
+        if self._active_job():
+            raise CaptureError(
+                f"cannot capture bed Y reference while vision job {self._active_job()!r} is active"
+            )
+
+        bootstrap_template = self._load_bed_y_template(params)
+        image_bytes, image, source_metadata = self._fresh_bed_y_frame(params)
+        match = match_bed_y_template_full_image(
+            image=image,
+            template_image=bootstrap_template,
+            feature_mode=str(params.get("feature_mode")),
+        )
+        correlation = float(match["correlation"])
+        minimum_correlation = float(params.get("min_correlation"))
+        if correlation < minimum_correlation:
+            raise CaptureError(
+                "run-local bed-Y reference could not locate the configured feature: "
+                f"correlation {correlation:.4f} below {minimum_correlation:.4f}"
+            )
+        if match.get("search_boundary_hit"):
+            raise CaptureError(
+                "run-local bed-Y reference feature is clipped by the camera frame"
+            )
+
+        template_width = int(params.get("template_width"))
+        template_height = int(params.get("template_height"))
+        matched_x = int(round(float(match["match_roi"][0])))
+        matched_y = int(round(float(match["match_roi"][1])))
+        matched_x = max(0, min(image.shape[1] - template_width, matched_x))
+        matched_y = max(0, min(image.shape[0] - template_height, matched_y))
+        run_template = image[
+            matched_y : matched_y + template_height,
+            matched_x : matched_x + template_width,
+        ].copy()
+        anchor = (
+            matched_x + template_width / 2.0,
+            matched_y + template_height / 2.0,
+        )
+        encoded, encoded_template = cv2.imencode(".png", run_template)
+        if not encoded:
+            raise CaptureError("could not encode run-local bed-Y reference template")
+
+        run_id = sanitize_name(params.get("run") or "manual")
+        session_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        run_dir = BED_Y_CHECK_ROOT / run_id / session_id
+        reference_frame_path = run_dir / "reference_frame.jpg"
+        reference_template_path = run_dir / "reference_template.png"
+        reference_path = run_dir / "reference.json"
+        atomic_write_bytes(reference_frame_path, image_bytes)
+        atomic_write_bytes(reference_template_path, encoded_template.tobytes())
+        reference = {
+            "run": run_id,
+            "session_id": session_id,
+            "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            "reference_y_mm": round(float(params.get("run_reference_y_mm")), 6),
+            "reference_anchor_px": [round(value, 4) for value in anchor],
+            "configured_axis_vector_px_per_mm": [
+                float(params.get("axis_vector_x")),
+                float(params.get("axis_vector_y")),
+            ],
+            "live_axis_vector_px_per_mm": None,
+            "validated": False,
+            "bootstrap_correlation": round(correlation, 6),
+            "bootstrap_match_roi": [
+                round(float(value), 4) for value in match["match_roi"]
+            ],
+            "reference_framebuffer_seq": framebuffer_seq(source_metadata),
+            "reference_frame_path": str(reference_frame_path),
+            "reference_template_path": str(reference_template_path),
+            "reference_template_sha256": sha256_file(reference_template_path),
+            "template_width": template_width,
+            "template_height": template_height,
+            "feature_mode": str(params.get("feature_mode")),
+        }
+        atomic_write_json(reference_path, reference)
+        return reference
+
+    def _measure_run_bed_y_attempt(
+        self,
+        params: dict[str, Any],
+        *,
+        attempt: int,
+        use_live_vector: bool,
+    ) -> dict[str, Any]:
+        import cv2
+
+        reference = self._load_run_bed_y_reference(params)
+        vector_key = (
+            "live_axis_vector_px_per_mm"
+            if use_live_vector
+            else "configured_axis_vector_px_per_mm"
+        )
+        axis_vector_value = reference.get(vector_key)
+        if not axis_vector_value:
+            raise CaptureError(
+                "run-local bed-Y reference has not passed its 1 mm validation"
+            )
+        axis_vector = tuple(float(value) for value in axis_vector_value)
+        reference_anchor = tuple(
+            float(value) for value in reference["reference_anchor_px"]
+        )
+        reference_y = float(reference["reference_y_mm"])
+        expected_delta = float(params.get("expected_delta_mm"))
+        expected_y = reference_y + expected_delta
+        expected_anchor = expected_pixel_for_y(
+            expected_y_mm=expected_y,
+            reference_y_mm=reference_y,
+            reference_pixel=reference_anchor,
+            axis_vector_px_per_mm=axis_vector,
+        )
+
+        template_path = Path(reference["reference_template_path"])
+        if sha256_file(template_path) != reference["reference_template_sha256"]:
+            raise CaptureError("run-local bed-Y reference template hash mismatch")
+        template = cv2.imread(str(template_path))
+        if template is None:
+            raise CaptureError("could not read run-local bed-Y reference template")
+        image_bytes, image, source_metadata = self._fresh_bed_y_frame(params)
+        match = match_bed_y_template(
+            image=image,
+            template_image=template,
+            expected_anchor_px=expected_anchor,
+            axis_vector_px_per_mm=axis_vector,
+            feature_mode=str(reference["feature_mode"]),
+            search_radius_mm=float(params.get("search_radius_mm")),
+            cross_axis_margin_px=float(params.get("max_cross_axis_px")) * 2.0,
+        )
+        projection = project_pixel_to_y(
+            pixel=tuple(match["anchor_px"]),
+            reference_pixel=reference_anchor,
+            reference_y_mm=reference_y,
+            axis_vector_px_per_mm=axis_vector,
+        )
+        measured_y = float(projection["measured_y_mm"])
+        error_mm = measured_y - expected_y
+        correlation = float(match["correlation"])
+        cross_axis_px = float(projection["cross_axis_px"])
+        boundary_hit = bool(match.get("search_boundary_hit"))
+        quality_ok = (
+            correlation >= float(params.get("min_correlation"))
+            and abs(cross_axis_px) <= float(params.get("max_cross_axis_px"))
+            and not boundary_hit
+        )
+        within_tolerance = abs(error_mm) <= float(params.get("tolerance_mm"))
+        failures = []
+        if correlation < float(params.get("min_correlation")):
+            failures.append(
+                f"correlation {correlation:.4f} below "
+                f"{float(params.get('min_correlation')):.4f}"
+            )
+        if abs(cross_axis_px) > float(params.get("max_cross_axis_px")):
+            failures.append(
+                f"cross-axis error {cross_axis_px:+.3f}px exceeds "
+                f"{float(params.get('max_cross_axis_px')):.3f}px"
+            )
+        if boundary_hit:
+            failures.append("template match reached the search-window boundary")
+        if not within_tolerance:
+            failures.append(
+                f"Y error {error_mm:+.4f}mm exceeds "
+                f"{float(params.get('tolerance_mm')):.4f}mm"
+            )
+        return {
+            "attempt": attempt,
+            "accepted": quality_ok and within_tolerance,
+            "quality_ok": quality_ok,
+            "within_tolerance": within_tolerance,
+            "reference_mode": "run_local",
+            "session_id": reference["session_id"],
+            "measured_y_mm": round(measured_y, 6),
+            "expected_y_mm": round(expected_y, 6),
+            "measured_delta_mm": round(measured_y - reference_y, 6),
+            "expected_delta_mm": round(expected_delta, 6),
+            "error_mm": round(error_mm, 6),
+            "correlation": round(correlation, 6),
+            "cross_axis_px": round(cross_axis_px, 6),
+            "search_boundary_hit": boundary_hit,
+            "anchor_px": [round(float(value), 4) for value in match["anchor_px"]],
+            "match_roi": [round(float(value), 4) for value in match["match_roi"]],
+            "search_roi": match["search_roi"],
+            "framebuffer_seq": framebuffer_seq(source_metadata),
+            "failure_reason": "; ".join(failures),
+            "_image_bytes": image_bytes,
+        }
+
+    def validate_bed_y_reference(self, params: dict[str, Any]) -> dict[str, Any]:
+        camera = sanitize_name(params.get("camera"))
+        if camera != self.camera:
+            raise CaptureError(f"bed-Y CAMERA={camera!r} is not {self.camera!r}")
+        if "y" not in str(params.get("homed_axes") or ""):
+            raise CaptureError("bed-Y camera validation requires Y homed")
+        if self._active_job():
+            raise CaptureError(
+                f"cannot validate bed Y while vision job {self._active_job()!r} is active"
+            )
+        reference = self._load_run_bed_y_reference(params)
+        expected_delta = float(params.get("expected_delta_mm"))
+        if abs(expected_delta) <= 1.0e-9:
+            raise CaptureError("bed-Y reference validation delta must be non-zero")
+        attempts = []
+        final = None
+        image_bytes = b""
+        for attempt_index in range(int(params.get("confirm") or 0) + 1):
+            attempt = self._measure_run_bed_y_attempt(
+                params, attempt=attempt_index + 1, use_live_vector=False
+            )
+            image_bytes = attempt.pop("_image_bytes")
+            attempts.append(attempt)
+            final = dict(attempt)
+            if attempt.get("accepted"):
+                break
+        assert final is not None
+        final["attempts"] = attempts
+        final["retry_used"] = len(attempts) > 1
+        final["confirmation_count"] = len(attempts) - 1
+        final["phase"] = str(params.get("phase") or "startup_validation")
+        if final.get("accepted"):
+            reference_anchor = tuple(
+                float(value) for value in reference["reference_anchor_px"]
+            )
+            measured_anchor = tuple(float(value) for value in final["anchor_px"])
+            live_vector = [
+                (measured_anchor[index] - reference_anchor[index]) / expected_delta
+                for index in range(2)
+            ]
+            if sum(value * value for value in live_vector) <= 1.0e-12:
+                raise CaptureError("validated bed-Y pixel vector is zero")
+            reference["live_axis_vector_px_per_mm"] = [
+                round(value, 6) for value in live_vector
+            ]
+            reference["validated"] = True
+            reference["validated_at_utc"] = datetime.now(timezone.utc).isoformat()
+            reference["validation"] = {
+                key: value for key, value in final.items() if key != "attempts"
+            }
+            atomic_write_json(
+                self._bed_y_reference_dir(params) / "reference.json", reference
+            )
+            final["live_axis_vector_px_per_mm"] = reference[
+                "live_axis_vector_px_per_mm"
+            ]
+        return self._record_bed_y_measurement(params, final, image_bytes)
+
+    def measure_bed_y_relative(self, params: dict[str, Any]) -> dict[str, Any]:
+        camera = sanitize_name(params.get("camera"))
+        if camera != self.camera:
+            raise CaptureError(f"bed-Y CAMERA={camera!r} is not {self.camera!r}")
+        if "y" not in str(params.get("homed_axes") or ""):
+            raise CaptureError("run-local bed-Y camera measurement requires Y homed")
+        if self._active_job():
+            raise CaptureError(
+                f"cannot measure bed Y while vision job {self._active_job()!r} is active"
+            )
+        reference = self._load_run_bed_y_reference(params)
+        if not reference.get("validated"):
+            raise CaptureError(
+                "run-local bed-Y reference has not passed its 1 mm validation"
+            )
+        attempts = []
+        final = None
+        image_bytes = b""
+        for attempt_index in range(int(params.get("confirm") or 0) + 1):
+            attempt = self._measure_run_bed_y_attempt(
+                params, attempt=attempt_index + 1, use_live_vector=True
+            )
+            image_bytes = attempt.pop("_image_bytes")
+            attempts.append(attempt)
+            final = dict(attempt)
+            if attempt.get("accepted"):
+                break
+        assert final is not None
+        final["attempts"] = attempts
+        final["retry_used"] = len(attempts) > 1
+        final["confirmation_count"] = len(attempts) - 1
+        final["phase"] = str(params.get("phase") or "repeatability")
+        final["live_axis_vector_px_per_mm"] = reference["live_axis_vector_px_per_mm"]
+        return self._record_bed_y_measurement(params, final, image_bytes)
 
     def _measure_bed_y_attempt(
         self, params: dict[str, Any], *, attempt: int
@@ -986,7 +1365,9 @@ class VisionJobApi:
             required_profile=profile,
         )
         image_bytes = source_image.read_bytes()
-        image = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+        image = cv2.imdecode(
+            np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR
+        )
         if image is None:
             raise CaptureError("could not decode fresh bed-Y framebuffer image")
         expected_size = (
@@ -1035,9 +1416,11 @@ class VisionJobApi:
         error_mm = measured_y - expected_y
         correlation = float(match["correlation"])
         cross_axis_px = float(projection["cross_axis_px"])
+        boundary_hit = bool(match.get("search_boundary_hit"))
         quality_ok = (
             correlation >= float(params.get("min_correlation"))
             and abs(cross_axis_px) <= float(params.get("max_cross_axis_px"))
+            and not boundary_hit
         )
         within_tolerance = abs(error_mm) <= float(params.get("tolerance_mm"))
         failures = []
@@ -1051,6 +1434,8 @@ class VisionJobApi:
                 f"cross-axis error {cross_axis_px:+.3f}px exceeds "
                 f"{float(params.get('max_cross_axis_px')):.3f}px"
             )
+        if boundary_hit:
+            failures.append("template match reached the search-window boundary")
         if not within_tolerance:
             failures.append(
                 f"Y error {error_mm:+.4f}mm exceeds "
@@ -1066,6 +1451,7 @@ class VisionJobApi:
             "error_mm": round(error_mm, 6),
             "correlation": round(correlation, 6),
             "cross_axis_px": round(cross_axis_px, 6),
+            "search_boundary_hit": boundary_hit,
             "anchor_px": [round(float(value), 4) for value in match["anchor_px"]],
             "match_roi": [round(float(value), 4) for value in match["match_roi"]],
             "search_roi": match["search_roi"],
@@ -1079,6 +1465,10 @@ class VisionJobApi:
     ) -> dict[str, Any]:
         run_id = sanitize_name(params.get("run") or "manual")
         run_dir = BED_Y_CHECK_ROOT / run_id
+        session_value = str(params.get("session_id") or "").strip()
+        session_id = sanitize_name(session_value) if session_value else ""
+        if session_value:
+            run_dir = run_dir / session_id
         run_dir.mkdir(parents=True, exist_ok=True)
         step = int(params.get("step") or 0)
         if not result.get("accepted"):
@@ -1100,6 +1490,7 @@ class VisionJobApi:
         errors = [float(item["error_mm"]) for item in records]
         summary = {
             "run": run_id,
+            "session_id": session_id or None,
             "updated_at_utc": datetime.now(timezone.utc).isoformat(),
             "measurement_count": len(records),
             "accepted_count": sum(bool(item.get("accepted")) for item in records),
@@ -1152,7 +1543,9 @@ class VisionJobApi:
         camera = sanitize_name(params.get("camera"))
         profile = sanitize_profile(params.get("profile"))
         if camera != self.camera:
-            raise CaptureError(f"VISION_CAPTURE_SYNC CAMERA={camera!r} is not {self.camera!r}")
+            raise CaptureError(
+                f"VISION_CAPTURE_SYNC CAMERA={camera!r} is not {self.camera!r}"
+            )
         if not profile:
             raise CaptureError("VISION_CAPTURE_SYNC PROFILE is required")
         self._require_active(job_id)
@@ -1374,7 +1767,9 @@ class VisionJobApi:
                 },
             )
         except Exception as failure_record_exc:
-            log(f"Could not record vision job failure for {job_id}: {failure_record_exc}")
+            log(
+                f"Could not record vision job failure for {job_id}: {failure_record_exc}"
+            )
         try:
             self._release_lock(job_id)
         except Exception as release_exc:

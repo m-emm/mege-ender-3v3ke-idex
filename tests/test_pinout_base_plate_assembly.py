@@ -181,10 +181,11 @@ def test_base_plate_uses_derived_envelopes_through_contacts_and_exact_box(tmp_pa
 
     assert get_volume(assembly.leader) > 0
     assert assembly.followers == []
-    assert set(assembly.non_production_indices_by_name) == {
+    non_production_names = set(assembly.non_production_indices_by_name)
+    assert {
         "component_socket",
         "reference_module_box",
-    }
+    } <= non_production_names
     assert set(assembly.cutter_indices_by_name) == {"pin_row_slots"}
 
     project = load_pinout_config(pinout_path)
@@ -198,6 +199,28 @@ def test_base_plate_uses_derived_envelopes_through_contacts_and_exact_box(tmp_pa
     assert {
         slot["orientation"] for slot in assembly.additional_data["pin_row_slots"]
     } == {"horizontal", "vertical"}
+    for slot in assembly.additional_data["pin_row_slots"]:
+        preview_name = f"pin_header_{slot['component_id']}_{slot['pin_set_id']}_pins"
+        assert preview_name in non_production_names
+        preview_bbox = get_bounding_box(
+            assembly.get_named_non_production_part(preview_name)
+        )
+        top_pins_bbox = get_bounding_box(
+            assembly.get_named_non_production_part(
+                preview_name.removesuffix("_pins") + "_top_pins"
+            )
+        )
+        preview_center = [
+            (top_pins_bbox[0][axis] + top_pins_bbox[1][axis]) / 2 for axis in (0, 1)
+        ]
+        slot_center = [
+            (slot["minimum_mm"][axis] + slot["maximum_mm"][axis]) / 2 for axis in (0, 1)
+        ]
+        assert preview_center == pytest.approx(slot_center)
+        assert preview_bbox[0][2] < 0
+        assert preview_bbox[1][2] == pytest.approx(
+            assembly.additional_data["plate_size_mm"][2]
+        )
     assert assembly.additional_data["individual_pin_pass_throughs"] == []
     row_slots_bbox = get_bounding_box(assembly.get_named_cutter("pin_row_slots"))
     assert row_slots_bbox[0][2] < 0
@@ -332,14 +355,44 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
     assert assembly.additional_data["pin_line_clamp_component_ids"] == [
         "external_io_pin_line"
     ]
-    assert "pin_line_external_io_pin_line_pins" in (
-        assembly.non_production_indices_by_name
-    )
+    non_production_names = set(assembly.non_production_indices_by_name)
+    clamp_component_ids = set(assembly.additional_data["pin_line_clamp_component_ids"])
+    for slot in assembly.additional_data["pin_row_slots"]:
+        if slot["component_id"] in clamp_component_ids:
+            continue
+        preview_name = f"pin_header_{slot['component_id']}_{slot['pin_set_id']}_pins"
+        assert preview_name in non_production_names
+        preview_bbox = get_bounding_box(
+            assembly.get_named_non_production_part(preview_name)
+        )
+        assert preview_bbox[0][2] < 0
+        assert preview_bbox[1][2] == pytest.approx(
+            assembly.additional_data["plate_size_mm"][2]
+        )
+
+    assert "pin_line_external_io_pin_line_pins" in non_production_names
     pin_line_pins_bbox = get_bounding_box(
         assembly.get_named_non_production_part("pin_line_external_io_pin_line_pins")
     )
     assert pin_line_pins_bbox[0][2] < 0
     assert pin_line_pins_bbox[1][2] >= assembly.additional_data["plate_size_mm"][2]
+    pin_line_top_pins_bbox = get_bounding_box(
+        assembly.get_named_non_production_part("pin_line_external_io_pin_line_top_pins")
+    )
+    pin_line_center = [
+        (pin_line_top_pins_bbox[0][axis] + pin_line_top_pins_bbox[1][axis]) / 2
+        for axis in (0, 1)
+    ]
+    pin_line_slot = next(
+        slot
+        for slot in assembly.additional_data["pin_row_slots"]
+        if slot["component_id"] == "external_io_pin_line"
+    )
+    pin_line_slot_center = [
+        (pin_line_slot["minimum_mm"][axis] + pin_line_slot["maximum_mm"][axis]) / 2
+        for axis in (0, 1)
+    ]
+    assert pin_line_center == pytest.approx(pin_line_slot_center)
     assert "reference_tmc5160t_plus_driver" in (assembly.non_production_indices_by_name)
 
 
