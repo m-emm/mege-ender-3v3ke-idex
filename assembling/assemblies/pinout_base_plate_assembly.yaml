@@ -1,0 +1,61 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Generic fitted base plate generated from physical pinout topology
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - bottom
+        - front
+        - back
+      width: 900
+      height: 700
+    parts:
+      - source: self
+        artifact: leader
+        name: base_plate
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+
+  Production:
+    process_data_preset: petgcf_medium_strength_high_speed_06
+    parts:
+      - source: self
+        artifact: leader
+        name: base_plate
+
+Parameters:
+  pinout_base_plate_pinout_yaml_path:
+    Type: String
+  pinout_base_plate_raster_pitch:
+    Type: Float
+  pinout_base_plate_thickness:
+    Type: Float
+  pinout_base_plate_border:
+    Type: Float
+  pinout_base_plate_corner_radius:
+    Type: Float
+  pinout_base_plate_pin_tail_width:
+    Type: Float
+  pinout_base_plate_pin_pass_through_clearance:
+    Type: Float
+  pinout_base_plate_reference_frame_width:
+    Type: Float
+  pinout_base_plate_reference_frame_height:
+    Type: Float
+  pinout_base_plate_component_profiles:
+    Type: Any
+
+Parts:
+  PinoutBasePlateAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.pinout_base_plate_assembly.create_pinout_base_plate_assembly
+      FileDependencies:
+        - ../../klipper_setup/klipper_config/wiring/rp2040plus_btt_tmc5160t_plus_y.yaml

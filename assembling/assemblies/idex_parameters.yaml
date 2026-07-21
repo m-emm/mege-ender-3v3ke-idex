@@ -242,6 +242,56 @@ globals:
   board_holder_frame_mount_eye_thickness: 4
   board_holder_frame_mount_eye_fillet_radius: 3
   board_holder_frame_mount_eye_hole_front_offset: null
+  pinout_base_plate_thickness: 3.1
+  pinout_base_plate_border: 3.0
+  pinout_base_plate_corner_radius: 2.0
+  pinout_base_plate_pin_pass_through_clearance: 0.35
+  pinout_base_plate_reference_frame_width: 1.0
+  pinout_base_plate_reference_frame_height: 3.0
+  # Phase 2 preview profiles. Measure and tune these physical bodies in Phase 4.
+  pinout_base_plate_component_profiles:
+    rp2040_plus_2x20:
+      left_margin_mm: 0.5
+      right_margin_mm: 0.5
+      top_margin_mm: 1.5
+      bottom_margin_mm: 1.5
+      body_height_mm: 1.1
+    ar20_2x10:
+      left_margin_mm: 1.27
+      right_margin_mm: 1.27
+      top_margin_mm: 1.27
+      bottom_margin_mm: 1.27
+      body_height_mm: 5.0
+    dip14_socket:
+      left_margin_mm: 1.27
+      right_margin_mm: 1.27
+      top_margin_mm: 1.27
+      bottom_margin_mm: 1.27
+      body_height_mm: 4.0
+    stepstick_adapter:
+      left_margin_mm: 2.57
+      right_margin_mm: 2.57
+      top_margin_mm: 1.31
+      bottom_margin_mm: 1.31
+      body_height_mm: 1.6
+    endstop_connector:
+      left_margin_mm: 1.27
+      right_margin_mm: 1.27
+      top_margin_mm: 1.27
+      bottom_margin_mm: 1.27
+      body_height_mm: 8.0
+    inline_fuse_holder:
+      left_margin_mm: 2.0
+      right_margin_mm: 2.0
+      top_margin_mm: 2.0
+      bottom_margin_mm: 2.0
+      body_height_mm: 10.0
+    two_pin_power_input:
+      left_margin_mm: 2.0
+      right_margin_mm: 2.0
+      top_margin_mm: 2.0
+      bottom_margin_mm: 2.0
+      body_height_mm: 8.0
   x_axis_mcu_holder_motor_flange_gap: 5
   x_axis_mcu_holder_frame_mount_eye_hole_front_offset: 10
   board_holder_additional_pins_num_pins: 30

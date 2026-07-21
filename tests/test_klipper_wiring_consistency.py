@@ -194,7 +194,7 @@ def test_tmc5160_review_wiring_uses_stepstick_spi_adapter_pattern():
         "VIO_7",
         "GND_LOGIC_8",
     ]
-    assert top["pins"] == ["DIAG"]
+    assert top["pins"] == ["DIAG0", "DIAG1"]
 
 
 def test_tmc5160_review_wiring_has_four_true_2x10_component_carriers():

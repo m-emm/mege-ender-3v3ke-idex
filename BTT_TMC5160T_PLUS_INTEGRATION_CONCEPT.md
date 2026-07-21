@@ -129,7 +129,8 @@ The supplied non-Plus TMC5160T Pro pinout provided for this project matches the 
 | A2, A1, B2, B1 | Conventional StepStick motor-output positions | Expected not to carry Plus motor current; verify and leave unused |
 | VIO | Logic voltage | Sequenced approximately 3.3 V from Pico USB VBUS through the BC327/zener branch |
 | GND | Logic ground | Common logic reference |
-| DIAG1 pad/header | TMC diagnostic output | Protected direct Pico diagnostic input; not a production endstop |
+| DIAG0 header pin | Second physical adapter diagnostic pin | Leave electrically unconnected initially; still provide a carrier pass-through hole |
+| DIAG1 header pin | TMC diagnostic output | Protected direct Pico diagnostic input; not a production endstop; provide a carrier pass-through hole |
 
 The Plus schematic shows the driver's 12-pin ordinary-control connector as:
 
@@ -146,7 +147,7 @@ The Plus schematic shows the driver's 12-pin ordinary-control connector as:
 11. 24V
 12. GND
 
-Before any power is applied, the actual adapter and supplied cable must be continuity-tested pin by pin. The result, including connector orientation and pin-1 markings, becomes the source of truth for the wiring YAML. In particular, the adapter `VM`, conventional A/B pins, `CLK`, and DIAG pad must not be inferred solely from the older module image.
+Before any power is applied, the actual adapter and supplied cable must be continuity-tested pin by pin. The result, including connector orientation and pin-1 markings, becomes the source of truth for the wiring YAML. The adapter has a separate two-pin `DIAG0`/`DIAG1` through-header in addition to its J1/J2 rows; both physical pins need holes in the carrier even though only `DIAG1` is wired initially. In particular, the adapter `VM`, conventional A/B pins, `CLK`, and diagnostic routing must not be inferred solely from the older module image.
 
 ### 5.2 Driver mode and jumpers
 
@@ -446,7 +447,7 @@ Create the new active wiring source:
 It should generate top and underside diagrams suitable for actual wire wrapping. It must show:
 
 - both Pico header rows with physical pin numbers;
-- the ordinary adapter's two StepStick rows and DIAG pad;
+- the ordinary adapter's two StepStick rows and its separate two-pin `DIAG0`/`DIAG1` through-header, including the electrically unused but physically present `DIAG0` pin;
 - the 12-pin adapter-to-driver connector at both ends, including pin 1;
 - the `SN7407N` PDIP pinout, 100 nF decoupling, all six open-collector channel directions, input safe-state pulls, and VIO-side collector pull-ups;
 - the exact ILD74, BC327, 12 V detector zener, 3.3 V VIO shunt zener, and power-good network from Section 6.3;

@@ -3758,6 +3758,22 @@ assemblies:
     resource_file: opb991t11z_sensor_assembly.yaml
     depends_on: []
 
+  - name: pinout_base_plate_assembly
+
+    resource_file: pinout_base_plate_assembly.yaml
+    depends_on: []
+    parameters:
+      pinout_base_plate_pinout_yaml_path: klipper_setup/klipper_config/wiring/rp2040plus_btt_tmc5160t_plus_y.yaml
+      pinout_base_plate_raster_pitch: !Ref x_axis_mcu_dil_pitch
+      pinout_base_plate_thickness: !Ref pinout_base_plate_thickness
+      pinout_base_plate_border: !Ref pinout_base_plate_border
+      pinout_base_plate_corner_radius: !Ref pinout_base_plate_corner_radius
+      pinout_base_plate_pin_tail_width: !Ref x_axis_mcu_wire_wrap_pin_side
+      pinout_base_plate_pin_pass_through_clearance: !Ref pinout_base_plate_pin_pass_through_clearance
+      pinout_base_plate_reference_frame_width: !Ref pinout_base_plate_reference_frame_width
+      pinout_base_plate_reference_frame_height: !Ref pinout_base_plate_reference_frame_height
+      pinout_base_plate_component_profiles: !Ref pinout_base_plate_component_profiles
+
   - name: tool_head_mount_machined_bottom_assembly
 
     resource_file: tool_head_mount_machined_assembly.yaml

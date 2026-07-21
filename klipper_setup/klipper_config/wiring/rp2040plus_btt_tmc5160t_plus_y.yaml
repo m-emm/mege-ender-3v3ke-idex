@@ -11,6 +11,8 @@ metadata:
     Continuity-check the received adapter/ribbon and mark pin 1 before applying power.
     TMC1 J1: EN, MOSI/CFG1, SCK/CFG2, CS/CFG3, MISO/CFG0, CLK N/C, STEP, DIR.
     TMC1 J2: auxiliary 24V, two grounds, B2/B1/A1/A2 N/C, sequenced VIO.
+    TMC1 TOP: DIAG0 is electrically unused and DIAG1 is the protected GPIO3 return;
+    both are physical through-pins and require carrier holes.
     U1 is SN7407N DIP-14. U2 is ILD74 DIP-8. Both use the shown top-view pin numbering.
     A/B/C/HV are AR20-HZW/TN 20-pin, 0.3-inch DIL wire-wrap sockets with spring contacts.
     Physical layout: Pico at the left; Socket A above U1; the HV socket above Socket C;
@@ -63,6 +65,75 @@ boxes:
       Screw-terminal spacing illustrative
     top_left: [42, 36.45]
     size_pitches: [25.1968503937, 22.4409448819]
+
+physical_components:
+  - id: pico
+    label: RP2040-Plus
+    component_type: rp2040_plus_2x20
+    pin_sets: [pico_left, pico_right]
+    downholder: corner
+
+  - id: socket_b
+    label: Socket B
+    component_type: ar20_2x10
+    pin_sets: [socket_b_left, socket_b_right]
+    downholder: center_strip
+
+  - id: socket_a
+    label: Socket A
+    component_type: ar20_2x10
+    pin_sets: [socket_a_left, socket_a_right]
+    downholder: center_strip
+
+  - id: u1_socket
+    label: U1 SN7407N socket
+    component_type: dip14_socket
+    pin_sets: [u1_left, u1_right]
+    downholder: center_strip
+
+  - id: socket_hv
+    label: HV detector socket
+    component_type: ar20_2x10
+    pin_sets: [socket_hv_left, socket_hv_right]
+    downholder: center_strip
+
+  - id: socket_c
+    label: Socket C
+    component_type: ar20_2x10
+    pin_sets: [socket_c_left, socket_c_right]
+    downholder: center_strip
+
+  - id: tmc_adapter
+    label: TMC5160T Plus StepStick adapter
+    component_type: stepstick_adapter
+    pin_sets: [tmc1_j1, tmc1_j2, tmc1_top]
+    downholder: none
+
+  - id: endstop
+    label: Y endstop connector
+    component_type: endstop_connector
+    pin_sets: [endstop_y]
+    downholder: none
+
+  - id: branch_fuse
+    label: 5A branch fuse
+    component_type: inline_fuse_holder
+    pin_sets: [f1]
+    downholder: none
+
+  - id: switched_power_input
+    label: Switched-24V input
+    component_type: two_pin_power_input
+    pin_sets: [power_input]
+    downholder: none
+
+  - id: tmc5160t_plus_driver
+    label: TMC5160T Plus
+    component_type: boxed_module
+    pin_sets: [tmc5160_hv]
+    through_pin_sets: []
+    box: tmc5160t_plus_driver
+    downholder: none
 
 # Coordinate system: origin at bottom-left; X increases right; Y increases up.
 pin_sets:
@@ -182,7 +253,8 @@ pin_sets:
     origin: [34, 36]
     direction: right
     pins:
-      - DIAG
+      - DIAG0
+      - DIAG1
 
   - id: endstop_y
     prefix: ENDSTOP_Y_
@@ -546,7 +618,8 @@ discrete_view:
     PICO_VBUS_40: "40"
     TMC1_J1_EN_1: J1-1
     TMC1_J2_VM_1: J2-1
-    TMC1_TOP_DIAG: DIAG
+    TMC1_TOP_DIAG0: DIAG0
+    TMC1_TOP_DIAG1: DIAG1
     ENDSTOP_Y_NO: "NO"
     ENDSTOP_Y_GND: GND
     ENDSTOP_Y_VCC: VCC
@@ -819,7 +892,7 @@ wires:
   - from: C09_R21_PICO_MISO
     to: PICO_GPIO_8
     type: return
-  - from: TMC1_TOP_DIAG
+  - from: TMC1_TOP_DIAG1
     to: C15_R20_TMC_DIAG
     type: return
   - from: C06_R20_PICO_DIAG
