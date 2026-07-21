@@ -3770,6 +3770,17 @@ assemblies:
       pinout_base_plate_corner_radius: !Ref pinout_base_plate_corner_radius
       pinout_base_plate_pin_tail_width: !Ref x_axis_mcu_wire_wrap_pin_side
       pinout_base_plate_pin_pass_through_clearance: !Ref pinout_base_plate_pin_pass_through_clearance
+      pinout_base_plate_pin_row_base_width: !Ref x_axis_mcu_wire_wrap_pin_base_width
+      pinout_base_plate_pin_row_slot_clearance: !Ref x_axis_mcu_electronics_holder_slack
+      pinout_base_plate_pin_row_vertical_clearance: !Ref x_axis_mcu_base_cutter_vertical_slack
+      pinout_base_plate_wire_wrap_pin_length: !Ref x_axis_mcu_wire_wrap_pin_length
+      pinout_base_plate_wire_wrap_pin_base_thickness: !Ref x_axis_mcu_wire_wrap_pin_base_thickness
+      pinout_base_plate_top_pin_length: !Ref x_axis_mcu_top_pin_length
+      pinout_base_plate_pin_line_clamp_base_length: !Ref board_holder_additional_pins_base_plate_length
+      pinout_base_plate_pin_line_clamp_holder_slack: !Ref pinout_base_plate_pin_line_clamp_holder_slack
+      pinout_base_plate_pin_line_clamp_vertical_slack: !Ref pinout_base_plate_pin_line_clamp_vertical_slack
+      pinout_base_plate_pin_line_clamp_lip_size: !Ref pinout_base_plate_pin_line_clamp_lip_size
+      pinout_base_plate_pin_line_clamp_slit_width: !Ref pinout_base_plate_pin_line_clamp_slit_width
       pinout_base_plate_reference_frame_width: !Ref pinout_base_plate_reference_frame_width
       pinout_base_plate_reference_frame_height: !Ref pinout_base_plate_reference_frame_height
       pinout_base_plate_component_profiles: !Ref pinout_base_plate_component_profiles

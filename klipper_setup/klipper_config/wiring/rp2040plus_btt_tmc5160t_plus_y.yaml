@@ -16,7 +16,7 @@ metadata:
     U1 is SN7407N DIP-14. U2 is ILD74 DIP-8. Both use the shown top-view pin numbering.
     A/B/C/HV are AR20-HZW/TN 20-pin, 0.3-inch DIL wire-wrap sockets with spring contacts.
     Physical layout: Pico at the left; Socket A above U1; the HV socket above Socket C;
-    the endstop/fused input below the TMC adapter; then the full driver footprint.
+    the TMC adapter, 5A fuse, and 16-pin external I/O row precede the full driver footprint.
     Top-row parts align with the Pico USB edge. Keep the area above that edge clear.
     Insert each passive across its labeled opposite contact pair; the passive itself joins the pair.
     Socket HV contacts 1-4 and 20-17 hold U2 pins 1-4 and 8-5; positions 8-10 hold R1, DZ1, D1.
@@ -39,7 +39,10 @@ metadata:
     grey on the drawing=physical white wire for Pico 3.3V and sequenced VIO.
     U1 collectors are pulled up only from sequenced TMC_VIO. Initial SPI speed is 500kHz.
     Logic, detector, and VIO conductors are low-current wire-wrap class only.
-    High-current 24V bypasses all Pico, DIL-socket, and wire-wrap conductors.
+    The external I/O row carries switched 24V through two paralleled positive contacts and
+    two paralleled ground contacts. Connect and size both contacts of each pair together.
+    Keep LINE16_NC_ISOLATION and LINE16_SPARE_01 through LINE16_SPARE_08 unconnected.
+    High-current 24V bypasses the Pico and DIL-socket conductors.
     Land the four Y-motor conductors directly on the driver's 1B/2B/1A/2A screw terminals.
     The 64x57mm driver box is exact; screw-terminal spacing within it is illustrative.
     F1 is a dedicated serviceable 5A branch fuse. Size all high-current wiring above the fuse rating.
@@ -109,22 +112,16 @@ physical_components:
     pin_sets: [tmc1_j1, tmc1_j2, tmc1_top]
     downholder: none
 
-  - id: endstop
-    label: Y endstop connector
-    component_type: endstop_connector
-    pin_sets: [endstop_y]
-    downholder: none
+  - id: external_io_pin_line
+    label: 16-pin power, spare, and Y-endstop row
+    component_type: pin_line
+    pin_sets: [external_io]
+    downholder: pin_line_clamp
 
   - id: branch_fuse
     label: 5A branch fuse
     component_type: inline_fuse_holder
     pin_sets: [f1]
-    downholder: none
-
-  - id: switched_power_input
-    label: Switched-24V input
-    component_type: two_pin_power_input
-    pin_sets: [power_input]
     downholder: none
 
   - id: tmc5160t_plus_driver
@@ -256,14 +253,30 @@ pin_sets:
       - DIAG0
       - DIAG1
 
-  - id: endstop_y
-    prefix: ENDSTOP_Y_
-    origin: [33, 23]
-    direction: down
+  # One retained 16-pin SIL row. Numbering runs from the lower power end toward
+  # the upper endstop end so the two functions are physically far apart.
+  - id: external_io
+    prefix: LINE16_
+    origin: [40, 21]
+    direction: up
+    discrete_pin_numbers: {start: 1, step: 1}
     pins:
-      - "NO"
-      - GND
-      - VCC
+      - PWR_V24_SW_A
+      - PWR_V24_SW_B
+      - NC_ISOLATION
+      - PWR_GND_A
+      - PWR_GND_B
+      - SPARE_01
+      - SPARE_02
+      - SPARE_03
+      - SPARE_04
+      - SPARE_05
+      - SPARE_06
+      - SPARE_07
+      - SPARE_08
+      - ENDSTOP_NO
+      - ENDSTOP_GND
+      - ENDSTOP_VCC
 
   # AR20 socket A: VBUS switch/VIO regulator plus Q1 on one side.
   - id: socket_a_left
@@ -416,18 +429,11 @@ pin_sets:
       - HVIN_8_60V
   - id: f1
     prefix: F1_5A_
-    origin: [33, 17]
+    origin: [38, 19]
     direction: right
     pins:
       - OUT
       - IN
-  - id: power_input
-    prefix: PWR_
-    origin: [38, 17]
-    direction: down
-    pins:
-      - V24_SW
-      - GND
 
 component_placements:
   - ref: U1
@@ -592,9 +598,9 @@ discrete_view:
     - id: tmc_adapter
       label: TMC5160T Plus StepStick adapter
       pin_sets: [tmc1_j1, tmc1_j2, tmc1_top]
-    - id: endstop
-      label: Y endstop
-      pin_sets: [endstop_y]
+    - id: external_io
+      label: 16-pin external I/O — power end at pin 1, endstop end at pin 16
+      pin_sets: [external_io]
     - id: socket_a
       label: Socket A — AR20
       pin_sets: [socket_a_left, socket_a_right]
@@ -610,9 +616,9 @@ discrete_view:
     - id: high_current
       label: TMC5160T Plus screw terminals
       pin_sets: [tmc5160_hv]
-    - id: fused_input
-      label: Fused switched-24V input
-      pin_sets: [f1, power_input]
+    - id: branch_fuse
+      label: 5A branch fuse
+      pin_sets: [f1]
   anchor_labels:
     PICO_GPIO_0: "1"
     PICO_VBUS_40: "40"
@@ -620,26 +626,35 @@ discrete_view:
     TMC1_J2_VM_1: J2-1
     TMC1_TOP_DIAG0: DIAG0
     TMC1_TOP_DIAG1: DIAG1
-    ENDSTOP_Y_NO: "NO"
-    ENDSTOP_Y_GND: GND
-    ENDSTOP_Y_VCC: VCC
+    LINE16_PWR_V24_SW_A: 24V-A
+    LINE16_PWR_V24_SW_B: 24V-B
+    LINE16_NC_ISOLATION: KEEP EMPTY
+    LINE16_PWR_GND_A: GND-A
+    LINE16_PWR_GND_B: GND-B
+    LINE16_ENDSTOP_NO: "NO"
+    LINE16_ENDSTOP_GND: GND
+    LINE16_ENDSTOP_VCC: VCC
     B01_NC: "1"
     B20_NC: "20"
     TMC5160_HV_1B: 1B
     TMC5160_HV_HVIN_8_60V: HVIN
     F1_5A_OUT: OUT
     F1_5A_IN: IN
-    PWR_V24_SW: 24V
-    PWR_GND: GND
 wires:
-  # High-current wiring: these conductors do not use the wire-wrap carrier.
-  - from: PWR_V24_SW
+  # Switched-24V input uses both paralleled positive and ground contacts.
+  - from: LINE16_PWR_V24_SW_A
+    to: LINE16_PWR_V24_SW_B
+    type: hazard_power
+  - from: LINE16_PWR_V24_SW_B
     to: F1_5A_IN
     type: hazard_power
   - from: F1_5A_OUT
     to: TMC5160_HV_HVIN_8_60V
     type: hazard_power
-  - from: PWR_GND
+  - from: LINE16_PWR_GND_A
+    to: LINE16_PWR_GND_B
+    type: ground
+  - from: LINE16_PWR_GND_B
     to: TMC5160_HV_GND
     type: ground
 
@@ -653,7 +668,7 @@ wires:
 
   # Common ground. The lower chain keeps motor current out of logic wiring; the
   # upper analog contacts form a short left-to-right bus fed once from U1 ground.
-  - from: PWR_GND
+  - from: LINE16_PWR_GND_B
     to: TMC1_J2_GND_MOTOR_2
     type: ground
   - from: TMC1_J2_GND_MOTOR_2
@@ -696,7 +711,7 @@ wires:
     to: HV20_U2P8_E_A
     type: ground
   - from: PICO_GND_03
-    to: ENDSTOP_Y_GND
+    to: LINE16_ENDSTOP_GND
     type: ground
 
   # Pico USB VBUS powers U1 and the switched VIO regulator input.
@@ -736,7 +751,7 @@ wires:
     to: B08_R9_3V3
     type: lv_power
   - from: PICO_THREEV3_OUT_36
-    to: ENDSTOP_Y_VCC
+    to: LINE16_ENDSTOP_VCC
     type: lv_power
 
   # Switched-24V threshold detector: R1, DZ1, two ILD74 LEDs in series, and D1.
@@ -904,5 +919,5 @@ wires:
 
   # Physical Y endstop remains authoritative for production homing.
   - from: PICO_GPIO_4
-    to: ENDSTOP_Y_NO
+    to: LINE16_ENDSTOP_NO
     type: data

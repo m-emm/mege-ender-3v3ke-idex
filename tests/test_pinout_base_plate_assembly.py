@@ -14,7 +14,7 @@ from mege_ender_3v3ke_idex.designs.assemblies.pinout_base_plate_assembly import 
     create_pinout_base_plate_assembly,
     resolve_component_profiles,
 )
-from shellforgepy.simple import get_bounding_box_size, get_volume
+from shellforgepy.simple import get_bounding_box, get_bounding_box_size, get_volume
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 TMC5160_PINOUT = (
@@ -48,7 +48,7 @@ pin_sets:
   - id: socket_right
     prefix: R_
     origin: [{4 + x_shift}, {4 + y_shift}]
-    direction: down
+    direction: right
     pins: [ONE, TWO]
   - id: module_contacts
     prefix: M_
@@ -72,7 +72,7 @@ wires:
 """
 
 
-def _fixture_kwargs(pinout_path):
+def _fixture_kwargs(pinout_path, *, pass_through_style="row_slot"):
     return {
         "pinout_base_plate_pinout_yaml_path": pinout_path,
         "pinout_base_plate_raster_pitch": 2.5,
@@ -81,6 +81,17 @@ def _fixture_kwargs(pinout_path):
         "pinout_base_plate_corner_radius": 1.0,
         "pinout_base_plate_pin_tail_width": 0.6,
         "pinout_base_plate_pin_pass_through_clearance": 0.2,
+        "pinout_base_plate_pin_row_base_width": 2.4,
+        "pinout_base_plate_pin_row_slot_clearance": 0.3,
+        "pinout_base_plate_pin_row_vertical_clearance": 0.4,
+        "pinout_base_plate_wire_wrap_pin_length": 10.0,
+        "pinout_base_plate_wire_wrap_pin_base_thickness": 2.0,
+        "pinout_base_plate_top_pin_length": 2.5,
+        "pinout_base_plate_pin_line_clamp_base_length": 6.0,
+        "pinout_base_plate_pin_line_clamp_holder_slack": 0.3,
+        "pinout_base_plate_pin_line_clamp_vertical_slack": 0.2,
+        "pinout_base_plate_pin_line_clamp_lip_size": 0.8,
+        "pinout_base_plate_pin_line_clamp_slit_width": 0.4,
         "pinout_base_plate_reference_frame_width": 0.8,
         "pinout_base_plate_reference_frame_height": 2.0,
         "pinout_base_plate_component_profiles": {
@@ -90,6 +101,7 @@ def _fixture_kwargs(pinout_path):
                 "top_margin_mm": 2.0,
                 "bottom_margin_mm": 2.5,
                 "body_height_mm": 4.0,
+                "pass_through_style": pass_through_style,
             }
         },
     }
@@ -142,6 +154,21 @@ def test_component_profile_registry_rejects_missing_and_invalid_dimensions():
                     "top_margin_mm": 1,
                     "bottom_margin_mm": 1,
                     "body_height_mm": 2,
+                    "pass_through_style": "row_slot",
+                }
+            }
+        )
+
+    with pytest.raises(ValueError, match="pass_through_style"):
+        resolve_component_profiles(
+            {
+                "socket": {
+                    "left_margin_mm": 1,
+                    "right_margin_mm": 1,
+                    "top_margin_mm": 1,
+                    "bottom_margin_mm": 1,
+                    "body_height_mm": 2,
+                    "pass_through_style": "invented",
                 }
             }
         )
@@ -158,7 +185,7 @@ def test_base_plate_uses_derived_envelopes_through_contacts_and_exact_box(tmp_pa
         "component_socket",
         "reference_module_box",
     }
-    assert set(assembly.cutter_indices_by_name) == {"pin_pass_throughs"}
+    assert set(assembly.cutter_indices_by_name) == {"pin_row_slots"}
 
     project = load_pinout_config(pinout_path)
     through_pin_count = sum(
@@ -167,6 +194,14 @@ def test_base_plate_uses_derived_envelopes_through_contacts_and_exact_box(tmp_pa
         for pin_set_id in component.through_pin_sets
     )
     assert len(assembly.additional_data["pin_pass_throughs"]) == through_pin_count
+    assert len(assembly.additional_data["pin_row_slots"]) == 2
+    assert {
+        slot["orientation"] for slot in assembly.additional_data["pin_row_slots"]
+    } == {"horizontal", "vertical"}
+    assert assembly.additional_data["individual_pin_pass_throughs"] == []
+    row_slots_bbox = get_bounding_box(assembly.get_named_cutter("pin_row_slots"))
+    assert row_slots_bbox[0][2] < 0
+    assert row_slots_bbox[1][2] > assembly.additional_data["plate_size_mm"][2]
 
     box = project.boxes[0]
     frame = assembly.get_non_production_part_by_name("reference_module_box")
@@ -224,6 +259,32 @@ def test_global_pinout_translation_preserves_normalized_plate_geometry(tmp_path)
         assert second_center == pytest.approx(first_center)
 
 
+def test_individual_hole_profile_preserves_per_contact_cutters(tmp_path):
+    pinout_path = tmp_path / "individual.yaml"
+    pinout_path.write_text(_fixture_pinout())
+    assembly = create_pinout_base_plate_assembly(
+        **_fixture_kwargs(pinout_path, pass_through_style="individual_holes")
+    )
+
+    assert set(assembly.cutter_indices_by_name) == {"individual_pin_pass_throughs"}
+    assert assembly.additional_data["pin_row_slots"] == []
+    assert len(assembly.additional_data["individual_pin_pass_throughs"]) == 4
+
+
+def test_row_slot_rejects_non_unit_pin_spacing(tmp_path):
+    pinout_path = tmp_path / "irregular.yaml"
+    pinout_path.write_text(
+        _fixture_pinout().replace(
+            "direction: down\n    pins: [ONE, TWO]",
+            "direction: down\n    step: 2\n    pins: [ONE, TWO]",
+            1,
+        )
+    )
+
+    with pytest.raises(ValueError, match="one-pitch spacing"):
+        create_pinout_base_plate_assembly(**_fixture_kwargs(pinout_path))
+
+
 def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
     project = load_pinout_config(TMC5160_PINOUT)
     owned_pin_sets = {
@@ -238,6 +299,25 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
         pinout_base_plate_pinout_yaml_path=TMC5160_PINOUT,
         pinout_base_plate_raster_pitch=DEFAULTS["x_axis_mcu_dil_pitch"],
         pinout_base_plate_pin_tail_width=DEFAULTS["x_axis_mcu_wire_wrap_pin_side"],
+        pinout_base_plate_pin_row_base_width=DEFAULTS[
+            "x_axis_mcu_wire_wrap_pin_base_width"
+        ],
+        pinout_base_plate_pin_row_slot_clearance=DEFAULTS[
+            "x_axis_mcu_electronics_holder_slack"
+        ],
+        pinout_base_plate_pin_row_vertical_clearance=DEFAULTS[
+            "x_axis_mcu_base_cutter_vertical_slack"
+        ],
+        pinout_base_plate_wire_wrap_pin_length=DEFAULTS[
+            "x_axis_mcu_wire_wrap_pin_length"
+        ],
+        pinout_base_plate_wire_wrap_pin_base_thickness=DEFAULTS[
+            "x_axis_mcu_wire_wrap_pin_base_thickness"
+        ],
+        pinout_base_plate_top_pin_length=DEFAULTS["x_axis_mcu_top_pin_length"],
+        pinout_base_plate_pin_line_clamp_base_length=DEFAULTS[
+            "board_holder_additional_pins_base_plate_length"
+        ],
     )
     assembly = create_pinout_base_plate_assembly(**kwargs)
 
@@ -247,4 +327,63 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
         for pin_set_id in component.through_pin_sets
     )
     assert len(assembly.additional_data["pin_pass_throughs"]) == expected_through_pins
+    assert assembly.additional_data["pin_row_slots"]
+    assert assembly.additional_data["individual_pin_pass_throughs"]
+    assert assembly.additional_data["pin_line_clamp_component_ids"] == [
+        "external_io_pin_line"
+    ]
+    assert "pin_line_external_io_pin_line_pins" in (
+        assembly.non_production_indices_by_name
+    )
+    pin_line_pins_bbox = get_bounding_box(
+        assembly.get_named_non_production_part("pin_line_external_io_pin_line_pins")
+    )
+    assert pin_line_pins_bbox[0][2] < 0
+    assert pin_line_pins_bbox[1][2] >= assembly.additional_data["plate_size_mm"][2]
     assert "reference_tmc5160t_plus_driver" in (assembly.non_production_indices_by_name)
+
+
+def test_tmc5160_external_pin_line_keeps_power_isolation_spares_and_endstop():
+    project = load_pinout_config(TMC5160_PINOUT)
+    component = next(
+        component
+        for component in project.physical_components
+        if component.id == "external_io_pin_line"
+    )
+    pin_names = project.pin_sets[component.pin_sets[0]]
+
+    assert component.component_type == "pin_line"
+    assert component.downholder.value == "pin_line_clamp"
+    assert pin_names == (
+        "LINE16_PWR_V24_SW_A",
+        "LINE16_PWR_V24_SW_B",
+        "LINE16_NC_ISOLATION",
+        "LINE16_PWR_GND_A",
+        "LINE16_PWR_GND_B",
+        "LINE16_SPARE_01",
+        "LINE16_SPARE_02",
+        "LINE16_SPARE_03",
+        "LINE16_SPARE_04",
+        "LINE16_SPARE_05",
+        "LINE16_SPARE_06",
+        "LINE16_SPARE_07",
+        "LINE16_SPARE_08",
+        "LINE16_ENDSTOP_NO",
+        "LINE16_ENDSTOP_GND",
+        "LINE16_ENDSTOP_VCC",
+    )
+
+    edges = {
+        frozenset((connection["from"], connection["to"]))
+        for connection in project.connections
+    }
+    assert frozenset((pin_names[0], pin_names[1])) in edges
+    assert frozenset((pin_names[1], "F1_5A_IN")) in edges
+    assert frozenset((pin_names[3], pin_names[4])) in edges
+    assert frozenset((pin_names[13], "PICO_GPIO_4")) in edges
+    assert frozenset((pin_names[14], "PICO_GND_03")) in edges
+    assert frozenset((pin_names[15], "PICO_THREEV3_OUT_36")) in edges
+
+    connected_pins = {pin for edge in edges for pin in edge}
+    assert pin_names[2] not in connected_pins
+    assert not set(pin_names[5:13]) & connected_pins

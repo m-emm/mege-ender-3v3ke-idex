@@ -38,7 +38,8 @@ manufactured:
 - grouping pin sets into the real physical components which provide them;
 - the semantic component type, such as `rp2040_plus_2x20` or `ar20_2x10`;
 - which grouped contacts are through-board contacts;
-- the semantic downholder choice, such as `corner`, `center_strip`, or `none`;
+- the semantic downholder choice, such as `corner`, `center_strip`,
+  `pin_line_clamp`, or `none`;
 - physical module boxes and their raster dimensions.
 
 The downholder choice belongs here because it follows the type and topology of
@@ -178,7 +179,8 @@ Each record may contain:
 - `pin_sets`: all existing pin sets that belong to this real component;
 - `through_pin_sets`: optional subset whose contacts physically pass through
   the carrier; omission means all listed pin sets;
-- `downholder`: semantic retention kind: `corner`, `center_strip`, or `none`;
+- `downholder`: semantic retention kind: `corner`, `center_strip`,
+  `pin_line_clamp`, or `none`;
 - `box`: optional reference to an existing exact-size physical module box.
 
 There are deliberately no millimetre values in this structure.
@@ -229,16 +231,16 @@ physical_components:
     pin_sets: [tmc1_j1, tmc1_j2, tmc1_top]
     downholder: none
 
-  - id: endstop
-    label: Y endstop connector
-    component_type: endstop_connector
-    pin_sets: [endstop_y]
-    downholder: none
+  - id: external_io_pin_line
+    label: 16-pin power, spare, and Y-endstop row
+    component_type: pin_line
+    pin_sets: [external_io]
+    downholder: pin_line_clamp
 
-  - id: fused_input
-    label: Fused switched-24V input
-    component_type: fused_input_connectors
-    pin_sets: [f1, power_input]
+  - id: branch_fuse
+    label: 5A branch fuse
+    component_type: inline_fuse_holder
+    pin_sets: [f1]
     downholder: none
 
   - id: tmc5160t_plus_driver
@@ -250,10 +252,12 @@ physical_components:
     downholder: none
 ```
 
-The final list should reflect the real construction. In particular, a fuse and
-input connector may become two physical components if they are independently
-mounted. That is a topology decision made in the pinout, not a coordinate or
-dimension added by CAD code.
+The final list reflects the real construction. The 16-pin line replaces the
+separate power-input and endstop connectors: two switched-24V contacts, one
+empty isolation contact, two ground contacts, eight unassigned contacts, and
+the three endstop contacts occupy one retained row. The branch fuse remains a
+separate component. These are topology decisions made in the pinout, not
+coordinates or dimensions added by CAD code.
 
 ### Why this is not `discrete_view.groups`
 
@@ -376,6 +380,17 @@ def create_pinout_base_plate_assembly(
     plate_corner_radius_mm: float,
     pin_tail_width_mm: float,
     pin_pass_through_clearance_mm: float,
+    pin_row_base_width_mm: float,
+    pin_row_slot_clearance_mm: float,
+    pin_row_vertical_clearance_mm: float,
+    wire_wrap_pin_length_mm: float,
+    wire_wrap_pin_base_thickness_mm: float,
+    top_pin_length_mm: float,
+    pin_line_clamp_base_length_mm: float,
+    pin_line_clamp_holder_slack_mm: float,
+    pin_line_clamp_vertical_slack_mm: float,
+    pin_line_clamp_lip_size_mm: float,
+    pin_line_clamp_slit_width_mm: float,
     screw_size: str,
     screw_length_mm: float,
     self_threading_core_radius_adjustment_mm: float,
@@ -451,6 +466,22 @@ plug-in ICs, resistors, diodes, and transistors. The real socket channel must be
 fit-checked; the generator must not silently invent a side-offset strip if the
 configured profile does not fit.
 
+### `pin_line_clamp`
+
+This is the retained SIL row pattern from the original board holder.
+
+- One physical component owns exactly one collinear through-pin set.
+- The pin count and row direction come entirely from that pin set.
+- One continuous full-depth slot admits the plastic pin-header base and all
+  wire-wrap tails.
+- A slit-and-lip clamp replaces a matching patch of the base plate and retains
+  the row without a TPU cover.
+- The header body, upper contacts, and wire-wrap tails are non-production
+  reference geometry.
+
+Header width, slot clearance, base thickness, slit, lip, and clamp dimensions
+come from assembly parameters. The pinout contains none of those values.
+
 ### `none`
 
 The component contributes its physical footprint and relevant contact holes,
@@ -476,16 +507,20 @@ The base plate is derived in this order:
    box-backed reference footprints;
 6. expand it by the assembly-supplied plate border;
 7. create one filleted plate using assembly-supplied dimensions;
-8. cut pin pass-throughs only for `through_pin_sets`;
-9. cut the downholder self-threading holes;
-10. add downholders as separate named followers;
-11. add bodies, pin tails, screws, and box frames as named non-production
+8. for every `through_pin_set`, use its component profile to cut either one
+   continuous row slot or individual contact holes;
+9. replace the pin-line clamp region with the slit-and-lip holder geometry;
+10. cut the other downholder self-threading holes;
+11. add separately printed downholders as named followers;
+12. add bodies, pin tails, screws, and box frames as named non-production
     reference parts.
 
-The initial pass-through is one hole per wire-wrap tail. Its size is calculated
-from assembly parameters. A future mechanical profile may request a row slot,
-but no component-body opening is inferred automatically: the plate should
-support the socket body while leaving its wire-wrap tails accessible below.
+Socket and header profiles use one continuous slot for each physical pin row,
+matching the base cutters used by the original Pico/TMC holder. The Pico, AR20,
+DIP-14, StepStick J1/J2, StepStick DIAG0/DIAG1, and generic pin-line rows all
+use this form. Slots must be collinear and regularly spaced at one raster
+pitch. Discrete components such as the fuse may instead request one hole per
+contact. Both styles are dimensioned only by assembly parameters.
 
 The generator also exposes a non-production underside keepout for wire-wrap
 tails, with depth supplied by the assembly. Housing generators can consume it
@@ -613,22 +648,25 @@ Status: implemented in `mege-circuits`.
 
 ### Phase 2: assembly parameter boundary and base plate
 
-Status: implemented. The current TMC5160T review pinout now supplies the
-physical-component grouping needed to exercise the generic assembly; measured
-profile refinement remains Phase 4.
+Status: implemented. The current TMC5160T review pinout supplies the physical
+component grouping, continuous socket/header row slots, discrete fuse holes,
+and the retained 16-pin external I/O line; measured profile refinement remains
+Phase 4.
 
 - Add the required mechanical values to `idex_parameters.yaml` or an imported
   mechanical-parameter file.
 - Add an assembly resource which passes them explicitly to the generator.
 - Implement raster-to-CAD conversion, component-profile resolution, fitted
-  plate generation, and per-contact pass-throughs.
+  plate generation, continuous row slots, and discrete-contact pass-throughs.
 - Generate non-production body previews and exact box frames.
+- Reuse the original SIL slit-and-lip construction for `pin_line_clamp`.
 
 ### Phase 3: downholders
 
 - Extract or generalize the rigid mount-eye and self-threading-hole helpers
   from the vision-light pattern.
-- Implement `corner`, `center_strip`, and `none`.
+- Implement the remaining `corner`, `center_strip`, and `none` behaviors;
+  `pin_line_clamp` is already implemented with the base plate.
 - Add base-plate self-threading holes, downholder clearance holes, and
   non-production screw previews.
 - Export every downholder as a separately printable named part.
@@ -637,8 +675,8 @@ profile refinement remains Phase 4.
 
 - Add only the physical-component grouping, semantic component types,
   downholder choices, and required box references to the TMC5160T pinout YAML.
-- Measure the RP2040-Plus, AR20 and DIP sockets, StepStick adapter, endstop
-  connector, fuse holder, and input connector.
+- Measure the RP2040-Plus, AR20 and DIP sockets, StepStick adapter, 16-pin SIL
+  row, and fuse holder.
 - Put those body, holder, plate, and fastener measurements into the IDEX
   assembly parameters, not the pinout.
 - Render and inspect component-side and underside CAD previews.
@@ -658,13 +696,18 @@ profile refinement remains Phase 4.
 - The generated plate encloses all configured component footprints,
   downholder eyes, and the exact TMC5160T Plus reference box.
 - Wire-wrap tails pass through the plate and remain accessible from below.
+- Every configured socket/header pin set forms one full-depth continuous slot;
+  the separate fuse retains individual holes.
+- The 16-pin external row is retained by the integrated slit-and-lip clamp and
+  keeps its empty isolation and spare contacts electrically unused.
 - The Pico uses the `corner` variant and leaves its USB edge unobstructed.
 - Each configured IC/wire-wrap socket uses the `center_strip` variant.
 - Base holes reuse the vision-light self-threading pattern; no TPU cover is
   generated.
 - The driver box appears as an exact-size non-production frame without
   invented driver features.
-- Base plate and downholders export independently, while reference geometry is
+- Separately printed downholders export independently; the pin-line clamp is
+  intentionally integrated into the base plate, and reference geometry remains
   preview-only.
 - No test freezes layout coordinates, colours, mechanical parameter values, or
   other intentionally configurable data.

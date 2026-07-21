@@ -299,8 +299,8 @@ def test_tmc5160_review_wiring_stays_out_of_active_klipper_validation():
 
     assert all("klipper" not in wire for wire in wiring["wires"])
     assert TMC5160_REVIEW_PATH not in validator.DEFAULT_WIRING_FILES
-    assert ("PICO_GND_03", "ENDSTOP_Y_GND") in wire_pairs
-    assert ("PICO_THREEV3_OUT_36", "ENDSTOP_Y_VCC") in wire_pairs
+    assert ("PICO_GND_03", "LINE16_ENDSTOP_GND") in wire_pairs
+    assert ("PICO_THREEV3_OUT_36", "LINE16_ENDSTOP_VCC") in wire_pairs
     assert all("PICO_GND_13" not in pair for pair in wire_pairs)
     assert ("U1_07_GND", "PICO_GND_28") in wire_pairs
     assert ("A20_C1_GND", "A19_C2_GND") in wire_pairs

@@ -44,6 +44,28 @@ Parameters:
     Type: Float
   pinout_base_plate_pin_pass_through_clearance:
     Type: Float
+  pinout_base_plate_pin_row_base_width:
+    Type: Float
+  pinout_base_plate_pin_row_slot_clearance:
+    Type: Float
+  pinout_base_plate_pin_row_vertical_clearance:
+    Type: Float
+  pinout_base_plate_wire_wrap_pin_length:
+    Type: Float
+  pinout_base_plate_wire_wrap_pin_base_thickness:
+    Type: Float
+  pinout_base_plate_top_pin_length:
+    Type: Float
+  pinout_base_plate_pin_line_clamp_base_length:
+    Type: Float
+  pinout_base_plate_pin_line_clamp_holder_slack:
+    Type: Float
+  pinout_base_plate_pin_line_clamp_vertical_slack:
+    Type: Float
+  pinout_base_plate_pin_line_clamp_lip_size:
+    Type: Float
+  pinout_base_plate_pin_line_clamp_slit_width:
+    Type: Float
   pinout_base_plate_reference_frame_width:
     Type: Float
   pinout_base_plate_reference_frame_height:
