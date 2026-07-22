@@ -17,7 +17,9 @@ Klipper config.
   registered as active Klipper wiring. Its retained 18-pin external-I/O row
   includes separate `F1_5A_IN` and `F1_5A_OUT` contacts; install the serviceable
   external 5 A fuse between those contacts, with no separate carrier-mounted
-  fuse holder.
+  fuse holder. The row uses a bottom-mounted upholder in the generated carrier:
+  its long wire-wrap tails remain downward while the printed base plate itself
+  has no fused underside protrusions.
 - `pico_tb6600_stripboard_interface.py` and
   `pico_tb6600_stripboard_layout.py` generate the live external Y
   TB6600 interface schematic and verified stripboard assembly.

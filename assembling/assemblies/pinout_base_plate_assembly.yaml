@@ -88,7 +88,11 @@ Parameters:
     Type: Float
   pinout_base_plate_mount_screw_clearance_type:
     Type: String
+  pinout_base_plate_self_threading_clearance_type:
+    Type: String
   pinout_base_plate_self_threading_core_radius_adjustment:
+    Type: Float
+  pinout_base_plate_self_threading_extra_hole_length:
     Type: Float
   pinout_base_plate_mount_eye_diameter_clearance:
     Type: Float

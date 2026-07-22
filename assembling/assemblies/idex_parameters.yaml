@@ -258,7 +258,9 @@ globals:
   pinout_base_plate_mount_screw_size: "M2.5"
   pinout_base_plate_mount_screw_length: 12.0
   pinout_base_plate_mount_screw_clearance_type: loose
+  pinout_base_plate_self_threading_clearance_type: close
   pinout_base_plate_self_threading_core_radius_adjustment: -0.25
+  pinout_base_plate_self_threading_extra_hole_length: 1.0
   pinout_base_plate_mount_eye_diameter_clearance: 2.0
   pinout_base_plate_downholder_profiles:
     corner:
@@ -273,6 +275,16 @@ globals:
       thickness_mm: 2.1
       rail_width_mm: 2.54
       crossbar_width_mm: 2.54
+    pin_line_upholder:
+      thickness_mm: 2.1
+      body_border_mm: 1.5
+      roof_thickness_mm: 1.0
+      recess_fit_clearance_mm: 0.3
+      pocket_vertical_clearance_mm: 0.2
+      screw_length_mm: 8.0
+      minimum_thread_engagement_mm: 4.0
+      screw_tip_clearance_mm: 0.3
+      boss_diameter_mm: 6.5
   pinout_base_plate_usb_bridge_wall_thickness: 2.0
   pinout_base_plate_usb_cable_hole_width: 15.0
   pinout_base_plate_usb_cable_hole_height: 15.0

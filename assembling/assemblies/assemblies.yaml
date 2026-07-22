@@ -3789,7 +3789,9 @@ assemblies:
       pinout_base_plate_mount_screw_size: !Ref pinout_base_plate_mount_screw_size
       pinout_base_plate_mount_screw_length: !Ref pinout_base_plate_mount_screw_length
       pinout_base_plate_mount_screw_clearance_type: !Ref pinout_base_plate_mount_screw_clearance_type
+      pinout_base_plate_self_threading_clearance_type: !Ref pinout_base_plate_self_threading_clearance_type
       pinout_base_plate_self_threading_core_radius_adjustment: !Ref pinout_base_plate_self_threading_core_radius_adjustment
+      pinout_base_plate_self_threading_extra_hole_length: !Ref pinout_base_plate_self_threading_extra_hole_length
       pinout_base_plate_mount_eye_diameter_clearance: !Ref pinout_base_plate_mount_eye_diameter_clearance
       pinout_base_plate_downholder_profiles: !Ref pinout_base_plate_downholder_profiles
       pinout_base_plate_usb_bridge_wall_thickness: !Ref pinout_base_plate_usb_bridge_wall_thickness

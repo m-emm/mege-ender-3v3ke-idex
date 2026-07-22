@@ -100,7 +100,9 @@ def _fixture_kwargs(pinout_path, *, pass_through_style="row_slot"):
         "pinout_base_plate_mount_screw_size": "M2.5",
         "pinout_base_plate_mount_screw_length": 12.0,
         "pinout_base_plate_mount_screw_clearance_type": "loose",
+        "pinout_base_plate_self_threading_clearance_type": "close",
         "pinout_base_plate_self_threading_core_radius_adjustment": -0.25,
+        "pinout_base_plate_self_threading_extra_hole_length": 1.0,
         "pinout_base_plate_mount_eye_diameter_clearance": 2.0,
         "pinout_base_plate_downholder_profiles": {
             "corner": {
@@ -114,6 +116,17 @@ def _fixture_kwargs(pinout_path, *, pass_through_style="row_slot"):
                 "thickness_mm": 2.1,
                 "rail_width_mm": 2.5,
                 "crossbar_width_mm": 2.5,
+            },
+            "pin_line_upholder": {
+                "thickness_mm": 2.1,
+                "body_border_mm": 1.5,
+                "roof_thickness_mm": 1.0,
+                "recess_fit_clearance_mm": 0.3,
+                "pocket_vertical_clearance_mm": 0.2,
+                "screw_length_mm": 8.0,
+                "minimum_thread_engagement_mm": 4.0,
+                "screw_tip_clearance_mm": 0.3,
+                "boss_diameter_mm": 6.5,
             },
         },
         "pinout_base_plate_usb_bridge_wall_thickness": 2.0,
@@ -415,14 +428,22 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
     assert assembly.additional_data["pin_row_slots"]
     assert assembly.additional_data["individual_pin_pass_throughs"] == []
     assert "individual_pin_pass_throughs" not in assembly.cutter_indices_by_name
-    assert assembly.additional_data["pin_line_clamp_component_ids"] == [
+    roof_slits = assembly.additional_data["pin_line_upholder_roof_slits"]
+    assert len(roof_slits) == 1
+    roof_slit = roof_slits[0]
+    assert roof_slit["component_id"] == "external_io_pin_line"
+    assert roof_slit["pin_count"] == len(project.pin_sets["external_io"])
+    assert "pin_line_upholder_roof_slits" in assembly.cutter_indices_by_name
+    assert assembly.additional_data["pin_line_clamp_component_ids"] == []
+    assert assembly.additional_data["pin_line_upholder_component_ids"] == [
         "external_io_pin_line"
     ]
+    assert all(
+        slot["component_id"] != "external_io_pin_line"
+        for slot in assembly.additional_data["pin_row_slots"]
+    )
     non_production_names = set(assembly.non_production_indices_by_name)
-    clamp_component_ids = set(assembly.additional_data["pin_line_clamp_component_ids"])
     for slot in assembly.additional_data["pin_row_slots"]:
-        if slot["component_id"] in clamp_component_ids:
-            continue
         preview_name = f"pin_header_{slot['component_id']}_{slot['pin_set_id']}_pins"
         assert preview_name in non_production_names
         preview_bbox = get_bounding_box(
@@ -438,24 +459,32 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
         assembly.get_named_non_production_part("pin_line_external_io_pin_line_pins")
     )
     assert pin_line_pins_bbox[0][2] < 0
-    assert pin_line_pins_bbox[1][2] >= assembly.additional_data["plate_size_mm"][2]
+    assert pin_line_pins_bbox[1][2] < assembly.additional_data["plate_size_mm"][2]
     pin_line_top_pins_bbox = get_bounding_box(
         assembly.get_named_non_production_part("pin_line_external_io_pin_line_top_pins")
     )
+    assert pin_line_top_pins_bbox[1][2] > assembly.additional_data["plate_size_mm"][2]
     pin_line_center = [
         (pin_line_top_pins_bbox[0][axis] + pin_line_top_pins_bbox[1][axis]) / 2
         for axis in (0, 1)
     ]
-    pin_line_slot = next(
-        slot
-        for slot in assembly.additional_data["pin_row_slots"]
-        if slot["component_id"] == "external_io_pin_line"
+    pin_line_recess = next(
+        recess
+        for recess in assembly.additional_data["pin_line_upholder_recesses"]
+        if recess["component_id"] == "external_io_pin_line"
     )
-    pin_line_slot_center = [
-        (pin_line_slot["minimum_mm"][axis] + pin_line_slot["maximum_mm"][axis]) / 2
+    pin_line_recess_center = [
+        (
+            pin_line_recess["minimum_mm"][axis]
+            + pin_line_recess["maximum_mm"][axis]
+        )
+        / 2
         for axis in (0, 1)
     ]
-    assert pin_line_center == pytest.approx(pin_line_slot_center)
+    assert pin_line_center == pytest.approx(pin_line_recess_center)
+    assert pin_line_recess["depth_mm"] + pin_line_recess[
+        "roof_thickness_mm"
+    ] == pytest.approx(assembly.additional_data["plate_size_mm"][2])
     assert "reference_tmc5160t_plus_driver" in (assembly.non_production_indices_by_name)
     assert "pico_usb_cable_passage" in assembly.cutter_indices_by_name
     assert "pico_usb_connector" in non_production_names
@@ -489,6 +518,7 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
         "downholder_socket_hv",
         "downholder_socket_c",
         "downholder_tmc_adapter",
+        "downholder_external_io_pin_line",
     }
     assert set(assembly.follower_indices_by_name) == expected_downholders
     assert "downholder_self_threading_holes" in assembly.cutter_indices_by_name
@@ -513,6 +543,111 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
     assert adapter_downholder["eye_count"] == 2
     assert adapter_downholder["loose_hole_count"] == 2
 
+    pin_line_upholder = downholders["external_io_pin_line"]
+    assert pin_line_upholder["eye_count"] == 2
+    assert pin_line_upholder["loose_hole_count"] == 2
+    assert pin_line_upholder["tail_slit_count"] == 1
+    assert pin_line_upholder["tail_contact_count"] == len(
+        project.pin_sets["external_io"]
+    )
+    assert "pin_line_upholder_tail_slits" in assembly.cutter_indices_by_name
+    roof_slit_bbox = get_bounding_box(
+        assembly.get_named_cutter("pin_line_upholder_roof_slits")
+    )
+    tail_slit_bbox = get_bounding_box(
+        assembly.get_named_cutter("pin_line_upholder_tail_slits")
+    )
+    assert roof_slit_bbox[0][:2] == pytest.approx(tail_slit_bbox[0][:2])
+    assert roof_slit_bbox[1][:2] == pytest.approx(tail_slit_bbox[1][:2])
+    active_axis = 1 if pin_line_upholder["orientation"] == "vertical" else 0
+    cross_axis = 1 - active_axis
+    assert roof_slit_bbox[1][active_axis] - roof_slit_bbox[0][active_axis] > (
+        assembly.additional_data["raster_pitch_mm"]
+    )
+    assert roof_slit_bbox[1][cross_axis] - roof_slit_bbox[0][cross_axis] == (
+        pytest.approx(assembly.additional_data["pin_hole_size_mm"])
+    )
+    assert pin_line_upholder["screw_direction"] == "upward"
+    assert pin_line_upholder["self_threading_lead_in_face"] == "bottom"
+    assert all(
+        downholder["self_threading_lead_in_face"] == "top"
+        for component_id, downholder in downholders.items()
+        if component_id != "external_io_pin_line"
+    )
+    plate_thickness = assembly.additional_data["plate_size_mm"][2]
+    for component_id, downholder in downholders.items():
+        cutter_bbox = get_bounding_box(
+            assembly.get_named_cutter(
+                f"downholder_{component_id}_self_threading_holes"
+            )
+        )
+        if downholder["self_threading_lead_in_face"] == "bottom":
+            assert cutter_bbox[0][2] == pytest.approx(
+                downholder["self_threading_entry_z_mm"], abs=1e-6
+            )
+            assert downholder[
+                "self_threading_hole_distance_from_head_mm"
+            ] == pytest.approx(-downholder["holder_bottom_z_mm"])
+        else:
+            assert cutter_bbox[1][2] == pytest.approx(
+                downholder["self_threading_entry_z_mm"], abs=1e-6
+            )
+            assert downholder["self_threading_entry_z_mm"] == pytest.approx(
+                plate_thickness
+            )
+            assert downholder[
+                "self_threading_hole_distance_from_head_mm"
+            ] == pytest.approx(downholder["holder_top_z_mm"] - plate_thickness)
+            assert cutter_bbox[0][2] < 0
+    pin_line_profile = DEFAULTS["pinout_base_plate_downholder_profiles"][
+        "pin_line_upholder"
+    ]
+    assert pin_line_upholder["screw_length_mm"] == pytest.approx(
+        pin_line_profile["screw_length_mm"]
+    )
+    assert pin_line_upholder["thread_engagement_mm"] >= pin_line_profile[
+        "minimum_thread_engagement_mm"
+    ]
+    assert pin_line_upholder["boss_count"] == 2
+    assert pin_line_upholder["boss_height_mm"] > 0
+    assert pin_line_upholder["boss_minimum_z_mm"] == pytest.approx(
+        assembly.additional_data["plate_size_mm"][2]
+    )
+    assert pin_line_upholder["boss_maximum_z_mm"] > pin_line_upholder[
+        "boss_minimum_z_mm"
+    ]
+    pin_line_thread_cutter_bbox = get_bounding_box(
+        assembly.get_named_cutter(
+            "downholder_external_io_pin_line_self_threading_holes"
+        )
+    )
+    assert pin_line_thread_cutter_bbox[1][2] > pin_line_upholder[
+        "boss_maximum_z_mm"
+    ]
+    assert pin_line_upholder["holder_bottom_z_mm"] < 0
+    assert pin_line_upholder["holder_top_z_mm"] == pytest.approx(0)
+    upholder_bbox = get_bounding_box(
+        assembly.get_follower_part_by_name("downholder_external_io_pin_line")
+    )
+    assert upholder_bbox[0][2] < 0
+    assert upholder_bbox[1][2] == pytest.approx(0)
+    assert get_bounding_box(assembly.leader)[0][2] == pytest.approx(0, abs=1e-6)
+    adapter_envelope = assembly.additional_data["component_envelopes"]["tmc_adapter"]
+    assert (
+        upholder_bbox[1][0] < adapter_envelope["minimum_mm"][0]
+        or upholder_bbox[0][0] > adapter_envelope["maximum_mm"][0]
+        or upholder_bbox[1][1] < adapter_envelope["minimum_mm"][1]
+        or upholder_bbox[0][1] > adapter_envelope["maximum_mm"][1]
+    )
+    for screw_index in (1, 2):
+        screw_bbox = get_bounding_box(
+            assembly.get_named_non_production_part(
+                f"downholder_external_io_pin_line_screw_{screw_index}"
+            )
+        )
+        assert screw_bbox[0][2] < upholder_bbox[0][2]
+        assert screw_bbox[1][2] > assembly.additional_data["plate_size_mm"][2]
+
     center_strip_component_ids = {
         component.id
         for component in project.physical_components
@@ -521,6 +656,7 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
     assert center_strip_component_ids == set(downholders) - {
         "pico",
         "tmc_adapter",
+        "external_io_pin_line",
     }
     for component_id in center_strip_component_ids:
         downholder = downholders[component_id]
@@ -588,7 +724,7 @@ def test_tmc5160_external_pin_line_keeps_power_isolation_spares_and_endstop():
     pin_names = project.pin_sets[component.pin_sets[0]]
 
     assert component.component_type == "pin_line"
-    assert component.downholder.value == "pin_line_clamp"
+    assert component.downholder.value == "pin_line_upholder"
     assert pin_names == (
         "LINE18_F1_5A_OUT",
         "LINE18_F1_5A_IN",

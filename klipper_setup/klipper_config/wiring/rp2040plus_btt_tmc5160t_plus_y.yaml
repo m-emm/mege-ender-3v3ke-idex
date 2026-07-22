@@ -42,6 +42,7 @@ metadata:
     The external I/O row carries both external 5A fuse contacts, switched 24V through two
     paralleled positive contacts, and two paralleled ground contacts. Connect the serviceable
     external fuse only between LINE18_F1_5A_IN and LINE18_F1_5A_OUT.
+    Its carrier uses a separately printed bottom upholder; the long wire-wrap tails point down.
     Keep LINE18_NC_ISOLATION and LINE18_SPARE_01 through LINE18_SPARE_08 unconnected.
     High-current 24V bypasses the Pico and DIL-socket conductors.
     Land the four Y-motor conductors directly on the driver's 1B/2B/1A/2A screw terminals.
@@ -118,7 +119,7 @@ physical_components:
     label: 18-pin fuse, power, spare, and Y-endstop row
     component_type: pin_line
     pin_sets: [external_io]
-    downholder: pin_line_clamp
+    downholder: pin_line_upholder
 
   - id: tmc5160t_plus_driver
     label: TMC5160T Plus
@@ -254,7 +255,7 @@ pin_sets:
   # far apart.
   - id: external_io
     prefix: LINE18_
-    origin: [40, 18]
+    origin: [40, 8]
     direction: up
     discrete_pin_numbers: {start: 1, step: 1}
     pins:

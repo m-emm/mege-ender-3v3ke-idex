@@ -39,7 +39,7 @@ manufactured:
 - the semantic component type, such as `rp2040_plus_2x20` or `ar20_2x10`;
 - which grouped contacts are through-board contacts;
 - the semantic downholder choice, such as `corner`, `center_strip`,
-  `perimeter_frame`, `pin_line_clamp`, or `none`;
+  `perimeter_frame`, `pin_line_clamp`, `pin_line_upholder`, or `none`;
 - physical module boxes and their raster dimensions.
 
 The downholder choice belongs here because it follows the type and topology of
@@ -158,9 +158,12 @@ pattern in `vision_light_mount_assembly.py`:
 - a rigid printable strip or corner land bears on the retained component;
 - rounded mount eyes extend beyond its footprint;
 - the downholder receives loose screw-clearance holes;
-- the base plate receives lead-in self-threading holes made with
-  `create_self_threading_hole_cutter`;
-- screw visuals are non-production parts.
+- one `create_complete_screw_assembly` per eye keeps the screw preview and its
+  lead-in self-threading cutter in a single alignable assembly;
+- the complete screw assembly's head-side cutter face is aligned to the actual
+  carrier entry face: plate top for the ordinary downholders and plate bottom
+  for the upward-entering pin-line upholder;
+- screw visuals remain named non-production parts.
 
 The proven M2.5 setup is a useful starting value, but its screw size, screw
 length, downholder thickness, eye clearance, and self-threading adjustment are
@@ -183,7 +186,7 @@ Each record may contain:
 - `through_pin_sets`: optional subset whose contacts physically pass through
   the carrier; omission means all listed pin sets;
 - `downholder`: semantic retention kind: `corner`, `center_strip`,
-  `perimeter_frame`, `pin_line_clamp`, or `none`;
+  `perimeter_frame`, `pin_line_clamp`, `pin_line_upholder`, or `none`;
 - `box`: optional reference to an existing exact-size physical module box.
 
 There are deliberately no millimetre values in this structure.
@@ -238,7 +241,7 @@ physical_components:
     label: 18-pin fuse, power, spare, and Y-endstop row
     component_type: pin_line
     pin_sets: [external_io]
-    downholder: pin_line_clamp
+    downholder: pin_line_upholder
 
   - id: tmc5160t_plus_driver
     label: TMC5160T Plus
@@ -339,7 +342,11 @@ Parameters:
     Type: Float
   pinout_mount_eye_head_clearance:
     Type: Float
+  pinout_self_threading_clearance_type:
+    Type: String
   pinout_self_threading_core_radius_adjustment:
+    Type: Float
+  pinout_self_threading_extra_hole_length:
     Type: Float
   pinout_reference_frame_width:
     Type: Float
@@ -516,6 +523,29 @@ This is the retained SIL row pattern from the original board holder.
 
 Header width, slot clearance, base thickness, slit, lip, and clamp dimensions
 come from assembly parameters. The pinout contains none of those values.
+
+### `pin_line_upholder`
+
+This is the bottom-retained SIL row pattern used by the current 18-pin external
+interface.
+
+- One physical component owns exactly one collinear, one-pitch through-pin set.
+- A shallow underside recess admits most of the plastic header body while a
+  configured roof remains part of the base plate.
+- One continuous longitudinal slit through that roof passes the pins. The short
+  contacts emerge above the plate and the long wire-wrap tails remain accessible
+  below it.
+- A separately printable follower sits below the carrier, supports the small
+  exposed portion of the header body, and uses a matching continuous tail slit.
+  This follows the proven vision-light pin-holder pattern and avoids isolated
+  square apertures which do not print reliably.
+- Filleted eyes stack beyond the two short ends. Screws enter upward through
+  loose follower holes and underside lead-ins into self-threading carrier holes
+  and compact top-side bosses.
+- The production plate has no fused geometry below its nominal bottom plane.
+
+Roof thickness, recess and pocket clearance, follower dimensions, screw length,
+thread engagement, and boss geometry all come from assembly parameters.
 
 ### `none`
 
@@ -705,7 +735,9 @@ Phase 4.
   dimensions, and remove the plate below the bridge through to the carrier edge
   for cable and plug access.
 - Generate non-production body previews and exact box frames.
-- Reuse the original SIL slit-and-lip construction for `pin_line_clamp`.
+- Keep the original SIL slit-and-lip construction available for
+  `pin_line_clamp`. The current external row instead uses the separately
+  printable `pin_line_upholder` described below.
 
 ### Phase 3: downholders
 
@@ -718,10 +750,16 @@ Status: implemented for the current carrier.
   beyond each short end.
 - The StepStick adapter uses one closed-frame follower with two long-side rails,
   crossbars one pitch beyond the end pins, and one eye at each short edge.
-- Every eye receives a loose M2.5 hole and shares its centre with a lead-in
-  self-threading hole in the base plate; screws are preview-only parts.
-- All seven rigid downholders export as separately printable named followers.
-  `pin_line_clamp` remains integrated with the plate and `none` adds no holder.
+- Every eye receives a loose M2.5 hole and shares its centre with a complete
+  screw assembly whose self-threading lead-in is aligned to the carrier entry
+  face; screws are preview-only parts.
+- The 18-pin external row uses a shallow underside body recess with a retained
+  carrier roof and one continuous pin slit. Its long wire-wrap tails point down
+  through a separately printable bottom upholder with stacked short-edge eyes.
+  M2.5x8 screws enter upward into compact top-side bosses, while the production
+  plate has no fused geometry below its nominal bottom surface.
+- All eight rigid downholders export as separately printable named followers.
+  `pin_line_clamp` remains available for other pinouts and `none` adds no holder.
 
 ### Phase 4: measurements and first assembly
 
@@ -748,9 +786,12 @@ Status: implemented for the current carrier.
 - The generated plate encloses all configured component footprints,
   downholder eyes, and the exact TMC5160T Plus reference box.
 - Wire-wrap tails pass through the plate and remain accessible from below.
-- Every configured socket/header pin set forms one full-depth continuous slot;
-  there is no separate fuse component or fuse-hole geometry.
-- The 18-pin external row is retained by the integrated slit-and-lip clamp,
+- Every configured socket and board-header pin set forms one continuous slot;
+  ordinary socket/header slots are full-depth, while the upholder row slot only
+  cuts through its retained roof. There is no separate fuse component or
+  fuse-hole geometry.
+- The 18-pin external row uses one continuous roof slit and a shallow body
+  recess, is retained from below by a matching slotted `pin_line_upholder`,
   exposes separate serviceable-fuse input/output contacts, and keeps its empty
   isolation and spare contacts electrically unused.
 - The Pico uses the `corner` variant, while the plate continues past its USB
@@ -764,8 +805,8 @@ Status: implemented for the current carrier.
   generated.
 - The driver box appears as an exact-size non-production frame without
   invented driver features.
-- Separately printed downholders export independently; the pin-line clamp is
-  intentionally integrated into the base plate, and reference geometry remains
+- Separately printed downholders, including the external-row upholder, export
+  independently; reference headers, screws, components, and box frames remain
   preview-only.
 - No test freezes layout coordinates, colours, mechanical parameter values, or
   other intentionally configurable data.
