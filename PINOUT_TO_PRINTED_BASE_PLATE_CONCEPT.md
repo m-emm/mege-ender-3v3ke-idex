@@ -399,6 +399,8 @@ def create_pinout_base_plate_assembly(
     self_threading_core_radius_adjustment_mm: float,
     downholder_thickness_mm: float,
     downholder_strip_width_mm: float,
+    perimeter_frame_rail_width_mm: float,
+    perimeter_frame_crossbar_width_mm: float,
     mount_eye_head_clearance_mm: float,
     reference_frame_width_mm: float,
     reference_frame_height_mm: float,
@@ -457,6 +459,8 @@ This is the Pico/RP2040-Plus pattern.
   so the eye and rail share a full joining face rather than touching at an
   edge.
 - No holder member enters the USB bridge or cable-passage keepout.
+- A one-raster solid plate land remains beyond the Pico body; the raised bridge
+  and its through-plate opening start only beyond that retaining land.
 - Each eye's loose clearance hole aligns with a self-threading hole in the base
   plate.
 
@@ -653,8 +657,9 @@ Useful tests include:
 - changing plate thickness, screw size, or downholder thickness changes the
   CAD result without changing or rewriting the pinout model;
 - corner holders have the required topology and avoid the Pico USB edge;
-- the plate extends beyond the Pico USB edge and the derived cable passage cuts
-  completely through the plate beneath the raised bridge and out to the edge;
+- the plate extends beyond the Pico USB edge, retains one raster of solid plate
+  beyond the board, and then cuts the cable passage completely through the
+  plate beneath the raised bridge and out to the edge;
 - center-strip holders have two end eyes and align to the derived long axis;
 - perimeter-frame holders have two long-side rails, two one-pitch-offset end
   crossbars, and two short-edge eyes;
@@ -695,8 +700,10 @@ Phase 4.
 - Add an assembly resource which passes them explicitly to the generator.
 - Implement raster-to-CAD conversion, component-profile resolution, fitted
   plate generation, continuous row slots, and discrete-contact pass-throughs.
-- Extend the plate beyond the Pico USB edge and derive the open cable bridge
-  from the Pico rows plus assembly-owned USB dimensions.
+- Extend the plate beyond the Pico USB edge, retain a one-raster plate land,
+  derive the raised bridge from the Pico rows plus assembly-owned USB
+  dimensions, and remove the plate below the bridge through to the carrier edge
+  for cable and plug access.
 - Generate non-production body previews and exact box frames.
 - Reuse the original SIL slit-and-lip construction for `pin_line_clamp`.
 
@@ -747,8 +754,9 @@ Status: implemented for the current carrier.
   exposes separate serviceable-fuse input/output contacts, and keeps its empty
   isolation and spare contacts electrically unused.
 - The Pico uses the `corner` variant, while the plate continues past its USB
-  edge into a raised bridge; the plate beneath it is removed for the USB-C
-  plug and cable and remains unobstructed by the holder.
+  edge through a one-raster retaining land and then into a raised bridge; the
+  plate beneath the bridge is removed for the USB-C plug and cable and remains
+  unobstructed by the holder.
 - Each configured IC/wire-wrap socket uses the `center_strip` variant.
 - The StepStick adapter uses the `perimeter_frame` variant with its J1/J2 rails,
   two end crossbars, and two short-edge mount eyes.

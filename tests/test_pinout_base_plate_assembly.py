@@ -469,6 +469,15 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
     assert usb_bridge["opening_width_mm"] > 0
     assert usb_bridge["opening_height_mm"] > 0
     assert usb_bridge["minimum_y_mm"] < usb_bridge["maximum_y_mm"]
+    assert usb_bridge["plate_cutout_minimum_y_mm"] == pytest.approx(
+        usb_bridge["minimum_y_mm"]
+    )
+    assert (
+        usb_bridge["minimum_y_mm"] - usb_bridge["pico_board_maximum_y_mm"]
+    ) == pytest.approx(usb_bridge["retaining_land_depth_mm"])
+    assert usb_bridge["retaining_land_depth_mm"] == pytest.approx(
+        assembly.additional_data["raster_pitch_mm"]
+    )
     assert usb_bridge["maximum_y_mm"] == pytest.approx(
         assembly.additional_data["plate_size_mm"][1]
     )

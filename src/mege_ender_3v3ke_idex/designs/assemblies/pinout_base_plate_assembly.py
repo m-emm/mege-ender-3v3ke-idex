@@ -711,6 +711,12 @@ def create_pinout_base_plate_assembly(
             max(coordinate[1] for coordinate in pico_pin_coordinates) * raster_pitch_mm
             - plate_source_minimum_y_mm
         )
+        pico_envelope = next(
+            envelope
+            for envelope in component_envelopes
+            if envelope.component_id == pico_component.id
+        )
+        pico_board_maximum_y_mm = pico_envelope.maximum_y_mm - plate_source_minimum_y_mm
         pico_center_x_mm = sum(pico_row_x_coordinates_mm) / 2
         bridge_opening_width_mm = max(
             usb_cable_hole_width_mm,
@@ -718,7 +724,7 @@ def create_pinout_base_plate_assembly(
             - pico_row_x_coordinates_mm[0]
             + corner_rail_width_mm,
         )
-        bridge_minimum_y_mm = pico_maximum_pin_y_mm + corner_rail_width_mm / 2
+        bridge_minimum_y_mm = pico_board_maximum_y_mm + raster_pitch_mm
         bridge_depth_mm = plate_depth_mm - bridge_minimum_y_mm
         if bridge_depth_mm <= 0:
             raise ValueError(
@@ -742,11 +748,11 @@ def create_pinout_base_plate_assembly(
         )
         pico_usb_cable_cutter = create_box(
             bridge_opening_width_mm,
-            plate_depth_mm - connector_minimum_y_mm + 1,
+            plate_depth_mm - bridge_minimum_y_mm + 1,
             plate_thickness_mm + usb_cable_hole_height_mm + 1,
             origin=(
                 pico_center_x_mm - bridge_opening_width_mm / 2,
-                connector_minimum_y_mm,
+                bridge_minimum_y_mm,
                 -1,
             ),
         )
@@ -768,7 +774,9 @@ def create_pinout_base_plate_assembly(
             "component_id": pico_component.id,
             "opening_width_mm": bridge_opening_width_mm,
             "opening_height_mm": usb_cable_hole_height_mm,
-            "plate_cutout_minimum_y_mm": connector_minimum_y_mm,
+            "plate_cutout_minimum_y_mm": bridge_minimum_y_mm,
+            "pico_board_maximum_y_mm": pico_board_maximum_y_mm,
+            "retaining_land_depth_mm": raster_pitch_mm,
             "minimum_y_mm": bridge_minimum_y_mm,
             "maximum_y_mm": plate_depth_mm,
         }
