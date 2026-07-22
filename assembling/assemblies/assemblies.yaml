@@ -3766,7 +3766,10 @@ assemblies:
       pinout_base_plate_pinout_yaml_path: klipper_setup/klipper_config/wiring/rp2040plus_btt_tmc5160t_plus_y.yaml
       pinout_base_plate_raster_pitch: !Ref x_axis_mcu_dil_pitch
       pinout_base_plate_thickness: !Ref pinout_base_plate_thickness
-      pinout_base_plate_border: !Ref pinout_base_plate_border
+      pinout_base_plate_border_left: !Ref pinout_base_plate_border_left
+      pinout_base_plate_border_right: !Ref pinout_base_plate_border_right
+      pinout_base_plate_border_top: !Ref pinout_base_plate_border_top
+      pinout_base_plate_border_bottom: !Ref pinout_base_plate_border_bottom
       pinout_base_plate_corner_radius: !Ref pinout_base_plate_corner_radius
       pinout_base_plate_pin_tail_width: !Ref x_axis_mcu_wire_wrap_pin_side
       pinout_base_plate_pin_pass_through_clearance: !Ref pinout_base_plate_pin_pass_through_clearance
@@ -3783,6 +3786,19 @@ assemblies:
       pinout_base_plate_pin_line_clamp_slit_width: !Ref pinout_base_plate_pin_line_clamp_slit_width
       pinout_base_plate_reference_frame_width: !Ref pinout_base_plate_reference_frame_width
       pinout_base_plate_reference_frame_height: !Ref pinout_base_plate_reference_frame_height
+      pinout_base_plate_mount_screw_size: !Ref pinout_base_plate_mount_screw_size
+      pinout_base_plate_mount_screw_length: !Ref pinout_base_plate_mount_screw_length
+      pinout_base_plate_mount_screw_clearance_type: !Ref pinout_base_plate_mount_screw_clearance_type
+      pinout_base_plate_self_threading_core_radius_adjustment: !Ref pinout_base_plate_self_threading_core_radius_adjustment
+      pinout_base_plate_mount_eye_diameter_clearance: !Ref pinout_base_plate_mount_eye_diameter_clearance
+      pinout_base_plate_downholder_profiles: !Ref pinout_base_plate_downholder_profiles
+      pinout_base_plate_usb_bridge_wall_thickness: !Ref pinout_base_plate_usb_bridge_wall_thickness
+      pinout_base_plate_usb_cable_hole_width: !Ref pinout_base_plate_usb_cable_hole_width
+      pinout_base_plate_usb_cable_hole_height: !Ref pinout_base_plate_usb_cable_hole_height
+      pinout_base_plate_pico_usb_connector_width: !Ref pinout_base_plate_pico_usb_connector_width
+      pinout_base_plate_pico_usb_connector_thickness: !Ref pinout_base_plate_pico_usb_connector_thickness
+      pinout_base_plate_pico_usb_connector_depth: !Ref pinout_base_plate_pico_usb_connector_depth
+      pinout_base_plate_pico_usb_connector_offset: !Ref pinout_base_plate_pico_usb_connector_offset
       pinout_base_plate_component_profiles: !Ref pinout_base_plate_component_profiles
 
   - name: tool_head_mount_machined_bottom_assembly

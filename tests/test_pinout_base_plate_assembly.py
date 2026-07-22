@@ -59,7 +59,7 @@ physical_components:
   - id: socket
     component_type: fixture_socket
     pin_sets: [socket_left, socket_right]
-    downholder: center_strip
+    downholder: none
   - id: module
     component_type: boxed_module
     pin_sets: [module_contacts]
@@ -77,7 +77,10 @@ def _fixture_kwargs(pinout_path, *, pass_through_style="row_slot"):
         "pinout_base_plate_pinout_yaml_path": pinout_path,
         "pinout_base_plate_raster_pitch": 2.5,
         "pinout_base_plate_thickness": 3.0,
-        "pinout_base_plate_border": 2.0,
+        "pinout_base_plate_border_left": 2.0,
+        "pinout_base_plate_border_right": 2.0,
+        "pinout_base_plate_border_top": 0.0,
+        "pinout_base_plate_border_bottom": 2.0,
         "pinout_base_plate_corner_radius": 1.0,
         "pinout_base_plate_pin_tail_width": 0.6,
         "pinout_base_plate_pin_pass_through_clearance": 0.2,
@@ -94,6 +97,27 @@ def _fixture_kwargs(pinout_path, *, pass_through_style="row_slot"):
         "pinout_base_plate_pin_line_clamp_slit_width": 0.4,
         "pinout_base_plate_reference_frame_width": 0.8,
         "pinout_base_plate_reference_frame_height": 2.0,
+        "pinout_base_plate_mount_screw_size": "M2.5",
+        "pinout_base_plate_mount_screw_length": 12.0,
+        "pinout_base_plate_mount_screw_clearance_type": "loose",
+        "pinout_base_plate_self_threading_core_radius_adjustment": -0.25,
+        "pinout_base_plate_mount_eye_diameter_clearance": 2.0,
+        "pinout_base_plate_downholder_profiles": {
+            "corner": {
+                "thickness_mm": 2.1,
+                "rail_width_mm": 2.5,
+                "bridge_width_mm": 2.5,
+                "bridge_pin_indices_from_bottom": [1, 2],
+            },
+            "center_strip": {"thickness_mm": 2.1, "strip_width_mm": 1.0},
+        },
+        "pinout_base_plate_usb_bridge_wall_thickness": 2.0,
+        "pinout_base_plate_usb_cable_hole_width": 15.0,
+        "pinout_base_plate_usb_cable_hole_height": 15.0,
+        "pinout_base_plate_pico_usb_connector_width": 7.0,
+        "pinout_base_plate_pico_usb_connector_thickness": 3.0,
+        "pinout_base_plate_pico_usb_connector_depth": 5.0,
+        "pinout_base_plate_pico_usb_connector_offset": 1.0,
         "pinout_base_plate_component_profiles": {
             "fixture_socket": {
                 "left_margin_mm": 1.0,
@@ -173,6 +197,20 @@ def test_component_profile_registry_rejects_missing_and_invalid_dimensions():
             }
         )
 
+    profile = resolve_component_profiles(
+        {
+            "socket": {
+                "left_margin_mm": 1,
+                "right_margin_mm": 1,
+                "top_margin_mm": 1,
+                "bottom_margin_mm": 1,
+                "body_height_mm": 2,
+                "pass_through_style": "row_slot",
+            }
+        }
+    )["socket"]
+    assert profile.clamp_surface_height_mm == profile.body_height_mm
+
 
 def test_base_plate_uses_derived_envelopes_through_contacts_and_exact_box(tmp_path):
     pinout_path = tmp_path / "fixture.yaml"
@@ -241,12 +279,12 @@ def test_base_plate_uses_derived_envelopes_through_contacts_and_exact_box(tmp_pa
     component_minimum_y = min(value["minimum_mm"][1] for value in envelopes.values())
     component_maximum_x = max(value["maximum_mm"][0] for value in envelopes.values())
     component_maximum_y = max(value["maximum_mm"][1] for value in envelopes.values())
-    border = _fixture_kwargs(pinout_path)["pinout_base_plate_border"]
+    margins = assembly.additional_data["plate_margins_mm"]
     plate_size = assembly.additional_data["plate_size_mm"]
-    assert component_minimum_x == pytest.approx(border)
-    assert component_minimum_y == pytest.approx(border)
-    assert plate_size[0] - component_maximum_x == pytest.approx(border)
-    assert plate_size[1] - component_maximum_y == pytest.approx(border)
+    assert component_minimum_x >= margins["left"]
+    assert component_minimum_y >= margins["bottom"]
+    assert plate_size[0] - component_maximum_x >= margins["right"]
+    assert plate_size[1] - component_maximum_y == pytest.approx(margins["top"])
 
 
 def test_global_pinout_translation_preserves_normalized_plate_geometry(tmp_path):
@@ -308,6 +346,25 @@ def test_row_slot_rejects_non_unit_pin_spacing(tmp_path):
         create_pinout_base_plate_assembly(**_fixture_kwargs(pinout_path))
 
 
+def test_center_strip_rejects_a_strip_wider_than_the_socket_channel(tmp_path):
+    pinout_path = tmp_path / "narrow-channel.yaml"
+    pinout_path.write_text(
+        _fixture_pinout()
+        .replace(
+            "direction: right\n    pins: [ONE, TWO]",
+            "direction: down\n    pins: [ONE, TWO]",
+        )
+        .replace("downholder: none", "downholder: center_strip", 1)
+    )
+    kwargs = _fixture_kwargs(pinout_path)
+    kwargs["pinout_base_plate_downholder_profiles"]["center_strip"][
+        "strip_width_mm"
+    ] = 100
+
+    with pytest.raises(ValueError, match="between socket rows"):
+        create_pinout_base_plate_assembly(**kwargs)
+
+
 def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
     project = load_pinout_config(TMC5160_PINOUT)
     owned_pin_sets = {
@@ -351,7 +408,8 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
     )
     assert len(assembly.additional_data["pin_pass_throughs"]) == expected_through_pins
     assert assembly.additional_data["pin_row_slots"]
-    assert assembly.additional_data["individual_pin_pass_throughs"]
+    assert assembly.additional_data["individual_pin_pass_throughs"] == []
+    assert "individual_pin_pass_throughs" not in assembly.cutter_indices_by_name
     assert assembly.additional_data["pin_line_clamp_component_ids"] == [
         "external_io_pin_line"
     ]
@@ -394,6 +452,94 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
     ]
     assert pin_line_center == pytest.approx(pin_line_slot_center)
     assert "reference_tmc5160t_plus_driver" in (assembly.non_production_indices_by_name)
+    assert "pico_usb_cable_passage" in assembly.cutter_indices_by_name
+    assert "pico_usb_connector" in non_production_names
+    usb_bridge = assembly.additional_data["pico_usb_bridge"]
+    assert usb_bridge["component_id"] == "pico"
+    assert usb_bridge["opening_width_mm"] > 0
+    assert usb_bridge["opening_height_mm"] > 0
+    assert usb_bridge["minimum_y_mm"] < usb_bridge["maximum_y_mm"]
+    assert usb_bridge["maximum_y_mm"] == pytest.approx(
+        assembly.additional_data["plate_size_mm"][1]
+    )
+    expected_downholders = {
+        "downholder_pico",
+        "downholder_socket_b",
+        "downholder_socket_a",
+        "downholder_u1_socket",
+        "downholder_socket_hv",
+        "downholder_socket_c",
+    }
+    assert set(assembly.follower_indices_by_name) == expected_downholders
+    assert "downholder_self_threading_holes" in assembly.cutter_indices_by_name
+    assert "downholder_loose_holes" in assembly.cutter_indices_by_name
+
+    downholders = {
+        downholder["component_id"]: downholder
+        for downholder in assembly.additional_data["downholders"]
+    }
+    pico_downholder = downholders["pico"]
+    assert pico_downholder["rail_count"] == 2
+    assert pico_downholder["bridge_count"] == len(
+        pico_downholder["bridge_pin_indices_from_bottom"]
+    )
+    assert pico_downholder["eye_count"] == 4
+    assert pico_downholder["loose_hole_count"] == 4
+
+    center_strip_component_ids = {
+        component.id
+        for component in project.physical_components
+        if component.downholder.value == "center_strip"
+    }
+    assert center_strip_component_ids == set(downholders) - {"pico"}
+    for component_id in center_strip_component_ids:
+        downholder = downholders[component_id]
+        assert downholder["strip_count"] == 1
+        assert downholder["eye_count"] == 2
+        assert downholder["loose_hole_count"] == 2
+        envelope = assembly.additional_data["component_envelopes"][component_id]
+        screw_y_coordinates = sorted(
+            center[1] for center in downholder["screw_centers_mm"]
+        )
+        assert screw_y_coordinates[0] < envelope["minimum_mm"][1]
+        assert screw_y_coordinates[1] > envelope["maximum_mm"][1]
+
+    pico_envelope = assembly.additional_data["component_envelopes"]["pico"]
+    pico_screw_x_coordinates = sorted(
+        {center[0] for center in pico_downholder["screw_centers_mm"]}
+    )
+    assert pico_screw_x_coordinates[0] < pico_envelope["minimum_mm"][0]
+    assert pico_screw_x_coordinates[1] > pico_envelope["maximum_mm"][0]
+
+    plate_width, plate_depth, _plate_thickness = assembly.additional_data[
+        "plate_size_mm"
+    ]
+    for follower_name in expected_downholders:
+        follower_bbox = get_bounding_box(
+            assembly.get_follower_part_by_name(follower_name)
+        )
+        assert 0 <= follower_bbox[0][0] < follower_bbox[1][0] <= plate_width
+        assert 0 <= follower_bbox[0][1] < follower_bbox[1][1] <= plate_depth
+
+    topmost_component_y = max(
+        envelope["maximum_mm"][1]
+        for envelope in assembly.additional_data["component_envelopes"].values()
+    )
+    assert plate_depth - topmost_component_y == pytest.approx(
+        assembly.additional_data["plate_margins_mm"]["top"]
+    )
+    assert all(
+        downholder["holder_top_z_mm"] < DEFAULTS["pinout_base_plate_mount_screw_length"]
+        for downholder in downholders.values()
+    )
+    screw_preview_names = {
+        name
+        for name in assembly.non_production_indices_by_name
+        if name.startswith("downholder_") and "_screw_" in name
+    }
+    assert len(screw_preview_names) == sum(
+        downholder["loose_hole_count"] for downholder in downholders.values()
+    )
 
 
 def test_tmc5160_external_pin_line_keeps_power_isolation_spares_and_endstop():
@@ -408,35 +554,44 @@ def test_tmc5160_external_pin_line_keeps_power_isolation_spares_and_endstop():
     assert component.component_type == "pin_line"
     assert component.downholder.value == "pin_line_clamp"
     assert pin_names == (
-        "LINE16_PWR_V24_SW_A",
-        "LINE16_PWR_V24_SW_B",
-        "LINE16_NC_ISOLATION",
-        "LINE16_PWR_GND_A",
-        "LINE16_PWR_GND_B",
-        "LINE16_SPARE_01",
-        "LINE16_SPARE_02",
-        "LINE16_SPARE_03",
-        "LINE16_SPARE_04",
-        "LINE16_SPARE_05",
-        "LINE16_SPARE_06",
-        "LINE16_SPARE_07",
-        "LINE16_SPARE_08",
-        "LINE16_ENDSTOP_NO",
-        "LINE16_ENDSTOP_GND",
-        "LINE16_ENDSTOP_VCC",
+        "LINE18_F1_5A_OUT",
+        "LINE18_F1_5A_IN",
+        "LINE18_PWR_V24_SW_A",
+        "LINE18_PWR_V24_SW_B",
+        "LINE18_NC_ISOLATION",
+        "LINE18_PWR_GND_A",
+        "LINE18_PWR_GND_B",
+        "LINE18_SPARE_01",
+        "LINE18_SPARE_02",
+        "LINE18_SPARE_03",
+        "LINE18_SPARE_04",
+        "LINE18_SPARE_05",
+        "LINE18_SPARE_06",
+        "LINE18_SPARE_07",
+        "LINE18_SPARE_08",
+        "LINE18_ENDSTOP_NO",
+        "LINE18_ENDSTOP_GND",
+        "LINE18_ENDSTOP_VCC",
     )
 
     edges = {
         frozenset((connection["from"], connection["to"]))
         for connection in project.connections
     }
-    assert frozenset((pin_names[0], pin_names[1])) in edges
-    assert frozenset((pin_names[1], "F1_5A_IN")) in edges
-    assert frozenset((pin_names[3], pin_names[4])) in edges
-    assert frozenset((pin_names[13], "PICO_GPIO_4")) in edges
-    assert frozenset((pin_names[14], "PICO_GND_03")) in edges
-    assert frozenset((pin_names[15], "PICO_THREEV3_OUT_36")) in edges
+    assert frozenset((pin_names[2], pin_names[3])) in edges
+    assert frozenset((pin_names[3], pin_names[1])) in edges
+    assert frozenset((pin_names[5], pin_names[6])) in edges
+    assert frozenset((pin_names[15], "PICO_GPIO_4")) in edges
+    assert frozenset((pin_names[16], "PICO_GND_03")) in edges
+    assert frozenset((pin_names[17], "PICO_THREEV3_OUT_36")) in edges
 
     connected_pins = {pin for edge in edges for pin in edge}
-    assert pin_names[2] not in connected_pins
-    assert not set(pin_names[5:13]) & connected_pins
+    assert frozenset((pin_names[0], pin_names[1])) not in edges
+    assert pin_names[4] not in connected_pins
+    assert not set(pin_names[7:15]) & connected_pins
+
+    physical_component_ids = {
+        physical_component.id for physical_component in project.physical_components
+    }
+    assert "branch_fuse" not in physical_component_ids
+    assert "f1" not in project.pin_sets

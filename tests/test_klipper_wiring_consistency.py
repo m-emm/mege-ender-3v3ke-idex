@@ -8,7 +8,6 @@ from xml.etree import ElementTree as ET
 
 import yaml
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 KLIPPER_CONFIG_DIR = REPO_ROOT / "klipper_setup" / "klipper_config"
 WIRING_DIR = KLIPPER_CONFIG_DIR / "wiring"
@@ -299,8 +298,8 @@ def test_tmc5160_review_wiring_stays_out_of_active_klipper_validation():
 
     assert all("klipper" not in wire for wire in wiring["wires"])
     assert TMC5160_REVIEW_PATH not in validator.DEFAULT_WIRING_FILES
-    assert ("PICO_GND_03", "LINE16_ENDSTOP_GND") in wire_pairs
-    assert ("PICO_THREEV3_OUT_36", "LINE16_ENDSTOP_VCC") in wire_pairs
+    assert ("PICO_GND_03", "LINE18_ENDSTOP_GND") in wire_pairs
+    assert ("PICO_THREEV3_OUT_36", "LINE18_ENDSTOP_VCC") in wire_pairs
     assert all("PICO_GND_13" not in pair for pair in wire_pairs)
     assert ("U1_07_GND", "PICO_GND_28") in wire_pairs
     assert ("A20_C1_GND", "A19_C2_GND") in wire_pairs

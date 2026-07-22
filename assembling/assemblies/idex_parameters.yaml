@@ -243,7 +243,10 @@ globals:
   board_holder_frame_mount_eye_fillet_radius: 3
   board_holder_frame_mount_eye_hole_front_offset: null
   pinout_base_plate_thickness: 3.1
-  pinout_base_plate_border: 3.0
+  pinout_base_plate_border_left: 3.0
+  pinout_base_plate_border_right: 3.0
+  pinout_base_plate_border_top: 11.0
+  pinout_base_plate_border_bottom: 3.0
   pinout_base_plate_corner_radius: 2.0
   pinout_base_plate_pin_pass_through_clearance: 0.35
   pinout_base_plate_pin_line_clamp_holder_slack: 0.3
@@ -252,7 +255,28 @@ globals:
   pinout_base_plate_pin_line_clamp_slit_width: 0.4
   pinout_base_plate_reference_frame_width: 1.0
   pinout_base_plate_reference_frame_height: 3.0
-  # Phase 2 preview profiles. Measure and tune these physical bodies in Phase 4.
+  pinout_base_plate_mount_screw_size: "M2.5"
+  pinout_base_plate_mount_screw_length: 12.0
+  pinout_base_plate_mount_screw_clearance_type: loose
+  pinout_base_plate_self_threading_core_radius_adjustment: -0.25
+  pinout_base_plate_mount_eye_diameter_clearance: 2.0
+  pinout_base_plate_downholder_profiles:
+    corner:
+      thickness_mm: 2.1
+      rail_width_mm: 2.54
+      bridge_width_mm: 2.54
+      bridge_pin_indices_from_bottom: [4, 10, 17]
+    center_strip:
+      thickness_mm: 2.1
+      strip_width_mm: 3.0
+  pinout_base_plate_usb_bridge_wall_thickness: 2.0
+  pinout_base_plate_usb_cable_hole_width: 15.0
+  pinout_base_plate_usb_cable_hole_height: 15.0
+  pinout_base_plate_pico_usb_connector_width: 7.0
+  pinout_base_plate_pico_usb_connector_thickness: 3.0
+  pinout_base_plate_pico_usb_connector_depth: 5.0
+  pinout_base_plate_pico_usb_connector_offset: 1.3
+  # Physical preview and clamp-surface profiles. Measure and tune in Phase 4.
   pinout_base_plate_component_profiles:
     rp2040_plus_2x20:
       left_margin_mm: 0.5
@@ -267,6 +291,7 @@ globals:
       top_margin_mm: 1.27
       bottom_margin_mm: 1.27
       body_height_mm: 5.0
+      clamp_surface_height_mm: 5.0
       pass_through_style: row_slot
     dip14_socket:
       left_margin_mm: 1.27
@@ -274,6 +299,7 @@ globals:
       top_margin_mm: 1.27
       bottom_margin_mm: 1.27
       body_height_mm: 4.0
+      clamp_surface_height_mm: 4.0
       pass_through_style: row_slot
     stepstick_adapter:
       left_margin_mm: 2.57
@@ -289,13 +315,6 @@ globals:
       bottom_margin_mm: 3.81
       body_height_mm: 3.95
       pass_through_style: row_slot
-    inline_fuse_holder:
-      left_margin_mm: 2.0
-      right_margin_mm: 2.0
-      top_margin_mm: 2.0
-      bottom_margin_mm: 2.0
-      body_height_mm: 10.0
-      pass_through_style: individual_holes
   x_axis_mcu_holder_motor_flange_gap: 5
   x_axis_mcu_holder_frame_mount_eye_hole_front_offset: 10
   board_holder_additional_pins_num_pins: 30

@@ -19,6 +19,9 @@ Builder:
         artifact: leader
         name: base_plate
       - source: self
+        artifact: followers
+        name_template: "{name}"
+      - source: self
         artifact: non_production_parts
         name_template: "{name}"
 
@@ -28,6 +31,9 @@ Builder:
       - source: self
         artifact: leader
         name: base_plate
+      - source: self
+        artifact: followers
+        name_template: "{name}"
 
 Parameters:
   pinout_base_plate_pinout_yaml_path:
@@ -36,7 +42,13 @@ Parameters:
     Type: Float
   pinout_base_plate_thickness:
     Type: Float
-  pinout_base_plate_border:
+  pinout_base_plate_border_left:
+    Type: Float
+  pinout_base_plate_border_right:
+    Type: Float
+  pinout_base_plate_border_top:
+    Type: Float
+  pinout_base_plate_border_bottom:
     Type: Float
   pinout_base_plate_corner_radius:
     Type: Float
@@ -69,6 +81,32 @@ Parameters:
   pinout_base_plate_reference_frame_width:
     Type: Float
   pinout_base_plate_reference_frame_height:
+    Type: Float
+  pinout_base_plate_mount_screw_size:
+    Type: String
+  pinout_base_plate_mount_screw_length:
+    Type: Float
+  pinout_base_plate_mount_screw_clearance_type:
+    Type: String
+  pinout_base_plate_self_threading_core_radius_adjustment:
+    Type: Float
+  pinout_base_plate_mount_eye_diameter_clearance:
+    Type: Float
+  pinout_base_plate_downholder_profiles:
+    Type: Any
+  pinout_base_plate_usb_bridge_wall_thickness:
+    Type: Float
+  pinout_base_plate_usb_cable_hole_width:
+    Type: Float
+  pinout_base_plate_usb_cable_hole_height:
+    Type: Float
+  pinout_base_plate_pico_usb_connector_width:
+    Type: Float
+  pinout_base_plate_pico_usb_connector_thickness:
+    Type: Float
+  pinout_base_plate_pico_usb_connector_depth:
+    Type: Float
+  pinout_base_plate_pico_usb_connector_offset:
     Type: Float
   pinout_base_plate_component_profiles:
     Type: Any

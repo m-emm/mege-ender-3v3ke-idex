@@ -141,7 +141,10 @@ a combined physical envelope, add a configurable border, create a plate, and
 use component geometry as cutters. The new generator should retain that
 geometry-first approach and `LeaderFollowersCuttersPart` composition, but it
 must not depend on the existing assembly's board-count layout, TPU cover,
-plugs, USB bridge, walls, lid, fan, or enclosure hardware.
+plugs, walls, lid, fan, or enclosure hardware. The Pico USB cable bridge is
+the one retained pattern: it is derived from the Pico pin rows and the
+assembly-supplied connector/cable dimensions, fused into the plate, and cut
+through by the cable passage.
 
 The generic helper should be implemented independently or extracted as a
 public reusable helper; it should not call private functions from
@@ -232,16 +235,10 @@ physical_components:
     downholder: none
 
   - id: external_io_pin_line
-    label: 16-pin power, spare, and Y-endstop row
+    label: 18-pin fuse, power, spare, and Y-endstop row
     component_type: pin_line
     pin_sets: [external_io]
     downholder: pin_line_clamp
-
-  - id: branch_fuse
-    label: 5A branch fuse
-    component_type: inline_fuse_holder
-    pin_sets: [f1]
-    downholder: none
 
   - id: tmc5160t_plus_driver
     label: TMC5160T Plus
@@ -252,12 +249,15 @@ physical_components:
     downholder: none
 ```
 
-The final list reflects the real construction. The 16-pin line replaces the
-separate power-input and endstop connectors: two switched-24V contacts, one
-empty isolation contact, two ground contacts, eight unassigned contacts, and
-the three endstop contacts occupy one retained row. The branch fuse remains a
-separate component. These are topology decisions made in the pinout, not
-coordinates or dimensions added by CAD code.
+The final list reflects the real construction. The 18-pin line replaces the
+separate fuse, power-input, and endstop pin components. From its power end it
+provides separate external-fuse output and input contacts, two switched-24V
+contacts, one empty isolation contact, two ground contacts, eight unassigned
+contacts, and the three endstop contacts. The serviceable 5 A fuse is external
+to the carrier and connects only between its two dedicated line contacts; the
+generator therefore creates no fuse body, fuse holes, or fuse retainer. These
+are topology decisions made in the pinout, not coordinates or dimensions
+added by CAD code.
 
 ### Why this is not `discrete_view.groups`
 
@@ -293,7 +293,7 @@ position. For example:
 boxes:
   - id: tmc5160t_plus_driver
     label: TMC5160T Plus
-    top_left: [42, 36.45]
+    top_left: [42, 36]
     size_pitches: [25.1968503937, 22.4409448819]
 ```
 
@@ -376,7 +376,10 @@ def create_pinout_base_plate_assembly(
     pinout_yaml_path: str | Path,
     raster_pitch_mm: float,
     plate_thickness_mm: float,
-    plate_border_mm: float,
+    plate_border_left_mm: float,
+    plate_border_right_mm: float,
+    plate_border_top_mm: float,
+    plate_border_bottom_mm: float,
     plate_corner_radius_mm: float,
     pin_tail_width_mm: float,
     pin_pass_through_clearance_mm: float,
@@ -401,6 +404,13 @@ def create_pinout_base_plate_assembly(
     reference_frame_height_mm: float,
     component_profiles: ComponentProfileRegistry,
     downholder_profiles: DownholderProfileRegistry,
+    usb_bridge_wall_thickness_mm: float,
+    usb_cable_hole_width_mm: float,
+    usb_cable_hole_height_mm: float,
+    pico_usb_connector_width_mm: float,
+    pico_usb_connector_thickness_mm: float,
+    pico_usb_connector_depth_mm: float,
+    pico_usb_connector_offset_mm: float,
 ) -> LeaderFollowersCuttersPart:
     ...
 ```
@@ -438,12 +448,12 @@ its actual printable geometry.
 
 This is the Pico/RP2040-Plus pattern.
 
-- Four small contact lands retain the board corners without covering its
-  centre.
-- Four mount eyes sit outside the two long sides.
-- The initial implementation produces two rigid side pieces, one along each
-  long edge.
-- No member crosses the USB/top edge.
+- One printable grid has two rails resting on the two 20-pin rows.
+- Three one-raster bridges cross the board at assembly-configured, bottom-based
+  pin-row indices.
+- Four mount eyes extend outside the two long sides while remaining within the
+  Pico's top/bottom pin extent.
+- No holder member enters the USB bridge or cable-passage keepout.
 - Each eye's loose clearance hole aligns with a self-threading hole in the base
   plate.
 
@@ -519,8 +529,9 @@ Socket and header profiles use one continuous slot for each physical pin row,
 matching the base cutters used by the original Pico/TMC holder. The Pico, AR20,
 DIP-14, StepStick J1/J2, StepStick DIAG0/DIAG1, and generic pin-line rows all
 use this form. Slots must be collinear and regularly spaced at one raster
-pitch. Discrete components such as the fuse may instead request one hole per
-contact. Both styles are dimensioned only by assembly parameters.
+pitch. The current assembly has no discrete fuse contacts or individual fuse
+holes. `individual_holes` remains available for a future genuinely discrete
+through component. Both styles are dimensioned only by assembly parameters.
 
 The generator also exposes a non-production underside keepout for wire-wrap
 tails, with depth supplied by the assembly. Housing generators can consume it
@@ -621,6 +632,8 @@ Useful tests include:
 - changing plate thickness, screw size, or downholder thickness changes the
   CAD result without changing or rewriting the pinout model;
 - corner holders have the required topology and avoid the Pico USB edge;
+- the plate extends beyond the Pico USB edge and the derived bridge retains a
+  clear cable passage;
 - center-strip holders have two end eyes and align to the derived long axis;
 - every screw centre is shared by a downholder clearance hole and a base-plate
   self-threading cutter;
@@ -649,8 +662,9 @@ Status: implemented in `mege-circuits`.
 ### Phase 2: assembly parameter boundary and base plate
 
 Status: implemented. The current TMC5160T review pinout supplies the physical
-component grouping, continuous socket/header row slots, discrete fuse holes,
-and the retained 16-pin external I/O line; measured profile refinement remains
+component grouping, continuous socket/header row slots, and retained 18-pin
+external I/O line. Both serviceable fuse terminals are contacts on that line;
+there is no separate fuse-hole geometry. Measured profile refinement remains
 Phase 4.
 
 - Add the required mechanical values to `idex_parameters.yaml` or an imported
@@ -658,25 +672,30 @@ Phase 4.
 - Add an assembly resource which passes them explicitly to the generator.
 - Implement raster-to-CAD conversion, component-profile resolution, fitted
   plate generation, continuous row slots, and discrete-contact pass-throughs.
+- Extend the plate beyond the Pico USB edge and derive the open cable bridge
+  from the Pico rows plus assembly-owned USB dimensions.
 - Generate non-production body previews and exact box frames.
 - Reuse the original SIL slit-and-lip construction for `pin_line_clamp`.
 
 ### Phase 3: downholders
 
-- Extract or generalize the rigid mount-eye and self-threading-hole helpers
-  from the vision-light pattern.
-- Implement the remaining `corner`, `center_strip`, and `none` behaviors;
-  `pin_line_clamp` is already implemented with the base plate.
-- Add base-plate self-threading holes, downholder clearance holes, and
-  non-production screw previews.
-- Export every downholder as a separately printable named part.
+Status: implemented for the current carrier.
+
+- The Pico uses one rigid grid follower: two rails over its 20-pin rows, three
+  raster-width bridges counted from the bottom pin row, and four outward eyes.
+- Each AR20 and DIP socket uses one central strip follower with a rounded eye
+  beyond each short end.
+- Every eye receives a loose M2.5 hole and shares its centre with a lead-in
+  self-threading hole in the base plate; screws are preview-only parts.
+- All six rigid downholders export as separately printable named followers.
+  `pin_line_clamp` remains integrated with the plate and `none` adds no holder.
 
 ### Phase 4: measurements and first assembly
 
 - Add only the physical-component grouping, semantic component types,
   downholder choices, and required box references to the TMC5160T pinout YAML.
-- Measure the RP2040-Plus, AR20 and DIP sockets, StepStick adapter, 16-pin SIL
-  row, and fuse holder.
+- Measure the RP2040-Plus, AR20 and DIP sockets, StepStick adapter, and 18-pin
+  SIL row.
 - Put those body, holder, plate, and fastener measurements into the IDEX
   assembly parameters, not the pinout.
 - Render and inspect component-side and underside CAD previews.
@@ -697,10 +716,12 @@ Phase 4.
   downholder eyes, and the exact TMC5160T Plus reference box.
 - Wire-wrap tails pass through the plate and remain accessible from below.
 - Every configured socket/header pin set forms one full-depth continuous slot;
-  the separate fuse retains individual holes.
-- The 16-pin external row is retained by the integrated slit-and-lip clamp and
-  keeps its empty isolation and spare contacts electrically unused.
-- The Pico uses the `corner` variant and leaves its USB edge unobstructed.
+  there is no separate fuse component or fuse-hole geometry.
+- The 18-pin external row is retained by the integrated slit-and-lip clamp,
+  exposes separate serviceable-fuse input/output contacts, and keeps its empty
+  isolation and spare contacts electrically unused.
+- The Pico uses the `corner` variant, while the plate continues past its USB
+  edge into an open cable bridge which remains unobstructed by the holder.
 - Each configured IC/wire-wrap socket uses the `center_strip` variant.
 - Base holes reuse the vision-light self-threading pattern; no TPU cover is
   generated.
