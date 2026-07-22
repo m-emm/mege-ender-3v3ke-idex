@@ -102,7 +102,7 @@ def test_joiner_returns_only_replacement_holder_without_mutating_inputs(
     assert set(joined_result) == {"y_axis_driver_board_holder"}
     joined_holder = joined_result["y_axis_driver_board_holder"]
     assert joined_holder is not holder
-    assert REFERENCE_DRIVER_NAME not in joined_holder.non_production_indices_by_name
+    assert REFERENCE_DRIVER_NAME in joined_holder.non_production_indices_by_name
     assert _bbox_values(holder.leader) == pytest.approx(baseline["holder_bbox"])
     assert get_volume(holder.leader) == pytest.approx(baseline["holder_volume"])
     assert _bbox_values(driver.leader) == pytest.approx(baseline["driver_bbox"])
@@ -123,9 +123,11 @@ def test_joined_holder_preserves_named_artifacts_and_consumes_only_original_hold
         *holder.cutter_indices_by_name,
         "mount_screw_holes",
     }
-    assert set(joined_holder.non_production_indices_by_name) == (
-        set(holder.non_production_indices_by_name) - {REFERENCE_DRIVER_NAME}
+    assert set(joined_holder.non_production_indices_by_name) == set(
+        holder.non_production_indices_by_name
     )
+    assert joined_holder.hidden_by_default_names == holder.hidden_by_default_names
+    assert joined_holder.hidden_by_default_names is not holder.hidden_by_default_names
 
     expected_consumed_refs = {
         holder.part_ref_for_leader(),

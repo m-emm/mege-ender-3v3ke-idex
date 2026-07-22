@@ -269,7 +269,7 @@ globals:
       bridge_width_mm: 2.54
       bridge_pin_indices_from_bottom: [4, 10, 17]
     center_strip:
-      thickness_mm: 2.1
+      thickness_mm: 1.6
       strip_width_mm: 3.0
     perimeter_frame:
       thickness_mm: 2.1
@@ -306,16 +306,16 @@ globals:
       right_margin_mm: 1.27
       top_margin_mm: 1.27
       bottom_margin_mm: 1.27
-      body_height_mm: 5.0
-      clamp_surface_height_mm: 5.0
+      body_height_mm: 3.0
+      clamp_surface_height_mm: 2.0
       pass_through_style: row_slot
     dip14_socket:
       left_margin_mm: 1.27
       right_margin_mm: 1.27
       top_margin_mm: 1.27
       bottom_margin_mm: 1.27
-      body_height_mm: 4.0
-      clamp_surface_height_mm: 4.0
+      body_height_mm: 3.0
+      clamp_surface_height_mm: 2.0
       pass_through_style: row_slot
     stepstick_adapter:
       left_margin_mm: 2.57
@@ -610,6 +610,9 @@ globals:
   eddy_duo_fiducial_cross_length: 6.5
   eddy_duo_fiducial_stroke_width: 0.4
   eddy_duo_fiducial_marking_height: 0.01
+  eddy_duo_tool_head_side_gap: -3
+  eddy_duo_tool_head_front_gap: 1.0
+  eddy_duo_nozzle_clearance: 2.5
 
   electric_switchboard_height: 100
   electric_switchboard_width: 40
@@ -1471,10 +1474,12 @@ globals:
   x_axis_belt_carriage_fan_side_clamp_gap: 5
   x_axis_belt_carriage_bridge_mount_screw_size: "M3"
   x_axis_belt_carriage_bridge_depth: 12
-  x_axis_belt_carriage_bridge_thickness: 5
+  x_axis_belt_carriage_bridge_thickness: 5.0
   x_axis_belt_carriage_bridge_web_height: 14
   x_axis_belt_carriage_mount_eye_thickness: 4
   x_axis_belt_carriage_mount_eye_length: 24
   x_axis_belt_carriage_mount_eye_width: 16
   x_axis_belt_carriage_mount_eye_hole_diameter: 5.5
   x_axis_belt_carriage_mount_eye_fillet_radius: 2
+
+  y_axis_driver_board_holder_mount_screw_hole_inset: 4

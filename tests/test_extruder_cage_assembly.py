@@ -221,7 +221,7 @@ def test_extruder_cage_builds_mount_strips_and_insert_hardware(drive_position):
             assert _recut_delta(cage.leader, retained_material_probe) > 0.05
 
 
-def test_extruder_cage_sides_share_resource_and_join_directly_to_final_outputs():
+def test_extruder_cage_sides_share_resource_and_reach_final_outputs():
     config = yaml.load(
         (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
         Loader=AssemblyDefaultsLoader,
@@ -247,6 +247,7 @@ def test_extruder_cage_sides_share_resource_and_join_directly_to_final_outputs()
             "nitehawk_board": "nitehawk_board_left_assembly",
             "tool_head_mount_machined": "tool_head_mount_machined_bottom_assembly",
             "final_cage": "extruder_cage_left_joined_assembly",
+            "fan_joined_cage": "extruder_cage_left_fan_joined_assembly",
             "final_fans": "part_fan_left_joined_assembly",
         },
         "right": {
@@ -275,11 +276,25 @@ def test_extruder_cage_sides_share_resource_and_join_directly_to_final_outputs()
             "part_fans": f"part_fan_{side}_assembly",
             "extruder_cage": f"extruder_cage_{side}_assembly",
         }
-        assert fan_join["outputs"]["extruder_cage"] == expected["final_cage"]
+        assert fan_join["outputs"]["extruder_cage"] == expected.get(
+            "fan_joined_cage",
+            expected["final_cage"],
+        )
         assert fan_join["outputs"]["part_fans"] == expected["final_fans"]
 
+    left_belt_join = assemblies["left_belt_carriage_cage_joiner"]
+    assert left_belt_join["resource_file"] == "left_belt_carriage_cage_joiner.yaml"
+    assert left_belt_join["inject_parts"] == {
+        "extruder_cage": "extruder_cage_left_fan_joined_assembly",
+        "belt_carriage": "x_axis_belt_carriage_bottom_assembly",
+        "sprite_extruder": "sprite_extruder_left_assembly",
+    }
+    assert left_belt_join["outputs"] == {
+        "extruder_cage": "extruder_cage_left_joined_assembly",
+        "belt_carriage": "x_axis_belt_carriage_bottom_remainder_assembly",
+    }
+
     assembly_names = set(assemblies)
-    assert not any("fan_joined_assembly" in name for name in assembly_names)
     assert not any("tap" in name.lower() for name in assembly_names)
 
     graph = builder_graph_model.build_graph_model(config["assemblies"], config)
@@ -291,12 +306,18 @@ def test_extruder_cage_sides_share_resource_and_join_directly_to_final_outputs()
         for index, generation in enumerate(generations)
         for name in generation
     }
-    for side, expected in side_context.items():
-        assert (
-            generation_index[f"join:part_fan_cage_{side}_join"]
-            < generation_index[expected["final_cage"]]
-            < generation_index["tool_heads_assembly"]
-        )
+    assert (
+        generation_index["join:part_fan_cage_left_join"]
+        < generation_index["extruder_cage_left_fan_joined_assembly"]
+        < generation_index["join:left_belt_carriage_cage_joiner"]
+        < generation_index["extruder_cage_left_joined_assembly"]
+        < generation_index["tool_heads_assembly"]
+    )
+    assert (
+        generation_index["join:part_fan_cage_right_join"]
+        < generation_index["extruder_cage_right_joined_assembly"]
+        < generation_index["tool_heads_assembly"]
+    )
 
     tool_heads_resource = yaml.load(
         (ASSEMBLIES_DIR / "tool_heads_assembly.yaml").read_text(),
@@ -313,13 +334,23 @@ def test_extruder_cage_sides_share_resource_and_join_directly_to_final_outputs()
         "part_fan_right_joined",
     }
     plates = {plate["name"]: plate for plate in production["arrange"]["plates"]}
-    assert set(plates) == {"tool_head_left_petgcf", "tool_head_right_petgcf"}
-    for side in ("left", "right"):
-        assert plates[f"tool_head_{side}_petgcf"]["parts"] == [
-            f"extruder_cage_{side}_joined",
-            f"tool_head_cable_attach_shield_{side}",
-            f"part_fan_{side}_joined",
-        ]
+    assert set(plates) == {
+        "tool_head_left_petgcf",
+        "tool_head_right_petgcf",
+        "extruder_cage_right",
+    }
+    assert plates["tool_head_left_petgcf"]["parts"] == [
+        "extruder_cage_left_joined",
+        "tool_head_cable_attach_shield_left",
+        "part_fan_left_joined",
+    ]
+    assert plates["tool_head_right_petgcf"]["parts"] == [
+        "tool_head_cable_attach_shield_right",
+        "part_fan_right_joined",
+    ]
+    assert plates["extruder_cage_right"]["parts"] == [
+        "extruder_cage_right_joined"
+    ]
 
 
 def test_tool_head_mount_machined_assemblies_use_side_drive_context_without_belts():
@@ -360,3 +391,75 @@ def test_tool_head_mount_machined_assemblies_use_side_drive_context_without_belt
         )
         assert mount["parameters"] == {"drive_position": expected["drive_position"]}
         assert set(mount["depends_on"]) == expected["dependencies"]
+
+
+def test_tool_heads_renders_modified_lower_belt_carriage_separately():
+    config = yaml.load(
+        (ASSEMBLIES_DIR / "assemblies.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+    assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
+    tool_heads = assemblies["tool_heads_assembly"]
+    resource = yaml.load(
+        (ASSEMBLIES_DIR / "tool_heads_assembly.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+
+    visualization_parts = resource["Builder"]["Visualization"]["parts"]
+    assert "x_axis_belt_carriage_bottom_assembly" not in tool_heads["depends_on"]
+    assert (
+        "x_axis_belt_carriage_bottom_remainder_assembly"
+        in tool_heads["depends_on"]
+    )
+    assert (
+        tool_heads["inject_parts"]["x_axis_belt_carriage_bottom"]
+        == "x_axis_belt_carriage_bottom_remainder_assembly"
+    )
+    bottom_carriage = next(
+        part
+        for part in visualization_parts
+        if part.get("assembly") == "x_axis_belt_carriage_bottom"
+    )
+    assert bottom_carriage["artifact"] == "all"
+    assert bottom_carriage["name_template"] == "x_axis_belt_carriage_bottom_{name}"
+    assert bottom_carriage["animation"] == {
+        "x_carriage_1": [
+            {"$ref": "x_axis_x_travel"},
+            0,
+            0,
+        ]
+    }
+
+    graph = builder_graph_model.build_graph_model(config["assemblies"], config)
+    generations = builder_graph_model.resolve_build_generation_names(
+        graph, ["tool_heads_assembly"]
+    )
+    generation_index = {
+        name: index
+        for index, generation in enumerate(generations)
+        for name in generation
+    }
+    assert (
+        generation_index["join:left_belt_carriage_cage_joiner"]
+        < generation_index["x_axis_belt_carriage_bottom_remainder_assembly"]
+        < generation_index["tool_heads_assembly"]
+    )
+
+    assert "x_axis_belt_carriage_top_assembly" in tool_heads["depends_on"]
+    assert (
+        tool_heads["inject_parts"]["x_axis_belt_carriage_top"]
+        == "x_axis_belt_carriage_top_assembly"
+    )
+    top_carriage = next(
+        part
+        for part in visualization_parts
+        if part.get("assembly") == "x_axis_belt_carriage_top"
+    )
+    assert top_carriage["artifact"] == "all"
+    assert top_carriage["animation"] == {
+        "x_carriage_2": [
+            {"$ref": "x_axis_x_travel_negative"},
+            0,
+            0,
+        ]
+    }

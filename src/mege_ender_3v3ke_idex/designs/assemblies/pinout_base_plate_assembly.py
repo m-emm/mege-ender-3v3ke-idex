@@ -437,13 +437,13 @@ def resolve_downholder_plans(
                 f"Unsupported downholder {component.downholder.value!r} on "
                 f"{component.id!r}"
             )
-        if len(component.pin_sets) != 2:
+        if len(component.pin_sets) < 2:
             raise ValueError(
                 f"Center-strip downholder {component.id!r} requires two pin rows"
             )
 
         pin_rows = []
-        for pin_set_id in component.pin_sets:
+        for pin_set_id in component.pin_sets[:2]:
             coordinates = [
                 pinout_project.pin_positions[name]
                 for name in pinout_project.pin_sets[pin_set_id]
@@ -2111,10 +2111,10 @@ def create_pinout_base_plate_assembly(
                 ),
             )
         )
-        assembly.add_named_non_production_part(
-            frame,
-            f"reference_{envelope.box_id}",
-        )
+        reference_name = f"reference_{envelope.box_id}"
+        assembly.add_named_non_production_part(frame, reference_name)
+        if reference_name == "reference_tmc5160t_plus_driver":
+            assembly.set_hidden_by_default(reference_name)
         component_preview_parts[envelope.component_id] = frame
 
     for component_id, boss in pin_line_upholder_boss_parts:
@@ -2158,7 +2158,10 @@ def create_pinout_base_plate_assembly(
                     f"Downholder {component_id!r} collides with downholder "
                     f"{other_component_id!r}"
                 )
-
+    assembly.add_named_non_production_part(
+        plate_surface_reference, "plate_surface_reference"
+    )
+    assembly.set_hidden_by_default("plate_surface_reference")
     assembly.additional_data.update(
         {
             "pinout_yaml_path": str(pinout_yaml_path),

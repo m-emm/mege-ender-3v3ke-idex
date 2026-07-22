@@ -1,7 +1,6 @@
 """Join the positioned Y-axis driver-board holder and TMC5160T Plus."""
 
-import copy
-
+import numpy as np
 from shellforgepy.simple import *
 
 
@@ -14,40 +13,70 @@ def join_y_axis_driver_board_holder_with_tmc5160t_plus(
 ):
     """Return the replaced holder without repositioning either injected input."""
 
-    joined_holder = LeaderFollowersCuttersPart(
-        y_axis_driver_board_holder.leader.copy(),
-        additional_data=copy.deepcopy(y_axis_driver_board_holder.additional_data),
+    joined_holder = y_axis_driver_board_holder.copy()
+
+    plate_surface_reference = y_axis_driver_board_holder.get_named_non_production_part(
+        "plate_surface_reference"
     )
 
-    for name, follower in y_axis_driver_board_holder.get_named_follower_items():
-        joined_holder.add_named_follower(follower.copy(), name)
+    plate_surface_reference_size = get_bounding_box_size(plate_surface_reference)
+    plate_thickness = plate_surface_reference_size[2]
 
-    for name, cutter in y_axis_driver_board_holder.get_named_cutter_items():
-        joined_holder.add_named_cutter(cutter.copy(), name)
+    mount_holes_fused = PartCollector()
+    for name, cutter in bigtreetech_stepper_driver.get_named_cutter_items():
+        if name.startswith("mount_hole"):
+            mount_holes_fused = mount_holes_fused.fuse(cutter)
 
-    for (
-        name,
-        non_production_part,
-    ) in y_axis_driver_board_holder.get_named_non_production_part_items():
-        if name == "reference_tmc5160t_plus_driver":
-            continue
-        joined_holder.add_named_non_production_part(
-            non_production_part.copy(),
-            name,
-        )
-
-    for (
-        name,
-        index,
-    ) in y_axis_driver_board_holder.direction_vector_indices_by_name.items():
-        joined_holder.add_named_direction_vector(
-            tuple(y_axis_driver_board_holder.direction_vectors[index]),
-            name,
-        )
-
-    joined_holder.leader = bigtreetech_stepper_driver.use_as_cutter_on(
-        joined_holder.leader
+    mount_hole_plate = materialize_bounding_box(
+        mount_holes_fused, x_enlargement=3, y_enlargement=3, z_size=plate_thickness
     )
+
+    bigtreetech_stepper_driver_bbox = np.array(
+        get_bounding_box(bigtreetech_stepper_driver)
+    )
+
+    diagonal_direction = np.array(bigtreetech_stepper_driver_bbox[1]) - np.array(
+        bigtreetech_stepper_driver_bbox[0]
+    )
+    diagonal_direction[2] = 0
+    length = np.linalg.norm(diagonal_direction)
+    diagonal_direction /= length
+
+    diagonal = directed_box_at(
+        bigtreetech_stepper_driver_bbox[0],
+        diagonal_direction,
+        5,
+        plate_thickness,
+        length,
+    )
+
+    diagonal_center = get_bounding_box_center(diagonal)
+
+    other_diagonal = mirror((0, 1, 0), point=diagonal_center)(diagonal)
+
+    cross = diagonal.fuse(other_diagonal)
+
+    cross = align(cross, joined_holder, Alignment.BOTTOM)
+
+    mount_hole_plate = align(mount_hole_plate, joined_holder, Alignment.BOTTOM)
+    mount_hole_plate_inner_cutter = materialize_bounding_box(
+        mount_hole_plate, x_enlargement=-12, y_enlargement=-12, z_enlargement=100
+    )
+
+    btt_cutter = materialize_bounding_box(
+        bigtreetech_stepper_driver,
+        x_enlargement=-1,
+        y_enlargement=-1,
+        z_enlargement=100,
+    )
+
+    joined_holder = joined_holder.cut(btt_cutter)
+
+    joined_holder = joined_holder.fuse(cross)
+    joined_holder = joined_holder.fuse(mount_hole_plate)
+    joined_holder = joined_holder.cut(mount_hole_plate_inner_cutter)
+
+    joined_holder = bigtreetech_stepper_driver.use_as_cutter_on(joined_holder)
 
     mount_screw_hole_diameter = MScrew.from_size(
         board_holder_mount_screw_size
@@ -63,18 +92,17 @@ def join_y_axis_driver_board_holder_with_tmc5160t_plus(
             )
             mount_screw_drill = align(
                 mount_screw_drill,
-                joined_holder.leader,
+                joined_holder,
                 Alignment.CENTER,
-                axes=[2],
             )
             mount_screw_drill = align(
                 mount_screw_drill,
-                joined_holder.leader,
+                joined_holder,
                 left_right_alignment.edge_alignment,
             )
             mount_screw_drill = align(
                 mount_screw_drill,
-                joined_holder.leader,
+                joined_holder,
                 front_back_alignment.edge_alignment,
             )
             mount_screw_drill = translate(

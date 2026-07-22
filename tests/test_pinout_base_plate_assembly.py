@@ -30,12 +30,12 @@ def _load_yaml(path):
     return yaml.load(path.read_text(), Loader=AssemblyDefaultsLoader)
 
 
-def _fixture_pinout(*, translation=(0, 0)):
+def _fixture_pinout(*, translation=(0, 0), box_id="module_box"):
     x_shift, y_shift = translation
     return f"""
 basename: fixture
 boxes:
-  - id: module_box
+  - id: {box_id}
     label: Module
     top_left: [{10 + x_shift}, {8 + y_shift}]
     size_pitches: [4, 3]
@@ -64,7 +64,7 @@ physical_components:
     component_type: boxed_module
     pin_sets: [module_contacts]
     through_pin_sets: []
-    box: module_box
+    box: {box_id}
     downholder: none
 wires:
   - from: L_ONE
@@ -308,6 +308,18 @@ def test_base_plate_uses_derived_envelopes_through_contacts_and_exact_box(tmp_pa
     assert plate_size[1] - component_maximum_y == pytest.approx(margins["top"])
 
 
+def test_placement_references_are_hidden_by_default(tmp_path):
+    pinout_path = tmp_path / "fixture.yaml"
+    pinout_path.write_text(_fixture_pinout(box_id="tmc5160t_plus_driver"))
+
+    assembly = create_pinout_base_plate_assembly(**_fixture_kwargs(pinout_path))
+
+    assert set(assembly.hidden_by_default_names) == {
+        "plate_surface_reference",
+        "reference_tmc5160t_plus_driver",
+    }
+
+
 def test_global_pinout_translation_preserves_normalized_plate_geometry(tmp_path):
     first_path = tmp_path / "first.yaml"
     second_path = tmp_path / "second.yaml"
@@ -488,7 +500,9 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
     assert pin_line_recess["depth_mm"] + pin_line_recess[
         "roof_thickness_mm"
     ] == pytest.approx(assembly.additional_data["plate_size_mm"][2])
-    assert "reference_tmc5160t_plus_driver" in (assembly.non_production_indices_by_name)
+    assert "reference_tmc5160t_plus_driver" in (
+        assembly.non_production_indices_by_name
+    )
     assert "pico_usb_cable_passage" in assembly.cutter_indices_by_name
     assert "pico_usb_connector" in non_production_names
     usb_cable_passage_bbox = get_bounding_box(

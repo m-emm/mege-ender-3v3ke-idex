@@ -427,6 +427,32 @@ placement:
         - sprite_extruder_right_assembly
       to: tool_head_mount_machined_top_assembly
 
+    - part: eddy_duo_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 0, 1]
+
+    - part: eddy_duo_assembly
+      to: sprite_extruder_left_assembly.non_production_parts.hotend
+      alignment: CENTER
+
+    - part: eddy_duo_assembly
+      to: tool_head_mount_machined_bottom_assembly
+      alignment: STACK_LEFT
+      stack_gap:
+        $ref: eddy_duo_tool_head_side_gap
+
+    - part: eddy_duo_assembly
+      to: sprite_extruder_left_assembly.non_production_parts.hotend
+      alignment: BOTTOM
+      post_translation:
+        - 0
+        - 0
+        - $ref: eddy_duo_nozzle_clearance
+    - rigid_group:
+        - eddy_duo_assembly
+      to: tool_head_mount_machined_bottom_assembly
+
     - part: z_axis_profile_left_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left
       alignment: CENTER
@@ -3483,7 +3509,9 @@ assemblies:
       - tool_head_mount_machined_top_assembly
       - tool_head_cable_attach_shield_left_assembly
       - tool_head_cable_attach_shield_right_assembly
+      - x_axis_belt_carriage_bottom_remainder_assembly
       - x_axis_belt_carriage_top_assembly
+      - eddy_duo_assembly
     parameters:
       x_axis_x_travel: !Ref x_axis_x_travel
       x_axis_x_travel_negative: !Ref x_axis_x_travel_negative
@@ -3505,7 +3533,9 @@ assemblies:
       tool_head_mount_machined_top: tool_head_mount_machined_top_assembly
       tool_head_cable_attach_shield_left: tool_head_cable_attach_shield_left_assembly
       tool_head_cable_attach_shield_right: tool_head_cable_attach_shield_right_assembly
+      x_axis_belt_carriage_bottom: x_axis_belt_carriage_bottom_remainder_assembly
       x_axis_belt_carriage_top: x_axis_belt_carriage_top_assembly
+      eddy_duo: eddy_duo_assembly
 
   - name: tool_head_mounts_collection_assembly
 
@@ -3757,7 +3787,7 @@ assemblies:
       extruder_cage: extruder_cage_left_assembly
     outputs:
       part_fans: part_fan_left_joined_assembly
-      extruder_cage: extruder_cage_left_joined_assembly
+      extruder_cage: extruder_cage_left_fan_joined_assembly
 
   - name: part_fan_cage_right_join
 
@@ -3786,6 +3816,18 @@ assemblies:
       tool_heead_mount_machined: tool_head_mount_machined_bottom_assembly
     parameters:
       drive_position: bottom
+
+  - name: left_belt_carriage_cage_joiner
+
+    kind: join
+    resource_file: left_belt_carriage_cage_joiner.yaml
+    inject_parts:
+      extruder_cage: extruder_cage_left_fan_joined_assembly
+      belt_carriage: x_axis_belt_carriage_bottom_assembly
+      sprite_extruder: sprite_extruder_left_assembly
+    outputs:
+      extruder_cage: extruder_cage_left_joined_assembly
+      belt_carriage: x_axis_belt_carriage_bottom_remainder_assembly
 
   - name: opb991t11z_sensor_assembly
 
@@ -3852,7 +3894,7 @@ assemblies:
     outputs:
       y_axis_driver_board_holder: y_axis_driver_board_holder_joined_assembly
     parameters:
-      board_holder_mount_screw_hole_inset: !Ref board_holder_mount_screw_hole_inset
+      board_holder_mount_screw_hole_inset: !Ref y_axis_driver_board_holder_mount_screw_hole_inset
 
   - name: tool_head_mount_machined_bottom_assembly
 

@@ -1,0 +1,79 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Joiner for the lower belt-carriage remainder and left extruder cage
+
+Builder:
+  Outputs:
+    extruder_cage:
+      Visualization:
+        preview:
+          enabled: true
+          views:
+            - isometric
+            - front
+            - back
+            - top
+            - left
+            - right
+          width: 700
+          height: 700
+        parts:
+          - source: self
+            artifact: leader
+            name: extruder_cage_belt_joined
+          - source: self
+            artifact: followers
+            name_template: "extruder_cage_{name}"
+          - source: self
+            artifact: non_production_parts
+            name_template: "extruder_cage_{name}"
+      Production:
+        process_data_preset: petgcf_max_strength_high_speed_06
+        parts:
+          - source: self
+            artifact: leader
+            name: extruder_cage_joined
+            prod_rotation_angle: 180
+            prod_rotation_axis: [0, 1, 0]
+        arrange:
+          export_individual_parts: false
+          plates:
+            - name: extruder_cage_joined
+              filename: extruder_cage_joined
+              process_data_preset: petgcf_max_strength_high_speed_06
+              process_data:
+                overrides:
+                  process_overrides:
+                    enable_support: "1"
+                    support_threshold_angle: "25"
+              parts:
+                - extruder_cage_joined
+          auto_assign_plates: false
+
+    belt_carriage:
+      Visualization:
+        preview:
+          enabled: true
+          views:
+            - isometric
+            - front
+            - top
+          width: 512
+          height: 512
+        parts:
+          - source: self
+            artifact: leader
+            name: belt_carriage_remainder
+          - source: self
+            artifact: followers
+            name_template: "belt_carriage_{name}"
+          - source: self
+            artifact: non_production_parts
+            name_template: "belt_carriage_{name}"
+
+Parts:
+  LeftBeltCarriageCageJoiner:
+    Type: Shellforgepy::AssemblyJoiner
+
+    Properties:
+      Joiner: mege_ender_3v3ke_idex.designs.assemblies.left_belt_carriage_cage_joiner.join_left_belt_carriage_with_cage

@@ -113,7 +113,7 @@ physical_components:
     label: TMC5160T Plus StepStick adapter
     component_type: stepstick_adapter
     pin_sets: [tmc1_j1, tmc1_j2, tmc1_top]
-    downholder: perimeter_frame
+    downholder: center_strip
 
   - id: external_io_pin_line
     label: 18-pin fuse, power, spare, and Y-endstop row
@@ -160,7 +160,7 @@ pin_sets:
       - GPIO_15
   - id: pico_right
     prefix: PICO_
-    origin: [8, 36]
+    origin: [7, 36]
     direction: down
     discrete_pin_numbers: {start: 40, step: -1}
     pins:
@@ -230,7 +230,7 @@ pin_sets:
       - DIR_8
   - id: tmc1_j2
     prefix: TMC1_J2_
-    origin: [37, 36]
+    origin: [38, 36]
     direction: down
     discrete_pin_numbers: {start: 1, step: 1}
     pins:

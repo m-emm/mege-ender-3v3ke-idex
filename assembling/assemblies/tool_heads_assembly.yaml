@@ -50,6 +50,15 @@ Builder:
             - 0
             - 0
       - source: injected
+        assembly: eddy_duo
+        artifact: all
+        name_template: "eddy_duo_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
         assembly: nitehawk_board_left
         artifact: followers
         name_template: "nitehawk_board_left_{name}"
@@ -107,6 +116,15 @@ Builder:
         assembly: tool_head_cable_attach_shield_left
         artifact: all
         name_template: "tool_head_cable_attach_shield_left_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
+        assembly: x_axis_belt_carriage_bottom
+        artifact: all
+        name_template: "x_axis_belt_carriage_bottom_{name}"
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }
