@@ -1,0 +1,11 @@
+{
+  "image": "/Users/mege/git/mege-ender-3v3ke-idex/resources/eddy_duo/IMG_9774.png",
+  "query": {
+    "type": "ruler_scale"
+  },
+  "error": {
+    "code": "no_feature_found",
+    "message": "No horizontal ruler edge was detected in the image."
+  },
+  "overlay": "/var/folders/qc/mtskzv0d0lbf9jmbwjpshvz40000gn/T/tmp.CZ4oPJ7NwM/IMG_9774_scale_overlay.png"
+}

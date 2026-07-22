@@ -1,5 +1,3 @@
-import math
-
 import pytest
 import yaml
 from assembly_defaults import ASSEMBLIES_DIR, AssemblyDefaultsLoader, assembly_kwargs
@@ -8,10 +6,12 @@ from mege_ender_3v3ke_idex.designs.assemblies.bigtreetech_stepper_driver_tmc_516
 )
 from shellforgepy.simple import (
     MScrew,
+    create_cylinder,
     get_bounding_box,
     get_bounding_box_center,
     get_bounding_box_size,
     get_volume,
+    translate,
 )
 
 RESOURCE_FILE = (
@@ -129,22 +129,16 @@ def test_driver_housing_has_four_blind_m3_core_bores(driver, driver_kwargs):
     mount_screw = MScrew.from_size(
         driver_kwargs["bigtreetech_tmc5160t_plus_mount_screw_size"]
     )
-    unbored_volume = (
-        driver_kwargs["bigtreetech_tmc5160t_plus_housing_length"]
-        * driver_kwargs["bigtreetech_tmc5160t_plus_housing_width"]
-        * driver_kwargs["bigtreetech_tmc5160t_plus_housing_height"]
-    )
-    expected_bore_volume = (
-        4
-        * math.pi
-        * (mount_screw.core_hole / 2) ** 2
-        * driver_kwargs["bigtreetech_tmc5160t_plus_mount_hole_core_bore_depth"]
-    )
+    bore_depth = driver_kwargs["bigtreetech_tmc5160t_plus_mount_hole_core_bore_depth"]
+    for name in driver.cutter_indices_by_name:
+        center = get_bounding_box_center(driver.get_cutter_part_by_name(name))
+        bore_probe = create_cylinder(mount_screw.core_hole / 2, bore_depth)
+        bore_probe = translate(center[0], center[1], 0)(bore_probe)
+        assert get_volume(driver.leader.cut(bore_probe)) == pytest.approx(
+            get_volume(driver.leader),
+            abs=0.01,
+        )
 
-    assert get_volume(driver.leader) == pytest.approx(
-        unbored_volume - expected_bore_volume,
-        abs=0.1,
-    )
     assert mount_screw.core_hole < mount_screw.clearance_hole_normal
 
 

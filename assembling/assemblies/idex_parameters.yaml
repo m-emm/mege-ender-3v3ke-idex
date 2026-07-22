@@ -590,6 +590,27 @@ globals:
     $expr:
       "$sub": "${emergency_button_neck_diameter} - 2 * ${emergency_button_neck_collar_wall_thickness}"
   emergency_button_neck_mount_hole_clearance: 0.5
+
+  eddy_duo_width: 18.09
+  eddy_duo_depth: 18.30
+  eddy_duo_height: 33.79
+  eddy_duo_main_body_depth: 15.30
+  eddy_duo_upper_section_height: 26.61
+  eddy_duo_top_flat_width: 10.50
+  eddy_duo_top_flat_depth: 12.0
+  eddy_duo_top_facet_height: 5.0
+  eddy_duo_base_lip_height: 1.2
+  eddy_duo_lower_flat_width: 10.50
+  eddy_duo_mounting_hole_diameter: 3.15
+  eddy_duo_mounting_hole_spacing: 11.64
+  eddy_duo_mounting_hole_center_from_top: 10.90
+  eddy_duo_coil_center_depth_offset: 2.18
+  eddy_duo_fiducial_outer_ring_diameter: 5.0
+  eddy_duo_fiducial_inner_ring_diameter: 2.8
+  eddy_duo_fiducial_cross_length: 6.5
+  eddy_duo_fiducial_stroke_width: 0.4
+  eddy_duo_fiducial_marking_height: 0.01
+
   electric_switchboard_height: 100
   electric_switchboard_width: 40
   electric_switchboard_depth: 120

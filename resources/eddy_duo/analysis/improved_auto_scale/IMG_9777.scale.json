@@ -1,0 +1,55 @@
+{
+  "image": "/Users/mege/git/mege-ender-3v3ke-idex/resources/eddy_duo/IMG_9777.png",
+  "query": {
+    "type": "ruler_scale"
+  },
+  "scale": {
+    "units": "mm",
+    "px_per_mm": 56,
+    "mm_per_px": 0.0179,
+    "px_per_cm": 560,
+    "orientation_deg": 0,
+    "roi": [
+      1291,
+      2055,
+      2693,
+      2235
+    ],
+    "tick_zone_px": [
+      1291,
+      2064,
+      2693,
+      2190
+    ],
+    "tick_positions_x": [
+      1318,
+      1374,
+      1428,
+      1484,
+      1541,
+      1596,
+      1652,
+      1708,
+      1763,
+      1820,
+      1874,
+      1930,
+      1985,
+      2041,
+      2096,
+      2152,
+      2220,
+      2263,
+      2320,
+      2374,
+      2442,
+      2485,
+      2542,
+      2599,
+      2666
+    ],
+    "num_ticks": 25,
+    "confidence": 0.9639
+  },
+  "overlay": "/Users/mege/git/mege-ender-3v3ke-idex/resources/eddy_duo/analysis/improved_auto_scale/IMG_9777.scale_overlay.png"
+}

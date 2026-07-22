@@ -1,0 +1,102 @@
+SchemaVersion: "2026-07-22"
+Units: mm
+
+AxisConvention:
+  x: width across the two mounting holes
+  y: depth from the front face toward the rear face
+  z: long installed height from the sensing face toward the cable exit
+  aliases:
+    length: z
+    installed_height: z
+
+Envelope:
+  width: 18.09
+  depth: 18.30
+  height: 33.79
+  tolerance_target: 0.5
+  source: BTT nominal dimension diagram
+
+BodyFeatures:
+  main_body_depth: 15.30
+  upper_section_height: 26.61
+  lower_section_height:
+    value: 7.18
+    derived_from: 33.79 - 26.61
+  top_flat_width: 10.50
+  top_facet_height:
+    value: 5.0
+    method: proportional measurement of the BTT dimension diagram
+  base_lip_height:
+    value: 1.2
+    method: proportional measurement of the BTT dimension diagram and photos
+  lower_flat_width: 10.50
+
+MountingHoles:
+  count: 2
+  diameter:
+    nominal: 3.15
+    photo_measurement: 3.11
+  center_spacing:
+    value: 11.64
+    method: IMG_9774 detected centers, 628.8 px at 54 px/mm
+  center_from_top: 10.90
+  detected_centers_px:
+    image: IMG_9774.png
+    values:
+      - [2070.2, 694.6]
+      - [2079.8, 1323.4]
+
+CoilCenter:
+  width_from_left: 9.05
+  width_from_right: 9.05
+  depth_from_edge_a: 6.97
+  depth_from_opposite_edge: 11.33
+  depth_offset_from_geometric_center: 2.18
+  assembly_coordinate: [0.0, 0.0, 0.0]
+  assembly_body_y_bounds: [-11.33, 6.97]
+  source: BTT nominal probe-location diagram
+
+Fiducial:
+  detected_center_px:
+    image: IMG_9777.png
+    value: [1070.2, 819.8]
+  visible_outer_ring_diameter:
+    value: 5.02
+    method: 280.96 px at the local 56 px/mm ruler scale
+  model_outer_ring_diameter: 5.0
+  model_inner_ring_diameter: 2.8
+  model_cross_length: 6.5
+  model_stroke_width: 0.4
+
+ImageScaleFindings:
+  caveat: >-
+    Each scale is local to the ruler plane. Perspective and separation between
+    the ruler and part can shift measurements on the Eddy plane, so BTT nominal
+    dimensions are used for the final envelope and the photos are used for
+    proportions and feature confirmation.
+  IMG_9774.png:
+    px_per_mm: 54
+    confidence: 0.9635
+    tick_count: 65
+    scale_sidecar: analysis/improved_auto_scale/IMG_9774.scale.json
+    overlay: analysis/improved_auto_scale/IMG_9774.scale_overlay.png
+  IMG_9775.png:
+    px_per_mm: 60
+    confidence: 0.9456
+    tick_count: 55
+    scale_sidecar: analysis/improved_auto_scale/IMG_9775.scale.json
+    overlay: analysis/improved_auto_scale/IMG_9775.scale_overlay.png
+  IMG_9777.png:
+    px_per_mm: 56
+    confidence: 0.9639
+    tick_count: 25
+    scale_sidecar: analysis/improved_auto_scale/IMG_9777.scale.json
+    overlay: analysis/improved_auto_scale/IMG_9777.scale_overlay.png
+
+Evidence:
+  official_dimensions_url: https://github.com/bigtreetech/Eddy#btt-eddy-dimensions-and-probe-location
+  official_dimension_image: analysis/reference/btt_dimensions.jpg
+  mounting_hole_detection: analysis/feature_detection/IMG_9774_mounting_holes.json
+  mounting_hole_overlay: analysis/feature_detection/IMG_9774_mounting_holes_overlay.png
+  fiducial_detection: analysis/feature_detection/IMG_9777_fiducial_outer_ring.json
+  fiducial_overlay: analysis/feature_detection/IMG_9777_fiducial_outer_ring_overlay.png

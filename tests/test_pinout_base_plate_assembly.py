@@ -166,9 +166,12 @@ def test_pinout_base_plate_generator_matches_resource_and_is_registered():
     matching_entries = [
         entry
         for entry in config["assemblies"]
-        if entry["name"] == "pinout_base_plate_assembly"
+        if entry["name"] == "y_axis_driver_board_holder_assembly"
     ]
     assert len(matching_entries) == 1
+    assert not any(
+        entry["name"] == "pinout_base_plate_assembly" for entry in config["assemblies"]
+    )
     entry = matching_entries[0]
     assert entry["resource_file"] == resource_path.name
     assert entry["depends_on"] == []

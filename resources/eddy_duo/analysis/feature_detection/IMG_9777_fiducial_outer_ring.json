@@ -1,0 +1,31 @@
+{
+  "image": "/Users/mege/git/mege-ender-3v3ke-idex/resources/eddy_duo/IMG_9777.png",
+  "query": {
+    "type": "circle",
+    "bbox": [
+      850,
+      500,
+      1650,
+      1200
+    ],
+    "min_diameter": 250,
+    "max_diameter": 700
+  },
+  "feature": {
+    "type": "circle",
+    "center": [
+      1070.2,
+      819.8
+    ],
+    "radius_px": 140.48,
+    "diameter_px": 280.96,
+    "bbox_px": [
+      929.72,
+      679.32,
+      1210.68,
+      960.28
+    ],
+    "confidence": 0.9514
+  },
+  "overlay": "/Users/mege/git/mege-ender-3v3ke-idex/resources/eddy_duo/analysis/feature_detection/IMG_9777_fiducial_outer_ring_overlay.png"
+}

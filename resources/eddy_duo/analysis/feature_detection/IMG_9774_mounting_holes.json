@@ -1,0 +1,50 @@
+{
+  "image": "/Users/mege/git/mege-ender-3v3ke-idex/resources/eddy_duo/IMG_9774.png",
+  "query": {
+    "type": "circles",
+    "bbox": [
+      1550,
+      430,
+      2200,
+      1450
+    ],
+    "count": 2,
+    "min_diameter": 100,
+    "max_diameter": 300
+  },
+  "circles": [
+    {
+      "id": "circle_01",
+      "center_px": [
+        2070.2,
+        694.6
+      ],
+      "radius_px": 86,
+      "diameter_px": 172,
+      "bbox_px": [
+        1984.2,
+        608.6,
+        2156.2,
+        780.6
+      ],
+      "confidence": 0.8958
+    },
+    {
+      "id": "circle_02",
+      "center_px": [
+        2079.8,
+        1323.4
+      ],
+      "radius_px": 82.16,
+      "diameter_px": 164.32,
+      "bbox_px": [
+        1997.64,
+        1241.24,
+        2161.9601,
+        1405.56
+      ],
+      "confidence": 0.625
+    }
+  ],
+  "overlay": "/Users/mege/git/mege-ender-3v3ke-idex/resources/eddy_duo/analysis/feature_detection/IMG_9774_mounting_holes_overlay.png"
+}

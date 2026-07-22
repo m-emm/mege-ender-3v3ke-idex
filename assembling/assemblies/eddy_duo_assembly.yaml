@@ -1,0 +1,72 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: BIGTREETECH Eddy Duo probe reference assembly
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - back
+        - left
+        - right
+        - top
+        - bottom
+      width: 700
+      height: 700
+    parts:
+      - source: self
+        artifact: all
+        name_template: "{name}"
+
+  Production:
+    parts: []
+
+Parameters:
+  eddy_duo_width:
+    Type: Float
+  eddy_duo_depth:
+    Type: Float
+  eddy_duo_height:
+    Type: Float
+  eddy_duo_main_body_depth:
+    Type: Float
+  eddy_duo_upper_section_height:
+    Type: Float
+  eddy_duo_top_flat_width:
+    Type: Float
+  eddy_duo_top_flat_depth:
+    Type: Float
+  eddy_duo_top_facet_height:
+    Type: Float
+  eddy_duo_base_lip_height:
+    Type: Float
+  eddy_duo_lower_flat_width:
+    Type: Float
+  eddy_duo_mounting_hole_diameter:
+    Type: Float
+  eddy_duo_mounting_hole_spacing:
+    Type: Float
+  eddy_duo_mounting_hole_center_from_top:
+    Type: Float
+  eddy_duo_coil_center_depth_offset:
+    Type: Float
+  eddy_duo_fiducial_outer_ring_diameter:
+    Type: Float
+  eddy_duo_fiducial_inner_ring_diameter:
+    Type: Float
+  eddy_duo_fiducial_cross_length:
+    Type: Float
+  eddy_duo_fiducial_stroke_width:
+    Type: Float
+  eddy_duo_fiducial_marking_height:
+    Type: Float
+
+Parts:
+  EddyDuoAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.eddy_duo_assembly.create_eddy_duo_assembly
