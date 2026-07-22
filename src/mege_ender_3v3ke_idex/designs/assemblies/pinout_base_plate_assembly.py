@@ -192,6 +192,8 @@ def resolve_downholder_plans(
     mount_eye_diameter_mm: float,
     corner_rail_width_mm: float,
     center_strip_width_mm: float,
+    perimeter_frame_rail_width_mm: float,
+    perimeter_frame_crossbar_width_mm: float,
 ) -> tuple[DownholderPlan, ...]:
     """Resolve retainer extents and screw centres without a second layout."""
 
@@ -263,6 +265,73 @@ def resolve_downholder_plans(
                             max(row_x_coordinates) + eye_center_offset_mm,
                             maximum_y_mm - eye_radius_mm,
                         ),
+                    ),
+                )
+            )
+            continue
+
+        if component.downholder is PinoutDownholderKind.PERIMETER_FRAME:
+            vertical_pin_rows = []
+            for pin_set_id in component.pin_sets:
+                coordinates = [
+                    pinout_project.pin_positions[name]
+                    for name in pinout_project.pin_sets[pin_set_id]
+                ]
+                if len(coordinates) > 1 and all(
+                    math.isclose(coordinate[0], coordinates[0][0])
+                    for coordinate in coordinates
+                ):
+                    vertical_pin_rows.append(coordinates)
+            if len(vertical_pin_rows) != 2:
+                raise ValueError(
+                    f"Perimeter-frame downholder {component.id!r} requires "
+                    "exactly two vertical long-side pin rows"
+                )
+            if len(vertical_pin_rows[0]) != len(vertical_pin_rows[1]):
+                raise ValueError(
+                    f"Perimeter-frame downholder {component.id!r} requires "
+                    "equally long side rows"
+                )
+            row_x_coordinates_mm = sorted(
+                row[0][0] * raster_pitch_mm for row in vertical_pin_rows
+            )
+            row_y_coordinates_mm = sorted(
+                {
+                    coordinate[1] * raster_pitch_mm
+                    for row in vertical_pin_rows
+                    for coordinate in row
+                }
+            )
+            bottom_crossbar_center_y_mm = row_y_coordinates_mm[0] - raster_pitch_mm
+            top_crossbar_center_y_mm = row_y_coordinates_mm[-1] + raster_pitch_mm
+            center_x_mm = sum(row_x_coordinates_mm) / 2
+            bottom_screw_center_y_mm = (
+                bottom_crossbar_center_y_mm
+                - perimeter_frame_crossbar_width_mm / 2
+                - eye_radius_mm
+            )
+            top_screw_center_y_mm = (
+                top_crossbar_center_y_mm
+                + perimeter_frame_crossbar_width_mm / 2
+                + eye_radius_mm
+            )
+            plans.append(
+                DownholderPlan(
+                    component_id=component.id,
+                    kind=component.downholder,
+                    minimum_x_mm=min(
+                        row_x_coordinates_mm[0] - perimeter_frame_rail_width_mm / 2,
+                        center_x_mm - eye_radius_mm,
+                    ),
+                    minimum_y_mm=bottom_screw_center_y_mm - eye_radius_mm,
+                    maximum_x_mm=max(
+                        row_x_coordinates_mm[-1] + perimeter_frame_rail_width_mm / 2,
+                        center_x_mm + eye_radius_mm,
+                    ),
+                    maximum_y_mm=top_screw_center_y_mm + eye_radius_mm,
+                    screw_centers_mm=(
+                        (center_x_mm, bottom_screw_center_y_mm),
+                        (center_x_mm, top_screw_center_y_mm),
                     ),
                 )
             )
@@ -437,10 +506,18 @@ def create_pinout_base_plate_assembly(
         raise ValueError("pinout_base_plate_downholder_profiles must be a mapping")
     corner_profile = pinout_base_plate_downholder_profiles.get("corner")
     center_strip_profile = pinout_base_plate_downholder_profiles.get("center_strip")
-    if not isinstance(corner_profile, Mapping) or not isinstance(
-        center_strip_profile, Mapping
+    perimeter_frame_profile = pinout_base_plate_downholder_profiles.get(
+        "perimeter_frame"
+    )
+    if (
+        not isinstance(corner_profile, Mapping)
+        or not isinstance(center_strip_profile, Mapping)
+        or not isinstance(perimeter_frame_profile, Mapping)
     ):
-        raise ValueError("Downholder profiles require corner and center_strip mappings")
+        raise ValueError(
+            "Downholder profiles require corner, center_strip, and "
+            "perimeter_frame mappings"
+        )
     corner_holder_thickness_mm = float(corner_profile["thickness_mm"])
     corner_rail_width_mm = float(corner_profile["rail_width_mm"])
     corner_bridge_width_mm = float(corner_profile["bridge_width_mm"])
@@ -449,6 +526,11 @@ def create_pinout_base_plate_assembly(
     )
     center_strip_holder_thickness_mm = float(center_strip_profile["thickness_mm"])
     center_strip_width_mm = float(center_strip_profile["strip_width_mm"])
+    perimeter_frame_holder_thickness_mm = float(perimeter_frame_profile["thickness_mm"])
+    perimeter_frame_rail_width_mm = float(perimeter_frame_profile["rail_width_mm"])
+    perimeter_frame_crossbar_width_mm = float(
+        perimeter_frame_profile["crossbar_width_mm"]
+    )
     screw_record = MScrew.from_size(mount_screw_size)
     loose_hole_diameter_mm = screw_record.get_clearance_hole_diameter(
         mount_screw_clearance_type
@@ -456,6 +538,7 @@ def create_pinout_base_plate_assembly(
     mount_eye_diameter_mm = (
         screw_record.cylinder_head_diameter + mount_eye_diameter_clearance_mm
     )
+    mount_eye_fillet_radius_mm = mount_eye_diameter_mm / 2 - 0.01
     usb_bridge_wall_thickness_mm = float(pinout_base_plate_usb_bridge_wall_thickness)
     usb_cable_hole_width_mm = float(pinout_base_plate_usb_cable_hole_width)
     usb_cable_hole_height_mm = float(pinout_base_plate_usb_cable_hole_height)
@@ -490,6 +573,9 @@ def create_pinout_base_plate_assembly(
         "corner_bridge_width": corner_bridge_width_mm,
         "center_strip_holder_thickness": center_strip_holder_thickness_mm,
         "center_strip_width": center_strip_width_mm,
+        "perimeter_frame_holder_thickness": perimeter_frame_holder_thickness_mm,
+        "perimeter_frame_rail_width": perimeter_frame_rail_width_mm,
+        "perimeter_frame_crossbar_width": perimeter_frame_crossbar_width_mm,
         "usb_bridge_wall_thickness": usb_bridge_wall_thickness_mm,
         "usb_cable_hole_width": usb_cable_hole_width_mm,
         "usb_cable_hole_height": usb_cable_hole_height_mm,
@@ -547,6 +633,8 @@ def create_pinout_base_plate_assembly(
         mount_eye_diameter_mm=mount_eye_diameter_mm,
         corner_rail_width_mm=corner_rail_width_mm,
         center_strip_width_mm=center_strip_width_mm,
+        perimeter_frame_rail_width_mm=perimeter_frame_rail_width_mm,
+        perimeter_frame_crossbar_width_mm=perimeter_frame_crossbar_width_mm,
     )
 
     component_minimum_x_mm = min(
@@ -641,6 +729,7 @@ def create_pinout_base_plate_assembly(
             bridge_opening_width_mm + 2 * usb_bridge_wall_thickness_mm
         )
         bridge_outer_height_mm = usb_cable_hole_height_mm + usb_bridge_wall_thickness_mm
+        connector_minimum_y_mm = pico_maximum_pin_y_mm - pico_usb_connector_offset_mm
         pico_usb_bridge = create_box(
             bridge_outer_width_mm,
             bridge_depth_mm,
@@ -653,18 +742,18 @@ def create_pinout_base_plate_assembly(
         )
         pico_usb_cable_cutter = create_box(
             bridge_opening_width_mm,
-            bridge_depth_mm + 2,
-            usb_cable_hole_height_mm,
+            plate_depth_mm - connector_minimum_y_mm + 1,
+            plate_thickness_mm + usb_cable_hole_height_mm + 1,
             origin=(
                 pico_center_x_mm - bridge_opening_width_mm / 2,
-                bridge_minimum_y_mm - 1,
-                plate_thickness_mm,
+                connector_minimum_y_mm,
+                -1,
             ),
         )
         pico_usb_bridge = pico_usb_bridge.cut(pico_usb_cable_cutter)
         base_plate = base_plate.fuse(pico_usb_bridge)
+        base_plate = base_plate.cut(pico_usb_cable_cutter)
 
-        connector_minimum_y_mm = pico_maximum_pin_y_mm - pico_usb_connector_offset_mm
         pico_usb_connector_preview = create_box(
             pico_usb_connector_width_mm,
             pico_usb_connector_depth_mm,
@@ -679,6 +768,7 @@ def create_pinout_base_plate_assembly(
             "component_id": pico_component.id,
             "opening_width_mm": bridge_opening_width_mm,
             "opening_height_mm": usb_cable_hole_height_mm,
+            "plate_cutout_minimum_y_mm": connector_minimum_y_mm,
             "minimum_y_mm": bridge_minimum_y_mm,
             "maximum_y_mm": plate_depth_mm,
         }
@@ -1017,6 +1107,92 @@ def create_pinout_base_plate_assembly(
                 "strip_count": 1,
                 "eye_count": 2,
             }
+        elif plan.kind is PinoutDownholderKind.PERIMETER_FRAME:
+            holder_bottom_z_mm = plate_thickness_mm + profile.clamp_surface_height_mm
+            vertical_source_rows = []
+            for pin_set_id in component.pin_sets:
+                source_coordinates = [
+                    pinout_project.pin_positions[name]
+                    for name in pinout_project.pin_sets[pin_set_id]
+                ]
+                if len(source_coordinates) > 1 and all(
+                    math.isclose(coordinate[0], source_coordinates[0][0])
+                    for coordinate in source_coordinates
+                ):
+                    vertical_source_rows.append(source_coordinates)
+            row_x_coordinates_mm = sorted(
+                row[0][0] * raster_pitch_mm - plate_source_minimum_x_mm
+                for row in vertical_source_rows
+            )
+            row_y_coordinates_mm = sorted(
+                {
+                    coordinate[1] * raster_pitch_mm - plate_source_minimum_y_mm
+                    for row in vertical_source_rows
+                    for coordinate in row
+                }
+            )
+            crossbar_center_y_coordinates_mm = (
+                row_y_coordinates_mm[0] - raster_pitch_mm,
+                row_y_coordinates_mm[-1] + raster_pitch_mm,
+            )
+            holder = PartCollector()
+            for row_x_mm in row_x_coordinates_mm:
+                holder = holder.fuse(
+                    create_box(
+                        perimeter_frame_rail_width_mm,
+                        crossbar_center_y_coordinates_mm[1]
+                        - crossbar_center_y_coordinates_mm[0],
+                        perimeter_frame_holder_thickness_mm,
+                        origin=(
+                            row_x_mm - perimeter_frame_rail_width_mm / 2,
+                            crossbar_center_y_coordinates_mm[0],
+                            holder_bottom_z_mm,
+                        ),
+                    )
+                )
+            crossbars_by_alignment = {}
+            for front_back_alignment, crossbar_center_y_mm in zip(
+                (Alignment.FRONT, Alignment.BACK),
+                crossbar_center_y_coordinates_mm,
+                strict=True,
+            ):
+                crossbar = create_box(
+                    row_x_coordinates_mm[-1]
+                    - row_x_coordinates_mm[0]
+                    + perimeter_frame_rail_width_mm,
+                    perimeter_frame_crossbar_width_mm,
+                    perimeter_frame_holder_thickness_mm,
+                    origin=(
+                        row_x_coordinates_mm[0] - perimeter_frame_rail_width_mm / 2,
+                        crossbar_center_y_mm - perimeter_frame_crossbar_width_mm / 2,
+                        holder_bottom_z_mm,
+                    ),
+                )
+                holder = holder.fuse(crossbar)
+                crossbars_by_alignment[front_back_alignment] = crossbar
+            for front_back_alignment, crossbar in crossbars_by_alignment.items():
+                eye = create_filleted_box(
+                    mount_eye_diameter_mm,
+                    mount_eye_diameter_mm,
+                    perimeter_frame_holder_thickness_mm,
+                    fillet_radius=mount_eye_fillet_radius_mm,
+                    no_fillets_at=[
+                        Alignment.TOP,
+                        Alignment.BOTTOM,
+                        front_back_alignment.opposite,
+                    ],
+                )
+                eye = align(eye, crossbar, Alignment.CENTER, axes=[0])
+                eye = align(eye, crossbar, front_back_alignment.stack_alignment)
+                eye = align(eye, crossbar, Alignment.BOTTOM)
+                holder = holder.fuse(eye)
+            holder_thickness_mm = perimeter_frame_holder_thickness_mm
+            feature_metadata = {
+                "rail_count": 2,
+                "crossbar_count": 2,
+                "crossbar_offset_pitches": 1,
+                "eye_count": 2,
+            }
         elif plan.kind is PinoutDownholderKind.CORNER:
             headers = pin_headers_by_component.get(component_id, {})
             if set(headers) != set(component.pin_sets):
@@ -1046,19 +1222,24 @@ def create_pinout_base_plate_assembly(
                 }
             )
             holder = PartCollector()
-            for row_x_mm in row_x_coordinates_mm:
-                holder = holder.fuse(
-                    create_box(
-                        corner_rail_width_mm,
-                        row_y_coordinates_mm[-1] - row_y_coordinates_mm[0],
-                        corner_holder_thickness_mm,
-                        origin=(
-                            row_x_mm - corner_rail_width_mm / 2,
-                            row_y_coordinates_mm[0],
-                            holder_bottom_z_mm,
-                        ),
-                    )
+            rails_by_alignment = {}
+            for left_right_alignment, row_x_mm in zip(
+                (Alignment.LEFT, Alignment.RIGHT),
+                row_x_coordinates_mm,
+                strict=True,
+            ):
+                rail = create_box(
+                    corner_rail_width_mm,
+                    row_y_coordinates_mm[-1] - row_y_coordinates_mm[0],
+                    corner_holder_thickness_mm,
+                    origin=(
+                        row_x_mm - corner_rail_width_mm / 2,
+                        row_y_coordinates_mm[0],
+                        holder_bottom_z_mm,
+                    ),
                 )
+                holder = holder.fuse(rail)
+                rails_by_alignment[left_right_alignment] = rail
             for pin_index in corner_bridge_indices:
                 if pin_index > len(row_y_coordinates_mm):
                     raise ValueError(
@@ -1080,33 +1261,23 @@ def create_pinout_base_plate_assembly(
                         ),
                     )
                 )
-            for screw_center_x_mm, screw_center_y_mm in normalized_screw_centers:
-                eye = create_cylinder(
-                    mount_eye_diameter_mm / 2,
-                    corner_holder_thickness_mm,
-                )
-                eye = translate(
-                    screw_center_x_mm,
-                    screw_center_y_mm,
-                    holder_bottom_z_mm,
-                )(eye)
-                holder = holder.fuse(eye)
-                nearest_row_x_mm = min(
-                    row_x_coordinates_mm,
-                    key=lambda row_x_mm: abs(row_x_mm - screw_center_x_mm),
-                )
-                connector_minimum_x_mm = min(nearest_row_x_mm, screw_center_x_mm)
-                connector = create_box(
-                    abs(nearest_row_x_mm - screw_center_x_mm),
-                    corner_rail_width_mm,
-                    corner_holder_thickness_mm,
-                    origin=(
-                        connector_minimum_x_mm,
-                        screw_center_y_mm - corner_rail_width_mm / 2,
-                        holder_bottom_z_mm,
-                    ),
-                )
-                holder = holder.fuse(connector)
+            for left_right_alignment, rail in rails_by_alignment.items():
+                for front_back_alignment in (Alignment.FRONT, Alignment.BACK):
+                    eye = create_filleted_box(
+                        mount_eye_diameter_mm,
+                        mount_eye_diameter_mm,
+                        corner_holder_thickness_mm,
+                        fillet_radius=mount_eye_fillet_radius_mm,
+                        no_fillets_at=[
+                            Alignment.TOP,
+                            Alignment.BOTTOM,
+                            left_right_alignment.opposite,
+                        ],
+                    )
+                    eye = align(eye, rail, front_back_alignment)
+                    eye = align(eye, rail, left_right_alignment.stack_alignment)
+                    eye = align(eye, rail, Alignment.BOTTOM)
+                    holder = holder.fuse(eye)
             holder_thickness_mm = corner_holder_thickness_mm
             feature_metadata = {
                 "rail_count": 2,

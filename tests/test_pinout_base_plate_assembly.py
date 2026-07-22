@@ -110,6 +110,11 @@ def _fixture_kwargs(pinout_path, *, pass_through_style="row_slot"):
                 "bridge_pin_indices_from_bottom": [1, 2],
             },
             "center_strip": {"thickness_mm": 2.1, "strip_width_mm": 1.0},
+            "perimeter_frame": {
+                "thickness_mm": 2.1,
+                "rail_width_mm": 2.5,
+                "crossbar_width_mm": 2.5,
+            },
         },
         "pinout_base_plate_usb_bridge_wall_thickness": 2.0,
         "pinout_base_plate_usb_cable_hole_width": 15.0,
@@ -454,6 +459,11 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
     assert "reference_tmc5160t_plus_driver" in (assembly.non_production_indices_by_name)
     assert "pico_usb_cable_passage" in assembly.cutter_indices_by_name
     assert "pico_usb_connector" in non_production_names
+    usb_cable_passage_bbox = get_bounding_box(
+        assembly.get_named_cutter("pico_usb_cable_passage")
+    )
+    assert usb_cable_passage_bbox[0][2] < 0
+    assert usb_cable_passage_bbox[1][2] > assembly.additional_data["plate_size_mm"][2]
     usb_bridge = assembly.additional_data["pico_usb_bridge"]
     assert usb_bridge["component_id"] == "pico"
     assert usb_bridge["opening_width_mm"] > 0
@@ -469,6 +479,7 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
         "downholder_u1_socket",
         "downholder_socket_hv",
         "downholder_socket_c",
+        "downholder_tmc_adapter",
     }
     assert set(assembly.follower_indices_by_name) == expected_downholders
     assert "downholder_self_threading_holes" in assembly.cutter_indices_by_name
@@ -486,12 +497,22 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
     assert pico_downholder["eye_count"] == 4
     assert pico_downholder["loose_hole_count"] == 4
 
+    adapter_downholder = downholders["tmc_adapter"]
+    assert adapter_downholder["rail_count"] == 2
+    assert adapter_downholder["crossbar_count"] == 2
+    assert adapter_downholder["crossbar_offset_pitches"] == 1
+    assert adapter_downholder["eye_count"] == 2
+    assert adapter_downholder["loose_hole_count"] == 2
+
     center_strip_component_ids = {
         component.id
         for component in project.physical_components
         if component.downholder.value == "center_strip"
     }
-    assert center_strip_component_ids == set(downholders) - {"pico"}
+    assert center_strip_component_ids == set(downholders) - {
+        "pico",
+        "tmc_adapter",
+    }
     for component_id in center_strip_component_ids:
         downholder = downholders[component_id]
         assert downholder["strip_count"] == 1
@@ -521,11 +542,17 @@ def test_tmc5160_pinout_physical_topology_builds_without_position_assertions():
         assert 0 <= follower_bbox[0][0] < follower_bbox[1][0] <= plate_width
         assert 0 <= follower_bbox[0][1] < follower_bbox[1][1] <= plate_depth
 
-    topmost_component_y = max(
-        envelope["maximum_mm"][1]
-        for envelope in assembly.additional_data["component_envelopes"].values()
+    topmost_physical_y = max(
+        [
+            envelope["maximum_mm"][1]
+            for envelope in assembly.additional_data["component_envelopes"].values()
+        ]
+        + [
+            get_bounding_box(assembly.get_follower_part_by_name(follower_name))[1][1]
+            for follower_name in expected_downholders
+        ]
     )
-    assert plate_depth - topmost_component_y == pytest.approx(
+    assert plate_depth - topmost_physical_y == pytest.approx(
         assembly.additional_data["plate_margins_mm"]["top"]
     )
     assert all(

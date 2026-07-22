@@ -39,7 +39,7 @@ manufactured:
 - the semantic component type, such as `rp2040_plus_2x20` or `ar20_2x10`;
 - which grouped contacts are through-board contacts;
 - the semantic downholder choice, such as `corner`, `center_strip`,
-  `pin_line_clamp`, or `none`;
+  `perimeter_frame`, `pin_line_clamp`, or `none`;
 - physical module boxes and their raster dimensions.
 
 The downholder choice belongs here because it follows the type and topology of
@@ -183,7 +183,7 @@ Each record may contain:
 - `through_pin_sets`: optional subset whose contacts physically pass through
   the carrier; omission means all listed pin sets;
 - `downholder`: semantic retention kind: `corner`, `center_strip`,
-  `pin_line_clamp`, or `none`;
+  `perimeter_frame`, `pin_line_clamp`, or `none`;
 - `box`: optional reference to an existing exact-size physical module box.
 
 There are deliberately no millimetre values in this structure.
@@ -232,7 +232,7 @@ physical_components:
     label: TMC5160T Plus StepStick adapter
     component_type: stepstick_adapter
     pin_sets: [tmc1_j1, tmc1_j2, tmc1_top]
-    downholder: none
+    downholder: perimeter_frame
 
   - id: external_io_pin_line
     label: 18-pin fuse, power, spare, and Y-endstop row
@@ -453,6 +453,9 @@ This is the Pico/RP2040-Plus pattern.
   pin-row indices.
 - Four mount eyes extend outside the two long sides while remaining within the
   Pico's top/bottom pin extent.
+- Each eye is a filleted land with an unfilleted face stacked against its rail,
+  so the eye and rail share a full joining face rather than touching at an
+  edge.
 - No holder member enters the USB bridge or cable-passage keepout.
 - Each eye's loose clearance hole aligns with a self-threading hole in the base
   plate.
@@ -475,6 +478,24 @@ eye geometry, and screw details. Socket downholders are installed before
 plug-in ICs, resistors, diodes, and transistors. The real socket channel must be
 fit-checked; the generator must not silently invent a side-offset strip if the
 configured profile does not fit.
+
+### `perimeter_frame`
+
+This is the StepStick-adapter retention pattern.
+
+- Two rails bear on the adapter's two long pin rows.
+- One crossbar closes each short end, one raster pitch beyond the first and
+  last pin positions.
+- One mount eye extends outward from each short-edge crossbar.
+- Each eye is a filleted land whose flat joining face is stacked against its
+  crossbar.
+- The two loose holder holes align with base-plate self-threading holes.
+- Additional through-pin sets, such as the adapter's two-pin diagnostic row,
+  still receive their plate slot but do not define a third frame rail.
+
+The assembly supplies rail width, crossbar width, holder thickness, clamp
+height, eye geometry, and screw details. The pinout supplies only the
+`perimeter_frame` selection and the adapter's real pin-set grouping.
 
 ### `pin_line_clamp`
 
@@ -632,9 +653,11 @@ Useful tests include:
 - changing plate thickness, screw size, or downholder thickness changes the
   CAD result without changing or rewriting the pinout model;
 - corner holders have the required topology and avoid the Pico USB edge;
-- the plate extends beyond the Pico USB edge and the derived bridge retains a
-  clear cable passage;
+- the plate extends beyond the Pico USB edge and the derived cable passage cuts
+  completely through the plate beneath the raised bridge and out to the edge;
 - center-strip holders have two end eyes and align to the derived long axis;
+- perimeter-frame holders have two long-side rails, two one-pitch-offset end
+  crossbars, and two short-edge eyes;
 - every screw centre is shared by a downholder clearance hole and a base-plate
   self-threading cutter;
 - production solids satisfy the supplied clearances and plate wall thickness;
@@ -682,12 +705,15 @@ Phase 4.
 Status: implemented for the current carrier.
 
 - The Pico uses one rigid grid follower: two rails over its 20-pin rows, three
-  raster-width bridges counted from the bottom pin row, and four outward eyes.
+  raster-width bridges counted from the bottom pin row, and four outward,
+  full-face-joined filleted eyes.
 - Each AR20 and DIP socket uses one central strip follower with a rounded eye
   beyond each short end.
+- The StepStick adapter uses one closed-frame follower with two long-side rails,
+  crossbars one pitch beyond the end pins, and one eye at each short edge.
 - Every eye receives a loose M2.5 hole and shares its centre with a lead-in
   self-threading hole in the base plate; screws are preview-only parts.
-- All six rigid downholders export as separately printable named followers.
+- All seven rigid downholders export as separately printable named followers.
   `pin_line_clamp` remains integrated with the plate and `none` adds no holder.
 
 ### Phase 4: measurements and first assembly
@@ -721,8 +747,11 @@ Status: implemented for the current carrier.
   exposes separate serviceable-fuse input/output contacts, and keeps its empty
   isolation and spare contacts electrically unused.
 - The Pico uses the `corner` variant, while the plate continues past its USB
-  edge into an open cable bridge which remains unobstructed by the holder.
+  edge into a raised bridge; the plate beneath it is removed for the USB-C
+  plug and cable and remains unobstructed by the holder.
 - Each configured IC/wire-wrap socket uses the `center_strip` variant.
+- The StepStick adapter uses the `perimeter_frame` variant with its J1/J2 rails,
+  two end crossbars, and two short-edge mount eyes.
 - Base holes reuse the vision-light self-threading pattern; no TPU cover is
   generated.
 - The driver box appears as an exact-size non-production frame without

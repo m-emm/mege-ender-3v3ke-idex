@@ -269,6 +269,10 @@ globals:
     center_strip:
       thickness_mm: 2.1
       strip_width_mm: 3.0
+    perimeter_frame:
+      thickness_mm: 2.1
+      rail_width_mm: 2.54
+      crossbar_width_mm: 2.54
   pinout_base_plate_usb_bridge_wall_thickness: 2.0
   pinout_base_plate_usb_cable_hole_width: 15.0
   pinout_base_plate_usb_cable_hole_height: 15.0

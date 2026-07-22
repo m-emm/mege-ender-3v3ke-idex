@@ -112,7 +112,7 @@ physical_components:
     label: TMC5160T Plus StepStick adapter
     component_type: stepstick_adapter
     pin_sets: [tmc1_j1, tmc1_j2, tmc1_top]
-    downholder: none
+    downholder: perimeter_frame
 
   - id: external_io_pin_line
     label: 18-pin fuse, power, spare, and Y-endstop row
