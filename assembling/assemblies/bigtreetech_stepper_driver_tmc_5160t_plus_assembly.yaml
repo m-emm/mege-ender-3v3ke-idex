@@ -1,0 +1,65 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: BIGTREETECH TMC5160T Plus stepper-driver reference mock-up
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - top
+        - bottom
+        - front
+        - back
+        - left
+        - right
+      width: 512
+      height: 512
+    parts:
+      - source: self
+        artifact: leader
+        name: housing
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+
+  Production:
+    parts: []
+
+Parameters:
+  bigtreetech_tmc5160t_plus_housing_length:
+    Type: Float
+  bigtreetech_tmc5160t_plus_housing_width:
+    Type: Float
+  bigtreetech_tmc5160t_plus_housing_height:
+    Type: Float
+  bigtreetech_tmc5160t_plus_capacitor_diameter:
+    Type: Float
+  bigtreetech_tmc5160t_plus_capacitor_top_height:
+    Type: Float
+  bigtreetech_tmc5160t_plus_capacitor_left_x:
+    Type: Float
+  bigtreetech_tmc5160t_plus_capacitor_right_x:
+    Type: Float
+  bigtreetech_tmc5160t_plus_capacitor_y:
+    Type: Float
+  bigtreetech_tmc5160t_plus_mount_hole_front_left_x:
+    Type: Float
+  bigtreetech_tmc5160t_plus_mount_hole_front_left_y:
+    Type: Float
+  bigtreetech_tmc5160t_plus_mount_hole_pitch_x:
+    Type: Float
+  bigtreetech_tmc5160t_plus_mount_hole_pitch_y:
+    Type: Float
+  bigtreetech_tmc5160t_plus_mount_screw_size:
+    Type: String
+  bigtreetech_tmc5160t_plus_mount_hole_core_bore_depth:
+    Type: Float
+
+Parts:
+  BigtreetechStepperDriverTmc5160tPlusAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.bigtreetech_stepper_driver_tmc_5160t_plus_assembly.create_bigtreetech_stepper_driver_tmc_5160t_plus_assembly

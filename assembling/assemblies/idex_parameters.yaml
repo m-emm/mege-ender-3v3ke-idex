@@ -481,6 +481,20 @@ globals:
   mosfet_driver_j1_four_pin_row_x: 3.7
   mosfet_driver_j1_two_pin_row_x: 1.4
   mosfet_driver_j1_two_pin_y_offset: 2.55
+  bigtreetech_tmc5160t_plus_housing_length: 64.0
+  bigtreetech_tmc5160t_plus_housing_width: 56.0
+  bigtreetech_tmc5160t_plus_housing_height: 26.5
+  bigtreetech_tmc5160t_plus_capacitor_diameter: 12.9
+  bigtreetech_tmc5160t_plus_capacitor_top_height: 32.9
+  bigtreetech_tmc5160t_plus_capacitor_left_x: 9.5
+  bigtreetech_tmc5160t_plus_capacitor_right_x: 55.5
+  bigtreetech_tmc5160t_plus_capacitor_y: 43.0
+  bigtreetech_tmc5160t_plus_mount_hole_front_left_x: 20.5
+  bigtreetech_tmc5160t_plus_mount_hole_front_left_y: 9.1
+  bigtreetech_tmc5160t_plus_mount_hole_pitch_x: 24.5
+  bigtreetech_tmc5160t_plus_mount_hole_pitch_y: 32.7
+  bigtreetech_tmc5160t_plus_mount_screw_size: "M3"
+  bigtreetech_tmc5160t_plus_mount_hole_core_bore_depth: 6.0
   nitehawk_usb_board_length: 30.0
   nitehawk_usb_board_width: 28.0
   nitehawk_usb_board_thickness: 1.6

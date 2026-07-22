@@ -1692,6 +1692,26 @@ assemblies:
       x_axis_mcu_electronics_board_cutter_slack: !Ref x_axis_mcu_electronics_board_cutter_slack
       x_axis_mcu_base_cutter_vertical_slack: !Ref x_axis_mcu_base_cutter_vertical_slack
 
+  - name: bigtreetech_stepper_driver_tmc_5160t_plus_assembly
+
+    resource_file: bigtreetech_stepper_driver_tmc_5160t_plus_assembly.yaml
+    depends_on: []
+    parameters:
+      bigtreetech_tmc5160t_plus_housing_length: !Ref bigtreetech_tmc5160t_plus_housing_length
+      bigtreetech_tmc5160t_plus_housing_width: !Ref bigtreetech_tmc5160t_plus_housing_width
+      bigtreetech_tmc5160t_plus_housing_height: !Ref bigtreetech_tmc5160t_plus_housing_height
+      bigtreetech_tmc5160t_plus_capacitor_diameter: !Ref bigtreetech_tmc5160t_plus_capacitor_diameter
+      bigtreetech_tmc5160t_plus_capacitor_top_height: !Ref bigtreetech_tmc5160t_plus_capacitor_top_height
+      bigtreetech_tmc5160t_plus_capacitor_left_x: !Ref bigtreetech_tmc5160t_plus_capacitor_left_x
+      bigtreetech_tmc5160t_plus_capacitor_right_x: !Ref bigtreetech_tmc5160t_plus_capacitor_right_x
+      bigtreetech_tmc5160t_plus_capacitor_y: !Ref bigtreetech_tmc5160t_plus_capacitor_y
+      bigtreetech_tmc5160t_plus_mount_hole_front_left_x: !Ref bigtreetech_tmc5160t_plus_mount_hole_front_left_x
+      bigtreetech_tmc5160t_plus_mount_hole_front_left_y: !Ref bigtreetech_tmc5160t_plus_mount_hole_front_left_y
+      bigtreetech_tmc5160t_plus_mount_hole_pitch_x: !Ref bigtreetech_tmc5160t_plus_mount_hole_pitch_x
+      bigtreetech_tmc5160t_plus_mount_hole_pitch_y: !Ref bigtreetech_tmc5160t_plus_mount_hole_pitch_y
+      bigtreetech_tmc5160t_plus_mount_screw_size: !Ref bigtreetech_tmc5160t_plus_mount_screw_size
+      bigtreetech_tmc5160t_plus_mount_hole_core_bore_depth: !Ref bigtreetech_tmc5160t_plus_mount_hole_core_bore_depth
+
   - name: nitehawk_usb_board_assembly
 
     resource_file: nitehawk_usb_board_assembly.yaml
