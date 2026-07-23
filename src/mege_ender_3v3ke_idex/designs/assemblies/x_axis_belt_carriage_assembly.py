@@ -67,6 +67,7 @@ def create_x_axis_belt_carriage_assembly(
     assembly = None
 
     clamps = []
+    clamp_lfcs = []
     cages = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         clamp_lfc = create_gt_belt_clamp(
@@ -122,6 +123,8 @@ def create_x_axis_belt_carriage_assembly(
             )
 
         clamp_lfc = align(clamp_lfc, axis_profile, Alignment.CENTER, axes=[2])
+
+        clamp_lfcs.append(clamp_lfc)
 
         current_belt_path_cutter = clamp_lfc.get_named_follower("belt_path_cutter")
         current_belt_path_cutter_size = get_bounding_box_size(current_belt_path_cutter)
@@ -310,20 +313,119 @@ def create_x_axis_belt_carriage_assembly(
         )
         clamp_drill = align(clamp_drill, right_clamp, Alignment.CENTER)
 
+        threaded_inset_holder_radius = 3.5
+
+        threaded_inset_holder = create_cylinder(
+            threaded_inset_holder_radius, bridge_thickness, direction=(0, 1, 0)
+        )
+        threaded_inset_holder = align(
+            threaded_inset_holder, clamp_drill, Alignment.CENTER
+        )
+        threaded_inset_holder = align(
+            threaded_inset_holder, bridge, Alignment.STACK_BACK
+        )
+
+        assembly = assembly.fuse(threaded_inset_holder)
+
         assembly = assembly.cut(clamp_drill)
         assembly.add_named_cutter(clamp_drill, "right_clamp_hole_drill")
 
-        left_bridge_drill = create_cylinder(
+        thread_inset = create_thread_inset_assembly(
+            size="M3",
+            thickness=6,
+            extra_radius=0.01,
+            clearance_type="close",
+        )
+        thread_inset = rotate(-90, axis=(1, 0, 0))(thread_inset)
+
+        thread_inset = align(thread_inset, clamp_drill, Alignment.CENTER)
+        thread_inset = align(thread_inset, threaded_inset_holder, Alignment.BACK)
+
+        assembly = thread_inset.use_as_cutter_on(assembly)
+        thread_inset = thread_inset.prefixed_copy("right_clamp_thread_inset")
+        assembly = assembly.merge_except_leader(thread_inset)
+
+        left_carrier_right_bridge_hole_drill = create_cylinder(
             MScrew.from_size("M3").clearance_hole_loose / 2,
             BIG_THING,
             direction=(0, 1, 0),
         )
-        left_bridge_drill = align(left_bridge_drill, bridge, Alignment.CENTER)
-
-        left_bridge_drill = align(
-            left_bridge_drill, right_clamp, Alignment.CENTER, axes=[2]
+        left_carrier_right_bridge_hole_drill = align(
+            left_carrier_right_bridge_hole_drill, bridge, Alignment.CENTER
         )
+
+        left_carrier_right_bridge_hole_drill = align(
+            left_carrier_right_bridge_hole_drill,
+            right_clamp,
+            Alignment.CENTER,
+            axes=[2],
+        )
+
+        left_carrier_right_bridge_hole_drill = align(
+            left_carrier_right_bridge_hole_drill,
+            tool_head_mount_machined,
+            Alignment.LEFT,
+        )
+        left_carrier_right_bridge_hole_drill = translate(2, 0, 0)(
+            left_carrier_right_bridge_hole_drill
+        )
+
+        left_threaded_inset_holder = create_cylinder(
+            threaded_inset_holder_radius, bridge_thickness, direction=(0, 1, 0)
+        )
+        left_threaded_inset_holder = align(
+            left_threaded_inset_holder,
+            left_carrier_right_bridge_hole_drill,
+            Alignment.CENTER,
+        )
+        left_threaded_inset_holder = align(
+            left_threaded_inset_holder, bridge, Alignment.STACK_BACK
+        )
+        assembly = assembly.fuse(left_threaded_inset_holder)
+
+        assembly = assembly.cut(left_carrier_right_bridge_hole_drill)
+        assembly.add_named_cutter(
+            left_carrier_right_bridge_hole_drill, "left_carrier_right_bridge_hole_drill"
+        )
+
+        left_thread_inset = create_thread_inset_assembly(
+            size="M3",
+            thickness=6,
+            extra_radius=0.01,
+            clearance_type="close",
+        )
+        left_thread_inset = rotate(-90, axis=(1, 0, 0))(left_thread_inset)
+
+        left_thread_inset = align(
+            left_thread_inset, left_carrier_right_bridge_hole_drill, Alignment.CENTER
+        )
+        left_thread_inset = align(
+            left_thread_inset, left_threaded_inset_holder, Alignment.BACK
+        )
+
+        left_carrier_left_bridge_hole_drill = create_cylinder(
+            MScrew.from_size("M3").clearance_hole_loose / 2,
+            BIG_THING,
+            direction=(0, 1, 0),
+        )
+        left_carrier_left_bridge_hole_drill = align(
+            left_carrier_left_bridge_hole_drill, left_thread_inset, Alignment.CENTER
+        )
+
+        assembly.add_named_cutter(
+            left_carrier_left_bridge_hole_drill, "left_carrier_left_bridge_hole_drill"
+        )
+
+        assembly = left_thread_inset.use_as_cutter_on(assembly)
+        left_thread_inset = left_thread_inset.prefixed_copy("left_bridge_thread_inset")
+        assembly = assembly.merge_except_leader(left_thread_inset)
+
         assembly.add_named_non_production_part(bridge, "bridge_reference")
         assembly.set_hidden_by_default("bridge_reference")
+
+        assembly.add_named_cutter(
+            clamp_lfcs[1].get_named_follower("belt_path_cutter"),
+            "right_belt_path_cutter",
+        )
 
     return assembly

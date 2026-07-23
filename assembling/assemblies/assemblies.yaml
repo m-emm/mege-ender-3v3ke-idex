@@ -438,6 +438,10 @@ placement:
 
     - part: eddy_duo_assembly
       to: tool_head_mount_machined_bottom_assembly
+      alignment: FRONT
+
+    - part: eddy_duo_assembly
+      to: tool_head_mount_machined_bottom_assembly
       alignment: STACK_LEFT
       stack_gap:
         $ref: eddy_duo_tool_head_side_gap
@@ -446,8 +450,8 @@ placement:
       to: sprite_extruder_left_assembly.non_production_parts.hotend
       alignment: BOTTOM
       post_translation:
-        - 0
-        - 0
+        - -6
+        - 9
         - $ref: eddy_duo_nozzle_clearance
     - rigid_group:
         - eddy_duo_assembly
@@ -3827,6 +3831,7 @@ assemblies:
       sprite_extruder: sprite_extruder_left_assembly
       tool_head_mount_machined: tool_head_mount_machined_bottom_assembly
       axis_profile: x_axis_top_profile_assembly
+      eddy_duo_assembly: eddy_duo_assembly
 
     outputs:
       extruder_cage: extruder_cage_left_joined_assembly

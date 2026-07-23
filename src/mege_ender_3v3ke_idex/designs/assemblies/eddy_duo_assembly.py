@@ -89,7 +89,7 @@ def create_eddy_duo_assembly(
     for side in (-1, 1):
         mounting_hole = create_cylinder(
             eddy_duo_mounting_hole_diameter / 2,
-            eddy_duo_depth + 2,
+            eddy_duo_depth * 2,
             direction=(0, 1, 0),
         )
         mounting_hole = align(mounting_hole, body, Alignment.CENTER)

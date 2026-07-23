@@ -631,6 +631,9 @@ def create_extruder_cage_assembly(
             cage.add_named_non_production_part(inset, name)
 
     cage.add_named_cutter(mount_hole_cutter, "mount_hole_cutter")
+
+    cage.add_named_non_production_part(right_mount_plate, "right_mount_plate_reference")
+    cage.set_hidden_by_default("right_mount_plate_reference")
     for name, cutter in nitehawk_cutters.items():
         cage.add_named_cutter(cutter, name)
     for position_name, cutter in fixed_mount_strip_thread_inset_cutter_items:
