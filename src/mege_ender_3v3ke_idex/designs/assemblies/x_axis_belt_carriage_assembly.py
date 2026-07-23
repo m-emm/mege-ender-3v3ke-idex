@@ -16,7 +16,7 @@ def create_x_axis_belt_carriage_assembly(
     carriage,
     axis_profile,
     sprite_extruder,
-    tool_heead_mount_machined,
+    tool_head_mount_machined,
     tool_head_mount_base_plate_height,
     tool_head_mount_belt_clamp_base_thickness,
     tool_head_mount_belt_clamp_length,
@@ -102,7 +102,7 @@ def create_x_axis_belt_carriage_assembly(
 
             if lr == Alignment.LEFT:
                 clamp_gap = 0.3
-                part_to_align_to = tool_heead_mount_machined
+                part_to_align_to = tool_head_mount_machined
             else:
                 part_to_align_to = sprite_extruder_all_fused
 
@@ -117,7 +117,7 @@ def create_x_axis_belt_carriage_assembly(
 
             clamp_lfc = clamp_lfc.aligned_from_follower(
                 "clamp",
-                tool_heead_mount_machined,
+                tool_head_mount_machined,
                 lr.stack_alignment,
             )
 
@@ -269,9 +269,9 @@ def create_x_axis_belt_carriage_assembly(
             )
             mount_flange_back = align(mount_flange_back, bridge, Alignment.BACK)
             mount_flange_back = align(
-                mount_flange_back, tool_heead_mount_machined, Alignment.STACK_TOP
+                mount_flange_back, tool_head_mount_machined, Alignment.STACK_TOP
             )
-            mount_flange_back = align(mount_flange_back, tool_heead_mount_machined, lr)
+            mount_flange_back = align(mount_flange_back, tool_head_mount_machined, lr)
 
             # mount_flange_back = fit_part_between(
             #     mount_flange_back,
@@ -294,7 +294,7 @@ def create_x_axis_belt_carriage_assembly(
                 mount_flange_floor, mount_flange_back, Alignment.BACK
             )
 
-            mount_flange_floor = tool_heead_mount_machined.use_as_cutter_on(
+            mount_flange_floor = tool_head_mount_machined.use_as_cutter_on(
                 mount_flange_floor
             )
 
@@ -323,5 +323,7 @@ def create_x_axis_belt_carriage_assembly(
         left_bridge_drill = align(
             left_bridge_drill, right_clamp, Alignment.CENTER, axes=[2]
         )
+        assembly.add_named_non_production_part(bridge, "bridge_reference")
+        assembly.set_hidden_by_default("bridge_reference")
 
     return assembly

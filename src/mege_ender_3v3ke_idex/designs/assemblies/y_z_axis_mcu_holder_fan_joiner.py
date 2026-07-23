@@ -12,31 +12,6 @@ DEFAULT_FAN_LID_PATCH_MARGIN = 4.0
 DEFAULT_FAN_ROTATION_ANGLE = 90.0
 
 
-def _copy_holder_without_old_lid_and_fan(y_z_axis_mcu_holder):
-    joined_holder = LeaderFollowersCuttersPart(
-        y_z_axis_mcu_holder.leader.copy(),
-        additional_data=y_z_axis_mcu_holder.additional_data.copy(),
-    )
-
-    for name, follower in y_z_axis_mcu_holder.get_named_follower_items():
-        if name == "top_lid":
-            continue
-        joined_holder.add_named_follower(follower.copy(), name)
-
-    for name, cutter in y_z_axis_mcu_holder.get_named_cutter_items():
-        joined_holder.add_named_cutter(cutter.copy(), name)
-
-    for (
-        name,
-        non_production_part,
-    ) in y_z_axis_mcu_holder.get_named_non_production_part_items():
-        if name == "fan":
-            continue
-        joined_holder.add_named_non_production_part(non_production_part.copy(), name)
-
-    return joined_holder
-
-
 def place_y_z_axis_mcu_holder_fan(
     *,
     y_z_axis_mcu_holder,
@@ -98,7 +73,7 @@ def join_y_z_axis_mcu_holder_with_fan(
         fan_rotation_angle=fan_rotation_angle,
     )
 
-    joined_holder = _copy_holder_without_old_lid_and_fan(y_z_axis_mcu_holder)
+    joined_holder = y_z_axis_mcu_holder.filtered_copy(["top_lid", "fan"])
     replacement_top_lid = input_top_lid.copy()
 
     replacement_top_lid = replacement_top_lid.fuse(

@@ -609,6 +609,11 @@ def create_extruder_cage_assembly(
     cage_leader = cage_leader.cut(fixed_mount_strip_thread_inset_cutters)
     cage = LeaderFollowersCuttersPart(cage_leader)
 
+    cage.add_named_non_production_part(
+        part_fan_back_mount_plate, "back_mount_plate_reference"
+    )
+    cage.set_hidden_by_default("back_mount_plate_reference")
+
     for side_name, screw in sprite_mount_screws:
         cage.add_named_non_production_part(
             screw,

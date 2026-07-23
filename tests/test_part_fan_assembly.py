@@ -674,11 +674,36 @@ def test_part_fans_preserve_joiner_anchor_markers_in_leader():
 
 def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
     part_fans = _create_part_fans_with_origin()
+    part_fans.followers.append(translate(120, 0, 0)(create_box(1, 1, 1)))
+    part_fans.cutters.append(translate(121, 0, 0)(create_box(1, 1, 1)))
+    part_fans.non_production_parts.append(translate(122, 0, 0)(create_box(1, 1, 1)))
+    part_fans.add_named_follower(
+        translate(123, 0, 0)(create_box(1, 1, 1)),
+        "retained_follower",
+    )
+    part_fans.add_named_cutter(
+        translate(124, 0, 0)(create_box(1, 1, 1)),
+        "retained_cutter",
+    )
+    part_fans.add_named_non_production_part(
+        translate(125, 0, 0)(create_box(1, 1, 1)),
+        "retained_reference",
+    )
+    part_fans.add_named_direction_vector((1, 2, 3), "retained_direction")
+    part_fans.set_hidden_by_default("side_mount_plate")
+    part_fans.set_hidden_by_default("retained_reference")
+    part_fans.additional_data["nested"] = {"values": [1, 2]}
+
     extruder_cage = LeaderFollowersCuttersPart(
-        translate(100, 100, 100)(create_box(5, 5, 5))
+        translate(100, 100, 100)(create_box(5, 5, 5)),
+        additional_data={
+            "nested": {"values": [3, 4]},
+            "consumed_part_refs": ["existing.cage.ref"],
+        },
     )
     cage_hardware_reference = translate(100, 100, 100)(create_box(1, 1, 1))
     cage_hardware_cavity = translate(101, 101, 101)(create_box(1, 1, 1))
+    cage_hidden_reference = translate(102, 102, 102)(create_box(1, 1, 1))
     extruder_cage.add_named_non_production_part(
         cage_hardware_reference,
         "fixed_mount_strip_thread_inset_left_front_thread_inset",
@@ -687,6 +712,13 @@ def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
         cage_hardware_cavity,
         "fixed_mount_strip_thread_inset_cutter_left_front",
     )
+    extruder_cage.add_named_non_production_part(
+        cage_hidden_reference,
+        "back_mount_plate_reference",
+    )
+    extruder_cage.set_hidden_by_default("back_mount_plate_reference")
+    extruder_cage.add_named_direction_vector((0, 1, 0), "cage_direction")
+    extruder_cage.followers.append(translate(103, 103, 103)(create_box(1, 1, 1)))
 
     original_part_fan_volume = get_volume(part_fans.leader)
     original_cage_volume = get_volume(extruder_cage.leader)
@@ -697,6 +729,11 @@ def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
         extruder_cage.non_production_indices_by_name
     )
     original_cage_cutter_names = dict(extruder_cage.cutter_indices_by_name)
+    original_part_fan_consumed_refs = part_fans.consumed_part_refs()
+    original_cage_additional_data = {
+        "nested": {"values": [3, 4]},
+        "consumed_part_refs": ["existing.cage.ref"],
+    }
 
     result = join_part_fans_with_extruder_cage(
         part_fans=part_fans,
@@ -717,14 +754,69 @@ def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
         == original_cage_non_production_names
     )
     assert extruder_cage.cutter_indices_by_name == original_cage_cutter_names
+    assert part_fans.consumed_part_refs() == original_part_fan_consumed_refs
+    assert extruder_cage.additional_data == original_cage_additional_data
+    assert part_fans.hidden_by_default_names == [
+        "side_mount_plate",
+        "retained_reference",
+    ]
+    assert extruder_cage.hidden_by_default_names == ["back_mount_plate_reference"]
 
     joined_part_fans = result["part_fans"]
     joined_extruder_cage = result["extruder_cage"]
+    assert set(joined_part_fans.non_production_indices_by_name) == {
+        "retained_reference"
+    }
+    assert joined_part_fans.follower_indices_by_name == {"retained_follower": 1}
+    assert joined_part_fans.cutter_indices_by_name == {"retained_cutter": 1}
+    assert joined_part_fans.direction_vector_indices_by_name == {
+        "retained_direction": 0
+    }
+    assert len(joined_part_fans.followers) == len(part_fans.followers)
+    assert len(joined_part_fans.cutters) == len(part_fans.cutters)
+    assert len(joined_part_fans.non_production_parts) == (
+        len(part_fans.non_production_parts) - 2
+    )
+    assert joined_part_fans.hidden_by_default_names == ["retained_reference"]
+    assert (
+        joined_part_fans.hidden_by_default_names
+        is not part_fans.hidden_by_default_names
+    )
+    assert joined_part_fans.additional_data["nested"] == {"values": [1, 2]}
+    assert (
+        joined_part_fans.additional_data["nested"]
+        is not part_fans.additional_data["nested"]
+    )
+    assert joined_part_fans.consumed_part_refs() == [
+        *original_part_fan_consumed_refs,
+        part_fans.part_ref_for_named_non_production_part("side_mount_plate"),
+        part_fans.part_ref_for_named_non_production_part(
+            "duct_back_mount_plate_connector"
+        ),
+    ]
+
     assert (
         joined_extruder_cage.non_production_indices_by_name
         == original_cage_non_production_names
     )
     assert joined_extruder_cage.cutter_indices_by_name == original_cage_cutter_names
+    assert joined_extruder_cage.direction_vector_indices_by_name == {
+        "cage_direction": 0
+    }
+    assert len(joined_extruder_cage.followers) == len(extruder_cage.followers)
+    assert joined_extruder_cage.followers[0] is not extruder_cage.followers[0]
+    assert joined_extruder_cage.hidden_by_default_names == [
+        "back_mount_plate_reference"
+    ]
+    assert (
+        joined_extruder_cage.hidden_by_default_names
+        is not extruder_cage.hidden_by_default_names
+    )
+    assert joined_extruder_cage.additional_data == original_cage_additional_data
+    assert (
+        joined_extruder_cage.additional_data["nested"]
+        is not extruder_cage.additional_data["nested"]
+    )
     assert get_volume(
         joined_extruder_cage.get_named_non_production_part(
             "fixed_mount_strip_thread_inset_left_front_thread_inset"

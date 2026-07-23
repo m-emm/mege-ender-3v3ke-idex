@@ -7,31 +7,6 @@ from shellforgepy.simple import *
 _logger = logging.getLogger(__name__)
 
 
-def _copy_holder_without_old_lid_and_fan(x_axis_mcu_holder):
-    joined_holder = LeaderFollowersCuttersPart(
-        x_axis_mcu_holder.leader.copy(),
-        additional_data=x_axis_mcu_holder.additional_data.copy(),
-    )
-
-    for name, follower in x_axis_mcu_holder.get_named_follower_items():
-        if name == "top_lid":
-            continue
-        joined_holder.add_named_follower(follower.copy(), name)
-
-    for name, cutter in x_axis_mcu_holder.get_named_cutter_items():
-        joined_holder.add_named_cutter(cutter.copy(), name)
-
-    for (
-        name,
-        non_production_part,
-    ) in x_axis_mcu_holder.get_named_non_production_part_items():
-        if name == "fan":
-            continue
-        joined_holder.add_named_non_production_part(non_production_part.copy(), name)
-
-    return joined_holder
-
-
 BOARD_HOLDER_LID_THICKNESS = 1.2
 
 
@@ -47,7 +22,7 @@ def join_x_axis_mcu_holder_with_fan(
 
     input_top_lid = x_axis_mcu_holder.get_named_follower("top_lid")
 
-    joined_holder = _copy_holder_without_old_lid_and_fan(x_axis_mcu_holder)
+    joined_holder = x_axis_mcu_holder.filtered_copy(["top_lid", "fan"])
 
     top_lid_size = get_bounding_box_size(input_top_lid)
     # replacement_top_lid = create_filleted_box(

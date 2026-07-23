@@ -34,7 +34,13 @@ from mege_ender_3v3ke_idex.designs.assemblies.y_z_axis_mcu_holder_fan_joiner imp
     join_y_z_axis_mcu_holder_with_fan,
     place_y_z_axis_mcu_holder_fan,
 )
-from shellforgepy.simple import get_bounding_box, get_bounding_box_size, get_volume
+from shellforgepy.simple import (
+    create_box,
+    get_bounding_box,
+    get_bounding_box_size,
+    get_volume,
+    translate,
+)
 
 
 def _create_y_z_axis_mcu_holder_base():
@@ -125,6 +131,19 @@ def _plate_by_name(plates, name):
 def test_y_z_axis_mcu_holder_fan_joiner_only_changes_top_lid_and_fan_visual():
     base_holder = _create_y_z_axis_mcu_holder_base()
     fan = _create_y_z_axis_mcu_holder_fan()
+    base_holder.followers.append(translate(200, 0, 0)(create_box(1, 1, 1)))
+    base_holder.cutters.append(translate(201, 0, 0)(create_box(1, 1, 1)))
+    base_holder.non_production_parts.append(translate(202, 0, 0)(create_box(1, 1, 1)))
+    base_holder.add_named_non_production_part(
+        translate(203, 0, 0)(create_box(1, 1, 1)),
+        "retained_hidden_reference",
+    )
+    base_holder.add_named_direction_vector((1, 2, 3), "retained_direction")
+    base_holder.set_hidden_by_default("fan")
+    base_holder.set_hidden_by_default("retained_hidden_reference")
+    base_holder.additional_data["nested"] = {"values": [1, 2]}
+    base_holder.add_consumed_part_ref("existing.holder.ref")
+    original_consumed_part_refs = base_holder.consumed_part_refs()
 
     result = join_y_z_axis_mcu_holder_with_fan(
         y_z_axis_mcu_holder=base_holder,
@@ -147,6 +166,39 @@ def test_y_z_axis_mcu_holder_fan_joiner_only_changes_top_lid_and_fan_visual():
     assert joined_holder.additional_data[
         "replacement_fan_rotation_angle"
     ] == pytest.approx(DEFAULT_FAN_ROTATION_ANGLE)
+    assert joined_holder.additional_data["nested"] == {"values": [1, 2]}
+    assert (
+        joined_holder.additional_data["nested"]
+        is not base_holder.additional_data["nested"]
+    )
+    assert base_holder.additional_data["nested"] == {"values": [1, 2]}
+    assert base_holder.consumed_part_refs() == original_consumed_part_refs
+    assert base_holder.hidden_by_default_names == [
+        "fan",
+        "retained_hidden_reference",
+    ]
+    assert joined_holder.hidden_by_default_names == ["retained_hidden_reference"]
+    assert (
+        joined_holder.hidden_by_default_names is not base_holder.hidden_by_default_names
+    )
+    assert joined_holder.direction_vector_indices_by_name == {"retained_direction": 0}
+    assert joined_holder.direction_vectors == [(1, 2, 3)]
+    assert set(joined_holder.cutter_indices_by_name) == set(
+        base_holder.cutter_indices_by_name
+    )
+    assert set(joined_holder.non_production_indices_by_name) == {
+        *base_holder.non_production_indices_by_name,
+    } - {"fan"}
+    assert len(joined_holder.followers) == len(base_holder.followers)
+    assert len(joined_holder.cutters) == len(base_holder.cutters)
+    assert len(joined_holder.non_production_parts) == (
+        len(base_holder.non_production_parts) - 1
+    )
+    assert joined_holder.followers[0] is not base_holder.followers[0]
+    assert joined_holder.cutters[0] is not base_holder.cutters[0]
+    assert joined_holder.get_named_non_production_part(
+        "retained_hidden_reference"
+    ) is not base_holder.get_named_non_production_part("retained_hidden_reference")
 
     for name, follower in base_holder.get_named_follower_items():
         joined_follower = joined_holder.get_named_follower(name)
@@ -164,6 +216,7 @@ def test_y_z_axis_mcu_holder_fan_joiner_only_changes_top_lid_and_fan_visual():
         ) == pytest.approx(_bbox_values(part))
 
     assert joined_holder.consumed_part_refs() == [
+        "existing.holder.ref",
         "y_z_axis_mcu_holder_base_assembly.followers.top_lid",
         "y_z_axis_mcu_holder_fan_assembly.followers.mount_plate",
         "y_z_axis_mcu_holder_fan_assembly.followers.outlet",

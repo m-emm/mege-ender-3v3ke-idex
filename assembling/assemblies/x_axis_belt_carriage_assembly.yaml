@@ -39,7 +39,7 @@ Builder:
         artifact: non_production_parts
         name_template: "sprite_extruder_{name}"
       - source: injected
-        assembly: tool_heead_mount_machined
+        assembly: tool_head_mount_machined
         artifact: leader
         name: tool_head_mount_machined
   Production:

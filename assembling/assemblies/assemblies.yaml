@@ -3813,7 +3813,7 @@ assemblies:
       carriage: x_axis_left_carriage_assembly
       axis_profile: x_axis_lower_profile_assembly
       sprite_extruder: sprite_extruder_left_assembly
-      tool_heead_mount_machined: tool_head_mount_machined_bottom_assembly
+      tool_head_mount_machined: tool_head_mount_machined_bottom_assembly
     parameters:
       drive_position: bottom
 
@@ -3825,6 +3825,9 @@ assemblies:
       extruder_cage: extruder_cage_left_fan_joined_assembly
       belt_carriage: x_axis_belt_carriage_bottom_assembly
       sprite_extruder: sprite_extruder_left_assembly
+      tool_head_mount_machined: tool_head_mount_machined_bottom_assembly
+      axis_profile: x_axis_top_profile_assembly
+
     outputs:
       extruder_cage: extruder_cage_left_joined_assembly
       belt_carriage: x_axis_belt_carriage_bottom_remainder_assembly
@@ -3955,7 +3958,7 @@ assemblies:
       carriage: x_axis_right_carriage_assembly
       axis_profile: x_axis_top_profile_assembly
       sprite_extruder: sprite_extruder_right_assembly
-      tool_heead_mount_machined: tool_head_mount_machined_top_assembly
+      tool_head_mount_machined: tool_head_mount_machined_top_assembly
     parameters:
       drive_position: top
 
