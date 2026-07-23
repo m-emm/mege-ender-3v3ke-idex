@@ -324,8 +324,19 @@ Builder:
                 enable_support: "1"
           parts:
             - extruder_cage_left_joined
-            - tool_head_cable_attach_shield_left
+            # - tool_head_cable_attach_shield_left
             - part_fan_left_joined
+        - name: tool_head_left_cable_attach_shield
+          filename: tool_head_left_cable_attach_shield
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "1"
+          parts:            
+            - tool_head_cable_attach_shield_left
+            
+
         - name: left_belt_carriage
           filename: left_belt_carriage
           process_data_preset: petgcf_max_strength_high_speed_06
