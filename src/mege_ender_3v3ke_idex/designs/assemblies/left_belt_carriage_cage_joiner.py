@@ -50,6 +50,8 @@ def join_left_belt_carriage_with_cage(
 
     top_plate = top_plate.cut(sprite_extruder_cutter)
 
+    top_plate = tool_head_mount_machined.use_as_cutter_on(top_plate)
+
     joined_belt_carriage.add_named_follower(top_plate, "belt_carriage_top_plate")
     # joined_extruder_cage.add_consumed_part_ref(belt_carriage.part_ref_for_leader())
 
