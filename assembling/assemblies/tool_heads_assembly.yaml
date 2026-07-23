@@ -260,6 +260,36 @@ Builder:
         name: part_fan_right_joined
         prod_rotation_angle: 50
         prod_rotation_axis: [1, 0, 0]
+      - source: dependencies
+        assembly: x_axis_belt_carriage_bottom_remainder_assembly
+        artifact: leader
+        name: belt_carriage_remainder
+        prod_rotation_angle: 180
+        prod_rotation_axis: [0, 1, 0]
+      - source: dependencies
+        assembly: x_axis_belt_carriage_bottom_remainder_assembly
+        artifact: followers
+        names:
+          - belt_clamp_left_base
+        name_template: "{name}"
+        prod_rotation_angle: -90
+        prod_rotation_axis: [0, 1, 0]
+      - source: dependencies
+        assembly: x_axis_belt_carriage_bottom_remainder_assembly
+        artifact: followers
+        names:
+          - belt_clamp_right_base
+        name_template: "{name}"
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
+      - source: dependencies
+        assembly: x_axis_belt_carriage_bottom_remainder_assembly
+        artifact: followers
+        names:
+          - belt_carriage_top_plate
+        name_template: "{name}"
+        prod_rotation_angle: 180
+        prod_rotation_axis: [0, 1, 0]
 
     arrange:
       export_individual_parts: false
@@ -296,6 +326,18 @@ Builder:
             - extruder_cage_left_joined
             - tool_head_cable_attach_shield_left
             - part_fan_left_joined
+        - name: left_belt_carriage
+          filename: left_belt_carriage
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "1"
+          parts:
+            - belt_carriage_remainder
+            - belt_clamp_left_base
+            - belt_clamp_right_base
+            - belt_carriage_top_plate
 
       auto_assign_plates: false
 

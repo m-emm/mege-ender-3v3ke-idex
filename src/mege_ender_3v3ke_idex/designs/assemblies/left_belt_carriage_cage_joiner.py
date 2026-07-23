@@ -58,7 +58,7 @@ def join_left_belt_carriage_with_cage(
     top_plate = tool_head_mount_machined.use_as_cutter_on(top_plate)
 
     eddy_duo_size = get_bounding_box_size(eddy_duo_assembly)
-    eddy_duo_mount_plate = create_box(4, eddy_duo_size[1], 200)
+    eddy_duo_mount_plate = create_box(4, eddy_duo_size[1] + 4, 200)
 
     eddy_duo_mount_plate = align(
         eddy_duo_mount_plate, eddy_duo_assembly, Alignment.CENTER
@@ -105,7 +105,7 @@ def join_left_belt_carriage_with_cage(
         "left_bridge_thread_inset_thread_inset"
     )
 
-    left_flange = create_box(6, 5, 10)
+    left_flange = create_box(7.5, 5, 10)
 
     left_flange = align(left_flange, left_thrad_inset, Alignment.CENTER)
     left_flange = align(left_flange, bridge_reference, Alignment.STACK_FRONT)
@@ -186,7 +186,9 @@ def join_left_belt_carriage_with_cage(
         "right_mount_plate_reference"
     )
 
-    right_flange_extruder_connector = create_box(3, 20, 9)
+    extruder_connector_height = 9
+
+    right_flange_extruder_connector = create_box(4.5, 20, extruder_connector_height)
     right_flange_extruder_connector = align(
         right_flange_extruder_connector,
         right_mount_plate_reference,
@@ -207,6 +209,21 @@ def join_left_belt_carriage_with_cage(
     )
 
     right_flange = right_flange.fuse(right_flange_extruder_connector)
+
+    extruder_connector_enhancement = create_box(12, 5, extruder_connector_height)
+    extruder_connector_enhancement = align(
+        extruder_connector_enhancement, right_flange_extruder_connector, Alignment.CENTER
+    )
+
+    extruder_connector_enhancement = align(
+        extruder_connector_enhancement, right_flange_extruder_connector, Alignment.BACK
+    )
+
+    extruder_connector_enhancement = align(
+        extruder_connector_enhancement, right_flange_extruder_connector, Alignment.LEFT
+    )
+
+    right_flange = right_flange.fuse(extruder_connector_enhancement)
 
     right_belt_path_cutter = belt_carriage.get_named_cutter("right_belt_path_cutter")
     right_flange = right_flange.cut(right_belt_path_cutter)
