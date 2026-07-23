@@ -79,7 +79,25 @@ def join_left_belt_carriage_with_cage(
 
     eddy_duo_mount_plate = align(eddy_duo_mount_plate, top_plate, Alignment.TOP)
 
-    eddy_duo_mount_plate = eddy_duo_assembly.use_as_cutter_on(eddy_duo_mount_plate)
+    eddy_duo_mounting_holes_drill = PartCollector()
+
+    for side in [Alignment.LEFT, Alignment.RIGHT]:
+
+        drill = eddy_duo_assembly.get_named_cutter(f"mounting_hole_{side.name.lower()}")
+
+        drill_size = get_bounding_box_size(drill)
+        drill_diameter = drill_size[1]
+
+        long_hole = create_rounded_slab(
+            3 * drill_diameter, drill_diameter, 100, drill_diameter / 2
+        )
+
+        long_hole = rotate(90, axis=(0, 1, 0))(long_hole)
+
+        long_hole = align(long_hole, drill, Alignment.CENTER)
+        eddy_duo_mounting_holes_drill.fuse(long_hole)
+
+    eddy_duo_mount_plate = eddy_duo_mount_plate.cut(eddy_duo_mounting_holes_drill.part)
 
     top_plate = top_plate.fuse(eddy_duo_mount_plate)
 
