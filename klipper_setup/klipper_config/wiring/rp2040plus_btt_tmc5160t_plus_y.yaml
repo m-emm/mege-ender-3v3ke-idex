@@ -501,9 +501,13 @@ component_placements:
     value: BC327 PNP
     terminals: {collector: A08_Q1_C, base: A09_Q1_B, emitter: A10_Q1_E}
   - ref: U3
-    kind: to92
+    kind: voltage_regulator
+    part: UTC_LP2950L_33_T92
     value: LP2950L-3.3
-    terminals: {pin1: A13_U3P1_OUT, pin2: A12_U3P2_GND, pin3: A11_U3P3_IN}
+    terminals:
+      output: A13_U3P1_OUT
+      ground: A12_U3P2_GND
+      input: A11_U3P3_IN
   - ref: R6
     kind: resistor
     value: 47k

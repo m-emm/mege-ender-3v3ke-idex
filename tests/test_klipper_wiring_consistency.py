@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -66,6 +67,25 @@ def _load_tmc5160_review_wiring():
 
 def _pin_sets_with_prefix(wiring, prefix):
     return [pin_set for pin_set in wiring["pin_sets"] if pin_set["prefix"] == prefix]
+
+
+def _wire_nodes_connected(wiring, start, end):
+    adjacency = {}
+    for wire in wiring["wires"]:
+        adjacency.setdefault(wire["from"], set()).add(wire["to"])
+        adjacency.setdefault(wire["to"], set()).add(wire["from"])
+
+    pending = [start]
+    visited = set()
+    while pending:
+        node = pending.pop()
+        if node == end:
+            return True
+        if node in visited:
+            continue
+        visited.add(node)
+        pending.extend(adjacency.get(node, ()) - visited)
+    return False
 
 
 def test_active_wiring_matches_klipper_template():
@@ -155,11 +175,12 @@ def test_tmc5160_review_wiring_declares_discrete_component_placements():
         "base": "A09_Q1_B",
         "emitter": "A10_Q1_E",
     }
-    assert placements["U3"]["kind"] == "to92"
+    assert placements["U3"]["kind"] == "voltage_regulator"
+    assert placements["U3"]["part"] == "UTC_LP2950L_33_T92"
     assert placements["U3"]["terminals"] == {
-        "pin1": "A13_U3P1_OUT",
-        "pin2": "A12_U3P2_GND",
-        "pin3": "A11_U3P3_IN",
+        "output": "A13_U3P1_OUT",
+        "ground": "A12_U3P2_GND",
+        "input": "A11_U3P3_IN",
     }
     assert placements["DZ1"]["terminals"] == {
         "anode": "HV12_DZ1_A",
@@ -323,6 +344,14 @@ def test_tmc5160_review_wiring_stays_out_of_active_klipper_validation():
         "HV17_U2P5_E_B",
         "HV20_U2P8_E_A",
     ) in wire_pairs
+
+
+def test_tmc5160_u3_regulator_terminals_join_the_intended_electrical_nets():
+    wiring = _load_tmc5160_review_wiring()
+
+    assert _wire_nodes_connected(wiring, "A08_Q1_C", "A11_U3P3_IN")
+    assert _wire_nodes_connected(wiring, "A12_U3P2_GND", "PICO_GND_38")
+    assert _wire_nodes_connected(wiring, "A13_U3P1_OUT", "TMC1_J2_VIO_7")
 
 
 def test_tmc5160_review_wiring_separates_hvin_from_24v_adapter_power():
@@ -508,6 +537,82 @@ def test_generated_tmc5160_discrete_top_is_an_assembly_view_without_wires():
         assert math.dist(polarity_labels["cathode"], cathode_position) < math.dist(
             polarity_labels["cathode"], anode_position
         )
+
+
+def test_generated_tmc5160_u3_has_correct_flat_face_and_semantic_pin_order():
+    svg_path = (
+        WIRING_DIR / "diagrams" / "rp2040plus_btt_tmc5160t_plus_y_top_discrete.svg"
+    )
+    root = ET.fromstring(svg_path.read_text(encoding="utf-8"))
+    namespace = "{http://www.w3.org/2000/svg}"
+    pin_positions = {
+        node.attrib["data-pin"]: (
+            float(node.attrib["cx"]),
+            float(node.attrib["cy"]),
+        )
+        for node in root.iter(f"{namespace}circle")
+        if node.attrib.get("class") == "discrete-pin"
+    }
+    u3_pins = {
+        "output": "A13_U3P1_OUT",
+        "ground": "A12_U3P2_GND",
+        "input": "A11_U3P3_IN",
+    }
+    contact_xs = {pin_positions[pin_name][0] for pin_name in u3_pins.values()}
+    assert len(contact_xs) == 1
+    contact_x = contact_xs.pop()
+
+    body = next(
+        node
+        for node in root.iter(f"{namespace}path")
+        if node.attrib.get("class") == "to92-body"
+        and node.attrib.get("data-component") == "U3"
+    )
+    flat_face = next(
+        node
+        for node in root.iter(f"{namespace}line")
+        if node.attrib.get("class") == "to92-flat-face"
+        and node.attrib.get("data-component") == "U3"
+    )
+    body_min_x = float(body.attrib["data-body-min-x"])
+    body_max_x = float(body.attrib["data-body-max-x"])
+    flat_xs = {float(flat_face.attrib["x1"]), float(flat_face.attrib["x2"])}
+    assert len(flat_xs) == 1
+    flat_x = flat_xs.pop()
+
+    assert body.attrib["data-part"] == "UTC_LP2950L_33_T92"
+    assert body_min_x > contact_x
+    assert flat_x == pytest.approx(body_min_x)
+    assert body_max_x > flat_x
+    assert flat_x - contact_x < body_max_x - flat_x
+
+    expected_labels = {
+        "output": ("OUT", "1"),
+        "ground": ("GND", "2"),
+        "input": ("IN", "3"),
+    }
+    labels = {
+        node.attrib["data-terminal"]: (
+            node.text,
+            node.attrib["data-pin-number"],
+        )
+        for node in root.iter(f"{namespace}text")
+        if node.attrib.get("class") == "to92-terminal-label"
+        and node.attrib.get("data-component") == "U3"
+    }
+    assert labels == expected_labels
+
+    leads = {
+        node.attrib["data-terminal"]: node
+        for node in root.iter(f"{namespace}line")
+        if node.attrib.get("class") == "to92-lead"
+        and node.attrib.get("data-component") == "U3"
+    }
+    for terminal, pin_name in u3_pins.items():
+        assert (
+            float(leads[terminal].attrib["x1"]),
+            float(leads[terminal].attrib["y1"]),
+        ) == pytest.approx(pin_positions[pin_name])
 
 
 def test_generated_yz_wiring_svg_includes_bed_thermistor_damping_capacitor():
