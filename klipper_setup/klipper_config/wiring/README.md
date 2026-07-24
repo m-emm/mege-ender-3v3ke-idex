@@ -32,6 +32,15 @@ Klipper config.
   24–48 V, gates Pico VBUS through Q1, and uses the LP2950L-3.3 for sequenced
   VIO feeding the SN7407N open-collector interface. It is not active printer
   wiring.
+- `tmc5160t_plus_84dd4cb_delta.py` generates two one-off board-rework aids for
+  redesign commit `84dd4cb` relative to its first parent:
+  - `rp2040plus_btt_tmc5160t_plus_y_top_discrete_84dd4cb_delta.svg` shows
+    installed or replaced components with bold purple strokes and obsolete
+    components as dashed purple ghosts.
+  - `rp2040plus_btt_tmc5160t_plus_y_bottom_84dd4cb_delta.svg` compares wiring
+    as a coordinate graph. Thick solid edges are new or changed wraps, purple
+    dashed edges are obsolete wraps to remove, and dim thin edges are retained.
+  The ordinary component and wiring diagrams remain unmodified references.
 - `diagrams/*.svg` and selected `diagrams/*.png` files are generated artifacts
   committed for review.
 - `../printer.cfg.template` is the active Klipper config source.

@@ -106,12 +106,14 @@ import sys
 
 from pico_tb6600_stripboard_interface import render_tb6600_schematic
 from pico_tb6600_stripboard_layout import render_tb6600_stripboard_build
+from tmc5160t_plus_84dd4cb_delta import render_tmc5160t_plus_84dd4cb_delta
 from tmc5160t_plus_power_sequencing import render_tmc5160t_plus_power_sequencing
 
 output_dir = Path(sys.argv[1])
 render_tb6600_schematic(output_dir)
 render_tb6600_stripboard_build(output_dir)
 render_tmc5160t_plus_power_sequencing(output_dir)
+render_tmc5160t_plus_84dd4cb_delta(output_dir)
 PY
 }
 
@@ -177,6 +179,12 @@ if [[ "${MODE}" == "check" ]]; then
       diff -u "${OUTPUT_DIR}/${stem}.svg" "${TMP_DIR}/${stem}.svg"
       require_nonempty "${OUTPUT_DIR}/${stem}.png"
       require_nonempty "${TMP_DIR}/${stem}.png"
+    done
+    for stem in \
+      rp2040plus_btt_tmc5160t_plus_y_top_discrete_84dd4cb_delta \
+      rp2040plus_btt_tmc5160t_plus_y_bottom_84dd4cb_delta
+    do
+      diff -u "${OUTPUT_DIR}/${stem}.svg" "${TMP_DIR}/${stem}.svg"
     done
   fi
   echo "Wiring SVG check passed."
