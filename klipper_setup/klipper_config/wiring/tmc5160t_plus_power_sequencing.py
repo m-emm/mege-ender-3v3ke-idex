@@ -1,4 +1,4 @@
-"""Render the TMC5160T Plus driver-before-logic sequencing schematic."""
+"""Render the TMC5160T Plus 24-to-48V HVIN sequencing schematic."""
 
 import logging
 from pathlib import Path
@@ -33,7 +33,7 @@ LOCAL_GROUND_GAP = 0.55
 Q1_CONTROL_GAP = 2.1
 Q1_BASE_PULLUP_GAP = 0.55
 VIO_TO_GROUND_GAP = 4.8
-VIO_SHUNT_GAP = 2.2
+VIO_COMPONENT_GAP = 2.2
 
 BUFFER_FROM_VIO_GAP = 8.0
 BUFFER_NODE_GAP = 0.9
@@ -64,7 +64,7 @@ BUFFER_CHANNELS = (
 
 def create_tmc5160t_plus_nets():
     net_kinds = {
-        "switched_24v": "hazard_power",
+        "motor_hvin": "hazard_power",
         "detector_after_r1": "hazard_power",
         "detector_pin1": "hazard_power",
         "detector_led_link": "hazard_power",
@@ -284,30 +284,98 @@ def create_tmc5160t_plus_power_sequencing_schema():
     dz1 = modify_label_alignment(dz1, Alignment.TOP)
     detector_after_r1 = align(detector_after_r1, dz1.end, Alignment.CENTER)
 
-    switched_24v = create_node(
+    motor_hvin = create_node(
         Dot,
-        "switched_24v",
-        net=nets["switched_24v"],
-        label="+24V_SW",
+        "motor_hvin",
+        net=nets["motor_hvin"],
+        label="FUSED MOTOR_HVIN 24-48V\n-> TMC HVIN + detector",
         label_alignment=Alignment.LEFT,
     )
-    r1 = create_element(
-        Resistor,
-        "R1",
-        "620 ohm / 0.5 W",
-        switched_24v,
+    r1_input_nodes = {}
+    r1_output_nodes = {}
+    r1_elements = {}
+    for ref in ("R1A", "R1B", "R1C"):
+        r1_input_nodes[ref] = create_node(
+            Dot,
+            f"{ref.lower()}_input",
+            net=nets["motor_hvin"],
+            kind=SCHEMATIC_JUNCTION,
+        )
+        r1_output_nodes[ref] = create_node(
+            Dot,
+            f"{ref.lower()}_output",
+            net=nets["detector_after_r1"],
+            kind=SCHEMATIC_JUNCTION,
+        )
+        resistor = create_element(
+            Resistor,
+            ref,
+            "8.2 kohm / 0.25 W",
+            r1_input_nodes[ref],
+            r1_output_nodes[ref],
+        )
+        resistor = rotate(90)(resistor)
+        r1_elements[ref] = modify_label_alignment(resistor, Alignment.BOTTOM)
+
+    r1_elements["R1A"] = align(
+        r1_elements["R1A"],
         detector_after_r1,
+        Alignment.STACK_LEFT,
+        stack_gap=0.8,
     )
-    r1 = rotate(90)(r1)
-    r1 = align(r1.end, detector_after_r1, Alignment.CENTER)
-    r1 = modify_label_alignment(r1, Alignment.BOTTOM)
-    switched_24v = align(
-        switched_24v,
-        r1.start,
+    r1_elements["R1A"] = align(
+        r1_elements["R1A"].end,
+        detector_after_r1,
+        Alignment.CENTER,
+        axes=["y"],
+    )
+    r1_elements["R1C"] = align(
+        r1_elements["R1C"],
+        r1_elements["R1A"],
+        Alignment.STACK_TOP,
+        stack_gap=0.9,
+    )
+    r1_elements["R1C"] = align(
+        r1_elements["R1C"],
+        r1_elements["R1A"],
+        Alignment.CENTER,
+        axes=["x"],
+    )
+    r1_elements["R1B"] = align(
+        r1_elements["R1B"],
+        r1_elements["R1C"],
+        Alignment.STACK_TOP,
+        stack_gap=0.9,
+    )
+    r1_elements["R1B"] = align(
+        r1_elements["R1B"],
+        r1_elements["R1A"],
+        Alignment.CENTER,
+        axes=["x"],
+    )
+    for ref, resistor in r1_elements.items():
+        r1_input_nodes[ref] = align(
+            r1_input_nodes[ref],
+            resistor.start,
+            Alignment.CENTER,
+        )
+        r1_output_nodes[ref] = align(
+            r1_output_nodes[ref],
+            resistor.end,
+            Alignment.CENTER,
+        )
+    motor_hvin = align(
+        motor_hvin,
+        r1_input_nodes["R1A"],
         Alignment.STACK_LEFT,
         stack_gap=DETECTOR_INPUT_GAP,
     )
-    switched_24v = align(switched_24v, r1.start, Alignment.CENTER, axes=["y"])
+    motor_hvin = align(
+        motor_hvin,
+        r1_input_nodes["R1A"],
+        Alignment.CENTER,
+        axes=["y"],
+    )
 
     power_good = create_node(
         Dot,
@@ -327,7 +395,7 @@ def create_tmc5160t_plus_power_sequencing_schema():
         Dot,
         "power_good_gpio",
         net=nets["power_good"],
-        label="PWR_OK_N -> y_pico:gpio5\nactive-low: LOW = +24V_SW valid",
+        label="PWR_OK_N -> y_pico:gpio5\nactive-low: LOW = MOTOR_HVIN valid",
         label_alignment=Alignment.RIGHT,
     )
     power_good_gpio = align(
@@ -353,7 +421,7 @@ def create_tmc5160t_plus_power_sequencing_schema():
     r6 = create_element(
         Resistor,
         "R6",
-        "4.7 kohm",
+        "47 kohm",
         pico_3v3_power_good,
         power_good_gpio,
     )
@@ -381,7 +449,7 @@ def create_tmc5160t_plus_power_sequencing_schema():
     r3 = create_element(
         Resistor,
         "R3",
-        "2.7 kohm",
+        "47 kohm",
         u2_pin7,
         q1_base,
     )
@@ -460,18 +528,38 @@ def create_tmc5160t_plus_power_sequencing_schema():
         VIO_RAIL_LENGTH,
         anchor=Alignment.LEFT,
     )
-    r4 = create_element(
-        Resistor,
-        "R4",
-        "39 ohm / 0.5 W",
-        q1_collector,
-        tmc_vio_rail,
+    u3_input = create_node(
+        Dot,
+        "u3_input",
+        net=nets["q1_collector"],
+        kind=SCHEMATIC_JUNCTION,
     )
-    r4 = align(r4.start, q1_collector, Alignment.CENTER)
-    r4 = modify_label_alignment(r4, Alignment.RIGHT)
+    u3_ground_terminal = create_node(
+        Dot,
+        "u3_ground_terminal",
+        net=nets["gnd"],
+        kind=SCHEMATIC_JUNCTION,
+    )
+    u3 = create_element(
+        LinearRegulator,
+        "U3",
+        "LP2950L-3.3",
+        input=u3_input,
+        ground=u3_ground_terminal,
+        output=tmc_vio_rail,
+    )
+    u3 = align(u3, q1, Alignment.STACK_RIGHT, stack_gap=3.0)
+    u3 = align(u3.input, q1_collector, Alignment.CENTER, axes=["y"])
+    u3 = modify_label_alignment(u3, Alignment.TOP)
+    u3_input = align(u3_input, u3.input, Alignment.CENTER)
     tmc_vio_rail = align(
         point_at(tmc_vio_rail, Alignment.LEFT),
-        r4.end,
+        u3.output,
+        Alignment.CENTER,
+    )
+    u3_ground_terminal = align(
+        u3_ground_terminal,
+        u3.ground,
         Alignment.CENTER,
     )
 
@@ -479,7 +567,9 @@ def create_tmc5160t_plus_power_sequencing_schema():
         Dot,
         "tmc_vio_boundary",
         net=nets["tmc_vio"],
-        label="TMC_VIO_3V3 -> adapter VIO",
+        label=(
+            "TMC_VIO_3V3 -> adapter VIO\n" "adapter VM stays separate regulated 24V"
+        ),
         label_alignment=Alignment.RIGHT,
     )
     tmc_vio_boundary = align(
@@ -516,42 +606,36 @@ def create_tmc5160t_plus_power_sequencing_schema():
         axes=["x"],
     )
 
-    dz2 = create_element(
-        Zener,
-        "DZ2",
-        "3.3 V / 0.5 W",
-        vio_ground_rail,
-        tmc_vio_rail,
-    )
-    dz2 = rotate(180)(dz2)
-    dz2 = align(
-        dz2,
-        r4,
-        Alignment.STACK_RIGHT,
-        stack_gap=VIO_SHUNT_GAP,
-    )
-    dz2 = align(dz2.end, tmc_vio_rail, Alignment.CENTER, axes=["y"])
-    dz2 = modify_label_alignment(dz2, Alignment.RIGHT)
-
     r5 = create_element(
         Resistor,
         "R5",
-        "2.2 kohm",
+        "10 kohm discharge",
         tmc_vio_rail,
         vio_ground_rail,
     )
-    r5 = align(r5, dz2, Alignment.STACK_RIGHT, stack_gap=VIO_SHUNT_GAP)
+    r5 = align(r5, u3, Alignment.STACK_RIGHT, stack_gap=VIO_COMPONENT_GAP)
     r5 = align(r5.start, tmc_vio_rail, Alignment.CENTER, axes=["y"])
     r5 = modify_label_alignment(r5, Alignment.RIGHT)
+
+    c3 = create_element(
+        Capacitor,
+        "C3",
+        "100 nF output",
+        tmc_vio_rail,
+        vio_ground_rail,
+    )
+    c3 = align(c3, r5, Alignment.STACK_RIGHT, stack_gap=VIO_COMPONENT_GAP)
+    c3 = align(c3.start, tmc_vio_rail, Alignment.CENTER, axes=["y"])
+    c3 = modify_label_alignment(c3, Alignment.RIGHT)
 
     c1 = create_element(
         Capacitor,
         "C1",
-        "100 nF",
+        "1 uF electrolytic/tantalum\n+ to TMC_VIO_3V3",
         tmc_vio_rail,
         vio_ground_rail,
     )
-    c1 = align(c1, r5, Alignment.STACK_RIGHT, stack_gap=VIO_SHUNT_GAP)
+    c1 = align(c1, c3, Alignment.STACK_RIGHT, stack_gap=VIO_COMPONENT_GAP)
     c1 = align(c1.start, tmc_vio_rail, Alignment.CENTER, axes=["y"])
     c1 = modify_label_alignment(c1, Alignment.RIGHT)
 
@@ -949,7 +1033,7 @@ def create_tmc5160t_plus_power_sequencing_schema():
         c2,
         signal_vio_rail,
         Alignment.STACK_RIGHT,
-        stack_gap=VIO_SHUNT_GAP,
+        stack_gap=VIO_COMPONENT_GAP,
     )
     c2 = align(c2, u1, Alignment.CENTER, axes=["y"])
     c2 = modify_label_alignment(c2, Alignment.RIGHT)
@@ -988,13 +1072,17 @@ def create_tmc5160t_plus_power_sequencing_schema():
         d1_anode_tap,
         d1_cathode_tap,
         detector_after_r1,
-        switched_24v,
+        motor_hvin,
+        *r1_input_nodes.values(),
+        *r1_output_nodes.values(),
         power_good,
         power_good_gpio,
         pico_3v3_power_good,
         q1_base,
         pico_vbus_rail,
         q1_collector,
+        u3_input,
+        u3_ground_terminal,
         tmc_vio_rail,
         tmc_vio_boundary,
         vio_ground_rail,
@@ -1021,7 +1109,7 @@ def create_tmc5160t_plus_power_sequencing_schema():
         c2_ground,
     ]
     elements = [
-        r1,
+        *r1_elements.values(),
         dz1,
         d1,
         u2,
@@ -1029,8 +1117,8 @@ def create_tmc5160t_plus_power_sequencing_schema():
         r3,
         r2,
         q1,
-        r4,
-        dz2,
+        u3,
+        c3,
         r5,
         c1,
         u1,
@@ -1050,8 +1138,16 @@ def create_tmc5160t_plus_power_sequencing_schema():
         create_wire(d1_anode_tap, u2_pin3),
         create_wire(d1_cathode, d1_cathode_tap),
         create_wire(d1_cathode_tap, u2_pin1),
+        create_wire(motor_hvin, r1_input_nodes["R1A"]),
+        create_wire(r1_input_nodes["R1B"], r1_input_nodes["R1C"]),
+        create_wire(r1_input_nodes["R1C"], r1_input_nodes["R1A"]),
+        create_wire(r1_output_nodes["R1B"], r1_output_nodes["R1C"]),
+        create_wire(r1_output_nodes["R1C"], r1_output_nodes["R1A"]),
+        create_wire(r1_output_nodes["R1A"], detector_after_r1),
         create_wire(u2_pin6, power_good),
         create_wire(power_good, power_good_gpio),
+        create_wire(q1_collector, u3_input),
+        create_wire(u3_ground_terminal, vio_ground_rail),
         create_wire(tmc_vio_rail, tmc_vio_boundary),
         create_wire(pico_3v3_input_rail, pico_3v3_input_label),
         create_wire(signal_vio_rail, signal_vio_label),

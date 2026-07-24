@@ -10,45 +10,59 @@ metadata:
     TMC1_J1/J2/TOP model the ordinary StepStick-format adapter and supplied ribbon as one boundary.
     Continuity-check the received adapter/ribbon and mark pin 1 before applying power.
     TMC1 J1: EN, MOSI/CFG1, SCK/CFG2, CS/CFG3, MISO/CFG0, CLK N/C, STEP, DIR.
-    TMC1 J2: auxiliary 24V, two grounds, B2/B1/A1/A2 N/C, sequenced VIO.
+    TMC1 J2: regulated auxiliary 24V, two grounds, B2/B1/A1/A2 N/C, sequenced VIO.
     TMC1 TOP: DIAG0 is electrically unused and DIAG1 is the protected GPIO3 return;
     both are physical through-pins and require carrier holes.
     U1 is SN7407N DIP-14. U2 is ILD74 DIP-8. Both use the shown top-view pin numbering.
+    U3 is the received UTC LP2950L-3.3 in TO-92. Its pinout is pin 1=OUT,
+    pin 2=GND, pin 3=IN. Follow the flat-face orientation in the top component
+    view and verify those three functions before insertion.
     A/B/C/HV are AR20-HZW/TN 20-pin, 0.3-inch DIL wire-wrap sockets with spring contacts.
     Physical layout: Pico at the left; Socket A above U1; the HV socket above Socket C;
     the TMC adapter and 18-pin external I/O row precede the full driver footprint.
     Top-row parts align with the Pico USB edge. Keep that area clear except for the plate's USB bridge.
     Insert each passive across its labeled opposite contact pair; the passive itself joins the pair.
-    Socket HV contacts 1-4 and 20-17 hold U2 pins 1-4 and 8-5; positions 8-10 hold R1, DZ1, D1.
-    HV positions 5-7 remain empty as a physical guard gap between U2 and the detector passives.
-    Do not use those spare HV contacts for low-voltage circuitry.
-    Socket A positions 1-2 hold C1/C2; positions 3-7 hold R2-R5 and DZ2.
+    Socket HV contacts 1-4 and 20-17 hold U2 pins 1-4 and 8-5.
+    Positions 6-8 and 15-13 hold R1A/R1B/R1C; positions 9-10 hold DZ1/D1.
+    HV positions 5 and 16 remain empty as a physical guard row between U2 and
+    the detector passives. Do not use those contacts for low-voltage circuitry.
+    Socket A keeps the earlier placement: positions 1-4 hold C1/C2/R2/R3,
+    position 6 holds R5, and position 7 holds C3 in place of the old DZ2.
+    The removed R4's A05/A16 contacts remain the U3 input/output feed points.
     A08/A09/A10 hold Q1 C/B/E on one side.
-    A13/A12/A11 remain empty. Verify the actual BC327 lead order before inserting Q1.
+    A13/A12/A11 hold U3 pins 1/2/3 (OUT/GND/IN) on the opposite side.
+    Verify the actual BC327 lead order before inserting Q1.
     Socket B positions 2-8 hold R6, R12, R7, R11, R8, R10, R9 in that order;
     positions 1, 9, and 10 remain empty.
     Socket C positions 1-10: R15, R18, R17, R16, R19, R20, R13, R14, R21, R22.
     HV optocoupler labels use U2P=ILD74 pin, LEDA/LEDB=channel, A/K=anode/cathode,
     and C/E=collector/emitter.
-    DZ1/DZ2 contacts marked K/A are cathode/anode. D1 K goes to U2 pin 1; D1 A to U2 pin 3.
-    R1=620R/0.5W; R2=47k; R3=2.7k; R4=39R/0.5W; R5=2.2k; R6=4.7k.
+    DZ1 contacts marked K/A are cathode/anode. D1 K goes to U2 pin 1; D1 A to U2 pin 3.
+    R1A=R1B=R1C=8.2k/0.25W in parallel (2.73k equivalent);
+    R2=47k; R3=47k; R5=10k; R6=47k.
     R7-R12=10k; R13-R15=4.7k; R16-R18=2.2k; R19-R20=1k; R21-R22=47k.
-    DZ1=12V/0.5W; DZ2=3.3V/0.5W; D1=1N4148; C1=C2=100nF ceramic.
-    PWR_OK_N is active-low: LOW means switched 24V is valid; it is a reporting input only.
+    DZ1=12V/0.5W; D1=1N4148; C1=1uF electrolytic/tantalum;
+    C2=C3=100nF ceramic. C3 replaces the old DZ2 without moving its leads.
+    PWR_OK_N is active-low: LOW means fused MOTOR_HVIN is valid; it is a reporting input only.
     Wire colors: red=positive power; black=ground; blue=STEP/SCLK; yellow=all other signals;
     grey on the drawing=physical white wire for Pico 3.3V and sequenced VIO.
-    U1 collectors are pulled up only from sequenced TMC_VIO. Initial SPI speed is 500kHz.
+    U1 collectors are pulled up only from sequenced TMC_VIO. U3 is fed from
+    Pico USB VBUS only after Q1 is enabled by the HVIN detector.
+    Initial SPI speed is 500kHz.
     Logic, detector, and VIO conductors are low-current wire-wrap class only.
-    The external I/O row carries both external 5A fuse contacts, switched 24V through two
-    paralleled positive contacts, and two paralleled ground contacts. Connect the serviceable
-    external fuse only between LINE18_F1_5A_IN and LINE18_F1_5A_OUT.
+    The external I/O row carries both external 5A fuse contacts, MOTOR_HVIN through two
+    paralleled positive contacts, regulated auxiliary 24V through two paralleled contacts,
+    and two paralleled ground contacts. Connect the serviceable external fuse only between
+    LINE18_F1_5A_IN and LINE18_F1_5A_OUT.
+    MOTOR_HVIN may be 24V to 48V; AUX_24V must remain regulated 24V maximum.
+    When both domains are 24V, bridge them only in the external harness, not on this board.
     Its carrier uses a separately printed bottom upholder; the long wire-wrap tails point down.
-    Keep LINE18_NC_ISOLATION and LINE18_SPARE_01 through LINE18_SPARE_08 unconnected.
-    High-current 24V bypasses the Pico and DIL-socket conductors.
+    Keep LINE18_NC_ISOLATION and LINE18_SPARE_03 through LINE18_SPARE_08 unconnected.
+    High-current MOTOR_HVIN bypasses the Pico and DIL-socket conductors.
     Land the four Y-motor conductors directly on the driver's 1B/2B/1A/2A screw terminals.
     The 64x57mm driver box is exact; screw-terminal spacing within it is illustrative.
     F1 is a dedicated serviceable external 5A branch fuse.
-    Size all high-current wiring above the fuse rating.
+    Size and insulate all high-current wiring for the fuse rating and 48V maximum.
 
 color_map:
   power: "#ff0000"
@@ -116,7 +130,7 @@ physical_components:
     downholder: center_strip
 
   - id: external_io_pin_line
-    label: 18-pin fuse, power, spare, and Y-endstop row
+    label: 18-pin fuse, HVIN, 24V auxiliary, spare, and Y-endstop row
     component_type: pin_line
     pin_sets: [external_io]
     downholder: pin_line_upholder
@@ -261,13 +275,13 @@ pin_sets:
     pins:
       - F1_5A_OUT
       - F1_5A_IN
-      - PWR_V24_SW_A
-      - PWR_V24_SW_B
+      - PWR_HVIN_SW_A
+      - PWR_HVIN_SW_B
       - NC_ISOLATION
       - PWR_GND_A
       - PWR_GND_B
-      - SPARE_01
-      - SPARE_02
+      - AUX_24V_A
+      - AUX_24V_B
       - SPARE_03
       - SPARE_04
       - SPARE_05
@@ -278,7 +292,7 @@ pin_sets:
       - ENDSTOP_GND
       - ENDSTOP_VCC
 
-  # AR20 socket A: VBUS switch/VIO regulator plus Q1 on one side.
+  # AR20 socket A: VBUS-gated LP2950 VIO regulator and local decoupling.
   - id: socket_a_left
     prefix: A
     origin: [19, 33]
@@ -289,9 +303,9 @@ pin_sets:
       - 02_C2_VBUS
       - 03_R2_VBUS
       - 04_R3_BASE
-      - 05_R4_Q1C
+      - 05_U3_IN_FEED
       - 06_R5_VIO
-      - 07_DZ2_K
+      - 07_C3_VIO
       - 08_Q1_C
       - 09_Q1_B
       - 10_Q1_E
@@ -305,12 +319,12 @@ pin_sets:
       - 19_C2_GND
       - 18_R2_BASE
       - 17_R3_U2A
-      - 16_R4_VIO
+      - 16_U3_OUT_FEED
       - 15_R5_GND
-      - 14_DZ2_A
-      - 13_NC
-      - 12_NC
-      - 11_NC
+      - 14_C3_GND
+      - 13_U3P1_OUT
+      - 12_U3P2_GND
+      - 11_U3P3_IN
 
   # AR20 socket B: power-good/input pulls, signal pulls, and capacitors.
   - id: socket_b_left
@@ -380,8 +394,8 @@ pin_sets:
       - 12_R21_GND
       - 11_R22_GND
 
-  # Dedicated switched-24V detector carrier. U2 occupies the first four
-  # contacts on each side. Three empty positions form a guard gap before R1/DZ1/D1.
+  # Dedicated 24-to-48V MOTOR_HVIN detector carrier. U2 occupies the first four
+  # contacts on each side. Position 5/16 is the guard before R1A-R1C/DZ1/D1.
   - id: socket_hv_left
     prefix: HV
     origin: [26, 33]
@@ -393,9 +407,9 @@ pin_sets:
       - 03_U2P3_LEDB_K
       - 04_U2P4_LEDB_A
       - 05_NC
-      - 06_NC
-      - 07_NC
-      - 08_R1_24V
+      - 06_R1A_HVIN
+      - 07_R1B_HVIN
+      - 08_R1C_HVIN
       - 09_DZ1_K
       - 10_D1_K
   - id: socket_hv_right
@@ -409,9 +423,9 @@ pin_sets:
       - 18_U2P6_C_B
       - 17_U2P5_E_B
       - 16_NC
-      - 15_NC
-      - 14_NC
-      - 13_R1_DZ1
+      - 15_R1A_DZ1
+      - 14_R1B_DZ1
+      - 13_R1C_DZ1
       - 12_DZ1_A
       - 11_D1_A
 
@@ -460,7 +474,7 @@ component_placements:
       8: HV20_U2P8_E_A
   - ref: C1
     kind: capacitor
-    value: 100nF ceramic
+    value: 1uF electrolytic/tantalum, + at A01
     terminals: {start: A01_C1_VIO, end: A20_C1_GND}
   - ref: C2
     kind: capacitor
@@ -472,27 +486,27 @@ component_placements:
     terminals: {start: A03_R2_VBUS, end: A18_R2_BASE}
   - ref: R3
     kind: resistor
-    value: 2.7k
+    value: 47k
     terminals: {start: A04_R3_BASE, end: A17_R3_U2A}
-  - ref: R4
-    kind: resistor
-    value: 39R / 0.5W
-    terminals: {start: A05_R4_Q1C, end: A16_R4_VIO}
+  - ref: C3
+    kind: capacitor
+    value: 100nF ceramic
+    terminals: {start: A07_C3_VIO, end: A14_C3_GND}
   - ref: R5
     kind: resistor
-    value: 2.2k
+    value: 10k
     terminals: {start: A06_R5_VIO, end: A15_R5_GND}
-  - ref: DZ2
-    kind: zener
-    value: 3.3V / 0.5W
-    terminals: {anode: A14_DZ2_A, cathode: A07_DZ2_K}
   - ref: Q1
     kind: bjt_pnp
     value: BC327 PNP
     terminals: {collector: A08_Q1_C, base: A09_Q1_B, emitter: A10_Q1_E}
+  - ref: U3
+    kind: to92
+    value: LP2950L-3.3
+    terminals: {pin1: A13_U3P1_OUT, pin2: A12_U3P2_GND, pin3: A11_U3P3_IN}
   - ref: R6
     kind: resistor
-    value: 4.7k
+    value: 47k
     terminals: {start: B02_R6_3V3, end: B19_R6_PWR_OK}
   - ref: R12
     kind: resistor
@@ -558,10 +572,18 @@ component_placements:
     kind: resistor
     value: 47k
     terminals: {start: C10_R22_PICO_DIAG, end: C11_R22_GND}
-  - ref: R1
+  - ref: R1A
     kind: resistor
-    value: 620R / 0.5W
-    terminals: {start: HV08_R1_24V, end: HV13_R1_DZ1}
+    value: 8.2k / 0.25W
+    terminals: {start: HV06_R1A_HVIN, end: HV15_R1A_DZ1}
+  - ref: R1B
+    kind: resistor
+    value: 8.2k / 0.25W
+    terminals: {start: HV07_R1B_HVIN, end: HV14_R1B_DZ1}
+  - ref: R1C
+    kind: resistor
+    value: 8.2k / 0.25W
+    terminals: {start: HV08_R1C_HVIN, end: HV13_R1C_DZ1}
   - ref: DZ1
     kind: zener
     value: 12V / 0.5W
@@ -579,7 +601,10 @@ discrete_view:
     Then flip the board and use rp2040plus_btt_tmc5160t_plus_y_bottom.svg for wrapping.
     Diodes: K is the cathode/band. U1/U2: align the notch and pin-1 marker.
     Q1: C/B/E are shown; verify the actual BC327 flat-side lead order before insertion.
-    HV socket: leave positions 5-7 and 14-16 empty as the detector guard gap.
+    U3: numbered TO-92 leads use the received UTC part's pinout:
+    pin 1=OUT at A13, pin 2=GND at A12, pin 3=IN at A11.
+    C1 is polarized: positive to A01 TMC_VIO and negative to A20 GND.
+    HV socket: leave positions 5 and 16 empty as the detector guard row.
   groups:
     - id: pico
       label: RP2040-Plus — USB / BOARD TOP
@@ -617,11 +642,13 @@ discrete_view:
     TMC1_TOP_DIAG1: DIAG1
     LINE18_F1_5A_OUT: FUSE OUT
     LINE18_F1_5A_IN: FUSE IN
-    LINE18_PWR_V24_SW_A: 24V-A
-    LINE18_PWR_V24_SW_B: 24V-B
+    LINE18_PWR_HVIN_SW_A: HVIN-A
+    LINE18_PWR_HVIN_SW_B: HVIN-B
     LINE18_NC_ISOLATION: KEEP EMPTY
     LINE18_PWR_GND_A: GND-A
     LINE18_PWR_GND_B: GND-B
+    LINE18_AUX_24V_A: AUX24-A
+    LINE18_AUX_24V_B: AUX24-B
     LINE18_ENDSTOP_NO: "NO"
     LINE18_ENDSTOP_GND: GND
     LINE18_ENDSTOP_VCC: VCC
@@ -630,13 +657,14 @@ discrete_view:
     TMC5160_HV_1B: 1B
     TMC5160_HV_HVIN_8_60V: HVIN
 wires:
-  # Switched-24V input uses both paralleled positive and ground contacts. The
+  # Switched 24-to-48V MOTOR_HVIN uses both paralleled positive and ground
+  # contacts. The
   # serviceable external fuse is connected physically between the two dedicated
   # contacts.
-  - from: LINE18_PWR_V24_SW_A
-    to: LINE18_PWR_V24_SW_B
+  - from: LINE18_PWR_HVIN_SW_A
+    to: LINE18_PWR_HVIN_SW_B
     type: hazard_power
-  - from: LINE18_PWR_V24_SW_B
+  - from: LINE18_PWR_HVIN_SW_B
     to: LINE18_F1_5A_IN
     type: hazard_power
   - from: LINE18_F1_5A_OUT
@@ -649,23 +677,34 @@ wires:
     to: TMC5160_HV_GND
     type: ground
 
-  # Fused switched 24V also supplies the low-current detector and adapter auxiliary input.
+  # Fused MOTOR_HVIN also supplies the low-current sequencing detector.
   - from: LINE18_F1_5A_OUT
-    to: HV08_R1_24V
+    to: HV06_R1A_HVIN
     type: hazard_power
-  - from: LINE18_F1_5A_OUT
-    to: TMC1_J2_VM_1
+  - from: HV06_R1A_HVIN
+    to: HV07_R1B_HVIN
+    type: hazard_power
+  - from: HV07_R1B_HVIN
+    to: HV08_R1C_HVIN
     type: hazard_power
 
-  # Common ground. The lower chain keeps motor current out of logic wiring; the
-  # upper analog contacts form a short left-to-right bus fed once from U1 ground.
+  # The adapter auxiliary input remains on a separate regulated 24V rail.
+  - from: LINE18_AUX_24V_A
+    to: LINE18_AUX_24V_B
+    type: power
+  - from: LINE18_AUX_24V_B
+    to: TMC1_J2_VM_1
+    type: power
+
+  # Common ground. The high-current return lands directly at the driver. Logic,
+  # detector, and Socket A each return through short low-current branches.
   - from: LINE18_PWR_GND_B
     to: TMC1_J2_GND_MOTOR_2
     type: ground
   - from: TMC1_J2_GND_MOTOR_2
     to: TMC1_J2_GND_LOGIC_8
     type: ground
-  - from: TMC1_J2_GND_LOGIC_8
+  - from: LINE18_PWR_GND_A
     to: C11_R22_GND
     type: ground
   - from: C11_R22_GND
@@ -677,8 +716,11 @@ wires:
   - from: U1_07_GND
     to: PICO_GND_28
     type: ground
-  - from: U1_07_GND
-    to: A14_DZ2_A
+  - from: LINE18_PWR_GND_A
+    to: HV11_D1_A
+    type: ground
+  - from: PICO_GND_38
+    to: A20_C1_GND
     type: ground
   - from: A20_C1_GND
     to: A19_C2_GND
@@ -687,9 +729,12 @@ wires:
     to: A15_R5_GND
     type: ground
   - from: A15_R5_GND
-    to: A14_DZ2_A
+    to: A14_C3_GND
     type: ground
-  - from: A14_DZ2_A
+  - from: A14_C3_GND
+    to: A12_U3P2_GND
+    type: ground
+  - from: A12_U3P2_GND
     to: HV11_D1_A
     type: ground
   - from: HV11_D1_A
@@ -701,13 +746,13 @@ wires:
   - from: HV17_U2P5_E_B
     to: HV20_U2P8_E_A
     type: ground
-  - from: PICO_GND_03
+  - from: HV11_D1_A
     to: LINE18_ENDSTOP_GND
     type: ground
 
   # Pico USB VBUS powers U1 and the switched VIO regulator input.
   - from: PICO_VBUS_40
-    to: U1_14_VCC
+    to: A02_C2_VBUS
     type: power
   - from: U1_14_VCC
     to: A10_Q1_E
@@ -745,8 +790,15 @@ wires:
     to: LINE18_ENDSTOP_VCC
     type: lv_power
 
-  # Switched-24V threshold detector: R1, DZ1, two ILD74 LEDs in series, and D1.
-  - from: HV13_R1_DZ1
+  # 24-to-48V MOTOR_HVIN detector: R1A/R1B/R1C in parallel, DZ1,
+  # two ILD74 LEDs in series, and D1.
+  - from: HV15_R1A_DZ1
+    to: HV14_R1B_DZ1
+    type: hazard_power
+  - from: HV14_R1B_DZ1
+    to: HV13_R1C_DZ1
+    type: hazard_power
+  - from: HV13_R1C_DZ1
     to: HV09_DZ1_K
     type: hazard_power
   - from: HV12_DZ1_A
@@ -769,17 +821,23 @@ wires:
     to: HV19_U2P7_C_A
     type: control
   - from: A08_Q1_C
-    to: A05_R4_Q1C
+    to: A05_U3_IN_FEED
+    type: power
+  - from: A05_U3_IN_FEED
+    to: A11_U3P3_IN
     type: power
 
-  # Sequenced VIO shunt regulator and all collector pull-up supply contacts.
-  - from: A16_R4_VIO
+  # U3 generates sequenced 3.3V VIO; R5 discharges it after HVIN is removed.
+  - from: A13_U3P1_OUT
+    to: A16_U3_OUT_FEED
+    type: lv_power
+  - from: A16_U3_OUT_FEED
     to: A06_R5_VIO
     type: lv_power
   - from: A06_R5_VIO
-    to: A07_DZ2_K
+    to: A07_C3_VIO
     type: lv_power
-  - from: A07_DZ2_K
+  - from: A07_C3_VIO
     to: A01_C1_VIO
     type: lv_power
   - from: A01_C1_VIO
@@ -800,7 +858,7 @@ wires:
   - from: C07_R13_VIO
     to: C08_R14_VIO
     type: lv_power
-  - from: C08_R14_VIO
+  - from: A01_C1_VIO
     to: TMC1_J2_VIO_7
     type: lv_power
 

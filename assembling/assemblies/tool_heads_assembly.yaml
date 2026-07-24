@@ -333,9 +333,8 @@ Builder:
             overrides:
               process_overrides:
                 enable_support: "1"
-          parts:            
+          parts:
             - tool_head_cable_attach_shield_left
-            
 
         - name: left_belt_carriage
           filename: left_belt_carriage

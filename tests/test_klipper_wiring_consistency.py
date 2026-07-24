@@ -126,13 +126,17 @@ def test_tmc5160_review_wiring_declares_discrete_component_placements():
     assert set(placements) == {
         "U1",
         "U2",
+        "U3",
         "Q1",
         "C1",
         "C2",
+        "C3",
         "D1",
         "DZ1",
-        "DZ2",
-        *(f"R{number}" for number in range(1, 23)),
+        "R1A",
+        "R1B",
+        "R1C",
+        *(f"R{number}" for number in (2, 3, *range(5, 23))),
     }
     assert placements["U1"]["terminals"][1] == "U1_01_1A_STEP"
     assert placements["U1"]["terminals"][14] == "U1_14_VCC"
@@ -150,6 +154,12 @@ def test_tmc5160_review_wiring_declares_discrete_component_placements():
         "collector": "A08_Q1_C",
         "base": "A09_Q1_B",
         "emitter": "A10_Q1_E",
+    }
+    assert placements["U3"]["kind"] == "to92"
+    assert placements["U3"]["terminals"] == {
+        "pin1": "A13_U3P1_OUT",
+        "pin2": "A12_U3P2_GND",
+        "pin3": "A11_U3P3_IN",
     }
     assert placements["DZ1"]["terminals"] == {
         "anode": "HV12_DZ1_A",
@@ -204,12 +214,12 @@ def test_tmc5160_review_wiring_has_four_true_2x10_component_carriers():
             ("02_C2_VBUS", "19_C2_GND"),
             ("03_R2_VBUS", "18_R2_BASE"),
             ("04_R3_BASE", "17_R3_U2A"),
-            ("05_R4_Q1C", "16_R4_VIO"),
+            ("05_U3_IN_FEED", "16_U3_OUT_FEED"),
             ("06_R5_VIO", "15_R5_GND"),
-            ("07_DZ2_K", "14_DZ2_A"),
-            ("08_Q1_C", "13_NC"),
-            ("09_Q1_B", "12_NC"),
-            ("10_Q1_E", "11_NC"),
+            ("07_C3_VIO", "14_C3_GND"),
+            ("08_Q1_C", "13_U3P1_OUT"),
+            ("09_Q1_B", "12_U3P2_GND"),
+            ("10_Q1_E", "11_U3P3_IN"),
         ],
         "B": [
             ("01_NC", "20_NC"),
@@ -241,9 +251,9 @@ def test_tmc5160_review_wiring_has_four_true_2x10_component_carriers():
             ("03_U2P3_LEDB_K", "18_U2P6_C_B"),
             ("04_U2P4_LEDB_A", "17_U2P5_E_B"),
             ("05_NC", "16_NC"),
-            ("06_NC", "15_NC"),
-            ("07_NC", "14_NC"),
-            ("08_R1_24V", "13_R1_DZ1"),
+            ("06_R1A_HVIN", "15_R1A_DZ1"),
+            ("07_R1B_HVIN", "14_R1B_DZ1"),
+            ("08_R1C_HVIN", "13_R1C_DZ1"),
             ("09_DZ1_K", "12_DZ1_A"),
             ("10_D1_K", "11_D1_A"),
         ],
@@ -260,10 +270,6 @@ def test_tmc5160_review_wiring_has_four_true_2x10_component_carriers():
 
     hv_guard_contacts = {
         "HV05_NC",
-        "HV06_NC",
-        "HV07_NC",
-        "HV14_NC",
-        "HV15_NC",
         "HV16_NC",
     }
     assert all(
@@ -298,14 +304,16 @@ def test_tmc5160_review_wiring_stays_out_of_active_klipper_validation():
 
     assert all("klipper" not in wire for wire in wiring["wires"])
     assert TMC5160_REVIEW_PATH not in validator.DEFAULT_WIRING_FILES
-    assert ("PICO_GND_03", "LINE18_ENDSTOP_GND") in wire_pairs
+    assert ("HV11_D1_A", "LINE18_ENDSTOP_GND") in wire_pairs
     assert ("PICO_THREEV3_OUT_36", "LINE18_ENDSTOP_VCC") in wire_pairs
     assert all("PICO_GND_13" not in pair for pair in wire_pairs)
     assert ("U1_07_GND", "PICO_GND_28") in wire_pairs
+    assert ("PICO_GND_38", "A20_C1_GND") in wire_pairs
     assert ("A20_C1_GND", "A19_C2_GND") in wire_pairs
     assert ("A19_C2_GND", "A15_R5_GND") in wire_pairs
-    assert ("A15_R5_GND", "A14_DZ2_A") in wire_pairs
-    assert ("A14_DZ2_A", "HV11_D1_A") in wire_pairs
+    assert ("A15_R5_GND", "A14_C3_GND") in wire_pairs
+    assert ("A14_C3_GND", "A12_U3P2_GND") in wire_pairs
+    assert ("LINE18_PWR_GND_A", "HV11_D1_A") in wire_pairs
     assert ("HV11_D1_A", "HV03_U2P3_LEDB_K") in wire_pairs
     assert (
         "HV03_U2P3_LEDB_K",
@@ -315,6 +323,33 @@ def test_tmc5160_review_wiring_stays_out_of_active_klipper_validation():
         "HV17_U2P5_E_B",
         "HV20_U2P8_E_A",
     ) in wire_pairs
+
+
+def test_tmc5160_review_wiring_separates_hvin_from_24v_adapter_power():
+    wiring = _load_tmc5160_review_wiring()
+    wire_pairs = {(wire["from"], wire["to"]) for wire in wiring["wires"]}
+
+    assert {
+        ("LINE18_PWR_HVIN_SW_A", "LINE18_PWR_HVIN_SW_B"),
+        ("LINE18_PWR_HVIN_SW_B", "LINE18_F1_5A_IN"),
+        ("LINE18_F1_5A_OUT", "TMC5160_HV_HVIN_8_60V"),
+        ("LINE18_F1_5A_OUT", "HV06_R1A_HVIN"),
+        ("HV06_R1A_HVIN", "HV07_R1B_HVIN"),
+        ("HV07_R1B_HVIN", "HV08_R1C_HVIN"),
+        ("HV15_R1A_DZ1", "HV14_R1B_DZ1"),
+        ("HV14_R1B_DZ1", "HV13_R1C_DZ1"),
+        ("HV13_R1C_DZ1", "HV09_DZ1_K"),
+    } <= wire_pairs
+    assert {
+        ("LINE18_AUX_24V_A", "LINE18_AUX_24V_B"),
+        ("LINE18_AUX_24V_B", "TMC1_J2_VM_1"),
+    } <= wire_pairs
+    assert all(
+        "LINE18_AUX_24V" not in endpoint
+        for wire in wiring["wires"]
+        if "TMC5160_HV_HVIN" in {wire["from"], wire["to"]}
+        for endpoint in (wire["from"], wire["to"])
+    )
 
 
 def test_tmc5160_review_wiring_uses_declared_wire_types():
@@ -440,7 +475,7 @@ def test_generated_tmc5160_discrete_top_is_an_assembly_view_without_wires():
     placements = {
         placement["ref"]: placement for placement in wiring["component_placements"]
     }
-    for ref in ("D1", "DZ1", "DZ2"):
+    for ref in ("D1", "DZ1"):
         terminals = placements[ref]["terminals"]
         anode_position = pin_positions[terminals["anode"]]
         cathode_position = pin_positions[terminals["cathode"]]

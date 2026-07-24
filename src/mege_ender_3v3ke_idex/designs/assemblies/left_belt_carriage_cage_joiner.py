@@ -212,7 +212,9 @@ def join_left_belt_carriage_with_cage(
 
     extruder_connector_enhancement = create_box(12, 5, extruder_connector_height)
     extruder_connector_enhancement = align(
-        extruder_connector_enhancement, right_flange_extruder_connector, Alignment.CENTER
+        extruder_connector_enhancement,
+        right_flange_extruder_connector,
+        Alignment.CENTER,
     )
 
     extruder_connector_enhancement = align(

@@ -12,10 +12,13 @@ Klipper config.
   four AR20 wire-wrap carriers, the isolated high-current terminal zone, and
   the exact 64x57mm driver outline. All three views use one shared set of YAML
   coordinates; the underside view mirrors that same physical arrangement.
-  One AR20 is dedicated to the ILD74 and switched-24V detector, with an unused
-  three-position guard gap before its detector passives. The artifact is not
-  registered as active Klipper wiring. Its retained 18-pin external-I/O row
-  includes separate `F1_5A_IN` and `F1_5A_OUT` contacts; install the serviceable
+  One AR20 is dedicated to the ILD74 and 24-to-48 V `MOTOR_HVIN` detector. Three
+  parallel 8.2 kΩ, ¼ W resistors share its detector load while one socket row
+  remains empty as a guard. Socket A carries the VBUS-gated UTC LP2950L-3.3
+  regulator using its `1=OUT`, `2=GND`, `3=IN` TO-92 pinout.
+  The artifact is not registered as active Klipper wiring. Its retained 18-pin
+  external-I/O row keeps `MOTOR_HVIN` and regulated 24 V adapter auxiliary power
+  separate. It includes `F1_5A_IN` and `F1_5A_OUT`; install the serviceable
   external 5 A fuse between those contacts, with no separate carrier-mounted
   fuse holder. The row uses a bottom-mounted upholder in the generated carrier:
   its long wire-wrap tails remain downward while the printed base plate itself
@@ -25,8 +28,10 @@ Klipper config.
   TB6600 interface schematic and verified stripboard assembly.
 - `pico_tb6600_stripboard_interface.md` documents that interface.
 - `tmc5160t_plus_power_sequencing.py` generates the standalone TMC5160T Plus
-  driver-before-logic concept-review schematic, including the sequenced-VIO
-  SN7407N open-collector interface. It is not active printer wiring.
+  driver-before-logic concept-review schematic. The HVIN detector accepts
+  24–48 V, gates Pico VBUS through Q1, and uses the LP2950L-3.3 for sequenced
+  VIO feeding the SN7407N open-collector interface. It is not active printer
+  wiring.
 - `diagrams/*.svg` and selected `diagrams/*.png` files are generated artifacts
   committed for review.
 - `../printer.cfg.template` is the active Klipper config source.
