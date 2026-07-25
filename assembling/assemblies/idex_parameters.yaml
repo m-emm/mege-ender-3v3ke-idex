@@ -1487,4 +1487,4 @@ globals:
   y_axis_power_drive_housing_lid_thickness: 4.0
   y_axis_power_drive_housing_board_wall_clearance: 6.0
   y_axis_power_drive_housing_z_clearance_top: 5.0
-  y_axis_power_drive_housing_z_clearance_bottom: 5.0
+  y_axis_power_drive_housing_z_clearance_bottom: 15

@@ -121,7 +121,7 @@ def create_y_axis_power_drive_housing_assembly(
         posts = posts.fuse(post)
         post_items.append((post_name, post))
 
-    board_support_top_size = 14
+    board_support_top_size = 16
     board_support_bottom_size = 5
 
     board_bottom_z = get_bounding_box(y_axis_driver_board_holder_joined)[0][2]
@@ -371,6 +371,54 @@ def create_y_axis_power_drive_housing_assembly(
             lid_screw_items.append((f"{hardware_prefix}_screw", screw))
 
         lids[lid_name] = lid
+
+
+
+    
+
+    power_rail_nut_pockets = None
+
+    num_connections = 5
+    screw_size = "M4"
+    pitch = 12
+
+    for i in range(num_connections):
+        terminal_nut_pocket = create_hidden_nut_pocket_cutter(
+            screw_size,
+            square_nut=True,
+        )
+
+        terminal_nut_pocket = translate(i * pitch, 0, 0)(terminal_nut_pocket)
+        terminal_nut_pocket = terminal_nut_pocket.prefixed_copy(f"terminal_{i}_")
+
+        if power_rail_nut_pockets is None:
+            power_rail_nut_pockets = terminal_nut_pocket
+        else:
+            power_rail_nut_pockets = power_rail_nut_pockets.fuse(terminal_nut_pocket)
+
+        
+
+
+
+
+    rail = materialize_bounding_box(
+        power_rail_nut_pockets,z_size=20, x_enlargement=10, y_enlargement=8)
+
+    rail = power_rail_nut_pockets.use_as_cutter_on(rail)
+
+
+    power_rail_nut_pockets.leader = rail
+    rail = rotate(180)(rail)
+    rail = rotate(90,axis=(1,0,0))(rail)
+
+    rail = align(rail, inner_space, Alignment.CENTER)
+    rail = align(rail, inner_space, Alignment.BOTTOM)
+    rail = align(rail, inner_space, Alignment.BACK)
+
+
+    housing_box = housing_box.fuse(rail)
+
+
 
     housing = LeaderFollowersCuttersPart(leader=housing_box)
     housing.add_named_follower(
