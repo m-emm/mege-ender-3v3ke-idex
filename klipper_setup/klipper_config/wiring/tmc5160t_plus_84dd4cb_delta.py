@@ -94,6 +94,37 @@ class DeltaRenderResult:
     connections: ConnectionDelta
 
 
+@dataclass(frozen=True)
+class DeltaPresentation:
+    """Labels and metadata used to present one wiring rework delta."""
+
+    identifier: str
+    base_ref: str
+    component_title: str
+    component_svg_title: str
+    wiring_title: str
+    wiring_svg_title: str
+    bottom_filename: str
+    removed_component_description: str
+    wiring_extra_note: str | None = None
+
+
+DEFAULT_PRESENTATION = DeltaPresentation(
+    identifier=REDESIGN_COMMIT,
+    base_ref=REDESIGN_BASE_REF,
+    component_title="84dd4cb REDESIGN DELTA — COMPONENT SIDE",
+    component_svg_title=(
+        "RP2040-Plus / TMC5160T Plus component delta — 84dd4cb — top side"
+    ),
+    wiring_title="84dd4cb WIRING DELTA — UNDERSIDE / MIRRORED",
+    wiring_svg_title="84dd4cb Wiring Delta — Underside View",
+    bottom_filename=BOTTOM_DELTA_FILENAME,
+    removed_component_description=(
+        "R4 at A05-A16; DZ2 at A07-A14; R1 at HV08-HV13"
+    ),
+)
+
+
 def _git_show_text(revision: str, repo_path: str) -> str:
     result = subprocess.run(
         ["git", "show", f"{revision}:{repo_path}"],
@@ -333,13 +364,14 @@ def _expand_viewbox_up(root: ET.Element, required_top: float) -> None:
 def _add_component_delta_legend(
     root: ET.Element,
     components: ComponentDelta,
+    presentation: DeltaPresentation = DEFAULT_PRESENTATION,
 ) -> None:
     group = ET.SubElement(
         root,
         f"{SVG_TAG}g",
         {
             "class": "delta-legend",
-            "data-redesign-commit": REDESIGN_COMMIT,
+            "data-delta-id": presentation.identifier,
         },
     )
     legend_x = 20.0
@@ -362,7 +394,7 @@ def _add_component_delta_legend(
     )
     _add_text(
         group,
-        "84dd4cb REDESIGN DELTA — COMPONENT SIDE",
+        presentation.component_title,
         x=legend_x + 15,
         y=legend_y + 24,
         size=15,
@@ -381,7 +413,8 @@ def _add_component_delta_legend(
     )
     _add_text(
         group,
-        "PURPLE DASHED — REMOVE: R4 at A05-A16; " "DZ2 at A07-A14; R1 at HV08-HV13",
+        "PURPLE DASHED — REMOVE: "
+        + presentation.removed_component_description,
         x=legend_x + 15,
         y=legend_y + 72,
         size=12,
@@ -403,12 +436,15 @@ def _render_component_delta_svg(
     base_project: PinoutProject,
     display_project: PinoutProject,
     components: ComponentDelta,
+    presentation: DeltaPresentation = DEFAULT_PRESENTATION,
 ) -> str:
     target_root = ET.fromstring(generate_discrete_top_svg(display_project))
     base_root = ET.fromstring(generate_discrete_top_svg(base_project))
     target_root.set("data-delta-kind", "component-placement")
-    target_root.set("data-redesign-commit", REDESIGN_COMMIT)
-    target_root.set("data-redesign-base", REDESIGN_BASE_REF)
+    target_root.set("data-delta-id", presentation.identifier)
+    target_root.set("data-delta-base", presentation.base_ref)
+    target_root.set("data-redesign-commit", presentation.identifier)
+    target_root.set("data-redesign-base", presentation.base_ref)
 
     target_groups = {
         group.attrib["data-component"]: group
@@ -490,9 +526,7 @@ def _render_component_delta_svg(
 
     for text_node in target_root.iter(f"{SVG_TAG}text"):
         if text_node.attrib.get("class") == "discrete-title":
-            text_node.text = (
-                "RP2040-Plus / TMC5160T Plus component delta — " "84dd4cb — top side"
-            )
+            text_node.text = presentation.component_svg_title
         elif (
             text_node.attrib.get("class") == "discrete-note"
             and text_node.text
@@ -500,10 +534,10 @@ def _render_component_delta_svg(
         ):
             text_node.text = (
                 "Then flip the board and use "
-                f"{BOTTOM_DELTA_FILENAME} for delta wrapping."
+                f"{presentation.bottom_filename} for delta wrapping."
             )
 
-    _add_component_delta_legend(target_root, components)
+    _add_component_delta_legend(target_root, components, presentation)
     return ET.tostring(target_root, encoding="unicode")
 
 
@@ -601,17 +635,18 @@ def _add_removed_wire_overlays(
 def _add_wiring_delta_legend(
     root: ET.Element,
     connections: ConnectionDelta,
+    presentation: DeltaPresentation = DEFAULT_PRESENTATION,
 ) -> None:
     legend_x = 2840.0
     legend_y = 925.0
     legend_width = 635.0
-    legend_height = 180.0
+    legend_height = 205.0 if presentation.wiring_extra_note else 180.0
     group = ET.SubElement(
         root,
         f"{SVG_TAG}g",
         {
             "class": "delta-legend",
-            "data-redesign-commit": REDESIGN_COMMIT,
+            "data-delta-id": presentation.identifier,
         },
     )
     ET.SubElement(
@@ -631,7 +666,7 @@ def _add_wiring_delta_legend(
     )
     _add_text(
         group,
-        "84dd4cb WIRING DELTA — UNDERSIDE / MIRRORED",
+        presentation.wiring_title,
         x=legend_x + 15,
         y=legend_y + 25,
         size=14,
@@ -680,11 +715,21 @@ def _add_wiring_delta_legend(
         weight="700",
         fill=REMOVED_PURPLE,
     )
+    if presentation.wiring_extra_note:
+        _add_text(
+            group,
+            presentation.wiring_extra_note,
+            x=legend_x + 15,
+            y=legend_y + 183,
+            size=11,
+            weight="700",
+        )
 
 
 def _render_wiring_delta_svg(
     display_project: PinoutProject,
     connections: ConnectionDelta,
+    presentation: DeltaPresentation = DEFAULT_PRESENTATION,
 ) -> str:
     waypoint_solutions = route_problematic_connections(
         display_project.pin_positions,
@@ -704,8 +749,10 @@ def _render_wiring_delta_svg(
         )
     )
     root.set("data-delta-kind", "coordinate-graph")
-    root.set("data-redesign-commit", REDESIGN_COMMIT)
-    root.set("data-redesign-base", REDESIGN_BASE_REF)
+    root.set("data-delta-id", presentation.identifier)
+    root.set("data-delta-base", presentation.base_ref)
+    root.set("data-redesign-commit", presentation.identifier)
+    root.set("data-redesign-base", presentation.base_ref)
     root.set("data-new-connections", str(connections.count("new")))
     root.set("data-changed-connections", str(connections.count("changed")))
     root.set("data-removed-connections", str(len(connections.removed_edges)))
@@ -791,10 +838,10 @@ def _render_wiring_delta_svg(
 
     for text_node in root.iter(f"{SVG_TAG}text"):
         if text_node.text == "Underside View":
-            text_node.text = "84dd4cb Wiring Delta — Underside View"
+            text_node.text = presentation.wiring_svg_title
             text_node.set("fill", DELTA_PURPLE)
             text_node.set("class", "delta-title")
-    _add_wiring_delta_legend(root, connections)
+    _add_wiring_delta_legend(root, connections, presentation)
     return ET.tostring(root, encoding="unicode")
 
 
@@ -815,7 +862,6 @@ def render_tmc5160t_plus_84dd4cb_delta(
 ) -> DeltaRenderResult:
     """Render the two board-rework diagrams for redesign commit 84dd4cb."""
     output_path = Path(output_dir)
-    display_project = load_pinout_config(CONFIG_PATH)
     with tempfile.TemporaryDirectory(prefix="tmc5160t-delta-") as temporary_name:
         temporary_directory = Path(temporary_name)
         base_project = _load_revision_project(
@@ -826,12 +872,7 @@ def render_tmc5160t_plus_84dd4cb_delta(
             REDESIGN_COMMIT,
             temporary_directory=temporary_directory,
         )
-
-    if _graph_signature(display_project) != _graph_signature(target_project):
-        raise ValueError(
-            "Current wiring graph has diverged from redesign commit 84dd4cb; "
-            "review the one-off delta baseline before regenerating"
-        )
+    display_project = target_project
 
     component_delta = analyze_component_deltas(base_project, target_project)
     connection_delta = analyze_connection_deltas(base_project, target_project)

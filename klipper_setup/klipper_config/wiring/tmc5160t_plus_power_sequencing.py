@@ -1,4 +1,4 @@
-"""Render the TMC5160T Plus 24-to-48V HVIN sequencing schematic."""
+"""Render the TMC5160T Plus dual-rail VIO sequencing schematic."""
 
 import logging
 from pathlib import Path
@@ -42,8 +42,8 @@ BUFFER_RAIL_LENGTH = 8.4
 RETURN_ROW_GAP = 2.4
 
 VBUS_RAIL_LENGTH = 3.1
-VIO_RAIL_LENGTH = 8.0
-VIO_GROUND_RAIL_LENGTH = 8.0
+VIO_RAIL_LENGTH = 10.2
+VIO_GROUND_RAIL_LENGTH = 10.2
 
 BUFFER_CHANNELS = (
     ("step", "GPIO0", "STEP", "R7", "R13", "4.7 kohm"),
@@ -67,15 +67,17 @@ def create_tmc5160t_plus_nets():
         "motor_hvin": "hazard_power",
         "detector_after_r1": "hazard_power",
         "detector_pin1": "hazard_power",
-        "detector_led_link": "hazard_power",
+        "aux_24v": "power",
+        "aux_after_r23": "power",
+        "aux_after_dz2": "power",
         "gnd": "ground",
         "u2a_collector": "default",
+        "u2_series": "default",
         "q1_base": "default",
         "pico_vbus": "power",
         "q1_collector": "power",
         "tmc_vio": "power",
         "pico_3v3": "lv_power",
-        "power_good": "power_good",
         "pico_step": "clock",
         "tmc_step": "clock",
         "pico_dir": "data",
@@ -109,15 +111,16 @@ def create_tmc5160t_plus_power_sequencing_schema():
     u2_pin2 = create_node(
         Dot,
         "u2_pin2",
-        net=nets["detector_led_link"],
-        label="pins 2-4 linked",
+        net=nets["gnd"],
+        label="pin 2",
         label_alignment=Alignment.LEFT,
     )
     u2_pin4 = create_node(
         Dot,
         "u2_pin4",
-        net=nets["detector_led_link"],
-        kind=SCHEMATIC_JUNCTION,
+        net=nets["aux_after_dz2"],
+        label="pin 4",
+        label_alignment=Alignment.LEFT,
     )
     u2_pin3 = create_node(
         Dot,
@@ -136,14 +139,14 @@ def create_tmc5160t_plus_power_sequencing_schema():
     u2_pin8 = create_node(
         Dot,
         "u2_pin8",
-        net=nets["gnd"],
+        net=nets["u2_series"],
         label="pin 8",
         label_alignment=Alignment.TOP,
     )
     u2_pin6 = create_node(
         Dot,
         "u2_pin6",
-        net=nets["power_good"],
+        net=nets["u2_series"],
         label="pin 6",
         label_alignment=Alignment.BOTTOM,
     )
@@ -179,6 +182,19 @@ def create_tmc5160t_plus_power_sequencing_schema():
     u2_pin6 = align(u2_pin6, u2.b_collector, Alignment.CENTER)
     u2_pin5 = align(u2_pin5, u2.b_emitter, Alignment.CENTER)
 
+    pin2_ground = create_node(
+        Ground,
+        "pin2_ground",
+        net=nets["gnd"],
+    )
+    pin2_ground = align(
+        pin2_ground,
+        u2_pin2,
+        Alignment.STACK_BOTTOM,
+        stack_gap=LOCAL_GROUND_GAP,
+    )
+    pin2_ground = align(pin2_ground, u2_pin2, Alignment.CENTER, axes=["x"])
+
     pin3_ground = create_node(
         Ground,
         "pin3_ground",
@@ -191,19 +207,6 @@ def create_tmc5160t_plus_power_sequencing_schema():
         stack_gap=LOCAL_GROUND_GAP,
     )
     pin3_ground = align(pin3_ground, u2_pin3, Alignment.CENTER, axes=["x"])
-
-    pin8_ground = create_node(
-        Ground,
-        "pin8_ground",
-        net=nets["gnd"],
-    )
-    pin8_ground = align(
-        pin8_ground,
-        u2_pin8,
-        Alignment.STACK_BOTTOM,
-        stack_gap=LOCAL_GROUND_GAP,
-    )
-    pin8_ground = align(pin8_ground, u2_pin8, Alignment.CENTER, axes=["x"])
 
     pin5_ground = create_node(
         Ground,
@@ -232,9 +235,9 @@ def create_tmc5160t_plus_power_sequencing_schema():
     )
     d1 = create_element(Diode, "D1", "1N4148 antiparallel", d1_anode, d1_cathode)
     d1 = rotate(180)(d1)
-    d1 = align(d1, u2, Alignment.STACK_LEFT, stack_gap=D1_PACKAGE_GAP)
-    d1 = align(d1, u2, Alignment.CENTER, axes=["y"])
-    d1 = modify_label_alignment(d1, Alignment.BOTTOM)
+    d1 = align(d1, u2, Alignment.STACK_TOP, stack_gap=D1_PACKAGE_GAP)
+    d1 = align(d1, u2, Alignment.CENTER, axes=["x"])
+    d1 = modify_label_alignment(d1, Alignment.TOP)
     d1_anode = align(d1_anode, d1.start, Alignment.CENTER)
     d1_cathode = align(d1_cathode, d1.end, Alignment.CENTER)
 
@@ -265,6 +268,49 @@ def create_tmc5160t_plus_power_sequencing_schema():
         Alignment.CENTER,
         axes=["y"],
     )
+
+    aux_after_r23 = create_node(
+        Dot,
+        "aux_after_r23",
+        net=nets["aux_after_r23"],
+        kind=SCHEMATIC_JUNCTION,
+    )
+    dz2 = create_element(
+        Zener,
+        "DZ2",
+        "15 V / 0.5 W",
+        u2_pin4,
+        aux_after_r23,
+    )
+    dz2 = rotate(-90)(dz2)
+    dz2 = align(dz2.start, u2_pin4, Alignment.CENTER)
+    dz2 = modify_label_alignment(dz2, Alignment.BOTTOM)
+    aux_after_r23 = align(aux_after_r23, dz2.end, Alignment.CENTER)
+
+    aux_24v = create_node(
+        Dot,
+        "aux_24v",
+        net=nets["aux_24v"],
+        label="REGULATED AUX_24V\n-> adapter VM + U2B detector",
+        label_alignment=Alignment.LEFT,
+    )
+    r23 = create_element(
+        Resistor,
+        "R23",
+        "1.5 kohm / 0.25 W",
+        aux_24v,
+        aux_after_r23,
+    )
+    r23 = rotate(90)(r23)
+    r23 = align(r23.end, aux_after_r23, Alignment.CENTER)
+    r23 = modify_label_alignment(r23, Alignment.TOP)
+    aux_24v = align(
+        aux_24v,
+        r23.start,
+        Alignment.STACK_LEFT,
+        stack_gap=DETECTOR_INPUT_GAP,
+    )
+    aux_24v = align(aux_24v, r23.start, Alignment.CENTER, axes=["y"])
 
     detector_after_r1 = create_node(
         Dot,
@@ -375,69 +421,6 @@ def create_tmc5160t_plus_power_sequencing_schema():
         r1_input_nodes["R1A"],
         Alignment.CENTER,
         axes=["y"],
-    )
-
-    power_good = create_node(
-        Dot,
-        "power_good",
-        net=nets["power_good"],
-        kind=SCHEMATIC_JUNCTION,
-    )
-    power_good = align(
-        power_good,
-        u2_pin6,
-        Alignment.STACK_RIGHT,
-        stack_gap=Q1_CONTROL_GAP,
-    )
-    power_good = align(power_good, u2_pin6, Alignment.CENTER, axes=["y"])
-
-    power_good_gpio = create_node(
-        Dot,
-        "power_good_gpio",
-        net=nets["power_good"],
-        label="PWR_OK_N -> y_pico:gpio5\nactive-low: LOW = MOTOR_HVIN valid",
-        label_alignment=Alignment.RIGHT,
-    )
-    power_good_gpio = align(
-        power_good_gpio,
-        power_good,
-        Alignment.STACK_BOTTOM,
-        stack_gap=1.4,
-    )
-    power_good_gpio = align(
-        power_good_gpio,
-        power_good,
-        Alignment.CENTER,
-        axes=["x"],
-    )
-
-    pico_3v3_power_good = create_node(
-        Dot,
-        "pico_3v3_power_good",
-        net=nets["pico_3v3"],
-        label="PICO_3V3",
-        label_alignment=Alignment.TOP,
-    )
-    r6 = create_element(
-        Resistor,
-        "R6",
-        "47 kohm",
-        pico_3v3_power_good,
-        power_good_gpio,
-    )
-    r6 = align(r6.end, power_good_gpio, Alignment.CENTER)
-    r6 = modify_label_alignment(r6, Alignment.RIGHT)
-    pico_3v3_power_good = align(
-        pico_3v3_power_good,
-        r6.start,
-        Alignment.STACK_TOP,
-        stack_gap=0.6,
-    )
-    pico_3v3_power_good = align(
-        pico_3v3_power_good,
-        r6.start,
-        Alignment.CENTER,
-        axes=["x"],
     )
 
     q1_base = create_node(
@@ -567,9 +550,7 @@ def create_tmc5160t_plus_power_sequencing_schema():
         Dot,
         "tmc_vio_boundary",
         net=nets["tmc_vio"],
-        label=(
-            "TMC_VIO_3V3 -> adapter VIO\n" "adapter VM stays separate regulated 24V"
-        ),
+        label="adapter VIO",
         label_alignment=Alignment.RIGHT,
     )
     tmc_vio_boundary = align(
@@ -583,7 +564,10 @@ def create_tmc5160t_plus_power_sequencing_schema():
         "vio_ground_rail",
         net=nets["gnd"],
         label=(
-            "COMMON GND\n" "CONCEPT REVIEW ONLY\n" "BENCH VALIDATE BEFORE CONSTRUCTION"
+            "COMMON GND\n"
+            "PHYSICAL STAR AT LINE18 GND-A/GND-B\n"
+            "CONCEPT REVIEW ONLY\n"
+            "BENCH VALIDATE BEFORE CONSTRUCTION"
         ),
         label_alignment=Alignment.LEFT,
     )
@@ -638,6 +622,33 @@ def create_tmc5160t_plus_power_sequencing_schema():
     c1 = align(c1, c3, Alignment.STACK_RIGHT, stack_gap=VIO_COMPONENT_GAP)
     c1 = align(c1.start, tmc_vio_rail, Alignment.CENTER, axes=["y"])
     c1 = modify_label_alignment(c1, Alignment.RIGHT)
+
+    vio_ok_gpio = create_node(
+        Dot,
+        "vio_ok_gpio",
+        net=nets["tmc_vio"],
+        label="VIO_OK -> GPIO5\nHIGH = VIO present\nOFF ~0.58 V via R6/R5",
+        label_alignment=Alignment.BOTTOM,
+    )
+    pico_3v3_vio_ok = create_node(
+        Dot,
+        "pico_3v3_vio_ok",
+        net=nets["pico_3v3"],
+        label="PICO_3V3\nretained B02 injection",
+        label_alignment=Alignment.TOP,
+    )
+    r6 = create_element(
+        Resistor,
+        "R6",
+        "47k retained",
+        pico_3v3_vio_ok,
+        vio_ok_gpio,
+    )
+    r6 = align(r6, c1, Alignment.STACK_RIGHT, stack_gap=VIO_COMPONENT_GAP)
+    r6 = align(r6.end, tmc_vio_rail, Alignment.CENTER, axes=["y"])
+    r6 = modify_label_alignment(r6, Alignment.RIGHT)
+    pico_3v3_vio_ok = align(pico_3v3_vio_ok, r6.start, Alignment.CENTER)
+    vio_ok_gpio = align(vio_ok_gpio, r6.end, Alignment.CENTER)
 
     input_nodes = {}
     output_nodes = {}
@@ -1064,20 +1075,19 @@ def create_tmc5160t_plus_power_sequencing_schema():
         u2_pin8,
         u2_pin6,
         u2_pin5,
+        pin2_ground,
         pin3_ground,
-        pin8_ground,
         pin5_ground,
         d1_anode,
         d1_cathode,
         d1_anode_tap,
         d1_cathode_tap,
+        aux_24v,
+        aux_after_r23,
         detector_after_r1,
         motor_hvin,
         *r1_input_nodes.values(),
         *r1_output_nodes.values(),
-        power_good,
-        power_good_gpio,
-        pico_3v3_power_good,
         q1_base,
         pico_vbus_rail,
         q1_collector,
@@ -1086,6 +1096,8 @@ def create_tmc5160t_plus_power_sequencing_schema():
         tmc_vio_rail,
         tmc_vio_boundary,
         vio_ground_rail,
+        pico_3v3_vio_ok,
+        vio_ok_gpio,
         u1_terminal_nodes["vcc"],
         u1_terminal_nodes["gnd"],
         *input_nodes.values(),
@@ -1111,6 +1123,8 @@ def create_tmc5160t_plus_power_sequencing_schema():
     elements = [
         *r1_elements.values(),
         dz1,
+        r23,
+        dz2,
         d1,
         u2,
         r6,
@@ -1130,9 +1144,9 @@ def create_tmc5160t_plus_power_sequencing_schema():
         c2,
     ]
     wires = [
-        create_wire(u2_pin2, u2_pin4),
+        create_wire(u2_pin2, pin2_ground),
         create_wire(u2_pin3, pin3_ground),
-        create_wire(u2_pin8, pin8_ground),
+        create_wire(u2_pin8, u2_pin6),
         create_wire(u2_pin5, pin5_ground),
         create_wire(d1_anode, d1_anode_tap),
         create_wire(d1_anode_tap, u2_pin3),
@@ -1144,8 +1158,6 @@ def create_tmc5160t_plus_power_sequencing_schema():
         create_wire(r1_output_nodes["R1B"], r1_output_nodes["R1C"]),
         create_wire(r1_output_nodes["R1C"], r1_output_nodes["R1A"]),
         create_wire(r1_output_nodes["R1A"], detector_after_r1),
-        create_wire(u2_pin6, power_good),
-        create_wire(power_good, power_good_gpio),
         create_wire(q1_collector, u3_input),
         create_wire(u3_ground_terminal, vio_ground_rail),
         create_wire(tmc_vio_rail, tmc_vio_boundary),

@@ -3,6 +3,7 @@ import math
 import os
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -153,10 +154,11 @@ def test_tmc5160_review_wiring_declares_discrete_component_placements():
         "C3",
         "D1",
         "DZ1",
+        "DZ2",
         "R1A",
         "R1B",
         "R1C",
-        *(f"R{number}" for number in (2, 3, *range(5, 23))),
+        *(f"R{number}" for number in (2, 3, *range(5, 24))),
     }
     assert placements["U1"]["terminals"][1] == "U1_01_1A_STEP"
     assert placements["U1"]["terminals"][14] == "U1_14_VCC"
@@ -189,6 +191,18 @@ def test_tmc5160_review_wiring_declares_discrete_component_placements():
     assert placements["D1"]["terminals"] == {
         "anode": "HV11_D1_A",
         "cathode": "HV10_D1_K",
+    }
+    assert placements["R6"]["terminals"] == {
+        "start": "B02_R6_3V3",
+        "end": "B19_R6_VIO_OK",
+    }
+    assert placements["R23"]["terminals"] == {
+        "start": "B10_R23_AUX24",
+        "end": "B11_R23_DZ2",
+    }
+    assert placements["DZ2"]["terminals"] == {
+        "anode": "B12_DZ2_A",
+        "cathode": "B09_DZ2_K",
     }
     assert len(
         {
@@ -244,15 +258,15 @@ def test_tmc5160_review_wiring_has_four_true_2x10_component_carriers():
         ],
         "B": [
             ("01_NC", "20_NC"),
-            ("02_R6_3V3", "19_R6_PWR_OK"),
+            ("02_R6_3V3", "19_R6_VIO_OK"),
             ("03_R12_3V3", "18_R12_MOSI"),
             ("04_R7_3V3", "17_R7_STEP"),
             ("05_R11_3V3", "16_R11_SCLK"),
             ("06_R8_3V3", "15_R8_DIR"),
             ("07_R10_3V3", "14_R10_CS"),
             ("08_R9_3V3", "13_R9_ENABLE"),
-            ("09_NC", "12_NC"),
-            ("10_NC", "11_NC"),
+            ("09_DZ2_K", "12_DZ2_A"),
+            ("10_R23_AUX24", "11_R23_DZ2"),
         ],
         "C": [
             ("01_R15_VIO", "20_R15_ENABLE"),
@@ -325,25 +339,65 @@ def test_tmc5160_review_wiring_stays_out_of_active_klipper_validation():
 
     assert all("klipper" not in wire for wire in wiring["wires"])
     assert TMC5160_REVIEW_PATH not in validator.DEFAULT_WIRING_FILES
-    assert ("HV11_D1_A", "LINE18_ENDSTOP_GND") in wire_pairs
     assert ("PICO_THREEV3_OUT_36", "LINE18_ENDSTOP_VCC") in wire_pairs
     assert all("PICO_GND_13" not in pair for pair in wire_pairs)
-    assert ("U1_07_GND", "PICO_GND_28") in wire_pairs
-    assert ("PICO_GND_38", "A20_C1_GND") in wire_pairs
-    assert ("A20_C1_GND", "A19_C2_GND") in wire_pairs
-    assert ("A19_C2_GND", "A15_R5_GND") in wire_pairs
-    assert ("A15_R5_GND", "A14_C3_GND") in wire_pairs
-    assert ("A14_C3_GND", "A12_U3P2_GND") in wire_pairs
-    assert ("LINE18_PWR_GND_A", "HV11_D1_A") in wire_pairs
-    assert ("HV11_D1_A", "HV03_U2P3_LEDB_K") in wire_pairs
     assert (
-        "HV03_U2P3_LEDB_K",
-        "HV17_U2P5_E_B",
-    ) in wire_pairs
-    assert (
-        "HV17_U2P5_E_B",
         "HV20_U2P8_E_A",
+        "HV18_U2P6_C_B",
     ) in wire_pairs
+
+
+def test_tmc5160_review_wiring_uses_two_post_ground_star():
+    wiring = _load_tmc5160_review_wiring()
+    hubs = {"LINE18_PWR_GND_A", "LINE18_PWR_GND_B"}
+    expected_spokes = {
+        frozenset(("LINE18_PWR_GND_A", "TMC5160_HV_GND")),
+        frozenset(("LINE18_PWR_GND_A", "TMC1_J2_GND_MOTOR_2")),
+        frozenset(("LINE18_PWR_GND_A", "TMC1_J2_GND_LOGIC_8")),
+        frozenset(("LINE18_PWR_GND_A", "C12_R21_GND")),
+        frozenset(("LINE18_PWR_GND_A", "U1_07_GND")),
+        frozenset(("LINE18_PWR_GND_A", "PICO_GND_28")),
+        frozenset(("LINE18_PWR_GND_A", "PICO_GND_38")),
+        frozenset(("LINE18_PWR_GND_A", "LINE18_ENDSTOP_GND")),
+        frozenset(("LINE18_PWR_GND_A", "A20_C1_GND")),
+        frozenset(("LINE18_PWR_GND_B", "C11_R22_GND")),
+        frozenset(("LINE18_PWR_GND_B", "A19_C2_GND")),
+        frozenset(("LINE18_PWR_GND_B", "A15_R5_GND")),
+        frozenset(("LINE18_PWR_GND_B", "A14_C3_GND")),
+        frozenset(("LINE18_PWR_GND_B", "A12_U3P2_GND")),
+        frozenset(("LINE18_PWR_GND_B", "HV11_D1_A")),
+        frozenset(("LINE18_PWR_GND_B", "HV02_U2P2_LEDA_K")),
+        frozenset(("LINE18_PWR_GND_B", "HV03_U2P3_LEDB_K")),
+        frozenset(("LINE18_PWR_GND_B", "HV17_U2P5_E_B")),
+    }
+    ground_wires = [wire for wire in wiring["wires"] if wire["type"] == "ground"]
+    ground_edges = {
+        frozenset((wire["from"], wire["to"])) for wire in ground_wires
+    }
+
+    assert ground_edges == {
+        frozenset(hubs),
+        *expected_spokes,
+    }
+    assert all(hubs & {wire["from"], wire["to"]} for wire in ground_wires)
+
+    non_hub_contacts = Counter(
+        endpoint
+        for wire in ground_wires
+        for endpoint in (wire["from"], wire["to"])
+        if endpoint not in hubs
+    )
+    assert set(non_hub_contacts.values()) == {1}
+    hub_contacts = Counter(
+        endpoint
+        for wire in ground_wires
+        for endpoint in (wire["from"], wire["to"])
+        if endpoint in hubs
+    )
+    assert hub_contacts == {
+        "LINE18_PWR_GND_A": 10,
+        "LINE18_PWR_GND_B": 10,
+    }
 
 
 def test_tmc5160_u3_regulator_terminals_join_the_intended_electrical_nets():
@@ -372,6 +426,9 @@ def test_tmc5160_review_wiring_separates_hvin_from_24v_adapter_power():
     assert {
         ("LINE18_AUX_24V_A", "LINE18_AUX_24V_B"),
         ("LINE18_AUX_24V_B", "TMC1_J2_VM_1"),
+        ("LINE18_AUX_24V_B", "B10_R23_AUX24"),
+        ("B11_R23_DZ2", "B09_DZ2_K"),
+        ("B12_DZ2_A", "HV04_U2P4_LEDB_A"),
     } <= wire_pairs
     assert all(
         "LINE18_AUX_24V" not in endpoint
@@ -411,7 +468,6 @@ def test_tmc5160_review_wiring_uses_declared_wire_types():
             assert wire["type"] == "lv_power"
 
     pull_up_branch_pairs = {
-        ("B19_R6_PWR_OK", "HV18_U2P6_C_B"),
         ("U1_01_1A_STEP", "B17_R7_STEP"),
         ("U1_03_2A_DIR", "B15_R8_DIR"),
         ("U1_05_3A_ENABLE", "B13_R9_ENABLE"),
@@ -424,6 +480,17 @@ def test_tmc5160_review_wiring_uses_declared_wire_types():
         for wire in wiring["wires"]
         if wire["type"] == "lv_power"
     }.issuperset(pull_up_branch_pairs)
+
+    assert {
+        ("PICO_THREEV3_OUT_36", "B02_R6_3V3"),
+        ("B02_R6_3V3", "B03_R12_3V3"),
+        ("A01_C1_VIO", "B19_R6_VIO_OK"),
+        ("B19_R6_VIO_OK", "PICO_GPIO_5"),
+    } <= {
+        (wire["from"], wire["to"])
+        for wire in wiring["wires"]
+        if wire["type"] in {"lv_power", "power_good"}
+    }
 
 
 def test_generated_tmc5160_review_svgs_include_physical_boundaries():
@@ -504,7 +571,7 @@ def test_generated_tmc5160_discrete_top_is_an_assembly_view_without_wires():
     placements = {
         placement["ref"]: placement for placement in wiring["component_placements"]
     }
-    for ref in ("D1", "DZ1"):
+    for ref in ("D1", "DZ1", "DZ2"):
         terminals = placements[ref]["terminals"]
         anode_position = pin_positions[terminals["anode"]]
         cathode_position = pin_positions[terminals["cathode"]]

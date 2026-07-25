@@ -6,7 +6,7 @@ metadata:
   notes: |
     REVIEW ONLY: not active printer wiring. Bench-validate before construction.
     Pico: STEP=GPIO0, DIR=GPIO1, ENABLE=GPIO2, DIAG1=GPIO3, endstop=GPIO4,
-    PWR_OK_N=GPIO5, MISO=GPIO8, CS=GPIO9, SCLK=GPIO10, MOSI=GPIO11.
+    VIO_OK=GPIO5, MISO=GPIO8, CS=GPIO9, SCLK=GPIO10, MOSI=GPIO11.
     TMC1_J1/J2/TOP model the ordinary StepStick-format adapter and supplied ribbon as one boundary.
     Continuity-check the received adapter/ribbon and mark pin 1 before applying power.
     TMC1 J1: EN, MOSI/CFG1, SCK/CFG2, CS/CFG3, MISO/CFG0, CLK N/C, STEP, DIR.
@@ -32,22 +32,31 @@ metadata:
     A08/A09/A10 hold Q1 C/B/E on one side.
     A13/A12/A11 hold U3 pins 1/2/3 (OUT/GND/IN) on the opposite side.
     Verify the actual BC327 lead order before inserting Q1.
-    Socket B positions 2-8 hold R6, R12, R7, R11, R8, R10, R9 in that order;
-    positions 1, 9, and 10 remain empty.
+    Socket B keeps the earlier power-injection placement: position 2 holds R6
+    from Pico 3.3V to the VIO_OK node, and positions 3-8 hold R12, R7, R11,
+    R8, R10, R9. Position 9 holds DZ2 and position 10 holds R23.
     Socket C positions 1-10: R15, R18, R17, R16, R19, R20, R13, R14, R21, R22.
     HV optocoupler labels use U2P=ILD74 pin, LEDA/LEDB=channel, A/K=anode/cathode,
     and C/E=collector/emitter.
-    DZ1 contacts marked K/A are cathode/anode. D1 K goes to U2 pin 1; D1 A to U2 pin 3.
+    DZ1/DZ2 contacts marked K/A are cathode/anode.
+    D1 K goes to U2 pin 1; D1 A returns to common ground.
     R1A=R1B=R1C=8.2k/0.25W in parallel (2.73k equivalent);
-    R2=47k; R3=47k; R5=10k; R6=47k.
+    R2=47k; R3=47k; R5=10k; R6=47k; R23=1.5k/0.25W.
     R7-R12=10k; R13-R15=4.7k; R16-R18=2.2k; R19-R20=1k; R21-R22=47k.
-    DZ1=12V/0.5W; D1=1N4148; C1=1uF electrolytic/tantalum;
+    DZ1=12V/0.5W; DZ2=15V/0.5W; D1=1N4148; C1=1uF electrolytic/tantalum;
     C2=C3=100nF ceramic. C3 replaces the old DZ2 without moving its leads.
-    PWR_OK_N is active-low: LOW means fused MOTOR_HVIN is valid; it is a reporting input only.
+    VIO_OK is active-high: HIGH means the gated LP2950 output is actually present.
+    With VIO off, retained R6=47k to Pico 3.3V and R5=10k to ground hold
+    GPIO5 near 0.58V. Do not omit R5 or reduce R6.
     Wire colors: red=positive power; black=ground; blue=STEP/SCLK; yellow=all other signals;
     grey on the drawing=physical white wire for Pico 3.3V and sequenced VIO.
-    U1 collectors are pulled up only from sequenced TMC_VIO. U3 is fed from
-    Pico USB VBUS only after Q1 is enabled by the HVIN detector.
+    U1 collectors are pulled up only from sequenced TMC_VIO. U2A detects fused
+    MOTOR_HVIN; U2B detects valid AUX_24V through R23/DZ2. Their output
+    transistors are in series, so U3 is fed from Pico USB VBUS only when both
+    power domains are valid.
+    LINE18_PWR_GND_A and LINE18_PWR_GND_B are the joined two-post ground hub.
+    Every other ground contact has one direct star branch to exactly one hub
+    post; there are no daisy-chained ground contacts.
     Initial SPI speed is 500kHz.
     Logic, detector, and VIO conductors are low-current wire-wrap class only.
     The external I/O row carries both external 5A fuse contacts, MOTOR_HVIN through two
@@ -326,7 +335,7 @@ pin_sets:
       - 12_U3P2_GND
       - 11_U3P3_IN
 
-  # AR20 socket B: power-good/input pulls, signal pulls, and capacitors.
+  # AR20 socket B: AUX24 detector, VIO-good/input pulls, and signal pulls.
   - id: socket_b_left
     prefix: B
     origin: [12, 33]
@@ -341,8 +350,8 @@ pin_sets:
       - 06_R8_3V3
       - 07_R10_3V3
       - 08_R9_3V3
-      - 09_NC
-      - 10_NC
+      - 09_DZ2_K
+      - 10_R23_AUX24
   - id: socket_b_right
     prefix: B
     origin: [15, 33]
@@ -350,15 +359,15 @@ pin_sets:
     discrete_pin_numbers: {start: 20, step: -1}
     pins:
       - 20_NC
-      - 19_R6_PWR_OK
+      - 19_R6_VIO_OK
       - 18_R12_MOSI
       - 17_R7_STEP
       - 16_R11_SCLK
       - 15_R8_DIR
       - 14_R10_CS
       - 13_R9_ENABLE
-      - 12_NC
-      - 11_NC
+      - 12_DZ2_A
+      - 11_R23_DZ2
 
   # AR20 socket C: collector pull-ups and protected return paths.
   - id: socket_c_left
@@ -511,7 +520,11 @@ component_placements:
   - ref: R6
     kind: resistor
     value: 47k
-    terminals: {start: B02_R6_3V3, end: B19_R6_PWR_OK}
+    terminals: {start: B02_R6_3V3, end: B19_R6_VIO_OK}
+  - ref: R23
+    kind: resistor
+    value: 1.5k / 0.25W
+    terminals: {start: B10_R23_AUX24, end: B11_R23_DZ2}
   - ref: R12
     kind: resistor
     value: 10k
@@ -592,6 +605,10 @@ component_placements:
     kind: zener
     value: 12V / 0.5W
     terminals: {anode: HV12_DZ1_A, cathode: HV09_DZ1_K}
+  - ref: DZ2
+    kind: zener
+    value: 15V / 0.5W
+    terminals: {anode: B12_DZ2_A, cathode: B09_DZ2_K}
   - ref: D1
     kind: diode
     value: 1N4148
@@ -609,6 +626,7 @@ discrete_view:
     pin 1=OUT at A13, pin 2=GND at A12, pin 3=IN at A11.
     C1 is polarized: positive to A01 TMC_VIO and negative to A20 GND.
     HV socket: leave positions 5 and 16 empty as the detector guard row.
+    Socket B: DZ2 is at row 9 and R23 is at the bottom row 10.
   groups:
     - id: pico
       label: RP2040-Plus — USB / BOARD TOP
@@ -677,7 +695,7 @@ wires:
   - from: LINE18_PWR_GND_A
     to: LINE18_PWR_GND_B
     type: ground
-  - from: LINE18_PWR_GND_B
+  - from: LINE18_PWR_GND_A
     to: TMC5160_HV_GND
     type: ground
 
@@ -692,66 +710,77 @@ wires:
     to: HV08_R1C_HVIN
     type: hazard_power
 
-  # The adapter auxiliary input remains on a separate regulated 24V rail.
+  # The adapter auxiliary input remains on a separate regulated 24V rail and
+  # also supplies the thresholded U2B sequencing detector.
   - from: LINE18_AUX_24V_A
     to: LINE18_AUX_24V_B
     type: power
   - from: LINE18_AUX_24V_B
     to: TMC1_J2_VM_1
     type: power
+  - from: LINE18_AUX_24V_B
+    to: B10_R23_AUX24
+    type: power
+  - from: B11_R23_DZ2
+    to: B09_DZ2_K
+    type: power
+  - from: B12_DZ2_A
+    to: HV04_U2P4_LEDB_A
+    type: power
 
-  # Common ground. The high-current return lands directly at the driver. Logic,
-  # detector, and Socket A each return through short low-current branches.
-  - from: LINE18_PWR_GND_B
+  # Two-post ground star. GND-A and GND-B are joined above; every remaining
+  # ground contact has exactly one direct branch to one of those hub posts.
+  - from: LINE18_PWR_GND_A
     to: TMC1_J2_GND_MOTOR_2
     type: ground
-  - from: TMC1_J2_GND_MOTOR_2
+  - from: LINE18_PWR_GND_A
     to: TMC1_J2_GND_LOGIC_8
     type: ground
   - from: LINE18_PWR_GND_A
-    to: C11_R22_GND
-    type: ground
-  - from: C11_R22_GND
     to: C12_R21_GND
     type: ground
-  - from: C12_R21_GND
+  - from: LINE18_PWR_GND_A
     to: U1_07_GND
     type: ground
-  - from: U1_07_GND
+  - from: LINE18_PWR_GND_A
     to: PICO_GND_28
     type: ground
   - from: LINE18_PWR_GND_A
-    to: HV11_D1_A
+    to: PICO_GND_38
     type: ground
-  - from: PICO_GND_38
+  - from: LINE18_PWR_GND_A
+    to: LINE18_ENDSTOP_GND
+    type: ground
+  - from: LINE18_PWR_GND_A
     to: A20_C1_GND
     type: ground
-  - from: A20_C1_GND
+
+  - from: LINE18_PWR_GND_B
+    to: C11_R22_GND
+    type: ground
+  - from: LINE18_PWR_GND_B
     to: A19_C2_GND
     type: ground
-  - from: A19_C2_GND
+  - from: LINE18_PWR_GND_B
     to: A15_R5_GND
     type: ground
-  - from: A15_R5_GND
+  - from: LINE18_PWR_GND_B
     to: A14_C3_GND
     type: ground
-  - from: A14_C3_GND
+  - from: LINE18_PWR_GND_B
     to: A12_U3P2_GND
     type: ground
-  - from: A12_U3P2_GND
+  - from: LINE18_PWR_GND_B
     to: HV11_D1_A
     type: ground
-  - from: HV11_D1_A
+  - from: LINE18_PWR_GND_B
+    to: HV02_U2P2_LEDA_K
+    type: ground
+  - from: LINE18_PWR_GND_B
     to: HV03_U2P3_LEDB_K
     type: ground
-  - from: HV03_U2P3_LEDB_K
+  - from: LINE18_PWR_GND_B
     to: HV17_U2P5_E_B
-    type: ground
-  - from: HV17_U2P5_E_B
-    to: HV20_U2P8_E_A
-    type: ground
-  - from: HV11_D1_A
-    to: LINE18_ENDSTOP_GND
     type: ground
 
   # Pico USB VBUS powers U1 and the switched VIO regulator input.
@@ -768,7 +797,7 @@ wires:
     to: A02_C2_VBUS
     type: power
 
-  # Pico 3.3V safe-state and power-good pull-ups.
+  # Pico 3.3V safe-state pull-ups.
   - from: PICO_THREEV3_OUT_36
     to: B02_R6_3V3
     type: lv_power
@@ -795,7 +824,7 @@ wires:
     type: lv_power
 
   # 24-to-48V MOTOR_HVIN detector: R1A/R1B/R1C in parallel, DZ1,
-  # two ILD74 LEDs in series, and D1.
+  # U2A, and D1. U2B is independently driven by AUX24 through R23/DZ2.
   - from: HV15_R1A_DZ1
     to: HV14_R1B_DZ1
     type: hazard_power
@@ -808,13 +837,11 @@ wires:
   - from: HV12_DZ1_A
     to: HV01_U2P1_LEDA_A
     type: hazard_power
-  - from: HV02_U2P2_LEDA_K
-    to: HV04_U2P4_LEDB_A
-    type: hazard_power
   - from: HV10_D1_K
     to: HV01_U2P1_LEDA_A
     type: hazard_power
-  # U2A drives the BC327 VBUS high-side switch.
+  # U2A and U2B output transistors are in series, so both power detectors
+  # must be valid before they can pull down the BC327 base.
   - from: A18_R2_BASE
     to: A04_R3_BASE
     type: control
@@ -824,6 +851,9 @@ wires:
   - from: A17_R3_U2A
     to: HV19_U2P7_C_A
     type: control
+  - from: HV20_U2P8_E_A
+    to: HV18_U2P6_C_B
+    type: control
   - from: A08_Q1_C
     to: A05_U3_IN_FEED
     type: power
@@ -831,7 +861,8 @@ wires:
     to: A11_U3P3_IN
     type: power
 
-  # U3 generates sequenced 3.3V VIO; R5 discharges it after HVIN is removed.
+  # U3 generates sequenced 3.3V VIO; R5 discharges it after either detector
+  # becomes invalid.
   - from: A13_U3P1_OUT
     to: A16_U3_OUT_FEED
     type: lv_power
@@ -866,11 +897,13 @@ wires:
     to: TMC1_J2_VIO_7
     type: lv_power
 
-  # Active-low power-good reporting from U2B to Pico GPIO5.
-  - from: B19_R6_PWR_OK
-    to: HV18_U2P6_C_B
+  # Active-high end-to-end power-good reporting from actual sequenced VIO.
+  # Retained R6 connects B19 to Pico 3.3V at B02; when U3 is off, R5's 10k
+  # VIO discharge path forms a divider with R6 and holds GPIO5 near 0.58V.
+  - from: A01_C1_VIO
+    to: B19_R6_VIO_OK
     type: lv_power
-  - from: HV18_U2P6_C_B
+  - from: B19_R6_VIO_OK
     to: PICO_GPIO_5
     type: power_good
 

@@ -14,8 +14,13 @@ Klipper config.
   coordinates; the underside view mirrors that same physical arrangement.
   One AR20 is dedicated to the ILD74 and 24-to-48 V `MOTOR_HVIN` detector. Three
   parallel 8.2 kΩ, ¼ W resistors share its detector load while one socket row
-  remains empty as a guard. Socket A carries the VBUS-gated UTC LP2950L-3.3
-  regulator using its `1=OUT`, `2=GND`, `3=IN` TO-92 pinout.
+  remains empty as a guard. The ILD74's second channel independently detects
+  regulated `AUX_24V` through a 1.5 kΩ resistor and 15 V zener in Socket B.
+  The two output transistors form a series hardware AND. Socket A carries the
+  VBUS-gated UTC LP2950L-3.3 regulator using its `1=OUT`, `2=GND`, `3=IN`
+  TO-92 pinout; GPIO5 reports the resulting VIO directly as active-high
+  `VIO_OK`. `LINE18_PWR_GND_A` and `LINE18_PWR_GND_B` form a joined two-post
+  ground hub, with every other ground contact wired directly to one hub post.
   The artifact is not registered as active Klipper wiring. Its retained 18-pin
   external-I/O row keeps `MOTOR_HVIN` and regulated 24 V adapter auxiliary power
   separate. It includes `F1_5A_IN` and `F1_5A_OUT`; install the serviceable
@@ -28,10 +33,9 @@ Klipper config.
   TB6600 interface schematic and verified stripboard assembly.
 - `pico_tb6600_stripboard_interface.md` documents that interface.
 - `tmc5160t_plus_power_sequencing.py` generates the standalone TMC5160T Plus
-  driver-before-logic concept-review schematic. The HVIN detector accepts
-  24–48 V, gates Pico VBUS through Q1, and uses the LP2950L-3.3 for sequenced
-  VIO feeding the SN7407N open-collector interface. It is not active printer
-  wiring.
+  driver-before-logic concept-review schematic. Independent HVIN and AUX24
+  detectors gate Pico VBUS through Q1, and the LP2950L-3.3 provides sequenced
+  VIO to the SN7407N open-collector interface. It is not active printer wiring.
 - `tmc5160t_plus_84dd4cb_delta.py` generates two one-off board-rework aids for
   redesign commit `84dd4cb` relative to its first parent:
   - `rp2040plus_btt_tmc5160t_plus_y_top_discrete_84dd4cb_delta.svg` shows
@@ -41,6 +45,14 @@ Klipper config.
     as a coordinate graph. Thick solid edges are new or changed wraps, purple
     dashed edges are obsolete wraps to remove, and dim thin edges are retained.
   The ordinary component and wiring diagrams remain unmodified references.
+- `tmc5160t_plus_dual_rail_delta.py` generates the follow-up rework aids from
+  baseline commit `ece0565` to the dual-rail VIO gate:
+  - `rp2040plus_btt_tmc5160t_plus_y_top_discrete_dual_rail_delta.svg` highlights
+    the added DZ2 at Socket B row 9 and R23 at the bottom row 10.
+  - `rp2040plus_btt_tmc5160t_plus_y_bottom_dual_rail_delta.svg` shows only the
+    wraps to remove and add for the independent optocoupler inputs, series
+    output-transistor AND, VIO-derived GPIO5 reporting, and the two-post
+    ground-star conversion.
 - `diagrams/*.svg` and selected `diagrams/*.png` files are generated artifacts
   committed for review.
 - `../printer.cfg.template` is the active Klipper config source.
