@@ -87,6 +87,8 @@ def create_y_axis_power_drive_housing_assembly(
     )
     housing_box = housing_box.cut(inner_space_cutter)
 
+    housing_box_box = housing_box
+
     lid_screw = MScrew.from_size(LID_SCREW_SIZE)
     thread_inset_depth = lid_screw.thread_inset_length
     post_reference = create_thread_inset_assembly(
@@ -104,6 +106,8 @@ def create_y_axis_power_drive_housing_assembly(
     ]
     posts = PartCollector()
     post_items = []
+
+    post_offset = post_radius * 1.5
     for post_name, left_right_alignment, front_back_alignment in post_positions:
         post = create_cylinder(post_radius, inner_space_size[2])
         post = align(post, inner_space, Alignment.CENTER, axes=[2])
@@ -111,13 +115,13 @@ def create_y_axis_power_drive_housing_assembly(
             post,
             inner_space,
             left_right_alignment.stack_alignment,
-            stack_gap=-post_radius,
+            stack_gap=-post_offset,
         )
         post = align(
             post,
             inner_space,
             front_back_alignment.stack_alignment,
-            stack_gap=-post_radius,
+            stack_gap=-post_offset,
         )
         posts = posts.fuse(post)
         post_items.append((post_name, post))
@@ -464,6 +468,60 @@ def create_y_axis_power_drive_housing_assembly(
     cable_cutout = align(cable_cutout, inner_space, Alignment.EDGE_BACK)
 
     housing_box = housing_box.cut(cable_cutout)
+
+    #   electric_switchboard_mount_flange_width: 15
+    #   electric_switchboard_mount_flange_length: 18
+    #   electric_switchboard_mount_flange_thickness: 4
+    #   electric_switchboard_mount_flange_fillet_radius: 3
+
+    mount_flange_screw_size = "M5"
+    hv_switchbox_mount_flange_width = 50
+    hv_switchbox_mount_flange_length = 18
+    hv_switchbox_mount_flange_thickness = 4
+    hv_switchbox_mount_flange_fillet_radius = 3
+
+    mount_flange_screw_hole_diameter = MScrew.from_size(
+        mount_flange_screw_size
+    ).clearance_hole_normal
+    mount_flange_screw_holes = PartCollector()
+    mount_flanges = PartCollector()
+
+    for side in [Alignment.RIGHT, Alignment.LEFT]:
+        mount_flange = create_filleted_box(
+            hv_switchbox_mount_flange_length,
+            hv_switchbox_mount_flange_thickness,
+            hv_switchbox_mount_flange_width,
+            fillet_radius=hv_switchbox_mount_flange_fillet_radius,
+            no_fillets_at=[Alignment.BACK, Alignment.FRONT, side.opposite],
+        )
+
+        mount_flange = align(
+            mount_flange,
+            housing_box_box,
+            side.stack_alignment,
+            stack_gap=-CORNER_FILLET_RADIUS,
+        )
+        mount_flange = align(mount_flange, housing_box_box, Alignment.BOTTOM)
+        mount_flange = align(mount_flange, housing_box_box, Alignment.FRONT)
+        mount_flanges = mount_flanges.fuse(mount_flange)
+
+        mount_flange_screw_hole = create_rounded_slab(
+            hv_switchbox_mount_flange_width - 2 * mount_flange_screw_hole_diameter,
+            mount_flange_screw_hole_diameter,
+            hv_switchbox_mount_flange_thickness + 2,
+            mount_flange_screw_hole_diameter / 2,
+        )
+        mount_flange_screw_hole = rotate(90)(mount_flange_screw_hole)
+        mount_flange_screw_hole = rotate(90, axis=(1, 0, 0))(mount_flange_screw_hole)
+        mount_flange_screw_hole = align(
+            mount_flange_screw_hole, mount_flange, Alignment.CENTER
+        )
+        mount_flange_screw_holes = mount_flange_screw_holes.fuse(
+            mount_flange_screw_hole
+        )
+
+    housing_box = housing_box.fuse(mount_flanges)
+    housing_box = housing_box.cut(mount_flange_screw_holes)
 
     housing = LeaderFollowersCuttersPart(leader=housing_box)
     housing.add_named_follower(
