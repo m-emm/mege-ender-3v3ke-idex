@@ -32,22 +32,22 @@ metadata:
     A08/A09/A10 hold Q1 C/B/E on one side.
     A13/A12/A11 hold U3 pins 1/2/3 (OUT/GND/IN) on the opposite side.
     Verify the actual BC327 lead order before inserting Q1.
-    Socket B keeps the earlier power-injection placement: position 2 holds R6
-    from Pico 3.3V to the VIO_OK node, and positions 3-8 hold R12, R7, R11,
-    R8, R10, R9. Position 9 holds DZ2 and position 10 holds R23.
+    Socket B position 2 is unused. Position 19 is the direct VIO_OK junction,
+    positions 3-8 hold R12, R7, R11, R8, R10, R9, position 9 holds DZ2,
+    and position 10 holds R23.
     Socket C positions 1-10: R15, R18, R17, R16, R19, R20, R13, R14, R21, R22.
     HV optocoupler labels use U2P=ILD74 pin, LEDA/LEDB=channel, A/K=anode/cathode,
     and C/E=collector/emitter.
     DZ1/DZ2 contacts marked K/A are cathode/anode.
     D1 K goes to U2 pin 1; D1 A returns to common ground.
     R1A=R1B=R1C=8.2k/0.25W in parallel (2.73k equivalent);
-    R2=47k; R3=47k; R5=10k; R6=47k; R23=1.5k/0.25W.
+    R2=47k; R3=47k; R5=10k; R23=1.5k/0.25W.
     R7-R12=10k; R13-R15=4.7k; R16-R18=2.2k; R19-R20=1k; R21-R22=47k.
     DZ1=12V/0.5W; DZ2=15V/0.5W; D1=1N4148; C1=1uF electrolytic/tantalum;
     C2=C3=100nF ceramic. C3 replaces the old DZ2 without moving its leads.
     VIO_OK is active-high: HIGH means the gated LP2950 output is actually present.
-    With VIO off, retained R6=47k to Pico 3.3V and R5=10k to ground hold
-    GPIO5 near 0.58V. Do not omit R5 or reduce R6.
+    GPIO5 senses VIO directly through B19. With VIO off, R5 discharges the rail
+    and holds GPIO5 low without a Pico 3.3V injection path.
     Wire colors: red=positive power; black=ground; blue=STEP/SCLK; yellow=all other signals;
     grey on the drawing=physical white wire for Pico 3.3V and sequenced VIO.
     U1 collectors are pulled up only from sequenced TMC_VIO. U2A detects fused
@@ -343,7 +343,7 @@ pin_sets:
     discrete_pin_numbers: {start: 1, step: 1}
     pins:
       - 01_NC
-      - 02_R6_3V3
+      - 02_NC
       - 03_R12_3V3
       - 04_R7_3V3
       - 05_R11_3V3
@@ -359,7 +359,7 @@ pin_sets:
     discrete_pin_numbers: {start: 20, step: -1}
     pins:
       - 20_NC
-      - 19_R6_VIO_OK
+      - 19_VIO_OK
       - 18_R12_MOSI
       - 17_R7_STEP
       - 16_R11_SCLK
@@ -517,10 +517,6 @@ component_placements:
       output: A13_U3P1_OUT
       ground: A12_U3P2_GND
       input: A11_U3P3_IN
-  - ref: R6
-    kind: resistor
-    value: 47k
-    terminals: {start: B02_R6_3V3, end: B19_R6_VIO_OK}
   - ref: R23
     kind: resistor
     value: 1.5k / 0.25W
@@ -799,9 +795,6 @@ wires:
 
   # Pico 3.3V safe-state pull-ups.
   - from: PICO_THREEV3_OUT_36
-    to: B02_R6_3V3
-    type: lv_power
-  - from: B02_R6_3V3
     to: B03_R12_3V3
     type: lv_power
   - from: B03_R12_3V3
@@ -898,12 +891,12 @@ wires:
     type: lv_power
 
   # Active-high end-to-end power-good reporting from actual sequenced VIO.
-  # Retained R6 connects B19 to Pico 3.3V at B02; when U3 is off, R5's 10k
-  # VIO discharge path forms a divider with R6 and holds GPIO5 near 0.58V.
+  # B19 is a direct junction between sequenced VIO and GPIO5. When U3 is off,
+  # R5 discharges VIO and holds the input low.
   - from: A01_C1_VIO
-    to: B19_R6_VIO_OK
+    to: B19_VIO_OK
     type: lv_power
-  - from: B19_R6_VIO_OK
+  - from: B19_VIO_OK
     to: PICO_GPIO_5
     type: power_good
 

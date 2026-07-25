@@ -33,8 +33,9 @@ EXPECTED_NEW_CONNECTIONS = {
     ("LINE18_PWR_GND_B", "HV03_U2P3_LEDB_K"),
     ("LINE18_PWR_GND_B", "HV17_U2P5_E_B"),
     ("HV20_U2P8_E_A", "HV18_U2P6_C_B"),
-    ("A01_C1_VIO", "B19_R6_VIO_OK"),
-    ("B19_R6_VIO_OK", "PICO_GPIO_5"),
+    ("PICO_THREEV3_OUT_36", "B03_R12_3V3"),
+    ("A01_C1_VIO", "B19_VIO_OK"),
+    ("B19_VIO_OK", "PICO_GPIO_5"),
 }
 
 EXPECTED_REMOVED_CONNECTIONS = {
@@ -57,6 +58,8 @@ EXPECTED_REMOVED_CONNECTIONS = {
     ("HV17_U2P5_E_B", "HV20_U2P8_E_A"),
     ("HV02_U2P2_LEDA_K", "HV04_U2P4_LEDB_A"),
     ("HV11_D1_A", "LINE18_ENDSTOP_GND"),
+    ("PICO_THREEV3_OUT_36", "B02_R6_3V3"),
+    ("B02_R6_3V3", "B03_R12_3V3"),
     ("B19_R6_PWR_OK", "HV18_U2P6_C_B"),
     ("HV18_U2P6_C_B", "PICO_GPIO_5"),
 }
@@ -90,18 +93,18 @@ def test_dual_rail_delta_classifies_only_the_latest_board_rework(rendered_delta)
 
     assert result.components.added == ("DZ2", "R23")
     assert result.components.changed == ()
-    assert result.components.removed == ()
-    assert len(result.components.unchanged) == 32
+    assert result.components.removed == ("R6",)
+    assert len(result.components.unchanged) == 31
 
-    assert result.connections.count("new") == 24
+    assert result.connections.count("new") == 25
     assert result.connections.count("changed") == 0
-    assert result.connections.count("unchanged") == 73
+    assert result.connections.count("unchanged") == 71
     assert {
         (edge.from_pin, edge.to_pin) for edge in result.connections.removed_edges
     } == EXPECTED_REMOVED_CONNECTIONS
 
 
-def test_dual_rail_component_delta_marks_only_r23_and_dz2(rendered_delta):
+def test_dual_rail_component_delta_marks_additions_and_r6_removal(rendered_delta):
     module, result = rendered_delta
     root = ET.parse(result.top_path).getroot()
 
@@ -117,11 +120,11 @@ def test_dual_rail_component_delta_marks_only_r23_and_dz2(rendered_delta):
         for ref, group in groups.items()
         if group.attrib.get("data-delta") == "added"
     } == {"DZ2", "R23"}
-    assert not {
+    assert {
         ref
         for ref, group in groups.items()
         if group.attrib.get("data-delta") in {"changed", "removed"}
-    }
+    } == {"R6"}
     assert result.top_path.name == module.TOP_DELTA_FILENAME
 
 
@@ -131,10 +134,10 @@ def test_dual_rail_bottom_delta_marks_exact_rewire_connections(rendered_delta):
 
     assert root.attrib["data-delta-kind"] == "coordinate-graph"
     assert root.attrib["data-delta-id"] == module.DELTA_IDENTIFIER
-    assert root.attrib["data-new-connections"] == "24"
+    assert root.attrib["data-new-connections"] == "25"
     assert root.attrib["data-changed-connections"] == "0"
-    assert root.attrib["data-removed-connections"] == "21"
-    assert root.attrib["data-unchanged-connections"] == "73"
+    assert root.attrib["data-removed-connections"] == "23"
+    assert root.attrib["data-unchanged-connections"] == "71"
 
     target_lines = [
         node

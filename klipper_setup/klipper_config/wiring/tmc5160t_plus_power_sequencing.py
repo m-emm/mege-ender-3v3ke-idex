@@ -627,28 +627,21 @@ def create_tmc5160t_plus_power_sequencing_schema():
         Dot,
         "vio_ok_gpio",
         net=nets["tmc_vio"],
-        label="VIO_OK -> GPIO5\nHIGH = VIO present\nOFF ~0.58 V via R6/R5",
+        label="VIO_OK -> GPIO5\nHIGH = VIO present\nLOW = VIO off via R5",
         label_alignment=Alignment.BOTTOM,
     )
-    pico_3v3_vio_ok = create_node(
-        Dot,
-        "pico_3v3_vio_ok",
-        net=nets["pico_3v3"],
-        label="PICO_3V3\nretained B02 injection",
-        label_alignment=Alignment.TOP,
-    )
-    r6 = create_element(
-        Resistor,
-        "R6",
-        "47k retained",
-        pico_3v3_vio_ok,
+    vio_ok_gpio = align(
         vio_ok_gpio,
+        tmc_vio_boundary,
+        Alignment.STACK_RIGHT,
+        stack_gap=VIO_COMPONENT_GAP,
     )
-    r6 = align(r6, c1, Alignment.STACK_RIGHT, stack_gap=VIO_COMPONENT_GAP)
-    r6 = align(r6.end, tmc_vio_rail, Alignment.CENTER, axes=["y"])
-    r6 = modify_label_alignment(r6, Alignment.RIGHT)
-    pico_3v3_vio_ok = align(pico_3v3_vio_ok, r6.start, Alignment.CENTER)
-    vio_ok_gpio = align(vio_ok_gpio, r6.end, Alignment.CENTER)
+    vio_ok_gpio = align(
+        vio_ok_gpio,
+        tmc_vio_rail,
+        Alignment.CENTER,
+        axes=["y"],
+    )
 
     input_nodes = {}
     output_nodes = {}
@@ -1096,7 +1089,6 @@ def create_tmc5160t_plus_power_sequencing_schema():
         tmc_vio_rail,
         tmc_vio_boundary,
         vio_ground_rail,
-        pico_3v3_vio_ok,
         vio_ok_gpio,
         u1_terminal_nodes["vcc"],
         u1_terminal_nodes["gnd"],
@@ -1127,7 +1119,6 @@ def create_tmc5160t_plus_power_sequencing_schema():
         dz2,
         d1,
         u2,
-        r6,
         r3,
         r2,
         q1,
@@ -1161,6 +1152,7 @@ def create_tmc5160t_plus_power_sequencing_schema():
         create_wire(q1_collector, u3_input),
         create_wire(u3_ground_terminal, vio_ground_rail),
         create_wire(tmc_vio_rail, tmc_vio_boundary),
+        create_wire(tmc_vio_boundary, vio_ok_gpio),
         create_wire(pico_3v3_input_rail, pico_3v3_input_label),
         create_wire(signal_vio_rail, signal_vio_label),
         create_wire(u1_terminal_nodes["vcc"], u1_vbus_rail),

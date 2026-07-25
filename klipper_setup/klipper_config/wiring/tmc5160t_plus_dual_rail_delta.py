@@ -24,7 +24,7 @@ from tmc5160t_plus_84dd4cb_delta import (
 
 BASELINE_COMMIT = "ece0565ec180e14dc5bcc4a643de45c2c63c1880"
 TARGET_CONFIG_SHA256 = (
-    "4006bc7a5b6f6cbc8af4918f3b1391afa00e3a0c4c739ce3c8f2b3e9c5a1b329"
+    "9153373f1bc5adb09e12643999f812575556269fbccb3ccd3c17ba7204fe1e08"
 )
 DELTA_IDENTIFIER = "dual-rail-vio-ground-star-after-ece0565"
 TOP_DELTA_FILENAME = (
@@ -35,16 +35,23 @@ BOTTOM_DELTA_FILENAME = "rp2040plus_btt_tmc5160t_plus_y_bottom_dual_rail_delta.s
 PRESENTATION = DeltaPresentation(
     identifier=DELTA_IDENTIFIER,
     base_ref=BASELINE_COMMIT,
-    component_title="DUAL-RAIL VIO + GROUND STAR DELTA — COMPONENT SIDE",
-    component_svg_title=(
-        "RP2040-Plus / TMC5160T Plus dual-rail VIO + ground star — top side"
+    component_title=(
+        "DUAL-RAIL VIO + GROUND STAR + R6 REMOVAL — COMPONENT SIDE"
     ),
-    wiring_title="DUAL-RAIL VIO + GROUND STAR — UNDERSIDE / MIRRORED",
-    wiring_svg_title="Dual-Rail VIO + Ground-Star Delta — Underside View",
+    component_svg_title=(
+        "RP2040-Plus / TMC5160T Plus dual-rail VIO + ground star + R6 removal"
+    ),
+    wiring_title=(
+        "DUAL-RAIL VIO + GROUND STAR + R6 REMOVAL — UNDERSIDE / MIRRORED"
+    ),
+    wiring_svg_title=(
+        "Dual-Rail VIO + Ground-Star + R6 Removal Delta — Underside View"
+    ),
     bottom_filename=BOTTOM_DELTA_FILENAME,
-    removed_component_description="none",
+    removed_component_description="R6 at B02-B19",
     wiring_extra_note=(
-        "GROUND REBUILD: also install the dim GND-A <-> GND-B hub link."
+        "GROUND REBUILD: install the dim GND-A <-> GND-B hub link. "
+        "R6: remove it, leave B02 unused, and retain B19 as VIO_OK."
     ),
 )
 

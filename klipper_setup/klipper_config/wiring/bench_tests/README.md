@@ -9,11 +9,20 @@ It covers the temporary bench-probe wiring in
 `rp2040plus_btt_tmc5160t_plus_y.yaml`:
 
 - `gpio0` drives `U1_01_1A_STEP`
-- `gpio5` reads `B19_R6_VIO_OK`
+- `gpio5` reads `B19_VIO_OK`
 - `gpio17` (physical Pico header pin 22, `PICO_GPIO_17_22`) reads the temporary
   `U1_01_1A_STEP` probe
 - `gpio16` (physical Pico header pin 21, `PICO_GPIO_16_21`) reads the temporary
   `C14_R13_STEP` probe
+- `gpio18` (physical pin 24) reads `C20_R15_ENABLE`
+- `gpio19` (physical pin 25) reads `C19_R18_MOSI`
+- `gpio20` (physical pin 26) reads `C18_R17_SCLK`
+- `gpio21` (physical pin 27) reads `C17_R16_CS`
+- `gpio22` (physical pin 29) reads `C13_R14_DIR`
+- `gpio26` (physical pin 31) temporarily drives `C15_R20_TMC_DIAG`; the test
+  verifies that the protected return reaches the normal DIAG input on `gpio3`
+- `gpio27` (physical pin 32) temporarily drives `C16_R19_TMC_MISO`; the test
+  verifies that the protected return reaches the normal MISO input on `gpio8`
 
 With high-voltage power disconnected, first inspect the dry-run plan:
 
@@ -40,9 +49,19 @@ HV-on assertions explicitly:
   --hv-on --armed
 ```
 
-This mode requires `PWR_OK` to remain HIGH. It toggles STEP LOW/HIGH/LOW and
-requires both the `gpio17` input-side probe and the `gpio16` /
-`C14_R13_STEP` output-side probe to follow it. STEP is restored LOW on exit.
+This mode requires `PWR_OK` to remain HIGH. It tests STEP, DIR, ENABLE, CS,
+SCLK, and MOSI one at a time and requires only the corresponding temporary
+probe to change. It then drives the temporary TMC-side DIAG and MISO probes
+one at a time and verifies that only the intended protected Pico input changes.
+This catches missing, swapped, and shorted test connections.
+
+The safe idle state is STEP/DIR/SCLK/MOSI LOW, ENABLE/CS HIGH, and both
+TMC-side return-test sources LOW. The script restores that state on exit,
+including after an assertion failure.
+
+If a previous native-command session leaves the Klipper MCU in shutdown or
+without fresh button reports, power-cycle/reconnect the bench Pico before
+rerunning. Restore the intended HV state before invoking `--armed`.
 
 The runner uses the existing bench-test `.venv` and downloads one pinned,
 checksum-verified Klipper `msgproto.py` file into the repository's ignored

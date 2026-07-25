@@ -158,7 +158,7 @@ def test_tmc5160_review_wiring_declares_discrete_component_placements():
         "R1A",
         "R1B",
         "R1C",
-        *(f"R{number}" for number in (2, 3, *range(5, 24))),
+        *(f"R{number}" for number in (2, 3, 5, *range(7, 24))),
     }
     assert placements["U1"]["terminals"][1] == "U1_01_1A_STEP"
     assert placements["U1"]["terminals"][14] == "U1_14_VCC"
@@ -192,10 +192,7 @@ def test_tmc5160_review_wiring_declares_discrete_component_placements():
         "anode": "HV11_D1_A",
         "cathode": "HV10_D1_K",
     }
-    assert placements["R6"]["terminals"] == {
-        "start": "B02_R6_3V3",
-        "end": "B19_R6_VIO_OK",
-    }
+    assert "R6" not in placements
     assert placements["R23"]["terminals"] == {
         "start": "B10_R23_AUX24",
         "end": "B11_R23_DZ2",
@@ -258,7 +255,7 @@ def test_tmc5160_review_wiring_has_four_true_2x10_component_carriers():
         ],
         "B": [
             ("01_NC", "20_NC"),
-            ("02_R6_3V3", "19_R6_VIO_OK"),
+            ("02_NC", "19_VIO_OK"),
             ("03_R12_3V3", "18_R12_MOSI"),
             ("04_R7_3V3", "17_R7_STEP"),
             ("05_R11_3V3", "16_R11_SCLK"),
@@ -449,7 +446,6 @@ def test_tmc5160_review_wiring_uses_declared_wire_types():
     )
 
     pull_up_supply_contacts = {
-        "B02_R6_3V3",
         "B03_R12_3V3",
         "B04_R7_3V3",
         "B05_R11_3V3",
@@ -482,15 +478,17 @@ def test_tmc5160_review_wiring_uses_declared_wire_types():
     }.issuperset(pull_up_branch_pairs)
 
     assert {
-        ("PICO_THREEV3_OUT_36", "B02_R6_3V3"),
-        ("B02_R6_3V3", "B03_R12_3V3"),
-        ("A01_C1_VIO", "B19_R6_VIO_OK"),
-        ("B19_R6_VIO_OK", "PICO_GPIO_5"),
+        ("PICO_THREEV3_OUT_36", "B03_R12_3V3"),
+        ("A01_C1_VIO", "B19_VIO_OK"),
+        ("B19_VIO_OK", "PICO_GPIO_5"),
     } <= {
         (wire["from"], wire["to"])
         for wire in wiring["wires"]
         if wire["type"] in {"lv_power", "power_good"}
     }
+    assert all(
+        "B02_NC" not in {wire["from"], wire["to"]} for wire in wiring["wires"]
+    )
 
 
 def test_generated_tmc5160_review_svgs_include_physical_boundaries():
