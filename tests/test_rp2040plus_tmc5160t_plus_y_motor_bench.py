@@ -255,10 +255,11 @@ def test_full_current_reverse_test_is_equal_slow_and_bounded():
     )
 
 
-def test_repeated_motion_test_has_three_approximately_three_second_cycles():
+def test_repeated_motion_test_has_three_ten_cycle_enable_groups():
     motion_duration_s = (
         MOTOR_BENCH.REPEATED_MOTION_STEP_COUNT
         * 2
+        * MOTOR_BENCH.REPEATED_MOTION_CYCLES_PER_RUN
         / MOTOR_BENCH.REPEATED_MOTION_STEP_RATE_HZ
     )
     enabled_duration_s = (
@@ -266,15 +267,27 @@ def test_repeated_motion_test_has_three_approximately_three_second_cycles():
         + motion_duration_s
         + MOTOR_BENCH.JOG_COMPLETION_MARGIN_S
     )
+    current = MOTOR_BENCH.calculate_current_settings(
+        MOTOR_BENCH.REPEATED_MOTION_CURRENT_A
+    )
 
     assert MOTOR_BENCH.REPEATED_MOTION_RUNS == 3
+    assert MOTOR_BENCH.REPEATED_MOTION_CYCLES_PER_RUN == 10
+    assert (
+        MOTOR_BENCH.REPEATED_MOTION_RUNS * MOTOR_BENCH.REPEATED_MOTION_CYCLES_PER_RUN
+        == 30
+    )
     assert (
         MOTOR_BENCH.REPEATED_MOTION_STEP_COUNT
         == MOTOR_BENCH.FULL_CURRENT_REVERSE_STEP_COUNT
     )
-    assert motion_duration_s == pytest.approx(2.5)
-    assert enabled_duration_s == pytest.approx(2.95)
-    assert enabled_duration_s < 3.0
+    assert motion_duration_s == pytest.approx(6.25)
+    assert enabled_duration_s == pytest.approx(6.70)
+    assert current.requested_run_current_a == MOTOR_BENCH.REPEATED_MOTION_CURRENT_A
+    assert current.actual_run_current_a == pytest.approx(
+        MOTOR_BENCH.REPEATED_MOTION_CURRENT_A,
+        rel=0.03,
+    )
 
 
 def test_enable_probe_is_an_explicit_armed_mode():

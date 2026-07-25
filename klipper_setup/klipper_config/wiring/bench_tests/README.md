@@ -166,18 +166,20 @@ This requires the signed MCU position to return to zero before restoring
 ENABLE HIGH. The operator must confirm the free shaft moved in both directions
 and returned approximately to its starting position.
 
-For three faster repetitions at the known-good 500 kHz SPI rate:
+For three higher-speed stress groups at the known-good 500 kHz SPI rate:
 
 ```bash
 ./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_motor_bench.sh \
   --armed --repeated-motion-test
 ```
 
-Each cycle has no initial hold. It sends 2,000 forward and 2,000 reverse pulses
-at 1,600 pulses/s, for 2.5 seconds of motion and less than three seconds with
-the scheduling margins. After every cycle it restores ENABLE HIGH, writes
-`CHOPCONF.toff=0`, requires the MCU position to be zero, and reads IOIN,
-CHOPCONF, GSTAT, and DRV_STATUS before proceeding.
+Each group has no initial hold and uses approximately 1.5 A RMS. It enables the
+driver once, performs ten continuous back-and-forth cycles without toggling
+ENABLE, and then disables the driver. Each cycle sends 2,000 forward and 2,000
+reverse pulses at 6,400 pulses/s; one ten-cycle group therefore moves for 6.25
+seconds. After every group the test writes `CHOPCONF.toff=0`, requires the MCU
+position to be zero, and reads IOIN, CHOPCONF, GSTAT, and DRV_STATUS before
+enabling the next group.
 
 Only after the SPI-only test passes, run the fixed jog:
 

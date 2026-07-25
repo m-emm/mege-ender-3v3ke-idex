@@ -62,8 +62,10 @@ LOW_CURRENT_EXPECTED_MCU_POSITION = -LOW_CURRENT_STEP_COUNT
 FULL_CURRENT_REVERSE_STEP_COUNT = 2_000
 FULL_CURRENT_REVERSE_STEP_RATE_HZ = 200
 REPEATED_MOTION_RUNS = 3
+REPEATED_MOTION_CYCLES_PER_RUN = 10
 REPEATED_MOTION_STEP_COUNT = FULL_CURRENT_REVERSE_STEP_COUNT
-REPEATED_MOTION_STEP_RATE_HZ = 1_600
+REPEATED_MOTION_STEP_RATE_HZ = 6_400
+REPEATED_MOTION_CURRENT_A = 1.5
 WATCHDOG_REFRESH_INTERVAL_S = 0.75
 MICROSTEPS = 16
 JOG_STEPS = 128
@@ -832,19 +834,25 @@ def run_repeated_motion_test(
 ) -> None:
     clock_frequency = client.parser.get_constant_int("CLOCK_FREQ")
     interval_ticks = round(clock_frequency / REPEATED_MOTION_STEP_RATE_HZ)
-    motion_duration_s = REPEATED_MOTION_STEP_COUNT * 2 / REPEATED_MOTION_STEP_RATE_HZ
+    motion_duration_s = (
+        REPEATED_MOTION_STEP_COUNT
+        * 2
+        * REPEATED_MOTION_CYCLES_PER_RUN
+        / REPEATED_MOTION_STEP_RATE_HZ
+    )
     enabled_duration_s = JOG_START_LEAD_S + motion_duration_s + JOG_COMPLETION_MARGIN_S
 
     print(
-        f"4. Running {REPEATED_MOTION_RUNS} motion cycles with no initial hold; "
-        f"each sends {REPEATED_MOTION_STEP_COUNT} pulses forward and "
-        f"{REPEATED_MOTION_STEP_COUNT} in reverse at "
+        f"4. Running {REPEATED_MOTION_RUNS} enable groups with no initial "
+        f"hold; each group performs {REPEATED_MOTION_CYCLES_PER_RUN} "
+        f"continuous cycles of {REPEATED_MOTION_STEP_COUNT} pulses forward "
+        f"and {REPEATED_MOTION_STEP_COUNT} in reverse at "
         f"{REPEATED_MOTION_STEP_RATE_HZ} pulses/s ...",
         flush=True,
     )
 
-    for cycle in range(1, REPEATED_MOTION_RUNS + 1):
-        stage = f"repeated motion cycle {cycle}/{REPEATED_MOTION_RUNS}"
+    for run in range(1, REPEATED_MOTION_RUNS + 1):
+        stage = f"repeated motion group {run}/{REPEATED_MOTION_RUNS}"
         require_safe_inputs(client, stage=f"pre-{stage}")
         write_register_verified(
             client,
@@ -862,16 +870,17 @@ def run_repeated_motion_test(
             client.send_command(
                 f"reset_step_clock oid={STEPPER_OID} clock={start_clock}"
             )
-            client.send_command(f"set_next_step_dir oid={STEPPER_OID} dir=0")
-            client.send_command(
-                f"queue_step oid={STEPPER_OID} interval={interval_ticks} "
-                f"count={REPEATED_MOTION_STEP_COUNT} add=0"
-            )
-            client.send_command(f"set_next_step_dir oid={STEPPER_OID} dir=1")
-            client.send_command(
-                f"queue_step oid={STEPPER_OID} interval={interval_ticks} "
-                f"count={REPEATED_MOTION_STEP_COUNT} add=0"
-            )
+            for _cycle in range(REPEATED_MOTION_CYCLES_PER_RUN):
+                client.send_command(f"set_next_step_dir oid={STEPPER_OID} dir=0")
+                client.send_command(
+                    f"queue_step oid={STEPPER_OID} interval={interval_ticks} "
+                    f"count={REPEATED_MOTION_STEP_COUNT} add=0"
+                )
+                client.send_command(f"set_next_step_dir oid={STEPPER_OID} dir=1")
+                client.send_command(
+                    f"queue_step oid={STEPPER_OID} interval={interval_ticks} "
+                    f"count={REPEATED_MOTION_STEP_COUNT} add=0"
+                )
             wait_with_enable_watchdog(client, enabled_duration_s)
             position = client.request(
                 f"stepper_get_position oid={STEPPER_OID}",
@@ -890,15 +899,18 @@ def run_repeated_motion_test(
         time.sleep(0.05)
         verify_disabled_postcondition(client, stage=f"post-{stage}")
         print(
-            f"   PASS {cycle}/{REPEATED_MOTION_RUNS}: "
-            f"{motion_duration_s:.2f} s motion, MCU position zero, "
-            "ENABLE HIGH, and SPI/status clean",
+            f"   PASS group {run}/{REPEATED_MOTION_RUNS}: "
+            f"{REPEATED_MOTION_CYCLES_PER_RUN} continuous cycles in "
+            f"{motion_duration_s:.2f} s, MCU position zero, ENABLE HIGH, "
+            "and SPI/status clean",
             flush=True,
         )
 
     print(
-        f"   PASS: all {REPEATED_MOTION_RUNS} repeated motion cycles completed "
-        f"at {current.actual_run_current_a:.3f} A RMS",
+        f"   PASS: all "
+        f"{REPEATED_MOTION_RUNS * REPEATED_MOTION_CYCLES_PER_RUN} "
+        f"back-and-forth cycles completed in {REPEATED_MOTION_RUNS} "
+        f"enable groups at {current.actual_run_current_a:.3f} A RMS",
         flush=True,
     )
 
@@ -1031,7 +1043,8 @@ def print_plan(
         f"{FULL_CURRENT_REVERSE_STEP_COUNT} forward + "
         f"{FULL_CURRENT_REVERSE_STEP_COUNT} reverse at "
         f"{FULL_CURRENT_REVERSE_STEP_RATE_HZ} pulses/s\n"
-        f"  repeated motion test: {REPEATED_MOTION_RUNS} cycles, each "
+        f"  repeated motion test: {REPEATED_MOTION_RUNS} enable groups x "
+        f"{REPEATED_MOTION_CYCLES_PER_RUN} continuous cycles, each "
         f"{REPEATED_MOTION_STEP_COUNT} forward + "
         f"{REPEATED_MOTION_STEP_COUNT} reverse at "
         f"{REPEATED_MOTION_STEP_RATE_HZ} pulses/s\n"
@@ -1108,8 +1121,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--repeated-motion-test",
         action="store_true",
         help=(
-            "Run three approximately three-second 1 A forward/reverse "
-            "cycles, checking SPI after every cycle."
+            "Run three groups of ten continuous fast 1.5 A forward/reverse "
+            "cycles, checking SPI after every group."
         ),
     )
     mode.add_argument(
@@ -1123,11 +1136,16 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    current = calculate_current_settings(
+    requested_current_a = (
         LOW_CURRENT_HOLD_A
         if args.low_current_hold or args.low_current_step_test
-        else REQUESTED_CURRENT_A
+        else (
+            REPEATED_MOTION_CURRENT_A
+            if args.repeated_motion_test
+            else REQUESTED_CURRENT_A
+        )
     )
+    current = calculate_current_settings(requested_current_a)
     if not MIN_SPI_SPEED_HZ <= args.spi_speed_hz <= MAX_SPI_SPEED_HZ:
         parser.error(
             f"--spi-speed-hz must be between {MIN_SPI_SPEED_HZ} and "
@@ -1140,7 +1158,7 @@ def main(argv: list[str] | None = None) -> int:
             "full-current forward/reverse STEP test"
             if args.full_current_reverse_test
             else (
-                "three repeated fast forward/reverse tests"
+                "three enable groups of ten continuous forward/reverse cycles"
                 if args.repeated_motion_test
                 else (
                     "five-second hold plus low-current STEP test"
