@@ -17,6 +17,7 @@ def create_y_axis_power_drive_housing_assembly(
     *,
     y_axis_driver_board_holder_joined,
     bigtreetech_stepper_driver,
+    fuse_holder,
     y_axis_power_drive_housing_wall_thickness,
     y_axis_power_drive_housing_lid_thickness,
     y_axis_power_drive_housing_board_wall_clearance,
@@ -372,20 +373,48 @@ def create_y_axis_power_drive_housing_assembly(
 
         lids[lid_name] = lid
 
+    fuse_holder_y_inset = 25
+    fuse_holder_z_inset = 15
 
+    # fuse_holder = rotate(-90, axis=(0, 1, 0))(fuse_holder)
+    fuse_holder = fuse_holder.aligned_from_non_production_part(
+        "mount_panel_reference",
+        inner_space,
+        Alignment.CENTER,
+    )
+    fuse_holder = fuse_holder.aligned_from_non_production_part(
+        "mount_panel_reference",
+        inner_space,
+        Alignment.RIGHT,
+    )
 
-    
+    fuse_holder = fuse_holder.aligned_from_non_production_part(
+        "mount_panel_reference",
+        inner_space,
+        Alignment.EDGE_BOTTOM,
+    )
+
+    fuse_holder = fuse_holder.aligned_from_non_production_part(
+        "mount_panel_reference",
+        inner_space,
+        Alignment.EDGE_FRONT,
+    )
+
+    fuse_holder = translate(0, fuse_holder_y_inset, fuse_holder_z_inset)(fuse_holder)
+    housing_box = housing_box.cut(fuse_holder.get_cutter_part_by_name("mount_hole"))
 
     power_rail_nut_pockets = None
 
     num_connections = 5
     screw_size = "M4"
-    pitch = 12
+    pitch = 14
 
     for i in range(num_connections):
         terminal_nut_pocket = create_hidden_nut_pocket_cutter(
             screw_size,
             square_nut=True,
+            slack=0.3,
+            bottom_cutter_length=5,
         )
 
         terminal_nut_pocket = translate(i * pitch, 0, 0)(terminal_nut_pocket)
@@ -396,29 +425,45 @@ def create_y_axis_power_drive_housing_assembly(
         else:
             power_rail_nut_pockets = power_rail_nut_pockets.fuse(terminal_nut_pocket)
 
-        
-
-
-
-
     rail = materialize_bounding_box(
-        power_rail_nut_pockets,z_size=20, x_enlargement=10, y_enlargement=8)
+        power_rail_nut_pockets, z_size=20, x_enlargement=10, y_enlargement=8
+    )
 
     rail = power_rail_nut_pockets.use_as_cutter_on(rail)
 
-
     power_rail_nut_pockets.leader = rail
     rail = rotate(180)(rail)
-    rail = rotate(90,axis=(1,0,0))(rail)
+    rail = rotate(90, axis=(1, 0, 0))(rail)
 
     rail = align(rail, inner_space, Alignment.CENTER)
     rail = align(rail, inner_space, Alignment.BOTTOM)
     rail = align(rail, inner_space, Alignment.BACK)
+    rail = align(rail, inner_space, Alignment.RIGHT)
 
+    rail = translate(-board_support_top_size - 4, 0, 3)(rail)
 
     housing_box = housing_box.fuse(rail)
 
+    usb_connector = y_axis_driver_board_holder_joined.get_named_non_production_part(
+        "pico_usb_connector"
+    )
 
+    usb_cutter = materialize_bounding_box(
+        usb_connector, y_size=50, x_size=20, z_size=20
+    )
+
+    usb_cutter = align(usb_cutter, inner_space, Alignment.EDGE_BACK)
+
+    housing_box = housing_box.cut(usb_cutter)
+
+    cable_cutout = create_filleted_box(60, 10, 12, fillet_radius=3)
+
+    cable_cutout = align(
+        cable_cutout, bigtreetech_stepper_driver.leader, Alignment.CENTER
+    )
+    cable_cutout = align(cable_cutout, inner_space, Alignment.EDGE_BACK)
+
+    housing_box = housing_box.cut(cable_cutout)
 
     housing = LeaderFollowersCuttersPart(leader=housing_box)
     housing.add_named_follower(
@@ -439,21 +484,19 @@ def create_y_axis_power_drive_housing_assembly(
     for name, screw in lid_screw_items:
         housing.add_named_non_production_part(screw, name)
 
-    housing.additional_data["physical_envelope_bbox"] = (
-        physical_min,
-        physical_max,
-    )
-    housing.additional_data["post_centers"] = {
-        name: get_bounding_box_center(post) for name, post in post_items
-    }
-    housing.additional_data["post_radius"] = post_radius
-    housing.additional_data["lid_screw_size"] = LID_SCREW_SIZE
-    housing.additional_data["lid_screw_length"] = screw_length
-
     for name, mount_screw in mount_screws:
         _logger.info(f"Adding mount screw {name} to housing")
         housing.add_named_non_production_part(
             mount_screw.get_named_non_production_part("complete_screw"), name
         )
+
+    for name, part in fuse_holder.get_named_follower_items():
+        housing.add_named_non_production_part(part, f"fuse_holder_{name}")
+
+    for name, part in fuse_holder.get_named_cutter_items():
+        housing.add_named_cutter(part, f"fuse_holder_{name}")
+
+    for name, part in fuse_holder.get_named_non_production_part_items():
+        housing.add_named_non_production_part(part, f"fuse_holder_{name}")
 
     return housing

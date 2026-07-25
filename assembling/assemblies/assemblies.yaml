@@ -3913,6 +3913,8 @@ assemblies:
     inject_parts:
       y_axis_driver_board_holder_joined: y_axis_driver_board_holder_joined_assembly
       bigtreetech_stepper_driver: bigtreetech_stepper_driver_tmc_5160t_plus_assembly
+      fuse_holder: big_fuses_holder_assembly
+
     parameters:
       y_axis_power_drive_housing_wall_thickness: !Ref y_axis_power_drive_housing_wall_thickness
       y_axis_power_drive_housing_lid_thickness: !Ref y_axis_power_drive_housing_lid_thickness
