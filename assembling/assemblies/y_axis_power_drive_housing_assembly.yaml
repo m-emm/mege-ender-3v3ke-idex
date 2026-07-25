@@ -1,0 +1,118 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Two-lid housing for the Y-axis driver board and TMC5160T Plus
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - back
+        - top
+        - bottom
+      width: 900
+      height: 700
+    parts:
+      - source: self
+        artifact: leader
+        name: y_axis_power_drive_housing
+        color: [1, 1, 1]
+      - source: self
+        artifact: followers
+        names:
+          - y_axis_power_drive_housing_top_lid
+          - y_axis_power_drive_housing_bottom_lid
+        name_template: "{name}"
+        color: [1, 1, 1]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - top_lid_mount_screw_*_screw
+          - top_lid_mount_screw_*_thread_inset
+          - bottom_lid_mount_screw_*_screw
+          - bottom_lid_mount_screw_*_thread_inset
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
+      - source: injected
+        assembly: y_axis_driver_board_holder_joined
+        artifact: leader
+        name: y_axis_driver_board_holder_joined
+        color: [0.82, 0.88, 1]
+      - source: injected
+        assembly: y_axis_driver_board_holder_joined
+        artifact: followers
+        name_template: "y_axis_driver_board_holder_{name}"
+        color: [0.82, 0.88, 1]
+      - source: injected
+        assembly: y_axis_driver_board_holder_joined
+        artifact: non_production_parts
+        name_template: "y_axis_driver_board_holder_{name}"
+      - source: injected
+        assembly: bigtreetech_stepper_driver
+        artifact: leader
+        name: bigtreetech_stepper_driver_tmc_5160t_plus
+        color: [0.86, 1, 0.82]
+      - source: injected
+        assembly: bigtreetech_stepper_driver
+        artifact: non_production_parts
+        name_template: "bigtreetech_stepper_driver_{name}"
+
+  Production:
+    process_data_preset: petgcf_max_strength_high_speed_06
+    parts:
+      - source: self
+        artifact: leader
+        name: y_axis_power_drive_housing
+      - source: self
+        artifact: followers
+        names:
+          - y_axis_power_drive_housing_top_lid
+        name_template: "{name}"
+        prod_rotation_angle: 180
+        prod_rotation_axis: [1, 0, 0]
+      - source: self
+        artifact: followers
+        names:
+          - y_axis_power_drive_housing_bottom_lid
+        name_template: "{name}"
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: y_axis_power_drive_housing
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "1"
+          parts:
+            - y_axis_power_drive_housing
+        - name: y_axis_power_drive_housing_top_lid
+          process_data_preset: petgcf_max_strength_high_speed_06
+          parts:
+            - y_axis_power_drive_housing_top_lid
+        - name: y_axis_power_drive_housing_bottom_lid
+          process_data_preset: petgcf_max_strength_high_speed_06
+          parts:
+            - y_axis_power_drive_housing_bottom_lid
+      auto_assign_plates: false
+
+Parameters:
+  y_axis_power_drive_housing_wall_thickness:
+    Type: Float
+  y_axis_power_drive_housing_lid_thickness:
+    Type: Float
+  y_axis_power_drive_housing_board_wall_clearance:
+    Type: Float
+  y_axis_power_drive_housing_z_clearance_top:
+    Type: Float
+  y_axis_power_drive_housing_z_clearance_bottom:
+    Type: Float
+
+Parts:
+  YAxisPowerDriveHousingAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.y_axis_power_drive_housing_assembly.create_y_axis_power_drive_housing_assembly

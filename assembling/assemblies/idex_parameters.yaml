@@ -1483,3 +1483,8 @@ globals:
   x_axis_belt_carriage_mount_eye_fillet_radius: 2
 
   y_axis_driver_board_holder_mount_screw_hole_inset: 4
+  y_axis_power_drive_housing_wall_thickness: 3.2
+  y_axis_power_drive_housing_lid_thickness: 4.0
+  y_axis_power_drive_housing_board_wall_clearance: 6.0
+  y_axis_power_drive_housing_z_clearance_top: 5.0
+  y_axis_power_drive_housing_z_clearance_bottom: 5.0

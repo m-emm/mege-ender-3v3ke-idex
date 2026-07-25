@@ -2,6 +2,53 @@
 
 Small local hardware probes for wiring experiments.
 
+## RP2040-Plus / TMC5160T Plus Y Power Tests
+
+This test uses native Klipper MCU commands over the Pico USB serial connection.
+It covers the temporary bench-probe wiring in
+`rp2040plus_btt_tmc5160t_plus_y.yaml`:
+
+- `gpio0` drives `U1_01_1A_STEP`
+- `gpio5` reads `B19_R6_VIO_OK`
+- `gpio17` (physical Pico header pin 22, `PICO_GPIO_17_22`) reads the temporary
+  `U1_01_1A_STEP` probe
+- `gpio16` (physical Pico header pin 21, `PICO_GPIO_16_21`) reads the temporary
+  `C14_R13_STEP` probe
+
+With high-voltage power disconnected, first inspect the dry-run plan:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_bench.sh
+```
+
+Then confirm HV is still off and run the assertions:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_bench.sh \
+  --armed
+```
+
+The armed test asserts that `PWR_OK` is LOW, toggles STEP LOW/HIGH/LOW and
+asserts that the `gpio17` probe follows it, and continuously requires the
+`gpio16` / `C14_R13_STEP` probe to remain LOW. STEP is restored LOW on exit.
+
+With the intended HV inputs connected and VIO expected to be up, select the
+HV-on assertions explicitly:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_bench.sh \
+  --hv-on --armed
+```
+
+This mode requires `PWR_OK` to remain HIGH. It toggles STEP LOW/HIGH/LOW and
+requires both the `gpio17` input-side probe and the `gpio16` /
+`C14_R13_STEP` output-side probe to follow it. STEP is restored LOW on exit.
+
+The runner uses the existing bench-test `.venv` and downloads one pinned,
+checksum-verified Klipper `msgproto.py` file into the repository's ignored
+`.cache/` directory. The small macOS transport in the bench script is used
+because Klipper's normal host serial helper contains Linux-specific code.
+
 ## Current FT232H Bench Wiring
 
 Stepper/TB6600 bench wiring:
