@@ -2,10 +2,10 @@
 
 Small local hardware probes for wiring experiments.
 
-## RP2040-Plus / TMC5160T Plus Y Power Tests
+## RP2040-Plus / TMC5160T Plus Y Continuity Tests
 
 This test uses native Klipper MCU commands over the Pico USB serial connection.
-It covers the temporary bench-probe wiring in
+It covers the earlier ribbon-disconnected temporary bench-probe wiring in
 `rp2040plus_btt_tmc5160t_plus_y.yaml`:
 
 - `gpio0` drives `U1_01_1A_STEP`
@@ -59,6 +59,10 @@ The safe idle state is STEP/DIR/SCLK/MOSI LOW, ENABLE/CS HIGH, and both
 TMC-side return-test sources LOW. The script restores that state on exit,
 including after an assertion failure.
 
+Do not use this continuity test after connecting the driver ribbon and motor.
+Its `gpio16`-`gpio22` and `gpio26`-`gpio27` connections are temporary probes,
+not part of the finished driver-connected wiring.
+
 If a previous native-command session leaves the Klipper MCU in shutdown or
 without fresh button reports, power-cycle/reconnect the bench Pico before
 rerunning. Restore the intended HV state before invoking `--armed`.
@@ -67,6 +71,136 @@ The runner uses the existing bench-test `.venv` and downloads one pinned,
 checksum-verified Klipper `msgproto.py` file into the repository's ignored
 `.cache/` directory. The small macOS transport in the bench script is used
 because Klipper's normal host serial helper contains Linux-specific code.
+
+## RP2040-Plus / TMC5160T Plus Driver and Motor Test
+
+This separate bench test is for the driver-connected state after removing all
+temporary continuity probes. It uses only the intended signals:
+
+- STEP `gpio0`, DIR `gpio1`, active-low ENABLE `gpio2`
+- DIAG `gpio3`, PWR_OK `gpio5`
+- software SPI mode 3 at 500 kHz: MISO `gpio8`, CS `gpio9`, SCLK `gpio10`,
+  MOSI `gpio11`
+
+Before connecting the motor, switch off 24 V and verify both motor phase pairs
+by continuity. Secure the motor so its shaft remains free. Never connect or
+disconnect the motor or driver ribbon while powered.
+
+Print the plan without touching the hardware:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_motor_bench.sh \
+  --device /dev/cu.usbmodem13301 --spi-only
+```
+
+With both 24 V inputs powered, run the disabled-driver diagnostics first:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_motor_bench.sh \
+  --device /dev/cu.usbmodem13301 --armed --spi-only
+```
+
+This requires PWR_OK HIGH and DIAG LOW, identifies TMC5160 IOIN version `0x30`,
+clears and checks GSTAT, programs the pinned Klipper register defaults, and
+rejects undervoltage, thermal, and short-circuit faults. ENABLE stays HIGH.
+
+For a bench-only signal-integrity comparison, run the same disabled-driver
+diagnostics at 1 kHz, 500 times slower than the normal 500 kHz bus:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_motor_bench.sh \
+  --armed --spi-only --spi-speed-hz 1000
+```
+
+The explicit override is limited to 1 kHz through 500 kHz. Changing it changes
+the Klipper MCU configuration CRC, so reset the Pico before switching between
+SPI rates. This option is diagnostic only; keep 500 kHz as the normal setting
+unless repeated comparison tests demonstrate a rate-dependent failure.
+
+For diagnosis without energizing the motor, force `CHOPCONF.toff=0` and probe
+only the active-low ENABLE logic:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_motor_bench.sh \
+  --device /dev/cu.usbmodem13301 --armed --enable-probe
+```
+
+This lowers and raises ENABLE while the MOSFET bridge remains off. It requires
+IOIN `DRV_ENN` to follow, SPI to remain healthy, and `toff` to remain zero.
+
+For a diagnostic ten-second motor hold at approximately 0.204 A RMS, without
+issuing any STEP pulses:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_motor_bench.sh \
+  --armed --low-current-hold
+```
+
+This performs no SPI access during the ten-second enabled interval. It refreshes
+the two-second MCU ENABLE watchdog without changing the LOW state, reads IOIN
+while still enabled, then immediately restores ENABLE HIGH and
+`CHOPCONF.toff=0`.
+
+To hold for five seconds and then send 1,000 forward STEP pulses at 200
+pulses/s, still at approximately 0.204 A RMS:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_motor_bench.sh \
+  --armed --low-current-step-test
+```
+
+This makes no SPI access during the five-second hold or five-second pulse
+train. It verifies the MCU generated all 1,000 pulses, reads SPI only after
+motion, and immediately restores ENABLE HIGH and `CHOPCONF.toff=0`.
+
+For the final directional test, hold for five seconds at approximately 1.02 A
+RMS, send 2,000 forward pulses followed by 2,000 reverse pulses at 200
+pulses/s, and read SPI only after both moves:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_motor_bench.sh \
+  --armed --full-current-reverse-test
+```
+
+This requires the signed MCU position to return to zero before restoring
+ENABLE HIGH. The operator must confirm the free shaft moved in both directions
+and returned approximately to its starting position.
+
+For three faster repetitions at the known-good 500 kHz SPI rate:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_motor_bench.sh \
+  --armed --repeated-motion-test
+```
+
+Each cycle has no initial hold. It sends 2,000 forward and 2,000 reverse pulses
+at 1,600 pulses/s, for 2.5 seconds of motion and less than three seconds with
+the scheduling margins. After every cycle it restores ENABLE HIGH, writes
+`CHOPCONF.toff=0`, requires the MCU position to be zero, and reads IOIN,
+CHOPCONF, GSTAT, and DRV_STATUS before proceeding.
+
+Only after the SPI-only test passes, run the fixed jog:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_motor_bench.sh \
+  --device /dev/cu.usbmodem13301 --armed --jog
+```
+
+The jog uses 16 microsteps, a 5 us STEP pulse, and approximately 1.02 A RMS
+after quantizing the requested 1.0 A with the board's 22 mOhm sense resistor.
+It sends 128 microsteps forward and 128 backward at 400 pulses/s, then requires
+the MCU step count to return to zero.
+
+ENABLE starts and finishes HIGH. While ENABLE is LOW, a two-second MCU
+`max_duration` watchdog is active, and Klipper's shutdown message writes
+`CHOPCONF.toff=0`. Normal exit, failure, Ctrl-C, and termination all request
+ENABLE HIGH and `toff=0`; unacknowledged cleanup escalates to Klipper
+`emergency_stop`.
+
+Keep the physical 24 V switch within reach: switching off 24 V is the final
+emergency stop. Reconnect the Pico USB before changing between this motor test
+and the earlier continuity test because their native Klipper configurations
+have different CRCs.
 
 ## Current FT232H Bench Wiring
 
