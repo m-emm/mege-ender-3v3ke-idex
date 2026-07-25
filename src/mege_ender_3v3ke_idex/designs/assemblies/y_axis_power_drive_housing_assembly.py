@@ -411,14 +411,14 @@ def create_y_axis_power_drive_housing_assembly(
 
     num_connections = 5
     screw_size = "M4"
-    pitch = 14
+    pitch = 16
 
     for i in range(num_connections):
         terminal_nut_pocket = create_hidden_nut_pocket_cutter(
             screw_size,
             square_nut=True,
             slack=0.3,
-            bottom_cutter_length=5,
+            bottom_cutter_length=7,
         )
 
         terminal_nut_pocket = translate(i * pitch, 0, 0)(terminal_nut_pocket)
@@ -488,21 +488,20 @@ def create_y_axis_power_drive_housing_assembly(
 
     for side in [Alignment.RIGHT, Alignment.LEFT]:
         mount_flange = create_filleted_box(
-            hv_switchbox_mount_flange_length,
-            hv_switchbox_mount_flange_thickness,
             hv_switchbox_mount_flange_width,
+            hv_switchbox_mount_flange_length,
+            hv_switchbox_mount_flange_thickness,            
             fillet_radius=hv_switchbox_mount_flange_fillet_radius,
-            no_fillets_at=[Alignment.BACK, Alignment.FRONT, side.opposite],
+            no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.BACK],
         )
 
         mount_flange = align(
             mount_flange,
             housing_box_box,
-            side.stack_alignment,
-            stack_gap=-CORNER_FILLET_RADIUS,
+            side,
         )
         mount_flange = align(mount_flange, housing_box_box, Alignment.BOTTOM)
-        mount_flange = align(mount_flange, housing_box_box, Alignment.FRONT)
+        mount_flange = align(mount_flange, housing_box_box, Alignment.STACK_FRONT)
         mount_flanges = mount_flanges.fuse(mount_flange)
 
         mount_flange_screw_hole = create_rounded_slab(
@@ -511,8 +510,8 @@ def create_y_axis_power_drive_housing_assembly(
             hv_switchbox_mount_flange_thickness + 2,
             mount_flange_screw_hole_diameter / 2,
         )
-        mount_flange_screw_hole = rotate(90)(mount_flange_screw_hole)
-        mount_flange_screw_hole = rotate(90, axis=(1, 0, 0))(mount_flange_screw_hole)
+        # mount_flange_screw_hole = rotate(90)(mount_flange_screw_hole)
+        # mount_flange_screw_hole = rotate(90, axis=(1, 0, 0))(mount_flange_screw_hole)
         mount_flange_screw_hole = align(
             mount_flange_screw_hole, mount_flange, Alignment.CENTER
         )

@@ -67,6 +67,8 @@ Builder:
             overrides:
               process_overrides:
                 enable_support: "1"
+          # prod_rotation_angle: 45
+          # prod_rotation_axis: [0, 0, 1]
           parts:
             - y_axis_power_drive_housing
         - name: y_axis_power_drive_housing_top_lid
