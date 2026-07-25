@@ -82,8 +82,9 @@ def join_y_axis_driver_board_holder_with_tmc5160t_plus(
         board_holder_mount_screw_size
     ).clearance_hole_normal
     mount_screw_holes = PartCollector()
-    mount_screw_hole_centers = []
+
     drill_length = max(get_bounding_box_size(joined_holder.leader)) * 2
+    mount_screw_holes_list = []
     for left_right_alignment in [Alignment.LEFT, Alignment.RIGHT]:
         for front_back_alignment in [Alignment.FRONT, Alignment.BACK]:
             mount_screw_drill = create_cylinder(
@@ -110,17 +111,15 @@ def join_y_axis_driver_board_holder_with_tmc5160t_plus(
                 -front_back_alignment.sign * board_holder_mount_screw_hole_inset,
                 0,
             )(mount_screw_drill)
-            mount_screw_hole_centers.append(
-                tuple(get_bounding_box_center(mount_screw_drill))
+            mount_screw_holes_list.append(
+                (
+                    f"mount_hole_{left_right_alignment.name.lower()}_{front_back_alignment.name.lower()}",
+                    mount_screw_drill,
+                )
             )
             mount_screw_holes = mount_screw_holes.fuse(mount_screw_drill)
 
     joined_holder.leader = joined_holder.leader.cut(mount_screw_holes)
-    joined_holder.add_named_cutter(mount_screw_holes, "mount_screw_holes")
-    joined_holder.additional_data["mount_screw_hole_centers"] = mount_screw_hole_centers
-    joined_holder.additional_data["mount_screw_hole_diameter"] = (
-        mount_screw_hole_diameter
-    )
 
     joined_holder.add_consumed_part_ref(
         y_axis_driver_board_holder.part_ref_for_leader()
@@ -137,5 +136,8 @@ def join_y_axis_driver_board_holder_with_tmc5160t_plus(
         joined_holder.add_consumed_part_ref(
             y_axis_driver_board_holder.part_ref_for_named_non_production_part(name)
         )
+
+    for name, mount_screw_hole in mount_screw_holes_list:
+        joined_holder.add_named_cutter(mount_screw_hole, name)
 
     return {"y_axis_driver_board_holder": joined_holder}

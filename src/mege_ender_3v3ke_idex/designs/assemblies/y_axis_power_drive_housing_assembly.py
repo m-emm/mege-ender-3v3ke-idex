@@ -1,7 +1,10 @@
 """Y-axis power-drive housing assembly."""
 
+import logging
+
 from shellforgepy.simple import *
 
+_logger = logging.getLogger(__name__)
 LID_RIM_CLEARANCE = 0.3
 LID_SCREW_SIZE = "M3"
 LID_SCREW_ENGAGEMENT = 5.0
@@ -118,14 +121,99 @@ def create_y_axis_power_drive_housing_assembly(
         posts = posts.fuse(post)
         post_items.append((post_name, post))
 
+    board_support_top_size = 14
+    board_support_bottom_size = 5
+
+    board_bottom_z = get_bounding_box(y_axis_driver_board_holder_joined)[0][2]
+
+    inner_space_bottom_z = get_bounding_box(inner_space)[0][2]
+    board_support_height = board_bottom_z - inner_space_bottom_z
+    board_support_top_plate_thickness = 4
+    board_supports = PartCollector()
+    mount_screws = []
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+            board_support_name = f"board_support_{lr.name.lower()}_{fb.name.lower()}"
+
+            board_support = create_pyramid_stump(
+                2 * board_support_top_size,
+                2 * board_support_bottom_size,
+                2 * board_support_top_size,
+                2 * board_support_bottom_size,
+                board_support_height - board_support_top_plate_thickness,
+            )
+
+            board_support = rotate(180, axis=(1, 0, 0))(board_support)
+
+            board_support = align(board_support, inner_space, Alignment.CENTER)
+            board_support = align(board_support, inner_space, Alignment.BOTTOM)
+            board_support = align(board_support, inner_space, lr.edge_alignment)
+            board_support = align(board_support, inner_space, fb.edge_alignment)
+
+            board_support_top_plate = materialize_bounding_box(
+                board_support, z_size=board_support_top_plate_thickness
+            )
+
+            board_support_top_plate = align(
+                board_support_top_plate, board_support, Alignment.STACK_TOP
+            )
+
+            board_support = board_support.fuse(board_support_top_plate)
+
+            mount_screw_hole = y_axis_driver_board_holder_joined.get_named_cutter(
+                f"mount_hole_{lr.name.lower()}_{fb.name.lower()}"
+            )
+
+            mount_screw = create_complete_screw_assembly(
+                "M3",
+                12,
+                access_hole_clearance=1,
+                extra_access_hole_length=100,
+                with_access_hole=True,
+            )
+            mount_screw = rotate(180, axis=(1, 0, 0))(mount_screw)
+
+            mount_screw = align(mount_screw, mount_screw_hole, Alignment.CENTER)
+
+            mount_screw = align(
+                mount_screw,
+                y_axis_driver_board_holder_joined,
+                Alignment.STACK_BOTTOM,
+                stack_gap=-5,
+            )
+
+            # mount_screw_collar = create_cylinder(MScrew.from_size("M3").cylinder_head_diameter /   2 + 1, MScrew.from_size("M3").cylinder_head_height + 5)
+            # mount_screw_collar = align(mount_screw_collar, mount_screw, Alignment.CENTER)
+            # mount_screw_collar = align(mount_screw_collar,mount_screw, Alignment.STACK_BOTTOM)
+
+            # board_support = board_support.fuse(mount_screw_collar)
+
+            board_support = mount_screw.use_as_cutter_on(board_support)
+            mount_screws.append(
+                (f"mount_screw_{lr.name.lower()}_{fb.name.lower()}", mount_screw)
+            )
+
+            board_supports = board_supports.fuse(board_support)
+
+    board_support_cutter = create_box_hole_cutter(*get_bounding_box_size(inner_space))
+
+    board_support_cutter = align(board_support_cutter, inner_space, Alignment.CENTER)
+
+    board_supports = board_support_cutter.use_as_cutter_on(board_supports)
+
+    # for _, mount_screw in mount_screws:
+    #     board_supports = mount_screw.use_as_cutter_on(board_supports)
+
     housing_box = housing_box.fuse(posts)
+    housing_box = housing_box.fuse(board_supports)
 
     thread_inset_pocket_items = []
     thread_inset_items = []
-    for lid_name, z_alignment in [
-        ("top", Alignment.TOP),
-        ("bottom", Alignment.BOTTOM),
+    for z_alignment in [
+        Alignment.TOP,
+        Alignment.BOTTOM,
     ]:
+        lid_name = z_alignment.name.lower()
         for index, (_post_name, post) in enumerate(post_items):
             thread_inset_assembly = create_thread_inset_assembly(
                 size=LID_SCREW_SIZE,
@@ -182,10 +270,11 @@ def create_y_axis_power_drive_housing_assembly(
         rim_outer_size[1] - 2 * wall_thickness,
     )
 
-    for lid_name, z_alignment in [
-        ("top", Alignment.TOP),
-        ("bottom", Alignment.BOTTOM),
+    for z_alignment in [
+        Alignment.TOP,
+        Alignment.BOTTOM,
     ]:
+        lid_name = z_alignment.name.lower()
         lid_plate = create_filleted_box(
             body_size[0],
             body_size[1],
@@ -312,5 +401,11 @@ def create_y_axis_power_drive_housing_assembly(
     housing.additional_data["post_radius"] = post_radius
     housing.additional_data["lid_screw_size"] = LID_SCREW_SIZE
     housing.additional_data["lid_screw_length"] = screw_length
+
+    for name, mount_screw in mount_screws:
+        _logger.info(f"Adding mount screw {name} to housing")
+        housing.add_named_non_production_part(
+            mount_screw.get_named_non_production_part("complete_screw"), name
+        )
 
     return housing

@@ -16,35 +16,17 @@ Builder:
       height: 700
     parts:
       - source: self
-        artifact: leader
-        name: y_axis_power_drive_housing
-        color: [1, 1, 1]
-      - source: self
-        artifact: followers
-        names:
-          - y_axis_power_drive_housing_top_lid
-          - y_axis_power_drive_housing_bottom_lid
-        name_template: "{name}"
-        color: [1, 1, 1]
-      - source: self
-        artifact: non_production_parts
-        names:
-          - top_lid_mount_screw_*_screw
-          - top_lid_mount_screw_*_thread_inset
-          - bottom_lid_mount_screw_*_screw
-          - bottom_lid_mount_screw_*_thread_inset
-        name_template: "{name}"
-        color: [0.78, 0.78, 0.72]
+        artifact: all
+
       - source: injected
         assembly: y_axis_driver_board_holder_joined
         artifact: leader
         name: y_axis_driver_board_holder_joined
-        color: [0.82, 0.88, 1]
       - source: injected
         assembly: y_axis_driver_board_holder_joined
         artifact: followers
         name_template: "y_axis_driver_board_holder_{name}"
-        color: [0.82, 0.88, 1]
+
       - source: injected
         assembly: y_axis_driver_board_holder_joined
         artifact: non_production_parts
@@ -53,7 +35,6 @@ Builder:
         assembly: bigtreetech_stepper_driver
         artifact: leader
         name: bigtreetech_stepper_driver_tmc_5160t_plus
-        color: [0.86, 1, 0.82]
       - source: injected
         assembly: bigtreetech_stepper_driver
         artifact: non_production_parts
