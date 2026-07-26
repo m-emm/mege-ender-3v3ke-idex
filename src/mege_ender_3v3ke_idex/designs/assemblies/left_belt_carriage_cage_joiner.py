@@ -81,6 +81,19 @@ def join_left_belt_carriage_with_cage(
 
     eddy_duo_mount_plate = align(eddy_duo_mount_plate, top_plate, Alignment.TOP)
 
+    eddy_duo_mount_plate_enhancer = materialize_bounding_box(
+        eddy_duo_mount_plate, z_enlargement=-25, y_size=4, x_size=9
+    )
+
+    eddy_duo_mount_plate_enhancer = align(
+        eddy_duo_mount_plate_enhancer, eddy_duo_mount_plate, Alignment.TOP
+    )
+    eddy_duo_mount_plate_enhancer = align(
+        eddy_duo_mount_plate_enhancer, eddy_duo_mount_plate, Alignment.STACK_LEFT
+    )
+
+    eddy_duo_mount_plate = eddy_duo_mount_plate.fuse(eddy_duo_mount_plate_enhancer)
+
     eddy_duo_mounting_holes_drill = PartCollector()
 
     for side in [Alignment.LEFT, Alignment.RIGHT]:
