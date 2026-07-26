@@ -1,10 +1,10 @@
 basename: rp2040plus_btt_tmc5160t_plus_y
 
 metadata:
-  version_label: "RP2040-Plus + BTT TMC5160T Plus Y concept review"
+  version_label: "RP2040-Plus + BTT TMC5160T Plus active Y drive"
   klipper_mcu: y_pico
   notes: |
-    REVIEW ONLY: not active printer wiring. Bench-validate before construction.
+    ACTIVE Y DRIVE: bench-validated before integration with the printer.
     Pico: STEP=GPIO0, DIR=GPIO1, ENABLE=GPIO2, DIAG1=GPIO3, endstop=GPIO4,
     VIO_OK=GPIO5, MISO=GPIO8, CS=GPIO9, SCLK=GPIO10, MOSI=GPIO11.
     TMC1_J1/J2/TOP model the ordinary StepStick-format adapter and supplied ribbon as one boundary.
@@ -903,36 +903,42 @@ wires:
   # U1 inputs and their 10k Pico-3.3V default-high resistors.
   - from: PICO_GPIO_0
     to: U1_01_1A_STEP
+    klipper: stepper_y.step_pin
     type: clock
   - from: U1_01_1A_STEP
     to: B17_R7_STEP
     type: lv_power
   - from: PICO_GPIO_1
     to: U1_03_2A_DIR
+    klipper: stepper_y.dir_pin
     type: data
   - from: U1_03_2A_DIR
     to: B15_R8_DIR
     type: lv_power
   - from: PICO_GPIO_2
     to: U1_05_3A_ENABLE
+    klipper: stepper_y.enable_pin
     type: control
   - from: U1_05_3A_ENABLE
     to: B13_R9_ENABLE
     type: lv_power
   - from: PICO_GPIO_9
     to: U1_09_4A_CS
+    klipper: "tmc5160 stepper_y.cs_pin"
     type: control
   - from: U1_09_4A_CS
     to: B14_R10_CS
     type: lv_power
   - from: PICO_GPIO_10
     to: U1_11_5A_SCLK
+    klipper: "tmc5160 stepper_y.spi_software_sclk_pin"
     type: clock
   - from: U1_11_5A_SCLK
     to: B16_R11_SCLK
     type: lv_power
   - from: PICO_GPIO_11
     to: U1_13_6A_MOSI
+    klipper: "tmc5160 stepper_y.spi_software_mosi_pin"
     type: data
   - from: U1_13_6A_MOSI
     to: B18_R12_MOSI
@@ -985,6 +991,7 @@ wires:
     type: return
   - from: C09_R21_PICO_MISO
     to: PICO_GPIO_8
+    klipper: "tmc5160 stepper_y.spi_software_miso_pin"
     type: return
   - from: TMC1_TOP_DIAG1
     to: C15_R20_TMC_DIAG
@@ -999,4 +1006,5 @@ wires:
   # Physical Y endstop remains authoritative for production homing.
   - from: PICO_GPIO_4
     to: LINE18_ENDSTOP_NO
+    klipper: stepper_y.endstop_pin
     type: data

@@ -279,6 +279,18 @@ def join_left_belt_carriage_with_cage(
 
     joined_belt_carriage = joined_belt_carriage.fuse(correction_filler)
 
+
+    top_plate_back_left_cutter = create_box(20, 20, 20)
+    top_plate_back_left_cutter = align(
+        top_plate_back_left_cutter, top_plate, Alignment.CENTER)
+    top_plate_back_left_cutter = align(
+            top_plate_back_left_cutter, top_plate, Alignment.BACK)
+    
+    top_plate_back_left_cutter = align(
+             top_plate_back_left_cutter, tool_head_mount_machined, Alignment.STACK_LEFT)
+
+    top_plate = top_plate.cut(top_plate_back_left_cutter)
+
     tool_head_mount_machined_bottom_z = get_bounding_box(tool_head_mount_machined)[0][2]
     top_plate_top, top_plate__bottom = cut_in_two(
         top_plate,

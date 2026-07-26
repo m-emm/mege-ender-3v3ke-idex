@@ -24,7 +24,7 @@ from tmc5160t_plus_84dd4cb_delta import (
 
 BASELINE_COMMIT = "ece0565ec180e14dc5bcc4a643de45c2c63c1880"
 TARGET_CONFIG_SHA256 = (
-    "9153373f1bc5adb09e12643999f812575556269fbccb3ccd3c17ba7204fe1e08"
+    "a5e7e3a3d9c0026e64257a799f575ef45b9b9a374487de587f2bea91f4e4efa2"
 )
 DELTA_IDENTIFIER = "dual-rail-vio-ground-star-after-ece0565"
 TOP_DELTA_FILENAME = (

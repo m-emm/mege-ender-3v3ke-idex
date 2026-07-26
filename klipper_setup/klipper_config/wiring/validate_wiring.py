@@ -18,6 +18,7 @@ DEFAULT_TEMPLATE_PATH = KLIPPER_CONFIG_DIR / "printer.cfg.template"
 DEFAULT_WIRING_FILES = (
     SCRIPT_DIR / "pico_w_btt_tmc2226_x.yaml",
     SCRIPT_DIR / "pico_w_btt_tmc2226_y_z.yaml",
+    SCRIPT_DIR / "rp2040plus_btt_tmc5160t_plus_y.yaml",
 )
 
 

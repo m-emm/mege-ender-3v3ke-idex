@@ -33,8 +33,10 @@ EXPECTED_KLIPPER_TAGS = {
     "stepper_y.dir_pin",
     "stepper_y.enable_pin",
     "stepper_y.endstop_pin",
-    "tmc2209 stepper_y.uart_pin",
-    "gcode_button y_tmc_diag.pin",
+    "tmc5160 stepper_y.cs_pin",
+    "tmc5160 stepper_y.spi_software_miso_pin",
+    "tmc5160 stepper_y.spi_software_mosi_pin",
+    "tmc5160 stepper_y.spi_software_sclk_pin",
     "dotstar vision_light.clock_pin",
     "dotstar vision_light.data_pin",
     "stepper_z.step_pin",
@@ -329,13 +331,26 @@ def test_tmc5160_review_wiring_has_official_high_current_terminal_order():
     )
 
 
-def test_tmc5160_review_wiring_stays_out_of_active_klipper_validation():
+def test_tmc5160_wiring_is_active_klipper_y_truth():
     wiring = _load_tmc5160_review_wiring()
     validator = _load_validator_module()
     wire_pairs = {(wire["from"], wire["to"]) for wire in wiring["wires"]}
 
-    assert all("klipper" not in wire for wire in wiring["wires"])
-    assert TMC5160_REVIEW_PATH not in validator.DEFAULT_WIRING_FILES
+    assert TMC5160_REVIEW_PATH in validator.DEFAULT_WIRING_FILES
+    assert {
+        "stepper_y.step_pin",
+        "stepper_y.dir_pin",
+        "stepper_y.enable_pin",
+        "stepper_y.endstop_pin",
+        "tmc5160 stepper_y.cs_pin",
+        "tmc5160 stepper_y.spi_software_miso_pin",
+        "tmc5160 stepper_y.spi_software_mosi_pin",
+        "tmc5160 stepper_y.spi_software_sclk_pin",
+    } == {
+        tag
+        for wire in wiring["wires"]
+        for tag in validator.klipper_tags(wire.get("klipper"))
+    }
     assert ("PICO_THREEV3_OUT_36", "LINE18_ENDSTOP_VCC") in wire_pairs
     assert all("PICO_GND_13" not in pair for pair in wire_pairs)
     assert (

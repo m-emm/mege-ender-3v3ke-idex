@@ -333,15 +333,12 @@ wires:
     type: ground
   - from: PICO_GPIO_1
     to: Y_TB6600_IF_DIR
-    klipper: stepper_y.dir_pin
     type: data
   - from: PICO_GPIO_0
     to: Y_TB6600_IF_STEP
-    klipper: stepper_y.step_pin
     type: clock
   - from: PICO_GPIO_2
     to: Y_TB6600_IF_ENABLE
-    klipper: stepper_y.enable_pin
     type: data
 
   # Reserved Y TMC2226 fallback driver.
@@ -447,7 +444,6 @@ wires:
 
   - from: PICO_GPIO_4
     to: ENDSTOP_Y_NO
-    klipper: stepper_y.endstop_pin
     type: data
   - from: PICO_GPIO_22_29
     to: ENDSTOP_Z_LEFT_NO
