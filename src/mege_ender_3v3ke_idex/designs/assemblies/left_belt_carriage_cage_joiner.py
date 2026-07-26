@@ -298,7 +298,9 @@ def join_left_belt_carriage_with_cage(
         cut_in_two(top_plate_top_front, cut_normal=(0, 0, 1))
     )
 
-    gap_cutter = create_box(30, 100, 100)
+    gap_cutter_size = 50
+
+    gap_cutter = create_box(gap_cutter_size, 100, 100)
 
     gap_cutter = align(
         gap_cutter, top_plate_top_front_front_bottom_right, Alignment.CENTER
@@ -317,7 +319,7 @@ def join_left_belt_carriage_with_cage(
         gap_cutter
     )
 
-    gap_cutter = create_box(30, 100, 100)
+    gap_cutter = create_box(gap_cutter_size, 100, 100)
 
     gap_cutter = align(gap_cutter, top_plate_top_front_front_top_left, Alignment.CENTER)
     gap_cutter = align(

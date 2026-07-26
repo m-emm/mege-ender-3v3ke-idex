@@ -286,7 +286,8 @@ Builder:
         assembly: x_axis_belt_carriage_bottom_remainder_assembly
         artifact: followers
         names:
-          - belt_carriage_top_plate
+          - belt_carriage_top_plate_left
+          - belt_carriage_top_plate_right
         name_template: "{name}"
         prod_rotation_angle: 180
         prod_rotation_axis: [0, 1, 0]
@@ -347,7 +348,17 @@ Builder:
             - belt_carriage_remainder
             - belt_clamp_left_base
             - belt_clamp_right_base
-            - belt_carriage_top_plate
+
+        - name: belt_carriage_top_plates
+          filename: belt_carriage_top_plates
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "1"
+          parts:
+            - belt_carriage_top_plate_left
+            - belt_carriage_top_plate_right
 
       auto_assign_plates: false
 
