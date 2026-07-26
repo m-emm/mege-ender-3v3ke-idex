@@ -244,6 +244,23 @@ python wiring/validate_wiring.py
 `update_menderpi.sh` copies local `printer.cfg` to the Pi, backs up the previous
 remote `printer.cfg`, restarts Klipper, and reports Moonraker/Klippy status.
 
+### Firmware Reuse Policy
+
+RP2040/MCU firmware building and flashing are not part of routine Klipper
+configuration deployment or ordinary printer troubleshooting. Once an MCU has
+known-working firmware, reuse that firmware and its existing artifact; do not
+rebuild it merely because the host restarted, Klipper is temporarily not ready,
+or a device appears in Katapult mode.
+
+- Do not automatically build, rebuild, update, or flash MCU firmware.
+- First diagnose power, USB enumeration, bootloader/application state, serial
+  paths, services, and the existing known-working firmware artifact.
+- Only build or flash firmware when the user explicitly requests firmware work,
+  or after a verified firmware incompatibility/corruption leaves no suitable
+  known-working artifact and the user approves that recovery step.
+- Treat Katapult enumeration alone as a recovery-state observation, not as
+  permission or a reason to compile new firmware.
+
 ### Git Tracking of Configuration Files
 
 Klipper `.cfg` files in `klipper_setup/klipper_config/` and its archive are

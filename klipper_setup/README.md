@@ -94,6 +94,14 @@ freshly flashed card.
 This repo also includes Dockerized RP2040 firmware builders and native flashing
 helpers:
 
+- Firmware work is exceptional maintenance, not routine printer configuration
+  or business workflow. Reuse known-working MCU firmware and existing firmware
+  artifacts; do not rebuild or reflash merely because Klipper restarted, is
+  temporarily unavailable, or an MCU enumerates as Katapult.
+- Do not automatically build or flash firmware. Diagnose power, USB/serial
+  enumeration, bootloader/application state, and services first. Build or flash
+  only when explicitly requested, or after a verified firmware problem and
+  user approval.
 - Klipper firmware builds are Docker-only; do not use a native macOS compiler
   toolchain for RP2040 firmware.
 - Direct (no Katapult): build `klipper.uf2` in Docker and flash via BOOTSEL.

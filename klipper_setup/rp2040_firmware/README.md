@@ -3,6 +3,22 @@
 This directory builds Klipper firmware for RP2040-based boards such as Pico,
 Pico W, and LDO Nitehawk toolhead boards.
 
+## Operating Policy: Reuse Known-Working Firmware
+
+Firmware building and flashing are exceptional maintenance operations, not
+routine Klipper deployment or ordinary printer troubleshooting. Once a board
+has known-working firmware, reuse it and its existing firmware artifact.
+
+- Do not automatically build, rebuild, update, or flash MCU firmware.
+- A host restart, temporary Klipper startup failure, changed serial
+  enumeration, or Katapult-mode appearance does not by itself justify a build
+  or flash.
+- Diagnose power, USB/serial enumeration, bootloader/application state,
+  services, and available known-working artifacts first.
+- Build or flash only when the user explicitly requests firmware work, or when
+  a verified incompatibility/corruption leaves no suitable known-working
+  artifact and the user approves the recovery.
+
 Klipper firmware builds are Docker-only. Do not install or use a native macOS
 RP2040/Klipper compiler toolchain here. Native host scripts are kept only for
 USB detection and flashing already-built firmware.
@@ -34,6 +50,8 @@ Build modes:
 
 - `-k` uses `rp2040_config` and builds `klipper/out/klipper.bin` for boards
   with Katapult at the 16KiB offset.
+- `-c rp2040_config_eddy` builds the BTT Eddy USB/Duo Katapult application
+  with the W25Q080 `CLKDIV=4` startup setting required by BTT.
 - `-d` uses `rp2040_config_direct` and builds `klipper/out/klipper.uf2` for
   direct BOOTSEL flashing without Katapult.
 - `-c <config>` uses an explicit config file from this directory.

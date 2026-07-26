@@ -581,7 +581,7 @@ spi_software_mosi_pin: y_pico:gpio11
 spi_software_sclk_pin: y_pico:gpio10
 spi_speed: 500000
 interpolate: true
-run_current: 1.5
+run_current: 3.0
 sense_resistor: 0.022
 stealthchop_threshold: 0
 
