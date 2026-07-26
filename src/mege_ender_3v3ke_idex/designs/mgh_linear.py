@@ -65,7 +65,14 @@ def create_mgn12h_carriage():
 
     carriage = carriage.cut(holes)
 
-    carriage = LeaderFollowersCuttersPart(carriage, cutters=[holes])
+    carriage = LeaderFollowersCuttersPart(
+        carriage,
+        cutters=[holes],
+        additional_data={
+            "screw_hole_diameter": screw_hole_diameter,
+            "screw_hole_pitch": mgn_12h_screw_hole_pitch,
+        },
+    )
 
     carriage = translate(0, 0, mgn_12h_h1)(carriage)
 

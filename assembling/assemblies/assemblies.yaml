@@ -3832,6 +3832,7 @@ assemblies:
       tool_head_mount_machined: tool_head_mount_machined_bottom_assembly
       axis_profile: x_axis_top_profile_assembly
       eddy_duo_assembly: eddy_duo_assembly
+      x_axis_left_carriage_assembly: x_axis_left_carriage_assembly
 
     outputs:
       extruder_cage: extruder_cage_left_joined_assembly

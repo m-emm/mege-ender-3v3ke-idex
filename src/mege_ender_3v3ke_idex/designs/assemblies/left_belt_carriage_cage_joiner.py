@@ -13,6 +13,7 @@ def join_left_belt_carriage_with_cage(
     tool_head_mount_machined,
     axis_profile,
     eddy_duo_assembly,
+    x_axis_left_carriage_assembly,
 ):
     """Return a cage containing the carriage outside the Sprite envelope."""
 
@@ -43,6 +44,7 @@ def join_left_belt_carriage_with_cage(
     profile_cutter = materialize_bounding_box(axis_profile, z_size=100, y_size=100)
     profile_cutter = align(profile_cutter, axis_profile, Alignment.FRONT)
 
+    profile_cutter = translate(0, 5, 0)(profile_cutter)
     top_plate = top_plate.cut(profile_cutter)
 
     sprite_extruder_cutter = materialize_bounding_box(
@@ -232,6 +234,8 @@ def join_left_belt_carriage_with_cage(
 
     top_plate = top_plate.fuse(right_flange)
 
+    top_plate = x_axis_left_carriage_assembly.use_as_cutter_on(top_plate)
+
     correction_radius = 4
     right_clamp_inset_correction_cutter = create_cylinder(
         correction_radius, 100, direction=(0, 1, 0)
@@ -262,7 +266,91 @@ def join_left_belt_carriage_with_cage(
 
     joined_belt_carriage = joined_belt_carriage.fuse(correction_filler)
 
-    joined_belt_carriage.add_named_follower(top_plate, "belt_carriage_top_plate")
+    tool_head_mount_machined_bottom_z = get_bounding_box(tool_head_mount_machined)[0][2]
+    top_plate_top, top_plate__bottom = cut_in_two(
+        top_plate,
+        cut_normal=(0, 0, 1),
+        cut_point=(0, 0, tool_head_mount_machined_bottom_z),
+    )
+
+    top_plate_bottom_left, top_plate_bottom_right = cut_in_two(
+        top_plate__bottom, cut_normal=(-1, 0, 0)
+    )
+
+    bottom_righ_back_y = get_bounding_box(right_flange_connector)[1][1]
+    top_plate_top_center = get_bounding_box_center(top_plate_top)
+
+    top_plate_top_front, top_plate_top_back = cut_in_two(
+        top_plate_top,
+        cut_normal=(0, 1, 0),
+        cut_point=(
+            top_plate_top_center[0],
+            bottom_righ_back_y,
+            top_plate_top_center[2],
+        ),
+    )
+
+    top_plate_top_back_left, top_plate_top_back_right = cut_in_two(
+        top_plate_top_back, cut_normal=(-1, 0, 0)
+    )
+
+    top_plate_top_front_front_top_left, top_plate_top_front_front_bottom_right = (
+        cut_in_two(top_plate_top_front, cut_normal=(0, 0, 1))
+    )
+
+    gap_cutter = create_box(30, 100, 100)
+
+    gap_cutter = align(
+        gap_cutter, top_plate_top_front_front_bottom_right, Alignment.CENTER
+    )
+    gap_cutter = align(
+        gap_cutter, top_plate_top_front_front_bottom_right, Alignment.EDGE_LEFT
+    )
+    gap_cutter = align(
+        gap_cutter,
+        top_plate_top_front_front_bottom_right,
+        Alignment.STACK_FRONT,
+        stack_gap=-0.5,
+    )
+
+    top_plate_top_front_front_bottom_right = top_plate_top_front_front_bottom_right.cut(
+        gap_cutter
+    )
+
+    gap_cutter = create_box(30, 100, 100)
+
+    gap_cutter = align(gap_cutter, top_plate_top_front_front_top_left, Alignment.CENTER)
+    gap_cutter = align(
+        gap_cutter, top_plate_top_front_front_top_left, Alignment.EDGE_RIGHT
+    )
+    gap_cutter = align(
+        gap_cutter,
+        top_plate_top_front_front_top_left,
+        Alignment.STACK_FRONT,
+        stack_gap=-0.5,
+    )
+
+    top_plate_top_front_front_top_left = top_plate_top_front_front_top_left.cut(
+        gap_cutter
+    )
+
+    top_plate_left = (
+        top_plate_bottom_left.fuse(top_plate_top_back_left)
+        .fuse(top_plate_bottom_left)
+        .fuse(top_plate_top_front_front_top_left)
+    )
+    top_plate_right = (
+        top_plate_bottom_right.fuse(top_plate_top_back_right)
+        .fuse(top_plate_bottom_right)
+        .fuse(top_plate_top_front_front_bottom_right)
+    )
+
+    joined_belt_carriage.add_named_follower(
+        top_plate_left, "belt_carriage_top_plate_left"
+    )
+    joined_belt_carriage.add_named_follower(
+        top_plate_right, "belt_carriage_top_plate_right"
+    )
 
     return {
         "extruder_cage": joined_extruder_cage,

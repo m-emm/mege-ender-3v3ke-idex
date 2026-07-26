@@ -490,7 +490,7 @@ def create_y_axis_power_drive_housing_assembly(
         mount_flange = create_filleted_box(
             hv_switchbox_mount_flange_width,
             hv_switchbox_mount_flange_length,
-            hv_switchbox_mount_flange_thickness,            
+            hv_switchbox_mount_flange_thickness,
             fillet_radius=hv_switchbox_mount_flange_fillet_radius,
             no_fillets_at=[Alignment.BOTTOM, Alignment.TOP, Alignment.BACK],
         )
