@@ -1022,7 +1022,7 @@ globals:
   z_axis_creality_nut_rod_guide_bottom_overstand: 2
   z_axis_creality_nut_rod_guide_diameter: 9.97
   z_axis_creality_nut_rod_guide_height: 10.55
-  z_axis_creality_nut_threaded_rod_cuide_cutter_clearance: 0.5
+  z_axis_creality_nut_threaded_rod_cuide_cutter_clearance: 0.8
   z_axis_guide_rod_carriage_clamp_screw_length: 20
   z_axis_igus_drylin_bearing_cutter_clearance: 0.1
   z_axis_igus_drylin_bearing_inner_diameter: 8

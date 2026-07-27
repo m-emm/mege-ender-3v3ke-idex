@@ -17,13 +17,26 @@ Builder:
           - x_axis_alignment_reference
         name_template: "{name}"
   Production:
+    process_data_preset: petgcf_max_strength_high_speed_06
     parts:
       - source: self
         artifact: leader
         name: carriage
+        prod_rotation_angle: 180
+        prod_rotation_axis: [0, 1, 0]
       - source: self
         artifact: followers
         name_template: "{name}"
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: z_axis_carriage
+          parts:
+            - carriage
+            - carriage_clamp_0
+      auto_assign_plates: false
 
 Parameters:
   carriage_z_offset:
@@ -100,4 +113,4 @@ Parts:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_carriage_assembly.create_z_axis_carriage_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_carriage_assembly_v2.create_z_axis_carriage_assembly_v2
