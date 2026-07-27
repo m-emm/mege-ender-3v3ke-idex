@@ -1306,6 +1306,11 @@ assemblies:
     resource_file: brass_angle_assembly.yaml
     depends_on: []
 
+  - name: linear_bearing_LM8LUU_assembly
+
+    resource_file: linear_bearing_LM8LUU_assembly.yaml
+    depends_on: []
+
   - name: printer_frame_assembly
 
     depends_on: []

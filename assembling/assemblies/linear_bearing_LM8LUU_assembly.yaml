@@ -1,0 +1,19 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for an LM8LUU linear bearing assembly.
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: linear_bearing_LM8LUU
+
+Parameters: {}
+
+Parts:
+  LinearBearingLM8LUUAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.linear_bearing_LM8LUU_assembly.create_linear_bearing_LM8LUU_assembly
