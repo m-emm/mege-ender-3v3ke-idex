@@ -1301,6 +1301,11 @@ process_data_presets:
         sparse_infill_pattern: "cubic"
 
 assemblies:
+  - name: brass_angle_assembly
+
+    resource_file: brass_angle_assembly.yaml
+    depends_on: []
+
   - name: printer_frame_assembly
 
     depends_on: []

@@ -1,0 +1,19 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for a brass angle assembly.
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: brass_angle
+
+Parameters: {}
+
+Parts:
+  BrassAngleAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.brass_angle_assembly.create_brass_angle_assembly
