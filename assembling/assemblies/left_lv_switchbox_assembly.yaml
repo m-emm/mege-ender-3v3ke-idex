@@ -1,0 +1,98 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Standalone low-voltage power switchbox with fixed bottom and removable lid
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - back
+        - top
+      width: 900
+      height: 700
+    parts:
+      - source: self
+        artifact: leader
+        name: left_lv_switchbox
+        color: [0.88, 0.9, 0.92]
+      - source: self
+        artifact: followers
+        names:
+          - left_lv_switchbox_lid
+        name_template: "{name}"
+        color: [0.72, 0.82, 0.9]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - lid_mount_screw_*_screw
+          - lid_mount_screw_*_thread_inset
+          - terminal_*_square_nut
+        name_template: "{name}"
+        color: [0.78, 0.78, 0.72]
+
+  Production:
+    process_data_preset: petgcf_max_strength_high_speed_06
+    parts:
+      - source: self
+        artifact: leader
+        name: left_lv_switchbox
+      - source: self
+        artifact: followers
+        names:
+          - left_lv_switchbox_lid
+        name_template: "{name}"
+        prod_rotation_angle: 180
+        prod_rotation_axis: [1, 0, 0]
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: left_lv_switchbox
+          process_data_preset: petgcf_max_strength_high_speed_06
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "1"
+          parts:
+            - left_lv_switchbox
+        - name: left_lv_switchbox_lid
+          process_data_preset: petgcf_max_strength_high_speed_06
+          parts:
+            - left_lv_switchbox_lid
+      auto_assign_plates: false
+
+Parameters:
+  left_lv_switchbox_width:
+    Type: Float
+  left_lv_switchbox_depth:
+    Type: Float
+  left_lv_switchbox_total_height:
+    Type: Float
+  left_lv_switchbox_wall_thickness:
+    Type: Float
+  left_lv_switchbox_bottom_thickness:
+    Type: Float
+  left_lv_switchbox_lid_thickness:
+    Type: Float
+  left_lv_switchbox_terminal_rail_width:
+    Type: Float
+  left_lv_switchbox_terminal_rail_height:
+    Type: Float
+  left_lv_switchbox_cable_entry_width:
+    Type: Float
+  left_lv_switchbox_cable_entry_height:
+    Type: Float
+  left_lv_switchbox_mount_flange_width:
+    Type: Float
+  left_lv_switchbox_mount_flange_length:
+    Type: Float
+  left_lv_switchbox_mount_flange_thickness:
+    Type: Float
+
+Parts:
+  LeftLvSwitchboxAssembly:
+    Type: Shellforgepy::Assembly
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.left_lv_switchbox_assembly.create_left_lv_switchbox_assembly

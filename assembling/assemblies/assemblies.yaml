@@ -3933,6 +3933,25 @@ assemblies:
       y_axis_power_drive_housing_z_clearance_top: !Ref y_axis_power_drive_housing_z_clearance_top
       y_axis_power_drive_housing_z_clearance_bottom: !Ref y_axis_power_drive_housing_z_clearance_bottom
 
+  - name: left_lv_switchbox_assembly
+
+    resource_file: left_lv_switchbox_assembly.yaml
+    depends_on: []
+    parameters:
+      left_lv_switchbox_width: !Ref left_lv_switchbox_width
+      left_lv_switchbox_depth: !Ref left_lv_switchbox_depth
+      left_lv_switchbox_total_height: !Ref left_lv_switchbox_total_height
+      left_lv_switchbox_wall_thickness: !Ref left_lv_switchbox_wall_thickness
+      left_lv_switchbox_bottom_thickness: !Ref left_lv_switchbox_bottom_thickness
+      left_lv_switchbox_lid_thickness: !Ref left_lv_switchbox_lid_thickness
+      left_lv_switchbox_terminal_rail_width: !Ref left_lv_switchbox_terminal_rail_width
+      left_lv_switchbox_terminal_rail_height: !Ref left_lv_switchbox_terminal_rail_height
+      left_lv_switchbox_cable_entry_width: !Ref left_lv_switchbox_cable_entry_width
+      left_lv_switchbox_cable_entry_height: !Ref left_lv_switchbox_cable_entry_height
+      left_lv_switchbox_mount_flange_width: !Ref left_lv_switchbox_mount_flange_width
+      left_lv_switchbox_mount_flange_length: !Ref left_lv_switchbox_mount_flange_length
+      left_lv_switchbox_mount_flange_thickness: !Ref left_lv_switchbox_mount_flange_thickness
+
   - name: tool_head_mount_machined_bottom_assembly
 
     resource_file: tool_head_mount_machined_assembly.yaml

@@ -1488,3 +1488,17 @@ globals:
   y_axis_power_drive_housing_board_wall_clearance: 6.0
   y_axis_power_drive_housing_z_clearance_top: 5.0
   y_axis_power_drive_housing_z_clearance_bottom: 20
+
+  left_lv_switchbox_width: 90.0
+  left_lv_switchbox_depth: 40.0
+  left_lv_switchbox_total_height: 25.0
+  left_lv_switchbox_wall_thickness: 3.2
+  left_lv_switchbox_bottom_thickness: 3.2
+  left_lv_switchbox_lid_thickness: 3.2
+  left_lv_switchbox_terminal_rail_width: 14.0
+  left_lv_switchbox_terminal_rail_height: 8.0
+  left_lv_switchbox_cable_entry_width: 35.0
+  left_lv_switchbox_cable_entry_height: 10.0
+  left_lv_switchbox_mount_flange_width: 30.0
+  left_lv_switchbox_mount_flange_length: 16.0
+  left_lv_switchbox_mount_flange_thickness: 3.2
