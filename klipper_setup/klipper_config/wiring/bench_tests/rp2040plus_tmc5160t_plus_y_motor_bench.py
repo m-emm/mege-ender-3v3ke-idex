@@ -46,7 +46,7 @@ OID_COUNT = 6
 SPI_MODE = 3
 SPI_SPEED_HZ = 500_000
 MIN_SPI_SPEED_HZ = 1_000
-MAX_SPI_SPEED_HZ = SPI_SPEED_HZ
+MAX_SPI_SPEED_HZ = 3_000_000
 VERY_SLOW_SPI_SPEED_HZ = MIN_SPI_SPEED_HZ
 STEP_PULSE_DURATION_S = 0.000005
 ENABLE_WATCHDOG_S = 2.0
@@ -66,8 +66,20 @@ REPEATED_MOTION_CYCLES_PER_RUN = 10
 REPEATED_MOTION_STEP_COUNT = FULL_CURRENT_REVERSE_STEP_COUNT
 REPEATED_MOTION_STEP_RATE_HZ = 6_400
 REPEATED_MOTION_CURRENT_A = 1.5
-WATCHDOG_REFRESH_INTERVAL_S = 0.75
 MICROSTEPS = 16
+MAX_STRESS_CURRENT_A = 2.5
+MOTOR_FULL_STEPS_PER_REVOLUTION = 200
+MAX_STRESS_REVOLUTIONS_PER_LEG = 10
+MAX_STRESS_STEP_COUNT = (
+    MOTOR_FULL_STEPS_PER_REVOLUTION
+    * MICROSTEPS
+    * MAX_STRESS_REVOLUTIONS_PER_LEG
+)
+MAX_STRESS_STEP_RATE_HZ = 6_400
+MAX_STRESS_LEG_DURATION_S = MAX_STRESS_STEP_COUNT / MAX_STRESS_STEP_RATE_HZ
+MAX_STRESS_RUNS = 3
+MAX_STRESS_MONITOR_INTERVAL_S = 0.75
+WATCHDOG_REFRESH_INTERVAL_S = 0.75
 JOG_STEPS = 128
 JOG_STEP_RATE_HZ = 400
 JOG_START_LEAD_S = 0.25
@@ -594,6 +606,60 @@ def wait_with_enable_watchdog(
             next_watchdog_refresh += WATCHDOG_REFRESH_INTERVAL_S
 
 
+def wait_with_max_stress_monitor(
+    client: KlipperSerial,
+    duration_s: float,
+    *,
+    stage: str,
+) -> int:
+    wait_deadline = time.monotonic() + duration_s
+    sample_number = 0
+    while True:
+        remaining_s = wait_deadline - time.monotonic()
+        if remaining_s <= 0:
+            return sample_number
+        time.sleep(min(MAX_STRESS_MONITOR_INTERVAL_S, remaining_s))
+        if time.monotonic() >= wait_deadline:
+            return sample_number
+
+        client.send_command(f"update_digital_out oid={ENABLE_OID} value=0")
+        require_safe_inputs(client, stage=stage)
+        ioin = read_register(client, REGISTER_IOIN)
+        require_ioin(ioin, expected_disabled=False, stage=stage)
+        gstat, _drv_status = require_clean_status(client, stage=stage)
+        if gstat.value:
+            raise BenchFailure(
+                f"{stage}: unexpected GSTAT latch during motion: "
+                f"{gstat.value:#010x}"
+            )
+        sample_number += 1
+
+
+def read_stepper_position(client: KlipperSerial) -> int:
+    response = client.request(
+        f"stepper_get_position oid={STEPPER_OID}",
+        "stepper_position",
+        predicate=lambda item: item["oid"] == STEPPER_OID,
+    )
+    return int(response["pos"])
+
+
+def require_position_delta(
+    *,
+    start_position: int,
+    end_position: int | None,
+    expected_delta: int,
+    stage: str,
+) -> None:
+    actual_delta = None if end_position is None else end_position - start_position
+    if actual_delta != expected_delta:
+        raise BenchFailure(
+            f"{stage}: MCU STEP position delta is {actual_delta}, "
+            f"expected {expected_delta} (start={start_position}, "
+            f"end={end_position})"
+        )
+
+
 def run_low_current_hold(
     client: KlipperSerial,
     *,
@@ -660,8 +726,9 @@ def run_low_current_step_test(
     )
     require_safe_inputs(client, stage="pre-low-current-step-test")
 
+    start_position = read_stepper_position(client)
     enabled_ioin: TmcResponse | None = None
-    position: dict[str, Any] | None = None
+    end_position: int | None = None
     client.send_command(f"update_digital_out oid={ENABLE_OID} value=0")
     try:
         wait_with_enable_watchdog(
@@ -680,11 +747,7 @@ def run_low_current_step_test(
             client,
             JOG_START_LEAD_S + motion_duration_s + JOG_COMPLETION_MARGIN_S,
         )
-        position = client.request(
-            f"stepper_get_position oid={STEPPER_OID}",
-            "stepper_position",
-            predicate=lambda item: item["oid"] == STEPPER_OID,
-        )
+        end_position = read_stepper_position(client)
         enabled_ioin = read_register(client, REGISTER_IOIN)
     finally:
         disable_driver(client)
@@ -692,16 +755,16 @@ def run_low_current_step_test(
     time.sleep(0.05)
     require_safe_inputs(client, stage="post-low-current-step-test")
     recovered_ioin = read_register(client, REGISTER_IOIN)
-    if position is None or position["pos"] != LOW_CURRENT_EXPECTED_MCU_POSITION:
-        actual_position = None if position is None else position["pos"]
-        raise BenchFailure(
-            f"MCU STEP position is {actual_position}, expected "
-            f"{LOW_CURRENT_EXPECTED_MCU_POSITION}"
-        )
+    require_position_delta(
+        start_position=start_position,
+        end_position=end_position,
+        expected_delta=LOW_CURRENT_EXPECTED_MCU_POSITION,
+        stage="low-current step test",
+    )
     print(
         f"   MCU PASS: completed {LOW_CURRENT_STEP_COUNT} forward pulses "
-        f"at {LOW_CURRENT_STEP_RATE_HZ} pulses/s; signed position "
-        f"{position['pos']}; ENABLE restored HIGH",
+        f"at {LOW_CURRENT_STEP_RATE_HZ} pulses/s; signed position delta "
+        f"{end_position - start_position}; ENABLE restored HIGH",
         flush=True,
     )
     if enabled_ioin is None:
@@ -751,8 +814,9 @@ def run_full_current_reverse_test(
     )
     require_safe_inputs(client, stage="pre-full-current-reverse-test")
 
+    start_position = read_stepper_position(client)
     enabled_ioin: TmcResponse | None = None
-    position: dict[str, Any] | None = None
+    end_position: int | None = None
     client.send_command(f"update_digital_out oid={ENABLE_OID} value=0")
     try:
         wait_with_enable_watchdog(
@@ -776,11 +840,7 @@ def run_full_current_reverse_test(
             client,
             JOG_START_LEAD_S + motion_duration_s + JOG_COMPLETION_MARGIN_S,
         )
-        position = client.request(
-            f"stepper_get_position oid={STEPPER_OID}",
-            "stepper_position",
-            predicate=lambda item: item["oid"] == STEPPER_OID,
-        )
+        end_position = read_stepper_position(client)
         enabled_ioin = read_register(client, REGISTER_IOIN)
     finally:
         disable_driver(client)
@@ -788,16 +848,16 @@ def run_full_current_reverse_test(
     time.sleep(0.05)
     require_safe_inputs(client, stage="post-full-current-reverse-test")
     recovered_ioin = read_register(client, REGISTER_IOIN)
-    if position is None or position["pos"] != 0:
-        actual_position = None if position is None else position["pos"]
-        raise BenchFailure(
-            f"Equal forward/reverse queues ended at MCU position "
-            f"{actual_position}, expected zero"
-        )
+    require_position_delta(
+        start_position=start_position,
+        end_position=end_position,
+        expected_delta=0,
+        stage="full-current reverse test",
+    )
     print(
         f"   MCU PASS: completed {FULL_CURRENT_REVERSE_STEP_COUNT} forward "
-        f"and {FULL_CURRENT_REVERSE_STEP_COUNT} reverse pulses; signed "
-        "position returned to zero; ENABLE restored HIGH",
+        f"and {FULL_CURRENT_REVERSE_STEP_COUNT} reverse pulses; signed position "
+        "delta returned to zero; ENABLE restored HIGH",
         flush=True,
     )
     if enabled_ioin is None:
@@ -854,13 +914,14 @@ def run_repeated_motion_test(
     for run in range(1, REPEATED_MOTION_RUNS + 1):
         stage = f"repeated motion group {run}/{REPEATED_MOTION_RUNS}"
         require_safe_inputs(client, stage=f"pre-{stage}")
+        start_position = read_stepper_position(client)
         write_register_verified(
             client,
             REGISTER_CHOPCONF,
             CHOPCONF_RUN,
         )
 
-        position: dict[str, Any] | None = None
+        end_position: int | None = None
         client.send_command(f"update_digital_out oid={ENABLE_OID} value=0")
         try:
             clock = client.request("get_clock", "clock")["clock"]
@@ -882,26 +943,22 @@ def run_repeated_motion_test(
                     f"count={REPEATED_MOTION_STEP_COUNT} add=0"
                 )
             wait_with_enable_watchdog(client, enabled_duration_s)
-            position = client.request(
-                f"stepper_get_position oid={STEPPER_OID}",
-                "stepper_position",
-                predicate=lambda item: item["oid"] == STEPPER_OID,
-            )
+            end_position = read_stepper_position(client)
         finally:
             disable_driver(client)
 
-        if position is None or position["pos"] != 0:
-            actual_position = None if position is None else position["pos"]
-            raise BenchFailure(
-                f"{stage}: equal forward/reverse queues ended at MCU "
-                f"position {actual_position}, expected zero"
-            )
+        require_position_delta(
+            start_position=start_position,
+            end_position=end_position,
+            expected_delta=0,
+            stage=stage,
+        )
         time.sleep(0.05)
         verify_disabled_postcondition(client, stage=f"post-{stage}")
         print(
             f"   PASS group {run}/{REPEATED_MOTION_RUNS}: "
             f"{REPEATED_MOTION_CYCLES_PER_RUN} continuous cycles in "
-            f"{motion_duration_s:.2f} s, MCU position zero, ENABLE HIGH, "
+            f"{motion_duration_s:.2f} s, MCU position delta zero, ENABLE HIGH, "
             "and SPI/status clean",
             flush=True,
         )
@@ -911,6 +968,117 @@ def run_repeated_motion_test(
         f"{REPEATED_MOTION_RUNS * REPEATED_MOTION_CYCLES_PER_RUN} "
         f"back-and-forth cycles completed in {REPEATED_MOTION_RUNS} "
         f"enable groups at {current.actual_run_current_a:.3f} A RMS",
+        flush=True,
+    )
+
+
+def run_max_stress_test(
+    client: KlipperSerial,
+    *,
+    current: CurrentSettings,
+) -> None:
+    clock_frequency = client.parser.get_constant_int("CLOCK_FREQ")
+    interval_ticks = round(clock_frequency / MAX_STRESS_STEP_RATE_HZ)
+    monitored_leg_duration_s = (
+        JOG_START_LEAD_S
+        + MAX_STRESS_LEG_DURATION_S
+        + JOG_COMPLETION_MARGIN_S
+    )
+
+    print(
+        f"4. Running {MAX_STRESS_RUNS} maximum-stress groups; each group "
+        f"keeps ENABLE active for {MAX_STRESS_REVOLUTIONS_PER_LEG} revolutions "
+        f"forward and {MAX_STRESS_REVOLUTIONS_PER_LEG} in reverse at "
+        f"{MAX_STRESS_STEP_RATE_HZ} pulses/s "
+        f"({MAX_STRESS_LEG_DURATION_S:.2f} s per direction) ...",
+        flush=True,
+    )
+
+    total_spi_samples = 0
+    for run in range(1, MAX_STRESS_RUNS + 1):
+        group_stage = f"maximum stress group {run}/{MAX_STRESS_RUNS}"
+        require_safe_inputs(client, stage=f"pre-{group_stage}")
+        start_position = read_stepper_position(client)
+        write_register_verified(client, REGISTER_CHOPCONF, CHOPCONF_RUN)
+
+        forward_position: int | None = None
+        end_position: int | None = None
+        client.send_command(f"update_digital_out oid={ENABLE_OID} value=0")
+        try:
+            clock = client.request("get_clock", "clock")["clock"]
+            start_clock = (
+                clock + round(clock_frequency * JOG_START_LEAD_S)
+            ) & 0xFFFFFFFF
+            client.send_command(
+                f"reset_step_clock oid={STEPPER_OID} clock={start_clock}"
+            )
+            client.send_command(f"set_next_step_dir oid={STEPPER_OID} dir=0")
+            client.send_command(
+                f"queue_step oid={STEPPER_OID} interval={interval_ticks} "
+                f"count={MAX_STRESS_STEP_COUNT} add=0"
+            )
+            total_spi_samples += wait_with_max_stress_monitor(
+                client,
+                monitored_leg_duration_s,
+                stage=f"{group_stage} forward",
+            )
+            forward_position = read_stepper_position(client)
+            require_position_delta(
+                start_position=start_position,
+                end_position=forward_position,
+                expected_delta=-MAX_STRESS_STEP_COUNT,
+                stage=f"{group_stage} forward",
+            )
+
+            clock = client.request("get_clock", "clock")["clock"]
+            start_clock = (
+                clock + round(clock_frequency * JOG_START_LEAD_S)
+            ) & 0xFFFFFFFF
+            client.send_command(
+                f"reset_step_clock oid={STEPPER_OID} clock={start_clock}"
+            )
+            client.send_command(f"set_next_step_dir oid={STEPPER_OID} dir=1")
+            client.send_command(
+                f"queue_step oid={STEPPER_OID} interval={interval_ticks} "
+                f"count={MAX_STRESS_STEP_COUNT} add=0"
+            )
+            total_spi_samples += wait_with_max_stress_monitor(
+                client,
+                monitored_leg_duration_s,
+                stage=f"{group_stage} reverse",
+            )
+            end_position = read_stepper_position(client)
+        finally:
+            disable_driver(client)
+
+        require_position_delta(
+            start_position=forward_position
+            if forward_position is not None
+            else start_position,
+            end_position=end_position,
+            expected_delta=MAX_STRESS_STEP_COUNT,
+            stage=f"{group_stage} reverse",
+        )
+        require_position_delta(
+            start_position=start_position,
+            end_position=end_position,
+            expected_delta=0,
+            stage=group_stage,
+        )
+        time.sleep(0.05)
+        verify_disabled_postcondition(client, stage=f"post-{group_stage}")
+        print(
+            f"   PASS group {run}/{MAX_STRESS_RUNS}: "
+            f"{MAX_STRESS_REVOLUTIONS_PER_LEG} revolutions each way, "
+            "MCU position delta zero, ENABLE HIGH, and live SPI/status clean",
+            flush=True,
+        )
+
+    print(
+        f"   PASS: {MAX_STRESS_RUNS * MAX_STRESS_REVOLUTIONS_PER_LEG} "
+        "revolutions in each direction completed at "
+        f"{current.actual_run_current_a:.3f} A RMS with "
+        f"{total_spi_samples} live motion SPI/status samples",
         flush=True,
     )
 
@@ -925,6 +1093,7 @@ def run_jog(client: KlipperSerial) -> None:
         flush=True,
     )
     require_safe_inputs(client, stage="pre-jog")
+    start_position = read_stepper_position(client)
     client.send_command(f"update_digital_out oid={ENABLE_OID} value=0")
     time.sleep(0.05)
     require_safe_inputs(client, stage="enabled pre-jog")
@@ -979,20 +1148,17 @@ def run_jog(client: KlipperSerial) -> None:
         require_safe_inputs(client, stage="jog")
         time.sleep(min(0.04, max(0.0, deadline - time.monotonic())))
 
-    position = client.request(
-        f"stepper_get_position oid={STEPPER_OID}",
-        "stepper_position",
-        predicate=lambda item: item["oid"] == STEPPER_OID,
-    )
+    end_position = read_stepper_position(client)
     disable_driver(client)
-    if position["pos"] != 0:
-        raise BenchFailure(
-            "Equal forward/reverse queues did not return the MCU step count "
-            f"to zero (position={position['pos']})"
-        )
+    require_position_delta(
+        start_position=start_position,
+        end_position=end_position,
+        expected_delta=0,
+        stage="jog",
+    )
     print(
         f"   PASS: {JOG_STEPS} microsteps forward and {JOG_STEPS} backward; "
-        "MCU step count returned to zero; ENABLE restored HIGH",
+        "MCU step-count delta returned to zero; ENABLE restored HIGH",
         flush=True,
     )
 
@@ -1048,6 +1214,11 @@ def print_plan(
         f"{REPEATED_MOTION_STEP_COUNT} forward + "
         f"{REPEATED_MOTION_STEP_COUNT} reverse at "
         f"{REPEATED_MOTION_STEP_RATE_HZ} pulses/s\n"
+        f"  maximum stress test: {MAX_STRESS_RUNS} enable groups x "
+        f"{MAX_STRESS_REVOLUTIONS_PER_LEG} revolutions forward + "
+        f"{MAX_STRESS_REVOLUTIONS_PER_LEG} reverse, "
+        f"{MAX_STRESS_LEG_DURATION_S:.2f} s per direction at "
+        f"{MAX_STRESS_STEP_RATE_HZ} pulses/s\n"
         f"  safety: ENABLE gpio2 idles HIGH; {ENABLE_WATCHDOG_S:.0f} s MCU "
         "watchdog; shutdown writes CHOPCONF.toff=0\n"
         "\n"
@@ -1126,6 +1297,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     mode.add_argument(
+        "--max-stress-test",
+        action="store_true",
+        help=(
+            "Run three 2.5 A groups with ten five-second revolutions in "
+            "each direction and live SPI/status polling."
+        ),
+    )
+    mode.add_argument(
         "--jog",
         action="store_true",
         help="Run SPI checks and the fixed, bounded forward/reverse motor jog.",
@@ -1140,9 +1319,13 @@ def main(argv: list[str] | None = None) -> int:
         LOW_CURRENT_HOLD_A
         if args.low_current_hold or args.low_current_step_test
         else (
-            REPEATED_MOTION_CURRENT_A
-            if args.repeated_motion_test
-            else REQUESTED_CURRENT_A
+            MAX_STRESS_CURRENT_A
+            if args.max_stress_test
+            else (
+                REPEATED_MOTION_CURRENT_A
+                if args.repeated_motion_test
+                else REQUESTED_CURRENT_A
+            )
         )
     )
     current = calculate_current_settings(requested_current_a)
@@ -1155,21 +1338,25 @@ def main(argv: list[str] | None = None) -> int:
         "jog"
         if args.jog
         else (
-            "full-current forward/reverse STEP test"
-            if args.full_current_reverse_test
+            "maximum-current long-leg motion and live-SPI stress test"
+            if args.max_stress_test
             else (
-                "three enable groups of ten continuous forward/reverse cycles"
-                if args.repeated_motion_test
+                "full-current forward/reverse STEP test"
+                if args.full_current_reverse_test
                 else (
-                    "five-second hold plus low-current STEP test"
-                    if args.low_current_step_test
+                    "three enable groups of ten continuous forward/reverse cycles"
+                    if args.repeated_motion_test
                     else (
-                        "ten-second low-current hold"
-                        if args.low_current_hold
+                        "five-second hold plus low-current STEP test"
+                        if args.low_current_step_test
                         else (
-                            "no-current ENABLE probe"
-                            if args.enable_probe
-                            else "SPI diagnostics only"
+                            "ten-second low-current hold"
+                            if args.low_current_hold
+                            else (
+                                "no-current ENABLE probe"
+                                if args.enable_probe
+                                else "SPI diagnostics only"
+                            )
                         )
                     )
                 )
@@ -1186,8 +1373,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "\nDry run only. Select --spi-only, --enable-probe, "
             "--low-current-hold, --low-current-step-test, "
-            "--full-current-reverse-test, --repeated-motion-test, or --jog "
-            "and add --armed "
+            "--full-current-reverse-test, --repeated-motion-test, "
+            "--max-stress-test, or --jog and add --armed "
             "after confirming the printed preconditions."
         )
         return 0
@@ -1199,6 +1386,7 @@ def main(argv: list[str] | None = None) -> int:
             args.low_current_step_test,
             args.full_current_reverse_test,
             args.repeated_motion_test,
+            args.max_stress_test,
             args.jog,
         )
     )
@@ -1206,7 +1394,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(
             "--armed requires exactly one of --spi-only, --enable-probe, "
             "--low-current-hold, --low-current-step-test, "
-            "--full-current-reverse-test, --repeated-motion-test, or --jog"
+            "--full-current-reverse-test, --repeated-motion-test, "
+            "--max-stress-test, or --jog"
         )
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
@@ -1251,6 +1440,8 @@ def main(argv: list[str] | None = None) -> int:
         initialize_driver(client, current=current)
         if args.jog:
             run_jog(client)
+        elif args.max_stress_test:
+            run_max_stress_test(client, current=current)
         elif args.repeated_motion_test:
             run_repeated_motion_test(client, current=current)
         elif args.full_current_reverse_test:
@@ -1298,21 +1489,25 @@ def main(argv: list[str] | None = None) -> int:
         "SPI diagnostics"
         if args.spi_only
         else (
-            "SPI diagnostics and full-current reverse test"
-            if args.full_current_reverse_test
+            "SPI diagnostics and maximum-current long-leg motion stress test"
+            if args.max_stress_test
             else (
-                "SPI diagnostics and repeated motion test"
-                if args.repeated_motion_test
+                "SPI diagnostics and full-current reverse test"
+                if args.full_current_reverse_test
                 else (
-                    "SPI diagnostics and low-current STEP test"
-                    if args.low_current_step_test
+                    "SPI diagnostics and repeated motion test"
+                    if args.repeated_motion_test
                     else (
-                        "SPI diagnostics and low-current hold"
-                        if args.low_current_hold
+                        "SPI diagnostics and low-current STEP test"
+                        if args.low_current_step_test
                         else (
-                            "SPI diagnostics and no-current ENABLE probe"
-                            if args.enable_probe
-                            else "SPI diagnostics and jog"
+                            "SPI diagnostics and low-current hold"
+                            if args.low_current_hold
+                            else (
+                                "SPI diagnostics and no-current ENABLE probe"
+                                if args.enable_probe
+                                else "SPI diagnostics and jog"
+                            )
                         )
                     )
                 )

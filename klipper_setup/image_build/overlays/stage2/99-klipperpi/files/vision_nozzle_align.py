@@ -114,6 +114,30 @@ NOZZLE_Z_COARSE_MIN_CORRELATION = float(
 NOZZLE_Z_REFINED_MIN_CORRELATION = float(
     os.environ.get("VISION_NOZZLE_Z_REFINED_MIN_CORRELATION", "0.85")
 )
+EDDY_FIDUCIAL_COARSE_ROI_1080 = tuple(
+    float(v)
+    for v in os.environ.get(
+        "VISION_EDDY_FIDUCIAL_COARSE_ROI_1080", "960,360,160,150"
+    ).split(",")
+)
+EDDY_FIDUCIAL_REFINED_ROI_1080 = tuple(
+    float(v)
+    for v in os.environ.get(
+        "VISION_EDDY_FIDUCIAL_REFINED_ROI_1080", "1030,500,95,80"
+    ).split(",")
+)
+NOZZLE_TARGET_COARSE_ROI_1080 = tuple(
+    float(v)
+    for v in os.environ.get(
+        "VISION_NOZZLE_TARGET_COARSE_ROI_1080", "960,340,170,170"
+    ).split(",")
+)
+NOZZLE_TARGET_REFINED_ROI_1080 = tuple(
+    float(v)
+    for v in os.environ.get(
+        "VISION_NOZZLE_TARGET_REFINED_ROI_1080", "995,370,65,105"
+    ).split(",")
+)
 PUBLIC_BASE_URL = os.environ.get("VISION_PUBLIC_BASE_URL", "http://menderpi.local")
 NAME_REPLACEMENTS = str.maketrans({c: "_" for c in " /\\:;|?*[]{}()<>'\"`$&!"})
 VISION_JOB_SCHEMA_VERSION = 1
@@ -122,6 +146,8 @@ BED_Y_JOB_KIND = "nozzle_cam_bed_y_sweep"
 BED_Y_MEASUREMENT = "nozzle_cam_bed_y_motion"
 NOZZLE_Z_JOB_KIND = "nozzle_cam_nozzle_z_sweep"
 NOZZLE_Z_MEASUREMENT = "nozzle_cam_nozzle_z_offsets"
+EDDY_RELATIVE_JOB_KIND = "nozzle_cam_eddy_relative_calibration"
+EDDY_RELATIVE_MEASUREMENT = "cold_contact_free_eddy_relative_calibration"
 VISION_JOB_CAMERA = "nozzle_cam"
 VISION_JOB_PROFILE = "analysis"
 VISION_JOB_LIGHTING = "NOZZLE_CAM_ANALYSIS_LIGHT"
@@ -142,6 +168,15 @@ NOZZLE_Z_MIN_SCALE_SLOPE_ABS = float(
 )
 NOZZLE_Z_MAX_TOOL_SLOPE_RELATIVE_SPREAD = float(
     os.environ.get("VISION_NOZZLE_Z_MAX_TOOL_SLOPE_RELATIVE_SPREAD", "0.25")
+)
+EDDY_MAX_TARGET_SLOPE_RELATIVE_SPREAD = float(
+    os.environ.get("VISION_EDDY_MAX_TARGET_SLOPE_RELATIVE_SPREAD", "0.25")
+)
+EDDY_MAX_CAD_SEPARATION_ERROR_MM = float(
+    os.environ.get("VISION_EDDY_MAX_CAD_SEPARATION_ERROR_MM", "0.75")
+)
+EDDY_DEFAULT_REPEATABILITY_SIGMA_MM = float(
+    os.environ.get("VISION_EDDY_REPEATABILITY_SIGMA_MM", "0.05")
 )
 BED_Y_ROIS_1080 = {
     "marked_line_tight": (690.0, 438.0, 300.0, 125.0),
@@ -360,12 +395,14 @@ def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def generated_job_id(name: str, timestamp: datetime) -> str:
     timestamp_part = timestamp.strftime("%Y%m%dT%H%M%SZ")
-    return f"{VISION_JOB_KIND}_{timestamp_part}_{sanitize_name(name)}"
+    return sanitize_name(
+        f"{VISION_JOB_KIND}_{timestamp_part}_{sanitize_name(name)}"
+    )
 
 
 def generated_job_id_for_kind(kind: str, name: str, timestamp: datetime) -> str:
     timestamp_part = timestamp.strftime("%Y%m%dT%H%M%SZ")
-    return f"{kind}_{timestamp_part}_{sanitize_name(name)}"
+    return sanitize_name(f"{kind}_{timestamp_part}_{sanitize_name(name)}")
 
 
 def build_nozzle_sweep_job_frames(
@@ -489,6 +526,105 @@ def build_nozzle_z_sweep_job_frames(
                         z_sample=z_sample,
                     )
                 )
+    return tuple(frames)
+
+
+def build_eddy_relative_job_frames(
+    *,
+    bed_y_x: float,
+    bed_y_y: float,
+    bed_y_z: float,
+    tool_x: float,
+    tool_y: float,
+    center_x: float,
+    center_y: float,
+    travel_z: float,
+    y_offsets: list[float],
+    x_offsets: list[float],
+    z_values: list[float],
+    feedrate: float,
+    settle_ms: int,
+    camera: str,
+    profile: str,
+) -> tuple[VisionJobFrame, ...]:
+    frames: list[VisionJobFrame] = list(
+        build_bed_y_sweep_job_frames(
+            x=bed_y_x,
+            y=bed_y_y,
+            z=bed_y_z,
+            y_offsets=y_offsets,
+            feedrate=feedrate,
+            settle_ms=settle_ms,
+            camera=camera,
+            profile=profile,
+        )
+    )
+    for x_offset in x_offsets:
+        for z_sample in z_values_high_to_low(z_values):
+            frame_id = f"t0_x{dx_label(x_offset)}_z{dx_label(z_sample)}"
+            frames.append(
+                VisionJobFrame(
+                    seq=len(frames),
+                    frame=frame_id,
+                    tool="T0",
+                    dx=x_offset,
+                    x=tool_x + x_offset,
+                    y=tool_y,
+                    z=z_sample,
+                    feedrate=feedrate,
+                    settle_ms=settle_ms,
+                    lighting=NOZZLE_Z_TOOL_LIGHTING,
+                    camera=camera,
+                    profile=profile,
+                    phase="tool_xz_sweep",
+                    target="nozzle_and_eddy_fiducial",
+                    x_offset=x_offset,
+                    z_sample=z_sample,
+                )
+            )
+    for y_offset in y_offsets:
+        if abs(y_offset) <= 1.0e-9:
+            continue
+        for z_sample in z_values_high_to_low(z_values):
+            frame_id = f"t0_y{dx_label(y_offset)}_z{dx_label(z_sample)}"
+            frames.append(
+                VisionJobFrame(
+                    seq=len(frames),
+                    frame=frame_id,
+                    tool="T0",
+                    dx=y_offset,
+                    x=tool_x,
+                    y=tool_y + y_offset,
+                    z=z_sample,
+                    feedrate=feedrate,
+                    settle_ms=settle_ms,
+                    lighting=NOZZLE_Z_TOOL_LIGHTING,
+                    camera=camera,
+                    profile=profile,
+                    phase="tool_yz_sweep",
+                    target="nozzle_and_eddy_fiducial",
+                    y_offset=y_offset,
+                    z_sample=z_sample,
+                )
+            )
+    frames.append(
+        VisionJobFrame(
+            seq=len(frames),
+            frame="eddy_center_sanity_z20",
+            tool="T0",
+            dx=0.0,
+            x=center_x,
+            y=center_y,
+            z=travel_z,
+            feedrate=feedrate,
+            settle_ms=settle_ms,
+            lighting=NOZZLE_Z_TOOL_LIGHTING,
+            camera=camera,
+            profile=profile,
+            phase="center_sanity",
+            target="eddy_coil_over_bed_center",
+        )
+    )
     return tuple(frames)
 
 
@@ -684,6 +820,118 @@ def build_nozzle_z_vision_job(
     )
 
 
+def build_eddy_relative_vision_job(
+    *,
+    name: str,
+    job_root: Path,
+    job_id: str | None,
+    bed_y_x: float,
+    bed_y_y: float,
+    bed_y_z: float,
+    tool_x: float,
+    tool_y: float,
+    travel_z: float,
+    y_offsets: list[float],
+    x_offsets: list[float],
+    z_values: list[float],
+    bed_feature_z_mm: float,
+    current_t0_z_endstop: float,
+    bed_center_x: float,
+    bed_center_y: float,
+    nozzle_to_coil_x: float,
+    nozzle_to_coil_y: float,
+    nozzle_to_coil_z: float,
+    feedrate: float,
+    settle_time: float,
+    camera: str,
+    profile: str,
+    now: datetime | None = None,
+) -> VisionJob:
+    timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    resolved_job_id = (
+        sanitize_name(job_id)
+        if job_id
+        else generated_job_id_for_kind(EDDY_RELATIVE_JOB_KIND, name, timestamp)
+    )
+    job_dir = job_root / resolved_job_id
+    center_x = bed_center_x - nozzle_to_coil_x
+    center_y = bed_center_y - nozzle_to_coil_y
+    z_capture_order = z_values_high_to_low(z_values)
+    frames = build_eddy_relative_job_frames(
+        bed_y_x=bed_y_x,
+        bed_y_y=bed_y_y,
+        bed_y_z=bed_y_z,
+        tool_x=tool_x,
+        tool_y=tool_y,
+        center_x=center_x,
+        center_y=center_y,
+        travel_z=travel_z,
+        y_offsets=y_offsets,
+        x_offsets=x_offsets,
+        z_values=z_capture_order,
+        feedrate=feedrate,
+        settle_ms=settle_time_to_ms(settle_time),
+        camera=camera,
+        profile=profile,
+    )
+    return VisionJob(
+        job_id=resolved_job_id,
+        kind=EDDY_RELATIVE_JOB_KIND,
+        created_at_utc=timestamp.isoformat(),
+        camera=camera,
+        profile=profile,
+        job_dir=job_dir,
+        manifest_path=job_dir / "manifest.json",
+        gcode_path=job_dir / "acquisition.gcode",
+        state_path=job_dir / "state.json",
+        events_path=job_dir / "events.jsonl",
+        frames_dir=job_dir / "frames",
+        analysis_dir=job_dir / "analysis",
+        frames=frames,
+        measurement_parameters={
+            "bed_y_pose": {
+                "x": round(bed_y_x, 4),
+                "y": round(bed_y_y, 4),
+                "z": round(bed_y_z, 4),
+            },
+            "tool_pose": {
+                "x": round(tool_x, 4),
+                "y": round(tool_y, 4),
+                "travel_z": round(travel_z, 4),
+            },
+            "bed_center": {
+                "x": round(bed_center_x, 4),
+                "y": round(bed_center_y, 4),
+            },
+            "nozzle_to_coil": {
+                "x": round(nozzle_to_coil_x, 4),
+                "y": round(nozzle_to_coil_y, 4),
+                "z": round(nozzle_to_coil_z, 4),
+            },
+            "coil_center_command": {
+                "x": round(center_x, 4),
+                "y": round(center_y, 4),
+            },
+            "y_offsets": [round(value, 4) for value in y_offsets],
+            "x_offsets": [round(value, 4) for value in x_offsets],
+            "z_values": [round(value, 4) for value in z_values],
+            "z_capture_order": [round(value, 4) for value in z_capture_order],
+            "bed_feature_z_mm": round(bed_feature_z_mm, 4),
+            "current_calib_yaml": {
+                "tools": {"t0": {"z_endstop": round(current_t0_z_endstop, 4)}}
+            },
+            "report_only": True,
+            "fiducial_to_sensing_plane_correction_mm": 0.0,
+            "lighting": {
+                "bed_y_sweep": {"macro": BED_Y_JOB_LIGHTING},
+                "tool_xz_sweep": {"macro": NOZZLE_Z_TOOL_LIGHTING},
+                "tool_yz_sweep": {"macro": NOZZLE_Z_TOOL_LIGHTING},
+                "center_sanity": {"macro": NOZZLE_Z_TOOL_LIGHTING},
+            },
+        },
+    )
+
+
 def render_acquisition_gcode(
     job: VisionJob,
     *,
@@ -708,7 +956,7 @@ def render_acquisition_gcode(
     active_profile = job.profile
     previous_tool_frame: VisionJobFrame | None = None
     travel_z = None
-    if job.kind == NOZZLE_Z_JOB_KIND:
+    if job.kind in (NOZZLE_Z_JOB_KIND, EDDY_RELATIVE_JOB_KIND):
         parameters = job.measurement_parameters or {}
         tool_pose = parameters.get("tool_pose") or {}
         try:
@@ -730,8 +978,12 @@ def render_acquisition_gcode(
             lines.append(frame.tool)
             active_tool = frame.tool
         if (
-            job.kind == NOZZLE_Z_JOB_KIND
-            and frame.phase == "tool_xz_sweep"
+            job.kind in (NOZZLE_Z_JOB_KIND, EDDY_RELATIVE_JOB_KIND)
+            and frame.phase in (
+                "tool_xz_sweep",
+                "tool_yz_sweep",
+                "center_sanity",
+            )
             and previous_tool_frame is not None
             and (
                 frame.tool != previous_tool_frame.tool
@@ -772,7 +1024,7 @@ def render_acquisition_gcode(
                 "",
             ]
         )
-        if frame.phase == "tool_xz_sweep":
+        if frame.phase in ("tool_xz_sweep", "tool_yz_sweep"):
             previous_tool_frame = frame
     lines.append(f"VISION_JOB_END JOB={job.job_id} EXPECTED_FRAMES={len(job.frames)}")
     return "\n".join(lines) + "\n"
@@ -1022,6 +1274,82 @@ def prepare_nozzle_z_sweep_job(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def prepare_eddy_relative_vision_job(args: argparse.Namespace) -> dict[str, Any]:
+    job = build_eddy_relative_vision_job(
+        name=args.name,
+        job_root=Path(args.job_root),
+        job_id=args.job_id,
+        bed_y_x=float(args.bed_y_x),
+        bed_y_y=float(args.bed_y_y),
+        bed_y_z=float(args.bed_y_z),
+        tool_x=float(args.tool_x),
+        tool_y=float(args.tool_y),
+        travel_z=float(args.travel_z),
+        y_offsets=parse_y_offsets(args.y_offsets),
+        x_offsets=parse_float_list(args.x_offsets, "X offset"),
+        z_values=parse_float_list(args.z_values, "Z sample"),
+        bed_feature_z_mm=float(args.bed_feature_z_mm),
+        current_t0_z_endstop=float(args.current_t0_z_endstop),
+        bed_center_x=float(args.bed_center_x),
+        bed_center_y=float(args.bed_center_y),
+        nozzle_to_coil_x=float(args.nozzle_to_coil_x),
+        nozzle_to_coil_y=float(args.nozzle_to_coil_y),
+        nozzle_to_coil_z=float(args.nozzle_to_coil_z),
+        feedrate=float(args.feedrate),
+        settle_time=float(args.settle_time),
+        camera=sanitize_name(args.camera),
+        profile=sanitize_name(args.profile),
+    )
+    if job.job_dir.exists():
+        raise FileExistsError(f"Vision job directory already exists: {job.job_dir}")
+    job = job_with_hashes(job)
+    manifest = build_manifest(job)
+    gcode = render_acquisition_gcode(
+        job,
+        manifest_hash=job.manifest_hash,
+        gcode_hash=job.gcode_hash,
+    )
+    state = {
+        "schema_version": VISION_JOB_SCHEMA_VERSION,
+        "job_id": job.job_id,
+        "kind": job.kind,
+        "state": "prepared",
+        "created_at_utc": job.created_at_utc,
+        "updated_at_utc": job.created_at_utc,
+        "frame_count": len(job.frames),
+        "committed_frame_count": 0,
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+    event = {
+        "timestamp_utc": job.created_at_utc,
+        "job_id": job.job_id,
+        "event": "prepared",
+        "state": "prepared",
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+    job.frames_dir.mkdir(parents=True)
+    job.analysis_dir.mkdir(parents=True)
+    atomic_write_json(job.manifest_path, manifest)
+    atomic_write_text(job.gcode_path, gcode)
+    atomic_write_json(job.state_path, state)
+    atomic_write_text(job.events_path, json.dumps(event, sort_keys=True) + "\n")
+    return {
+        "ok": True,
+        "job_id": job.job_id,
+        "job_dir": str(job.job_dir),
+        "manifest_path": str(job.manifest_path),
+        "gcode_path": str(job.gcode_path),
+        "state_path": str(job.state_path),
+        "events_path": str(job.events_path),
+        "state": "prepared",
+        "frame_count": len(job.frames),
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+
+
 def load_job_frames_for_analysis(manifest_path: Path) -> list[dict[str, Any]]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     job_dir = manifest_path.parent
@@ -1159,6 +1487,7 @@ def append_job_event(job_dir: Path, event: str, payload: dict[str, Any]) -> None
     record = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "job_id": manifest["job_id"],
+        "job_dir": str(job_dir),
         "event": event,
         **payload,
     }
@@ -1624,6 +1953,13 @@ def run_bed_y_acquisition_job(args: argparse.Namespace) -> dict[str, Any]:
 
 def run_nozzle_z_acquisition_job(args: argparse.Namespace) -> dict[str, Any]:
     summary = prepare_nozzle_z_sweep_job(args)
+    start_args = argparse.Namespace(**vars(args))
+    start_args.start_prepared_job = summary["job_id"]
+    return start_prepared_job(start_args)
+
+
+def run_eddy_relative_acquisition_job(args: argparse.Namespace) -> dict[str, Any]:
+    summary = prepare_eddy_relative_vision_job(args)
     start_args = argparse.Namespace(**vars(args))
     start_args.start_prepared_job = summary["job_id"]
     return start_prepared_job(start_args)
@@ -2624,6 +2960,16 @@ def match_nozzle_z_roi_pair(
         cv2.TM_CCOEFF_NORMED,
     )
     _min_value, max_value, _min_loc, max_loc = cv2.minMaxLoc(response)
+    exclusion = max(5, min(w, h) // 4)
+    secondary = response.copy()
+    x0 = max(0, max_loc[0] - exclusion)
+    y0 = max(0, max_loc[1] - exclusion)
+    x1 = min(secondary.shape[1], max_loc[0] + exclusion + 1)
+    y1 = min(secondary.shape[0], max_loc[1] + exclusion + 1)
+    secondary[y0:y1, x0:x1] = -1.0
+    _secondary_min, second_value, _secondary_min_loc, second_loc = cv2.minMaxLoc(
+        secondary
+    )
     sub_dx, sub_dy = subpixel_peak_offset(response, max_loc)
     matched_x = float(sx + max_loc[0]) + sub_dx
     matched_y = float(sy + max_loc[1]) + sub_dy
@@ -2634,6 +2980,9 @@ def match_nozzle_z_roi_pair(
         "dx": dx,
         "dy": dy,
         "correlation": float(max_value),
+        "secondary_correlation": float(second_value),
+        "secondary_peak_location": [int(second_loc[0]), int(second_loc[1])],
+        "peak_margin": float(max_value - second_value),
         "roi": list(source_roi),
         "search_roi": list(search_roi),
         "match_roi": [round(matched_x, 3), round(matched_y, 3), w, h],
@@ -2649,6 +2998,14 @@ def track_nozzle_z_roi_group(
     features: dict[str, Any],
     width: int,
     height: int,
+    coarse_roi_1080: tuple[float, float, float, float] = NOZZLE_Z_COARSE_ROI_1080,
+    refined_roi_1080: tuple[float, float, float, float] = NOZZLE_Z_REFINED_ROI_1080,
+    coarse_search_pad_1080: float = NOZZLE_Z_COARSE_SEARCH_PAD_1080,
+    refined_search_pad_1080: float = NOZZLE_Z_REFINED_SEARCH_PAD_1080,
+    coarse_min_correlation: float = NOZZLE_Z_COARSE_MIN_CORRELATION,
+    refined_min_correlation: float = NOZZLE_Z_REFINED_MIN_CORRELATION,
+    min_peak_margin: float = 0.0,
+    source_name: str = "roi_cross_alignment",
 ) -> dict[str, Any]:
     ordered = sorted(
         group_frames,
@@ -2656,13 +3013,13 @@ def track_nozzle_z_roi_group(
     )
     tool = str(ordered[0].get("tool", "")).lower() if ordered else ""
     z_sample = float(ordered[0]["z_sample"]) if ordered else None
-    coarse_roi = scale_rect_1080(NOZZLE_Z_COARSE_ROI_1080, width, height)
-    refined_roi = scale_rect_1080(NOZZLE_Z_REFINED_ROI_1080, width, height)
+    coarse_roi = scale_rect_1080(coarse_roi_1080, width, height)
+    refined_roi = scale_rect_1080(refined_roi_1080, width, height)
     coarse_pad = scaled_nozzle_z_pixels_1080(
-        NOZZLE_Z_COARSE_SEARCH_PAD_1080, width, height
+        coarse_search_pad_1080, width, height
     )
     refined_pad = scaled_nozzle_z_pixels_1080(
-        NOZZLE_Z_REFINED_SEARCH_PAD_1080, width, height
+        refined_search_pad_1080, width, height
     )
     failures: list[str] = []
     detections: dict[str, dict[str, Any]] = {}
@@ -2700,7 +3057,7 @@ def track_nozzle_z_roi_group(
     )
     detections[first["prefix"]] = {
         "accepted": True,
-        "source": "roi_cross_alignment_reference",
+        "source": f"{source_name}_reference",
         "point_px": [round(first_point[0], 3), round(first_point[1], 3)],
         "coarse_roi": list(current_coarse_roi),
         "refined_roi": list(current_refined_roi),
@@ -2734,20 +3091,30 @@ def track_nozzle_z_roi_group(
         coarse_ok = (
             bool(coarse_match.get("accepted"))
             and float(coarse_match.get("correlation") or 0.0)
-            >= NOZZLE_Z_COARSE_MIN_CORRELATION
+            >= coarse_min_correlation
+            and float(coarse_match.get("peak_margin") or 0.0)
+            >= min_peak_margin
         )
         if not coarse_ok:
             reason = (
                 f"{target_prefix}: coarse ROI correlation "
                 f"{float(coarse_match.get('correlation') or 0.0):.3f} below "
-                f"{NOZZLE_Z_COARSE_MIN_CORRELATION:.2f}"
+                f"{coarse_min_correlation:.2f}"
             )
             if coarse_match.get("rejection_reason"):
                 reason = f"{target_prefix}: {coarse_match['rejection_reason']}"
+            elif (
+                float(coarse_match.get("peak_margin") or 0.0)
+                < min_peak_margin
+            ):
+                reason = (
+                    f"{target_prefix}: coarse ROI match is ambiguous "
+                    f"(peak margin {float(coarse_match.get('peak_margin') or 0.0):.4f})"
+                )
             failures.append(reason)
             detections[target_prefix] = {
                 "accepted": False,
-                "source": "roi_cross_alignment",
+                "source": source_name,
                 "rejection_reason": reason,
                 "coarse_roi": list(current_coarse_roi),
                 "refined_roi": list(current_refined_roi),
@@ -2769,20 +3136,30 @@ def track_nozzle_z_roi_group(
         refined_ok = (
             bool(refined_match.get("accepted"))
             and float(refined_match.get("correlation") or 0.0)
-            >= NOZZLE_Z_REFINED_MIN_CORRELATION
+            >= refined_min_correlation
+            and float(refined_match.get("peak_margin") or 0.0)
+            >= min_peak_margin
         )
         if not refined_ok:
             reason = (
                 f"{target_prefix}: refined ROI correlation "
                 f"{float(refined_match.get('correlation') or 0.0):.3f} below "
-                f"{NOZZLE_Z_REFINED_MIN_CORRELATION:.2f}"
+                f"{refined_min_correlation:.2f}"
             )
             if refined_match.get("rejection_reason"):
                 reason = f"{target_prefix}: {refined_match['rejection_reason']}"
+            elif (
+                float(refined_match.get("peak_margin") or 0.0)
+                < min_peak_margin
+            ):
+                reason = (
+                    f"{target_prefix}: refined ROI match is ambiguous "
+                    f"(peak margin {float(refined_match.get('peak_margin') or 0.0):.4f})"
+                )
             failures.append(reason)
             detections[target_prefix] = {
                 "accepted": False,
-                "source": "roi_cross_alignment",
+                "source": source_name,
                 "rejection_reason": reason,
                 "coarse_roi": list(current_coarse_roi),
                 "refined_roi": list(current_refined_roi),
@@ -2812,7 +3189,7 @@ def track_nozzle_z_roi_group(
         )
         detections[target_prefix] = {
             "accepted": True,
-            "source": "roi_cross_alignment",
+            "source": source_name,
             "point_px": [round(point[0], 3), round(point[1], 3)],
             "coarse_roi": list(current_coarse_roi),
             "refined_roi": list(current_refined_roi),
@@ -2826,7 +3203,7 @@ def track_nozzle_z_roi_group(
             frame["prefix"],
             {
                 "accepted": False,
-                "source": "roi_cross_alignment",
+                "source": source_name,
                 "rejection_reason": "not analyzed after an earlier pair failure",
                 "coarse_roi": list(current_coarse_roi),
                 "refined_roi": list(current_refined_roi),
@@ -3428,6 +3805,385 @@ def analyze_tool_xz_sweep_frames(
     }
 
 
+def analyze_single_target_xz_frames(
+    frames: list[dict[str, Any]],
+    *,
+    target_name: str,
+    coarse_roi_1080: tuple[float, float, float, float],
+    refined_roi_1080: tuple[float, float, float, float],
+) -> dict[str, Any]:
+    try:
+        import cv2
+    except Exception as exc:  # pragma: no cover - depends on Pi package install
+        return {
+            "ok": False,
+            "target": target_name,
+            "hard_failures": [f"OpenCV import failed: {exc}"],
+        }
+    hard_failures: list[str] = []
+    groups: dict[float, list[dict[str, Any]]] = {}
+    for frame in frames:
+        if str(frame.get("tool", "")).lower() != "t0":
+            hard_failures.append(
+                f"{frame['prefix']}: Eddy relative calibration supports T0 only"
+            )
+            continue
+        groups.setdefault(float(frame["z_sample"]), []).append(frame)
+
+    fits: dict[str, dict[str, Any]] = {}
+    alignments: dict[str, dict[str, Any]] = {}
+    detections: dict[str, dict[str, Any]] = {}
+    vectors: list[tuple[float, float]] = []
+    coarse_correlations: list[float] = []
+    refined_correlations: list[float] = []
+    image_shape: tuple[int, int] | None = None
+    for z_sample in sorted(groups, reverse=True):
+        group_frames = groups[z_sample]
+        features: dict[str, Any] = {}
+        group_failures: list[str] = []
+        for frame in group_frames:
+            image = cv2.imread(frame["image_path"])
+            if image is None:
+                group_failures.append(f"could not read {frame['image_path']}")
+                continue
+            height, width = image.shape[:2]
+            if image_shape is None:
+                image_shape = (width, height)
+            elif image_shape != (width, height):
+                group_failures.append(
+                    f"{frame['prefix']}: inconsistent image dimensions"
+                )
+                continue
+            features[frame["prefix"]] = nozzle_z_preprocess_image(image)
+        width, height = image_shape or (int(RED_BASE_WIDTH), int(RED_BASE_HEIGHT))
+        if group_failures:
+            result = {
+                "ok": False,
+                "hard_failures": group_failures,
+                "fit": {"ok": False, "accepted": False},
+                "detections": {},
+                "pairwise": [],
+            }
+        else:
+            result = track_nozzle_z_roi_group(
+                group_frames=group_frames,
+                features=features,
+                width=width,
+                height=height,
+                coarse_roi_1080=coarse_roi_1080,
+                refined_roi_1080=refined_roi_1080,
+                min_peak_margin=0.01,
+                source_name=f"{target_name}_roi_cross_alignment",
+            )
+        fit = result.get("fit") or {}
+        label = dx_label(z_sample)
+        fits[label] = fit
+        detections.update(result.get("detections") or {})
+        alignments[label] = {
+            "accepted": bool(result.get("ok")),
+            "z_sample": z_sample,
+            "fit": fit,
+            "samples": result.get("diagnostic_samples") or [],
+            "pairwise": result.get("pairwise") or [],
+            "rejection_reason": result.get("rejection_reason") or "",
+        }
+        if not result.get("ok"):
+            hard_failures.extend(
+                f"{target_name} Z={z_sample:g}: {failure}"
+                for failure in (
+                    result.get("hard_failures")
+                    or [result.get("rejection_reason") or "rejected"]
+                )
+            )
+        elif fit.get("ok") and fit.get("accepted", True):
+            vector = fit.get("vector_px_per_mm") or []
+            if len(vector) == 2:
+                vectors.append((float(vector[0]), float(vector[1])))
+        for pair in result.get("pairwise") or []:
+            coarse = pair.get("coarse") or {}
+            refined = pair.get("refined") or {}
+            if coarse.get("correlation") is not None:
+                coarse_correlations.append(float(coarse["correlation"]))
+            if refined.get("correlation") is not None:
+                refined_correlations.append(float(refined["correlation"]))
+
+    axis_unit = None
+    if vectors:
+        avg = (
+            sum(vector[0] for vector in vectors) / len(vectors),
+            sum(vector[1] for vector in vectors) / len(vectors),
+        )
+        length = math.hypot(*avg)
+        if length > 0:
+            axis_unit = (avg[0] / length, avg[1] / length)
+    if axis_unit is None:
+        hard_failures.append(f"{target_name}: no usable image X-axis vector")
+
+    scale_samples: list[dict[str, Any]] = []
+    if axis_unit is not None:
+        ux, uy = axis_unit
+        for fit in fits.values():
+            if not fit.get("ok") or not fit.get("accepted", True):
+                continue
+            vector = fit["vector_px_per_mm"]
+            scale_samples.append(
+                {
+                    "z_sample": float(fit["z_sample"]),
+                    "scale_px_per_mm": float(vector[0]) * ux + float(vector[1]) * uy,
+                    "fit_residual_rms_px": fit.get("residual_rms_px"),
+                }
+            )
+    scale_fit: dict[str, Any]
+    if len(scale_samples) < 3:
+        scale_fit = {
+            "ok": False,
+            "accepted": False,
+            "rejection_reason": "need at least three accepted Z samples",
+        }
+        hard_failures.append(
+            f"{target_name}: need at least three accepted Z samples"
+        )
+    else:
+        scale_fit = linear_fit_xy(
+            [sample["z_sample"] for sample in scale_samples],
+            [sample["scale_px_per_mm"] for sample in scale_samples],
+        )
+        residual = float(scale_fit.get("residual_rms") or math.inf)
+        accepted = (
+            bool(scale_fit.get("ok"))
+            and residual <= NOZZLE_Z_MAX_SCALE_FIT_RESIDUAL_PX_PER_MM
+            and abs(float(scale_fit.get("slope") or 0.0))
+            >= NOZZLE_Z_MIN_SCALE_SLOPE_ABS
+            and all(
+                sample.get("fit_residual_rms_px") is not None
+                and float(sample["fit_residual_rms_px"])
+                <= NOZZLE_Z_MAX_PER_Z_X_FIT_RESIDUAL_PX
+                for sample in scale_samples
+            )
+        )
+        scale_fit.update(
+            {
+                "accepted": accepted,
+                "slope_px_per_mm2": scale_fit.get("slope"),
+                "intercept_px_per_mm": scale_fit.get("intercept"),
+                "residual_rms_px_per_mm": residual,
+                "samples": scale_samples,
+            }
+        )
+        if not accepted:
+            hard_failures.append(
+                f"{target_name}: image-scale fit failed quality limits"
+            )
+    ok = bool(scale_fit.get("ok") and scale_fit.get("accepted") and not hard_failures)
+    return {
+        "ok": ok,
+        "target": target_name,
+        "hard_failures": hard_failures,
+        "alignment_method": "iterative_roi_cross_alignment",
+        "coarse_roi_1080": list(coarse_roi_1080),
+        "refined_roi_1080": list(refined_roi_1080),
+        "coarse_correlation_min": (
+            min(coarse_correlations) if coarse_correlations else None
+        ),
+        "refined_correlation_min": (
+            min(refined_correlations) if refined_correlations else None
+        ),
+        "per_z_x_fits": fits,
+        "pairwise_alignment_by_z": alignments,
+        "detections": detections,
+        "x_axis_unit_vector_px": list(axis_unit) if axis_unit else None,
+        "scale_samples": scale_samples,
+        "scale_fit": scale_fit,
+    }
+
+
+def validate_eddy_relative_fits(
+    *,
+    bed_scale_px_per_mm: float | None,
+    bed_fit_residual_px: float | None,
+    nozzle_analysis: dict[str, Any],
+    eddy_analysis: dict[str, Any],
+    bed_feature_z_mm: float,
+    cad_separation_mm: float,
+) -> dict[str, Any]:
+    hard_failures: list[str] = []
+    if bed_scale_px_per_mm is None:
+        hard_failures.append("bed image scale is unavailable")
+    if not nozzle_analysis.get("ok"):
+        hard_failures.extend(
+            "nozzle: " + str(item)
+            for item in (nozzle_analysis.get("hard_failures") or ["rejected"])
+        )
+    if not eddy_analysis.get("ok"):
+        hard_failures.extend(
+            "eddy fiducial: " + str(item)
+            for item in (eddy_analysis.get("hard_failures") or ["rejected"])
+        )
+    nozzle_fit = nozzle_analysis.get("scale_fit") or {}
+    eddy_fit = eddy_analysis.get("scale_fit") or {}
+    nozzle_slope = (
+        float(nozzle_fit["slope"]) if nozzle_fit.get("slope") is not None else None
+    )
+    eddy_slope = (
+        float(eddy_fit["slope"]) if eddy_fit.get("slope") is not None else None
+    )
+    common_slope = (
+        (nozzle_slope + eddy_slope) / 2.0
+        if nozzle_slope is not None and eddy_slope is not None
+        else None
+    )
+    relative_spread = None
+    if nozzle_slope is not None and eddy_slope is not None:
+        if nozzle_slope * eddy_slope <= 0:
+            hard_failures.append(
+                "nozzle and Eddy parallax slopes disagree in sign "
+                f"({nozzle_slope:.6f}, {eddy_slope:.6f})"
+            )
+        elif common_slope not in (None, 0):
+            relative_spread = abs(nozzle_slope - eddy_slope) / abs(common_slope)
+            if relative_spread > EDDY_MAX_TARGET_SLOPE_RELATIVE_SPREAD:
+                hard_failures.append(
+                    "nozzle and Eddy parallax slopes disagree in magnitude "
+                    f"(relative spread {relative_spread:.3f})"
+                )
+    if common_slope is None or abs(common_slope) < NOZZLE_Z_MIN_SCALE_SLOPE_ABS:
+        hard_failures.append("common nozzle/Eddy parallax slope is unusable")
+
+    nozzle_zero_error = None
+    eddy_zero_error = None
+    eddy_above_nozzle = None
+    if (
+        not hard_failures
+        and bed_scale_px_per_mm is not None
+        and nozzle_slope not in (None, 0)
+        and eddy_slope not in (None, 0)
+    ):
+        nozzle_zero_error = bed_feature_z_mm + (
+            float(nozzle_fit["intercept"]) - bed_scale_px_per_mm
+        ) / nozzle_slope
+        eddy_zero_error = bed_feature_z_mm + (
+            float(eddy_fit["intercept"]) - bed_scale_px_per_mm
+        ) / eddy_slope
+        eddy_above_nozzle = eddy_zero_error - nozzle_zero_error
+        separation_error = eddy_above_nozzle - cad_separation_mm
+        if abs(separation_error) > EDDY_MAX_CAD_SEPARATION_ERROR_MM:
+            hard_failures.append(
+                "vision/CAD vertical separation disagreement: "
+                f"vision={eddy_above_nozzle:.4f}mm, CAD={cad_separation_mm:.4f}mm"
+            )
+
+    nozzle_sigma = (
+        float(nozzle_fit.get("residual_rms") or 0.0) / abs(nozzle_slope)
+        if nozzle_slope not in (None, 0)
+        else math.inf
+    )
+    eddy_sigma = (
+        float(eddy_fit.get("residual_rms") or 0.0) / abs(eddy_slope)
+        if eddy_slope not in (None, 0)
+        else math.inf
+    )
+    bed_sigma = (
+        abs(float(bed_fit_residual_px or 0.0) / float(bed_scale_px_per_mm))
+        if bed_scale_px_per_mm not in (None, 0)
+        else math.inf
+    )
+    vision_sigma = max(
+        0.02, math.sqrt(nozzle_sigma**2 + eddy_sigma**2 + bed_sigma**2)
+    )
+    return {
+        "ok": not hard_failures,
+        "hard_failures": hard_failures,
+        "nozzle_zero_error_mm": (
+            round(nozzle_zero_error, 6)
+            if nozzle_zero_error is not None
+            else None
+        ),
+        "eddy_zero_error_mm": (
+            round(eddy_zero_error, 6) if eddy_zero_error is not None else None
+        ),
+        "eddy_above_nozzle_mm": (
+            round(eddy_above_nozzle, 6)
+            if eddy_above_nozzle is not None
+            else None
+        ),
+        "cad_eddy_above_nozzle_mm": cad_separation_mm,
+        "separation_error_mm": (
+            round(eddy_above_nozzle - cad_separation_mm, 6)
+            if eddy_above_nozzle is not None
+            else None
+        ),
+        "nozzle_slope_px_per_mm2": nozzle_slope,
+        "eddy_slope_px_per_mm2": eddy_slope,
+        "common_slope_px_per_mm2": common_slope,
+        "slope_relative_spread": relative_spread,
+        "vision_uncertainty_sigma_mm": round(vision_sigma, 6),
+        "repeatability_uncertainty_sigma_mm": EDDY_DEFAULT_REPEATABILITY_SIGMA_MM,
+        "combined_uncertainty_sigma_mm": round(
+            math.hypot(vision_sigma, EDDY_DEFAULT_REPEATABILITY_SIGMA_MM), 6
+        ),
+    }
+
+
+def annotate_eddy_relative_tool_frame(
+    image: Any,
+    frame: dict[str, Any],
+    nozzle_detection: dict[str, Any],
+    eddy_detection: dict[str, Any],
+) -> Any:
+    import cv2
+
+    overlay = image.copy()
+
+    def draw_detection(
+        detection: dict[str, Any], color: tuple[int, int, int], label: str
+    ) -> None:
+        roi = detection.get("refined_roi")
+        if roi:
+            x, y, w, h = [int(round(float(value))) for value in roi]
+            cv2.rectangle(overlay, (x, y), (x + w, y + h), color, 2)
+        point = detection.get("point_px")
+        if detection.get("accepted") and point:
+            px, py = [int(round(float(value))) for value in point]
+            cv2.drawMarker(
+                overlay,
+                (px, py),
+                color,
+                markerType=cv2.MARKER_CROSS,
+                markerSize=28,
+                thickness=2,
+            )
+            cv2.putText(
+                overlay,
+                label,
+                (px + 12, py - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                color,
+                2,
+                cv2.LINE_AA,
+            )
+
+    draw_detection(nozzle_detection, (0, 220, 0), "nozzle")
+    draw_detection(eddy_detection, (0, 170, 255), "Eddy fiducial")
+    status = (
+        f"T0 x={frame.get('x_offset', 0):g} z={frame.get('z_sample', 0):g} "
+        f"nozzle={'ok' if nozzle_detection.get('accepted') else 'FAIL'} "
+        f"eddy={'ok' if eddy_detection.get('accepted') else 'FAIL'}"
+    )
+    cv2.rectangle(overlay, (0, 0), (920, 48), (0, 0, 0), -1)
+    cv2.putText(
+        overlay,
+        status,
+        (18, 34),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.75,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+    return overlay
+
+
 def phase_lighting_from_manifest(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:
     lighting: dict[str, dict[str, Any]] = {}
     parameters = manifest.get("measurement_parameters") or {}
@@ -3689,6 +4445,375 @@ def analyze_nozzle_z_sweep_frames(
     return analysis
 
 
+def build_eddy_relative_facts(
+    *, manifest: dict[str, Any], analysis: dict[str, Any], result_path: Path
+) -> dict[str, Any]:
+    parameters = manifest.get("measurement_parameters") or {}
+    relative_fit = analysis.get("relative_fit") or {}
+    accepted = bool(analysis.get("ok"))
+    return {
+        "schema_version": VISION_JOB_SCHEMA_VERSION,
+        "job_id": manifest.get("job_id"),
+        "kind": manifest.get("kind"),
+        "measurement": EDDY_RELATIVE_MEASUREMENT,
+        "accepted": accepted,
+        "ok": accepted,
+        "report_only": True,
+        "configuration_activated": False,
+        "save_config_allowed": False,
+        "source_result": result_path.name,
+        "relative_to": "vision-observed bed reference plane",
+        "bed_center_warp_is_uncertainty": True,
+        "bed_feature_z_mm": parameters.get("bed_feature_z_mm"),
+        "bed_center": parameters.get("bed_center"),
+        "cad_nozzle_to_coil": parameters.get("nozzle_to_coil"),
+        "coil_center_command": parameters.get("coil_center_command"),
+        "nozzle_zero_error_mm": relative_fit.get("nozzle_zero_error_mm"),
+        "eddy_zero_error_mm": relative_fit.get("eddy_zero_error_mm"),
+        "eddy_above_nozzle_mm": relative_fit.get("eddy_above_nozzle_mm"),
+        "cad_eddy_above_nozzle_mm": relative_fit.get(
+            "cad_eddy_above_nozzle_mm"
+        ),
+        "separation_error_mm": relative_fit.get("separation_error_mm"),
+        "vision_uncertainty_sigma_mm": relative_fit.get(
+            "vision_uncertainty_sigma_mm"
+        ),
+        "repeatability_uncertainty_sigma_mm": relative_fit.get(
+            "repeatability_uncertainty_sigma_mm"
+        ),
+        "combined_uncertainty_sigma_mm": relative_fit.get(
+            "combined_uncertainty_sigma_mm"
+        ),
+        "lighting": phase_lighting_from_manifest(manifest),
+        "quality": {
+            "bed_y_sweep": analysis.get("bed_y_sweep"),
+            "nozzle_target": analysis.get("nozzle_target"),
+            "eddy_fiducial": analysis.get("eddy_fiducial"),
+            "relative_fit": relative_fit,
+        },
+        "hard_failures": analysis.get("hard_failures") or [],
+        "rejection_reasons": analysis.get("hard_failures") or [],
+    }
+
+
+def write_eddy_scale_plot(
+    path: Path, nozzle_analysis: dict[str, Any], eddy_analysis: dict[str, Any]
+) -> None:
+    import cv2
+    import numpy as np
+
+    width, height = 1100, 720
+    left, right, top, bottom = 100, 50, 80, 90
+    image = np.full((height, width, 3), 255, dtype=np.uint8)
+    series = [
+        (
+            "nozzle",
+            nozzle_analysis.get("scale_samples") or [],
+            (0, 170, 0),
+        ),
+        (
+            "Eddy fiducial",
+            eddy_analysis.get("scale_samples") or [],
+            (0, 130, 230),
+        ),
+    ]
+    points = [
+        (float(item["z_sample"]), float(item["scale_px_per_mm"]), color)
+        for _name, samples, color in series
+        for item in samples
+    ]
+    if not points:
+        cv2.putText(
+            image,
+            "No accepted image-scale samples",
+            (left, top + 60),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (0, 0, 0),
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.imwrite(str(path), image)
+        return
+    xs = [point[0] for point in points]
+    ys = [point[1] for point in points]
+    xmin, xmax = min(xs) - 0.25, max(xs) + 0.25
+    ypad = max((max(ys) - min(ys)) * 0.12, 0.1)
+    ymin, ymax = min(ys) - ypad, max(ys) + ypad
+
+    def pixel(x: float, y: float) -> tuple[int, int]:
+        return (
+            int(left + (x - xmin) / (xmax - xmin) * (width - left - right)),
+            int(top + (ymax - y) / (ymax - ymin) * (height - top - bottom)),
+        )
+
+    cv2.rectangle(
+        image, (left, top), (width - right, height - bottom), (60, 60, 60), 2
+    )
+    for name, samples, color in series:
+        ordered = sorted(samples, key=lambda item: float(item["z_sample"]))
+        pixels = [
+            pixel(float(item["z_sample"]), float(item["scale_px_per_mm"]))
+            for item in ordered
+        ]
+        for first, second in zip(pixels, pixels[1:]):
+            cv2.line(image, first, second, color, 2, cv2.LINE_AA)
+        for point in pixels:
+            cv2.circle(image, point, 6, color, -1, cv2.LINE_AA)
+        cv2.putText(
+            image,
+            name,
+            (width - 280, 45 + 28 * series.index((name, samples, color))),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.58,
+            color,
+            2,
+            cv2.LINE_AA,
+        )
+    cv2.putText(
+        image,
+        "Nozzle and Eddy image scale versus commanded Z",
+        (left, 45),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.8,
+        (20, 20, 20),
+        2,
+        cv2.LINE_AA,
+    )
+    cv2.putText(
+        image,
+        "commanded Z (mm)",
+        (width // 2 - 100, height - 30),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.6,
+        (20, 20, 20),
+        1,
+        cv2.LINE_AA,
+    )
+    cv2.imwrite(str(path), image, [int(cv2.IMWRITE_JPEG_QUALITY), 94])
+
+
+def write_eddy_relative_contact_sheet(
+    frames: list[dict[str, Any]],
+    analysis: dict[str, Any],
+    path: Path,
+    *,
+    use_overlays: bool,
+) -> None:
+    import cv2
+    import numpy as np
+
+    tile_w, tile_h, cols = 260, 195, 7
+    rows = max(1, math.ceil(len(frames) / cols))
+    summary_h = 250
+    sheet = np.full(
+        (rows * tile_h + summary_h, cols * tile_w, 3), 245, dtype=np.uint8
+    )
+    for index, frame in enumerate(frames):
+        source = frame.get("overlay_path") if use_overlays else frame["image_path"]
+        image = cv2.imread(str(source or frame["image_path"]))
+        if image is None:
+            continue
+        tile = letterbox(image, tile_w, tile_h)
+        row, col = divmod(index, cols)
+        x, y = col * tile_w, row * tile_h
+        sheet[y : y + tile_h, x : x + tile_w] = tile
+        cv2.rectangle(sheet, (x, y), (x + tile_w, y + 27), (0, 0, 0), -1)
+        cv2.putText(
+            sheet,
+            frame["prefix"][:34],
+            (x + 5, y + 19),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.43,
+            (255, 255, 255),
+            1,
+            cv2.LINE_AA,
+        )
+    facts = analysis.get("facts_preview") or {}
+    lines = [
+        "Cold contact-free Eddy relative calibration - vision phase",
+        f"status: {'accepted' if analysis.get('ok') else 'REJECTED'}",
+        f"nozzle zero error: {facts.get('nozzle_zero_error_mm')} mm",
+        f"Eddy zero error: {facts.get('eddy_zero_error_mm')} mm",
+        (
+            "Eddy above nozzle: "
+            f"{facts.get('eddy_above_nozzle_mm')} mm "
+            f"(CAD {facts.get('cad_eddy_above_nozzle_mm')} mm)"
+        ),
+        "Result is relative to the vision-observed bed plane; center bed warp remains an uncertainty.",
+    ]
+    if not analysis.get("ok"):
+        lines.append(
+            "failures: "
+            + "; ".join(str(item) for item in analysis.get("hard_failures", [])[:3])
+        )
+    y0 = rows * tile_h
+    draw_text_lines(sheet, lines, (20, y0 + 34), line_height=29, scale=0.54)
+    cv2.imwrite(str(path), sheet, [int(cv2.IMWRITE_JPEG_QUALITY), 93])
+
+
+def analyze_eddy_relative_sweep_frames(
+    frames: list[dict[str, Any]],
+    run_dir: Path,
+    overlay_dir: Path | None,
+    manifest: dict[str, Any],
+    result_path: Path,
+) -> dict[str, Any]:
+    import cv2
+
+    bed_frames = [frame for frame in frames if frame.get("phase") == "bed_y_sweep"]
+    tool_x_frames = [
+        frame for frame in frames if frame.get("phase") == "tool_xz_sweep"
+    ]
+    tool_y_frames = [
+        frame for frame in frames if frame.get("phase") == "tool_yz_sweep"
+    ]
+    tool_frames = tool_x_frames + tool_y_frames
+    sanity_frames = [
+        frame for frame in frames if frame.get("phase") == "center_sanity"
+    ]
+    overlay_root = overlay_dir or run_dir
+    overlay_root.mkdir(parents=True, exist_ok=True)
+    bed_analysis = analyze_bed_y_sweep_frames(
+        bed_frames, run_dir, overlay_dir=overlay_root
+    )
+    nozzle_x_diagnostic = analyze_single_target_xz_frames(
+        tool_x_frames,
+        target_name="nozzle",
+        coarse_roi_1080=NOZZLE_TARGET_COARSE_ROI_1080,
+        refined_roi_1080=NOZZLE_TARGET_REFINED_ROI_1080,
+    )
+    eddy_x_diagnostic = analyze_single_target_xz_frames(
+        tool_x_frames,
+        target_name="eddy_fiducial",
+        coarse_roi_1080=EDDY_FIDUCIAL_COARSE_ROI_1080,
+        refined_roi_1080=EDDY_FIDUCIAL_REFINED_ROI_1080,
+    )
+    axis_y_frames: list[dict[str, Any]] = []
+    for frame in tool_x_frames:
+        if abs(float(frame.get("x_offset", 0.0))) > 1.0e-9:
+            continue
+        adapted = dict(frame)
+        adapted["x_offset"] = 0.0
+        axis_y_frames.append(adapted)
+    for frame in tool_y_frames:
+        adapted = dict(frame)
+        adapted["x_offset"] = float(frame.get("y_offset", 0.0))
+        axis_y_frames.append(adapted)
+    nozzle_analysis = analyze_single_target_xz_frames(
+        axis_y_frames,
+        target_name="nozzle_y_axis",
+        coarse_roi_1080=NOZZLE_TARGET_COARSE_ROI_1080,
+        refined_roi_1080=NOZZLE_TARGET_REFINED_ROI_1080,
+    )
+    eddy_analysis = analyze_single_target_xz_frames(
+        axis_y_frames,
+        target_name="eddy_fiducial_y_axis",
+        coarse_roi_1080=EDDY_FIDUCIAL_COARSE_ROI_1080,
+        refined_roi_1080=EDDY_FIDUCIAL_REFINED_ROI_1080,
+    )
+    parameters = manifest.get("measurement_parameters") or {}
+    cad = parameters.get("nozzle_to_coil") or {}
+    relative_fit = validate_eddy_relative_fits(
+        bed_scale_px_per_mm=bed_analysis.get("bed_y_scale_px_per_mm"),
+        bed_fit_residual_px=bed_analysis.get("bed_y_fit_residual_rms_px"),
+        nozzle_analysis=nozzle_analysis,
+        eddy_analysis=eddy_analysis,
+        bed_feature_z_mm=float(
+            parameters.get("bed_feature_z_mm", DEFAULT_NOZZLE_Z_BED_FEATURE_Z_MM)
+        ),
+        cad_separation_mm=float(cad.get("z", 2.5)),
+    )
+
+    nozzle_detections = {
+        **(nozzle_x_diagnostic.get("detections") or {}),
+        **(nozzle_analysis.get("detections") or {}),
+    }
+    eddy_detections = {
+        **(eddy_x_diagnostic.get("detections") or {}),
+        **(eddy_analysis.get("detections") or {}),
+    }
+    for frame in tool_frames:
+        image = cv2.imread(frame["image_path"])
+        if image is None:
+            continue
+        nozzle_detection = nozzle_detections.get(frame["prefix"]) or {}
+        eddy_detection = eddy_detections.get(frame["prefix"]) or {}
+        frame["nozzle_detection"] = nozzle_detection
+        frame["eddy_fiducial_detection"] = eddy_detection
+        overlay = annotate_eddy_relative_tool_frame(
+            image, frame, nozzle_detection, eddy_detection
+        )
+        overlay_path = overlay_root / f"{frame['prefix']}_overlay.jpg"
+        cv2.imwrite(str(overlay_path), overlay, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+        frame["overlay_path"] = str(overlay_path)
+        frame["overlay_url"] = safe_vision_url(overlay_path)
+    for frame in sanity_frames:
+        image = cv2.imread(frame["image_path"])
+        if image is None:
+            continue
+        overlay = image.copy()
+        cv2.rectangle(overlay, (0, 0), (1000, 48), (0, 0, 0), -1)
+        cv2.putText(
+            overlay,
+            "High-Z sanity: CAD coil center commanded over bed center; no descent yet",
+            (18, 34),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.72,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+        overlay_path = overlay_root / f"{frame['prefix']}_overlay.jpg"
+        cv2.imwrite(str(overlay_path), overlay, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+        frame["overlay_path"] = str(overlay_path)
+        frame["overlay_url"] = safe_vision_url(overlay_path)
+    scale_plot = run_dir / "image_scale_vs_z.jpg"
+    write_eddy_scale_plot(scale_plot, nozzle_analysis, eddy_analysis)
+
+    hard_failures: list[str] = []
+    if not bed_analysis.get("ok"):
+        hard_failures.extend(
+            "bed_y_sweep: " + str(item)
+            for item in (bed_analysis.get("hard_failures") or ["rejected"])
+        )
+    hard_failures.extend(relative_fit.get("hard_failures") or [])
+    if len(sanity_frames) != 1:
+        hard_failures.append("missing unique high-Z center sanity capture")
+    ok = not hard_failures
+    analysis = {
+        "ok": ok,
+        "proxy_only": not ok,
+        "measurement": EDDY_RELATIVE_MEASUREMENT,
+        "hard_failures": hard_failures,
+        "bed_y_sweep": bed_analysis,
+        "nozzle_target": nozzle_analysis,
+        "eddy_fiducial": eddy_analysis,
+        "nozzle_x_axis_diagnostic": nozzle_x_diagnostic,
+        "eddy_x_axis_diagnostic": eddy_x_diagnostic,
+        "calibration_axis": "printer_y",
+        "relative_fit": relative_fit,
+        "image_scale_vs_z_path": str(scale_plot),
+        "image_scale_vs_z_url": safe_vision_url(scale_plot),
+        "phase_frame_counts": {
+            "bed_y_sweep": len(bed_frames),
+            "tool_xz_sweep": len(tool_frames),
+            "center_sanity": len(sanity_frames),
+        },
+        "lighting": phase_lighting_from_manifest(manifest),
+        "message": (
+            "Cold contact-free Eddy vision references accepted."
+            if ok
+            else "Cold contact-free Eddy vision references rejected: "
+            + "; ".join(hard_failures)
+        ),
+    }
+    analysis["facts_preview"] = build_eddy_relative_facts(
+        manifest=manifest, analysis=analysis, result_path=result_path
+    )
+    return analysis
+
+
 def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
     job_id = sanitize_name(args.analyze_job or args.job_id)
     if not job_id:
@@ -3744,14 +4869,14 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
             for frame in manifest.get("frames") or []
             if frame.get("phase") == "bed_y_sweep"
         ]
-    elif manifest.get("kind") == NOZZLE_Z_JOB_KIND:
+    elif manifest.get("kind") in (NOZZLE_Z_JOB_KIND, EDDY_RELATIVE_JOB_KIND):
         result["phase_frame_counts"] = {
             phase: sum(
                 1
                 for frame in manifest.get("frames") or []
                 if frame.get("phase") == phase
             )
-            for phase in ("bed_y_sweep", "tool_xz_sweep")
+            for phase in ("bed_y_sweep", "tool_xz_sweep", "center_sanity")
         }
         result["y_offsets"] = [
             float(frame["y_offset"])
@@ -3835,6 +4960,38 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
                     paths["overlay_contact_sheet"],
                     use_overlays=True,
                 )
+        elif manifest.get("kind") == EDDY_RELATIVE_JOB_KIND:
+            frames = load_nozzle_z_job_frames_for_analysis(job_dir / "manifest.json")
+            analysis = analyze_eddy_relative_sweep_frames(
+                frames,
+                paths["analysis_dir"],
+                overlay_dir=paths["overlays_dir"],
+                manifest=manifest,
+                result_path=paths["result"],
+            )
+            analysis.update(
+                {
+                    "run_name": manifest["job_id"],
+                    "job_id": manifest["job_id"],
+                }
+            )
+            facts = build_eddy_relative_facts(
+                manifest=manifest, analysis=analysis, result_path=paths["result"]
+            )
+            analysis["facts_preview"] = facts
+            if frames:
+                write_eddy_relative_contact_sheet(
+                    frames,
+                    analysis,
+                    paths["raw_contact_sheet"],
+                    use_overlays=False,
+                )
+                write_eddy_relative_contact_sheet(
+                    frames,
+                    analysis,
+                    paths["overlay_contact_sheet"],
+                    use_overlays=True,
+                )
         else:
             frames = load_job_frames_for_analysis(job_dir / "manifest.json")
             analysis = analyze_sweep_frames(
@@ -3896,9 +5053,13 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
                 BED_Y_MEASUREMENT
                 if manifest.get("kind") == BED_Y_JOB_KIND
                 else (
-                    NOZZLE_Z_MEASUREMENT
-                    if manifest.get("kind") == NOZZLE_Z_JOB_KIND
-                    else "idex_nozzle_relative_offset"
+                    EDDY_RELATIVE_MEASUREMENT
+                    if manifest.get("kind") == EDDY_RELATIVE_JOB_KIND
+                    else (
+                        NOZZLE_Z_MEASUREMENT
+                        if manifest.get("kind") == NOZZLE_Z_JOB_KIND
+                        else "idex_nozzle_relative_offset"
+                    )
                 )
             ),
             "accepted": False,
@@ -3989,6 +5150,408 @@ def run_nozzle_z_full_job(args: argparse.Namespace) -> dict[str, Any]:
         "committed_frame_count": acquisition.get("committed_frame_count"),
     }
     return result
+
+
+def query_eddy_preflight_status(base_url: str) -> dict[str, Any]:
+    path = (
+        "/printer/objects/query?"
+        "webhooks&print_stats&toolhead&gcode_move&"
+        "extruder&extruder1&heater_bed&"
+        "temperature_probe%20btt_eddy&"
+        "temperature_sensor%20btt_eddy_mcu&configfile"
+    )
+    return moonraker_get(base_url, path)["result"]["status"]
+
+
+def cold_eddy_preflight(base_url: str) -> dict[str, Any]:
+    snapshots: list[dict[str, Any]] = []
+    for index in range(3):
+        status = query_eddy_preflight_status(base_url)
+        snapshots.append(status)
+        if index < 2:
+            time.sleep(2.0)
+    latest = snapshots[-1]
+    webhooks = latest.get("webhooks") or {}
+    print_stats = latest.get("print_stats") or {}
+    toolhead = latest.get("toolhead") or {}
+    if webhooks.get("state") != "ready":
+        raise RuntimeError(f"Klipper is not ready: {webhooks.get('state')!r}")
+    if print_stats.get("state") not in ("standby", "complete"):
+        raise RuntimeError(
+            "cold Eddy calibration requires an idle printer; "
+            f"print_stats.state={print_stats.get('state')!r}"
+        )
+    if not set("xyz").issubset(set(str(toolhead.get("homed_axes") or ""))):
+        raise RuntimeError("cold Eddy calibration requires X/Y/Z homed")
+    for heater_name in ("extruder", "extruder1", "heater_bed"):
+        heater = latest.get(heater_name) or {}
+        if float(heater.get("target") or 0.0) != 0.0:
+            raise RuntimeError(f"{heater_name} target must be zero")
+        if float(heater.get("temperature") or 0.0) > 35.0:
+            raise RuntimeError(
+                f"{heater_name} is not cold ({heater.get('temperature')}C)"
+            )
+    configfile = latest.get("configfile") or {}
+    if configfile.get("save_config_pending") is not False:
+        raise RuntimeError(
+            "SAVE_CONFIG already has pending items; refusing report-only calibration"
+        )
+    probe_temperatures = [
+        float(
+            (snapshot.get("temperature_probe btt_eddy") or {}).get(
+                "temperature"
+            )
+        )
+        for snapshot in snapshots
+    ]
+    probe_drift = max(probe_temperatures) - min(probe_temperatures)
+    if probe_drift > 0.5:
+        raise RuntimeError(
+            "powered-idle Eddy temperature is not stable: "
+            f"{probe_temperatures}, range={probe_drift:.3f}C"
+        )
+    with urllib.request.urlopen(WEBCAM_SNAPSHOT_URL, timeout=5) as response:
+        jpeg_header = response.read(2)
+    if jpeg_header != b"\xff\xd8":
+        raise RuntimeError("nozzle camera snapshot did not return JPEG data")
+    return {
+        "accepted": True,
+        "captured_at_utc": datetime.now(timezone.utc).isoformat(),
+        "heater_temperatures_c": {
+            name: float((latest.get(name) or {}).get("temperature"))
+            for name in ("extruder", "extruder1", "heater_bed")
+        },
+        "heater_targets_c": {
+            name: float((latest.get(name) or {}).get("target"))
+            for name in ("extruder", "extruder1", "heater_bed")
+        },
+        "eddy_temperature_samples_c": probe_temperatures,
+        "eddy_temperature_range_c": probe_drift,
+        "eddy_mcu_temperature_c": float(
+            (latest.get("temperature_sensor btt_eddy_mcu") or {}).get(
+                "temperature"
+            )
+        ),
+        "axis_minimum": toolhead.get("axis_minimum"),
+        "axis_maximum": toolhead.get("axis_maximum"),
+        "homed_axes": toolhead.get("homed_axes"),
+    }
+
+
+def run_drive_current_check(
+    *,
+    base_url: str,
+    center_x: float,
+    center_y: float,
+    nozzle_zero_error_mm: float,
+    axis_minimum: list[float],
+    axis_maximum: list[float],
+) -> dict[str, Any]:
+    if len(axis_minimum) < 3 or len(axis_maximum) < 3:
+        raise RuntimeError("Moonraker toolhead status has no XYZ axis limits")
+    for axis, value, index in (
+        ("X", center_x, 0),
+        ("Y", center_y, 1),
+    ):
+        if not float(axis_minimum[index]) <= value <= float(axis_maximum[index]):
+            raise RuntimeError(
+                f"drive-current check {axis}={value:.4f} is outside configured "
+                f"limits {axis_minimum[index]}..{axis_maximum[index]}"
+            )
+    check_command_z = 20.0 - nozzle_zero_error_mm
+    if not float(axis_minimum[2]) <= check_command_z <= float(axis_maximum[2]):
+        raise RuntimeError(
+            f"20mm drive-current check requires Z={check_command_z:.4f}, "
+            f"outside configured limits {axis_minimum[2]}..{axis_maximum[2]}"
+        )
+    lift_command_z = max(check_command_z, 20.0)
+    if lift_command_z > float(axis_maximum[2]):
+        raise RuntimeError(
+            f"drive-current safety lift Z={lift_command_z:.4f} is outside "
+            f"configured limits {axis_minimum[2]}..{axis_maximum[2]}"
+        )
+    run_gcode(
+        base_url,
+        (
+            "G90\nT0\n"
+            f"G1 Z{gcode_float(lift_command_z)} F1200\n"
+            f"G1 X{gcode_float(center_x)} Y{gcode_float(center_y)} "
+            f"Z{gcode_float(check_command_z)} F3600\n"
+            "M400\n"
+            "LDC_CALIBRATE_DRIVE_CURRENT CHIP=btt_eddy"
+        ),
+        timeout=60,
+    )
+    status = query_eddy_preflight_status(base_url)
+    configfile = status.get("configfile") or {}
+    configured = (
+        (configfile.get("config") or {})
+        .get("probe_eddy_current btt_eddy", {})
+        .get("reg_drive_current")
+    )
+    active = int(configured) if configured is not None else 15
+    pending = (
+        (configfile.get("save_config_pending_items") or {})
+        .get("probe_eddy_current btt_eddy", {})
+        .get("reg_drive_current")
+    )
+    if pending is None:
+        raise RuntimeError(
+            "LDC_CALIBRATE_DRIVE_CURRENT did not expose a proposed value"
+        )
+    proposed = int(pending)
+    result = {
+        "command": "LDC_CALIBRATE_DRIVE_CURRENT CHIP=btt_eddy",
+        "check_nozzle_gap_mm": 20.0,
+        "check_commanded_z_mm": round(check_command_z, 4),
+        "active_reg_drive_current": active,
+        "proposed_reg_drive_current": proposed,
+        "matches_active": proposed == active,
+        "save_config_called": False,
+        "runtime_drive_current_changed": False,
+    }
+    if proposed != active:
+        result["stop_reason"] = (
+            "proposed drive current differs from active; frequency sweep not run"
+        )
+    return result
+
+
+def virtual_sd_filename_matches(actual: Any, expected: str) -> bool:
+    actual_normalized = str(actual or "").replace("\\", "/").lstrip("/")
+    expected_normalized = str(expected).replace("\\", "/").lstrip("/")
+    if actual_normalized == expected_normalized:
+        return True
+    return actual_normalized.rsplit("/", 1)[-1] == expected_normalized.rsplit(
+        "/", 1
+    )[-1]
+
+
+def stage_and_run_eddy_sweep(
+    *,
+    args: argparse.Namespace,
+    job_dir: Path,
+    manifest: dict[str, Any],
+    gcode: str,
+) -> dict[str, Any]:
+    from eddy_relative_calibration import compute_gcode_hash
+
+    sweep_dir = job_dir / "eddy_sweep"
+    sweep_dir.mkdir(parents=True)
+    manifest_path = sweep_dir / "manifest.json"
+    gcode_path = sweep_dir / "sweep.gcode"
+    atomic_write_json(manifest_path, manifest)
+    atomic_write_text(gcode_path, gcode)
+    if compute_gcode_hash(gcode) != manifest.get("gcode_hash"):
+        raise RuntimeError("Eddy sweep G-code hash does not match manifest")
+    subdir = normalized_virtual_sd_subdir(str(args.virtual_sd_subdir))
+    target_dir = Path(args.virtual_sd_root) / subdir
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / f"{manifest['job_id']}_eddy_frequency.gcode"
+    if target.exists():
+        if target.read_text(encoding="utf-8") != gcode:
+            raise RuntimeError(
+                f"refusing to overwrite existing virtual SD file: {target}"
+            )
+    else:
+        atomic_write_text(target, gcode)
+    filename = (subdir / target.name).as_posix()
+    append_job_event(
+        job_dir,
+        "eddy_sweep_start_requested",
+        {
+            "manifest_hash": manifest["manifest_hash"],
+            "gcode_hash": manifest["gcode_hash"],
+            "virtual_sd_filename": filename,
+            "sample_count": len(manifest["samples"]),
+        },
+    )
+    run_gcode(
+        args.moonraker_url,
+        f"SDCARD_PRINT_FILE FILENAME={filename}",
+        timeout=30,
+    )
+    deadline = time.monotonic() + float(args.eddy_monitor_timeout)
+    last_state = None
+    try:
+        while time.monotonic() < deadline:
+            status = query_status(args.moonraker_url)
+            print_stats = status.get("print_stats") or {}
+            last_state = print_stats.get("state")
+            if last_state == "complete" and virtual_sd_filename_matches(
+                print_stats.get("filename"), filename
+            ):
+                break
+            if last_state in ("cancelled", "error"):
+                raise RuntimeError(
+                    f"Eddy sweep ended in {last_state}: "
+                    f"{print_stats.get('message')}"
+                )
+            time.sleep(0.5)
+        else:
+            raise RuntimeError(
+                f"timed out waiting for Eddy sweep; last state={last_state!r}"
+            )
+    except Exception:
+        if last_state not in ("complete", "cancelled", "error"):
+            try:
+                run_gcode(args.moonraker_url, "CANCEL_PRINT", timeout=30)
+            except Exception:
+                pass
+        raise
+    committed = list((sweep_dir / "raw").glob("*.json"))
+    if len(committed) != len(manifest["samples"]):
+        raise RuntimeError(
+            f"Eddy sweep committed {len(committed)} of "
+            f"{len(manifest['samples'])} sample windows"
+        )
+    append_job_event(
+        job_dir,
+        "eddy_sweep_acquired",
+        {"sample_count": len(committed), "virtual_sd_filename": filename},
+    )
+    return {
+        "ok": True,
+        "sweep_dir": str(sweep_dir),
+        "manifest_path": str(manifest_path),
+        "gcode_path": str(gcode_path),
+        "virtual_sd_filename": filename,
+        "sample_count": len(committed),
+    }
+
+
+def run_eddy_relative_full_job(args: argparse.Namespace) -> dict[str, Any]:
+    from eddy_relative_calibration import (
+        build_sample_schedule,
+        build_sweep_manifest,
+        finalize_sweep_hashes,
+        sha256_file,
+        write_analysis_artifacts,
+    )
+
+    preflight = cold_eddy_preflight(args.moonraker_url)
+    acquisition = run_eddy_relative_acquisition_job(args)
+    if not acquisition.get("ok"):
+        return {
+            **acquisition,
+            "ok": False,
+            "preflight": preflight,
+            "frequency_sweep_started": False,
+        }
+    analyze_args = argparse.Namespace(**vars(args))
+    analyze_args.analyze_job = acquisition["job_id"]
+    vision_result = analyze_acquired_job(analyze_args)
+    vision_result["preflight"] = preflight
+    vision_result["acquisition"] = acquisition
+    job_dir_value = vision_result.get("job_dir")
+    if job_dir_value is not None:
+        job_dir = Path(job_dir_value)
+    elif vision_result.get("manifest_path") is not None:
+        job_dir = Path(vision_result["manifest_path"]).parent
+    else:
+        raise RuntimeError("vision result has neither job_dir nor manifest_path")
+    report_path = job_dir / "eddy_relative_report.json"
+    vision_result["eddy_relative_report_path"] = str(report_path)
+    vision_result["eddy_relative_report_url"] = safe_vision_url(report_path)
+
+    def commit_report() -> None:
+        atomic_write_json(report_path, vision_result)
+
+    if not vision_result.get("ok"):
+        vision_result["frequency_sweep_started"] = False
+        commit_report()
+        return vision_result
+
+    facts = vision_result["facts"]
+    center = facts["coil_center_command"]
+    failed_stage = "drive_current_check"
+    frequency_sweep_started = False
+    try:
+        drive_current = run_drive_current_check(
+            base_url=args.moonraker_url,
+            center_x=float(center["x"]),
+            center_y=float(center["y"]),
+            nozzle_zero_error_mm=float(facts["nozzle_zero_error_mm"]),
+            axis_minimum=preflight["axis_minimum"],
+            axis_maximum=preflight["axis_maximum"],
+        )
+        vision_result["drive_current"] = drive_current
+        if not drive_current["matches_active"]:
+            vision_result.update(
+                {
+                    "ok": False,
+                    "accepted": False,
+                    "frequency_sweep_started": False,
+                    "failed_stage": failed_stage,
+                    "message": drive_current["stop_reason"],
+                }
+            )
+            commit_report()
+            return vision_result
+
+        failed_stage = "safe_schedule"
+        schedule = build_sample_schedule(
+            nozzle_zero_error_mm=float(facts["nozzle_zero_error_mm"]),
+            eddy_above_nozzle_mm=float(facts["eddy_above_nozzle_mm"]),
+            vision_sigma_mm=float(facts["vision_uncertainty_sigma_mm"]),
+            z_min_mm=float(preflight["axis_minimum"][2]),
+            z_max_mm=float(preflight["axis_maximum"][2]),
+            upper_gap_mm=float(args.eddy_upper_gap),
+            step_mm=float(args.eddy_step),
+        )
+        failed_stage = "frequency_sweep"
+        manifest = build_sweep_manifest(
+            job_id=vision_result["job_id"],
+            center_x=float(center["x"]),
+            center_y=float(center["y"]),
+            schedule=schedule,
+            vision_facts_hash=sha256_file(Path(vision_result["facts_path"])),
+            drive_current=drive_current,
+        )
+        manifest, gcode = finalize_sweep_hashes(manifest)
+        frequency_sweep_started = True
+        sweep = stage_and_run_eddy_sweep(
+            args=args, job_dir=job_dir, manifest=manifest, gcode=gcode
+        )
+        failed_stage = "frequency_analysis"
+        frequency_analysis = write_analysis_artifacts(
+            Path(sweep["sweep_dir"]), manifest
+        )
+    except Exception as exc:
+        vision_result.update(
+            {
+                "ok": False,
+                "accepted": False,
+                "frequency_sweep_started": frequency_sweep_started,
+                "failed_stage": failed_stage,
+                "message": f"{failed_stage} failed: {exc}",
+                "error": str(exc),
+            }
+        )
+        commit_report()
+        return vision_result
+
+    vision_result.update(
+        {
+            "ok": bool(frequency_analysis.get("ok")),
+            "accepted": bool(frequency_analysis.get("accepted")),
+            "frequency_sweep_started": True,
+            "frequency_sweep": sweep,
+            "frequency_analysis": frequency_analysis,
+            "message": (
+                "Cold contact-free Eddy relative calibration accepted; "
+                "candidate remains inactive."
+                if frequency_analysis.get("ok")
+                else "Eddy frequency sweep completed but quality gates rejected it."
+            ),
+        }
+    )
+    commit_report()
+    console_respond(
+        args.moonraker_url,
+        "Cold Eddy relative report: " + public_url(report_path),
+    )
+    return vision_result
 
 
 def html_text(value: Any) -> str:
@@ -6462,6 +8025,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Generate one immutable bed-Y plus nozzle X/Z calibration job.",
     )
     mode.add_argument(
+        "--prepare-eddy-relative-job",
+        action="store_true",
+        help="Generate the immutable vision phase of a cold Eddy relative job.",
+    )
+    mode.add_argument(
         "--start-prepared-job",
         metavar="JOB_ID",
         help="Start and monitor an existing prepared vision job through virtual SD.",
@@ -6475,6 +8043,11 @@ def main(argv: list[str] | None = None) -> int:
         "--run-nozzle-z-acquisition-job",
         action="store_true",
         help="Prepare, start, and monitor one combined nozzle Z acquisition job.",
+    )
+    mode.add_argument(
+        "--run-eddy-relative-acquisition-job",
+        action="store_true",
+        help="Prepare, start, and monitor the Eddy relative vision phase only.",
     )
     mode.add_argument(
         "--analyze-job",
@@ -6497,6 +8070,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Prepare, acquire, analyze, and report a complete nozzle Z sweep.",
     )
     mode.add_argument(
+        "--run-eddy-relative-job",
+        action="store_true",
+        help="Run the complete cold, contact-free, report-only Eddy calibration.",
+    )
+    mode.add_argument(
         "--refresh-ui",
         action="store_true",
         help="Regenerate static vision job HTML and jobs.json without printer motion.",
@@ -6514,6 +8092,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tool-x", type=float, default=195.0)
     parser.add_argument("--tool-y", type=float, default=-14.8)
     parser.add_argument("--travel-z", type=float, default=20.0)
+    parser.add_argument("--bed-center-x", type=float, default=117.5)
+    parser.add_argument("--bed-center-y", type=float, default=117.5)
+    parser.add_argument("--nozzle-to-coil-x", type=float, default=-8.18)
+    parser.add_argument("--nozzle-to-coil-y", type=float, default=9.0)
+    parser.add_argument("--nozzle-to-coil-z", type=float, default=2.5)
+    parser.add_argument("--eddy-upper-gap", type=float, default=4.0)
+    parser.add_argument("--eddy-step", type=float, default=0.1)
     parser.add_argument(
         "--bed-feature-z-mm",
         type=float,
@@ -6539,6 +8124,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--virtual-sd-root", type=Path, default=DEFAULT_VIRTUAL_SD_ROOT)
     parser.add_argument("--virtual-sd-subdir", default=DEFAULT_VIRTUAL_SD_SUBDIR)
     parser.add_argument("--monitor-timeout", type=float, default=180.0)
+    parser.add_argument("--eddy-monitor-timeout", type=float, default=900.0)
     parser.add_argument(
         "--restore", action=argparse.BooleanOptionalAction, default=True
     )
@@ -6554,21 +8140,27 @@ def main(argv: list[str] | None = None) -> int:
         and not args.prepare_job
         and not args.prepare_bed_y_job
         and not args.prepare_nozzle_z_job
+        and not args.prepare_eddy_relative_job
         and not args.start_prepared_job
         and not args.run_acquisition_job
         and not args.run_nozzle_z_acquisition_job
+        and not args.run_eddy_relative_acquisition_job
         and not args.analyze_job
         and not args.run_job
         and not args.run_bed_y_job
         and not args.run_nozzle_z_job
+        and not args.run_eddy_relative_job
         and not args.refresh_ui
     ):
         parser.error(
             "single-image nozzle vision check was removed; use --sweep, "
             "--prepare-job, --prepare-bed-y-job, --prepare-nozzle-z-job, "
+            "--prepare-eddy-relative-job, "
             "--start-prepared-job, --run-acquisition-job, "
-            "--run-nozzle-z-acquisition-job, --analyze-job, --run-job, "
-            "--run-bed-y-job, --run-nozzle-z-job, or --refresh-ui"
+            "--run-nozzle-z-acquisition-job, "
+            "--run-eddy-relative-acquisition-job, --analyze-job, --run-job, "
+            "--run-bed-y-job, --run-nozzle-z-job, "
+            "--run-eddy-relative-job, or --refresh-ui"
         )
     if args.z is None:
         args.z = 20.0
@@ -6591,13 +8183,21 @@ def main(argv: list[str] | None = None) -> int:
         attach_ui_refresh(summary, args)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0 if summary.get("ok") else 1
+    if args.prepare_eddy_relative_job:
+        summary = prepare_eddy_relative_vision_job(args)
+        attach_ui_refresh(summary, args)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0 if summary.get("ok") else 1
     if (
         args.start_prepared_job
         or args.run_acquisition_job
         or args.run_nozzle_z_acquisition_job
+        or args.run_eddy_relative_acquisition_job
     ):
         try:
-            if args.run_nozzle_z_acquisition_job:
+            if args.run_eddy_relative_acquisition_job:
+                result = run_eddy_relative_acquisition_job(args)
+            elif args.run_nozzle_z_acquisition_job:
                 result = run_nozzle_z_acquisition_job(args)
             elif args.run_acquisition_job:
                 result = run_acquisition_job(args)
@@ -6612,9 +8212,17 @@ def main(argv: list[str] | None = None) -> int:
         attach_ui_refresh(result, args)
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0 if result.get("ok") else 1
-    if args.analyze_job or args.run_job or args.run_bed_y_job or args.run_nozzle_z_job:
+    if (
+        args.analyze_job
+        or args.run_job
+        or args.run_bed_y_job
+        or args.run_nozzle_z_job
+        or args.run_eddy_relative_job
+    ):
         try:
-            if args.run_bed_y_job:
+            if args.run_eddy_relative_job:
+                result = run_eddy_relative_full_job(args)
+            elif args.run_bed_y_job:
                 result = run_bed_y_full_job(args)
             elif args.run_nozzle_z_job:
                 result = run_nozzle_z_full_job(args)

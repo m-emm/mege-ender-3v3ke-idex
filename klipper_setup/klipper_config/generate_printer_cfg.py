@@ -140,6 +140,43 @@ def _load_camera_calibration(data: dict[str, Any], calib_path: Path) -> dict[str
     }
 
 
+def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
+    defaults = {
+        "bed_center_x": 117.5,
+        "bed_center_y": 117.5,
+        "nozzle_to_coil_x": -8.18,
+        "nozzle_to_coil_y": 9.0,
+        "nozzle_to_coil_z": 2.5,
+    }
+    value = data.get("eddy_relative_calibration")
+    if value is None:
+        return defaults
+    value = _require_mapping(value, "eddy_relative_calibration")
+    bed_center = _require_mapping(
+        value.get("bed_center"), "eddy_relative_calibration.bed_center"
+    )
+    nozzle_to_coil = _require_mapping(
+        value.get("nozzle_to_coil"), "eddy_relative_calibration.nozzle_to_coil"
+    )
+    return {
+        "bed_center_x": _require_float(
+            bed_center, "x", "eddy_relative_calibration.bed_center"
+        ),
+        "bed_center_y": _require_float(
+            bed_center, "y", "eddy_relative_calibration.bed_center"
+        ),
+        "nozzle_to_coil_x": _require_float(
+            nozzle_to_coil, "x", "eddy_relative_calibration.nozzle_to_coil"
+        ),
+        "nozzle_to_coil_y": _require_float(
+            nozzle_to_coil, "y", "eddy_relative_calibration.nozzle_to_coil"
+        ),
+        "nozzle_to_coil_z": _require_float(
+            nozzle_to_coil, "z", "eddy_relative_calibration.nozzle_to_coil"
+        ),
+    }
+
+
 def load_calibration(calib_path: Path) -> dict[str, Any]:
     data = yaml.safe_load(calib_path.read_text(encoding="utf-8"))
     data = _require_mapping(data, "calib.yaml")
@@ -166,6 +203,7 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
             },
         },
         "nozzle_cam": _load_camera_calibration(data, calib_path),
+        "eddy_relative": _load_eddy_relative_calibration(data),
     }
 
 
@@ -276,6 +314,13 @@ def template_values(
     t0 = calibration["tools"]["t0"]
     t1 = calibration["tools"]["t1"]
     nozzle_cam = calibration.get("nozzle_cam")
+    eddy_relative = calibration.get("eddy_relative") or {
+        "bed_center_x": 117.5,
+        "bed_center_y": 117.5,
+        "nozzle_to_coil_x": -8.18,
+        "nozzle_to_coil_y": 9.0,
+        "nozzle_to_coil_z": 2.5,
+    }
     if nozzle_cam is None:
         nozzle_cam = {
             "image_width": 1,
@@ -325,6 +370,11 @@ def template_values(
         "bed_y_template_width": str(nozzle_cam["template_width"]),
         "bed_y_template_height": str(nozzle_cam["template_height"]),
         "bed_y_feature_mode": str(nozzle_cam["feature_mode"]),
+        "eddy_bed_center_x": format_mm(eddy_relative["bed_center_x"]),
+        "eddy_bed_center_y": format_mm(eddy_relative["bed_center_y"]),
+        "eddy_nozzle_to_coil_x": format_mm(eddy_relative["nozzle_to_coil_x"]),
+        "eddy_nozzle_to_coil_y": format_mm(eddy_relative["nozzle_to_coil_y"]),
+        "eddy_nozzle_to_coil_z": format_mm(eddy_relative["nozzle_to_coil_z"]),
     }
 
 

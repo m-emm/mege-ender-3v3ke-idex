@@ -1,4 +1,5 @@
 import inspect
+from pathlib import Path
 
 import pytest
 import yaml
@@ -106,17 +107,16 @@ def test_eddy_duo_is_placed_and_animated_with_the_left_tool_head():
     } in placements
     assert {
         "part": "eddy_duo_assembly",
-        "to": "sprite_extruder_left_assembly",
-        "alignment": "STACK_FRONT",
-        "stack_gap": {"$ref": "eddy_duo_tool_head_front_gap"},
+        "to": "tool_head_mount_machined_bottom_assembly",
+        "alignment": "FRONT",
     } in placements
     assert {
         "part": "eddy_duo_assembly",
         "to": "sprite_extruder_left_assembly.non_production_parts.hotend",
         "alignment": "BOTTOM",
         "post_translation": [
-            0,
-            0,
+            -6,
+            9,
             {"$ref": "eddy_duo_nozzle_clearance"},
         ],
     } in placements
@@ -137,3 +137,41 @@ def test_eddy_duo_is_placed_and_animated_with_the_left_tool_head():
             0,
         ]
     }
+
+
+def test_runtime_eddy_xy_offset_matches_resolved_assembly_graph_parameters():
+    config = _load_yaml(ASSEMBLIES_DIR / "assemblies.yaml")
+    parameters = _load_yaml(ASSEMBLIES_DIR / "idex_parameters.yaml")["globals"]
+    calib_path = (
+        Path(__file__).resolve().parents[1]
+        / "klipper_setup"
+        / "klipper_config"
+        / "calib.yaml"
+    )
+    runtime = yaml.safe_load(calib_path.read_text(encoding="utf-8"))[
+        "eddy_relative_calibration"
+    ]["nozzle_to_coil"]
+    placements = config["placement"]["alignments"]
+    rotation = next(
+        item
+        for item in placements
+        if item.get("part") == "eddy_duo_assembly" and item.get("post_rotation")
+    )
+    final = next(
+        item
+        for item in placements
+        if item.get("part") == "eddy_duo_assembly"
+        and item.get("alignment") == "BOTTOM"
+        and item.get("post_translation")
+    )
+    assert rotation["post_rotation"] == {"angle": 90, "axis": [0, 0, 1]}
+    translation = final["post_translation"]
+    # The local +Y coil-depth offset rotates to printer -X.
+    resolved_x = float(translation[0]) - float(
+        parameters["eddy_duo_coil_center_depth_offset"]
+    )
+    resolved_y = float(translation[1])
+    resolved_z = float(parameters["eddy_duo_nozzle_clearance"])
+    assert runtime == pytest.approx(
+        {"x": resolved_x, "y": resolved_y, "z": resolved_z}
+    )

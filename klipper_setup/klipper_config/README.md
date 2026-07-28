@@ -198,6 +198,39 @@ python apply_nozzle_vision_calibration.py --dry-run --update-z /path/to/facts.js
 python apply_nozzle_vision_calibration.py --update-z /path/to/facts.json
 ```
 
+## Cold, Contact-Free Eddy Relative Calibration
+
+Run this only with the bed and both nozzles cold, all heaters off, the Eddy
+electronics at a stable powered-idle temperature, and X/Y/Z already homed:
+
+```gcode
+IDEX_EDDY_RELATIVE_CALIBRATE_COLD NAME=eddy_relative_cold
+```
+
+The job captures the five-frame bed-Y reference and a T0 X/Z sweep at Z=8, 4,
+2, and 1 mm. Every T0 image is analyzed independently for the nozzle feature
+and the Eddy concentric-ring/cross fiducial. A high-Z image records the
+CAD-derived coil-center command over the configured bed center before any
+frequency descent is allowed.
+
+Only accepted vision fits can start the center frequency sweep. The lowest
+requested nozzle gap is `0.5 mm + 3 * combined uncertainty`; configured axis
+limits are never bypassed. The LDC drive-current command is checked first, and
+the sweep stops if its proposal differs from the active value.
+
+Artifacts are written under:
+
+```text
+/home/pi/printer_data/vision/nozzle_cam/jobs/<job_id>/
+```
+
+The output includes raw images and overlays, contact sheets, image-scale and
+frequency plots, raw LDC CSV/JSON, drift and approach-direction results,
+provenance hashes, and—only when all quality gates pass—an inactive
+`[probe_eddy_current btt_eddy]` candidate. The command never calls
+`SAVE_CONFIG`, never activates the candidate, and never performs nozzle
+contact.
+
 ## Boosted Heatbed
 
 The active bed remains `[heater_bed]` for normal Klipper and UI compatibility.

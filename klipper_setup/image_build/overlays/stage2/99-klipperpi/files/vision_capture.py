@@ -73,6 +73,8 @@ BED_Y_REMOTE_METHOD = "idex_bed_y_vision_sweep"
 BED_Y_REMOTE_ACTION = "run_idex_bed_y_vision_sweep"
 NOZZLE_Z_REMOTE_METHOD = "idex_nozzle_z_vision_sweep"
 NOZZLE_Z_REMOTE_ACTION = "run_idex_nozzle_z_vision_sweep"
+EDDY_RELATIVE_REMOTE_METHOD = "idex_eddy_relative_calibrate_cold"
+EDDY_RELATIVE_REMOTE_ACTION = "run_idex_eddy_relative_calibrate_cold"
 NOZZLE_PROFILE_REMOTE_METHOD = os.environ.get(
     "VISION_PROFILE_REMOTE_METHOD", "nozzle_cam_profile"
 )
@@ -725,6 +727,8 @@ class VisionJobApi:
                 result = self.capture(params)
             elif action == "job_end":
                 result = self.job_end(params)
+            elif action == "eddy_sample":
+                result = self.eddy_sample(params)
             elif action == "measure_bed_y":
                 result = self.measure_bed_y(params)
             elif action == "bed_y_reference":
@@ -757,6 +761,9 @@ class VisionJobApi:
 
     def _frames_dir(self, job_id: Any) -> Path:
         return self._job_dir(job_id) / "frames"
+
+    def _eddy_sweep_dir(self, job_id: Any) -> Path:
+        return self._job_dir(job_id) / "eddy_sweep"
 
     def _load_manifest(self, job_id: Any) -> dict[str, Any]:
         path = self._manifest_path(job_id)
@@ -953,6 +960,98 @@ class VisionJobApi:
             "profile_request_utc": requested_at.isoformat(),
             "framebuffer_seq": framebuffer_seq(metadata),
             "camera_profile": metadata.get("camera_profile"),
+        }
+
+    def eddy_sample(self, params: dict[str, Any]) -> dict[str, Any]:
+        job_id = sanitize_name(params.get("job"))
+        sweep_dir = self._eddy_sweep_dir(job_id)
+        manifest_path = sweep_dir / "manifest.json"
+        if not manifest_path.is_file():
+            raise CaptureError(f"missing Eddy sweep manifest: {manifest_path}")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        expected_hash = str(params.get("manifest_hash") or "")
+        actual_hash = str(manifest.get("manifest_hash") or "")
+        if expected_hash != actual_hash:
+            raise CaptureError(
+                f"Eddy sweep manifest hash mismatch: {expected_hash} != {actual_hash}"
+            )
+        manifest_for_hash = dict(manifest)
+        manifest_for_hash["manifest_hash"] = VISION_HASH_PLACEHOLDER
+        computed_hash = "sha256:" + hashlib.sha256(
+            canonical_json_bytes(manifest_for_hash)
+        ).hexdigest()
+        if computed_hash != actual_hash:
+            raise CaptureError(
+                f"Eddy sweep manifest content hash mismatch: {computed_hash} != {actual_hash}"
+            )
+        seq = int(params.get("seq"))
+        scheduled = None
+        for item in manifest.get("samples") or []:
+            if int(item.get("seq")) == seq:
+                scheduled = item
+                break
+        if scheduled is None:
+            raise CaptureError(f"Eddy sweep manifest has no sample seq={seq}")
+        sample_id = sanitize_name(params.get("sample"))
+        if sample_id != str(scheduled.get("sample")):
+            raise CaptureError(
+                f"Eddy sample id mismatch: {sample_id!r} != {scheduled.get('sample')!r}"
+            )
+        for key in ("commanded_z", "nozzle_gap", "coil_gap"):
+            if abs(float(params.get(key)) - float(scheduled.get(key))) > 0.0005:
+                raise CaptureError(
+                    f"Eddy sample {key} mismatch: {params.get(key)} != {scheduled.get(key)}"
+                )
+        if str(params.get("approach")) != str(scheduled.get("approach")):
+            raise CaptureError(
+                "Eddy sample approach mismatch: "
+                f"{params.get('approach')!r} != {scheduled.get('approach')!r}"
+            )
+        raw_dir = sweep_dir / "raw"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        sample_path = raw_dir / f"{seq:03d}_{sample_id}.json"
+        if sample_path.exists():
+            raise CaptureError(f"refusing to overwrite Eddy sample: {sample_path}")
+        frequencies = [
+            float(sample[1]) for sample in (params.get("samples") or [])
+        ]
+        median_frequency = statistics.median(frequencies) if frequencies else None
+        mad_frequency = (
+            statistics.median(
+                abs(value - median_frequency) for value in frequencies
+            )
+            if frequencies
+            else None
+        )
+        record = {
+            "schema_version": 1,
+            "job_id": job_id,
+            "seq": seq,
+            "sample": sample_id,
+            "captured_at_utc": datetime.now(timezone.utc).isoformat(),
+            **params,
+            "median_frequency_hz": median_frequency,
+            "mad_frequency_hz": mad_frequency,
+        }
+        atomic_write_json(sample_path, record)
+        self._append_event(
+            job_id,
+            "eddy_sample_committed",
+            {
+                "seq": seq,
+                "sample": sample_id,
+                "sample_count": len(frequencies),
+                "median_frequency_hz": median_frequency,
+                "mad_frequency_hz": mad_frequency,
+                "errors": int(params.get("errors") or 0),
+                "overflows": int(params.get("overflows") or 0),
+            },
+        )
+        return {
+            "sample_path": str(sample_path),
+            "sample_count": len(frequencies),
+            "median_frequency_hz": median_frequency,
+            "mad_frequency_hz": mad_frequency,
         }
 
     def _load_bed_y_template(self, params: dict[str, Any]) -> Any:
@@ -1845,6 +1944,8 @@ class KlippyRemoteCaptureDaemon:
                     self._run_bed_y_sweep(params)
                 elif job_kind == NOZZLE_Z_REMOTE_ACTION:
                     self._run_nozzle_z_sweep(params)
+                elif job_kind == EDDY_RELATIVE_REMOTE_ACTION:
+                    self._run_eddy_relative_calibration(params)
                 elif job_kind == NOZZLE_PROFILE_REMOTE_ACTION:
                     self._request_nozzle_profile(params)
                 else:
@@ -1956,6 +2057,38 @@ class KlippyRemoteCaptureDaemon:
                 or "nozzle Z vision sweep failed"
             )
 
+    def _run_eddy_relative_calibration(self, params: dict[str, Any]) -> None:
+        command = [
+            NOZZLE_ALIGN_BIN,
+            "--run-eddy-relative-job",
+            "--name",
+            sanitize_name(params.get("name", "eddy_relative_cold")),
+            "--bed-center-x",
+            str(float(params.get("bed_center_x", 117.5))),
+            "--bed-center-y",
+            str(float(params.get("bed_center_y", 117.5))),
+            "--nozzle-to-coil-x",
+            str(float(params.get("nozzle_to_coil_x", -8.18))),
+            "--nozzle-to-coil-y",
+            str(float(params.get("nozzle_to_coil_y", 9.0))),
+            "--nozzle-to-coil-z",
+            str(float(params.get("nozzle_to_coil_z", 2.5))),
+            "--current-t0-z-endstop",
+            str(float(params.get("current_t0_z_endstop", 293.75))),
+            "--no-manage-crowsnest",
+        ]
+        result = run_command(command, timeout=1800)
+        if result.stdout.strip():
+            log(f"Eddy relative calibration result: {result.stdout.strip()}")
+        if result.stderr.strip():
+            log(f"Eddy relative calibration stderr: {result.stderr.strip()}")
+        if result.returncode != 0:
+            raise CaptureError(
+                result.stderr.strip()
+                or result.stdout.strip()
+                or "Eddy relative calibration failed"
+            )
+
     def _request_nozzle_profile(self, params: dict[str, Any]) -> None:
         profile = sanitize_profile(params.get("profile") or DEFAULT_CAMERA_PROFILE)
         if not profile:
@@ -1999,6 +2132,9 @@ class KlippyRemoteCaptureDaemon:
                 sock, NOZZLE_Z_REMOTE_METHOD, NOZZLE_Z_REMOTE_ACTION
             )
             self._register_remote_method(
+                sock, EDDY_RELATIVE_REMOTE_METHOD, EDDY_RELATIVE_REMOTE_ACTION
+            )
+            self._register_remote_method(
                 sock, NOZZLE_PROFILE_REMOTE_METHOD, NOZZLE_PROFILE_REMOTE_ACTION
             )
 
@@ -2011,6 +2147,7 @@ class KlippyRemoteCaptureDaemon:
                     NOZZLE_SWEEP_REMOTE_ACTION,
                     BED_Y_REMOTE_ACTION,
                     NOZZLE_Z_REMOTE_ACTION,
+                    EDDY_RELATIVE_REMOTE_ACTION,
                     NOZZLE_PROFILE_REMOTE_ACTION,
                 )
             )

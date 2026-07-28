@@ -67,6 +67,11 @@ class Vision:
             desc="Finish and verify a synchronous vision acquisition job.",
         )
         self.gcode.register_command(
+            "VISION_EDDY_SAMPLE_SYNC",
+            self.cmd_VISION_EDDY_SAMPLE_SYNC,
+            desc="Collect and commit one synchronized raw Eddy sample window.",
+        )
+        self.gcode.register_command(
             "VISION_MEASURE_BED_Y",
             self.cmd_VISION_MEASURE_BED_Y,
             desc="Synchronously measure physical bed Y with the nozzle camera.",
@@ -252,6 +257,131 @@ class Vision:
                 "expected_frames": gcmd.get_int("EXPECTED_FRAMES", minval=0),
             },
         )
+
+    def _object_status(self, name):
+        obj = self.printer.lookup_object(name, None)
+        if obj is None or not hasattr(obj, "get_status"):
+            return None
+        try:
+            return obj.get_status(self.reactor.monotonic())
+        except Exception:
+            return None
+
+    def cmd_VISION_EDDY_SAMPLE_SYNC(self, gcmd):
+        self._wait_moves()
+        probe = self.printer.lookup_object("probe", None)
+        if probe is None or not hasattr(probe, "add_client"):
+            raise gcmd.error(
+                "VISION_EDDY_SAMPLE_SYNC requires an Eddy probe with add_client"
+            )
+        settle_ms = gcmd.get_int("SETTLE_MS", 100, minval=0)
+        duration_ms = gcmd.get_int("DURATION_MS", 250, minval=100)
+        toolhead = self.printer.lookup_object("toolhead")
+        batches = []
+        collection = {"finished": False}
+        batch_completion = self.reactor.completion()
+        window_origin = toolhead.get_last_move_time()
+        window_start = window_origin + settle_ms / 1000.0
+        window_end = window_start + duration_ms / 1000.0
+
+        def handle_batch(msg):
+            if collection["finished"]:
+                return False
+            batches.append(msg)
+            data = msg.get("data") or []
+            if data and float(data[-1][0]) >= window_end:
+                collection["finished"] = True
+                if not batch_completion.test():
+                    batch_completion.complete(True)
+                return False
+            return True
+
+        probe.add_client(handle_batch)
+        toolhead.dwell((settle_ms + duration_ms) / 1000.0)
+        toolhead.wait_moves()
+        batch_received = batch_completion.wait(
+            self.reactor.monotonic() + 2.0, None
+        )
+        collection["finished"] = True
+        if batch_received is None:
+            raise gcmd.error(
+                "Eddy sample %s timed out waiting for a sensor batch"
+                % (gcmd.get("SAMPLE"),)
+            )
+
+        raw_samples = []
+        error_count = 0
+        overflow_count = 0
+        for batch in batches:
+            error_count = max(error_count, int(batch.get("errors") or 0))
+            overflow_count = max(
+                overflow_count, int(batch.get("overflows") or 0)
+            )
+            for sample in batch.get("data") or []:
+                sample_time = float(sample[0])
+                if window_start <= sample_time <= window_end:
+                    raw_samples.append(
+                        [
+                            round(sample_time, 6),
+                            round(float(sample[1]), 3),
+                            round(float(sample[2]), 6),
+                        ]
+                    )
+
+        expected_count = duration_ms * 0.4
+        complete = (
+            len(raw_samples) >= max(1, int(expected_count * 0.80))
+            and error_count == 0
+            and overflow_count == 0
+        )
+        params = {
+            "job": gcmd.get("JOB"),
+            "seq": gcmd.get_int("SEQ", minval=0),
+            "sample": gcmd.get("SAMPLE"),
+            "manifest_hash": gcmd.get("MANIFEST_HASH"),
+            "approach": gcmd.get("APPROACH"),
+            "commanded_z": gcmd.get_float("COMMANDED_Z"),
+            "nozzle_gap": gcmd.get_float("NOZZLE_GAP"),
+            "coil_gap": gcmd.get_float("COIL_GAP"),
+            "settle_ms": settle_ms,
+            "duration_ms": duration_ms,
+            "sample_rate_hz": 400,
+            "sample_window": [round(window_start, 6), round(window_end, 6)],
+            "samples": raw_samples,
+            "errors": error_count,
+            "overflows": overflow_count,
+            "complete": complete,
+            "toolhead_position": self._toolhead_position(),
+            "gcode_position": self._gcode_position(),
+            "homed_axes": self._homed_axes(),
+            "temperatures": {
+                "coil": self._object_status("temperature_probe btt_eddy"),
+                "mcu": self._object_status("temperature_sensor btt_eddy_mcu"),
+            },
+        }
+        response = self._request_visiond("eddy_sample", params)
+        result = response.get("result") or {}
+        gcmd.respond_info(
+            "Eddy sample %s: n=%d errors=%d overflows=%d median=%.3fHz"
+            % (
+                params["sample"],
+                len(raw_samples),
+                error_count,
+                overflow_count,
+                float(result.get("median_frequency_hz") or 0.0),
+            )
+        )
+        if not complete:
+            raise gcmd.error(
+                "Eddy sample %s incomplete: n=%d errors=%d overflows=%d"
+                % (
+                    params["sample"],
+                    len(raw_samples),
+                    error_count,
+                    overflow_count,
+                )
+            )
+        return result
 
     def _bed_y_common_params(self, gcmd):
         params = dict(self.bed_y_calibration)

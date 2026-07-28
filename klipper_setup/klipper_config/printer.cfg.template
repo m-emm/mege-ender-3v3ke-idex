@@ -388,6 +388,36 @@ gcode:
     RESPOND TYPE=echo MSG="IDEX nozzle Z vision sweep queued: BED_Y_X={bed_y_x}, BED_Y_Y={bed_y_y}, BED_Y_Z={bed_y_z}, TOOL_X={tool_x}, TOOL_Y={tool_y}, TRAVEL_Z={travel_z}, Y_OFFSETS={y_offsets}, X_OFFSETS={x_offsets}, Z_VALUES={z_values}, BED_FEATURE_Z={bed_feature_z}, NAME={name}"
     {action_call_remote_method("idex_nozzle_z_vision_sweep", name=name, bed_y_x=bed_y_x, bed_y_y=bed_y_y, bed_y_z=bed_y_z, tool_x=tool_x, tool_y=tool_y, travel_z=travel_z, y_offsets=y_offsets, x_offsets=x_offsets, z_values=z_values, bed_feature_z_mm=bed_feature_z, current_t0_z_endstop=state.t0_z_endstop, current_t1_z_endstop=state.t1_z_endstop)}
 
+[gcode_macro IDEX_EDDY_RELATIVE_CALIBRATE_COLD]
+description: Cold, contact-free, report-only Eddy relative calibration.
+gcode:
+    {% set name = params.NAME|default("eddy_relative_cold") %}
+    {% set print_state = printer.print_stats.state %}
+    {% set homed = printer.toolhead.homed_axes %}
+    {% set bed_target = printer.heater_bed.target|float %}
+    {% set t0_target = printer.extruder.target|float %}
+    {% set t1_target = printer.extruder1.target|float %}
+    {% if print_state not in ["standby", "complete"] %}
+        { action_raise_error("IDEX_EDDY_RELATIVE_CALIBRATE_COLD requires an idle printer; print_stats.state=" ~ print_state) }
+    {% endif %}
+    {% if "x" not in homed or "y" not in homed or "z" not in homed %}
+        { action_raise_error("IDEX_EDDY_RELATIVE_CALIBRATE_COLD requires X/Y/Z homed; it will not home automatically.") }
+    {% endif %}
+    {% if bed_target != 0.0 or t0_target != 0.0 or t1_target != 0.0 %}
+        { action_raise_error("IDEX_EDDY_RELATIVE_CALIBRATE_COLD requires bed and both nozzle heater targets to be zero.") }
+    {% endif %}
+    RESPOND TYPE=echo MSG="Cold contact-free Eddy relative calibration queued; report-only, no SAVE_CONFIG and no calibration activation."
+    {action_call_remote_method(
+        "idex_eddy_relative_calibrate_cold",
+        name=name,
+        bed_center_x=${eddy_bed_center_x},
+        bed_center_y=${eddy_bed_center_y},
+        nozzle_to_coil_x=${eddy_nozzle_to_coil_x},
+        nozzle_to_coil_y=${eddy_nozzle_to_coil_y},
+        nozzle_to_coil_z=${eddy_nozzle_to_coil_z},
+        current_t0_z_endstop=printer["gcode_macro _IDEX_TOOL_STATE"].t0_z_endstop
+    )}
+
 # Custom thermistor calibration for the left Micro Swiss FlowTech toolhead.
 # Values retained from the same calibrated Micro Swiss hotend assembly.
 [thermistor microswiss_calibrated]

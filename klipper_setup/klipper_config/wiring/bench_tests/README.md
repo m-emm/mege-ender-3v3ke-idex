@@ -112,10 +112,13 @@ diagnostics at 1 kHz, 500 times slower than the normal 500 kHz bus:
   --armed --spi-only --spi-speed-hz 1000
 ```
 
-The explicit override is limited to 1 kHz through 500 kHz. Changing it changes
-the Klipper MCU configuration CRC, so reset the Pico before switching between
-SPI rates. This option is diagnostic only; keep 500 kHz as the normal setting
-unless repeated comparison tests demonstrate a rate-dependent failure.
+The explicit override is limited to 1 kHz through 3 MHz. The 3 MHz ceiling is
+the fastest symmetric software-SPI period available from this firmware's
+12 MHz timer while retaining margin below the TMC5160's 4 MHz internal-clock
+limit. Changing the rate changes the Klipper MCU configuration CRC, so reset
+the Pico before switching between SPI rates. This option is diagnostic only;
+keep 500 kHz as the normal setting unless repeated comparison tests demonstrate
+a rate-dependent failure.
 
 For diagnosis without energizing the motor, force `CHOPCONF.toff=0` and probe
 only the active-low ENABLE logic:
@@ -180,6 +183,23 @@ reverse pulses at 6,400 pulses/s; one ten-cycle group therefore moves for 6.25
 seconds. After every group the test writes `CHOPCONF.toff=0`, requires the MCU
 position to be zero, and reads IOIN, CHOPCONF, GSTAT, and DRV_STATUS before
 enabling the next group.
+
+For a deliberately harsher 3 MHz SPI and 2.5 A motor-current test:
+
+```bash
+./klipper_setup/klipper_config/wiring/bench_tests/run_rp2040plus_tmc5160t_plus_y_motor_bench.sh \
+  --device /dev/cu.usbmodem13301 --spi-speed-hz 3000000 \
+  --max-stress-test --armed
+```
+
+This mode runs three enabled groups. Each group sends 32,000 microsteps
+forward and 32,000 in reverse at 6,400 pulses/s: ten revolutions and five
+seconds in each direction for a 200-step motor at 16 microsteps. While motion
+is queued, it repeatedly verifies PWR_OK, DIAG1, IOIN identity and enabled
+state, GSTAT, and DRV_STATUS. It requires a zero MCU position delta after each
+group and disables the bridge between groups. Use it only with a secured,
+free-shaft motor and adequate driver cooling; keep the physical 24 V switch
+within reach.
 
 Only after the SPI-only test passes, run the fixed jog:
 

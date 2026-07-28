@@ -108,6 +108,24 @@ def test_spi_speed_override_is_bench_bounded():
     assert args.spi_speed_hz == MOTOR_BENCH.VERY_SLOW_SPI_SPEED_HZ
 
 
+def test_maximum_software_spi_rate_has_symmetric_12mhz_half_cycles():
+    commands = MOTOR_BENCH.build_config_commands(
+        12_000_000,
+        spi_speed_hz=MOTOR_BENCH.MAX_SPI_SPEED_HZ,
+    )
+    spi_command = next(
+        command for command in commands if command.startswith("spi_set_sw_bus")
+    )
+
+    assert MOTOR_BENCH.MAX_SPI_SPEED_HZ == 3_000_000
+    assert "pulse_ticks=4" in spi_command
+    with pytest.raises(ValueError, match="SPI speed must be between"):
+        MOTOR_BENCH.build_config_commands(
+            12_000_000,
+            spi_speed_hz=MOTOR_BENCH.MAX_SPI_SPEED_HZ + 1,
+        )
+
+
 def test_22_milliohm_current_quantizes_to_klipper_register_settings():
     current = MOTOR_BENCH.calculate_current_settings(
         1.0,
@@ -118,6 +136,18 @@ def test_22_milliohm_current_quantizes_to_klipper_register_settings():
     assert current.irun == 24
     assert current.ihold == 24
     assert current.actual_run_current_a == pytest.approx(1.0201069952)
+
+
+def test_22_milliohm_max_stress_current_quantizes_near_2_5_amps():
+    current = MOTOR_BENCH.calculate_current_settings(
+        MOTOR_BENCH.MAX_STRESS_CURRENT_A,
+        sense_resistor_ohms=0.022,
+    )
+
+    assert current.globalscaler == 61
+    assert current.irun == 31
+    assert current.ihold == 31
+    assert current.actual_run_current_a == pytest.approx(2.4890610684)
 
 
 def test_register_defaults_select_16_microsteps_spreadcycle_and_interpolation():
@@ -290,6 +320,36 @@ def test_repeated_motion_test_has_three_ten_cycle_enable_groups():
     )
 
 
+def test_max_stress_test_has_long_ten_revolution_legs():
+    assert MOTOR_BENCH.MICROSTEPS == 16
+    assert MOTOR_BENCH.MOTOR_FULL_STEPS_PER_REVOLUTION == 200
+    assert MOTOR_BENCH.MAX_STRESS_REVOLUTIONS_PER_LEG == 10
+    assert MOTOR_BENCH.MAX_STRESS_STEP_COUNT == 32_000
+    assert MOTOR_BENCH.MAX_STRESS_STEP_RATE_HZ == 6_400
+    assert MOTOR_BENCH.MAX_STRESS_LEG_DURATION_S == pytest.approx(5.0)
+    assert MOTOR_BENCH.MAX_STRESS_RUNS == 3
+    assert (
+        MOTOR_BENCH.MAX_STRESS_MONITOR_INTERVAL_S
+        < MOTOR_BENCH.ENABLE_WATCHDOG_S
+    )
+
+
+def test_position_checks_are_relative_to_each_invocation():
+    MOTOR_BENCH.require_position_delta(
+        start_position=-1_000,
+        end_position=-1_000,
+        expected_delta=0,
+        stage="test",
+    )
+    with pytest.raises(MOTOR_BENCH.BenchFailure, match="position delta"):
+        MOTOR_BENCH.require_position_delta(
+            start_position=-1_000,
+            end_position=0,
+            expected_delta=0,
+            stage="test",
+        )
+
+
 def test_enable_probe_is_an_explicit_armed_mode():
     parser = MOTOR_BENCH.build_parser()
     args = parser.parse_args(["--armed", "--enable-probe"])
@@ -347,4 +407,15 @@ def test_repeated_motion_test_is_an_explicit_armed_mode():
     assert not args.low_current_hold
     assert not args.low_current_step_test
     assert not args.full_current_reverse_test
+    assert not args.jog
+
+
+def test_max_stress_test_is_an_explicit_armed_mode():
+    parser = MOTOR_BENCH.build_parser()
+    args = parser.parse_args(["--armed", "--max-stress-test"])
+
+    assert args.armed
+    assert args.max_stress_test
+    assert not args.spi_only
+    assert not args.repeated_motion_test
     assert not args.jog
