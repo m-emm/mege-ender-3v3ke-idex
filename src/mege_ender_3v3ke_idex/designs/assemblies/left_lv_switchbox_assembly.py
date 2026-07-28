@@ -17,6 +17,12 @@ TERMINAL_SCREW_SIZE = "M4"
 THREAD_INSET_EXTRA_RADIUS = 2.0
 
 
+cable_tie_mount_width = 4
+cable_tie_mount_depth = 10
+cable_tie_mount_thickness = 6
+cable_tie_mount_hole_thickness = 3
+cable_tie_mount_hole_depth = 6
+
 def create_left_lv_switchbox_assembly(
     *,
     left_lv_switchbox_width,
@@ -192,6 +198,7 @@ def create_left_lv_switchbox_assembly(
 
     terminal_square_nut_pocket_items = []
     terminal_square_nut_items = []
+    cable_tie_mounts = PartCollector()
     for terminal_index in range(TERMINAL_COUNT):
         terminal_x_offset = (terminal_index - (TERMINAL_COUNT - 1) / 2) * TERMINAL_PITCH
         terminal_nut_pocket = create_hidden_nut_pocket_cutter(
@@ -228,6 +235,35 @@ def create_left_lv_switchbox_assembly(
             )
         )
 
+        cable_tie_mount = create_box(cable_tie_mount_width, cable_tie_mount_depth, cable_tie_mount_thickness)
+        cable_tie_mount_hole_cutter = create_box(100, cable_tie_mount_hole_depth, cable_tie_mount_hole_thickness)
+        cable_tie_mount_hole_cutter = align(
+            cable_tie_mount_hole_cutter,
+            cable_tie_mount,
+            Alignment.CENTER)
+
+        cable_tie_mount_hole_cutter = align(
+            cable_tie_mount_hole_cutter,
+            cable_tie_mount,
+            Alignment.BOTTOM)
+
+        cable_tie_mount = cable_tie_mount.cut(cable_tie_mount_hole_cutter)
+
+        cable_tie_mount = translate(TERMINAL_PITCH *1.2 * terminal_index, 0,0)(cable_tie_mount)
+        cable_tie_mounts = cable_tie_mounts.fuse(cable_tie_mount)
+
+    cable_tie_mounts = align(
+        cable_tie_mounts, bottom_reference, Alignment.CENTER)
+
+
+    cable_tie_mounts = align(
+        cable_tie_mounts, bottom_reference, Alignment.STACK_TOP)
+
+    cable_tie_mounts = align(
+        cable_tie_mounts, inner_space, Alignment.BACK)
+    
+
+    cable_tie_mounts = translate(0, -6, 0)(cable_tie_mounts)
     housing_box = housing_box.fuse(terminal_rail)
 
     cable_entry_cutter = create_filleted_box(
@@ -407,6 +443,7 @@ def create_left_lv_switchbox_assembly(
         )
         lid_screw_items.append((f"{hardware_prefix}_screw", screw))
 
+    housing_box = housing_box.fuse(cable_tie_mounts)
     housing = LeaderFollowersCuttersPart(leader=housing_box)
     housing.add_named_follower(lid, "left_lv_switchbox_lid")
     housing.add_named_cutter(inner_space_cutter, "inner_space")
