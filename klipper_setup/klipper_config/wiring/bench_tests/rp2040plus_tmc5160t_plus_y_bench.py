@@ -56,7 +56,7 @@ OUTPUTS = (
     BenchOutput("SCLK", 4, "gpio10", 0, "U1_11_5A_SCLK"),
     BenchOutput("MOSI", 5, "gpio11", 0, "U1_13_6A_MOSI"),
     BenchOutput("TMC_DIAG_TEST", 6, "gpio26", 0, "C15_R20_TMC_DIAG"),
-    BenchOutput("TMC_MISO_TEST", 7, "gpio27", 0, "C16_R19_TMC_MISO"),
+    BenchOutput("TMC_MISO_TEST", 7, "gpio27", 0, "TMC1_J1_MISO_CFG0_5"),
 )
 OUTPUT_BY_NAME = {output.name: output for output in OUTPUTS}
 
@@ -74,7 +74,7 @@ OUTGOING_PROBES = (
 )
 RETURN_PROBES = (
     InputProbe("DIAG Pico-side", 0, "gpio3", 5, "C06_R20_PICO_DIAG"),
-    InputProbe("MISO Pico-side", 1, "gpio8", 11, "C05_R19_PICO_MISO"),
+    InputProbe("MISO Pico-side", 1, "gpio8", 11, "PICO_GPIO_8"),
 )
 OUTGOING_PROBE_BY_NAME = {probe.name: probe for probe in OUTGOING_PROBES}
 RETURN_PROBE_BY_NAME = {probe.name: probe for probe in RETURN_PROBES}
@@ -133,7 +133,7 @@ RETURN_TESTS = (
     LoopbackTest(
         "TMC_MISO_TEST",
         RETURN_PROBE_BY_NAME["MISO Pico-side"].mask,
-        "gpio27 -> C16_R19_TMC_MISO -> R19 -> gpio8",
+        "gpio27 -> TMC1_J1_MISO_CFG0_5 -> direct twisted-pair MISO -> gpio8",
     ),
 )
 

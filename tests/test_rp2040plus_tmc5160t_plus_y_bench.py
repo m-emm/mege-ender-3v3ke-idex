@@ -16,39 +16,49 @@ SPEC.loader.exec_module(BENCH)
 
 
 def test_temporary_probe_names_resolve_to_rp2040_gpio_numbers():
-    assert BENCH.STEP_INPUT_PIN == "gpio17"
-    assert BENCH.STEP_INPUT_PHYSICAL_PIN == 22
-    assert BENCH.DRIVER_STEP_INPUT_PIN == "gpio16"
-    assert BENCH.DRIVER_STEP_INPUT_PHYSICAL_PIN == 21
+    step_input = BENCH.OUTGOING_PROBE_BY_NAME["STEP input-side"]
+    driver_step = BENCH.OUTGOING_PROBE_BY_NAME["STEP driver-side"]
+    miso_return = BENCH.RETURN_PROBE_BY_NAME["MISO Pico-side"]
+
+    assert (step_input.pin, step_input.physical_pin) == ("gpio17", 22)
+    assert (driver_step.pin, driver_step.physical_pin) == ("gpio16", 21)
+    assert (miso_return.pin, miso_return.physical_pin) == ("gpio8", 11)
+    assert miso_return.endpoint == "PICO_GPIO_8"
 
 
-def test_input_state_decoder_keeps_three_assertions_independent():
-    low = BENCH.decode_input_state(0)
-    assert not low.pwr_ok
-    assert not low.step_input
-    assert not low.driver_step
+def test_input_probe_masks_are_independent_and_cover_each_bank():
+    outgoing_masks = {probe.mask for probe in BENCH.OUTGOING_PROBES}
+    return_masks = {probe.mask for probe in BENCH.RETURN_PROBES}
 
-    step_high = BENCH.decode_input_state(BENCH.STEP_INPUT_MASK)
-    assert not step_high.pwr_ok
-    assert step_high.step_input
-    assert not step_high.driver_step
-
-    all_high = BENCH.decode_input_state(BENCH.HV_ON_STEP_HIGH_STATE)
-    assert all_high.pwr_ok
-    assert all_high.step_input
-    assert all_high.driver_step
+    assert len(outgoing_masks) == len(BENCH.OUTGOING_PROBES)
+    assert len(return_masks) == len(BENCH.RETURN_PROBES)
+    assert sum(outgoing_masks) == BENCH.OUTGOING_INPUT_MASK
+    assert sum(return_masks) == BENCH.RETURN_INPUT_MASK
+    assert BENCH.STEP_INPUT_MASK != (
+        BENCH.OUTGOING_PROBE_BY_NAME["STEP driver-side"].mask
+    )
 
 
 def test_expected_power_states_match_the_bench_contract():
-    assert BENCH.NO_HV_STEP_LOW_STATE == 0
-    assert BENCH.NO_HV_STEP_HIGH_STATE == BENCH.STEP_INPUT_MASK
-    assert BENCH.HV_ON_STEP_LOW_STATE == BENCH.PWR_OK_MASK
-    assert BENCH.HV_ON_STEP_HIGH_STATE == BENCH.INPUT_MASK
+    assert BENCH.PWR_OK_MASK == BENCH.OUTGOING_PROBE_BY_NAME["PWR_OK"].mask
+    assert BENCH.HV_ON_IDLE_STATE & BENCH.PWR_OK_MASK
+    assert BENCH.HV_ON_IDLE_STATE & (
+        BENCH.OUTGOING_PROBE_BY_NAME["ENABLE driver-side"].mask
+    )
+    assert BENCH.HV_ON_IDLE_STATE & (
+        BENCH.OUTGOING_PROBE_BY_NAME["CS driver-side"].mask
+    )
+    assert not BENCH.HV_ON_IDLE_STATE & BENCH.STEP_INPUT_MASK
 
 
 def test_bench_configuration_uses_declared_wiring_pins():
     commands = "\n".join(BENCH.CONFIG_COMMANDS)
-    assert f"pin={BENCH.STEP_OUTPUT_PIN}" in commands
-    assert f"pin={BENCH.PWR_OK_INPUT_PIN}" in commands
-    assert f"pin={BENCH.STEP_INPUT_PIN}" in commands
-    assert f"pin={BENCH.DRIVER_STEP_INPUT_PIN}" in commands
+    for output in BENCH.OUTPUTS:
+        assert f"pin={output.pin}" in commands
+    for probe in (*BENCH.OUTGOING_PROBES, *BENCH.RETURN_PROBES):
+        assert f"pin={probe.pin}" in commands
+
+    assert (
+        BENCH.OUTPUT_BY_NAME["TMC_MISO_TEST"].endpoint
+        == "TMC1_J1_MISO_CFG0_5"
+    )

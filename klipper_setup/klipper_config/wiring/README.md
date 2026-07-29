@@ -6,8 +6,8 @@ Klipper config.
 
 - `pico_w_btt_tmc2226_x.yaml` is the X-axis Pico wiring source.
 - `pico_w_btt_tmc2226_y_z.yaml` is the Y/Z/heatbed Pico wiring source.
-- `rp2040plus_btt_tmc5160t_plus_y.yaml` is the review-only physical wiring
-  source for the proposed RP2040-Plus/TMC5160T Plus Y controller. Its generated
+- `rp2040plus_btt_tmc5160t_plus_y.yaml` is the physical wiring source for the
+  RP2040-Plus/TMC5160T Plus Y controller. Its generated
   top, discrete-component top, and underside SVGs model the adapter boundary,
   four AR20 wire-wrap carriers, the isolated high-current terminal zone, and
   the exact 64x57mm driver outline. All three views use one shared set of YAML
@@ -20,8 +20,11 @@ Klipper config.
   VBUS-gated UTC LP2950L-3.3 regulator using its `1=OUT`, `2=GND`, `3=IN`
   TO-92 pinout; GPIO5 reports the resulting VIO directly as active-high
   `VIO_OK`. `LINE18_PWR_GND_A` and `LINE18_PWR_GND_B` form a joined two-post
-  ground hub, with every other ground contact wired directly to one hub post.
-  The artifact is not registered as active Klipper wiring. Its retained 18-pin
+  ground hub, with every power, detector, and logic ground contact wired
+  directly to one hub post. The bench-validated MISO repair removes R19 and
+  R21 and runs TMC J1-5 MISO directly to Pico GPIO8, twisted with a dedicated
+  companion wire from TMC J2-8 logic ground to Pico physical GND pin 13.
+  The source is registered with the Klipper wiring validator. Its retained 18-pin
   external-I/O row keeps `MOTOR_HVIN` and regulated 24 V adapter auxiliary power
   separate. It includes `F1_5A_IN` and `F1_5A_OUT`; install the serviceable
   external 5 A fuse between those contacts, with no separate carrier-mounted
@@ -45,14 +48,18 @@ Klipper config.
     as a coordinate graph. Thick solid edges are new or changed wraps, purple
     dashed edges are obsolete wraps to remove, and dim thin edges are retained.
   The ordinary component and wiring diagrams remain unmodified references.
-- `tmc5160t_plus_dual_rail_delta.py` generates the follow-up rework aids from
-  baseline commit `ece0565` to the dual-rail VIO gate:
+- `tmc5160t_plus_dual_rail_delta.py` generates the cumulative follow-up rework
+  aids from baseline commit `ece0565` through the dual-rail VIO gate,
+  ground-star conversion, and direct-MISO repair:
   - `rp2040plus_btt_tmc5160t_plus_y_top_discrete_dual_rail_delta.svg` highlights
-    the added DZ2 at Socket B row 9 and R23 at the bottom row 10.
+    the added DZ2 at Socket B row 9 and R23 at the bottom row 10, plus removed
+    R6, R19, and R21 positions.
   - `rp2040plus_btt_tmc5160t_plus_y_bottom_dual_rail_delta.svg` shows only the
     wraps to remove and add for the independent optocoupler inputs, series
     output-transistor AND, VIO-derived GPIO5 reporting, and the two-post
-    ground-star conversion.
+    ground-star conversion. It also shows the direct TMC J1-5 MISO to Pico
+    GPIO8 wire and its twisted companion from TMC J2-8 logic ground to Pico
+    physical GND pin 13.
 - `diagrams/*.svg` and selected `diagrams/*.png` files are generated artifacts
   committed for review.
 - `../printer.cfg.template` is the active Klipper config source.

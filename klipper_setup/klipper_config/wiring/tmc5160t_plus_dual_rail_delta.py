@@ -1,4 +1,4 @@
-"""Generate the TMC5160T Plus dual-rail VIO and ground-star rework delta."""
+"""Generate the current TMC5160T Plus board-rework delta."""
 
 from __future__ import annotations
 
@@ -24,9 +24,9 @@ from tmc5160t_plus_84dd4cb_delta import (
 
 BASELINE_COMMIT = "ece0565ec180e14dc5bcc4a643de45c2c63c1880"
 TARGET_CONFIG_SHA256 = (
-    "a5e7e3a3d9c0026e64257a799f575ef45b9b9a374487de587f2bea91f4e4efa2"
+    "201902f821a4c4f7cc5166aaa80da1c8f8d0d57f019548a4a8ac83268b517549"
 )
-DELTA_IDENTIFIER = "dual-rail-vio-ground-star-after-ece0565"
+DELTA_IDENTIFIER = "dual-rail-vio-ground-star-direct-miso-after-ece0565"
 TOP_DELTA_FILENAME = (
     "rp2040plus_btt_tmc5160t_plus_y_top_discrete_dual_rail_delta.svg"
 )
@@ -36,22 +36,24 @@ PRESENTATION = DeltaPresentation(
     identifier=DELTA_IDENTIFIER,
     base_ref=BASELINE_COMMIT,
     component_title=(
-        "DUAL-RAIL VIO + GROUND STAR + R6 REMOVAL — COMPONENT SIDE"
+        "DUAL-RAIL VIO + GROUND STAR + DIRECT MISO — COMPONENT SIDE"
     ),
     component_svg_title=(
-        "RP2040-Plus / TMC5160T Plus dual-rail VIO + ground star + R6 removal"
+        "RP2040-Plus / TMC5160T Plus dual-rail, ground-star, direct-MISO rework"
     ),
     wiring_title=(
-        "DUAL-RAIL VIO + GROUND STAR + R6 REMOVAL — UNDERSIDE / MIRRORED"
+        "DUAL-RAIL VIO + GROUND STAR + DIRECT MISO — UNDERSIDE / MIRRORED"
     ),
     wiring_svg_title=(
-        "Dual-Rail VIO + Ground-Star + R6 Removal Delta — Underside View"
+        "Dual-Rail VIO + Ground-Star + Direct-MISO Delta — Underside View"
     ),
     bottom_filename=BOTTOM_DELTA_FILENAME,
-    removed_component_description="R6 at B02-B19",
+    removed_component_description=(
+        "R6 at B02-B19; R19 at C05-C16; R21 at C09-C12"
+    ),
     wiring_extra_note=(
-        "GROUND REBUILD: install the dim GND-A <-> GND-B hub link. "
-        "R6: remove it, leave B02 unused, and retain B19 as VIO_OK."
+        "DIRECT MISO: remove R19/R21; twist J1-5 -> GPIO8 with "
+        "J2-8 GND -> Pico pin 13."
     ),
 )
 
@@ -63,12 +65,13 @@ def _config_sha256() -> str:
 def render_tmc5160t_plus_dual_rail_delta(
     output_dir: str | Path = DEFAULT_OUTPUT_DIR,
 ) -> DeltaRenderResult:
-    """Render deltas from ece0565 to the dual-rail and ground-star design."""
+    """Render deltas from ece0565 to the current direct-MISO design."""
     current_hash = _config_sha256()
     if current_hash != TARGET_CONFIG_SHA256:
         raise ValueError(
             "Current TMC5160T Plus wiring YAML has diverged from the reviewed "
-            "dual-rail delta target; update the one-off delta baseline deliberately"
+            "dual-rail/direct-MISO delta target; update the one-off delta "
+            "baseline deliberately"
         )
 
     output_path = Path(output_dir)
@@ -127,7 +130,7 @@ def render_tmc5160t_plus_dual_rail_delta(
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Generate the dual-rail and ground-star TMC5160T Plus rework delta."
+            "Generate the current TMC5160T Plus board-rework delta."
         )
     )
     parser.add_argument(

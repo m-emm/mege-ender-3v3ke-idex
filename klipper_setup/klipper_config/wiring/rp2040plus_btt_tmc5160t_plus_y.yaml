@@ -35,14 +35,16 @@ metadata:
     Socket B position 2 is unused. Position 19 is the direct VIO_OK junction,
     positions 3-8 hold R12, R7, R11, R8, R10, R9, position 9 holds DZ2,
     and position 10 holds R23.
-    Socket C positions 1-10: R15, R18, R17, R16, R19, R20, R13, R14, R21, R22.
+    Socket C positions 1-10: R15, R18, R17, R16, empty, R20, R13, R14,
+    empty, R22. R19 and R21 were removed after the direct twisted-pair MISO
+    return proved reliable on the bench.
     HV optocoupler labels use U2P=ILD74 pin, LEDA/LEDB=channel, A/K=anode/cathode,
     and C/E=collector/emitter.
     DZ1/DZ2 contacts marked K/A are cathode/anode.
     D1 K goes to U2 pin 1; D1 A returns to common ground.
     R1A=R1B=R1C=8.2k/0.25W in parallel (2.73k equivalent);
     R2=47k; R3=47k; R5=10k; R23=1.5k/0.25W.
-    R7-R12=10k; R13-R15=4.7k; R16-R18=2.2k; R19-R20=1k; R21-R22=47k.
+    R7-R12=10k; R13-R15=4.7k; R16-R18=2.2k; R20=1k; R22=47k.
     DZ1=12V/0.5W; DZ2=15V/0.5W; D1=1N4148; C1=1uF electrolytic/tantalum;
     C2=C3=100nF ceramic. C3 replaces the old DZ2 without moving its leads.
     VIO_OK is active-high: HIGH means the gated LP2950 output is actually present.
@@ -55,8 +57,11 @@ metadata:
     transistors are in series, so U3 is fed from Pico USB VBUS only when both
     power domains are valid.
     LINE18_PWR_GND_A and LINE18_PWR_GND_B are the joined two-post ground hub.
-    Every other ground contact has one direct star branch to exactly one hub
-    post; there are no daisy-chained ground contacts.
+    Every power, detector, and logic ground contact has one direct star branch
+    to exactly one hub post; there are no daisy-chained ground contacts.
+    In addition, TMC1 J1-5 MISO and J2-8 logic GND form a dedicated twisted
+    pair directly to Pico GPIO8 and Pico physical GND pin 13. The local return
+    is intentional and supplements the logic-ground star branch.
     Initial SPI speed is 500kHz.
     Logic, detector, and VIO conductors are low-current wire-wrap class only.
     The external I/O row carries both external 5A fuse contacts, MOTOR_HVIN through two
@@ -369,7 +374,8 @@ pin_sets:
       - 12_DZ2_A
       - 11_R23_DZ2
 
-  # AR20 socket C: collector pull-ups and protected return paths.
+  # AR20 socket C: collector pull-ups and the protected DIAG1 return.
+  # Rows 5/16 and 9/12 are empty after removal of the R19/R21 MISO network.
   - id: socket_c_left
     prefix: C
     origin: [23, 18]
@@ -380,11 +386,11 @@ pin_sets:
       - 02_R18_VIO
       - 03_R17_VIO
       - 04_R16_VIO
-      - 05_R19_PICO_MISO
+      - 05_NC
       - 06_R20_PICO_DIAG
       - 07_R13_VIO
       - 08_R14_VIO
-      - 09_R21_PICO_MISO
+      - 09_NC
       - 10_R22_PICO_DIAG
   - id: socket_c_right
     prefix: C
@@ -396,11 +402,11 @@ pin_sets:
       - 19_R18_MOSI
       - 18_R17_SCLK
       - 17_R16_CS
-      - 16_R19_TMC_MISO
+      - 16_NC
       - 15_R20_TMC_DIAG
       - 14_R13_STEP
       - 13_R14_DIR
-      - 12_R21_GND
+      - 12_NC
       - 11_R22_GND
 
   # Dedicated 24-to-48V MOTOR_HVIN detector carrier. U2 occupies the first four
@@ -561,10 +567,6 @@ component_placements:
     kind: resistor
     value: 2.2k
     terminals: {start: C04_R16_VIO, end: C17_R16_CS}
-  - ref: R19
-    kind: resistor
-    value: 1k
-    terminals: {start: C05_R19_PICO_MISO, end: C16_R19_TMC_MISO}
   - ref: R20
     kind: resistor
     value: 1k
@@ -577,10 +579,6 @@ component_placements:
     kind: resistor
     value: 4.7k
     terminals: {start: C08_R14_VIO, end: C13_R14_DIR}
-  - ref: R21
-    kind: resistor
-    value: 47k
-    terminals: {start: C09_R21_PICO_MISO, end: C12_R21_GND}
   - ref: R22
     kind: resistor
     value: 47k
@@ -724,16 +722,14 @@ wires:
     to: HV04_U2P4_LEDB_A
     type: power
 
-  # Two-post ground star. GND-A and GND-B are joined above; every remaining
-  # ground contact has exactly one direct branch to one of those hub posts.
+  # Two-post ground star. GND-A and GND-B are joined above. The dedicated
+  # TMC-logic-ground-to-Pico-pin-13 MISO return is added below as the companion
+  # conductor of the direct MISO twisted pair.
   - from: LINE18_PWR_GND_A
     to: TMC1_J2_GND_MOTOR_2
     type: ground
   - from: LINE18_PWR_GND_A
     to: TMC1_J2_GND_LOGIC_8
-    type: ground
-  - from: LINE18_PWR_GND_A
-    to: C12_R21_GND
     type: ground
   - from: LINE18_PWR_GND_A
     to: U1_07_GND
@@ -777,6 +773,9 @@ wires:
     type: ground
   - from: LINE18_PWR_GND_B
     to: HV17_U2P5_E_B
+    type: ground
+  - from: TMC1_J2_GND_LOGIC_8
+    to: PICO_GND_13
     type: ground
 
   # Pico USB VBUS powers U1 and the switched VIO regulator input.
@@ -982,17 +981,14 @@ wires:
     to: TMC1_J1_MOSI_CFG1_2
     type: data
 
-  # Protected adapter-to-Pico MISO and DIAG1 returns.
+  # Bench-validated direct MISO return. Route this wire as a twisted pair with
+  # the TMC1_J2_GND_LOGIC_8 -> PICO_GND_13 conductor above.
   - from: TMC1_J1_MISO_CFG0_5
-    to: C16_R19_TMC_MISO
-    type: return
-  - from: C05_R19_PICO_MISO
-    to: C09_R21_PICO_MISO
-    type: return
-  - from: C09_R21_PICO_MISO
     to: PICO_GPIO_8
     klipper: "tmc5160 stepper_y.spi_software_miso_pin"
     type: return
+
+  # DIAG1 retains its 1k series resistor and 47k Pico-side pulldown.
   - from: TMC1_TOP_DIAG1
     to: C15_R20_TMC_DIAG
     type: return

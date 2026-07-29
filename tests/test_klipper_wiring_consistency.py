@@ -160,8 +160,13 @@ def test_tmc5160_review_wiring_declares_discrete_component_placements():
         "R1A",
         "R1B",
         "R1C",
-        *(f"R{number}" for number in (2, 3, 5, *range(7, 24))),
+        *(
+            f"R{number}"
+            for number in (2, 3, 5, *(n for n in range(7, 24) if n not in {19, 21}))
+        ),
     }
+    assert "R19" not in placements
+    assert "R21" not in placements
     assert placements["U1"]["terminals"][1] == "U1_01_1A_STEP"
     assert placements["U1"]["terminals"][14] == "U1_14_VCC"
     assert placements["U2"]["terminals"] == {
@@ -272,11 +277,11 @@ def test_tmc5160_review_wiring_has_four_true_2x10_component_carriers():
             ("02_R18_VIO", "19_R18_MOSI"),
             ("03_R17_VIO", "18_R17_SCLK"),
             ("04_R16_VIO", "17_R16_CS"),
-            ("05_R19_PICO_MISO", "16_R19_TMC_MISO"),
+            ("05_NC", "16_NC"),
             ("06_R20_PICO_DIAG", "15_R20_TMC_DIAG"),
             ("07_R13_VIO", "14_R13_STEP"),
             ("08_R14_VIO", "13_R14_DIR"),
-            ("09_R21_PICO_MISO", "12_R21_GND"),
+            ("09_NC", "12_NC"),
             ("10_R22_PICO_DIAG", "11_R22_GND"),
         ],
         "HV": [
@@ -352,7 +357,18 @@ def test_tmc5160_wiring_is_active_klipper_y_truth():
         for tag in validator.klipper_tags(wire.get("klipper"))
     }
     assert ("PICO_THREEV3_OUT_36", "LINE18_ENDSTOP_VCC") in wire_pairs
-    assert all("PICO_GND_13" not in pair for pair in wire_pairs)
+    assert ("TMC1_J1_MISO_CFG0_5", "PICO_GPIO_8") in wire_pairs
+    assert ("TMC1_J2_GND_LOGIC_8", "PICO_GND_13") in wire_pairs
+    assert all(
+        not {
+            "C05_R19_PICO_MISO",
+            "C09_R21_PICO_MISO",
+            "C12_R21_GND",
+            "C16_R19_TMC_MISO",
+        }
+        & set(pair)
+        for pair in wire_pairs
+    )
     assert (
         "HV20_U2P8_E_A",
         "HV18_U2P6_C_B",
@@ -366,7 +382,6 @@ def test_tmc5160_review_wiring_uses_two_post_ground_star():
         frozenset(("LINE18_PWR_GND_A", "TMC5160_HV_GND")),
         frozenset(("LINE18_PWR_GND_A", "TMC1_J2_GND_MOTOR_2")),
         frozenset(("LINE18_PWR_GND_A", "TMC1_J2_GND_LOGIC_8")),
-        frozenset(("LINE18_PWR_GND_A", "C12_R21_GND")),
         frozenset(("LINE18_PWR_GND_A", "U1_07_GND")),
         frozenset(("LINE18_PWR_GND_A", "PICO_GND_28")),
         frozenset(("LINE18_PWR_GND_A", "PICO_GND_38")),
@@ -387,11 +402,19 @@ def test_tmc5160_review_wiring_uses_two_post_ground_star():
         frozenset((wire["from"], wire["to"])) for wire in ground_wires
     }
 
+    paired_miso_return = frozenset(
+        ("TMC1_J2_GND_LOGIC_8", "PICO_GND_13")
+    )
     assert ground_edges == {
         frozenset(hubs),
         *expected_spokes,
+        paired_miso_return,
     }
-    assert all(hubs & {wire["from"], wire["to"]} for wire in ground_wires)
+    assert all(
+        hubs & {wire["from"], wire["to"]}
+        or frozenset((wire["from"], wire["to"])) == paired_miso_return
+        for wire in ground_wires
+    )
 
     non_hub_contacts = Counter(
         endpoint
@@ -399,7 +422,12 @@ def test_tmc5160_review_wiring_uses_two_post_ground_star():
         for endpoint in (wire["from"], wire["to"])
         if endpoint not in hubs
     )
-    assert set(non_hub_contacts.values()) == {1}
+    assert non_hub_contacts["TMC1_J2_GND_LOGIC_8"] == 2
+    assert all(
+        count == 1
+        for contact, count in non_hub_contacts.items()
+        if contact != "TMC1_J2_GND_LOGIC_8"
+    )
     hub_contacts = Counter(
         endpoint
         for wire in ground_wires
@@ -407,7 +435,7 @@ def test_tmc5160_review_wiring_uses_two_post_ground_star():
         if endpoint in hubs
     )
     assert hub_contacts == {
-        "LINE18_PWR_GND_A": 10,
+        "LINE18_PWR_GND_A": 9,
         "LINE18_PWR_GND_B": 10,
     }
 

@@ -12,12 +12,13 @@ SVG_NAMESPACE = "{http://www.w3.org/2000/svg}"
 
 EXPECTED_NEW_CONNECTIONS = {
     ("LINE18_PWR_GND_A", "TMC5160_HV_GND"),
+    ("TMC1_J1_MISO_CFG0_5", "PICO_GPIO_8"),
+    ("TMC1_J2_GND_LOGIC_8", "PICO_GND_13"),
     ("LINE18_AUX_24V_B", "B10_R23_AUX24"),
     ("B11_R23_DZ2", "B09_DZ2_K"),
     ("B12_DZ2_A", "HV04_U2P4_LEDB_A"),
     ("LINE18_PWR_GND_A", "TMC1_J2_GND_MOTOR_2"),
     ("LINE18_PWR_GND_A", "TMC1_J2_GND_LOGIC_8"),
-    ("LINE18_PWR_GND_A", "C12_R21_GND"),
     ("LINE18_PWR_GND_A", "U1_07_GND"),
     ("LINE18_PWR_GND_A", "PICO_GND_28"),
     ("LINE18_PWR_GND_A", "PICO_GND_38"),
@@ -62,6 +63,9 @@ EXPECTED_REMOVED_CONNECTIONS = {
     ("B02_R6_3V3", "B03_R12_3V3"),
     ("B19_R6_PWR_OK", "HV18_U2P6_C_B"),
     ("HV18_U2P6_C_B", "PICO_GPIO_5"),
+    ("TMC1_J1_MISO_CFG0_5", "C16_R19_TMC_MISO"),
+    ("C05_R19_PICO_MISO", "C09_R21_PICO_MISO"),
+    ("C09_R21_PICO_MISO", "PICO_GPIO_8"),
 }
 
 
@@ -93,18 +97,18 @@ def test_dual_rail_delta_classifies_only_the_latest_board_rework(rendered_delta)
 
     assert result.components.added == ("DZ2", "R23")
     assert result.components.changed == ()
-    assert result.components.removed == ("R6",)
-    assert len(result.components.unchanged) == 31
+    assert result.components.removed == ("R19", "R21", "R6")
+    assert len(result.components.unchanged) == 29
 
-    assert result.connections.count("new") == 25
+    assert result.connections.count("new") == 26
     assert result.connections.count("changed") == 0
-    assert result.connections.count("unchanged") == 71
+    assert result.connections.count("unchanged") == 68
     assert {
         (edge.from_pin, edge.to_pin) for edge in result.connections.removed_edges
     } == EXPECTED_REMOVED_CONNECTIONS
 
 
-def test_dual_rail_component_delta_marks_additions_and_r6_removal(rendered_delta):
+def test_dual_rail_component_delta_marks_additions_and_removals(rendered_delta):
     module, result = rendered_delta
     root = ET.parse(result.top_path).getroot()
 
@@ -124,7 +128,7 @@ def test_dual_rail_component_delta_marks_additions_and_r6_removal(rendered_delta
         ref
         for ref, group in groups.items()
         if group.attrib.get("data-delta") in {"changed", "removed"}
-    } == {"R6"}
+    } == {"R6", "R19", "R21"}
     assert result.top_path.name == module.TOP_DELTA_FILENAME
 
 
@@ -134,10 +138,10 @@ def test_dual_rail_bottom_delta_marks_exact_rewire_connections(rendered_delta):
 
     assert root.attrib["data-delta-kind"] == "coordinate-graph"
     assert root.attrib["data-delta-id"] == module.DELTA_IDENTIFIER
-    assert root.attrib["data-new-connections"] == "25"
+    assert root.attrib["data-new-connections"] == "26"
     assert root.attrib["data-changed-connections"] == "0"
-    assert root.attrib["data-removed-connections"] == "23"
-    assert root.attrib["data-unchanged-connections"] == "71"
+    assert root.attrib["data-removed-connections"] == "26"
+    assert root.attrib["data-unchanged-connections"] == "68"
 
     target_lines = [
         node

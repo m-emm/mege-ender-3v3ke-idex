@@ -21,8 +21,9 @@ It covers the earlier ribbon-disconnected temporary bench-probe wiring in
 - `gpio22` (physical pin 29) reads `C13_R14_DIR`
 - `gpio26` (physical pin 31) temporarily drives `C15_R20_TMC_DIAG`; the test
   verifies that the protected return reaches the normal DIAG input on `gpio3`
-- `gpio27` (physical pin 32) temporarily drives `C16_R19_TMC_MISO`; the test
-  verifies that the protected return reaches the normal MISO input on `gpio8`
+- `gpio27` (physical pin 32) temporarily drives `TMC1_J1_MISO_CFG0_5`; the test
+  verifies that the direct twisted-pair return reaches the normal MISO input
+  on `gpio8`
 
 With high-voltage power disconnected, first inspect the dry-run plan:
 
@@ -52,7 +53,8 @@ HV-on assertions explicitly:
 This mode requires `PWR_OK` to remain HIGH. It tests STEP, DIR, ENABLE, CS,
 SCLK, and MOSI one at a time and requires only the corresponding temporary
 probe to change. It then drives the temporary TMC-side DIAG and MISO probes
-one at a time and verifies that only the intended protected Pico input changes.
+one at a time and verifies that only the intended Pico input changes. DIAG
+retains its protected resistor network; MISO uses the direct twisted-pair path.
 This catches missing, swapped, and shorted test connections.
 
 The safe idle state is STEP/DIR/SCLK/MOSI LOW, ENABLE/CS HIGH, and both
