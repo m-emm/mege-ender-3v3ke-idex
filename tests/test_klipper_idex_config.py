@@ -67,6 +67,48 @@ SYNTHETIC_CALIBRATION_VALUES = {
     "t1_y_endstop": -15.6,
 }
 
+
+def test_image_waits_for_wlan_ipv4_before_printer_usb_consumers():
+    image_install = (IMAGE_BUILD_STAGE_DIR / "01-run-chroot.sh").read_text(
+        encoding="utf-8"
+    )
+    overlay_renderer = (
+        Path(__file__).resolve().parents[1]
+        / "klipper_setup"
+        / "image_build"
+        / "scripts"
+        / "render_overlay.sh"
+    ).read_text(encoding="utf-8")
+    ready_service = (
+        IMAGE_BUILD_FILES_DIR / "menderpi-wlan-ready.service"
+    ).read_text(encoding="utf-8")
+    ready_script = (IMAGE_BUILD_FILES_DIR / "menderpi-wlan-ready.sh").read_text(
+        encoding="utf-8"
+    )
+
+    guarded_units = (
+        "klipper.service",
+        "moonraker.service",
+        "vision-framebuffer.service",
+        "vision-framebuffer-nozzle-cam.service",
+    )
+    for unit_name in guarded_units:
+        unit_text = (IMAGE_BUILD_FILES_DIR / unit_name).read_text(encoding="utf-8")
+        assert "After=" in unit_text
+        assert "menderpi-wlan-ready.service" in unit_text
+        assert "Requires=menderpi-wlan-ready.service" in unit_text
+
+    assert "After=NetworkManager.service" in ready_service
+    assert "TimeoutStartSec=infinity" in ready_service
+    assert "ip -4 -o address show" in ready_script
+    assert "scope global" in ready_script
+    assert "menderpi-wlan-ready.service" in image_install
+    assert "menderpi-wlan-ready.sh" in image_install
+    assert "systemctl_enable_safe menderpi-wlan-ready" in image_install
+    assert "autoconnect-retries=4" in overlay_renderer
+    assert "wait-device-timeout=60000" in overlay_renderer
+    assert "may-fail=false" in overlay_renderer
+
 SYNTHETIC_CALIBRATION_YAML = """\
 bed_grid_zero:
   x: 113.3

@@ -1,7 +1,8 @@
 [Unit]
 Description=High-resolution RAM-buffered webcam still-frame service
-After=network-online.target
+After=network-online.target menderpi-wlan-ready.service
 Wants=network-online.target
+Requires=menderpi-wlan-ready.service
 
 [Service]
 Type=simple

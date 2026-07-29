@@ -24,8 +24,9 @@ cp klipper_setup/image_build/build.env.example klipper_setup/image_build/secrets
 ```bash
 WIFI_SSIDS=("office-ssid" "basement-ssid")
 WIFI_PASSWORD="your-password"
-WIFI_IFACE="wlan1"
 ```
+The image disables onboard Wi-Fi and leaves these profiles unbound, so the USB
+Wi-Fi dongle is discovered as `wlan0`.
 4) Adjust `build.env` values (hostname, locale, pins, etc.).
 
 ## Build
@@ -60,8 +61,9 @@ Or explicitly use the symlink:
 ## After boot (Milestone checks)
 - `ssh <USER>@<HOSTNAME>.local` works with your key.
 - If Wi-Fi was configured, `nmcli -t -f DEVICE,STATE,CONNECTION dev` shows
-  `wlan1` connected to `klipperpi-wifi-dongle`.
-- `lsusb -t` shows the root USB bus using `Driver=dwc2/1p` on Raspberry Pi 3.
+  `wlan0` connected to a `klipperpi-wifi-*` profile.
+- `lsusb -t` shows USB-A devices on the Raspberry Pi 4
+  `Driver=xhci_hcd` buses.
 - `systemctl status klipper moonraker nginx lightdm` all green.
 - PiTFT43 shows KlipperScreen UI.
 - Mainsail reachable at `http://<hostname>.local/`.
@@ -73,12 +75,50 @@ Or explicitly use the symlink:
 - `../klipper_host/klippy/extras/heaters.py` — custom Klipper host patch
   installed into `/opt/klipper` for the boosted heatbed.
 
-## Raspberry Pi 3 USB note
-The image forces `dtoverlay=dwc2,dr_mode=host` under `[all]` because the legacy
-`dwc_otg` host driver can hard-freeze a Raspberry Pi 3 when Klipper starts
-traffic on a USB CDC ACM MCU such as an RP2040/Pico. The build also removes
-stale `dwc_otg.*` kernel command-line options and masks ModemManager so it
-cannot probe the MCU serial port.
+## Raspberry Pi 4 USB and Wi-Fi note
+The Raspberry Pi 4 USB-A ports use the VL805 xHCI controller. Do not add the
+Raspberry Pi 3 `dtoverlay=dwc2,dr_mode=host` workaround or the obsolete
+`max_usb_current=1` setting. The image keeps onboard Wi-Fi disabled so the
+external USB Wi-Fi dongle is the only wireless interface, and it masks
+ModemManager so it cannot probe MCU serial ports.
+
+### Required cold-boot USB topology
+
+Keep the two UVC cameras on different hubs. Cold boot repeatedly failed when
+both cameras were connected directly to the Raspberry Pi, regardless of the
+industrial hub arrangement. The following split topology cold-booted
+successfully and was verified live on 2026-07-29:
+
+| Linux USB path | Required connection |
+| --- | --- |
+| `1-1.1` | Vimicro `0458:6006` nozzle camera, connected directly to the Pi |
+| `1-1.2` | Empty |
+| `1-1.3` | Ralink RT5370 `148f:5370` Wi-Fi dongle, connected directly to the Pi |
+| `1-1.4` | Industrial seven-port hub `1a40:0201`, connected directly to the Pi |
+| `1-1.4.2` | Aukey `1bcf:0215` printer camera, connected to industrial-hub port 2 |
+
+Do not move the Aukey camera back to a direct Pi port without repeating a full
+cold-boot test. The direct Pi path numbers above are the Linux topology reported
+by `lsusb -t`; label the physical sockets/cables to preserve the working
+mapping.
+
+The remaining industrial-hub ports retain the printer MCU wiring:
+
+| Industrial-hub port | Device |
+| --- | --- |
+| 1 | `x_pico`, RP2040 `E66368254F174333` |
+| 2 | Aukey printer camera |
+| 3 | `y_pico`, RP2040 `DE62A87557907227` |
+| 4 | `eddy`, RP2040 `504434040889101C` |
+| 5 | `right_nitehawk`, RP2040 `3232323236198418` behind its internal hub |
+| 6 | `left_nitehawk`, RP2040 `30333938340637C1` behind its internal hub |
+| 7 | Main `mcu`, RP2040 `E6633861A3673038` |
+
+After a cold boot, verify the topology with `lsusb -t`, check that all six
+`/dev/serial/by-id/usb-Klipper_rp2040_*` links exist, and confirm that
+`menderpi-wlan-ready.service` is active. The WLAN-ready guard delays Klipper,
+Moonraker, and the camera framebuffer services until `wlan0` has a global IPv4
+address; it does not make an arbitrary camera topology cold-boot safe.
 
 The first boot also enables `klipperpi-expand-rootfs.service`, a one-shot
 service that grows the root partition/filesystem before Klipper starts. Without

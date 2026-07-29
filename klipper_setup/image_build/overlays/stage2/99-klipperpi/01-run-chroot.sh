@@ -55,11 +55,6 @@ if [ ! -f "${BOOT_CONFIG}" ]; then
   BOOT_CONFIG="/boot/config.txt"
 fi
 
-BOOT_CMDLINE="/boot/firmware/cmdline.txt"
-if [ ! -f "${BOOT_CMDLINE}" ]; then
-  BOOT_CMDLINE="/boot/cmdline.txt"
-fi
-
 # --- Sanity prerequisites ----------------------------------------------------
 
 require_cmd apt-get
@@ -129,28 +124,6 @@ ensure_boot_config_in_all() {
       echo "${setting}"
     } >> "${BOOT_CONFIG}"
   fi
-}
-
-remove_cmdline_param_prefix() {
-  local prefix="$1"
-
-  if [ -f "${BOOT_CMDLINE}" ]; then
-    sed -i -E "s/(^| )${prefix}[^ ]*//g; s/  +/ /g; s/^ //; s/ $//" "${BOOT_CMDLINE}"
-  fi
-}
-
-remove_boot_config_setting_outside_all() {
-  local setting="$1"
-  local tmp
-
-  tmp="$(mktemp)"
-  awk -v setting="${setting}" '
-    /^\[/ { section=$0 }
-    $0 == setting && section != "[all]" { next }
-    { print }
-  ' "${BOOT_CONFIG}" > "${tmp}"
-  cat "${tmp}" > "${BOOT_CONFIG}"
-  rm -f "${tmp}"
 }
 
 # --- Base package install ----------------------------------------------------
@@ -443,6 +416,8 @@ log "Installing systemd units"
 
 require_file "${FILES_DIR}/klipper.service"
 require_file "${FILES_DIR}/moonraker.service"
+require_file "${FILES_DIR}/menderpi-wlan-ready.service"
+require_file "${FILES_DIR}/menderpi-wlan-ready.sh"
 require_file "${FILES_DIR}/vision-framebuffer.service"
 require_file "${FILES_DIR}/vision-framebuffer-nozzle-cam.service"
 require_file "${FILES_DIR}/vision-capture.service"
@@ -460,6 +435,8 @@ require_file "${FILES_DIR}/klipperpi-expand-rootfs-once.sh"
 
 install -m 0644 "${FILES_DIR}/klipper.service" /etc/systemd/system/klipper.service
 install -m 0644 "${FILES_DIR}/moonraker.service" /etc/systemd/system/moonraker.service
+install -m 0644 "${FILES_DIR}/menderpi-wlan-ready.service" /etc/systemd/system/menderpi-wlan-ready.service
+install -m 0755 "${FILES_DIR}/menderpi-wlan-ready.sh" /usr/local/sbin/menderpi-wlan-ready.sh
 install -m 0644 "${FILES_DIR}/vision-framebuffer.service" /etc/systemd/system/vision-framebuffer.service
 install -m 0644 "${FILES_DIR}/vision-framebuffer-nozzle-cam.service" /etc/systemd/system/vision-framebuffer-nozzle-cam.service
 install -m 0644 "${FILES_DIR}/vision-capture.service" /etc/systemd/system/vision-capture.service
@@ -485,6 +462,7 @@ systemctl daemon-reload
 
 # Enable units (after they exist)
 systemctl_enable_safe klipperpi-expand-rootfs
+systemctl_enable_safe menderpi-wlan-ready
 systemctl_enable_safe klipper
 systemctl_enable_safe moonraker
 systemctl_enable_safe vision-framebuffer
@@ -497,17 +475,6 @@ systemctl_enable_safe vision-capture-nozzle-cam
 
 log "Applying PiTFT43 display overlay"
 if [ -f "${BOOT_CONFIG}" ]; then
-  log "Configuring Raspberry Pi 3 USB host driver"
-  remove_boot_config_setting_outside_all "dtoverlay=dwc2,dr_mode=host"
-  ensure_boot_config_in_all \
-    "dtoverlay=dwc2,dr_mode=host" \
-    "Use dwc2 host mode; dwc_otg can hard-freeze Pi 3 with USB ACM MCU traffic."
-
-  if [ -f "${BOOT_CMDLINE}" ]; then
-    remove_cmdline_param_prefix 'dwc_otg\.'
-    remove_cmdline_param_prefix 'usbcore\.autosuspend='
-  fi
-
   require_file "${FILES_DIR}/pitft43.conf"
   if ! grep -q "gt911_btt_tft43_dip" "${BOOT_CONFIG}"; then
     cat "${FILES_DIR}/pitft43.conf" >> "${BOOT_CONFIG}"
@@ -532,15 +499,6 @@ if [ -f "${BOOT_CONFIG}" ]; then
     log "Enabled disable_fw_kms_setup for DPI display"
   fi
   
-  # Enable increased USB current limit (1.2A instead of 600mA)
-  # Harmless on newer boards and useful for USB peripherals on older Pi models.
-  if ! grep -q "^max_usb_current=1" "${BOOT_CONFIG}"; then
-    ensure_boot_config_in_all \
-      "max_usb_current=1" \
-      "Increase USB current limit for USB peripherals on older Pi models."
-    log "Enabled max_usb_current=1 for USB peripherals"
-  fi
-
   mkdir -p /boot/firmware/overlays /boot/overlays
   if [ ! -f /boot/firmware/overlays/gt911_btt_tft43_dip.dtbo ] && [ ! -f /boot/overlays/gt911_btt_tft43_dip.dtbo ]; then
     wget -q \
@@ -675,6 +633,7 @@ systemctl_enable_safe ssh
 systemctl_enable_safe avahi-daemon
 systemctl_enable_safe nginx
 systemctl_enable_safe klipperpi-expand-rootfs
+systemctl_enable_safe menderpi-wlan-ready
 systemctl_enable_safe klipper
 systemctl_enable_safe moonraker
 systemctl disable crowsnest >/dev/null 2>&1 || true

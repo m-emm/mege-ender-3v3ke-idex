@@ -1,7 +1,8 @@
 [Unit]
 Description=Moonraker API Service
-After=network-online.target klipper.service
+After=network-online.target menderpi-wlan-ready.service klipper.service
 Wants=network-online.target
+Requires=menderpi-wlan-ready.service
 
 [Service]
 Type=simple

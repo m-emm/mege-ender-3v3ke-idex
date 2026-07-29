@@ -132,8 +132,8 @@ if [ -n "${WIFI_ENV_SRC}" ]; then
     exit 1
   fi
 
-  if [[ "${WIFI_PASSWORD}${WIFI_IFACE:-}" == *$'\n'* ]] || \
-     [[ "${WIFI_PASSWORD}${WIFI_IFACE:-}" == *$'\r'* ]]; then
+  if [[ "${WIFI_PASSWORD}" == *$'\n'* ]] || \
+     [[ "${WIFI_PASSWORD}" == *$'\r'* ]]; then
     echo "WiFi values must not contain newline characters" >&2
     exit 1
   fi
@@ -158,19 +158,16 @@ if [ -n "${WIFI_ENV_SRC}" ]; then
       WIFI_SAFE_NAME="network-${WIFI_INDEX}"
     fi
 
-    WIFI_INTERFACE_LINE=""
-    if [ -n "${WIFI_IFACE:-}" ]; then
-      WIFI_INTERFACE_LINE="interface-name=${WIFI_IFACE}"
-    fi
-
     WIFI_PROFILE="${PIGEN_DIR}/stage2/99-klipperpi/files/klipperpi-wifi-${WIFI_INDEX}-${WIFI_SAFE_NAME}.nmconnection"
     cat > "${WIFI_PROFILE}" <<EOF
 [connection]
 id=klipperpi-wifi-${WIFI_SAFE_NAME}
 uuid=${WIFI_UUID}
 type=wifi
+autoconnect=true
 autoconnect-priority=80
-${WIFI_INTERFACE_LINE}
+autoconnect-retries=4
+wait-device-timeout=60000
 
 [wifi]
 mode=infrastructure
@@ -182,6 +179,7 @@ psk=${WIFI_PASSWORD}
 
 [ipv4]
 method=auto
+may-fail=false
 
 [ipv6]
 addr-gen-mode=default
