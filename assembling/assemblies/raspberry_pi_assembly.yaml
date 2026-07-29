@@ -21,6 +21,11 @@ Builder:
         artifact: followers
         name_template: "{name}"
 
+Parameters:
+  raspberry_pi_model:
+    Type: String
+    Default: "3B"
+
 Parts:
   RaspberryPiAssembly:
     Type: Shellforgepy::Assembly

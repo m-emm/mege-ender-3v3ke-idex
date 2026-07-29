@@ -11,6 +11,9 @@ from shellforgepy.simple import *
 
 BIG_THING = 500
 
+RASPBERRY_PI_MODEL_3B = "3B"
+RASPBERRY_PI_MODEL_4B = "4B"
+
 raspi_width = 56
 raspi_board_length = 85
 raspi_board_width = raspi_width
@@ -50,6 +53,36 @@ raspi_jack_diameter = 6
 raspi_jack_dist = 53.5
 raspi_jack_length_cylinder = 2.6
 raspi_jack_length_cube = 12.7
+
+raspi_4_network_dist = 45.75
+raspi_4_network_width = 15.51
+raspi_4_network_length = 21.35
+raspi_4_network_height = 13.5
+raspi_4_network_overstand = 3
+
+raspi_4_usb_1_dist = 9
+raspi_4_usb_1_width = 13.92
+raspi_4_usb_1_length = 17.7
+raspi_4_usb_2_dist = 27
+raspi_4_usb_2_width = 13.82
+raspi_4_usb_2_length = 17.5
+raspi_4_usb_height = 16
+raspi_4_usb_overstand = 3
+
+raspi_4_usb_c_dist = 11.2
+raspi_4_usb_c_width = 8.65
+raspi_4_usb_c_length = 7.4
+raspi_4_usb_c_height = 3.2
+raspi_4_usb_c_overstand = 1.25
+
+raspi_4_micro_hdmi_width = 7.2
+raspi_4_micro_hdmi_length = 7.95
+raspi_4_micro_hdmi_height = 3
+raspi_4_micro_hdmi_overstand = 1.43
+raspi_4_micro_hdmi_dists = (26, 39.5)
+
+raspi_4_jack_dist = 54
+raspi_4_jack_overstand = 2.5
 
 raspi_gpio_dist_y = 3.5 + 49
 raspi_gpio_dist_x = 3.5 + 29
@@ -91,7 +124,16 @@ def create_raspberry_pi_gpio():
     return gpio
 
 
-def create_raspberry_pi_assembly():
+def create_raspberry_pi_assembly(*, raspberry_pi_model=RASPBERRY_PI_MODEL_3B):
+    if raspberry_pi_model not in {
+        RASPBERRY_PI_MODEL_3B,
+        RASPBERRY_PI_MODEL_4B,
+    }:
+        raise ValueError(
+            f"Unsupported Raspberry Pi model {raspberry_pi_model!r}; "
+            f"expected {RASPBERRY_PI_MODEL_3B!r} or {RASPBERRY_PI_MODEL_4B!r}"
+        )
+
     raw_board = create_filleted_box(
         raspi_board_length,
         raspi_board_width,
@@ -127,58 +169,137 @@ def create_raspberry_pi_assembly():
         cutter_names=mount_hole_cutter_names,
     )
 
-    network = create_box(
-        raspi_network_length,
-        raspi_network_width,
-        raspi_network_height,
-    )
-    network = translate(
-        raspi_board_length - raspi_network_length + raspi_connector_overstand,
-        raspi_network_dist - raspi_network_width / 2,
-        raspi_board_thickness,
-    )(network)
-    raspi.add_named_follower(network, "network")
-
-    for usb_index, usb_dist in enumerate([raspi_usb_1_dist, raspi_usb_2_dist], start=1):
-        usb = create_box(raspi_usb_length, raspi_usb_width, raspi_usb_height)
-        usb = translate(
-            raspi_board_length - raspi_usb_length + raspi_connector_overstand,
-            usb_dist - raspi_usb_width / 2,
+    if raspberry_pi_model == RASPBERRY_PI_MODEL_3B:
+        network = create_box(
+            raspi_network_length,
+            raspi_network_width,
+            raspi_network_height,
+        )
+        network = translate(
+            raspi_board_length - raspi_network_length + raspi_connector_overstand,
+            raspi_network_dist - raspi_network_width / 2,
             raspi_board_thickness,
-        )(usb)
-        raspi.add_named_follower(usb, f"usb_{usb_index}")
+        )(network)
+        raspi.add_named_follower(network, "network")
 
-    micro_usb = create_box(
-        raspi_micro_usb_width,
-        raspi_micro_usb_length,
-        raspi_micro_usb_height,
-    )
-    micro_usb = translate(
-        raspi_micro_usb_dist - raspi_micro_usb_width / 2,
-        -raspi_micro_usb_overstand,
-        raspi_board_thickness,
-    )(micro_usb)
-    raspi.add_named_follower(micro_usb, "micro_usb")
+        for usb_index, usb_dist in enumerate(
+            [raspi_usb_1_dist, raspi_usb_2_dist], start=1
+        ):
+            usb = create_box(raspi_usb_length, raspi_usb_width, raspi_usb_height)
+            usb = translate(
+                raspi_board_length - raspi_usb_length + raspi_connector_overstand,
+                usb_dist - raspi_usb_width / 2,
+                raspi_board_thickness,
+            )(usb)
+            raspi.add_named_follower(usb, f"usb_{usb_index}")
 
-    hdmi = create_box(raspi_hdmi_width, raspi_hdmi_length, raspi_hdmi_height)
-    hdmi = translate(
-        raspi_hdmi_dist - raspi_hdmi_width / 2,
-        -raspi_hdmi_overstand,
-        raspi_board_thickness,
-    )(hdmi)
-    raspi.add_named_follower(hdmi, "hdmi")
+        micro_usb = create_box(
+            raspi_micro_usb_width,
+            raspi_micro_usb_length,
+            raspi_micro_usb_height,
+        )
+        micro_usb = translate(
+            raspi_micro_usb_dist - raspi_micro_usb_width / 2,
+            -raspi_micro_usb_overstand,
+            raspi_board_thickness,
+        )(micro_usb)
+        raspi.add_named_follower(micro_usb, "micro_usb")
 
-    jack = create_box(
-        raspi_jack_diameter,
-        raspi_jack_length_cube,
-        raspi_jack_diameter,
-    )
-    jack = translate(
-        raspi_jack_dist - raspi_jack_diameter / 2,
-        -raspi_jack_length_cylinder,
-        raspi_board_thickness,
-    )(jack)
-    raspi.add_named_follower(jack, "jack")
+        hdmi = create_box(raspi_hdmi_width, raspi_hdmi_length, raspi_hdmi_height)
+        hdmi = translate(
+            raspi_hdmi_dist - raspi_hdmi_width / 2,
+            -raspi_hdmi_overstand,
+            raspi_board_thickness,
+        )(hdmi)
+        raspi.add_named_follower(hdmi, "hdmi")
+
+        jack = create_box(
+            raspi_jack_diameter,
+            raspi_jack_length_cube,
+            raspi_jack_diameter,
+        )
+        jack = translate(
+            raspi_jack_dist - raspi_jack_diameter / 2,
+            -raspi_jack_length_cylinder,
+            raspi_board_thickness,
+        )(jack)
+        raspi.add_named_follower(jack, "jack")
+
+    elif raspberry_pi_model == RASPBERRY_PI_MODEL_4B:
+        network = create_box(
+            raspi_4_network_length,
+            raspi_4_network_width,
+            raspi_4_network_height,
+        )
+        network = translate(
+            raspi_board_length - raspi_4_network_length + raspi_4_network_overstand,
+            raspi_4_network_dist - raspi_4_network_width / 2,
+            raspi_board_thickness,
+        )(network)
+        raspi.add_named_follower(network, "network")
+
+        for usb_index, (usb_dist, usb_width, usb_length) in enumerate(
+            [
+                (
+                    raspi_4_usb_1_dist,
+                    raspi_4_usb_1_width,
+                    raspi_4_usb_1_length,
+                ),
+                (
+                    raspi_4_usb_2_dist,
+                    raspi_4_usb_2_width,
+                    raspi_4_usb_2_length,
+                ),
+            ],
+            start=1,
+        ):
+            usb = create_box(usb_length, usb_width, raspi_4_usb_height)
+            usb = translate(
+                raspi_board_length - usb_length + raspi_4_usb_overstand,
+                usb_dist - usb_width / 2,
+                raspi_board_thickness,
+            )(usb)
+            raspi.add_named_follower(usb, f"usb_{usb_index}")
+
+        usb_c = create_box(
+            raspi_4_usb_c_width,
+            raspi_4_usb_c_length,
+            raspi_4_usb_c_height,
+        )
+        usb_c = translate(
+            raspi_4_usb_c_dist - raspi_4_usb_c_width / 2,
+            -raspi_4_usb_c_overstand,
+            raspi_board_thickness,
+        )(usb_c)
+        raspi.add_named_follower(usb_c, "usb_c")
+
+        for hdmi_index, hdmi_dist in enumerate(
+            raspi_4_micro_hdmi_dists,
+            start=1,
+        ):
+            micro_hdmi = create_box(
+                raspi_4_micro_hdmi_width,
+                raspi_4_micro_hdmi_length,
+                raspi_4_micro_hdmi_height,
+            )
+            micro_hdmi = translate(
+                hdmi_dist - raspi_4_micro_hdmi_width / 2,
+                -raspi_4_micro_hdmi_overstand,
+                raspi_board_thickness,
+            )(micro_hdmi)
+            raspi.add_named_follower(micro_hdmi, f"micro_hdmi_{hdmi_index}")
+
+        jack = create_box(
+            raspi_jack_diameter,
+            raspi_jack_length_cube,
+            raspi_jack_diameter,
+        )
+        jack = translate(
+            raspi_4_jack_dist - raspi_jack_diameter / 2,
+            -raspi_4_jack_overstand,
+            raspi_board_thickness,
+        )(jack)
+        raspi.add_named_follower(jack, "jack")
 
     microsd_socket = create_box(
         raspi_microsd_socket_length,

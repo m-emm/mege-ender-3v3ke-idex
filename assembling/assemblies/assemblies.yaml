@@ -2460,6 +2460,13 @@ assemblies:
     resource_file: raspberry_pi_assembly.yaml
     depends_on: []
 
+  - name: raspberry_pi_4_assembly
+
+    resource_file: raspberry_pi_assembly.yaml
+    depends_on: []
+    parameters:
+      raspberry_pi_model: "4B"
+
   - name: printer_host_and_screen_assembly
 
     resource_file: printer_host_and_screen_assembly.yaml
