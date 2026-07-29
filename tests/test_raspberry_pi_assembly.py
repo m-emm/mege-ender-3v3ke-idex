@@ -137,7 +137,7 @@ def test_raspberry_pi_rejects_unsupported_model():
         create_raspberry_pi_assembly(raspberry_pi_model="5B")
 
 
-def test_raspberry_pi_yaml_defaults_to_3b_and_registers_4b_instance():
+def test_raspberry_pi_yaml_defaults_to_3b_and_registers_integrated_4b_instance():
     resource = yaml.load(RESOURCE_FILE.read_text(), Loader=AssemblyDefaultsLoader)
     config = yaml.load(ASSEMBLIES_FILE.read_text(), Loader=AssemblyDefaultsLoader)
     assemblies = {assembly["name"]: assembly for assembly in config["assemblies"]}
@@ -150,10 +150,11 @@ def test_raspberry_pi_yaml_defaults_to_3b_and_registers_4b_instance():
         "name": "raspberry_pi_assembly",
         "resource_file": "raspberry_pi_assembly.yaml",
         "depends_on": [],
+        "parameters": {"raspberry_pi_model": RASPBERRY_PI_MODEL_4B},
     }
-    assert assemblies["raspberry_pi_4_assembly"] == {
-        "name": "raspberry_pi_4_assembly",
+    assert assemblies["raspberry_pi_3_assembly"] == {
+        "name": "raspberry_pi_3_assembly",
         "resource_file": "raspberry_pi_assembly.yaml",
         "depends_on": [],
-        "parameters": {"raspberry_pi_model": RASPBERRY_PI_MODEL_4B},
+        "parameters": {"raspberry_pi_model": RASPBERRY_PI_MODEL_3B},
     }
