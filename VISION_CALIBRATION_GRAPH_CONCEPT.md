@@ -111,8 +111,9 @@ flowchart TD
     G[Other machine geometry seed facts] --> Y[Bed-tab Y/parallax sweep]
     Y --> C[Bed-tab corner reference]
     C --> R[Coarse T0/T1 red-marker X sweeps]
-    R --> AX[Apply rough X calibration]
-    AX --> VX[Verify rough X at common commanded X]
+    P --> AX[Calculate and apply T0/T1 X calibration]
+    R --> AX
+    AX --> VX[Verify both markers at bed-tab X plus 10 mm]
     C --> F[Fine T0/T1 nozzle X/Z grid]
     VX --> F
     F --> N[Fine nozzle/bed and T1-to-T0 facts]
@@ -145,24 +146,22 @@ coordinates of the physical bed-tab corner:
 
 ```yaml
 bed_tab_corner_prior:
-  x_mm: 170.0  # illustrative only; user must measure and replace
-  y_mm: -20.0  # illustrative only; user must measure and replace
-  z_mm: 0.0    # defined to be the bed/print reference plane
+  x_mm: 173.0
+  y_mm: -18.0
+  z_mm: 0.0
 ```
 
-The approximate X and Y values above are planning examples, not production
-defaults. For initial infrastructure bring-up, the user explicitly authorized
-publishing these numeric examples as a visibly provisional revision with
-measurement method `pending_physical_measurement`. Z is defined as `0 mm` for
-this reference. Replacing the provisional revision with measured X/Y values
-uses normal superseding and downstream invalidation; the values are never
-silently treated as measured.
+This is the current user-defined coordinate identity of the physical corner,
+not an image-derived estimate. Its X coordinate is `173 mm`, its Y coordinate
+is `-18 mm`, and its Z coordinate defines the `0 mm` bed/print reference
+plane. If physical measurement later leads the user to redefine these values,
+the replacement uses normal superseding and downstream invalidation.
 
 This is an authoritative initial prior fact:
 
 - `bed.tab_corner.printer_xyz`
 - provenance source `user_initial_prior`
-- user-supplied X/Y measurement method
+- measurement method `user_defined_fixed_reference`
 - exact `Z=0` definition
 - revision, timestamp, and canonical fact hash
 
@@ -287,11 +286,12 @@ Analysis:
 Produced facts:
 
 - `camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2`
-- `camera.nozzle_cam.image_x_axis_angle`
 - `tool.t0.red_marker_to_bed_tab_x_mm`
 - `tool.t1.red_marker_to_bed_tab_x_mm`
-- `tool.t1.rough_x_error_relative_to_t0_mm`
-- marker visibility intervals and fit quality
+- marker visibility intervals and fit quality as diagnostics
+
+The image-axis angle is a derived report value rather than a separate fact.
+Stage 4 calibrates each tool independently to the fixed bed-tab corner.
 
 The red marker is suitable for coarse localization because it is easy to find
 over a large range. It is not the final nozzle reference.
@@ -301,39 +301,95 @@ over a large range. It is not the final nozzle reference.
 Operation type:
 
 ```text
-apply_rough_t1_x_calibration
+apply_rough_tool_x_calibration
 ```
 
 Dependencies:
 
-- accepted coarse red-marker facts
-- exact `bed.tab_corner.printer_xyz` prior transitively used by those facts
+- current `tool.t0.red_marker_to_bed_tab_x_mm`
+- current `tool.t1.red_marker_to_bed_tab_x_mm`
+- exact current `bed.tab_corner.printer_xyz`
 - exact active configuration fingerprint used by the coarse acquisition
 
 Behavior:
 
-- keep T0 as the physical reference
-- interpret the red-marker trajectories in the absolute coordinate system
-  anchored by the exact user-supplied bed-tab corner prior
-- create a candidate changing only `tools.t1.x_endstop`
-- record old value, correction, new value, source fact IDs, source config hash,
-  and generated config fingerprint
+- treat neither tool as the absolute X reference
+- calibrate T0 and T1 independently to the fixed bed-tab corner at `X=173 mm`
+- calculate both corrections from existing facts; this operation requires no
+  new acquisition images
+- create one atomic candidate changing only `tools.t0.x_endstop` and
+  `tools.t1.x_endstop`
+- do not change either tool's Y or Z calibration
+- record both old values, corrections, new values, source fact IDs, source
+  config hash, and generated config fingerprint
 - apply only after explicit approval
 - restart Klipper and require a ready state
 
+For each tool `t`, let:
+
+- `B_x = 173 mm`, from `bed.tab_corner.printer_xyz`
+- `X_ref,t` be the `reference_commanded_x_mm` stored in the tool's Stage 3 fact
+- `d_t` be its signed `red_marker_to_bed_tab_x_mm.offset_mm`, positive toward
+  printer +X
+
+The Stage 3 observation places the marker at printer coordinate
+`B_x + d_t` while the tool was commanded to `X_ref,t`. Therefore:
+
+```text
+rough_x_residual_t = B_x + d_t - X_ref,t
+new_x_endstop_t    = old_x_endstop_t + rough_x_residual_t
+```
+
+Changing an endstop by `rough_x_residual_t` moves that tool's physical marker
+by the opposite amount at the same commanded coordinate. After activation,
+the marker is therefore at physical X=`X_ref,t` when commanded to `X_ref,t`;
+with the measured linear X mapping, commanding the tool to X=`B_x` places the
+marker at the bed-tab corner. This calculation is performed separately for T0
+and T1. Their mutual alignment is a consequence, not the calibration
+reference.
+
 Produced activation fact:
 
-- `calibration.rough_t1_x.active_snapshot`
+- `calibration.rough_tool_x.active_snapshot`
 
 Verification job:
 
 ```text
-verify_rough_t1_x_red_marker
+verify_rough_tool_x_at_bed_tab_plus_10
 ```
 
-It commands T0 to `X=200`, then T1 to `X=200`, and captures both markers. The
-markers should appear approximately at the same image position. This is a
-coarse gate, not the final X calibration.
+The marker is only partially visible at X=`173 mm`, so verification uses a
+defined `+10 mm` offset from the calibration anchor. At the same safe viewing
+Y/Z pose used by Stage 3, it commands T0 to `X=183`, captures the marker and
+bed-tab corner, then safely changes tools, commands T1 to `X=183`, and captures
+the same references.
+
+Let `p_corner` be the observed bed-tab corner pixel and `v_x` be
+`camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2`. The expected marker
+position is:
+
+```text
+p_expected = p_corner + 10 mm * v_x
+```
+
+Verification checks both absolute and relative conditions:
+
+- each marker is `10 mm` toward printer +X from the bed-tab corner when
+  projected onto the measured image-X axis
+- the T0 and T1 markers have the same image-X coordinate
+- each marker is sufficiently visible for a reliable fit
+
+The cross-tool agreement alone is insufficient because both markers could
+share the same absolute offset from `p_expected`.
+
+The prior's `Y=-18` and `Z=0` define the corner's printer coordinates; they are
+not the acquisition pose. Verification retains the safe camera pose and never
+commands Z=0.
+
+The verification produces `calibration.rough_tool_x.verified`, including the
+separate T0 and T1 residuals relative to the expected `+10 mm` position and a
+marker-coincidence residual. This remains a coarse red-marker gate, not the
+final nozzle X calibration.
 
 The fine X/Z job requires both the active rough-X snapshot and its accepted
 verification fact. This prevents a fine sweep from being generated against
@@ -528,8 +584,8 @@ facts:
   - fact_id: sha256:...
     fact_type: bed.tab_corner.printer_xyz
     value:
-      x: 170.0
-      y: -20.0
+      x: 173.0
+      y: -18.0
       z: 0.0
     unit: mm
     coordinate_frame: printer_xyz
@@ -537,13 +593,12 @@ facts:
       z: bed_print_reference_plane
     provenance:
       entered_by: user
-      measurement_method: to_be_recorded
-      provisional: true
+      measurement_method: user_defined_fixed_reference
 ```
 
-The example X/Y values are placeholders. The user replaces them before the
-first authoritative run. Editing this file does not mutate an existing fact:
-it publishes a new prior fact set and triggers normal downstream invalidation.
+These are the current authoritative prior values. Changing them does not
+mutate the existing fact: it publishes a new prior fact set and triggers normal
+downstream invalidation.
 
 ### Job-type definition
 
@@ -561,9 +616,9 @@ requires:
     current: true
   - fact_type: bed.tab_corner.printer_xyz
     current: true
-  - fact_type: calibration.rough_t1_x.active_snapshot
+  - fact_type: calibration.rough_tool_x.active_snapshot
     current: true
-  - fact_type: calibration.rough_t1_x.verified
+  - fact_type: calibration.rough_tool_x.verified
     current: true
 produces:
   - camera.nozzle_cam.nozzle.x_scale_px_per_mm_at_bed_plane
@@ -601,7 +656,7 @@ Extend the existing immutable `manifest.json` with fact bindings:
     },
     {
       "requirement": "rough_x_snapshot",
-      "fact_type": "calibration.rough_t1_x.active_snapshot",
+      "fact_type": "calibration.rough_tool_x.active_snapshot",
       "fact_id": "sha256:...",
       "fact_set_id": "sha256:..."
     }
@@ -727,15 +782,20 @@ Applying rough or final calibration creates an immutable snapshot:
 ```yaml
 schema_version: 1
 snapshot_id: sha256:...
-kind: rough_t1_x
+kind: rough_tool_x
 status: active
 base_config_fingerprint: sha256:...
 source_fact_ids:
   - sha256:...
 changes:
+  tools.t0.x_endstop:
+    old: ACTIVE_T0_X_ENDSTOP_MM
+    correction: DERIVED_T0_ROUGH_X_RESIDUAL_MM
+    new: DERIVED_T0_X_ENDSTOP_MM
   tools.t1.x_endstop:
-    old: 357.532
-    new: 347.380
+    old: ACTIVE_T1_X_ENDSTOP_MM
+    correction: DERIVED_T1_ROUGH_X_RESIDUAL_MM
+    new: DERIVED_T1_X_ENDSTOP_MM
 generated_config_fingerprint: sha256:...
 applied_at_utc: ...
 ```
@@ -869,8 +929,13 @@ No page should silently apply calibration because analysis completed.
 
 - implement the sparse T0/T1 red-marker sweep
 - tolerate missing-marker images
-- produce and explicitly apply a T1-X-only candidate
-- add the two-frame common-X verification job
+- calculate independent T0 and T1 corrections against the current
+  `bed.tab_corner.printer_xyz` X coordinate
+- produce and explicitly apply one atomic candidate changing only
+  `tools.t0.x_endstop` and `tools.t1.x_endstop`
+- add the two-frame X=`183 mm` verification job that checks each marker at the
+  predicted `+10 mm` image-X offset from the corner and compares the two
+  marker image-X coordinates
 
 ### 5. Implement the fine nozzle model
 
@@ -916,7 +981,13 @@ Job tests:
 - missing red-marker frames are excluded without inventing detections
 - tight neighboring-image registration recovers synthetic X/Z transforms
 - outlier registration edges are rejected before model fitting
-- coarse and fine correction signs are recovered correctly
+- the rough-X calculation recovers the correction sign independently for T0
+  and T1 from the bed-tab prior, marker offset, and reference commanded X
+- the rough-X candidate changes both tool X endstops atomically and no Y/Z
+  value
+- rough-X verification rejects a pair of mutually aligned markers when both
+  differ from the expected `+10 mm` image-X offset from the bed-tab corner
+- fine correction signs are recovered correctly
 - fine-model acceptance fails when the usable observations no longer span the
   declared minimum X and Z ranges
 - Eddy lighting and geometry facts invalidate only their true consumers
@@ -949,8 +1020,15 @@ UI tests:
 - Applying calibration is explicit and produces an immutable active snapshot.
 - The bed-tab corner printer XYZ is a user-defined initial prior; vision binds a
   pixel to it but does not invent its absolute coordinates.
+- The current bed-tab corner prior is `[173, -18, 0] mm`.
 - Changing the bed-tab prior invalidates rough X and every downstream fact.
 - The bed-tab reference is established before any tool calibration.
+- Rough X calibrates both T0 and T1 independently to the fixed bed-tab corner;
+  T0 is not held as the absolute X reference.
+- Rough X changes only the two tool X endstops. It does not alter Y or Z.
+- Rough-X verification commands each tool to X=`183 mm`, checks each marker
+  against the predicted point `10 mm` toward +X from the bed-tab corner, and
+  also requires the T0 and T1 image-X coordinates to agree.
 - Rough X is applied and verified before the fine T0/T1 X/Z grid.
 - Eddy geometry depends on the accepted T0/nozzle model and independent Eddy
   lighting facts.

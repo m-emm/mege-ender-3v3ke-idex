@@ -48,6 +48,8 @@ CORNER_CALIBRATION_REMOTE_METHOD = "idex_bed_tab_corner_calibrate"
 CORNER_CALIBRATION_REMOTE_ACTION = "run_idex_bed_tab_corner_calibrate"
 RED_MARKER_CALIBRATION_REMOTE_METHOD = "idex_red_marker_x_sweep_calibrate"
 RED_MARKER_CALIBRATION_REMOTE_ACTION = "run_idex_red_marker_x_sweep_calibrate"
+ROUGH_X_VERIFY_REMOTE_METHOD = "idex_rough_tool_x_verify"
+ROUGH_X_VERIFY_REMOTE_ACTION = "run_idex_rough_tool_x_verify"
 CALIBRATION_BIN = os.environ.get(
     "VISION_CALIBRATION_BIN", "/usr/local/bin/vision_calibration.py"
 )
@@ -421,6 +423,7 @@ class VisionJobApi:
             "nozzle_cam_bed_tab_y_scale",
             "nozzle_cam_bed_tab_corner",
             "idex_tool_red_marker_x_sweep",
+            "idex_rough_tool_x_verify",
         ):
             raise CaptureError("unsupported acquisition job_type")
         if manifest.get("job_id") != sanitize_name(job_id):
@@ -831,6 +834,32 @@ class KlippyRemoteDaemon:
                             result.stderr.strip()
                             or "red-marker X calibration job failed"
                         )
+                elif action == ROUGH_X_VERIFY_REMOTE_ACTION:
+                    command = [
+                        CALIBRATION_BIN,
+                        "run",
+                        "idex_rough_tool_x_verify",
+                        "--name",
+                        sanitize_name(params.get("name", "rough_x_verify")),
+                    ]
+                    fingerprint = str(params.get("active_config_fingerprint") or "")
+                    if fingerprint:
+                        command.extend(["--expected-fingerprint", fingerprint])
+                    result = subprocess.run(
+                        command,
+                        check=False,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        timeout=300,
+                    )
+                    if result.stdout.strip():
+                        log(result.stdout.strip())
+                    if result.returncode:
+                        raise CaptureError(
+                            result.stderr.strip()
+                            or "rough-X verification job failed"
+                        )
                 else:
                     raise CaptureError(f"unknown queued action {action}")
             except Exception as exc:
@@ -877,6 +906,11 @@ class KlippyRemoteDaemon:
                 RED_MARKER_CALIBRATION_REMOTE_METHOD,
                 RED_MARKER_CALIBRATION_REMOTE_ACTION,
             )
+            self._register_method(
+                sock,
+                ROUGH_X_VERIFY_REMOTE_METHOD,
+                ROUGH_X_VERIFY_REMOTE_ACTION,
+            )
 
     def _handle_message(self, message: dict[str, Any]) -> None:
         action = message.get("action")
@@ -885,6 +919,7 @@ class KlippyRemoteDaemon:
             valid.add(CALIBRATION_REMOTE_ACTION)
             valid.add(CORNER_CALIBRATION_REMOTE_ACTION)
             valid.add(RED_MARKER_CALIBRATION_REMOTE_ACTION)
+            valid.add(ROUGH_X_VERIFY_REMOTE_ACTION)
         if action not in valid:
             return
         params = message.get("params") or {}

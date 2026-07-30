@@ -193,10 +193,6 @@ def _pair_registration(
     target_center: np.ndarray,
 ) -> dict[str, Any]:
     records: dict[str, Any] = {}
-    shifts = []
-    correlations = []
-    disagreements = []
-    boundary = False
     for representation in ("gray", "clahe"):
         forward = _one_way_registration(
             source_representations[representation],
@@ -214,24 +210,78 @@ def _pair_registration(
         reverse_as_forward = -np.asarray(reverse["shift_px"], dtype=float)
         combined = (forward_shift + reverse_as_forward) / 2.0
         disagreement = float(np.linalg.norm(forward_shift - reverse_as_forward))
-        shifts.append(combined)
-        correlations.extend([forward["correlation"], reverse["correlation"]])
-        disagreements.append(disagreement)
-        boundary = boundary or forward["boundary_hit"] or reverse["boundary_hit"]
         records[representation] = {
             "forward": forward,
             "reverse": reverse,
             "combined_shift_px": combined.tolist(),
             "forward_reverse_disagreement_px": disagreement,
         }
-    spread = float(np.linalg.norm(shifts[0] - shifts[1]))
+    usable_names = [
+        name
+        for name, record in records.items()
+        if not record["forward"]["boundary_hit"]
+        and not record["reverse"]["boundary_hit"]
+        and record["forward_reverse_disagreement_px"]
+        <= MAX_REPRESENTATION_SPREAD_PX
+    ]
+    if not usable_names:
+        return {
+            "shift_px": [0.0, 0.0],
+            "minimum_correlation": min(
+                min(record["forward"]["correlation"], record["reverse"]["correlation"])
+                for record in records.values()
+            ),
+            "median_correlation": float(
+                np.median(
+                    [
+                        value
+                        for record in records.values()
+                        for value in (
+                            record["forward"]["correlation"],
+                            record["reverse"]["correlation"],
+                        )
+                    ]
+                )
+            ),
+            "representation_spread_px": float("inf"),
+            "maximum_forward_reverse_disagreement_px": max(
+                record["forward_reverse_disagreement_px"]
+                for record in records.values()
+            ),
+            "boundary_hit": True,
+            "usable_representations": [],
+            "representations": records,
+        }
+
+    usable_records = [records[name] for name in usable_names]
+    shifts = [
+        np.asarray(record["combined_shift_px"], dtype=float)
+        for record in usable_records
+    ]
+    correlations = [
+        value
+        for record in usable_records
+        for value in (
+            record["forward"]["correlation"],
+            record["reverse"]["correlation"],
+        )
+    ]
+    spread = (
+        float(np.linalg.norm(shifts[0] - shifts[1]))
+        if len(shifts) > 1
+        else 0.0
+    )
     return {
         "shift_px": np.mean(np.asarray(shifts), axis=0).tolist(),
         "minimum_correlation": min(correlations),
         "median_correlation": float(np.median(correlations)),
         "representation_spread_px": spread,
-        "maximum_forward_reverse_disagreement_px": max(disagreements),
-        "boundary_hit": boundary,
+        "maximum_forward_reverse_disagreement_px": max(
+            record["forward_reverse_disagreement_px"]
+            for record in usable_records
+        ),
+        "boundary_hit": False,
+        "usable_representations": usable_names,
         "representations": records,
     }
 
@@ -799,9 +849,6 @@ def analyze(
         cross_shift = np.asarray(
             selection["cross_registration"]["shift_px"], dtype=float
         )
-        rough_error = float(np.dot(cross_shift, unit_x) / scale)
-        if abs(rough_error) > 25.0:
-            reasons.append("rough T1 X error exceeds the 25 mm safety limit")
         corner_pixel = np.asarray(reference["corner_pixel_xy_px"], dtype=float)
         corner_xyz = np.asarray(reference["corner_printer_xyz_mm"], dtype=float)
         capture_y = float(reference["capture_y_mm"])
@@ -848,7 +895,6 @@ def analyze(
                 "t1_marker_pixel_px": marker1.tolist(),
                 "t0_red_marker_to_bed_tab_x_mm": t0_offset,
                 "t1_red_marker_to_bed_tab_x_mm": t1_offset,
-                "rough_t1_x_error_relative_to_t0_mm": rough_error,
                 "selected_tracks": {
                     "T0": selection["t0"],
                     "T1": selection["t1"],

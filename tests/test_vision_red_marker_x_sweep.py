@@ -116,9 +116,6 @@ def test_recovers_marker_axis_and_rejects_larger_red_distractor(tmp_path):
     assert result["common_axis_vector_px_per_mm"] == pytest.approx(
         [4.05, 0.0], abs=0.1
     )
-    assert result["rough_t1_x_error_relative_to_t0_mm"] == pytest.approx(
-        -40.0 / 4.05, abs=0.35
-    )
     assert set(result["artifacts"]) == {
         "contact_sheet",
         "marker_selection",
@@ -149,3 +146,37 @@ def test_rejects_missing_tool_trajectory(tmp_path):
     )
     assert not result["accepted"]
     assert any("T1" in reason for reason in result["reasons"])
+
+
+def test_pair_registration_excludes_one_inconsistent_representation(monkeypatch):
+    module = _module()
+    calls = iter(
+        [
+            {"shift_px": [80.0, -1.0], "correlation": 0.75, "boundary_hit": False},
+            {"shift_px": [-76.0, 1.0], "correlation": 0.72, "boundary_hit": False},
+            {"shift_px": [79.0, -1.2], "correlation": 0.81, "boundary_hit": False},
+            {"shift_px": [-79.4, 1.0], "correlation": 0.79, "boundary_hit": False},
+        ]
+    )
+
+    monkeypatch.setattr(
+        module,
+        "_one_way_registration",
+        lambda *_args, **_kwargs: next(calls),
+    )
+    representations = {
+        "gray": np.zeros((20, 20), dtype=np.uint8),
+        "clahe": np.zeros((20, 20), dtype=np.uint8),
+    }
+    registration = module._pair_registration(
+        representations,
+        np.asarray([10.0, 10.0]),
+        representations,
+        np.asarray([10.0, 10.0]),
+    )
+
+    assert registration["usable_representations"] == ["clahe"]
+    assert registration["shift_px"] == pytest.approx([79.2, -1.1])
+    assert registration["minimum_correlation"] == pytest.approx(0.79)
+    assert registration["representation_spread_px"] == 0.0
+    assert not registration["boundary_hit"]

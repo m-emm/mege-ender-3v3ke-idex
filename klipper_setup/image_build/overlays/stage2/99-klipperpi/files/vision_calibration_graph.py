@@ -116,6 +116,7 @@ def validate_registry(record: Any) -> dict[str, Any]:
         "nozzle_cam_bed_tab_y_scale",
         "nozzle_cam_bed_tab_corner",
         "idex_tool_red_marker_x_sweep",
+        "idex_rough_tool_x_verify",
     }:
         raise CalibrationGraphError("registry has an invalid native job-type set")
     definition = _require_mapping(
@@ -141,8 +142,8 @@ def validate_registry(record: Any) -> dict[str, Any]:
         job_types["nozzle_cam_bed_tab_corner"],
         "registry.job_types.nozzle_cam_bed_tab_corner",
     )
-    if corner.get("definition_version") != 1:
-        raise CalibrationGraphError("bed-tab corner definition_version must be 1")
+    if corner.get("definition_version") != 2:
+        raise CalibrationGraphError("bed-tab corner definition_version must be 2")
     if corner.get("publish_on_accept") is not True:
         raise CalibrationGraphError(
             "bed-tab corner job must publish accepted facts immediately"
@@ -173,6 +174,10 @@ def validate_registry(record: Any) -> dict[str, Any]:
         )
     if corner.get("duplicate_count") != 5:
         raise CalibrationGraphError("bed-tab corner job must acquire five duplicates")
+    if corner.get("discard_fresh_frames") != 1:
+        raise CalibrationGraphError(
+            "bed-tab corner job must discard one fresh frame per duplicate"
+        )
     red_marker = _require_mapping(
         job_types["idex_tool_red_marker_x_sweep"],
         "registry.job_types.idex_tool_red_marker_x_sweep",
@@ -209,9 +214,54 @@ def validate_registry(record: Any) -> dict[str, Any]:
         "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
         "tool.t0.red_marker_to_bed_tab_x_mm",
         "tool.t1.red_marker_to_bed_tab_x_mm",
-        "tool.t1.rough_x_error_relative_to_t0_mm",
     ]:
         raise CalibrationGraphError("red-marker sweep has an invalid fact contract")
+    verification = _require_mapping(
+        job_types["idex_rough_tool_x_verify"],
+        "registry.job_types.idex_rough_tool_x_verify",
+    )
+    if verification.get("definition_version") != 1:
+        raise CalibrationGraphError(
+            "rough-X verification definition_version must be 1"
+        )
+    if verification.get("publish_on_accept") is not True:
+        raise CalibrationGraphError(
+            "rough-X verification must publish accepted facts immediately"
+        )
+    if verification.get("localizer") != {
+        "kind": "rough_x_marker_verification",
+        "version": 1,
+    }:
+        raise CalibrationGraphError(
+            "rough-X verification has an invalid localizer"
+        )
+    if verification.get("verification_offset_x_mm") != 10:
+        raise CalibrationGraphError(
+            "rough-X verification must use the declared +10 mm offset"
+        )
+    if verification.get("requires") != [
+        {
+            "requirement": "partial_bed_coordinate_system",
+            "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system",
+        },
+        {
+            "requirement": "image_x_axis",
+            "fact_name": "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
+        },
+        {
+            "requirement": "rough_x_active_snapshot",
+            "fact_name": "calibration.rough_tool_x.active_snapshot",
+        },
+    ]:
+        raise CalibrationGraphError(
+            "rough-X verification has invalid fact requirements"
+        )
+    if verification.get("fact_names") != [
+        "calibration.rough_tool_x.verified"
+    ]:
+        raise CalibrationGraphError(
+            "rough-X verification has an invalid fact contract"
+        )
     return record
 
 
@@ -224,6 +274,7 @@ def validate_manifest(record: Any) -> dict[str, Any]:
         "nozzle_cam_bed_tab_y_scale",
         "nozzle_cam_bed_tab_corner",
         "idex_tool_red_marker_x_sweep",
+        "idex_rough_tool_x_verify",
     ):
         raise CalibrationGraphError("manifest has an unsupported job_type")
     definition_version = record.get("definition_version")
@@ -269,9 +320,9 @@ def validate_manifest(record: Any) -> dict[str, Any]:
         if [frame.get("y_offset_mm") for frame in frames] != expected_offsets:
             raise CalibrationGraphError("manifest has an invalid Y motion order")
     elif job_type == "nozzle_cam_bed_tab_corner":
-        if definition_version != 1:
+        if definition_version not in (1, 2):
             raise CalibrationGraphError(
-                "bed-tab corner manifest definition_version must be 1"
+                "bed-tab corner manifest definition_version must be 1 or 2"
             )
         if record.get("publish_on_accept") is not True:
             raise CalibrationGraphError(
@@ -290,6 +341,12 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             )
         if [frame.get("duplicate_index") for frame in frames] != list(range(5)):
             raise CalibrationGraphError("bed-tab corner duplicate order is invalid")
+        if definition_version == 2 and any(
+            frame.get("discard_fresh_frames") != 1 for frame in frames
+        ):
+            raise CalibrationGraphError(
+                "definition-v2 bed-tab corner frames must discard one fresh frame"
+            )
         positions = [frame.get("commanded_position_mm") for frame in frames]
         if not positions or any(position != positions[0] for position in positions):
             raise CalibrationGraphError(
@@ -314,7 +371,7 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             )
         for binding in normalized_input_facts:
             _require_string(binding.get("fact_set_hash"), "input fact_set_hash")
-    else:
+    elif job_type == "idex_tool_red_marker_x_sweep":
         if definition_version != 1:
             raise CalibrationGraphError(
                 "red-marker manifest definition_version must be 1"
@@ -375,6 +432,68 @@ def validate_manifest(record: Any) -> dict[str, Any]:
                 raise CalibrationGraphError(
                     f"red-marker active calibration snapshot lacks {key}"
                 )
+    else:
+        if definition_version != 1:
+            raise CalibrationGraphError(
+                "rough-X verification manifest definition_version must be 1"
+            )
+        if record.get("publish_on_accept") is not True:
+            raise CalibrationGraphError(
+                "rough-X verification manifest must publish on acceptance"
+            )
+        if record.get("localizer") != {
+            "kind": "rough_x_marker_verification",
+            "version": 1,
+        }:
+            raise CalibrationGraphError(
+                "rough-X verification manifest has an invalid localizer"
+            )
+        if len(frames) != 2 or record.get("frame_count") != 2:
+            raise CalibrationGraphError(
+                "rough-X verification manifest must contain two frames"
+            )
+        expected_x = record.get("verification_reference", {}).get(
+            "command_x_mm"
+        )
+        if not isinstance(expected_x, (int, float)):
+            raise CalibrationGraphError(
+                "rough-X verification command X is unavailable"
+            )
+        if [(frame.get("tool"), frame.get("x_mm")) for frame in frames] != [
+            ("T0", expected_x),
+            ("T1", expected_x),
+        ]:
+            raise CalibrationGraphError(
+                "rough-X verification has an invalid tool/X motion order"
+            )
+        if any(frame.get("discard_fresh_frames") != 1 for frame in frames):
+            raise CalibrationGraphError(
+                "rough-X verification frames must discard one fresh frame"
+            )
+        expected_requirements = {
+            "partial_bed_coordinate_system":
+                "camera.nozzle_cam.partial_bed_coordinate_system",
+            "image_x_axis":
+                "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
+            "rough_x_active_snapshot":
+                "calibration.rough_tool_x.active_snapshot",
+        }
+        input_facts = _require_list(
+            record.get("input_facts"), "manifest.input_facts"
+        )
+        normalized_input_facts = [
+            _require_mapping(item, f"manifest.input_facts[{index}]")
+            for index, item in enumerate(input_facts)
+        ]
+        if {
+            item.get("requirement"): item.get("fact_name")
+            for item in normalized_input_facts
+        } != expected_requirements:
+            raise CalibrationGraphError(
+                "rough-X verification manifest has invalid input fact bindings"
+            )
+        for binding in normalized_input_facts:
+            _require_string(binding.get("fact_set_hash"), "input fact_set_hash")
     for seq, frame_value in enumerate(frames):
         frame = _require_mapping(frame_value, f"manifest.frames[{seq}]")
         if frame.get("seq") != seq:
@@ -564,17 +683,33 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                     raise CalibrationGraphError(
                         f"red-marker {field} must be a coordinate-system item"
                     )
-        if fact_name == "tool.t1.rough_x_error_relative_to_t0_mm":
-            for field in ("correction_mm", "candidate_t1_x_endstop_mm"):
+        if fact_name == "calibration.rough_tool_x.active_snapshot":
+            for field in (
+                "bed_tab_x_mm",
+                "t0_old_x_endstop_mm",
+                "t0_calculated_correction_mm",
+                "t0_applied_x_endstop_mm",
+                "t1_old_x_endstop_mm",
+                "t1_calculated_correction_mm",
+                "t1_applied_x_endstop_mm",
+            ):
                 if not isinstance(value.get(field), (int, float)):
-                    raise CalibrationGraphError(f"rough X {field} must be numeric")
+                    raise CalibrationGraphError(
+                        f"rough-X active snapshot {field} must be numeric"
+                    )
                 if (
                     fact_definition_version == 4
                     and declared_roles.get(field) != "coordinate_system"
                 ):
                     raise CalibrationGraphError(
-                        f"rough X {field} must be a coordinate-system item"
+                        f"rough-X active snapshot {field} must be "
+                        "a coordinate-system item"
                     )
+        if fact_name == "calibration.rough_tool_x.verified":
+            if fact_definition_version == 4 and fact.get("role") != "diagnostic":
+                raise CalibrationGraphError(
+                    "rough-X verification must be a diagnostic fact"
+                )
         dependencies = _require_list(
             fact.get("dependencies"),
             f"fact_set.facts[{fact_index}].dependencies",
@@ -706,9 +841,13 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
                 "applicability_hash": fact_set["applicability_hash"],
                 "fact_set_path": str(fact_set_path.relative_to(root)),
                 "source_kind": (
-                    "seed"
-                    if fact_set_path.parent.parent == root / "seeds"
-                    else "analysis"
+                    "operation"
+                    if str(fact_set.get("job_id", "")).startswith("operation:")
+                    else (
+                        "seed"
+                        if fact_set_path.parent.parent == root / "seeds"
+                        else "analysis"
+                    )
                 ),
             }
         publications.append(publication)

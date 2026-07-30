@@ -20,7 +20,7 @@
       ]
     },
     "nozzle_cam_bed_tab_corner": {
-      "definition_version": 1,
+      "definition_version": 2,
       "camera": "nozzle_cam",
       "profile": "analysis",
       "light_macro": "NOZZLE_CAM_Y_FEATURE_LIGHT",
@@ -32,6 +32,7 @@
       "duplicate_count": 5,
       "velocity_mm_s": 60,
       "settle_ms": 300,
+      "discard_fresh_frames": 1,
       "publish_on_accept": true,
       "requires": [
         {
@@ -82,8 +83,43 @@
       "fact_names": [
         "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
         "tool.t0.red_marker_to_bed_tab_x_mm",
-        "tool.t1.red_marker_to_bed_tab_x_mm",
-        "tool.t1.rough_x_error_relative_to_t0_mm"
+        "tool.t1.red_marker_to_bed_tab_x_mm"
+      ]
+    },
+    "idex_rough_tool_x_verify": {
+      "definition_version": 1,
+      "camera": "nozzle_cam",
+      "profile": "analysis",
+      "light_macro": "NOZZLE_CAM_ANALYSIS_LIGHT",
+      "localizer": {
+        "kind": "rough_x_marker_verification",
+        "version": 1
+      },
+      "verification_offset_x_mm": 10,
+      "capture_y_mm": -14,
+      "capture_z_mm": 2,
+      "safe_tool_change_z_mm": 5,
+      "velocity_mm_s": 60,
+      "settle_ms": 300,
+      "tool_change_settle_ms": 1000,
+      "discard_fresh_frames": 1,
+      "publish_on_accept": true,
+      "requires": [
+        {
+          "requirement": "partial_bed_coordinate_system",
+          "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system"
+        },
+        {
+          "requirement": "image_x_axis",
+          "fact_name": "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2"
+        },
+        {
+          "requirement": "rough_x_active_snapshot",
+          "fact_name": "calibration.rough_tool_x.active_snapshot"
+        }
+      ],
+      "fact_names": [
+        "calibration.rough_tool_x.verified"
       ]
     }
   }

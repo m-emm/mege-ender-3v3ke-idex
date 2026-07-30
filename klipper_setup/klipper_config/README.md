@@ -86,9 +86,44 @@ or directly on the printer host:
 ```
 
 Accepted red-marker jobs publish their four coordinate facts immediately. They
-do not modify `calib.yaml` or activate the candidate T1 X endstop.
+do not modify `calib.yaml` or activate either tool's X endstop.
 
-The provisional seed values live in
+The rough-X calibration sequence synchronizes the current priors, asks the
+dependency graph which inputs are missing or stale, reruns only those
+acquisition and analysis jobs in dependency order, publishes their accepted
+facts, and calculates both tool endstops independently:
+
+```bash
+/usr/local/bin/vision_calibration.py calibrate-rough-x \
+  --name rough_x_calibration
+```
+
+Pass `--force` when every acquisition stage should be repeated even if its
+current facts are fresh. The sequence stores an immutable operation result with
+the exact input fact bindings and candidate. It never modifies configuration.
+
+After copying the accepted candidates into `calib.yaml`, regenerating and
+deploying `printer.cfg`, record the active snapshot with the pre-calibration
+values used by the candidate:
+
+```bash
+/usr/local/bin/vision_calibration.py record-rough-x-activation \
+  --old-t0=-80.400 --old-t1=357.532 \
+  --expected-fingerprint=<active-config-fingerprint>
+```
+
+Finally, home the printer and capture exactly one image from each tool at
+X=183:
+
+```gcode
+IDEX_ROUGH_X_VERIFY NAME=rough_x_activation_verify
+```
+
+The verification expects each red marker to project 10 mm along the measured
+image-X axis from the fixed bed-tab corner and expects the two marker image-X
+positions to agree. It is report-only and does not change configuration.
+
+The seed values live in
 `/usr/local/share/vision/vision_calibration_priors.json`. Publishing changed
 prior values supersedes the old seed facts and makes downstream corner facts
 stale.

@@ -409,6 +409,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     red_marker_macro = _section(
         config_text, "gcode_macro IDEX_RED_MARKER_X_SWEEP_CALIBRATE"
     )
+    rough_x_verify_macro = _section(
+        config_text, "gcode_macro IDEX_ROUGH_X_VERIFY"
+    )
     capture_script = (IMAGE_BUILD_FILES_DIR / "vision_capture.py").read_text(
         encoding="utf-8"
     )
@@ -426,6 +429,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     )
     red_marker_analyzer = (
         IMAGE_BUILD_FILES_DIR / "vision_red_marker_x_sweep.py"
+    ).read_text(encoding="utf-8")
+    rough_x_analyzer = (
+        IMAGE_BUILD_FILES_DIR / "vision_rough_x_verification.py"
     ).read_text(encoding="utf-8")
     registry = json.loads(
         (IMAGE_BUILD_FILES_DIR / "vision_job_types.json").read_text(encoding="utf-8")
@@ -459,12 +465,15 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert '"idex_bed_tab_corner_calibrate"' in corner_macro
     assert "requires X/Y/Z homed" in red_marker_macro
     assert '"idex_red_marker_x_sweep_calibrate"' in red_marker_macro
+    assert "requires X/Y/Z homed" in rough_x_verify_macro
+    assert '"idex_rough_tool_x_verify"' in rough_x_verify_macro
 
     assert registry["schema_version"] == 1
     assert set(registry["job_types"]) == {
         "nozzle_cam_bed_tab_y_scale",
         "nozzle_cam_bed_tab_corner",
         "idex_tool_red_marker_x_sweep",
+        "idex_rough_tool_x_verify",
     }
     definition = registry["job_types"]["nozzle_cam_bed_tab_y_scale"]
     assert definition["definition_version"] == 4
@@ -478,8 +487,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert definition["settle_ms"] == 300
     assert definition["light_macro"] == "NOZZLE_CAM_Y_FEATURE_LIGHT"
     corner_definition = registry["job_types"]["nozzle_cam_bed_tab_corner"]
-    assert corner_definition["definition_version"] == 1
+    assert corner_definition["definition_version"] == 2
     assert corner_definition["duplicate_count"] == 5
+    assert corner_definition["discard_fresh_frames"] == 1
     assert corner_definition["capture_y_offset_mm"] == 20
     assert corner_definition["localizer"] == {
         "kind": "bed_tab_corner",
@@ -495,11 +505,22 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert red_marker_definition["x_positions_mm"] == [160, 170, 180, 190, 200, 210]
     assert red_marker_definition["discard_fresh_frames"] == 1
     assert red_marker_definition["publish_on_accept"] is True
+    rough_x_definition = registry["job_types"]["idex_rough_tool_x_verify"]
+    assert rough_x_definition["definition_version"] == 1
+    assert rough_x_definition["verification_offset_x_mm"] == 10
+    assert rough_x_definition["discard_fresh_frames"] == 1
+    assert rough_x_definition["publish_on_accept"] is True
+    assert [item["fact_name"] for item in rough_x_definition["requires"]] == [
+        "camera.nozzle_cam.partial_bed_coordinate_system",
+        "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
+        "calibration.rough_tool_x.active_snapshot",
+    ]
 
     assert "VisionJobApi" in capture_script
     assert "idex_bed_tab_y_scale_calibrate" in capture_script
     assert "idex_bed_tab_corner_calibrate" in capture_script
     assert "idex_red_marker_x_sweep_calibrate" in capture_script
+    assert "idex_rough_tool_x_verify" in capture_script
     assert "VISION_REGISTER_CALIBRATION_METHODS" in capture_script
     assert "measure_bed_y" not in capture_script
     assert "vision_nozzle_align" not in capture_script
@@ -520,6 +541,10 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "_red_candidates" in red_marker_analyzer
     assert "_pair_registration" in red_marker_analyzer
     assert "red_marker_trajectory" in red_marker_analyzer
+    assert "calculate_candidate" in rough_x_analyzer
+    assert "rough_x_marker_verification" in rough_x_analyzer
+    assert "calibrate_rough_x_sequence" in calibration_script
+    assert '"calibrate-rough-x"' in calibration_script
 
     assert (
         "VISION_JOB_ROOT=/home/pi/printer_data/vision/calibration/jobs"
@@ -549,6 +574,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "vision_bed_tab_y_scale.py",
         "vision_bed_tab_corner.py",
         "vision_red_marker_x_sweep.py",
+        "vision_rough_x_verification.py",
         "vision_job_types.json",
         "vision_calibration_priors.json",
     ):
@@ -581,6 +607,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "IDEX_BED_TAB_Y_SCALE_CALIBRATE" in klipper_readme
     assert "IDEX_BED_TAB_CORNER_CALIBRATE" in klipper_readme
     assert "IDEX_RED_MARKER_X_SWEEP_CALIBRATE" in klipper_readme
+    assert "IDEX_ROUGH_X_VERIFY" in klipper_readme
     assert "no reader, migration, alias" in concept
 
 

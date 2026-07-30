@@ -337,9 +337,10 @@ def test_prepare_corner_binds_current_facts_and_generates_fixed_duplicates(
     gcode = (job_dir / "acquisition.gcode").read_text()
 
     assert manifest["job_type"] == "nozzle_cam_bed_tab_corner"
-    assert manifest["definition_version"] == 1
+    assert manifest["definition_version"] == 2
     assert manifest["frame_count"] == 5
     assert [frame["duplicate_index"] for frame in manifest["frames"]] == list(range(5))
+    assert all(frame["discard_fresh_frames"] == 1 for frame in manifest["frames"])
     assert (
         len({tuple(frame["commanded_position_mm"]) for frame in manifest["frames"]})
         == 1
@@ -358,12 +359,19 @@ def test_prepare_corner_binds_current_facts_and_generates_fixed_duplicates(
         "bed_tab_corner_prior",
         "tab_plane_z",
     }
-    assert manifest["corner_reference"]["corner_printer_xyz_mm"] == [
-        170.0,
-        -20.0,
-        0.0,
-    ]
-    assert manifest["corner_reference"]["prior_provisional"] is True
+    prior_registry = json.loads(module.PRIOR_PATH.read_text())
+    prior_value = next(
+        seed["value"]
+        for seed in prior_registry["seeds"]
+        if seed["name"] == "bed.tab_corner.printer_xyz"
+    )
+    assert (
+        manifest["corner_reference"]["corner_printer_xyz_mm"]
+        == prior_value["xyz_mm"]
+    )
+    assert manifest["corner_reference"]["prior_provisional"] is bool(
+        prior_value.get("provisional")
+    )
     assert (
         np.linalg.norm(
             np.asarray(manifest["corner_reference"]["expected_corner_px"])
@@ -399,11 +407,14 @@ def test_corner_analysis_publishes_dependency_bound_partial_coordinate_system(
                 {
                     "job_seq": frame["seq"],
                     "capture_errors": 0,
-                    "width": 200,
-                    "height": 120,
-                    "camera_profile": {"profile_names": ["analysis"]},
-                    "framebuffer_seq": 200 + frame["seq"],
-                    "sha256": module.sha256_file(image_path),
+                        "width": 200,
+                        "height": 120,
+                        "camera_profile": {"profile_names": ["analysis"]},
+                        "framebuffer_seq": 200 + frame["seq"],
+                        "discarded_framebuffer_sequences": [
+                            100 + frame["seq"]
+                        ],
+                        "sha256": module.sha256_file(image_path),
                 }
             ),
             encoding="utf-8",
@@ -468,7 +479,13 @@ def test_corner_analysis_publishes_dependency_bound_partial_coordinate_system(
     assert fact["name"] == "camera.nozzle_cam.partial_bed_coordinate_system"
     assert fact["role"] == "coordinate_system"
     assert fact["value"]["corner_pixel_xy_px"] == [921.8, 215.5]
-    assert fact["value"]["corner_printer_xyz_mm"] == [170.0, -20.0, 0.0]
+    prior_registry = json.loads(module.PRIOR_PATH.read_text())
+    expected_prior = next(
+        seed["value"]["xyz_mm"]
+        for seed in prior_registry["seeds"]
+        if seed["name"] == "bed.tab_corner.printer_xyz"
+    )
+    assert fact["value"]["corner_printer_xyz_mm"] == expected_prior
     assert fact["value"]["image_y_axis_vector_px_per_mm"] == [-0.22, -10.5]
     assert fact["dependencies"] == [
         {
@@ -486,7 +503,11 @@ def test_corner_analysis_publishes_dependency_bound_partial_coordinate_system(
     )
     dashboard = (module.VISION_ROOT / "index.html").read_text()
     assert "[921.8000, 215.5000] px" in dashboard
-    assert "[170.0000, -20.0000, 0.0000] mm" in dashboard
+    assert (
+        "["
+        + ", ".join(f"{float(value):.4f}" for value in expected_prior)
+        + "] mm"
+    ) in dashboard
     assert "Corner repeatability" not in dashboard
     job_page = (job_dir / "index.html").read_text()
     assert "Automatically localized bed-tab corner" in job_page
@@ -753,3 +774,74 @@ def test_legacy_public_interfaces_and_runtime_fields_are_absent():
         assert legacy not in combined
     assert "IDEX_BED_TAB_Y_SCALE_CALIBRATE" in template
     assert "idex_bed_tab_y_scale_calibrate" in capture
+
+
+def test_rough_x_sequence_reruns_only_missing_or_stale_graph_stages(
+    monkeypatch, tmp_path
+):
+    module = _load(monkeypatch, tmp_path)
+    status = _status()
+    fresh = {
+        "camera.nozzle_cam.bed_tab.y_parallax_model",
+    }
+    run_types = []
+
+    def catalog():
+        return {
+            "heads": {
+                name: {"fact_set_hash": f"sha256:{index:064x}"}
+                for index, name in enumerate(sorted(fresh), start=1)
+            },
+            "stale_fact_sets": {},
+        }
+
+    def run_job(name, *, job_type, expected_fingerprint, timeout):
+        assert name.startswith("repeatable_rough_x_")
+        assert expected_fingerprint == "sha256:active"
+        assert timeout == 90.0
+        run_types.append(job_type)
+        stage = next(
+            fact_names
+            for stage_type, _stage_slug, fact_names
+            in module.ROUGH_X_CALIBRATION_STAGES
+            if stage_type == job_type
+        )
+        fresh.update(stage)
+        return {
+            "prepared": {"job_id": f"job-{job_type}"},
+            "analysis": {
+                "state": "accepted",
+                "analysis_run_id": f"analysis-{job_type}",
+                "review_url": f"/vision/{job_type}",
+            },
+        }
+
+    monkeypatch.setattr(module, "sync_seed_facts", lambda: {"seeds": []})
+    monkeypatch.setattr(module, "_wait_for_printer_idle", lambda timeout=30.0: status)
+    monkeypatch.setattr(module, "rebuild_catalog", lambda _root: catalog())
+    monkeypatch.setattr(module, "run_job", run_job)
+    monkeypatch.setattr(
+        module,
+        "calculate_rough_x",
+        lambda status: {"tools": {"T0": {}, "T1": {}}},
+    )
+    monkeypatch.setattr(module, "render_ui", lambda _catalog: None)
+
+    result = module.calibrate_rough_x_sequence(
+        "repeatable_rough_x",
+        timeout=90.0,
+    )
+
+    assert run_types == [
+        module.BED_TAB_CORNER_JOB_TYPE,
+        module.RED_MARKER_X_JOB_TYPE,
+    ]
+    assert [stage["action"] for stage in result["stages"]] == [
+        "reused_current_facts",
+        "acquired_analyzed_published",
+        "acquired_analyzed_published",
+    ]
+    operation = json.loads(Path(result["operation_path"]).read_text())
+    assert operation["result_hash"] == module.content_hash(
+        operation, "result_hash"
+    )

@@ -429,6 +429,7 @@ require_file "${FILES_DIR}/vision_calibration_graph.py"
 require_file "${FILES_DIR}/vision_bed_tab_y_scale.py"
 require_file "${FILES_DIR}/vision_bed_tab_corner.py"
 require_file "${FILES_DIR}/vision_red_marker_x_sweep.py"
+require_file "${FILES_DIR}/vision_rough_x_verification.py"
 require_file "${FILES_DIR}/vision_job_types.json"
 require_file "${FILES_DIR}/vision_calibration_priors.json"
 require_file "${FILES_DIR}/webcam_health_probe.py"
@@ -454,6 +455,7 @@ install -m 0644 "${FILES_DIR}/vision_calibration_graph.py" /usr/local/bin/vision
 install -m 0644 "${FILES_DIR}/vision_bed_tab_y_scale.py" /usr/local/bin/vision_bed_tab_y_scale.py
 install -m 0644 "${FILES_DIR}/vision_bed_tab_corner.py" /usr/local/bin/vision_bed_tab_corner.py
 install -m 0644 "${FILES_DIR}/vision_red_marker_x_sweep.py" /usr/local/bin/vision_red_marker_x_sweep.py
+install -m 0644 "${FILES_DIR}/vision_rough_x_verification.py" /usr/local/bin/vision_rough_x_verification.py
 install -m 0755 "${FILES_DIR}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py
 install -d -m 0755 /usr/local/share/vision
 install -m 0644 "${FILES_DIR}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json

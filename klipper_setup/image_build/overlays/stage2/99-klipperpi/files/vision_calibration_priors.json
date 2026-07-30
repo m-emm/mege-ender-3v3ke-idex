@@ -5,8 +5,8 @@
     {
       "name": "bed.tab_corner.printer_xyz",
       "definition_version": 4,
-      "revision": 1,
-      "recorded_at_utc": "2026-07-30T00:00:00+00:00",
+      "revision": 2,
+      "recorded_at_utc": "2026-07-30T11:28:46+00:00",
       "role": "coordinate_system",
       "value_items": [
         {
@@ -16,20 +16,15 @@
         {
           "field": "measurement_method",
           "role": "diagnostic"
-        },
-        {
-          "field": "provisional",
-          "role": "diagnostic"
         }
       ],
       "value": {
         "xyz_mm": [
-          170.0,
-          -20.0,
+          173.0,
+          -18.0,
           0.0
         ],
-        "measurement_method": "provisional_conversation_assumption_pending_physical_measurement",
-        "provisional": true
+        "measurement_method": "user_defined_fixed_reference"
       }
     },
     {
