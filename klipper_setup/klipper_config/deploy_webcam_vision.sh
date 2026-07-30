@@ -137,15 +137,28 @@ if status.get("virtual_sdcard", {}).get("is_active"):
     raise SystemExit(f"Virtual SD is active: {status}")
 PY
   echo "Stopping vision writers and removing the authorized legacy data..."
-  sudo systemctl stop vision-capture.service vision-capture-nozzle-cam.service
+  sudo systemctl stop \
+    vision-capture.service \
+    vision-capture-nozzle-cam.service \
+    vision-framebuffer.service \
+    vision-framebuffer-nozzle-cam.service
   python3 - <<'PY'
 import shutil
 from pathlib import Path
 
-for expected in (
+data_directories = (
     Path("/home/pi/printer_data/vision"),
     Path("/home/pi/printer_data/gcodes/vision_jobs"),
-):
+)
+runtime_directories = (
+    Path("/run/vision-preview"),
+    Path("/run/vision-preview-nozzle_cam"),
+    Path("/run/vision-capture"),
+    Path("/run/vision-capture-nozzle_cam"),
+)
+for expected in data_directories + runtime_directories:
+    if not expected.is_absolute():
+        raise SystemExit(f"Refusing relative cleanup target: {expected}")
     expected.mkdir(parents=True, exist_ok=True)
     if expected.resolve() != expected:
         raise SystemExit(f"Refusing unexpected cleanup target: {expected.resolve()}")
