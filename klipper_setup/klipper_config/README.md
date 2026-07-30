@@ -43,64 +43,41 @@ restarts Klipper, and reports the Moonraker/Klippy state.
 
 ## Vision Calibration Framework
 
-The clean framework starts with the relative bed-tab Y/parallax job. It
-resolves T0 X park, Y minimum, and Z maximum from active Klipper, then captures
-six frames at Y offsets 0, 10, 20, 20, 10, and 0 mm: three forward and three
-reverse.
-
-Run it from Mainsail:
+The clean chain starts with seed facts for the 8 mm square fiducial patch, its
+printer-Z plane (`-0.6 mm`), and the bed-tab corner (`[173, -18, 0] mm`).
+First select reproducible, low-glare fiducial lighting:
 
 ```gcode
-IDEX_BED_TAB_Y_SCALE_CALIBRATE NAME=bed_tab_y_scale
+IDEX_BED_FIDUCIAL_LIGHTING_CALIBRATE NAME=bed_fiducial_lighting
 ```
 
-Or from the printer:
+Then capture the six-frame `0, 10, 20, 20, 10, 0 mm` printer-Y sweep and
+recover the local fiducial metric:
 
-```bash
-/usr/local/bin/vision_calibration.py run nozzle_cam_bed_tab_y_scale --name bed_tab_y_scale
+```gcode
+IDEX_BED_FIDUCIAL_METRIC_CALIBRATE NAME=bed_fiducial_metric
 ```
 
-The next dependency-bound stage uses the current Y-parallax fact plus the
-versioned bed-tab XYZ and tab-plane Z seed facts:
+Observe the bed-tab corner relative to that metric:
 
 ```gcode
 IDEX_BED_TAB_CORNER_CALIBRATE NAME=bed_tab_corner
 ```
 
-or:
-
-```bash
-/usr/local/bin/vision_calibration.py run nozzle_cam_bed_tab_corner --name bed_tab_corner
-```
-
-Run the dependency-bound coarse T0/T1 red-marker X sweep:
+The coarse red-marker sweep establishes image X and both tool relations:
 
 ```gcode
 IDEX_RED_MARKER_X_SWEEP_CALIBRATE NAME=red_marker_x_sweep
 ```
 
-or directly on the printer host:
-
-```bash
-/usr/local/bin/vision_calibration.py run idex_tool_red_marker_x_sweep --name red_marker_x_sweep
-```
-
 Accepted red-marker jobs publish their three coordinate facts immediately. They
 do not modify `calib.yaml` or activate either tool's X endstop.
 
-The rough-X calibration sequence synchronizes the current priors, asks the
-dependency graph which inputs are missing or stale, reruns only those
-acquisition and analysis jobs in dependency order, publishes their accepted
-facts, and calculates both tool endstops independently:
+Calculate both tool X endstops independently from the fixed bed prior:
 
 ```bash
-/usr/local/bin/vision_calibration.py calibrate-rough-x \
-  --name rough_x_calibration
+/usr/local/bin/vision_calibration.py calculate-rough-x
 ```
-
-Pass `--force` when every acquisition stage should be repeated even if its
-current facts are fresh. The sequence stores an immutable operation result with
-the exact input fact bindings and candidate. It never modifies configuration.
 
 After copying the accepted candidates into `calib.yaml`, regenerating and
 deploying `printer.cfg`, record the active snapshot with the pre-calibration
@@ -123,41 +100,37 @@ The verification expects each red marker to project 10 mm along the measured
 image-X axis from the fixed bed-tab corner and expects the two marker image-X
 positions to agree. It is report-only and does not change configuration.
 
-The current Stage 5 planning acquisition derives its X positions from the
-current bed-tab prior and binds every required Stage 0–4 fact:
+Stage 5 captures a sparse 40-frame T0/T1 nozzle grid. Full X rows use offsets
+`10, 13, 16, 19, 22, 25 mm` at Z 1, 3, and 5 mm; Z 2 and 4 mm use the center
+X only:
 
-```bash
-/usr/local/bin/vision_calibration.py acquire idex_nozzle_fine_xz_grid \
-  --name fine_nozzle_xz_survey
+```gcode
+IDEX_NOZZLE_FINE_XZ_CALIBRATE NAME=fine_nozzle_xz
 ```
 
-This command acquires the registered T0/T1 X/Z survey and publishes it on the
-vision job page. Fine-grid analysis is intentionally not enabled until the
-projection model and bed-plane Z anchor described in
-`VISION_CALIBRATION_GRAPH_CONCEPT.md` are implemented; the survey publishes no
-calibration facts.
+It publishes the nozzle projection model and both nozzle coordinates relative
+to the bed tab. The known fiducial plane at Z `-0.6 mm` anchors the print-plane
+extrapolation.
+
+The corresponding host job types, in dependency order, are:
+
+```text
+nozzle_cam_bed_fiducial_lighting_sweep
+nozzle_cam_bed_fiducial_y_metric
+nozzle_cam_bed_tab_corner
+idex_tool_red_marker_x_sweep
+idex_rough_tool_x_verify
+idex_nozzle_fine_xz_grid
+```
 
 The seed values live in
 `/usr/local/share/vision/vision_calibration_priors.json`. Publishing changed
 prior values supersedes the old seed facts and makes downstream corner facts
 stale.
 
-Watch preparation, frame progress, analysis, and artifacts at
-`http://menderpi.local/vision/`. An accepted result creates and immediately
-publishes the current `camera.nozzle_cam.bed_tab.y_parallax_model` fact.
-Rejected analyses publish nothing. No pixel position or ROI is configured: the
-v4 analysis discovers horizontal features in both zero-offset frames and
-requires the bed-tab geometry—a horizontal top with a steep side descending to
-its right. It then tracks all semantic candidates, rejects stationary enclosure
-features and lower frame reflections, and selects the best moving tab top from
-fit quality.
-
-The job page makes the discovered-edge overlay and the six-frame measured-versus-
-fitted overlay prominent. Yellow marks the measured seam and strip, cyan marks
-the fitted model, and green/magenta distinguish forward and reverse passes. The
-page also includes the raw contact sheet, displacement plot, and direction
-comparison. Small fit and direction inconsistencies are warnings; a repeated
-position discrepancy above 1.5 mm remains a rejection.
+Watch progress and artifacts at `http://menderpi.local/vision/`. Accepted
+results publish immediately; rejected analyses publish nothing. Fiducial and
+feature pixel positions are observed, never configured.
 
 The `/vision/` overview shows only fields explicitly declared as
 coordinate-system defining. The full current-facts report keeps diagnostic

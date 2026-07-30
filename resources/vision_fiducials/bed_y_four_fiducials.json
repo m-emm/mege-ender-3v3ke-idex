@@ -1,0 +1,46 @@
+{
+  "artifact": "bed_y_four_fiducials",
+  "coordinate_units": "mm",
+  "fiducials": {
+    "center_spacing_x_mm": 8.0,
+    "center_spacing_y_mm": 8.0,
+    "centers_xy_mm": {
+      "bottom_left": [
+        3.0,
+        11.0
+      ],
+      "bottom_right": [
+        11.0,
+        11.0
+      ],
+      "top_left": [
+        3.0,
+        3.0
+      ],
+      "top_right": [
+        11.0,
+        3.0
+      ]
+    },
+    "count": 4,
+    "outer_diameter_mm": 3.0,
+    "style": "white concentric circles on black"
+  },
+  "files": {
+    "bed_y_four_fiducials.svg": "515243b59031ab1a640f8fe454648bf2993b05d4c1b077b5a9a17f5f1c1e366b",
+    "bed_y_four_fiducials_a4.pdf": "aebf64beac8c937f26b39d3ecc77c3336e15e8065653e37fc0467de3fb6056b0",
+    "bed_y_four_fiducials_a4.svg": "f3cba2bfc54a470436550ef2b76dc2dffa5ccea8faa691e8db27803b63eed7f8"
+  },
+  "patch": {
+    "background": "black",
+    "height_mm": 14.0,
+    "width_mm": 14.0
+  },
+  "pdf": {
+    "height_mm": 297.0,
+    "page": "A4 portrait",
+    "print_instruction": "Print at 100% / actual size; disable fit-to-page and scaling.",
+    "width_mm": 210.0
+  },
+  "schema_version": 1
+}

@@ -402,8 +402,11 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     template_text = TEMPLATE_PATH.read_text(encoding="utf-8")
     vision_section = _section(config_text, "vision")
-    calibration_macro = _section(
-        config_text, "gcode_macro IDEX_BED_TAB_Y_SCALE_CALIBRATE"
+    lighting_macro = _section(
+        config_text, "gcode_macro IDEX_BED_FIDUCIAL_LIGHTING_CALIBRATE"
+    )
+    metric_macro = _section(
+        config_text, "gcode_macro IDEX_BED_FIDUCIAL_METRIC_CALIBRATE"
     )
     corner_macro = _section(config_text, "gcode_macro IDEX_BED_TAB_CORNER_CALIBRATE")
     red_marker_macro = _section(
@@ -411,6 +414,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     )
     rough_x_verify_macro = _section(
         config_text, "gcode_macro IDEX_ROUGH_X_VERIFY"
+    )
+    fine_xz_macro = _section(
+        config_text, "gcode_macro IDEX_NOZZLE_FINE_XZ_CALIBRATE"
     )
     capture_script = (IMAGE_BUILD_FILES_DIR / "vision_capture.py").read_text(
         encoding="utf-8"
@@ -421,10 +427,10 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     graph_script = (IMAGE_BUILD_FILES_DIR / "vision_calibration_graph.py").read_text(
         encoding="utf-8"
     )
-    analyzer_script = (IMAGE_BUILD_FILES_DIR / "vision_bed_tab_y_scale.py").read_text(
+    fiducial_analyzer = (IMAGE_BUILD_FILES_DIR / "vision_bed_fiducial.py").read_text(
         encoding="utf-8"
     )
-    corner_analyzer = (IMAGE_BUILD_FILES_DIR / "vision_bed_tab_corner.py").read_text(
+    fine_xz_analyzer = (IMAGE_BUILD_FILES_DIR / "vision_nozzle_fine_xz.py").read_text(
         encoding="utf-8"
     )
     red_marker_analyzer = (
@@ -457,57 +463,69 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "timeout: 45.0" in vision_section
     assert "bed_y_" not in vision_section
     assert "[vision]" in template_text
-    assert "print_stats.state" in calibration_macro
-    assert "requires X/Y/Z homed" in calibration_macro
-    assert '"idex_bed_tab_y_scale_calibrate"' in calibration_macro
-    assert "active_config_fingerprint=fingerprint" in calibration_macro
+    assert "requires X/Y/Z homed" in lighting_macro
+    assert '"idex_bed_fiducial_lighting_calibrate"' in lighting_macro
+    assert "requires X/Y/Z homed" in metric_macro
+    assert '"idex_bed_fiducial_metric_calibrate"' in metric_macro
+    assert "active_config_fingerprint=fingerprint" in metric_macro
     assert "requires X/Y/Z homed" in corner_macro
     assert '"idex_bed_tab_corner_calibrate"' in corner_macro
     assert "requires X/Y/Z homed" in red_marker_macro
     assert '"idex_red_marker_x_sweep_calibrate"' in red_marker_macro
     assert "requires X/Y/Z homed" in rough_x_verify_macro
     assert '"idex_rough_tool_x_verify"' in rough_x_verify_macro
+    assert "requires X/Y/Z homed" in fine_xz_macro
+    assert '"idex_nozzle_fine_xz_calibrate"' in fine_xz_macro
 
     assert registry["schema_version"] == 1
     assert set(registry["job_types"]) == {
-        "nozzle_cam_bed_tab_y_scale",
+        "nozzle_cam_bed_fiducial_lighting_sweep",
+        "nozzle_cam_bed_fiducial_y_metric",
         "nozzle_cam_bed_tab_corner",
         "idex_tool_red_marker_x_sweep",
         "idex_rough_tool_x_verify",
         "idex_nozzle_fine_xz_grid",
     }
-    definition = registry["job_types"]["nozzle_cam_bed_tab_y_scale"]
-    assert definition["definition_version"] == 5
-    assert definition["localizer"] == {
-        "kind": "bed_tab_top_edge",
+    lighting_definition = registry["job_types"][
+        "nozzle_cam_bed_fiducial_lighting_sweep"
+    ]
+    assert lighting_definition["definition_version"] == 1
+    assert lighting_definition["localizer"] == {
+        "kind": "four_concentric_circle_square",
         "version": 1,
     }
-    assert definition["y_offsets_mm"] == [0, 10, 20, 20, 10, 0]
-    assert definition["publish_on_accept"] is True
-    assert definition["velocity_mm_s"] == 60
-    assert definition["settle_ms"] == 300
-    assert definition["light_macro"] == "NOZZLE_CAM_Y_FEATURE_LIGHT"
+    assert len(lighting_definition["exposure_profiles"]) == 4
+    metric_definition = registry["job_types"]["nozzle_cam_bed_fiducial_y_metric"]
+    assert metric_definition["definition_version"] == 1
+    assert metric_definition["y_offsets_mm"] == [0, 10, 20, 20, 10, 0]
+    assert metric_definition["publish_on_accept"] is True
+    assert metric_definition["velocity_mm_s"] == 60
+    assert metric_definition["settle_ms"] == 300
     corner_definition = registry["job_types"]["nozzle_cam_bed_tab_corner"]
-    assert corner_definition["definition_version"] == 5
+    assert corner_definition["definition_version"] == 1
     assert corner_definition["duplicate_count"] == 5
     assert corner_definition["discard_fresh_frames"] == 1
     assert corner_definition["capture_y_offset_mm"] == 20
     assert corner_definition["localizer"] == {
-        "kind": "bed_tab_corner",
+        "kind": "bed_tab_corner_relative_to_fiducial_patch",
         "version": 1,
     }
+    assert corner_definition["profile"] == "vision"
+    assert corner_definition["light_pixels"] == {
+        str(index): 0.45 for index in range(1, 9)
+    }
     assert [item["fact_name"] for item in corner_definition["requires"]] == [
-        "camera.nozzle_cam.bed_tab.y_parallax_model",
+        "camera.nozzle_cam.bed_fiducial.local_metric_model",
         "bed.tab_corner.printer_xyz",
-        "bed.reference_plane.tab_to_print_plane_z_mm",
+        "bed.fiducial_patch.printer_z_mm",
     ]
     red_marker_definition = registry["job_types"]["idex_tool_red_marker_x_sweep"]
-    assert red_marker_definition["definition_version"] == 5
+    assert red_marker_definition["definition_version"] == 1
     assert red_marker_definition["x_positions_mm"] == [160, 170, 180, 190, 200, 210]
     assert red_marker_definition["discard_fresh_frames"] == 1
     assert red_marker_definition["publish_on_accept"] is True
     rough_x_definition = registry["job_types"]["idex_rough_tool_x_verify"]
-    assert rough_x_definition["definition_version"] == 5
+    assert rough_x_definition["definition_version"] == 1
     assert rough_x_definition["verification_offset_x_mm"] == 10
     assert rough_x_definition["discard_fresh_frames"] == 1
     assert rough_x_definition["publish_on_accept"] is True
@@ -517,25 +535,28 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "calibration.rough_tool_x.active_snapshot",
     ]
     fine_xz_definition = registry["job_types"]["idex_nozzle_fine_xz_grid"]
-    assert fine_xz_definition["definition_version"] == 5
-    assert fine_xz_definition["x_offsets_from_bed_tab_mm"] == [10, 16, 25]
-    assert fine_xz_definition["z_positions_mm"] == [1, 3, 5]
+    assert fine_xz_definition["definition_version"] == 1
+    assert fine_xz_definition["x_offsets_from_bed_tab_mm"] == [10, 13, 16, 19, 22, 25]
+    assert fine_xz_definition["full_row_z_mm"] == [1, 3, 5]
+    assert fine_xz_definition["center_only_z_mm"] == [2, 4]
     assert fine_xz_definition["localizer"] == {
         "kind": "nozzle_tip_registration_grid",
         "version": 1,
     }
     assert [item["fact_name"] for item in fine_xz_definition["requires"]] == [
-        "camera.nozzle_cam.bed_tab.y_parallax_model",
+        "camera.nozzle_cam.bed_fiducial.local_metric_model",
         "camera.nozzle_cam.partial_bed_coordinate_system",
         "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
         "tool.t0.red_marker_to_bed_tab_x_mm",
         "tool.t1.red_marker_to_bed_tab_x_mm",
+        "bed.fiducial_patch.printer_z_mm",
         "calibration.rough_tool_x.active_snapshot",
         "calibration.rough_tool_x.verified",
     ]
 
     assert "VisionJobApi" in capture_script
-    assert "idex_bed_tab_y_scale_calibrate" in capture_script
+    assert "idex_bed_fiducial_lighting_calibrate" in capture_script
+    assert "idex_bed_fiducial_metric_calibrate" in capture_script
     assert "idex_bed_tab_corner_calibrate" in capture_script
     assert "idex_red_marker_x_sweep_calibrate" in capture_script
     assert "idex_rough_tool_x_verify" in capture_script
@@ -550,20 +571,20 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "canonical_hash" in graph_script
     assert "_detect_cycles" in graph_script
     assert "stale_fact_sets" in graph_script
-    assert "_discover_candidates" in analyzer_script
-    assert "bed_tab_top_edge" in analyzer_script
-    assert "goodFeaturesToTrack" not in analyzer_script
-    assert "forward_reverse" in analyzer_script
-    assert "_detect_candidates" in corner_analyzer
-    assert "_register" in corner_analyzer
-    assert "expected_corner_px" in corner_analyzer
+    assert "detect_four_fiducials" in fiducial_analyzer
+    assert "analyze_lighting" in fiducial_analyzer
+    assert "analyze_metric" in fiducial_analyzer
+    assert "analyze_corner" in fiducial_analyzer
+    assert "expected_corner_px" not in fiducial_analyzer
+    assert "Fine T0/T1 nozzle X/Z grid analysis" in fine_xz_analyzer
+    assert "_fit_tool" in fine_xz_analyzer
     assert "_red_candidates" in red_marker_analyzer
     assert "_pair_registration" in red_marker_analyzer
     assert "red_marker_trajectory" in red_marker_analyzer
     assert "calculate_candidate" in rough_x_analyzer
     assert "rough_x_marker_verification" in rough_x_analyzer
-    assert "calibrate_rough_x_sequence" in calibration_script
-    assert '"calibrate-rough-x"' in calibration_script
+    assert "calculate_rough_x" in calibration_script
+    assert '"calculate-rough-x"' in calibration_script
 
     assert (
         "VISION_JOB_ROOT=/home/pi/printer_data/vision/calibration/jobs"
@@ -590,8 +611,8 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     for filename in (
         "vision_calibration.py",
         "vision_calibration_graph.py",
-        "vision_bed_tab_y_scale.py",
-        "vision_bed_tab_corner.py",
+        "vision_bed_fiducial.py",
+        "vision_nozzle_fine_xz.py",
         "vision_red_marker_x_sweep.py",
         "vision_rough_x_verification.py",
         "vision_job_types.json",
@@ -622,11 +643,13 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     concept = VISION_JOB_CONCEPT_PATH.read_text(encoding="utf-8")
     assert "http://menderpi.local/vision/" in readme
     assert "vision_calibration.py rebuild-catalog" in readme
-    assert "nozzle_cam_bed_tab_y_scale" in klipper_readme
-    assert "IDEX_BED_TAB_Y_SCALE_CALIBRATE" in klipper_readme
+    assert "nozzle_cam_bed_fiducial_y_metric" in klipper_readme
+    assert "IDEX_BED_FIDUCIAL_LIGHTING_CALIBRATE" in klipper_readme
+    assert "IDEX_BED_FIDUCIAL_METRIC_CALIBRATE" in klipper_readme
     assert "IDEX_BED_TAB_CORNER_CALIBRATE" in klipper_readme
     assert "IDEX_RED_MARKER_X_SWEEP_CALIBRATE" in klipper_readme
     assert "IDEX_ROUGH_X_VERIFY" in klipper_readme
+    assert "IDEX_NOZZLE_FINE_XZ_CALIBRATE" in klipper_readme
     assert "no reader, migration, alias" in concept
 
 

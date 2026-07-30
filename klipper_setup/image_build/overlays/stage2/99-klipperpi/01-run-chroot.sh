@@ -426,8 +426,8 @@ require_file "${FILES_DIR}/vision_framebuffer.py"
 require_file "${FILES_DIR}/vision_capture.py"
 require_file "${FILES_DIR}/vision_calibration.py"
 require_file "${FILES_DIR}/vision_calibration_graph.py"
-require_file "${FILES_DIR}/vision_bed_tab_y_scale.py"
-require_file "${FILES_DIR}/vision_bed_tab_corner.py"
+require_file "${FILES_DIR}/vision_bed_fiducial.py"
+require_file "${FILES_DIR}/vision_nozzle_fine_xz.py"
 require_file "${FILES_DIR}/vision_red_marker_x_sweep.py"
 require_file "${FILES_DIR}/vision_rough_x_verification.py"
 require_file "${FILES_DIR}/vision_job_types.json"
@@ -452,8 +452,8 @@ install -m 0755 "${FILES_DIR}/vision_framebuffer.py" /usr/local/bin/vision_frame
 install -m 0755 "${FILES_DIR}/vision_capture.py" /usr/local/bin/vision_capture.py
 install -m 0755 "${FILES_DIR}/vision_calibration.py" /usr/local/bin/vision_calibration.py
 install -m 0644 "${FILES_DIR}/vision_calibration_graph.py" /usr/local/bin/vision_calibration_graph.py
-install -m 0644 "${FILES_DIR}/vision_bed_tab_y_scale.py" /usr/local/bin/vision_bed_tab_y_scale.py
-install -m 0644 "${FILES_DIR}/vision_bed_tab_corner.py" /usr/local/bin/vision_bed_tab_corner.py
+install -m 0644 "${FILES_DIR}/vision_bed_fiducial.py" /usr/local/bin/vision_bed_fiducial.py
+install -m 0644 "${FILES_DIR}/vision_nozzle_fine_xz.py" /usr/local/bin/vision_nozzle_fine_xz.py
 install -m 0644 "${FILES_DIR}/vision_red_marker_x_sweep.py" /usr/local/bin/vision_red_marker_x_sweep.py
 install -m 0644 "${FILES_DIR}/vision_rough_x_verification.py" /usr/local/bin/vision_rough_x_verification.py
 install -m 0755 "${FILES_DIR}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py

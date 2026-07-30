@@ -25,11 +25,16 @@ calibration-specific graph above that runtime.
 
 ### Terminology note
 
-The first bed-tab job below uses a commanded printer **Y** sweep. That is the
-axis that establishes the image-space Y/parallax mapping and is consistent with
-the later statement that the image X-axis direction is not known yet. If the
-machine eventually exposes this physical motion under another axis name, the
-job definition can change its commanded axis without changing the fact types.
+The first observed bed-reference stage uses the four-marker patch now attached
+to the underside of the print bed. The printed pattern contains four identical
+3 mm concentric-circle fiducials whose centers form an 8 x 8 mm square. The
+printed scale was physically checked before installation.
+
+That stage still commands printer **Y** back and forth. The known square gives
+an absolute in-plane metric while the commanded motion identifies printer +Y
+and measures the image-space Y/parallax vector. The identical square does not
+by itself identify printer +X versus -X; the later red-marker X sweep resolves
+that remaining sign.
 
 ## Design Principles
 
@@ -108,7 +113,12 @@ The intended end-to-end graph is:
 ```mermaid
 flowchart TD
     P[User prior: bed-tab corner XYZ] --> C[Bed-tab corner reference]
-    G[Other machine geometry seed facts] --> Y[Bed-tab Y/parallax sweep]
+    Q[Installed 8 x 8 mm bed fiducial reference] --> L[Bed fiducial lighting sweep]
+    ZP[User-known fiducial plane printer Z = -0.6 mm] --> C
+    ZP --> F
+    G[Other machine geometry seed facts] --> L
+    L --> Y[Bed fiducial Y/metric sweep]
+    Q --> Y
     Y --> C[Bed-tab corner reference]
     C --> R[Coarse T0/T1 red-marker X sweeps]
     P --> AX[Calculate and apply T0/T1 X calibration]
@@ -118,7 +128,7 @@ flowchart TD
     VX --> F
     F --> N[Fine nozzle/bed and T1-to-T0 facts]
 
-    L[Eddy lighting sweep] --> E[Eddy fiducial X/Z grid]
+    EL[Eddy lighting sweep] --> E[Eddy fiducial X/Z grid]
     C --> E
     N --> E
     E --> D[Full calibration candidate]
@@ -130,12 +140,16 @@ The graph contains two kinds of roots:
 
 - observed roots, produced by vision jobs
 - versioned seed facts, including the user-defined bed-tab corner printer XYZ,
-  the tab-plane-to-print-plane Z relationship, camera identity, and the active
-  Klipper configuration fingerprint
+  the installed bed-fiducial physical reference, the
+  fiducial-plane printer-Z coordinate, camera identity, and the
+  active Klipper configuration fingerprint
 
 Seed facts use the same provenance and invalidation rules as image-derived
 facts. Changing the user-defined bed-tab corner coordinates or a CAD geometry
 fact therefore invalidates every downstream fact that used the old fact ID.
+Removing, replacing, or repositioning the glued fiducial patch publishes a new
+installation fact and similarly invalidates its lighting, bed metric, corner,
+and all downstream calibration facts.
 
 ## Calibration Stages
 
@@ -171,44 +185,134 @@ that observation to this prior. Replacing the prior later creates a new fact ID
 and makes the corner reference, rough X calibration, fine nozzle calibration,
 Eddy geometry, and full calibration candidate stale.
 
-### 1. Bed-tab Y/parallax scale
+The independent installed-pattern seed fact is:
+
+- `bed.fiducial_patch.physical_reference`
+- four white concentric-circle markers on black
+- marker outer diameter `3 mm`
+- marker centers at patch-local `[3,3]`, `[11,3]`, `[3,11]`, and `[11,11] mm`
+- center spacing `8 mm` in both patch axes
+- printed scale physically checked by the user
+- rigid attachment to the underside of the print bed
+- exact source SVG, A4 PDF, manifest hashes, and installation revision
+
+The patch's pixel position, rotation, and relation to printer axes are
+deliberately not configuration. They are observed on every applicable run.
+
+### 1. Bed-fiducial lighting and Y/metric scale
+
+#### 1a. Bed-fiducial lighting
 
 Job type:
 
 ```text
-nozzle_cam_bed_tab_y_scale
+nozzle_cam_bed_fiducial_lighting_sweep
+```
+
+Dependencies:
+
+- current `bed.fiducial_patch.physical_reference`
+- camera identity and available fixed camera controls
+- configured bed-reference viewing pose and available light pixels
+
+The current live view shows all four rings, but the left side of the black
+patch has strong glare. The first calibration acquisition therefore performs a
+compact lighting sweep before measuring geometry:
+
+1. capture a short manual-exposure bracket with the lights off
+2. test each configured light pixel independently at low intensity
+3. test a bounded set of the best asymmetric light combinations
+4. refine exposure and intensity around the best candidates
+5. capture at least three duplicates of the winner
+
+The adaptive sweep is capped at 24 committed frames. It stops testing settings
+that clip a marker or fail to expose all four rings.
+
+Auto exposure may be used only to find a coarse starting point. Every accepted
+image uses fixed manual exposure, gain, white balance, and exact per-pixel
+light values. The sweep is coordinate-free: it detects candidate
+concentric-circle groups over the image and does not contain a configured
+fiducial pixel or ROI.
+
+Candidates are scored by the worst of the four markers, not merely by their
+mean. The score favors:
+
+- visible outer and inner rings for all four fiducials
+- radial symmetry and a stable common center
+- white-ring contrast against the black patch
+- low clipped-pixel fraction and low veiling glare
+- consistent center and template registration across duplicates
+- sufficient nearby tab-edge contrast for the following corner job
+
+Produced fact:
+
+- `camera.nozzle_cam.bed_fiducial.lighting_profile`
+
+The fact has role `acquisition_profile`, not `coordinate_system`, and stores
+only fixed camera and light settings. Candidate scores, detected ROIs, clipped
+fractions, and duplicate measurements remain diagnostics. Replacing this fact
+invalidates the bed-fiducial metric and every downstream consumer, because
+those analyses bind to the exact illumination under which their images were
+acquired.
+
+The job page makes the winner inspectable with a settings contact sheet, score
+table or heatmap, clipped-pixel masks, and full-frame overlays showing all four
+detected ring centers and their tight ROIs.
+
+#### 1b. Bed-fiducial Y/metric sweep
+
+Job type:
+
+```text
+nozzle_cam_bed_fiducial_y_metric
 ```
 
 Acquisition:
 
-- use fixed exposure and bed-tab lighting
+- use the accepted fixed bed-fiducial lighting profile
 - move commanded Y back and forth by known distances
-- capture the bed-tab edge or another textured patch rigidly attached to the
-  same reference
+- capture all four bed-attached fiducials at each position
 - include reversals so backlash or direction-dependent registration can be
   measured
-- no absolute feature detection is required
+- use the six-frame forward/reverse sequence `[0, 10, 20, 20, 10, 0] mm`
+- keep the same camera profile, exposure, gain, white balance, and light values
+  for all six frames
 
 Analysis:
 
-- select one good reference patch
-- align every other image to the reference with tight relative template
-  registration
-- fit pixel displacement against commanded Y
-- reject low-correlation matches, direction-dependent outliers, and patches
-  whose parallax differs from the bed-tab plane
+- find groups of four concentric-circle candidates consistent with a projective
+  image of an 8 x 8 mm square; do not hardcode their image location
+- use circle/ring detection only to initialize four tight ROIs
+- align each fiducial ROI through forward and reverse frame chains using
+  grayscale, CLAHE, and gradient registration
+- jointly fit the four marker centers, one local patch-plane homography, and
+  image displacement against commanded Y
+- use commanded +Y motion to resolve the signed printer-Y image vector
+- use the known square metric to recover local physical scale in both in-plane
+  directions without assuming that the glued patch is aligned to printer X/Y
+- retain the two possible printer-X signs; Stage 3 resolves the sign from
+  commanded X motion
+- compare the 8 mm printed dimensions with commanded-Y displacement as an
+  independent consistency check
+- reject low-correlation matches, clipped rings, glare-biased centers,
+  direction-dependent outliers, and stationary enclosure features
 
 Produced fact:
 
-- `camera.nozzle_cam.bed_tab.y_parallax_model`, containing the measured
-  two-dimensional image displacement per commanded Y millimetre plus concrete
-  quality measurements and artifact hashes
+- `camera.nozzle_cam.bed_fiducial.local_metric_model`, with role
+  `coordinate_system`, containing:
+  - the signed two-dimensional image displacement per printer +Y millimetre
+  - the local patch-mm-to-image-pixel homography at the reference capture
+  - the unresolved pair of possible printer-X image directions
+  - exact bindings to the installed physical reference and lighting profile
 
-Scalar scale, inverse scale, and angle are derived in reports. They are not
-published as redundant graph facts.
+Scalar scales, inverse scales, angles, correlations, residuals, and individual
+marker centers are shown in reports. Only the coordinate-defining model fields
+are displayed in the current-facts overview.
 
-These facts establish an image-space Y direction and local scale. They do not
-yet establish the image X direction or an absolute image origin.
+This fact establishes an absolute local bed-attached fiducial-plane metric and
+signed image-space Y direction. It does not establish an absolute image
+origin, the sign of printer X, or the print-plane Z relationship.
 
 ### 2. Bed-tab corner reference
 
@@ -220,32 +324,48 @@ nozzle_cam_bed_tab_corner
 
 Dependencies:
 
-- current accepted bed-tab Y/parallax facts
+- current accepted bed-fiducial local metric fact
 - current user-defined `bed.tab_corner.printer_xyz` prior
-- versioned tab-plane-to-print-plane Z relationship
+- current `bed.fiducial_patch.printer_z_mm` seed
 
 Acquisition:
 
 - capture several duplicates of the bed-tab corner at a fixed safe pose
-- use fixed lighting and exposure from the bed-tab target profile
+- keep the four installed fiducials and the tab corner in the same frame
+- use a separate bright, glare-friendly corner profile; the low-glare
+  fiducial profile is deliberately not reused because it hides the tab side
+  edge
+- the initial fixed corner setup is the `vision` camera profile with all eight
+  light pixels at `0.45`; this setting intentionally permits clipping and
+  specular glare where they strengthen the tab-edge geometry
+- record the exact corner camera profile and light values in the manifest and
+  applicability scope
 
 Analysis:
 
 - find the two tab edges and their intersection
 - use edge or line detection only for initial localization
-- refine the corner by registering duplicates to a selected reference image
+- predict the four-marker location from the accepted local metric model at the
+  exact corner-capture Y position; the bright corner image is not required to
+  re-detect all four low-glare fiducial rings
+- refine the corner by registering all bright duplicates to whichever frame
+  gives the strongest semantic tab-edge intersection
+- measure the corner relative to that observed patch rather than to a
+  hardcoded corner ROI
 - bind the observed corner pixel to the exact commanded Y coordinate of the
   corner capture
-- project the corner through the accepted Y mapping from that capture pose
+- project the corner through the accepted bed-plane metric from that capture
+  pose
 
 Produced facts:
 
 - `camera.nozzle_cam.partial_bed_coordinate_system`, which binds:
   - the observed corner pixel
   - the exact commanded Y at which that pixel was observed
-  - the accepted image Y-axis vector
+  - the accepted bed-fiducial local metric model
+  - the observed patch-to-corner transform
   - the exact user-prior fact ID
-  - the tab-plane-to-print-plane relationship
+  - the exact fiducial-plane printer-Z fact ID
 
 The observed pixel and the physical prior are deliberately different pieces of
 information. The prior Y identifies the physical corner in printer
@@ -256,7 +376,7 @@ the corner with:
 ```text
 corner_pixel_at_capture =
     observed_corner_pixel
-    + image_y_axis_vector_px_per_mm
+    + bed_metric.image_y_axis_vector_px_per_mm
       * (capture_y_mm - observed_corner_capture_y_mm)
 ```
 
@@ -264,9 +384,9 @@ Using the prior Y in place of `observed_corner_capture_y_mm` is invalid and
 shifts every downstream overlay by the difference between those Y values.
 
 At this point one pixel has an absolute bed X/Y identity, and the image Y basis
-is known because the pixel observation is bound to the user’s prior. The
-physical X coordinate of the tab corner is known, but the image X-axis
-direction and X scale are still unresolved.
+is known because the pixel observation is bound to the user’s prior. The local
+X scale is already known from the printed square, but the sign of printer X is
+still unresolved.
 
 ### 3. Coarse red-marker X sweeps
 
@@ -279,7 +399,7 @@ idex_tool_red_marker_x_sweep
 Dependencies:
 
 - current bed-tab corner facts
-- current bed-tab Y/parallax facts
+- current bed-fiducial local metric facts
 - current active calibration snapshot
 
 Acquisition:
@@ -299,6 +419,10 @@ Analysis:
 - retain detections with acceptable color, shape, and non-clipped bounds
 - fit the red-marker image trajectory against commanded X for each tool
 - compare T0 and T1 trajectory direction and scale
+- choose the printer +X sign from the two candidates in the accepted
+  bed-fiducial local metric model
+- compare the marker-derived X scale at commanded Z=2 with the
+  fiducial-plane metric as a parallax observation
 - project the trajectories relative to the bed-tab corner
 
 Produced facts:
@@ -423,7 +547,7 @@ idex_nozzle_fine_xz_grid
 
 Dependencies:
 
-- bed-tab Y/parallax facts
+- bed-fiducial local metric and lighting facts
 - bed-tab corner and bed reference-plane facts
 - red-marker X-axis and per-tool marker-offset facts
 - active and verified rough-X calibration snapshot
@@ -504,7 +628,8 @@ Jx(z) = Jx0 + Jxz * (z - z_ref)
 
 The bilinear term is the measured X parallax change with Z. The log-scale
 observable supplies an independent Z discriminator for the cross-tool solve.
-The bed-tab Y vector supplies the image direction for printer Y. The joint
+The bed-fiducial local metric supplies the image direction for printer Y and
+the observed fiducial-plane directional scale ratio. The joint
 three-observable solve yields one absolute nozzle pose for each tool relative
 to the bed-tab coordinate system. Their cross-tool difference is derived in
 reports from those two absolute poses; it is not stored as a second, redundant
@@ -513,32 +638,39 @@ graph fact and is not an endstop-correction fact.
 #### Bed-plane Z anchoring
 
 The original proposal was to declare nozzle Z=0 where the magnitude of the
-nozzle X scale equals the bed-tab Y scale. That equality is not generally valid
-for an oblique camera: the local image scale can differ by world direction even
-at one physical plane.
+nozzle X scale equals the old bed-tab Y scale. That equality is not generally
+valid for an oblique camera: the local image scale can differ by world
+direction even at one physical plane.
 
 Write the comparison explicitly as:
 
 ```text
-Sx_nozzle(z_zero) = Rxy_bed * Sy_bed
+Sx_nozzle(z_zero) = Sx_bed_print
+Sx_bed_print      = Rxy_bed_print * Sy_bed_print
 ```
 
-where `Rxy_bed = Sx_bed / Sy_bed` is a bed-plane directional scale ratio. The
-current graph measures `Sy_bed`, but it does not yet measure `Sx_bed`, so
-`Rxy_bed` is not known. Assuming `Rxy_bed=1` is permitted only as a diagnostic
-calculation and cannot publish the nozzle Z origin.
+The installed 8 x 8 mm square now measures both in-plane directions, so the
+bed-plane directional scale ratio is observed instead of assumed. The
+commanded Y sweep determines printer Y; the square's known Euclidean metric
+determines the perpendicular X scale; and the red-marker X sweep resolves its
+sign.
 
-The missing anchor can be supplied later by one of:
+The printed patch is attached to the underside of the bed rather than to the
+print surface. Its local metric is therefore measured at the fiducial plane.
+The user-known coordinate seed is:
 
-- a known physical X length on the bed tab, measured in the same images
-- a second bed-plane X reference point with a printer-coordinate prior
-- a camera-intrinsic/plane calibration that determines `Rxy_bed`
-- a direct vision bed/nozzle depth reference independent of scalar scale
-  equality
+- `bed.fiducial_patch.printer_z_mm = -0.6`
+- printer Z=0 is the bed print-reference plane
+- the derived displacement from the fiducial plane to the print plane is
+  therefore +0.6 mm
 
-Until one of these anchors is current and accepted, the job may publish the
-projection model but must not publish absolute nozzle Z or a deployable XYZ
-candidate.
+The fitted X-scale-versus-Z model transports the observed
+fiducial-plane metric to the print plane and solves the equation above. No
+assumption that X and Y scalar scales are equal is made.
+
+Absolute nozzle Z and deployable XYZ candidates must bind the exact current
+`bed.fiducial_patch.printer_z_mm` fact ID. Replacing that seed invalidates those
+downstream results.
 
 Produced coordinate-system facts:
 
@@ -554,42 +686,6 @@ outliers are diagnostic fields or analysis artifacts.
 This stage produces a fine calibration candidate only after both absolute
 per-tool nozzle facts are available. Activation remains a separate operation
 that records the exact fact sets used.
-
-#### Live planning survey, 2026-07-30
-
-The reproducible planning acquisition
-`20260730T134526.452210Z-stage5_live_survey` is visible under `/vision/`. It
-captured 18 fresh frames:
-
-- T0 and T1
-- X offsets `[10, 16, 25] mm` from the current bed-tab X
-- commanded Z `[1, 3, 5] mm`
-- fixed Y=`-14 mm`, fixed analysis profile and lighting
-
-The nozzle-face annulus is visible in all 18 frames. At X=`189 mm`, the
-observed nozzle ROI center is approximately `[+24, +100] px` from the T0 red
-marker and `[+24, +102] px` from the T1 marker. These are observations from
-this survey, not configured localizer coordinates.
-
-A 116×116 px annulus template registered within each tool with the following
-measured X scales:
-
-| Tool | Z=1 | Z=3 | Z=5 | fitted scale slope |
-| --- | ---: | ---: | ---: | ---: |
-| T0 | 9.557 px/mm | 9.312 px/mm | 9.140 px/mm | -0.1042 px/mm per mm Z |
-| T1 | 9.528 px/mm | 9.317 px/mm | 9.117 px/mm | -0.1028 px/mm per mm Z |
-
-The two independently fitted slopes agree closely, so the proposed parallax
-model is observable in these images. Core T0/T1 template correlations are
-approximately 0.72 around X=`183`–`189 mm`; the X=`198 mm` cross-tool images
-are weaker at approximately 0.4, although within-tool tracking remains usable.
-The final analyzer should therefore use the full X span for within-tool
-parallax but favor the central/core images for cross-tool alignment.
-
-The current bed-tab Y scale is approximately 10.502 px/mm. Setting
-`Rxy_bed=1` would extrapolate the two nozzle models to Z approximately
-`-8.2 mm` and `-8.5 mm`. This is a physically implausible result and confirms
-that raw X/Y scalar equality is not an acceptable bed-zero anchor.
 
 ### 6. Eddy lighting
 
@@ -730,6 +826,65 @@ These are the current authoritative prior values. Changing them does not
 mutate the existing fact: it publishes a new prior fact set and triggers normal
 downstream invalidation.
 
+### Installed bed-fiducial physical-reference fact
+
+The printed and attached square is also represented as an immutable seed fact:
+
+```yaml
+schema_version: 1
+fact_set_id: sha256:...
+status: accepted
+authoritative: true
+producer:
+  source: user_installed_physical_reference
+  recorded_at_utc: 2026-07-30T...
+applicability:
+  printer: menderpi
+facts:
+  - fact_id: sha256:...
+    fact_type: bed.fiducial_patch.physical_reference
+    role: coordinate_system
+    value:
+      pattern: four_concentric_circles
+      outer_diameter_mm: 3.0
+      centers_patch_xy_mm:
+        - [3.0, 3.0]
+        - [11.0, 3.0]
+        - [3.0, 11.0]
+        - [11.0, 11.0]
+      center_spacing_xy_mm: [8.0, 8.0]
+      substrate_plane: print_bed_underside
+      rigid_to: print_bed
+      installation_revision: 1
+      printed_scale_checked: true
+    source_artifacts:
+      svg: resources/vision_fiducials/bed_y_four_fiducials.svg
+      pdf: resources/vision_fiducials/bed_y_four_fiducials_a4.pdf
+      manifest: resources/vision_fiducials/bed_y_four_fiducials.json
+    coordinate_frame: fiducial_patch_xy
+  - fact_id: sha256:...
+    fact_type: bed.fiducial_patch.printer_z_mm
+    role: coordinate_system
+    value: -0.6
+    unit: mm
+    coordinate_frame: printer_z
+    definition:
+      bed_print_reference_plane_z_mm: 0.0
+      meaning: fiducial_plane_is_0.6_mm_below_print_plane
+    provenance:
+      entered_by: user
+      measurement_method: known_physical_bed_geometry
+```
+
+The fact defines geometry and physical identity, not image location. Removing,
+re-gluing, rotating, or replacing the patch requires a new installation
+revision even when the printed artwork is unchanged. The new fact then makes
+the lighting profile, bed metric, and all downstream consumers stale.
+
+The direct printer-Z fact records the known fiducial plane at `-0.6 mm`. The
+corresponding +0.6 mm displacement from the fiducial plane to the print plane
+is derived and is not published as a second, ambiguously signed fact.
+
 ### Job-type definition
 
 Job types should be registered declaratively, for example in
@@ -738,11 +893,11 @@ Job types should be registered declaratively, for example in
 ```yaml
 schema_version: 1
 job_type: idex_nozzle_fine_xz_grid
-definition_version: 5
+definition_version: 6
 acquisition_generator: vision_calibration:build_fine_xz_job
 analyzer: vision_calibration:analyze_fine_xz_job
 requires:
-  - fact_type: camera.nozzle_cam.bed_tab.y_parallax_model
+  - fact_type: camera.nozzle_cam.bed_fiducial.local_metric_model
     current: true
   - fact_type: camera.nozzle_cam.partial_bed_coordinate_system
     current: true
@@ -786,10 +941,10 @@ Extend the existing immutable `manifest.json` with fact bindings:
   "active_config_fingerprint": "sha256:...",
   "input_facts": [
     {
-      "requirement": "bed_y_model",
-      "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model",
+      "requirement": "bed_fiducial_metric",
+      "fact_name": "camera.nozzle_cam.bed_fiducial.local_metric_model",
       "fact_set_hash": "sha256:...",
-      "fact_definition_version": 5
+      "fact_definition_version": 1
     },
     {
       "requirement": "rough_x_active_snapshot",
@@ -878,7 +1033,9 @@ rebuildable index:
 {
   "schema_version": 1,
   "heads": {
-    "camera.nozzle_cam.bed_tab.y_parallax_model": "sha256:...",
+    "bed.fiducial_patch.physical_reference": "sha256:...",
+    "camera.nozzle_cam.bed_fiducial.lighting_profile": "sha256:...",
+    "camera.nozzle_cam.bed_fiducial.local_metric_model": "sha256:...",
     "bed.tab_corner.printer_xyz": "sha256:...",
     "tool.t1.nozzle_to_bed_tab_xyz_mm": "sha256:..."
   },
@@ -1043,16 +1200,24 @@ No page should silently apply calibration because analysis completed.
 
 - add the user-editable, versioned bed-tab corner XYZ prior; require explicit
   X/Y values and define Z as `0 mm`
-- implement the bed-tab Y/parallax sweep
+- publish the installed four-marker physical-reference fact from the checked
+  SVG/PDF geometry and installation revision
+- implement the compact coordinate-free bed-fiducial lighting sweep
+- implement the six-frame bed-fiducial Y/metric sweep
+- recover the local patch homography, signed printer-Y vector, both in-plane
+  scale magnitudes, and unresolved printer-X sign
 - implement bed-tab corner acquisition and duplicate registration
-- bind the observed corner pixel to the exact user-prior fact ID
-- add the remaining tab-plane-to-print-plane geometry seed facts
-- expose both stages and their dependency state in `/vision/`
+- bind the observed corner pixel and patch-relative transform to the exact
+  user-prior and metric fact IDs
+- publish the user-known `bed.fiducial_patch.printer_z_mm = -0.6` seed fact
+- expose lighting, metric, and corner stages and their dependency state in
+  `/vision/`
 
 ### 4. Implement and activate rough X
 
 - implement the sparse T0/T1 red-marker sweep
 - tolerate missing-marker images
+- resolve the printer-X sign left ambiguous by the symmetric four-marker square
 - calculate independent T0 and T1 corrections against the current
   `bed.tab_corner.printer_xyz` X coordinate
 - produce and explicitly apply one atomic candidate changing only
@@ -1067,6 +1232,8 @@ No page should silently apply calibration because analysis completed.
   snapshot
 - build pairwise tight-ROI registrations
 - solve the registration graph and camera model jointly
+- transport the observed fiducial-plane metric to printer Z=0 using the exact
+  physical plane-offset seed
 - publish nozzle/bed and T1-to-T0 facts with their measured fit-quality data
 
 ### 6. Implement Eddy geometry
@@ -1102,6 +1269,18 @@ Job tests:
 - generated frame order and G-code match each declared sweep
 - no frame is commanded below the job safety minimum
 - tool changes occur only at safe travel Z
+- the lighting sweep finds a low-glare fixed profile without a configured
+  fiducial pixel or ROI
+- lighting selection requires all four rings and scores the worst marker rather
+  than accepting three good markers and one clipped marker
+- four identical concentric-circle markers are grouped as an 8 x 8 mm square
+  under translation, rotation, perspective, and image-size changes
+- the bed metric recovers a known local homography and signed Y vector from the
+  six-frame forward/reverse sweep
+- the symmetric square leaves only the intended X-sign ambiguity, and the
+  commanded red-marker X sweep resolves it
+- stationary enclosure circles, glare blobs, clipped rings, and inconsistent
+  four-marker groups are rejected
 - missing red-marker frames are excluded without inventing detections
 - tight neighboring-image registration recovers synthetic X/Z transforms
 - outlier registration edges are rejected before model fitting
@@ -1112,6 +1291,11 @@ Job tests:
 - rough-X verification rejects a pair of mutually aligned markers when both
   differ from the expected `+10 mm` image-X offset from the bed-tab corner
 - fine correction signs are recovered correctly
+- absolute nozzle Z remains blocked if the required current
+  `bed.fiducial_patch.printer_z_mm` seed is absent
+- with the current `-0.6 mm` seed, the measured directional bed metric is
+  transported to Z=0
+  without assuming `Sx=Sy`
 - fine-model acceptance fails when the usable observations no longer span the
   declared minimum X and Z ranges
 - Eddy lighting and geometry facts invalidate only their true consumers
@@ -1120,6 +1304,10 @@ Provenance tests:
 
 - changing camera identity, image size, profile, CAD geometry hash, or active
   config fingerprint prevents accidental fact reuse
+- replacing or repositioning the installed fiducial patch makes its lighting,
+  bed metric, corner, and every downstream consumer stale
+- replacing the accepted bed-fiducial lighting profile invalidates the metric
+  and its consumers but does not mutate historical images
 - re-analysis preserves original manifest and input bindings
 - candidate YAML records exact old/new values and source fact IDs
 - activation records the generated live configuration fingerprint
@@ -1145,6 +1333,17 @@ UI tests:
 - The bed-tab corner printer XYZ is a user-defined initial prior; vision binds a
   pixel to it but does not invent its absolute coordinates.
 - The current bed-tab corner prior is `[173, -18, 0] mm`.
+- The current bed reference includes one physically scale-checked patch with
+  four 3 mm concentric-circle fiducials on an 8 x 8 mm center grid.
+- The patch's printed geometry is configuration; its glued pixel position and
+  rotation are always observed and never hardcoded.
+- Bed-fiducial lighting is calibrated before the Y/metric sweep, uses fixed
+  manual controls, and is independent of Eddy-fiducial lighting.
+- The fiducial square and commanded Y sweep establish the absolute local
+  bed-plane metric and printer +Y direction. The later red-marker sweep resolves
+  printer +X sign.
+- The underside fiducial plane is explicitly defined as printer `Z=-0.6 mm`,
+  relative to the bed print-reference plane at `Z=0`.
 - Changing the bed-tab prior invalidates rough X and every downstream fact.
 - The bed-tab reference is established before any tool calibration.
 - Rough X calibrates both T0 and T1 independently to the fixed bed-tab corner;

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 210 297" shape-rendering="geometricPrecision">
+  <title>1:1 bed Y fiducial print sheet</title>
+  <rect width="210" height="297" fill="#ffffff"/>
+  <svg id="fiducial-patch" x="30" y="30" width="14" height="14" viewBox="0 0 14 14" preserveAspectRatio="none">
+    <rect id="black-background" x="0" y="0" width="14" height="14" fill="#000000"/>
+    <g id="top_left" class="fiducial">
+      <circle class="outer-ring" cx="3" cy="3" r="1.35" fill="none" stroke="#ffffff" stroke-width="0.3"/>
+      <circle class="inner-ring" cx="3" cy="3" r="0.75" fill="none" stroke="#ffffff" stroke-width="0.25"/>
+      <circle class="center-dot" cx="3" cy="3" r="0.2" fill="#ffffff"/>
+    </g>
+    <g id="top_right" class="fiducial">
+      <circle class="outer-ring" cx="11" cy="3" r="1.35" fill="none" stroke="#ffffff" stroke-width="0.3"/>
+      <circle class="inner-ring" cx="11" cy="3" r="0.75" fill="none" stroke="#ffffff" stroke-width="0.25"/>
+      <circle class="center-dot" cx="11" cy="3" r="0.2" fill="#ffffff"/>
+    </g>
+    <g id="bottom_left" class="fiducial">
+      <circle class="outer-ring" cx="3" cy="11" r="1.35" fill="none" stroke="#ffffff" stroke-width="0.3"/>
+      <circle class="inner-ring" cx="3" cy="11" r="0.75" fill="none" stroke="#ffffff" stroke-width="0.25"/>
+      <circle class="center-dot" cx="3" cy="11" r="0.2" fill="#ffffff"/>
+    </g>
+    <g id="bottom_right" class="fiducial">
+      <circle class="outer-ring" cx="11" cy="11" r="1.35" fill="none" stroke="#ffffff" stroke-width="0.3"/>
+      <circle class="inner-ring" cx="11" cy="11" r="0.75" fill="none" stroke="#ffffff" stroke-width="0.25"/>
+      <circle class="center-dot" cx="11" cy="11" r="0.2" fill="#ffffff"/>
+    </g>
+  </svg>
+  <g id="crop-marks" stroke="#000000" stroke-width="0.2">
+    <line x1="27.5" y1="30" x2="29.3" y2="30"/>
+    <line x1="30" y1="27.5" x2="30" y2="29.3"/>
+    <line x1="44.7" y1="30" x2="46.5" y2="30"/>
+    <line x1="44" y1="27.5" x2="44" y2="29.3"/>
+    <line x1="27.5" y1="44" x2="29.3" y2="44"/>
+    <line x1="30" y1="44.7" x2="30" y2="46.5"/>
+    <line x1="44.7" y1="44" x2="46.5" y2="44"/>
+    <line x1="44" y1="44.7" x2="44" y2="46.5"/>
+  </g>
+  <text x="30" y="51" font-family="Arial, sans-serif" font-size="4" font-weight="700">Bed Y fiducials - 1:1</text>
+  <text x="30" y="56" font-family="Arial, sans-serif" font-size="3">Four 3 mm markers; centers form an 8 x 8 mm square.</text>
+  <text x="30" y="61" font-family="Arial, sans-serif" font-size="3">Print at 100% / actual size. Disable fit-to-page and scaling.</text>
+  <g id="calibration-rulers" fill="none" stroke="#000000">
+    <path d="M 30 72 h 50 m -50 -2 v 4 m 50 -4 v 4" stroke-width="0.35"/>
+    <path d="M 30 86 h 8 m -8 -1.5 v 3 m 8 -3 v 3" stroke-width="0.25"/>
+  </g>
+  <text x="55" y="77" font-family="Arial, sans-serif" font-size="3" text-anchor="middle">50 mm print-scale check</text>
+  <text x="34" y="91" font-family="Arial, sans-serif" font-size="3" text-anchor="middle">8 mm</text>
+</svg>

@@ -18,8 +18,8 @@ required_files=(
   vision_capture.py
   vision_calibration.py
   vision_calibration_graph.py
-  vision_bed_tab_y_scale.py
-  vision_bed_tab_corner.py
+  vision_bed_fiducial.py
+  vision_nozzle_fine_xz.py
   vision_red_marker_x_sweep.py
   vision_rough_x_verification.py
   vision_job_types.json
@@ -79,8 +79,8 @@ scp \
   "${FILES_DIR}/vision_capture.py" \
   "${FILES_DIR}/vision_calibration.py" \
   "${FILES_DIR}/vision_calibration_graph.py" \
-  "${FILES_DIR}/vision_bed_tab_y_scale.py" \
-  "${FILES_DIR}/vision_bed_tab_corner.py" \
+  "${FILES_DIR}/vision_bed_fiducial.py" \
+  "${FILES_DIR}/vision_nozzle_fine_xz.py" \
   "${FILES_DIR}/vision_red_marker_x_sweep.py" \
   "${FILES_DIR}/vision_rough_x_verification.py" \
   "${FILES_DIR}/vision_job_types.json" \
@@ -142,7 +142,7 @@ PY
     vision-capture-nozzle-cam.service \
     vision-framebuffer.service \
     vision-framebuffer-nozzle-cam.service
-  python3 - <<'PY'
+  sudo python3 - <<'PY'
 import shutil
 from pathlib import Path
 
@@ -210,8 +210,8 @@ sudo install -m 0755 "${REMOTE_TMP}/vision_framebuffer.py" /usr/local/bin/vision
 sudo install -m 0755 "${REMOTE_TMP}/vision_capture.py" /usr/local/bin/vision_capture.py
 sudo install -m 0755 "${REMOTE_TMP}/vision_calibration.py" /usr/local/bin/vision_calibration.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_calibration_graph.py" /usr/local/bin/vision_calibration_graph.py
-sudo install -m 0644 "${REMOTE_TMP}/vision_bed_tab_y_scale.py" /usr/local/bin/vision_bed_tab_y_scale.py
-sudo install -m 0644 "${REMOTE_TMP}/vision_bed_tab_corner.py" /usr/local/bin/vision_bed_tab_corner.py
+sudo install -m 0644 "${REMOTE_TMP}/vision_bed_fiducial.py" /usr/local/bin/vision_bed_fiducial.py
+sudo install -m 0644 "${REMOTE_TMP}/vision_nozzle_fine_xz.py" /usr/local/bin/vision_nozzle_fine_xz.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_red_marker_x_sweep.py" /usr/local/bin/vision_red_marker_x_sweep.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_rough_x_verification.py" /usr/local/bin/vision_rough_x_verification.py
 sudo install -m 0755 "${REMOTE_TMP}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py

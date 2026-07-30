@@ -42,14 +42,18 @@ PROFILE_REMOTE_METHOD = os.environ.get(
 PROFILE_REMOTE_ACTION = os.environ.get(
     "VISION_PROFILE_REMOTE_ACTION", "run_nozzle_cam_profile"
 )
-CALIBRATION_REMOTE_METHOD = "idex_bed_tab_y_scale_calibrate"
-CALIBRATION_REMOTE_ACTION = "run_idex_bed_tab_y_scale_calibrate"
+LIGHTING_CALIBRATION_REMOTE_METHOD = "idex_bed_fiducial_lighting_calibrate"
+LIGHTING_CALIBRATION_REMOTE_ACTION = "run_idex_bed_fiducial_lighting_calibrate"
+METRIC_CALIBRATION_REMOTE_METHOD = "idex_bed_fiducial_metric_calibrate"
+METRIC_CALIBRATION_REMOTE_ACTION = "run_idex_bed_fiducial_metric_calibrate"
 CORNER_CALIBRATION_REMOTE_METHOD = "idex_bed_tab_corner_calibrate"
 CORNER_CALIBRATION_REMOTE_ACTION = "run_idex_bed_tab_corner_calibrate"
 RED_MARKER_CALIBRATION_REMOTE_METHOD = "idex_red_marker_x_sweep_calibrate"
 RED_MARKER_CALIBRATION_REMOTE_ACTION = "run_idex_red_marker_x_sweep_calibrate"
 ROUGH_X_VERIFY_REMOTE_METHOD = "idex_rough_tool_x_verify"
 ROUGH_X_VERIFY_REMOTE_ACTION = "run_idex_rough_tool_x_verify"
+FINE_NOZZLE_REMOTE_METHOD = "idex_nozzle_fine_xz_calibrate"
+FINE_NOZZLE_REMOTE_ACTION = "run_idex_nozzle_fine_xz_calibrate"
 CALIBRATION_BIN = os.environ.get(
     "VISION_CALIBRATION_BIN", "/usr/local/bin/vision_calibration.py"
 )
@@ -420,7 +424,8 @@ class VisionJobApi:
         if manifest.get("schema_version") != 1:
             raise CaptureError("unsupported acquisition manifest schema_version")
         if manifest.get("job_type") not in (
-            "nozzle_cam_bed_tab_y_scale",
+            "nozzle_cam_bed_fiducial_lighting_sweep",
+            "nozzle_cam_bed_fiducial_y_metric",
             "nozzle_cam_bed_tab_corner",
             "idex_tool_red_marker_x_sweep",
             "idex_rough_tool_x_verify",
@@ -579,7 +584,8 @@ class VisionJobApi:
             )
         if params.get("camera") != manifest["camera"]:
             raise CaptureError("camera is inconsistent with manifest")
-        if params.get("profile") != manifest["profile"]:
+        frame_profile = frame["profile"]
+        if params.get("profile") != frame_profile:
             raise CaptureError("profile is inconsistent with manifest")
         if params.get("tool") != frame["tool"]:
             raise CaptureError("tool is inconsistent with manifest")
@@ -594,14 +600,14 @@ class VisionJobApi:
             _discarded_path, discarded_metadata = wait_for_new_frame(
                 previous_seq,
                 timeout=self.request_timeout,
-                profile=manifest["profile"],
+                profile=frame_profile,
             )
             previous_seq = framebuffer_seq(discarded_metadata)
             discarded_framebuffer_sequences.append(previous_seq)
         source_path, source_metadata = wait_for_new_frame(
             previous_seq,
             timeout=self.request_timeout,
-            profile=manifest["profile"],
+            profile=frame_profile,
         )
         temporary_image = frames_dir / f".{frame['frame']}.tmp.jpg"
         shutil.copyfile(source_path, temporary_image)
@@ -758,13 +764,13 @@ class KlippyRemoteDaemon:
                     profile = sanitize_profile(params.get("profile") or DEFAULT_PROFILE)
                     request_framebuffer_profile(profile)
                     wait_for_active_profile(profile, VISIOND_TIMEOUT)
-                elif action == CALIBRATION_REMOTE_ACTION:
+                elif action == LIGHTING_CALIBRATION_REMOTE_ACTION:
                     command = [
                         CALIBRATION_BIN,
                         "run",
-                        "nozzle_cam_bed_tab_y_scale",
+                        "nozzle_cam_bed_fiducial_lighting_sweep",
                         "--name",
-                        sanitize_name(params.get("name", "bed_tab_y_scale")),
+                        sanitize_name(params.get("name", "bed_fiducial_lighting")),
                     ]
                     fingerprint = str(params.get("active_config_fingerprint") or "")
                     if fingerprint:
@@ -781,7 +787,34 @@ class KlippyRemoteDaemon:
                         log(result.stdout.strip())
                     if result.returncode:
                         raise CaptureError(
-                            result.stderr.strip() or "bed-tab Y calibration job failed"
+                            result.stderr.strip()
+                            or "bed-fiducial lighting calibration job failed"
+                        )
+                elif action == METRIC_CALIBRATION_REMOTE_ACTION:
+                    command = [
+                        CALIBRATION_BIN,
+                        "run",
+                        "nozzle_cam_bed_fiducial_y_metric",
+                        "--name",
+                        sanitize_name(params.get("name", "bed_fiducial_metric")),
+                    ]
+                    fingerprint = str(params.get("active_config_fingerprint") or "")
+                    if fingerprint:
+                        command.extend(["--expected-fingerprint", fingerprint])
+                    result = subprocess.run(
+                        command,
+                        check=False,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        timeout=300,
+                    )
+                    if result.stdout.strip():
+                        log(result.stdout.strip())
+                    if result.returncode:
+                        raise CaptureError(
+                            result.stderr.strip()
+                            or "bed-fiducial metric calibration job failed"
                         )
                 elif action == CORNER_CALIBRATION_REMOTE_ACTION:
                     command = [
@@ -861,6 +894,32 @@ class KlippyRemoteDaemon:
                             result.stderr.strip()
                             or "rough-X verification job failed"
                         )
+                elif action == FINE_NOZZLE_REMOTE_ACTION:
+                    command = [
+                        CALIBRATION_BIN,
+                        "run",
+                        "idex_nozzle_fine_xz_grid",
+                        "--name",
+                        sanitize_name(params.get("name", "fine_nozzle_xz")),
+                    ]
+                    fingerprint = str(params.get("active_config_fingerprint") or "")
+                    if fingerprint:
+                        command.extend(["--expected-fingerprint", fingerprint])
+                    result = subprocess.run(
+                        command,
+                        check=False,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        timeout=600,
+                    )
+                    if result.stdout.strip():
+                        log(result.stdout.strip())
+                    if result.returncode:
+                        raise CaptureError(
+                            result.stderr.strip()
+                            or "fine nozzle X/Z calibration job failed"
+                        )
                 else:
                     raise CaptureError(f"unknown queued action {action}")
             except Exception as exc:
@@ -895,7 +954,14 @@ class KlippyRemoteDaemon:
             self._register_method(sock, PROFILE_REMOTE_METHOD, PROFILE_REMOTE_ACTION)
         if REGISTER_CALIBRATION:
             self._register_method(
-                sock, CALIBRATION_REMOTE_METHOD, CALIBRATION_REMOTE_ACTION
+                sock,
+                LIGHTING_CALIBRATION_REMOTE_METHOD,
+                LIGHTING_CALIBRATION_REMOTE_ACTION,
+            )
+            self._register_method(
+                sock,
+                METRIC_CALIBRATION_REMOTE_METHOD,
+                METRIC_CALIBRATION_REMOTE_ACTION,
             )
             self._register_method(
                 sock,
@@ -912,15 +978,22 @@ class KlippyRemoteDaemon:
                 ROUGH_X_VERIFY_REMOTE_METHOD,
                 ROUGH_X_VERIFY_REMOTE_ACTION,
             )
+            self._register_method(
+                sock,
+                FINE_NOZZLE_REMOTE_METHOD,
+                FINE_NOZZLE_REMOTE_ACTION,
+            )
 
     def _handle_message(self, message: dict[str, Any]) -> None:
         action = message.get("action")
         valid = {REMOTE_ACTION, PROFILE_REMOTE_ACTION}
         if REGISTER_CALIBRATION:
-            valid.add(CALIBRATION_REMOTE_ACTION)
+            valid.add(LIGHTING_CALIBRATION_REMOTE_ACTION)
+            valid.add(METRIC_CALIBRATION_REMOTE_ACTION)
             valid.add(CORNER_CALIBRATION_REMOTE_ACTION)
             valid.add(RED_MARKER_CALIBRATION_REMOTE_ACTION)
             valid.add(ROUGH_X_VERIFY_REMOTE_ACTION)
+            valid.add(FINE_NOZZLE_REMOTE_ACTION)
         if action not in valid:
             return
         params = message.get("params") or {}

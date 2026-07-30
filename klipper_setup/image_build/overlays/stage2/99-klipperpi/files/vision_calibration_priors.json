@@ -4,9 +4,9 @@
   "seeds": [
     {
       "name": "bed.tab_corner.printer_xyz",
-      "definition_version": 4,
-      "revision": 2,
-      "recorded_at_utc": "2026-07-30T11:28:46+00:00",
+      "definition_version": 1,
+      "revision": 1,
+      "recorded_at_utc": "2026-07-30T00:00:00+00:00",
       "role": "coordinate_system",
       "value_items": [
         {
@@ -19,23 +19,60 @@
         }
       ],
       "value": {
-        "xyz_mm": [
-          173.0,
-          -18.0,
-          0.0
-        ],
+        "xyz_mm": [173.0, -18.0, 0.0],
         "measurement_method": "user_defined_fixed_reference"
       }
     },
     {
-      "name": "bed.reference_plane.tab_to_print_plane_z_mm",
-      "definition_version": 4,
+      "name": "bed.fiducial_patch.physical_reference",
+      "definition_version": 1,
       "revision": 1,
       "recorded_at_utc": "2026-07-30T00:00:00+00:00",
       "role": "coordinate_system",
       "value_items": [
         {
-          "field": "z_offset_mm",
+          "field": "pattern",
+          "role": "diagnostic"
+        },
+        {
+          "field": "outer_diameter_mm",
+          "role": "coordinate_system"
+        },
+        {
+          "field": "center_spacing_xy_mm",
+          "role": "coordinate_system"
+        },
+        {
+          "field": "centers_patch_xy_mm",
+          "role": "coordinate_system"
+        },
+        {
+          "field": "installation_revision",
+          "role": "diagnostic"
+        },
+        {
+          "field": "printed_scale_checked",
+          "role": "diagnostic"
+        }
+      ],
+      "value": {
+        "pattern": "four_concentric_circles",
+        "outer_diameter_mm": 3.0,
+        "center_spacing_xy_mm": [8.0, 8.0],
+        "centers_patch_xy_mm": [[3.0, 3.0], [11.0, 3.0], [3.0, 11.0], [11.0, 11.0]],
+        "installation_revision": 1,
+        "printed_scale_checked": true
+      }
+    },
+    {
+      "name": "bed.fiducial_patch.printer_z_mm",
+      "definition_version": 1,
+      "revision": 1,
+      "recorded_at_utc": "2026-07-30T00:00:00+00:00",
+      "role": "coordinate_system",
+      "value_items": [
+        {
+          "field": "z_mm",
           "role": "coordinate_system"
         },
         {
@@ -44,8 +81,8 @@
         }
       ],
       "value": {
-        "z_offset_mm": 0.0,
-        "definition": "bed_tab_corner_z_is_the_print_reference_plane"
+        "z_mm": -0.6,
+        "definition": "fiducial_plane_in_printer_z_with_print_reference_plane_at_zero"
       }
     }
   ]

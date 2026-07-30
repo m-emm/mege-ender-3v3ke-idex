@@ -89,10 +89,11 @@ Rebuild the catalog and UI with:
 /usr/local/bin/vision_calibration.py rebuild-catalog
 ```
 
-Run the first relative bed-tab Y/parallax job with:
+Run the first live bed-fiducial stages with:
 
 ```bash
-/usr/local/bin/vision_calibration.py run nozzle_cam_bed_tab_y_scale --name bed_tab_y_scale
+/usr/local/bin/vision_calibration.py run nozzle_cam_bed_fiducial_lighting_sweep --name bed_fiducial_lighting
+/usr/local/bin/vision_calibration.py run nozzle_cam_bed_fiducial_y_metric --name bed_fiducial_metric
 ```
 
 The generated files live at:

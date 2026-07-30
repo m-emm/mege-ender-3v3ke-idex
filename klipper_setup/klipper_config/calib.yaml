@@ -3,11 +3,11 @@ bed_grid_zero:
   y: 107.000
 tools:
   t0:
-    x_endstop: -81.047
+    x_endstop: -78.016
     y_endstop: -14.800
     z_endstop: 293.750
   t1:
-    x_endstop: 346.959
+    x_endstop: 350.161
     y_endstop: -15.820
     z_endstop: 293.650
 eddy_relative_calibration:
