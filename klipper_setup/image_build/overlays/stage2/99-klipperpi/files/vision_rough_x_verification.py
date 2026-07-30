@@ -84,6 +84,26 @@ def _projection_mm(
     return float(np.dot(point - corner, unit_x) / scale)
 
 
+def _image_x_representation_spread_px(
+    registration: dict[str, Any], unit_x: np.ndarray
+) -> float:
+    projections = [
+        float(
+            np.dot(
+                np.asarray(
+                    registration["representations"][name]["combined_shift_px"],
+                    dtype=float,
+                ),
+                unit_x,
+            )
+        )
+        for name in registration.get("usable_representations", [])
+    ]
+    if len(projections) < 2:
+        return 0.0
+    return max(projections) - min(projections)
+
+
 def _select_candidate(
     candidates: list[dict[str, Any]],
     *,
@@ -325,6 +345,9 @@ def analyze(
             _representations(images[1]),
             t1_search_center,
         )
+        registration["image_x_representation_spread_px"] = (
+            _image_x_representation_spread_px(registration, unit_x)
+        )
         registered_t1_center = t0_center + np.asarray(
             registration["shift_px"], dtype=float
         )
@@ -339,10 +362,12 @@ def analyze(
         if registration["minimum_correlation"] < MIN_CROSS_TOOL_CORRELATION:
             reasons.append("cross-tool marker registration correlation is too low")
         if (
-            registration["representation_spread_px"]
+            registration["image_x_representation_spread_px"]
             > MAX_REPRESENTATION_SPREAD_PX
         ):
-            reasons.append("grayscale and CLAHE marker registrations disagree")
+            reasons.append(
+                "grayscale and CLAHE image-X marker registrations disagree"
+            )
         if (
             registration["maximum_forward_reverse_disagreement_px"]
             > MAX_FORWARD_REVERSE_DISAGREEMENT_PX

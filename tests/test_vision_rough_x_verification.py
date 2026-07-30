@@ -142,3 +142,20 @@ def test_rejects_missing_marker(tmp_path):
 
     assert not result["accepted"]
     assert any("red marker was not found" in reason for reason in result["reasons"])
+
+
+def test_registration_spread_ignores_tool_appearance_shift_normal_to_image_x():
+    module = _module()
+    registration = {
+        "usable_representations": ["gray", "clahe"],
+        "representations": {
+            "gray": {"combined_shift_px": [2.0, 6.0]},
+            "clahe": {"combined_shift_px": [2.3, 11.0]},
+        },
+    }
+
+    spread = module._image_x_representation_spread_px(
+        registration, np.asarray([1.0, 0.0])
+    )
+
+    assert spread == pytest.approx(0.3)
