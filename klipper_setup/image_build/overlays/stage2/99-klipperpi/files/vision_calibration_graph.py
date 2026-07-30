@@ -19,6 +19,11 @@ ANALYSIS_SCHEMA = "vision-calibration-analysis"
 MANIFEST_SCHEMA = "vision-calibration-acquisition-manifest"
 REGISTRY_SCHEMA = "vision-calibration-job-registry"
 FACT_ROLES = {"coordinate_system", "diagnostic"}
+ROLE_AWARE_FACT_DEFINITION_VERSIONS = {4, 5}
+PRIOR_FACT_NAMES = {
+    "bed.tab_corner.printer_xyz",
+    "bed.reference_plane.tab_to_print_plane_z_mm",
+}
 
 
 class CalibrationGraphError(RuntimeError):
@@ -123,8 +128,10 @@ def validate_registry(record: Any) -> dict[str, Any]:
         job_types["nozzle_cam_bed_tab_y_scale"],
         "registry.job_types.nozzle_cam_bed_tab_y_scale",
     )
-    if definition.get("definition_version") != 4:
-        raise CalibrationGraphError("job definition_version must be 4")
+    if definition.get("definition_version") != 5:
+        raise CalibrationGraphError("bed-tab Y definition_version must be 5")
+    if definition.get("fact_definition_version") != 5:
+        raise CalibrationGraphError("bed-tab Y fact definition_version must be 5")
     if definition.get("publish_on_accept") is not True:
         raise CalibrationGraphError(
             "bed-tab Y job must publish accepted facts immediately"
@@ -142,8 +149,10 @@ def validate_registry(record: Any) -> dict[str, Any]:
         job_types["nozzle_cam_bed_tab_corner"],
         "registry.job_types.nozzle_cam_bed_tab_corner",
     )
-    if corner.get("definition_version") != 2:
-        raise CalibrationGraphError("bed-tab corner definition_version must be 2")
+    if corner.get("definition_version") != 5:
+        raise CalibrationGraphError("bed-tab corner definition_version must be 5")
+    if corner.get("fact_definition_version") != 5:
+        raise CalibrationGraphError("bed-tab corner fact definition_version must be 5")
     if corner.get("publish_on_accept") is not True:
         raise CalibrationGraphError(
             "bed-tab corner job must publish accepted facts immediately"
@@ -154,14 +163,17 @@ def validate_registry(record: Any) -> dict[str, Any]:
         {
             "requirement": "bed_y_model",
             "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model",
+            "fact_definition_version": 5,
         },
         {
             "requirement": "bed_tab_corner_prior",
             "fact_name": "bed.tab_corner.printer_xyz",
+            "fact_definition_version": 4,
         },
         {
             "requirement": "tab_plane_z",
             "fact_name": "bed.reference_plane.tab_to_print_plane_z_mm",
+            "fact_definition_version": 4,
         },
     ]:
         raise CalibrationGraphError("bed-tab corner has invalid fact requirements")
@@ -182,8 +194,10 @@ def validate_registry(record: Any) -> dict[str, Any]:
         job_types["idex_tool_red_marker_x_sweep"],
         "registry.job_types.idex_tool_red_marker_x_sweep",
     )
-    if red_marker.get("definition_version") != 1:
-        raise CalibrationGraphError("red-marker sweep definition_version must be 1")
+    if red_marker.get("definition_version") != 5:
+        raise CalibrationGraphError("red-marker sweep definition_version must be 5")
+    if red_marker.get("fact_definition_version") != 5:
+        raise CalibrationGraphError("red-marker fact definition_version must be 5")
     if red_marker.get("publish_on_accept") is not True:
         raise CalibrationGraphError(
             "red-marker sweep must publish accepted facts immediately"
@@ -203,10 +217,12 @@ def validate_registry(record: Any) -> dict[str, Any]:
         {
             "requirement": "partial_bed_coordinate_system",
             "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system",
+            "fact_definition_version": 5,
         },
         {
             "requirement": "bed_y_model",
             "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model",
+            "fact_definition_version": 5,
         },
     ]:
         raise CalibrationGraphError("red-marker sweep has invalid fact requirements")
@@ -220,9 +236,13 @@ def validate_registry(record: Any) -> dict[str, Any]:
         job_types["idex_rough_tool_x_verify"],
         "registry.job_types.idex_rough_tool_x_verify",
     )
-    if verification.get("definition_version") != 1:
+    if verification.get("definition_version") != 5:
         raise CalibrationGraphError(
-            "rough-X verification definition_version must be 1"
+            "rough-X verification definition_version must be 5"
+        )
+    if verification.get("fact_definition_version") != 5:
+        raise CalibrationGraphError(
+            "rough-X verification fact definition_version must be 5"
         )
     if verification.get("publish_on_accept") is not True:
         raise CalibrationGraphError(
@@ -243,14 +263,17 @@ def validate_registry(record: Any) -> dict[str, Any]:
         {
             "requirement": "partial_bed_coordinate_system",
             "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system",
+            "fact_definition_version": 5,
         },
         {
             "requirement": "image_x_axis",
             "fact_name": "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
+            "fact_definition_version": 5,
         },
         {
             "requirement": "rough_x_active_snapshot",
             "fact_name": "calibration.rough_tool_x.active_snapshot",
+            "fact_definition_version": 5,
         },
     ]:
         raise CalibrationGraphError(
@@ -282,35 +305,22 @@ def validate_manifest(record: Any) -> dict[str, Any]:
         raise CalibrationGraphError("manifest.camera must be nozzle_cam")
     frames = _require_list(record.get("frames"), "manifest.frames")
     if job_type == "nozzle_cam_bed_tab_y_scale":
-        motion_contracts = {
-            1: [0, 5, 10, 15, 20, 15, 10, 5, 0],
-            2: [0, 10, 20, 20, 10, 0],
-            3: [0, 10, 20, 20, 10, 0],
-            4: [0, 10, 20, 20, 10, 0],
-        }
-        if definition_version not in motion_contracts:
+        if definition_version != 5:
             raise CalibrationGraphError(
-                "manifest.definition_version must be a known native definition"
+                "bed-tab Y manifest definition_version must be 5"
             )
-        if (
-            definition_version in (2, 3, 4)
-            and record.get("publish_on_accept") is not True
-        ):
+        if record.get("publish_on_accept") is not True:
             raise CalibrationGraphError(
-                "definition-v2/v3/v4 bed-tab Y manifests must publish on acceptance"
+                "bed-tab Y manifest must publish on acceptance"
             )
-        localizer_contracts = {
-            3: {"kind": "horizontal_moving_edge", "version": 1},
-            4: {"kind": "bed_tab_top_edge", "version": 1},
-        }
-        if (
-            definition_version in localizer_contracts
-            and record.get("localizer") != localizer_contracts[definition_version]
-        ):
+        if record.get("localizer") != {
+            "kind": "bed_tab_top_edge",
+            "version": 1,
+        }:
             raise CalibrationGraphError(
-                f"definition-v{definition_version} manifest has an invalid edge localizer"
+                "bed-tab Y manifest has an invalid edge localizer"
             )
-        expected_offsets = motion_contracts[definition_version]
+        expected_offsets = [0, 10, 20, 20, 10, 0]
         if len(frames) != len(expected_offsets) or record.get("frame_count") != len(
             expected_offsets
         ):
@@ -320,9 +330,9 @@ def validate_manifest(record: Any) -> dict[str, Any]:
         if [frame.get("y_offset_mm") for frame in frames] != expected_offsets:
             raise CalibrationGraphError("manifest has an invalid Y motion order")
     elif job_type == "nozzle_cam_bed_tab_corner":
-        if definition_version not in (1, 2):
+        if definition_version != 5:
             raise CalibrationGraphError(
-                "bed-tab corner manifest definition_version must be 1 or 2"
+                "bed-tab corner manifest definition_version must be 5"
             )
         if record.get("publish_on_accept") is not True:
             raise CalibrationGraphError(
@@ -341,11 +351,11 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             )
         if [frame.get("duplicate_index") for frame in frames] != list(range(5)):
             raise CalibrationGraphError("bed-tab corner duplicate order is invalid")
-        if definition_version == 2 and any(
+        if any(
             frame.get("discard_fresh_frames") != 1 for frame in frames
         ):
             raise CalibrationGraphError(
-                "definition-v2 bed-tab corner frames must discard one fresh frame"
+                "current bed-tab corner frames must discard one fresh frame"
             )
         positions = [frame.get("commanded_position_mm") for frame in frames]
         if not positions or any(position != positions[0] for position in positions):
@@ -371,10 +381,21 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             )
         for binding in normalized_input_facts:
             _require_string(binding.get("fact_set_hash"), "input fact_set_hash")
-    elif job_type == "idex_tool_red_marker_x_sweep":
-        if definition_version != 1:
+        if {
+            item["requirement"]: item.get("fact_definition_version")
+            for item in normalized_input_facts
+        } != {
+            "bed_y_model": 5,
+            "bed_tab_corner_prior": 4,
+            "tab_plane_z": 4,
+        }:
             raise CalibrationGraphError(
-                "red-marker manifest definition_version must be 1"
+                "bed-tab corner has invalid input fact versions"
+            )
+    elif job_type == "idex_tool_red_marker_x_sweep":
+        if definition_version != 5:
+            raise CalibrationGraphError(
+                "red-marker manifest definition_version must be 5"
             )
         if record.get("publish_on_accept") is not True:
             raise CalibrationGraphError(
@@ -423,6 +444,16 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             )
         for binding in normalized_input_facts:
             _require_string(binding.get("fact_set_hash"), "input fact_set_hash")
+        if {
+            item["requirement"]: item.get("fact_definition_version")
+            for item in normalized_input_facts
+        } != {
+            "partial_bed_coordinate_system": 5,
+            "bed_y_model": 5,
+        }:
+            raise CalibrationGraphError(
+                "red-marker manifest has invalid input fact versions"
+            )
         snapshot = _require_mapping(
             record.get("active_calibration_snapshot"),
             "manifest.active_calibration_snapshot",
@@ -433,9 +464,9 @@ def validate_manifest(record: Any) -> dict[str, Any]:
                     f"red-marker active calibration snapshot lacks {key}"
                 )
     else:
-        if definition_version != 1:
+        if definition_version != 5:
             raise CalibrationGraphError(
-                "rough-X verification manifest definition_version must be 1"
+                "rough-X verification manifest definition_version must be 5"
             )
         if record.get("publish_on_accept") is not True:
             raise CalibrationGraphError(
@@ -494,6 +525,17 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             )
         for binding in normalized_input_facts:
             _require_string(binding.get("fact_set_hash"), "input fact_set_hash")
+        if {
+            item["requirement"]: item.get("fact_definition_version")
+            for item in normalized_input_facts
+        } != {
+            "partial_bed_coordinate_system": 5,
+            "image_x_axis": 5,
+            "rough_x_active_snapshot": 5,
+        }:
+            raise CalibrationGraphError(
+                "rough-X verification has invalid input fact versions"
+            )
     for seq, frame_value in enumerate(frames):
         frame = _require_mapping(frame_value, f"manifest.frames[{seq}]")
         if frame.get("seq") != seq:
@@ -551,7 +593,20 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
             fact.get("value"), f"fact_set.facts[{fact_index}].value"
         )
         fact_definition_version = fact.get("definition_version")
-        if fact_definition_version == 4:
+        if fact_definition_version not in ROLE_AWARE_FACT_DEFINITION_VERSIONS:
+            raise CalibrationGraphError(
+                "fact definition_version must be 4 for retained priors or 5 "
+                "for the current calibration chain"
+            )
+        if (
+            fact_definition_version == 4
+            and fact_name not in PRIOR_FACT_NAMES
+        ):
+            raise CalibrationGraphError(
+                "definition-v4 facts are reserved for retained calibration priors"
+            )
+        declared_roles: dict[str, str] = {}
+        if fact_definition_version in ROLE_AWARE_FACT_DEFINITION_VERSIONS:
             fact_role = _require_string(
                 fact.get("role"), f"fact_set.facts[{fact_index}].role"
             )
@@ -563,7 +618,6 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                 fact.get("value_items"),
                 f"fact_set.facts[{fact_index}].value_items",
             )
-            declared_roles: dict[str, str] = {}
             for item_index, item_value in enumerate(value_items):
                 item = _require_mapping(
                     item_value,
@@ -615,7 +669,7 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                     "axis vector must contain two numeric values"
                 )
             if (
-                fact_definition_version == 4
+                fact_definition_version in ROLE_AWARE_FACT_DEFINITION_VERSIONS
                 and declared_roles.get("axis_vector_px_per_mm") != "coordinate_system"
             ):
                 raise CalibrationGraphError(
@@ -636,7 +690,7 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                         f"partial bed {field} must contain {length} numeric values"
                     )
                 if (
-                    fact_definition_version == 4
+                    fact_definition_version in ROLE_AWARE_FACT_DEFINITION_VERSIONS
                     and declared_roles.get(field) != "coordinate_system"
                 ):
                     raise CalibrationGraphError(
@@ -646,6 +700,21 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                 raise CalibrationGraphError(
                     "partial bed tab_to_print_plane_z_mm must be numeric"
                 )
+            if fact_definition_version == 5:
+                if not isinstance(
+                    value.get("corner_pixel_capture_y_mm"), (int, float)
+                ):
+                    raise CalibrationGraphError(
+                        "partial bed corner_pixel_capture_y_mm must be numeric"
+                    )
+                if (
+                    declared_roles.get("corner_pixel_capture_y_mm")
+                    != "coordinate_system"
+                ):
+                    raise CalibrationGraphError(
+                        "partial bed corner_pixel_capture_y_mm must be a "
+                        "coordinate-system item"
+                    )
         if fact_name == (
             "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2"
         ):
@@ -660,7 +729,7 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                     "red-marker image X vector must contain two numeric values"
                 )
             if (
-                fact_definition_version == 4
+                fact_definition_version in ROLE_AWARE_FACT_DEFINITION_VERSIONS
                 and declared_roles.get("axis_vector_px_per_mm")
                 != "coordinate_system"
             ):
@@ -677,7 +746,7 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                         f"red-marker {field} must be numeric"
                     )
                 if (
-                    fact_definition_version == 4
+                    fact_definition_version in ROLE_AWARE_FACT_DEFINITION_VERSIONS
                     and declared_roles.get(field) != "coordinate_system"
                 ):
                     raise CalibrationGraphError(
@@ -698,7 +767,7 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                         f"rough-X active snapshot {field} must be numeric"
                     )
                 if (
-                    fact_definition_version == 4
+                    fact_definition_version in ROLE_AWARE_FACT_DEFINITION_VERSIONS
                     and declared_roles.get(field) != "coordinate_system"
                 ):
                     raise CalibrationGraphError(
@@ -706,7 +775,10 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                         "a coordinate-system item"
                     )
         if fact_name == "calibration.rough_tool_x.verified":
-            if fact_definition_version == 4 and fact.get("role") != "diagnostic":
+            if (
+                fact_definition_version in ROLE_AWARE_FACT_DEFINITION_VERSIONS
+                and fact.get("role") != "diagnostic"
+            ):
                 raise CalibrationGraphError(
                     "rough-X verification must be a diagnostic fact"
                 )

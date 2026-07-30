@@ -234,16 +234,34 @@ Analysis:
 - find the two tab edges and their intersection
 - use edge or line detection only for initial localization
 - refine the corner by registering duplicates to a selected reference image
-- project the corner through the accepted Y mapping
+- bind the observed corner pixel to the exact commanded Y coordinate of the
+  corner capture
+- project the corner through the accepted Y mapping from that capture pose
 
 Produced facts:
 
-- `bed.tab_corner.pixel_xy`
-- `bed.tab_corner.repeatability_px`
-- `bed.reference_plane.z_relative_to_print_plane_mm`
-- `camera.nozzle_cam.partial_bed_coordinate_system`
-- `bed.tab_corner.image_reference`, which binds the observed pixel to the exact
-  user-prior fact ID
+- `camera.nozzle_cam.partial_bed_coordinate_system`, which binds:
+  - the observed corner pixel
+  - the exact commanded Y at which that pixel was observed
+  - the accepted image Y-axis vector
+  - the exact user-prior fact ID
+  - the tab-plane-to-print-plane relationship
+
+The observed pixel and the physical prior are deliberately different pieces of
+information. The prior Y identifies the physical corner in printer
+coordinates; the observed capture Y identifies the bed pose at which the
+corner pixel was measured. A downstream image captured at another Y projects
+the corner with:
+
+```text
+corner_pixel_at_capture =
+    observed_corner_pixel
+    + image_y_axis_vector_px_per_mm
+      * (capture_y_mm - observed_corner_capture_y_mm)
+```
+
+Using the prior Y in place of `observed_corner_capture_y_mm` is invalid and
+shifts every downstream overlay by the difference between those Y values.
 
 At this point one pixel has an absolute bed X/Y identity, and the image Y basis
 is known because the pixel observation is bound to the user’s prior. The

@@ -28,12 +28,8 @@ def _load():
     return module
 
 
-def _manifest(module, job_id, *, definition_version=4):
-    offsets = (
-        (0, 10, 20, 20, 10, 0)
-        if definition_version in (2, 3, 4)
-        else (0, 5, 10, 15, 20, 15, 10, 5, 0)
-    )
+def _manifest(module, job_id):
+    offsets = (0, 10, 20, 20, 10, 0)
     frames = [
         {
             "seq": seq,
@@ -47,25 +43,18 @@ def _manifest(module, job_id, *, definition_version=4):
         "schema_version": 1,
         "job_id": job_id,
         "job_type": "nozzle_cam_bed_tab_y_scale",
-        "definition_version": definition_version,
+        "definition_version": 5,
         "created_at_utc": "2026-07-30T00:00:00+00:00",
         "camera": "nozzle_cam",
         "frame_count": len(frames),
         "frames": frames,
         "manifest_hash": "",
     }
-    if definition_version in (2, 3, 4):
-        record["publish_on_accept"] = True
-    if definition_version == 3:
-        record["localizer"] = {
-            "kind": "horizontal_moving_edge",
-            "version": 1,
-        }
-    if definition_version == 4:
-        record["localizer"] = {
-            "kind": "bed_tab_top_edge",
-            "version": 1,
-        }
+    record["publish_on_accept"] = True
+    record["localizer"] = {
+        "kind": "bed_tab_top_edge",
+        "version": 1,
+    }
     record["manifest_hash"] = module.content_hash(record, "manifest_hash")
     return record
 
@@ -100,8 +89,14 @@ def _analysis_and_fact_set(
     result["analysis_hash"] = module.content_hash(result, "analysis_hash")
     (analysis_dir / "result.json").write_text(json.dumps(result), encoding="utf-8")
     value = {"value": analysis_id}
+    fact_role = "diagnostic"
+    value_items = [{"field": "value", "role": "diagnostic"}]
     if fact_name == "camera.nozzle_cam.bed_tab.y_parallax_model":
         value["axis_vector_px_per_mm"] = [1.0, -8.0]
+        fact_role = "coordinate_system"
+        value_items.append(
+            {"field": "axis_vector_px_per_mm", "role": "coordinate_system"}
+        )
     fact_set = {
         "schema": module.FACT_SET_SCHEMA,
         "schema_version": 1,
@@ -115,7 +110,10 @@ def _analysis_and_fact_set(
         "facts": [
             {
                 "name": fact_name,
+                "definition_version": 5,
+                "role": fact_role,
                 "dependencies": list(dependencies),
+                "value_items": value_items,
                 "value": value,
             }
         ],
@@ -140,7 +138,7 @@ def test_canonical_hash_is_order_independent_and_rejects_old_schema():
         )
 
 
-def test_definition_v4_fact_items_require_complete_role_declarations(tmp_path):
+def test_definition_v5_fact_items_require_complete_role_declarations(tmp_path):
     module = _load()
     fact_set = _analysis_and_fact_set(
         module,
@@ -150,7 +148,7 @@ def test_definition_v4_fact_items_require_complete_role_declarations(tmp_path):
         fact_name="camera.nozzle_cam.bed_tab.y_parallax_model",
     )
     fact = fact_set["facts"][0]
-    fact["definition_version"] = 4
+    fact["definition_version"] = 5
     fact["role"] = "coordinate_system"
     fact["value"] = {
         "axis_vector_px_per_mm": [1.0, -8.0],
@@ -179,30 +177,18 @@ def test_definition_v4_fact_items_require_complete_role_declarations(tmp_path):
         module.validate_fact_set(misclassified)
 
 
-def test_current_v4_and_historical_native_manifests_validate():
+def test_only_current_native_manifest_definition_validates():
     module = _load()
     assert module.validate_manifest(_manifest(module, "current"))["frame_count"] == 6
-    assert (
-        module.validate_manifest(
-            _manifest(module, "definition_three_history", definition_version=3)
-        )["frame_count"]
-        == 6
-    )
-    assert (
-        module.validate_manifest(
-            _manifest(module, "definition_two_history", definition_version=2)
-        )["frame_count"]
-        == 6
-    )
-    assert (
-        module.validate_manifest(
-            _manifest(module, "native_history", definition_version=1)
-        )["frame_count"]
-        == 9
-    )
+    for old_version in (1, 2, 3, 4):
+        old = _manifest(module, f"old_definition_{old_version}")
+        old["definition_version"] = old_version
+        old["manifest_hash"] = module.content_hash(old, "manifest_hash")
+        with pytest.raises(module.CalibrationGraphError, match="definition_version"):
+            module.validate_manifest(old)
 
 
-def test_v4_requires_coordinate_free_tab_edge_localizer():
+def test_current_definition_requires_coordinate_free_tab_edge_localizer():
     module = _load()
     manifest = _manifest(module, "wrong_localizer")
     manifest["localizer"] = {"kind": "fixed_roi", "version": 1}

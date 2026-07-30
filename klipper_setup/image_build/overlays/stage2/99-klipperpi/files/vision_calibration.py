@@ -268,13 +268,13 @@ def calculate_rough_x(
     status: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     prior_binding, prior_fact = _resolve_current_fact(
-        "bed_tab_corner_prior", "bed.tab_corner.printer_xyz"
+        "bed_tab_corner_prior", "bed.tab_corner.printer_xyz", 4
     )
     t0_binding, t0_fact = _resolve_current_fact(
-        "t0_marker", "tool.t0.red_marker_to_bed_tab_x_mm"
+        "t0_marker", "tool.t0.red_marker_to_bed_tab_x_mm", 5
     )
     t1_binding, t1_fact = _resolve_current_fact(
-        "t1_marker", "tool.t1.red_marker_to_bed_tab_x_mm"
+        "t1_marker", "tool.t1.red_marker_to_bed_tab_x_mm", 5
     )
     printer_status = status or query_printer_status()
     settings = printer_status.get("configfile", {}).get("settings")
@@ -379,7 +379,7 @@ def record_rough_x_activation(
         facts=[
             {
                 "name": "calibration.rough_tool_x.active_snapshot",
-                "definition_version": 4,
+                "definition_version": 5,
                 "role": "coordinate_system",
                 "dependencies": dependencies,
                 "value_items": [
@@ -895,7 +895,9 @@ def _update_state(job_dir: Path, **values: Any) -> dict[str, Any]:
 
 
 def _resolve_current_fact(
-    requirement: str, fact_name: str
+    requirement: str,
+    fact_name: str,
+    expected_definition_version: int,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     catalog = rebuild_catalog(CALIBRATION_ROOT)
     head = catalog.get("heads", {}).get(fact_name)
@@ -927,6 +929,12 @@ def _resolve_current_fact(
     if fact is None:
         raise VisionCalibrationError(
             f"current fact set does not contain required fact {fact_name!r}"
+        )
+    if fact.get("definition_version") != expected_definition_version:
+        raise VisionCalibrationError(
+            f"required current fact {fact_name!r} has definition version "
+            f"{fact.get('definition_version')!r}, expected "
+            f"{expected_definition_version}"
         )
     return (
         {
@@ -1009,7 +1017,9 @@ def prepare_job(
     ):
         for requirement in definition["requires"]:
             binding, fact = _resolve_current_fact(
-                requirement["requirement"], requirement["fact_name"]
+                requirement["requirement"],
+                requirement["fact_name"],
+                int(requirement["fact_definition_version"]),
             )
             input_facts.append(binding)
             input_fact_values[requirement["requirement"]] = fact
@@ -1192,6 +1202,9 @@ def prepare_job(
         bed_y_value = input_fact_values["bed_y_model"]["value"]
         manifest["red_marker_reference"] = {
             "corner_pixel_xy_px": partial_value["corner_pixel_xy_px"],
+            "corner_pixel_capture_y_mm": partial_value[
+                "corner_pixel_capture_y_mm"
+            ],
             "corner_printer_xyz_mm": partial_value["corner_printer_xyz_mm"],
             "image_y_axis_vector_px_per_mm": bed_y_value[
                 "axis_vector_px_per_mm"
@@ -1206,6 +1219,9 @@ def prepare_job(
             "command_x_mm": float(definition["command_x_mm"]),
             "expected_offset_mm": float(definition["verification_offset_x_mm"]),
             "corner_pixel_xy_px": partial_value["corner_pixel_xy_px"],
+            "corner_pixel_capture_y_mm": partial_value[
+                "corner_pixel_capture_y_mm"
+            ],
             "corner_printer_xyz_mm": partial_value["corner_printer_xyz_mm"],
             "image_y_axis_vector_px_per_mm": partial_value[
                 "image_y_axis_vector_px_per_mm"
@@ -1610,28 +1626,28 @@ def analyze_job(job_id: str) -> dict[str, Any]:
     job_dir = CALIBRATION_ROOT / "jobs" / _sanitize(job_id)
     manifest = validate_manifest(load_json(job_dir / "manifest.json"))
     if manifest["job_type"] == BED_TAB_Y_JOB_TYPE and (
-        manifest["definition_version"] != 4
+        manifest["definition_version"] != 5
     ):
         raise VisionCalibrationError(
-            "only definition-v4 bed-tab Y jobs use the current localizer"
+            "only definition-v5 bed-tab Y jobs use the current localizer"
         )
     if manifest["job_type"] == BED_TAB_CORNER_JOB_TYPE and (
-        manifest["definition_version"] not in (1, 2)
+        manifest["definition_version"] != 5
     ):
         raise VisionCalibrationError(
-            "only definition-v1/v2 bed-tab corner jobs use the current localizer"
+            "only definition-v5 bed-tab corner jobs use the current localizer"
         )
     if manifest["job_type"] == RED_MARKER_X_JOB_TYPE and (
-        manifest["definition_version"] != 1
+        manifest["definition_version"] != 5
     ):
         raise VisionCalibrationError(
-            "only definition-v1 red-marker jobs use the current localizer"
+            "only definition-v5 red-marker jobs use the current localizer"
         )
     if manifest["job_type"] == ROUGH_X_VERIFY_JOB_TYPE and (
-        manifest["definition_version"] != 1
+        manifest["definition_version"] != 5
     ):
         raise VisionCalibrationError(
-            "only definition-v1 rough-X verification jobs use the current localizer"
+            "only definition-v5 rough-X verification jobs use the current localizer"
         )
     state = load_json(job_dir / "state.json")
     if state.get("state") not in ("acquired", "analyzed", "rejected"):
@@ -1723,7 +1739,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 facts = [
                     {
                         "name": "camera.nozzle_cam.bed_tab.y_parallax_model",
-                        "definition_version": 4,
+                        "definition_version": 5,
                         "role": "coordinate_system",
                         "dependencies": [],
                         "value_items": [
@@ -1818,12 +1834,16 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 facts = [
                     {
                         "name": "camera.nozzle_cam.partial_bed_coordinate_system",
-                        "definition_version": 4,
+                        "definition_version": 5,
                         "role": "coordinate_system",
                         "dependencies": dependencies,
                         "value_items": [
                             {
                                 "field": "corner_pixel_xy_px",
+                                "role": "coordinate_system",
+                            },
+                            {
+                                "field": "corner_pixel_capture_y_mm",
                                 "role": "coordinate_system",
                             },
                             {
@@ -1866,6 +1886,9 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         ],
                         "value": {
                             "corner_pixel_xy_px": result_details["corner_pixel_xy_px"],
+                            "corner_pixel_capture_y_mm": float(
+                                manifest["frames"][0]["commanded_position_mm"][1]
+                            ),
                             "corner_printer_xyz_mm": reference["corner_printer_xyz_mm"],
                             "image_y_axis_vector_px_per_mm": reference[
                                 "image_y_axis_vector_px_per_mm"
@@ -1876,7 +1899,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                             "mapping_convention": (
                                 "pixel_xy = corner_pixel_xy_px + "
                                 "image_y_axis_vector_px_per_mm * "
-                                "(printer_y_mm - corner_printer_y_mm)"
+                                "(capture_y_mm - corner_pixel_capture_y_mm)"
                             ),
                             "camera": manifest["camera"],
                             "profile": manifest["profile"],
@@ -1913,6 +1936,9 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 ]
                 observed_provenance = {
                     "corner_pixel_xy_px": result_details["corner_pixel_xy_px"],
+                    "corner_pixel_capture_y_mm": float(
+                        manifest["frames"][0]["commanded_position_mm"][1]
+                    ),
                     "selected_candidate": result_details["selected_candidate"],
                 }
             elif manifest["job_type"] == RED_MARKER_X_JOB_TYPE:
@@ -1975,7 +2001,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 ) -> dict[str, Any]:
                     return {
                         "name": name,
-                        "definition_version": 4,
+                        "definition_version": 5,
                         "role": "coordinate_system",
                         "dependencies": dependencies,
                         "value_items": [
@@ -2068,7 +2094,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 facts = [
                     {
                         "name": "calibration.rough_tool_x.verified",
-                        "definition_version": 4,
+                        "definition_version": 5,
                         "role": "diagnostic",
                         "dependencies": dependencies,
                         "value_items": [
@@ -2238,15 +2264,25 @@ ROUGH_X_CALIBRATION_STAGES = (
 
 
 def _fact_names_are_fresh(
-    catalog: dict[str, Any], fact_names: tuple[str, ...]
+    catalog: dict[str, Any],
+    job_type: str,
+    fact_names: tuple[str, ...],
 ) -> bool:
     heads = catalog.get("heads", {})
     stale = catalog.get("stale_fact_sets", {})
-    return all(
-        isinstance(heads.get(fact_name), dict)
-        and heads[fact_name].get("fact_set_hash") not in stale
-        for fact_name in fact_names
+    expected_version = int(
+        _load_registry()["job_types"][job_type]["fact_definition_version"]
     )
+    for fact_name in fact_names:
+        head = heads.get(fact_name)
+        if not isinstance(head, dict):
+            return False
+        if head.get("fact_set_hash") in stale:
+            return False
+        loaded = _load_current_fact(fact_name, head)
+        if loaded is None or loaded[1].get("definition_version") != expected_version:
+            return False
+    return True
 
 
 def _wait_for_printer_idle(timeout: float = 30.0) -> dict[str, Any]:
@@ -2293,7 +2329,7 @@ def calibrate_rough_x_sequence(
     stages: list[dict[str, Any]] = []
     for job_type, stage_slug, fact_names in ROUGH_X_CALIBRATION_STAGES:
         catalog = rebuild_catalog(CALIBRATION_ROOT)
-        fresh_before = _fact_names_are_fresh(catalog, fact_names)
+        fresh_before = _fact_names_are_fresh(catalog, job_type, fact_names)
         if fresh_before and not force:
             stages.append(
                 {
@@ -2317,7 +2353,7 @@ def calibrate_rough_x_sequence(
                 f"inspect {result['analysis']['review_url']}"
             )
         catalog = rebuild_catalog(CALIBRATION_ROOT)
-        if not _fact_names_are_fresh(catalog, fact_names):
+        if not _fact_names_are_fresh(catalog, job_type, fact_names):
             raise VisionCalibrationError(
                 f"{job_type} completed without fresh current output facts"
             )
@@ -2423,10 +2459,6 @@ def _write_job_page(job: dict[str, Any], root: Path) -> None:
                 "displacement_vs_y",
                 "forward_reverse",
                 "contact_sheet",
-                # Historical definition-v2 artifacts remain readable.
-                "motion_overlay_contact_sheet",
-                "motion_grid_overlay",
-                "patch_selection",
             )
             ordered_artifacts = sorted(
                 artifacts.items(),
@@ -2451,8 +2483,6 @@ def _write_job_page(job: dict[str, Any], root: Path) -> None:
                         "corner_duplicate_registration",
                         "edge_localization",
                         "edge_tracking_overlay",
-                        "motion_overlay_contact_sheet",
-                        "motion_grid_overlay",
                         "marker_selection",
                         "core_registration",
                         "cross_tool_registration",
@@ -2598,26 +2628,10 @@ def _write_job_page(job: dict[str, Any], root: Path) -> None:
                         f'src="{html.escape(tracking_path)}"></a>'
                     )
                 else:
-                    per_frame_overlay = artifacts.get("motion_overlay_contact_sheet")
-                    motion_overlay = per_frame_overlay or artifacts.get(
-                        "motion_grid_overlay"
+                    overlay_html = (
+                        '<p class="warning">No current calibration overlay was '
+                        "produced.</p>"
                     )
-                    if motion_overlay:
-                        overlay_path = os.path.relpath(
-                            Path(motion_overlay["path"]),
-                            job_dir,
-                        )
-                        overlay_html = (
-                            "<h3>Historical motion overlay</h3>"
-                            "<p>This analysis predates automatic edge discovery.</p>"
-                            f'<a href="{html.escape(overlay_path)}">'
-                            f'<img class="hero-overlay" '
-                            f'src="{html.escape(overlay_path)}"></a>'
-                        )
-                    else:
-                        overlay_html = (
-                            '<p class="warning">No edge overlay was produced.</p>'
-                        )
                 artifact_links = "".join(
                     "<li>"
                     f'<a href="{html.escape(os.path.relpath(Path(record["path"]), job_dir))}">'
@@ -2836,6 +2850,7 @@ def _fact_card(
     coordinate_metric_specs = (
         ("xyz_mm", "Printer XYZ prior", "mm"),
         ("corner_pixel_xy_px", "Corner pixel XY", "px"),
+        ("corner_pixel_capture_y_mm", "Corner pixel capture Y", "mm"),
         ("corner_printer_xyz_mm", "Corner printer XYZ", "mm"),
         ("z_offset_mm", "Z offset", "mm"),
         ("tab_to_print_plane_z_mm", "Tab to print-plane Z", "mm"),
@@ -2976,13 +2991,6 @@ def _fact_card(
     role = str(fact.get("role", "unclassified"))
     role_label = role.replace("_", " ")
     if overview:
-        if not coordinate_fields:
-            metrics.append(
-                _metric(
-                    "Declaration missing",
-                    "This historical fact has no coordinate-system field declaration.",
-                )
-            )
         return (
             '<article class="fact-card fact-card-overview">'
             f"<h3>{html.escape(_fact_title(name))} "

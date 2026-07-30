@@ -297,11 +297,10 @@ def analyze(
         raise ValueError("rough-X verification image X axis is degenerate")
     unit_x = x_vector / scale
     corner = np.asarray(reference["corner_pixel_xy_px"], dtype=float)
-    corner_xyz = np.asarray(reference["corner_printer_xyz_mm"], dtype=float)
     y_vector = np.asarray(reference["image_y_axis_vector_px_per_mm"], dtype=float)
     capture_y = float(reference["capture_y_mm"])
     corner_at_capture = corner + y_vector * (
-        capture_y - float(corner_xyz[1])
+        capture_y - float(reference["corner_pixel_capture_y_mm"])
     )
     expected_offset = float(reference["expected_offset_mm"])
     expected_point = corner_at_capture + x_vector * expected_offset

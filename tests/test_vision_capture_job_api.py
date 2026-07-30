@@ -87,7 +87,7 @@ def _prepare(module, tmp_path):
         "schema_version": 1,
         "job_id": job_id,
         "job_type": "nozzle_cam_bed_tab_y_scale",
-        "definition_version": 4,
+        "definition_version": 5,
         "localizer": {
             "kind": "bed_tab_top_edge",
             "version": 1,

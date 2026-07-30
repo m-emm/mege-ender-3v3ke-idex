@@ -850,10 +850,9 @@ def analyze(
             selection["cross_registration"]["shift_px"], dtype=float
         )
         corner_pixel = np.asarray(reference["corner_pixel_xy_px"], dtype=float)
-        corner_xyz = np.asarray(reference["corner_printer_xyz_mm"], dtype=float)
         capture_y = float(reference["capture_y_mm"])
         corner_at_capture = corner_pixel + y_axis_vector * (
-            capture_y - float(corner_xyz[1])
+            capture_y - float(reference["corner_pixel_capture_y_mm"])
         )
         marker0 = np.asarray(selection["t0_center_px"], dtype=float)
         marker1 = marker0 + cross_shift

@@ -3,7 +3,8 @@
   "schema_version": 1,
   "job_types": {
     "nozzle_cam_bed_tab_y_scale": {
-      "definition_version": 4,
+      "definition_version": 5,
+      "fact_definition_version": 5,
       "camera": "nozzle_cam",
       "profile": "analysis",
       "light_macro": "NOZZLE_CAM_Y_FEATURE_LIGHT",
@@ -20,7 +21,8 @@
       ]
     },
     "nozzle_cam_bed_tab_corner": {
-      "definition_version": 2,
+      "definition_version": 5,
+      "fact_definition_version": 5,
       "camera": "nozzle_cam",
       "profile": "analysis",
       "light_macro": "NOZZLE_CAM_Y_FEATURE_LIGHT",
@@ -37,15 +39,18 @@
       "requires": [
         {
           "requirement": "bed_y_model",
-          "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model"
+          "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model",
+          "fact_definition_version": 5
         },
         {
           "requirement": "bed_tab_corner_prior",
-          "fact_name": "bed.tab_corner.printer_xyz"
+          "fact_name": "bed.tab_corner.printer_xyz",
+          "fact_definition_version": 4
         },
         {
           "requirement": "tab_plane_z",
-          "fact_name": "bed.reference_plane.tab_to_print_plane_z_mm"
+          "fact_name": "bed.reference_plane.tab_to_print_plane_z_mm",
+          "fact_definition_version": 4
         }
       ],
       "fact_names": [
@@ -53,7 +58,8 @@
       ]
     },
     "idex_tool_red_marker_x_sweep": {
-      "definition_version": 1,
+      "definition_version": 5,
+      "fact_definition_version": 5,
       "camera": "nozzle_cam",
       "profile": "analysis",
       "light_macro": "NOZZLE_CAM_ANALYSIS_LIGHT",
@@ -73,11 +79,13 @@
       "requires": [
         {
           "requirement": "partial_bed_coordinate_system",
-          "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system"
+          "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system",
+          "fact_definition_version": 5
         },
         {
           "requirement": "bed_y_model",
-          "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model"
+          "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model",
+          "fact_definition_version": 5
         }
       ],
       "fact_names": [
@@ -87,7 +95,8 @@
       ]
     },
     "idex_rough_tool_x_verify": {
-      "definition_version": 1,
+      "definition_version": 5,
+      "fact_definition_version": 5,
       "camera": "nozzle_cam",
       "profile": "analysis",
       "light_macro": "NOZZLE_CAM_ANALYSIS_LIGHT",
@@ -107,15 +116,18 @@
       "requires": [
         {
           "requirement": "partial_bed_coordinate_system",
-          "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system"
+          "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system",
+          "fact_definition_version": 5
         },
         {
           "requirement": "image_x_axis",
-          "fact_name": "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2"
+          "fact_name": "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
+          "fact_definition_version": 5
         },
         {
           "requirement": "rough_x_active_snapshot",
-          "fact_name": "calibration.rough_tool_x.active_snapshot"
+          "fact_name": "calibration.rough_tool_x.active_snapshot",
+          "fact_definition_version": 5
         }
       ],
       "fact_names": [

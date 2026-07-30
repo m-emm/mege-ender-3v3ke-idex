@@ -39,6 +39,7 @@ def _reference():
         "corner_pixel_xy_px": [300.0, 300.0],
         "corner_printer_xyz_mm": [173.0, -18.0, 0.0],
         "image_y_axis_vector_px_per_mm": [0.0, -5.0],
+        "corner_pixel_capture_y_mm": -18.0,
         "capture_y_mm": -18.0,
         "expected_offset_mm": 10.0,
         "command_x_mm": 183.0,
@@ -112,6 +113,25 @@ def test_accepts_two_markers_at_expected_x_projection(tmp_path):
         "verification_overlay",
         "cross_tool_registration",
     }
+
+
+def test_projects_corner_from_its_capture_y_not_the_physical_prior_y(tmp_path):
+    module = _module()
+    paths, frames = _verification_frames(tmp_path)
+    reference = _reference()
+    reference["corner_pixel_xy_px"] = [300.0, 100.0]
+    reference["corner_pixel_capture_y_mm"] = 5.0
+    reference["capture_y_mm"] = -15.0
+
+    result = module.analyze(
+        paths,
+        tmp_path / "capture-anchor-artifacts",
+        frames=frames,
+        reference=reference,
+        localizer={"kind": "rough_x_marker_verification", "version": 1},
+    )
+
+    assert result["corner_pixel_at_capture_y_px"] == pytest.approx([300.0, 200.0])
 
 
 def test_rejects_mutually_aligned_markers_at_wrong_absolute_x(tmp_path):

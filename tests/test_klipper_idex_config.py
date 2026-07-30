@@ -476,7 +476,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "idex_rough_tool_x_verify",
     }
     definition = registry["job_types"]["nozzle_cam_bed_tab_y_scale"]
-    assert definition["definition_version"] == 4
+    assert definition["definition_version"] == 5
     assert definition["localizer"] == {
         "kind": "bed_tab_top_edge",
         "version": 1,
@@ -487,7 +487,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert definition["settle_ms"] == 300
     assert definition["light_macro"] == "NOZZLE_CAM_Y_FEATURE_LIGHT"
     corner_definition = registry["job_types"]["nozzle_cam_bed_tab_corner"]
-    assert corner_definition["definition_version"] == 2
+    assert corner_definition["definition_version"] == 5
     assert corner_definition["duplicate_count"] == 5
     assert corner_definition["discard_fresh_frames"] == 1
     assert corner_definition["capture_y_offset_mm"] == 20
@@ -501,12 +501,12 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "bed.reference_plane.tab_to_print_plane_z_mm",
     ]
     red_marker_definition = registry["job_types"]["idex_tool_red_marker_x_sweep"]
-    assert red_marker_definition["definition_version"] == 1
+    assert red_marker_definition["definition_version"] == 5
     assert red_marker_definition["x_positions_mm"] == [160, 170, 180, 190, 200, 210]
     assert red_marker_definition["discard_fresh_frames"] == 1
     assert red_marker_definition["publish_on_accept"] is True
     rough_x_definition = registry["job_types"]["idex_rough_tool_x_verify"]
-    assert rough_x_definition["definition_version"] == 1
+    assert rough_x_definition["definition_version"] == 5
     assert rough_x_definition["verification_offset_x_mm"] == 10
     assert rough_x_definition["discard_fresh_frames"] == 1
     assert rough_x_definition["publish_on_accept"] is True

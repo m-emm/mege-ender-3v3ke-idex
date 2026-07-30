@@ -129,7 +129,7 @@ def _publish_test_bed_y_fact(module):
         "facts": [
             {
                 "name": "camera.nozzle_cam.bed_tab.y_parallax_model",
-                "definition_version": 4,
+                "definition_version": 5,
                 "role": "coordinate_system",
                 "dependencies": [],
                 "value_items": [
@@ -184,7 +184,7 @@ def _publish_test_partial_bed_fact(module, bed_y):
         "facts": [
             {
                 "name": "camera.nozzle_cam.partial_bed_coordinate_system",
-                "definition_version": 4,
+                "definition_version": 5,
                 "role": "coordinate_system",
                 "dependencies": [
                     {
@@ -200,6 +200,10 @@ def _publish_test_partial_bed_fact(module, bed_y):
                         "role": "coordinate_system",
                     },
                     {
+                        "field": "corner_pixel_capture_y_mm",
+                        "role": "coordinate_system",
+                    },
+                    {
                         "field": "tab_to_print_plane_z_mm",
                         "role": "coordinate_system",
                     },
@@ -208,6 +212,7 @@ def _publish_test_partial_bed_fact(module, bed_y):
                     "corner_pixel_xy_px": [922.0, 216.5],
                     "corner_printer_xyz_mm": [170.0, -20.0, 0.0],
                     "image_y_axis_vector_px_per_mm": [-0.22, -10.5],
+                    "corner_pixel_capture_y_mm": 5.2,
                     "tab_to_print_plane_z_mm": 0.0,
                 },
             }
@@ -303,7 +308,7 @@ def test_prepare_resolves_active_limits_and_generates_exact_motion(
         "reverse",
     ]
     assert manifest["publish_on_accept"] is True
-    assert manifest["definition_version"] == 4
+    assert manifest["definition_version"] == 5
     assert manifest["localizer"] == {
         "kind": "bed_tab_top_edge",
         "version": 1,
@@ -337,7 +342,7 @@ def test_prepare_corner_binds_current_facts_and_generates_fixed_duplicates(
     gcode = (job_dir / "acquisition.gcode").read_text()
 
     assert manifest["job_type"] == "nozzle_cam_bed_tab_corner"
-    assert manifest["definition_version"] == 2
+    assert manifest["definition_version"] == 5
     assert manifest["frame_count"] == 5
     assert [frame["duplicate_index"] for frame in manifest["frames"]] == list(range(5))
     assert all(frame["discard_fresh_frames"] == 1 for frame in manifest["frames"])
@@ -479,6 +484,7 @@ def test_corner_analysis_publishes_dependency_bound_partial_coordinate_system(
     assert fact["name"] == "camera.nozzle_cam.partial_bed_coordinate_system"
     assert fact["role"] == "coordinate_system"
     assert fact["value"]["corner_pixel_xy_px"] == [921.8, 215.5]
+    assert fact["value"]["corner_pixel_capture_y_mm"] == pytest.approx(5.2)
     prior_registry = json.loads(module.PRIOR_PATH.read_text())
     expected_prior = next(
         seed["value"]["xyz_mm"]
@@ -693,7 +699,7 @@ def test_accepted_analysis_is_published_immediately(monkeypatch, tmp_path):
         (job_dir / "analysis" / result["analysis_run_id"] / "fact_set.json").read_text()
     )
     fact = fact_set["facts"][0]
-    assert fact["definition_version"] == 4
+    assert fact["definition_version"] == 5
     assert fact["role"] == "coordinate_system"
     assert {item["field"]: item["role"] for item in fact["value_items"]} == {
         "axis_vector_px_per_mm": "coordinate_system",
@@ -819,6 +825,11 @@ def test_rough_x_sequence_reruns_only_missing_or_stale_graph_stages(
     monkeypatch.setattr(module, "sync_seed_facts", lambda: {"seeds": []})
     monkeypatch.setattr(module, "_wait_for_printer_idle", lambda timeout=30.0: status)
     monkeypatch.setattr(module, "rebuild_catalog", lambda _root: catalog())
+    monkeypatch.setattr(
+        module,
+        "_load_current_fact",
+        lambda _name, _head: ({}, {"definition_version": 5}),
+    )
     monkeypatch.setattr(module, "run_job", run_job)
     monkeypatch.setattr(
         module,
