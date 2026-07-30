@@ -223,6 +223,26 @@ gcode:
         active_config_fingerprint=fingerprint
     )}
 
+[gcode_macro IDEX_RED_MARKER_X_SWEEP_CALIBRATE]
+description: Acquire, analyze, and publish the coarse T0/T1 red-marker X facts.
+gcode:
+    {% set name = params.NAME|default("red_marker_x_sweep") %}
+    {% set print_state = printer.print_stats.state %}
+    {% set homed = printer.toolhead.homed_axes %}
+    {% set fingerprint = printer["gcode_macro _IDEX_CONFIG_FINGERPRINT"].source_sha256 %}
+    {% if print_state not in ["standby", "complete"] %}
+        { action_raise_error("IDEX_RED_MARKER_X_SWEEP_CALIBRATE requires an idle printer; print_stats.state=" ~ print_state) }
+    {% endif %}
+    {% if "x" not in homed or "y" not in homed or "z" not in homed %}
+        { action_raise_error("IDEX_RED_MARKER_X_SWEEP_CALIBRATE requires X/Y/Z homed; it never homes automatically.") }
+    {% endif %}
+    RESPOND TYPE=echo MSG="Coarse T0/T1 red-marker X sweep queued: NAME={name}. Watch /vision/ for live progress and published facts."
+    {action_call_remote_method(
+        "idex_red_marker_x_sweep_calibrate",
+        name=name,
+        active_config_fingerprint=fingerprint
+    )}
+
 
 # Custom thermistor calibration for the left Micro Swiss FlowTech toolhead.
 # Values retained from the same calibrated Micro Swiss hotend assembly.

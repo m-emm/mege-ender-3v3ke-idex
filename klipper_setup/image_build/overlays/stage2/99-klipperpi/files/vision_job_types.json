@@ -50,6 +50,41 @@
       "fact_names": [
         "camera.nozzle_cam.partial_bed_coordinate_system"
       ]
+    },
+    "idex_tool_red_marker_x_sweep": {
+      "definition_version": 1,
+      "camera": "nozzle_cam",
+      "profile": "analysis",
+      "light_macro": "NOZZLE_CAM_ANALYSIS_LIGHT",
+      "localizer": {
+        "kind": "red_marker_trajectory",
+        "version": 1
+      },
+      "x_positions_mm": [160, 170, 180, 190, 200, 210],
+      "capture_y_mm": -14,
+      "capture_z_mm": 2,
+      "safe_tool_change_z_mm": 5,
+      "velocity_mm_s": 60,
+      "settle_ms": 300,
+      "tool_change_settle_ms": 1000,
+      "discard_fresh_frames": 1,
+      "publish_on_accept": true,
+      "requires": [
+        {
+          "requirement": "partial_bed_coordinate_system",
+          "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system"
+        },
+        {
+          "requirement": "bed_y_model",
+          "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model"
+        }
+      ],
+      "fact_names": [
+        "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
+        "tool.t0.red_marker_to_bed_tab_x_mm",
+        "tool.t1.red_marker_to_bed_tab_x_mm",
+        "tool.t1.rough_x_error_relative_to_t0_mm"
+      ]
     }
   }
 }

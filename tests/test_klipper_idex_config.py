@@ -406,6 +406,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         config_text, "gcode_macro IDEX_BED_TAB_Y_SCALE_CALIBRATE"
     )
     corner_macro = _section(config_text, "gcode_macro IDEX_BED_TAB_CORNER_CALIBRATE")
+    red_marker_macro = _section(
+        config_text, "gcode_macro IDEX_RED_MARKER_X_SWEEP_CALIBRATE"
+    )
     capture_script = (IMAGE_BUILD_FILES_DIR / "vision_capture.py").read_text(
         encoding="utf-8"
     )
@@ -421,6 +424,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     corner_analyzer = (IMAGE_BUILD_FILES_DIR / "vision_bed_tab_corner.py").read_text(
         encoding="utf-8"
     )
+    red_marker_analyzer = (
+        IMAGE_BUILD_FILES_DIR / "vision_red_marker_x_sweep.py"
+    ).read_text(encoding="utf-8")
     registry = json.loads(
         (IMAGE_BUILD_FILES_DIR / "vision_job_types.json").read_text(encoding="utf-8")
     )
@@ -451,11 +457,14 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "active_config_fingerprint=fingerprint" in calibration_macro
     assert "requires X/Y/Z homed" in corner_macro
     assert '"idex_bed_tab_corner_calibrate"' in corner_macro
+    assert "requires X/Y/Z homed" in red_marker_macro
+    assert '"idex_red_marker_x_sweep_calibrate"' in red_marker_macro
 
     assert registry["schema_version"] == 1
     assert set(registry["job_types"]) == {
         "nozzle_cam_bed_tab_y_scale",
         "nozzle_cam_bed_tab_corner",
+        "idex_tool_red_marker_x_sweep",
     }
     definition = registry["job_types"]["nozzle_cam_bed_tab_y_scale"]
     assert definition["definition_version"] == 4
@@ -481,10 +490,16 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "bed.tab_corner.printer_xyz",
         "bed.reference_plane.tab_to_print_plane_z_mm",
     ]
+    red_marker_definition = registry["job_types"]["idex_tool_red_marker_x_sweep"]
+    assert red_marker_definition["definition_version"] == 1
+    assert red_marker_definition["x_positions_mm"] == [160, 170, 180, 190, 200, 210]
+    assert red_marker_definition["discard_fresh_frames"] == 1
+    assert red_marker_definition["publish_on_accept"] is True
 
     assert "VisionJobApi" in capture_script
     assert "idex_bed_tab_y_scale_calibrate" in capture_script
     assert "idex_bed_tab_corner_calibrate" in capture_script
+    assert "idex_red_marker_x_sweep_calibrate" in capture_script
     assert "VISION_REGISTER_CALIBRATION_METHODS" in capture_script
     assert "measure_bed_y" not in capture_script
     assert "vision_nozzle_align" not in capture_script
@@ -502,6 +517,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "_detect_candidates" in corner_analyzer
     assert "_register" in corner_analyzer
     assert "expected_corner_px" in corner_analyzer
+    assert "_red_candidates" in red_marker_analyzer
+    assert "_pair_registration" in red_marker_analyzer
+    assert "red_marker_trajectory" in red_marker_analyzer
 
     assert (
         "VISION_JOB_ROOT=/home/pi/printer_data/vision/calibration/jobs"
@@ -530,6 +548,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "vision_calibration_graph.py",
         "vision_bed_tab_y_scale.py",
         "vision_bed_tab_corner.py",
+        "vision_red_marker_x_sweep.py",
         "vision_job_types.json",
         "vision_calibration_priors.json",
     ):
@@ -561,6 +580,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "nozzle_cam_bed_tab_y_scale" in klipper_readme
     assert "IDEX_BED_TAB_Y_SCALE_CALIBRATE" in klipper_readme
     assert "IDEX_BED_TAB_CORNER_CALIBRATE" in klipper_readme
+    assert "IDEX_RED_MARKER_X_SWEEP_CALIBRATE" in klipper_readme
     assert "no reader, migration, alias" in concept
 
 

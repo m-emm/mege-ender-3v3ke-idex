@@ -73,6 +73,21 @@ or:
 /usr/local/bin/vision_calibration.py run nozzle_cam_bed_tab_corner --name bed_tab_corner
 ```
 
+Run the dependency-bound coarse T0/T1 red-marker X sweep:
+
+```gcode
+IDEX_RED_MARKER_X_SWEEP_CALIBRATE NAME=red_marker_x_sweep
+```
+
+or directly on the printer host:
+
+```bash
+/usr/local/bin/vision_calibration.py run idex_tool_red_marker_x_sweep --name red_marker_x_sweep
+```
+
+Accepted red-marker jobs publish their four coordinate facts immediately. They
+do not modify `calib.yaml` or activate the candidate T1 X endstop.
+
 The provisional seed values live in
 `/usr/local/share/vision/vision_calibration_priors.json`. Publishing changed
 prior values supersedes the old seed facts and makes downstream corner facts

@@ -115,6 +115,7 @@ def validate_registry(record: Any) -> dict[str, Any]:
     if set(job_types) != {
         "nozzle_cam_bed_tab_y_scale",
         "nozzle_cam_bed_tab_corner",
+        "idex_tool_red_marker_x_sweep",
     }:
         raise CalibrationGraphError("registry has an invalid native job-type set")
     definition = _require_mapping(
@@ -172,6 +173,45 @@ def validate_registry(record: Any) -> dict[str, Any]:
         )
     if corner.get("duplicate_count") != 5:
         raise CalibrationGraphError("bed-tab corner job must acquire five duplicates")
+    red_marker = _require_mapping(
+        job_types["idex_tool_red_marker_x_sweep"],
+        "registry.job_types.idex_tool_red_marker_x_sweep",
+    )
+    if red_marker.get("definition_version") != 1:
+        raise CalibrationGraphError("red-marker sweep definition_version must be 1")
+    if red_marker.get("publish_on_accept") is not True:
+        raise CalibrationGraphError(
+            "red-marker sweep must publish accepted facts immediately"
+        )
+    if red_marker.get("localizer") != {
+        "kind": "red_marker_trajectory",
+        "version": 1,
+    }:
+        raise CalibrationGraphError(
+            "red-marker sweep must use red_marker_trajectory localizer version 1"
+        )
+    if red_marker.get("x_positions_mm") != [160, 170, 180, 190, 200, 210]:
+        raise CalibrationGraphError("red-marker sweep has an invalid X motion order")
+    if red_marker.get("discard_fresh_frames") != 1:
+        raise CalibrationGraphError("red-marker sweep must discard one fresh frame")
+    if red_marker.get("requires") != [
+        {
+            "requirement": "partial_bed_coordinate_system",
+            "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system",
+        },
+        {
+            "requirement": "bed_y_model",
+            "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model",
+        },
+    ]:
+        raise CalibrationGraphError("red-marker sweep has invalid fact requirements")
+    if red_marker.get("fact_names") != [
+        "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
+        "tool.t0.red_marker_to_bed_tab_x_mm",
+        "tool.t1.red_marker_to_bed_tab_x_mm",
+        "tool.t1.rough_x_error_relative_to_t0_mm",
+    ]:
+        raise CalibrationGraphError("red-marker sweep has an invalid fact contract")
     return record
 
 
@@ -183,6 +223,7 @@ def validate_manifest(record: Any) -> dict[str, Any]:
     if job_type not in (
         "nozzle_cam_bed_tab_y_scale",
         "nozzle_cam_bed_tab_corner",
+        "idex_tool_red_marker_x_sweep",
     ):
         raise CalibrationGraphError("manifest has an unsupported job_type")
     definition_version = record.get("definition_version")
@@ -227,7 +268,7 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             )
         if [frame.get("y_offset_mm") for frame in frames] != expected_offsets:
             raise CalibrationGraphError("manifest has an invalid Y motion order")
-    else:
+    elif job_type == "nozzle_cam_bed_tab_corner":
         if definition_version != 1:
             raise CalibrationGraphError(
                 "bed-tab corner manifest definition_version must be 1"
@@ -273,6 +314,67 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             )
         for binding in normalized_input_facts:
             _require_string(binding.get("fact_set_hash"), "input fact_set_hash")
+    else:
+        if definition_version != 1:
+            raise CalibrationGraphError(
+                "red-marker manifest definition_version must be 1"
+            )
+        if record.get("publish_on_accept") is not True:
+            raise CalibrationGraphError(
+                "red-marker manifest must publish on acceptance"
+            )
+        if record.get("localizer") != {
+            "kind": "red_marker_trajectory",
+            "version": 1,
+        }:
+            raise CalibrationGraphError(
+                "red-marker manifest has an invalid localizer"
+            )
+        expected = [
+            (tool, x)
+            for tool in ("T0", "T1")
+            for x in (160, 170, 180, 190, 200, 210)
+        ]
+        if len(frames) != 12 or record.get("frame_count") != 12:
+            raise CalibrationGraphError(
+                "red-marker manifest must contain twelve frames"
+            )
+        if [(frame.get("tool"), frame.get("x_mm")) for frame in frames] != expected:
+            raise CalibrationGraphError(
+                "red-marker manifest has an invalid tool/X motion order"
+            )
+        if any(frame.get("discard_fresh_frames") != 1 for frame in frames):
+            raise CalibrationGraphError(
+                "red-marker frames must discard one fresh framebuffer frame"
+            )
+        expected_requirements = {
+            "partial_bed_coordinate_system":
+                "camera.nozzle_cam.partial_bed_coordinate_system",
+            "bed_y_model": "camera.nozzle_cam.bed_tab.y_parallax_model",
+        }
+        input_facts = _require_list(record.get("input_facts"), "manifest.input_facts")
+        normalized_input_facts = [
+            _require_mapping(item, f"manifest.input_facts[{index}]")
+            for index, item in enumerate(input_facts)
+        ]
+        if {
+            item.get("requirement"): item.get("fact_name")
+            for item in normalized_input_facts
+        } != expected_requirements:
+            raise CalibrationGraphError(
+                "red-marker manifest has invalid input fact bindings"
+            )
+        for binding in normalized_input_facts:
+            _require_string(binding.get("fact_set_hash"), "input fact_set_hash")
+        snapshot = _require_mapping(
+            record.get("active_calibration_snapshot"),
+            "manifest.active_calibration_snapshot",
+        )
+        for key in ("t0_x_endstop_mm", "t1_x_endstop_mm"):
+            if not isinstance(snapshot.get(key), (int, float)):
+                raise CalibrationGraphError(
+                    f"red-marker active calibration snapshot lacks {key}"
+                )
     for seq, frame_value in enumerate(frames):
         frame = _require_mapping(frame_value, f"manifest.frames[{seq}]")
         if frame.get("seq") != seq:
@@ -425,6 +527,54 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                 raise CalibrationGraphError(
                     "partial bed tab_to_print_plane_z_mm must be numeric"
                 )
+        if fact_name == (
+            "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2"
+        ):
+            vector = _require_list(
+                value.get("axis_vector_px_per_mm"),
+                "red-marker image X axis_vector_px_per_mm",
+            )
+            if len(vector) != 2 or not all(
+                isinstance(component, (int, float)) for component in vector
+            ):
+                raise CalibrationGraphError(
+                    "red-marker image X vector must contain two numeric values"
+                )
+            if (
+                fact_definition_version == 4
+                and declared_roles.get("axis_vector_px_per_mm")
+                != "coordinate_system"
+            ):
+                raise CalibrationGraphError(
+                    "red-marker image X vector must be a coordinate-system item"
+                )
+        if fact_name in (
+            "tool.t0.red_marker_to_bed_tab_x_mm",
+            "tool.t1.red_marker_to_bed_tab_x_mm",
+        ):
+            for field in ("offset_mm", "reference_commanded_x_mm"):
+                if not isinstance(value.get(field), (int, float)):
+                    raise CalibrationGraphError(
+                        f"red-marker {field} must be numeric"
+                    )
+                if (
+                    fact_definition_version == 4
+                    and declared_roles.get(field) != "coordinate_system"
+                ):
+                    raise CalibrationGraphError(
+                        f"red-marker {field} must be a coordinate-system item"
+                    )
+        if fact_name == "tool.t1.rough_x_error_relative_to_t0_mm":
+            for field in ("correction_mm", "candidate_t1_x_endstop_mm"):
+                if not isinstance(value.get(field), (int, float)):
+                    raise CalibrationGraphError(f"rough X {field} must be numeric")
+                if (
+                    fact_definition_version == 4
+                    and declared_roles.get(field) != "coordinate_system"
+                ):
+                    raise CalibrationGraphError(
+                        f"rough X {field} must be a coordinate-system item"
+                    )
         dependencies = _require_list(
             fact.get("dependencies"),
             f"fact_set.facts[{fact_index}].dependencies",

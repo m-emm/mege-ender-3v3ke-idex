@@ -21,6 +21,7 @@ from typing import Any
 from vision_bed_tab_corner import analyze as analyze_bed_tab_corner
 from vision_bed_tab_y_scale import Y_OFFSETS_MM
 from vision_bed_tab_y_scale import analyze as analyze_bed_tab_y_scale
+from vision_red_marker_x_sweep import analyze as analyze_red_marker_x_sweep
 from vision_calibration_graph import (
     ANALYSIS_SCHEMA,
     FACT_SET_SCHEMA,
@@ -78,7 +79,8 @@ FRAMEBUFFER_DIR = Path(
 MOONRAKER_URL = os.environ.get("VISION_MOONRAKER_URL", "http://127.0.0.1")
 BED_TAB_Y_JOB_TYPE = "nozzle_cam_bed_tab_y_scale"
 BED_TAB_CORNER_JOB_TYPE = "nozzle_cam_bed_tab_corner"
-JOB_TYPES = (BED_TAB_Y_JOB_TYPE, BED_TAB_CORNER_JOB_TYPE)
+RED_MARKER_X_JOB_TYPE = "idex_tool_red_marker_x_sweep"
+JOB_TYPES = (BED_TAB_Y_JOB_TYPE, BED_TAB_CORNER_JOB_TYPE, RED_MARKER_X_JOB_TYPE)
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 HASH_TOKEN_RE = re.compile(r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+")
 HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
@@ -314,6 +316,45 @@ def _resolve_preflight(
         resolved_positions = [
             [x_min, y_min + float(definition["capture_y_offset_mm"]), z_max]
         ] * int(definition["duplicate_count"])
+    elif job_type == RED_MARKER_X_JOB_TYPE:
+        dual_carriage = _settings_section(settings, "dual_carriage")
+        x_positions = [float(value) for value in definition["x_positions_mm"]]
+        capture_y = float(definition["capture_y_mm"])
+        capture_z = float(definition["capture_z_mm"])
+        safe_z = float(definition["safe_tool_change_z_mm"])
+        resolved_positions = [
+            [x, capture_y, capture_z]
+            for _tool in ("T0", "T1")
+            for x in x_positions
+        ]
+        for heater_name in ("extruder", "extruder1", "heater_bed"):
+            if abs(float(status.get(heater_name, {}).get("target") or 0.0)) > 0.01:
+                raise VisionCalibrationError(
+                    f"{heater_name} target must be off for the cold red-marker sweep"
+                )
+        for axis_name, value in (("Y", capture_y), ("Z", capture_z), ("Z", safe_z)):
+            axis_index = "XYZ".index(axis_name)
+            if not axis_minimum[axis_index] <= value <= axis_maximum[axis_index]:
+                raise VisionCalibrationError(
+                    f"red-marker {axis_name}={value} lies outside active limits"
+                )
+        tool_limits = {
+            "T0": (
+                _number(stepper_x, "position_min", "stepper_x"),
+                _number(stepper_x, "position_max", "stepper_x"),
+            ),
+            "T1": (
+                _number(dual_carriage, "position_min", "dual_carriage"),
+                _number(dual_carriage, "position_max", "dual_carriage"),
+            ),
+        }
+        for tool, (minimum, maximum) in tool_limits.items():
+            for x in x_positions:
+                if not minimum <= x <= maximum:
+                    raise VisionCalibrationError(
+                        f"red-marker {tool} X={x} lies outside active limits "
+                        f"[{minimum}, {maximum}]"
+                    )
     else:
         raise VisionCalibrationError(f"unsupported preflight job type {job_type}")
     for index, position in enumerate(resolved_positions):
@@ -348,9 +389,12 @@ def _resolve_preflight(
     if not image_bytes.startswith(b"\xff\xd8") or not image_bytes.endswith(b"\xff\xd9"):
         raise VisionCalibrationError("camera framebuffer is not a complete JPEG")
 
-    light_settings = _settings_section(
-        settings, "gcode_macro nozzle_cam_y_feature_light"
+    light_section = (
+        "gcode_macro nozzle_cam_analysis_light"
+        if job_type == RED_MARKER_X_JOB_TYPE
+        else "gcode_macro nozzle_cam_y_feature_light"
     )
+    light_settings = _settings_section(settings, light_section)
     scope: dict[str, Any] = {
         "camera": "nozzle_cam",
         "profile": definition["profile"],
@@ -370,13 +414,32 @@ def _resolve_preflight(
             "rotation_distance": stepper_y.get("rotation_distance"),
             "microsteps": stepper_y.get("microsteps"),
         }
-    else:
+    elif job_type == BED_TAB_CORNER_JOB_TYPE:
         scope["corner_capture"] = {
             "position_min_mm": y_min,
             "y_offset_mm": definition["capture_y_offset_mm"],
             "duplicate_count": definition["duplicate_count"],
             "velocity_mm_s": definition["velocity_mm_s"],
             "settle_ms": definition["settle_ms"],
+        }
+    else:
+        scope["red_marker_sweep"] = {
+            "x_positions_mm": definition["x_positions_mm"],
+            "capture_y_mm": definition["capture_y_mm"],
+            "capture_z_mm": definition["capture_z_mm"],
+            "safe_tool_change_z_mm": definition["safe_tool_change_z_mm"],
+            "velocity_mm_s": definition["velocity_mm_s"],
+            "settle_ms": definition["settle_ms"],
+            "tool_change_settle_ms": definition["tool_change_settle_ms"],
+            "discard_fresh_frames": definition["discard_fresh_frames"],
+            "t0_x_limits_mm": [
+                _number(stepper_x, "position_min", "stepper_x"),
+                _number(stepper_x, "position_max", "stepper_x"),
+            ],
+            "t1_x_limits_mm": [
+                _number(dual_carriage, "position_min", "dual_carriage"),
+                _number(dual_carriage, "position_max", "dual_carriage"),
+            ],
         }
     return {
         "fingerprint": fingerprint,
@@ -387,7 +450,30 @@ def _resolve_preflight(
             "y_base_mm": y_min,
             "y_endstop_mm": y_endstop,
             "z_mm": z_max,
+            **(
+                {
+                    "capture_y_mm": float(definition["capture_y_mm"]),
+                    "capture_z_mm": float(definition["capture_z_mm"]),
+                    "safe_tool_change_z_mm": float(
+                        definition["safe_tool_change_z_mm"]
+                    ),
+                }
+                if job_type == RED_MARKER_X_JOB_TYPE
+                else {}
+            ),
         },
+        "active_calibration_snapshot": (
+            {
+                "t0_x_endstop_mm": _number(
+                    stepper_x, "position_endstop", "stepper_x"
+                ),
+                "t1_x_endstop_mm": _number(
+                    dual_carriage, "position_endstop", "dual_carriage"
+                ),
+            }
+            if job_type == RED_MARKER_X_JOB_TYPE
+            else None
+        ),
         "axis_minimum": axis_minimum,
         "axis_maximum": axis_maximum,
         "framebuffer": {
@@ -423,6 +509,55 @@ def _gcode(
     pose: dict[str, float],
 ) -> str:
     feedrate = float(definition["velocity_mm_s"]) * 60.0
+    if job_type == RED_MARKER_X_JOB_TYPE:
+        lines = [
+            f"; vision calibration job {job_id}",
+            "G90",
+            (
+                f"VISION_JOB_BEGIN JOB={job_id} "
+                f"MANIFEST_HASH={manifest_hash} GCODE_HASH={gcode_hash}"
+            ),
+            ("VISION_PROFILE CAMERA=nozzle_cam " f"PROFILE={definition['profile']}"),
+            definition["light_macro"],
+        ]
+        seq = 0
+        for tool in ("T0", "T1"):
+            lines.extend(
+                [
+                    f"G1 Z{pose['safe_tool_change_z_mm']:.6f} F{feedrate:.3f}",
+                    tool,
+                    f"G1 Z{pose['safe_tool_change_z_mm']:.6f} F{feedrate:.3f}",
+                    f"G1 Y{pose['capture_y_mm']:.6f} F{feedrate:.3f}",
+                    "M400",
+                    f"G4 P{int(definition['tool_change_settle_ms'])}",
+                ]
+            )
+            for x_mm in definition["x_positions_mm"]:
+                frame = f"{seq:02d}_{tool.lower()}_x{int(x_mm)}"
+                lines.extend(
+                    [
+                        f"G1 X{float(x_mm):.6f} F{feedrate:.3f}",
+                        "M400",
+                        f"G4 P{int(definition['settle_ms'])}",
+                        (
+                            f"VISION_CAPTURE_SYNC JOB={job_id} SEQ={seq} "
+                            f"FRAME={frame} CAMERA=nozzle_cam "
+                            f"PROFILE={definition['profile']} TOOL={tool}"
+                        ),
+                    ]
+                )
+                seq += 1
+        lines.extend(
+            [
+                f"G1 Z{pose['safe_tool_change_z_mm']:.6f} F{feedrate:.3f}",
+                "T0",
+                f"G1 Z{pose['safe_tool_change_z_mm']:.6f} F{feedrate:.3f}",
+                (f"VISION_JOB_END JOB={job_id} " f"EXPECTED_FRAMES={seq}"),
+                "VISION_LIGHT_OFF",
+                "",
+            ]
+        )
+        return "\n".join(lines)
     lines = [
         f"; vision calibration job {job_id}",
         "G90",
@@ -587,12 +722,14 @@ def prepare_job(
     corner_prediction = None
     if job_type == BED_TAB_CORNER_JOB_TYPE:
         sync_seed_facts()
+    if job_type in (BED_TAB_CORNER_JOB_TYPE, RED_MARKER_X_JOB_TYPE):
         for requirement in definition["requires"]:
             binding, fact = _resolve_current_fact(
                 requirement["requirement"], requirement["fact_name"]
             )
             input_facts.append(binding)
             input_fact_values[requirement["requirement"]] = fact
+    if job_type == BED_TAB_CORNER_JOB_TYPE:
         corner_prediction = _bed_tab_corner_prediction(
             input_fact_values["bed_y_model"],
             float(definition["capture_y_offset_mm"]),
@@ -632,7 +769,7 @@ def prepare_job(
                     "pass": "forward" if seq < forward_count else "reverse",
                 }
             )
-    else:
+    elif job_type == BED_TAB_CORNER_JOB_TYPE:
         offset = float(definition["capture_y_offset_mm"])
         for seq in range(int(definition["duplicate_count"])):
             frames.append(
@@ -652,6 +789,29 @@ def prepare_job(
                     "pass": "duplicate",
                 }
             )
+    else:
+        for tool in ("T0", "T1"):
+            for x_mm in definition["x_positions_mm"]:
+                seq = len(frames)
+                frames.append(
+                    {
+                        "seq": seq,
+                        "frame": f"{seq:02d}_{tool.lower()}_x{int(x_mm)}",
+                        "camera": "nozzle_cam",
+                        "profile": definition["profile"],
+                        "tool": tool,
+                        "x_mm": x_mm,
+                        "commanded_position_mm": [
+                            float(x_mm),
+                            resolved["pose"]["capture_y_mm"],
+                            resolved["pose"]["capture_z_mm"],
+                        ],
+                        "pass": tool.lower(),
+                        "discard_fresh_frames": int(
+                            definition["discard_fresh_frames"]
+                        ),
+                    }
+                )
     manifest = {
         "schema": MANIFEST_SCHEMA,
         "schema_version": SCHEMA_VERSION,
@@ -688,6 +848,10 @@ def prepare_job(
         "gcode_hash": HASH_PLACEHOLDER,
         "manifest_hash": HASH_PLACEHOLDER,
     }
+    if job_type == RED_MARKER_X_JOB_TYPE:
+        manifest["active_calibration_snapshot"] = resolved[
+            "active_calibration_snapshot"
+        ]
     if corner_prediction is not None:
         prior_value = input_fact_values["bed_tab_corner_prior"]["value"]
         z_value = input_fact_values["tab_plane_z"]["value"]
@@ -696,6 +860,18 @@ def prepare_job(
             "corner_printer_xyz_mm": prior_value["xyz_mm"],
             "tab_to_print_plane_z_mm": z_value["z_offset_mm"],
             "prior_provisional": bool(prior_value.get("provisional")),
+        }
+    if job_type == RED_MARKER_X_JOB_TYPE:
+        partial_value = input_fact_values["partial_bed_coordinate_system"]["value"]
+        bed_y_value = input_fact_values["bed_y_model"]["value"]
+        manifest["red_marker_reference"] = {
+            "corner_pixel_xy_px": partial_value["corner_pixel_xy_px"],
+            "corner_printer_xyz_mm": partial_value["corner_printer_xyz_mm"],
+            "image_y_axis_vector_px_per_mm": bed_y_value[
+                "axis_vector_px_per_mm"
+            ],
+            "capture_y_mm": float(definition["capture_y_mm"]),
+            "capture_z_mm": float(definition["capture_z_mm"]),
         }
     placeholder_gcode = _gcode(
         job_id,
@@ -803,6 +979,18 @@ def _frame_integrity(
             )
         profiles.update(str(item) for item in profile_names)
         framebuffer_sequences.append(int(sidecar["framebuffer_seq"]))
+        if manifest["job_type"] == RED_MARKER_X_JOB_TYPE:
+            discarded = sidecar.get("discarded_framebuffer_sequences")
+            if (
+                not isinstance(discarded, list)
+                or len(discarded) != 1
+                or not isinstance(discarded[0], int)
+                or discarded[0] >= int(sidecar["framebuffer_seq"])
+            ):
+                raise VisionCalibrationError(
+                    f"frame {frame['frame']} lacks its required discarded "
+                    "fresh-frame provenance"
+                )
         paths.append(image_path)
         sidecars.append(sidecar)
     if len(dimensions) != 1:
@@ -820,6 +1008,59 @@ def _analysis_run_id(manifest: dict[str, Any]) -> str:
 def _report_markdown(
     manifest: dict[str, Any], analysis: dict[str, Any], result: dict[str, Any]
 ) -> str:
+    if manifest.get("job_type") == RED_MARKER_X_JOB_TYPE:
+        lines = [
+            "# Coarse T0/T1 red-marker X sweep",
+            "",
+            f"- Job: `{manifest['job_id']}`",
+            f"- Analysis: `{analysis['analysis_run_id']}`",
+            f"- Result: **{analysis['state']}**",
+            (
+                "- Common image X-axis vector: "
+                f"`{result.get('common_axis_vector_px_per_mm')}` px/mm"
+            ),
+            (
+                "- Accepted T0 X positions: "
+                f"`{result.get('accepted_x_mm', {}).get('T0')}` mm"
+            ),
+            (
+                "- Accepted T1 X positions: "
+                f"`{result.get('accepted_x_mm', {}).get('T1')}` mm"
+            ),
+            (
+                "- Common commanded X: "
+                f"`{result.get('common_commanded_x_mm')}` mm"
+            ),
+            (
+                "- Cross-tool marker shift: "
+                f"`{result.get('cross_tool_shift_px')}` px"
+            ),
+            (
+                "- T0 marker to bed-tab X: "
+                f"`{result.get('t0_red_marker_to_bed_tab_x_mm')}` mm"
+            ),
+            (
+                "- T1 marker to bed-tab X: "
+                f"`{result.get('t1_red_marker_to_bed_tab_x_mm')}` mm"
+            ),
+            (
+                "- Rough T1 X correction: "
+                f"`{result.get('rough_t1_x_error_relative_to_t0_mm')}` mm"
+            ),
+            "",
+            "Red color only proposed candidate regions. The published coordinate "
+            "facts come from bidirectional grayscale/CLAHE registration and the "
+            "dependency-bound bed-tab coordinate system.",
+            "This job publishes facts but does not modify calib.yaml or live "
+            "Klipper coordinates.",
+        ]
+        if result.get("warnings"):
+            lines.extend(["", "## Warnings", ""])
+            lines.extend(f"- {warning}" for warning in result["warnings"])
+        if analysis["state"] == "rejected":
+            lines.extend(["", "## Rejection reasons", ""])
+            lines.extend(f"- {reason}" for reason in result.get("reasons", []))
+        return "\n".join(lines) + "\n"
     if manifest.get("job_type", BED_TAB_Y_JOB_TYPE) == BED_TAB_CORNER_JOB_TYPE:
         corner = result.get("corner_pixel_xy_px")
         reference = manifest["corner_reference"]
@@ -980,6 +1221,12 @@ def analyze_job(job_id: str) -> dict[str, Any]:
         raise VisionCalibrationError(
             "only definition-v1 bed-tab corner jobs use the current localizer"
         )
+    if manifest["job_type"] == RED_MARKER_X_JOB_TYPE and (
+        manifest["definition_version"] != 1
+    ):
+        raise VisionCalibrationError(
+            "only definition-v1 red-marker jobs use the current localizer"
+        )
     state = load_json(job_dir / "state.json")
     if state.get("state") not in ("acquired", "analyzed", "rejected"):
         raise VisionCalibrationError(
@@ -1006,11 +1253,19 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 ],
                 localizer=manifest["localizer"],
             )
-        else:
+        elif manifest["job_type"] == BED_TAB_CORNER_JOB_TYPE:
             result_details = analyze_bed_tab_corner(
                 frame_paths,
                 staging_dir / "artifacts",
                 expected_corner_px=manifest["corner_reference"]["expected_corner_px"],
+                localizer=manifest["localizer"],
+            )
+        else:
+            result_details = analyze_red_marker_x_sweep(
+                frame_paths,
+                staging_dir / "artifacts",
+                frames=manifest["frames"],
+                reference=manifest["red_marker_reference"],
                 localizer=manifest["localizer"],
             )
         for artifact in result_details.get("artifacts", {}).values():
@@ -1137,7 +1392,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                     }
                 ]
                 observed_provenance = result_details["observed_target"]
-            else:
+            elif manifest["job_type"] == BED_TAB_CORNER_JOB_TYPE:
                 dependencies = [
                     {
                         "fact_name": item["fact_name"],
@@ -1246,6 +1501,138 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                     "corner_pixel_xy_px": result_details["corner_pixel_xy_px"],
                     "selected_candidate": result_details["selected_candidate"],
                 }
+            else:
+                dependencies = [
+                    {
+                        "fact_name": item["fact_name"],
+                        "fact_set_hash": item["fact_set_hash"],
+                    }
+                    for item in manifest["input_facts"]
+                ]
+                diagnostic_fields = [
+                    {"field": "camera", "role": "diagnostic"},
+                    {"field": "profile", "role": "diagnostic"},
+                    {"field": "light_macro", "role": "diagnostic"},
+                    {"field": "image_dimensions_px", "role": "diagnostic"},
+                    {"field": "quality", "role": "diagnostic"},
+                    {
+                        "field": "supporting_artifact_hashes",
+                        "role": "diagnostic",
+                    },
+                ]
+                diagnostics = {
+                    "camera": manifest["camera"],
+                    "profile": manifest["profile"],
+                    "light_macro": manifest["light_macro"],
+                    "image_dimensions_px": [width, height],
+                    "quality": {
+                        "accepted_x_mm": result_details["accepted_x_mm"],
+                        "tool_axis_vectors_px_per_mm": result_details[
+                            "tool_axis_vectors_px_per_mm"
+                        ],
+                        "tool_fit_rms_px": result_details["tool_fit_rms_px"],
+                        "tool_minimum_correlation": result_details[
+                            "tool_minimum_correlation"
+                        ],
+                        "tool_scale_delta_fraction": result_details[
+                            "tool_scale_delta_fraction"
+                        ],
+                        "tool_angle_delta_deg": result_details[
+                            "tool_angle_delta_deg"
+                        ],
+                        "cross_tool_minimum_correlation": result_details[
+                            "cross_tool_minimum_correlation"
+                        ],
+                        "cross_tool_shift_px": result_details[
+                            "cross_tool_shift_px"
+                        ],
+                        "warnings": result_details["warnings"],
+                    },
+                    "supporting_artifact_hashes": {
+                        name: item["sha256"]
+                        for name, item in result_details["artifacts"].items()
+                    },
+                }
+
+                def coordinate_fact(
+                    name: str,
+                    coordinate_value: dict[str, Any],
+                    coordinate_fields: list[str],
+                ) -> dict[str, Any]:
+                    return {
+                        "name": name,
+                        "definition_version": 4,
+                        "role": "coordinate_system",
+                        "dependencies": dependencies,
+                        "value_items": [
+                            *[
+                                {"field": field, "role": "coordinate_system"}
+                                for field in coordinate_fields
+                            ],
+                            *diagnostic_fields,
+                        ],
+                        "value": {**coordinate_value, **diagnostics},
+                    }
+
+                common_x = result_details["common_commanded_x_mm"]
+                facts = [
+                    coordinate_fact(
+                        "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
+                        {
+                            "axis_vector_px_per_mm": result_details[
+                                "common_axis_vector_px_per_mm"
+                            ]
+                        },
+                        ["axis_vector_px_per_mm"],
+                    ),
+                    coordinate_fact(
+                        "tool.t0.red_marker_to_bed_tab_x_mm",
+                        {
+                            "offset_mm": result_details[
+                                "t0_red_marker_to_bed_tab_x_mm"
+                            ],
+                            "reference_commanded_x_mm": common_x,
+                        },
+                        ["offset_mm", "reference_commanded_x_mm"],
+                    ),
+                    coordinate_fact(
+                        "tool.t1.red_marker_to_bed_tab_x_mm",
+                        {
+                            "offset_mm": result_details[
+                                "t1_red_marker_to_bed_tab_x_mm"
+                            ],
+                            "reference_commanded_x_mm": common_x,
+                        },
+                        ["offset_mm", "reference_commanded_x_mm"],
+                    ),
+                    coordinate_fact(
+                        "tool.t1.rough_x_error_relative_to_t0_mm",
+                        {
+                            "correction_mm": result_details[
+                                "rough_t1_x_error_relative_to_t0_mm"
+                            ],
+                            "candidate_t1_x_endstop_mm": (
+                                manifest["active_calibration_snapshot"][
+                                    "t1_x_endstop_mm"
+                                ]
+                                + result_details[
+                                    "rough_t1_x_error_relative_to_t0_mm"
+                                ]
+                            ),
+                        },
+                        ["correction_mm", "candidate_t1_x_endstop_mm"],
+                    ),
+                ]
+                observed_provenance = {
+                    "selected_candidate_ids": result_details[
+                        "selected_candidate_ids"
+                    ],
+                    "accepted_x_mm": result_details["accepted_x_mm"],
+                    "common_commanded_x_mm": common_x,
+                    "corner_pixel_at_capture_y_px": result_details[
+                        "corner_pixel_at_capture_y_px"
+                    ],
+                }
             fact_set = {
                 "schema": FACT_SET_SCHEMA,
                 "schema_version": SCHEMA_VERSION,
@@ -1326,12 +1713,20 @@ def run_job(
         load_json(CALIBRATION_ROOT / "jobs" / prepared["job_id"] / "manifest.json")
     )
     current = query_printer_status()
-    _resolve_preflight(
+    current_resolved = _resolve_preflight(
         current,
         job_type,
         _load_registry()["job_types"][job_type],
         expected_fingerprint or manifest["provenance"]["active_printer_fingerprint"],
     )
+    if (
+        job_type == RED_MARKER_X_JOB_TYPE
+        and current_resolved["active_calibration_snapshot"]
+        != manifest["active_calibration_snapshot"]
+    ):
+        raise VisionCalibrationError(
+            "active T0/T1 X calibration changed after red-marker preparation"
+        )
     if manifest.get("input_facts"):
         catalog = rebuild_catalog(CALIBRATION_ROOT)
         for binding in manifest["input_facts"]:
@@ -1364,10 +1759,15 @@ def _write_job_page(job: dict[str, Any], root: Path) -> None:
             if image.exists()
             else "<span>pending</span>"
         )
+        position_label = (
+            f"{frame['tool']} X={frame['x_mm']} mm"
+            if "x_mm" in frame
+            else f"Y offset={frame.get('y_offset_mm')} mm"
+        )
         rows.append(
             "<tr>"
             f"<td>{frame['seq']}</td>"
-            f"<td>{frame['y_offset_mm']}</td>"
+            f"<td>{html.escape(position_label)}</td>"
             f"<td>{html.escape(frame['pass'])}</td>"
             f"<td>{image_html}</td>"
             "</tr>"
@@ -1394,6 +1794,10 @@ def _write_job_page(job: dict[str, Any], root: Path) -> None:
             artifact_items = []
             artifacts = result.get("diagnostics", {}).get("artifacts", {})
             artifact_order = (
+                "marker_selection",
+                "core_registration",
+                "cross_tool_registration",
+                "trajectory",
                 "corner_localization",
                 "corner_duplicate_registration",
                 "edge_localization",
@@ -1431,6 +1835,10 @@ def _write_job_page(job: dict[str, Any], root: Path) -> None:
                         "edge_tracking_overlay",
                         "motion_overlay_contact_sheet",
                         "motion_grid_overlay",
+                        "marker_selection",
+                        "core_registration",
+                        "cross_tool_registration",
+                        "trajectory",
                     )
                     else ""
                 )
@@ -1479,7 +1887,45 @@ def _write_job_page(job: dict[str, Any], root: Path) -> None:
                 corner_duplicates = artifacts.get("corner_duplicate_registration")
                 edge_localization = artifacts.get("edge_localization")
                 edge_tracking = artifacts.get("edge_tracking_overlay")
-                if corner_localization and corner_duplicates:
+                marker_selection = artifacts.get("marker_selection")
+                core_registration = artifacts.get("core_registration")
+                cross_tool_registration = artifacts.get(
+                    "cross_tool_registration"
+                )
+                if marker_selection and core_registration and cross_tool_registration:
+                    selection_path = os.path.relpath(
+                        Path(marker_selection["path"]), job_dir
+                    )
+                    core_path = os.path.relpath(
+                        Path(core_registration["path"]), job_dir
+                    )
+                    cross_path = os.path.relpath(
+                        Path(cross_tool_registration["path"]), job_dir
+                    )
+                    overlay_html = (
+                        "<h3>Automatically selected red-marker trajectories</h3>"
+                        "<p>Green boxes are the marker observations used in the "
+                        "fit; red boxes are color candidates excluded by trajectory "
+                        "or registration consistency.</p>"
+                        f'<a href="{html.escape(selection_path)}">'
+                        f'<img class="hero-overlay" '
+                        f'src="{html.escape(selection_path)}"></a>'
+                        "<h3>Within-tool registration</h3>"
+                        "<p>The same shifted line grid is drawn on each accepted "
+                        "full frame so the measured motion can be compared directly "
+                        "with the visible marker motion.</p>"
+                        f'<a href="{html.escape(core_path)}">'
+                        f'<img class="hero-overlay" '
+                        f'src="{html.escape(core_path)}"></a>'
+                        "<h3>Cross-tool common-X registration</h3>"
+                        "<p>T0 and T1 are shown side by side at the accepted common "
+                        "commanded X. The boxes and crosses show the bidirectional "
+                        "grayscale/CLAHE registration.</p>"
+                        f'<a href="{html.escape(cross_path)}">'
+                        f'<img class="hero-overlay" '
+                        f'src="{html.escape(cross_path)}"></a>'
+                    )
+                elif corner_localization and corner_duplicates:
                     localization_path = os.path.relpath(
                         Path(corner_localization["path"]),
                         job_dir,
@@ -1584,7 +2030,7 @@ def _write_job_page(job: dict[str, Any], root: Path) -> None:
             '<a href="acquisition.gcode">G-code</a></p>'
             f"{latest_analysis_html}"
             f"<h2>Analyses</h2><ul>{''.join(analyses) or '<li>none</li>'}</ul>"
-            "<h2>Frames</h2><table><thead><tr><th>Seq</th><th>Y offset</th>"
+            "<h2>Frames</h2><table><thead><tr><th>Seq</th><th>Position</th>"
             f"<th>Pass</th><th>Image</th></tr></thead><tbody>{''.join(rows)}</tbody></table>"
         ),
         prefix="../../../",
@@ -1665,6 +2111,18 @@ def _fact_title(name: str) -> str:
         ),
         "camera.nozzle_cam.partial_bed_coordinate_system": (
             "Nozzle camera — partial bed coordinate system"
+        ),
+        "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2": (
+            "Nozzle camera — image X axis at Z2"
+        ),
+        "tool.t0.red_marker_to_bed_tab_x_mm": (
+            "T0 red marker — X from bed tab"
+        ),
+        "tool.t1.red_marker_to_bed_tab_x_mm": (
+            "T1 red marker — X from bed tab"
+        ),
+        "tool.t1.rough_x_error_relative_to_t0_mm": (
+            "T1 rough X correction"
         ),
     }
     if name in titles:
@@ -1760,6 +2218,10 @@ def _fact_card(
         ("corner_printer_xyz_mm", "Corner printer XYZ", "mm"),
         ("z_offset_mm", "Z offset", "mm"),
         ("tab_to_print_plane_z_mm", "Tab to print-plane Z", "mm"),
+        ("offset_mm", "Marker X from bed tab", "mm"),
+        ("reference_commanded_x_mm", "Reference commanded X", "mm"),
+        ("correction_mm", "T1 X correction", "mm"),
+        ("candidate_t1_x_endstop_mm", "Candidate T1 X endstop", "mm"),
     )
     for field, label, unit in coordinate_metric_specs:
         if field not in coordinate_fields or field not in value:

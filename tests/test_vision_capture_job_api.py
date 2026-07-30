@@ -191,3 +191,57 @@ def test_capture_api_commits_six_fresh_frames(monkeypatch, tmp_path):
         == "acquired"
     )
     assert not (job_root / ".active_job.json").exists()
+
+
+def test_capture_api_discards_requested_fresh_frame_before_commit(
+    monkeypatch, tmp_path
+):
+    module = _module(monkeypatch, tmp_path)
+    job_root, manifest = _prepare(module, tmp_path)
+    job_dir = job_root / manifest["job_id"]
+    manifest["frames"][0]["discard_fresh_frames"] = 1
+    manifest["manifest_hash"] = module.compute_manifest_hash(manifest)
+    gcode = (
+        f"VISION_JOB_BEGIN JOB={manifest['job_id']} "
+        f"MANIFEST_HASH={module.HASH_PLACEHOLDER} "
+        f"GCODE_HASH={module.HASH_PLACEHOLDER}\n"
+    )
+    manifest["gcode_hash"] = module.compute_gcode_hash(gcode)
+    manifest["manifest_hash"] = module.compute_manifest_hash(manifest)
+    final_gcode = gcode.replace(
+        f"MANIFEST_HASH={module.HASH_PLACEHOLDER}",
+        f"MANIFEST_HASH={manifest['manifest_hash']}",
+    ).replace(
+        f"GCODE_HASH={module.HASH_PLACEHOLDER}",
+        f"GCODE_HASH={manifest['gcode_hash']}",
+    )
+    (job_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (job_dir / "acquisition.gcode").write_text(final_gcode, encoding="utf-8")
+    api = module.VisionJobApi(job_root=job_root)
+    source = module.FRAMEBUFFER_LATEST_IMAGE
+    sequence = {"value": 10}
+
+    def fresh(previous_seq, *, timeout, profile):
+        assert previous_seq == sequence["value"]
+        sequence["value"] += 1
+        return source, {
+            "frame_seq": sequence["value"],
+            "captured_at_utc": "2026-07-30T00:00:00+00:00",
+            "camera_profile": {"profile_names": ["analysis"]},
+        }
+
+    monkeypatch.setattr(module, "wait_for_new_frame", fresh)
+    api.job_begin(_begin(manifest))
+    frame = manifest["frames"][0]
+    sidecar = api.capture(
+        {
+            "job": manifest["job_id"],
+            "seq": 0,
+            "frame": frame["frame"],
+            "camera": "nozzle_cam",
+            "profile": "analysis",
+            "tool": "T0",
+        }
+    )
+    assert sidecar["discarded_framebuffer_sequences"] == [11]
+    assert sidecar["framebuffer_seq"] == 12

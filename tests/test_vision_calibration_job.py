@@ -94,8 +94,16 @@ def _status(*, homed="xyz", virtual_sd=False, y_max=230.0):
                     "position_endstop": 293.75,
                     "position_max": 293.75,
                 },
+                "dual_carriage": {
+                    "position_min": 110.0,
+                    "position_endstop": 357.532,
+                    "position_max": 357.532,
+                },
                 "gcode_macro nozzle_cam_y_feature_light": {
                     "gcode": "VISION_LIGHT_OFF\nSET_LED LED=vision_light INDEX=2 RED=0.45"
+                },
+                "gcode_macro nozzle_cam_analysis_light": {
+                    "gcode": "VISION_LIGHT_OFF\nSET_LED LED=vision_light INDEX=5 RED=0.20"
                 },
             },
         },
@@ -159,6 +167,106 @@ def _publish_test_bed_y_fact(module):
     module.atomic_write_json(path, fact_set, immutable=True)
     module.publish_seed_fact_set(module.CALIBRATION_ROOT, path)
     return fact_set
+
+
+def _publish_test_partial_bed_fact(module, bed_y):
+    fact_set = {
+        "schema": module.FACT_SET_SCHEMA,
+        "schema_version": 1,
+        "fact_set_id": "seed:test-partial-bed",
+        "job_id": "seed:test-partial-bed",
+        "analysis_run_id": "revision-1",
+        "analysis_hash": module.canonical_hash({"test": "partial-bed"}),
+        "created_at_utc": "2026-07-30T00:00:00+00:00",
+        "accepted": True,
+        "publication_eligible": True,
+        "applicability_hash": module.canonical_hash({"test": "partial-bed-scope"}),
+        "facts": [
+            {
+                "name": "camera.nozzle_cam.partial_bed_coordinate_system",
+                "definition_version": 4,
+                "role": "coordinate_system",
+                "dependencies": [
+                    {
+                        "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model",
+                        "fact_set_hash": bed_y["fact_set_hash"],
+                    }
+                ],
+                "value_items": [
+                    {"field": "corner_pixel_xy_px", "role": "coordinate_system"},
+                    {"field": "corner_printer_xyz_mm", "role": "coordinate_system"},
+                    {
+                        "field": "image_y_axis_vector_px_per_mm",
+                        "role": "coordinate_system",
+                    },
+                    {
+                        "field": "tab_to_print_plane_z_mm",
+                        "role": "coordinate_system",
+                    },
+                ],
+                "value": {
+                    "corner_pixel_xy_px": [922.0, 216.5],
+                    "corner_printer_xyz_mm": [170.0, -20.0, 0.0],
+                    "image_y_axis_vector_px_per_mm": [-0.22, -10.5],
+                    "tab_to_print_plane_z_mm": 0.0,
+                },
+            }
+        ],
+        "provenance": {"source": "test"},
+        "fact_set_hash": "",
+    }
+    fact_set["fact_set_hash"] = module.content_hash(fact_set, "fact_set_hash")
+    path = (
+        module.CALIBRATION_ROOT
+        / "seeds"
+        / fact_set["fact_set_hash"][7:23]
+        / "fact_set.json"
+    )
+    module.atomic_write_json(path, fact_set, immutable=True)
+    module.publish_seed_fact_set(module.CALIBRATION_ROOT, path)
+    return fact_set
+
+
+def test_prepare_red_marker_sweep_binds_facts_and_discards_transition_frames(
+    monkeypatch, tmp_path
+):
+    module = _load(monkeypatch, tmp_path)
+    bed_y = _publish_test_bed_y_fact(module)
+    partial = _publish_test_partial_bed_fact(module, bed_y)
+    result = module.prepare_job(
+        "red_marker",
+        job_type="idex_tool_red_marker_x_sweep",
+        expected_fingerprint="sha256:active",
+        status=_status(),
+    )
+    job_dir = Path(result["job_dir"])
+    manifest = json.loads((job_dir / "manifest.json").read_text())
+    gcode = (job_dir / "acquisition.gcode").read_text()
+
+    assert manifest["frame_count"] == 12
+    assert [(frame["tool"], frame["x_mm"]) for frame in manifest["frames"]] == [
+        (tool, x)
+        for tool in ("T0", "T1")
+        for x in (160, 170, 180, 190, 200, 210)
+    ]
+    assert all(frame["discard_fresh_frames"] == 1 for frame in manifest["frames"])
+    assert manifest["active_calibration_snapshot"] == {
+        "t0_x_endstop_mm": -80.4,
+        "t1_x_endstop_mm": 357.532,
+    }
+    bindings = {item["requirement"]: item for item in manifest["input_facts"]}
+    assert bindings["bed_y_model"]["fact_set_hash"] == bed_y["fact_set_hash"]
+    assert (
+        bindings["partial_bed_coordinate_system"]["fact_set_hash"]
+        == partial["fact_set_hash"]
+    )
+    assert "G28" not in gcode
+    assert gcode.count("VISION_CAPTURE_SYNC ") == 12
+    assert gcode.index("\nT0\n") < gcode.index("FRAME=00_t0_x160")
+    assert gcode.index("\nT1\n") < gcode.index("FRAME=06_t1_x160")
+    assert "G1 Z5.000000 F3600.000\nT0\nG1 Z5.000000 F3600.000" in gcode
+    assert gcode.rindex("\nT0\n") < gcode.index("VISION_JOB_END")
+    assert gcode.index("VISION_JOB_END") < gcode.index("VISION_LIGHT_OFF")
 
 
 def test_prepare_resolves_active_limits_and_generates_exact_motion(

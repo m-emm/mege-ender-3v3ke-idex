@@ -20,6 +20,7 @@ required_files=(
   vision_calibration_graph.py
   vision_bed_tab_y_scale.py
   vision_bed_tab_corner.py
+  vision_red_marker_x_sweep.py
   vision_job_types.json
   vision_calibration_priors.json
   webcam_health_probe.py
@@ -79,6 +80,7 @@ scp \
   "${FILES_DIR}/vision_calibration_graph.py" \
   "${FILES_DIR}/vision_bed_tab_y_scale.py" \
   "${FILES_DIR}/vision_bed_tab_corner.py" \
+  "${FILES_DIR}/vision_red_marker_x_sweep.py" \
   "${FILES_DIR}/vision_job_types.json" \
   "${FILES_DIR}/vision_calibration_priors.json" \
   "${FILES_DIR}/webcam_health_probe.py" \
@@ -195,6 +197,7 @@ sudo install -m 0755 "${REMOTE_TMP}/vision_calibration.py" /usr/local/bin/vision
 sudo install -m 0644 "${REMOTE_TMP}/vision_calibration_graph.py" /usr/local/bin/vision_calibration_graph.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_bed_tab_y_scale.py" /usr/local/bin/vision_bed_tab_y_scale.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_bed_tab_corner.py" /usr/local/bin/vision_bed_tab_corner.py
+sudo install -m 0644 "${REMOTE_TMP}/vision_red_marker_x_sweep.py" /usr/local/bin/vision_red_marker_x_sweep.py
 sudo install -m 0755 "${REMOTE_TMP}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py
 sudo install -m 0644 "${REMOTE_TMP}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json
 sudo install -m 0644 "${REMOTE_TMP}/vision_job_types.json" /usr/local/share/vision/vision_job_types.json
