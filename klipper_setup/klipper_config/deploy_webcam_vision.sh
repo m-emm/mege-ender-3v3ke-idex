@@ -19,6 +19,8 @@ required_files=(
   vision_calibration.py
   vision_calibration_graph.py
   vision_bed_fiducial.py
+  vision_fine_tool_calibration.py
+  vision_fine_tool_xy_verification.py
   vision_nozzle_fine_xz.py
   vision_red_marker_x_sweep.py
   vision_rough_x_verification.py
@@ -80,6 +82,8 @@ scp \
   "${FILES_DIR}/vision_calibration.py" \
   "${FILES_DIR}/vision_calibration_graph.py" \
   "${FILES_DIR}/vision_bed_fiducial.py" \
+  "${FILES_DIR}/vision_fine_tool_calibration.py" \
+  "${FILES_DIR}/vision_fine_tool_xy_verification.py" \
   "${FILES_DIR}/vision_nozzle_fine_xz.py" \
   "${FILES_DIR}/vision_red_marker_x_sweep.py" \
   "${FILES_DIR}/vision_rough_x_verification.py" \
@@ -179,6 +183,7 @@ sudo apt-get install -y --no-install-recommends \
   sudo \
   python3 \
   python3-opencv \
+  python3-yaml \
   v4l-utils
 
 echo "Installing tracked configs and services..."
@@ -211,6 +216,8 @@ sudo install -m 0755 "${REMOTE_TMP}/vision_capture.py" /usr/local/bin/vision_cap
 sudo install -m 0755 "${REMOTE_TMP}/vision_calibration.py" /usr/local/bin/vision_calibration.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_calibration_graph.py" /usr/local/bin/vision_calibration_graph.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_bed_fiducial.py" /usr/local/bin/vision_bed_fiducial.py
+sudo install -m 0644 "${REMOTE_TMP}/vision_fine_tool_calibration.py" /usr/local/bin/vision_fine_tool_calibration.py
+sudo install -m 0644 "${REMOTE_TMP}/vision_fine_tool_xy_verification.py" /usr/local/bin/vision_fine_tool_xy_verification.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_nozzle_fine_xz.py" /usr/local/bin/vision_nozzle_fine_xz.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_red_marker_x_sweep.py" /usr/local/bin/vision_red_marker_x_sweep.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_rough_x_verification.py" /usr/local/bin/vision_rough_x_verification.py

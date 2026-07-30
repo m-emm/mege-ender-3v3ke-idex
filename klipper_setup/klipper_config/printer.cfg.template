@@ -303,6 +303,26 @@ gcode:
         active_config_fingerprint=fingerprint
     )}
 
+[gcode_macro IDEX_FINE_TOOL_XY_VERIFY]
+description: Independently verify active fine T0/T1 X/Y calibration with six safe frames.
+gcode:
+    {% set name = params.NAME|default("fine_tool_xy_verify") %}
+    {% set print_state = printer.print_stats.state %}
+    {% set homed = printer.toolhead.homed_axes %}
+    {% set fingerprint = printer["gcode_macro _IDEX_CONFIG_FINGERPRINT"].source_sha256 %}
+    {% if print_state not in ["standby", "complete"] %}
+        { action_raise_error("IDEX_FINE_TOOL_XY_VERIFY requires an idle printer; print_stats.state=" ~ print_state) }
+    {% endif %}
+    {% if "x" not in homed or "y" not in homed or "z" not in homed %}
+        { action_raise_error("IDEX_FINE_TOOL_XY_VERIFY requires X/Y/Z homed; it never homes automatically.") }
+    {% endif %}
+    RESPOND TYPE=echo MSG="Fine T0/T1 X/Y verification queued: NAME={name}. Z remains pending Eddy verification."
+    {action_call_remote_method(
+        "idex_fine_tool_xy_verify",
+        name=name,
+        active_config_fingerprint=fingerprint
+    )}
+
 
 # Custom thermistor calibration for the left Micro Swiss FlowTech toolhead.
 # Values retained from the same calibrated Micro Swiss hotend assembly.

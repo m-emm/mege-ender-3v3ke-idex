@@ -253,6 +253,64 @@
       "fact_names": [
         "camera.nozzle_cam.nozzle_tip.projection_model"
       ]
+    },
+    "idex_fine_tool_xy_verify": {
+      "definition_version": 1,
+      "fact_definition_version": 1,
+      "camera": "nozzle_cam",
+      "profile": "analysis",
+      "light_macro": "NOZZLE_CAM_ANALYSIS_LIGHT",
+      "localizer": {
+        "kind": "nozzle_tip_and_bed_fiducial_xy_verification",
+        "version": 1
+      },
+      "center_x_offset_from_bed_tab_mm": 16,
+      "capture_y_mm": -14,
+      "capture_z_mm": 5,
+      "x_dither_mm": 3,
+      "y_dither_mm": 3,
+      "safe_tool_change_z_mm": 9,
+      "velocity_mm_s": 60,
+      "settle_ms": 300,
+      "tool_change_settle_ms": 1000,
+      "discard_fresh_frames": 1,
+      "tip_search_size_px": 100,
+      "publish_on_accept": true,
+      "requires": [
+        {
+          "requirement": "bed_metric",
+          "fact_name": "camera.nozzle_cam.bed_fiducial.local_metric_model",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "partial_bed_coordinate_system",
+          "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "nozzle_tip_projection",
+          "fact_name": "camera.nozzle_cam.nozzle_tip.projection_model",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "t0_nozzle_coordinate",
+          "fact_name": "tool.t0.nozzle_to_bed_tab_xyz_mm",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "t1_nozzle_coordinate",
+          "fact_name": "tool.t1.nozzle_to_bed_tab_xyz_mm",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "fine_tool_xyz_active_snapshot",
+          "fact_name": "calibration.fine_tool_xyz.active_snapshot",
+          "fact_definition_version": 1
+        }
+      ],
+      "fact_names": [
+        "calibration.fine_tool_xy.verified"
+      ]
     }
   }
 }

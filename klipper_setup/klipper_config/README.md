@@ -113,6 +113,33 @@ It publishes the nozzle-tip projection and registration model. It deliberately
 does not publish absolute nozzle XYZ or infer Z by forcing the nozzle X vector
 to equal the bed X vector; that joint solve is a separate follow-up operation.
 
+Stage 5.1 performs that gated calculation:
+
+```bash
+/usr/local/bin/vision_calibration.py calculate-fine-tool-xyz
+```
+
+An accepted calculation writes a complete `calib_candidate.yaml` and publishes
+the two absolute nozzle-coordinate facts plus
+`calibration.fine_tool_xyz.candidate`. A rejected calculation remains visible
+under `/vision/`, publishes nothing, and must not be deployed. After deploying
+an accepted candidate, verify all four generated physical endstop mappings and
+both derived T1 Y/Z offsets by recording the active snapshot:
+
+```bash
+/usr/local/bin/vision_calibration.py record-fine-tool-xyz-activation \
+  <calculation-id> --expected-fingerprint=<active-config-fingerprint>
+```
+
+Then home and run the independent six-frame X/Y verification:
+
+```gcode
+IDEX_FINE_TOOL_XY_VERIFY NAME=fine_tool_xy_verify
+```
+
+Z is activated but remains explicitly `pending_eddy_verification`; the
+six-frame job verifies only X and Y.
+
 The corresponding host job types, in dependency order, are:
 
 ```text
@@ -122,6 +149,7 @@ nozzle_cam_bed_tab_corner
 idex_tool_red_marker_x_sweep
 idex_rough_tool_x_verify
 idex_nozzle_fine_xz_grid
+idex_fine_tool_xy_verify
 ```
 
 The seed values live in

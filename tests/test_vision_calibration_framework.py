@@ -84,6 +84,11 @@ def test_registry_is_exact_clean_chain():
     assert fine["fact_names"] == [
         "camera.nozzle_cam.nozzle_tip.projection_model"
     ]
+    verify = registry["job_types"]["idex_fine_tool_xy_verify"]
+    assert verify["center_x_offset_from_bed_tab_mm"] == 16
+    assert verify["x_dither_mm"] == 3
+    assert verify["y_dither_mm"] == 3
+    assert verify["fact_names"] == ["calibration.fine_tool_xy.verified"]
 
 
 def test_canonical_hash_is_order_independent_and_strict():

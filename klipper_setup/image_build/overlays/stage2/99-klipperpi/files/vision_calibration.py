@@ -20,6 +20,7 @@ from typing import Any
 
 import cv2
 import numpy as np
+import yaml
 
 from vision_bed_fiducial import (
     analyze_corner,
@@ -45,6 +46,13 @@ from vision_calibration_graph import (
     validate_registry,
 )
 from vision_nozzle_fine_xz import analyze as analyze_fine_nozzle_xz
+from vision_fine_tool_calibration import (
+    calculate_candidate as calculate_fine_tool_candidate,
+    write_artifacts as write_fine_tool_artifacts,
+)
+from vision_fine_tool_xy_verification import (
+    analyze as analyze_fine_tool_xy_verification,
+)
 from vision_red_marker_x_sweep import analyze as analyze_red_marker_x_sweep
 from vision_rough_x_verification import (
     analyze as analyze_rough_x_verification,
@@ -83,6 +91,12 @@ PRIOR_PATH = Path(
         "/usr/local/share/vision/vision_calibration_priors.json",
     )
 )
+CALIB_PATH = Path(
+    os.environ.get(
+        "VISION_CALIBRATION_CALIB_FILE",
+        "/usr/local/share/vision/calib.yaml",
+    )
+)
 FRAMEBUFFER_DIR = Path(
     os.environ.get("VISION_FRAMEBUFFER_DIR", "/run/vision-preview-nozzle_cam")
 )
@@ -94,6 +108,7 @@ BED_TAB_CORNER_JOB = "nozzle_cam_bed_tab_corner"
 RED_MARKER_X_JOB = "idex_tool_red_marker_x_sweep"
 ROUGH_X_VERIFY_JOB = "idex_rough_tool_x_verify"
 FINE_NOZZLE_XZ_JOB = "idex_nozzle_fine_xz_grid"
+FINE_TOOL_XY_VERIFY_JOB = "idex_fine_tool_xy_verify"
 JOB_TYPES = (
     BED_FIDUCIAL_LIGHTING_JOB,
     BED_FIDUCIAL_METRIC_JOB,
@@ -101,6 +116,7 @@ JOB_TYPES = (
     RED_MARKER_X_JOB,
     ROUGH_X_VERIFY_JOB,
     FINE_NOZZLE_XZ_JOB,
+    FINE_TOOL_XY_VERIFY_JOB,
 )
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 HASH_RE = re.compile(r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+")
@@ -296,6 +312,7 @@ def query_printer_status() -> dict[str, Any]:
     objects = (
         "webhooks&print_stats&virtual_sdcard&toolhead&gcode_move&configfile"
         "&extruder&extruder1&heater_bed&gcode_macro%20_IDEX_CONFIG_FINGERPRINT"
+        "&gcode_macro%20_IDEX_TOOL_STATE"
     )
     return _moonraker_get(f"/printer/objects/query?{objects}")["status"]
 
@@ -435,7 +452,12 @@ def _preflight(
                 pose["z_mm"],
             )
         )
-    elif job_type in {RED_MARKER_X_JOB, ROUGH_X_VERIFY_JOB, FINE_NOZZLE_XZ_JOB}:
+    elif job_type in {
+        RED_MARKER_X_JOB,
+        ROUGH_X_VERIFY_JOB,
+        FINE_NOZZLE_XZ_JOB,
+        FINE_TOOL_XY_VERIFY_JOB,
+    }:
         positions.append(
             (
                 axis_minimum[0],
@@ -443,7 +465,7 @@ def _preflight(
                 pose["safe_tool_change_z_mm"],
             )
         )
-    else:
+    elif job_type == FINE_NOZZLE_XZ_JOB:
         positions.append((pose["x_mm"], pose["y_base_mm"], pose["z_mm"]))
     for x, y, z in positions:
         if not (
@@ -617,6 +639,7 @@ def _gcode(
         )
         current_tool = None
         current_z = None
+        current_y = None
         for frame in frames:
             tool = frame["tool"]
             if tool != current_tool:
@@ -641,11 +664,16 @@ def _gcode(
                 )
                 current_tool = tool
                 current_z = pose["safe_tool_change_z_mm"]
+                current_y = float(frame["commanded_position_mm"][1])
             z_mm = float(frame["commanded_position_mm"][2])
             x_mm = float(frame["commanded_position_mm"][0])
+            y_mm = float(frame["commanded_position_mm"][1])
             if current_z != z_mm:
                 lines.append(f"G1 Z{z_mm:.6f} F{feedrate:.3f}")
                 current_z = z_mm
+            if current_y != y_mm:
+                lines.append(f"G1 Y{y_mm:.6f} F{feedrate:.3f}")
+                current_y = y_mm
             lines.extend(
                 [
                     f"G1 X{x_mm:.6f} F{feedrate:.3f}",
@@ -897,7 +925,7 @@ def prepare_job(
                     ],
                 }
             )
-    else:
+    elif job_type == FINE_NOZZLE_XZ_JOB:
         partial = input_values["partial_bed_coordinate_system"]
         x_axis = input_values["image_x_axis_z2"]["axis_vector_px_per_mm"]
         bed_tab_x = float(partial["corner_printer_xyz_mm"][0])
@@ -954,6 +982,51 @@ def prepare_job(
                             ],
                         }
                     )
+    else:
+        partial = input_values["partial_bed_coordinate_system"]
+        bed_tab_x = float(partial["corner_printer_xyz_mm"][0])
+        center_x = bed_tab_x + float(
+            definition["center_x_offset_from_bed_tab_mm"]
+        )
+        center_y = float(definition["capture_y_mm"])
+        center_z = float(definition["capture_z_mm"])
+        poses = [
+            ("center", center_x, center_y),
+            (
+                "x_dither",
+                center_x + float(definition["x_dither_mm"]),
+                center_y,
+            ),
+            (
+                "y_dither",
+                center_x,
+                center_y + float(definition["y_dither_mm"]),
+            ),
+        ]
+        for tool in ("T0", "T1"):
+            for pose_name, x_mm, y_mm in poses:
+                seq = len(frames)
+                frames.append(
+                    {
+                        "seq": seq,
+                        "frame": (
+                            f"{seq:02d}_{tool.lower()}_{pose_name}_"
+                            f"x{x_mm:.3f}_y{y_mm:.3f}_z{center_z:.3f}"
+                        ).replace(".", "p"),
+                        "camera": "nozzle_cam",
+                        "profile": definition["profile"],
+                        "tool": tool,
+                        "pose": pose_name,
+                        "discard_fresh_frames": int(
+                            definition["discard_fresh_frames"]
+                        ),
+                        "commanded_position_mm": [
+                            x_mm,
+                            y_mm,
+                            center_z,
+                        ],
+                    }
+                )
     manifest = {
         "schema": MANIFEST_SCHEMA,
         "schema_version": SCHEMA_VERSION,
@@ -991,7 +1064,11 @@ def prepare_job(
         "gcode_hash": HASH_PLACEHOLDER,
         "manifest_hash": HASH_PLACEHOLDER,
     }
-    if job_type in {RED_MARKER_X_JOB, FINE_NOZZLE_XZ_JOB}:
+    if job_type in {
+        RED_MARKER_X_JOB,
+        FINE_NOZZLE_XZ_JOB,
+        FINE_TOOL_XY_VERIFY_JOB,
+    }:
         manifest["active_calibration_snapshot"] = resolved[
             "active_calibration_snapshot"
         ]
@@ -1050,6 +1127,92 @@ def prepare_job(
                 "image_y_axis_vector_px_per_mm"
             ],
             "corner_pixel_at_fine_capture_px": corner_at_capture.tolist(),
+        }
+    elif job_type == FINE_TOOL_XY_VERIFY_JOB:
+        metric = input_values["bed_metric"]
+        projection = input_values["nozzle_tip_projection"]
+        active = input_values["fine_tool_xyz_active_snapshot"]
+        projection_binding = next(
+            item
+            for item in input_facts
+            if item["requirement"] == "nozzle_tip_projection"
+        )
+        projection_fact_set = load_json(
+            CALIBRATION_ROOT / projection_binding["fact_set_path"]
+        )
+        projection_job_id = projection_fact_set["job_id"]
+        projection_manifest = load_json(
+            CALIBRATION_ROOT
+            / "jobs"
+            / projection_job_id
+            / "manifest.json"
+        )
+        registrations = projection_fact_set["provenance"]["observations"][
+            "registrations"
+        ]
+        center_x = float(frames[0]["commanded_position_mm"][0])
+        tools = {}
+        for tool in ("T0", "T1"):
+            reference_record = min(
+                (
+                    record
+                    for record in registrations
+                    if record["tool"] == tool
+                ),
+                key=lambda record: (
+                    abs(float(record["x_mm"]) - center_x)
+                    + abs(float(record["z_mm"]) - float(definition["capture_z_mm"]))
+                ),
+            )
+            source_frame = projection_manifest["frames"][
+                int(reference_record["seq"])
+            ]
+            source_path = (
+                CALIBRATION_ROOT
+                / "jobs"
+                / projection_job_id
+                / "frames"
+                / f"{source_frame['frame']}.jpg"
+            )
+            if not source_path.is_file():
+                raise VisionCalibrationError(
+                    f"missing bound {tool} source template frame"
+                )
+            coordinate = input_values[
+                "t0_nozzle_coordinate"
+                if tool == "T0"
+                else "t1_nozzle_coordinate"
+            ]
+            tools[tool] = {
+                "projection_model": projection["tool_models"][tool],
+                "coordinate_residual_xyz_mm": coordinate[
+                    "coordinate_residual_xyz_mm"
+                ],
+                "source_frame_path": str(source_path),
+                "source_frame_sha256": sha256_file(source_path),
+                "source_center_px": reference_record["center_px"],
+                "source_sequence": int(reference_record["seq"]),
+                "template_size_px": int(reference_record["tip_roi_size_px"]),
+            }
+        manifest["fine_xy_verification_reference"] = {
+            "tools": tools,
+            "reference_marker_centers_px": metric[
+                "reference_marker_centers_px"
+            ],
+            "metric_reference_capture_y_mm": metric[
+                "reference_capture_y_mm"
+            ],
+            "image_y_axis_vector_px_per_mm": metric[
+                "image_y_axis_vector_px_per_mm"
+            ],
+            "x_dither_mm": float(definition["x_dither_mm"]),
+            "y_dither_mm": float(definition["y_dither_mm"]),
+            "tip_search_size_px": int(definition["tip_search_size_px"]),
+            "active_calculation_id": active["calculation_id"],
+            "active_config_fingerprint": active[
+                "active_config_fingerprint"
+            ],
+            "z_verification_status": active["z_verification_status"],
         }
     placeholder = _gcode(
         job_id, HASH_PLACEHOLDER, HASH_PLACEHOLDER, manifest, definition
@@ -1290,12 +1453,19 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 reference=manifest["verification_reference"],
                 localizer=manifest["localizer"],
             )
-        else:
+        elif job_type == FINE_NOZZLE_XZ_JOB:
             details = analyze_fine_nozzle_xz(
                 frame_paths,
                 artifact_dir,
                 frames=manifest["frames"],
                 reference=manifest["fine_reference"],
+            )
+        else:
+            details = analyze_fine_tool_xy_verification(
+                frame_paths,
+                artifact_dir,
+                frames=manifest["frames"],
+                reference=manifest["fine_xy_verification_reference"],
             )
         for artifact in details.get("artifacts", {}).values():
             path = Path(artifact["path"])
@@ -1575,7 +1745,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         dependencies,
                     )
                 ]
-            else:
+            elif job_type == FINE_NOZZLE_XZ_JOB:
                 projection = {
                     "tool_models": details["models"],
                     "bed_x_vector_fiducial_plane_px_per_mm": details[
@@ -1619,6 +1789,32 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                             "x_vector_z_slope_px_per_mm_per_mm",
                             "cross_tool_tip_offset_px_at_x189_z5",
                         },
+                    )
+                ]
+            else:
+                value = {
+                    "verified": True,
+                    "tool_results": details["tool_results"],
+                    "t1_minus_t0_x_residual_mm": details[
+                        "t1_minus_t0_x_residual_mm"
+                    ],
+                    "t1_minus_t0_y_residual_mm": details[
+                        "t1_minus_t0_y_residual_mm"
+                    ],
+                    "z_verification_status": details[
+                        "z_verification_status"
+                    ],
+                    "supporting_artifact_hashes": {
+                        key: item["sha256"]
+                        for key, item in details["artifacts"].items()
+                    },
+                }
+                facts = [
+                    _fact(
+                        "calibration.fine_tool_xy.verified",
+                        "diagnostic",
+                        value,
+                        dependencies,
                     )
                 ]
             fact_set = {
@@ -1855,6 +2051,419 @@ def record_rough_x_activation(
     return {"candidate": candidate, "activation": activation}
 
 
+def _load_calib_yaml(path: Path = CALIB_PATH) -> dict[str, Any]:
+    try:
+        value = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise VisionCalibrationError(f"missing synchronized calibration: {path}") from None
+    if not isinstance(value, dict) or not isinstance(value.get("tools"), dict):
+        raise VisionCalibrationError(f"{path} does not contain tools calibration")
+    for tool in ("t0", "t1"):
+        item = value["tools"].get(tool)
+        if not isinstance(item, dict):
+            raise VisionCalibrationError(f"{path} lacks tools.{tool}")
+        for axis in ("x", "y", "z"):
+            key = f"{axis}_endstop"
+            if not isinstance(item.get(key), (int, float)):
+                raise VisionCalibrationError(f"{path} lacks numeric tools.{tool}.{key}")
+    return value
+
+
+def _calib_datums(calib: dict[str, Any]) -> dict[str, dict[str, float]]:
+    return {
+        tool: {
+            f"{axis}_endstop": float(calib["tools"][tool][f"{axis}_endstop"])
+            for axis in ("x", "y", "z")
+        }
+        for tool in ("t0", "t1")
+    }
+
+
+def _active_generated_calibration(status: dict[str, Any]) -> dict[str, float]:
+    settings = status["configfile"]["settings"]
+    tool_state = status.get("gcode_macro _IDEX_TOOL_STATE") or {}
+    return {
+        "t0_x_position_endstop": _number(
+            _settings(settings, "stepper_x"), "position_endstop", "stepper_x"
+        ),
+        "t1_x_position_endstop": _number(
+            _settings(settings, "dual_carriage"),
+            "position_endstop",
+            "dual_carriage",
+        ),
+        "y_position_endstop": _number(
+            _settings(settings, "stepper_y"), "position_endstop", "stepper_y"
+        ),
+        "z_position_endstop": _number(
+            _settings(settings, "stepper_z"), "position_endstop", "stepper_z"
+        ),
+        "t1_y_gcode_offset": _number(
+            tool_state, "t1_y_offset", "gcode_macro _IDEX_TOOL_STATE"
+        ),
+        "t1_z_gcode_offset": _number(
+            tool_state, "t1_z_offset", "gcode_macro _IDEX_TOOL_STATE"
+        ),
+    }
+
+
+def _require_generated_matches(
+    active: dict[str, float],
+    expected: dict[str, float],
+    *,
+    context: str,
+) -> None:
+    for field, expected_value in expected.items():
+        active_value = float(active[field])
+        if abs(active_value - float(expected_value)) > 0.0011:
+            raise VisionCalibrationError(
+                f"{context}: active {field}={active_value:.6f} differs from "
+                f"expected {float(expected_value):.6f}"
+            )
+
+
+def _candidate_calib(
+    source: dict[str, Any], calculation: dict[str, Any]
+) -> dict[str, Any]:
+    candidate = json.loads(json.dumps(source))
+    new = calculation["calibration"]["persisted_calib"]["new"]
+    for tool in ("t0", "t1"):
+        for axis in ("x", "y", "z"):
+            candidate["tools"][tool][f"{axis}_endstop"] = float(
+                new[tool][axis]
+            )
+    return candidate
+
+
+def calculate_fine_tool_xyz(
+    *,
+    status: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    projection_binding, projection_fact = _resolve_current_fact(
+        "nozzle_tip_projection",
+        "camera.nozzle_cam.nozzle_tip.projection_model",
+        1,
+    )
+    partial_binding, partial_fact = _resolve_current_fact(
+        "partial_bed_coordinate_system",
+        "camera.nozzle_cam.partial_bed_coordinate_system",
+        1,
+    )
+    rough_binding, _rough_fact = _resolve_current_fact(
+        "rough_x_active_snapshot",
+        "calibration.rough_tool_x.active_snapshot",
+        1,
+    )
+    source_facts = [projection_binding, partial_binding, rough_binding]
+    projection_fact_set = load_json(
+        CALIBRATION_ROOT / projection_binding["fact_set_path"]
+    )
+    registrations = projection_fact_set.get("provenance", {}).get(
+        "observations", {}
+    ).get("registrations")
+    if not isinstance(registrations, list) or not registrations:
+        raise VisionCalibrationError(
+            "nozzle-tip projection fact lacks bound registration observations"
+        )
+
+    registry = _load_registry()
+    capture_y = float(
+        registry["job_types"][FINE_NOZZLE_XZ_JOB]["capture_y_mm"]
+    )
+    calib = _load_calib_yaml()
+    old_datums = _calib_datums(calib)
+    printer_status = status or query_printer_status()
+    old_generated = {
+        "t0_x_position_endstop": old_datums["t0"]["x_endstop"],
+        "t1_x_position_endstop": old_datums["t1"]["x_endstop"],
+        "y_position_endstop": old_datums["t0"]["y_endstop"],
+        "z_position_endstop": old_datums["t0"]["z_endstop"],
+        "t1_y_gcode_offset": (
+            old_datums["t0"]["y_endstop"] - old_datums["t1"]["y_endstop"]
+        ),
+        "t1_z_gcode_offset": (
+            old_datums["t0"]["z_endstop"] - old_datums["t1"]["z_endstop"]
+        ),
+    }
+    _require_generated_matches(
+        _active_generated_calibration(printer_status),
+        old_generated,
+        context="source calibration is not the active Klipper calibration",
+    )
+    calculation = calculate_fine_tool_candidate(
+        projection=projection_fact["value"],
+        partial_bed=partial_fact["value"],
+        registrations=registrations,
+        old_datums=old_datums,
+        capture_y_mm=capture_y,
+    )
+    fingerprint = str(
+        printer_status["gcode_macro _IDEX_CONFIG_FINGERPRINT"]["source_sha256"]
+    )
+    calculation_id = (
+        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        + "-fine_tool_xyz"
+    )
+    calculation_dir = CALIBRATION_ROOT / "calculations" / calculation_id
+    calculation_dir.mkdir(parents=True)
+    candidate_path = calculation_dir / "calib_candidate.yaml"
+    candidate_hash = None
+    candidate = None
+    if calculation["accepted"]:
+        candidate = _candidate_calib(calib, calculation)
+        candidate_path.write_text(
+            yaml.safe_dump(candidate, sort_keys=False),
+            encoding="utf-8",
+        )
+        candidate_hash = sha256_file(candidate_path)
+
+    calculation.update(
+        {
+            "schema": "vision-calibration-fine-tool-xyz-calculation",
+            "schema_version": 1,
+            "calculation_id": calculation_id,
+            "created_at_utc": utc_now(),
+            "source_facts": source_facts,
+            "source_calib_sha256": sha256_file(CALIB_PATH),
+            "source_active_config_fingerprint": fingerprint,
+            "candidate_calib_path": (
+                "calib_candidate.yaml" if candidate is not None else None
+            ),
+            "candidate_calib_sha256": candidate_hash,
+        }
+    )
+    calculation["artifacts"] = write_fine_tool_artifacts(
+        calculation, calculation_dir / "artifacts"
+    )
+
+    publication = None
+    if calculation["accepted"]:
+        dependencies = [
+            {
+                "fact_name": item["fact_name"],
+                "fact_set_hash": item["fact_set_hash"],
+            }
+            for item in source_facts
+        ]
+        tool_facts = []
+        for tool in ("T0", "T1"):
+            item = calculation["tools"][tool]
+            value = {
+                "reference_commanded_xyz_mm": item[
+                    "reference_commanded_xyz_mm"
+                ],
+                "measured_nozzle_xyz_mm": item["measured_nozzle_xyz_mm"],
+                "coordinate_residual_xyz_mm": item[
+                    "coordinate_residual_xyz_mm"
+                ],
+                "z_verification_status": "pending_eddy_verification",
+            }
+            tool_facts.append(
+                _fact(
+                    f"tool.{tool.lower()}.nozzle_to_bed_tab_xyz_mm",
+                    "coordinate_system",
+                    value,
+                    dependencies,
+                    {
+                        "reference_commanded_xyz_mm",
+                        "measured_nozzle_xyz_mm",
+                        "coordinate_residual_xyz_mm",
+                    },
+                )
+            )
+        candidate_value = {
+            "calculation_id": calculation_id,
+            "persisted_calib": calculation["calibration"]["persisted_calib"],
+            "generated_klipper": calculation["calibration"][
+                "generated_klipper"
+            ],
+            "candidate_calib_sha256": candidate_hash,
+            "source_calib_sha256": calculation["source_calib_sha256"],
+            "source_active_config_fingerprint": fingerprint,
+            "z_verification_status": "pending_eddy_verification",
+        }
+        candidate_fact = _fact(
+            "calibration.fine_tool_xyz.candidate",
+            "coordinate_system",
+            candidate_value,
+            dependencies,
+            {"persisted_calib", "generated_klipper"},
+        )
+        publication = _publish_operation_fact_set(
+            "fine_tool_xyz_candidate",
+            facts=[*tool_facts, candidate_fact],
+            provenance={
+                "method": "stage_5_1_projective_candidate",
+                "calculation_id": calculation_id,
+                "source_calib_sha256": calculation["source_calib_sha256"],
+                "candidate_calib_sha256": candidate_hash,
+            },
+            applicability={
+                "printer": "menderpi",
+                "active_config_fingerprint": fingerprint,
+                "source_fact_set_hashes": [
+                    item["fact_set_hash"] for item in source_facts
+                ],
+            },
+        )
+        calculation["candidate_fact_set_hash"] = publication["fact_set_hash"]
+    calculation["publication"] = publication
+    calculation["result_hash"] = canonical_hash(
+        {key: value for key, value in calculation.items() if key != "result_hash"}
+    )
+    atomic_write_json(
+        calculation_dir / "result.json", calculation, immutable=True
+    )
+    report = [
+        "# Stage 5.1 fine T0/T1 XYZ calculation",
+        "",
+        f"- Calculation: `{calculation_id}`",
+        f"- State: **{'accepted' if calculation['accepted'] else 'rejected'}**",
+        f"- Source calib: `{calculation['source_calib_sha256']}`",
+        f"- Candidate calib: `{candidate_hash or 'not produced'}`",
+        "- Z interpretation: `pending_eddy_verification`",
+        "",
+        "## Tool results",
+        "",
+    ]
+    for tool in ("T0", "T1"):
+        item = calculation["tools"][tool]
+        report.extend(
+            [
+                f"### {tool}",
+                "",
+                "- Coordinate residual XYZ: `"
+                + json.dumps(item["coordinate_residual_xyz_mm"])
+                + "` mm",
+                (
+                    "- Commanded Z at fitted print plane: "
+                    f"`{item['commanded_z_at_print_plane_mm']:.6f}` mm"
+                ),
+                (
+                    "- Full 2-D X-vector residual: "
+                    f"`{item['x_vector_residual_magnitude_px_per_mm']:.6f}` "
+                    "px/mm"
+                ),
+                "",
+            ]
+        )
+    report.extend(
+        [
+            "## Rejection reasons",
+            "",
+            *(
+                [f"- {item}" for item in calculation["reasons"]]
+                or ["- None"]
+            ),
+            "",
+            "## Warnings",
+            "",
+            *(
+                [f"- {item}" for item in calculation["warnings"]]
+                or ["- None"]
+            ),
+            "",
+        ]
+    )
+    (calculation_dir / "report.md").write_text(
+        "\n".join(report), encoding="utf-8"
+    )
+    rebuild_and_render()
+    return {
+        "calculation_id": calculation_id,
+        "accepted": calculation["accepted"],
+        "reasons": calculation["reasons"],
+        "candidate_calib_path": (
+            str(candidate_path) if candidate is not None else None
+        ),
+        "candidate_calib_sha256": candidate_hash,
+        "publication": publication,
+        "review_url": f"/vision/calibration/calculations/{calculation_id}/",
+        "tools": calculation["tools"],
+    }
+
+
+def record_fine_tool_xyz_activation(
+    *,
+    calculation_id: str,
+    expected_fingerprint: str | None = None,
+    status: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    calculation_dir = CALIBRATION_ROOT / "calculations" / _sanitize(
+        calculation_id
+    )
+    result = load_json(calculation_dir / "result.json")
+    if result.get("accepted") is not True:
+        raise VisionCalibrationError("rejected fine-tool calculation cannot activate")
+    candidate_path = calculation_dir / "calib_candidate.yaml"
+    if sha256_file(CALIB_PATH) != result["candidate_calib_sha256"]:
+        raise VisionCalibrationError(
+            "synchronized calib.yaml does not match the accepted candidate"
+        )
+    if sha256_file(candidate_path) != result["candidate_calib_sha256"]:
+        raise VisionCalibrationError("stored candidate calibration hash mismatch")
+    printer_status = status or query_printer_status()
+    fingerprint = str(
+        printer_status["gcode_macro _IDEX_CONFIG_FINGERPRINT"]["source_sha256"]
+    )
+    if expected_fingerprint and fingerprint != expected_fingerprint:
+        raise VisionCalibrationError(
+            f"active fingerprint {fingerprint} != {expected_fingerprint}"
+        )
+    expected_generated = result["calibration"]["generated_klipper"]["new"]
+    active_generated = _active_generated_calibration(printer_status)
+    _require_generated_matches(
+        active_generated,
+        expected_generated,
+        context="deployed fine calibration",
+    )
+    candidate_binding, candidate_fact = _resolve_current_fact(
+        "fine_tool_xyz_candidate",
+        "calibration.fine_tool_xyz.candidate",
+        1,
+    )
+    if candidate_fact["value"]["calculation_id"] != calculation_id:
+        raise VisionCalibrationError(
+            "current fine-tool candidate is not the requested calculation"
+        )
+    dependencies = [
+        {
+            "fact_name": candidate_binding["fact_name"],
+            "fact_set_hash": candidate_binding["fact_set_hash"],
+        }
+    ]
+    value = {
+        "calculation_id": calculation_id,
+        "persisted_calib": result["calibration"]["persisted_calib"]["new"],
+        "generated_klipper": active_generated,
+        "active_config_fingerprint": fingerprint,
+        "active_calib_sha256": sha256_file(CALIB_PATH),
+        "z_verification_status": "pending_eddy_verification",
+        "supersedes": "calibration.rough_tool_x.active_snapshot",
+    }
+    fact = _fact(
+        "calibration.fine_tool_xyz.active_snapshot",
+        "coordinate_system",
+        value,
+        dependencies,
+        {"persisted_calib", "generated_klipper"},
+    )
+    activation = _publish_operation_fact_set(
+        "fine_tool_xyz_activation",
+        facts=[fact],
+        provenance={
+            "method": "verified_live_stage_5_1_activation",
+            "calculation_id": calculation_id,
+            "candidate_fact_set_hash": candidate_binding["fact_set_hash"],
+        },
+        applicability={
+            "printer": "menderpi",
+            "active_config_fingerprint": fingerprint,
+            "active_calib_sha256": sha256_file(CALIB_PATH),
+        },
+    )
+    return {"active_snapshot": value, "activation": activation}
+
+
 def _json_link(path: str, label: str) -> str:
     return f'<a href="{html.escape(path)}">{html.escape(label)}</a>'
 
@@ -1907,6 +2516,23 @@ def _coordinate_summary(name: str, value: dict[str, Any]) -> str:
             "x_vector_z_slope_px_per_mm_per_mm",
             "cross_tool_tip_offset_px_at_x189_z5",
         ],
+        "tool.t0.nozzle_to_bed_tab_xyz_mm": [
+            "coordinate_residual_xyz_mm",
+            "measured_nozzle_xyz_mm",
+        ],
+        "tool.t1.nozzle_to_bed_tab_xyz_mm": [
+            "coordinate_residual_xyz_mm",
+            "measured_nozzle_xyz_mm",
+        ],
+        "calibration.fine_tool_xyz.candidate": [
+            "persisted_calib",
+            "generated_klipper",
+        ],
+        "calibration.fine_tool_xyz.active_snapshot": [
+            "persisted_calib",
+            "generated_klipper",
+            "z_verification_status",
+        ],
     }.get(name, [])
     return "<br>".join(
         f"<strong>{html.escape(field)}</strong>: "
@@ -1948,11 +2574,40 @@ def render_ui(catalog: dict[str, Any]) -> None:
             f"<td>{job['committed_frame_count']}/{job['frame_count']}</td>"
             f"<td>{len(job['analyses'])}</td></tr>"
         )
+    calculation_rows = []
+    calculations_root = CALIBRATION_ROOT / "calculations"
+    if calculations_root.exists():
+        for calculation_dir in sorted(
+            (
+                item
+                for item in calculations_root.iterdir()
+                if item.is_dir() and (item / "result.json").exists()
+            ),
+            reverse=True,
+        ):
+            result = load_json(calculation_dir / "result.json")
+            state = "accepted" if result.get("accepted") else "rejected"
+            calculation_rows.append(
+                "<tr>"
+                f"<td>{_json_link('calibration/calculations/' + calculation_dir.name + '/', calculation_dir.name)}</td>"
+                f"<td class=\"{'good' if state == 'accepted' else 'bad'}\">"
+                f"{state}</td>"
+                f"<td>{html.escape('; '.join(result.get('reasons', [])) or 'none')}</td>"
+                "</tr>"
+            )
     body = (
         "<h1>Vision calibration</h1>"
         "<p>Current graph: installed bed fiducials through fine T0/T1 nozzle X/Z.</p>"
         "<h2>Current coordinate-system facts</h2>"
         + ("".join(current_cards) or "<p>None.</p>")
+        + "<h2>Stage 5.1 calculations</h2>"
+        + (
+            "<table><tr><th>Calculation</th><th>State</th><th>Gates</th></tr>"
+            + "".join(calculation_rows)
+            + "</table>"
+            if calculation_rows
+            else "<p>None.</p>"
+        )
         + "<h2>Jobs</h2><table><tr><th>Job</th><th>Type</th><th>State</th>"
         "<th>Frames</th><th>Analyses</th></tr>"
         + "".join(job_rows)
@@ -2027,6 +2682,57 @@ def render_ui(catalog: dict[str, Any]) -> None:
                 _page(item["analysis_run_id"], analysis_body, prefix="../../../../../"),
                 encoding="utf-8",
             )
+    if calculations_root.exists():
+        for calculation_dir in (
+            item
+            for item in calculations_root.iterdir()
+            if item.is_dir() and (item / "result.json").exists()
+        ):
+            result = load_json(calculation_dir / "result.json")
+            artifact_html = []
+            for name, artifact in result.get("artifacts", {}).items():
+                relative = Path(artifact["path"]).relative_to(calculation_dir)
+                if relative.suffix.lower() in {".png", ".jpg", ".jpeg"}:
+                    artifact_html.append(
+                        f'<div class="card"><h3>{html.escape(name)}</h3>'
+                        f'<a href="{relative}"><img src="{relative}"></a></div>'
+                    )
+                else:
+                    artifact_html.append(
+                        f'<div class="card"><h3>{html.escape(name)}</h3>'
+                        f'{_json_link(str(relative), relative.name)}</div>'
+                    )
+            state = "accepted" if result.get("accepted") else "rejected"
+            calculation_body = (
+                f"<h1>{html.escape(calculation_dir.name)}</h1>"
+                f"<p class=\"{'good' if state == 'accepted' else 'bad'}\">"
+                f"State: {state}</p>"
+                f"<p>{_json_link('report.md', 'report')} · "
+                f"{_json_link('result.json', 'result JSON')}"
+                + (
+                    f" · {_json_link('calib_candidate.yaml', 'calib candidate')}"
+                    if (calculation_dir / "calib_candidate.yaml").exists()
+                    else ""
+                )
+                + "</p><h2>Gate result</h2><ul>"
+                + (
+                    "".join(
+                        f"<li>{html.escape(reason)}</li>"
+                        for reason in result.get("reasons", [])
+                    )
+                    or "<li>All gates passed.</li>"
+                )
+                + "</ul><h2>Artifacts</h2>"
+                + ("".join(artifact_html) or "<p>None.</p>")
+            )
+            (calculation_dir / "index.html").write_text(
+                _page(
+                    calculation_dir.name,
+                    calculation_body,
+                    prefix="../../../",
+                ),
+                encoding="utf-8",
+            )
 
 
 def rebuild_and_render() -> dict[str, Any]:
@@ -2053,10 +2759,16 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("sync-priors")
     subparsers.add_parser("rebuild-catalog")
     subparsers.add_parser("calculate-rough-x")
+    subparsers.add_parser("calculate-fine-tool-xyz")
     record_parser = subparsers.add_parser("record-rough-x-activation")
     record_parser.add_argument("--old-t0", type=float, required=True)
     record_parser.add_argument("--old-t1", type=float, required=True)
     record_parser.add_argument("--expected-fingerprint")
+    fine_record_parser = subparsers.add_parser(
+        "record-fine-tool-xyz-activation"
+    )
+    fine_record_parser.add_argument("calculation_id")
+    fine_record_parser.add_argument("--expected-fingerprint")
     args = parser.parse_args(argv)
     try:
         if args.command == "prepare":
@@ -2090,10 +2802,17 @@ def main(argv: list[str] | None = None) -> int:
             result = sync_seed_facts()
         elif args.command == "calculate-rough-x":
             result = calculate_rough_x()
+        elif args.command == "calculate-fine-tool-xyz":
+            result = calculate_fine_tool_xyz()
         elif args.command == "record-rough-x-activation":
             result = record_rough_x_activation(
                 old_t0_x_endstop_mm=args.old_t0,
                 old_t1_x_endstop_mm=args.old_t1,
+                expected_fingerprint=args.expected_fingerprint,
+            )
+        elif args.command == "record-fine-tool-xyz-activation":
+            result = record_fine_tool_xyz_activation(
+                calculation_id=args.calculation_id,
                 expected_fingerprint=args.expected_fingerprint,
             )
         else:

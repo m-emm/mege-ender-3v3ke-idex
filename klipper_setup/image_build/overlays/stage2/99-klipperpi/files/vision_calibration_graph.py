@@ -26,6 +26,7 @@ JOB_TYPES = {
     "idex_tool_red_marker_x_sweep",
     "idex_rough_tool_x_verify",
     "idex_nozzle_fine_xz_grid",
+    "idex_fine_tool_xy_verify",
 }
 SEED_FACT_NAMES = {
     "bed.tab_corner.printer_xyz",
@@ -180,6 +181,15 @@ def validate_registry(record: Any) -> dict[str, Any]:
         raise CalibrationGraphError("fine nozzle center-only Z values are invalid")
     if fine.get("safe_tool_change_z_mm") != 9:
         raise CalibrationGraphError("fine nozzle tool-change Z is invalid")
+    verify = job_types["idex_fine_tool_xy_verify"]
+    if (
+        verify.get("center_x_offset_from_bed_tab_mm") != 16
+        or verify.get("x_dither_mm") != 3
+        or verify.get("y_dither_mm") != 3
+    ):
+        raise CalibrationGraphError("fine X/Y verification dithers are invalid")
+    if verify.get("capture_z_mm") != 5 or verify.get("safe_tool_change_z_mm") != 9:
+        raise CalibrationGraphError("fine X/Y verification Z poses are invalid")
     return record
 
 
@@ -274,6 +284,23 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             raise CalibrationGraphError("fine nozzle grid must acquire T0 first")
         if [frame.get("tool") for frame in frames[20:]] != ["T1"] * 20:
             raise CalibrationGraphError("fine nozzle grid must acquire T1 second")
+    elif job_type == "idex_fine_tool_xy_verify":
+        expected = [
+            (tool, pose)
+            for tool in ("T0", "T1")
+            for pose in ("center", "x_dither", "y_dither")
+        ]
+        if [(frame.get("tool"), frame.get("pose")) for frame in frames] != expected:
+            raise CalibrationGraphError(
+                "fine X/Y verification frame order is invalid"
+            )
+        if any(
+            float(frame.get("commanded_position_mm", [0, 0, -1])[2]) < 3.0
+            for frame in frames
+        ):
+            raise CalibrationGraphError(
+                "fine X/Y verification may not command below Z=3"
+            )
 
     expected_hash = content_hash(record, "manifest_hash")
     if record.get("manifest_hash") != expected_hash:

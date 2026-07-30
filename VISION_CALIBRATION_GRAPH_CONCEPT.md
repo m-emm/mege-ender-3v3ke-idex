@@ -121,23 +121,27 @@ flowchart TD
     Q --> Y
     Y --> C[Bed-tab corner reference]
     C --> R[Coarse T0/T1 red-marker X sweeps]
+    R --> PX[Resolve fiducial patch to printer XY mapping]
+    Y --> PX
+    C --> PX
     P --> AX[Calculate and apply T0/T1 X calibration]
     R --> AX
     AX --> VX[Verify both markers at bed-tab X plus 10 mm]
     C --> F[Fine T0/T1 nozzle X/Z grid]
     VX --> F
     F --> N[Fine nozzle projection and registration facts]
-    N --> S51[Joint absolute T0/T1 nozzle solve]
+    PX --> NZ[Transport each nozzle scale field to fiducial X]
+    N --> NZ
+    ZP --> NZ
+    NZ --> S51[Absolute T0/T1 nozzle XYZ solve]
     S51 --> A51[Apply fine T0/T1 XYZ calibration]
-    A51 --> V51[Verify absolute and relative nozzle X/Y]
+    A51 --> V51[Verify absolute and relative nozzle XYZ]
 
     EL[Eddy lighting sweep] --> E[Eddy fiducial X/Z grid]
     C --> E
     V51 --> E
-    E --> ZV[Verify deferred nozzle and Eddy Z]
     E --> D[Full calibration candidate]
     V51 --> D
-    ZV --> D
     D --> A[Explicit final calibration activation]
 ```
 
@@ -310,6 +314,16 @@ Produced fact:
   - the local patch-mm-to-image-pixel homography at the reference capture
   - the unresolved pair of possible printer-X image directions
   - exact bindings to the installed physical reference and lighting profile
+  - enough patch-coordinate information to reconstruct the signed
+    patch-to-printer basis after Stage 3 resolves printer +X
+  - the image-space printer-X vector at the physical center of the four
+    fiducials, not only a scalar average marker spacing
+
+The analysis must retain the local metric at every acquired commanded-Y
+position, not only at one reference frame. It fits the first-order change of
+the printer-X vector with commanded Y. A downstream job captured at a slightly
+different Y can therefore evaluate the fiducial reference at its exact capture
+Y instead of assuming that camera depth is unchanged.
 
 Scalar scales, inverse scales, angles, correlations, residuals, and individual
 marker centers are shown in reports. Only the coordinate-defining model fields
@@ -393,6 +407,11 @@ is known because the pixel observation is bound to the user’s prior. The local
 X scale is already known from the printed square, but the sign of printer X is
 still unresolved.
 
+The corner fact must retain `corner_patch_xy_mm` as a coordinate-system field.
+Together with the corner's printer `[X,Y]`, the metric model's
+`patch_y_vector_per_printer_y_mm`, and the Stage 3 printer-X sign, this is the
+anchor needed to calculate the printer coordinates of the fiducial centers.
+
 ### 3. Coarse red-marker X sweeps
 
 Job type:
@@ -435,7 +454,25 @@ Produced facts:
 - `camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2`
 - `tool.t0.red_marker_to_bed_tab_x_mm`
 - `tool.t1.red_marker_to_bed_tab_x_mm`
+- `camera.nozzle_cam.bed_fiducial.printer_xy_mapping`
 - marker visibility intervals and fit quality as diagnostics
+
+The resolved bed-fiducial mapping contains:
+
+```text
+corner_patch_xy_mm
+corner_printer_xy_mm
+patch_x_vector_per_printer_x_mm
+patch_y_vector_per_printer_y_mm
+fiducial_center_printer_xy_mm[4]
+fiducial_reference_printer_xy_mm
+```
+
+The four printer coordinates and their reference center are derived from the
+observed patch geometry; they are not configured pixel locations. With the
+current observations, the fiducial reference center is near printer
+`X=165.65 mm`. That value is diagnostic evidence from the current installation,
+not a hardcoded job parameter.
 
 The image-axis angle is a derived report value rather than a separate fact.
 Stage 4 calibrates each tool independently to the fixed bed-tab corner.
@@ -637,110 +674,244 @@ translation, isotropic scale, correlation, forward/reverse disagreement,
 boundary status, and rejection reason. The graph is solved jointly after weak
 or inconsistent edges are removed.
 
-For each tool, use the three-observable nozzle state
+For each tool, retain the three-observable nozzle state
 
 ```text
 o = [image_x, image_y, log(apparent_scale)]
 ```
 
-and fit a local projection model
+The authoritative geometry comes from the registered tip position. Apparent
+template scale remains an independent consistency observation. A bilinear
+position model is insufficient because the live data shows that local
+image-X scale changes with both nozzle Z and lateral printer X. Fit the
+first-order lateral scale field by making position quadratic in X and linear
+in Z:
 
 ```text
-image_position(x, z)
-  = p0 + Jx0 * (x - x_ref)
-       + Jz  * (z - z_ref)
-       + Jxz * (x - x_ref) * (z - z_ref)
+dx = x - x_ref
+dz = z - z_ref
 
-Jx(z) = Jx0 + Jxz * (z - z_ref)
+p_t(x,z)
+  = p0_t
+    + Ax_t   * dx
+    + Az_t   * dz
+    + Axz_t  * dx*dz
+    + Axx_t  * dx^2
+    + Axxz_t * dx^2*dz
+
+Jx_t(x,z) = dp_t/dx
+  = Ax_t + Axz_t*dz + 2*Axx_t*dx + 2*Axxz_t*dx*dz
 ```
 
-The bilinear term is the measured X parallax change with Z. The log-scale
-observable supplies an independent Z discriminator for the cross-tool solve.
-The bed-fiducial local metric supplies the image direction for printer Y and
-the observed fiducial-plane directional scale ratio. This stage fits the
-tool-local projection and registration evidence. It does not by itself declare
-an absolute nozzle pose or an endstop correction. The absolute solve and its
-physical plausibility gates belong to Stage 5.1.
+All coefficients are two-dimensional image vectors. Consequently,
+`Jx_t(x,z)` is the local image displacement vector per commanded printer-X
+millimetre at any X/Z location covered by, or deliberately extrapolated from,
+the survey.
 
-#### Bed-plane Z anchoring
+Fit positions directly rather than fitting noisy adjacent finite-difference
+scales. The full X rows at commanded Z=`1`, `5`, and `9 mm` identify the
+lateral scale field. The center-only Z=`3` and `7 mm` observations constrain
+the tip's Z trajectory and template identity but cannot independently identify
+scale versus X. Each full row requires at least five usable X observations.
 
-The original proposal was to declare nozzle Z=0 where the magnitude of the
-nozzle X scale equals the old bed-tab Y scale. That equality is not generally
-valid for an oblique camera: the local image scale can differ by world
-direction even at one physical plane.
+The `dx^2*dz` term is the first-order change with Z of the lateral perspective
+gradient. A rational pinhole model may replace this polynomial later, but it
+must expose the same local derivative `Jx_t(x,z)` and reproduce the polynomial
+fit over the measured range before becoming authoritative.
 
-Write the comparison explicitly as:
+The bed-fiducial local metric supplies the signed image direction for printer
+Y and, after Stage 3 resolves printer +X, the fiducial-plane printer-X
+reference vector. This stage publishes the tool-local scale field and
+registration evidence. It does not itself edit an endstop.
+
+#### Fiducial-plane Z anchoring by lateral scale transport
+
+The failed calculation compared a nozzle X scale evaluated around
+printer X=`189 mm` directly with a fiducial scale observed around
+printer X=`165.65 mm`. That confounds two real projective effects:
+
+- scale squeeze with camera depth/Z
+- lateral scale variation with image/printer X
+
+The comparison becomes valid only after evaluating both scales at the same
+printer-X location.
+
+Let `X_fid` be the printer X coordinate of the physical center of the four
+fiducials. Derive it from the current patch installation:
 
 ```text
-Sx_nozzle(z_zero) = Sx_bed_print
-Sx_bed_print      = Rxy_bed_print * Sy_bed_print
+B_patch_from_printer =
+    [patch_x_vector_per_printer_x_mm,
+     patch_y_vector_per_printer_y_mm]
+
+printer_xy(marker_i) =
+    corner_printer_xy
+    + inverse(B_patch_from_printer)
+      * (marker_patch_xy_i - corner_patch_xy)
+
+X_fid = mean(printer_x(marker_i))
 ```
 
-The installed 8 x 8 mm square now measures both in-plane directions, so the
-bed-plane directional scale ratio is observed instead of assumed. The
-commanded Y sweep determines printer Y; the square's known Euclidean metric
-determines the perpendicular X scale; and the red-marker X sweep resolves its
-sign.
+No fiducial image coordinate or current numerical `X_fid` is configured.
+Replacing or moving the patch necessarily changes the facts used to derive it.
 
-The printed patch is attached to the underside of the bed rather than to the
-print surface. Its local metric is therefore measured at the fiducial plane.
-The user-known coordinate seed is:
+Let `Vx_fid` be the signed image vector per printer-X millimetre measured from
+the 8 mm square at its physical center and evaluated at the exact Stage 5
+capture Y. Define:
 
-- `bed.fiducial_patch.printer_z_mm = -0.6`
-- printer Z=0 is the bed print-reference plane
-- the derived displacement from the fiducial plane to the print plane is
-  therefore +0.6 mm
+```text
+ex_fid = Vx_fid / |Vx_fid|
+Sx_fid = |Vx_fid|
 
-The fitted X-scale-versus-Z model may transport local vectors between nearby
-planes, but equality of one nozzle X-motion vector with one bed X-motion vector
-is not sufficient to solve nozzle Z. Image X scale also changes with camera
-depth, including a nozzle's printer-Y position, and the vector angle contains
-the same projective coupling. Stage 5 therefore must not attribute the complete
-bed/nozzle vector difference to Z.
+Sx_t_at_fid(z) = dot(Jx_t(X_fid, z), ex_fid)
+```
+
+For each tool independently, solve:
+
+```text
+Sx_t_at_fid(z_cmd_at_fiducial_plane) = Sx_fid
+```
+
+This is the original scale-squeeze idea with the missing lateral-perspective
+transport restored. The vector magnitude crossing is calculated as an
+independent check and should give the same answer. A solver must not compare
+`Jx_t(x_ref,z)` directly with `Vx_fid`.
+
+The printed patch is attached below the print surface:
+
+```text
+Z_fiducial_plane = -0.6 mm
+
+nozzle_height_above_fiducial_plane_t(z_cmd)
+    = z_cmd - z_cmd_at_fiducial_plane_t
+
+nozzle_bed_referenced_z_t(z_cmd)
+    = Z_fiducial_plane
+      + nozzle_height_above_fiducial_plane_t(z_cmd)
+
+nozzle_z_residual_at_commanded_zero_t
+    = Z_fiducial_plane - z_cmd_at_fiducial_plane_t
+```
+
+Thus a crossing at commanded `Z=-0.6458 mm` means:
+
+```text
+height above fiducial plane = commanded Z + 0.6458 mm
+bed-referenced nozzle Z     = commanded Z + 0.0458 mm
+```
+
+The sign is important: because the fiducial plane is at `-0.6 mm`, convert a
+height above that plane to bed-referenced Z by subtracting `0.6 mm`.
 
 Produced coordinate-system fact:
 
 - `camera.nozzle_cam.nozzle_tip.projection_model`
 
 The projection fact stores the fitted X vector at the reference Z and its
-vector-valued Z slope. ROI geometry, correlations, fit residuals, accepted
-registration edges, any scalar-equality extrapolation, sweep coverage, and
-outliers are diagnostic fields or analysis artifacts. The exact accepted
-registrations remain available to the Stage 5.1 joint solve.
+X/Z-dependent lateral scale field. It also stores the exact X/Z reference,
+model family/version, and accepted registrations needed to evaluate
+`Jx_t(x,z)`. ROI geometry, correlations, fit residuals, finite-difference
+plots, sweep coverage, and outliers are diagnostic fields or analysis
+artifacts.
 
-#### Finding from the first live grid
+#### Validation from the corrected live grid
 
-The first live implementation produced:
-
-```text
-T0 commanded_z_at_print_plane_mm = -4.109041
-T1 commanded_z_at_print_plane_mm = -8.546839
-```
-
-These values are physically implausible and must not drive a calibration
-candidate. For T1, for example, the fitted vectors were approximately:
+The corrected six-X-position T0 analysis, transported from its measured
+X=`183..198 mm` range to the observed fiducial reference at approximately
+X=`165.65 mm`, produced:
 
 ```text
-Jx_nozzle(z=3) = [9.121, -0.032] px/mm
-dJx_nozzle/dz  = [-0.0505, 0.0120] px/mm/mm
-Jx_bed(z=0)    = [9.837,  0.394] px/mm
+Sx_T0_at_fid(z_cmd) = 9.917869 - 0.177671*z_cmd px/mm
+Sx_fid              = 10.032601 px/mm
+z_cmd_at_fid_plane  = -0.645755 mm
+T0 bed-Z residual   = +0.045755 mm
 ```
 
-The one-dimensional line `Jx_nozzle(z)` does not pass through the measured bed
-vector. The old solver returned the least-squares closest Z without rejecting
-the large remaining vector mismatch. It thereby interpreted printer-Y/camera
-depth and feature-plane differences as Z parallax.
+The full two-dimensional vector-magnitude check gives approximately
+`+0.053 mm`, confirming the image-X result. The tip-position model fit RMS was
+approximately `0.471 px`.
 
-The overlay also shows that the current broad template follows the circular
-outer ring as a whole. The ring is about 3 mm above the actual nozzle tip. It
-is useful localization evidence, but its motion and apparent scale describe
-the wrong physical plane. The authoritative template must instead be the very
-small tip-centered ROI defined above.
+This agrees with an independent physical setup that is deliberately not a
+solver input: T0 was previously paper-calibrated to touch the print surface at
+commanded Z=0 by mechanically adjusting the bed. The print-tab foil thickness
+is approximately `0.55 mm`; the additional printed paper brings the known
+fiducial-plane depth to `0.6 mm` below the print surface. Recovering the nozzle
+zero to `+0.0458 mm` therefore independently reproduces the existing
+paper-touch setup to about `0.05 mm`. This validates the model, feature
+identity, scale direction, and conversion sign.
 
-Consequently, the corresponding absolute per-tool facts from that analysis
-are invalid as calibration inputs. A corrected implementation must publish a
-new Stage 5 definition and re-analyze or reacquire the grid. It must not retain
-the current absolute nozzle facts as current graph heads.
+The paper-touch calibration must remain an external validation statement, not
+a coordinate-system fact consumed by the vision solve. Future runs recompute
+the crossing from images and may legitimately reveal that the mechanically
+adjusted bed or nozzle has moved.
+
+The earlier three-X-position, Z=`1..5 mm` survey is useful diagnostic evidence
+but is not sufficient for an authoritative lateral transport to the fiducial
+position. The production fact must come from the extended survey with at least
+five accepted X positions on each of at least three full Z rows. This
+requirement applies independently to T0 and T1.
+
+#### Required analysis artifacts
+
+The Stage 5 analysis and Stage 5.1 calculation must make the scale transport
+visually auditable. For each tool they publish:
+
+- a nozzle-tip overlay for every accepted and rejected grid frame
+- measured image X versus commanded printer X at each full Z row, with the
+  direct-position model overlaid
+- local printer-X scale versus printer X at each full Z row, showing the
+  measured nozzle range and the derived fiducial reference X
+- transported scale at `X_fid` versus commanded Z, with the measured
+  fiducial-plane scale, crossing, and converted bed-Z residual marked
+- image-X, signed-vector-projection, and vector-magnitude crossing curves on
+  one comparison plot
+- leave-one-X and leave-one-full-Z-row crossing results
+- a compact calculation table containing the exact source fact IDs, model
+  coefficients, `X_fid`, extrapolation distance, scale crossing, and sign
+  conversion
+
+The current-facts overview shows only the coordinate-defining result:
+`commanded_z_at_fiducial_plane_mm`,
+`fiducial_plane_printer_z_mm`, and
+`bed_referenced_z_at_commanded_zero_mm`. Fit residuals, correlations, image
+dimensions, model coefficients, and sensitivity checks remain diagnostics in
+the linked analysis report.
+
+#### Required upstream fact-contract changes
+
+The implementation must update the existing jobs rather than calculate this
+from untracked report values:
+
+1. `camera.nozzle_cam.bed_fiducial.local_metric_model` must retain the patch
+   homography, patch marker coordinates, patch-Y-per-printer-Y vector, both
+   printer-X candidates, exact reference capture Y, and the observed
+   first-order change of the printer-X vector with capture Y.
+2. `camera.nozzle_cam.partial_bed_coordinate_system` must retain
+   `corner_patch_xy_mm` and `corner_printer_xyz_mm` as coordinate-system
+   fields.
+3. Stage 3 must publish
+   `camera.nozzle_cam.bed_fiducial.printer_xy_mapping` after resolving +X.
+   This fact contains the signed patch/printer basis and the derived printer
+   coordinates of all four fiducials and their reference center.
+4. `camera.nozzle_cam.nozzle_tip.projection_model` must replace the old
+   X-independent `Jx(z)` contract with the per-tool `Jx_t(x,z)` scale field,
+   accepted direct tip positions, reference X/Z, and model version.
+5. The Stage 5.1 calculation must publish one absolute Z anchor per tool:
+
+   ```text
+   tool.t0.nozzle_z_fiducial_reference
+   tool.t1.nozzle_z_fiducial_reference
+   ```
+
+   Each contains `fiducial_reference_printer_x_mm`,
+   `fiducial_x_vector_px_per_mm`, `commanded_z_at_fiducial_plane_mm`,
+   `fiducial_plane_printer_z_mm`, and
+   `bed_referenced_z_at_commanded_zero_mm`. Model residuals, extrapolation
+   distance, and alternate crossing checks are diagnostic fields.
+
+Publishing any replacement metric, corner, printer-XY mapping, or scale field
+automatically makes both nozzle-Z anchors and every calibration candidate that
+consumes them stale.
 
 ### 5.1 Verify and apply resulting calibration
 
@@ -749,7 +920,7 @@ This stage separates three operations:
 ```text
 calculate_fine_tool_xyz_calibration
 apply_fine_tool_xyz_calibration
-verify_fine_tool_xy_calibration
+verify_fine_tool_xyz_calibration
 ```
 
 The calculation consumes the accepted Stage 5 projection and registration
@@ -759,35 +930,41 @@ image job after the changed configuration is active.
 #### Dependencies
 
 - current bed-fiducial physical reference, metric, and printer-Z facts
+- current resolved bed-fiducial printer-XY mapping
 - current bed-tab corner coordinate system
-- accepted Stage 5 nozzle-tip registration graph and projection model
+- accepted Stage 5 per-tool nozzle-tip registration graphs and lateral
+  X/Z scale-field models
 - exact active rough-X snapshot under which the Stage 5 images were acquired
 - exact current `calib.yaml` and generated printer-configuration fingerprint
 
 The red-marker facts remain useful acquisition provenance and coarse locator
 inputs. They are not calibration inputs once the fine nozzle solve is accepted.
 
-#### Joint absolute solve
+#### Absolute solve
 
-The absolute solve must fit one common camera geometry and two independent tool
-offset vectors. It uses:
+The absolute solve uses:
 
 - the known bed-fiducial X/Y geometry in the plane at printer Z=`-0.6 mm`
 - the observed bed-tab corner bound to `[173, -18, 0] mm`
 - known commanded X/Z differences in each tool's fine grid
 - tight T0/T1 nozzle registrations at corresponding commanded poses
-- the nozzle feature's image position and apparent-scale observations
+- the per-tool X/Z-dependent lateral scale fields
+- the resolved printer coordinates and signed printer-X vector of the
+  fiducial reference
 
-The solver must account jointly for printer Y, printer Z, camera depth, and
-perspective. It must not solve Z by forcing:
+For each tool, it first performs the lateral scale transport and fiducial-plane
+crossing defined in Stage 5. It thereby obtains an absolute bed-referenced
+nozzle Z residual without touching the bed.
 
-```text
-Jx_nozzle(z) = Jx_bed
-```
+Absolute X and Y are then solved from the registered nozzle positions using
+that Z anchor, the bed-tab corner coordinate system, and the common camera
+geometry. The T0/T1 corresponding-pose registrations remain an important loop
+closure, but neither tool is defined as the other's absolute reference.
 
-in isolation. If the available X/Z grid and bed plane do not identify all
-parameters cleanly, the solve rejects and requests a small explicit nozzle-Y
-dither acquisition. It never invents the missing degree of freedom.
+If the scale field cannot be transported stably from the measured nozzle-X
+range to `X_fid`, the solve rejects and requests a wider visible X sweep or a
+better camera model. It must not fall back to direct scale equality at
+`x_ref`.
 
 For each tool `t`, the accepted result stores:
 
@@ -796,29 +973,84 @@ reference_commanded_xyz_mm_t
 measured_nozzle_xyz_mm_t
 ```
 
-both in the printer coordinate system. The endstop residual is derived as:
+both in the printer coordinate system. The coordinate-calibration residual is:
 
 ```text
 r_t = measured_nozzle_xyz_mm_t - reference_commanded_xyz_mm_t
 ```
 
-Changing an endstop value by `r_t` moves that tool's physical nozzle by
-`-r_t` at the same commanded coordinate. The candidate is therefore:
+Here, `r_t` is a coordinate-calibration residual, not necessarily a physical
+endstop correction. The two X carriages have independent physical endstops,
+while Y and Z are shared machine axes. T0 defines the shared Y/Z machine
+coordinate system. T1 Y/Z are implemented as tool-specific G-code offsets
+relative to that T0 coordinate system.
 
-```text
-new tools.t0.x_endstop = old tools.t0.x_endstop + r_t0.x
-new tools.t0.y_endstop = old tools.t0.y_endstop + r_t0.y
-new tools.t0.z_endstop = old tools.t0.z_endstop + r_t0.z
+`calib.yaml` deliberately stores one absolute coordinate datum per tool and
+axis:
 
-new tools.t1.x_endstop = old tools.t1.x_endstop + r_t1.x
-new tools.t1.y_endstop = old tools.t1.y_endstop + r_t1.y
-new tools.t1.z_endstop = old tools.t1.z_endstop + r_t1.z
+```yaml
+tools:
+  t0:
+    x_endstop: E0x
+    y_endstop: E0y
+    z_endstop: E0z
+  t1:
+    x_endstop: E1x
+    y_endstop: E1y  # absolute T1 Y datum; not a physical Y endstop
+    z_endstop: E1z  # absolute T1 Z datum; not a physical Z endstop
 ```
 
-T0 and T1 are each calibrated absolutely to the measured bed coordinate
-system. Neither is treated as the reference tool. T1-minus-T0 XYZ is derived
-for the report from the two absolute poses; it is not stored as a correction
-fact.
+The existing `y_endstop` and `z_endstop` names under `tools.t1` describe the
+absolute coordinate that the T1 nozzle would have at the shared Y/Z homing
+position. They do not imply additional T1 Y or Z endstop hardware.
+
+The six persisted absolute datums are updated independently:
+
+```text
+E0x' = E0x + r_t0.x
+E0y' = E0y + r_t0.y
+E0z' = E0z + r_t0.z
+
+E1x' = E1x + r_t1.x
+E1y' = E1y + r_t1.y
+E1z' = E1z + r_t1.z
+```
+
+Their generated Klipper representation is different for each axis:
+
+| Calibration value | Generated Klipper behavior |
+| --- | --- |
+| `E0x'` | `[stepper_x] position_endstop` and `position_min` |
+| `E1x'` | `[dual_carriage] position_endstop` and `position_max` |
+| `E0y'` | `[stepper_y] position_endstop` and `position_min` |
+| `E1y'` | no endstop change; contributes to T1 `SET_GCODE_OFFSET Y` |
+| `E0z'` | `[stepper_z] position_endstop` and `position_max` |
+| `E1z'` | no endstop change; contributes to T1 `SET_GCODE_OFFSET Z` |
+
+The generated offsets are:
+
+```text
+T0 Y offset = 0
+T0 Z offset = 0
+T1 Y offset = E0y' - E1y'
+T1 Z offset = E0z' - E1z'
+```
+
+Therefore their changes relative to the currently active offsets are:
+
+```text
+delta T1 Y offset = r_t0.y - r_t1.y
+delta T1 Z offset = r_t0.z - r_t1.z
+```
+
+It would be wrong to add `r_t1.y` or `r_t1.z` directly to the corresponding
+runtime offset. The T0 correction changes both the shared machine coordinate
+system and the relative offset required by T1.
+
+T0 and T1 are still each calibrated absolutely to the measured bed coordinate
+system; T0 is only the implementation reference for the shared Y/Z axes.
+T1-minus-T0 XYZ is derived for the report from the two absolute datums. It is
+not stored as a correction fact.
 
 #### Calculation gates
 
@@ -826,38 +1058,53 @@ No candidate is produced unless:
 
 - the tracked feature is explicitly identified as the nozzle tip, not merely a
   broad tool-face feature
-- the joint bed/tool camera model fits both tools with compatible geometry
-- the fitted print-plane command lies near commanded Z=0 and no farther than
-  one grid step outside the measured Z range
-- the predicted and observed 2-D motion vectors agree after the full
-  projective solve; a nearest-point Z with a large remaining vector residual is
-  rejected
-- leaving out any one X row or Z level does not change the correction enough to
-  reverse or qualitatively alter it
-- all six proposed endstop changes lie inside declared mechanical and
+- each full Z row retains at least five usable X positions spanning at least
+  12 mm, and at least three full rows span at least 6 mm in Z
+- the X-dependent position model fits direct tip positions and yields a finite,
+  signed local scale throughout the measured and transported range
+- the transported scale changes monotonically with Z in the physically
+  observed direction
+- the fiducial-plane crossing lies no farther than one full-row Z interval
+  outside the measured Z range
+- image-X projection, full-vector magnitude, and signed-vector projection
+  crossings agree closely enough to produce the same calibration decision
+- leaving out one interior X observation or one full Z row does not reverse or
+  qualitatively alter the crossing
+- the lateral extrapolation distance from the measured nozzle range to
+  `X_fid`, model family, position-fit RMS, and crossing checks are recorded
+  explicitly in the report
+- all four physical endstop-coordinate changes, both T1 virtual-datum changes,
+  and the two resulting T1 G-code offsets lie inside declared mechanical and
   configuration safety bounds
-
-The current `-4.109 mm` and `-8.547 mm` results fail these gates.
 
 #### Candidate, application, and superseding rough X
 
 The calculation produces:
 
+- `tool.t0.nozzle_z_fiducial_reference`
+- `tool.t1.nozzle_z_fiducial_reference`
 - `tool.t0.nozzle_to_bed_tab_xyz_mm`
 - `tool.t1.nozzle_to_bed_tab_xyz_mm`
 - `calibration.fine_tool_xyz.candidate`
 
 The candidate contains a complete copy of the current calibration with only
-`tools.t0.{x,y,z}_endstop` and `tools.t1.{x,y,z}_endstop` changed. It records
-the exact old/new values, source fact IDs, source `calib.yaml` hash, and active
-printer fingerprint.
+the six absolute tool-coordinate datums
+`tools.t0.{x,y,z}_endstop` and `tools.t1.{x,y,z}_endstop` changed. The T1 Y/Z
+keys are virtual absolute datums as defined above, not physical endstop
+settings. The candidate records:
+
+- exact old/new values for all six persisted datums
+- the generated old/new T1 Y and Z G-code offsets
+- the four generated Klipper endstop/min/max changes
+- source fact IDs, source `calib.yaml` hash, and active printer fingerprint
 
 Application:
 
 1. creates a recoverable remote backup
-2. updates the six values atomically in `calib.yaml`
+2. updates the six absolute datums atomically in `calib.yaml`
 3. regenerates `printer.cfg`
-4. validates generated consistency and the exact scoped diff
+4. validates the four endstop/min/max mappings and both derived T1 offsets
+   against the equations above, then validates the exact scoped diff
 5. deploys the synchronized files
 6. restarts Klipper and requires `ready`
 7. homes safely, while making no low-Z verification move
@@ -868,12 +1115,30 @@ Successful application publishes
 snapshot. The old snapshot and red-marker measurements remain historical
 provenance but cannot satisfy downstream current-calibration requirements.
 
-The calculated T0 and T1 Z endstops are recorded and activated with this
-snapshot, but their physical nozzle-to-bed interpretation remains explicitly
-`pending_eddy_verification`. Until Stage 7 resolves that status, no
-contact-near-Z workflow may claim a verified nozzle Z zero.
+The calculated T0 Z endstop and T1 absolute Z datum are recorded and activated
+with this snapshot; T1 receives the derived Z G-code offset. Their physical
+nozzle-to-bed interpretation is established by the current fiducial-plane
+scale crossing. The later Eddy stage is an independent cross-check and
+connects the electrical probe plane; it is no longer required to make the
+vision nozzle-Z calibration valid.
 
-#### Independent X/Y verification
+The active snapshot stores both layers so the implementation cannot be
+misread later:
+
+```yaml
+persisted_calib:
+  tools.t0: {x_endstop: E0x_prime, y_endstop: E0y_prime, z_endstop: E0z_prime}
+  tools.t1: {x_endstop: E1x_prime, y_endstop: E1y_prime, z_endstop: E1z_prime}
+generated_klipper:
+  t0_x_position_endstop: E0x_prime
+  t1_x_position_endstop: E1x_prime
+  y_position_endstop: E0y_prime
+  z_position_endstop: E0z_prime
+  t1_y_gcode_offset: E0y_prime - E1y_prime
+  t1_z_gcode_offset: E0z_prime - E1z_prime
+```
+
+#### Independent XYZ verification
 
 The post-activation verification is a new acquisition, not a re-analysis of
 the calibration grid. At a safe central Z it captures both tools at:
@@ -899,10 +1164,24 @@ Passing requires both absolute residuals and the relative T0/T1 residuals to
 meet the job's declared direct-measurement limits. Mutual T0/T1 alignment alone
 is insufficient: both tools could otherwise share the same absolute error.
 
-The verification publishes `calibration.fine_tool_xy.verified`. It does not
-verify Z. It reports the active Z values and their
-`pending_eddy_verification` status so the omission is visible rather than
-implicit.
+Z verification repeats the three full X rows at safe commanded Z=`1`, `5`,
+and `9 mm`, or an equivalent declared grid with the same X/Z identifiability.
+It refits each tool's lateral scale field under the active fine snapshot,
+transports both fields to the current `X_fid`, and requires the recovered
+bed-referenced Z residuals to be near zero. It never commands the nozzle to the
+fiducial plane or below the safe Z minimum.
+
+The verification publishes `calibration.fine_tool_xyz.verified`, containing:
+
+- absolute T0 and T1 X/Y residuals
+- relative T1-minus-T0 X/Y residuals
+- per-tool `commanded_z_at_fiducial_plane_mm`
+- per-tool bed-referenced Z residual at commanded Z=0
+- the exact fiducial-plane, patch-mapping, scale-field, and active-snapshot
+  fact bindings
+
+Eddy verification may later compare against this fact, but does not replace
+or retroactively activate it.
 
 ### 6. Eddy lighting
 
@@ -936,7 +1215,7 @@ Dependencies:
 
 - current accepted absolute T0/nozzle calibration fact
 - current fine-tool XYZ active snapshot
-- current fine-tool X/Y verification fact
+- current fine-tool XYZ verification fact
 - bed-tab coordinate and bed reference-plane facts
 - current accepted Eddy lighting facts
 - active configuration fingerprint
@@ -985,9 +1264,8 @@ assemble_full_vision_calibration
 Dependencies:
 
 - accepted absolute fine nozzle fact set
-- active fine-tool XYZ snapshot and X/Y verification fact
+- active fine-tool XYZ snapshot and XYZ verification fact
 - accepted Eddy geometry fact set
-- completed nozzle/Eddy Z verification
 - all exact seed facts used by those results
 - current base configuration fingerprint
 
@@ -1114,13 +1392,15 @@ Job types should be registered declaratively, for example in
 ```yaml
 schema_version: 1
 job_type: idex_nozzle_fine_xz_grid
-definition_version: 6
+definition_version: 7
 acquisition_generator: vision_calibration:build_fine_xz_job
 analyzer: vision_calibration:analyze_fine_xz_job
 requires:
   - fact_type: camera.nozzle_cam.bed_fiducial.local_metric_model
     current: true
   - fact_type: camera.nozzle_cam.partial_bed_coordinate_system
+    current: true
+  - fact_type: camera.nozzle_cam.bed_fiducial.printer_xy_mapping
     current: true
   - fact_type: camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2
     current: true
@@ -1134,8 +1414,6 @@ requires:
     current: true
 produces:
   - camera.nozzle_cam.nozzle_tip.projection_model
-  - tool.t0.nozzle_to_bed_tab_xyz_mm
-  - tool.t1.nozzle_to_bed_tab_xyz_mm
 safety:
   required_homed_axes: xyz
   require_idle: true
@@ -1154,9 +1432,9 @@ Extend the existing immutable `manifest.json` with fact bindings:
 {
   "schema": "vision-calibration-acquisition-manifest",
   "schema_version": 1,
-  "job_id": "idex_nozzle_fine_xz_grid_20260729T180000Z",
+  "job_id": "calculate_fine_tool_xyz_calibration_20260730T190000Z",
   "job_type": "idex_nozzle_fine_xz_grid",
-  "definition_version": 5,
+  "definition_version": 7,
   "manifest_hash": "sha256:...",
   "gcode_hash": "sha256:...",
   "active_config_fingerprint": "sha256:...",
@@ -1164,6 +1442,12 @@ Extend the existing immutable `manifest.json` with fact bindings:
     {
       "requirement": "bed_fiducial_metric",
       "fact_name": "camera.nozzle_cam.bed_fiducial.local_metric_model",
+      "fact_set_hash": "sha256:...",
+      "fact_definition_version": 1
+    },
+    {
+      "requirement": "bed_fiducial_printer_xy_mapping",
+      "fact_name": "camera.nozzle_cam.bed_fiducial.printer_xy_mapping",
       "fact_set_hash": "sha256:...",
       "fact_definition_version": 1
     },
@@ -1228,14 +1512,31 @@ Facts from one accepted analysis are published atomically as a fact set:
   "applicability_hash": "sha256:...",
   "facts": [
     {
-      "name": "tool.t1.nozzle_to_bed_tab_xyz_mm",
-      "definition_version": 5,
+      "name": "tool.t0.nozzle_z_fiducial_reference",
+      "definition_version": 1,
       "role": "coordinate_system",
-      "dependencies": [],
+      "dependencies": ["sha256:fiducial_metric", "sha256:projection_model"],
       "value_items": [
-        {"field": "xyz_mm", "role": "coordinate_system"}
+        {
+          "field": "commanded_z_at_fiducial_plane_mm",
+          "role": "coordinate_system"
+        },
+        {
+          "field": "fiducial_plane_printer_z_mm",
+          "role": "coordinate_system"
+        },
+        {
+          "field": "bed_referenced_z_at_commanded_zero_mm",
+          "role": "coordinate_system"
+        },
+        {"field": "position_fit_rms_px", "role": "diagnostic"}
       ],
-      "value": {"xyz_mm": [173.02, -18.04, 0.08]}
+      "value": {
+        "commanded_z_at_fiducial_plane_mm": -0.6458,
+        "fiducial_plane_printer_z_mm": -0.6,
+        "bed_referenced_z_at_commanded_zero_mm": 0.0458,
+        "position_fit_rms_px": 0.471
+      }
     }
   ]
 }
@@ -1255,9 +1556,15 @@ rebuildable index:
   "schema_version": 1,
   "heads": {
     "bed.fiducial_patch.physical_reference": "sha256:...",
+    "bed.fiducial_patch.printer_z_mm": "sha256:...",
     "camera.nozzle_cam.bed_fiducial.lighting_profile": "sha256:...",
     "camera.nozzle_cam.bed_fiducial.local_metric_model": "sha256:...",
     "bed.tab_corner.printer_xyz": "sha256:...",
+    "camera.nozzle_cam.bed_fiducial.printer_xy_mapping": "sha256:...",
+    "camera.nozzle_cam.nozzle_tip.projection_model": "sha256:...",
+    "tool.t0.nozzle_z_fiducial_reference": "sha256:...",
+    "tool.t1.nozzle_z_fiducial_reference": "sha256:...",
+    "tool.t0.nozzle_to_bed_tab_xyz_mm": "sha256:...",
     "tool.t1.nozzle_to_bed_tab_xyz_mm": "sha256:..."
   },
   "fact_sets": {
@@ -1426,7 +1733,8 @@ No page should silently apply calibration because analysis completed.
 - implement the compact coordinate-free bed-fiducial lighting sweep
 - implement the six-frame bed-fiducial Y/metric sweep
 - recover the local patch homography, signed printer-Y vector, both in-plane
-  scale magnitudes, and unresolved printer-X sign
+  scale vectors, their first-order capture-Y dependence, and unresolved
+  printer-X sign
 - implement bed-tab corner acquisition and duplicate registration
 - bind the observed corner pixel and patch-relative transform to the exact
   user-prior and metric fact IDs
@@ -1439,6 +1747,8 @@ No page should silently apply calibration because analysis completed.
 - implement the sparse T0/T1 red-marker sweep
 - tolerate missing-marker images
 - resolve the printer-X sign left ambiguous by the symmetric four-marker square
+- publish the signed patch-to-printer XY basis and derived printer coordinates
+  of the four fiducial centers
 - calculate independent T0 and T1 corrections against the current
   `bed.tab_corner.printer_xyz` X coordinate
 - produce and explicitly apply one atomic candidate changing only
@@ -1456,25 +1766,31 @@ No page should silently apply calibration because analysis completed.
   the very small observed nozzle-tip ROI
 - reject registration tracks that drift from the tip onto the ring, which is
   about 3 mm above the target plane
-- solve the registration graph and camera model jointly
-- transport the observed fiducial-plane metric to printer Z=0 using the exact
-  physical plane-offset seed
-- publish the nozzle projection and registration fact with measured
-  fit-quality data
+- fit direct tip positions with the X/Z-dependent lateral scale field
+  `Jx_t(x,z)`; do not collapse the model to one `Jx(z)` at a single X
+- publish the nozzle projection and registration fact with its model version,
+  accepted direct positions, reference X/Z, and measured fit-quality data
 
 ### 5.1 Calculate, apply, and verify fine tool calibration
 
-- jointly solve camera perspective, nozzle X/Y position, and nozzle Z from the
-  bed-plane geometry and both tool-local X/Z grids
-- reject the scalar vector-equality shortcut and any result requiring excessive
-  extrapolation beyond the measured Z span
-- produce absolute T0 and T1 nozzle facts and a six-value `calib.yaml`
+- derive the current fiducial reference printer X from the signed patch mapping
+- transport each tool's measured lateral scale field from the visible nozzle-X
+  range to that fiducial X before performing any depth comparison
+- solve the signed scale crossing at the known `Z=-0.6 mm` fiducial plane and
+  convert it to a bed-referenced Z residual with the explicit sign equations
+- calculate image-X, signed-vector-projection, and vector-magnitude crossings
+  as consistency checks
+- solve absolute nozzle X/Y using the resulting per-tool Z anchors, bed
+  coordinate facts, and cross-tool registration loops
+- produce absolute T0 and T1 nozzle facts and a six-datum `calib.yaml`
   candidate
-- apply both tools' X/Y/Z endstop changes atomically and supersede the rough-X
-  active snapshot
-- run the independent common-pose plus X/Y-dither verification job
-- publish fine X/Y verification while leaving physical Z verification pending
-  for the Eddy stage
+- apply the two X endstops and shared T0 Y/Z endstops, derive T1 Y/Z G-code
+  offsets from the two tools' absolute datums, and supersede the rough-X active
+  snapshot
+- run the independent common-pose X/Y dither verification and repeat the safe
+  full-row scale measurement under the active fine snapshot
+- publish fine XYZ verification; retain Eddy as an independent electrical-probe
+  cross-check rather than a prerequisite for nozzle Z
 
 ### 6. Implement Eddy geometry
 
@@ -1528,6 +1844,16 @@ Job tests:
   ring or another feature plane above the nozzle tip
 - tight neighboring-image registration recovers synthetic X/Z transforms
 - outlier registration edges are rejected before model fitting
+- a synthetic camera with scale varying in both X and Z recovers the local
+  derivative field `Jx(x,z)` from direct tip positions
+- direct comparison of scales measured at different X positions is rejected;
+  transporting the nozzle scale field to the fiducial X recovers the known
+  fiducial-plane Z crossing
+- patch geometry, corner binding, and resolved printer-X sign recover the
+  printer coordinates of all four fiducials without a configured pixel or
+  hardcoded current `X_fid`
+- changing the patch installation or bed-tab corner prior changes the derived
+  fiducial printer X and makes existing nozzle-Z anchors stale
 - the rough-X calculation recovers the correction sign independently for T0
   and T1 from the bed-tab prior, marker offset, and reference commanded X
 - the rough-X candidate changes both tool X endstops atomically and no Y/Z
@@ -1537,18 +1863,24 @@ Job tests:
 - fine correction signs are recovered correctly
 - the fast fine grid spans Z=`1` through `9 mm` without commanding below
   Z=`1 mm`, and tool changes occur at the declared safe upper Z
-- the absolute solve rejects a nearest-point vector match when the remaining
-  2-D vector residual is incompatible, even if the returned scalar Z lies
-  inside a broad numeric range
-- the fine candidate updates both tools' X/Y/Z endstops atomically and
-  supersedes, rather than composes with, rough X
-- post-activation X/Y verification checks absolute bed-referenced residuals as
-  well as derived T1-minus-T0 residuals
+- image-X, signed-vector-projection, and vector-magnitude crossing checks
+  recover consistent Z translations
+- the Z conversion uses
+  `Z_bed = Z_fiducial + Z_commanded - Z_commanded_at_fiducial`; a sign-reversed
+  `+0.6 mm` conversion fails
+- leave-one-X and leave-one-full-Z-row checks reject unstable lateral
+  extrapolations
+- the fine candidate updates two X endstops, the shared T0 Y/Z endstops, and
+  the two absolute T1 Y/Z datums atomically; generated T1 Y/Z offsets match the
+  declared difference equations, and the result supersedes rather than
+  composes with rough X
+- post-activation XYZ verification checks absolute bed-referenced residuals,
+  derived T1-minus-T0 X/Y residuals, and a repeated per-tool scale crossing
 - absolute nozzle Z remains blocked if the required current
   `bed.fiducial_patch.printer_z_mm` seed is absent
-- with the current `-0.6 mm` seed, the measured directional bed metric is
-  transported to Z=0
-  without assuming `Sx=Sy`
+- with the current `-0.6 mm` seed, the nozzle scale field is first transported
+  laterally to the fiducial X and then crossed against the measured
+  printer-X fiducial vector without assuming `Sx=Sy`
 - fine-model acceptance fails when the usable observations no longer span the
   declared minimum X and Z ranges
 - Eddy lighting and geometry facts invalidate only their true consumers
@@ -1612,13 +1944,20 @@ UI tests:
   nozzle tip and cannot contribute authoritative scale or pose measurements.
 - Fine registration uses a very small, observed tip-centered ROI and rejects
   any track that drifts onto the outer ring.
-- Fine absolute calibration solves camera perspective and both tools'
-  independent XYZ residuals jointly. Equality of a nozzle X-motion vector and
-  a bed X-motion vector is not an independent Z solution.
-- The fine snapshot supersedes rough X and changes both tools' X/Y/Z endstops
-  atomically.
-- Fine post-activation verification establishes absolute and relative X/Y.
-  Activated Z values remain visibly pending until the Eddy stage verifies the
-  physical nozzle/bed relationship.
+- Fine nozzle modeling retains the lateral X-scale gradient and its change with
+  Z. A single `Jx(z)` evaluated only at the nozzle reference X is insufficient.
+- Nozzle Z is found by transporting each tool's `Jx_t(x,z)` field to the
+  current fiducial reference printer X and solving the signed scale crossing at
+  the known fiducial plane `Z=-0.6 mm`.
+- The current T0 live calculation recovered
+  `Z_bed = Z_commanded + approximately 0.046 mm`, independently reproducing
+  the existing paper-touch bed setup. That contact setup validates the result
+  but is not an input fact.
+- The fine snapshot supersedes rough X and atomically changes the two X
+  endstops, the shared T0 Y/Z endstops, and T1's virtual absolute Y/Z datums.
+  The latter two are realized only as derived T1 G-code offsets.
+- Fine post-activation verification establishes absolute and relative X/Y and
+  repeats the safe fiducial-plane scale crossing for both tools. Eddy remains
+  an independent sensor-plane cross-check.
 - Eddy geometry depends on the accepted T0/nozzle model and independent Eddy
   lighting facts.
