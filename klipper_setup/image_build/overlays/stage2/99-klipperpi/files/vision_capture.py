@@ -424,6 +424,7 @@ class VisionJobApi:
             "nozzle_cam_bed_tab_corner",
             "idex_tool_red_marker_x_sweep",
             "idex_rough_tool_x_verify",
+            "idex_nozzle_fine_xz_grid",
         ):
             raise CaptureError("unsupported acquisition job_type")
         if manifest.get("job_id") != sanitize_name(job_id):

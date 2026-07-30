@@ -85,11 +85,13 @@ BED_TAB_Y_JOB_TYPE = "nozzle_cam_bed_tab_y_scale"
 BED_TAB_CORNER_JOB_TYPE = "nozzle_cam_bed_tab_corner"
 RED_MARKER_X_JOB_TYPE = "idex_tool_red_marker_x_sweep"
 ROUGH_X_VERIFY_JOB_TYPE = "idex_rough_tool_x_verify"
+FINE_NOZZLE_XZ_JOB_TYPE = "idex_nozzle_fine_xz_grid"
 JOB_TYPES = (
     BED_TAB_Y_JOB_TYPE,
     BED_TAB_CORNER_JOB_TYPE,
     RED_MARKER_X_JOB_TYPE,
     ROUGH_X_VERIFY_JOB_TYPE,
+    FINE_NOZZLE_XZ_JOB_TYPE,
 )
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 HASH_TOKEN_RE = re.compile(r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+")
@@ -525,22 +527,33 @@ def _resolve_preflight(
         resolved_positions = [
             [x_min, y_min + float(definition["capture_y_offset_mm"]), z_max]
         ] * int(definition["duplicate_count"])
-    elif job_type in (RED_MARKER_X_JOB_TYPE, ROUGH_X_VERIFY_JOB_TYPE):
+    elif job_type in (
+        RED_MARKER_X_JOB_TYPE,
+        ROUGH_X_VERIFY_JOB_TYPE,
+        FINE_NOZZLE_XZ_JOB_TYPE,
+    ):
         dual_carriage = _settings_section(settings, "dual_carriage")
-        x_positions = [
-            float(value)
-            for value in (
-                definition["x_positions_mm"]
-                if job_type == RED_MARKER_X_JOB_TYPE
-                else [definition["command_x_mm"]]
-            )
-        ]
+        if job_type == RED_MARKER_X_JOB_TYPE:
+            x_positions = [
+                float(value) for value in definition["x_positions_mm"]
+            ]
+        elif job_type == FINE_NOZZLE_XZ_JOB_TYPE:
+            x_positions = [
+                float(value) for value in definition["resolved_x_positions_mm"]
+            ]
+        else:
+            x_positions = [float(definition["command_x_mm"])]
         capture_y = float(definition["capture_y_mm"])
-        capture_z = float(definition["capture_z_mm"])
         safe_z = float(definition["safe_tool_change_z_mm"])
+        z_positions = (
+            [float(value) for value in definition["z_positions_mm"]]
+            if job_type == FINE_NOZZLE_XZ_JOB_TYPE
+            else [float(definition["capture_z_mm"])]
+        )
         resolved_positions = [
-            [x, capture_y, capture_z]
+            [x, capture_y, z]
             for _tool in ("T0", "T1")
+            for z in z_positions
             for x in x_positions
         ]
         for heater_name in ("extruder", "extruder1", "heater_bed"):
@@ -548,7 +561,10 @@ def _resolve_preflight(
                 raise VisionCalibrationError(
                     f"{heater_name} target must be off for the cold marker job"
                 )
-        for axis_name, value in (("Y", capture_y), ("Z", capture_z), ("Z", safe_z)):
+        for axis_name, value in (
+            [("Y", capture_y), ("Z", safe_z)]
+            + [("Z", value) for value in z_positions]
+        ):
             axis_index = "XYZ".index(axis_name)
             if not axis_minimum[axis_index] <= value <= axis_maximum[axis_index]:
                 raise VisionCalibrationError(
@@ -607,7 +623,11 @@ def _resolve_preflight(
 
     light_section = (
         "gcode_macro nozzle_cam_analysis_light"
-        if job_type in (RED_MARKER_X_JOB_TYPE, ROUGH_X_VERIFY_JOB_TYPE)
+        if job_type in (
+            RED_MARKER_X_JOB_TYPE,
+            ROUGH_X_VERIFY_JOB_TYPE,
+            FINE_NOZZLE_XZ_JOB_TYPE,
+        )
         else "gcode_macro nozzle_cam_y_feature_light"
     )
     light_settings = _settings_section(settings, light_section)
@@ -658,6 +678,28 @@ def _resolve_preflight(
                 _number(dual_carriage, "position_max", "dual_carriage"),
             ],
         }
+    elif job_type == FINE_NOZZLE_XZ_JOB_TYPE:
+        scope["fine_nozzle_xz_grid"] = {
+            "x_offsets_from_bed_tab_mm": definition[
+                "x_offsets_from_bed_tab_mm"
+            ],
+            "resolved_x_positions_mm": definition["resolved_x_positions_mm"],
+            "z_positions_mm": definition["z_positions_mm"],
+            "capture_y_mm": definition["capture_y_mm"],
+            "safe_tool_change_z_mm": definition["safe_tool_change_z_mm"],
+            "velocity_mm_s": definition["velocity_mm_s"],
+            "settle_ms": definition["settle_ms"],
+            "tool_change_settle_ms": definition["tool_change_settle_ms"],
+            "discard_fresh_frames": definition["discard_fresh_frames"],
+            "t0_x_limits_mm": [
+                _number(stepper_x, "position_min", "stepper_x"),
+                _number(stepper_x, "position_max", "stepper_x"),
+            ],
+            "t1_x_limits_mm": [
+                _number(dual_carriage, "position_min", "dual_carriage"),
+                _number(dual_carriage, "position_max", "dual_carriage"),
+            ],
+        }
     else:
         scope["rough_x_verification"] = {
             "command_x_mm": float(definition["command_x_mm"]),
@@ -684,12 +726,25 @@ def _resolve_preflight(
             **(
                 {
                     "capture_y_mm": float(definition["capture_y_mm"]),
-                    "capture_z_mm": float(definition["capture_z_mm"]),
                     "safe_tool_change_z_mm": float(
                         definition["safe_tool_change_z_mm"]
                     ),
+                    **(
+                        {}
+                        if job_type == FINE_NOZZLE_XZ_JOB_TYPE
+                        else {
+                            "capture_z_mm": float(
+                                definition["capture_z_mm"]
+                            )
+                        }
+                    ),
                 }
-                if job_type in (RED_MARKER_X_JOB_TYPE, ROUGH_X_VERIFY_JOB_TYPE)
+                if job_type
+                in (
+                    RED_MARKER_X_JOB_TYPE,
+                    ROUGH_X_VERIFY_JOB_TYPE,
+                    FINE_NOZZLE_XZ_JOB_TYPE,
+                )
                 else {}
             ),
         },
@@ -702,7 +757,12 @@ def _resolve_preflight(
                     dual_carriage, "position_endstop", "dual_carriage"
                 ),
             }
-            if job_type in (RED_MARKER_X_JOB_TYPE, ROUGH_X_VERIFY_JOB_TYPE)
+            if job_type
+            in (
+                RED_MARKER_X_JOB_TYPE,
+                ROUGH_X_VERIFY_JOB_TYPE,
+                FINE_NOZZLE_XZ_JOB_TYPE,
+            )
             else None
         ),
         "axis_minimum": axis_minimum,
@@ -740,6 +800,74 @@ def _gcode(
     pose: dict[str, float],
 ) -> str:
     feedrate = float(definition["velocity_mm_s"]) * 60.0
+    if job_type == FINE_NOZZLE_XZ_JOB_TYPE:
+        lines = [
+            f"; vision calibration job {job_id}",
+            "G90",
+            (
+                f"VISION_JOB_BEGIN JOB={job_id} "
+                f"MANIFEST_HASH={manifest_hash} GCODE_HASH={gcode_hash}"
+            ),
+            ("VISION_PROFILE CAMERA=nozzle_cam " f"PROFILE={definition['profile']}"),
+            definition["light_macro"],
+        ]
+        seq = 0
+        x_positions = [
+            float(value) for value in definition["resolved_x_positions_mm"]
+        ]
+        z_positions = [float(value) for value in definition["z_positions_mm"]]
+        for tool in ("T0", "T1"):
+            lines.extend(
+                [
+                    f"G1 Z{pose['safe_tool_change_z_mm']:.6f} F{feedrate:.3f}",
+                    tool,
+                    f"G1 Z{pose['safe_tool_change_z_mm']:.6f} F{feedrate:.3f}",
+                    f"G1 Y{pose['capture_y_mm']:.6f} F{feedrate:.3f}",
+                    "M400",
+                    f"G4 P{int(definition['tool_change_settle_ms'])}",
+                ]
+            )
+            for z_index, z_mm in enumerate(z_positions):
+                row_x = (
+                    x_positions
+                    if z_index % 2 == 0
+                    else list(reversed(x_positions))
+                )
+                lines.extend(
+                    [
+                        f"G1 X{row_x[0]:.6f} F{feedrate:.3f}",
+                        f"G1 Z{z_mm:.6f} F{feedrate:.3f}",
+                    ]
+                )
+                for x_mm in row_x:
+                    frame = (
+                        f"{seq:02d}_{tool.lower()}_"
+                        f"x{x_mm:.3f}_z{z_mm:.3f}"
+                    ).replace(".", "p")
+                    lines.extend(
+                        [
+                            f"G1 X{x_mm:.6f} F{feedrate:.3f}",
+                            "M400",
+                            f"G4 P{int(definition['settle_ms'])}",
+                            (
+                                f"VISION_CAPTURE_SYNC JOB={job_id} SEQ={seq} "
+                                f"FRAME={frame} CAMERA=nozzle_cam "
+                                f"PROFILE={definition['profile']} TOOL={tool}"
+                            ),
+                        ]
+                    )
+                    seq += 1
+        lines.extend(
+            [
+                f"G1 Z{pose['safe_tool_change_z_mm']:.6f} F{feedrate:.3f}",
+                "T0",
+                f"G1 Z{pose['safe_tool_change_z_mm']:.6f} F{feedrate:.3f}",
+                (f"VISION_JOB_END JOB={job_id} EXPECTED_FRAMES={seq}"),
+                "VISION_LIGHT_OFF",
+                "",
+            ]
+        )
+        return "\n".join(lines)
     if job_type == ROUGH_X_VERIFY_JOB_TYPE:
         lines = [
             f"; vision calibration job {job_id}",
@@ -1014,6 +1142,7 @@ def prepare_job(
         BED_TAB_CORNER_JOB_TYPE,
         RED_MARKER_X_JOB_TYPE,
         ROUGH_X_VERIFY_JOB_TYPE,
+        FINE_NOZZLE_XZ_JOB_TYPE,
     ):
         for requirement in definition["requires"]:
             binding, fact = _resolve_current_fact(
@@ -1041,6 +1170,13 @@ def prepare_job(
         definition["command_x_mm"] = bed_tab_x + float(
             definition["verification_offset_x_mm"]
         )
+    if job_type == FINE_NOZZLE_XZ_JOB_TYPE:
+        partial_value = input_fact_values["partial_bed_coordinate_system"]["value"]
+        bed_tab_x = float(partial_value["corner_printer_xyz_mm"][0])
+        definition["resolved_x_positions_mm"] = [
+            bed_tab_x + float(offset)
+            for offset in definition["x_offsets_from_bed_tab_mm"]
+        ]
     resolved = _resolve_preflight(
         status or query_printer_status(),
         job_type,
@@ -1052,6 +1188,17 @@ def prepare_job(
             item["requirement"]: item["fact_set_hash"] for item in input_facts
         }
         resolved["applicability_hash"] = canonical_hash(resolved["scope"])
+    if job_type == FINE_NOZZLE_XZ_JOB_TYPE:
+        active_value = input_fact_values["rough_x_active_snapshot"]["value"]
+        expected_active = {
+            "t0_x_endstop_mm": float(active_value["t0_applied_x_endstop_mm"]),
+            "t1_x_endstop_mm": float(active_value["t1_applied_x_endstop_mm"]),
+        }
+        if resolved["active_calibration_snapshot"] != expected_active:
+            raise VisionCalibrationError(
+                "active T0/T1 X calibration does not match the verified "
+                "rough-X snapshot"
+            )
     job_id = _job_id(name)
     job_dir = CALIBRATION_ROOT / "jobs" / job_id
     if job_dir.exists():
@@ -1122,6 +1269,45 @@ def prepare_job(
                         ),
                     }
                 )
+    elif job_type == FINE_NOZZLE_XZ_JOB_TYPE:
+        offsets = [
+            float(value) for value in definition["x_offsets_from_bed_tab_mm"]
+        ]
+        x_positions = [
+            float(value) for value in definition["resolved_x_positions_mm"]
+        ]
+        for tool in ("T0", "T1"):
+            for z_index, z_mm in enumerate(definition["z_positions_mm"]):
+                row = list(zip(offsets, x_positions))
+                if z_index % 2:
+                    row.reverse()
+                for offset, x_mm in row:
+                    seq = len(frames)
+                    frame_name = (
+                        f"{seq:02d}_{tool.lower()}_"
+                        f"x{x_mm:.3f}_z{float(z_mm):.3f}"
+                    ).replace(".", "p")
+                    frames.append(
+                        {
+                            "seq": seq,
+                            "frame": frame_name,
+                            "camera": "nozzle_cam",
+                            "profile": definition["profile"],
+                            "tool": tool,
+                            "x_offset_from_bed_tab_mm": offset,
+                            "x_mm": x_mm,
+                            "z_mm": float(z_mm),
+                            "commanded_position_mm": [
+                                x_mm,
+                                resolved["pose"]["capture_y_mm"],
+                                float(z_mm),
+                            ],
+                            "pass": f"{tool.lower()}_z{float(z_mm):g}",
+                            "discard_fresh_frames": int(
+                                definition["discard_fresh_frames"]
+                            ),
+                        }
+                    )
     else:
         command_x = float(definition["command_x_mm"])
         for tool in ("T0", "T1"):
@@ -1184,7 +1370,7 @@ def prepare_job(
         "gcode_hash": HASH_PLACEHOLDER,
         "manifest_hash": HASH_PLACEHOLDER,
     }
-    if job_type == RED_MARKER_X_JOB_TYPE:
+    if job_type in (RED_MARKER_X_JOB_TYPE, FINE_NOZZLE_XZ_JOB_TYPE):
         manifest["active_calibration_snapshot"] = resolved[
             "active_calibration_snapshot"
         ]
@@ -1243,6 +1429,19 @@ def prepare_job(
                     ]
                 ),
             },
+        }
+    if job_type == FINE_NOZZLE_XZ_JOB_TYPE:
+        partial_value = input_fact_values["partial_bed_coordinate_system"]["value"]
+        manifest["grid_reference"] = {
+            "bed_tab_x_mm": float(partial_value["corner_printer_xyz_mm"][0]),
+            "x_offsets_from_bed_tab_mm": definition[
+                "x_offsets_from_bed_tab_mm"
+            ],
+            "resolved_x_positions_mm": definition["resolved_x_positions_mm"],
+            "z_positions_mm": definition["z_positions_mm"],
+            "capture_y_mm": float(definition["capture_y_mm"]),
+            "survey_only": True,
+            "analysis_contract_pending": True,
         }
     placeholder_gcode = _gcode(
         job_id,
@@ -1625,6 +1824,11 @@ def _report_markdown(
 def analyze_job(job_id: str) -> dict[str, Any]:
     job_dir = CALIBRATION_ROOT / "jobs" / _sanitize(job_id)
     manifest = validate_manifest(load_json(job_dir / "manifest.json"))
+    if manifest["job_type"] == FINE_NOZZLE_XZ_JOB_TYPE:
+        raise VisionCalibrationError(
+            "fine nozzle X/Z survey analysis is intentionally pending; "
+            "the acquired frames are planning evidence, not calibration facts"
+        )
     if manifest["job_type"] == BED_TAB_Y_JOB_TYPE and (
         manifest["definition_version"] != 5
     ):
@@ -2177,7 +2381,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
     }
 
 
-def run_job(
+def acquire_job(
     name: str,
     *,
     job_type: str = BED_TAB_Y_JOB_TYPE,
@@ -2200,6 +2404,10 @@ def run_job(
         current_definition["command_x_mm"] = manifest["verification_reference"][
             "command_x_mm"
         ]
+    if job_type == FINE_NOZZLE_XZ_JOB_TYPE:
+        current_definition["resolved_x_positions_mm"] = manifest[
+            "grid_reference"
+        ]["resolved_x_positions_mm"]
     current_resolved = _resolve_preflight(
         current,
         job_type,
@@ -2207,12 +2415,12 @@ def run_job(
         expected_fingerprint or manifest["provenance"]["active_printer_fingerprint"],
     )
     if (
-        job_type == RED_MARKER_X_JOB_TYPE
+        job_type in (RED_MARKER_X_JOB_TYPE, FINE_NOZZLE_XZ_JOB_TYPE)
         and current_resolved["active_calibration_snapshot"]
         != manifest["active_calibration_snapshot"]
     ):
         raise VisionCalibrationError(
-            "active T0/T1 X calibration changed after red-marker preparation"
+            "active T0/T1 X calibration changed after job preparation"
         )
     if (
         job_type == ROUGH_X_VERIFY_JOB_TYPE
@@ -2235,9 +2443,31 @@ def run_job(
                     f"bound input {binding['fact_name']} is no longer current"
                 )
     _start_print(prepared["job_id"])
-    _wait_for_acquisition(prepared["job_id"], timeout=timeout)
-    analyzed = analyze_job(prepared["job_id"])
-    return {"prepared": prepared, "analysis": analyzed}
+    state = _wait_for_acquisition(prepared["job_id"], timeout=timeout)
+    rebuild_and_render()
+    return {"prepared": prepared, "state": state}
+
+
+def run_job(
+    name: str,
+    *,
+    job_type: str = BED_TAB_Y_JOB_TYPE,
+    expected_fingerprint: str | None = None,
+    timeout: float = 180.0,
+) -> dict[str, Any]:
+    if job_type == FINE_NOZZLE_XZ_JOB_TYPE:
+        raise VisionCalibrationError(
+            "fine nozzle X/Z analysis is not implemented yet; use acquire "
+            "to collect the registered planning grid"
+        )
+    acquired = acquire_job(
+        name,
+        job_type=job_type,
+        expected_fingerprint=expected_fingerprint,
+        timeout=timeout,
+    )
+    analyzed = analyze_job(acquired["prepared"]["job_id"])
+    return {"prepared": acquired["prepared"], "analysis": analyzed}
 
 
 ROUGH_X_CALIBRATION_STAGES = (
@@ -2413,11 +2643,15 @@ def _write_job_page(job: dict[str, Any], root: Path) -> None:
             if image.exists()
             else "<span>pending</span>"
         )
-        position_label = (
-            f"{frame['tool']} X={frame['x_mm']} mm"
-            if "x_mm" in frame
-            else f"Y offset={frame.get('y_offset_mm')} mm"
-        )
+        if "x_mm" in frame and "z_mm" in frame:
+            position_label = (
+                f"{frame['tool']} X={frame['x_mm']} mm "
+                f"Z={frame['z_mm']} mm"
+            )
+        elif "x_mm" in frame:
+            position_label = f"{frame['tool']} X={frame['x_mm']} mm"
+        else:
+            position_label = f"Y offset={frame.get('y_offset_mm')} mm"
         rows.append(
             "<tr>"
             f"<td>{frame['seq']}</td>"
@@ -3139,12 +3373,12 @@ def rebuild_and_render() -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for command in ("prepare", "run"):
+    for command in ("prepare", "acquire", "run"):
         subparser = subparsers.add_parser(command)
         subparser.add_argument("job_type", choices=JOB_TYPES)
         subparser.add_argument("--name", default="bed_tab_y_scale")
         subparser.add_argument("--expected-fingerprint")
-        if command == "run":
+        if command in ("acquire", "run"):
             subparser.add_argument("--timeout", type=float, default=180.0)
     analyze_parser = subparsers.add_parser("analyze")
     analyze_parser.add_argument("job_id")
@@ -3173,6 +3407,13 @@ def main(argv: list[str] | None = None) -> int:
                 args.name,
                 job_type=args.job_type,
                 expected_fingerprint=args.expected_fingerprint,
+            )
+        elif args.command == "acquire":
+            result = acquire_job(
+                args.name,
+                job_type=args.job_type,
+                expected_fingerprint=args.expected_fingerprint,
+                timeout=args.timeout,
             )
         elif args.command == "run":
             result = run_job(

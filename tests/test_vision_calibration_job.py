@@ -274,6 +274,88 @@ def test_prepare_red_marker_sweep_binds_facts_and_discards_transition_frames(
     assert gcode.index("VISION_JOB_END") < gcode.index("VISION_LIGHT_OFF")
 
 
+def test_prepare_fine_nozzle_xz_survey_uses_bed_relative_snake_grid(
+    monkeypatch, tmp_path
+):
+    module = _load(monkeypatch, tmp_path)
+    fact_values = {
+        "partial_bed_coordinate_system": {
+            "corner_printer_xyz_mm": [173.0, -18.0, 0.0]
+        },
+        "rough_x_active_snapshot": {
+            "t0_applied_x_endstop_mm": -80.4,
+            "t1_applied_x_endstop_mm": 357.532,
+        },
+    }
+
+    def resolve(requirement, fact_name, expected_definition_version):
+        return (
+            {
+                "requirement": requirement,
+                "fact_name": fact_name,
+                "fact_set_hash": f"sha256:{requirement}",
+                "fact_definition_version": expected_definition_version,
+                "source_job_id": f"source-{requirement}",
+                "source_analysis_run_id": "analysis",
+            },
+            {
+                "name": fact_name,
+                "definition_version": expected_definition_version,
+                "value": fact_values.get(requirement, {}),
+            },
+        )
+
+    monkeypatch.setattr(module, "_resolve_current_fact", resolve)
+    result = module.prepare_job(
+        "fine_xz_survey",
+        job_type="idex_nozzle_fine_xz_grid",
+        expected_fingerprint="sha256:active",
+        status=_status(),
+    )
+    job_dir = Path(result["job_dir"])
+    manifest = json.loads((job_dir / "manifest.json").read_text())
+    gcode = (job_dir / "acquisition.gcode").read_text()
+
+    expected = []
+    for tool in ("T0", "T1"):
+        for z_index, z_mm in enumerate((1.0, 3.0, 5.0)):
+            offsets = [10.0, 16.0, 25.0]
+            if z_index % 2:
+                offsets.reverse()
+            expected.extend(
+                (tool, offset, 173.0 + offset, z_mm) for offset in offsets
+            )
+    assert manifest["frame_count"] == 18
+    assert [
+        (
+            frame["tool"],
+            frame["x_offset_from_bed_tab_mm"],
+            frame["x_mm"],
+            frame["z_mm"],
+        )
+        for frame in manifest["frames"]
+    ] == expected
+    assert manifest["grid_reference"] == {
+        "bed_tab_x_mm": 173.0,
+        "x_offsets_from_bed_tab_mm": [10, 16, 25],
+        "resolved_x_positions_mm": [183.0, 189.0, 198.0],
+        "z_positions_mm": [1, 3, 5],
+        "capture_y_mm": -14.0,
+        "survey_only": True,
+        "analysis_contract_pending": True,
+    }
+    assert all(
+        frame["commanded_position_mm"][2] >= 1.0
+        for frame in manifest["frames"]
+    )
+    assert "G28" not in gcode
+    assert gcode.count("VISION_CAPTURE_SYNC ") == 18
+    assert gcode.index("\nT0\n") < gcode.index("FRAME=00_t0_x183p000_z1p000")
+    assert gcode.index("\nT1\n") < gcode.index("FRAME=09_t1_x183p000_z1p000")
+    assert gcode.rindex("\nT0\n") < gcode.index("VISION_JOB_END")
+    assert gcode.index("VISION_JOB_END") < gcode.index("VISION_LIGHT_OFF")
+
+
 def test_prepare_resolves_active_limits_and_generates_exact_motion(
     monkeypatch, tmp_path
 ):

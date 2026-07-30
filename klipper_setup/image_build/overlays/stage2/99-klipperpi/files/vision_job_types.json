@@ -133,6 +133,68 @@
       "fact_names": [
         "calibration.rough_tool_x.verified"
       ]
+    },
+    "idex_nozzle_fine_xz_grid": {
+      "definition_version": 5,
+      "fact_definition_version": 5,
+      "camera": "nozzle_cam",
+      "profile": "analysis",
+      "light_macro": "NOZZLE_CAM_ANALYSIS_LIGHT",
+      "localizer": {
+        "kind": "nozzle_tip_registration_grid",
+        "version": 1
+      },
+      "x_offsets_from_bed_tab_mm": [10, 16, 25],
+      "z_positions_mm": [1, 3, 5],
+      "capture_y_mm": -14,
+      "safe_tool_change_z_mm": 5,
+      "velocity_mm_s": 60,
+      "settle_ms": 300,
+      "tool_change_settle_ms": 1000,
+      "discard_fresh_frames": 1,
+      "publish_on_accept": true,
+      "requires": [
+        {
+          "requirement": "bed_y_model",
+          "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model",
+          "fact_definition_version": 5
+        },
+        {
+          "requirement": "partial_bed_coordinate_system",
+          "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system",
+          "fact_definition_version": 5
+        },
+        {
+          "requirement": "image_x_axis_z2",
+          "fact_name": "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
+          "fact_definition_version": 5
+        },
+        {
+          "requirement": "t0_red_marker_offset",
+          "fact_name": "tool.t0.red_marker_to_bed_tab_x_mm",
+          "fact_definition_version": 5
+        },
+        {
+          "requirement": "t1_red_marker_offset",
+          "fact_name": "tool.t1.red_marker_to_bed_tab_x_mm",
+          "fact_definition_version": 5
+        },
+        {
+          "requirement": "rough_x_active_snapshot",
+          "fact_name": "calibration.rough_tool_x.active_snapshot",
+          "fact_definition_version": 5
+        },
+        {
+          "requirement": "rough_x_verified",
+          "fact_name": "calibration.rough_tool_x.verified",
+          "fact_definition_version": 5
+        }
+      ],
+      "fact_names": [
+        "camera.nozzle_cam.nozzle_tip.projection_model",
+        "tool.t0.nozzle_to_bed_tab_xyz_mm",
+        "tool.t1.nozzle_to_bed_tab_xyz_mm"
+      ]
     }
   }
 }

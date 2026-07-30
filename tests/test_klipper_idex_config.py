@@ -474,6 +474,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "nozzle_cam_bed_tab_corner",
         "idex_tool_red_marker_x_sweep",
         "idex_rough_tool_x_verify",
+        "idex_nozzle_fine_xz_grid",
     }
     definition = registry["job_types"]["nozzle_cam_bed_tab_y_scale"]
     assert definition["definition_version"] == 5
@@ -515,12 +516,30 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
         "calibration.rough_tool_x.active_snapshot",
     ]
+    fine_xz_definition = registry["job_types"]["idex_nozzle_fine_xz_grid"]
+    assert fine_xz_definition["definition_version"] == 5
+    assert fine_xz_definition["x_offsets_from_bed_tab_mm"] == [10, 16, 25]
+    assert fine_xz_definition["z_positions_mm"] == [1, 3, 5]
+    assert fine_xz_definition["localizer"] == {
+        "kind": "nozzle_tip_registration_grid",
+        "version": 1,
+    }
+    assert [item["fact_name"] for item in fine_xz_definition["requires"]] == [
+        "camera.nozzle_cam.bed_tab.y_parallax_model",
+        "camera.nozzle_cam.partial_bed_coordinate_system",
+        "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
+        "tool.t0.red_marker_to_bed_tab_x_mm",
+        "tool.t1.red_marker_to_bed_tab_x_mm",
+        "calibration.rough_tool_x.active_snapshot",
+        "calibration.rough_tool_x.verified",
+    ]
 
     assert "VisionJobApi" in capture_script
     assert "idex_bed_tab_y_scale_calibrate" in capture_script
     assert "idex_bed_tab_corner_calibrate" in capture_script
     assert "idex_red_marker_x_sweep_calibrate" in capture_script
     assert "idex_rough_tool_x_verify" in capture_script
+    assert "idex_nozzle_fine_xz_grid" in capture_script
     assert "VISION_REGISTER_CALIBRATION_METHODS" in capture_script
     assert "measure_bed_y" not in capture_script
     assert "vision_nozzle_align" not in capture_script

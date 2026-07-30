@@ -122,6 +122,7 @@ def validate_registry(record: Any) -> dict[str, Any]:
         "nozzle_cam_bed_tab_corner",
         "idex_tool_red_marker_x_sweep",
         "idex_rough_tool_x_verify",
+        "idex_nozzle_fine_xz_grid",
     }:
         raise CalibrationGraphError("registry has an invalid native job-type set")
     definition = _require_mapping(
@@ -285,6 +286,85 @@ def validate_registry(record: Any) -> dict[str, Any]:
         raise CalibrationGraphError(
             "rough-X verification has an invalid fact contract"
         )
+    fine_grid = _require_mapping(
+        job_types["idex_nozzle_fine_xz_grid"],
+        "registry.job_types.idex_nozzle_fine_xz_grid",
+    )
+    if fine_grid.get("definition_version") != 5:
+        raise CalibrationGraphError(
+            "fine nozzle X/Z grid definition_version must be 5"
+        )
+    if fine_grid.get("fact_definition_version") != 5:
+        raise CalibrationGraphError(
+            "fine nozzle X/Z fact definition_version must be 5"
+        )
+    if fine_grid.get("publish_on_accept") is not True:
+        raise CalibrationGraphError(
+            "fine nozzle X/Z grid must publish accepted facts immediately"
+        )
+    if fine_grid.get("localizer") != {
+        "kind": "nozzle_tip_registration_grid",
+        "version": 1,
+    }:
+        raise CalibrationGraphError(
+            "fine nozzle X/Z grid has an invalid localizer"
+        )
+    if fine_grid.get("x_offsets_from_bed_tab_mm") != [10, 16, 25]:
+        raise CalibrationGraphError(
+            "fine nozzle X/Z survey has an invalid X motion definition"
+        )
+    if fine_grid.get("z_positions_mm") != [1, 3, 5]:
+        raise CalibrationGraphError(
+            "fine nozzle X/Z survey has an invalid Z motion definition"
+        )
+    if fine_grid.get("requires") != [
+        {
+            "requirement": "bed_y_model",
+            "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model",
+            "fact_definition_version": 5,
+        },
+        {
+            "requirement": "partial_bed_coordinate_system",
+            "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system",
+            "fact_definition_version": 5,
+        },
+        {
+            "requirement": "image_x_axis_z2",
+            "fact_name": "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
+            "fact_definition_version": 5,
+        },
+        {
+            "requirement": "t0_red_marker_offset",
+            "fact_name": "tool.t0.red_marker_to_bed_tab_x_mm",
+            "fact_definition_version": 5,
+        },
+        {
+            "requirement": "t1_red_marker_offset",
+            "fact_name": "tool.t1.red_marker_to_bed_tab_x_mm",
+            "fact_definition_version": 5,
+        },
+        {
+            "requirement": "rough_x_active_snapshot",
+            "fact_name": "calibration.rough_tool_x.active_snapshot",
+            "fact_definition_version": 5,
+        },
+        {
+            "requirement": "rough_x_verified",
+            "fact_name": "calibration.rough_tool_x.verified",
+            "fact_definition_version": 5,
+        },
+    ]:
+        raise CalibrationGraphError(
+            "fine nozzle X/Z grid has invalid fact requirements"
+        )
+    if fine_grid.get("fact_names") != [
+        "camera.nozzle_cam.nozzle_tip.projection_model",
+        "tool.t0.nozzle_to_bed_tab_xyz_mm",
+        "tool.t1.nozzle_to_bed_tab_xyz_mm",
+    ]:
+        raise CalibrationGraphError(
+            "fine nozzle X/Z grid has an invalid fact contract"
+        )
     return record
 
 
@@ -298,6 +378,7 @@ def validate_manifest(record: Any) -> dict[str, Any]:
         "nozzle_cam_bed_tab_corner",
         "idex_tool_red_marker_x_sweep",
         "idex_rough_tool_x_verify",
+        "idex_nozzle_fine_xz_grid",
     ):
         raise CalibrationGraphError("manifest has an unsupported job_type")
     definition_version = record.get("definition_version")
@@ -463,7 +544,7 @@ def validate_manifest(record: Any) -> dict[str, Any]:
                 raise CalibrationGraphError(
                     f"red-marker active calibration snapshot lacks {key}"
                 )
-    else:
+    elif job_type == "idex_rough_tool_x_verify":
         if definition_version != 5:
             raise CalibrationGraphError(
                 "rough-X verification manifest definition_version must be 5"
@@ -536,6 +617,106 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             raise CalibrationGraphError(
                 "rough-X verification has invalid input fact versions"
             )
+    else:
+        if definition_version != 5:
+            raise CalibrationGraphError(
+                "fine nozzle X/Z manifest definition_version must be 5"
+            )
+        if record.get("publish_on_accept") is not True:
+            raise CalibrationGraphError(
+                "fine nozzle X/Z manifest must publish on acceptance"
+            )
+        if record.get("localizer") != {
+            "kind": "nozzle_tip_registration_grid",
+            "version": 1,
+        }:
+            raise CalibrationGraphError(
+                "fine nozzle X/Z manifest has an invalid localizer"
+            )
+        reference = _require_mapping(
+            record.get("grid_reference"), "manifest.grid_reference"
+        )
+        bed_tab_x = reference.get("bed_tab_x_mm")
+        if not isinstance(bed_tab_x, (int, float)):
+            raise CalibrationGraphError(
+                "fine nozzle X/Z manifest lacks the bed-tab X reference"
+            )
+        expected_offsets = [10, 16, 25]
+        expected_z = [1, 3, 5]
+        expected = []
+        for tool in ("T0", "T1"):
+            for z_index, z_mm in enumerate(expected_z):
+                offsets = (
+                    expected_offsets
+                    if z_index % 2 == 0
+                    else list(reversed(expected_offsets))
+                )
+                for offset in offsets:
+                    expected.append((tool, offset, bed_tab_x + offset, z_mm))
+        actual = [
+            (
+                frame.get("tool"),
+                frame.get("x_offset_from_bed_tab_mm"),
+                frame.get("x_mm"),
+                frame.get("z_mm"),
+            )
+            for frame in frames
+        ]
+        if len(frames) != 18 or record.get("frame_count") != 18:
+            raise CalibrationGraphError(
+                "fine nozzle X/Z survey manifest must contain eighteen frames"
+            )
+        if actual != expected:
+            raise CalibrationGraphError(
+                "fine nozzle X/Z manifest has an invalid snake-grid motion order"
+            )
+        if any(frame.get("discard_fresh_frames") != 1 for frame in frames):
+            raise CalibrationGraphError(
+                "fine nozzle X/Z frames must discard one fresh framebuffer frame"
+            )
+        expected_requirements = {
+            "bed_y_model": "camera.nozzle_cam.bed_tab.y_parallax_model",
+            "partial_bed_coordinate_system":
+                "camera.nozzle_cam.partial_bed_coordinate_system",
+            "image_x_axis_z2":
+                "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
+            "t0_red_marker_offset": "tool.t0.red_marker_to_bed_tab_x_mm",
+            "t1_red_marker_offset": "tool.t1.red_marker_to_bed_tab_x_mm",
+            "rough_x_active_snapshot": "calibration.rough_tool_x.active_snapshot",
+            "rough_x_verified": "calibration.rough_tool_x.verified",
+        }
+        input_facts = _require_list(
+            record.get("input_facts"), "manifest.input_facts"
+        )
+        normalized_input_facts = [
+            _require_mapping(item, f"manifest.input_facts[{index}]")
+            for index, item in enumerate(input_facts)
+        ]
+        if {
+            item.get("requirement"): item.get("fact_name")
+            for item in normalized_input_facts
+        } != expected_requirements:
+            raise CalibrationGraphError(
+                "fine nozzle X/Z manifest has invalid input fact bindings"
+            )
+        for binding in normalized_input_facts:
+            _require_string(binding.get("fact_set_hash"), "input fact_set_hash")
+        if any(
+            item.get("fact_definition_version") != 5
+            for item in normalized_input_facts
+        ):
+            raise CalibrationGraphError(
+                "fine nozzle X/Z manifest has invalid input fact versions"
+            )
+        snapshot = _require_mapping(
+            record.get("active_calibration_snapshot"),
+            "manifest.active_calibration_snapshot",
+        )
+        for key in ("t0_x_endstop_mm", "t1_x_endstop_mm"):
+            if not isinstance(snapshot.get(key), (int, float)):
+                raise CalibrationGraphError(
+                    f"fine nozzle X/Z active calibration snapshot lacks {key}"
+                )
     for seq, frame_value in enumerate(frames):
         frame = _require_mapping(frame_value, f"manifest.frames[{seq}]")
         if frame.get("seq") != seq:

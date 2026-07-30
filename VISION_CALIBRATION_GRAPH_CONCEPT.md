@@ -425,59 +425,171 @@ Dependencies:
 
 - bed-tab Y/parallax facts
 - bed-tab corner and bed reference-plane facts
+- red-marker X-axis and per-tool marker-offset facts
 - active and verified rough-X calibration snapshot
 - fixed nozzle lighting/camera profile
 
-Acquisition:
+The path is calculated from the current corner prior rather than hardcoded in
+printer coordinates. With the current `bed_tab_x=173 mm`, the default X row is:
 
-- start approximately `5 mm` to the image-right side of the bed-tab corner
-- capture a configurable rectangular grid
-- use `3 mm` commanded X increments
-- use `2 mm` commanded Z increments
-- acquire the same nominal grid for T0 and T1
-- keep every commanded Z at or above the job’s declared safety minimum
-- capture center duplicates for repeatability
+```text
+bed_tab_x + [10, 13, 16, 19, 22, 25] mm
+          = [183, 186, 189, 192, 195, 198] mm
+```
 
-The exact grid extent is a job parameter. It should be kept small enough that
-the nozzle remains visible in a tight ROI and large enough to constrain X scale
-and its Z dependence.
+The intended Z span is `1` through `5 mm`. “Four Z steps” means four 1 mm
+intervals and therefore five possible levels: `[1, 2, 3, 4, 5] mm`. A full
+rectangular acquisition would contain 60 frames. The fast default should use a
+40-frame sparse tensor grid:
 
-Analysis is registration-first:
+- full six-position X rows at Z=`1`, `3`, and `5 mm`: 36 frames for two tools
+- the center X position at Z=`2` and `4 mm`: 4 additional frames
+- snake the X direction between rows
+- raise to Z=`5 mm` before every tool change
+- never command below Z=`1 mm`
 
-1. locate the nozzle only once per connected visible region
-2. construct a tight nozzle ROI
-3. align neighboring X images of the same tool
-4. align neighboring Z images of the same tool
-5. align T0 and T1 images at corresponding corrected poses
-6. build a graph of pairwise relative transforms
-7. reject weak edges and solve the remaining graph jointly
+The full rectangular grid remains configurable for later high-precision work.
+The same nominal printer-coordinate path is acquired for T0 and T1.
 
-Circle, orifice, or ellipse detection may seed the ROI, but the fit uses
-relative transforms between images. Each pairwise edge records translation,
-scale, correlation, registration residual, and rejection reason.
+#### Coordinate-free nozzle localization
 
-The model should solve at least:
+The nozzle ROI is not a configured pixel rectangle and no marker-to-nozzle
+pixel offset is hardcoded.
 
-- T0-to-T1 nozzle X offset
-- T0-to-T1 nozzle Z offset
-- T0-to-T1 nozzle Y offset using the bed-tab Y coordinate system
-- X scale at the bed reference plane
-- variation of X scale with Z
-- T0 nozzle Z relative to the vision-observed bed reference plane
-- T0 nozzle X relative to the bed-tab corner
+1. Use the current red-marker trajectory model to identify the tool-local red
+   marker. Do not select the largest red component: T1 has other red wiring that
+   can be larger than the marker.
+2. Search a broad image-size-relative region around the marker for dark
+   annulus/orifice candidates.
+3. Circle, ellipse, or central-orifice detection may propose candidates only.
+4. Track every candidate across the X/Z grid.
+5. Select the candidate whose motion follows commanded X, whose apparent scale
+   changes smoothly with Z, and whose T0/T1 core images register consistently.
+6. Derive a tight ROI from that observed candidate and use registration for all
+   measurements.
 
-Produced facts:
+A frame in which the nozzle is hidden, clipped, or ambiguously matched is
+excluded. It cannot contribute a calibration fact.
 
-- `camera.nozzle_cam.nozzle.x_scale_px_per_mm_at_bed_plane`
-- `camera.nozzle_cam.nozzle.x_scale_slope_per_z`
-- `tool.t0.nozzle_to_bed_tab_xyz_mm`
-- `tool.t1.nozzle_to_t0_xyz_mm`
-- `tool.t0.nozzle_z_to_bed_plane_mm`
-- `tool.t1.fine_endstop_correction_xyz_mm`
-- model residuals, accepted registration edges, sweep coverage, and outliers
+#### Registration graph
 
-This stage produces a fine calibration candidate. Activation remains a separate
-operation and records the exact fact set used.
+The authoritative measurements are forward/reverse relative registrations:
+
+- neighboring X images of the same tool at the same Z
+- neighboring Z images of the same tool at the center X
+- T0/T1 images at corresponding commanded X/Z poses
+- duplicate or loop-closing edges where the sparse grid provides them
+
+Use grayscale, CLAHE, and gradient representations. Each edge records
+translation, isotropic scale, correlation, forward/reverse disagreement,
+boundary status, and rejection reason. The graph is solved jointly after weak
+or inconsistent edges are removed.
+
+For each tool, use the three-observable nozzle state
+
+```text
+o = [image_x, image_y, log(apparent_scale)]
+```
+
+and fit a local projection model
+
+```text
+image_position(x, z)
+  = p0 + Jx0 * (x - x_ref)
+       + Jz  * (z - z_ref)
+       + Jxz * (x - x_ref) * (z - z_ref)
+
+Jx(z) = Jx0 + Jxz * (z - z_ref)
+```
+
+The bilinear term is the measured X parallax change with Z. The log-scale
+observable supplies an independent Z discriminator for the cross-tool solve.
+The bed-tab Y vector supplies the image direction for printer Y. The joint
+three-observable solve yields one absolute nozzle pose for each tool relative
+to the bed-tab coordinate system. Their cross-tool difference is derived in
+reports from those two absolute poses; it is not stored as a second, redundant
+graph fact and is not an endstop-correction fact.
+
+#### Bed-plane Z anchoring
+
+The original proposal was to declare nozzle Z=0 where the magnitude of the
+nozzle X scale equals the bed-tab Y scale. That equality is not generally valid
+for an oblique camera: the local image scale can differ by world direction even
+at one physical plane.
+
+Write the comparison explicitly as:
+
+```text
+Sx_nozzle(z_zero) = Rxy_bed * Sy_bed
+```
+
+where `Rxy_bed = Sx_bed / Sy_bed` is a bed-plane directional scale ratio. The
+current graph measures `Sy_bed`, but it does not yet measure `Sx_bed`, so
+`Rxy_bed` is not known. Assuming `Rxy_bed=1` is permitted only as a diagnostic
+calculation and cannot publish the nozzle Z origin.
+
+The missing anchor can be supplied later by one of:
+
+- a known physical X length on the bed tab, measured in the same images
+- a second bed-plane X reference point with a printer-coordinate prior
+- a camera-intrinsic/plane calibration that determines `Rxy_bed`
+- a direct vision bed/nozzle depth reference independent of scalar scale
+  equality
+
+Until one of these anchors is current and accepted, the job may publish the
+projection model but must not publish absolute nozzle Z or a deployable XYZ
+candidate.
+
+Produced coordinate-system facts:
+
+- `camera.nozzle_cam.nozzle_tip.projection_model`
+- `tool.t0.nozzle_to_bed_tab_xyz_mm`, only when X/Y/Z are all anchored
+- `tool.t1.nozzle_to_bed_tab_xyz_mm`, only when X/Y/Z are all anchored
+
+The projection fact stores the fitted X vector at the reference Z and its
+vector-valued Z slope. ROI geometry, correlations, fit residuals, accepted
+registration edges, raw scalar-equality extrapolation, sweep coverage, and
+outliers are diagnostic fields or analysis artifacts.
+
+This stage produces a fine calibration candidate only after both absolute
+per-tool nozzle facts are available. Activation remains a separate operation
+that records the exact fact sets used.
+
+#### Live planning survey, 2026-07-30
+
+The reproducible planning acquisition
+`20260730T134526.452210Z-stage5_live_survey` is visible under `/vision/`. It
+captured 18 fresh frames:
+
+- T0 and T1
+- X offsets `[10, 16, 25] mm` from the current bed-tab X
+- commanded Z `[1, 3, 5] mm`
+- fixed Y=`-14 mm`, fixed analysis profile and lighting
+
+The nozzle-face annulus is visible in all 18 frames. At X=`189 mm`, the
+observed nozzle ROI center is approximately `[+24, +100] px` from the T0 red
+marker and `[+24, +102] px` from the T1 marker. These are observations from
+this survey, not configured localizer coordinates.
+
+A 116×116 px annulus template registered within each tool with the following
+measured X scales:
+
+| Tool | Z=1 | Z=3 | Z=5 | fitted scale slope |
+| --- | ---: | ---: | ---: | ---: |
+| T0 | 9.557 px/mm | 9.312 px/mm | 9.140 px/mm | -0.1042 px/mm per mm Z |
+| T1 | 9.528 px/mm | 9.317 px/mm | 9.117 px/mm | -0.1028 px/mm per mm Z |
+
+The two independently fitted slopes agree closely, so the proposed parallax
+model is observable in these images. Core T0/T1 template correlations are
+approximately 0.72 around X=`183`–`189 mm`; the X=`198 mm` cross-tool images
+are weaker at approximately 0.4, although within-tool tracking remains usable.
+The final analyzer should therefore use the full X span for within-tool
+parallax but favor the central/core images for cross-tool alignment.
+
+The current bed-tab Y scale is approximately 10.502 px/mm. Setting
+`Rxy_bed=1` would extrapolate the two nozzle models to Z approximately
+`-8.2 mm` and `-8.5 mm`. This is a physically implausible result and confirms
+that raw X/Y scalar equality is not an acceptable bed-zero anchor.
 
 ### 6. Eddy lighting
 
@@ -626,22 +738,28 @@ Job types should be registered declaratively, for example in
 ```yaml
 schema_version: 1
 job_type: idex_nozzle_fine_xz_grid
-definition_version: 1
+definition_version: 5
 acquisition_generator: vision_calibration:build_fine_xz_job
 analyzer: vision_calibration:analyze_fine_xz_job
 requires:
   - fact_type: camera.nozzle_cam.bed_tab.y_parallax_model
     current: true
-  - fact_type: bed.tab_corner.printer_xyz
+  - fact_type: camera.nozzle_cam.partial_bed_coordinate_system
+    current: true
+  - fact_type: camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2
+    current: true
+  - fact_type: tool.t0.red_marker_to_bed_tab_x_mm
+    current: true
+  - fact_type: tool.t1.red_marker_to_bed_tab_x_mm
     current: true
   - fact_type: calibration.rough_tool_x.active_snapshot
     current: true
   - fact_type: calibration.rough_tool_x.verified
     current: true
 produces:
-  - camera.nozzle_cam.nozzle.x_scale_px_per_mm_at_bed_plane
+  - camera.nozzle_cam.nozzle_tip.projection_model
   - tool.t0.nozzle_to_bed_tab_xyz_mm
-  - tool.t1.nozzle_to_t0_xyz_mm
+  - tool.t1.nozzle_to_bed_tab_xyz_mm
 safety:
   required_homed_axes: xyz
   require_idle: true
@@ -658,30 +776,32 @@ Extend the existing immutable `manifest.json` with fact bindings:
 
 ```json
 {
-  "schema_version": 2,
+  "schema": "vision-calibration-acquisition-manifest",
+  "schema_version": 1,
   "job_id": "idex_nozzle_fine_xz_grid_20260729T180000Z",
   "job_type": "idex_nozzle_fine_xz_grid",
-  "job_definition_version": 1,
+  "definition_version": 5,
   "manifest_hash": "sha256:...",
   "gcode_hash": "sha256:...",
   "active_config_fingerprint": "sha256:...",
   "input_facts": [
     {
       "requirement": "bed_y_model",
-      "fact_type": "camera.nozzle_cam.bed_tab.y_parallax_model",
-      "fact_id": "sha256:...",
-      "fact_set_id": "sha256:..."
+      "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model",
+      "fact_set_hash": "sha256:...",
+      "fact_definition_version": 5
     },
     {
-      "requirement": "rough_x_snapshot",
-      "fact_type": "calibration.rough_tool_x.active_snapshot",
-      "fact_id": "sha256:...",
-      "fact_set_id": "sha256:..."
+      "requirement": "rough_x_active_snapshot",
+      "fact_name": "calibration.rough_tool_x.active_snapshot",
+      "fact_set_hash": "sha256:...",
+      "fact_definition_version": 5
     }
   ],
-  "parameters": {
-    "x_step_mm": 3.0,
-    "z_step_mm": 2.0,
+  "grid_reference": {
+    "bed_tab_x_mm": 173.0,
+    "x_offsets_from_bed_tab_mm": [10, 13, 16, 19, 22, 25],
+    "z_positions_mm": [1, 2, 3, 4, 5],
     "minimum_commanded_z_mm": 1.0
   },
   "frames": []
@@ -722,38 +842,24 @@ Facts from one accepted analysis are published atomically as a fact set:
 
 ```json
 {
+  "schema": "vision-calibration-fact-set",
   "schema_version": 1,
-  "fact_set_id": "sha256:...",
-  "status": "accepted",
-  "authoritative": true,
-  "producer": {
-    "job_id": "idex_nozzle_fine_xz_grid_20260729T180000Z",
-    "analysis_run_id": "sha256:...",
-    "manifest_hash": "sha256:..."
-  },
-  "inputs": [
-    {"fact_id": "sha256:...", "role": "bed_y_model"},
-    {"fact_id": "sha256:...", "role": "rough_x_snapshot"}
-  ],
-  "applicability": {
-    "printer": "menderpi",
-    "camera": "nozzle_cam",
-    "camera_serial": "...",
-    "image_size_px": [1920, 1080],
-    "profile": "analysis",
-    "active_config_fingerprint": "sha256:..."
-  },
+  "fact_set_hash": "sha256:...",
+  "job_id": "idex_nozzle_fine_xz_grid_20260729T180000Z",
+  "analysis_run_id": "sha256:...",
+  "accepted": true,
+  "publication_eligible": true,
+  "applicability_hash": "sha256:...",
   "facts": [
     {
-      "fact_id": "sha256:...",
-      "fact_type": "tool.t1.nozzle_to_t0_xyz_mm",
-      "value": {"x": -0.12, "y": 0.04, "z": -0.08},
-      "unit": "mm",
-      "coordinate_frame": "printer_xyz",
-      "quality": {
-        "accepted_edges": 42,
-        "fit_rms_px": 0.31
-      }
+      "name": "tool.t1.nozzle_to_bed_tab_xyz_mm",
+      "definition_version": 5,
+      "role": "coordinate_system",
+      "dependencies": [],
+      "value_items": [
+        {"field": "xyz_mm", "role": "coordinate_system"}
+      ],
+      "value": {"xyz_mm": [173.02, -18.04, 0.08]}
     }
   ]
 }
@@ -774,7 +880,7 @@ rebuildable index:
   "heads": {
     "camera.nozzle_cam.bed_tab.y_parallax_model": "sha256:...",
     "bed.tab_corner.printer_xyz": "sha256:...",
-    "tool.t1.nozzle_to_t0_xyz_mm": "sha256:..."
+    "tool.t1.nozzle_to_bed_tab_xyz_mm": "sha256:..."
   },
   "fact_sets": {
     "sha256:...": {

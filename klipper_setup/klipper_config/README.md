@@ -85,7 +85,7 @@ or directly on the printer host:
 /usr/local/bin/vision_calibration.py run idex_tool_red_marker_x_sweep --name red_marker_x_sweep
 ```
 
-Accepted red-marker jobs publish their four coordinate facts immediately. They
+Accepted red-marker jobs publish their three coordinate facts immediately. They
 do not modify `calib.yaml` or activate either tool's X endstop.
 
 The rough-X calibration sequence synchronizes the current priors, asks the
@@ -122,6 +122,20 @@ IDEX_ROUGH_X_VERIFY NAME=rough_x_activation_verify
 The verification expects each red marker to project 10 mm along the measured
 image-X axis from the fixed bed-tab corner and expects the two marker image-X
 positions to agree. It is report-only and does not change configuration.
+
+The current Stage 5 planning acquisition derives its X positions from the
+current bed-tab prior and binds every required Stage 0–4 fact:
+
+```bash
+/usr/local/bin/vision_calibration.py acquire idex_nozzle_fine_xz_grid \
+  --name fine_nozzle_xz_survey
+```
+
+This command acquires the registered T0/T1 X/Z survey and publishes it on the
+vision job page. Fine-grid analysis is intentionally not enabled until the
+projection model and bed-plane Z anchor described in
+`VISION_CALIBRATION_GRAPH_CONCEPT.md` are implemented; the survey publishes no
+calibration facts.
 
 The seed values live in
 `/usr/local/share/vision/vision_calibration_priors.json`. Publishing changed
