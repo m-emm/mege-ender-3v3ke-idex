@@ -174,10 +174,12 @@ def validate_registry(record: Any) -> dict[str, Any]:
     fine = job_types["idex_nozzle_fine_xz_grid"]
     if fine.get("x_offsets_from_bed_tab_mm") != [10, 13, 16, 19, 22, 25]:
         raise CalibrationGraphError("fine nozzle X offsets are invalid")
-    if fine.get("full_row_z_mm") != [1, 3, 5]:
+    if fine.get("full_row_z_mm") != [1, 5, 9]:
         raise CalibrationGraphError("fine nozzle full-row Z values are invalid")
-    if fine.get("center_only_z_mm") != [2, 4]:
+    if fine.get("center_only_z_mm") != [3, 7]:
         raise CalibrationGraphError("fine nozzle center-only Z values are invalid")
+    if fine.get("safe_tool_change_z_mm") != 9:
+        raise CalibrationGraphError("fine nozzle tool-change Z is invalid")
     return record
 
 
@@ -408,15 +410,6 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
             for field in ("offset_mm", "reference_commanded_x_mm"):
                 if not isinstance(fact_value.get(field), (int, float)):
                     raise CalibrationGraphError(f"red-marker {field} must be numeric")
-        elif name in {
-            "tool.t0.nozzle_to_bed_tab_xyz_mm",
-            "tool.t1.nozzle_to_bed_tab_xyz_mm",
-        }:
-            _numeric_vector(
-                fact_value.get("offset_xyz_mm_at_commanded_bed_tab"),
-                3,
-                "nozzle-to-bed-tab XYZ",
-            )
     if record.get("fact_set_hash") != content_hash(record, "fact_set_hash"):
         raise CalibrationGraphError("fact set hash mismatch")
     return record

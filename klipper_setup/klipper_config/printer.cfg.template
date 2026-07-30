@@ -284,7 +284,7 @@ gcode:
     )}
 
 [gcode_macro IDEX_NOZZLE_FINE_XZ_CALIBRATE]
-description: Acquire and analyze the sparse 40-frame T0/T1 nozzle X/Z grid.
+description: Acquire and analyze the sparse 40-frame T0/T1 nozzle-tip X/Z grid over Z=1..9.
 gcode:
     {% set name = params.NAME|default("fine_nozzle_xz") %}
     {% set print_state = printer.print_stats.state %}

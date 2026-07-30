@@ -101,16 +101,17 @@ image-X axis from the fixed bed-tab corner and expects the two marker image-X
 positions to agree. It is report-only and does not change configuration.
 
 Stage 5 captures a sparse 40-frame T0/T1 nozzle grid. Full X rows use offsets
-`10, 13, 16, 19, 22, 25 mm` at Z 1, 3, and 5 mm; Z 2 and 4 mm use the center
-X only:
+`10, 13, 16, 19, 22, 25 mm` at Z 1, 5, and 9 mm; Z 3 and 7 mm use the center
+X only. The outer circular ring is a coarse locator. Only a small ROI centered
+on the actual metallic nozzle tip contributes registration measurements:
 
 ```gcode
 IDEX_NOZZLE_FINE_XZ_CALIBRATE NAME=fine_nozzle_xz
 ```
 
-It publishes the nozzle projection model and both nozzle coordinates relative
-to the bed tab. The known fiducial plane at Z `-0.6 mm` anchors the print-plane
-extrapolation.
+It publishes the nozzle-tip projection and registration model. It deliberately
+does not publish absolute nozzle XYZ or infer Z by forcing the nozzle X vector
+to equal the bed X vector; that joint solve is a separate follow-up operation.
 
 The corresponding host job types, in dependency order, are:
 

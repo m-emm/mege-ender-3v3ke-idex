@@ -1590,11 +1590,15 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                     "x_vector_z_slope_px_per_mm_per_mm": details[
                         "average_x_vector_z_slope_px_per_mm_per_mm"
                     ],
+                    "cross_tool_tip_offset_px_at_x189_z5": details[
+                        "cross_tool_tip_offset_px_at_x189_z5"
+                    ],
+                    "tip_tracking": details["tip_tracking"],
+                    "vector_comparison_at_commanded_z0": details[
+                        "vector_comparison_at_commanded_z0"
+                    ],
                     "quality": {
                         "warnings": details["warnings"],
-                        "marker_delta_cluster_px": details[
-                            "marker_delta_cluster_px"
-                        ],
                     },
                     "supporting_artifact_hashes": {
                         key: item["sha256"]
@@ -1613,37 +1617,10 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                             "bed_x_vector_print_plane_px_per_mm",
                             "image_y_axis_vector_px_per_mm",
                             "x_vector_z_slope_px_per_mm_per_mm",
+                            "cross_tool_tip_offset_px_at_x189_z5",
                         },
                     )
                 ]
-                for tool, fact_name in (
-                    ("T0", "tool.t0.nozzle_to_bed_tab_xyz_mm"),
-                    ("T1", "tool.t1.nozzle_to_bed_tab_xyz_mm"),
-                ):
-                    tool_value = {
-                        **details["tool_facts"][tool],
-                        "quality": {
-                            "model": details["models"][tool],
-                            "warnings": details["warnings"],
-                        },
-                        "supporting_artifact_hashes": {
-                            key: item["sha256"]
-                            for key, item in details["artifacts"].items()
-                        },
-                    }
-                    facts.append(
-                        _fact(
-                            fact_name,
-                            "coordinate_system",
-                            tool_value,
-                            dependencies,
-                            {
-                                "offset_xyz_mm_at_commanded_bed_tab",
-                                "commanded_z_at_print_plane_mm",
-                                "nozzle_pixel_at_bed_tab_and_print_plane_px",
-                            },
-                        )
-                    )
             fact_set = {
                 "schema": FACT_SET_SCHEMA,
                 "schema_version": 1,
@@ -1926,13 +1903,9 @@ def _coordinate_summary(name: str, value: dict[str, Any]) -> str:
             "t0_applied_x_endstop_mm",
             "t1_applied_x_endstop_mm",
         ],
-        "tool.t0.nozzle_to_bed_tab_xyz_mm": [
-            "offset_xyz_mm_at_commanded_bed_tab",
-            "commanded_z_at_print_plane_mm",
-        ],
-        "tool.t1.nozzle_to_bed_tab_xyz_mm": [
-            "offset_xyz_mm_at_commanded_bed_tab",
-            "commanded_z_at_print_plane_mm",
+        "camera.nozzle_cam.nozzle_tip.projection_model": [
+            "x_vector_z_slope_px_per_mm_per_mm",
+            "cross_tool_tip_offset_px_at_x189_z5",
         ],
     }.get(name, [])
     return "<br>".join(

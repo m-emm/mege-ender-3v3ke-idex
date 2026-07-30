@@ -3,6 +3,8 @@ import json
 import sys
 from pathlib import Path
 
+import cv2
+import numpy as np
 import pytest
 
 
@@ -75,6 +77,13 @@ def test_registry_is_exact_clean_chain():
     assert registry["job_types"]["idex_nozzle_fine_xz_grid"][
         "x_offsets_from_bed_tab_mm"
     ] == [10, 13, 16, 19, 22, 25]
+    fine = registry["job_types"]["idex_nozzle_fine_xz_grid"]
+    assert fine["full_row_z_mm"] == [1, 5, 9]
+    assert fine["center_only_z_mm"] == [3, 7]
+    assert fine["safe_tool_change_z_mm"] == 9
+    assert fine["fact_names"] == [
+        "camera.nozzle_cam.nozzle_tip.projection_model"
+    ]
 
 
 def test_canonical_hash_is_order_independent_and_strict():
@@ -163,3 +172,37 @@ def test_priors_define_fiducial_plane_without_uncertainties():
     ]
     assert seeds["bed.fiducial_patch.printer_z_mm"]["value"]["z_mm"] == -0.6
     assert "uncert" not in json.dumps(priors).lower()
+
+
+def test_fine_grid_localizes_the_nozzle_tip_inside_the_outer_ring():
+    analyzer = _module(
+        "vision_nozzle_fine_xz.py", "vision_nozzle_tip_localizer_test"
+    )
+    image = np.full((240, 240, 3), 24, dtype=np.uint8)
+    ring_center = np.asarray([120.0, 120.0])
+    cv2.circle(image, (120, 120), 52, (130, 130, 130), 7)
+    cv2.circle(image, (129, 118), 5, (252, 252, 252), -1)
+
+    candidates = analyzer._tip_candidates(
+        image,
+        {"center_px": ring_center.tolist(), "radius_px": 52.0},
+    )
+
+    assert candidates
+    recovered = np.asarray(candidates[0]["center_px"])
+    assert np.linalg.norm(recovered - np.asarray([129.0, 118.0])) < 2.0
+    assert np.linalg.norm(recovered - ring_center) > 5.0
+
+
+def test_fine_grid_analyzer_streams_frames_and_publishes_projection_only():
+    source = (FILES / "vision_nozzle_fine_xz.py").read_text(encoding="utf-8")
+    registry = json.loads(
+        (FILES / "vision_job_types.json").read_text(encoding="utf-8")
+    )
+    fine = registry["job_types"]["idex_nozzle_fine_xz_grid"]
+
+    assert "images.append" not in source
+    assert "commanded_z_at_print_plane_mm" not in source
+    assert fine["fact_names"] == [
+        "camera.nozzle_cam.nozzle_tip.projection_model"
+    ]

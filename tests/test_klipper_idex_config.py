@@ -537,8 +537,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     fine_xz_definition = registry["job_types"]["idex_nozzle_fine_xz_grid"]
     assert fine_xz_definition["definition_version"] == 1
     assert fine_xz_definition["x_offsets_from_bed_tab_mm"] == [10, 13, 16, 19, 22, 25]
-    assert fine_xz_definition["full_row_z_mm"] == [1, 3, 5]
-    assert fine_xz_definition["center_only_z_mm"] == [2, 4]
+    assert fine_xz_definition["full_row_z_mm"] == [1, 5, 9]
+    assert fine_xz_definition["center_only_z_mm"] == [3, 7]
+    assert fine_xz_definition["safe_tool_change_z_mm"] == 9
     assert fine_xz_definition["localizer"] == {
         "kind": "nozzle_tip_registration_grid",
         "version": 1,
@@ -552,6 +553,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "bed.fiducial_patch.printer_z_mm",
         "calibration.rough_tool_x.active_snapshot",
         "calibration.rough_tool_x.verified",
+    ]
+    assert fine_xz_definition["fact_names"] == [
+        "camera.nozzle_cam.nozzle_tip.projection_model"
     ]
 
     assert "VisionJobApi" in capture_script
@@ -576,7 +580,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "analyze_metric" in fiducial_analyzer
     assert "analyze_corner" in fiducial_analyzer
     assert "expected_corner_px" not in fiducial_analyzer
-    assert "Fine T0/T1 nozzle X/Z grid analysis" in fine_xz_analyzer
+    assert "Fine T0/T1 nozzle-tip X/Z analysis" in fine_xz_analyzer
     assert "_fit_tool" in fine_xz_analyzer
     assert "_red_candidates" in red_marker_analyzer
     assert "_pair_registration" in red_marker_analyzer
