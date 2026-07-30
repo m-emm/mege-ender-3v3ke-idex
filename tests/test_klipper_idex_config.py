@@ -408,19 +408,17 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     capture_script = (IMAGE_BUILD_FILES_DIR / "vision_capture.py").read_text(
         encoding="utf-8"
     )
-    calibration_script = (
-        IMAGE_BUILD_FILES_DIR / "vision_calibration.py"
-    ).read_text(encoding="utf-8")
-    graph_script = (
-        IMAGE_BUILD_FILES_DIR / "vision_calibration_graph.py"
-    ).read_text(encoding="utf-8")
-    analyzer_script = (
-        IMAGE_BUILD_FILES_DIR / "vision_bed_tab_y_scale.py"
-    ).read_text(encoding="utf-8")
+    calibration_script = (IMAGE_BUILD_FILES_DIR / "vision_calibration.py").read_text(
+        encoding="utf-8"
+    )
+    graph_script = (IMAGE_BUILD_FILES_DIR / "vision_calibration_graph.py").read_text(
+        encoding="utf-8"
+    )
+    analyzer_script = (IMAGE_BUILD_FILES_DIR / "vision_bed_tab_y_scale.py").read_text(
+        encoding="utf-8"
+    )
     registry = json.loads(
-        (IMAGE_BUILD_FILES_DIR / "vision_job_types.json").read_text(
-            encoding="utf-8"
-        )
+        (IMAGE_BUILD_FILES_DIR / "vision_job_types.json").read_text(encoding="utf-8")
     )
     capture_service = (
         IMAGE_BUILD_FILES_DIR / "vision-capture-nozzle-cam.service"
@@ -428,9 +426,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     image_install = (IMAGE_BUILD_STAGE_DIR / "01-run-chroot.sh").read_text(
         encoding="utf-8"
     )
-    live_deploy = (
-        KLIPPER_CONFIG_DIR / "deploy_webcam_vision.sh"
-    ).read_text(encoding="utf-8")
+    live_deploy = (KLIPPER_CONFIG_DIR / "deploy_webcam_vision.sh").read_text(
+        encoding="utf-8"
+    )
     extra = (
         Path(__file__).resolve().parents[1]
         / "klipper_setup/klipper_host/klippy/extras/vision.py"
@@ -451,7 +449,13 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert registry["schema_version"] == 1
     assert set(registry["job_types"]) == {"nozzle_cam_bed_tab_y_scale"}
     definition = registry["job_types"]["nozzle_cam_bed_tab_y_scale"]
-    assert definition["y_offsets_mm"] == [0, 5, 10, 15, 20, 15, 10, 5, 0]
+    assert definition["definition_version"] == 4
+    assert definition["localizer"] == {
+        "kind": "bed_tab_top_edge",
+        "version": 1,
+    }
+    assert definition["y_offsets_mm"] == [0, 10, 20, 20, 10, 0]
+    assert definition["publish_on_accept"] is True
     assert definition["velocity_mm_s"] == 60
     assert definition["settle_ms"] == 300
     assert definition["light_macro"] == "NOZZLE_CAM_Y_FEATURE_LIGHT"
@@ -468,10 +472,15 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "canonical_hash" in graph_script
     assert "_detect_cycles" in graph_script
     assert "stale_fact_sets" in graph_script
-    assert "_cluster_tracks" in analyzer_script
+    assert "_discover_candidates" in analyzer_script
+    assert "bed_tab_top_edge" in analyzer_script
+    assert "goodFeaturesToTrack" not in analyzer_script
     assert "forward_reverse" in analyzer_script
 
-    assert "VISION_JOB_ROOT=/home/pi/printer_data/vision/calibration/jobs" in capture_service
+    assert (
+        "VISION_JOB_ROOT=/home/pi/printer_data/vision/calibration/jobs"
+        in capture_service
+    )
     assert "VISION_REGISTER_CALIBRATION_METHODS=1" in capture_service
     assert "VISIOND_SOCKET_REQUEST_TIMEOUT=45" in capture_service
     assert "VISION_REGISTER_NOZZLE_METHODS" not in capture_service
@@ -516,9 +525,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "vision_calibration.py rebuild-catalog" in live_deploy
 
     readme = README_PATH.read_text(encoding="utf-8")
-    klipper_readme = (KLIPPER_CONFIG_DIR / "README.md").read_text(
-        encoding="utf-8"
-    )
+    klipper_readme = (KLIPPER_CONFIG_DIR / "README.md").read_text(encoding="utf-8")
     concept = VISION_JOB_CONCEPT_PATH.read_text(encoding="utf-8")
     assert "http://menderpi.local/vision/" in readme
     assert "vision_calibration.py rebuild-catalog" in readme

@@ -45,7 +45,8 @@ restarts Klipper, and reports the Moonraker/Klippy state.
 
 The clean framework starts with the relative bed-tab Y/parallax job. It
 resolves T0 X park, Y minimum, and Z maximum from active Klipper, then captures
-nine frames at Y offsets 0, 5, 10, 15, 20, 15, 10, 5, and 0 mm.
+six frames at Y offsets 0, 10, 20, 20, 10, and 0 mm: three forward and three
+reverse.
 
 Run it from Mainsail:
 
@@ -60,15 +61,25 @@ Or from the printer:
 ```
 
 Watch preparation, frame progress, analysis, and artifacts at
-`http://menderpi.local/vision/`. An accepted result creates one
-publication-eligible fact,
-`camera.nozzle_cam.bed_tab.y_parallax_model`, but does not make it current.
-After inspecting the patch overlay, contact sheet, displacement plot, and
-forward/reverse comparison, publish explicitly:
+`http://menderpi.local/vision/`. An accepted result creates and immediately
+publishes the current `camera.nozzle_cam.bed_tab.y_parallax_model` fact.
+Rejected analyses publish nothing. No pixel position or ROI is configured: the
+v4 analysis discovers horizontal features in both zero-offset frames and
+requires the bed-tab geometry—a horizontal top with a steep side descending to
+its right. It then tracks all semantic candidates, rejects stationary enclosure
+features and lower frame reflections, and selects the best moving tab top from
+fit quality.
 
-```bash
-/usr/local/bin/vision_calibration.py publish <job_id> <analysis_run_id>
-```
+The job page makes the discovered-edge overlay and the six-frame measured-versus-
+fitted overlay prominent. Yellow marks the measured seam and strip, cyan marks
+the fitted model, and green/magenta distinguish forward and reverse passes. The
+page also includes the raw contact sheet, displacement plot, and direction
+comparison. Small fit and direction inconsistencies are warnings; a repeated
+position discrepancy above 1.5 mm remains a rejection.
+
+The `/vision/` overview shows only fields explicitly declared as
+coordinate-system defining. The full current-facts report keeps diagnostic
+fields such as fit quality, capture details, provenance, and artifact hashes.
 
 Publication updates only the fact catalog. It does not edit `calib.yaml`,
 restart Klipper, or activate a printer calibration.

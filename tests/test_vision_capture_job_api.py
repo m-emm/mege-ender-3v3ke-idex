@@ -73,9 +73,9 @@ def _prepare(module, tmp_path):
             "tool": "T0",
             "y_offset_mm": offset,
             "commanded_position_mm": [-80.0, -14.0 + offset, 300.0],
-            "pass": "forward" if seq <= 4 else "reverse",
+            "pass": "forward" if seq < 3 else "reverse",
         }
-        for seq, offset in enumerate((0, 5, 10, 15, 20, 15, 10, 5, 0))
+        for seq, offset in enumerate((0, 10, 20, 20, 10, 0))
     ]
     gcode = (
         f"VISION_JOB_BEGIN JOB={job_id} "
@@ -87,12 +87,17 @@ def _prepare(module, tmp_path):
         "schema_version": 1,
         "job_id": job_id,
         "job_type": "nozzle_cam_bed_tab_y_scale",
-        "definition_version": 1,
+        "definition_version": 4,
+        "localizer": {
+            "kind": "bed_tab_top_edge",
+            "version": 1,
+        },
         "created_at_utc": "2026-07-30T00:00:00+00:00",
         "camera": "nozzle_cam",
         "profile": "analysis",
         "light_macro": "NOZZLE_CAM_Y_FEATURE_LIGHT",
-        "frame_count": 9,
+        "publish_on_accept": True,
+        "frame_count": 6,
         "frames": frames,
         "motion": {},
         "applicability": {},
@@ -111,9 +116,7 @@ def _prepare(module, tmp_path):
         f"GCODE_HASH={manifest['gcode_hash']}",
     )
     (job_dir / "acquisition.gcode").write_text(final_gcode, encoding="utf-8")
-    (job_dir / "manifest.json").write_text(
-        json.dumps(manifest), encoding="utf-8"
-    )
+    (job_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (job_dir / "state.json").write_text(
         json.dumps({"state": "prepared", "committed_frame_count": 0}),
         encoding="utf-8",
@@ -147,7 +150,7 @@ def test_capture_api_rejects_old_actions_and_bad_hash(monkeypatch, tmp_path):
         )
 
 
-def test_capture_api_commits_nine_fresh_frames(monkeypatch, tmp_path):
+def test_capture_api_commits_six_fresh_frames(monkeypatch, tmp_path):
     module = _module(monkeypatch, tmp_path)
     job_root, manifest = _prepare(module, tmp_path)
     api = module.VisionJobApi(job_root=job_root)
@@ -160,9 +163,7 @@ def test_capture_api_commits_nine_fresh_frames(monkeypatch, tmp_path):
         return source, {
             "frame_seq": sequence["value"],
             "captured_at_utc": f"2026-07-30T00:00:{sequence['value']:02d}+00:00",
-            "camera_profile": {
-                "profile_names": ["analysis", "nozzle_cam_analysis"]
-            },
+            "camera_profile": {"profile_names": ["analysis", "nozzle_cam_analysis"]},
         }
 
     monkeypatch.setattr(module, "wait_for_new_frame", fresh)
@@ -185,7 +186,8 @@ def test_capture_api_commits_nine_fresh_frames(monkeypatch, tmp_path):
         assert result["framebuffer_seq"] == 11 + frame["seq"]
         assert result["actual_toolhead_position_mm"]
         assert result["temperatures"]["heater_bed"]["temperature"] == 23.0
-    assert api.job_end(
-        {"job": manifest["job_id"], "expected_frames": 9}
-    )["state"] == "acquired"
+    assert (
+        api.job_end({"job": manifest["job_id"], "expected_frames": 6})["state"]
+        == "acquired"
+    )
     assert not (job_root / ".active_job.json").exists()

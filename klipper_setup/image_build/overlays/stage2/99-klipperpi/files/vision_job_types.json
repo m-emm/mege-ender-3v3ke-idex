@@ -3,13 +3,18 @@
   "schema_version": 1,
   "job_types": {
     "nozzle_cam_bed_tab_y_scale": {
-      "definition_version": 1,
+      "definition_version": 4,
       "camera": "nozzle_cam",
       "profile": "analysis",
       "light_macro": "NOZZLE_CAM_Y_FEATURE_LIGHT",
-      "y_offsets_mm": [0, 5, 10, 15, 20, 15, 10, 5, 0],
+      "localizer": {
+        "kind": "bed_tab_top_edge",
+        "version": 1
+      },
+      "y_offsets_mm": [0, 10, 20, 20, 10, 0],
       "velocity_mm_s": 60,
       "settle_ms": 300,
+      "publish_on_accept": true,
       "fact_names": [
         "camera.nozzle_cam.bed_tab.y_parallax_model"
       ]

@@ -18,6 +18,7 @@ FACT_SET_SCHEMA = "vision-calibration-fact-set"
 ANALYSIS_SCHEMA = "vision-calibration-analysis"
 MANIFEST_SCHEMA = "vision-calibration-acquisition-manifest"
 REGISTRY_SCHEMA = "vision-calibration-job-registry"
+FACT_ROLES = {"coordinate_system", "diagnostic"}
 
 
 class CalibrationGraphError(RuntimeError):
@@ -119,10 +120,21 @@ def validate_registry(record: Any) -> dict[str, Any]:
         job_types["nozzle_cam_bed_tab_y_scale"],
         "registry.job_types.nozzle_cam_bed_tab_y_scale",
     )
-    if definition.get("definition_version") != 1:
-        raise CalibrationGraphError("job definition_version must be 1")
+    if definition.get("definition_version") != 4:
+        raise CalibrationGraphError("job definition_version must be 4")
+    if definition.get("publish_on_accept") is not True:
+        raise CalibrationGraphError(
+            "bed-tab Y job must publish accepted facts immediately"
+        )
     if definition.get("fact_names") != ["camera.nozzle_cam.bed_tab.y_parallax_model"]:
         raise CalibrationGraphError("job registry has an invalid fact contract")
+    if definition.get("localizer") != {
+        "kind": "bed_tab_top_edge",
+        "version": 1,
+    }:
+        raise CalibrationGraphError(
+            "bed-tab Y job must use bed_tab_top_edge localizer version 1"
+        )
     return record
 
 
@@ -132,14 +144,42 @@ def validate_manifest(record: Any) -> dict[str, Any]:
     _require_string(record.get("job_id"), "manifest.job_id")
     if record.get("job_type") != "nozzle_cam_bed_tab_y_scale":
         raise CalibrationGraphError("manifest has an unsupported job_type")
-    if record.get("definition_version") != 1:
-        raise CalibrationGraphError("manifest.definition_version must be 1")
+    definition_version = record.get("definition_version")
+    motion_contracts = {
+        1: [0, 5, 10, 15, 20, 15, 10, 5, 0],
+        2: [0, 10, 20, 20, 10, 0],
+        3: [0, 10, 20, 20, 10, 0],
+        4: [0, 10, 20, 20, 10, 0],
+    }
+    if definition_version not in motion_contracts:
+        raise CalibrationGraphError(
+            "manifest.definition_version must be a known native definition"
+        )
     if record.get("camera") != "nozzle_cam":
         raise CalibrationGraphError("manifest.camera must be nozzle_cam")
+    if definition_version in (2, 3, 4) and record.get("publish_on_accept") is not True:
+        raise CalibrationGraphError(
+            "definition-v2/v3/v4 bed-tab Y manifests must publish on acceptance"
+        )
+    localizer_contracts = {
+        3: {"kind": "horizontal_moving_edge", "version": 1},
+        4: {"kind": "bed_tab_top_edge", "version": 1},
+    }
+    if (
+        definition_version in localizer_contracts
+        and record.get("localizer") != localizer_contracts[definition_version]
+    ):
+        raise CalibrationGraphError(
+            f"definition-v{definition_version} manifest has an invalid edge localizer"
+        )
     frames = _require_list(record.get("frames"), "manifest.frames")
-    if len(frames) != 9 or record.get("frame_count") != 9:
-        raise CalibrationGraphError("bed-tab Y manifest must contain nine frames")
-    expected_offsets = [0, 5, 10, 15, 20, 15, 10, 5, 0]
+    expected_offsets = motion_contracts[definition_version]
+    if len(frames) != len(expected_offsets) or record.get("frame_count") != len(
+        expected_offsets
+    ):
+        raise CalibrationGraphError(
+            "bed-tab Y manifest has the wrong frame count for its definition"
+        )
     if [frame.get("y_offset_mm") for frame in frames] != expected_offsets:
         raise CalibrationGraphError("manifest has an invalid Y motion order")
     for seq, frame_value in enumerate(frames):
@@ -198,6 +238,59 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
         value = _require_mapping(
             fact.get("value"), f"fact_set.facts[{fact_index}].value"
         )
+        fact_definition_version = fact.get("definition_version")
+        if fact_definition_version == 4:
+            fact_role = _require_string(
+                fact.get("role"), f"fact_set.facts[{fact_index}].role"
+            )
+            if fact_role not in FACT_ROLES:
+                raise CalibrationGraphError(
+                    f"fact role must be one of {sorted(FACT_ROLES)}"
+                )
+            value_items = _require_list(
+                fact.get("value_items"),
+                f"fact_set.facts[{fact_index}].value_items",
+            )
+            declared_roles: dict[str, str] = {}
+            for item_index, item_value in enumerate(value_items):
+                item = _require_mapping(
+                    item_value,
+                    f"fact_set.facts[{fact_index}].value_items[{item_index}]",
+                )
+                field = _require_string(
+                    item.get("field"), f"fact.value_items[{item_index}].field"
+                )
+                role = _require_string(
+                    item.get("role"), f"fact.value_items[{item_index}].role"
+                )
+                if role not in FACT_ROLES:
+                    raise CalibrationGraphError(
+                        f"fact item role must be one of {sorted(FACT_ROLES)}"
+                    )
+                if field in declared_roles:
+                    raise CalibrationGraphError(
+                        f"duplicate fact item declaration for {field}"
+                    )
+                declared_roles[field] = role
+            if set(declared_roles) != set(value):
+                missing = sorted(set(value) - set(declared_roles))
+                extra = sorted(set(declared_roles) - set(value))
+                raise CalibrationGraphError(
+                    "fact item declarations must exactly cover value fields; "
+                    f"missing={missing}, extra={extra}"
+                )
+            if fact_role == "coordinate_system" and not any(
+                role == "coordinate_system" for role in declared_roles.values()
+            ):
+                raise CalibrationGraphError(
+                    "coordinate-system fact must declare a coordinate-system item"
+                )
+            if fact_role == "diagnostic" and any(
+                role == "coordinate_system" for role in declared_roles.values()
+            ):
+                raise CalibrationGraphError(
+                    "diagnostic fact cannot declare coordinate-system items"
+                )
         if fact_name == "camera.nozzle_cam.bed_tab.y_parallax_model":
             vector = _require_list(
                 value.get("axis_vector_px_per_mm"),
@@ -208,6 +301,13 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
             ):
                 raise CalibrationGraphError(
                     "axis vector must contain two numeric values"
+                )
+            if (
+                fact_definition_version == 4
+                and declared_roles.get("axis_vector_px_per_mm") != "coordinate_system"
+            ):
+                raise CalibrationGraphError(
+                    "bed-tab axis vector must be a coordinate-system item"
                 )
         dependencies = _require_list(
             fact.get("dependencies"),
