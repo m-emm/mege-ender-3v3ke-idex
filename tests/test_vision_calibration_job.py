@@ -46,6 +46,10 @@ def _load(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "VISION_CAMERA_PROFILE_FILE", str(FILES / "nozzle_cam_profiles.json")
     )
+    monkeypatch.setenv(
+        "VISION_CALIBRATION_PRIOR_FILE",
+        str(FILES / "vision_calibration_priors.json"),
+    )
     monkeypatch.setenv("VISION_FRAMEBUFFER_DIR", str(framebuffer))
     if str(FILES) not in sys.path:
         sys.path.insert(0, str(FILES))
@@ -102,6 +106,61 @@ def _status(*, homed="xyz", virtual_sd=False, y_max=230.0):
     }
 
 
+def _publish_test_bed_y_fact(module):
+    fact_set = {
+        "schema": module.FACT_SET_SCHEMA,
+        "schema_version": 1,
+        "fact_set_id": "seed:test-bed-y",
+        "job_id": "seed:test-bed-y",
+        "analysis_run_id": "revision-1",
+        "analysis_hash": module.canonical_hash({"test": "bed-y"}),
+        "created_at_utc": "2026-07-30T00:00:00+00:00",
+        "accepted": True,
+        "publication_eligible": True,
+        "applicability_hash": module.canonical_hash({"test": "bed-y-scope"}),
+        "facts": [
+            {
+                "name": "camera.nozzle_cam.bed_tab.y_parallax_model",
+                "definition_version": 4,
+                "role": "coordinate_system",
+                "dependencies": [],
+                "value_items": [
+                    {
+                        "field": "axis_vector_px_per_mm",
+                        "role": "coordinate_system",
+                    },
+                    {"field": "observed_target", "role": "diagnostic"},
+                ],
+                "value": {
+                    "axis_vector_px_per_mm": [-0.22, -10.5],
+                    "observed_target": {
+                        "reference_line_px": [690.0, 426.0, 811.0],
+                        "reference_seam_y_px": 425.0,
+                        "reference_tab_side": {
+                            "x0": 925.0,
+                            "y0": 432.0,
+                            "x1": 960.0,
+                            "y1": 525.0,
+                        },
+                    },
+                },
+            }
+        ],
+        "provenance": {"source": "test"},
+        "fact_set_hash": "",
+    }
+    fact_set["fact_set_hash"] = module.content_hash(fact_set, "fact_set_hash")
+    path = (
+        module.CALIBRATION_ROOT
+        / "seeds"
+        / fact_set["fact_set_hash"][7:23]
+        / "fact_set.json"
+    )
+    module.atomic_write_json(path, fact_set, immutable=True)
+    module.publish_seed_fact_set(module.CALIBRATION_ROOT, path)
+    return fact_set
+
+
 def test_prepare_resolves_active_limits_and_generates_exact_motion(
     monkeypatch, tmp_path
 ):
@@ -151,6 +210,179 @@ def test_prepare_resolves_active_limits_and_generates_exact_motion(
     assert gcode.count("F3600.000") == 8
     assert (module.GCODE_ROOT / f"{manifest['job_id']}.gcode").is_file()
     assert (module.VISION_ROOT / "index.html").is_file()
+
+
+def test_prepare_corner_binds_current_facts_and_generates_fixed_duplicates(
+    monkeypatch, tmp_path
+):
+    module = _load(monkeypatch, tmp_path)
+    module.sync_seed_facts()
+    bed_y = _publish_test_bed_y_fact(module)
+    result = module.prepare_job(
+        "corner",
+        job_type="nozzle_cam_bed_tab_corner",
+        expected_fingerprint="sha256:active",
+        status=_status(),
+    )
+    job_dir = Path(result["job_dir"])
+    manifest = json.loads((job_dir / "manifest.json").read_text())
+    gcode = (job_dir / "acquisition.gcode").read_text()
+
+    assert manifest["job_type"] == "nozzle_cam_bed_tab_corner"
+    assert manifest["definition_version"] == 1
+    assert manifest["frame_count"] == 5
+    assert [frame["duplicate_index"] for frame in manifest["frames"]] == list(range(5))
+    assert (
+        len({tuple(frame["commanded_position_mm"]) for frame in manifest["frames"]})
+        == 1
+    )
+    assert manifest["frames"][0]["commanded_position_mm"] == pytest.approx(
+        [
+            -80.4,
+            5.2,
+            293.75,
+        ]
+    )
+    bindings = {item["requirement"]: item for item in manifest["input_facts"]}
+    assert bindings["bed_y_model"]["fact_set_hash"] == bed_y["fact_set_hash"]
+    assert set(bindings) == {
+        "bed_y_model",
+        "bed_tab_corner_prior",
+        "tab_plane_z",
+    }
+    assert manifest["corner_reference"]["corner_printer_xyz_mm"] == [
+        170.0,
+        -20.0,
+        0.0,
+    ]
+    assert manifest["corner_reference"]["prior_provisional"] is True
+    assert (
+        np.linalg.norm(
+            np.asarray(manifest["corner_reference"]["expected_corner_px"])
+            - np.asarray([917.96, 215.0])
+        )
+        < 1.0
+    )
+    assert gcode.count("VISION_CAPTURE_SYNC ") == 5
+    assert gcode.count("G1 Y5.200000") == 1
+    assert "G28" not in gcode
+
+
+def test_corner_analysis_publishes_dependency_bound_partial_coordinate_system(
+    monkeypatch, tmp_path
+):
+    module = _load(monkeypatch, tmp_path)
+    module.sync_seed_facts()
+    _publish_test_bed_y_fact(module)
+    prepared = module.prepare_job(
+        "corner-analysis",
+        job_type="nozzle_cam_bed_tab_corner",
+        expected_fingerprint="sha256:active",
+        status=_status(),
+    )
+    job_dir = Path(prepared["job_dir"])
+    manifest = json.loads((job_dir / "manifest.json").read_text())
+    source = module.FRAMEBUFFER_DIR / "latest.jpg"
+    for frame in manifest["frames"]:
+        image_path = job_dir / "frames" / f"{frame['frame']}.jpg"
+        image_path.write_bytes(source.read_bytes())
+        (job_dir / "frames" / f"{frame['frame']}.json").write_text(
+            json.dumps(
+                {
+                    "job_seq": frame["seq"],
+                    "capture_errors": 0,
+                    "width": 200,
+                    "height": 120,
+                    "camera_profile": {"profile_names": ["analysis"]},
+                    "framebuffer_seq": 200 + frame["seq"],
+                    "sha256": module.sha256_file(image_path),
+                }
+            ),
+            encoding="utf-8",
+        )
+    module._update_state(job_dir, state="acquired", committed_frame_count=5)
+    monkeypatch.setattr(
+        module,
+        "_analysis_run_id",
+        lambda _manifest: "20260730T130000.000000Z-corner",
+    )
+
+    def accepted(_frames, output_dir, *, expected_corner_px, localizer):
+        assert expected_corner_px == manifest["corner_reference"]["expected_corner_px"]
+        assert localizer == {"kind": "bed_tab_corner", "version": 1}
+        output_dir.mkdir(parents=True)
+        localization = output_dir / "corner_localization.jpg"
+        duplicates = output_dir / "corner_duplicate_registration.jpg"
+        assert cv2.imwrite(
+            str(localization), np.full((120, 200, 3), 80, dtype=np.uint8)
+        )
+        assert cv2.imwrite(str(duplicates), np.full((120, 200, 3), 90, dtype=np.uint8))
+        return {
+            "accepted": True,
+            "reasons": [],
+            "warnings": [],
+            "missing_frames": [],
+            "localizer": {"kind": "bed_tab_corner", "version": 1},
+            "expected_corner_px": expected_corner_px,
+            "selected_candidate": {
+                "candidate_id": "corner_00",
+                "corner_px": [921.8, 215.5],
+            },
+            "expected_distance_px": 4.5,
+            "corner_pixel_xy_px": [921.8, 215.5],
+            "usable_frame_count": 5,
+            "line_confirmation_count": 5,
+            "minimum_correlation": 0.98,
+            "median_correlation": 0.995,
+            "repeatability_rms_px": 0.2,
+            "repeatability_max_px": 0.35,
+            "maximum_representation_spread_px": 0.1,
+            "maximum_forward_reverse_disagreement_px": 0.15,
+            "candidates_by_frame": [],
+            "observations": [],
+            "artifacts": {
+                "corner_localization": {
+                    "path": str(localization),
+                    "sha256": module.sha256_file(localization),
+                },
+                "corner_duplicate_registration": {
+                    "path": str(duplicates),
+                    "sha256": module.sha256_file(duplicates),
+                },
+            },
+        }
+
+    monkeypatch.setattr(module, "analyze_bed_tab_corner", accepted)
+    result = module.analyze_job(manifest["job_id"])
+    assert result["state"] == "accepted"
+    fact_set = json.loads(Path(result["fact_set_path"]).read_text())
+    fact = fact_set["facts"][0]
+    assert fact["name"] == "camera.nozzle_cam.partial_bed_coordinate_system"
+    assert fact["role"] == "coordinate_system"
+    assert fact["value"]["corner_pixel_xy_px"] == [921.8, 215.5]
+    assert fact["value"]["corner_printer_xyz_mm"] == [170.0, -20.0, 0.0]
+    assert fact["value"]["image_y_axis_vector_px_per_mm"] == [-0.22, -10.5]
+    assert fact["dependencies"] == [
+        {
+            "fact_name": item["fact_name"],
+            "fact_set_hash": item["fact_set_hash"],
+        }
+        for item in manifest["input_facts"]
+    ]
+    catalog = json.loads((module.CALIBRATION_ROOT / "catalog.json").read_text())
+    assert (
+        catalog["heads"]["camera.nozzle_cam.partial_bed_coordinate_system"][
+            "fact_set_hash"
+        ]
+        == fact_set["fact_set_hash"]
+    )
+    dashboard = (module.VISION_ROOT / "index.html").read_text()
+    assert "[921.8000, 215.5000] px" in dashboard
+    assert "[170.0000, -20.0000, 0.0000] mm" in dashboard
+    assert "Corner repeatability" not in dashboard
+    job_page = (job_dir / "index.html").read_text()
+    assert "Automatically localized bed-tab corner" in job_page
+    assert "Duplicate registration and line confirmation" in job_page
 
 
 @pytest.mark.parametrize(

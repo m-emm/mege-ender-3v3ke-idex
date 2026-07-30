@@ -405,6 +405,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     calibration_macro = _section(
         config_text, "gcode_macro IDEX_BED_TAB_Y_SCALE_CALIBRATE"
     )
+    corner_macro = _section(config_text, "gcode_macro IDEX_BED_TAB_CORNER_CALIBRATE")
     capture_script = (IMAGE_BUILD_FILES_DIR / "vision_capture.py").read_text(
         encoding="utf-8"
     )
@@ -415,6 +416,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         encoding="utf-8"
     )
     analyzer_script = (IMAGE_BUILD_FILES_DIR / "vision_bed_tab_y_scale.py").read_text(
+        encoding="utf-8"
+    )
+    corner_analyzer = (IMAGE_BUILD_FILES_DIR / "vision_bed_tab_corner.py").read_text(
         encoding="utf-8"
     )
     registry = json.loads(
@@ -445,9 +449,14 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "requires X/Y/Z homed" in calibration_macro
     assert '"idex_bed_tab_y_scale_calibrate"' in calibration_macro
     assert "active_config_fingerprint=fingerprint" in calibration_macro
+    assert "requires X/Y/Z homed" in corner_macro
+    assert '"idex_bed_tab_corner_calibrate"' in corner_macro
 
     assert registry["schema_version"] == 1
-    assert set(registry["job_types"]) == {"nozzle_cam_bed_tab_y_scale"}
+    assert set(registry["job_types"]) == {
+        "nozzle_cam_bed_tab_y_scale",
+        "nozzle_cam_bed_tab_corner",
+    }
     definition = registry["job_types"]["nozzle_cam_bed_tab_y_scale"]
     assert definition["definition_version"] == 4
     assert definition["localizer"] == {
@@ -459,9 +468,23 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert definition["velocity_mm_s"] == 60
     assert definition["settle_ms"] == 300
     assert definition["light_macro"] == "NOZZLE_CAM_Y_FEATURE_LIGHT"
+    corner_definition = registry["job_types"]["nozzle_cam_bed_tab_corner"]
+    assert corner_definition["definition_version"] == 1
+    assert corner_definition["duplicate_count"] == 5
+    assert corner_definition["capture_y_offset_mm"] == 20
+    assert corner_definition["localizer"] == {
+        "kind": "bed_tab_corner",
+        "version": 1,
+    }
+    assert [item["fact_name"] for item in corner_definition["requires"]] == [
+        "camera.nozzle_cam.bed_tab.y_parallax_model",
+        "bed.tab_corner.printer_xyz",
+        "bed.reference_plane.tab_to_print_plane_z_mm",
+    ]
 
     assert "VisionJobApi" in capture_script
     assert "idex_bed_tab_y_scale_calibrate" in capture_script
+    assert "idex_bed_tab_corner_calibrate" in capture_script
     assert "VISION_REGISTER_CALIBRATION_METHODS" in capture_script
     assert "measure_bed_y" not in capture_script
     assert "vision_nozzle_align" not in capture_script
@@ -476,6 +499,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "bed_tab_top_edge" in analyzer_script
     assert "goodFeaturesToTrack" not in analyzer_script
     assert "forward_reverse" in analyzer_script
+    assert "_detect_candidates" in corner_analyzer
+    assert "_register" in corner_analyzer
+    assert "expected_corner_px" in corner_analyzer
 
     assert (
         "VISION_JOB_ROOT=/home/pi/printer_data/vision/calibration/jobs"
@@ -503,7 +529,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "vision_calibration.py",
         "vision_calibration_graph.py",
         "vision_bed_tab_y_scale.py",
+        "vision_bed_tab_corner.py",
         "vision_job_types.json",
+        "vision_calibration_priors.json",
     ):
         assert filename in image_install
         assert filename in live_deploy
@@ -523,6 +551,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert 'Path("/home/pi/printer_data/gcodes/vision_jobs")' in live_deploy
     assert "virtual_sdcard=is_active" in live_deploy
     assert "vision_calibration.py rebuild-catalog" in live_deploy
+    assert "vision_calibration.py sync-priors" in live_deploy
 
     readme = README_PATH.read_text(encoding="utf-8")
     klipper_readme = (KLIPPER_CONFIG_DIR / "README.md").read_text(encoding="utf-8")
@@ -531,6 +560,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "vision_calibration.py rebuild-catalog" in readme
     assert "nozzle_cam_bed_tab_y_scale" in klipper_readme
     assert "IDEX_BED_TAB_Y_SCALE_CALIBRATE" in klipper_readme
+    assert "IDEX_BED_TAB_CORNER_CALIBRATE" in klipper_readme
     assert "no reader, migration, alias" in concept
 
 

@@ -19,7 +19,9 @@ required_files=(
   vision_calibration.py
   vision_calibration_graph.py
   vision_bed_tab_y_scale.py
+  vision_bed_tab_corner.py
   vision_job_types.json
+  vision_calibration_priors.json
   webcam_health_probe.py
   nozzle_cam_profiles.json
   vision-framebuffer.service
@@ -76,7 +78,9 @@ scp \
   "${FILES_DIR}/vision_calibration.py" \
   "${FILES_DIR}/vision_calibration_graph.py" \
   "${FILES_DIR}/vision_bed_tab_y_scale.py" \
+  "${FILES_DIR}/vision_bed_tab_corner.py" \
   "${FILES_DIR}/vision_job_types.json" \
+  "${FILES_DIR}/vision_calibration_priors.json" \
   "${FILES_DIR}/webcam_health_probe.py" \
   "${FILES_DIR}/nozzle_cam_profiles.json" \
   "${FILES_DIR}/vision-framebuffer.service" \
@@ -190,9 +194,11 @@ sudo install -m 0755 "${REMOTE_TMP}/vision_capture.py" /usr/local/bin/vision_cap
 sudo install -m 0755 "${REMOTE_TMP}/vision_calibration.py" /usr/local/bin/vision_calibration.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_calibration_graph.py" /usr/local/bin/vision_calibration_graph.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_bed_tab_y_scale.py" /usr/local/bin/vision_bed_tab_y_scale.py
+sudo install -m 0644 "${REMOTE_TMP}/vision_bed_tab_corner.py" /usr/local/bin/vision_bed_tab_corner.py
 sudo install -m 0755 "${REMOTE_TMP}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py
 sudo install -m 0644 "${REMOTE_TMP}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json
 sudo install -m 0644 "${REMOTE_TMP}/vision_job_types.json" /usr/local/share/vision/vision_job_types.json
+sudo install -m 0644 "${REMOTE_TMP}/vision_calibration_priors.json" /usr/local/share/vision/vision_calibration_priors.json
 sudo install -m 0644 "${REMOTE_TMP}/calib.yaml" /usr/local/share/vision/calib.yaml
 sudo rm -f \
   /usr/local/bin/vision_bed_y.py \
@@ -225,6 +231,10 @@ sudo systemctl restart vision-capture
 sudo systemctl restart vision-capture-nozzle-cam
 
 echo "Regenerating static vision UI..."
+sudo -u "${USERNAME}" env \
+  VISION_OUTPUT_DIR="${VISION_DIR}" \
+  VISION_OUTPUT_URL_PREFIX=/vision \
+  /usr/local/bin/vision_calibration.py sync-priors
 sudo -u "${USERNAME}" env \
   VISION_OUTPUT_DIR="${VISION_DIR}" \
   VISION_OUTPUT_URL_PREFIX=/vision \

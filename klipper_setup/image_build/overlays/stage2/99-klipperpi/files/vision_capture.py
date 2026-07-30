@@ -22,14 +22,10 @@ import cv2
 
 
 OUTPUT_DIR = Path(os.environ.get("VISION_OUTPUT_DIR", "/home/pi/printer_data/vision"))
-FRAMEBUFFER_DIR = Path(
-    os.environ.get("VISION_FRAMEBUFFER_DIR", "/run/vision-preview")
-)
+FRAMEBUFFER_DIR = Path(os.environ.get("VISION_FRAMEBUFFER_DIR", "/run/vision-preview"))
 FRAMEBUFFER_LATEST_IMAGE = FRAMEBUFFER_DIR / "latest.jpg"
 FRAMEBUFFER_LATEST_METADATA = FRAMEBUFFER_DIR / "latest.json"
-PROFILE_REQUEST_ENV = os.environ.get(
-    "VISION_CAMERA_PROFILE_REQUEST_FILE", ""
-).strip()
+PROFILE_REQUEST_ENV = os.environ.get("VISION_CAMERA_PROFILE_REQUEST_FILE", "").strip()
 PROFILE_REQUEST_FILE = Path(PROFILE_REQUEST_ENV) if PROFILE_REQUEST_ENV else None
 KLIPPY_SOCKET = os.environ.get(
     "VISION_KLIPPY_SOCKET", "/home/pi/printer_data/comms/klippy.sock"
@@ -48,6 +44,8 @@ PROFILE_REMOTE_ACTION = os.environ.get(
 )
 CALIBRATION_REMOTE_METHOD = "idex_bed_tab_y_scale_calibrate"
 CALIBRATION_REMOTE_ACTION = "run_idex_bed_tab_y_scale_calibrate"
+CORNER_CALIBRATION_REMOTE_METHOD = "idex_bed_tab_corner_calibrate"
+CORNER_CALIBRATION_REMOTE_ACTION = "run_idex_bed_tab_corner_calibrate"
 CALIBRATION_BIN = os.environ.get(
     "VISION_CALIBRATION_BIN", "/usr/local/bin/vision_calibration.py"
 )
@@ -211,9 +209,7 @@ def framebuffer_seq(metadata: dict[str, Any]) -> int:
         raise CaptureError("framebuffer metadata has no integer frame_seq") from None
 
 
-def metadata_matches_profile(
-    metadata: dict[str, Any], profile: str | None
-) -> bool:
+def metadata_matches_profile(metadata: dict[str, Any], profile: str | None) -> bool:
     if not profile:
         return True
     camera_profile = metadata.get("camera_profile") or {}
@@ -419,7 +415,10 @@ class VisionJobApi:
             raise CaptureError("unsupported acquisition manifest schema")
         if manifest.get("schema_version") != 1:
             raise CaptureError("unsupported acquisition manifest schema_version")
-        if manifest.get("job_type") != "nozzle_cam_bed_tab_y_scale":
+        if manifest.get("job_type") not in (
+            "nozzle_cam_bed_tab_y_scale",
+            "nozzle_cam_bed_tab_corner",
+        ):
             raise CaptureError("unsupported acquisition job_type")
         if manifest.get("job_id") != sanitize_name(job_id):
             raise CaptureError("manifest job_id does not match JOB")
@@ -439,9 +438,7 @@ class VisionJobApi:
         state["updated_at_utc"] = datetime.now(timezone.utc).isoformat()
         atomic_write_json(self._state_path(job_id), state)
 
-    def _append_event(
-        self, job_id: Any, event: str, payload: dict[str, Any]
-    ) -> None:
+    def _append_event(self, job_id: Any, event: str, payload: dict[str, Any]) -> None:
         append_jsonl(
             self._events_path(job_id),
             {
@@ -457,9 +454,7 @@ class VisionJobApi:
             return None
         try:
             return str(
-                json.loads(self.lock_path.read_text(encoding="utf-8")).get(
-                    "job", ""
-                )
+                json.loads(self.lock_path.read_text(encoding="utf-8")).get("job", "")
             )
         except Exception:
             return ""
@@ -472,9 +467,7 @@ class VisionJobApi:
                     json.dumps(
                         {
                             "job": job_id,
-                            "created_at_utc": datetime.now(
-                                timezone.utc
-                            ).isoformat(),
+                            "created_at_utc": datetime.now(timezone.utc).isoformat(),
                         }
                     )
                     + "\n"
@@ -487,16 +480,12 @@ class VisionJobApi:
     def _release_lock(self, job_id: str) -> None:
         active = self._active_job()
         if active and active != job_id:
-            raise CaptureError(
-                f"active job lock belongs to {active!r}, not {job_id!r}"
-            )
+            raise CaptureError(f"active job lock belongs to {active!r}, not {job_id!r}")
         self.lock_path.unlink(missing_ok=True)
 
     def _require_active(self, job_id: str) -> None:
         if self._active_job() != job_id:
-            raise CaptureError(
-                f"active job is {self._active_job()!r}, not {job_id!r}"
-            )
+            raise CaptureError(f"active job is {self._active_job()!r}, not {job_id!r}")
 
     def _frame(self, manifest: dict[str, Any], seq: int) -> dict[str, Any]:
         for frame in manifest["frames"]:
@@ -611,8 +600,9 @@ class VisionJobApi:
             "frame": frame["frame"],
             "captured_at_utc": datetime.now(timezone.utc).isoformat(),
             "commanded_position_mm": frame["commanded_position_mm"],
-            "y_offset_mm": frame["y_offset_mm"],
-            "pass": frame["pass"],
+            "y_offset_mm": frame.get("y_offset_mm"),
+            "pass": frame.get("pass"),
+            "duplicate_index": frame.get("duplicate_index"),
             "actual_toolhead_position_mm": params.get("toolhead_position"),
             "actual_gcode_position_mm": params.get("gcode_position"),
             "homed_axes": params.get("homed_axes"),
@@ -623,9 +613,7 @@ class VisionJobApi:
             "size_bytes": temporary_image.stat().st_size,
             "sha256": image_sha256,
             "camera_profile": source_metadata.get("camera_profile"),
-            "framebuffer_captured_at_utc": source_metadata.get(
-                "captured_at_utc"
-            ),
+            "framebuffer_captured_at_utc": source_metadata.get("captured_at_utc"),
             "capture_errors": source_metadata.get("capture_errors", 0),
             "capture_retries": source_metadata.get("capture_retries", 0),
         }
@@ -749,9 +737,7 @@ class KlippyRemoteDaemon:
                 if action == REMOTE_ACTION:
                     capture_frame(params)
                 elif action == PROFILE_REMOTE_ACTION:
-                    profile = sanitize_profile(
-                        params.get("profile") or DEFAULT_PROFILE
-                    )
+                    profile = sanitize_profile(params.get("profile") or DEFAULT_PROFILE)
                     request_framebuffer_profile(profile)
                     wait_for_active_profile(profile, VISIOND_TIMEOUT)
                 elif action == CALIBRATION_REMOTE_ACTION:
@@ -762,9 +748,32 @@ class KlippyRemoteDaemon:
                         "--name",
                         sanitize_name(params.get("name", "bed_tab_y_scale")),
                     ]
-                    fingerprint = str(
-                        params.get("active_config_fingerprint") or ""
+                    fingerprint = str(params.get("active_config_fingerprint") or "")
+                    if fingerprint:
+                        command.extend(["--expected-fingerprint", fingerprint])
+                    result = subprocess.run(
+                        command,
+                        check=False,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        timeout=300,
                     )
+                    if result.stdout.strip():
+                        log(result.stdout.strip())
+                    if result.returncode:
+                        raise CaptureError(
+                            result.stderr.strip() or "bed-tab Y calibration job failed"
+                        )
+                elif action == CORNER_CALIBRATION_REMOTE_ACTION:
+                    command = [
+                        CALIBRATION_BIN,
+                        "run",
+                        "nozzle_cam_bed_tab_corner",
+                        "--name",
+                        sanitize_name(params.get("name", "bed_tab_corner")),
+                    ]
+                    fingerprint = str(params.get("active_config_fingerprint") or "")
                     if fingerprint:
                         command.extend(["--expected-fingerprint", fingerprint])
                     result = subprocess.run(
@@ -780,7 +789,7 @@ class KlippyRemoteDaemon:
                     if result.returncode:
                         raise CaptureError(
                             result.stderr.strip()
-                            or "bed-tab Y calibration job failed"
+                            or "bed-tab corner calibration job failed"
                         )
                 else:
                     raise CaptureError(f"unknown queued action {action}")
@@ -790,9 +799,7 @@ class KlippyRemoteDaemon:
                 self.jobs.task_done()
 
     def _send(self, sock: socket.socket, payload: dict[str, Any]) -> None:
-        sock.sendall(
-            json.dumps(payload, separators=(",", ":")).encode() + b"\x03"
-        )
+        sock.sendall(json.dumps(payload, separators=(",", ":")).encode() + b"\x03")
 
     def _register_method(
         self, sock: socket.socket, remote_method: str, action: str
@@ -815,12 +822,15 @@ class KlippyRemoteDaemon:
     def _register(self, sock: socket.socket) -> None:
         self._register_method(sock, REMOTE_METHOD, REMOTE_ACTION)
         if PROFILE_REQUEST_FILE is not None:
-            self._register_method(
-                sock, PROFILE_REMOTE_METHOD, PROFILE_REMOTE_ACTION
-            )
+            self._register_method(sock, PROFILE_REMOTE_METHOD, PROFILE_REMOTE_ACTION)
         if REGISTER_CALIBRATION:
             self._register_method(
                 sock, CALIBRATION_REMOTE_METHOD, CALIBRATION_REMOTE_ACTION
+            )
+            self._register_method(
+                sock,
+                CORNER_CALIBRATION_REMOTE_METHOD,
+                CORNER_CALIBRATION_REMOTE_ACTION,
             )
 
     def _handle_message(self, message: dict[str, Any]) -> None:
@@ -828,6 +838,7 @@ class KlippyRemoteDaemon:
         valid = {REMOTE_ACTION, PROFILE_REMOTE_ACTION}
         if REGISTER_CALIBRATION:
             valid.add(CALIBRATION_REMOTE_ACTION)
+            valid.add(CORNER_CALIBRATION_REMOTE_ACTION)
         if action not in valid:
             return
         params = message.get("params") or {}

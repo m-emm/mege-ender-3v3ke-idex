@@ -16,10 +16,11 @@ Every calibration job has three separate operations:
    `publish` command remains available for job definitions that deliberately
    disable automatic publication.
 
-The first registered job type is:
+The registered bed-reference job types are:
 
 ```text
 nozzle_cam_bed_tab_y_scale
+nozzle_cam_bed_tab_corner
 ```
 
 The public command surface is:
@@ -27,8 +28,11 @@ The public command surface is:
 ```text
 vision_calibration.py prepare nozzle_cam_bed_tab_y_scale
 vision_calibration.py run nozzle_cam_bed_tab_y_scale
+vision_calibration.py prepare nozzle_cam_bed_tab_corner
+vision_calibration.py run nozzle_cam_bed_tab_corner
 vision_calibration.py analyze <job_id>
 vision_calibration.py publish <job_id> <analysis_run_id>
+vision_calibration.py sync-priors
 vision_calibration.py rebuild-catalog
 ```
 
@@ -36,6 +40,7 @@ Klipper exposes the equivalent acquisition-and-analysis entry point as:
 
 ```text
 IDEX_BED_TAB_Y_SCALE_CALIBRATE NAME=...
+IDEX_BED_TAB_CORNER_CALIBRATE NAME=...
 ```
 
 ## Storage
@@ -47,6 +52,9 @@ IDEX_BED_TAB_Y_SCALE_CALIBRATE NAME=...
     catalog.json
     publications/
       <publication_id>.json
+    seeds/
+      <fact-set-hash>/
+        fact_set.json
     jobs/
       <job_id>/
         manifest.json
@@ -124,6 +132,15 @@ published fact stores the measured two-dimensional image displacement per
 commanded Y millimetre. Discovered line endpoints and the expanded tracking
 strip are retained as observed provenance for that analysis only; they are not
 inputs to a later run.
+
+The bed-tab corner job binds the exact current Y-parallax fact plus two
+versioned seed facts: the provisional printer XYZ of the physical corner and
+the tab-plane-to-print-plane Z relationship. It captures five duplicates at
+the fixed `Y_min + 20 mm` view. The upstream Y vector projects the previously
+observed tab top/side intersection into this view without a configured pixel
+ROI. Line geometry localizes the semantic corner once; grayscale/CLAHE
+forward/reverse registration refines it across duplicates, while independent
+line intersections confirm attachment to the same feature.
 
 ## UI
 

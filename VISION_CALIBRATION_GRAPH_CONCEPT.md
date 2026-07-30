@@ -151,9 +151,12 @@ bed_tab_corner_prior:
 ```
 
 The approximate X and Y values above are planning examples, not production
-defaults. The first real calibration branch is blocked until the user supplies
-numeric X and Y values and records how they were measured. Z is defined as
-`0 mm` for this reference.
+defaults. For initial infrastructure bring-up, the user explicitly authorized
+publishing these numeric examples as a visibly provisional revision with
+measurement method `pending_physical_measurement`. Z is defined as `0 mm` for
+this reference. Replacing the provisional revision with measured X/Y values
+uses normal superseding and downstream invalidation; the values are never
+silently treated as measured.
 
 This is an authoritative initial prior fact:
 

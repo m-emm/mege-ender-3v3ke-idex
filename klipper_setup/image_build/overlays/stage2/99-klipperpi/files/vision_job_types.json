@@ -18,6 +18,38 @@
       "fact_names": [
         "camera.nozzle_cam.bed_tab.y_parallax_model"
       ]
+    },
+    "nozzle_cam_bed_tab_corner": {
+      "definition_version": 1,
+      "camera": "nozzle_cam",
+      "profile": "analysis",
+      "light_macro": "NOZZLE_CAM_Y_FEATURE_LIGHT",
+      "localizer": {
+        "kind": "bed_tab_corner",
+        "version": 1
+      },
+      "capture_y_offset_mm": 20,
+      "duplicate_count": 5,
+      "velocity_mm_s": 60,
+      "settle_ms": 300,
+      "publish_on_accept": true,
+      "requires": [
+        {
+          "requirement": "bed_y_model",
+          "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model"
+        },
+        {
+          "requirement": "bed_tab_corner_prior",
+          "fact_name": "bed.tab_corner.printer_xyz"
+        },
+        {
+          "requirement": "tab_plane_z",
+          "fact_name": "bed.reference_plane.tab_to_print_plane_z_mm"
+        }
+      ],
+      "fact_names": [
+        "camera.nozzle_cam.partial_bed_coordinate_system"
+      ]
     }
   }
 }

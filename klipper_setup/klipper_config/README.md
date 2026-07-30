@@ -60,6 +60,24 @@ Or from the printer:
 /usr/local/bin/vision_calibration.py run nozzle_cam_bed_tab_y_scale --name bed_tab_y_scale
 ```
 
+The next dependency-bound stage uses the current Y-parallax fact plus the
+versioned bed-tab XYZ and tab-plane Z seed facts:
+
+```gcode
+IDEX_BED_TAB_CORNER_CALIBRATE NAME=bed_tab_corner
+```
+
+or:
+
+```bash
+/usr/local/bin/vision_calibration.py run nozzle_cam_bed_tab_corner --name bed_tab_corner
+```
+
+The provisional seed values live in
+`/usr/local/share/vision/vision_calibration_priors.json`. Publishing changed
+prior values supersedes the old seed facts and makes downstream corner facts
+stale.
+
 Watch preparation, frame progress, analysis, and artifacts at
 `http://menderpi.local/vision/`. An accepted result creates and immediately
 publishes the current `camera.nozzle_cam.bed_tab.y_parallax_model` fact.

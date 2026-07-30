@@ -1,0 +1,57 @@
+{
+  "schema": "vision-calibration-seed-registry",
+  "schema_version": 1,
+  "seeds": [
+    {
+      "name": "bed.tab_corner.printer_xyz",
+      "definition_version": 4,
+      "revision": 1,
+      "recorded_at_utc": "2026-07-30T00:00:00+00:00",
+      "role": "coordinate_system",
+      "value_items": [
+        {
+          "field": "xyz_mm",
+          "role": "coordinate_system"
+        },
+        {
+          "field": "measurement_method",
+          "role": "diagnostic"
+        },
+        {
+          "field": "provisional",
+          "role": "diagnostic"
+        }
+      ],
+      "value": {
+        "xyz_mm": [
+          170.0,
+          -20.0,
+          0.0
+        ],
+        "measurement_method": "provisional_conversation_assumption_pending_physical_measurement",
+        "provisional": true
+      }
+    },
+    {
+      "name": "bed.reference_plane.tab_to_print_plane_z_mm",
+      "definition_version": 4,
+      "revision": 1,
+      "recorded_at_utc": "2026-07-30T00:00:00+00:00",
+      "role": "coordinate_system",
+      "value_items": [
+        {
+          "field": "z_offset_mm",
+          "role": "coordinate_system"
+        },
+        {
+          "field": "definition",
+          "role": "diagnostic"
+        }
+      ],
+      "value": {
+        "z_offset_mm": 0.0,
+        "definition": "bed_tab_corner_z_is_the_print_reference_plane"
+      }
+    }
+  ]
+}

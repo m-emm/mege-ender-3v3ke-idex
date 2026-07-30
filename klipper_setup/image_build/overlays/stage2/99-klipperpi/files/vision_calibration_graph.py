@@ -112,10 +112,11 @@ def validate_registry(record: Any) -> dict[str, Any]:
     record = _require_mapping(record, "registry")
     _validate_header(record, REGISTRY_SCHEMA, "registry")
     job_types = _require_mapping(record.get("job_types"), "registry.job_types")
-    if set(job_types) != {"nozzle_cam_bed_tab_y_scale"}:
-        raise CalibrationGraphError(
-            "registry must contain only nozzle_cam_bed_tab_y_scale"
-        )
+    if set(job_types) != {
+        "nozzle_cam_bed_tab_y_scale",
+        "nozzle_cam_bed_tab_corner",
+    }:
+        raise CalibrationGraphError("registry has an invalid native job-type set")
     definition = _require_mapping(
         job_types["nozzle_cam_bed_tab_y_scale"],
         "registry.job_types.nozzle_cam_bed_tab_y_scale",
@@ -135,6 +136,42 @@ def validate_registry(record: Any) -> dict[str, Any]:
         raise CalibrationGraphError(
             "bed-tab Y job must use bed_tab_top_edge localizer version 1"
         )
+    corner = _require_mapping(
+        job_types["nozzle_cam_bed_tab_corner"],
+        "registry.job_types.nozzle_cam_bed_tab_corner",
+    )
+    if corner.get("definition_version") != 1:
+        raise CalibrationGraphError("bed-tab corner definition_version must be 1")
+    if corner.get("publish_on_accept") is not True:
+        raise CalibrationGraphError(
+            "bed-tab corner job must publish accepted facts immediately"
+        )
+    if corner.get("fact_names") != ["camera.nozzle_cam.partial_bed_coordinate_system"]:
+        raise CalibrationGraphError("bed-tab corner has an invalid fact contract")
+    if corner.get("requires") != [
+        {
+            "requirement": "bed_y_model",
+            "fact_name": "camera.nozzle_cam.bed_tab.y_parallax_model",
+        },
+        {
+            "requirement": "bed_tab_corner_prior",
+            "fact_name": "bed.tab_corner.printer_xyz",
+        },
+        {
+            "requirement": "tab_plane_z",
+            "fact_name": "bed.reference_plane.tab_to_print_plane_z_mm",
+        },
+    ]:
+        raise CalibrationGraphError("bed-tab corner has invalid fact requirements")
+    if corner.get("localizer") != {
+        "kind": "bed_tab_corner",
+        "version": 1,
+    }:
+        raise CalibrationGraphError(
+            "bed-tab corner job must use bed_tab_corner localizer version 1"
+        )
+    if corner.get("duplicate_count") != 5:
+        raise CalibrationGraphError("bed-tab corner job must acquire five duplicates")
     return record
 
 
@@ -142,46 +179,100 @@ def validate_manifest(record: Any) -> dict[str, Any]:
     record = _require_mapping(record, "manifest")
     _validate_header(record, MANIFEST_SCHEMA, "manifest")
     _require_string(record.get("job_id"), "manifest.job_id")
-    if record.get("job_type") != "nozzle_cam_bed_tab_y_scale":
+    job_type = record.get("job_type")
+    if job_type not in (
+        "nozzle_cam_bed_tab_y_scale",
+        "nozzle_cam_bed_tab_corner",
+    ):
         raise CalibrationGraphError("manifest has an unsupported job_type")
     definition_version = record.get("definition_version")
-    motion_contracts = {
-        1: [0, 5, 10, 15, 20, 15, 10, 5, 0],
-        2: [0, 10, 20, 20, 10, 0],
-        3: [0, 10, 20, 20, 10, 0],
-        4: [0, 10, 20, 20, 10, 0],
-    }
-    if definition_version not in motion_contracts:
-        raise CalibrationGraphError(
-            "manifest.definition_version must be a known native definition"
-        )
     if record.get("camera") != "nozzle_cam":
         raise CalibrationGraphError("manifest.camera must be nozzle_cam")
-    if definition_version in (2, 3, 4) and record.get("publish_on_accept") is not True:
-        raise CalibrationGraphError(
-            "definition-v2/v3/v4 bed-tab Y manifests must publish on acceptance"
-        )
-    localizer_contracts = {
-        3: {"kind": "horizontal_moving_edge", "version": 1},
-        4: {"kind": "bed_tab_top_edge", "version": 1},
-    }
-    if (
-        definition_version in localizer_contracts
-        and record.get("localizer") != localizer_contracts[definition_version]
-    ):
-        raise CalibrationGraphError(
-            f"definition-v{definition_version} manifest has an invalid edge localizer"
-        )
     frames = _require_list(record.get("frames"), "manifest.frames")
-    expected_offsets = motion_contracts[definition_version]
-    if len(frames) != len(expected_offsets) or record.get("frame_count") != len(
-        expected_offsets
-    ):
-        raise CalibrationGraphError(
-            "bed-tab Y manifest has the wrong frame count for its definition"
-        )
-    if [frame.get("y_offset_mm") for frame in frames] != expected_offsets:
-        raise CalibrationGraphError("manifest has an invalid Y motion order")
+    if job_type == "nozzle_cam_bed_tab_y_scale":
+        motion_contracts = {
+            1: [0, 5, 10, 15, 20, 15, 10, 5, 0],
+            2: [0, 10, 20, 20, 10, 0],
+            3: [0, 10, 20, 20, 10, 0],
+            4: [0, 10, 20, 20, 10, 0],
+        }
+        if definition_version not in motion_contracts:
+            raise CalibrationGraphError(
+                "manifest.definition_version must be a known native definition"
+            )
+        if (
+            definition_version in (2, 3, 4)
+            and record.get("publish_on_accept") is not True
+        ):
+            raise CalibrationGraphError(
+                "definition-v2/v3/v4 bed-tab Y manifests must publish on acceptance"
+            )
+        localizer_contracts = {
+            3: {"kind": "horizontal_moving_edge", "version": 1},
+            4: {"kind": "bed_tab_top_edge", "version": 1},
+        }
+        if (
+            definition_version in localizer_contracts
+            and record.get("localizer") != localizer_contracts[definition_version]
+        ):
+            raise CalibrationGraphError(
+                f"definition-v{definition_version} manifest has an invalid edge localizer"
+            )
+        expected_offsets = motion_contracts[definition_version]
+        if len(frames) != len(expected_offsets) or record.get("frame_count") != len(
+            expected_offsets
+        ):
+            raise CalibrationGraphError(
+                "bed-tab Y manifest has the wrong frame count for its definition"
+            )
+        if [frame.get("y_offset_mm") for frame in frames] != expected_offsets:
+            raise CalibrationGraphError("manifest has an invalid Y motion order")
+    else:
+        if definition_version != 1:
+            raise CalibrationGraphError(
+                "bed-tab corner manifest definition_version must be 1"
+            )
+        if record.get("publish_on_accept") is not True:
+            raise CalibrationGraphError(
+                "bed-tab corner manifest must publish on acceptance"
+            )
+        if record.get("localizer") != {
+            "kind": "bed_tab_corner",
+            "version": 1,
+        }:
+            raise CalibrationGraphError(
+                "bed-tab corner manifest has an invalid localizer"
+            )
+        if len(frames) != 5 or record.get("frame_count") != 5:
+            raise CalibrationGraphError(
+                "bed-tab corner manifest must contain five duplicates"
+            )
+        if [frame.get("duplicate_index") for frame in frames] != list(range(5)):
+            raise CalibrationGraphError("bed-tab corner duplicate order is invalid")
+        positions = [frame.get("commanded_position_mm") for frame in frames]
+        if not positions or any(position != positions[0] for position in positions):
+            raise CalibrationGraphError(
+                "bed-tab corner duplicates must use one fixed pose"
+            )
+        expected_requirements = {
+            "bed_y_model": "camera.nozzle_cam.bed_tab.y_parallax_model",
+            "bed_tab_corner_prior": "bed.tab_corner.printer_xyz",
+            "tab_plane_z": "bed.reference_plane.tab_to_print_plane_z_mm",
+        }
+        input_facts = _require_list(record.get("input_facts"), "manifest.input_facts")
+        normalized_input_facts = [
+            _require_mapping(item, f"manifest.input_facts[{index}]")
+            for index, item in enumerate(input_facts)
+        ]
+        if {
+            item.get("requirement"): item.get("fact_name")
+            for item in normalized_input_facts
+        } != expected_requirements:
+            raise CalibrationGraphError(
+                "bed-tab corner manifest has invalid input fact bindings"
+            )
+        for binding in normalized_input_facts:
+            _require_string(binding.get("fact_set_hash"), "input fact_set_hash")
     for seq, frame_value in enumerate(frames):
         frame = _require_mapping(frame_value, f"manifest.frames[{seq}]")
         if frame.get("seq") != seq:
@@ -309,6 +400,31 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                 raise CalibrationGraphError(
                     "bed-tab axis vector must be a coordinate-system item"
                 )
+        if fact_name == "camera.nozzle_cam.partial_bed_coordinate_system":
+            expected_lengths = {
+                "corner_pixel_xy_px": 2,
+                "corner_printer_xyz_mm": 3,
+                "image_y_axis_vector_px_per_mm": 2,
+            }
+            for field, length in expected_lengths.items():
+                item = _require_list(value.get(field), f"partial bed {field}")
+                if len(item) != length or not all(
+                    isinstance(component, (int, float)) for component in item
+                ):
+                    raise CalibrationGraphError(
+                        f"partial bed {field} must contain {length} numeric values"
+                    )
+                if (
+                    fact_definition_version == 4
+                    and declared_roles.get(field) != "coordinate_system"
+                ):
+                    raise CalibrationGraphError(
+                        f"partial bed {field} must be a coordinate-system item"
+                    )
+            if not isinstance(value.get("tab_to_print_plane_z_mm"), (int, float)):
+                raise CalibrationGraphError(
+                    "partial bed tab_to_print_plane_z_mm must be numeric"
+                )
         dependencies = _require_list(
             fact.get("dependencies"),
             f"fact_set.facts[{fact_index}].dependencies",
@@ -353,9 +469,13 @@ def _publication_files(publications_dir: Path) -> Iterable[Path]:
 def _fact_set_index(root: Path) -> dict[str, tuple[Path, dict[str, Any]]]:
     result: dict[str, tuple[Path, dict[str, Any]]] = {}
     jobs_dir = root / "jobs"
-    if not jobs_dir.exists():
-        return result
-    for path in sorted(jobs_dir.glob("*/analysis/*/fact_set.json")):
+    paths = (
+        list(jobs_dir.glob("*/analysis/*/fact_set.json")) if jobs_dir.exists() else []
+    )
+    seeds_dir = root / "seeds"
+    if seeds_dir.exists():
+        paths.extend(seeds_dir.glob("*/fact_set.json"))
+    for path in sorted(paths):
         fact_set = validate_fact_set(load_json(path))
         fact_set_hash = fact_set["fact_set_hash"]
         if fact_set_hash in result:
@@ -412,7 +532,7 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
             raise CalibrationGraphError(
                 f"publication {path} references a missing fact set"
             )
-        _fact_set_path, fact_set = fact_set_entry
+        fact_set_path, fact_set = fact_set_entry
         published_names = [fact["name"] for fact in fact_set["facts"]]
         if publication["facts"] != published_names:
             raise CalibrationGraphError(
@@ -434,6 +554,12 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
                 "publication_id": publication["publication_id"],
                 "published_at_utc": publication["created_at_utc"],
                 "applicability_hash": fact_set["applicability_hash"],
+                "fact_set_path": str(fact_set_path.relative_to(root)),
+                "source_kind": (
+                    "seed"
+                    if fact_set_path.parent.parent == root / "seeds"
+                    else "analysis"
+                ),
             }
         publications.append(publication)
 
@@ -587,4 +713,63 @@ def publish_fact_set(
         "publication": publication,
         "publication_path": str(publication_path),
         "catalog": catalog,
+    }
+
+
+def publish_seed_fact_set(root: Path, fact_set_path: Path) -> dict[str, Any]:
+    resolved_root = root.resolve()
+    resolved_path = fact_set_path.resolve()
+    seeds_root = (root / "seeds").resolve()
+    if seeds_root not in resolved_path.parents:
+        raise CalibrationGraphError(
+            f"seed fact set must be beneath {seeds_root}: {resolved_path}"
+        )
+    fact_set = validate_fact_set(load_json(resolved_path))
+    catalog = rebuild_catalog(root)
+    existing = [
+        item
+        for item in catalog["publications"]
+        if item["fact_set_hash"] == fact_set["fact_set_hash"]
+    ]
+    if existing:
+        return {
+            "publication": existing[0],
+            "publication_path": None,
+            "catalog": catalog,
+            "already_published": True,
+        }
+    supersedes = {
+        fact["name"]: catalog["heads"].get(fact["name"], {}).get("fact_set_hash")
+        for fact in fact_set["facts"]
+    }
+    publication_id = (
+        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        + "-"
+        + fact_set["fact_set_hash"].split(":", 1)[1][:10]
+    )
+    publication = {
+        "schema": PUBLICATION_SCHEMA,
+        "schema_version": SCHEMA_VERSION,
+        "publication_id": publication_id,
+        "created_at_utc": utc_now(),
+        "job_id": fact_set["job_id"],
+        "analysis_run_id": fact_set["analysis_run_id"],
+        "analysis_hash": fact_set["analysis_hash"],
+        "fact_set_hash": fact_set["fact_set_hash"],
+        "facts": [fact["name"] for fact in fact_set["facts"]],
+        "supersedes": supersedes,
+        "publication_hash": "",
+    }
+    publication["publication_hash"] = content_hash(publication, "publication_hash")
+    validate_publication(publication)
+    publication_path = root / "publications" / f"{publication_id}.json"
+    atomic_write_json(publication_path, publication, immutable=True)
+    catalog = rebuild_catalog(root)
+    if resolved_root != root.resolve():
+        raise CalibrationGraphError("calibration root changed during publication")
+    return {
+        "publication": publication,
+        "publication_path": str(publication_path),
+        "catalog": catalog,
+        "already_published": False,
     }

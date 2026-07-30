@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from vision_bed_tab_corner import analyze as analyze_bed_tab_corner
 from vision_bed_tab_y_scale import Y_OFFSETS_MM
 from vision_bed_tab_y_scale import analyze as analyze_bed_tab_y_scale
 from vision_calibration_graph import (
@@ -31,6 +32,7 @@ from vision_calibration_graph import (
     content_hash,
     load_json,
     publish_fact_set,
+    publish_seed_fact_set,
     rebuild_catalog,
     sha256_file,
     utc_now,
@@ -64,11 +66,19 @@ PROFILE_PATH = Path(
         "/usr/local/share/vision/nozzle_cam_profiles.json",
     )
 )
+PRIOR_PATH = Path(
+    os.environ.get(
+        "VISION_CALIBRATION_PRIOR_FILE",
+        "/usr/local/share/vision/vision_calibration_priors.json",
+    )
+)
 FRAMEBUFFER_DIR = Path(
     os.environ.get("VISION_FRAMEBUFFER_DIR", "/run/vision-preview-nozzle_cam")
 )
 MOONRAKER_URL = os.environ.get("VISION_MOONRAKER_URL", "http://127.0.0.1")
-JOB_TYPE = "nozzle_cam_bed_tab_y_scale"
+BED_TAB_Y_JOB_TYPE = "nozzle_cam_bed_tab_y_scale"
+BED_TAB_CORNER_JOB_TYPE = "nozzle_cam_bed_tab_corner"
+JOB_TYPES = (BED_TAB_Y_JOB_TYPE, BED_TAB_CORNER_JOB_TYPE)
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 HASH_TOKEN_RE = re.compile(r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+")
 HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
@@ -85,6 +95,106 @@ def _sanitize(value: str) -> str:
 
 def _load_registry() -> dict[str, Any]:
     return validate_registry(load_json(REGISTRY_PATH))
+
+
+def _load_seed_registry() -> dict[str, Any]:
+    registry = load_json(PRIOR_PATH)
+    if registry.get("schema") != "vision-calibration-seed-registry":
+        raise VisionCalibrationError("unsupported calibration seed registry")
+    if registry.get("schema_version") != SCHEMA_VERSION:
+        raise VisionCalibrationError("unsupported calibration seed schema version")
+    seeds = registry.get("seeds")
+    if not isinstance(seeds, list) or not seeds:
+        raise VisionCalibrationError("calibration seed registry contains no seeds")
+    expected_names = {
+        "bed.tab_corner.printer_xyz",
+        "bed.reference_plane.tab_to_print_plane_z_mm",
+    }
+    names = {seed.get("name") for seed in seeds if isinstance(seed, dict)}
+    if names != expected_names:
+        raise VisionCalibrationError("calibration seed registry has invalid facts")
+    for seed in seeds:
+        if not isinstance(seed, dict):
+            raise VisionCalibrationError("calibration seed must be an object")
+        if seed.get("definition_version") != 4:
+            raise VisionCalibrationError(
+                f"seed {seed.get('name')} definition_version must be 4"
+            )
+        if seed.get("role") not in ("coordinate_system", "diagnostic"):
+            raise VisionCalibrationError(f"seed {seed.get('name')} has an invalid role")
+        value = seed.get("value")
+        value_items = seed.get("value_items")
+        if not isinstance(value, dict) or not isinstance(value_items, list):
+            raise VisionCalibrationError(
+                f"seed {seed.get('name')} has invalid value declarations"
+            )
+        if {item.get("field") for item in value_items} != set(value):
+            raise VisionCalibrationError(
+                f"seed {seed.get('name')} declarations do not cover its value"
+            )
+    return registry
+
+
+def sync_seed_facts() -> dict[str, Any]:
+    registry = _load_seed_registry()
+    registry_hash = sha256_file(PRIOR_PATH)
+    results = []
+    for seed in registry["seeds"]:
+        seed_content_hash = canonical_hash(seed)
+        analysis_hash = canonical_hash(
+            {
+                "kind": "vision_calibration_seed",
+                "seed": seed,
+                "seed_registry_sha256": registry_hash,
+            }
+        )
+        fact_set = {
+            "schema": FACT_SET_SCHEMA,
+            "schema_version": SCHEMA_VERSION,
+            "fact_set_id": f"seed:{seed['name']}:{seed_content_hash[7:19]}",
+            "job_id": f"seed:{seed['name']}",
+            "analysis_run_id": f"revision-{seed['revision']}",
+            "analysis_hash": analysis_hash,
+            "created_at_utc": seed["recorded_at_utc"],
+            "accepted": True,
+            "publication_eligible": True,
+            "applicability_hash": canonical_hash(
+                {"printer": "menderpi", "seed_name": seed["name"]}
+            ),
+            "facts": [
+                {
+                    "name": seed["name"],
+                    "definition_version": seed["definition_version"],
+                    "role": seed["role"],
+                    "dependencies": [],
+                    "value_items": seed["value_items"],
+                    "value": seed["value"],
+                }
+            ],
+            "provenance": {
+                "source": "user_initial_prior",
+                "seed_registry_sha256": registry_hash,
+                "seed_content_hash": seed_content_hash,
+                "revision": seed["revision"],
+            },
+            "fact_set_hash": "",
+        }
+        fact_set["fact_set_hash"] = content_hash(fact_set, "fact_set_hash")
+        seed_dir = CALIBRATION_ROOT / "seeds" / fact_set["fact_set_hash"][7:23]
+        fact_set_path = seed_dir / "fact_set.json"
+        if not fact_set_path.exists():
+            atomic_write_json(fact_set_path, fact_set, immutable=True)
+        publication = publish_seed_fact_set(CALIBRATION_ROOT, fact_set_path)
+        results.append(
+            {
+                "name": seed["name"],
+                "fact_set_hash": fact_set["fact_set_hash"],
+                "publication": publication["publication"],
+                "already_published": publication["already_published"],
+            }
+        )
+    rebuild_and_render()
+    return {"seeds": results}
 
 
 def _canonical_gcode(gcode: str) -> str:
@@ -153,6 +263,7 @@ def _settings_section(settings: dict[str, Any], name: str) -> dict[str, Any]:
 
 def _resolve_preflight(
     status: dict[str, Any],
+    job_type: str,
     definition: dict[str, Any],
     expected_fingerprint: str | None,
 ) -> dict[str, Any]:
@@ -195,9 +306,16 @@ def _resolve_preflight(
     z_max = _number(stepper_z, "position_max", "stepper_z")
     axis_minimum = [float(item) for item in status["toolhead"]["axis_minimum"]]
     axis_maximum = [float(item) for item in status["toolhead"]["axis_maximum"]]
-    resolved_positions = [
-        [x_min, y_min + offset, z_max] for offset in definition["y_offsets_mm"]
-    ]
+    if job_type == BED_TAB_Y_JOB_TYPE:
+        resolved_positions = [
+            [x_min, y_min + offset, z_max] for offset in definition["y_offsets_mm"]
+        ]
+    elif job_type == BED_TAB_CORNER_JOB_TYPE:
+        resolved_positions = [
+            [x_min, y_min + float(definition["capture_y_offset_mm"]), z_max]
+        ] * int(definition["duplicate_count"])
+    else:
+        raise VisionCalibrationError(f"unsupported preflight job type {job_type}")
     for index, position in enumerate(resolved_positions):
         for axis, value, minimum, maximum in zip(
             "xyz", position, axis_minimum, axis_maximum
@@ -233,7 +351,7 @@ def _resolve_preflight(
     light_settings = _settings_section(
         settings, "gcode_macro nozzle_cam_y_feature_light"
     )
-    scope = {
+    scope: dict[str, Any] = {
         "camera": "nozzle_cam",
         "profile": definition["profile"],
         "profile_file_sha256": sha256_file(PROFILE_PATH),
@@ -241,7 +359,9 @@ def _resolve_preflight(
         "light_gcode": light_settings.get("gcode"),
         "localizer": definition["localizer"],
         "t0_viewing_pose": {"x_mm": x_min, "z_mm": z_max},
-        "y_motion": {
+    }
+    if job_type == BED_TAB_Y_JOB_TYPE:
+        scope["y_motion"] = {
             "position_min_mm": y_min,
             "position_endstop_mm": y_endstop,
             "offsets_mm": definition["y_offsets_mm"],
@@ -249,8 +369,15 @@ def _resolve_preflight(
             "settle_ms": definition["settle_ms"],
             "rotation_distance": stepper_y.get("rotation_distance"),
             "microsteps": stepper_y.get("microsteps"),
-        },
-    }
+        }
+    else:
+        scope["corner_capture"] = {
+            "position_min_mm": y_min,
+            "y_offset_mm": definition["capture_y_offset_mm"],
+            "duplicate_count": definition["duplicate_count"],
+            "velocity_mm_s": definition["velocity_mm_s"],
+            "settle_ms": definition["settle_ms"],
+        }
     return {
         "fingerprint": fingerprint,
         "scope": scope,
@@ -291,6 +418,7 @@ def _gcode(
     job_id: str,
     manifest_hash: str,
     gcode_hash: str,
+    job_type: str,
     definition: dict[str, Any],
     pose: dict[str, float],
 ) -> str:
@@ -308,12 +436,27 @@ def _gcode(
         f"G1 Z{pose['z_mm']:.6f} F{feedrate:.3f}",
         (f"G1 X{pose['x_mm']:.6f} Y{pose['y_base_mm']:.6f} " f"F{feedrate:.3f}"),
     ]
-    for seq, offset in enumerate(definition["y_offsets_mm"]):
-        y = pose["y_base_mm"] + float(offset)
-        frame = f"y_{seq:02d}_{int(offset):02d}mm"
+    if job_type == BED_TAB_Y_JOB_TYPE:
+        captures = [
+            (seq, float(offset), f"y_{seq:02d}_{int(offset):02d}mm")
+            for seq, offset in enumerate(definition["y_offsets_mm"])
+        ]
+    elif job_type == BED_TAB_CORNER_JOB_TYPE:
+        offset = float(definition["capture_y_offset_mm"])
+        captures = [
+            (seq, offset, f"corner_duplicate_{seq:02d}")
+            for seq in range(int(definition["duplicate_count"]))
+        ]
+    else:
+        raise VisionCalibrationError(f"unsupported G-code job type {job_type}")
+    last_offset = None
+    for seq, offset, frame in captures:
+        y = pose["y_base_mm"] + offset
+        if job_type == BED_TAB_Y_JOB_TYPE or last_offset != offset:
+            lines.append(f"G1 Y{y:.6f} F{feedrate:.3f}")
+            last_offset = offset
         lines.extend(
             [
-                f"G1 Y{y:.6f} F{feedrate:.3f}",
                 "M400",
                 f"G4 P{int(definition['settle_ms'])}",
                 (
@@ -325,10 +468,7 @@ def _gcode(
         )
     lines.extend(
         [
-            (
-                f"VISION_JOB_END JOB={job_id} "
-                f"EXPECTED_FRAMES={len(definition['y_offsets_mm'])}"
-            ),
+            (f"VISION_JOB_END JOB={job_id} " f"EXPECTED_FRAMES={len(captures)}"),
             "VISION_LIGHT_OFF",
             "",
         ]
@@ -345,45 +485,178 @@ def _update_state(job_dir: Path, **values: Any) -> dict[str, Any]:
     return state
 
 
+def _resolve_current_fact(
+    requirement: str, fact_name: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    catalog = rebuild_catalog(CALIBRATION_ROOT)
+    head = catalog.get("heads", {}).get(fact_name)
+    if not isinstance(head, dict):
+        raise VisionCalibrationError(
+            f"required current fact {fact_name!r} is unavailable"
+        )
+    relative_path = head.get("fact_set_path")
+    if not isinstance(relative_path, str):
+        raise VisionCalibrationError(
+            f"required fact {fact_name!r} has no source fact-set path"
+        )
+    fact_set_path = (CALIBRATION_ROOT / relative_path).resolve()
+    if CALIBRATION_ROOT.resolve() not in fact_set_path.parents:
+        raise VisionCalibrationError(
+            f"required fact {fact_name!r} resolved outside calibration storage"
+        )
+    fact_set = load_json(fact_set_path)
+    fact = next(
+        (item for item in fact_set.get("facts", []) if item.get("name") == fact_name),
+        None,
+    )
+    if fact is None:
+        raise VisionCalibrationError(
+            f"current fact set does not contain required fact {fact_name!r}"
+        )
+    return (
+        {
+            "requirement": requirement,
+            "fact_name": fact_name,
+            "fact_set_hash": head["fact_set_hash"],
+            "fact_definition_version": fact.get("definition_version"),
+            "source_job_id": head["job_id"],
+            "source_analysis_run_id": head["analysis_run_id"],
+        },
+        fact,
+    )
+
+
+def _bed_tab_corner_prediction(
+    bed_y_fact: dict[str, Any], target_y_offset_mm: float
+) -> dict[str, Any]:
+    value = bed_y_fact.get("value", {})
+    vector = value.get("axis_vector_px_per_mm")
+    target = value.get("observed_target") or {}
+    line = target.get("reference_line_px")
+    side = target.get("reference_tab_side")
+    if (
+        not isinstance(vector, list)
+        or len(vector) != 2
+        or not isinstance(line, list)
+        or len(line) != 3
+        or not isinstance(side, dict)
+    ):
+        raise VisionCalibrationError(
+            "bed-tab Y fact lacks the observed tab geometry needed for corner prediction"
+        )
+    seam_y = float(target.get("reference_seam_y_px", line[1]))
+    denominator = float(side["y1"]) - float(side["y0"])
+    if abs(denominator) < 1.0e-9:
+        raise VisionCalibrationError("bed-tab side geometry is degenerate")
+    source_x = (
+        float(side["x0"])
+        + (seam_y - float(side["y0"]))
+        * (float(side["x1"]) - float(side["x0"]))
+        / denominator
+    )
+    source_corner = [source_x, seam_y]
+    expected_corner = [
+        source_corner[0] + float(vector[0]) * target_y_offset_mm,
+        source_corner[1] + float(vector[1]) * target_y_offset_mm,
+    ]
+    return {
+        "source_reference_corner_px": source_corner,
+        "source_reference_y_offset_mm": 0.0,
+        "capture_y_offset_mm": target_y_offset_mm,
+        "expected_corner_px": expected_corner,
+        "image_y_axis_vector_px_per_mm": [
+            float(vector[0]),
+            float(vector[1]),
+        ],
+    }
+
+
 def prepare_job(
     name: str,
     *,
+    job_type: str = BED_TAB_Y_JOB_TYPE,
     expected_fingerprint: str | None = None,
     status: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     registry = _load_registry()
-    definition = registry["job_types"][JOB_TYPE]
+    if job_type not in JOB_TYPES:
+        raise VisionCalibrationError(f"unsupported job type {job_type}")
+    definition = registry["job_types"][job_type]
+    input_facts = []
+    input_fact_values: dict[str, dict[str, Any]] = {}
+    corner_prediction = None
+    if job_type == BED_TAB_CORNER_JOB_TYPE:
+        sync_seed_facts()
+        for requirement in definition["requires"]:
+            binding, fact = _resolve_current_fact(
+                requirement["requirement"], requirement["fact_name"]
+            )
+            input_facts.append(binding)
+            input_fact_values[requirement["requirement"]] = fact
+        corner_prediction = _bed_tab_corner_prediction(
+            input_fact_values["bed_y_model"],
+            float(definition["capture_y_offset_mm"]),
+        )
     resolved = _resolve_preflight(
-        status or query_printer_status(), definition, expected_fingerprint
+        status or query_printer_status(),
+        job_type,
+        definition,
+        expected_fingerprint,
     )
+    if input_facts:
+        resolved["scope"]["input_fact_hashes"] = {
+            item["requirement"]: item["fact_set_hash"] for item in input_facts
+        }
+        resolved["applicability_hash"] = canonical_hash(resolved["scope"])
     job_id = _job_id(name)
     job_dir = CALIBRATION_ROOT / "jobs" / job_id
     if job_dir.exists():
         raise VisionCalibrationError(f"job already exists: {job_id}")
     frames = []
-    forward_count = len(definition["y_offsets_mm"]) // 2
-    for seq, offset in enumerate(definition["y_offsets_mm"]):
-        frames.append(
-            {
-                "seq": seq,
-                "frame": f"y_{seq:02d}_{int(offset):02d}mm",
-                "camera": "nozzle_cam",
-                "profile": definition["profile"],
-                "tool": "T0",
-                "y_offset_mm": offset,
-                "commanded_position_mm": [
-                    resolved["pose"]["x_mm"],
-                    resolved["pose"]["y_base_mm"] + float(offset),
-                    resolved["pose"]["z_mm"],
-                ],
-                "pass": "forward" if seq < forward_count else "reverse",
-            }
-        )
+    if job_type == BED_TAB_Y_JOB_TYPE:
+        forward_count = len(definition["y_offsets_mm"]) // 2
+        for seq, offset in enumerate(definition["y_offsets_mm"]):
+            frames.append(
+                {
+                    "seq": seq,
+                    "frame": f"y_{seq:02d}_{int(offset):02d}mm",
+                    "camera": "nozzle_cam",
+                    "profile": definition["profile"],
+                    "tool": "T0",
+                    "y_offset_mm": offset,
+                    "commanded_position_mm": [
+                        resolved["pose"]["x_mm"],
+                        resolved["pose"]["y_base_mm"] + float(offset),
+                        resolved["pose"]["z_mm"],
+                    ],
+                    "pass": "forward" if seq < forward_count else "reverse",
+                }
+            )
+    else:
+        offset = float(definition["capture_y_offset_mm"])
+        for seq in range(int(definition["duplicate_count"])):
+            frames.append(
+                {
+                    "seq": seq,
+                    "frame": f"corner_duplicate_{seq:02d}",
+                    "camera": "nozzle_cam",
+                    "profile": definition["profile"],
+                    "tool": "T0",
+                    "y_offset_mm": offset,
+                    "duplicate_index": seq,
+                    "commanded_position_mm": [
+                        resolved["pose"]["x_mm"],
+                        resolved["pose"]["y_base_mm"] + offset,
+                        resolved["pose"]["z_mm"],
+                    ],
+                    "pass": "duplicate",
+                }
+            )
     manifest = {
         "schema": MANIFEST_SCHEMA,
         "schema_version": SCHEMA_VERSION,
         "job_id": job_id,
-        "job_type": JOB_TYPE,
+        "job_type": job_type,
         "definition_version": definition["definition_version"],
         "created_at_utc": utc_now(),
         "camera": "nozzle_cam",
@@ -393,6 +666,7 @@ def prepare_job(
         "publish_on_accept": bool(definition["publish_on_accept"]),
         "frame_count": len(frames),
         "frames": frames,
+        "input_facts": input_facts,
         "motion": {
             "velocity_mm_s": definition["velocity_mm_s"],
             "settle_ms": definition["settle_ms"],
@@ -414,10 +688,20 @@ def prepare_job(
         "gcode_hash": HASH_PLACEHOLDER,
         "manifest_hash": HASH_PLACEHOLDER,
     }
+    if corner_prediction is not None:
+        prior_value = input_fact_values["bed_tab_corner_prior"]["value"]
+        z_value = input_fact_values["tab_plane_z"]["value"]
+        manifest["corner_reference"] = {
+            **corner_prediction,
+            "corner_printer_xyz_mm": prior_value["xyz_mm"],
+            "tab_to_print_plane_z_mm": z_value["z_offset_mm"],
+            "prior_provisional": bool(prior_value.get("provisional")),
+        }
     placeholder_gcode = _gcode(
         job_id,
         HASH_PLACEHOLDER,
         HASH_PLACEHOLDER,
+        job_type,
         definition,
         resolved["pose"],
     )
@@ -427,6 +711,7 @@ def prepare_job(
         job_id,
         manifest["manifest_hash"],
         manifest["gcode_hash"],
+        job_type,
         definition,
         resolved["pose"],
     )
@@ -535,6 +820,68 @@ def _analysis_run_id(manifest: dict[str, Any]) -> str:
 def _report_markdown(
     manifest: dict[str, Any], analysis: dict[str, Any], result: dict[str, Any]
 ) -> str:
+    if manifest.get("job_type", BED_TAB_Y_JOB_TYPE) == BED_TAB_CORNER_JOB_TYPE:
+        corner = result.get("corner_pixel_xy_px")
+        reference = manifest["corner_reference"]
+        lines = [
+            "# Bed-tab corner reference analysis",
+            "",
+            f"- Job: `{manifest['job_id']}`",
+            f"- Analysis: `{analysis['analysis_run_id']}`",
+            f"- Result: **{analysis['state']}**",
+            f"- Observed corner pixel: `{corner}` px",
+            (
+                "- Provisional printer corner XYZ: "
+                f"`{reference['corner_printer_xyz_mm']}` mm"
+            ),
+            (
+                "- Image Y-axis vector: "
+                f"`{reference['image_y_axis_vector_px_per_mm']}` px/mm"
+            ),
+            ("- Upstream-predicted pixel: " f"`{reference['expected_corner_px']}` px"),
+            (
+                "- Prediction-to-localization distance: "
+                f"`{result.get('expected_distance_px')}` px"
+            ),
+            (
+                "- Duplicate repeatability: "
+                f"`{result.get('repeatability_rms_px')}` px RMS / "
+                f"`{result.get('repeatability_max_px')}` px maximum"
+            ),
+            (
+                "- Duplicate registration correlation: "
+                f"`{result.get('minimum_correlation')}` minimum / "
+                f"`{result.get('median_correlation')}` median"
+            ),
+            (
+                "- Usable/line-confirmed duplicates: "
+                f"`{result.get('usable_frame_count')}` / "
+                f"`{result.get('line_confirmation_count')}`"
+            ),
+            "",
+            "The pixel location is bound to the exact current Y-parallax fact, "
+            "the provisional bed-tab printer-XYZ prior, and the tab-plane Z seed.",
+            "This job does not modify calib.yaml or live Klipper coordinates.",
+        ]
+        if reference.get("prior_provisional"):
+            lines.extend(
+                [
+                    "",
+                    "## Provisional prior",
+                    "",
+                    "The printer XYZ prior is intentionally provisional. Replacing "
+                    "and publishing the measured prior will make this corner reference "
+                    "stale and require this job to be rerun.",
+                ]
+            )
+        if result.get("warnings"):
+            lines.extend(["", "## Warnings", ""])
+            lines.extend(f"- {warning}" for warning in result["warnings"])
+        if analysis["state"] == "rejected":
+            lines.extend(["", "## Rejection reasons", ""])
+            lines.extend(f"- {reason}" for reason in result.get("reasons", []))
+        return "\n".join(lines) + "\n"
+
     axis_vector = result.get("axis_vector_px_per_mm")
     has_axis_vector = (
         isinstance(axis_vector, list)
@@ -621,9 +968,17 @@ def _report_markdown(
 def analyze_job(job_id: str) -> dict[str, Any]:
     job_dir = CALIBRATION_ROOT / "jobs" / _sanitize(job_id)
     manifest = validate_manifest(load_json(job_dir / "manifest.json"))
-    if manifest["definition_version"] != 4:
+    if manifest["job_type"] == BED_TAB_Y_JOB_TYPE and (
+        manifest["definition_version"] != 4
+    ):
         raise VisionCalibrationError(
-            "only definition-v4 jobs can be analyzed by the current localizer"
+            "only definition-v4 bed-tab Y jobs use the current localizer"
+        )
+    if manifest["job_type"] == BED_TAB_CORNER_JOB_TYPE and (
+        manifest["definition_version"] != 1
+    ):
+        raise VisionCalibrationError(
+            "only definition-v1 bed-tab corner jobs use the current localizer"
         )
     state = load_json(job_dir / "state.json")
     if state.get("state") not in ("acquired", "analyzed", "rejected"):
@@ -642,12 +997,22 @@ def analyze_job(job_id: str) -> dict[str, Any]:
         )
     staging_dir.mkdir(parents=True)
     try:
-        result_details = analyze_bed_tab_y_scale(
-            frame_paths,
-            staging_dir / "artifacts",
-            offsets_mm=[float(frame["y_offset_mm"]) for frame in manifest["frames"]],
-            localizer=manifest["localizer"],
-        )
+        if manifest["job_type"] == BED_TAB_Y_JOB_TYPE:
+            result_details = analyze_bed_tab_y_scale(
+                frame_paths,
+                staging_dir / "artifacts",
+                offsets_mm=[
+                    float(frame["y_offset_mm"]) for frame in manifest["frames"]
+                ],
+                localizer=manifest["localizer"],
+            )
+        else:
+            result_details = analyze_bed_tab_corner(
+                frame_paths,
+                staging_dir / "artifacts",
+                expected_corner_px=manifest["corner_reference"]["expected_corner_px"],
+                localizer=manifest["localizer"],
+            )
         for artifact in result_details.get("artifacts", {}).values():
             staging_path = Path(artifact["path"])
             relative_path = staging_path.relative_to(staging_dir)
@@ -674,7 +1039,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                     }
                     for frame, sidecar in zip(manifest["frames"], sidecars)
                 ],
-                "dependencies": [],
+                "dependencies": manifest.get("input_facts", []),
             },
             "diagnostics": result_details,
             "fact_set_path": "fact_set.json" if result_details["accepted"] else None,
@@ -685,18 +1050,8 @@ def analyze_job(job_id: str) -> dict[str, Any]:
         if result_details["accepted"]:
             width = int(sidecars[0]["width"])
             height = int(sidecars[0]["height"])
-            fact_set = {
-                "schema": FACT_SET_SCHEMA,
-                "schema_version": SCHEMA_VERSION,
-                "fact_set_id": f"{manifest['job_id']}:{analysis_run_id}",
-                "job_id": manifest["job_id"],
-                "analysis_run_id": analysis_run_id,
-                "analysis_hash": analysis["analysis_hash"],
-                "created_at_utc": utc_now(),
-                "accepted": True,
-                "publication_eligible": True,
-                "applicability_hash": manifest["applicability_hash"],
-                "facts": [
+            if manifest["job_type"] == BED_TAB_Y_JOB_TYPE:
+                facts = [
                     {
                         "name": "camera.nozzle_cam.bed_tab.y_parallax_model",
                         "definition_version": 4,
@@ -780,14 +1135,137 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                             },
                         },
                     }
-                ],
+                ]
+                observed_provenance = result_details["observed_target"]
+            else:
+                dependencies = [
+                    {
+                        "fact_name": item["fact_name"],
+                        "fact_set_hash": item["fact_set_hash"],
+                    }
+                    for item in manifest["input_facts"]
+                ]
+                reference = manifest["corner_reference"]
+                facts = [
+                    {
+                        "name": "camera.nozzle_cam.partial_bed_coordinate_system",
+                        "definition_version": 4,
+                        "role": "coordinate_system",
+                        "dependencies": dependencies,
+                        "value_items": [
+                            {
+                                "field": "corner_pixel_xy_px",
+                                "role": "coordinate_system",
+                            },
+                            {
+                                "field": "corner_printer_xyz_mm",
+                                "role": "coordinate_system",
+                            },
+                            {
+                                "field": "image_y_axis_vector_px_per_mm",
+                                "role": "coordinate_system",
+                            },
+                            {
+                                "field": "tab_to_print_plane_z_mm",
+                                "role": "coordinate_system",
+                            },
+                            {"field": "mapping_convention", "role": "diagnostic"},
+                            {"field": "camera", "role": "diagnostic"},
+                            {"field": "profile", "role": "diagnostic"},
+                            {"field": "light_macro", "role": "diagnostic"},
+                            {
+                                "field": "image_dimensions_px",
+                                "role": "diagnostic",
+                            },
+                            {
+                                "field": "capture_pose_mm",
+                                "role": "diagnostic",
+                            },
+                            {
+                                "field": "upstream_prediction",
+                                "role": "diagnostic",
+                            },
+                            {
+                                "field": "prior_provisional",
+                                "role": "diagnostic",
+                            },
+                            {"field": "quality", "role": "diagnostic"},
+                            {
+                                "field": "supporting_artifact_hashes",
+                                "role": "diagnostic",
+                            },
+                        ],
+                        "value": {
+                            "corner_pixel_xy_px": result_details["corner_pixel_xy_px"],
+                            "corner_printer_xyz_mm": reference["corner_printer_xyz_mm"],
+                            "image_y_axis_vector_px_per_mm": reference[
+                                "image_y_axis_vector_px_per_mm"
+                            ],
+                            "tab_to_print_plane_z_mm": reference[
+                                "tab_to_print_plane_z_mm"
+                            ],
+                            "mapping_convention": (
+                                "pixel_xy = corner_pixel_xy_px + "
+                                "image_y_axis_vector_px_per_mm * "
+                                "(printer_y_mm - corner_printer_y_mm)"
+                            ),
+                            "camera": manifest["camera"],
+                            "profile": manifest["profile"],
+                            "light_macro": manifest["light_macro"],
+                            "image_dimensions_px": [width, height],
+                            "capture_pose_mm": manifest["frames"][0][
+                                "commanded_position_mm"
+                            ],
+                            "upstream_prediction": {
+                                "expected_corner_px": reference["expected_corner_px"],
+                                "distance_px": result_details["expected_distance_px"],
+                            },
+                            "prior_provisional": reference["prior_provisional"],
+                            "quality": {
+                                key: result_details[key]
+                                for key in (
+                                    "usable_frame_count",
+                                    "line_confirmation_count",
+                                    "minimum_correlation",
+                                    "median_correlation",
+                                    "repeatability_rms_px",
+                                    "repeatability_max_px",
+                                    "maximum_representation_spread_px",
+                                    "maximum_forward_reverse_disagreement_px",
+                                    "warnings",
+                                )
+                            },
+                            "supporting_artifact_hashes": {
+                                name: item["sha256"]
+                                for name, item in result_details["artifacts"].items()
+                            },
+                        },
+                    }
+                ]
+                observed_provenance = {
+                    "corner_pixel_xy_px": result_details["corner_pixel_xy_px"],
+                    "selected_candidate": result_details["selected_candidate"],
+                }
+            fact_set = {
+                "schema": FACT_SET_SCHEMA,
+                "schema_version": SCHEMA_VERSION,
+                "fact_set_id": f"{manifest['job_id']}:{analysis_run_id}",
+                "job_id": manifest["job_id"],
+                "analysis_run_id": analysis_run_id,
+                "analysis_hash": analysis["analysis_hash"],
+                "created_at_utc": utc_now(),
+                "accepted": True,
+                "publication_eligible": True,
+                "applicability_hash": manifest["applicability_hash"],
+                "facts": facts,
                 "provenance": {
                     "active_printer_fingerprint": manifest["provenance"][
                         "active_printer_fingerprint"
                     ],
                     "manifest_hash": manifest["manifest_hash"],
                     "analysis_hash": analysis["analysis_hash"],
-                    "observed_target": result_details["observed_target"],
+                    "observed_target": observed_provenance,
+                    "input_facts": manifest.get("input_facts", []),
                 },
                 "fact_set_hash": "",
             }
@@ -835,19 +1313,37 @@ def analyze_job(job_id: str) -> dict[str, Any]:
 def run_job(
     name: str,
     *,
+    job_type: str = BED_TAB_Y_JOB_TYPE,
     expected_fingerprint: str | None = None,
     timeout: float = 180.0,
 ) -> dict[str, Any]:
-    prepared = prepare_job(name, expected_fingerprint=expected_fingerprint)
+    prepared = prepare_job(
+        name,
+        job_type=job_type,
+        expected_fingerprint=expected_fingerprint,
+    )
+    manifest = validate_manifest(
+        load_json(CALIBRATION_ROOT / "jobs" / prepared["job_id"] / "manifest.json")
+    )
     current = query_printer_status()
     _resolve_preflight(
         current,
-        _load_registry()["job_types"][JOB_TYPE],
-        expected_fingerprint
-        or validate_manifest(
-            load_json(CALIBRATION_ROOT / "jobs" / prepared["job_id"] / "manifest.json")
-        )["provenance"]["active_printer_fingerprint"],
+        job_type,
+        _load_registry()["job_types"][job_type],
+        expected_fingerprint or manifest["provenance"]["active_printer_fingerprint"],
     )
+    if manifest.get("input_facts"):
+        catalog = rebuild_catalog(CALIBRATION_ROOT)
+        for binding in manifest["input_facts"]:
+            current_hash = (
+                catalog.get("heads", {})
+                .get(binding["fact_name"], {})
+                .get("fact_set_hash")
+            )
+            if current_hash != binding["fact_set_hash"]:
+                raise VisionCalibrationError(
+                    f"bound input {binding['fact_name']} is no longer current"
+                )
     _start_print(prepared["job_id"])
     _wait_for_acquisition(prepared["job_id"], timeout=timeout)
     analyzed = analyze_job(prepared["job_id"])
@@ -898,6 +1394,8 @@ def _write_job_page(job: dict[str, Any], root: Path) -> None:
             artifact_items = []
             artifacts = result.get("diagnostics", {}).get("artifacts", {})
             artifact_order = (
+                "corner_localization",
+                "corner_duplicate_registration",
                 "edge_localization",
                 "edge_tracking_overlay",
                 "displacement_vs_y",
@@ -927,6 +1425,8 @@ def _write_job_page(job: dict[str, Any], root: Path) -> None:
                     ' class="hero-overlay"'
                     if name
                     in (
+                        "corner_localization",
+                        "corner_duplicate_registration",
                         "edge_localization",
                         "edge_tracking_overlay",
                         "motion_overlay_contact_sheet",
@@ -975,9 +1475,37 @@ def _write_job_page(job: dict[str, Any], root: Path) -> None:
                     if warnings
                     else ""
                 )
+                corner_localization = artifacts.get("corner_localization")
+                corner_duplicates = artifacts.get("corner_duplicate_registration")
                 edge_localization = artifacts.get("edge_localization")
                 edge_tracking = artifacts.get("edge_tracking_overlay")
-                if edge_localization and edge_tracking:
+                if corner_localization and corner_duplicates:
+                    localization_path = os.path.relpath(
+                        Path(corner_localization["path"]),
+                        job_dir,
+                    )
+                    duplicates_path = os.path.relpath(
+                        Path(corner_duplicates["path"]),
+                        job_dir,
+                    )
+                    overlay_html = (
+                        "<h3>Automatically localized bed-tab corner</h3>"
+                        "<p>Cyan is the upstream Y-model prediction. Yellow is "
+                        "the selected horizontal tab top, descending side, their "
+                        "intersection, and the registration ROI. Other semantic "
+                        "corner candidates are red.</p>"
+                        f'<a href="{html.escape(localization_path)}">'
+                        f'<img class="hero-overlay" '
+                        f'src="{html.escape(localization_path)}"></a>'
+                        "<h3>Duplicate registration and line confirmation</h3>"
+                        "<p>Each panel is a fixed-pose duplicate. Cyan is the "
+                        "registration-projected corner and yellow is the "
+                        "independently detected edge intersection.</p>"
+                        f'<a href="{html.escape(duplicates_path)}">'
+                        f'<img class="hero-overlay" '
+                        f'src="{html.escape(duplicates_path)}"></a>'
+                    )
+                elif edge_localization and edge_tracking:
                     localization_path = os.path.relpath(
                         Path(edge_localization["path"]),
                         job_dir,
@@ -1105,14 +1633,18 @@ def _format_number(value: Any, digits: int = 6) -> str:
 def _load_current_fact(
     name: str, head: dict[str, Any]
 ) -> tuple[dict[str, Any], dict[str, Any]] | None:
-    fact_set_path = (
-        CALIBRATION_ROOT
-        / "jobs"
-        / str(head["job_id"])
-        / "analysis"
-        / str(head["analysis_run_id"])
-        / "fact_set.json"
-    )
+    relative_path = head.get("fact_set_path")
+    if isinstance(relative_path, str):
+        fact_set_path = CALIBRATION_ROOT / relative_path
+    else:
+        fact_set_path = (
+            CALIBRATION_ROOT
+            / "jobs"
+            / str(head["job_id"])
+            / "analysis"
+            / str(head["analysis_run_id"])
+            / "fact_set.json"
+        )
     if not fact_set_path.is_file():
         return None
     fact_set = load_json(fact_set_path)
@@ -1123,8 +1655,20 @@ def _load_current_fact(
 
 
 def _fact_title(name: str) -> str:
-    if name == "camera.nozzle_cam.bed_tab.y_parallax_model":
-        return "Nozzle camera — bed-tab Y parallax"
+    titles = {
+        "camera.nozzle_cam.bed_tab.y_parallax_model": (
+            "Nozzle camera — bed-tab Y parallax"
+        ),
+        "bed.tab_corner.printer_xyz": "Bed-tab corner printer prior",
+        "bed.reference_plane.tab_to_print_plane_z_mm": (
+            "Bed-tab plane to print-plane Z"
+        ),
+        "camera.nozzle_cam.partial_bed_coordinate_system": (
+            "Nozzle camera — partial bed coordinate system"
+        ),
+    }
+    if name in titles:
+        return titles[name]
     return name.replace(".", " · ").replace("_", " ")
 
 
@@ -1188,6 +1732,48 @@ def _fact_card(
                 _metric("Image-axis angle", f"{_format_number(angle, 3)}°"),
             )
         )
+    image_y_vector = value.get("image_y_axis_vector_px_per_mm")
+    if (
+        "image_y_axis_vector_px_per_mm" in coordinate_fields
+        and isinstance(image_y_vector, list)
+        and len(image_y_vector) == 2
+    ):
+        image_y_scale = math.hypot(float(image_y_vector[0]), float(image_y_vector[1]))
+        metrics.extend(
+            (
+                _metric(
+                    "Image Y-axis vector",
+                    (
+                        f"[{_format_number(image_y_vector[0])}, "
+                        f"{_format_number(image_y_vector[1])}] px/mm"
+                    ),
+                ),
+                _metric(
+                    "Image Y scale",
+                    f"{_format_number(image_y_scale)} px/mm",
+                ),
+            )
+        )
+    coordinate_metric_specs = (
+        ("xyz_mm", "Printer XYZ prior", "mm"),
+        ("corner_pixel_xy_px", "Corner pixel XY", "px"),
+        ("corner_printer_xyz_mm", "Corner printer XYZ", "mm"),
+        ("z_offset_mm", "Z offset", "mm"),
+        ("tab_to_print_plane_z_mm", "Tab to print-plane Z", "mm"),
+    )
+    for field, label, unit in coordinate_metric_specs:
+        if field not in coordinate_fields or field not in value:
+            continue
+        metric_value = value[field]
+        if isinstance(metric_value, list):
+            rendered = (
+                "["
+                + ", ".join(_format_number(component, 4) for component in metric_value)
+                + "]"
+            )
+        else:
+            rendered = _format_number(metric_value, 4)
+        metrics.append(_metric(label, f"{rendered} {unit}"))
     if not overview:
         fit_px = quality.get("joint_residual_rms_px")
         fit_mm = quality.get("joint_residual_rms_mm")
@@ -1234,6 +1820,28 @@ def _fact_card(
                     (
                         f"{usable_frames if usable_frames is not None else 'unavailable'} "
                         f"frames / {_format_number(commanded_span, 1)} mm"
+                    ),
+                )
+            )
+        if quality.get("repeatability_rms_px") is not None:
+            metrics.append(
+                _metric(
+                    "Corner repeatability",
+                    (
+                        f"{_format_number(quality.get('repeatability_rms_px'), 3)} "
+                        "px RMS / "
+                        f"{_format_number(quality.get('repeatability_max_px'), 3)} "
+                        "px maximum"
+                    ),
+                )
+            )
+        if quality.get("line_confirmation_count") is not None:
+            metrics.append(
+                _metric(
+                    "Corner duplicates",
+                    (
+                        f"{quality.get('usable_frame_count')} usable / "
+                        f"{quality.get('line_confirmation_count')} line-confirmed"
                     ),
                 )
             )
@@ -1302,6 +1910,21 @@ def _fact_card(
         "<strong>Diagnostic fields:</strong> "
         f"{html.escape(', '.join(diagnostic_fields) or 'none')}</p>"
     )
+    if head.get("source_kind") == "seed":
+        fact_set_link = "../" + str(head["fact_set_path"])
+        actions = (
+            '<div class="fact-actions">'
+            f'<a href="{html.escape(fact_set_link)}">Seed fact-set JSON</a>'
+            "</div>"
+        )
+    else:
+        actions = (
+            '<div class="fact-actions">'
+            f'<a href="{html.escape(source_base)}/">Source analysis</a>'
+            f'<a href="{html.escape(source_base)}/fact_set.json">Fact-set JSON</a>'
+            f'<a href="{html.escape(source_base)}/report.md">Analysis report</a>'
+            "</div>"
+        )
     return (
         '<article class="fact-card">'
         f"<h3>{html.escape(_fact_title(name))} "
@@ -1310,11 +1933,7 @@ def _fact_card(
         f'<dl class="fact-metrics">{"".join(metrics)}</dl>'
         f"{declarations}"
         f"{warning_html}"
-        '<div class="fact-actions">'
-        f'<a href="{html.escape(source_base)}/">Source analysis</a>'
-        f'<a href="{html.escape(source_base)}/fact_set.json">Fact-set JSON</a>'
-        f'<a href="{html.escape(source_base)}/report.md">Analysis report</a>'
-        "</div>"
+        f"{actions}"
         '<p class="fact-meta">'
         f"Definition v{html.escape(str(fact.get('definition_version', 'unavailable')))}"
         f" · Published {published}<br>"
@@ -1357,16 +1976,17 @@ def render_ui(catalog: dict[str, Any]) -> None:
             report_facts.append(missing)
             continue
         fact_set, fact = loaded
-        dashboard_facts.append(
-            _fact_card(
-                name,
-                head,
-                fact_set,
-                fact,
-                source_prefix="calibration/jobs",
-                overview=True,
+        if fact.get("role") == "coordinate_system":
+            dashboard_facts.append(
+                _fact_card(
+                    name,
+                    head,
+                    fact_set,
+                    fact,
+                    source_prefix="calibration/jobs",
+                    overview=True,
+                )
             )
-        )
         report_facts.append(
             _fact_card(
                 name,
@@ -1420,7 +2040,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     for command in ("prepare", "run"):
         subparser = subparsers.add_parser(command)
-        subparser.add_argument("job_type", choices=[JOB_TYPE])
+        subparser.add_argument("job_type", choices=JOB_TYPES)
         subparser.add_argument("--name", default="bed_tab_y_scale")
         subparser.add_argument("--expected-fingerprint")
         if command == "run":
@@ -1431,16 +2051,20 @@ def main(argv: list[str] | None = None) -> int:
     publish_parser.add_argument("job_id")
     publish_parser.add_argument("analysis_run_id")
     subparsers.add_parser("rebuild-catalog")
+    subparsers.add_parser("sync-priors")
     args = parser.parse_args(argv)
 
     try:
         if args.command == "prepare":
             result = prepare_job(
-                args.name, expected_fingerprint=args.expected_fingerprint
+                args.name,
+                job_type=args.job_type,
+                expected_fingerprint=args.expected_fingerprint,
             )
         elif args.command == "run":
             result = run_job(
                 args.name,
+                job_type=args.job_type,
                 expected_fingerprint=args.expected_fingerprint,
                 timeout=args.timeout,
             )
@@ -1451,6 +2075,8 @@ def main(argv: list[str] | None = None) -> int:
                 CALIBRATION_ROOT, args.job_id, args.analysis_run_id
             )
             rebuild_and_render()
+        elif args.command == "sync-priors":
+            result = sync_seed_facts()
         else:
             result = rebuild_and_render()
         print(json.dumps(result, indent=2, sort_keys=True))
