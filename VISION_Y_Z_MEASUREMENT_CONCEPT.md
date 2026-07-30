@@ -1,5 +1,12 @@
 # IDEX Nozzle Y/Z Vision Measurement Concept
 
+> Historical note: this one-run measurement concept is superseded for new
+> implementation by `VISION_CALIBRATION_GRAPH_CONCEPT.md`. The newer design
+> establishes the bed-tab reference first, applies and verifies rough X, then
+> runs a fine X/Z registration grid with explicit fact dependencies. This
+> document remains useful as background for the earlier parallax experiments
+> and acceptance metrics.
+
 This document describes a new nozzle-camera measurement job for deriving the
 relative Z height of the T0 and T1 nozzle tips, and their height relative to the
 visible print-bed feature plane. It is intended to build on the current

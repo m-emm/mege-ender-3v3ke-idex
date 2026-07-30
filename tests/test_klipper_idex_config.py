@@ -1,5 +1,6 @@
-import json
 import importlib.util
+import configparser
+import json
 import re
 import sys
 from datetime import datetime
@@ -79,9 +80,9 @@ def test_image_waits_for_wlan_ipv4_before_printer_usb_consumers():
         / "scripts"
         / "render_overlay.sh"
     ).read_text(encoding="utf-8")
-    ready_service = (
-        IMAGE_BUILD_FILES_DIR / "menderpi-wlan-ready.service"
-    ).read_text(encoding="utf-8")
+    ready_service = (IMAGE_BUILD_FILES_DIR / "menderpi-wlan-ready.service").read_text(
+        encoding="utf-8"
+    )
     ready_script = (IMAGE_BUILD_FILES_DIR / "menderpi-wlan-ready.sh").read_text(
         encoding="utf-8"
     )
@@ -108,6 +109,7 @@ def test_image_waits_for_wlan_ipv4_before_printer_usb_consumers():
     assert "autoconnect-retries=4" in overlay_renderer
     assert "wait-device-timeout=60000" in overlay_renderer
     assert "may-fail=false" in overlay_renderer
+
 
 SYNTHETIC_CALIBRATION_YAML = """\
 bed_grid_zero:
@@ -277,6 +279,103 @@ def test_printer_cfg_includes_generated_fingerprint_macro():
     assert f'variable_source_sha256: "{fingerprint}"' in fingerprint_section
 
 
+def test_eddy_probe_geometry_and_visualization_mesh_are_generated_from_calib():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    probe = _section(config_text, "probe_eddy_current btt_eddy")
+    mesh = _section(config_text, "bed_mesh")
+
+    assert _setting_float(probe, "x_offset") == pytest.approx(-8.18)
+    assert _setting_float(probe, "y_offset") == pytest.approx(9.0)
+    assert _setting_float(probe, "descend_z") == pytest.approx(0.5)
+    assert "reg_drive_current:" not in probe
+    assert "calibrate:" not in probe
+    assert _setting_value(mesh, "mesh_min") == "37.500,37.500"
+    assert _setting_value(mesh, "mesh_max") == "197.500,197.500"
+    assert _setting_value(mesh, "probe_count") == "5,5"
+    assert _setting_value(mesh, "mesh_pps") == "0,0"
+    assert _setting_float(mesh, "horizontal_move_z") == pytest.approx(5.0)
+    assert _setting_value(mesh, "zero_reference_position") == "117.500,117.500"
+
+
+def test_eddy_klipper_calibration_curve_round_trips_exactly():
+    generator = _load_generator_module()
+    pairs = [
+        f"{index / 10:.6f}:{1_350_000.125 - index * 1234.5:.3f}" for index in range(12)
+    ]
+    curve = "\n" + ",\n".join(
+        ",".join(pairs[index : index + 3]) for index in range(0, len(pairs), 3)
+    )
+    eddy = generator._load_eddy_relative_calibration(
+        {
+            "eddy_relative_calibration": {
+                "bed_center": {"x": 117.5, "y": 117.5},
+                "nozzle_to_coil": {"x": -8.18, "y": 9.0, "z": 2.5},
+                "klipper": {
+                    "reg_drive_current": 15,
+                    "calibrate": curve,
+                    "capture": {
+                        "status": "accepted",
+                        "captured_at_utc": "2026-07-29T00:00:00Z",
+                        "method": "consistent_paper_pinch",
+                    },
+                },
+            }
+        }
+    )
+    calibration = {
+        "bed_grid_zero": {"x": 113.3, "y": 107.0},
+        "tools": {
+            "t0": {
+                "x_endstop": -80.4,
+                "y_endstop": -14.8,
+                "z_endstop": 293.75,
+            },
+            "t1": {
+                "x_endstop": 357.532,
+                "y_endstop": -15.82,
+                "z_endstop": 293.65,
+            },
+        },
+        "eddy_relative": eddy,
+        "nozzle_cam": None,
+    }
+
+    values = generator.template_values(calibration, "a" * 64)
+
+    rendered = values["eddy_klipper_calibration"]
+    assert rendered == (
+        "reg_drive_current: 15\ncalibrate:\n"
+        + "\n".join(f"    {line}" for line in curve.split("\n")[1:])
+    )
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.read_string(f"[probe_eddy_current btt_eddy]\n{rendered}\n")
+    assert parser["probe_eddy_current btt_eddy"]["calibrate"] == curve
+    assert eddy["calibrate"] == curve
+    assert eddy["capture"]["method"] == "consistent_paper_pinch"
+
+
+def test_cold_eddy_z_diagnostic_macro_contains_all_safety_guards():
+    macro = _section(
+        CONFIG_PATH.read_text(encoding="utf-8"),
+        "gcode_macro IDEX_EDDY_Z_DIAGNOSTIC_COLD",
+    )
+
+    assert 'print_state not in ["standby", "complete"]' in macro
+    assert '"x" not in homed or "y" not in homed or "z" not in homed' in macro
+    assert "heater_bed.target|float != 0.0" in macro
+    assert "extruder.target|float != 0.0" in macro
+    assert "extruder1.target|float != 0.0" in macro
+    assert "heater_bed.temperature|float > 35.0" in macro
+    assert "configfile.save_config_pending" in macro
+    assert "eddy.reg_drive_current is not defined" in macro
+    assert "eddy.reg_drive_current is none" in macro
+    assert "eddy.calibrate is not defined" in macro
+    assert "eddy.calibrate is none" in macro
+    assert '"idex_eddy_z_diagnostic_cold"' in macro
+    assert "active_config_fingerprint=fingerprint" in macro
+    assert re.search(r"^\s*SAVE_CONFIG\s*$", macro, flags=re.MULTILINE) is None
+
+
 def test_printer_motion_limits_match_proven_idex_axes():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     printer = _section(config_text, "printer")
@@ -395,6 +494,9 @@ def test_vision_capture_macro_and_host_files_exist():
     nozzle_script = (IMAGE_BUILD_FILES_DIR / "vision_nozzle_align.py").read_text(
         encoding="utf-8"
     )
+    eddy_z_diagnostic_script = (
+        IMAGE_BUILD_FILES_DIR / "eddy_z_diagnostic.py"
+    ).read_text(encoding="utf-8")
     runner_script = (IMAGE_BUILD_FILES_DIR / "vision_runner.py").read_text(
         encoding="utf-8"
     )
@@ -403,7 +505,7 @@ def test_vision_capture_macro_and_host_files_exist():
     )
 
     assert "socket_path: /run/vision-capture-nozzle_cam/visiond.sock" in vision_section
-    assert "timeout: 20.0" in vision_section
+    assert "timeout: 45.0" in vision_section
     assert "bed_y_calibrated:" in vision_section
     assert "[vision]" in template_text
     assert 'action_call_remote_method("vision_capture"' in macro
@@ -541,6 +643,9 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "run_idex_nozzle_vision_sweep" in capture_script
     assert "run_idex_bed_y_vision_sweep" in capture_script
     assert "run_idex_nozzle_z_vision_sweep" in capture_script
+    assert "idex_eddy_z_diagnostic_cold" in capture_script
+    assert "run_idex_eddy_z_diagnostic_cold" in capture_script
+    assert "eddy_z_diagnostic.py" in capture_script
     assert "vision_nozzle_align.py" in capture_script
     assert '"--sweep"' in capture_script
     assert '"--run-bed-y-job"' in capture_script
@@ -611,6 +716,12 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "IDEX nozzle sweep report" in nozzle_script
     assert "offsets_applied" in nozzle_script
     assert "IDEX_SET_TOOL_OFFSET" not in nozzle_script
+    assert "stage_and_run_eddy_sweep" in eddy_z_diagnostic_script
+    assert "BED_MESH_CLEAR" in eddy_z_diagnostic_script
+    assert "BED_MESH_CALIBRATE" in eddy_z_diagnostic_script
+    assert 'run_gcode(args.moonraker_url, "SAVE_CONFIG"' not in (
+        eddy_z_diagnostic_script
+    )
     helper = NOZZLE_VISION_CALIBRATION_PATH.read_text(encoding="utf-8")
     assert "old_x + along_x_mm" in helper
     assert "new_y_offset = current_y_offset - perpendicular_mm" in helper
@@ -652,6 +763,8 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "vision-capture-nozzle-cam.service" in image_install
     assert "nozzle_cam_profiles.json" in image_install
     assert "vision_nozzle_align.py" in image_install
+    assert "eddy_relative_calibration.py" in image_install
+    assert "eddy_z_diagnostic.py" in image_install
     assert "vision_bed_y.py" in image_install
     assert "vision_framebuffer.py" in live_deploy
     assert "vision-framebuffer.service" in live_deploy
@@ -659,6 +772,8 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "vision-capture-nozzle-cam.service" in live_deploy
     assert "nozzle_cam_profiles.json" in live_deploy
     assert "vision_nozzle_align.py" in live_deploy
+    assert "eddy_relative_calibration.py" in live_deploy
+    assert "eddy_z_diagnostic.py" in live_deploy
     assert "vision_bed_y.py" in live_deploy
     assert "vision_nozzle_align.py --refresh-ui" in live_deploy
     assert "SOURCE_VISION" in live_klipper_deploy
@@ -681,12 +796,17 @@ def test_vision_capture_macro_and_host_files_exist():
     assert "--state-url http://127.0.0.1:8081/state" in live_deploy
     assert '"target_fps": "1"' in live_deploy
 
-    assert nozzle_profiles["aliases"] == {
+    assert {
         "analysis": "nozzle_cam_analysis",
         "auto": "nozzle_cam_auto",
         "baseline": "nozzle_cam_baseline",
         "vision": "nozzle_cam_vision",
-    }
+    }.items() <= nozzle_profiles["aliases"].items()
+    for exposure in (600, 900, 1200, 1800, 2600, 3600, 5000):
+        assert (
+            nozzle_profiles["aliases"][f"eddy_exp_{exposure}"]
+            == f"nozzle_cam_eddy_exp_{exposure}"
+        )
     profile_controls = {
         name: {control["name"]: control["value"] for control in profile["controls"]}
         for name, profile in nozzle_profiles["profiles"].items()

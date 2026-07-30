@@ -75,6 +75,12 @@ NOZZLE_Z_REMOTE_METHOD = "idex_nozzle_z_vision_sweep"
 NOZZLE_Z_REMOTE_ACTION = "run_idex_nozzle_z_vision_sweep"
 EDDY_RELATIVE_REMOTE_METHOD = "idex_eddy_relative_calibrate_cold"
 EDDY_RELATIVE_REMOTE_ACTION = "run_idex_eddy_relative_calibrate_cold"
+ROUGH_RELATIVE_REMOTE_METHOD = "idex_nozzle_rough_calibrate"
+ROUGH_RELATIVE_REMOTE_ACTION = "run_idex_nozzle_rough_calibrate"
+EDDY_LIGHT_REMOTE_METHOD = "idex_eddy_vision_light_sweep"
+EDDY_LIGHT_REMOTE_ACTION = "run_idex_eddy_vision_light_sweep"
+EDDY_Z_DIAGNOSTIC_REMOTE_METHOD = "idex_eddy_z_diagnostic_cold"
+EDDY_Z_DIAGNOSTIC_REMOTE_ACTION = "run_idex_eddy_z_diagnostic_cold"
 NOZZLE_PROFILE_REMOTE_METHOD = os.environ.get(
     "VISION_PROFILE_REMOTE_METHOD", "nozzle_cam_profile"
 )
@@ -83,6 +89,9 @@ NOZZLE_PROFILE_REMOTE_ACTION = os.environ.get(
 )
 NOZZLE_ALIGN_BIN = os.environ.get(
     "VISION_NOZZLE_ALIGN_BIN", "/usr/local/bin/vision_nozzle_align.py"
+)
+EDDY_Z_DIAGNOSTIC_BIN = os.environ.get(
+    "VISION_EDDY_Z_DIAGNOSTIC_BIN", "/usr/local/bin/eddy_z_diagnostic.py"
 )
 CAPTURE_RESOLUTIONS = ((1920, 1080), (1280, 720))
 DEFAULT_CAPTURE_RETRIES = int(os.environ.get("VISION_CAPTURE_RETRIES", "3"))
@@ -221,8 +230,15 @@ def start_service(service: str, *, wait_for_webcam: bool = False) -> dict[str, A
 
 def verify_jpeg(path: Path) -> None:
     data = path.read_bytes()
-    if len(data) < 4 or data[:2] != b"\xff\xd8":
+    if (
+        len(data) < 4
+        or data[:2] != b"\xff\xd8"
+        or data[-2:] != b"\xff\xd9"
+    ):
         raise CaptureError(f"{path} is not a JPEG frame")
+    width, height = jpeg_dimensions(path)
+    if not width or not height:
+        raise CaptureError(f"{path} has no decodable JPEG dimensions")
 
 
 def jpeg_dimensions(path: Path) -> tuple[int | None, int | None]:
@@ -1946,6 +1962,12 @@ class KlippyRemoteCaptureDaemon:
                     self._run_nozzle_z_sweep(params)
                 elif job_kind == EDDY_RELATIVE_REMOTE_ACTION:
                     self._run_eddy_relative_calibration(params)
+                elif job_kind == ROUGH_RELATIVE_REMOTE_ACTION:
+                    self._run_rough_relative_calibration(params)
+                elif job_kind == EDDY_LIGHT_REMOTE_ACTION:
+                    self._run_eddy_lighting_sweep(params)
+                elif job_kind == EDDY_Z_DIAGNOSTIC_REMOTE_ACTION:
+                    self._run_eddy_z_diagnostic(params)
                 elif job_kind == NOZZLE_PROFILE_REMOTE_ACTION:
                     self._request_nozzle_profile(params)
                 else:
@@ -2089,6 +2111,111 @@ class KlippyRemoteCaptureDaemon:
                 or "Eddy relative calibration failed"
             )
 
+    def _run_rough_relative_calibration(self, params: dict[str, Any]) -> None:
+        command = [
+            NOZZLE_ALIGN_BIN,
+            "--run-rough-relative-job",
+            "--name",
+            sanitize_name(params.get("name", "rough_relative")),
+            "--mode",
+            str(params.get("mode", "MEASURE")).upper(),
+            "--t0-anchor-x",
+            str(float(params.get("t0_anchor_x", 185.0))),
+            "--t1-anchor-x",
+            str(float(params.get("t1_anchor_x", 195.0))),
+            "--anchor-y",
+            str(float(params.get("anchor_y", -14.0))),
+            "--anchor-z",
+            str(float(params.get("anchor_z", 3.0))),
+            "--rough-travel-z",
+            str(float(params.get("travel_z", 5.0))),
+            "--current-t1-x-endstop",
+            str(float(params.get("current_t1_x_endstop", 357.532))),
+            "--current-t1-y-endstop",
+            str(float(params.get("current_t1_y_endstop", -15.820))),
+            "--current-t1-z-endstop",
+            str(float(params.get("current_t1_z_endstop", 293.650))),
+            "--active-config-fingerprint",
+            str(params.get("active_config_fingerprint", "")),
+            "--monitor-timeout",
+            "1200",
+            "--no-manage-crowsnest",
+        ]
+        result = run_command(command, timeout=1800)
+        if result.stdout.strip():
+            log(f"Rough relative calibration result: {result.stdout.strip()}")
+        if result.stderr.strip():
+            log(f"Rough relative calibration stderr: {result.stderr.strip()}")
+        if result.returncode != 0:
+            raise CaptureError(
+                result.stderr.strip()
+                or result.stdout.strip()
+                or "rough relative calibration failed"
+            )
+
+    def _run_eddy_lighting_sweep(self, params: dict[str, Any]) -> None:
+        command = [
+            NOZZLE_ALIGN_BIN,
+            "--run-eddy-lighting-job",
+            "--name",
+            sanitize_name(params.get("name", "eddy_lighting")),
+            "--eddy-anchor-x",
+            str(float(params.get("eddy_anchor_x", 230.0))),
+            "--eddy-anchor-y",
+            str(float(params.get("eddy_anchor_y", -14.0))),
+            "--eddy-anchor-z",
+            str(float(params.get("eddy_anchor_z", 3.0))),
+            "--active-config-fingerprint",
+            str(params.get("active_config_fingerprint", "")),
+            "--monitor-timeout",
+            "900",
+            "--no-manage-crowsnest",
+        ]
+        result = run_command(command, timeout=2400)
+        if result.stdout.strip():
+            log(f"Eddy lighting sweep result: {result.stdout.strip()}")
+        if result.stderr.strip():
+            log(f"Eddy lighting sweep stderr: {result.stderr.strip()}")
+        if result.returncode != 0:
+            raise CaptureError(
+                result.stderr.strip()
+                or result.stdout.strip()
+                or "Eddy lighting sweep failed"
+            )
+
+    def _run_eddy_z_diagnostic(self, params: dict[str, Any]) -> None:
+        command = [
+            EDDY_Z_DIAGNOSTIC_BIN,
+            "--run-job",
+            "--name",
+            sanitize_name(params.get("name", "post_rebuild_baseline")),
+            "--bed-center-x",
+            str(float(params.get("bed_center_x", 117.5))),
+            "--bed-center-y",
+            str(float(params.get("bed_center_y", 117.5))),
+            "--nozzle-to-coil-x",
+            str(float(params.get("nozzle_to_coil_x", -8.18))),
+            "--nozzle-to-coil-y",
+            str(float(params.get("nozzle_to_coil_y", 9.0))),
+            "--nozzle-to-coil-z",
+            str(float(params.get("nozzle_to_coil_z", 2.5))),
+            "--active-config-fingerprint",
+            str(params.get("active_config_fingerprint", "")),
+            "--eddy-monitor-timeout",
+            "1800",
+        ]
+        result = run_command(command, timeout=2400)
+        if result.stdout.strip():
+            log(f"Eddy Z diagnostic result: {result.stdout.strip()}")
+        if result.stderr.strip():
+            log(f"Eddy Z diagnostic stderr: {result.stderr.strip()}")
+        if result.returncode != 0:
+            raise CaptureError(
+                result.stderr.strip()
+                or result.stdout.strip()
+                or "Eddy Z diagnostic failed"
+            )
+
     def _request_nozzle_profile(self, params: dict[str, Any]) -> None:
         profile = sanitize_profile(params.get("profile") or DEFAULT_CAMERA_PROFILE)
         if not profile:
@@ -2135,6 +2262,17 @@ class KlippyRemoteCaptureDaemon:
                 sock, EDDY_RELATIVE_REMOTE_METHOD, EDDY_RELATIVE_REMOTE_ACTION
             )
             self._register_remote_method(
+                sock, ROUGH_RELATIVE_REMOTE_METHOD, ROUGH_RELATIVE_REMOTE_ACTION
+            )
+            self._register_remote_method(
+                sock, EDDY_LIGHT_REMOTE_METHOD, EDDY_LIGHT_REMOTE_ACTION
+            )
+            self._register_remote_method(
+                sock,
+                EDDY_Z_DIAGNOSTIC_REMOTE_METHOD,
+                EDDY_Z_DIAGNOSTIC_REMOTE_ACTION,
+            )
+            self._register_remote_method(
                 sock, NOZZLE_PROFILE_REMOTE_METHOD, NOZZLE_PROFILE_REMOTE_ACTION
             )
 
@@ -2148,6 +2286,9 @@ class KlippyRemoteCaptureDaemon:
                     BED_Y_REMOTE_ACTION,
                     NOZZLE_Z_REMOTE_ACTION,
                     EDDY_RELATIVE_REMOTE_ACTION,
+                    ROUGH_RELATIVE_REMOTE_ACTION,
+                    EDDY_LIGHT_REMOTE_ACTION,
+                    EDDY_Z_DIAGNOSTIC_REMOTE_ACTION,
                     NOZZLE_PROFILE_REMOTE_ACTION,
                 )
             )

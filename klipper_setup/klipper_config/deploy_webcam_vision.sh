@@ -17,7 +17,9 @@ required_files=(
   vision_capture.py
   vision_bed_y.py
   vision_nozzle_align.py
+  vision_rough_calibration.py
   eddy_relative_calibration.py
+  eddy_z_diagnostic.py
   vision_runner.py
   webcam_health_probe.py
   nozzle_cam_profiles.json
@@ -33,6 +35,10 @@ for file in "${required_files[@]}"; do
     exit 1
   fi
 done
+if [[ ! -f "${SCRIPT_DIR}/calib.yaml" ]]; then
+  echo "Missing required file: ${SCRIPT_DIR}/calib.yaml" >&2
+  exit 1
+fi
 
 echo "Checking cameras on ${REMOTE_HOST}:"
 echo "  primary: ${PRIMARY_CAMERA_DEVICE}"
@@ -70,7 +76,9 @@ scp \
   "${FILES_DIR}/vision_capture.py" \
   "${FILES_DIR}/vision_bed_y.py" \
   "${FILES_DIR}/vision_nozzle_align.py" \
+  "${FILES_DIR}/vision_rough_calibration.py" \
   "${FILES_DIR}/eddy_relative_calibration.py" \
+  "${FILES_DIR}/eddy_z_diagnostic.py" \
   "${FILES_DIR}/vision_runner.py" \
   "${FILES_DIR}/webcam_health_probe.py" \
   "${FILES_DIR}/nozzle_cam_profiles.json" \
@@ -78,6 +86,7 @@ scp \
   "${FILES_DIR}/vision-framebuffer-nozzle-cam.service" \
   "${FILES_DIR}/vision-capture.service" \
   "${FILES_DIR}/vision-capture-nozzle-cam.service" \
+  "${SCRIPT_DIR}/calib.yaml" \
   "${REMOTE_HOST}:${remote_tmp}/"
 
 ssh "${REMOTE_HOST}" \
@@ -136,10 +145,13 @@ sudo install -m 0755 "${REMOTE_TMP}/vision_framebuffer.py" /usr/local/bin/vision
 sudo install -m 0755 "${REMOTE_TMP}/vision_capture.py" /usr/local/bin/vision_capture.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_bed_y.py" /usr/local/bin/vision_bed_y.py
 sudo install -m 0755 "${REMOTE_TMP}/vision_nozzle_align.py" /usr/local/bin/vision_nozzle_align.py
+sudo install -m 0644 "${REMOTE_TMP}/vision_rough_calibration.py" /usr/local/bin/vision_rough_calibration.py
 sudo install -m 0644 "${REMOTE_TMP}/eddy_relative_calibration.py" /usr/local/bin/eddy_relative_calibration.py
+sudo install -m 0755 "${REMOTE_TMP}/eddy_z_diagnostic.py" /usr/local/bin/eddy_z_diagnostic.py
 sudo install -m 0755 "${REMOTE_TMP}/vision_runner.py" /usr/local/bin/vision_runner.py
 sudo install -m 0755 "${REMOTE_TMP}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py
 sudo install -m 0644 "${REMOTE_TMP}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json
+sudo install -m 0644 "${REMOTE_TMP}/calib.yaml" /usr/local/share/vision/calib.yaml
 sudo install -m 0644 "${REMOTE_TMP}/vision-framebuffer.service" /etc/systemd/system/vision-framebuffer.service
 sudo install -m 0644 "${REMOTE_TMP}/vision-framebuffer-nozzle-cam.service" /etc/systemd/system/vision-framebuffer-nozzle-cam.service
 sudo install -m 0644 "${REMOTE_TMP}/vision-capture.service" /etc/systemd/system/vision-capture.service
@@ -147,6 +159,7 @@ sudo install -m 0644 "${REMOTE_TMP}/vision-capture-nozzle-cam.service" /etc/syst
 sudo usermod -a -G video "${USERNAME}" || true
 sudo rm -f /run/vision-preview/profile_request.json \
   /run/vision-preview-nozzle_cam/profile_request.json
+sudo chown -R "${USERNAME}:${USERNAME}" "${VISION_DIR}"
 
 echo "Restarting services..."
 sudo systemctl daemon-reload

@@ -3,7 +3,14 @@
     "auto": "nozzle_cam_auto",
     "baseline": "nozzle_cam_baseline",
     "analysis": "nozzle_cam_analysis",
-    "vision": "nozzle_cam_vision"
+    "vision": "nozzle_cam_vision",
+    "eddy_exp_600": "nozzle_cam_eddy_exp_600",
+    "eddy_exp_900": "nozzle_cam_eddy_exp_900",
+    "eddy_exp_1200": "nozzle_cam_eddy_exp_1200",
+    "eddy_exp_1800": "nozzle_cam_eddy_exp_1800",
+    "eddy_exp_2600": "nozzle_cam_eddy_exp_2600",
+    "eddy_exp_3600": "nozzle_cam_eddy_exp_3600",
+    "eddy_exp_5000": "nozzle_cam_eddy_exp_5000"
   },
   "profiles": {
     "nozzle_cam_auto": {
@@ -51,6 +58,118 @@
         {"name": "sharpness", "value": 7}
       ],
       "description": "Default nozzle analysis profile for the tuned 8-pixel ring light."
+    },
+    "nozzle_cam_eddy_exp_600": {
+      "controls": [
+        {"name": "auto_exposure", "value": 1},
+        {"name": "exposure_time_absolute", "value": 600},
+        {"name": "white_balance_automatic", "value": 0},
+        {"name": "white_balance_temperature", "value": 6500},
+        {"name": "power_line_frequency", "value": 1},
+        {"name": "brightness", "value": 0},
+        {"name": "contrast", "value": 12},
+        {"name": "saturation", "value": 9},
+        {"name": "hue", "value": 0},
+        {"name": "gamma", "value": 188},
+        {"name": "sharpness", "value": 7}
+      ],
+      "description": "Fixed manual Eddy fiducial exposure bracket: 600."
+    },
+    "nozzle_cam_eddy_exp_900": {
+      "controls": [
+        {"name": "auto_exposure", "value": 1},
+        {"name": "exposure_time_absolute", "value": 900},
+        {"name": "white_balance_automatic", "value": 0},
+        {"name": "white_balance_temperature", "value": 6500},
+        {"name": "power_line_frequency", "value": 1},
+        {"name": "brightness", "value": 0},
+        {"name": "contrast", "value": 12},
+        {"name": "saturation", "value": 9},
+        {"name": "hue", "value": 0},
+        {"name": "gamma", "value": 188},
+        {"name": "sharpness", "value": 7}
+      ],
+      "description": "Fixed manual Eddy fiducial exposure bracket: 900."
+    },
+    "nozzle_cam_eddy_exp_1200": {
+      "controls": [
+        {"name": "auto_exposure", "value": 1},
+        {"name": "exposure_time_absolute", "value": 1200},
+        {"name": "white_balance_automatic", "value": 0},
+        {"name": "white_balance_temperature", "value": 6500},
+        {"name": "power_line_frequency", "value": 1},
+        {"name": "brightness", "value": 0},
+        {"name": "contrast", "value": 12},
+        {"name": "saturation", "value": 9},
+        {"name": "hue", "value": 0},
+        {"name": "gamma", "value": 188},
+        {"name": "sharpness", "value": 7}
+      ],
+      "description": "Fixed manual Eddy fiducial exposure bracket: 1200."
+    },
+    "nozzle_cam_eddy_exp_1800": {
+      "controls": [
+        {"name": "auto_exposure", "value": 1},
+        {"name": "exposure_time_absolute", "value": 1800},
+        {"name": "white_balance_automatic", "value": 0},
+        {"name": "white_balance_temperature", "value": 6500},
+        {"name": "power_line_frequency", "value": 1},
+        {"name": "brightness", "value": 0},
+        {"name": "contrast", "value": 12},
+        {"name": "saturation", "value": 9},
+        {"name": "hue", "value": 0},
+        {"name": "gamma", "value": 188},
+        {"name": "sharpness", "value": 7}
+      ],
+      "description": "Fixed manual Eddy fiducial exposure bracket: 1800."
+    },
+    "nozzle_cam_eddy_exp_2600": {
+      "controls": [
+        {"name": "auto_exposure", "value": 1},
+        {"name": "exposure_time_absolute", "value": 2600},
+        {"name": "white_balance_automatic", "value": 0},
+        {"name": "white_balance_temperature", "value": 6500},
+        {"name": "power_line_frequency", "value": 1},
+        {"name": "brightness", "value": 0},
+        {"name": "contrast", "value": 12},
+        {"name": "saturation", "value": 9},
+        {"name": "hue", "value": 0},
+        {"name": "gamma", "value": 188},
+        {"name": "sharpness", "value": 7}
+      ],
+      "description": "Fixed manual Eddy fiducial exposure bracket: 2600."
+    },
+    "nozzle_cam_eddy_exp_3600": {
+      "controls": [
+        {"name": "auto_exposure", "value": 1},
+        {"name": "exposure_time_absolute", "value": 3600},
+        {"name": "white_balance_automatic", "value": 0},
+        {"name": "white_balance_temperature", "value": 6500},
+        {"name": "power_line_frequency", "value": 1},
+        {"name": "brightness", "value": 0},
+        {"name": "contrast", "value": 12},
+        {"name": "saturation", "value": 9},
+        {"name": "hue", "value": 0},
+        {"name": "gamma", "value": 188},
+        {"name": "sharpness", "value": 7}
+      ],
+      "description": "Fixed manual Eddy fiducial exposure bracket: 3600."
+    },
+    "nozzle_cam_eddy_exp_5000": {
+      "controls": [
+        {"name": "auto_exposure", "value": 1},
+        {"name": "exposure_time_absolute", "value": 5000},
+        {"name": "white_balance_automatic", "value": 0},
+        {"name": "white_balance_temperature", "value": 6500},
+        {"name": "power_line_frequency", "value": 1},
+        {"name": "brightness", "value": 0},
+        {"name": "contrast", "value": 12},
+        {"name": "saturation", "value": 9},
+        {"name": "hue", "value": 0},
+        {"name": "gamma", "value": 188},
+        {"name": "sharpness", "value": 7}
+      ],
+      "description": "Fixed manual Eddy fiducial exposure bracket: 5000."
     },
     "nozzle_cam_vision": {
       "controls": [

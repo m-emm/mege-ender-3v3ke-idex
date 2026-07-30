@@ -38,6 +38,9 @@ TARGET_FPS = float(os.environ.get("VISION_FRAMEBUFFER_FPS", "1.0"))
 STREAM_FPS = float(os.environ.get("VISION_FRAMEBUFFER_STREAM_FPS", str(TARGET_FPS)))
 RING_SIZE = int(os.environ.get("VISION_FRAMEBUFFER_RING_SIZE", "30"))
 CAPTURE_TIMEOUT = float(os.environ.get("VISION_FRAMEBUFFER_CAPTURE_TIMEOUT", "8"))
+CAPTURE_RETRIES = max(
+    1, int(os.environ.get("VISION_FRAMEBUFFER_CAPTURE_RETRIES", "3"))
+)
 STALE_AFTER = float(os.environ.get("VISION_FRAMEBUFFER_STALE_AFTER", "5"))
 PUBLIC_SNAPSHOT_URL = os.environ.get(
     "VISION_FRAMEBUFFER_PUBLIC_SNAPSHOT_URL", "/webcam/?action=snapshot"
@@ -83,8 +86,15 @@ def run_command(command: list[str], *, timeout: float) -> subprocess.CompletedPr
 
 def verify_jpeg(path: Path) -> None:
     data = path.read_bytes()
-    if len(data) < 4 or data[:2] != b"\xff\xd8":
+    if (
+        len(data) < 4
+        or data[:2] != b"\xff\xd8"
+        or data[-2:] != b"\xff\xd9"
+    ):
         raise FramebufferError(f"{path} is not a JPEG frame")
+    width, height = jpeg_dimensions(path)
+    if not width or not height:
+        raise FramebufferError(f"{path} has no decodable JPEG dimensions")
 
 
 def jpeg_dimensions(path: Path) -> tuple[int | None, int | None]:
@@ -149,31 +159,55 @@ def set_mjpeg_format(device: str, width: int, height: int) -> dict[str, Any]:
 def capture_mjpeg_frame(
     device: str, path: Path, width: int, height: int
 ) -> dict[str, Any]:
-    result = run_command(
-        [
-            "v4l2-ctl",
-            "-d",
-            device,
-            "--stream-mmap",
-            "--stream-count=1",
-            f"--stream-to={path}",
-        ],
-        timeout=CAPTURE_TIMEOUT,
+    errors: list[str] = []
+    for attempt in range(1, CAPTURE_RETRIES + 1):
+        path.unlink(missing_ok=True)
+        try:
+            result = run_command(
+                [
+                    "v4l2-ctl",
+                    "-d",
+                    device,
+                    "--stream-mmap",
+                    "--stream-count=1",
+                    f"--stream-to={path}",
+                ],
+                timeout=CAPTURE_TIMEOUT,
+            )
+            if result.returncode != 0:
+                raise FramebufferError(
+                    result.stderr.strip()
+                    or result.stdout.strip()
+                    or "v4l2 capture failed"
+                )
+            verify_jpeg(path)
+            actual_width, actual_height = jpeg_dimensions(path)
+            if (actual_width, actual_height) != (width, height):
+                raise FramebufferError(
+                    "captured JPEG dimensions "
+                    f"{actual_width}x{actual_height} do not match "
+                    f"requested {width}x{height}"
+                )
+            return {
+                "requested_width": width,
+                "requested_height": height,
+                "width": actual_width,
+                "height": actual_height,
+                "stream_stdout": result.stdout.strip(),
+                "stream_stderr": result.stderr.strip(),
+                "capture_attempt": attempt,
+                "capture_retry_count": attempt - 1,
+                "capture_errors": errors,
+            }
+        except Exception as exc:
+            errors.append(str(exc))
+            path.unlink(missing_ok=True)
+            if attempt < CAPTURE_RETRIES:
+                time.sleep(0.1)
+    raise FramebufferError(
+        f"v4l2 capture failed after {CAPTURE_RETRIES} attempts: "
+        + "; ".join(errors)
     )
-    if result.returncode != 0:
-        raise FramebufferError(
-            result.stderr.strip() or result.stdout.strip() or "v4l2 capture failed"
-        )
-    verify_jpeg(path)
-    actual_width, actual_height = jpeg_dimensions(path)
-    return {
-        "requested_width": width,
-        "requested_height": height,
-        "width": actual_width,
-        "height": actual_height,
-        "stream_stdout": result.stdout.strip(),
-        "stream_stderr": result.stderr.strip(),
-    }
 
 
 class CameraProfileManager:
@@ -509,6 +543,11 @@ class CaptureThread(threading.Thread):
                     "ring_metadata_path": str(meta_path),
                     "latest_url": PUBLIC_SNAPSHOT_URL,
                     "capture_info": capture_info,
+                    "capture_attempt": capture_info.get("capture_attempt", 1),
+                    "capture_retry_count": capture_info.get(
+                        "capture_retry_count", 0
+                    ),
+                    "capture_errors": capture_info.get("capture_errors", []),
                     "camera_profile": camera_profile,
                 }
                 atomic_write_bytes(image_path, frame)

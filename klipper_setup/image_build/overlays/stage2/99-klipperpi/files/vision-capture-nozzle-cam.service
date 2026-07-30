@@ -5,6 +5,9 @@ Wants=klipper.service vision-framebuffer-nozzle-cam.service
 
 [Service]
 Type=simple
+User=pi
+Group=pi
+SupplementaryGroups=video
 RuntimeDirectory=vision-capture-nozzle_cam
 RuntimeDirectoryMode=0755
 Environment=VISION_CAMERA_DEVICE=/dev/v4l/by-id/usb-Vimicro_corp._PC-LM1E_Camera_PC-LM1E_Audio-video-index0
@@ -24,6 +27,7 @@ Environment=VISIOND_CAMERA=nozzle_cam
 Environment=VISIOND_SOCKET_ENABLED=1
 Environment=VISIOND_SOCKET=/run/vision-capture-nozzle_cam/visiond.sock
 Environment=VISION_JOB_ROOT=/home/pi/printer_data/vision/nozzle_cam/jobs
+Environment=VISIOND_SOCKET_REQUEST_TIMEOUT=40
 ExecStart=/usr/local/bin/vision_capture.py --daemon
 Restart=always
 RestartSec=5

@@ -20,12 +20,93 @@ eddy_relative_calibration:
     x: -8.180
     y: 9.000
     z: 2.500
+  klipper:
+    # Populate these from configfile.save_config_pending_items after the
+    # supervised commands. Never accept the generated SAVE_CONFIG footer.
+    reg_drive_current:
+    calibrate:
+    capture:
+      status: pending_manual_paper_calibration
+      method: consistent_paper_pinch
+      cold_only: true
+      drive_current:
+        chip: btt_eddy
+        coil_height_mm: 20.000
+        nozzle_command_position: {x: 125.680, y: 108.500, z: 17.500}
+      height_mapping:
+        chip: btt_eddy
+        nozzle_start_position: {x: 117.500, y: 117.500, z: 5.000}
+        required_usable_height_mm: 3.000
+      smoke_checks:
+        stationary_scan:
+          command: PROBE_ACCURACY METHOD=scan SAMPLES=50
+          result: pending
+        repeated_descent:
+          command: PROBE_ACCURACY SAMPLES=20 PROBE_SPEED=2 SAMPLE_RETRACT_DIST=1
+          result: pending
 cameras:
   nozzle_cam:
     image:
       width_px: 1920
       height_px: 1080
       profile: analysis
+    targets:
+      rough_nozzle:
+        fixed_manual: true
+        capture_pose:
+          t0: {x: 185.000, y: -14.000, z: 3.000}
+          t1: {x: 195.000, y: -14.000, z: 3.000}
+        profile: analysis
+        camera_controls:
+          auto_exposure: 1
+          exposure_time_absolute: 1200
+          white_balance_automatic: 0
+          white_balance_temperature: 6500
+        lighting:
+          type: dotstar
+          pixels:
+            1: 0.30
+            2: 0.08
+            3: 0.00
+            4: 0.00
+            5: 0.08
+            6: 0.30
+            7: 0.30
+            8: 0.30
+        quality:
+          accepted: false
+          status: rebuild_pending
+        provenance:
+          source: rough calibration rebuild anchors
+      eddy_fiducial:
+        fixed_manual: true
+        capture_pose:
+          tool: T0
+          x: 230.000
+          y: -14.000
+          z: 3.000
+        profile: analysis
+        camera_controls:
+          auto_exposure: 1
+          exposure_time_absolute: 1200
+          white_balance_automatic: 0
+          white_balance_temperature: 6500
+        lighting:
+          type: dotstar
+          pixels:
+            1: 0.00
+            2: 0.00
+            3: 0.00
+            4: 0.00
+            5: 0.00
+            6: 0.00
+            7: 0.00
+            8: 0.00
+        quality:
+          accepted: false
+          status: lighting_sweep_required
+        provenance:
+          source: post-mechanical-change diagnostic anchor
     printer_to_image:
       reference:
         printer_y_mm: -4.8

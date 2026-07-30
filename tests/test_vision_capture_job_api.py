@@ -32,11 +32,16 @@ def _load_module(path: Path, name: str):
 
 
 def _load_vision_capture(monkeypatch, tmp_path):
+    cv2 = pytest.importorskip("cv2")
+    np = pytest.importorskip("numpy")
     output_dir = tmp_path / "vision" / "nozzle_cam"
     framebuffer_dir = tmp_path / "framebuffer"
     profile_request = framebuffer_dir / "profile_request.json"
     framebuffer_dir.mkdir(parents=True)
-    (framebuffer_dir / "latest.jpg").write_bytes(b"\xff\xd8\xff\xd9")
+    assert cv2.imwrite(
+        str(framebuffer_dir / "latest.jpg"),
+        np.zeros((2, 2, 3), dtype=np.uint8),
+    )
     (framebuffer_dir / "latest.json").write_text(
         json.dumps(
             {

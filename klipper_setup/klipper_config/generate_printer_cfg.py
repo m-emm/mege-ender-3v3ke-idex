@@ -47,7 +47,15 @@ def _require_string(mapping: dict[str, Any], key: str, path: str) -> str:
     return value.strip()
 
 
-def _load_camera_calibration(data: dict[str, Any], calib_path: Path) -> dict[str, Any] | None:
+def _render_config_option(name: str, value: str) -> str:
+    lines = value.split("\n")
+    first = f"{name}: {lines[0]}" if lines[0] else f"{name}:"
+    return "\n".join([first, *(f"    {line}" for line in lines[1:])])
+
+
+def _load_camera_calibration(
+    data: dict[str, Any], calib_path: Path
+) -> dict[str, Any] | None:
     cameras = data.get("cameras")
     if cameras is None:
         return None
@@ -147,6 +155,9 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
         "nozzle_to_coil_x": -8.18,
         "nozzle_to_coil_y": 9.0,
         "nozzle_to_coil_z": 2.5,
+        "reg_drive_current": None,
+        "calibrate": None,
+        "capture": None,
     }
     value = data.get("eddy_relative_calibration")
     if value is None:
@@ -158,6 +169,54 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
     nozzle_to_coil = _require_mapping(
         value.get("nozzle_to_coil"), "eddy_relative_calibration.nozzle_to_coil"
     )
+    klipper = value.get("klipper")
+    reg_drive_current = None
+    calibrate = None
+    capture = None
+    if klipper is not None:
+        klipper = _require_mapping(klipper, "eddy_relative_calibration.klipper")
+        if klipper.get("capture") is not None:
+            capture = _require_mapping(
+                klipper["capture"],
+                "eddy_relative_calibration.klipper.capture",
+            )
+        if klipper.get("reg_drive_current") is not None:
+            try:
+                reg_drive_current = int(klipper["reg_drive_current"])
+            except (TypeError, ValueError):
+                raise ValueError(
+                    "eddy_relative_calibration.klipper.reg_drive_current "
+                    "must be an integer"
+                ) from None
+            if not 0 <= reg_drive_current <= 31:
+                raise ValueError(
+                    "eddy_relative_calibration.klipper.reg_drive_current "
+                    "must be between 0 and 31"
+                )
+        if klipper.get("calibrate") is not None:
+            calibrate_value = klipper.get("calibrate")
+            if not isinstance(calibrate_value, str) or not calibrate_value.strip():
+                raise ValueError(
+                    "eddy_relative_calibration.klipper.calibrate "
+                    "must be a non-empty string"
+                )
+            calibrate = calibrate_value
+            pairs = [item.strip() for item in calibrate.split(",") if item.strip()]
+            if len(pairs) < 9:
+                raise ValueError(
+                    "eddy_relative_calibration.klipper.calibrate must contain "
+                    "at least 9 height:frequency pairs"
+                )
+            for pair in pairs:
+                try:
+                    height, frequency = pair.split(":", 1)
+                    float(height)
+                    float(frequency)
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        "eddy_relative_calibration.klipper.calibrate contains "
+                        f"an invalid height:frequency pair: {pair!r}"
+                    ) from None
     return {
         "bed_center_x": _require_float(
             bed_center, "x", "eddy_relative_calibration.bed_center"
@@ -174,6 +233,9 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
         "nozzle_to_coil_z": _require_float(
             nozzle_to_coil, "z", "eddy_relative_calibration.nozzle_to_coil"
         ),
+        "reg_drive_current": reg_drive_current,
+        "calibrate": calibrate,
+        "capture": capture,
     }
 
 
@@ -320,6 +382,9 @@ def template_values(
         "nozzle_to_coil_x": -8.18,
         "nozzle_to_coil_y": 9.0,
         "nozzle_to_coil_z": 2.5,
+        "reg_drive_current": None,
+        "calibrate": None,
+        "capture": None,
     }
     if nozzle_cam is None:
         nozzle_cam = {
@@ -340,6 +405,16 @@ def template_values(
         bed_y_calibrated = "false"
     else:
         bed_y_calibrated = "true"
+
+    eddy_klipper_lines = []
+    if eddy_relative.get("reg_drive_current") is not None:
+        eddy_klipper_lines.append(
+            f"reg_drive_current: {int(eddy_relative['reg_drive_current'])}"
+        )
+    if eddy_relative.get("calibrate"):
+        eddy_klipper_lines.append(
+            _render_config_option("calibrate", eddy_relative["calibrate"])
+        )
 
     return {
         "bed_grid_zero_x": format_mm(bed_grid_zero["x"]),
@@ -375,6 +450,11 @@ def template_values(
         "eddy_nozzle_to_coil_x": format_mm(eddy_relative["nozzle_to_coil_x"]),
         "eddy_nozzle_to_coil_y": format_mm(eddy_relative["nozzle_to_coil_y"]),
         "eddy_nozzle_to_coil_z": format_mm(eddy_relative["nozzle_to_coil_z"]),
+        "eddy_klipper_calibration": "\n".join(eddy_klipper_lines),
+        "eddy_mesh_min_x": format_mm(eddy_relative["bed_center_x"] - 80.0),
+        "eddy_mesh_min_y": format_mm(eddy_relative["bed_center_y"] - 80.0),
+        "eddy_mesh_max_x": format_mm(eddy_relative["bed_center_x"] + 80.0),
+        "eddy_mesh_max_y": format_mm(eddy_relative["bed_center_y"] + 80.0),
     }
 
 

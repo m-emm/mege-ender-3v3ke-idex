@@ -6,6 +6,11 @@ Requires=menderpi-wlan-ready.service
 
 [Service]
 Type=simple
+User=pi
+Group=pi
+SupplementaryGroups=video
+RuntimeDirectory=vision-preview-nozzle_cam
+RuntimeDirectoryMode=0755
 Environment=VISION_CAMERA_DEVICE=/dev/v4l/by-id/usb-Vimicro_corp._PC-LM1E_Camera_PC-LM1E_Audio-video-index0
 Environment=VISION_FRAMEBUFFER_DIR=/run/vision-preview-nozzle_cam
 Environment=VISION_FRAMEBUFFER_PORT=8081
@@ -14,6 +19,7 @@ Environment=VISION_FRAMEBUFFER_SERVICE_NAME=vision-framebuffer-nozzle-cam
 Environment=VISION_CAMERA_PROFILE_FILE=/usr/local/share/vision/nozzle_cam_profiles.json
 Environment=VISION_CAMERA_DEFAULT_PROFILE=analysis
 Environment=VISION_CAMERA_PROFILE_REQUEST_FILE=/run/vision-preview-nozzle_cam/profile_request.json
+Environment=VISION_FRAMEBUFFER_CAPTURE_RETRIES=3
 ExecStart=/usr/local/bin/vision_framebuffer.py
 Restart=always
 RestartSec=2

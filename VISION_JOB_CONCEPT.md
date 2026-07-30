@@ -15,6 +15,10 @@ Mender IDEX vision stack:
 The goal of the new design is to separate fast, deterministic acquisition from
 slower orchestration and image analysis.
 
+The calibration-specific fact model, dependency graph, invalidation rules, and
+staged bed-tab/nozzle/Eddy workflow are specified separately in
+`VISION_CALIBRATION_GRAPH_CONCEPT.md`.
+
 ## Design Goal
 
 A vision measurement should have two phases:

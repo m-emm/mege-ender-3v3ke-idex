@@ -426,6 +426,9 @@ require_file "${FILES_DIR}/vision_framebuffer.py"
 require_file "${FILES_DIR}/vision_capture.py"
 require_file "${FILES_DIR}/vision_bed_y.py"
 require_file "${FILES_DIR}/vision_nozzle_align.py"
+require_file "${FILES_DIR}/vision_rough_calibration.py"
+require_file "${FILES_DIR}/eddy_relative_calibration.py"
+require_file "${FILES_DIR}/eddy_z_diagnostic.py"
 require_file "${FILES_DIR}/vision_runner.py"
 require_file "${FILES_DIR}/webcam_health_probe.py"
 require_file "${FILES_DIR}/nozzle_cam_profiles.json"
@@ -447,6 +450,9 @@ install -m 0755 "${FILES_DIR}/vision_framebuffer.py" /usr/local/bin/vision_frame
 install -m 0755 "${FILES_DIR}/vision_capture.py" /usr/local/bin/vision_capture.py
 install -m 0644 "${FILES_DIR}/vision_bed_y.py" /usr/local/bin/vision_bed_y.py
 install -m 0755 "${FILES_DIR}/vision_nozzle_align.py" /usr/local/bin/vision_nozzle_align.py
+install -m 0644 "${FILES_DIR}/vision_rough_calibration.py" /usr/local/bin/vision_rough_calibration.py
+install -m 0644 "${FILES_DIR}/eddy_relative_calibration.py" /usr/local/bin/eddy_relative_calibration.py
+install -m 0755 "${FILES_DIR}/eddy_z_diagnostic.py" /usr/local/bin/eddy_z_diagnostic.py
 install -m 0755 "${FILES_DIR}/vision_runner.py" /usr/local/bin/vision_runner.py
 install -m 0755 "${FILES_DIR}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py
 install -d -m 0755 /usr/local/share/vision

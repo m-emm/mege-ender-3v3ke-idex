@@ -548,3 +548,22 @@ def test_camera_scoped_output_dir_still_generates_root_index(monkeypatch, tmp_pa
     assert ui["index_url"] == "/vision/index.html"
     assert (root / "index.html").exists()
     assert (camera_root / "jobs" / "camera_scoped" / "index.html").exists()
+
+
+def test_root_index_aggregates_primary_and_nozzle_camera_jobs(monkeypatch, tmp_path):
+    module = _load_module()
+    root, nozzle_job_root = _configure_ui_paths(monkeypatch, module, tmp_path)
+    primary_job_root = root / "jobs"
+    _prepare_job(module, primary_job_root, job_id="primary_camera_job", dx="0")
+    _prepare_job(module, nozzle_job_root, job_id="nozzle_camera_job", dx="0")
+
+    ui = module.refresh_vision_ui(nozzle_job_root)
+
+    assert ui["job_count"] == 2
+    jobs = json.loads((root / "jobs.json").read_text(encoding="utf-8"))
+    assert {job["job_id"] for job in jobs["jobs"]} == {
+        "primary_camera_job",
+        "nozzle_camera_job",
+    }
+    assert (primary_job_root / "primary_camera_job" / "index.html").exists()
+    assert (nozzle_job_root / "nozzle_camera_job" / "index.html").exists()

@@ -1210,16 +1210,33 @@ process_data_presets:
         retract_lift_below: "0"
         retract_lift_enforce: "All Surfaces"
         wipe: "0"
-        travel_speed: "200"
-        travel_acceleration: "2000"
-        default_acceleration: "2000"
-        initial_layer_acceleration: "2000"
-        outer_wall_acceleration: "2000"
-        inner_wall_acceleration: "2000"
-        top_surface_acceleration: "2000"
-        internal_solid_infill_acceleration: "2000"
-        sparse_infill_acceleration: "2000"
-        bridge_acceleration: "2000"
+        machine_end_gcode: |-
+          G92 E0 ; Reset extruder
+          G1 E-1.2 F1200 ; Retract before lift and parking
+          G90 ; Absolute positioning
+          {if max_layer_z < printable_height}
+          G1 Z{min(max_layer_z+150, printable_height)} F480 ; Lift print clear, capped at Z max
+          {endif}
+          M106 S0 ;Turn-off fan
+          T0 ;Park right carriage, select and park left carriage
+          M104 S0 ;Turn-off left hotend
+          M140 S0 ;Turn-off bed
+
+          M84 X Y E ;Disable all steppers but Z
+        travel_speed: "100"
+        inner_wall_speed: "100"
+        solid_infill_speed: "100"
+        internal_solid_infill_speed: "100"
+        sparse_infill_speed: "100"
+        travel_acceleration: "1500"
+        default_acceleration: "1500"
+        initial_layer_acceleration: "1500"
+        outer_wall_acceleration: "1500"
+        inner_wall_acceleration: "1500"
+        top_surface_acceleration: "1500"
+        internal_solid_infill_acceleration: "1500"
+        sparse_infill_acceleration: "1500"
+        bridge_acceleration: "1500"
         travel_jerk: "2"
         default_jerk: "2"
         initial_layer_jerk: "2"

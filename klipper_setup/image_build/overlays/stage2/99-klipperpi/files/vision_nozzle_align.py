@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+import itertools
 import json
 import math
 import os
@@ -33,6 +34,29 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 from vision_bed_y import preprocess_image as shared_bed_y_preprocess_image
 from vision_bed_y import subpixel_peak_offset as shared_subpixel_peak_offset
+from vision_rough_calibration import (
+    ROUGH_MAX_DUPLICATE_MAD,
+    ROUGH_MAX_FIT_RMS,
+    ROUGH_MAX_JACOBIAN_CONDITION,
+    ROUGH_MAX_RING_SCALE_SPREAD,
+    ROUGH_OBSERVATION_SCALE,
+    ROUGH_RING_RADIUS_HINT_1080,
+    ROUGH_TEMPLATE_STRICT_MIN_CORRELATION,
+    ROUGH_TOOL_CENTER_HINTS_1080,
+    ROUGH_X_AXIS_HINT_PX_PER_MM_1080,
+    center_out_offsets,
+    combine_pass_corrections,
+    detect_nozzle_observation,
+    fit_observation_model,
+    make_nozzle_tracking_template,
+    median_absolute_deviation,
+    score_eddy_lighting,
+    sha256_file as rough_sha256_file,
+    solve_pass_correction,
+    track_nozzle_template,
+    validate_lighting_duplicates,
+    write_calib_candidate,
+)
 
 DEFAULT_MOONRAKER_URL = "http://127.0.0.1:7125"
 VISION_DIR = Path(os.environ.get("VISION_OUTPUT_DIR", "/home/pi/printer_data/vision"))
@@ -148,6 +172,11 @@ NOZZLE_Z_JOB_KIND = "nozzle_cam_nozzle_z_sweep"
 NOZZLE_Z_MEASUREMENT = "nozzle_cam_nozzle_z_offsets"
 EDDY_RELATIVE_JOB_KIND = "nozzle_cam_eddy_relative_calibration"
 EDDY_RELATIVE_MEASUREMENT = "cold_contact_free_eddy_relative_calibration"
+ROUGH_RELATIVE_JOB_KIND = "nozzle_cam_rough_relative_xyz"
+ROUGH_RELATIVE_MEASUREMENT = "idex_nozzle_rough_xyz"
+EDDY_LIGHT_JOB_KIND = "nozzle_cam_eddy_lighting_sweep"
+EDDY_LIGHT_MEASUREMENT = "nozzle_cam_eddy_fiducial_lighting"
+EDDY_Z_DIAGNOSTIC_MEASUREMENT = "eddy_z_diagnostic"
 VISION_JOB_CAMERA = "nozzle_cam"
 VISION_JOB_PROFILE = "analysis"
 VISION_JOB_LIGHTING = "NOZZLE_CAM_ANALYSIS_LIGHT"
@@ -189,6 +218,25 @@ BED_Y_SEARCH_DOWN_1080 = 120.0
 BED_Y_CALIBRATION_REFERENCE_OFFSET_MM = 10.0
 VISION_HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
 HASHED_GCODE_TOKEN_RE = re.compile(r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+")
+DEFAULT_CALIB_SOURCE = Path(
+    os.environ.get("VISION_CALIB_SOURCE", "/usr/local/share/vision/calib.yaml")
+)
+DEFAULT_PROFILE_SOURCE = Path(
+    os.environ.get(
+        "VISION_PROFILE_SOURCE", "/usr/local/share/vision/nozzle_cam_profiles.json"
+    )
+)
+ROUGH_T0_ANCHOR_X = 185.0
+ROUGH_T1_ANCHOR_X = 195.0
+ROUGH_ANCHOR_Y = -14.0
+ROUGH_ANCHOR_Z = 3.0
+ROUGH_TRAVEL_Z = 5.0
+EDDY_LIGHT_ANCHOR_X = 230.0
+EDDY_LIGHT_ANCHOR_Y = -14.0
+EDDY_LIGHT_ANCHOR_Z = 3.0
+EDDY_LIGHT_EXPOSURES = (600, 900, 1200, 1800, 2600, 3600, 5000)
+EDDY_LIGHT_SINGLE_INTENSITIES = (0.08, 0.20)
+EDDY_LIGHT_PAIR_INTENSITIES = (0.05, 0.10, 0.20)
 
 
 @dataclass(frozen=True)
@@ -210,6 +258,7 @@ class VisionJobFrame:
     y_offset: float | None = None
     x_offset: float | None = None
     z_sample: float | None = None
+    extras: dict[str, Any] | None = None
 
     @property
     def tool_key(self) -> str:
@@ -243,6 +292,8 @@ class VisionJobFrame:
             record["x_offset"] = round(self.x_offset, 4)
         if self.z_sample is not None:
             record["z_sample"] = round(self.z_sample, 4)
+        if self.extras:
+            record.update(self.extras)
         return record
 
 
@@ -628,6 +679,250 @@ def build_eddy_relative_job_frames(
     return tuple(frames)
 
 
+def _rough_frame(
+    frames: list[VisionJobFrame],
+    *,
+    pass_index: int,
+    tool: str,
+    anchor_x: float,
+    x: float,
+    y: float,
+    z: float,
+    role: str,
+    axis: str,
+    sample_value: float,
+    require_orifice: bool,
+    feedrate: float,
+    settle_ms: int,
+    camera: str,
+    profile: str,
+) -> None:
+    sample_label = dx_label(sample_value)
+    frame_id = (
+        f"p{pass_index}_{tool.lower()}_{role}_{axis.lower()}{sample_label}_"
+        f"{len(frames):03d}"
+    )
+    frames.append(
+        VisionJobFrame(
+            seq=len(frames),
+            frame=frame_id,
+            tool=tool,
+            dx=x - anchor_x,
+            x=x,
+            y=y,
+            z=z,
+            feedrate=feedrate,
+            settle_ms=settle_ms,
+            lighting=NOZZLE_Z_TOOL_LIGHTING,
+            camera=camera,
+            profile=profile,
+            phase="rough_relative_xyz",
+            target="rough_nozzle",
+            extras={
+                "pass_index": pass_index,
+                "role": role,
+                "axis": axis,
+                "sample_value": round(sample_value, 4),
+                "anchor_x": round(anchor_x, 4),
+                "require_orifice": require_orifice,
+            },
+        )
+    )
+
+
+def build_rough_relative_job_frames(
+    *,
+    t0_anchor_x: float,
+    t1_anchor_x: float,
+    anchor_y: float,
+    anchor_z: float,
+    feedrate: float,
+    settle_ms: int,
+    camera: str,
+    profile: str,
+) -> tuple[VisionJobFrame, ...]:
+    frames: list[VisionJobFrame] = []
+    for pass_index in (1, 2):
+        for tool, anchor_x in (("T0", t0_anchor_x), ("T1", t1_anchor_x)):
+            for x_offset in (0.0, -3.0, 3.0, -6.0, 6.0):
+                _rough_frame(
+                    frames,
+                    pass_index=pass_index,
+                    tool=tool,
+                    anchor_x=anchor_x,
+                    x=anchor_x + x_offset,
+                    y=anchor_y,
+                    z=anchor_z,
+                    role="search",
+                    axis="x",
+                    sample_value=x_offset,
+                    require_orifice=False,
+                    feedrate=feedrate,
+                    settle_ms=settle_ms,
+                    camera=camera,
+                    profile=profile,
+                )
+            for x_offset in (0.0,):
+                _rough_frame(
+                    frames,
+                    pass_index=pass_index,
+                    tool=tool,
+                    anchor_x=anchor_x,
+                    x=anchor_x + x_offset,
+                    y=anchor_y,
+                    z=anchor_z,
+                    role="refine",
+                    axis="x",
+                    sample_value=x_offset,
+                    require_orifice=True,
+                    feedrate=feedrate,
+                    settle_ms=settle_ms,
+                    camera=camera,
+                    profile=profile,
+                )
+            for y_value in (-14.0, -12.0):
+                _rough_frame(
+                    frames,
+                    pass_index=pass_index,
+                    tool=tool,
+                    anchor_x=anchor_x,
+                    x=anchor_x,
+                    y=y_value,
+                    z=anchor_z,
+                    role="dither",
+                    axis="y",
+                    sample_value=y_value,
+                    require_orifice=True,
+                    feedrate=feedrate,
+                    settle_ms=settle_ms,
+                    camera=camera,
+                    profile=profile,
+                )
+            for z_value in (2.0, 5.0):
+                _rough_frame(
+                    frames,
+                    pass_index=pass_index,
+                    tool=tool,
+                    anchor_x=anchor_x,
+                    x=anchor_x,
+                    y=anchor_y,
+                    z=z_value,
+                    role="dither",
+                    axis="z",
+                    sample_value=z_value,
+                    require_orifice=True,
+                    feedrate=feedrate,
+                    settle_ms=settle_ms,
+                    camera=camera,
+                    profile=profile,
+                )
+    return tuple(frames)
+
+
+def eddy_lighting_command(pixel_values: dict[int, float]) -> str:
+    lines = ["VISION_LIGHT_OFF"]
+    for index in sorted(pixel_values):
+        value = float(pixel_values[index])
+        lines.append(
+            f"SET_LED LED=vision_light INDEX={index} "
+            f"RED={value:.3f} GREEN={value:.3f} BLUE={value:.3f}"
+        )
+    return "\n".join(lines)
+
+
+def build_eddy_lighting_job_frames(
+    *,
+    stage: str,
+    exposures: list[int],
+    led_indices: list[int] | None,
+    led_pairs: list[tuple[int, int]] | None,
+    winner: dict[str, Any] | None,
+    x: float,
+    y: float,
+    z: float,
+    feedrate: float,
+    settle_ms: int,
+    camera: str,
+) -> tuple[VisionJobFrame, ...]:
+    frames: list[VisionJobFrame] = []
+
+    def append_frame(
+        *,
+        exposure: int,
+        pixels: dict[int, float],
+        label: str,
+        duplicate_index: int | None = None,
+    ) -> None:
+        extras: dict[str, Any] = {
+            "lighting_stage": stage,
+            "exposure": exposure,
+            "pixel_values": {str(key): value for key, value in pixels.items()},
+        }
+        if duplicate_index is not None:
+            extras["duplicate_index"] = duplicate_index
+        frames.append(
+            VisionJobFrame(
+                seq=len(frames),
+                frame=f"{stage}_{label}_e{exposure}_{len(frames):03d}",
+                tool="T0",
+                dx=0.0,
+                x=x,
+                y=y,
+                z=z,
+                feedrate=feedrate,
+                settle_ms=settle_ms,
+                lighting=eddy_lighting_command(pixels),
+                camera=camera,
+                profile=f"eddy_exp_{exposure}",
+                phase="eddy_lighting",
+                target="eddy_fiducial",
+                extras=extras,
+            )
+        )
+
+    if stage == "exposure":
+        for exposure in exposures:
+            append_frame(exposure=exposure, pixels={}, label="off")
+    elif stage == "single":
+        for exposure in exposures:
+            for index in led_indices or []:
+                for intensity in EDDY_LIGHT_SINGLE_INTENSITIES:
+                    append_frame(
+                        exposure=exposure,
+                        pixels={index: intensity},
+                        label=f"led{index}_i{dx_label(intensity)}",
+                    )
+    elif stage == "pair":
+        for exposure in exposures:
+            for first, second in led_pairs or []:
+                for intensity in EDDY_LIGHT_PAIR_INTENSITIES:
+                    append_frame(
+                        exposure=exposure,
+                        pixels={first: intensity, second: intensity},
+                        label=(
+                            f"led{first}_{second}_i{dx_label(intensity)}"
+                        ),
+                    )
+    elif stage == "duplicate":
+        if not winner:
+            raise ValueError("duplicate lighting stage requires a winner")
+        exposure = int(winner["exposure"])
+        pixels = {
+            int(key): float(value)
+            for key, value in (winner.get("pixel_values") or {}).items()
+        }
+        for duplicate_index in range(5):
+            append_frame(
+                exposure=exposure,
+                pixels=pixels,
+                label=f"duplicate{duplicate_index + 1}",
+                duplicate_index=duplicate_index + 1,
+            )
+    else:
+        raise ValueError(f"unknown Eddy lighting stage {stage!r}")
+    return tuple(frames)
+
+
 def build_vision_job(
     *,
     name: str,
@@ -932,6 +1227,161 @@ def build_eddy_relative_vision_job(
     )
 
 
+def build_rough_relative_vision_job(
+    *,
+    name: str,
+    job_root: Path,
+    job_id: str | None,
+    t0_anchor_x: float,
+    t1_anchor_x: float,
+    anchor_y: float,
+    anchor_z: float,
+    travel_z: float,
+    current_t1_x_endstop: float,
+    current_t1_y_endstop: float,
+    current_t1_z_endstop: float,
+    mode: str,
+    source_calib_path: Path,
+    active_config_fingerprint: str,
+    feedrate: float,
+    settle_time: float,
+    camera: str,
+    profile: str,
+    now: datetime | None = None,
+) -> VisionJob:
+    timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    resolved_job_id = (
+        sanitize_name(job_id)
+        if job_id
+        else generated_job_id_for_kind(ROUGH_RELATIVE_JOB_KIND, name, timestamp)
+    )
+    job_dir = job_root / resolved_job_id
+    frames = build_rough_relative_job_frames(
+        t0_anchor_x=t0_anchor_x,
+        t1_anchor_x=t1_anchor_x,
+        anchor_y=anchor_y,
+        anchor_z=anchor_z,
+        feedrate=feedrate,
+        settle_ms=settle_time_to_ms(settle_time),
+        camera=camera,
+        profile=profile,
+    )
+    return VisionJob(
+        job_id=resolved_job_id,
+        kind=ROUGH_RELATIVE_JOB_KIND,
+        created_at_utc=timestamp.isoformat(),
+        camera=camera,
+        profile=profile,
+        job_dir=job_dir,
+        manifest_path=job_dir / "manifest.json",
+        gcode_path=job_dir / "acquisition.gcode",
+        state_path=job_dir / "state.json",
+        events_path=job_dir / "events.jsonl",
+        frames_dir=job_dir / "frames",
+        analysis_dir=job_dir / "analysis",
+        frames=frames,
+        measurement_parameters={
+            "measurement": ROUGH_RELATIVE_MEASUREMENT,
+            "mode": mode.upper(),
+            "anchors": {
+                "t0": {"x": t0_anchor_x, "y": anchor_y, "z": anchor_z},
+                "t1": {"x": t1_anchor_x, "y": anchor_y, "z": anchor_z},
+            },
+            "travel_z": travel_z,
+            "minimum_commanded_z": min(frame.z for frame in frames),
+            "search_offsets_mm": [0.0, -3.0, 3.0, -6.0, 6.0],
+            "fast_core_frame_limit": 40,
+            "accepted_axes": ["x"],
+            "unresolved_axes": ["y", "z"],
+            "current_calib_yaml": {
+                "tools": {
+                    "t1": {
+                        "x_endstop": current_t1_x_endstop,
+                        "y_endstop": current_t1_y_endstop,
+                        "z_endstop": current_t1_z_endstop,
+                    }
+                }
+            },
+            "source_calib_path": str(source_calib_path),
+            "source_calib_sha256": rough_sha256_file(source_calib_path),
+            "active_config_fingerprint": active_config_fingerprint,
+            "report_only": True,
+        },
+    )
+
+
+def build_eddy_lighting_vision_job(
+    *,
+    name: str,
+    job_root: Path,
+    job_id: str | None,
+    stage: str,
+    exposures: list[int],
+    led_indices: list[int] | None,
+    led_pairs: list[tuple[int, int]] | None,
+    winner: dict[str, Any] | None,
+    x: float,
+    y: float,
+    z: float,
+    source_calib_path: Path,
+    active_config_fingerprint: str,
+    parent_run_id: str,
+    feedrate: float,
+    settle_time: float,
+    camera: str,
+    now: datetime | None = None,
+) -> VisionJob:
+    timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    resolved_job_id = (
+        sanitize_name(job_id)
+        if job_id
+        else generated_job_id_for_kind(
+            EDDY_LIGHT_JOB_KIND, f"{name}_{stage}", timestamp
+        )
+    )
+    job_dir = job_root / resolved_job_id
+    frames = build_eddy_lighting_job_frames(
+        stage=stage,
+        exposures=exposures,
+        led_indices=led_indices,
+        led_pairs=led_pairs,
+        winner=winner,
+        x=x,
+        y=y,
+        z=z,
+        feedrate=feedrate,
+        settle_ms=settle_time_to_ms(settle_time),
+        camera=camera,
+    )
+    return VisionJob(
+        job_id=resolved_job_id,
+        kind=EDDY_LIGHT_JOB_KIND,
+        created_at_utc=timestamp.isoformat(),
+        camera=camera,
+        profile=frames[0].profile,
+        job_dir=job_dir,
+        manifest_path=job_dir / "manifest.json",
+        gcode_path=job_dir / "acquisition.gcode",
+        state_path=job_dir / "state.json",
+        events_path=job_dir / "events.jsonl",
+        frames_dir=job_dir / "frames",
+        analysis_dir=job_dir / "analysis",
+        frames=frames,
+        measurement_parameters={
+            "measurement": EDDY_LIGHT_MEASUREMENT,
+            "stage": stage,
+            "parent_run_id": parent_run_id,
+            "capture_pose": {"x": x, "y": y, "z": z},
+            "exposures": exposures,
+            "winner": winner,
+            "source_calib_path": str(source_calib_path),
+            "source_calib_sha256": rough_sha256_file(source_calib_path),
+            "active_config_fingerprint": active_config_fingerprint,
+            "report_only": True,
+        },
+    )
+
+
 def render_acquisition_gcode(
     job: VisionJob,
     *,
@@ -956,13 +1406,33 @@ def render_acquisition_gcode(
     active_profile = job.profile
     previous_tool_frame: VisionJobFrame | None = None
     travel_z = None
-    if job.kind in (NOZZLE_Z_JOB_KIND, EDDY_RELATIVE_JOB_KIND):
+    if job.kind in (
+        NOZZLE_Z_JOB_KIND,
+        EDDY_RELATIVE_JOB_KIND,
+        ROUGH_RELATIVE_JOB_KIND,
+        EDDY_LIGHT_JOB_KIND,
+    ):
         parameters = job.measurement_parameters or {}
-        tool_pose = parameters.get("tool_pose") or {}
+        tool_pose = parameters.get("tool_pose") or parameters
         try:
             travel_z = float(tool_pose.get("travel_z"))
         except (TypeError, ValueError):
-            travel_z = None
+            travel_z = (
+                ROUGH_TRAVEL_Z
+                if job.kind in (ROUGH_RELATIVE_JOB_KIND, EDDY_LIGHT_JOB_KIND)
+                else None
+            )
+    if travel_z is not None and job.kind in (
+        ROUGH_RELATIVE_JOB_KIND,
+        EDDY_LIGHT_JOB_KIND,
+    ):
+        lines.extend(
+            [
+                f"G1 Z{gcode_float(travel_z)} F{job.frames[0].feedrate:.0f}",
+                "M400",
+                "",
+            ]
+        )
     for frame in job.frames:
         if frame.profile != active_profile:
             lines.append(
@@ -978,11 +1448,19 @@ def render_acquisition_gcode(
             lines.append(frame.tool)
             active_tool = frame.tool
         if (
-            job.kind in (NOZZLE_Z_JOB_KIND, EDDY_RELATIVE_JOB_KIND)
+            job.kind
+            in (
+                NOZZLE_Z_JOB_KIND,
+                EDDY_RELATIVE_JOB_KIND,
+                ROUGH_RELATIVE_JOB_KIND,
+                EDDY_LIGHT_JOB_KIND,
+            )
             and frame.phase in (
                 "tool_xz_sweep",
                 "tool_yz_sweep",
                 "center_sanity",
+                "rough_relative_xyz",
+                "eddy_lighting",
             )
             and previous_tool_frame is not None
             and (
@@ -1024,13 +1502,19 @@ def render_acquisition_gcode(
                 "",
             ]
         )
-        if frame.phase in ("tool_xz_sweep", "tool_yz_sweep"):
+        if frame.phase in (
+            "tool_xz_sweep",
+            "tool_yz_sweep",
+            "rough_relative_xyz",
+            "eddy_lighting",
+        ):
             previous_tool_frame = frame
     lines.append(f"VISION_JOB_END JOB={job.job_id} EXPECTED_FRAMES={len(job.frames)}")
     return "\n".join(lines) + "\n"
 
 
 def build_manifest(job: VisionJob) -> dict[str, Any]:
+    cold_report_job = job.kind in (ROUGH_RELATIVE_JOB_KIND, EDDY_LIGHT_JOB_KIND)
     manifest = {
         "schema_version": VISION_JOB_SCHEMA_VERSION,
         "job_id": job.job_id,
@@ -1046,6 +1530,10 @@ def build_manifest(job: VisionJob) -> dict[str, Any]:
         "preconditions": {
             "required_homed_axes": "y" if job.kind == BED_Y_JOB_KIND else "xyz",
             "require_idle": True,
+            "require_heaters_off": cold_report_job,
+            "minimum_commanded_z": (
+                1.0 if cold_report_job else None
+            ),
         },
         "frames": [frame.manifest_record() for frame in job.frames],
     }
@@ -1066,6 +1554,135 @@ def job_with_hashes(job: VisionJob) -> VisionJob:
     )
     manifest_hash = compute_manifest_hash(manifest_for_hash)
     return replace(job, manifest_hash=manifest_hash, gcode_hash=gcode_hash)
+
+
+def persist_prepared_job(job: VisionJob) -> dict[str, Any]:
+    if job.job_dir.exists():
+        raise FileExistsError(f"Vision job directory already exists: {job.job_dir}")
+    job = job_with_hashes(job)
+    manifest = build_manifest(job)
+    gcode = render_acquisition_gcode(
+        job,
+        manifest_hash=job.manifest_hash,
+        gcode_hash=job.gcode_hash,
+    )
+    state = {
+        "schema_version": VISION_JOB_SCHEMA_VERSION,
+        "job_id": job.job_id,
+        "kind": job.kind,
+        "state": "prepared",
+        "created_at_utc": job.created_at_utc,
+        "updated_at_utc": job.created_at_utc,
+        "frame_count": len(job.frames),
+        "committed_frame_count": 0,
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+    event = {
+        "timestamp_utc": job.created_at_utc,
+        "job_id": job.job_id,
+        "event": "prepared",
+        "state": "prepared",
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+    job.frames_dir.mkdir(parents=True)
+    job.analysis_dir.mkdir(parents=True)
+    atomic_write_json(job.manifest_path, manifest)
+    atomic_write_text(job.gcode_path, gcode)
+    atomic_write_json(job.state_path, state)
+    atomic_write_text(job.events_path, json.dumps(event, sort_keys=True) + "\n")
+    return {
+        "ok": True,
+        "job_id": job.job_id,
+        "job_dir": str(job.job_dir),
+        "manifest_path": str(job.manifest_path),
+        "gcode_path": str(job.gcode_path),
+        "state_path": str(job.state_path),
+        "events_path": str(job.events_path),
+        "state": "prepared",
+        "frame_count": len(job.frames),
+        "manifest_hash": job.manifest_hash,
+        "gcode_hash": job.gcode_hash,
+    }
+
+
+def prepare_rough_relative_vision_job(args: argparse.Namespace) -> dict[str, Any]:
+    source_calib_path = Path(args.source_calib)
+    if not source_calib_path.is_file():
+        raise FileNotFoundError(f"calibration source does not exist: {source_calib_path}")
+    mode = str(args.mode).upper()
+    if mode not in ("MEASURE", "VERIFY"):
+        raise ValueError("rough relative calibration MODE must be MEASURE or VERIFY")
+    job = build_rough_relative_vision_job(
+        name=args.name,
+        job_root=Path(args.job_root),
+        job_id=args.job_id,
+        t0_anchor_x=float(args.t0_anchor_x),
+        t1_anchor_x=float(args.t1_anchor_x),
+        anchor_y=float(args.anchor_y),
+        anchor_z=float(args.anchor_z),
+        travel_z=float(args.rough_travel_z),
+        current_t1_x_endstop=float(args.current_t1_x_endstop),
+        current_t1_y_endstop=float(args.current_t1_y_endstop),
+        current_t1_z_endstop=float(args.current_t1_z_endstop),
+        mode=mode,
+        source_calib_path=source_calib_path,
+        active_config_fingerprint=str(args.active_config_fingerprint or ""),
+        feedrate=float(args.feedrate),
+        settle_time=float(args.settle_time),
+        camera=sanitize_name(args.camera),
+        profile=sanitize_name(args.profile),
+    )
+    return persist_prepared_job(job)
+
+
+def prepare_eddy_lighting_vision_job(
+    args: argparse.Namespace,
+    *,
+    stage: str | None = None,
+    exposures: list[int] | None = None,
+    led_indices: list[int] | None = None,
+    led_pairs: list[tuple[int, int]] | None = None,
+    winner: dict[str, Any] | None = None,
+    parent_run_id: str | None = None,
+) -> dict[str, Any]:
+    source_calib_path = Path(args.source_calib)
+    if not source_calib_path.is_file():
+        raise FileNotFoundError(f"calibration source does not exist: {source_calib_path}")
+    resolved_stage = stage or str(args.lighting_stage)
+    resolved_exposures = exposures or [
+        int(value)
+        for value in parse_float_list(args.eddy_exposures, "Eddy exposure")
+    ]
+    run_id = parent_run_id or sanitize_name(
+        args.parent_run_id
+        or generated_job_id_for_kind(
+            EDDY_LIGHT_JOB_KIND,
+            args.name,
+            datetime.now(timezone.utc),
+        )
+    )
+    job = build_eddy_lighting_vision_job(
+        name=args.name,
+        job_root=Path(args.job_root),
+        job_id=args.job_id,
+        stage=resolved_stage,
+        exposures=resolved_exposures,
+        led_indices=led_indices,
+        led_pairs=led_pairs,
+        winner=winner,
+        x=float(args.eddy_anchor_x),
+        y=float(args.eddy_anchor_y),
+        z=float(args.eddy_anchor_z),
+        source_calib_path=source_calib_path,
+        active_config_fingerprint=str(args.active_config_fingerprint or ""),
+        parent_run_id=run_id,
+        feedrate=float(args.feedrate),
+        settle_time=float(args.settle_time),
+        camera=sanitize_name(args.camera),
+    )
+    return persist_prepared_job(job)
 
 
 def prepare_nozzle_sweep_job(args: argparse.Namespace) -> dict[str, Any]:
@@ -1478,6 +2095,46 @@ def load_nozzle_z_job_frames_for_analysis(manifest_path: Path) -> list[dict[str,
     return frames
 
 
+def load_extended_job_frames_for_analysis(
+    manifest_path: Path,
+) -> list[dict[str, Any]]:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    job_dir = manifest_path.parent
+    frames: list[dict[str, Any]] = []
+    for manifest_frame in manifest.get("frames") or []:
+        frame_id = str(manifest_frame["frame"])
+        image_path = job_dir / "frames" / f"{frame_id}.jpg"
+        metadata_path = job_dir / "frames" / f"{frame_id}.json"
+        if not image_path.is_file() or not metadata_path.is_file():
+            raise FileNotFoundError(f"missing committed artifacts for {frame_id}")
+        pose = manifest_frame["pose"]
+        record = dict(manifest_frame)
+        record.update(
+            {
+                "tool": str(manifest_frame.get("tool") or "T0").lower(),
+                "macro": str(manifest_frame.get("tool") or "T0").upper(),
+                "prefix": frame_id,
+                "pose": {
+                    "x": float(pose["x"]),
+                    "y": float(pose["y"]),
+                    "z": float(pose["z"]),
+                },
+                "target_gcode_position": {
+                    "x": float(pose["x"]),
+                    "y": float(pose["y"]),
+                    "z": float(pose["z"]),
+                },
+                "capture": read_json(metadata_path),
+                "image_path": str(image_path),
+                "metadata_path": str(metadata_path),
+                "image_url": safe_vision_url(image_path),
+                "metadata_url": safe_vision_url(metadata_path),
+            }
+        )
+        frames.append(record)
+    return frames
+
+
 def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -1542,8 +2199,12 @@ def safe_root_vision_url(path: Path) -> str:
 
 
 def verify_jpeg_header(path: Path) -> None:
-    data = path.read_bytes()[:4]
-    if len(data) < 2 or data[:2] != b"\xff\xd8":
+    data = path.read_bytes()
+    if (
+        len(data) < 4
+        or data[:2] != b"\xff\xd8"
+        or data[-2:] != b"\xff\xd9"
+    ):
         raise RuntimeError(f"{path} is not a JPEG frame")
 
 
@@ -1632,6 +2293,45 @@ def preflight_prepared_job(
     if missing_axes:
         raise RuntimeError(f"required axes are not homed: {''.join(missing_axes)}")
     ensure_job_poses_inside_limits(manifest, status)
+    preconditions = manifest.get("preconditions") or {}
+    if preconditions.get("require_heaters_off"):
+        for heater_name in ("extruder", "extruder1", "heater_bed"):
+            target = float((status.get(heater_name) or {}).get("target") or 0.0)
+            if target != 0.0:
+                raise RuntimeError(
+                    f"{heater_name} target must be zero for cold vision calibration"
+                )
+    minimum_commanded_z = preconditions.get("minimum_commanded_z")
+    if minimum_commanded_z is not None:
+        for frame in manifest.get("frames") or []:
+            frame_z = float((frame.get("pose") or {}).get("z"))
+            if frame_z < float(minimum_commanded_z) - 1.0e-9:
+                raise RuntimeError(
+                    f"frame {frame.get('frame')} Z={frame_z:.4f} is below "
+                    f"the job safety floor Z={float(minimum_commanded_z):.4f}"
+                )
+    parameters = manifest.get("measurement_parameters") or {}
+    source_path_value = parameters.get("source_calib_path")
+    expected_source_hash = parameters.get("source_calib_sha256")
+    if source_path_value and expected_source_hash:
+        source_path = Path(str(source_path_value))
+        if not source_path.is_file():
+            raise RuntimeError(f"calibration source is missing: {source_path}")
+        actual_source_hash = rough_sha256_file(source_path)
+        if actual_source_hash != expected_source_hash:
+            raise RuntimeError(
+                "calibration source changed after job preparation: "
+                f"{actual_source_hash} != {expected_source_hash}"
+            )
+    expected_fingerprint = str(parameters.get("active_config_fingerprint") or "")
+    if expected_fingerprint:
+        active_macro = status.get("gcode_macro _IDEX_CONFIG_FINGERPRINT") or {}
+        active_fingerprint = str(active_macro.get("source_sha256") or "")
+        if active_fingerprint and active_fingerprint != expected_fingerprint:
+            raise RuntimeError(
+                "active printer fingerprint changed after job preparation: "
+                f"{active_fingerprint} != {expected_fingerprint}"
+            )
     return manifest, state, status
 
 
@@ -1923,11 +2623,17 @@ def start_prepared_job(args: argparse.Namespace) -> dict[str, Any]:
         moonraker_url=args.moonraker_url,
         virtual_sd=virtual_sd,
     )
+    refresh_vision_ui_best_effort(job_root)
     run_gcode(
         args.moonraker_url,
         f"SDCARD_PRINT_FILE FILENAME={virtual_sd['virtual_sd_filename']}",
         timeout=30,
     )
+    for _attempt in range(20):
+        if read_json(job_dir / "state.json").get("state") != "prepared":
+            break
+        time.sleep(0.1)
+    refresh_vision_ui_best_effort(job_root)
     return monitor_acquisition_job(
         job_dir=job_dir,
         job_root=job_root,
@@ -1963,6 +2669,48 @@ def run_eddy_relative_acquisition_job(args: argparse.Namespace) -> dict[str, Any
     start_args = argparse.Namespace(**vars(args))
     start_args.start_prepared_job = summary["job_id"]
     return start_prepared_job(start_args)
+
+
+def run_rough_relative_acquisition_job(args: argparse.Namespace) -> dict[str, Any]:
+    summary = prepare_rough_relative_vision_job(args)
+    start_args = argparse.Namespace(**vars(args))
+    start_args.start_prepared_job = summary["job_id"]
+    return start_prepared_job(start_args)
+
+
+def run_eddy_lighting_stage(
+    args: argparse.Namespace,
+    *,
+    stage: str,
+    exposures: list[int],
+    led_indices: list[int] | None = None,
+    led_pairs: list[tuple[int, int]] | None = None,
+    winner: dict[str, Any] | None = None,
+    parent_run_id: str,
+) -> dict[str, Any]:
+    stage_args = argparse.Namespace(**vars(args))
+    stage_args.job_id = None
+    summary = prepare_eddy_lighting_vision_job(
+        stage_args,
+        stage=stage,
+        exposures=exposures,
+        led_indices=led_indices,
+        led_pairs=led_pairs,
+        winner=winner,
+        parent_run_id=parent_run_id,
+    )
+    stage_args.start_prepared_job = summary["job_id"]
+    acquisition = start_prepared_job(stage_args)
+    if not acquisition.get("ok"):
+        return {
+            **acquisition,
+            "analysis_started": False,
+            "stage": stage,
+        }
+    stage_args.analyze_job = acquisition["job_id"]
+    result = analyze_acquired_job(stage_args)
+    result["acquisition"] = acquisition
+    return result
 
 
 def job_analysis_paths(job_dir: Path) -> dict[str, Path]:
@@ -4814,6 +5562,1016 @@ def analyze_eddy_relative_sweep_frames(
     return analysis
 
 
+def _capture_quality_failures(
+    frames: list[dict[str, Any]],
+) -> tuple[list[str], dict[str, Any]]:
+    failures: list[str] = []
+    dimensions: set[tuple[int, int]] = set()
+    sequences: list[int] = []
+    retry_count = 0
+    capture_errors: list[str] = []
+    for frame in frames:
+        capture = frame.get("capture") or {}
+        dimensions.add((int(capture.get("width") or 0), int(capture.get("height") or 0)))
+        if str(capture.get("profile") or "") != str(frame.get("profile") or ""):
+            failures.append(f"{frame['prefix']}: committed profile changed")
+        try:
+            sequences.append(int(capture["framebuffer_seq"]))
+        except (KeyError, TypeError, ValueError):
+            failures.append(f"{frame['prefix']}: missing framebuffer sequence")
+        source = capture.get("source_frame") or {}
+        retry_count += int(source.get("capture_retry_count") or 0)
+        capture_errors.extend(str(item) for item in source.get("capture_errors") or [])
+    if len(dimensions) != 1 or (0, 0) in dimensions:
+        failures.append(f"committed frame dimensions changed: {sorted(dimensions)}")
+    if any(second <= first for first, second in zip(sequences, sequences[1:])):
+        failures.append("committed framebuffer sequence is stale or non-increasing")
+    return failures, {
+        "dimensions": [list(value) for value in sorted(dimensions)],
+        "framebuffer_sequences": sequences,
+        "capture_retry_count": retry_count,
+        "capture_errors": capture_errors,
+    }
+
+
+def _annotate_rough_frame(
+    image: Any, frame: dict[str, Any], detection: dict[str, Any]
+) -> Any:
+    import cv2
+
+    overlay = image.copy()
+    color = (0, 190, 0) if detection.get("accepted") else (0, 0, 230)
+    roi = detection.get("roi")
+    if roi:
+        x, y, width, height = [int(round(float(value))) for value in roi]
+        cv2.rectangle(overlay, (x, y), (x + width, y + height), color, 2)
+    center = detection.get("center_px")
+    radius = detection.get("radius_px")
+    if center:
+        point = tuple(int(round(float(value))) for value in center)
+        cv2.drawMarker(
+            overlay, point, color, cv2.MARKER_CROSS, 28, 2, cv2.LINE_AA
+        )
+        if radius:
+            cv2.circle(overlay, point, int(round(float(radius))), color, 2)
+    expected = (detection.get("tracking") or {}).get("expected_center_px")
+    if expected:
+        expected_point = tuple(int(round(float(value))) for value in expected)
+        cv2.drawMarker(
+            overlay,
+            expected_point,
+            (255, 180, 0),
+            cv2.MARKER_TILTED_CROSS,
+            20,
+            2,
+            cv2.LINE_AA,
+        )
+    template_tracking = detection.get("template_tracking") or {}
+    template_quality = (
+        f" corr={float(template_tracking['correlation']):.3f}"
+        f" scale={float(template_tracking['scale']):.3f}"
+        if template_tracking.get("correlation") is not None
+        and template_tracking.get("scale") is not None
+        else ""
+    )
+    text = (
+        f"{frame['prefix']} "
+        f"{'accepted' if detection.get('accepted') else detection.get('rejection_reason')}"
+        f"{template_quality}"
+    )
+    cv2.rectangle(overlay, (0, 0), (min(1919, max(900, len(text) * 14)), 48), (0, 0, 0), -1)
+    cv2.putText(
+        overlay,
+        text,
+        (14, 33),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.65,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+    return overlay
+
+
+def _write_extended_contact_sheet(
+    frames: list[dict[str, Any]], destination: Path, *, overlays: bool
+) -> None:
+    import cv2
+    import numpy as np
+
+    if not frames:
+        return
+    tile_w, tile_h = 320, 205
+    columns = 4
+    rows = int(math.ceil(len(frames) / columns))
+    sheet = np.full((rows * tile_h, columns * tile_w, 3), 245, dtype=np.uint8)
+    for index, frame in enumerate(frames):
+        source = Path(
+            frame.get("overlay_path") if overlays else frame["image_path"]
+        )
+        image = cv2.imread(str(source))
+        if image is None:
+            continue
+        thumb = cv2.resize(image, (tile_w, 180), interpolation=cv2.INTER_AREA)
+        row, column = divmod(index, columns)
+        y0, x0 = row * tile_h, column * tile_w
+        sheet[y0 : y0 + 180, x0 : x0 + tile_w] = thumb
+        cv2.putText(
+            sheet,
+            str(frame["prefix"])[:44],
+            (x0 + 4, y0 + 198),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.36,
+            (20, 20, 20),
+            1,
+            cv2.LINE_AA,
+        )
+    cv2.imwrite(str(destination), sheet, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+
+
+def _rough_motion_gate(samples: list[dict[str, Any]]) -> dict[str, Any]:
+    import numpy as np
+
+    if len(samples) < 5:
+        return {"ok": False, "reason": "fewer than five accepted search observations"}
+    positions = np.asarray([float(item["pose"]["x"]) for item in samples], dtype=float)
+    observations = np.asarray(
+        [item["detection"]["center_px"] for item in samples], dtype=float
+    )
+    best_inliers: Any = None
+    best_key: tuple[int, float, float] | None = None
+    for first in range(len(samples)):
+        for second in range(first + 1, len(samples)):
+            delta = positions[second] - positions[first]
+            if abs(float(delta)) <= 1.0e-9:
+                continue
+            slope = (observations[second] - observations[first]) / delta
+            intercept = observations[first] - slope * positions[first]
+            residuals = np.linalg.norm(
+                observations - (positions[:, None] * slope + intercept),
+                axis=1,
+            )
+            inliers = residuals <= 2.0
+            if int(np.count_nonzero(inliers)) < 2:
+                continue
+            inlier_span = float(
+                positions[inliers].max() - positions[inliers].min()
+            )
+            inlier_rms = float(
+                math.sqrt(float(np.mean(np.square(residuals[inliers]))))
+            )
+            key = (int(np.count_nonzero(inliers)), inlier_span, -inlier_rms)
+            if best_key is None or key > best_key:
+                best_key = key
+                best_inliers = inliers
+    if best_inliers is None:
+        return {
+            "ok": False,
+            "reason": "search observations have no coherent relative trajectory",
+        }
+    inlier_positions = positions[best_inliers]
+    inlier_observations = observations[best_inliers]
+    span = float(inlier_positions.max() - inlier_positions.min())
+    design = np.column_stack(
+        (inlier_positions, np.ones(len(inlier_positions)))
+    )
+    coefficients, _residuals, rank, _singular = np.linalg.lstsq(
+        design, inlier_observations, rcond=None
+    )
+    predicted = design @ coefficients
+    rms = float(
+        math.sqrt(
+            float(
+                np.mean(
+                    np.sum((inlier_observations - predicted) ** 2, axis=1)
+                )
+            )
+        )
+    )
+    slope = coefficients[0]
+    magnitude = float(np.linalg.norm(slope))
+    inlier_count = int(np.count_nonzero(best_inliers))
+    ok = (
+        rank == 2
+        and inlier_count >= 5
+        and span >= 9.0
+        and magnitude >= 2.0
+        and rms <= 3.0
+    )
+    return {
+        "ok": ok,
+        "accepted_count": inlier_count,
+        "input_count": len(samples),
+        "span_mm": span,
+        "axis_vector_px_per_mm": slope.tolist(),
+        "axis_magnitude_px_per_mm": magnitude,
+        "fit_rms_px": rms,
+        "inlier_prefixes": [
+            sample["prefix"]
+            for sample, inlier in zip(samples, best_inliers.tolist())
+            if inlier
+        ],
+        "outlier_prefixes": [
+            sample["prefix"]
+            for sample, inlier in zip(samples, best_inliers.tolist())
+            if not inlier
+        ],
+        "reason": (
+            ""
+            if ok
+            else "search observations failed temporal motion/span gate"
+        ),
+    }
+
+
+def analyze_rough_relative_frames(
+    frames: list[dict[str, Any]],
+    analysis_dir: Path,
+    overlays_dir: Path,
+    manifest: dict[str, Any],
+) -> dict[str, Any]:
+    import cv2
+    import numpy as np
+
+    overlays_dir.mkdir(parents=True, exist_ok=True)
+    hard_failures, capture_quality = _capture_quality_failures(frames)
+
+    for pass_index in (1, 2):
+        t0_reference_edge_template = None
+        for tool in ("t0", "t1"):
+            subset = [
+                frame
+                for frame in frames
+                if int(frame.get("pass_index") or 0) == pass_index
+                and frame["tool"] == tool
+            ]
+            if not subset:
+                continue
+            sample_image = None
+            for frame in subset:
+                sample_image = cv2.imread(frame["image_path"])
+                if sample_image is not None:
+                    break
+            if sample_image is None:
+                for frame in subset:
+                    frame["detection"] = {
+                        "accepted": False,
+                        "rejection_reason": (
+                            "OpenCV could not decode committed frame"
+                        ),
+                        "exclusion_reason": "nozzle_not_visible",
+                    }
+                hard_failures.append(
+                    f"pass {pass_index} {tool.upper()}: no decodable frames"
+                )
+                continue
+            image_height, image_width = sample_image.shape[:2]
+            del sample_image
+            scale_x = image_width / 1920.0
+            scale_y = image_height / 1080.0
+            scale = (scale_x + scale_y) / 2.0
+            center_hint_1080 = ROUGH_TOOL_CENTER_HINTS_1080[tool]
+            center_hint = (
+                center_hint_1080[0] * scale_x,
+                center_hint_1080[1] * scale_y,
+            )
+            radius_hint = ROUGH_RING_RADIUS_HINT_1080 * scale
+            anchor_frames = [
+                frame
+                for frame in subset
+                if (
+                    frame.get("role") == "search"
+                    and abs(float(frame.get("sample_value") or 0.0)) <= 1.0e-9
+                )
+                or (
+                    frame.get("role") == "refine"
+                    and frame.get("axis") == "x"
+                    and abs(float(frame.get("sample_value") or 0.0)) <= 1.0e-9
+                )
+            ]
+            anchor_detections: list[tuple[dict[str, Any], dict[str, Any]]] = []
+            for frame in anchor_frames:
+                anchor_image = cv2.imread(frame["image_path"])
+                if anchor_image is None:
+                    continue
+                detection = detect_nozzle_observation(
+                    anchor_image,
+                    require_orifice=True,
+                    expected_center_px=center_hint,
+                    expected_radius_px=radius_hint,
+                )
+                del anchor_image
+                if detection.get("accepted"):
+                    anchor_detections.append((frame, detection))
+            if anchor_detections:
+                # The configured hint defines the template origin.  Circle and
+                # orifice detections only prove that a nozzle is present near
+                # that origin; they must not move the relative coordinate
+                # system from frame to frame.
+                baseline_center = center_hint
+                baseline_radius = radius_hint
+                template_frame, _ = next(
+                    (
+                        item
+                        for item in anchor_detections
+                        if item[0].get("role") == "search"
+                        and abs(float(item[0].get("sample_value") or 0.0))
+                        <= 1.0e-9
+                    ),
+                    max(
+                        anchor_detections,
+                        key=lambda item: float(
+                            (item[1].get("ring") or {}).get("score")
+                            or -math.inf
+                        ),
+                    ),
+                )
+                cross_tool_anchor_alignment = None
+                if tool == "t1" and t0_reference_edge_template is not None:
+                    cross_matches = []
+                    for anchor_frame, _ in anchor_detections:
+                        anchor_image = cv2.imread(anchor_frame["image_path"])
+                        if anchor_image is None:
+                            continue
+                        match = track_nozzle_template(
+                            anchor_image,
+                            t0_reference_edge_template,
+                            center_hint,
+                            minimum_correlation=0.22,
+                            maximum_center_error_px=10.0,
+                            edge=True,
+                        )
+                        del anchor_image
+                        if match.get("accepted"):
+                            cross_matches.append(
+                                {
+                                    **match,
+                                    "prefix": anchor_frame["prefix"],
+                                }
+                            )
+                    if len(cross_matches) >= 2:
+                        cross_center = (
+                            float(
+                                np.median(
+                                    [
+                                        item["center_px"][0]
+                                        for item in cross_matches
+                                    ]
+                                )
+                            ),
+                            float(
+                                np.median(
+                                    [
+                                        item["center_px"][1]
+                                        for item in cross_matches
+                                    ]
+                                )
+                            ),
+                        )
+                        center_spread = max(
+                            math.hypot(
+                                float(item["center_px"][0]) - cross_center[0],
+                                float(item["center_px"][1]) - cross_center[1],
+                            )
+                            for item in cross_matches
+                        )
+                        cross_tool_anchor_alignment = {
+                            "accepted": center_spread <= 0.75 * scale,
+                            "center_px": list(cross_center),
+                            "center_spread_px": center_spread,
+                            "correlation_min": min(
+                                float(item["correlation"])
+                                for item in cross_matches
+                            ),
+                            "matches": cross_matches,
+                            "method": "tight_roi_edge_template",
+                        }
+                        if cross_tool_anchor_alignment["accepted"]:
+                            baseline_center = cross_center
+                        else:
+                            hard_failures.append(
+                                f"pass {pass_index} T1: repeated direct "
+                                "T0-to-T1 anchor alignments disagree"
+                            )
+                    else:
+                        hard_failures.append(
+                            f"pass {pass_index} T1: direct T0-to-T1 anchor "
+                            "template alignment failed"
+                        )
+                template_image = cv2.imread(template_frame["image_path"])
+                if template_image is None:
+                    tracking_template = None
+                    hard_failures.append(
+                        f"pass {pass_index} {tool.upper()}: template frame "
+                        "could not be decoded"
+                    )
+                else:
+                    tracking_template = make_nozzle_tracking_template(
+                        template_image, baseline_center
+                    )
+                    if tool == "t0":
+                        t0_reference_edge_template = (
+                            make_nozzle_tracking_template(
+                                template_image,
+                                baseline_center,
+                                edge=True,
+                            )
+                        )
+                    del template_image
+            else:
+                baseline_center = center_hint
+                baseline_radius = radius_hint
+                tracking_template = None
+                cross_tool_anchor_alignment = None
+                hard_failures.append(
+                    f"pass {pass_index} {tool.upper()}: "
+                    "no visible zero-offset anchor nozzle"
+                )
+            for frame in subset:
+                image = cv2.imread(frame["image_path"])
+                if image is None:
+                    frame["detection"] = {
+                        "accepted": False,
+                        "rejection_reason": (
+                            "OpenCV could not decode committed frame"
+                        ),
+                        "exclusion_reason": "nozzle_not_visible",
+                    }
+                    continue
+                x_offset = float(frame["pose"]["x"]) - float(frame["anchor_x"])
+                expected_center = (
+                    baseline_center[0]
+                    + ROUGH_X_AXIS_HINT_PX_PER_MM_1080 * scale_x * x_offset,
+                    baseline_center[1],
+                )
+                detection = detect_nozzle_observation(
+                    image,
+                    require_orifice=bool(frame.get("require_orifice", True)),
+                    expected_center_px=expected_center,
+                    expected_radius_px=baseline_radius,
+                )
+                if tracking_template is not None:
+                    strict_frame = frame.get("role") != "search"
+                    template_tracking = track_nozzle_template(
+                        image,
+                        tracking_template,
+                        expected_center,
+                        minimum_correlation=(
+                            ROUGH_TEMPLATE_STRICT_MIN_CORRELATION
+                            if strict_frame
+                            else 0.70
+                        ),
+                        maximum_center_error_px=(
+                            10.0 if strict_frame else 18.0
+                        ),
+                    )
+                    detection["template_tracking"] = template_tracking
+                    template_accepted = bool(template_tracking.get("accepted"))
+                    if (
+                        strict_frame
+                        and template_tracking.get("scale_at_search_limit")
+                    ):
+                        template_accepted = False
+                        template_tracking["accepted"] = False
+                        template_tracking["rejection_reason"] = (
+                            "nozzle template scale reached the search limit"
+                        )
+                    if template_accepted:
+                        detection["ring_detection_center_px"] = detection.get(
+                            "center_px"
+                        )
+                        detection["ring_detection_radius_px"] = detection.get(
+                            "radius_px"
+                        )
+                        center = [
+                            float(value)
+                            for value in template_tracking["center_px"]
+                        ]
+                        radius = (
+                            ROUGH_RING_RADIUS_HINT_1080
+                            * scale
+                            * float(template_tracking["scale"])
+                        )
+                        detection["center_px"] = center
+                        detection["radius_px"] = round(radius, 6)
+                        detection["observation"] = [
+                            round(center[0], 6),
+                            round(center[1], 6),
+                            round(
+                                ROUGH_OBSERVATION_SCALE * math.log(radius),
+                                6,
+                            ),
+                        ]
+                        detection["accepted"] = True
+                        detection["rejection_reason"] = ""
+                        detection["exclusion_reason"] = ""
+                        detection["visibility_method"] = (
+                            "tight_roi_relative_template"
+                        )
+                    else:
+                        detection["accepted"] = False
+                        detection["rejection_reason"] = (
+                            template_tracking.get("rejection_reason")
+                            or "nozzle template tracking failed"
+                        )
+                elif detection.get("accepted"):
+                    detection["accepted"] = False
+                    detection["rejection_reason"] = (
+                        "no zero-offset nozzle template is available"
+                    )
+                detection["tracking"] = {
+                    "baseline_center_px": list(baseline_center),
+                    "baseline_radius_px": baseline_radius,
+                    "expected_center_px": list(expected_center),
+                    "x_offset_mm": x_offset,
+                    "visibility_required": True,
+                    "cross_tool_anchor_alignment": cross_tool_anchor_alignment,
+                }
+                if not detection.get("accepted"):
+                    detection["exclusion_reason"] = "nozzle_not_visible"
+                    detection["rejection_reason"] = (
+                        "nozzle_not_visible: "
+                        + str(
+                            detection.get("rejection_reason")
+                            or "tool-local face/orifice check failed"
+                        )
+                    )
+                frame["detection"] = detection
+                overlay = _annotate_rough_frame(image, frame, detection)
+                overlay_path = overlays_dir / f"{frame['prefix']}_overlay.jpg"
+                cv2.imwrite(
+                    str(overlay_path),
+                    overlay,
+                    [int(cv2.IMWRITE_JPEG_QUALITY), 92],
+                )
+                frame["overlay_path"] = str(overlay_path)
+                frame["overlay_url"] = safe_vision_url(overlay_path)
+                del overlay
+                del image
+
+    pass_results: list[dict[str, Any]] = []
+    tool_fits_by_pass: dict[int, dict[str, dict[str, Any]]] = {}
+    for pass_index in (1, 2):
+        tool_fits: dict[str, dict[str, Any]] = {}
+        for tool in ("t0", "t1"):
+            subset = [
+                frame
+                for frame in frames
+                if int(frame.get("pass_index") or 0) == pass_index
+                and frame["tool"] == tool
+            ]
+            core_search = [
+                frame
+                for frame in subset
+                if frame.get("role") == "search"
+                and abs(float(frame.get("sample_value") or 0.0)) <= 6.0
+                and frame["detection"].get("accepted")
+            ]
+            core_refine_center = [
+                frame
+                for frame in subset
+                if frame.get("role") == "refine"
+                and frame.get("axis") == "x"
+                and abs(float(frame.get("sample_value") or 0.0)) <= 1.0e-9
+                and frame["detection"].get("accepted")
+            ][:1]
+            core_y = [
+                frame
+                for frame in subset
+                if frame.get("role") == "dither"
+                and frame.get("axis") == "y"
+                and float(frame.get("sample_value") or 0.0) in (-14.0, -12.0)
+                and frame["detection"].get("accepted")
+            ]
+            core_z = [
+                frame
+                for frame in subset
+                if frame.get("role") == "dither"
+                and frame.get("axis") == "z"
+                and float(frame.get("sample_value") or 0.0) in (2.0, 5.0)
+                and frame["detection"].get("accepted")
+            ]
+            search = [
+                frame for frame in core_search
+            ]
+            motion_gate = _rough_motion_gate(search)
+            motion_outliers = set(motion_gate.get("outlier_prefixes") or [])
+            for frame in search:
+                if frame["prefix"] not in motion_outliers:
+                    continue
+                frame["detection"]["accepted"] = False
+                frame["detection"]["exclusion_reason"] = "nozzle_not_visible"
+                frame["detection"]["rejection_reason"] = (
+                    "nozzle_not_visible: relative-template trajectory outlier"
+                )
+            if not motion_gate["ok"]:
+                hard_failures.append(
+                    f"pass {pass_index} {tool.upper()}: {motion_gate['reason']}"
+                )
+            model_frames = core_search + core_refine_center + core_y + core_z
+            strict = [
+                {
+                    "pose": frame["pose"],
+                    "observation": frame["detection"]["observation"],
+                    "radius_px": frame["detection"]["radius_px"],
+                    "prefix": frame["prefix"],
+                }
+                for frame in model_frames
+                if frame["detection"].get("accepted")
+            ]
+            fit = fit_observation_model(strict)
+            fit["motion_gate"] = motion_gate
+            if not fit.get("ok"):
+                hard_failures.append(
+                    f"pass {pass_index} {tool.upper()}: "
+                    f"{fit.get('rejection_reason') or 'observation fit failed'}"
+                )
+            elif float(fit["fit_rms"]) > ROUGH_MAX_FIT_RMS:
+                hard_failures.append(
+                    f"pass {pass_index} {tool.upper()}: fit RMS "
+                    f"{fit['fit_rms']:.3f}px exceeds {ROUGH_MAX_FIT_RMS:.3f}px"
+                )
+                fit["ok"] = False
+            elif float(fit["condition_number"]) > ROUGH_MAX_JACOBIAN_CONDITION:
+                hard_failures.append(
+                    f"pass {pass_index} {tool.upper()}: Jacobian condition "
+                    f"{fit['condition_number']:.3f} exceeds "
+                    f"{ROUGH_MAX_JACOBIAN_CONDITION:.3f}"
+                )
+                fit["ok"] = False
+            duplicates = [
+                frame["detection"]["center_px"]
+                for frame in core_search + core_refine_center
+                if frame.get("axis") == "x"
+                and abs(float(frame.get("sample_value") or 0.0)) <= 1.0e-9
+                and frame["detection"].get("accepted")
+            ]
+            duplicate_mad = math.inf
+            if len(duplicates) >= 2:
+                duplicate_mad = max(
+                    median_absolute_deviation(
+                        [float(center[axis]) for center in duplicates]
+                    )
+                    for axis in (0, 1)
+                )
+            fit["duplicate_center_mad_px"] = duplicate_mad
+            fit["median_ring_radius_px"] = (
+                float(np.median([item["radius_px"] for item in strict]))
+                if strict
+                else None
+            )
+            fit["core_frame_prefixes"] = [
+                frame["prefix"] for frame in model_frames
+            ]
+            fit["core_frame_count"] = len(model_frames)
+            if duplicate_mad > ROUGH_MAX_DUPLICATE_MAD:
+                hard_failures.append(
+                    f"pass {pass_index} {tool.upper()}: duplicate center MAD "
+                    f"{duplicate_mad:.3f}px exceeds {ROUGH_MAX_DUPLICATE_MAD:.3f}px"
+                )
+                fit["ok"] = False
+            tool_fits[tool] = fit
+        radii = [
+            tool_fits[tool].get("median_ring_radius_px") for tool in ("t0", "t1")
+        ]
+        if all(value is not None for value in radii):
+            ring_spread = abs(float(radii[1]) - float(radii[0])) / max(
+                1.0e-9, (float(radii[0]) + float(radii[1])) / 2.0
+            )
+        else:
+            ring_spread = math.inf
+        if ring_spread > ROUGH_MAX_RING_SCALE_SPREAD:
+            hard_failures.append(
+                f"pass {pass_index}: nozzle ring scale spread {ring_spread:.4f} "
+                f"exceeds {ROUGH_MAX_RING_SCALE_SPREAD:.4f}"
+            )
+            tool_fits["t0"]["ok"] = False
+            tool_fits["t1"]["ok"] = False
+        pass_result = solve_pass_correction(tool_fits["t0"], tool_fits["t1"])
+        pass_result["pass_index"] = pass_index
+        pass_result["tool_fits"] = tool_fits
+        pass_result["ring_scale_relative_spread"] = ring_spread
+        hard_failures.extend(
+            f"pass {pass_index}: {item}"
+            for item in pass_result.get("hard_failures") or []
+        )
+        pass_results.append(pass_result)
+        tool_fits_by_pass[pass_index] = tool_fits
+    combined = combine_pass_corrections(pass_results)
+    hard_failures.extend(combined.get("hard_failures") or [])
+    parameters = manifest.get("measurement_parameters") or {}
+    mode = str(parameters.get("mode") or "MEASURE").upper()
+    correction = combined.get("correction_mm") or {}
+    if mode == "VERIFY" and correction:
+        for axis, limit in (("x", 0.10), ("y", 0.15), ("z", 0.15)):
+            if abs(float(correction[axis])) > limit:
+                hard_failures.append(
+                    f"VERIFY residual {axis.upper()}={float(correction[axis]):.4f}mm "
+                    f"exceeds {limit:.4f}mm"
+                )
+    source_path = Path(str(parameters.get("source_calib_path")))
+    if rough_sha256_file(source_path) != parameters.get("source_calib_sha256"):
+        hard_failures.append("source calib.yaml changed before analysis")
+    accepted = not hard_failures and bool(combined.get("ok"))
+    candidate = None
+    changes_path = analysis_dir / "calib_changes.json"
+    report_path = analysis_dir / "report.md"
+    if accepted and mode == "MEASURE":
+        candidate = write_calib_candidate(
+            source_path=source_path,
+            destination=analysis_dir / "calib_candidate.yaml",
+            correction_mm={axis: float(correction[axis]) for axis in ("x", "y", "z")},
+        )
+        atomic_write_json(
+            changes_path,
+            {
+                **candidate,
+                "correction_mm": correction,
+                "active_config_fingerprint": parameters.get(
+                    "active_config_fingerprint"
+                ),
+                "manifest_hash": manifest["manifest_hash"],
+            },
+        )
+    report_lines = [
+        "# Rough T0/T1 vision calibration",
+        "",
+        f"- Mode: `{mode}`",
+        f"- Accepted: `{accepted}`",
+        f"- Source calib SHA-256: `{parameters.get('source_calib_sha256')}`",
+        f"- Active printer fingerprint: `{parameters.get('active_config_fingerprint')}`",
+    ]
+    if correction:
+        report_lines.extend(
+            [
+                f"- Endstop correction X: `{float(correction['x']):+.4f} mm`",
+                f"- Endstop correction Y: `{float(correction['y']):+.4f} mm`",
+                f"- Endstop correction Z: `{float(correction['z']):+.4f} mm`",
+            ]
+        )
+    if candidate:
+        report_lines.append(f"- Candidate: `{candidate['candidate_path']}`")
+        for section, values in candidate["changes"].items():
+            report_lines.append(f"- `{section}` old/new: `{json.dumps(values)}`")
+    if hard_failures:
+        report_lines.extend(["", "## Rejection reasons", ""])
+        report_lines.extend(f"- {item}" for item in hard_failures)
+    atomic_write_text(report_path, "\n".join(report_lines) + "\n")
+    return {
+        "ok": accepted,
+        "accepted": accepted,
+        "proxy_only": not accepted,
+        "measurement": ROUGH_RELATIVE_MEASUREMENT,
+        "mode": mode,
+        "hard_failures": hard_failures,
+        "capture_quality": capture_quality,
+        "passes": pass_results,
+        "combined": combined,
+        "correction_mm": correction or None,
+        "candidate": candidate,
+        "changes_path": str(changes_path) if changes_path.exists() else None,
+        "report_path": str(report_path),
+        "message": (
+            f"Rough relative {mode} vision calibration accepted."
+            if accepted
+            else "Rough relative vision calibration rejected: "
+            + "; ".join(hard_failures[:5])
+        ),
+    }
+
+
+def _annotate_eddy_lighting_frame(
+    image: Any, frame: dict[str, Any], score: dict[str, Any]
+) -> Any:
+    import cv2
+
+    overlay = image.copy()
+    color = (0, 200, 0) if score.get("accepted") else (0, 140, 255)
+    x, y, width, height = [int(value) for value in score["roi"]]
+    cv2.rectangle(overlay, (x, y), (x + width, y + height), color, 2)
+    for circle in score.get("circles") or []:
+        center = tuple(int(round(float(value))) for value in circle["center_px"])
+        cv2.circle(overlay, center, int(round(float(circle["radius_px"]))), color, 1)
+    if score.get("center_px"):
+        center = tuple(int(round(float(value))) for value in score["center_px"])
+        cv2.drawMarker(
+            overlay, center, color, cv2.MARKER_CROSS, 30, 2, cv2.LINE_AA
+        )
+    label = (
+        f"{frame['prefix']} score={float(score['score']):.1f} "
+        f"rings={score['ring_count']} clip={100*float(score['clipped_fraction']):.2f}%"
+    )
+    cv2.rectangle(overlay, (0, 0), (1200, 48), (0, 0, 0), -1)
+    cv2.putText(
+        overlay,
+        label,
+        (14, 33),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.64,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+    return overlay
+
+
+def _write_lighting_score_plot(
+    records: list[dict[str, Any]], destination: Path
+) -> None:
+    import cv2
+    import numpy as np
+
+    width = 1200
+    row_height = 30
+    ordered = sorted(records, key=lambda item: float(item["score"]["score"]), reverse=True)
+    ordered = ordered[: min(40, len(ordered))]
+    image = np.full((80 + row_height * len(ordered), width, 3), 250, dtype=np.uint8)
+    cv2.putText(
+        image,
+        "Eddy lighting score ranking",
+        (15, 35),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.9,
+        (20, 20, 20),
+        2,
+        cv2.LINE_AA,
+    )
+    values = [float(item["score"]["score"]) for item in ordered]
+    low = min(values) if values else 0.0
+    high = max(values) if values else 1.0
+    span = max(1.0, high - low)
+    for index, record in enumerate(ordered):
+        y = 65 + index * row_height
+        value = float(record["score"]["score"])
+        bar = int(round(420 * (value - low) / span))
+        cv2.rectangle(image, (700, y - 16), (700 + bar, y + 2), (50, 130, 220), -1)
+        cv2.putText(
+            image,
+            f"{record['prefix'][:68]:68s} {value:8.1f}",
+            (12, y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.43,
+            (25, 25, 25),
+            1,
+            cv2.LINE_AA,
+        )
+    cv2.imwrite(str(destination), image)
+
+
+def analyze_eddy_lighting_frames(
+    frames: list[dict[str, Any]],
+    analysis_dir: Path,
+    overlays_dir: Path,
+    manifest: dict[str, Any],
+) -> dict[str, Any]:
+    import cv2
+
+    hard_failures, capture_quality = _capture_quality_failures(frames)
+    records: list[dict[str, Any]] = []
+    duplicate_rois: list[Any] = []
+    overlays_dir.mkdir(parents=True, exist_ok=True)
+    for frame in frames:
+        image = cv2.imread(frame["image_path"])
+        if image is None:
+            hard_failures.append(f"{frame['prefix']}: OpenCV decode failed")
+            continue
+        score = score_eddy_lighting(image)
+        frame["lighting_score"] = score
+        overlay = _annotate_eddy_lighting_frame(image, frame, score)
+        overlay_path = overlays_dir / f"{frame['prefix']}_overlay.jpg"
+        cv2.imwrite(str(overlay_path), overlay, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+        frame["overlay_path"] = str(overlay_path)
+        frame["overlay_url"] = safe_vision_url(overlay_path)
+        records.append({"prefix": frame["prefix"], "frame": frame, "score": score})
+        if str((manifest.get("measurement_parameters") or {}).get("stage")) == "duplicate":
+            roi_x, roi_y, roi_width, roi_height = score["roi"]
+            duplicate_rois.append(
+                cv2.cvtColor(
+                    image[
+                        roi_y : roi_y + roi_height,
+                        roi_x : roi_x + roi_width,
+                    ],
+                    cv2.COLOR_BGR2GRAY,
+                )
+            )
+    stage = str((manifest.get("measurement_parameters") or {}).get("stage"))
+    ranking = sorted(records, key=lambda item: float(item["score"]["score"]), reverse=True)
+    selection: dict[str, Any] = {}
+    if stage == "exposure":
+        selected = [
+            item
+            for item in ranking
+            if item["score"].get("accepted")
+            and float(item["score"].get("clipped_fraction") or 0.0) < 0.005
+        ][:2]
+        if len(selected) != 2:
+            hard_failures.append(
+                "fewer than two non-clipped fixed exposures detected the fiducial"
+            )
+        selection["exposures"] = [
+            int(item["frame"]["exposure"]) for item in selected
+        ]
+    elif stage == "single":
+        best_by_led: dict[int, dict[str, Any]] = {}
+        for item in ranking:
+            pixels = item["frame"].get("pixel_values") or {}
+            if len(pixels) != 1:
+                continue
+            led = int(next(iter(pixels)))
+            best_by_led.setdefault(led, item)
+        selected_leds = [
+            led
+            for led, _item in sorted(
+                best_by_led.items(),
+                key=lambda pair: float(pair[1]["score"]["score"]),
+                reverse=True,
+            )[:4]
+        ]
+        selection["led_indices"] = selected_leds
+    elif stage == "pair":
+        accepted_ranking = [
+            item for item in ranking if item["score"].get("accepted")
+        ]
+        winner_record = (accepted_ranking or ranking)[0] if ranking else None
+        if winner_record is None:
+            hard_failures.append("no pair lighting frame could be scored")
+        else:
+            winner_frame = winner_record["frame"]
+            selection["winner"] = {
+                "exposure": int(winner_frame["exposure"]),
+                "pixel_values": {
+                    str(key): float(value)
+                    for key, value in (winner_frame.get("pixel_values") or {}).items()
+                },
+                "score": winner_record["score"],
+                "source_frame": winner_frame["prefix"],
+            }
+            if not winner_record["score"].get("accepted"):
+                hard_failures.append("no pair configuration passed fiducial quality")
+    elif stage == "duplicate":
+        correlations = None
+        if duplicate_rois:
+            reference = duplicate_rois[0]
+            correlations = [
+                float(
+                    cv2.matchTemplate(
+                        reference,
+                        duplicate,
+                        cv2.TM_CCOEFF_NORMED,
+                    )[0, 0]
+                )
+                for duplicate in duplicate_rois
+            ]
+        duplicate_validation = validate_lighting_duplicates(
+            [item["score"] for item in records],
+            correlations=correlations,
+        )
+        selection["duplicate_validation"] = duplicate_validation
+        hard_failures.extend(duplicate_validation.get("hard_failures") or [])
+    else:
+        hard_failures.append(f"unknown Eddy lighting stage {stage!r}")
+    score_path = analysis_dir / "lighting_scores.json"
+    atomic_write_json(
+        score_path,
+        {
+            "stage": stage,
+            "records": records,
+            "selection": selection,
+            "capture_quality": capture_quality,
+        },
+    )
+    score_plot = analysis_dir / "lighting_score_heatmap.jpg"
+    _write_lighting_score_plot(records, score_plot)
+    stage_ok = not hard_failures
+    return {
+        "ok": stage_ok,
+        "accepted": stage_ok,
+        "proxy_only": not stage_ok,
+        "measurement": EDDY_LIGHT_MEASUREMENT,
+        "stage": stage,
+        "hard_failures": hard_failures,
+        "capture_quality": capture_quality,
+        "selection": selection,
+        "ranking": [
+            {
+                "prefix": item["prefix"],
+                "exposure": item["frame"].get("exposure"),
+                "pixel_values": item["frame"].get("pixel_values"),
+                "score": item["score"],
+            }
+            for item in ranking
+        ],
+        "score_path": str(score_path),
+        "score_plot_path": str(score_plot),
+        "message": (
+            f"Eddy lighting {stage} stage accepted."
+            if stage_ok
+            else f"Eddy lighting {stage} stage rejected: "
+            + "; ".join(hard_failures[:5])
+        ),
+    }
+
+
 def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
     job_id = sanitize_name(args.analyze_job or args.job_id)
     if not job_id:
@@ -4837,6 +6595,7 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
     paths["analysis_dir"].mkdir(parents=True, exist_ok=True)
     paths["overlays_dir"].mkdir(parents=True, exist_ok=True)
     mark_job_analysing(job_dir)
+    refresh_vision_ui_best_effort(Path(args.job_root))
 
     result: dict[str, Any] = {
         "ok": False,
@@ -4897,6 +6656,15 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
                 if frame.get("phase") == "tool_xz_sweep"
             }
         )
+    elif manifest.get("kind") in (ROUGH_RELATIVE_JOB_KIND, EDDY_LIGHT_JOB_KIND):
+        result["phase_frame_counts"] = {
+            phase: sum(
+                1
+                for frame in manifest.get("frames") or []
+                if frame.get("phase") == phase
+            )
+            for phase in ("rough_relative_xyz", "eddy_lighting")
+        }
     else:
         result["dx_values"] = unique_dx_values_from_manifest(manifest)
     try:
@@ -4992,6 +6760,83 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
                     paths["overlay_contact_sheet"],
                     use_overlays=True,
                 )
+        elif manifest.get("kind") == ROUGH_RELATIVE_JOB_KIND:
+            frames = load_extended_job_frames_for_analysis(
+                job_dir / "manifest.json"
+            )
+            analysis = analyze_rough_relative_frames(
+                frames,
+                paths["analysis_dir"],
+                paths["overlays_dir"],
+                manifest,
+            )
+            analysis.update(
+                {
+                    "run_name": manifest["job_id"],
+                    "job_id": manifest["job_id"],
+                }
+            )
+            _write_extended_contact_sheet(
+                frames, paths["raw_contact_sheet"], overlays=False
+            )
+            _write_extended_contact_sheet(
+                frames, paths["overlay_contact_sheet"], overlays=True
+            )
+            facts = {
+                "schema_version": VISION_JOB_SCHEMA_VERSION,
+                "job_id": manifest["job_id"],
+                "kind": manifest["kind"],
+                "measurement": ROUGH_RELATIVE_MEASUREMENT,
+                "accepted": bool(analysis.get("ok")),
+                "mode": analysis.get("mode"),
+                "correction_mm": analysis.get("correction_mm"),
+                "candidate": analysis.get("candidate"),
+                "hard_failures": analysis.get("hard_failures") or [],
+                "source_calib_sha256": (
+                    manifest.get("measurement_parameters") or {}
+                ).get("source_calib_sha256"),
+                "active_config_fingerprint": (
+                    manifest.get("measurement_parameters") or {}
+                ).get("active_config_fingerprint"),
+            }
+        elif manifest.get("kind") == EDDY_LIGHT_JOB_KIND:
+            frames = load_extended_job_frames_for_analysis(
+                job_dir / "manifest.json"
+            )
+            analysis = analyze_eddy_lighting_frames(
+                frames,
+                paths["analysis_dir"],
+                paths["overlays_dir"],
+                manifest,
+            )
+            analysis.update(
+                {
+                    "run_name": manifest["job_id"],
+                    "job_id": manifest["job_id"],
+                }
+            )
+            _write_extended_contact_sheet(
+                frames, paths["raw_contact_sheet"], overlays=False
+            )
+            _write_extended_contact_sheet(
+                frames, paths["overlay_contact_sheet"], overlays=True
+            )
+            facts = {
+                "schema_version": VISION_JOB_SCHEMA_VERSION,
+                "job_id": manifest["job_id"],
+                "kind": manifest["kind"],
+                "measurement": EDDY_LIGHT_MEASUREMENT,
+                "accepted": bool(analysis.get("ok")),
+                "stage": analysis.get("stage"),
+                "selection": analysis.get("selection"),
+                "hard_failures": analysis.get("hard_failures") or [],
+                "source_calib_sha256": (
+                    manifest.get("measurement_parameters") or {}
+                ).get("source_calib_sha256"),
+                "active_config_fingerprint": (
+                    manifest.get("measurement_parameters") or {}
+                ).get("active_config_fingerprint"),
+            }
         else:
             frames = load_job_frames_for_analysis(job_dir / "manifest.json")
             analysis = analyze_sweep_frames(
@@ -5053,12 +6898,20 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
                 BED_Y_MEASUREMENT
                 if manifest.get("kind") == BED_Y_JOB_KIND
                 else (
-                    EDDY_RELATIVE_MEASUREMENT
-                    if manifest.get("kind") == EDDY_RELATIVE_JOB_KIND
+                    ROUGH_RELATIVE_MEASUREMENT
+                    if manifest.get("kind") == ROUGH_RELATIVE_JOB_KIND
                     else (
-                        NOZZLE_Z_MEASUREMENT
-                        if manifest.get("kind") == NOZZLE_Z_JOB_KIND
-                        else "idex_nozzle_relative_offset"
+                        EDDY_LIGHT_MEASUREMENT
+                        if manifest.get("kind") == EDDY_LIGHT_JOB_KIND
+                        else (
+                            EDDY_RELATIVE_MEASUREMENT
+                            if manifest.get("kind") == EDDY_RELATIVE_JOB_KIND
+                            else (
+                                NOZZLE_Z_MEASUREMENT
+                                if manifest.get("kind") == NOZZLE_Z_JOB_KIND
+                                else "idex_nozzle_relative_offset"
+                            )
+                        )
                     )
                 )
             ),
@@ -5080,6 +6933,7 @@ def analyze_acquired_job(args: argparse.Namespace) -> dict[str, Any]:
         result["final_state"] = final_state.get("state")
     finally:
         atomic_write_json(paths["result"], result)
+        refresh_vision_ui_best_effort(Path(args.job_root))
     return result
 
 
@@ -5150,6 +7004,258 @@ def run_nozzle_z_full_job(args: argparse.Namespace) -> dict[str, Any]:
         "committed_frame_count": acquisition.get("committed_frame_count"),
     }
     return result
+
+
+def run_rough_relative_full_job(args: argparse.Namespace) -> dict[str, Any]:
+    acquisition = run_rough_relative_acquisition_job(args)
+    if not acquisition.get("ok"):
+        return {
+            **acquisition,
+            "ok": False,
+            "analysis_started": False,
+            "message": acquisition.get("error")
+            or acquisition.get("failure")
+            or "rough relative acquisition failed before analysis",
+        }
+    analyze_args = argparse.Namespace(**vars(args))
+    analyze_args.analyze_job = acquisition["job_id"]
+    result = analyze_acquired_job(analyze_args)
+    result["acquisition"] = {
+        "ok": acquisition.get("ok"),
+        "state": acquisition.get("state"),
+        "virtual_sd_filename": acquisition.get("virtual_sd_filename"),
+        "committed_frame_count": acquisition.get("committed_frame_count"),
+    }
+    return result
+
+
+def _profile_controls(profile_path: Path, profile_name: str) -> list[dict[str, Any]]:
+    payload = read_json(profile_path)
+    aliases = payload.get("aliases") or {}
+    resolved_name = str(aliases.get(profile_name) or profile_name)
+    profile = (payload.get("profiles") or {}).get(resolved_name)
+    if not isinstance(profile, dict):
+        raise RuntimeError(f"camera profile {profile_name!r} is not defined")
+    controls = profile.get("controls")
+    if not isinstance(controls, list):
+        raise RuntimeError(f"camera profile {profile_name!r} has no controls")
+    return controls
+
+
+def run_eddy_lighting_full_job(args: argparse.Namespace) -> dict[str, Any]:
+    parent_run_id = generated_job_id_for_kind(
+        EDDY_LIGHT_JOB_KIND,
+        args.name,
+        datetime.now(timezone.utc),
+    )
+    stages: list[dict[str, Any]] = []
+
+    exposure_result = run_eddy_lighting_stage(
+        args,
+        stage="exposure",
+        exposures=list(EDDY_LIGHT_EXPOSURES),
+        parent_run_id=parent_run_id,
+    )
+    stages.append(exposure_result)
+    if not exposure_result.get("ok"):
+        return {
+            **exposure_result,
+            "parent_run_id": parent_run_id,
+            "stages": stages,
+        }
+    exposures = [
+        int(value)
+        for value in (
+            exposure_result.get("analysis", {})
+            .get("selection", {})
+            .get("exposures", [])
+        )
+    ]
+    if len(set(exposures)) != 2:
+        return {
+            "ok": False,
+            "parent_run_id": parent_run_id,
+            "stages": stages,
+            "error": "exposure bracket did not resolve two fixed exposures",
+        }
+
+    single_result = run_eddy_lighting_stage(
+        args,
+        stage="single",
+        exposures=exposures,
+        led_indices=list(range(1, 9)),
+        parent_run_id=parent_run_id,
+    )
+    stages.append(single_result)
+    if not single_result.get("ok"):
+        return {
+            **single_result,
+            "parent_run_id": parent_run_id,
+            "stages": stages,
+        }
+    led_indices = [
+        int(value)
+        for value in (
+            single_result.get("analysis", {})
+            .get("selection", {})
+            .get("led_indices", [])
+        )
+    ]
+    if len(set(led_indices)) != 4:
+        return {
+            "ok": False,
+            "parent_run_id": parent_run_id,
+            "stages": stages,
+            "error": "single-LED sweep did not resolve four low-glare LEDs",
+        }
+
+    pairs = [tuple(pair) for pair in itertools.combinations(led_indices, 2)]
+    pair_result = run_eddy_lighting_stage(
+        args,
+        stage="pair",
+        exposures=exposures,
+        led_pairs=pairs,
+        parent_run_id=parent_run_id,
+    )
+    stages.append(pair_result)
+    if not pair_result.get("ok"):
+        return {
+            **pair_result,
+            "parent_run_id": parent_run_id,
+            "stages": stages,
+        }
+    winner = (
+        pair_result.get("analysis", {}).get("selection", {}).get("winner")
+    )
+    if not isinstance(winner, dict):
+        return {
+            "ok": False,
+            "parent_run_id": parent_run_id,
+            "stages": stages,
+            "error": "pair sweep did not resolve a fixed lighting winner",
+        }
+
+    duplicate_result = run_eddy_lighting_stage(
+        args,
+        stage="duplicate",
+        exposures=[int(winner["exposure"])],
+        winner=winner,
+        parent_run_id=parent_run_id,
+    )
+    stages.append(duplicate_result)
+    if not duplicate_result.get("ok"):
+        return {
+            **duplicate_result,
+            "parent_run_id": parent_run_id,
+            "stages": stages,
+        }
+
+    source_path = Path(args.source_calib)
+    profile_name = f"eddy_exp_{int(winner['exposure'])}"
+    controls = _profile_controls(Path(args.profile_source), profile_name)
+    final_job_dir = Path(duplicate_result["manifest_path"]).parent
+    final_analysis_dir = final_job_dir / "analysis"
+    pixel_values = {
+        str(index): float((winner.get("pixel_values") or {}).get(str(index), 0.0))
+        for index in range(1, 9)
+    }
+    duplicate_validation = (
+        duplicate_result.get("analysis", {})
+        .get("selection", {})
+        .get("duplicate_validation")
+    )
+    target = {
+        "fixed_manual": True,
+        "capture_pose": {
+            "tool": "T0",
+            "x": float(args.eddy_anchor_x),
+            "y": float(args.eddy_anchor_y),
+            "z": float(args.eddy_anchor_z),
+        },
+        "profile": profile_name,
+        "camera_controls": controls,
+        "lighting": {
+            "type": "dotstar",
+            "pixels": pixel_values,
+        },
+        "quality": {
+            "winning_search_score": winner.get("score"),
+            "duplicate_validation": duplicate_validation,
+        },
+        "provenance": {
+            "parent_run_id": parent_run_id,
+            "stage_job_ids": [stage.get("job_id") for stage in stages],
+            "stage_manifest_hashes": [
+                stage.get("manifest_hash") for stage in stages
+            ],
+            "source_calib_sha256": rough_sha256_file(source_path),
+            "active_config_fingerprint": args.active_config_fingerprint,
+        },
+    }
+    candidate = write_calib_candidate(
+        source_path=source_path,
+        destination=final_analysis_dir / "calib_eddy_lighting_candidate.yaml",
+        target_update=("eddy_fiducial", target),
+    )
+    report = {
+        "ok": True,
+        "accepted": True,
+        "report_only": True,
+        "parent_run_id": parent_run_id,
+        "selected_exposures": exposures,
+        "selected_low_glare_leds": led_indices,
+        "tested_pairs": [list(pair) for pair in pairs],
+        "winner": winner,
+        "duplicate_validation": duplicate_validation,
+        "candidate": candidate,
+        "stages": [
+            {
+                "stage": stage.get("analysis", {}).get("stage"),
+                "job_id": stage.get("job_id"),
+                "manifest_hash": stage.get("manifest_hash"),
+                "result_path": stage.get("result_path"),
+                "overlay_contact_sheet_path": stage.get(
+                    "overlay_contact_sheet_path"
+                ),
+            }
+            for stage in stages
+        ],
+    }
+    report_path = final_analysis_dir / "eddy_lighting_report.json"
+    atomic_write_json(report_path, report)
+    markdown_path = final_analysis_dir / "eddy_lighting_report.md"
+    atomic_write_text(
+        markdown_path,
+        "\n".join(
+            [
+                "# Eddy fiducial lighting calibration",
+                "",
+                "- Accepted: `True`",
+                f"- Fixed exposure: `{winner['exposure']}`",
+                f"- Per-pixel lighting: `{json.dumps(pixel_values, sort_keys=True)}`",
+                (
+                    "- Duplicate center spread: "
+                    f"`{float(duplicate_validation['center_spread_px']):.4f} px`"
+                ),
+                (
+                    "- Duplicate score variation: "
+                    f"`{float(duplicate_validation['score_cv']):.4f}`"
+                ),
+                f"- Candidate: `{candidate['candidate_path']}`",
+                "",
+                "The candidate is report-only and has not been activated.",
+            ]
+        )
+        + "\n",
+    )
+    duplicate_result["lighting_report"] = report
+    duplicate_result["lighting_report_path"] = str(report_path)
+    duplicate_result["lighting_markdown_path"] = str(markdown_path)
+    duplicate_result["candidate"] = candidate
+    duplicate_result["parent_run_id"] = parent_run_id
+    duplicate_result["stages"] = report["stages"]
+    atomic_write_json(Path(duplicate_result["result_path"]), duplicate_result)
+    return duplicate_result
 
 
 def query_eddy_preflight_status(base_url: str) -> dict[str, Any]:
@@ -5808,6 +7914,124 @@ def render_nozzle_z_offsets_result(facts: dict[str, Any], state: dict[str, Any])
     )
 
 
+def render_eddy_z_diagnostic_result(
+    facts: dict[str, Any], state: dict[str, Any]
+) -> str:
+    accepted = bool(facts.get("ok"))
+    status_class = "result-ok" if accepted else "result-bad"
+    status_text = "complete" if accepted else "data-quality failure"
+    stationary = (
+        (facts.get("stationary_noise") or {}).get("raw_calibrated_height_mm")
+        or {}
+    )
+    small_step = facts.get("small_step_response") or {}
+    homing = facts.get("homing_repeatability") or {}
+    center = next(
+        (
+            item
+            for item in homing.get("positions") or []
+            if math.isclose(float(item.get("sensor_x_mm") or 0.0), 117.5)
+        ),
+        {},
+    )
+    gantry = (facts.get("gantry_plane") or {}).get("left_to_right_span_mm") or {}
+    bed = facts.get("bed_planeness") or {}
+    rows = [
+        (
+            "Data quality",
+            f'<span class="{status_class}">{html_text(status_text)}</span>',
+            html_text(
+                state.get("reason")
+                or "; ".join(str(value) for value in facts.get("hard_failures") or [])
+                or "all synchronized sample windows complete"
+            ),
+        ),
+        (
+            "Stationary Eddy noise",
+            html_text(format_report_value(stationary.get("stddev"), "mm", 6)),
+            "raw calibrated-height standard deviation",
+        ),
+        (
+            "Maximum directional hysteresis",
+            html_text(
+                format_report_value(
+                    facts.get("maximum_absolute_hysteresis_mm"), "mm", 6
+                )
+            ),
+            "baseline only; no mechanical pass/fail threshold",
+        ),
+        (
+            "Smallest resolved reversal",
+            html_text(
+                format_report_value(
+                    small_step.get("smallest_reliably_resolved_reversal_mm"),
+                    "mm",
+                    4,
+                )
+            ),
+            "requires repeatable response in both directions",
+        ),
+        (
+            "Center homing range",
+            html_text(format_report_value(center.get("range"), "mm", 6)),
+            "ten physical dual-Z homes",
+        ),
+        (
+            "Gantry-plane cycle spread",
+            html_text(format_report_value(gantry.get("range"), "mm", 6)),
+            "range of fitted left-to-right span",
+        ),
+        (
+            "Bed peak-to-valley",
+            html_text(
+                format_report_value(bed.get("peak_to_valley_mm"), "mm", 5)
+            ),
+            "raw central 5x5 default-method mesh",
+        ),
+        (
+            "Residual bed warp",
+            html_text(
+                format_report_value(
+                    bed.get("residual_peak_to_valley_mm"), "mm", 5
+                )
+            ),
+            "peak-to-valley after best-fit X/Y plane removal",
+        ),
+    ]
+    row_html = "\n".join(
+        "<tr>"
+        f"<th>{html_text(label)}</th><td>{value}</td><td>{html_text(note)}</td>"
+        "</tr>"
+        for label, value, note in rows
+    )
+    artifacts = facts.get("artifacts") or {}
+    links = []
+    for label, key in (
+        ("Markdown report", "report"),
+        ("Samples CSV", "samples_csv"),
+        ("Analysis JSON", "analysis_json"),
+    ):
+        value = artifacts.get(key)
+        if value:
+            links.append(
+                f'<a href="{html_text(safe_root_vision_url(Path(value)))}">'
+                f"{html_text(label)}</a>"
+            )
+    plot_html = ""
+    for value in artifacts.get("plots") or []:
+        url = html_text(safe_root_vision_url(Path(value)))
+        plot_html += (
+            f'<a href="{url}"><img src="{url}" loading="lazy" '
+            'style="max-width:48%; margin:6px" alt="Eddy diagnostic plot"></a>'
+        )
+    return (
+        '<section class="measurement"><h2>Cold Eddy Z Diagnostic</h2>'
+        "<table><thead><tr><th>Metric</th><th>Value</th><th>Meaning</th></tr>"
+        f"</thead><tbody>{row_html}</tbody></table>"
+        f"<p>{' · '.join(links)}</p>{plot_html}</section>"
+    )
+
+
 def render_measurement_result(facts_path: Path, state: dict[str, Any]) -> str:
     facts = read_json_optional(facts_path)
     if not facts:
@@ -5826,6 +8050,8 @@ def render_measurement_result(facts_path: Path, state: dict[str, Any]) -> str:
         return render_bed_y_motion_result(facts, state)
     if facts.get("measurement") == NOZZLE_Z_MEASUREMENT:
         return render_nozzle_z_offsets_result(facts, state)
+    if facts.get("measurement") == EDDY_Z_DIAGNOSTIC_MEASUREMENT:
+        return render_eddy_z_diagnostic_result(facts, state)
 
     accepted = bool(facts.get("accepted") or facts.get("ok"))
     hard_failures = facts.get("hard_failures") or []
@@ -6008,6 +8234,34 @@ def discover_ui_jobs(job_root: Path) -> list[dict[str, Any]]:
     return jobs
 
 
+def discover_ui_job_roots(job_root: Path) -> list[Path]:
+    candidates = (
+        Path(job_root),
+        VISION_ROOT_DIR / "jobs",
+        VISION_ROOT_DIR / "nozzle_cam" / "jobs",
+        NOZZLE_JOB_ROOT,
+    )
+    roots: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = str(candidate.resolve(strict=False))
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        roots.append(candidate)
+    return roots
+
+
+def discover_all_ui_jobs(job_roots: list[Path]) -> list[dict[str, Any]]:
+    jobs_by_directory: dict[str, dict[str, Any]] = {}
+    for job_root in job_roots:
+        for job in discover_ui_jobs(job_root):
+            jobs_by_directory[str(job["job_dir"])] = job
+    jobs = list(jobs_by_directory.values())
+    jobs.sort(key=job_sort_timestamp, reverse=True)
+    return jobs
+
+
 def job_counts_by_state(jobs: list[dict[str, Any]]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for job in jobs:
@@ -6017,20 +8271,39 @@ def job_counts_by_state(jobs: list[dict[str, Any]]) -> dict[str, int]:
 
 
 def active_ui_job(job_root: Path, jobs: list[dict[str, Any]]) -> dict[str, Any] | None:
+    resolved_root = job_root.resolve(strict=False)
+    scoped_jobs = []
+    for job in jobs:
+        try:
+            Path(str(job["job_dir"])).resolve(strict=False).relative_to(resolved_root)
+        except ValueError:
+            continue
+        scoped_jobs.append(job)
     active_job_id = active_job_from_lock(job_root)
     if active_job_id:
-        for job in jobs:
+        for job in scoped_jobs:
             if job.get("job_id") == active_job_id:
                 return job
         return {"job_id": active_job_id, "state": "active-lock"}
-    for job in jobs:
+    for job in scoped_jobs:
         if job.get("state") in ("acquiring", "analysing"):
             return job
     return None
 
 
-def ui_jobs_payload(job_root: Path, jobs: list[dict[str, Any]]) -> dict[str, Any]:
-    active = active_ui_job(job_root, jobs)
+def ui_jobs_payload(
+    job_root: Path,
+    jobs: list[dict[str, Any]],
+    *,
+    job_roots: list[Path] | None = None,
+) -> dict[str, Any]:
+    active = None
+    for candidate_root in job_roots or [job_root]:
+        active = active_ui_job(candidate_root, jobs)
+        if active and active.get("state") == "active-lock":
+            continue
+        if active:
+            break
     return {
         "schema_version": VISION_JOB_SCHEMA_VERSION,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -6403,12 +8676,13 @@ setInterval(pollState, 4000);
 def refresh_vision_ui(job_root: Path | None = None) -> dict[str, Any]:
     resolved_job_root = Path(job_root or NOZZLE_JOB_ROOT)
     VISION_ROOT_DIR.mkdir(parents=True, exist_ok=True)
-    jobs = discover_ui_jobs(resolved_job_root)
+    job_roots = discover_ui_job_roots(resolved_job_root)
+    jobs = discover_all_ui_jobs(job_roots)
     for job in jobs:
         job_dir = Path(str(job["job_dir"]))
         if (job_dir / "manifest.json").exists() and (job_dir / "state.json").exists():
             atomic_write_text(job_dir / "index.html", render_job_detail_page(job_dir))
-    payload = ui_jobs_payload(resolved_job_root, jobs)
+    payload = ui_jobs_payload(resolved_job_root, jobs, job_roots=job_roots)
     jobs_path = VISION_ROOT_DIR / "jobs.json"
     index_path = VISION_ROOT_DIR / "index.html"
     atomic_write_json(jobs_path, payload)
@@ -6424,6 +8698,13 @@ def refresh_vision_ui(job_root: Path | None = None) -> dict[str, Any]:
         "job_count": len(jobs),
         "counts_by_state": payload["counts_by_state"],
     }
+
+
+def refresh_vision_ui_best_effort(job_root: Path) -> dict[str, Any] | None:
+    try:
+        return refresh_vision_ui(job_root)
+    except Exception:
+        return None
 
 
 def attach_ui_refresh(
@@ -6525,7 +8806,11 @@ def run_gcode(base_url: str, script: str, *, timeout: float = 60.0) -> None:
 
 
 def query_status(base_url: str) -> dict[str, Any]:
-    path = "/printer/objects/query?toolhead&gcode_move&webhooks&print_stats"
+    path = (
+        "/printer/objects/query?toolhead&gcode_move&webhooks&print_stats&"
+        "extruder&extruder1&heater_bed&"
+        "gcode_macro%20_IDEX_CONFIG_FINGERPRINT"
+    )
     return moonraker_get(base_url, path)["result"]["status"]
 
 
@@ -8030,6 +10315,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Generate the immutable vision phase of a cold Eddy relative job.",
     )
     mode.add_argument(
+        "--prepare-rough-relative-job",
+        action="store_true",
+        help="Generate an immutable cold rough T0/T1 XYZ vision job.",
+    )
+    mode.add_argument(
+        "--prepare-eddy-lighting-job",
+        action="store_true",
+        help="Generate one immutable Eddy fiducial lighting stage.",
+    )
+    mode.add_argument(
         "--start-prepared-job",
         metavar="JOB_ID",
         help="Start and monitor an existing prepared vision job through virtual SD.",
@@ -8048,6 +10343,11 @@ def main(argv: list[str] | None = None) -> int:
         "--run-eddy-relative-acquisition-job",
         action="store_true",
         help="Prepare, start, and monitor the Eddy relative vision phase only.",
+    )
+    mode.add_argument(
+        "--run-rough-relative-acquisition-job",
+        action="store_true",
+        help="Prepare, start, and monitor a rough T0/T1 XYZ vision job.",
     )
     mode.add_argument(
         "--analyze-job",
@@ -8075,6 +10375,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Run the complete cold, contact-free, report-only Eddy calibration.",
     )
     mode.add_argument(
+        "--run-rough-relative-job",
+        action="store_true",
+        help="Run two-pass report-only rough T0/T1 XYZ calibration.",
+    )
+    mode.add_argument(
+        "--run-eddy-lighting-job",
+        action="store_true",
+        help="Run the four-stage report-only Eddy fiducial lighting sweep.",
+    )
+    mode.add_argument(
         "--refresh-ui",
         action="store_true",
         help="Regenerate static vision job HTML and jobs.json without printer motion.",
@@ -8092,6 +10402,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tool-x", type=float, default=195.0)
     parser.add_argument("--tool-y", type=float, default=-14.8)
     parser.add_argument("--travel-z", type=float, default=20.0)
+    parser.add_argument("--rough-travel-z", type=float, default=ROUGH_TRAVEL_Z)
+    parser.add_argument("--t0-anchor-x", type=float, default=ROUGH_T0_ANCHOR_X)
+    parser.add_argument("--t1-anchor-x", type=float, default=ROUGH_T1_ANCHOR_X)
+    parser.add_argument("--anchor-y", type=float, default=ROUGH_ANCHOR_Y)
+    parser.add_argument("--anchor-z", type=float, default=ROUGH_ANCHOR_Z)
+    parser.add_argument("--mode", choices=("MEASURE", "VERIFY"), default="MEASURE")
+    parser.add_argument("--current-t1-x-endstop", type=float, default=357.532)
+    parser.add_argument("--current-t1-y-endstop", type=float, default=-15.820)
     parser.add_argument("--bed-center-x", type=float, default=117.5)
     parser.add_argument("--bed-center-y", type=float, default=117.5)
     parser.add_argument("--nozzle-to-coil-x", type=float, default=-8.18)
@@ -8099,6 +10417,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--nozzle-to-coil-z", type=float, default=2.5)
     parser.add_argument("--eddy-upper-gap", type=float, default=4.0)
     parser.add_argument("--eddy-step", type=float, default=0.1)
+    parser.add_argument("--eddy-anchor-x", type=float, default=EDDY_LIGHT_ANCHOR_X)
+    parser.add_argument("--eddy-anchor-y", type=float, default=EDDY_LIGHT_ANCHOR_Y)
+    parser.add_argument("--eddy-anchor-z", type=float, default=EDDY_LIGHT_ANCHOR_Z)
+    parser.add_argument(
+        "--eddy-exposures",
+        default=",".join(str(value) for value in EDDY_LIGHT_EXPOSURES),
+    )
+    parser.add_argument(
+        "--lighting-stage",
+        choices=("exposure", "single", "pair", "duplicate"),
+        default="exposure",
+    )
+    parser.add_argument("--parent-run-id")
+    parser.add_argument("--source-calib", type=Path, default=DEFAULT_CALIB_SOURCE)
+    parser.add_argument("--profile-source", type=Path, default=DEFAULT_PROFILE_SOURCE)
+    parser.add_argument("--active-config-fingerprint", default="")
     parser.add_argument(
         "--bed-feature-z-mm",
         type=float,
@@ -8123,7 +10457,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ready-timeout", type=float, default=30.0)
     parser.add_argument("--virtual-sd-root", type=Path, default=DEFAULT_VIRTUAL_SD_ROOT)
     parser.add_argument("--virtual-sd-subdir", default=DEFAULT_VIRTUAL_SD_SUBDIR)
-    parser.add_argument("--monitor-timeout", type=float, default=180.0)
+    parser.add_argument("--monitor-timeout", type=float, default=900.0)
     parser.add_argument("--eddy-monitor-timeout", type=float, default=900.0)
     parser.add_argument(
         "--restore", action=argparse.BooleanOptionalAction, default=True
@@ -8141,26 +10475,34 @@ def main(argv: list[str] | None = None) -> int:
         and not args.prepare_bed_y_job
         and not args.prepare_nozzle_z_job
         and not args.prepare_eddy_relative_job
+        and not args.prepare_rough_relative_job
+        and not args.prepare_eddy_lighting_job
         and not args.start_prepared_job
         and not args.run_acquisition_job
         and not args.run_nozzle_z_acquisition_job
         and not args.run_eddy_relative_acquisition_job
+        and not args.run_rough_relative_acquisition_job
         and not args.analyze_job
         and not args.run_job
         and not args.run_bed_y_job
         and not args.run_nozzle_z_job
         and not args.run_eddy_relative_job
+        and not args.run_rough_relative_job
+        and not args.run_eddy_lighting_job
         and not args.refresh_ui
     ):
         parser.error(
             "single-image nozzle vision check was removed; use --sweep, "
             "--prepare-job, --prepare-bed-y-job, --prepare-nozzle-z-job, "
             "--prepare-eddy-relative-job, "
+            "--prepare-rough-relative-job, --prepare-eddy-lighting-job, "
             "--start-prepared-job, --run-acquisition-job, "
             "--run-nozzle-z-acquisition-job, "
             "--run-eddy-relative-acquisition-job, --analyze-job, --run-job, "
+            "--run-rough-relative-acquisition-job, "
             "--run-bed-y-job, --run-nozzle-z-job, "
-            "--run-eddy-relative-job, or --refresh-ui"
+            "--run-eddy-relative-job, --run-rough-relative-job, "
+            "--run-eddy-lighting-job, or --refresh-ui"
         )
     if args.z is None:
         args.z = 20.0
@@ -8188,14 +10530,27 @@ def main(argv: list[str] | None = None) -> int:
         attach_ui_refresh(summary, args)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0 if summary.get("ok") else 1
+    if args.prepare_rough_relative_job:
+        summary = prepare_rough_relative_vision_job(args)
+        attach_ui_refresh(summary, args)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0 if summary.get("ok") else 1
+    if args.prepare_eddy_lighting_job:
+        summary = prepare_eddy_lighting_vision_job(args)
+        attach_ui_refresh(summary, args)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0 if summary.get("ok") else 1
     if (
         args.start_prepared_job
         or args.run_acquisition_job
         or args.run_nozzle_z_acquisition_job
         or args.run_eddy_relative_acquisition_job
+        or args.run_rough_relative_acquisition_job
     ):
         try:
-            if args.run_eddy_relative_acquisition_job:
+            if args.run_rough_relative_acquisition_job:
+                result = run_rough_relative_acquisition_job(args)
+            elif args.run_eddy_relative_acquisition_job:
                 result = run_eddy_relative_acquisition_job(args)
             elif args.run_nozzle_z_acquisition_job:
                 result = run_nozzle_z_acquisition_job(args)
@@ -8218,9 +10573,15 @@ def main(argv: list[str] | None = None) -> int:
         or args.run_bed_y_job
         or args.run_nozzle_z_job
         or args.run_eddy_relative_job
+        or args.run_rough_relative_job
+        or args.run_eddy_lighting_job
     ):
         try:
-            if args.run_eddy_relative_job:
+            if args.run_eddy_lighting_job:
+                result = run_eddy_lighting_full_job(args)
+            elif args.run_rough_relative_job:
+                result = run_rough_relative_full_job(args)
+            elif args.run_eddy_relative_job:
                 result = run_eddy_relative_full_job(args)
             elif args.run_bed_y_job:
                 result = run_bed_y_full_job(args)

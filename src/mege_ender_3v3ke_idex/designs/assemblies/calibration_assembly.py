@@ -51,8 +51,8 @@ def create_calibration_assembly(
         # Add text label for diameter - centered on the cylinder in x-axis
         try:
             text_obj = create_text_object(
-                str(d), size=font_size, thickness=base_thickness + 2
-            )  # Cut all the way through
+                str(d), size=font_size, thickness=base_thickness / 2
+            )
             bbox_center = get_bounding_box_center(text_obj)
             text_obj = translate(-bbox_center[0], -bbox_center[1], -bbox_center[2])(
                 text_obj
@@ -63,9 +63,7 @@ def create_calibration_assembly(
                 text_obj, post, Alignment.CENTER, axes=[0]
             )  # x-axis centering
             text_obj = align(text_obj, original_base, Alignment.FRONT)
-            text_obj = align(
-                text_obj, original_base, Alignment.CENTER, axes=[2]
-            )  # Center in z-axis through the base
+            text_obj = align(text_obj, original_base, Alignment.TOP)
             text_obj = translate(0, text_y_offset, 0)(text_obj)  # Only y offset needed
 
             # Collect the text for cutting instead of fusing

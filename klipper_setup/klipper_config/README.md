@@ -231,6 +231,94 @@ provenance hashes, and—only when all quality gates pass—an inactive
 `SAVE_CONFIG`, never activates the candidate, and never performs nozzle
 contact.
 
+## Manual Eddy Probe Calibration
+
+The active config keeps both physical Z endstops. Eddy is a probe only; it is
+not a `z_virtual_endstop`. The CAD-derived probe offsets are `X=-8.180` and
+`Y=9.000`. The `reg_drive_current` and exact Klipper `calibrate` curve remain
+empty in `calib.yaml` until they have been measured on the assembled printer.
+
+Before motion, clean the cold T0 nozzle and bed, check that the Eddy and cable
+are rigid, and physically verify about 2–3 mm coil-to-bed clearance when the
+nozzle is at the paper-contact plane. Observe one Z home and a slow long Z move
+after any Z-axis rebuild.
+
+With X/Y/Z homed and T0 selected, put the coil at the bed center and about
+20 mm above the bed:
+
+```gcode
+G90
+G1 Z20 F1200
+G1 X125.68 Y108.5 F6000
+G1 Z17.5 F1200
+LDC_CALIBRATE_DRIVE_CURRENT CHIP=btt_eddy
+```
+
+Do not run `SAVE_CONFIG`. Read Klipper's staged value:
+
+```bash
+curl -s 'http://menderpi.local/server/printer/objects/query?configfile' \
+  | jq '.result.status.configfile.save_config_pending_items["probe_eddy_current btt_eddy"]'
+```
+
+Copy the proposed integer to
+`eddy_relative_calibration.klipper.reg_drive_current` in `calib.yaml`,
+regenerate, deploy, and confirm `save_config_pending` is exactly `false`.
+
+After the heaters are off, bed and both nozzles are at or below 35 C, and the
+self-heated Eddy temperature has stabilized, start the manual paper mapping:
+
+```gcode
+G90
+T0
+G1 Z5 F1200
+G1 X117.5 Y117.5 F6000
+PROBE_EDDY_CURRENT_CALIBRATE CHIP=btt_eddy
+```
+
+Use the Mainsail manual-probe controls and one consistent paper-pinch
+criterion. Use `ACCEPT` only after physically checking the nozzle; use `ABORT`
+on unexpected motion. Capture Klipper's noise, frequency-range, and
+usable-height messages. Require useful coverage through approximately 3 mm.
+Again, do not run `SAVE_CONFIG`: copy the exact staged `calibrate` string into
+`eddy_relative_calibration.klipper.calibrate`, regenerate, deploy, and verify
+that no autosave footer or pending state remains.
+
+Record the two smoke checks as provenance:
+
+```gcode
+PROBE_ACCURACY METHOD=scan SAMPLES=50
+PROBE_ACCURACY SAMPLES=20 PROBE_SPEED=2 SAMPLE_RETRACT_DIST=1
+```
+
+## Cold Eddy Z Diagnostic
+
+After the manual curve is active, run:
+
+```gcode
+IDEX_EDDY_Z_DIAGNOSTIC_COLD NAME=post_rebuild_baseline
+```
+
+The macro refuses printing, unhomed axes, nonzero heater targets, bed/nozzle
+temperatures above 35 C, pending `SAVE_CONFIG` changes, missing Eddy
+calibration, and a stale config fingerprint. The runner collects synchronized
+400 Hz stationary, directional-hysteresis, small-reversal, and ten-home
+left/center/right measurements. It then captures a default-method 5x5 mesh
+over probe coordinates `37.5,37.5` through `197.5,197.5`.
+
+The mesh is visualization data only. It is never saved and the runner attempts
+`BED_MESH_CLEAR` in unconditional cleanup, including after acquisition or
+analysis failure. JSON, CSV, Markdown, raw sidecars, and plots are written to:
+
+```text
+/home/pi/printer_data/vision/nozzle_cam/jobs/<job_id>/
+```
+
+Open `http://menderpi.local/vision/` for the browser report. Mechanical values
+are labeled `baseline_only`; only incomplete windows, Eddy errors/overflows,
+unsafe coordinates, excessive reference drift, or an incomplete mesh fail the
+job.
+
 ## Boosted Heatbed
 
 The active bed remains `[heater_bed]` for normal Klipper and UI compatibility.
