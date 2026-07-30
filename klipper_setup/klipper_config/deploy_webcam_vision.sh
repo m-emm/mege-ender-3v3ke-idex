@@ -9,18 +9,17 @@ PRIMARY_CAMERA_DEVICE="${VISION_CAMERA_DEVICE:-/dev/v4l/by-id/usb-Aukey-PC-LM1E_
 NOZZLE_CAMERA_DEVICE="${NOZZLE_CAMERA_DEVICE:-/dev/v4l/by-id/usb-Vimicro_corp._PC-LM1E_Camera_PC-LM1E_Audio-video-index0}"
 WEBCAM_HEALTH_DURATION="${WEBCAM_HEALTH_DURATION:-10}"
 WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES="${WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES:-2}"
+VISION_CLEAN_SLATE="${VISION_CLEAN_SLATE:-0}"
 
 required_files=(
   moonraker.conf
   nginx-mainsail.conf
   vision_framebuffer.py
   vision_capture.py
-  vision_bed_y.py
-  vision_nozzle_align.py
-  vision_rough_calibration.py
-  eddy_relative_calibration.py
-  eddy_z_diagnostic.py
-  vision_runner.py
+  vision_calibration.py
+  vision_calibration_graph.py
+  vision_bed_tab_y_scale.py
+  vision_job_types.json
   webcam_health_probe.py
   nozzle_cam_profiles.json
   vision-framebuffer.service
@@ -74,12 +73,10 @@ scp \
   "${FILES_DIR}/nginx-mainsail.conf" \
   "${FILES_DIR}/vision_framebuffer.py" \
   "${FILES_DIR}/vision_capture.py" \
-  "${FILES_DIR}/vision_bed_y.py" \
-  "${FILES_DIR}/vision_nozzle_align.py" \
-  "${FILES_DIR}/vision_rough_calibration.py" \
-  "${FILES_DIR}/eddy_relative_calibration.py" \
-  "${FILES_DIR}/eddy_z_diagnostic.py" \
-  "${FILES_DIR}/vision_runner.py" \
+  "${FILES_DIR}/vision_calibration.py" \
+  "${FILES_DIR}/vision_calibration_graph.py" \
+  "${FILES_DIR}/vision_bed_tab_y_scale.py" \
+  "${FILES_DIR}/vision_job_types.json" \
   "${FILES_DIR}/webcam_health_probe.py" \
   "${FILES_DIR}/nozzle_cam_profiles.json" \
   "${FILES_DIR}/vision-framebuffer.service" \
@@ -90,7 +87,7 @@ scp \
   "${REMOTE_HOST}:${remote_tmp}/"
 
 ssh "${REMOTE_HOST}" \
-  "REMOTE_TMP='${remote_tmp}' PRIMARY_CAMERA_DEVICE='${PRIMARY_CAMERA_DEVICE}' NOZZLE_CAMERA_DEVICE='${NOZZLE_CAMERA_DEVICE}' WEBCAM_HEALTH_DURATION='${WEBCAM_HEALTH_DURATION}' WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES='${WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES}' bash -s" <<'REMOTE_SCRIPT'
+  "REMOTE_TMP='${remote_tmp}' PRIMARY_CAMERA_DEVICE='${PRIMARY_CAMERA_DEVICE}' NOZZLE_CAMERA_DEVICE='${NOZZLE_CAMERA_DEVICE}' WEBCAM_HEALTH_DURATION='${WEBCAM_HEALTH_DURATION}' WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES='${WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES}' VISION_CLEAN_SLATE='${VISION_CLEAN_SLATE}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 USERNAME="$(id -un)"
@@ -108,6 +105,50 @@ backup_if_exists() {
   fi
 }
 
+if [[ "${VISION_CLEAN_SLATE}" == "1" ]]; then
+  if [[ "${USERNAME}" != "pi" || "${USER_HOME}" != "/home/pi" ]]; then
+    echo "Refusing clean-slate deletion for unexpected user/home: ${USERNAME} ${USER_HOME}" >&2
+    exit 1
+  fi
+  echo "Checking that Klipper is ready and no virtual-SD print is active..."
+  python3 - <<'PY'
+import json
+import urllib.request
+
+url = (
+    "http://127.0.0.1/printer/objects/query?"
+    "webhooks=state&print_stats=state,filename&virtual_sdcard=is_active"
+)
+with urllib.request.urlopen(url, timeout=10) as response:
+    status = json.loads(response.read())["result"]["status"]
+if status.get("webhooks", {}).get("state") != "ready":
+    raise SystemExit(f"Klipper is not ready: {status}")
+if status.get("print_stats", {}).get("state") not in ("standby", "complete"):
+    raise SystemExit(f"Printer is not idle: {status}")
+if status.get("virtual_sdcard", {}).get("is_active"):
+    raise SystemExit(f"Virtual SD is active: {status}")
+PY
+  echo "Stopping vision writers and removing the authorized legacy data..."
+  sudo systemctl stop vision-capture.service vision-capture-nozzle-cam.service
+  python3 - <<'PY'
+import shutil
+from pathlib import Path
+
+for expected in (
+    Path("/home/pi/printer_data/vision"),
+    Path("/home/pi/printer_data/gcodes/vision_jobs"),
+):
+    expected.mkdir(parents=True, exist_ok=True)
+    if expected.resolve() != expected:
+        raise SystemExit(f"Refusing unexpected cleanup target: {expected.resolve()}")
+    for child in list(expected.iterdir()):
+        if child.is_dir() and not child.is_symlink():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+PY
+fi
+
 echo "Installing webcam and vision-capture dependencies..."
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
@@ -121,7 +162,10 @@ sudo apt-get install -y --no-install-recommends \
 
 echo "Installing tracked configs and services..."
 sudo install -d -m 0755 -o "${USERNAME}" -g "${USERNAME}" \
-  "${CONFIG_DIR}" "${LOG_DIR}" "${PRINTER_DATA}/systemd" "${VISION_DIR}" "${VISION_DIR}/nozzle_cam"
+  "${CONFIG_DIR}" "${LOG_DIR}" "${PRINTER_DATA}/systemd" \
+  "${VISION_DIR}" "${VISION_DIR}/calibration/jobs" \
+  "${VISION_DIR}/calibration/publications" \
+  "${PRINTER_DATA}/gcodes/vision_jobs"
 sudo install -d -m 0755 /usr/local/share/vision
 sudo setfacl -m u:www-data:--x "${USER_HOME}"
 
@@ -143,15 +187,20 @@ sudo rm -f /etc/nginx/sites-enabled/default
 
 sudo install -m 0755 "${REMOTE_TMP}/vision_framebuffer.py" /usr/local/bin/vision_framebuffer.py
 sudo install -m 0755 "${REMOTE_TMP}/vision_capture.py" /usr/local/bin/vision_capture.py
-sudo install -m 0644 "${REMOTE_TMP}/vision_bed_y.py" /usr/local/bin/vision_bed_y.py
-sudo install -m 0755 "${REMOTE_TMP}/vision_nozzle_align.py" /usr/local/bin/vision_nozzle_align.py
-sudo install -m 0644 "${REMOTE_TMP}/vision_rough_calibration.py" /usr/local/bin/vision_rough_calibration.py
-sudo install -m 0644 "${REMOTE_TMP}/eddy_relative_calibration.py" /usr/local/bin/eddy_relative_calibration.py
-sudo install -m 0755 "${REMOTE_TMP}/eddy_z_diagnostic.py" /usr/local/bin/eddy_z_diagnostic.py
-sudo install -m 0755 "${REMOTE_TMP}/vision_runner.py" /usr/local/bin/vision_runner.py
+sudo install -m 0755 "${REMOTE_TMP}/vision_calibration.py" /usr/local/bin/vision_calibration.py
+sudo install -m 0644 "${REMOTE_TMP}/vision_calibration_graph.py" /usr/local/bin/vision_calibration_graph.py
+sudo install -m 0644 "${REMOTE_TMP}/vision_bed_tab_y_scale.py" /usr/local/bin/vision_bed_tab_y_scale.py
 sudo install -m 0755 "${REMOTE_TMP}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py
 sudo install -m 0644 "${REMOTE_TMP}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json
+sudo install -m 0644 "${REMOTE_TMP}/vision_job_types.json" /usr/local/share/vision/vision_job_types.json
 sudo install -m 0644 "${REMOTE_TMP}/calib.yaml" /usr/local/share/vision/calib.yaml
+sudo rm -f \
+  /usr/local/bin/vision_bed_y.py \
+  /usr/local/bin/vision_nozzle_align.py \
+  /usr/local/bin/vision_rough_calibration.py \
+  /usr/local/bin/eddy_relative_calibration.py \
+  /usr/local/bin/eddy_z_diagnostic.py \
+  /usr/local/bin/vision_runner.py
 sudo install -m 0644 "${REMOTE_TMP}/vision-framebuffer.service" /etc/systemd/system/vision-framebuffer.service
 sudo install -m 0644 "${REMOTE_TMP}/vision-framebuffer-nozzle-cam.service" /etc/systemd/system/vision-framebuffer-nozzle-cam.service
 sudo install -m 0644 "${REMOTE_TMP}/vision-capture.service" /etc/systemd/system/vision-capture.service
@@ -179,7 +228,7 @@ echo "Regenerating static vision UI..."
 sudo -u "${USERNAME}" env \
   VISION_OUTPUT_DIR="${VISION_DIR}" \
   VISION_OUTPUT_URL_PREFIX=/vision \
-  /usr/local/bin/vision_nozzle_align.py --refresh-ui
+  /usr/local/bin/vision_calibration.py rebuild-catalog
 
 echo "Waiting for RAM-buffered webcam endpoints..."
 python3 - <<'PY'
@@ -329,9 +378,9 @@ if ! /usr/local/bin/webcam_health_probe.py \
   --max-consecutive-zero 1 \
   --ignore-initial-samples "${WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES}" \
   --max-snapshot-p95 2.5 \
-  --json-output "${VISION_DIR}/webcam_health_latest.json"; then
+  --json-output "${REMOTE_TMP}/webcam_health_primary.json"; then
   echo "Webcam preview stream health check failed." >&2
-  echo "Report: ${VISION_DIR}/webcam_health_latest.json" >&2
+  echo "Report: ${REMOTE_TMP}/webcam_health_primary.json" >&2
   exit 1
 fi
 
@@ -348,9 +397,9 @@ if ! /usr/local/bin/webcam_health_probe.py \
   --max-consecutive-zero 1 \
   --ignore-initial-samples "${WEBCAM_HEALTH_IGNORE_INITIAL_SAMPLES}" \
   --max-snapshot-p95 2.5 \
-  --json-output "${VISION_DIR}/nozzle_cam/webcam_health_latest.json"; then
+  --json-output "${REMOTE_TMP}/webcam_health_nozzle_cam.json"; then
   echo "Nozzle camera preview stream health check failed." >&2
-  echo "Report: ${VISION_DIR}/nozzle_cam/webcam_health_latest.json" >&2
+  echo "Report: ${REMOTE_TMP}/webcam_health_nozzle_cam.json" >&2
   exit 1
 fi
 

@@ -82,24 +82,24 @@ http://menderpi.local/vision/
 ```
 
 Use that `/vision/` URL in the browser; do not paste the filesystem path into
-the address bar. It is a read-only static UI in this stage. Regenerate it from
-existing vision artifacts with:
+the address bar. It is generated only from the new calibration catalog.
+Rebuild the catalog and UI with:
 
 ```bash
-vision_nozzle_align.py --refresh-ui
+/usr/local/bin/vision_calibration.py rebuild-catalog
 ```
 
-Run a full IDEX nozzle acquisition and analysis job with:
+Run the first relative bed-tab Y/parallax job with:
 
 ```bash
-vision_nozzle_align.py --run-job --name nozzle_sweep --x 195 --y -14.8 --z 20 --dx 0,3,6,9,12
+/usr/local/bin/vision_calibration.py run nozzle_cam_bed_tab_y_scale --name bed_tab_y_scale
 ```
 
 The generated files live at:
 
 - `/home/pi/printer_data/vision/index.html`
-- `/home/pi/printer_data/vision/jobs.json`
-- `/home/pi/printer_data/vision/nozzle_cam/jobs/<job_id>/index.html`
+- `/home/pi/printer_data/vision/calibration/catalog.json`
+- `/home/pi/printer_data/vision/calibration/jobs/<job_id>/index.html`
 
 The boosted heatbed uses the normal `[heater_bed]` object with the 24V bed on
 `gpio21` and the SSR boost output on `gpio20`. Run the supervised calibration

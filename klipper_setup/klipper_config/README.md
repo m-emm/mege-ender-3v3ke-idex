@@ -33,291 +33,46 @@ python wiring/validate_wiring.py
 
 `update_menderpi.sh --check` verifies the generated local `printer.cfg`, the
 remote `~/printer_data/config/printer.cfg`, the patched remote
-`/opt/klipper/klippy/extras/heaters.py`, the bed-Y calibration template when
-configured, and the config Klippy has loaded via Moonraker without uploading
-files or restarting Klipper.
+`/opt/klipper/klippy/extras/heaters.py`, and the config Klippy has loaded via
+Moonraker without uploading files or restarting Klipper.
 
 `update_menderpi.sh` copies local `printer.cfg` to
 `~/printer_data/config/printer.cfg` on `pi@menderpi.local`, backs up the
 previous remote file with a timestamp, installs the custom Klipper host patch,
 restarts Klipper, and reports the Moonraker/Klippy state.
 
-## Nozzle Camera Bed Y Sweep
+## Vision Calibration Framework
 
-`nozzle_cam_bed_y_sweep` is a report-only first-stage vision job. It moves the
-printer Y axis away from the endstop and measures how fixed bed/fixture features
-move in nozzle-camera image space. It does not update `calib.yaml` and it does
-not solve nozzle Z height.
+The clean framework starts with the relative bed-tab Y/parallax job. It
+resolves T0 X park, Y minimum, and Z maximum from active Klipper, then captures
+nine frames at Y offsets 0, 5, 10, 15, 20, 15, 10, 5, and 0 mm.
 
-Run the default tested pose from SSH with:
+Run it from Mainsail:
+
+```gcode
+IDEX_BED_TAB_Y_SCALE_CALIBRATE NAME=bed_tab_y_scale
+```
+
+Or from the printer:
 
 ```bash
-ssh pi@menderpi.local '/usr/local/bin/vision_nozzle_align.py --run-bed-y-job --name bed_y --x -80.4 --y -14.8 --z 293.75 --y-offsets 0,5,10,15,20'
+/usr/local/bin/vision_calibration.py run nozzle_cam_bed_tab_y_scale --name bed_tab_y_scale
 ```
 
-Or queue the same job from Mainsail/Klipper with:
-
-```gcode
-IDEX_BED_Y_VISION_SWEEP NAME=bed_y X=-80.4 Y=-14.8 Z=293.75 Y_OFFSETS=0,5,10,15,20
-```
-
-Use the browser index for progress and history:
-
-- Browser index: `http://menderpi.local/vision/`
-- Per-job page: `http://menderpi.local/vision/nozzle_cam/jobs/<job_id>/`
-- Live progress: `state.json`, `events.jsonl`, and the frame count on the job
-  page.
-- Results: `analysis/facts.json`, `analysis/result.json`,
-  `analysis/raw_contact_sheet.jpg`, and `analysis/overlay_contact_sheet.jpg`.
-
-The stable fact names are:
-
-- `bed_y_axis_vector_px_per_mm`: image-space movement for +1 mm printer Y.
-  Image +Y is downward; negative image Y means the feature moves upward in the
-  camera image as printer Y increases.
-- `bed_y_scale_px_per_mm` and `bed_y_mm_per_px`: local bed-feature image scale.
-- `bed_y_axis_angle_deg`: direction in image coordinates.
-- `bed_y_cross_axis_px_per_mm`: X drift component during commanded Y motion.
-- `bed_y_fit_residual_rms_px`, `bed_y_correlation_min`, and
-  `bed_y_correlation_median`: template-match quality.
-- `bed_y_parallax_spread`: variation between accepted bed-feature ROIs. This is
-  local perspective variation, not a full Z-height solve.
-
-Persist one accepted sweep as the nozzle-camera Y mapping by copying the whole
-job directory locally and applying its `facts.json`. The default reference is
-the exact 10 mm sweep frame:
+Watch preparation, frame progress, analysis, and artifacts at
+`http://menderpi.local/vision/`. An accepted result creates one
+publication-eligible fact,
+`camera.nozzle_cam.bed_tab.y_parallax_model`, but does not make it current.
+After inspecting the patch overlay, contact sheet, displacement plot, and
+forward/reverse comparison, publish explicitly:
 
 ```bash
-scp -r pi@menderpi.local:/home/pi/printer_data/vision/nozzle_cam/jobs/<job_id> /tmp/
-python apply_nozzle_vision_calibration.py --dry-run --update-bed-y --reference-y-offset 10 /tmp/<job_id>/analysis/facts.json
-python apply_nozzle_vision_calibration.py --update-bed-y --reference-y-offset 10 /tmp/<job_id>/analysis/facts.json
-python generate_printer_cfg.py
-./update_menderpi.sh
+/usr/local/bin/vision_calibration.py publish <job_id> <analysis_run_id>
 ```
 
-This writes `cameras.nozzle_cam` in `calib.yaml` and a lossless reference crop
-under `vision_calibration/`. The generated mapping is:
-`pixel(y) = reference_pixel + y_axis_px_per_mm * (y - reference_y)`.
+Publication updates only the fact catalog. It does not edit `calib.yaml`,
+restart Klipper, or activate a printer calibration.
 
-After deployment, measure at the calibrated safe point without homing or moving
-X/Z:
-
-```gcode
-IDEX_MEASURE_BED_Y
-IDEX_MEASURE_BED_Y ASSERT=0 RUN=manual STEP=0
-```
-
-Generate the initial 20-check conservative repeatability file with:
-
-```bash
-python generate_y_step_loss_test_gcode.py --pattern camera-repeatability --camera-run-id camera_repeatability_YYYYMMDD
-```
-
-Each execution homes Y, moves to a checkpoint `10 mm` from the configured
-endstop, and captures a fresh run-local reference. It then moves `1 mm` toward
-home and requires the camera alignment to report `1.00 +/- 0.10 mm`. A passing
-validation supplies the pixel-per-mm vector for that run. The test returns to
-the checkpoint, verifies the reference again, and only then starts the stress
-moves. The persisted calibration template is used only to locate the bed
-feature in the first frame; its old absolute pixel position is not used as the
-repeatability reference. Every execution gets a separate result-session
-directory even when the same G-code file is run again.
-
-The default is one `100 mm/s`, `1000 mm/s^2` profile. A later acceleration
-ladder is enabled only by explicit arguments such as
-`--camera-velocity 500 --camera-accel-start 3500 --camera-accel-stop 8000
---camera-accel-step 500 --camera-checks-per-profile 2`.
-
-If a high-quality camera measurement exceeds the Y tolerance, the generated
-test verifies the physical endstop before stopping. It predicts the shifted
-commanded endstop as `configured_endstop - camera_error`, moves at `2 mm/s` and
-`50 mm/s^2` to `0.5 mm` before that point, and requires the switch to remain
-open. It then checks the predicted point and, if still open, checks once more
-`0.1 mm` farther toward the endstop. The terminal error reports whether the
-camera prediction and physical switch agree. Untrusted camera matches and
-runtime targets outside the configured Y range abort without making these
-verification moves.
-
-## Nozzle Camera Z Calibration Sweep
-
-`nozzle_cam_nozzle_z_sweep` is a report-only one-run calibration job. It first
-captures the bed-feature Y sweep for local scale, then captures T0 and T1 nozzle
-frames at multiple X offsets and Z samples in the same acquisition G-code file.
-No older job is used as input, and the measurement job does not edit
-`calib.yaml`.
-
-Run the default one-run acquisition and analysis from SSH with:
-
-```bash
-ssh pi@menderpi.local '/usr/local/bin/vision_nozzle_align.py --run-nozzle-z-job --name nozzle_z --bed-y-x -80.4 --bed-y-y -14.8 --bed-y-z 293.75 --tool-x 195 --tool-y -14.8 --travel-z 20 --y-offsets 0,5,10,15,20 --x-offsets 0,3,6,9,12 --z-values 1,2,4,8 --bed-feature-z-mm -0.1'
-```
-
-Or queue it from Mainsail/Klipper with:
-
-```gcode
-IDEX_NOZZLE_Z_VISION_SWEEP NAME=nozzle_z BED_Y_X=-80.4 BED_Y_Y=-14.8 BED_Y_Z=293.75 TOOL_X=195 TOOL_Y=-14.8 TRAVEL_Z=20 Y_OFFSETS=0,5,10,15,20 X_OFFSETS=0,3,6,9,12 Z_VALUES=1,2,4,8 BED_FEATURE_Z=-0.1
-```
-
-The generated `acquisition.gcode` explicitly switches lighting by phase:
-
-- `bed_y_sweep`: `NOZZLE_CAM_Y_FEATURE_LIGHT`
-- `tool_xz_sweep`: `NOZZLE_CAM_ANALYSIS_LIGHT`
-
-Use the same browser locations for progress and results:
-
-- Browser index: `http://menderpi.local/vision/`
-- Per-job page: `http://menderpi.local/vision/nozzle_cam/jobs/<job_id>/`
-- Live progress: `state.json`, `events.jsonl`, and frame count by phase on the
-  job page.
-- Results: `analysis/facts.json`, `analysis/result.json`,
-  `analysis/raw_contact_sheet.jpg`, and `analysis/overlay_contact_sheet.jpg`.
-
-Stable Z-calibration fact names include:
-
-- `measurement: "nozzle_cam_nozzle_z_offsets"`
-- `bed_feature_z_mm`: configured feature plane relative to print-surface `Z=0`.
-- `bed_y_axis_vector_px_per_mm` and `bed_y_scale_px_per_mm`: bed-feature image
-  scale from the first phase.
-- `tool_zero_error_mm.T0` and `tool_zero_error_mm.T1`: per-tool commanded
-  `Z=0` error relative to the print surface.
-- `tool_z_to_bed_feature_at_command_0_mm`: per-tool distance to the configured
-  bed feature plane at commanded `Z=0`.
-- `tool_delta_t1_minus_t0_z_mm`: T1 zero error minus T0 zero error.
-- `suggested_calib_yaml.tools.t0.z_endstop` and
-  `suggested_calib_yaml.tools.t1.z_endstop`: report-only values that can be
-  applied later.
-- `suggested_runtime_t1_z_offset`: generated as
-  `t0.z_endstop - t1.z_endstop`.
-- `lighting.bed_y_sweep.macro` and `lighting.tool_xz_sweep.macro`: phase
-  lighting used for the run.
-
-Apply accepted Z facts only as an explicit follow-up:
-
-```bash
-python apply_nozzle_vision_calibration.py --dry-run --update-z /path/to/facts.json
-python apply_nozzle_vision_calibration.py --update-z /path/to/facts.json
-```
-
-## Cold, Contact-Free Eddy Relative Calibration
-
-Run this only with the bed and both nozzles cold, all heaters off, the Eddy
-electronics at a stable powered-idle temperature, and X/Y/Z already homed:
-
-```gcode
-IDEX_EDDY_RELATIVE_CALIBRATE_COLD NAME=eddy_relative_cold
-```
-
-The job captures the five-frame bed-Y reference and a T0 X/Z sweep at Z=8, 4,
-2, and 1 mm. Every T0 image is analyzed independently for the nozzle feature
-and the Eddy concentric-ring/cross fiducial. A high-Z image records the
-CAD-derived coil-center command over the configured bed center before any
-frequency descent is allowed.
-
-Only accepted vision fits can start the center frequency sweep. The lowest
-requested nozzle gap is `0.5 mm + 3 * combined uncertainty`; configured axis
-limits are never bypassed. The LDC drive-current command is checked first, and
-the sweep stops if its proposal differs from the active value.
-
-Artifacts are written under:
-
-```text
-/home/pi/printer_data/vision/nozzle_cam/jobs/<job_id>/
-```
-
-The output includes raw images and overlays, contact sheets, image-scale and
-frequency plots, raw LDC CSV/JSON, drift and approach-direction results,
-provenance hashes, and—only when all quality gates pass—an inactive
-`[probe_eddy_current btt_eddy]` candidate. The command never calls
-`SAVE_CONFIG`, never activates the candidate, and never performs nozzle
-contact.
-
-## Manual Eddy Probe Calibration
-
-The active config keeps both physical Z endstops. Eddy is a probe only; it is
-not a `z_virtual_endstop`. The CAD-derived probe offsets are `X=-8.180` and
-`Y=9.000`. The `reg_drive_current` and exact Klipper `calibrate` curve remain
-empty in `calib.yaml` until they have been measured on the assembled printer.
-
-Before motion, clean the cold T0 nozzle and bed, check that the Eddy and cable
-are rigid, and physically verify about 2–3 mm coil-to-bed clearance when the
-nozzle is at the paper-contact plane. Observe one Z home and a slow long Z move
-after any Z-axis rebuild.
-
-With X/Y/Z homed and T0 selected, put the coil at the bed center and about
-20 mm above the bed:
-
-```gcode
-G90
-G1 Z20 F1200
-G1 X125.68 Y108.5 F6000
-G1 Z17.5 F1200
-LDC_CALIBRATE_DRIVE_CURRENT CHIP=btt_eddy
-```
-
-Do not run `SAVE_CONFIG`. Read Klipper's staged value:
-
-```bash
-curl -s 'http://menderpi.local/server/printer/objects/query?configfile' \
-  | jq '.result.status.configfile.save_config_pending_items["probe_eddy_current btt_eddy"]'
-```
-
-Copy the proposed integer to
-`eddy_relative_calibration.klipper.reg_drive_current` in `calib.yaml`,
-regenerate, deploy, and confirm `save_config_pending` is exactly `false`.
-
-After the heaters are off, bed and both nozzles are at or below 35 C, and the
-self-heated Eddy temperature has stabilized, start the manual paper mapping:
-
-```gcode
-G90
-T0
-G1 Z5 F1200
-G1 X117.5 Y117.5 F6000
-PROBE_EDDY_CURRENT_CALIBRATE CHIP=btt_eddy
-```
-
-Use the Mainsail manual-probe controls and one consistent paper-pinch
-criterion. Use `ACCEPT` only after physically checking the nozzle; use `ABORT`
-on unexpected motion. Capture Klipper's noise, frequency-range, and
-usable-height messages. Require useful coverage through approximately 3 mm.
-Again, do not run `SAVE_CONFIG`: copy the exact staged `calibrate` string into
-`eddy_relative_calibration.klipper.calibrate`, regenerate, deploy, and verify
-that no autosave footer or pending state remains.
-
-Record the two smoke checks as provenance:
-
-```gcode
-PROBE_ACCURACY METHOD=scan SAMPLES=50
-PROBE_ACCURACY SAMPLES=20 PROBE_SPEED=2 SAMPLE_RETRACT_DIST=1
-```
-
-## Cold Eddy Z Diagnostic
-
-After the manual curve is active, run:
-
-```gcode
-IDEX_EDDY_Z_DIAGNOSTIC_COLD NAME=post_rebuild_baseline
-```
-
-The macro refuses printing, unhomed axes, nonzero heater targets, bed/nozzle
-temperatures above 35 C, pending `SAVE_CONFIG` changes, missing Eddy
-calibration, and a stale config fingerprint. The runner collects synchronized
-400 Hz stationary, directional-hysteresis, small-reversal, and ten-home
-left/center/right measurements. It then captures a default-method 5x5 mesh
-over probe coordinates `37.5,37.5` through `197.5,197.5`.
-
-The mesh is visualization data only. It is never saved and the runner attempts
-`BED_MESH_CLEAR` in unconditional cleanup, including after acquisition or
-analysis failure. JSON, CSV, Markdown, raw sidecars, and plots are written to:
-
-```text
-/home/pi/printer_data/vision/nozzle_cam/jobs/<job_id>/
-```
-
-Open `http://menderpi.local/vision/` for the browser report. Mechanical values
-are labeled `baseline_only`; only incomplete windows, Eddy errors/overflows,
-unsafe coordinates, excessive reference drift, or an incomplete mesh fail the
-job.
 
 ## Boosted Heatbed
 

@@ -54,9 +54,6 @@ CONFIG_PATH = KLIPPER_CONFIG_DIR / "printer.cfg"
 CALIB_PATH = KLIPPER_CONFIG_DIR / "calib.yaml"
 TEMPLATE_PATH = KLIPPER_CONFIG_DIR / "printer.cfg.template"
 GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_printer_cfg.py"
-NOZZLE_VISION_CALIBRATION_PATH = (
-    KLIPPER_CONFIG_DIR / "apply_nozzle_vision_calibration.py"
-)
 Y_STEP_LOSS_GENERATOR_PATH = KLIPPER_CONFIG_DIR / "generate_y_step_loss_test_gcode.py"
 Y_TMC_STALLGUARD_RUNNER_PATH = KLIPPER_CONFIG_DIR / "run_y_tmc_stallguard_diagnostic.py"
 
@@ -153,18 +150,6 @@ def _load_generator_module():
 def _load_y_step_loss_generator_module():
     spec = importlib.util.spec_from_file_location(
         "generate_y_step_loss_test_gcode", Y_STEP_LOSS_GENERATOR_PATH
-    )
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-def _load_nozzle_vision_calibration_module():
-    spec = importlib.util.spec_from_file_location(
-        "apply_nozzle_vision_calibration", NOZZLE_VISION_CALIBRATION_PATH
     )
     assert spec is not None
     assert spec.loader is not None
@@ -354,28 +339,6 @@ def test_eddy_klipper_calibration_curve_round_trips_exactly():
     assert eddy["capture"]["method"] == "consistent_paper_pinch"
 
 
-def test_cold_eddy_z_diagnostic_macro_contains_all_safety_guards():
-    macro = _section(
-        CONFIG_PATH.read_text(encoding="utf-8"),
-        "gcode_macro IDEX_EDDY_Z_DIAGNOSTIC_COLD",
-    )
-
-    assert 'print_state not in ["standby", "complete"]' in macro
-    assert '"x" not in homed or "y" not in homed or "z" not in homed' in macro
-    assert "heater_bed.target|float != 0.0" in macro
-    assert "extruder.target|float != 0.0" in macro
-    assert "extruder1.target|float != 0.0" in macro
-    assert "heater_bed.temperature|float > 35.0" in macro
-    assert "configfile.save_config_pending" in macro
-    assert "eddy.reg_drive_current is not defined" in macro
-    assert "eddy.reg_drive_current is none" in macro
-    assert "eddy.calibrate is not defined" in macro
-    assert "eddy.calibrate is none" in macro
-    assert '"idex_eddy_z_diagnostic_cold"' in macro
-    assert "active_config_fingerprint=fingerprint" in macro
-    assert re.search(r"^\s*SAVE_CONFIG\s*$", macro, flags=re.MULTILINE) is None
-
-
 def test_printer_motion_limits_match_proven_idex_axes():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     printer = _section(config_text, "printer")
@@ -435,445 +398,133 @@ def test_vision_light_dotstar_and_macros():
     assert "NOZZLE_CAM_ANALYSIS_LIGHT" in startup_light
 
 
-def test_vision_capture_macro_and_host_files_exist():
+def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     template_text = TEMPLATE_PATH.read_text(encoding="utf-8")
     vision_section = _section(config_text, "vision")
-    macro = _section(config_text, "gcode_macro VISION_CAPTURE")
-    nozzle_capture_macro = _section(config_text, "gcode_macro NOZZLE_CAM_CAPTURE")
-    nozzle_profile_macro = _section(config_text, "gcode_macro NOZZLE_CAM_PROFILE")
-    nozzle_analysis_capture_macro = _section(
-        config_text, "gcode_macro NOZZLE_CAM_ANALYSIS_CAPTURE"
-    )
-    nozzle_sweep_macro = _section(config_text, "gcode_macro IDEX_NOZZLE_VISION_SWEEP")
-    bed_y_sweep_macro = _section(config_text, "gcode_macro IDEX_BED_Y_VISION_SWEEP")
-    nozzle_z_sweep_macro = _section(
-        config_text, "gcode_macro IDEX_NOZZLE_Z_VISION_SWEEP"
-    )
-    moonraker = (IMAGE_BUILD_FILES_DIR / "moonraker.conf").read_text(encoding="utf-8")
-    nginx = (IMAGE_BUILD_FILES_DIR / "nginx-mainsail.conf").read_text(encoding="utf-8")
-    image_packages = (IMAGE_BUILD_STAGE_DIR / "00-packages").read_text(encoding="utf-8")
-    image_install = (IMAGE_BUILD_STAGE_DIR / "01-run-chroot.sh").read_text(
-        encoding="utf-8"
-    )
-    live_klipper_deploy = (KLIPPER_CONFIG_DIR / "update_menderpi.sh").read_text(
-        encoding="utf-8"
-    )
-    live_deploy = (KLIPPER_CONFIG_DIR / "deploy_webcam_vision.sh").read_text(
-        encoding="utf-8"
-    )
-    capture_service = (IMAGE_BUILD_FILES_DIR / "vision-capture.service").read_text(
-        encoding="utf-8"
-    )
-    framebuffer_service = (
-        IMAGE_BUILD_FILES_DIR / "vision-framebuffer.service"
-    ).read_text(encoding="utf-8")
-    nozzle_framebuffer_service = (
-        IMAGE_BUILD_FILES_DIR / "vision-framebuffer-nozzle-cam.service"
-    ).read_text(encoding="utf-8")
-    nozzle_capture_service = (
-        IMAGE_BUILD_FILES_DIR / "vision-capture-nozzle-cam.service"
-    ).read_text(encoding="utf-8")
-    framebuffer_script = (IMAGE_BUILD_FILES_DIR / "vision_framebuffer.py").read_text(
-        encoding="utf-8"
+    calibration_macro = _section(
+        config_text, "gcode_macro IDEX_BED_TAB_Y_SCALE_CALIBRATE"
     )
     capture_script = (IMAGE_BUILD_FILES_DIR / "vision_capture.py").read_text(
         encoding="utf-8"
     )
-    klipper_vision_extra = (
+    calibration_script = (
+        IMAGE_BUILD_FILES_DIR / "vision_calibration.py"
+    ).read_text(encoding="utf-8")
+    graph_script = (
+        IMAGE_BUILD_FILES_DIR / "vision_calibration_graph.py"
+    ).read_text(encoding="utf-8")
+    analyzer_script = (
+        IMAGE_BUILD_FILES_DIR / "vision_bed_tab_y_scale.py"
+    ).read_text(encoding="utf-8")
+    registry = json.loads(
+        (IMAGE_BUILD_FILES_DIR / "vision_job_types.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    capture_service = (
+        IMAGE_BUILD_FILES_DIR / "vision-capture-nozzle-cam.service"
+    ).read_text(encoding="utf-8")
+    image_install = (IMAGE_BUILD_STAGE_DIR / "01-run-chroot.sh").read_text(
+        encoding="utf-8"
+    )
+    live_deploy = (
+        KLIPPER_CONFIG_DIR / "deploy_webcam_vision.sh"
+    ).read_text(encoding="utf-8")
+    extra = (
         Path(__file__).resolve().parents[1]
-        / "klipper_setup"
-        / "klipper_host"
-        / "klippy"
-        / "extras"
-        / "vision.py"
+        / "klipper_setup/klipper_host/klippy/extras/vision.py"
     ).read_text(encoding="utf-8")
-    image_klipper_vision_extra = (
-        IMAGE_BUILD_FILES_DIR / "klipper_host" / "klippy" / "extras" / "vision.py"
+    image_extra = (
+        IMAGE_BUILD_FILES_DIR / "klipper_host/klippy/extras/vision.py"
     ).read_text(encoding="utf-8")
-    nozzle_script = (IMAGE_BUILD_FILES_DIR / "vision_nozzle_align.py").read_text(
-        encoding="utf-8"
-    )
-    eddy_z_diagnostic_script = (
-        IMAGE_BUILD_FILES_DIR / "eddy_z_diagnostic.py"
-    ).read_text(encoding="utf-8")
-    runner_script = (IMAGE_BUILD_FILES_DIR / "vision_runner.py").read_text(
-        encoding="utf-8"
-    )
-    nozzle_profiles = json.loads(
-        (IMAGE_BUILD_FILES_DIR / "nozzle_cam_profiles.json").read_text(encoding="utf-8")
-    )
 
     assert "socket_path: /run/vision-capture-nozzle_cam/visiond.sock" in vision_section
     assert "timeout: 45.0" in vision_section
-    assert "bed_y_calibrated:" in vision_section
+    assert "bed_y_" not in vision_section
     assert "[vision]" in template_text
-    assert 'action_call_remote_method("vision_capture"' in macro
-    assert "printer.toolhead.position" in macro
-    assert 'RESPOND TYPE=echo MSG="Vision capture requested' in macro
-    assert 'action_call_remote_method("nozzle_cam_capture"' in nozzle_capture_macro
-    assert (
-        'RESPOND TYPE=echo MSG="Nozzle camera capture requested' in nozzle_capture_macro
-    )
-    assert 'params.PROFILE|default("analysis")' in nozzle_capture_macro
-    assert "profile=profile" in nozzle_capture_macro
-    assert 'action_call_remote_method("nozzle_cam_profile"' in nozzle_profile_macro
-    assert (
-        'RESPOND TYPE=echo MSG="Nozzle camera profile requested' in nozzle_profile_macro
-    )
-    assert 'params.PROFILE|default("analysis")' in nozzle_profile_macro
-    assert "NOZZLE_CAM_PROFILE PROFILE=analysis" in nozzle_analysis_capture_macro
-    assert "NOZZLE_CAM_ANALYSIS_LIGHT" in nozzle_analysis_capture_macro
-    assert "NOZZLE_CAM_CAPTURE NAME={name} REASON=nozzle_analysis PROFILE=analysis" in (
-        nozzle_analysis_capture_macro
-    )
-    assert "keep_light = params.KEEP_LIGHT|default(1)|int" in (
-        nozzle_analysis_capture_macro
-    )
-    assert "IDEX_NOZZLE_VISION_CHECK" not in config_text
-    assert "idex_nozzle_vision_check" not in config_text
-    assert 'action_call_remote_method("idex_nozzle_vision_sweep"' in nozzle_sweep_macro
-    assert "print_stats.state" in nozzle_sweep_macro
-    assert "requires X/Y/Z homed" in nozzle_sweep_macro
-    assert "dx=dx" in nozzle_sweep_macro
-    assert 'action_call_remote_method("idex_bed_y_vision_sweep"' in bed_y_sweep_macro
-    assert "Y_OFFSETS" in bed_y_sweep_macro
-    assert "y_offsets=y_offsets" in bed_y_sweep_macro
-    assert "print_stats.state" in bed_y_sweep_macro
-    assert "requires X/Y/Z homed" in bed_y_sweep_macro
-    assert (
-        'action_call_remote_method("idex_nozzle_z_vision_sweep"' in nozzle_z_sweep_macro
-    )
-    assert "BED_FEATURE_Z" in nozzle_z_sweep_macro
-    assert "X_OFFSETS" in nozzle_z_sweep_macro
-    assert "Z_VALUES" in nozzle_z_sweep_macro
-    assert "current_t0_z_endstop=state.t0_z_endstop" in nozzle_z_sweep_macro
-    assert "current_t1_z_endstop=state.t1_z_endstop" in nozzle_z_sweep_macro
-    assert "print_stats.state" in nozzle_z_sweep_macro
-    assert "requires X/Y/Z homed" in nozzle_z_sweep_macro
-    assert not (IMAGE_BUILD_FILES_DIR / "crowsnest.conf").exists()
-    assert "[webcam Printer Camera]" not in moonraker
-    assert "[update_manager crowsnest]" not in moonraker
-    assert "location /webcam/" in nginx
-    assert "location /nozzle_cam/" in nginx
-    assert "proxy_pass http://127.0.0.1:8081/" in nginx
-    assert "location /vision/" in nginx
-    assert "location = /home/pi/printer_data/vision/index.html" in nginx
-    assert "return 302 /vision/" in nginx
-    assert "return 302 /vision/$1" in nginx
-    assert "ExecStart=/usr/local/bin/vision_framebuffer.py" in framebuffer_service
-    assert "VISION_FRAMEBUFFER_PORT=8081" in nozzle_framebuffer_service
-    assert (
-        "VISION_FRAMEBUFFER_DIR=/run/vision-preview-nozzle_cam"
-        in nozzle_framebuffer_service
-    )
-    assert (
-        "VISION_FRAMEBUFFER_PUBLIC_SNAPSHOT_URL=/nozzle_cam/?action=snapshot"
-        in nozzle_framebuffer_service
-    )
-    assert (
-        "VISION_CAMERA_PROFILE_FILE=/usr/local/share/vision/nozzle_cam_profiles.json"
-        in nozzle_framebuffer_service
-    )
-    assert "VISION_CAMERA_DEFAULT_PROFILE=analysis" in nozzle_framebuffer_service
-    assert (
-        "VISION_CAMERA_PROFILE_REQUEST_FILE=/run/vision-preview-nozzle_cam/profile_request.json"
-        in nozzle_framebuffer_service
-    )
-    assert (
-        "usb-Vimicro_corp._PC-LM1E_Camera_PC-LM1E_Audio-video-index0"
-        in nozzle_framebuffer_service
-    )
-    assert "ThreadingHTTPServer" in framebuffer_script
-    assert "RUN_DIR = Path" in framebuffer_script
-    assert "latest.jpg" in framebuffer_script
-    assert "RING_DIR" in framebuffer_script
-    assert "CameraProfileManager" in framebuffer_script
-    assert "VISION_CAMERA_PROFILE_FILE" in framebuffer_script
-    assert "--set-ctrl=" in framebuffer_script
-    assert '"camera_profile": camera_profile' in framebuffer_script
-    assert "1920" in framebuffer_script
-    assert "1080" in framebuffer_script
-    assert "FALLBACK_FPS" not in framebuffer_script
-    assert "Falling back to capture profile" not in framebuffer_script
-    assert '"frame_seq": self.state.frame_seq' in framebuffer_script
-    assert '"frame_seq": self.frame_seq' in framebuffer_script
-    assert "ExecStart=/usr/local/bin/vision_capture.py --daemon" in capture_service
-    assert "VISION_REGISTER_NOZZLE_METHODS=0" in capture_service
-    assert "VISIOND_SOCKET_ENABLED=0" in capture_service
-    assert "vision-framebuffer.service" in capture_service
-    assert "VISION_CAPTURE_REMOTE_METHOD=nozzle_cam_capture" in nozzle_capture_service
-    assert (
-        "VISION_OUTPUT_DIR=/home/pi/printer_data/vision/nozzle_cam"
-        in nozzle_capture_service
-    )
-    assert (
-        "VISION_WEBCAM_SNAPSHOT_URL=http://127.0.0.1/nozzle_cam/?action=snapshot"
-        in nozzle_capture_service
-    )
-    assert "VISION_REGISTER_NOZZLE_METHODS=1" in nozzle_capture_service
-    assert (
-        "VISION_CAMERA_PROFILE_REQUEST_FILE=/run/vision-preview-nozzle_cam/profile_request.json"
-        in nozzle_capture_service
-    )
-    assert "VISION_CAPTURE_DEFAULT_PROFILE=analysis" in nozzle_capture_service
-    assert "VISION_PROFILE_REMOTE_METHOD=nozzle_cam_profile" in nozzle_capture_service
-    assert "RuntimeDirectory=vision-capture-nozzle_cam" in nozzle_capture_service
-    assert "VISIOND_SOCKET=/run/vision-capture-nozzle_cam/visiond.sock" in (
-        nozzle_capture_service
-    )
-    assert "VISION_JOB_ROOT=/home/pi/printer_data/vision/nozzle_cam/jobs" in (
-        nozzle_capture_service
-    )
-    assert "vision-framebuffer-nozzle-cam.service" in nozzle_capture_service
-    assert "register_remote_method" in capture_script
-    assert (
-        'REMOTE_METHOD = os.environ.get("VISION_CAPTURE_REMOTE_METHOD"'
-        in capture_script
-    )
-    assert "REGISTER_NOZZLE_METHODS" in capture_script
-    assert "NOZZLE_PROFILE_REMOTE_METHOD" in capture_script
-    assert "request_framebuffer_profile" in capture_script
-    assert "metadata_matches_profile" in capture_script
-    assert "idex_nozzle_vision_check" not in capture_script
-    assert "idex_nozzle_vision_sweep" in capture_script
-    assert "idex_bed_y_vision_sweep" in capture_script
-    assert "idex_nozzle_z_vision_sweep" in capture_script
-    assert "run_nozzle_cam_profile" in capture_script
-    assert "run_idex_nozzle_vision_sweep" in capture_script
-    assert "run_idex_bed_y_vision_sweep" in capture_script
-    assert "run_idex_nozzle_z_vision_sweep" in capture_script
-    assert "idex_eddy_z_diagnostic_cold" in capture_script
-    assert "run_idex_eddy_z_diagnostic_cold" in capture_script
-    assert "eddy_z_diagnostic.py" in capture_script
-    assert "vision_nozzle_align.py" in capture_script
-    assert '"--sweep"' in capture_script
-    assert '"--run-bed-y-job"' in capture_script
-    assert '"--run-nozzle-z-job"' in capture_script
-    assert "FRAMEBUFFER_LATEST_IMAGE" in capture_script
-    assert "wait_for_buffered_frame" in capture_script
+    assert "print_stats.state" in calibration_macro
+    assert "requires X/Y/Z homed" in calibration_macro
+    assert '"idex_bed_tab_y_scale_calibrate"' in calibration_macro
+    assert "active_config_fingerprint=fingerprint" in calibration_macro
+
+    assert registry["schema_version"] == 1
+    assert set(registry["job_types"]) == {"nozzle_cam_bed_tab_y_scale"}
+    definition = registry["job_types"]["nozzle_cam_bed_tab_y_scale"]
+    assert definition["y_offsets_mm"] == [0, 5, 10, 15, 20, 15, 10, 5, 0]
+    assert definition["velocity_mm_s"] == 60
+    assert definition["settle_ms"] == 300
+    assert definition["light_macro"] == "NOZZLE_CAM_Y_FEATURE_LIGHT"
+
     assert "VisionJobApi" in capture_script
-    assert "wait_for_buffered_frame_seq_after" in capture_script
-    assert "framebuffer_seq" in capture_script
-    assert "VISIOND_SOCKET" in capture_script
-    assert 'capture_source": "vision_framebuffer' in capture_script
-    assert "VISION_JOB_BEGIN" in klipper_vision_extra
-    assert "VISION_CAPTURE_SYNC" in klipper_vision_extra
-    assert "VISION_MEASURE_BED_Y" in klipper_vision_extra
-    assert "last_bed_y_measurement" in klipper_vision_extra
-    assert "wait_moves()" in klipper_vision_extra
-    assert "socket.AF_UNIX" in klipper_vision_extra
-    assert image_klipper_vision_extra == klipper_vision_extra
-    assert "NOZZLE_ALIGN_DIR" not in nozzle_script
-    assert "NOZZLE_SWEEP_DIR" in nozzle_script
-    assert "VISION_OUTPUT_URL_PREFIX" in nozzle_script
-    assert "--run-acquisition-job" in nozzle_script
-    assert "--start-prepared-job" in nozzle_script
-    assert "--analyze-job" in nozzle_script
-    assert "--run-job" in nozzle_script
-    assert "--prepare-bed-y-job" in nozzle_script
-    assert "--run-bed-y-job" in nozzle_script
-    assert "--prepare-nozzle-z-job" in nozzle_script
-    assert "--run-nozzle-z-acquisition-job" in nozzle_script
-    assert "--run-nozzle-z-job" in nozzle_script
-    assert "nozzle_cam_bed_y_sweep" in nozzle_script
-    assert "nozzle_cam_bed_y_motion" in nozzle_script
-    assert "nozzle_cam_nozzle_z_sweep" in nozzle_script
-    assert "nozzle_cam_nozzle_z_offsets" in nozzle_script
-    assert "bed_y_axis_vector_px_per_mm" in nozzle_script
-    assert "bed_y_scale_px_per_mm" in nozzle_script
-    assert "bed_y_parallax_spread" in nozzle_script
-    assert "calibration_candidate" in nozzle_script
-    assert "tool_zero_error_mm" in nozzle_script
-    assert "suggested_calib_yaml" in nozzle_script
-    assert "NOZZLE_CAM_Y_FEATURE_LIGHT" in nozzle_script
-    assert "NOZZLE_CAM_ANALYSIS_LIGHT" in nozzle_script
-    assert "--refresh-ui" in nozzle_script
-    assert "--virtual-sd-root" in nozzle_script
-    assert "SDCARD_PRINT_FILE FILENAME=" in nozzle_script
-    assert "index.html" in nozzle_script
-    assert "jobs.json" in nozzle_script
-    assert "raw_contact_sheet.jpg" in nozzle_script
-    assert "overlay_contact_sheet.jpg" in nozzle_script
-    assert "facts.json" in nozzle_script
-    assert "--fresh-after-utc" in nozzle_script
-    assert '"--sweep"' in nozzle_script
-    assert "vision_framebuffer" in nozzle_script
-    assert "cv2.HoughCircles" in nozzle_script
-    assert "dark_contour" in nozzle_script
-    assert "detect_red_marker" in nozzle_script
-    assert "derive_global_nozzle_roi" in nozzle_script
-    assert "single-image nozzle vision check was removed" in nozzle_script
-    assert "fit_global_roi_cross_match" in nozzle_script
-    assert "pairwise_match_matrix" in nozzle_script
-    assert "global_roi_cross_match" in nozzle_script
-    assert "perpendicular_mm_approx" in nozzle_script
-    assert "cols, rows = max(1, len(dx_labels)), 2" in nozzle_script
-    assert "fit_points_by_dx" in nozzle_script
-    assert "choose_motion_consistent_nozzle" in nozzle_script
-    assert "contact_sheet.jpg" in nozzle_script
-    assert "latest_contact_sheet.jpg" in nozzle_script
-    assert "IDEX nozzle sweep report" in nozzle_script
-    assert "offsets_applied" in nozzle_script
-    assert "IDEX_SET_TOOL_OFFSET" not in nozzle_script
-    assert "stage_and_run_eddy_sweep" in eddy_z_diagnostic_script
-    assert "BED_MESH_CLEAR" in eddy_z_diagnostic_script
-    assert "BED_MESH_CALIBRATE" in eddy_z_diagnostic_script
-    assert 'run_gcode(args.moonraker_url, "SAVE_CONFIG"' not in (
-        eddy_z_diagnostic_script
-    )
-    helper = NOZZLE_VISION_CALIBRATION_PATH.read_text(encoding="utf-8")
-    assert "old_x + along_x_mm" in helper
-    assert "new_y_offset = current_y_offset - perpendicular_mm" in helper
-    assert "--update-y" in helper
-    assert "--update-z" in helper
-    assert "--update-bed-y" in helper
-    assert "--reference-y-offset" in helper
-    assert "nozzle_cam_nozzle_z_offsets" in helper
-    assert 'vision_capture.py", "--capture-once"' in runner_script
-    assert "acl\n" in image_packages
-    assert "python3-opencv" in image_packages
+    assert "idex_bed_tab_y_scale_calibrate" in capture_script
+    assert "VISION_REGISTER_CALIBRATION_METHODS" in capture_script
+    assert "measure_bed_y" not in capture_script
+    assert "vision_nozzle_align" not in capture_script
+    assert "prepare_job" in calibration_script
+    assert "analyze_job" in calibration_script
+    assert "publish_fact_set" in calibration_script
+    assert "rebuild_and_render" in calibration_script
+    assert "canonical_hash" in graph_script
+    assert "_detect_cycles" in graph_script
+    assert "stale_fact_sets" in graph_script
+    assert "_cluster_tracks" in analyzer_script
+    assert "forward_reverse" in analyzer_script
+
+    assert "VISION_JOB_ROOT=/home/pi/printer_data/vision/calibration/jobs" in capture_service
+    assert "VISION_REGISTER_CALIBRATION_METHODS=1" in capture_service
+    assert "VISIOND_SOCKET_REQUEST_TIMEOUT=45" in capture_service
+    assert "VISION_REGISTER_NOZZLE_METHODS" not in capture_service
+    assert image_extra == extra
+    for command in (
+        "VISION_JOB_BEGIN",
+        "VISION_PROFILE",
+        "VISION_CAPTURE_SYNC",
+        "VISION_JOB_END",
+    ):
+        assert command in extra
+    for legacy in (
+        "VISION_MEASURE_BED_Y",
+        "VISION_EDDY_SAMPLE_SYNC",
+        "last_bed_y_measurement",
+    ):
+        assert legacy not in extra
+
+    for filename in (
+        "vision_calibration.py",
+        "vision_calibration_graph.py",
+        "vision_bed_tab_y_scale.py",
+        "vision_job_types.json",
+    ):
+        assert filename in image_install
+        assert filename in live_deploy
+    for legacy in (
+        "vision_nozzle_align.py",
+        "vision_bed_y.py",
+        "vision_rough_calibration.py",
+        "eddy_relative_calibration.py",
+        "eddy_z_diagnostic.py",
+    ):
+        assert f'require_file "${{FILES_DIR}}/{legacy}"' not in image_install
+        assert f'"${{FILES_DIR}}/{legacy}" \\' not in live_deploy
+        assert not (IMAGE_BUILD_FILES_DIR / legacy).exists()
+
+    assert 'VISION_CLEAN_SLATE="${VISION_CLEAN_SLATE:-0}"' in live_deploy
+    assert 'Path("/home/pi/printer_data/vision")' in live_deploy
+    assert 'Path("/home/pi/printer_data/gcodes/vision_jobs")' in live_deploy
+    assert "virtual_sdcard=is_active" in live_deploy
+    assert "vision_calibration.py rebuild-catalog" in live_deploy
+
     readme = README_PATH.read_text(encoding="utf-8")
-    klipper_readme = (KLIPPER_CONFIG_DIR / "README.md").read_text(encoding="utf-8")
+    klipper_readme = (KLIPPER_CONFIG_DIR / "README.md").read_text(
+        encoding="utf-8"
+    )
     concept = VISION_JOB_CONCEPT_PATH.read_text(encoding="utf-8")
     assert "http://menderpi.local/vision/" in readme
-    assert "do not paste the filesystem path" in readme
-    assert "vision_nozzle_align.py --refresh-ui" in readme
-    assert "vision_nozzle_align.py --run-job" in readme
-    assert "/home/pi/printer_data/vision/index.html" in readme
-    assert "Nozzle Camera Bed Y Sweep" in klipper_readme
-    assert "vision_nozzle_align.py --run-bed-y-job --name bed_y" in klipper_readme
-    assert "IDEX_BED_Y_VISION_SWEEP NAME=bed_y" in klipper_readme
-    assert "http://menderpi.local/vision/nozzle_cam/jobs/<job_id>/" in klipper_readme
-    assert "bed_y_axis_vector_px_per_mm" in klipper_readme
-    assert "negative image Y means the feature moves upward" in klipper_readme
-    assert "Nozzle Camera Z Calibration Sweep" in klipper_readme
-    assert "vision_nozzle_align.py --run-nozzle-z-job --name nozzle_z" in klipper_readme
-    assert "IDEX_NOZZLE_Z_VISION_SWEEP NAME=nozzle_z" in klipper_readme
-    assert "tool_zero_error_mm.T0" in klipper_readme
-    assert "suggested_runtime_t1_z_offset" in klipper_readme
-    assert "read-only generated static HTML/JSON" in concept
-    assert "libevent-dev" not in image_packages
-    assert "libjpeg-dev" not in image_packages
-    assert "libbsd-dev" not in image_packages
-    assert "vision_framebuffer.py" in image_install
-    assert "klipper_host/klippy/extras/vision.py" in image_install
-    assert "vision-framebuffer.service" in image_install
-    assert "vision-framebuffer-nozzle-cam.service" in image_install
-    assert "vision-capture-nozzle-cam.service" in image_install
-    assert "nozzle_cam_profiles.json" in image_install
-    assert "vision_nozzle_align.py" in image_install
-    assert "eddy_relative_calibration.py" in image_install
-    assert "eddy_z_diagnostic.py" in image_install
-    assert "vision_bed_y.py" in image_install
-    assert "vision_framebuffer.py" in live_deploy
-    assert "vision-framebuffer.service" in live_deploy
-    assert "vision-framebuffer-nozzle-cam.service" in live_deploy
-    assert "vision-capture-nozzle-cam.service" in live_deploy
-    assert "nozzle_cam_profiles.json" in live_deploy
-    assert "vision_nozzle_align.py" in live_deploy
-    assert "eddy_relative_calibration.py" in live_deploy
-    assert "eddy_z_diagnostic.py" in live_deploy
-    assert "vision_bed_y.py" in live_deploy
-    assert "vision_nozzle_align.py --refresh-ui" in live_deploy
-    assert "SOURCE_VISION" in live_klipper_deploy
-    assert "REMOTE_TMP_VISION" in live_klipper_deploy
-    assert "vision.py" in live_klipper_deploy
-    assert "SOURCE_BED_Y_TEMPLATE" in live_klipper_deploy
-
-    assert "/run/vision-preview-nozzle_cam/profile_request.json" in live_deploy
-    assert "setfacl -m u:www-data:--x" in image_install
-    assert "setfacl -m u:www-data:--x" in live_deploy
-    assert "github.com/mainsail-crew/crowsnest" not in image_install
-    assert "github.com/mainsail-crew/crowsnest" not in live_deploy
-    assert "ln -sfn /opt/crowsnest" not in image_install
-    assert "ln -sfn /opt/crowsnest" not in live_deploy
-    assert "systemctl disable crowsnest" in image_install
-    assert "systemctl disable --now crowsnest" in live_deploy
-    assert '"name": "Printer Camera"' in live_deploy
-    assert '"name": "nozzle_cam"' in live_deploy
-    assert '"/nozzle_cam/?action=stream"' in live_deploy
-    assert "--state-url http://127.0.0.1:8081/state" in live_deploy
-    assert '"target_fps": "1"' in live_deploy
-
-    assert {
-        "analysis": "nozzle_cam_analysis",
-        "auto": "nozzle_cam_auto",
-        "baseline": "nozzle_cam_baseline",
-        "vision": "nozzle_cam_vision",
-    }.items() <= nozzle_profiles["aliases"].items()
-    for exposure in (600, 900, 1200, 1800, 2600, 3600, 5000):
-        assert (
-            nozzle_profiles["aliases"][f"eddy_exp_{exposure}"]
-            == f"nozzle_cam_eddy_exp_{exposure}"
-        )
-    profile_controls = {
-        name: {control["name"]: control["value"] for control in profile["controls"]}
-        for name, profile in nozzle_profiles["profiles"].items()
-    }
-    for name in ("nozzle_cam_vision", "nozzle_cam_baseline", "nozzle_cam_analysis"):
-        control_names = [
-            control["name"] for control in nozzle_profiles["profiles"][name]["controls"]
-        ]
-        assert control_names[:4] == [
-            "auto_exposure",
-            "exposure_time_absolute",
-            "white_balance_automatic",
-            "white_balance_temperature",
-        ]
-        assert profile_controls[name]["auto_exposure"] == 1
-        assert profile_controls[name]["white_balance_automatic"] == 0
-    assert (
-        profile_controls["nozzle_cam_vision"]["exposure_time_absolute"]
-        > profile_controls["nozzle_cam_baseline"]["exposure_time_absolute"]
-    )
-    assert (
-        profile_controls["nozzle_cam_analysis"]["exposure_time_absolute"]
-        < profile_controls["nozzle_cam_vision"]["exposure_time_absolute"]
-    )
-    assert profile_controls["nozzle_cam_analysis"]["brightness"] <= 0
-    assert profile_controls["nozzle_cam_auto"]["auto_exposure"] == 3
-    assert profile_controls["nozzle_cam_auto"]["white_balance_automatic"] == 1
-
-
-def test_nozzle_z_apply_helper_requires_explicit_update_z(tmp_path):
-    helper = _load_nozzle_vision_calibration_module()
-    payload = {
-        "ok": True,
-        "measurement": "nozzle_cam_nozzle_z_offsets",
-        "suggested_calib_yaml": {
-            "tools": {
-                "t0": {"z_endstop": 293.812},
-                "t1": {"z_endstop": 293.577},
-            }
-        },
-        "suggested_runtime_t1_z_offset": 0.235,
-    }
-    measurement = helper.extract_measurement(payload, "facts.json")
-    assert measurement["measurement"] == "nozzle_cam_nozzle_z_offsets"
-    assert measurement["t0_z_endstop"] == pytest.approx(293.812)
-    assert measurement["t1_z_endstop"] == pytest.approx(293.577)
-
-    calib_path = tmp_path / "calib.yaml"
-    calib_path.write_text(SYNTHETIC_CALIBRATION_YAML, encoding="utf-8")
-    calib = helper.load_calib(calib_path)
-    helper.apply_z_measurement(
-        calib,
-        t0_z_endstop=measurement["t0_z_endstop"],
-        t1_z_endstop=measurement["t1_z_endstop"],
-        update_z=False,
-    )
-    assert calib["tools"]["t0"]["z_endstop"] == pytest.approx(293.75)
-    assert calib["tools"]["t1"]["z_endstop"] == pytest.approx(293.65)
-
-    helper.apply_z_measurement(
-        calib,
-        t0_z_endstop=measurement["t0_z_endstop"],
-        t1_z_endstop=measurement["t1_z_endstop"],
-        update_z=True,
-    )
-    assert calib["tools"]["t0"]["z_endstop"] == pytest.approx(293.812)
-    assert calib["tools"]["t1"]["z_endstop"] == pytest.approx(293.577)
+    assert "vision_calibration.py rebuild-catalog" in readme
+    assert "nozzle_cam_bed_tab_y_scale" in klipper_readme
+    assert "IDEX_BED_TAB_Y_SCALE_CALIBRATE" in klipper_readme
+    assert "no reader, migration, alias" in concept
 
 
 def test_y_tmc_stallguard_runner_streams_live_samples_and_keeps_aggressive_opt_in():
@@ -1489,154 +1140,6 @@ def test_idex_tool_offsets_are_derived_from_calibration_values():
     assert values["t0_y_offset"] == "0.000"
     assert values["t1_y_offset"] == "0.400"
     assert values["t1_z_offset"] == "0.300"
-
-
-def test_camera_repeatability_generator_is_y_only_and_defaults_to_one_safe_profile():
-    generator = _load_y_step_loss_generator_module()
-    printer = generator.PrinterConfig(
-        x=generator.AxisRange(-80.4, 244.0),
-        y=generator.AxisRange(-14.8, 296.0),
-        z=generator.AxisRange(-1.0, 293.75),
-        y_position_endstop=-14.8,
-        max_velocity=500.0,
-        max_accel=6000.0,
-        square_corner_velocity=5.0,
-        bed_y_calibrated=True,
-        bed_y_reference_y_mm=-4.8,
-        bed_y_profile="analysis",
-    )
-    plan = generator.CameraRepeatabilityPlan(run_id="test_camera_repeatability")
-    gcode = generator.generate_camera_repeatability_gcode(printer, plan)
-    lines = gcode.splitlines()
-
-    reference_lines = [
-        line for line in lines if line.startswith("VISION_BED_Y_REFERENCE ")
-    ]
-    validation_lines = [
-        line for line in lines if line.startswith("VISION_VALIDATE_BED_Y_REFERENCE ")
-    ]
-    measure_lines = [
-        line for line in lines if line.startswith("VISION_MEASURE_BED_Y_RELATIVE ")
-    ]
-    diagnostic_lines = [
-        line for line in lines if line.startswith("Y_CAMERA_VERIFY_SHIFTED_ENDSTOP ")
-    ]
-    assert len(reference_lines) == 1
-    assert "REFERENCE_Y=-4.800" in reference_lines[0]
-    assert len(validation_lines) == 1
-    assert "EXPECTED_DELTA=-1.000" in validation_lines[0]
-    assert "TOLERANCE=0.1" in validation_lines[0]
-    assert len(measure_lines) == 21
-    assert len(diagnostic_lines) == 20
-    assert "ASSERT=1" in measure_lines[0]
-    assert "PHASE=startup_return" in measure_lines[0]
-    assert all("ASSERT=0" in line for line in measure_lines[1:])
-    assert all("PHASE=stress" in line for line in measure_lines[1:])
-    assert sum(line == "G28 Y" for line in lines) == 1
-    assert "QUERY_ENDSTOPS" not in gcode
-    assert "Y_STEP_LOSS_ASSERT_ENDSTOP" not in gcode
-    assert "M104 S0" in lines
-    assert "M140 S0" in lines
-    motion_lines = [line for line in lines if re.match(r"^G[01]\s", line)]
-    assert all(" X" not in line and " Z" not in line for line in motion_lines)
-    assert not any(line in {"T0", "T1"} for line in lines)
-    assert gcode.count("profile=accel_1000") == 20
-    restore = "SET_VELOCITY_LIMIT VELOCITY=500 ACCEL=6000 SQUARE_CORNER_VELOCITY=5"
-    for index, line in enumerate(lines):
-        if line.startswith("VISION_MEASURE_BED_Y_RELATIVE "):
-            assert restore in lines[max(0, index - 5) : index]
-            if "PHASE=stress" in line:
-                assert lines[index + 1].startswith("Y_CAMERA_VERIFY_SHIFTED_ENDSTOP ")
-    expected_diagnostic_parameters = (
-        f"CLEARANCE={plan.endstop_clearance_mm:g} "
-        f"EXTRA={plan.endstop_extra_mm:g} "
-        f"VELOCITY={plan.endstop_velocity_mm_s:g} "
-        f"ACCEL={plan.endstop_accel_mm_s2:g}"
-    )
-    assert all(expected_diagnostic_parameters in line for line in diagnostic_lines)
-
-
-def test_camera_shifted_endstop_verification_is_bounded_and_stops_with_result():
-    config_text = CONFIG_PATH.read_text(encoding="utf-8")
-    entry = _section(config_text, "gcode_macro Y_CAMERA_VERIFY_SHIFTED_ENDSTOP")
-    start = _section(config_text, "gcode_macro _Y_CAMERA_SHIFTED_ENDSTOP_CHECK_START")
-    near = _section(config_text, "gcode_macro _Y_CAMERA_SHIFTED_ENDSTOP_CHECK_NEAR")
-    predicted = _section(
-        config_text, "gcode_macro _Y_CAMERA_SHIFTED_ENDSTOP_CHECK_PREDICTED"
-    )
-    extra = _section(config_text, "gcode_macro _Y_CAMERA_SHIFTED_ENDSTOP_CHECK_EXTRA")
-    stop = _section(config_text, "gcode_macro _Y_CAMERA_SHIFTED_ENDSTOP_STOP")
-
-    assert 'not measurement["accepted"]' in entry
-    assert 'not measurement["quality_ok"]' in entry
-    assert "configured_endstop - error" in entry
-    assert "predicted + clearance" in entry
-    assert "predicted - extra" in entry
-    assert "position_min" in entry
-    assert "position_max" in entry
-    assert "QUERY_ENDSTOPS" in entry
-    assert "_Y_CAMERA_SHIFTED_ENDSTOP_CHECK_START" in entry
-
-    assert 'printer.query_endstops.last_query["stepper_y"]' in start
-    assert "G1 Y{params.NEAR}" in start
-    assert "QUERY_ENDSTOPS" in start
-    assert "_Y_CAMERA_SHIFTED_ENDSTOP_CHECK_NEAR" in start
-
-    assert 'printer.query_endstops.last_query["stepper_y"]' in near
-    assert "G1 Y{params.PREDICTED}" in near
-    assert "QUERY_ENDSTOPS" in near
-    assert "_Y_CAMERA_SHIFTED_ENDSTOP_CHECK_PREDICTED" in near
-
-    assert 'printer.query_endstops.last_query["stepper_y"]' in predicted
-    assert "G1 Y{params.EXTRA_TARGET}" in predicted
-    assert "QUERY_ENDSTOPS" in predicted
-    assert "_Y_CAMERA_SHIFTED_ENDSTOP_CHECK_EXTRA" in predicted
-
-    assert "SET_VELOCITY_LIMIT" in extra
-    assert "OUTCOME=EXTRA_TRIGGERED" in extra
-    assert "OUTCOME=EXTRA_OPEN" in extra
-    assert "action_raise_error" in stop
-    assert "AGREE:" in stop
-    assert "AGREE WITHIN" in stop
-    assert "DISAGREE:" in stop
-
-
-def test_camera_repeatability_acceleration_ladder_is_cli_configurable():
-    generator = _load_y_step_loss_generator_module()
-    printer = generator.PrinterConfig(
-        x=generator.AxisRange(-80.4, 244.0),
-        y=generator.AxisRange(-14.8, 296.0),
-        z=generator.AxisRange(-1.0, 293.75),
-        y_position_endstop=-14.8,
-        max_velocity=500.0,
-        max_accel=6000.0,
-        square_corner_velocity=5.0,
-        bed_y_calibrated=True,
-        bed_y_reference_y_mm=-4.8,
-        bed_y_profile="analysis",
-    )
-    plan = generator.CameraRepeatabilityPlan(
-        checks_per_profile=2,
-        velocity_mm_s=500.0,
-        accel_start_mm_s2=3500.0,
-        accel_stop_mm_s2=4500.0,
-        accel_step_mm_s2=500.0,
-    )
-    profiles = generator.camera_stress_profiles(plan)
-    assert [profile.accel_mm_s2 for profile in profiles] == [3500.0, 4000.0, 4500.0]
-    gcode = generator.generate_camera_repeatability_gcode(printer, plan)
-    assert gcode.count("VISION_MEASURE_BED_Y_RELATIVE ") == 7
-    assert gcode.count("VISION_BED_Y_REFERENCE ") == 1
-    assert gcode.count("VISION_VALIDATE_BED_Y_REFERENCE ") == 1
-
-    with pytest.raises(ValueError, match="step must be positive"):
-        generator.camera_stress_profiles(
-            generator.CameraRepeatabilityPlan(
-                accel_start_mm_s2=1000.0,
-                accel_stop_mm_s2=2000.0,
-                accel_step_mm_s2=0.0,
-            )
-        )
 
 
 def test_grid_calibration_reads_yaml_values(tmp_path):

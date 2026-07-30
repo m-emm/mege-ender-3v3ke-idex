@@ -53,101 +53,6 @@ def _render_config_option(name: str, value: str) -> str:
     return "\n".join([first, *(f"    {line}" for line in lines[1:])])
 
 
-def _load_camera_calibration(
-    data: dict[str, Any], calib_path: Path
-) -> dict[str, Any] | None:
-    cameras = data.get("cameras")
-    if cameras is None:
-        return None
-    cameras = _require_mapping(cameras, "cameras")
-    nozzle_cam = _require_mapping(cameras.get("nozzle_cam"), "cameras.nozzle_cam")
-    image = _require_mapping(nozzle_cam.get("image"), "cameras.nozzle_cam.image")
-    transform = _require_mapping(
-        nozzle_cam.get("printer_to_image"), "cameras.nozzle_cam.printer_to_image"
-    )
-    reference = _require_mapping(
-        transform.get("reference"), "cameras.nozzle_cam.printer_to_image.reference"
-    )
-    axes = _require_mapping(
-        transform.get("axes_px_per_mm"),
-        "cameras.nozzle_cam.printer_to_image.axes_px_per_mm",
-    )
-    y_axis = _require_mapping(
-        axes.get("y"), "cameras.nozzle_cam.printer_to_image.axes_px_per_mm.y"
-    )
-    feature = _require_mapping(
-        nozzle_cam.get("bed_y_feature"), "cameras.nozzle_cam.bed_y_feature"
-    )
-    width = int(_require_float(image, "width_px", "cameras.nozzle_cam.image"))
-    height = int(_require_float(image, "height_px", "cameras.nozzle_cam.image"))
-    if width <= 0 or height <= 0:
-        raise ValueError("camera image dimensions must be positive")
-    vector_x = _require_float(
-        y_axis, "x", "cameras.nozzle_cam.printer_to_image.axes_px_per_mm.y"
-    )
-    vector_y = _require_float(
-        y_axis, "y", "cameras.nozzle_cam.printer_to_image.axes_px_per_mm.y"
-    )
-    if vector_x * vector_x + vector_y * vector_y <= 1.0e-12:
-        raise ValueError("camera bed-Y axis vector must be non-zero")
-    template_file = _require_string(
-        feature, "template_file", "cameras.nozzle_cam.bed_y_feature"
-    )
-    template_relative = Path(template_file)
-    if template_relative.is_absolute() or ".." in template_relative.parts:
-        raise ValueError("camera bed-Y template_file must be a safe relative path")
-    template_path = calib_path.parent / template_relative
-    if not template_path.is_file():
-        raise ValueError(f"camera bed-Y template does not exist: {template_path}")
-    template_sha256 = _require_string(
-        feature, "template_sha256", "cameras.nozzle_cam.bed_y_feature"
-    )
-    if not re.fullmatch(r"[0-9a-f]{64}", template_sha256):
-        raise ValueError("camera bed-Y template_sha256 must be 64 lowercase hex digits")
-    actual_template_sha256 = hashlib.sha256(template_path.read_bytes()).hexdigest()
-    if actual_template_sha256 != template_sha256:
-        raise ValueError(
-            "camera bed-Y template hash mismatch: "
-            f"{actual_template_sha256} != {template_sha256}"
-        )
-    feature_mode = _require_string(
-        feature, "feature_mode", "cameras.nozzle_cam.bed_y_feature"
-    )
-    if feature_mode not in ("gray_norm", "clahe", "grad_y", "grad_mag"):
-        raise ValueError(f"unsupported camera bed-Y feature mode {feature_mode!r}")
-    return {
-        "image_width": width,
-        "image_height": height,
-        "profile": _require_string(image, "profile", "cameras.nozzle_cam.image"),
-        "reference_y": _require_float(
-            reference,
-            "printer_y_mm",
-            "cameras.nozzle_cam.printer_to_image.reference",
-        ),
-        "reference_pixel_x": _require_float(
-            reference, "pixel_x", "cameras.nozzle_cam.printer_to_image.reference"
-        ),
-        "reference_pixel_y": _require_float(
-            reference, "pixel_y", "cameras.nozzle_cam.printer_to_image.reference"
-        ),
-        "axis_vector_x": vector_x,
-        "axis_vector_y": vector_y,
-        "template_file": template_file,
-        "template_sha256": template_sha256,
-        "template_width": int(
-            _require_float(
-                feature, "template_width_px", "cameras.nozzle_cam.bed_y_feature"
-            )
-        ),
-        "template_height": int(
-            _require_float(
-                feature, "template_height_px", "cameras.nozzle_cam.bed_y_feature"
-            )
-        ),
-        "feature_mode": feature_mode,
-    }
-
-
 def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
     defaults = {
         "bed_center_x": 117.5,
@@ -264,7 +169,6 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
                 "z_endstop": _require_float(t1, "z_endstop", "tools.t1"),
             },
         },
-        "nozzle_cam": _load_camera_calibration(data, calib_path),
         "eddy_relative": _load_eddy_relative_calibration(data),
     }
 
@@ -375,7 +279,6 @@ def template_values(
     bed_grid_zero = calibration["bed_grid_zero"]
     t0 = calibration["tools"]["t0"]
     t1 = calibration["tools"]["t1"]
-    nozzle_cam = calibration.get("nozzle_cam")
     eddy_relative = calibration.get("eddy_relative") or {
         "bed_center_x": 117.5,
         "bed_center_y": 117.5,
@@ -386,26 +289,6 @@ def template_values(
         "calibrate": None,
         "capture": None,
     }
-    if nozzle_cam is None:
-        nozzle_cam = {
-            "image_width": 1,
-            "image_height": 1,
-            "profile": "analysis",
-            "reference_y": t0["y_endstop"] + 10.0,
-            "reference_pixel_x": 0.0,
-            "reference_pixel_y": 0.0,
-            "axis_vector_x": 0.0,
-            "axis_vector_y": 1.0,
-            "template_file": "vision_calibration/nozzle_cam_bed_y_reference.png",
-            "template_sha256": "0" * 64,
-            "template_width": 1,
-            "template_height": 1,
-            "feature_mode": "gray_norm",
-        }
-        bed_y_calibrated = "false"
-    else:
-        bed_y_calibrated = "true"
-
     eddy_klipper_lines = []
     if eddy_relative.get("reg_drive_current") is not None:
         eddy_klipper_lines.append(
@@ -429,22 +312,6 @@ def template_values(
         "t1_y_offset": format_mm(t0["y_endstop"] - t1["y_endstop"]),
         "t1_z_offset": format_mm(t0["z_endstop"] - t1["z_endstop"]),
         "config_fingerprint": config_fingerprint,
-        "bed_y_calibrated": bed_y_calibrated,
-        "bed_y_image_width": str(nozzle_cam["image_width"]),
-        "bed_y_image_height": str(nozzle_cam["image_height"]),
-        "bed_y_profile": str(nozzle_cam["profile"]),
-        "bed_y_reference_y": format_mm(nozzle_cam["reference_y"]),
-        "bed_y_reference_pixel_x": f"{nozzle_cam['reference_pixel_x']:.4f}",
-        "bed_y_reference_pixel_y": f"{nozzle_cam['reference_pixel_y']:.4f}",
-        "bed_y_axis_vector_x": f"{nozzle_cam['axis_vector_x']:.6f}",
-        "bed_y_axis_vector_y": f"{nozzle_cam['axis_vector_y']:.6f}",
-        "bed_y_template_path": (
-            "/home/pi/printer_data/config/" + str(nozzle_cam["template_file"])
-        ),
-        "bed_y_template_sha256": str(nozzle_cam["template_sha256"]),
-        "bed_y_template_width": str(nozzle_cam["template_width"]),
-        "bed_y_template_height": str(nozzle_cam["template_height"]),
-        "bed_y_feature_mode": str(nozzle_cam["feature_mode"]),
         "eddy_bed_center_x": format_mm(eddy_relative["bed_center_x"]),
         "eddy_bed_center_y": format_mm(eddy_relative["bed_center_y"]),
         "eddy_nozzle_to_coil_x": format_mm(eddy_relative["nozzle_to_coil_x"]),

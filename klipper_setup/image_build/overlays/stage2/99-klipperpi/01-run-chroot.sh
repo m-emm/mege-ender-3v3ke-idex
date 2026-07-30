@@ -424,12 +424,10 @@ require_file "${FILES_DIR}/vision-capture.service"
 require_file "${FILES_DIR}/vision-capture-nozzle-cam.service"
 require_file "${FILES_DIR}/vision_framebuffer.py"
 require_file "${FILES_DIR}/vision_capture.py"
-require_file "${FILES_DIR}/vision_bed_y.py"
-require_file "${FILES_DIR}/vision_nozzle_align.py"
-require_file "${FILES_DIR}/vision_rough_calibration.py"
-require_file "${FILES_DIR}/eddy_relative_calibration.py"
-require_file "${FILES_DIR}/eddy_z_diagnostic.py"
-require_file "${FILES_DIR}/vision_runner.py"
+require_file "${FILES_DIR}/vision_calibration.py"
+require_file "${FILES_DIR}/vision_calibration_graph.py"
+require_file "${FILES_DIR}/vision_bed_tab_y_scale.py"
+require_file "${FILES_DIR}/vision_job_types.json"
 require_file "${FILES_DIR}/webcam_health_probe.py"
 require_file "${FILES_DIR}/nozzle_cam_profiles.json"
 require_file "${FILES_DIR}/klipperpi-expand-rootfs.service"
@@ -448,15 +446,13 @@ install -m 0644 "${FILES_DIR}/klipperpi-expand-rootfs.service" /etc/systemd/syst
 install -m 0755 "${FILES_DIR}/klipperpi-expand-rootfs-once.sh" /usr/local/sbin/klipperpi-expand-rootfs-once.sh
 install -m 0755 "${FILES_DIR}/vision_framebuffer.py" /usr/local/bin/vision_framebuffer.py
 install -m 0755 "${FILES_DIR}/vision_capture.py" /usr/local/bin/vision_capture.py
-install -m 0644 "${FILES_DIR}/vision_bed_y.py" /usr/local/bin/vision_bed_y.py
-install -m 0755 "${FILES_DIR}/vision_nozzle_align.py" /usr/local/bin/vision_nozzle_align.py
-install -m 0644 "${FILES_DIR}/vision_rough_calibration.py" /usr/local/bin/vision_rough_calibration.py
-install -m 0644 "${FILES_DIR}/eddy_relative_calibration.py" /usr/local/bin/eddy_relative_calibration.py
-install -m 0755 "${FILES_DIR}/eddy_z_diagnostic.py" /usr/local/bin/eddy_z_diagnostic.py
-install -m 0755 "${FILES_DIR}/vision_runner.py" /usr/local/bin/vision_runner.py
+install -m 0755 "${FILES_DIR}/vision_calibration.py" /usr/local/bin/vision_calibration.py
+install -m 0644 "${FILES_DIR}/vision_calibration_graph.py" /usr/local/bin/vision_calibration_graph.py
+install -m 0644 "${FILES_DIR}/vision_bed_tab_y_scale.py" /usr/local/bin/vision_bed_tab_y_scale.py
 install -m 0755 "${FILES_DIR}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py
 install -d -m 0755 /usr/local/share/vision
 install -m 0644 "${FILES_DIR}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json
+install -m 0644 "${FILES_DIR}/vision_job_types.json" /usr/local/share/vision/vision_job_types.json
 setfacl -m u:www-data:--x "${USER_HOME}"
 
 # Replace __USER__ placeholder

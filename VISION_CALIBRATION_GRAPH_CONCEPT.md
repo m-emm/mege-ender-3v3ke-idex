@@ -19,9 +19,9 @@ facts, results derived from the replaced facts become stale.
 This makes calibration a reproducible dependency graph instead of a sequence of
 scripts that happen to share values in `calib.yaml`.
 
-The generic acquisition runtime, state machine, synchronized capture, and job
-directory layout remain as described in `VISION_JOB_CONCEPT.md`. This document
-defines the calibration-specific layer above that runtime.
+The clean acquisition runtime, synchronized capture, and job directory layout
+are described in `VISION_JOB_CONCEPT.md`. This document defines the
+calibration-specific graph above that runtime.
 
 ### Terminology note
 
@@ -196,14 +196,14 @@ Analysis:
 - reject low-correlation matches, direction-dependent outliers, and patches
   whose parallax differs from the bed-tab plane
 
-Produced facts:
+Produced fact:
 
-- `camera.nozzle_cam.bed_tab.y_axis_vector_px_per_mm`
-- `camera.nozzle_cam.bed_tab.y_scale_px_per_mm`
-- `camera.nozzle_cam.bed_tab.y_mm_per_px`
-- `camera.nozzle_cam.bed_tab.y_parallax_model`
-- `camera.nozzle_cam.bed_tab.reference_template`
-- fit residuals, repeatability, direction difference, ROI, and sweep coverage
+- `camera.nozzle_cam.bed_tab.y_parallax_model`, containing the measured
+  two-dimensional image displacement per commanded Y millimetre plus concrete
+  quality measurements and artifact hashes
+
+Scalar scale, inverse scale, and angle are derived in reports. They are not
+published as redundant graph facts.
 
 These facts establish an image-space Y direction and local scale. They do not
 yet establish the image X direction or an absolute image origin.
@@ -551,8 +551,8 @@ Job types should be registered declaratively, for example in
 schema_version: 1
 job_type: idex_nozzle_fine_xz_grid
 definition_version: 1
-acquisition_generator: vision_nozzle_align:build_fine_xz_job
-analyzer: vision_nozzle_align:analyze_fine_xz_job
+acquisition_generator: vision_calibration:build_fine_xz_job
+analyzer: vision_calibration:analyze_fine_xz_job
 requires:
   - fact_type: camera.nozzle_cam.bed_tab.y_parallax_model
     current: true
@@ -625,7 +625,7 @@ facts and active configuration are still current.
   "schema_version": 1,
   "analysis_run_id": "sha256:...",
   "acquisition_job_id": "idex_nozzle_fine_xz_grid_20260729T180000Z",
-  "analyzer": "vision_nozzle_align:analyze_fine_xz_job",
+  "analyzer": "vision_calibration:analyze_fine_xz_job",
   "analyzer_version": "git:...",
   "input_manifest_hash": "sha256:...",
   "input_fact_ids": ["sha256:...", "sha256:..."],
@@ -842,15 +842,15 @@ No page should silently apply calibration because analysis completed.
 - implement exact dependency binding and cycle detection
 - implement staleness propagation
 
-### 2. Adapt the current job runtime
+### 2. Establish the clean job runtime
 
-- retain existing manifests, generated G-code, synchronous capture, sidecars,
-  and state machine
-- add `job_type`, `job_definition_version`, `input_facts`, and active config
-  fingerprint to new manifests
-- write analysis runs into versioned analysis subdirectories
-- provide adapters that expose existing accepted `facts.json` files as legacy
-  fact sets without rewriting old jobs
+- start manifests, analyses, fact sets, publications, and the catalog at schema
+  version 1
+- retain only generated G-code, synchronous framebuffer capture, camera
+  profiles, and Moonraker execution as low-level infrastructure
+- write immutable analysis runs into versioned analysis subdirectories
+- reject previous manifests, flat fact files, aliases, and historical job
+  layouts
 
 ### 3. Implement the bed reference foundation
 
