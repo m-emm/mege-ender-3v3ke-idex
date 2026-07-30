@@ -131,6 +131,21 @@ def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+def clear_runtime_framebuffer(
+    run_dir: Path = RUN_DIR,
+    ring_dir: Path = RING_DIR,
+) -> None:
+    """Remove frames from an earlier service process before starting a new ring."""
+    run_dir.mkdir(parents=True, exist_ok=True)
+    ring_dir.mkdir(parents=True, exist_ok=True)
+    for path in ring_dir.iterdir():
+        if path.is_dir() and not path.is_symlink():
+            raise FramebufferError(f"unexpected directory in framebuffer ring: {path}")
+        path.unlink()
+    for name in (".capture.jpg.tmp", "latest.jpg", "latest.json"):
+        (run_dir / name).unlink(missing_ok=True)
+
+
 def set_mjpeg_format(device: str, width: int, height: int) -> dict[str, Any]:
     fmt = f"width={width},height={height},pixelformat=MJPG"
     result = run_command(
@@ -497,8 +512,7 @@ class CaptureThread(threading.Thread):
         )
 
     def run(self) -> None:
-        RUN_DIR.mkdir(parents=True, exist_ok=True)
-        RING_DIR.mkdir(parents=True, exist_ok=True)
+        clear_runtime_framebuffer()
         while not self.state.stop_requested.is_set():
             self.state.update_profile(
                 width=TARGET_WIDTH, height=TARGET_HEIGHT, target_fps=TARGET_FPS
