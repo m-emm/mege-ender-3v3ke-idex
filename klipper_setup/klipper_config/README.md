@@ -131,14 +131,10 @@ both derived T1 Y/Z offsets by recording the active snapshot:
   <calculation-id> --expected-fingerprint=<active-config-fingerprint>
 ```
 
-Then home and run the independent six-frame X/Y verification:
-
-```gcode
-IDEX_FINE_TOOL_XY_VERIFY NAME=fine_tool_xy_verify
-```
-
-Z is activated but remains explicitly `pending_eddy_verification`; the
-six-frame job verifies only X and Y.
+The calculation is the Stage 5.1 deployment gate. Do not deploy a rejected
+candidate. The independent post-activation XYZ verification described in the
+calibration concept is deliberately not exposed until its full X/Y dither and
+three-row Z-scale contract is implemented; there is no legacy X/Y-only alias.
 
 The corresponding host job types, in dependency order, are:
 
@@ -149,7 +145,6 @@ nozzle_cam_bed_tab_corner
 idex_tool_red_marker_x_sweep
 idex_rough_tool_x_verify
 idex_nozzle_fine_xz_grid
-idex_fine_tool_xy_verify
 ```
 
 The seed values live in

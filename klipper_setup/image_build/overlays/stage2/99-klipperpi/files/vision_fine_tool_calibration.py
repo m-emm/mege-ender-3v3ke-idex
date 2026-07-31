@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage 5.1 fine T0/T1 XYZ calculation and report artifacts."""
+"""Stage 5.1 fiducial-plane T0/T1 XYZ calculation and gate artifacts."""
 
 from __future__ import annotations
 
@@ -15,6 +15,17 @@ import numpy as np
 
 class FineToolCalibrationError(RuntimeError):
     pass
+
+
+MODEL_FAMILY = "quadratic_x_linear_z_position_v1"
+MODEL_TERMS = (
+    "constant",
+    "dx",
+    "dz",
+    "dx_dz",
+    "dx_squared",
+    "dx_squared_dz",
+)
 
 
 def _finite(value: Any) -> Any:
@@ -39,18 +50,40 @@ def _artifact(path: Path) -> dict[str, str]:
     }
 
 
+def _design(x_mm: float, z_mm: float, x_ref_mm: float, z_ref_mm: float) -> np.ndarray:
+    dx = float(x_mm) - float(x_ref_mm)
+    dz = float(z_mm) - float(z_ref_mm)
+    return np.asarray(
+        [1.0, dx, dz, dx * dz, dx * dx, dx * dx * dz],
+        dtype=np.float64,
+    )
+
+
 def _position(model: dict[str, Any], x_mm: float, z_mm: float) -> np.ndarray:
+    return _design(
+        x_mm,
+        z_mm,
+        float(model["x_ref_mm"]),
+        float(model["z_ref_mm"]),
+    ) @ np.asarray(model["position_coefficients"], dtype=np.float64)
+
+
+def _x_vector(model: dict[str, Any], x_mm: float, z_mm: float) -> np.ndarray:
+    coefficients = np.asarray(model["position_coefficients"], dtype=np.float64)
     dx = float(x_mm) - float(model["x_ref_mm"])
     dz = float(z_mm) - float(model["z_ref_mm"])
-    design = np.asarray([1.0, dx, dz, dx * dz], dtype=np.float64)
-    return design @ np.asarray(model["position_coefficients"], dtype=np.float64)
-
-
-def _x_vector(model: dict[str, Any], z_mm: float) -> np.ndarray:
-    coefficients = np.asarray(model["position_coefficients"], dtype=np.float64)
-    return coefficients[1] + coefficients[3] * (
-        float(z_mm) - float(model["z_ref_mm"])
+    return (
+        coefficients[1]
+        + coefficients[3] * dz
+        + 2.0 * coefficients[4] * dx
+        + 2.0 * coefficients[5] * dx * dz
     )
+
+
+def _x_vector_z_slope(model: dict[str, Any], x_mm: float) -> np.ndarray:
+    coefficients = np.asarray(model["position_coefficients"], dtype=np.float64)
+    dx = float(x_mm) - float(model["x_ref_mm"])
+    return coefficients[3] + 2.0 * coefficients[5] * dx
 
 
 def _fit_model(
@@ -59,88 +92,175 @@ def _fit_model(
     x_ref_mm: float,
     z_ref_mm: float,
 ) -> dict[str, Any]:
-    if len(records) < 8:
-        raise FineToolCalibrationError("too few registrations for stability fit")
+    if len(records) < 12:
+        raise FineToolCalibrationError("too few direct tip positions for scale field")
     design = np.asarray(
         [
-            [
-                1.0,
-                float(record["x_mm"]) - x_ref_mm,
-                float(record["z_mm"]) - z_ref_mm,
-                (float(record["x_mm"]) - x_ref_mm)
-                * (float(record["z_mm"]) - z_ref_mm),
-            ]
+            _design(record["x_mm"], record["z_mm"], x_ref_mm, z_ref_mm)
             for record in records
         ],
         dtype=np.float64,
     )
     positions = np.asarray(
-        [record["center_px"] for record in records], dtype=np.float64
+        [record["center_px"] for record in records],
+        dtype=np.float64,
     )
+    if np.linalg.matrix_rank(design) < len(MODEL_TERMS):
+        raise FineToolCalibrationError("tip-position design matrix is singular")
     coefficients = np.linalg.lstsq(design, positions, rcond=None)[0]
     residuals = positions - design @ coefficients
-    return {
-        "x_ref_mm": float(x_ref_mm),
-        "z_ref_mm": float(z_ref_mm),
-        "position_coefficients": coefficients.tolist(),
-        "position_fit_rms_px": float(
-            np.sqrt(np.mean(np.sum(residuals**2, axis=1)))
-        ),
+    return _finite(
+        {
+            "model_family": MODEL_FAMILY,
+            "model_terms": MODEL_TERMS,
+            "x_ref_mm": float(x_ref_mm),
+            "z_ref_mm": float(z_ref_mm),
+            "position_coefficients": coefficients,
+            "position_fit_rms_px": float(
+                np.sqrt(np.mean(np.sum(residuals**2, axis=1)))
+            ),
+            "accepted_count": len(records),
+            "accepted_sequences": [int(record["seq"]) for record in records],
+        }
+    )
+
+
+def _accepted_records(
+    model: dict[str, Any],
+    records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    accepted_sequences = {
+        int(item) for item in model.get("accepted_sequences", [])
     }
+    accepted = [
+        record
+        for record in records
+        if not accepted_sequences or int(record["seq"]) in accepted_sequences
+    ]
+    if len(accepted) < 12:
+        raise FineToolCalibrationError("projection fact has too few accepted records")
+    return accepted
 
 
-def _homography_jacobian(
-    homography: np.ndarray, point: np.ndarray
-) -> np.ndarray:
-    x, y = [float(item) for item in point]
-    h = homography
-    denominator = h[2, 0] * x + h[2, 1] * y + h[2, 2]
-    u_numerator = h[0, 0] * x + h[0, 1] * y + h[0, 2]
-    v_numerator = h[1, 0] * x + h[1, 1] * y + h[1, 2]
-    return np.asarray(
-        [
-            [
-                (h[0, 0] * denominator - u_numerator * h[2, 0])
-                / denominator**2,
-                (h[0, 1] * denominator - u_numerator * h[2, 1])
-                / denominator**2,
-            ],
-            [
-                (h[1, 0] * denominator - v_numerator * h[2, 0])
-                / denominator**2,
-                (h[1, 1] * denominator - v_numerator * h[2, 0])
-                / denominator**2,
-            ],
-        ],
-        dtype=np.float64,
-    )
+def _full_row_coverage(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = []
+    for z_mm in sorted({float(record["z_mm"]) for record in records}):
+        selected = [
+            record
+            for record in records
+            if abs(float(record["z_mm"]) - z_mm) < 1e-9
+        ]
+        x_values = sorted({float(record["x_mm"]) for record in selected})
+        if len(x_values) < 2:
+            continue
+        rows.append(
+            {
+                "z_mm": z_mm,
+                "accepted_count": len(x_values),
+                "x_min_mm": x_values[0],
+                "x_max_mm": x_values[-1],
+                "x_span_mm": x_values[-1] - x_values[0],
+            }
+        )
+    return rows
 
 
-def _patch_to_printer_matrix(
-    metric: dict[str, Any], projection: dict[str, Any]
-) -> np.ndarray:
-    homography = np.asarray(
-        metric["patch_to_image_homography"], dtype=np.float64
+def _magnitude_crossing(
+    base_vector: np.ndarray,
+    z_slope: np.ndarray,
+    fiducial_scale: float,
+    z_ref_mm: float,
+    preferred_z_mm: float,
+) -> tuple[float | None, list[float]]:
+    a = float(np.dot(z_slope, z_slope))
+    b = 2.0 * float(np.dot(base_vector, z_slope))
+    c = float(np.dot(base_vector, base_vector) - fiducial_scale**2)
+    roots: list[float] = []
+    if a < 1e-12:
+        if abs(b) >= 1e-12:
+            roots = [float(z_ref_mm - c / b)]
+    else:
+        discriminant = b * b - 4.0 * a * c
+        if discriminant >= 0.0:
+            root = math.sqrt(discriminant)
+            roots = [
+                float(z_ref_mm + (-b - root) / (2.0 * a)),
+                float(z_ref_mm + (-b + root) / (2.0 * a)),
+            ]
+    selected = (
+        min(roots, key=lambda item: abs(item - preferred_z_mm))
+        if roots
+        else None
     )
-    patch_center = np.asarray(
-        metric["patch_reference_center_xy_mm"], dtype=np.float64
+    return selected, roots
+
+
+def _scale_crossing(
+    model: dict[str, Any],
+    *,
+    fiducial_reference_x_mm: float,
+    fiducial_x_vector_px_per_mm: np.ndarray,
+    fiducial_plane_z_mm: float,
+) -> dict[str, Any]:
+    z_ref = float(model["z_ref_mm"])
+    fiducial_scale = float(np.linalg.norm(fiducial_x_vector_px_per_mm))
+    if fiducial_scale <= 1e-9:
+        raise FineToolCalibrationError("fiducial X vector has zero magnitude")
+    fiducial_direction = fiducial_x_vector_px_per_mm / fiducial_scale
+    base_vector = _x_vector(model, fiducial_reference_x_mm, z_ref)
+    z_slope = _x_vector_z_slope(model, fiducial_reference_x_mm)
+    projected_slope = float(np.dot(z_slope, fiducial_direction))
+    if abs(projected_slope) < 1e-6:
+        raise FineToolCalibrationError(
+            "transported nozzle X scale has insufficient Z dependence"
+        )
+    projected_base = float(np.dot(base_vector, fiducial_direction))
+    commanded_z_at_fiducial = float(
+        z_ref + (fiducial_scale - projected_base) / projected_slope
     )
-    jacobian = _homography_jacobian(homography, patch_center)
-    bed_x = np.asarray(
-        projection["bed_x_vector_fiducial_plane_px_per_mm"],
-        dtype=np.float64,
+    slope_norm_squared = float(np.dot(z_slope, z_slope))
+    closest_vector_z = float(
+        z_ref
+        + np.dot(
+            z_slope,
+            fiducial_x_vector_px_per_mm - base_vector,
+        )
+        / slope_norm_squared
     )
-    patch_x = np.linalg.solve(jacobian, bed_x)
-    patch_x /= np.linalg.norm(patch_x)
-    measured_patch_y = -np.asarray(
-        metric["patch_y_vector_per_printer_y_mm"], dtype=np.float64
+    magnitude_z, magnitude_roots = _magnitude_crossing(
+        base_vector,
+        z_slope,
+        fiducial_scale,
+        z_ref,
+        commanded_z_at_fiducial,
     )
-    measured_patch_y /= np.linalg.norm(measured_patch_y)
-    patch_y = np.asarray([-patch_x[1], patch_x[0]], dtype=np.float64)
-    if float(np.dot(patch_y, measured_patch_y)) < 0:
-        patch_y *= -1.0
-    printer_to_patch = np.column_stack((patch_x, patch_y))
-    return np.linalg.inv(printer_to_patch)
+    crossing_vector = _x_vector(
+        model,
+        fiducial_reference_x_mm,
+        commanded_z_at_fiducial,
+    )
+    return _finite(
+        {
+            "fiducial_reference_printer_x_mm": fiducial_reference_x_mm,
+            "fiducial_x_vector_px_per_mm": fiducial_x_vector_px_per_mm,
+            "fiducial_x_scale_px_per_mm": fiducial_scale,
+            "fiducial_x_direction_unit": fiducial_direction,
+            "transported_vector_at_model_reference_z_px_per_mm": base_vector,
+            "transported_vector_z_slope_px_per_mm_per_mm": z_slope,
+            "projected_scale_at_model_reference_z_px_per_mm": projected_base,
+            "projected_scale_z_slope_px_per_mm_per_mm": projected_slope,
+            "commanded_z_at_fiducial_plane_mm": commanded_z_at_fiducial,
+            "closest_full_vector_commanded_z_mm": closest_vector_z,
+            "magnitude_crossing_commanded_z_mm": magnitude_z,
+            "magnitude_crossing_roots_mm": magnitude_roots,
+            "crossing_vector_px_per_mm": crossing_vector,
+            "crossing_vector_residual_px_per_mm":
+                crossing_vector - fiducial_x_vector_px_per_mm,
+            "fiducial_plane_printer_z_mm": fiducial_plane_z_mm,
+            "bed_referenced_z_at_commanded_zero_mm":
+                fiducial_plane_z_mm - commanded_z_at_fiducial,
+        }
+    )
 
 
 def _projective_matrix_from_correspondences(
@@ -148,8 +268,7 @@ def _projective_matrix_from_correspondences(
 ) -> np.ndarray:
     rows = []
     for world, image in zip(world_points, image_points):
-        x, y, z = world
-        homogeneous = np.asarray([x, y, z, 1.0], dtype=np.float64)
+        homogeneous = np.asarray([*world, 1.0], dtype=np.float64)
         u, v = image
         rows.append(np.r_[homogeneous, np.zeros(4), -u * homogeneous])
         rows.append(np.r_[np.zeros(4), homogeneous, -v * homogeneous])
@@ -160,6 +279,24 @@ def _projective_matrix_from_correspondences(
             "joint projective initialization has an invalid scale"
         )
     return matrix / matrix[2, 3]
+
+
+def _affine_projective_initialization(
+    world_points: np.ndarray, image_points: np.ndarray
+) -> np.ndarray:
+    normalized = _normalized_world(world_points)
+    design = np.column_stack(
+        (normalized, np.ones(len(normalized), dtype=np.float64))
+    )
+    coefficients = np.linalg.lstsq(design, image_points, rcond=None)[0]
+    return np.asarray(
+        [
+            coefficients[:, 0],
+            coefficients[:, 1],
+            [0.0, 0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
 
 
 def _encode_projective(matrix: np.ndarray) -> np.ndarray:
@@ -219,67 +356,72 @@ def _project(matrix: np.ndarray, world: np.ndarray) -> np.ndarray:
 def _joint_observations(
     *,
     parameters: np.ndarray,
-    patch_to_printer: np.ndarray,
+    patch_to_printer_xy: np.ndarray,
+    patch_origin_printer_xy: np.ndarray,
     patch_points_mm: np.ndarray,
-    metric_centers: np.ndarray,
-    metric_commanded_y_mm: np.ndarray,
-    fiducial_plane_z_mm: float,
-    corner_pixels: np.ndarray,
-    corner_commanded_y_mm: np.ndarray,
+    metric_observations: list[dict[str, Any]],
+    corner_observations: list[dict[str, Any]],
     corner_xyz_mm: np.ndarray,
+    fiducial_plane_z_mm: float,
     registrations: list[dict[str, Any]],
+    tool_z_residuals_mm: dict[str, float],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str]]:
-    patch_translation = parameters[11:13]
-    tool_residuals = {
-        "T0": parameters[13:16],
-        "T1": parameters[16:19],
+    tool_xy_residuals = {
+        "T0": parameters[11:13],
+        "T1": parameters[13:15],
     }
     world_points = []
     image_points = []
-    base_weights = []
+    weights = []
     labels = []
-    for centers, commanded_y in zip(metric_centers, metric_commanded_y_mm):
-        absolute_xy = (
-            patch_points_mm @ patch_to_printer.T + patch_translation
-        )
-        for absolute, image in zip(absolute_xy, centers):
+    absolute_patch_xy = (
+        patch_points_mm @ patch_to_printer_xy.T
+        + patch_origin_printer_xy
+    )
+    for observation in metric_observations:
+        commanded_y = float(observation["commanded_y_mm"])
+        for absolute_xy, image_xy in zip(
+            absolute_patch_xy, observation["centers_px"]
+        ):
             world_points.append(
                 [
-                    float(absolute[0]),
-                    float(absolute[1] - commanded_y),
-                    float(fiducial_plane_z_mm),
+                    float(absolute_xy[0]),
+                    float(absolute_xy[1] + commanded_y),
+                    fiducial_plane_z_mm,
                 ]
             )
-            image_points.append(image)
-            base_weights.append(1.0)
+            image_points.append(image_xy)
+            weights.append(1.0)
             labels.append("bed_fiducial")
-    for image, commanded_y in zip(corner_pixels, corner_commanded_y_mm):
+    for observation in corner_observations:
+        commanded_y = float(observation["commanded_y_mm"])
         world_points.append(
             [
                 float(corner_xyz_mm[0]),
-                float(corner_xyz_mm[1] - commanded_y),
+                float(corner_xyz_mm[1] + commanded_y),
                 float(corner_xyz_mm[2]),
             ]
         )
-        image_points.append(image)
-        base_weights.append(2.0)
+        image_points.append(observation["pixel_px"])
+        weights.append(2.0)
         labels.append("bed_tab_corner")
     for record in registrations:
-        residual = tool_residuals[record["tool"]]
+        tool = str(record["tool"])
+        xy_residual = tool_xy_residuals[tool]
         world_points.append(
             [
-                float(record["x_mm"]) + residual[0],
-                residual[1],
-                float(record["z_mm"]) + residual[2],
+                float(record["x_mm"]) + float(xy_residual[0]),
+                float(xy_residual[1]),
+                float(record["z_mm"]) + float(tool_z_residuals_mm[tool]),
             ]
         )
         image_points.append(record["center_px"])
-        base_weights.append(1.0)
-        labels.append(f"nozzle_{record['tool']}")
+        weights.append(1.0)
+        labels.append(f"nozzle_{tool}")
     return (
         np.asarray(world_points, dtype=np.float64),
         np.asarray(image_points, dtype=np.float64),
-        np.asarray(base_weights, dtype=np.float64),
+        np.asarray(weights, dtype=np.float64),
         labels,
     )
 
@@ -295,61 +437,48 @@ def _huber_objective(residuals: np.ndarray, weights: np.ndarray) -> float:
     return float(np.sum(weights * losses))
 
 
-def _fit_joint_projective(
+def _fit_joint_projective_xy(
     *,
-    projection: dict[str, Any],
-    partial_bed: dict[str, Any],
     registrations: list[dict[str, Any]],
-    metric: dict[str, Any],
-    metric_centers_px: list[list[list[float]]],
-    metric_commanded_y_mm: list[float],
-    corner_pixels_px: list[list[float]],
-    corner_commanded_y_mm: list[float],
+    metric_observations: list[dict[str, Any]],
+    corner_observations: list[dict[str, Any]],
     patch_points_mm: list[list[float]],
+    patch_to_printer_xy: list[list[float]],
+    patch_origin_printer_xy_mm: list[float],
+    corner_xyz_mm: list[float],
     fiducial_plane_z_mm: float,
-    initial_tools: dict[str, dict[str, Any]],
+    tool_z_residuals_mm: dict[str, float],
 ) -> dict[str, Any]:
-    patch_to_printer = _patch_to_printer_matrix(metric, projection)
-    corner_patch = np.asarray(
-        partial_bed["corner_patch_xy_mm"], dtype=np.float64
-    )
-    corner_xyz = np.asarray(
-        partial_bed["corner_printer_xyz_mm"], dtype=np.float64
-    )
-    patch_translation = (
-        corner_xyz[:2] - patch_to_printer @ corner_patch
-    )
-    initial_residuals = np.r_[
-        initial_tools["T0"]["coordinate_residual_xyz_mm"],
-        initial_tools["T1"]["coordinate_residual_xyz_mm"],
-    ]
-    temporary = np.r_[np.zeros(11), patch_translation, initial_residuals]
+    if len(metric_observations) < 4:
+        raise FineToolCalibrationError(
+            "joint XY solve needs at least four metric observations"
+        )
+    if len(corner_observations) < 3:
+        raise FineToolCalibrationError(
+            "joint XY solve needs at least three corner observations"
+        )
     observation_args = {
-        "patch_to_printer": patch_to_printer,
+        "patch_to_printer_xy": np.asarray(
+            patch_to_printer_xy, dtype=np.float64
+        ),
+        "patch_origin_printer_xy": np.asarray(
+            patch_origin_printer_xy_mm, dtype=np.float64
+        ),
         "patch_points_mm": np.asarray(patch_points_mm, dtype=np.float64),
-        "metric_centers": np.asarray(metric_centers_px, dtype=np.float64),
-        "metric_commanded_y_mm": np.asarray(
-            metric_commanded_y_mm, dtype=np.float64
-        ),
+        "metric_observations": metric_observations,
+        "corner_observations": corner_observations,
+        "corner_xyz_mm": np.asarray(corner_xyz_mm, dtype=np.float64),
         "fiducial_plane_z_mm": float(fiducial_plane_z_mm),
-        "corner_pixels": np.asarray(corner_pixels_px, dtype=np.float64),
-        "corner_commanded_y_mm": np.asarray(
-            corner_commanded_y_mm, dtype=np.float64
-        ),
-        "corner_xyz_mm": corner_xyz,
         "registrations": registrations,
+        "tool_z_residuals_mm": tool_z_residuals_mm,
     }
+    temporary = np.r_[np.zeros(11), np.zeros(4)]
     world, image, _weights, _labels = _joint_observations(
         parameters=temporary, **observation_args
     )
-    initial_matrix = _projective_matrix_from_correspondences(
-        _normalized_world(world), image
-    )
-    parameters = np.r_[
-        _encode_projective(initial_matrix),
-        patch_translation,
-        initial_residuals,
-    ]
+    initial_matrix = _affine_projective_initialization(world, image)
+    parameters = temporary.copy()
+    parameters[:11] = _encode_projective(initial_matrix)
 
     def evaluate(values: np.ndarray) -> tuple[np.ndarray, np.ndarray, list[str]]:
         world_values, image_values, weights, labels = _joint_observations(
@@ -379,7 +508,9 @@ def _fit_joint_projective(
             trial[index] += epsilon
             trial_residual, _trial_weights, _trial_labels = evaluate(trial)
             jacobian[:, index] = (
-                (trial_residual - residuals) * point_weights[:, None] / epsilon
+                (trial_residual - residuals)
+                * point_weights[:, None]
+                / epsilon
             ).ravel()
         normal = jacobian.T @ jacobian
         gradient = jacobian.T @ weighted_residual
@@ -412,63 +543,30 @@ def _fit_joint_projective(
                     converged = True
                 break
             damping *= 5.0
-        if not accepted_step:
-            break
-        if converged:
+        if not accepted_step or converged:
             break
 
     residuals, base_weights, labels = evaluate(parameters)
-    matrix = _decode_projective(parameters[:11])
     source_rms = {}
     for label in sorted(set(labels)):
         selected = residuals[np.asarray([item == label for item in labels])]
         source_rms[label] = float(
             np.sqrt(np.mean(np.sum(selected**2, axis=1)))
         )
-    tool_residuals = {
-        "T0": parameters[13:16],
-        "T1": parameters[16:19],
-    }
-    tools = {}
-    for tool in ("T0", "T1"):
-        residual = tool_residuals[tool]
-        tools[tool] = {
-            "coordinate_residual_xyz_mm": residual,
-            "reference_commanded_xyz_mm": [
-                float(projection["tool_models"][tool]["x_ref_mm"]),
-                -14.0,
-                -float(residual[2]),
-            ],
-            "measured_nozzle_xyz_mm": [
-                float(projection["tool_models"][tool]["x_ref_mm"])
-                + float(residual[0]),
-                -14.0 + float(residual[1]),
-                0.0,
-            ],
-            "commanded_z_at_print_plane_mm": -float(residual[2]),
-        }
     return _finite(
         {
             "converged": converged,
             "iteration_count": iteration_count,
-            "camera_matrix_normalized": matrix,
-            "world_normalization": {
-                "x_origin_mm": 173.0,
-                "x_scale_mm": 20.0,
-                "y_origin_mm": 0.0,
-                "y_scale_mm": 20.0,
-                "z_origin_mm": 0.0,
-                "z_scale_mm": 10.0,
+            "camera_matrix_normalized": _decode_projective(parameters[:11]),
+            "patch_origin_printer_xy_mm": patch_origin_printer_xy_mm,
+            "tool_xy_residuals_mm": {
+                "T0": parameters[11:13],
+                "T1": parameters[13:15],
             },
-            "patch_to_printer_xy_matrix": patch_to_printer,
-            "patch_origin_printer_xy_mm": parameters[11:13],
-            "tools": tools,
             "source_rms_px": source_rms,
             "joint_rms_px": float(
                 np.sqrt(
-                    np.sum(
-                        base_weights[:, None] * residuals**2
-                    )
+                    np.sum(base_weights[:, None] * residuals**2)
                     / (2.0 * np.sum(base_weights))
                 )
             ),
@@ -479,141 +577,154 @@ def _fit_joint_projective(
     )
 
 
-def _solve_tool(
-    model: dict[str, Any],
-    *,
-    bed_x_vector: np.ndarray,
-    physical_y_vector: np.ndarray,
-    corner_pixel: np.ndarray,
-    corner_xyz_mm: np.ndarray,
-    reference_commanded_x_mm: float,
-    capture_y_mm: float,
-) -> dict[str, Any]:
-    coefficients = np.asarray(model["position_coefficients"], dtype=np.float64)
-    slope = coefficients[3]
-    slope_norm_squared = float(np.dot(slope, slope))
-    if slope_norm_squared < 1e-6:
-        raise FineToolCalibrationError(
-            "nozzle X-scale/Z slope is too small to identify the print plane"
-        )
-    z_ref = float(model["z_ref_mm"])
-    x_at_z_ref = coefficients[1]
-    commanded_z_at_print_plane = z_ref + float(
-        np.dot(slope, bed_x_vector - x_at_z_ref) / slope_norm_squared
-    )
-    nozzle_x_vector = _x_vector(model, commanded_z_at_print_plane)
-    vector_residual = nozzle_x_vector - bed_x_vector
-
-    tip_pixel = _position(
-        model, reference_commanded_x_mm, commanded_z_at_print_plane
-    )
-    basis = np.column_stack((bed_x_vector, physical_y_vector))
-    condition = float(np.linalg.cond(basis))
-    if not math.isfinite(condition) or condition > 25.0:
-        raise FineToolCalibrationError(
-            f"bed image basis is singular or ill-conditioned ({condition:.3f})"
-        )
-    bed_delta_xy = np.linalg.solve(basis, tip_pixel - corner_pixel)
-    measured_xyz = np.asarray(
-        [
-            corner_xyz_mm[0] + bed_delta_xy[0],
-            corner_xyz_mm[1] + bed_delta_xy[1],
-            0.0,
-        ],
-        dtype=np.float64,
-    )
-    reference_commanded_xyz = np.asarray(
-        [
-            reference_commanded_x_mm,
-            capture_y_mm,
-            commanded_z_at_print_plane,
-        ],
-        dtype=np.float64,
-    )
-    residual = measured_xyz - reference_commanded_xyz
-    return _finite(
-        {
-            "reference_commanded_xyz_mm": reference_commanded_xyz,
-            "measured_nozzle_xyz_mm": measured_xyz,
-            "coordinate_residual_xyz_mm": residual,
-            "commanded_z_at_print_plane_mm": commanded_z_at_print_plane,
-            "tip_pixel_at_print_plane_px": tip_pixel,
-            "nozzle_x_vector_at_print_plane_px_per_mm": nozzle_x_vector,
-            "bed_x_vector_at_print_plane_px_per_mm": bed_x_vector,
-            "x_vector_residual_px_per_mm": vector_residual,
-            "x_vector_residual_magnitude_px_per_mm": float(
-                np.linalg.norm(vector_residual)
-            ),
-            "bed_image_basis_condition": condition,
-        }
-    )
-
-
 def _stability_checks(
+    *,
     model: dict[str, Any],
     records: list[dict[str, Any]],
-    solve_arguments: dict[str, Any],
+    crossing_arguments: dict[str, Any],
 ) -> dict[str, Any]:
-    accepted_sequences = {
-        int(item) for item in model.get("accepted_sequences", [])
-    }
-    accepted = [
-        record
-        for record in records
-        if not accepted_sequences or int(record["seq"]) in accepted_sequences
-    ]
-    baseline = _solve_tool(model, **solve_arguments)
-    baseline_residual = np.asarray(
-        baseline["coordinate_residual_xyz_mm"], dtype=np.float64
-    )
+    baseline = _scale_crossing(model, **crossing_arguments)
+    baseline_z = float(baseline["commanded_z_at_fiducial_plane_mm"])
     trials = []
-    groups = [
-        ("x", value)
-        for value in sorted({float(record["x_mm"]) for record in accepted})
-    ] + [
-        ("z", value)
-        for value in sorted({float(record["z_mm"]) for record in accepted})
-    ]
-    for axis, value in groups:
-        retained = [
-            record
-            for record in accepted
-            if abs(float(record[f"{axis}_mm"]) - value) > 1e-9
-        ]
-        if len(retained) < 8:
+    x_values = sorted({float(record["x_mm"]) for record in records})
+    interior_x = set(x_values[1:-1])
+    for record in records:
+        if float(record["x_mm"]) not in interior_x:
             continue
+        retained = [
+            item for item in records if int(item["seq"]) != int(record["seq"])
+        ]
         trial_model = _fit_model(
             retained,
             x_ref_mm=float(model["x_ref_mm"]),
             z_ref_mm=float(model["z_ref_mm"]),
         )
-        trial = _solve_tool(trial_model, **solve_arguments)
-        trial_residual = np.asarray(
-            trial["coordinate_residual_xyz_mm"], dtype=np.float64
-        )
-        delta = trial_residual - baseline_residual
+        crossing = _scale_crossing(trial_model, **crossing_arguments)
+        trial_z = float(crossing["commanded_z_at_fiducial_plane_mm"])
         trials.append(
             {
-                "left_out_axis": axis,
-                "left_out_value_mm": value,
-                "coordinate_residual_xyz_mm": trial_residual.tolist(),
-                "change_from_full_fit_xyz_mm": delta.tolist(),
-                "change_magnitude_mm": float(np.linalg.norm(delta)),
+                "kind": "leave_one_x_observation",
+                "left_out_sequence": int(record["seq"]),
+                "left_out_x_mm": float(record["x_mm"]),
+                "left_out_z_mm": float(record["z_mm"]),
+                "commanded_z_at_fiducial_plane_mm": trial_z,
+                "change_mm": trial_z - baseline_z,
             }
         )
-    return {
-        "trials": trials,
-        "maximum_change_mm": max(
-            (float(item["change_magnitude_mm"]) for item in trials), default=0.0
-        ),
-        "maximum_axis_change_mm": max(
-            (
-                max(abs(float(value)) for value in item["change_from_full_fit_xyz_mm"])
-                for item in trials
+    for row in _full_row_coverage(records):
+        retained = [
+            record
+            for record in records
+            if abs(float(record["z_mm"]) - float(row["z_mm"])) > 1e-9
+        ]
+        if len(retained) < 12:
+            continue
+        try:
+            trial_model = _fit_model(
+                retained,
+                x_ref_mm=float(model["x_ref_mm"]),
+                z_ref_mm=float(model["z_ref_mm"]),
+            )
+            crossing = _scale_crossing(trial_model, **crossing_arguments)
+        except FineToolCalibrationError:
+            continue
+        trial_z = float(crossing["commanded_z_at_fiducial_plane_mm"])
+        trials.append(
+            {
+                "kind": "leave_one_full_z_row",
+                "left_out_z_mm": float(row["z_mm"]),
+                "commanded_z_at_fiducial_plane_mm": trial_z,
+                "change_mm": trial_z - baseline_z,
+            }
+        )
+    return _finite(
+        {
+            "baseline_commanded_z_at_fiducial_plane_mm": baseline_z,
+            "trials": trials,
+            "maximum_change_mm": max(
+                (abs(float(item["change_mm"])) for item in trials),
+                default=0.0,
             ),
-            default=0.0,
-        ),
+            "maximum_observation_change_mm": max(
+                (
+                    abs(float(item["change_mm"]))
+                    for item in trials
+                    if item["kind"] == "leave_one_x_observation"
+                ),
+                default=0.0,
+            ),
+            "maximum_full_row_change_mm": max(
+                (
+                    abs(float(item["change_mm"]))
+                    for item in trials
+                    if item["kind"] == "leave_one_full_z_row"
+                ),
+                default=0.0,
+            ),
+        }
+    )
+
+
+def _solve_tool(
+    *,
+    model: dict[str, Any],
+    records: list[dict[str, Any]],
+    fiducial_reference_xy_mm: np.ndarray,
+    fiducial_x_vector_px_per_mm: np.ndarray,
+    fiducial_plane_z_mm: float,
+    capture_y_mm: float,
+) -> dict[str, Any]:
+    accepted = _accepted_records(model, records)
+    crossing_arguments = {
+        "fiducial_reference_x_mm": float(fiducial_reference_xy_mm[0]),
+        "fiducial_x_vector_px_per_mm": fiducial_x_vector_px_per_mm,
+        "fiducial_plane_z_mm": fiducial_plane_z_mm,
     }
+    crossing = _scale_crossing(model, **crossing_arguments)
+    crossing_z = float(crossing["commanded_z_at_fiducial_plane_mm"])
+    reference_x = float(model["x_ref_mm"])
+    tip_pixel = _position(model, reference_x, crossing_z)
+    reference_commanded_xyz = np.asarray(
+        [reference_x, capture_y_mm, crossing_z],
+        dtype=np.float64,
+    )
+    coordinate_residual = np.asarray(
+        [0.0, 0.0, fiducial_plane_z_mm - crossing_z],
+        dtype=np.float64,
+    )
+    measured_xyz = reference_commanded_xyz + coordinate_residual
+    stability = _stability_checks(
+        model=model,
+        records=accepted,
+        crossing_arguments=crossing_arguments,
+    )
+    coverage = _full_row_coverage(accepted)
+    measured_x_values = [float(record["x_mm"]) for record in accepted]
+    extrapolation = max(
+        0.0,
+        min(measured_x_values) - float(fiducial_reference_xy_mm[0]),
+        float(fiducial_reference_xy_mm[0]) - max(measured_x_values),
+    )
+    return _finite(
+        {
+            "reference_commanded_xyz_mm": reference_commanded_xyz,
+            "measured_nozzle_xyz_mm": measured_xyz,
+            "coordinate_residual_xyz_mm": coordinate_residual,
+            "tip_pixel_at_fiducial_plane_px": tip_pixel,
+            "lateral_extrapolation_distance_mm": extrapolation,
+            "measured_x_range_mm": [
+                min(measured_x_values),
+                max(measured_x_values),
+            ],
+            "measured_z_range_mm": [
+                min(float(record["z_mm"]) for record in accepted),
+                max(float(record["z_mm"]) for record in accepted),
+            ],
+            "full_row_coverage": coverage,
+            "scale_crossing": crossing,
+            "stability": stability,
+        }
+    )
 
 
 def generated_calibration(
@@ -635,10 +746,7 @@ def generated_calibration(
         for tool in ("t0", "t1")
     }
     return {
-        "persisted_calib": {
-            "old": old,
-            "new": new,
-        },
+        "persisted_calib": {"old": old, "new": new},
         "generated_klipper": {
             "old": {
                 "t0_x_position_endstop": old["t0"]["x"],
@@ -663,171 +771,228 @@ def generated_calibration(
 def calculate_candidate(
     *,
     projection: dict[str, Any],
-    partial_bed: dict[str, Any],
     registrations: list[dict[str, Any]],
+    metric_observations: list[dict[str, Any]],
+    corner_observations: list[dict[str, Any]],
+    physical_reference: dict[str, Any],
+    mapping: dict[str, Any],
+    partial_bed: dict[str, Any],
     old_datums: dict[str, dict[str, float]],
-    capture_y_mm: float,
-    metric: dict[str, Any] | None = None,
-    metric_centers_px: list[list[list[float]]] | None = None,
-    metric_commanded_y_mm: list[float] | None = None,
-    corner_pixels_px: list[list[float]] | None = None,
-    corner_commanded_y_mm: list[float] | None = None,
-    patch_points_mm: list[list[float]] | None = None,
-    fiducial_plane_z_mm: float | None = None,
 ) -> dict[str, Any]:
-    bed_x = np.asarray(
-        projection["bed_x_vector_print_plane_px_per_mm"], dtype=np.float64
+    fiducial_xy = np.asarray(
+        projection["fiducial_reference_printer_xy_mm"],
+        dtype=np.float64,
     )
-    image_y = np.asarray(
-        projection["image_y_axis_vector_px_per_mm"], dtype=np.float64
+    fiducial_x_vector = np.asarray(
+        projection["fiducial_x_vector_at_fine_capture_px_per_mm"],
+        dtype=np.float64,
     )
-    physical_y = -image_y
-    corner_xyz = np.asarray(
-        partial_bed["corner_printer_xyz_mm"], dtype=np.float64
-    )
-    corner_pixel = np.asarray(
-        partial_bed["corner_pixel_xy_px"], dtype=np.float64
-    ) + image_y * (
-        float(capture_y_mm)
-        - float(partial_bed["corner_pixel_capture_y_mm"])
-    )
-    reference_x = float(
-        np.mean(
-            [
-                float(projection["tool_models"][tool]["x_ref_mm"])
-                for tool in ("T0", "T1")
-            ]
-        )
-    )
-    solve_arguments = {
-        "bed_x_vector": bed_x,
-        "physical_y_vector": physical_y,
-        "corner_pixel": corner_pixel,
-        "corner_xyz_mm": corner_xyz,
-        "reference_commanded_x_mm": reference_x,
-        "capture_y_mm": float(capture_y_mm),
-    }
+    fiducial_z = float(projection["fiducial_plane_printer_z_mm"])
+    capture_y = float(projection["fine_capture_y_mm"])
     tools = {}
+    reasons = []
+    warnings = []
     for tool in ("T0", "T1"):
         model = projection["tool_models"][tool]
-        solved = _solve_tool(model, **solve_arguments)
-        solved["stability"] = _stability_checks(
-            model,
-            [record for record in registrations if record["tool"] == tool],
-            solve_arguments,
-        )
-        tools[tool] = solved
-
-    joint_arguments = (
-        metric,
-        metric_centers_px,
-        metric_commanded_y_mm,
-        corner_pixels_px,
-        corner_commanded_y_mm,
-        patch_points_mm,
-        fiducial_plane_z_mm,
-    )
-    joint = None
-    if any(item is not None for item in joint_arguments):
-        if any(item is None for item in joint_arguments):
+        if model.get("model_family") != MODEL_FAMILY:
             raise FineToolCalibrationError(
-                "joint projective inputs must be supplied as one complete set"
+                f"{tool} projection model is not {MODEL_FAMILY}"
             )
-        joint = _fit_joint_projective(
-            projection=projection,
-            partial_bed=partial_bed,
-            registrations=registrations,
-            metric=metric,
-            metric_centers_px=metric_centers_px,
-            metric_commanded_y_mm=metric_commanded_y_mm,
-            corner_pixels_px=corner_pixels_px,
-            corner_commanded_y_mm=corner_commanded_y_mm,
-            patch_points_mm=patch_points_mm,
-            fiducial_plane_z_mm=float(fiducial_plane_z_mm),
-            initial_tools=tools,
+        tool_records = [
+            record for record in registrations if record["tool"] == tool
+        ]
+        solved = _solve_tool(
+            model=model,
+            records=tool_records,
+            fiducial_reference_xy_mm=fiducial_xy,
+            fiducial_x_vector_px_per_mm=fiducial_x_vector,
+            fiducial_plane_z_mm=fiducial_z,
+            capture_y_mm=capture_y,
         )
-        for tool in ("T0", "T1"):
-            tools[tool]["nearest_vector_diagnostic"] = {
-                key: tools[tool][key]
-                for key in (
-                    "reference_commanded_xyz_mm",
-                    "measured_nozzle_xyz_mm",
-                    "coordinate_residual_xyz_mm",
-                    "commanded_z_at_print_plane_mm",
+        solved["projection_model"] = model
+        tools[tool] = solved
+        if float(model["position_fit_rms_px"]) > 1.5:
+            reasons.append(
+                f"{tool} position fit RMS {model['position_fit_rms_px']:.3f} px"
+            )
+        rows = solved["full_row_coverage"]
+        if len(rows) < 3:
+            reasons.append(f"{tool} has only {len(rows)} usable full X rows")
+        for row in rows:
+            if int(row["accepted_count"]) < 5 or float(row["x_span_mm"]) < 12.0:
+                reasons.append(
+                    f"{tool} Z={row['z_mm']:.3f} row has "
+                    f"{row['accepted_count']} X positions over "
+                    f"{row['x_span_mm']:.3f} mm"
                 )
-            }
-            tools[tool].update(joint["tools"][tool])
+        crossing = solved["scale_crossing"]
+        z_crossing = float(crossing["commanded_z_at_fiducial_plane_mm"])
+        z_min, z_max = solved["measured_z_range_mm"]
+        row_z = sorted(float(row["z_mm"]) for row in rows)
+        row_interval = max(
+            (
+                second - first
+                for first, second in zip(row_z, row_z[1:])
+            ),
+            default=4.0,
+        )
+        if not z_min - row_interval <= z_crossing <= z_max + row_interval:
+            reasons.append(
+                f"{tool} fiducial-plane crossing Z={z_crossing:+.3f} mm "
+                "is too far outside the measured range"
+            )
+        projected_slope = float(
+            crossing["projected_scale_z_slope_px_per_mm_per_mm"]
+        )
+        if abs(projected_slope) < 0.01:
+            reasons.append(f"{tool} transported scale is not Z-identifiable")
+        magnitude_z = crossing["magnitude_crossing_commanded_z_mm"]
+        if magnitude_z is None or abs(float(magnitude_z) - z_crossing) > 0.25:
+            reasons.append(
+                f"{tool} projected and magnitude scale crossings disagree"
+            )
+        closest_z = float(crossing["closest_full_vector_commanded_z_mm"])
+        full_vector_difference = abs(closest_z - z_crossing)
+        if full_vector_difference > 0.75:
+            reasons.append(
+                f"{tool} projected and full-vector crossings disagree"
+            )
+        elif full_vector_difference > 0.25:
+            warnings.append(
+                f"{tool} projected and full-vector crossings differ by "
+                f"{full_vector_difference:.3f} mm"
+            )
+        observation_stability = float(
+            solved["stability"]["maximum_observation_change_mm"]
+        )
+        row_stability = float(
+            solved["stability"]["maximum_full_row_change_mm"]
+        )
+        if observation_stability > 1.50:
+            reasons.append(
+                f"{tool} leave-one-observation crossing changes by "
+                f"{observation_stability:.3f} mm"
+            )
+        elif observation_stability > 0.50:
+            warnings.append(
+                f"{tool} leave-one-observation crossing changes by "
+                f"{observation_stability:.3f} mm"
+            )
+        if row_stability > 2.0:
+            reasons.append(
+                f"{tool} leave-one-full-row crossing changes by "
+                f"{row_stability:.3f} mm"
+            )
+        elif row_stability > 0.50:
+            warnings.append(
+                f"{tool} leave-one-full-row crossing changes by "
+                f"{row_stability:.3f} mm"
+            )
+        if float(solved["lateral_extrapolation_distance_mm"]) > 15.0:
+            warnings.append(
+                f"{tool} scale field is extrapolated "
+                f"{solved['lateral_extrapolation_distance_mm']:.3f} mm "
+                "to the fiducial reference X"
+            )
+
+    z_residuals = {
+        tool: float(tools[tool]["coordinate_residual_xyz_mm"][2])
+        for tool in ("T0", "T1")
+    }
+    joint_xy = _fit_joint_projective_xy(
+        registrations=registrations,
+        metric_observations=metric_observations,
+        corner_observations=corner_observations,
+        patch_points_mm=physical_reference["centers_patch_xy_mm"],
+        patch_to_printer_xy=mapping["patch_to_printer_xy_matrix"],
+        patch_origin_printer_xy_mm=mapping["patch_origin_printer_xy_mm"],
+        corner_xyz_mm=partial_bed["corner_printer_xyz_mm"],
+        fiducial_plane_z_mm=fiducial_z,
+        tool_z_residuals_mm=z_residuals,
+    )
+    for tool in ("T0", "T1"):
+        projective_xy = np.asarray(
+            joint_xy["tool_xy_residuals_mm"][tool], dtype=np.float64
+        )
+        corner_y = float(partial_bed["corner_printer_xyz_mm"][1])
+        aligned_corner_command_y = float(projective_xy[1] - corner_y)
+        xy_residual = np.asarray(
+            [
+                projective_xy[0],
+                aligned_corner_command_y - corner_y,
+            ],
+            dtype=np.float64,
+        )
+        residual = np.asarray(
+            [xy_residual[0], xy_residual[1], z_residuals[tool]],
+            dtype=np.float64,
+        )
+        tools[tool]["coordinate_residual_xyz_mm"] = residual.tolist()
+        tools[tool]["reference_commanded_xyz_mm"] = [
+            float(tools[tool]["projection_model"]["x_ref_mm"]),
+            corner_y,
+            float(
+                tools[tool]["scale_crossing"][
+                    "commanded_z_at_fiducial_plane_mm"
+                ]
+            ),
+        ]
+        tools[tool]["measured_nozzle_xyz_mm"] = [
+            float(tools[tool]["projection_model"]["x_ref_mm"]) + xy_residual[0],
+            aligned_corner_command_y,
+            fiducial_z,
+        ]
+        tools[tool]["projective_camera_y_mm"] = float(projective_xy[1])
+        tools[tool]["bed_tab_corner_aligned_command_y_mm"] = (
+            aligned_corner_command_y
+        )
+        for axis, value, limit in zip("XYZ", residual, (25.0, 5.0, 2.0)):
+            if abs(float(value)) > limit:
+                reasons.append(
+                    f"{tool} {axis} correction {float(value):+.3f} mm "
+                    f"exceeds {limit:.3f} mm"
+                )
+    if not joint_xy["converged"]:
+        warnings.append("joint projective XY fit stopped before step convergence")
+    if float(joint_xy["joint_rms_px"]) > 1.5:
+        reasons.append(
+            f"joint projective XY RMS is {joint_xy['joint_rms_px']:.3f} px"
+        )
+    elif float(joint_xy["joint_rms_px"]) > 0.9:
+        warnings.append(
+            f"joint projective XY RMS is {joint_xy['joint_rms_px']:.3f} px"
+        )
+    for source, rms in joint_xy["source_rms_px"].items():
+        if float(rms) > 3.0:
+            reasons.append(f"{source} projective RMS is {float(rms):.3f} px")
+
+    transported_slopes = [
+        np.asarray(
+            tools[tool]["scale_crossing"][
+                "transported_vector_z_slope_px_per_mm_per_mm"
+            ],
+            dtype=np.float64,
+        )
+        for tool in ("T0", "T1")
+    ]
+    slope_norms = [float(np.linalg.norm(item)) for item in transported_slopes]
+    if min(slope_norms) <= 1e-8 or float(
+        np.dot(transported_slopes[0], transported_slopes[1])
+    ) <= 0.0:
+        reasons.append("T0/T1 transported scale slopes disagree in sign")
+    elif abs(slope_norms[0] - slope_norms[1]) / max(slope_norms) > 0.30:
+        warnings.append("T0/T1 transported scale slope magnitudes differ by over 30%")
 
     residuals = {
         "t0": tools["T0"]["coordinate_residual_xyz_mm"],
         "t1": tools["T1"]["coordinate_residual_xyz_mm"],
     }
     calibration = generated_calibration(old_datums, residuals)
-    reasons = []
-    warnings = []
-    if joint is not None:
-        if not joint["converged"]:
-            warnings.append(
-                "joint projective optimizer stopped before the sub-step "
-                "convergence threshold"
-            )
-        if float(joint["joint_rms_px"]) > 1.0:
-            reasons.append(
-                f"joint projective RMS is {joint['joint_rms_px']:.3f} px"
-            )
-        source_limits = {
-            "bed_fiducial": 1.5,
-            "bed_tab_corner": 1.0,
-            "nozzle_T0": 1.5,
-            "nozzle_T1": 1.5,
-        }
-        for source, limit in source_limits.items():
-            value = float(joint["source_rms_px"].get(source, math.inf))
-            if value > limit:
-                reasons.append(
-                    f"joint {source} RMS {value:.3f} px exceeds {limit:.3f} px"
-                )
-    for tool in ("T0", "T1"):
-        result = tools[tool]
-        residual = result["coordinate_residual_xyz_mm"]
-        limits = (25.0, 5.0, 2.0)
-        for axis, value, limit in zip("XYZ", residual, limits):
-            if abs(float(value)) > limit:
-                reasons.append(
-                    f"{tool} {axis} correction {float(value):+.3f} mm "
-                    f"exceeds {limit:.3f} mm"
-                )
-        z0 = float(result["commanded_z_at_print_plane_mm"])
-        if abs(z0) > 2.0:
-            reasons.append(
-                f"{tool} fitted print plane is commanded Z={z0:+.3f} mm, "
-                "not near commanded Z=0"
-            )
-        vector_residual = float(
-            result["x_vector_residual_magnitude_px_per_mm"]
-        )
-        if vector_residual > 0.25:
-            reasons.append(
-                f"{tool} full 2-D X-vector residual is "
-                f"{vector_residual:.3f} px/mm"
-            )
-        stability = float(result["stability"]["maximum_axis_change_mm"])
-        if stability > 0.50:
-            reasons.append(
-                f"{tool} leave-one-row/level correction changes by "
-                f"{stability:.3f} mm"
-            )
-        elif stability > 0.25:
-            warnings.append(
-                f"{tool} leave-one-row/level correction changes by "
-                f"{stability:.3f} mm"
-            )
-
     generated_new = calibration["generated_klipper"]["new"]
     if not -100.0 <= generated_new["t0_x_position_endstop"] <= -40.0:
-        reasons.append("generated T0 X endstop is outside the declared safe range")
+        reasons.append("generated T0 X endstop is outside the safe range")
     if not 320.0 <= generated_new["t1_x_position_endstop"] <= 380.0:
-        reasons.append("generated T1 X endstop is outside the declared safe range")
+        reasons.append("generated T1 X endstop is outside the safe range")
     if not -25.0 <= generated_new["y_position_endstop"] <= -5.0:
         reasons.append("generated shared Y endstop is outside the safe range")
     if not 285.0 <= generated_new["z_position_endstop"] <= 300.0:
@@ -835,125 +1000,354 @@ def calculate_candidate(
     for axis in ("t1_y_gcode_offset", "t1_z_gcode_offset"):
         if abs(float(generated_new[axis])) > 5.0:
             reasons.append(f"generated {axis} is outside +/-5 mm")
-
     return _finite(
         {
             "accepted": not reasons,
-            "reasons": reasons,
-            "warnings": warnings,
+            "reasons": sorted(set(reasons)),
+            "warnings": sorted(set(warnings)),
             "reference": {
-                "capture_y_mm": float(capture_y_mm),
-                "reference_commanded_x_mm": reference_x,
-                "corner_pixel_at_capture_px": corner_pixel,
-                "corner_printer_xyz_mm": corner_xyz,
-                "bed_x_vector_print_plane_px_per_mm": bed_x,
-                "physical_y_vector_px_per_mm": physical_y,
+                "fiducial_reference_printer_xy_mm": fiducial_xy,
+                "fiducial_x_vector_at_fine_capture_px_per_mm":
+                    fiducial_x_vector,
+                "fiducial_plane_printer_z_mm": fiducial_z,
+                "fine_capture_y_mm": capture_y,
             },
             "tools": tools,
-            "joint_projective_model": joint,
+            "joint_projective_xy": joint_xy,
             "calibration": calibration,
-            "z_verification_status": "pending_eddy_verification",
         }
     )
 
 
-def write_artifacts(result: dict[str, Any], artifact_dir: Path) -> dict[str, Any]:
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-    canvas = np.full((720, 1280, 3), 24, dtype=np.uint8)
-    colors = {"T0": (80, 220, 100), "T1": (240, 120, 220)}
-    cv2.putText(
-        canvas,
-        "Stage 5.1 fine tool XYZ calculation",
-        (40, 55),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        1.15,
-        (245, 245, 245),
-        2,
-        cv2.LINE_AA,
+def _map_plot_point(
+    x_value: float,
+    y_value: float,
+    *,
+    x_limits: tuple[float, float],
+    y_limits: tuple[float, float],
+    rectangle: tuple[int, int, int, int],
+) -> tuple[int, int]:
+    left, top, right, bottom = rectangle
+    x = left + (x_value - x_limits[0]) * (right - left) / max(
+        1e-9, x_limits[1] - x_limits[0]
     )
-    state = "ACCEPTED" if result["accepted"] else "REJECTED - NOT APPLIED"
-    state_color = (80, 220, 100) if result["accepted"] else (80, 80, 255)
-    cv2.putText(
-        canvas,
-        state,
-        (40, 105),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.95,
-        state_color,
-        2,
-        cv2.LINE_AA,
+    y = bottom - (y_value - y_limits[0]) * (bottom - top) / max(
+        1e-9, y_limits[1] - y_limits[0]
+    )
+    return int(round(x)), int(round(y))
+
+
+def _write_scale_transport(result: dict[str, Any], path: Path) -> None:
+    canvas = np.full((900, 1500, 3), 24, dtype=np.uint8)
+    colors = {"T0": (70, 230, 100), "T1": (230, 110, 230)}
+    fiducial_scale = float(
+        np.linalg.norm(
+            result["reference"]["fiducial_x_vector_at_fine_capture_px_per_mm"]
+        )
     )
     for column, tool in enumerate(("T0", "T1")):
-        x0 = 45 + column * 615
+        left = 70 + column * 740
+        rectangle = (left, 110, left + 650, 790)
         item = result["tools"][tool]
+        model = item["projection_model"]
+        crossing = item["scale_crossing"]
+        direction = np.asarray(
+            crossing["fiducial_x_direction_unit"],
+            dtype=np.float64,
+        )
+        x_fid = float(crossing["fiducial_reference_printer_x_mm"])
+        z_cross = float(crossing["commanded_z_at_fiducial_plane_mm"])
+        z_values = np.linspace(-3.0, 13.0, 321)
+        scales = [
+            float(np.dot(_x_vector(model, x_fid, z), direction))
+            for z in z_values
+        ]
+        y_min = min(min(scales), fiducial_scale) - 0.25
+        y_max = max(max(scales), fiducial_scale) + 0.25
+        cv2.rectangle(
+            canvas,
+            (rectangle[0], rectangle[1]),
+            (rectangle[2], rectangle[3]),
+            (100, 100, 100),
+            1,
+        )
+        points = [
+            _map_plot_point(
+                float(z),
+                scale,
+                x_limits=(-3.0, 13.0),
+                y_limits=(y_min, y_max),
+                rectangle=rectangle,
+            )
+            for z, scale in zip(z_values, scales)
+        ]
+        cv2.polylines(canvas, [np.asarray(points)], False, colors[tool], 3)
+        line_y = _map_plot_point(
+            0.0,
+            fiducial_scale,
+            x_limits=(-3.0, 13.0),
+            y_limits=(y_min, y_max),
+            rectangle=rectangle,
+        )[1]
+        cv2.line(
+            canvas,
+            (rectangle[0], line_y),
+            (rectangle[2], line_y),
+            (0, 220, 255),
+            2,
+        )
+        crossing_point = _map_plot_point(
+            z_cross,
+            fiducial_scale,
+            x_limits=(-3.0, 13.0),
+            y_limits=(y_min, y_max),
+            rectangle=rectangle,
+        )
+        cv2.drawMarker(
+            canvas,
+            crossing_point,
+            (0, 255, 255),
+            cv2.MARKER_TILTED_CROSS,
+            24,
+            3,
+        )
         cv2.putText(
             canvas,
-            tool,
-            (x0, 170),
+            (
+                f"{tool}: crossing Zcmd={z_cross:+.4f}, "
+                "bed residual="
+                f"{crossing['bed_referenced_z_at_commanded_zero_mm']:+.4f} mm"
+            ),
+            (left, 55),
             cv2.FONT_HERSHEY_SIMPLEX,
-            1.0,
+            0.70,
             colors[tool],
             2,
             cv2.LINE_AA,
         )
-        rows = [
-            "residual XYZ: "
-            + ", ".join(
-                f"{float(value):+.3f}"
-                for value in item["coordinate_residual_xyz_mm"]
-            )
-            + " mm",
+        cv2.putText(
+            canvas,
             (
-                "commanded Z at print plane: "
-                f"{float(item['commanded_z_at_print_plane_mm']):+.3f} mm"
+                f"Xfid={x_fid:.3f}; extrapolation="
+                f"{item['lateral_extrapolation_distance_mm']:.3f} mm"
             ),
-            (
-                "2-D vector residual: "
-                f"{float(item['x_vector_residual_magnitude_px_per_mm']):.3f} px/mm"
-            ),
-            (
-                "max leave-out axis change: "
-                f"{float(item['stability']['maximum_axis_change_mm']):.3f} mm"
-            ),
+            (left, 85),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (225, 225, 225),
+            1,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            canvas,
+            "commanded Z [mm]",
+            (left + 250, 840),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.60,
+            (220, 220, 220),
+            1,
+            cv2.LINE_AA,
+        )
+    if not cv2.imwrite(str(path), canvas):
+        raise FineToolCalibrationError("failed to write scale-transport plot")
+
+
+def _write_scale_vs_x(result: dict[str, Any], path: Path) -> None:
+    canvas = np.full((900, 1500, 3), 24, dtype=np.uint8)
+    row_colors = {
+        1.0: (80, 180, 255),
+        5.0: (80, 240, 120),
+        9.0: (240, 120, 220),
+    }
+    for column, tool in enumerate(("T0", "T1")):
+        left = 70 + column * 740
+        rectangle = (left, 110, left + 650, 790)
+        item = result["tools"][tool]
+        model = item["projection_model"]
+        crossing = item["scale_crossing"]
+        direction = np.asarray(
+            crossing["fiducial_x_direction_unit"],
+            dtype=np.float64,
+        )
+        x_fid = float(crossing["fiducial_reference_printer_x_mm"])
+        x_values = np.linspace(x_fid, 199.0, 300)
+        rows = [float(row["z_mm"]) for row in item["full_row_coverage"]]
+        all_scales = [
+            float(np.dot(_x_vector(model, x, z), direction))
+            for z in rows
+            for x in x_values
         ]
-        for row, text in enumerate(rows):
+        y_limits = (min(all_scales) - 0.2, max(all_scales) + 0.2)
+        cv2.rectangle(
+            canvas,
+            (rectangle[0], rectangle[1]),
+            (rectangle[2], rectangle[3]),
+            (100, 100, 100),
+            1,
+        )
+        for z in rows:
+            scales = [
+                float(np.dot(_x_vector(model, x, z), direction))
+                for x in x_values
+            ]
+            points = [
+                _map_plot_point(
+                    float(x),
+                    scale,
+                    x_limits=(x_fid, 199.0),
+                    y_limits=y_limits,
+                    rectangle=rectangle,
+                )
+                for x, scale in zip(x_values, scales)
+            ]
+            color = row_colors.get(z, (200, 200, 200))
+            cv2.polylines(canvas, [np.asarray(points)], False, color, 3)
             cv2.putText(
                 canvas,
-                text,
-                (x0, 220 + row * 45),
+                f"Z={z:g}",
+                (rectangle[2] - 85, points[-1][1] - 5),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.62,
-                (230, 230, 230),
+                0.50,
+                color,
                 1,
                 cv2.LINE_AA,
             )
-    y = 440
+        measured_min, measured_max = item["measured_x_range_mm"]
+        for x_value, color in (
+            (x_fid, (0, 255, 255)),
+            (float(measured_min), (255, 180, 60)),
+            (float(measured_max), (255, 180, 60)),
+        ):
+            x_pixel = _map_plot_point(
+                x_value,
+                y_limits[0],
+                x_limits=(x_fid, 199.0),
+                y_limits=y_limits,
+                rectangle=rectangle,
+            )[0]
+            cv2.line(
+                canvas,
+                (x_pixel, rectangle[1]),
+                (x_pixel, rectangle[3]),
+                color,
+                2,
+            )
+        cv2.putText(
+            canvas,
+            f"{tool}: local printer-X scale transported to Xfid",
+            (left, 60),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.70,
+            (235, 235, 235),
+            2,
+            cv2.LINE_AA,
+        )
+    if not cv2.imwrite(str(path), canvas):
+        raise FineToolCalibrationError("failed to write scale-versus-X plot")
+
+
+def write_artifacts(result: dict[str, Any], artifact_dir: Path) -> dict[str, Any]:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    summary = np.full((760, 1400, 3), 24, dtype=np.uint8)
     cv2.putText(
-        canvas,
-        "Gates",
-        (40, y),
+        summary,
+        "Stage 5.1 fiducial-plane fine tool XYZ gate",
+        (40, 55),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.8,
+        1.05,
         (245, 245, 245),
         2,
         cv2.LINE_AA,
     )
-    for reason in result["reasons"][:7]:
-        y += 35
+    state = "ACCEPTED - CANDIDATE ONLY" if result["accepted"] else "REJECTED"
+    state_color = (80, 220, 100) if result["accepted"] else (80, 80, 255)
+    cv2.putText(
+        summary,
+        state,
+        (40, 105),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.88,
+        state_color,
+        2,
+        cv2.LINE_AA,
+    )
+    colors = {"T0": (80, 220, 100), "T1": (240, 120, 220)}
+    def formatted(value: Any) -> str:
+        return "unresolved" if value is None else f"{float(value):+.4f}"
+
+    for column, tool in enumerate(("T0", "T1")):
+        x0 = 45 + column * 675
+        item = result["tools"][tool]
+        crossing = item["scale_crossing"]
+        rows = [
+            (
+                "residual XYZ: "
+                + ", ".join(
+                    f"{float(value):+.4f}"
+                    for value in item["coordinate_residual_xyz_mm"]
+                )
+                + " mm"
+            ),
+            (
+                "Zcmd at fiducial plane: "
+                f"{crossing['commanded_z_at_fiducial_plane_mm']:+.4f} mm"
+            ),
+            (
+                "bed Z at commanded zero: "
+                f"{crossing['bed_referenced_z_at_commanded_zero_mm']:+.4f} mm"
+            ),
+            (
+                "projection / magnitude / full-vector Z: "
+                f"{crossing['commanded_z_at_fiducial_plane_mm']:+.4f} / "
+                f"{formatted(crossing['magnitude_crossing_commanded_z_mm'])} / "
+                f"{crossing['closest_full_vector_commanded_z_mm']:+.4f}"
+            ),
+            (
+                "max leave-out change: "
+                f"{item['stability']['maximum_change_mm']:.4f} mm"
+            ),
+        ]
         cv2.putText(
-            canvas,
+            summary,
+            tool,
+            (x0, 170),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.95,
+            colors[tool],
+            2,
+            cv2.LINE_AA,
+        )
+        for row_index, text in enumerate(rows):
+            cv2.putText(
+                summary,
+                text,
+                (x0, 215 + row_index * 42),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.53,
+                (230, 230, 230),
+                1,
+                cv2.LINE_AA,
+            )
+    y = 485
+    for reason in result["reasons"][:7]:
+        cv2.putText(
+            summary,
             "- " + reason,
             (45, y),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.52,
+            0.50,
             (100, 150, 255),
             1,
             cv2.LINE_AA,
         )
+        y += 32
     summary_path = artifact_dir / "candidate_summary.png"
-    if not cv2.imwrite(str(summary_path), canvas):
+    if not cv2.imwrite(str(summary_path), summary):
         raise FineToolCalibrationError("failed to write candidate summary")
-
+    transport_path = artifact_dir / "scale_transport_to_fiducial_plane.png"
+    _write_scale_transport(result, transport_path)
+    scale_x_path = artifact_dir / "local_scale_vs_printer_x.png"
+    _write_scale_vs_x(result, scale_x_path)
     data_path = artifact_dir / "calculation.json"
     data_path.write_text(
         json.dumps(result, indent=2, sort_keys=True) + "\n",
@@ -961,5 +1355,7 @@ def write_artifacts(result: dict[str, Any], artifact_dir: Path) -> dict[str, Any
     )
     return {
         "candidate_summary": _artifact(summary_path),
+        "scale_transport_to_fiducial_plane": _artifact(transport_path),
+        "local_scale_vs_printer_x": _artifact(scale_x_path),
         "calculation": _artifact(data_path),
     }

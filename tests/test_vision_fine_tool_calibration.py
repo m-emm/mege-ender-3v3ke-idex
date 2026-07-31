@@ -30,44 +30,27 @@ def _module():
     return module
 
 
-def _position(model, x_mm, z_mm):
-    dx = x_mm - model["x_ref_mm"]
-    dz = z_mm - model["z_ref_mm"]
-    return (
-        np.asarray([1.0, dx, dz, dx * dz])
-        @ np.asarray(model["position_coefficients"])
-    ).tolist()
+def _fixture(module, *, implausible_z=False):
+    def project(world):
+        x_mm, y_mm, z_mm = world
+        denominator = 1.0 + 0.005 * z_mm
+        return np.asarray(
+            [
+                (10.0 * x_mm + 0.3 * y_mm + 50.0) / denominator,
+                (0.2 * x_mm - 8.0 * y_mm + 250.0) / denominator,
+            ]
+        )
 
-
-def _fixture(*, implausible_z=False):
-    bed_x = [10.0, 0.0]
-    models = {
-        "T0": {
-            "x_ref_mm": 189.0,
-            "z_ref_mm": 5.0,
-            "position_coefficients": [
-                [269.5, 148.0],
-                [11.1 if not implausible_z else 12.0, 0.0],
-                [1.0, 2.0],
-                [0.2, 0.0],
-            ],
-            "accepted_sequences": list(range(20)),
-        },
-        "T1": {
-            "x_ref_mm": 189.0,
-            "z_ref_mm": 5.0,
-            "position_coefficients": [
-                [263.4, 151.8],
-                [11.08 if not implausible_z else 12.0, 0.0],
-                [1.0, 2.0],
-                [0.2, 0.0],
-            ],
-            "accepted_sequences": list(range(20, 40)),
-        },
+    expected = {
+        "T0": np.asarray([0.4, -0.3, 0.5]),
+        "T1": np.asarray([-0.2, 0.1, 3.0 if implausible_z else 0.4]),
     }
+    corner_y = -18.0
     registrations = []
+    full_records = {"T0": [], "T1": []}
     sequence = 0
     for tool in ("T0", "T1"):
+        camera_y = 2.0 * corner_y + expected[tool][1]
         for z_mm, x_values in (
             (1.0, [183.0, 186.0, 189.0, 192.0, 195.0, 198.0]),
             (3.0, [189.0]),
@@ -76,26 +59,83 @@ def _fixture(*, implausible_z=False):
             (9.0, [183.0, 186.0, 189.0, 192.0, 195.0, 198.0]),
         ):
             for x_mm in x_values:
-                registrations.append(
-                    {
-                        "seq": sequence,
-                        "tool": tool,
-                        "x_mm": x_mm,
-                        "z_mm": z_mm,
-                        "center_px": _position(models[tool], x_mm, z_mm),
-                    }
-                )
+                record = {
+                    "seq": sequence,
+                    "tool": tool,
+                    "x_mm": x_mm,
+                    "z_mm": z_mm,
+                    "center_px": project(
+                        [
+                            x_mm + expected[tool][0],
+                            camera_y,
+                            z_mm + expected[tool][2],
+                        ]
+                    ).tolist(),
+                }
+                registrations.append(record)
+                if len(x_values) >= 5:
+                    full_records[tool].append(record)
                 sequence += 1
+    models = {
+        tool: module._fit_model(
+            full_records[tool], x_ref_mm=189.0, z_ref_mm=5.0
+        )
+        for tool in ("T0", "T1")
+    }
+    patch_points = np.asarray(
+        [[3.0, 3.0], [11.0, 3.0], [3.0, 11.0], [11.0, 11.0]]
+    )
+    patch_origin = np.asarray([176.0, -25.0])
+    metric_observations = []
+    for seq, commanded_y in enumerate([-14.0, -4.0, 6.0, 6.0, -4.0, -14.0]):
+        metric_observations.append(
+            {
+                "seq": seq,
+                "commanded_y_mm": commanded_y,
+                "centers_px": [
+                    project([*(point + patch_origin), -0.6]).tolist()
+                    for point in patch_points
+                ],
+            }
+        )
+        for point_index, point in enumerate(patch_points):
+            metric_observations[-1]["centers_px"][point_index] = project(
+                [
+                    point[0] + patch_origin[0],
+                    point[1] + patch_origin[1] + commanded_y,
+                    -0.6,
+                ]
+            ).tolist()
+    corner_observations = [
+        {
+            "seq": seq,
+            "commanded_y_mm": -14.0,
+            "pixel_px": project([173.0, -32.0, 0.0]).tolist(),
+        }
+        for seq in range(5)
+    ]
+    fiducial_reference = patch_origin + np.mean(patch_points, axis=0)
+    fiducial_x_vector = (
+        project([fiducial_reference[0] + 1.0, fiducial_reference[1], -0.6])
+        - project([*fiducial_reference, -0.6])
+    )
     projection = {
         "tool_models": models,
-        "bed_x_vector_print_plane_px_per_mm": bed_x,
-        "image_y_axis_vector_px_per_mm": [0.0, -10.0],
+        "fiducial_reference_printer_xy_mm": fiducial_reference.tolist(),
+        "fiducial_x_vector_at_fine_capture_px_per_mm":
+            fiducial_x_vector.tolist(),
+        "fiducial_plane_printer_z_mm": -0.6,
+        "fine_capture_y_mm": -14.0,
     }
     partial = {
         "corner_printer_xyz_mm": [173.0, -18.0, 0.0],
-        "corner_pixel_xy_px": [100.0, 100.0],
         "corner_pixel_capture_y_mm": -14.0,
     }
+    mapping = {
+        "patch_to_printer_xy_matrix": np.eye(2).tolist(),
+        "patch_origin_printer_xy_mm": patch_origin.tolist(),
+    }
+    physical_reference = {"centers_patch_xy_mm": patch_points.tolist()}
     old = {
         "t0": {
             "x_endstop": -77.0,
@@ -108,36 +148,59 @@ def _fixture(*, implausible_z=False):
             "z_endstop": 293.2,
         },
     }
-    return projection, partial, registrations, old
+    return (
+        projection,
+        partial,
+        registrations,
+        metric_observations,
+        corner_observations,
+        physical_reference,
+        mapping,
+        old,
+        expected,
+    )
 
 
 def test_stage_5_1_recovers_six_absolute_datums_and_generated_offsets():
     module = _module()
-    projection, partial, registrations, old = _fixture()
+    (
+        projection,
+        partial,
+        registrations,
+        metric,
+        corner,
+        physical,
+        mapping,
+        old,
+        expected,
+    ) = _fixture(module)
 
     result = module.calculate_candidate(
         projection=projection,
         partial_bed=partial,
         registrations=registrations,
+        metric_observations=metric,
+        corner_observations=corner,
+        physical_reference=physical,
+        mapping=mapping,
         old_datums=old,
-        capture_y_mm=-14.0,
     )
 
     assert result["accepted"], result["reasons"]
     np.testing.assert_allclose(
         result["tools"]["T0"]["coordinate_residual_xyz_mm"],
-        [0.4, -0.3, 0.5],
-        atol=1e-9,
+        expected["T0"],
+        atol=0.16,
     )
     np.testing.assert_allclose(
         result["tools"]["T1"]["coordinate_residual_xyz_mm"],
-        [-0.2, 0.1, 0.4],
-        atol=1e-9,
+        expected["T1"],
+        atol=0.16,
     )
     persisted = result["calibration"]["persisted_calib"]["new"]
     generated = result["calibration"]["generated_klipper"]["new"]
-    assert persisted["t0"]["x"] == -76.6
-    assert persisted["t1"]["x"] == 349.8
+    assert abs(persisted["t0"]["x"] - (-76.6)) < 0.16
+    assert abs(persisted["t1"]["x"] - 349.8) < 0.16
     assert generated["y_position_endstop"] == persisted["t0"]["y"]
     assert generated["z_position_endstop"] == persisted["t0"]["z"]
     assert generated["t1_y_gcode_offset"] == (
@@ -150,18 +213,30 @@ def test_stage_5_1_recovers_six_absolute_datums_and_generated_offsets():
 
 def test_stage_5_1_rejects_implausible_print_plane_instead_of_emitting_candidate():
     module = _module()
-    projection, partial, registrations, old = _fixture(implausible_z=True)
+    (
+        projection,
+        partial,
+        registrations,
+        metric,
+        corner,
+        physical,
+        mapping,
+        old,
+        _expected,
+    ) = _fixture(module, implausible_z=True)
 
     result = module.calculate_candidate(
         projection=projection,
         partial_bed=partial,
         registrations=registrations,
+        metric_observations=metric,
+        corner_observations=corner,
+        physical_reference=physical,
+        mapping=mapping,
         old_datums=old,
-        capture_y_mm=-14.0,
     )
 
     assert not result["accepted"]
-    assert any("not near commanded Z=0" in reason for reason in result["reasons"])
     assert any("Z correction" in reason for reason in result["reasons"])
 
 

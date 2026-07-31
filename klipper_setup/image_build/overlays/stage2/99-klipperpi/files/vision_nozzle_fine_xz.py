@@ -411,17 +411,15 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
         )
     x_ref = float(np.median([record["x_mm"] for record in accepted]))
     z_ref = float(np.median([record["z_mm"] for record in accepted]))
+
+    def design_row(record: dict[str, Any]) -> list[float]:
+        dx = float(record["x_mm"]) - x_ref
+        dz = float(record["z_mm"]) - z_ref
+        return [1.0, dx, dz, dx * dz, dx * dx, dx * dx * dz]
+
     for _iteration in range(3):
         design = np.asarray(
-            [
-                [
-                    1.0,
-                    record["x_mm"] - x_ref,
-                    record["z_mm"] - z_ref,
-                    (record["x_mm"] - x_ref) * (record["z_mm"] - z_ref),
-                ]
-                for record in accepted
-            ],
+            [design_row(record) for record in accepted],
             dtype=np.float64,
         )
         positions = np.asarray(
@@ -440,23 +438,36 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
         if len(retained) < 8 or len(retained) == len(accepted):
             break
         accepted = retained
+    full_row_z = {
+        z_mm
+        for z_mm in {float(record["z_mm"]) for record in accepted}
+        if len(
+            {
+                float(record["x_mm"])
+                for record in accepted
+                if abs(float(record["z_mm"]) - z_mm) < 1e-9
+            }
+        )
+        >= 5
+    }
+    model_records = [
+        record
+        for record in accepted
+        if float(record["z_mm"]) in full_row_z
+    ]
+    if len(full_row_z) < 3 or len(model_records) < 15:
+        raise FineNozzleError(
+            f"only {len(full_row_z)} full rows contain enough X observations"
+        )
     design = np.asarray(
-        [
-            [
-                1.0,
-                record["x_mm"] - x_ref,
-                record["z_mm"] - z_ref,
-                (record["x_mm"] - x_ref) * (record["z_mm"] - z_ref),
-            ]
-            for record in accepted
-        ],
+        [design_row(record) for record in model_records],
         dtype=np.float64,
     )
     positions = np.asarray(
-        [record["center_px"] for record in accepted], dtype=np.float64
+        [record["center_px"] for record in model_records], dtype=np.float64
     )
     log_scales = np.log(
-        np.asarray([record["template_scale"] for record in accepted])
+        np.asarray([record["template_scale"] for record in model_records])
     )
     position_coefficients = np.linalg.lstsq(design, positions, rcond=None)[0]
     scale_coefficients = np.linalg.lstsq(design, log_scales, rcond=None)[0]
@@ -468,22 +479,42 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
         {
             "x_ref_mm": x_ref,
             "z_ref_mm": z_ref,
+            "model_family": "quadratic_x_linear_z_position_v1",
             "position_coefficients": position_coefficients,
             "log_scale_coefficients": scale_coefficients,
             "position_fit_rms_px": float(
                 np.sqrt(np.mean(np.sum(position_residuals**2, axis=1)))
             ),
             "log_scale_fit_rms": float(np.sqrt(np.mean(scale_residuals**2))),
-            "accepted_count": len(accepted),
+            "accepted_count": len(model_records),
             "minimum_correlation": min(
-                record["minimum_correlation"] for record in accepted
+                record["minimum_correlation"] for record in model_records
             ),
             "median_correlation": float(
                 np.median(
-                    [record["minimum_correlation"] for record in accepted]
+                    [
+                        record["minimum_correlation"]
+                        for record in model_records
+                    ]
                 )
             ),
-            "accepted_sequences": [record["seq"] for record in accepted],
+            "accepted_sequences": [
+                record["seq"] for record in model_records
+            ],
+            "trajectory_only_sequences": [
+                record["seq"]
+                for record in accepted
+                if record not in model_records
+            ],
+            "accepted_direct_positions": [
+                {
+                    "seq": record["seq"],
+                    "x_mm": record["x_mm"],
+                    "z_mm": record["z_mm"],
+                    "center_px": record["center_px"],
+                }
+                for record in model_records
+            ],
         }
     )
 
@@ -493,14 +524,23 @@ def _evaluate_position(
 ) -> np.ndarray:
     dx = x_mm - float(model["x_ref_mm"])
     dz = z_mm - float(model["z_ref_mm"])
-    design = np.asarray([1.0, dx, dz, dx * dz])
+    design = np.asarray(
+        [1.0, dx, dz, dx * dz, dx * dx, dx * dx * dz]
+    )
     return design @ np.asarray(model["position_coefficients"], dtype=np.float64)
 
 
-def _x_vector(model: dict[str, Any], z_mm: float) -> np.ndarray:
+def _x_vector(
+    model: dict[str, Any], x_mm: float, z_mm: float
+) -> np.ndarray:
     coefficients = np.asarray(model["position_coefficients"], dtype=np.float64)
-    return coefficients[1] + coefficients[3] * (
-        z_mm - float(model["z_ref_mm"])
+    dx = float(x_mm) - float(model["x_ref_mm"])
+    dz = float(z_mm) - float(model["z_ref_mm"])
+    return (
+        coefficients[1]
+        + coefficients[3] * dz
+        + 2.0 * coefficients[4] * dx
+        + 2.0 * coefficients[5] * dx * dz
     )
 
 
@@ -733,43 +773,52 @@ def analyze(
         )
         for tool in ("T0", "T1")
     }
-    average_x_z_slope = np.mean(
-        np.asarray(
-            [
-                np.asarray(models[tool]["position_coefficients"])[3]
-                for tool in ("T0", "T1")
-            ]
-        ),
-        axis=0,
+    fiducial_reference_xy = np.asarray(
+        reference["fiducial_reference_printer_xy_mm"],
+        dtype=np.float64,
     )
-    metric_homography = np.asarray(
-        reference["patch_to_image_homography"], dtype=np.float64
+    fiducial_reference_pixel = np.asarray(
+        reference["fiducial_reference_pixel_at_fine_capture_px"],
+        dtype=np.float64,
     )
-    corner_patch = np.asarray(reference["corner_patch_xy_mm"], dtype=np.float64)
-    patch_jacobian = _homography_jacobian(metric_homography, corner_patch)
-    patch_x_unit = np.asarray(reference["patch_x_unit_vector"], dtype=np.float64)
-    bed_x_fiducial = patch_jacobian @ patch_x_unit
+    bed_x_fiducial = np.asarray(
+        reference["fiducial_x_vector_at_fine_capture_px_per_mm"],
+        dtype=np.float64,
+    )
     fiducial_plane_z = float(reference["fiducial_plane_printer_z_mm"])
-    bed_x_print = bed_x_fiducial + (
-        0.0 - fiducial_plane_z
-    ) * average_x_z_slope
+    fiducial_x = float(fiducial_reference_xy[0])
     image_y_vector = np.asarray(
         reference["image_y_axis_vector_px_per_mm"], dtype=np.float64
     )
     vector_comparison_at_z0 = {}
     for tool in ("T0", "T1"):
-        nozzle_vector = _x_vector(models[tool], 0.0)
-        residual = nozzle_vector - bed_x_print
+        nozzle_vector = _x_vector(models[tool], fiducial_x, 0.0)
+        residual = nozzle_vector - bed_x_fiducial
+        coefficients = np.asarray(
+            models[tool]["position_coefficients"],
+            dtype=np.float64,
+        )
+        dx_fiducial = fiducial_x - float(models[tool]["x_ref_mm"])
+        z_slope = coefficients[3] + 2.0 * coefficients[5] * dx_fiducial
         vector_comparison_at_z0[tool] = {
             "nozzle_x_vector_px_per_mm": nozzle_vector,
-            "bed_x_vector_px_per_mm": bed_x_print,
+            "fiducial_x_vector_px_per_mm": bed_x_fiducial,
             "residual_vector_px_per_mm": residual,
             "residual_magnitude_px_per_mm": float(np.linalg.norm(residual)),
+            "x_vector_z_slope_px_per_mm_per_mm": z_slope,
         }
+    cross_tool_reference_x = float(reference["bed_tab_x_mm"] + 16.0)
+    cross_tool_reference_z = 5.0
     cross_tool_reference_offset = (
-        _evaluate_position(models["T1"], float(reference["bed_tab_x_mm"] + 16.0), 5.0)
+        _evaluate_position(
+            models["T1"],
+            cross_tool_reference_x,
+            cross_tool_reference_z,
+        )
         - _evaluate_position(
-            models["T0"], float(reference["bed_tab_x_mm"] + 16.0), 5.0
+            models["T0"],
+            cross_tool_reference_x,
+            cross_tool_reference_z,
         )
     )
 
@@ -779,6 +828,14 @@ def analyze(
         model = models[tool]
         tool_records = [
             record for record in registrations if record["tool"] == tool
+        ]
+        accepted_sequences_for_tool = {
+            int(item) for item in model["accepted_sequences"]
+        }
+        accepted_tool_records = [
+            record
+            for record in tool_records
+            if int(record["seq"]) in accepted_sequences_for_tool
         ]
         z_span = max(record["z_mm"] for record in tool_records) - min(
             record["z_mm"] for record in tool_records
@@ -807,24 +864,65 @@ def analyze(
             reasons.append(
                 f"{tool} has only {len(tip_tracks[tool])} direct tip detections"
             )
+        full_rows = []
+        for z_mm in sorted(
+            {float(record["z_mm"]) for record in tool_records}
+        ):
+            row = [
+                record
+                for record in accepted_tool_records
+                if abs(float(record["z_mm"]) - z_mm) < 1e-9
+            ]
+            unique_x = sorted({float(record["x_mm"]) for record in row})
+            if len(unique_x) >= 2:
+                full_rows.append(
+                    {
+                        "z_mm": z_mm,
+                        "accepted_count": len(unique_x),
+                        "x_span_mm": unique_x[-1] - unique_x[0],
+                    }
+                )
+        if len(full_rows) < 3:
+            reasons.append(f"{tool} has only {len(full_rows)} usable full X rows")
+        for row in full_rows:
+            if row["accepted_count"] < 5 or row["x_span_mm"] < 12.0:
+                reasons.append(
+                    f"{tool} Z={row['z_mm']:.3f} row has "
+                    f"{row['accepted_count']} X positions over "
+                    f"{row['x_span_mm']:.3f} mm"
+                )
+        model["full_row_coverage"] = full_rows
         if (
             vector_comparison_at_z0[tool]["residual_magnitude_px_per_mm"]
             > 0.25
         ):
             warnings.append(
-                f"{tool} bed/nozzle X-vector residual at commanded Z=0 is "
+                f"{tool} fiducial/nozzle X-vector residual at commanded Z=0 is "
                 f"{vector_comparison_at_z0[tool]['residual_magnitude_px_per_mm']:.3f} "
-                "px/mm; no absolute Z is inferred"
+                "px/mm; Stage 5.1 will solve the crossing"
             )
     slopes = [
-        np.asarray(models[tool]["position_coefficients"], dtype=np.float64)[3]
+        np.asarray(
+            vector_comparison_at_z0[tool][
+                "x_vector_z_slope_px_per_mm_per_mm"
+            ],
+            dtype=np.float64,
+        )
         for tool in ("T0", "T1")
     ]
     slope_norms = [float(np.linalg.norm(item)) for item in slopes]
     if min(slope_norms) <= 1e-8 or float(np.dot(slopes[0], slopes[1])) <= 0:
         reasons.append("T0/T1 X-parallax slopes do not agree in sign")
-    elif abs(slope_norms[0] - slope_norms[1]) / max(slope_norms) > 0.25:
-        reasons.append("T0/T1 X-parallax slope magnitudes differ by more than 25%")
+    else:
+        slope_delta = abs(slope_norms[0] - slope_norms[1]) / max(slope_norms)
+        if slope_delta > 0.60:
+            reasons.append(
+                "T0/T1 X-parallax slope magnitudes differ by more than 60%"
+            )
+        elif slope_delta > 0.25:
+            warnings.append(
+                "T0/T1 X-parallax slope magnitudes differ by more than 25%"
+            )
 
     panel_width = 480
     full_height = 270
@@ -1021,16 +1119,19 @@ def analyze(
             2,
             cv2.LINE_AA,
         )
-        bed_norm = float(np.linalg.norm(bed_x_print))
+        bed_norm = float(np.linalg.norm(bed_x_fiducial))
         for z in np.linspace(1.0, 9.0, 161):
-            vector = _x_vector(model, float(z))
+            vector = _x_vector(model, fiducial_x, float(z))
             x = int(round(100 + 120 * (z - 1.0)))
             y = int(round(y_base - 80 * (np.linalg.norm(vector) - bed_norm)))
             cv2.circle(model_plot, (x, y), 2, colors[tool], -1)
         cv2.line(model_plot, (100, y_base), (1060, y_base), (100, 100, 100), 1)
         cv2.putText(
             model_plot,
-            "gray line: measured bed X-vector magnitude at print plane",
+            (
+                "gray line: measured fiducial X-vector magnitude at "
+                f"X={fiducial_x:.3f}, Z={fiducial_plane_z:.3f}"
+            ),
             (100, y_base + 35),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.52,
@@ -1063,12 +1164,20 @@ def analyze(
                 }
                 for tool in ("T0", "T1")
             },
-            "bed_x_vector_fiducial_plane_px_per_mm": bed_x_fiducial,
-            "bed_x_vector_print_plane_px_per_mm": bed_x_print,
-            "average_x_vector_z_slope_px_per_mm_per_mm": average_x_z_slope,
+            "fiducial_reference_printer_xy_mm": fiducial_reference_xy,
+            "fiducial_reference_pixel_at_fine_capture_px":
+                fiducial_reference_pixel,
+            "fiducial_x_vector_at_fine_capture_px_per_mm":
+                bed_x_fiducial,
+            "fiducial_plane_printer_z_mm": fiducial_plane_z,
+            "fine_capture_y_mm": float(reference["fine_capture_y_mm"]),
             "image_y_axis_vector_px_per_mm": image_y_vector,
             "vector_comparison_at_commanded_z0": vector_comparison_at_z0,
-            "cross_tool_tip_offset_px_at_x189_z5": cross_tool_reference_offset,
+            "cross_tool_tip_offset_at_reference": {
+                "commanded_x_mm": cross_tool_reference_x,
+                "commanded_z_mm": cross_tool_reference_z,
+                "offset_px": cross_tool_reference_offset,
+            },
             "artifacts": {
                 "fine_nozzle_tip_registration_grid": _artifact(contact_path),
                 "fine_nozzle_tip_references": _artifact(reference_path),

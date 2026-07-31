@@ -418,9 +418,6 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     fine_xz_macro = _section(
         config_text, "gcode_macro IDEX_NOZZLE_FINE_XZ_CALIBRATE"
     )
-    fine_xy_verify_macro = _section(
-        config_text, "gcode_macro IDEX_FINE_TOOL_XY_VERIFY"
-    )
     capture_script = (IMAGE_BUILD_FILES_DIR / "vision_capture.py").read_text(
         encoding="utf-8"
     )
@@ -438,9 +435,6 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     )
     fine_tool_calculator = (
         IMAGE_BUILD_FILES_DIR / "vision_fine_tool_calibration.py"
-    ).read_text(encoding="utf-8")
-    fine_xy_analyzer = (
-        IMAGE_BUILD_FILES_DIR / "vision_fine_tool_xy_verification.py"
     ).read_text(encoding="utf-8")
     red_marker_analyzer = (
         IMAGE_BUILD_FILES_DIR / "vision_red_marker_x_sweep.py"
@@ -485,8 +479,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert '"idex_rough_tool_x_verify"' in rough_x_verify_macro
     assert "requires X/Y/Z homed" in fine_xz_macro
     assert '"idex_nozzle_fine_xz_calibrate"' in fine_xz_macro
-    assert "requires X/Y/Z homed" in fine_xy_verify_macro
-    assert '"idex_fine_tool_xy_verify"' in fine_xy_verify_macro
+    assert "IDEX_FINE_TOOL_XY_VERIFY" not in config_text
 
     assert registry["schema_version"] == 1
     assert set(registry["job_types"]) == {
@@ -496,7 +489,6 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "idex_tool_red_marker_x_sweep",
         "idex_rough_tool_x_verify",
         "idex_nozzle_fine_xz_grid",
-        "idex_fine_tool_xy_verify",
     }
     lighting_definition = registry["job_types"][
         "nozzle_cam_bed_fiducial_lighting_sweep"
@@ -559,6 +551,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert [item["fact_name"] for item in fine_xz_definition["requires"]] == [
         "camera.nozzle_cam.bed_fiducial.local_metric_model",
         "camera.nozzle_cam.partial_bed_coordinate_system",
+        "camera.nozzle_cam.bed_fiducial.printer_xy_mapping",
         "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
         "tool.t0.red_marker_to_bed_tab_x_mm",
         "tool.t1.red_marker_to_bed_tab_x_mm",
@@ -569,16 +562,6 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert fine_xz_definition["fact_names"] == [
         "camera.nozzle_cam.nozzle_tip.projection_model"
     ]
-    fine_xy_definition = registry["job_types"]["idex_fine_tool_xy_verify"]
-    assert fine_xy_definition["center_x_offset_from_bed_tab_mm"] == 16
-    assert fine_xy_definition["x_dither_mm"] == 3
-    assert fine_xy_definition["y_dither_mm"] == 3
-    assert fine_xy_definition["capture_z_mm"] == 5
-    assert fine_xy_definition["safe_tool_change_z_mm"] == 9
-    assert fine_xy_definition["fact_names"] == [
-        "calibration.fine_tool_xy.verified"
-    ]
-
     assert "VisionJobApi" in capture_script
     assert "idex_bed_fiducial_lighting_calibrate" in capture_script
     assert "idex_bed_fiducial_metric_calibrate" in capture_script
@@ -586,7 +569,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "idex_red_marker_x_sweep_calibrate" in capture_script
     assert "idex_rough_tool_x_verify" in capture_script
     assert "idex_nozzle_fine_xz_grid" in capture_script
-    assert "idex_fine_tool_xy_verify" in capture_script
+    assert "idex_fine_tool_xy_verify" not in capture_script
     assert "VISION_REGISTER_CALIBRATION_METHODS" in capture_script
     assert "measure_bed_y" not in capture_script
     assert "vision_nozzle_align" not in capture_script
@@ -614,8 +597,8 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "calculate_fine_tool_xyz" in calibration_script
     assert '"calculate-fine-tool-xyz"' in calibration_script
     assert "generated_calibration" in fine_tool_calculator
-    assert "pending_eddy_verification" in fine_tool_calculator
-    assert "fine X/Y verification" in fine_xy_analyzer
+    assert "_fit_joint_projective_xy" in fine_tool_calculator
+    assert "fiducial_plane_lateral_scale_transport" in calibration_script
 
     assert (
         "VISION_JOB_ROOT=/home/pi/printer_data/vision/calibration/jobs"
@@ -644,7 +627,6 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "vision_calibration_graph.py",
         "vision_bed_fiducial.py",
         "vision_fine_tool_calibration.py",
-        "vision_fine_tool_xy_verification.py",
         "vision_nozzle_fine_xz.py",
         "vision_red_marker_x_sweep.py",
         "vision_rough_x_verification.py",
@@ -657,6 +639,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "vision_nozzle_align.py",
         "vision_bed_y.py",
         "vision_rough_calibration.py",
+        "vision_fine_tool_xy_verification.py",
         "eddy_relative_calibration.py",
         "eddy_z_diagnostic.py",
     ):
@@ -683,7 +666,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "IDEX_RED_MARKER_X_SWEEP_CALIBRATE" in klipper_readme
     assert "IDEX_ROUGH_X_VERIFY" in klipper_readme
     assert "IDEX_NOZZLE_FINE_XZ_CALIBRATE" in klipper_readme
-    assert "IDEX_FINE_TOOL_XY_VERIFY" in config_text
+    assert "IDEX_FINE_TOOL_XY_VERIFY" not in config_text
     assert "no reader, migration, alias" in concept
 
 

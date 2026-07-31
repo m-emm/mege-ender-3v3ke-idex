@@ -84,11 +84,7 @@ def test_registry_is_exact_clean_chain():
     assert fine["fact_names"] == [
         "camera.nozzle_cam.nozzle_tip.projection_model"
     ]
-    verify = registry["job_types"]["idex_fine_tool_xy_verify"]
-    assert verify["center_x_offset_from_bed_tab_mm"] == 16
-    assert verify["x_dither_mm"] == 3
-    assert verify["y_dither_mm"] == 3
-    assert verify["fact_names"] == ["calibration.fine_tool_xy.verified"]
+    assert "idex_fine_tool_xy_verify" not in registry["job_types"]
 
 
 def test_canonical_hash_is_order_independent_and_strict():
@@ -201,6 +197,7 @@ def test_fine_grid_localizes_the_nozzle_tip_inside_the_outer_ring():
 
 def test_fine_grid_analyzer_streams_frames_and_publishes_projection_only():
     source = (FILES / "vision_nozzle_fine_xz.py").read_text(encoding="utf-8")
+    graph_source = (FILES / "vision_calibration_graph.py").read_text(encoding="utf-8")
     registry = json.loads(
         (FILES / "vision_job_types.json").read_text(encoding="utf-8")
     )
@@ -208,6 +205,7 @@ def test_fine_grid_analyzer_streams_frames_and_publishes_projection_only():
 
     assert "images.append" not in source
     assert "commanded_z_at_print_plane_mm" not in source
+    assert "fine X/Y verification may not command below Z=3" not in graph_source
     assert fine["fact_names"] == [
         "camera.nozzle_cam.nozzle_tip.projection_model"
     ]

@@ -622,20 +622,25 @@ def analyze_metric(
         try:
             if image is None:
                 raise BedFiducialError("frame cannot be decoded")
+            detection = detect_four_fiducials(
+                image,
+                reference_centers_px=reference_centers,
+            )
             tracking = _track_patch_translation(
                 images[0],
                 image,
                 reference_roi,
             )
-            shift = np.asarray(tracking["shift_px"], dtype=np.float64)
-            detection = json.loads(json.dumps(reference_detection))
-            detection["centers_px"] = _finite(reference_centers + shift)
-            detection["roi_px"] = [
-                int(round(reference_roi[0] + shift[0])),
-                int(round(reference_roi[1] + shift[1])),
-                int(round(reference_roi[2] + shift[0])),
-                int(round(reference_roi[3] + shift[1])),
-            ]
+            direct_center = np.mean(
+                np.asarray(detection["centers_px"], dtype=np.float64),
+                axis=0,
+            )
+            tracked_center = np.mean(reference_centers, axis=0) + np.asarray(
+                tracking["shift_px"], dtype=np.float64
+            )
+            tracking["direct_detection_disagreement_px"] = float(
+                np.linalg.norm(direct_center - tracked_center)
+            )
             detection["tracking"] = tracking
             detections.append(detection)
             tracking_records.append(tracking)
@@ -726,8 +731,86 @@ def analyze_metric(
     else:
         patch_y_unit = np.asarray([0.0, 1.0])
     patch_x_a = np.asarray([patch_y_unit[1], -patch_y_unit[0]])
-    image_x_a = jacobian @ patch_x_a
-    image_x_b = -image_x_a
+    capture_y_values = np.asarray(
+        [
+            float(frames[index]["commanded_position_mm"][1])
+            for index in valid_indices
+        ],
+        dtype=np.float64,
+    )
+    local_metric_records = []
+    image_x_vectors_a = []
+    for index in valid_indices:
+        centers = np.asarray(detections[index]["centers_px"], dtype=np.float64)
+        local_homography, _mask = cv2.findHomography(patch_points, centers, 0)
+        if local_homography is None:
+            reasons.append(f"frame {index} local patch homography cannot be solved")
+            continue
+        local_jacobian = _homography_jacobian(
+            local_homography,
+            tuple(patch_center),
+        )
+        image_x_vector_a = local_jacobian @ patch_x_a
+        image_x_vectors_a.append(image_x_vector_a)
+        local_metric_records.append(
+            {
+                "seq": index,
+                "commanded_y_mm": float(
+                    frames[index]["commanded_position_mm"][1]
+                ),
+                "y_offset_mm": float(frames[index]["y_offset_mm"]),
+                "patch_to_image_homography": local_homography,
+                "image_x_candidate_a_px_per_mm": image_x_vector_a,
+            }
+        )
+    if len(image_x_vectors_a) != len(valid_indices):
+        reasons.append("not every usable frame has a local metric")
+    if len(image_x_vectors_a) >= 2 and float(np.ptp(capture_y_values)) > 0.0:
+        image_x_vectors_array = np.asarray(
+            image_x_vectors_a,
+            dtype=np.float64,
+        )
+        zero_mask = np.asarray(
+            [
+                abs(float(frames[index]["y_offset_mm"])) < 1e-9
+                for index in valid_indices
+            ]
+        )
+        image_x_reference_a = np.mean(
+            image_x_vectors_array[zero_mask],
+            axis=0,
+        )
+        delta_y = capture_y_values - reference_capture_y
+        denominator = float(np.dot(delta_y, delta_y))
+        image_x_y_slope_a = np.sum(
+            delta_y[:, None]
+            * (image_x_vectors_array - image_x_reference_a),
+            axis=0,
+        ) / denominator
+        x_fit_residuals = image_x_vectors_array - (
+            image_x_reference_a
+            + delta_y[:, None] * image_x_y_slope_a
+        )
+        x_fit_rms_px_per_mm = float(
+            np.sqrt(np.mean(np.sum(x_fit_residuals**2, axis=1)))
+        )
+    else:
+        image_x_reference_a = jacobian @ patch_x_a
+        image_x_y_slope_a = np.zeros(2, dtype=np.float64)
+        x_fit_rms_px_per_mm = float("inf")
+        reasons.append("printer-X scale/capture-Y slope cannot be fitted")
+    image_x_models = [
+        {
+            "reference_capture_y_mm": reference_capture_y,
+            "reference_vector_px_per_mm": image_x_reference_a,
+            "capture_y_slope_px_per_mm_per_mm": image_x_y_slope_a,
+        },
+        {
+            "reference_capture_y_mm": reference_capture_y,
+            "reference_vector_px_per_mm": -image_x_reference_a,
+            "capture_y_slope_px_per_mm_per_mm": -image_x_y_slope_a,
+        },
+    ]
 
     duplicate_disagreement_px = 0.0
     if len(zero_indices) >= 2:
@@ -824,7 +907,14 @@ def analyze_metric(
             "patch_to_image_homography": homography,
             "patch_reference_center_xy_mm": patch_center,
             "patch_y_vector_per_printer_y_mm": patch_y_per_printer_y,
-            "image_x_axis_candidates_px_per_mm": [image_x_a, image_x_b],
+            "patch_x_axis_candidates_patch_mm_per_printer_mm": [
+                patch_x_a,
+                -patch_x_a,
+            ],
+            "image_x_axis_candidate_models": image_x_models,
+            "image_x_vector_capture_y_fit_rms_px_per_mm":
+                x_fit_rms_px_per_mm,
+            "local_metric_records": local_metric_records,
             "reference_marker_centers_px": reference_centers,
             "reference_capture_y_mm": reference_capture_y,
             "fit_rms_px": fit_rms_px,
