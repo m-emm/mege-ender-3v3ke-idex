@@ -28,6 +28,10 @@ JOB_TYPES = {
     "idex_eddy_fiducial_xz_grid",
     "idex_nozzle_fine_xz_grid_t0",
     "idex_nozzle_fine_xz_grid_t1",
+    "idex_eddy_t0_xyz_offset",
+}
+COMPUTE_ONLY_JOB_TYPES = {
+    "idex_eddy_t0_xyz_offset",
 }
 SEED_FACT_NAMES = {
     "bed.tab_corner.printer_xyz",
@@ -306,6 +310,9 @@ def validate_manifest(record: Any) -> dict[str, Any]:
         observed = [(frame.get("x_mm"), frame.get("z_mm")) for frame in frames]
         if observed != expected or any(frame.get("tool") != "T0" for frame in frames):
             raise CalibrationGraphError("Eddy fiducial X/Z motion order is invalid")
+    elif job_type == "idex_eddy_t0_xyz_offset":
+        if frames:
+            raise CalibrationGraphError("compute-only job must have no frames")
     elif job_type in {
         "idex_nozzle_fine_xz_grid_t0",
         "idex_nozzle_fine_xz_grid_t1",

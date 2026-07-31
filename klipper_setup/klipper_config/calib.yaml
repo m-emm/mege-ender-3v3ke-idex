@@ -11,15 +11,16 @@ tools:
     y_endstop: -15.820
     z_endstop: 293.650
 eddy_relative_calibration:
-  # Resolved from the production T0 assembly graph. The vector is from the
-  # nozzle center to the Eddy coil/fiducial center in printer coordinates.
+  # Vision-measured 2026-07-31 (idex_eddy_t0_xyz_offset job).
+  # The vector is from the nozzle center to the Eddy coil/fiducial center
+  # in printer coordinates.
   bed_center:
     x: 117.500
     y: 117.500
   nozzle_to_coil:
-    x: -8.180
-    y: 9.000
-    z: 2.500
+    x: -57.391
+    y: 18.997
+    z: 1.399
   klipper:
     # Populate these from configfile.save_config_pending_items after the
     # supervised commands. Never accept the generated SAVE_CONFIG footer.

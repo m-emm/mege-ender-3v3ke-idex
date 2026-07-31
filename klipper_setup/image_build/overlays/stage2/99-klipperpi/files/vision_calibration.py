@@ -29,6 +29,7 @@ from vision_bed_fiducial import (
 )
 from vision_calibration_graph import (
     ANALYSIS_SCHEMA,
+    COMPUTE_ONLY_JOB_TYPES,
     FACT_SET_SCHEMA,
     MANIFEST_SCHEMA,
     SCHEMA_VERSION,
@@ -46,6 +47,7 @@ from vision_calibration_graph import (
     validate_registry,
 )
 from vision_eddy_fiducial_xz import analyze as analyze_eddy_fiducial_xz
+from vision_eddy_xyz_offset import analyze as analyze_eddy_xyz_offset
 from vision_nozzle_fine_xz import analyze as analyze_fine_nozzle_xz
 from vision_fine_tool_calibration import (
     calculate_candidate as calculate_fine_tool_candidate,
@@ -106,6 +108,7 @@ BED_TAB_CORNER_JOB = "nozzle_cam_bed_tab_corner"
 RED_MARKER_X_JOB = "idex_tool_red_marker_x_sweep"
 ROUGH_X_VERIFY_JOB = "idex_rough_tool_x_verify"
 EDDY_FIDUCIAL_XZ_JOB = "idex_eddy_fiducial_xz_grid"
+EDDY_T0_XYZ_OFFSET_JOB = "idex_eddy_t0_xyz_offset"
 FINE_NOZZLE_XZ_T0_JOB = "idex_nozzle_fine_xz_grid_t0"
 FINE_NOZZLE_XZ_T1_JOB = "idex_nozzle_fine_xz_grid_t1"
 FINE_NOZZLE_XZ_JOBS = {
@@ -121,6 +124,7 @@ JOB_TYPES = (
     EDDY_FIDUCIAL_XZ_JOB,
     FINE_NOZZLE_XZ_T0_JOB,
     FINE_NOZZLE_XZ_T1_JOB,
+    EDDY_T0_XYZ_OFFSET_JOB,
 )
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 HASH_RE = re.compile(r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+")
@@ -522,6 +526,24 @@ def _resolve_current_fact(
         },
         fact,
     )
+
+
+def _load_bound_fact(binding: dict[str, Any]) -> Any:
+    """Load a fact value directly from the fact_set_path stored in a manifest binding.
+
+    Preferred over re-resolving the catalog head for compute jobs, where
+    determinism requires using the exact fact that was bound at job creation.
+    """
+    path = CALIBRATION_ROOT / binding["fact_set_path"]
+    fact_set = load_json(path)
+    fact = next(
+        (f for f in fact_set["facts"] if f["name"] == binding["fact_name"]), None
+    )
+    if fact is None:
+        raise VisionCalibrationError(
+            f"bound fact {binding['fact_name']} not found in {path}"
+        )
+    return fact["value"]
 
 
 def _canonical_gcode(gcode: str) -> str:
@@ -1407,6 +1429,12 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 frames=manifest["frames"],
                 reference=manifest["fine_reference"],
             )
+        elif job_type == EDDY_T0_XYZ_OFFSET_JOB:
+            bindings = {item["requirement"]: item for item in manifest["input_facts"]}
+            details = analyze_eddy_xyz_offset(
+                t0_projection=_load_bound_fact(bindings["t0_projection_model"]),
+                eddy_positions=_load_bound_fact(bindings["eddy_xz_image_positions"]),
+            )
         else:
             raise VisionCalibrationError(f"unsupported job type: {job_type}")
         for artifact in details.get("artifacts", {}).values():
@@ -1443,8 +1471,8 @@ def analyze_job(job_id: str) -> dict[str, Any]:
         analysis["analysis_hash"] = content_hash(analysis, "analysis_hash")
         facts = []
         dependencies = _dependencies(manifest)
-        width = int(sidecars[0]["width"])
-        height = int(sidecars[0]["height"])
+        width = int(sidecars[0]["width"]) if sidecars else 0
+        height = int(sidecars[0]["height"]) if sidecars else 0
         if details["accepted"]:
             if job_type == BED_FIDUCIAL_LIGHTING_JOB:
                 value = {
@@ -1787,6 +1815,25 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         },
                     )
                 ]
+            elif job_type == EDDY_T0_XYZ_OFFSET_JOB:
+                value = {
+                    "tool": "T0",
+                    "offset_xyz_mm": details["offset_xyz_mm"],
+                    "fit_rms_px": details["fit_rms_px"],
+                    "max_error_px": details["max_error_px"],
+                    "n_eddy_detections": details["n_eddy_detections"],
+                    "nozzle_model_fit_rms_px": details["nozzle_model_fit_rms_px"],
+                    "detection_residuals": details["detection_residuals"],
+                }
+                facts = [
+                    _fact(
+                        "camera.nozzle_cam.eddy_fiducial.t0_xyz_offset",
+                        "coordinate_system",
+                        value,
+                        dependencies,
+                        {"offset_xyz_mm"},
+                    )
+                ]
             else:
                 raise VisionCalibrationError(
                     f"unsupported accepted job type: {job_type}"
@@ -1804,9 +1851,9 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 "applicability_hash": manifest["applicability_hash"],
                 "facts": facts,
                 "provenance": {
-                    "active_printer_fingerprint": manifest["provenance"][
+                    "active_printer_fingerprint": manifest.get("provenance", {}).get(
                         "active_printer_fingerprint"
-                    ],
+                    ),
                     "manifest_hash": manifest["manifest_hash"],
                     "observations": details,
                 },
@@ -1868,6 +1915,87 @@ def analyze_job(job_id: str) -> dict[str, Any]:
         ),
         "details": details,
     }
+
+
+def compute_job(
+    name: str,
+    *,
+    job_type: str,
+) -> dict[str, Any]:
+    """Create and immediately analyze a compute-only vision job (no image capture).
+
+    The job manifest is written with zero frames and state is set directly to
+    ``acquired`` — no gcode or printer motion is involved.  ``analyze_job`` is
+    then called immediately and the full result is returned.
+    """
+    if job_type not in COMPUTE_ONLY_JOB_TYPES:
+        raise VisionCalibrationError(
+            f"{job_type!r} is not a compute-only job type"
+        )
+
+    definition = validate_registry(load_json(REGISTRY_PATH))["job_types"][job_type]
+
+    # Resolve required input facts.
+    input_facts: list[dict[str, Any]] = []
+    for item in definition["requires"]:
+        req, _fact_obj = _resolve_current_fact(
+            item["requirement"],
+            item["fact_name"],
+            item["fact_definition_version"],
+        )
+        input_facts.append(req)
+
+    job_id = (
+        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + "-" + _sanitize(name)
+    )
+    job_dir = CALIBRATION_ROOT / "jobs" / _sanitize(job_id)
+    if job_dir.exists():
+        raise VisionCalibrationError(f"job already exists: {job_id}")
+
+    # Applicability is fully determined by the bound input fact hashes.
+    applicability_scope = {
+        "camera": "nozzle_cam",
+        "job_type": job_type,
+        "input_fact_hashes": {
+            item["requirement"]: item["fact_set_hash"]
+            for item in input_facts
+        },
+    }
+    manifest: dict[str, Any] = {
+        "schema": MANIFEST_SCHEMA,
+        "schema_version": SCHEMA_VERSION,
+        "job_id": job_id,
+        "job_type": job_type,
+        "definition_version": 1,
+        "created_at_utc": utc_now(),
+        "camera": "nozzle_cam",
+        "localizer": definition["localizer"],
+        "publish_on_accept": True,
+        "frame_count": 0,
+        "frames": [],
+        "input_facts": input_facts,
+        "applicability": applicability_scope,
+        "applicability_hash": canonical_hash(applicability_scope),
+        "manifest_hash": HASH_PLACEHOLDER,
+    }
+    manifest["manifest_hash"] = content_hash(manifest, "manifest_hash")
+    validate_manifest(manifest)
+
+    job_dir.mkdir(parents=True)
+    (job_dir / "frames").mkdir()
+    (job_dir / "analysis").mkdir()
+    atomic_write_json(job_dir / "manifest.json", manifest, immutable=True)
+    _update_state(
+        job_dir,
+        schema="vision-calibration-job-state",
+        schema_version=1,
+        job_id=job_id,
+        state="acquired",
+        committed_frame_count=0,
+    )
+    rebuild_and_render()
+    analysis = analyze_job(job_id)
+    return {"job_id": job_id, "analysis": analysis}
 
 
 def acquire_job(
@@ -2896,6 +3024,9 @@ def main(argv: list[str] | None = None) -> int:
         subparser.add_argument("--expected-fingerprint")
         if command in {"acquire", "run"}:
             subparser.add_argument("--timeout", type=float, default=300.0)
+    compute_parser = subparsers.add_parser("compute")
+    compute_parser.add_argument("job_type", choices=sorted(COMPUTE_ONLY_JOB_TYPES))
+    compute_parser.add_argument("--name", default="vision_calibration")
     analyze_parser = subparsers.add_parser("analyze")
     analyze_parser.add_argument("job_id")
     publish_parser = subparsers.add_parser("publish")
@@ -2935,6 +3066,8 @@ def main(argv: list[str] | None = None) -> int:
                 expected_fingerprint=args.expected_fingerprint,
                 timeout=args.timeout,
             )
+        elif args.command == "compute":
+            result = compute_job(args.name, job_type=args.job_type)
         elif args.command == "analyze":
             result = analyze_job(args.job_id)
         elif args.command == "publish":
