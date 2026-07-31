@@ -316,18 +316,24 @@ def analyze(
 ) -> dict[str, Any]:
     """Measure the Eddy fiducial image center for every commanded X/Z pose.
 
-    All frames are pre-loaded so that a temporal median background can be
-    computed once and used to anchor every per-frame circle search.  The
-    background image and per-frame diff images are saved as artifacts for
-    visual inspection.
+    Images are read one at a time.  SIFT body localisation drives the crop
+    for each Hough circle search; no background image is needed.
     """
     artifact_dir.mkdir(parents=True, exist_ok=True)
     if len(frame_paths) != len(frames):
         raise EddyFiducialError("Eddy frame paths do not match the manifest")
 
-    # --- Pre-load all images and compute the temporal median background ---------
-    images: list[np.ndarray] = []
+    # --- Load frozen SIFT template once ----------------------------------------
+    sift_context = _load_sift_template()
+
+    artifacts: dict[str, Any] = {}
+
+    # --- Per-frame detection and circle overlays (one image at a time) ----------
+    records = []
+    expected_center: np.ndarray | None = None
+    panels_overlay: list[np.ndarray] = []
     image_dimensions: list[int] | None = None
+
     for path, frame in zip(frame_paths, frames):
         image = cv2.imread(str(path), cv2.IMREAD_COLOR)
         if image is None:
@@ -337,41 +343,18 @@ def analyze(
             image_dimensions = dimensions
         elif dimensions != image_dimensions:
             raise EddyFiducialError("Eddy grid images have inconsistent dimensions")
-        images.append(image)
 
-    background = np.median(
-        np.stack([img.astype(np.float32) for img in images], axis=0), axis=0
-    ).astype(np.uint8)
-
-    artifacts: dict[str, Any] = {}
-    background_path = artifact_dir / "eddy_background.png"
-    if not cv2.imwrite(str(background_path), background):
-        raise EddyFiducialError(f"could not write background {background_path}")
-    artifacts["eddy_background"] = _artifact(background_path)
-
-    # --- Load frozen SIFT template once ----------------------------------------
-    sift_context = _load_sift_template()
-
-    # --- Per-frame detection, diff images, and circle overlays ------------------
-    records = []
-    expected_center: np.ndarray | None = None
-    panels_overlay: list[np.ndarray] = []
-    panels_diff: list[np.ndarray] = []
-
-    for image, frame in zip(images, frames):
         sift_roi = _sift_body_roi(image, *sift_context) if sift_context is not None else None
         detection = detect_circle(
             image,
             localizer,
             expected_center_px=expected_center,
-            background=background,
             sift_roi=sift_roi,
         )
         if detection["accepted"]:
             expected_center = np.asarray(detection["center_px"], dtype=np.float64)
 
         center = detection.get("center_px")
-        blob_anchor = detection.get("blob_anchor_px")
         sift_roi_record = detection.get("sift_roi_px")
         record = {
             "seq": int(frame["seq"]),
@@ -382,7 +365,6 @@ def analyze(
             "detected": bool(detection["accepted"]),
             "radius_px": detection.get("radius_px"),
             "edge_score": detection.get("edge_score"),
-            "blob_anchor_px": blob_anchor,
             "sift_roi_px": sift_roi_record,
             "rejection_reason": detection.get("reason"),
         }
@@ -393,24 +375,12 @@ def analyze(
             f"Z={record['commanded_z_mm']:.3f} "
             f"{'detected' if record['detected'] else 'MISSED'}"
         )
-        ok_color = (0, 255, 0)
-        fail_color = (0, 0, 255)
-        draw_color = ok_color if record["detected"] else fail_color
+        draw_color = (0, 255, 0) if record["detected"] else (0, 0, 255)
 
-        # Circle overlay on the original image
         overlay = image.copy()
         if sift_roi_record is not None:
             rx0, ry0, rx1, ry1 = sift_roi_record
-            cv2.rectangle(overlay, (rx0, ry0), (rx1, ry1), (0, 230, 230), 2)  # cyan — SIFT ROI
-        elif blob_anchor is not None:
-            cv2.drawMarker(
-                overlay,
-                (int(round(blob_anchor[0])), int(round(blob_anchor[1]))),
-                (255, 165, 0),  # orange — blob centroid (fallback)
-                cv2.MARKER_DIAMOND,
-                20,
-                2,
-            )
+            cv2.rectangle(overlay, (rx0, ry0), (rx1, ry1), (0, 230, 230), 2)
         if center is not None:
             center_point = tuple(np.rint(center).astype(int))
             cv2.circle(overlay, center_point, int(round(float(detection["radius_px"]))), draw_color, 3)
@@ -422,39 +392,9 @@ def analyze(
             raise EddyFiducialError(f"could not write overlay {overlay_path}")
         artifacts[f"eddy_circle_overlay_{int(frame['seq']):02d}"] = _artifact(overlay_path)
         panels_overlay.append(cv2.resize(overlay, (480, 270), interpolation=cv2.INTER_AREA))
+        # image and overlay go out of scope here — GC reclaims the memory
 
-        # Background-diff image: colormap + SIFT ROI box + detected circle
-        diff = np.clip(
-            image.astype(np.float32) - background.astype(np.float32), 0.0, 255.0
-        ).astype(np.uint8)
-        diff_gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
-        diff_vis = cv2.applyColorMap(diff_gray, cv2.COLORMAP_HOT)
-        if sift_roi_record is not None:
-            rx0, ry0, rx1, ry1 = sift_roi_record
-            cv2.rectangle(diff_vis, (rx0, ry0), (rx1, ry1), (0, 230, 230), 2)
-        elif blob_anchor is not None:
-            cv2.drawMarker(
-                diff_vis,
-                (int(round(blob_anchor[0])), int(round(blob_anchor[1]))),
-                (255, 255, 255),
-                cv2.MARKER_DIAMOND,
-                22,
-                2,
-            )
-        if center is not None:
-            center_point = tuple(np.rint(center).astype(int))
-            cv2.circle(diff_vis, center_point, int(round(float(detection["radius_px"]))),
-                       (0, 255, 255), 3)
-            cv2.drawMarker(diff_vis, center_point, (0, 255, 255), cv2.MARKER_CROSS, 24, 3)
-        cv2.putText(diff_vis, status_text, (24, 42), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.8, (200, 200, 200), 2, cv2.LINE_AA)
-        diff_path = artifact_dir / f"{frame['frame']}_eddy_diff.png"
-        if not cv2.imwrite(str(diff_path), diff_vis):
-            raise EddyFiducialError(f"could not write diff image {diff_path}")
-        artifacts[f"eddy_diff_{int(frame['seq']):02d}"] = _artifact(diff_path)
-        panels_diff.append(cv2.resize(diff_vis, (480, 270), interpolation=cv2.INTER_AREA))
-
-    # --- Contact sheets (4 columns) ---------------------------------------------
+    # --- Contact sheet (4 columns) ----------------------------------------------
     def _contact_sheet(panels: list[np.ndarray], path: Path) -> None:
         rows = []
         for start in range(0, len(panels), 4):
@@ -468,10 +408,6 @@ def analyze(
     contact_overlay_path = artifact_dir / "eddy_fiducial_xz_grid.jpg"
     _contact_sheet(panels_overlay, contact_overlay_path)
     artifacts["eddy_fiducial_xz_grid"] = _artifact(contact_overlay_path)
-
-    contact_diff_path = artifact_dir / "eddy_diff_grid.jpg"
-    _contact_sheet(panels_diff, contact_diff_path)
-    artifacts["eddy_diff_grid"] = _artifact(contact_diff_path)
 
     # --- Result -----------------------------------------------------------------
     missing = [record["seq"] for record in records if not record["detected"]]

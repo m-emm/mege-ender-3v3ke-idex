@@ -135,8 +135,6 @@ def test_replay_captured_eddy_fiducial_xz_and_render_overlays():
     # --- log intermediates and generated files ---
     print(f"\nEDDY FIDUCIAL XZ REPLAY OUTPUT:\n{run_root.resolve()}")
     print("\nKEY FILES:")
-    print(f"  BACKGROUND:        {result['artifacts']['eddy_background']['path']}")
-    print(f"  DIFF CONTACT:      {result['artifacts'].get('eddy_diff_grid', {}).get('path', '—')}")
     print(f"  OVERLAY CONTACT:   {result['artifacts']['eddy_fiducial_xz_grid']['path']}")
     print(f"  POSITION PLOT:     {plot_path}")
     print(f"  RESULT JSON:       {result_json_path}")
@@ -177,11 +175,6 @@ def test_replay_captured_eddy_fiducial_xz_and_render_overlays():
             assert record["image_y_px"] is not None
             assert record["radius_px"] is not None
 
-    assert "eddy_background" in result["artifacts"]
-    assert Path(result["artifacts"]["eddy_background"]["path"]).is_file()
-    assert "eddy_diff_grid" in result["artifacts"]
-    assert Path(result["artifacts"]["eddy_diff_grid"]["path"]).is_file()
-
     assert "eddy_fiducial_xz_grid" in result["artifacts"]
     contact_path = Path(result["artifacts"]["eddy_fiducial_xz_grid"]["path"])
     assert contact_path.is_file(), f"contact sheet missing: {contact_path}"
@@ -206,8 +199,6 @@ def test_replay_captured_eddy_fiducial_xz_and_render_overlays():
         "",
         f"- [Commanded X vs image X plot](commanded_x_vs_image_x.png)",
         f"- [Circle overlay contact sheet](artifacts/eddy_fiducial_xz_grid.jpg)",
-        f"- [Diff contact sheet](artifacts/eddy_diff_grid.jpg)",
-        f"- [Background](artifacts/eddy_background.png)",
         f"- [Result JSON](result.json)",
         f"- Per-frame overlays: `frame_overlays/` ({len(overlay_keys)} files)",
         "",
