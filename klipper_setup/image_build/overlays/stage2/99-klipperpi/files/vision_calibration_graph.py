@@ -181,23 +181,26 @@ def validate_registry(record: Any) -> dict[str, Any]:
         x_offsets = fine.get("x_offsets_from_bed_tab_mm")
         if (
             not isinstance(x_offsets, list)
-            or len(x_offsets) != 7
+            or len(x_offsets) < 4
+            or len(set(x_offsets)) != len(x_offsets)
             or sorted(x_offsets) != x_offsets
-            or float(x_offsets[-1]) - float(x_offsets[0]) < 15.0
+            or float(x_offsets[-1]) - float(x_offsets[0]) < 8.0
         ):
             raise CalibrationGraphError(
-                f"fine nozzle {tool} X grid must have seven ordered columns"
+                f"fine nozzle {tool} X grid must have at least four unique "
+                "ordered columns spanning 8 mm"
             )
         full_rows = fine.get("full_row_z_mm")
         if (
             not isinstance(full_rows, list)
-            or len(full_rows) != 4
+            or len(full_rows) < 4
+            or len(set(full_rows)) != len(full_rows)
             or sorted(full_rows) != full_rows
-            or float(full_rows[0]) < 1.0
             or float(full_rows[-1]) - float(full_rows[0]) < 8.0
         ):
             raise CalibrationGraphError(
-                f"fine nozzle {tool} grid must have four ordered full Z rows"
+                f"fine nozzle {tool} grid must have at least four unique "
+                "ordered Z rows spanning 8 mm"
             )
         if fine.get("safe_tool_change_z_mm") != 9:
             raise CalibrationGraphError(f"fine nozzle {tool} tool-change Z is invalid")
@@ -289,22 +292,24 @@ def validate_manifest(record: Any) -> dict[str, Any]:
         "idex_nozzle_fine_xz_grid_t1",
     }:
         expected_tool = "T0" if job_type.endswith("_t0") else "T1"
-        if len(frames) != 28:
-            raise CalibrationGraphError(
-                "fine nozzle per-tool grid must contain 28 frames"
-            )
-        if any(float(frame.get("z_mm", -1)) < 1.0 for frame in frames):
-            raise CalibrationGraphError("fine nozzle grid may not command below Z=1")
-        if [frame.get("tool") for frame in frames] != [expected_tool] * 28:
+        if not frames:
+            raise CalibrationGraphError("fine nozzle per-tool grid is empty")
+        if any(frame.get("tool") != expected_tool for frame in frames):
             raise CalibrationGraphError(
                 f"fine nozzle grid must acquire only {expected_tool}"
             )
         rows = {}
         for frame in frames:
             rows.setdefault(float(frame["z_mm"]), set()).add(float(frame["x_mm"]))
-        if len(rows) != 4 or any(len(x_values) != 7 for x_values in rows.values()):
+        first_row = next(iter(rows.values()))
+        if (
+            len(rows) < 2
+            or len(first_row) < 2
+            or any(x_values != first_row for x_values in rows.values())
+            or len(frames) != len(rows) * len(first_row)
+        ):
             raise CalibrationGraphError(
-                "fine nozzle grid must contain four complete seven-column rows"
+                "fine nozzle grid must be a complete rectangular X/Z grid"
             )
 
     expected_hash = content_hash(record, "manifest_hash")

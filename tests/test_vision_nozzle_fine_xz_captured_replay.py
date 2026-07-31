@@ -63,6 +63,40 @@ def _model_x_vector_px_per_mm(model, commanded_x_mm, commanded_z_mm):
     )
 
 
+def _global_absolute_position_refit(model, registrations):
+    accepted_sequences = {int(item) for item in model["accepted_sequences"]}
+    accepted = [
+        record
+        for record in registrations
+        if int(record["seq"]) in accepted_sequences
+    ]
+    x_ref = float(model["x_ref_mm"])
+    z_ref = float(model["z_ref_mm"])
+    design = []
+    for record in accepted:
+        dx = float(record["x_mm"]) - x_ref
+        dz = float(record["z_mm"]) - z_ref
+        design.append([1.0, dx, dz, dx * dz, dx * dx, dx * dx * dz])
+    design = np.asarray(design, dtype=np.float64)
+    positions = np.asarray(
+        [record["center_px"] for record in accepted], dtype=np.float64
+    )
+    assert np.linalg.matrix_rank(design) == design.shape[1]
+    coefficients = np.linalg.lstsq(design, positions, rcond=None)[0]
+    refit = dict(model)
+    refit["position_coefficients"] = coefficients.tolist()
+    refit["position_fit_rms_px"] = float(
+        np.sqrt(np.mean(np.sum((positions - design @ coefficients) ** 2, axis=1)))
+    )
+    assert np.allclose(
+        coefficients,
+        np.asarray(model["position_coefficients"], dtype=np.float64),
+        rtol=1e-10,
+        atol=1e-8,
+    )
+    return refit, accepted
+
+
 def _draw_dashed_line(
     image, start, end, color, *, thickness=2, dash_length=12, gap_length=8
 ):
@@ -85,6 +119,19 @@ def _draw_dashed_line(
         )
 
 
+def _distinct_bgr_colors(count):
+    assert count > 0
+    hues = np.linspace(0, 179, count, endpoint=False, dtype=np.uint8)
+    hsv = np.zeros((1, count, 3), dtype=np.uint8)
+    hsv[0, :, 0] = hues
+    hsv[0, :, 1] = 185
+    hsv[0, :, 2] = 205
+    return [
+        tuple(int(channel) for channel in color)
+        for color in cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)[0]
+    ]
+
+
 def _plot_point(x_value, y_value, *, x_limits, y_limits, rectangle):
     left, top, right, bottom = rectangle
     x = left + (x_value - x_limits[0]) * (right - left) / (
@@ -96,14 +143,18 @@ def _plot_point(x_value, y_value, *, x_limits, y_limits, rectangle):
     return int(round(x)), int(round(y))
 
 
-def _write_downstream_absolute_x_plot(tool, result, path):
+def _write_downstream_absolute_x_plot(tool, result, path, *, show_model):
     canvas = np.full((1000, 1000, 3), 245, dtype=np.uint8)
     cv2.putText(
         canvas,
-        f"Stage 5 {tool}: absolute image X versus commanded Z",
+        (
+            f"Stage 5 {tool}: global absolute-position model overlay"
+            if show_model
+            else f"Stage 5 {tool}: raw absolute image X versus commanded Z"
+        ),
         (45, 55),
         cv2.FONT_HERSHEY_SIMPLEX,
-        1.18,
+        0.96,
         (20, 20, 20),
         2,
         cv2.LINE_AA,
@@ -111,8 +162,12 @@ def _write_downstream_absolute_x_plot(tool, result, path):
     cv2.putText(
         canvas,
         (
-            "circles: accepted green coordinates   red X: discarded   "
-            "solid lines: fitted projection model"
+            (
+                "circles: measured accepted   red X: discarded   "
+                "black +: fitted prediction"
+            )
+            if show_model
+            else "circles: measured accepted coordinates   red X: discarded   no model"
         ),
         (45, 92),
         cv2.FONT_HERSHEY_SIMPLEX,
@@ -121,47 +176,79 @@ def _write_downstream_absolute_x_plot(tool, result, path):
         2,
         cv2.LINE_AA,
     )
-    colors = [
-        (210, 80, 50),
-        (50, 140, 210),
-        (70, 170, 70),
-        (170, 80, 180),
-        (40, 170, 190),
-        (180, 120, 50),
-        (110, 110, 110),
-    ]
     for tool_index, tool in enumerate((tool,)):
-        model = result["models"][tool]
         registrations = result["registrations"]
+        model, _accepted_records = _global_absolute_position_refit(
+            result["models"][tool], registrations
+        )
         accepted_sequences = {int(item) for item in model["accepted_sequences"]}
         commanded_x_values = sorted(
             {float(record["x_mm"]) for record in registrations}
         )
+        colors = _distinct_bgr_colors(len(commanded_x_values))
         commanded_z_values = sorted(
             {float(record["z_mm"]) for record in registrations}
         )
-        predicted_x_values = [
-            _model_center_x_px(model, commanded_x, commanded_z)
-            for commanded_x in commanded_x_values
-            for commanded_z in np.linspace(
-                commanded_z_values[0], commanded_z_values[-1], 121
-            )
-        ]
+        x_differences = np.diff(commanded_x_values)
+        commanded_x_pitch = float(np.median(x_differences))
+        assert np.allclose(x_differences, commanded_x_pitch, atol=1e-9)
+        fiducial_x = float(result["fiducial_reference_printer_xy_mm"][0])
+        extrapolated_commanded_x_values = []
+        next_commanded_x = commanded_x_values[0] - commanded_x_pitch
+        while next_commanded_x >= fiducial_x - 0.5 * commanded_x_pitch:
+            extrapolated_commanded_x_values.append(next_commanded_x)
+            next_commanded_x -= commanded_x_pitch
+
+        model_z_min = -1.0
+        model_z_max = commanded_z_values[-1]
+        fiducial_plane_z = float(result["fiducial_plane_printer_z_mm"])
+        fiducial_columns = (
+            (
+                "reference fiducial",
+                float(result["fiducial_reference_printer_xy_mm"][0]),
+                float(result["fiducial_reference_pixel_at_fine_capture_px"][0]),
+                (175, 70, 165),
+            ),
+            (
+                "bed-tab fiducial",
+                float(result["bed_tab_printer_x_mm"]),
+                float(result["bed_tab_corner_pixel_at_fine_capture_px"][0]),
+                (35, 115, 220),
+            ),
+        )
+        dense_z_values = np.linspace(model_z_min, model_z_max, 181)
+        predicted_x_values = (
+            [
+                _model_center_x_px(model, commanded_x, commanded_z)
+                for commanded_x in (
+                    commanded_x_values + extrapolated_commanded_x_values
+                )
+                for commanded_z in dense_z_values
+            ]
+            if show_model
+            else []
+        )
         measured_x_values = [
             float(record["center_px"][0]) for record in registrations
         ]
+        if show_model:
+            measured_x_values.extend(column[2] for column in fiducial_columns)
         y_min = min(measured_x_values + predicted_x_values)
         y_max = max(measured_x_values + predicted_x_values)
         y_margin = max(5.0, 0.08 * (y_max - y_min))
         y_limits = (y_min - y_margin, y_max + y_margin)
-        x_limits = (commanded_z_values[0], commanded_z_values[-1])
+        x_limits = (
+            (model_z_min, model_z_max)
+            if show_model
+            else (commanded_z_values[0], commanded_z_values[-1])
+        )
         panel_left = 70 + tool_index * 930
         rectangle = (panel_left + 90, 275, panel_left + 850, 860)
 
         cv2.putText(
             canvas,
             (
-                f"{tool}: measured center_px[0] used downstream "
+                f"{tool}: measured center_px[0] "
                 f"({len(accepted_sequences)}/{len(registrations)} accepted)"
             ),
             (panel_left, 145),
@@ -188,7 +275,28 @@ def _write_downstream_absolute_x_plot(tool, result, path):
                 cv2.LINE_AA,
             )
 
-        for tick_z in commanded_z_values:
+        if show_model:
+            cv2.putText(
+                canvas,
+                (
+                    f"global fit input={len(_accepted_records)} absolute coordinates; "
+                    f"solid=measured X trajectories; dashed=extrapolated X "
+                    f"{extrapolated_commanded_x_values[0]:.1f}.."
+                    f"{extrapolated_commanded_x_values[-1]:.1f} mm at "
+                    f"{commanded_x_pitch:.1f} mm pitch"
+                ),
+                (panel_left, 244),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.40,
+                (35, 35, 35),
+                1,
+                cv2.LINE_AA,
+            )
+
+        tick_z_values = (
+            [model_z_min] + commanded_z_values if show_model else commanded_z_values
+        )
+        for tick_z in tick_z_values:
             top_point = _plot_point(
                 tick_z,
                 y_limits[1],
@@ -248,23 +356,48 @@ def _write_downstream_absolute_x_plot(tool, result, path):
             2,
         )
 
-        dense_z_values = np.linspace(x_limits[0], x_limits[1], 121)
+        if show_model:
+            measured_region_left = _plot_point(
+                commanded_z_values[0],
+                y_limits[1],
+                x_limits=x_limits,
+                y_limits=y_limits,
+                rectangle=rectangle,
+            )[0]
+            cv2.rectangle(
+                canvas,
+                (rectangle[0], rectangle[1]),
+                (measured_region_left, rectangle[3]),
+                (225, 238, 245),
+                -1,
+            )
+            cv2.rectangle(
+                canvas,
+                (rectangle[0], rectangle[1]),
+                (rectangle[2], rectangle[3]),
+                (65, 65, 65),
+                2,
+            )
+
         for index, commanded_x in enumerate(commanded_x_values):
             color = colors[index]
-            line_points = np.asarray(
-                [
-                    _plot_point(
-                        float(commanded_z),
-                        _model_center_x_px(model, commanded_x, commanded_z),
-                        x_limits=x_limits,
-                        y_limits=y_limits,
-                        rectangle=rectangle,
-                    )
-                    for commanded_z in dense_z_values
-                ],
-                dtype=np.int32,
-            )
-            cv2.polylines(canvas, [line_points], False, color, 2, cv2.LINE_AA)
+            if show_model:
+                line_points = np.asarray(
+                    [
+                        _plot_point(
+                            float(commanded_z),
+                            _model_center_x_px(model, commanded_x, commanded_z),
+                            x_limits=x_limits,
+                            y_limits=y_limits,
+                            rectangle=rectangle,
+                        )
+                        for commanded_z in dense_z_values
+                    ],
+                    dtype=np.int32,
+                )
+                cv2.polylines(
+                    canvas, [line_points], False, color, 2, cv2.LINE_AA
+                )
             for record in registrations:
                 if abs(float(record["x_mm"]) - commanded_x) > 1e-9:
                     continue
@@ -288,6 +421,122 @@ def _write_downstream_absolute_x_plot(tool, result, path):
                         3,
                         cv2.LINE_AA,
                     )
+
+        if show_model:
+            fiducial_top = _plot_point(
+                fiducial_plane_z,
+                y_limits[1],
+                x_limits=x_limits,
+                y_limits=y_limits,
+                rectangle=rectangle,
+            )
+            fiducial_bottom = _plot_point(
+                fiducial_plane_z,
+                y_limits[0],
+                x_limits=x_limits,
+                y_limits=y_limits,
+                rectangle=rectangle,
+            )
+            _draw_dashed_line(
+                canvas,
+                fiducial_top,
+                fiducial_bottom,
+                (90, 90, 90),
+                thickness=2,
+                dash_length=4,
+                gap_length=5,
+            )
+            cv2.putText(
+                canvas,
+                f"fiducial plane Z={fiducial_plane_z:+.3f}",
+                (fiducial_top[0] + 8, rectangle[1] + 20),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.37,
+                (55, 55, 55),
+                1,
+                cv2.LINE_AA,
+            )
+
+            for extrapolated_index, commanded_x in enumerate(
+                extrapolated_commanded_x_values
+            ):
+                shade = int(
+                    85
+                    + 95
+                    * extrapolated_index
+                    / max(1, len(extrapolated_commanded_x_values) - 1)
+                )
+                start = _plot_point(
+                    model_z_min,
+                    _model_center_x_px(model, commanded_x, model_z_min),
+                    x_limits=x_limits,
+                    y_limits=y_limits,
+                    rectangle=rectangle,
+                )
+                end = _plot_point(
+                    model_z_max,
+                    _model_center_x_px(model, commanded_x, model_z_max),
+                    x_limits=x_limits,
+                    y_limits=y_limits,
+                    rectangle=rectangle,
+                )
+                _draw_dashed_line(
+                    canvas,
+                    start,
+                    end,
+                    (shade, shade, shade),
+                    thickness=2,
+                    dash_length=10,
+                    gap_length=7,
+                )
+
+            for name, printer_x, image_x, color in fiducial_columns:
+                point = _plot_point(
+                    fiducial_plane_z,
+                    image_x,
+                    x_limits=x_limits,
+                    y_limits=y_limits,
+                    rectangle=rectangle,
+                )
+                cv2.drawMarker(
+                    canvas,
+                    point,
+                    color,
+                    cv2.MARKER_DIAMOND,
+                    20,
+                    3,
+                    cv2.LINE_AA,
+                )
+                cv2.putText(
+                    canvas,
+                    f"{name}: printer X={printer_x:.3f}, image X={image_x:.3f}",
+                    (point[0] + 12, point[1] - 8),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.35,
+                    color,
+                    1,
+                    cv2.LINE_AA,
+                )
+
+            for record in _accepted_records:
+                prediction = _plot_point(
+                    float(record["z_mm"]),
+                    _model_center_x_px(
+                        model, float(record["x_mm"]), float(record["z_mm"])
+                    ),
+                    x_limits=x_limits,
+                    y_limits=y_limits,
+                    rectangle=rectangle,
+                )
+                cv2.drawMarker(
+                    canvas,
+                    prediction,
+                    (15, 15, 15),
+                    cv2.MARKER_CROSS,
+                    11,
+                    2,
+                    cv2.LINE_AA,
+                )
 
         cv2.putText(
             canvas,
@@ -328,8 +577,8 @@ def _write_fiducial_x_extrapolation_preview(tool, result, path):
     cv2.putText(
         canvas,
         (
-            "left: adjacent accepted-coordinate scales and model extrapolation   "
-            "right: extrapolated scale versus commanded Z and fiducial-scale crossing"
+            "left: derivative of one global fit to accepted absolute coordinates   "
+            "right: that fitted derivative transported to fiducial X"
         ),
         (45, 92),
         cv2.FONT_HERSHEY_SIMPLEX,
@@ -338,26 +587,18 @@ def _write_fiducial_x_extrapolation_preview(tool, result, path):
         2,
         cv2.LINE_AA,
     )
-    z_colors = [
-        (60, 160, 70),
-        (50, 150, 210),
-        (170, 90, 180),
-        (210, 100, 55),
-    ]
     for tool_index, tool in enumerate((tool,)):
-        model = result["models"][tool]
         registrations = result["registrations"]
+        model, accepted = _global_absolute_position_refit(
+            result["models"][tool], registrations
+        )
         accepted_sequences = {int(item) for item in model["accepted_sequences"]}
-        accepted = [
-            record
-            for record in registrations
-            if int(record["seq"]) in accepted_sequences
-        ]
         measured_x_min = min(float(record["x_mm"]) for record in registrations)
         measured_x_max = max(float(record["x_mm"]) for record in registrations)
         commanded_z_values = sorted(
             {float(record["z_mm"]) for record in registrations}
         )
+        z_colors = _distinct_bgr_colors(len(commanded_z_values))
         fiducial_x = float(result["fiducial_reference_printer_xy_mm"][0])
         fiducial_vector = np.asarray(
             result["fiducial_x_vector_at_fine_capture_px_per_mm"],
@@ -378,32 +619,6 @@ def _write_fiducial_x_extrapolation_preview(tool, result, path):
                 )
             )
 
-        measured_scale_points = {}
-        for commanded_z in commanded_z_values:
-            row = sorted(
-                (
-                    record
-                    for record in accepted
-                    if abs(float(record["z_mm"]) - commanded_z) < 1e-9
-                ),
-                key=lambda record: float(record["x_mm"]),
-            )
-            points = []
-            for first, second in zip(row, row[1:]):
-                delta_x_mm = float(second["x_mm"]) - float(first["x_mm"])
-                if delta_x_mm <= 0.0:
-                    continue
-                image_delta = np.asarray(
-                    second["center_px"], dtype=np.float64
-                ) - np.asarray(first["center_px"], dtype=np.float64)
-                points.append(
-                    (
-                        0.5 * (float(first["x_mm"]) + float(second["x_mm"])),
-                        float(np.dot(image_delta / delta_x_mm, fiducial_direction)),
-                    )
-                )
-            measured_scale_points[commanded_z] = points
-
         extrapolation_x_limits = (
             fiducial_x - 2.0,
             measured_x_max + 2.0,
@@ -413,10 +628,6 @@ def _write_fiducial_x_extrapolation_preview(tool, result, path):
             projected_scale(float(commanded_x), commanded_z)
             for commanded_z in commanded_z_values
             for commanded_x in dense_x
-        ] + [
-            scale
-            for points in measured_scale_points.values()
-            for _commanded_x, scale in points
         ]
         left_margin = max(0.15, 0.08 * (max(left_values) - min(left_values)))
         left_y_limits = (
@@ -472,7 +683,8 @@ def _write_fiducial_x_extrapolation_preview(tool, result, path):
             canvas,
             (
                 f"{tool}: {len(accepted_sequences)}/{len(registrations)} accepted; "
-                f"fit RMS={float(model['position_fit_rms_px']):.3f} px"
+                f"one global absolute-coordinate fit; "
+                f"RMS={float(model['position_fit_rms_px']):.3f} px"
             ),
             (55, row_top + 42),
             cv2.FONT_HERSHEY_SIMPLEX,
@@ -483,7 +695,7 @@ def _write_fiducial_x_extrapolation_preview(tool, result, path):
         )
         cv2.putText(
             canvas,
-            "Lateral scale field and extrapolation",
+            "Derivative of global absolute-position fit",
             (left_rectangle[0] + 215, row_top + 83),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.66,
@@ -638,16 +850,6 @@ def _write_fiducial_x_extrapolation_preview(tool, result, path):
                 dtype=np.int32,
             )
             cv2.polylines(canvas, [line_points], False, color, 2, cv2.LINE_AA)
-            for commanded_x, measured_scale in measured_scale_points[commanded_z]:
-                point = _plot_point(
-                    commanded_x,
-                    measured_scale,
-                    x_limits=extrapolation_x_limits,
-                    y_limits=left_y_limits,
-                    rectangle=left_rectangle,
-                )
-                cv2.circle(canvas, point, 6, (25, 25, 25), 2, cv2.LINE_AA)
-                cv2.circle(canvas, point, 4, color, -1, cv2.LINE_AA)
             extrapolated_point = _plot_point(
                 fiducial_x,
                 projected_scale(fiducial_x, commanded_z),
@@ -806,7 +1008,9 @@ def _write_fiducial_x_extrapolation_preview(tool, result, path):
         cv2.putText(
             canvas,
             (
-                f"fiducial scale={fiducial_scale:.6f} px/mm; "
+                f"fit input={len(accepted)} accepted absolute coordinates; "
+                f"pairwise local scales used=0; fiducial scale="
+                f"{fiducial_scale:.6f} px/mm; "
                 f"scale-Z slope={projected_z_slope:+.6f} px/mm/mm; "
                 f"{crossing_text}; fiducial-plane Z="
                 f"{float(result['fiducial_plane_printer_z_mm']):+.3f} mm"
@@ -862,7 +1066,14 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
             capture_dir / "frames" / f"{frame['frame']}.jpg"
             for frame in manifest["frames"]
         ]
-        assert len(frame_paths) == 28
+        rows = {}
+        for frame in manifest["frames"]:
+            rows.setdefault(float(frame["z_mm"]), set()).add(float(frame["x_mm"]))
+        assert len(rows) >= 2
+        expected_x_positions = next(iter(rows.values()))
+        assert len(expected_x_positions) >= 2
+        assert all(x_positions == expected_x_positions for x_positions in rows.values())
+        assert len(frame_paths) == len(rows) * len(expected_x_positions)
         assert all(path.is_file() for path in frame_paths)
 
         artifact_dir = run_root / tool.lower()
@@ -903,6 +1114,9 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
             assert overlay_image.shape == source_image.shape
 
         model = result["models"][tool]
+        assert model["position_fit_input"] == "all_accepted_absolute_coordinates"
+        assert int(model["position_fit_input_count"]) == int(model["accepted_count"])
+        assert int(model["pairwise_local_scales_used_for_position_fit"]) == 0
         reasons = result["reasons"] or ["none"]
         summaries.extend(
             [
@@ -919,6 +1133,8 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
                 f"  - [projection model]({tool.lower()}/fine_nozzle_projection_model.png)",
                 f"  - [absolute image X versus commanded Z]"
                 f"({tool.lower()}/downstream_absolute_x_vs_commanded_z.png)",
+                f"  - [absolute image X global-model overlay]"
+                f"({tool.lower()}/downstream_absolute_x_vs_commanded_z_model_overlay.png)",
                 f"  - [fiducial-X extrapolation preview]"
                 f"({tool.lower()}/fiducial_x_extrapolation_preview.png)",
                 f"  - Individual full-resolution overlays: "
@@ -935,6 +1151,13 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
             tool,
             result,
             tool_output / "downstream_absolute_x_vs_commanded_z.png",
+            show_model=False,
+        )
+        _write_downstream_absolute_x_plot(
+            tool,
+            result,
+            tool_output / "downstream_absolute_x_vs_commanded_z_model_overlay.png",
+            show_model=True,
         )
         _write_fiducial_x_extrapolation_preview(
             tool,
@@ -945,8 +1168,9 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
     summary_path.write_text(
         "# Local Step 5 captured-image replay\n\n"
         "The green cross is the coordinate passed into each projection model.\n\n"
-        "Downstream-coordinate and fiducial-extrapolation plots are generated "
-        "as separate T0 and T1 images.\n\n"
+        "Raw downstream coordinates, global-model overlays, and "
+        "fiducial-extrapolation previews are generated as separate T0 and T1 "
+        "images.\n\n"
         + "\n".join(summaries),
         encoding="utf-8",
     )

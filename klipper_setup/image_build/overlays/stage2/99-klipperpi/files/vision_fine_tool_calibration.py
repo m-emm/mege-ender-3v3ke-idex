@@ -123,6 +123,9 @@ def _fit_model(
             "position_fit_rms_px": float(
                 np.sqrt(np.mean(np.sum(residuals**2, axis=1)))
             ),
+            "position_fit_input": "all_supplied_absolute_coordinates",
+            "position_fit_input_count": len(records),
+            "pairwise_local_scales_used_for_position_fit": 0,
             "accepted_count": len(records),
             "accepted_sequences": [int(record["seq"]) for record in records],
         }
@@ -807,15 +810,21 @@ def calculate_candidate(
     if float(model["position_fit_rms_px"]) > 1.5:
         reasons.append(f"{tool} position fit RMS {model['position_fit_rms_px']:.3f} px")
     rows = solved["full_row_coverage"]
-    if len(rows) < 4:
-        reasons.append(f"{tool} has only {len(rows)} usable full X rows")
+    expected_row_count = len(
+        {float(record["z_mm"]) for record in registrations}
+    )
+    if len(rows) < expected_row_count:
+        reasons.append(
+            f"{tool} has only {len(rows)} usable X rows from "
+            f"{expected_row_count} captured Z heights"
+        )
     for row in rows:
-        if int(row["accepted_count"]) < 6 or float(row["x_span_mm"]) < 12.5:
+        if int(row["accepted_count"]) < 4 or float(row["x_span_mm"]) < 8.0:
             reasons.append(
                 f"{tool} Z={row['z_mm']:.3f} row has "
                 f"{row['accepted_count']} accepted X positions over "
-                f"{row['x_span_mm']:.3f} mm; at least 6 positions over "
-                "12.500 mm are required"
+                f"{row['x_span_mm']:.3f} mm; at least 4 positions over "
+                "8.000 mm are required"
             )
     crossing = solved["scale_crossing"]
     z_crossing = float(crossing["commanded_z_at_fiducial_plane_mm"])

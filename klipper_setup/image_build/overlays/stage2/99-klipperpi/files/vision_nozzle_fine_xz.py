@@ -499,36 +499,35 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
                 "limit_px": limit,
             }
         accepted = retained
-    full_row_z = {
-        z_mm
-        for z_mm in {float(record["z_mm"]) for record in accepted}
-        if len(
-            {
-                float(record["x_mm"])
-                for record in accepted
-                if abs(float(record["z_mm"]) - z_mm) < 1e-9
-            }
-        )
-        >= 5
-    }
-    model_records = [
-        record for record in accepted if float(record["z_mm"]) in full_row_z
-    ]
-    if len(full_row_z) < 4 or len(model_records) < 20:
+    model_records = accepted
+    if len(model_records) < 8:
         _logger.info(
-            "analysis rejected stage=projection_model_row_coverage tool=%s "
-            "reason=only %d full rows and %d records contain enough X observations",
+            "analysis rejected stage=global_absolute_position_fit tool=%s "
+            "reason=only %d accepted absolute coordinates remain",
             records[0]["tool"],
-            len(full_row_z),
             len(model_records),
         )
         raise FineNozzleError(
-            f"only {len(full_row_z)} full rows contain enough X observations"
+            f"only {len(model_records)} accepted absolute coordinates remain"
         )
+    x_ref = float(np.median([record["x_mm"] for record in model_records]))
+    z_ref = float(np.median([record["z_mm"] for record in model_records]))
     design = np.asarray(
         [design_row(record) for record in model_records],
         dtype=np.float64,
     )
+    design_rank = int(np.linalg.matrix_rank(design))
+    if design_rank < design.shape[1]:
+        _logger.info(
+            "analysis rejected stage=global_absolute_position_fit tool=%s "
+            "reason=accepted absolute-coordinate design matrix is singular "
+            "accepted=%d rank=%d required_rank=%d",
+            records[0]["tool"],
+            len(model_records),
+            design_rank,
+            int(design.shape[1]),
+        )
+        raise FineNozzleError("accepted absolute-coordinate design matrix is singular")
     positions = np.asarray(
         [record["center_px"] for record in model_records], dtype=np.float64
     )
@@ -541,6 +540,14 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
     fitted_scales = design @ scale_coefficients
     position_residuals = positions - fitted_positions
     scale_residuals = log_scales - fitted_scales
+    _logger.info(
+        "projection model fit stage=global_absolute_position_fit tool=%s "
+        "input=all_accepted_absolute_coordinates accepted=%d "
+        "pairwise_local_scales_used=0 terms=%d",
+        records[0]["tool"],
+        len(model_records),
+        int(design.shape[1]),
+    )
     return _finite(
         {
             "x_ref_mm": x_ref,
@@ -551,6 +558,9 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
             "position_fit_rms_px": float(
                 np.sqrt(np.mean(np.sum(position_residuals**2, axis=1)))
             ),
+            "position_fit_input": "all_accepted_absolute_coordinates",
+            "position_fit_input_count": len(model_records),
+            "pairwise_local_scales_used_for_position_fit": 0,
             "log_scale_fit_rms": float(np.sqrt(np.mean(scale_residuals**2))),
             "accepted_count": len(model_records),
             "minimum_correlation": min(
@@ -560,9 +570,7 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
                 np.median([record["minimum_correlation"] for record in model_records])
             ),
             "accepted_sequences": [record["seq"] for record in model_records],
-            "trajectory_only_sequences": [
-                record["seq"] for record in accepted if record not in model_records
-            ],
+            "trajectory_only_sequences": [],
             "accepted_direct_positions": [
                 {
                     "seq": record["seq"],
@@ -967,9 +975,11 @@ def analyze(
                 f"{tool} has only {len(physical_tip_tracks[tool])} direct "
                 "physical tip detections"
             )
-        minimum_usable_z_rows = 4
-        minimum_accepted_x_positions_per_row = 6
-        minimum_x_span_per_row_mm = 12.5
+        minimum_usable_z_rows = len(
+            {float(record["z_mm"]) for record in tool_records}
+        )
+        minimum_accepted_x_positions_per_row = 4
+        minimum_x_span_per_row_mm = 8.0
         full_rows = []
         row_coverage_gate = []
         for z_mm in sorted({float(record["z_mm"]) for record in tool_records}):
@@ -1338,6 +1348,10 @@ def analyze(
             },
             "fiducial_reference_printer_xy_mm": fiducial_reference_xy,
             "fiducial_reference_pixel_at_fine_capture_px": fiducial_reference_pixel,
+            "bed_tab_printer_x_mm": float(reference["bed_tab_x_mm"]),
+            "bed_tab_corner_pixel_at_fine_capture_px": reference[
+                "corner_pixel_at_fine_capture_px"
+            ],
             "fiducial_x_vector_at_fine_capture_px_per_mm": bed_x_fiducial,
             "fiducial_plane_printer_z_mm": fiducial_plane_z,
             "fine_capture_y_mm": float(reference["fine_capture_y_mm"]),

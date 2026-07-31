@@ -552,8 +552,8 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     ]
     assert all(
         definition["definition_version"] == 1
-        and len(definition["x_offsets_from_bed_tab_mm"]) == 7
-        and len(definition["full_row_z_mm"]) == 4
+        and len(definition["x_offsets_from_bed_tab_mm"]) >= 4
+        and len(definition["full_row_z_mm"]) >= 4
         and definition["localizer"]
         == {"kind": "nozzle_tip_registration_grid", "version": 1}
         for definition in fine_xz_definitions

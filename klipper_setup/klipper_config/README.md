@@ -102,8 +102,8 @@ positions to agree. It is report-only and does not change configuration.
 
 Stage 5 is split into independent T0 and T1 jobs. Each job captures a
 28-frame nozzle grid: seven evenly spaced X columns at bed-tab offsets
-`10, 12.5, 15, 17.5, 20, 22.5, 25 mm` on four complete Z rows spanning
-Z 1 through 9 mm. The outer circular ring is a coarse locator. Only a small
+`10, 12.5, 15, 17.5, 20, 22.5, 25 mm` on eight complete Z rows spanning
+Z 0.5 through 25 mm. The outer circular ring is a coarse locator. Only a small
 ROI centered on the actual metallic nozzle tip contributes registration
 measurements:
 
