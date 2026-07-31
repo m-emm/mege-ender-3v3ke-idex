@@ -100,31 +100,39 @@ The verification expects each red marker to project 10 mm along the measured
 image-X axis from the fixed bed-tab corner and expects the two marker image-X
 positions to agree. It is report-only and does not change configuration.
 
-Stage 5 captures a sparse 40-frame T0/T1 nozzle grid. Full X rows use offsets
-`10, 13, 16, 19, 22, 25 mm` at Z 1, 5, and 9 mm; Z 3 and 7 mm use the center
-X only. The outer circular ring is a coarse locator. Only a small ROI centered
-on the actual metallic nozzle tip contributes registration measurements:
+Stage 5 is split into independent T0 and T1 jobs. Each job captures a
+28-frame nozzle grid: seven evenly spaced X columns at bed-tab offsets
+`10, 12.5, 15, 17.5, 20, 22.5, 25 mm` on four complete Z rows spanning
+Z 1 through 9 mm. The outer circular ring is a coarse locator. Only a small
+ROI centered on the actual metallic nozzle tip contributes registration
+measurements:
 
 ```gcode
-IDEX_NOZZLE_FINE_XZ_CALIBRATE NAME=fine_nozzle_xz
+IDEX_NOZZLE_FINE_XZ_CALIBRATE_T0 NAME=fine_nozzle_xz_t0
+IDEX_NOZZLE_FINE_XZ_CALIBRATE_T1 NAME=fine_nozzle_xz_t1
 ```
 
-It publishes the nozzle-tip projection and registration model. It deliberately
-does not publish absolute nozzle XYZ or infer Z by forcing the nozzle X vector
-to equal the bed X vector; that joint solve is a separate follow-up operation.
+Each job publishes only its own tool's nozzle-tip projection and registration
+model. It deliberately does not publish absolute nozzle XYZ or infer Z by
+forcing the nozzle X vector to equal the bed X vector; that solve is a
+separate per-tool follow-up operation.
 
 Stage 5.1 performs that gated calculation:
 
 ```bash
-/usr/local/bin/vision_calibration.py calculate-fine-tool-xyz
+/usr/local/bin/vision_calibration.py calculate-fine-tool-xyz --tool T0
+/usr/local/bin/vision_calibration.py calculate-fine-tool-xyz --tool T1
 ```
 
-An accepted calculation writes a complete `calib_candidate.yaml` and publishes
-the two absolute nozzle-coordinate facts plus
-`calibration.fine_tool_xyz.candidate`. A rejected calculation remains visible
-under `/vision/`, publishes nothing, and must not be deployed. After deploying
-an accepted candidate, verify all four generated physical endstop mappings and
-both derived T1 Y/Z offsets by recording the active snapshot:
+Each accepted calculation writes a complete `calib_candidate.yaml`, changing
+only the selected tool's persisted XYZ datum, and publishes that tool's
+absolute nozzle-coordinate facts plus its per-tool candidate fact. A rejected
+calculation remains visible under `/vision/`, publishes nothing, and must not
+be deployed. A per-tool candidate is based on the active source calibration;
+after applying one candidate, recapture and recalculate the other tool rather
+than applying a candidate computed against the previous source file. After
+deploying an accepted candidate, verify the generated mappings by recording
+the active snapshot:
 
 ```bash
 /usr/local/bin/vision_calibration.py record-fine-tool-xyz-activation \
@@ -144,7 +152,8 @@ nozzle_cam_bed_fiducial_y_metric
 nozzle_cam_bed_tab_corner
 idex_tool_red_marker_x_sweep
 idex_rough_tool_x_verify
-idex_nozzle_fine_xz_grid
+idex_nozzle_fine_xz_grid_t0
+idex_nozzle_fine_xz_grid_t1
 ```
 
 The seed values live in

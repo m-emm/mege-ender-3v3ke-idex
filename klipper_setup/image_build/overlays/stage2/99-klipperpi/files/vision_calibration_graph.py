@@ -25,7 +25,8 @@ JOB_TYPES = {
     "nozzle_cam_bed_tab_corner",
     "idex_tool_red_marker_x_sweep",
     "idex_rough_tool_x_verify",
-    "idex_nozzle_fine_xz_grid",
+    "idex_nozzle_fine_xz_grid_t0",
+    "idex_nozzle_fine_xz_grid_t1",
 }
 SEED_FACT_NAMES = {
     "bed.tab_corner.printer_xyz",
@@ -113,9 +114,7 @@ def _header(record: dict[str, Any], schema: str, name: str) -> None:
     if record.get("schema") != schema:
         raise CalibrationGraphError(f"{name}.schema must be {schema!r}")
     if record.get("schema_version") != SCHEMA_VERSION:
-        raise CalibrationGraphError(
-            f"{name}.schema_version must be {SCHEMA_VERSION}"
-        )
+        raise CalibrationGraphError(f"{name}.schema_version must be {SCHEMA_VERSION}")
 
 
 def validate_registry(record: Any) -> dict[str, Any]:
@@ -129,13 +128,9 @@ def validate_registry(record: Any) -> dict[str, Any]:
     for job_type, value in job_types.items():
         definition = _mapping(value, f"registry.job_types.{job_type}")
         if definition.get("definition_version") != 1:
-            raise CalibrationGraphError(
-                f"{job_type} definition_version must be 1"
-            )
+            raise CalibrationGraphError(f"{job_type} definition_version must be 1")
         if definition.get("fact_definition_version") != 1:
-            raise CalibrationGraphError(
-                f"{job_type} fact_definition_version must be 1"
-            )
+            raise CalibrationGraphError(f"{job_type} fact_definition_version must be 1")
         if definition.get("camera") != "nozzle_cam":
             raise CalibrationGraphError(f"{job_type} camera must be nozzle_cam")
         if definition.get("publish_on_accept") is not True:
@@ -161,25 +156,51 @@ def validate_registry(record: Any) -> dict[str, Any]:
                 raise CalibrationGraphError(
                     f"{job_type} requirements must bind definition version 1"
                 )
-    if (
-        job_types["nozzle_cam_bed_fiducial_y_metric"].get("y_offsets_mm")
-        != [0, 10, 20, 20, 10, 0]
-    ):
+    if job_types["nozzle_cam_bed_fiducial_y_metric"].get("y_offsets_mm") != [
+        0,
+        10,
+        20,
+        20,
+        10,
+        0,
+    ]:
         raise CalibrationGraphError("bed metric motion order is invalid")
-    if (
-        job_types["idex_tool_red_marker_x_sweep"].get("x_positions_mm")
-        != [160, 170, 180, 190, 200, 210]
-    ):
+    if job_types["idex_tool_red_marker_x_sweep"].get("x_positions_mm") != [
+        160,
+        170,
+        180,
+        190,
+        200,
+        210,
+    ]:
         raise CalibrationGraphError("red-marker X motion order is invalid")
-    fine = job_types["idex_nozzle_fine_xz_grid"]
-    if fine.get("x_offsets_from_bed_tab_mm") != [10, 13, 16, 19, 22, 25]:
-        raise CalibrationGraphError("fine nozzle X offsets are invalid")
-    if fine.get("full_row_z_mm") != [1, 5, 9]:
-        raise CalibrationGraphError("fine nozzle full-row Z values are invalid")
-    if fine.get("center_only_z_mm") != [3, 7]:
-        raise CalibrationGraphError("fine nozzle center-only Z values are invalid")
-    if fine.get("safe_tool_change_z_mm") != 9:
-        raise CalibrationGraphError("fine nozzle tool-change Z is invalid")
+    for tool in ("T0", "T1"):
+        fine = job_types[f"idex_nozzle_fine_xz_grid_{tool.lower()}"]
+        if fine.get("tool") != tool:
+            raise CalibrationGraphError(f"fine nozzle {tool} job targets wrong tool")
+        x_offsets = fine.get("x_offsets_from_bed_tab_mm")
+        if (
+            not isinstance(x_offsets, list)
+            or len(x_offsets) != 7
+            or sorted(x_offsets) != x_offsets
+            or float(x_offsets[-1]) - float(x_offsets[0]) < 15.0
+        ):
+            raise CalibrationGraphError(
+                f"fine nozzle {tool} X grid must have seven ordered columns"
+            )
+        full_rows = fine.get("full_row_z_mm")
+        if (
+            not isinstance(full_rows, list)
+            or len(full_rows) != 4
+            or sorted(full_rows) != full_rows
+            or float(full_rows[0]) < 1.0
+            or float(full_rows[-1]) - float(full_rows[0]) < 8.0
+        ):
+            raise CalibrationGraphError(
+                f"fine nozzle {tool} grid must have four ordered full Z rows"
+            )
+        if fine.get("safe_tool_change_z_mm") != 9:
+            raise CalibrationGraphError(f"fine nozzle {tool} tool-change Z is invalid")
     return record
 
 
@@ -253,9 +274,7 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             raise CalibrationGraphError("corner duplicate order is invalid")
     elif job_type == "idex_tool_red_marker_x_sweep":
         expected = [
-            (tool, x)
-            for tool in ("T0", "T1")
-            for x in (160, 170, 180, 190, 200, 210)
+            (tool, x) for tool in ("T0", "T1") for x in (160, 170, 180, 190, 200, 210)
         ]
         if [(frame.get("tool"), frame.get("x_mm")) for frame in frames] != expected:
             raise CalibrationGraphError("red-marker motion order is invalid")
@@ -265,15 +284,28 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             "T1",
         ]:
             raise CalibrationGraphError("rough-X verification frames are invalid")
-    elif job_type == "idex_nozzle_fine_xz_grid":
-        if len(frames) != 40:
-            raise CalibrationGraphError("fine nozzle grid must contain 40 frames")
+    elif job_type in {
+        "idex_nozzle_fine_xz_grid_t0",
+        "idex_nozzle_fine_xz_grid_t1",
+    }:
+        expected_tool = "T0" if job_type.endswith("_t0") else "T1"
+        if len(frames) != 28:
+            raise CalibrationGraphError(
+                "fine nozzle per-tool grid must contain 28 frames"
+            )
         if any(float(frame.get("z_mm", -1)) < 1.0 for frame in frames):
             raise CalibrationGraphError("fine nozzle grid may not command below Z=1")
-        if [frame.get("tool") for frame in frames[:20]] != ["T0"] * 20:
-            raise CalibrationGraphError("fine nozzle grid must acquire T0 first")
-        if [frame.get("tool") for frame in frames[20:]] != ["T1"] * 20:
-            raise CalibrationGraphError("fine nozzle grid must acquire T1 second")
+        if [frame.get("tool") for frame in frames] != [expected_tool] * 28:
+            raise CalibrationGraphError(
+                f"fine nozzle grid must acquire only {expected_tool}"
+            )
+        rows = {}
+        for frame in frames:
+            rows.setdefault(float(frame["z_mm"]), set()).add(float(frame["x_mm"]))
+        if len(rows) != 4 or any(len(x_values) != 7 for x_values in rows.values()):
+            raise CalibrationGraphError(
+                "fine nozzle grid must contain four complete seven-column rows"
+            )
 
     expected_hash = content_hash(record, "manifest_hash")
     if record.get("manifest_hash") != expected_hash:
@@ -300,9 +332,7 @@ def _numeric_vector(value: Any, length: int, name: str) -> list[Any]:
     if len(result) != length or not all(
         isinstance(item, (int, float)) for item in result
     ):
-        raise CalibrationGraphError(
-            f"{name} must contain {length} numeric components"
-        )
+        raise CalibrationGraphError(f"{name} must contain {length} numeric components")
     return result
 
 
@@ -393,9 +423,7 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                 "metric printer-Y vector",
             )
         elif name == "camera.nozzle_cam.partial_bed_coordinate_system":
-            _numeric_vector(
-                fact_value.get("corner_pixel_xy_px"), 2, "corner pixel"
-            )
+            _numeric_vector(fact_value.get("corner_pixel_xy_px"), 2, "corner pixel")
             _numeric_vector(
                 fact_value.get("corner_printer_xyz_mm"), 3, "corner printer XYZ"
             )
@@ -421,9 +449,7 @@ def validate_publication(record: Any) -> dict[str, Any]:
     _string(record.get("publication_id"), "publication.publication_id")
     _string(record.get("fact_set_hash"), "publication.fact_set_hash")
     _list(record.get("facts"), "publication.facts")
-    if record.get("publication_hash") != content_hash(
-        record, "publication_hash"
-    ):
+    if record.get("publication_hash") != content_hash(record, "publication_hash"):
         raise CalibrationGraphError("publication hash mismatch")
     return record
 
@@ -548,9 +574,10 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
     jobs_root = root / "jobs"
     if jobs_root.exists():
         for job_dir in sorted(item for item in jobs_root.iterdir() if item.is_dir()):
-            if not (job_dir / "manifest.json").exists() or not (
-                job_dir / "state.json"
-            ).exists():
+            if (
+                not (job_dir / "manifest.json").exists()
+                or not (job_dir / "state.json").exists()
+            ):
                 continue
             manifest = validate_manifest(load_json(job_dir / "manifest.json"))
             state = load_json(job_dir / "state.json")
@@ -636,9 +663,7 @@ def _publish(root: Path, fact_set_path: Path) -> dict[str, Any]:
         "fact_set_hash": fact_set["fact_set_hash"],
         "facts": [fact["name"] for fact in fact_set["facts"]],
         "supersedes": {
-            fact["name"]: catalog["heads"]
-            .get(fact["name"], {})
-            .get("fact_set_hash")
+            fact["name"]: catalog["heads"].get(fact["name"], {}).get("fact_set_hash")
             for fact in fact_set["facts"]
         },
         "publication_hash": "",

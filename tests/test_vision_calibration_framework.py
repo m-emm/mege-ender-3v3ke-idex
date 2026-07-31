@@ -74,17 +74,46 @@ def test_registry_is_exact_clean_chain():
         and definition["publish_on_accept"] is True
         for definition in registry["job_types"].values()
     )
-    assert registry["job_types"]["idex_nozzle_fine_xz_grid"][
-        "x_offsets_from_bed_tab_mm"
-    ] == [10, 13, 16, 19, 22, 25]
-    fine = registry["job_types"]["idex_nozzle_fine_xz_grid"]
-    assert fine["full_row_z_mm"] == [1, 5, 9]
-    assert fine["center_only_z_mm"] == [3, 7]
-    assert fine["safe_tool_change_z_mm"] == 9
-    assert fine["fact_names"] == [
-        "camera.nozzle_cam.nozzle_tip.projection_model"
+    fine_jobs = [
+        registry["job_types"][f"idex_nozzle_fine_xz_grid_{tool.lower()}"]
+        for tool in ("T0", "T1")
+    ]
+    assert [fine["tool"] for fine in fine_jobs] == ["T0", "T1"]
+    assert all(len(fine["x_offsets_from_bed_tab_mm"]) == 7 for fine in fine_jobs)
+    assert all(len(fine["full_row_z_mm"]) == 4 for fine in fine_jobs)
+    assert all(
+        fine["x_offsets_from_bed_tab_mm"] == fine_jobs[0]["x_offsets_from_bed_tab_mm"]
+        and fine["full_row_z_mm"] == fine_jobs[0]["full_row_z_mm"]
+        for fine in fine_jobs
+    )
+    assert [fine["fact_names"] for fine in fine_jobs] == [
+        ["camera.nozzle_cam.nozzle_tip.t0_projection_model"],
+        ["camera.nozzle_cam.nozzle_tip.t1_projection_model"],
     ]
     assert "idex_fine_tool_xy_verify" not in registry["job_types"]
+
+
+def test_fine_nozzle_marker_selection_rejects_distant_red_distractor(monkeypatch):
+    fine = _module("vision_nozzle_fine_xz.py", "vision_fine_marker_selection_test")
+    expected = np.asarray([1083.0, 412.0])
+    distractor = {"center_px": [1100.0, 521.0]}
+    monkeypatch.setattr(fine, "_red_candidates", lambda _image, _index: [distractor])
+
+    center, record = fine._select_marker(
+        np.zeros((1080, 1920, 3), dtype=np.uint8),
+        expected,
+        0,
+    )
+
+    np.testing.assert_allclose(center, expected)
+    assert record is None
+
+
+def test_fine_nozzle_physical_tip_sector_excludes_lower_tracking_anchor():
+    fine = _module("vision_nozzle_fine_xz.py", "vision_fine_tip_sector_test")
+
+    assert fine._is_physical_tip_delta(np.asarray([17.5, -2.0]), 63.0)
+    assert not fine._is_physical_tip_delta(np.asarray([7.0, 16.0]), 63.0)
 
 
 def test_canonical_hash_is_order_independent_and_strict():
@@ -109,9 +138,7 @@ def test_fact_items_are_exact_and_uncertainty_is_rejected():
 
     undeclared = json.loads(json.dumps(record))
     undeclared["facts"][0]["value"]["quality"] = 1
-    undeclared["fact_set_hash"] = graph.content_hash(
-        undeclared, "fact_set_hash"
-    )
+    undeclared["fact_set_hash"] = graph.content_hash(undeclared, "fact_set_hash")
     with pytest.raises(graph.CalibrationGraphError, match="exactly cover"):
         graph.validate_fact_set(undeclared)
 
@@ -120,9 +147,7 @@ def test_fact_items_are_exact_and_uncertainty_is_rejected():
     uncertain["facts"][0]["value_items"].append(
         {"field": "uncertainty_mm", "role": "diagnostic"}
     )
-    uncertain["fact_set_hash"] = graph.content_hash(
-        uncertain, "fact_set_hash"
-    )
+    uncertain["fact_set_hash"] = graph.content_hash(uncertain, "fact_set_hash")
     with pytest.raises(graph.CalibrationGraphError, match="uncertainty"):
         graph.validate_fact_set(uncertain)
 
@@ -176,9 +201,7 @@ def test_priors_define_fiducial_plane_without_uncertainties():
 
 
 def test_fine_grid_localizes_the_nozzle_tip_inside_the_outer_ring():
-    analyzer = _module(
-        "vision_nozzle_fine_xz.py", "vision_nozzle_tip_localizer_test"
-    )
+    analyzer = _module("vision_nozzle_fine_xz.py", "vision_nozzle_tip_localizer_test")
     image = np.full((240, 240, 3), 24, dtype=np.uint8)
     ring_center = np.asarray([120.0, 120.0])
     cv2.circle(image, (120, 120), 52, (130, 130, 130), 7)
@@ -198,14 +221,40 @@ def test_fine_grid_localizes_the_nozzle_tip_inside_the_outer_ring():
 def test_fine_grid_analyzer_streams_frames_and_publishes_projection_only():
     source = (FILES / "vision_nozzle_fine_xz.py").read_text(encoding="utf-8")
     graph_source = (FILES / "vision_calibration_graph.py").read_text(encoding="utf-8")
-    registry = json.loads(
-        (FILES / "vision_job_types.json").read_text(encoding="utf-8")
-    )
-    fine = registry["job_types"]["idex_nozzle_fine_xz_grid"]
+    registry = json.loads((FILES / "vision_job_types.json").read_text(encoding="utf-8"))
+    fine = registry["job_types"]["idex_nozzle_fine_xz_grid_t0"]
 
     assert "images.append" not in source
     assert "commanded_z_at_print_plane_mm" not in source
     assert "fine X/Y verification may not command below Z=3" not in graph_source
-    assert fine["fact_names"] == [
-        "camera.nozzle_cam.nozzle_tip.projection_model"
-    ]
+    assert fine["fact_names"] == ["camera.nozzle_cam.nozzle_tip.t0_projection_model"]
+
+
+def test_fine_tool_candidate_changes_only_the_selected_tool():
+    calculator = _module(
+        "vision_fine_tool_calibration.py",
+        "vision_fine_tool_candidate_scope_test",
+    )
+    old_datums = {
+        "t0": {"x_endstop": 1.0, "y_endstop": 2.0, "z_endstop": 3.0},
+        "t1": {"x_endstop": 4.0, "y_endstop": 5.0, "z_endstop": 6.0},
+    }
+
+    for tool, target, other in (
+        ("T0", "t0", "t1"),
+        ("T1", "t1", "t0"),
+    ):
+        result = calculator.generated_calibration(
+            old_datums,
+            tool=tool,
+            residual_xyz_mm=[0.1, 0.2, 0.3],
+        )
+
+        assert result["persisted_calib"]["new"][target] == {
+            "x": old_datums[target]["x_endstop"] + 0.1,
+            "y": old_datums[target]["y_endstop"] + 0.2,
+            "z": old_datums[target]["z_endstop"] + 0.3,
+        }
+        assert result["persisted_calib"]["new"][other] == {
+            axis: old_datums[other][f"{axis}_endstop"] for axis in ("x", "y", "z")
+        }

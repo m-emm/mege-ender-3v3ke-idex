@@ -22,7 +22,8 @@ nozzle_cam_bed_fiducial_y_metric
 nozzle_cam_bed_tab_corner
 idex_tool_red_marker_x_sweep
 idex_rough_tool_x_verify
-idex_nozzle_fine_xz_grid
+idex_nozzle_fine_xz_grid_t0
+idex_nozzle_fine_xz_grid_t1
 ```
 
 The command surface is:
@@ -36,6 +37,8 @@ vision_calibration.py publish <job-id> <analysis-run-id>
 vision_calibration.py sync-priors
 vision_calibration.py rebuild-catalog
 vision_calibration.py calculate-rough-x
+vision_calibration.py calculate-fine-tool-xyz --tool T0
+vision_calibration.py calculate-fine-tool-xyz --tool T1
 vision_calibration.py record-rough-x-activation ...
 ```
 

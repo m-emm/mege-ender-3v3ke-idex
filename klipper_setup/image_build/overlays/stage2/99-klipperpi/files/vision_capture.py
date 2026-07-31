@@ -52,8 +52,10 @@ RED_MARKER_CALIBRATION_REMOTE_METHOD = "idex_red_marker_x_sweep_calibrate"
 RED_MARKER_CALIBRATION_REMOTE_ACTION = "run_idex_red_marker_x_sweep_calibrate"
 ROUGH_X_VERIFY_REMOTE_METHOD = "idex_rough_tool_x_verify"
 ROUGH_X_VERIFY_REMOTE_ACTION = "run_idex_rough_tool_x_verify"
-FINE_NOZZLE_REMOTE_METHOD = "idex_nozzle_fine_xz_calibrate"
-FINE_NOZZLE_REMOTE_ACTION = "run_idex_nozzle_fine_xz_calibrate"
+FINE_NOZZLE_T0_REMOTE_METHOD = "idex_nozzle_fine_xz_calibrate_t0"
+FINE_NOZZLE_T0_REMOTE_ACTION = "run_idex_nozzle_fine_xz_calibrate_t0"
+FINE_NOZZLE_T1_REMOTE_METHOD = "idex_nozzle_fine_xz_calibrate_t1"
+FINE_NOZZLE_T1_REMOTE_ACTION = "run_idex_nozzle_fine_xz_calibrate_t1"
 CALIBRATION_BIN = os.environ.get(
     "VISION_CALIBRATION_BIN", "/usr/local/bin/vision_calibration.py"
 )
@@ -429,7 +431,8 @@ class VisionJobApi:
             "nozzle_cam_bed_tab_corner",
             "idex_tool_red_marker_x_sweep",
             "idex_rough_tool_x_verify",
-            "idex_nozzle_fine_xz_grid",
+            "idex_nozzle_fine_xz_grid_t0",
+            "idex_nozzle_fine_xz_grid_t1",
         ):
             raise CaptureError("unsupported acquisition job_type")
         if manifest.get("job_id") != sanitize_name(job_id):
@@ -891,16 +894,19 @@ class KlippyRemoteDaemon:
                         log(result.stdout.strip())
                     if result.returncode:
                         raise CaptureError(
-                            result.stderr.strip()
-                            or "rough-X verification job failed"
+                            result.stderr.strip() or "rough-X verification job failed"
                         )
-                elif action == FINE_NOZZLE_REMOTE_ACTION:
+                elif action in {
+                    FINE_NOZZLE_T0_REMOTE_ACTION,
+                    FINE_NOZZLE_T1_REMOTE_ACTION,
+                }:
+                    tool = "t0" if action == FINE_NOZZLE_T0_REMOTE_ACTION else "t1"
                     command = [
                         CALIBRATION_BIN,
                         "run",
-                        "idex_nozzle_fine_xz_grid",
+                        f"idex_nozzle_fine_xz_grid_{tool}",
                         "--name",
-                        sanitize_name(params.get("name", "fine_nozzle_xz")),
+                        sanitize_name(params.get("name", f"fine_nozzle_xz_{tool}")),
                     ]
                     fingerprint = str(params.get("active_config_fingerprint") or "")
                     if fingerprint:
@@ -918,7 +924,7 @@ class KlippyRemoteDaemon:
                     if result.returncode:
                         raise CaptureError(
                             result.stderr.strip()
-                            or "fine nozzle X/Z calibration job failed"
+                            or f"fine nozzle {tool.upper()} X/Z calibration job failed"
                         )
                 else:
                     raise CaptureError(f"unknown queued action {action}")
@@ -980,8 +986,13 @@ class KlippyRemoteDaemon:
             )
             self._register_method(
                 sock,
-                FINE_NOZZLE_REMOTE_METHOD,
-                FINE_NOZZLE_REMOTE_ACTION,
+                FINE_NOZZLE_T0_REMOTE_METHOD,
+                FINE_NOZZLE_T0_REMOTE_ACTION,
+            )
+            self._register_method(
+                sock,
+                FINE_NOZZLE_T1_REMOTE_METHOD,
+                FINE_NOZZLE_T1_REMOTE_ACTION,
             )
 
     def _handle_message(self, message: dict[str, Any]) -> None:
@@ -993,7 +1004,8 @@ class KlippyRemoteDaemon:
             valid.add(CORNER_CALIBRATION_REMOTE_ACTION)
             valid.add(RED_MARKER_CALIBRATION_REMOTE_ACTION)
             valid.add(ROUGH_X_VERIFY_REMOTE_ACTION)
-            valid.add(FINE_NOZZLE_REMOTE_ACTION)
+            valid.add(FINE_NOZZLE_T0_REMOTE_ACTION)
+            valid.add(FINE_NOZZLE_T1_REMOTE_ACTION)
         if action not in valid:
             return
         params = message.get("params") or {}

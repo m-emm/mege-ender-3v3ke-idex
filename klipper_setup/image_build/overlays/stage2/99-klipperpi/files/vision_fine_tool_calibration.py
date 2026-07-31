@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""Stage 5.1 fiducial-plane T0/T1 XYZ calculation and gate artifacts."""
+"""Stage 5.1 fiducial-plane single-tool XYZ calculation and gate artifacts."""
 
 from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 from pathlib import Path
 from typing import Any
 
 import cv2
 import numpy as np
+
+
+_logger = logging.getLogger(__name__)
 
 
 class FineToolCalibrationError(RuntimeError):
@@ -129,9 +133,7 @@ def _accepted_records(
     model: dict[str, Any],
     records: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    accepted_sequences = {
-        int(item) for item in model.get("accepted_sequences", [])
-    }
+    accepted_sequences = {int(item) for item in model.get("accepted_sequences", [])}
     accepted = [
         record
         for record in records
@@ -146,9 +148,7 @@ def _full_row_coverage(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows = []
     for z_mm in sorted({float(record["z_mm"]) for record in records}):
         selected = [
-            record
-            for record in records
-            if abs(float(record["z_mm"]) - z_mm) < 1e-9
+            record for record in records if abs(float(record["z_mm"]) - z_mm) < 1e-9
         ]
         x_values = sorted({float(record["x_mm"]) for record in selected})
         if len(x_values) < 2:
@@ -188,9 +188,7 @@ def _magnitude_crossing(
                 float(z_ref_mm + (-b + root) / (2.0 * a)),
             ]
     selected = (
-        min(roots, key=lambda item: abs(item - preferred_z_mm))
-        if roots
-        else None
+        min(roots, key=lambda item: abs(item - preferred_z_mm)) if roots else None
     )
     return selected, roots
 
@@ -254,11 +252,11 @@ def _scale_crossing(
             "magnitude_crossing_commanded_z_mm": magnitude_z,
             "magnitude_crossing_roots_mm": magnitude_roots,
             "crossing_vector_px_per_mm": crossing_vector,
-            "crossing_vector_residual_px_per_mm":
-                crossing_vector - fiducial_x_vector_px_per_mm,
+            "crossing_vector_residual_px_per_mm": crossing_vector
+            - fiducial_x_vector_px_per_mm,
             "fiducial_plane_printer_z_mm": fiducial_plane_z_mm,
-            "bed_referenced_z_at_commanded_zero_mm":
-                fiducial_plane_z_mm - commanded_z_at_fiducial,
+            "bed_referenced_z_at_commanded_zero_mm": fiducial_plane_z_mm
+            - commanded_z_at_fiducial,
         }
     )
 
@@ -285,9 +283,7 @@ def _affine_projective_initialization(
     world_points: np.ndarray, image_points: np.ndarray
 ) -> np.ndarray:
     normalized = _normalized_world(world_points)
-    design = np.column_stack(
-        (normalized, np.ones(len(normalized), dtype=np.float64))
-    )
+    design = np.column_stack((normalized, np.ones(len(normalized), dtype=np.float64)))
     coefficients = np.linalg.lstsq(design, image_points, rcond=None)[0]
     return np.asarray(
         [
@@ -364,25 +360,20 @@ def _joint_observations(
     corner_xyz_mm: np.ndarray,
     fiducial_plane_z_mm: float,
     registrations: list[dict[str, Any]],
-    tool_z_residuals_mm: dict[str, float],
+    tool: str,
+    tool_z_residual_mm: float,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str]]:
-    tool_xy_residuals = {
-        "T0": parameters[11:13],
-        "T1": parameters[13:15],
-    }
+    tool_xy_residual = parameters[11:13]
     world_points = []
     image_points = []
     weights = []
     labels = []
     absolute_patch_xy = (
-        patch_points_mm @ patch_to_printer_xy.T
-        + patch_origin_printer_xy
+        patch_points_mm @ patch_to_printer_xy.T + patch_origin_printer_xy
     )
     for observation in metric_observations:
         commanded_y = float(observation["commanded_y_mm"])
-        for absolute_xy, image_xy in zip(
-            absolute_patch_xy, observation["centers_px"]
-        ):
+        for absolute_xy, image_xy in zip(absolute_patch_xy, observation["centers_px"]):
             world_points.append(
                 [
                     float(absolute_xy[0]),
@@ -406,13 +397,15 @@ def _joint_observations(
         weights.append(2.0)
         labels.append("bed_tab_corner")
     for record in registrations:
-        tool = str(record["tool"])
-        xy_residual = tool_xy_residuals[tool]
+        if str(record["tool"]) != tool:
+            raise FineToolCalibrationError(
+                f"{tool} calculation received a {record['tool']} registration"
+            )
         world_points.append(
             [
-                float(record["x_mm"]) + float(xy_residual[0]),
-                float(xy_residual[1]),
-                float(record["z_mm"]) + float(tool_z_residuals_mm[tool]),
+                float(record["x_mm"]) + float(tool_xy_residual[0]),
+                float(tool_xy_residual[1]),
+                float(record["z_mm"]) + float(tool_z_residual_mm),
             ]
         )
         image_points.append(record["center_px"])
@@ -447,7 +440,8 @@ def _fit_joint_projective_xy(
     patch_origin_printer_xy_mm: list[float],
     corner_xyz_mm: list[float],
     fiducial_plane_z_mm: float,
-    tool_z_residuals_mm: dict[str, float],
+    tool: str,
+    tool_z_residual_mm: float,
 ) -> dict[str, Any]:
     if len(metric_observations) < 4:
         raise FineToolCalibrationError(
@@ -458,9 +452,7 @@ def _fit_joint_projective_xy(
             "joint XY solve needs at least three corner observations"
         )
     observation_args = {
-        "patch_to_printer_xy": np.asarray(
-            patch_to_printer_xy, dtype=np.float64
-        ),
+        "patch_to_printer_xy": np.asarray(patch_to_printer_xy, dtype=np.float64),
         "patch_origin_printer_xy": np.asarray(
             patch_origin_printer_xy_mm, dtype=np.float64
         ),
@@ -470,9 +462,10 @@ def _fit_joint_projective_xy(
         "corner_xyz_mm": np.asarray(corner_xyz_mm, dtype=np.float64),
         "fiducial_plane_z_mm": float(fiducial_plane_z_mm),
         "registrations": registrations,
-        "tool_z_residuals_mm": tool_z_residuals_mm,
+        "tool": tool,
+        "tool_z_residual_mm": tool_z_residual_mm,
     }
-    temporary = np.r_[np.zeros(11), np.zeros(4)]
+    temporary = np.r_[np.zeros(11), np.zeros(2)]
     world, image, _weights, _labels = _joint_observations(
         parameters=temporary, **observation_args
     )
@@ -500,17 +493,13 @@ def _fit_joint_projective_xy(
         jacobian = np.empty((weighted_residual.size, parameters.size))
         for index in range(parameters.size):
             epsilon = (
-                1e-6 * max(1.0, abs(float(parameters[index])))
-                if index < 11
-                else 1e-4
+                1e-6 * max(1.0, abs(float(parameters[index]))) if index < 11 else 1e-4
             )
             trial = parameters.copy()
             trial[index] += epsilon
             trial_residual, _trial_weights, _trial_labels = evaluate(trial)
             jacobian[:, index] = (
-                (trial_residual - residuals)
-                * point_weights[:, None]
-                / epsilon
+                (trial_residual - residuals) * point_weights[:, None] / epsilon
             ).ravel()
         normal = jacobian.T @ jacobian
         gradient = jacobian.T @ weighted_residual
@@ -519,9 +508,7 @@ def _fit_joint_projective_xy(
         accepted_step = False
         for _attempt in range(12):
             try:
-                step = np.linalg.solve(
-                    normal + damping * np.diag(diagonal), -gradient
-                )
+                step = np.linalg.solve(normal + damping * np.diag(diagonal), -gradient)
             except np.linalg.LinAlgError:
                 damping *= 10.0
                 continue
@@ -530,9 +517,7 @@ def _fit_joint_projective_xy(
                 trial_residuals, trial_weights, _trial_labels = evaluate(
                     trial_parameters
                 )
-                trial_objective = _huber_objective(
-                    trial_residuals, trial_weights
-                )
+                trial_objective = _huber_objective(trial_residuals, trial_weights)
             except FineToolCalibrationError:
                 trial_objective = math.inf
             if trial_objective < objective:
@@ -550,19 +535,15 @@ def _fit_joint_projective_xy(
     source_rms = {}
     for label in sorted(set(labels)):
         selected = residuals[np.asarray([item == label for item in labels])]
-        source_rms[label] = float(
-            np.sqrt(np.mean(np.sum(selected**2, axis=1)))
-        )
+        source_rms[label] = float(np.sqrt(np.mean(np.sum(selected**2, axis=1))))
     return _finite(
         {
             "converged": converged,
             "iteration_count": iteration_count,
             "camera_matrix_normalized": _decode_projective(parameters[:11]),
             "patch_origin_printer_xy_mm": patch_origin_printer_xy_mm,
-            "tool_xy_residuals_mm": {
-                "T0": parameters[11:13],
-                "T1": parameters[13:15],
-            },
+            "tool": tool,
+            "tool_xy_residual_mm": parameters[11:13],
             "source_rms_px": source_rms,
             "joint_rms_px": float(
                 np.sqrt(
@@ -570,9 +551,7 @@ def _fit_joint_projective_xy(
                     / (2.0 * np.sum(base_weights))
                 )
             ),
-            "maximum_residual_px": float(
-                np.max(np.linalg.norm(residuals, axis=1))
-            ),
+            "maximum_residual_px": float(np.max(np.linalg.norm(residuals, axis=1))),
         }
     )
 
@@ -591,9 +570,7 @@ def _stability_checks(
     for record in records:
         if float(record["x_mm"]) not in interior_x:
             continue
-        retained = [
-            item for item in records if int(item["seq"]) != int(record["seq"])
-        ]
+        retained = [item for item in records if int(item["seq"]) != int(record["seq"])]
         trial_model = _fit_model(
             retained,
             x_ref_mm=float(model["x_ref_mm"]),
@@ -729,23 +706,23 @@ def _solve_tool(
 
 def generated_calibration(
     old_datums: dict[str, dict[str, float]],
-    residuals: dict[str, list[float]],
+    *,
+    tool: str,
+    residual_xyz_mm: list[float],
 ) -> dict[str, Any]:
     old = {
-        tool: {
-            axis: float(old_datums[tool][f"{axis}_endstop"])
+        tool_name: {
+            axis: float(old_datums[tool_name][f"{axis}_endstop"])
             for axis in ("x", "y", "z")
         }
-        for tool in ("t0", "t1")
+        for tool_name in ("t0", "t1")
     }
-    new = {
-        tool: {
-            axis: old[tool][axis] + float(residuals[tool][index])
-            for index, axis in enumerate(("x", "y", "z"))
-        }
-        for tool in ("t0", "t1")
-    }
+    new = {tool_name: dict(values) for tool_name, values in old.items()}
+    target = tool.lower()
+    for index, axis in enumerate(("x", "y", "z")):
+        new[target][axis] += float(residual_xyz_mm[index])
     return {
+        "tool": tool,
         "persisted_calib": {"old": old, "new": new},
         "generated_klipper": {
             "old": {
@@ -770,6 +747,7 @@ def generated_calibration(
 
 def calculate_candidate(
     *,
+    tool: str,
     projection: dict[str, Any],
     registrations: list[dict[str, Any]],
     metric_observations: list[dict[str, Any]],
@@ -779,6 +757,8 @@ def calculate_candidate(
     partial_bed: dict[str, Any],
     old_datums: dict[str, dict[str, float]],
 ) -> dict[str, Any]:
+    if tool not in {"T0", "T1"}:
+        raise FineToolCalibrationError(f"unsupported tool {tool!r}")
     fiducial_xy = np.asarray(
         projection["fiducial_reference_printer_xy_mm"],
         dtype=np.float64,
@@ -789,118 +769,148 @@ def calculate_candidate(
     )
     fiducial_z = float(projection["fiducial_plane_printer_z_mm"])
     capture_y = float(projection["fine_capture_y_mm"])
-    tools = {}
     reasons = []
     warnings = []
-    for tool in ("T0", "T1"):
-        model = projection["tool_models"][tool]
-        if model.get("model_family") != MODEL_FAMILY:
-            raise FineToolCalibrationError(
-                f"{tool} projection model is not {MODEL_FAMILY}"
-            )
-        tool_records = [
-            record for record in registrations if record["tool"] == tool
-        ]
-        solved = _solve_tool(
-            model=model,
-            records=tool_records,
-            fiducial_reference_xy_mm=fiducial_xy,
-            fiducial_x_vector_px_per_mm=fiducial_x_vector,
-            fiducial_plane_z_mm=fiducial_z,
-            capture_y_mm=capture_y,
+    model = projection["tool_models"][tool]
+    if model.get("model_family") != MODEL_FAMILY:
+        raise FineToolCalibrationError(f"{tool} projection model is not {MODEL_FAMILY}")
+    if any(str(record.get("tool")) != tool for record in registrations):
+        raise FineToolCalibrationError(
+            f"{tool} calculation received registrations from another tool"
         )
-        solved["projection_model"] = model
-        tools[tool] = solved
-        if float(model["position_fit_rms_px"]) > 1.5:
+    accepted_registrations = _accepted_records(model, registrations)
+    accepted_sequences = {int(record["seq"]) for record in accepted_registrations}
+    discarded_sequences = [
+        int(record["seq"])
+        for record in registrations
+        if int(record["seq"]) not in accepted_sequences
+    ]
+    _logger.info(
+        "stage5.1 registration input tool=%s provided=%d accepted_green=%d "
+        "discarded_rejected=%d discarded_sequences=%s",
+        tool,
+        len(registrations),
+        len(accepted_registrations),
+        len(discarded_sequences),
+        ",".join(str(item) for item in discarded_sequences) or "none",
+    )
+    solved = _solve_tool(
+        model=model,
+        records=accepted_registrations,
+        fiducial_reference_xy_mm=fiducial_xy,
+        fiducial_x_vector_px_per_mm=fiducial_x_vector,
+        fiducial_plane_z_mm=fiducial_z,
+        capture_y_mm=capture_y,
+    )
+    solved["projection_model"] = model
+    tools = {tool: solved}
+    if float(model["position_fit_rms_px"]) > 1.5:
+        reasons.append(f"{tool} position fit RMS {model['position_fit_rms_px']:.3f} px")
+    rows = solved["full_row_coverage"]
+    if len(rows) < 4:
+        reasons.append(f"{tool} has only {len(rows)} usable full X rows")
+    for row in rows:
+        if int(row["accepted_count"]) < 6 or float(row["x_span_mm"]) < 12.5:
             reasons.append(
-                f"{tool} position fit RMS {model['position_fit_rms_px']:.3f} px"
+                f"{tool} Z={row['z_mm']:.3f} row has "
+                f"{row['accepted_count']} accepted X positions over "
+                f"{row['x_span_mm']:.3f} mm; at least 6 positions over "
+                "12.500 mm are required"
             )
-        rows = solved["full_row_coverage"]
-        if len(rows) < 3:
-            reasons.append(f"{tool} has only {len(rows)} usable full X rows")
-        for row in rows:
-            if int(row["accepted_count"]) < 5 or float(row["x_span_mm"]) < 12.0:
-                reasons.append(
-                    f"{tool} Z={row['z_mm']:.3f} row has "
-                    f"{row['accepted_count']} X positions over "
-                    f"{row['x_span_mm']:.3f} mm"
-                )
-        crossing = solved["scale_crossing"]
-        z_crossing = float(crossing["commanded_z_at_fiducial_plane_mm"])
-        z_min, z_max = solved["measured_z_range_mm"]
-        row_z = sorted(float(row["z_mm"]) for row in rows)
-        row_interval = max(
-            (
-                second - first
-                for first, second in zip(row_z, row_z[1:])
-            ),
-            default=4.0,
+    crossing = solved["scale_crossing"]
+    z_crossing = float(crossing["commanded_z_at_fiducial_plane_mm"])
+    z_min, z_max = solved["measured_z_range_mm"]
+    row_z = sorted(float(row["z_mm"]) for row in rows)
+    row_interval = max(
+        (second - first for first, second in zip(row_z, row_z[1:])),
+        default=4.0,
+    )
+    if not z_min - row_interval <= z_crossing <= z_max + row_interval:
+        reasons.append(
+            f"{tool} fiducial-plane crossing Z={z_crossing:+.3f} mm is "
+            f"outside the measured Z={z_min:.3f}..{z_max:.3f} mm range by "
+            "more than one sampled row interval"
         )
-        if not z_min - row_interval <= z_crossing <= z_max + row_interval:
-            reasons.append(
-                f"{tool} fiducial-plane crossing Z={z_crossing:+.3f} mm "
-                "is too far outside the measured range"
-            )
-        projected_slope = float(
-            crossing["projected_scale_z_slope_px_per_mm_per_mm"]
+    projected_slope = float(crossing["projected_scale_z_slope_px_per_mm_per_mm"])
+    if abs(projected_slope) < 0.01:
+        reasons.append(f"{tool} transported scale is not Z-identifiable")
+    magnitude_z = crossing["magnitude_crossing_commanded_z_mm"]
+    if magnitude_z is None or abs(float(magnitude_z) - z_crossing) > 0.25:
+        reasons.append(
+            f"{tool} scalar scale checks disagree: image-X crossing "
+            f"{z_crossing:+.3f} mm versus vector-magnitude crossing "
+            f"{'unresolved' if magnitude_z is None else f'{float(magnitude_z):+.3f} mm'}"
         )
-        if abs(projected_slope) < 0.01:
-            reasons.append(f"{tool} transported scale is not Z-identifiable")
-        magnitude_z = crossing["magnitude_crossing_commanded_z_mm"]
-        if magnitude_z is None or abs(float(magnitude_z) - z_crossing) > 0.25:
-            reasons.append(
-                f"{tool} projected and magnitude scale crossings disagree"
-            )
-        closest_z = float(crossing["closest_full_vector_commanded_z_mm"])
-        full_vector_difference = abs(closest_z - z_crossing)
-        if full_vector_difference > 0.75:
-            reasons.append(
-                f"{tool} projected and full-vector crossings disagree"
-            )
-        elif full_vector_difference > 0.25:
-            warnings.append(
-                f"{tool} projected and full-vector crossings differ by "
-                f"{full_vector_difference:.3f} mm"
-            )
-        observation_stability = float(
-            solved["stability"]["maximum_observation_change_mm"]
+    closest_z = float(crossing["closest_full_vector_commanded_z_mm"])
+    full_vector_difference = abs(closest_z - z_crossing)
+    if full_vector_difference > 0.75:
+        reasons.append(
+            f"{tool} 2D vector check disagrees: image-X crossing "
+            f"{z_crossing:+.3f} mm versus closest full-vector match "
+            f"{closest_z:+.3f} mm ({full_vector_difference:.3f} mm apart)"
         )
-        row_stability = float(
-            solved["stability"]["maximum_full_row_change_mm"]
+    elif full_vector_difference > 0.25:
+        warnings.append(
+            f"{tool} image-X crossing and closest full-vector match are "
+            f"{full_vector_difference:.3f} mm apart"
         )
-        if observation_stability > 1.50:
-            reasons.append(
-                f"{tool} leave-one-observation crossing changes by "
-                f"{observation_stability:.3f} mm"
-            )
-        elif observation_stability > 0.50:
-            warnings.append(
-                f"{tool} leave-one-observation crossing changes by "
-                f"{observation_stability:.3f} mm"
-            )
-        if row_stability > 2.0:
-            reasons.append(
-                f"{tool} leave-one-full-row crossing changes by "
-                f"{row_stability:.3f} mm"
-            )
-        elif row_stability > 0.50:
-            warnings.append(
-                f"{tool} leave-one-full-row crossing changes by "
-                f"{row_stability:.3f} mm"
-            )
-        if float(solved["lateral_extrapolation_distance_mm"]) > 15.0:
-            warnings.append(
-                f"{tool} scale field is extrapolated "
-                f"{solved['lateral_extrapolation_distance_mm']:.3f} mm "
-                "to the fiducial reference X"
-            )
+    observation_trials = [
+        item
+        for item in solved["stability"]["trials"]
+        if item["kind"] == "leave_one_x_observation"
+    ]
+    worst_observation = max(
+        observation_trials,
+        key=lambda item: abs(float(item["change_mm"])),
+        default=None,
+    )
+    observation_stability = float(solved["stability"]["maximum_observation_change_mm"])
+    observation_message = (
+        f"{tool} single-sample sensitivity check: omitting the sample at "
+        f"X={worst_observation['left_out_x_mm']:.3f}, "
+        f"Z={worst_observation['left_out_z_mm']:.3f} mm changes the computed "
+        f"fiducial-plane crossing by {observation_stability:.3f} mm"
+        if worst_observation is not None
+        else f"{tool} single-sample sensitivity check could not be run"
+    )
+    if observation_stability > 1.50:
+        reasons.append(observation_message)
+    elif observation_stability > 0.50:
+        warnings.append(observation_message)
+    row_trials = [
+        item
+        for item in solved["stability"]["trials"]
+        if item["kind"] == "leave_one_full_z_row"
+    ]
+    worst_row = max(
+        row_trials,
+        key=lambda item: abs(float(item["change_mm"])),
+        default=None,
+    )
+    row_stability = float(solved["stability"]["maximum_full_row_change_mm"])
+    row_message = (
+        f"{tool} full-row sensitivity check: refitting after omitting all "
+        f"accepted samples at Z={worst_row['left_out_z_mm']:.3f} mm changes "
+        f"the computed fiducial-plane crossing from {z_crossing:+.3f} to "
+        f"{float(worst_row['commanded_z_at_fiducial_plane_mm']):+.3f} mm "
+        f"({row_stability:.3f} mm)"
+        if worst_row is not None
+        else f"{tool} full-row sensitivity check could not be run"
+    )
+    if row_stability > 2.0:
+        reasons.append(row_message)
+    elif row_stability > 0.50:
+        warnings.append(row_message)
+    if float(solved["lateral_extrapolation_distance_mm"]) > 15.0:
+        warnings.append(
+            f"{tool} scale field is extrapolated "
+            f"{solved['lateral_extrapolation_distance_mm']:.3f} mm "
+            "to the fiducial reference X"
+        )
 
-    z_residuals = {
-        tool: float(tools[tool]["coordinate_residual_xyz_mm"][2])
-        for tool in ("T0", "T1")
-    }
+    z_residual = float(solved["coordinate_residual_xyz_mm"][2])
     joint_xy = _fit_joint_projective_xy(
-        registrations=registrations,
+        registrations=accepted_registrations,
         metric_observations=metric_observations,
         corner_observations=corner_observations,
         patch_points_mm=physical_reference["centers_patch_xy_mm"],
@@ -908,86 +918,57 @@ def calculate_candidate(
         patch_origin_printer_xy_mm=mapping["patch_origin_printer_xy_mm"],
         corner_xyz_mm=partial_bed["corner_printer_xyz_mm"],
         fiducial_plane_z_mm=fiducial_z,
-        tool_z_residuals_mm=z_residuals,
+        tool=tool,
+        tool_z_residual_mm=z_residual,
     )
-    for tool in ("T0", "T1"):
-        projective_xy = np.asarray(
-            joint_xy["tool_xy_residuals_mm"][tool], dtype=np.float64
-        )
-        corner_y = float(partial_bed["corner_printer_xyz_mm"][1])
-        aligned_corner_command_y = float(projective_xy[1] - corner_y)
-        xy_residual = np.asarray(
-            [
-                projective_xy[0],
-                aligned_corner_command_y - corner_y,
-            ],
-            dtype=np.float64,
-        )
-        residual = np.asarray(
-            [xy_residual[0], xy_residual[1], z_residuals[tool]],
-            dtype=np.float64,
-        )
-        tools[tool]["coordinate_residual_xyz_mm"] = residual.tolist()
-        tools[tool]["reference_commanded_xyz_mm"] = [
-            float(tools[tool]["projection_model"]["x_ref_mm"]),
-            corner_y,
-            float(
-                tools[tool]["scale_crossing"][
-                    "commanded_z_at_fiducial_plane_mm"
-                ]
-            ),
-        ]
-        tools[tool]["measured_nozzle_xyz_mm"] = [
-            float(tools[tool]["projection_model"]["x_ref_mm"]) + xy_residual[0],
-            aligned_corner_command_y,
-            fiducial_z,
-        ]
-        tools[tool]["projective_camera_y_mm"] = float(projective_xy[1])
-        tools[tool]["bed_tab_corner_aligned_command_y_mm"] = (
-            aligned_corner_command_y
-        )
-        for axis, value, limit in zip("XYZ", residual, (25.0, 5.0, 2.0)):
-            if abs(float(value)) > limit:
-                reasons.append(
-                    f"{tool} {axis} correction {float(value):+.3f} mm "
-                    f"exceeds {limit:.3f} mm"
-                )
+    projective_xy = np.asarray(joint_xy["tool_xy_residual_mm"], dtype=np.float64)
+    corner_y = float(partial_bed["corner_printer_xyz_mm"][1])
+    aligned_corner_command_y = float(projective_xy[1] - corner_y)
+    xy_residual = np.asarray(
+        [
+            projective_xy[0],
+            aligned_corner_command_y - corner_y,
+        ],
+        dtype=np.float64,
+    )
+    residual = np.asarray(
+        [xy_residual[0], xy_residual[1], z_residual],
+        dtype=np.float64,
+    )
+    solved["coordinate_residual_xyz_mm"] = residual.tolist()
+    solved["reference_commanded_xyz_mm"] = [
+        float(model["x_ref_mm"]),
+        corner_y,
+        z_crossing,
+    ]
+    solved["measured_nozzle_xyz_mm"] = [
+        float(model["x_ref_mm"]) + xy_residual[0],
+        aligned_corner_command_y,
+        fiducial_z,
+    ]
+    solved["projective_camera_y_mm"] = float(projective_xy[1])
+    solved["bed_tab_corner_aligned_command_y_mm"] = aligned_corner_command_y
+    for axis, value, limit in zip("XYZ", residual, (25.0, 5.0, 2.0)):
+        if abs(float(value)) > limit:
+            reasons.append(
+                f"{tool} {axis} correction {float(value):+.3f} mm "
+                f"exceeds {limit:.3f} mm"
+            )
     if not joint_xy["converged"]:
         warnings.append("joint projective XY fit stopped before step convergence")
     if float(joint_xy["joint_rms_px"]) > 1.5:
-        reasons.append(
-            f"joint projective XY RMS is {joint_xy['joint_rms_px']:.3f} px"
-        )
+        reasons.append(f"joint projective XY RMS is {joint_xy['joint_rms_px']:.3f} px")
     elif float(joint_xy["joint_rms_px"]) > 0.9:
-        warnings.append(
-            f"joint projective XY RMS is {joint_xy['joint_rms_px']:.3f} px"
-        )
+        warnings.append(f"joint projective XY RMS is {joint_xy['joint_rms_px']:.3f} px")
     for source, rms in joint_xy["source_rms_px"].items():
         if float(rms) > 3.0:
             reasons.append(f"{source} projective RMS is {float(rms):.3f} px")
 
-    transported_slopes = [
-        np.asarray(
-            tools[tool]["scale_crossing"][
-                "transported_vector_z_slope_px_per_mm_per_mm"
-            ],
-            dtype=np.float64,
-        )
-        for tool in ("T0", "T1")
-    ]
-    slope_norms = [float(np.linalg.norm(item)) for item in transported_slopes]
-    if min(slope_norms) <= 1e-8 or float(
-        np.dot(transported_slopes[0], transported_slopes[1])
-    ) <= 0.0:
-        reasons.append("T0/T1 transported scale slopes disagree in sign")
-    elif abs(slope_norms[0] - slope_norms[1]) / max(slope_norms) > 0.30:
-        warnings.append("T0/T1 transported scale slope magnitudes differ by over 30%")
-
-    residuals = {
-        "t0": tools["T0"]["coordinate_residual_xyz_mm"],
-        "t1": tools["T1"]["coordinate_residual_xyz_mm"],
-    }
-    calibration = generated_calibration(old_datums, residuals)
+    calibration = generated_calibration(
+        old_datums,
+        tool=tool,
+        residual_xyz_mm=solved["coordinate_residual_xyz_mm"],
+    )
     generated_new = calibration["generated_klipper"]["new"]
     if not -100.0 <= generated_new["t0_x_position_endstop"] <= -40.0:
         reasons.append("generated T0 X endstop is outside the safe range")
@@ -1000,15 +981,46 @@ def calculate_candidate(
     for axis in ("t1_y_gcode_offset", "t1_z_gcode_offset"):
         if abs(float(generated_new[axis])) > 5.0:
             reasons.append(f"generated {axis} is outside +/-5 mm")
+    unique_reasons = sorted(set(reasons))
+    unique_warnings = sorted(set(warnings))
+    _logger.info(
+        "stage5.1 result tool=%s accepted=%s accepted_green=%d "
+        "discarded_rejected=%d rejection_count=%d warning_count=%d",
+        tool,
+        not unique_reasons,
+        len(accepted_registrations),
+        len(discarded_sequences),
+        len(unique_reasons),
+        len(unique_warnings),
+    )
+    for reason in unique_reasons:
+        _logger.info(
+            "analysis rejected stage=stage5.1_acceptance_gate tool=%s reason=%s",
+            tool,
+            reason,
+        )
+    for warning in unique_warnings:
+        _logger.info(
+            "analysis warning stage=stage5.1_acceptance_gate tool=%s reason=%s",
+            tool,
+            warning,
+        )
     return _finite(
         {
-            "accepted": not reasons,
-            "reasons": sorted(set(reasons)),
-            "warnings": sorted(set(warnings)),
+            "accepted": not unique_reasons,
+            "tool": tool,
+            "reasons": unique_reasons,
+            "warnings": unique_warnings,
+            "registration_usage": {
+                "provided_count": len(registrations),
+                "accepted_green_count": len(accepted_registrations),
+                "discarded_rejected_count": len(discarded_sequences),
+                "accepted_sequences": sorted(accepted_sequences),
+                "discarded_sequences": discarded_sequences,
+            },
             "reference": {
                 "fiducial_reference_printer_xy_mm": fiducial_xy,
-                "fiducial_x_vector_at_fine_capture_px_per_mm":
-                    fiducial_x_vector,
+                "fiducial_x_vector_at_fine_capture_px_per_mm": fiducial_x_vector,
                 "fiducial_plane_printer_z_mm": fiducial_z,
                 "fine_capture_y_mm": capture_y,
             },
@@ -1045,7 +1057,7 @@ def _write_scale_transport(result: dict[str, Any], path: Path) -> None:
             result["reference"]["fiducial_x_vector_at_fine_capture_px_per_mm"]
         )
     )
-    for column, tool in enumerate(("T0", "T1")):
+    for column, tool in enumerate((result["tool"],)):
         left = 70 + column * 740
         rectangle = (left, 110, left + 650, 790)
         item = result["tools"][tool]
@@ -1059,8 +1071,7 @@ def _write_scale_transport(result: dict[str, Any], path: Path) -> None:
         z_cross = float(crossing["commanded_z_at_fiducial_plane_mm"])
         z_values = np.linspace(-3.0, 13.0, 321)
         scales = [
-            float(np.dot(_x_vector(model, x_fid, z), direction))
-            for z in z_values
+            float(np.dot(_x_vector(model, x_fid, z), direction)) for z in z_values
         ]
         y_min = min(min(scales), fiducial_scale) - 0.25
         y_max = max(max(scales), fiducial_scale) + 0.25
@@ -1159,7 +1170,7 @@ def _write_scale_vs_x(result: dict[str, Any], path: Path) -> None:
         5.0: (80, 240, 120),
         9.0: (240, 120, 220),
     }
-    for column, tool in enumerate(("T0", "T1")):
+    for column, tool in enumerate((result["tool"],)):
         left = 70 + column * 740
         rectangle = (left, 110, left + 650, 790)
         item = result["tools"][tool]
@@ -1187,8 +1198,7 @@ def _write_scale_vs_x(result: dict[str, Any], path: Path) -> None:
         )
         for z in rows:
             scales = [
-                float(np.dot(_x_vector(model, x, z), direction))
-                for x in x_values
+                float(np.dot(_x_vector(model, x, z), direction)) for x in x_values
             ]
             points = [
                 _map_plot_point(
@@ -1272,10 +1282,11 @@ def write_artifacts(result: dict[str, Any], artifact_dir: Path) -> dict[str, Any
         cv2.LINE_AA,
     )
     colors = {"T0": (80, 220, 100), "T1": (240, 120, 220)}
+
     def formatted(value: Any) -> str:
         return "unresolved" if value is None else f"{float(value):+.4f}"
 
-    for column, tool in enumerate(("T0", "T1")):
+    for column, tool in enumerate((result["tool"],)):
         x0 = 45 + column * 675
         item = result["tools"][tool]
         crossing = item["scale_crossing"]
@@ -1303,8 +1314,9 @@ def write_artifacts(result: dict[str, Any], artifact_dir: Path) -> dict[str, Any
                 f"{crossing['closest_full_vector_commanded_z_mm']:+.4f}"
             ),
             (
-                "max leave-out change: "
-                f"{item['stability']['maximum_change_mm']:.4f} mm"
+                "worst single-sample / full-row refit change: "
+                f"{item['stability']['maximum_observation_change_mm']:.4f} / "
+                f"{item['stability']['maximum_full_row_change_mm']:.4f} mm"
             ),
         ]
         cv2.putText(

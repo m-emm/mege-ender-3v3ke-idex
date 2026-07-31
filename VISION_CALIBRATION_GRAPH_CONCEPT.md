@@ -579,12 +579,13 @@ The fine X/Z job requires both the active rough-X snapshot and its accepted
 verification fact. This prevents a fine sweep from being generated against
 coordinates that were measured but never activated.
 
-### 5. Fine T0/T1 nozzle X/Z grid
+### 5. Fine per-tool nozzle X/Z grids
 
-Job type:
+Job types:
 
 ```text
-idex_nozzle_fine_xz_grid
+idex_nozzle_fine_xz_grid_t0
+idex_nozzle_fine_xz_grid_t1
 ```
 
 Dependencies:
@@ -599,25 +600,22 @@ The path is calculated from the current corner prior rather than hardcoded in
 printer coordinates. With the current `bed_tab_x=173 mm`, the default X row is:
 
 ```text
-bed_tab_x + [10, 13, 16, 19, 22, 25] mm
-          = [183, 186, 189, 192, 195, 198] mm
+bed_tab_x + [10, 12.5, 15, 17.5, 20, 22.5, 25] mm
+          = [183, 185.5, 188, 190.5, 193, 195.5, 198] mm
 ```
 
-The initial `1` through `5 mm` Z span proved too short for a reliable
-perspective fit. The fast default doubles the measured span while preserving
-the same image count:
+The initial `1` through `5 mm` Z span and the later three-full-row sparse
+survey both proved too weak for a reliable row-removal sensitivity check.
+Each tool now uses four complete rows across the same 8 mm span:
 
 ```text
-Z = [1, 3, 5, 7, 9] mm
+Z = [1, 3.6666666667, 6.3333333333, 9] mm
 ```
 
 This gives an 8 mm measured span and still keeps the conservative minimum at
-Z=`1 mm`. A full rectangular acquisition would contain 60 frames. The fast
-default remains a 40-frame sparse tensor grid:
-
-- full six-position X rows at Z=`1`, `5`, and `9 mm`: 36 frames for two tools
-- the center X position at Z=`3` and `7 mm`: 4 additional frames
-- snake the X direction between rows
+Z=`1 mm`. Each per-tool job contains 28 frames, and X direction snakes between
+rows. Splitting acquisition prevents one tool's localization failure from
+hiding inside a combined accepted analysis.
 - raise to Z=`9 mm` before every tool change
 - never command below Z=`1 mm`
 
@@ -805,7 +803,8 @@ height above that plane to bed-referenced Z by subtracting `0.6 mm`.
 
 Produced coordinate-system fact:
 
-- `camera.nozzle_cam.nozzle_tip.projection_model`
+- `camera.nozzle_cam.nozzle_tip.t0_projection_model`
+- `camera.nozzle_cam.nozzle_tip.t1_projection_model`
 
 The projection fact stores the fitted X vector at the reference Z and its
 X/Z-dependent lateral scale field. It also stores the exact X/Z reference,
@@ -893,9 +892,12 @@ from untracked report values:
    `camera.nozzle_cam.bed_fiducial.printer_xy_mapping` after resolving +X.
    This fact contains the signed patch/printer basis and the derived printer
    coordinates of all four fiducials and their reference center.
-4. `camera.nozzle_cam.nozzle_tip.projection_model` must replace the old
-   X-independent `Jx(z)` contract with the per-tool `Jx_t(x,z)` scale field,
-   accepted direct tip positions, reference X/Z, and model version.
+4. The separate
+   `camera.nozzle_cam.nozzle_tip.t0_projection_model` and
+   `camera.nozzle_cam.nozzle_tip.t1_projection_model` facts replace the old
+   combined, X-independent `Jx(z)` contract with one per-tool `Jx_t(x,z)`
+   scale field, accepted direct tip positions, reference X/Z, and model
+   version.
 5. The Stage 5.1 calculation must publish one absolute Z anchor per tool:
 
    ```text
@@ -1079,21 +1081,22 @@ No candidate is produced unless:
 
 #### Candidate, application, and superseding rough X
 
-The calculation produces:
+The two independent calculations collectively produce:
 
 - `tool.t0.nozzle_z_fiducial_reference`
 - `tool.t1.nozzle_z_fiducial_reference`
 - `tool.t0.nozzle_to_bed_tab_xyz_mm`
 - `tool.t1.nozzle_to_bed_tab_xyz_mm`
-- `calibration.fine_tool_xyz.candidate`
+- `calibration.fine_tool_xyz.t0_candidate`
+- `calibration.fine_tool_xyz.t1_candidate`
 
-The candidate contains a complete copy of the current calibration with only
-the six absolute tool-coordinate datums
-`tools.t0.{x,y,z}_endstop` and `tools.t1.{x,y,z}_endstop` changed. The T1 Y/Z
-keys are virtual absolute datums as defined above, not physical endstop
-settings. The candidate records:
+Each per-tool candidate contains a complete copy of the current calibration
+with only the selected tool's three absolute coordinate datums changed. The T1
+Y/Z keys are virtual absolute datums as defined above, not physical endstop
+settings. A candidate records:
 
-- exact old/new values for all six persisted datums
+- exact old/new values for all six persisted datums, with the non-target tool
+  unchanged
 - the generated old/new T1 Y and Z G-code offsets
 - the four generated Klipper endstop/min/max changes
 - source fact IDs, source `calib.yaml` hash, and active printer fingerprint
@@ -1109,8 +1112,9 @@ Application:
 6. restarts Klipper and requires `ready`
 7. homes safely, while making no low-Z verification move
 
-Successful application publishes
-`calibration.fine_tool_xyz.active_snapshot`. It supersedes
+Successful application publishes the selected tool's
+`calibration.fine_tool_xyz.t0_active_snapshot` or
+`calibration.fine_tool_xyz.t1_active_snapshot`. It supersedes
 `calibration.rough_tool_x.active_snapshot` as the authoritative tool-coordinate
 snapshot. The old snapshot and red-marker measurements remain historical
 provenance but cannot satisfy downstream current-calibration requirements.
@@ -1391,7 +1395,7 @@ Job types should be registered declaratively, for example in
 
 ```yaml
 schema_version: 1
-job_type: idex_nozzle_fine_xz_grid
+job_type: idex_nozzle_fine_xz_grid_t0
 definition_version: 7
 acquisition_generator: vision_calibration:build_fine_xz_job
 analyzer: vision_calibration:analyze_fine_xz_job
@@ -1406,14 +1410,12 @@ requires:
     current: true
   - fact_type: tool.t0.red_marker_to_bed_tab_x_mm
     current: true
-  - fact_type: tool.t1.red_marker_to_bed_tab_x_mm
-    current: true
   - fact_type: calibration.rough_tool_x.active_snapshot
     current: true
   - fact_type: calibration.rough_tool_x.verified
     current: true
 produces:
-  - camera.nozzle_cam.nozzle_tip.projection_model
+  - camera.nozzle_cam.nozzle_tip.t0_projection_model
 safety:
   required_homed_axes: xyz
   require_idle: true
@@ -1433,7 +1435,7 @@ Extend the existing immutable `manifest.json` with fact bindings:
   "schema": "vision-calibration-acquisition-manifest",
   "schema_version": 1,
   "job_id": "calculate_fine_tool_xyz_calibration_20260730T190000Z",
-  "job_type": "idex_nozzle_fine_xz_grid",
+  "job_type": "idex_nozzle_fine_xz_grid_t0",
   "definition_version": 7,
   "manifest_hash": "sha256:...",
   "gcode_hash": "sha256:...",
@@ -1505,7 +1507,7 @@ Facts from one accepted analysis are published atomically as a fact set:
   "schema": "vision-calibration-fact-set",
   "schema_version": 1,
   "fact_set_hash": "sha256:...",
-  "job_id": "idex_nozzle_fine_xz_grid_20260729T180000Z",
+  "job_id": "idex_nozzle_fine_xz_grid_t0_20260729T180000Z",
   "analysis_run_id": "sha256:...",
   "accepted": true,
   "publication_eligible": true,
@@ -1561,7 +1563,8 @@ rebuildable index:
     "camera.nozzle_cam.bed_fiducial.local_metric_model": "sha256:...",
     "bed.tab_corner.printer_xyz": "sha256:...",
     "camera.nozzle_cam.bed_fiducial.printer_xy_mapping": "sha256:...",
-    "camera.nozzle_cam.nozzle_tip.projection_model": "sha256:...",
+    "camera.nozzle_cam.nozzle_tip.t0_projection_model": "sha256:...",
+    "camera.nozzle_cam.nozzle_tip.t1_projection_model": "sha256:...",
     "tool.t0.nozzle_z_fiducial_reference": "sha256:...",
     "tool.t1.nozzle_z_fiducial_reference": "sha256:...",
     "tool.t0.nozzle_to_bed_tab_xyz_mm": "sha256:...",
@@ -1761,7 +1764,8 @@ No page should silently apply calibration because analysis completed.
 
 - generate the local X/Z grid from the accepted bed corner and rough-X
   snapshot
-- use the 40-frame sparse grid over Z=`[1, 3, 5, 7, 9] mm`
+- run independent 28-frame T0 and T1 grids with seven X columns and four
+  complete Z rows
 - locate the outer ring only coarsely, then build pairwise registrations from
   the very small observed nozzle-tip ROI
 - reject registration tracks that drift from the tip onto the ring, which is
@@ -1780,10 +1784,10 @@ No page should silently apply calibration because analysis completed.
   convert it to a bed-referenced Z residual with the explicit sign equations
 - calculate image-X, signed-vector-projection, and vector-magnitude crossings
   as consistency checks
-- solve absolute nozzle X/Y using the resulting per-tool Z anchors, bed
-  coordinate facts, and cross-tool registration loops
-- produce absolute T0 and T1 nozzle facts and a six-datum `calib.yaml`
-  candidate
+- solve absolute nozzle X/Y independently for the selected tool using its Z
+  anchor and the bed coordinate facts
+- produce one tool's absolute nozzle facts and a complete `calib.yaml`
+  candidate that changes only that tool's three persisted datums
 - apply the two X endstops and shared T0 Y/Z endstops, derive T1 Y/Z G-code
   offsets from the two tools' absolute datums, and supersede the rough-X active
   snapshot

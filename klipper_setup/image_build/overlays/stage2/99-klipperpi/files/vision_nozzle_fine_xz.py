@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Fine T0/T1 nozzle-tip X/Z analysis using tight relative registration."""
+"""Fine single-tool nozzle-tip X/Z analysis using tight relative registration."""
 
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,9 @@ import cv2
 import numpy as np
 
 from vision_red_marker_x_sweep import _red_candidates
+
+
+_logger = logging.getLogger(__name__)
 
 
 class FineNozzleError(RuntimeError):
@@ -55,9 +59,7 @@ def _gradient(image: np.ndarray) -> np.ndarray:
     x_gradient = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
     y_gradient = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
     magnitude = cv2.magnitude(x_gradient, y_gradient)
-    return cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(
-        np.uint8
-    )
+    return cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
 
 def _select_marker(
@@ -65,6 +67,11 @@ def _select_marker(
 ) -> tuple[np.ndarray, dict[str, Any] | None]:
     candidates = _red_candidates(image, frame_index)
     if not candidates:
+        _logger.info(
+            "match rejected stage=red_marker_detection frame=%d "
+            "reason=no red-marker candidates; using expected marker position",
+            frame_index,
+        )
         return expected.copy(), None
     selected = min(
         candidates,
@@ -73,24 +80,27 @@ def _select_marker(
         ),
     )
     center = np.asarray(selected["center_px"], dtype=np.float64)
-    if float(np.linalg.norm(center - expected)) > 130.0:
+    distance = float(np.linalg.norm(center - expected))
+    if distance > 60.0:
+        _logger.info(
+            "match rejected stage=red_marker_distance_gate frame=%d "
+            "reason=nearest candidate is too far from expected position "
+            "distance_px=%.3f maximum_px=60.000; using expected marker position",
+            frame_index,
+            distance,
+        )
         return expected.copy(), None
     return center, selected
 
 
-def _circle_edge_score(
-    gray: np.ndarray, center: np.ndarray, radius: float
-) -> float:
+def _circle_edge_score(gray: np.ndarray, center: np.ndarray, radius: float) -> float:
     angles = np.linspace(0.0, 2.0 * math.pi, 96, endpoint=False)
     scores = []
     for scale in (0.82, 0.94, 1.06, 1.18):
         xs = np.rint(center[0] + radius * scale * np.cos(angles)).astype(int)
         ys = np.rint(center[1] + radius * scale * np.sin(angles)).astype(int)
         valid = (
-            (xs >= 1)
-            & (xs < gray.shape[1] - 1)
-            & (ys >= 1)
-            & (ys < gray.shape[0] - 1)
+            (xs >= 1) & (xs < gray.shape[1] - 1) & (ys >= 1) & (ys < gray.shape[0] - 1)
         )
         if int(np.count_nonzero(valid)) < 80:
             return 0.0
@@ -101,9 +111,7 @@ def _circle_edge_score(
     return float(np.sum(np.abs(np.diff(means))) - 0.35 * symmetry)
 
 
-def _ring_candidates(
-    image: np.ndarray, marker: np.ndarray
-) -> list[dict[str, Any]]:
+def _ring_candidates(image: np.ndarray, marker: np.ndarray) -> list[dict[str, Any]]:
     height, width = image.shape[:2]
     scale = min(width / 1920.0, height / 1080.0)
     radius = int(round(190.0 * scale))
@@ -155,9 +163,7 @@ def _cluster_candidates(
     radius_px: float,
 ) -> tuple[np.ndarray, float, dict[int, dict[str, Any]]]:
     entries = [
-        candidate
-        for candidates in candidate_sets.values()
-        for candidate in candidates
+        candidate for candidates in candidate_sets.values() for candidate in candidates
     ]
     if not entries:
         raise FineNozzleError(f"no candidates contain {delta_field}")
@@ -201,8 +207,15 @@ def _cluster_candidates(
     return best[1], best[2], best[3]
 
 
+def _is_physical_tip_delta(delta: np.ndarray, ring_radius: float) -> bool:
+    return bool(delta[0] >= 0.12 * ring_radius and abs(delta[1]) <= 0.15 * ring_radius)
+
+
 def _tip_candidates(
-    image: np.ndarray, ring: dict[str, Any]
+    image: np.ndarray,
+    ring: dict[str, Any],
+    *,
+    physical_tip_only: bool = False,
 ) -> list[dict[str, Any]]:
     gray = _gray(image)
     ring_center = np.asarray(ring["center_px"], dtype=np.float64)
@@ -216,10 +229,9 @@ def _tip_candidates(
     roi = gray[y0:y1, x0:x1]
     local_center = ring_center - np.asarray([x0, y0], dtype=np.float64)
     yy, xx = np.ogrid[: roi.shape[0], : roi.shape[1]]
-    mask = (
-        (xx - local_center[0]) ** 2 + (yy - local_center[1]) ** 2
-        <= (0.34 * ring_radius) ** 2
-    )
+    delta_x = xx - local_center[0]
+    delta_y = yy - local_center[1]
+    mask = delta_x**2 + delta_y**2 <= (0.34 * ring_radius) ** 2
     values = roi[mask]
     if values.size < 20:
         return []
@@ -243,6 +255,14 @@ def _tip_candidates(
             delta = center - ring_center
             distance = float(np.linalg.norm(delta))
             if distance > 0.34 * ring_radius:
+                continue
+            # The physical nozzle tip is the bright feature just camera-right of
+            # the circular locator's horizontal centerline. Other bright
+            # features lower in the ring are not nozzle-tip measurements.
+            if physical_tip_only and not _is_physical_tip_delta(
+                delta,
+                ring_radius,
+            ):
                 continue
             component_values = roi[labels == component].astype(np.float64)
             mean_value = float(np.mean(component_values))
@@ -345,7 +365,7 @@ def _match_template_scaled(
             continue
         centers = []
         correlations = []
-        for name in ("gray", "clahe", "gradient"):
+        for name in ("gray", "clahe"):
             template = cv2.resize(
                 reference_representations[name],
                 (width, height),
@@ -372,9 +392,7 @@ def _match_template_scaled(
             correlations.append(float(maximum))
         center_array = np.asarray(centers)
         center_median = np.median(center_array, axis=0)
-        spread = float(
-            np.max(np.linalg.norm(center_array - center_median, axis=1))
-        )
+        spread = float(np.max(np.linalg.norm(center_array - center_median, axis=1)))
         records.append(
             {
                 "scale": float(scale),
@@ -383,7 +401,7 @@ def _match_template_scaled(
                 "median_correlation": float(np.median(correlations)),
                 "representation_spread_px": spread,
                 "representation_correlations": dict(
-                    zip(("gray", "clahe", "gradient"), correlations)
+                    zip(("gray", "clahe"), correlations)
                 ),
             }
         )
@@ -397,15 +415,49 @@ def _match_template_scaled(
     )
 
 
+def _log_match_rejection(
+    registration: dict[str, Any],
+    *,
+    stage: str,
+    reason: str,
+) -> None:
+    _logger.info(
+        "match rejected stage=%s tool=%s seq=%d x_mm=%.3f z_mm=%.3f "
+        "reason=%s minimum_correlation=%.3f median_correlation=%.3f "
+        "representation_spread_px=%.3f tip_seed_error_px=%.3f "
+        "maximum_tip_seed_error_px=%.3f",
+        stage,
+        registration["tool"],
+        int(registration["seq"]),
+        float(registration["x_mm"]),
+        float(registration["z_mm"]),
+        reason,
+        float(registration["minimum_correlation"]),
+        float(registration["median_correlation"]),
+        float(registration["representation_spread_px"]),
+        float(registration["tip_prediction_error_px"]),
+        float(registration["maximum_tip_prediction_error_px"]),
+    )
+
+
 def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
     accepted = [
         record
         for record in records
-        if record["minimum_correlation"] >= 0.30
-        and record["median_correlation"] >= 0.42
+        if record["minimum_correlation"] >= 0.22
+        and record["median_correlation"] >= 0.38
         and record["representation_spread_px"] <= 2.5
+        and record["tip_prediction_error_px"]
+        <= record["maximum_tip_prediction_error_px"]
     ]
     if len(accepted) < 8:
+        _logger.info(
+            "analysis rejected stage=initial_registration_gates tool=%s "
+            "reason=only %d of %d nozzle registrations passed",
+            records[0]["tool"],
+            len(accepted),
+            len(records),
+        )
         raise FineNozzleError(
             f"only {len(accepted)} nozzle registrations passed for {records[0]['tool']}"
         )
@@ -417,7 +469,7 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
         dz = float(record["z_mm"]) - z_ref
         return [1.0, dx, dz, dx * dz, dx * dx, dx * dx * dz]
 
-    for _iteration in range(3):
+    for iteration in range(3):
         design = np.asarray(
             [design_row(record) for record in accepted],
             dtype=np.float64,
@@ -429,7 +481,7 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
         residuals = np.linalg.norm(positions - design @ position_coefficients, axis=1)
         median = float(np.median(residuals))
         mad = float(np.median(np.abs(residuals - median)))
-        limit = max(2.5, median + 4.0 * max(mad, 0.05))
+        limit = max(2.5, median + 5 * max(mad, 0.05))
         retained = [
             record
             for record, residual in zip(accepted, residuals)
@@ -437,6 +489,15 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
         ]
         if len(retained) < 8 or len(retained) == len(accepted):
             break
+        retained_sequences = {int(record["seq"]) for record in retained}
+        for record, residual in zip(accepted, residuals):
+            if int(record["seq"]) in retained_sequences:
+                continue
+            record["robust_fit_rejection"] = {
+                "iteration": iteration + 1,
+                "residual_px": float(residual),
+                "limit_px": limit,
+            }
         accepted = retained
     full_row_z = {
         z_mm
@@ -451,11 +512,16 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
         >= 5
     }
     model_records = [
-        record
-        for record in accepted
-        if float(record["z_mm"]) in full_row_z
+        record for record in accepted if float(record["z_mm"]) in full_row_z
     ]
-    if len(full_row_z) < 3 or len(model_records) < 15:
+    if len(full_row_z) < 4 or len(model_records) < 20:
+        _logger.info(
+            "analysis rejected stage=projection_model_row_coverage tool=%s "
+            "reason=only %d full rows and %d records contain enough X observations",
+            records[0]["tool"],
+            len(full_row_z),
+            len(model_records),
+        )
         raise FineNozzleError(
             f"only {len(full_row_z)} full rows contain enough X observations"
         )
@@ -491,20 +557,11 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
                 record["minimum_correlation"] for record in model_records
             ),
             "median_correlation": float(
-                np.median(
-                    [
-                        record["minimum_correlation"]
-                        for record in model_records
-                    ]
-                )
+                np.median([record["minimum_correlation"] for record in model_records])
             ),
-            "accepted_sequences": [
-                record["seq"] for record in model_records
-            ],
+            "accepted_sequences": [record["seq"] for record in model_records],
             "trajectory_only_sequences": [
-                record["seq"]
-                for record in accepted
-                if record not in model_records
+                record["seq"] for record in accepted if record not in model_records
             ],
             "accepted_direct_positions": [
                 {
@@ -519,20 +576,14 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
     )
 
 
-def _evaluate_position(
-    model: dict[str, Any], x_mm: float, z_mm: float
-) -> np.ndarray:
+def _evaluate_position(model: dict[str, Any], x_mm: float, z_mm: float) -> np.ndarray:
     dx = x_mm - float(model["x_ref_mm"])
     dz = z_mm - float(model["z_ref_mm"])
-    design = np.asarray(
-        [1.0, dx, dz, dx * dz, dx * dx, dx * dx * dz]
-    )
+    design = np.asarray([1.0, dx, dz, dx * dz, dx * dx, dx * dx * dz])
     return design @ np.asarray(model["position_coefficients"], dtype=np.float64)
 
 
-def _x_vector(
-    model: dict[str, Any], x_mm: float, z_mm: float
-) -> np.ndarray:
+def _x_vector(model: dict[str, Any], x_mm: float, z_mm: float) -> np.ndarray:
     coefficients = np.asarray(model["position_coefficients"], dtype=np.float64)
     dx = float(x_mm) - float(model["x_ref_mm"])
     dz = float(z_mm) - float(model["z_ref_mm"])
@@ -553,16 +604,12 @@ def _homography_jacobian(homography: np.ndarray, point: np.ndarray) -> np.ndarra
     return np.asarray(
         [
             [
-                (h[0, 0] * denominator - u_numerator * h[2, 0])
-                / denominator**2,
-                (h[0, 1] * denominator - u_numerator * h[2, 1])
-                / denominator**2,
+                (h[0, 0] * denominator - u_numerator * h[2, 0]) / denominator**2,
+                (h[0, 1] * denominator - u_numerator * h[2, 1]) / denominator**2,
             ],
             [
-                (h[1, 0] * denominator - v_numerator * h[2, 0])
-                / denominator**2,
-                (h[1, 1] * denominator - v_numerator * h[2, 1])
-                / denominator**2,
+                (h[1, 0] * denominator - v_numerator * h[2, 0]) / denominator**2,
+                (h[1, 1] * denominator - v_numerator * h[2, 1]) / denominator**2,
             ],
         ]
     )
@@ -578,13 +625,14 @@ def analyze(
     artifact_dir.mkdir(parents=True, exist_ok=True)
     if len(frame_paths) != len(frames):
         raise FineNozzleError("fine-grid frame paths do not match the manifest")
+    tools = {str(frame["tool"]) for frame in frames}
+    if len(tools) != 1 or tools - {"T0", "T1"}:
+        raise FineNozzleError("fine-grid analysis requires exactly one tool")
+    target_tool = tools.pop()
 
     marker_centers = []
     marker_records = []
-    ring_candidate_sets: dict[str, dict[int, list[dict[str, Any]]]] = {
-        "T0": {},
-        "T1": {},
-    }
+    ring_candidate_sets: dict[str, dict[int, list[dict[str, Any]]]] = {target_tool: {}}
     for index, (path, frame) in enumerate(zip(frame_paths, frames)):
         image = cv2.imread(str(path), cv2.IMREAD_COLOR)
         if image is None:
@@ -598,84 +646,101 @@ def analyze(
     ring_tracks: dict[str, dict[int, dict[str, Any]]] = {}
     ring_deltas: dict[str, np.ndarray] = {}
     ring_spreads: dict[str, float] = {}
-    tip_tracks: dict[str, dict[int, dict[str, Any]]] = {}
-    tip_deltas: dict[str, np.ndarray] = {}
-    tip_spreads: dict[str, float] = {}
+    physical_tip_tracks: dict[str, dict[int, dict[str, Any]]] = {}
+    physical_tip_deltas: dict[str, np.ndarray] = {}
+    physical_tip_spreads: dict[str, float] = {}
     ring_radius_medians: dict[str, float] = {}
-    for tool in ("T0", "T1"):
+    minimum_direct_detections = max(14, math.ceil(0.65 * len(frames)))
+    for tool in (target_tool,):
         delta, spread, selected = _cluster_candidates(
             ring_candidate_sets[tool],
             delta_field="marker_delta_px",
             score_field="edge_score",
             radius_px=18.0,
         )
-        if len(selected) < 14:
+        if len(selected) < minimum_direct_detections:
+            _logger.info(
+                "analysis rejected stage=coarse_ring_localization tool=%s "
+                "reason=only %d of %d frames have consistent ring observations; "
+                "minimum=%d",
+                tool,
+                len(selected),
+                len(frames),
+                minimum_direct_detections,
+            )
             raise FineNozzleError(
                 f"only {len(selected)} coarse ring observations for {tool}"
             )
         ring_deltas[tool] = delta
         ring_spreads[tool] = spread
         ring_tracks[tool] = selected
-        tip_candidate_sets = {}
+        physical_tip_candidate_sets = {}
         for index, ring in selected.items():
             image = cv2.imread(str(frame_paths[index]), cv2.IMREAD_COLOR)
             if image is None:
-                raise FineNozzleError(
-                    f"fine-grid image {index} cannot be decoded"
-                )
-            tip_candidate_sets[index] = _tip_candidates(image, ring)
-        tip_delta, tip_spread, selected_tips = _cluster_candidates(
-            tip_candidate_sets,
+                raise FineNozzleError(f"fine-grid image {index} cannot be decoded")
+            physical_tip_candidate_sets[index] = _tip_candidates(
+                image,
+                ring,
+                physical_tip_only=True,
+            )
+        (
+            physical_tip_delta,
+            physical_tip_spread,
+            selected_physical_tips,
+        ) = _cluster_candidates(
+            physical_tip_candidate_sets,
             delta_field="tip_to_ring_delta_px",
             score_field="score",
             radius_px=7.0,
         )
-        if len(selected_tips) < 14:
+        if len(selected_physical_tips) < minimum_direct_detections:
+            _logger.info(
+                "analysis rejected stage=physical_tip_detection tool=%s "
+                "reason=only %d of %d frames have consistent physical-tip "
+                "observations; minimum=%d",
+                tool,
+                len(selected_physical_tips),
+                len(frames),
+                minimum_direct_detections,
+            )
             raise FineNozzleError(
-                f"only {len(selected_tips)} tip observations for {tool}"
+                f"only {len(selected_physical_tips)} physical tip observations "
+                f"for {tool}"
             )
-        tip_deltas[tool] = tip_delta
-        tip_spreads[tool] = tip_spread
-        tip_tracks[tool] = selected_tips
+        physical_tip_deltas[tool] = physical_tip_delta
+        physical_tip_spreads[tool] = physical_tip_spread
+        physical_tip_tracks[tool] = selected_physical_tips
         ring_radius_medians[tool] = float(
-            np.median(
-                [float(ring["radius_px"]) for ring in selected.values()]
-            )
+            np.median([float(ring["radius_px"]) for ring in selected.values()])
         )
 
     tool_references: dict[str, dict[str, Any]] = {}
-    for tool in ("T0", "T1"):
+    reference_x = float(np.median([frame["x_mm"] for frame in frames]))
+    reference_z = float(np.median([frame["z_mm"] for frame in frames]))
+    for tool in (target_tool,):
         reference_candidates = [
-            (index, frame, tip_tracks[tool].get(index))
+            (index, frame, physical_tip_tracks[tool].get(index))
             for index, frame in enumerate(frames)
-            if frame["tool"] == tool and tip_tracks[tool].get(index) is not None
+            if frame["tool"] == tool
+            and physical_tip_tracks[tool].get(index) is not None
         ]
         index, _frame, selected_tip = min(
             reference_candidates,
             key=lambda item: (
-                abs(float(item[1]["z_mm"]) - 5.0)
-                + 0.1
-                * abs(
-                    float(item[1]["x_mm"])
-                    - float(reference["bed_tab_x_mm"] + 16.0)
-                )
+                abs(float(item[1]["z_mm"]) - reference_z)
+                + 0.1 * abs(float(item[1]["x_mm"]) - reference_x)
             ),
         )
         center = np.asarray(selected_tip["center_px"], dtype=np.float64)
-        reference_image = cv2.imread(
-            str(frame_paths[index]), cv2.IMREAD_COLOR
-        )
+        reference_image = cv2.imread(str(frame_paths[index]), cv2.IMREAD_COLOR)
         if reference_image is None:
-            raise FineNozzleError(
-                f"fine-grid image {index} cannot be decoded"
-            )
+            raise FineNozzleError(f"fine-grid image {index} cannot be decoded")
         image_scale = min(
             reference_image.shape[1] / 1920.0,
             reference_image.shape[0] / 1080.0,
         )
-        template_size = int(
-            round(2.0 * ring_radius_medians[tool] * 0.24)
-        )
+        template_size = int(round(2.0 * ring_radius_medians[tool] * 0.24))
         template_size = max(
             int(round(24.0 * image_scale)),
             min(int(round(40.0 * image_scale)), template_size),
@@ -696,9 +761,7 @@ def analyze(
     ):
         image = cv2.imread(str(path), cv2.IMREAD_COLOR)
         if image is None:
-            raise FineNozzleError(
-                f"fine-grid image {index} cannot be decoded"
-            )
+            raise FineNozzleError(f"fine-grid image {index} cannot be decoded")
         tool = frame["tool"]
         ring = ring_tracks[tool].get(index)
         ring_center = (
@@ -706,30 +769,33 @@ def analyze(
             if ring is not None
             else marker + ring_deltas[tool]
         )
-        detected_tip = tip_tracks[tool].get(index)
-        predicted = (
-            np.asarray(detected_tip["center_px"], dtype=np.float64)
-            if detected_tip is not None
-            else ring_center + tip_deltas[tool]
-        )
+        detected_tip = physical_tip_tracks[tool].get(index)
+        predicted_tip = ring_center + physical_tip_deltas[tool]
         reference_record = tool_references[tool]
         search_size = max(
-            int(round(76.0 * min(image.shape[1] / 1920.0, image.shape[0] / 1080.0))),
-            int(reference_record["template_size_px"]) * 2 + 8,
+            int(reference_record["template_size_px"])
+            + int(
+                round(
+                    8.0
+                    * min(
+                        image.shape[1] / 1920.0,
+                        image.shape[0] / 1080.0,
+                    )
+                )
+            ),
+            int(round(40.0 * min(image.shape[1] / 1920.0, image.shape[0] / 1080.0))),
         )
         match = _match_template_scaled(
             reference_record["template"],
             image,
-            predicted,
+            predicted_tip,
             search_size=search_size,
         )
         prediction_error = float(
-            np.linalg.norm(np.asarray(match["center_px"]) - predicted)
+            np.linalg.norm(np.asarray(match["center_px"]) - predicted_tip)
         )
         ring_radius = (
-            float(ring["radius_px"])
-            if ring is not None
-            else ring_radius_medians[tool]
+            float(ring["radius_px"]) if ring is not None else ring_radius_medians[tool]
         )
         maximum_prediction_error = max(
             8.0 * min(image.shape[1] / 1920.0, image.shape[0] / 1080.0),
@@ -746,33 +812,87 @@ def analyze(
                 "minimum_correlation": match["minimum_correlation"],
                 "median_correlation": match["median_correlation"],
                 "representation_spread_px": match["representation_spread_px"],
-                "representation_correlations": match[
-                    "representation_correlations"
-                ],
+                "representation_correlations": match["representation_correlations"],
                 "marker_center_px": marker,
                 "marker_detected": marker_records[index] is not None,
                 "ring_center_px": ring_center,
                 "ring_radius_px": ring_radius,
                 "ring_detected": ring is not None,
-                "predicted_tip_center_px": predicted,
+                "predicted_tip_center_px": predicted_tip,
                 "tip_detector_center_px": (
-                    detected_tip["center_px"]
-                    if detected_tip is not None
-                    else None
+                    detected_tip["center_px"] if detected_tip is not None else None
                 ),
                 "tip_prediction_error_px": prediction_error,
                 "maximum_tip_prediction_error_px": maximum_prediction_error,
                 "reference_seq": reference_record["reference_seq"],
                 "tip_roi_size_px": reference_record["template_size_px"],
+                "tip_detector_agrees_with_registration": (
+                    prediction_error <= maximum_prediction_error
+                ),
             }
         )
 
-    models = {
-        tool: _fit_tool(
-            [record for record in registrations if record["tool"] == tool]
-        )
-        for tool in ("T0", "T1")
+    models = {target_tool: _fit_tool(registrations)}
+    accepted_sequences = {
+        int(item) for item in models[target_tool]["accepted_sequences"]
     }
+    for registration in registrations:
+        rejection_details = []
+        if float(registration["minimum_correlation"]) < 0.22:
+            rejection_details.append(
+                (
+                    "minimum_tip_correlation_gate",
+                    "minimum tip correlation is below 0.22",
+                )
+            )
+        if float(registration["median_correlation"]) < 0.38:
+            rejection_details.append(
+                (
+                    "median_tip_correlation_gate",
+                    "median tip correlation is below 0.38",
+                )
+            )
+        if float(registration["representation_spread_px"]) > 2.5:
+            rejection_details.append(
+                (
+                    "representation_spread_gate",
+                    "gray/contrast tip registrations disagree by more than 2.5 px",
+                )
+            )
+        if float(registration["tip_prediction_error_px"]) > float(
+            registration["maximum_tip_prediction_error_px"]
+        ):
+            rejection_details.append(
+                (
+                    "physical_tip_seed_distance_gate",
+                    "physical-tip registration moved too far from its detector seed",
+                )
+            )
+        if not rejection_details and int(registration["seq"]) not in accepted_sequences:
+            robust_rejection = registration.get("robust_fit_rejection")
+            if robust_rejection:
+                robust_reason = (
+                    f"position residual {robust_rejection['residual_px']:.3f} px "
+                    f"exceeds {robust_rejection['limit_px']:.3f} px at iteration "
+                    f"{robust_rejection['iteration']}"
+                )
+            else:
+                robust_reason = "excluded by the robust position-fit outlier filter"
+            rejection_details.append(
+                (
+                    "robust_position_fit",
+                    robust_reason,
+                )
+            )
+        rejection_reasons = [reason for _stage, reason in rejection_details]
+        for stage, reason in rejection_details:
+            _log_match_rejection(
+                registration,
+                stage=stage,
+                reason=reason,
+            )
+        registration["accepted_for_projection_model"] = not rejection_reasons
+        registration["projection_rejection_reasons"] = rejection_reasons
     fiducial_reference_xy = np.asarray(
         reference["fiducial_reference_printer_xy_mm"],
         dtype=np.float64,
@@ -791,7 +911,7 @@ def analyze(
         reference["image_y_axis_vector_px_per_mm"], dtype=np.float64
     )
     vector_comparison_at_z0 = {}
-    for tool in ("T0", "T1"):
+    for tool in (target_tool,):
         nozzle_vector = _x_vector(models[tool], fiducial_x, 0.0)
         residual = nozzle_vector - bed_x_fiducial
         coefficients = np.asarray(
@@ -807,28 +927,11 @@ def analyze(
             "residual_magnitude_px_per_mm": float(np.linalg.norm(residual)),
             "x_vector_z_slope_px_per_mm_per_mm": z_slope,
         }
-    cross_tool_reference_x = float(reference["bed_tab_x_mm"] + 16.0)
-    cross_tool_reference_z = 5.0
-    cross_tool_reference_offset = (
-        _evaluate_position(
-            models["T1"],
-            cross_tool_reference_x,
-            cross_tool_reference_z,
-        )
-        - _evaluate_position(
-            models["T0"],
-            cross_tool_reference_x,
-            cross_tool_reference_z,
-        )
-    )
-
     reasons = []
     warnings = []
-    for tool in ("T0", "T1"):
+    for tool in (target_tool,):
         model = models[tool]
-        tool_records = [
-            record for record in registrations if record["tool"] == tool
-        ]
+        tool_records = registrations
         accepted_sequences_for_tool = {
             int(item) for item in model["accepted_sequences"]
         }
@@ -844,96 +947,158 @@ def analyze(
             reasons.append(
                 f"{tool} position fit RMS {model['position_fit_rms_px']:.3f} px"
             )
-        if model["accepted_count"] < 14:
+        if model["accepted_count"] < 20:
             reasons.append(
                 f"{tool} has only {model['accepted_count']} accepted registrations"
             )
         if z_span < 8.0:
-            reasons.append(
-                f"{tool} usable Z span is only {z_span:.3f} mm"
-            )
+            reasons.append(f"{tool} usable Z span is only {z_span:.3f} mm")
         if model["minimum_correlation"] < 0.5:
             warnings.append(
                 f"{tool} minimum accepted correlation is {model['minimum_correlation']:.3f}"
             )
-        if tip_spreads[tool] > 5.0:
+        if physical_tip_spreads[tool] > 5.0:
             reasons.append(
-                f"{tool} tip-localizer spread {tip_spreads[tool]:.3f} px is too large"
+                f"{tool} physical tip-localizer spread "
+                f"{physical_tip_spreads[tool]:.3f} px is too large"
             )
-        if len(tip_tracks[tool]) < 14:
+        if len(physical_tip_tracks[tool]) < minimum_direct_detections:
             reasons.append(
-                f"{tool} has only {len(tip_tracks[tool])} direct tip detections"
+                f"{tool} has only {len(physical_tip_tracks[tool])} direct "
+                "physical tip detections"
             )
+        minimum_usable_z_rows = 4
+        minimum_accepted_x_positions_per_row = 6
+        minimum_x_span_per_row_mm = 12.5
         full_rows = []
-        for z_mm in sorted(
-            {float(record["z_mm"]) for record in tool_records}
-        ):
+        row_coverage_gate = []
+        for z_mm in sorted({float(record["z_mm"]) for record in tool_records}):
+            all_row_records = [
+                record
+                for record in tool_records
+                if abs(float(record["z_mm"]) - z_mm) < 1e-9
+            ]
             row = [
                 record
                 for record in accepted_tool_records
                 if abs(float(record["z_mm"]) - z_mm) < 1e-9
             ]
             unique_x = sorted({float(record["x_mm"]) for record in row})
+            x_span_mm = unique_x[-1] - unique_x[0] if len(unique_x) >= 2 else 0.0
+            rejected_samples = [
+                {
+                    "seq": int(record["seq"]),
+                    "x_mm": float(record["x_mm"]),
+                    "reasons": record.get("projection_rejection_reasons", []),
+                }
+                for record in all_row_records
+                if int(record["seq"]) not in accepted_sequences_for_tool
+            ]
+            row_passed = (
+                len(unique_x) >= minimum_accepted_x_positions_per_row
+                and x_span_mm >= minimum_x_span_per_row_mm
+            )
+            row_coverage_gate.append(
+                {
+                    "z_mm": z_mm,
+                    "passed": row_passed,
+                    "accepted_count": len(unique_x),
+                    "captured_count": len(
+                        {float(record["x_mm"]) for record in all_row_records}
+                    ),
+                    "x_span_mm": x_span_mm,
+                    "required_accepted_count": (
+                        minimum_accepted_x_positions_per_row
+                    ),
+                    "required_x_span_mm": minimum_x_span_per_row_mm,
+                    "rejected_samples": rejected_samples,
+                }
+            )
             if len(unique_x) >= 2:
                 full_rows.append(
                     {
                         "z_mm": z_mm,
                         "accepted_count": len(unique_x),
-                        "x_span_mm": unique_x[-1] - unique_x[0],
+                        "x_span_mm": x_span_mm,
                     }
                 )
-        if len(full_rows) < 3:
-            reasons.append(f"{tool} has only {len(full_rows)} usable full X rows")
-        for row in full_rows:
-            if row["accepted_count"] < 5 or row["x_span_mm"] < 12.0:
-                reasons.append(
-                    f"{tool} Z={row['z_mm']:.3f} row has "
-                    f"{row['accepted_count']} X positions over "
-                    f"{row['x_span_mm']:.3f} mm"
+        if len(full_rows) < minimum_usable_z_rows:
+            reasons.append(
+                f"{tool} has only {len(full_rows)} usable Z rows; "
+                f"at least {minimum_usable_z_rows} are required"
+            )
+        failed_row_gates = [
+            row for row in row_coverage_gate if not bool(row["passed"])
+        ]
+        for row in failed_row_gates:
+            rejected_summary = ", ".join(
+                (
+                    f"seq={sample['seq']} X={sample['x_mm']:.3f} "
+                    f"({' | '.join(sample['reasons']) or 'rejected by model fit'})"
                 )
+                for sample in row["rejected_samples"]
+            )
+            reasons.append(
+                f"{tool} Z={row['z_mm']:.3f} row coverage failed: "
+                f"{row['accepted_count']}/{row['captured_count']} X positions "
+                f"accepted (required >={row['required_accepted_count']}), "
+                f"span {row['x_span_mm']:.3f} mm "
+                f"(required >={row['required_x_span_mm']:.3f} mm); "
+                f"rejected samples: {rejected_summary or 'none recorded'}"
+            )
+        model["row_coverage_gate"] = {
+            "passed": (
+                len(full_rows) >= minimum_usable_z_rows and not failed_row_gates
+            ),
+            "required_usable_z_rows": minimum_usable_z_rows,
+            "required_accepted_x_positions_per_row": (
+                minimum_accepted_x_positions_per_row
+            ),
+            "required_x_span_per_row_mm": minimum_x_span_per_row_mm,
+            "failed_row_count": len(failed_row_gates),
+            "rows": row_coverage_gate,
+        }
+        if failed_row_gates:
+            _logger.info(
+                "analysis rejected stage=overall_z_row_coverage_gate tool=%s "
+                "reason=%d of %d Z rows fail coverage "
+                "required_accepted_x_positions_per_row=%d "
+                "required_x_span_per_row_mm=%.3f failed_z_rows=%s",
+                tool,
+                len(failed_row_gates),
+                len(row_coverage_gate),
+                minimum_accepted_x_positions_per_row,
+                minimum_x_span_per_row_mm,
+                ",".join(f"{row['z_mm']:.3f}" for row in failed_row_gates),
+            )
         model["full_row_coverage"] = full_rows
-        if (
-            vector_comparison_at_z0[tool]["residual_magnitude_px_per_mm"]
-            > 0.25
-        ):
+        if vector_comparison_at_z0[tool]["residual_magnitude_px_per_mm"] > 0.25:
             warnings.append(
                 f"{tool} fiducial/nozzle X-vector residual at commanded Z=0 is "
                 f"{vector_comparison_at_z0[tool]['residual_magnitude_px_per_mm']:.3f} "
                 "px/mm; Stage 5.1 will solve the crossing"
             )
-    slopes = [
-        np.asarray(
-            vector_comparison_at_z0[tool][
-                "x_vector_z_slope_px_per_mm_per_mm"
-            ],
-            dtype=np.float64,
-        )
-        for tool in ("T0", "T1")
-    ]
-    slope_norms = [float(np.linalg.norm(item)) for item in slopes]
-    if min(slope_norms) <= 1e-8 or float(np.dot(slopes[0], slopes[1])) <= 0:
-        reasons.append("T0/T1 X-parallax slopes do not agree in sign")
-    else:
-        slope_delta = abs(slope_norms[0] - slope_norms[1]) / max(slope_norms)
-        if slope_delta > 0.60:
-            reasons.append(
-                "T0/T1 X-parallax slope magnitudes differ by more than 60%"
+        for reason in reasons:
+            _logger.info(
+                "analysis rejected stage=analysis_acceptance_gate tool=%s reason=%s",
+                tool,
+                reason,
             )
-        elif slope_delta > 0.25:
-            warnings.append(
-                "T0/T1 X-parallax slope magnitudes differ by more than 25%"
+        for warning in warnings:
+            _logger.info(
+                "analysis warning stage=analysis_acceptance_gate tool=%s reason=%s",
+                tool,
+                warning,
             )
-
     panel_width = 480
     full_height = 270
     zoom_height = 180
     panels = []
-    accepted_sequences = {
-        tool: set(models[tool]["accepted_sequences"]) for tool in ("T0", "T1")
-    }
-    for path, frame, registration in zip(
-        frame_paths, frames, registrations
-    ):
+    individual_overlay_dir = artifact_dir / "fine_nozzle_tip_overlays"
+    individual_overlay_dir.mkdir()
+    individual_overlay_artifacts = {}
+    accepted_sequences = {target_tool: set(models[target_tool]["accepted_sequences"])}
+    for path, frame, registration in zip(frame_paths, frames, registrations):
         image = cv2.imread(str(path), cv2.IMREAD_COLOR)
         if image is None:
             raise FineNozzleError(
@@ -972,21 +1137,20 @@ def analyze(
             18,
             2,
         )
-        roi_half = max(4, int(registration["tip_roi_size_px"]) // 2)
-        cv2.rectangle(
-            panel,
-            tuple(np.rint(center - roi_half).astype(int)),
-            tuple(np.rint(center + roi_half).astype(int)),
-            color,
-            3,
-        )
         cv2.drawMarker(
             panel,
             tuple(np.rint(center).astype(int)),
             color,
-            cv2.MARKER_TILTED_CROSS,
-            26,
+            cv2.MARKER_CROSS,
+            18,
             3,
+        )
+        cv2.circle(
+            panel,
+            tuple(np.rint(center).astype(int)),
+            6,
+            color,
+            2,
         )
         cv2.putText(
             panel,
@@ -1001,14 +1165,27 @@ def analyze(
             2,
             cv2.LINE_AA,
         )
+        acceptance = (
+            "accepted"
+            if registration["seq"] in accepted_sequences[frame["tool"]]
+            else "rejected"
+        )
+        individual_overlay_path = (
+            individual_overlay_dir / f"{frame['frame']}_{acceptance}.png"
+        )
+        if not cv2.imwrite(str(individual_overlay_path), panel):
+            raise FineNozzleError(
+                f"could not write full-resolution overlay for frame {frame['frame']}"
+            )
+        individual_overlay_artifacts[
+            f"fine_nozzle_tip_overlay_{int(registration['seq']):02d}"
+        ] = _artifact(individual_overlay_path)
         full = cv2.resize(
             panel,
             (panel_width, full_height),
             interpolation=cv2.INTER_AREA,
         )
-        zoom_size = max(
-            96, int(round(2.5 * float(registration["ring_radius_px"])))
-        )
+        zoom_size = max(96, int(round(2.5 * float(registration["ring_radius_px"]))))
         zoom, _origin = _crop(panel, ring_center, zoom_size)
         zoom = cv2.resize(
             zoom, (zoom_height, zoom_height), interpolation=cv2.INTER_CUBIC
@@ -1016,11 +1193,11 @@ def analyze(
         zoom_strip = np.full((zoom_height, panel_width, 3), 18, np.uint8)
         zoom_strip[:, :zoom_height] = zoom
         lines = [
-            "cyan: coarse ring only",
-            "magenta: predicted tip",
-            "green/red: matched tip ROI",
+            "cyan: search locator only",
+            "magenta: physical-tip detector seed",
+            "green/red: only downstream coordinate",
             (
-                f"err={registration['tip_prediction_error_px']:.2f}px "
+                f"tip seed err={registration['tip_prediction_error_px']:.2f}px "
                 f"scale={registration['template_scale']:.3f}"
             ),
         ]
@@ -1028,9 +1205,9 @@ def analyze(
             cv2.putText(
                 zoom_strip,
                 line,
-                (zoom_height + 12, 32 + line_index * 36),
+                (zoom_height + 12, 26 + line_index * 34),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.52,
+                0.44,
                 (230, 230, 230),
                 1,
                 cv2.LINE_AA,
@@ -1047,15 +1224,13 @@ def analyze(
     cv2.imwrite(str(contact_path), contact)
 
     reference_panels = []
-    for tool in ("T0", "T1"):
+    for tool in (target_tool,):
         record = tool_references[tool]
         index = int(record["reference_seq"])
         registration = registrations[index]
         image = cv2.imread(str(frame_paths[index]), cv2.IMREAD_COLOR)
         if image is None:
-            raise FineNozzleError(
-                f"fine-grid image {index} cannot be decoded"
-            )
+            raise FineNozzleError(f"fine-grid image {index} cannot be decoded")
         ring_center = np.asarray(registration["ring_center_px"])
         center = np.asarray(registration["center_px"])
         radius = float(registration["ring_radius_px"])
@@ -1066,27 +1241,26 @@ def analyze(
             (255, 255, 0),
             3,
         )
-        half = int(registration["tip_roi_size_px"]) // 2
-        cv2.rectangle(
-            image,
-            tuple(np.rint(center - half).astype(int)),
-            tuple(np.rint(center + half).astype(int)),
-            (0, 255, 0),
-            3,
-        )
         cv2.drawMarker(
             image,
             tuple(np.rint(center).astype(int)),
             (0, 255, 0),
-            cv2.MARKER_TILTED_CROSS,
-            20,
+            cv2.MARKER_CROSS,
+            18,
+            2,
+        )
+        cv2.circle(
+            image,
+            tuple(np.rint(center).astype(int)),
+            6,
+            (0, 255, 0),
             2,
         )
         crop, _origin = _crop(image, ring_center, int(round(2.6 * radius)))
         crop = cv2.resize(crop, (520, 520), interpolation=cv2.INTER_CUBIC)
         cv2.putText(
             crop,
-            f"{tool}: small nozzle-tip ROI; outer ring is locator only",
+            f"{tool}: green is the only downstream coordinate",
             (18, 34),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.60,
@@ -1101,13 +1275,13 @@ def analyze(
 
     model_plot = np.full((760, 1280, 3), 24, np.uint8)
     colors = {"T0": (0, 255, 255), "T1": (255, 128, 255)}
-    for row, tool in enumerate(("T0", "T1")):
-        y_base = 250 + row * 320
+    for tool in (target_tool,):
+        y_base = 360
         model = models[tool]
         cv2.putText(
             model_plot,
             (
-                f"{tool}: tip ROI={tool_references[tool]['template_size_px']} px, "
+                f"{tool}: green physical-tip coordinate only, "
                 f"fit RMS={models[tool]['position_fit_rms_px']:.3f} px, "
                 f"Z0 bed-vector residual="
                 f"{vector_comparison_at_z0[tool]['residual_magnitude_px_per_mm']:.3f} px/mm"
@@ -1154,34 +1328,26 @@ def analyze(
                     "marker_to_ring_delta_px": ring_deltas[tool],
                     "ring_delta_spread_px": ring_spreads[tool],
                     "ring_detection_count": len(ring_tracks[tool]),
-                    "tip_to_ring_delta_px": tip_deltas[tool],
-                    "tip_delta_spread_px": tip_spreads[tool],
-                    "tip_detection_count": len(tip_tracks[tool]),
-                    "tip_roi_size_px": tool_references[tool][
-                        "template_size_px"
-                    ],
+                    "physical_tip_to_ring_delta_px": physical_tip_deltas[tool],
+                    "physical_tip_delta_spread_px": physical_tip_spreads[tool],
+                    "physical_tip_detection_count": len(physical_tip_tracks[tool]),
+                    "tip_roi_size_px": tool_references[tool]["template_size_px"],
                     "reference_seq": tool_references[tool]["reference_seq"],
                 }
-                for tool in ("T0", "T1")
+                for tool in (target_tool,)
             },
             "fiducial_reference_printer_xy_mm": fiducial_reference_xy,
-            "fiducial_reference_pixel_at_fine_capture_px":
-                fiducial_reference_pixel,
-            "fiducial_x_vector_at_fine_capture_px_per_mm":
-                bed_x_fiducial,
+            "fiducial_reference_pixel_at_fine_capture_px": fiducial_reference_pixel,
+            "fiducial_x_vector_at_fine_capture_px_per_mm": bed_x_fiducial,
             "fiducial_plane_printer_z_mm": fiducial_plane_z,
             "fine_capture_y_mm": float(reference["fine_capture_y_mm"]),
             "image_y_axis_vector_px_per_mm": image_y_vector,
             "vector_comparison_at_commanded_z0": vector_comparison_at_z0,
-            "cross_tool_tip_offset_at_reference": {
-                "commanded_x_mm": cross_tool_reference_x,
-                "commanded_z_mm": cross_tool_reference_z,
-                "offset_px": cross_tool_reference_offset,
-            },
             "artifacts": {
                 "fine_nozzle_tip_registration_grid": _artifact(contact_path),
                 "fine_nozzle_tip_references": _artifact(reference_path),
                 "fine_nozzle_projection_model": _artifact(plot_path),
+                **individual_overlay_artifacts,
             },
         }
     )
