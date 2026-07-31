@@ -19,6 +19,7 @@ required_files=(
   vision_calibration.py
   vision_calibration_graph.py
   vision_bed_fiducial.py
+  vision_eddy_fiducial_xz.py
   vision_fine_tool_calibration.py
   vision_nozzle_fine_xz.py
   vision_red_marker_x_sweep.py
@@ -81,6 +82,7 @@ scp \
   "${FILES_DIR}/vision_calibration.py" \
   "${FILES_DIR}/vision_calibration_graph.py" \
   "${FILES_DIR}/vision_bed_fiducial.py" \
+  "${FILES_DIR}/vision_eddy_fiducial_xz.py" \
   "${FILES_DIR}/vision_fine_tool_calibration.py" \
   "${FILES_DIR}/vision_nozzle_fine_xz.py" \
   "${FILES_DIR}/vision_red_marker_x_sweep.py" \
@@ -214,6 +216,7 @@ sudo install -m 0755 "${REMOTE_TMP}/vision_capture.py" /usr/local/bin/vision_cap
 sudo install -m 0755 "${REMOTE_TMP}/vision_calibration.py" /usr/local/bin/vision_calibration.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_calibration_graph.py" /usr/local/bin/vision_calibration_graph.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_bed_fiducial.py" /usr/local/bin/vision_bed_fiducial.py
+sudo install -m 0644 "${REMOTE_TMP}/vision_eddy_fiducial_xz.py" /usr/local/bin/vision_eddy_fiducial_xz.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_fine_tool_calibration.py" /usr/local/bin/vision_fine_tool_calibration.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_nozzle_fine_xz.py" /usr/local/bin/vision_nozzle_fine_xz.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_red_marker_x_sweep.py" /usr/local/bin/vision_red_marker_x_sweep.py

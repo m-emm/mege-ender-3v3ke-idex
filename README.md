@@ -81,6 +81,11 @@ The generated nozzle-vision job UI is available on the printer at:
 http://menderpi.local/vision/
 ```
 
+The complete repo-root shell workflow for editing vision jobs and Python,
+deploying and starting the printer-side services, running acquisition and
+analysis, and downloading raw frames plus overlays is documented in
+[Vision Code Development, Deployment, and Artifact Download](klipper_setup/klipper_config/README.md#vision-code-development-deployment-and-artifact-download).
+
 Use that `/vision/` URL in the browser; do not paste the filesystem path into
 the address bar. It is generated only from the new calibration catalog.
 Rebuild the catalog and UI with:

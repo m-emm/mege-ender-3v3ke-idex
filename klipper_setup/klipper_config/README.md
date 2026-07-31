@@ -41,6 +41,176 @@ Moonraker without uploading files or restarting Klipper.
 previous remote file with a timestamp, installs the custom Klipper host patch,
 restarts Klipper, and reports the Moonraker/Klippy state.
 
+## Vision Code Development, Deployment, and Artifact Download
+
+The commands in this section assume the current directory is already the
+repository root:
+
+```text
+/Users/mege/git/mege-ender-3v3ke-idex
+```
+
+### Edit the tracked source
+
+The source deployed to the printer is under:
+
+```text
+klipper_setup/image_build/overlays/stage2/99-klipperpi/files/
+```
+
+The main files are:
+
+| Change | Tracked source |
+| --- | --- |
+| Job names, capture grids, G-code, analyzer selection, and analyzer parameters | `vision_job_types.json` |
+| Job preparation, acquisition, analysis dispatch, publication, and static UI generation | `vision_calibration.py` |
+| Job graph, manifests, dependencies, and validation | `vision_calibration_graph.py` |
+| Eddy fiducial X/Z circle analysis | `vision_eddy_fiducial_xz.py` |
+| Stage 5 nozzle-tip analysis | `vision_nozzle_fine_xz.py` |
+| Stage 5.1 fine-tool calculation | `vision_fine_tool_calibration.py` |
+| Camera capture daemon | `vision_capture.py` |
+| Capture service definition | `vision-capture-nozzle-cam.service` |
+
+For example, from the repository root:
+
+```bash
+${EDITOR:-vi} klipper_setup/image_build/overlays/stage2/99-klipperpi/files/vision_job_types.json
+${EDITOR:-vi} klipper_setup/image_build/overlays/stage2/99-klipperpi/files/vision_nozzle_fine_xz.py
+```
+
+If a new Python module is added, also add it to the required-file, `scp`, and
+`install` lists in
+`klipper_setup/klipper_config/deploy_webcam_vision.sh`.
+
+### Deploy and start the complete vision stack
+
+The normal deployment command is:
+
+```bash
+klipper_setup/klipper_config/deploy_webcam_vision.sh
+```
+
+It deploys the tracked Python, JSON, web-server, and systemd files; restarts
+Moonraker, nginx, both framebuffer services, and both capture services;
+rebuilds the static `/vision/` catalog; and checks both cameras. Existing jobs
+and analysis results are retained because `VISION_CLEAN_SLATE` defaults to
+`0`.
+
+Do not set `VISION_CLEAN_SLATE=1` for an ordinary code deployment. That option
+permanently removes the existing printer-side vision jobs and generated
+G-code after first checking that Klipper is ready and idle.
+
+For a quick Python/JSON-only tuning cycle, use:
+
+```bash
+klipper_setup/klipper_config/deploy_vision_code.sh
+```
+
+The helper deploys every top-level `*.py` and `*.json` file from the tracked
+vision source directory, installs Python under `/usr/local/bin` and JSON under
+`/usr/local/share/vision`, restarts the four vision framebuffer/capture
+services, rebuilds the static catalog, and confirms that all four services are
+active. It deliberately does not install packages or webcam configuration and
+does not restart Klipper, Moonraker, or nginx. It also leaves all acquired jobs
+and analysis results untouched.
+
+Set `MENDERPI_HOST` only when deploying to a host other than the default
+`pi@menderpi.local`.
+
+Follow nozzle-camera capture logs in a separate shell with:
+
+```bash
+ssh pi@menderpi.local 'journalctl -u vision-capture-nozzle-cam.service -f'
+```
+
+### Acquire and analyze a job
+
+Before starting a motion job, home the printer and wait for homing to finish.
+The vision jobs do not implicitly home the printer. The current homing and
+print state can be checked without changing anything:
+
+```bash
+ssh pi@menderpi.local \
+  'curl -fsS "http://127.0.0.1:7125/printer/objects/query?toolhead=homed_axes&print_stats=state"'
+```
+
+Run acquisition and analysis together with `run`. For example, the two Stage
+5 jobs are:
+
+```bash
+ssh pi@menderpi.local \
+  '/usr/local/bin/vision_calibration.py run idex_nozzle_fine_xz_grid_t0 --name stage5_t0 --timeout 1200'
+
+ssh pi@menderpi.local \
+  '/usr/local/bin/vision_calibration.py run idex_nozzle_fine_xz_grid_t1 --name stage5_t1 --timeout 1200'
+```
+
+To stop after capturing the images, use `acquire` instead of `run`:
+
+```bash
+ssh pi@menderpi.local \
+  '/usr/local/bin/vision_calibration.py acquire idex_nozzle_fine_xz_grid_t0 --name stage5_t0 --timeout 1200'
+```
+
+Re-run analysis without moving the printer or capturing new images by using
+the job ID printed by `run`/`acquire` and shown in the `/vision/` UI:
+
+```bash
+VISION_JOB_ID=20260731T102429.673230Z-stage5_z0p5_to25_t1
+ssh pi@menderpi.local \
+  "/usr/local/bin/vision_calibration.py analyze ${VISION_JOB_ID}"
+```
+
+Each analysis creates a new timestamped directory. Older analyses remain
+available for comparison. Rebuild the overview after manual changes with:
+
+```bash
+ssh pi@menderpi.local \
+  '/usr/local/bin/vision_calibration.py rebuild-catalog'
+```
+
+Inspect jobs and analysis pages at:
+
+```text
+http://menderpi.local/vision/
+```
+
+### Download frames, results, and overlays
+
+List recent job IDs first:
+
+```bash
+ssh pi@menderpi.local \
+  'find /home/pi/printer_data/vision/calibration/jobs -mindepth 1 -maxdepth 1 -type d -printf "%f\n" | sort | tail -n 20'
+```
+
+Download one complete job into a new timestamped local directory:
+
+```bash
+VISION_JOB_ID=20260731T102429.673230Z-stage5_z0p5_to25_t1
+VISION_DOWNLOAD_DIR="output/vision_downloads/$(date -u +%Y%m%dT%H%M%SZ)-${VISION_JOB_ID}"
+mkdir -p "${VISION_DOWNLOAD_DIR}"
+scp -r \
+  "pi@menderpi.local:/home/pi/printer_data/vision/calibration/jobs/${VISION_JOB_ID}/." \
+  "${VISION_DOWNLOAD_DIR}/"
+printf 'Downloaded vision job to:\n%s\n' "${VISION_DOWNLOAD_DIR}"
+find "${VISION_DOWNLOAD_DIR}" -maxdepth 4 -type f | sort
+```
+
+The downloaded job contains:
+
+- `manifest.json`, `state.json`, `events.jsonl`, and `acquisition.gcode` at the
+  job root;
+- raw images and per-frame metadata under `frames/`;
+- one directory per analysis run under `analysis/`;
+- `result.json` and `report.md` in each analysis directory; and
+- the full-resolution generated overlays and model plots under
+  `analysis/<analysis_run_id>/artifacts/`.
+
+Opening the downloaded `index.html` directly is useful for file discovery,
+but the printer-hosted UI remains the authoritative rendered view because its
+links use the `/vision/` URL prefix.
+
 ## Vision Calibration Framework
 
 The clean chain starts with seed facts for the 8 mm square fiducial patch, its
@@ -100,8 +270,18 @@ The verification expects each red marker to project 10 mm along the measured
 image-X axis from the fixed bed-tab corner and expects the two marker image-X
 positions to agree. It is report-only and does not change configuration.
 
+The independent Eddy diagnostic commands T0 through four X positions from
+`230` to `244 mm` and four Z positions from `0.5` to `9 mm`, producing 16
+captures at `Y=-14 mm`. It uses the existing nozzle analysis profile and light
+macro, detects the strongest circular Eddy fiducial, and publishes only the raw
+commanded X/Z and image X/Y records:
+
+```gcode
+IDEX_EDDY_FIDUCIAL_XZ_ACQUIRE NAME=eddy_fiducial_xz
+```
+
 Stage 5 is split into independent T0 and T1 jobs. Each job captures a
-28-frame nozzle grid: seven evenly spaced X columns at bed-tab offsets
+56-frame nozzle grid: seven evenly spaced X columns at bed-tab offsets
 `10, 12.5, 15, 17.5, 20, 22.5, 25 mm` on eight complete Z rows spanning
 Z 0.5 through 25 mm. The outer circular ring is a coarse locator. Only a small
 ROI centered on the actual metallic nozzle tip contributes registration
@@ -152,6 +332,7 @@ nozzle_cam_bed_fiducial_y_metric
 nozzle_cam_bed_tab_corner
 idex_tool_red_marker_x_sweep
 idex_rough_tool_x_verify
+idex_eddy_fiducial_xz_grid
 idex_nozzle_fine_xz_grid_t0
 idex_nozzle_fine_xz_grid_t1
 ```

@@ -45,6 +45,7 @@ from vision_calibration_graph import (
     validate_manifest,
     validate_registry,
 )
+from vision_eddy_fiducial_xz import analyze as analyze_eddy_fiducial_xz
 from vision_nozzle_fine_xz import analyze as analyze_fine_nozzle_xz
 from vision_fine_tool_calibration import (
     calculate_candidate as calculate_fine_tool_candidate,
@@ -104,6 +105,7 @@ BED_FIDUCIAL_METRIC_JOB = "nozzle_cam_bed_fiducial_y_metric"
 BED_TAB_CORNER_JOB = "nozzle_cam_bed_tab_corner"
 RED_MARKER_X_JOB = "idex_tool_red_marker_x_sweep"
 ROUGH_X_VERIFY_JOB = "idex_rough_tool_x_verify"
+EDDY_FIDUCIAL_XZ_JOB = "idex_eddy_fiducial_xz_grid"
 FINE_NOZZLE_XZ_T0_JOB = "idex_nozzle_fine_xz_grid_t0"
 FINE_NOZZLE_XZ_T1_JOB = "idex_nozzle_fine_xz_grid_t1"
 FINE_NOZZLE_XZ_JOBS = {
@@ -116,6 +118,7 @@ JOB_TYPES = (
     BED_TAB_CORNER_JOB,
     RED_MARKER_X_JOB,
     ROUGH_X_VERIFY_JOB,
+    EDDY_FIDUCIAL_XZ_JOB,
     FINE_NOZZLE_XZ_T0_JOB,
     FINE_NOZZLE_XZ_T1_JOB,
 )
@@ -451,6 +454,7 @@ def _preflight(
     elif job_type in {
         RED_MARKER_X_JOB,
         ROUGH_X_VERIFY_JOB,
+        EDDY_FIDUCIAL_XZ_JOB,
         *FINE_NOZZLE_XZ_JOBS,
     }:
         positions.append(
@@ -958,6 +962,34 @@ def prepare_job(
                     ],
                 }
             )
+    elif job_type == EDDY_FIDUCIAL_XZ_JOB:
+        x_positions = [float(item) for item in definition["x_positions_mm"]]
+        for row_index, z_value in enumerate(definition["z_positions_mm"]):
+            z_mm = float(z_value)
+            row = x_positions if row_index % 2 == 0 else list(reversed(x_positions))
+            for x_mm in row:
+                seq = len(frames)
+                frames.append(
+                    {
+                        "seq": seq,
+                        "frame": f"{seq:02d}_eddy_x{x_mm:.3f}_z{z_mm:.3f}".replace(
+                            ".", "p"
+                        ),
+                        "camera": "nozzle_cam",
+                        "profile": definition["profile"],
+                        "tool": "T0",
+                        "x_mm": x_mm,
+                        "z_mm": z_mm,
+                        "discard_fresh_frames": int(
+                            definition["discard_fresh_frames"]
+                        ),
+                        "commanded_position_mm": [
+                            x_mm,
+                            pose["capture_y_mm"],
+                            z_mm,
+                        ],
+                    }
+                )
     elif job_type in FINE_NOZZLE_XZ_JOBS:
         partial = input_values["partial_bed_coordinate_system"]
         x_axis = input_values["image_x_axis_z2"]["axis_vector_px_per_mm"]
@@ -1361,6 +1393,13 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 reference=manifest["verification_reference"],
                 localizer=manifest["localizer"],
             )
+        elif job_type == EDDY_FIDUCIAL_XZ_JOB:
+            details = analyze_eddy_fiducial_xz(
+                frame_paths,
+                artifact_dir,
+                frames=manifest["frames"],
+                localizer=manifest["localizer"],
+            )
         elif job_type in FINE_NOZZLE_XZ_JOBS:
             details = analyze_fine_nozzle_xz(
                 frame_paths,
@@ -1674,6 +1713,25 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 facts = [
                     _fact(
                         "calibration.rough_tool_x.verified",
+                        "diagnostic",
+                        value,
+                        dependencies,
+                    )
+                ]
+            elif job_type == EDDY_FIDUCIAL_XZ_JOB:
+                value = {
+                    "camera": "nozzle_cam",
+                    "image_dimensions_px": details["image_dimensions_px"],
+                    "positions": details["raw_positions"],
+                    "detector_records": details["records"],
+                    "supporting_artifact_hashes": {
+                        key: item["sha256"]
+                        for key, item in details["artifacts"].items()
+                    },
+                }
+                facts = [
+                    _fact(
+                        "camera.nozzle_cam.eddy_fiducial.xz_image_positions",
                         "diagnostic",
                         value,
                         dependencies,

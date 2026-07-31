@@ -25,6 +25,7 @@ JOB_TYPES = {
     "nozzle_cam_bed_tab_corner",
     "idex_tool_red_marker_x_sweep",
     "idex_rough_tool_x_verify",
+    "idex_eddy_fiducial_xz_grid",
     "idex_nozzle_fine_xz_grid_t0",
     "idex_nozzle_fine_xz_grid_t1",
 }
@@ -174,6 +175,15 @@ def validate_registry(record: Any) -> dict[str, Any]:
         210,
     ]:
         raise CalibrationGraphError("red-marker X motion order is invalid")
+    eddy = job_types["idex_eddy_fiducial_xz_grid"]
+    if eddy.get("tool") != "T0":
+        raise CalibrationGraphError("Eddy fiducial job must target T0")
+    if eddy.get("x_positions_mm") != [230, 234.666667, 239.333333, 244]:
+        raise CalibrationGraphError("Eddy fiducial X positions are invalid")
+    if eddy.get("z_positions_mm") != [0.5, 3.333333, 6.166667, 9]:
+        raise CalibrationGraphError("Eddy fiducial Z positions are invalid")
+    if eddy.get("safe_tool_change_z_mm") != 9:
+        raise CalibrationGraphError("Eddy fiducial tool-change Z is invalid")
     for tool in ("T0", "T1"):
         fine = job_types[f"idex_nozzle_fine_xz_grid_{tool.lower()}"]
         if fine.get("tool") != tool:
@@ -287,6 +297,15 @@ def validate_manifest(record: Any) -> dict[str, Any]:
             "T1",
         ]:
             raise CalibrationGraphError("rough-X verification frames are invalid")
+    elif job_type == "idex_eddy_fiducial_xz_grid":
+        expected = []
+        x_positions = [230, 234.666667, 239.333333, 244]
+        for row_index, z_mm in enumerate((0.5, 3.333333, 6.166667, 9)):
+            row = x_positions if row_index % 2 == 0 else list(reversed(x_positions))
+            expected.extend((x_mm, z_mm) for x_mm in row)
+        observed = [(frame.get("x_mm"), frame.get("z_mm")) for frame in frames]
+        if observed != expected or any(frame.get("tool") != "T0" for frame in frames):
+            raise CalibrationGraphError("Eddy fiducial X/Z motion order is invalid")
     elif job_type in {
         "idex_nozzle_fine_xz_grid_t0",
         "idex_nozzle_fine_xz_grid_t1",

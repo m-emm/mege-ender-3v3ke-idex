@@ -194,6 +194,38 @@
         "calibration.rough_tool_x.verified"
       ]
     },
+    "idex_eddy_fiducial_xz_grid": {
+      "definition_version": 1,
+      "fact_definition_version": 1,
+      "camera": "nozzle_cam",
+      "profile": "analysis",
+      "light_macro": "NOZZLE_CAM_ANALYSIS_LIGHT",
+      "tool": "T0",
+      "localizer": {
+        "kind": "eddy_fiducial_circle",
+        "version": 2,
+        "expected_center_1080": [970, 310],
+        "search_radius_1080": 130,
+        "radius_range_1080": [20, 50],
+        "max_distance_from_expected_1080": 110,
+        "hough_threshold": 40,
+        "minimum_edge_score": 6,
+        "center_weight": 0.03
+      },
+      "x_positions_mm": [230, 234.666667, 239.333333, 244],
+      "z_positions_mm": [0.5, 3.333333, 6.166667, 9],
+      "capture_y_mm": -14,
+      "safe_tool_change_z_mm": 9,
+      "velocity_mm_s": 60,
+      "settle_ms": 300,
+      "tool_change_settle_ms": 1000,
+      "discard_fresh_frames": 1,
+      "publish_on_accept": true,
+      "requires": [],
+      "fact_names": [
+        "camera.nozzle_cam.eddy_fiducial.xz_image_positions"
+      ]
+    },
     "idex_nozzle_fine_xz_grid_t0": {
       "definition_version": 1,
       "fact_definition_version": 1,
@@ -206,7 +238,7 @@
         "version": 1
       },
       "x_offsets_from_bed_tab_mm": [10, 12.5, 15, 17.5, 20, 22.5, 25],
-      "full_row_z_mm": [0.5, 4, 7.5, 11, 14.5, 18, 21.5, 25],
+      "full_row_z_mm": [0.5, 4, 7.5, 11, 14.5, 18],
       "capture_y_mm": -14,
       "safe_tool_change_z_mm": 9,
       "velocity_mm_s": 60,
