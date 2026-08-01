@@ -1068,6 +1068,16 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
 
     overlay = image.copy()
 
+    for i , candidate in enumerate(four_fiducials["candiates"]):
+        _logger.info(f"Drawing candidate {i} at {candidate}")
+        cv2.circle(
+            overlay,
+            tuple(np.rint(candidate["center_px"]).astype(int)),
+            int(round(candidate["radius_px"])),
+            (255, 0, 0),
+            2,
+        )
+
     for i, (center, radius) in enumerate(
         zip(
             four_fiducials["centers_px"],
@@ -1083,15 +1093,6 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
             2,
         )
 
-    for i , candidate in enumerate(four_fiducials["candiates"]):
-        _logger.info(f"Drawing candidate {i} at {candidate}")
-        cv2.circle(
-            overlay,
-            tuple(np.rint(candidate["center_px"]).astype(int)),
-            int(round(candidate["radius_px"])),
-            (255, 0, 0),
-            2,
-        )
 
 
     cv2.imwrite(str(run_root / "overlay.jpg"), overlay)
