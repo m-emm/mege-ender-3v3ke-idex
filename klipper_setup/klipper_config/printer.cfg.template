@@ -60,15 +60,16 @@ ${eddy_klipper_calibration}
 sensor_type: Generic 3950
 sensor_pin: eddy:gpio26
 horizontal_move_z: 2
+calibration_temp: ${eddy_temperature_calibration_temp}
 
 [bed_mesh]
 # Central, probe-coordinate-only visualization region. Diagnostic jobs clear
 # this runtime mesh and never persist a profile.
 speed: 100
-horizontal_move_z: 5
+horizontal_move_z: 2
 mesh_min: ${eddy_mesh_min_x},${eddy_mesh_min_y}
 mesh_max: ${eddy_mesh_max_x},${eddy_mesh_max_y}
-probe_count: 5,5
+probe_count: 11,11
 mesh_pps: 0,0
 zero_reference_position: ${eddy_bed_center_x},${eddy_bed_center_y}
 

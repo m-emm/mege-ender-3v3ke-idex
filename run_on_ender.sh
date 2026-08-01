@@ -11,16 +11,21 @@ if [ $# -ne 1 ]; then
     exit 1
 fi
 
-if [ "$1" = "-" ]; then
-    GCODE="$(cat)"
-else
-    GCODE="$1"
-fi
+_send_gcode() {
+    printf '{"script":"%s"}\n' "$1" |
+    ssh -T "$HOST" \
+      "curl -fsS \
+        -X POST http://127.0.0.1:7125/printer/gcode/script \
+        -H 'Content-Type: application/json' \
+        --data-binary @-"
+}
 
-printf '{"script":"%s"}\n' "$GCODE" |
-ssh -T "$HOST" \
-  "curl -fsS \
-    -X POST http://127.0.0.1:7125/printer/gcode/script \
-    -H 'Content-Type: application/json' \
-    --data-binary @-"
+if [ "$1" = "-" ]; then
+    while IFS= read -r line; do
+        [[ -z "${line// }" ]] && continue
+        _send_gcode "$line"
+    done
+else
+    _send_gcode "$1"
+fi
 

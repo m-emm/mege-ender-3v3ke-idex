@@ -291,9 +291,8 @@ def join_left_belt_carriage_with_cage(
         top_plate_back_left_cutter, tool_head_mount_machined, Alignment.STACK_LEFT
     )
     top_plate_back_left_cutter = align(
-            top_plate_back_left_cutter, tool_head_mount_machined, Alignment.STACK_TOP
-        )
-    
+        top_plate_back_left_cutter, tool_head_mount_machined, Alignment.STACK_TOP
+    )
 
     top_plate = top_plate.cut(top_plate_back_left_cutter)
 

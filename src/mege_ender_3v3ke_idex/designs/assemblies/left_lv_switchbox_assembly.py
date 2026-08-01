@@ -23,6 +23,7 @@ cable_tie_mount_thickness = 6
 cable_tie_mount_hole_thickness = 3
 cable_tie_mount_hole_depth = 6
 
+
 def create_left_lv_switchbox_assembly(
     *,
     left_lv_switchbox_width,
@@ -188,13 +189,11 @@ def create_left_lv_switchbox_assembly(
         stack_gap=-RAIL_BASE_OVERLAP,
     )
 
-
     terminal_rail = align(
         terminal_rail,
         bottom_reference,
-        Alignment.FRONT,        
+        Alignment.FRONT,
     )
-    
 
     terminal_square_nut_pocket_items = []
     terminal_square_nut_items = []
@@ -235,33 +234,32 @@ def create_left_lv_switchbox_assembly(
             )
         )
 
-        cable_tie_mount = create_box(cable_tie_mount_width, cable_tie_mount_depth, cable_tie_mount_thickness)
-        cable_tie_mount_hole_cutter = create_box(100, cable_tie_mount_hole_depth, cable_tie_mount_hole_thickness)
+        cable_tie_mount = create_box(
+            cable_tie_mount_width, cable_tie_mount_depth, cable_tie_mount_thickness
+        )
+        cable_tie_mount_hole_cutter = create_box(
+            100, cable_tie_mount_hole_depth, cable_tie_mount_hole_thickness
+        )
         cable_tie_mount_hole_cutter = align(
-            cable_tie_mount_hole_cutter,
-            cable_tie_mount,
-            Alignment.CENTER)
+            cable_tie_mount_hole_cutter, cable_tie_mount, Alignment.CENTER
+        )
 
         cable_tie_mount_hole_cutter = align(
-            cable_tie_mount_hole_cutter,
-            cable_tie_mount,
-            Alignment.BOTTOM)
+            cable_tie_mount_hole_cutter, cable_tie_mount, Alignment.BOTTOM
+        )
 
         cable_tie_mount = cable_tie_mount.cut(cable_tie_mount_hole_cutter)
 
-        cable_tie_mount = translate(TERMINAL_PITCH *1.2 * terminal_index, 0,0)(cable_tie_mount)
+        cable_tie_mount = translate(TERMINAL_PITCH * 1.2 * terminal_index, 0, 0)(
+            cable_tie_mount
+        )
         cable_tie_mounts = cable_tie_mounts.fuse(cable_tie_mount)
 
-    cable_tie_mounts = align(
-        cable_tie_mounts, bottom_reference, Alignment.CENTER)
+    cable_tie_mounts = align(cable_tie_mounts, bottom_reference, Alignment.CENTER)
 
+    cable_tie_mounts = align(cable_tie_mounts, bottom_reference, Alignment.STACK_TOP)
 
-    cable_tie_mounts = align(
-        cable_tie_mounts, bottom_reference, Alignment.STACK_TOP)
-
-    cable_tie_mounts = align(
-        cable_tie_mounts, inner_space, Alignment.BACK)
-    
+    cable_tie_mounts = align(cable_tie_mounts, inner_space, Alignment.BACK)
 
     cable_tie_mounts = translate(0, -6, 0)(cable_tie_mounts)
     housing_box = housing_box.fuse(terminal_rail)

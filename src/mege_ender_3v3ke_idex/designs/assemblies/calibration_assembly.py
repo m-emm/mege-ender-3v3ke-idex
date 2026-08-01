@@ -6,7 +6,7 @@ def create_calibration_assembly(
     BIG_THING=500,
 ):
 
-    diameters = [2, 4, 8]
+    diameters = [ 4, 8,10]
     base_thickness = 2
     post_height = 4
     x_gap = 10
