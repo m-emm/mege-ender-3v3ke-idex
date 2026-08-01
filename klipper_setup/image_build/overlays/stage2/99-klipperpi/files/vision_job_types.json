@@ -377,6 +377,36 @@
         "camera.nozzle_cam.eddy_fiducial.t0_xyz_offset"
       ]
     },
+    "idex_t0_t1_xyz_offset": {
+      "definition_version": 1,
+      "fact_definition_version": 1,
+      "camera": "nozzle_cam",
+      "localizer": {
+        "kind": "compute_only",
+        "version": 1
+      },
+      "publish_on_accept": true,
+      "requires": [
+        {
+          "requirement": "t0_projection_model",
+          "fact_name": "camera.nozzle_cam.nozzle_tip.t0_projection_model",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "eddy_xz_image_positions",
+          "fact_name": "camera.nozzle_cam.eddy_fiducial.xz_image_positions",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "t1_projection_model",
+          "fact_name": "camera.nozzle_cam.nozzle_tip.t1_projection_model",
+          "fact_definition_version": 1
+        }
+      ],
+      "fact_names": [
+        "camera.nozzle_cam.nozzle_tip.t0_t1_xyz_offset"
+      ]
+    },
     "idex_nozzle_fine_xz_grid_t1": {
       "definition_version": 1,
       "fact_definition_version": 1,

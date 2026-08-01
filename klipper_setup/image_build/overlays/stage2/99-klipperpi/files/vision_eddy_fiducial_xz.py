@@ -10,12 +10,14 @@ from typing import Any
 
 import cv2
 import numpy as np
+import logging
 
+_logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Frozen SIFT template — committed PNG of the BTT Eddy sensor body crop.
-# Deployed alongside this script as eddy_sift_body_template.png.
+# Deployed to /usr/local/share/vision/eddy_sift_body_template.png.
 # ---------------------------------------------------------------------------
-_SIFT_TEMPLATE_PATH = Path(__file__).with_name("eddy_sift_body_template.png")
+_SIFT_TEMPLATE_PATH = Path("/usr/local/share/vision/eddy_sift_body_template.png")
 _SIFT_LOWE_RATIO = 0.75
 _SIFT_MIN_INLIERS = 8
 
@@ -48,6 +50,115 @@ def _artifact(path: Path) -> dict[str, str]:
     }
 
 
+def _gradient_image(gray: np.ndarray) -> np.ndarray:
+    """Return an illumination-resistant structural image."""
+
+    gray = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+
+    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+
+    magnitude = cv2.magnitude(gx, gy)
+
+    # Convert to uint8 for compact storage and fast template matching.
+
+    return cv2.normalize(
+        magnitude,
+        None,
+        0,
+        255,
+        cv2.NORM_MINMAX,
+        dtype=cv2.CV_8U,
+    )
+
+
+def locate_body_template(
+    frame: np.ndarray,
+    template_gray: np.ndarray,
+    *,
+    scales: tuple[float, ...] = (
+        0.80,
+        0.85,
+        0.90,
+        0.95,
+        1.00,
+        1.05,
+        1.10,
+        1.15,
+        1.20,
+    ),
+    min_score: float = 0.45,
+) -> tuple[int, int, int, int] | None:
+    """Locate the Eddy body using multi-scale gradient template matching."""
+
+    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    frame_features = _gradient_image(frame_gray)
+
+    template_features = _gradient_image(template_gray)
+
+    frame_h, frame_w = frame_features.shape
+
+    best_score = -1.0
+
+    best_rect: tuple[int, int, int, int] | None = None
+
+    for scale in scales:
+
+        template_w = round(template_features.shape[1] * scale)
+
+        template_h = round(template_features.shape[0] * scale)
+
+        if template_w < 16 or template_h < 16:
+
+            continue
+
+        if template_w > frame_w or template_h > frame_h:
+
+            continue
+
+        scaled_template = cv2.resize(
+            template_features,
+            (template_w, template_h),
+            interpolation=(cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR),
+        )
+
+        response = cv2.matchTemplate(
+            frame_features,
+            scaled_template,
+            cv2.TM_CCOEFF_NORMED,
+        )
+
+        _, score, _, location = cv2.minMaxLoc(response)
+
+        if score > best_score:
+
+            x, y = location
+
+            best_score = score
+
+            best_rect = (x, y, x + template_w, y + template_h)
+
+    if best_rect is None or best_score < min_score:
+
+        return None
+
+    return best_rect
+
+def _load_gray_template() -> np.ndarray:
+    template_gray = cv2.imread(
+        str(_SIFT_TEMPLATE_PATH),
+        cv2.IMREAD_GRAYSCALE,
+    )
+    if template_gray is None:
+        raise EddyFiducialError(
+            f"Cannot load body template {_SIFT_TEMPLATE_PATH}"
+        )
+    return template_gray
+
+template_gray = _load_gray_template()
+
 def _load_sift_template() -> tuple[list, np.ndarray, int, int] | None:
     """Load the frozen sensor-body SIFT template from the sibling PNG.
 
@@ -59,7 +170,13 @@ def _load_sift_template() -> tuple[list, np.ndarray, int, int] | None:
     crop = cv2.imread(str(_SIFT_TEMPLATE_PATH), cv2.IMREAD_COLOR)
     if crop is None:
         return None
-    sift = cv2.SIFT_create()
+    sift = cv2.SIFT_create(
+        nfeatures=1500,
+        nOctaveLayers=3,
+        contrastThreshold=0.04,
+        edgeThreshold=10,
+        sigma=1.6,
+    )
     kp, des = sift.detectAndCompute(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), None)
     if des is None or len(kp) < 4:
         return None
@@ -80,12 +197,20 @@ def _sift_body_roi(
     coordinates that tightly contains the projected template, or None when
     fewer than _SIFT_MIN_INLIERS inliers survive.
     """
+    _logger.info("Creating SIFT detector for body localisation")
     sift = cv2.SIFT_create()
+
+    _logger.info("SIFT detector created")
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    _logger.info("Detecting SIFT keypoints in frame")
     kp2, des2 = sift.detectAndCompute(gray, None)
     if des2 is None or len(kp2) < 4:
-        return None
+        raise EddyFiducialError("SIFT body detection failed — insufficient keypoints")
     bf = cv2.BFMatcher(cv2.NORM_L2)
+
+    _logger.info("Matching SIFT template against frame")
+
     raw = bf.knnMatch(template_des, des2, k=2)
     good = [
         m
@@ -93,18 +218,21 @@ def _sift_body_roi(
         if len([m, n]) == 2 and m.distance < _SIFT_LOWE_RATIO * n.distance
     ]
     if len(good) < _SIFT_MIN_INLIERS:
-        return None
-    src_pts = np.float32(
-        [template_kp[m.queryIdx].pt for m in good]
-    ).reshape(-1, 1, 2)
-    dst_pts = np.float32(
-        [kp2[m.trainIdx].pt for m in good]
-    ).reshape(-1, 1, 2)
+        raise EddyFiducialError(
+            f"SIFT body detection failed — only {len(good)} inliers"
+        )
+    _logger.info(f"Found {len(good)} SIFT inliers for body localisation")
+    src_pts = np.float32([template_kp[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
+    dst_pts = np.float32([kp2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
     M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
     if M is None:
-        return None
+        raise EddyFiducialError(
+            "SIFT body detection failed — homography could not be computed"
+        )
     if mask is not None and int(np.sum(mask)) < _SIFT_MIN_INLIERS:
-        return None
+        raise EddyFiducialError(
+            f"SIFT body detection failed — only {int(np.sum(mask))} inliers"
+        )
     corners = np.float32(
         [[0, 0], [template_w, 0], [template_w, template_h], [0, template_h]]
     ).reshape(-1, 1, 2)
@@ -115,13 +243,11 @@ def _sift_body_roi(
     x1 = min(fw, int(np.ceil(np.max(projected[:, 0]))))
     y1 = min(fh, int(np.ceil(np.max(projected[:, 1]))))
     if x1 <= x0 or y1 <= y0:
-        return None
+        raise EddyFiducialError("SIFT body ROI is degenerate")
     return x0, y0, x1, y1
 
 
-def _blob_anchor(
-    diff_gray: np.ndarray, scale: float
-) -> np.ndarray | None:
+def _blob_anchor(diff_gray: np.ndarray, scale: float) -> np.ndarray | None:
     """Find the centroid of the largest foreground blob in a background-diff image.
 
     Returns a (x, y) array in full-frame coordinates, or None if no clear blob
@@ -144,18 +270,14 @@ def _blob_anchor(
     return np.asarray(centroids[lbl], dtype=np.float64)
 
 
-def _circle_edge_score(
-    gray: np.ndarray, center: np.ndarray, radius: float
-) -> float:
+def _circle_edge_score(gray: np.ndarray, center: np.ndarray, radius: float) -> float:
     angles = np.linspace(0.0, 2.0 * math.pi, 180, endpoint=False)
     radial_means = []
     radial_spreads = []
     for radius_scale in (0.82, 0.94, 1.06, 1.18):
         xs = np.rint(center[0] + radius * radius_scale * np.cos(angles)).astype(int)
         ys = np.rint(center[1] + radius * radius_scale * np.sin(angles)).astype(int)
-        valid = (
-            (xs >= 0) & (xs < gray.shape[1]) & (ys >= 0) & (ys < gray.shape[0])
-        )
+        valid = (xs >= 0) & (xs < gray.shape[1]) & (ys >= 0) & (ys < gray.shape[0])
         if int(np.count_nonzero(valid)) < 150:
             return 0.0
         values = gray[ys[valid], xs[valid]].astype(np.float64)
@@ -200,9 +322,7 @@ def detect_circle(
     if sift_roi is not None:
         # --- Stage 1a: SIFT body bbox drives the crop directly ---------------
         x0, y0, x1, y1 = sift_roi
-        anchor = np.asarray(
-            [(x0 + x1) / 2.0, (y0 + y1) / 2.0], dtype=np.float64
-        )
+        anchor = np.asarray([(x0 + x1) / 2.0, (y0 + y1) / 2.0], dtype=np.float64)
         # Accept any circle whose centre lies within the projected ROI
         max_dist = math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2) / 2.0
     else:
@@ -233,7 +353,9 @@ def detect_circle(
         y0 = max(0, cy - half)
         x1 = min(width, cx + half)
         y1 = min(height, cy + half)
-        max_dist = float(localizer.get("max_distance_from_expected_1080", 110.0)) * scale
+        max_dist = (
+            float(localizer.get("max_distance_from_expected_1080", 110.0)) * scale
+        )
 
     # --- Stage 2: Hough on image crop defined by the ROI ------------------------
     crop = image[y0:y1, x0:x1]
@@ -319,23 +441,25 @@ def analyze(
     Images are read one at a time.  SIFT body localisation drives the crop
     for each Hough circle search; no background image is needed.
     """
+
+    _logger.info(f"analyzing {len(frames)} Eddy fiducial X/Z frames in {artifact_dir}")
     artifact_dir.mkdir(parents=True, exist_ok=True)
     if len(frame_paths) != len(frames):
         raise EddyFiducialError("Eddy frame paths do not match the manifest")
 
-    # --- Load frozen SIFT template once ----------------------------------------
-    sift_context = _load_sift_template()
-
-    artifacts: dict[str, Any] = {}
 
     # --- Per-frame detection and circle overlays (one image at a time) ----------
     records = []
     expected_center: np.ndarray | None = None
     panels_overlay: list[np.ndarray] = []
     image_dimensions: list[int] | None = None
+    artifacts: dict[str, Any] = {}
 
     for path, frame in zip(frame_paths, frames):
+        _logger.info(f"Loading frame {frame['seq']} from {path}")
+
         image = cv2.imread(str(path), cv2.IMREAD_COLOR)
+        _logger.info(f"Loaded frame {frame['seq']} from {path}")
         if image is None:
             raise EddyFiducialError(f"Eddy image {frame['seq']} cannot be decoded")
         dimensions = [int(image.shape[1]), int(image.shape[0])]
@@ -344,18 +468,28 @@ def analyze(
         elif dimensions != image_dimensions:
             raise EddyFiducialError("Eddy grid images have inconsistent dimensions")
 
-        sift_roi = _sift_body_roi(image, *sift_context) if sift_context is not None else None
+        
+        body_rect = locate_body_template(image, template_gray)
+
+        if body_rect is None:
+            continue
+            # raise EddyFiducialError("Could not locate Eddy body")
+
+        x0, y0, x1, y1 = body_rect    
+
+
+
         detection = detect_circle(
             image,
             localizer,
             expected_center_px=expected_center,
-            sift_roi=sift_roi,
+            sift_roi=(x0, y0, x1, y1),
         )
         if detection["accepted"]:
             expected_center = np.asarray(detection["center_px"], dtype=np.float64)
 
         center = detection.get("center_px")
-        sift_roi_record = detection.get("sift_roi_px")
+        sift_roi_record = detection["sift_roi_px"]
         record = {
             "seq": int(frame["seq"]),
             "commanded_x_mm": float(frame["x_mm"]),
@@ -378,20 +512,44 @@ def analyze(
         draw_color = (0, 255, 0) if record["detected"] else (0, 0, 255)
 
         overlay = image.copy()
-        if sift_roi_record is not None:
-            rx0, ry0, rx1, ry1 = sift_roi_record
-            cv2.rectangle(overlay, (rx0, ry0), (rx1, ry1), (0, 230, 230), 2)
+        rx0, ry0, rx1, ry1 = sift_roi_record
+
+        _logger.info(
+            f"Drawing rectangle overlay for frame {frame['seq']}: ({rx0}, {ry0}) to ({rx1}, {ry1})"
+        )
+        cv2.rectangle(overlay, (rx0, ry0), (rx1, ry1), (0, 230, 230), 2)
         if center is not None:
             center_point = tuple(np.rint(center).astype(int))
-            cv2.circle(overlay, center_point, int(round(float(detection["radius_px"]))), draw_color, 3)
+            cv2.circle(
+                overlay,
+                center_point,
+                int(round(float(detection["radius_px"]))),
+                draw_color,
+                3,
+            )
             cv2.drawMarker(overlay, center_point, draw_color, cv2.MARKER_CROSS, 24, 3)
-        cv2.putText(overlay, status_text, (24, 42), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.8, draw_color, 2, cv2.LINE_AA)
+        cv2.putText(
+            overlay,
+            status_text,
+            (24, 42),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            draw_color,
+            2,
+            cv2.LINE_AA,
+        )
+
         overlay_path = artifact_dir / f"{frame['frame']}_eddy_circle.png"
         if not cv2.imwrite(str(overlay_path), overlay):
             raise EddyFiducialError(f"could not write overlay {overlay_path}")
-        artifacts[f"eddy_circle_overlay_{int(frame['seq']):02d}"] = _artifact(overlay_path)
-        panels_overlay.append(cv2.resize(overlay, (480, 270), interpolation=cv2.INTER_AREA))
+
+        _logger.info(f"Saved overlay for frame {frame['seq']} to {overlay_path}")
+        artifacts[f"eddy_circle_overlay_{int(frame['seq']):02d}"] = _artifact(
+            overlay_path
+        )
+        panels_overlay.append(
+            cv2.resize(overlay, (480, 270), interpolation=cv2.INTER_AREA)
+        )
         # image and overlay go out of scope here — GC reclaims the memory
 
     # --- Contact sheet (4 columns) ----------------------------------------------

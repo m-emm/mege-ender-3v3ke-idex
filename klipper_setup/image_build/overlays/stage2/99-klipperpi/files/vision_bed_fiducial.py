@@ -642,6 +642,7 @@ def analyze_metric(
                 np.linalg.norm(direct_center - tracked_center)
             )
             detection["tracking"] = tracking
+            detection["commanded_position_mm"] = list(frames[index]["commanded_position_mm"])
             detections.append(detection)
             tracking_records.append(tracking)
         except BedFiducialError as exc:

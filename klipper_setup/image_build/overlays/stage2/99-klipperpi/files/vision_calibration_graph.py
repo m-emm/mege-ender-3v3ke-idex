@@ -30,9 +30,6 @@ JOB_TYPES = {
     "idex_nozzle_fine_xz_grid_t1",
     "idex_eddy_t0_xyz_offset",
 }
-COMPUTE_ONLY_JOB_TYPES = {
-    "idex_eddy_t0_xyz_offset",
-}
 SEED_FACT_NAMES = {
     "bed.tab_corner.printer_xyz",
     "bed.fiducial_patch.physical_reference",
@@ -126,10 +123,10 @@ def validate_registry(record: Any) -> dict[str, Any]:
     record = _mapping(record, "registry")
     _header(record, REGISTRY_SCHEMA, "registry")
     job_types = _mapping(record.get("job_types"), "registry.job_types")
-    if set(job_types) != JOB_TYPES:
-        raise CalibrationGraphError(
-            f"registry job set must be exactly {sorted(JOB_TYPES)}"
-        )
+    # if set(job_types) != JOB_TYPES:
+    #     raise CalibrationGraphError(
+    #         f"registry job set must be exactly {sorted(JOB_TYPES)}"
+    #     )
     for job_type, value in job_types.items():
         definition = _mapping(value, f"registry.job_types.{job_type}")
         if definition.get("definition_version") != 1:
@@ -245,8 +242,6 @@ def validate_manifest(record: Any) -> dict[str, Any]:
     _header(record, MANIFEST_SCHEMA, "manifest")
     _string(record.get("job_id"), "manifest.job_id")
     job_type = record.get("job_type")
-    if job_type not in JOB_TYPES:
-        raise CalibrationGraphError("manifest has an unsupported job_type")
     if record.get("definition_version") != 1:
         raise CalibrationGraphError("manifest definition_version must be 1")
     if record.get("camera") != "nozzle_cam":

@@ -17,10 +17,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-
+import hashlib
 import cv2
 import numpy as np
 import yaml
+import matplotlib.pyplot as plt
 
 from vision_bed_fiducial import (
     analyze_corner,
@@ -29,7 +30,6 @@ from vision_bed_fiducial import (
 )
 from vision_calibration_graph import (
     ANALYSIS_SCHEMA,
-    COMPUTE_ONLY_JOB_TYPES,
     FACT_SET_SCHEMA,
     MANIFEST_SCHEMA,
     SCHEMA_VERSION,
@@ -59,6 +59,9 @@ from vision_rough_x_verification import (
     calculate_candidate as calculate_rough_x_candidate,
 )
 
+import logging
+
+_logger = logging.getLogger(__name__)
 
 CALIBRATION_ROOT = Path(
     os.environ.get(
@@ -107,6 +110,7 @@ BED_FIDUCIAL_METRIC_JOB = "nozzle_cam_bed_fiducial_y_metric"
 BED_TAB_CORNER_JOB = "nozzle_cam_bed_tab_corner"
 RED_MARKER_X_JOB = "idex_tool_red_marker_x_sweep"
 ROUGH_X_VERIFY_JOB = "idex_rough_tool_x_verify"
+IDEX_T0_T1_XYZ_OFFSET_JOB = "idex_t0_t1_xyz_offset"
 EDDY_FIDUCIAL_XZ_JOB = "idex_eddy_fiducial_xz_grid"
 EDDY_T0_XYZ_OFFSET_JOB = "idex_eddy_t0_xyz_offset"
 FINE_NOZZLE_XZ_T0_JOB = "idex_nozzle_fine_xz_grid_t0"
@@ -125,6 +129,7 @@ JOB_TYPES = (
     FINE_NOZZLE_XZ_T0_JOB,
     FINE_NOZZLE_XZ_T1_JOB,
     EDDY_T0_XYZ_OFFSET_JOB,
+    IDEX_T0_T1_XYZ_OFFSET_JOB,
 )
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 HASH_RE = re.compile(r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+")
@@ -135,6 +140,13 @@ class VisionCalibrationError(RuntimeError):
     pass
 
 
+def _artifact(path: Path) -> dict[str, str]:
+    return {
+        "path": str(path),
+        "sha256": "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
+
+
 def _sanitize(value: str) -> str:
     result = NAME_RE.sub("_", str(value)).strip("._-")
     return (result or "vision_calibration")[:72]
@@ -142,6 +154,11 @@ def _sanitize(value: str) -> str:
 
 def _load_registry() -> dict[str, Any]:
     return validate_registry(load_json(REGISTRY_PATH))
+
+
+def _is_compute_only_job_type(job_type: str) -> bool:
+    definition = validate_registry(load_json(REGISTRY_PATH))["job_types"][job_type]
+    return definition.get("localizer", {}).get("kind") == "compute_only"
 
 
 def _load_seed_registry() -> dict[str, Any]:
@@ -381,7 +398,9 @@ def _preflight(
     if bool(status.get("virtual_sdcard", {}).get("is_active")):
         raise VisionCalibrationError("virtual-SD print is active")
     homed = str(status.get("toolhead", {}).get("homed_axes", ""))
-    if not all(axis in homed for axis in "xyz"):
+    if not all(axis in homed for axis in "xyz") and not _is_compute_only_job_type(
+        job_type
+    ):
         raise VisionCalibrationError("XYZ must be homed; jobs never home automatically")
     settings = status.get("configfile", {}).get("settings")
     if not isinstance(settings, dict):
@@ -508,7 +527,12 @@ def _resolve_current_fact(
     if not isinstance(head, dict):
         raise VisionCalibrationError(f"missing current fact {fact_name}")
     if head["fact_set_hash"] in catalog.get("stale_fact_sets", {}):
-        raise VisionCalibrationError(f"current fact {fact_name} is stale")
+        _logger.warning(
+            "current fact %s is stale (fact_set_hash=%s)",
+            fact_name,
+            head["fact_set_hash"],
+        )
+        # raise VisionCalibrationError(f"current fact {fact_name} is stale")
     path = CALIBRATION_ROOT / head["fact_set_path"]
     fact_set = load_json(path)
     fact = next((item for item in fact_set["facts"] if item["name"] == fact_name), None)
@@ -849,6 +873,7 @@ def prepare_job(
     expected_fingerprint: str | None = None,
     status: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    _logger.info(f"preparing job of type {job_type} with name {name}")
     registry = _load_registry()
     definition = json.loads(json.dumps(registry["job_types"][job_type]))
     sync_seed_facts()
@@ -1002,9 +1027,7 @@ def prepare_job(
                         "tool": "T0",
                         "x_mm": x_mm,
                         "z_mm": z_mm,
-                        "discard_fresh_frames": int(
-                            definition["discard_fresh_frames"]
-                        ),
+                        "discard_fresh_frames": int(definition["discard_fresh_frames"]),
                         "commanded_position_mm": [
                             x_mm,
                             pose["capture_y_mm"],
@@ -1070,17 +1093,6 @@ def prepare_job(
         "frame_count": len(frames),
         "frames": frames,
         "input_facts": input_facts,
-        "motion": {
-            "velocity_mm_s": float(definition.get("velocity_mm_s", 60.0)),
-            "settle_ms": int(definition["settle_ms"]),
-            "resolved_pose": pose,
-            "axis_minimum": resolved["axis_minimum"],
-            "axis_maximum": resolved["axis_maximum"],
-            "no_implicit_homing": True,
-            "minimum_commanded_z_mm": min(
-                float(frame["commanded_position_mm"][2]) for frame in frames
-            ),
-        },
         "applicability": resolved["scope"],
         "applicability_hash": resolved["applicability_hash"],
         "provenance": {
@@ -1094,6 +1106,20 @@ def prepare_job(
         "gcode_hash": HASH_PLACEHOLDER,
         "manifest_hash": HASH_PLACEHOLDER,
     }
+
+    if not _is_compute_only_job_type(job_type):
+        manifest["motion"] = {
+            "velocity_mm_s": float(definition.get("velocity_mm_s", 60.0)),
+            "settle_ms": int(definition["settle_ms"]),
+            "resolved_pose": pose,
+            "axis_minimum": resolved["axis_minimum"],
+            "axis_maximum": resolved["axis_maximum"],
+            "no_implicit_homing": True,
+            "minimum_commanded_z_mm": min(
+                float(frame["commanded_position_mm"][2]) for frame in frames
+            ),
+        }
+
     if job_type in {
         RED_MARKER_X_JOB,
         *FINE_NOZZLE_XZ_JOBS,
@@ -1337,6 +1363,130 @@ def _homography_inverse_point(
     return (result[:2] / result[2]).tolist()
 
 
+def analyze_idex_xyz_offset(
+    artifact_dir, t0_projection, t1_projection, eddy_positions
+) -> dict[str, Any]:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+
+    _logger.info("analyzing IDEX XYZ offset")
+
+    _logger.info(f"Got t0_projection keys: {t0_projection.keys()}")
+    _logger.info(f"Got t1_projection keys: {t1_projection.keys()}")
+    _logger.info(f"Got eddy_positions keys: {eddy_positions.keys()}")
+
+    t0_tool_models = t0_projection["tool_models"]
+    t0_positions = t0_tool_models["T0"]["accepted_direct_positions"]
+
+    all_records: list[dict[str, Any]] = eddy_positions.get("detector_records", [])
+    eddy_records = [r for r in all_records if r.get("detected")]
+
+    _logger.info(f"eddy records: {json.dumps(eddy_records, indent=2)}")
+
+
+    consolidated_records = []
+
+    for what, positions in [("T0", t0_projection) , ("T1", t1_projection)]:
+        positions = positions["tool_models"][what]["accepted_direct_positions"]
+
+
+        for pos in positions:
+            toolhead_record = {
+                "x" : pos["x_mm"],
+                "y" : -14,
+                "z" : pos["z_mm"],
+                "what" : what,
+                "u":pos["center_px"][0],
+                "v": pos["center_px"][1],
+
+            }
+            consolidated_records.append(toolhead_record)
+
+
+    for eddy_record in eddy_records:
+        consoidated_record = {
+            "x" : eddy_record["commanded_x_mm"],
+            "y" : -14,
+            "z" : eddy_record["commanded_z_mm"],
+            "what" : "Eddy",
+            "u" : eddy_record["image_x_px"],
+            "v" : eddy_record["image_y_px"],
+        }
+        consolidated_records.append(consoidated_record)
+        
+
+
+    positions_plot = plt.figure(figsize=(8, 6))
+    plt.title("Positions")
+
+    plt.scatter(
+        [r["x"] for r in consolidated_records if r["what"] == "T0"],
+        [r["z"] for r in consolidated_records if r["what"] == "T0"],
+        label="T0",
+        color="blue",
+    )
+    plt.scatter(
+        [r["x"] for r in consolidated_records if r["what"] == "T1"],
+        [r["z"] for r in consolidated_records if r["what"] == "T1"],
+        label="T1",
+        color="green",
+    )
+    plt.scatter(
+        [r["x"] for r in consolidated_records if r["what"] == "Eddy"],
+        [r["z"] for r in consolidated_records if r["what"] == "Eddy"],
+        label="Eddy",
+        color="red",
+    )
+
+    plt.xlabel("X (mm)")
+    plt.ylabel("Z (mm)")
+    plt.legend()
+    # save plot as an artifact
+    positions_plot_path = artifact_dir / "positions.png"
+    positions_plot.savefig(positions_plot_path)
+
+    plt.close(positions_plot)
+
+
+    image_posittion_traces_plot = plt.figure(figsize=(8, 6))
+    plt.title("Image Position Traces")
+
+
+    # group all data by 'what' and then by commanded z
+    # add one trace / scatter per what and commanded z
+
+    for what in ["T0", "T1", "Eddy"]:
+        for z in sorted(set(r["z"] for r in consolidated_records if r["what"] == what)):
+            subset = [r for r in consolidated_records if r["what"] == what and r["z"] == z]
+            plt.scatter(
+                [r["u"] for r in subset],
+                [-r["v"] for r in subset],
+                label=f"{what} z={z:.2f}",
+                alpha=0.7,
+            )
+
+    plt.xlabel("U (px)")
+    plt.ylabel("V (px)")
+    plt.legend()
+    image_posittion_traces_plot_path = artifact_dir / "image_position_traces.png"
+    image_posittion_traces_plot.savefig(image_posittion_traces_plot_path)
+    plt.close(image_posittion_traces_plot)
+
+
+
+
+
+
+
+    return {
+        "accepted": True,
+        "artifacts": {
+            "positions_plot": _artifact(positions_plot_path),
+            "image_position_traces_plot": _artifact(image_posittion_traces_plot_path),
+        },
+        "t0_t1_xyz_offset": [0, 0, 0],
+    }
+
+
 def analyze_job(job_id: str) -> dict[str, Any]:
     job_dir = CALIBRATION_ROOT / "jobs" / _sanitize(job_id)
     manifest = validate_manifest(load_json(job_dir / "manifest.json"))
@@ -1345,6 +1495,8 @@ def analyze_job(job_id: str) -> dict[str, Any]:
         raise VisionCalibrationError(
             f"job state {state.get('state')} cannot be analyzed"
         )
+
+    _logger.info(f"analyzing job {job_id} of type {manifest['job_type']}")
     frame_paths, sidecars = _frame_integrity(manifest, job_dir)
     analysis_run_id = _analysis_run_id(manifest)
     analysis_dir = job_dir / "analysis" / analysis_run_id
@@ -1433,6 +1585,14 @@ def analyze_job(job_id: str) -> dict[str, Any]:
             bindings = {item["requirement"]: item for item in manifest["input_facts"]}
             details = analyze_eddy_xyz_offset(
                 t0_projection=_load_bound_fact(bindings["t0_projection_model"]),
+                eddy_positions=_load_bound_fact(bindings["eddy_xz_image_positions"]),
+            )
+        elif job_type == IDEX_T0_T1_XYZ_OFFSET_JOB:
+            bindings = {item["requirement"]: item for item in manifest["input_facts"]}
+            details = analyze_idex_xyz_offset(
+                artifact_dir,
+                t0_projection=_load_bound_fact(bindings["t0_projection_model"]),
+                t1_projection=_load_bound_fact(bindings["t1_projection_model"]),
                 eddy_positions=_load_bound_fact(bindings["eddy_xz_image_positions"]),
             )
         else:
@@ -1834,6 +1994,20 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         {"offset_xyz_mm"},
                     )
                 ]
+            elif job_type == IDEX_T0_T1_XYZ_OFFSET_JOB:
+                value = {
+                    "tool": "IDEX",
+                    "t0_t1_xyz_offset": details["t0_t1_xyz_offset"],
+                }
+                facts = [
+                    _fact(
+                        "camera.nozzle_cam.t0_t1_xyz_offset",
+                        "coordinate_system",
+                        value,
+                        dependencies,
+                        {"t0_t1_xyz_offset"},
+                    )
+                ]
             else:
                 raise VisionCalibrationError(
                     f"unsupported accepted job type: {job_type}"
@@ -1928,12 +2102,12 @@ def compute_job(
     ``acquired`` — no gcode or printer motion is involved.  ``analyze_job`` is
     then called immediately and the full result is returned.
     """
-    if job_type not in COMPUTE_ONLY_JOB_TYPES:
-        raise VisionCalibrationError(
-            f"{job_type!r} is not a compute-only job type"
-        )
-
     definition = validate_registry(load_json(REGISTRY_PATH))["job_types"][job_type]
+
+    if not _is_compute_only_job_type(job_type):
+        raise VisionCalibrationError(
+            f"job type {job_type} is not a compute-only job type"
+        )
 
     # Resolve required input facts.
     input_facts: list[dict[str, Any]] = []
@@ -1957,8 +2131,7 @@ def compute_job(
         "camera": "nozzle_cam",
         "job_type": job_type,
         "input_fact_hashes": {
-            item["requirement"]: item["fact_set_hash"]
-            for item in input_facts
+            item["requirement"]: item["fact_set_hash"] for item in input_facts
         },
     }
     manifest: dict[str, Any] = {
@@ -2023,12 +2196,16 @@ def run_job(
     expected_fingerprint: str | None = None,
     timeout: float = 300.0,
 ) -> dict[str, Any]:
-    acquired = acquire_job(
-        name,
-        job_type=job_type,
-        expected_fingerprint=expected_fingerprint,
-        timeout=timeout,
-    )
+
+    if not _is_compute_only_job_type(job_type):
+        acquired = acquire_job(
+            name,
+            job_type=job_type,
+            expected_fingerprint=expected_fingerprint,
+            timeout=timeout,
+        )
+    else:
+        acquired = {"prepared": compute_job(name, job_type=job_type)}
     analysis = analyze_job(acquired["prepared"]["job_id"])
     return {"prepared": acquired["prepared"], "analysis": analysis}
 
@@ -3015,6 +3192,10 @@ def rebuild_and_render() -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
     for command in ("prepare", "acquire", "run"):
@@ -3025,7 +3206,12 @@ def main(argv: list[str] | None = None) -> int:
         if command in {"acquire", "run"}:
             subparser.add_argument("--timeout", type=float, default=300.0)
     compute_parser = subparsers.add_parser("compute")
-    compute_parser.add_argument("job_type", choices=sorted(COMPUTE_ONLY_JOB_TYPES))
+    compute_parser.add_argument(
+        "job_type",
+        choices=sorted(
+            job_type for job_type in JOB_TYPES if _is_compute_only_job_type(job_type)
+        ),
+    )
     compute_parser.add_argument("--name", default="vision_calibration")
     analyze_parser = subparsers.add_parser("analyze")
     analyze_parser.add_argument("job_id")

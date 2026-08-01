@@ -9,6 +9,7 @@ REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 shopt -s nullglob
 python_files=("${FILES_DIR}"/*.py)
 json_files=("${FILES_DIR}"/*.json)
+png_files=("${FILES_DIR}"/*.png)
 
 if (( ${#python_files[@]} == 0 )); then
   echo "No top-level Python files found in ${FILES_DIR}" >&2
@@ -19,7 +20,7 @@ if (( ${#json_files[@]} == 0 )); then
   exit 1
 fi
 
-echo "Deploying ${#python_files[@]} Python files and ${#json_files[@]} JSON files to ${REMOTE_HOST}"
+echo "Deploying ${#python_files[@]} Python files, ${#json_files[@]} JSON files, and ${#png_files[@]} PNG files to ${REMOTE_HOST}"
 
 remote_tmp="$(ssh "${REMOTE_HOST}" "mktemp -d /tmp/vision-code.XXXXXX")"
 case "${remote_tmp}" in
@@ -35,7 +36,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-scp "${python_files[@]}" "${json_files[@]}" "${REMOTE_HOST}:${remote_tmp}/"
+scp "${python_files[@]}" "${json_files[@]}" ${png_files[@]+"${png_files[@]}"} "${REMOTE_HOST}:${remote_tmp}/"
 
 ssh "${REMOTE_HOST}" "REMOTE_TMP='${remote_tmp}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
@@ -59,6 +60,16 @@ for source in "${REMOTE_TMP}"/*.json; do
   echo "Installing ${filename} -> /usr/local/share/vision/${filename}"
   sudo install -m 0644 "${source}" "/usr/local/share/vision/${filename}"
 done
+
+for source in "${REMOTE_TMP}"/*.png; do
+  [[ -e "${source}" ]] || continue
+  filename="${source##*/}"
+  echo "Installing ${filename} -> /usr/local/share/vision/${filename}"
+  sudo install -m 0644 "${source}" "/usr/local/share/vision/${filename}"
+done
+
+echo "Ensuring Python vision dependencies"
+sudo apt-get install -y python3-matplotlib
 
 echo "Restarting vision services"
 sudo systemctl restart vision-framebuffer.service

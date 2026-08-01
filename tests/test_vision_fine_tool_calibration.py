@@ -175,10 +175,22 @@ def test_stage_5_1_recovers_six_absolute_datums_and_generated_offsets():
         expected,
     ) = _fixture(module)
 
-    result = module.calculate_candidate(
+    result_t0 = module.calculate_candidate(
+        tool="T0",
         projection=projection,
         partial_bed=partial,
-        registrations=registrations,
+        registrations=[r for r in registrations if r["tool"] == "T0"],
+        metric_observations=metric,
+        corner_observations=corner,
+        physical_reference=physical,
+        mapping=mapping,
+        old_datums=old,
+    )
+    result_t1 = module.calculate_candidate(
+        tool="T1",
+        projection=projection,
+        partial_bed=partial,
+        registrations=[r for r in registrations if r["tool"] == "T1"],
         metric_observations=metric,
         corner_observations=corner,
         physical_reference=physical,
@@ -186,28 +198,30 @@ def test_stage_5_1_recovers_six_absolute_datums_and_generated_offsets():
         old_datums=old,
     )
 
-    assert result["accepted"], result["reasons"]
+    assert result_t0["accepted"], result_t0["reasons"]
+    assert result_t1["accepted"], result_t1["reasons"]
     np.testing.assert_allclose(
-        result["tools"]["T0"]["coordinate_residual_xyz_mm"],
+        result_t0["tools"]["T0"]["coordinate_residual_xyz_mm"],
         expected["T0"],
         atol=0.16,
     )
     np.testing.assert_allclose(
-        result["tools"]["T1"]["coordinate_residual_xyz_mm"],
+        result_t1["tools"]["T1"]["coordinate_residual_xyz_mm"],
         expected["T1"],
         atol=0.16,
     )
-    persisted = result["calibration"]["persisted_calib"]["new"]
-    generated = result["calibration"]["generated_klipper"]["new"]
-    assert abs(persisted["t0"]["x"] - (-76.6)) < 0.16
-    assert abs(persisted["t1"]["x"] - 349.8) < 0.16
-    assert generated["y_position_endstop"] == persisted["t0"]["y"]
-    assert generated["z_position_endstop"] == persisted["t0"]["z"]
-    assert generated["t1_y_gcode_offset"] == (
-        persisted["t0"]["y"] - persisted["t1"]["y"]
+    persisted_t0 = result_t0["calibration"]["persisted_calib"]["new"]
+    persisted_t1 = result_t1["calibration"]["persisted_calib"]["new"]
+    generated_t0 = result_t0["calibration"]["generated_klipper"]["new"]
+    assert abs(persisted_t0["t0"]["x"] - (-76.6)) < 0.16
+    assert abs(persisted_t1["t1"]["x"] - 349.8) < 0.16
+    assert generated_t0["y_position_endstop"] == persisted_t0["t0"]["y"]
+    assert generated_t0["z_position_endstop"] == persisted_t0["t0"]["z"]
+    assert generated_t0["t1_y_gcode_offset"] == (
+        persisted_t0["t0"]["y"] - persisted_t0["t1"]["y"]
     )
-    assert generated["t1_z_gcode_offset"] == (
-        persisted["t0"]["z"] - persisted["t1"]["z"]
+    assert generated_t0["t1_z_gcode_offset"] == (
+        persisted_t0["t0"]["z"] - persisted_t0["t1"]["z"]
     )
 
 
@@ -226,9 +240,10 @@ def test_stage_5_1_rejects_implausible_print_plane_instead_of_emitting_candidate
     ) = _fixture(module, implausible_z=True)
 
     result = module.calculate_candidate(
+        tool="T1",
         projection=projection,
         partial_bed=partial,
-        registrations=registrations,
+        registrations=[r for r in registrations if r["tool"] == "T1"],
         metric_observations=metric,
         corner_observations=corner,
         physical_reference=physical,
@@ -248,9 +263,21 @@ def test_t1_virtual_datum_changes_offset_by_t0_minus_t1_residual():
     }
     residuals = {"t0": [0.0, 0.4, -0.2], "t1": [0.0, -0.1, 0.3]}
 
-    result = module.generated_calibration(old, residuals)
-    old_generated = result["generated_klipper"]["old"]
-    new_generated = result["generated_klipper"]["new"]
+    result_t0 = module.generated_calibration(
+        old, tool="T0", residual_xyz_mm=residuals["t0"]
+    )
+    updated = {
+        "t0": {
+            f"{a}_endstop": v
+            for a, v in result_t0["persisted_calib"]["new"]["t0"].items()
+        },
+        "t1": old["t1"],
+    }
+    result_t1 = module.generated_calibration(
+        updated, tool="T1", residual_xyz_mm=residuals["t1"]
+    )
+    old_generated = result_t0["generated_klipper"]["old"]
+    new_generated = result_t1["generated_klipper"]["new"]
 
     assert (
         new_generated["t1_y_gcode_offset"]

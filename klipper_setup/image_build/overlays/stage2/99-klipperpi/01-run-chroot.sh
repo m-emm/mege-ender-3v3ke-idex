@@ -429,6 +429,7 @@ require_file "${FILES_DIR}/vision_calibration.py"
 require_file "${FILES_DIR}/vision_calibration_graph.py"
 require_file "${FILES_DIR}/vision_bed_fiducial.py"
 require_file "${FILES_DIR}/vision_eddy_fiducial_xz.py"
+require_file "${FILES_DIR}/eddy_sift_body_template.png"
 require_file "${FILES_DIR}/vision_fine_tool_calibration.py"
 require_file "${FILES_DIR}/vision_nozzle_fine_xz.py"
 require_file "${FILES_DIR}/vision_red_marker_x_sweep.py"
@@ -466,6 +467,7 @@ install -d -m 0755 /usr/local/share/vision
 install -m 0644 "${FILES_DIR}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json
 install -m 0644 "${FILES_DIR}/vision_job_types.json" /usr/local/share/vision/vision_job_types.json
 install -m 0644 "${FILES_DIR}/vision_calibration_priors.json" /usr/local/share/vision/vision_calibration_priors.json
+install -m 0644 "${FILES_DIR}/eddy_sift_body_template.png" /usr/local/share/vision/eddy_sift_body_template.png
 setfacl -m u:www-data:--x "${USER_HOME}"
 
 # Replace __USER__ placeholder
