@@ -55,9 +55,7 @@ def _normalize_eddy_calibrate(value: str) -> str:
 
 
 def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
-    defaults = {
-        "bed_center_x": 117.5,
-        "bed_center_y": 117.5,
+    defaults = {        
         "nozzle_to_coil_x": -57.391,
         "nozzle_to_coil_y": -18.997,
         "nozzle_to_coil_z": 1.399,
@@ -73,10 +71,6 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
 
     value = _require_mapping(value, "eddy_relative_calibration")
 
-    bed_center = _require_mapping(
-        value.get("bed_center"),
-        "eddy_relative_calibration.bed_center",
-    )
     nozzle_to_coil = _require_mapping(
         value.get("nozzle_to_coil"),
         "eddy_relative_calibration.nozzle_to_coil",
@@ -162,16 +156,6 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
         )
 
     return {
-        "bed_center_x": _require_float(
-            bed_center,
-            "x",
-            "eddy_relative_calibration.bed_center",
-        ),
-        "bed_center_y": _require_float(
-            bed_center,
-            "y",
-            "eddy_relative_calibration.bed_center",
-        ),
         "nozzle_to_coil_x": _require_float(
             nozzle_to_coil,
             "x",
@@ -255,7 +239,7 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
                 ),
             },
         },
-        "eddy_relative": _load_eddy_relative_calibration(data),
+        "eddy_relative_calibration": _load_eddy_relative_calibration(data),
     }
 
 
@@ -385,14 +369,12 @@ def live_config_check_errors(
 def template_values(
     calibration: dict[str, Any],
     config_fingerprint: str,
-) -> dict[str, str]:
-    bed_grid_zero = calibration["bed_grid_zero"]
+) -> dict[str, str]:    
     t0 = calibration["tools"]["t0"]
     t1 = calibration["tools"]["t1"]
+    bed_grid_zero = calibration["bed_grid_zero"]
 
-    eddy_relative = calibration.get("eddy_relative") or {
-        "bed_center_x": 117.5,
-        "bed_center_y": 117.5,
+    eddy_relative_calibration = calibration.get("eddy_relative_calibration") or {
         "nozzle_to_coil_x": -57.391,
         "nozzle_to_coil_y": -18.997,
         "nozzle_to_coil_z": 1.399,
@@ -404,21 +386,21 @@ def template_values(
 
     eddy_klipper_lines = []
 
-    if eddy_relative.get("reg_drive_current") is not None:
+    if eddy_relative_calibration.get("reg_drive_current") is not None:
         eddy_klipper_lines.append(
             f"reg_drive_current: "
-            f"{int(eddy_relative['reg_drive_current'])}"
+            f"{int(eddy_relative_calibration['reg_drive_current'])}"
         )
 
-    if eddy_relative.get("calibrate"):
+    if eddy_relative_calibration.get("calibrate"):
         eddy_klipper_lines.append(
             _render_config_option(
                 "calibrate",
-                eddy_relative["calibrate"],
+                eddy_relative_calibration["calibrate"],
             )
         )
 
-    temperature_calibration_temp = eddy_relative.get(
+    temperature_calibration_temp = eddy_relative_calibration.get(
         "temperature_calibration_temp"
     )
 
@@ -444,40 +426,22 @@ def template_values(
         "t1_z_offset": format_mm(
             t0["z_endstop"] - t1["z_endstop"]
         ),
-        "config_fingerprint": config_fingerprint,
-        "eddy_bed_center_x": format_mm(
-            eddy_relative["bed_center_x"]
-        ),
-        "eddy_bed_center_y": format_mm(
-            eddy_relative["bed_center_y"]
-        ),
+        "config_fingerprint": config_fingerprint,        
         "eddy_nozzle_to_coil_x": format_mm(
-            eddy_relative["nozzle_to_coil_x"]
+            eddy_relative_calibration["nozzle_to_coil_x"]
         ),
         "eddy_nozzle_to_coil_y": format_mm(
-            eddy_relative["nozzle_to_coil_y"]
+            eddy_relative_calibration["nozzle_to_coil_y"]
         ),
         "eddy_nozzle_to_coil_z": format_mm(
-            eddy_relative["nozzle_to_coil_z"]
+            eddy_relative_calibration["nozzle_to_coil_z"]
         ),
         "eddy_klipper_calibration": "\n".join(
             eddy_klipper_lines
         ),
         "eddy_temperature_calibration_temp": (
             f"{temperature_calibration_temp:.6f}"
-        ),
-        "eddy_mesh_min_x": format_mm(
-            eddy_relative["bed_center_x"] - 60.0
-        ),
-        "eddy_mesh_min_y": format_mm(
-            eddy_relative["bed_center_y"] - 60.0
-        ),
-        "eddy_mesh_max_x": format_mm(
-            eddy_relative["bed_center_x"] + 60.0
-        ),
-        "eddy_mesh_max_y": format_mm(
-            eddy_relative["bed_center_y"] + 60.0
-        ),
+        ),        
     }
 
 

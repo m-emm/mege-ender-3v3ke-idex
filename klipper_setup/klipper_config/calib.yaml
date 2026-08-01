@@ -18,9 +18,6 @@ eddy_relative_calibration:
   # Vision-measured 2026-07-31 (idex_eddy_t0_xyz_offset job).
   # The vector is from the nozzle center to the Eddy coil/fiducial center
   # in printer coordinates.
-  bed_center:
-    x: 117.500
-    y: 117.500
   nozzle_to_coil:
     x: -57.391
     y: -18.997
