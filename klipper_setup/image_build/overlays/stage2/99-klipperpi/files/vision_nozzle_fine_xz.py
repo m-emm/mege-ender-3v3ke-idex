@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import itertools
 import logging
 import math
 from pathlib import Path
@@ -107,6 +108,245 @@ def _circle_edge_score(gray: np.ndarray, center: np.ndarray, radius: float) -> f
     means = np.asarray([item[0] for item in scores])
     symmetry = float(np.median([item[1] for item in scores]))
     return float(np.sum(np.abs(np.diff(means))) - 0.35 * symmetry)
+
+
+def _sample_circle(
+    gray: np.ndarray, center: tuple[float, float], radius: float
+) -> tuple[float, float]:
+    angles = np.linspace(0.0, 2.0 * math.pi, 72, endpoint=False)
+    xs = np.rint(center[0] + radius * np.cos(angles)).astype(int)
+    ys = np.rint(center[1] + radius * np.sin(angles)).astype(int)
+    valid = (xs >= 0) & (xs < gray.shape[1]) & (ys >= 0) & (ys < gray.shape[0])
+    if int(np.count_nonzero(valid)) < 54:
+        return 0.0, 255.0
+    values = gray[ys[valid], xs[valid]].astype(np.float64)
+    return float(np.mean(values)), float(np.std(values))
+
+
+def _ring_score(
+    gray: np.ndarray, center: tuple[float, float], radius: float
+) -> tuple[float, dict[str, Any]]:
+    radii = (0.18, 0.36, 0.55, 0.74, 0.94, 1.12)
+    samples = [_sample_circle(gray, center, radius * ratio) for ratio in radii]
+    means = np.asarray([item[0] for item in samples], dtype=np.float64)
+    deviations = np.asarray([item[1] for item in samples], dtype=np.float64)
+    alternation = float(np.sum(np.abs(np.diff(means))))
+    range_score = float(np.max(means) - np.min(means))
+    symmetry_penalty = float(np.median(deviations))
+    score = alternation + 1.5 * range_score - 0.8 * symmetry_penalty
+    return score, {
+        "radial_means": means.tolist(),
+        "radial_stddev": deviations.tolist(),
+        "alternation": alternation,
+        "range": range_score,
+        "symmetry_penalty": symmetry_penalty,
+    }
+
+
+def _order_quad(points: np.ndarray) -> np.ndarray:
+    order = np.argsort(points[:, 1])
+    top = points[order[:2]][np.argsort(points[order[:2], 0])]
+    bottom = points[order[2:]][np.argsort(points[order[2:], 0])]
+    return np.asarray([top[0], top[1], bottom[0], bottom[1]], dtype=np.float64)
+
+
+def _quad_geometry(points: np.ndarray) -> tuple[float, dict[str, float]] | None:
+    ordered = _order_quad(points)
+    tl, tr, bl, br = ordered
+    lengths = np.asarray(
+        [
+            np.linalg.norm(tr - tl),
+            np.linalg.norm(br - bl),
+            np.linalg.norm(bl - tl),
+            np.linalg.norm(br - tr),
+        ],
+        dtype=np.float64,
+    )
+    mean_length = float(np.mean(lengths))
+    if mean_length <= 0.0:
+        return None
+    if float(np.min(lengths)) < 0.45 * mean_length:
+        return None
+    if float(np.max(lengths)) > 1.75 * mean_length:
+        return None
+    diagonal_midpoint_error = float(np.linalg.norm((tl + br) * 0.5 - (tr + bl) * 0.5))
+    if diagonal_midpoint_error > 0.28 * mean_length:
+        return None
+    area = abs(float(np.cross(tr - tl, bl - tl)))
+    if area < 0.25 * mean_length * mean_length:
+        return None
+    opposite_error = float(
+        abs(lengths[0] - lengths[1]) + abs(lengths[2] - lengths[3])
+    ) / (2.0 * mean_length)
+    side_balance = float(abs(np.mean(lengths[:2]) - np.mean(lengths[2:]))) / mean_length
+    if side_balance > 0.22:
+        return None
+    geometry_score = 120.0 * (
+        1.0
+        - min(
+            1.0, opposite_error + side_balance + diagonal_midpoint_error / mean_length
+        )
+    )
+    return geometry_score, {
+        "mean_side_px": mean_length,
+        "opposite_error_fraction": opposite_error,
+        "side_balance_fraction": side_balance,
+        "diagonal_midpoint_error_px": diagonal_midpoint_error,
+        "area_px2": area,
+    }
+
+
+def detect_four_fiducials(
+    image: np.ndarray,
+    *,
+    reference_centers_px: list[list[float]] | np.ndarray | None = None,
+) -> dict[str, Any]:
+    """Find the 8 x 8 mm four-ring patch without an image-position prior."""
+
+    height, width = image.shape[:2]
+    scale = min(width / 1920.0, height / 1080.0)
+    reference_centers = None
+    reference_shape = None
+    reference_side = None
+    if reference_centers_px is not None:
+        reference_centers = _order_quad(
+            np.asarray(reference_centers_px, dtype=np.float64)
+        )
+        if reference_centers.shape != (4, 2):
+            raise ValueError("fiducial reference must contain four centers")
+        reference_shape = reference_centers - np.mean(reference_centers, axis=0)
+        reference_geometry = _quad_geometry(reference_centers)
+        if reference_geometry is None:
+            raise ValueError("fiducial reference geometry is invalid")
+        reference_side = reference_geometry[1]["mean_side_px"]
+    gray = _gray(image)
+
+    enhanced = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
+    blurred = cv2.GaussianBlur(enhanced, (5, 5), 1.2)
+    circles = cv2.HoughCircles(
+        blurred,
+        cv2.HOUGH_GRADIENT,
+        dp=1.15,
+        minDist=max(8.0, 14.0 * scale),
+        param1=90,
+        param2=16,
+        minRadius=max(4, int(round(7 * scale))),
+        maxRadius=max(12, int(round(25 * scale))),
+    )
+    if circles is None:
+        raise ValueError("no circular fiducial candidates detected")
+
+    candidates: list[dict[str, Any]] = []
+    for x, y, radius in circles[0]:
+        score, radial = _ring_score(gray, (float(x), float(y)), float(radius))
+        if score < 44.0:
+            continue
+        candidates.append(
+            {
+                "center_px": [float(x), float(y)],
+                "radius_px": float(radius),
+                "ring_score": score,
+                "radial": radial,
+            }
+        )
+    candidates.sort(key=lambda item: item["ring_score"], reverse=True)
+
+    deduplicated: list[dict[str, Any]] = []
+    for candidate in candidates:
+        center = np.asarray(candidate["center_px"], dtype=np.float64)
+        if any(
+            np.linalg.norm(center - np.asarray(item["center_px"])) < 10.0 * scale
+            for item in deduplicated
+        ):
+            continue
+        deduplicated.append(candidate)
+        if len(deduplicated) >= 36:
+            break
+    if len(deduplicated) < 4:
+        raise ValueError(
+            f"only {len(deduplicated)} independent ring candidates detected"
+        )
+
+    best: tuple[float, np.ndarray, list[dict[str, Any]], dict[str, float]] | None = None
+    for combination in itertools.combinations(deduplicated, 4):
+        radii = np.asarray([item["radius_px"] for item in combination])
+        if float(np.max(radii) / np.min(radii)) > 1.35:
+            continue
+        points = np.asarray([item["center_px"] for item in combination])
+        geometry = _quad_geometry(points)
+        if geometry is None:
+            continue
+        geometry_score, geometry_details = geometry
+        mean_side = geometry_details["mean_side_px"]
+        if not 24.0 * scale <= mean_side <= 220.0 * scale:
+            continue
+        ordered_points = _order_quad(points)
+        reference_shape_rms = None
+        if reference_shape is not None and reference_side is not None:
+            if not 0.75 <= mean_side / reference_side <= 1.25:
+                continue
+            candidate_shape = ordered_points - np.mean(ordered_points, axis=0)
+            reference_shape_rms = float(
+                np.sqrt(
+                    np.mean(np.sum((candidate_shape - reference_shape) ** 2, axis=1))
+                )
+            )
+            if reference_shape_rms > max(5.0 * scale, 0.12 * reference_side):
+                continue
+        ordered_candidates = [
+            min(
+                combination,
+                key=lambda item, point=point: float(
+                    np.linalg.norm(np.asarray(item["center_px"]) - point)
+                ),
+            )
+            for point in ordered_points
+        ]
+        worst_ring = min(item["ring_score"] for item in ordered_candidates)
+        score = geometry_score + 0.55 * worst_ring
+        if reference_shape_rms is not None:
+            score -= 2.0 * reference_shape_rms
+            geometry_details = dict(geometry_details)
+            geometry_details["reference_shape_rms_px"] = reference_shape_rms
+        if best is None or score > best[0]:
+            best = (
+                score,
+                ordered_points,
+                ordered_candidates,
+                geometry_details,
+            )
+    if best is None:
+        raise ValueError("no four-ring square candidate passed geometry checks")
+
+    score, centers, selected, geometry_details = best
+    x0, y0 = np.min(centers, axis=0)
+    x1, y1 = np.max(centers, axis=0)
+    pad = max(12.0 * scale, 0.35 * geometry_details["mean_side_px"])
+    roi = [
+        max(0, int(math.floor(x0 - pad))),
+        max(0, int(math.floor(y0 - pad))),
+        min(width, int(math.ceil(x1 + pad))),
+        min(height, int(math.ceil(y1 + pad))),
+    ]
+    roi_pixels = image[roi[1] : roi[3], roi[0] : roi[2]]
+    clipped_fraction = float(np.mean(np.max(roi_pixels, axis=2) >= 252))
+    dark_fraction = float(np.mean(_gray(roi_pixels) <= 28))
+    transform_to_global = lambda point: point
+    return _finite(
+        {
+            "centers_px": [transform_to_global(item["center_px"]) for item in selected],
+            "radii_px": [item["radius_px"] for item in selected],
+            "ring_scores": [item["ring_score"] for item in selected],
+            "worst_ring_score": min(item["ring_score"] for item in selected),
+            "geometry": geometry_details,
+            "detection_score": score - 350.0 * clipped_fraction,
+            "roi_px": roi,
+            "clipped_fraction": clipped_fraction,
+            "dark_fraction": dark_fraction,
+            "candidate_count": len(deduplicated),
+            "candiates": [item for item in deduplicated],
+        }
+    )
 
 
 def _ring_candidates(image: np.ndarray, marker: np.ndarray) -> list[dict[str, Any]]:
@@ -582,13 +822,6 @@ def _fit_tool(records: list[dict[str, Any]]) -> dict[str, Any]:
     )
 
 
-def _evaluate_position(model: dict[str, Any], x_mm: float, z_mm: float) -> np.ndarray:
-    dx = x_mm - float(model["x_ref_mm"])
-    dz = z_mm - float(model["z_ref_mm"])
-    design = np.asarray([1.0, dx, dz, dx * dz, dx * dx, dx * dx * dz])
-    return design @ np.asarray(model["position_coefficients"], dtype=np.float64)
-
-
 def _x_vector(model: dict[str, Any], x_mm: float, z_mm: float) -> np.ndarray:
     coefficients = np.asarray(model["position_coefficients"], dtype=np.float64)
     dx = float(x_mm) - float(model["x_ref_mm"])
@@ -601,26 +834,6 @@ def _x_vector(model: dict[str, Any], x_mm: float, z_mm: float) -> np.ndarray:
     )
 
 
-def _homography_jacobian(homography: np.ndarray, point: np.ndarray) -> np.ndarray:
-    x, y = [float(item) for item in point]
-    h = homography
-    denominator = h[2, 0] * x + h[2, 1] * y + h[2, 2]
-    u_numerator = h[0, 0] * x + h[0, 1] * y + h[0, 2]
-    v_numerator = h[1, 0] * x + h[1, 1] * y + h[1, 2]
-    return np.asarray(
-        [
-            [
-                (h[0, 0] * denominator - u_numerator * h[2, 0]) / denominator**2,
-                (h[0, 1] * denominator - u_numerator * h[2, 1]) / denominator**2,
-            ],
-            [
-                (h[1, 0] * denominator - v_numerator * h[2, 0]) / denominator**2,
-                (h[1, 1] * denominator - v_numerator * h[2, 1]) / denominator**2,
-            ],
-        ]
-    )
-
-
 def analyze(
     frame_paths: list[Path],
     artifact_dir: Path,
@@ -628,6 +841,7 @@ def analyze(
     frames: list[dict[str, Any]],
     reference: dict[str, Any],
 ) -> dict[str, Any]:
+    _logger.info(f"fine-grid analysis started with {len(frames)} frames")
     artifact_dir.mkdir(parents=True, exist_ok=True)
     if len(frame_paths) != len(frames):
         raise FineNozzleError("fine-grid frame paths do not match the manifest")
@@ -762,13 +976,27 @@ def analyze(
         }
 
     registrations = []
+    four_fiducials_registrations = []
     for index, (path, frame, marker) in enumerate(
         zip(frame_paths, frames, marker_centers)
     ):
+        _logger.info(f"Loading image {index} for fine-grid analysis from {path}")
         image = cv2.imread(str(path), cv2.IMREAD_COLOR)
         if image is None:
             raise FineNozzleError(f"fine-grid image {index} cannot be decoded")
         tool = frame["tool"]
+
+        four_fiducials = detect_four_fiducials(image)
+        four_fiducials_registrations.append(
+            {
+                "seq": index,
+                "tool": tool,
+                "x_mm": float(frame["x_mm"]),
+                "z_mm": float(frame["z_mm"]),
+                "four_fiducials": four_fiducials,
+            }
+        )
+
         ring = ring_tracks[tool].get(index)
         ring_center = (
             np.asarray(ring["center_px"], dtype=np.float64)
@@ -1101,7 +1329,9 @@ def analyze(
     individual_overlay_dir.mkdir()
     individual_overlay_artifacts = {}
     accepted_sequences = {target_tool: set(models[target_tool]["accepted_sequences"])}
-    for path, frame, registration in zip(frame_paths, frames, registrations):
+    for path, frame, registration, four_fiducial_registration in zip(
+        frame_paths, frames, registrations, four_fiducials_registrations
+    ):
         image = cv2.imread(str(path), cv2.IMREAD_COLOR)
         if image is None:
             raise FineNozzleError(
@@ -1168,6 +1398,23 @@ def analyze(
             2,
             cv2.LINE_AA,
         )
+
+        _logger.info(f"four fiducials registration: {four_fiducial_registration}")
+        for i, (center, radius) in enumerate(
+            zip(
+                four_fiducial_registration["four_fiducials"]["centers_px"],
+                four_fiducial_registration["four_fiducials"]["radii_px"],
+            )
+        ):
+            _logger.info(f"Drawing fiducial {i} at {center} with radius {radius}")
+            cv2.circle(
+                panel,
+                tuple(np.rint(center).astype(int)),
+                int(round(radius)),
+                (0, 255, 255),
+                2,
+            )
+
         acceptance = (
             "accepted"
             if registration["seq"] in accepted_sequences[frame["tool"]]
@@ -1180,6 +1427,7 @@ def analyze(
             raise FineNozzleError(
                 f"could not write full-resolution overlay for frame {frame['frame']}"
             )
+        _logger.info(f"Wrote overlay {individual_overlay_path}")
         individual_overlay_artifacts[
             f"fine_nozzle_tip_overlay_{int(registration['seq']):02d}"
         ] = _artifact(individual_overlay_path)
@@ -1316,6 +1564,7 @@ def analyze(
             1,
             cv2.LINE_AA,
         )
+
     plot_path = artifact_dir / "fine_nozzle_projection_model.jpg"
     cv2.imwrite(str(plot_path), model_plot)
 

@@ -27,7 +27,6 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import least_squares
-
 from vision_calibration_graph import VisionCalibrationError, atomic_write_json
 
 _logger = logging.getLogger(__name__)
