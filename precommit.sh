@@ -1,8 +1,11 @@
 #! /bin/bash
 
 # Format code
+
+
 isort  $(find src -name '*.py' )  ; black  $(find src  -name '*.py' ) 
 
+isort  $(find klipper_setup/image_build/overlays/stage2/99-klipperpi/files/ -name '*.py' )  ; black  $(find klipper_setup/image_build/overlays/stage2/99-klipperpi/files/ -name '*.py' )
 # # Format workflow files
 # npx prettier --write  .github/workflows/*.yml
 npx prettier --write  assembling/assemblies/*.yaml

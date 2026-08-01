@@ -38,9 +38,7 @@ TARGET_FPS = float(os.environ.get("VISION_FRAMEBUFFER_FPS", "1.0"))
 STREAM_FPS = float(os.environ.get("VISION_FRAMEBUFFER_STREAM_FPS", str(TARGET_FPS)))
 RING_SIZE = int(os.environ.get("VISION_FRAMEBUFFER_RING_SIZE", "30"))
 CAPTURE_TIMEOUT = float(os.environ.get("VISION_FRAMEBUFFER_CAPTURE_TIMEOUT", "8"))
-CAPTURE_RETRIES = max(
-    1, int(os.environ.get("VISION_FRAMEBUFFER_CAPTURE_RETRIES", "3"))
-)
+CAPTURE_RETRIES = max(1, int(os.environ.get("VISION_FRAMEBUFFER_CAPTURE_RETRIES", "3")))
 STALE_AFTER = float(os.environ.get("VISION_FRAMEBUFFER_STALE_AFTER", "5"))
 PUBLIC_SNAPSHOT_URL = os.environ.get(
     "VISION_FRAMEBUFFER_PUBLIC_SNAPSHOT_URL", "/webcam/?action=snapshot"
@@ -86,11 +84,7 @@ def run_command(command: list[str], *, timeout: float) -> subprocess.CompletedPr
 
 def verify_jpeg(path: Path) -> None:
     data = path.read_bytes()
-    if (
-        len(data) < 4
-        or data[:2] != b"\xff\xd8"
-        or data[-2:] != b"\xff\xd9"
-    ):
+    if len(data) < 4 or data[:2] != b"\xff\xd8" or data[-2:] != b"\xff\xd9":
         raise FramebufferError(f"{path} is not a JPEG frame")
     width, height = jpeg_dimensions(path)
     if not width or not height:
@@ -220,8 +214,7 @@ def capture_mjpeg_frame(
             if attempt < CAPTURE_RETRIES:
                 time.sleep(0.1)
     raise FramebufferError(
-        f"v4l2 capture failed after {CAPTURE_RETRIES} attempts: "
-        + "; ".join(errors)
+        f"v4l2 capture failed after {CAPTURE_RETRIES} attempts: " + "; ".join(errors)
     )
 
 
@@ -558,9 +551,7 @@ class CaptureThread(threading.Thread):
                     "latest_url": PUBLIC_SNAPSHOT_URL,
                     "capture_info": capture_info,
                     "capture_attempt": capture_info.get("capture_attempt", 1),
-                    "capture_retry_count": capture_info.get(
-                        "capture_retry_count", 0
-                    ),
+                    "capture_retry_count": capture_info.get("capture_retry_count", 0),
                     "capture_errors": capture_info.get("capture_errors", []),
                     "camera_profile": camera_profile,
                 }

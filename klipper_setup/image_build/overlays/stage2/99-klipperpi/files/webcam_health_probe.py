@@ -22,8 +22,7 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_CAMERA_DEVICE = (
-    "/dev/v4l/by-id/"
-    "usb-Aukey-PC-LM1E_Camera_Aukey-PC-LM1E_Camera-video-index0"
+    "/dev/v4l/by-id/" "usb-Aukey-PC-LM1E_Camera_Aukey-PC-LM1E_Camera-video-index0"
 )
 
 
@@ -91,7 +90,9 @@ def start_stream_client(url: str, output_path: Path, duration: int) -> subproces
 
 def collect_usb_path(camera_device: str) -> dict[str, Any]:
     path = run_command(["readlink", "-f", camera_device], timeout=5)
-    udev_path = run_command(["udevadm", "info", "-q", "path", "-n", camera_device], timeout=5)
+    udev_path = run_command(
+        ["udevadm", "info", "-q", "path", "-n", camera_device], timeout=5
+    )
     return {
         "device": camera_device,
         "resolved": path.get("stdout"),
@@ -118,7 +119,11 @@ def collect_process_snapshot() -> dict[str, Any]:
         "throttled": run_command(["vcgencmd", "get_throttled"], timeout=5),
         "temperature": run_command(["vcgencmd", "measure_temp"], timeout=5),
         "vision_framebuffer_processes": run_command(
-            ["sh", "-c", "ps -o pid,ppid,pcpu,pmem,stat,etime,args -p $(pgrep -f 'vision_framebuffer.py' | paste -sd, -)"],
+            [
+                "sh",
+                "-c",
+                "ps -o pid,ppid,pcpu,pmem,stat,etime,args -p $(pgrep -f 'vision_framebuffer.py' | paste -sd, -)",
+            ],
             timeout=5,
         ),
     }
@@ -128,8 +133,12 @@ def collect_recent_uvc_messages() -> list[str]:
     result = run_command(["dmesg", "--ctime"], timeout=10)
     if not result.get("ok"):
         return []
-    pattern = re.compile(r"usb|uvc|video|reset|resubmit|bandwidth|thrott|under-voltage", re.I)
-    return [line for line in result.get("stdout", "").splitlines() if pattern.search(line)][-80:]
+    pattern = re.compile(
+        r"usb|uvc|video|reset|resubmit|bandwidth|thrott|under-voltage", re.I
+    )
+    return [
+        line for line in result.get("stdout", "").splitlines() if pattern.search(line)
+    ][-80:]
 
 
 def consecutive_zero_count(samples: list[dict[str, Any]]) -> int:
@@ -186,9 +195,7 @@ def probe(args: argparse.Namespace) -> dict[str, Any]:
                 state = read_json_url(args.state_url, timeout=1.5)
                 result_state = state.get("result", {})
                 source = (
-                    result_state.get("framebuffer")
-                    or result_state.get("source")
-                    or {}
+                    result_state.get("framebuffer") or result_state.get("source") or {}
                 )
                 stream = state.get("result", {}).get("stream", {})
                 sample.update(
@@ -256,7 +263,9 @@ def probe(args: argparse.Namespace) -> dict[str, Any]:
             "summary": {
                 "sample_count": len(samples),
                 "captured_fps_min": min(captured_values) if captured_values else None,
-                "captured_fps_median": percentile([float(v) for v in captured_values], 0.5),
+                "captured_fps_median": percentile(
+                    [float(v) for v in captured_values], 0.5
+                ),
                 "queued_fps_median": percentile([float(v) for v in queued_values], 0.5),
                 "zero_captured_samples": zero_samples,
                 "longest_zero_captured_run": longest_zero_run,
@@ -276,7 +285,10 @@ def probe(args: argparse.Namespace) -> dict[str, Any]:
         and summary["longest_zero_captured_run"] <= args.max_consecutive_zero
         and summary["zero_captured_samples"] <= args.max_zero_samples
         and (summary["queued_fps_median"] or 0) >= args.min_median_queued_fps
-        and (summary["snapshot_p95_s"] is None or summary["snapshot_p95_s"] <= args.max_snapshot_p95)
+        and (
+            summary["snapshot_p95_s"] is None
+            or summary["snapshot_p95_s"] <= args.max_snapshot_p95
+        )
     )
     return result
 

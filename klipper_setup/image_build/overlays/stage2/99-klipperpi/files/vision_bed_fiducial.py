@@ -44,12 +44,7 @@ def _sample_circle(
     angles = np.linspace(0.0, 2.0 * math.pi, 72, endpoint=False)
     xs = np.rint(center[0] + radius * np.cos(angles)).astype(int)
     ys = np.rint(center[1] + radius * np.sin(angles)).astype(int)
-    valid = (
-        (xs >= 0)
-        & (xs < gray.shape[1])
-        & (ys >= 0)
-        & (ys < gray.shape[0])
-    )
+    valid = (xs >= 0) & (xs < gray.shape[1]) & (ys >= 0) & (ys < gray.shape[0])
     if int(np.count_nonzero(valid)) < 54:
         return 0.0, 255.0
     values = gray[ys[valid], xs[valid]].astype(np.float64)
@@ -102,9 +97,7 @@ def _quad_geometry(points: np.ndarray) -> tuple[float, dict[str, float]] | None:
         return None
     if float(np.max(lengths)) > 1.75 * mean_length:
         return None
-    diagonal_midpoint_error = float(
-        np.linalg.norm((tl + br) * 0.5 - (tr + bl) * 0.5)
-    )
+    diagonal_midpoint_error = float(np.linalg.norm((tl + br) * 0.5 - (tr + bl) * 0.5))
     if diagonal_midpoint_error > 0.28 * mean_length:
         return None
     area = abs(float(np.cross(tr - tl, bl - tl)))
@@ -117,7 +110,10 @@ def _quad_geometry(points: np.ndarray) -> tuple[float, dict[str, float]] | None:
     if side_balance > 0.22:
         return None
     geometry_score = 120.0 * (
-        1.0 - min(1.0, opposite_error + side_balance + diagonal_midpoint_error / mean_length)
+        1.0
+        - min(
+            1.0, opposite_error + side_balance + diagonal_midpoint_error / mean_length
+        )
     )
     return geometry_score, {
         "mean_side_px": mean_length,
@@ -218,7 +214,9 @@ def detect_four_fiducials(
                 continue
             candidate_shape = ordered_points - np.mean(ordered_points, axis=0)
             reference_shape_rms = float(
-                np.sqrt(np.mean(np.sum((candidate_shape - reference_shape) ** 2, axis=1)))
+                np.sqrt(
+                    np.mean(np.sum((candidate_shape - reference_shape) ** 2, axis=1))
+                )
             )
             if reference_shape_rms > max(5.0 * scale, 0.12 * reference_side):
                 continue
@@ -416,10 +414,7 @@ def analyze_lighting(
             _draw_detection(
                 image,
                 detection,
-                (
-                    f"{index}: {frame['profile']} "
-                    f"score={records[index]['score']}"
-                ),
+                (f"{index}: {frame['profile']} " f"score={records[index]['score']}"),
                 selected=index == winner_index,
             ),
             560,
@@ -472,9 +467,7 @@ def analyze_lighting(
 
     accepted = winner_index is not None
     winner = frames[winner_index] if winner_index is not None else None
-    winner_detection = (
-        detections[winner_index] if winner_index is not None else None
-    )
+    winner_detection = detections[winner_index] if winner_index is not None else None
     return _finite(
         {
             "accepted": accepted,
@@ -493,7 +486,9 @@ def analyze_lighting(
     )
 
 
-def _homography_jacobian(homography: np.ndarray, point: tuple[float, float]) -> np.ndarray:
+def _homography_jacobian(
+    homography: np.ndarray, point: tuple[float, float]
+) -> np.ndarray:
     x, y = point
     h = homography
     denominator = h[2, 0] * x + h[2, 1] * y + h[2, 2]
@@ -502,16 +497,12 @@ def _homography_jacobian(homography: np.ndarray, point: tuple[float, float]) -> 
     return np.asarray(
         [
             [
-                (h[0, 0] * denominator - u_numerator * h[2, 0])
-                / denominator**2,
-                (h[0, 1] * denominator - u_numerator * h[2, 1])
-                / denominator**2,
+                (h[0, 0] * denominator - u_numerator * h[2, 0]) / denominator**2,
+                (h[0, 1] * denominator - u_numerator * h[2, 1]) / denominator**2,
             ],
             [
-                (h[1, 0] * denominator - v_numerator * h[2, 0])
-                / denominator**2,
-                (h[1, 1] * denominator - v_numerator * h[2, 1])
-                / denominator**2,
+                (h[1, 0] * denominator - v_numerator * h[2, 0]) / denominator**2,
+                (h[1, 1] * denominator - v_numerator * h[2, 1]) / denominator**2,
             ],
         ],
         dtype=np.float64,
@@ -562,9 +553,7 @@ def _track_patch_translation(
         template = reference[y0:y1, x0:x1]
         search = target[search_y0:search_y1, search_x0:search_x1]
         response = cv2.matchTemplate(search, template, cv2.TM_CCOEFF_NORMED)
-        _minimum, maximum, _minimum_location, maximum_location = cv2.minMaxLoc(
-            response
-        )
+        _minimum, maximum, _minimum_location, maximum_location = cv2.minMaxLoc(response)
         peak_x, peak_y = _subpixel_peak(
             response, maximum_location[0], maximum_location[1]
         )
@@ -614,9 +603,7 @@ def analyze_metric(
         images[0],
         reference_centers_px=reference_centers_px,
     )
-    reference_centers = np.asarray(
-        reference_detection["centers_px"], dtype=np.float64
-    )
+    reference_centers = np.asarray(reference_detection["centers_px"], dtype=np.float64)
     reference_roi = list(reference_detection["roi_px"])
     for index, image in enumerate(images):
         try:
@@ -642,7 +629,9 @@ def analyze_metric(
                 np.linalg.norm(direct_center - tracked_center)
             )
             detection["tracking"] = tracking
-            detection["commanded_position_mm"] = list(frames[index]["commanded_position_mm"])
+            detection["commanded_position_mm"] = list(
+                frames[index]["commanded_position_mm"]
+            )
             detections.append(detection)
             tracking_records.append(tracking)
         except BedFiducialError as exc:
@@ -703,9 +692,7 @@ def analyze_metric(
             np.asarray([detections[index]["centers_px"] for index in zero_indices]),
             axis=0,
         )
-        reference_capture_y = float(
-            frames[zero_indices[0]]["commanded_position_mm"][1]
-        )
+        reference_capture_y = float(frames[zero_indices[0]]["commanded_position_mm"][1])
 
     patch_points = np.asarray(patch_points_mm, dtype=np.float64)
     if patch_points.shape != (4, 2):
@@ -733,10 +720,7 @@ def analyze_metric(
         patch_y_unit = np.asarray([0.0, 1.0])
     patch_x_a = np.asarray([patch_y_unit[1], -patch_y_unit[0]])
     capture_y_values = np.asarray(
-        [
-            float(frames[index]["commanded_position_mm"][1])
-            for index in valid_indices
-        ],
+        [float(frames[index]["commanded_position_mm"][1]) for index in valid_indices],
         dtype=np.float64,
     )
     local_metric_records = []
@@ -756,9 +740,7 @@ def analyze_metric(
         local_metric_records.append(
             {
                 "seq": index,
-                "commanded_y_mm": float(
-                    frames[index]["commanded_position_mm"][1]
-                ),
+                "commanded_y_mm": float(frames[index]["commanded_position_mm"][1]),
                 "y_offset_mm": float(frames[index]["y_offset_mm"]),
                 "patch_to_image_homography": local_homography,
                 "image_x_candidate_a_px_per_mm": image_x_vector_a,
@@ -772,10 +754,7 @@ def analyze_metric(
             dtype=np.float64,
         )
         zero_mask = np.asarray(
-            [
-                abs(float(frames[index]["y_offset_mm"])) < 1e-9
-                for index in valid_indices
-            ]
+            [abs(float(frames[index]["y_offset_mm"])) < 1e-9 for index in valid_indices]
         )
         image_x_reference_a = np.mean(
             image_x_vectors_array[zero_mask],
@@ -783,14 +762,15 @@ def analyze_metric(
         )
         delta_y = capture_y_values - reference_capture_y
         denominator = float(np.dot(delta_y, delta_y))
-        image_x_y_slope_a = np.sum(
-            delta_y[:, None]
-            * (image_x_vectors_array - image_x_reference_a),
-            axis=0,
-        ) / denominator
+        image_x_y_slope_a = (
+            np.sum(
+                delta_y[:, None] * (image_x_vectors_array - image_x_reference_a),
+                axis=0,
+            )
+            / denominator
+        )
         x_fit_residuals = image_x_vectors_array - (
-            image_x_reference_a
-            + delta_y[:, None] * image_x_y_slope_a
+            image_x_reference_a + delta_y[:, None] * image_x_y_slope_a
         )
         x_fit_rms_px_per_mm = float(
             np.sqrt(np.mean(np.sum(x_fit_residuals**2, axis=1)))
@@ -842,10 +822,7 @@ def analyze_metric(
         panel = _draw_detection(
             image,
             detection,
-            (
-                f"seq={index} Yoff={frames[index]['y_offset_mm']} "
-                f"res={residual}"
-            ),
+            (f"seq={index} Yoff={frames[index]['y_offset_mm']} " f"res={residual}"),
             selected=detection is not None,
         )
         if detection is not None:
@@ -913,8 +890,7 @@ def analyze_metric(
                 -patch_x_a,
             ],
             "image_x_axis_candidate_models": image_x_models,
-            "image_x_vector_capture_y_fit_rms_px_per_mm":
-                x_fit_rms_px_per_mm,
+            "image_x_vector_capture_y_fit_rms_px_per_mm": x_fit_rms_px_per_mm,
             "local_metric_records": local_metric_records,
             "reference_marker_centers_px": reference_centers,
             "reference_capture_y_mm": reference_capture_y,
@@ -1043,10 +1019,7 @@ def detect_tab_corner_relative_to_patch(
             above_distance = abs((top_y - point[1]) - 0.45 * vertical_span)
             right_distance = abs((point[0] - right_x) - 0.7 * horizontal_span)
             score = (
-                horizontal["length"]
-                + side["length"]
-                - above_distance
-                - right_distance
+                horizontal["length"] + side["length"] - above_distance - right_distance
             )
             candidates.append((score, point, horizontal, side))
     if not candidates:
@@ -1119,9 +1092,7 @@ def analyze_corner(
     ]
     semantic_corners: list[dict[str, Any] | None] = []
     warnings: list[str] = []
-    for index, (image, detection) in enumerate(
-        zip(images, predicted_detections)
-    ):
+    for index, (image, detection) in enumerate(zip(images, predicted_detections)):
         try:
             corner = detect_tab_corner_relative_to_patch(image, detection)
         except BedFiducialError as exc:
@@ -1201,9 +1172,7 @@ def analyze_corner(
     if registered_points:
         points = np.asarray(registered_points, dtype=np.float64)
         corner_pixel = np.median(points, axis=0)
-        repeatability = float(
-            np.max(np.linalg.norm(points - corner_pixel, axis=1))
-        )
+        repeatability = float(np.max(np.linalg.norm(points - corner_pixel, axis=1)))
         patch_reference = np.mean(np.asarray(patch_centers), axis=0)
         relative_corner = corner_pixel - np.mean(patch_reference, axis=0)
     else:

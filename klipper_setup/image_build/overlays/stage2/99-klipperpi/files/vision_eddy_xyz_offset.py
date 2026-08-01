@@ -33,7 +33,6 @@ from typing import Any
 
 import numpy as np
 
-
 ACCEPTED_MAX_RMS_PX = 12.0
 ACCEPTED_MAX_ERROR_PX = 30.0
 MIN_EDDY_DETECTIONS = 4
@@ -42,9 +41,7 @@ MIN_EDDY_DETECTIONS = 4
 # ── polynomial camera model ───────────────────────────────────────────────────
 
 
-def _eval_model(
-    model: dict[str, Any], x_mm: float, z_mm: float
-) -> tuple[float, float]:
+def _eval_model(model: dict[str, Any], x_mm: float, z_mm: float) -> tuple[float, float]:
     """Evaluate the 6-term nozzle projection polynomial at (x_mm, z_mm).
 
     terms = [1, dx, dz, dx·dz, dx², dx²·dz]
@@ -91,16 +88,26 @@ def _residuals_and_jacobian(
         pred = terms @ coeffs  # shape (2,)
         pred[0] += yvec_x * dy_p
         pred[1] += yvec_y * dy_p
-        r[2 * i]     = pred[0] - rec["image_x_px"]
+        r[2 * i] = pred[0] - rec["image_x_px"]
         r[2 * i + 1] = pred[1] - rec["image_y_px"]
         # d(pred_x)/d(δx) = c1 + c3*dz + 2*c4*dx + 2*c5*dx*dz
         # d(pred_x)/d(δz) = c2 + c3*dx + c5*dx^2
-        J[2 * i,     0] = coeffs[1, 0] + coeffs[3, 0]*dz + 2*coeffs[4, 0]*dx + 2*coeffs[5, 0]*dx*dz
-        J[2 * i,     1] = yvec_x
-        J[2 * i,     2] = coeffs[2, 0] + coeffs[3, 0]*dx + coeffs[5, 0]*dx*dx
-        J[2 * i + 1, 0] = coeffs[1, 1] + coeffs[3, 1]*dz + 2*coeffs[4, 1]*dx + 2*coeffs[5, 1]*dx*dz
+        J[2 * i, 0] = (
+            coeffs[1, 0]
+            + coeffs[3, 0] * dz
+            + 2 * coeffs[4, 0] * dx
+            + 2 * coeffs[5, 0] * dx * dz
+        )
+        J[2 * i, 1] = yvec_x
+        J[2 * i, 2] = coeffs[2, 0] + coeffs[3, 0] * dx + coeffs[5, 0] * dx * dx
+        J[2 * i + 1, 0] = (
+            coeffs[1, 1]
+            + coeffs[3, 1] * dz
+            + 2 * coeffs[4, 1] * dx
+            + 2 * coeffs[5, 1] * dx * dz
+        )
         J[2 * i + 1, 1] = yvec_y
-        J[2 * i + 1, 2] = coeffs[2, 1] + coeffs[3, 1]*dx + coeffs[5, 1]*dx*dx
+        J[2 * i + 1, 2] = coeffs[2, 1] + coeffs[3, 1] * dx + coeffs[5, 1] * dx * dx
     return r, J
 
 
@@ -197,19 +204,25 @@ def analyze(
     tool_models = t0_projection.get("tool_models", {})
     if "T0" not in tool_models:
         reasons.append("t0_projection_model missing T0 tool model")
-        return {"accepted": False, "reasons": reasons, "warnings": warnings,
-                "artifacts": {}}
+        return {
+            "accepted": False,
+            "reasons": reasons,
+            "warnings": warnings,
+            "artifacts": {},
+        }
 
     model = tool_models["T0"]
     y_axis_raw = t0_projection.get("image_y_axis_vector_px_per_mm", [0.0, -10.0])
     y_vec: tuple[float, float] = (float(y_axis_raw[0]), float(y_axis_raw[1]))
 
     if abs(y_vec[1]) < 1.0:
-        reasons.append(
-            f"image_y_axis_vector_px_per_mm magnitude is too small: {y_vec}"
-        )
-        return {"accepted": False, "reasons": reasons, "warnings": warnings,
-                "artifacts": {}}
+        reasons.append(f"image_y_axis_vector_px_per_mm magnitude is too small: {y_vec}")
+        return {
+            "accepted": False,
+            "reasons": reasons,
+            "warnings": warnings,
+            "artifacts": {},
+        }
 
     all_records: list[dict[str, Any]] = eddy_positions.get("detector_records", [])
     records = [r for r in all_records if r.get("detected")]
@@ -218,8 +231,12 @@ def analyze(
         reasons.append(
             f"only {len(records)} eddy detections, need at least {MIN_EDDY_DETECTIONS}"
         )
-        return {"accepted": False, "reasons": reasons, "warnings": warnings,
-                "artifacts": {}}
+        return {
+            "accepted": False,
+            "reasons": reasons,
+            "warnings": warnings,
+            "artifacts": {},
+        }
 
     # ── initial guess ─────────────────────────────────────────────────────────
     # δy from median image_y gap (dominant term — Eddy is Y-offset from nozzle)
@@ -261,32 +278,36 @@ def analyze(
     for i, rec in enumerate(records):
         res_x = float(residual_vec[2 * i])
         res_y = float(residual_vec[2 * i + 1])
-        detection_residuals.append({
-            "seq": int(rec["seq"]),
-            "commanded_x_mm": float(rec["commanded_x_mm"]),
-            "commanded_z_mm": float(rec["commanded_z_mm"]),
-            "residual_x_px": res_x,
-            "residual_y_px": res_y,
-            "residual_magnitude_px": float(math.hypot(res_x, res_y)),
-        })
+        detection_residuals.append(
+            {
+                "seq": int(rec["seq"]),
+                "commanded_x_mm": float(rec["commanded_x_mm"]),
+                "commanded_z_mm": float(rec["commanded_z_mm"]),
+                "residual_x_px": res_x,
+                "residual_y_px": res_y,
+                "residual_magnitude_px": float(math.hypot(res_x, res_y)),
+            }
+        )
 
     accepted = not reasons
-    return _finite_json({
-        "accepted": accepted,
-        "reasons": reasons,
-        "warnings": warnings,
-        "artifacts": {},
-        # offset — the primary output
-        "offset_xyz_mm": [dx, dy, dz],
-        # diagnostics
-        "fit_rms_px": rms_px,
-        "max_error_px": max_err_px,
-        "n_eddy_detections": len(records),
-        "n_eddy_total": len(all_records),
-        "initial_guess_xyz_mm": [dx0, dy0, dz0],
-        "nozzle_model_x_ref_mm": float(model["x_ref_mm"]),
-        "nozzle_model_z_ref_mm": float(model["z_ref_mm"]),
-        "nozzle_model_fit_rms_px": float(model.get("position_fit_rms_px", 0.0)),
-        "image_y_axis_vector_px_per_mm": list(y_vec),
-        "detection_residuals": detection_residuals,
-    })
+    return _finite_json(
+        {
+            "accepted": accepted,
+            "reasons": reasons,
+            "warnings": warnings,
+            "artifacts": {},
+            # offset — the primary output
+            "offset_xyz_mm": [dx, dy, dz],
+            # diagnostics
+            "fit_rms_px": rms_px,
+            "max_error_px": max_err_px,
+            "n_eddy_detections": len(records),
+            "n_eddy_total": len(all_records),
+            "initial_guess_xyz_mm": [dx0, dy0, dz0],
+            "nozzle_model_x_ref_mm": float(model["x_ref_mm"]),
+            "nozzle_model_z_ref_mm": float(model["z_ref_mm"]),
+            "nozzle_model_fit_rms_px": float(model.get("position_fit_rms_px", 0.0)),
+            "image_y_axis_vector_px_per_mm": list(y_vec),
+            "detection_residuals": detection_residuals,
+        }
+    )

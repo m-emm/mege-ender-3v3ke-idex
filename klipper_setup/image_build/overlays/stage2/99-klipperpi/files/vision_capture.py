@@ -20,7 +20,6 @@ from typing import Any
 
 import cv2
 
-
 OUTPUT_DIR = Path(os.environ.get("VISION_OUTPUT_DIR", "/home/pi/printer_data/vision"))
 FRAMEBUFFER_DIR = Path(os.environ.get("VISION_FRAMEBUFFER_DIR", "/run/vision-preview"))
 FRAMEBUFFER_LATEST_IMAGE = FRAMEBUFFER_DIR / "latest.jpg"

@@ -11,9 +11,7 @@ from typing import Any
 
 import cv2
 import numpy as np
-
 from vision_red_marker_x_sweep import _red_candidates
-
 
 _logger = logging.getLogger(__name__)
 
@@ -975,9 +973,7 @@ def analyze(
                 f"{tool} has only {len(physical_tip_tracks[tool])} direct "
                 "physical tip detections"
             )
-        minimum_usable_z_rows = len(
-            {float(record["z_mm"]) for record in tool_records}
-        )
+        minimum_usable_z_rows = len({float(record["z_mm"]) for record in tool_records})
         minimum_accepted_x_positions_per_row = 4
         minimum_x_span_per_row_mm = 8.0
         full_rows = []
@@ -1018,9 +1014,7 @@ def analyze(
                         {float(record["x_mm"]) for record in all_row_records}
                     ),
                     "x_span_mm": x_span_mm,
-                    "required_accepted_count": (
-                        minimum_accepted_x_positions_per_row
-                    ),
+                    "required_accepted_count": (minimum_accepted_x_positions_per_row),
                     "required_x_span_mm": minimum_x_span_per_row_mm,
                     "rejected_samples": rejected_samples,
                 }
@@ -1038,9 +1032,7 @@ def analyze(
                 f"{tool} has only {len(full_rows)} usable Z rows; "
                 f"at least {minimum_usable_z_rows} are required"
             )
-        failed_row_gates = [
-            row for row in row_coverage_gate if not bool(row["passed"])
-        ]
+        failed_row_gates = [row for row in row_coverage_gate if not bool(row["passed"])]
         for row in failed_row_gates:
             rejected_summary = ", ".join(
                 (

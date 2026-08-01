@@ -10,9 +10,7 @@ from typing import Any
 
 import cv2
 import numpy as np
-
 from vision_calibration_graph import sha256_file
-
 
 LOCALIZER = {"kind": "red_marker_trajectory", "version": 1}
 MIN_TOOL_FRAMES = 3
@@ -77,9 +75,7 @@ def _red_candidates(image: np.ndarray, frame_index: int) -> list[dict[str, Any]]
     image_area = float(width * height)
     candidates: list[dict[str, Any]] = []
     for component in range(1, count):
-        x, y, box_width, box_height, area = [
-            int(item) for item in stats[component]
-        ]
+        x, y, box_width, box_height, area = [int(item) for item in stats[component]]
         fill = area / float(max(1, box_width * box_height))
         relative_area = area / image_area
         boundary = (
@@ -154,7 +150,11 @@ def _one_way_registration(
         ty0 : ty0 + roi_height + 2 * margin_y,
         tx0 : tx0 + roi_width + 2 * margin_x,
     ]
-    if template.size == 0 or search.shape[0] < roi_height or search.shape[1] < roi_width:
+    if (
+        template.size == 0
+        or search.shape[0] < roi_height
+        or search.shape[1] < roi_width
+    ):
         raise ValueError("registration ROI lies outside the image")
     scores = cv2.matchTemplate(search, template, cv2.TM_CCOEFF_NORMED)
     _minimum, maximum, _minimum_location, location = cv2.minMaxLoc(scores)
@@ -221,8 +221,7 @@ def _pair_registration(
         for name, record in records.items()
         if not record["forward"]["boundary_hit"]
         and not record["reverse"]["boundary_hit"]
-        and record["forward_reverse_disagreement_px"]
-        <= MAX_REPRESENTATION_SPREAD_PX
+        and record["forward_reverse_disagreement_px"] <= MAX_REPRESENTATION_SPREAD_PX
     ]
     if not usable_names:
         return {
@@ -245,8 +244,7 @@ def _pair_registration(
             ),
             "representation_spread_px": float("inf"),
             "maximum_forward_reverse_disagreement_px": max(
-                record["forward_reverse_disagreement_px"]
-                for record in records.values()
+                record["forward_reverse_disagreement_px"] for record in records.values()
             ),
             "boundary_hit": True,
             "usable_representations": [],
@@ -266,19 +264,14 @@ def _pair_registration(
             record["reverse"]["correlation"],
         )
     ]
-    spread = (
-        float(np.linalg.norm(shifts[0] - shifts[1]))
-        if len(shifts) > 1
-        else 0.0
-    )
+    spread = float(np.linalg.norm(shifts[0] - shifts[1])) if len(shifts) > 1 else 0.0
     return {
         "shift_px": np.mean(np.asarray(shifts), axis=0).tolist(),
         "minimum_correlation": min(correlations),
         "median_correlation": float(np.median(correlations)),
         "representation_spread_px": spread,
         "maximum_forward_reverse_disagreement_px": max(
-            record["forward_reverse_disagreement_px"]
-            for record in usable_records
+            record["forward_reverse_disagreement_px"] for record in usable_records
         ),
         "boundary_hit": False,
         "usable_representations": usable_names,
@@ -329,10 +322,13 @@ def _trajectory_hypotheses(
                 continue
             if rough_rms > 25.0:
                 continue
-            if min(
-                _angle_degrees(rough_vector, y_axis_vector),
-                _angle_degrees(rough_vector, -y_axis_vector),
-            ) < 60.0:
+            if (
+                min(
+                    _angle_degrees(rough_vector, y_axis_vector),
+                    _angle_degrees(rough_vector, -y_axis_vector),
+                )
+                < 60.0
+            ):
                 continue
             registrations = []
             registered_positions = [centers[0]]
@@ -351,8 +347,7 @@ def _trajectory_hypotheses(
                 )
                 if (
                     registration["boundary_hit"]
-                    or registration["minimum_correlation"]
-                    < MIN_WITHIN_TOOL_CORRELATION
+                    or registration["minimum_correlation"] < MIN_WITHIN_TOOL_CORRELATION
                     or registration["representation_spread_px"]
                     > MAX_REPRESENTATION_SPREAD_PX
                     or registration["maximum_forward_reverse_disagreement_px"]
@@ -381,15 +376,12 @@ def _trajectory_hypotheses(
             ]
             if (
                 len(edge_vectors) > 1
-                and max(
-                    float(np.linalg.norm(edge - vector)) for edge in edge_vectors
-                )
+                and max(float(np.linalg.norm(edge - vector)) for edge in edge_vectors)
                 > 0.25
             ):
                 continue
             minimum_correlation = min(
-                registration["minimum_correlation"]
-                for registration in registrations
+                registration["minimum_correlation"] for registration in registrations
             )
             hypotheses.append(
                 {
@@ -465,12 +457,8 @@ def _select_cross_tool_pair(
             for common_x in common:
                 t0_index = t0["x_values_mm"].index(common_x)
                 t1_index = t1["x_values_mm"].index(common_x)
-                center0 = np.asarray(
-                    t0["candidate_centers_px"][t0_index], dtype=float
-                )
-                center1 = np.asarray(
-                    t1["candidate_centers_px"][t1_index], dtype=float
-                )
+                center0 = np.asarray(t0["candidate_centers_px"][t0_index], dtype=float)
+                center1 = np.asarray(t1["candidate_centers_px"][t1_index], dtype=float)
                 cross = _pair_registration(
                     frames_by_tool_x[("T0", common_x)]["representations"],
                     center0,
@@ -480,8 +468,7 @@ def _select_cross_tool_pair(
                 if (
                     cross["boundary_hit"]
                     or cross["minimum_correlation"] < MIN_CROSS_TOOL_CORRELATION
-                    or cross["representation_spread_px"]
-                    > MAX_REPRESENTATION_SPREAD_PX
+                    or cross["representation_spread_px"] > MAX_REPRESENTATION_SPREAD_PX
                     or cross["maximum_forward_reverse_disagreement_px"]
                     > MAX_REPRESENTATION_SPREAD_PX
                 ):
@@ -551,10 +538,7 @@ def _contact_sheet(
             cv2.LINE_AA,
         )
         cells.append(canvas)
-    rows = [
-        np.hstack(cells[index : index + 3])
-        for index in range(0, len(cells), 3)
-    ]
+    rows = [np.hstack(cells[index : index + 3]) for index in range(0, len(cells), 3)]
     path.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(path), np.vstack(rows))
 
@@ -605,10 +589,7 @@ def _marker_selection_overlay(
     cv2.imwrite(
         str(path),
         np.vstack(
-            [
-                np.hstack(cells[index : index + 3])
-                for index in range(0, len(cells), 3)
-            ]
+            [np.hstack(cells[index : index + 3]) for index in range(0, len(cells), 3)]
         ),
     )
 
@@ -789,9 +770,7 @@ def analyze(
                 "candidates": _red_candidates(image, index),
             }
         )
-    frames_by_tool_x = {
-        (record["tool"], record["x_mm"]): record for record in records
-    }
+    frames_by_tool_x = {(record["tool"], record["x_mm"]): record for record in records}
     y_axis_vector = np.asarray(reference["image_y_axis_vector_px_per_mm"], dtype=float)
     hypotheses = {
         tool: _trajectory_hypotheses(
@@ -822,9 +801,7 @@ def analyze(
         "marker_selection": output_dir / "marker_selection.jpg",
     }
     _contact_sheet(records, selected_ids, artifact_paths["contact_sheet"])
-    _marker_selection_overlay(
-        records, selected_ids, artifact_paths["marker_selection"]
-    )
+    _marker_selection_overlay(records, selected_ids, artifact_paths["marker_selection"])
 
     result: dict[str, Any] = {
         "accepted": False,
@@ -868,9 +845,7 @@ def analyze(
                     "T0": vector0.tolist(),
                     "T1": vector1.tolist(),
                 },
-                "tool_scale_delta_fraction": selection[
-                    "tool_scale_delta_fraction"
-                ],
+                "tool_scale_delta_fraction": selection["tool_scale_delta_fraction"],
                 "tool_angle_delta_deg": selection["tool_angle_delta_deg"],
                 "tool_fit_rms_px": {
                     "T0": selection["t0"]["fit_rms_px"],
@@ -886,9 +861,9 @@ def analyze(
                 },
                 "common_commanded_x_mm": selection["common_x_mm"],
                 "cross_tool_shift_px": cross_shift.tolist(),
-                "cross_tool_minimum_correlation": selection[
-                    "cross_registration"
-                ]["minimum_correlation"],
+                "cross_tool_minimum_correlation": selection["cross_registration"][
+                    "minimum_correlation"
+                ],
                 "corner_pixel_at_capture_y_px": corner_at_capture.tolist(),
                 "t0_marker_pixel_px": marker0.tolist(),
                 "t1_marker_pixel_px": marker1.tolist(),
@@ -904,12 +879,13 @@ def analyze(
         artifact_paths.update(
             {
                 "core_registration": output_dir / "core_registration.jpg",
-                "cross_tool_registration": output_dir
-                / "cross_tool_registration.jpg",
+                "cross_tool_registration": output_dir / "cross_tool_registration.jpg",
                 "trajectory": output_dir / "trajectory.jpg",
             }
         )
-        _core_registration_overlay(selection, frames_by_tool_x, artifact_paths["core_registration"])
+        _core_registration_overlay(
+            selection, frames_by_tool_x, artifact_paths["core_registration"]
+        )
         _cross_tool_overlay(
             selection, frames_by_tool_x, artifact_paths["cross_tool_registration"]
         )

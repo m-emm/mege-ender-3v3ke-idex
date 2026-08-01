@@ -10,7 +10,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-
 SCHEMA_VERSION = 1
 FACT_CATALOG_SCHEMA = "vision-calibration-fact-catalog"
 PUBLICATION_SCHEMA = "vision-calibration-publication"

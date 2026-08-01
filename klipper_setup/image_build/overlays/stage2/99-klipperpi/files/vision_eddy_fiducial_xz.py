@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 from pathlib import Path
 from typing import Any
 
 import cv2
 import numpy as np
-import logging
 
 _logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
@@ -146,18 +146,19 @@ def locate_body_template(
 
     return best_rect
 
+
 def _load_gray_template() -> np.ndarray:
     template_gray = cv2.imread(
         str(_SIFT_TEMPLATE_PATH),
         cv2.IMREAD_GRAYSCALE,
     )
     if template_gray is None:
-        raise EddyFiducialError(
-            f"Cannot load body template {_SIFT_TEMPLATE_PATH}"
-        )
+        raise EddyFiducialError(f"Cannot load body template {_SIFT_TEMPLATE_PATH}")
     return template_gray
 
+
 template_gray = _load_gray_template()
+
 
 def _load_sift_template() -> tuple[list, np.ndarray, int, int] | None:
     """Load the frozen sensor-body SIFT template from the sibling PNG.
@@ -447,7 +448,6 @@ def analyze(
     if len(frame_paths) != len(frames):
         raise EddyFiducialError("Eddy frame paths do not match the manifest")
 
-
     # --- Per-frame detection and circle overlays (one image at a time) ----------
     records = []
     expected_center: np.ndarray | None = None
@@ -468,16 +468,13 @@ def analyze(
         elif dimensions != image_dimensions:
             raise EddyFiducialError("Eddy grid images have inconsistent dimensions")
 
-        
         body_rect = locate_body_template(image, template_gray)
 
         if body_rect is None:
             continue
             # raise EddyFiducialError("Could not locate Eddy body")
 
-        x0, y0, x1, y1 = body_rect    
-
-
+        x0, y0, x1, y1 = body_rect
 
         detection = detect_circle(
             image,

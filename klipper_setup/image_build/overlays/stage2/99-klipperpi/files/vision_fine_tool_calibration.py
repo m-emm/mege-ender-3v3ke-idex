@@ -13,7 +13,6 @@ from typing import Any
 import cv2
 import numpy as np
 
-
 _logger = logging.getLogger(__name__)
 
 
@@ -810,9 +809,7 @@ def calculate_candidate(
     if float(model["position_fit_rms_px"]) > 1.5:
         reasons.append(f"{tool} position fit RMS {model['position_fit_rms_px']:.3f} px")
     rows = solved["full_row_coverage"]
-    expected_row_count = len(
-        {float(record["z_mm"]) for record in registrations}
-    )
+    expected_row_count = len({float(record["z_mm"]) for record in registrations})
     if len(rows) < expected_row_count:
         reasons.append(
             f"{tool} has only {len(rows)} usable X rows from "

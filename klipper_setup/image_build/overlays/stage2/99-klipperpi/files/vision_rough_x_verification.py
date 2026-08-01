@@ -9,14 +9,12 @@ from typing import Any
 
 import cv2
 import numpy as np
-
 from vision_calibration_graph import sha256_file
 from vision_red_marker_x_sweep import (
     _pair_registration,
     _red_candidates,
     _representations,
 )
-
 
 LOCALIZER = {"kind": "rough_x_marker_verification", "version": 1}
 MAX_ABSOLUTE_RESIDUAL_MM = 1.5
@@ -177,9 +175,7 @@ def _verification_overlay(
         if selected:
             x0, y0, x1, y1 = selected["bbox_px"]
             cv2.rectangle(panel, (x0, y0), (x1, y1), (0, 255, 0), 4)
-            center = tuple(
-                int(round(value)) for value in selected["center_px"]
-            )
+            center = tuple(int(round(value)) for value in selected["center_px"])
             cv2.drawMarker(
                 panel,
                 center,
@@ -326,18 +322,14 @@ def analyze(
             reasons.append(f"{frame['tool']} red marker was not found")
         else:
             record["marker_offset_mm"] = selected["projected_offset_mm"]
-            record["residual_mm"] = (
-                selected["projected_offset_mm"] - expected_offset
-            )
+            record["residual_mm"] = selected["projected_offset_mm"] - expected_offset
         records.append(record)
 
     registration = None
     registered_t1_center = None
     if not reasons:
         t0_center = np.asarray(records[0]["selected"]["center_px"], dtype=float)
-        t1_search_center = np.asarray(
-            records[1]["selected"]["center_px"], dtype=float
-        )
+        t1_search_center = np.asarray(records[1]["selected"]["center_px"], dtype=float)
         registration = _pair_registration(
             _representations(images[0]),
             t0_center,
@@ -364,18 +356,14 @@ def analyze(
             registration["image_x_representation_spread_px"]
             > MAX_REPRESENTATION_SPREAD_PX
         ):
-            reasons.append(
-                "grayscale and CLAHE image-X marker registrations disagree"
-            )
+            reasons.append("grayscale and CLAHE image-X marker registrations disagree")
         if (
             registration["maximum_forward_reverse_disagreement_px"]
             > MAX_FORWARD_REVERSE_DISAGREEMENT_PX
         ):
             reasons.append("forward and reverse marker registrations disagree")
 
-    residuals = {
-        record["tool"]: record.get("residual_mm") for record in records
-    }
+    residuals = {record["tool"]: record.get("residual_mm") for record in records}
     if all(value is not None for value in residuals.values()):
         for tool, residual in residuals.items():
             if abs(float(residual)) > MAX_ABSOLUTE_RESIDUAL_MM:

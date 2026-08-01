@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
+import logging
 import math
 import os
 import re
@@ -17,17 +19,13 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-import hashlib
+
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import yaml
-import matplotlib.pyplot as plt
-
-from vision_bed_fiducial import (
-    analyze_corner,
-    analyze_lighting,
-    analyze_metric,
-)
+from scipy.optimize import least_squares
+from vision_bed_fiducial import analyze_corner, analyze_lighting, analyze_metric
 from vision_calibration_graph import (
     ANALYSIS_SCHEMA,
     FACT_SET_SCHEMA,
@@ -48,18 +46,16 @@ from vision_calibration_graph import (
 )
 from vision_eddy_fiducial_xz import analyze as analyze_eddy_fiducial_xz
 from vision_eddy_xyz_offset import analyze as analyze_eddy_xyz_offset
-from vision_nozzle_fine_xz import analyze as analyze_fine_nozzle_xz
 from vision_fine_tool_calibration import (
     calculate_candidate as calculate_fine_tool_candidate,
-    write_artifacts as write_fine_tool_artifacts,
 )
+from vision_fine_tool_calibration import write_artifacts as write_fine_tool_artifacts
+from vision_nozzle_fine_xz import analyze as analyze_fine_nozzle_xz
 from vision_red_marker_x_sweep import analyze as analyze_red_marker_x_sweep
+from vision_rough_x_verification import analyze as analyze_rough_x_verification
 from vision_rough_x_verification import (
-    analyze as analyze_rough_x_verification,
     calculate_candidate as calculate_rough_x_candidate,
 )
-
-import logging
 
 _logger = logging.getLogger(__name__)
 
@@ -138,6 +134,140 @@ HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
 
 class VisionCalibrationError(RuntimeError):
     pass
+
+
+def _project_points(
+    points_xyz,
+    *,
+    log_fx,
+    log_fy,
+    cx,
+    cy,
+    rvec,
+    tvec,
+    k1,
+    k2,
+):
+
+    camera_matrix = np.array(
+        [
+            [math.exp(log_fx), 0.0, cx],
+            [0.0, math.exp(log_fy), cy],
+            [0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+
+    distortion = np.array(
+        [k1, k2, 0.0, 0.0, 0.0],
+        dtype=np.float64,
+    )
+
+    projected, _ = cv2.projectPoints(
+        np.asarray(points_xyz, dtype=np.float64),
+        np.asarray(rvec, dtype=np.float64),
+        np.asarray(tvec, dtype=np.float64),
+        camera_matrix,
+        distortion,
+    )
+
+    return projected.reshape(-1, 2)
+
+
+def _global_fit_residuals(
+    theta,
+    *,
+    nozzle_cmd_xz,
+    nozzle_uv,
+    eddy_cmd_xz,
+    eddy_uv,
+    eddy_offset_xyz,
+    bed_cmd_y,
+    bed_corner_offsets_xy,
+    bed_uv,
+    bed_plane_z_mm,
+    bed_motion_sign,
+):
+
+    log_fx, log_fy, cx, cy = theta[0:4]
+
+    rvec = theta[4:7]
+
+    tvec = theta[7:10]
+
+    z_bias = theta[10]
+
+    bed_x0 = theta[11]
+
+    bed_y0 = theta[12]
+
+    k1 = theta[13]
+
+    k2 = theta[14]
+
+    nozzle_points = np.column_stack(
+        [
+            nozzle_cmd_xz[:, 0],
+            np.zeros(len(nozzle_cmd_xz)),
+            nozzle_cmd_xz[:, 1] + z_bias,
+        ]
+    )
+
+    dx, dy, dz = eddy_offset_xyz
+
+    eddy_points = np.column_stack(
+        [
+            eddy_cmd_xz[:, 0] + dx,
+            np.full(len(eddy_cmd_xz), dy),
+            eddy_cmd_xz[:, 1] + z_bias + dz,
+        ]
+    )
+
+    bed_points = []
+
+    for y_cmd in bed_cmd_y:
+
+        for corner_x, corner_y in bed_corner_offsets_xy:
+
+            bed_points.append(
+                [
+                    bed_x0 + corner_x,
+                    bed_y0 + bed_motion_sign * y_cmd + corner_y,
+                    bed_plane_z_mm,
+                ]
+            )
+
+    bed_points = np.asarray(bed_points, dtype=np.float64)
+
+    points_xyz = np.vstack(
+        [
+            nozzle_points,
+            eddy_points,
+            bed_points,
+        ]
+    )
+
+    measured_uv = np.vstack(
+        [
+            nozzle_uv,
+            eddy_uv,
+            bed_uv.reshape(-1, 2),
+        ]
+    )
+
+    predicted_uv = _project_points(
+        points_xyz,
+        log_fx=log_fx,
+        log_fy=log_fy,
+        cx=cx,
+        cy=cy,
+        rvec=rvec,
+        tvec=tvec,
+        k1=k1,
+        k2=k2,
+    )
+
+    return (predicted_uv - measured_uv).ravel()
 
 
 def _artifact(path: Path) -> dict[str, str]:
@@ -1363,57 +1493,90 @@ def _homography_inverse_point(
     return (result[:2] / result[2]).tolist()
 
 
+def _t1_offset_residuals(
+    offset_xyz,
+    *,
+    t1_cmd_xz,
+    t1_uv,
+    camera_parameters,
+):
+
+    dx, dy, dz = offset_xyz
+
+    t1_points = np.column_stack(
+        [
+            t1_cmd_xz[:, 0] + dx,
+            np.full(len(t1_cmd_xz), dy),
+            t1_cmd_xz[:, 1] + dz,
+        ]
+    )
+
+    projected_uv = _project_points(
+        t1_points,
+        **camera_parameters,
+    )
+
+    return (projected_uv - t1_uv).ravel()
+
+
 def analyze_idex_xyz_offset(
-    artifact_dir, t0_projection, t1_projection, eddy_positions
+    artifact_dir, t0_projection, t1_projection, eddy_positions, bed_metric
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
     _logger.info("analyzing IDEX XYZ offset")
 
-    _logger.info(f"Got t0_projection keys: {t0_projection.keys()}")
-    _logger.info(f"Got t1_projection keys: {t1_projection.keys()}")
-    _logger.info(f"Got eddy_positions keys: {eddy_positions.keys()}")
+    # _logger.info(f"Got t0_projection keys: {t0_projection.keys()}")
+    # _logger.info(f"Got t1_projection keys: {t1_projection.keys()}")
+    # _logger.info(f"Got eddy_positions keys: {eddy_positions.keys()}")
+
+    # _logger.info(f"Got bed metric: {json.dumps(bed_metric, indent=2)}")
 
     t0_tool_models = t0_projection["tool_models"]
-    t0_positions = t0_tool_models["T0"]["accepted_direct_positions"]
 
     all_records: list[dict[str, Any]] = eddy_positions.get("detector_records", [])
     eddy_records = [r for r in all_records if r.get("detected")]
 
-    _logger.info(f"eddy records: {json.dumps(eddy_records, indent=2)}")
-
+    # _logger.info(f"eddy records: {json.dumps(eddy_records, indent=2)}")
 
     consolidated_records = []
 
-    for what, positions in [("T0", t0_projection) , ("T1", t1_projection)]:
+    for what, positions in [("T0", t0_projection), ("T1", t1_projection)]:
         positions = positions["tool_models"][what]["accepted_direct_positions"]
-
 
         for pos in positions:
             toolhead_record = {
-                "x" : pos["x_mm"],
-                "y" : -14,
-                "z" : pos["z_mm"],
-                "what" : what,
-                "u":pos["center_px"][0],
+                "x": pos["x_mm"],
+                "y": -14,
+                "z": pos["z_mm"],
+                "what": what,
+                "u": pos["center_px"][0],
                 "v": pos["center_px"][1],
-
             }
             consolidated_records.append(toolhead_record)
 
-
     for eddy_record in eddy_records:
         consoidated_record = {
-            "x" : eddy_record["commanded_x_mm"],
-            "y" : -14,
-            "z" : eddy_record["commanded_z_mm"],
-            "what" : "Eddy",
-            "u" : eddy_record["image_x_px"],
-            "v" : eddy_record["image_y_px"],
+            "x": eddy_record["commanded_x_mm"],
+            "y": -14,
+            "z": eddy_record["commanded_z_mm"],
+            "what": "Eddy",
+            "u": eddy_record["image_x_px"],
+            "v": eddy_record["image_y_px"],
         }
         consolidated_records.append(consoidated_record)
-        
 
+    for fiducial_record in bed_metric["detection_records"]:
+        center = np.mean(fiducial_record["centers_px"], axis=0).tolist()
+        consoidated_record = {
+            "x": 165,
+            "y": fiducial_record["commanded_position_mm"][1],
+            "z": -0.6,
+            "what": "Fiducial",
+            "u": center[0],
+            "v": center[1],
+        }
+        consolidated_records.append(consoidated_record)
 
     positions_plot = plt.figure(figsize=(8, 6))
     plt.title("Positions")
@@ -1437,6 +1600,13 @@ def analyze_idex_xyz_offset(
         color="red",
     )
 
+    plt.scatter(
+        [r["x"] for r in consolidated_records if r["what"] == "Fiducial"],
+        [r["z"] for r in consolidated_records if r["what"] == "Fiducial"],
+        label="Fiducial",
+        color="orange",
+    )
+
     plt.xlabel("X (mm)")
     plt.ylabel("Z (mm)")
     plt.legend()
@@ -1446,17 +1616,17 @@ def analyze_idex_xyz_offset(
 
     plt.close(positions_plot)
 
-
     image_posittion_traces_plot = plt.figure(figsize=(8, 6))
     plt.title("Image Position Traces")
 
-
     # group all data by 'what' and then by commanded z
-    # add one trace / scatter per what and commanded z
+    # add one trace / scatter per what and commanded z
 
-    for what in ["T0", "T1", "Eddy"]:
+    for what in ["T0", "T1", "Eddy", "Fiducial"]:
         for z in sorted(set(r["z"] for r in consolidated_records if r["what"] == what)):
-            subset = [r for r in consolidated_records if r["what"] == what and r["z"] == z]
+            subset = [
+                r for r in consolidated_records if r["what"] == what and r["z"] == z
+            ]
             plt.scatter(
                 [r["u"] for r in subset],
                 [-r["v"] for r in subset],
@@ -1467,23 +1637,298 @@ def analyze_idex_xyz_offset(
     plt.xlabel("U (px)")
     plt.ylabel("V (px)")
     plt.legend()
-    image_posittion_traces_plot_path = artifact_dir / "image_position_traces.png"
-    image_posittion_traces_plot.savefig(image_posittion_traces_plot_path)
+    image_position_traces_plot_path = artifact_dir / "image_position_traces.png"
+    image_posittion_traces_plot.savefig(image_position_traces_plot_path)
     plt.close(image_posittion_traces_plot)
 
+    _logger.info(f"Fitting model...")
 
+    t0_positions = t0_projection["tool_models"]["T0"]["accepted_direct_positions"]
 
+    nozzle_cmd_xz = np.asarray(
+        [[pos["x_mm"], pos["z_mm"]] for pos in t0_positions],
+        dtype=np.float64,
+    )
 
+    nozzle_uv = np.asarray(
+        [pos["center_px"] for pos in t0_positions],
+        dtype=np.float64,
+    )
 
+    all_eddy_records = eddy_positions.get(
+        "detector_records",
+        [],
+    )
 
+    eddy_records = [record for record in all_eddy_records if record.get("detected")]
+
+    eddy_cmd_xz = np.asarray(
+        [
+            [
+                record["commanded_x_mm"],
+                record["commanded_z_mm"],
+            ]
+            for record in eddy_records
+        ],
+        dtype=np.float64,
+    )
+
+    eddy_uv = np.asarray(
+        [
+            [
+                record["image_x_px"],
+                record["image_y_px"],
+            ]
+            for record in eddy_records
+        ],
+        dtype=np.float64,
+    )
+
+    eddy_offset_xyz = np.asarray(
+        [-57.391, -18.997, 1.399],
+        dtype=np.float64,
+    )
+
+    bed_records = bed_metric["detection_records"]
+
+    bed_cmd_y = np.asarray(
+        [record["commanded_position_mm"][1] for record in bed_records],
+        dtype=np.float64,
+    )
+
+    bed_uv = np.asarray(
+        [record["centers_px"] for record in bed_records],
+        dtype=np.float64,
+    )
+
+    bed_corner_offsets_xy = np.asarray(
+        [
+            [-4.0, -4.0],
+            [4.0, -4.0],
+            [4.0, 4.0],
+            [-4.0, 4.0],
+        ],
+        dtype=np.float64,
+    )
+
+    image_width = 1920
+
+    image_height = 1080
+
+    theta0 = np.asarray(
+        [
+            np.log(1500.0),  # fx
+            np.log(1500.0),  # fy
+            960.0,  # cx
+            540.0,  # cy
+            np.pi,  # camera rotation vector
+            0.0,
+            0.0,
+            0.0,  # camera translation
+            0.0,
+            300.0,
+            0.0,  # T0 Z bias, the number we want
+            165.0,  # bed fiducial X origin
+            0.0,  # bed fiducial Y origin
+            0.0,  # k1
+            0.0,  # k2
+        ],
+        dtype=np.float64,
+    )
+
+    lower_bounds = np.asarray(
+        [
+            np.log(300.0),  # fx
+            np.log(300.0),  # fy
+            0.0,  # cx
+            0.0,  # cy
+            -2.0 * np.pi,  # rvec x
+            -2.0 * np.pi,  # rvec y
+            -2.0 * np.pi,  # rvec z
+            -1000.0,  # tvec x
+            -1000.0,  # tvec y
+            1.0,  # tvec z
+            -20.0,  # T0 Z bias
+            -500.0,  # bed X origin
+            -500.0,  # bed Y origin
+            -1.0,  # k1
+            -1.0,  # k2
+        ],
+        dtype=np.float64,
+    )
+
+    upper_bounds = np.asarray(
+        [
+            np.log(5000.0),
+            np.log(5000.0),
+            float(image_width),
+            float(image_height),
+            2.0 * np.pi,
+            2.0 * np.pi,
+            2.0 * np.pi,
+            1000.0,
+            1000.0,
+            2000.0,
+            20.0,
+            500.0,
+            500.0,
+            1.0,
+            1.0,
+        ],
+        dtype=np.float64,
+    )
+
+    _logger.info(
+        "Starting least-squares fit with %d residual values and %d parameters",
+        2 * (len(nozzle_uv) + len(eddy_uv) + bed_uv.shape[0] * bed_uv.shape[1]),
+        len(theta0),
+    )
+
+    fit = least_squares(
+        lambda theta: _global_fit_residuals(
+            theta,
+            nozzle_cmd_xz=nozzle_cmd_xz,
+            nozzle_uv=nozzle_uv,
+            eddy_cmd_xz=eddy_cmd_xz,
+            eddy_uv=eddy_uv,
+            eddy_offset_xyz=eddy_offset_xyz,
+            bed_cmd_y=bed_cmd_y,
+            bed_corner_offsets_xy=bed_corner_offsets_xy,
+            bed_uv=bed_uv,
+            bed_plane_z_mm=-0.6,
+            bed_motion_sign=-1.0,
+        ),
+        theta0,
+        bounds=(lower_bounds, upper_bounds),
+        loss="soft_l1",
+        f_scale=1.0,
+        x_scale="jac",
+        max_nfev=3000,
+        verbose=2,
+    )
+
+    _logger.info(
+        "Fit finished: success=%s status=%d nfev=%d "
+        "cost=%.6f optimality=%.6g message=%s",
+        fit.success,
+        fit.status,
+        fit.nfev,
+        fit.cost,
+        fit.optimality,
+        fit.message,
+    )
+
+    if not fit.success:
+
+        raise VisionCalibrationError(
+            f"global camera fit failed after {fit.nfev} evaluations: " f"{fit.message}"
+        )
+
+    z_bias = float(fit.x[10])
+
+    camera_fit_parameters = {
+        "log_fx": float(fit.x[0]),
+        "log_fy": float(fit.x[1]),
+        "cx": float(fit.x[2]),
+        "cy": float(fit.x[3]),
+        "rvec": np.asarray(fit.x[4:7], dtype=np.float64),
+        "tvec": np.asarray(fit.x[7:10], dtype=np.float64),
+        "k1": float(fit.x[13]),
+        "k2": float(fit.x[14]),
+    }
+
+    def t1_offset_residuals(offset_xyz: np.ndarray) -> np.ndarray:
+
+        dx_mm, dy_mm, dz_mm = offset_xyz
+
+        t1_points_xyz = np.column_stack(
+            [
+                t1_cmd_xz[:, 0] + dx_mm,
+                np.full(len(t1_cmd_xz), dy_mm, dtype=np.float64),
+                t1_cmd_xz[:, 1] + z_bias + dz_mm,
+            ]
+        )
+
+        projected_uv = _project_points(
+            t1_points_xyz,
+            **camera_fit_parameters,
+        )
+
+        return (projected_uv - t1_uv).reshape(-1)
+
+    t1_positions = t1_projection["tool_models"]["T1"]["accepted_direct_positions"]
+
+    t1_cmd_xz = np.asarray(
+        [[pos["x_mm"], pos["z_mm"]] for pos in t1_positions],
+        dtype=np.float64,
+    )
+
+    t1_uv = np.asarray(
+        [pos["center_px"] for pos in t1_positions],
+        dtype=np.float64,
+    )
+
+    if len(t1_uv) < 3:
+
+        raise VisionCalibrationError(
+            f"T0->T1 fit requires at least 3 T1 observations, got {len(t1_uv)}"
+        )
+    _logger.info(
+        "Fitting T0->T1 XYZ offset from %d observations",
+        len(t1_uv),
+    )
+
+    t1_fit = least_squares(
+        t1_offset_residuals,
+        x0=np.asarray([0.0, 0.0, 0.0], dtype=np.float64),
+        bounds=(
+            np.asarray([-25.0, -25.0, -10.0], dtype=np.float64),
+            np.asarray([25.0, 25.0, 10.0], dtype=np.float64),
+        ),
+        loss="soft_l1",
+        f_scale=1.0,
+        x_scale="jac",
+        max_nfev=2000,
+    )
+
+    if not t1_fit.success:
+
+        raise VisionCalibrationError(
+            "T0->T1 XYZ offset fit failed after "
+            f"{t1_fit.nfev} evaluations: {t1_fit.message}"
+        )
+
+    t0_t1_xyz_offset = np.asarray(
+        t1_fit.x,
+        dtype=np.float64,
+    )
+
+    t1_residual_pairs = t1_offset_residuals(t0_t1_xyz_offset).reshape(-1, 2)
+
+    t1_error_px = np.linalg.norm(
+        t1_residual_pairs,
+        axis=1,
+    )
+
+    t1_rms_px = float(np.sqrt(np.mean(t1_error_px**2)))
+
+    _logger.info(
+        "Fitted T0->T1 offset: "
+        "dx=%+.6f mm dy=%+.6f mm dz=%+.6f mm; "
+        "T1 reprojection RMS=%.4f px",
+        t0_t1_xyz_offset[0],
+        t0_t1_xyz_offset[1],
+        t0_t1_xyz_offset[2],
+        t1_rms_px,
+    )
 
     return {
         "accepted": True,
         "artifacts": {
             "positions_plot": _artifact(positions_plot_path),
-            "image_position_traces_plot": _artifact(image_posittion_traces_plot_path),
+            "image_position_traces_plot": _artifact(image_position_traces_plot_path),
         },
-        "t0_t1_xyz_offset": [0, 0, 0],
+        "t0_t1_xyz_offset": t0_t1_xyz_offset.tolist(),
     }
 
 
@@ -1594,6 +2039,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 t0_projection=_load_bound_fact(bindings["t0_projection_model"]),
                 t1_projection=_load_bound_fact(bindings["t1_projection_model"]),
                 eddy_positions=_load_bound_fact(bindings["eddy_xz_image_positions"]),
+                bed_metric=_load_bound_fact(bindings["bed_metric"]),
             )
         else:
             raise VisionCalibrationError(f"unsupported job type: {job_type}")
@@ -1658,6 +2104,8 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                     )
                 ]
             elif job_type == BED_FIDUCIAL_METRIC_JOB:
+                detection_records_keys = ["centers_px", "commanded_position_mm"]
+
                 value = {
                     "image_y_axis_vector_px_per_mm": details[
                         "image_y_axis_vector_px_per_mm"
@@ -1680,6 +2128,11 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                     ],
                     "reference_capture_y_mm": details["reference_capture_y_mm"],
                     "image_dimensions_px": [width, height],
+                    "detection_records": [
+                        {key: record[key] for key in detection_records_keys}
+                        for record in details["detection_records"]
+                        if record is not None
+                    ],
                     "quality": {
                         key: details[key]
                         for key in (
@@ -2197,16 +2650,19 @@ def run_job(
     timeout: float = 300.0,
 ) -> dict[str, Any]:
 
-    if not _is_compute_only_job_type(job_type):
+    if _is_compute_only_job_type(job_type):
+        result = compute_job(name, job_type=job_type)
+
+        return {"prepared": result, "analysis": result}
+
+    else:
         acquired = acquire_job(
             name,
             job_type=job_type,
             expected_fingerprint=expected_fingerprint,
             timeout=timeout,
         )
-    else:
-        acquired = {"prepared": compute_job(name, job_type=job_type)}
-    analysis = analyze_job(acquired["prepared"]["job_id"])
+        analysis = analyze_job(acquired["prepared"]["job_id"])
     return {"prepared": acquired["prepared"], "analysis": analysis}
 
 

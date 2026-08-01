@@ -156,9 +156,7 @@ class Vision:
                 sock.fileno(), read_callback, write_callback
             )
             self.reactor.set_fd_wake(fd_handle, True, True)
-            response = completion.wait(
-                self.reactor.monotonic() + self.timeout, None
-            )
+            response = completion.wait(self.reactor.monotonic() + self.timeout, None)
         except Exception as exc:
             response = {"ok": False, "error": str(exc)}
         finally:
@@ -168,8 +166,7 @@ class Vision:
 
         if response is None:
             raise self.gcode.error(
-                "Vision command %s timed out after %.3fs"
-                % (action, self.timeout)
+                "Vision command %s timed out after %.3fs" % (action, self.timeout)
             )
         if not response.get("ok"):
             raise self.gcode.error(
