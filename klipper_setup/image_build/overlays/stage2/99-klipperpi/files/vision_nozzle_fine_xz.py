@@ -658,7 +658,7 @@ def analyze(
     physical_tip_deltas: dict[str, np.ndarray] = {}
     physical_tip_spreads: dict[str, float] = {}
     ring_radius_medians: dict[str, float] = {}
-    minimum_direct_detections = max(14, math.ceil(0.65 * len(frames)))
+    minimum_direct_detections = max(10, math.ceil(0.20 * len(frames)))
     for tool in (target_tool,):
         delta, spread, selected = _cluster_candidates(
             ring_candidate_sets[tool],

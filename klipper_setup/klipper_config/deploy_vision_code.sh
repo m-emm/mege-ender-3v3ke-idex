@@ -66,6 +66,9 @@ sudo systemctl restart vision-framebuffer-nozzle-cam.service
 sudo systemctl restart vision-capture.service
 sudo systemctl restart vision-capture-nozzle-cam.service
 
+echo "Fixing vision data ownership"
+sudo chown -R pi:pi /home/pi/printer_data/vision/ 2>/dev/null || true
+
 echo "Rebuilding static vision UI"
 VISION_OUTPUT_DIR=/home/pi/printer_data/vision \
 VISION_OUTPUT_URL_PREFIX=/vision \

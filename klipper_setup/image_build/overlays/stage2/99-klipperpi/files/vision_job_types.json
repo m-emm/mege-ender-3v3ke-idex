@@ -288,7 +288,8 @@
         17.5,
         20,
         22.5,
-        25
+        25,
+        27.5
       ],
       "full_row_z_mm": [
         0.5,
@@ -300,7 +301,7 @@
       ],
       "capture_y_mm": -14,
       "safe_tool_change_z_mm": 9,
-      "velocity_mm_s": 60,
+      "velocity_mm_s": 110,
       "settle_ms": 300,
       "tool_change_settle_ms": 1000,
       "discard_fresh_frames": 1,
@@ -394,7 +395,8 @@
         17.5,
         20,
         22.5,
-        25
+        25,
+        27.5
       ],
       "full_row_z_mm": [
         0.5,
@@ -405,7 +407,7 @@
       ],
       "capture_y_mm": -14,
       "safe_tool_change_z_mm": 9,
-      "velocity_mm_s": 60,
+      "velocity_mm_s": 110,
       "settle_ms": 300,
       "tool_change_settle_ms": 1000,
       "discard_fresh_frames": 1,
