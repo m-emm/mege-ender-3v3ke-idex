@@ -40,6 +40,10 @@ class CalibrationGraphError(RuntimeError):
     pass
 
 
+class VisionCalibrationError(RuntimeError):
+    pass
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
