@@ -1001,6 +1001,34 @@ def _x_vector(model: dict[str, Any], x_mm: float, z_mm: float) -> np.ndarray:
     )
 
 
+def _pixel_delta_to_printer_xy_mm(
+    pixel_delta: np.ndarray,
+    *,
+    x_vector_px_per_mm: np.ndarray,
+    y_vector_px_per_mm: np.ndarray,
+) -> np.ndarray:
+
+    basis = np.column_stack(
+        (
+            np.asarray(x_vector_px_per_mm, dtype=np.float64),
+            np.asarray(y_vector_px_per_mm, dtype=np.float64),
+        )
+    )
+
+    condition_number = float(np.linalg.cond(basis))
+
+    if not math.isfinite(condition_number) or condition_number > 100.0:
+
+        raise FineNozzleError(
+            f"pixel/printer XY basis is ill-conditioned: {condition_number:.3f}"
+        )
+
+    return np.linalg.solve(
+        basis,
+        np.asarray(pixel_delta, dtype=np.float64),
+    )
+
+
 def analyze(
     frame_paths: list[Path],
     artifact_dir: Path,
@@ -1553,17 +1581,34 @@ def analyze(
             2,
         )
 
-
-        tip_pos_text  = (
-            f"tip_pos={marker[0]:.1f},{marker[1]:.1f}"
+        fiducial_centers_px = np.asarray(
+            four_fiducial_registration["four_fiducials"]["centers_px"],
+            dtype=np.float64,
         )
-        
+        fiducial_patch_center_px = np.mean(fiducial_centers_px, axis=0)
+        tip_from_fiducial_px = center - fiducial_patch_center_px
+        tip_from_fiducial_xy_mm = _pixel_delta_to_printer_xy_mm(
+            tip_from_fiducial_px,
+            x_vector_px_per_mm=bed_x_fiducial,
+            y_vector_px_per_mm=image_y_vector,
+        )
+
+        tip_pos_text = (
+            f"tip_px={center[0]:.1f},{center[1]:.1f} "
+            f"fiducials_to_tip_mm="
+            f"{tip_from_fiducial_xy_mm[0]:+.3f},"
+            f"{tip_from_fiducial_xy_mm[1]:+.3f}"
+        )
+
+        registration["four_fiducial_center_px"] = fiducial_patch_center_px
+        registration["fiducial_to_tip_delta_px"] = tip_from_fiducial_px
+        registration["fiducial_to_tip_delta_printer_xy_mm"] = tip_from_fiducial_xy_mm
+
         cv2.putText(
             panel,
             (
                 f"{frame['tool']} X={frame['x_mm']} Z={frame['z_mm']} "
                 f"corr={registration['minimum_correlation']:.3f} " + tip_pos_text
-                
             ),
             (24, 40),
             cv2.FONT_HERSHEY_SIMPLEX,
@@ -1658,6 +1703,22 @@ def analyze(
         ring_center = np.asarray(registration["ring_center_px"])
         center = np.asarray(registration["center_px"])
         radius = float(registration["ring_radius_px"])
+
+        fiducial_centers_px = np.asarray(
+            four_fiducial_registration["four_fiducials"]["centers_px"],
+            dtype=np.float64,
+        )
+
+        fiducial_patch_center_px = np.mean(fiducial_centers_px, axis=0)
+
+        tip_from_fiducial_px = center - fiducial_patch_center_px
+
+        tip_from_fiducial_xy_mm = _pixel_delta_to_printer_xy_mm(
+            tip_from_fiducial_px,
+            x_vector_px_per_mm=bed_x_fiducial,
+            y_vector_px_per_mm=image_y_vector,
+        )
+
         cv2.circle(
             image,
             tuple(np.rint(ring_center).astype(int)),
