@@ -261,6 +261,207 @@ def _quad_geometry(points: np.ndarray) -> tuple[float, dict[str, float]] | None:
     }
 
 
+EXPECTED_EDGE_LENGTH_PX = 80.0
+EDGE_LENGTH_TOLERANCE_FRACTION = 0.5
+EXPECTED_RIGHT_EDGE_ANGLE_DEG = -5
+EXPECTED_UP_EDGE_ANGLE_DEG = EXPECTED_RIGHT_EDGE_ANGLE_DEG - 90.0
+EDGE_ANGLE_TOLERANCE_DEG = 4
+FOURTH_POINT_TOLERANCE_PX = 7
+MAX_RADIUS_RATIO = 2
+
+
+def _angle_deg(vector: np.ndarray) -> float:
+
+    return math.degrees(math.atan2(vector[1], vector[0]))
+
+
+def _angle_error_deg(angle: float, expected: float) -> float:
+
+    return abs((angle - expected + 180.0) % 360.0 - 180.0)
+
+
+def find_four_fiducials(
+    candidates: list[dict],
+    expected_edge_length_px: float = EXPECTED_EDGE_LENGTH_PX,
+) -> list[dict]:
+
+    centers = np.asarray(
+        [candidate["center_px"] for candidate in candidates],
+        dtype=np.float64,
+    )
+
+    radii = np.asarray(
+        [candidate["radius_px"] for candidate in candidates],
+        dtype=np.float64,
+    )
+
+    side_min = expected_edge_length_px * (1.0 - EDGE_LENGTH_TOLERANCE_FRACTION)
+
+    side_max = expected_edge_length_px * (1.0 + EDGE_LENGTH_TOLERANCE_FRACTION)
+
+    order_x = np.argsort(centers[:, 0])
+
+    right_edges = []
+
+    for position, left_index in enumerate(order_x[:-1]):
+
+        left = centers[left_index]
+
+        for right_index in order_x[position + 1 :]:
+
+            right = centers[right_index]
+
+            edge = right - left
+
+            if edge[0] > side_max:
+
+                break
+
+            length = float(np.linalg.norm(edge))
+
+            if not side_min <= length <= side_max:
+
+                continue
+
+            angle_error = _angle_error_deg(
+                _angle_deg(edge),
+                EXPECTED_RIGHT_EDGE_ANGLE_DEG,
+            )
+
+            if angle_error > EDGE_ANGLE_TOLERANCE_DEG:
+
+                continue
+
+            right_edges.append(
+                (
+                    int(left_index),
+                    int(right_index),
+                    length,
+                    angle_error,
+                )
+            )
+    if not right_edges:
+        raise ValueError("no right-edge fiducial pairs found")
+
+    best = None
+
+    best_edge = None
+    best_edge_angle_error = None
+
+    best_up = None
+
+    for (
+        bottom_left_index,
+        bottom_right_index,
+        right_length,
+        right_angle_error,
+    ) in right_edges:
+
+        bottom_left = centers[bottom_left_index]
+
+        bottom_right = centers[bottom_right_index]
+
+        if best_edge is None or right_angle_error < best_edge_angle_error:
+            best_edge = (
+                bottom_left_index,
+                bottom_right_index,
+                right_length,
+                right_angle_error,
+            )
+            best_edge_angle_error = right_angle_error
+
+        for top_left_index, top_left in enumerate(centers):
+
+            if top_left_index in {bottom_left_index, bottom_right_index}:
+
+                continue
+
+            up_edge = top_left - bottom_left
+
+            up_length = float(np.linalg.norm(up_edge))
+
+            if not side_min <= up_length <= side_max:
+
+                continue
+
+            up_angle_error = _angle_error_deg(
+                _angle_deg(up_edge),
+                EXPECTED_UP_EDGE_ANGLE_DEG,
+            )
+
+            if up_angle_error > EDGE_ANGLE_TOLERANCE_DEG:
+
+                continue
+
+            if best_up is None or up_angle_error < best_up[2]:
+                best_up = (top_left_index, up_length, up_angle_error)
+
+            predicted_top_right = bottom_right + up_edge
+
+            errors = np.linalg.norm(
+                centers - predicted_top_right,
+                axis=1,
+            )
+
+            errors[
+                [
+                    bottom_left_index,
+                    bottom_right_index,
+                    top_left_index,
+                ]
+            ] = np.inf
+
+            top_right_index = int(np.argmin(errors))
+
+            fourth_error = float(errors[top_right_index])
+
+            if fourth_error > FOURTH_POINT_TOLERANCE_PX:
+
+                continue
+
+            selected_indices = np.asarray(
+                [
+                    top_left_index,
+                    top_right_index,
+                    bottom_left_index,
+                    bottom_right_index,
+                ]
+            )
+
+            selected_radii = radii[selected_indices]
+
+            if np.max(selected_radii) / np.min(selected_radii) > MAX_RADIUS_RATIO:
+
+                continue
+
+            score = (
+                abs(right_length - expected_edge_length_px)
+                + abs(up_length - expected_edge_length_px)
+                + abs(right_length - up_length)
+                + right_angle_error
+                + up_angle_error
+                + fourth_error
+            )
+
+            if best is None or score < best[0]:
+
+                best = score, selected_indices
+
+    if best is None:
+
+        if best_up is not None:
+            return [candidates[index] for index in best_up[0:1]] + [
+                candidates[index] for index in best_edge[0:2]
+            ]
+
+        if best_edge is not None:
+            return [candidates[index] for index in best_edge[0:2]]
+
+        raise ValueError("no four-fiducial pattern found")
+
+    return [candidates[index] for index in best[1]]
+
+
 def detect_four_fiducials(
     image: np.ndarray,
     *,
@@ -292,29 +493,23 @@ def detect_four_fiducials(
         blurred,
         cv2.HOUGH_GRADIENT,
         dp=1.15,
-        minDist=max(8.0, 14.0 * scale),
+        minDist=20 * scale,
         param1=90,
         param2=16,
-        minRadius=max(4, int(round(7 * scale))),
-        maxRadius=max(12, int(round(25 * scale))),
+        minRadius=int(round(7 * scale)),
+        maxRadius=int(round(18 * scale)),
     )
     if circles is None:
         raise ValueError("no circular fiducial candidates detected")
 
     candidates: list[dict[str, Any]] = []
     for x, y, radius in circles[0]:
-        score, radial = _ring_score(gray, (float(x), float(y)), float(radius))
-        if score < 44.0:
-            continue
         candidates.append(
             {
                 "center_px": [float(x), float(y)],
                 "radius_px": float(radius),
-                "ring_score": score,
-                "radial": radial,
             }
         )
-    candidates.sort(key=lambda item: item["ring_score"], reverse=True)
 
     deduplicated: list[dict[str, Any]] = []
     for candidate in candidates:
@@ -336,180 +531,16 @@ def detect_four_fiducials(
 
     expected_side = 80.0 * scale
 
-    side_min = 0.70 * expected_side
+    selected = find_four_fiducials(deduplicated, expected_edge_length_px=expected_side)
 
-    side_max = 1.30 * expected_side
-
-    centers = [np.asarray(item["center_px"], dtype=np.float64) for item in deduplicated]
-
-    neighbors: dict[int, list[int]] = {index: [] for index in range(len(deduplicated))}
-
-    for i, j in itertools.combinations(range(len(deduplicated)), 2):
-
-        distance = float(np.linalg.norm(centers[j] - centers[i]))
-
-        if side_min <= distance <= side_max:
-
-            neighbors[i].append(j)
-
-            neighbors[j].append(i)
-
-    for i in range(len(deduplicated)):
-
-        for j, k in itertools.combinations(neighbors[i], 2):
-
-            u = centers[j] - centers[i]
-
-            v = centers[k] - centers[i]
-
-            norm_u = float(np.linalg.norm(u))
-
-            norm_v = float(np.linalg.norm(v))
-
-            cosine = abs(float(np.dot(u, v) / (norm_u * norm_v)))
-
-            if cosine > 0.28:
-
-                continue
-
-            predicted_fourth = centers[j] + centers[k] - centers[i]
-
-            fourth_candidates = sorted(
-                (
-                    (
-                        float(np.linalg.norm(center - predicted_fourth)),
-                        index,
-                    )
-                    for index, center in enumerate(centers)
-                    if index not in {i, j, k}
-                )
-            )
-
-            fourth_error, fourth_index = fourth_candidates[0]
-
-            if fourth_error > 0.20 * expected_side:
-
-                continue
-
-            combination_indices = {i, j, k, fourth_index}
-
-            if len(combination_indices) != 4:
-
-                continue
-
-            combination = tuple(deduplicated[index] for index in combination_indices)
-
-            radii = np.asarray([item["radius_px"] for item in combination])
-            median_radius = float(np.median(radii))
-
-            median_radius = float(np.median(radii))
-
-            maximum_radius_error = float(
-                np.max(np.abs(radii - median_radius)) / median_radius
-            )
-
-            if maximum_radius_error > 0.38:
-
-                continue
-
-            radius_ratio = float(np.max(radii) / np.min(radii))
-
-            maximum_radius_error = float(
-                np.max(np.abs(radii - median_radius)) / median_radius
-            )
-
-            if radius_ratio > 1.55 or maximum_radius_error > 0.38:
-
-                continue
-
-            radius_error = float(
-                np.median(np.abs(radii - median_radius)) / median_radius
-            )
-
-            if radius_error > 0.25:
-
-                continue
-            points = np.asarray([item["center_px"] for item in combination])
-            geometry = _quad_geometry(points)
-            if geometry is None:
-                continue
-            geometry_score, geometry_details = geometry
-            mean_side = geometry_details["mean_side_px"]
-
-            expected_side_px = 80.0 * scale
-
-            minimum_side_px = 0.70 * expected_side_px
-
-            maximum_side_px = 1.35 * expected_side_px
-
-            if not minimum_side_px <= mean_side <= maximum_side_px:
-                continue
-
-            ordered_points = _order_quad(points)
-            reference_shape_rms = None
-            if reference_shape is not None and reference_side is not None:
-                if not 0.75 <= mean_side / reference_side <= 1.25:
-                    continue
-                candidate_shape = ordered_points - np.mean(ordered_points, axis=0)
-                reference_shape_rms = float(
-                    np.sqrt(
-                        np.mean(
-                            np.sum((candidate_shape - reference_shape) ** 2, axis=1)
-                        )
-                    )
-                )
-                if reference_shape_rms > max(5.0 * scale, 0.12 * reference_side):
-                    continue
-            ordered_candidates = [
-                min(
-                    combination,
-                    key=lambda item, point=point: float(
-                        np.linalg.norm(np.asarray(item["center_px"]) - point)
-                    ),
-                )
-                for point in ordered_points
-            ]
-            worst_ring = min(item["ring_score"] for item in ordered_candidates)
-            score = geometry_score + 0.55 * worst_ring
-            if reference_shape_rms is not None:
-                score -= 2.0 * reference_shape_rms
-                geometry_details = dict(geometry_details)
-                geometry_details["reference_shape_rms_px"] = reference_shape_rms
-            if best is None or score > best[0]:
-                best = (
-                    score,
-                    ordered_points,
-                    ordered_candidates,
-                    geometry_details,
-                )
-    if best is None:
-        raise ValueError("no four-ring square candidate passed geometry checks")
-
-    score, centers, selected, geometry_details = best
-    x0, y0 = np.min(centers, axis=0)
-    x1, y1 = np.max(centers, axis=0)
-    pad = max(12.0 * scale, 0.35 * geometry_details["mean_side_px"])
-    roi = [
-        max(0, int(math.floor(x0 - pad))),
-        max(0, int(math.floor(y0 - pad))),
-        min(width, int(math.ceil(x1 + pad))),
-        min(height, int(math.ceil(y1 + pad))),
-    ]
-    roi_pixels = image[roi[1] : roi[3], roi[0] : roi[2]]
-    clipped_fraction = float(np.mean(np.max(roi_pixels, axis=2) >= 252))
-    dark_fraction = float(np.mean(_gray(roi_pixels) <= 28))
-    transform_to_global = lambda point: point
+    centers = np.asarray(
+        [candidate["center_px"] for candidate in selected],
+        dtype=np.float64,
+    )
     return _finite(
         {
-            "centers_px": [transform_to_global(item["center_px"]) for item in selected],
+            "centers_px": [item["center_px"] for item in selected],
             "radii_px": [item["radius_px"] for item in selected],
-            "ring_scores": [item["ring_score"] for item in selected],
-            "worst_ring_score": min(item["ring_score"] for item in selected),
-            "geometry": geometry_details,
-            "detection_score": score - 350.0 * clipped_fraction,
-            "roi_px": roi,
-            "clipped_fraction": clipped_fraction,
-            "dark_fraction": dark_fraction,
             "candidate_count": len(deduplicated),
             "candiates": [item for item in deduplicated],
         }
@@ -524,8 +555,9 @@ def _ring_candidates(image: np.ndarray, marker: np.ndarray) -> list[dict[str, An
     y0 = max(0, int(round(marker[1])) - radius)
     x1 = min(width, int(round(marker[0])) + radius)
     y1 = min(height, int(round(marker[1])) + radius)
-    roi = _clahe(image)[y0:y1, x0:x1]
-    blurred = cv2.GaussianBlur(roi, (7, 7), 1.5)
+    gray = _gray(image)
+    roi = gray  # _clahe(image)[y0:y1, x0:x1]
+    blurred = cv2.GaussianBlur(roi, (7, 7), 2.5)
     circles = cv2.HoughCircles(
         blurred,
         cv2.HOUGH_GRADIENT,

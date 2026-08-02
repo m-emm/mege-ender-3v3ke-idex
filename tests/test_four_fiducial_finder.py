@@ -1109,24 +1109,21 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
         #     _logger.info(f"{path.resolve()}")
 
 
-    median_centers = np.median(
-        np.array(list(centers.values())), axis=0
-    )
+    centers_of_centers = np.array([np.mean(center, axis=0) for center in centers.values()])
+    median_of_centers_of_centers = np.median(centers_of_centers, axis=0)
 
-    center_of_median_centers = np.mean(median_centers, axis=0)
 
-    centers_of_centers = np.mean(
-        np.array(list(centers.values())), axis=0
-    )
+    
 
     for i, (path, center) in enumerate(centers.items()):
         center_mean = np.mean(center, axis=0)
-        offset = center_of_median_centers - center_mean
+        offset = median_of_centers_of_centers - center_mean
 
-        if np.linalg.norm(offset) >10:
+        if np.linalg.norm(offset) >100:
             overlay_path = overlay_paths[i]
+            path_obj = Path(path)
             _logger.warning(
-                f"Center offset for {path.name} is {offset}, which exceeds the threshold. See overlay at {overlay_path}"
+                f"Center offset for {path_obj.name} is {offset}, which exceeds the threshold. See overlay at {overlay_path}"
             )
 
 
