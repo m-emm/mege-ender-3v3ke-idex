@@ -144,20 +144,14 @@ flowchart TD
     D --> A[Explicit final calibration activation]
 ```
 
-The graph contains two kinds of roots:
+The runtime has two kinds of roots:
 
 - observed roots, produced by vision jobs
-- versioned seed facts, including the user-defined bed-tab corner printer XYZ,
-  the installed bed-fiducial physical reference, the
-  fiducial-plane printer-Z coordinate, camera identity, and the
-  active Klipper configuration fingerprint
+- flat static values from `priors.yaml`, accessed through `CalibDAO`
 
-Seed facts use the same provenance and invalidation rules as image-derived
-facts. Changing the user-defined bed-tab corner coordinates or a CAD geometry
-fact therefore invalidates every downstream fact that used the old fact ID.
-Removing, replacing, or repositioning the glued fiducial patch publishes a new
-installation fact and similarly invalidates its bed metric, corner,
-and all downstream calibration facts.
+Prior changes apply to new preparations and analyses. Existing published facts
+remain usable until the operator deliberately reruns the affected chain.
+Historical seed facts remain accepted only so existing catalogs rebuild.
 
 ## Calibration Stages
 
@@ -174,35 +168,21 @@ bed_tab_corner_prior:
 ```
 
 This is the current user-defined coordinate identity of the physical corner,
-not an image-derived estimate. Its X coordinate is `173 mm`, its Y coordinate
-is `-18 mm`, and its Z coordinate defines the `0 mm` bed/print reference
-plane. If physical measurement later leads the user to redefine these values,
-the replacement uses normal superseding and downstream invalidation.
-
-This is an authoritative initial prior fact:
-
-- `bed.tab_corner.printer_xyz`
-- provenance source `user_initial_prior`
-- measurement method `user_defined_fixed_reference`
-- exact `Z=0` definition
-- revision, timestamp, and canonical fact hash
+not an image-derived estimate. `CalibDAO.bed_corner()` reads it from the flat
+`bed_corner_xyz_mm` entry in `priors.yaml`.
 
 Vision does not discover or silently refine these absolute printer
 coordinates. The corner-reference job finds the corresponding pixel and binds
-that observation to this prior. Replacing the prior later creates a new fact ID
-and makes the corner reference, rough X calibration, fine nozzle calibration,
-Eddy geometry, and full calibration candidate stale.
+that observation to the current configured value.
 
-The independent installed-pattern seed fact is:
+The installed pattern is described by the flat fiducial origin and spacing
+entries. `CalibDAO.fiducial_centers()` calculates:
 
-- `bed.fiducial_patch.physical_reference`
-- four white concentric-circle markers on black
-- marker outer diameter `3 mm`
 - marker centers at patch-local `[3,3]`, `[11,3]`, `[3,11]`, and `[11,11] mm`
 - center spacing `8 mm` in both patch axes
-- printed scale physically checked by the user
-- rigid attachment to the underside of the print bed
-- exact source SVG, A4 PDF, manifest hashes, and installation revision
+
+The target remains four white concentric-circle markers on black, rigidly
+attached to the underside of the print bed.
 
 The patch's pixel position, rotation, and relation to printer axes are
 deliberately not configuration. They are observed on every applicable run.

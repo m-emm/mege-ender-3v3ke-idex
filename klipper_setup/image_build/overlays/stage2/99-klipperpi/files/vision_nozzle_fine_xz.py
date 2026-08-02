@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import math
 from pathlib import Path
@@ -660,7 +661,7 @@ def analyze(
     physical_tip_deltas: dict[str, np.ndarray] = {}
     physical_tip_spreads: dict[str, float] = {}
     ring_radius_medians: dict[str, float] = {}
-    minimum_direct_detections = max(10, math.ceil(0.20 * len(frames)))
+    minimum_direct_detections = 2
     for tool in (target_tool,):
         delta, spread, selected = _cluster_candidates(
             ring_candidate_sets[tool],
@@ -1188,30 +1189,49 @@ def analyze(
             y_vector_px_per_mm=image_y_vector,
         )
 
+        tip_from_fiducial_x_mm = float(tip_from_fiducial_xy_mm[0])
+        tip_from_fiducial_y_mm = float(tip_from_fiducial_xy_mm[1])
         tip_pos_text = (
             f"tip_px={center[0]:.1f},{center[1]:.1f} "
             f"fiducials_to_tip_mm="
-            f"{tip_from_fiducial_xy_mm[0]:+.3f},"
-            f"{tip_from_fiducial_xy_mm[1]:+.3f}"
+            f"{tip_from_fiducial_x_mm:+.3f},"
+            f"{tip_from_fiducial_y_mm:+.3f}"
         )
 
         registration["four_fiducial_center_px"] = fiducial_patch_center_px
         registration["fiducial_to_tip_delta_px"] = tip_from_fiducial_px
         registration["fiducial_to_tip_delta_printer_xy_mm"] = tip_from_fiducial_xy_mm
-
-        cv2.putText(
-            panel,
-            (
-                f"{frame['tool']} X={frame['x_mm']} Z={frame['z_mm']} "
-                f"corr={registration['minimum_correlation']:.3f} " + tip_pos_text
-            ),
-            (24, 40),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
-            color,
-            2,
-            cv2.LINE_AA,
+        frame_y_mm = frame.get(
+            "y_mm",
+            frame.get("capture_y_mm", frame["commanded_position_mm"][1]),
         )
+        display_x_mm = frame["x_mm"]
+        display_y_mm = frame_y_mm
+        display_z_mm = frame["z_mm"]
+
+        top_line_text = (
+            f"{frame['tool']} X={display_x_mm} Y={display_y_mm} Z={display_z_mm} "
+            f"corr={registration['minimum_correlation']:.3f} " + tip_pos_text
+        )
+
+        fiducials_seen_at = [
+            display_x_mm - tip_from_fiducial_x_mm,
+            display_y_mm - tip_from_fiducial_y_mm,
+        ]
+
+        second_line = f"fiducials seen at: X={fiducials_seen_at[0]:.3f} Y={fiducials_seen_at[1]:.3f} "
+        lines = [top_line_text, second_line]
+        for k, line in enumerate(lines):
+            cv2.putText(
+                panel,
+                line,
+                (24, 40 + k * 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                color,
+                2,
+                cv2.LINE_AA,
+            )
 
         for i, (center, radius) in enumerate(
             zip(

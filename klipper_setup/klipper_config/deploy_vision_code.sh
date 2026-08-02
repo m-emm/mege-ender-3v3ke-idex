@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 FILES_DIR="${REPO_ROOT}/klipper_setup/image_build/overlays/stage2/99-klipperpi/files"
+PRIORS_FILE="${SCRIPT_DIR}/priors.yaml"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 
 shopt -s nullglob
@@ -17,6 +18,10 @@ if (( ${#python_files[@]} == 0 )); then
 fi
 if (( ${#json_files[@]} == 0 )); then
   echo "No top-level JSON files found in ${FILES_DIR}" >&2
+  exit 1
+fi
+if [[ ! -f "${PRIORS_FILE}" ]]; then
+  echo "Missing required file: ${PRIORS_FILE}" >&2
   exit 1
 fi
 
@@ -36,7 +41,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-scp "${python_files[@]}" "${json_files[@]}" ${png_files[@]+"${png_files[@]}"} "${REMOTE_HOST}:${remote_tmp}/"
+scp "${python_files[@]}" "${json_files[@]}" ${png_files[@]+"${png_files[@]}"} "${PRIORS_FILE}" "${REMOTE_HOST}:${remote_tmp}/"
 
 ssh "${REMOTE_HOST}" "REMOTE_TMP='${remote_tmp}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
@@ -67,6 +72,9 @@ for source in "${REMOTE_TMP}"/*.png; do
   echo "Installing ${filename} -> /usr/local/share/vision/${filename}"
   sudo install -m 0644 "${source}" "/usr/local/share/vision/${filename}"
 done
+
+sudo install -m 0644 "${REMOTE_TMP}/priors.yaml" /usr/local/share/vision/priors.yaml
+sudo rm -f /usr/local/share/vision/vision_calibration_priors.json
 
 echo "Ensuring Python vision dependencies"
 sudo apt-get install -y python3-matplotlib

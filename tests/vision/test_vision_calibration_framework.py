@@ -6,6 +6,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
+import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -87,8 +88,17 @@ def test_registry_is_exact_clean_chain():
         for tool in ("T0", "T1")
     ]
     assert [fine["tool"] for fine in fine_jobs] == ["T0", "T1"]
-    assert all(len(fine["x_offsets_from_bed_tab_mm"]) >= 4 for fine in fine_jobs)
-    assert all(len(fine["full_row_z_mm"]) >= 4 for fine in fine_jobs)
+    assert all(fine["x_offsets_from_bed_tab_mm"] for fine in fine_jobs)
+    assert all(fine["full_row_z_mm"] for fine in fine_jobs)
+    assert all(
+        fine["x_offsets_from_bed_tab_mm"]
+        == sorted(set(fine["x_offsets_from_bed_tab_mm"]))
+        for fine in fine_jobs
+    )
+    assert all(
+        fine["full_row_z_mm"] == sorted(set(fine["full_row_z_mm"]))
+        for fine in fine_jobs
+    )
     assert all(
         fine["x_offsets_from_bed_tab_mm"] == fine_jobs[0]["x_offsets_from_bed_tab_mm"]
         and fine["full_row_z_mm"] == fine_jobs[0]["full_row_z_mm"]
@@ -369,24 +379,103 @@ def test_missing_published_fact_set_falls_back_and_can_be_superseded(tmp_path):
     )
 
 
-def test_priors_define_fiducial_plane_without_uncertainties():
-    priors = json.loads(
-        (FILES / "vision_calibration_priors.json").read_text(encoding="utf-8")
-    )
-    seeds = {item["name"]: item for item in priors["seeds"]}
-
-    assert set(seeds) == {
+def test_flat_priors_replace_active_seed_fact_dependencies():
+    priors_path = REPO_ROOT / "klipper_setup" / "klipper_config" / "priors.yaml"
+    priors = yaml.safe_load(priors_path.read_text(encoding="utf-8"))
+    registry = json.loads((FILES / "vision_job_types.json").read_text(encoding="utf-8"))
+    retired = {
         "bed.tab_corner.printer_xyz",
         "bed.fiducial_patch.physical_reference",
         "bed.fiducial_patch.printer_z_mm",
     }
-    assert seeds["bed.tab_corner.printer_xyz"]["value"]["xyz_mm"] == [
-        173.0,
-        -18.0,
-        0.0,
+
+    assert set(priors) == {
+        "bed_corner_xyz_mm",
+        "fiducial_origin_xy_mm",
+        "fiducial_spacing_xy_mm",
+        "fiducial_z_mm",
+        "fiducial_right_angle_deg",
+    }
+    assert not (FILES / "vision_calibration_priors.json").exists()
+    assert all(
+        requirement["fact_name"] not in retired
+        for definition in registry["job_types"].values()
+        for requirement in definition["requires"]
+    )
+    calibration_source = (FILES / "vision_calibration.py").read_text(
+        encoding="utf-8"
+    )
+    assert "sync-priors" not in calibration_source
+    assert "sync_seed_facts" not in calibration_source
+
+
+def test_old_manifests_drop_retired_prior_fact_bindings():
+    calibration = _module("vision_calibration.py", "vision_retired_prior_binding_test")
+    manifest = {
+        "input_facts": [
+            {
+                "requirement": "physical_reference",
+                "fact_name": "bed.fiducial_patch.physical_reference",
+                "fact_definition_version": 1,
+                "fact_set_hash": "sha256:retired",
+            },
+            {
+                "requirement": "bed_metric",
+                "fact_name": "camera.nozzle_cam.bed_fiducial.local_metric_model",
+                "fact_definition_version": 1,
+                "fact_set_hash": "sha256:active",
+            },
+        ]
+    }
+
+    assert calibration._active_input_facts(manifest) == [manifest["input_facts"][1]]
+    assert calibration._dependencies(manifest) == [
+        {
+            "fact_name": "camera.nozzle_cam.bed_fiducial.local_metric_model",
+            "fact_set_hash": "sha256:active",
+        }
     ]
-    assert seeds["bed.fiducial_patch.printer_z_mm"]["value"]["z_mm"] == -0.6
-    assert "uncert" not in json.dumps(priors).lower()
+
+
+def test_new_bed_metric_manifest_uses_dao_without_seed_facts(tmp_path):
+    calibration = _module("vision_calibration.py", "vision_dao_manifest_test")
+    calibration.CALIBRATION_ROOT = tmp_path / "calibration"
+    calibration.VISION_ROOT = tmp_path / "vision"
+    calibration.GCODE_ROOT = tmp_path / "gcodes"
+    calibration.REGISTRY_PATH = FILES / "vision_job_types.json"
+    calibration.PROFILE_PATH = FILES / "nozzle_cam_profiles.json"
+    calibration.CALIB = calibration.CalibDAO(
+        REPO_ROOT / "klipper_setup" / "klipper_config" / "calib.yaml",
+        REPO_ROOT / "klipper_setup" / "klipper_config" / "priors.yaml",
+    )
+    calibration._preflight = lambda *_args, **_kwargs: {
+        "pose": {"x_mm": -77.635, "y_base_mm": -14.8, "z_mm": 293.75},
+        "axis_minimum": [-80.0, -20.0, 0.0],
+        "axis_maximum": [355.0, 320.0, 300.0],
+        "fingerprint": "test-fingerprint",
+        "temperatures": {},
+        "framebuffer": {},
+        "active_calibration_snapshot": {},
+        "scope": {"printer": "test"},
+        "applicability_hash": "unused-before-input-binding",
+    }
+
+    prepared = calibration.prepare_job(
+        "dao-metric",
+        job_type="nozzle_cam_bed_fiducial_y_metric",
+        status={"test": True},
+    )
+    manifest = json.loads(
+        (Path(prepared["job_dir"]) / "manifest.json").read_text(encoding="utf-8")
+    )
+
+    assert manifest["input_facts"] == []
+    assert manifest["provenance"]["priors"]["fiducial_centers_xy_mm"] == [
+        [3.0, 3.0],
+        [11.0, 3.0],
+        [3.0, 11.0],
+        [11.0, 11.0],
+    ]
 
 
 def test_fine_grid_localizes_the_nozzle_tip_inside_the_outer_ring():

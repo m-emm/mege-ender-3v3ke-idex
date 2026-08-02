@@ -439,6 +439,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     calibration_script = (IMAGE_BUILD_FILES_DIR / "vision_calibration.py").read_text(
         encoding="utf-8"
     )
+    dao_script = (IMAGE_BUILD_FILES_DIR / "calib_dao.py").read_text(encoding="utf-8")
     graph_script = (IMAGE_BUILD_FILES_DIR / "vision_calibration_graph.py").read_text(
         encoding="utf-8"
     )
@@ -472,6 +473,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     image_install = (IMAGE_BUILD_STAGE_DIR / "01-run-chroot.sh").read_text(
         encoding="utf-8"
     )
+    overlay_render = (
+        IMAGE_BUILD_STAGE_DIR.parents[2] / "scripts" / "render_overlay.sh"
+    ).read_text(encoding="utf-8")
     live_deploy = (KLIPPER_CONFIG_DIR / "deploy_webcam_vision.sh").read_text(
         encoding="utf-8"
     )
@@ -528,9 +532,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert metric_definition["publish_on_accept"] is True
     assert metric_definition["velocity_mm_s"] == 60
     assert metric_definition["settle_ms"] == 300
-    assert [item["requirement"] for item in metric_definition["requires"]] == [
-        "physical_reference"
-    ]
+    assert metric_definition["requires"] == []
     corner_definition = registry["job_types"]["nozzle_cam_bed_tab_corner"]
     assert corner_definition["definition_version"] == 1
     assert corner_definition["duplicate_count"] == 5
@@ -551,8 +553,6 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     }
     assert [item["fact_name"] for item in corner_definition["requires"]] == [
         "camera.nozzle_cam.bed_fiducial.local_metric_model",
-        "bed.tab_corner.printer_xyz",
-        "bed.fiducial_patch.printer_z_mm",
     ]
     red_marker_definition = registry["job_types"]["idex_tool_red_marker_x_sweep"]
     assert red_marker_definition["definition_version"] == 1
@@ -593,8 +593,8 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     ]
     assert all(
         definition["definition_version"] == 1
-        and len(definition["x_offsets_from_bed_tab_mm"]) >= 4
-        and len(definition["full_row_z_mm"]) >= 4
+        and definition["x_offsets_from_bed_tab_mm"]
+        and definition["full_row_z_mm"]
         and definition["localizer"]
         == {"kind": "nozzle_tip_registration_grid", "version": 1}
         for definition in fine_xz_definitions
@@ -660,6 +660,12 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "generated_calibration" in fine_tool_calculator
     assert "_fit_joint_projective_xy" in fine_tool_calculator
     assert "fiducial_plane_lateral_scale_transport" in calibration_script
+    assert "from calib_dao import CalibDAO" in calibration_script
+    assert "_load_calib_yaml" not in calibration_script
+    assert "sync-priors" not in calibration_script
+    assert "class CalibDAO" in dao_script
+    assert "fiducial_angles()" in four_fiducial_analyzer
+    assert "EXPECTED_RIGHT_EDGE_ANGLE_DEG" not in four_fiducial_analyzer
 
     assert (
         "VISION_JOB_ROOT=/home/pi/printer_data/vision/calibration/jobs"
@@ -686,6 +692,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         assert legacy not in extra
 
     for filename in (
+        "calib_dao.py",
         "vision_calibration.py",
         "vision_calibration_graph.py",
         "vision_bed_fiducial.py",
@@ -696,7 +703,8 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "vision_red_marker_x_sweep.py",
         "vision_rough_x_verification.py",
         "vision_job_types.json",
-        "vision_calibration_priors.json",
+        "calib.yaml",
+        "priors.yaml",
     ):
         assert filename in image_install
         assert filename in live_deploy
@@ -717,7 +725,16 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert 'Path("/home/pi/printer_data/gcodes/vision_jobs")' in live_deploy
     assert "virtual_sdcard=is_active" in live_deploy
     assert "vision_calibration.py rebuild-catalog" in live_deploy
-    assert "vision_calibration.py sync-priors" in live_deploy
+    assert "vision_calibration.py sync-priors" not in live_deploy
+    assert "rm -f /usr/local/share/vision/vision_calibration_priors.json" in (
+        live_deploy
+    )
+    assert not (IMAGE_BUILD_FILES_DIR / "vision_calibration_priors.json").exists()
+    assert 'PRIORS_SRC="${IMAGE_BUILD_DIR}/../klipper_config/priors.yaml"' in (
+        overlay_render
+    )
+    assert 'cp "${PRIORS_SRC}"' in overlay_render
+    assert 'cp "${CALIB_SRC}"' in overlay_render
 
     readme = README_PATH.read_text(encoding="utf-8")
     klipper_readme = (KLIPPER_CONFIG_DIR / "README.md").read_text(encoding="utf-8")

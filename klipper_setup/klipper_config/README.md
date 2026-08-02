@@ -226,8 +226,10 @@ links use the `/vision/` URL prefix.
 
 ## Vision Calibration Framework
 
-The clean chain starts with seed facts for the 8 mm square fiducial patch, its
-printer-Z plane (`-0.6 mm`), and the bed-tab corner (`[173, -18, 0] mm`).
+The clean chain starts with the flat values in `priors.yaml` for the 8 mm
+square fiducial patch, its printer-Z plane (`-0.6 mm`), and the bed-tab corner
+(`[173, -18, 0] mm`). Vision runtime code reads these through `CalibDAO`; they
+are configuration, not published graph facts.
 Capture the six-frame `0, 10, 20, 20, 10, 0 mm` printer-Y sweep under the
 standard nozzle-camera lighting and recover the local fiducial metric:
 
@@ -343,10 +345,10 @@ idex_nozzle_fine_xz_grid_t0
 idex_nozzle_fine_xz_grid_t1
 ```
 
-The seed values live in
-`/usr/local/share/vision/vision_calibration_priors.json`. Publishing changed
-prior values supersedes the old seed facts and makes downstream corner facts
-stale.
+The prior values live in `/usr/local/share/vision/priors.yaml`, deployed from
+the canonical `klipper_setup/klipper_config/priors.yaml`. Changes apply to new
+preparations and analyses; deliberately rerun the affected calibration chain
+when an existing published result should be replaced.
 
 Watch progress and artifacts at `http://menderpi.local/vision/`. Accepted
 results publish immediately; rejected analyses publish nothing. Fiducial and

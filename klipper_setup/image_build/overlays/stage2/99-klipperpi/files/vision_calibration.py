@@ -21,7 +21,7 @@ from typing import Any
 
 import cv2
 import numpy as np
-import yaml
+from calib_dao import CalibDAO
 from vision_bed_fiducial import analyze_corner, analyze_metric
 from vision_calibration_graph import (
     ANALYSIS_SCHEMA,
@@ -35,7 +35,6 @@ from vision_calibration_graph import (
     content_hash,
     load_json,
     publish_fact_set,
-    publish_seed_fact_set,
     rebuild_catalog,
     sha256_file,
     utc_now,
@@ -83,18 +82,6 @@ PROFILE_PATH = Path(
         "/usr/local/share/vision/nozzle_cam_profiles.json",
     )
 )
-PRIOR_PATH = Path(
-    os.environ.get(
-        "VISION_CALIBRATION_PRIOR_FILE",
-        "/usr/local/share/vision/vision_calibration_priors.json",
-    )
-)
-CALIB_PATH = Path(
-    os.environ.get(
-        "VISION_CALIBRATION_CALIB_FILE",
-        "/usr/local/share/vision/calib.yaml",
-    )
-)
 FRAMEBUFFER_DIR = Path(
     os.environ.get("VISION_FRAMEBUFFER_DIR", "/run/vision-preview-nozzle_cam")
 )
@@ -128,6 +115,12 @@ NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 HASH_RE = re.compile(r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+")
 HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
 _LOGGED_CATALOG_WARNINGS: set[str] = set()
+CALIB = CalibDAO()
+RETIRED_PRIOR_FACT_NAMES = {
+    "bed.tab_corner.printer_xyz",
+    "bed.fiducial_patch.physical_reference",
+    "bed.fiducial_patch.printer_z_mm",
+}
 
 
 def _sanitize(value: str) -> str:
@@ -144,96 +137,18 @@ def _is_compute_only_job_type(job_type: str) -> bool:
     return definition.get("localizer", {}).get("kind") == "compute_only"
 
 
-def _load_seed_registry() -> dict[str, Any]:
-    registry = load_json(PRIOR_PATH)
-    if registry.get("schema") != "vision-calibration-seed-registry":
-        raise VisionCalibrationError("unsupported seed registry")
-    if registry.get("schema_version") != 1:
-        raise VisionCalibrationError("unsupported seed schema version")
-    seeds = registry.get("seeds")
-    if not isinstance(seeds, list):
-        raise VisionCalibrationError("seed registry must contain a seed list")
-    names = {seed.get("name") for seed in seeds if isinstance(seed, dict)}
-    expected = {
-        "bed.tab_corner.printer_xyz",
-        "bed.fiducial_patch.physical_reference",
-        "bed.fiducial_patch.printer_z_mm",
-    }
-    if names != expected:
-        raise VisionCalibrationError(
-            f"seed registry must contain exactly {sorted(expected)}"
-        )
-    for seed in seeds:
-        if seed.get("definition_version") != 1:
-            raise VisionCalibrationError("all seed definitions must be version 1")
-    return registry
-
-
-def sync_seed_facts() -> dict[str, Any]:
-    registry = _load_seed_registry()
-    results = []
-    for seed in registry["seeds"]:
-        source = {
-            "name": seed["name"],
-            "definition_version": seed["definition_version"],
-            "revision": seed["revision"],
-            "recorded_at_utc": seed["recorded_at_utc"],
-            "role": seed["role"],
-            "value_items": seed["value_items"],
-            "value": seed["value"],
-        }
-        source_hash = canonical_hash(source)
-        fact = {
-            "name": seed["name"],
-            "definition_version": 1,
-            "role": seed["role"],
-            "dependencies": [],
-            "value_items": seed["value_items"],
-            "value": seed["value"],
-        }
-        fact_set = {
-            "schema": FACT_SET_SCHEMA,
-            "schema_version": SCHEMA_VERSION,
-            "fact_set_id": f"seed:{seed['name']}:revision-{seed['revision']}",
-            "job_id": f"seed:{seed['name']}",
-            "analysis_run_id": f"revision-{seed['revision']}",
-            "analysis_hash": source_hash,
-            "created_at_utc": seed["recorded_at_utc"],
-            "accepted": True,
-            "publication_eligible": True,
-            "applicability_hash": canonical_hash(
-                {
-                    "printer": "menderpi",
-                    "seed_name": seed["name"],
-                    "revision": seed["revision"],
-                }
-            ),
-            "facts": [fact],
-            "provenance": {
-                "source": "vision_calibration_priors.json",
-                "source_sha256": sha256_file(PRIOR_PATH),
-                "source_record_hash": source_hash,
-            },
-            "fact_set_hash": "",
-        }
-        fact_set["fact_set_hash"] = content_hash(fact_set, "fact_set_hash")
-        directory = CALIBRATION_ROOT / "seeds" / fact_set["fact_set_hash"][7:23]
-        path = directory / "fact_set.json"
-        if path.exists():
-            if load_json(path) != fact_set:
-                raise VisionCalibrationError(f"seed hash collision at {path}")
-        else:
-            atomic_write_json(path, fact_set, immutable=True)
-        publication = publish_seed_fact_set(CALIBRATION_ROOT, path)
-        results.append(
-            {
-                "name": seed["name"],
-                "fact_set_hash": fact_set["fact_set_hash"],
-                "already_published": publication["already_published"],
-            }
-        )
-    rebuild_and_render()
-    return {"seeds": results}
+def _prior_provenance(job_type: str) -> dict[str, Any]:
+    result: dict[str, Any] = {"sha256": CALIB.priors_hash()}
+    if job_type in {BED_FIDUCIAL_METRIC_JOB, BED_TAB_CORNER_JOB, *FINE_NOZZLE_XZ_JOBS}:
+        right, up = CALIB.fiducial_angles()
+        result["fiducial_angles_deg"] = {"right": right, "up": up}
+    if job_type in {BED_FIDUCIAL_METRIC_JOB, RED_MARKER_X_JOB}:
+        result["fiducial_centers_xy_mm"] = CALIB.fiducial_centers()
+    if job_type == BED_TAB_CORNER_JOB:
+        result["bed_corner_xyz_mm"] = CALIB.bed_corner()
+    if job_type in {BED_TAB_CORNER_JOB, *FINE_NOZZLE_XZ_JOBS}:
+        result["fiducial_z_mm"] = CALIB.fiducial_z()
+    return result
 
 
 def _publish_operation_fact_set(
@@ -813,7 +728,6 @@ def prepare_job(
     _logger.info(f"preparing job of type {job_type} with name {name}")
     registry = _load_registry()
     definition = json.loads(json.dumps(registry["job_types"][job_type]))
-    sync_seed_facts()
     input_facts = []
     input_values = {}
     for requirement in definition["requires"]:
@@ -989,6 +903,7 @@ def prepare_job(
                         "x_offset_from_bed_tab_mm": offset,
                         "x_mm": x_mm,
                         "z_mm": z_mm,
+                        "y_mm": pose["capture_y_mm"],
                         "expected_marker_pixel_px": expected_marker.tolist(),
                         "discard_fresh_frames": 1,
                         "commanded_position_mm": [
@@ -1017,6 +932,7 @@ def prepare_job(
             "active_printer_fingerprint": resolved["fingerprint"],
             "registry_sha256": sha256_file(REGISTRY_PATH),
             "profile_file_sha256": sha256_file(PROFILE_PATH),
+            "priors": _prior_provenance(job_type),
             "preflight_temperatures": resolved["temperatures"],
             "preflight_framebuffer": resolved["framebuffer"],
         },
@@ -1106,7 +1022,7 @@ def prepare_job(
         )
         manifest["fine_reference"] = {
             "bed_tab_x_mm": partial["corner_printer_xyz_mm"][0],
-            "fiducial_plane_printer_z_mm": input_values["fiducial_plane_z"]["z_mm"],
+            "fiducial_plane_printer_z_mm": CALIB.fiducial_z(),
             "fiducial_reference_printer_xy_mm": mapping[
                 "fiducial_reference_printer_xy_mm"
             ],
@@ -1218,13 +1134,21 @@ def _analysis_run_id(manifest: dict[str, Any]) -> str:
     return f"{timestamp}-{manifest['manifest_hash'][7:17]}"
 
 
+def _active_input_facts(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        item
+        for item in manifest["input_facts"]
+        if item["fact_name"] not in RETIRED_PRIOR_FACT_NAMES
+    ]
+
+
 def _dependencies(manifest: dict[str, Any]) -> list[dict[str, str]]:
     return [
         {
             "fact_name": item["fact_name"],
             "fact_set_hash": item["fact_set_hash"],
         }
-        for item in manifest["input_facts"]
+        for item in _active_input_facts(manifest)
     ]
 
 
@@ -1296,16 +1220,11 @@ def analyze_job(job_id: str) -> dict[str, Any]:
     try:
         job_type = manifest["job_type"]
         if job_type == BED_FIDUCIAL_METRIC_JOB:
-            physical = _resolve_current_fact(
-                "physical_reference",
-                "bed.fiducial_patch.physical_reference",
-                1,
-            )[1]["value"]
             details = analyze_metric(
                 frame_paths,
                 artifact_dir,
                 frames=manifest["frames"],
-                patch_points_mm=physical["centers_patch_xy_mm"],
+                patch_points_mm=CALIB.fiducial_centers(),
             )
         elif job_type == BED_TAB_CORNER_JOB:
             metric = _resolve_current_fact(
@@ -1398,7 +1317,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                     }
                     for frame, sidecar in zip(manifest["frames"], sidecars)
                 ],
-                "dependencies": manifest["input_facts"],
+                "dependencies": _active_input_facts(manifest),
             },
             "diagnostics": details,
             "fact_set_path": "fact_set.json" if details["accepted"] else None,
@@ -1480,10 +1399,9 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         item["fact_name"],
                         item["fact_definition_version"],
                     )[1]["value"]
-                    for item in manifest["input_facts"]
+                    for item in _active_input_facts(manifest)
                 }
                 metric = input_values["bed_metric"]
-                prior = input_values["bed_tab_corner_prior"]
                 corner_capture_y = float(
                     manifest["frames"][0]["commanded_position_mm"][1]
                 )
@@ -1503,14 +1421,12 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                     "corner_pixel_xy_px": details["corner_pixel_xy_px"],
                     "corner_pixel_capture_y_mm": corner_capture_y,
                     "corner_pixel_at_metric_reference_px": corner_at_metric_reference.tolist(),
-                    "corner_printer_xyz_mm": prior["xyz_mm"],
+                    "corner_printer_xyz_mm": CALIB.bed_corner(),
                     "corner_patch_xy_mm": corner_patch,
                     "image_y_axis_vector_px_per_mm": metric[
                         "image_y_axis_vector_px_per_mm"
                     ],
-                    "fiducial_plane_printer_z_mm": input_values["fiducial_plane_z"][
-                        "z_mm"
-                    ],
+                    "fiducial_plane_printer_z_mm": CALIB.fiducial_z(),
                     "observed_patch_marker_centers_px": details[
                         "patch_marker_centers_px"
                     ],
@@ -1548,7 +1464,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         item["fact_name"],
                         item["fact_definition_version"],
                     )[1]["value"]
-                    for item in manifest["input_facts"]
+                    for item in _active_input_facts(manifest)
                 }
                 diagnostic = {
                     "camera": "nozzle_cam",
@@ -1576,9 +1492,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                     metric=input_values["bed_metric"],
                     partial=input_values["partial_bed_coordinate_system"],
                     image_x_axis=details["common_axis_vector_px_per_mm"],
-                    patch_points_mm=input_values["physical_reference"][
-                        "centers_patch_xy_mm"
-                    ],
+                    patch_points_mm=CALIB.fiducial_centers(),
                     capture_y_mm=float(
                         manifest["red_marker_reference"]["capture_y_mm"]
                     ),
@@ -1789,6 +1703,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         "active_printer_fingerprint"
                     ),
                     "manifest_hash": manifest["manifest_hash"],
+                    "priors": _prior_provenance(job_type),
                     "observations": details,
                 },
                 "fact_set_hash": "",
@@ -1979,9 +1894,6 @@ def calculate_rough_x(
     old_t1_x_endstop_mm: float | None = None,
     status: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    prior_binding, prior = _resolve_current_fact(
-        "bed_tab_corner_prior", "bed.tab_corner.printer_xyz", 1
-    )
     t0_binding, t0 = _resolve_current_fact(
         "t0_marker", "tool.t0.red_marker_to_bed_tab_x_mm", 1
     )
@@ -1997,7 +1909,7 @@ def calculate_rough_x(
         _settings(settings, "dual_carriage"), "position_endstop", "dual_carriage"
     )
     candidate = calculate_rough_x_candidate(
-        prior_xyz_mm=prior["value"]["xyz_mm"],
+        prior_xyz_mm=CALIB.bed_corner(),
         t0_marker_fact=t0["value"],
         t1_marker_fact=t1["value"],
         old_t0_x_endstop_mm=(
@@ -2008,7 +1920,8 @@ def calculate_rough_x(
         ),
     )
     candidate["active_before_or_current_mm"] = {"T0": active_t0, "T1": active_t1}
-    candidate["source_facts"] = [prior_binding, t0_binding, t1_binding]
+    candidate["source_facts"] = [t0_binding, t1_binding]
+    candidate["source_priors_sha256"] = CALIB.priors_hash()
     candidate["active_config_fingerprint"] = str(
         printer_status["gcode_macro _IDEX_CONFIG_FINGERPRINT"]["source_sha256"]
     )
@@ -2050,6 +1963,7 @@ def record_rough_x_activation(
         ],
         "t1_applied_x_endstop_mm": active["T1"],
         "active_config_fingerprint": candidate["active_config_fingerprint"],
+        "source_priors_sha256": candidate["source_priors_sha256"],
         "source_fact_set_hashes": {
             item["fact_name"]: item["fact_set_hash"]
             for item in candidate["source_facts"]
@@ -2080,43 +1994,17 @@ def record_rough_x_activation(
     activation = _publish_operation_fact_set(
         "rough_tool_x_activation",
         facts=[fact],
-        provenance={"method": "verified_live_activation", "candidate": candidate},
+        provenance={
+            "method": "verified_live_activation",
+            "candidate": candidate,
+            "source_priors_sha256": candidate["source_priors_sha256"],
+        },
         applicability={
             "printer": "menderpi",
             "active_config_fingerprint": candidate["active_config_fingerprint"],
         },
     )
     return {"candidate": candidate, "activation": activation}
-
-
-def _load_calib_yaml(path: Path = CALIB_PATH) -> dict[str, Any]:
-    try:
-        value = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        raise VisionCalibrationError(
-            f"missing synchronized calibration: {path}"
-        ) from None
-    if not isinstance(value, dict) or not isinstance(value.get("tools"), dict):
-        raise VisionCalibrationError(f"{path} does not contain tools calibration")
-    for tool in ("t0", "t1"):
-        item = value["tools"].get(tool)
-        if not isinstance(item, dict):
-            raise VisionCalibrationError(f"{path} lacks tools.{tool}")
-        for axis in ("x", "y", "z"):
-            key = f"{axis}_endstop"
-            if not isinstance(item.get(key), (int, float)):
-                raise VisionCalibrationError(f"{path} lacks numeric tools.{tool}.{key}")
-    return value
-
-
-def _calib_datums(calib: dict[str, Any]) -> dict[str, dict[str, float]]:
-    return {
-        tool: {
-            f"{axis}_endstop": float(calib["tools"][tool][f"{axis}_endstop"])
-            for axis in ("x", "y", "z")
-        }
-        for tool in ("t0", "t1")
-    }
 
 
 def _active_generated_calibration(status: dict[str, Any]) -> dict[str, float]:
@@ -2161,17 +2049,6 @@ def _require_generated_matches(
             )
 
 
-def _candidate_calib(
-    source: dict[str, Any], calculation: dict[str, Any]
-) -> dict[str, Any]:
-    candidate = json.loads(json.dumps(source))
-    new = calculation["calibration"]["persisted_calib"]["new"]
-    for tool in ("t0", "t1"):
-        for axis in ("x", "y", "z"):
-            candidate["tools"][tool][f"{axis}_endstop"] = float(new[tool][axis])
-    return candidate
-
-
 def calculate_fine_tool_xyz(
     *,
     tool: str,
@@ -2200,16 +2077,6 @@ def calculate_fine_tool_xyz(
         "camera.nozzle_cam.bed_fiducial.printer_xy_mapping",
         1,
     )
-    physical_binding, physical_fact = _resolve_current_fact(
-        "physical_reference",
-        "bed.fiducial_patch.physical_reference",
-        1,
-    )
-    fiducial_z_binding, _fiducial_z_fact = _resolve_current_fact(
-        "fiducial_plane_z",
-        "bed.fiducial_patch.printer_z_mm",
-        1,
-    )
     rough_binding, _rough_fact = _resolve_current_fact(
         "rough_x_active_snapshot",
         "calibration.rough_tool_x.active_snapshot",
@@ -2220,8 +2087,6 @@ def calculate_fine_tool_xyz(
         metric_binding,
         partial_binding,
         mapping_binding,
-        physical_binding,
-        fiducial_z_binding,
         rough_binding,
     ]
     projection_fact_set = load_json(
@@ -2275,8 +2140,7 @@ def calculate_fine_tool_xyz(
             "bed-tab corner fact lacks enough bound corner observations"
         )
 
-    calib = _load_calib_yaml()
-    old_datums = _calib_datums(calib)
+    old_datums = CALIB.tool_datums()
     printer_status = status or query_printer_status()
     old_generated = {
         "t0_x_position_endstop": old_datums["t0"]["x_endstop"],
@@ -2301,7 +2165,7 @@ def calculate_fine_tool_xyz(
         registrations=registrations,
         metric_observations=metric_observations,
         corner_observations=corner_observations,
-        physical_reference=physical_fact["value"],
+        physical_reference={"centers_patch_xy_mm": CALIB.fiducial_centers()},
         mapping=mapping_fact["value"],
         partial_bed=partial_fact["value"],
         old_datums=old_datums,
@@ -2317,14 +2181,11 @@ def calculate_fine_tool_xyz(
     calculation_dir.mkdir(parents=True)
     candidate_path = calculation_dir / "calib_candidate.yaml"
     candidate_hash = None
-    candidate = None
     if calculation["accepted"]:
-        candidate = _candidate_calib(calib, calculation)
-        candidate_path.write_text(
-            yaml.safe_dump(candidate, sort_keys=False),
-            encoding="utf-8",
+        candidate_hash = CALIB.write_candidate(
+            candidate_path,
+            calculation["calibration"]["persisted_calib"]["new"],
         )
-        candidate_hash = sha256_file(candidate_path)
 
     calculation.update(
         {
@@ -2333,10 +2194,15 @@ def calculate_fine_tool_xyz(
             "calculation_id": calculation_id,
             "created_at_utc": utc_now(),
             "source_facts": source_facts,
-            "source_calib_sha256": sha256_file(CALIB_PATH),
+            "source_calib_sha256": CALIB.calib_hash(),
+            "source_priors_sha256": CALIB.priors_hash(),
+            "source_priors": {
+                "fiducial_centers_xy_mm": CALIB.fiducial_centers(),
+                "fiducial_z_mm": CALIB.fiducial_z(),
+            },
             "source_active_config_fingerprint": fingerprint,
             "candidate_calib_path": (
-                "calib_candidate.yaml" if candidate is not None else None
+                "calib_candidate.yaml" if candidate_hash is not None else None
             ),
             "candidate_calib_sha256": candidate_hash,
         }
@@ -2422,6 +2288,7 @@ def calculate_fine_tool_xyz(
             "generated_klipper": calculation["calibration"]["generated_klipper"],
             "candidate_calib_sha256": candidate_hash,
             "source_calib_sha256": calculation["source_calib_sha256"],
+            "source_priors_sha256": calculation["source_priors_sha256"],
             "source_active_config_fingerprint": fingerprint,
             "z_reference_method": "fiducial_plane_lateral_scale_transport",
         }
@@ -2439,11 +2306,13 @@ def calculate_fine_tool_xyz(
                 "method": "stage_5_1_fiducial_plane_scale_transport",
                 "calculation_id": calculation_id,
                 "source_calib_sha256": calculation["source_calib_sha256"],
+                "source_priors_sha256": calculation["source_priors_sha256"],
                 "candidate_calib_sha256": candidate_hash,
             },
             applicability={
                 "printer": "menderpi",
                 "active_config_fingerprint": fingerprint,
+                "source_priors_sha256": calculation["source_priors_sha256"],
                 "source_fact_set_hashes": [
                     item["fact_set_hash"] for item in source_facts
                 ],
@@ -2556,7 +2425,7 @@ def calculate_fine_tool_xyz(
         "accepted": calculation["accepted"],
         "reasons": calculation["reasons"],
         "candidate_calib_path": (
-            str(candidate_path) if candidate is not None else None
+            str(candidate_path) if candidate_hash is not None else None
         ),
         "candidate_calib_sha256": candidate_hash,
         "publication": publication,
@@ -2576,7 +2445,7 @@ def record_fine_tool_xyz_activation(
     if result.get("accepted") is not True:
         raise VisionCalibrationError("rejected fine-tool calculation cannot activate")
     candidate_path = calculation_dir / "calib_candidate.yaml"
-    if sha256_file(CALIB_PATH) != result["candidate_calib_sha256"]:
+    if CALIB.calib_hash() != result["candidate_calib_sha256"]:
         raise VisionCalibrationError(
             "synchronized calib.yaml does not match the accepted candidate"
         )
@@ -2618,7 +2487,7 @@ def record_fine_tool_xyz_activation(
         "persisted_calib": result["calibration"]["persisted_calib"]["new"],
         "generated_klipper": active_generated,
         "active_config_fingerprint": fingerprint,
-        "active_calib_sha256": sha256_file(CALIB_PATH),
+        "active_calib_sha256": CALIB.calib_hash(),
         "z_reference_method": "fiducial_plane_lateral_scale_transport",
         "supersedes": "calibration.rough_tool_x.active_snapshot",
     }
@@ -2640,7 +2509,7 @@ def record_fine_tool_xyz_activation(
         applicability={
             "printer": "menderpi",
             "active_config_fingerprint": fingerprint,
-            "active_calib_sha256": sha256_file(CALIB_PATH),
+            "active_calib_sha256": CALIB.calib_hash(),
         },
     )
     return {"active_snapshot": value, "activation": activation}
@@ -2991,7 +2860,6 @@ def main(argv: list[str] | None = None) -> int:
     publish_parser = subparsers.add_parser("publish")
     publish_parser.add_argument("job_id")
     publish_parser.add_argument("analysis_run_id")
-    subparsers.add_parser("sync-priors")
     subparsers.add_parser("rebuild-catalog")
     subparsers.add_parser("calculate-rough-x")
     fine_calculate_parser = subparsers.add_parser("calculate-fine-tool-xyz")
@@ -3034,8 +2902,6 @@ def main(argv: list[str] | None = None) -> int:
                 CALIBRATION_ROOT, args.job_id, args.analysis_run_id
             )
             rebuild_and_render()
-        elif args.command == "sync-priors":
-            result = sync_seed_facts()
         elif args.command == "calculate-rough-x":
             result = calculate_rough_x()
         elif args.command == "calculate-fine-tool-xyz":

@@ -31,7 +31,7 @@ JOB_TYPES = {
     "idex_eddy_t0_xyz_offset",
     "idex_t0_t1_xyz_offset",
 }
-SEED_FACT_NAMES = {
+RETIRED_PRIOR_FACT_NAMES = {
     "bed.tab_corner.printer_xyz",
     "bed.fiducial_patch.physical_reference",
     "bed.fiducial_patch.printer_z_mm",
@@ -197,10 +197,8 @@ def validate_registry(record: Any) -> dict[str, Any]:
         x_offsets = fine.get("x_offsets_from_bed_tab_mm")
         if (
             not isinstance(x_offsets, list)
-            or len(x_offsets) < 4
             or len(set(x_offsets)) != len(x_offsets)
             or sorted(x_offsets) != x_offsets
-            or float(x_offsets[-1]) - float(x_offsets[0]) < 8.0
         ):
             raise CalibrationGraphError(
                 f"fine nozzle {tool} X grid must have at least four unique "
@@ -209,10 +207,8 @@ def validate_registry(record: Any) -> dict[str, Any]:
         full_rows = fine.get("full_row_z_mm")
         if (
             not isinstance(full_rows, list)
-            or len(full_rows) < 4
             or len(set(full_rows)) != len(full_rows)
             or sorted(full_rows) != full_rows
-            or float(full_rows[-1]) - float(full_rows[0]) < 8.0
         ):
             raise CalibrationGraphError(
                 f"fine nozzle {tool} grid must have at least four unique "

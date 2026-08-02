@@ -8,14 +8,14 @@ from typing import Any
 
 import cv2
 import numpy as np
+from calib_dao import CalibDAO
 
 EXPECTED_EDGE_LENGTH_PX = 80.0
 EDGE_LENGTH_TOLERANCE_FRACTION = 0.5
-EXPECTED_RIGHT_EDGE_ANGLE_DEG = -5.0
-EXPECTED_UP_EDGE_ANGLE_DEG = EXPECTED_RIGHT_EDGE_ANGLE_DEG - 90.0
 EDGE_ANGLE_TOLERANCE_DEG = 4.0
 FOURTH_POINT_TOLERANCE_PX = 7.0
 MAX_RADIUS_RATIO = 2.0
+_CALIB = CalibDAO()
 
 
 class FourFiducialError(ValueError):
@@ -89,7 +89,12 @@ def _angle_error_deg(angle: float, expected: float) -> float:
 def find_four_fiducials(
     candidates: list[dict[str, Any]],
     expected_edge_length_px: float = EXPECTED_EDGE_LENGTH_PX,
+    *,
+    calib: CalibDAO | None = None,
 ) -> list[dict[str, Any]]:
+    expected_right_angle_deg, expected_up_angle_deg = (
+        calib or _CALIB
+    ).fiducial_angles()
     centers = np.asarray(
         [candidate["center_px"] for candidate in candidates],
         dtype=np.float64,
@@ -114,7 +119,7 @@ def find_four_fiducials(
                 continue
             angle_error = _angle_error_deg(
                 _angle_deg(edge),
-                EXPECTED_RIGHT_EDGE_ANGLE_DEG,
+                expected_right_angle_deg,
             )
             if angle_error <= EDGE_ANGLE_TOLERANCE_DEG:
                 right_edges.append(
@@ -141,7 +146,7 @@ def find_four_fiducials(
                 continue
             up_angle_error = _angle_error_deg(
                 _angle_deg(up_edge),
-                EXPECTED_UP_EDGE_ANGLE_DEG,
+                expected_up_angle_deg,
             )
             if up_angle_error > EDGE_ANGLE_TOLERANCE_DEG:
                 continue
@@ -180,6 +185,8 @@ def find_four_fiducials(
 
 def detect_four_fiducials(
     image: np.ndarray,
+    *,
+    calib: CalibDAO | None = None,
 ) -> dict[str, Any]:
     """Find and order the 8 x 8 mm four-ring patch in a camera frame."""
 
@@ -227,6 +234,7 @@ def detect_four_fiducials(
     selected = find_four_fiducials(
         deduplicated,
         expected_edge_length_px=EXPECTED_EDGE_LENGTH_PX * scale,
+        calib=calib,
     )
     centers = np.asarray(
         [candidate["center_px"] for candidate in selected],

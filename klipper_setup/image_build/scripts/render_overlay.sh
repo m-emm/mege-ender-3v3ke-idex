@@ -9,6 +9,8 @@ PIGEN_DIR="${IMAGE_BUILD_DIR}/pi-gen"
 SECRETS_DIR="${IMAGE_BUILD_DIR}/secrets"
 OUT_CONFIG="${PIGEN_DIR}/config"
 RESONANCE_HELPER_SRC="${IMAGE_BUILD_DIR}/../klipper_config/archive/resonance/run_resonance_plot.py"
+CALIB_SRC="${IMAGE_BUILD_DIR}/../klipper_config/calib.yaml"
+PRIORS_SRC="${IMAGE_BUILD_DIR}/../klipper_config/priors.yaml"
 
 BUILD_ENV_SRC="${SECRETS_DIR}/build.env"
 AUTHORIZED_KEYS_SRC="${SECRETS_DIR}/authorized_keys"
@@ -92,6 +94,16 @@ fi
 
 echo "Refreshing overlay into pi-gen/stage2/99-klipperpi"
 rsync -a --delete "${OVERLAY_SRC}/" "${PIGEN_DIR}/stage2/99-klipperpi/"
+
+for source in "${CALIB_SRC}" "${PRIORS_SRC}"; do
+  if [ ! -f "${source}" ]; then
+    echo "Missing vision calibration source: ${source}" >&2
+    exit 1
+  fi
+done
+echo "Injecting canonical calibration YAML files"
+cp "${CALIB_SRC}" "${PIGEN_DIR}/stage2/99-klipperpi/files/calib.yaml"
+cp "${PRIORS_SRC}" "${PIGEN_DIR}/stage2/99-klipperpi/files/priors.yaml"
 
 if [ ! -f "${RESONANCE_HELPER_SRC}" ]; then
   echo "Missing resonance helper: ${RESONANCE_HELPER_SRC}" >&2

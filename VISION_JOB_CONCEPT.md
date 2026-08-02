@@ -33,7 +33,6 @@ vision_calibration.py acquire <job-type>
 vision_calibration.py run <job-type>
 vision_calibration.py analyze <job-id>
 vision_calibration.py publish <job-id> <analysis-run-id>
-vision_calibration.py sync-priors
 vision_calibration.py rebuild-catalog
 vision_calibration.py calculate-rough-x
 vision_calibration.py calculate-fine-tool-xyz --tool T0
@@ -60,8 +59,10 @@ provenance. These contracts contain no uncertainty or covariance fields.
 
 ## Calibration chain
 
-The chain begins with seed facts for the 8 mm square fiducial patch, its
-printer-Z plane at `-0.6 mm`, and the bed-tab corner at `[173, -18, 0] mm`.
+The chain begins with flat `priors.yaml` configuration for the 8 mm square
+fiducial patch, its printer-Z plane at `-0.6 mm`, and the bed-tab corner at
+`[173, -18, 0] mm`. Vision consumers access these values through `CalibDAO`;
+they are not graph facts. Existing historical seed records remain readable.
 The live stages then:
 
 1. recover the fiducial plane metric and printer-Y image vector under standard lighting;

@@ -32,13 +32,7 @@
       "velocity_mm_s": 60,
       "settle_ms": 300,
       "publish_on_accept": true,
-      "requires": [
-        {
-          "requirement": "physical_reference",
-          "fact_name": "bed.fiducial_patch.physical_reference",
-          "fact_definition_version": 1
-        }
-      ],
+      "requires": [],
       "fact_names": [
         "camera.nozzle_cam.bed_fiducial.local_metric_model"
       ]
@@ -72,16 +66,6 @@
         {
           "requirement": "bed_metric",
           "fact_name": "camera.nozzle_cam.bed_fiducial.local_metric_model",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "bed_tab_corner_prior",
-          "fact_name": "bed.tab_corner.printer_xyz",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "fiducial_plane_z",
-          "fact_name": "bed.fiducial_patch.printer_z_mm",
           "fact_definition_version": 1
         }
       ],
@@ -124,11 +108,6 @@
         {
           "requirement": "bed_metric",
           "fact_name": "camera.nozzle_cam.bed_fiducial.local_metric_model",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "physical_reference",
-          "fact_name": "bed.fiducial_patch.physical_reference",
           "fact_definition_version": 1
         }
       ],
@@ -240,21 +219,15 @@
       },
       "x_offsets_from_bed_tab_mm": [
         10,
-        12.5,
         15,
-        17.5,
         20,
-        22.5,
         25,
         27.5
       ],
       "full_row_z_mm": [
         0.5,
         4,
-        7.5,
-        11,
-        14.5,
-        18
+        16
       ],
       "capture_y_mm": -14,
       "safe_tool_change_z_mm": 9,
@@ -287,11 +260,6 @@
         {
           "requirement": "t0_red_marker_offset",
           "fact_name": "tool.t0.red_marker_to_bed_tab_x_mm",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "fiducial_plane_z",
-          "fact_name": "bed.fiducial_patch.printer_z_mm",
           "fact_definition_version": 1
         },
         {
@@ -347,21 +315,15 @@
       },
       "x_offsets_from_bed_tab_mm": [
         10,
-        12.5,
         15,
-        17.5,
         20,
-        22.5,
         25,
         27.5
       ],
       "full_row_z_mm": [
         0.5,
         4,
-        7.5,
-        11,
-        14.5,
-        18
+        16
       ],
       "capture_y_mm": -13,
       "safe_tool_change_z_mm": 9,
@@ -394,11 +356,6 @@
         {
           "requirement": "t1_red_marker_offset",
           "fact_name": "tool.t1.red_marker_to_bed_tab_x_mm",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "fiducial_plane_z",
-          "fact_name": "bed.fiducial_patch.printer_z_mm",
           "fact_definition_version": 1
         },
         {

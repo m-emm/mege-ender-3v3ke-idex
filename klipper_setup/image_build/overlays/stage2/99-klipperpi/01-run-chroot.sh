@@ -426,6 +426,7 @@ require_file "${FILES_DIR}/vision-capture-nozzle-cam.service"
 require_file "${FILES_DIR}/vision_framebuffer.py"
 require_file "${FILES_DIR}/vision_capture.py"
 require_file "${FILES_DIR}/vision_calibration.py"
+require_file "${FILES_DIR}/calib_dao.py"
 require_file "${FILES_DIR}/vision_calibration_graph.py"
 require_file "${FILES_DIR}/vision_bed_fiducial.py"
 require_file "${FILES_DIR}/vision_four_fiducials.py"
@@ -436,7 +437,8 @@ require_file "${FILES_DIR}/vision_nozzle_fine_xz.py"
 require_file "${FILES_DIR}/vision_red_marker_x_sweep.py"
 require_file "${FILES_DIR}/vision_rough_x_verification.py"
 require_file "${FILES_DIR}/vision_job_types.json"
-require_file "${FILES_DIR}/vision_calibration_priors.json"
+require_file "${FILES_DIR}/calib.yaml"
+require_file "${FILES_DIR}/priors.yaml"
 require_file "${FILES_DIR}/webcam_health_probe.py"
 require_file "${FILES_DIR}/nozzle_cam_profiles.json"
 require_file "${FILES_DIR}/klipperpi-expand-rootfs.service"
@@ -456,6 +458,7 @@ install -m 0755 "${FILES_DIR}/klipperpi-expand-rootfs-once.sh" /usr/local/sbin/k
 install -m 0755 "${FILES_DIR}/vision_framebuffer.py" /usr/local/bin/vision_framebuffer.py
 install -m 0755 "${FILES_DIR}/vision_capture.py" /usr/local/bin/vision_capture.py
 install -m 0755 "${FILES_DIR}/vision_calibration.py" /usr/local/bin/vision_calibration.py
+install -m 0644 "${FILES_DIR}/calib_dao.py" /usr/local/bin/calib_dao.py
 install -m 0644 "${FILES_DIR}/vision_calibration_graph.py" /usr/local/bin/vision_calibration_graph.py
 install -m 0644 "${FILES_DIR}/vision_bed_fiducial.py" /usr/local/bin/vision_bed_fiducial.py
 install -m 0644 "${FILES_DIR}/vision_four_fiducials.py" /usr/local/bin/vision_four_fiducials.py
@@ -468,7 +471,8 @@ install -m 0755 "${FILES_DIR}/webcam_health_probe.py" /usr/local/bin/webcam_heal
 install -d -m 0755 /usr/local/share/vision
 install -m 0644 "${FILES_DIR}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json
 install -m 0644 "${FILES_DIR}/vision_job_types.json" /usr/local/share/vision/vision_job_types.json
-install -m 0644 "${FILES_DIR}/vision_calibration_priors.json" /usr/local/share/vision/vision_calibration_priors.json
+install -m 0644 "${FILES_DIR}/calib.yaml" /usr/local/share/vision/calib.yaml
+install -m 0644 "${FILES_DIR}/priors.yaml" /usr/local/share/vision/priors.yaml
 install -m 0644 "${FILES_DIR}/eddy_sift_body_template.png" /usr/local/share/vision/eddy_sift_body_template.png
 setfacl -m u:www-data:--x "${USER_HOME}"
 

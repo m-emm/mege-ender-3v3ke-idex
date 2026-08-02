@@ -17,6 +17,7 @@ required_files=(
   vision_framebuffer.py
   vision_capture.py
   vision_calibration.py
+  calib_dao.py
   vision_calibration_graph.py
   vision_bed_fiducial.py
   vision_four_fiducials.py
@@ -26,7 +27,6 @@ required_files=(
   vision_red_marker_x_sweep.py
   vision_rough_x_verification.py
   vision_job_types.json
-  vision_calibration_priors.json
   webcam_health_probe.py
   nozzle_cam_profiles.json
   vision-framebuffer.service
@@ -43,6 +43,10 @@ for file in "${required_files[@]}"; do
 done
 if [[ ! -f "${SCRIPT_DIR}/calib.yaml" ]]; then
   echo "Missing required file: ${SCRIPT_DIR}/calib.yaml" >&2
+  exit 1
+fi
+if [[ ! -f "${SCRIPT_DIR}/priors.yaml" ]]; then
+  echo "Missing required file: ${SCRIPT_DIR}/priors.yaml" >&2
   exit 1
 fi
 
@@ -81,6 +85,7 @@ scp \
   "${FILES_DIR}/vision_framebuffer.py" \
   "${FILES_DIR}/vision_capture.py" \
   "${FILES_DIR}/vision_calibration.py" \
+  "${FILES_DIR}/calib_dao.py" \
   "${FILES_DIR}/vision_calibration_graph.py" \
   "${FILES_DIR}/vision_bed_fiducial.py" \
   "${FILES_DIR}/vision_four_fiducials.py" \
@@ -90,7 +95,6 @@ scp \
   "${FILES_DIR}/vision_red_marker_x_sweep.py" \
   "${FILES_DIR}/vision_rough_x_verification.py" \
   "${FILES_DIR}/vision_job_types.json" \
-  "${FILES_DIR}/vision_calibration_priors.json" \
   "${FILES_DIR}/webcam_health_probe.py" \
   "${FILES_DIR}/nozzle_cam_profiles.json" \
   "${FILES_DIR}/vision-framebuffer.service" \
@@ -98,6 +102,7 @@ scp \
   "${FILES_DIR}/vision-capture.service" \
   "${FILES_DIR}/vision-capture-nozzle-cam.service" \
   "${SCRIPT_DIR}/calib.yaml" \
+  "${SCRIPT_DIR}/priors.yaml" \
   "${REMOTE_HOST}:${remote_tmp}/"
 
 ssh "${REMOTE_HOST}" \
@@ -216,6 +221,7 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo install -m 0755 "${REMOTE_TMP}/vision_framebuffer.py" /usr/local/bin/vision_framebuffer.py
 sudo install -m 0755 "${REMOTE_TMP}/vision_capture.py" /usr/local/bin/vision_capture.py
 sudo install -m 0755 "${REMOTE_TMP}/vision_calibration.py" /usr/local/bin/vision_calibration.py
+sudo install -m 0644 "${REMOTE_TMP}/calib_dao.py" /usr/local/bin/calib_dao.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_calibration_graph.py" /usr/local/bin/vision_calibration_graph.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_bed_fiducial.py" /usr/local/bin/vision_bed_fiducial.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_four_fiducials.py" /usr/local/bin/vision_four_fiducials.py
@@ -227,8 +233,9 @@ sudo install -m 0644 "${REMOTE_TMP}/vision_rough_x_verification.py" /usr/local/b
 sudo install -m 0755 "${REMOTE_TMP}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py
 sudo install -m 0644 "${REMOTE_TMP}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json
 sudo install -m 0644 "${REMOTE_TMP}/vision_job_types.json" /usr/local/share/vision/vision_job_types.json
-sudo install -m 0644 "${REMOTE_TMP}/vision_calibration_priors.json" /usr/local/share/vision/vision_calibration_priors.json
 sudo install -m 0644 "${REMOTE_TMP}/calib.yaml" /usr/local/share/vision/calib.yaml
+sudo install -m 0644 "${REMOTE_TMP}/priors.yaml" /usr/local/share/vision/priors.yaml
+sudo rm -f /usr/local/share/vision/vision_calibration_priors.json
 sudo rm -f \
   /usr/local/bin/vision_bed_y.py \
   /usr/local/bin/vision_fine_tool_xy_verification.py \
@@ -261,10 +268,6 @@ sudo systemctl restart vision-capture
 sudo systemctl restart vision-capture-nozzle-cam
 
 echo "Regenerating static vision UI..."
-sudo -u "${USERNAME}" env \
-  VISION_OUTPUT_DIR="${VISION_DIR}" \
-  VISION_OUTPUT_URL_PREFIX=/vision \
-  /usr/local/bin/vision_calibration.py sync-priors
 sudo -u "${USERNAME}" env \
   VISION_OUTPUT_DIR="${VISION_DIR}" \
   VISION_OUTPUT_URL_PREFIX=/vision \
