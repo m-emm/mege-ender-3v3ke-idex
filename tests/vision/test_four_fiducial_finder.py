@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import logging
 import math
 import sys
 from datetime import datetime, timezone
@@ -8,8 +9,6 @@ from uuid import uuid4
 
 import cv2
 import numpy as np
-import pytest
-import logging
 
 _logger = logging.getLogger(__name__)
 
@@ -23,25 +22,8 @@ FILES = (
     / "99-klipperpi"
     / "files"
 )
-DATASET_ROOT = (
-    REPO_ROOT
-    / "resources"
-    / "vision_datasets"
-    / "20260731_step5_green_coordinate_check"
-)
 OUTPUT_ROOT = REPO_ROOT / "output" / "vision_step5_green_coordinate_check"
-CAPTURES = {
-    "T0": DATASET_ROOT / "t0",
-    "T1": DATASET_ROOT / "t1",
-}
-EXPECTED_ARTIFACTS = (
-    "fine_nozzle_tip_registration_grid",
-    "fine_nozzle_tip_references",
-    "fine_nozzle_projection_model",
-)
-INDIVIDUAL_OVERLAY_PREFIX = "fine_nozzle_tip_overlay_"
-
-TEST_FRAMES_DIR = Path("/tmp/test_fidu_jobs/frames/")
+TEST_FRAMES_DIR = Path(__file__).resolve().parent / "fixtures" / "four_fiducial_finder"
 
 def _model_center_x_px(model, commanded_x_mm, commanded_z_mm):
     dx = float(commanded_x_mm) - float(model["x_ref_mm"])
@@ -1043,16 +1025,6 @@ def _analyzer_module():
 
 
 def test_replay_captured_t0_and_t1_and_render_overlays():
-
-
-    missing = [
-        str(capture_dir)
-        for capture_dir in CAPTURES.values()
-        if not (capture_dir / "manifest.json").is_file()
-    ]
-    if missing:
-        pytest.skip("local captured datasets are absent: " + ", ".join(missing))
-
     _logger.info(f"Load analyzer module from {FILES / 'vision_nozzle_fine_xz.py'}")
     analyzer = _analyzer_module()
     run_id = (
@@ -1061,14 +1033,17 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
     run_root = OUTPUT_ROOT / "runs" / run_id
     run_root.mkdir(parents=True, exist_ok=True)
 
-    centers= {}
+    frame_paths = sorted(TEST_FRAMES_DIR.glob("*.jpg"))
+    assert len(frame_paths) == 14, f"expected 14 committed frames in {TEST_FRAMES_DIR}"
+
+    centers = {}
 
     overlay_paths = []
-    for i, path in enumerate(sorted(item for item in TEST_FRAMES_DIR.rglob("*.jpg") if item.is_file())):
+    for i, path in enumerate(frame_paths):
         _logger.info(f"{path.resolve()}")
 
-        
-        image =  cv2.imread(str(path), cv2.IMREAD_COLOR)
+        image = cv2.imread(str(path), cv2.IMREAD_COLOR)
+        assert image is not None, f"could not decode committed frame {path}"
         four_fiducials = analyzer.detect_four_fiducials(image)
 
 
@@ -1124,7 +1099,6 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
             _logger.warning(
                 f"Center offset for {path_obj.name} is {offset}, which exceeds the threshold. See overlay at {overlay_path}"
             )
-
 
 
 
