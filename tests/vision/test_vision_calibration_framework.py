@@ -324,7 +324,7 @@ def test_missing_published_fact_set_falls_back_and_can_be_superseded(tmp_path):
             immutable=True,
         )
 
-    first_path, first = fact_set("one", 173.0)
+    _first_path, first = fact_set("one", 173.0)
     publication("0001-first", first["fact_set_hash"], None)
     missing_hash = graph.canonical_hash({"deleted": "fact-set"})
     publication("0002-deleted", missing_hash, first["fact_set_hash"])
@@ -336,14 +336,36 @@ def test_missing_published_fact_set_falls_back_and_can_be_superseded(tmp_path):
     assert catalog["warnings"][0]["fallback_heads"] == {
         fact_name: first["fact_set_hash"]
     }
+    assert catalog["warnings"][0]["missing_fallbacks"] == []
+    assert "continuing with previous available facts" in (
+        catalog["warnings"][0]["message"]
+    )
+    assert "Rerun the calibration" in (
+        catalog["warnings"][0]["suggested_action"]
+    )
     assert catalog["publications"][-1]["fact_set_available"] is False
 
-    third_path, third = fact_set("three", 175.0)
-    published = graph.publish_seed_fact_set(root, third_path)
+    _legacy_path, legacy = fact_set("legacy-recovery", 174.0)
+    publication("0003-legacy-recovery", legacy["fact_set_hash"], first["fact_set_hash"])
 
-    assert published["publication"]["supersedes"] == {fact_name: missing_hash}
+    repaired = graph.rebuild_catalog(root)
+
+    assert repaired["heads"][fact_name]["fact_set_hash"] == legacy["fact_set_hash"]
+    assert repaired["publication_heads"][fact_name] == legacy["fact_set_hash"]
+    repair_warning = repaired["warnings"][-1]
+    assert repair_warning["code"] == "publication_lineage_repaired"
+    assert repair_warning["declared_supersedes"] == first["fact_set_hash"]
+    assert repair_warning["lineage_head"] == missing_hash
+    assert repair_warning["available_head"] == first["fact_set_hash"]
+
+    fourth_path, fourth = fact_set("four", 175.0)
+    published = graph.publish_seed_fact_set(root, fourth_path)
+
+    assert published["publication"]["supersedes"] == {
+        fact_name: legacy["fact_set_hash"]
+    }
     assert published["catalog"]["heads"][fact_name]["fact_set_hash"] == (
-        third["fact_set_hash"]
+        fourth["fact_set_hash"]
     )
 
 

@@ -526,17 +526,35 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
     publications = []
     heads: dict[str, dict[str, Any]] = {}
     publication_heads: dict[str, str] = {}
-    orphaned_publications: list[dict[str, Any]] = []
+    catalog_warnings: list[dict[str, Any]] = []
     for path in _publication_files(root / "publications"):
         publication = validate_publication(load_json(path))
         names = publication["facts"]
         supersedes = publication.get("supersedes") or {}
         for name in names:
             previous = publication_heads.get(name)
-            if supersedes.get(name) != previous:
-                raise CalibrationGraphError(
-                    f"publication conflict for {name}: expected "
-                    f"{supersedes.get(name)!r}, current {previous!r}"
+            declared = supersedes.get(name)
+            if declared != previous:
+                available = heads.get(name, {}).get("fact_set_hash")
+                catalog_warnings.append(
+                    {
+                        "code": "publication_lineage_repaired",
+                        "publication_id": publication["publication_id"],
+                        "publication_path": str(path.relative_to(root)),
+                        "job_id": publication.get("job_id"),
+                        "fact_name": name,
+                        "declared_supersedes": declared,
+                        "lineage_head": previous,
+                        "available_head": available,
+                        "message": (
+                            f"Publication {publication['publication_id']} from job "
+                            f"{publication.get('job_id')} declares that {name} "
+                            f"supersedes {declared!r}, while publication history "
+                            f"points to {previous!r}. Accepting the newer "
+                            f"publication and repairing the catalog lineage; the "
+                            f"previous available fact was {available!r}."
+                        ),
+                    }
                 )
             publication_heads[name] = publication["fact_set_hash"]
         publications.append(publication)
@@ -544,7 +562,26 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
             fallback_heads = {
                 name: heads.get(name, {}).get("fact_set_hash") for name in names
             }
-            orphaned_publications.append(
+            available_fallbacks = {
+                name: fact_set_hash
+                for name, fact_set_hash in fallback_heads.items()
+                if fact_set_hash is not None
+            }
+            missing_fallbacks = [
+                name
+                for name, fact_set_hash in fallback_heads.items()
+                if fact_set_hash is None
+            ]
+            fallback_summary = (
+                f"continuing with previous available facts {available_fallbacks}"
+                if available_fallbacks
+                else "no previous available fact exists"
+            )
+            if missing_fallbacks:
+                fallback_summary += (
+                    f"; jobs requiring {missing_fallbacks} remain blocked"
+                )
+            catalog_warnings.append(
                 {
                     "code": "publication_missing_fact_set",
                     "publication_id": publication["publication_id"],
@@ -553,11 +590,17 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
                     "fact_set_hash": publication["fact_set_hash"],
                     "facts": names,
                     "fallback_heads": fallback_heads,
+                    "missing_fallbacks": missing_fallbacks,
+                    "suggested_action": (
+                        f"Rerun the calibration that produced job "
+                        f"{publication.get('job_id')} to replace the deleted result."
+                    ),
                     "message": (
-                        f"Ignored publication {publication['publication_id']} from "
-                        f"deleted job {publication.get('job_id')}: fact set "
-                        f"{publication['fact_set_hash']} is missing for {names}; "
-                        f"using previous available heads {fallback_heads}."
+                        f"Publication {publication['publication_id']} from job "
+                        f"{publication.get('job_id')} references deleted fact set "
+                        f"{publication['fact_set_hash']} for {names}; "
+                        f"{fallback_summary}. Rerun that calibration to replace "
+                        f"the deleted result."
                     ),
                 }
             )
@@ -655,7 +698,7 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
         "heads": heads,
         "publication_heads": publication_heads,
         "stale_fact_sets": stale,
-        "warnings": orphaned_publications,
+        "warnings": catalog_warnings,
         "publications": [
             {
                 "publication_id": item["publication_id"],

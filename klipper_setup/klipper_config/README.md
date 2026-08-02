@@ -172,6 +172,16 @@ ssh pi@menderpi.local \
   '/usr/local/bin/vision_calibration.py rebuild-catalog'
 ```
 
+The rebuild output includes a `warnings` list. If a publication still points
+to a fact set removed by manual cleanup, rebuilding continues with the newest
+surviving fact for that name and reports the deleted job, affected fact, chosen
+fallback, and recovery action. A job only needs to be rerun when its warning
+has no fallback or when you want to replace the deleted newer measurement.
+If a later publication superseded that fallback directly, rebuilding repairs
+the publication lineage in chronological order and reports the repair instead
+of blocking calibration jobs.
+The same warnings appear at the top of the `/vision/` overview.
+
 Inspect jobs and analysis pages at:
 
 ```text

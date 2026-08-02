@@ -127,6 +127,7 @@ JOB_TYPES = (
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 HASH_RE = re.compile(r"\b(?P<name>MANIFEST_HASH|GCODE_HASH)=sha256:\S+")
 HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
+_LOGGED_CATALOG_WARNINGS: set[str] = set()
 
 
 def _sanitize(value: str) -> str:
@@ -498,6 +499,13 @@ def _preflight(
 
 def _log_catalog_warnings(catalog: dict[str, Any]) -> None:
     for warning in catalog.get("warnings", []):
+        warning_key = "|".join(
+            str(warning.get(field, ""))
+            for field in ("code", "publication_id", "fact_name", "fact_set_hash")
+        )
+        if warning_key in _LOGGED_CATALOG_WARNINGS:
+            continue
+        _LOGGED_CATALOG_WARNINGS.add(warning_key)
         _logger.warning("catalog: %s", warning["message"])
 
 
