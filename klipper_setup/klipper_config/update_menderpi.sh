@@ -348,7 +348,7 @@ bed = status.get("heater_bed", {})
 virtual_sd_active = status.get("virtual_sdcard", {}).get("is_active", False)
 
 if klippy_state == "ready":
-    if print_state not in {"standby", "complete", "error"}:
+    if print_state not in {"standby", "complete", "cancelled", "error"}:
         raise SystemExit(
             "Refusing to restart ready Klipper while "
             f"print_stats.state={print_state!r}"
