@@ -63,8 +63,8 @@ horizontal_move_z: 2
 calibration_temp: ${eddy_temperature_calibration_temp}
 
 [bed_mesh]
-# Central, probe-coordinate-only visualization region. Diagnostic jobs clear
-# this runtime mesh and never persist a profile.
+# Printing mesh measured with the Eddy-equipped T0 toolhead. Tool changes apply
+# the matching BED_MESH_OFFSET so this one physical-bed mesh follows both nozzles.
 speed: 100
 horizontal_move_z: 2
 mesh_min: 0,20
@@ -718,6 +718,15 @@ pid_Kd: 731.124
 min_temp: 0
 max_temp: 130
 
+[gcode_macro M190]
+description: Wait for the bed within a practical temperature tolerance.
+rename_existing: M190.1
+gcode:
+    {% set target = params.S|float %}
+    {% set tolerance = 3.0 %}
+    SET_HEATER_TEMPERATURE HEATER=heater_bed TARGET={target}
+    TEMPERATURE_WAIT SENSOR=heater_bed MINIMUM={target - tolerance} MAXIMUM={target + tolerance}
+
 # Normal GUI homing support for IDEX X, Y, and dual-Z.
 #
 # - G28 or "home all" homes Z first, then both X carriages, then Y.
@@ -754,6 +763,8 @@ variable_t1_z_endstop: ${t1_z_endstop}
 variable_t0_y_offset: ${t0_y_offset}
 variable_t1_y_offset: ${t1_y_offset}
 variable_t1_z_offset: ${t1_z_offset}
+variable_t1_mesh_y_offset: ${t1_mesh_y_offset}
+variable_t1_mesh_zfade_offset: ${t1_mesh_zfade_offset}
 variable_bed_grid_zero_x: ${bed_grid_zero_x}
 variable_bed_grid_zero_y: ${bed_grid_zero_y}
 variable_offset_move_speed: 5.0
@@ -869,14 +880,19 @@ gcode:
     {% if tool == 0 %}
         {% set y = state.t0_y_offset|float %}
         {% set z = 0.0 %}
+        {% set mesh_y = 0.0 %}
+        {% set mesh_zfade = 0.0 %}
     {% elif tool == 1 %}
         {% set y = state.t1_y_offset|float %}
         {% set z = state.t1_z_offset|float %}
+        {% set mesh_y = state.t1_mesh_y_offset|float %}
+        {% set mesh_zfade = state.t1_mesh_zfade_offset|float %}
     {% else %}
         { action_raise_error("IDEX tool offset TOOL must be 0 or 1.") }
     {% endif %}
     SET_GCODE_OFFSET X=0 Y={y} Z={z} MOVE={move} MOVE_SPEED={speed}
-    RESPOND TYPE=echo MSG="IDEX T{tool} offset applied: X=0 endstop-calibrated, Y={y}, Z={z}, MOVE={move}"
+    BED_MESH_OFFSET X=0 Y={mesh_y} ZFADE={mesh_zfade}
+    RESPOND TYPE=echo MSG="IDEX T{tool} offsets applied: gcode X=0 Y={y} Z={z}; mesh X=0 Y={mesh_y} ZFADE={mesh_zfade}; MOVE={move}"
 
 [gcode_macro IDEX_REPORT_TOOL_OFFSETS]
 description: Report configured IDEX absolute calibration and derived offsets.

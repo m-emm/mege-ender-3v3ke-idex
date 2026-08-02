@@ -426,6 +426,12 @@ def template_values(
         "t1_z_offset": format_mm(
             t0["z_endstop"] - t1["z_endstop"]
         ),
+        "t1_mesh_y_offset": format_mm(
+            t1["y_endstop"] - t0["y_endstop"]
+        ),
+        "t1_mesh_zfade_offset": format_mm(
+            t1["z_endstop"] - t0["z_endstop"]
+        ),
         "config_fingerprint": config_fingerprint,        
         "eddy_nozzle_to_coil_x": format_mm(
             eddy_relative_calibration["nozzle_to_coil_x"]

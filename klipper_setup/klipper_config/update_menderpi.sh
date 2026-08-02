@@ -336,15 +336,45 @@ import json
 import sys
 import urllib.request
 
-url = "http://127.0.0.1:7125/printer/objects/query?print_stats&heater_bed"
+url = (
+    "http://127.0.0.1:7125/printer/objects/query?"
+    "webhooks&print_stats&heater_bed&virtual_sdcard"
+)
 status = json.loads(urllib.request.urlopen(url, timeout=10).read())["result"]["status"]
+webhooks = status.get("webhooks", {})
+klippy_state = webhooks.get("state")
 print_state = status.get("print_stats", {}).get("state")
 bed = status.get("heater_bed", {})
-if print_state not in {"standby", "complete", "error"}:
-    raise SystemExit(f"Refusing to restart Klipper while print_stats.state={print_state!r}")
-if bed.get("target", 0.0) not in {0, 0.0}:
-    raise SystemExit(f"Refusing to restart Klipper while heater_bed target={bed.get('target')!r}")
-print(f"Printer idle check passed: print_stats.state={print_state}, heater_bed target={bed.get('target')}")
+virtual_sd_active = status.get("virtual_sdcard", {}).get("is_active", False)
+
+if klippy_state == "ready":
+    if print_state not in {"standby", "complete", "error"}:
+        raise SystemExit(
+            "Refusing to restart ready Klipper while "
+            f"print_stats.state={print_state!r}"
+        )
+    if virtual_sd_active:
+        raise SystemExit("Refusing to restart ready Klipper while virtual SD is active")
+    if bed.get("target", 0.0) not in {0, 0.0}:
+        raise SystemExit(
+            "Refusing to restart ready Klipper while "
+            f"heater_bed target={bed.get('target')!r}"
+        )
+    print(
+        "Printer idle check passed: "
+        f"Klippy state={klippy_state}, print_stats.state={print_state}, "
+        f"heater_bed target={bed.get('target')}"
+    )
+elif klippy_state == "error":
+    print(
+        "Klippy is in config/error recovery state; allowing config install "
+        f"and service restart: {webhooks.get('state_message')}"
+    )
+else:
+    raise SystemExit(
+        "Refusing to restart Klipper with unverified state: "
+        f"webhooks.state={klippy_state!r}, print_stats.state={print_state!r}"
+    )
 PY
 
 if [[ "${current_heaters_sha}" == "${EXPECTED_PATCHED_HEATERS_SHA256}" ]]; then
