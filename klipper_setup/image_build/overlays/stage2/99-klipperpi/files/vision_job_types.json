@@ -325,7 +325,7 @@
         4,
         16
       ],
-      "capture_y_mm": -13,
+      "capture_y_mm": -14,
       "safe_tool_change_z_mm": 9,
       "velocity_mm_s": 110,
       "settle_ms": 300,
