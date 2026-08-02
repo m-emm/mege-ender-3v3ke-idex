@@ -1221,6 +1221,8 @@ def analyze(
 
         second_line = f"fiducials seen at: X={fiducials_seen_at[0]:.3f} Y={fiducials_seen_at[1]:.3f} "
         lines = [top_line_text, second_line]
+        _logger.info(f"Info for frame {frame['frame']}: {top_line_text} | {second_line}")
+
         for k, line in enumerate(lines):
             cv2.putText(
                 panel,
