@@ -134,12 +134,7 @@ def prepare_measurement(
     if tool not in {"T0", "T1"}:
         raise ToolXYError("tool-XY measurement requires T0 or T1")
     tool_key = tool.lower()
-    gap = _number(definition, "capture_endstop_gap_mm", "job definition")
-    if gap <= 0.0:
-        raise ToolXYError("capture_endstop_gap_mm must be positive")
     commanded_z = _number(definition, "commanded_z_mm", "job definition")
-    if abs(commanded_z - 0.5) > 1e-9:
-        raise ToolXYError("tool-XY measurement requires commanded Z=0.5 mm")
 
     snapshot = _active_tool_state(resolved)
     endstops = snapshot["tool_xy_endstops_mm"]
@@ -157,15 +152,32 @@ def prepare_measurement(
             f"T0-minus-{tool} endstop offset {expected_offset:.6f}"
         )
 
-    capture_y = selected_y_endstop + gap
-    internal_y = capture_y + selected_y_offset
-    expected_internal_y = t0_y_endstop + gap
-    if abs(internal_y - expected_internal_y) > 1e-6:
-        raise ToolXYError("derived capture Y does not preserve the endstop gap")
+    has_capture_y = "capture_y_mm" in definition
+    has_gap = "capture_endstop_gap_mm" in definition
+    if has_capture_y == has_gap:
+        raise ToolXYError(
+            "job definition must set exactly one of capture_y_mm or "
+            "capture_endstop_gap_mm"
+        )
+    if has_capture_y:
+        capture_y = _number(definition, "capture_y_mm", "job definition")
+        internal_y = capture_y + selected_y_offset
+        gap = internal_y - t0_y_endstop
+    else:
+        gap = _number(definition, "capture_endstop_gap_mm", "job definition")
+        capture_y = selected_y_endstop + gap
+        internal_y = capture_y + selected_y_offset
+    if gap <= 0.0:
+        raise ToolXYError("capture position must remain beyond the Y endstop")
     axis_minimum = resolved.get("axis_minimum")
     axis_maximum = resolved.get("axis_maximum")
     if not isinstance(axis_minimum, list) or not isinstance(axis_maximum, list):
         raise ToolXYError("preflight motion limits are unavailable")
+    if not float(axis_minimum[2]) <= commanded_z <= float(axis_maximum[2]):
+        raise ToolXYError(
+            f"commanded Z {commanded_z:.6f} is outside loaded limits "
+            f"[{float(axis_minimum[2]):.6f}, {float(axis_maximum[2]):.6f}]"
+        )
     if not float(axis_minimum[1]) <= internal_y <= float(axis_maximum[1]):
         raise ToolXYError(
             f"derived internal capture Y {internal_y:.6f} is outside loaded "
@@ -212,8 +224,8 @@ def prepare_measurement(
     offsets_x = [
         float(item) for item in definition.get("x_offsets_from_bed_tab_mm", [])
     ]
-    if len(offsets_x) < 3 or offsets_x != sorted(set(offsets_x)):
-        raise ToolXYError("tool-XY X offsets must contain at least three unique values")
+    if not offsets_x or not all(math.isfinite(item) for item in offsets_x):
+        raise ToolXYError("tool-XY X offsets must contain finite numeric values")
     frames = []
     for seq, offset_x in enumerate(offsets_x):
         x_mm = float(corner_xy[0]) + offset_x
@@ -361,6 +373,18 @@ def _endstop_line(acquisition_calibration: dict[str, Any]) -> str:
     )
 
 
+def _display_mm(value: Any) -> str:
+    if not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+        return "n/a"
+    return f"{float(value):.3f}"
+
+
+def _display_xy_mm(value: Any) -> str:
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        return "n/a"
+    return f"({_display_mm(value[0])}, {_display_mm(value[1])})"
+
+
 def _write_overlays(
     frame_paths: list[Path],
     frames: list[dict[str, Any]],
@@ -394,19 +418,31 @@ def _write_overlays(
                 f"{('accepted' if accepted else 'rejected')}"
             ),
             (
-                f"fiducials_to_tip_mm={record.get('fiducials_to_tip_xy_mm')} "
-                f"x_datum={record.get('x_datum_mm')} "
-                f"y_datum={record.get('y_datum_mm')}"
+                "fiducials_to_tip_mm="
+                f"{_display_xy_mm(record.get('fiducials_to_tip_xy_mm'))} "
+                f"x_datum={_display_mm(record.get('x_datum_mm'))} "
+                f"y_datum={_display_mm(record.get('y_datum_mm'))}"
             ),
             endstop_line,
         ]
         if not accepted:
             lines.append("reasons: " + " | ".join(record.get("rejection_reasons", [])))
         for line_index, line in enumerate(lines):
+            origin = (24, 40 + 30 * line_index)
             cv2.putText(
                 image,
                 line,
-                (24, 40 + 30 * line_index),
+                origin,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.72,
+                (0, 0, 0),
+                7,
+                cv2.LINE_AA,
+            )
+            cv2.putText(
+                image,
+                line,
+                origin,
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.72,
                 color,
@@ -467,10 +503,14 @@ def analyze_measurement(
         reference.get("marker_x_vector_px_per_mm"),
         "marker image motion vector",
     )
-    for frame in frames:
-        if abs(float(frame["commanded_position_mm"][2]) - 0.5) > 1e-9:
-            raise ToolXYError("tool-XY analysis requires commanded Z=0.5 mm")
-
+    commanded_z_values = {
+        float(frame["commanded_position_mm"][2]) for frame in frames
+    }
+    if len(commanded_z_values) != 1 or not all(
+        math.isfinite(value) for value in commanded_z_values
+    ):
+        raise ToolXYError("tool-XY frames must share one finite commanded Z")
+    commanded_z = commanded_z_values.pop()
     valid_paths = []
     valid_frames = []
     fiducials_by_source_seq: dict[int, dict[str, Any]] = {}
@@ -638,7 +678,7 @@ def analyze_measurement(
             "reasons": reasons,
             "warnings": [],
             "tool": tool,
-            "commanded_z_mm": 0.5,
+            "commanded_z_mm": commanded_z,
             "x_datum_mm": datum[0] if datum is not None else None,
             "y_datum_mm": datum[1] if datum is not None else None,
             "accepted_count": len(accepted_records),

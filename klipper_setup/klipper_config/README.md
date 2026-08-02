@@ -39,7 +39,10 @@ Moonraker without uploading files or restarting Klipper.
 `update_menderpi.sh` copies local `printer.cfg` to
 `~/printer_data/config/printer.cfg` on `pi@menderpi.local`, backs up the
 previous remote file with a timestamp, installs the custom Klipper host patch,
-restarts Klipper, and reports the Moonraker/Klippy state.
+restarts Klipper, verifies the Moonraker/Klippy state, then runs
+`deploy_vision_code.sh` to synchronize all tracked top-level vision Python,
+JSON, and PNG assets plus `priors.yaml`, restart the four vision services, and
+rebuild the static vision catalog.
 
 ## Vision Code Development, Deployment, and Artifact Download
 

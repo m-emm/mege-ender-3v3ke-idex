@@ -508,4 +508,7 @@ REMOTE_SCRIPT
 echo "Verifying deployed config and host patch..."
 check_live_config
 
+echo "Deploying the complete tracked vision code set..."
+MENDERPI_HOST="${REMOTE_HOST}" "${SCRIPT_DIR}/deploy_vision_code.sh"
+
 echo "Update complete."

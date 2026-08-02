@@ -445,6 +445,7 @@ def _preflight(
         ROUGH_X_VERIFY_JOB,
         EDDY_FIDUCIAL_XZ_JOB,
         *FINE_NOZZLE_XZ_JOBS,
+        *TOOL_XY_JOBS,
     }:
         positions.append(
             (
@@ -1056,7 +1057,7 @@ def prepare_job(
         "created_at_utc": utc_now(),
         "camera": "nozzle_cam",
         "localizer": definition["localizer"],
-        "publish_on_accept": True,
+        "publish_on_accept": definition["publish_on_accept"],
         "frame_count": len(frames),
         "frames": frames,
         "input_facts": input_facts,
@@ -1947,7 +1948,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
         latest_analysis_run_id=analysis_run_id,
     )
     publication = None
-    if details["accepted"]:
+    if details["accepted"] and manifest["publish_on_accept"]:
         publication = publish_fact_set(
             CALIBRATION_ROOT, manifest["job_id"], analysis_run_id
         )["publication"]
@@ -2024,7 +2025,7 @@ def compute_job(
         "created_at_utc": utc_now(),
         "camera": "nozzle_cam",
         "localizer": definition["localizer"],
-        "publish_on_accept": True,
+        "publish_on_accept": definition["publish_on_accept"],
         "frame_count": 0,
         "frames": [],
         "input_facts": input_facts,

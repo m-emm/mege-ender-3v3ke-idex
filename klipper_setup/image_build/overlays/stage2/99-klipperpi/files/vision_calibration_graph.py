@@ -131,10 +131,11 @@ def validate_registry(record: Any) -> dict[str, Any]:
     record = _mapping(record, "registry")
     _header(record, REGISTRY_SCHEMA, "registry")
     job_types = _mapping(record.get("job_types"), "registry.job_types")
-    # if set(job_types) != JOB_TYPES:
-    #     raise CalibrationGraphError(
-    #         f"registry job set must be exactly {sorted(JOB_TYPES)}"
-    #     )
+    missing_job_types = JOB_TYPES - set(job_types)
+    if missing_job_types:
+        raise CalibrationGraphError(
+            f"registry is missing required jobs {sorted(missing_job_types)}"
+        )
     for job_type, value in job_types.items():
         definition = _mapping(value, f"registry.job_types.{job_type}")
         if definition.get("definition_version") != 1:
@@ -143,13 +144,24 @@ def validate_registry(record: Any) -> dict[str, Any]:
             raise CalibrationGraphError(f"{job_type} fact_definition_version must be 1")
         if definition.get("camera") != "nozzle_cam":
             raise CalibrationGraphError(f"{job_type} camera must be nozzle_cam")
-        if definition.get("publish_on_accept") is not True:
+        if not isinstance(definition.get("publish_on_accept"), bool):
+            raise CalibrationGraphError(f"{job_type}.publish_on_accept must be boolean")
+        localizer = _mapping(definition.get("localizer"), f"{job_type}.localizer")
+        _string(localizer.get("kind"), f"{job_type}.localizer.kind")
+        if (
+            not isinstance(localizer.get("version"), int)
+            or isinstance(localizer.get("version"), bool)
+            or localizer["version"] <= 0
+        ):
             raise CalibrationGraphError(
-                f"{job_type} must publish immediately when accepted"
+                f"{job_type}.localizer.version must be a positive integer"
             )
-        _mapping(definition.get("localizer"), f"{job_type}.localizer")
         facts = _list(definition.get("fact_names"), f"{job_type}.fact_names")
-        if not facts or not all(isinstance(item, str) and item for item in facts):
+        if (
+            not facts
+            or not all(isinstance(item, str) and item.strip() for item in facts)
+            or len(set(facts)) != len(facts)
+        ):
             raise CalibrationGraphError(f"{job_type} has an invalid fact contract")
         requirements = _list(definition.get("requires"), f"{job_type}.requires")
         names = set()
@@ -166,100 +178,6 @@ def validate_registry(record: Any) -> dict[str, Any]:
                 raise CalibrationGraphError(
                     f"{job_type} requirements must bind definition version 1"
                 )
-    if job_types["nozzle_cam_bed_fiducial_y_metric"].get("y_offsets_mm") != [
-        0,
-        10,
-        20,
-        20,
-        10,
-        0,
-    ]:
-        raise CalibrationGraphError("bed metric motion order is invalid")
-    if job_types["idex_tool_red_marker_x_sweep"].get("x_positions_mm") != [
-        160,
-        170,
-        180,
-        190,
-        200,
-        210,
-    ]:
-        raise CalibrationGraphError("red-marker X motion order is invalid")
-    eddy = job_types["idex_eddy_fiducial_xz_grid"]
-    if eddy.get("tool") != "T0":
-        raise CalibrationGraphError("Eddy fiducial job must target T0")
-    if eddy.get("x_positions_mm") != [230, 234.666667, 239.333333, 244]:
-        raise CalibrationGraphError("Eddy fiducial X positions are invalid")
-    if eddy.get("z_positions_mm") != [0.5, 3.333333, 6.166667, 9]:
-        raise CalibrationGraphError("Eddy fiducial Z positions are invalid")
-    if eddy.get("safe_tool_change_z_mm") != 9:
-        raise CalibrationGraphError("Eddy fiducial tool-change Z is invalid")
-    for tool in ("T0", "T1"):
-        fine = job_types[f"idex_nozzle_fine_xz_grid_{tool.lower()}"]
-        if fine.get("tool") != tool:
-            raise CalibrationGraphError(f"fine nozzle {tool} job targets wrong tool")
-        x_offsets = fine.get("x_offsets_from_bed_tab_mm")
-        if (
-            not isinstance(x_offsets, list)
-            or len(set(x_offsets)) != len(x_offsets)
-            or sorted(x_offsets) != x_offsets
-        ):
-            raise CalibrationGraphError(
-                f"fine nozzle {tool} X grid must have at least four unique "
-                "ordered columns spanning 8 mm"
-            )
-        full_rows = fine.get("full_row_z_mm")
-        if (
-            not isinstance(full_rows, list)
-            or len(set(full_rows)) != len(full_rows)
-            or sorted(full_rows) != full_rows
-        ):
-            raise CalibrationGraphError(
-                f"fine nozzle {tool} grid must have at least four unique "
-                "ordered Z rows spanning 8 mm"
-            )
-        if fine.get("safe_tool_change_z_mm") != 9:
-            raise CalibrationGraphError(f"fine nozzle {tool} tool-change Z is invalid")
-    tool_xy_gaps = []
-    for tool in ("T0", "T1"):
-        measurement = job_types[f"idex_tool_xy_measure_{tool.lower()}"]
-        if measurement.get("tool") != tool:
-            raise CalibrationGraphError(f"tool-XY {tool} job targets wrong tool")
-        if "capture_y_mm" in measurement:
-            raise CalibrationGraphError(
-                f"tool-XY {tool} capture Y must be derived from its endstop"
-            )
-        gap = measurement.get("capture_endstop_gap_mm")
-        if not isinstance(gap, (int, float)) or float(gap) <= 0.0:
-            raise CalibrationGraphError(
-                f"tool-XY {tool} capture_endstop_gap_mm must be positive"
-            )
-        tool_xy_gaps.append(float(gap))
-        if measurement.get("commanded_z_mm") != 0.5:
-            raise CalibrationGraphError(f"tool-XY {tool} must command Z=0.5")
-        if measurement.get("x_offsets_from_bed_tab_mm") != [10, 15, 20, 25, 27.5]:
-            raise CalibrationGraphError(f"tool-XY {tool} X positions are invalid")
-    if abs(tool_xy_gaps[0] - tool_xy_gaps[1]) > 1e-12:
-        raise CalibrationGraphError("tool-XY capture endstop gaps must match")
-    candidate = job_types["idex_tool_xy_candidate"]
-    if candidate.get("localizer") != {"kind": "compute_only", "version": 1}:
-        raise CalibrationGraphError("tool-XY candidate must be compute-only")
-    if candidate.get("requires") != [
-        {
-            "requirement": "t0_xy_datum",
-            "fact_name": "tool.t0.vision_xy_datum",
-            "fact_definition_version": 1,
-        },
-        {
-            "requirement": "t1_xy_datum",
-            "fact_name": "tool.t1.vision_xy_datum",
-            "fact_definition_version": 1,
-        },
-    ]:
-        raise CalibrationGraphError(
-            "tool-XY candidate must require exactly the T0 and T1 datum facts"
-        )
-    if candidate.get("fact_names") != ["calibration.idex_tool_xy.candidate"]:
-        raise CalibrationGraphError("tool-XY candidate fact name is invalid")
     return record
 
 
@@ -291,8 +209,8 @@ def validate_manifest(record: Any) -> dict[str, Any]:
         raise CalibrationGraphError("manifest definition_version must be 1")
     if record.get("camera") != "nozzle_cam":
         raise CalibrationGraphError("manifest.camera must be nozzle_cam")
-    if record.get("publish_on_accept") is not True:
-        raise CalibrationGraphError("manifest must publish accepted facts")
+    if not isinstance(record.get("publish_on_accept"), bool):
+        raise CalibrationGraphError("manifest.publish_on_accept must be boolean")
     _mapping(record.get("localizer"), "manifest.localizer")
     frames = _list(record.get("frames"), "manifest.frames")
     if record.get("frame_count") != len(frames):
@@ -304,69 +222,8 @@ def validate_manifest(record: Any) -> dict[str, Any]:
         _string(frame.get("frame"), f"manifest.frames[{index}].frame")
     _validate_input_facts(record)
 
-    if job_type == "nozzle_cam_bed_fiducial_y_metric":
-        if [frame.get("y_offset_mm") for frame in frames] != [
-            0,
-            10,
-            20,
-            20,
-            10,
-            0,
-        ]:
-            raise CalibrationGraphError("metric manifest Y motion order is invalid")
-    elif job_type == "nozzle_cam_bed_tab_corner":
-        if len(frames) != 5:
-            raise CalibrationGraphError("corner job must contain five duplicates")
-        if [frame.get("duplicate_index") for frame in frames] != list(range(5)):
-            raise CalibrationGraphError("corner duplicate order is invalid")
-    elif job_type == "idex_tool_red_marker_x_sweep":
-        expected = [
-            (tool, x) for tool in ("T0", "T1") for x in (160, 170, 180, 190, 200, 210)
-        ]
-        if [(frame.get("tool"), frame.get("x_mm")) for frame in frames] != expected:
-            raise CalibrationGraphError("red-marker motion order is invalid")
-    elif job_type == "idex_rough_tool_x_verify":
-        if len(frames) != 2 or [frame.get("tool") for frame in frames] != [
-            "T0",
-            "T1",
-        ]:
-            raise CalibrationGraphError("rough-X verification frames are invalid")
-    elif job_type == "idex_eddy_fiducial_xz_grid":
-        expected = []
-        x_positions = [230, 234.666667, 239.333333, 244]
-        for row_index, z_mm in enumerate((0.5, 3.333333, 6.166667, 9)):
-            row = x_positions if row_index % 2 == 0 else list(reversed(x_positions))
-            expected.extend((x_mm, z_mm) for x_mm in row)
-        observed = [(frame.get("x_mm"), frame.get("z_mm")) for frame in frames]
-        if observed != expected or any(frame.get("tool") != "T0" for frame in frames):
-            raise CalibrationGraphError("Eddy fiducial X/Z motion order is invalid")
-    elif job_type in {"idex_eddy_t0_xyz_offset", "idex_tool_xy_candidate"}:
-        if frames:
-            raise CalibrationGraphError("compute-only job must have no frames")
-    elif job_type in {
-        "idex_nozzle_fine_xz_grid_t0",
-        "idex_nozzle_fine_xz_grid_t1",
-    }:
-        expected_tool = "T0" if job_type.endswith("_t0") else "T1"
-        if not frames:
-            raise CalibrationGraphError("fine nozzle per-tool grid is empty")
-        if any(frame.get("tool") != expected_tool for frame in frames):
-            raise CalibrationGraphError(
-                f"fine nozzle grid must acquire only {expected_tool}"
-            )
-        rows = {}
-        for frame in frames:
-            rows.setdefault(float(frame["z_mm"]), set()).add(float(frame["x_mm"]))
-        first_row = next(iter(rows.values()))
-        if (
-            len(rows) < 2
-            or len(first_row) < 2
-            or any(x_values != first_row for x_values in rows.values())
-            or len(frames) != len(rows) * len(first_row)
-        ):
-            raise CalibrationGraphError(
-                "fine nozzle grid must be a complete rectangular X/Z grid"
-            )
+    if record["localizer"].get("kind") == "compute_only" and frames:
+        raise CalibrationGraphError("compute-only job must have no frames")
 
     expected_hash = content_hash(record, "manifest_hash")
     if record.get("manifest_hash") != expected_hash:

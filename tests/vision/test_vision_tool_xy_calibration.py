@@ -108,13 +108,10 @@ def test_prepare_derives_per_tool_command_y_with_one_physical_gap(
     assert result["reference"]["capture_y_mm"] == expected_command_y
     assert result["reference"]["internal_capture_y_mm"] == -14.3
     assert result["reference"]["capture_endstop_gap_mm"] == 0.5
-    assert len(result["frames"]) == 5
+    offsets = _definition(tool)["x_offsets_from_bed_tab_mm"]
+    assert len(result["frames"]) == len(offsets)
     assert [frame["x_mm"] for frame in result["frames"]] == [
-        183.0,
-        188.0,
-        193.0,
-        198.0,
-        200.5,
+        173.0 + offset for offset in offsets
     ]
     assert {
         tuple(frame["commanded_position_mm"][1:]) for frame in result["frames"]
@@ -127,7 +124,7 @@ def test_prepare_rejects_invalid_gap_offset_and_physical_limit():
 
     bad_gap = json.loads(json.dumps(definition))
     bad_gap["capture_endstop_gap_mm"] = 0
-    with pytest.raises(module.ToolXYError, match="must be positive"):
+    with pytest.raises(module.ToolXYError, match="beyond the Y endstop"):
         module.prepare_measurement(
             bad_gap,
             input_values=_inputs("T1"),
@@ -151,6 +148,26 @@ def test_prepare_rejects_invalid_gap_offset_and_physical_limit():
             input_values=_inputs("T1"),
             resolved=bad_limit,
         )
+
+
+def test_prepare_accepts_configured_capture_y_and_commanded_z():
+    module = _module()
+    definition = json.loads(json.dumps(_definition("T1")))
+    definition.pop("capture_endstop_gap_mm")
+    definition["capture_y_mm"] = -13.1
+    definition["commanded_z_mm"] = 1.25
+
+    result = module.prepare_measurement(
+        definition,
+        input_values=_inputs("T1"),
+        resolved=_resolved(),
+    )
+
+    assert result["reference"]["capture_y_mm"] == -13.1
+    assert result["reference"]["commanded_z_mm"] == 1.25
+    assert {
+        frame["commanded_position_mm"][2] for frame in result["frames"]
+    } == {1.25}
 
 
 def test_tool_xy_gcode_homes_and_returns_to_t0():
@@ -185,7 +202,9 @@ def test_tool_xy_gcode_homes_and_returns_to_t0():
     ]
     assert lines.count("T1") == 1
     assert lines[-4] == "T0"
-    assert sum(line.startswith("VISION_CAPTURE_SYNC") for line in lines) == 5
+    assert sum(line.startswith("VISION_CAPTURE_SYNC") for line in lines) == len(
+        definition["x_offsets_from_bed_tab_mm"]
+    )
     assert all("Z0.500000" in line for line in lines if line.startswith("G1 Z0."))
 
 

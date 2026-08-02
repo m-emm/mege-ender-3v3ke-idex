@@ -71,44 +71,35 @@ def _fact_set(
     return record
 
 
-def test_registry_is_exact_clean_chain():
+def test_registry_has_valid_extensible_job_definitions():
     graph = _module("vision_calibration_graph.py", "vision_graph_registry_test")
     registry = graph.validate_registry(
         json.loads((FILES / "vision_job_types.json").read_text(encoding="utf-8"))
     )
 
-    assert set(registry["job_types"]) == graph.JOB_TYPES
+    assert set(registry["job_types"]) >= graph.JOB_TYPES
     assert all(
         definition["definition_version"] == 1
-        and definition["publish_on_accept"] is True
+        and isinstance(definition["publish_on_accept"], bool)
+        and definition["fact_names"]
         for definition in registry["job_types"].values()
     )
-    fine_jobs = [
-        registry["job_types"][f"idex_nozzle_fine_xz_grid_{tool.lower()}"]
-        for tool in ("T0", "T1")
-    ]
-    assert [fine["tool"] for fine in fine_jobs] == ["T0", "T1"]
-    assert all(fine["x_offsets_from_bed_tab_mm"] for fine in fine_jobs)
-    assert all(fine["full_row_z_mm"] for fine in fine_jobs)
-    assert all(
-        fine["x_offsets_from_bed_tab_mm"]
-        == sorted(set(fine["x_offsets_from_bed_tab_mm"]))
-        for fine in fine_jobs
+
+
+def test_registry_does_not_pin_tunable_job_values():
+    graph = _module("vision_calibration_graph.py", "vision_graph_tuning_test")
+    registry = json.loads(
+        (FILES / "vision_job_types.json").read_text(encoding="utf-8")
     )
-    assert all(
-        fine["full_row_z_mm"] == sorted(set(fine["full_row_z_mm"]))
-        for fine in fine_jobs
-    )
-    assert all(
-        fine["x_offsets_from_bed_tab_mm"] == fine_jobs[0]["x_offsets_from_bed_tab_mm"]
-        and fine["full_row_z_mm"] == fine_jobs[0]["full_row_z_mm"]
-        for fine in fine_jobs
-    )
-    assert [fine["fact_names"] for fine in fine_jobs] == [
-        ["camera.nozzle_cam.nozzle_tip.t0_projection_model"],
-        ["camera.nozzle_cam.nozzle_tip.t1_projection_model"],
-    ]
-    assert "idex_fine_tool_xy_verify" not in registry["job_types"]
+    measurement = registry["job_types"]["idex_tool_xy_measure_t0"]
+    measurement["tool"] = "T1"
+    measurement["x_offsets_from_bed_tab_mm"] = [22.0, 10.0, 22.0]
+    measurement["commanded_z_mm"] = 1.25
+    measurement["capture_endstop_gap_mm"] = 0.75
+    measurement["safe_tool_change_z_mm"] = 12.0
+    measurement["publish_on_accept"] = False
+
+    assert graph.validate_registry(registry) == registry
 
 
 def test_generated_acquisition_gcode_homes_before_job_motion():
