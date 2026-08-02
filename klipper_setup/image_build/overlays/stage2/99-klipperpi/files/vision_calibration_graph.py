@@ -28,6 +28,8 @@ JOB_TYPES = {
     "idex_eddy_fiducial_xz_grid",
     "idex_nozzle_fine_xz_grid_t0",
     "idex_nozzle_fine_xz_grid_t1",
+    "idex_tool_xy_measure_t0",
+    "idex_tool_xy_measure_t1",
     "idex_eddy_t0_xyz_offset",
     "idex_t0_t1_xyz_offset",
 }
@@ -216,6 +218,27 @@ def validate_registry(record: Any) -> dict[str, Any]:
             )
         if fine.get("safe_tool_change_z_mm") != 9:
             raise CalibrationGraphError(f"fine nozzle {tool} tool-change Z is invalid")
+    tool_xy_gaps = []
+    for tool in ("T0", "T1"):
+        measurement = job_types[f"idex_tool_xy_measure_{tool.lower()}"]
+        if measurement.get("tool") != tool:
+            raise CalibrationGraphError(f"tool-XY {tool} job targets wrong tool")
+        if "capture_y_mm" in measurement:
+            raise CalibrationGraphError(
+                f"tool-XY {tool} capture Y must be derived from its endstop"
+            )
+        gap = measurement.get("capture_endstop_gap_mm")
+        if not isinstance(gap, (int, float)) or float(gap) <= 0.0:
+            raise CalibrationGraphError(
+                f"tool-XY {tool} capture_endstop_gap_mm must be positive"
+            )
+        tool_xy_gaps.append(float(gap))
+        if measurement.get("commanded_z_mm") != 0.5:
+            raise CalibrationGraphError(f"tool-XY {tool} must command Z=0.5")
+        if measurement.get("x_offsets_from_bed_tab_mm") != [10, 15, 20, 25, 27.5]:
+            raise CalibrationGraphError(f"tool-XY {tool} X positions are invalid")
+    if abs(tool_xy_gaps[0] - tool_xy_gaps[1]) > 1e-12:
+        raise CalibrationGraphError("tool-XY capture endstop gaps must match")
     return record
 
 

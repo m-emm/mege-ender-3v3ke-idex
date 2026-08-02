@@ -8,6 +8,18 @@ Usage:
   run_resonance_plot.sh Y --chip right_toolhead
   run_resonance_plot.sh --render-only /tmp/resonances_x_YYYYMMDD_HHMMSS.csv
 
+IDEX T1 (right carriage) X-axis resonance:
+  For a true T1 X measurement the right carriage must be the active one when
+  TEST_RESONANCES runs. Prepare the printer first via Moonraker, then invoke
+  this script with --chip right_toolhead:
+
+    ssh pi@menderpi.local 'curl -s -X POST "http://localhost:7125/printer/gcode/script" -d "script=G28 X"'
+    ssh pi@menderpi.local 'curl -s -X POST "http://localhost:7125/printer/gcode/script" -d "script=T1"'
+    run_resonance_plot.sh X --chip right_toolhead
+
+  G28 X homes both carriages. T1 makes the right carriage active so that the
+  subsequent TEST_RESONANCES AXIS=X sweeps T1. Visually confirmed 2026-08-02.
+
 Environment:
   MENDERPI_HOST   SSH target, default pi@menderpi.local
   LOCAL_OUT_DIR   Local copy destination, default runs/klipper_resonance

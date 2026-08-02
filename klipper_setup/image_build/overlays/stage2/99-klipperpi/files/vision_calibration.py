@@ -54,6 +54,15 @@ from vision_rough_x_verification import analyze as analyze_rough_x_verification
 from vision_rough_x_verification import (
     calculate_candidate as calculate_rough_x_candidate,
 )
+from vision_tool_xy_calibration import ToolXYError
+from vision_tool_xy_calibration import (
+    analyze_measurement as analyze_tool_xy_measurement,
+)
+from vision_tool_xy_calibration import build_acquisition_gcode as build_tool_xy_gcode
+from vision_tool_xy_calibration import build_measurement_fact as build_tool_xy_fact
+from vision_tool_xy_calibration import (
+    prepare_measurement as prepare_tool_xy_measurement,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -100,6 +109,9 @@ FINE_NOZZLE_XZ_JOBS = {
     FINE_NOZZLE_XZ_T0_JOB,
     FINE_NOZZLE_XZ_T1_JOB,
 }
+TOOL_XY_T0_JOB = "idex_tool_xy_measure_t0"
+TOOL_XY_T1_JOB = "idex_tool_xy_measure_t1"
+TOOL_XY_JOBS = {TOOL_XY_T0_JOB, TOOL_XY_T1_JOB}
 JOB_TYPES = (
     BED_FIDUCIAL_METRIC_JOB,
     BED_TAB_CORNER_JOB,
@@ -108,6 +120,8 @@ JOB_TYPES = (
     EDDY_FIDUCIAL_XZ_JOB,
     FINE_NOZZLE_XZ_T0_JOB,
     FINE_NOZZLE_XZ_T1_JOB,
+    TOOL_XY_T0_JOB,
+    TOOL_XY_T1_JOB,
     EDDY_T0_XYZ_OFFSET_JOB,
     IDEX_T0_T1_XYZ_OFFSET_JOB,
 )
@@ -405,6 +419,30 @@ def _preflight(
         "t0_x_endstop_mm": _number(stepper_x, "position_endstop", "stepper_x"),
         "t1_x_endstop_mm": _number(dual, "position_endstop", "dual_carriage"),
     }
+    active_tool_calibration = None
+    if job_type in TOOL_XY_JOBS:
+        tool_state = status.get("gcode_macro _IDEX_TOOL_STATE")
+        if not isinstance(tool_state, dict):
+            raise VisionCalibrationError(
+                "active _IDEX_TOOL_STATE is unavailable for tool-XY acquisition"
+            )
+        active_tool_calibration = {
+            "active_fingerprint": fingerprint,
+            "tool_xy_endstops_mm": {
+                "t0": {
+                    "x": active_snapshot["t0_x_endstop_mm"],
+                    "y": _number(tool_state, "t0_y_endstop", "_IDEX_TOOL_STATE"),
+                },
+                "t1": {
+                    "x": active_snapshot["t1_x_endstop_mm"],
+                    "y": _number(tool_state, "t1_y_endstop", "_IDEX_TOOL_STATE"),
+                },
+            },
+            "tool_y_offsets_mm": {
+                "t0": _number(tool_state, "t0_y_offset", "_IDEX_TOOL_STATE"),
+                "t1": _number(tool_state, "t1_y_offset", "_IDEX_TOOL_STATE"),
+            },
+        }
     scope = {
         "camera": "nozzle_cam",
         "registry_job": definition,
@@ -413,6 +451,8 @@ def _preflight(
         "axis_maximum": axis_maximum,
         "active_fingerprint": fingerprint,
     }
+    if active_tool_calibration is not None:
+        scope["active_tool_calibration"] = active_tool_calibration
     return {
         "pose": pose,
         "axis_minimum": axis_minimum,
@@ -421,6 +461,7 @@ def _preflight(
         "temperatures": temperatures,
         "framebuffer": framebuffer,
         "active_calibration_snapshot": active_snapshot,
+        "active_tool_calibration": active_tool_calibration,
         "scope": scope,
         "applicability_hash": canonical_hash(scope),
     }
@@ -525,6 +566,14 @@ def _gcode(
     manifest: dict[str, Any],
     definition: dict[str, Any],
 ) -> str:
+    if manifest["job_type"] in TOOL_XY_JOBS:
+        return build_tool_xy_gcode(
+            job_id,
+            manifest_hash,
+            gcode_hash,
+            manifest,
+            definition,
+        )
     pose = manifest["motion"]["resolved_pose"]
     feedrate = float(definition.get("velocity_mm_s", 60.0)) * 60.0
     lines = [
@@ -758,11 +807,23 @@ def prepare_job(
         definition,
         expected_fingerprint,
     )
+    pose = resolved["pose"]
+    tool_xy_prepared = None
+    if job_type in TOOL_XY_JOBS:
+        try:
+            tool_xy_prepared = prepare_tool_xy_measurement(
+                definition,
+                input_values=input_values,
+                resolved=resolved,
+            )
+        except ToolXYError as exc:
+            raise VisionCalibrationError(str(exc)) from None
+        pose["capture_y_mm"] = float(tool_xy_prepared["reference"]["capture_y_mm"])
+        pose["capture_z_mm"] = float(tool_xy_prepared["reference"]["commanded_z_mm"])
     resolved["scope"]["input_fact_hashes"] = {
         item["requirement"]: item["fact_set_hash"] for item in input_facts
     }
     resolved["applicability_hash"] = canonical_hash(resolved["scope"])
-    pose = resolved["pose"]
     job_id = (
         datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + "-" + _sanitize(name)
     )
@@ -927,6 +988,9 @@ def prepare_job(
                         ],
                     }
                 )
+    elif job_type in TOOL_XY_JOBS:
+        assert tool_xy_prepared is not None
+        frames = tool_xy_prepared["frames"]
     manifest = {
         "schema": MANIFEST_SCHEMA,
         "schema_version": SCHEMA_VERSION,
@@ -1049,6 +1113,12 @@ def prepare_job(
             "coarse_image_x_axis_px_per_mm": x_axis,
         }
         manifest["acquisition_calibration"] = _acquisition_calibration_snapshot()
+    elif job_type in TOOL_XY_JOBS:
+        assert tool_xy_prepared is not None
+        manifest["tool_xy_reference"] = tool_xy_prepared["reference"]
+        manifest["acquisition_calibration"] = tool_xy_prepared[
+            "active_tool_calibration"
+        ]
     placeholder = _gcode(
         job_id, HASH_PLACEHOLDER, HASH_PLACEHOLDER, manifest, definition
     )
@@ -1291,6 +1361,14 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 frames=manifest["frames"],
                 reference=manifest["fine_reference"],
                 acquisition_calibration=manifest.get("acquisition_calibration"),
+            )
+        elif job_type in TOOL_XY_JOBS:
+            details = analyze_tool_xy_measurement(
+                frame_paths,
+                artifact_dir,
+                frames=manifest["frames"],
+                reference=manifest["tool_xy_reference"],
+                acquisition_calibration=manifest["acquisition_calibration"],
             )
         elif job_type == EDDY_T0_XYZ_OFFSET_JOB:
             bindings = {item["requirement"]: item for item in manifest["input_facts"]}
@@ -1663,6 +1741,20 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                             "fine_capture_y_mm",
                             "image_y_axis_vector_px_per_mm",
                         },
+                    )
+                ]
+            elif job_type in TOOL_XY_JOBS:
+                value = build_tool_xy_fact(
+                    details,
+                    acquisition_calibration=manifest["acquisition_calibration"],
+                )
+                facts = [
+                    _fact(
+                        f"tool.{details['tool'].lower()}.vision_xy_datum",
+                        "coordinate_system",
+                        value,
+                        dependencies,
+                        {"x_datum_mm", "y_datum_mm"},
                     )
                 ]
             elif job_type == EDDY_T0_XYZ_OFFSET_JOB:

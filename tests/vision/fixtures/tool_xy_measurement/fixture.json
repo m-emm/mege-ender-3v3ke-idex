@@ -1,0 +1,30 @@
+{
+  "schema": "vision-tool-xy-real-image-fixture",
+  "schema_version": 1,
+  "source_fact_sets": {
+    "bed_metric": {
+      "path": "source_facts/bed_metric_fact_set.json",
+      "fact_set_hash": "sha256:2115e0748244e56ddac87999eaaf594b04396d3737536261896865e37e09f347"
+    },
+    "red_marker_and_mapping": {
+      "path": "source_facts/red_marker_fact_set.json",
+      "fact_set_hash": "sha256:3bbf2579b700af11162d15b95a81955d5370dd975b5d59bee40f16f1fe932b2f"
+    }
+  },
+  "cases": {
+    "T0": {
+      "directory": "t0",
+      "source_job": "20260802T103522.226760Z-idex_nozzle_fine_xz_grid_t0",
+      "source_sequences": [1, 2, 3],
+      "expected_datum_xy_mm": [166.390, -14.833],
+      "tolerance_mm": 0.05
+    },
+    "T1": {
+      "directory": "t1",
+      "source_job": "20260802T103757.906809Z-idex_nozzle_fine_xz_grid_t1",
+      "source_sequences": [1, 2, 3],
+      "expected_datum_xy_mm": [166.929, -15.871],
+      "tolerance_mm": 0.05
+    }
+  }
+}

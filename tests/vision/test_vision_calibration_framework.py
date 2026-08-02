@@ -182,12 +182,17 @@ def test_new_job_replaces_abandoned_acquisition_lock(tmp_path):
 
 
 def test_fine_nozzle_marker_selection_rejects_distant_red_distractor(monkeypatch):
-    fine = _module("vision_nozzle_fine_xz.py", "vision_fine_marker_selection_test")
+    locator = _module(
+        "vision_nozzle_tip_localization.py",
+        "vision_fine_marker_selection_test",
+    )
     expected = np.asarray([1083.0, 412.0])
     distractor = {"center_px": [1100.0, 521.0]}
-    monkeypatch.setattr(fine, "_red_candidates", lambda _image, _index: [distractor])
+    monkeypatch.setattr(
+        locator, "_red_candidates", lambda _image, _index: [distractor]
+    )
 
-    center, record = fine._select_marker(
+    center, record = locator._select_marker(
         np.zeros((1080, 1920, 3), dtype=np.uint8),
         expected,
         0,
@@ -198,10 +203,12 @@ def test_fine_nozzle_marker_selection_rejects_distant_red_distractor(monkeypatch
 
 
 def test_fine_nozzle_physical_tip_sector_excludes_lower_tracking_anchor():
-    fine = _module("vision_nozzle_fine_xz.py", "vision_fine_tip_sector_test")
+    locator = _module(
+        "vision_nozzle_tip_localization.py", "vision_fine_tip_sector_test"
+    )
 
-    assert fine._is_physical_tip_delta(np.asarray([17.5, -2.0]), 63.0)
-    assert not fine._is_physical_tip_delta(np.asarray([7.0, 16.0]), 63.0)
+    assert locator._is_physical_tip_delta(np.asarray([17.5, -2.0]), 63.0)
+    assert not locator._is_physical_tip_delta(np.asarray([7.0, 16.0]), 63.0)
 
 
 def test_canonical_hash_is_order_independent_and_strict():
@@ -479,7 +486,9 @@ def test_new_bed_metric_manifest_uses_dao_without_seed_facts(tmp_path):
 
 
 def test_fine_grid_localizes_the_nozzle_tip_inside_the_outer_ring():
-    analyzer = _module("vision_nozzle_fine_xz.py", "vision_nozzle_tip_localizer_test")
+    analyzer = _module(
+        "vision_nozzle_tip_localization.py", "vision_nozzle_tip_localizer_test"
+    )
     image = np.full((240, 240, 3), 24, dtype=np.uint8)
     ring_center = np.asarray([120.0, 120.0])
     cv2.circle(image, (120, 120), 52, (130, 130, 130), 7)

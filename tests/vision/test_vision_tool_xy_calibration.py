@@ -1,0 +1,389 @@
+import hashlib
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+import cv2
+import numpy as np
+import pytest
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+FILES = (
+    REPO_ROOT
+    / "klipper_setup"
+    / "image_build"
+    / "overlays"
+    / "stage2"
+    / "99-klipperpi"
+    / "files"
+)
+FIXTURE = Path(__file__).parent / "fixtures" / "tool_xy_measurement"
+
+
+def _module():
+    if str(FILES) not in sys.path:
+        sys.path.insert(0, str(FILES))
+    spec = importlib.util.spec_from_file_location(
+        "vision_tool_xy_calibration_test",
+        FILES / "vision_tool_xy_calibration.py",
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _definition(tool):
+    registry = json.loads((FILES / "vision_job_types.json").read_text())
+    return registry["job_types"][f"idex_tool_xy_measure_{tool.lower()}"]
+
+
+def _inputs(tool):
+    return {
+        "bed_metric": {
+            "image_y_axis_vector_px_per_mm": [0.0, -10.0],
+            "reference_marker_centers_px": [
+                [900.0, 400.0],
+                [980.0, 400.0],
+                [900.0, 480.0],
+                [980.0, 480.0],
+            ],
+            "reference_capture_y_mm": -14.0,
+        },
+        "bed_fiducial_printer_xy_mapping": {
+            "corner_printer_xy_mm": [173.0, -18.0],
+            "fiducial_reference_printer_xy_mm": [180.0, -11.0],
+            "fiducial_x_vector_model_px_per_mm": {
+                "reference_vector_px_per_mm": [10.0, 0.0],
+                "capture_y_slope_px_per_mm_per_mm": [0.0, 0.0],
+                "reference_capture_y_mm": -14.0,
+            },
+        },
+        f"{tool.lower()}_red_marker_offset": {
+            "offset_mm": 20.0,
+            "reference_commanded_x_mm": 193.0,
+            "quality": {
+                "tool_axis_vectors_px_per_mm": {
+                    "T0": [8.0, 0.0],
+                    "T1": [8.0, 0.0],
+                }
+            },
+        },
+    }
+
+
+def _resolved():
+    return {
+        "axis_minimum": [-80.0, -14.8, 0.0],
+        "axis_maximum": [355.0, 296.0, 300.0],
+        "active_tool_calibration": {
+            "tool_xy_endstops_mm": {
+                "t0": {"x": -77.635, "y": -14.8},
+                "t1": {"x": 351.739, "y": -13.8},
+            },
+            "tool_y_offsets_mm": {"t0": 0.0, "t1": -1.0},
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("tool", "expected_command_y"),
+    [("T0", -14.3), ("T1", -13.3)],
+)
+def test_prepare_derives_per_tool_command_y_with_one_physical_gap(
+    tool, expected_command_y
+):
+    module = _module()
+
+    result = module.prepare_measurement(
+        _definition(tool),
+        input_values=_inputs(tool),
+        resolved=_resolved(),
+    )
+
+    assert result["reference"]["capture_y_mm"] == expected_command_y
+    assert result["reference"]["internal_capture_y_mm"] == -14.3
+    assert result["reference"]["capture_endstop_gap_mm"] == 0.5
+    assert len(result["frames"]) == 5
+    assert [frame["x_mm"] for frame in result["frames"]] == [
+        183.0,
+        188.0,
+        193.0,
+        198.0,
+        200.5,
+    ]
+    assert {
+        tuple(frame["commanded_position_mm"][1:]) for frame in result["frames"]
+    } == {(expected_command_y, 0.5)}
+
+
+def test_prepare_rejects_invalid_gap_offset_and_physical_limit():
+    module = _module()
+    definition = _definition("T1")
+
+    bad_gap = json.loads(json.dumps(definition))
+    bad_gap["capture_endstop_gap_mm"] = 0
+    with pytest.raises(module.ToolXYError, match="must be positive"):
+        module.prepare_measurement(
+            bad_gap,
+            input_values=_inputs("T1"),
+            resolved=_resolved(),
+        )
+
+    bad_offset = _resolved()
+    bad_offset["active_tool_calibration"]["tool_y_offsets_mm"]["t1"] = -0.5
+    with pytest.raises(module.ToolXYError, match="does not equal"):
+        module.prepare_measurement(
+            definition,
+            input_values=_inputs("T1"),
+            resolved=bad_offset,
+        )
+
+    bad_limit = _resolved()
+    bad_limit["axis_minimum"][1] = -14.0
+    with pytest.raises(module.ToolXYError, match="outside loaded limits"):
+        module.prepare_measurement(
+            definition,
+            input_values=_inputs("T1"),
+            resolved=bad_limit,
+        )
+
+
+def test_tool_xy_gcode_homes_and_returns_to_t0():
+    module = _module()
+    definition = _definition("T1")
+    prepared = module.prepare_measurement(
+        definition,
+        input_values=_inputs("T1"),
+        resolved=_resolved(),
+    )
+    manifest = {
+        "frames": prepared["frames"],
+        "motion": {"resolved_pose": {"safe_tool_change_z_mm": 9.0}},
+    }
+
+    lines = module.build_acquisition_gcode(
+        "tool-xy-test",
+        "sha256:manifest",
+        "sha256:gcode",
+        manifest,
+        definition,
+    ).splitlines()
+
+    assert lines[:4] == [
+        "; vision calibration job tool-xy-test",
+        "G28",
+        "G90",
+        (
+            "VISION_JOB_BEGIN JOB=tool-xy-test "
+            "MANIFEST_HASH=sha256:manifest GCODE_HASH=sha256:gcode"
+        ),
+    ]
+    assert lines.count("T1") == 1
+    assert lines[-4] == "T0"
+    assert sum(line.startswith("VISION_CAPTURE_SYNC") for line in lines) == 5
+    assert all("Z0.500000" in line for line in lines if line.startswith("G1 Z0."))
+
+
+def _analysis_frames(count=5):
+    frames = []
+    for seq, x_mm in enumerate([100.0, 105.0, 110.0, 115.0, 120.0][:count]):
+        y_mm = -14.0 + seq
+        frames.append(
+            {
+                "seq": seq,
+                "frame": f"frame_{seq}",
+                "tool": "T0",
+                "x_mm": x_mm,
+                "y_mm": y_mm,
+                "z_mm": 0.5,
+                "expected_marker_pixel_px": [100.0, 100.0],
+                "commanded_position_mm": [x_mm, y_mm, 0.5],
+            }
+        )
+    return frames
+
+
+def test_analysis_cancels_commanded_x_and_y_and_rejects_a_datum_outlier(
+    tmp_path, monkeypatch
+):
+    module = _module()
+    frames = _analysis_frames()
+    paths = []
+    for frame in frames:
+        path = tmp_path / f"{frame['frame']}.jpg"
+        assert cv2.imwrite(str(path), np.full((240, 320, 3), 32, dtype=np.uint8))
+        paths.append(path)
+
+    fiducials = {
+        "centers_px": [[90.0, 90.0], [110.0, 90.0], [90.0, 110.0], [110.0, 110.0]],
+        "radii_px": [4.0, 4.0, 4.0, 4.0],
+    }
+    monkeypatch.setattr(module, "detect_four_fiducials", lambda _image: fiducials)
+
+    def localize(_paths, *, frames, **_kwargs):
+        registrations = []
+        for index, frame in enumerate(frames):
+            x_datum = 50.0 if index != 4 else 52.0
+            y_datum = -20.0
+            delta = [
+                float(frame["commanded_position_mm"][0]) - x_datum,
+                y_datum - float(frame["commanded_position_mm"][1]),
+            ]
+            registrations.append(
+                {
+                    "seq": index,
+                    "tool": "T0",
+                    "x_mm": frame["x_mm"],
+                    "z_mm": 0.5,
+                    "center_px": (np.asarray([100.0, 100.0]) + delta).tolist(),
+                    "minimum_correlation": 0.9,
+                    "median_correlation": 0.9,
+                    "representation_spread_px": 0.1,
+                    "tip_prediction_error_px": 0.1,
+                    "maximum_tip_prediction_error_px": 8.0,
+                }
+            )
+        return {"registrations": registrations}
+
+    monkeypatch.setattr(module, "localize_nozzle_tip_grid", localize)
+    acquisition = _resolved()["active_tool_calibration"]
+    result = module.analyze_measurement(
+        paths,
+        tmp_path / "artifacts",
+        frames=frames,
+        reference={
+            "tool": "T0",
+            "image_x_vector_px_per_mm": [1.0, 0.0],
+            "image_y_vector_px_per_mm": [0.0, 1.0],
+            "marker_x_vector_px_per_mm": [1.0, 0.0],
+            "corner_printer_xy_mm": [0.0, 0.0],
+            "fiducial_reference_printer_xy_mm": [0.0, 0.0],
+            "marker_offset_mm": 0.0,
+            "marker_reference_commanded_x_mm": 0.0,
+        },
+        acquisition_calibration=acquisition,
+    )
+
+    assert result["accepted"], result["reasons"]
+    assert result["accepted_count"] == 4
+    assert result["accepted_x_span_mm"] == 15.0
+    assert result["x_datum_mm"] == 50.0
+    assert result["y_datum_mm"] == -20.0
+    assert not result["records"][-1]["accepted"]
+    assert "datum residual" in result["records"][-1]["rejection_reasons"][-1]
+    assert module.build_measurement_fact(
+        result,
+        acquisition_calibration=acquisition,
+    ) == {
+        "x_datum_mm": 50.0,
+        "y_datum_mm": -20.0,
+        "acquisition_endstop_xy_mm": [-77.635, -14.8],
+        "commanded_z_mm": 0.5,
+    }
+
+
+def _fact_value(fact_set, fact_name):
+    return next(fact["value"] for fact in fact_set["facts"] if fact["name"] == fact_name)
+
+
+@pytest.mark.parametrize("tool", ["T0", "T1"])
+def test_real_images_publish_stable_tool_xy_datum(tool, tmp_path):
+    module = _module()
+    fixture = json.loads((FIXTURE / "fixture.json").read_text())
+    case = fixture["cases"][tool]
+    directory = FIXTURE / case["directory"]
+    source_manifest = json.loads((directory / "source_manifest.json").read_text())
+    frames = [
+        frame
+        for frame in source_manifest["frames"]
+        if int(frame["seq"]) in set(case["source_sequences"])
+    ]
+    frame_paths = [directory / f"{frame['frame']}.jpg" for frame in frames]
+    for frame, image_path in zip(frames, frame_paths):
+        sidecar = json.loads((directory / f"{frame['frame']}.json").read_text())
+        assert sidecar["sha256"] == "sha256:" + hashlib.sha256(
+            image_path.read_bytes()
+        ).hexdigest()
+        assert sidecar["commanded_position_mm"] == frame["commanded_position_mm"]
+
+    fine_reference = source_manifest["fine_reference"]
+    source_facts = json.loads(
+        (
+            FIXTURE
+            / fixture["source_fact_sets"]["red_marker_and_mapping"]["path"]
+        ).read_text()
+    )
+    mapping = _fact_value(
+        source_facts, "camera.nozzle_cam.bed_fiducial.printer_xy_mapping"
+    )
+    marker = _fact_value(
+        source_facts, f"tool.{tool.lower()}.red_marker_to_bed_tab_x_mm"
+    )
+    result = module.analyze_measurement(
+        frame_paths,
+        tmp_path / tool.lower(),
+        frames=frames,
+        reference={
+            "tool": tool,
+            "image_x_vector_px_per_mm": fine_reference[
+                "fiducial_x_vector_at_fine_capture_px_per_mm"
+            ],
+            "image_y_vector_px_per_mm": fine_reference[
+                "image_y_axis_vector_px_per_mm"
+            ],
+            "marker_x_vector_px_per_mm": marker["quality"][
+                "tool_axis_vectors_px_per_mm"
+            ][tool],
+            "corner_printer_xy_mm": mapping["corner_printer_xy_mm"],
+            "fiducial_reference_printer_xy_mm": mapping[
+                "fiducial_reference_printer_xy_mm"
+            ],
+            "marker_offset_mm": marker["offset_mm"],
+            "marker_reference_commanded_x_mm": marker[
+                "reference_commanded_x_mm"
+            ],
+        },
+        acquisition_calibration=source_manifest["acquisition_calibration"],
+    )
+
+    assert result["accepted"], result["reasons"]
+    assert result["accepted_count"] == 3
+    np.testing.assert_allclose(
+        [result["x_datum_mm"], result["y_datum_mm"]],
+        case["expected_datum_xy_mm"],
+        atol=float(case["tolerance_mm"]),
+    )
+    assert set(result["artifacts"]) == {
+        "tool_xy_measurement",
+        "tool_xy_overlay_01",
+        "tool_xy_overlay_02",
+        "tool_xy_overlay_03",
+    }
+
+
+def test_real_fixture_retains_exact_source_fact_sets():
+    fixture = json.loads((FIXTURE / "fixture.json").read_text())
+    for source in fixture["source_fact_sets"].values():
+        fact_set = json.loads((FIXTURE / source["path"]).read_text())
+        assert fact_set["fact_set_hash"] == source["fact_set_hash"]
+    bed = json.loads(
+        (FIXTURE / fixture["source_fact_sets"]["bed_metric"]["path"]).read_text()
+    )
+    red = json.loads(
+        (
+            FIXTURE
+            / fixture["source_fact_sets"]["red_marker_and_mapping"]["path"]
+        ).read_text()
+    )
+    assert _fact_value(
+        bed, "camera.nozzle_cam.bed_fiducial.local_metric_model"
+    )
+    assert _fact_value(
+        red, "camera.nozzle_cam.bed_fiducial.printer_xy_mapping"
+    )
+    assert _fact_value(red, "tool.t0.red_marker_to_bed_tab_x_mm")
+    assert _fact_value(red, "tool.t1.red_marker_to_bed_tab_x_mm")

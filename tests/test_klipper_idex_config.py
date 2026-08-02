@@ -455,6 +455,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     fine_xz_analyzer = (IMAGE_BUILD_FILES_DIR / "vision_nozzle_fine_xz.py").read_text(
         encoding="utf-8"
     )
+    nozzle_tip_localizer = (
+        IMAGE_BUILD_FILES_DIR / "vision_nozzle_tip_localization.py"
+    ).read_text(encoding="utf-8")
     fine_tool_calculator = (
         IMAGE_BUILD_FILES_DIR / "vision_fine_tool_calibration.py"
     ).read_text(encoding="utf-8")
@@ -523,6 +526,8 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "idex_eddy_fiducial_xz_grid",
         "idex_nozzle_fine_xz_grid_t0",
         "idex_nozzle_fine_xz_grid_t1",
+        "idex_tool_xy_measure_t0",
+        "idex_tool_xy_measure_t1",
         "idex_eddy_t0_xyz_offset",
         "idex_t0_t1_xyz_offset",
     }
@@ -636,7 +641,13 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "detect_circle" in eddy_fiducial_analyzer
     assert "raw_positions" in eddy_fiducial_analyzer
     assert "Fine single-tool nozzle-tip X/Z analysis" in fine_xz_analyzer
-    assert "from vision_four_fiducials import detect_four_fiducials" in fine_xz_analyzer
+    assert "from vision_nozzle_tip_localization import" in fine_xz_analyzer
+    assert "def localize_nozzle_tip_grid" not in fine_xz_analyzer
+    assert "from vision_nozzle_tip_localization import" in (
+        IMAGE_BUILD_FILES_DIR / "vision_tool_xy_calibration.py"
+    ).read_text(encoding="utf-8")
+    assert "def localize_nozzle_tip_grid" in nozzle_tip_localizer
+    assert "from vision_nozzle_fine_xz import" not in nozzle_tip_localizer
     assert "def detect_four_fiducials" not in fine_xz_analyzer
     assert "_fit_tool" in fine_xz_analyzer
     assert "class FourFiducialError" in four_fiducial_analyzer
@@ -700,6 +711,8 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "vision_eddy_fiducial_xz.py",
         "vision_fine_tool_calibration.py",
         "vision_nozzle_fine_xz.py",
+        "vision_nozzle_tip_localization.py",
+        "vision_tool_xy_calibration.py",
         "vision_red_marker_x_sweep.py",
         "vision_rough_x_verification.py",
         "vision_job_types.json",

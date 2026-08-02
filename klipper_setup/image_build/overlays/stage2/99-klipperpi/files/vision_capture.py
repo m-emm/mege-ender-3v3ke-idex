@@ -432,6 +432,8 @@ class VisionJobApi:
             "idex_eddy_fiducial_xz_grid",
             "idex_nozzle_fine_xz_grid_t0",
             "idex_nozzle_fine_xz_grid_t1",
+            "idex_tool_xy_measure_t0",
+            "idex_tool_xy_measure_t1",
         ):
             raise CaptureError("unsupported acquisition job_type")
         if manifest.get("job_id") != sanitize_name(job_id):

@@ -1,0 +1,175 @@
+{
+  "actual_gcode_position_mm": [
+    188.0,
+    -13.0,
+    0.5,
+    0.0
+  ],
+  "actual_toolhead_position_mm": [
+    188.0,
+    -13.0,
+    0.6,
+    0.0
+  ],
+  "camera_profile": {
+    "active_profile": "nozzle_cam_analysis",
+    "applied_controls": [
+      {
+        "name": "auto_exposure",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 1
+      },
+      {
+        "name": "exposure_time_absolute",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 1200
+      },
+      {
+        "name": "white_balance_automatic",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 0
+      },
+      {
+        "name": "white_balance_temperature",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 6500
+      },
+      {
+        "name": "power_line_frequency",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 1
+      },
+      {
+        "name": "brightness",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 0
+      },
+      {
+        "name": "contrast",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 12
+      },
+      {
+        "name": "saturation",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 9
+      },
+      {
+        "name": "hue",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 0
+      },
+      {
+        "name": "gamma",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 188
+      },
+      {
+        "name": "sharpness",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 7
+      }
+    ],
+    "control_errors": [],
+    "enabled": true,
+    "last_request": {
+      "profile": "analysis",
+      "requested_at_utc": "2026-08-02T10:38:28.490259+00:00",
+      "requester": "vision_capture"
+    },
+    "profile_file": "/usr/local/share/vision/nozzle_cam_profiles.json",
+    "profile_names": [
+      "analysis",
+      "nozzle_cam_analysis"
+    ],
+    "request_file": "/run/vision-preview-nozzle_cam/profile_request.json",
+    "requested_profile": "analysis"
+  },
+  "capture_errors": [],
+  "capture_retries": 0,
+  "captured_at_utc": "2026-08-02T10:38:47.211343+00:00",
+  "commanded_position_mm": [
+    188.0,
+    -13.0,
+    0.5
+  ],
+  "discarded_framebuffer_sequences": [
+    683
+  ],
+  "duplicate_index": null,
+  "frame": "01_t1_x188p000_z0p500",
+  "framebuffer_captured_at_utc": null,
+  "framebuffer_seq": 684,
+  "height": 1080,
+  "homed_axes": "xyz",
+  "job_id": "20260802T103757.906809Z-idex_nozzle_fine_xz_grid_t1",
+  "job_seq": 1,
+  "pass": null,
+  "schema": "vision-calibration-frame-sidecar",
+  "schema_version": 1,
+  "sha256": "sha256:b4183bb66b5b9d5cdc9857d522b3ea193f63d3f67eb2ca27863cd125138ce513",
+  "size_bytes": 387972,
+  "temperatures": {
+    "eddy_coil": {
+      "compensation_enabled": false,
+      "estimated_expansion": 0,
+      "in_calibration": false,
+      "measured_max_temp": 37.97,
+      "measured_min_temp": 37.8,
+      "temperature": 37.856400744815424
+    },
+    "eddy_mcu": {
+      "measured_max_temp": 41.85,
+      "measured_min_temp": 41.2,
+      "temperature": 41.61
+    },
+    "extruder": {
+      "can_extrude": false,
+      "motion_queue": null,
+      "power": 0.0,
+      "pressure_advance": 0.0,
+      "smooth_time": 0.04,
+      "target": 0.0,
+      "temperature": 23.7
+    },
+    "extruder1": {
+      "can_extrude": false,
+      "motion_queue": null,
+      "power": 0.0,
+      "pressure_advance": 0.0,
+      "smooth_time": 0.04,
+      "target": 0.0,
+      "temperature": 24.35
+    },
+    "heater_bed": {
+      "power": 0.0,
+      "target": 0.0,
+      "temperature": 25.42
+    }
+  },
+  "width": 1920,
+  "x_mm": 188.0,
+  "y_offset_mm": null
+}
