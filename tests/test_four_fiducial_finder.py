@@ -1089,7 +1089,6 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
                 four_fiducials["radii_px"],
             )
         ):
-            # _logger.info(f"Drawing fiducial {i} at {center} with radius {radius}")
             cv2.circle(
                 overlay,
                 tuple(np.rint(center).astype(int)),

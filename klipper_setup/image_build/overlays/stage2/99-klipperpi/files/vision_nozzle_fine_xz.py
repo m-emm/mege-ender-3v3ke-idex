@@ -556,7 +556,7 @@ def _ring_candidates(image: np.ndarray, marker: np.ndarray) -> list[dict[str, An
     x1 = min(width, int(round(marker[0])) + radius)
     y1 = min(height, int(round(marker[1])) + radius)
     gray = _gray(image)
-    roi = gray  # _clahe(image)[y0:y1, x0:x1]
+    roi = gray[y0:y1, x0:x1]
     blurred = cv2.GaussianBlur(roi, (7, 7), 2.5)
     circles = cv2.HoughCircles(
         blurred,
@@ -1656,7 +1656,6 @@ def analyze(
                 four_fiducial_registration["four_fiducials"]["radii_px"],
             )
         ):
-            _logger.info(f"Drawing fiducial {i} at {center} with radius {radius}")
             cv2.circle(
                 panel,
                 tuple(np.rint(center).astype(int)),
