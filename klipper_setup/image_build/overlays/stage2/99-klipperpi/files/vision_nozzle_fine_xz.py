@@ -661,9 +661,7 @@ def analyze(
     if len(tools) != 1 or tools - {"T0", "T1"}:
         raise FineNozzleError("fine-grid analysis requires exactly one tool")
     target_tool = tools.pop()
-    acquisition_xy_endstop_line = _acquisition_xy_endstop_line(
-        acquisition_calibration
-    )
+    acquisition_xy_endstop_line = _acquisition_xy_endstop_line(acquisition_calibration)
 
     marker_centers = []
     marker_records = []
@@ -1243,7 +1241,12 @@ def analyze(
             display_y_mm - tip_from_fiducial_y_mm,
         ]
 
-        second_line = f"fiducials seen at: X={fiducials_seen_at[0]:.3f} Y={fiducials_seen_at[1]:.3f} "
+        tool_head_datum = [
+            display_x_mm - tip_from_fiducial_x_mm,
+            display_y_mm + tip_from_fiducial_y_mm,
+        ]
+
+        second_line = f"fiducials seen at: X={fiducials_seen_at[0]:.3f} Y={fiducials_seen_at[1]:.3f} tool head datum: X={tool_head_datum[0]:.3f} Y={tool_head_datum[1]:.3f}"
         lines = [top_line_text, second_line, acquisition_xy_endstop_line]
         _logger.info(
             "Info for frame %s: %s",
