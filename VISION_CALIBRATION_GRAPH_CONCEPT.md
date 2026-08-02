@@ -113,11 +113,10 @@ The intended end-to-end graph is:
 ```mermaid
 flowchart TD
     P[User prior: bed-tab corner XYZ] --> C[Bed-tab corner reference]
-    Q[Installed 8 x 8 mm bed fiducial reference] --> L[Bed fiducial lighting sweep]
+    Q[Installed 8 x 8 mm bed fiducial reference] --> Y[Bed fiducial Y/metric sweep]
     ZP[User-known fiducial plane printer Z = -0.6 mm] --> C
     ZP --> F
-    G[Other machine geometry seed facts] --> L
-    L --> Y[Bed fiducial Y/metric sweep]
+    G[Other machine geometry seed facts] --> Y
     Q --> Y
     Y --> C[Bed-tab corner reference]
     C --> R[Coarse T0/T1 red-marker X sweeps]
@@ -157,7 +156,7 @@ Seed facts use the same provenance and invalidation rules as image-derived
 facts. Changing the user-defined bed-tab corner coordinates or a CAD geometry
 fact therefore invalidates every downstream fact that used the old fact ID.
 Removing, replacing, or repositioning the glued fiducial patch publishes a new
-installation fact and similarly invalidates its lighting, bed metric, corner,
+installation fact and similarly invalidates its bed metric, corner,
 and all downstream calibration facts.
 
 ## Calibration Stages
@@ -208,67 +207,7 @@ The independent installed-pattern seed fact is:
 The patch's pixel position, rotation, and relation to printer axes are
 deliberately not configuration. They are observed on every applicable run.
 
-### 1. Bed-fiducial lighting and Y/metric scale
-
-#### 1a. Bed-fiducial lighting
-
-Job type:
-
-```text
-nozzle_cam_bed_fiducial_lighting_sweep
-```
-
-Dependencies:
-
-- current `bed.fiducial_patch.physical_reference`
-- camera identity and available fixed camera controls
-- configured bed-reference viewing pose and available light pixels
-
-The current live view shows all four rings, but the left side of the black
-patch has strong glare. The first calibration acquisition therefore performs a
-compact lighting sweep before measuring geometry:
-
-1. capture a short manual-exposure bracket with the lights off
-2. test each configured light pixel independently at low intensity
-3. test a bounded set of the best asymmetric light combinations
-4. refine exposure and intensity around the best candidates
-5. capture at least three duplicates of the winner
-
-The adaptive sweep is capped at 24 committed frames. It stops testing settings
-that clip a marker or fail to expose all four rings.
-
-Auto exposure may be used only to find a coarse starting point. Every accepted
-image uses fixed manual exposure, gain, white balance, and exact per-pixel
-light values. The sweep is coordinate-free: it detects candidate
-concentric-circle groups over the image and does not contain a configured
-fiducial pixel or ROI.
-
-Candidates are scored by the worst of the four markers, not merely by their
-mean. The score favors:
-
-- visible outer and inner rings for all four fiducials
-- radial symmetry and a stable common center
-- white-ring contrast against the black patch
-- low clipped-pixel fraction and low veiling glare
-- consistent center and template registration across duplicates
-- sufficient nearby tab-edge contrast for the following corner job
-
-Produced fact:
-
-- `camera.nozzle_cam.bed_fiducial.lighting_profile`
-
-The fact has role `acquisition_profile`, not `coordinate_system`, and stores
-only fixed camera and light settings. Candidate scores, detected ROIs, clipped
-fractions, and duplicate measurements remain diagnostics. Replacing this fact
-invalidates the bed-fiducial metric and every downstream consumer, because
-those analyses bind to the exact illumination under which their images were
-acquired.
-
-The job page makes the winner inspectable with a settings contact sheet, score
-table or heatmap, clipped-pixel masks, and full-frame overlays showing all four
-detected ring centers and their tight ROIs.
-
-#### 1b. Bed-fiducial Y/metric sweep
+### 1. Bed-fiducial Y/metric scale
 
 Job type:
 
@@ -278,7 +217,7 @@ nozzle_cam_bed_fiducial_y_metric
 
 Acquisition:
 
-- use the accepted fixed bed-fiducial lighting profile
+- use the standard fixed nozzle-camera profile and lighting
 - move commanded Y back and forth by known distances
 - capture all four bed-attached fiducials at each position
 - include reversals so backlash or direction-dependent registration can be
@@ -313,7 +252,7 @@ Produced fact:
   - the signed two-dimensional image displacement per printer +Y millimetre
   - the local patch-mm-to-image-pixel homography at the reference capture
   - the unresolved pair of possible printer-X image directions
-  - exact bindings to the installed physical reference and lighting profile
+  - an exact binding to the installed physical reference
   - enough patch-coordinate information to reconstruct the signed
     patch-to-printer basis after Stage 3 resolves printer +X
   - the image-space printer-X vector at the physical center of the four
@@ -590,7 +529,7 @@ idex_nozzle_fine_xz_grid_t1
 
 Dependencies:
 
-- bed-fiducial local metric and lighting facts
+- bed-fiducial local metric fact
 - bed-tab corner and bed reference-plane facts
 - red-marker X-axis and per-tool marker-offset facts
 - active and verified rough-X calibration snapshot
@@ -1382,7 +1321,7 @@ facts:
 The fact defines geometry and physical identity, not image location. Removing,
 re-gluing, rotating, or replacing the patch requires a new installation
 revision even when the printed artwork is unchanged. The new fact then makes
-the lighting profile, bed metric, and all downstream consumers stale.
+the bed metric and all downstream consumers stale.
 
 The direct printer-Z fact records the known fiducial plane at `-0.6 mm`. The
 corresponding +0.6 mm displacement from the fiducial plane to the print plane
@@ -1417,7 +1356,7 @@ requires:
 produces:
   - camera.nozzle_cam.nozzle_tip.t0_projection_model
 safety:
-  required_homed_axes: xyz
+  homes_axes_before_motion: xyz
   require_idle: true
   require_heaters_off: true
   minimum_commanded_z_mm: 1.0
@@ -1559,7 +1498,6 @@ rebuildable index:
   "heads": {
     "bed.fiducial_patch.physical_reference": "sha256:...",
     "bed.fiducial_patch.printer_z_mm": "sha256:...",
-    "camera.nozzle_cam.bed_fiducial.lighting_profile": "sha256:...",
     "camera.nozzle_cam.bed_fiducial.local_metric_model": "sha256:...",
     "bed.tab_corner.printer_xyz": "sha256:...",
     "camera.nozzle_cam.bed_fiducial.printer_xy_mapping": "sha256:...",
@@ -1733,7 +1671,6 @@ No page should silently apply calibration because analysis completed.
   X/Y values and define Z as `0 mm`
 - publish the installed four-marker physical-reference fact from the checked
   SVG/PDF geometry and installation revision
-- implement the compact coordinate-free bed-fiducial lighting sweep
 - implement the six-frame bed-fiducial Y/metric sweep
 - recover the local patch homography, signed printer-Y vector, both in-plane
   scale vectors, their first-order capture-Y dependence, and unresolved
@@ -1742,7 +1679,7 @@ No page should silently apply calibration because analysis completed.
 - bind the observed corner pixel and patch-relative transform to the exact
   user-prior and metric fact IDs
 - publish the user-known `bed.fiducial_patch.printer_z_mm = -0.6` seed fact
-- expose lighting, metric, and corner stages and their dependency state in
+- expose metric and corner stages and their dependency state in
   `/vision/`
 
 ### 4. Implement and activate rough X
@@ -1829,10 +1766,6 @@ Job tests:
 - generated frame order and G-code match each declared sweep
 - no frame is commanded below the job safety minimum
 - tool changes occur only at safe travel Z
-- the lighting sweep finds a low-glare fixed profile without a configured
-  fiducial pixel or ROI
-- lighting selection requires all four rings and scores the worst marker rather
-  than accepting three good markers and one clipped marker
 - four identical concentric-circle markers are grouped as an 8 x 8 mm square
   under translation, rotation, perspective, and image-size changes
 - the bed metric recovers a known local homography and signed Y vector from the
@@ -1893,10 +1826,8 @@ Provenance tests:
 
 - changing camera identity, image size, profile, CAD geometry hash, or active
   config fingerprint prevents accidental fact reuse
-- replacing or repositioning the installed fiducial patch makes its lighting,
-  bed metric, corner, and every downstream consumer stale
-- replacing the accepted bed-fiducial lighting profile invalidates the metric
-  and its consumers but does not mutate historical images
+- replacing or repositioning the installed fiducial patch makes its bed metric,
+  corner, and every downstream consumer stale
 - re-analysis preserves original manifest and input bindings
 - candidate YAML records exact old/new values and source fact IDs
 - activation records the generated live configuration fingerprint
@@ -1926,8 +1857,8 @@ UI tests:
   four 3 mm concentric-circle fiducials on an 8 x 8 mm center grid.
 - The patch's printed geometry is configuration; its glued pixel position and
   rotation are always observed and never hardcoded.
-- Bed-fiducial lighting is calibrated before the Y/metric sweep, uses fixed
-  manual controls, and is independent of Eddy-fiducial lighting.
+- Bed-fiducial metric acquisition uses the standard fixed nozzle-camera profile
+  and lighting; Eddy-fiducial lighting remains independent.
 - The fiducial square and commanded Y sweep establish the absolute local
   bed-plane metric and printer +Y direction. The later red-marker sweep resolves
   printer +X sign.

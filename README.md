@@ -97,7 +97,6 @@ Rebuild the catalog and UI with:
 Run the first live bed-fiducial stages with:
 
 ```bash
-/usr/local/bin/vision_calibration.py run nozzle_cam_bed_fiducial_lighting_sweep --name bed_fiducial_lighting
 /usr/local/bin/vision_calibration.py run nozzle_cam_bed_fiducial_y_metric --name bed_fiducial_metric
 ```
 

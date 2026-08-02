@@ -428,6 +428,7 @@ require_file "${FILES_DIR}/vision_capture.py"
 require_file "${FILES_DIR}/vision_calibration.py"
 require_file "${FILES_DIR}/vision_calibration_graph.py"
 require_file "${FILES_DIR}/vision_bed_fiducial.py"
+require_file "${FILES_DIR}/vision_four_fiducials.py"
 require_file "${FILES_DIR}/vision_eddy_fiducial_xz.py"
 require_file "${FILES_DIR}/eddy_sift_body_template.png"
 require_file "${FILES_DIR}/vision_fine_tool_calibration.py"
@@ -457,6 +458,7 @@ install -m 0755 "${FILES_DIR}/vision_capture.py" /usr/local/bin/vision_capture.p
 install -m 0755 "${FILES_DIR}/vision_calibration.py" /usr/local/bin/vision_calibration.py
 install -m 0644 "${FILES_DIR}/vision_calibration_graph.py" /usr/local/bin/vision_calibration_graph.py
 install -m 0644 "${FILES_DIR}/vision_bed_fiducial.py" /usr/local/bin/vision_bed_fiducial.py
+install -m 0644 "${FILES_DIR}/vision_four_fiducials.py" /usr/local/bin/vision_four_fiducials.py
 install -m 0644 "${FILES_DIR}/vision_eddy_fiducial_xz.py" /usr/local/bin/vision_eddy_fiducial_xz.py
 install -m 0644 "${FILES_DIR}/vision_fine_tool_calibration.py" /usr/local/bin/vision_fine_tool_calibration.py
 install -m 0644 "${FILES_DIR}/vision_nozzle_fine_xz.py" /usr/local/bin/vision_nozzle_fine_xz.py

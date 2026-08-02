@@ -41,8 +41,6 @@ PROFILE_REMOTE_METHOD = os.environ.get(
 PROFILE_REMOTE_ACTION = os.environ.get(
     "VISION_PROFILE_REMOTE_ACTION", "run_nozzle_cam_profile"
 )
-LIGHTING_CALIBRATION_REMOTE_METHOD = "idex_bed_fiducial_lighting_calibrate"
-LIGHTING_CALIBRATION_REMOTE_ACTION = "run_idex_bed_fiducial_lighting_calibrate"
 METRIC_CALIBRATION_REMOTE_METHOD = "idex_bed_fiducial_metric_calibrate"
 METRIC_CALIBRATION_REMOTE_ACTION = "run_idex_bed_fiducial_metric_calibrate"
 CORNER_CALIBRATION_REMOTE_METHOD = "idex_bed_tab_corner_calibrate"
@@ -427,7 +425,6 @@ class VisionJobApi:
         if manifest.get("schema_version") != 1:
             raise CaptureError("unsupported acquisition manifest schema_version")
         if manifest.get("job_type") not in (
-            "nozzle_cam_bed_fiducial_lighting_sweep",
             "nozzle_cam_bed_fiducial_y_metric",
             "nozzle_cam_bed_tab_corner",
             "idex_tool_red_marker_x_sweep",
@@ -476,23 +473,49 @@ class VisionJobApi:
         except Exception:
             return ""
 
-    def _acquire_lock(self, job_id: str) -> None:
+    def _acquire_lock(self, job_id: str) -> str | None:
         self.job_root.mkdir(parents=True, exist_ok=True)
-        try:
-            with self.lock_path.open("x", encoding="utf-8") as handle:
-                handle.write(
-                    json.dumps(
+        displaced_job = self._active_job()
+        if self.lock_path.exists():
+            if displaced_job and displaced_job != job_id:
+                try:
+                    state = self._load_state(displaced_job)
+                    previous_state = state.get("state")
+                    if previous_state == "acquiring":
+                        state.update(
+                            {
+                                "state": "failed",
+                                "failure": (
+                                    f"acquisition lock replaced by job {job_id}"
+                                ),
+                                "failed_at_utc": datetime.now(timezone.utc).isoformat(),
+                                "superseded_by_job": job_id,
+                            }
+                        )
+                        self._write_state(displaced_job, state)
+                    self._append_event(
+                        displaced_job,
+                        "acquisition_lock_replaced",
                         {
-                            "job": job_id,
-                            "created_at_utc": datetime.now(timezone.utc).isoformat(),
-                        }
+                            "state": state.get("state"),
+                            "previous_state": previous_state,
+                            "superseded_by_job": job_id,
+                        },
                     )
-                    + "\n"
+                except Exception as exc:
+                    log(f"Could not update displaced job {displaced_job}: {exc}")
+            self.lock_path.unlink(missing_ok=True)
+        with self.lock_path.open("x", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "job": job_id,
+                        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+                    }
                 )
-        except FileExistsError:
-            raise CaptureError(
-                f"another calibration job is active: {self._active_job()}"
-            ) from None
+                + "\n"
+            )
+        return displaced_job if displaced_job != job_id else None
 
     def _release_lock(self, job_id: str) -> None:
         active = self._active_job()
@@ -542,7 +565,7 @@ class VisionJobApi:
         committed = list(self._frames_dir(job_id).glob("*.jpg"))
         if committed:
             raise CaptureError("prepared job already contains committed frames")
-        self._acquire_lock(job_id)
+        displaced_job = self._acquire_lock(job_id)
         state.update(
             {
                 "state": "acquiring",
@@ -552,8 +575,16 @@ class VisionJobApi:
             }
         )
         self._write_state(job_id, state)
-        self._append_event(job_id, "acquiring", {"state": "acquiring"})
-        return {"job": job_id, "state": "acquiring"}
+        self._append_event(
+            job_id,
+            "acquiring",
+            {"state": "acquiring", "displaced_job": displaced_job},
+        )
+        return {
+            "job": job_id,
+            "state": "acquiring",
+            "displaced_job": displaced_job,
+        }
 
     def profile(self, params: dict[str, Any]) -> dict[str, Any]:
         camera = sanitize_name(params.get("camera"))
@@ -769,32 +800,6 @@ class KlippyRemoteDaemon:
                     profile = sanitize_profile(params.get("profile") or DEFAULT_PROFILE)
                     request_framebuffer_profile(profile)
                     wait_for_active_profile(profile, VISIOND_TIMEOUT)
-                elif action == LIGHTING_CALIBRATION_REMOTE_ACTION:
-                    command = [
-                        CALIBRATION_BIN,
-                        "run",
-                        "nozzle_cam_bed_fiducial_lighting_sweep",
-                        "--name",
-                        sanitize_name(params.get("name", "bed_fiducial_lighting")),
-                    ]
-                    fingerprint = str(params.get("active_config_fingerprint") or "")
-                    if fingerprint:
-                        command.extend(["--expected-fingerprint", fingerprint])
-                    result = subprocess.run(
-                        command,
-                        check=False,
-                        text=True,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        timeout=300,
-                    )
-                    if result.stdout.strip():
-                        log(result.stdout.strip())
-                    if result.returncode:
-                        raise CaptureError(
-                            result.stderr.strip()
-                            or "bed-fiducial lighting calibration job failed"
-                        )
                 elif action == METRIC_CALIBRATION_REMOTE_ACTION:
                     command = [
                         CALIBRATION_BIN,
@@ -989,11 +994,6 @@ class KlippyRemoteDaemon:
         if REGISTER_CALIBRATION:
             self._register_method(
                 sock,
-                LIGHTING_CALIBRATION_REMOTE_METHOD,
-                LIGHTING_CALIBRATION_REMOTE_ACTION,
-            )
-            self._register_method(
-                sock,
                 METRIC_CALIBRATION_REMOTE_METHOD,
                 METRIC_CALIBRATION_REMOTE_ACTION,
             )
@@ -1032,7 +1032,6 @@ class KlippyRemoteDaemon:
         action = message.get("action")
         valid = {REMOTE_ACTION, PROFILE_REMOTE_ACTION}
         if REGISTER_CALIBRATION:
-            valid.add(LIGHTING_CALIBRATION_REMOTE_ACTION)
             valid.add(METRIC_CALIBRATION_REMOTE_ACTION)
             valid.add(CORNER_CALIBRATION_REMOTE_ACTION)
             valid.add(RED_MARKER_CALIBRATION_REMOTE_ACTION)

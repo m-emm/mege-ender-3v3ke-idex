@@ -184,38 +184,14 @@ gcode:
         VISION_LIGHT_OFF
     {% endif %}
 
-[gcode_macro IDEX_BED_FIDUCIAL_LIGHTING_CALIBRATE]
-description: Select fixed low-glare lighting for the four bed fiducials.
-gcode:
-    {% set name = params.NAME|default("bed_fiducial_lighting") %}
-    {% set print_state = printer.print_stats.state %}
-    {% set homed = printer.toolhead.homed_axes %}
-    {% set fingerprint = printer["gcode_macro _IDEX_CONFIG_FINGERPRINT"].source_sha256 %}
-    {% if print_state not in ["standby", "complete"] %}
-        { action_raise_error("IDEX_BED_FIDUCIAL_LIGHTING_CALIBRATE requires an idle printer; print_stats.state=" ~ print_state) }
-    {% endif %}
-    {% if "x" not in homed or "y" not in homed or "z" not in homed %}
-        { action_raise_error("IDEX_BED_FIDUCIAL_LIGHTING_CALIBRATE requires X/Y/Z homed; it never homes automatically.") }
-    {% endif %}
-    RESPOND TYPE=echo MSG="Bed-fiducial lighting sweep queued: NAME={name}. Watch /vision/ for progress."
-    {action_call_remote_method(
-        "idex_bed_fiducial_lighting_calibrate",
-        name=name,
-        active_config_fingerprint=fingerprint
-    )}
-
 [gcode_macro IDEX_BED_FIDUCIAL_METRIC_CALIBRATE]
 description: Measure the four-fiducial bed metric and printer-Y image vector.
 gcode:
     {% set name = params.NAME|default("bed_fiducial_metric") %}
     {% set print_state = printer.print_stats.state %}
-    {% set homed = printer.toolhead.homed_axes %}
     {% set fingerprint = printer["gcode_macro _IDEX_CONFIG_FINGERPRINT"].source_sha256 %}
     {% if print_state not in ["standby", "complete"] %}
         { action_raise_error("IDEX_BED_FIDUCIAL_METRIC_CALIBRATE requires an idle printer; print_stats.state=" ~ print_state) }
-    {% endif %}
-    {% if "x" not in homed or "y" not in homed or "z" not in homed %}
-        { action_raise_error("IDEX_BED_FIDUCIAL_METRIC_CALIBRATE requires X/Y/Z homed; it never homes automatically.") }
     {% endif %}
     RESPOND TYPE=echo MSG="Bed-fiducial metric calibration queued: NAME={name}. Watch /vision/ for progress."
     {action_call_remote_method(
@@ -229,13 +205,9 @@ description: Acquire and analyze the dependency-bound nozzle-camera bed-tab corn
 gcode:
     {% set name = params.NAME|default("bed_tab_corner") %}
     {% set print_state = printer.print_stats.state %}
-    {% set homed = printer.toolhead.homed_axes %}
     {% set fingerprint = printer["gcode_macro _IDEX_CONFIG_FINGERPRINT"].source_sha256 %}
     {% if print_state not in ["standby", "complete"] %}
         { action_raise_error("IDEX_BED_TAB_CORNER_CALIBRATE requires an idle printer; print_stats.state=" ~ print_state) }
-    {% endif %}
-    {% if "x" not in homed or "y" not in homed or "z" not in homed %}
-        { action_raise_error("IDEX_BED_TAB_CORNER_CALIBRATE requires X/Y/Z homed; it never homes automatically.") }
     {% endif %}
     RESPOND TYPE=echo MSG="Bed-tab corner calibration queued: NAME={name}. Watch /vision/ for progress."
     {action_call_remote_method(
@@ -249,13 +221,9 @@ description: Acquire, analyze, and publish the coarse T0/T1 red-marker X facts.
 gcode:
     {% set name = params.NAME|default("red_marker_x_sweep") %}
     {% set print_state = printer.print_stats.state %}
-    {% set homed = printer.toolhead.homed_axes %}
     {% set fingerprint = printer["gcode_macro _IDEX_CONFIG_FINGERPRINT"].source_sha256 %}
     {% if print_state not in ["standby", "complete"] %}
         { action_raise_error("IDEX_RED_MARKER_X_SWEEP_CALIBRATE requires an idle printer; print_stats.state=" ~ print_state) }
-    {% endif %}
-    {% if "x" not in homed or "y" not in homed or "z" not in homed %}
-        { action_raise_error("IDEX_RED_MARKER_X_SWEEP_CALIBRATE requires X/Y/Z homed; it never homes automatically.") }
     {% endif %}
     RESPOND TYPE=echo MSG="Coarse T0/T1 red-marker X sweep queued: NAME={name}. Watch /vision/ for live progress and published facts."
     {action_call_remote_method(
@@ -269,13 +237,9 @@ description: Verify both calibrated red markers at X=bed-tab-X+10 mm.
 gcode:
     {% set name = params.NAME|default("rough_x_verify") %}
     {% set print_state = printer.print_stats.state %}
-    {% set homed = printer.toolhead.homed_axes %}
     {% set fingerprint = printer["gcode_macro _IDEX_CONFIG_FINGERPRINT"].source_sha256 %}
     {% if print_state not in ["standby", "complete"] %}
         { action_raise_error("IDEX_ROUGH_X_VERIFY requires an idle printer; print_stats.state=" ~ print_state) }
-    {% endif %}
-    {% if "x" not in homed or "y" not in homed or "z" not in homed %}
-        { action_raise_error("IDEX_ROUGH_X_VERIFY requires X/Y/Z homed; it never homes automatically.") }
     {% endif %}
     RESPOND TYPE=echo MSG="Rough T0/T1 X verification queued at bed-tab X+10 mm. Watch /vision/ for both frames and residuals."
     {action_call_remote_method(
@@ -289,13 +253,9 @@ description: Acquire Eddy fiducial image positions over a 4x4 commanded X/Z grid
 gcode:
     {% set name = params.NAME|default("eddy_fiducial_xz") %}
     {% set print_state = printer.print_stats.state %}
-    {% set homed = printer.toolhead.homed_axes %}
     {% set fingerprint = printer["gcode_macro _IDEX_CONFIG_FINGERPRINT"].source_sha256 %}
     {% if print_state not in ["standby", "complete"] %}
         { action_raise_error("IDEX_EDDY_FIDUCIAL_XZ_ACQUIRE requires an idle printer; print_stats.state=" ~ print_state) }
-    {% endif %}
-    {% if "x" not in homed or "y" not in homed or "z" not in homed %}
-        { action_raise_error("IDEX_EDDY_FIDUCIAL_XZ_ACQUIRE requires X/Y/Z homed; it never homes automatically.") }
     {% endif %}
     RESPOND TYPE=echo MSG="Eddy fiducial X/Z acquisition queued: NAME={name}. Watch /vision/ for raw image positions."
     {action_call_remote_method(
@@ -309,13 +269,9 @@ description: Acquire and analyze the 28-frame T0 nozzle-tip X/Z grid over Z=1..9
 gcode:
     {% set name = params.NAME|default("fine_nozzle_xz_t0") %}
     {% set print_state = printer.print_stats.state %}
-    {% set homed = printer.toolhead.homed_axes %}
     {% set fingerprint = printer["gcode_macro _IDEX_CONFIG_FINGERPRINT"].source_sha256 %}
     {% if print_state not in ["standby", "complete"] %}
         { action_raise_error("IDEX_NOZZLE_FINE_XZ_CALIBRATE_T0 requires an idle printer; print_stats.state=" ~ print_state) }
-    {% endif %}
-    {% if "x" not in homed or "y" not in homed or "z" not in homed %}
-        { action_raise_error("IDEX_NOZZLE_FINE_XZ_CALIBRATE_T0 requires X/Y/Z homed; it never homes automatically.") }
     {% endif %}
     RESPOND TYPE=echo MSG="Fine T0 nozzle X/Z grid queued: NAME={name}. Watch /vision/ for progress."
     {action_call_remote_method(
@@ -329,13 +285,9 @@ description: Acquire and analyze the 28-frame T1 nozzle-tip X/Z grid over Z=1..9
 gcode:
     {% set name = params.NAME|default("fine_nozzle_xz_t1") %}
     {% set print_state = printer.print_stats.state %}
-    {% set homed = printer.toolhead.homed_axes %}
     {% set fingerprint = printer["gcode_macro _IDEX_CONFIG_FINGERPRINT"].source_sha256 %}
     {% if print_state not in ["standby", "complete"] %}
         { action_raise_error("IDEX_NOZZLE_FINE_XZ_CALIBRATE_T1 requires an idle printer; print_stats.state=" ~ print_state) }
-    {% endif %}
-    {% if "x" not in homed or "y" not in homed or "z" not in homed %}
-        { action_raise_error("IDEX_NOZZLE_FINE_XZ_CALIBRATE_T1 requires X/Y/Z homed; it never homes automatically.") }
     {% endif %}
     RESPOND TYPE=echo MSG="Fine T1 nozzle X/Z grid queued: NAME={name}. Watch /vision/ for progress."
     {action_call_remote_method(

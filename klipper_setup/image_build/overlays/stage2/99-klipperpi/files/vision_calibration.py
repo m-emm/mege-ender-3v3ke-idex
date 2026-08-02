@@ -22,7 +22,7 @@ from typing import Any
 import cv2
 import numpy as np
 import yaml
-from vision_bed_fiducial import analyze_corner, analyze_lighting, analyze_metric
+from vision_bed_fiducial import analyze_corner, analyze_metric
 from vision_calibration_graph import (
     ANALYSIS_SCHEMA,
     FACT_SET_SCHEMA,
@@ -100,7 +100,6 @@ FRAMEBUFFER_DIR = Path(
 )
 MOONRAKER_URL = os.environ.get("VISION_MOONRAKER_URL", "http://127.0.0.1")
 
-BED_FIDUCIAL_LIGHTING_JOB = "nozzle_cam_bed_fiducial_lighting_sweep"
 BED_FIDUCIAL_METRIC_JOB = "nozzle_cam_bed_fiducial_y_metric"
 BED_TAB_CORNER_JOB = "nozzle_cam_bed_tab_corner"
 RED_MARKER_X_JOB = "idex_tool_red_marker_x_sweep"
@@ -115,7 +114,6 @@ FINE_NOZZLE_XZ_JOBS = {
     FINE_NOZZLE_XZ_T1_JOB,
 }
 JOB_TYPES = (
-    BED_FIDUCIAL_LIGHTING_JOB,
     BED_FIDUCIAL_METRIC_JOB,
     BED_TAB_CORNER_JOB,
     RED_MARKER_X_JOB,
@@ -381,11 +379,6 @@ def _preflight(
         raise VisionCalibrationError(f"printer is not idle: {print_state}")
     if bool(status.get("virtual_sdcard", {}).get("is_active")):
         raise VisionCalibrationError("virtual-SD print is active")
-    homed = str(status.get("toolhead", {}).get("homed_axes", ""))
-    if not all(axis in homed for axis in "xyz") and not _is_compute_only_job_type(
-        job_type
-    ):
-        raise VisionCalibrationError("XYZ must be homed; jobs never home automatically")
     settings = status.get("configfile", {}).get("settings")
     if not isinstance(settings, dict):
         raise VisionCalibrationError("active Klipper settings are unavailable")
@@ -503,10 +496,16 @@ def _preflight(
     }
 
 
+def _log_catalog_warnings(catalog: dict[str, Any]) -> None:
+    for warning in catalog.get("warnings", []):
+        _logger.warning("catalog: %s", warning["message"])
+
+
 def _resolve_current_fact(
     requirement: str, fact_name: str, definition_version: int
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     catalog = rebuild_catalog(CALIBRATION_ROOT)
+    _log_catalog_warnings(catalog)
     head = catalog.get("heads", {}).get(fact_name)
     if not isinstance(head, dict):
         raise VisionCalibrationError(f"missing current fact {fact_name}")
@@ -593,6 +592,7 @@ def _gcode(
     feedrate = float(definition.get("velocity_mm_s", 60.0)) * 60.0
     lines = [
         f"; vision calibration job {job_id}",
+        "G28",
         "G90",
         (
             f"VISION_JOB_BEGIN JOB={job_id} "
@@ -601,28 +601,7 @@ def _gcode(
     ]
     job_type = manifest["job_type"]
     frames = manifest["frames"]
-    if job_type == BED_FIDUCIAL_LIGHTING_JOB:
-        lines.extend(
-            [
-                "T0",
-                f"G1 Z{pose['z_mm']:.6f} F{feedrate:.3f}",
-                (
-                    f"G1 X{pose['x_mm']:.6f} Y{pose['y_base_mm']:.6f} "
-                    f"F{feedrate:.3f}"
-                ),
-            ]
-        )
-        for frame in frames:
-            lines.append(f"VISION_PROFILE CAMERA=nozzle_cam PROFILE={frame['profile']}")
-            lines.extend(_light_lines(frame["light_pixels"]))
-            lines.extend(
-                [
-                    "M400",
-                    f"G4 P{int(definition['settle_ms'])}",
-                    _capture_line(job_id, frame, tool="T0"),
-                ]
-            )
-    elif job_type in {BED_FIDUCIAL_METRIC_JOB, BED_TAB_CORNER_JOB}:
+    if job_type in {BED_FIDUCIAL_METRIC_JOB, BED_TAB_CORNER_JOB}:
         profile = frames[0]["profile"]
         lines.extend(
             [
@@ -725,40 +704,6 @@ def _update_state(job_dir: Path, **values: Any) -> dict[str, Any]:
     state["updated_at_utc"] = utc_now()
     atomic_write_json(path, state)
     return state
-
-
-def _lighting_schedule(definition: dict[str, Any]) -> list[dict[str, Any]]:
-    zero = {str(index): 0.0 for index in range(1, 9)}
-    profiles = definition["exposure_profiles"]
-    frames = [
-        {"profile": profile, "light_pixels": dict(zero), "candidate": "lights_off"}
-        for profile in profiles
-    ]
-    for profile in profiles[1:3]:
-        for index in range(1, 9):
-            pixels = dict(zero)
-            pixels[str(index)] = float(definition["individual_light_intensity"])
-            frames.append(
-                {
-                    "profile": profile,
-                    "light_pixels": pixels,
-                    "candidate": f"pixel_{index}",
-                }
-            )
-    for indices in definition["combination_pixels"]:
-        pixels = dict(zero)
-        for index in indices:
-            pixels[str(index)] = float(definition["combination_light_intensity"])
-        frames.append(
-            {
-                "profile": profiles[1],
-                "light_pixels": pixels,
-                "candidate": "pixels_" + "_".join(str(item) for item in indices),
-            }
-        )
-    if len(frames) != 24:
-        raise VisionCalibrationError("lighting schedule must contain 24 frames")
-    return frames
 
 
 def _metric_x_axis_at_capture(
@@ -889,35 +834,16 @@ def prepare_job(
     if job_dir.exists():
         raise VisionCalibrationError(f"job already exists: {job_id}")
     frames = []
-    if job_type == BED_FIDUCIAL_LIGHTING_JOB:
-        for seq, item in enumerate(_lighting_schedule(definition)):
-            frames.append(
-                {
-                    "seq": seq,
-                    "frame": f"lighting_{seq:02d}_{item['candidate']}",
-                    "camera": "nozzle_cam",
-                    "profile": item["profile"],
-                    "tool": "T0",
-                    "light_pixels": item["light_pixels"],
-                    "candidate": item["candidate"],
-                    "commanded_position_mm": [
-                        pose["x_mm"],
-                        pose["y_base_mm"],
-                        pose["z_mm"],
-                    ],
-                }
-            )
-    elif job_type == BED_FIDUCIAL_METRIC_JOB:
-        lighting = input_values["lighting_profile"]
+    if job_type == BED_FIDUCIAL_METRIC_JOB:
         for seq, offset in enumerate(definition["y_offsets_mm"]):
             frames.append(
                 {
                     "seq": seq,
                     "frame": f"metric_y_{seq:02d}_{int(offset):02d}mm",
                     "camera": "nozzle_cam",
-                    "profile": lighting["profile"],
+                    "profile": definition["profile"],
                     "tool": "T0",
-                    "light_pixels": lighting["light_pixels"],
+                    "light_pixels": definition["light_pixels"],
                     "y_offset_mm": offset,
                     "pass": "forward" if seq < 3 else "reverse",
                     "commanded_position_mm": [
@@ -1324,13 +1250,7 @@ def _fact(
             {
                 "field": field,
                 "role": (
-                    "coordinate_system"
-                    if field in coordinate_fields
-                    else (
-                        "acquisition_profile"
-                        if role == "acquisition_profile"
-                        else "diagnostic"
-                    )
+                    "coordinate_system" if field in coordinate_fields else "diagnostic"
                 ),
             }
             for field in value
@@ -1367,19 +1287,10 @@ def analyze_job(job_id: str) -> dict[str, Any]:
     artifact_dir = staging / "artifacts"
     try:
         job_type = manifest["job_type"]
-        if job_type == BED_FIDUCIAL_LIGHTING_JOB:
-            details = analyze_lighting(
-                frame_paths, artifact_dir, frames=manifest["frames"]
-            )
-        elif job_type == BED_FIDUCIAL_METRIC_JOB:
+        if job_type == BED_FIDUCIAL_METRIC_JOB:
             physical = _resolve_current_fact(
                 "physical_reference",
                 "bed.fiducial_patch.physical_reference",
-                1,
-            )[1]["value"]
-            lighting = _resolve_current_fact(
-                "lighting_profile",
-                "camera.nozzle_cam.bed_fiducial.lighting_profile",
                 1,
             )[1]["value"]
             details = analyze_metric(
@@ -1387,9 +1298,6 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 artifact_dir,
                 frames=manifest["frames"],
                 patch_points_mm=physical["centers_patch_xy_mm"],
-                reference_centers_px=lighting["quality"]["winner_detection"][
-                    "centers_px"
-                ],
             )
         elif job_type == BED_TAB_CORNER_JOB:
             metric = _resolve_current_fact(
@@ -1494,30 +1402,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
         width = int(sidecars[0]["width"]) if sidecars else 0
         height = int(sidecars[0]["height"]) if sidecars else 0
         if details["accepted"]:
-            if job_type == BED_FIDUCIAL_LIGHTING_JOB:
-                value = {
-                    "profile": details["winner_profile"],
-                    "light_pixels": details["winner_light_pixels"],
-                    "camera": "nozzle_cam",
-                    "fixed_manual": True,
-                    "quality": {
-                        "winner_index": details["winner_index"],
-                        "winner_detection": details["winner_detection"],
-                    },
-                    "supporting_artifact_hashes": {
-                        key: item["sha256"]
-                        for key, item in details["artifacts"].items()
-                    },
-                }
-                facts = [
-                    _fact(
-                        "camera.nozzle_cam.bed_fiducial.lighting_profile",
-                        "acquisition_profile",
-                        value,
-                        dependencies,
-                    )
-                ]
-            elif job_type == BED_FIDUCIAL_METRIC_JOB:
+            if job_type == BED_FIDUCIAL_METRIC_JOB:
                 detection_records_keys = ["centers_px", "commanded_position_mm"]
 
                 value = {
@@ -2920,10 +2805,19 @@ def render_ui(catalog: dict[str, Any]) -> None:
                 f"<td>{html.escape('; '.join(result.get('reasons', [])) or 'none')}</td>"
                 "</tr>"
             )
+    warning_items = "".join(
+        f"<li>{html.escape(item['message'])}</li>"
+        for item in catalog.get("warnings", [])
+    )
     body = (
         "<h1>Vision calibration</h1>"
         "<p>Current graph: installed bed fiducials through fine T0/T1 nozzle X/Z.</p>"
-        "<h2>Current coordinate-system facts</h2>"
+        + (
+            "<h2>Catalog warnings</h2><ul>" + warning_items + "</ul>"
+            if warning_items
+            else ""
+        )
+        + "<h2>Current coordinate-system facts</h2>"
         + ("".join(current_cards) or "<p>None.</p>")
         + "<h2>Stage 5.1 calculations</h2>"
         + (
@@ -3057,6 +2951,7 @@ def render_ui(catalog: dict[str, Any]) -> None:
 
 def rebuild_and_render() -> dict[str, Any]:
     catalog = rebuild_catalog(CALIBRATION_ROOT)
+    _log_catalog_warnings(catalog)
     render_ui(catalog)
     return catalog
 

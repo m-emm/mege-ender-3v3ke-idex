@@ -17,7 +17,6 @@ Every job has three operations:
 The registry contains exactly:
 
 ```text
-nozzle_cam_bed_fiducial_lighting_sweep
 nozzle_cam_bed_fiducial_y_metric
 nozzle_cam_bed_tab_corner
 idex_tool_red_marker_x_sweep
@@ -55,7 +54,7 @@ selects current heads, and propagates staleness when a dependency is
 superseded.
 
 Facts and every top-level value item declare whether they define the printer
-coordinate system, select an acquisition profile, or are diagnostic. The
+coordinate system or are diagnostic. The
 dashboard shows only coordinate-system values; reports retain diagnostics and
 provenance. These contracts contain no uncertainty or covariance fields.
 
@@ -65,12 +64,11 @@ The chain begins with seed facts for the 8 mm square fiducial patch, its
 printer-Z plane at `-0.6 mm`, and the bed-tab corner at `[173, -18, 0] mm`.
 The live stages then:
 
-1. select fixed low-glare fiducial lighting;
-2. recover the fiducial plane metric and printer-Y image vector;
-3. locate the bed-tab corner relative to the observed patch;
-4. sweep both red markers and independently calculate each tool's rough X;
-5. record and verify the activated rough X at X=183;
-6. fit the fine T0/T1 nozzle X/Z projection grid and print-plane coordinates.
+1. recover the fiducial plane metric and printer-Y image vector under standard lighting;
+2. locate the bed-tab corner relative to the observed patch;
+3. sweep both red markers and independently calculate each tool's rough X;
+4. record and verify the activated rough X at X=183;
+5. fit the fine T0/T1 nozzle X/Z projection grid and print-plane coordinates.
 
 No configured pixel position or ROI identifies the fiducial patch. Detection is
 coordinate-free within the image, and subsequent tight regions are derived

@@ -2,59 +2,21 @@
   "schema": "vision-calibration-job-registry",
   "schema_version": 1,
   "job_types": {
-    "nozzle_cam_bed_fiducial_lighting_sweep": {
-      "definition_version": 1,
-      "fact_definition_version": 1,
-      "camera": "nozzle_cam",
-      "localizer": {
-        "kind": "four_concentric_circle_square",
-        "version": 1
-      },
-      "exposure_profiles": [
-        "bed_fid_exp_600",
-        "bed_fid_exp_900",
-        "bed_fid_exp_1200",
-        "bed_fid_exp_1800"
-      ],
-      "individual_light_intensity": 0.08,
-      "combination_light_intensity": 0.08,
-      "combination_pixels": [
-        [
-          2,
-          3
-        ],
-        [
-          2,
-          4
-        ],
-        [
-          3,
-          4
-        ],
-        [
-          2,
-          3,
-          4,
-          5
-        ]
-      ],
-      "settle_ms": 350,
-      "publish_on_accept": true,
-      "requires": [
-        {
-          "requirement": "physical_reference",
-          "fact_name": "bed.fiducial_patch.physical_reference",
-          "fact_definition_version": 1
-        }
-      ],
-      "fact_names": [
-        "camera.nozzle_cam.bed_fiducial.lighting_profile"
-      ]
-    },
     "nozzle_cam_bed_fiducial_y_metric": {
       "definition_version": 1,
       "fact_definition_version": 1,
       "camera": "nozzle_cam",
+      "profile": "vision",
+      "light_pixels": {
+        "1": 0.45,
+        "2": 0.45,
+        "3": 0.45,
+        "4": 0.45,
+        "5": 0.45,
+        "6": 0.45,
+        "7": 0.45,
+        "8": 0.45
+      },
       "localizer": {
         "kind": "four_concentric_circle_square_metric",
         "version": 1
@@ -74,11 +36,6 @@
         {
           "requirement": "physical_reference",
           "fact_name": "bed.fiducial_patch.physical_reference",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "lighting_profile",
-          "fact_name": "camera.nozzle_cam.bed_fiducial.lighting_profile",
           "fact_definition_version": 1
         }
       ],
@@ -406,7 +363,7 @@
         14.5,
         18
       ],
-      "capture_y_mm": -14,
+      "capture_y_mm": -13,
       "safe_tool_change_z_mm": 9,
       "velocity_mm_s": 110,
       "settle_ms": 300,

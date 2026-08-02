@@ -17,9 +17,10 @@ FACT_SET_SCHEMA = "vision-calibration-fact-set"
 ANALYSIS_SCHEMA = "vision-calibration-analysis"
 MANIFEST_SCHEMA = "vision-calibration-acquisition-manifest"
 REGISTRY_SCHEMA = "vision-calibration-job-registry"
-FACT_ROLES = {"coordinate_system", "diagnostic", "acquisition_profile"}
+ACTIVE_FACT_ROLES = {"coordinate_system", "diagnostic"}
+RETIRED_FACT_ROLES = {"acquisition_profile"}
+FACT_ROLES = ACTIVE_FACT_ROLES | RETIRED_FACT_ROLES
 JOB_TYPES = {
-    "nozzle_cam_bed_fiducial_lighting_sweep",
     "nozzle_cam_bed_fiducial_y_metric",
     "nozzle_cam_bed_tab_corner",
     "idex_tool_red_marker_x_sweep",
@@ -263,17 +264,7 @@ def validate_manifest(record: Any) -> dict[str, Any]:
         _string(frame.get("frame"), f"manifest.frames[{index}].frame")
     _validate_input_facts(record)
 
-    if job_type == "nozzle_cam_bed_fiducial_lighting_sweep":
-        if len(frames) != 24:
-            raise CalibrationGraphError("lighting sweep must contain 24 frames")
-        for frame in frames:
-            _string(frame.get("profile"), "lighting frame profile")
-            pixels = _mapping(frame.get("light_pixels"), "lighting frame pixels")
-            if set(pixels) != {str(index) for index in range(1, 9)}:
-                raise CalibrationGraphError(
-                    "lighting frame must define all eight light pixels"
-                )
-    elif job_type == "nozzle_cam_bed_fiducial_y_metric":
+    if job_type == "nozzle_cam_bed_fiducial_y_metric":
         if [frame.get("y_offset_mm") for frame in frames] != [
             0,
             10,
@@ -423,12 +414,6 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
             raise CalibrationGraphError(
                 "diagnostic fact cannot contain coordinate-system items"
             )
-        if role == "acquisition_profile" and any(
-            item == "coordinate_system" for item in declared.values()
-        ):
-            raise CalibrationGraphError(
-                "acquisition profile cannot contain coordinate-system items"
-            )
         dependencies = _list(fact.get("dependencies"), "fact.dependencies")
         for dependency_value in dependencies:
             dependency = _mapping(dependency_value, "fact dependency")
@@ -540,24 +525,48 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
     _detect_cycles(fact_sets)
     publications = []
     heads: dict[str, dict[str, Any]] = {}
+    publication_heads: dict[str, str] = {}
+    orphaned_publications: list[dict[str, Any]] = []
     for path in _publication_files(root / "publications"):
         publication = validate_publication(load_json(path))
-        if publication["fact_set_hash"] not in fact_sets:
-            raise CalibrationGraphError(
-                f"publication {path} references missing fact set"
-            )
-        fact_set_path, fact_set = fact_sets[publication["fact_set_hash"]]
-        names = [fact["name"] for fact in fact_set["facts"]]
-        if publication["facts"] != names:
-            raise CalibrationGraphError("publication fact list mismatch")
+        names = publication["facts"]
         supersedes = publication.get("supersedes") or {}
         for name in names:
-            previous = heads.get(name, {}).get("fact_set_hash")
+            previous = publication_heads.get(name)
             if supersedes.get(name) != previous:
                 raise CalibrationGraphError(
                     f"publication conflict for {name}: expected "
                     f"{supersedes.get(name)!r}, current {previous!r}"
                 )
+            publication_heads[name] = publication["fact_set_hash"]
+        publications.append(publication)
+        if publication["fact_set_hash"] not in fact_sets:
+            fallback_heads = {
+                name: heads.get(name, {}).get("fact_set_hash") for name in names
+            }
+            orphaned_publications.append(
+                {
+                    "code": "publication_missing_fact_set",
+                    "publication_id": publication["publication_id"],
+                    "publication_path": str(path.relative_to(root)),
+                    "job_id": publication.get("job_id"),
+                    "fact_set_hash": publication["fact_set_hash"],
+                    "facts": names,
+                    "fallback_heads": fallback_heads,
+                    "message": (
+                        f"Ignored publication {publication['publication_id']} from "
+                        f"deleted job {publication.get('job_id')}: fact set "
+                        f"{publication['fact_set_hash']} is missing for {names}; "
+                        f"using previous available heads {fallback_heads}."
+                    ),
+                }
+            )
+            continue
+        fact_set_path, fact_set = fact_sets[publication["fact_set_hash"]]
+        fact_names = [fact["name"] for fact in fact_set["facts"]]
+        if names != fact_names:
+            raise CalibrationGraphError("publication fact list mismatch")
+        for name in names:
             heads[name] = {
                 "fact_set_hash": fact_set["fact_set_hash"],
                 "job_id": fact_set["job_id"],
@@ -576,7 +585,6 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
                     )
                 ),
             }
-        publications.append(publication)
 
     stale: dict[str, list[str]] = {}
     changed = True
@@ -645,7 +653,9 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
         "schema_version": SCHEMA_VERSION,
         "generated_at_utc": utc_now(),
         "heads": heads,
+        "publication_heads": publication_heads,
         "stale_fact_sets": stale,
+        "warnings": orphaned_publications,
         "publications": [
             {
                 "publication_id": item["publication_id"],
@@ -653,6 +663,7 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
                 "fact_set_hash": item["fact_set_hash"],
                 "facts": item["facts"],
                 "created_at_utc": item["created_at_utc"],
+                "fact_set_available": item["fact_set_hash"] in fact_sets,
             }
             for item in publications
         ],
@@ -693,7 +704,7 @@ def _publish(root: Path, fact_set_path: Path) -> dict[str, Any]:
         "fact_set_hash": fact_set["fact_set_hash"],
         "facts": [fact["name"] for fact in fact_set["facts"]],
         "supersedes": {
-            fact["name"]: catalog["heads"].get(fact["name"], {}).get("fact_set_hash")
+            fact["name"]: catalog.get("publication_heads", {}).get(fact["name"])
             for fact in fact_set["facts"]
         },
         "publication_hash": "",

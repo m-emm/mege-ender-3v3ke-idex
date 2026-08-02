@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Coordinate-free bed-fiducial lighting, metric, and tab-corner analysis."""
+"""Coordinate-free bed-fiducial metric and tab-corner analysis."""
 
 from __future__ import annotations
 
-import itertools
-import json
 import math
 from pathlib import Path
 from typing import Any
 
 import cv2
 import numpy as np
+from vision_four_fiducials import FourFiducialError, detect_four_fiducials
+from vision_four_fiducials import order_quad as _order_quad
+from vision_four_fiducials import quad_geometry as _quad_geometry
 
 
 class BedFiducialError(RuntimeError):
@@ -36,242 +37,6 @@ def _finite(value: Any) -> Any:
 
 def _gray(image: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-
-def _sample_circle(
-    gray: np.ndarray, center: tuple[float, float], radius: float
-) -> tuple[float, float]:
-    angles = np.linspace(0.0, 2.0 * math.pi, 72, endpoint=False)
-    xs = np.rint(center[0] + radius * np.cos(angles)).astype(int)
-    ys = np.rint(center[1] + radius * np.sin(angles)).astype(int)
-    valid = (xs >= 0) & (xs < gray.shape[1]) & (ys >= 0) & (ys < gray.shape[0])
-    if int(np.count_nonzero(valid)) < 54:
-        return 0.0, 255.0
-    values = gray[ys[valid], xs[valid]].astype(np.float64)
-    return float(np.mean(values)), float(np.std(values))
-
-
-def _ring_score(
-    gray: np.ndarray, center: tuple[float, float], radius: float
-) -> tuple[float, dict[str, Any]]:
-    radii = (0.18, 0.36, 0.55, 0.74, 0.94, 1.12)
-    samples = [_sample_circle(gray, center, radius * ratio) for ratio in radii]
-    means = np.asarray([item[0] for item in samples], dtype=np.float64)
-    deviations = np.asarray([item[1] for item in samples], dtype=np.float64)
-    alternation = float(np.sum(np.abs(np.diff(means))))
-    range_score = float(np.max(means) - np.min(means))
-    symmetry_penalty = float(np.median(deviations))
-    score = alternation + 1.5 * range_score - 0.8 * symmetry_penalty
-    return score, {
-        "radial_means": means.tolist(),
-        "radial_stddev": deviations.tolist(),
-        "alternation": alternation,
-        "range": range_score,
-        "symmetry_penalty": symmetry_penalty,
-    }
-
-
-def _order_quad(points: np.ndarray) -> np.ndarray:
-    order = np.argsort(points[:, 1])
-    top = points[order[:2]][np.argsort(points[order[:2], 0])]
-    bottom = points[order[2:]][np.argsort(points[order[2:], 0])]
-    return np.asarray([top[0], top[1], bottom[0], bottom[1]], dtype=np.float64)
-
-
-def _quad_geometry(points: np.ndarray) -> tuple[float, dict[str, float]] | None:
-    ordered = _order_quad(points)
-    tl, tr, bl, br = ordered
-    lengths = np.asarray(
-        [
-            np.linalg.norm(tr - tl),
-            np.linalg.norm(br - bl),
-            np.linalg.norm(bl - tl),
-            np.linalg.norm(br - tr),
-        ],
-        dtype=np.float64,
-    )
-    mean_length = float(np.mean(lengths))
-    if mean_length <= 0.0:
-        return None
-    if float(np.min(lengths)) < 0.45 * mean_length:
-        return None
-    if float(np.max(lengths)) > 1.75 * mean_length:
-        return None
-    diagonal_midpoint_error = float(np.linalg.norm((tl + br) * 0.5 - (tr + bl) * 0.5))
-    if diagonal_midpoint_error > 0.28 * mean_length:
-        return None
-    area = abs(float(np.cross(tr - tl, bl - tl)))
-    if area < 0.25 * mean_length * mean_length:
-        return None
-    opposite_error = float(
-        abs(lengths[0] - lengths[1]) + abs(lengths[2] - lengths[3])
-    ) / (2.0 * mean_length)
-    side_balance = float(abs(np.mean(lengths[:2]) - np.mean(lengths[2:]))) / mean_length
-    if side_balance > 0.22:
-        return None
-    geometry_score = 120.0 * (
-        1.0
-        - min(
-            1.0, opposite_error + side_balance + diagonal_midpoint_error / mean_length
-        )
-    )
-    return geometry_score, {
-        "mean_side_px": mean_length,
-        "opposite_error_fraction": opposite_error,
-        "side_balance_fraction": side_balance,
-        "diagonal_midpoint_error_px": diagonal_midpoint_error,
-        "area_px2": area,
-    }
-
-
-def detect_four_fiducials(
-    image: np.ndarray,
-    *,
-    reference_centers_px: list[list[float]] | np.ndarray | None = None,
-) -> dict[str, Any]:
-    """Find the 8 x 8 mm four-ring patch without an image-position prior."""
-
-    height, width = image.shape[:2]
-    scale = min(width / 1920.0, height / 1080.0)
-    reference_centers = None
-    reference_shape = None
-    reference_side = None
-    if reference_centers_px is not None:
-        reference_centers = _order_quad(
-            np.asarray(reference_centers_px, dtype=np.float64)
-        )
-        if reference_centers.shape != (4, 2):
-            raise BedFiducialError("fiducial reference must contain four centers")
-        reference_shape = reference_centers - np.mean(reference_centers, axis=0)
-        reference_geometry = _quad_geometry(reference_centers)
-        if reference_geometry is None:
-            raise BedFiducialError("fiducial reference geometry is invalid")
-        reference_side = reference_geometry[1]["mean_side_px"]
-    gray = _gray(image)
-    enhanced = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
-    blurred = cv2.GaussianBlur(enhanced, (5, 5), 1.2)
-    circles = cv2.HoughCircles(
-        blurred,
-        cv2.HOUGH_GRADIENT,
-        dp=1.15,
-        minDist=max(8.0, 14.0 * scale),
-        param1=90,
-        param2=16,
-        minRadius=max(4, int(round(7 * scale))),
-        maxRadius=max(12, int(round(25 * scale))),
-    )
-    if circles is None:
-        raise BedFiducialError("no circular fiducial candidates detected")
-
-    candidates: list[dict[str, Any]] = []
-    for x, y, radius in circles[0]:
-        score, radial = _ring_score(gray, (float(x), float(y)), float(radius))
-        if score < 44.0:
-            continue
-        candidates.append(
-            {
-                "center_px": [float(x), float(y)],
-                "radius_px": float(radius),
-                "ring_score": score,
-                "radial": radial,
-            }
-        )
-    candidates.sort(key=lambda item: item["ring_score"], reverse=True)
-
-    deduplicated: list[dict[str, Any]] = []
-    for candidate in candidates:
-        center = np.asarray(candidate["center_px"], dtype=np.float64)
-        if any(
-            np.linalg.norm(center - np.asarray(item["center_px"])) < 10.0 * scale
-            for item in deduplicated
-        ):
-            continue
-        deduplicated.append(candidate)
-        if len(deduplicated) >= 36:
-            break
-    if len(deduplicated) < 4:
-        raise BedFiducialError(
-            f"only {len(deduplicated)} independent ring candidates detected"
-        )
-
-    best: tuple[float, np.ndarray, list[dict[str, Any]], dict[str, float]] | None = None
-    for combination in itertools.combinations(deduplicated, 4):
-        radii = np.asarray([item["radius_px"] for item in combination])
-        if float(np.max(radii) / np.min(radii)) > 1.35:
-            continue
-        points = np.asarray([item["center_px"] for item in combination])
-        geometry = _quad_geometry(points)
-        if geometry is None:
-            continue
-        geometry_score, geometry_details = geometry
-        mean_side = geometry_details["mean_side_px"]
-        if not 24.0 * scale <= mean_side <= 220.0 * scale:
-            continue
-        ordered_points = _order_quad(points)
-        reference_shape_rms = None
-        if reference_shape is not None and reference_side is not None:
-            if not 0.75 <= mean_side / reference_side <= 1.25:
-                continue
-            candidate_shape = ordered_points - np.mean(ordered_points, axis=0)
-            reference_shape_rms = float(
-                np.sqrt(
-                    np.mean(np.sum((candidate_shape - reference_shape) ** 2, axis=1))
-                )
-            )
-            if reference_shape_rms > max(5.0 * scale, 0.12 * reference_side):
-                continue
-        ordered_candidates = [
-            min(
-                combination,
-                key=lambda item, point=point: float(
-                    np.linalg.norm(np.asarray(item["center_px"]) - point)
-                ),
-            )
-            for point in ordered_points
-        ]
-        worst_ring = min(item["ring_score"] for item in ordered_candidates)
-        score = geometry_score + 0.55 * worst_ring
-        if reference_shape_rms is not None:
-            score -= 2.0 * reference_shape_rms
-            geometry_details = dict(geometry_details)
-            geometry_details["reference_shape_rms_px"] = reference_shape_rms
-        if best is None or score > best[0]:
-            best = (
-                score,
-                ordered_points,
-                ordered_candidates,
-                geometry_details,
-            )
-    if best is None:
-        raise BedFiducialError("no four-ring square candidate passed geometry checks")
-
-    score, centers, selected, geometry_details = best
-    x0, y0 = np.min(centers, axis=0)
-    x1, y1 = np.max(centers, axis=0)
-    pad = max(12.0 * scale, 0.35 * geometry_details["mean_side_px"])
-    roi = [
-        max(0, int(math.floor(x0 - pad))),
-        max(0, int(math.floor(y0 - pad))),
-        min(width, int(math.ceil(x1 + pad))),
-        min(height, int(math.ceil(y1 + pad))),
-    ]
-    roi_pixels = image[roi[1] : roi[3], roi[0] : roi[2]]
-    clipped_fraction = float(np.mean(np.max(roi_pixels, axis=2) >= 252))
-    dark_fraction = float(np.mean(_gray(roi_pixels) <= 28))
-    return _finite(
-        {
-            "centers_px": centers,
-            "radii_px": [item["radius_px"] for item in selected],
-            "ring_scores": [item["ring_score"] for item in selected],
-            "worst_ring_score": min(item["ring_score"] for item in selected),
-            "geometry": geometry_details,
-            "detection_score": score - 350.0 * clipped_fraction,
-            "roi_px": roi,
-            "clipped_fraction": clipped_fraction,
-            "dark_fraction": dark_fraction,
-            "candidate_count": len(deduplicated),
-        }
-    )
 
 
 def _artifact(path: Path) -> dict[str, str]:
@@ -345,145 +110,6 @@ def _draw_detection(
     x0, y0, x1, y1 = detection["roi_px"]
     cv2.rectangle(result, (x0, y0), (x1, y1), color, 2)
     return result
-
-
-def analyze_lighting(
-    frame_paths: list[Path],
-    artifact_dir: Path,
-    *,
-    frames: list[dict[str, Any]],
-) -> dict[str, Any]:
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-    images = [cv2.imread(str(path), cv2.IMREAD_COLOR) for path in frame_paths]
-    if any(image is None for image in images):
-        raise BedFiducialError("one or more lighting frames cannot be decoded")
-    detections: list[dict[str, Any] | None] = []
-    records: list[dict[str, Any]] = []
-    for index, (image, frame) in enumerate(zip(images, frames)):
-        try:
-            detection = detect_four_fiducials(image)
-            rejection = None
-        except BedFiducialError as exc:
-            detection = None
-            rejection = str(exc)
-        detections.append(detection)
-        records.append(
-            {
-                "seq": index,
-                "profile": frame["profile"],
-                "light_pixels": frame["light_pixels"],
-                "detected": detection is not None,
-                "score": (
-                    float(detection["detection_score"])
-                    if detection is not None
-                    else None
-                ),
-                "worst_ring_score": (
-                    float(detection["worst_ring_score"])
-                    if detection is not None
-                    else None
-                ),
-                "clipped_fraction": (
-                    float(detection["clipped_fraction"])
-                    if detection is not None
-                    else None
-                ),
-                "rejection": rejection,
-            }
-        )
-    valid = [
-        (index, detection)
-        for index, detection in enumerate(detections)
-        if detection is not None and detection["clipped_fraction"] < 0.08
-    ]
-    reasons: list[str] = []
-    if not valid:
-        reasons.append("no lighting candidate exposed all four fiducials")
-        winner_index = None
-    else:
-        winner_index = max(
-            valid,
-            key=lambda item: (
-                item[1]["detection_score"],
-                item[1]["worst_ring_score"],
-            ),
-        )[0]
-
-    panels = [
-        _fit_panel(
-            _draw_detection(
-                image,
-                detection,
-                (f"{index}: {frame['profile']} " f"score={records[index]['score']}"),
-                selected=index == winner_index,
-            ),
-            560,
-        )
-        for index, (image, detection, frame) in enumerate(
-            zip(images, detections, frames)
-        )
-    ]
-    columns = 4
-    rows = []
-    for start in range(0, len(panels), columns):
-        row = panels[start : start + columns]
-        while len(row) < columns:
-            row.append(np.zeros_like(panels[0]))
-        rows.append(cv2.hconcat(row))
-    contact_sheet = cv2.vconcat(rows)
-    contact_path = artifact_dir / "lighting_sweep_contact_sheet.jpg"
-    cv2.imwrite(str(contact_path), contact_sheet)
-
-    score_canvas = np.full((max(360, 34 * (len(records) + 2)), 1280, 3), 24, np.uint8)
-    cv2.putText(
-        score_canvas,
-        "Bed fiducial lighting candidates",
-        (24, 36),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.9,
-        (255, 255, 255),
-        2,
-        cv2.LINE_AA,
-    )
-    for row, record in enumerate(records, start=2):
-        color = (0, 255, 0) if record["seq"] == winner_index else (220, 220, 220)
-        text = (
-            f"{record['seq']:02d} {record['profile']:<18} "
-            f"score={record['score']} clipped={record['clipped_fraction']} "
-            f"lights={json.dumps(record['light_pixels'], sort_keys=True)}"
-        )
-        cv2.putText(
-            score_canvas,
-            text,
-            (24, 20 + row * 30),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.52,
-            color,
-            1,
-            cv2.LINE_AA,
-        )
-    score_path = artifact_dir / "lighting_scores.jpg"
-    cv2.imwrite(str(score_path), score_canvas)
-
-    accepted = winner_index is not None
-    winner = frames[winner_index] if winner_index is not None else None
-    winner_detection = detections[winner_index] if winner_index is not None else None
-    return _finite(
-        {
-            "accepted": accepted,
-            "reasons": reasons,
-            "warnings": [],
-            "winner_index": winner_index,
-            "winner_profile": winner["profile"] if winner else None,
-            "winner_light_pixels": winner["light_pixels"] if winner else None,
-            "winner_detection": winner_detection,
-            "candidate_records": records,
-            "artifacts": {
-                "lighting_sweep_contact_sheet": _artifact(contact_path),
-                "lighting_scores": _artifact(score_path),
-            },
-        }
-    )
 
 
 def _homography_jacobian(
@@ -590,7 +216,6 @@ def analyze_metric(
     *,
     frames: list[dict[str, Any]],
     patch_points_mm: list[list[float]],
-    reference_centers_px: list[list[float]],
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     images = [cv2.imread(str(path), cv2.IMREAD_COLOR) for path in frame_paths]
@@ -599,19 +224,15 @@ def analyze_metric(
     failures: list[str] = []
     if not images or images[0] is None:
         raise BedFiducialError("metric reference frame cannot be decoded")
-    reference_detection = detect_four_fiducials(
-        images[0],
-        reference_centers_px=reference_centers_px,
-    )
+    reference_detection = detect_four_fiducials(images[0])
     reference_centers = np.asarray(reference_detection["centers_px"], dtype=np.float64)
     reference_roi = list(reference_detection["roi_px"])
     for index, image in enumerate(images):
         try:
             if image is None:
                 raise BedFiducialError("frame cannot be decoded")
-            detection = detect_four_fiducials(
-                image,
-                reference_centers_px=reference_centers,
+            detection = (
+                reference_detection if index == 0 else detect_four_fiducials(image)
             )
             tracking = _track_patch_translation(
                 images[0],
@@ -634,7 +255,7 @@ def analyze_metric(
             )
             detections.append(detection)
             tracking_records.append(tracking)
-        except BedFiducialError as exc:
+        except (BedFiducialError, FourFiducialError) as exc:
             detections.append(None)
             tracking_records.append(None)
             failures.append(f"frame {index}: {exc}")

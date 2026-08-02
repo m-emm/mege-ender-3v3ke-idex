@@ -125,14 +125,17 @@ ssh pi@menderpi.local 'journalctl -u vision-capture-nozzle-cam.service -f'
 
 ### Acquire and analyze a job
 
-Before starting a motion job, home the printer and wait for homing to finish.
-The vision jobs do not implicitly home the printer. The current homing and
-print state can be checked without changing anything:
+Vision motion jobs begin with `G28`, like normal print jobs. The current print
+state can be checked without changing anything:
 
 ```bash
 ssh pi@menderpi.local \
-  'curl -fsS "http://127.0.0.1:7125/printer/objects/query?toolhead=homed_axes&print_stats=state"'
+  'curl -fsS "http://127.0.0.1:7125/printer/objects/query?print_stats=state"'
 ```
+
+Starting a new acquisition replaces any stale acquisition lock left by an
+aborted job. The displaced job is recorded as failed and its partial frames
+remain available for diagnosis; it cannot block the requested job.
 
 Run acquisition and analysis together with `run`. For example, the two Stage
 5 jobs are:
@@ -215,14 +218,8 @@ links use the `/vision/` URL prefix.
 
 The clean chain starts with seed facts for the 8 mm square fiducial patch, its
 printer-Z plane (`-0.6 mm`), and the bed-tab corner (`[173, -18, 0] mm`).
-First select reproducible, low-glare fiducial lighting:
-
-```gcode
-IDEX_BED_FIDUCIAL_LIGHTING_CALIBRATE NAME=bed_fiducial_lighting
-```
-
-Then capture the six-frame `0, 10, 20, 20, 10, 0 mm` printer-Y sweep and
-recover the local fiducial metric:
+Capture the six-frame `0, 10, 20, 20, 10, 0 mm` printer-Y sweep under the
+standard nozzle-camera lighting and recover the local fiducial metric:
 
 ```gcode
 IDEX_BED_FIDUCIAL_METRIC_CALIBRATE NAME=bed_fiducial_metric
@@ -327,7 +324,6 @@ three-row Z-scale contract is implemented; there is no legacy X/Y-only alias.
 The corresponding host job types, in dependency order, are:
 
 ```text
-nozzle_cam_bed_fiducial_lighting_sweep
 nozzle_cam_bed_fiducial_y_metric
 nozzle_cam_bed_tab_corner
 idex_tool_red_marker_x_sweep

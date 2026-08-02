@@ -1011,12 +1011,12 @@ def _write_fiducial_x_extrapolation_preview(tool, result, path):
     assert cv2.imwrite(str(path), canvas)
 
 
-def _analyzer_module():
+def _fiducial_module():
     if str(FILES) not in sys.path:
         sys.path.insert(0, str(FILES))
     spec = importlib.util.spec_from_file_location(
-        "vision_nozzle_fine_xz_captured_replay",
-        FILES / "vision_nozzle_fine_xz.py",
+        "vision_four_fiducials_captured_replay",
+        FILES / "vision_four_fiducials.py",
     )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -1025,8 +1025,8 @@ def _analyzer_module():
 
 
 def test_replay_captured_t0_and_t1_and_render_overlays():
-    _logger.info(f"Load analyzer module from {FILES / 'vision_nozzle_fine_xz.py'}")
-    analyzer = _analyzer_module()
+    _logger.info(f"Load analyzer module from {FILES / 'vision_four_fiducials.py'}")
+    analyzer = _fiducial_module()
     run_id = (
         datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + "-" + uuid4().hex[:8]
     )
@@ -1045,11 +1045,13 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
         image = cv2.imread(str(path), cv2.IMREAD_COLOR)
         assert image is not None, f"could not decode committed frame {path}"
         four_fiducials = analyzer.detect_four_fiducials(image)
-
+        assert np.asarray(four_fiducials["centers_px"]).shape == (4, 2)
+        assert len(four_fiducials["radii_px"]) == 4
+        assert four_fiducials["candidate_count"] >= 4
 
         overlay = image.copy()
 
-        for j, candidate in enumerate(four_fiducials["candiates"]):
+        for j, candidate in enumerate(four_fiducials["candidates"]):
             cv2.circle(
                 overlay,
                 tuple(np.rint(candidate["center_px"]).astype(int)),
@@ -1099,7 +1101,6 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
             _logger.warning(
                 f"Center offset for {path_obj.name} is {offset}, which exceeds the threshold. See overlay at {overlay_path}"
             )
-
 
 
 
