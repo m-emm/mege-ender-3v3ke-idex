@@ -41,6 +41,7 @@ EXPECTED_ARTIFACTS = (
 )
 INDIVIDUAL_OVERLAY_PREFIX = "fine_nozzle_tip_overlay_"
 
+TEST_FRAMES_DIR = Path("/tmp/test_fidu_jobs/frames/")
 
 def _model_center_x_px(model, commanded_x_mm, commanded_z_mm):
     dx = float(commanded_x_mm) - float(model["x_ref_mm"])
@@ -1042,6 +1043,8 @@ def _analyzer_module():
 
 
 def test_replay_captured_t0_and_t1_and_render_overlays():
+
+
     missing = [
         str(capture_dir)
         for capture_dir in CAPTURES.values()
@@ -1050,53 +1053,83 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
     if missing:
         pytest.skip("local captured datasets are absent: " + ", ".join(missing))
 
+    _logger.info(f"Load analyzer module from {FILES / 'vision_nozzle_fine_xz.py'}")
     analyzer = _analyzer_module()
     run_id = (
         datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + "-" + uuid4().hex[:8]
     )
-    path = Path("/Users/mege/git/mege-ender-3v3ke-idex/resources/vision_datasets/20260731_step5_green_coordinate_check/t0/frames/21_t0_x198p000_z11p000.jpg")
-
-
-
-    image =  cv2.imread(str(path), cv2.IMREAD_COLOR)
-    four_fiducials = analyzer.detect_four_fiducials(image)
-
-
-    
     run_root = OUTPUT_ROOT / "runs" / run_id
-    run_root.mkdir(parents=True)
+    run_root.mkdir(parents=True, exist_ok=True)
 
-    overlay = image.copy()
+    centers= {}
 
-    for i , candidate in enumerate(four_fiducials["candiates"]):
-        _logger.info(f"Drawing candidate {i} at {candidate}")
-        cv2.circle(
-            overlay,
-            tuple(np.rint(candidate["center_px"]).astype(int)),
-            int(round(candidate["radius_px"])),
-            (255, 0, 0),
-            2,
-        )
-
-    for i, (center, radius) in enumerate(
-        zip(
-            four_fiducials["centers_px"],
-            four_fiducials["radii_px"],
-        )
-    ):
-        _logger.info(f"Drawing fiducial {i} at {center} with radius {radius}")
-        cv2.circle(
-            overlay,
-            tuple(np.rint(center).astype(int)),
-            int(round(radius)),
-            (0, 255, 255),
-            2,
-        )
-
-
-
-    cv2.imwrite(str(run_root / "overlay.jpg"), overlay)
-    _logger.info(f"Saved overlay image to {run_root / 'overlay.jpg'}")
-
-    for path in sorted(item for item in run_root.rglob("*") if item.is_file()):
+    overlay_paths = []
+    for i, path in enumerate(sorted(item for item in TEST_FRAMES_DIR.rglob("*.jpg") if item.is_file())):
         _logger.info(f"{path.resolve()}")
+
+        
+        image =  cv2.imread(str(path), cv2.IMREAD_COLOR)
+        four_fiducials = analyzer.detect_four_fiducials(image)
+
+
+        overlay = image.copy()
+
+        for j, candidate in enumerate(four_fiducials["candiates"]):
+            cv2.circle(
+                overlay,
+                tuple(np.rint(candidate["center_px"]).astype(int)),
+                int(round(candidate["radius_px"])),
+                (255, 0, 0),
+                2,
+            )
+
+        for j, (center, radius) in enumerate(
+            zip(
+                four_fiducials["centers_px"],    
+                four_fiducials["radii_px"],
+            )
+        ):
+            # _logger.info(f"Drawing fiducial {i} at {center} with radius {radius}")
+            cv2.circle(
+                overlay,
+                tuple(np.rint(center).astype(int)),
+                int(round(radius)),
+                (0, 255, 255),
+                2,
+            )
+
+        centers[str(path)] = four_fiducials["centers_px"]
+
+        overlay_file_name = f"overlay_{i:02d}.jpg"
+        overlay_paths.append(run_root / overlay_file_name)
+        cv2.imwrite(str(run_root / overlay_file_name), overlay)
+        _logger.info(f"Saved overlay image to {run_root / overlay_file_name}")
+
+        # for path in sorted(item for item in run_root.rglob("*") if item.is_file()):
+        #     _logger.info(f"{path.resolve()}")
+
+
+    median_centers = np.median(
+        np.array(list(centers.values())), axis=0
+    )
+
+    center_of_median_centers = np.mean(median_centers, axis=0)
+
+    centers_of_centers = np.mean(
+        np.array(list(centers.values())), axis=0
+    )
+
+    for i, (path, center) in enumerate(centers.items()):
+        center_mean = np.mean(center, axis=0)
+        offset = center_of_median_centers - center_mean
+
+        if np.linalg.norm(offset) >10:
+            overlay_path = overlay_paths[i]
+            _logger.warning(
+                f"Center offset for {path.name} is {offset}, which exceeds the threshold. See overlay at {overlay_path}"
+            )
+
+
+
+
+
