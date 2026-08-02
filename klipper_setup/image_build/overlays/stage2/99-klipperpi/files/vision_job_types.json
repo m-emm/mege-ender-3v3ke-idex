@@ -467,6 +467,31 @@
         "tool.t1.vision_xy_datum"
       ]
     },
+    "idex_tool_xy_candidate": {
+      "definition_version": 1,
+      "fact_definition_version": 1,
+      "camera": "nozzle_cam",
+      "localizer": {
+        "kind": "compute_only",
+        "version": 1
+      },
+      "publish_on_accept": true,
+      "requires": [
+        {
+          "requirement": "t0_xy_datum",
+          "fact_name": "tool.t0.vision_xy_datum",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "t1_xy_datum",
+          "fact_name": "tool.t1.vision_xy_datum",
+          "fact_definition_version": 1
+        }
+      ],
+      "fact_names": [
+        "calibration.idex_tool_xy.candidate"
+      ]
+    },
     "idex_t0_t1_xyz_offset": {
       "definition_version": 1,
       "fact_definition_version": 1,

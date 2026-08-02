@@ -30,6 +30,7 @@ JOB_TYPES = {
     "idex_nozzle_fine_xz_grid_t1",
     "idex_tool_xy_measure_t0",
     "idex_tool_xy_measure_t1",
+    "idex_tool_xy_candidate",
     "idex_eddy_t0_xyz_offset",
     "idex_t0_t1_xyz_offset",
 }
@@ -239,6 +240,26 @@ def validate_registry(record: Any) -> dict[str, Any]:
             raise CalibrationGraphError(f"tool-XY {tool} X positions are invalid")
     if abs(tool_xy_gaps[0] - tool_xy_gaps[1]) > 1e-12:
         raise CalibrationGraphError("tool-XY capture endstop gaps must match")
+    candidate = job_types["idex_tool_xy_candidate"]
+    if candidate.get("localizer") != {"kind": "compute_only", "version": 1}:
+        raise CalibrationGraphError("tool-XY candidate must be compute-only")
+    if candidate.get("requires") != [
+        {
+            "requirement": "t0_xy_datum",
+            "fact_name": "tool.t0.vision_xy_datum",
+            "fact_definition_version": 1,
+        },
+        {
+            "requirement": "t1_xy_datum",
+            "fact_name": "tool.t1.vision_xy_datum",
+            "fact_definition_version": 1,
+        },
+    ]:
+        raise CalibrationGraphError(
+            "tool-XY candidate must require exactly the T0 and T1 datum facts"
+        )
+    if candidate.get("fact_names") != ["calibration.idex_tool_xy.candidate"]:
+        raise CalibrationGraphError("tool-XY candidate fact name is invalid")
     return record
 
 
@@ -319,7 +340,7 @@ def validate_manifest(record: Any) -> dict[str, Any]:
         observed = [(frame.get("x_mm"), frame.get("z_mm")) for frame in frames]
         if observed != expected or any(frame.get("tool") != "T0" for frame in frames):
             raise CalibrationGraphError("Eddy fiducial X/Z motion order is invalid")
-    elif job_type == "idex_eddy_t0_xyz_offset":
+    elif job_type in {"idex_eddy_t0_xyz_offset", "idex_tool_xy_candidate"}:
         if frames:
             raise CalibrationGraphError("compute-only job must have no frames")
     elif job_type in {
@@ -492,7 +513,9 @@ def _publication_files(directory: Path) -> Iterable[Path]:
     return sorted(directory.glob("*.json")) if directory.exists() else ()
 
 
-def _fact_sets(root: Path) -> dict[str, tuple[Path, dict[str, Any]]]:
+def _fact_sets(
+    root: Path,
+) -> tuple[dict[str, tuple[Path, dict[str, Any]]], list[dict[str, Any]]]:
     paths = []
     jobs = root / "jobs"
     if jobs.exists():
@@ -501,13 +524,29 @@ def _fact_sets(root: Path) -> dict[str, tuple[Path, dict[str, Any]]]:
     if seeds.exists():
         paths.extend(seeds.glob("*/fact_set.json"))
     result = {}
+    warnings = []
     for path in sorted(paths):
-        fact_set = validate_fact_set(load_json(path))
+        try:
+            fact_set = validate_fact_set(load_json(path))
+        except CalibrationGraphError as exc:
+            relative_path = str(path.relative_to(root))
+            warnings.append(
+                {
+                    "code": "invalid_fact_set_ignored",
+                    "fact_set_path": relative_path,
+                    "message": (
+                        f"Ignoring invalid historical fact set {relative_path}: "
+                        f"{exc}. It cannot be selected as a current fact; rerun "
+                        "its calibration if the result is still needed."
+                    ),
+                }
+            )
+            continue
         fact_set_hash = fact_set["fact_set_hash"]
         if fact_set_hash in result:
             raise CalibrationGraphError(f"duplicate fact set {fact_set_hash}")
         result[fact_set_hash] = (path, fact_set)
-    return result
+    return result, warnings
 
 
 def _detect_cycles(fact_sets: dict[str, tuple[Path, dict[str, Any]]]) -> None:
@@ -540,12 +579,11 @@ def _detect_cycles(fact_sets: dict[str, tuple[Path, dict[str, Any]]]) -> None:
 
 def rebuild_catalog(root: Path) -> dict[str, Any]:
     root.mkdir(parents=True, exist_ok=True)
-    fact_sets = _fact_sets(root)
+    fact_sets, catalog_warnings = _fact_sets(root)
     _detect_cycles(fact_sets)
     publications = []
     heads: dict[str, dict[str, Any]] = {}
     publication_heads: dict[str, str] = {}
-    catalog_warnings: list[dict[str, Any]] = []
     for path in _publication_files(root / "publications"):
         publication = validate_publication(load_json(path))
         names = publication["facts"]
@@ -685,11 +723,14 @@ def rebuild_catalog(root: Path) -> dict[str, Any]:
             for result_path in sorted(job_dir.glob("analysis/*/result.json")):
                 result = validate_analysis(load_json(result_path))
                 fact_path = result_path.with_name("fact_set.json")
-                fact_set_hash = (
-                    validate_fact_set(load_json(fact_path))["fact_set_hash"]
-                    if fact_path.exists()
-                    else None
-                )
+                fact_set_hash = None
+                if fact_path.exists():
+                    try:
+                        fact_set_hash = validate_fact_set(load_json(fact_path))[
+                            "fact_set_hash"
+                        ]
+                    except CalibrationGraphError:
+                        pass
                 analyses.append(
                     {
                         "analysis_run_id": result["analysis_run_id"],

@@ -10,6 +10,7 @@ from typing import Any
 
 import cv2
 import numpy as np
+from calib_dao import CalibDAO
 from vision_four_fiducials import FourFiducialError, detect_four_fiducials
 from vision_nozzle_tip_localization import (
     NozzleTipLocalizationError,
@@ -672,4 +673,359 @@ def build_measurement_fact(
         "y_datum_mm": float(details["y_datum_mm"]),
         "acquisition_endstop_xy_mm": acquisition_xy,
         "commanded_z_mm": float(details["commanded_z_mm"]),
+    }
+
+
+def _source_xy_endstops(source: dict[str, Any], label: str) -> dict[str, list[float]]:
+    acquisition = source.get("acquisition_calibration")
+    if not isinstance(acquisition, dict):
+        raise ToolXYError(f"{label} measurement lacks acquisition calibration")
+    endstops = acquisition.get("tool_xy_endstops_mm")
+    if not isinstance(endstops, dict):
+        raise ToolXYError(f"{label} measurement lacks acquisition endstops")
+    result = {}
+    for tool in ("t0", "t1"):
+        try:
+            result[tool] = [
+                float(endstops[tool]["x"]),
+                float(endstops[tool]["y"]),
+            ]
+        except (KeyError, TypeError, ValueError):
+            raise ToolXYError(
+                f"{label} measurement has invalid {tool.upper()} acquisition endstops"
+            ) from None
+    return result
+
+
+def _coordinate_references(source: dict[str, Any], label: str) -> dict[str, str]:
+    required = {
+        "camera.nozzle_cam.bed_fiducial.local_metric_model",
+        "camera.nozzle_cam.bed_fiducial.printer_xy_mapping",
+    }
+    dependencies = source.get("dependencies")
+    if not isinstance(dependencies, list):
+        raise ToolXYError(f"{label} measurement lacks fact dependencies")
+    result = {
+        str(item.get("fact_name")): str(item.get("fact_set_hash"))
+        for item in dependencies
+        if isinstance(item, dict) and item.get("fact_name") in required
+    }
+    if set(result) != required or any(not value.startswith("sha256:") for value in result.values()):
+        raise ToolXYError(f"{label} measurement lacks coordinate-reference facts")
+    return result
+
+
+def _source_fingerprint(source: dict[str, Any], label: str) -> str:
+    acquisition = source.get("acquisition_calibration")
+    fingerprint = (
+        acquisition.get("active_fingerprint")
+        if isinstance(acquisition, dict)
+        else None
+    )
+    provenance_fingerprint = source.get("active_printer_fingerprint")
+    if not isinstance(fingerprint, str) or not fingerprint:
+        raise ToolXYError(f"{label} measurement lacks its acquisition fingerprint")
+    if provenance_fingerprint != fingerprint:
+        raise ToolXYError(
+            f"{label} measurement has inconsistent acquisition fingerprints"
+        )
+    return fingerprint
+
+
+def _same_xy(left: list[float], right: list[float], tolerance: float = 0.0011) -> bool:
+    return all(abs(float(a) - float(b)) <= tolerance for a, b in zip(left, right))
+
+
+def _draw_alignment_panel(
+    canvas: np.ndarray,
+    *,
+    origin_x: int,
+    title: str,
+    t1_offset_xy_mm: list[float],
+    grid_span_mm: float,
+) -> None:
+    panel_width = 560
+    top = 100
+    bottom = 660
+    left = origin_x
+    right = origin_x + panel_width
+    center = np.asarray([(left + right) // 2, (top + bottom) // 2], dtype=float)
+    pixels_per_mm = min(panel_width, bottom - top) / grid_span_mm
+    cv2.putText(
+        canvas,
+        title,
+        (left + 20, 58),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.85,
+        (30, 30, 30),
+        2,
+        cv2.LINE_AA,
+    )
+    for index in range(5):
+        x = int(round(left + index * panel_width / 4.0))
+        y = int(round(top + index * (bottom - top) / 4.0))
+        cv2.line(canvas, (x, top), (x, bottom), (205, 205, 205), 1)
+        cv2.line(canvas, (left, y), (right, y), (205, 205, 205), 1)
+    cv2.line(
+        canvas,
+        (int(center[0]), top),
+        (int(center[0]), bottom),
+        (115, 115, 115),
+        2,
+    )
+    cv2.line(
+        canvas,
+        (left, int(center[1])),
+        (right, int(center[1])),
+        (115, 115, 115),
+        2,
+    )
+
+    def nozzle(point: np.ndarray, color: tuple[int, int, int], label: str) -> None:
+        x, y = np.rint(point).astype(int)
+        cv2.rectangle(canvas, (x - 28, y - 34), (x + 28, y - 4), color, -1)
+        cv2.fillConvexPoly(
+            canvas,
+            np.asarray([[x - 17, y - 4], [x + 17, y - 4], [x, y + 24]]),
+            color,
+        )
+        cv2.putText(
+            canvas,
+            label,
+            (x + 34, y + 8),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            color,
+            2,
+            cv2.LINE_AA,
+        )
+
+    nozzle(center, (190, 80, 30), "T0")
+    offset = np.asarray(
+        [t1_offset_xy_mm[0], -t1_offset_xy_mm[1]], dtype=float
+    ) * pixels_per_mm
+    if float(np.linalg.norm(offset)) < 1.0e-9:
+        center_x, center_y = np.rint(center).astype(int)
+        cv2.circle(canvas, (center_x, center_y - 5), 43, (35, 125, 220), 3)
+        cv2.putText(
+            canvas,
+            "T1 aligned",
+            (center_x + 34, center_y + 36),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.62,
+            (35, 125, 220),
+            2,
+            cv2.LINE_AA,
+        )
+    else:
+        nozzle(center + offset, (35, 125, 220), "T1")
+    cv2.putText(
+        canvas,
+        f"T1-T0: X={t1_offset_xy_mm[0]:+.4f} mm  Y={t1_offset_xy_mm[1]:+.4f} mm",
+        (left + 20, 715),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.62,
+        (30, 30, 30),
+        2,
+        cv2.LINE_AA,
+    )
+
+
+def _write_candidate_visualization(
+    path: Path,
+    *,
+    alignment_error_xy_mm: list[float],
+    suggested_t1_xy_mm: list[float],
+) -> dict[str, str]:
+    canvas = np.full((820, 1200, 3), 248, dtype=np.uint8)
+    largest_error = max(abs(float(item)) for item in alignment_error_xy_mm)
+    grid_span = max(2.0, 2.4 * largest_error)
+    _draw_alignment_panel(
+        canvas,
+        origin_x=30,
+        title="Measured alignment",
+        t1_offset_xy_mm=alignment_error_xy_mm,
+        grid_span_mm=grid_span,
+    )
+    _draw_alignment_panel(
+        canvas,
+        origin_x=610,
+        title="After suggested correction",
+        t1_offset_xy_mm=[0.0, 0.0],
+        grid_span_mm=grid_span,
+    )
+    cv2.putText(
+        canvas,
+        f"Suggested T1 endstop: X={suggested_t1_xy_mm[0]:.4f}  Y={suggested_t1_xy_mm[1]:.4f}",
+        (300, 780),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.72,
+        (30, 30, 30),
+        2,
+        cv2.LINE_AA,
+    )
+    if not cv2.imwrite(str(path), canvas):
+        raise ToolXYError(f"could not write candidate visualization {path}")
+    return _artifact(path)
+
+
+def calculate_candidate(
+    artifact_dir: Path,
+    *,
+    t0_source: dict[str, Any],
+    t1_source: dict[str, Any],
+    active_calibration: dict[str, Any],
+    calib: CalibDAO,
+) -> dict[str, Any]:
+    """Calculate and persist the T1 correction from two bound datum facts."""
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    t0_value = t0_source.get("value")
+    t1_value = t1_source.get("value")
+    if not isinstance(t0_value, dict) or not isinstance(t1_value, dict):
+        raise ToolXYError("tool-XY candidate requires two datum values")
+    try:
+        t0_datum = [float(t0_value["x_datum_mm"]), float(t0_value["y_datum_mm"])]
+        t1_datum = [float(t1_value["x_datum_mm"]), float(t1_value["y_datum_mm"])]
+        t0_z = float(t0_value["commanded_z_mm"])
+        t1_z = float(t1_value["commanded_z_mm"])
+    except (KeyError, TypeError, ValueError):
+        raise ToolXYError("tool-XY datum facts are incomplete") from None
+    if abs(t0_z - 0.5) > 1e-9 or abs(t1_z - 0.5) > 1e-9:
+        raise ToolXYError("both tool-XY measurements must use commanded Z=0.5 mm")
+
+    t0_references = _coordinate_references(t0_source, "T0")
+    t1_references = _coordinate_references(t1_source, "T1")
+    if t0_references != t1_references:
+        raise ToolXYError(
+            "T0 and T1 used different bed coordinate references; rerun both measurements"
+        )
+    if t0_source.get("priors_hash") != t1_source.get("priors_hash"):
+        raise ToolXYError("T0 and T1 used different priors; rerun both measurements")
+
+    t0_fingerprint = _source_fingerprint(t0_source, "T0")
+    t1_fingerprint = _source_fingerprint(t1_source, "T1")
+    active_fingerprint = active_calibration.get("active_fingerprint")
+    if (
+        not isinstance(active_fingerprint, str)
+        or t0_fingerprint != t1_fingerprint
+        or t0_fingerprint != active_fingerprint
+    ):
+        raise ToolXYError(
+            "measurement fingerprints do not match loaded Klipper; rerun both tool-XY measurements"
+        )
+
+    t0_endstops = _source_xy_endstops(t0_source, "T0")
+    t1_endstops = _source_xy_endstops(t1_source, "T1")
+    if t0_endstops != t1_endstops:
+        raise ToolXYError(
+            "T0 and T1 were acquired with different endstops; rerun both measurements"
+        )
+    active_endstops_raw = active_calibration.get("tool_xy_endstops_mm")
+    if not isinstance(active_endstops_raw, dict):
+        raise ToolXYError("loaded Klipper endstops are unavailable")
+    active_endstops = {
+        tool: [
+            float(active_endstops_raw[tool]["x"]),
+            float(active_endstops_raw[tool]["y"]),
+        ]
+        for tool in ("t0", "t1")
+    }
+    for tool in ("t0", "t1"):
+        if not _same_xy(t0_endstops[tool], active_endstops[tool]):
+            raise ToolXYError(
+                f"{tool.upper()} measurement used X/Y endstop "
+                f"{t0_endstops[tool]}, but loaded Klipper uses "
+                f"{active_endstops[tool]}; rerun both tool-XY measurements"
+            )
+    if not _same_xy(
+        [float(item) for item in t0_value["acquisition_endstop_xy_mm"]],
+        t0_endstops["t0"],
+    ) or not _same_xy(
+        [float(item) for item in t1_value["acquisition_endstop_xy_mm"]],
+        t0_endstops["t1"],
+    ):
+        raise ToolXYError("datum fact endstops disagree with acquisition manifests")
+
+    alignment_error = [
+        float(t1_datum[0] - t0_datum[0]),
+        float(t1_datum[1] - t0_datum[1]),
+    ]
+    old_t1 = t0_endstops["t1"]
+    suggested_t1 = [
+        float(old_t1[0] - alignment_error[0]),
+        float(old_t1[1] - alignment_error[1]),
+    ]
+
+    dao_datums = calib.tool_datums()
+    candidate_datums = {
+        tool: {
+            "x": active_endstops[tool][0],
+            "y": active_endstops[tool][1],
+            "z": float(dao_datums[tool]["z_endstop"]),
+        }
+        for tool in ("t0", "t1")
+    }
+    candidate_datums["t1"]["x"] = suggested_t1[0]
+    candidate_datums["t1"]["y"] = suggested_t1[1]
+    candidate_path = artifact_dir.parent / "calib_candidate.yaml"
+    candidate_hash = calib.write_candidate(candidate_path, candidate_datums)
+
+    warnings = []
+    dao_xy = {
+        tool: [
+            float(dao_datums[tool]["x_endstop"]),
+            float(dao_datums[tool]["y_endstop"]),
+        ]
+        for tool in ("t0", "t1")
+    }
+    if any(not _same_xy(dao_xy[tool], active_endstops[tool]) for tool in ("t0", "t1")):
+        warnings.append(
+            "deployed DAO calib.yaml X/Y differs from loaded Klipper; the candidate "
+            "uses acquisition-time X/Y and the Mac apply script must update canonical calib.yaml"
+        )
+
+    visualization_path = artifact_dir / "tool_xy_candidate.png"
+    artifacts = {
+        "tool_xy_candidate": _write_candidate_visualization(
+            visualization_path,
+            alignment_error_xy_mm=alignment_error,
+            suggested_t1_xy_mm=suggested_t1,
+        )
+    }
+    return _finite(
+        {
+            "accepted": True,
+            "reasons": [],
+            "warnings": warnings,
+            "t0_datum_xy_mm": t0_datum,
+            "t1_datum_xy_mm": t1_datum,
+            "alignment_error_xy_mm": alignment_error,
+            "source_endstop_xy_mm": t0_endstops,
+            "suggested_t1_endstop_xy_mm": suggested_t1,
+            "expected_residual_xy_mm": [0.0, 0.0],
+            "coordinate_reference_fact_hashes": t0_references,
+            "source_measurement_fact_set_hashes": {
+                "t0": t0_source["fact_set_hash"],
+                "t1": t1_source["fact_set_hash"],
+            },
+            "source_active_config_fingerprint": active_fingerprint,
+            "source_calib_sha256": calib.calib_hash(),
+            "candidate_calib_path": "calib_candidate.yaml",
+            "candidate_calib_sha256": candidate_hash,
+            "artifacts": artifacts,
+        }
+    )
+
+
+def build_candidate_fact(details: dict[str, Any]) -> dict[str, Any]:
+    if not details.get("accepted"):
+        raise ToolXYError("cannot publish a rejected tool-XY candidate")
+    error = [float(item) for item in details["alignment_error_xy_mm"]]
+    return {
+        "x_alignment_error_mm": error[0],
+        "y_alignment_error_mm": error[1],
+        "source_t0_endstop_xy_mm": details["source_endstop_xy_mm"]["t0"],
+        "source_t1_endstop_xy_mm": details["source_endstop_xy_mm"]["t1"],
+        "suggested_t1_endstop_xy_mm": details["suggested_t1_endstop_xy_mm"],
+        "candidate_calib_sha256": details["candidate_calib_sha256"],
     }

@@ -59,7 +59,9 @@ from vision_tool_xy_calibration import (
     analyze_measurement as analyze_tool_xy_measurement,
 )
 from vision_tool_xy_calibration import build_acquisition_gcode as build_tool_xy_gcode
+from vision_tool_xy_calibration import build_candidate_fact as build_tool_xy_candidate_fact
 from vision_tool_xy_calibration import build_measurement_fact as build_tool_xy_fact
+from vision_tool_xy_calibration import calculate_candidate as calculate_tool_xy_candidate
 from vision_tool_xy_calibration import (
     prepare_measurement as prepare_tool_xy_measurement,
 )
@@ -112,6 +114,7 @@ FINE_NOZZLE_XZ_JOBS = {
 TOOL_XY_T0_JOB = "idex_tool_xy_measure_t0"
 TOOL_XY_T1_JOB = "idex_tool_xy_measure_t1"
 TOOL_XY_JOBS = {TOOL_XY_T0_JOB, TOOL_XY_T1_JOB}
+TOOL_XY_CANDIDATE_JOB = "idex_tool_xy_candidate"
 JOB_TYPES = (
     BED_FIDUCIAL_METRIC_JOB,
     BED_TAB_CORNER_JOB,
@@ -122,6 +125,7 @@ JOB_TYPES = (
     FINE_NOZZLE_XZ_T1_JOB,
     TOOL_XY_T0_JOB,
     TOOL_XY_T1_JOB,
+    TOOL_XY_CANDIDATE_JOB,
     EDDY_T0_XYZ_OFFSET_JOB,
     IDEX_T0_T1_XYZ_OFFSET_JOB,
 )
@@ -281,6 +285,47 @@ def _number(mapping: dict[str, Any], key: str, context: str) -> float:
     return float(value)
 
 
+def _active_tool_xy_calibration(status: dict[str, Any]) -> dict[str, Any]:
+    settings = status.get("configfile", {}).get("settings")
+    if not isinstance(settings, dict):
+        raise VisionCalibrationError("active Klipper settings are unavailable")
+    tool_state = status.get("gcode_macro _IDEX_TOOL_STATE")
+    if not isinstance(tool_state, dict):
+        raise VisionCalibrationError("active _IDEX_TOOL_STATE is unavailable")
+    fingerprint = str(
+        status.get("gcode_macro _IDEX_CONFIG_FINGERPRINT", {}).get(
+            "source_sha256", ""
+        )
+    )
+    if not fingerprint:
+        raise VisionCalibrationError("active printer fingerprint is unavailable")
+    return {
+        "active_fingerprint": fingerprint,
+        "tool_xy_endstops_mm": {
+            "t0": {
+                "x": _number(
+                    _settings(settings, "stepper_x"),
+                    "position_endstop",
+                    "stepper_x",
+                ),
+                "y": _number(tool_state, "t0_y_endstop", "_IDEX_TOOL_STATE"),
+            },
+            "t1": {
+                "x": _number(
+                    _settings(settings, "dual_carriage"),
+                    "position_endstop",
+                    "dual_carriage",
+                ),
+                "y": _number(tool_state, "t1_y_endstop", "_IDEX_TOOL_STATE"),
+            },
+        },
+        "tool_y_offsets_mm": {
+            "t0": _number(tool_state, "t0_y_offset", "_IDEX_TOOL_STATE"),
+            "t1": _number(tool_state, "t1_y_offset", "_IDEX_TOOL_STATE"),
+        },
+    }
+
+
 def _profile_names() -> set[str]:
     payload = load_json(PROFILE_PATH)
     aliases = payload.get("aliases") or {}
@@ -421,28 +466,7 @@ def _preflight(
     }
     active_tool_calibration = None
     if job_type in TOOL_XY_JOBS:
-        tool_state = status.get("gcode_macro _IDEX_TOOL_STATE")
-        if not isinstance(tool_state, dict):
-            raise VisionCalibrationError(
-                "active _IDEX_TOOL_STATE is unavailable for tool-XY acquisition"
-            )
-        active_tool_calibration = {
-            "active_fingerprint": fingerprint,
-            "tool_xy_endstops_mm": {
-                "t0": {
-                    "x": active_snapshot["t0_x_endstop_mm"],
-                    "y": _number(tool_state, "t0_y_endstop", "_IDEX_TOOL_STATE"),
-                },
-                "t1": {
-                    "x": active_snapshot["t1_x_endstop_mm"],
-                    "y": _number(tool_state, "t1_y_endstop", "_IDEX_TOOL_STATE"),
-                },
-            },
-            "tool_y_offsets_mm": {
-                "t0": _number(tool_state, "t0_y_offset", "_IDEX_TOOL_STATE"),
-                "t1": _number(tool_state, "t1_y_offset", "_IDEX_TOOL_STATE"),
-            },
-        }
+        active_tool_calibration = _active_tool_xy_calibration(status)
     scope = {
         "camera": "nozzle_cam",
         "registry_job": definition,
@@ -529,6 +553,38 @@ def _load_bound_fact(binding: dict[str, Any]) -> Any:
             f"bound fact {binding['fact_name']} not found in {path}"
         )
     return fact["value"]
+
+
+def _load_tool_xy_source(binding: dict[str, Any]) -> dict[str, Any]:
+    path = CALIBRATION_ROOT / binding["fact_set_path"]
+    fact_set = load_json(path)
+    fact = next(
+        (
+            item
+            for item in fact_set["facts"]
+            if item["name"] == binding["fact_name"]
+        ),
+        None,
+    )
+    if fact is None:
+        raise VisionCalibrationError(
+            f"bound fact {binding['fact_name']} not found in {path}"
+        )
+    manifest_path = (
+        CALIBRATION_ROOT / "jobs" / fact_set["job_id"] / "manifest.json"
+    )
+    manifest = validate_manifest(load_json(manifest_path))
+    priors = fact_set.get("provenance", {}).get("priors", {})
+    return {
+        "fact_set_hash": fact_set["fact_set_hash"],
+        "value": fact["value"],
+        "dependencies": fact.get("dependencies", []),
+        "active_printer_fingerprint": fact_set.get("provenance", {}).get(
+            "active_printer_fingerprint"
+        ),
+        "priors_hash": priors.get("sha256"),
+        "acquisition_calibration": manifest.get("acquisition_calibration"),
+    }
 
 
 def _canonical_gcode(gcode: str) -> str:
@@ -1276,6 +1332,24 @@ def _fact(
     }
 
 
+def _tool_xy_candidate_publication_fact(
+    value: dict[str, Any], dependencies: list[dict[str, str]]
+) -> dict[str, Any]:
+    return _fact(
+        "calibration.idex_tool_xy.candidate",
+        "coordinate_system",
+        value,
+        dependencies,
+        {
+            "x_alignment_error_mm",
+            "y_alignment_error_mm",
+            "source_t0_endstop_xy_mm",
+            "source_t1_endstop_xy_mm",
+            "suggested_t1_endstop_xy_mm",
+        },
+    )
+
+
 def _homography_inverse_point(
     homography: list[list[float]], point: list[float]
 ) -> list[float]:
@@ -1369,6 +1443,19 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 frames=manifest["frames"],
                 reference=manifest["tool_xy_reference"],
                 acquisition_calibration=manifest["acquisition_calibration"],
+            )
+        elif job_type == TOOL_XY_CANDIDATE_JOB:
+            bindings = {
+                item["requirement"]: item for item in manifest["input_facts"]
+            }
+            details = calculate_tool_xy_candidate(
+                artifact_dir,
+                t0_source=_load_tool_xy_source(bindings["t0_xy_datum"]),
+                t1_source=_load_tool_xy_source(bindings["t1_xy_datum"]),
+                active_calibration=_active_tool_xy_calibration(
+                    query_printer_status()
+                ),
+                calib=CALIB,
             )
         elif job_type == EDDY_T0_XYZ_OFFSET_JOB:
             bindings = {item["requirement"]: item for item in manifest["input_facts"]}
@@ -1757,6 +1844,9 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         {"x_datum_mm", "y_datum_mm"},
                     )
                 ]
+            elif job_type == TOOL_XY_CANDIDATE_JOB:
+                value = build_tool_xy_candidate_fact(details)
+                facts = [_tool_xy_candidate_publication_fact(value, dependencies)]
             elif job_type == EDDY_T0_XYZ_OFFSET_JOB:
                 value = {
                     "tool": "T0",
@@ -1902,6 +1992,10 @@ def compute_job(
         )
         input_facts.append(req)
 
+    active_tool_xy = None
+    if job_type == TOOL_XY_CANDIDATE_JOB:
+        active_tool_xy = _active_tool_xy_calibration(query_printer_status())
+
     job_id = (
         datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + "-" + _sanitize(name)
     )
@@ -1917,6 +2011,10 @@ def compute_job(
             item["requirement"]: item["fact_set_hash"] for item in input_facts
         },
     }
+    if active_tool_xy is not None:
+        applicability_scope["active_printer_fingerprint"] = active_tool_xy[
+            "active_fingerprint"
+        ]
     manifest: dict[str, Any] = {
         "schema": MANIFEST_SCHEMA,
         "schema_version": SCHEMA_VERSION,
@@ -1934,6 +2032,10 @@ def compute_job(
         "applicability_hash": canonical_hash(applicability_scope),
         "manifest_hash": HASH_PLACEHOLDER,
     }
+    if active_tool_xy is not None:
+        manifest["provenance"] = {
+            "active_printer_fingerprint": active_tool_xy["active_fingerprint"]
+        }
     manifest["manifest_hash"] = content_hash(manifest, "manifest_hash")
     validate_manifest(manifest)
 
@@ -2724,6 +2826,13 @@ def _coordinate_summary(name: str, value: dict[str, Any]) -> str:
             "generated_klipper",
             "z_reference_method",
         ],
+        "calibration.idex_tool_xy.candidate": [
+            "x_alignment_error_mm",
+            "y_alignment_error_mm",
+            "source_t0_endstop_xy_mm",
+            "source_t1_endstop_xy_mm",
+            "suggested_t1_endstop_xy_mm",
+        ],
     }.get(name, [])
     return (
         "<br>".join(
@@ -2872,6 +2981,11 @@ def render_ui(catalog: dict[str, Any]) -> None:
                 + (
                     f" · {_json_link('fact_set.json', 'fact set')}"
                     if (analysis_dir / "fact_set.json").exists()
+                    else ""
+                )
+                + (
+                    f" · {_json_link('calib_candidate.yaml', 'calib candidate')}"
+                    if (analysis_dir / "calib_candidate.yaml").exists()
                     else ""
                 )
                 + "</p><h2>Primary artifacts</h2>"
@@ -3031,6 +3145,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except (
         CalibrationGraphError,
+        ToolXYError,
         VisionCalibrationError,
         OSError,
         ValueError,

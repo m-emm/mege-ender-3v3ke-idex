@@ -67,6 +67,8 @@ The main files are:
 | Job graph, manifests, dependencies, and validation | `vision_calibration_graph.py` |
 | Eddy fiducial X/Z circle analysis | `vision_eddy_fiducial_xz.py` |
 | Stage 5 nozzle-tip analysis | `vision_nozzle_fine_xz.py` |
+| Shared nozzle-tip localization | `vision_nozzle_tip_localization.py` |
+| Fixed-Z tool-XY measurement and candidate calculation | `vision_tool_xy_calibration.py` |
 | Stage 5.1 fine-tool calculation | `vision_fine_tool_calibration.py` |
 | Camera capture daemon | `vision_capture.py` |
 | Capture service definition | `vision-capture-nozzle-cam.service` |
@@ -81,6 +83,24 @@ ${EDITOR:-vi} klipper_setup/image_build/overlays/stage2/99-klipperpi/files/visio
 If a new Python module is added, also add it to the required-file, `scp`, and
 `install` lists in
 `klipper_setup/klipper_config/deploy_webcam_vision.sh`.
+
+### Apply the latest vision tool-XY candidate locally
+
+After successful `idex_tool_xy_measure_t0` and `idex_tool_xy_measure_t1` jobs,
+deploy the current vision code and run:
+
+```bash
+klipper_setup/klipper_config/fetch_apply_vision_tool_xy_candidate.sh
+```
+
+The script runs the compute-only `idex_tool_xy_candidate` job against the two
+latest published datum facts, fetches its hashed candidate, verifies that the
+local versioned `calib.yaml` still contains the acquisition-time T0/T1 X/Y
+endstops, updates only `tools.t1.{x,y}_endstop`, and regenerates the versioned
+`printer.cfg`. It does not deploy or restart the printer. Review the diff, then
+use `update_menderpi.sh` to deploy the generated Klipper config and
+`deploy_webcam_vision.sh` to synchronize the DAO copy of `calib.yaml` before
+rerunning both measurement jobs.
 
 ### Deploy and start the complete vision stack
 

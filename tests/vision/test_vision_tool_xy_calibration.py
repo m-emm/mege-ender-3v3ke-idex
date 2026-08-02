@@ -7,6 +7,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
+import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -387,3 +388,130 @@ def test_real_fixture_retains_exact_source_fact_sets():
     )
     assert _fact_value(red, "tool.t0.red_marker_to_bed_tab_x_mm")
     assert _fact_value(red, "tool.t1.red_marker_to_bed_tab_x_mm")
+
+
+def _candidate_source(tool, datum_xy, fingerprint="active-fingerprint"):
+    endstops = {
+        "t0": {"x": -77.635, "y": -14.8},
+        "t1": {"x": 351.739, "y": -13.8},
+    }
+    return {
+        "fact_set_hash": f"sha256:{tool.lower()}-measurement",
+        "value": {
+            "x_datum_mm": datum_xy[0],
+            "y_datum_mm": datum_xy[1],
+            "acquisition_endstop_xy_mm": [
+                endstops[tool.lower()]["x"],
+                endstops[tool.lower()]["y"],
+            ],
+            "commanded_z_mm": 0.5,
+        },
+        "dependencies": [
+            {
+                "fact_name": "camera.nozzle_cam.bed_fiducial.local_metric_model",
+                "fact_set_hash": "sha256:metric",
+            },
+            {
+                "fact_name": "camera.nozzle_cam.bed_fiducial.printer_xy_mapping",
+                "fact_set_hash": "sha256:mapping",
+            },
+        ],
+        "active_printer_fingerprint": fingerprint,
+        "priors_hash": "sha256:priors",
+        "acquisition_calibration": {
+            "active_fingerprint": fingerprint,
+            "tool_xy_endstops_mm": endstops,
+            "tool_y_offsets_mm": {"t0": 0.0, "t1": -1.0},
+        },
+    }
+
+
+def test_candidate_corrects_both_t1_endstop_signs_and_preserves_calib(tmp_path):
+    module = _module()
+    calib_path = tmp_path / "calib.yaml"
+    calib_path.write_text(
+        yaml.safe_dump(
+            {
+                "unrelated": {"keep": "this"},
+                "tools": {
+                    "t0": {
+                        "x_endstop": -77.635,
+                        "y_endstop": -14.8,
+                        "z_endstop": 293.75,
+                    },
+                    "t1": {
+                        "x_endstop": 350.516,
+                        "y_endstop": -15.82,
+                        "z_endstop": 293.65,
+                    },
+                },
+            },
+            sort_keys=False,
+        )
+    )
+    active = {
+        "active_fingerprint": "active-fingerprint",
+        "tool_xy_endstops_mm": {
+            "t0": {"x": -77.635, "y": -14.8},
+            "t1": {"x": 351.739, "y": -13.8},
+        },
+    }
+    result = module.calculate_candidate(
+        tmp_path / "analysis" / "artifacts",
+        t0_source=_candidate_source("T0", [166.353885, -14.862874]),
+        t1_source=_candidate_source("T1", [166.895501, -14.984996]),
+        active_calibration=active,
+        calib=module.CalibDAO(calib_path=calib_path),
+    )
+
+    np.testing.assert_allclose(
+        result["alignment_error_xy_mm"], [0.541616, -0.122122], atol=1e-6
+    )
+    np.testing.assert_allclose(
+        result["suggested_t1_endstop_xy_mm"],
+        [351.197384, -13.677878],
+        atol=1e-6,
+    )
+    candidate = yaml.safe_load(
+        (tmp_path / "analysis" / "calib_candidate.yaml").read_text()
+    )
+    assert candidate["unrelated"] == {"keep": "this"}
+    assert candidate["tools"]["t0"]["x_endstop"] == -77.635
+    assert candidate["tools"]["t1"]["x_endstop"] == pytest.approx(351.197384)
+    assert candidate["tools"]["t1"]["y_endstop"] == pytest.approx(-13.677878)
+    assert result["warnings"]
+    assert cv2.imread(
+        str(tmp_path / "analysis" / "artifacts" / "tool_xy_candidate.png")
+    ) is not None
+    assert module.build_candidate_fact(result)["x_alignment_error_mm"] == pytest.approx(
+        0.541616
+    )
+
+
+def test_candidate_rejects_stale_measurements(tmp_path):
+    module = _module()
+    calib_path = tmp_path / "calib.yaml"
+    calib_path.write_text(
+        yaml.safe_dump(
+            {
+                "tools": {
+                    "t0": {"x_endstop": -77.635, "y_endstop": -14.8, "z_endstop": 1},
+                    "t1": {"x_endstop": 351.739, "y_endstop": -13.8, "z_endstop": 1},
+                }
+            }
+        )
+    )
+    with pytest.raises(module.ToolXYError, match="fingerprints do not match"):
+        module.calculate_candidate(
+            tmp_path / "artifacts",
+            t0_source=_candidate_source("T0", [1.0, 2.0]),
+            t1_source=_candidate_source("T1", [1.0, 2.0]),
+            active_calibration={
+                "active_fingerprint": "different",
+                "tool_xy_endstops_mm": {
+                    "t0": {"x": -77.635, "y": -14.8},
+                    "t1": {"x": 351.739, "y": -13.8},
+                },
+            },
+            calib=module.CalibDAO(calib_path=calib_path),
+        )

@@ -247,6 +247,33 @@ def test_fact_items_are_exact_and_uncertainty_is_rejected():
         graph.validate_fact_set(uncertain)
 
 
+def test_tool_xy_candidate_publication_is_a_valid_coordinate_fact():
+    graph = _module("vision_calibration_graph.py", "vision_graph_xy_candidate_test")
+    calibration = _module(
+        "vision_calibration.py", "vision_calibration_xy_candidate_fact_test"
+    )
+    value = {
+        "x_alignment_error_mm": 0.54,
+        "y_alignment_error_mm": -0.12,
+        "source_t0_endstop_xy_mm": [-77.635, -14.8],
+        "source_t1_endstop_xy_mm": [351.739, -13.8],
+        "suggested_t1_endstop_xy_mm": [351.199, -13.68],
+        "candidate_calib_sha256": "sha256:candidate",
+    }
+    fact = calibration._tool_xy_candidate_publication_fact(value, [])
+    record = _fact_set(
+        graph,
+        fact_name=fact["name"],
+        value=fact["value"],
+        value_roles={item["field"]: item["role"] for item in fact["value_items"]},
+        serial="tool-xy-candidate",
+        fact_role=fact["role"],
+    )
+
+    assert fact["role"] == "coordinate_system"
+    assert graph.validate_fact_set(record) == record
+
+
 def test_catalog_rebuild_accepts_retired_acquisition_profile_facts(tmp_path):
     graph = _module("vision_calibration_graph.py", "vision_graph_retired_role_test")
     record = _fact_set(
@@ -271,6 +298,37 @@ def test_catalog_rebuild_accepts_retired_acquisition_profile_facts(tmp_path):
     catalog = graph.rebuild_catalog(tmp_path)
 
     assert catalog["heads"] == {}
+
+
+def test_catalog_rebuild_ignores_an_invalid_unpublished_fact_set(tmp_path):
+    graph = _module("vision_calibration_graph.py", "vision_graph_invalid_history_test")
+    record = _fact_set(
+        graph,
+        fact_name="calibration.idex_tool_xy.candidate",
+        value={"suggested_t1_endstop_xy_mm": [351.0, -13.5]},
+        value_roles={"suggested_t1_endstop_xy_mm": "coordinate_system"},
+        serial="broken-candidate",
+        fact_role="diagnostic",
+    )
+    fact_set_path = (
+        tmp_path
+        / "jobs"
+        / "failed-candidate"
+        / "analysis"
+        / "failed-analysis"
+        / "fact_set.json"
+    )
+    fact_set_path.parent.mkdir(parents=True)
+    fact_set_path.write_text(json.dumps(record), encoding="utf-8")
+
+    catalog = graph.rebuild_catalog(tmp_path)
+
+    assert catalog["heads"] == {}
+    assert len(catalog["warnings"]) == 1
+    assert catalog["warnings"][0]["code"] == "invalid_fact_set_ignored"
+    assert catalog["warnings"][0]["fact_set_path"] == (
+        "jobs/failed-candidate/analysis/failed-analysis/fact_set.json"
+    )
 
 
 def test_seed_superseding_selects_new_head(tmp_path):
