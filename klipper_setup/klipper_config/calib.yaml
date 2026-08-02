@@ -5,11 +5,11 @@ tools:
   t0:
     x_endstop: -77.635
     y_endstop: -14.800
-    z_endstop: 293.600
+    z_endstop: 293.550
   t1:
     x_endstop: 349.939
     y_endstop: -13.710
-    z_endstop: 292.600
+    z_endstop: 292.700
     
 eddy_relative_calibration:
 
