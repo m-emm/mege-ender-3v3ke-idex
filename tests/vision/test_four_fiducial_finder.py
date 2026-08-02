@@ -13,7 +13,7 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 FILES = (
     REPO_ROOT
     / "klipper_setup"

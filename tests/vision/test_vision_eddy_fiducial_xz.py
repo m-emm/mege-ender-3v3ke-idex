@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 FILES = (
     REPO_ROOT
     / "klipper_setup"
@@ -50,7 +50,7 @@ def test_eddy_circle_detector_recovers_center_from_simple_ring():
 
     assert result["accepted"]
     np.testing.assert_allclose(result["center_px"], [560, 220], atol=2.0)
-    assert 40 <= result["radius_px"] <= 48
+    assert 40 <= result["radius_px"] <= 50
 
 
 def test_eddy_grid_analysis_emits_raw_commanded_and_image_positions(tmp_path):

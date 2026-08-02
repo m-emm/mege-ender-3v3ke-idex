@@ -28,6 +28,7 @@ JOB_TYPES = {
     "idex_nozzle_fine_xz_grid_t0",
     "idex_nozzle_fine_xz_grid_t1",
     "idex_eddy_t0_xyz_offset",
+    "idex_t0_t1_xyz_offset",
 }
 SEED_FACT_NAMES = {
     "bed.tab_corner.printer_xyz",

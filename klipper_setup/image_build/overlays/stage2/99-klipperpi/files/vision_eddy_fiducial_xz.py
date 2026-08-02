@@ -15,9 +15,18 @@ import numpy as np
 _logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Frozen SIFT template — committed PNG of the BTT Eddy sensor body crop.
-# Deployed to /usr/local/share/vision/eddy_sift_body_template.png.
+# Production installs it under /usr/local/share/vision; source-tree runs use
+# the copy next to this analyzer.
 # ---------------------------------------------------------------------------
-_SIFT_TEMPLATE_PATH = Path("/usr/local/share/vision/eddy_sift_body_template.png")
+_DEPLOYED_SIFT_TEMPLATE_PATH = Path(
+    "/usr/local/share/vision/eddy_sift_body_template.png"
+)
+_SOURCE_SIFT_TEMPLATE_PATH = Path(__file__).with_name("eddy_sift_body_template.png")
+_SIFT_TEMPLATE_PATH = (
+    _DEPLOYED_SIFT_TEMPLATE_PATH
+    if _DEPLOYED_SIFT_TEMPLATE_PATH.is_file()
+    else _SOURCE_SIFT_TEMPLATE_PATH
+)
 _SIFT_LOWE_RATIO = 0.75
 _SIFT_MIN_INLIERS = 8
 
@@ -471,22 +480,24 @@ def analyze(
         body_rect = locate_body_template(image, template_gray)
 
         if body_rect is None:
-            continue
-            # raise EddyFiducialError("Could not locate Eddy body")
-
-        x0, y0, x1, y1 = body_rect
-
-        detection = detect_circle(
-            image,
-            localizer,
-            expected_center_px=expected_center,
-            sift_roi=(x0, y0, x1, y1),
-        )
+            detection = detect_circle(
+                image,
+                localizer,
+                expected_center_px=expected_center,
+            )
+        else:
+            x0, y0, x1, y1 = body_rect
+            detection = detect_circle(
+                image,
+                localizer,
+                expected_center_px=expected_center,
+                sift_roi=(x0, y0, x1, y1),
+            )
         if detection["accepted"]:
             expected_center = np.asarray(detection["center_px"], dtype=np.float64)
 
         center = detection.get("center_px")
-        sift_roi_record = detection["sift_roi_px"]
+        sift_roi_record = detection.get("sift_roi_px")
         record = {
             "seq": int(frame["seq"]),
             "commanded_x_mm": float(frame["x_mm"]),
@@ -509,12 +520,13 @@ def analyze(
         draw_color = (0, 255, 0) if record["detected"] else (0, 0, 255)
 
         overlay = image.copy()
-        rx0, ry0, rx1, ry1 = sift_roi_record
-
-        _logger.info(
-            f"Drawing rectangle overlay for frame {frame['seq']}: ({rx0}, {ry0}) to ({rx1}, {ry1})"
-        )
-        cv2.rectangle(overlay, (rx0, ry0), (rx1, ry1), (0, 230, 230), 2)
+        if sift_roi_record is not None:
+            rx0, ry0, rx1, ry1 = sift_roi_record
+            _logger.info(
+                f"Drawing rectangle overlay for frame {frame['seq']}: "
+                f"({rx0}, {ry0}) to ({rx1}, {ry1})"
+            )
+            cv2.rectangle(overlay, (rx0, ry0), (rx1, ry1), (0, 230, 230), 2)
         if center is not None:
             center_point = tuple(np.rint(center).astype(int))
             cv2.circle(

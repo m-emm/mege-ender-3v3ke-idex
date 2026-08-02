@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 FILES = (
     REPO_ROOT
     / "klipper_setup"
@@ -33,11 +33,10 @@ def _module():
 def _fixture(module, *, implausible_z=False):
     def project(world):
         x_mm, y_mm, z_mm = world
-        denominator = 1.0 + 0.005 * z_mm
         return np.asarray(
             [
-                (10.0 * x_mm + 0.3 * y_mm + 50.0) / denominator,
-                (0.2 * x_mm - 8.0 * y_mm + 250.0) / denominator,
+                (10.0 + 0.05 * z_mm) * x_mm + 0.3 * y_mm + 50.0,
+                (0.2 + 0.01 * z_mm) * x_mm - 8.0 * y_mm + 250.0,
             ]
         )
 
@@ -52,11 +51,12 @@ def _fixture(module, *, implausible_z=False):
     for tool in ("T0", "T1"):
         camera_y = 2.0 * corner_y + expected[tool][1]
         for z_mm, x_values in (
-            (1.0, [183.0, 186.0, 189.0, 192.0, 195.0, 198.0]),
-            (3.0, [189.0]),
-            (5.0, [198.0, 195.0, 192.0, 189.0, 186.0, 183.0]),
-            (7.0, [189.0]),
-            (9.0, [183.0, 186.0, 189.0, 192.0, 195.0, 198.0]),
+            (0.5, [183.0, 185.5, 188.0, 190.5, 193.0, 195.5, 198.0, 200.5]),
+            (4.0, [200.5, 198.0, 195.5, 193.0, 190.5, 188.0, 185.5, 183.0]),
+            (7.5, [183.0, 185.5, 188.0, 190.5, 193.0, 195.5, 198.0, 200.5]),
+            (11.0, [200.5, 198.0, 195.5, 193.0, 190.5, 188.0, 185.5, 183.0]),
+            (14.5, [183.0, 185.5, 188.0, 190.5, 193.0, 195.5, 198.0, 200.5]),
+            (18.0, [200.5, 198.0, 195.5, 193.0, 190.5, 188.0, 185.5, 183.0]),
         ):
             for x_mm in x_values:
                 record = {
