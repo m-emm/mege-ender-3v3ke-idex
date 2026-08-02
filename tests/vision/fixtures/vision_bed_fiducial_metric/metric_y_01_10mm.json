@@ -1,0 +1,173 @@
+{
+  "actual_gcode_position_mm": [
+    -77.635,
+    -4.8,
+    293.75,
+    0.0
+  ],
+  "actual_toolhead_position_mm": [
+    -77.635,
+    -4.8,
+    293.75,
+    0.0
+  ],
+  "camera_profile": {
+    "active_profile": "nozzle_cam_eddy_exp_900",
+    "applied_controls": [
+      {
+        "name": "auto_exposure",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 1
+      },
+      {
+        "name": "exposure_time_absolute",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 900
+      },
+      {
+        "name": "white_balance_automatic",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 0
+      },
+      {
+        "name": "white_balance_temperature",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 6500
+      },
+      {
+        "name": "power_line_frequency",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 1
+      },
+      {
+        "name": "brightness",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 0
+      },
+      {
+        "name": "contrast",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 12
+      },
+      {
+        "name": "saturation",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 9
+      },
+      {
+        "name": "hue",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 0
+      },
+      {
+        "name": "gamma",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 188
+      },
+      {
+        "name": "sharpness",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "",
+        "value": 7
+      }
+    ],
+    "control_errors": [],
+    "enabled": true,
+    "last_request": {
+      "profile": "bed_fid_exp_900",
+      "requested_at_utc": "2026-08-02T07:59:40.445828+00:00",
+      "requester": "vision_capture"
+    },
+    "profile_file": "/usr/local/share/vision/nozzle_cam_profiles.json",
+    "profile_names": [
+      "bed_fid_exp_900",
+      "nozzle_cam_eddy_exp_900"
+    ],
+    "request_file": "/run/vision-preview-nozzle_cam/profile_request.json",
+    "requested_profile": "bed_fid_exp_900"
+  },
+  "capture_errors": [],
+  "capture_retries": 0,
+  "captured_at_utc": "2026-08-02T07:59:46.618222+00:00",
+  "commanded_position_mm": [
+    -77.635,
+    -4.800000000000001,
+    293.75
+  ],
+  "discarded_framebuffer_sequences": [],
+  "duplicate_index": null,
+  "frame": "metric_y_01_10mm",
+  "framebuffer_captured_at_utc": null,
+  "framebuffer_seq": 1803,
+  "height": 1080,
+  "homed_axes": "xyz",
+  "job_id": "20260802T075938.966434Z-nozzle_cam_bed_fiducial_y_metric",
+  "job_seq": 1,
+  "pass": "forward",
+  "schema": "vision-calibration-frame-sidecar",
+  "schema_version": 1,
+  "sha256": "sha256:fcb5e2b6f22ecad8ce6fb5a9010672f9b584b72dd4e86f7f1a3a9556c0d29cb1",
+  "size_bytes": 386404,
+  "temperatures": {
+    "eddy_coil": {
+      "compensation_enabled": false,
+      "estimated_expansion": 0,
+      "in_calibration": false,
+      "measured_max_temp": 38.71,
+      "measured_min_temp": 29.54,
+      "temperature": 37.60654945465789
+    },
+    "eddy_mcu": {
+      "measured_max_temp": 42.43,
+      "measured_min_temp": 32.07,
+      "temperature": 41.5
+    },
+    "extruder": {
+      "can_extrude": false,
+      "motion_queue": null,
+      "power": 0.0,
+      "pressure_advance": 0.0,
+      "smooth_time": 0.04,
+      "target": 0.0,
+      "temperature": 23.52
+    },
+    "extruder1": {
+      "can_extrude": false,
+      "motion_queue": null,
+      "power": 0.0,
+      "pressure_advance": 0.0,
+      "smooth_time": 0.04,
+      "target": 0.0,
+      "temperature": 24.07
+    },
+    "heater_bed": {
+      "power": 0.0,
+      "target": 0.0,
+      "temperature": 24.34
+    }
+  },
+  "width": 1920,
+  "x_mm": null,
+  "y_offset_mm": 10
+}
