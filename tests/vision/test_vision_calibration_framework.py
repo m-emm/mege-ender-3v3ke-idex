@@ -496,6 +496,60 @@ def test_fine_grid_localizes_the_nozzle_tip_inside_the_outer_ring():
     assert np.linalg.norm(recovered - ring_center) > 5.0
 
 
+def test_fine_grid_overlay_lists_both_tools_acquisition_xy_endstops():
+    analyzer = _module("vision_nozzle_fine_xz.py", "vision_nozzle_endstop_overlay_test")
+    snapshot = {
+        "tool_xy_endstops_mm": {
+            "t0": {"x": -70.125, "y": -14.25},
+            "t1": {"x": 350.75, "y": -13.5},
+        }
+    }
+
+    assert analyzer._acquisition_xy_endstop_line(snapshot) == (
+        "acquire calib endstops: T0 X=-70.125 Y=-14.250 | "
+        "T1 X=350.750 Y=-13.500"
+    )
+    assert analyzer._acquisition_xy_endstop_line(None) == (
+        "acquire calib endstops: unavailable (legacy manifest)"
+    )
+
+
+def test_fine_grid_acquisition_snapshot_comes_from_dao():
+    calibration = _module(
+        "vision_calibration.py", "vision_fine_acquisition_calibration_test"
+    )
+
+    class TestCalib:
+        @staticmethod
+        def tool_datums():
+            return {
+                "t0": {
+                    "x_endstop": -70.125,
+                    "y_endstop": -14.25,
+                    "z_endstop": 290.0,
+                },
+                "t1": {
+                    "x_endstop": 350.75,
+                    "y_endstop": -13.5,
+                    "z_endstop": 291.0,
+                },
+            }
+
+        @staticmethod
+        def calib_hash():
+            return "sha256:acquisition-calib"
+
+    calibration.CALIB = TestCalib()
+
+    assert calibration._acquisition_calibration_snapshot() == {
+        "calib_sha256": "sha256:acquisition-calib",
+        "tool_xy_endstops_mm": {
+            "t0": {"x": -70.125, "y": -14.25},
+            "t1": {"x": 350.75, "y": -13.5},
+        },
+    }
+
+
 def test_fine_grid_analyzer_streams_frames_and_publishes_projection_only():
     source = (FILES / "vision_nozzle_fine_xz.py").read_text(encoding="utf-8")
     graph_source = (FILES / "vision_calibration_graph.py").read_text(encoding="utf-8")

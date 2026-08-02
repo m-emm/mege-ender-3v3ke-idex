@@ -151,6 +151,20 @@ def _prior_provenance(job_type: str) -> dict[str, Any]:
     return result
 
 
+def _acquisition_calibration_snapshot() -> dict[str, Any]:
+    datums = CALIB.tool_datums()
+    return {
+        "calib_sha256": CALIB.calib_hash(),
+        "tool_xy_endstops_mm": {
+            tool: {
+                "x": datums[tool]["x_endstop"],
+                "y": datums[tool]["y_endstop"],
+            }
+            for tool in ("t0", "t1")
+        },
+    }
+
+
 def _publish_operation_fact_set(
     operation: str,
     *,
@@ -1034,6 +1048,7 @@ def prepare_job(
             "corner_pixel_at_fine_capture_px": corner_at_capture.tolist(),
             "coarse_image_x_axis_px_per_mm": x_axis,
         }
+        manifest["acquisition_calibration"] = _acquisition_calibration_snapshot()
     placeholder = _gcode(
         job_id, HASH_PLACEHOLDER, HASH_PLACEHOLDER, manifest, definition
     )
@@ -1275,6 +1290,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 artifact_dir,
                 frames=manifest["frames"],
                 reference=manifest["fine_reference"],
+                acquisition_calibration=manifest.get("acquisition_calibration"),
             )
         elif job_type == EDDY_T0_XYZ_OFFSET_JOB:
             bindings = {item["requirement"]: item for item in manifest["input_facts"]}

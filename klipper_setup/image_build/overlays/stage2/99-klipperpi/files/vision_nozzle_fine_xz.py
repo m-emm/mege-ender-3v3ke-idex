@@ -46,6 +46,26 @@ def _artifact(path: Path) -> dict[str, str]:
     }
 
 
+def _acquisition_xy_endstop_line(
+    acquisition_calibration: dict[str, Any] | None,
+) -> str:
+    if not acquisition_calibration:
+        return "acquire calib endstops: unavailable (legacy manifest)"
+    datums = acquisition_calibration.get("tool_xy_endstops_mm")
+    if not isinstance(datums, dict):
+        raise FineNozzleError("acquisition calibration lacks tool XY endstops")
+    try:
+        return "acquire calib endstops: " + " | ".join(
+            f"{tool.upper()} X={float(datums[tool]['x']):.3f} "
+            f"Y={float(datums[tool]['y']):.3f}"
+            for tool in ("t0", "t1")
+        )
+    except (KeyError, TypeError, ValueError):
+        raise FineNozzleError(
+            "acquisition calibration has invalid tool XY endstops"
+        ) from None
+
+
 def _gray(image: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -631,6 +651,7 @@ def analyze(
     *,
     frames: list[dict[str, Any]],
     reference: dict[str, Any],
+    acquisition_calibration: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     _logger.info(f"fine-grid analysis started with {len(frames)} frames")
     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -640,6 +661,9 @@ def analyze(
     if len(tools) != 1 or tools - {"T0", "T1"}:
         raise FineNozzleError("fine-grid analysis requires exactly one tool")
     target_tool = tools.pop()
+    acquisition_xy_endstop_line = _acquisition_xy_endstop_line(
+        acquisition_calibration
+    )
 
     marker_centers = []
     marker_records = []
@@ -1220,8 +1244,12 @@ def analyze(
         ]
 
         second_line = f"fiducials seen at: X={fiducials_seen_at[0]:.3f} Y={fiducials_seen_at[1]:.3f} "
-        lines = [top_line_text, second_line]
-        _logger.info(f"Info for frame {frame['frame']}: {top_line_text} | {second_line}")
+        lines = [top_line_text, second_line, acquisition_xy_endstop_line]
+        _logger.info(
+            "Info for frame %s: %s",
+            frame["frame"],
+            " | ".join(lines),
+        )
 
         for k, line in enumerate(lines):
             cv2.putText(
