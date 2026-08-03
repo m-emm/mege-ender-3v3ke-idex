@@ -1,0 +1,464 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: x-z-axis interface scene
+
+Builder:
+  Collection: true
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - back
+        - top
+        - left
+        - right
+        - bottom
+      width: 700
+      height: 700
+    parts:
+      - source: injected
+        assembly: printer_frame
+        artifact: all
+      - source: injected
+        assembly: printer_foot_left_front
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: printer_foot_left_back
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: printer_foot_right_front
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: printer_foot_right_back
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_profile_left
+        artifact: all
+      - source: injected
+        assembly: z_axis_profile_right
+        artifact: all
+      - source: injected
+        assembly: z_axis_guide_rod_left
+        artifact: all
+      - source: injected
+        assembly: z_axis_guide_rod_right
+        artifact: all
+      - source: injected
+        assembly: z_axis_threaded_rod_left
+        artifact: leader
+        name: z_axis_threaded_rod_left
+      - source: injected
+        assembly: z_axis_threaded_rod_right
+        artifact: leader
+        name: z_axis_threaded_rod_right
+      - source: injected
+        assembly: z_axis_motor_mount_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_motor_mount_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_bottom_support_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_guide_rod_top_mount_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_bottom_support_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_carriage_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: z_axis_carriage_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_lower_profile
+        artifact: all
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_top_profile
+        artifact: all
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_rail
+        artifact: all
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_composite_bottom
+        artifact: leader
+        name: x_axis_composite_bottom
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_composite_bottom
+        artifact: non_production_parts
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_composite_top
+        artifact: leader
+        name: x_axis_composite_top
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_composite_top
+        artifact: non_production_parts
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis
+        artifact: followers
+        names:
+          - x_axis_idler_endcap_bottom_left
+          - x_axis_idler_endcap_bottom_right
+          - x_axis_idler_endcap_bottom_right_cage
+          - x_axis_idler_endcap_top_left
+          - x_axis_idler_endcap_top_right
+          - x_axis_idler_endcap_top_right_cage
+        name_template: "{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_carriage_stopper_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_carriage_stopper_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_endstop_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_endstop_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_left_carriage
+        artifact: all
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_right_carriage
+        artifact: all
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: sprite_extruder_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: nitehawk_board_left
+        artifact: followers
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: extruder_cage_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: part_fan_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: single_part_fan_front_left_assembly
+        artifact: leader
+        name: part_fan_left_front_body
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: single_part_fan_side_left_assembly
+        artifact: leader
+        name: part_fan_left_side_body
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: tool_head_mount_machined_bottom
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: tool_head_cable_attach_shield_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: sprite_extruder_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: nitehawk_board_right
+        artifact: followers
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: extruder_cage_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: part_fan_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: single_part_fan_front_right_assembly
+        artifact: leader
+        name: part_fan_right_front_body
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: dependencies
+        assembly: single_part_fan_side_right_assembly
+        artifact: leader
+        name: part_fan_right_side_body
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: tool_head_mount_machined_top
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: tool_head_cable_attach_shield_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: x_axis_belt_carriage_top
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+
+Parameters:
+  print_bed_y_travel:
+    Type: Float
+  x_axis_x_travel:
+    Type: Float
+  x_axis_x_travel_negative:
+    Type: Float
+  z_axis_z_travel:
+    Type: Float

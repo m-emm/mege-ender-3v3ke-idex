@@ -563,7 +563,6 @@ placement:
         - 0
         - 0
         - -20.0
-   
 
     - part: z_axis_top_profile_gusset_left_assembly.non_production_parts.z_profile_to_align
       to: z_axis_profile_left_assembly
@@ -930,8 +929,6 @@ placement:
         - nitehawk_usb_dual_board_housing_assembly
       to: x_axis_rail_assembly
 
-
-
     - rigid_group:
         - z_axis_top_profile_gusset_left_assembly
         - z_axis_top_profile_gusset_right_assembly
@@ -947,7 +944,7 @@ placement:
             "$sub": "-1 * ${z_axis_top_bridge_profile_top_drop}"
 
     - rigid_group:
-        - z_axis_top_bridge_profile_assembly        
+        - z_axis_top_bridge_profile_assembly
       to: z_axis_profile_right_assembly
 
     - part: sprite_extruder_left_assembly.non_production_parts.hotend
@@ -1084,7 +1081,6 @@ placement:
     - part: heatbed_psu_housing_assembly
       to: printer_frame_assembly
       alignment: BOTTOM
-
 
 process_data_generators:
   mege3devops_parametric:
@@ -3528,6 +3524,125 @@ assemblies:
       electric_switchboard: electric_switchboard_assembly
       hv_switchbox: hv_switchbox_assembly
       heatbed_psu_housing: heatbed_psu_housing_assembly
+
+  - name: x_z_axis_interface_assembly
+
+    depends_on:
+      - printer_frame_assembly
+      - printer_foot_left_front_assembly
+      - printer_foot_left_back_assembly
+      - printer_foot_right_front_assembly
+      - printer_foot_right_back_assembly
+      - print_bed_assembly
+      - print_bed_undercarriage_assembly
+      - y_axis_drive_assembly
+      - y_axis_assembly
+      - y_axis_endstop_holder_assembly
+      - y_axis_rail_carrier_brackets_assembly
+      - z_axis_profile_left_assembly
+      - z_axis_profile_right_assembly
+      - z_axis_guide_rod_left_assembly
+      - z_axis_guide_rod_right_assembly
+      - z_axis_threaded_rod_left_assembly
+      - z_axis_threaded_rod_right_assembly
+      - z_axis_motor_mount_left_assembly
+      - z_axis_motor_mount_right_assembly
+      - z_axis_bottom_support_left_assembly
+      - z_axis_bottom_support_right_assembly
+      - z_axis_guide_rod_top_mount_left_assembly
+      - z_axis_guide_rod_top_mount_right_assembly
+      - z_axis_carriage_left_assembly
+      - z_axis_carriage_right_assembly
+      - z_axis_top_bridge_profile_assembly
+      - z_axis_top_profile_gusset_left_assembly
+      - z_axis_top_profile_gusset_right_assembly
+      - x_axis_assembly
+      - x_axis_carriage_stopper_left_assembly
+      - x_axis_carriage_stopper_right_assembly
+      - x_axis_lower_profile_assembly
+      - x_axis_top_profile_assembly
+      - x_axis_composite_bottom_assembly
+      - x_axis_composite_top_assembly
+      - x_axis_rail_assembly
+      - x_axis_left_carriage_assembly
+      - x_axis_right_carriage_assembly
+      - x_axis_endstop_left_assembly
+      - x_axis_endstop_right_assembly
+      - x_axis_mcu_holder_with_fan_assembly
+      - sprite_extruder_left_assembly
+      - sprite_extruder_right_assembly
+      - nitehawk_board_left_assembly
+      - nitehawk_board_right_assembly
+      - extruder_cage_left_joined_assembly
+      - part_fan_left_joined_assembly
+      - extruder_cage_right_joined_assembly
+      - part_fan_right_joined_assembly
+      - tool_head_mount_machined_bottom_assembly
+      - tool_head_mount_machined_top_assembly
+      - tool_head_cable_attach_shield_left_assembly
+      - tool_head_cable_attach_shield_right_assembly
+      - x_axis_belt_carriage_top_assembly
+      - y_z_axis_mcu_holder_assembly
+      - nitehawk_usb_dual_board_housing_assembly
+      - printer_host_and_screen_assembly
+      - raspberry_pi_assembly
+      - electric_switchboard_assembly
+      - hv_switchbox_assembly
+      - heatbed_psu_housing_assembly
+    parameters:
+      print_bed_y_travel: !Ref print_bed_y_travel
+      x_axis_x_travel: !Ref x_axis_x_travel
+      x_axis_x_travel_negative: !Ref x_axis_x_travel_negative
+      z_axis_z_travel: !Ref z_axis_z_travel
+    inject_parts:
+      printer_frame: printer_frame_assembly
+      printer_foot_left_front: printer_foot_left_front_assembly
+      printer_foot_left_back: printer_foot_left_back_assembly
+      printer_foot_right_front: printer_foot_right_front_assembly
+      printer_foot_right_back: printer_foot_right_back_assembly
+      z_axis_profile_left: z_axis_profile_left_assembly
+      z_axis_profile_right: z_axis_profile_right_assembly
+      z_axis_guide_rod_left: z_axis_guide_rod_left_assembly
+      z_axis_guide_rod_right: z_axis_guide_rod_right_assembly
+      z_axis_threaded_rod_left: z_axis_threaded_rod_left_assembly
+      z_axis_threaded_rod_right: z_axis_threaded_rod_right_assembly
+      z_axis_motor_mount_left: z_axis_motor_mount_left_assembly
+      z_axis_motor_mount_right: z_axis_motor_mount_right_assembly
+      z_axis_bottom_support_left: z_axis_bottom_support_left_assembly
+      z_axis_bottom_support_right: z_axis_bottom_support_right_assembly
+      z_axis_guide_rod_top_mount_left: z_axis_guide_rod_top_mount_left_assembly
+      z_axis_guide_rod_top_mount_right: z_axis_guide_rod_top_mount_right_assembly
+      z_axis_carriage_left: z_axis_carriage_left_assembly
+      z_axis_carriage_right: z_axis_carriage_right_assembly
+      z_axis_top_bridge_profile: z_axis_top_bridge_profile_assembly
+      z_axis_top_profile_gusset_left: z_axis_top_profile_gusset_left_assembly
+      z_axis_top_profile_gusset_right: z_axis_top_profile_gusset_right_assembly
+      x_axis: x_axis_assembly
+      x_axis_lower_profile: x_axis_lower_profile_assembly
+      x_axis_top_profile: x_axis_top_profile_assembly
+      x_axis_rail: x_axis_rail_assembly
+      x_axis_composite_bottom: x_axis_composite_bottom_assembly
+      x_axis_composite_top: x_axis_composite_top_assembly
+      x_axis_carriage_stopper_left: x_axis_carriage_stopper_left_assembly
+      x_axis_carriage_stopper_right: x_axis_carriage_stopper_right_assembly
+      x_axis_endstop_left: x_axis_endstop_left_assembly
+      x_axis_endstop_right: x_axis_endstop_right_assembly
+      x_axis_left_carriage: x_axis_left_carriage_assembly
+      x_axis_right_carriage: x_axis_right_carriage_assembly
+      x_axis_mcu_holder: x_axis_mcu_holder_with_fan_assembly
+      sprite_extruder_left: sprite_extruder_left_assembly
+      sprite_extruder_right: sprite_extruder_right_assembly
+      nitehawk_board_left: nitehawk_board_left_assembly
+      nitehawk_board_right: nitehawk_board_right_assembly
+      extruder_cage_left: extruder_cage_left_joined_assembly
+      part_fan_left: part_fan_left_joined_assembly
+      extruder_cage_right: extruder_cage_right_joined_assembly
+      part_fan_right: part_fan_right_joined_assembly
+      tool_head_mount_machined_bottom: tool_head_mount_machined_bottom_assembly
+      tool_head_mount_machined_top: tool_head_mount_machined_top_assembly
+      tool_head_cable_attach_shield_left: tool_head_cable_attach_shield_left_assembly
+      tool_head_cable_attach_shield_right: tool_head_cable_attach_shield_right_assembly
+      x_axis_belt_carriage_top: x_axis_belt_carriage_top_assembly
 
   - name: tool_heads_assembly
 

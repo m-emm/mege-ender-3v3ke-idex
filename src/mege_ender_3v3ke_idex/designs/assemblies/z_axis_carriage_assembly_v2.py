@@ -571,5 +571,6 @@ def create_z_axis_carriage_assembly_v2(
         carriage_reference,
         "x_axis_alignment_reference",
     )
+    retval.set_hidden_by_default("x_axis_alignment_reference")
 
     return translate(0, 0, carriage_z_offset)(retval)
