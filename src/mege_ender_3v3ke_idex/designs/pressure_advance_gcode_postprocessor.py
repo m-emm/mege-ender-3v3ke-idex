@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any, Mapping, Sequence
 
 _WORD_PATTERN = re.compile(
@@ -20,6 +21,97 @@ class _PressureAdvanceBand:
     y_max: float
     advance: float
     label: str
+
+
+def _decimal_value(value: Any, field_name: str) -> Decimal:
+    try:
+        result = Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError(f"sweep.{field_name} must be numeric") from exc
+    if not result.is_finite():
+        raise ValueError(f"sweep.{field_name} must be finite")
+    return result
+
+
+def expand_pressure_advance_sweep(
+    sweep: Mapping[str, Any],
+) -> tuple[dict[str, Any], ...]:
+    """Expand a compact pressure-advance sweep into labelled Y bands."""
+
+    if not isinstance(sweep, Mapping):
+        raise ValueError("sweep must be a mapping")
+
+    y_min_start = _decimal_value(sweep["y_min_start"], "y_min_start")
+    band_height = _decimal_value(sweep["band_height"], "band_height")
+    y_pitch = _decimal_value(sweep["y_pitch"], "y_pitch")
+    advance_start = _decimal_value(sweep["advance_start"], "advance_start")
+    if band_height <= 0:
+        raise ValueError("sweep.band_height must be positive")
+    if y_pitch < band_height:
+        raise ValueError("sweep.y_pitch must be at least sweep.band_height")
+    if advance_start < 0:
+        raise ValueError("sweep.advance_start must be non-negative")
+
+    has_pitch_count = "advance_pitch" in sweep or "count" in sweep
+    has_stop_intervals = "advance_stop" in sweep or "intervals" in sweep
+    if has_pitch_count == has_stop_intervals:
+        raise ValueError(
+            "sweep must define exactly one of advance_pitch/count or "
+            "advance_stop/intervals"
+        )
+
+    if has_pitch_count:
+        if "advance_pitch" not in sweep or "count" not in sweep:
+            raise ValueError("sweep.advance_pitch and sweep.count are both required")
+        advance_pitch = _decimal_value(sweep["advance_pitch"], "advance_pitch")
+        count = int(sweep["count"])
+        if Decimal(count) != _decimal_value(sweep["count"], "count"):
+            raise ValueError("sweep.count must be an integer")
+        if advance_pitch <= 0:
+            raise ValueError("sweep.advance_pitch must be positive")
+    else:
+        if "advance_stop" not in sweep or "intervals" not in sweep:
+            raise ValueError("sweep.advance_stop and sweep.intervals are both required")
+        advance_stop = _decimal_value(sweep["advance_stop"], "advance_stop")
+        intervals = int(sweep["intervals"])
+        if Decimal(intervals) != _decimal_value(sweep["intervals"], "intervals"):
+            raise ValueError("sweep.intervals must be an integer")
+        if intervals <= 0:
+            raise ValueError("sweep.intervals must be positive")
+        if advance_stop <= advance_start:
+            raise ValueError("sweep.advance_stop must exceed sweep.advance_start")
+        count = intervals + 1
+        advance_pitch = (advance_stop - advance_start) / Decimal(intervals)
+
+    if count <= 0:
+        raise ValueError("sweep.count must be positive")
+    label_decimals = int(sweep.get("label_decimals", 3))
+    if label_decimals < 0 or label_decimals > 6:
+        raise ValueError("sweep.label_decimals must be between 0 and 6")
+    quantum = Decimal(1).scaleb(-label_decimals)
+
+    bands = []
+    previous_advance = None
+    for index in range(count):
+        advance = (advance_start + advance_pitch * index).quantize(
+            quantum,
+            rounding=ROUND_HALF_UP,
+        )
+        if previous_advance is not None and advance <= previous_advance:
+            raise ValueError(
+                "sweep values must remain strictly increasing after rounding"
+            )
+        previous_advance = advance
+        y_min = y_min_start + y_pitch * index
+        bands.append(
+            {
+                "y_min": float(y_min),
+                "y_max": float(y_min + band_height),
+                "advance": float(advance),
+                "label": f"{advance:.{label_decimals}f}",
+            }
+        )
+    return tuple(bands)
 
 
 def _parse_words(code: str) -> dict[str, float]:
@@ -85,13 +177,18 @@ def apply_y_banded_pressure_advance(
     gcode_text: str,
     *,
     context,
-    bands,
     restore_advance,
+    bands=None,
+    sweep=None,
 ) -> str:
     """Insert pressure-advance changes for positive extrusion in configured Y bands."""
 
     del context
-    normalized_bands = _normalize_bands(bands)
+    if (bands is None) == (sweep is None):
+        raise ValueError("exactly one of bands or sweep must be configured")
+    normalized_bands = _normalize_bands(
+        expand_pressure_advance_sweep(sweep) if sweep is not None else bands
+    )
     restore_value = float(restore_advance)
     if not math.isfinite(restore_value) or restore_value < 0:
         raise ValueError("restore_advance must be a finite non-negative number")
@@ -191,4 +288,4 @@ def apply_y_banded_pressure_advance(
     return "".join(output_lines)
 
 
-__all__ = ["apply_y_banded_pressure_advance"]
+__all__ = ["apply_y_banded_pressure_advance", "expand_pressure_advance_sweep"]

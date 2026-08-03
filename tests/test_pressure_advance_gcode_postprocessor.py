@@ -5,6 +5,7 @@ import pytest
 import yaml
 from mege_ender_3v3ke_idex.designs.assemblies.pressure_advance_calibration_assembly import (
     CALIBRATION_LAYER_HEIGHT,
+    DEFAULT_PRESSURE_ADVANCE_SWEEP,
     LABEL_PLAQUE_DEPTH,
     LABEL_PLAQUE_HEIGHT,
     LABEL_TEXT_HEIGHT,
@@ -18,6 +19,7 @@ from mege_ender_3v3ke_idex.designs.assemblies.pressure_advance_calibration_assem
 )
 from mege_ender_3v3ke_idex.designs.pressure_advance_gcode_postprocessor import (
     apply_y_banded_pressure_advance,
+    expand_pressure_advance_sweep,
 )
 from shellforgepy.simple import get_bounding_box, get_bounding_box_size
 
@@ -105,6 +107,63 @@ def test_y_banded_pressure_advance_requires_extrusion_in_every_band():
         _apply("G90\nM83\nG1 Y15\nG1 X10 E1\n")
 
 
+def test_compact_sweep_expands_pitch_and_count():
+    bands = expand_pressure_advance_sweep(
+        {
+            "y_min_start": 10,
+            "band_height": 10,
+            "y_pitch": 20,
+            "advance_start": 0.01,
+            "advance_pitch": 0.01,
+            "count": 3,
+            "label_decimals": 2,
+        }
+    )
+
+    assert [band["label"] for band in bands] == ["0.01", "0.02", "0.03"]
+    assert [(band["y_min"], band["y_max"]) for band in bands] == [
+        (10.0, 20.0),
+        (30.0, 40.0),
+        (50.0, 60.0),
+    ]
+
+
+def test_compact_sweep_expands_stop_across_intervals_with_label_rounding():
+    bands = expand_pressure_advance_sweep(
+        {
+            "y_min_start": 10,
+            "band_height": 10,
+            "y_pitch": 20,
+            "advance_start": 0.03,
+            "advance_stop": 0.20,
+            "intervals": 7,
+            "label_decimals": 3,
+        }
+    )
+
+    assert [band["label"] for band in bands] == [
+        "0.030",
+        "0.054",
+        "0.079",
+        "0.103",
+        "0.127",
+        "0.151",
+        "0.176",
+        "0.200",
+    ]
+
+
+def test_y_banded_pressure_advance_requires_one_band_representation():
+    with pytest.raises(ValueError, match="exactly one"):
+        apply_y_banded_pressure_advance(
+            "G90\n",
+            context=SimpleNamespace(plate_name="fixture"),
+            bands=_bands(),
+            sweep=DEFAULT_PRESSURE_ADVANCE_SWEEP,
+            restore_advance=0,
+        )
+
+
 def test_calibration_geometry_and_yaml_bands_stay_consistent():
     assembly = create_pressure_advance_calibration_assembly()
     min_point, _ = get_bounding_box(assembly)
@@ -133,10 +192,55 @@ def test_calibration_geometry_and_yaml_bands_stay_consistent():
     )
     assert LABEL_PLAQUE_HEIGHT == pytest.approx(CALIBRATION_LAYER_HEIGHT)
     assert LABEL_TEXT_HEIGHT <= 4 * CALIBRATION_LAYER_HEIGHT
-    bands = plate["gcode_postprocessor"]["arguments"]["bands"]
+    sweep = plate["gcode_postprocessor"]["arguments"]["sweep"]
+    assert (
+        sweep
+        == resource["Parts"]["PressureAdvanceCalibrationAssembly"]["Properties"][
+            "Properties"
+        ]["pressure_advance_sweep"]
+    )
+    bands = expand_pressure_advance_sweep(sweep)
     assert len(bands) == len(PRESSURE_ADVANCE_VALUES)
     assert [band["label"] for band in bands] == [
         f"{value:.3f}" for value in PRESSURE_ADVANCE_VALUES
     ]
     for previous, current in zip(bands, bands[1:]):
         assert previous["y_max"] < current["y_min"]
+
+
+def test_tpu95_calibration_geometry_and_production_config_stay_consistent():
+    repository_dir = Path(__file__).resolve().parents[1]
+    resource = yaml.safe_load(
+        (
+            repository_dir
+            / "assembling/assemblies/pressure_advance_calibration_tpu95_assembly.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    production = resource["Builder"]["Production"]
+    plate = production["arrange"]["plates"][0]
+    sweep = plate["gcode_postprocessor"]["arguments"]["sweep"]
+    generator_sweep = resource["Parts"]["PressureAdvanceCalibrationAssembly"][
+        "Properties"
+    ]["Properties"]["pressure_advance_sweep"]
+    bands = expand_pressure_advance_sweep(sweep)
+    assembly = create_pressure_advance_calibration_assembly(generator_sweep)
+    min_point, _ = get_bounding_box(assembly)
+    _, depth, _ = get_bounding_box_size(assembly)
+
+    assert sweep == generator_sweep
+    assert len(bands) > 1
+    assert all(band["label"] for band in bands)
+    assert [band["advance"] for band in bands] == sorted(
+        band["advance"] for band in bands
+    )
+    assert min_point[2] == pytest.approx(0.0)
+    assert depth == pytest.approx(
+        len(bands) * STRIP_DEPTH + (len(bands) - 1) * STRIP_GAP
+    )
+    assert production["process_data_preset"] == "tpu95a_high_speed_06_idex_t1"
+    assert production["parts"][0]["obj_metadata"]["slicer_filament_id"] == 2
+    assert production["arrange"]["export_individual_parts"] is True
+    assert (
+        plate["process_data"]["overrides"]["process_overrides"]["enable_arc_fitting"]
+        == "0"
+    )

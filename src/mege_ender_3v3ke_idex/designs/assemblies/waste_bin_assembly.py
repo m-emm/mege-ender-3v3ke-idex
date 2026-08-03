@@ -17,6 +17,50 @@ waste_bin_connector_thickness = 2
 waste_bin_brush_long_slit_inset = 3
 waste_bin_brush_mount_screw_size = "M3"
 
+nozzle_brush_width = 14
+nozzle_brush_depth = 6
+nozzle_brush_base_height = 4.6
+nozzle_brush_total_height = 6.3
+nozzle_brush_hairs_height = nozzle_brush_total_height - nozzle_brush_base_height
+
+
+nozzle_brush_num_depth_hairs = 4
+nozzle_brush_num_width_hairs = 7
+nozzle_brush_hair_diameter = 1
+
+waste_bin_brush_nozzle_overlap = 0.5
+
+nozzle_brush_holder_wall_thickness = 2.5
+
+nozzle_brush_holder_clearance = 0.1
+nozzle_brush_holder_height = 14
+nozzle_brush_holder_slider_height = 8
+
+
+def create_nozzle_brush():
+    base = create_box(nozzle_brush_width, nozzle_brush_depth, nozzle_brush_base_height)
+    hairs = PartCollector()
+    hair_x_pitch = nozzle_brush_width / nozzle_brush_num_width_hairs
+    hair_y_pitch = nozzle_brush_depth / nozzle_brush_num_depth_hairs
+    for depth_index in range(nozzle_brush_num_depth_hairs):
+        for width_index in range(nozzle_brush_num_width_hairs):
+            hair = create_cylinder(
+                nozzle_brush_hair_diameter / 2, nozzle_brush_hairs_height
+            )
+            hair = translate(
+                width_index * hair_x_pitch,
+                depth_index * hair_y_pitch,
+                0,
+            )(hair)
+            hairs = hairs.fuse(hair)
+
+    hairs = align(hairs, base, Alignment.CENTER)
+    hairs = align(hairs, base, Alignment.STACK_TOP)
+
+    brush = base.fuse(hairs)
+
+    return brush
+
 
 def create_waste_bin_assembly(
     *,
@@ -54,7 +98,7 @@ def create_waste_bin_assembly(
     body = align(
         body, hotend, Alignment.STACK_BOTTOM, stack_gap=waste_bin_body_nozzle_clearance
     )
-
+    base = body
     nozzle_brush_mount_hole_diameter = MScrew.from_size(
         waste_bin_brush_mount_screw_size
     ).clearance_hole_loose
@@ -197,10 +241,124 @@ def create_waste_bin_assembly(
 
     body = body.cut(nozzle_brush_long_slit_cutter)
 
+    nozzle_brush = create_nozzle_brush()
+    nozzle_brush = rotate(90)(nozzle_brush)
+
+    nozzle_brush = align(nozzle_brush, hotend, Alignment.CENTER)
+
+    nozzle_brush = align(nozzle_brush, base, Alignment.RIGHT)
+    nozzle_brush = align(
+        nozzle_brush,
+        hotend,
+        Alignment.STACK_BOTTOM,
+        stack_gap=-waste_bin_brush_nozzle_overlap,
+    )
+
+    nozzle_brush = translate(
+        -waste_bin_wall_thickness
+        - nozzle_brush_holder_wall_thickness
+        - nozzle_brush_holder_clearance,
+        0,
+        0,
+    )(nozzle_brush)
+
+    nozzle_brush_holder = materialize_bounding_box(
+        nozzle_brush,
+        x_enlargement=2 * nozzle_brush_holder_wall_thickness
+        + 2 * nozzle_brush_holder_clearance,
+        y_enlargement=2 * nozzle_brush_holder_wall_thickness
+        + 2 * nozzle_brush_holder_clearance,
+        z_size=nozzle_brush_holder_height,
+    )
+
+    nozzle_brush_holder_main_size = get_bounding_box_size(nozzle_brush_holder)
+
+    nozzle_brush_cutter = materialize_bounding_box(
+        nozzle_brush,
+        x_enlargement=2 * nozzle_brush_holder_clearance,
+        y_enlargement=2 * nozzle_brush_holder_clearance,
+        z_enlargement=2 * nozzle_brush_holder_clearance,
+    )
+
+    nozzle_brush_holder = align(
+        nozzle_brush_holder,
+        nozzle_brush,
+        Alignment.STACK_BOTTOM,
+        stack_gap=-nozzle_brush_base_height,
+    )
+    nozzle_brush_holder = nozzle_brush_holder.cut(nozzle_brush_cutter)
+
+    slider_width = MScrew.from_size(waste_bin_brush_mount_screw_size).core_hole + 0.3
+    nozzle_brush_holder_slider = create_rounded_slab(
+        nozzle_brush_holder_slider_height,
+        slider_width,
+        nozzle_brush_holder_wall_thickness,
+        slider_width / 2,
+    )
+    nozzle_brush_holder_slider = rotate(90, axis=(0, 1, 0))(nozzle_brush_holder_slider)
+    nozzle_brush_holder_slider = align(
+        nozzle_brush_holder_slider, nozzle_brush_long_slit_cutter, Alignment.CENTER
+    )
+    nozzle_brush_holder_slider = align(
+        nozzle_brush_holder_slider, nozzle_brush_holder, Alignment.BOTTOM
+    )
+    nozzle_brush_holder_slider = align(
+        nozzle_brush_holder_slider, nozzle_brush_holder, Alignment.STACK_RIGHT
+    )
+
+    nozzle_brush_holder = nozzle_brush_holder.fuse(nozzle_brush_holder_slider)
+    nozzle_brush_holder_size = get_bounding_box_size(nozzle_brush_holder)
+    nozzle_brlush_holder_screw_length = int(nozzle_brush_holder_size[1] / 4) * 4
+
+    nozzle_brush_holder_screw = create_complete_screw_assembly(
+        waste_bin_brush_mount_screw_size,
+        nozzle_brlush_holder_screw_length,
+    )
+    nozzle_brush_holder_screw = rotate(90, axis=(0, 1, 0))(nozzle_brush_holder_screw)
+    nozzle_brush_holder_screw = align(
+        nozzle_brush_holder_screw, nozzle_brush_holder_slider, Alignment.CENTER
+    )
+    nozzle_brush_holder_screw = align(
+        nozzle_brush_holder_screw, nozzle_brush_holder_slider, Alignment.RIGHT
+    )
+
+    nozzle_brush_holder = nozzle_brush_holder_screw.use_as_cutter_on(
+        nozzle_brush_holder
+    )
+
+    threaded_insert = create_thread_inset_assembly(
+        waste_bin_brush_mount_screw_size,
+        6,
+        extra_radius=1,
+        thread_inset_hole_radius_adjustment=-0.3,
+    )
+
+    threaded_insert = rotate(90, axis=(0, 1, 0))(threaded_insert)
+    threaded_insert = align(
+        threaded_insert, nozzle_brush_holder_screw, Alignment.CENTER
+    )
+    threaded_insert = align(threaded_insert, nozzle_brush_holder, Alignment.LEFT)
+
+    nozzle_brush_holder = threaded_insert.use_as_cutter_on(nozzle_brush_holder)
+
+    thread_inset_boss = threaded_insert.get_named_cutter("assembly_cutter")
+    thread_inset_boss = nozzle_brush_holder_screw.use_as_cutter_on(thread_inset_boss)
+    nozzle_brush_holder = nozzle_brush_holder.fuse(thread_inset_boss)
+
     retval = LeaderFollowersCuttersPart(
         leader=body,
     )
 
+    retval.add_named_non_production_part(nozzle_brush, "nozzle_brush")
+    retval.add_named_follower(nozzle_brush_holder, "nozzle_brush_holder")
+    retval.add_named_non_production_part(
+        threaded_insert.get_named_non_production_part("thread_inset"),
+        "nozzle_brush_holder_threaded_insert",
+    )
+    retval.add_named_non_production_part(
+        nozzle_brush_holder_screw.get_named_non_production_part("complete_screw"),
+        "nozzle_brush_holder_screw",
+    )
     for i, mount_screw in enumerate(mount_screws):
         retval.add_named_non_production_part(
             mount_screw.get_named_non_production_part("complete_screw"),

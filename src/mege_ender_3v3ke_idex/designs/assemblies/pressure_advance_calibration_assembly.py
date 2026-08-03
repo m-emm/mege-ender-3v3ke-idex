@@ -1,8 +1,23 @@
 """Vector-labelled pressure-advance corner-strip calibration assembly."""
 
+from mege_ender_3v3ke_idex.designs.pressure_advance_gcode_postprocessor import (
+    expand_pressure_advance_sweep,
+)
 from shellforgepy.simple import *
 
-PRESSURE_ADVANCE_VALUES = tuple(0.025 + index * 0.005 for index in range(7))
+DEFAULT_PRESSURE_ADVANCE_SWEEP = {
+    "y_min_start": 43.5,
+    "band_height": 13.0,
+    "y_pitch": 20.0,
+    "advance_start": 0.025,
+    "advance_pitch": 0.005,
+    "count": 7,
+    "label_decimals": 3,
+}
+PRESSURE_ADVANCE_VALUES = tuple(
+    band["advance"]
+    for band in expand_pressure_advance_sweep(DEFAULT_PRESSURE_ADVANCE_SWEEP)
+)
 STRIP_WIDTH = 70.0
 STRIP_DEPTH = 12.0
 STRIP_HEIGHT = 3.0
@@ -18,12 +33,15 @@ LABEL_TEXT_STROKE_WIDTH = 1.5
 LABEL_STRIP_OVERLAP = 0.6
 
 
-def create_pressure_advance_calibration_assembly():
-    """Create nine labelled strips for comparing pressure advance by Y position."""
+def create_pressure_advance_calibration_assembly(pressure_advance_sweep=None):
+    """Create labelled strips for comparing pressure advance by Y position."""
 
     calibration = PartCollector()
+    bands = expand_pressure_advance_sweep(
+        pressure_advance_sweep or DEFAULT_PRESSURE_ADVANCE_SWEEP
+    )
 
-    for index, pressure_advance in enumerate(PRESSURE_ADVANCE_VALUES):
+    for index, band in enumerate(bands):
         strip = create_box(STRIP_WIDTH, STRIP_DEPTH, STRIP_HEIGHT)
         strip_cutter = create_box(
             STRIP_WIDTH - 2 * STRIP_WALL_THICKNESS,
@@ -48,7 +66,7 @@ def create_pressure_advance_calibration_assembly():
         )
 
         label = create_vector_text_object(
-            f"{pressure_advance:.3f}",
+            band["label"],
             size=LABEL_TEXT_SIZE,
             thickness=LABEL_TEXT_HEIGHT,
             stroke_width=LABEL_TEXT_STROKE_WIDTH,

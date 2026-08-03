@@ -1093,6 +1093,8 @@ process_data_generators:
       printer_id: megemaster
   mege3devops_idex_parametric:
     function: mege_3devops.process_data.mege_ender_3v3ke_idex.resolve_idex_process_data_from_parameters
+  mege3devops_idex_t1_tpu95a_06_high_speed:
+    function: mege_3devops.process_data.mege_ender_3v3ke_idex.t1_tpu95a_06_high_speed_process_data
 
 process_data_presets:
   pla_medium_strength_max_quality_06:
@@ -1381,6 +1383,9 @@ process_data_presets:
       process_overrides:
         brim_type: "no_brim"
         sparse_infill_pattern: "cubic"
+
+  tpu95a_high_speed_06_idex_t1:
+    generator: mege3devops_idex_t1_tpu95a_06_high_speed
 
 assemblies:
   - name: brass_angle_assembly
@@ -4253,5 +4258,11 @@ assemblies:
   - name: pressure_advance_calibration_assembly
 
     resource_file: pressure_advance_calibration_assembly.yaml
+    depends_on: []
+    parameters: {}
+
+  - name: pressure_advance_calibration_tpu95_assembly
+
+    resource_file: pressure_advance_calibration_tpu95_assembly.yaml
     depends_on: []
     parameters: {}

@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Vector-labelled Y-banded pressure-advance calibration strips
+Description: Vector-labelled TPU95 T1 pressure-advance calibration strips
 
 Builder:
   Visualization:
@@ -10,30 +10,35 @@ Builder:
         name: pressure_advance_calibration
 
   Production:
-    process_data_preset: petgcf_max_strength_high_speed_06_idex_stock_matched
+    process_data_preset: tpu95a_high_speed_06_idex_t1
     parts:
       - source: self
         artifact: leader
         name: pressure_advance_calibration
+        obj_metadata:
+          slicer_filament_id: 2
     arrange:
-      export_individual_parts: false
+      export_individual_parts: true
       plates:
-        - name: pressure_advance_calibration
+        - name: pressure_advance_calibration_tpu95
           process_data:
             overrides:
               process_overrides:
+                enable_pressure_advance: "0"
+                pressure_advance: "0"
+                enable_arc_fitting: "0"
                 enable_support: "0"
                 brim_type: no_brim
                 skirt_loops: "0"
                 has_scarf_joint_seam: "0"
                 sparse_infill_density: "0%"
                 wall_loops: "2"
-                layer_height: "0.32"
-                initial_layer_print_height: "0.32"
-                outer_wall_speed: "200"
-                inner_wall_speed: "200"
-                initial_layer_speed: "200"
-                initial_layer_infill_speed: "200"
+                layer_height: "0.36"
+                initial_layer_print_height: "0.36"
+                outer_wall_speed: "100"
+                inner_wall_speed: "130"
+                initial_layer_speed: "100"
+                initial_layer_infill_speed: "100"
                 default_acceleration: "500"
                 initial_layer_acceleration: "500"
                 inner_wall_acceleration: "500"
@@ -53,15 +58,15 @@ Builder:
           gcode_postprocessor:
             function: mege_ender_3v3ke_idex.designs.pressure_advance_gcode_postprocessor.apply_y_banded_pressure_advance
             arguments:
-              restore_advance: 0.06
+              restore_advance: 0.12
               sweep:
                 {
                   y_min_start: 43.5,
                   band_height: 13,
                   y_pitch: 20,
-                  advance_start: 0.025,
-                  advance_pitch: 0.005,
-                  count: 7,
+                  advance_start: 0.03,
+                  advance_stop: 0.20,
+                  intervals: 7,
                   label_decimals: 3,
                 }
           parts:
@@ -81,8 +86,8 @@ Parts:
             y_min_start: 43.5,
             band_height: 13,
             y_pitch: 20,
-            advance_start: 0.025,
-            advance_pitch: 0.005,
-            count: 7,
+            advance_start: 0.03,
+            advance_stop: 0.20,
+            intervals: 7,
             label_decimals: 3,
           }
