@@ -3,12 +3,15 @@
 from shellforgepy.simple import *
 
 waste_bin_mount_plate_thickness = 4.0
-waste_bin_mount_plate_depth = 25
-waste_bin_mount_plate_outside_offset = 15
+waste_bin_mount_plate_depth = 21
+waste_bin_mount_plate_outside_offset = 17
 waste_bin_body_nozzle_clearance = 3
 waste_bin_mount_screw_size = "M3"
 waste_bin_mount_screw_length = 8
-waste_bin_vertical_mount_plate_depth = 4
+waste_bin_vertical_mount_plate_depth = 2.5
+waste_bin_vertical_rib_depth = 3
+
+
 waste_bin_connector_thickness = 2
 
 waste_bin_brush_long_slit_inset = 3
@@ -154,7 +157,37 @@ def create_waste_bin_assembly(
         connector = align(connector, vertical_mount_plate, Alignment.BACK)
         connector = align(connector, body, lr)
 
+        rib = materialize_bounding_box(
+            vertical_mount_plate,
+            y_size=waste_bin_vertical_rib_depth,
+            x_size=waste_bin_wall_thickness,
+        )
+        rib = align(rib, vertical_mount_plate, Alignment.STACK_FRONT)
+        rib = align(rib, vertical_mount_plate, lr.opposite)
+
         vertical_mount_plate = vertical_mount_plate.fuse(connector)
+
+        connector_angle_part = create_right_triangle(
+            waste_bin_mount_plate_depth,
+            waste_bin_mount_plate_depth,
+            waste_bin_wall_thickness,
+            extrusion_direction=(1, 0, 0),
+            a_normal=(0, 1, 0),
+            b_normal=(0, 0, -1),
+        )
+
+        connector_angle_part = align(
+            connector_angle_part, vertical_mount_plate, Alignment.CENTER
+        )
+        connector_angle_part = align(connector_angle_part, mount_plate, Alignment.BACK)
+        connector_angle_part = align(
+            connector_angle_part, mount_plate, Alignment.STACK_BOTTOM
+        )
+
+        connector_angle_part = align(connector_angle_part, mount_plate, lr.opposite)
+
+        vertical_mount_plate = vertical_mount_plate.fuse(connector_angle_part)
+        vertical_mount_plate = vertical_mount_plate.fuse(rib)
 
         vertical_mount_plates = vertical_mount_plates.fuse(vertical_mount_plate)
 

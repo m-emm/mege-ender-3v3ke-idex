@@ -1500,5 +1500,5 @@ globals:
   waste_bin_width: 50.0
   waste_bin_depth: 30
   waste_bin_height: 20.0
-  waste_bin_wall_thickness: 1.0
+  waste_bin_wall_thickness: 2.0
   waste_bin_fillet_radius: 2.0

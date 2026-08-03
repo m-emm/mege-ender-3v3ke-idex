@@ -1,0 +1,77 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Vector-labelled Y-banded pressure-advance calibration strips
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: pressure_advance_calibration
+
+  Production:
+    process_data_preset: petgcf_max_strength_high_speed_06_idex_stock_matched
+    parts:
+      - source: self
+        artifact: leader
+        name: pressure_advance_calibration
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: pressure_advance_calibration
+          process_data:
+            overrides:
+              process_overrides:
+                enable_support: "0"
+                brim_type: no_brim
+                skirt_loops: "0"
+                has_scarf_joint_seam: "0"
+                sparse_infill_density: "0%"
+                wall_loops: "2"
+                layer_height: "0.32"
+                initial_layer_print_height: "0.32"
+                outer_wall_speed: "100"
+                inner_wall_speed: "100"
+                initial_layer_speed: "100"
+                initial_layer_infill_speed: "100"
+                default_acceleration: "500"
+                initial_layer_acceleration: "500"
+                inner_wall_acceleration: "500"
+                outer_wall_acceleration: "500"
+                top_surface_acceleration: "500"
+                travel_acceleration: "500"
+                sparse_infill_acceleration: "500"
+                internal_solid_infill_acceleration: "500"
+                bridge_acceleration: "500"
+                default_jerk: "1"
+                infill_jerk: "1"
+                initial_layer_jerk: "1"
+                inner_wall_jerk: "1"
+                outer_wall_jerk: "1"
+                top_surface_jerk: "1"
+                travel_jerk: "1"
+          gcode_postprocessor:
+            function: mege_ender_3v3ke_idex.designs.pressure_advance_gcode_postprocessor.apply_y_banded_pressure_advance
+            arguments:
+              restore_advance: 0.03
+              bands:
+                - { y_min: 23.5, y_max: 36.5, advance: 0.00, label: "0.00" }
+                - { y_min: 43.5, y_max: 56.5, advance: 0.01, label: "0.01" }
+                - { y_min: 63.5, y_max: 76.5, advance: 0.02, label: "0.02" }
+                - { y_min: 83.5, y_max: 96.5, advance: 0.03, label: "0.03" }
+                - { y_min: 103.5, y_max: 116.5, advance: 0.04, label: "0.04" }
+                - { y_min: 123.5, y_max: 136.5, advance: 0.05, label: "0.05" }
+                - { y_min: 143.5, y_max: 156.5, advance: 0.06, label: "0.06" }
+                - { y_min: 163.5, y_max: 176.5, advance: 0.07, label: "0.07" }
+                - { y_min: 183.5, y_max: 196.5, advance: 0.08, label: "0.08" }
+          parts:
+            - pressure_advance_calibration
+      auto_assign_plates: false
+
+Parameters: {}
+
+Parts:
+  PressureAdvanceCalibrationAssembly:
+    Type: Shellforgepy::Assembly
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.pressure_advance_calibration_assembly.create_pressure_advance_calibration_assembly

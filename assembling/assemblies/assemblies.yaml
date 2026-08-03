@@ -4247,3 +4247,9 @@ assemblies:
 
     depends_on: []
     parameters: {}
+
+  - name: pressure_advance_calibration_assembly
+
+    resource_file: pressure_advance_calibration_assembly.yaml
+    depends_on: []
+    parameters: {}
