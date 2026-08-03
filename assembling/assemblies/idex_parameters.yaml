@@ -372,12 +372,6 @@ globals:
   x_axis_profile_stack_gap:
     $expr:
       "$sub": "${x_axis_profile_pitch} - 20"
-  x_axis_umbilical_guide_radius: 100
-  x_axis_umbilical_guide_cable_diameter: 5.25
-  x_axis_umbilical_guide_inner_width: 5
-  x_axis_umbilical_guide_wall_thickness: 1
-  x_axis_umbilical_guide_depth: 8
-  x_axis_umbilical_guide_stack_gap: 0
   x_axis_rail_length: 450
   x_axis_carriage_length: 45.4
   x_axis_carriage_height: 10
@@ -914,7 +908,7 @@ globals:
       "$sub": "${print_bed_vertical_gap_to_frame} - 43"
   z_axis_profile_length: 500
   z_axis_top_bridge_profile_back_offset: 7
-  z_axis_top_bridge_profile_top_drop: 20
+  z_axis_top_bridge_profile_top_drop: 80
   z_axis_top_profile_gusset_wall_thickness: 5
   z_axis_top_profile_gusset_profile_clearance: 0.3
   z_axis_top_profile_gusset_z_mount_width: 36

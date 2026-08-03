@@ -59,9 +59,13 @@ from vision_tool_xy_calibration import (
     analyze_measurement as analyze_tool_xy_measurement,
 )
 from vision_tool_xy_calibration import build_acquisition_gcode as build_tool_xy_gcode
-from vision_tool_xy_calibration import build_candidate_fact as build_tool_xy_candidate_fact
+from vision_tool_xy_calibration import (
+    build_candidate_fact as build_tool_xy_candidate_fact,
+)
 from vision_tool_xy_calibration import build_measurement_fact as build_tool_xy_fact
-from vision_tool_xy_calibration import calculate_candidate as calculate_tool_xy_candidate
+from vision_tool_xy_calibration import (
+    calculate_candidate as calculate_tool_xy_candidate,
+)
 from vision_tool_xy_calibration import (
     prepare_measurement as prepare_tool_xy_measurement,
 )
@@ -293,9 +297,7 @@ def _active_tool_xy_calibration(status: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(tool_state, dict):
         raise VisionCalibrationError("active _IDEX_TOOL_STATE is unavailable")
     fingerprint = str(
-        status.get("gcode_macro _IDEX_CONFIG_FINGERPRINT", {}).get(
-            "source_sha256", ""
-        )
+        status.get("gcode_macro _IDEX_CONFIG_FINGERPRINT", {}).get("source_sha256", "")
     )
     if not fingerprint:
         raise VisionCalibrationError("active printer fingerprint is unavailable")
@@ -560,20 +562,14 @@ def _load_tool_xy_source(binding: dict[str, Any]) -> dict[str, Any]:
     path = CALIBRATION_ROOT / binding["fact_set_path"]
     fact_set = load_json(path)
     fact = next(
-        (
-            item
-            for item in fact_set["facts"]
-            if item["name"] == binding["fact_name"]
-        ),
+        (item for item in fact_set["facts"] if item["name"] == binding["fact_name"]),
         None,
     )
     if fact is None:
         raise VisionCalibrationError(
             f"bound fact {binding['fact_name']} not found in {path}"
         )
-    manifest_path = (
-        CALIBRATION_ROOT / "jobs" / fact_set["job_id"] / "manifest.json"
-    )
+    manifest_path = CALIBRATION_ROOT / "jobs" / fact_set["job_id"] / "manifest.json"
     manifest = validate_manifest(load_json(manifest_path))
     priors = fact_set.get("provenance", {}).get("priors", {})
     return {
@@ -1446,16 +1442,12 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 acquisition_calibration=manifest["acquisition_calibration"],
             )
         elif job_type == TOOL_XY_CANDIDATE_JOB:
-            bindings = {
-                item["requirement"]: item for item in manifest["input_facts"]
-            }
+            bindings = {item["requirement"]: item for item in manifest["input_facts"]}
             details = calculate_tool_xy_candidate(
                 artifact_dir,
                 t0_source=_load_tool_xy_source(bindings["t0_xy_datum"]),
                 t1_source=_load_tool_xy_source(bindings["t1_xy_datum"]),
-                active_calibration=_active_tool_xy_calibration(
-                    query_printer_status()
-                ),
+                active_calibration=_active_tool_xy_calibration(query_printer_status()),
                 calib=CALIB,
             )
         elif job_type == EDDY_T0_XYZ_OFFSET_JOB:

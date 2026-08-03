@@ -40,6 +40,7 @@ BIG_SQUARE_SIZE = 75
 BIG_SQUARE_THICKNESS = 0.6
 BIG_SQUARE_STRIP_WIDTH = 10
 
+
 def create_soft_outside_demo_materials():
     petgcf_core = create_box(CORE_WIDTH_MM, CORE_DEPTH_MM, CORE_HEIGHT_MM)
 
@@ -67,32 +68,30 @@ def main():
 
     petgcf_core, tpu_shell = create_soft_outside_demo_materials()
 
-
-
-    big_square_strip = create_box(BIG_SQUARE_SIZE, BIG_SQUARE_SIZE, BIG_SQUARE_THICKNESS)
-    hole = materialize_bounding_box(big_square_strip, x_enlargement=-BIG_SQUARE_STRIP_WIDTH, y_enlargement=-BIG_SQUARE_STRIP_WIDTH, z_enlargement=0)
+    big_square_strip = create_box(
+        BIG_SQUARE_SIZE, BIG_SQUARE_SIZE, BIG_SQUARE_THICKNESS
+    )
+    hole = materialize_bounding_box(
+        big_square_strip,
+        x_enlargement=-BIG_SQUARE_STRIP_WIDTH,
+        y_enlargement=-BIG_SQUARE_STRIP_WIDTH,
+        z_enlargement=0,
+    )
 
     big_square_strip = big_square_strip.cut(hole)
 
-
     big_square_strip = align(big_square_strip, petgcf_core, Alignment.BOTTOM)
     big_square_strip = align(big_square_strip, petgcf_core, Alignment.LEFT)
-    big_square_strip = align(big_square_strip, petgcf_core, Alignment.STACK_BACK  )
-
-
+    big_square_strip = align(big_square_strip, petgcf_core, Alignment.STACK_BACK)
 
     petgcf_core = petgcf_core.fuse(big_square_strip)
     tpu_shell = tpu_shell.cut(big_square_strip)
 
-
-    big_square_strip = align(big_square_strip, tpu_shell    , Alignment.RIGHT)  
-    big_square_strip = align(big_square_strip, tpu_shell    , Alignment.STACK_FRONT)
+    big_square_strip = align(big_square_strip, tpu_shell, Alignment.RIGHT)
+    big_square_strip = align(big_square_strip, tpu_shell, Alignment.STACK_FRONT)
 
     tpu_shell = tpu_shell.fuse(big_square_strip)
     petgcf_core = petgcf_core.cut(big_square_strip)
-
-
-
 
     parts.add(
         petgcf_core,
@@ -116,9 +115,6 @@ def main():
             "tool": "T1",
         },
     )
-
-
-
 
     arrange_and_export(
         parts.as_list(),

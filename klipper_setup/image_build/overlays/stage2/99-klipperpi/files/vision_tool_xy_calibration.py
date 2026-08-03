@@ -503,9 +503,7 @@ def analyze_measurement(
         reference.get("marker_x_vector_px_per_mm"),
         "marker image motion vector",
     )
-    commanded_z_values = {
-        float(frame["commanded_position_mm"][2]) for frame in frames
-    }
+    commanded_z_values = {float(frame["commanded_position_mm"][2]) for frame in frames}
     if len(commanded_z_values) != 1 or not all(
         math.isfinite(value) for value in commanded_z_values
     ):
@@ -750,7 +748,9 @@ def _coordinate_references(source: dict[str, Any], label: str) -> dict[str, str]
         for item in dependencies
         if isinstance(item, dict) and item.get("fact_name") in required
     }
-    if set(result) != required or any(not value.startswith("sha256:") for value in result.values()):
+    if set(result) != required or any(
+        not value.startswith("sha256:") for value in result.values()
+    ):
         raise ToolXYError(f"{label} measurement lacks coordinate-reference facts")
     return result
 
@@ -758,9 +758,7 @@ def _coordinate_references(source: dict[str, Any], label: str) -> dict[str, str]
 def _source_fingerprint(source: dict[str, Any], label: str) -> str:
     acquisition = source.get("acquisition_calibration")
     fingerprint = (
-        acquisition.get("active_fingerprint")
-        if isinstance(acquisition, dict)
-        else None
+        acquisition.get("active_fingerprint") if isinstance(acquisition, dict) else None
     )
     provenance_fingerprint = source.get("active_printer_fingerprint")
     if not isinstance(fingerprint, str) or not fingerprint:
@@ -841,9 +839,10 @@ def _draw_alignment_panel(
         )
 
     nozzle(center, (190, 80, 30), "T0")
-    offset = np.asarray(
-        [t1_offset_xy_mm[0], -t1_offset_xy_mm[1]], dtype=float
-    ) * pixels_per_mm
+    offset = (
+        np.asarray([t1_offset_xy_mm[0], -t1_offset_xy_mm[1]], dtype=float)
+        * pixels_per_mm
+    )
     if float(np.linalg.norm(offset)) < 1.0e-9:
         center_x, center_y = np.rint(center).astype(int)
         cv2.circle(canvas, (center_x, center_y - 5), 43, (35, 125, 220), 3)
