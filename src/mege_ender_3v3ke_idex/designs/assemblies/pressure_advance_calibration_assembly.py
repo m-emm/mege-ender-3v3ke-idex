@@ -2,18 +2,19 @@
 
 from shellforgepy.simple import *
 
-PRESSURE_ADVANCE_VALUES = tuple(index / 100 for index in range(9))
-STRIP_WIDTH = 60.0
+PRESSURE_ADVANCE_VALUES = tuple(0.025 + index * 0.005 for index in range(7))
+STRIP_WIDTH = 70.0
 STRIP_DEPTH = 12.0
 STRIP_HEIGHT = 3.0
 STRIP_WALL_THICKNESS = 1.2
 STRIP_GAP = 8.0
+CALIBRATION_LAYER_HEIGHT = 0.32
 LABEL_PLAQUE_WIDTH = 32.0
 LABEL_PLAQUE_DEPTH = 12.0
-LABEL_PLAQUE_HEIGHT = 0.64
+LABEL_PLAQUE_HEIGHT = CALIBRATION_LAYER_HEIGHT
 LABEL_TEXT_SIZE = 7.0
-LABEL_TEXT_HEIGHT = 0.96
-LABEL_TEXT_STROKE_WIDTH = 1.2
+LABEL_TEXT_HEIGHT = 4 * CALIBRATION_LAYER_HEIGHT
+LABEL_TEXT_STROKE_WIDTH = 1.5
 LABEL_STRIP_OVERLAP = 0.6
 
 
@@ -47,7 +48,7 @@ def create_pressure_advance_calibration_assembly():
         )
 
         label = create_vector_text_object(
-            f"{pressure_advance:.2f}",
+            f"{pressure_advance:.3f}",
             size=LABEL_TEXT_SIZE,
             thickness=LABEL_TEXT_HEIGHT,
             stroke_width=LABEL_TEXT_STROKE_WIDTH,
@@ -63,5 +64,12 @@ def create_pressure_advance_calibration_assembly():
             0,
         )(strip_with_label)
         calibration = calibration.fuse(strip_with_label)
+
+    side_connector = materialize_bounding_box(
+        calibration, x_size=LABEL_PLAQUE_WIDTH * 0.1, z_size=LABEL_PLAQUE_HEIGHT
+    )
+    side_connector = align(side_connector, calibration, Alignment.LEFT)
+    side_connector = align(side_connector, calibration, Alignment.BOTTOM)
+    calibration = calibration.fuse(side_connector)
 
     return LeaderFollowersCuttersPart(leader=calibration)

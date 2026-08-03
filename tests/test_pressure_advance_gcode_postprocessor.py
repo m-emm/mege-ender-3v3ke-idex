@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 import yaml
 from mege_ender_3v3ke_idex.designs.assemblies.pressure_advance_calibration_assembly import (
+    CALIBRATION_LAYER_HEIGHT,
     LABEL_PLAQUE_DEPTH,
     LABEL_PLAQUE_HEIGHT,
     LABEL_TEXT_HEIGHT,
@@ -76,9 +77,22 @@ def test_y_banded_pressure_advance_tracks_relative_xy_and_absolute_e_resets():
     assert "ADVANCE=0.02" in result
 
 
-def test_y_banded_pressure_advance_rejects_extrusion_crossing_band_boundary():
-    with pytest.raises(ValueError, match="crosses a pressure-advance band boundary"):
-        _apply("G90\nM83\nG1 Y15\nG1 Y25 E1\nG1 Y35\nG1 X10 E1\n")
+def test_y_banded_pressure_advance_leaves_cross_band_extrusion_untouched():
+    result = _apply(
+        "G90\n"
+        "M83\n"
+        "G1 Y15\n"
+        "G1 X10 E1\n"
+        "G1 Y35 E1 ; cross-band connector\n"
+        "G1 X20 E1\n"
+    )
+
+    crossing = "G1 Y35 E1 ; cross-band connector"
+    assert crossing in result
+    assert result.count("shellforgepy PA calibration low") == 1
+    assert result.count("shellforgepy PA calibration high") == 1
+    assert result.index("shellforgepy PA calibration low") < result.index(crossing)
+    assert result.index(crossing) < result.index("shellforgepy PA calibration high")
 
 
 def test_y_banded_pressure_advance_rejects_extrusion_arcs():
@@ -113,10 +127,16 @@ def test_calibration_geometry_and_yaml_bands_stay_consistent():
         ).read_text(encoding="utf-8")
     )
     plate = resource["Builder"]["Production"]["arrange"]["plates"][0]
+    process_overrides = plate["process_data"]["overrides"]["process_overrides"]
+    assert float(process_overrides["layer_height"]) == pytest.approx(
+        CALIBRATION_LAYER_HEIGHT
+    )
+    assert LABEL_PLAQUE_HEIGHT == pytest.approx(CALIBRATION_LAYER_HEIGHT)
+    assert LABEL_TEXT_HEIGHT <= 4 * CALIBRATION_LAYER_HEIGHT
     bands = plate["gcode_postprocessor"]["arguments"]["bands"]
     assert len(bands) == len(PRESSURE_ADVANCE_VALUES)
     assert [band["label"] for band in bands] == [
-        f"{value:.2f}" for value in PRESSURE_ADVANCE_VALUES
+        f"{value:.3f}" for value in PRESSURE_ADVANCE_VALUES
     ]
     for previous, current in zip(bands, bands[1:]):
         assert previous["y_max"] < current["y_min"]

@@ -137,27 +137,24 @@ def apply_y_banded_pressure_advance(
                     )
                 start_band_index = _band_index_for_y(y, normalized_bands)
                 end_band_index = _band_index_for_y(target_y, normalized_bands)
-                if (
+                crosses_band_boundary = (
                     start_band_index != end_band_index
                     and abs(target_y - y) > _POSITION_EPSILON
-                ):
-                    if start_band_index is not None or end_band_index is not None:
-                        raise ValueError(
-                            "Extrusion move crosses a pressure-advance band boundary "
-                            f"at G-code line {line_number}: Y{y:g} -> Y{target_y:g}"
-                        )
-                band_index = end_band_index
-                if band_index is not None:
-                    encountered_band_indices.add(band_index)
-                    if active_band_index != band_index:
-                        band = normalized_bands[band_index]
-                        newline = "\r\n" if line.endswith("\r\n") else "\n"
-                        output_lines.append(
-                            "SET_PRESSURE_ADVANCE ADVANCE="
-                            f"{_format_advance(band.advance)}"
-                            f" ; shellforgepy PA calibration {band.label}{newline}"
-                        )
-                        active_band_index = band_index
+                    and (start_band_index is not None or end_band_index is not None)
+                )
+                if not crosses_band_boundary:
+                    band_index = end_band_index
+                    if band_index is not None:
+                        encountered_band_indices.add(band_index)
+                        if active_band_index != band_index:
+                            band = normalized_bands[band_index]
+                            newline = "\r\n" if line.endswith("\r\n") else "\n"
+                            output_lines.append(
+                                "SET_PRESSURE_ADVANCE ADVANCE="
+                                f"{_format_advance(band.advance)}"
+                                f" ; shellforgepy PA calibration {band.label}{newline}"
+                            )
+                            active_band_index = band_index
             x = target_x
             y = target_y
             e = target_e

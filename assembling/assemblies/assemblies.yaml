@@ -1273,6 +1273,8 @@ process_data_presets:
       quality_factor: 0.5
     overrides:
       process_overrides:
+        enable_pressure_advance: "1"
+        pressure_advance: "0.06"
         sparse_infill_pattern: "cubic"
         support_object_first_layer_gap: "2.5"
         brim_type: no_brim
