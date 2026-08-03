@@ -1262,6 +1262,52 @@ process_data_presets:
         infill_jerk: "2"
         top_surface_jerk: "2"
 
+  petgcf_max_strength_high_speed_06_idex_stock_matched:
+    generator: mege3devops_idex_parametric
+    arguments:
+      material_name: petg_cf_generic
+      nozzle_diameter_mm: 0.6
+      nozzle_hardened: true
+      nozzle_high_flow: true
+      strength_factor: 0.9
+      quality_factor: 0.5
+    overrides:
+      process_overrides:
+        sparse_infill_pattern: "cubic"
+        support_object_first_layer_gap: "2.5"
+        brim_type: no_brim
+        support_type: tree(auto)
+        support_style: organic
+        support_on_build_plate_only: "1"
+        support_interface_spacing: "2"
+        wall_loops: "3"
+        xy_contour_compensation: "-0.3" # This is a carefully calibrated value, measured at 2026-04-14
+        xy_hole_compensation: "0.4" # This is a carefully calibrated value, measured at 2026-04-14
+        z_hop: "0.45"
+        retract_lift_above: "0"
+        retract_lift_below: "0"
+        retract_lift_enforce: "All Surfaces"
+        wipe: "0"
+        bridge_acceleration: 50%
+        elefant_foot_compensation: "0.05"
+        gap_fill_speed: "500"
+        gap_infill_speed: "500"
+        internal_solid_infill_speed: "500"
+        solid_infill_speed: "500"
+        support_speed: "200"
+        standby_temperature_delta: "-5"
+        prime_tower_width: "60"
+        travel_speed: "350"
+        travel_acceleration: "5000"
+        default_acceleration: "5000"
+        initial_layer_acceleration: "5000"
+        travel_jerk: "8"
+        default_jerk: "8"
+        initial_layer_jerk: "8"
+        top_surface_acceleration: "2650"
+        internal_solid_infill_acceleration: "4240"
+        sparse_infill_acceleration: "4240"
+
   petgcf_medium_strength_max_quality_06:
     generator: mege3devops_parametric
     arguments:

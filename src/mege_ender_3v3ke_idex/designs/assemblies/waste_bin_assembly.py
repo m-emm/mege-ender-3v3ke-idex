@@ -11,6 +11,9 @@ waste_bin_mount_screw_length = 8
 waste_bin_vertical_mount_plate_depth = 4
 waste_bin_connector_thickness = 2
 
+waste_bin_brush_long_slit_inset = 3
+waste_bin_brush_mount_screw_size = "M3"
+
 
 def create_waste_bin_assembly(
     *,
@@ -48,6 +51,39 @@ def create_waste_bin_assembly(
     body = align(
         body, hotend, Alignment.STACK_BOTTOM, stack_gap=waste_bin_body_nozzle_clearance
     )
+
+    nozzle_brush_mount_hole_diameter = MScrew.from_size(
+        waste_bin_brush_mount_screw_size
+    ).clearance_hole_loose
+
+    cut_size = 5 * waste_bin_wall_thickness
+
+    nozzle_brush_long_slit_cutter = PartCollector()
+
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        nozzle_brush_long_slit_cutter_part = create_rounded_slab(
+            waste_bin_height - 2 * waste_bin_brush_long_slit_inset,
+            nozzle_brush_mount_hole_diameter,
+            cut_size,
+            nozzle_brush_mount_hole_diameter / 2,
+        )
+
+        nozzle_brush_long_slit_cutter_part = rotate(90, axis=(0, 1, 0))(
+            nozzle_brush_long_slit_cutter_part
+        )
+
+        nozzle_brush_long_slit_cutter_part = align(
+            nozzle_brush_long_slit_cutter_part, body, Alignment.CENTER
+        )
+        nozzle_brush_long_slit_cutter_part = align(
+            nozzle_brush_long_slit_cutter_part,
+            body,
+            lr.stack_alignment,
+            stack_gap=-cut_size / 2,
+        )
+        nozzle_brush_long_slit_cutter = nozzle_brush_long_slit_cutter.fuse(
+            nozzle_brush_long_slit_cutter_part
+        )
 
     profile_size = get_bounding_box_size(x_axis_bottom_profile)
     profile_width = profile_size[1]
@@ -125,6 +161,8 @@ def create_waste_bin_assembly(
     body = body.fuse(vertical_mount_plates)
 
     body = body.fuse(mount_plates)
+
+    body = body.cut(nozzle_brush_long_slit_cutter)
 
     retval = LeaderFollowersCuttersPart(
         leader=body,
