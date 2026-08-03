@@ -1496,3 +1496,9 @@ globals:
   left_lv_switchbox_mount_flange_width: 30.0
   left_lv_switchbox_mount_flange_length: 16.0
   left_lv_switchbox_mount_flange_thickness: 3.2
+
+  waste_bin_width: 50.0
+  waste_bin_depth: 40.0
+  waste_bin_height: 20.0
+  waste_bin_wall_thickness: 1.0
+  waste_bin_fillet_radius: 2.0

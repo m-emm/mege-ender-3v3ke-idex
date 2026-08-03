@@ -542,14 +542,14 @@ Builder:
         assembly: nitehawk_usb_dual_board_housing
         artifact: leader
         name: nitehawk_usb_dual_board_housing
-        color: [1, 1, 1]
+
       - source: injected
         assembly: nitehawk_usb_dual_board_housing
         artifact: followers
         names:
           - nitehawk_usb_dual_housing_lid
         name_template: "nitehawk_usb_dual_board_housing_{name}"
-        color: [1, 1, 1]
+
       - source: injected
         assembly: nitehawk_usb_dual_board_housing
         artifact: non_production_parts
@@ -573,7 +573,7 @@ Builder:
           - lid_mount_screws
           - profile_mount_screws
         name_template: "nitehawk_usb_dual_board_housing_{name}"
-        color: [0.78, 0.78, 0.72]
+
       - source: injected
         assembly: printer_host_and_screen
         artifact: all
@@ -586,21 +586,21 @@ Builder:
         assembly: electric_switchboard
         artifact: leader
         name: electric_switchboard_box
-        color: [1, 1, 1]
+
       - source: injected
         assembly: electric_switchboard
         artifact: followers
         names:
           - electric_switchboard_lid
         name_template: "electric_switchboard_{name}"
-        color: [1, 1, 1]
+
       - source: injected
         assembly: electric_switchboard
         artifact: followers
         names:
           - electric_switchboard_cable_cutout_cover
         name_template: "electric_switchboard_{name}"
-        color: [0.78, 0.86, 0.82]
+
       - source: injected
         assembly: electric_switchboard
         artifact: non_production_parts
@@ -608,42 +608,42 @@ Builder:
           - emergency_button_body
           - emergency_button_neck
         name_template: "electric_switchboard_{name}"
-        color: [0.72, 0.62, 0.46]
+
       - source: injected
         assembly: electric_switchboard
         artifact: non_production_parts
         names:
           - emergency_button_silver_collar
         name_template: "electric_switchboard_{name}"
-        color: [1.0, 1.0, 1.0]
+
       - source: injected
         assembly: electric_switchboard
         artifact: non_production_parts
         names:
           - emergency_button_button_disc
         name_template: "electric_switchboard_{name}"
-        color: [0.88, 0.02, 0.02]
+
       - source: injected
         assembly: electric_switchboard
         artifact: non_production_parts
         names:
           - fuse_holder_holder_body
         name_template: "electric_switchboard_{name}"
-        color: [0.35, 0.45, 0.55]
+
       - source: injected
         assembly: electric_switchboard
         artifact: non_production_parts
         names:
           - fuse_holder_mount_nut
         name_template: "electric_switchboard_{name}"
-        color: [0.78, 0.78, 0.72]
+
       - source: injected
         assembly: electric_switchboard
         artifact: non_production_parts
         names:
           - fuse_holder_terminal_blades
         name_template: "electric_switchboard_{name}"
-        color: [0.9, 0.86, 0.72]
+
       - source: injected
         assembly: electric_switchboard
         artifact: non_production_parts
@@ -654,26 +654,26 @@ Builder:
           - cable_cutout_cover_mount_screws
           - cable_cutout_cover_mount_nuts
         name_template: "electric_switchboard_{name}"
-        color: [0.78, 0.78, 0.72]
+
       - source: injected
         assembly: hv_switchbox
         artifact: leader
         name: hv_switchbox_box
-        color: [1, 1, 1]
+
       - source: injected
         assembly: hv_switchbox
         artifact: followers
         names:
           - hv_switchbox_lid
         name_template: "hv_switchbox_{name}"
-        color: [1, 1, 1]
+
       - source: injected
         assembly: hv_switchbox
         artifact: followers
         names:
           - hv_switchbox_cable_cutout_cover
         name_template: "hv_switchbox_{name}"
-        color: [0.78, 0.86, 0.82]
+
       - source: injected
         assembly: hv_switchbox
         artifact: non_production_parts
@@ -684,14 +684,14 @@ Builder:
           - ssr_output_terminal_screws
           - ssr_input_terminal_screws
         name_template: "hv_switchbox_{name}"
-        color: [0.55, 0.58, 0.62]
+
       - source: injected
         assembly: hv_switchbox
         artifact: non_production_parts
         names:
           - fuse_holder_holder_body
         name_template: "hv_switchbox_{name}"
-        color: [0.35, 0.45, 0.55]
+
       - source: injected
         assembly: hv_switchbox
         artifact: non_production_parts
@@ -706,26 +706,26 @@ Builder:
           - cable_cutout_cover_mount_screws
           - cable_cutout_cover_mount_nuts
         name_template: "hv_switchbox_{name}"
-        color: [0.78, 0.78, 0.72]
+
       - source: injected
         assembly: hv_switchbox
         artifact: non_production_parts
         names:
           - fuse_holder_terminal_blades
         name_template: "hv_switchbox_{name}"
-        color: [0.9, 0.86, 0.72]
+
       - source: injected
         assembly: heatbed_psu_housing
         artifact: leader
         name: heatbed_psu_housing_box
-        color: [1, 1, 1]
+
       - source: injected
         assembly: heatbed_psu_housing
         artifact: followers
         names:
           - heatbed_psu_housing_lid
         name_template: "heatbed_psu_housing_{name}"
-        color: [1, 1, 1]
+
       - source: injected
         assembly: heatbed_psu_housing
         artifact: non_production_parts
@@ -733,7 +733,11 @@ Builder:
           - lid_mount_screw_*_screw
           - lid_mount_screw_*_nut
         name_template: "heatbed_psu_housing_{name}"
-        color: [0.78, 0.78, 0.72]
+
+      - source: injected
+        assembly: waste_bin_left_assembly
+        artifact: leader
+        name: waste_bin_left
 
 Parameters:
   print_bed_y_travel:

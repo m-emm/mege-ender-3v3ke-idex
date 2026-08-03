@@ -1,0 +1,103 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: waste bin visualization assembly
+
+Builder:
+  Collection: true
+  Visualization:
+    parts:
+      - source: self
+        artifact: all
+        name_template: "{name}"
+      - source: dependencies
+        assembly: sprite_extruder_left_assembly
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+
+      - source: dependencies
+        assembly: part_fan_left_joined_assembly
+        artifact: leader
+        name_template: "{assembly_name}_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+
+      - source: injected
+        assembly: waste_bin_left_assembly
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: waste_bin_left_assembly
+        artifact: leader
+        name: waste_bin_left
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+
+      - source: injected
+        assembly: z_axis_guide_rod_left
+        artifact: all
+
+      - source: injected
+        assembly: z_axis_profile_left
+        artifact: all
+
+      - source: injected
+        assembly: x_axis_lower_profile
+        artifact: all
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+
+      - source: injected
+        assembly: z_axis_bottom_support_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+
+      - source: injected
+        assembly: z_axis_threaded_rod_left
+        artifact: leader
+        name: z_axis_threaded_rod_left
+      - source: injected
+        assembly: z_axis_motor_mount_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_carriage_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+
+Parameters:
+  x_axis_x_travel:
+    Type: Float
+  z_axis_z_travel:
+    Type: Float

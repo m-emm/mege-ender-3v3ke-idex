@@ -1,0 +1,44 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Standalone waste bin assembly
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: waste_bin
+      - source: dependencies
+        assembly: sprite_extruder_left_assembly
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+
+      - source: dependencies
+        assembly: part_fan_left_joined_assembly
+        artifact: leader
+        name_template: "{assembly_name}_{name}"
+
+  Production:
+    parts:
+      - source: self
+        artifact: leader
+        name: waste_bin
+
+Parameters:
+  waste_bin_width:
+    Type: Float
+  waste_bin_depth:
+    Type: Float
+  waste_bin_height:
+    Type: Float
+  waste_bin_wall_thickness:
+    Type: Float
+  waste_bin_fillet_radius:
+    Type: Float
+
+Parts:
+  WasteBinAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.waste_bin_assembly.create_waste_bin_assembly
