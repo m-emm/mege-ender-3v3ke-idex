@@ -6,8 +6,8 @@ Builder:
   Visualization:
     parts:
       - source: self
-        artifact: leader
-        name: waste_bin
+        artifact: all
+        name_template: "{assembly_name}_{name}"
 
       - source: dependencies
         assembly: sprite_extruder_left_assembly
@@ -25,6 +25,11 @@ Builder:
       overrides:
         process_overrides:
           enable_support: "1"
+          support_type: normal(auto)
+          support_style: default
+          bridge_no_support: "0"
+          max_bridge_length: "0"
+
 
     parts:
       - source: self
@@ -40,7 +45,7 @@ Builder:
         names:
           - top_bin
         name_template: "{name}"
-        prod_rotation_angle: 135
+        prod_rotation_angle: -90
         prod_rotation_axis: [1, 0, 0]
     arrange:
       export_individual_parts: false

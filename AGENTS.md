@@ -146,6 +146,17 @@ arrange_and_export(
 
 For support tuning, interpret `support_threshold_angle` carefully: higher values produce more aggressive support generation, while lower values produce less support. In practice, values like `80` can support near-vertical walls, while values like `10` can leave even near-horizontal geometry unsupported. Do not assume that increasing `support_threshold_angle` reduces support.
 
+### Orca bridge-support trap
+
+Orca's `bridge_no_support` name and boolean value form a double negative:
+
+- `bridge_no_support: "1"` means do not generate support beneath bridge-classified regions.
+- `bridge_no_support: "0"` only makes those regions eligible for support; it does not by itself guarantee that the selected support algorithm will generate support there.
+
+For OrcaSlicer 2.3.0, `tree(auto)` did not generate support beneath the waste-bin bridge even with `enable_support: "1"`, `bridge_no_support: "0"`, and `max_bridge_length: "0"`. Use `support_type: normal(auto)` with `support_style: default` (Orca's normal/grid default) when support beneath a bridge is required. Keep `max_bridge_length: "0"` as an explicit request to support all bridge lengths, but do not treat it as sufficient when tree support is selected.
+
+Always verify the resolved values in the run's process JSON or G-code footer and inspect the sliced toolpaths. A YAML override appearing in the source does not prove that Orca generated support beneath the intended bridge.
+
 ## Code Style
 
 ### Python Conventions

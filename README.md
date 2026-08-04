@@ -28,6 +28,23 @@ Example production run for the print bed undercarriage adjustment wheel plate:
 
 This builds the `print_bed_undercarriage_assembly`, selects the `adjustment_wheel_single` production plate, slices it, visualizes it, and opens the slicer GUI.
 
+### Supporting bridges in OrcaSlicer
+
+`bridge_no_support` is a double-negative Orca setting: `"0"` allows support beneath bridges, while `"1"` suppresses it. Allowing support is not the same as generating it. With OrcaSlicer 2.3.0, `tree(auto)` may still leave bridge-classified spans unsupported even when `bridge_no_support: "0"` and `max_bridge_length: "0"` are set.
+
+For a bridge that must be supported, use an explicit production override like:
+
+```yaml
+process_overrides:
+  enable_support: "1"
+  support_type: normal(auto)
+  support_style: default
+  bridge_no_support: "0"
+  max_bridge_length: "0"
+```
+
+Inspect the sliced preview to confirm support exists beneath the bridge. See `AGENTS.md` under "Orca bridge-support trap" for the detailed warning.
+
 ## Demos
 - **Extrusion profile (T-slot) demo:** build 2020/4040 profiles with aligned T-slot cutters  
   `./run.sh src/mege_ender_3v3ke_idex/designs/alu_extrusion_profile.py`  
