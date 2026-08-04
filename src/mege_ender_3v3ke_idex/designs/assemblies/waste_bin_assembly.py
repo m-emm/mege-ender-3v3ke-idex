@@ -3,7 +3,7 @@
 from shellforgepy.simple import *
 
 waste_bin_mount_plate_thickness = 4.0
-waste_bin_mount_plate_depth = 21
+waste_bin_mount_plate_depth = 19
 waste_bin_mount_plate_outside_offset = 17
 waste_bin_body_nozzle_clearance = 3
 waste_bin_mount_screw_size = "M3"
@@ -288,7 +288,7 @@ def create_waste_bin_assembly(
     )
     nozzle_brush_holder = nozzle_brush_holder.cut(nozzle_brush_cutter)
 
-    slider_width = MScrew.from_size(waste_bin_brush_mount_screw_size).core_hole + 0.3
+    slider_width = MScrew.from_size(waste_bin_brush_mount_screw_size).core_hole + 0.45
     nozzle_brush_holder_slider = create_rounded_slab(
         nozzle_brush_holder_slider_height,
         slider_width,
@@ -303,7 +303,10 @@ def create_waste_bin_assembly(
         nozzle_brush_holder_slider, nozzle_brush_holder, Alignment.BOTTOM
     )
     nozzle_brush_holder_slider = align(
-        nozzle_brush_holder_slider, nozzle_brush_holder, Alignment.STACK_RIGHT
+        nozzle_brush_holder_slider, base, Alignment.RIGHT
+    )
+    nozzle_brush_holder_slider = translate(-nozzle_brush_holder_clearance, 0, 0)(
+        nozzle_brush_holder_slider
     )
 
     nozzle_brush_holder = nozzle_brush_holder.fuse(nozzle_brush_holder_slider)
@@ -313,6 +316,7 @@ def create_waste_bin_assembly(
     nozzle_brush_holder_screw = create_complete_screw_assembly(
         waste_bin_brush_mount_screw_size,
         nozzle_brlush_holder_screw_length,
+        clearance_type="close",
     )
     nozzle_brush_holder_screw = rotate(90, axis=(0, 1, 0))(nozzle_brush_holder_screw)
     nozzle_brush_holder_screw = align(
@@ -329,8 +333,9 @@ def create_waste_bin_assembly(
     threaded_insert = create_thread_inset_assembly(
         waste_bin_brush_mount_screw_size,
         6,
-        extra_radius=1,
-        thread_inset_hole_radius_adjustment=-0.3,
+        extra_radius=0,
+        thread_inset_hole_radius_adjustment=-0.35,
+        clearance_type="close",
     )
 
     threaded_insert = rotate(90, axis=(0, 1, 0))(threaded_insert)
@@ -344,6 +349,8 @@ def create_waste_bin_assembly(
     thread_inset_boss = threaded_insert.get_named_cutter("assembly_cutter")
     thread_inset_boss = nozzle_brush_holder_screw.use_as_cutter_on(thread_inset_boss)
     nozzle_brush_holder = nozzle_brush_holder.fuse(thread_inset_boss)
+
+    nozzle_brush_holder = threaded_insert.use_as_cutter_on(nozzle_brush_holder)
 
     retval = LeaderFollowersCuttersPart(
         leader=body,
