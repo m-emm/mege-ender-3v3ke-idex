@@ -50,9 +50,10 @@ Builder:
           parts:
             - waste_bin
             - top_bin
-        - name: nozzle_brush_holder
-          parts:
             - nozzle_brush_holder
+
+        # - name: nozzle_brush_holder
+        #   parts:
 
       auto_assign_plates: false
 
