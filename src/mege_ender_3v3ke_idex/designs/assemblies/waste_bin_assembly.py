@@ -9,8 +9,8 @@ waste_bin_body_nozzle_clearance = 3
 waste_bin_mount_screw_size = "M3"
 waste_bin_mount_screw_length = 8
 waste_bin_vertical_mount_plate_depth = 2.5
-waste_bin_vertical_rib_depth = 3
-
+waste_bin_vertical_rib_depth = 6
+waste_bin_vertical_rib_width = 3
 
 waste_bin_connector_thickness = 2
 
@@ -205,7 +205,7 @@ def create_waste_bin_assembly(
         rib = materialize_bounding_box(
             vertical_mount_plate,
             y_size=waste_bin_vertical_rib_depth,
-            x_size=waste_bin_wall_thickness,
+            x_size=waste_bin_vertical_rib_width,
         )
         rib = align(rib, vertical_mount_plate, Alignment.STACK_FRONT)
         rib = align(rib, vertical_mount_plate, lr.opposite)
