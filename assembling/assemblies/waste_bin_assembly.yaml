@@ -30,16 +30,25 @@ Builder:
       - source: self
         artifact: leader
         name: waste_bin
+        num_copies: 2
       - source: self
         artifact: followers
+        names:
+          - nozzle_brush_holder
         name_template: "{name}"
+        num_copies: 2
     arrange:
       export_individual_parts: false
 
       plates:
         - name: waste_bin
+          parts:
+            - waste_bin
+        - name: nozzle_brush_holder
+          parts:
+            - nozzle_brush_holder
 
-      auto_assign_plates: true
+      auto_assign_plates: false
 
 Parameters:
   waste_bin_width:

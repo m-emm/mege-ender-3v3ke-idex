@@ -32,10 +32,11 @@ waste_bin_brush_nozzle_overlap = 0.5
 
 nozzle_brush_holder_wall_thickness = 2.5
 
-nozzle_brush_holder_clearance = 0.1
+nozzle_brush_holder_clearance = -0.05
 nozzle_brush_holder_height = 14
 nozzle_brush_holder_slider_height = 8
 
+nozzle_brush_up_offset = 0.8
 
 def create_nozzle_brush():
     base = create_box(nozzle_brush_width, nozzle_brush_depth, nozzle_brush_base_height)
@@ -271,7 +272,6 @@ def create_waste_bin_assembly(
         z_size=nozzle_brush_holder_height,
     )
 
-    nozzle_brush_holder_main_size = get_bounding_box_size(nozzle_brush_holder)
 
     nozzle_brush_cutter = materialize_bounding_box(
         nozzle_brush,
@@ -284,7 +284,7 @@ def create_waste_bin_assembly(
         nozzle_brush_holder,
         nozzle_brush,
         Alignment.STACK_BOTTOM,
-        stack_gap=-nozzle_brush_base_height,
+        stack_gap=-nozzle_brush_base_height+nozzle_brush_up_offset,
     )
     nozzle_brush_holder = nozzle_brush_holder.cut(nozzle_brush_cutter)
 
