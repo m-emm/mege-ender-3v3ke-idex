@@ -327,7 +327,7 @@ def create_waste_bin_assembly(
     nozzle_brush_holder_screw = create_complete_screw_assembly(
         waste_bin_brush_mount_screw_size,
         nozzle_brlush_holder_screw_length,
-        clearance_type="close",
+        clearance_type="normal",
     )
     nozzle_brush_holder_screw = rotate(90, axis=(0, 1, 0))(nozzle_brush_holder_screw)
     nozzle_brush_holder_screw = align(
