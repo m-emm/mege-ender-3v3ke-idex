@@ -30,13 +30,18 @@ Builder:
       - source: self
         artifact: leader
         name: waste_bin
-        num_copies: 2
       - source: self
         artifact: followers
         names:
           - nozzle_brush_holder
         name_template: "{name}"
-        num_copies: 2
+      - source: self
+        artifact: followers
+        names:
+          - top_bin
+        name_template: "{name}"
+        prod_rotation_angle: 135
+        prod_rotation_axis: [1, 0, 0]
     arrange:
       export_individual_parts: false
 
@@ -44,6 +49,7 @@ Builder:
         - name: waste_bin
           parts:
             - waste_bin
+            - top_bin
         - name: nozzle_brush_holder
           parts:
             - nozzle_brush_holder

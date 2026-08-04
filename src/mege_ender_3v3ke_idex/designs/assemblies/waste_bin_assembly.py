@@ -3,13 +3,13 @@
 from shellforgepy.simple import *
 
 waste_bin_mount_plate_thickness = 4.0
-waste_bin_mount_plate_depth = 19
+waste_bin_mount_plate_depth = 18
 waste_bin_mount_plate_outside_offset = 17
 waste_bin_body_nozzle_clearance = 3
 waste_bin_mount_screw_size = "M3"
 waste_bin_mount_screw_length = 8
-waste_bin_vertical_mount_plate_depth = 2.5
-waste_bin_vertical_rib_depth = 6
+waste_bin_vertical_mount_plate_depth = 3
+waste_bin_vertical_rib_depth = 4
 waste_bin_vertical_rib_width = 3
 
 waste_bin_connector_thickness = 2
@@ -36,7 +36,15 @@ nozzle_brush_holder_clearance = -0.05
 nozzle_brush_holder_height = 14
 nozzle_brush_holder_slider_height = 8
 
+nozzle_brush_holder_guide_clearance = 0.4
+nozzle_brush_holder_guide_width = 8
+nozzle_brush_holder_guide_depth = 2
+
 nozzle_brush_up_offset = 0.8
+
+waste_bin_top_connector_plate_height = 15
+waste_bin_top_connector_plate_thickness = 7
+
 
 def create_nozzle_brush():
     base = create_box(nozzle_brush_width, nozzle_brush_depth, nozzle_brush_base_height)
@@ -272,7 +280,6 @@ def create_waste_bin_assembly(
         z_size=nozzle_brush_holder_height,
     )
 
-
     nozzle_brush_cutter = materialize_bounding_box(
         nozzle_brush,
         x_enlargement=2 * nozzle_brush_holder_clearance,
@@ -284,7 +291,7 @@ def create_waste_bin_assembly(
         nozzle_brush_holder,
         nozzle_brush,
         Alignment.STACK_BOTTOM,
-        stack_gap=-nozzle_brush_base_height+nozzle_brush_up_offset,
+        stack_gap=-nozzle_brush_base_height + nozzle_brush_up_offset,
     )
     nozzle_brush_holder = nozzle_brush_holder.cut(nozzle_brush_cutter)
 
@@ -309,7 +316,6 @@ def create_waste_bin_assembly(
         nozzle_brush_holder_slider
     )
 
-    nozzle_brush_holder = nozzle_brush_holder.fuse(nozzle_brush_holder_slider)
     nozzle_brush_holder_size = get_bounding_box_size(nozzle_brush_holder)
     nozzle_brlush_holder_screw_length = int(nozzle_brush_holder_size[1] / 4) * 4
 
@@ -352,10 +358,192 @@ def create_waste_bin_assembly(
 
     nozzle_brush_holder = threaded_insert.use_as_cutter_on(nozzle_brush_holder)
 
-    retval = LeaderFollowersCuttersPart(
-        leader=body,
+    guides = PartCollector()
+
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for fb in [Alignment.FRONT, Alignment.BACK]:
+            guide = create_box(
+                nozzle_brush_holder_guide_width,
+                nozzle_brush_holder_guide_depth,
+                waste_bin_height,
+            )
+
+            guide = align(guide, base, lr)
+            guide = align(guide, base, Alignment.BOTTOM)
+            guide = align(
+                guide,
+                nozzle_brush_holder,
+                fb.stack_alignment,
+                stack_gap=nozzle_brush_holder_guide_clearance,
+            )
+
+            guides = guides.fuse(guide)
+
+    body = body.fuse(guides)
+
+    body_bounding_box = get_bounding_box(body)
+    very_top_cut_point = list(get_bounding_box_center(body))
+
+    very_top_cut_point[2] = body_bounding_box[1][2] - 20
+
+    very_top_bin, body = cut_in_two(
+        body, cut_normal=(0, 0, 1), cut_point=very_top_cut_point
     )
 
+    cut_point_fb = list(get_bounding_box_center(body))
+
+    cut_point_fb[1] += 15
+
+    back_bin, front_bin = cut_in_two(body, cut_normal=(0, 1, 0), cut_point=cut_point_fb)
+
+    cut_point = list(get_bounding_box_center(body))
+
+    cut_point[2] = body_bounding_box[0][2] + waste_bin_height - 8
+
+    top_bin, bottom_bin = cut_in_two(
+        back_bin, cut_normal=(0, 0, 1), cut_point=cut_point, cut_thickness=0.2
+    )
+
+    top_connector_plate = materialize_bounding_box(
+        top_bin,
+        z_size=waste_bin_top_connector_plate_height,
+        y_size=waste_bin_top_connector_plate_thickness,
+    )
+    top_connector_plate = align(top_connector_plate, top_bin, Alignment.BACK)
+    top_connector_plate = align(top_connector_plate, top_bin, Alignment.BOTTOM)
+
+    waste_bin_bottom_connector_counter_plate_thickness = 3
+    waste_bin_bottom_connector_counter_plate_clearance = 0.2
+
+    bottom_connector_counter_plate = materialize_bounding_box(
+        bottom_bin,
+        z_size=waste_bin_top_connector_plate_height,
+        y_size=waste_bin_bottom_connector_counter_plate_thickness,
+    )
+    bottom_connector_counter_plate = align(
+        bottom_connector_counter_plate, top_connector_plate, Alignment.CENTER
+    )
+    bottom_connector_counter_plate = align(
+        bottom_connector_counter_plate,
+        bottom_bin,
+        Alignment.STACK_TOP,
+        stack_gap=-4 * waste_bin_bottom_connector_counter_plate_clearance,
+    )
+
+    botom_connector_counter_palate_cutter = materialize_bounding_box(
+        bottom_connector_counter_plate,
+        y_enlargement=2 * waste_bin_bottom_connector_counter_plate_clearance,
+        x_enlargement=5,
+        z_enlargement=2,
+    )
+    botom_connector_counter_palate_cutter = align(
+        botom_connector_counter_palate_cutter,
+        bottom_connector_counter_plate,
+        Alignment.TOP,
+    )
+    botom_connector_counter_palate_cutter = translate(
+        0, 0, waste_bin_bottom_connector_counter_plate_clearance
+    )(botom_connector_counter_palate_cutter)
+
+    top_bin = top_bin.fuse(top_connector_plate)
+    top_bin = top_bin.cut(botom_connector_counter_palate_cutter)
+
+    top_connector_plate_front_cutter = create_box(500, 500, 500)
+    top_connector_plate_front_cutter = align(
+        top_connector_plate_front_cutter, top_connector_plate, Alignment.CENTER
+    )
+    top_connector_plate_front_cutter = align(
+        top_connector_plate_front_cutter, top_connector_plate, Alignment.STACK_FRONT
+    )
+    top_connector_plate_front_cutter = align(
+        top_connector_plate_front_cutter, top_connector_plate, Alignment.BOTTOM
+    )
+
+    top_bin = top_bin.cut(top_connector_plate_front_cutter)
+
+    bottom_bin = bottom_bin.fuse(bottom_connector_counter_plate)
+
+    screws_pitch = waste_bin_top_connector_plate_height / 2
+
+    screws = {}
+
+    mount_plate_size = get_bounding_box_size(mount_plates)
+
+    long_slit_shortening = 5
+
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        for bt in [Alignment.BOTTOM, Alignment.TOP]:
+            screw = create_complete_screw_assembly(
+                waste_bin_mount_screw_size, waste_bin_mount_screw_length
+            )
+            screw = rotate(90, axis=(1, 0, 0))(screw)
+
+            screw = align(screw, top_connector_plate, Alignment.CENTER)
+            screw = align(screw, top_connector_plate, Alignment.FRONT)
+
+            screw = translate(
+                lr.sign * screws_pitch / 2, 0, bt.sign * screws_pitch / 2
+            )(screw)
+
+            if lr == Alignment.LEFT:
+                hole_diameter = MScrew.from_size(
+                    waste_bin_mount_screw_size
+                ).clearance_hole_loose
+                long_slit_cutter = create_rounded_slab(
+                    mount_plate_size[0] - 2 * long_slit_shortening,
+                    hole_diameter,
+                    mount_plate_size[1] * 3,
+                    hole_diameter / 2,
+                )
+
+                long_slit_cutter = rotate(90, axis=(1, 0, 0))(long_slit_cutter)
+                long_slit_cutter = align(long_slit_cutter, screw, Alignment.CENTER)
+
+                screw.add_named_cutter(long_slit_cutter, "long_slit_cutter")
+
+            screws[f"{lr.name}_{bt.name}"] = screw
+
+    screw_lfc = None
+
+    for name, current_screw_lfc in screws.items():
+        current_screw = current_screw_lfc.prefixed_copy(name)
+
+        if screw_lfc is None:
+            screw_lfc = current_screw
+        else:
+            screw_lfc = screw_lfc.fuse(current_screw)
+
+    screw_lfc = align(screw_lfc, top_connector_plate, Alignment.CENTER)
+    screw_lfc = align(screw_lfc, top_connector_plate, Alignment.FRONT)
+
+    for name, cutter in screw_lfc.get_named_cutter_items():
+
+        if "long_slit_cutter" in name:
+            aligned_cutter = align(
+                cutter, top_connector_plate, Alignment.CENTER, axes=[0]
+            )
+            top_bin = top_bin.cut(cutter)
+
+    for name, cutter in screw_lfc.get_named_cutter_items():
+
+        if "long_slit_cutter" not in name:
+
+            bottom_bin = bottom_bin.cut(cutter)
+
+    bottom_bin = bottom_bin.fuse(front_bin)
+
+    top_bin = top_bin.fuse(very_top_bin)
+
+    retval = LeaderFollowersCuttersPart(
+        leader=bottom_bin,
+    )
+
+    for name, npp in screw_lfc.get_named_non_production_part_items():
+
+        if "complete_screw" in name:
+            retval.add_named_non_production_part(npp, name)
+
+    retval.add_named_follower(top_bin, "top_bin")
     retval.add_named_non_production_part(nozzle_brush, "nozzle_brush")
     retval.add_named_follower(nozzle_brush_holder, "nozzle_brush_holder")
     retval.add_named_non_production_part(
