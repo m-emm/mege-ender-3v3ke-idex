@@ -9,7 +9,7 @@ waste_bin_mount_screw_pitch= 75.75
 waste_bin_mount_plate_thickness = 4.0
 waste_bin_mount_plate_depth = 18
 waste_bin_mount_plate_outside_offset = 17
-waste_bin_body_nozzle_clearance = 3
+waste_bin_body_nozzle_clearance = 2
 waste_bin_mount_screw_size = "M3"
 waste_bin_mount_screw_length = 8
 waste_bin_vertical_mount_plate_depth = 3
@@ -54,7 +54,7 @@ waste_bin_top_connector_plate_extension_height = 3
 waste_bin_join_screw_length = 8
 
 waste_bin_square_nut_sink_depth = 0.8
-
+waste_connector_plates_thickness = 3
 
 def create_nozzle_brush():
     base = create_box(nozzle_brush_width, nozzle_brush_depth, nozzle_brush_base_height)
@@ -210,15 +210,6 @@ def create_waste_bin_assembly(
         vertical_mount_plate = align(vertical_mount_plate, mount_plate, Alignment.BACK)
         vertical_mount_plate = align(vertical_mount_plate, mount_plate, Alignment.TOP)
 
-        connector_depth = mount_plate_bbox[1][1] - body_bbox[0][1]
-
-        connector = create_box(
-            waste_bin_connector_thickness, connector_depth, body_size[2]
-        )
-        connector = align(connector, vertical_mount_plate, Alignment.CENTER)
-        connector = align(connector, vertical_mount_plate, Alignment.BOTTOM)
-        connector = align(connector, vertical_mount_plate, Alignment.BACK)
-        connector = align(connector, body, lr)
 
         rib = materialize_bounding_box(
             vertical_mount_plate,
@@ -228,7 +219,6 @@ def create_waste_bin_assembly(
         rib = align(rib, vertical_mount_plate, Alignment.STACK_FRONT)
         rib = align(rib, vertical_mount_plate, lr.opposite)
 
-        vertical_mount_plate = vertical_mount_plate.fuse(connector)
 
         connector_angle_part = create_right_triangle(
             waste_bin_mount_plate_depth,
@@ -254,10 +244,8 @@ def create_waste_bin_assembly(
 
         vertical_mount_plates = vertical_mount_plates.fuse(vertical_mount_plate)
 
-    body = body.fuse(vertical_mount_plates)
-
-    body = body.fuse(mount_plates)
-
+    mounting_assembly = vertical_mount_plates.fuse(mount_plates)
+    
     body = body.cut(nozzle_brush_long_slit_cutter)
 
     nozzle_brush = create_nozzle_brush()
@@ -391,101 +379,15 @@ def create_waste_bin_assembly(
 
     body = body.fuse(guides)
 
-    body_bounding_box = get_bounding_box(body)
-    very_top_cut_point = list(get_bounding_box_center(body))
 
-    very_top_cut_point[2] = body_bounding_box[1][2] - 20
 
-    very_top_bin, body = cut_in_two(
-        body, cut_normal=(0, 0, 1), cut_point=very_top_cut_point
-    )
+    top_connector_plate = materialize_bounding_box(mounting_assembly, z_size=waste_connector_plates_thickness, y_size = 22)
 
-    cut_point_fb = list(get_bounding_box_center(body))
+    top_connector_plate = align(top_connector_plate, body,Alignment.BOTTOM)
+    top_connector_plate = align(top_connector_plate, mounting_assembly,Alignment.BACK)
 
-    cut_point_fb[1] += 15
-
-    back_bin, front_bin = cut_in_two(body, cut_normal=(0, 1, 0), cut_point=cut_point_fb)
-
-    cut_point = list(get_bounding_box_center(body))
-
-    cut_point[2] = body_bounding_box[0][2] + waste_bin_height - 8
-
-    top_bin, bottom_bin = cut_in_two(
-        back_bin, cut_normal=(0, 0, 1), cut_point=cut_point, cut_thickness=0.2
-    )
-
-    top_connector_plate = materialize_bounding_box(
-        top_bin,
-        z_size=waste_bin_top_connector_plate_height,
-        y_size=waste_bin_top_connector_plate_thickness,
-    )
-    top_connector_plate = align(top_connector_plate, top_bin, Alignment.BACK)
-    top_connector_plate = align(top_connector_plate, top_bin, Alignment.BOTTOM)
-
-    waste_bin_bottom_connector_counter_plate_thickness = 3
-    waste_bin_bottom_connector_counter_plate_clearance = 0.2
-
-    bottom_connector_counter_plate = materialize_bounding_box(
-        bottom_bin,
-        z_size=waste_bin_top_connector_plate_height,
-        y_size=waste_bin_bottom_connector_counter_plate_thickness,
-    )
-    bottom_connector_counter_plate = align(
-        bottom_connector_counter_plate, top_connector_plate, Alignment.CENTER
-    )
-    bottom_connector_counter_plate = align(
-        bottom_connector_counter_plate, top_connector_plate, Alignment.BACK
-    )
-
-    bottom_connector_counter_plate = align(
-        bottom_connector_counter_plate,
-        bottom_bin,
-        Alignment.STACK_TOP,
-        stack_gap=-4 * waste_bin_bottom_connector_counter_plate_clearance,
-    )
-
-    botom_connector_counter_palate_cutter = materialize_bounding_box(
-        bottom_connector_counter_plate,
-        y_enlargement=2 * waste_bin_bottom_connector_counter_plate_clearance,
-        x_enlargement=5,
-        z_enlargement=2,
-    )
-    botom_connector_counter_palate_cutter = align(
-        botom_connector_counter_palate_cutter,
-        bottom_connector_counter_plate,
-        Alignment.TOP,
-    )
-    botom_connector_counter_palate_cutter = translate(
-        0, 0, waste_bin_bottom_connector_counter_plate_clearance
-    )(botom_connector_counter_palate_cutter)
-
-    top_connector_plate_extension = materialize_bounding_box(
-        top_connector_plate,
-        z_size=waste_bin_top_connector_plate_extension_height,
-    )
-
-    top_connector_plate_extension = align(
-        top_connector_plate_extension, top_connector_plate, Alignment.STACK_TOP
-    )
-
-    top_bin = top_bin.fuse(top_connector_plate)
-    top_bin = top_bin.fuse(top_connector_plate_extension)
-    top_bin = top_bin.cut(botom_connector_counter_palate_cutter)
-
-    top_connector_plate_front_cutter = create_box(500, 500, 500)
-    top_connector_plate_front_cutter = align(
-        top_connector_plate_front_cutter, top_connector_plate, Alignment.CENTER
-    )
-    top_connector_plate_front_cutter = align(
-        top_connector_plate_front_cutter, top_connector_plate, Alignment.STACK_FRONT
-    )
-    top_connector_plate_front_cutter = align(
-        top_connector_plate_front_cutter, top_connector_plate, Alignment.BOTTOM
-    )
-
-    top_bin = top_bin.cut(top_connector_plate_front_cutter)
-
-    bottom_bin = bottom_bin.fuse(bottom_connector_counter_plate)
+    bottom_connector_counter_plate = materialize_bounding_box(top_connector_plate.fuse(body), z_size=waste_connector_plates_thickness)
+    bottom_connector_counter_plate = align(bottom_connector_counter_plate, top_connector_plate,Alignment.STACK_BOTTOM)
 
     screws_z_pitch = waste_bin_top_connector_plate_height / 2
 
@@ -498,7 +400,7 @@ def create_waste_bin_assembly(
     long_slit_shortening = 4
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        for bt in [Alignment.BOTTOM, Alignment.TOP]:
+        for bt in [Alignment.FRONT, Alignment.BACK]:
             screw = create_complete_screw_assembly(
                 waste_bin_mount_screw_size, waste_bin_join_screw_length
             )
@@ -518,13 +420,12 @@ def create_waste_bin_assembly(
 
             screw.add_named_cutter(square_nut_cutter, "square_nut_cutter")
 
-            screw = rotate(90, axis=(1, 0, 0))(screw)
 
             screw = align(screw, top_connector_plate, Alignment.CENTER)
-            screw = align(screw, top_connector_plate, Alignment.FRONT)
+            screw = align(screw, top_connector_plate, Alignment.TOP)
 
             screw = translate(
-                lr.sign * screws_x_pitch / 2, 0, bt.sign * screws_z_pitch / 2
+                lr.sign * screws_x_pitch / 2,  bt.sign * screws_z_pitch / 2,0
             )(screw)
 
             if lr == Alignment.LEFT:
@@ -537,8 +438,7 @@ def create_waste_bin_assembly(
                     mount_plate_size[1] * 3,
                     hole_diameter / 2,
                 )
-
-                long_slit_cutter = rotate(90, axis=(1, 0, 0))(long_slit_cutter)
+                
                 long_slit_cutter = align(long_slit_cutter, screw, Alignment.CENTER)
 
                 screw.add_named_cutter(long_slit_cutter, "long_slit_cutter")
@@ -556,7 +456,8 @@ def create_waste_bin_assembly(
             screw_lfc = screw_lfc.fuse(current_screw)
 
     screw_lfc = align(screw_lfc, top_connector_plate, Alignment.CENTER)
-    screw_lfc = align(screw_lfc, top_connector_plate, Alignment.FRONT)
+    screw_lfc = align(screw_lfc, top_connector_plate, Alignment.TOP)
+    screw_lfc = align(screw_lfc, body, Alignment.STACK_BACK, stack_gap = 3.5)
 
     center_bridge_width = 5
     center_bridge_cutter = create_box(center_bridge_width, 500, 500)
@@ -564,6 +465,45 @@ def create_waste_bin_assembly(
     center_bridge_cutter = align(
         center_bridge_cutter, top_connector_plate, Alignment.CENTER
     )
+
+
+    top_connector_plate_size = get_bounding_box_size(top_connector_plate)
+    top_connector_plate_depth = top_connector_plate_size[1]
+    top_connector_plate_angles = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        top_connector_plate_angle = create_right_triangle(
+            top_connector_plate_depth,
+            top_connector_plate_depth,
+            waste_bin_wall_thickness,
+            extrusion_direction=(1, 0, 0),
+            a_normal=(0, 1, 0),
+            b_normal=(0, 0, 1),
+        )
+        top_connector_plate_angle = align(
+            top_connector_plate_angle, top_connector_plate, Alignment.CENTER
+        )
+        top_connector_plate_angle = align(
+                    top_connector_plate_angle, top_connector_plate, Alignment.BACK
+                )
+        top_connector_plate_angle = align(
+            top_connector_plate_angle, top_connector_plate, lr
+        )
+
+        top_connector_plate_angle = align(
+                    top_connector_plate_angle, top_connector_plate, Alignment.STACK_TOP
+                )
+
+        top_connector_plate_angles = top_connector_plate_angles.fuse(
+            top_connector_plate_angle
+        )
+
+    
+
+    top_connector_plate = top_connector_plate.fuse(top_connector_plate_angles)
+
+    top_bin = mounting_assembly.fuse(top_connector_plate)
+    bottom_bin = body.fuse(bottom_connector_counter_plate)
+
 
     for name, cutter in screw_lfc.get_named_cutter_items():
 
@@ -578,16 +518,13 @@ def create_waste_bin_assembly(
             aligned_cutter = align(
                 cutter,
                 bottom_connector_counter_plate,
-                Alignment.STACK_BACK,
+                Alignment.STACK_BOTTOM,
                 stack_gap=-waste_bin_square_nut_sink_depth,
             )
             bottom_bin = bottom_bin.cut(aligned_cutter)
         else:
             bottom_bin = bottom_bin.cut(cutter)
 
-    bottom_bin = bottom_bin.fuse(front_bin)
-
-    top_bin = top_bin.fuse(very_top_bin)
 
     retval = LeaderFollowersCuttersPart(
         leader=bottom_bin,
@@ -601,7 +538,7 @@ def create_waste_bin_assembly(
             aligned_nut = align(
                 npp,
                 bottom_connector_counter_plate,
-                Alignment.STACK_BACK,
+                Alignment.STACK_BOTTOM,
                 stack_gap=-waste_bin_square_nut_sink_depth,
             )
             retval.add_named_non_production_part(aligned_nut, name)

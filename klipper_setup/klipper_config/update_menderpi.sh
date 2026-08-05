@@ -43,7 +43,7 @@ check_local_support_files() {
   python3 "${SCRIPT_DIR}/wiring/validate_wiring.py"
 
   if [[ ! -f "${SOURCE_HEATERS}" ]]; then
-    echo "Error: managed upstream Klipper heaters.py not found: ${SOURCE_HEATERS}" >&2
+    echo "Error: managed Klipper heaters.py not found: ${SOURCE_HEATERS}" >&2
     exit 1
   fi
   if [[ ! -f "${SOURCE_VISION}" ]]; then
@@ -64,7 +64,7 @@ PY
 check_live_config() {
   echo "Checking ${REMOTE_HOST} for the active Klipper config..."
   echo "  Source: ${SOURCE_CFG}"
-  echo "  Klipper upstream heaters.py: ${SOURCE_HEATERS}"
+  echo "  Managed Klipper heaters.py: ${SOURCE_HEATERS}"
   echo "  Klipper vision extra: ${SOURCE_VISION}"
 
   python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --check
@@ -200,7 +200,7 @@ errors = generator.live_config_check_errors(
 )
 if remote_heaters_sha256 != local_heaters_sha256:
     errors.append(
-        "remote Klipper heaters.py sha256 does not match the managed upstream file "
+        "remote Klipper heaters.py sha256 does not match the managed file "
         f"({remote_heaters_sha256} != {local_heaters_sha256})"
     )
 if remote_vision_sha256 != local_vision_sha256:
@@ -267,7 +267,7 @@ local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
 
 echo "Updating ${REMOTE_HOST} with THE active Klipper config and host extras..."
 echo "  Source: ${SOURCE_CFG}"
-echo "  Klipper upstream heaters.py: ${SOURCE_HEATERS}"
+echo "  Managed Klipper heaters.py: ${SOURCE_HEATERS}"
 echo "  Klipper vision extra: ${SOURCE_VISION}"
 
 scp "${SOURCE_CFG}" "${REMOTE_HOST}:${REMOTE_TMP_CFG}"
@@ -311,16 +311,16 @@ fi
 
 current_heaters_sha="$(sha256sum "${HEATERS_PY}" | awk '{print $1}')"
 if [[ "${current_heaters_sha}" != "${EXPECTED_UPSTREAM_HEATERS_SHA256}" \
-      && "${current_heaters_sha}" != "${LEGACY_BOOSTED_HEATERS_SHA256}" ]]; then
+      && "${current_heaters_sha}" != "${LEGACY_BOOSTED_HEATERS_SHA256}" \
+      && "${current_heaters_sha}" != "${EXPECTED_MANAGED_HEATERS_SHA256}" ]]; then
   echo "Error: remote heaters.py has unexpected sha256 ${current_heaters_sha}" >&2
   echo "Expected upstream ${EXPECTED_UPSTREAM_HEATERS_SHA256} or legacy boosted ${LEGACY_BOOSTED_HEATERS_SHA256}" >&2
   exit 1
 fi
 
 uploaded_heaters_sha="$(sha256sum "${REMOTE_TMP_HEATERS}" | awk '{print $1}')"
-if [[ "${uploaded_heaters_sha}" != "${EXPECTED_MANAGED_HEATERS_SHA256}" \
-      || "${uploaded_heaters_sha}" != "${EXPECTED_UPSTREAM_HEATERS_SHA256}" ]]; then
-  echo "Error: uploaded heaters.py sha256 ${uploaded_heaters_sha} is not the expected upstream file" >&2
+if [[ "${uploaded_heaters_sha}" != "${EXPECTED_MANAGED_HEATERS_SHA256}" ]]; then
+  echo "Error: uploaded heaters.py sha256 ${uploaded_heaters_sha} does not match the managed file" >&2
   exit 1
 fi
 
@@ -376,13 +376,13 @@ else:
     )
 PY
 
-if [[ "${current_heaters_sha}" == "${EXPECTED_UPSTREAM_HEATERS_SHA256}" ]]; then
-  echo "Upstream Klipper heaters.py already installed: ${HEATERS_PY}"
+if [[ "${current_heaters_sha}" == "${EXPECTED_MANAGED_HEATERS_SHA256}" ]]; then
+  echo "Managed Klipper heaters.py already installed: ${HEATERS_PY}"
 else
   cp -a "${HEATERS_PY}" "${HEATERS_BACKUP}"
   echo "Backed up: ${HEATERS_BACKUP}"
   cp -a "${REMOTE_TMP_HEATERS}" "${HEATERS_PY}"
-  echo "Restored upstream Klipper heaters.py: ${HEATERS_PY}"
+  echo "Installed managed Klipper heaters.py: ${HEATERS_PY}"
 fi
 rm -f "${REMOTE_TMP_HEATERS}"
 

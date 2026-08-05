@@ -73,14 +73,14 @@ Builder:
         assembly: waste_bin_left_assembly
         artifact: non_production_parts
         names:
-          - LEFT_BOTTOM_complete_screw
-          - LEFT_BOTTOM_square_nut
-          - LEFT_TOP_complete_screw
-          - LEFT_TOP_square_nut
-          - RIGHT_BOTTOM_complete_screw
-          - RIGHT_BOTTOM_square_nut
-          - RIGHT_TOP_complete_screw
-          - RIGHT_TOP_square_nut
+          - LEFT_FRONT_complete_screw
+          - LEFT_BACK_square_nut
+          - LEFT_BACK_complete_screw
+          - LEFT_BACK_square_nut
+          - RIGHT_FRONT_complete_screw
+          - RIGHT_FRONT_square_nut
+          - RIGHT_BACK_complete_screw
+          - RIGHT_BACK_square_nut
           - nozzle_brush
           - nozzle_brush_holder_threaded_insert
           - nozzle_brush_holder_screw

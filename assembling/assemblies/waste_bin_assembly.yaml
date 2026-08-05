@@ -54,10 +54,11 @@ Builder:
           parts:
             - waste_bin
             - nozzle_brush_holder
-
-        - name: waste_bin_top
-          parts:
             - top_bin
+
+
+        # - name: waste_bin_top
+        #   parts:
 
       auto_assign_plates: false
 
@@ -78,4 +79,4 @@ Parts:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.waste_bin_assembly.create_waste_bin_assembly
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.waste_bin_assembly_v2.create_waste_bin_assembly
