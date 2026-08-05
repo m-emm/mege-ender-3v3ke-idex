@@ -707,9 +707,11 @@ pwm_cycle_time: 2.0
 sensor_type: Generic 3950
 sensor_pin: gpio26
 pullup_resistor: 4700
-# Calibration-ready only; calibrate_bed_pid.sh replaces this temporary control.
-control: watermark
-max_delta: 2.0
+# PID constants measured by calibrate_bed_pid.sh.
+control: pid
+pid_Kp: 54.980
+pid_Ki: 2.003
+pid_Kd: 377.297
 min_temp: 0
 max_temp: 130
 
