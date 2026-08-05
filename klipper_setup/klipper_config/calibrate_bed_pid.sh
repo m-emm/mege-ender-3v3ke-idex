@@ -3,13 +3,13 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-Usage: calibrate_boosted_bed_pid.sh [--target TEMP_C] [--timeout SECONDS] [--yes]
+Usage: calibrate_bed_pid.sh [--target TEMP_C] [--timeout SECONDS] [--yes]
 
-Runs a supervised boosted heatbed PID calibration on menderpi, writes the
+Runs a supervised heatbed PID calibration on menderpi, writes the
 measured PID constants into printer.cfg.template, regenerates printer.cfg, and
 redeploys.
 
-This energizes the 24V heatbed and the 230V SSR boost bed.
+This energizes the single 220V 750W SSR-controlled heatbed.
 EOF
 }
 
@@ -48,9 +48,7 @@ TEMPLATE="${SCRIPT_DIR}/printer.cfg.template"
 
 if [[ "${ASSUME_YES}" != "1" ]]; then
   cat >&2 <<EOF
-This will heat the bed to ${TARGET}C using both:
-  - 24V heatbed MOSFET on gpio21
-  - 230V SSR boost bed on gpio20
+This will heat the single 220V 750W bed to ${TARGET}C using the SSR on gpio20.
 
 Stay at the printer, verify mains wiring/earthing/fusing/SSR cooling, and be
 ready to cut power immediately.
@@ -64,7 +62,7 @@ EOF
   fi
 fi
 
-echo "Deploying calibration-ready boosted-bed config..."
+echo "Deploying calibration-ready single-bed config..."
 "${SCRIPT_DIR}/update_menderpi.sh"
 
 echo "Starting PID_CALIBRATE HEATER=heater_bed TARGET=${TARGET} on ${REMOTE_HOST}..."
@@ -160,24 +158,18 @@ if section_match is None:
 
 new_lines = []
 inserted_pid = False
-skip_comment_continuation = False
 for line in section_match.group(0).splitlines():
     stripped = line.strip()
-    if stripped.startswith("# Calibration-ready only."):
-        skip_comment_continuation = True
+    if stripped.startswith("# Calibration-ready only"):
         continue
     if stripped.startswith("# PID constants measured"):
         continue
-    if skip_comment_continuation and stripped.startswith("# the printer"):
-        skip_comment_continuation = False
-        continue
-    skip_comment_continuation = False
     if stripped.startswith("pid_K"):
         continue
     if stripped.startswith("max_delta:"):
         continue
     if stripped.startswith("control:"):
-        new_lines.append("# PID constants measured by calibrate_boosted_bed_pid.sh.")
+        new_lines.append("# PID constants measured by calibrate_bed_pid.sh.")
         new_lines.append("control: pid")
         new_lines.append(f"pid_Kp: {pid['pid_Kp']:.3f}")
         new_lines.append(f"pid_Ki: {pid['pid_Ki']:.3f}")
@@ -202,4 +194,4 @@ echo "Regenerating printer.cfg and redeploying measured PID config..."
 python3 "${SCRIPT_DIR}/generate_printer_cfg.py"
 "${SCRIPT_DIR}/update_menderpi.sh"
 
-echo "Boosted bed PID calibration complete."
+echo "Bed PID calibration complete."

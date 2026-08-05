@@ -5,7 +5,8 @@ This directory has one active printer configuration:
 - `printer.cfg` is THE config for the active printer.
 - `printer.cfg.template` plus `calib.yaml` generate `printer.cfg`.
 - `wiring/` is THE active wiring source for the custom Pico/TMC wiring.
-- `../klipper_host/` is THE active custom Klipper host patch source.
+- `../klipper_host/` is THE active Klipper host-extra source and contains the
+  upstream heater baseline used to remove the retired dual-heater patch.
 - `update_menderpi.sh` is THE script for copying it to `pi@menderpi.local`.
 - `archive/` is historical/reference material only. Do not edit files there to
   change the active printer.
@@ -32,13 +33,14 @@ python wiring/validate_wiring.py
 ```
 
 `update_menderpi.sh --check` verifies the generated local `printer.cfg`, the
-remote `~/printer_data/config/printer.cfg`, the patched remote
+remote `~/printer_data/config/printer.cfg`, the upstream remote
 `/opt/klipper/klippy/extras/heaters.py`, and the config Klippy has loaded via
 Moonraker without uploading files or restarting Klipper.
 
 `update_menderpi.sh` copies local `printer.cfg` to
 `~/printer_data/config/printer.cfg` on `pi@menderpi.local`, backs up the
-previous remote file with a timestamp, installs the custom Klipper host patch,
+previous remote file with a timestamp, restores upstream Klipper heater
+handling, installs the custom vision extra,
 restarts Klipper, verifies the Moonraker/Klippy state, then runs
 `deploy_vision_code.sh` to synchronize all tracked top-level vision Python,
 JSON, and PNG assets plus `priors.yaml`, restart the four vision services, and
@@ -385,15 +387,11 @@ Publication updates only the fact catalog. It does not edit `calib.yaml`,
 restart Klipper, or activate a printer calibration.
 
 
-## Boosted Heatbed
+## Heatbed
 
 The active bed remains `[heater_bed]` for normal Klipper and UI compatibility.
-The patched Klipper host code adds `boost_pin`, `primary_heater_power`, and
-`boost_heater_power` support:
-
-- `heater_pin: gpio21` drives the original 24V 240W bed MOSFET.
-- `boost_pin: gpio20` drives the 230V 500W SSR boost bed.
-- `pwm_cycle_time: 2.0` uses long software PWM for both outputs.
+`heater_pin: gpio20` drives the SSR for the single 220V 750W bed, and
+`pwm_cycle_time: 2.0` provides appropriately long software PWM for the SSR.
 
 The template stays in calibration-ready `watermark` mode until measured PID
 constants exist. To tune and deploy the final PID bed config while physically
@@ -401,7 +399,7 @@ supervising the printer:
 
 ```bash
 cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
-./calibrate_boosted_bed_pid.sh --target 80
+./calibrate_bed_pid.sh --target 80
 ```
 
 No other root script or config is part of the active deployment path. The

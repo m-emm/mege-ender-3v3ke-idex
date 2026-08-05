@@ -1129,20 +1129,21 @@ def test_live_config_check_rejects_pending_save_config():
     assert any("save_config_pending" in error for error in errors)
 
 
-def test_boosted_heatbed_config_uses_measured_60c_pid():
+def test_single_ssr_heatbed_config_is_ready_for_pid_calibration():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     heater_bed = _section(config_text, "heater_bed")
 
-    assert _setting_value(heater_bed, "heater_pin")
-    assert _setting_value(heater_bed, "boost_pin")
-    assert _setting_float(heater_bed, "primary_heater_power") > 0.0
-    assert _setting_float(heater_bed, "boost_heater_power") > 0.0
+    assert _setting_value(heater_bed, "heater_pin") == "gpio20"
+    assert "boost_pin:" not in heater_bed
+    assert "primary_heater_power:" not in heater_bed
+    assert "boost_heater_power:" not in heater_bed
     assert _setting_float(heater_bed, "pwm_cycle_time") > 0.0
     assert _setting_value(heater_bed, "sensor_pin")
-    assert "control: pid" in heater_bed
-    for setting_name in ("pid_Kp", "pid_Ki", "pid_Kd"):
-        assert _setting_float(heater_bed, setting_name) > 0.0
-    assert "max_delta:" not in heater_bed
+    assert "control: watermark" in heater_bed
+    assert _setting_float(heater_bed, "max_delta") > 0.0
+    assert "pid_Kp:" not in heater_bed
+    assert "pid_Ki:" not in heater_bed
+    assert "pid_Kd:" not in heater_bed
 
 
 def test_idex_part_fan_pins_and_slicer_routing():

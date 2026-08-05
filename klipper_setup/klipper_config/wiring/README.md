@@ -65,7 +65,7 @@ Klipper config.
 - `../printer.cfg.template` is the active Klipper config source.
 
 The YAML files own physical wiring: Pico pins, driver pins, connector pins,
-motor coils, power rails, pull-ups, endstops, MOSFET, SSR boost output, and
+motor coils, power rails, pull-ups, endstops, heatbed SSR output, and
 thermistor wiring.
 The generic pinout renderer is provided by
 [`mege-circuits`](https://github.com/m-emm/mege-circuits); this repository owns
@@ -100,8 +100,10 @@ python klipper_setup/klipper_config/wiring/validate_wiring.py
 ```
 
 Only wires with `klipper:` metadata are checked against `printer.cfg.template`.
-For the heatbed, both `heater_bed.heater_pin` and `heater_bed.boost_pin` are
-checked so the 24V MOSFET and SSR boost output cannot drift silently.
+For the heatbed, `heater_bed.heater_pin` is checked against the single 220V
+heatbed SSR output so the active mains-heater control cannot drift silently.
+The GPIO21 MOSFET driver remains shown and wired as reserved/unused hardware,
+without a `klipper:` tag or active configuration assignment.
 The X-axis SFS and CR Touch wires are documented here as wired/reserved hardware,
 but they are not active Klipper config and intentionally have no `klipper:` tag.
 The Y-axis TB6600 interface connector is the active Y motion path. TMC1 remains

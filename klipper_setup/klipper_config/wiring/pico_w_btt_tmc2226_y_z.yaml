@@ -11,8 +11,8 @@ metadata:
     Driver3 (Z-right): STEP=GPIO14, DIR=GPIO15, EN=GPIO16, UART=GPIO13.
     Live Y motor phases are on the external TB6600 driver; the local TMC1 motor wiring is reserved for rollback.
     Z endstops: Z-left=GPIO22, Z-right=GPIO17.
-    Heatbed MOSFET: HEATBED_ON=GPIO21.
-    Heatbed boost SSR: SSR_OUT=GPIO20 with Pico logic ground.
+    Heatbed SSR: SSR_OUT=GPIO20 with Pico logic ground for the single 220V 750W bed.
+    Reserved MOSFET driver: HEATBED_ON=GPIO21 remains wired but has no active Klipper assignment.
     Heatbed thermistor: SIGNAL=GPIO26_ADC0, GND=AGND, 4.7k pull-up REF-to-SIGNAL.
     Heatbed thermistor damping: 100uF SIGNAL-to-GND; electrolytic positive to SIGNAL, negative to AGND/GND.
     Vision APA102 helper header: 5V=VBUS for small-strip test use, 3.3V=level-shifter LV reference,
@@ -280,7 +280,7 @@ pin_sets:
       - N/C
       - GND
 
-  - prefix: MOSFET_
+  - prefix: MOSFET_RESERVED_UNUSED_
     origin: [4, 4]
     direction: right
     pins:
@@ -288,7 +288,7 @@ pin_sets:
       - NC
       - HEATBED_ON
       - NC_2
-  - prefix: SSR_BOOST_
+  - prefix: SSR_HEATBED_
     origin: [9, 4]
     direction: right
     pins:
@@ -571,19 +571,20 @@ wires:
     to: TMC3_J2_GND_MOTOR_2
     type: ground
 
+  # The MOSFET driver remains physically connected for a possible future
+  # auxiliary heater, but it is intentionally absent from printer.cfg.
   - from: PWR_GND
-    to: MOSFET_GND
+    to: MOSFET_RESERVED_UNUSED_GND
     type: ground
   - from: PICO_GPIO_21_27
-    to: MOSFET_HEATBED_ON
-    klipper: heater_bed.heater_pin
+    to: MOSFET_RESERVED_UNUSED_HEATBED_ON
     type: data
   - from: PICO_GND_28
-    to: SSR_BOOST_GND
+    to: SSR_HEATBED_GND
     type: ground
   - from: PICO_GPIO_20_26
-    to: SSR_BOOST_SSR_OUT
-    klipper: heater_bed.boost_pin
+    to: SSR_HEATBED_SSR_OUT
+    klipper: heater_bed.heater_pin
     type: data
 
     

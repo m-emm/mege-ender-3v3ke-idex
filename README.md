@@ -123,13 +123,13 @@ The generated files live at:
 - `/home/pi/printer_data/vision/calibration/catalog.json`
 - `/home/pi/printer_data/vision/calibration/jobs/<job_id>/index.html`
 
-The boosted heatbed uses the normal `[heater_bed]` object with the 24V bed on
-`gpio21` and the SSR boost output on `gpio20`. Run the supervised calibration
+The single 220V 750W heatbed uses the normal `[heater_bed]` object with its SSR
+on `gpio20`. Run the supervised calibration
 helper before changing the bed to PID operation:
 
 ```bash
 cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
-./calibrate_boosted_bed_pid.sh --target 80
+./calibrate_bed_pid.sh --target 80
 ```
 
 See `AGENTS.md` for the detailed deployment workflow.

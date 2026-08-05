@@ -73,7 +73,8 @@ Or explicitly use the symlink:
 - `overlays/stage2/99-klipperpi/files/moonraker.conf` — extend to match your setup.
 - `overlays/stage2/99-klipperpi/files/pitft43.conf` — adjust rotation if you mount the screen differently.
 - `../klipper_host/klippy/extras/heaters.py` — custom Klipper host patch
-  installed into `/opt/klipper` for the boosted heatbed.
+  installed into `/opt/klipper`; the tracked upstream `heaters.py` baseline
+  removes the retired boosted-heatbed extension during deployment.
 
 ## Raspberry Pi 4 USB and Wi-Fi note
 The Raspberry Pi 4 USB-A ports use the VL805 xHCI controller. Do not add the

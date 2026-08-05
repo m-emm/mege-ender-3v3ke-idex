@@ -39,7 +39,82 @@ Builder:
 
       - source: injected
         assembly: waste_bin_left_assembly
-        artifact: all
+        artifact: followers
+        names:
+          - nozzle_brush_holder
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+          waste_bin_left:
+            - $expr:
+                $sub: "-0.5 * ${waste_bin_width}"
+            - 0
+            - 0
+          waste_bin_right:
+            - $expr:
+                $sub: "0.5 * ${waste_bin_width}"
+            - 0
+            - 0
+      - source: injected
+        assembly: waste_bin_left_assembly
+        artifact: followers
+        exclude_names:
+          - nozzle_brush_holder
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: waste_bin_left_assembly
+        artifact: non_production_parts
+        names:
+          - LEFT_BOTTOM_complete_screw
+          - LEFT_BOTTOM_square_nut
+          - LEFT_TOP_complete_screw
+          - LEFT_TOP_square_nut
+          - RIGHT_BOTTOM_complete_screw
+          - RIGHT_BOTTOM_square_nut
+          - RIGHT_TOP_complete_screw
+          - RIGHT_TOP_square_nut
+          - nozzle_brush
+          - nozzle_brush_holder_threaded_insert
+          - nozzle_brush_holder_screw
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+          waste_bin_left:
+            - $expr:
+                $sub: "-0.5 * ${waste_bin_width}"
+            - 0
+            - 0
+          waste_bin_right:
+            - $expr:
+                $sub: "0.5 * ${waste_bin_width}"
+            - 0
+            - 0
+      - source: injected
+        assembly: waste_bin_left_assembly
+        artifact: non_production_parts
+        exclude_names:
+          - LEFT_BOTTOM_complete_screw
+          - LEFT_BOTTOM_square_nut
+          - LEFT_TOP_complete_screw
+          - LEFT_TOP_square_nut
+          - RIGHT_BOTTOM_complete_screw
+          - RIGHT_BOTTOM_square_nut
+          - RIGHT_TOP_complete_screw
+          - RIGHT_TOP_square_nut
+          - nozzle_brush
+          - nozzle_brush_holder_threaded_insert
+          - nozzle_brush_holder_screw
         name_template: "{assembly_name}_{name}"
         animation:
           z_axis:
@@ -55,6 +130,16 @@ Builder:
             - 0
             - 0
             - { $ref: z_axis_z_travel }
+          waste_bin_left:
+            - $expr:
+                $sub: "-0.5 * ${waste_bin_width}"
+            - 0
+            - 0
+          waste_bin_right:
+            - $expr:
+                $sub: "0.5 * ${waste_bin_width}"
+            - 0
+            - 0
 
       - source: injected
         assembly: z_axis_guide_rod_left
@@ -97,6 +182,8 @@ Builder:
             - { $ref: z_axis_z_travel }
 
 Parameters:
+  waste_bin_width:
+    Type: Float
   x_axis_x_travel:
     Type: Float
   z_axis_z_travel:

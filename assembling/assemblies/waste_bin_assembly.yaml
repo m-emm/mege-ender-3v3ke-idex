@@ -30,7 +30,6 @@ Builder:
           bridge_no_support: "0"
           max_bridge_length: "0"
 
-
     parts:
       - source: self
         artifact: leader
@@ -54,11 +53,11 @@ Builder:
         - name: waste_bin
           parts:
             - waste_bin
-            - top_bin
             - nozzle_brush_holder
 
-        # - name: nozzle_brush_holder
-        #   parts:
+        - name: waste_bin_top
+          parts:
+            - top_bin
 
       auto_assign_plates: false
 

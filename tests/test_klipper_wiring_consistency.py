@@ -13,6 +13,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 KLIPPER_CONFIG_DIR = REPO_ROOT / "klipper_setup" / "klipper_config"
 WIRING_DIR = KLIPPER_CONFIG_DIR / "wiring"
+ACTIVE_Y_Z_WIRING_PATH = WIRING_DIR / "pico_w_btt_tmc2226_y_z.yaml"
 VALIDATOR_PATH = WIRING_DIR / "validate_wiring.py"
 TMC5160_REVIEW_PATH = WIRING_DIR / "rp2040plus_btt_tmc5160t_plus_y.yaml"
 MEGE_CIRCUITS_SRC = REPO_ROOT.parent / "mege-circuits" / "src"
@@ -50,7 +51,6 @@ EXPECTED_KLIPPER_TAGS = {
     "stepper_z1.endstop_pin",
     "tmc2209 stepper_z1.uart_pin",
     "heater_bed.heater_pin",
-    "heater_bed.boost_pin",
     "heater_bed.sensor_pin",
 }
 
@@ -102,6 +102,20 @@ def test_active_wiring_tags_cover_expected_pico_klipper_pins():
     tags = set(validator.iter_tagged_wiring_refs(validator.DEFAULT_WIRING_FILES))
 
     assert tags == EXPECTED_KLIPPER_TAGS
+
+
+def test_reserved_mosfet_driver_remains_wired_but_unconfigured():
+    wiring = yaml.safe_load(ACTIVE_Y_Z_WIRING_PATH.read_text(encoding="utf-8"))
+    prefixes = {pin_set["prefix"] for pin_set in wiring["pin_sets"]}
+    mosfet_control = next(
+        wire
+        for wire in wiring["wires"]
+        if wire["from"] == "PICO_GPIO_21_27"
+        and wire["to"] == "MOSFET_RESERVED_UNUSED_HEATBED_ON"
+    )
+
+    assert "MOSFET_RESERVED_UNUSED_" in prefixes
+    assert "klipper" not in mosfet_control
 
 
 def test_generated_wiring_svgs_are_current():

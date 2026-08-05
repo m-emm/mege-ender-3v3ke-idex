@@ -20,49 +20,6 @@ QUELL_STALE_TIME = 7.0
 MIN_PWM_CHANGE_RATIO = 0.05
 
 
-def split_boosted_heater_power(value, primary_power, boost_power):
-    value = max(0.0, min(1.0, value))
-    total_power = primary_power + boost_power
-    requested_power = value * total_power
-    primary_pwm = min(requested_power, primary_power) / primary_power
-    boost_pwm = max(0.0, requested_power - primary_power) / boost_power
-    return primary_pwm, min(boost_pwm, 1.0)
-
-
-class BoostedHeaterPwmOutput:
-    def __init__(self, primary_pwm, boost_pwm, primary_power, boost_power):
-        self.primary_pwm = primary_pwm
-        self.boost_pwm = boost_pwm
-        self.primary_power = primary_power
-        self.boost_power = boost_power
-        self.last_primary_pwm = 0.0
-        self.last_boost_pwm = 0.0
-
-    def get_mcu(self):
-        return self.primary_pwm.get_mcu()
-
-    def setup_max_duration(self, max_duration):
-        self.primary_pwm.setup_max_duration(max_duration)
-        self.boost_pwm.setup_max_duration(max_duration)
-
-    def setup_start_value(self, start_value, shutdown_value):
-        self.primary_pwm.setup_start_value(start_value, shutdown_value)
-        self.boost_pwm.setup_start_value(start_value, shutdown_value)
-
-    def setup_cycle_time(self, cycle_time, hardware_pwm=False):
-        self.primary_pwm.setup_cycle_time(cycle_time, hardware_pwm)
-        self.boost_pwm.setup_cycle_time(cycle_time, hardware_pwm)
-
-    def set_pwm(self, print_time, value):
-        primary_value, boost_value = split_boosted_heater_power(
-            value, self.primary_power, self.boost_power
-        )
-        self.last_primary_pwm = primary_value
-        self.last_boost_pwm = boost_value
-        self.primary_pwm.set_pwm(print_time, primary_value)
-        self.boost_pwm.set_pwm(print_time, boost_value)
-
-
 class Heater:
     def __init__(self, config, sensor):
         self.printer = config.get_printer()
@@ -99,24 +56,9 @@ class Heater:
         # Setup output heater pin
         heater_pin = config.get("heater_pin")
         ppins = self.printer.lookup_object("pins")
-        primary_pwm = ppins.setup_pin("pwm", heater_pin)
-        boost_pin = config.get("boost_pin", None)
-        pwm_cycle_time_max = self.pwm_delay
-        if boost_pin is None:
-            self.mcu_pwm = primary_pwm
-        else:
-            boost_pwm = ppins.setup_pin("pwm", boost_pin)
-            primary_power = config.getfloat("primary_heater_power", above=0.0)
-            boost_power = config.getfloat("boost_heater_power", above=0.0)
-            self.mcu_pwm = BoostedHeaterPwmOutput(
-                primary_pwm, boost_pwm, primary_power, boost_power
-            )
-            pwm_cycle_time_max = min(
-                primary_pwm.get_mcu().max_nominal_duration(),
-                boost_pwm.get_mcu().max_nominal_duration(),
-            )
+        self.mcu_pwm = ppins.setup_pin("pwm", heater_pin)
         pwm_cycle_time = config.getfloat(
-            "pwm_cycle_time", 0.100, above=0.0, maxval=pwm_cycle_time_max
+            "pwm_cycle_time", 0.100, above=0.0, maxval=self.pwm_delay
         )
         self.mcu_pwm.setup_cycle_time(pwm_cycle_time)
         self.mcu_pwm.setup_max_duration(MAX_HEAT_TIME)

@@ -51,6 +51,7 @@ waste_bin_join_screw_length = 8
 
 waste_bin_square_nut_sink_depth = 0.8
 
+
 def create_nozzle_brush():
     base = create_box(nozzle_brush_width, nozzle_brush_depth, nozzle_brush_base_height)
     hairs = PartCollector()
@@ -490,7 +491,7 @@ def create_waste_bin_assembly(
 
     screws_x_pitch = mount_plate_size[0] / 3
 
-    long_slit_shortening = 10
+    long_slit_shortening = 4
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
         for bt in [Alignment.BOTTOM, Alignment.TOP]:
@@ -504,15 +505,14 @@ def create_waste_bin_assembly(
             square_nut = align(square_nut, screw, Alignment.BOTTOM)
 
             screw.add_named_non_production_part(square_nut, "square_nut")
-            
-            square_nut_cutter = create_square_nut(waste_bin_mount_screw_size, slack=0.1,height = 5, no_hole=True)
+
+            square_nut_cutter = create_square_nut(
+                waste_bin_mount_screw_size, slack=0.1, height=5, no_hole=True
+            )
             square_nut_cutter = align(square_nut_cutter, square_nut, Alignment.CENTER)
             square_nut_cutter = align(square_nut_cutter, square_nut, Alignment.TOP)
 
             screw.add_named_cutter(square_nut_cutter, "square_nut_cutter")
-
-            
-
 
             screw = rotate(90, axis=(1, 0, 0))(screw)
 
@@ -572,7 +572,11 @@ def create_waste_bin_assembly(
             top_bin = top_bin.cut(aligned_cutter)
         elif "square_nut_cutter" in name:
             aligned_cutter = align(
-                cutter, bottom_connector_counter_plate, Alignment.STACK_BACK, stack_gap = -waste_bin_square_nut_sink_depth)                        
+                cutter,
+                bottom_connector_counter_plate,
+                Alignment.STACK_BACK,
+                stack_gap=-waste_bin_square_nut_sink_depth,
+            )
             bottom_bin = bottom_bin.cut(aligned_cutter)
         else:
             bottom_bin = bottom_bin.cut(cutter)
@@ -590,9 +594,13 @@ def create_waste_bin_assembly(
         if "complete_screw" in name:
             retval.add_named_non_production_part(npp, name)
         elif "square_nut" in name:
-            aligned_nut = align(npp, bottom_connector_counter_plate, Alignment.STACK_BACK, stack_gap = -waste_bin_square_nut_sink_depth)
+            aligned_nut = align(
+                npp,
+                bottom_connector_counter_plate,
+                Alignment.STACK_BACK,
+                stack_gap=-waste_bin_square_nut_sink_depth,
+            )
             retval.add_named_non_production_part(aligned_nut, name)
-            
 
     retval.add_named_follower(top_bin, "top_bin")
     retval.add_named_non_production_part(nozzle_brush, "nozzle_brush")

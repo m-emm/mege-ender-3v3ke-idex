@@ -3614,6 +3614,7 @@ assemblies:
       z_axis_carriage_left: z_axis_carriage_left_assembly
 
     parameters:
+      waste_bin_width: !Ref waste_bin_width
       x_axis_x_travel: !Ref x_axis_x_travel
       z_axis_z_travel: !Ref z_axis_z_travel
 
