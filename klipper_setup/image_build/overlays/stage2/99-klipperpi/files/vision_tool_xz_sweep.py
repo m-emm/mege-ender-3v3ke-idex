@@ -869,7 +869,136 @@ def _write_slope_plot(
                     linewidth=2.0,
                     label=f"{tool} shared curve",
                 )
-    axis.set_title("Nozzle image-u slope versus commanded Z")
+    if shared_curve_fit.get("available"):
+        delta_text = (
+            f"T1 ΔZ = {float(shared_curve_fit['t1_z_delta_mm']):+.4f} mm\n"
+            "physical Z = commanded Z + ΔZ"
+        )
+        axis.text(
+            0.02,
+            0.98,
+            delta_text,
+            transform=axis.transAxes,
+            va="top",
+            fontsize=12,
+            fontweight="bold",
+            bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.9},
+        )
+        title = "Nozzle image-u slope versus commanded Z"
+    else:
+        title = "Nozzle image-u slope versus commanded Z (shared fit unavailable)"
+    axis.set_title(title)
+    axis.set_xlabel("Commanded Z (mm)")
+    axis.set_ylabel("du/dX (px/mm)")
+    axis.grid(True, alpha=0.3)
+    axis.legend()
+    figure.tight_layout()
+    figure.savefig(path, dpi=160)
+    plt.close(figure)
+
+
+def _write_shared_curve_plot(
+    fits: list[dict[str, Any]],
+    shared_curve_fit: dict[str, Any],
+    path: Path,
+) -> None:
+    figure, axis = plt.subplots(figsize=(10, 6))
+    tool_colors = {"T0": PLOT_COLORS[0], "T1": PLOT_COLORS[1]}
+    tool_markers = {"T0": "o", "T1": "s"}
+
+    for tool in ("T0", "T1"):
+        tool_fits = [
+            fit
+            for fit in fits
+            if fit["tool"] == tool and fit["slope_u_px_per_mm"] is not None
+        ]
+        if tool_fits:
+            axis.scatter(
+                [float(fit["z_mm"]) for fit in tool_fits],
+                [float(fit["slope_u_px_per_mm"]) for fit in tool_fits],
+                color=tool_colors[tool],
+                marker=tool_markers[tool],
+                s=70,
+                label=f"{tool} measured slope",
+            )
+
+    excluded = [
+        row
+        for row in shared_curve_fit.get("excluded_rows", [])
+        if row.get("slope_u_px_per_mm") is not None
+    ]
+    if excluded:
+        axis.scatter(
+            [float(row["z_mm"]) for row in excluded],
+            [float(row["slope_u_px_per_mm"]) for row in excluded],
+            color="#D62728",
+            marker="x",
+            s=90,
+            linewidths=2.5,
+            label="excluded from shared fit",
+        )
+
+    if shared_curve_fit.get("available"):
+        included = shared_curve_fit.get("included_rows", [])
+        z_values = np.asarray(
+            [float(row["z_mm"]) for row in included], dtype=np.float64
+        )
+        if len(z_values):
+            z_grid = np.linspace(float(z_values.min()), float(z_values.max()), 300)
+            a = float(shared_curve_fit["curve_intercept"])
+            b = float(shared_curve_fit["curve_linear_z"])
+            c = float(shared_curve_fit["curve_quadratic_z"])
+            delta = float(shared_curve_fit["t1_z_delta_mm"])
+            for tool in ("T0", "T1"):
+                physical_z = z_grid + (delta if tool == "T1" else 0.0)
+                predicted = a + b * physical_z + c * physical_z**2
+                axis.plot(
+                    z_grid,
+                    predicted,
+                    color=tool_colors[tool],
+                    linestyle="-",
+                    linewidth=2.5,
+                    label=f"{tool} fitted shared curve",
+                )
+            annotation = (
+                f"T1 ΔZ = {delta:+.4f} mm\n"
+                f"RMS = {float(shared_curve_fit['rms_slope_px_per_mm']):.4f} px/mm\n"
+                f"included={len(included)}  excluded={len(shared_curve_fit.get('excluded_rows', []))}"
+            )
+            axis.text(
+                0.02,
+                0.98,
+                annotation,
+                transform=axis.transAxes,
+                va="top",
+                fontsize=13,
+                fontweight="bold",
+                bbox={
+                    "boxstyle": "round",
+                    "facecolor": "#FFF2CC",
+                    "edgecolor": "#8C6D1F",
+                    "alpha": 0.95,
+                },
+            )
+            title = "Shared quadratic slope fit and T1 Z offset"
+        else:
+            title = "Shared quadratic slope fit has no included rows"
+    else:
+        title = "Shared quadratic slope fit unavailable"
+        axis.text(
+            0.02,
+            0.98,
+            "T1 ΔZ = unavailable\n"
+            + str(shared_curve_fit.get("reason", "unknown reason")),
+            transform=axis.transAxes,
+            va="top",
+            fontsize=12,
+            fontweight="bold",
+            color="#8B0000",
+            bbox={"boxstyle": "round", "facecolor": "#FDECEC", "alpha": 0.95},
+        )
+
+    axis.set_title(title)
     axis.set_xlabel("Commanded Z (mm)")
     axis.set_ylabel("du/dX (px/mm)")
     axis.grid(True, alpha=0.3)
@@ -1062,6 +1191,14 @@ def analyze(
     )
     _logger.info("Wrote X/Z sweep slope-versus-Z plot path=%s", slope_plot_path)
     artifacts["tool_xz_sweep_u_slope_vs_z"] = _artifact(slope_plot_path)
+    shared_plot_path = artifact_dir / "tool_xz_sweep_shared_z_fit.png"
+    _write_shared_curve_plot(
+        fits=u_x_linear_fits,
+        shared_curve_fit=shared_z_curve_fit,
+        path=shared_plot_path,
+    )
+    _logger.info("Wrote X/Z sweep shared-fit plot path=%s", shared_plot_path)
+    artifacts["tool_xz_sweep_shared_z_fit"] = _artifact(shared_plot_path)
 
     missing_fiducials = sum(not record["fiducials_detected"] for record in records)
     missing_nozzles = sum(not record["nozzle_detected"] for record in records)

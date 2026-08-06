@@ -320,9 +320,11 @@ def test_analysis_writes_raw_records_and_two_plots(tmp_path, monkeypatch):
     assert not (tmp_path / "artifacts" / "tool_xz_sweep_overlays").exists()
     assert (tmp_path / "artifacts" / "tool_xz_sweep_u_vs_x.png").is_file()
     assert (tmp_path / "artifacts" / "tool_xz_sweep_u_slope_vs_z.png").is_file()
+    assert (tmp_path / "artifacts" / "tool_xz_sweep_shared_z_fit.png").is_file()
     assert set(result["artifacts"]) == {
         "tool_xz_sweep_u_vs_x",
         "tool_xz_sweep_u_slope_vs_z",
+        "tool_xz_sweep_shared_z_fit",
     }
     fits = result["u_x_linear_fits"]
     t0_fit = next(fit for fit in fits if fit["tool"] == "T0" and fit["z_mm"] == 0.5)

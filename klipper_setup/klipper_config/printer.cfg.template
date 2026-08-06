@@ -435,7 +435,7 @@ rotation_distance: 36
 endstop_pin: ^x_pico:gpio4
 position_endstop: ${t0_x_endstop}
 position_min: ${t0_x_endstop}
-position_max: 250.000
+position_max: 255.000
 homing_positive_dir: false
 homing_speed: 25
 second_homing_speed: 3
@@ -454,7 +454,7 @@ microsteps: 16
 rotation_distance: 36
 endstop_pin: ^x_pico:gpio22
 position_endstop: ${t1_x_endstop}
-position_min: 0.000
+position_min: 16.0
 position_max: ${t1_x_endstop}
 homing_positive_dir: true
 homing_speed: 25

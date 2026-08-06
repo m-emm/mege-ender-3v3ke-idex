@@ -100,6 +100,42 @@ def test_registry_does_not_pin_tunable_job_values():
     assert graph.validate_registry(registry) == registry
 
 
+def test_xz_sweep_shared_delta_summary_is_prominent_and_reports_unavailable():
+    calibration = _module("vision_calibration.py", "vision_calibration_ui_summary_test")
+
+    available = calibration._shared_z_fit_summary_html(
+        {
+            "diagnostics": {
+                "shared_z_curve_fit": {
+                    "available": True,
+                    "t1_z_delta_mm": -0.6,
+                    "rms_slope_px_per_mm": 0.0123,
+                    "included_rows": [{"tool": "T0"}],
+                    "excluded_rows": [{"tool": "T1"}],
+                }
+            }
+        }
+    )
+    assert "Shared T1 Z offset" in available
+    assert "T1 ΔZ = -0.6000 mm" in available
+    assert "reducing the top-endstop value" in available
+    assert "included rows: 1" in available
+    assert "excluded rows: 1" in available
+
+    unavailable = calibration._shared_z_fit_summary_html(
+        {
+            "diagnostics": {
+                "shared_z_curve_fit": {
+                    "available": False,
+                    "reason": "not enough usable tool/Z rows",
+                }
+            }
+        }
+    )
+    assert "T1 ΔZ = unavailable" in unavailable
+    assert "not enough usable tool/Z rows" in unavailable
+
+
 def test_generated_acquisition_gcode_homes_before_job_motion():
     calibration = _module("vision_calibration.py", "vision_gcode_homing_test")
     manifest = {

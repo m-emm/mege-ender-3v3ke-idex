@@ -2785,6 +2785,42 @@ def _json_link(path: str, label: str) -> str:
     return f'<a href="{html.escape(path)}">{html.escape(label)}</a>'
 
 
+def _shared_z_fit_summary_html(result: dict[str, Any]) -> str:
+    """Render the X/Z sweep's most important diagnostic prominently."""
+    diagnostics = result.get("diagnostics", {})
+    shared_fit = diagnostics.get("shared_z_curve_fit")
+    if not isinstance(shared_fit, dict):
+        return ""
+
+    if shared_fit.get("available"):
+        delta = float(shared_fit["t1_z_delta_mm"])
+        rms = float(shared_fit["rms_slope_px_per_mm"])
+        included = len(shared_fit.get("included_rows", []))
+        excluded = len(shared_fit.get("excluded_rows", []))
+        return (
+            '<div class="card" style="border-color:#d6a72c">'
+            "<h2>Shared T1 Z offset</h2>"
+            f'<p class="good" style="font-size:1.6em"><strong>'
+            f"T1 ΔZ = {delta:+.4f} mm</strong></p>"
+            "<p>Physical Z = commanded Z + ΔZ. A negative ΔZ means T1 is "
+            "physically lower at the same command and should be raised by "
+            "reducing the top-endstop value.</p>"
+            f"<p>Shared quadratic fit RMS: {rms:.4f} px/mm · "
+            f"included rows: {included} · excluded rows: {excluded}</p>"
+            "</div>"
+        )
+
+    reason = html.escape(str(shared_fit.get("reason", "unknown reason")))
+    return (
+        '<div class="card" style="border-color:#ff6b6b">'
+        "<h2>Shared T1 Z offset</h2>"
+        '<p class="bad" style="font-size:1.4em"><strong>'
+        "T1 ΔZ = unavailable</strong></p>"
+        f"<p>Reason: {reason}</p>"
+        "</div>"
+    )
+
+
 def _page(title: str, body: str, *, prefix: str = "") -> str:
     return f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>{html.escape(title)}</title>
@@ -3044,7 +3080,9 @@ def render_ui(catalog: dict[str, Any]) -> None:
                     if (analysis_dir / "calib_candidate.yaml").exists()
                     else ""
                 )
-                + "</p><h2>Primary artifacts</h2>"
+                + "</p>"
+                + _shared_z_fit_summary_html(result)
+                + "<h2>Primary artifacts</h2>"
                 + ("".join(artifact_html) or "<p>None.</p>")
             )
             (analysis_dir / "index.html").write_text(
