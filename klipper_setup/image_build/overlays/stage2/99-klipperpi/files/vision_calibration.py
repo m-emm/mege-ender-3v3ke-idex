@@ -69,11 +69,9 @@ from vision_tool_xy_calibration import (
 from vision_tool_xy_calibration import (
     prepare_measurement as prepare_tool_xy_measurement,
 )
-from vision_tool_xz_sweep import (
-    ToolXZSweepError,
-    analyze as analyze_tool_xz_sweep,
-    prepare_sweep as prepare_tool_xz_sweep,
-)
+from vision_tool_xz_sweep import ToolXZSweepError
+from vision_tool_xz_sweep import analyze as analyze_tool_xz_sweep
+from vision_tool_xz_sweep import prepare_sweep as prepare_tool_xz_sweep
 
 _logger = logging.getLogger(__name__)
 

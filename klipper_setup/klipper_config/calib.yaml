@@ -1,6 +1,16 @@
 bed_grid_zero:
   x: 113.300
   y: 107.000
+# Canonical absolute Z datum for the Iteration 1 T0 tap workflow.
+bed_z_reference:
+  x: 150.000
+  y: 150.000
+# Accepted vision-derived relationship. Iteration 1 may translate both
+# endstops, but must never change this relative T1/T0 Z alignment.
+vision_relative_alignment:
+  t0_minus_t1_z: 1.274
+  tolerance_mm: 0.010
+  source: accepted vision-derived T1/T0 Z relationship
 tools:
   t0:
     x_endstop: -77.635
@@ -25,6 +35,9 @@ eddy_relative_calibration:
     z: 1.399
   klipper:
     reg_drive_current: 15
+    # The final threshold is populated by the supervised Iteration 1 runner.
+    tap_threshold: null
+    tap_z_offset: 0.000
     calibrate: |
       0.050000:3206065.674,0.090000:3205605.396,0.130000:3205168.569,
       0.170000:3204712.976,0.210000:3204294.797,0.250000:3203871.234,

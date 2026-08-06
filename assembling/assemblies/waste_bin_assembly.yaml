@@ -55,11 +55,9 @@ Builder:
             - waste_bin
             - top_bin
 
-
         - name: waste_bin_nozzle_brush_holder
           parts:
             - nozzle_brush_holder
-            
 
       auto_assign_plates: false
 

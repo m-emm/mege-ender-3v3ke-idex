@@ -55,12 +55,14 @@ def _normalize_eddy_calibrate(value: str) -> str:
 
 
 def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
-    defaults = {        
+    defaults = {
         "nozzle_to_coil_x": -57.391,
         "nozzle_to_coil_y": -18.997,
         "nozzle_to_coil_z": 1.399,
         "reg_drive_current": None,
         "calibrate": None,
+        "tap_threshold": None,
+        "tap_z_offset": None,
         "capture": None,
         "temperature_calibration_temp": None,
     }
@@ -79,6 +81,8 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
     reg_drive_current = None
     calibrate = None
     capture = None
+    tap_threshold = None
+    tap_z_offset = None
     temperature_calibration_temp = None
 
     klipper = value.get("klipper")
@@ -143,6 +147,27 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
                         f"an invalid height:frequency pair: {pair!r}"
                     ) from None
 
+        if klipper.get("tap_threshold") is not None:
+            try:
+                tap_threshold = int(klipper["tap_threshold"])
+            except (TypeError, ValueError):
+                raise ValueError(
+                    "eddy_relative_calibration.klipper.tap_threshold "
+                    "must be an integer"
+                ) from None
+            if tap_threshold <= 0:
+                raise ValueError(
+                    "eddy_relative_calibration.klipper.tap_threshold "
+                    "must be positive"
+                )
+
+        if klipper.get("tap_z_offset") is not None:
+            tap_z_offset = _require_float(
+                klipper,
+                "tap_z_offset",
+                "eddy_relative_calibration.klipper",
+            )
+
     temperature_probe = value.get("temperature_probe")
     if temperature_probe is not None:
         temperature_probe = _require_mapping(
@@ -173,6 +198,8 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
         ),
         "reg_drive_current": reg_drive_current,
         "calibrate": calibrate,
+        "tap_threshold": tap_threshold,
+        "tap_z_offset": tap_z_offset,
         "capture": capture,
         "temperature_calibration_temp": temperature_calibration_temp,
     }
@@ -185,6 +212,10 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
     bed_grid_zero = _require_mapping(
         data.get("bed_grid_zero"),
         "bed_grid_zero",
+    )
+    bed_z_reference = _require_mapping(
+        data.get("bed_z_reference", bed_grid_zero),
+        "bed_z_reference",
     )
     tools = _require_mapping(data.get("tools"), "tools")
     t0 = _require_mapping(tools.get("t0"), "tools.t0")
@@ -201,6 +232,18 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
                 bed_grid_zero,
                 "y",
                 "bed_grid_zero",
+            ),
+        },
+        "bed_z_reference": {
+            "x": _require_float(
+                bed_z_reference,
+                "x",
+                "bed_z_reference",
+            ),
+            "y": _require_float(
+                bed_z_reference,
+                "y",
+                "bed_z_reference",
             ),
         },
         "tools": {
@@ -373,6 +416,7 @@ def template_values(
     t0 = calibration["tools"]["t0"]
     t1 = calibration["tools"]["t1"]
     bed_grid_zero = calibration["bed_grid_zero"]
+    bed_z_reference = calibration.get("bed_z_reference", bed_grid_zero)
 
     eddy_relative_calibration = calibration.get("eddy_relative_calibration") or {
         "nozzle_to_coil_x": -57.391,
@@ -380,6 +424,8 @@ def template_values(
         "nozzle_to_coil_z": 1.399,
         "reg_drive_current": None,
         "calibrate": None,
+        "tap_threshold": None,
+        "tap_z_offset": None,
         "capture": None,
         "temperature_calibration_temp": None,
     }
@@ -400,6 +446,17 @@ def template_values(
             )
         )
 
+    if eddy_relative_calibration.get("tap_threshold") is not None:
+        eddy_klipper_lines.append(
+            f"tap_threshold: {int(eddy_relative_calibration['tap_threshold'])}"
+        )
+
+    if eddy_relative_calibration.get("tap_z_offset") is not None:
+        eddy_klipper_lines.append(
+            "tap_z_offset: "
+            f"{float(eddy_relative_calibration['tap_z_offset']):.3f}"
+        )
+
     temperature_calibration_temp = eddy_relative_calibration.get(
         "temperature_calibration_temp"
     )
@@ -413,6 +470,8 @@ def template_values(
     return {
         "bed_grid_zero_x": format_mm(bed_grid_zero["x"]),
         "bed_grid_zero_y": format_mm(bed_grid_zero["y"]),
+        "bed_z_reference_x": format_mm(bed_z_reference["x"]),
+        "bed_z_reference_y": format_mm(bed_z_reference["y"]),
         "t0_x_endstop": format_mm(t0["x_endstop"]),
         "t0_y_endstop": format_mm(t0["y_endstop"]),
         "t0_z_endstop": format_mm(t0["z_endstop"]),

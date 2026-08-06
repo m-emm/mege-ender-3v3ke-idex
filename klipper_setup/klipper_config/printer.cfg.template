@@ -71,7 +71,7 @@ mesh_min: 0,20
 mesh_max: 190,275
 probe_count: 11,11
 mesh_pps: 0,0
-zero_reference_position: 170,170
+zero_reference_position: ${bed_z_reference_x},${bed_z_reference_y}
 
 [printer]
 kinematics: cartesian

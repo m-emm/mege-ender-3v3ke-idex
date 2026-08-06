@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.stats import theilslopes
-
 from vision_four_fiducials import FourFiducialError, detect_four_fiducials
 from vision_nozzle_tip_localization import (
     NozzleTipLocalizationError,

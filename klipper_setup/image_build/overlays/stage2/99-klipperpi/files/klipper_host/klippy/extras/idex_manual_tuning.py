@@ -114,8 +114,7 @@ class IDEXManualTuning:
             "active_tool": self.active_tool,
             "active_tool_z_offset": self.active_tool_z_offset,
             "manual_z_adjust": self.manual_z_adjust,
-            "effective_z_offset": self.active_tool_z_offset
-            + self.manual_z_adjust,
+            "effective_z_offset": self.active_tool_z_offset + self.manual_z_adjust,
             "speed_factor": self.speed_factor,
             "flow_factor": self.flow_factor,
         }
