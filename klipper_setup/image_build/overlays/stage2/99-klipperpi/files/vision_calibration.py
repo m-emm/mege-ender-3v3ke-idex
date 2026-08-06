@@ -332,6 +332,10 @@ def _active_tool_xy_calibration(status: dict[str, Any]) -> dict[str, Any]:
             "t0": _number(tool_state, "t0_y_offset", "_IDEX_TOOL_STATE"),
             "t1": _number(tool_state, "t1_y_offset", "_IDEX_TOOL_STATE"),
         },
+        "tool_z_endstops_mm": {
+            "t0": _number(tool_state, "t0_z_endstop", "_IDEX_TOOL_STATE"),
+            "t1": _number(tool_state, "t1_z_endstop", "_IDEX_TOOL_STATE"),
+        },
     }
 
 
@@ -1876,15 +1880,13 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 value = {
                     "camera": "nozzle_cam",
                     "tools": details["tools"],
-                    "x_offsets_from_bed_tab_mm": details[
-                        "x_offsets_from_bed_tab_mm"
-                    ],
+                    "x_offsets_from_bed_tab_mm": details["x_offsets_from_bed_tab_mm"],
                     "z_positions_mm": details["z_positions_mm"],
                     "image_dimensions_px": details["image_dimensions_px"],
                     "records": details["records"],
-                    "acquisition_calibration": details[
-                        "acquisition_calibration"
-                    ],
+                    "u_x_linear_fits": details["u_x_linear_fits"],
+                    "shared_z_curve_fit": details["shared_z_curve_fit"],
+                    "acquisition_calibration": details["acquisition_calibration"],
                     "supporting_artifact_hashes": {
                         key: item["sha256"]
                         for key, item in details["artifacts"].items()

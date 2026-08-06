@@ -88,9 +88,7 @@ def test_registry_has_valid_extensible_job_definitions():
 
 def test_registry_does_not_pin_tunable_job_values():
     graph = _module("vision_calibration_graph.py", "vision_graph_tuning_test")
-    registry = json.loads(
-        (FILES / "vision_job_types.json").read_text(encoding="utf-8")
-    )
+    registry = json.loads((FILES / "vision_job_types.json").read_text(encoding="utf-8"))
     measurement = registry["job_types"]["idex_tool_xy_measure_t0"]
     measurement["tool"] = "T1"
     measurement["x_offsets_from_bed_tab_mm"] = [22.0, 10.0, 22.0]
@@ -167,9 +165,9 @@ def test_new_job_replaces_abandoned_acquisition_lock(tmp_path):
     assert abandoned_state["state"] == "failed"
     assert abandoned_state["committed_frame_count"] == 3
     assert abandoned_state["superseded_by_job"] == "replacement-job"
-    assert "acquisition_lock_replaced" in (
-        abandoned_dir / "events.jsonl"
-    ).read_text(encoding="utf-8")
+    assert "acquisition_lock_replaced" in (abandoned_dir / "events.jsonl").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_fine_nozzle_marker_selection_rejects_distant_red_distractor(monkeypatch):
@@ -179,9 +177,7 @@ def test_fine_nozzle_marker_selection_rejects_distant_red_distractor(monkeypatch
     )
     expected = np.asarray([1083.0, 412.0])
     distractor = {"center_px": [1100.0, 521.0]}
-    monkeypatch.setattr(
-        locator, "_red_candidates", lambda _image, _index: [distractor]
-    )
+    monkeypatch.setattr(locator, "_red_candidates", lambda _image, _index: [distractor])
 
     center, record = locator._select_marker(
         np.zeros((1080, 1920, 3), dtype=np.uint8),
@@ -381,9 +377,7 @@ def test_missing_published_fact_set_falls_back_and_can_be_superseded(tmp_path):
             "supersedes": {fact_name: supersedes},
             "publication_hash": "",
         }
-        record["publication_hash"] = graph.content_hash(
-            record, "publication_hash"
-        )
+        record["publication_hash"] = graph.content_hash(record, "publication_hash")
         graph.atomic_write_json(
             root / "publications" / f"{publication_id}.json",
             record,
@@ -406,9 +400,7 @@ def test_missing_published_fact_set_falls_back_and_can_be_superseded(tmp_path):
     assert "continuing with previous available facts" in (
         catalog["warnings"][0]["message"]
     )
-    assert "Rerun the calibration" in (
-        catalog["warnings"][0]["suggested_action"]
-    )
+    assert "Rerun the calibration" in (catalog["warnings"][0]["suggested_action"])
     assert catalog["publications"][-1]["fact_set_available"] is False
 
     _legacy_path, legacy = fact_set("legacy-recovery", 174.0)
@@ -458,9 +450,7 @@ def test_flat_priors_replace_active_seed_fact_dependencies():
         for definition in registry["job_types"].values()
         for requirement in definition["requires"]
     )
-    calibration_source = (FILES / "vision_calibration.py").read_text(
-        encoding="utf-8"
-    )
+    calibration_source = (FILES / "vision_calibration.py").read_text(encoding="utf-8")
     assert "sync-priors" not in calibration_source
     assert "sync_seed_facts" not in calibration_source
 
@@ -564,8 +554,7 @@ def test_fine_grid_overlay_lists_both_tools_acquisition_xy_endstops():
     }
 
     assert analyzer._acquisition_xy_endstop_line(snapshot) == (
-        "acquire calib endstops: T0 X=-70.125 Y=-14.250 | "
-        "T1 X=350.750 Y=-13.500"
+        "acquire calib endstops: T0 X=-70.125 Y=-14.250 | " "T1 X=350.750 Y=-13.500"
     )
     assert analyzer._acquisition_xy_endstop_line(None) == (
         "acquire calib endstops: unavailable (legacy manifest)"
@@ -606,6 +595,31 @@ def test_fine_grid_acquisition_snapshot_comes_from_dao():
             "t1": {"x": 350.75, "y": -13.5},
         },
     }
+
+
+def test_tool_sweep_acquisition_snapshot_includes_z_endstops():
+    calibration = _module("vision_calibration.py", "vision_tool_sweep_z_snapshot_test")
+    status = {
+        "configfile": {
+            "settings": {
+                "stepper_x": {"position_endstop": -70.125},
+                "dual_carriage": {"position_endstop": 350.75},
+            }
+        },
+        "gcode_macro _IDEX_CONFIG_FINGERPRINT": {"source_sha256": "sha256:test-active"},
+        "gcode_macro _IDEX_TOOL_STATE": {
+            "t0_y_endstop": -14.25,
+            "t1_y_endstop": -13.5,
+            "t0_y_offset": 0.0,
+            "t1_y_offset": -0.75,
+            "t0_z_endstop": 290.0,
+            "t1_z_endstop": 289.4,
+        },
+    }
+
+    snapshot = calibration._active_tool_xy_calibration(status)
+
+    assert snapshot["tool_z_endstops_mm"] == {"t0": 290.0, "t1": 289.4}
 
 
 def test_fine_grid_analyzer_streams_frames_and_publishes_projection_only():

@@ -366,11 +366,30 @@ report-only nozzle X/Z sweep with:
 IDEX_TOOL_XZ_SWEEP_REPORT NAME=tool_xz_sweep_report
 ```
 
-The job captures both T0 and T1 at the configured XY sweep columns and Z rows,
-initially Z=`0.5, 1, 4, 8 mm`. It records commanded X/Y/Z, raw nozzle image
-`(u, v)`, and all four fiducial positions for every frame, then writes one
-annotated overlay per frame and a combined `u(x)` plot. This step is
-diagnostic-only and does not calculate or apply a calibration correction.
+The job captures both T0 and T1 at the configured XY sweep columns and Z rows.
+It records commanded X/Y/Z, raw nozzle image `(u, v)`, and all four fiducial
+positions for every frame, then writes one combined `u(x)` plot. Overlay
+generation is currently disabled behind a module guard. This step is
+diagnostic-only and does not calculate or apply a calibration correction. It
+also fits a robust Theil-Sen
+`u = intercept + slope * X` model independently for each toolhead and Z height,
+records the slope and fit quality, and writes a slope-versus-Z plot. Correlated
+rows are then fitted to a shared robust quadratic slope-versus-physical-Z curve
+with a bounded T1 Z shift. Poor-correlation rows and MAD-detected curve outliers
+are excluded and documented; the resulting T1 Z delta remains diagnostic only.
+
+After reviewing an accepted shared-curve result, fetch and apply its local T1
+Z-endstop candidate with:
+
+```bash
+./fetch_apply_vision_tool_z_offset_candidate.sh
+```
+
+The helper verifies that local T0/T1 Z endstops still match the sweep's
+acquisition snapshot, then applies `new T1 z_endstop = old z_endstop + fitted
+T1 Z delta` and regenerates `printer.cfg`. Because Z homes at the top, a
+negative fitted delta reduces `z_endstop` and raises the T1 nozzle. The helper
+only edits the local source-of-truth files; deployment remains explicit.
 
 The corresponding host job types, in dependency order, are:
 

@@ -1,10 +1,12 @@
 import importlib.util
 import json
 import sys
+import weakref
 from pathlib import Path
 
 import cv2
 import numpy as np
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -88,6 +90,7 @@ def _resolved():
                 "t1": {"x": 351.739, "y": -13.8},
             },
             "tool_y_offsets_mm": {"t0": 0.0, "t1": -1.0},
+            "tool_z_endstops_mm": {"t0": 293.5, "t1": 292.95},
         },
     }
 
@@ -142,13 +145,100 @@ def test_prepare_rejects_z_outside_loaded_limits():
         raise AssertionError("out-of-range Z was accepted")
 
 
-def test_analysis_writes_raw_records_overlays_and_u_plot(tmp_path, monkeypatch):
+def test_robust_u_x_slope_rejects_an_outlier():
     module = _module()
+    records = [
+        {
+            "commanded_x_mm": x_mm,
+            "nozzle_uv_px": [u_px, 80.0],
+        }
+        for x_mm, u_px in (
+            (0.0, 10.0),
+            (1.0, 12.0),
+            (2.0, 14.0),
+            (3.0, 16.0),
+            (4.0, 100.0),
+        )
+    ]
+
+    assert module._fit_robust_u_x_slope(records) == pytest.approx(2.0)
+    assert module._fit_robust_u_x_slope(records[:2]) is None
+
+
+def test_registration_quality_rejects_bad_image_correlation():
+    module = _module()
+    registration = {
+        "minimum_correlation": 0.1,
+        "median_correlation": 0.9,
+        "representation_spread_px": 0.2,
+        "tip_prediction_error_px": 1.0,
+        "maximum_tip_prediction_error_px": 8.0,
+    }
+
+    reasons = module._registration_fit_reasons(registration)
+    assert len(reasons) == 1
+    assert "minimum tip correlation" in reasons[0]
+
+
+def test_shared_z_curve_rejects_bad_correlation_and_curve_outlier():
+    module = _module()
+    expected_delta = -0.6
+    fits = []
+    for tool in ("T0", "T1"):
+        for z_mm in (0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5):
+            physical_z = z_mm + (expected_delta if tool == "T1" else 0.0)
+            slope = 9.85 - 0.1 * physical_z + 0.01 * physical_z**2
+            fits.append(
+                {
+                    "tool": tool,
+                    "z_mm": z_mm,
+                    "slope_u_px_per_mm": slope,
+                    "u_x_correlation_coefficient": 0.999,
+                }
+            )
+
+    next(fit for fit in fits if fit["tool"] == "T0" and fit["z_mm"] == 3.5)[
+        "u_x_correlation_coefficient"
+    ] = 0.2
+    next(fit for fit in fits if fit["tool"] == "T1" and fit["z_mm"] == 2.0)[
+        "slope_u_px_per_mm"
+    ] += 1.0
+
+    result = module.estimate_tool_z_delta(fits)
+
+    assert result["available"] is True
+    assert result["t1_z_delta_mm"] == pytest.approx(expected_delta, abs=0.02)
+    assert result["rms_slope_px_per_mm"] < 1.0e-6
+    assert {row["reason"] for row in result["excluded_rows"]} == {
+        "bad_u_x_correlation",
+        "shared_curve_residual_outlier",
+    }
+
+
+def test_printer_install_paths_include_scipy():
+    stage_dir = FILES.parent
+    install_sources = (
+        stage_dir / "00-packages",
+        stage_dir / "01-run-chroot.sh",
+        REPO_ROOT / "klipper_setup" / "klipper_config" / "deploy_webcam_vision.sh",
+        REPO_ROOT / "klipper_setup" / "klipper_config" / "deploy_vision_code.sh",
+    )
+
+    for source in install_sources:
+        assert "python3-scipy" in source.read_text(encoding="utf-8")
+
+
+def test_analysis_writes_raw_records_and_two_plots(tmp_path, monkeypatch):
+    module = _module()
+    assert len(module.PLOT_COLORS) >= 8
+    assert len(set(module.PLOT_COLORS)) == len(module.PLOT_COLORS)
     frames = []
     for seq, (tool, x_mm, y_mm, z_mm) in enumerate(
         (
             ("T0", 173.0, -14.3, 0.5),
-            ("T0", 178.0, -14.3, 4.0),
+            ("T0", 178.0, -14.3, 0.5),
+            ("T0", 183.0, -14.3, 0.5),
+            ("T0", 173.0, -14.3, 4.0),
             ("T1", 173.0, -13.3, 0.5),
             ("T1", 178.0, -13.3, 4.0),
         )
@@ -173,10 +263,21 @@ def test_analysis_writes_raw_records_overlays_and_u_plot(tmp_path, monkeypatch):
         paths.append(path)
 
     fiducial_calls = iter(range(len(frames)))
+    decoded_refs = []
+    live_during_detection = []
+    real_imread = module.cv2.imread
+
+    def imread(path, flags):
+        image = real_imread(path, flags)
+        decoded_refs.append(weakref.ref(image))
+        return image
 
     def detect(_image):
         index = next(fiducial_calls)
-        if index == 2:
+        live_during_detection.append(
+            sum(reference() is not None for reference in decoded_refs)
+        )
+        if index == 5:
             raise module.FourFiducialError("synthetic miss")
         return {
             "centers_px": [[90.0, 90.0], [110.0, 90.0], [90.0, 110.0], [110.0, 110.0]],
@@ -190,6 +291,10 @@ def test_analysis_writes_raw_records_overlays_and_u_plot(tmp_path, monkeypatch):
                     "seq": index,
                     "center_px": [120.0 + 5.0 * index, 80.0 + index],
                     "minimum_correlation": 0.9,
+                    "median_correlation": 0.9,
+                    "representation_spread_px": 0.2,
+                    "tip_prediction_error_px": 1.0,
+                    "maximum_tip_prediction_error_px": 8.0,
                 }
                 for index, _frame in enumerate(frames)
             ]
@@ -197,6 +302,7 @@ def test_analysis_writes_raw_records_overlays_and_u_plot(tmp_path, monkeypatch):
 
     monkeypatch.setattr(module, "detect_four_fiducials", detect)
     monkeypatch.setattr(module, "localize_nozzle_tip_grid", localize)
+    monkeypatch.setattr(module.cv2, "imread", imread)
 
     result = module.analyze(
         paths,
@@ -209,11 +315,21 @@ def test_analysis_writes_raw_records_overlays_and_u_plot(tmp_path, monkeypatch):
     assert result["accepted"] is True
     assert len(result["records"]) == len(frames)
     assert result["records"][0]["nozzle_uv_px"] == [120.0, 80.0]
-    assert result["records"][2]["fiducials_detected"] is False
-    assert result["records"][2]["nozzle_uv_px"] is None
-    assert (
-        len(list((tmp_path / "artifacts" / "tool_xz_sweep_overlays").glob("*.png")))
-        == 4
-    )
+    assert result["records"][5]["fiducials_detected"] is False
+    assert result["records"][5]["nozzle_uv_px"] is None
+    assert not (tmp_path / "artifacts" / "tool_xz_sweep_overlays").exists()
     assert (tmp_path / "artifacts" / "tool_xz_sweep_u_vs_x.png").is_file()
+    assert (tmp_path / "artifacts" / "tool_xz_sweep_u_slope_vs_z.png").is_file()
+    assert set(result["artifacts"]) == {
+        "tool_xz_sweep_u_vs_x",
+        "tool_xz_sweep_u_slope_vs_z",
+    }
+    fits = result["u_x_linear_fits"]
+    t0_fit = next(fit for fit in fits if fit["tool"] == "T0" and fit["z_mm"] == 0.5)
+    assert t0_fit["slope_u_px_per_mm"] == pytest.approx(1.0)
+    assert t0_fit["sample_count"] == 3
+    assert t0_fit["fit_method"] == "theil_sen"
+    assert any(fit["slope_u_px_per_mm"] is None for fit in fits)
+    assert result["shared_z_curve_fit"]["available"] is False
     assert result["warnings"]
+    assert live_during_detection == [1, 1, 1, 1, 1, 1]

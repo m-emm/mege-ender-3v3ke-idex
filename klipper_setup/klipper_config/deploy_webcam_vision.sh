@@ -196,8 +196,10 @@ sudo apt-get install -y --no-install-recommends \
   sudo \
   python3 \
   python3-opencv \
+  python3-scipy \
   python3-yaml \
   v4l-utils
+python3 -c 'from scipy.stats import theilslopes'
 
 echo "Installing tracked configs and services..."
 sudo install -d -m 0755 -o "${USERNAME}" -g "${USERNAME}" \

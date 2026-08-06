@@ -77,7 +77,8 @@ sudo install -m 0644 "${REMOTE_TMP}/priors.yaml" /usr/local/share/vision/priors.
 sudo rm -f /usr/local/share/vision/vision_calibration_priors.json
 
 echo "Ensuring Python vision dependencies"
-sudo apt-get install -y python3-matplotlib
+sudo apt-get install -y --no-install-recommends python3-matplotlib python3-scipy
+python3 -c 'from scipy.stats import theilslopes'
 
 echo "Restarting vision services"
 sudo systemctl restart vision-framebuffer.service
@@ -101,4 +102,4 @@ systemctl is-active \
   vision-capture-nozzle-cam.service
 REMOTE_SCRIPT
 
-echo "Vision code deployment complete. Klipper, Moonraker, nginx, packages, and webcam registration were not changed."
+echo "Vision code deployment complete. Python vision dependencies were ensured; Klipper, Moonraker, nginx, and webcam registration were not changed."

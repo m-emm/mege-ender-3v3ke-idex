@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 from pathlib import Path
 from typing import Any
@@ -14,12 +15,39 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.optimize import least_squares
+from scipy.stats import theilslopes
 
 from vision_four_fiducials import FourFiducialError, detect_four_fiducials
 from vision_nozzle_tip_localization import (
     NozzleTipLocalizationError,
     localize_nozzle_tip_grid,
 )
+
+_logger = logging.getLogger(__name__)
+
+PLOT_COLORS = (
+    "#0072B2",  # blue
+    "#D55E00",  # vermilion
+    "#009E73",  # green
+    "#CC79A7",  # purple
+    "#E69F00",  # orange
+    "#56B4E9",  # sky blue
+    "#A6761D",  # ochre
+    "#332288",  # indigo
+)
+
+# Temporary guard: retain the overlay implementation for later re-enablement,
+# but avoid the image reloads and artifact writes while the report is plot-only.
+GENERATE_OVERLAYS = False
+
+MIN_SHARED_CURVE_CORRELATION = 0.95
+SHARED_CURVE_F_SCALE_PX_PER_MM = 0.03
+SHARED_CURVE_OUTLIER_SIGMA = 4.0
+SHARED_CURVE_MIN_OUTLIER_LIMIT_PX_PER_MM = 0.09
+MINIMUM_TIP_CORRELATION = 0.22
+MINIMUM_MEDIAN_TIP_CORRELATION = 0.38
+MAXIMUM_REPRESENTATION_SPREAD_PX = 2.5
 
 
 class ToolXZSweepError(RuntimeError):
@@ -297,9 +325,47 @@ def _base_record(frame: dict[str, Any]) -> dict[str, Any]:
         "fiducial_centers_uv_px": None,
         "fiducial_centroid_uv_px": None,
         "nozzle_detected": False,
+        "accepted_for_u_x_fit": False,
+        "u_x_fit_rejection_reasons": [],
         "fiducials_detected": False,
         "reasons": [],
     }
+
+
+def _registration_fit_reasons(registration: dict[str, Any]) -> list[str]:
+    required = (
+        "minimum_correlation",
+        "median_correlation",
+        "representation_spread_px",
+        "tip_prediction_error_px",
+        "maximum_tip_prediction_error_px",
+    )
+    missing = [key for key in required if registration.get(key) is None]
+    if missing:
+        return ["localization quality metrics are incomplete: " + ", ".join(missing)]
+
+    reasons = []
+    if float(registration["minimum_correlation"]) < MINIMUM_TIP_CORRELATION:
+        reasons.append(
+            f"minimum tip correlation is below {MINIMUM_TIP_CORRELATION:.2f}"
+        )
+    if float(registration["median_correlation"]) < MINIMUM_MEDIAN_TIP_CORRELATION:
+        reasons.append(
+            "median tip correlation is below " f"{MINIMUM_MEDIAN_TIP_CORRELATION:.2f}"
+        )
+    if (
+        float(registration["representation_spread_px"])
+        > MAXIMUM_REPRESENTATION_SPREAD_PX
+    ):
+        reasons.append(
+            "gray/contrast tip registrations disagree by more than "
+            f"{MAXIMUM_REPRESENTATION_SPREAD_PX:.1f} px"
+        )
+    if float(registration["tip_prediction_error_px"]) > float(
+        registration["maximum_tip_prediction_error_px"]
+    ):
+        reasons.append("physical-tip registration moved too far from its detector seed")
+    return reasons
 
 
 def _write_overlay(
@@ -384,8 +450,9 @@ def _write_overlay(
 
 def _write_u_plot(records: list[dict[str, Any]], path: Path) -> None:
     figure, axis = plt.subplots(figsize=(10, 6))
-    colors = {"T0": "tab:blue", "T1": "tab:orange"}
     markers = {"T0": "o", "T1": "s"}
+    line_styles = {"T0": "-", "T1": "--"}
+    series_index = 0
     for tool in ("T0", "T1"):
         for z_mm in sorted(
             {
@@ -414,12 +481,397 @@ def _write_u_plot(records: list[dict[str, Any]], path: Path) -> None:
                 x_values,
                 u_values,
                 marker=markers[tool],
-                color=colors[tool],
+                linestyle=line_styles[tool],
+                color=PLOT_COLORS[series_index % len(PLOT_COLORS)],
+                linewidth=2.0,
+                markersize=6.0,
                 label=f"{tool} Z={z_mm:g} mm",
             )
+            series_index += 1
     axis.set_title("Nozzle image u coordinate versus commanded X")
     axis.set_xlabel("Commanded X (mm)")
     axis.set_ylabel("Nozzle u (px)")
+    axis.grid(True, alpha=0.3)
+    axis.legend()
+    figure.tight_layout()
+    figure.savefig(path, dpi=160)
+    plt.close(figure)
+
+
+def _fit_robust_u_x_slope(records: list[dict[str, Any]]) -> float | None:
+    usable = [
+        record
+        for record in records
+        if record["nozzle_uv_px"] is not None
+        and record.get("accepted_for_u_x_fit", True)
+    ]
+    if len(usable) < 3:
+        return None
+
+    x_values = np.asarray(
+        [float(record["commanded_x_mm"]) for record in usable],
+        dtype=np.float64,
+    )
+    u_values = np.asarray(
+        [float(record["nozzle_uv_px"][0]) for record in usable],
+        dtype=np.float64,
+    )
+    if len(np.unique(x_values)) < 2:
+        return None
+
+    slope, _intercept, _, _ = theilslopes(u_values, x_values)
+    return float(slope)
+
+
+def _u_x_correlation(x_values: np.ndarray, u_values: np.ndarray) -> float | None:
+    if (
+        len(x_values) < 3
+        or len(np.unique(x_values)) < 2
+        or len(np.unique(u_values)) < 2
+    ):
+        return None
+    correlation = float(np.corrcoef(x_values, u_values)[0, 1])
+    return correlation if math.isfinite(correlation) else None
+
+
+def _fit_u_x_models(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Fit robust ``u = intercept + slope * commanded_x`` tool/Z models."""
+    fits = []
+    z_positions = sorted(
+        {
+            float(record["commanded_z_mm"])
+            for record in records
+            if record["tool"] in {"T0", "T1"}
+        }
+    )
+    for tool in ("T0", "T1"):
+        for z_mm in z_positions:
+            usable = [
+                record
+                for record in records
+                if record["tool"] == tool
+                and abs(float(record["commanded_z_mm"]) - z_mm) < 1.0e-9
+                and record["nozzle_uv_px"] is not None
+                and record.get("accepted_for_u_x_fit", True)
+            ]
+            row_records = [
+                record
+                for record in records
+                if record["tool"] == tool
+                and abs(float(record["commanded_z_mm"]) - z_mm) < 1.0e-9
+            ]
+            usable.sort(key=lambda record: float(record["commanded_x_mm"]))
+            x_values = np.asarray(
+                [float(record["commanded_x_mm"]) for record in usable],
+                dtype=np.float64,
+            )
+            u_values = np.asarray(
+                [float(record["nozzle_uv_px"][0]) for record in usable],
+                dtype=np.float64,
+            )
+            fit = {
+                "tool": tool,
+                "z_mm": z_mm,
+                "sample_count": int(len(usable)),
+                "rejected_sample_count": sum(
+                    record["nozzle_uv_px"] is not None
+                    and not record.get("accepted_for_u_x_fit", True)
+                    for record in row_records
+                ),
+                "fit_method": "theil_sen",
+                "u_x_correlation_coefficient": _u_x_correlation(x_values, u_values),
+                "slope_u_px_per_mm": None,
+                "intercept_u_px": None,
+                "fit_rms_px": None,
+                "x_values_mm": x_values.tolist(),
+                "u_values_px": u_values.tolist(),
+            }
+            slope = _fit_robust_u_x_slope(usable)
+            if slope is None:
+                fit["reason"] = (
+                    "fewer than three usable nozzle detections"
+                    if len(usable) < 3
+                    else "commanded X values do not span a robust linear fit"
+                )
+                _logger.info(
+                    "Robust nozzle u(x) fit unavailable tool=%s z_mm=%.3f "
+                    "samples=%d reason=%s",
+                    tool,
+                    z_mm,
+                    len(usable),
+                    fit["reason"],
+                )
+                fits.append(fit)
+                continue
+
+            intercept = float(np.median(u_values - slope * x_values))
+            residuals = u_values - (slope * x_values + intercept)
+            fit["slope_u_px_per_mm"] = slope
+            fit["intercept_u_px"] = intercept
+            fit["fit_rms_px"] = float(np.sqrt(np.mean(residuals**2)))
+            _logger.info(
+                "Fitted robust nozzle u(x) tool=%s z_mm=%.3f samples=%d "
+                "method=theil_sen slope=%.6f px/mm intercept=%.3f px "
+                "fit_rms=%.3f px",
+                tool,
+                z_mm,
+                len(usable),
+                fit["slope_u_px_per_mm"],
+                fit["intercept_u_px"],
+                fit["fit_rms_px"],
+            )
+            fits.append(fit)
+    return fits
+
+
+def _shared_curve_arrays(
+    fits: list[dict[str, Any]],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    return (
+        np.asarray([float(fit["z_mm"]) for fit in fits], dtype=np.float64),
+        np.asarray(
+            [float(fit["slope_u_px_per_mm"]) for fit in fits],
+            dtype=np.float64,
+        ),
+        np.asarray(
+            [fit["tool"] == "T1" for fit in fits],
+            dtype=np.float64,
+        ),
+    )
+
+
+def _shared_curve_is_identifiable(fits: list[dict[str, Any]]) -> bool:
+    tools = {fit["tool"] for fit in fits}
+    z_positions = {float(fit["z_mm"]) for fit in fits}
+    return (
+        len(fits) >= 6
+        and tools == {"T0", "T1"}
+        and sum(fit["tool"] == "T0" for fit in fits) >= 2
+        and sum(fit["tool"] == "T1" for fit in fits) >= 2
+        and len(z_positions) >= 3
+    )
+
+
+def _least_squares_shared_curve(fits: list[dict[str, Any]]):
+    z_values, slope_values, is_t1 = _shared_curve_arrays(fits)
+
+    def residuals(parameters: np.ndarray) -> np.ndarray:
+        a, b, c, t1_z_delta = parameters
+        physical_z = z_values + is_t1 * t1_z_delta
+        predicted = a + b * physical_z + c * physical_z**2
+        return predicted - slope_values
+
+    result = least_squares(
+        residuals,
+        x0=np.asarray([9.85, -0.1, 0.0, -0.6], dtype=np.float64),
+        loss="soft_l1",
+        f_scale=SHARED_CURVE_F_SCALE_PX_PER_MM,
+        bounds=(
+            [-np.inf, -np.inf, -np.inf, -1.5],
+            [np.inf, np.inf, np.inf, 1.5],
+        ),
+    )
+    return result, residuals
+
+
+def estimate_tool_z_delta(fits: list[dict[str, Any]]) -> dict[str, Any]:
+    excluded_rows = []
+    quality_rows = []
+    for fit in fits:
+        row = {
+            "tool": fit["tool"],
+            "z_mm": float(fit["z_mm"]),
+            "slope_u_px_per_mm": fit.get("slope_u_px_per_mm"),
+            "u_x_correlation_coefficient": fit.get("u_x_correlation_coefficient"),
+        }
+        slope = fit.get("slope_u_px_per_mm")
+        correlation = fit.get("u_x_correlation_coefficient")
+        if slope is None:
+            row["reason"] = "missing_u_x_slope"
+            excluded_rows.append(row)
+            continue
+        if correlation is None or float(correlation) < MIN_SHARED_CURVE_CORRELATION:
+            row["reason"] = "bad_u_x_correlation"
+            row["minimum_correlation"] = MIN_SHARED_CURVE_CORRELATION
+            excluded_rows.append(row)
+            continue
+        quality_rows.append(fit)
+
+    if not _shared_curve_is_identifiable(quality_rows):
+        reason = (
+            "shared Z curve requires at least six correlated slope rows, both "
+            "tools, at least two rows per tool, and three distinct Z heights"
+        )
+        _logger.info(
+            "Shared nozzle slope curve unavailable quality_rows=%d excluded_rows=%d reason=%s",
+            len(quality_rows),
+            len(excluded_rows),
+            reason,
+        )
+        return {
+            "available": False,
+            "fit_method": "quadratic_soft_l1_with_mad_prefilter",
+            "reason": reason,
+            "included_rows": [],
+            "excluded_rows": excluded_rows,
+        }
+
+    initial_result, initial_residuals_fn = _least_squares_shared_curve(quality_rows)
+    if not initial_result.success:
+        reason = f"initial shared-curve optimization failed: {initial_result.message}"
+        _logger.info("Shared nozzle slope curve unavailable reason=%s", reason)
+        return {
+            "available": False,
+            "fit_method": "quadratic_soft_l1_with_mad_prefilter",
+            "reason": reason,
+            "included_rows": [],
+            "excluded_rows": excluded_rows,
+        }
+
+    initial_residuals = initial_residuals_fn(initial_result.x)
+    residual_center = float(np.median(initial_residuals))
+    residual_mad = float(np.median(np.abs(initial_residuals - residual_center)))
+    robust_sigma = 1.4826 * residual_mad
+    residual_limit = max(
+        SHARED_CURVE_MIN_OUTLIER_LIMIT_PX_PER_MM,
+        SHARED_CURVE_OUTLIER_SIGMA * robust_sigma,
+    )
+    retained_rows = []
+    for fit, residual in zip(quality_rows, initial_residuals):
+        centered_residual = abs(float(residual) - residual_center)
+        if centered_residual <= residual_limit:
+            retained_rows.append(fit)
+            continue
+        excluded_rows.append(
+            {
+                "tool": fit["tool"],
+                "z_mm": float(fit["z_mm"]),
+                "slope_u_px_per_mm": float(fit["slope_u_px_per_mm"]),
+                "u_x_correlation_coefficient": fit.get("u_x_correlation_coefficient"),
+                "reason": "shared_curve_residual_outlier",
+                "initial_residual_px_per_mm": float(residual),
+                "residual_limit_px_per_mm": residual_limit,
+            }
+        )
+
+    if not _shared_curve_is_identifiable(retained_rows):
+        reason = "too few shared-curve rows remain after outlier rejection"
+        _logger.info(
+            "Shared nozzle slope curve unavailable retained_rows=%d reason=%s",
+            len(retained_rows),
+            reason,
+        )
+        return {
+            "available": False,
+            "fit_method": "quadratic_soft_l1_with_mad_prefilter",
+            "reason": reason,
+            "outlier_residual_limit_px_per_mm": residual_limit,
+            "included_rows": [],
+            "excluded_rows": excluded_rows,
+        }
+
+    result, residuals_fn = _least_squares_shared_curve(retained_rows)
+    if not result.success:
+        reason = f"final shared-curve optimization failed: {result.message}"
+        _logger.info("Shared nozzle slope curve unavailable reason=%s", reason)
+        return {
+            "available": False,
+            "fit_method": "quadratic_soft_l1_with_mad_prefilter",
+            "reason": reason,
+            "outlier_residual_limit_px_per_mm": residual_limit,
+            "included_rows": [],
+            "excluded_rows": excluded_rows,
+        }
+
+    final_residuals = residuals_fn(result.x)
+    included_rows = [
+        {
+            "tool": fit["tool"],
+            "z_mm": float(fit["z_mm"]),
+            "slope_u_px_per_mm": float(fit["slope_u_px_per_mm"]),
+            "u_x_correlation_coefficient": fit.get("u_x_correlation_coefficient"),
+            "residual_px_per_mm": float(residual),
+        }
+        for fit, residual in zip(retained_rows, final_residuals)
+    ]
+    a, b, c, t1_z_delta = result.x
+    _logger.info(
+        "Fitted shared nozzle slope curve rows=%d excluded=%d "
+        "t1_z_delta_mm=%.6f rms_slope_px_per_mm=%.6f",
+        len(retained_rows),
+        len(excluded_rows),
+        float(t1_z_delta),
+        float(np.sqrt(np.mean(final_residuals**2))),
+    )
+    return {
+        "available": True,
+        "fit_method": "quadratic_soft_l1_with_mad_prefilter",
+        "curve_intercept": float(a),
+        "curve_linear_z": float(b),
+        "curve_quadratic_z": float(c),
+        "t1_z_delta_mm": float(t1_z_delta),
+        "rms_slope_px_per_mm": float(np.sqrt(np.mean(final_residuals**2))),
+        "outlier_residual_limit_px_per_mm": residual_limit,
+        "included_rows": included_rows,
+        "excluded_rows": excluded_rows,
+    }
+
+
+def _write_slope_plot(
+    fits: list[dict[str, Any]],
+    path: Path,
+    *,
+    shared_curve_fit: dict[str, Any],
+) -> None:
+    figure, axis = plt.subplots(figsize=(8, 6))
+    tool_colors = {"T0": PLOT_COLORS[0], "T1": PLOT_COLORS[1]}
+    tool_markers = {"T0": "o", "T1": "s"}
+    for tool in ("T0", "T1"):
+        tool_fits = [fit for fit in fits if fit["tool"] == tool]
+        tool_fits.sort(key=lambda fit: float(fit["z_mm"]))
+        z_values = [float(fit["z_mm"]) for fit in tool_fits]
+        slope_values = [
+            (
+                float(fit["slope_u_px_per_mm"])
+                if fit["slope_u_px_per_mm"] is not None
+                else np.nan
+            )
+            for fit in tool_fits
+        ]
+        axis.plot(
+            z_values,
+            slope_values,
+            marker=tool_markers[tool],
+            linestyle="-",
+            color=tool_colors[tool],
+            linewidth=2.0,
+            markersize=7.0,
+            label=tool,
+        )
+    if shared_curve_fit.get("available"):
+        z_values = np.asarray(
+            sorted({float(fit["z_mm"]) for fit in fits}), dtype=np.float64
+        )
+        if len(z_values):
+            z_grid = np.linspace(float(z_values[0]), float(z_values[-1]), 200)
+            a = float(shared_curve_fit["curve_intercept"])
+            b = float(shared_curve_fit["curve_linear_z"])
+            c = float(shared_curve_fit["curve_quadratic_z"])
+            t1_z_delta = float(shared_curve_fit["t1_z_delta_mm"])
+            for tool in ("T0", "T1"):
+                physical_z = z_grid + (t1_z_delta if tool == "T1" else 0.0)
+                predicted = a + b * physical_z + c * physical_z**2
+                axis.plot(
+                    z_grid,
+                    predicted,
+                    linestyle="--",
+                    color=tool_colors[tool],
+                    linewidth=2.0,
+                    label=f"{tool} shared curve",
+                )
+    axis.set_title("Nozzle image-u slope versus commanded Z")
+    axis.set_xlabel("Commanded Z (mm)")
+    axis.set_ylabel("du/dX (px/mm)")
     axis.grid(True, alpha=0.3)
     axis.legend()
     figure.tight_layout()
@@ -435,6 +887,11 @@ def analyze(
     references: dict[str, Any],
     acquisition_calibration: dict[str, Any],
 ) -> dict[str, Any]:
+    _logger.info(
+        "X/Z sweep analysis started frames=%d artifact_dir=%s",
+        len(frames),
+        artifact_dir,
+    )
     if len(frame_paths) != len(frames):
         raise ToolXZSweepError("X/Z sweep frame paths do not match the manifest")
     if not frames:
@@ -443,35 +900,72 @@ def analyze(
         raise ToolXZSweepError("X/Z sweep requires both T0 and T1 frames")
 
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    overlay_dir = artifact_dir / "tool_xz_sweep_overlays"
-    overlay_dir.mkdir(parents=True, exist_ok=True)
     records = [_base_record(frame) for frame in frames]
-    images: dict[int, np.ndarray] = {}
     valid_for_localization: dict[str, list[int]] = {"T0": [], "T1": []}
+    image_dimensions: list[int] | None = None
 
     for index, (path, frame, record) in enumerate(zip(frame_paths, frames, records)):
+        _logger.info(
+            "Loading X/Z sweep frame %d/%d seq=%d tool=%s x_mm=%.3f y_mm=%.3f z_mm=%.3f path=%s",
+            index + 1,
+            len(frames),
+            int(frame["seq"]),
+            frame["tool"],
+            float(frame["commanded_position_mm"][0]),
+            float(frame["commanded_position_mm"][1]),
+            float(frame["commanded_position_mm"][2]),
+            path,
+        )
         image = cv2.imread(str(path), cv2.IMREAD_COLOR)
         if image is None:
             raise ToolXZSweepError(f"X/Z sweep image {index} cannot be decoded")
-        images[index] = image
+        dimensions = [int(image.shape[1]), int(image.shape[0])]
+        if image_dimensions is None:
+            image_dimensions = dimensions
+        elif dimensions != image_dimensions:
+            raise ToolXZSweepError("X/Z sweep images have inconsistent dimensions")
         try:
             fiducials = detect_four_fiducials(image)
         except FourFiducialError as exc:
             record["reasons"].append(f"four-fiducial detection failed: {exc}")
-            continue
-        centers = np.asarray(fiducials["centers_px"], dtype=np.float64)
-        record["fiducials_detected"] = True
-        record["fiducial_centers_uv_px"] = centers.tolist()
-        record["fiducial_radii_px"] = [float(value) for value in fiducials["radii_px"]]
-        record["fiducial_centroid_uv_px"] = np.mean(centers, axis=0).tolist()
-        valid_for_localization[frame["tool"]].append(index)
+            _logger.info(
+                "Four-fiducial detection missed seq=%d tool=%s reason=%s",
+                int(frame["seq"]),
+                frame["tool"],
+                exc,
+            )
+        else:
+            centers = np.asarray(fiducials["centers_px"], dtype=np.float64)
+            record["fiducials_detected"] = True
+            record["fiducial_centers_uv_px"] = centers.tolist()
+            record["fiducial_radii_px"] = [
+                float(value) for value in fiducials["radii_px"]
+            ]
+            record["fiducial_centroid_uv_px"] = np.mean(centers, axis=0).tolist()
+            valid_for_localization[frame["tool"]].append(index)
+            _logger.info(
+                "Four-fiducial detection succeeded seq=%d tool=%s centroid_u=%.2f centroid_v=%.2f",
+                int(frame["seq"]),
+                frame["tool"],
+                float(record["fiducial_centroid_uv_px"][0]),
+                float(record["fiducial_centroid_uv_px"][1]),
+            )
+        del image
 
     for tool in ("T0", "T1"):
         indices = valid_for_localization[tool]
         if not indices:
+            _logger.info(
+                "Skipping nozzle localization tool=%s reason=no valid fiducials", tool
+            )
             continue
         tool_paths = [frame_paths[index] for index in indices]
         tool_frames = [frames[index] for index in indices]
+        _logger.info(
+            "Starting nozzle localization tool=%s valid_fiducial_frames=%d",
+            tool,
+            len(indices),
+        )
         try:
             localized = localize_nozzle_tip_grid(
                 tool_paths,
@@ -480,6 +974,12 @@ def analyze(
                 physical_tip_cluster_radius_px=16.0,
             )
         except NozzleTipLocalizationError as exc:
+            _logger.info(
+                "Nozzle localization failed tool=%s valid_fiducial_frames=%d reason=%s",
+                tool,
+                len(indices),
+                exc,
+            )
             for index in indices:
                 records[index]["reasons"].append(
                     f"nozzle-tip localization failed: {exc}"
@@ -490,6 +990,21 @@ def analyze(
             center = _vector(registration.get("center_px"), "nozzle center")
             records[source_index]["nozzle_uv_px"] = center.tolist()
             records[source_index]["nozzle_detected"] = True
+            fit_rejection_reasons = _registration_fit_reasons(registration)
+            records[source_index]["accepted_for_u_x_fit"] = not fit_rejection_reasons
+            records[source_index]["u_x_fit_rejection_reasons"] = fit_rejection_reasons
+            if fit_rejection_reasons:
+                records[source_index]["reasons"].extend(
+                    "excluded from u(X) fitting: " + reason
+                    for reason in fit_rejection_reasons
+                )
+                _logger.info(
+                    "Rejected nozzle localization from u(X) fitting "
+                    "seq=%d tool=%s reasons=%s",
+                    int(frames[source_index]["seq"]),
+                    tool,
+                    " | ".join(fit_rejection_reasons),
+                )
             records[source_index]["localization"] = _finite(
                 {
                     key: value
@@ -497,27 +1012,93 @@ def analyze(
                     if key not in {"center_px", "marker_center_px", "ring_center_px"}
                 }
             )
+        _logger.info(
+            "Nozzle localization complete tool=%s localized_frames=%d",
+            tool,
+            sum(1 for index in indices if records[index]["nozzle_detected"]),
+        )
 
     artifacts: dict[str, dict[str, str]] = {}
-    for index, (frame, record) in enumerate(zip(frames, records)):
-        overlay_path = overlay_dir / f"{frame['frame']}.png"
-        _write_overlay(images[index], frame, record, overlay_path)
-        artifacts[f"tool_xz_sweep_overlay_{int(frame['seq']):02d}"] = _artifact(
-            overlay_path
-        )
+    if GENERATE_OVERLAYS:
+        overlay_dir = artifact_dir / "tool_xz_sweep_overlays"
+        overlay_dir.mkdir(parents=True, exist_ok=True)
+        for index, (frame, record) in enumerate(zip(frames, records)):
+            _logger.info(
+                "Writing X/Z sweep overlay %d/%d seq=%d path=%s",
+                index + 1,
+                len(frames),
+                int(frame["seq"]),
+                frame_paths[index],
+            )
+            image = cv2.imread(str(frame_paths[index]), cv2.IMREAD_COLOR)
+            if image is None:
+                raise ToolXZSweepError(f"X/Z sweep image {index} cannot be decoded")
+            overlay_path = overlay_dir / f"{frame['frame']}.png"
+            _write_overlay(image, frame, record, overlay_path)
+            del image
+            _logger.info(
+                "Wrote X/Z sweep overlay seq=%d path=%s",
+                int(frame["seq"]),
+                overlay_path,
+            )
+            artifacts[f"tool_xz_sweep_overlay_{int(frame['seq']):02d}"] = _artifact(
+                overlay_path
+            )
+    else:
+        _logger.info("Skipping X/Z sweep overlays: GENERATE_OVERLAYS is disabled")
 
     plot_path = artifact_dir / "tool_xz_sweep_u_vs_x.png"
     _write_u_plot(records, plot_path)
+    _logger.info("Wrote X/Z sweep u(x) plot path=%s", plot_path)
     artifacts["tool_xz_sweep_u_vs_x"] = _artifact(plot_path)
+
+    u_x_linear_fits = _fit_u_x_models(records)
+    shared_z_curve_fit = estimate_tool_z_delta(u_x_linear_fits)
+    slope_plot_path = artifact_dir / "tool_xz_sweep_u_slope_vs_z.png"
+    _write_slope_plot(
+        u_x_linear_fits,
+        slope_plot_path,
+        shared_curve_fit=shared_z_curve_fit,
+    )
+    _logger.info("Wrote X/Z sweep slope-versus-Z plot path=%s", slope_plot_path)
+    artifacts["tool_xz_sweep_u_slope_vs_z"] = _artifact(slope_plot_path)
 
     missing_fiducials = sum(not record["fiducials_detected"] for record in records)
     missing_nozzles = sum(not record["nozzle_detected"] for record in records)
+    rejected_nozzles = sum(
+        record["nozzle_detected"] and not record["accepted_for_u_x_fit"]
+        for record in records
+    )
     warnings = []
     if missing_fiducials:
         warnings.append(f"{missing_fiducials} frame(s) lack four-fiducial detections")
     if missing_nozzles:
         warnings.append(f"{missing_nozzles} frame(s) lack nozzle-tip detections")
-    dimensions = images[0].shape
+    if rejected_nozzles:
+        warnings.append(
+            f"{rejected_nozzles} nozzle localization(s) failed fitting quality gates"
+        )
+    missing_fits = sum(fit["slope_u_px_per_mm"] is None for fit in u_x_linear_fits)
+    if missing_fits:
+        warnings.append(f"{missing_fits} tool/Z row(s) lack a usable linear fit")
+    if not shared_z_curve_fit["available"]:
+        warnings.append(
+            "shared tool-Z slope curve unavailable: "
+            + str(shared_z_curve_fit["reason"])
+        )
+    elif shared_z_curve_fit["excluded_rows"]:
+        warnings.append(
+            f"{len(shared_z_curve_fit['excluded_rows'])} tool/Z row(s) were "
+            "excluded from the shared slope curve"
+        )
+    _logger.info(
+        "X/Z sweep analysis complete frames=%d fiducial_misses=%d "
+        "nozzle_misses=%d nozzle_fit_rejections=%d",
+        len(records),
+        missing_fiducials,
+        missing_nozzles,
+        rejected_nozzles,
+    )
     return _finite(
         {
             "accepted": True,
@@ -528,8 +1109,10 @@ def analyze(
                 {float(frame["x_offset_from_bed_tab_mm"]) for frame in frames}
             ),
             "z_positions_mm": sorted({float(frame["z_mm"]) for frame in frames}),
-            "image_dimensions_px": [int(dimensions[1]), int(dimensions[0])],
+            "image_dimensions_px": image_dimensions,
             "records": records,
+            "u_x_linear_fits": u_x_linear_fits,
+            "shared_z_curve_fit": shared_z_curve_fit,
             "acquisition_calibration": acquisition_calibration,
             "artifacts": artifacts,
         }

@@ -151,11 +151,13 @@ apt-get install -y --no-install-recommends \
   python3-dev \
   python3-numpy \
   python3-matplotlib \
+  python3-scipy \
   python3-yaml \
   build-essential \
   libatlas-base-dev \
   libopenblas-dev \
   libsodium23
+python3 -c 'from scipy.stats import theilslopes'
 
 # You install these later; keeping them separate is fine, but installing here makes it deterministic.
 # If you want to keep image smaller, move dev packages into a conditional section.
