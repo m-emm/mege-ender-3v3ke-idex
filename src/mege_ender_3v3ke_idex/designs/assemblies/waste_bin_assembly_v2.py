@@ -54,7 +54,9 @@ waste_bin_top_connector_plate_extension_height = 3
 waste_bin_join_screw_length = 8
 
 waste_bin_square_nut_sink_depth = 0.8
-waste_connector_plates_thickness = 3
+waste_connector_top_plate_thickness = 3
+waste_connector_bottom_plate_thickness = 4
+
 
 def create_nozzle_brush():
     base = create_box(nozzle_brush_width, nozzle_brush_depth, nozzle_brush_base_height)
@@ -381,12 +383,12 @@ def create_waste_bin_assembly(
 
 
 
-    top_connector_plate = materialize_bounding_box(mounting_assembly, z_size=waste_connector_plates_thickness, y_size = 22)
+    top_connector_plate = materialize_bounding_box(mounting_assembly, z_size=waste_connector_top_plate_thickness, y_size = 22)
 
     top_connector_plate = align(top_connector_plate, body,Alignment.BOTTOM)
     top_connector_plate = align(top_connector_plate, mounting_assembly,Alignment.BACK)
 
-    bottom_connector_counter_plate = materialize_bounding_box(top_connector_plate.fuse(body), z_size=waste_connector_plates_thickness)
+    bottom_connector_counter_plate = materialize_bounding_box(top_connector_plate.fuse(body), z_size=waste_connector_bottom_plate_thickness, x_size=waste_bin_width)
     bottom_connector_counter_plate = align(bottom_connector_counter_plate, top_connector_plate,Alignment.STACK_BOTTOM)
 
     screws_z_pitch = waste_bin_top_connector_plate_height / 2

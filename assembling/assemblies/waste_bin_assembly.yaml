@@ -53,12 +53,13 @@ Builder:
         - name: waste_bin
           parts:
             - waste_bin
-            - nozzle_brush_holder
             - top_bin
 
 
-        # - name: waste_bin_top
-        #   parts:
+        - name: waste_bin_nozzle_brush_holder
+          parts:
+            - nozzle_brush_holder
+            
 
       auto_assign_plates: false
 
