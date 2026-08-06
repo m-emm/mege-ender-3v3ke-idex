@@ -30,6 +30,7 @@ JOB_TYPES = {
     "idex_nozzle_fine_xz_grid_t1",
     "idex_tool_xy_measure_t0",
     "idex_tool_xy_measure_t1",
+    "idex_tool_xz_sweep_report",
     "idex_tool_xy_candidate",
     "idex_eddy_t0_xyz_offset",
     "idex_t0_t1_xyz_offset",

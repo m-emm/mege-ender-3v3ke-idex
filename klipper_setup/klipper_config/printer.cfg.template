@@ -296,6 +296,22 @@ gcode:
         active_config_fingerprint=fingerprint
     )}
 
+[gcode_macro IDEX_TOOL_XZ_SWEEP_REPORT]
+description: Capture a combined report-only T0/T1 nozzle image X/Z sweep.
+gcode:
+    {% set name = params.NAME|default("tool_xz_sweep_report") %}
+    {% set print_state = printer.print_stats.state %}
+    {% set fingerprint = printer["gcode_macro _IDEX_CONFIG_FINGERPRINT"].source_sha256 %}
+    {% if print_state not in ["standby", "complete"] %}
+        { action_raise_error("IDEX_TOOL_XZ_SWEEP_REPORT requires an idle printer; print_stats.state=" ~ print_state) }
+    {% endif %}
+    RESPOND TYPE=echo MSG="Combined T0/T1 nozzle X/Z sweep report queued: NAME={name}. Watch /vision/ for progress."
+    {action_call_remote_method(
+        "idex_tool_xz_sweep_report",
+        name=name,
+        active_config_fingerprint=fingerprint
+    )}
+
 # Custom thermistor calibration for the left Micro Swiss FlowTech toolhead.
 # Values retained from the same calibrated Micro Swiss hotend assembly.
 [thermistor microswiss_calibrated]

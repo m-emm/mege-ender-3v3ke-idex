@@ -69,6 +69,11 @@ from vision_tool_xy_calibration import (
 from vision_tool_xy_calibration import (
     prepare_measurement as prepare_tool_xy_measurement,
 )
+from vision_tool_xz_sweep import (
+    ToolXZSweepError,
+    analyze as analyze_tool_xz_sweep,
+    prepare_sweep as prepare_tool_xz_sweep,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -118,6 +123,7 @@ FINE_NOZZLE_XZ_JOBS = {
 TOOL_XY_T0_JOB = "idex_tool_xy_measure_t0"
 TOOL_XY_T1_JOB = "idex_tool_xy_measure_t1"
 TOOL_XY_JOBS = {TOOL_XY_T0_JOB, TOOL_XY_T1_JOB}
+TOOL_XZ_SWEEP_JOB = "idex_tool_xz_sweep_report"
 TOOL_XY_CANDIDATE_JOB = "idex_tool_xy_candidate"
 JOB_TYPES = (
     BED_FIDUCIAL_METRIC_JOB,
@@ -129,6 +135,7 @@ JOB_TYPES = (
     FINE_NOZZLE_XZ_T1_JOB,
     TOOL_XY_T0_JOB,
     TOOL_XY_T1_JOB,
+    TOOL_XZ_SWEEP_JOB,
     TOOL_XY_CANDIDATE_JOB,
     EDDY_T0_XYZ_OFFSET_JOB,
     IDEX_T0_T1_XYZ_OFFSET_JOB,
@@ -448,6 +455,7 @@ def _preflight(
         EDDY_FIDUCIAL_XZ_JOB,
         *FINE_NOZZLE_XZ_JOBS,
         *TOOL_XY_JOBS,
+        TOOL_XZ_SWEEP_JOB,
     }:
         positions.append(
             (
@@ -468,7 +476,7 @@ def _preflight(
         "t1_x_endstop_mm": _number(dual, "position_endstop", "dual_carriage"),
     }
     active_tool_calibration = None
-    if job_type in TOOL_XY_JOBS:
+    if job_type in TOOL_XY_JOBS or job_type == TOOL_XZ_SWEEP_JOB:
         active_tool_calibration = _active_tool_xy_calibration(status)
     scope = {
         "camera": "nozzle_cam",
@@ -862,6 +870,7 @@ def prepare_job(
     )
     pose = resolved["pose"]
     tool_xy_prepared = None
+    tool_xz_prepared = None
     if job_type in TOOL_XY_JOBS:
         try:
             tool_xy_prepared = prepare_tool_xy_measurement(
@@ -873,6 +882,15 @@ def prepare_job(
             raise VisionCalibrationError(str(exc)) from None
         pose["capture_y_mm"] = float(tool_xy_prepared["reference"]["capture_y_mm"])
         pose["capture_z_mm"] = float(tool_xy_prepared["reference"]["commanded_z_mm"])
+    elif job_type == TOOL_XZ_SWEEP_JOB:
+        try:
+            tool_xz_prepared = prepare_tool_xz_sweep(
+                definition,
+                input_values=input_values,
+                resolved=resolved,
+            )
+        except ToolXZSweepError as exc:
+            raise VisionCalibrationError(str(exc)) from None
     resolved["scope"]["input_fact_hashes"] = {
         item["requirement"]: item["fact_set_hash"] for item in input_facts
     }
@@ -1044,6 +1062,9 @@ def prepare_job(
     elif job_type in TOOL_XY_JOBS:
         assert tool_xy_prepared is not None
         frames = tool_xy_prepared["frames"]
+    elif job_type == TOOL_XZ_SWEEP_JOB:
+        assert tool_xz_prepared is not None
+        frames = tool_xz_prepared["frames"]
     manifest = {
         "schema": MANIFEST_SCHEMA,
         "schema_version": SCHEMA_VERSION,
@@ -1170,6 +1191,12 @@ def prepare_job(
         assert tool_xy_prepared is not None
         manifest["tool_xy_reference"] = tool_xy_prepared["reference"]
         manifest["acquisition_calibration"] = tool_xy_prepared[
+            "active_tool_calibration"
+        ]
+    elif job_type == TOOL_XZ_SWEEP_JOB:
+        assert tool_xz_prepared is not None
+        manifest["tool_xz_reference"] = tool_xz_prepared["references"]
+        manifest["acquisition_calibration"] = tool_xz_prepared[
             "active_tool_calibration"
         ]
     placeholder = _gcode(
@@ -1439,6 +1466,14 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 artifact_dir,
                 frames=manifest["frames"],
                 reference=manifest["tool_xy_reference"],
+                acquisition_calibration=manifest["acquisition_calibration"],
+            )
+        elif job_type == TOOL_XZ_SWEEP_JOB:
+            details = analyze_tool_xz_sweep(
+                frame_paths,
+                artifact_dir,
+                frames=manifest["frames"],
+                references=manifest["tool_xz_reference"],
                 acquisition_calibration=manifest["acquisition_calibration"],
             )
         elif job_type == TOOL_XY_CANDIDATE_JOB:
@@ -1835,6 +1870,32 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         value,
                         dependencies,
                         {"x_datum_mm", "y_datum_mm"},
+                    )
+                ]
+            elif job_type == TOOL_XZ_SWEEP_JOB:
+                value = {
+                    "camera": "nozzle_cam",
+                    "tools": details["tools"],
+                    "x_offsets_from_bed_tab_mm": details[
+                        "x_offsets_from_bed_tab_mm"
+                    ],
+                    "z_positions_mm": details["z_positions_mm"],
+                    "image_dimensions_px": details["image_dimensions_px"],
+                    "records": details["records"],
+                    "acquisition_calibration": details[
+                        "acquisition_calibration"
+                    ],
+                    "supporting_artifact_hashes": {
+                        key: item["sha256"]
+                        for key, item in details["artifacts"].items()
+                    },
+                }
+                facts = [
+                    _fact(
+                        "camera.nozzle_cam.nozzle_tip.xz_sweep_report",
+                        "diagnostic",
+                        value,
+                        dependencies,
                     )
                 ]
             elif job_type == TOOL_XY_CANDIDATE_JOB:
@@ -3139,6 +3200,7 @@ def main(argv: list[str] | None = None) -> int:
     except (
         CalibrationGraphError,
         ToolXYError,
+        ToolXZSweepError,
         VisionCalibrationError,
         OSError,
         ValueError,

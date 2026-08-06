@@ -467,6 +467,81 @@
         "tool.t1.vision_xy_datum"
       ]
     },
+    "idex_tool_xz_sweep_report": {
+      "definition_version": 1,
+      "fact_definition_version": 1,
+      "camera": "nozzle_cam",
+      "profile": "analysis",
+      "light_macro": "NOZZLE_CAM_ANALYSIS_LIGHT",
+      "tools": [
+        "T0",
+        "T1"
+      ],
+      "localizer": {
+        "kind": "nozzle_tip_xz_sweep_report",
+        "version": 1
+      },
+      "x_offsets_from_bed_tab_mm": [
+        18,
+        20,
+        22,
+        24,
+        26
+      ],
+      "z_positions_mm": [
+        0.5,
+        1,
+        4,
+        8
+      ],
+      "capture_endstop_gap_mm": 0.5,
+      "safe_tool_change_z_mm": 9,
+      "velocity_mm_s": 110,
+      "settle_ms": 300,
+      "tool_change_settle_ms": 1000,
+      "discard_fresh_frames": 1,
+      "publish_on_accept": true,
+      "requires": [
+        {
+          "requirement": "t0_xy_datum",
+          "fact_name": "tool.t0.vision_xy_datum",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "t1_xy_datum",
+          "fact_name": "tool.t1.vision_xy_datum",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "bed_metric",
+          "fact_name": "camera.nozzle_cam.bed_fiducial.local_metric_model",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "bed_fiducial_printer_xy_mapping",
+          "fact_name": "camera.nozzle_cam.bed_fiducial.printer_xy_mapping",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "t0_red_marker_offset",
+          "fact_name": "tool.t0.red_marker_to_bed_tab_x_mm",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "t1_red_marker_offset",
+          "fact_name": "tool.t1.red_marker_to_bed_tab_x_mm",
+          "fact_definition_version": 1
+        },
+        {
+          "requirement": "partial_bed_coordinate_system",
+          "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system",
+          "fact_definition_version": 1
+        }
+      ],
+      "fact_names": [
+        "camera.nozzle_cam.nozzle_tip.xz_sweep_report"
+      ]
+    },
     "idex_tool_xy_candidate": {
       "definition_version": 1,
       "fact_definition_version": 1,

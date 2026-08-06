@@ -55,6 +55,8 @@ FINE_NOZZLE_T0_REMOTE_METHOD = "idex_nozzle_fine_xz_calibrate_t0"
 FINE_NOZZLE_T0_REMOTE_ACTION = "run_idex_nozzle_fine_xz_calibrate_t0"
 FINE_NOZZLE_T1_REMOTE_METHOD = "idex_nozzle_fine_xz_calibrate_t1"
 FINE_NOZZLE_T1_REMOTE_ACTION = "run_idex_nozzle_fine_xz_calibrate_t1"
+TOOL_XZ_SWEEP_REMOTE_METHOD = "idex_tool_xz_sweep_report"
+TOOL_XZ_SWEEP_REMOTE_ACTION = "run_idex_tool_xz_sweep_report"
 CALIBRATION_BIN = os.environ.get(
     "VISION_CALIBRATION_BIN", "/usr/local/bin/vision_calibration.py"
 )
@@ -434,6 +436,7 @@ class VisionJobApi:
             "idex_nozzle_fine_xz_grid_t1",
             "idex_tool_xy_measure_t0",
             "idex_tool_xy_measure_t1",
+            "idex_tool_xz_sweep_report",
         ):
             raise CaptureError("unsupported acquisition job_type")
         if manifest.get("job_id") != sanitize_name(job_id):
@@ -961,6 +964,32 @@ class KlippyRemoteDaemon:
                             result.stderr.strip()
                             or f"fine nozzle {tool.upper()} X/Z calibration job failed"
                         )
+                elif action == TOOL_XZ_SWEEP_REMOTE_ACTION:
+                    command = [
+                        CALIBRATION_BIN,
+                        "run",
+                        "idex_tool_xz_sweep_report",
+                        "--name",
+                        sanitize_name(params.get("name", "tool_xz_sweep_report")),
+                    ]
+                    fingerprint = str(params.get("active_config_fingerprint") or "")
+                    if fingerprint:
+                        command.extend(["--expected-fingerprint", fingerprint])
+                    result = subprocess.run(
+                        command,
+                        check=False,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        timeout=900,
+                    )
+                    if result.stdout.strip():
+                        log(result.stdout.strip())
+                    if result.returncode:
+                        raise CaptureError(
+                            result.stderr.strip()
+                            or "combined tool X/Z sweep report failed"
+                        )
                 else:
                     raise CaptureError(f"unknown queued action {action}")
             except Exception as exc:
@@ -1029,6 +1058,11 @@ class KlippyRemoteDaemon:
                 FINE_NOZZLE_T1_REMOTE_METHOD,
                 FINE_NOZZLE_T1_REMOTE_ACTION,
             )
+            self._register_method(
+                sock,
+                TOOL_XZ_SWEEP_REMOTE_METHOD,
+                TOOL_XZ_SWEEP_REMOTE_ACTION,
+            )
 
     def _handle_message(self, message: dict[str, Any]) -> None:
         action = message.get("action")
@@ -1041,6 +1075,7 @@ class KlippyRemoteDaemon:
             valid.add(EDDY_FIDUCIAL_XZ_REMOTE_ACTION)
             valid.add(FINE_NOZZLE_T0_REMOTE_ACTION)
             valid.add(FINE_NOZZLE_T1_REMOTE_ACTION)
+            valid.add(TOOL_XZ_SWEEP_REMOTE_ACTION)
         if action not in valid:
             return
         params = message.get("params") or {}

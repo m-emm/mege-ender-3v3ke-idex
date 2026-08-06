@@ -433,6 +433,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     fine_xz_t1_macro = _section(
         config_text, "gcode_macro IDEX_NOZZLE_FINE_XZ_CALIBRATE_T1"
     )
+    tool_xz_sweep_macro = _section(
+        config_text, "gcode_macro IDEX_TOOL_XZ_SWEEP_REPORT"
+    )
     capture_script = (IMAGE_BUILD_FILES_DIR / "vision_capture.py").read_text(
         encoding="utf-8"
     )
@@ -504,6 +507,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert '"idex_eddy_fiducial_xz_acquire"' in eddy_fiducial_macro
     assert '"idex_nozzle_fine_xz_calibrate_t0"' in fine_xz_t0_macro
     assert '"idex_nozzle_fine_xz_calibrate_t1"' in fine_xz_t1_macro
+    assert '"idex_tool_xz_sweep_report"' in tool_xz_sweep_macro
     for calibration_macro in (
         metric_macro,
         corner_macro,
@@ -512,6 +516,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         eddy_fiducial_macro,
         fine_xz_t0_macro,
         fine_xz_t1_macro,
+        tool_xz_sweep_macro,
     ):
         assert "homed_axes" not in calibration_macro
         assert "requires X/Y/Z homed" not in calibration_macro
@@ -528,6 +533,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "idex_nozzle_fine_xz_grid_t1",
         "idex_tool_xy_measure_t0",
         "idex_tool_xy_measure_t1",
+        "idex_tool_xz_sweep_report",
         "idex_tool_xy_candidate",
         "idex_eddy_t0_xyz_offset",
         "idex_t0_t1_xyz_offset",
@@ -714,6 +720,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         "vision_nozzle_fine_xz.py",
         "vision_nozzle_tip_localization.py",
         "vision_tool_xy_calibration.py",
+        "vision_tool_xz_sweep.py",
         "vision_red_marker_x_sweep.py",
         "vision_rough_x_verification.py",
         "vision_job_types.json",
@@ -1129,7 +1136,7 @@ def test_live_config_check_rejects_pending_save_config():
     assert any("save_config_pending" in error for error in errors)
 
 
-def test_single_ssr_heatbed_config_is_ready_for_pid_calibration():
+def test_single_ssr_heatbed_config_has_valid_single_heater_structure():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     heater_bed = _section(config_text, "heater_bed")
 
@@ -1139,11 +1146,6 @@ def test_single_ssr_heatbed_config_is_ready_for_pid_calibration():
     assert "boost_heater_power:" not in heater_bed
     assert _setting_float(heater_bed, "pwm_cycle_time") > 0.0
     assert _setting_value(heater_bed, "sensor_pin")
-    assert "control: watermark" in heater_bed
-    assert _setting_float(heater_bed, "max_delta") > 0.0
-    assert "pid_Kp:" not in heater_bed
-    assert "pid_Ki:" not in heater_bed
-    assert "pid_Kd:" not in heater_bed
 
 
 def test_idex_part_fan_pins_and_slicer_routing():

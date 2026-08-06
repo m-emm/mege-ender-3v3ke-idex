@@ -436,6 +436,7 @@ require_file "${FILES_DIR}/vision_fine_tool_calibration.py"
 require_file "${FILES_DIR}/vision_nozzle_fine_xz.py"
 require_file "${FILES_DIR}/vision_nozzle_tip_localization.py"
 require_file "${FILES_DIR}/vision_tool_xy_calibration.py"
+require_file "${FILES_DIR}/vision_tool_xz_sweep.py"
 require_file "${FILES_DIR}/vision_red_marker_x_sweep.py"
 require_file "${FILES_DIR}/vision_rough_x_verification.py"
 require_file "${FILES_DIR}/vision_job_types.json"
@@ -469,6 +470,7 @@ install -m 0644 "${FILES_DIR}/vision_fine_tool_calibration.py" /usr/local/bin/vi
 install -m 0644 "${FILES_DIR}/vision_nozzle_fine_xz.py" /usr/local/bin/vision_nozzle_fine_xz.py
 install -m 0644 "${FILES_DIR}/vision_nozzle_tip_localization.py" /usr/local/bin/vision_nozzle_tip_localization.py
 install -m 0644 "${FILES_DIR}/vision_tool_xy_calibration.py" /usr/local/bin/vision_tool_xy_calibration.py
+install -m 0644 "${FILES_DIR}/vision_tool_xz_sweep.py" /usr/local/bin/vision_tool_xz_sweep.py
 install -m 0644 "${FILES_DIR}/vision_red_marker_x_sweep.py" /usr/local/bin/vision_red_marker_x_sweep.py
 install -m 0644 "${FILES_DIR}/vision_rough_x_verification.py" /usr/local/bin/vision_rough_x_verification.py
 install -m 0755 "${FILES_DIR}/webcam_health_probe.py" /usr/local/bin/webcam_health_probe.py

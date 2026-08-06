@@ -74,6 +74,7 @@ The main files are:
 | Stage 5 nozzle-tip analysis | `vision_nozzle_fine_xz.py` |
 | Shared nozzle-tip localization | `vision_nozzle_tip_localization.py` |
 | Fixed-Z tool-XY measurement and candidate calculation | `vision_tool_xy_calibration.py` |
+| Combined post-XY nozzle X/Z sweep report | `vision_tool_xz_sweep.py` |
 | Stage 5.1 fine-tool calculation | `vision_fine_tool_calibration.py` |
 | Camera capture daemon | `vision_capture.py` |
 | Capture service definition | `vision-capture-nozzle-cam.service` |
@@ -358,6 +359,19 @@ candidate. The independent post-activation XYZ verification described in the
 calibration concept is deliberately not exposed until its full X/Y dither and
 three-row Z-scale contract is implemented; there is no legacy X/Y-only alias.
 
+After both tool XY datums have been corrected and deployed, start the combined
+report-only nozzle X/Z sweep with:
+
+```gcode
+IDEX_TOOL_XZ_SWEEP_REPORT NAME=tool_xz_sweep_report
+```
+
+The job captures both T0 and T1 at the configured XY sweep columns and Z rows,
+initially Z=`0.5, 1, 4, 8 mm`. It records commanded X/Y/Z, raw nozzle image
+`(u, v)`, and all four fiducial positions for every frame, then writes one
+annotated overlay per frame and a combined `u(x)` plot. This step is
+diagnostic-only and does not calculate or apply a calibration correction.
+
 The corresponding host job types, in dependency order, are:
 
 ```text
@@ -368,6 +382,7 @@ idex_rough_tool_x_verify
 idex_eddy_fiducial_xz_grid
 idex_nozzle_fine_xz_grid_t0
 idex_nozzle_fine_xz_grid_t1
+idex_tool_xz_sweep_report
 ```
 
 The prior values live in `/usr/local/share/vision/priors.yaml`, deployed from
