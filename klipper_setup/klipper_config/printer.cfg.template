@@ -791,6 +791,8 @@ variable_brush_retract_speed: 30.0
 variable_brush_move_speed: 30.0
 gcode:
 
+[idex_manual_tuning]
+
 [gcode_macro _IDEX_CONFIG_FINGERPRINT]
 description: Generated config identity used by update_menderpi.sh --check.
 variable_source_sha256: "${config_fingerprint}"
@@ -910,9 +912,9 @@ gcode:
     {% else %}
         { action_raise_error("IDEX tool offset TOOL must be 0 or 1.") }
     {% endif %}
-    SET_GCODE_OFFSET X=0 Y={y} Z={z} MOVE={move} MOVE_SPEED={speed}
+    IDEX_MANUAL_TUNING_APPLY TOOL={tool} TOOL_Z={z} Y={y} MOVE={move} MOVE_SPEED={speed}
     BED_MESH_OFFSET X=0 Y={mesh_y} ZFADE={mesh_zfade}
-    RESPOND TYPE=echo MSG="IDEX T{tool} offsets applied: gcode X=0 Y={y} Z={z}; mesh X=0 Y={mesh_y} ZFADE={mesh_zfade}; MOVE={move}"
+    RESPOND TYPE=echo MSG="IDEX T{tool} offsets applied: gcode X=0 Y={y} static Z={z} plus manual tuning; mesh X=0 Y={mesh_y} ZFADE={mesh_zfade}; MOVE={move}"
 
 [gcode_macro IDEX_REPORT_TOOL_OFFSETS]
 description: Report configured IDEX absolute calibration and derived offsets.
@@ -951,6 +953,7 @@ gcode:
     {% endif %}
     RESPOND TYPE=echo MSG="IDEX T{tool} runtime offset updated. Put proven values in printer.cfg to persist them."
     {% if apply and tool == active_tool %}
+        IDEX_MANUAL_TUNING_CAPTURE TOOL={active_tool}
         _IDEX_APPLY_TOOL_OFFSET TOOL={tool} MOVE={can_move}
     {% endif %}
 
@@ -1071,6 +1074,7 @@ gcode:
     {% set offset_target_z = position.z|float + target_z_offset - current_z_offset %}
     {% set move_offsets = 1 if "x" in homed and "y" in homed and "z" in homed else 0 %}
     {% set can_move_offsets = 1 if move_offsets and offset_target_y >= axis_min.y|float and offset_target_y <= axis_max.y|float and offset_target_z >= axis_min.z|float and offset_target_z <= axis_max.z|float else 0 %}
+    IDEX_MANUAL_TUNING_CAPTURE TOOL={current_tool}
     ACTIVATE_EXTRUDER EXTRUDER=extruder
     SET_GCODE_VARIABLE MACRO=_IDEX_TOOL_STATE VARIABLE=active_tool VALUE=0
     SET_GCODE_VARIABLE MACRO=IDEX_NEXT_PRINTABLE_CORNER VARIABLE=corner_index VALUE=0
@@ -1108,6 +1112,7 @@ gcode:
     {% set offset_target_z = position.z|float + target_z_offset - current_z_offset %}
     {% set move_offsets = 1 if "x" in homed and "y" in homed and "z" in homed else 0 %}
     {% set can_move_offsets = 1 if move_offsets and offset_target_y >= axis_min.y|float and offset_target_y <= axis_max.y|float and offset_target_z >= axis_min.z|float and offset_target_z <= axis_max.z|float else 0 %}
+    IDEX_MANUAL_TUNING_CAPTURE TOOL={current_tool}
     ACTIVATE_EXTRUDER EXTRUDER=extruder1
     SET_GCODE_VARIABLE MACRO=_IDEX_TOOL_STATE VARIABLE=active_tool VALUE=1
     SET_GCODE_VARIABLE MACRO=IDEX_NEXT_PRINTABLE_CORNER VARIABLE=corner_index VALUE=0

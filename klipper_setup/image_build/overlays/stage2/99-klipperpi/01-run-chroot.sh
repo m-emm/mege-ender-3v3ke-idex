@@ -562,12 +562,16 @@ python3 -m venv /opt/klipper-env
 log "Installing custom Klipper host extras"
 require_file "${FILES_DIR}/klipper_host/klippy/extras/heaters.py"
 require_file "${FILES_DIR}/klipper_host/klippy/extras/vision.py"
+require_file "${FILES_DIR}/klipper_host/klippy/extras/idex_manual_tuning.py"
 install -m 0644 \
   "${FILES_DIR}/klipper_host/klippy/extras/heaters.py" \
   /opt/klipper/klippy/extras/heaters.py
 install -m 0644 \
   "${FILES_DIR}/klipper_host/klippy/extras/vision.py" \
   /opt/klipper/klippy/extras/vision.py
+install -m 0644 \
+  "${FILES_DIR}/klipper_host/klippy/extras/idex_manual_tuning.py" \
+  /opt/klipper/klippy/extras/idex_manual_tuning.py
 
 chown -R "${USERNAME}:${USERNAME}" /opt/klipper /opt/klipper-env
 
@@ -680,7 +684,7 @@ log "Writing build info"
   echo "hostname=${HOSTNAME}"
   echo "username=${USERNAME}"
   echo "klipper_commit=${KLIPPER_COMMIT:-}"
-  echo "klipper_host_extras=vision.py"
+  echo "klipper_host_extras=vision.py,idex_manual_tuning.py"
   echo "moonraker_commit=${MOONRAKER_COMMIT:-}"
   echo "mainsail_version=${MAINSAIL_VERSION}"
   echo "build_time_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

@@ -1273,6 +1273,10 @@ def test_idex_tool_selection_skips_offset_move_at_axis_edges():
         assert "offset_target_y" in macro
         assert "offset_target_z" in macro
         assert "can_move_offsets" in macro
+        assert f"IDEX_MANUAL_TUNING_CAPTURE TOOL={{current_tool}}" in macro
+        assert macro.index("IDEX_MANUAL_TUNING_CAPTURE") < macro.index(
+            "ACTIVATE_EXTRUDER"
+        )
         assert f"_IDEX_APPLY_TOOL_OFFSET TOOL={tool} MOVE={{can_move_offsets}}" in macro
         assert "offset compensation move skipped at current Y/Z edge" in macro
 
@@ -1896,7 +1900,8 @@ def test_idex_tool_offset_macro_clears_x_and_rejects_t0_runtime_updates():
     apply_offset = _section(config_text, "gcode_macro _IDEX_APPLY_TOOL_OFFSET")
     set_offset = _section(config_text, "gcode_macro IDEX_SET_TOOL_OFFSET")
 
-    assert "SET_GCODE_OFFSET X=0 Y={y} Z={z}" in apply_offset
+    assert "IDEX_MANUAL_TUNING_APPLY TOOL={tool} TOOL_Z={z} Y={y}" in apply_offset
+    assert "BED_MESH_OFFSET X=0 Y={mesh_y} ZFADE={mesh_zfade}" in apply_offset
     assert "t0_x_offset" not in apply_offset
     assert "t1_x_offset" not in apply_offset
     assert "state.t0_z_offset" not in apply_offset
