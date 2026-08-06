@@ -1672,13 +1672,21 @@ def test_absolute_xy_calibration_uses_petgcf_tpu_process_structure():
     assert process_data["filaments"][1] != process_data["filaments"][0]
     for key in (
         "enable_prime_tower",
-        "wipe_tower_x",
-        "wipe_tower_y",
         "hot_plate_temp",
         "hot_plate_temp_initial_layer",
         "travel_speed",
     ):
         assert key in overrides
+    assert overrides["enable_prime_tower"] == "0"
+    for key in (
+        "prime_tower_width",
+        "prime_tower_brim_width",
+        "purge_in_prime_tower",
+        "wipe_tower_x",
+        "wipe_tower_y",
+        "wipe_tower_no_sparse_layers",
+    ):
+        assert key not in overrides
     assert float(overrides["travel_speed"]) <= SAFE_XY_SPEED_MM_S
     for key in (
         "default_acceleration",
@@ -1840,6 +1848,47 @@ def test_idex_tool_parking_uses_absolute_edges():
         assert "x_negative_offset_clearance" not in select_macro
 
     assert "stepper_x.position_min|float" in select_right
+
+
+def test_idex_print_brush_macro_is_separate_from_normal_tool_selection():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    tool_state = _section(config_text, "gcode_macro _IDEX_TOOL_STATE")
+    brush_macro = _section(config_text, "gcode_macro IDEX_PRIME_AND_BRUSH")
+    t0_macro = _section(config_text, "gcode_macro T0")
+    t1_macro = _section(config_text, "gcode_macro T1")
+
+    assert _macro_variable_float(tool_state, "brush_distance") > 0.0
+    assert _macro_variable_float(tool_state, "brush_cycles") == 3.0
+    assert _macro_variable_float(tool_state, "brush_prime_length") == 5.0
+    assert _macro_variable_float(tool_state, "brush_retract_length") == 1.0
+    assert "stepper_x.position_endstop|float" in brush_macro
+    assert "dual_carriage.position_endstop|float" in brush_macro
+    assert "left_home_x + brush_distance" in brush_macro
+    assert "right_home_x - brush_distance" in brush_macro
+    assert brush_macro.count("{% for _ in range(cycles) %}") == 2
+    assert "G1 E{prime_length}" in brush_macro
+    assert "G1 E-{retract_length}" in brush_macro
+    assert "IDEX_PRIME_AND_BRUSH" not in t0_macro
+    assert "IDEX_PRIME_AND_BRUSH" not in t1_macro
+    assert "G1 E" not in t0_macro
+    assert "G1 E" not in t1_macro
+
+
+def test_soft_outside_demo_uses_print_only_brush_toolchange():
+    process_data = copy_dual_petgcf_tpu95a_06_demo_process_data()
+    overrides = process_data["process_overrides"]
+
+    assert overrides["enable_prime_tower"] == "0"
+    assert "prime_tower_width" not in overrides
+    assert "prime_tower_brim_width" not in overrides
+    assert "purge_in_prime_tower" not in overrides
+    assert "wipe_tower_x" not in overrides
+    assert "wipe_tower_y" not in overrides
+    assert "wipe_tower_no_sparse_layers" not in overrides
+    assert overrides["change_filament_gcode"] == (
+        "T{next_extruder}\n"
+        "IDEX_PRIME_AND_BRUSH TOOL={next_extruder}"
+    )
 
 
 def test_idex_tool_offset_macro_clears_x_and_rejects_t0_runtime_updates():

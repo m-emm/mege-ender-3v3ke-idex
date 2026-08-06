@@ -1,8 +1,11 @@
 """Small IDEX PETG-CF core with TPU outside shell demo.
 
 Usage:
-    cd <project_root> && ./run.sh --slice --open \
+    cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh --slice --open \
         src/mege_ender_3v3ke_idex/designs/soft_outside_demo.py
+
+The production process data disables the prime tower and adds the print-only
+IDEX nozzle-brush tool-change sequence.
 """
 
 import logging
@@ -27,9 +30,9 @@ TPU_SHELL_PART_NAME = "soft_outside_demo_tpu_shell"
 PETGCF_COLOR = (0.08, 0.08, 0.08)
 TPU_COLOR = (0.0, 0.85, 0.2)
 
-CORE_WIDTH_MM = 25.0
-CORE_DEPTH_MM = 25.0
-CORE_HEIGHT_MM = 25.0
+CORE_WIDTH_MM = 3.0
+CORE_DEPTH_MM = 30.0
+CORE_HEIGHT_MM = 5.0
 SHELL_THICKNESS_MM = 5
 SHELL_OUTER_WIDTH_MM = CORE_WIDTH_MM + 2 * SHELL_THICKNESS_MM
 SHELL_OUTER_DEPTH_MM = CORE_DEPTH_MM + 2 * SHELL_THICKNESS_MM

@@ -782,6 +782,13 @@ variable_bed_grid_zero_x: ${bed_grid_zero_x}
 variable_bed_grid_zero_y: ${bed_grid_zero_y}
 variable_offset_move_speed: 5.0
 variable_park_move_speed: 180.0
+variable_brush_distance: 25.0
+variable_brush_cycles: 3
+variable_brush_prime_length: 5.0
+variable_brush_retract_length: 1.0
+variable_brush_prime_speed: 5.0
+variable_brush_retract_speed: 30.0
+variable_brush_move_speed: 30.0
 gcode:
 
 [gcode_macro _IDEX_CONFIG_FINGERPRINT]
@@ -983,6 +990,64 @@ gcode:
     RESTORE_GCODE_STATE NAME=IDEX_SELECT_RIGHT_STATE
     RESPOND TYPE=echo MSG="IDEX active carriage: X-right"
     M117 IDEX X-right active
+
+[gcode_macro IDEX_PRIME_AND_BRUSH]
+description: Prime the active IDEX nozzle, brush it three times, and retract before leaving.
+gcode:
+    {% set state = printer["gcode_macro _IDEX_TOOL_STATE"] %}
+    {% set tool = params.TOOL|default(state.active_tool)|int %}
+    {% set active_tool = state.active_tool|int %}
+    {% set homed = printer.toolhead.homed_axes %}
+    {% set brush_distance = state.brush_distance|float %}
+    {% set cycles = state.brush_cycles|int %}
+    {% set prime_length = state.brush_prime_length|float %}
+    {% set retract_length = state.brush_retract_length|float %}
+    {% set prime_feed = state.brush_prime_speed|float * 60.0 %}
+    {% set retract_feed = state.brush_retract_speed|float * 60.0 %}
+    {% set brush_feed = state.brush_move_speed|float * 60.0 %}
+    {% set left_home_x = printer.configfile.settings.stepper_x.position_endstop|float %}
+    {% set right_home_x = printer.configfile.settings.dual_carriage.position_endstop|float %}
+    {% if tool not in [0, 1] %}
+        { action_raise_error("IDEX_PRIME_AND_BRUSH TOOL must be 0 or 1.") }
+    {% elif tool != active_tool %}
+        { action_raise_error("IDEX_PRIME_AND_BRUSH TOOL must match the active IDEX tool.") }
+    {% elif "x" not in homed %}
+        { action_raise_error("Home X first with G28 X or IDEX_HOME_X.") }
+    {% elif brush_distance <= 0.0 or cycles < 1 or prime_length <= 0.0 or retract_length <= 0.0 %}
+        { action_raise_error("IDEX_PRIME_AND_BRUSH distances and cycle count must be positive.") }
+    {% elif tool == 0 %}
+        {% set home_x = left_home_x %}
+        {% set inside_x = left_home_x + brush_distance %}
+        SAVE_GCODE_STATE NAME=IDEX_PRIME_AND_BRUSH_STATE
+        G90
+        M83
+        G1 X{home_x} F{brush_feed}
+        G1 E{prime_length} F{prime_feed}
+        M400
+        {% for _ in range(cycles) %}
+            G1 X{inside_x} F{brush_feed}
+            G1 X{home_x} F{brush_feed}
+        {% endfor %}
+        M400
+        G1 E-{retract_length} F{retract_feed}
+        RESTORE_GCODE_STATE NAME=IDEX_PRIME_AND_BRUSH_STATE
+    {% else %}
+        {% set home_x = right_home_x %}
+        {% set inside_x = right_home_x - brush_distance %}
+        SAVE_GCODE_STATE NAME=IDEX_PRIME_AND_BRUSH_STATE
+        G90
+        M83
+        G1 X{home_x} F{brush_feed}
+        G1 E{prime_length} F{prime_feed}
+        M400
+        {% for _ in range(cycles) %}
+            G1 X{inside_x} F{brush_feed}
+            G1 X{home_x} F{brush_feed}
+        {% endfor %}
+        M400
+        G1 E-{retract_length} F{retract_feed}
+        RESTORE_GCODE_STATE NAME=IDEX_PRIME_AND_BRUSH_STATE
+    {% endif %}
 
 [gcode_macro T0]
 description: Select the left IDEX toolhead and left extruder.
