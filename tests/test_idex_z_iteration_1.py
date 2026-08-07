@@ -63,6 +63,20 @@ def test_regular_eddy_probe_measurement_uses_canonical_probe_result():
         )
 
 
+def test_regular_eddy_probe_result_keeps_physical_xy_and_statistics():
+    module = _load_module()
+
+    result = module.probe_result_from_status(
+        {"probe": {"last_probe_position": [207.391, 168.997, -0.012, 0.0]}}
+    )
+    assert result == {"x": pytest.approx(207.391), "y": pytest.approx(168.997), "z": pytest.approx(-0.012)}
+    summary = module.summarize_probe_results(
+        [result, {"x": 207.391, "y": 168.997, "z": 0.004}]
+    )
+    assert summary["median"] == pytest.approx(-0.004)
+    assert summary["span"] == pytest.approx(0.016)
+
+
 def test_post_eddy_probe_reference_runs_regular_probe_and_records_evidence():
     module = _load_module()
 
@@ -76,15 +90,24 @@ def test_post_eddy_probe_reference_runs_regular_probe_and_records_evidence():
     runner = object.__new__(module.Iteration1Runner)
     runner.dry_run = True
     runner.store = Store()
+    runner.raw_calibration = {
+        "eddy_relative_calibration": {
+            "nozzle_to_coil": {"x": -57.391, "y": -18.997, "z": 1.399}
+        }
+    }
     scripts = []
     runner._gcode = scripts.append
 
-    evidence = runner.verify_eddy_probe_reference()
+    evidence = runner.verify_eddy_probe_reference({"median": 0.0})
 
-    assert scripts == [
-        "G90\nG1 X150.000 Y150.000 Z5 F1200\nPROBE METHOD=probe"
-    ]
-    assert evidence["probe_z"] == pytest.approx(0.0)
+    assert scripts == []
+    assert evidence["probe_summary"]["median"] == pytest.approx(0.0)
+    assert evidence["median_residual"] == pytest.approx(0.0)
+    assert evidence["nozzle_pose"] == {
+        "x": pytest.approx(207.391),
+        "y": pytest.approx(168.997),
+        "z": pytest.approx(5.0),
+    }
     assert runner.store.writes["post-eddy-probe-reference.json"] == evidence
 
 

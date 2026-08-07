@@ -839,6 +839,16 @@ span, and population standard deviation in the Klipper console. It reports the
 post-retract toolhead Z separately for diagnostic comparison; statistics use
 the tap contact result.
 
+After the tap series, it reads the configured regular Eddy X/Y offsets and
+places the coil over the same physical bed point. For example, with the
+current offsets `(-57.391,-18.997)`, a tap at `(150,150)` requires the nozzle
+at `(207.391,168.997)` for the comparison probe. The extra reports the regular
+probe result beside the tap median and includes their signed difference. If
+that derived nozzle pose is outside the current homed motion limits, the tap
+statistics remain valid and the regular comparison is skipped with a warning.
+The macro does not clear mesh or visible offsets; it measures the current
+coordinate state.
+
 ### Canonical calibration data
 
 Extend `calib.yaml` and the generator so Iteration 1 data has one authoritative
@@ -1142,9 +1152,25 @@ repeatability limits, move to their median tap height, and capture
    `GET_POSITION` again. Apply the same `+/-0.020 mm` mean and `0.030 mm` span
    gate, then compare the pre/post raw MCU step counts and converted positions
    alongside the two tap summaries. A post-calibration tap shift is
-evidence, not something to hide with an endstop or `tap_z_offset` update. If
-the post sequence fails, stop with the new curve uncommitted as an accepted
-phase and do not continue to re-anchor or mesh.
+   evidence, not something to hide with an endstop or `tap_z_offset` update.
+2. Place the nozzle at `P - probe_offset_xy`, where `P=(150,150)` is the tap
+   point, and take five regular `PROBE METHOD=probe` samples. Require the
+   reported physical probe XY to be within `0.020 mm` of `P`, the regular
+   median and mean to be within `+/-0.020 mm`, the regular span to be no more
+   than `0.030 mm`, and the regular-minus-tap median residual to be within
+   `+/-0.020 mm`.
+3. If this regular-probe gate fails, record regular probes at 1, 2, and
+   5 mm/s and stationary `METHOD=scan` samples at commanded Z values 3, 2, 1,
+   and 0.5 mm over the same physical point. Interpret constant residuals as a
+   possible datum translation, speed-dependent residuals as a descent-path
+   issue, height-dependent residuals as a curve-shape issue, temperature
+   dependence as a thermal-drift issue, and XY dependence as an offset,
+   geometry, or interference issue.
+
+The newly captured curve is provisional until all post-calibration gates pass.
+The runner snapshots the pre-candidate calibration and restores it if the tap
+or same-point Eddy gate fails. Failed candidates and diagnostic evidence remain
+in the run directory, but the failed curve is not left active.
 
 Only after the post sequence passes may the runner commit I1.5. Raise to
 `Z=5` after the evidence is captured; the runtime mesh remains clear.

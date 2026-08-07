@@ -64,7 +64,7 @@ move_speed: 20.0
 default_count: 7
 
 [gcode_macro EDDY_TAP_MEASURE]
-description: Measure repeated Eddy tap contacts at the canonical bed reference.
+description: Measure taps and compare a same-point regular Eddy PROBE.
 gcode:
     {% set threshold = params.THRESHOLD|default(printer.configfile.settings["probe_eddy_current btt_eddy"].tap_threshold)|float %}
     {% set count = params.COUNT|default(7)|int %}

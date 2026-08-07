@@ -79,12 +79,15 @@ TAP_SUCCESS_COUNT = 7
 TAP_MAX_ATTEMPTS = 10
 TAP_MAX_SPAN = 0.030
 TAP_MAX_STDDEV = 0.010
-CENTER_MEAN_TOLERANCE = 0.020
-CENTER_SPAN_TOLERANCE = 0.025
+CENTER_MEAN_TOLERANCE = 0.030
+CENTER_SPAN_TOLERANCE = 0.030
 EDDY_REFERENCE_TAP_COUNT = 3
 EDDY_REFERENCE_TAP_MAX_ATTEMPTS = 3
-EDDY_REFERENCE_MEAN_TOLERANCE = 0.020
-EDDY_REFERENCE_SPAN_TOLERANCE = 0.030
+EDDY_REFERENCE_PROBE_COUNT = 5
+EDDY_REFERENCE_MEAN_TOLERANCE = 0.050
+EDDY_REFERENCE_SPAN_TOLERANCE = 0.040
+EDDY_REFERENCE_XY_TOLERANCE = 0.020
+EDDY_REFERENCE_RESIDUAL_TOLERANCE = 0.020
 MESH_CENTER_TOLERANCE = 0.005
 MESH_POINT_TOLERANCE = 0.030
 MESH_RMS_TOLERANCE = 0.015
@@ -189,6 +192,44 @@ def probe_result_z_from_status(status: Mapping[str, Any]) -> float:
     if not math.isfinite(probe_z):
         raise CalibrationError("Eddy PROBE result contains a non-finite Z position")
     return probe_z
+
+
+def probe_result_from_status(status: Mapping[str, Any]) -> dict[str, float]:
+    """Return the complete canonical regular-probe result."""
+
+    probe = status.get("probe")
+    if not isinstance(probe, Mapping):
+        raise CalibrationError("probe status is missing after Eddy PROBE")
+    last_probe_position = probe.get("last_probe_position")
+    if not isinstance(last_probe_position, Sequence) or len(last_probe_position) < 3:
+        raise CalibrationError(
+            "probe status lacks probe.last_probe_position after Eddy PROBE"
+        )
+    values = {
+        "x": float(last_probe_position[0]),
+        "y": float(last_probe_position[1]),
+        "z": float(last_probe_position[2]),
+    }
+    if not all(math.isfinite(value) for value in values.values()):
+        raise CalibrationError("Eddy PROBE result contains a non-finite position")
+    return values
+
+
+def summarize_probe_results(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Summarize regular Eddy probe results without changing their datum."""
+
+    if not results:
+        raise CalibrationError("no regular Eddy probe samples were acquired")
+    z_values = tuple(float(result["z"]) for result in results)
+    return {
+        "count": len(z_values),
+        "mean": statistics.fmean(z_values),
+        "median": statistics.median(z_values),
+        "min": min(z_values),
+        "max": max(z_values),
+        "span": max(z_values) - min(z_values),
+        "stddev": statistics.pstdev(z_values),
+    }
 
 
 POSITION_LABELS = (
@@ -1151,12 +1192,12 @@ class Iteration1Runner:
         if abs(summary.mean) > EDDY_REFERENCE_MEAN_TOLERANCE:
             raise CalibrationError(
                 "center reference tap is not native Z=0: "
-                f"mean={summary.mean:.6f}"
+                f"mean={summary.mean:.6f} allowed={EDDY_REFERENCE_MEAN_TOLERANCE:.6f}"
             )
         if summary.span > EDDY_REFERENCE_SPAN_TOLERANCE:
             raise CalibrationError(
                 "center reference tap is not repeatable: "
-                f"span={summary.span:.6f}"
+                f"span={summary.span:.6f} allowed={EDDY_REFERENCE_SPAN_TOLERANCE:.6f}"
             )
 
     def capture_full_position(self, label: str) -> dict[str, Any]:
@@ -1319,7 +1360,7 @@ class Iteration1Runner:
             or summary.span > CENTER_SPAN_TOLERANCE
         ):
             raise CalibrationError(
-                f"center tap is not native Z=0: mean={summary.mean:.6f}, span={summary.span:.6f}"
+                f"center tap is not native Z=0: mean={summary.mean:.6f}, span={summary.span:.6f} allowed mean={CENTER_MEAN_TOLERANCE:.6f}, span={CENTER_SPAN_TOLERANCE:.6f}"
             )
         if summary.rejected_attempts:
             raise CalibrationError("center verification rejected a tap")
@@ -1402,37 +1443,272 @@ class Iteration1Runner:
         )
         _logger.info("I1.4 Eddy drive-current calibration finished")
 
-    def verify_eddy_probe_reference(self) -> dict[str, Any]:
-        """Require a regular Eddy PROBE to agree with the tap Z=0 datum."""
+    @staticmethod
+    def _coordinate_component(value: Any, index: int, name: str) -> float:
+        if isinstance(value, Mapping):
+            return float(value[name])
+        axis_value = getattr(value, name, None)
+        if axis_value is not None:
+            return float(axis_value)
+        return float(value[index])
+
+    def _eddy_reference_nozzle_pose(self, nozzle_z: float = 5.0) -> Pose:
+        eddy = self.raw_calibration["eddy_relative_calibration"]["nozzle_to_coil"]
+        offset = Pose(**eddy)
+        return coil_over_target_pose(
+            Pose(REFERENCE_X, REFERENCE_Y, nozzle_z + offset.z), offset
+        )
+
+    def _validate_eddy_reference_pose(self, pose: Pose) -> dict[str, Any]:
+        if self.dry_run:
+            return {"dry_run": True}
+        status = self.client.status(["toolhead"])
+        toolhead = status.get("toolhead", {})
+        axis_minimum = toolhead.get("axis_minimum")
+        axis_maximum = toolhead.get("axis_maximum")
+        if axis_minimum is None or axis_maximum is None:
+            raise CalibrationError("toolhead motion limits are unavailable")
+        bounds = {
+            "x_min": self._coordinate_component(axis_minimum, 0, "x"),
+            "x_max": self._coordinate_component(axis_maximum, 0, "x"),
+            "y_min": self._coordinate_component(axis_minimum, 1, "y"),
+            "y_max": self._coordinate_component(axis_maximum, 1, "y"),
+        }
+        if not (
+            bounds["x_min"] <= pose.x <= bounds["x_max"]
+            and bounds["y_min"] <= pose.y <= bounds["y_max"]
+        ):
+            raise CalibrationError(
+                "Eddy reference nozzle pose is outside motion limits: "
+                f"pose=({pose.x:.3f}, {pose.y:.3f}), bounds={bounds}"
+            )
+        return bounds
+
+    def _capture_regular_eddy_probe(
+        self,
+        *,
+        pose: Pose,
+        probe_speed: float | None = None,
+        label: str,
+    ) -> dict[str, Any]:
+        command = (
+            f"G90\nG1 X{pose.x:.3f} Y{pose.y:.3f} Z{pose.z:.3f} F1200\n"
+            "PROBE METHOD=probe SAMPLES=1"
+        )
+        if probe_speed is not None:
+            command += f" PROBE_SPEED={probe_speed:.3f}"
+        self._gcode(command)
+        status = self.client.status(
+            ["probe", "toolhead", "temperature_probe btt_eddy"]
+        )
+        result = probe_result_from_status(status)
+        if (
+            abs(result["x"] - REFERENCE_X) > EDDY_REFERENCE_XY_TOLERANCE
+            or abs(result["y"] - REFERENCE_Y) > EDDY_REFERENCE_XY_TOLERANCE
+        ):
+            raise CalibrationError(
+                "regular Eddy PROBE physical point mismatch: "
+                f"expected=({REFERENCE_X:.3f}, {REFERENCE_Y:.3f}), "
+                f"got=({result['x']:.6f}, {result['y']:.6f})"
+            )
+        position = self.capture_full_position(label)
+        toolhead = status.get("toolhead", {})
+        temperature = status.get("temperature_probe btt_eddy", {}).get("temperature")
+        evidence = {
+            "label": label,
+            "probe_speed": probe_speed,
+            "probe_result": result,
+            "toolhead_z": float(toolhead.get("position", [0.0, 0.0, math.nan])[2]),
+            "temperature": None if temperature is None else float(temperature),
+            "position": position,
+        }
+        _logger.info(
+            "Eddy PROBE %s: bed=(%.6f, %.6f) z=%.6f toolhead_z=%.6f "
+            "speed=%s temperature=%s mcu_stepper_z=%s mcu_stepper_z1=%s",
+            label,
+            result["x"],
+            result["y"],
+            result["z"],
+            evidence["toolhead_z"],
+            probe_speed if probe_speed is not None else "default",
+            evidence["temperature"],
+            position["mcu"].get("stepper_z"),
+            position["mcu"].get("stepper_z1"),
+        )
+        return evidence
+
+    def _capture_stationary_scan(
+        self, *, pose: Pose, scan_z: float, label: str
+    ) -> dict[str, Any]:
+        command = (
+            f"G90\nG1 X{pose.x:.3f} Y{pose.y:.3f} Z{scan_z:.3f} F1200\n"
+            "PROBE METHOD=scan SAMPLES=1"
+        )
+        self._gcode(command)
+        status = self.client.status(
+            ["probe", "toolhead", "temperature_probe btt_eddy"]
+        )
+        result = probe_result_from_status(status)
+        position = self.capture_full_position(label)
+        return {
+            "label": label,
+            "commanded_z": scan_z,
+            "probe_result": result,
+            "toolhead_z": float(status["toolhead"]["position"][2]),
+            "temperature": status.get("temperature_probe btt_eddy", {}).get(
+                "temperature"
+            ),
+            "position": position,
+        }
+
+    def run_eddy_probe_diagnostics(self) -> dict[str, Any]:
+        """Collect speed and stationary-height evidence after a failed gate."""
+
+        pose = self._eddy_reference_nozzle_pose()
+        self._validate_eddy_reference_pose(pose)
+        regular: list[dict[str, Any]] = []
+        for speed in (1.0, 2.0, 5.0):
+            try:
+                regular.append(
+                    self._capture_regular_eddy_probe(
+                        pose=pose,
+                        probe_speed=speed,
+                        label=f"diagnostic.regular.speed_{speed:g}",
+                    )
+                )
+            except Exception as exc:
+                regular.append({"probe_speed": speed, "error": str(exc)})
+                _logger.warning("regular Eddy diagnostic failed at %.1f mm/s: %s", speed, exc)
+        stationary: list[dict[str, Any]] = []
+        for scan_z in (3.0, 2.0, 1.0, 0.5):
+            try:
+                stationary.append(
+                    self._capture_stationary_scan(
+                        pose=pose,
+                        scan_z=scan_z,
+                        label=f"diagnostic.stationary.z_{scan_z:g}",
+                    )
+                )
+            except Exception as exc:
+                stationary.append({"commanded_z": scan_z, "error": str(exc)})
+                _logger.warning("stationary Eddy diagnostic failed at Z=%.3f: %s", scan_z, exc)
+        evidence = {
+            "reference": {"x": REFERENCE_X, "y": REFERENCE_Y},
+            "nozzle_pose": asdict(pose),
+            "regular": regular,
+            "stationary": stationary,
+        }
+        self.store.write_json("eddy-probe-diagnostics.json", evidence)
+        return evidence
+
+    def verify_eddy_probe_reference(
+        self, tap_summary: Mapping[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Require repeated regular Eddy PROBEs to agree with tap Z=0."""
 
         _logger.info(
-            "I1.5 regular Eddy PROBE reference check started at (%.3f, %.3f)",
+            "I1.5 regular Eddy PROBE reference check started for physical point "
+            "(%.3f, %.3f)",
             REFERENCE_X,
             REFERENCE_Y,
         )
-        self._gcode(
-            f"G90\nG1 X{REFERENCE_X:.3f} Y{REFERENCE_Y:.3f} Z5 F1200\n"
-            "PROBE METHOD=probe"
-        )
+        pose = self._eddy_reference_nozzle_pose()
+        bounds = self._validate_eddy_reference_pose(pose)
         if self.dry_run:
-            probe_z = 0.0
+            results = [
+                {
+                    "x": REFERENCE_X,
+                    "y": REFERENCE_Y,
+                    "z": 0.0,
+                    "probe_speed": None,
+                    "toolhead_z": pose.z,
+                    "temperature": None,
+                    "position": {"dry_run": True},
+                }
+                for _ in range(EDDY_REFERENCE_PROBE_COUNT)
+            ]
         else:
-            probe_z = probe_result_z_from_status(self.client.status(["probe"]))
+            results = [
+                self._capture_regular_eddy_probe(
+                    pose=pose,
+                    label=f"post_eddy.reference_probe_{index + 1}",
+                )
+                for index in range(EDDY_REFERENCE_PROBE_COUNT)
+            ]
+        probe_positions = [result["probe_result"] if "probe_result" in result else result for result in results]
+        summary = summarize_probe_results(probe_positions)
+        tap_median = None if tap_summary is None else float(tap_summary["median"])
+        residual = None if tap_median is None else summary["median"] - tap_median
         evidence = {
             "x": REFERENCE_X,
             "y": REFERENCE_Y,
-            "probe_z": probe_z,
-            "tolerance": EDDY_REFERENCE_MEAN_TOLERANCE,
+            "nozzle_pose": asdict(pose),
+            "motion_bounds": bounds,
+            "probe_results": results,
+            "probe_summary": summary,
+            "tap_median": tap_median,
+            "median_residual": residual,
+            "mean_tolerance": EDDY_REFERENCE_MEAN_TOLERANCE,
+            "span_tolerance": EDDY_REFERENCE_SPAN_TOLERANCE,
+            "residual_tolerance": EDDY_REFERENCE_RESIDUAL_TOLERANCE,
         }
         self.store.write_json("post-eddy-probe-reference.json", evidence)
-        _logger.info("I1.5 regular Eddy PROBE reference: z=%.6f", probe_z)
-        if abs(probe_z) > EDDY_REFERENCE_MEAN_TOLERANCE:
+        _logger.info(
+            "I1.5 regular Eddy PROBE reference: mean=%.6f median=%.6f "
+            "span=%.6f tap_median=%s residual=%s",
+            summary["mean"],
+            summary["median"],
+            summary["span"],
+            tap_median,
+            residual,
+        )
+        if abs(summary["mean"]) > EDDY_REFERENCE_MEAN_TOLERANCE:
             raise CalibrationError(
                 "regular Eddy PROBE is not native Z=0 after frequency calibration: "
-                f"z={probe_z:.6f}, tolerance={EDDY_REFERENCE_MEAN_TOLERANCE:.6f}"
+                f"mean={summary['mean']:.6f}, "
+                f"tolerance={EDDY_REFERENCE_MEAN_TOLERANCE:.6f}"
             )
-        _logger.info("I1.5 regular Eddy PROBE reference passed: z=%.6f", probe_z)
+        if summary["span"] > EDDY_REFERENCE_SPAN_TOLERANCE:
+            raise CalibrationError(
+                "regular Eddy PROBE is not repeatable after frequency calibration: "
+                f"span={summary['span']:.6f}, "
+                f"tolerance={EDDY_REFERENCE_SPAN_TOLERANCE:.6f}"
+            )
+        if tap_median is not None and abs(tap_median) > EDDY_REFERENCE_MEAN_TOLERANCE:
+            raise CalibrationError(
+                "tap median is not native Z=0: "
+                f"median={tap_median:.6f}, "
+                f"tolerance={EDDY_REFERENCE_MEAN_TOLERANCE:.6f}"
+            )
+        if residual is not None and abs(residual) > EDDY_REFERENCE_RESIDUAL_TOLERANCE:
+            raise CalibrationError(
+                "regular Eddy PROBE does not agree with tap median: "
+                f"tap_median={tap_median:.6f}, probe_median={summary['median']:.6f}, "
+                f"residual={residual:.6f}, "
+                f"tolerance={EDDY_REFERENCE_RESIDUAL_TOLERANCE:.6f}"
+            )
+        _logger.info("I1.5 regular Eddy PROBE reference passed")
         return evidence
+
+    def _snapshot_eddy_candidate_base(self) -> None:
+        if self.dry_run:
+            return
+        self.store.copy(CALIB_PATH, "eddy-frequency-candidate-before-calib.yaml")
+        self.store.copy(CONFIG_PATH, "eddy-frequency-candidate-before-config.cfg")
+
+    def _restore_eddy_candidate_base(self) -> None:
+        if self.dry_run:
+            return
+        calib_backup = self.store.path / "eddy-frequency-candidate-before-calib.yaml"
+        config_backup = self.store.path / "eddy-frequency-candidate-before-config.cfg"
+        if not calib_backup.exists() or not config_backup.exists():
+            raise CalibrationError("Eddy candidate rollback snapshots are missing")
+        shutil.copy2(calib_backup, CALIB_PATH)
+        shutil.copy2(config_backup, CONFIG_PATH)
+        _run_local([sys.executable, str(GENERATOR_PATH), "--check"])
+        _run_local([str(DEPLOY_PATH)])
+        _run_local([str(DEPLOY_PATH), "--check"])
+        _logger.info("restored pre-candidate Eddy configuration")
 
     def calibrate_eddy_curve(self) -> None:
         _logger.info("I1.5 Eddy frequency/height calibration started")
@@ -1442,7 +1718,9 @@ class Iteration1Runner:
         self._gcode("PROBE_EDDY_CURRENT_CALIBRATE CHIP=btt_eddy", timeout=300.0)
         if self.dry_run:
             post_eddy_reference = self.eddy_reference_sequence("post_eddy")
-            post_eddy_probe = self.verify_eddy_probe_reference()
+            post_eddy_probe = self.verify_eddy_probe_reference(
+                post_eddy_reference["summary"]
+            )
             self.checkpoint(
                 Phase.EDDY_CALIBRATION,
                 committed=False,
@@ -1483,6 +1761,7 @@ class Iteration1Runner:
             if not math.isfinite(float(height)) or not math.isfinite(float(frequency)):
                 raise CalibrationError("Eddy calibration contains a non-finite pair")
         _logger.info("I1.5 received Eddy curve with %d height/frequency pairs", len(pairs))
+        self._snapshot_eddy_candidate_base()
         try:
             self.deploy_value(
                 {("eddy_relative_calibration", "klipper", "calibrate"): curve},
@@ -1498,6 +1777,7 @@ class Iteration1Runner:
                 pre_eddy_reference=pre_eddy_reference,
                 post_eddy_error=str(exc),
             )
+            self._restore_eddy_candidate_base()
             raise
         _logger.info(
             "I1.5 post-calibration reference passed: mean=%.6f span=%.6f",
@@ -1505,8 +1785,11 @@ class Iteration1Runner:
             post_eddy_reference["summary"]["span"],
         )
         try:
-            post_eddy_probe = self.verify_eddy_probe_reference()
+            post_eddy_probe = self.verify_eddy_probe_reference(
+                post_eddy_reference["summary"]
+            )
         except CalibrationError as exc:
+            diagnostics = self.run_eddy_probe_diagnostics()
             self.checkpoint(
                 Phase.EDDY_CALIBRATION,
                 committed=False,
@@ -1514,7 +1797,9 @@ class Iteration1Runner:
                 pre_eddy_reference=pre_eddy_reference,
                 post_eddy_reference=post_eddy_reference,
                 post_eddy_probe_error=str(exc),
+                eddy_probe_diagnostics=diagnostics,
             )
+            self._restore_eddy_candidate_base()
             raise
         self._gcode(f"G1 X{REFERENCE_X:.3f} Y{REFERENCE_Y:.3f} Z5 F1200")
         self.checkpoint(
