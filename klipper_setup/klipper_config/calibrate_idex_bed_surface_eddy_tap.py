@@ -98,7 +98,7 @@ CURVE_DOCTOR_SPAN_TOLERANCE = 0.020
 MESH_CENTER_TOLERANCE = 0.005
 MESH_POINT_TOLERANCE = 0.030
 MESH_RMS_TOLERANCE = 0.015
-MESH_STATIONARY_SCAN_HEIGHT = 2.0
+MESH_STATIONARY_SCAN_HEIGHT = 1.0
 MESH_STATIONARY_SCAN_COUNT = 3
 MESH_STATIONARY_SCAN_DURATION = 0.5
 MESH_DIAGNOSTIC_TAP_COUNT = 1
@@ -2473,7 +2473,7 @@ class Iteration1Runner:
         )
         reference = MeshPoint(REFERENCE_X, REFERENCE_Y)
         _logger.info(
-            "mesh METHOD=scan diagnostic: clearing mesh for clean measurements"
+            "mesh METHOD=rapid_scan diagnostic: clearing mesh for clean measurements"
         )
         self._gcode("BED_MESH_CLEAR")
         reference_result: dict[str, Any] = {
@@ -2555,7 +2555,7 @@ class Iteration1Runner:
             if not result["ok"]:
                 failed_points.append(result)
             _logger.info(
-                "mesh METHOD=scan diagnostic point: x=%.3f y=%.3f mesh=%+.6f "
+                "mesh METHOD=rapid_scan diagnostic point: x=%.3f y=%.3f mesh=%+.6f "
                 "tap=%s stationary=%s mesh_minus_stationary=%s "
                 "stationary_minus_tap=%s",
                 point.x,
@@ -2915,14 +2915,14 @@ class Iteration1Runner:
             pending = before.get("configfile", {}).get("save_config_pending_items", {})
             if pending:
                 raise CalibrationError("pending configuration exists before mesh scan")
-        _logger.info("running mesh scan at HORIZONTAL_MOVE_Z=1")
+        _logger.info("running mesh rapid_scan at HORIZONTAL_MOVE_Z=1")
         self._gcode(
-            "BED_MESH_CALIBRATE METHOD=scan PROFILE=default HORIZONTAL_MOVE_Z=1",
+            "BED_MESH_CALIBRATE METHOD=rapid_scan PROFILE=default HORIZONTAL_MOVE_Z=1",
             timeout=900.0,
         )
         if not self.dry_run:
             _logger.info(
-                "saving METHOD=scan mesh profile %s for supervised manual inspection",
+                "saving METHOD=rapid_scan mesh profile %s for supervised manual inspection",
                 MESH_MANUAL_PROFILE,
             )
             self._gcode(f"BED_MESH_PROFILE SAVE={MESH_MANUAL_PROFILE}")
@@ -2951,7 +2951,7 @@ class Iteration1Runner:
                 }
             finally:
                 _logger.info(
-                    "reloading saved METHOD=scan mesh profile %s after clean diagnostics",
+                    "reloading saved METHOD=rapid_scan mesh profile %s after clean diagnostics",
                     MESH_MANUAL_PROFILE,
                 )
                 self._gcode(f"BED_MESH_PROFILE LOAD={MESH_MANUAL_PROFILE}")
@@ -2961,7 +2961,7 @@ class Iteration1Runner:
                 "profile_name"
             ) != MESH_MANUAL_PROFILE or not active_mesh.get("mesh_matrix"):
                 reload_error = (
-                    f"METHOD=scan mesh profile {MESH_MANUAL_PROFILE} did not become active "
+                    f"METHOD=rapid_scan mesh profile {MESH_MANUAL_PROFILE} did not become active "
                     "after reload"
                 )
                 verification["error"] = "; ".join(
@@ -3006,7 +3006,7 @@ class Iteration1Runner:
             rapid_stationary = verification["rapid_mesh_minus_stationary"]
             stationary_tap = verification["stationary_eddy_minus_tap"]
             _logger.info(
-                "I1.7 METHOD=scan diagnostic passed: mesh-vs-Tap max_abs=%.6f "
+                "I1.7 METHOD=rapid_scan diagnostic passed: mesh-vs-Tap max_abs=%.6f "
                 "rms=%.6f; mesh-vs-stationary max_abs=%s; "
                 "stationary-vs-Tap max_abs=%s",
                 rapid_tap["max_abs"],

@@ -884,7 +884,7 @@ configuration provides:
 EDDY_TAP_MEASURE
 EDDY_TAP_MEASURE THRESHOLD=5100
 EDDY_TAP_MEASURE COUNT=3 THRESHOLD=5100
-EDDY_TAP_MEASURE X=150 Y=150 COUNT=1 EDDY_MODE=scan SCAN_COUNT=3 SCAN_HEIGHT=2 XY_SPEED=100
+EDDY_TAP_MEASURE X=150 Y=150 COUNT=1 EDDY_MODE=scan SCAN_COUNT=3 SCAN_HEIGHT=1 XY_SPEED=100
 ```
 
 The default is seven taps and the threshold defaults to the canonical value in
@@ -1253,9 +1253,9 @@ resumed workflow boundaries still begin from the full clean homed frame.
 
 With center tap verified at native Z=0 and regular Eddy aligned to tap:
 
-1. run one full 11x11 scan over the configured domain with
-   `BED_MESH_CALIBRATE METHOD=scan PROFILE=default HORIZONTAL_MOVE_Z=1`;
-2. issue `BED_MESH_PROFILE SAVE=saved_mesh` so the exact `METHOD=scan` mesh remains
+1. run one full 11x11 moving scan over the configured domain with
+   `BED_MESH_CALIBRATE METHOD=rapid_scan PROFILE=default HORIZONTAL_MOVE_Z=1`;
+2. issue `BED_MESH_PROFILE SAVE=saved_mesh` so the exact `METHOD=rapid_scan` mesh remains
    available for supervised manual `BED_MESH_PROFILE LOAD=saved_mesh`
    experiments, without calling `SAVE_CONFIG`;
 3. reject invalid samples, out-of-range sensor values, or mesh range exceeding
@@ -1272,6 +1272,13 @@ cover every scanned point because tap requires both nozzle and offset coil to
 remain over the bed. No deployment or restart occurs between this scan and
 I1.7; verification must use this exact in-memory mesh.
 
+`rapid_scan` is intentionally a moving acquisition: Klipper holds the nozzle
+at `1.0 mm` and timestamps each Eddy frequency sample against the corresponding
+MCU stepper position. The separate I1.7 stationary comparison is also
+Tap-relative `+1.0 mm`, so both tests operate in the low-height region where
+the current frequency curve is most accurate. It remains stationary on purpose
+so any remaining moving-scan error is visible in the recorded residual.
+
 #### I1.7: verify mesh against tap
 
 Derive a 3x3 validation grid inside the intersection of:
@@ -1283,10 +1290,10 @@ Derive a 3x3 validation grid inside the intersection of:
   bed;
 - a conservative edge margin.
 
-The diagnostic snapshots the `METHOD=scan` mesh, clears it, then calls
+The diagnostic snapshots the `METHOD=rapid_scan` mesh, clears it, then calls
 `EDDY_TAP_MEASURE EDDY_MODE=scan` at the reference and each grid point. Each
 point takes one raw Tap and three same-point stationary scans at Tap-relative
-`+2.0 mm`, with 100 mm/s safe XY travel. It records mesh-minus-Tap,
+`+1.0 mm`, with 100 mm/s safe XY travel. It records mesh-minus-Tap,
 stationary-Eddy-minus-Tap, and mesh-minus-stationary residuals with requested
 and returned coordinate evidence. Stationary residuals are report-only for now;
 the mesh-vs-single-Tap gate remains authoritative. It reloads `saved_mesh` even
@@ -1842,7 +1849,7 @@ The eventual startup order for a tap-anchored print should be:
 5. perform repeated validated T0 taps at the fixed anchor;
 6. either verify the static source-controlled datum or establish the optional
    per-print common runtime datum;
-7. run `BED_MESH_CALIBRATE METHOD=scan` under controlled conditions, using that
+7. run `BED_MESH_CALIBRATE METHOD=rapid_scan` under controlled conditions, using that
    anchor as `zero_reference_position`;
 8. permit T0/T1 printing only after datum, mesh, and relative-tool status agree.
 
@@ -2300,7 +2307,7 @@ Actions:
 1. Home once and record post-home raw-step baseline.
 2. At the configured zero-reference bed point, perform the validated same-point
    T0 tap and regular-Eddy comparison from Phase 8.
-3. Scan with `BED_MESH_CALIBRATE METHOD=scan` under recorded conditions.
+3. Scan with `BED_MESH_CALIBRATE METHOD=rapid_scan` under recorded conditions.
 4. Record `BED_MESH_OUTPUT` and verify the configured zero-reference correction
    is zero within interpolation tolerance.
 5. Move T0 to the zero-reference nozzle coordinate at a conservative Z.

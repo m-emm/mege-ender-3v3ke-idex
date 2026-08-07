@@ -73,7 +73,7 @@ gcode:
     {% set y = params.Y|default(printer.configfile.settings["eddy_tap_measure"].reference_y)|float %}
     {% set eddy_mode = params.EDDY_MODE|default("probe") %}
     {% set scan_count = params.SCAN_COUNT|default(3)|int %}
-    {% set scan_height = params.SCAN_HEIGHT|default(2.0)|float %}
+    {% set scan_height = params.SCAN_HEIGHT|default(1.0)|float %}
     {% set duration = params.DURATION|default(0.2)|float %}
     {% set xy_speed = params.XY_SPEED|default(printer.configfile.settings["eddy_tap_measure"].move_speed)|float %}
     _EDDY_TAP_MEASURE X={x} Y={y} THRESHOLD={threshold} COUNT={count} EDDY_MODE={eddy_mode} SCAN_COUNT={scan_count} SCAN_HEIGHT={scan_height} DURATION={duration} XY_SPEED={xy_speed}
@@ -104,7 +104,7 @@ description: Repeat stationary Eddy scans at one physical point; mesh must be cl
 gcode:
     {% set x = params.X|default(printer.configfile.settings["eddy_tap_measure"].reference_x)|float %}
     {% set y = params.Y|default(printer.configfile.settings["eddy_tap_measure"].reference_y)|float %}
-    {% set z = params.Z|default(2.0)|float %}
+    {% set z = params.Z|default(1.0)|float %}
     {% set count = params.COUNT|default(3)|int %}
     {% set duration = params.DURATION|default(0.5)|float %}
     {% set xy_speed = params.XY_SPEED|default(printer.configfile.settings["eddy_tap_measure"].move_speed)|float %}
@@ -120,7 +120,7 @@ calibration_temp: ${eddy_temperature_calibration_temp}
 # Printing mesh measured with the Eddy-equipped T0 toolhead. Tool changes apply
 # the matching BED_MESH_OFFSET so this one physical-bed mesh follows both nozzles.
 speed: 100
-horizontal_move_z: 2
+horizontal_move_z: 1
 mesh_min: 0,20
 mesh_max: 190,275
 probe_count: 11,11

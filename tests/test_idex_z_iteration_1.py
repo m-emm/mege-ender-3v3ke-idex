@@ -1141,7 +1141,7 @@ def test_final_mesh_runs_one_scan_at_final_clearance():
 
     assert scripts == [
         (
-            "BED_MESH_CALIBRATE METHOD=scan PROFILE=default HORIZONTAL_MOVE_Z=1",
+            "BED_MESH_CALIBRATE METHOD=rapid_scan PROFILE=default HORIZONTAL_MOVE_Z=1",
             {"timeout": 900.0},
         )
     ]
