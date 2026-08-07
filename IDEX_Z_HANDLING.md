@@ -1195,23 +1195,29 @@ in the final endstop frame and repeat verification. A remaining spatial or
 thermal dependency aborts Iteration 1; the script must not hide it in an
 offset.
 
-#### I1.7: two-stage full bed scan
+The final mesh verification is a complete survey, not a fail-fast loop. Every
+derived safe-grid point is attempted even when all taps fail at an earlier
+point or a point has excessive tap span. The run records each point's attempts,
+successful samples, mesh correction, and error in `mesh-verification.json`,
+then fails the workflow after the full grid has been surveyed. A failed survey
+therefore leaves the transient mesh and a location-specific report available
+for diagnosis.
+
+#### I1.7: full bed scan
 
 With center tap verified at native Z=0 and regular Eddy aligned to tap:
 
-1. run a safety scan over the configured full 11x11 domain at
-   `HORIZONTAL_MOVE_Z=2`;
+1. run one full 11x11 scan over the configured domain with
+   `BED_MESH_CALIBRATE METHOD=scan PROFILE=default HORIZONTAL_MOVE_Z=1`;
 2. reject invalid samples, out-of-range sensor values, or mesh range exceeding
    the configured safe limit;
-3. if safe, run the final precision scan with
-   `BED_MESH_CALIBRATE METHOD=scan PROFILE=default HORIZONTAL_MOVE_Z=1`;
-4. verify the generated mesh evaluates to zero at `(150,150)` within 0.005 mm;
-5. retain the matrix, mesh parameters, temperatures, and command transcript in
+3. verify the generated mesh evaluates to zero at `(150,150)` within 0.005 mm;
+4. retain the matrix, mesh parameters, temperatures, and command transcript in
    the run artifact directory as evidence only;
-6. verify that the new mesh is active in memory and that the only
+5. verify that the new mesh is active in memory and that the only
    `save_config_pending_items` entry is the transient `[bed_mesh default]` data
    created by Klipper;
-7. verify that `calib.yaml`, `printer.cfg.template`, and generated `printer.cfg`
+6. verify that `calib.yaml`, `printer.cfg.template`, and generated `printer.cfg`
    contain no measured mesh profile or point matrix.
 
 The full scan covers the configured bed-mesh domain. Tap verification cannot

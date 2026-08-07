@@ -145,13 +145,13 @@ def test_eddy_reference_gate_requires_zero_and_repeatable_three_tap_center():
 
     with pytest.raises(module.CalibrationError, match="native Z=0"):
         module.Iteration1Runner.require_center_tap(
-            module.summarize_taps([0.021, 0.021, 0.021]),
+            module.summarize_taps([0.06, 0.06, 0.06]),
             count=module.EDDY_REFERENCE_TAP_COUNT,
         )
 
     with pytest.raises(module.CalibrationError, match="repeatable"):
         module.Iteration1Runner.require_center_tap(
-            module.summarize_taps([-0.016, 0.0, 0.016]),
+            module.summarize_taps([-0.025, 0.0, 0.025]),
             count=module.EDDY_REFERENCE_TAP_COUNT,
         )
 
@@ -349,6 +349,73 @@ def test_mesh_interpolation_and_tap_acceptance_use_inverse_correction():
         {point: 0.15},
     )
     assert result["max_abs"] <= 0.001
+
+
+def test_mesh_verification_attempts_all_points_before_failing(tmp_path):
+    module = _load_module()
+
+    class Store:
+        def __init__(self):
+            self.writes = {}
+
+        def write_json(self, name, value):
+            self.writes[name] = value
+
+    runner = object.__new__(module.Iteration1Runner)
+    runner.raw_calibration = {
+        "eddy_relative_calibration": {
+            "nozzle_to_coil": {"x": -57.391, "y": -18.997, "z": 1.399}
+        }
+    }
+    runner.tap_threshold = 6500
+    runner.store = Store()
+    attempted = []
+
+    def collect_taps(**kwargs):
+        point = (kwargs["x"], kwargs["y"])
+        attempted.append(point)
+        if len(attempted) == 1:
+            return None, [{"attempt": 1, "ok": False, "error": "not enough lift"}]
+        summary = module.summarize_taps([0.0, 0.0, 0.0], attempts=3)
+        return summary, [{"attempt": index, "ok": True, "z": 0.0} for index in range(1, 4)]
+
+    runner.collect_taps = collect_taps
+    mesh = {
+        "mesh_matrix": [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
+        "mesh_min": [0.0, 20.0],
+        "mesh_max": [190.0, 275.0],
+    }
+
+    with pytest.raises(module.CalibrationError, match="surveyed all 9 points"):
+        runner.verify_mesh_against_tap(mesh)
+
+    assert len(attempted) == 9
+    report = runner.store.writes["mesh-verification.json"]
+    assert report["attempted_points"] == 9
+    assert report["successful_points"] == 8
+    assert len(report["failed_points"]) == 1
+
+
+def test_final_mesh_runs_one_scan_at_final_clearance():
+    module = _load_module()
+
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = True
+    scripts = []
+    checkpoints = []
+    runner._home_clean_frame = lambda: None
+    runner._gcode = lambda script, **kwargs: scripts.append((script, kwargs))
+    runner.checkpoint = lambda *args, **kwargs: checkpoints.append((args, kwargs))
+
+    runner.final_mesh()
+
+    assert scripts == [
+        (
+            "BED_MESH_CALIBRATE METHOD=scan PROFILE=default HORIZONTAL_MOVE_Z=1",
+            {"timeout": 900.0},
+        )
+    ]
+    assert checkpoints == [((module.Phase.MESH_SCAN,), {"committed": False})]
 
 
 def test_dry_run_does_not_send_gcode_or_write_artifacts(tmp_path, monkeypatch):

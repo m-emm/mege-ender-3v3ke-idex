@@ -697,7 +697,7 @@ microsteps: 16
 rotation_distance: 8
 endstop_pin: ^!gpio22
 position_endstop: ${t0_z_endstop}
-position_min: -1.000
+position_min: -2.200
 position_max: ${t0_z_endstop}
 homing_positive_dir: true
 homing_speed: 20

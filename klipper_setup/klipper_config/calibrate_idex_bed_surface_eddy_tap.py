@@ -1102,7 +1102,8 @@ class Iteration1Runner:
         count: int,
         max_attempts: int,
         tap_threshold: int,
-    ) -> tuple[TapSummary, list[dict[str, Any]]]:
+        allow_empty: bool = False,
+    ) -> tuple[TapSummary | None, list[dict[str, Any]]]:
         _logger.info(
             "tap series started: point=(%.3f, %.3f) target=%d max_attempts=%d "
             "threshold=%d",
@@ -1167,6 +1168,15 @@ class Iteration1Runner:
                 )
                 if not self.dry_run and attempt + 1 >= max_attempts:
                     break
+        if not samples and allow_empty:
+            _logger.warning(
+                "tap series finished without a successful sample: point=(%.3f, %.3f) "
+                "rejected=%d",
+                x,
+                y,
+                len(attempts),
+            )
+            return None, attempts
         summary = summarize_taps(samples, attempts=len(attempts))
         _logger.info(
             "tap series finished: successful=%d rejected=%d mean=%.6f "
@@ -1837,26 +1847,124 @@ class Iteration1Runner:
         )
         tap_samples: dict[MeshPoint, tuple[float, ...]] = {}
         corrections: dict[MeshPoint, float] = {}
+        point_results: list[dict[str, Any]] = []
+        failed_points: list[dict[str, Any]] = []
         for point in grid:
+            _logger.info(
+                "mesh verification point started: x=%.3f y=%.3f",
+                point.x,
+                point.y,
+            )
             summary, attempts = self.collect_taps(
                 x=point.x,
                 y=point.y,
                 count=3,
                 max_attempts=3,
                 tap_threshold=self.tap_threshold,
+                allow_empty=True,
             )
-            if summary.rejected_attempts:
-                raise CalibrationError(
-                    f"final mesh tap rejected at {point}: {attempts}"
+            result: dict[str, Any] = {
+                "point": {"x": point.x, "y": point.y},
+                "attempts": attempts,
+                "ok": False,
+            }
+            if summary is None:
+                result["error"] = "no successful tap samples"
+                failed_points.append(result)
+                point_results.append(result)
+                _logger.warning(
+                    "mesh verification point failed: x=%.3f y=%.3f "
+                    "no successful tap samples; continuing",
+                    point.x,
+                    point.y,
                 )
+                continue
+            result["summary"] = asdict(summary)
+            result["samples"] = list(summary.successful)
+            if summary.rejected_attempts or summary.span > 0.020:
+                result["error"] = (
+                    "tap repeatability failed: "
+                    f"rejected={summary.rejected_attempts}, span={summary.span:.6f}"
+                )
+                failed_points.append(result)
+                point_results.append(result)
+                _logger.warning(
+                    "mesh verification point failed: x=%.3f y=%.3f %s; continuing",
+                    point.x,
+                    point.y,
+                    result["error"],
+                )
+                continue
+            try:
+                correction = mesh_correction_at(
+                    matrix,
+                    mesh_min=mesh_min,
+                    mesh_max=mesh_max,
+                    point=point,
+                )
+            except Exception as exc:
+                result["error"] = str(exc)
+                failed_points.append(result)
+                point_results.append(result)
+                _logger.warning(
+                    "mesh verification point failed: x=%.3f y=%.3f %s; continuing",
+                    point.x,
+                    point.y,
+                    exc,
+                )
+                continue
+            result["mesh_correction"] = correction
+            result["ok"] = True
             tap_samples[point] = summary.successful
-            corrections[point] = mesh_correction_at(
-                matrix,
-                mesh_min=mesh_min,
-                mesh_max=mesh_max,
-                point=point,
+            corrections[point] = correction
+            point_results.append(result)
+            _logger.info(
+                "mesh verification point passed acquisition: x=%.3f y=%.3f "
+                "mean=%.6f span=%.6f correction=%.6f",
+                point.x,
+                point.y,
+                summary.mean,
+                summary.span,
+                correction,
             )
-        return mesh_tap_acceptance(tap_samples, corrections)
+        verification: dict[str, Any]
+        global_error: str | None = None
+        try:
+            verification = mesh_tap_acceptance(tap_samples, corrections)
+        except CalibrationError as exc:
+            global_error = str(exc)
+            verification = {
+                "points": {},
+                "rms": None,
+                "max_abs": None,
+            }
+        verification.update(
+            {
+                "point_results": point_results,
+                "failed_points": failed_points,
+                "attempted_points": len(grid),
+                "successful_points": len(tap_samples),
+            }
+        )
+        if global_error is not None:
+            verification["error"] = global_error
+        self.store.write_json("mesh-verification.json", verification)
+        if failed_points:
+            failed_labels = ", ".join(
+                f"({item['point']['x']:.3f},{item['point']['y']:.3f})"
+                for item in failed_points
+            )
+            raise CalibrationError(
+                "mesh verification surveyed all "
+                f"{len(grid)} points but failed at {len(failed_points)}: "
+                f"{failed_labels}"
+            )
+        if global_error is not None:
+            raise CalibrationError(
+                "mesh verification surveyed all points but failed its global gate: "
+                f"{global_error}"
+            )
+        return verification
 
     def final_mesh(self) -> None:
         _logger.info("I1.7/I1.8 final transient mesh scan started")
@@ -1866,11 +1974,7 @@ class Iteration1Runner:
             pending = before.get("configfile", {}).get("save_config_pending_items", {})
             if pending:
                 raise CalibrationError("pending configuration exists before mesh scan")
-        self._gcode(
-            "BED_MESH_CALIBRATE METHOD=scan PROFILE=default HORIZONTAL_MOVE_Z=2",
-            timeout=900.0,
-        )
-        _logger.info("first mesh scan finished; repeating at HORIZONTAL_MOVE_Z=1")
+        _logger.info("running mesh scan at HORIZONTAL_MOVE_Z=1")
         self._gcode(
             "BED_MESH_CALIBRATE METHOD=scan PROFILE=default HORIZONTAL_MOVE_Z=1",
             timeout=900.0,
@@ -1896,10 +2000,10 @@ class Iteration1Runner:
                 Phase.MESH_VERIFY, committed=True, mesh_verification=verification
             )
             _logger.info(
-                "I1.8 mesh verification passed: max_abs=%.6f rms=%.6f center=%.6f",
+                "I1.8 mesh verification passed: max_abs=%.6f rms=%.6f center=%s",
                 verification["max_abs"],
                 verification["rms"],
-                verification["center_corrected"],
+                verification.get("center_corrected", "not sampled"),
             )
         _logger.info("I1.7/I1.8 final transient mesh scan finished")
 
