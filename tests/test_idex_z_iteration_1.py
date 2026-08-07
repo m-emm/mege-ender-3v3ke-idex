@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -247,6 +248,8 @@ def test_curve_doctor_remaps_dense_curve_through_tap_anchored_frequencies():
     candidate, derived = module.doctor_eddy_curve(source, anchors)
     candidate_pairs = module.parse_eddy_curve(candidate)
 
+    assert all(line.endswith(",") for line in candidate.splitlines()[:-1])
+    assert all(":" in pair for pair in candidate.replace("\n", "").split(",") if pair)
     assert len(candidate_pairs) >= len(source_pairs)
     for anchor in derived:
         assert module.eddy_curve_height_at_frequency(
@@ -311,6 +314,140 @@ def test_curve_doctor_raw_batches_use_tap_relative_commanded_z():
     assert scripts == ["EDDY_RAW_MEASURE X=150.000 Y=150.000 Z=0.493000 DURATION=0.500"]
     assert raw["target_height"] == pytest.approx(0.5)
     assert raw["commanded_z"] == pytest.approx(0.493)
+
+
+def test_curve_doctor_collects_all_anchors_in_one_upward_sweep():
+    module = _load_module()
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = False
+    calls = []
+    runner._gcode = calls.append
+
+    def collect(**kwargs):
+        calls.append(kwargs)
+        return {"raw_frequency_hz": 3_200_000.0}
+
+    runner._collect_curve_doctor_raw_batch = collect
+    anchors = runner._collect_curve_doctor_anchors(0.0, _linear_eddy_curve())
+
+    batch_calls = [call for call in calls if isinstance(call, dict)]
+    assert [call["target_height"] for call in batch_calls] == [
+        0.5,
+        0.5,
+        0.5,
+        1.0,
+        1.0,
+        1.0,
+        2.0,
+        2.0,
+        2.0,
+        3.0,
+        3.0,
+        3.0,
+        4.0,
+        4.0,
+        4.0,
+    ]
+    assert batch_calls[0]["safe_travel"] is True
+    assert batch_calls[0]["lift_after"] is False
+    assert batch_calls[0]["approach_z"] == pytest.approx(0.1)
+    assert all(call["safe_travel"] is False for call in batch_calls[1:])
+    assert all(call["lift_after"] is False for call in batch_calls[1:])
+    assert all(call["approach_z"] is None for call in batch_calls[1:])
+    assert calls[-1] == "G90\nG1 Z5 F1200"
+    assert len(anchors) == 5
+
+
+def test_gcode_logs_and_persists_new_klipper_responses(tmp_path, caplog):
+    module = _load_module()
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = False
+    runner.store = module.ArtifactStore(tmp_path, "gcode-responses")
+
+    class Client:
+        def __init__(self):
+            self.entries = [
+                {"time": 1.0, "type": "response", "message": "// old response"}
+            ]
+
+        def gcode_store(self, *, count=100):
+            assert count == 100
+            return list(self.entries)
+
+        def gcode(self, script, *, timeout=60.0):
+            assert script == "EDDY_RAW_MEASURE X=150 Y=150 Z=1"
+            assert timeout == 60.0
+            self.entries.extend(
+                [
+                    {"time": 2.0, "type": "command", "message": script},
+                    {
+                        "time": 3.0,
+                        "type": "response",
+                        "message": "// EDDY_RAW_MEASURE: implied_bed_z=0.001",
+                    },
+                ]
+            )
+            return "ok"
+
+    runner.client = Client()
+
+    with caplog.at_level("INFO"):
+        runner._gcode("EDDY_RAW_MEASURE X=150 Y=150 Z=1")
+
+    assert "G-code response: // EDDY_RAW_MEASURE: implied_bed_z=0.001" in caplog.text
+    artifact = next((tmp_path / "gcode-responses").glob("command-*.json"))
+    assert json.loads(artifact.read_text())["gcode_responses"] == [
+        "// EDDY_RAW_MEASURE: implied_bed_z=0.001"
+    ]
+
+
+def test_compact_curve_doctor_summary_omits_full_raw_evidence(caplog, tmp_path):
+    module = _load_module()
+    state = module.RunState(
+        run_id="curve-doctor-summary",
+        phase="I1.5D",
+        committed_phase="I1.5D",
+        evidence={
+            "curve_doctor": {
+                "rollback": False,
+                "pre_reference": {"median_tap_z": -0.004},
+                "post_reference": {"median_tap_z": -0.005},
+                "anchors": [
+                    {
+                        "target_height": 0.5,
+                        "raw_frequency_hz": 3_216_000.0,
+                        "batch_frequency_span_hz": 80.0,
+                        "batches": [{"large": "raw evidence stays on disk"}],
+                    }
+                ],
+                "validation": {
+                    "span": 0.002,
+                    "results": [{"residual": -0.006, "raw": {"large": "detail"}}],
+                },
+            }
+        },
+    )
+
+    summary = module._compact_run_summary(state)
+    with caplog.at_level("INFO"):
+        module._log_run_summary(state, tmp_path)
+
+    assert summary["curve_doctor"] == {
+        "retained": True,
+        "pre_tap_median": -0.004,
+        "post_tap_median": -0.005,
+        "anchor_frequencies_hz": [
+            {"height": 0.5, "frequency": 3_216_000.0, "batch_span_hz": 80.0}
+        ],
+        "validation_residuals": [-0.006],
+        "validation_span": 0.002,
+    }
+    assert "curve-doctor summary: retained=True" in caplog.text
+    assert (
+        "curve-doctor anchors: z=0.500000 f=3216000.000Hz batch_span=80.000Hz"
+        in caplog.text
+    )
+    assert "raw evidence stays on disk" not in caplog.text
 
 
 def test_curve_doctor_validation_uses_post_tap_datum_and_shape_gate():
@@ -608,6 +745,9 @@ def test_pending_config_supports_mapping_and_record_shapes():
     module.require_only_transient_mesh_pending(
         {"bed_mesh default": {"mesh_matrix": []}}
     )
+    module.require_only_transient_mesh_pending(
+        {f"bed_mesh {module.MESH_MANUAL_PROFILE}": {"mesh_matrix": []}}
+    )
     with pytest.raises(module.CalibrationError, match="unexpected pending"):
         module.require_only_transient_mesh_pending(
             {"bed_mesh default": {}, "stepper_z": {"position_endstop": 1}}
@@ -699,6 +839,41 @@ def _flat_mesh():
         "mesh_min": [0.0, 20.0],
         "mesh_max": [190.0, 275.0],
     }
+
+
+def test_same_point_mesh_measurement_uses_one_tap_three_scans_and_fast_xy():
+    module = _load_module()
+    runner = _mesh_verification_runner(module)
+    commands = []
+    runner._gcode = lambda script, **kwargs: commands.append((script, kwargs))
+    point = module.MeshPoint(123.696, 156.998)
+    runner.client = type(
+        "Client",
+        (),
+        {
+            "status": lambda _self, objects: {
+                "eddy_tap_measure": {
+                    "last_tap_measurement": {
+                        "bed_x": point.x,
+                        "bed_y": point.y,
+                        "tap": {"count": 1},
+                        "stationary_scan": {"count": 3},
+                    }
+                }
+            }
+        },
+    )()
+
+    captured = runner._capture_same_point_mesh_measurement(point=point)
+
+    assert captured["bed_x"] == pytest.approx(point.x)
+    assert len(commands) == 1
+    command = commands[0][0]
+    assert "EDDY_TAP_MEASURE" in command
+    assert "COUNT=1" in command
+    assert "EDDY_MODE=scan" in command
+    assert "SCAN_COUNT=3" in command
+    assert "XY_SPEED=100.000" in command
 
 
 def test_mesh_reference_failure_still_attempts_all_grid_points():
@@ -804,6 +979,150 @@ def test_mesh_reference_failure_records_correction_and_corrected_mean(
     assert expected_error in report["reference"]["error"]
     assert "mesh_correction" in report["reference"]
     assert "mesh_corrected_mean" in report["reference"]
+
+
+def test_clean_mesh_diagnostic_surveys_all_points_and_reports_stationary_residuals():
+    module = _load_module()
+    runner = _mesh_verification_runner(module)
+    runner._gcode = lambda *_args, **_kwargs: None
+    attempts = []
+
+    def same_point_measurement(**kwargs):
+        point = kwargs["point"]
+        attempts.append((point.x, point.y))
+        return {
+            "eddy_mode": "scan",
+            "bed_x": point.x,
+            "bed_y": point.y,
+            "tap": {
+                "count": 1,
+                "samples": [{"x": point.x, "y": point.y, "z": 0.0}],
+                "mean": 0.0,
+                "median": 0.0,
+                "span": 0.0,
+                "standard_deviation": 0.0,
+            },
+            "stationary_scan": {
+                "bed_x": point.x,
+                "bed_y": point.y,
+                "count": 3,
+                "scan_bed_z_median": 0.01,
+                "scan_bed_z_span": 0.001,
+            },
+        }
+
+    runner._capture_same_point_mesh_measurement = same_point_measurement
+    snapshot = {
+        "mesh_min": [0.0, 20.0],
+        "mesh_max": [190.0, 275.0],
+        "mesh_matrix": [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
+    }
+
+    report = runner.diagnose_mesh_against_tap(snapshot)
+
+    assert attempts[0] == (module.REFERENCE_X, module.REFERENCE_Y)
+    assert len(attempts) == 10
+    assert report["error"] is None
+    assert report["attempted_points"] == 9
+    assert report["successful_tap_points"] == 9
+    assert report["rapid_mesh_vs_tap"]["max_abs"] == pytest.approx(0.0)
+    assert report["rapid_mesh_minus_stationary"]["median"] == pytest.approx(-0.01)
+    assert report["stationary_eddy_minus_tap"]["median"] == pytest.approx(0.01)
+    assert report["rapid_mesh_minus_tap"]["max_abs"] == pytest.approx(0.0)
+
+
+def test_active_mesh_raw_tap_check_uses_clean_raw_contact():
+    module = _load_module()
+    runner = _mesh_verification_runner(module)
+    selected = []
+
+    def collect_taps(**kwargs):
+        selected.append((kwargs["x"], kwargs["y"]))
+        summary = module.summarize_taps([0.0], attempts=1)
+        return summary, [{"attempt": 1, "ok": True, "z": 0.0}]
+
+    runner.collect_taps = collect_taps
+    report = runner.verify_active_mesh_transform(
+        {
+            "point_results": [
+                {
+                    "point": {"x": 62.0, "y": 44.0},
+                    "mesh_correction": 0.2,
+                    "tap_summary": {"mean": 0.0},
+                }
+            ]
+        }
+    )
+
+    assert selected == [(62.0, 44.0)]
+    assert report["expected_raw_tap"] == pytest.approx(0.0)
+    assert report["delta_active_minus_clean_raw"] == pytest.approx(0.0)
+    assert report["ok"] is True
+
+
+def test_final_mesh_reloads_rapid_profile_even_when_diagnostic_fails():
+    module = _load_module()
+
+    class Store:
+        def __init__(self):
+            self.writes = {}
+
+        def write_json(self, name, value):
+            self.writes[name] = value
+
+    class Client:
+        def status(self, objects):
+            if objects == ["configfile"]:
+                return {"configfile": {"save_config_pending_items": {}}}
+            if objects == ["bed_mesh", "configfile"]:
+                return {
+                    "bed_mesh": {
+                        "profile_name": module.MESH_MANUAL_PROFILE,
+                        "mesh_matrix": [[0.0, 0.0], [0.0, 0.0]],
+                        "probed_matrix": [[0.0, 0.0], [0.0, 0.0]],
+                        "mesh_min": [0.0, 20.0],
+                        "mesh_max": [190.0, 275.0],
+                    },
+                    "configfile": {"save_config_pending_items": {}},
+                }
+            if objects == ["bed_mesh"]:
+                return {
+                    "bed_mesh": {
+                        "profile_name": module.MESH_MANUAL_PROFILE,
+                        "mesh_matrix": [[0.0]],
+                    }
+                }
+            raise AssertionError(objects)
+
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = False
+    runner.client = Client()
+    runner.store = Store()
+    runner._home_clean_frame = lambda: None
+    commands = []
+    runner._gcode = lambda script, **kwargs: commands.append((script, kwargs))
+    runner._mesh_snapshot = lambda mesh: {"mesh_matrix": mesh["mesh_matrix"]}
+    runner.diagnose_mesh_against_tap = lambda snapshot: {
+        "error": "rapid-mesh-vs-Tap gate failed",
+        "point_results": [],
+    }
+    runner.verify_active_mesh_transform = lambda verification: {"ok": True}
+
+    with pytest.raises(module.CalibrationError, match="rapid-mesh-vs-Tap gate failed"):
+        runner.final_mesh()
+
+    assert any(
+        command[0] == f"BED_MESH_PROFILE SAVE={module.MESH_MANUAL_PROFILE}"
+        for command in commands
+    )
+    assert any(
+        command[0] == f"BED_MESH_PROFILE LOAD={module.MESH_MANUAL_PROFILE}"
+        for command in commands
+    )
+    assert runner.store.writes["mesh-verification.json"]["rapid_mesh_profile"] == (
+        module.MESH_MANUAL_PROFILE
+    )
+    assert runner.store.writes["mesh-verification.json"]["rapid_mesh_reloaded"] is True
 
 
 def test_final_mesh_runs_one_scan_at_final_clearance():

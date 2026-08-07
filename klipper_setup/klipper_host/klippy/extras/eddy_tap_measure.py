@@ -8,6 +8,7 @@ import statistics
 
 COMPARISON_XY_TOLERANCE = 0.020
 DEFAULT_RAW_DURATION = 0.200
+ASCENT_APPROACH_CLEARANCE = 0.100
 
 
 class RawEddySamples:
@@ -44,9 +45,11 @@ class EddyTapMeasure:
         probe_config = config.getsection("probe_eddy_current btt_eddy")
         self.tap_threshold = probe_config.getfloat("tap_threshold", 0.0, minval=0.0)
         self.default_count = config.getint("default_count", 7, minval=1)
-        self.default_scan_nozzle_zs = config.get("scan_nozzle_zs", "3,2,1,0.5")
+        self.default_scan_nozzle_zs = config.get("scan_nozzle_zs", "0.5,1,2,3")
         self.last_raw_measurement = None
         self.last_scan_height_test = None
+        self.last_stationary_scan_measurement = None
+        self.last_tap_measurement = None
         self.gcode.register_command(
             "_EDDY_TAP_MEASURE",
             self.cmd_EDDY_TAP_MEASURE,
@@ -62,6 +65,11 @@ class EddyTapMeasure:
             self.cmd_EDDY_SCAN_HEIGHT_TEST,
             desc="Verify stationary Eddy scan conversion across nozzle heights.",
         )
+        self.gcode.register_command(
+            "_EDDY_STATIONARY_SCAN_MEASURE",
+            self.cmd_EDDY_STATIONARY_SCAN_MEASURE,
+            desc="Repeat stationary Eddy scans at one physical bed point.",
+        )
 
     def get_status(self, eventtime):
         return {
@@ -72,6 +80,8 @@ class EddyTapMeasure:
             "default_scan_nozzle_zs": self.default_scan_nozzle_zs,
             "last_raw_measurement": self.last_raw_measurement,
             "last_scan_height_test": self.last_scan_height_test,
+            "last_stationary_scan_measurement": self.last_stationary_scan_measurement,
+            "last_tap_measurement": self.last_tap_measurement,
         }
 
     def _require_homed(self, command_name):
@@ -117,14 +127,17 @@ class EddyTapMeasure:
         self._require_t0_and_clear_mesh(command_name)
         return toolhead
 
-    def _move_to_reference(self, toolhead, x, y):
+    def _move_to_reference(self, toolhead, x, y, xy_speed=None):
+        if xy_speed is None:
+            xy_speed = self.move_speed
         self.gcode.run_script_from_command(
-            "G90\nG1 X%.3f Y%.3f Z%.3f F%.0f"
+            "G90\nG1 Z%.3f F%.0f\nG1 X%.3f Y%.3f F%.0f"
             % (
-                x,
-                y,
                 self.move_z,
                 self.move_speed * 60.0,
+                x,
+                y,
+                xy_speed * 60.0,
             )
         )
         toolhead.wait_moves()
@@ -159,7 +172,9 @@ class EddyTapMeasure:
             return None, (nozzle_x, nozzle_y), bounds
         return (nozzle_x, nozzle_y), (nozzle_x, nozzle_y), bounds
 
-    def _move_to_coil_target(self, toolhead, nozzle_x, nozzle_y):
+    def _move_to_coil_target(self, toolhead, nozzle_x, nozzle_y, xy_speed=None):
+        if xy_speed is None:
+            xy_speed = self.move_speed
         self.gcode.run_script_from_command(
             "G90\nG1 Z%.3f F%.0f\nG1 X%.3f Y%.3f F%.0f"
             % (
@@ -167,26 +182,26 @@ class EddyTapMeasure:
                 self.move_speed * 60.0,
                 nozzle_x,
                 nozzle_y,
-                self.move_speed * 60.0,
+                xy_speed * 60.0,
             )
         )
         toolhead.wait_moves()
 
-    def _move_to_scan_target(self, toolhead, nozzle_x, nozzle_y, nozzle_z):
+    def _move_z(self, toolhead, nozzle_z):
         self.gcode.run_script_from_command(
-            "G90\nG1 Z%.3f F%.0f\nG1 X%.3f Y%.3f F%.0f\n"
-            "G1 Z%.3f F%.0f"
-            % (
-                self.move_z,
-                self.move_speed * 60.0,
-                nozzle_x,
-                nozzle_y,
-                self.move_speed * 60.0,
-                nozzle_z,
-                self.move_speed * 60.0,
-            )
+            "G90\nG1 Z%.3f F%.0f" % (nozzle_z, self.move_speed * 60.0)
         )
         toolhead.wait_moves()
+
+    @staticmethod
+    def _optional_float(gcmd, name):
+        value = gcmd.get(name, None)
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError) as exc:
+            raise gcmd.error("%s must be a number" % name) from exc
 
     def _require_nozzle_z_in_limits(self, toolhead, nozzle_z, command_name):
         status = toolhead.get_status(self.printer.get_reactor().monotonic())
@@ -309,7 +324,6 @@ class EddyTapMeasure:
         nozzle_z,
         duration,
     ):
-        self._move_to_scan_target(toolhead, nozzle_x, nozzle_y, nozzle_z)
         eddy_sensor = self._eddy_sensor()
         collector = RawEddySamples()
         eddy_sensor.add_client(collector)
@@ -378,17 +392,121 @@ class EddyTapMeasure:
         finally:
             probe_session.end_probe_session()
 
+    def _stationary_scan_measurement(
+        self,
+        gcmd,
+        toolhead,
+        bed_x,
+        bed_y,
+        nozzle_x,
+        nozzle_y,
+        nozzle_z,
+        count,
+        duration,
+        xy_speed,
+        label,
+    ):
+        approach_z = nozzle_z - ASCENT_APPROACH_CLEARANCE
+        self._require_nozzle_z_in_limits(toolhead, nozzle_z, label)
+        self._require_nozzle_z_in_limits(toolhead, approach_z, label)
+        results = []
+        try:
+            self._move_to_coil_target(toolhead, nozzle_x, nozzle_y, xy_speed)
+            self._move_z(toolhead, approach_z)
+            self._move_z(toolhead, nozzle_z)
+            for sample_index in range(count):
+                result = self._scan_at_height(
+                    gcmd,
+                    toolhead,
+                    bed_x,
+                    bed_y,
+                    nozzle_x,
+                    nozzle_y,
+                    nozzle_z,
+                    duration,
+                )
+                results.append(result)
+                gcmd.respond_info(
+                    "%s sample %d/%d: scan_bed_z=%.6f raw_frequency_hz=%.3f "
+                    "implied_bed_z=%.6f temperature=%s"
+                    % (
+                        label,
+                        sample_index + 1,
+                        count,
+                        result["scan_bed_z"],
+                        result["raw_frequency_hz"],
+                        result["implied_bed_z"],
+                        (
+                            "unknown"
+                            if result["temperature"] is None
+                            else "%.3f" % result["temperature"]
+                        ),
+                    )
+                )
+        finally:
+            self._lift_to_safe_z(toolhead)
+        scan_values = [result["scan_bed_z"] for result in results]
+        raw_frequencies = [result["raw_frequency_hz"] for result in results]
+        temperatures = [result["temperature"] for result in results]
+        known_temperatures = [value for value in temperatures if value is not None]
+        measurement = {
+            "bed_x": bed_x,
+            "bed_y": bed_y,
+            "nozzle_x": nozzle_x,
+            "nozzle_y": nozzle_y,
+            "requested_nozzle_z": nozzle_z,
+            "count": count,
+            "duration": duration,
+            "results": results,
+            "scan_bed_z_median": statistics.median(scan_values),
+            "scan_bed_z_span": max(scan_values) - min(scan_values),
+            "raw_frequency_hz_median": statistics.median(raw_frequencies),
+            "raw_frequency_hz_span": max(raw_frequencies) - min(raw_frequencies),
+            "temperature_span": (
+                None
+                if not known_temperatures
+                else max(known_temperatures) - min(known_temperatures)
+            ),
+        }
+        gcmd.respond_info(
+            "%s summary: bed=(%.3f, %.3f) nozzle=(%.3f, %.3f) "
+            "scan_bed_z_median=%.6f scan_bed_z_span=%.6f "
+            "raw_frequency_hz_median=%.3f raw_frequency_hz_span=%.3f"
+            % (
+                label,
+                bed_x,
+                bed_y,
+                nozzle_x,
+                nozzle_y,
+                measurement["scan_bed_z_median"],
+                measurement["scan_bed_z_span"],
+                measurement["raw_frequency_hz_median"],
+                measurement["raw_frequency_hz_span"],
+            )
+        )
+        return measurement
+
     def cmd_EDDY_TAP_MEASURE(self, gcmd):
-        toolhead = self._require_homed("EDDY_TAP_MEASURE")
+        command_name = "EDDY_TAP_MEASURE"
+        toolhead = self._require_homed(command_name)
         x = gcmd.get_float("X", self.reference_x)
         y = gcmd.get_float("Y", self.reference_y)
         threshold = gcmd.get_float("THRESHOLD", self.tap_threshold, above=0.0)
         count = gcmd.get_int("COUNT", self.default_count, minval=1, maxval=100)
+        eddy_mode = gcmd.get("EDDY_MODE", "probe").lower()
+        if eddy_mode not in ("probe", "scan"):
+            raise gcmd.error("EDDY_MODE must be probe or scan")
+        xy_speed = gcmd.get_float("XY_SPEED", self.move_speed, above=0.0)
+        scan_count = gcmd.get_int("SCAN_COUNT", 3, minval=1, maxval=20)
+        scan_height = gcmd.get_float("SCAN_HEIGHT", 2.0, above=0.0)
+        duration = gcmd.get_float("DURATION", DEFAULT_RAW_DURATION, above=0.0)
+        if eddy_mode == "scan":
+            self._require_t0_and_clear_mesh(command_name)
 
-        self._move_to_reference(toolhead, x, y)
+        self._move_to_reference(toolhead, x, y, xy_speed)
         gcmd.respond_info(
-            "EDDY_TAP_MEASURE: reference=(%.3f, %.3f), taps=%d, threshold=%.3f"
-            % (x, y, count, threshold)
+            "EDDY_TAP_MEASURE: reference=(%.3f, %.3f), taps=%d, threshold=%.3f "
+            "eddy_mode=%s xy_speed=%.3f" % (x, y, count, threshold, eddy_mode, xy_speed)
         )
 
         params = dict(gcmd.get_command_parameters())
@@ -405,6 +523,7 @@ class EddyTapMeasure:
         probe = self.printer.lookup_object("probe")
         probe_session = probe.start_probe_session(probe_gcmd)
         results = []
+        tap_samples = []
         try:
             for index in range(count):
                 probe_session.run_probe(probe_gcmd)
@@ -415,9 +534,28 @@ class EddyTapMeasure:
                     )
                 result = sample[0]
                 results.append(float(result.bed_z))
+                tap_x = float(result.bed_x)
+                tap_y = float(result.bed_y)
+                if (
+                    abs(tap_x - x) > COMPARISON_XY_TOLERANCE
+                    or abs(tap_y - y) > COMPARISON_XY_TOLERANCE
+                ):
+                    raise gcmd.error(
+                        "EDDY_TAP_MEASURE Tap physical point mismatch: "
+                        "expected=(%.3f, %.3f), got=(%.3f, %.3f)" % (x, y, tap_x, tap_y)
+                    )
+                tap_samples.append({"x": tap_x, "y": tap_y, "z": float(result.bed_z)})
                 gcmd.respond_info(
-                    "EDDY_TAP_MEASURE tap %d/%d: contact_z=%.6f post_retract_z=%.6f"
-                    % (index + 1, count, result.bed_z, toolhead.get_position()[2])
+                    "EDDY_TAP_MEASURE tap %d/%d: contact=(%.3f, %.3f, %.6f) "
+                    "post_retract_z=%.6f"
+                    % (
+                        index + 1,
+                        count,
+                        tap_x,
+                        tap_y,
+                        result.bed_z,
+                        toolhead.get_position()[2],
+                    )
                 )
         finally:
             probe_session.end_probe_session()
@@ -433,6 +571,25 @@ class EddyTapMeasure:
             "min=%.6f max=%.6f span=%.6f stddev=%.6f"
             % (mean, median, minimum, maximum, span, standard_deviation)
         )
+
+        measurement = {
+            "eddy_mode": eddy_mode,
+            "bed_x": x,
+            "bed_y": y,
+            "xy_speed": xy_speed,
+            "tap": {
+                "count": count,
+                "samples": tap_samples,
+                "mean": mean,
+                "median": median,
+                "span": span,
+                "standard_deviation": standard_deviation,
+            },
+            "tap_coordinate_deltas": [
+                {"x": sample["x"] - x, "y": sample["y"] - y} for sample in tap_samples
+            ],
+        }
+        self.last_tap_measurement = measurement
 
         probe = self.printer.lookup_object("probe")
         coil_pose, requested_pose, bounds = self._coil_over_target_pose(
@@ -451,10 +608,64 @@ class EddyTapMeasure:
                     "limits x=[%.3f, %.3f] y=[%.3f, %.3f]; skipping Eddy PROBE"
                     % (x, y, requested_pose[0], requested_pose[1], *bounds)
                 )
+            measurement["eddy"] = {
+                "skipped": "coil target is unreachable",
+                "requested_nozzle_x": requested_pose[0],
+                "requested_nozzle_y": requested_pose[1],
+                "limits": bounds,
+            }
             return
 
         nozzle_x, nozzle_y = coil_pose
-        self._move_to_coil_target(toolhead, nozzle_x, nozzle_y)
+        measurement["coil_nozzle_x"] = nozzle_x
+        measurement["coil_nozzle_y"] = nozzle_y
+        if eddy_mode == "scan":
+            nozzle_z = median + scan_height
+            stationary = self._stationary_scan_measurement(
+                gcmd,
+                toolhead,
+                x,
+                y,
+                nozzle_x,
+                nozzle_y,
+                nozzle_z,
+                scan_count,
+                duration,
+                xy_speed,
+                command_name,
+            )
+            measurement["stationary_scan"] = stationary
+            measurement["scan_coordinate_deltas"] = [
+                {
+                    "x": float(sample["scan_bed_x"]) - x,
+                    "y": float(sample["scan_bed_y"]) - y,
+                }
+                for sample in stationary["results"]
+            ]
+            measurement["delta_scan_minus_tap"] = (
+                stationary["scan_bed_z_median"] - median
+            )
+            gcmd.respond_info(
+                "EDDY_TAP_MEASURE comparison: tap_median=%.6f scan_median=%.6f "
+                "delta_scan_minus_tap=%.6f target=(%.3f, %.3f) "
+                "tap=(%.3f, %.3f) scan=(%.3f, %.3f) nozzle=(%.3f, %.3f)"
+                % (
+                    median,
+                    stationary["scan_bed_z_median"],
+                    measurement["delta_scan_minus_tap"],
+                    x,
+                    y,
+                    tap_samples[-1]["x"],
+                    tap_samples[-1]["y"],
+                    stationary["results"][-1]["scan_bed_x"],
+                    stationary["results"][-1]["scan_bed_y"],
+                    nozzle_x,
+                    nozzle_y,
+                )
+            )
+            return
+
+        self._move_to_coil_target(toolhead, nozzle_x, nozzle_y, xy_speed)
         result = self._regular_probe(gcmd)
         if (
             abs(float(result.bed_x) - x) > COMPARISON_XY_TOLERANCE
@@ -465,11 +676,14 @@ class EddyTapMeasure:
                 "expected=(%.3f, %.3f), got=(%.3f, %.3f)"
                 % (x, y, result.bed_x, result.bed_y)
             )
-        self.gcode.run_script_from_command(
-            "G90\nG1 Z%.3f F%.0f" % (self.move_z, self.move_speed * 60.0)
-        )
-        toolhead.wait_moves()
+        self._lift_to_safe_z(toolhead)
         eddy_probe_z = float(result.bed_z)
+        measurement["regular_probe"] = {
+            "bed_x": float(result.bed_x),
+            "bed_y": float(result.bed_y),
+            "bed_z": eddy_probe_z,
+        }
+        measurement["delta_probe_minus_tap"] = eddy_probe_z - median
         gcmd.respond_info(
             "EDDY_TAP_MEASURE comparison: tap_median=%.6f eddy_probe=%.6f "
             "delta_probe_minus_tap=%.6f bed=(%.3f, %.3f) nozzle=(%.3f, %.3f)"
@@ -482,6 +696,86 @@ class EddyTapMeasure:
         bed_x = gcmd.get_float("X", self.reference_x)
         bed_y = gcmd.get_float("Y", self.reference_y)
         nozzle_z = gcmd.get_float("Z", 1.0, above=0.0)
+        duration = gcmd.get_float("DURATION", DEFAULT_RAW_DURATION, above=0.0)
+        safe_travel = gcmd.get_int("SAFE_TRAVEL", 1, minval=0, maxval=1)
+        lift_after = gcmd.get_int("LIFT_AFTER", 1, minval=0, maxval=1)
+        approach_z = self._optional_float(gcmd, "APPROACH_Z")
+        probe = self.printer.lookup_object("probe")
+        pose, requested_pose, bounds = self._coil_over_target_pose(
+            toolhead, probe, bed_x, bed_y
+        )
+        if pose is None:
+            raise self.gcode.error(
+                "%s coil target is unreachable: bed=(%.3f, %.3f) "
+                "requires nozzle=(%.3f, %.3f), limits=%s"
+                % (
+                    command_name,
+                    bed_x,
+                    bed_y,
+                    requested_pose[0],
+                    requested_pose[1],
+                    bounds,
+                )
+            )
+        nozzle_x, nozzle_y = pose
+        completed = False
+        try:
+            self._require_nozzle_z_in_limits(toolhead, nozzle_z, command_name)
+            if approach_z is not None:
+                self._require_nozzle_z_in_limits(toolhead, approach_z, command_name)
+                if approach_z >= nozzle_z:
+                    raise gcmd.error(
+                        "APPROACH_Z %.3f must be below requested nozzle Z %.3f"
+                        % (approach_z, nozzle_z)
+                    )
+            if safe_travel:
+                self._move_to_coil_target(toolhead, nozzle_x, nozzle_y)
+            else:
+                current_position = toolhead.get_position()
+                if (
+                    abs(current_position[0] - nozzle_x) > COMPARISON_XY_TOLERANCE
+                    or abs(current_position[1] - nozzle_y) > COMPARISON_XY_TOLERANCE
+                ):
+                    raise gcmd.error(
+                        "SAFE_TRAVEL=0 requires the coil already be over the target; "
+                        "expected nozzle=(%.3f, %.3f), current=(%.3f, %.3f)"
+                        % (
+                            nozzle_x,
+                            nozzle_y,
+                            current_position[0],
+                            current_position[1],
+                        )
+                    )
+            if approach_z is not None:
+                self._move_z(toolhead, approach_z)
+            self._move_z(toolhead, nozzle_z)
+            raw = self._capture_raw_measurement(toolhead, duration)
+            self.last_raw_measurement = {
+                "bed_x": bed_x,
+                "bed_y": bed_y,
+                "nozzle_x": nozzle_x,
+                "nozzle_y": nozzle_y,
+                "requested_nozzle_z": nozzle_z,
+                "duration": duration,
+                **raw,
+            }
+            gcmd.respond_info(
+                self._raw_measurement_report(
+                    command_name, bed_x, bed_y, nozzle_x, nozzle_y, raw
+                )
+            )
+            completed = True
+        finally:
+            if lift_after or not completed:
+                self._lift_to_safe_z(toolhead)
+
+    def cmd_EDDY_STATIONARY_SCAN_MEASURE(self, gcmd):
+        command_name = "EDDY_STATIONARY_SCAN_MEASURE"
+        toolhead = self._require_scan_ready(command_name)
+        bed_x = gcmd.get_float("X", self.reference_x)
+        bed_y = gcmd.get_float("Y", self.reference_y)
+        nozzle_z = gcmd.get_float("Z", 2.0, above=0.0)
+        count = gcmd.get_int("COUNT", 3, minval=1, maxval=20)
         duration = gcmd.get_float("DURATION", DEFAULT_RAW_DURATION, above=0.0)
         probe = self.printer.lookup_object("probe")
         pose, requested_pose, bounds = self._coil_over_target_pose(
@@ -501,26 +795,21 @@ class EddyTapMeasure:
                 )
             )
         nozzle_x, nozzle_y = pose
-        try:
-            self._require_nozzle_z_in_limits(toolhead, nozzle_z, command_name)
-            self._move_to_scan_target(toolhead, nozzle_x, nozzle_y, nozzle_z)
-            raw = self._capture_raw_measurement(toolhead, duration)
-            self.last_raw_measurement = {
-                "bed_x": bed_x,
-                "bed_y": bed_y,
-                "nozzle_x": nozzle_x,
-                "nozzle_y": nozzle_y,
-                "requested_nozzle_z": nozzle_z,
-                "duration": duration,
-                **raw,
-            }
-            gcmd.respond_info(
-                self._raw_measurement_report(
-                    command_name, bed_x, bed_y, nozzle_x, nozzle_y, raw
-                )
-            )
-        finally:
-            self._lift_to_safe_z(toolhead)
+        xy_speed = gcmd.get_float("XY_SPEED", self.move_speed, above=0.0)
+        measurement = self._stationary_scan_measurement(
+            gcmd,
+            toolhead,
+            bed_x,
+            bed_y,
+            nozzle_x,
+            nozzle_y,
+            nozzle_z,
+            count,
+            duration,
+            xy_speed,
+            command_name,
+        )
+        self.last_stationary_scan_measurement = measurement
 
     def cmd_EDDY_SCAN_HEIGHT_TEST(self, gcmd):
         command_name = "EDDY_SCAN_HEIGHT_TEST"
@@ -531,6 +820,10 @@ class EddyTapMeasure:
         nozzle_zs = self._parse_nozzle_zs(
             gcmd.get("NOZZLE_ZS", self.default_scan_nozzle_zs), gcmd
         )
+        if any(high <= low for low, high in zip(nozzle_zs, nozzle_zs[1:])):
+            raise gcmd.error(
+                "NOZZLE_ZS must be strictly ascending so each measurement is approached from below"
+            )
         probe = self.printer.lookup_object("probe")
         pose, requested_pose, bounds = self._coil_over_target_pose(
             toolhead, probe, bed_x, bed_y
@@ -564,6 +857,12 @@ class EddyTapMeasure:
         try:
             for nozzle_z in nozzle_zs:
                 self._require_nozzle_z_in_limits(toolhead, nozzle_z, command_name)
+            approach_z = nozzle_zs[0] - ASCENT_APPROACH_CLEARANCE
+            self._require_nozzle_z_in_limits(toolhead, approach_z, command_name)
+            self._move_to_coil_target(toolhead, nozzle_x, nozzle_y)
+            self._move_z(toolhead, approach_z)
+            for nozzle_z in nozzle_zs:
+                self._move_z(toolhead, nozzle_z)
                 result = self._scan_at_height(
                     gcmd,
                     toolhead,

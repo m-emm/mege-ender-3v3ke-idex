@@ -148,7 +148,13 @@ class FakeProbeSession:
     def run_probe(self, _gcmd):
         self.toolhead.position[2] = 3.99
         if self.method == "tap":
-            self.pending = [ProbeResult(next(self.values))]
+            self.pending = [
+                ProbeResult(
+                    next(self.values),
+                    bed_x=self.toolhead.position[0],
+                    bed_y=self.toolhead.position[1],
+                )
+            ]
         else:
             self.pending = [ProbeResult(-0.004)]
 
@@ -304,19 +310,67 @@ def test_eddy_tap_measure_reports_contact_statistics_and_threshold_override():
     printer.gcode.commands["_EDDY_TAP_MEASURE"](gcmd)
 
     assert printer.gcode.scripts == [
-        "G90\nG1 X123.456 Y234.567 Z5.000 F1200",
+        "G90\nG1 Z5.000 F1200\nG1 X123.456 Y234.567 F1200",
         "G90\nG1 Z5.000 F1200\nG1 X180.847 Y253.564 F1200",
         "G90\nG1 Z5.000 F1200",
     ]
     assert "threshold=5100.000" in gcmd.responses[0]
     assert "reference=(123.456, 234.567)" in gcmd.responses[0]
-    assert "contact_z=-0.012000" in gcmd.responses[1]
+    assert "contact=(123.456, 234.567, -0.012000)" in gcmd.responses[1]
     assert "post_retract_z=3.990000" in gcmd.responses[1]
     assert "mean=-0.010000 median=-0.010000" in gcmd.responses[-2]
     assert "span=0.004000" in gcmd.responses[-2]
     assert "tap_median=-0.010000 eddy_probe=-0.004000" in gcmd.responses[-1]
     assert "delta_probe_minus_tap=0.006000" in gcmd.responses[-1]
     assert all(session.ended for session in printer.probe.sessions)
+
+
+def test_eddy_tap_measure_scan_mode_reports_same_point_structured_evidence():
+    module = _load()
+    printer = FakePrinter()
+    measure = module.load_config(FakeConfig(printer))
+
+    gcmd = FakeGcmd(
+        {
+            "X": 150.0,
+            "Y": 150.0,
+            "COUNT": 1,
+            "EDDY_MODE": "scan",
+            "SCAN_COUNT": 3,
+            "SCAN_HEIGHT": 2.0,
+            "DURATION": 0.2,
+            "XY_SPEED": 100.0,
+        }
+    )
+    printer.gcode.commands["_EDDY_TAP_MEASURE"](gcmd)
+
+    assert printer.gcode.scripts[:4] == [
+        "G90\nG1 Z5.000 F1200\nG1 X150.000 Y150.000 F6000",
+        "G90\nG1 Z5.000 F1200\nG1 X207.391 Y168.997 F6000",
+        "G90\nG1 Z1.888 F1200",
+        "G90\nG1 Z1.988 F1200",
+    ]
+    assert printer.gcode.scripts.count("PROBE METHOD=scan SAMPLES=1") == 3
+    assert printer.gcode.scripts[-1] == "G90\nG1 Z5.000 F1200"
+    measurement = measure.get_status(0.0)["last_tap_measurement"]
+    assert measurement["eddy_mode"] == "scan"
+    assert measurement["tap"]["count"] == 1
+    assert measurement["tap"]["samples"][0] == {
+        "x": pytest.approx(150.0),
+        "y": pytest.approx(150.0),
+        "z": pytest.approx(-0.012),
+    }
+    assert measurement["tap_coordinate_deltas"] == [{"x": 0.0, "y": 0.0}]
+    assert measurement["coil_nozzle_x"] == pytest.approx(207.391)
+    assert measurement["stationary_scan"]["count"] == 3
+    assert measurement["scan_coordinate_deltas"] == [
+        {"x": 0.0, "y": 0.0},
+        {"x": 0.0, "y": 0.0},
+        {"x": 0.0, "y": 0.0},
+    ]
+    assert measurement["stationary_scan"]["scan_bed_z_median"] == pytest.approx(0.0)
+    assert measurement["delta_scan_minus_tap"] == pytest.approx(0.012)
+    assert any("target=(150.000, 150.000)" in response for response in gcmd.responses)
 
 
 def test_eddy_tap_measure_warns_and_keeps_tap_results_when_coil_is_unreachable():
@@ -332,7 +386,7 @@ def test_eddy_tap_measure_warns_and_keeps_tap_results_when_coil_is_unreachable()
         for response in gcmd.responses
     )
     assert len(printer.probe.sessions) == 1
-    assert printer.gcode.scripts == ["G90\nG1 X300.000 Y150.000 Z5.000 F1200"]
+    assert printer.gcode.scripts == ["G90\nG1 Z5.000 F1200\nG1 X300.000 Y150.000 F1200"]
 
 
 def test_eddy_raw_measure_reports_native_frequency_and_builtin_height():
@@ -344,7 +398,8 @@ def test_eddy_raw_measure_reports_native_frequency_and_builtin_height():
     printer.gcode.commands["_EDDY_RAW_MEASURE"](gcmd)
 
     assert printer.gcode.scripts == [
-        "G90\nG1 Z5.000 F1200\nG1 X207.391 Y168.997 F1200\nG1 Z1.000 F1200",
+        "G90\nG1 Z5.000 F1200\nG1 X207.391 Y168.997 F1200",
+        "G90\nG1 Z1.000 F1200",
         "G90\nG1 Z5.000 F1200",
     ]
     assert "raw_frequency_hz=3200000.000" in gcmd.responses[-1]
@@ -359,12 +414,78 @@ def test_eddy_raw_measure_reports_native_frequency_and_builtin_height():
     assert raw_status["toolhead_position"][:3] == pytest.approx([207.391, 168.997, 1.0])
 
 
+def test_eddy_raw_measure_can_collect_an_upward_sweep_without_intermediate_lifts():
+    module = _load()
+    printer = FakePrinter()
+    module.load_config(FakeConfig(printer))
+
+    first = FakeGcmd(
+        {
+            "X": 150.0,
+            "Y": 150.0,
+            "Z": 0.5,
+            "SAFE_TRAVEL": 1,
+            "LIFT_AFTER": 0,
+            "APPROACH_Z": 0.1,
+        }
+    )
+    printer.gcode.commands["_EDDY_RAW_MEASURE"](first)
+    second = FakeGcmd(
+        {
+            "X": 150.0,
+            "Y": 150.0,
+            "Z": 1.0,
+            "SAFE_TRAVEL": 0,
+            "LIFT_AFTER": 0,
+        }
+    )
+    printer.gcode.commands["_EDDY_RAW_MEASURE"](second)
+
+    assert printer.gcode.scripts == [
+        "G90\nG1 Z5.000 F1200\nG1 X207.391 Y168.997 F1200",
+        "G90\nG1 Z0.100 F1200",
+        "G90\nG1 Z0.500 F1200",
+        "G90\nG1 Z1.000 F1200",
+    ]
+
+
+def test_stationary_scan_measure_repeats_at_one_upward_approached_height():
+    module = _load()
+    printer = FakePrinter()
+    measure = module.load_config(FakeConfig(printer))
+
+    gcmd = FakeGcmd({"X": 150.0, "Y": 150.0, "Z": 2.0, "COUNT": 3, "DURATION": 0.2})
+    printer.gcode.commands["_EDDY_STATIONARY_SCAN_MEASURE"](gcmd)
+
+    assert printer.gcode.scripts[:6] == [
+        "G90\nG1 Z5.000 F1200\nG1 X207.391 Y168.997 F1200",
+        "G90\nG1 Z1.900 F1200",
+        "G90\nG1 Z2.000 F1200",
+        "PROBE METHOD=scan SAMPLES=1",
+        "PROBE METHOD=scan SAMPLES=1",
+        "PROBE METHOD=scan SAMPLES=1",
+    ]
+    assert printer.gcode.scripts[-1] == "G90\nG1 Z5.000 F1200"
+    measurement = measure.get_status(0.0)["last_stationary_scan_measurement"]
+    assert measurement["count"] == 3
+    assert measurement["scan_bed_z_median"] == pytest.approx(0.0)
+    assert measurement["scan_bed_z_span"] == pytest.approx(0.0)
+    assert len(measurement["results"]) == 3
+    assert (
+        sum(
+            response.startswith("EDDY_STATIONARY_SCAN_MEASURE sample")
+            for response in gcmd.responses
+        )
+        == 3
+    )
+
+
 def test_eddy_scan_height_test_reports_invariant_scan_results():
     module = _load()
     printer = FakePrinter()
     measure = module.load_config(FakeConfig(printer))
 
-    gcmd = FakeGcmd({"X": 150.0, "Y": 150.0, "NOZZLE_ZS": "3,2,1,0.5"})
+    gcmd = FakeGcmd({"X": 150.0, "Y": 150.0, "NOZZLE_ZS": "0.5,1,2,3"})
     printer.gcode.commands["_EDDY_SCAN_HEIGHT_TEST"](gcmd)
 
     scan_scripts = [
@@ -383,9 +504,18 @@ def test_eddy_scan_height_test_reports_invariant_scan_results():
         "scan_probe=(150.000, 150.000, 0.000000)" in report for report in point_reports
     )
     assert "scan_bed_z_span=0.000000" in gcmd.responses[-1]
+    assert printer.gcode.scripts[:6] == [
+        "G90\nG1 Z5.000 F1200\nG1 X207.391 Y168.997 F1200",
+        "G90\nG1 Z0.400 F1200",
+        "G90\nG1 Z0.500 F1200",
+        "PROBE METHOD=scan SAMPLES=1",
+        "G90\nG1 Z1.000 F1200",
+        "PROBE METHOD=scan SAMPLES=1",
+    ]
+    assert printer.gcode.scripts.count("G90\nG1 Z5.000 F1200") == 1
     assert printer.gcode.scripts[-1] == "G90\nG1 Z5.000 F1200"
     scan_status = measure.get_status(0.0)["last_scan_height_test"]
-    assert scan_status["requested_nozzle_zs"] == [3.0, 2.0, 1.0, 0.5]
+    assert scan_status["requested_nozzle_zs"] == [0.5, 1.0, 2.0, 3.0]
     assert scan_status["scan_bed_z_span"] == pytest.approx(0.0)
     assert len(scan_status["results"]) == 4
 
@@ -414,6 +544,10 @@ def test_eddy_scan_height_test_rejects_invalid_heights_and_unreachable_targets()
         printer.gcode.commands["_EDDY_SCAN_HEIGHT_TEST"](
             FakeGcmd({"NOZZLE_ZS": "3,not-a-number"})
         )
+    with pytest.raises(RuntimeError, match="strictly ascending"):
+        printer.gcode.commands["_EDDY_SCAN_HEIGHT_TEST"](
+            FakeGcmd({"NOZZLE_ZS": "3,2,1"})
+        )
     with pytest.raises(RuntimeError, match="unreachable"):
         printer.gcode.commands["_EDDY_RAW_MEASURE"](FakeGcmd({"X": 300.0}))
 
@@ -426,15 +560,23 @@ def test_eddy_tap_measure_is_deployed_and_generated_macro_is_present():
     assert "[eddy_tap_measure]" in config_text
     assert "[gcode_macro EDDY_TAP_MEASURE]" in config_text
     assert (
-        "_EDDY_TAP_MEASURE X={x} Y={y} THRESHOLD={threshold} COUNT={count}"
-        in config_text
+        "_EDDY_TAP_MEASURE X={x} Y={y} THRESHOLD={threshold} COUNT={count} "
+        "EDDY_MODE={eddy_mode}" in config_text
     )
     assert "[gcode_macro EDDY_RAW_MEASURE]" in config_text
-    assert "_EDDY_RAW_MEASURE X={x} Y={y} Z={z} DURATION={duration}" in config_text
+    assert (
+        "_EDDY_RAW_MEASURE X={x} Y={y} Z={z} DURATION={duration} "
+        "SAFE_TRAVEL={safe_travel} LIFT_AFTER={lift_after}" in config_text
+    )
     assert "[gcode_macro EDDY_SCAN_HEIGHT_TEST]" in config_text
     assert (
         "_EDDY_SCAN_HEIGHT_TEST X={x} Y={y} NOZZLE_ZS={nozzle_zs} "
         "DURATION={duration}" in config_text
+    )
+    assert "[gcode_macro EDDY_STATIONARY_SCAN_MEASURE]" in config_text
+    assert (
+        "_EDDY_STATIONARY_SCAN_MEASURE X={x} Y={y} Z={z} COUNT={count} "
+        "DURATION={duration} XY_SPEED={xy_speed}" in config_text
     )
     updater = UPDATER_PATH.read_text(encoding="utf-8")
     assert "SOURCE_EDDY_TAP_MEASURE" in updater
