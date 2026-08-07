@@ -56,6 +56,22 @@ y_offset: ${eddy_nozzle_to_coil_y}
 descend_z: 0.5
 ${eddy_klipper_calibration}
 
+[eddy_tap_measure]
+reference_x: ${bed_z_reference_x}
+reference_y: ${bed_z_reference_y}
+move_z: 5.0
+move_speed: 20.0
+default_count: 7
+
+[gcode_macro EDDY_TAP_MEASURE]
+description: Measure repeated Eddy tap contacts at the canonical bed reference.
+gcode:
+    {% set threshold = params.THRESHOLD|default(printer.configfile.settings["probe_eddy_current btt_eddy"].tap_threshold)|float %}
+    {% set count = params.COUNT|default(7)|int %}
+    {% set x = params.X|default(printer.configfile.settings["eddy_tap_measure"].reference_x)|float %}
+    {% set y = params.Y|default(printer.configfile.settings["eddy_tap_measure"].reference_y)|float %}
+    _EDDY_TAP_MEASURE X={x} Y={y} THRESHOLD={threshold} COUNT={count}
+
 [temperature_probe btt_eddy]
 sensor_type: Generic 3950
 sensor_pin: eddy:gpio26
@@ -494,7 +510,7 @@ position_endstop: ${t0_y_endstop}
 position_min: ${t0_y_endstop}
 position_max: 296.000
 homing_positive_dir: false
-homing_speed: 10
+homing_speed: 18
 second_homing_speed: 3
 homing_retract_dist: 5
 

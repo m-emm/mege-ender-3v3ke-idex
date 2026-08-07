@@ -20,12 +20,14 @@ SOURCE_CFG="${SCRIPT_DIR}/printer.cfg"
 SOURCE_HEATERS="${SCRIPT_DIR}/../klipper_host/klippy/extras/heaters.py"
 SOURCE_VISION="${SCRIPT_DIR}/../klipper_host/klippy/extras/vision.py"
 SOURCE_IDEX_MANUAL_TUNING="${SCRIPT_DIR}/../klipper_host/klippy/extras/idex_manual_tuning.py"
+SOURCE_EDDY_TAP_MEASURE="${SCRIPT_DIR}/../klipper_host/klippy/extras/eddy_tap_measure.py"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 REMOTE_KLIPPER_DIR="${MENDERPI_KLIPPER_DIR:-/opt/klipper}"
 REMOTE_TMP_CFG="/tmp/printer.cfg.$$"
 REMOTE_TMP_HEATERS="/tmp/heaters.py.$$"
 REMOTE_TMP_VISION="/tmp/vision.py.$$"
 REMOTE_TMP_IDEX_MANUAL_TUNING="/tmp/idex_manual_tuning.py.$$"
+REMOTE_TMP_EDDY_TAP_MEASURE="/tmp/eddy_tap_measure.py.$$"
 EXPECTED_KLIPPER_COMMIT="ca8230d505b7ba7fd225bfa6ed9655bc4520e805"
 EXPECTED_UPSTREAM_HEATERS_SHA256="a95d83be80296a7ff970ea6e1b73746d1a97a7d3e47ce621c02a89d80451ac9d"
 LEGACY_BOOSTED_HEATERS_SHA256="b3b362086277fc7202fb12c022aa210da7cc15a470bf536f2cc0d3d507719830"
@@ -56,8 +58,12 @@ check_local_support_files() {
     echo "Error: Klipper idex_manual_tuning.py extra not found: ${SOURCE_IDEX_MANUAL_TUNING}" >&2
     exit 1
   fi
+  if [[ ! -f "${SOURCE_EDDY_TAP_MEASURE}" ]]; then
+    echo "Error: Klipper eddy_tap_measure.py extra not found: ${SOURCE_EDDY_TAP_MEASURE}" >&2
+    exit 1
+  fi
 
-  python3 - "${SOURCE_HEATERS}" "${SOURCE_VISION}" "${SOURCE_IDEX_MANUAL_TUNING}" <<'PY'
+  python3 - "${SOURCE_HEATERS}" "${SOURCE_VISION}" "${SOURCE_IDEX_MANUAL_TUNING}" "${SOURCE_EDDY_TAP_MEASURE}" <<'PY'
 import ast
 import sys
 from pathlib import Path
@@ -73,6 +79,7 @@ check_live_config() {
   echo "  Managed Klipper heaters.py: ${SOURCE_HEATERS}"
   echo "  Klipper vision extra: ${SOURCE_VISION}"
   echo "  Klipper IDEX manual tuning extra: ${SOURCE_IDEX_MANUAL_TUNING}"
+  echo "  Klipper Eddy tap measurement extra: ${SOURCE_EDDY_TAP_MEASURE}"
 
   python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --check
   check_local_support_files
@@ -86,6 +93,7 @@ check_live_config() {
   local_heaters_sha256="$(sha256_file "${SOURCE_HEATERS}")"
   local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
   local_idex_manual_tuning_sha256="$(sha256_file "${SOURCE_IDEX_MANUAL_TUNING}")"
+  local_eddy_tap_measure_sha256="$(sha256_file "${SOURCE_EDDY_TAP_MEASURE}")"
   expected_fingerprint="$(
     python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --fingerprint
   )"
@@ -105,12 +113,14 @@ klipper_dir = Path(os.environ.get("REMOTE_KLIPPER_DIR", "/opt/klipper"))
 heaters_py = klipper_dir / "klippy" / "extras" / "heaters.py"
 vision_py = klipper_dir / "klippy" / "extras" / "vision.py"
 idex_manual_tuning_py = klipper_dir / "klippy" / "extras" / "idex_manual_tuning.py"
+eddy_tap_measure_py = klipper_dir / "klippy" / "extras" / "eddy_tap_measure.py"
 payload = {
     "ok": False,
     "remote_config_path": str(main_cfg),
     "remote_heaters_path": str(heaters_py),
     "remote_vision_path": str(vision_py),
     "remote_idex_manual_tuning_path": str(idex_manual_tuning_py),
+    "remote_eddy_tap_measure_path": str(eddy_tap_measure_py),
 }
 
 try:
@@ -120,6 +130,11 @@ try:
     payload["remote_idex_manual_tuning_sha256"] = (
         hashlib.sha256(idex_manual_tuning_py.read_bytes()).hexdigest()
         if idex_manual_tuning_py.is_file()
+        else ""
+    )
+    payload["remote_eddy_tap_measure_sha256"] = (
+        hashlib.sha256(eddy_tap_measure_py.read_bytes()).hexdigest()
+        if eddy_tap_measure_py.is_file()
         else ""
     )
     payload["remote_klipper_commit"] = subprocess.check_output(
@@ -145,6 +160,7 @@ PY
   CHECK_LOCAL_HEATERS_SHA256="${local_heaters_sha256}" \
   CHECK_LOCAL_VISION_SHA256="${local_vision_sha256}" \
   CHECK_LOCAL_IDEX_MANUAL_TUNING_SHA256="${local_idex_manual_tuning_sha256}" \
+  CHECK_LOCAL_EDDY_TAP_MEASURE_SHA256="${local_eddy_tap_measure_sha256}" \
   CHECK_EXPECTED_KLIPPER_COMMIT="${EXPECTED_KLIPPER_COMMIT}" \
   CHECK_REMOTE_HOST="${REMOTE_HOST}" \
   CHECK_REMOTE_PAYLOAD="${remote_payload}" \
@@ -166,6 +182,7 @@ local_sha256 = os.environ["CHECK_LOCAL_SHA256"]
 local_heaters_sha256 = os.environ["CHECK_LOCAL_HEATERS_SHA256"]
 local_vision_sha256 = os.environ["CHECK_LOCAL_VISION_SHA256"]
 local_idex_manual_tuning_sha256 = os.environ["CHECK_LOCAL_IDEX_MANUAL_TUNING_SHA256"]
+local_eddy_tap_measure_sha256 = os.environ["CHECK_LOCAL_EDDY_TAP_MEASURE_SHA256"]
 expected_fingerprint = os.environ["CHECK_EXPECTED_FINGERPRINT"]
 expected_klipper_commit = os.environ["CHECK_EXPECTED_KLIPPER_COMMIT"]
 remote_payload = json.loads(os.environ["CHECK_REMOTE_PAYLOAD"])
@@ -189,6 +206,7 @@ remote_sha256 = remote_payload.get("remote_sha256", "")
 remote_heaters_sha256 = remote_payload.get("remote_heaters_sha256", "")
 remote_vision_sha256 = remote_payload.get("remote_vision_sha256", "")
 remote_idex_manual_tuning_sha256 = remote_payload.get("remote_idex_manual_tuning_sha256", "")
+remote_eddy_tap_measure_sha256 = remote_payload.get("remote_eddy_tap_measure_sha256", "")
 remote_klipper_commit = remote_payload.get("remote_klipper_commit", "")
 status = remote_payload.get("status", {})
 webhooks = status.get("webhooks", {})
@@ -202,6 +220,8 @@ print(f"  Local vision.py sha256: {local_vision_sha256}")
 print(f"  Remote vision.py sha256: {remote_vision_sha256}")
 print(f"  Local idex_manual_tuning.py sha256: {local_idex_manual_tuning_sha256}")
 print(f"  Remote idex_manual_tuning.py sha256: {remote_idex_manual_tuning_sha256}")
+print(f"  Local eddy_tap_measure.py sha256: {local_eddy_tap_measure_sha256}")
+print(f"  Remote eddy_tap_measure.py sha256: {remote_eddy_tap_measure_sha256}")
 print(f"  Remote Klipper commit: {remote_klipper_commit}")
 print(f"  Klippy state: {webhooks.get('state')}")
 print(f"  save_config_pending: {configfile.get('save_config_pending')}")
@@ -228,6 +248,11 @@ if remote_idex_manual_tuning_sha256 != local_idex_manual_tuning_sha256:
     errors.append(
         "remote Klipper idex_manual_tuning.py sha256 does not match local extra "
         f"({remote_idex_manual_tuning_sha256} != {local_idex_manual_tuning_sha256})"
+    )
+if remote_eddy_tap_measure_sha256 != local_eddy_tap_measure_sha256:
+    errors.append(
+        "remote Klipper eddy_tap_measure.py sha256 does not match local extra "
+        f"({remote_eddy_tap_measure_sha256} != {local_eddy_tap_measure_sha256})"
     )
 if remote_klipper_commit != expected_klipper_commit:
     errors.append(
@@ -279,38 +304,43 @@ if [[ ! -f "${SOURCE_CFG}" ]]; then
 fi
 
 cleanup_remote_tmp() {
-  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}' '${REMOTE_TMP_VISION}' '${REMOTE_TMP_IDEX_MANUAL_TUNING}'" >/dev/null 2>&1 || true
+  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}' '${REMOTE_TMP_VISION}' '${REMOTE_TMP_IDEX_MANUAL_TUNING}' '${REMOTE_TMP_EDDY_TAP_MEASURE}'" >/dev/null 2>&1 || true
 }
 trap cleanup_remote_tmp EXIT
 
 local_heaters_sha256="$(sha256_file "${SOURCE_HEATERS}")"
 local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
 local_idex_manual_tuning_sha256="$(sha256_file "${SOURCE_IDEX_MANUAL_TUNING}")"
+local_eddy_tap_measure_sha256="$(sha256_file "${SOURCE_EDDY_TAP_MEASURE}")"
 
 echo "Updating ${REMOTE_HOST} with THE active Klipper config and host extras..."
 echo "  Source: ${SOURCE_CFG}"
 echo "  Managed Klipper heaters.py: ${SOURCE_HEATERS}"
 echo "  Klipper vision extra: ${SOURCE_VISION}"
 echo "  Klipper IDEX manual tuning extra: ${SOURCE_IDEX_MANUAL_TUNING}"
+echo "  Klipper Eddy tap measurement extra: ${SOURCE_EDDY_TAP_MEASURE}"
 
 scp "${SOURCE_CFG}" "${REMOTE_HOST}:${REMOTE_TMP_CFG}"
 scp "${SOURCE_HEATERS}" "${REMOTE_HOST}:${REMOTE_TMP_HEATERS}"
 scp "${SOURCE_VISION}" "${REMOTE_HOST}:${REMOTE_TMP_VISION}"
 scp "${SOURCE_IDEX_MANUAL_TUNING}" "${REMOTE_HOST}:${REMOTE_TMP_IDEX_MANUAL_TUNING}"
+scp "${SOURCE_EDDY_TAP_MEASURE}" "${REMOTE_HOST}:${REMOTE_TMP_EDDY_TAP_MEASURE}"
 
 ssh "${REMOTE_HOST}" \
-  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' bash -s" <<'REMOTE_SCRIPT'
+  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_TMP_EDDY_TAP_MEASURE='${REMOTE_TMP_EDDY_TAP_MEASURE}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' EXPECTED_EDDY_TAP_MEASURE_SHA256='${local_eddy_tap_measure_sha256}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 MAIN_CFG="${HOME}/printer_data/config/printer.cfg"
 HEATERS_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/heaters.py"
 VISION_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/vision.py"
 IDEX_MANUAL_TUNING_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/idex_manual_tuning.py"
+EDDY_TAP_MEASURE_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/eddy_tap_measure.py"
 TS="$(date +%Y%m%d-%H%M%S)"
 CFG_BACKUP="${MAIN_CFG}.bak.${TS}"
 HEATERS_BACKUP="${HEATERS_PY}.bak.${TS}"
 VISION_BACKUP="${VISION_PY}.bak.${TS}"
 IDEX_MANUAL_TUNING_BACKUP="${IDEX_MANUAL_TUNING_PY}.bak.${TS}"
+EDDY_TAP_MEASURE_BACKUP="${EDDY_TAP_MEASURE_PY}.bak.${TS}"
 
 if [[ ! -f "${REMOTE_TMP_CFG}" ]]; then
   echo "Error: uploaded config not found: ${REMOTE_TMP_CFG}" >&2
@@ -326,6 +356,10 @@ if [[ ! -f "${REMOTE_TMP_VISION}" ]]; then
 fi
 if [[ ! -f "${REMOTE_TMP_IDEX_MANUAL_TUNING}" ]]; then
   echo "Error: uploaded idex_manual_tuning.py not found: ${REMOTE_TMP_IDEX_MANUAL_TUNING}" >&2
+  exit 1
+fi
+if [[ ! -f "${REMOTE_TMP_EDDY_TAP_MEASURE}" ]]; then
+  echo "Error: uploaded eddy_tap_measure.py not found: ${REMOTE_TMP_EDDY_TAP_MEASURE}" >&2
   exit 1
 fi
 if [[ ! -f "${HEATERS_PY}" ]]; then
@@ -363,6 +397,12 @@ fi
 uploaded_idex_manual_tuning_sha="$(sha256sum "${REMOTE_TMP_IDEX_MANUAL_TUNING}" | awk '{print $1}')"
 if [[ "${uploaded_idex_manual_tuning_sha}" != "${EXPECTED_IDEX_MANUAL_TUNING_SHA256}" ]]; then
   echo "Error: uploaded idex_manual_tuning.py sha256 ${uploaded_idex_manual_tuning_sha} does not match local ${EXPECTED_IDEX_MANUAL_TUNING_SHA256}" >&2
+  exit 1
+fi
+
+uploaded_eddy_tap_measure_sha="$(sha256sum "${REMOTE_TMP_EDDY_TAP_MEASURE}" | awk '{print $1}')"
+if [[ "${uploaded_eddy_tap_measure_sha}" != "${EXPECTED_EDDY_TAP_MEASURE_SHA256}" ]]; then
+  echo "Error: uploaded eddy_tap_measure.py sha256 ${uploaded_eddy_tap_measure_sha} does not match local ${EXPECTED_EDDY_TAP_MEASURE_SHA256}" >&2
   exit 1
 fi
 
@@ -457,6 +497,24 @@ else
   echo "Installed: ${IDEX_MANUAL_TUNING_PY}"
 fi
 rm -f "${REMOTE_TMP_IDEX_MANUAL_TUNING}"
+
+if [[ -f "${EDDY_TAP_MEASURE_PY}" ]]; then
+  current_eddy_tap_measure_sha="$(sha256sum "${EDDY_TAP_MEASURE_PY}" | awk '{print $1}')"
+else
+  current_eddy_tap_measure_sha=""
+fi
+if [[ "${current_eddy_tap_measure_sha}" == "${EXPECTED_EDDY_TAP_MEASURE_SHA256}" ]]; then
+  echo "Klipper Eddy tap measurement extra already installed: ${EDDY_TAP_MEASURE_PY}"
+else
+  mkdir -p "$(dirname -- "${EDDY_TAP_MEASURE_PY}")"
+  if [[ -f "${EDDY_TAP_MEASURE_PY}" ]]; then
+    cp -a "${EDDY_TAP_MEASURE_PY}" "${EDDY_TAP_MEASURE_BACKUP}"
+    echo "Backed up: ${EDDY_TAP_MEASURE_BACKUP}"
+  fi
+  cp -a "${REMOTE_TMP_EDDY_TAP_MEASURE}" "${EDDY_TAP_MEASURE_PY}"
+  echo "Installed: ${EDDY_TAP_MEASURE_PY}"
+fi
+rm -f "${REMOTE_TMP_EDDY_TAP_MEASURE}"
 
 mkdir -p "$(dirname -- "${MAIN_CFG}")"
 

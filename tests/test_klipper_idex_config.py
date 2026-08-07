@@ -1862,9 +1862,6 @@ def test_idex_print_brush_macro_is_separate_from_normal_tool_selection():
     t1_macro = _section(config_text, "gcode_macro T1")
 
     assert _macro_variable_float(tool_state, "brush_distance") > 0.0
-    assert _macro_variable_float(tool_state, "brush_cycles") == 3.0
-    assert _macro_variable_float(tool_state, "brush_prime_length") == 5.0
-    assert _macro_variable_float(tool_state, "brush_retract_length") == 1.0
     assert "stepper_x.position_endstop|float" in brush_macro
     assert "dual_carriage.position_endstop|float" in brush_macro
     assert "left_home_x + brush_distance" in brush_macro

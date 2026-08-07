@@ -50,6 +50,51 @@ def test_tap_measurement_uses_probe_contact_not_post_retract_toolhead_position()
     assert post_retract_z - contact_z == pytest.approx(4.0)
 
 
+def test_get_position_parser_retains_raw_steps_and_coordinate_layers():
+    module = _load_module()
+
+    position = module.parse_get_position_message(
+        "mcu: stepper_x:-8654 stepper_y:-3392 stepper_z:-68561 "
+        "stepper_z1:-70175 dual_carriage:-2\n"
+        "stepper: stepper_x:149.997500 stepper_y:148.812500 "
+        "stepper_z:2.950000 stepper_z1:2.950000 dual_carriage:353.087000\n"
+        "kinematic: X:149.997500 Y:148.812500 Z:2.950000\n"
+        "toolhead: X:150.000000 Y:148.815000 Z:2.950599 E:684.467700\n"
+        "gcode: X:150.000000 Y:148.815000 Z:2.924000 E:684.467700\n"
+        "gcode base: X:0.000000 Y:-1.185000 Z:0.924000 E:542.357820\n"
+        "gcode homing: X:0.000000 Y:-1.185000 Z:0.924000"
+    )
+
+    assert position["mcu"]["stepper_z"] == -68561
+    assert position["mcu"]["stepper_z1"] == -70175
+    assert position["stepper"]["stepper_z"] == pytest.approx(2.95)
+    assert position["toolhead"]["Z"] == pytest.approx(2.950599)
+    assert position["gcode_homing"]["Z"] == pytest.approx(0.924)
+
+
+def test_eddy_reference_gate_requires_zero_and_repeatable_three_tap_center():
+    module = _load_module()
+
+    passing = module.summarize_taps(
+        [-0.025, -0.021, -0.003], attempts=module.EDDY_REFERENCE_TAP_COUNT
+    )
+    module.Iteration1Runner.require_center_tap(
+        passing, count=module.EDDY_REFERENCE_TAP_COUNT
+    )
+
+    with pytest.raises(module.CalibrationError, match="native Z=0"):
+        module.Iteration1Runner.require_center_tap(
+            module.summarize_taps([0.021, 0.021, 0.021]),
+            count=module.EDDY_REFERENCE_TAP_COUNT,
+        )
+
+    with pytest.raises(module.CalibrationError, match="repeatable"):
+        module.Iteration1Runner.require_center_tap(
+            module.summarize_taps([-0.016, 0.0, 0.016]),
+            count=module.EDDY_REFERENCE_TAP_COUNT,
+        )
+
+
 def test_tap_threshold_is_required_from_calib():
     module = _load_module()
 
@@ -62,6 +107,52 @@ def test_tap_threshold_is_required_from_calib():
         module.configured_tap_threshold(
             {"eddy_relative_calibration": {"klipper": {"tap_threshold": None}}}
         )
+
+
+def test_cli_exposes_each_calibration_phase_as_a_named_step():
+    module = _load_module()
+
+    args = module.build_parser().parse_args(
+        [
+            "--step",
+            "eddy-frequency",
+            "--run-dir",
+            "runs/idex_z_iteration_1/example",
+            "--host",
+            "pi@example.test",
+            "--yes",
+        ]
+    )
+
+    assert args.step == "eddy-frequency"
+    assert args.run_dir == Path("runs/idex_z_iteration_1/example")
+    assert args.host == "pi@example.test"
+    assert args.yes is True
+    assert set(module.STEP_CHOICES) >= {
+        "tap-baseline",
+        "drive-current",
+        "eddy-frequency",
+        "mesh",
+        "resume",
+    }
+
+
+def test_direct_step_can_reload_stale_run_state_but_resume_remains_strict(tmp_path, monkeypatch):
+    module = _load_module()
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "state.json").write_text(
+        '{"run_id": "run", "phase": "I1.1", '
+        '"source_hashes": {"calib.yaml": "old"}, "evidence": {}}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(module, "_config_hashes", lambda: {"calib.yaml": "new"})
+
+    with pytest.raises(module.CalibrationError, match="source hashes changed"):
+        module._load_run_state(run_dir)
+
+    state = module._load_run_state(run_dir, strict_hashes=False)
+    assert state.run_id == "run"
 
 
 def test_tap_acceptance_counts_rejections_and_enforces_spread():

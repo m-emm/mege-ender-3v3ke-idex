@@ -576,8 +576,11 @@ Use this order to remove the discrepancy without hiding its cause:
    tools, preserving the vision-derived relative alignment, then verify center
    tap after restart.
 4. **Recalibrate Eddy in the new frame.** Calibrate and deploy drive current,
-   restart, and then run `PROBE_EDDY_CURRENT_CALIBRATE` using native center Z=0
-   as the contact reference.
+   restart, prove the center tap invariant with three taps and a full
+   `GET_POSITION` snapshot, and only then run
+   `PROBE_EDDY_CURRENT_CALIBRATE` using native center Z=0 as the contact
+   reference. Repeat the same three-tap and full-position evidence after the
+   new frequency curve is deployed.
 5. **Re-anchor and compare methods.** Recheck center tap with the configured
    threshold and compare tap/regular Eddy at identical physical points. A full
    recalibration is preferred over translating an uncertain old curve.
@@ -748,12 +751,53 @@ the workflow is automatic across its planned Klipper restarts. It may pause
 only on a failed safety/acceptance gate; it must never ask an operator to choose
 a calibration value during the run.
 
-Proposed command contract:
+Command-line API:
 
 ```text
-python calibrate_idex_bed_surface_eddy_tap.py \
-  --host pi@menderpi.local
+cd /Users/mege/git/mege-ender-3v3ke-idex
+python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py \
+  --step tap-baseline \
+  --run-dir runs/idex_z_iteration_1/my-run \
+  --host pi@menderpi.local \
+  --yes
 ```
+
+Every workflow operation is available as a single `--step` invocation. The
+same `--run-dir` is reused for related commands; it contains the immutable
+pre-run snapshots, `state.json`, and phase evidence. A run directory can be
+named explicitly as above, or omitted for `--step run` to create a timestamped
+directory under `runs/idex_z_iteration_1/`.
+
+The supported steps are:
+
+| Step | Operation |
+| --- | --- |
+| `preflight` | Validate source, generated configuration, deployment checks, and live idle state |
+| `bootstrap-tap` | Home and acquire the guarded seven-tap center baseline |
+| `update-endstops` | Apply the saved bootstrap median to both native endstops and deploy |
+| `center-verify` | Verify five center taps at native Z=0 |
+| `tap-baseline` | Run `bootstrap-tap`, `update-endstops`, and `center-verify` in sequence |
+| `drive-current` | Run the Eddy drive-current calibration and deploy its result |
+| `eddy-frequency` | Run the guarded Eddy height/frequency calibration, including pre/post three-tap references |
+| `reanchor` | Repeat the post-Eddy center verification |
+| `mesh` | Scan, activate, and validate the transient default mesh |
+| `run` | Execute the complete fresh Iteration 1 workflow |
+| `resume` | Continue from the last committed phase in `state.json` |
+
+For example, the normal operator-controlled sequence can be run as individual
+one-liners:
+
+```text
+(cd /Users/mege/git/mege-ender-3v3ke-idex && python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py --step tap-baseline --run-dir runs/idex_z_iteration_1/my-run --host pi@menderpi.local)
+(cd /Users/mege/git/mege-ender-3v3ke-idex && python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py --step drive-current --run-dir runs/idex_z_iteration_1/my-run --host pi@menderpi.local)
+(cd /Users/mege/git/mege-ender-3v3ke-idex && python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py --step eddy-frequency --run-dir runs/idex_z_iteration_1/my-run --host pi@menderpi.local)
+(cd /Users/mege/git/mege-ender-3v3ke-idex && python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py --step reanchor --run-dir runs/idex_z_iteration_1/my-run --host pi@menderpi.local)
+(cd /Users/mege/git/mege-ender-3v3ke-idex && python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py --step mesh --run-dir runs/idex_z_iteration_1/my-run --host pi@menderpi.local)
+```
+
+Use `--yes` on a supervised run to bypass only the arming prompt. The existing
+`--resume <run-directory>` and `--rollback <run-directory>` forms remain
+available for compatibility.
 
 Additional interfaces:
 
@@ -775,6 +819,22 @@ T0 nozzle reference X = 150.000 mm
 T0 nozzle reference Y = 150.000 mm
 desired tap contact Z = 0.000 mm
 ```
+
+For an interactive printer-side measurement at that reference, the generated
+configuration provides:
+
+```text
+EDDY_TAP_MEASURE
+EDDY_TAP_MEASURE THRESHOLD=5100
+EDDY_TAP_MEASURE COUNT=3 THRESHOLD=5100
+```
+
+The default is seven taps and the threshold defaults to the canonical value in
+`calib.yaml`. The extra moves to the generated reference point, requires XYZ
+homing, and reports each contact result plus mean, median, minimum, maximum,
+span, and population standard deviation in the Klipper console. It reports the
+post-retract toolhead Z separately for diagnostic comparison; statistics use
+the tap contact result.
 
 ### Canonical calibration data
 
@@ -1013,10 +1073,36 @@ subsequent calibration, so this restart is mandatory. This follows
 which writes the proposed setting through `configfile.set()` while the
 configured `drive_cur` field remains the value loaded at startup.
 
-#### I1.5: automatically calibrate Eddy frequency/height
+#### I1.5: guarded Eddy frequency/height calibration
 
-After restart, rehome, select T0, clear mesh/offsets, and move the nozzle to
-`(150,150,5)`. Start:
+This phase starts after the drive-current phase has deployed its value and
+restarted Klipper. The preceding endstop phase is authoritative: I1.5 must
+not silently apply another endstop or tap offset. It must prove that the tap
+datum is still valid before allowing the frequency curve to change.
+
+At both the start and the end of the phase, run this reference sequence at
+`(150,150)` with the known-good threshold from `calib.yaml`:
+
+1. Home with mesh and visible offsets cleared. Immediately issue `GET_POSITION`
+   and retain the complete response. The `mcu:` line is the raw integer step
+   count, including `stepper_z` and `stepper_z1`; also retain the converted
+   `stepper:`, `kinematic:`, `toolhead:`, `gcode:`, `gcode base:`, and
+   `gcode homing:` lines.
+2. Move to the reference point and perform exactly three successful
+   `PROBE METHOD=tap TAP_THRESHOLD=<calib.yaml value>` samples. Read contact
+   Z from `probe.last_probe_position[2]`, not the post-retract toolhead Z.
+3. Require all three samples to succeed, have no rejected attempts, have a
+   mean within `+/-0.020 mm` of zero, and have a span no greater than
+   `0.030 mm`. These are deliberately looser than the final center datum
+   limits, but still bound the reference before changing the frequency curve.
+   If any condition fails, refuse to continue and do not start or accept the
+   Eddy frequency calibration.
+4. Move to the median of those three tap contact heights with an explicit
+   `G1 ... Z=<median>` and immediately retain another complete `GET_POSITION`
+   snapshot. This records the exact logical and raw-step position used as the
+   calibration reference.
+
+At the start sequence, then raise to `Z=5` and run:
 
 ```text
 PROBE_EDDY_CURRENT_CALIBRATE CHIP=btt_eddy
@@ -1033,10 +1119,11 @@ native contact coordinate:
 6. collect the proposed `calibrate` table from pending config state.
 
 This retains Klipper's intended same-point geometry. The accepted manual-probe
-position is the T0 nozzle touching `(150,150)`. Klipper then raises 5 mm,
-subtracts the configured probe X/Y offsets from the carriage position so the
-Eddy coil is over `(150,150)`, descends to 0.050 mm above the accepted contact
-plane, and performs the frequency sweep. See
+position is the T0 nozzle touching `(150,150)`, already proven by the three-tap
+gate. Klipper then raises 5 mm, subtracts the configured probe X/Y offsets
+from the carriage position so the Eddy coil is over `(150,150)`, descends to
+0.050 mm above the accepted contact plane, and performs the frequency sweep.
+See
 [`EddyCalibrationTool.post_manual_probe()`](klipper_setup/rp2040_firmware/klipper/klippy/extras/probe_eddy_current.py#L260-L294).
 The automation replaces only the paper judgement with the already verified
 native Z=0; it does not replace Klipper's sweep or coordinate translation.
@@ -1044,7 +1131,20 @@ native Z=0; it does not replace Klipper's sweep or coordinate translation.
 Validate that the table is finite, ordered, monotonic in the expected
 direction, has at least nine usable pairs, spans the required height range, and
 passes the repository generator's calibration parser. Store the complete table
-in `calib.yaml`, deploy, restart, and verify no pending autosave remains.
+in `calib.yaml`, deploy, and restart. Do not commit I1.5 yet.
+
+After that restart, repeat the complete reference sequence: home and capture
+`GET_POSITION`, take the three center taps, require the same zero and
+repeatability limits, move to their median tap height, and capture
+   `GET_POSITION` again. Apply the same `+/-0.020 mm` mean and `0.030 mm` span
+   gate, then compare the pre/post raw MCU step counts and converted positions
+   alongside the two tap summaries. A post-calibration tap shift is
+evidence, not something to hide with an endstop or `tap_z_offset` update. If
+the post sequence fails, stop with the new curve uncommitted as an accepted
+phase and do not continue to re-anchor or mesh.
+
+Only after the post sequence passes may the runner commit I1.5. Raise to
+`Z=5` after the evidence is captured; the runtime mesh remains clear.
 
 Any movement below the known contact coordinate, unexpected manual-probe state,
 or inability to land at Z=0 within step resolution aborts before `ACCEPT`.
@@ -2191,6 +2291,10 @@ one retained run report:
 
 - final T0 tap contact at `(150,150)` is native Z=0 within the specified center
   mean and repeatability tolerances, with visible G-code offsets neutral;
+- I1.5 retains complete pre/post `GET_POSITION` snapshots, including raw MCU
+  step counts, and three-tap center summaries around the frequency sweep;
+- a failed pre/post three-tap gate refuses to accept the Eddy curve and stops
+  before mesh or re-anchor phases;
 - exactly the same tap-derived endstop delta was applied to T0 and T1, leaving
   the vision-derived relative Z alignment unchanged;
 - final `reg_drive_current` and frequency/height table originate from the
@@ -2247,8 +2351,9 @@ separate implementation task; this document checks none of them.
       calculation, and exact preservation of the vision T1/T0 relationship.
 - [ ] Automate drive-current calibration, canonical capture, deployment, and
       mandatory restart before frequency/height calibration.
-- [ ] Automate `PROBE_EDDY_CURRENT_CALIBRATE` by targeting verified native Z=0
-      through the manual-probe API, then capture and deploy the table.
+- [ ] Automate `PROBE_EDDY_CURRENT_CALIBRATE` behind pre/post three-tap center
+      gates, full `GET_POSITION` snapshots including raw MCU step counts, and
+      capture/deploy the table only after the post gate passes.
 - [ ] Use the known-good tap threshold from `calib.yaml` for every tap, keeping
       `tap_z_offset: 0.000` for this baseline.
 - [ ] Re-anchor center contact with the configured threshold and require same-point

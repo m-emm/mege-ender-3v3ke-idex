@@ -7,6 +7,12 @@ become canonical configuration.  The known-good tap threshold is read from
 ``calib.yaml`` and is never discovered or overwritten by this workflow.  The mesh made
 by ``BED_MESH_CALIBRATE`` remains session-local evidence.
 
+The frequency/height calibration is guarded by a three-tap center reference
+before and after the sweep. Each guard records Klipper's complete
+``GET_POSITION`` response, including raw integer MCU step counts, so a change
+in the perceived tap plane can be distinguished from a change in the
+coordinate model.
+
 Most of this module is intentionally dependency-light.  The pure calculation
 helpers are useful in tests and make it possible to run ``--dry-run`` without
 opening a printer connection or changing a file.
@@ -22,6 +28,7 @@ import math
 import os
 import re
 import shutil
+import shlex
 import statistics
 import subprocess
 import sys
@@ -51,6 +58,20 @@ RUN_ROOT = REPO_ROOT / "runs" / "idex_z_iteration_1"
 DEFAULT_HOST = os.environ.get("MENDERPI_HOST", "pi@menderpi.local")
 EXPECTED_KLIPPER_COMMIT = "ca8230d505b7ba7fd225bfa6ed9655bc4520e805"
 
+STEP_CHOICES = (
+    "preflight",
+    "bootstrap-tap",
+    "update-endstops",
+    "center-verify",
+    "tap-baseline",
+    "drive-current",
+    "eddy-frequency",
+    "reanchor",
+    "mesh",
+    "run",
+    "resume",
+)
+
 REFERENCE_X = 150.0
 REFERENCE_Y = 150.0
 CONTACT_Z = 0.0
@@ -60,6 +81,10 @@ TAP_MAX_SPAN = 0.030
 TAP_MAX_STDDEV = 0.010
 CENTER_MEAN_TOLERANCE = 0.010
 CENTER_SPAN_TOLERANCE = 0.020
+EDDY_REFERENCE_TAP_COUNT = 3
+EDDY_REFERENCE_TAP_MAX_ATTEMPTS = 3
+EDDY_REFERENCE_MEAN_TOLERANCE = 0.020
+EDDY_REFERENCE_SPAN_TOLERANCE = 0.030
 MESH_CENTER_TOLERANCE = 0.005
 MESH_POINT_TOLERANCE = 0.030
 MESH_RMS_TOLERANCE = 0.015
@@ -147,6 +172,62 @@ def tap_contact_and_post_retract_z(status: Mapping[str, Any]) -> tuple[float, fl
     if not math.isfinite(contact_z) or not math.isfinite(post_retract_z):
         raise CalibrationError("tap status contains a non-finite Z position")
     return contact_z, post_retract_z
+
+
+POSITION_LABELS = (
+    "gcode homing",
+    "gcode base",
+    "kinematic",
+    "toolhead",
+    "stepper",
+    "gcode",
+    "mcu",
+)
+
+
+def _parse_position_values(payload: str, *, integer: bool) -> dict[str, int | float]:
+    values: dict[str, int | float] = {}
+    for token in payload.split():
+        try:
+            name, raw_value = token.rsplit(":", 1)
+            values[name] = int(raw_value) if integer else float(raw_value)
+        except (ValueError, IndexError) as exc:
+            raise CalibrationError(
+                f"invalid GET_POSITION value {token!r}"
+            ) from exc
+    return values
+
+
+def parse_get_position_message(message: str) -> dict[str, Any]:
+    """Parse Klipper's complete GET_POSITION response for run evidence."""
+
+    parsed: dict[str, Any] = {"raw": message.strip()}
+    for line in message.splitlines():
+        line = line.strip()
+        if line.startswith("//"):
+            line = line[2:].strip()
+        for label in POSITION_LABELS:
+            prefix = f"{label}:"
+            if line.startswith(prefix):
+                parsed[label.replace(" ", "_")] = _parse_position_values(
+                    line[len(prefix) :].strip(), integer=label == "mcu"
+                )
+                break
+    required = {
+        "mcu",
+        "stepper",
+        "kinematic",
+        "toolhead",
+        "gcode",
+        "gcode_base",
+        "gcode_homing",
+    }
+    missing = sorted(required.difference(parsed))
+    if missing:
+        raise CalibrationError(
+            "GET_POSITION response is incomplete; missing " + ", ".join(missing)
+        )
+    return parsed
 
 
 def sha256_file(path: Path) -> str:
@@ -663,6 +744,15 @@ with urllib.request.urlopen(request, timeout={float(timeout)!r}) as response:
             "/printer/gcode/script", {"script": script}, timeout=timeout
         )
 
+    def gcode_store(self, *, count: int = 50) -> list[dict[str, Any]]:
+        result = self.request(f"/server/gcode_store?count={int(count)}")
+        if not isinstance(result, Mapping):
+            raise CalibrationError("Moonraker gcode store returned a non-mapping")
+        entries = result.get("gcode_store", [])
+        if not isinstance(entries, list):
+            raise CalibrationError("Moonraker gcode store returned invalid entries")
+        return [entry for entry in entries if isinstance(entry, dict)]
+
     def restart(self, *, timeout: float = 30.0) -> dict[str, Any]:
         return self.request(
             "/machine/services/restart", {"service": "klipper"}, timeout=timeout
@@ -732,9 +822,31 @@ def configured_tap_threshold(calibration: Mapping[str, Any]) -> int:
 def _run_local(
     command: Sequence[str], *, check: bool = True
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        command, cwd=REPO_ROOT, text=True, capture_output=True, check=check
+    rendered = shlex.join(str(part) for part in command)
+    _logger.info("local command started: %s", rendered)
+    started = time.monotonic()
+    try:
+        result = subprocess.run(
+            command, cwd=REPO_ROOT, text=True, capture_output=True, check=check
+        )
+    except subprocess.CalledProcessError as exc:
+        _logger.error(
+            "local command failed after %.1fs: %s (exit=%s)",
+            time.monotonic() - started,
+            rendered,
+            exc.returncode,
+        )
+        if exc.stdout:
+            _logger.error("local stdout: %s", exc.stdout[-1000:].strip())
+        if exc.stderr:
+            _logger.error("local stderr: %s", exc.stderr[-1000:].strip())
+        raise
+    _logger.info(
+        "local command finished in %.1fs: %s",
+        time.monotonic() - started,
+        rendered,
     )
+    return result
 
 
 class Iteration1Runner:
@@ -756,6 +868,16 @@ class Iteration1Runner:
         self.state = RunState(run_id=store.path.name, phase=Phase.PREFLIGHT.value)
         self.raw_calibration = _load_raw_calibration()
         self.tap_threshold = configured_tap_threshold(self.raw_calibration)
+        _logger.info(
+            "calibration runner ready: run_dir=%s dry_run=%s host=%s "
+            "reference=(%.3f, %.3f) tap_threshold=%d",
+            self.store.path,
+            self.dry_run,
+            getattr(self.client, "host", "<injected>"),
+            REFERENCE_X,
+            REFERENCE_Y,
+            self.tap_threshold,
+        )
         if snapshot:
             self.store.copy(CALIB_PATH, "calib.yaml.before")
             self.store.copy(CONFIG_PATH, "printer.cfg.before")
@@ -769,6 +891,11 @@ class Iteration1Runner:
         self.state.source_hashes = _config_hashes()
         self.state.evidence = {**(self.state.evidence or {}), **evidence}
         self.store.write_json("state.json", asdict(self.state))
+        _logger.info(
+            "checkpoint: phase=%s committed=%s",
+            phase.value,
+            committed,
+        )
 
     def confirm(self) -> None:
         if self.dry_run or self.assume_yes:
@@ -783,6 +910,7 @@ class Iteration1Runner:
             raise CalibrationError("arming confirmation did not match")
 
     def preflight(self, *, checkpoint_state: bool = True) -> dict[str, Any]:
+        _logger.info("preflight: validating local configuration and live printer")
         if not CONFIG_PATH.exists():
             raise CalibrationError("generated printer.cfg is missing")
         _run_local([sys.executable, str(GENERATOR_PATH), "--check"])
@@ -816,6 +944,12 @@ class Iteration1Runner:
             ]
         )
         self._validate_status_preflight(status)
+        _logger.info(
+            "preflight passed: klippy=%s print_state=%s homed_axes=%s",
+            status.get("webhooks", {}).get("state"),
+            status.get("print_stats", {}).get("state"),
+            status.get("toolhead", {}).get("homed_axes"),
+        )
         if checkpoint_state:
             self.checkpoint(Phase.PREFLIGHT, committed=True, status=status)
         return status
@@ -865,11 +999,16 @@ class Iteration1Runner:
         timeout: float = 60.0,
         emergency_stop_on_error: bool = False,
     ) -> dict[str, Any]:
+        summary = " | ".join(
+            line.strip() for line in script.splitlines() if line.strip()
+        )
+        _logger.info("G-code started: %s (timeout=%.0fs)", summary, timeout)
         if self.dry_run:
             self.store.write_json(
                 "dry_run_command.json",
                 {"script": script, "timeout": timeout},
             )
+            _logger.info("G-code skipped in dry-run: %s", summary)
             return {}
         try:
             result = self.client.gcode(script, timeout=timeout)
@@ -886,9 +1025,11 @@ class Iteration1Runner:
             f"command-{int(time.time() * 1000)}.json",
             {"script": script, "result": result},
         )
+        _logger.info("G-code finished: %s", summary)
         return result
 
     def _home_clean_frame(self) -> None:
+        _logger.info("homing clean frame: heaters off, mesh/offsets clear, G28, T0")
         self._gcode(
             "M140 S0\nM104 T0 S0\nM104 T1 S0\n"
             "BED_MESH_CLEAR\nSET_GCODE_OFFSET X=0 Y=0 Z=0 MOVE=0\n"
@@ -904,12 +1045,28 @@ class Iteration1Runner:
         max_attempts: int,
         tap_threshold: int,
     ) -> tuple[TapSummary, list[dict[str, Any]]]:
+        _logger.info(
+            "tap series started: point=(%.3f, %.3f) target=%d max_attempts=%d "
+            "threshold=%d",
+            x,
+            y,
+            count,
+            max_attempts,
+            tap_threshold,
+        )
         samples: list[float] = []
         attempts: list[dict[str, Any]] = []
         for attempt in range(max_attempts):
             if len(samples) >= count:
                 break
             try:
+                _logger.info(
+                    "tap attempt %d/%d started (successful=%d/%d)",
+                    attempt + 1,
+                    max_attempts,
+                    len(samples),
+                    count,
+                )
                 self._gcode(
                     f"G90\nG1 X{x:.3f} Y{y:.3f} Z5 F1200\n"
                     f"PROBE METHOD=tap TAP_THRESHOLD={tap_threshold}"
@@ -929,6 +1086,12 @@ class Iteration1Runner:
                         post_retract_z - value,
                     )
                 samples.append(value)
+                _logger.info(
+                    "tap attempt %d accepted: contact_z=%.6f post_retract_z=%.6f",
+                    attempt + 1,
+                    value,
+                    post_retract_z,
+                )
                 attempts.append(
                     {
                         "attempt": attempt + 1,
@@ -940,15 +1103,124 @@ class Iteration1Runner:
                     }
                 )
             except Exception as exc:
+                _logger.warning("tap attempt %d rejected: %s", attempt + 1, exc)
                 attempts.append(
                     {"attempt": attempt + 1, "ok": False, "error": str(exc)}
                 )
                 if not self.dry_run and attempt + 1 >= max_attempts:
                     break
         summary = summarize_taps(samples, attempts=len(attempts))
+        _logger.info(
+            "tap series finished: successful=%d rejected=%d mean=%.6f "
+            "median=%.6f span=%.6f stddev=%.6f",
+            len(summary.successful),
+            summary.rejected_attempts,
+            summary.mean,
+            summary.median,
+            summary.span,
+            summary.standard_deviation,
+        )
         return summary, attempts
 
+    @staticmethod
+    def require_center_tap(summary: TapSummary, *, count: int) -> None:
+        if len(summary.successful) != count:
+            raise CalibrationError(
+                f"expected {count} successful center taps, got "
+                f"{len(summary.successful)}"
+            )
+        if summary.rejected_attempts:
+            raise CalibrationError("center reference tap rejected a sample")
+        if abs(summary.mean) > EDDY_REFERENCE_MEAN_TOLERANCE:
+            raise CalibrationError(
+                "center reference tap is not native Z=0: "
+                f"mean={summary.mean:.6f}"
+            )
+        if summary.span > EDDY_REFERENCE_SPAN_TOLERANCE:
+            raise CalibrationError(
+                "center reference tap is not repeatable: "
+                f"span={summary.span:.6f}"
+            )
+
+    def capture_full_position(self, label: str) -> dict[str, Any]:
+        """Capture GET_POSITION, including raw integer MCU step counts."""
+
+        if self.dry_run:
+            _logger.info("GET_POSITION skipped in dry-run: label=%s", label)
+            return {"label": label, "dry_run": True}
+        _logger.info("capturing GET_POSITION: label=%s", label)
+        self._gcode("GET_POSITION")
+        for entry in reversed(self.client.gcode_store()):
+            message = str(entry.get("message", ""))
+            if "mcu:" not in message or "stepper:" not in message:
+                continue
+            position = parse_get_position_message(message)
+            position["label"] = label
+            _logger.info(
+                "GET_POSITION captured: label=%s mcu_stepper_z=%s mcu_stepper_z1=%s "
+                "toolhead_z=%.6f",
+                label,
+                position["mcu"].get("stepper_z"),
+                position["mcu"].get("stepper_z1"),
+                position["toolhead"].get("Z", float("nan")),
+            )
+            return position
+        raise CalibrationError("GET_POSITION response was not found in gcode store")
+
+    def eddy_reference_sequence(self, label: str) -> dict[str, Any]:
+        """Home, prove center tap Z=0, and record the median-Z position."""
+
+        _logger.info("Eddy reference sequence started: %s", label)
+        self._home_clean_frame()
+        after_home = self.capture_full_position(f"{label}.after_home")
+        summary, attempts = self.collect_taps(
+            x=REFERENCE_X,
+            y=REFERENCE_Y,
+            count=EDDY_REFERENCE_TAP_COUNT,
+            max_attempts=EDDY_REFERENCE_TAP_MAX_ATTEMPTS,
+            tap_threshold=self.tap_threshold,
+        )
+        summary_data = asdict(summary)
+        try:
+            self.require_center_tap(summary, count=EDDY_REFERENCE_TAP_COUNT)
+        except CalibrationError as exc:
+            self.store.write_json(
+                f"{label}-reference.json",
+                {
+                    "after_home": after_home,
+                    "taps": attempts,
+                    "summary": summary_data,
+                    "error": str(exc),
+                },
+            )
+            raise
+        _logger.info(
+            "Eddy reference gate passed: label=%s mean=%.6f span=%.6f median=%.6f",
+            label,
+            summary.mean,
+            summary.span,
+            summary.median,
+        )
+        self._gcode(
+            f"G90\nG1 X{REFERENCE_X:.3f} Y{REFERENCE_Y:.3f} "
+            f"Z{summary.median:.6f} F1200"
+        )
+        after_median_move = self.capture_full_position(
+            f"{label}.after_median_tap_move"
+        )
+        evidence = {
+            "after_home": after_home,
+            "taps": attempts,
+            "summary": summary_data,
+            "median_tap_z": summary.median,
+            "after_median_move": after_median_move,
+        }
+        self.store.write_json(f"{label}-reference.json", evidence)
+        _logger.info("Eddy reference sequence finished: %s", label)
+        return evidence
+
     def bootstrap_tap(self) -> TapSummary:
+        _logger.info("I1.1 bootstrap tap started")
         self._home_clean_frame()
         summary, attempts = self.collect_taps(
             x=REFERENCE_X,
@@ -964,9 +1236,16 @@ class Iteration1Runner:
             bootstrap_taps=attempts,
             bootstrap_summary=asdict(summary),
         )
+        _logger.info(
+            "I1.1 bootstrap tap passed: median=%.6f mean=%.6f span=%.6f",
+            summary.median,
+            summary.mean,
+            summary.span,
+        )
         return summary
 
     def update_endstops(self, tap_center_z: float) -> tuple[float, float]:
+        _logger.info("I1.2 updating both endstops from tap_center_z=%.6f", tap_center_z)
         tools = self.raw_calibration["tools"]
         t0_old = float(tools["t0"]["z_endstop"])
         t1_old = float(tools["t1"]["z_endstop"])
@@ -982,6 +1261,14 @@ class Iteration1Runner:
                 proposed_endstops={"t0": t0_new, "t1": t1_new, "delta": delta},
             )
             return t0_new, t1_new
+        _logger.info(
+            "I1.2 deploying endstops: t0 %.6f -> %.6f, t1 %.6f -> %.6f, delta=%.6f",
+            t0_old,
+            t0_new,
+            t1_old,
+            t1_new,
+            delta,
+        )
         atomic_update_calibration(
             CALIB_PATH,
             {
@@ -997,9 +1284,11 @@ class Iteration1Runner:
             committed=True,
             endstops={"t0": t0_new, "t1": t1_new, "delta": delta},
         )
+        _logger.info("I1.2 endstop update deployed and committed")
         return t0_new, t1_new
 
     def verify_center(self, phase: Phase = Phase.CENTER_VERIFY) -> TapSummary:
+        _logger.info("%s center verification started", phase.value)
         self._home_clean_frame()
         summary, attempts = self.collect_taps(
             x=REFERENCE_X,
@@ -1023,6 +1312,12 @@ class Iteration1Runner:
             center_verification=attempts,
             center_summary=asdict(summary),
         )
+        _logger.info(
+            "%s center verification passed: mean=%.6f span=%.6f",
+            phase.value,
+            summary.mean,
+            summary.span,
+        )
         return summary
 
     def capture_pending(self, section: str, option: str) -> Any:
@@ -1034,18 +1329,32 @@ class Iteration1Runner:
             raise CalibrationError(str(exc)) from exc
 
     def deploy_value(
-        self, updates: Mapping[Sequence[str], Any], phase: Phase, **evidence: Any
+        self,
+        updates: Mapping[Sequence[str], Any],
+        phase: Phase,
+        *,
+        checkpoint: bool = True,
+        **evidence: Any,
     ) -> None:
+        _logger.info(
+            "deploying canonical update for phase=%s: %s",
+            phase.value,
+            ", ".join(".".join(path) for path in updates),
+        )
         if self.dry_run:
-            self.checkpoint(phase, committed=False, **evidence)
+            if checkpoint:
+                self.checkpoint(phase, committed=False, **evidence)
             return
         atomic_update_calibration(CALIB_PATH, updates)
         _run_local([sys.executable, str(GENERATOR_PATH)])
         _run_local([str(DEPLOY_PATH)])
         _run_local([str(DEPLOY_PATH), "--check"])
-        self.checkpoint(phase, committed=True, **evidence)
+        if checkpoint:
+            self.checkpoint(phase, committed=True, **evidence)
+        _logger.info("canonical update deployed: phase=%s", phase.value)
 
     def calibrate_drive_current(self) -> None:
+        _logger.info("I1.4 Eddy drive-current calibration started")
         self._home_clean_frame()
         eddy = self.raw_calibration["eddy_relative_calibration"]["nozzle_to_coil"]
         coil_pose = coil_over_target_pose(
@@ -1067,25 +1376,37 @@ class Iteration1Runner:
             raise CalibrationError(
                 f"proposed Eddy drive current is outside 0..31: {current}"
             )
+        _logger.info("I1.4 proposed Eddy drive current: %d", current)
         self.deploy_value(
             {("eddy_relative_calibration", "klipper", "reg_drive_current"): current},
             Phase.DRIVE_CURRENT,
             drive_current=current,
             coil_pose=asdict(coil_pose),
         )
+        _logger.info("I1.4 Eddy drive-current calibration finished")
 
     def calibrate_eddy_curve(self) -> None:
-        self._home_clean_frame()
+        _logger.info("I1.5 Eddy frequency/height calibration started")
+        pre_eddy_reference = self.eddy_reference_sequence("pre_eddy")
+        _logger.info("I1.5 pre-calibration reference passed; starting frequency sweep")
         self._gcode(f"G1 X{REFERENCE_X:.3f} Y{REFERENCE_Y:.3f} Z5 F1200")
         self._gcode("PROBE_EDDY_CURRENT_CALIBRATE CHIP=btt_eddy", timeout=300.0)
         if self.dry_run:
-            self.checkpoint(Phase.EDDY_CALIBRATION, committed=False)
+            post_eddy_reference = self.eddy_reference_sequence("post_eddy")
+            self.checkpoint(
+                Phase.EDDY_CALIBRATION,
+                committed=False,
+                pre_eddy_reference=pre_eddy_reference,
+                post_eddy_reference=post_eddy_reference,
+            )
+            _logger.info("I1.5 dry-run frequency sweep complete")
             return
         status = self.client.status(["manual_probe"])
         manual_probe = status.get("manual_probe", {})
         if not manual_probe.get("is_active"):
             raise CalibrationError("Eddy calibration did not enter manual-probe mode")
         current_z = float(manual_probe["z_position"])
+        _logger.info("I1.5 manual-probe mode active at z=%.6f; targeting z=0", current_z)
         delta = -current_z
         if current_z + delta < -0.01:
             raise CalibrationError(
@@ -1098,6 +1419,7 @@ class Iteration1Runner:
             raise CalibrationError(
                 f"manual-probe target did not reach Z=0: {final_z!r}"
             )
+        _logger.info("I1.5 manual-probe target reached at z=%.6f; accepting sweep", final_z)
         # Klipper continues the frequency sweep after ACCEPT; the response can
         # therefore take longer than the normal short G-code request timeout.
         self._gcode("ACCEPT", timeout=300.0)
@@ -1109,11 +1431,37 @@ class Iteration1Runner:
             height, frequency = pair.split(":", 1)
             if not math.isfinite(float(height)) or not math.isfinite(float(frequency)):
                 raise CalibrationError("Eddy calibration contains a non-finite pair")
-        self.deploy_value(
-            {("eddy_relative_calibration", "klipper", "calibrate"): curve},
-            Phase.EDDY_CALIBRATION,
-            eddy_calibration=curve,
+        _logger.info("I1.5 received Eddy curve with %d height/frequency pairs", len(pairs))
+        try:
+            self.deploy_value(
+                {("eddy_relative_calibration", "klipper", "calibrate"): curve},
+                Phase.EDDY_CALIBRATION,
+                checkpoint=False,
+            )
+            post_eddy_reference = self.eddy_reference_sequence("post_eddy")
+        except CalibrationError as exc:
+            self.checkpoint(
+                Phase.EDDY_CALIBRATION,
+                committed=False,
+                eddy_calibration=curve,
+                pre_eddy_reference=pre_eddy_reference,
+                post_eddy_error=str(exc),
+            )
+            raise
+        _logger.info(
+            "I1.5 post-calibration reference passed: mean=%.6f span=%.6f",
+            post_eddy_reference["summary"]["mean"],
+            post_eddy_reference["summary"]["span"],
         )
+        self._gcode(f"G1 X{REFERENCE_X:.3f} Y{REFERENCE_Y:.3f} Z5 F1200")
+        self.checkpoint(
+            Phase.EDDY_CALIBRATION,
+            committed=True,
+            eddy_calibration=curve,
+            pre_eddy_reference=pre_eddy_reference,
+            post_eddy_reference=post_eddy_reference,
+        )
+        _logger.info("I1.5 Eddy frequency/height calibration finished and committed")
 
     def verify_mesh_against_tap(self, mesh_status: Mapping[str, Any]) -> dict[str, Any]:
         matrix = mesh_status.get("mesh_matrix") or mesh_status.get("probed_matrix")
@@ -1162,6 +1510,7 @@ class Iteration1Runner:
         return mesh_tap_acceptance(tap_samples, corrections)
 
     def final_mesh(self) -> None:
+        _logger.info("I1.7/I1.8 final transient mesh scan started")
         self._home_clean_frame()
         if not self.dry_run:
             before = self.client.status(["configfile"])
@@ -1172,6 +1521,7 @@ class Iteration1Runner:
             "BED_MESH_CALIBRATE METHOD=scan PROFILE=default HORIZONTAL_MOVE_Z=2",
             timeout=900.0,
         )
+        _logger.info("first mesh scan finished; repeating at HORIZONTAL_MOVE_Z=1")
         self._gcode(
             "BED_MESH_CALIBRATE METHOD=scan PROFILE=default HORIZONTAL_MOVE_Z=1",
             timeout=900.0,
@@ -1196,6 +1546,13 @@ class Iteration1Runner:
             self.checkpoint(
                 Phase.MESH_VERIFY, committed=True, mesh_verification=verification
             )
+            _logger.info(
+                "I1.8 mesh verification passed: max_abs=%.6f rms=%.6f center=%.6f",
+                verification["max_abs"],
+                verification["rms"],
+                verification["center_corrected"],
+            )
+        _logger.info("I1.7/I1.8 final transient mesh scan finished")
 
     def resume(self) -> RunState:
         """Continue only from the last committed phase boundary."""
@@ -1292,10 +1649,131 @@ def rollback(run_directory: Path, *, host: str, assume_yes: bool) -> None:
     MoonrakerClient(host).restart()
 
 
+def _load_run_state(
+    run_directory: Path, *, strict_hashes: bool = True
+) -> RunState:
+    state_path = run_directory / "state.json"
+    if not state_path.exists():
+        raise CalibrationError(f"run state is missing: {state_path}")
+    try:
+        state_data = json.loads(state_path.read_text(encoding="utf-8"))
+        state = RunState(
+            run_id=state_data["run_id"],
+            phase=state_data["phase"],
+            committed_phase=state_data.get("committed_phase"),
+            source_hashes=state_data.get("source_hashes"),
+            evidence=state_data.get("evidence"),
+        )
+    except (KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise CalibrationError(f"invalid run state: {state_path}") from exc
+    saved_hashes = state.source_hashes or {}
+    if saved_hashes and saved_hashes != _config_hashes():
+        if strict_hashes:
+            raise CalibrationError(
+                "source hashes changed since the last committed phase"
+            )
+        _logger.warning(
+            "run state source hashes are stale; accepting them for the explicitly "
+            "requested direct step and refreshing state after it completes"
+        )
+    return state
+
+
+def _make_runner(
+    *,
+    run_directory: Path | None,
+    host: str,
+    dry_run: bool,
+    assume_yes: bool,
+    strict_state_hashes: bool = True,
+) -> tuple[Iteration1Runner, bool]:
+    if run_directory is None:
+        run_directory = RUN_ROOT / utc_run_id()
+    else:
+        run_directory = run_directory.expanduser().resolve()
+    store = ArtifactStore(
+        run_directory.parent,
+        run_directory.name,
+        enabled=not dry_run,
+    )
+    state_path = run_directory / "state.json"
+    existing = state_path.exists()
+    runner = Iteration1Runner(
+        client=MoonrakerClient(host),
+        store=store,
+        dry_run=dry_run,
+        assume_yes=assume_yes,
+        snapshot=not existing,
+    )
+    if existing:
+        runner.state = _load_run_state(
+            run_directory, strict_hashes=strict_state_hashes
+        )
+    return runner, existing
+
+
+def _run_step(runner: Iteration1Runner, step: str) -> RunState:
+    """Execute exactly one named workflow step against a persistent run dir."""
+
+    _logger.info("workflow step started: %s", step)
+    if step == "run":
+        state = runner.run()
+    elif step == "resume":
+        state = runner.resume()
+    elif step == "preflight":
+        runner.preflight()
+        state = runner.state
+    else:
+        runner.confirm()
+        runner.preflight(checkpoint_state=False)
+        if step == "bootstrap-tap":
+            runner.bootstrap_tap()
+        elif step == "update-endstops":
+            summary = (runner.state.evidence or {}).get("bootstrap_summary")
+            if not summary:
+                raise CalibrationError(
+                    "update-endstops requires a committed bootstrap-tap step"
+                )
+            runner.update_endstops(float(summary["median"]))
+        elif step == "center-verify":
+            runner.verify_center()
+        elif step == "tap-baseline":
+            summary = runner.bootstrap_tap()
+            runner.update_endstops(summary.median)
+            runner.verify_center()
+        elif step == "drive-current":
+            runner.calibrate_drive_current()
+        elif step == "eddy-frequency":
+            runner.calibrate_eddy_curve()
+        elif step == "reanchor":
+            runner.verify_center(Phase.REANCHOR)
+        elif step == "mesh":
+            runner.final_mesh()
+        else:
+            raise CalibrationError(f"unsupported calibration step: {step}")
+        state = runner.state
+    _logger.info(
+        "workflow step finished: %s committed_phase=%s",
+        step,
+        state.committed_phase,
+    )
+    return state
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--step",
+        choices=STEP_CHOICES,
+        help="run one named workflow step; use --run-dir to continue it later",
+    )
+    parser.add_argument(
+        "--run-dir",
+        type=Path,
+        help="persistent artifact/state directory for an individual step",
+    )
     parser.add_argument("--resume", type=Path)
     parser.add_argument("--rollback", type=Path)
     parser.add_argument("--yes", action="store_true")
@@ -1304,51 +1782,69 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stderr,
+        force=True,
+    )
     try:
+        _logger.info(
+            "calibration command: step=%s host=%s run_dir=%s dry_run=%s",
+            args.step or "run/resume",
+            args.host,
+            args.run_dir or args.resume or args.rollback or "(new timestamped run)",
+            args.dry_run,
+        )
+        if args.step and (args.resume or args.rollback):
+            raise CalibrationError(
+                "--step cannot be combined with --resume or --rollback"
+            )
+        if args.run_dir and (args.resume or args.rollback):
+            raise CalibrationError(
+                "--run-dir cannot be combined with --resume or --rollback"
+            )
         if args.rollback:
+            _logger.info("rollback started: run_dir=%s", args.rollback)
             rollback(args.rollback, host=args.host, assume_yes=args.yes)
+            _logger.info("rollback finished")
             return 0
         if args.resume:
-            state_path = args.resume / "state.json"
-            if not state_path.exists():
-                raise CalibrationError(f"resume state is missing: {state_path}")
-            state_data = json.loads(state_path.read_text(encoding="utf-8"))
-            saved_hashes = state_data.get("source_hashes") or {}
-            if saved_hashes and saved_hashes != _config_hashes():
-                raise CalibrationError(
-                    "source hashes changed since the last committed phase"
-                )
-            store = ArtifactStore(args.resume.parent, args.resume.name, enabled=True)
-            runner = Iteration1Runner(
-                client=MoonrakerClient(args.host),
-                store=store,
+            runner, _ = _make_runner(
+                run_directory=args.resume,
+                host=args.host,
                 dry_run=False,
                 assume_yes=args.yes,
-                snapshot=False,
-            )
-            runner.state = RunState(
-                run_id=state_data["run_id"],
-                phase=state_data["phase"],
-                committed_phase=state_data.get("committed_phase"),
-                source_hashes=state_data.get("source_hashes"),
-                evidence=state_data.get("evidence"),
             )
             state = runner.resume()
+            _logger.info(
+                "resume finished: committed_phase=%s", state.committed_phase
+            )
             print(json.dumps(asdict(state), indent=2, sort_keys=True, default=str))
             return 0
-        run_id = utc_run_id()
-        store = ArtifactStore(RUN_ROOT, run_id, enabled=not args.dry_run)
-        runner = Iteration1Runner(
-            client=MoonrakerClient(args.host),
-            store=store,
+        step = args.step or "run"
+        if step == "resume" and args.run_dir is None:
+            raise CalibrationError("--step resume requires --run-dir")
+        runner, existing = _make_runner(
+            run_directory=args.run_dir,
+            host=args.host,
             dry_run=args.dry_run,
             assume_yes=args.yes,
+            strict_state_hashes=step == "resume",
         )
-        state = runner.run()
+        if existing and step == "run":
+            raise CalibrationError(
+                "run directory already has state; use --step resume or choose a new directory"
+            )
+        if step == "resume" and not existing:
+            raise CalibrationError("--step resume requires an existing --run-dir")
+        state = _run_step(runner, step)
+        print(f"run-directory: {runner.store.path}", file=sys.stderr)
         print(json.dumps(asdict(state), indent=2, sort_keys=True, default=str))
         return 0
     except (CalibrationError, subprocess.CalledProcessError, OSError) as exc:
+        _logger.error("calibration aborted: %s", exc)
         print(f"Iteration 1 aborted: {exc}", file=sys.stderr)
         return 1
 
