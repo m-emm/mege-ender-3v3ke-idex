@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import math
 import os
 import re
@@ -33,6 +34,9 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.parse import urlencode
 
 import yaml
+
+
+_logger = logging.getLogger(__name__)
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -124,6 +128,26 @@ class MeshPoint:
 def utc_run_id(now: datetime | None = None) -> str:
     now = now or datetime.now(timezone.utc)
     return now.strftime("%Y%m%dT%H%M%SZ")
+
+
+def tap_contact_and_post_retract_z(status: Mapping[str, Any]) -> tuple[float, float]:
+    """Return Klipper's tap contact Z and the later toolhead Z separately."""
+
+    probe = status.get("probe")
+    toolhead = status.get("toolhead")
+    if not isinstance(probe, Mapping) or not isinstance(toolhead, Mapping):
+        raise CalibrationError("tap status lacks probe or toolhead data")
+    last_probe_position = probe.get("last_probe_position")
+    toolhead_position = toolhead.get("position")
+    if not isinstance(last_probe_position, Sequence) or len(last_probe_position) < 3:
+        raise CalibrationError("tap status lacks probe.last_probe_position")
+    if not isinstance(toolhead_position, Sequence) or len(toolhead_position) < 3:
+        raise CalibrationError("tap status lacks toolhead.position")
+    contact_z = float(last_probe_position[2])
+    post_retract_z = float(toolhead_position[2])
+    if not math.isfinite(contact_z) or not math.isfinite(post_retract_z):
+        raise CalibrationError("tap status contains a non-finite Z position")
+    return contact_z, post_retract_z
 
 
 def sha256_file(path: Path) -> str:
@@ -629,7 +653,7 @@ with urllib.request.urlopen(request, timeout={float(timeout)!r}) as response:
 
     def status(self, objects: Iterable[str] | None = None) -> dict[str, Any]:
         object_names = list(objects or ["webhooks", "configfile"])
-        query = "&".join(f"{name}=" for name in object_names)
+        query = urlencode([(name, "") for name in object_names])
         result = self.request(f"/printer/objects/query?{query}")
         if "result" in result and isinstance(result["result"], Mapping):
             result = result["result"]
@@ -747,6 +771,7 @@ class Iteration1Runner:
         if not CONFIG_PATH.exists():
             raise CalibrationError("generated printer.cfg is missing")
         _run_local([sys.executable, str(GENERATOR_PATH), "--check"])
+        _run_local([str(DEPLOY_PATH), "--check"])
         expected_delta = validate_vision_relative_provenance(self.raw_calibration)
         tools = self.raw_calibration.get("tools", {})
         t0 = tools.get("t0", {})
@@ -818,7 +843,13 @@ class Iteration1Runner:
                 f"visible G-code offset is not zero: {homing_origin}"
             )
 
-    def _gcode(self, script: str, *, timeout: float = 60.0) -> dict[str, Any]:
+    def _gcode(
+        self,
+        script: str,
+        *,
+        timeout: float = 60.0,
+        emergency_stop_on_error: bool = False,
+    ) -> dict[str, Any]:
         if self.dry_run:
             self.store.write_json(
                 "dry_run_command.json",
@@ -828,12 +859,13 @@ class Iteration1Runner:
         try:
             result = self.client.gcode(script, timeout=timeout)
         except Exception as exc:
-            try:
-                self.client.emergency_stop()
-            except Exception:
-                pass
+            if emergency_stop_on_error:
+                try:
+                    self.client.emergency_stop()
+                except Exception:
+                    pass
             raise CalibrationError(
-                f"G-code failed; emergency stop sent: {exc}"
+                f"G-code failed{'; emergency stop sent' if emergency_stop_on_error else ''}: {exc}"
             ) from exc
         self.store.write_json(
             f"command-{int(time.time() * 1000)}.json",
@@ -869,11 +901,29 @@ class Iteration1Runner:
                 )
                 if self.dry_run:
                     value = 0.0
+                    post_retract_z = 0.0
                 else:
-                    status = self.client.status(["toolhead"])
-                    value = float(status["toolhead"]["position"][2])
+                    status = self.client.status(["probe", "toolhead"])
+                    value, post_retract_z = tap_contact_and_post_retract_z(status)
+                    _logger.info(
+                        "tap %d: contact_z=%.6f post_retract_toolhead_z=%.6f "
+                        "retract_delta=%.6f",
+                        attempt + 1,
+                        value,
+                        post_retract_z,
+                        post_retract_z - value,
+                    )
                 samples.append(value)
-                attempts.append({"attempt": attempt + 1, "ok": True, "z": value})
+                attempts.append(
+                    {
+                        "attempt": attempt + 1,
+                        "ok": True,
+                        "z": value,
+                        "contact_z": value,
+                        "post_retract_toolhead_z": post_retract_z,
+                        "retract_delta": post_retract_z - value,
+                    }
+                )
             except Exception as exc:
                 attempts.append(
                     {"attempt": attempt + 1, "ok": False, "error": str(exc)}
@@ -927,7 +977,6 @@ class Iteration1Runner:
         _run_local([sys.executable, str(GENERATOR_PATH)])
         _run_local([str(DEPLOY_PATH)])
         _run_local([str(DEPLOY_PATH), "--check"])
-        self.client.restart()
         self.checkpoint(
             Phase.ENDSTOPS,
             committed=True,
@@ -979,7 +1028,6 @@ class Iteration1Runner:
         _run_local([sys.executable, str(GENERATOR_PATH)])
         _run_local([str(DEPLOY_PATH)])
         _run_local([str(DEPLOY_PATH), "--check"])
-        self.client.restart()
         self.checkpoint(phase, committed=True, **evidence)
 
     def calibrate_drive_current(self) -> None:
@@ -1035,7 +1083,9 @@ class Iteration1Runner:
             raise CalibrationError(
                 f"manual-probe target did not reach Z=0: {final_z!r}"
             )
-        self._gcode("ACCEPT")
+        # Klipper continues the frequency sweep after ACCEPT; the response can
+        # therefore take longer than the normal short G-code request timeout.
+        self._gcode("ACCEPT", timeout=300.0)
         curve = str(self.capture_pending("probe_eddy_current btt_eddy", "calibrate"))
         pairs = [part.strip() for part in curve.split(",") if part.strip()]
         if len(pairs) < 9:
@@ -1272,6 +1322,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     try:
         if args.rollback:
             rollback(args.rollback, host=args.host, assume_yes=args.yes)

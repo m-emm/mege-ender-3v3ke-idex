@@ -35,6 +35,21 @@ def test_common_endstop_update_preserves_relative_alignment():
     module.assert_relative_alignment(293.5, 292.226, t0, t1, expected_delta=1.274)
 
 
+def test_tap_measurement_uses_probe_contact_not_post_retract_toolhead_position():
+    module = _load_module()
+
+    contact_z, post_retract_z = module.tap_contact_and_post_retract_z(
+        {
+            "probe": {"last_probe_position": [150.0, 150.0, -0.0125, 0.0]},
+            "toolhead": {"position": [150.0, 150.0, 3.9875, 0.0]},
+        }
+    )
+
+    assert contact_z == pytest.approx(-0.0125)
+    assert post_retract_z == pytest.approx(3.9875)
+    assert post_retract_z - contact_z == pytest.approx(4.0)
+
+
 def test_tap_acceptance_counts_rejections_and_enforces_spread():
     module = _load_module()
 
