@@ -61,7 +61,7 @@ The Eddy Duo tap mode adds an important physical reference that was not part of
 the original analysis. A T0 `PROBE METHOD=tap` does not infer bed height from
 the normal frequency-to-distance calibration. It makes nozzle contact, analyzes
 the frequency response while pulling away, and reports the contact coordinate
-in Klipper's current kinematic frame. Once tap threshold, tap bias, mechanics,
+in Klipper's current kinematic frame. Once the known-good tap threshold, tap bias, mechanics,
 and repeatability are validated, repeated T0 taps can be the primary absolute
 contact reference. The non-contact Eddy calibration and scanned mesh can then
 be aligned to that reference instead of being asked to establish absolute
@@ -74,7 +74,7 @@ mismatch is approximately `+1.170089 mm`. Tap measurements at the original
 nozzle point indicate only about `0.041584 mm` of local bed-height difference,
 so bed shape cannot explain the large mismatch. The regular Eddy vertical
 calibration frame is the leading issue, but no correction should be applied
-until tap threshold and multi-point/temperature behavior are validated.
+until the configured threshold and multi-point/temperature behavior are validated.
 
 
 ## Goals and non-goals
@@ -97,7 +97,7 @@ The future design is intended to provide these invariants:
 This documentation task does **not** itself:
 
 - write or activate a new absolute nozzle-to-bed Z datum on the printer;
-- run the planned Eddy drive-current, frequency/height, tap-threshold, or mesh
+- run the planned Eddy drive-current, frequency/height, or mesh
   calibrations;
 - replace Klipper's Cartesian or dual-carriage kinematics;
 - prove that the endstop experiment was cancelled by bed mesh;
@@ -138,13 +138,11 @@ carriage, and apply the combined offset. See
 [`T0`](klipper_setup/klipper_config/printer.cfg.template#L1055-L1091) and
 [`T1`](klipper_setup/klipper_config/printer.cfg.template#L1093-L1129).
 
-The checked-in Eddy section currently provides the frequency/height
-calibration, `descend_z: 0.5`, and X/Y offsets, but it does not declare
-`tap_threshold` or `tap_z_offset`. A successful tap may therefore have used a
-runtime `TAP_THRESHOLD`, an uncommitted/live `SAVE_CONFIG` value, or a newer
-live config state. Before treating any tap result as calibration evidence, the
-exact command and effective live values must be captured and reconciled with
-the repository. This document does not infer them from the successful result.
+The checked-in Eddy section provides the frequency/height calibration,
+`descend_z: 0.5`, X/Y offsets, and the known-good `tap_threshold: 5000` with
+`tap_z_offset: 0.000`. Iteration 1 treats that source-controlled threshold as
+canonical and uses it for every tap. Threshold discovery is not part of this
+workflow.
 
 ### Why the GUI changes on a tool change
 
@@ -522,14 +520,15 @@ above the lowest depression position. This attempt missed the lower bound by
 `0.003192 mm`. The rejection is a valuable safety result: Klipper did not
 silently accept a contact fit outside its validity range. It may indicate early
 triggering, insufficient/variable bed depression, contact mechanics, noise, or
-an unrefined threshold. It is not evidence that lowering the configured
+the configured threshold or contact mechanics. It is not evidence that lowering the configured
 minimum would be safe.
 
-The fixed runtime `TAP_THRESHOLD=5000` should therefore remain an experimental
-value until the official guess/refine/verify sequence passes repeatedly. The
-configuration reference notes that increasing the threshold reduces early
-noise triggers but increases the risk of failing to stop promptly at contact;
-it should not be adjusted casually to eliminate one rejected sample.
+The known-good `TAP_THRESHOLD=5000` is canonical in `calib.yaml`. Iteration 1
+does not rediscover or mutate it; threshold changes are an out-of-band
+maintenance decision, not a phase of this workflow. The configuration
+reference notes that increasing the threshold reduces early noise triggers but
+increases the risk of failing to stop promptly at contact, so it should not be
+adjusted casually to eliminate one rejected sample.
 
 ### What the measured residual means
 
@@ -555,13 +554,12 @@ calibrated_height_new = calibrated_height_old - h
 This is an explanation of the current data, not a value to apply. Directly
 adding `1.170089 mm` to the checked-in calibration would be premature because:
 
-- tap threshold has not yet completed the official calibration/verification
-  procedure;
 - the regular-probe residual has not been mapped at multiple XY points and
   temperatures;
 - the existing frequency/height calibration may have been generated under the
   combined static/manual G-code-offset architecture;
-- checked-in `tap_threshold` and `tap_z_offset` are currently absent;
+- the known-good `tap_threshold: 5000` is not evidence that the regular-probe
+  residual is spatially or thermally constant;
 - a full Eddy recalibration may be more correct than translating a calibration
   whose provenance is uncertain.
 
@@ -572,23 +570,20 @@ Use this order to remove the discrepancy without hiding its cause:
 1. **Verify the current canonical baseline.** Require matching
    source/generated/live configuration, zero visible offsets, T0 active, mesh
    clear, and valid vision-relative T1/T0 provenance.
-2. **Bootstrap tap at center.** Use the provisional known-working threshold
-   only long enough to obtain a repeatable T0 contact estimate at `(150,150)`.
+2. **Bootstrap tap at center.** Use the known-good threshold from `calib.yaml`
+   to obtain a repeatable T0 contact estimate at `(150,150)`.
 3. **Establish native Z=0.** Apply the measured common endstop delta to both
    tools, preserving the vision-derived relative alignment, then verify center
    tap after restart.
 4. **Recalibrate Eddy in the new frame.** Calibrate and deploy drive current,
    restart, and then run `PROBE_EDDY_CURRENT_CALIBRATE` using native center Z=0
    as the contact reference.
-5. **Calibrate the official tap threshold.** Run the supported
-   guess/refine/verify sequence against the new main calibration and keep
-   `tap_z_offset` zero for Iteration 1.
-6. **Re-anchor and compare methods.** Recheck center tap with the final
+5. **Re-anchor and compare methods.** Recheck center tap with the configured
    threshold and compare tap/regular Eddy at identical physical points. A full
    recalibration is preferred over translating an uncertain old curve.
-7. **Generate the mesh.** Scan the full configured domain with `(150,150)` as
+6. **Generate the mesh.** Scan the full configured domain with `(150,150)` as
    its zero reference and keep the result active only in Klipper memory.
-8. **Verify through the inverse mesh.** At every safe Tap point, require
+7. **Verify through the inverse mesh.** At every safe Tap point, require
    `raw_tap_z - mesh_correction_z` to be near zero.
 
 This sequence treats the approximately `1.170 mm` value as a diagnostic of the
@@ -757,8 +752,7 @@ Proposed command contract:
 
 ```text
 python calibrate_idex_bed_surface_eddy_tap.py \
-  --host pi@menderpi.local \
-  --bootstrap-tap-threshold 5000
+  --host pi@menderpi.local
 ```
 
 Additional interfaces:
@@ -796,7 +790,7 @@ eddy_relative_calibration:
   klipper:
     reg_drive_current: <measured integer>
     calibrate: <measured height:frequency table>
-    tap_threshold: <verified threshold>
+    tap_threshold: 5000
     tap_z_offset: 0.000
 
 ```
@@ -835,7 +829,8 @@ This policy applies to:
 
 - `reg_drive_current`;
 - the Eddy `calibrate` frequency/height table;
-- `tap_threshold`.
+- the known-good `tap_threshold` read from `calib.yaml` (not generated by this
+  workflow).
 
 Klipper's `BED_MESH_CALIBRATE` automatically makes the new mesh active, stores
 a session-local profile, and stages `[bed_mesh default]` in
@@ -906,9 +901,8 @@ watchdog monitors Klipper state, Z motion, command timeout, and shutdown events.
 It sends `M112` if Z passes the configured emergency floor, Klipper leaves
 ready state unexpectedly, or a tap fails to stop within its bounded time.
 
-The bootstrap threshold `5000` is an explicit, provisional input based on the
-successful manual taps. It is not persisted as the final threshold until the
-official post-calibration guess/refine/verify sequence succeeds.
+The threshold is the known-good positive integer read from `calib.yaml`. It is
+used for every tap and is never discovered or overwritten by Iteration 1.
 
 ### Iteration 1 state machine
 
@@ -947,8 +941,8 @@ assuming a pose.
 #### I1.1: bootstrap T0 center tap
 
 Home all axes, select T0, clear bed mesh and visible offsets, move to
-`(150,150,5)`, and collect seven successful taps using the provisional
-threshold. A maximum of ten attempts is allowed; rejected attempts remain in
+`(150,150,5)`, and collect seven successful taps using the configured
+known-good threshold from `calib.yaml`. A maximum of ten attempts is allowed; rejected attempts remain in
 the report.
 
 The phase passes only if:
@@ -1055,29 +1049,11 @@ in `calib.yaml`, deploy, restart, and verify no pending autosave remains.
 Any movement below the known contact coordinate, unexpected manual-probe state,
 or inability to land at Z=0 within step resolution aborts before `ACCEPT`.
 
-#### I1.6: calibrate and deploy final tap threshold
+#### I1.6: final center re-anchor and clean-frame Eddy verification
 
-The official tap-threshold calibration depends on the main Eddy calibration,
-so it runs only now. At `(150,150)` and safe starting Z, execute in one Klipper
-session:
-
-```text
-PROBE_EDDY_CURRENT_TAP_CALIBRATE TAP=guess
-PROBE_EDDY_CURRENT_TAP_CALIBRATE TAP=refine
-PROBE_EDDY_CURRENT_TAP_CALIBRATE TAP=verify
-```
-
-The script maintains the emergency watchdog through all attempts. It requires
-all five verification taps to succeed, captures the pending `tap_threshold`,
-keeps `tap_z_offset: 0.000`, writes the threshold canonically, deploys, and
-restarts. Before each guess, refine, or verify command it explicitly returns to
-the center and verifies a 3-10 mm starting clearance, as required by the pinned
-[Eddy tap-calibration procedure](https://github.com/Klipper3d/klipper/blob/ca8230d505b7ba7fd225bfa6ed9655bc4520e805/docs/Eddy_Probe.md#L275-L354).
-
-#### I1.7: final center re-anchor and clean-frame Eddy verification
-
-Because the final threshold may shift fitted contact relative to the
-provisional threshold, collect a new seven-tap center set. If center mean is
+The runner does not discover or change `tap_threshold`. It reads the known-good
+positive integer from `calib.yaml` and uses it for the final center tap set.
+If center mean is
 outside 0.010 mm, apply one final common endstop delta to T0 and T1, deploy, and
 repeat the five-tap center verification.
 
@@ -1090,7 +1066,7 @@ in the final endstop frame and repeat verification. A remaining spatial or
 thermal dependency aborts Iteration 1; the script must not hide it in an
 offset.
 
-#### I1.8: two-stage full bed scan
+#### I1.7: two-stage full bed scan
 
 With center tap verified at native Z=0 and regular Eddy aligned to tap:
 
@@ -1112,9 +1088,9 @@ With center tap verified at native Z=0 and regular Eddy aligned to tap:
 The full scan covers the configured bed-mesh domain. Tap verification cannot
 cover every scanned point because tap requires both nozzle and offset coil to
 remain over the bed. No deployment or restart occurs between this scan and
-I1.9; verification must use this exact in-memory mesh.
+I1.8; verification must use this exact in-memory mesh.
 
-#### I1.9: verify mesh against tap
+#### I1.8: verify mesh against tap
 
 Derive a 3x3 validation grid inside the intersection of:
 
@@ -1155,7 +1131,7 @@ continuity, sensor range, and mesh bounds, not by unsafe tap attempts. The final
 report must say "verified across the tap-safe region", not claim literal tap
 coverage of every bed coordinate.
 
-#### I1.10: finish or rollback
+#### I1.9: finish or rollback
 
 On success:
 
@@ -1183,8 +1159,7 @@ Before live use, add tests for:
 - robust tap statistics, rejected-attempt accounting, and convergence limits;
 - coil/nozzle pose calculation from X/Y/Z offsets and bounds checking;
 - Moonraker command serialization, timeout handling, and watchdog M112 path;
-- pending-config extraction for drive current, calibration table, tap threshold,
-  and bed mesh;
+- pending-config extraction for drive current, calibration table, and bed mesh;
 - automatic manual-probe targeting of Z=0 without paper intervention;
 - calibration-table and transient in-memory mesh validation;
 - rejection of any attempt to copy mesh points into canonical or generated
@@ -1477,9 +1452,8 @@ to match. The methods need a declared hierarchy:
 
 The reconciliation sequence is:
 
-1. Calibrate and verify `tap_threshold` with
-   `PROBE_EDDY_CURRENT_TAP_CALIBRATE TAP=guess`, `TAP=refine`, and
-   `TAP=verify`, following the pinned Klipper procedure.
+1. Read and verify the canonical positive `tap_threshold` from `calib.yaml`.
+   Do not rediscover or overwrite it in the Iteration 1 workflow.
 2. Establish `tap_z_offset` only for measured, repeatable tap bias. Do not use
    it merely to make a one-off regular-probe result match.
 3. At one safe bed point, run repeated tap and regular probes using the two
@@ -1729,7 +1703,7 @@ hidden calibrated tool geometry: unchanged
 ## Iteration 2 integration and live test plan
 
 Iteration 1's own unit, simulation, deployment, and live-motion sequence is
-specified in I1.0-I1.10 above and must pass first. The phases below cover
+specified in I1.0-I1.9 above and must pass first. The phases below cover
 Iteration 2 and end-to-end regression after the hidden transform is added.
 They proceed from pure logic tests to guarded live motion; a later phase must
 not begin until the previous phase has passed and its evidence has been
@@ -2061,9 +2035,9 @@ Preconditions:
 
 Actions:
 
-1. Read `PROBE_EDDY_CURRENT_TAP_CALIBRATE` diagnostics and verify that the
-   configured threshold and calibration hashes match the accepted Iteration 1
-   report; do not recalibrate them in this regression phase.
+1. Read the canonical threshold and calibration hashes from `calib.yaml` and
+   verify they match the accepted Iteration 1 report; do not change them in
+   this regression phase.
 2. At bed point `P`, run repeated `PROBE METHOD=tap` samples with the nozzle at
    `P`.
 3. Move the nozzle to `(Px - x_offset, Py - y_offset)` and run repeated regular
@@ -2219,16 +2193,16 @@ one retained run report:
   mean and repeatability tolerances, with visible G-code offsets neutral;
 - exactly the same tap-derived endstop delta was applied to T0 and T1, leaving
   the vision-derived relative Z alignment unchanged;
-- final `reg_drive_current`, frequency/height table, tap threshold, and zero
-  `tap_z_offset` all originate from the recorded run and agree in `calib.yaml`,
-  generated config, and the active printer;
+- final `reg_drive_current` and frequency/height table originate from the
+  recorded run; the known-good tap threshold and zero `tap_z_offset` agree in
+  `calib.yaml`, generated config, and the active printer;
 - the verification mesh originates from a fresh scan in that run, remains
   runtime-only, and has no measured points in canonical or generated config;
 - regular Eddy and tap agree at identical physical bed coordinates within the
-  I1.7 tolerance after calibration;
+  I1.6 tolerance after calibration;
 - the loaded mesh evaluates to zero at `(150,150)` within tolerance;
 - at each safe verification point, `raw_tap_z - mesh_correction_z` is near
-  zero within the I1.9 per-point and RMS limits;
+  zero within the I1.8 per-point and RMS limits;
 - no raw Tap value away from center is misreported as a logical mesh-corrected
   coordinate;
 - every rejected sample, restart, deployment, and safety decision is retained;
@@ -2275,9 +2249,9 @@ separate implementation task; this document checks none of them.
       mandatory restart before frequency/height calibration.
 - [ ] Automate `PROBE_EDDY_CURRENT_CALIBRATE` by targeting verified native Z=0
       through the manual-probe API, then capture and deploy the table.
-- [ ] Automate tap threshold guess/refine/verify while keeping
+- [ ] Use the known-good tap threshold from `calib.yaml` for every tap, keeping
       `tap_z_offset: 0.000` for this baseline.
-- [ ] Re-anchor center contact with the final threshold and require same-point
+- [ ] Re-anchor center contact with the configured threshold and require same-point
       regular-Eddy/tap agreement.
 - [ ] Run a fresh full scan with `(150,150)` as zero reference and keep it
       active only in memory for verification.
@@ -2285,7 +2259,7 @@ separate implementation task; this document checks none of them.
       `raw_tap_z - mesh_correction_z`, not raw console Z alone.
 - [ ] Add state-machine, safety, fake-Moonraker, calibration parser, generator,
       deployment-parity, resume, and rollback tests.
-- [ ] Run I1.0-I1.10 under supervision and retain the complete passing report.
+- [ ] Run I1.0-I1.9 under supervision and retain the complete passing report.
 
 **Iteration 2: operator, G-code, and printing behavior**
 
@@ -2338,7 +2312,6 @@ code.
 | Probe result bed/test coordinates | [`manual_probe.create_probe_result`](klipper_setup/rp2040_firmware/klipper/klippy/extras/manual_probe.py#L8-L22) | [`manual_probe.py`](https://github.com/Klipper3d/klipper/blob/ca8230d505b7ba7fd225bfa6ed9655bc4520e805/klippy/extras/manual_probe.py#L8-L22) |
 | Manual-probe state, relative `TESTZ`, and `ACCEPT` | [`ManualProbeHelper`](klipper_setup/rp2040_firmware/klipper/klippy/extras/manual_probe.py#L163-L294) | [`manual_probe.py`](https://github.com/Klipper3d/klipper/blob/ca8230d505b7ba7fd225bfa6ed9655bc4520e805/klippy/extras/manual_probe.py#L163-L294) |
 | Pending `SAVE_CONFIG` status exposed to Moonraker | [`PrinterConfig.get_status` / `set`](klipper_setup/rp2040_firmware/klipper/klippy/configfile.py#L308-L324) | [`configfile.py`](https://github.com/Klipper3d/klipper/blob/ca8230d505b7ba7fd225bfa6ed9655bc4520e805/klippy/configfile.py#L308-L324) |
-| Tap threshold calibration | [`EddyTapCalibration`](klipper_setup/rp2040_firmware/klipper/klippy/extras/probe_eddy_current.py#L331-L439) | [`probe_eddy_current.py`](https://github.com/Klipper3d/klipper/blob/ca8230d505b7ba7fd225bfa6ed9655bc4520e805/klippy/extras/probe_eddy_current.py#L331-L439) |
 | Tap contact fitting and bias | [`EddyTap._analyze_pullback`](klipper_setup/rp2040_firmware/klipper/klippy/extras/probe_eddy_current.py#L862-L900) | [`probe_eddy_current.py`](https://github.com/Klipper3d/klipper/blob/ca8230d505b7ba7fd225bfa6ed9655bc4520e805/klippy/extras/probe_eddy_current.py#L862-L900) |
 | Eddy method dispatch and offsets | [`PrinterEddyProbe`](klipper_setup/rp2040_firmware/klipper/klippy/extras/probe_eddy_current.py#L1003-L1092) | [`probe_eddy_current.py`](https://github.com/Klipper3d/klipper/blob/ca8230d505b7ba7fd225bfa6ed9655bc4520e805/klippy/extras/probe_eddy_current.py#L1003-L1092) |
 | Eddy/tap offset application | [`EddyCalibrationTool.cmd_Z_OFFSET_APPLY_PROBE`](klipper_setup/rp2040_firmware/klipper/klippy/extras/probe_eddy_current.py#L301-L329) | [`probe_eddy_current.py`](https://github.com/Klipper3d/klipper/blob/ca8230d505b7ba7fd225bfa6ed9655bc4520e805/klippy/extras/probe_eddy_current.py#L301-L329) |

@@ -50,6 +50,20 @@ def test_tap_measurement_uses_probe_contact_not_post_retract_toolhead_position()
     assert post_retract_z - contact_z == pytest.approx(4.0)
 
 
+def test_tap_threshold_is_required_from_calib():
+    module = _load_module()
+
+    calibration = {
+        "eddy_relative_calibration": {"klipper": {"tap_threshold": 5000}}
+    }
+    assert module.configured_tap_threshold(calibration) == 5000
+
+    with pytest.raises(module.CalibrationError, match="tap_threshold"):
+        module.configured_tap_threshold(
+            {"eddy_relative_calibration": {"klipper": {"tap_threshold": None}}}
+        )
+
+
 def test_tap_acceptance_counts_rejections_and_enforces_spread():
     module = _load_module()
 
@@ -107,14 +121,14 @@ def test_pending_config_supports_mapping_and_record_shapes():
             [
                 {
                     "section": "probe_eddy_current btt_eddy",
-                    "option": "tap_threshold",
-                    "value": 4200,
+                    "option": "reg_drive_current",
+                    "value": 17,
                 }
             ],
             "probe_eddy_current btt_eddy",
-            "tap_threshold",
+            "reg_drive_current",
         )
-        == 4200
+        == 17
     )
     module.require_only_transient_mesh_pending(
         {"bed_mesh default": {"mesh_matrix": []}}
@@ -140,7 +154,7 @@ def test_mesh_inverse_and_atomic_calibration_update(tmp_path):
         "eddy_relative_calibration:\n"
         "  klipper:\n"
         "    reg_drive_current: 15\n"
-        "    tap_threshold: null\n"
+        "    tap_threshold: 5000\n"
         "    tap_z_offset: 0.000\n"
         "    calibrate: |\n"
         "      0.1:100,\n"
@@ -159,7 +173,6 @@ def test_mesh_inverse_and_atomic_calibration_update(tmp_path):
         {
             ("tools", "t0", "z_endstop"): 9.75,
             ("tools", "t1", "z_endstop"): 8.476,
-            ("eddy_relative_calibration", "klipper", "tap_threshold"): 5000,
             ("eddy_relative_calibration", "klipper", "tap_z_offset"): 0.0,
         },
     )
@@ -186,8 +199,9 @@ def test_mesh_interpolation_and_tap_acceptance_use_inverse_correction():
     assert result["max_abs"] <= 0.001
 
 
-def test_dry_run_does_not_send_gcode_or_write_artifacts(tmp_path):
+def test_dry_run_does_not_send_gcode_or_write_artifacts(tmp_path, monkeypatch):
     module = _load_module()
+    monkeypatch.setattr(module, "_run_local", lambda *args, **kwargs: None)
 
     class FakeClient:
         def __init__(self):
@@ -218,7 +232,6 @@ def test_dry_run_does_not_send_gcode_or_write_artifacts(tmp_path):
     runner = module.Iteration1Runner(
         client=client,
         store=store,
-        bootstrap_threshold=5000,
         dry_run=True,
         assume_yes=True,
     )

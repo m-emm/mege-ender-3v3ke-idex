@@ -2,8 +2,9 @@
 """Run the guarded IDEX Z Iteration 1 physical/sensor calibration.
 
 The script deliberately keeps measured mesh data out of the repository.  Eddy
-drive current, its height/frequency table, and the verified tap threshold are
-the only measured values that become canonical configuration.  The mesh made
+drive current and its height/frequency table are the only measured values that
+become canonical configuration.  The known-good tap threshold is read from
+``calib.yaml`` and is never discovered or overwritten by this workflow.  The mesh made
 by ``BED_MESH_CALIBRATE`` remains session-local evidence.
 
 Most of this module is intentionally dependency-light.  The pure calculation
@@ -62,7 +63,6 @@ CENTER_SPAN_TOLERANCE = 0.020
 MESH_CENTER_TOLERANCE = 0.005
 MESH_POINT_TOLERANCE = 0.030
 MESH_RMS_TOLERANCE = 0.015
-DEFAULT_TAP_THRESHOLD = 5000
 ARMING_PHRASE = "CALIBRATE IDEX Z ITERATION 1"
 
 
@@ -77,11 +77,10 @@ class Phase(str, Enum):
     CENTER_VERIFY = "I1.3"
     DRIVE_CURRENT = "I1.4"
     EDDY_CALIBRATION = "I1.5"
-    TAP_THRESHOLD = "I1.6"
-    REANCHOR = "I1.7"
-    MESH_SCAN = "I1.8"
-    MESH_VERIFY = "I1.9"
-    FINISH = "I1.10"
+    REANCHOR = "I1.6"
+    MESH_SCAN = "I1.7"
+    MESH_VERIFY = "I1.8"
+    FINISH = "I1.9"
 
 
 @dataclass(frozen=True)
@@ -712,6 +711,24 @@ def _load_raw_calibration() -> dict[str, Any]:
     return value
 
 
+def configured_tap_threshold(calibration: Mapping[str, Any]) -> int:
+    """Return the required known-good tap threshold from calib.yaml."""
+
+    try:
+        value = calibration["eddy_relative_calibration"]["klipper"][
+            "tap_threshold"
+        ]
+    except (KeyError, TypeError) as exc:
+        raise CalibrationError(
+            "calib.yaml must define eddy_relative_calibration.klipper.tap_threshold"
+        ) from exc
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise CalibrationError(
+            "calib.yaml tap_threshold must be a positive integer"
+        )
+    return value
+
+
 def _run_local(
     command: Sequence[str], *, check: bool = True
 ) -> subprocess.CompletedProcess[str]:
@@ -726,7 +743,6 @@ class Iteration1Runner:
         *,
         client: MoonrakerClient,
         store: ArtifactStore,
-        bootstrap_threshold: int,
         dry_run: bool = False,
         assume_yes: bool = False,
         sleep: Callable[[float], None] = time.sleep,
@@ -734,13 +750,12 @@ class Iteration1Runner:
     ) -> None:
         self.client = client
         self.store = store
-        self.bootstrap_threshold = int(bootstrap_threshold)
         self.dry_run = dry_run
         self.assume_yes = assume_yes
         self.sleep = sleep
-        self.tap_threshold = self.bootstrap_threshold
         self.state = RunState(run_id=store.path.name, phase=Phase.PREFLIGHT.value)
         self.raw_calibration = _load_raw_calibration()
+        self.tap_threshold = configured_tap_threshold(self.raw_calibration)
         if snapshot:
             self.store.copy(CALIB_PATH, "calib.yaml.before")
             self.store.copy(CONFIG_PATH, "printer.cfg.before")
@@ -940,7 +955,7 @@ class Iteration1Runner:
             y=REFERENCE_Y,
             count=TAP_SUCCESS_COUNT,
             max_attempts=TAP_MAX_ATTEMPTS,
-            tap_threshold=self.bootstrap_threshold,
+            tap_threshold=self.tap_threshold,
         )
         require_tap_acceptance(summary)
         self.checkpoint(
@@ -991,7 +1006,7 @@ class Iteration1Runner:
             y=REFERENCE_Y,
             count=5,
             max_attempts=5,
-            tap_threshold=self.bootstrap_threshold,
+            tap_threshold=self.tap_threshold,
         )
         if (
             abs(summary.mean) > CENTER_MEAN_TOLERANCE
@@ -1099,33 +1114,6 @@ class Iteration1Runner:
             Phase.EDDY_CALIBRATION,
             eddy_calibration=curve,
         )
-
-    def calibrate_tap_threshold(self) -> None:
-        self._home_clean_frame()
-        for mode in ("guess", "refine", "verify"):
-            self._gcode(
-                f"G1 X{REFERENCE_X:.3f} Y{REFERENCE_Y:.3f} Z5 F1200\n"
-                f"PROBE_EDDY_CURRENT_TAP_CALIBRATE TAP={mode}",
-                timeout=180.0,
-            )
-        if self.dry_run:
-            self.checkpoint(Phase.TAP_THRESHOLD, committed=False, tap_z_offset=0.0)
-            return
-        threshold = int(
-            self.capture_pending("probe_eddy_current btt_eddy", "tap_threshold")
-        )
-        if threshold <= 0:
-            raise CalibrationError(f"invalid proposed tap threshold: {threshold}")
-        self.deploy_value(
-            {
-                ("eddy_relative_calibration", "klipper", "tap_threshold"): threshold,
-                ("eddy_relative_calibration", "klipper", "tap_z_offset"): 0.0,
-            },
-            Phase.TAP_THRESHOLD,
-            tap_threshold=threshold,
-            tap_z_offset=0.0,
-        )
-        self.tap_threshold = threshold
 
     def verify_mesh_against_tap(self, mesh_status: Mapping[str, Any]) -> dict[str, Any]:
         matrix = mesh_status.get("mesh_matrix") or mesh_status.get("probed_matrix")
@@ -1235,8 +1223,6 @@ class Iteration1Runner:
         if index <= phases.index(Phase.DRIVE_CURRENT):
             self.calibrate_eddy_curve()
         if index <= phases.index(Phase.EDDY_CALIBRATION):
-            self.calibrate_tap_threshold()
-        if index <= phases.index(Phase.TAP_THRESHOLD):
             self.verify_center(Phase.REANCHOR)
         if index <= phases.index(Phase.REANCHOR):
             self.final_mesh()
@@ -1280,7 +1266,6 @@ class Iteration1Runner:
         self.verify_center()
         self.calibrate_drive_current()
         self.calibrate_eddy_curve()
-        self.calibrate_tap_threshold()
         self.verify_center(Phase.REANCHOR)
         self.final_mesh()
         self.checkpoint(Phase.FINISH, committed=True, note="Iteration 1 complete")
@@ -1310,9 +1295,6 @@ def rollback(run_directory: Path, *, host: str, assume_yes: bool) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default=DEFAULT_HOST)
-    parser.add_argument(
-        "--bootstrap-tap-threshold", type=int, default=DEFAULT_TAP_THRESHOLD
-    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--resume", type=Path)
     parser.add_argument("--rollback", type=Path)
@@ -1341,7 +1323,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             runner = Iteration1Runner(
                 client=MoonrakerClient(args.host),
                 store=store,
-                bootstrap_threshold=args.bootstrap_tap_threshold,
                 dry_run=False,
                 assume_yes=args.yes,
                 snapshot=False,
@@ -1361,7 +1342,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         runner = Iteration1Runner(
             client=MoonrakerClient(args.host),
             store=store,
-            bootstrap_threshold=args.bootstrap_tap_threshold,
             dry_run=args.dry_run,
             assume_yes=args.yes,
         )

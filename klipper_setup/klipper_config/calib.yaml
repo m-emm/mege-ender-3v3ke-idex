@@ -35,8 +35,8 @@ eddy_relative_calibration:
     z: 1.399
   klipper:
     reg_drive_current: 15
-    # The final threshold is populated by the supervised Iteration 1 runner.
-    tap_threshold: null
+    # Known-good printer threshold; Iteration 1 does not discover or mutate it.
+    tap_threshold: 5000
     tap_z_offset: 0.000
     calibrate: |
         0.050000:3222353.985,0.090000:3221784.599,0.130000:3221192.278,
