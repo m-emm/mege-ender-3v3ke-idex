@@ -50,6 +50,44 @@ def test_tap_measurement_uses_probe_contact_not_post_retract_toolhead_position()
     assert post_retract_z - contact_z == pytest.approx(4.0)
 
 
+def test_regular_eddy_probe_measurement_uses_canonical_probe_result():
+    module = _load_module()
+
+    assert module.probe_result_z_from_status(
+        {"probe": {"last_probe_position": [150.0, 150.0, 0.012, 0.0]}}
+    ) == pytest.approx(0.012)
+
+    with pytest.raises(module.CalibrationError, match="non-finite"):
+        module.probe_result_z_from_status(
+            {"probe": {"last_probe_position": [150.0, 150.0, float("nan")]}}
+        )
+
+
+def test_post_eddy_probe_reference_runs_regular_probe_and_records_evidence():
+    module = _load_module()
+
+    class Store:
+        def __init__(self):
+            self.writes = {}
+
+        def write_json(self, name, value):
+            self.writes[name] = value
+
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = True
+    runner.store = Store()
+    scripts = []
+    runner._gcode = scripts.append
+
+    evidence = runner.verify_eddy_probe_reference()
+
+    assert scripts == [
+        "G90\nG1 X150.000 Y150.000 Z5 F1200\nPROBE METHOD=probe"
+    ]
+    assert evidence["probe_z"] == pytest.approx(0.0)
+    assert runner.store.writes["post-eddy-probe-reference.json"] == evidence
+
+
 def test_get_position_parser_retains_raw_steps_and_coordinate_layers():
     module = _load_module()
 

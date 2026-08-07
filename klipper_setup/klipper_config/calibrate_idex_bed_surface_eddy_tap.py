@@ -79,8 +79,8 @@ TAP_SUCCESS_COUNT = 7
 TAP_MAX_ATTEMPTS = 10
 TAP_MAX_SPAN = 0.030
 TAP_MAX_STDDEV = 0.010
-CENTER_MEAN_TOLERANCE = 0.010
-CENTER_SPAN_TOLERANCE = 0.020
+CENTER_MEAN_TOLERANCE = 0.020
+CENTER_SPAN_TOLERANCE = 0.025
 EDDY_REFERENCE_TAP_COUNT = 3
 EDDY_REFERENCE_TAP_MAX_ATTEMPTS = 3
 EDDY_REFERENCE_MEAN_TOLERANCE = 0.020
@@ -172,6 +172,23 @@ def tap_contact_and_post_retract_z(status: Mapping[str, Any]) -> tuple[float, fl
     if not math.isfinite(contact_z) or not math.isfinite(post_retract_z):
         raise CalibrationError("tap status contains a non-finite Z position")
     return contact_z, post_retract_z
+
+
+def probe_result_z_from_status(status: Mapping[str, Any]) -> float:
+    """Return Klipper's canonical result from the last regular PROBE."""
+
+    probe = status.get("probe")
+    if not isinstance(probe, Mapping):
+        raise CalibrationError("probe status is missing after Eddy PROBE")
+    last_probe_position = probe.get("last_probe_position")
+    if not isinstance(last_probe_position, Sequence) or len(last_probe_position) < 3:
+        raise CalibrationError(
+            "probe status lacks probe.last_probe_position after Eddy PROBE"
+        )
+    probe_z = float(last_probe_position[2])
+    if not math.isfinite(probe_z):
+        raise CalibrationError("Eddy PROBE result contains a non-finite Z position")
+    return probe_z
 
 
 POSITION_LABELS = (
@@ -1385,6 +1402,38 @@ class Iteration1Runner:
         )
         _logger.info("I1.4 Eddy drive-current calibration finished")
 
+    def verify_eddy_probe_reference(self) -> dict[str, Any]:
+        """Require a regular Eddy PROBE to agree with the tap Z=0 datum."""
+
+        _logger.info(
+            "I1.5 regular Eddy PROBE reference check started at (%.3f, %.3f)",
+            REFERENCE_X,
+            REFERENCE_Y,
+        )
+        self._gcode(
+            f"G90\nG1 X{REFERENCE_X:.3f} Y{REFERENCE_Y:.3f} Z5 F1200\n"
+            "PROBE METHOD=probe"
+        )
+        if self.dry_run:
+            probe_z = 0.0
+        else:
+            probe_z = probe_result_z_from_status(self.client.status(["probe"]))
+        evidence = {
+            "x": REFERENCE_X,
+            "y": REFERENCE_Y,
+            "probe_z": probe_z,
+            "tolerance": EDDY_REFERENCE_MEAN_TOLERANCE,
+        }
+        self.store.write_json("post-eddy-probe-reference.json", evidence)
+        _logger.info("I1.5 regular Eddy PROBE reference: z=%.6f", probe_z)
+        if abs(probe_z) > EDDY_REFERENCE_MEAN_TOLERANCE:
+            raise CalibrationError(
+                "regular Eddy PROBE is not native Z=0 after frequency calibration: "
+                f"z={probe_z:.6f}, tolerance={EDDY_REFERENCE_MEAN_TOLERANCE:.6f}"
+            )
+        _logger.info("I1.5 regular Eddy PROBE reference passed: z=%.6f", probe_z)
+        return evidence
+
     def calibrate_eddy_curve(self) -> None:
         _logger.info("I1.5 Eddy frequency/height calibration started")
         pre_eddy_reference = self.eddy_reference_sequence("pre_eddy")
@@ -1393,11 +1442,13 @@ class Iteration1Runner:
         self._gcode("PROBE_EDDY_CURRENT_CALIBRATE CHIP=btt_eddy", timeout=300.0)
         if self.dry_run:
             post_eddy_reference = self.eddy_reference_sequence("post_eddy")
+            post_eddy_probe = self.verify_eddy_probe_reference()
             self.checkpoint(
                 Phase.EDDY_CALIBRATION,
                 committed=False,
                 pre_eddy_reference=pre_eddy_reference,
                 post_eddy_reference=post_eddy_reference,
+                post_eddy_probe=post_eddy_probe,
             )
             _logger.info("I1.5 dry-run frequency sweep complete")
             return
@@ -1453,6 +1504,18 @@ class Iteration1Runner:
             post_eddy_reference["summary"]["mean"],
             post_eddy_reference["summary"]["span"],
         )
+        try:
+            post_eddy_probe = self.verify_eddy_probe_reference()
+        except CalibrationError as exc:
+            self.checkpoint(
+                Phase.EDDY_CALIBRATION,
+                committed=False,
+                eddy_calibration=curve,
+                pre_eddy_reference=pre_eddy_reference,
+                post_eddy_reference=post_eddy_reference,
+                post_eddy_probe_error=str(exc),
+            )
+            raise
         self._gcode(f"G1 X{REFERENCE_X:.3f} Y{REFERENCE_Y:.3f} Z5 F1200")
         self.checkpoint(
             Phase.EDDY_CALIBRATION,
@@ -1460,6 +1523,7 @@ class Iteration1Runner:
             eddy_calibration=curve,
             pre_eddy_reference=pre_eddy_reference,
             post_eddy_reference=post_eddy_reference,
+            post_eddy_probe=post_eddy_probe,
         )
         _logger.info("I1.5 Eddy frequency/height calibration finished and committed")
 

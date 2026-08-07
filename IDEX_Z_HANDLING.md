@@ -580,7 +580,10 @@ Use this order to remove the discrepancy without hiding its cause:
    `GET_POSITION` snapshot, and only then run
    `PROBE_EDDY_CURRENT_CALIBRATE` using native center Z=0 as the contact
    reference. Repeat the same three-tap and full-position evidence after the
-   new frequency curve is deployed.
+   new frequency curve is deployed, then require a regular Eddy `PROBE` at the
+   same reference point to report approximately Z=0 as well. The regular-probe
+   result uses the same ±0.020 mm center-reference gate and is recorded before
+   I1.5 can be committed.
 5. **Re-anchor and compare methods.** Recheck center tap with the configured
    threshold and compare tap/regular Eddy at identical physical points. A full
    recalibration is preferred over translating an uncertain old curve.
@@ -778,7 +781,7 @@ The supported steps are:
 | `center-verify` | Verify five center taps at native Z=0 |
 | `tap-baseline` | Run `bootstrap-tap`, `update-endstops`, and `center-verify` in sequence |
 | `drive-current` | Run the Eddy drive-current calibration and deploy its result |
-| `eddy-frequency` | Run the guarded Eddy height/frequency calibration, including pre/post three-tap references |
+| `eddy-frequency` | Run the guarded Eddy height/frequency calibration, including pre/post three-tap references and a post-calibration regular Eddy `PROBE` Z=0 check |
 | `reanchor` | Repeat the post-Eddy center verification |
 | `mesh` | Scan, activate, and validate the transient default mesh |
 | `run` | Execute the complete fresh Iteration 1 workflow |
