@@ -232,7 +232,7 @@ def test_legacy_run_state_is_rejected_after_reanchor_removal(tmp_path):
         module._load_run_state(run_dir)
 
 
-def test_resume_after_eddy_calibration_runs_mesh_without_reanchor():
+def test_resume_after_eddy_calibration_runs_mesh_from_a_clean_frame():
     module = _load_module()
     runner = object.__new__(module.Iteration1Runner)
     runner.state = module.RunState(
@@ -243,16 +243,22 @@ def test_resume_after_eddy_calibration_runs_mesh_without_reanchor():
     calls = []
     runner.confirm = lambda: calls.append("confirm")
     runner.preflight = lambda **kwargs: calls.append("preflight")
-    runner.final_mesh = lambda: calls.append("mesh")
+    runner.final_mesh = lambda *, clean_frame=True: calls.append(f"mesh:{clean_frame}")
     runner.checkpoint = lambda phase, **kwargs: calls.append(phase.value)
     runner.write_final_report = lambda: calls.append("report")
 
     runner.resume()
 
-    assert calls == ["confirm", "preflight", "mesh", module.Phase.FINISH.value, "report"]
+    assert calls == [
+        "confirm",
+        "preflight",
+        "mesh:True",
+        module.Phase.FINISH.value,
+        "report",
+    ]
 
 
-def test_full_run_skips_duplicate_reanchor_verification():
+def test_full_run_reuses_verified_frames_for_drive_current_and_mesh():
     module = _load_module()
     runner = object.__new__(module.Iteration1Runner)
     runner.dry_run = False
@@ -265,9 +271,11 @@ def test_full_run_skips_duplicate_reanchor_verification():
     )
     runner.update_endstops = lambda median: calls.append("endstops")
     runner.verify_center = lambda *args, **kwargs: calls.append("center")
-    runner.calibrate_drive_current = lambda: calls.append("drive")
+    runner.calibrate_drive_current = (
+        lambda *, clean_frame=True: calls.append(f"drive:{clean_frame}")
+    )
     runner.calibrate_eddy_curve = lambda: calls.append("eddy")
-    runner.final_mesh = lambda: calls.append("mesh")
+    runner.final_mesh = lambda *, clean_frame=True: calls.append(f"mesh:{clean_frame}")
     runner.checkpoint = lambda phase, **kwargs: calls.append(phase.value)
     runner.write_final_report = lambda: calls.append("report")
 
@@ -279,9 +287,9 @@ def test_full_run_skips_duplicate_reanchor_verification():
         "bootstrap",
         "endstops",
         "center",
-        "drive",
+        "drive:False",
         "eddy",
-        "mesh",
+        "mesh:False",
         module.Phase.FINISH.value,
         "report",
     ]
@@ -422,9 +430,7 @@ def test_mesh_interpolation_and_tap_acceptance_use_inverse_correction():
     assert result["max_abs"] <= 0.001
 
 
-def test_mesh_verification_attempts_all_points_before_failing(tmp_path):
-    module = _load_module()
-
+def _mesh_verification_runner(module):
     class Store:
         def __init__(self):
             self.writes = {}
@@ -440,6 +446,20 @@ def test_mesh_verification_attempts_all_points_before_failing(tmp_path):
     }
     runner.tap_threshold = 6500
     runner.store = Store()
+    return runner
+
+
+def _flat_mesh():
+    return {
+        "mesh_matrix": [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
+        "mesh_min": [0.0, 20.0],
+        "mesh_max": [190.0, 275.0],
+    }
+
+
+def test_mesh_reference_failure_still_attempts_all_grid_points():
+    module = _load_module()
+    runner = _mesh_verification_runner(module)
     attempted = []
 
     def collect_taps(**kwargs):
@@ -451,20 +471,89 @@ def test_mesh_verification_attempts_all_points_before_failing(tmp_path):
         return summary, [{"attempt": index, "ok": True, "z": 0.0} for index in range(1, 4)]
 
     runner.collect_taps = collect_taps
-    mesh = {
-        "mesh_matrix": [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
-        "mesh_min": [0.0, 20.0],
-        "mesh_max": [190.0, 275.0],
-    }
+
+    with pytest.raises(module.CalibrationError, match="surveyed all 9 points"):
+        runner.verify_mesh_against_tap(_flat_mesh())
+
+    assert attempted[0] == (module.REFERENCE_X, module.REFERENCE_Y)
+    assert len(attempted) == 10
+    report = runner.store.writes["mesh-verification.json"]
+    assert report["attempted_points"] == 9
+    assert report["successful_points"] == 9
+    assert report["failed_points"] == []
+    assert report["reference"]["ok"] is False
+    assert report["reference"]["error"] == "no successful tap samples"
+
+
+def test_mesh_reference_success_records_exact_center_evidence():
+    module = _load_module()
+    runner = _mesh_verification_runner(module)
+    attempted = []
+
+    def collect_taps(**kwargs):
+        attempted.append((kwargs["x"], kwargs["y"]))
+        summary = module.summarize_taps([0.0, 0.0, 0.0], attempts=3)
+        return summary, [{"attempt": index, "ok": True, "z": 0.0} for index in range(1, 4)]
+
+    runner.collect_taps = collect_taps
+
+    report = runner.verify_mesh_against_tap(_flat_mesh())
+
+    assert len(attempted) == 10
+    reference = report["reference"]
+    assert reference["point"] == {"x": 150.0, "y": 150.0}
+    assert reference["ok"] is True
+    assert reference["samples"] == [0.0, 0.0, 0.0]
+    assert reference["summary"]["mean"] == pytest.approx(0.0)
+    assert reference["summary"]["span"] == pytest.approx(0.0)
+    assert reference["mesh_correction"] == pytest.approx(0.0)
+    assert reference["mesh_corrected_mean"] == pytest.approx(0.0)
+
+
+@pytest.mark.parametrize(
+    ("reference_samples", "mesh", "expected_error"),
+    [
+        (
+            (0.0, 0.0, 0.0),
+            {
+                "mesh_matrix": [[0.01, 0.01], [0.01, 0.01]],
+                "mesh_min": [0.0, 20.0],
+                "mesh_max": [190.0, 275.0],
+            },
+            "reference mesh correction exceeds tolerance",
+        ),
+        (
+            (0.04, 0.04, 0.04),
+            _flat_mesh(),
+            "mesh-corrected reference tap exceeds point tolerance",
+        ),
+    ],
+)
+def test_mesh_reference_failure_records_correction_and_corrected_mean(
+    reference_samples, mesh, expected_error
+):
+    module = _load_module()
+    runner = _mesh_verification_runner(module)
+    calls = 0
+
+    def collect_taps(**kwargs):
+        nonlocal calls
+        calls += 1
+        samples = reference_samples if calls == 1 else (0.0, 0.0, 0.0)
+        summary = module.summarize_taps(samples, attempts=3)
+        return summary, [{"attempt": index, "ok": True, "z": samples[0]} for index in range(1, 4)]
+
+    runner.collect_taps = collect_taps
 
     with pytest.raises(module.CalibrationError, match="surveyed all 9 points"):
         runner.verify_mesh_against_tap(mesh)
 
-    assert len(attempted) == 9
     report = runner.store.writes["mesh-verification.json"]
-    assert report["attempted_points"] == 9
-    assert report["successful_points"] == 8
-    assert len(report["failed_points"]) == 1
+    assert calls == 10
+    assert report["reference"]["ok"] is False
+    assert expected_error in report["reference"]["error"]
+    assert "mesh_correction" in report["reference"]
+    assert "mesh_corrected_mean" in report["reference"]
 
 
 def test_final_mesh_runs_one_scan_at_final_clearance():
@@ -474,7 +563,8 @@ def test_final_mesh_runs_one_scan_at_final_clearance():
     runner.dry_run = True
     scripts = []
     checkpoints = []
-    runner._home_clean_frame = lambda: None
+    homes = []
+    runner._home_clean_frame = lambda: homes.append("home")
     runner._gcode = lambda script, **kwargs: scripts.append((script, kwargs))
     runner.checkpoint = lambda *args, **kwargs: checkpoints.append((args, kwargs))
 
@@ -487,6 +577,75 @@ def test_final_mesh_runs_one_scan_at_final_clearance():
         )
     ]
     assert checkpoints == [((module.Phase.MESH_SCAN,), {"committed": False})]
+    assert homes == ["home"]
+
+
+def test_final_mesh_can_reuse_committed_post_eddy_frame():
+    module = _load_module()
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = True
+    homes = []
+    runner._home_clean_frame = lambda: homes.append("home")
+    runner._gcode = lambda *args, **kwargs: None
+    runner.checkpoint = lambda *args, **kwargs: None
+
+    runner.final_mesh(clean_frame=False)
+
+    assert homes == []
+
+
+def test_drive_current_can_reuse_verified_frame_with_safe_lift():
+    module = _load_module()
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = True
+    runner.raw_calibration = {
+        "eddy_relative_calibration": {
+            "nozzle_to_coil": {"x": -57.391, "y": -18.997, "z": 1.399}
+        }
+    }
+    homes = []
+    scripts = []
+    runner._home_clean_frame = lambda: homes.append("home")
+    runner._gcode = lambda script, **kwargs: scripts.append((script, kwargs))
+    runner.checkpoint = lambda *args, **kwargs: None
+
+    runner.calibrate_drive_current(clean_frame=False)
+
+    assert homes == []
+    assert scripts[0] == (
+        "G90\nG1 Z20.000 F1200\nG1 X207.391 Y168.997 F1200\nG1 Z18.601 F1200",
+        {},
+    )
+    assert scripts[1] == ("LDC_CALIBRATE_DRIVE_CURRENT CHIP=btt_eddy", {"timeout": 120.0})
+
+
+def test_direct_drive_current_and_mesh_steps_start_with_clean_frame():
+    module = _load_module()
+    drive_runner = object.__new__(module.Iteration1Runner)
+    drive_runner.dry_run = True
+    drive_runner.raw_calibration = {
+        "eddy_relative_calibration": {
+            "nozzle_to_coil": {"x": -57.391, "y": -18.997, "z": 1.399}
+        }
+    }
+    drive_homes = []
+    drive_runner._home_clean_frame = lambda: drive_homes.append("home")
+    drive_runner._gcode = lambda *args, **kwargs: None
+    drive_runner.checkpoint = lambda *args, **kwargs: None
+
+    drive_runner.calibrate_drive_current()
+
+    mesh_runner = object.__new__(module.Iteration1Runner)
+    mesh_runner.dry_run = True
+    mesh_homes = []
+    mesh_runner._home_clean_frame = lambda: mesh_homes.append("home")
+    mesh_runner._gcode = lambda *args, **kwargs: None
+    mesh_runner.checkpoint = lambda *args, **kwargs: None
+
+    mesh_runner.final_mesh()
+
+    assert drive_homes == ["home"]
+    assert mesh_homes == ["home"]
 
 
 def test_dry_run_does_not_send_gcode_or_write_artifacts(tmp_path, monkeypatch):

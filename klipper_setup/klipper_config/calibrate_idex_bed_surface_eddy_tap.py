@@ -1422,16 +1422,26 @@ class Iteration1Runner:
             self.checkpoint(phase, committed=True, **evidence)
         _logger.info("canonical update deployed: phase=%s", phase.value)
 
-    def calibrate_drive_current(self) -> None:
+    def calibrate_drive_current(self, *, clean_frame: bool = True) -> None:
         _logger.info("I1.4 Eddy drive-current calibration started")
-        self._home_clean_frame()
         eddy = self.raw_calibration["eddy_relative_calibration"]["nozzle_to_coil"]
         coil_pose = coil_over_target_pose(
             Pose(REFERENCE_X, REFERENCE_Y, 20.0), Pose(**eddy)
         )
-        self._gcode(
-            f"G1 X{coil_pose.x:.3f} Y{coil_pose.y:.3f} Z{coil_pose.z:.3f} F1200"
-        )
+        if clean_frame:
+            self._home_clean_frame()
+            self._gcode(
+                f"G1 X{coil_pose.x:.3f} Y{coil_pose.y:.3f} Z{coil_pose.z:.3f} F1200"
+            )
+        else:
+            _logger.info(
+                "I1.4 reusing the verified center frame; lifting before coil motion"
+            )
+            self._gcode(
+                f"G90\nG1 Z20.000 F1200\n"
+                f"G1 X{coil_pose.x:.3f} Y{coil_pose.y:.3f} F1200\n"
+                f"G1 Z{coil_pose.z:.3f} F1200"
+            )
         self._gcode("LDC_CALIBRATE_DRIVE_CURRENT CHIP=btt_eddy", timeout=120.0)
         if self.dry_run:
             self.checkpoint(
@@ -1846,6 +1856,88 @@ class Iteration1Runner:
             coil_offset_x=float(eddy["x"]),
             coil_offset_y=float(eddy["y"]),
         )
+        reference = MeshPoint(REFERENCE_X, REFERENCE_Y)
+        _logger.info(
+            "mesh reference verification started: x=%.3f y=%.3f",
+            reference.x,
+            reference.y,
+        )
+        reference_summary, reference_attempts = self.collect_taps(
+            x=reference.x,
+            y=reference.y,
+            count=3,
+            max_attempts=3,
+            tap_threshold=self.tap_threshold,
+            allow_empty=True,
+        )
+        reference_result: dict[str, Any] = {
+            "point": {"x": reference.x, "y": reference.y},
+            "attempts": reference_attempts,
+            "ok": False,
+        }
+        reference_errors: list[str] = []
+        if reference_summary is None:
+            reference_errors.append("no successful tap samples")
+        else:
+            reference_result["summary"] = asdict(reference_summary)
+            reference_result["samples"] = list(reference_summary.successful)
+            try:
+                reference_correction = mesh_correction_at(
+                    matrix,
+                    mesh_min=mesh_min,
+                    mesh_max=mesh_max,
+                    point=reference,
+                )
+            except Exception as exc:
+                reference_errors.append(str(exc))
+            else:
+                reference_corrected_mean = mesh_corrected_contact_z(
+                    reference_summary.mean, reference_correction
+                )
+                reference_result["mesh_correction"] = reference_correction
+                reference_result["mesh_corrected_mean"] = reference_corrected_mean
+                if (
+                    len(reference_summary.successful) != 3
+                    or reference_summary.rejected_attempts
+                ):
+                    reference_errors.append(
+                        "reference tap rejected a sample: "
+                        f"successful={len(reference_summary.successful)}, "
+                        f"rejected={reference_summary.rejected_attempts}"
+                    )
+                if reference_summary.span > 0.020:
+                    reference_errors.append(
+                        "reference tap span exceeds 0.020 mm: "
+                        f"span={reference_summary.span:.6f}"
+                    )
+                if abs(reference_correction) > MESH_CENTER_TOLERANCE:
+                    reference_errors.append(
+                        "reference mesh correction exceeds tolerance: "
+                        f"correction={reference_correction:.6f}, "
+                        f"tolerance={MESH_CENTER_TOLERANCE:.6f}"
+                    )
+                if abs(reference_corrected_mean) > MESH_POINT_TOLERANCE:
+                    reference_errors.append(
+                        "mesh-corrected reference tap exceeds point tolerance: "
+                        f"mean={reference_corrected_mean:.6f}, "
+                        f"tolerance={MESH_POINT_TOLERANCE:.6f}"
+                    )
+        if reference_errors:
+            reference_result["error"] = "; ".join(reference_errors)
+            _logger.warning(
+                "mesh reference verification failed: %s; continuing through grid",
+                reference_result["error"],
+            )
+        else:
+            reference_result["ok"] = True
+            _logger.info(
+                "mesh reference verification passed: mean=%.6f correction=%.6f "
+                "corrected_mean=%.6f span=%.6f",
+                reference_summary.mean,
+                reference_result["mesh_correction"],
+                reference_result["mesh_corrected_mean"],
+                reference_summary.span,
+            )
         tap_samples: dict[MeshPoint, tuple[float, ...]] = {}
         corrections: dict[MeshPoint, float] = {}
         point_results: list[dict[str, Any]] = []
@@ -1941,35 +2033,46 @@ class Iteration1Runner:
             }
         verification.update(
             {
+                "reference": reference_result,
                 "point_results": point_results,
                 "failed_points": failed_points,
                 "attempted_points": len(grid),
                 "successful_points": len(tap_samples),
             }
         )
-        if global_error is not None:
-            verification["error"] = global_error
-        self.store.write_json("mesh-verification.json", verification)
+        failures: list[str] = []
+        if reference_errors:
+            failures.append(
+                "reference "
+                f"({reference.x:.3f},{reference.y:.3f}): "
+                f"{reference_result['error']}"
+            )
         if failed_points:
             failed_labels = ", ".join(
                 f"({item['point']['x']:.3f},{item['point']['y']:.3f})"
                 for item in failed_points
             )
-            raise CalibrationError(
-                "mesh verification surveyed all "
-                f"{len(grid)} points but failed at {len(failed_points)}: "
-                f"{failed_labels}"
+            failures.append(
+                f"grid acquisition failed at {len(failed_points)}: {failed_labels}"
             )
         if global_error is not None:
+            failures.append(f"grid global gate: {global_error}")
+        if failures:
+            verification["error"] = "; ".join(failures)
+        self.store.write_json("mesh-verification.json", verification)
+        if failures:
             raise CalibrationError(
-                "mesh verification surveyed all points but failed its global gate: "
-                f"{global_error}"
+                "mesh verification surveyed all "
+                f"{len(grid)} points but failed: {verification['error']}"
             )
         return verification
 
-    def final_mesh(self) -> None:
+    def final_mesh(self, *, clean_frame: bool = True) -> None:
         _logger.info("I1.6/I1.7 final transient mesh scan started")
-        self._home_clean_frame()
+        if clean_frame:
+            self._home_clean_frame()
+        else:
+            _logger.info("I1.6 reusing the committed post-Eddy clean frame")
         if not self.dry_run:
             before = self.client.status(["configfile"])
             pending = before.get("configfile", {}).get("save_config_pending_items", {})
@@ -2073,9 +2176,9 @@ class Iteration1Runner:
         summary = self.bootstrap_tap()
         self.update_endstops(summary.median)
         self.verify_center()
-        self.calibrate_drive_current()
+        self.calibrate_drive_current(clean_frame=False)
         self.calibrate_eddy_curve()
-        self.final_mesh()
+        self.final_mesh(clean_frame=False)
         self.checkpoint(Phase.FINISH, committed=True, note="Iteration 1 complete")
         self.write_final_report()
         return self.state

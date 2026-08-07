@@ -1184,6 +1184,11 @@ then fails the workflow after the full grid has been surveyed. A failed survey
 therefore leaves the transient mesh and a location-specific report available
 for diagnosis.
 
+In an uninterrupted `run`, the verified I1.3 frame is reused for I1.4 after a
+safe lift before moving the coil in XY, and the committed post-Eddy I1.5 frame
+is reused for I1.6. These are the only skipped homes. Direct CLI steps and all
+resumed workflow boundaries still begin from the full clean homed frame.
+
 #### I1.6: full bed scan
 
 With center tap verified at native Z=0 and regular Eddy aligned to tap:
@@ -1230,6 +1235,15 @@ mesh_corrected_contact_z(x,y)
 Equivalently, this is the contact position obtained by applying the bed-mesh
 inverse. Expecting the raw `PROBE METHOD=tap` console value itself to be zero
 away from center would be incorrect.
+
+Before the 3x3 survey, additionally collect three taps at the exact reference
+point `(150,150)` without clearing or re-homing. Its active-mesh correction
+must be within +/-0.005 mm and its mesh-corrected mean must meet the normal
+per-point tolerance; all three taps must succeed with span at most 0.020 mm.
+The raw samples, correction, corrected mean, and any failure reason are kept
+under `reference` in `mesh-verification.json`. A failed reference gate does
+not stop the remaining 3x3 survey; the workflow fails only after all nine grid
+points have been collected.
 
 Iteration 1 passes when:
 

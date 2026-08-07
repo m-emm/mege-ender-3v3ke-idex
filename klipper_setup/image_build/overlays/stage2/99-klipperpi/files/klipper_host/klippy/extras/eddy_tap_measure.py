@@ -5,6 +5,7 @@
 
 import statistics
 
+
 COMPARISON_XY_TOLERANCE = 0.020
 
 
@@ -19,7 +20,9 @@ class EddyTapMeasure:
         self.move_z = config.getfloat("move_z", 5.0, above=0.0)
         self.move_speed = config.getfloat("move_speed", 20.0, above=0.0)
         probe_config = config.getsection("probe_eddy_current btt_eddy")
-        self.tap_threshold = probe_config.getfloat("tap_threshold", 0.0, minval=0.0)
+        self.tap_threshold = probe_config.getfloat(
+            "tap_threshold", 0.0, minval=0.0
+        )
         self.default_count = config.getint("default_count", 7, minval=1)
         self.gcode.register_command(
             "_EDDY_TAP_MEASURE",
@@ -82,9 +85,7 @@ class EddyTapMeasure:
             self._axis_value(axis_minimum, 1, "y"),
             self._axis_value(axis_maximum, 1, "y"),
         )
-        if not (
-            bounds[0] <= nozzle_x <= bounds[1] and bounds[2] <= nozzle_y <= bounds[3]
-        ):
+        if not (bounds[0] <= nozzle_x <= bounds[1] and bounds[2] <= nozzle_y <= bounds[3]):
             return None, (nozzle_x, nozzle_y), bounds
         return (nozzle_x, nozzle_y), (nozzle_x, nozzle_y), bounds
 
@@ -207,9 +208,7 @@ class EddyTapMeasure:
                 "expected=(%.3f, %.3f), got=(%.3f, %.3f)"
                 % (x, y, result.bed_x, result.bed_y)
             )
-        self.gcode.run_script_from_command(
-            "G90\nG1 Z%.3f F%.0f" % (self.move_z, self.move_speed * 60.0)
-        )
+        self.gcode.run_script_from_command("G90\nG1 Z%.3f F%.0f" % (self.move_z, self.move_speed * 60.0))
         toolhead.wait_moves()
         eddy_probe_z = float(result.bed_z)
         gcmd.respond_info(
