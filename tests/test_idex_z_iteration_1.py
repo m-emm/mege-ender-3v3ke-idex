@@ -196,6 +196,7 @@ def test_cli_exposes_each_calibration_phase_as_a_named_step():
         "mesh",
         "resume",
     }
+    assert "reanchor" not in module.STEP_CHOICES
 
 
 def test_direct_step_can_reload_stale_run_state_but_resume_remains_strict(tmp_path, monkeypatch):
@@ -204,6 +205,7 @@ def test_direct_step_can_reload_stale_run_state_but_resume_remains_strict(tmp_pa
     run_dir.mkdir()
     (run_dir / "state.json").write_text(
         '{"run_id": "run", "phase": "I1.1", '
+        f'"workflow_version": {module.WORKFLOW_VERSION}, '
         '"source_hashes": {"calib.yaml": "old"}, "evidence": {}}\n',
         encoding="utf-8",
     )
@@ -214,6 +216,75 @@ def test_direct_step_can_reload_stale_run_state_but_resume_remains_strict(tmp_pa
 
     state = module._load_run_state(run_dir, strict_hashes=False)
     assert state.run_id == "run"
+
+
+def test_legacy_run_state_is_rejected_after_reanchor_removal(tmp_path):
+    module = _load_module()
+    run_dir = tmp_path / "legacy-run"
+    run_dir.mkdir()
+    (run_dir / "state.json").write_text(
+        '{"run_id": "legacy-run", "phase": "I1.6", '
+        '"committed_phase": "I1.6", "evidence": {}}\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(module.CalibrationError, match="unsupported workflow version"):
+        module._load_run_state(run_dir)
+
+
+def test_resume_after_eddy_calibration_runs_mesh_without_reanchor():
+    module = _load_module()
+    runner = object.__new__(module.Iteration1Runner)
+    runner.state = module.RunState(
+        run_id="resume-after-eddy",
+        phase=module.Phase.EDDY_CALIBRATION.value,
+        committed_phase=module.Phase.EDDY_CALIBRATION.value,
+    )
+    calls = []
+    runner.confirm = lambda: calls.append("confirm")
+    runner.preflight = lambda **kwargs: calls.append("preflight")
+    runner.final_mesh = lambda: calls.append("mesh")
+    runner.checkpoint = lambda phase, **kwargs: calls.append(phase.value)
+    runner.write_final_report = lambda: calls.append("report")
+
+    runner.resume()
+
+    assert calls == ["confirm", "preflight", "mesh", module.Phase.FINISH.value, "report"]
+
+
+def test_full_run_skips_duplicate_reanchor_verification():
+    module = _load_module()
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = False
+    runner.state = module.RunState(run_id="full-run", phase=module.Phase.PREFLIGHT.value)
+    calls = []
+    runner.confirm = lambda: calls.append("confirm")
+    runner.preflight = lambda: calls.append("preflight")
+    runner.bootstrap_tap = lambda: (
+        calls.append("bootstrap") or type("Summary", (), {"median": 0.0})()
+    )
+    runner.update_endstops = lambda median: calls.append("endstops")
+    runner.verify_center = lambda *args, **kwargs: calls.append("center")
+    runner.calibrate_drive_current = lambda: calls.append("drive")
+    runner.calibrate_eddy_curve = lambda: calls.append("eddy")
+    runner.final_mesh = lambda: calls.append("mesh")
+    runner.checkpoint = lambda phase, **kwargs: calls.append(phase.value)
+    runner.write_final_report = lambda: calls.append("report")
+
+    runner.run()
+
+    assert calls == [
+        "confirm",
+        "preflight",
+        "bootstrap",
+        "endstops",
+        "center",
+        "drive",
+        "eddy",
+        "mesh",
+        module.Phase.FINISH.value,
+        "report",
+    ]
 
 
 def test_tap_acceptance_counts_rejections_and_enforces_spread():

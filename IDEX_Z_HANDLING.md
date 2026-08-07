@@ -584,7 +584,7 @@ Use this order to remove the discrepancy without hiding its cause:
    same reference point to report approximately Z=0 as well. The regular-probe
    result uses the same ±0.020 mm center-reference gate and is recorded before
    I1.5 can be committed.
-5. **Re-anchor and compare methods.** Recheck center tap with the configured
+5. **Verify and compare methods.** Recheck center tap with the configured
    threshold and compare tap/regular Eddy at identical physical points. A full
    recalibration is preferred over translating an uncertain old curve.
 6. **Generate the mesh.** Scan the full configured domain with `(150,150)` as
@@ -782,7 +782,6 @@ The supported steps are:
 | `tap-baseline` | Run `bootstrap-tap`, `update-endstops`, and `center-verify` in sequence |
 | `drive-current` | Run the Eddy drive-current calibration and deploy its result |
 | `eddy-frequency` | Run the guarded Eddy height/frequency calibration, including pre/post three-tap references and a post-calibration regular Eddy `PROBE` Z=0 check |
-| `reanchor` | Repeat the post-Eddy center verification |
 | `mesh` | Scan, activate, and validate the transient default mesh |
 | `run` | Execute the complete fresh Iteration 1 workflow |
 | `resume` | Continue from the last committed phase in `state.json` |
@@ -794,7 +793,6 @@ one-liners:
 (cd /Users/mege/git/mege-ender-3v3ke-idex && python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py --step tap-baseline --run-dir runs/idex_z_iteration_1/my-run --host pi@menderpi.local)
 (cd /Users/mege/git/mege-ender-3v3ke-idex && python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py --step drive-current --run-dir runs/idex_z_iteration_1/my-run --host pi@menderpi.local)
 (cd /Users/mege/git/mege-ender-3v3ke-idex && python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py --step eddy-frequency --run-dir runs/idex_z_iteration_1/my-run --host pi@menderpi.local)
-(cd /Users/mege/git/mege-ender-3v3ke-idex && python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py --step reanchor --run-dir runs/idex_z_iteration_1/my-run --host pi@menderpi.local)
 (cd /Users/mege/git/mege-ender-3v3ke-idex && python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py --step mesh --run-dir runs/idex_z_iteration_1/my-run --host pi@menderpi.local)
 ```
 
@@ -1178,23 +1176,6 @@ Only after the post sequence passes may the runner commit I1.5. Raise to
 Any movement below the known contact coordinate, unexpected manual-probe state,
 or inability to land at Z=0 within step resolution aborts before `ACCEPT`.
 
-#### I1.6: final center re-anchor and clean-frame Eddy verification
-
-The runner does not discover or change `tap_threshold`. It reads the known-good
-positive integer from `calib.yaml` and uses it for the final center tap set.
-If center mean is
-outside 0.010 mm, apply one final common endstop delta to T0 and T1, deploy, and
-repeat the five-tap center verification.
-
-Then perform same-physical-point tap and regular-Eddy measurements at center
-and at two additional safe points. For every physical point `P`, tap with the
-T0 nozzle at `P`, then place the nozzle at `P - probe_offset_xy` for the regular
-probe so the displaced coil measures `P`. If the regular-minus-tap residual is
-not within 0.030 mm at every point, rerun the frequency/height calibration once
-in the final endstop frame and repeat verification. A remaining spatial or
-thermal dependency aborts Iteration 1; the script must not hide it in an
-offset.
-
 The final mesh verification is a complete survey, not a fail-fast loop. Every
 derived safe-grid point is attempted even when all taps fail at an earlier
 point or a point has excessive tap span. The run records each point's attempts,
@@ -1203,7 +1184,7 @@ then fails the workflow after the full grid has been surveyed. A failed survey
 therefore leaves the transient mesh and a location-specific report available
 for diagnosis.
 
-#### I1.7: full bed scan
+#### I1.6: full bed scan
 
 With center tap verified at native Z=0 and regular Eddy aligned to tap:
 
@@ -1223,9 +1204,9 @@ With center tap verified at native Z=0 and regular Eddy aligned to tap:
 The full scan covers the configured bed-mesh domain. Tap verification cannot
 cover every scanned point because tap requires both nozzle and offset coil to
 remain over the bed. No deployment or restart occurs between this scan and
-I1.8; verification must use this exact in-memory mesh.
+I1.7; verification must use this exact in-memory mesh.
 
-#### I1.8: verify mesh against tap
+#### I1.7: verify mesh against tap
 
 Derive a 3x3 validation grid inside the intersection of:
 
@@ -1266,7 +1247,7 @@ continuity, sensor range, and mesh bounds, not by unsafe tap attempts. The final
 report must say "verified across the tap-safe region", not claim literal tap
 coverage of every bed coordinate.
 
-#### I1.9: finish or rollback
+#### I1.8: finish or rollback
 
 On success:
 
@@ -1838,7 +1819,7 @@ hidden calibrated tool geometry: unchanged
 ## Iteration 2 integration and live test plan
 
 Iteration 1's own unit, simulation, deployment, and live-motion sequence is
-specified in I1.0-I1.9 above and must pass first. The phases below cover
+specified in I1.0-I1.8 above and must pass first. The phases below cover
 Iteration 2 and end-to-end regression after the hidden transform is added.
 They proceed from pure logic tests to guarded live motion; a later phase must
 not begin until the previous phase has passed and its evidence has been
@@ -2329,7 +2310,7 @@ one retained run report:
 - I1.5 retains complete pre/post `GET_POSITION` snapshots, including raw MCU
   step counts, and three-tap center summaries around the frequency sweep;
 - a failed pre/post three-tap gate refuses to accept the Eddy curve and stops
-  before mesh or re-anchor phases;
+  before mesh scanning;
 - exactly the same tap-derived endstop delta was applied to T0 and T1, leaving
   the vision-derived relative Z alignment unchanged;
 - final `reg_drive_current` and frequency/height table originate from the
@@ -2338,10 +2319,10 @@ one retained run report:
 - the verification mesh originates from a fresh scan in that run, remains
   runtime-only, and has no measured points in canonical or generated config;
 - regular Eddy and tap agree at identical physical bed coordinates within the
-  I1.6 tolerance after calibration;
+  I1.5 tolerance after calibration;
 - the loaded mesh evaluates to zero at `(150,150)` within tolerance;
 - at each safe verification point, `raw_tap_z - mesh_correction_z` is near
-  zero within the I1.8 per-point and RMS limits;
+  zero within the I1.7 per-point and RMS limits;
 - no raw Tap value away from center is misreported as a logical mesh-corrected
   coordinate;
 - every rejected sample, restart, deployment, and safety decision is retained;
@@ -2391,7 +2372,7 @@ separate implementation task; this document checks none of them.
       capture/deploy the table only after the post gate passes.
 - [ ] Use the known-good tap threshold from `calib.yaml` for every tap, keeping
       `tap_z_offset: 0.000` for this baseline.
-- [ ] Re-anchor center contact with the configured threshold and require same-point
+- [ ] Require post-calibration center contact with the configured threshold and same-point
       regular-Eddy/tap agreement.
 - [ ] Run a fresh full scan with `(150,150)` as zero reference and keep it
       active only in memory for verification.
@@ -2399,7 +2380,7 @@ separate implementation task; this document checks none of them.
       `raw_tap_z - mesh_correction_z`, not raw console Z alone.
 - [ ] Add state-machine, safety, fake-Moonraker, calibration parser, generator,
       deployment-parity, resume, and rollback tests.
-- [ ] Run I1.0-I1.9 under supervision and retain the complete passing report.
+- [ ] Run I1.0-I1.8 under supervision and retain the complete passing report.
 
 **Iteration 2: operator, G-code, and printing behavior**
 

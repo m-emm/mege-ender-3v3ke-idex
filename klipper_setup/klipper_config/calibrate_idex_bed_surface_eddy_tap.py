@@ -66,7 +66,6 @@ STEP_CHOICES = (
     "tap-baseline",
     "drive-current",
     "eddy-frequency",
-    "reanchor",
     "mesh",
     "run",
     "resume",
@@ -92,6 +91,7 @@ MESH_CENTER_TOLERANCE = 0.005
 MESH_POINT_TOLERANCE = 0.030
 MESH_RMS_TOLERANCE = 0.015
 ARMING_PHRASE = "CALIBRATE IDEX Z ITERATION 1"
+WORKFLOW_VERSION = 2
 
 
 class CalibrationError(RuntimeError):
@@ -105,10 +105,9 @@ class Phase(str, Enum):
     CENTER_VERIFY = "I1.3"
     DRIVE_CURRENT = "I1.4"
     EDDY_CALIBRATION = "I1.5"
-    REANCHOR = "I1.6"
-    MESH_SCAN = "I1.7"
-    MESH_VERIFY = "I1.8"
-    FINISH = "I1.9"
+    MESH_SCAN = "I1.6"
+    MESH_VERIFY = "I1.7"
+    FINISH = "I1.8"
 
 
 @dataclass(frozen=True)
@@ -141,6 +140,7 @@ class TapSummary:
 class RunState:
     run_id: str
     phase: str
+    workflow_version: int = WORKFLOW_VERSION
     committed_phase: str | None = None
     source_hashes: dict[str, str] | None = None
     evidence: dict[str, Any] | None = None
@@ -943,6 +943,7 @@ class Iteration1Runner:
     def checkpoint(
         self, phase: Phase, *, committed: bool = False, **evidence: Any
     ) -> None:
+        self.state.workflow_version = WORKFLOW_VERSION
         self.state.phase = phase.value
         if committed:
             self.state.committed_phase = phase.value
@@ -1967,7 +1968,7 @@ class Iteration1Runner:
         return verification
 
     def final_mesh(self) -> None:
-        _logger.info("I1.7/I1.8 final transient mesh scan started")
+        _logger.info("I1.6/I1.7 final transient mesh scan started")
         self._home_clean_frame()
         if not self.dry_run:
             before = self.client.status(["configfile"])
@@ -2000,12 +2001,12 @@ class Iteration1Runner:
                 Phase.MESH_VERIFY, committed=True, mesh_verification=verification
             )
             _logger.info(
-                "I1.8 mesh verification passed: max_abs=%.6f rms=%.6f center=%s",
+                "I1.7 mesh verification passed: max_abs=%.6f rms=%.6f center=%s",
                 verification["max_abs"],
                 verification["rms"],
                 verification.get("center_corrected", "not sampled"),
             )
-        _logger.info("I1.7/I1.8 final transient mesh scan finished")
+        _logger.info("I1.6/I1.7 final transient mesh scan finished")
 
     def resume(self) -> RunState:
         """Continue only from the last committed phase boundary."""
@@ -2033,8 +2034,6 @@ class Iteration1Runner:
         if index <= phases.index(Phase.DRIVE_CURRENT):
             self.calibrate_eddy_curve()
         if index <= phases.index(Phase.EDDY_CALIBRATION):
-            self.verify_center(Phase.REANCHOR)
-        if index <= phases.index(Phase.REANCHOR):
             self.final_mesh()
         elif phase is Phase.MESH_SCAN:
             status = self.client.status(["bed_mesh", "configfile"])
@@ -2076,7 +2075,6 @@ class Iteration1Runner:
         self.verify_center()
         self.calibrate_drive_current()
         self.calibrate_eddy_curve()
-        self.verify_center(Phase.REANCHOR)
         self.final_mesh()
         self.checkpoint(Phase.FINISH, committed=True, note="Iteration 1 complete")
         self.write_final_report()
@@ -2113,12 +2111,17 @@ def _load_run_state(
         state = RunState(
             run_id=state_data["run_id"],
             phase=state_data["phase"],
+            workflow_version=int(state_data.get("workflow_version", 0)),
             committed_phase=state_data.get("committed_phase"),
             source_hashes=state_data.get("source_hashes"),
             evidence=state_data.get("evidence"),
         )
-    except (KeyError, TypeError, json.JSONDecodeError) as exc:
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise CalibrationError(f"invalid run state: {state_path}") from exc
+    if state.workflow_version != WORKFLOW_VERSION:
+        raise CalibrationError(
+            "run state uses an unsupported workflow version; start a new run"
+        )
     saved_hashes = state.source_hashes or {}
     if saved_hashes and saved_hashes != _config_hashes():
         if strict_hashes:
@@ -2198,8 +2201,6 @@ def _run_step(runner: Iteration1Runner, step: str) -> RunState:
             runner.calibrate_drive_current()
         elif step == "eddy-frequency":
             runner.calibrate_eddy_curve()
-        elif step == "reanchor":
-            runner.verify_center(Phase.REANCHOR)
         elif step == "mesh":
             runner.final_mesh()
         else:
