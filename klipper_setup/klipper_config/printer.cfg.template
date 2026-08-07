@@ -62,6 +62,7 @@ reference_y: ${bed_z_reference_y}
 move_z: 5.0
 move_speed: 20.0
 default_count: 7
+scan_nozzle_zs: 3,2,1,0.5
 
 [gcode_macro EDDY_TAP_MEASURE]
 description: Measure taps and compare a same-point regular Eddy PROBE.
@@ -71,6 +72,24 @@ gcode:
     {% set x = params.X|default(printer.configfile.settings["eddy_tap_measure"].reference_x)|float %}
     {% set y = params.Y|default(printer.configfile.settings["eddy_tap_measure"].reference_y)|float %}
     _EDDY_TAP_MEASURE X={x} Y={y} THRESHOLD={threshold} COUNT={count}
+
+[gcode_macro EDDY_RAW_MEASURE]
+description: Report native Eddy frequency and built-in conversion at one point.
+gcode:
+    {% set x = params.X|default(printer.configfile.settings["eddy_tap_measure"].reference_x)|float %}
+    {% set y = params.Y|default(printer.configfile.settings["eddy_tap_measure"].reference_y)|float %}
+    {% set z = params.Z|default(1.0)|float %}
+    {% set duration = params.DURATION|default(0.2)|float %}
+    _EDDY_RAW_MEASURE X={x} Y={y} Z={z} DURATION={duration}
+
+[gcode_macro EDDY_SCAN_HEIGHT_TEST]
+description: Compare stationary scan conversion across nozzle heights; mesh must be clear.
+gcode:
+    {% set x = params.X|default(printer.configfile.settings["eddy_tap_measure"].reference_x)|float %}
+    {% set y = params.Y|default(printer.configfile.settings["eddy_tap_measure"].reference_y)|float %}
+    {% set nozzle_zs = params.NOZZLE_ZS|default(printer.configfile.settings["eddy_tap_measure"].scan_nozzle_zs) %}
+    {% set duration = params.DURATION|default(0.2)|float %}
+    _EDDY_SCAN_HEIGHT_TEST X={x} Y={y} NOZZLE_ZS={nozzle_zs} DURATION={duration}
 
 [temperature_probe btt_eddy]
 sensor_type: Generic 3950

@@ -69,7 +69,11 @@ def test_regular_eddy_probe_result_keeps_physical_xy_and_statistics():
     result = module.probe_result_from_status(
         {"probe": {"last_probe_position": [207.391, 168.997, -0.012, 0.0]}}
     )
-    assert result == {"x": pytest.approx(207.391), "y": pytest.approx(168.997), "z": pytest.approx(-0.012)}
+    assert result == {
+        "x": pytest.approx(207.391),
+        "y": pytest.approx(168.997),
+        "z": pytest.approx(-0.012),
+    }
     summary = module.summarize_probe_results(
         [result, {"x": 207.391, "y": 168.997, "z": 0.004}]
     )
@@ -159,9 +163,7 @@ def test_eddy_reference_gate_requires_zero_and_repeatable_three_tap_center():
 def test_tap_threshold_is_required_from_calib():
     module = _load_module()
 
-    calibration = {
-        "eddy_relative_calibration": {"klipper": {"tap_threshold": 5000}}
-    }
+    calibration = {"eddy_relative_calibration": {"klipper": {"tap_threshold": 5000}}}
     assert module.configured_tap_threshold(calibration) == 5000
 
     with pytest.raises(module.CalibrationError, match="tap_threshold"):
@@ -193,13 +195,253 @@ def test_cli_exposes_each_calibration_phase_as_a_named_step():
         "tap-baseline",
         "drive-current",
         "eddy-frequency",
+        "curve-doctor",
         "mesh",
         "resume",
     }
     assert "reanchor" not in module.STEP_CHOICES
 
 
-def test_direct_step_can_reload_stale_run_state_but_resume_remains_strict(tmp_path, monkeypatch):
+def test_curve_doctor_step_syncs_the_managed_extra_before_measurement():
+    module = _load_module()
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = False
+    runner.state = module.RunState(run_id="curve-doctor", phase="I1.0")
+    calls = []
+    runner.confirm = lambda: calls.append("confirm")
+    runner.preflight = lambda **kwargs: calls.append(("preflight", kwargs))
+    runner.doctor_eddy_curve = lambda: calls.append("doctor")
+
+    module._run_step(runner, "curve-doctor")
+
+    assert calls == [
+        "confirm",
+        ("preflight", {"checkpoint_state": False, "sync_printer": True}),
+        "doctor",
+    ]
+
+
+def _linear_eddy_curve():
+    return ",".join(
+        f"{height:.1f}:{10000.0 - 1000.0 * height:.1f}"
+        for height in [index / 10 for index in range(1, 42)]
+    )
+
+
+def test_curve_doctor_remaps_dense_curve_through_tap_anchored_frequencies():
+    module = _load_module()
+    source = _linear_eddy_curve()
+    source_pairs = module.parse_eddy_curve(source)
+    anchors = []
+    for target_height in (0.5, 1.0, 2.0, 3.0, 4.0):
+        inferred_height = target_height * 0.98
+        anchors.append(
+            {
+                "target_height": target_height,
+                "raw_frequency_hz": module.eddy_curve_frequency_at_height(
+                    source_pairs, inferred_height
+                ),
+            }
+        )
+
+    candidate, derived = module.doctor_eddy_curve(source, anchors)
+    candidate_pairs = module.parse_eddy_curve(candidate)
+
+    assert len(candidate_pairs) >= len(source_pairs)
+    for anchor in derived:
+        assert module.eddy_curve_height_at_frequency(
+            candidate_pairs, anchor["raw_frequency_hz"]
+        ) == pytest.approx(anchor["target_height"])
+    assert candidate_pairs[0][0] == pytest.approx(0.1 + (0.5 - 0.49))
+
+
+def test_curve_doctor_rejects_crossed_anchor_data():
+    module = _load_module()
+    source_pairs = module.parse_eddy_curve(_linear_eddy_curve())
+
+    with pytest.raises(module.CalibrationError, match="cross"):
+        module.doctor_eddy_curve(
+            _linear_eddy_curve(),
+            [
+                {
+                    "target_height": 0.5,
+                    "raw_frequency_hz": module.eddy_curve_frequency_at_height(
+                        source_pairs, 2.0
+                    ),
+                },
+                {
+                    "target_height": 1.0,
+                    "raw_frequency_hz": module.eddy_curve_frequency_at_height(
+                        source_pairs, 0.5
+                    ),
+                },
+            ],
+        )
+
+
+def test_curve_doctor_raw_batches_use_tap_relative_commanded_z():
+    module = _load_module()
+    runner = object.__new__(module.Iteration1Runner)
+    scripts = []
+    runner._gcode = scripts.append
+
+    class Client:
+        def status(self, _objects):
+            return {
+                "eddy_tap_measure": {
+                    "last_raw_measurement": {
+                        "bed_x": 150.0,
+                        "bed_y": 150.0,
+                        "nozzle_x": 207.391,
+                        "nozzle_y": 168.997,
+                        "requested_nozzle_z": 0.493,
+                        "toolhead_z": 0.493,
+                        "toolhead_position": [207.391, 168.997, 0.493, 0.0],
+                        "raw_frequency_hz": 3_216_000.0,
+                        "raw_frequency_span_hz": 100.0,
+                        "sample_count": 200,
+                        "temperature": 39.1,
+                    }
+                }
+            }
+
+    runner.client = Client()
+    raw = runner._collect_curve_doctor_raw_batch(target_height=0.5, tap_median=-0.007)
+
+    assert scripts == ["EDDY_RAW_MEASURE X=150.000 Y=150.000 Z=0.493000 DURATION=0.500"]
+    assert raw["target_height"] == pytest.approx(0.5)
+    assert raw["commanded_z"] == pytest.approx(0.493)
+
+
+def test_curve_doctor_validation_uses_post_tap_datum_and_shape_gate():
+    module = _load_module()
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = False
+    scripts = []
+    runner._gcode = scripts.append
+    tap_median = -0.005
+    commanded = [tap_median + height for height in module.CURVE_DOCTOR_HEIGHTS]
+
+    class Client:
+        def status(self, _objects):
+            return {
+                "eddy_tap_measure": {
+                    "last_scan_height_test": {
+                        "results": [
+                            {
+                                "toolhead_z": height,
+                                "scan_bed_z": tap_median + residual,
+                            }
+                            for height, residual in zip(
+                                commanded, (-0.008, -0.004, 0.0, 0.004, 0.008)
+                            )
+                        ]
+                    }
+                }
+            }
+
+    runner.client = Client()
+    validation = runner._validate_curve_doctor_candidate(tap_median)
+
+    assert validation["span"] == pytest.approx(0.016)
+    assert all(
+        abs(point["residual"]) <= module.CURVE_DOCTOR_ABSOLUTE_TOLERANCE
+        for point in validation["results"]
+    )
+    assert "NOZZLE_ZS=0.495000,0.995000,1.995000,2.995000,3.995000" in scripts[0]
+
+
+def test_curve_doctor_rolls_back_when_candidate_validation_fails():
+    module = _load_module()
+
+    class Store:
+        def __init__(self):
+            self.writes = {}
+
+        def write_json(self, name, value):
+            self.writes[name] = value
+
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = False
+    runner.store = Store()
+    runner.raw_calibration = {
+        "eddy_relative_calibration": {"klipper": {"calibrate": _linear_eddy_curve()}}
+    }
+    runner.eddy_reference_sequence = lambda label: {"median_tap_z": 0.0, "label": label}
+    runner._collect_curve_doctor_anchors = lambda median, source: [
+        {
+            "target_height": 0.5,
+            "raw_frequency_hz": 9500.0,
+            "batches": [],
+        },
+        {
+            "target_height": 1.0,
+            "raw_frequency_hz": 9000.0,
+            "batches": [],
+        },
+    ]
+    calls = []
+    runner._snapshot_eddy_candidate_base = lambda: calls.append("snapshot")
+    runner.deploy_value = lambda *args, **kwargs: calls.append("deploy")
+    runner._validate_curve_doctor_candidate = lambda median: (_ for _ in ()).throw(
+        module.CalibrationError("validation failed")
+    )
+    runner._restore_eddy_candidate_base = lambda: calls.append("restore")
+    runner.checkpoint = lambda *args, **kwargs: calls.append("checkpoint")
+
+    with pytest.raises(module.CalibrationError, match="validation failed"):
+        runner.doctor_eddy_curve()
+
+    assert calls == ["snapshot", "deploy", "checkpoint", "restore"]
+    assert "curve-doctor-failed.json" in runner.store.writes
+
+
+def test_curve_doctor_rollback_restores_calib_and_generated_config(
+    tmp_path, monkeypatch
+):
+    module = _load_module()
+    source_curve = _linear_eddy_curve()
+    calib_path = tmp_path / "calib.yaml"
+    config_path = tmp_path / "printer.cfg"
+    original_calib = (
+        "eddy_relative_calibration:\n"
+        "  klipper:\n"
+        "    calibrate: |\n"
+        f"      {source_curve}\n"
+    )
+    calib_path.write_text(original_calib, encoding="utf-8")
+    config_path.write_text("original generated config\n", encoding="utf-8")
+    monkeypatch.setattr(module, "CALIB_PATH", calib_path)
+    monkeypatch.setattr(module, "CONFIG_PATH", config_path)
+    monkeypatch.setattr(module, "_run_local", lambda *args, **kwargs: None)
+
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = False
+    runner.store = module.ArtifactStore(tmp_path, "curve-doctor")
+    runner.state = module.RunState(run_id="curve-doctor", phase="I1.0")
+    runner.raw_calibration = {
+        "eddy_relative_calibration": {"klipper": {"calibrate": source_curve}}
+    }
+    runner.eddy_reference_sequence = lambda label: {"median_tap_z": 0.0, "label": label}
+    runner._collect_curve_doctor_anchors = lambda median, source: [
+        {"target_height": 0.5, "raw_frequency_hz": 9500.0, "batches": []},
+        {"target_height": 1.0, "raw_frequency_hz": 9000.0, "batches": []},
+    ]
+    runner._validate_curve_doctor_candidate = lambda median: (_ for _ in ()).throw(
+        module.CalibrationError("candidate failed")
+    )
+    runner.checkpoint = lambda *args, **kwargs: None
+
+    with pytest.raises(module.CalibrationError, match="candidate failed"):
+        runner.doctor_eddy_curve()
+
+    assert calib_path.read_text(encoding="utf-8") == original_calib
+    assert config_path.read_text(encoding="utf-8") == "original generated config\n"
+
+
+def test_direct_step_can_reload_stale_run_state_but_resume_remains_strict(
+    tmp_path, monkeypatch
+):
     module = _load_module()
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -262,7 +504,9 @@ def test_full_run_reuses_verified_frames_for_drive_current_and_mesh():
     module = _load_module()
     runner = object.__new__(module.Iteration1Runner)
     runner.dry_run = False
-    runner.state = module.RunState(run_id="full-run", phase=module.Phase.PREFLIGHT.value)
+    runner.state = module.RunState(
+        run_id="full-run", phase=module.Phase.PREFLIGHT.value
+    )
     calls = []
     runner.confirm = lambda: calls.append("confirm")
     runner.preflight = lambda: calls.append("preflight")
@@ -271,8 +515,8 @@ def test_full_run_reuses_verified_frames_for_drive_current_and_mesh():
     )
     runner.update_endstops = lambda median: calls.append("endstops")
     runner.verify_center = lambda *args, **kwargs: calls.append("center")
-    runner.calibrate_drive_current = (
-        lambda *, clean_frame=True: calls.append(f"drive:{clean_frame}")
+    runner.calibrate_drive_current = lambda *, clean_frame=True: calls.append(
+        f"drive:{clean_frame}"
     )
     runner.calibrate_eddy_curve = lambda: calls.append("eddy")
     runner.final_mesh = lambda *, clean_frame=True: calls.append(f"mesh:{clean_frame}")
@@ -468,7 +712,9 @@ def test_mesh_reference_failure_still_attempts_all_grid_points():
         if len(attempted) == 1:
             return None, [{"attempt": 1, "ok": False, "error": "not enough lift"}]
         summary = module.summarize_taps([0.0, 0.0, 0.0], attempts=3)
-        return summary, [{"attempt": index, "ok": True, "z": 0.0} for index in range(1, 4)]
+        return summary, [
+            {"attempt": index, "ok": True, "z": 0.0} for index in range(1, 4)
+        ]
 
     runner.collect_taps = collect_taps
 
@@ -493,7 +739,9 @@ def test_mesh_reference_success_records_exact_center_evidence():
     def collect_taps(**kwargs):
         attempted.append((kwargs["x"], kwargs["y"]))
         summary = module.summarize_taps([0.0, 0.0, 0.0], attempts=3)
-        return summary, [{"attempt": index, "ok": True, "z": 0.0} for index in range(1, 4)]
+        return summary, [
+            {"attempt": index, "ok": True, "z": 0.0} for index in range(1, 4)
+        ]
 
     runner.collect_taps = collect_taps
 
@@ -541,7 +789,9 @@ def test_mesh_reference_failure_records_correction_and_corrected_mean(
         calls += 1
         samples = reference_samples if calls == 1 else (0.0, 0.0, 0.0)
         summary = module.summarize_taps(samples, attempts=3)
-        return summary, [{"attempt": index, "ok": True, "z": samples[0]} for index in range(1, 4)]
+        return summary, [
+            {"attempt": index, "ok": True, "z": samples[0]} for index in range(1, 4)
+        ]
 
     runner.collect_taps = collect_taps
 
@@ -616,7 +866,10 @@ def test_drive_current_can_reuse_verified_frame_with_safe_lift():
         "G90\nG1 Z20.000 F1200\nG1 X207.391 Y168.997 F1200\nG1 Z18.601 F1200",
         {},
     )
-    assert scripts[1] == ("LDC_CALIBRATE_DRIVE_CURRENT CHIP=btt_eddy", {"timeout": 120.0})
+    assert scripts[1] == (
+        "LDC_CALIBRATE_DRIVE_CURRENT CHIP=btt_eddy",
+        {"timeout": 120.0},
+    )
 
 
 def test_direct_drive_current_and_mesh_steps_start_with_clean_frame():

@@ -608,6 +608,56 @@ Temperature matters: the bed, coil, electronics, and nearby metal can shift the
 measurement. Calibration and comparison scans should therefore be performed at
 controlled, recorded temperatures.
 
+### Pointwise scan-height diagnostic
+
+Before attributing a failed mesh comparison to XY behavior, verify the
+frequency-to-height conversion at one physical bed point without an active
+mesh. `METHOD=scan` does not descend: after the caller positions the nozzle at
+the requested Z, Klipper waits and samples the stationary Eddy signal. The
+following report-only sequence uses the built-in calibration path and changes
+no threshold, endstop, curve, or mesh:
+
+```gcode
+G28
+BED_MESH_CLEAR
+EDDY_SCAN_HEIGHT_TEST X=150 Y=150
+```
+
+The command moves the offset coil over the requested physical bed point and
+tests default **nozzle** heights `3,2,1,0.5` mm. For each height it reports the
+native LDC frequency, Klipper's thermally compensated frequency-to-height
+conversion, the implied bed Z, and the actual `METHOD=scan` probe result. The
+reported bed Z should remain stable across the four heights. Use
+`EDDY_RAW_MEASURE X=150 Y=150 Z=1` for a single stationary raw-frequency
+report. Both commands require T0, XYZ homing, and an already-cleared mesh; they
+will refuse to alter the mesh state themselves.
+
+### Tap-anchored curve doctoring
+
+If the pointwise scan-height diagnostic shows height-dependent inferred bed Z,
+correct the source-controlled frequency curve before changing mesh behavior.
+The standalone job establishes physical zero with three Taps at the canonical
+reference, samples native frequency at Tap-relative nozzle heights
+`0.5,1,2,3,4` mm, and remaps the dense Klipper curve through those anchors.
+It does not save mesh data.
+
+```sh
+(cd /Users/mege/git/mege-ender-3v3ke-idex && \
+  python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py \
+    --step curve-doctor \
+    --run-dir runs/idex_z_iteration_1/curve_doctor_1 \
+    --host pi@menderpi.local --yes)
+```
+
+The job first verifies that the printer is idle and safely deploys the managed
+diagnostic extra. It writes the candidate only to
+`eddy_relative_calibration.klipper.calibrate` in `calib.yaml`, regenerates and
+deploys it provisionally, then repeats the Tap reference and five stationary
+scan heights. It retains the candidate only when every Tap-relative scan error
+is within `+/-0.020 mm` and their span is at most `0.020 mm`; otherwise it
+restores and redeploys the prior curve while retaining the raw batches,
+candidate, validation, and rollback evidence in the run directory.
+
 ### How bed mesh transforms moves
 
 `BedMesh` registers itself as the initial G-code move transform by calling

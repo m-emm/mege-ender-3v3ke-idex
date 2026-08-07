@@ -21,6 +21,7 @@ opening a printer connection or changing a file.
 from __future__ import annotations
 
 import argparse
+import bisect
 import hashlib
 import json
 import logging
@@ -66,6 +67,7 @@ STEP_CHOICES = (
     "tap-baseline",
     "drive-current",
     "eddy-frequency",
+    "curve-doctor",
     "mesh",
     "run",
     "resume",
@@ -87,6 +89,11 @@ EDDY_REFERENCE_MEAN_TOLERANCE = 0.050
 EDDY_REFERENCE_SPAN_TOLERANCE = 0.040
 EDDY_REFERENCE_XY_TOLERANCE = 0.020
 EDDY_REFERENCE_RESIDUAL_TOLERANCE = 0.020
+CURVE_DOCTOR_HEIGHTS = (0.5, 1.0, 2.0, 3.0, 4.0)
+CURVE_DOCTOR_BATCH_COUNT = 3
+CURVE_DOCTOR_DURATION = 0.5
+CURVE_DOCTOR_ABSOLUTE_TOLERANCE = 0.020
+CURVE_DOCTOR_SPAN_TOLERANCE = 0.020
 MESH_CENTER_TOLERANCE = 0.005
 MESH_POINT_TOLERANCE = 0.030
 MESH_RMS_TOLERANCE = 0.015
@@ -105,6 +112,7 @@ class Phase(str, Enum):
     CENTER_VERIFY = "I1.3"
     DRIVE_CURRENT = "I1.4"
     EDDY_CALIBRATION = "I1.5"
+    CURVE_DOCTOR = "I1.5D"
     MESH_SCAN = "I1.6"
     MESH_VERIFY = "I1.7"
     FINISH = "I1.8"
@@ -150,6 +158,169 @@ class RunState:
 class MeshPoint:
     x: float
     y: float
+
+
+def parse_eddy_curve(curve: str) -> tuple[tuple[float, float], ...]:
+    """Parse and validate Klipper's ``height:frequency`` calibration table."""
+
+    try:
+        pairs = tuple(
+            tuple(float(value) for value in item.strip().split(":", 1))
+            for item in re.split(r"[,\n]+", curve)
+            if item.strip()
+        )
+    except (AttributeError, ValueError) as exc:
+        raise CalibrationError(
+            "Eddy curve contains an invalid height:frequency pair"
+        ) from exc
+    if len(pairs) < 9 or any(len(pair) != 2 for pair in pairs):
+        raise CalibrationError(
+            "Eddy curve must contain at least nine height:frequency pairs"
+        )
+    if not all(
+        math.isfinite(height) and math.isfinite(frequency)
+        for height, frequency in pairs
+    ):
+        raise CalibrationError("Eddy curve contains a non-finite pair")
+    if any(
+        next_height <= height or next_frequency >= frequency
+        for (height, frequency), (next_height, next_frequency) in zip(pairs, pairs[1:])
+    ):
+        raise CalibrationError(
+            "Eddy curve heights must increase while frequencies strictly decrease"
+        )
+    return pairs
+
+
+def eddy_curve_height_at_frequency(
+    curve: Sequence[tuple[float, float]], frequency: float
+) -> float:
+    """Evaluate Klipper's piecewise-linear frequency-to-height conversion."""
+
+    if not math.isfinite(frequency):
+        raise CalibrationError("Eddy anchor frequency is non-finite")
+    frequencies = [-item[1] for item in curve]
+    index = bisect.bisect_left(frequencies, -frequency)
+    if index == 0 or index >= len(curve):
+        raise CalibrationError(
+            "Eddy anchor frequency is outside the active calibration range"
+        )
+    low_height, low_frequency = curve[index - 1]
+    high_height, high_frequency = curve[index]
+    fraction = (frequency - low_frequency) / (high_frequency - low_frequency)
+    return low_height + fraction * (high_height - low_height)
+
+
+def eddy_curve_frequency_at_height(
+    curve: Sequence[tuple[float, float]], height: float
+) -> float:
+    """Evaluate the inverse of Klipper's piecewise-linear calibration table."""
+
+    if not math.isfinite(height):
+        raise CalibrationError("Eddy anchor height is non-finite")
+    heights = [item[0] for item in curve]
+    index = bisect.bisect_left(heights, height)
+    if index == 0 or index >= len(curve):
+        raise CalibrationError(
+            "Eddy anchor height is outside the active calibration range"
+        )
+    low_height, low_frequency = curve[index - 1]
+    high_height, high_frequency = curve[index]
+    fraction = (height - low_height) / (high_height - low_height)
+    return low_frequency + fraction * (high_frequency - low_frequency)
+
+
+def _interpolate_curve_doctor_height(
+    anchors: Sequence[tuple[float, float]], inferred_height: float
+) -> float:
+    """Map an old inferred height to the Tap-anchored physical height."""
+
+    inferred = [item[0] for item in anchors]
+    index = bisect.bisect_right(inferred, inferred_height)
+    if index == 0:
+        return inferred_height + (anchors[0][1] - anchors[0][0])
+    if index == len(anchors):
+        return inferred_height + (anchors[-1][1] - anchors[-1][0])
+    low_inferred, low_target = anchors[index - 1]
+    high_inferred, high_target = anchors[index]
+    fraction = (inferred_height - low_inferred) / (high_inferred - low_inferred)
+    return low_target + fraction * (high_target - low_target)
+
+
+def format_eddy_curve(curve: Sequence[tuple[float, float]]) -> str:
+    """Render a readable multiline Klipper curve without losing precision."""
+
+    rendered = [f"{height:.6f}:{frequency:.3f}" for height, frequency in curve]
+    return "\n".join(
+        ",".join(rendered[index : index + 3]) for index in range(0, len(rendered), 3)
+    )
+
+
+def doctor_eddy_curve(
+    source_curve: str, anchors: Sequence[Mapping[str, float]]
+) -> tuple[str, list[dict[str, float]]]:
+    """Remap a dense curve through measured Tap-anchored frequency points."""
+
+    source = parse_eddy_curve(source_curve)
+    derived: list[dict[str, float]] = []
+    for anchor in anchors:
+        target_height = float(anchor["target_height"])
+        frequency = float(anchor["raw_frequency_hz"])
+        if not math.isfinite(target_height) or target_height <= 0.0:
+            raise CalibrationError("curve-doctor target height must be positive")
+        derived.append(
+            {
+                "target_height": target_height,
+                "raw_frequency_hz": frequency,
+                "inferred_height": eddy_curve_height_at_frequency(source, frequency),
+            }
+        )
+    derived.sort(key=lambda item: item["inferred_height"])
+    if any(
+        next_anchor["inferred_height"] <= anchor["inferred_height"]
+        or next_anchor["target_height"] <= anchor["target_height"]
+        for anchor, next_anchor in zip(derived, derived[1:])
+    ):
+        raise CalibrationError("curve-doctor anchors cross or are not monotonic")
+    mapping = [
+        (anchor["inferred_height"], anchor["target_height"]) for anchor in derived
+    ]
+    candidate = [
+        (_interpolate_curve_doctor_height(mapping, height), frequency)
+        for height, frequency in source
+    ]
+    for anchor in derived:
+        frequency = anchor["raw_frequency_hz"]
+        matching = next(
+            (
+                index
+                for index, (_, source_frequency) in enumerate(candidate)
+                if abs(source_frequency - frequency) <= 1e-6
+            ),
+            None,
+        )
+        if matching is None:
+            candidate.append((anchor["target_height"], frequency))
+        else:
+            candidate[matching] = (anchor["target_height"], frequency)
+    candidate.sort(key=lambda item: item[0])
+    if any(
+        next_height <= height or next_frequency >= frequency
+        for (height, frequency), (next_height, next_frequency) in zip(
+            candidate, candidate[1:]
+        )
+    ):
+        raise CalibrationError("curve-doctor candidate is not strictly monotonic")
+    rendered = format_eddy_curve(candidate)
+    parsed_candidate = parse_eddy_curve(rendered)
+    for anchor in derived:
+        corrected = eddy_curve_height_at_frequency(
+            parsed_candidate, anchor["raw_frequency_hz"]
+        )
+        if abs(corrected - anchor["target_height"]) > 1e-6:
+            raise CalibrationError("curve-doctor candidate does not preserve an anchor")
+        anchor["candidate_height"] = corrected
+    return rendered, derived
 
 
 def utc_run_id(now: datetime | None = None) -> str:
@@ -250,9 +421,7 @@ def _parse_position_values(payload: str, *, integer: bool) -> dict[str, int | fl
             name, raw_value = token.rsplit(":", 1)
             values[name] = int(raw_value) if integer else float(raw_value)
         except (ValueError, IndexError) as exc:
-            raise CalibrationError(
-                f"invalid GET_POSITION value {token!r}"
-            ) from exc
+            raise CalibrationError(f"invalid GET_POSITION value {token!r}") from exc
     return values
 
 
@@ -863,17 +1032,13 @@ def configured_tap_threshold(calibration: Mapping[str, Any]) -> int:
     """Return the required known-good tap threshold from calib.yaml."""
 
     try:
-        value = calibration["eddy_relative_calibration"]["klipper"][
-            "tap_threshold"
-        ]
+        value = calibration["eddy_relative_calibration"]["klipper"]["tap_threshold"]
     except (KeyError, TypeError) as exc:
         raise CalibrationError(
             "calib.yaml must define eddy_relative_calibration.klipper.tap_threshold"
         ) from exc
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        raise CalibrationError(
-            "calib.yaml tap_threshold must be a positive integer"
-        )
+        raise CalibrationError("calib.yaml tap_threshold must be a positive integer")
     return value
 
 
@@ -968,11 +1133,30 @@ class Iteration1Runner:
         if input().strip() != ARMING_PHRASE:
             raise CalibrationError("arming confirmation did not match")
 
-    def preflight(self, *, checkpoint_state: bool = True) -> dict[str, Any]:
+    def preflight(
+        self, *, checkpoint_state: bool = True, sync_printer: bool = False
+    ) -> dict[str, Any]:
         _logger.info("preflight: validating local configuration and live printer")
         if not CONFIG_PATH.exists():
             raise CalibrationError("generated printer.cfg is missing")
         _run_local([sys.executable, str(GENERATOR_PATH), "--check"])
+        status_objects = [
+            "webhooks",
+            "print_stats",
+            "virtual_sdcard",
+            "configfile",
+            "toolhead",
+            "gcode_move",
+            "heater_bed",
+            "extruder",
+            "extruder1",
+            "temperature_probe btt_eddy",
+        ]
+        if sync_printer:
+            current_status = self.client.status(status_objects)
+            self._validate_status_preflight(current_status)
+            _logger.info("preflight: deploying managed diagnostic support files")
+            _run_local([str(DEPLOY_PATH)])
         _run_local([str(DEPLOY_PATH), "--check"])
         expected_delta = validate_vision_relative_provenance(self.raw_calibration)
         tools = self.raw_calibration.get("tools", {})
@@ -988,20 +1172,7 @@ class Iteration1Runner:
                 self.raw_calibration["vision_relative_alignment"]["tolerance_mm"]
             ),
         )
-        status = self.client.status(
-            [
-                "webhooks",
-                "print_stats",
-                "virtual_sdcard",
-                "configfile",
-                "toolhead",
-                "gcode_move",
-                "heater_bed",
-                "extruder",
-                "extruder1",
-                "temperature_probe btt_eddy",
-            ]
-        )
+        status = self.client.status(status_objects)
         self._validate_status_preflight(status)
         _logger.info(
             "preflight passed: klippy=%s print_state=%s homed_axes=%s",
@@ -1274,9 +1445,7 @@ class Iteration1Runner:
             f"G90\nG1 X{REFERENCE_X:.3f} Y{REFERENCE_Y:.3f} "
             f"Z{summary.median:.6f} F1200"
         )
-        after_median_move = self.capture_full_position(
-            f"{label}.after_median_tap_move"
-        )
+        after_median_move = self.capture_full_position(f"{label}.after_median_tap_move")
         evidence = {
             "after_home": after_home,
             "taps": attempts,
@@ -1519,9 +1688,7 @@ class Iteration1Runner:
         if probe_speed is not None:
             command += f" PROBE_SPEED={probe_speed:.3f}"
         self._gcode(command)
-        status = self.client.status(
-            ["probe", "toolhead", "temperature_probe btt_eddy"]
-        )
+        status = self.client.status(["probe", "toolhead", "temperature_probe btt_eddy"])
         result = probe_result_from_status(status)
         if (
             abs(result["x"] - REFERENCE_X) > EDDY_REFERENCE_XY_TOLERANCE
@@ -1559,21 +1726,21 @@ class Iteration1Runner:
         return evidence
 
     def _capture_stationary_scan(
-        self, *, pose: Pose, scan_z: float, label: str
+        self, *, pose: Pose, nozzle_z: float, label: str
     ) -> dict[str, Any]:
+        """Capture a stationary scan at a commanded nozzle Z height."""
+
         command = (
-            f"G90\nG1 X{pose.x:.3f} Y{pose.y:.3f} Z{scan_z:.3f} F1200\n"
+            f"G90\nG1 X{pose.x:.3f} Y{pose.y:.3f} Z{nozzle_z:.3f} F1200\n"
             "PROBE METHOD=scan SAMPLES=1"
         )
         self._gcode(command)
-        status = self.client.status(
-            ["probe", "toolhead", "temperature_probe btt_eddy"]
-        )
+        status = self.client.status(["probe", "toolhead", "temperature_probe btt_eddy"])
         result = probe_result_from_status(status)
         position = self.capture_full_position(label)
         return {
             "label": label,
-            "commanded_z": scan_z,
+            "commanded_nozzle_z": nozzle_z,
             "probe_result": result,
             "toolhead_z": float(status["toolhead"]["position"][2]),
             "temperature": status.get("temperature_probe btt_eddy", {}).get(
@@ -1599,20 +1766,26 @@ class Iteration1Runner:
                 )
             except Exception as exc:
                 regular.append({"probe_speed": speed, "error": str(exc)})
-                _logger.warning("regular Eddy diagnostic failed at %.1f mm/s: %s", speed, exc)
+                _logger.warning(
+                    "regular Eddy diagnostic failed at %.1f mm/s: %s", speed, exc
+                )
         stationary: list[dict[str, Any]] = []
-        for scan_z in (3.0, 2.0, 1.0, 0.5):
+        for nozzle_z in (3.0, 2.0, 1.0, 0.5):
             try:
                 stationary.append(
                     self._capture_stationary_scan(
                         pose=pose,
-                        scan_z=scan_z,
-                        label=f"diagnostic.stationary.z_{scan_z:g}",
+                        nozzle_z=nozzle_z,
+                        label=f"diagnostic.stationary.nozzle_z_{nozzle_z:g}",
                     )
                 )
             except Exception as exc:
-                stationary.append({"commanded_z": scan_z, "error": str(exc)})
-                _logger.warning("stationary Eddy diagnostic failed at Z=%.3f: %s", scan_z, exc)
+                stationary.append({"commanded_nozzle_z": nozzle_z, "error": str(exc)})
+                _logger.warning(
+                    "stationary Eddy diagnostic failed at nozzle Z=%.3f: %s",
+                    nozzle_z,
+                    exc,
+                )
         evidence = {
             "reference": {"x": REFERENCE_X, "y": REFERENCE_Y},
             "nozzle_pose": asdict(pose),
@@ -1656,7 +1829,10 @@ class Iteration1Runner:
                 )
                 for index in range(EDDY_REFERENCE_PROBE_COUNT)
             ]
-        probe_positions = [result["probe_result"] if "probe_result" in result else result for result in results]
+        probe_positions = [
+            result["probe_result"] if "probe_result" in result else result
+            for result in results
+        ]
         summary = summarize_probe_results(probe_positions)
         tap_median = None if tap_summary is None else float(tap_summary["median"])
         residual = None if tap_median is None else summary["median"] - tap_median
@@ -1756,7 +1932,9 @@ class Iteration1Runner:
         if not manual_probe.get("is_active"):
             raise CalibrationError("Eddy calibration did not enter manual-probe mode")
         current_z = float(manual_probe["z_position"])
-        _logger.info("I1.5 manual-probe mode active at z=%.6f; targeting z=0", current_z)
+        _logger.info(
+            "I1.5 manual-probe mode active at z=%.6f; targeting z=0", current_z
+        )
         delta = -current_z
         if current_z + delta < -0.01:
             raise CalibrationError(
@@ -1769,7 +1947,9 @@ class Iteration1Runner:
             raise CalibrationError(
                 f"manual-probe target did not reach Z=0: {final_z!r}"
             )
-        _logger.info("I1.5 manual-probe target reached at z=%.6f; accepting sweep", final_z)
+        _logger.info(
+            "I1.5 manual-probe target reached at z=%.6f; accepting sweep", final_z
+        )
         # Klipper continues the frequency sweep after ACCEPT; the response can
         # therefore take longer than the normal short G-code request timeout.
         self._gcode("ACCEPT", timeout=300.0)
@@ -1781,7 +1961,9 @@ class Iteration1Runner:
             height, frequency = pair.split(":", 1)
             if not math.isfinite(float(height)) or not math.isfinite(float(frequency)):
                 raise CalibrationError("Eddy calibration contains a non-finite pair")
-        _logger.info("I1.5 received Eddy curve with %d height/frequency pairs", len(pairs))
+        _logger.info(
+            "I1.5 received Eddy curve with %d height/frequency pairs", len(pairs)
+        )
         self._snapshot_eddy_candidate_base()
         try:
             self.deploy_value(
@@ -1832,6 +2014,258 @@ class Iteration1Runner:
             post_eddy_probe=post_eddy_probe,
         )
         _logger.info("I1.5 Eddy frequency/height calibration finished and committed")
+
+    @staticmethod
+    def _curve_doctor_status(status: Mapping[str, Any], field: str) -> dict[str, Any]:
+        extra = status.get("eddy_tap_measure")
+        if not isinstance(extra, Mapping):
+            raise CalibrationError("Eddy diagnostic extra status is unavailable")
+        value = extra.get(field)
+        if not isinstance(value, Mapping):
+            raise CalibrationError(f"Eddy diagnostic extra did not publish {field}")
+        return dict(value)
+
+    def _collect_curve_doctor_raw_batch(
+        self, *, target_height: float, tap_median: float
+    ) -> dict[str, Any]:
+        commanded_z = tap_median + target_height
+        if commanded_z <= 0.0:
+            raise CalibrationError(
+                f"curve-doctor commanded Z is unsafe: {commanded_z:.6f}"
+            )
+        self._gcode(
+            f"EDDY_RAW_MEASURE X={REFERENCE_X:.3f} Y={REFERENCE_Y:.3f} "
+            f"Z={commanded_z:.6f} DURATION={CURVE_DOCTOR_DURATION:.3f}"
+        )
+        raw = self._curve_doctor_status(
+            self.client.status(["eddy_tap_measure"]), "last_raw_measurement"
+        )
+        required = (
+            "bed_x",
+            "bed_y",
+            "nozzle_x",
+            "nozzle_y",
+            "requested_nozzle_z",
+            "toolhead_z",
+            "toolhead_position",
+            "raw_frequency_hz",
+            "raw_frequency_span_hz",
+            "sample_count",
+            "temperature",
+        )
+        if any(key not in raw for key in required):
+            raise CalibrationError("Eddy raw status is missing curve-doctor fields")
+        numeric = {
+            key: float(raw[key])
+            for key in required
+            if key not in {"temperature", "toolhead_position"}
+        }
+        if not all(math.isfinite(value) for value in numeric.values()):
+            raise CalibrationError("Eddy raw status contains a non-finite value")
+        if (
+            abs(numeric["bed_x"] - REFERENCE_X) > EDDY_REFERENCE_XY_TOLERANCE
+            or abs(numeric["bed_y"] - REFERENCE_Y) > EDDY_REFERENCE_XY_TOLERANCE
+        ):
+            raise CalibrationError(
+                "Eddy raw measurement did not use the reference bed point"
+            )
+        if abs(numeric["requested_nozzle_z"] - commanded_z) > 1e-6:
+            raise CalibrationError("Eddy raw measurement used an unexpected nozzle Z")
+        if abs(numeric["toolhead_z"] - commanded_z) > 0.005:
+            raise CalibrationError(
+                "Eddy raw measurement did not settle at its commanded Z"
+            )
+        toolhead_position = raw["toolhead_position"]
+        if (
+            not isinstance(toolhead_position, Sequence)
+            or len(toolhead_position) < 3
+            or any(not math.isfinite(float(value)) for value in toolhead_position[:3])
+        ):
+            raise CalibrationError("Eddy raw status is missing its toolhead position")
+        raw.update(numeric)
+        raw["target_height"] = target_height
+        raw["commanded_z"] = commanded_z
+        return raw
+
+    def _collect_curve_doctor_anchors(
+        self, tap_median: float, source_curve: str
+    ) -> list[dict[str, Any]]:
+        source = parse_eddy_curve(source_curve)
+        anchors: list[dict[str, Any]] = []
+        for target_height in CURVE_DOCTOR_HEIGHTS:
+            batches: list[dict[str, Any]] = []
+            for batch_index in range(CURVE_DOCTOR_BATCH_COUNT):
+                _logger.info(
+                    "curve-doctor raw batch %d/%d: target_height=%.3f",
+                    batch_index + 1,
+                    CURVE_DOCTOR_BATCH_COUNT,
+                    target_height,
+                )
+                if self.dry_run:
+                    frequency = eddy_curve_frequency_at_height(source, target_height)
+                    batches.append(
+                        {
+                            "target_height": target_height,
+                            "commanded_z": tap_median + target_height,
+                            "raw_frequency_hz": frequency,
+                            "raw_frequency_span_hz": 0.0,
+                            "sample_count": 0,
+                            "temperature": None,
+                            "dry_run": True,
+                        }
+                    )
+                else:
+                    batches.append(
+                        self._collect_curve_doctor_raw_batch(
+                            target_height=target_height, tap_median=tap_median
+                        )
+                    )
+            frequencies = [float(batch["raw_frequency_hz"]) for batch in batches]
+            anchors.append(
+                {
+                    "target_height": target_height,
+                    "commanded_z": tap_median + target_height,
+                    "raw_frequency_hz": statistics.median(frequencies),
+                    "batch_frequency_span_hz": max(frequencies) - min(frequencies),
+                    "batches": batches,
+                }
+            )
+        return anchors
+
+    def _validate_curve_doctor_candidate(self, tap_median: float) -> dict[str, Any]:
+        commanded_heights = tuple(
+            tap_median + target_height for target_height in CURVE_DOCTOR_HEIGHTS
+        )
+        if self.dry_run:
+            results = [
+                {
+                    "target_height": target_height,
+                    "commanded_z": commanded_z,
+                    "scan_bed_z": tap_median,
+                    "residual": 0.0,
+                }
+                for target_height, commanded_z in zip(
+                    CURVE_DOCTOR_HEIGHTS, commanded_heights
+                )
+            ]
+            return {"results": results, "span": 0.0, "dry_run": True}
+        nozzle_zs = ",".join(f"{height:.6f}" for height in commanded_heights)
+        self._gcode(
+            f"EDDY_SCAN_HEIGHT_TEST X={REFERENCE_X:.3f} Y={REFERENCE_Y:.3f} "
+            f"NOZZLE_ZS={nozzle_zs} DURATION={CURVE_DOCTOR_DURATION:.3f}"
+        )
+        measured = self._curve_doctor_status(
+            self.client.status(["eddy_tap_measure"]), "last_scan_height_test"
+        )
+        values = measured.get("results")
+        if not isinstance(values, Sequence) or len(values) != len(CURVE_DOCTOR_HEIGHTS):
+            raise CalibrationError(
+                "Eddy scan-height validation returned an invalid result count"
+            )
+        results: list[dict[str, Any]] = []
+        for target_height, commanded_z, value in zip(
+            CURVE_DOCTOR_HEIGHTS, commanded_heights, values
+        ):
+            if not isinstance(value, Mapping):
+                raise CalibrationError(
+                    "Eddy scan-height validation returned an invalid point"
+                )
+            scan_bed_z = float(value.get("scan_bed_z", math.nan))
+            toolhead_z = float(value.get("toolhead_z", math.nan))
+            if not math.isfinite(scan_bed_z) or not math.isfinite(toolhead_z):
+                raise CalibrationError(
+                    "Eddy scan-height validation returned a non-finite Z"
+                )
+            if abs(toolhead_z - commanded_z) > 0.005:
+                raise CalibrationError(
+                    "Eddy scan-height validation used an unexpected nozzle Z"
+                )
+            residual = scan_bed_z - tap_median
+            results.append(
+                {
+                    "target_height": target_height,
+                    "commanded_z": commanded_z,
+                    "scan_bed_z": scan_bed_z,
+                    "residual": residual,
+                    "raw": dict(value),
+                }
+            )
+        residuals = [float(result["residual"]) for result in results]
+        span = max(residuals) - min(residuals)
+        validation = {"results": results, "span": span, "raw_status": measured}
+        if any(
+            abs(residual) > CURVE_DOCTOR_ABSOLUTE_TOLERANCE for residual in residuals
+        ):
+            raise CalibrationError(
+                "curve-doctor validation exceeds absolute tolerance: " + repr(residuals)
+            )
+        if span > CURVE_DOCTOR_SPAN_TOLERANCE:
+            raise CalibrationError(
+                f"curve-doctor validation span {span:.6f} exceeds "
+                f"{CURVE_DOCTOR_SPAN_TOLERANCE:.6f}"
+            )
+        return validation
+
+    def doctor_eddy_curve(self) -> None:
+        """Build, deploy, validate, and atomically retain a Tap-anchored curve."""
+
+        _logger.info("I1.5D Tap-anchored Eddy curve doctoring started")
+        source_curve = str(
+            self.raw_calibration["eddy_relative_calibration"]["klipper"]["calibrate"]
+        )
+        pre_reference = self.eddy_reference_sequence("curve_doctor_pre")
+        tap_median = float(pre_reference["median_tap_z"])
+        anchors = self._collect_curve_doctor_anchors(tap_median, source_curve)
+        candidate_curve, derived_anchors = doctor_eddy_curve(source_curve, anchors)
+        evidence: dict[str, Any] = {
+            "source_curve": source_curve,
+            "pre_reference": pre_reference,
+            "anchors": anchors,
+            "derived_anchors": derived_anchors,
+            "candidate_curve": candidate_curve,
+        }
+        self.store.write_json("curve-doctor-candidate.json", evidence)
+        if self.dry_run:
+            validation = self._validate_curve_doctor_candidate(tap_median)
+            self.checkpoint(
+                Phase.CURVE_DOCTOR,
+                committed=False,
+                curve_doctor={**evidence, "validation": validation},
+            )
+            return
+        self._snapshot_eddy_candidate_base()
+        try:
+            self.deploy_value(
+                {
+                    (
+                        "eddy_relative_calibration",
+                        "klipper",
+                        "calibrate",
+                    ): candidate_curve
+                },
+                Phase.CURVE_DOCTOR,
+                checkpoint=False,
+            )
+            post_reference = self.eddy_reference_sequence("curve_doctor_post")
+            validation = self._validate_curve_doctor_candidate(
+                float(post_reference["median_tap_z"])
+            )
+        except Exception as exc:
+            failure = {**evidence, "error": str(exc)}
+            self.store.write_json("curve-doctor-failed.json", failure)
+            self.checkpoint(Phase.CURVE_DOCTOR, committed=False, curve_doctor=failure)
+            self._restore_eddy_candidate_base()
+            raise
+        self.raw_calibration = _load_raw_calibration()
+        accepted = {
+            **evidence,
+            "post_reference": post_reference,
+            "validation": validation,
+            "rollback": False,
+        }
+        self.store.write_json("curve-doctor-accepted.json", accepted)
+        self.checkpoint(Phase.CURVE_DOCTOR, committed=True, curve_doctor=accepted)
+        _logger.info("I1.5D Tap-anchored Eddy curve doctoring committed")
 
     def verify_mesh_against_tap(self, mesh_status: Mapping[str, Any]) -> dict[str, Any]:
         matrix = mesh_status.get("mesh_matrix") or mesh_status.get("probed_matrix")
@@ -2120,6 +2554,10 @@ class Iteration1Runner:
         self.confirm()
         self.preflight(checkpoint_state=False)
         phase = Phase(committed)
+        if phase is Phase.CURVE_DOCTOR:
+            raise CalibrationError(
+                "curve-doctor is a standalone step and cannot be resumed as Iteration 1"
+            )
         phases = list(Phase)
         index = phases.index(phase)
         if index <= phases.index(Phase.PREFLIGHT):
@@ -2203,9 +2641,7 @@ def rollback(run_directory: Path, *, host: str, assume_yes: bool) -> None:
     MoonrakerClient(host).restart()
 
 
-def _load_run_state(
-    run_directory: Path, *, strict_hashes: bool = True
-) -> RunState:
+def _load_run_state(run_directory: Path, *, strict_hashes: bool = True) -> RunState:
     state_path = run_directory / "state.json"
     if not state_path.exists():
         raise CalibrationError(f"run state is missing: {state_path}")
@@ -2265,9 +2701,7 @@ def _make_runner(
         snapshot=not existing,
     )
     if existing:
-        runner.state = _load_run_state(
-            run_directory, strict_hashes=strict_state_hashes
-        )
+        runner.state = _load_run_state(run_directory, strict_hashes=strict_state_hashes)
     return runner, existing
 
 
@@ -2284,7 +2718,10 @@ def _run_step(runner: Iteration1Runner, step: str) -> RunState:
         state = runner.state
     else:
         runner.confirm()
-        runner.preflight(checkpoint_state=False)
+        runner.preflight(
+            checkpoint_state=False,
+            sync_printer=step == "curve-doctor" and not runner.dry_run,
+        )
         if step == "bootstrap-tap":
             runner.bootstrap_tap()
         elif step == "update-endstops":
@@ -2304,6 +2741,8 @@ def _run_step(runner: Iteration1Runner, step: str) -> RunState:
             runner.calibrate_drive_current()
         elif step == "eddy-frequency":
             runner.calibrate_eddy_curve()
+        elif step == "curve-doctor":
+            runner.doctor_eddy_curve()
         elif step == "mesh":
             runner.final_mesh()
         else:
@@ -2375,9 +2814,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 assume_yes=args.yes,
             )
             state = runner.resume()
-            _logger.info(
-                "resume finished: committed_phase=%s", state.committed_phase
-            )
+            _logger.info("resume finished: committed_phase=%s", state.committed_phase)
             print(json.dumps(asdict(state), indent=2, sort_keys=True, default=str))
             return 0
         step = args.step or "run"
