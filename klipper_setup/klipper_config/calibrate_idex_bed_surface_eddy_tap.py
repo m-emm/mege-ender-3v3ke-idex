@@ -95,18 +95,11 @@ CURVE_DOCTOR_DURATION = 0.5
 CURVE_DOCTOR_ASCENT_APPROACH_CLEARANCE = 0.1
 CURVE_DOCTOR_ABSOLUTE_TOLERANCE = 0.020
 CURVE_DOCTOR_SPAN_TOLERANCE = 0.020
-MESH_CENTER_TOLERANCE = 0.005
-MESH_POINT_TOLERANCE = 0.030
-MESH_RMS_TOLERANCE = 0.015
-MESH_STATIONARY_SCAN_HEIGHT = 1.0
-MESH_STATIONARY_SCAN_COUNT = 3
-MESH_STATIONARY_SCAN_DURATION = 0.5
-MESH_DIAGNOSTIC_TAP_COUNT = 1
-MESH_DIAGNOSTIC_XY_SPEED = 100.0
-MESH_ACTIVE_TRANSFORM_TOLERANCE = 0.030
-MESH_MANUAL_PROFILE = "saved_mesh"
+TAP_MESH_PROFILE = "tap_7x7"
+TAP_MESH_PROBE_COUNT = "7,7"
+TAP_MESH_HORIZONTAL_MOVE_Z = 5.0
 ARMING_PHRASE = "CALIBRATE IDEX Z ITERATION 1"
-WORKFLOW_VERSION = 2
+WORKFLOW_VERSION = 3
 
 
 class CalibrationError(RuntimeError):
@@ -122,7 +115,6 @@ class Phase(str, Enum):
     EDDY_CALIBRATION = "I1.5"
     CURVE_DOCTOR = "I1.5D"
     MESH_SCAN = "I1.6"
-    MESH_VERIFY = "I1.7"
     FINISH = "I1.8"
 
 
@@ -617,114 +609,6 @@ def validate_pose(
         )
 
 
-def mesh_corrected_contact_z(raw_tap_z: float, mesh_correction_z: float) -> float:
-    """Apply the bed-mesh inverse to a raw kinematic tap result."""
-
-    return float(raw_tap_z) - float(mesh_correction_z)
-
-
-def mesh_correction_at(
-    matrix: Sequence[Sequence[float]],
-    *,
-    mesh_min: MeshPoint,
-    mesh_max: MeshPoint,
-    point: MeshPoint,
-) -> float:
-    """Bilinearly interpolate a Klipper mesh matrix at a validation point."""
-
-    if not matrix or not matrix[0] or len({len(row) for row in matrix}) != 1:
-        raise CalibrationError("active mesh matrix is empty or ragged")
-    rows = len(matrix)
-    columns = len(matrix[0])
-    if (
-        not mesh_min.x <= point.x <= mesh_max.x
-        or not mesh_min.y <= point.y <= mesh_max.y
-    ):
-        raise CalibrationError(f"mesh lookup point is outside the active mesh: {point}")
-    x_fraction = (point.x - mesh_min.x) / (mesh_max.x - mesh_min.x)
-    y_fraction = (point.y - mesh_min.y) / (mesh_max.y - mesh_min.y)
-    x_position = x_fraction * (columns - 1)
-    y_position = y_fraction * (rows - 1)
-    x0 = min(int(math.floor(x_position)), columns - 1)
-    x1 = min(x0 + 1, columns - 1)
-    y0 = min(int(math.floor(y_position)), rows - 1)
-    y1 = min(y0 + 1, rows - 1)
-    dx = x_position - x0
-    dy = y_position - y0
-    lower = float(matrix[y0][x0]) * (1.0 - dx) + float(matrix[y0][x1]) * dx
-    upper = float(matrix[y1][x0]) * (1.0 - dx) + float(matrix[y1][x1]) * dx
-    return lower * (1.0 - dy) + upper * dy
-
-
-def mesh_tap_acceptance(
-    tap_samples: Mapping[MeshPoint, Sequence[float]],
-    mesh_corrections: Mapping[MeshPoint, float],
-    *,
-    point_tolerance: float = MESH_POINT_TOLERANCE,
-    rms_tolerance: float = MESH_RMS_TOLERANCE,
-) -> dict[str, Any]:
-    """Calculate and gate raw-tap minus mesh-correction results."""
-
-    corrected: dict[str, dict[str, float]] = {}
-    residuals: list[float] = []
-    for point, samples in tap_samples.items():
-        if point not in mesh_corrections:
-            raise CalibrationError(f"missing mesh correction for tap point {point}")
-        summary = summarize_taps(samples, attempts=len(samples))
-        if summary.rejected_attempts or summary.span > 0.020:
-            raise CalibrationError(f"tap repeatability failed at {point}")
-        corrected_z = mesh_corrected_contact_z(summary.mean, mesh_corrections[point])
-        residuals.append(corrected_z)
-        corrected[f"{point.x:.3f},{point.y:.3f}"] = {
-            "raw_mean": summary.mean,
-            "mesh_correction": float(mesh_corrections[point]),
-            "mesh_corrected_mean": corrected_z,
-            "span": summary.span,
-        }
-    if not residuals:
-        raise CalibrationError("no tap-safe mesh validation points were measured")
-    rms = math.sqrt(statistics.fmean(value * value for value in residuals))
-    if any(abs(value) > point_tolerance for value in residuals):
-        raise CalibrationError(
-            f"mesh-corrected tap exceeds point tolerance: {residuals}"
-        )
-    if rms > rms_tolerance:
-        raise CalibrationError(
-            f"mesh-corrected tap RMS {rms:.6f} exceeds {rms_tolerance:.6f}"
-        )
-    return {"points": corrected, "rms": rms, "max_abs": max(map(abs, residuals))}
-
-
-def derive_safe_tap_grid(
-    *,
-    nozzle_x: AxisBounds,
-    nozzle_y: AxisBounds,
-    mesh_x: AxisBounds,
-    mesh_y: AxisBounds,
-    coil_offset_x: float,
-    coil_offset_y: float,
-    margin: float = 5.0,
-    count: int = 3,
-) -> tuple[MeshPoint, ...]:
-    """Derive a grid in the intersection safe for both nozzle and coil taps."""
-
-    if count < 2:
-        raise ValueError("tap validation grid needs at least two points per axis")
-    x_min = max(nozzle_x.minimum, mesh_x.minimum, mesh_x.minimum - coil_offset_x)
-    x_max = min(nozzle_x.maximum, mesh_x.maximum, mesh_x.maximum - coil_offset_x)
-    y_min = max(nozzle_y.minimum, mesh_y.minimum, mesh_y.minimum - coil_offset_y)
-    y_max = min(nozzle_y.maximum, mesh_y.maximum, mesh_y.maximum - coil_offset_y)
-    x_min += margin
-    x_max -= margin
-    y_min += margin
-    y_max -= margin
-    if x_min >= x_max or y_min >= y_max:
-        raise CalibrationError("no safe nozzle/coil overlap exists for tap validation")
-    xs = [x_min + (x_max - x_min) * i / (count - 1) for i in range(count)]
-    ys = [y_min + (y_max - y_min) * i / (count - 1) for i in range(count)]
-    return tuple(MeshPoint(x, y) for y in ys for x in xs)
-
-
 def extract_pending_value(
     pending: Mapping[str, Any] | Sequence[Any],
     section: str,
@@ -794,11 +678,7 @@ def pending_sections(pending: Any, *, _root: bool = True) -> set[str]:
 
 def require_only_transient_mesh_pending(pending: Any) -> None:
     sections = pending_sections(pending)
-    unexpected = sections - {
-        "bed_mesh default",
-        f"bed_mesh {MESH_MANUAL_PROFILE}",
-        "bed_mesh",
-    }
+    unexpected = sections - {f"bed_mesh {TAP_MESH_PROFILE}"}
     if unexpected:
         raise CalibrationError(
             "unexpected pending config after mesh scan: "
@@ -2359,553 +2239,10 @@ class Iteration1Runner:
         self.checkpoint(Phase.CURVE_DOCTOR, committed=True, curve_doctor=accepted)
         _logger.info("I1.5D Tap-anchored Eddy curve doctoring committed")
 
-    def _mesh_snapshot(self, mesh_status: Mapping[str, Any]) -> dict[str, Any]:
-        matrix = mesh_status.get("mesh_matrix") or mesh_status.get("probed_matrix")
-        if not matrix:
-            raise CalibrationError("active mesh did not expose a matrix for diagnosis")
-        mesh_min_values = mesh_status.get("mesh_min", [0.0, 20.0])
-        mesh_max_values = mesh_status.get("mesh_max", [190.0, 275.0])
-        if isinstance(mesh_min_values, Mapping):
-            mesh_min_values = [mesh_min_values["x"], mesh_min_values["y"]]
-        if isinstance(mesh_max_values, Mapping):
-            mesh_max_values = [mesh_max_values["x"], mesh_max_values["y"]]
-        eddy = self.raw_calibration["eddy_relative_calibration"]["nozzle_to_coil"]
-        live = self.client.status(
-            ["probe", "toolhead", "temperature_probe btt_eddy", "gcode_move"]
-        )
-        snapshot = {
-            "profile_name": mesh_status.get("profile_name"),
-            "mesh_min": [float(mesh_min_values[0]), float(mesh_min_values[1])],
-            "mesh_max": [float(mesh_max_values[0]), float(mesh_max_values[1])],
-            "mesh_matrix": [[float(value) for value in row] for row in matrix],
-            "probed_matrix": [
-                [float(value) for value in row]
-                for row in (mesh_status.get("probed_matrix") or matrix)
-            ],
-            "zero_reference_position": [REFERENCE_X, REFERENCE_Y],
-            "probe_offsets": {"x": float(eddy["x"]), "y": float(eddy["y"])},
-            "temperature": live.get("temperature_probe btt_eddy", {}).get(
-                "temperature"
-            ),
-            "toolhead_position": live.get("toolhead", {}).get("position"),
-            "gcode_position": live.get("gcode_move", {}).get("gcode_position"),
-        }
-        self.store.write_json("mesh-scan.json", snapshot)
-        return snapshot
-
-    @staticmethod
-    def _mesh_snapshot_bounds(
-        snapshot: Mapping[str, Any],
-    ) -> tuple[MeshPoint, MeshPoint]:
-        mesh_min = snapshot["mesh_min"]
-        mesh_max = snapshot["mesh_max"]
-        return (
-            MeshPoint(float(mesh_min[0]), float(mesh_min[1])),
-            MeshPoint(float(mesh_max[0]), float(mesh_max[1])),
-        )
-
-    def _capture_same_point_mesh_measurement(
-        self, *, point: MeshPoint
-    ) -> dict[str, Any]:
-        self._gcode(
-            f"EDDY_TAP_MEASURE X={point.x:.3f} Y={point.y:.3f} "
-            f"THRESHOLD={self.tap_threshold} COUNT={MESH_DIAGNOSTIC_TAP_COUNT} "
-            "EDDY_MODE=scan "
-            f"SCAN_COUNT={MESH_STATIONARY_SCAN_COUNT} "
-            f"SCAN_HEIGHT={MESH_STATIONARY_SCAN_HEIGHT:.6f} "
-            f"DURATION={MESH_STATIONARY_SCAN_DURATION:.3f} "
-            f"XY_SPEED={MESH_DIAGNOSTIC_XY_SPEED:.3f}"
-        )
-        status = self.client.status(["eddy_tap_measure"])
-        extra = status.get("eddy_tap_measure", {})
-        result = extra.get("last_tap_measurement")
-        if not isinstance(result, Mapping):
-            raise CalibrationError("same-point Tap/scan did not publish its result")
-        captured = dict(result)
-        tap = captured.get("tap")
-        stationary = captured.get("stationary_scan")
-        if not isinstance(tap, Mapping) or not isinstance(stationary, Mapping):
-            raise CalibrationError("same-point Tap/scan returned incomplete evidence")
-        if (
-            abs(float(captured.get("bed_x", math.nan)) - point.x)
-            > EDDY_REFERENCE_XY_TOLERANCE
-            or abs(float(captured.get("bed_y", math.nan)) - point.y)
-            > EDDY_REFERENCE_XY_TOLERANCE
-        ):
-            raise CalibrationError(
-                "same-point Tap/scan did not measure the requested physical point"
-            )
-        if int(tap.get("count", 0)) != MESH_DIAGNOSTIC_TAP_COUNT:
-            raise CalibrationError(
-                "same-point measurement returned an unexpected Tap count"
-            )
-        if int(stationary.get("count", 0)) != MESH_STATIONARY_SCAN_COUNT:
-            raise CalibrationError(
-                "same-point measurement returned an unexpected scan count"
-            )
-        return captured
-
-    @staticmethod
-    def _residual_summary(values: Sequence[float]) -> dict[str, float] | None:
-        if not values:
-            return None
-        return {
-            "median": statistics.median(values),
-            "rms": math.sqrt(statistics.fmean(value * value for value in values)),
-            "max_abs": max(map(abs, values)),
-        }
-
-    def diagnose_mesh_against_tap(
-        self, rapid_snapshot: Mapping[str, Any]
-    ) -> dict[str, Any]:
-        """Measure a clean same-point Tap/stationary-scan map against the mesh."""
-
-        mesh_min, mesh_max = self._mesh_snapshot_bounds(rapid_snapshot)
-        matrix = rapid_snapshot["mesh_matrix"]
-        eddy = self.raw_calibration["eddy_relative_calibration"]["nozzle_to_coil"]
-        grid = derive_safe_tap_grid(
-            nozzle_x=AxisBounds(0.0, 255.0),
-            nozzle_y=AxisBounds(-15.0, 296.0),
-            mesh_x=AxisBounds(mesh_min.x, mesh_max.x),
-            mesh_y=AxisBounds(mesh_min.y, mesh_max.y),
-            coil_offset_x=float(eddy["x"]),
-            coil_offset_y=float(eddy["y"]),
-        )
-        reference = MeshPoint(REFERENCE_X, REFERENCE_Y)
-        _logger.info(
-            "mesh METHOD=rapid_scan diagnostic: clearing mesh for clean measurements"
-        )
-        self._gcode("BED_MESH_CLEAR")
-        reference_result: dict[str, Any] = {
-            "point": asdict(reference),
-            "ok": False,
-        }
-        failures: list[str] = []
-        try:
-            center_measurement = self._capture_same_point_mesh_measurement(
-                point=reference
-            )
-        except Exception as exc:
-            reference_result["error"] = str(exc)
-            failures.append("reference same-point Tap/scan acquisition failed")
-        else:
-            center_tap = center_measurement["tap"]
-            center_scan = center_measurement["stationary_scan"]
-            reference_result["same_point"] = center_measurement
-            reference_result["summary"] = dict(center_tap)
-            reference_result["samples"] = [
-                float(sample["z"]) for sample in center_tap["samples"]
-            ]
-            reference_result["mesh_correction"] = mesh_correction_at(
-                matrix, mesh_min=mesh_min, mesh_max=mesh_max, point=reference
-            )
-            reference_result["ok"] = (
-                abs(float(center_tap["mean"])) <= MESH_POINT_TOLERANCE
-                and abs(reference_result["mesh_correction"]) <= MESH_CENTER_TOLERANCE
-            )
-            if not reference_result["ok"]:
-                reference_result["error"] = (
-                    "reference Tap/mesh gate failed: "
-                    f"mean={float(center_tap['mean']):.6f} "
-                    f"correction={reference_result['mesh_correction']:.6f}"
-                )
-                failures.append(reference_result["error"])
-            reference_result["stationary_scan"] = center_scan
-            reference_result["stationary_eddy_minus_tap"] = float(
-                center_scan["scan_bed_z_median"]
-            ) - float(center_tap["mean"])
-        point_results: list[dict[str, Any]] = []
-        failed_points: list[dict[str, Any]] = []
-        tap_samples: dict[MeshPoint, tuple[float, ...]] = {}
-        corrections: dict[MeshPoint, float] = {}
-        rapid_minus_stationary: list[float] = []
-        stationary_minus_tap: list[float] = []
-        rapid_minus_tap: list[float] = []
-        for point in grid:
-            result: dict[str, Any] = {"point": asdict(point), "ok": False}
-            correction = mesh_correction_at(
-                matrix, mesh_min=mesh_min, mesh_max=mesh_max, point=point
-            )
-            result["mesh_correction"] = correction
-            try:
-                measurement = self._capture_same_point_mesh_measurement(point=point)
-            except Exception as exc:
-                result["acquisition_error"] = str(exc)
-            else:
-                tap = measurement["tap"]
-                stationary = measurement["stationary_scan"]
-                tap_mean = float(tap["mean"])
-                stationary_median = float(stationary["scan_bed_z_median"])
-                result["same_point"] = measurement
-                result["tap_summary"] = dict(tap)
-                result["tap_samples"] = [
-                    float(sample["z"]) for sample in tap["samples"]
-                ]
-                result["stationary_scan"] = stationary
-                result["mesh_minus_stationary"] = correction - stationary_median
-                result["stationary_eddy_minus_tap"] = stationary_median - tap_mean
-                result["mesh_minus_tap"] = correction - tap_mean
-                rapid_minus_stationary.append(result["mesh_minus_stationary"])
-                stationary_minus_tap.append(result["stationary_eddy_minus_tap"])
-                rapid_minus_tap.append(result["mesh_minus_tap"])
-                tap_samples[point] = tuple(result["tap_samples"])
-                corrections[point] = correction
-                result["ok"] = True
-            point_results.append(result)
-            if not result["ok"]:
-                failed_points.append(result)
-            _logger.info(
-                "mesh METHOD=rapid_scan diagnostic point: x=%.3f y=%.3f mesh=%+.6f "
-                "tap=%s stationary=%s mesh_minus_stationary=%s "
-                "stationary_minus_tap=%s",
-                point.x,
-                point.y,
-                correction,
-                _format_optional_float(
-                    result.get("tap_summary", {}).get("mean")
-                    if isinstance(result.get("tap_summary"), Mapping)
-                    else None
-                ),
-                _format_optional_float(
-                    result.get("stationary_scan", {}).get("scan_bed_z_median")
-                    if isinstance(result.get("stationary_scan"), Mapping)
-                    else None
-                ),
-                _format_optional_float(result.get("mesh_minus_stationary")),
-                _format_optional_float(result.get("stationary_eddy_minus_tap")),
-            )
-        try:
-            rapid_tap_gate = mesh_tap_acceptance(tap_samples, corrections)
-        except CalibrationError as exc:
-            rapid_tap_gate = {"points": {}, "rms": None, "max_abs": None}
-            failures.append(f"mesh-vs-single-Tap gate: {exc}")
-        if failed_points:
-            failures.append(
-                f"diagnostic acquisition failed at {len(failed_points)} points"
-            )
-        verification: dict[str, Any] = {
-            "rapid_scan": dict(rapid_snapshot),
-            "reference": reference_result,
-            "same_point_eddy_mode": "scan",
-            "tap_count": MESH_DIAGNOSTIC_TAP_COUNT,
-            "stationary_scan_count": MESH_STATIONARY_SCAN_COUNT,
-            "stationary_scan_height": MESH_STATIONARY_SCAN_HEIGHT,
-            "xy_speed": MESH_DIAGNOSTIC_XY_SPEED,
-            "point_results": point_results,
-            "failed_points": failed_points,
-            "attempted_points": len(grid),
-            "successful_tap_points": len(tap_samples),
-            "rapid_mesh_vs_tap": rapid_tap_gate,
-            "rapid_mesh_minus_stationary": self._residual_summary(
-                rapid_minus_stationary
-            ),
-            "stationary_eddy_minus_tap": self._residual_summary(stationary_minus_tap),
-            "rapid_mesh_minus_tap": self._residual_summary(rapid_minus_tap),
-            "error": "; ".join(failures) if failures else None,
-        }
-        return verification
-
-    def verify_active_mesh_transform(
-        self, verification: Mapping[str, Any]
-    ) -> dict[str, Any]:
-        """Verify that an active mesh preserves raw Tap contact reporting."""
-
-        candidates = [
-            point
-            for point in verification.get("point_results", [])
-            if isinstance(point, Mapping)
-            and isinstance(point.get("tap_summary"), Mapping)
-            and "mesh_correction" in point
-        ]
-        if not candidates:
-            return {
-                "ok": False,
-                "error": "no Tap-safe point for active transform check",
-            }
-        candidate = max(
-            candidates, key=lambda item: abs(float(item["mesh_correction"]))
-        )
-        point_data = candidate["point"]
-        point = MeshPoint(float(point_data["x"]), float(point_data["y"]))
-        raw_tap_mean = float(candidate["tap_summary"]["mean"])
-        correction = float(candidate["mesh_correction"])
-        active_summary, attempts = self.collect_taps(
-            x=point.x,
-            y=point.y,
-            count=1,
-            max_attempts=1,
-            tap_threshold=self.tap_threshold,
-            allow_empty=True,
-        )
-        result: dict[str, Any] = {
-            "point": asdict(point),
-            "raw_tap_mean": raw_tap_mean,
-            "mesh_correction": correction,
-            "expected_raw_tap": raw_tap_mean,
-            "attempts": attempts,
-            "ok": False,
-        }
-        if active_summary is None:
-            result["error"] = "no active-mesh Tap samples"
-            return result
-        result["summary"] = asdict(active_summary)
-        result["active_tap_mean"] = active_summary.mean
-        result["delta_active_minus_clean_raw"] = active_summary.mean - raw_tap_mean
-        if active_summary.rejected_attempts:
-            result["error"] = (
-                "active-mesh raw Tap acquisition failed: "
-                f"rejected={active_summary.rejected_attempts}"
-            )
-            return result
-        if (
-            abs(result["delta_active_minus_clean_raw"])
-            > MESH_ACTIVE_TRANSFORM_TOLERANCE
-        ):
-            result["error"] = (
-                "active-mesh raw Tap differs from clean raw Tap: "
-                f"delta={result['delta_active_minus_clean_raw']:.6f} "
-                f"tolerance={MESH_ACTIVE_TRANSFORM_TOLERANCE:.6f}"
-            )
-            return result
-        result["ok"] = True
-        return result
-
-    def verify_mesh_against_tap(self, mesh_status: Mapping[str, Any]) -> dict[str, Any]:
-        matrix = mesh_status.get("mesh_matrix") or mesh_status.get("probed_matrix")
-        if not matrix:
-            raise CalibrationError(
-                "active mesh did not expose a matrix for verification"
-            )
-        mesh_min_values = mesh_status.get("mesh_min", [0.0, 20.0])
-        mesh_max_values = mesh_status.get("mesh_max", [190.0, 275.0])
-        if isinstance(mesh_min_values, Mapping):
-            mesh_min_values = [mesh_min_values["x"], mesh_min_values["y"]]
-        if isinstance(mesh_max_values, Mapping):
-            mesh_max_values = [mesh_max_values["x"], mesh_max_values["y"]]
-        mesh_min = MeshPoint(float(mesh_min_values[0]), float(mesh_min_values[1]))
-        mesh_max = MeshPoint(float(mesh_max_values[0]), float(mesh_max_values[1]))
-        eddy = self.raw_calibration["eddy_relative_calibration"]["nozzle_to_coil"]
-        grid = derive_safe_tap_grid(
-            nozzle_x=AxisBounds(0.0, 255.0),
-            nozzle_y=AxisBounds(-15.0, 296.0),
-            mesh_x=AxisBounds(mesh_min.x, mesh_max.x),
-            mesh_y=AxisBounds(mesh_min.y, mesh_max.y),
-            coil_offset_x=float(eddy["x"]),
-            coil_offset_y=float(eddy["y"]),
-        )
-        reference = MeshPoint(REFERENCE_X, REFERENCE_Y)
-        _logger.info(
-            "mesh reference verification started: x=%.3f y=%.3f",
-            reference.x,
-            reference.y,
-        )
-        reference_summary, reference_attempts = self.collect_taps(
-            x=reference.x,
-            y=reference.y,
-            count=3,
-            max_attempts=3,
-            tap_threshold=self.tap_threshold,
-            allow_empty=True,
-        )
-        reference_result: dict[str, Any] = {
-            "point": {"x": reference.x, "y": reference.y},
-            "attempts": reference_attempts,
-            "ok": False,
-        }
-        reference_errors: list[str] = []
-        if reference_summary is None:
-            reference_errors.append("no successful tap samples")
-        else:
-            reference_result["summary"] = asdict(reference_summary)
-            reference_result["samples"] = list(reference_summary.successful)
-            try:
-                reference_correction = mesh_correction_at(
-                    matrix,
-                    mesh_min=mesh_min,
-                    mesh_max=mesh_max,
-                    point=reference,
-                )
-            except Exception as exc:
-                reference_errors.append(str(exc))
-            else:
-                reference_corrected_mean = mesh_corrected_contact_z(
-                    reference_summary.mean, reference_correction
-                )
-                reference_result["mesh_correction"] = reference_correction
-                reference_result["mesh_corrected_mean"] = reference_corrected_mean
-                if (
-                    len(reference_summary.successful) != 3
-                    or reference_summary.rejected_attempts
-                ):
-                    reference_errors.append(
-                        "reference tap rejected a sample: "
-                        f"successful={len(reference_summary.successful)}, "
-                        f"rejected={reference_summary.rejected_attempts}"
-                    )
-                if reference_summary.span > 0.020:
-                    reference_errors.append(
-                        "reference tap span exceeds 0.020 mm: "
-                        f"span={reference_summary.span:.6f}"
-                    )
-                if abs(reference_correction) > MESH_CENTER_TOLERANCE:
-                    reference_errors.append(
-                        "reference mesh correction exceeds tolerance: "
-                        f"correction={reference_correction:.6f}, "
-                        f"tolerance={MESH_CENTER_TOLERANCE:.6f}"
-                    )
-                if abs(reference_corrected_mean) > MESH_POINT_TOLERANCE:
-                    reference_errors.append(
-                        "mesh-corrected reference tap exceeds point tolerance: "
-                        f"mean={reference_corrected_mean:.6f}, "
-                        f"tolerance={MESH_POINT_TOLERANCE:.6f}"
-                    )
-        if reference_errors:
-            reference_result["error"] = "; ".join(reference_errors)
-            _logger.warning(
-                "mesh reference verification failed: %s; continuing through grid",
-                reference_result["error"],
-            )
-        else:
-            reference_result["ok"] = True
-            _logger.info(
-                "mesh reference verification passed: mean=%.6f correction=%.6f "
-                "corrected_mean=%.6f span=%.6f",
-                reference_summary.mean,
-                reference_result["mesh_correction"],
-                reference_result["mesh_corrected_mean"],
-                reference_summary.span,
-            )
-        tap_samples: dict[MeshPoint, tuple[float, ...]] = {}
-        corrections: dict[MeshPoint, float] = {}
-        point_results: list[dict[str, Any]] = []
-        failed_points: list[dict[str, Any]] = []
-        for point in grid:
-            _logger.info(
-                "mesh verification point started: x=%.3f y=%.3f",
-                point.x,
-                point.y,
-            )
-            summary, attempts = self.collect_taps(
-                x=point.x,
-                y=point.y,
-                count=3,
-                max_attempts=3,
-                tap_threshold=self.tap_threshold,
-                allow_empty=True,
-            )
-            result: dict[str, Any] = {
-                "point": {"x": point.x, "y": point.y},
-                "attempts": attempts,
-                "ok": False,
-            }
-            if summary is None:
-                result["error"] = "no successful tap samples"
-                failed_points.append(result)
-                point_results.append(result)
-                _logger.warning(
-                    "mesh verification point failed: x=%.3f y=%.3f "
-                    "no successful tap samples; continuing",
-                    point.x,
-                    point.y,
-                )
-                continue
-            result["summary"] = asdict(summary)
-            result["samples"] = list(summary.successful)
-            if summary.rejected_attempts or summary.span > 0.020:
-                result["error"] = (
-                    "tap repeatability failed: "
-                    f"rejected={summary.rejected_attempts}, span={summary.span:.6f}"
-                )
-                failed_points.append(result)
-                point_results.append(result)
-                _logger.warning(
-                    "mesh verification point failed: x=%.3f y=%.3f %s; continuing",
-                    point.x,
-                    point.y,
-                    result["error"],
-                )
-                continue
-            try:
-                correction = mesh_correction_at(
-                    matrix,
-                    mesh_min=mesh_min,
-                    mesh_max=mesh_max,
-                    point=point,
-                )
-            except Exception as exc:
-                result["error"] = str(exc)
-                failed_points.append(result)
-                point_results.append(result)
-                _logger.warning(
-                    "mesh verification point failed: x=%.3f y=%.3f %s; continuing",
-                    point.x,
-                    point.y,
-                    exc,
-                )
-                continue
-            result["mesh_correction"] = correction
-            result["ok"] = True
-            tap_samples[point] = summary.successful
-            corrections[point] = correction
-            point_results.append(result)
-            _logger.info(
-                "mesh verification point passed acquisition: x=%.3f y=%.3f "
-                "mean=%.6f span=%.6f correction=%.6f",
-                point.x,
-                point.y,
-                summary.mean,
-                summary.span,
-                correction,
-            )
-        verification: dict[str, Any]
-        global_error: str | None = None
-        try:
-            verification = mesh_tap_acceptance(tap_samples, corrections)
-        except CalibrationError as exc:
-            global_error = str(exc)
-            verification = {
-                "points": {},
-                "rms": None,
-                "max_abs": None,
-            }
-        verification.update(
-            {
-                "reference": reference_result,
-                "point_results": point_results,
-                "failed_points": failed_points,
-                "attempted_points": len(grid),
-                "successful_points": len(tap_samples),
-            }
-        )
-        failures: list[str] = []
-        if reference_errors:
-            failures.append(
-                "reference "
-                f"({reference.x:.3f},{reference.y:.3f}): "
-                f"{reference_result['error']}"
-            )
-        if failed_points:
-            failed_labels = ", ".join(
-                f"({item['point']['x']:.3f},{item['point']['y']:.3f})"
-                for item in failed_points
-            )
-            failures.append(
-                f"grid acquisition failed at {len(failed_points)}: {failed_labels}"
-            )
-        if global_error is not None:
-            failures.append(f"grid global gate: {global_error}")
-        if failures:
-            verification["error"] = "; ".join(failures)
-        self.store.write_json("mesh-verification.json", verification)
-        if failures:
-            raise CalibrationError(
-                "mesh verification surveyed all "
-                f"{len(grid)} points but failed: {verification['error']}"
-            )
-        return verification
-
     def final_mesh(self, *, clean_frame: bool = True) -> None:
-        _logger.info("I1.6/I1.7 final transient mesh scan started")
+        """Create and retain a transient native T0 Tap mesh."""
+
+        _logger.info("I1.6 native T0 Tap mesh started")
         if clean_frame:
             self._home_clean_frame()
         else:
@@ -2914,111 +2251,54 @@ class Iteration1Runner:
             before = self.client.status(["configfile"])
             pending = before.get("configfile", {}).get("save_config_pending_items", {})
             if pending:
-                raise CalibrationError("pending configuration exists before mesh scan")
-        _logger.info("running mesh rapid_scan at HORIZONTAL_MOVE_Z=1")
-        self._gcode(
-            "BED_MESH_CALIBRATE METHOD=rapid_scan PROFILE=default HORIZONTAL_MOVE_Z=1",
-            timeout=900.0,
+                raise CalibrationError("pending configuration exists before Tap mesh")
+        command = (
+            "BED_MESH_CALIBRATE METHOD=tap "
+            f"TAP_THRESHOLD={self.tap_threshold:.3f} SAMPLES=1 "
+            f"HORIZONTAL_MOVE_Z={TAP_MESH_HORIZONTAL_MOVE_Z:.0f} "
+            f"PROBE_COUNT={TAP_MESH_PROBE_COUNT} PROFILE={TAP_MESH_PROFILE}"
         )
-        if not self.dry_run:
-            _logger.info(
-                "saving METHOD=rapid_scan mesh profile %s for supervised manual inspection",
-                MESH_MANUAL_PROFILE,
-            )
-            self._gcode(f"BED_MESH_PROFILE SAVE={MESH_MANUAL_PROFILE}")
-        status = (
-            self.client.status(["bed_mesh", "configfile"]) if not self.dry_run else {}
+        _logger.info(
+            "running native Tap mesh: profile=%s threshold=%.3f probe_count=%s "
+            "horizontal_move_z=%.3f",
+            TAP_MESH_PROFILE,
+            self.tap_threshold,
+            TAP_MESH_PROBE_COUNT,
+            TAP_MESH_HORIZONTAL_MOVE_Z,
         )
-        if not self.dry_run:
-            require_only_transient_mesh_pending(
-                status.get("configfile", {}).get("save_config_pending_items", {})
-            )
-            mesh = status.get("bed_mesh", {})
-            if not mesh.get("profile_name") and not mesh.get("mesh_matrix"):
-                raise CalibrationError(
-                    "mesh scan did not leave an active in-memory mesh"
-                )
-            rapid_snapshot = self._mesh_snapshot(mesh)
-            verification: dict[str, Any]
-            diagnostic_error: Exception | None = None
-            try:
-                verification = self.diagnose_mesh_against_tap(rapid_snapshot)
-            except Exception as exc:
-                diagnostic_error = exc
-                verification = {
-                    "rapid_scan": rapid_snapshot,
-                    "error": f"clean mesh diagnostic did not complete: {exc}",
-                }
-            finally:
-                _logger.info(
-                    "reloading saved METHOD=rapid_scan mesh profile %s after clean diagnostics",
-                    MESH_MANUAL_PROFILE,
-                )
-                self._gcode(f"BED_MESH_PROFILE LOAD={MESH_MANUAL_PROFILE}")
-            active_status = self.client.status(["bed_mesh"])
-            active_mesh = active_status.get("bed_mesh", {})
-            if active_mesh.get(
-                "profile_name"
-            ) != MESH_MANUAL_PROFILE or not active_mesh.get("mesh_matrix"):
-                reload_error = (
-                    f"METHOD=rapid_scan mesh profile {MESH_MANUAL_PROFILE} did not become active "
-                    "after reload"
-                )
-                verification["error"] = "; ".join(
-                    value
-                    for value in [verification.get("error"), reload_error]
-                    if value
-                )
-            else:
-                transform = self.verify_active_mesh_transform(verification)
-                verification["active_mesh_transform"] = transform
-                if not transform.get("ok"):
-                    verification["error"] = "; ".join(
-                        value
-                        for value in [
-                            verification.get("error"),
-                            "active mesh raw-Tap check: "
-                            + str(transform.get("error", "failed")),
-                        ]
-                        if value
-                    )
-            verification["rapid_mesh_profile"] = MESH_MANUAL_PROFILE
-            verification["rapid_mesh_reloaded"] = not bool(
-                verification.get("error")
-                and "did not become active" in str(verification["error"])
-            )
-            self.store.write_json("mesh-verification.json", verification)
-            if diagnostic_error is not None:
-                raise CalibrationError(str(diagnostic_error))
-            if verification.get("error"):
-                raise CalibrationError(
-                    "mesh diagnostic surveyed all 9 points but failed: "
-                    + str(verification["error"])
-                )
+        self._gcode("T0")
+        self._gcode(command, timeout=900.0)
         if self.dry_run:
             self.checkpoint(Phase.MESH_SCAN, committed=False)
-        else:
-            self.checkpoint(Phase.MESH_SCAN, committed=True, mesh_status=status)
-            self.checkpoint(
-                Phase.MESH_VERIFY, committed=True, mesh_verification=verification
+            return
+        status = self.client.status(["bed_mesh", "configfile"])
+        pending = status.get("configfile", {}).get("save_config_pending_items", {})
+        require_only_transient_mesh_pending(pending)
+        mesh = status.get("bed_mesh", {})
+        matrix = mesh.get("mesh_matrix") or mesh.get("probed_matrix")
+        if mesh.get("profile_name") != TAP_MESH_PROFILE or not matrix:
+            raise CalibrationError(
+                f"native Tap mesh did not leave active profile {TAP_MESH_PROFILE}"
             )
-            rapid_tap = verification["rapid_mesh_vs_tap"]
-            rapid_stationary = verification["rapid_mesh_minus_stationary"]
-            stationary_tap = verification["stationary_eddy_minus_tap"]
-            _logger.info(
-                "I1.7 METHOD=rapid_scan diagnostic passed: mesh-vs-Tap max_abs=%.6f "
-                "rms=%.6f; mesh-vs-stationary max_abs=%s; "
-                "stationary-vs-Tap max_abs=%s",
-                rapid_tap["max_abs"],
-                rapid_tap["rms"],
-                _format_optional_float(
-                    None if rapid_stationary is None else rapid_stationary["max_abs"]
-                ),
-                _format_optional_float(
-                    None if stationary_tap is None else stationary_tap["max_abs"]
-                ),
-            )
-        _logger.info("I1.6/I1.7 final transient mesh scan finished")
+        artifact = {
+            "method": "tap",
+            "profile": TAP_MESH_PROFILE,
+            "command": command,
+            "tap_threshold": self.tap_threshold,
+            "samples": 1,
+            "horizontal_move_z": TAP_MESH_HORIZONTAL_MOVE_Z,
+            "probe_count": TAP_MESH_PROBE_COUNT,
+            "mesh_status": mesh,
+            "pending_sections": sorted(pending_sections(pending)),
+        }
+        self.store.write_json("mesh-tap.json", artifact)
+        self.checkpoint(
+            Phase.MESH_SCAN,
+            committed=True,
+            mesh_status=status,
+            mesh_tap=artifact,
+        )
+        _logger.info("I1.6 native T0 Tap mesh finished and remains active")
 
     def resume(self) -> RunState:
         """Continue only from the last committed phase boundary."""
@@ -3028,6 +2308,11 @@ class Iteration1Runner:
             raise CalibrationError("run has no committed phase boundary")
         self.confirm()
         self.preflight(checkpoint_state=False)
+        if committed == "I1.7" or self.state.phase == "I1.7":
+            raise CalibrationError(
+                "run predates the native Tap mesh workflow at removed phase I1.7; "
+                "start a new run"
+            )
         phase = Phase(committed)
         if phase is Phase.CURVE_DOCTOR:
             raise CalibrationError(
@@ -3051,12 +2336,6 @@ class Iteration1Runner:
             self.calibrate_eddy_curve()
         if index <= phases.index(Phase.EDDY_CALIBRATION):
             self.final_mesh()
-        elif phase is Phase.MESH_SCAN:
-            status = self.client.status(["bed_mesh", "configfile"])
-            verification = self.verify_mesh_against_tap(status.get("bed_mesh", {}))
-            self.checkpoint(
-                Phase.MESH_VERIFY, committed=True, mesh_verification=verification
-            )
         self.checkpoint(Phase.FINISH, committed=True, note="Iteration 1 complete")
         self.write_final_report()
         return self.state
@@ -3132,6 +2411,11 @@ def _load_run_state(run_directory: Path, *, strict_hashes: bool = True) -> RunSt
         )
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise CalibrationError(f"invalid run state: {state_path}") from exc
+    if state.phase == "I1.7" or state.committed_phase == "I1.7":
+        raise CalibrationError(
+            "run predates the native Tap mesh workflow at removed phase I1.7; "
+            "start a new run"
+        )
     if state.workflow_version != WORKFLOW_VERSION:
         raise CalibrationError(
             "run state uses an unsupported workflow version; start a new run"

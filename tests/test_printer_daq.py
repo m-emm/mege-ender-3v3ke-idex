@@ -252,10 +252,12 @@ def test_eddy_grid_uses_common_reachable_area_and_bottom_to_top_heights():
         },
     )
 
-    assert geometry.x.minimum == pytest.approx(5.0)
-    assert geometry.x.maximum == pytest.approx(190.0)
-    assert geometry.y.minimum == pytest.approx(20.0)
-    assert geometry.y.maximum == pytest.approx(275.0)
+    mesh_min = module._pair_setting(config, "bed_mesh", "mesh_min")
+    mesh_max = module._pair_setting(config, "bed_mesh", "mesh_max")
+    assert geometry.x.minimum == pytest.approx(mesh_min[0] + 5.0)
+    assert geometry.x.maximum == pytest.approx(mesh_max[0])
+    assert geometry.y.minimum == pytest.approx(mesh_min[1])
+    assert geometry.y.maximum == pytest.approx(mesh_max[1])
     assert [point.column for point in points] == [0, 1, 1, 0]
     assert "EXPECTED_RECORDS=20" in gcode
     assert "T0_Z_ENDSTOP=293.641000" in gcode

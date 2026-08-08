@@ -129,7 +129,7 @@ calibration_temp: ${eddy_temperature_calibration_temp}
 # the matching BED_MESH_OFFSET so this one physical-bed mesh follows both nozzles.
 speed: 100
 horizontal_move_z: 1
-mesh_min: 0,20
+mesh_min: 42,20
 mesh_max: 190,275
 probe_count: 11,11
 mesh_pps: 0,0
