@@ -557,6 +557,7 @@ python3 -m venv /opt/klipper-env
 /opt/klipper-env/bin/pip install -r /opt/klipper/scripts/klippy-requirements.txt
 /opt/klipper-env/bin/pip install "numpy<1.26"
 /opt/klipper-env/bin/pip install "matplotlib<3.11"
+/opt/klipper-env/bin/pip install "sqlitedict==2.1.0"
 /opt/klipper-env/bin/python -c 'import numpy, matplotlib'
 
 log "Installing custom Klipper host extras"
@@ -564,6 +565,8 @@ require_file "${FILES_DIR}/klipper_host/klippy/extras/heaters.py"
 require_file "${FILES_DIR}/klipper_host/klippy/extras/vision.py"
 require_file "${FILES_DIR}/klipper_host/klippy/extras/idex_manual_tuning.py"
 require_file "${FILES_DIR}/klipper_host/klippy/extras/eddy_tap_measure.py"
+require_file "${FILES_DIR}/klipper_host/klippy/extras/daq.py"
+require_file "${FILES_DIR}/klipper_host/klippy/extras/eddy_daq.py"
 install -m 0644 \
   "${FILES_DIR}/klipper_host/klippy/extras/heaters.py" \
   /opt/klipper/klippy/extras/heaters.py
@@ -576,6 +579,12 @@ install -m 0644 \
 install -m 0644 \
   "${FILES_DIR}/klipper_host/klippy/extras/eddy_tap_measure.py" \
   /opt/klipper/klippy/extras/eddy_tap_measure.py
+install -m 0644 \
+  "${FILES_DIR}/klipper_host/klippy/extras/daq.py" \
+  /opt/klipper/klippy/extras/daq.py
+install -m 0644 \
+  "${FILES_DIR}/klipper_host/klippy/extras/eddy_daq.py" \
+  /opt/klipper/klippy/extras/eddy_daq.py
 
 chown -R "${USERNAME}:${USERNAME}" /opt/klipper /opt/klipper-env
 
@@ -688,7 +697,7 @@ log "Writing build info"
   echo "hostname=${HOSTNAME}"
   echo "username=${USERNAME}"
   echo "klipper_commit=${KLIPPER_COMMIT:-}"
-  echo "klipper_host_extras=vision.py,idex_manual_tuning.py,eddy_tap_measure.py"
+  echo "klipper_host_extras=vision.py,idex_manual_tuning.py,eddy_tap_measure.py,daq.py,eddy_daq.py"
   echo "moonraker_commit=${MOONRAKER_COMMIT:-}"
   echo "mainsail_version=${MAINSAIL_VERSION}"
   echo "build_time_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

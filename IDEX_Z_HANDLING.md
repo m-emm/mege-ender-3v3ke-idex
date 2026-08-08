@@ -77,6 +77,50 @@ calibration frame is the leading issue, but no correction should be applied
 until the configured threshold and multi-point/temperature behavior are validated.
 
 
+## Generic printer DAQ
+
+The printer also provides a persistent, generic data-acquisition store for
+supervised investigations.  It is deliberately separate from Z calibration:
+DAQ jobs clear the runtime mesh for their own measurements, but never update
+endstops, curves, thresholds, or saved mesh data.
+
+The first job type is an Eddy/Tap grid.  It surveys the common T0 nozzle/Eddy
+area derived from the active configuration: the configured mesh range,
+left-carriage travel, and live Eddy XY offsets.  The default 11 by 11 grid is
+therefore `X=5..190`, `Y=20..275`; the five millimetre left margin keeps the
+coil inside the uncertain physical bed edge.  At each point it takes one Tap,
+then samples the native Eddy stream while approaching absolute nozzle Z
+`0.5,1.0,1.5,2.0` bottom-to-top.
+
+Generate and run a job with:
+
+```bash
+(cd /Users/mege/git/mege-ender-3v3ke-idex && \
+  python3 klipper_setup/klipper_config/daq.py generate-eddy \
+    --run-dir runs/daq/first_11x11 --job-id first_11x11)
+(cd /Users/mege/git/mege-ender-3v3ke-idex && \
+  python3 klipper_setup/klipper_config/daq.py run \
+    --run-dir runs/daq/first_11x11 --host pi@menderpi.local)
+```
+
+Inspect or download any completed/incomplete job independently of its original
+run directory:
+
+```bash
+(cd /Users/mege/git/mege-ender-3v3ke-idex && \
+  python3 klipper_setup/klipper_config/daq.py jobs --host pi@menderpi.local)
+(cd /Users/mege/git/mege-ender-3v3ke-idex && \
+  python3 klipper_setup/klipper_config/daq.py download --job-id first_11x11 \
+    --host pi@menderpi.local --output-dir runs/daq/first_11x11)
+```
+
+Each job is stored at its exact job ID in
+`/home/pi/printer_data/database/daq.sqlite`; flat measurement records use
+`<job_id>_<zero-padded record index>`.  Downloads create a small metadata JSON
+file and an ordered JSONL file suitable for dataframe loading and plotting.
+The job metadata also includes the six canonical T0/T1 X/Y/Z endstop positions
+from `calib.yaml`, the configuration fingerprint, and live probe offsets.
+
 ## Goals and non-goals
 
 The future design is intended to provide these invariants:

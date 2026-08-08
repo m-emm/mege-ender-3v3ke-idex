@@ -64,6 +64,14 @@ move_speed: 20.0
 default_count: 7
 scan_nozzle_zs: 0.5,1,2,3
 
+[daq]
+# Generic printer data-acquisition database.  Job-specific extras use this
+# shared store; it deliberately contains no sensor or vision logic.
+database_path: /home/pi/printer_data/database/daq.sqlite
+
+[eddy_daq]
+# Eddy-specific commands backed by the generic [daq] store.
+
 [gcode_macro EDDY_TAP_MEASURE]
 description: Measure taps and compare same-point regular or stationary Eddy probing.
 gcode:

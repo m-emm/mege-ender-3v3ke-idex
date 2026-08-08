@@ -21,6 +21,8 @@ SOURCE_HEATERS="${SCRIPT_DIR}/../klipper_host/klippy/extras/heaters.py"
 SOURCE_VISION="${SCRIPT_DIR}/../klipper_host/klippy/extras/vision.py"
 SOURCE_IDEX_MANUAL_TUNING="${SCRIPT_DIR}/../klipper_host/klippy/extras/idex_manual_tuning.py"
 SOURCE_EDDY_TAP_MEASURE="${SCRIPT_DIR}/../klipper_host/klippy/extras/eddy_tap_measure.py"
+SOURCE_DAQ="${SCRIPT_DIR}/../klipper_host/klippy/extras/daq.py"
+SOURCE_EDDY_DAQ="${SCRIPT_DIR}/../klipper_host/klippy/extras/eddy_daq.py"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 REMOTE_KLIPPER_DIR="${MENDERPI_KLIPPER_DIR:-/opt/klipper}"
 REMOTE_TMP_CFG="/tmp/printer.cfg.$$"
@@ -28,6 +30,8 @@ REMOTE_TMP_HEATERS="/tmp/heaters.py.$$"
 REMOTE_TMP_VISION="/tmp/vision.py.$$"
 REMOTE_TMP_IDEX_MANUAL_TUNING="/tmp/idex_manual_tuning.py.$$"
 REMOTE_TMP_EDDY_TAP_MEASURE="/tmp/eddy_tap_measure.py.$$"
+REMOTE_TMP_DAQ="/tmp/daq.py.$$"
+REMOTE_TMP_EDDY_DAQ="/tmp/eddy_daq.py.$$"
 EXPECTED_KLIPPER_COMMIT="ca8230d505b7ba7fd225bfa6ed9655bc4520e805"
 EXPECTED_UPSTREAM_HEATERS_SHA256="a95d83be80296a7ff970ea6e1b73746d1a97a7d3e47ce621c02a89d80451ac9d"
 LEGACY_BOOSTED_HEATERS_SHA256="b3b362086277fc7202fb12c022aa210da7cc15a470bf536f2cc0d3d507719830"
@@ -62,8 +66,12 @@ check_local_support_files() {
     echo "Error: Klipper eddy_tap_measure.py extra not found: ${SOURCE_EDDY_TAP_MEASURE}" >&2
     exit 1
   fi
+  if [[ ! -f "${SOURCE_DAQ}" || ! -f "${SOURCE_EDDY_DAQ}" ]]; then
+    echo "Error: Klipper DAQ extras not found: ${SOURCE_DAQ}, ${SOURCE_EDDY_DAQ}" >&2
+    exit 1
+  fi
 
-  python3 - "${SOURCE_HEATERS}" "${SOURCE_VISION}" "${SOURCE_IDEX_MANUAL_TUNING}" "${SOURCE_EDDY_TAP_MEASURE}" <<'PY'
+  python3 - "${SOURCE_HEATERS}" "${SOURCE_VISION}" "${SOURCE_IDEX_MANUAL_TUNING}" "${SOURCE_EDDY_TAP_MEASURE}" "${SOURCE_DAQ}" "${SOURCE_EDDY_DAQ}" <<'PY'
 import ast
 import sys
 from pathlib import Path
@@ -80,6 +88,8 @@ check_live_config() {
   echo "  Klipper vision extra: ${SOURCE_VISION}"
   echo "  Klipper IDEX manual tuning extra: ${SOURCE_IDEX_MANUAL_TUNING}"
   echo "  Klipper Eddy tap measurement extra: ${SOURCE_EDDY_TAP_MEASURE}"
+  echo "  Klipper generic DAQ extra: ${SOURCE_DAQ}"
+  echo "  Klipper Eddy DAQ extra: ${SOURCE_EDDY_DAQ}"
 
   python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --check
   check_local_support_files
@@ -94,6 +104,8 @@ check_live_config() {
   local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
   local_idex_manual_tuning_sha256="$(sha256_file "${SOURCE_IDEX_MANUAL_TUNING}")"
   local_eddy_tap_measure_sha256="$(sha256_file "${SOURCE_EDDY_TAP_MEASURE}")"
+  local_daq_sha256="$(sha256_file "${SOURCE_DAQ}")"
+  local_eddy_daq_sha256="$(sha256_file "${SOURCE_EDDY_DAQ}")"
   expected_fingerprint="$(
     python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --fingerprint
   )"
@@ -114,6 +126,8 @@ heaters_py = klipper_dir / "klippy" / "extras" / "heaters.py"
 vision_py = klipper_dir / "klippy" / "extras" / "vision.py"
 idex_manual_tuning_py = klipper_dir / "klippy" / "extras" / "idex_manual_tuning.py"
 eddy_tap_measure_py = klipper_dir / "klippy" / "extras" / "eddy_tap_measure.py"
+daq_py = klipper_dir / "klippy" / "extras" / "daq.py"
+eddy_daq_py = klipper_dir / "klippy" / "extras" / "eddy_daq.py"
 payload = {
     "ok": False,
     "remote_config_path": str(main_cfg),
@@ -121,6 +135,8 @@ payload = {
     "remote_vision_path": str(vision_py),
     "remote_idex_manual_tuning_path": str(idex_manual_tuning_py),
     "remote_eddy_tap_measure_path": str(eddy_tap_measure_py),
+    "remote_daq_path": str(daq_py),
+    "remote_eddy_daq_path": str(eddy_daq_py),
 }
 
 try:
@@ -137,6 +153,15 @@ try:
         if eddy_tap_measure_py.is_file()
         else ""
     )
+    payload["remote_daq_sha256"] = (
+        hashlib.sha256(daq_py.read_bytes()).hexdigest() if daq_py.is_file() else ""
+    )
+    payload["remote_eddy_daq_sha256"] = (
+        hashlib.sha256(eddy_daq_py.read_bytes()).hexdigest()
+        if eddy_daq_py.is_file()
+        else ""
+    )
+    subprocess.check_call(["/opt/klipper-env/bin/python3", "-c", "import sqlitedict"])
     payload["remote_klipper_commit"] = subprocess.check_output(
         ["git", "-C", str(klipper_dir), "rev-parse", "HEAD"],
         text=True,
@@ -161,6 +186,8 @@ PY
   CHECK_LOCAL_VISION_SHA256="${local_vision_sha256}" \
   CHECK_LOCAL_IDEX_MANUAL_TUNING_SHA256="${local_idex_manual_tuning_sha256}" \
   CHECK_LOCAL_EDDY_TAP_MEASURE_SHA256="${local_eddy_tap_measure_sha256}" \
+  CHECK_LOCAL_DAQ_SHA256="${local_daq_sha256}" \
+  CHECK_LOCAL_EDDY_DAQ_SHA256="${local_eddy_daq_sha256}" \
   CHECK_EXPECTED_KLIPPER_COMMIT="${EXPECTED_KLIPPER_COMMIT}" \
   CHECK_REMOTE_HOST="${REMOTE_HOST}" \
   CHECK_REMOTE_PAYLOAD="${remote_payload}" \
@@ -183,6 +210,8 @@ local_heaters_sha256 = os.environ["CHECK_LOCAL_HEATERS_SHA256"]
 local_vision_sha256 = os.environ["CHECK_LOCAL_VISION_SHA256"]
 local_idex_manual_tuning_sha256 = os.environ["CHECK_LOCAL_IDEX_MANUAL_TUNING_SHA256"]
 local_eddy_tap_measure_sha256 = os.environ["CHECK_LOCAL_EDDY_TAP_MEASURE_SHA256"]
+local_daq_sha256 = os.environ["CHECK_LOCAL_DAQ_SHA256"]
+local_eddy_daq_sha256 = os.environ["CHECK_LOCAL_EDDY_DAQ_SHA256"]
 expected_fingerprint = os.environ["CHECK_EXPECTED_FINGERPRINT"]
 expected_klipper_commit = os.environ["CHECK_EXPECTED_KLIPPER_COMMIT"]
 remote_payload = json.loads(os.environ["CHECK_REMOTE_PAYLOAD"])
@@ -207,6 +236,8 @@ remote_heaters_sha256 = remote_payload.get("remote_heaters_sha256", "")
 remote_vision_sha256 = remote_payload.get("remote_vision_sha256", "")
 remote_idex_manual_tuning_sha256 = remote_payload.get("remote_idex_manual_tuning_sha256", "")
 remote_eddy_tap_measure_sha256 = remote_payload.get("remote_eddy_tap_measure_sha256", "")
+remote_daq_sha256 = remote_payload.get("remote_daq_sha256", "")
+remote_eddy_daq_sha256 = remote_payload.get("remote_eddy_daq_sha256", "")
 remote_klipper_commit = remote_payload.get("remote_klipper_commit", "")
 status = remote_payload.get("status", {})
 webhooks = status.get("webhooks", {})
@@ -222,6 +253,10 @@ print(f"  Local idex_manual_tuning.py sha256: {local_idex_manual_tuning_sha256}"
 print(f"  Remote idex_manual_tuning.py sha256: {remote_idex_manual_tuning_sha256}")
 print(f"  Local eddy_tap_measure.py sha256: {local_eddy_tap_measure_sha256}")
 print(f"  Remote eddy_tap_measure.py sha256: {remote_eddy_tap_measure_sha256}")
+print(f"  Local daq.py sha256: {local_daq_sha256}")
+print(f"  Remote daq.py sha256: {remote_daq_sha256}")
+print(f"  Local eddy_daq.py sha256: {local_eddy_daq_sha256}")
+print(f"  Remote eddy_daq.py sha256: {remote_eddy_daq_sha256}")
 print(f"  Remote Klipper commit: {remote_klipper_commit}")
 print(f"  Klippy state: {webhooks.get('state')}")
 print(f"  save_config_pending: {configfile.get('save_config_pending')}")
@@ -253,6 +288,16 @@ if remote_eddy_tap_measure_sha256 != local_eddy_tap_measure_sha256:
     errors.append(
         "remote Klipper eddy_tap_measure.py sha256 does not match local extra "
         f"({remote_eddy_tap_measure_sha256} != {local_eddy_tap_measure_sha256})"
+    )
+if remote_daq_sha256 != local_daq_sha256:
+    errors.append(
+        "remote Klipper daq.py sha256 does not match local extra "
+        f"({remote_daq_sha256} != {local_daq_sha256})"
+    )
+if remote_eddy_daq_sha256 != local_eddy_daq_sha256:
+    errors.append(
+        "remote Klipper eddy_daq.py sha256 does not match local extra "
+        f"({remote_eddy_daq_sha256} != {local_eddy_daq_sha256})"
     )
 if remote_klipper_commit != expected_klipper_commit:
     errors.append(
@@ -304,7 +349,7 @@ if [[ ! -f "${SOURCE_CFG}" ]]; then
 fi
 
 cleanup_remote_tmp() {
-  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}' '${REMOTE_TMP_VISION}' '${REMOTE_TMP_IDEX_MANUAL_TUNING}' '${REMOTE_TMP_EDDY_TAP_MEASURE}'" >/dev/null 2>&1 || true
+  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}' '${REMOTE_TMP_VISION}' '${REMOTE_TMP_IDEX_MANUAL_TUNING}' '${REMOTE_TMP_EDDY_TAP_MEASURE}' '${REMOTE_TMP_DAQ}' '${REMOTE_TMP_EDDY_DAQ}'" >/dev/null 2>&1 || true
 }
 trap cleanup_remote_tmp EXIT
 
@@ -312,6 +357,8 @@ local_heaters_sha256="$(sha256_file "${SOURCE_HEATERS}")"
 local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
 local_idex_manual_tuning_sha256="$(sha256_file "${SOURCE_IDEX_MANUAL_TUNING}")"
 local_eddy_tap_measure_sha256="$(sha256_file "${SOURCE_EDDY_TAP_MEASURE}")"
+local_daq_sha256="$(sha256_file "${SOURCE_DAQ}")"
+local_eddy_daq_sha256="$(sha256_file "${SOURCE_EDDY_DAQ}")"
 
 echo "Updating ${REMOTE_HOST} with THE active Klipper config and host extras..."
 echo "  Source: ${SOURCE_CFG}"
@@ -319,15 +366,19 @@ echo "  Managed Klipper heaters.py: ${SOURCE_HEATERS}"
 echo "  Klipper vision extra: ${SOURCE_VISION}"
 echo "  Klipper IDEX manual tuning extra: ${SOURCE_IDEX_MANUAL_TUNING}"
 echo "  Klipper Eddy tap measurement extra: ${SOURCE_EDDY_TAP_MEASURE}"
+echo "  Klipper generic DAQ extra: ${SOURCE_DAQ}"
+echo "  Klipper Eddy DAQ extra: ${SOURCE_EDDY_DAQ}"
 
 scp "${SOURCE_CFG}" "${REMOTE_HOST}:${REMOTE_TMP_CFG}"
 scp "${SOURCE_HEATERS}" "${REMOTE_HOST}:${REMOTE_TMP_HEATERS}"
 scp "${SOURCE_VISION}" "${REMOTE_HOST}:${REMOTE_TMP_VISION}"
 scp "${SOURCE_IDEX_MANUAL_TUNING}" "${REMOTE_HOST}:${REMOTE_TMP_IDEX_MANUAL_TUNING}"
 scp "${SOURCE_EDDY_TAP_MEASURE}" "${REMOTE_HOST}:${REMOTE_TMP_EDDY_TAP_MEASURE}"
+scp "${SOURCE_DAQ}" "${REMOTE_HOST}:${REMOTE_TMP_DAQ}"
+scp "${SOURCE_EDDY_DAQ}" "${REMOTE_HOST}:${REMOTE_TMP_EDDY_DAQ}"
 
 ssh "${REMOTE_HOST}" \
-  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_TMP_EDDY_TAP_MEASURE='${REMOTE_TMP_EDDY_TAP_MEASURE}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' EXPECTED_EDDY_TAP_MEASURE_SHA256='${local_eddy_tap_measure_sha256}' bash -s" <<'REMOTE_SCRIPT'
+  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_TMP_EDDY_TAP_MEASURE='${REMOTE_TMP_EDDY_TAP_MEASURE}' REMOTE_TMP_DAQ='${REMOTE_TMP_DAQ}' REMOTE_TMP_EDDY_DAQ='${REMOTE_TMP_EDDY_DAQ}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' EXPECTED_EDDY_TAP_MEASURE_SHA256='${local_eddy_tap_measure_sha256}' EXPECTED_DAQ_SHA256='${local_daq_sha256}' EXPECTED_EDDY_DAQ_SHA256='${local_eddy_daq_sha256}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 MAIN_CFG="${HOME}/printer_data/config/printer.cfg"
@@ -335,12 +386,16 @@ HEATERS_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/heaters.py"
 VISION_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/vision.py"
 IDEX_MANUAL_TUNING_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/idex_manual_tuning.py"
 EDDY_TAP_MEASURE_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/eddy_tap_measure.py"
+DAQ_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/daq.py"
+EDDY_DAQ_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/eddy_daq.py"
 TS="$(date +%Y%m%d-%H%M%S)"
 CFG_BACKUP="${MAIN_CFG}.bak.${TS}"
 HEATERS_BACKUP="${HEATERS_PY}.bak.${TS}"
 VISION_BACKUP="${VISION_PY}.bak.${TS}"
 IDEX_MANUAL_TUNING_BACKUP="${IDEX_MANUAL_TUNING_PY}.bak.${TS}"
 EDDY_TAP_MEASURE_BACKUP="${EDDY_TAP_MEASURE_PY}.bak.${TS}"
+DAQ_BACKUP="${DAQ_PY}.bak.${TS}"
+EDDY_DAQ_BACKUP="${EDDY_DAQ_PY}.bak.${TS}"
 
 if [[ ! -f "${REMOTE_TMP_CFG}" ]]; then
   echo "Error: uploaded config not found: ${REMOTE_TMP_CFG}" >&2
@@ -360,6 +415,10 @@ if [[ ! -f "${REMOTE_TMP_IDEX_MANUAL_TUNING}" ]]; then
 fi
 if [[ ! -f "${REMOTE_TMP_EDDY_TAP_MEASURE}" ]]; then
   echo "Error: uploaded eddy_tap_measure.py not found: ${REMOTE_TMP_EDDY_TAP_MEASURE}" >&2
+  exit 1
+fi
+if [[ ! -f "${REMOTE_TMP_DAQ}" || ! -f "${REMOTE_TMP_EDDY_DAQ}" ]]; then
+  echo "Error: uploaded DAQ extras not found" >&2
   exit 1
 fi
 if [[ ! -f "${HEATERS_PY}" ]]; then
@@ -403,6 +462,12 @@ fi
 uploaded_eddy_tap_measure_sha="$(sha256sum "${REMOTE_TMP_EDDY_TAP_MEASURE}" | awk '{print $1}')"
 if [[ "${uploaded_eddy_tap_measure_sha}" != "${EXPECTED_EDDY_TAP_MEASURE_SHA256}" ]]; then
   echo "Error: uploaded eddy_tap_measure.py sha256 ${uploaded_eddy_tap_measure_sha} does not match local ${EXPECTED_EDDY_TAP_MEASURE_SHA256}" >&2
+  exit 1
+fi
+uploaded_daq_sha="$(sha256sum "${REMOTE_TMP_DAQ}" | awk '{print $1}')"
+uploaded_eddy_daq_sha="$(sha256sum "${REMOTE_TMP_EDDY_DAQ}" | awk '{print $1}')"
+if [[ "${uploaded_daq_sha}" != "${EXPECTED_DAQ_SHA256}" || "${uploaded_eddy_daq_sha}" != "${EXPECTED_EDDY_DAQ_SHA256}" ]]; then
+  echo "Error: uploaded DAQ extra sha256 does not match local managed source" >&2
   exit 1
 fi
 
@@ -515,6 +580,41 @@ else
   echo "Installed: ${EDDY_TAP_MEASURE_PY}"
 fi
 rm -f "${REMOTE_TMP_EDDY_TAP_MEASURE}"
+
+if ! /opt/klipper-env/bin/python3 -c 'import sqlitedict' >/dev/null 2>&1; then
+  /opt/klipper-env/bin/pip install 'sqlitedict==2.1.0'
+fi
+
+for daq_extra in DAQ EDDY_DAQ; do
+  if [[ "${daq_extra}" == "DAQ" ]]; then
+    daq_path="${DAQ_PY}"
+    daq_tmp="${REMOTE_TMP_DAQ}"
+    daq_expected="${EXPECTED_DAQ_SHA256}"
+    daq_backup="${DAQ_BACKUP}"
+  else
+    daq_path="${EDDY_DAQ_PY}"
+    daq_tmp="${REMOTE_TMP_EDDY_DAQ}"
+    daq_expected="${EXPECTED_EDDY_DAQ_SHA256}"
+    daq_backup="${EDDY_DAQ_BACKUP}"
+  fi
+  if [[ -f "${daq_path}" ]]; then
+    daq_current="$(sha256sum "${daq_path}" | awk '{print $1}')"
+  else
+    daq_current=""
+  fi
+  if [[ "${daq_current}" == "${daq_expected}" ]]; then
+    echo "Klipper ${daq_extra,,} extra already installed: ${daq_path}"
+  else
+    mkdir -p "$(dirname -- "${daq_path}")"
+    if [[ -f "${daq_path}" ]]; then
+      cp -a "${daq_path}" "${daq_backup}"
+      echo "Backed up: ${daq_backup}"
+    fi
+    cp -a "${daq_tmp}" "${daq_path}"
+    echo "Installed: ${daq_path}"
+  fi
+  rm -f "${daq_tmp}"
+done
 
 mkdir -p "$(dirname -- "${MAIN_CFG}")"
 
