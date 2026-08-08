@@ -280,6 +280,9 @@ def test_eddy_probe_geometry_and_visualization_mesh_are_generated_from_calib():
         eddy["nozzle_to_coil_y"]
     )
     assert _setting_float(probe, "descend_z") > 0
+    assert _setting_float(probe, "tap_z_offset") == pytest.approx(0.0)
+    assert "tap_z_offset" not in eddy
+    assert calibration["bed_to_nozzle_gap"] > 0.0
     mesh_min = [float(item) for item in _setting_value(mesh, "mesh_min").split(",")]
     mesh_max = [float(item) for item in _setting_value(mesh, "mesh_max").split(",")]
     probe_count = [int(item) for item in _setting_value(mesh, "probe_count").split(",")]
@@ -295,6 +298,39 @@ def test_eddy_probe_geometry_and_visualization_mesh_are_generated_from_calib():
     assert probe_count[0] >= 2 and probe_count[1] >= 2
     assert mesh_pps[0] >= 0 and mesh_pps[1] >= 0
     assert _setting_float(mesh, "horizontal_move_z") > 0
+
+
+def test_global_bed_to_nozzle_gap_is_required_and_legacy_tap_offset_is_rejected(
+    tmp_path,
+):
+    generator = _load_generator_module()
+    source = CALIB_PATH.read_text(encoding="utf-8")
+
+    missing_gap = tmp_path / "missing-gap.yaml"
+    missing_gap.write_text(
+        source.replace("bed_to_nozzle_gap: 0.200\n", ""), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="bed_to_nozzle_gap"):
+        generator.load_calibration(missing_gap)
+
+    invalid_gap = tmp_path / "invalid-gap.yaml"
+    invalid_gap.write_text(
+        source.replace("bed_to_nozzle_gap: 0.200", "bed_to_nozzle_gap: 0"),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="finite and positive"):
+        generator.load_calibration(invalid_gap)
+
+    legacy_offset = tmp_path / "legacy-offset.yaml"
+    legacy_offset.write_text(
+        source.replace(
+            "tap_threshold: 7500",
+            "tap_threshold: 7500\n    tap_z_offset: 0.000",
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="no longer"):
+        generator.load_calibration(legacy_offset)
 
 
 def test_eddy_klipper_calibration_curve_round_trips_exactly():
@@ -346,6 +382,7 @@ def test_eddy_klipper_calibration_curve_round_trips_exactly():
     rendered = values["eddy_klipper_calibration"]
     assert "reg_drive_current: 15" in rendered
     assert "calibrate:" in rendered
+    assert "tap_z_offset: 0.000" in rendered
     parser = configparser.ConfigParser(interpolation=None)
     parser.read_string(f"[probe_eddy_current btt_eddy]\n{rendered}\n")
     assert parser["probe_eddy_current btt_eddy"]["calibrate"] == curve.strip()

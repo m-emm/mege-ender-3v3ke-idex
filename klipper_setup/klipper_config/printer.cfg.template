@@ -127,7 +127,9 @@ calibration_temp: ${eddy_temperature_calibration_temp}
 [bed_mesh]
 # Printing mesh measured with the Eddy-equipped T0 toolhead. Tool changes apply
 # the matching BED_MESH_OFFSET so this one physical-bed mesh follows both nozzles.
-speed: 100
+# Tap requires a short mechanical settling period after each mesh-point move.
+# 45 mm/s leaves margin below the empirically reliable 50 mm/s no-dwell limit.
+speed: 45
 horizontal_move_z: 1
 mesh_min: 42,20
 mesh_max: 190,275

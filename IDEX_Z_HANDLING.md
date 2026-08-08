@@ -51,21 +51,22 @@ implementation.
 
 Implementation is deliberately divided into two iterations. Iteration 1 first
 creates a source-controlled physical and sensor baseline: it uses T0 Eddy tap
-at `X=150,Y=150` to establish native Z=0, transfers the same common correction
-to T1 while preserving the vision-derived relative alignment, recalibrates
-Eddy, and verifies a full mesh against tap. Iteration 2 then addresses hidden
-tool geometry, KlipperScreen manual offsets, M220/M221, and print lifecycle
-state. Iteration 2 must not begin until Iteration 1 passes.
+at `X=150,Y=150` to establish the configured physical contact target,
+transfers the same common correction to T1 while preserving the
+vision-derived relative alignment, recalibrates Eddy, and verifies the active
+Tap mesh against that target. Iteration 2 then addresses hidden tool geometry,
+KlipperScreen manual offsets, M220/M221, and print lifecycle state. Iteration
+2 must not begin until Iteration 1 passes.
 
 The Eddy Duo tap mode adds an important physical reference that was not part of
 the original analysis. A T0 `PROBE METHOD=tap` does not infer bed height from
 the normal frequency-to-distance calibration. It makes nozzle contact, analyzes
 the frequency response while pulling away, and reports the contact coordinate
-in Klipper's current kinematic frame. Once the known-good tap threshold, tap bias, mechanics,
-and repeatability are validated, repeated T0 taps can be the primary absolute
-contact reference. The non-contact Eddy calibration and scanned mesh can then
-be aligned to that reference instead of being asked to establish absolute
-nozzle contact by themselves.
+in Klipper's current kinematic frame. Once the known-good tap threshold,
+mechanics, and repeatability are validated, repeated T0 taps can be the
+primary absolute contact reference. The non-contact Eddy calibration and
+scanned mesh can then be aligned to that reference instead of being asked to
+establish absolute nozzle contact by themselves.
 
 The controlled follow-up now compares both methods at the same physical bed
 point near `(92.606,130.997)`. Two regular samples average `+1.1317055 mm`; two
@@ -183,10 +184,11 @@ carriage, and apply the combined offset. See
 [`T1`](klipper_setup/klipper_config/printer.cfg.template#L1093-L1129).
 
 The checked-in Eddy section provides the frequency/height calibration,
-`descend_z: 0.5`, X/Y offsets, and the known-good `tap_threshold: 5000` with
-`tap_z_offset: 0.000`. Iteration 1 treats that source-controlled threshold as
-canonical and uses it for every tap. Threshold discovery is not part of this
-workflow.
+`descend_z: 0.5`, X/Y offsets, and the known-good `tap_threshold: 5000`.
+The separate top-level `bed_to_nozzle_gap` is the printer-wide physical
+clearance datum: at G-code `Z=0`, either nozzle is exactly that far above the
+bed. Iteration 1 treats the threshold and gap as canonical source-controlled
+inputs. Threshold discovery is not part of this workflow.
 
 ### Why the GUI changes on a tool change
 
@@ -363,15 +365,16 @@ especially
 or the
 [pinned upstream implementation](https://github.com/Klipper3d/klipper/blob/ca8230d505b7ba7fd225bfa6ed9655bc4520e805/klippy/extras/probe_eddy_current.py#L862-L900).
 
-The reported value is:
+The reported value is raw physical evidence in the current kinematic frame:
 
 ```text
-reported_tap_z = fitted_contact_z - tap_z_offset
+reported_tap_z = fitted_contact_z
 ```
 
-`tap_z_offset` is intended for a repeatable tap bias such as backlash, thermal
-expansion, or systemic contact-detection bias. It must not silently absorb T1
-relative geometry, a bed mesh, or an operator baby-step. See the
+Klipper's `tap_z_offset` is generated as the fixed literal `0.000`; it is not
+a repository calibration parameter. It must not absorb Tap bias, T1 relative
+geometry, a bed mesh, thermal behavior, or an operator baby-step. The sole
+repository-owned global physical Z adjustment is `bed_to_nozzle_gap`. See the
 [`tap_z_offset` configuration reference](klipper_setup/rp2040_firmware/klipper/docs/Config_Reference.md#L2358-L2371).
 
 For tap requests Klipper reports zero probe XYZ offsets, so the result is at
@@ -388,7 +391,7 @@ than a non-contact scan:
 - it does not use the main frequency-to-height calibration and therefore does
   not inherit that calibration's thermal drift;
 - it still depends on clean contact surfaces, Z mechanics, threshold quality,
-  contact/depression behavior, and the configured `tap_z_offset`.
+  and contact/depression behavior.
 
 Klipper's Eddy guide describes the same distinction and warns that the nozzle
 should begin roughly 3-20 mm above the bed, both nozzle and sensor must remain
@@ -616,16 +619,17 @@ Use this order to remove the discrepancy without hiding its cause:
    clear, and valid vision-relative T1/T0 provenance.
 2. **Bootstrap tap at center.** Use the known-good threshold from `calib.yaml`
    to obtain a repeatable T0 contact estimate at `(150,150)`.
-3. **Establish native Z=0.** Apply the measured common endstop delta to both
-   tools, preserving the vision-derived relative alignment, then verify center
-   tap after restart.
+3. **Establish the physical contact target.** Apply the measured common
+   endstop delta to both tools so raw Tap contact is
+   `-bed_to_nozzle_gap`, preserving the vision-derived relative alignment,
+   then verify center tap after restart.
 4. **Recalibrate Eddy in the new frame.** Calibrate and deploy drive current,
    restart, prove the center tap invariant with three taps and a full
    `GET_POSITION` snapshot, and only then run
-   `PROBE_EDDY_CURRENT_CALIBRATE` using native center Z=0 as the contact
+   `PROBE_EDDY_CURRENT_CALIBRATE` using the configured center contact target as the
    reference. Repeat the same three-tap and full-position evidence after the
    new frequency curve is deployed, then require a regular Eddy `PROBE` at the
-   same reference point to report approximately Z=0 as well. The regular-probe
+   same reference point to report that target as well. The regular-probe
    result uses the same ±0.020 mm center-reference gate and is recorded before
    I1.5 can be committed.
 5. **Verify and compare methods.** Recheck center tap with the configured
@@ -781,15 +785,17 @@ Iteration 1 establishes a clean physical coordinate system before changing
 operator, slicer, layer-change, or tool-change offset handling. Its output is a
 source-controlled printer configuration in which:
 
-- validated T0 Eddy tap contact at bed center `X=150`, `Y=150` is native Z=0;
+- raw T0 Eddy tap contact at bed center `X=150`, `Y=150` is
+  `-bed_to_nozzle_gap`;
+- G-code `Z=0` is `bed_to_nozzle_gap` above the physical bed for both tools;
 - T1 preserves the existing vision-determined relative Z alignment to T0;
 - Eddy drive current and frequency/height calibration are regenerated in that
   coordinate frame;
 - the bed mesh uses `(150,150)` as its zero-reference point;
-- a fresh full scan is active in memory for verification and is neither saved
-  to configuration nor checked into the repository;
-- tap contact, converted through the mesh inverse, is near logical Z=0 across
-  the tap-safe validation region.
+- a fresh native 7x7 Tap mesh is active in memory for verification and is
+  neither saved to configuration nor checked into the repository;
+- raw Tap contact with the active mesh remains near `-bed_to_nozzle_gap`
+  across the Tap-safe validation region.
 
 Iteration 1 does not fix KlipperScreen offset display, T0/T1 hidden-transform
 handling, M220/M221 persistence, or slicer interactions. Those belong to
@@ -847,11 +853,11 @@ The supported steps are:
 | `preflight` | Validate source, generated configuration, deployment checks, and live idle state |
 | `bootstrap-tap` | Home and acquire the guarded seven-tap center baseline |
 | `update-endstops` | Apply the saved bootstrap median to both native endstops and deploy |
-| `center-verify` | Verify five center taps at native Z=0 |
+| `center-verify` | Verify five center taps at the configured physical contact target |
 | `tap-baseline` | Run `bootstrap-tap`, `update-endstops`, and `center-verify` in sequence |
 | `drive-current` | Run the Eddy drive-current calibration and deploy its result |
-| `eddy-frequency` | Run the guarded Eddy height/frequency calibration, including pre/post three-tap references and a post-calibration regular Eddy `PROBE` Z=0 check |
-| `mesh` | Scan, activate, and validate the transient default mesh |
+| `eddy-frequency` | Run the guarded Eddy height/frequency calibration, including pre/post three-tap references and a post-calibration same-target regular Eddy `PROBE` check |
+| `mesh` | Create, activate, and verify the transient Tap mesh |
 | `run` | Execute the complete fresh Iteration 1 workflow |
 | `resume` | Continue from the last committed phase in `state.json` |
 
@@ -887,7 +893,8 @@ absolute reference as:
 ```text
 T0 nozzle reference X = 150.000 mm
 T0 nozzle reference Y = 150.000 mm
-desired tap contact Z = 0.000 mm
+bed_to_nozzle_gap = 0.200 mm
+desired raw tap contact Z = -0.200 mm
 ```
 
 For an interactive printer-side measurement at that reference, the generated
@@ -929,12 +936,14 @@ bed_z_reference:
   x: 150.000
   y: 150.000
 
+# Physical nozzle-to-bed clearance at G-code Z=0 for both tools.
+bed_to_nozzle_gap: 0.200
+
 eddy_relative_calibration:
   klipper:
     reg_drive_current: <measured integer>
     calibrate: <measured height:frequency table>
     tap_threshold: 5000
-    tap_z_offset: 0.000
 
 ```
 
@@ -945,10 +954,9 @@ points are runtime data: no `[bed_mesh default]` section, point matrix, or
 measured profile is added to `calib.yaml`, the template, or generated
 `printer.cfg`.
 
-`tap_z_offset` remains zero in Iteration 1. The native endstop is intentionally
-calibrated to the contact definition produced by the final verified tap
-algorithm. A later physical-bias study may justify a nonzero `tap_z_offset`, but
-it must not be introduced during this baseline workflow.
+`bed_to_nozzle_gap` is the only repository-owned global physical nozzle
+clearance adjustment. The generated Klipper `tap_z_offset` remains fixed at
+`0.000`; it is intentionally outside the calibration model.
 
 The template's current literal `zero_reference_position: 170,170` is replaced
 by the generated `(150,150)` reference. No second center constant may remain in
@@ -1101,13 +1109,14 @@ Use the median successful `z_tap_center` as the robust contact estimate.
 Let active, source-matched endstops be `E0_old` and `E1_old`. Compute:
 
 ```text
-delta_endstop = -median(z_tap_center)
+tap_contact_target_z = -bed_to_nozzle_gap
+delta_endstop = tap_contact_target_z - median(z_tap_center)
 E0_new = E0_old + delta_endstop
 E1_new = E1_old + delta_endstop
 ```
 
-This is equivalent to `E0_new = E0_old - z_tap_center`. Applying the same delta
-to both endstops preserves the vision-determined relative alignment exactly:
+Applying the same delta to both endstops preserves the vision-determined
+relative alignment exactly:
 
 ```text
 E0_new - E1_new = E0_old - E1_old
@@ -1121,11 +1130,11 @@ T1 relationship from tap because Iteration 1 taps only T0.
 Atomically update both Z endstops and the `(150,150)` mesh zero reference in
 `calib.yaml`, regenerate, run focused checks, deploy, restart, and verify parity.
 
-#### I1.3: verify native center Z=0
+#### I1.3: verify the physical center-contact target
 
 Rehome after deployment and repeat five center taps. Pass criteria:
 
-- mean contact Z magnitude at most 0.010 mm;
+- mean contact-Z residual from `-bed_to_nozzle_gap` at most 0.010 mm;
 - span at most 0.020 mm;
 - no rejected taps;
 - visible G-code offset remains zero;
@@ -1173,7 +1182,7 @@ At both the start and the end of the phase, run this reference sequence at
    `PROBE METHOD=tap TAP_THRESHOLD=<calib.yaml value>` samples. Read contact
    Z from `probe.last_probe_position[2]`, not the post-retract toolhead Z.
 3. Require all three samples to succeed, have no rejected attempts, have a
-   mean within `+/-0.020 mm` of zero, and have a span no greater than
+   mean within `+/-0.020 mm` of `-bed_to_nozzle_gap`, and have a span no greater than
    `0.030 mm`. These are deliberately looser than the final center datum
    limits, but still bound the reference before changing the frequency curve.
    If any condition fails, refuse to continue and do not start or accept the
@@ -1193,8 +1202,9 @@ Poll `manual_probe.is_active`. Instead of a paper test, use the already verified
 native contact coordinate:
 
 1. read `manual_probe.z_position`;
-2. send one bounded `TESTZ Z=<delta>` that targets exactly kinematic Z=0;
-3. verify the reported manual-probe Z is zero within one Z step;
+2. send one bounded `TESTZ Z=<delta>` that targets exactly
+   `-bed_to_nozzle_gap`;
+3. verify the reported manual-probe Z matches that target within one Z step;
 4. send `ACCEPT`;
 5. wait for the automatic coil sweep to finish;
 6. collect the proposed `calibrate` table from pending config state.
@@ -1207,7 +1217,8 @@ from the carriage position so the Eddy coil is over `(150,150)`, descends to
 See
 [`EddyCalibrationTool.post_manual_probe()`](klipper_setup/rp2040_firmware/klipper/klippy/extras/probe_eddy_current.py#L260-L294).
 The automation replaces only the paper judgement with the already verified
-native Z=0; it does not replace Klipper's sweep or coordinate translation.
+physical contact target; it does not replace Klipper's sweep or coordinate
+translation.
 
 Validate that the table is finite, ordered, monotonic in the expected
 direction, has at least nine usable pairs, spans the required height range, and
@@ -1215,16 +1226,16 @@ passes the repository generator's calibration parser. Store the complete table
 in `calib.yaml`, deploy, and restart. Do not commit I1.5 yet.
 
 After that restart, repeat the complete reference sequence: home and capture
-`GET_POSITION`, take the three center taps, require the same zero and
+`GET_POSITION`, take the three center taps, require the same target and
 repeatability limits, move to their median tap height, and capture
    `GET_POSITION` again. Apply the same `+/-0.020 mm` mean and `0.030 mm` span
    gate, then compare the pre/post raw MCU step counts and converted positions
    alongside the two tap summaries. A post-calibration tap shift is
-   evidence, not something to hide with an endstop or `tap_z_offset` update.
+   evidence, not something to hide with another offset layer.
 2. Place the nozzle at `P - probe_offset_xy`, where `P=(150,150)` is the tap
    point, and take five regular `PROBE METHOD=probe` samples. Require the
    reported physical probe XY to be within `0.020 mm` of `P`, the regular
-   median and mean to be within `+/-0.020 mm`, the regular span to be no more
+   median and mean to be within `+/-0.020 mm` of `-bed_to_nozzle_gap`, the regular span to be no more
    than `0.030 mm`, and the regular-minus-tap median residual to be within
    `+/-0.020 mm`.
 3. If this regular-probe gate fails, record regular probes at 1, 2, and
@@ -1244,12 +1255,12 @@ Only after the post sequence passes may the runner commit I1.5. Raise to
 `Z=5` after the evidence is captured; the runtime mesh remains clear.
 
 Any movement below the known contact coordinate, unexpected manual-probe state,
-or inability to land at Z=0 within step resolution aborts before `ACCEPT`.
+or inability to land at `-bed_to_nozzle_gap` within step resolution aborts
+before `ACCEPT`.
 
-The mesh step performs no additional post-mesh Tap/Eddy diagnostic. A native
-Tap mesh is itself the physical bed-leveling measurement, so clearing it for a
-second comparison would be redundant and would remove the mesh the operator
-asked to use.
+The mesh step performs no Eddy comparison or second mesh scan. Its nine-point
+raw-Tap check runs with the just-created native Tap mesh still active, so it
+verifies the retained profile without clearing, reloading, or replacing it.
 
 In an uninterrupted `run`, the verified I1.3 frame is reused for I1.4 after a
 safe lift before moving the coil in XY, and the committed post-Eddy I1.5 frame
@@ -1272,9 +1283,17 @@ BED_MESH_CALIBRATE METHOD=tap TAP_THRESHOLD=<calib.yaml value> SAMPLES=1 HORIZON
 Klipper records 49 nozzle-contact points, builds the mesh using the configured
 bounds and zero reference, makes `tap_7x7` active, and stages only its transient
 profile. The runner validates the active profile/matrix and writes the command
-and full runtime mesh status to `mesh-tap.json`. It neither invokes Eddy scan
-probing nor `BED_MESH_PROFILE SAVE`/`LOAD`, and it never calls `SAVE_CONFIG`.
-A failed Tap aborts the native mesh; no partial mesh is activated.
+and full runtime mesh status to `mesh-tap.json`. With that same profile still
+active, it then takes one raw Tap at each combination of configured mesh
+minimum, `(150,150)` reference, and configured mesh maximum: nine points in
+total. Every contact must be within `+/-0.030 mm` of
+`-bed_to_nozzle_gap`, with reported nozzle XY within `0.020 mm` of its requested
+point. The runner completes all nine acquisitions before accepting or failing,
+and records every contact, post-retract Z, residual, and failure in
+`mesh-tap.json`. It neither invokes Eddy scan probing nor
+`BED_MESH_PROFILE SAVE`/`LOAD`, and it never calls `SAVE_CONFIG`. A failed
+post-mesh verification leaves `tap_7x7` active for supervised inspection but
+marks the mesh workflow invalid.
 
 #### I1.8: finish or rollback
 
@@ -1306,7 +1325,8 @@ Before live use, add tests for:
 - coil/nozzle pose calculation from X/Y/Z offsets and bounds checking;
 - Moonraker command serialization, timeout handling, and watchdog M112 path;
 - pending-config extraction for drive current, calibration table, and bed mesh;
-- automatic manual-probe targeting of Z=0 without paper intervention;
+- automatic manual-probe targeting of `-bed_to_nozzle_gap` without paper
+  intervention;
 - calibration-table and transient in-memory mesh validation;
 - rejection of any attempt to copy mesh points into canonical or generated
   configuration;
@@ -1500,18 +1520,19 @@ measurements.
 
 With all other Z offsets neutral and mesh inactive, let `z_tap` be the mean T0
 tap contact coordinate at the chosen anchor. To make that same physical contact
-be native kinematic Z=0:
+be the configured physical-contact target:
 
 ```text
-new_t0_position_endstop = old_t0_position_endstop - z_tap
+tap_contact_target_z = -bed_to_nozzle_gap
+new_t0_position_endstop = old_t0_position_endstop + tap_contact_target_z - z_tap
 new_t1_z_endstop = new_t0_position_endstop - calibrated_t1_relative_z
 ```
 
-The sign follows directly from the top-endstop frame: subtracting a positive
-reported contact coordinate shifts every native Z coordinate down by that
-amount. This formula must be verified first with a deliberately small,
-guarded, non-persistent test because current combined offsets make historical
-observations difficult to interpret.
+The sign follows directly from the top-endstop frame: the common delta moves
+the measured contact coordinate to `-bed_to_nozzle_gap`, so G-code `Z=0`
+retains exactly that physical nozzle-to-bed clearance. This formula must be
+verified first with a deliberately small, guarded, non-persistent test because
+current combined offsets make historical observations difficult to interpret.
 
 The measured proposal should be written to `calib.yaml`, reviewed, generated,
 and deployed through the normal source-controlled path. `SAVE_CONFIG` output
@@ -1519,7 +1540,8 @@ must not become an undocumented second source of truth.
 
 This approach has useful properties:
 
-- T0 physical contact is native kinematic Z=0;
+- T0 physical contact is native kinematic Z=`-bed_to_nozzle_gap`;
+- G-code Z=0 has one explicit physical clearance for both nozzles;
 - no common runtime Z transform is required;
 - T1 inherits the same absolute datum through its separately calibrated
   relative Z difference;
@@ -1544,8 +1566,10 @@ IDEX.get_position() = B.get_position() - d - o_t
 ```
 
 For T0 with `tool_z[0] = 0`, a tap reporting physical kinematic contact at
-`z_tap` implies `common_runtime_z_datum = z_tap` if logical Z=0 is intended to
-map to that physical contact coordinate.
+`z_tap` implies `common_runtime_z_datum = z_tap + bed_to_nozzle_gap` when
+logical Z=0 is intended to retain the configured physical nozzle-to-bed
+clearance. The global `bed_to_nozzle_gap` remains the only physical-Z datum;
+this optional runtime datum would only rebase coordinates to preserve it.
 
 Changing `common_runtime_z_datum` is a coordinate rebase, not an ordinary
 move. A future command must:
@@ -1600,8 +1624,9 @@ The reconciliation sequence is:
 
 1. Read and verify the canonical positive `tap_threshold` from `calib.yaml`.
    Do not rediscover or overwrite it in the Iteration 1 workflow.
-2. Establish `tap_z_offset` only for measured, repeatable tap bias. Do not use
-   it merely to make a one-off regular-probe result match.
+2. Keep Klipper `tap_z_offset` fixed at zero. Use `bed_to_nozzle_gap` as the
+   single architecture-owned physical clearance datum; do not add a second
+   adjustment merely to make a one-off regular-probe result match.
 3. At one safe bed point, run repeated tap and regular probes using the two
    different toolhead XY poses required to measure that same physical point.
 4. Compute `delta_eddy_to_tap = regular_probe_z - tap_z` for paired samples.
@@ -1615,8 +1640,8 @@ The reconciliation sequence is:
 
 Klipper can translate the regular calibration through
 `Z_OFFSET_APPLY_PROBE`: it reads `homing_origin.z` and subtracts that value from
-every calibration height. For tap, `Z_OFFSET_APPLY_PROBE METHOD=tap` changes
-`tap_z_offset` instead. See
+every calibration height. `Z_OFFSET_APPLY_PROBE METHOD=tap` would instead
+change Klipper's Tap offset and is outside this architecture. See
 [`EddyCalibrationTool.cmd_Z_OFFSET_APPLY_PROBE()`](klipper_setup/rp2040_firmware/klipper/klippy/extras/probe_eddy_current.py#L301-L329)
 and the
 [pinned command reference](https://github.com/Klipper3d/klipper/blob/ca8230d505b7ba7fd225bfa6ed9655bc4520e805/docs/G-Codes.md#L1257-L1263).
@@ -2177,7 +2202,7 @@ Preconditions:
 - one homing session and recorded raw-step baseline;
 - a safe bed point for which both the tap-nozzle pose and offset-coil pose are
   inside carriage and bed limits;
-- exact tap threshold, `tap_z_offset`, speeds, and sample settings recorded.
+- exact tap threshold, `bed_to_nozzle_gap`, speeds, and sample settings recorded.
 
 Actions:
 
@@ -2335,8 +2360,9 @@ Rollback:
 Iteration 1 is acceptable only when all of the following are demonstrated in
 one retained run report:
 
-- final T0 tap contact at `(150,150)` is native Z=0 within the specified center
-  mean and repeatability tolerances, with visible G-code offsets neutral;
+- final T0 Tap contact at `(150,150)` is `-bed_to_nozzle_gap` within the
+  specified center mean and repeatability tolerances, with visible G-code
+  offsets neutral;
 - I1.5 retains complete pre/post `GET_POSITION` snapshots, including raw MCU
   step counts, and three-tap center summaries around the frequency sweep;
 - a failed pre/post three-tap gate refuses to accept the Eddy curve and stops
@@ -2344,17 +2370,16 @@ one retained run report:
 - exactly the same tap-derived endstop delta was applied to T0 and T1, leaving
   the vision-derived relative Z alignment unchanged;
 - final `reg_drive_current` and frequency/height table originate from the
-  recorded run; the known-good tap threshold and zero `tap_z_offset` agree in
-  `calib.yaml`, generated config, and the active printer;
+  recorded run; the known-good tap threshold and `bed_to_nozzle_gap` agree in
+  `calib.yaml`, generated config fingerprint, and the active printer;
 - the verification mesh originates from a fresh scan in that run, remains
   runtime-only, and has no measured points in canonical or generated config;
 - regular Eddy and tap agree at identical physical bed coordinates within the
   I1.5 tolerance after calibration;
 - the loaded mesh evaluates to zero at `(150,150)` within tolerance;
-- at each safe verification point, `raw_tap_z - mesh_correction_z` is near
-  zero within the I1.7 per-point and RMS limits;
-- no raw Tap value away from center is misreported as a logical mesh-corrected
-  coordinate;
+- at each of the nine active-profile verification points, raw Tap contact is
+  near `-bed_to_nozzle_gap` within the I1.6 per-point limit;
+- no raw Tap value is misreported as a logical mesh-corrected coordinate;
 - every rejected sample, restart, deployment, and safety decision is retained;
 - any failed phase rolls back to a verified canonical snapshot or stops for
   inspection when automatic recovery is unsafe.
@@ -2400,14 +2425,16 @@ separate implementation task; this document checks none of them.
 - [ ] Automate `PROBE_EDDY_CURRENT_CALIBRATE` behind pre/post three-tap center
       gates, full `GET_POSITION` snapshots including raw MCU step counts, and
       capture/deploy the table only after the post gate passes.
-- [ ] Use the known-good tap threshold from `calib.yaml` for every tap, keeping
-      `tap_z_offset: 0.000` for this baseline.
+- [ ] Use the known-good tap threshold and global `bed_to_nozzle_gap` from
+      `calib.yaml` for every physical-contact gate; keep generated Klipper
+      `tap_z_offset: 0.000` fixed and outside the calibration model.
 - [ ] Require post-calibration center contact with the configured threshold and same-point
       regular-Eddy/tap agreement.
 - [ ] Run a fresh full scan with `(150,150)` as zero reference and keep it
       active only in memory for verification.
-- [ ] Verify Tap against the active mesh using
-      `raw_tap_z - mesh_correction_z`, not raw console Z alone.
+- [ ] Verify nine raw Taps with the active mesh profile still loaded, requiring
+      each to match `-bed_to_nozzle_gap` rather than applying a second mesh
+      correction to the reported contact coordinate.
 - [ ] Add state-machine, safety, fake-Moonraker, calibration parser, generator,
       deployment-parity, resume, and rollback tests.
 - [ ] Run I1.0-I1.8 under supervision and retain the complete passing report.

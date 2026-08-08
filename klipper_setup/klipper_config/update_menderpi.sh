@@ -18,6 +18,7 @@ fi
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_CFG="${SCRIPT_DIR}/printer.cfg"
 SOURCE_HEATERS="${SCRIPT_DIR}/../klipper_host/klippy/extras/heaters.py"
+SOURCE_BED_MESH="${SCRIPT_DIR}/../klipper_host/klippy/extras/bed_mesh.py"
 SOURCE_VISION="${SCRIPT_DIR}/../klipper_host/klippy/extras/vision.py"
 SOURCE_IDEX_MANUAL_TUNING="${SCRIPT_DIR}/../klipper_host/klippy/extras/idex_manual_tuning.py"
 SOURCE_EDDY_TAP_MEASURE="${SCRIPT_DIR}/../klipper_host/klippy/extras/eddy_tap_measure.py"
@@ -27,6 +28,7 @@ REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 REMOTE_KLIPPER_DIR="${MENDERPI_KLIPPER_DIR:-/opt/klipper}"
 REMOTE_TMP_CFG="/tmp/printer.cfg.$$"
 REMOTE_TMP_HEATERS="/tmp/heaters.py.$$"
+REMOTE_TMP_BED_MESH="/tmp/bed_mesh.py.$$"
 REMOTE_TMP_VISION="/tmp/vision.py.$$"
 REMOTE_TMP_IDEX_MANUAL_TUNING="/tmp/idex_manual_tuning.py.$$"
 REMOTE_TMP_EDDY_TAP_MEASURE="/tmp/eddy_tap_measure.py.$$"
@@ -35,6 +37,10 @@ REMOTE_TMP_EDDY_DAQ="/tmp/eddy_daq.py.$$"
 EXPECTED_KLIPPER_COMMIT="ca8230d505b7ba7fd225bfa6ed9655bc4520e805"
 EXPECTED_UPSTREAM_HEATERS_SHA256="a95d83be80296a7ff970ea6e1b73746d1a97a7d3e47ce621c02a89d80451ac9d"
 LEGACY_BOOSTED_HEATERS_SHA256="b3b362086277fc7202fb12c022aa210da7cc15a470bf536f2cc0d3d507719830"
+EXPECTED_UPSTREAM_BED_MESH_SHA256="e1c381dba9859e569d091f95c8e6bb1c012b279619fcbbc9c41405ae77fb55f9"
+# First managed bed_mesh.py revision, before the managed-file marker was added.
+# It is accepted only to permit the one-time marker handoff below.
+LEGACY_MANAGED_BED_MESH_SHA256="35a8cb613808cd3b3b492ae32cb51d75437ef2b2b6880c21f4d4066c42b10581"
 
 sha256_file() {
   python3 - "$1" <<'PY'
@@ -54,6 +60,10 @@ check_local_support_files() {
     echo "Error: managed Klipper heaters.py not found: ${SOURCE_HEATERS}" >&2
     exit 1
   fi
+  if [[ ! -f "${SOURCE_BED_MESH}" ]]; then
+    echo "Error: managed Klipper bed_mesh.py not found: ${SOURCE_BED_MESH}" >&2
+    exit 1
+  fi
   if [[ ! -f "${SOURCE_VISION}" ]]; then
     echo "Error: Klipper vision.py extra not found: ${SOURCE_VISION}" >&2
     exit 1
@@ -71,7 +81,7 @@ check_local_support_files() {
     exit 1
   fi
 
-  python3 - "${SOURCE_HEATERS}" "${SOURCE_VISION}" "${SOURCE_IDEX_MANUAL_TUNING}" "${SOURCE_EDDY_TAP_MEASURE}" "${SOURCE_DAQ}" "${SOURCE_EDDY_DAQ}" <<'PY'
+  python3 - "${SOURCE_HEATERS}" "${SOURCE_BED_MESH}" "${SOURCE_VISION}" "${SOURCE_IDEX_MANUAL_TUNING}" "${SOURCE_EDDY_TAP_MEASURE}" "${SOURCE_DAQ}" "${SOURCE_EDDY_DAQ}" <<'PY'
 import ast
 import sys
 from pathlib import Path
@@ -85,6 +95,7 @@ check_live_config() {
   echo "Checking ${REMOTE_HOST} for the active Klipper config..."
   echo "  Source: ${SOURCE_CFG}"
   echo "  Managed Klipper heaters.py: ${SOURCE_HEATERS}"
+  echo "  Managed Klipper bed_mesh.py: ${SOURCE_BED_MESH}"
   echo "  Klipper vision extra: ${SOURCE_VISION}"
   echo "  Klipper IDEX manual tuning extra: ${SOURCE_IDEX_MANUAL_TUNING}"
   echo "  Klipper Eddy tap measurement extra: ${SOURCE_EDDY_TAP_MEASURE}"
@@ -101,6 +112,7 @@ check_live_config() {
 
   local_sha256="$(sha256_file "${SOURCE_CFG}")"
   local_heaters_sha256="$(sha256_file "${SOURCE_HEATERS}")"
+  local_bed_mesh_sha256="$(sha256_file "${SOURCE_BED_MESH}")"
   local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
   local_idex_manual_tuning_sha256="$(sha256_file "${SOURCE_IDEX_MANUAL_TUNING}")"
   local_eddy_tap_measure_sha256="$(sha256_file "${SOURCE_EDDY_TAP_MEASURE}")"
@@ -123,6 +135,7 @@ import urllib.request
 main_cfg = Path.home() / "printer_data" / "config" / "printer.cfg"
 klipper_dir = Path(os.environ.get("REMOTE_KLIPPER_DIR", "/opt/klipper"))
 heaters_py = klipper_dir / "klippy" / "extras" / "heaters.py"
+bed_mesh_py = klipper_dir / "klippy" / "extras" / "bed_mesh.py"
 vision_py = klipper_dir / "klippy" / "extras" / "vision.py"
 idex_manual_tuning_py = klipper_dir / "klippy" / "extras" / "idex_manual_tuning.py"
 eddy_tap_measure_py = klipper_dir / "klippy" / "extras" / "eddy_tap_measure.py"
@@ -132,6 +145,7 @@ payload = {
     "ok": False,
     "remote_config_path": str(main_cfg),
     "remote_heaters_path": str(heaters_py),
+    "remote_bed_mesh_path": str(bed_mesh_py),
     "remote_vision_path": str(vision_py),
     "remote_idex_manual_tuning_path": str(idex_manual_tuning_py),
     "remote_eddy_tap_measure_path": str(eddy_tap_measure_py),
@@ -142,6 +156,7 @@ payload = {
 try:
     payload["remote_sha256"] = hashlib.sha256(main_cfg.read_bytes()).hexdigest()
     payload["remote_heaters_sha256"] = hashlib.sha256(heaters_py.read_bytes()).hexdigest()
+    payload["remote_bed_mesh_sha256"] = hashlib.sha256(bed_mesh_py.read_bytes()).hexdigest()
     payload["remote_vision_sha256"] = hashlib.sha256(vision_py.read_bytes()).hexdigest()
     payload["remote_idex_manual_tuning_sha256"] = (
         hashlib.sha256(idex_manual_tuning_py.read_bytes()).hexdigest()
@@ -183,6 +198,7 @@ PY
   CHECK_EXPECTED_FINGERPRINT="${expected_fingerprint}" \
   CHECK_LOCAL_SHA256="${local_sha256}" \
   CHECK_LOCAL_HEATERS_SHA256="${local_heaters_sha256}" \
+  CHECK_LOCAL_BED_MESH_SHA256="${local_bed_mesh_sha256}" \
   CHECK_LOCAL_VISION_SHA256="${local_vision_sha256}" \
   CHECK_LOCAL_IDEX_MANUAL_TUNING_SHA256="${local_idex_manual_tuning_sha256}" \
   CHECK_LOCAL_EDDY_TAP_MEASURE_SHA256="${local_eddy_tap_measure_sha256}" \
@@ -207,6 +223,7 @@ spec.loader.exec_module(generator)
 remote_host = os.environ["CHECK_REMOTE_HOST"]
 local_sha256 = os.environ["CHECK_LOCAL_SHA256"]
 local_heaters_sha256 = os.environ["CHECK_LOCAL_HEATERS_SHA256"]
+local_bed_mesh_sha256 = os.environ["CHECK_LOCAL_BED_MESH_SHA256"]
 local_vision_sha256 = os.environ["CHECK_LOCAL_VISION_SHA256"]
 local_idex_manual_tuning_sha256 = os.environ["CHECK_LOCAL_IDEX_MANUAL_TUNING_SHA256"]
 local_eddy_tap_measure_sha256 = os.environ["CHECK_LOCAL_EDDY_TAP_MEASURE_SHA256"]
@@ -233,6 +250,7 @@ if not remote_payload.get("ok"):
 
 remote_sha256 = remote_payload.get("remote_sha256", "")
 remote_heaters_sha256 = remote_payload.get("remote_heaters_sha256", "")
+remote_bed_mesh_sha256 = remote_payload.get("remote_bed_mesh_sha256", "")
 remote_vision_sha256 = remote_payload.get("remote_vision_sha256", "")
 remote_idex_manual_tuning_sha256 = remote_payload.get("remote_idex_manual_tuning_sha256", "")
 remote_eddy_tap_measure_sha256 = remote_payload.get("remote_eddy_tap_measure_sha256", "")
@@ -247,6 +265,8 @@ live_fingerprint = generator.active_config_fingerprint(status)
 print(f"  Remote sha256: {remote_sha256}")
 print(f"  Local heaters.py sha256: {local_heaters_sha256}")
 print(f"  Remote heaters.py sha256: {remote_heaters_sha256}")
+print(f"  Local bed_mesh.py sha256: {local_bed_mesh_sha256}")
+print(f"  Remote bed_mesh.py sha256: {remote_bed_mesh_sha256}")
 print(f"  Local vision.py sha256: {local_vision_sha256}")
 print(f"  Remote vision.py sha256: {remote_vision_sha256}")
 print(f"  Local idex_manual_tuning.py sha256: {local_idex_manual_tuning_sha256}")
@@ -273,6 +293,11 @@ if remote_heaters_sha256 != local_heaters_sha256:
     errors.append(
         "remote Klipper heaters.py sha256 does not match the managed file "
         f"({remote_heaters_sha256} != {local_heaters_sha256})"
+    )
+if remote_bed_mesh_sha256 != local_bed_mesh_sha256:
+    errors.append(
+        "remote Klipper bed_mesh.py sha256 does not match the managed file "
+        f"({remote_bed_mesh_sha256} != {local_bed_mesh_sha256})"
     )
 if remote_vision_sha256 != local_vision_sha256:
     errors.append(
@@ -349,11 +374,12 @@ if [[ ! -f "${SOURCE_CFG}" ]]; then
 fi
 
 cleanup_remote_tmp() {
-  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}' '${REMOTE_TMP_VISION}' '${REMOTE_TMP_IDEX_MANUAL_TUNING}' '${REMOTE_TMP_EDDY_TAP_MEASURE}' '${REMOTE_TMP_DAQ}' '${REMOTE_TMP_EDDY_DAQ}'" >/dev/null 2>&1 || true
+  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}' '${REMOTE_TMP_BED_MESH}' '${REMOTE_TMP_VISION}' '${REMOTE_TMP_IDEX_MANUAL_TUNING}' '${REMOTE_TMP_EDDY_TAP_MEASURE}' '${REMOTE_TMP_DAQ}' '${REMOTE_TMP_EDDY_DAQ}'" >/dev/null 2>&1 || true
 }
 trap cleanup_remote_tmp EXIT
 
 local_heaters_sha256="$(sha256_file "${SOURCE_HEATERS}")"
+local_bed_mesh_sha256="$(sha256_file "${SOURCE_BED_MESH}")"
 local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
 local_idex_manual_tuning_sha256="$(sha256_file "${SOURCE_IDEX_MANUAL_TUNING}")"
 local_eddy_tap_measure_sha256="$(sha256_file "${SOURCE_EDDY_TAP_MEASURE}")"
@@ -363,6 +389,7 @@ local_eddy_daq_sha256="$(sha256_file "${SOURCE_EDDY_DAQ}")"
 echo "Updating ${REMOTE_HOST} with THE active Klipper config and host extras..."
 echo "  Source: ${SOURCE_CFG}"
 echo "  Managed Klipper heaters.py: ${SOURCE_HEATERS}"
+echo "  Managed Klipper bed_mesh.py: ${SOURCE_BED_MESH}"
 echo "  Klipper vision extra: ${SOURCE_VISION}"
 echo "  Klipper IDEX manual tuning extra: ${SOURCE_IDEX_MANUAL_TUNING}"
 echo "  Klipper Eddy tap measurement extra: ${SOURCE_EDDY_TAP_MEASURE}"
@@ -371,6 +398,7 @@ echo "  Klipper Eddy DAQ extra: ${SOURCE_EDDY_DAQ}"
 
 scp "${SOURCE_CFG}" "${REMOTE_HOST}:${REMOTE_TMP_CFG}"
 scp "${SOURCE_HEATERS}" "${REMOTE_HOST}:${REMOTE_TMP_HEATERS}"
+scp "${SOURCE_BED_MESH}" "${REMOTE_HOST}:${REMOTE_TMP_BED_MESH}"
 scp "${SOURCE_VISION}" "${REMOTE_HOST}:${REMOTE_TMP_VISION}"
 scp "${SOURCE_IDEX_MANUAL_TUNING}" "${REMOTE_HOST}:${REMOTE_TMP_IDEX_MANUAL_TUNING}"
 scp "${SOURCE_EDDY_TAP_MEASURE}" "${REMOTE_HOST}:${REMOTE_TMP_EDDY_TAP_MEASURE}"
@@ -378,11 +406,12 @@ scp "${SOURCE_DAQ}" "${REMOTE_HOST}:${REMOTE_TMP_DAQ}"
 scp "${SOURCE_EDDY_DAQ}" "${REMOTE_HOST}:${REMOTE_TMP_EDDY_DAQ}"
 
 ssh "${REMOTE_HOST}" \
-  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_TMP_EDDY_TAP_MEASURE='${REMOTE_TMP_EDDY_TAP_MEASURE}' REMOTE_TMP_DAQ='${REMOTE_TMP_DAQ}' REMOTE_TMP_EDDY_DAQ='${REMOTE_TMP_EDDY_DAQ}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' EXPECTED_EDDY_TAP_MEASURE_SHA256='${local_eddy_tap_measure_sha256}' EXPECTED_DAQ_SHA256='${local_daq_sha256}' EXPECTED_EDDY_DAQ_SHA256='${local_eddy_daq_sha256}' bash -s" <<'REMOTE_SCRIPT'
+  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_BED_MESH='${REMOTE_TMP_BED_MESH}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_TMP_EDDY_TAP_MEASURE='${REMOTE_TMP_EDDY_TAP_MEASURE}' REMOTE_TMP_DAQ='${REMOTE_TMP_DAQ}' REMOTE_TMP_EDDY_DAQ='${REMOTE_TMP_EDDY_DAQ}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_UPSTREAM_BED_MESH_SHA256='${EXPECTED_UPSTREAM_BED_MESH_SHA256}' LEGACY_MANAGED_BED_MESH_SHA256='${LEGACY_MANAGED_BED_MESH_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_MANAGED_BED_MESH_SHA256='${local_bed_mesh_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' EXPECTED_EDDY_TAP_MEASURE_SHA256='${local_eddy_tap_measure_sha256}' EXPECTED_DAQ_SHA256='${local_daq_sha256}' EXPECTED_EDDY_DAQ_SHA256='${local_eddy_daq_sha256}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 MAIN_CFG="${HOME}/printer_data/config/printer.cfg"
 HEATERS_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/heaters.py"
+BED_MESH_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/bed_mesh.py"
 VISION_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/vision.py"
 IDEX_MANUAL_TUNING_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/idex_manual_tuning.py"
 EDDY_TAP_MEASURE_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/eddy_tap_measure.py"
@@ -391,6 +420,7 @@ EDDY_DAQ_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/eddy_daq.py"
 TS="$(date +%Y%m%d-%H%M%S)"
 CFG_BACKUP="${MAIN_CFG}.bak.${TS}"
 HEATERS_BACKUP="${HEATERS_PY}.bak.${TS}"
+BED_MESH_BACKUP="${BED_MESH_PY}.bak.${TS}"
 VISION_BACKUP="${VISION_PY}.bak.${TS}"
 IDEX_MANUAL_TUNING_BACKUP="${IDEX_MANUAL_TUNING_PY}.bak.${TS}"
 EDDY_TAP_MEASURE_BACKUP="${EDDY_TAP_MEASURE_PY}.bak.${TS}"
@@ -403,6 +433,10 @@ if [[ ! -f "${REMOTE_TMP_CFG}" ]]; then
 fi
 if [[ ! -f "${REMOTE_TMP_HEATERS}" ]]; then
   echo "Error: uploaded heaters.py not found: ${REMOTE_TMP_HEATERS}" >&2
+  exit 1
+fi
+if [[ ! -f "${REMOTE_TMP_BED_MESH}" ]]; then
+  echo "Error: uploaded bed_mesh.py not found: ${REMOTE_TMP_BED_MESH}" >&2
   exit 1
 fi
 if [[ ! -f "${REMOTE_TMP_VISION}" ]]; then
@@ -425,6 +459,10 @@ if [[ ! -f "${HEATERS_PY}" ]]; then
   echo "Error: remote Klipper heaters.py not found: ${HEATERS_PY}" >&2
   exit 1
 fi
+if [[ ! -f "${BED_MESH_PY}" ]]; then
+  echo "Error: remote Klipper bed_mesh.py not found: ${BED_MESH_PY}" >&2
+  exit 1
+fi
 
 remote_commit="$(git -C "${REMOTE_KLIPPER_DIR}" rev-parse HEAD)"
 if [[ "${remote_commit}" != "${EXPECTED_KLIPPER_COMMIT}" ]]; then
@@ -441,9 +479,24 @@ if [[ "${current_heaters_sha}" != "${EXPECTED_UPSTREAM_HEATERS_SHA256}" \
   exit 1
 fi
 
+current_bed_mesh_sha="$(sha256sum "${BED_MESH_PY}" | awk '{print $1}')"
+if [[ "${current_bed_mesh_sha}" != "${EXPECTED_UPSTREAM_BED_MESH_SHA256}" \
+      && "${current_bed_mesh_sha}" != "${LEGACY_MANAGED_BED_MESH_SHA256}" \
+      && "${current_bed_mesh_sha}" != "${EXPECTED_MANAGED_BED_MESH_SHA256}" ]]; then
+  echo "Error: remote bed_mesh.py has unexpected sha256 ${current_bed_mesh_sha}" >&2
+  echo "Expected upstream ${EXPECTED_UPSTREAM_BED_MESH_SHA256} or an approved managed revision" >&2
+  exit 1
+fi
+
 uploaded_heaters_sha="$(sha256sum "${REMOTE_TMP_HEATERS}" | awk '{print $1}')"
 if [[ "${uploaded_heaters_sha}" != "${EXPECTED_MANAGED_HEATERS_SHA256}" ]]; then
   echo "Error: uploaded heaters.py sha256 ${uploaded_heaters_sha} does not match the managed file" >&2
+  exit 1
+fi
+
+uploaded_bed_mesh_sha="$(sha256sum "${REMOTE_TMP_BED_MESH}" | awk '{print $1}')"
+if [[ "${uploaded_bed_mesh_sha}" != "${EXPECTED_MANAGED_BED_MESH_SHA256}" ]]; then
+  echo "Error: uploaded bed_mesh.py sha256 ${uploaded_bed_mesh_sha} does not match the managed file" >&2
   exit 1
 fi
 
@@ -526,6 +579,16 @@ else
   echo "Installed managed Klipper heaters.py: ${HEATERS_PY}"
 fi
 rm -f "${REMOTE_TMP_HEATERS}"
+
+if [[ "${current_bed_mesh_sha}" == "${EXPECTED_MANAGED_BED_MESH_SHA256}" ]]; then
+  echo "Managed Klipper bed_mesh.py already installed: ${BED_MESH_PY}"
+else
+  cp -a "${BED_MESH_PY}" "${BED_MESH_BACKUP}"
+  echo "Backed up: ${BED_MESH_BACKUP}"
+  cp -a "${REMOTE_TMP_BED_MESH}" "${BED_MESH_PY}"
+  echo "Installed managed Klipper bed_mesh.py: ${BED_MESH_PY}"
+fi
+rm -f "${REMOTE_TMP_BED_MESH}"
 
 if [[ -f "${VISION_PY}" ]]; then
   current_vision_sha="$(sha256sum "${VISION_PY}" | awk '{print $1}')"

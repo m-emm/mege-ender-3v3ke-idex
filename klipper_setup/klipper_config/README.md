@@ -6,7 +6,9 @@ This directory has one active printer configuration:
 - `printer.cfg.template` plus `calib.yaml` generate `printer.cfg`.
 - `wiring/` is THE active wiring source for the custom Pico/TMC wiring.
 - `../klipper_host/` is THE active Klipper host-extra source and contains the
-  upstream heater baseline used to remove the retired dual-heater patch.
+  managed heater baseline plus the Tap-aware `bed_mesh.py` override. The
+  override uses nozzle coordinates for `METHOD=tap` and retains Eddy offsets
+  for Eddy methods.
 - `update_menderpi.sh` is THE script for copying it to `pi@menderpi.local`.
 - `archive/` is historical/reference material only. Do not edit files there to
   change the active printer.
@@ -33,14 +35,14 @@ python wiring/validate_wiring.py
 ```
 
 `update_menderpi.sh --check` verifies the generated local `printer.cfg`, the
-remote `~/printer_data/config/printer.cfg`, the upstream remote
-`/opt/klipper/klippy/extras/heaters.py`, and the config Klippy has loaded via
+remote `~/printer_data/config/printer.cfg`, the managed remote
+`/opt/klipper/klippy/extras/heaters.py` and `bed_mesh.py`, and the config Klippy has loaded via
 Moonraker without uploading files or restarting Klipper.
 
 `update_menderpi.sh` copies local `printer.cfg` to
 `~/printer_data/config/printer.cfg` on `pi@menderpi.local`, backs up the
-previous remote file with a timestamp, restores upstream Klipper heater
-handling, installs the custom vision extra,
+previous remote file with a timestamp, installs the managed Klipper core
+overrides and custom extras,
 restarts Klipper, verifies the Moonraker/Klippy state, then runs
 `deploy_vision_code.sh` to synchronize all tracked top-level vision Python,
 JSON, and PNG assets plus `priors.yaml`, restart the four vision services, and

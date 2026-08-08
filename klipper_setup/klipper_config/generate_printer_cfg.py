@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
+import math
 import sys
 from pathlib import Path
 from string import Template
@@ -62,7 +63,6 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
         "reg_drive_current": None,
         "calibrate": None,
         "tap_threshold": None,
-        "tap_z_offset": None,
         "capture": None,
         "temperature_calibration_temp": None,
     }
@@ -82,7 +82,6 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
     calibrate = None
     capture = None
     tap_threshold = None
-    tap_z_offset = None
     temperature_calibration_temp = None
 
     klipper = value.get("klipper")
@@ -161,11 +160,11 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
                     "must be positive"
                 )
 
-        if klipper.get("tap_z_offset") is not None:
-            tap_z_offset = _require_float(
-                klipper,
-                "tap_z_offset",
-                "eddy_relative_calibration.klipper",
+        if "tap_z_offset" in klipper:
+            raise ValueError(
+                "eddy_relative_calibration.klipper.tap_z_offset is no longer "
+                "a repository calibration parameter; it is fixed at 0.000 in "
+                "the generated Klipper configuration"
             )
 
     temperature_probe = value.get("temperature_probe")
@@ -199,7 +198,6 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
         "reg_drive_current": reg_drive_current,
         "calibrate": calibrate,
         "tap_threshold": tap_threshold,
-        "tap_z_offset": tap_z_offset,
         "capture": capture,
         "temperature_calibration_temp": temperature_calibration_temp,
     }
@@ -217,6 +215,13 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
         data.get("bed_z_reference", bed_grid_zero),
         "bed_z_reference",
     )
+    bed_to_nozzle_gap = _require_float(
+        data,
+        "bed_to_nozzle_gap",
+        "calib.yaml",
+    )
+    if not math.isfinite(bed_to_nozzle_gap) or bed_to_nozzle_gap <= 0.0:
+        raise ValueError("calib.yaml.bed_to_nozzle_gap must be finite and positive")
     tools = _require_mapping(data.get("tools"), "tools")
     t0 = _require_mapping(tools.get("t0"), "tools.t0")
     t1 = _require_mapping(tools.get("t1"), "tools.t1")
@@ -246,6 +251,7 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
                 "bed_z_reference",
             ),
         },
+        "bed_to_nozzle_gap": bed_to_nozzle_gap,
         "tools": {
             "t0": {
                 "x_endstop": _require_float(
@@ -425,7 +431,6 @@ def template_values(
         "reg_drive_current": None,
         "calibrate": None,
         "tap_threshold": None,
-        "tap_z_offset": None,
         "capture": None,
         "temperature_calibration_temp": None,
     }
@@ -451,11 +456,7 @@ def template_values(
             f"tap_threshold: {int(eddy_relative_calibration['tap_threshold'])}"
         )
 
-    if eddy_relative_calibration.get("tap_z_offset") is not None:
-        eddy_klipper_lines.append(
-            "tap_z_offset: "
-            f"{float(eddy_relative_calibration['tap_z_offset']):.3f}"
-        )
+    eddy_klipper_lines.append("tap_z_offset: 0.000")
 
     temperature_calibration_temp = eddy_relative_calibration.get(
         "temperature_calibration_temp"

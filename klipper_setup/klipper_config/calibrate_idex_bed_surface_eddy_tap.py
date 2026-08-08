@@ -73,7 +73,6 @@ STEP_CHOICES = (
 
 REFERENCE_X = 150.0
 REFERENCE_Y = 150.0
-CONTACT_Z = 0.0
 TAP_SUCCESS_COUNT = 7
 TAP_MAX_ATTEMPTS = 10
 TAP_MAX_SPAN = 0.030
@@ -87,11 +86,14 @@ EDDY_REFERENCE_MEAN_TOLERANCE = 0.050
 EDDY_REFERENCE_SPAN_TOLERANCE = 0.040
 EDDY_REFERENCE_XY_TOLERANCE = 0.020
 EDDY_REFERENCE_RESIDUAL_TOLERANCE = 0.020
+TAP_CONTACT_XY_TOLERANCE = 0.020
 TAP_MESH_PROFILE = "tap_7x7"
 TAP_MESH_PROBE_COUNT = "7,7"
 TAP_MESH_HORIZONTAL_MOVE_Z = 5.0
+TAP_MESH_ACTIVE_CONTACT_TOLERANCE = 0.030
+TAP_MESH_VERIFY_GCODE_Z = 5.0
 ARMING_PHRASE = "CALIBRATE IDEX Z ITERATION 1"
-WORKFLOW_VERSION = 4
+WORKFLOW_VERSION = 5
 
 
 class CalibrationError(RuntimeError):
@@ -346,10 +348,12 @@ def common_endstop_update(
     t0_old: float,
     t1_old: float,
     tap_contact_z: float,
+    *,
+    contact_target_z: float,
 ) -> tuple[float, float, float]:
-    """Translate both endstops so the observed T0 contact becomes Z=0."""
+    """Translate both endstops so observed T0 contact reaches the target."""
 
-    delta = CONTACT_Z - float(tap_contact_z)
+    delta = float(contact_target_z) - float(tap_contact_z)
     return t0_old + delta, t1_old + delta, delta
 
 
@@ -508,6 +512,49 @@ def require_only_transient_mesh_pending(pending: Any) -> None:
             "unexpected pending config after mesh scan: "
             + ", ".join(sorted(unexpected))
         )
+
+
+def _parse_configured_xy_pair(value: Any, *, option: str) -> tuple[float, float]:
+    if isinstance(value, str):
+        raw_values = [part.strip() for part in value.split(",")]
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        raw_values = list(value)
+    else:
+        raise CalibrationError(f"configured bed_mesh {option} is unavailable")
+    if len(raw_values) != 2:
+        raise CalibrationError(f"configured bed_mesh {option} must contain X,Y")
+    try:
+        x, y = (float(item) for item in raw_values)
+    except (TypeError, ValueError) as exc:
+        raise CalibrationError(
+            f"configured bed_mesh {option} must contain numeric X,Y"
+        ) from exc
+    if not math.isfinite(x) or not math.isfinite(y):
+        raise CalibrationError(f"configured bed_mesh {option} contains a non-finite value")
+    return x, y
+
+
+def configured_mesh_bounds(status: Mapping[str, Any]) -> tuple[Pose, Pose]:
+    """Read the active source-controlled mesh bounds from Klipper status."""
+
+    configfile = status.get("configfile", {})
+    if not isinstance(configfile, Mapping):
+        raise CalibrationError("configfile status is unavailable after Tap mesh")
+    section = None
+    for source_name in ("settings", "config"):
+        source = configfile.get(source_name, {})
+        if isinstance(source, Mapping):
+            candidate = source.get("bed_mesh")
+            if isinstance(candidate, Mapping):
+                section = candidate
+                break
+    if section is None:
+        raise CalibrationError("active bed_mesh configuration is unavailable")
+    minimum = _parse_configured_xy_pair(section.get("mesh_min"), option="mesh_min")
+    maximum = _parse_configured_xy_pair(section.get("mesh_max"), option="mesh_max")
+    if minimum[0] >= maximum[0] or minimum[1] >= maximum[1]:
+        raise CalibrationError("configured bed_mesh bounds are not increasing")
+    return Pose(*minimum, 0.0), Pose(*maximum, 0.0)
 
 
 def reject_mesh_data_in_canonical(data: Mapping[str, Any]) -> None:
@@ -762,6 +809,20 @@ def configured_tap_threshold(calibration: Mapping[str, Any]) -> int:
     return value
 
 
+def configured_bed_to_nozzle_gap(calibration: Mapping[str, Any]) -> float:
+    """Return the one source-controlled physical clearance datum in mm."""
+
+    try:
+        value = float(calibration["bed_to_nozzle_gap"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CalibrationError(
+            "calib.yaml must define a numeric bed_to_nozzle_gap"
+        ) from exc
+    if not math.isfinite(value) or value <= 0.0:
+        raise CalibrationError("calib.yaml bed_to_nozzle_gap must be finite and positive")
+    return value
+
+
 def _run_local(
     command: Sequence[str], *, check: bool = True
 ) -> subprocess.CompletedProcess[str]:
@@ -811,15 +872,20 @@ class Iteration1Runner:
         self.state = RunState(run_id=store.path.name, phase=Phase.PREFLIGHT.value)
         self.raw_calibration = _load_raw_calibration()
         self.tap_threshold = configured_tap_threshold(self.raw_calibration)
+        self.bed_to_nozzle_gap = configured_bed_to_nozzle_gap(self.raw_calibration)
+        self.tap_contact_target_z = -self.bed_to_nozzle_gap
         _logger.info(
             "calibration runner ready: run_dir=%s dry_run=%s host=%s "
-            "reference=(%.3f, %.3f) tap_threshold=%d",
+            "reference=(%.3f, %.3f) tap_threshold=%d bed_to_nozzle_gap=%.6f "
+            "tap_contact_target_z=%.6f",
             self.store.path,
             self.dry_run,
             getattr(self.client, "host", "<injected>"),
             REFERENCE_X,
             REFERENCE_Y,
             self.tap_threshold,
+            self.bed_to_nozzle_gap,
+            self.tap_contact_target_z,
         )
         if snapshot:
             self.store.copy(CALIB_PATH, "calib.yaml.before")
@@ -833,7 +899,15 @@ class Iteration1Runner:
         if committed:
             self.state.committed_phase = phase.value
         self.state.source_hashes = _config_hashes()
-        self.state.evidence = {**(self.state.evidence or {}), **evidence}
+        datum_evidence = {
+            "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
+            "tap_contact_target_z": self.tap_contact_target_z,
+        }
+        self.state.evidence = {
+            **(self.state.evidence or {}),
+            **datum_evidence,
+            **evidence,
+        }
         self.store.write_json("state.json", asdict(self.state))
         _logger.info(
             "checkpoint: phase=%s committed=%s",
@@ -1075,6 +1149,11 @@ class Iteration1Runner:
                 else:
                     status = self.client.status(["probe", "toolhead"])
                     value, post_retract_z = tap_contact_and_post_retract_z(status)
+                    last_probe_position = status["probe"]["last_probe_position"]
+                    contact_x = float(last_probe_position[0])
+                    contact_y = float(last_probe_position[1])
+                    if not math.isfinite(contact_x) or not math.isfinite(contact_y):
+                        raise CalibrationError("tap status contains a non-finite XY position")
                     _logger.info(
                         "tap %d: contact_z=%.6f post_retract_toolhead_z=%.6f "
                         "retract_delta=%.6f",
@@ -1096,6 +1175,8 @@ class Iteration1Runner:
                         "ok": True,
                         "z": value,
                         "contact_z": value,
+                        "contact_x": x if self.dry_run else contact_x,
+                        "contact_y": y if self.dry_run else contact_y,
                         "post_retract_toolhead_z": post_retract_z,
                         "retract_delta": post_retract_z - value,
                     }
@@ -1130,7 +1211,12 @@ class Iteration1Runner:
         return summary, attempts
 
     @staticmethod
-    def require_center_tap(summary: TapSummary, *, count: int) -> None:
+    def require_center_tap(
+        summary: TapSummary,
+        *,
+        count: int,
+        contact_target_z: float,
+    ) -> None:
         if len(summary.successful) != count:
             raise CalibrationError(
                 f"expected {count} successful center taps, got "
@@ -1138,10 +1224,11 @@ class Iteration1Runner:
             )
         if summary.rejected_attempts:
             raise CalibrationError("center reference tap rejected a sample")
-        if abs(summary.mean) > EDDY_REFERENCE_MEAN_TOLERANCE:
+        if abs(summary.mean - contact_target_z) > EDDY_REFERENCE_MEAN_TOLERANCE:
             raise CalibrationError(
-                "center reference tap is not native Z=0: "
-                f"mean={summary.mean:.6f} allowed={EDDY_REFERENCE_MEAN_TOLERANCE:.6f}"
+                "center reference tap is not at the physical contact target: "
+                f"mean={summary.mean:.6f} target={contact_target_z:.6f} "
+                f"tolerance={EDDY_REFERENCE_MEAN_TOLERANCE:.6f}"
             )
         if summary.span > EDDY_REFERENCE_SPAN_TOLERANCE:
             raise CalibrationError(
@@ -1175,7 +1262,7 @@ class Iteration1Runner:
         raise CalibrationError("GET_POSITION response was not found in gcode store")
 
     def eddy_reference_sequence(self, label: str) -> dict[str, Any]:
-        """Home, prove center tap Z=0, and record the median-Z position."""
+        """Home, prove the center physical-contact target, and record its median."""
 
         _logger.info("Eddy reference sequence started: %s", label)
         self._home_clean_frame()
@@ -1189,7 +1276,11 @@ class Iteration1Runner:
         )
         summary_data = asdict(summary)
         try:
-            self.require_center_tap(summary, count=EDDY_REFERENCE_TAP_COUNT)
+            self.require_center_tap(
+                summary,
+                count=EDDY_REFERENCE_TAP_COUNT,
+                contact_target_z=self.tap_contact_target_z,
+            )
         except CalibrationError as exc:
             self.store.write_json(
                 f"{label}-reference.json",
@@ -1197,6 +1288,8 @@ class Iteration1Runner:
                     "after_home": after_home,
                     "taps": attempts,
                     "summary": summary_data,
+                    "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
+                    "tap_contact_target_z": self.tap_contact_target_z,
                     "error": str(exc),
                 },
             )
@@ -1218,6 +1311,8 @@ class Iteration1Runner:
             "taps": attempts,
             "summary": summary_data,
             "median_tap_z": summary.median,
+            "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
+            "tap_contact_target_z": self.tap_contact_target_z,
             "after_median_move": after_median_move,
         }
         self.store.write_json(f"{label}-reference.json", evidence)
@@ -1250,12 +1345,22 @@ class Iteration1Runner:
         return summary
 
     def update_endstops(self, tap_center_z: float) -> tuple[float, float]:
-        _logger.info("I1.2 updating both endstops from tap_center_z=%.6f", tap_center_z)
+        _logger.info(
+            "I1.2 updating both endstops from tap_center_z=%.6f "
+            "to tap_contact_target_z=%.6f",
+            tap_center_z,
+            self.tap_contact_target_z,
+        )
         tools = self.raw_calibration["tools"]
         t0_old = float(tools["t0"]["z_endstop"])
         t1_old = float(tools["t1"]["z_endstop"])
         expected = validate_vision_relative_provenance(self.raw_calibration)
-        t0_new, t1_new, delta = common_endstop_update(t0_old, t1_old, tap_center_z)
+        t0_new, t1_new, delta = common_endstop_update(
+            t0_old,
+            t1_old,
+            tap_center_z,
+            contact_target_z=self.tap_contact_target_z,
+        )
         assert_relative_alignment(
             t0_old, t1_old, t0_new, t1_new, expected_delta=expected, tolerance=1e-9
         )
@@ -1263,7 +1368,13 @@ class Iteration1Runner:
             self.checkpoint(
                 Phase.ENDSTOPS,
                 committed=False,
-                proposed_endstops={"t0": t0_new, "t1": t1_new, "delta": delta},
+                proposed_endstops={
+                    "t0": t0_new,
+                    "t1": t1_new,
+                    "delta": delta,
+                    "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
+                    "tap_contact_target_z": self.tap_contact_target_z,
+                },
             )
             return t0_new, t1_new
         _logger.info(
@@ -1287,7 +1398,13 @@ class Iteration1Runner:
         self.checkpoint(
             Phase.ENDSTOPS,
             committed=True,
-            endstops={"t0": t0_new, "t1": t1_new, "delta": delta},
+            endstops={
+                "t0": t0_new,
+                "t1": t1_new,
+                "delta": delta,
+                "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
+                "tap_contact_target_z": self.tap_contact_target_z,
+            },
         )
         _logger.info("I1.2 endstop update deployed and committed")
         return t0_new, t1_new
@@ -1303,11 +1420,14 @@ class Iteration1Runner:
             tap_threshold=self.tap_threshold,
         )
         if (
-            abs(summary.mean) > CENTER_MEAN_TOLERANCE
+            abs(summary.mean - self.tap_contact_target_z) > CENTER_MEAN_TOLERANCE
             or summary.span > CENTER_SPAN_TOLERANCE
         ):
             raise CalibrationError(
-                f"center tap is not native Z=0: mean={summary.mean:.6f}, span={summary.span:.6f} allowed mean={CENTER_MEAN_TOLERANCE:.6f}, span={CENTER_SPAN_TOLERANCE:.6f}"
+                "center tap is not at the physical contact target: "
+                f"mean={summary.mean:.6f}, target={self.tap_contact_target_z:.6f}, "
+                f"span={summary.span:.6f}, allowed mean={CENTER_MEAN_TOLERANCE:.6f}, "
+                f"span={CENTER_SPAN_TOLERANCE:.6f}"
             )
         if summary.rejected_attempts:
             raise CalibrationError("center verification rejected a tap")
@@ -1316,11 +1436,14 @@ class Iteration1Runner:
             committed=True,
             center_verification=attempts,
             center_summary=asdict(summary),
+            bed_to_nozzle_gap=self.bed_to_nozzle_gap,
+            tap_contact_target_z=self.tap_contact_target_z,
         )
         _logger.info(
-            "%s center verification passed: mean=%.6f span=%.6f",
+            "%s center verification passed: mean=%.6f target=%.6f span=%.6f",
             phase.value,
             summary.mean,
+            self.tap_contact_target_z,
             summary.span,
         )
         return summary
@@ -1565,7 +1688,7 @@ class Iteration1Runner:
     def verify_eddy_probe_reference(
         self, tap_summary: Mapping[str, Any] | None = None
     ) -> dict[str, Any]:
-        """Require repeated regular Eddy PROBEs to agree with tap Z=0."""
+        """Require repeated regular Eddy PROBEs to agree with the contact target."""
 
         _logger.info(
             "I1.5 regular Eddy PROBE reference check started for physical point "
@@ -1580,7 +1703,7 @@ class Iteration1Runner:
                 {
                     "x": REFERENCE_X,
                     "y": REFERENCE_Y,
-                    "z": 0.0,
+                    "z": self.tap_contact_target_z,
                     "probe_speed": None,
                     "toolhead_z": pose.z,
                     "temperature": None,
@@ -1612,6 +1735,8 @@ class Iteration1Runner:
             "probe_summary": summary,
             "tap_median": tap_median,
             "median_residual": residual,
+            "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
+            "tap_contact_target_z": self.tap_contact_target_z,
             "mean_tolerance": EDDY_REFERENCE_MEAN_TOLERANCE,
             "span_tolerance": EDDY_REFERENCE_SPAN_TOLERANCE,
             "residual_tolerance": EDDY_REFERENCE_RESIDUAL_TOLERANCE,
@@ -1626,10 +1751,14 @@ class Iteration1Runner:
             tap_median,
             residual,
         )
-        if abs(summary["mean"]) > EDDY_REFERENCE_MEAN_TOLERANCE:
+        if (
+            abs(summary["mean"] - self.tap_contact_target_z)
+            > EDDY_REFERENCE_MEAN_TOLERANCE
+        ):
             raise CalibrationError(
-                "regular Eddy PROBE is not native Z=0 after frequency calibration: "
-                f"mean={summary['mean']:.6f}, "
+                "regular Eddy PROBE is not at the physical contact target after "
+                "frequency calibration: "
+                f"mean={summary['mean']:.6f}, target={self.tap_contact_target_z:.6f}, "
                 f"tolerance={EDDY_REFERENCE_MEAN_TOLERANCE:.6f}"
             )
         if summary["span"] > EDDY_REFERENCE_SPAN_TOLERANCE:
@@ -1638,10 +1767,14 @@ class Iteration1Runner:
                 f"span={summary['span']:.6f}, "
                 f"tolerance={EDDY_REFERENCE_SPAN_TOLERANCE:.6f}"
             )
-        if tap_median is not None and abs(tap_median) > EDDY_REFERENCE_MEAN_TOLERANCE:
+        if (
+            tap_median is not None
+            and abs(tap_median - self.tap_contact_target_z)
+            > EDDY_REFERENCE_MEAN_TOLERANCE
+        ):
             raise CalibrationError(
-                "tap median is not native Z=0: "
-                f"median={tap_median:.6f}, "
+                "tap median is not at the physical contact target: "
+                f"median={tap_median:.6f}, target={self.tap_contact_target_z:.6f}, "
                 f"tolerance={EDDY_REFERENCE_MEAN_TOLERANCE:.6f}"
             )
         if residual is not None and abs(residual) > EDDY_REFERENCE_RESIDUAL_TOLERANCE:
@@ -1699,20 +1832,26 @@ class Iteration1Runner:
         if not manual_probe.get("is_active"):
             raise CalibrationError("Eddy calibration did not enter manual-probe mode")
         current_z = float(manual_probe["z_position"])
+        if not math.isfinite(current_z):
+            raise CalibrationError("Eddy calibration manual-probe position is non-finite")
         _logger.info(
-            "I1.5 manual-probe mode active at z=%.6f; targeting z=0", current_z
+            "I1.5 manual-probe mode active at z=%.6f; targeting physical contact "
+            "z=%.6f (bed_to_nozzle_gap=%.6f)",
+            current_z,
+            self.tap_contact_target_z,
+            self.bed_to_nozzle_gap,
         )
-        delta = -current_z
-        if current_z + delta < -0.01:
-            raise CalibrationError(
-                "manual-probe targeting would descend below native contact"
-            )
+        delta = self.tap_contact_target_z - current_z
         self._gcode(f"TESTZ Z={delta:.6f}")
         status = self.client.status(["manual_probe"])
         final_z = float(status.get("manual_probe", {}).get("z_position", math.nan))
-        if not math.isfinite(final_z) or abs(final_z) > 0.004:
+        if (
+            not math.isfinite(final_z)
+            or abs(final_z - self.tap_contact_target_z) > 0.004
+        ):
             raise CalibrationError(
-                f"manual-probe target did not reach Z=0: {final_z!r}"
+                "manual-probe target did not reach the Tap contact target: "
+                f"actual={final_z!r} target={self.tap_contact_target_z:.6f}"
             )
         _logger.info(
             "I1.5 manual-probe target reached at z=%.6f; accepting sweep", final_z
@@ -1782,6 +1921,153 @@ class Iteration1Runner:
         )
         _logger.info("I1.5 Eddy frequency/height calibration finished and committed")
 
+    def active_mesh_transform_z_at(self, point: MeshPoint) -> float:
+        """Return the active mesh's physical Z translation at a safe G-code Z.
+
+        The returned value is also the physical location of the G-code Z=0
+        plane because this configuration has no mesh fade.  Raw Tap bypasses
+        the G-code move transform, so Tap alone cannot prove the active mesh.
+        """
+
+        self._gcode(
+            f"G90\nG1 X{point.x:.3f} Y{point.y:.3f} "
+            f"Z{TAP_MESH_VERIFY_GCODE_Z:.3f} F1200\nM400"
+        )
+        status = self.client.status(["toolhead", "gcode_move"])
+        toolhead_position = status.get("toolhead", {}).get("position")
+        gcode_position = status.get("gcode_move", {}).get("gcode_position")
+        if (
+            not isinstance(toolhead_position, Sequence)
+            or len(toolhead_position) < 3
+            or not isinstance(gcode_position, Sequence)
+            or len(gcode_position) < 3
+        ):
+            raise CalibrationError("active mesh transform status lacks positions")
+        toolhead_z = float(toolhead_position[2])
+        gcode_z = float(gcode_position[2])
+        if not math.isfinite(toolhead_z) or not math.isfinite(gcode_z):
+            raise CalibrationError("active mesh transform status contains non-finite Z")
+        if abs(gcode_z - TAP_MESH_VERIFY_GCODE_Z) > 0.001:
+            raise CalibrationError(
+                "active mesh transform move did not retain its requested G-code Z: "
+                f"requested={TAP_MESH_VERIFY_GCODE_Z:.6f} actual={gcode_z:.6f}"
+            )
+        return toolhead_z - gcode_z
+
+    def verify_active_tap_mesh(self, status: Mapping[str, Any]) -> dict[str, Any]:
+        """Verify that active mesh compensation produces the configured clearance."""
+
+        mesh_min, mesh_max = configured_mesh_bounds(status)
+        if not (
+            mesh_min.x <= REFERENCE_X <= mesh_max.x
+            and mesh_min.y <= REFERENCE_Y <= mesh_max.y
+        ):
+            raise CalibrationError(
+                "bed reference is outside the configured Tap mesh bounds: "
+                f"reference=({REFERENCE_X:.3f}, {REFERENCE_Y:.3f}) "
+                f"mesh_min=({mesh_min.x:.3f}, {mesh_min.y:.3f}) "
+                f"mesh_max=({mesh_max.x:.3f}, {mesh_max.y:.3f})"
+            )
+        points = tuple(
+            MeshPoint(x, y)
+            for y in (mesh_min.y, REFERENCE_Y, mesh_max.y)
+            for x in (mesh_min.x, REFERENCE_X, mesh_max.x)
+        )
+        records: list[dict[str, Any]] = []
+        failures: list[str] = []
+        _logger.info(
+            "I1.6 active Tap mesh verification started: points=%d gap=%.6f",
+            len(points),
+            self.bed_to_nozzle_gap,
+        )
+        for point in points:
+            record: dict[str, Any] = {
+                "requested_x": point.x,
+                "requested_y": point.y,
+                "tap_contact_target_z": self.tap_contact_target_z,
+                "expected_bed_to_nozzle_gap": self.bed_to_nozzle_gap,
+            }
+            try:
+                mesh_transform_z = self.active_mesh_transform_z_at(point)
+                summary, attempts = self.collect_taps(
+                    x=point.x,
+                    y=point.y,
+                    count=1,
+                    max_attempts=1,
+                    tap_threshold=self.tap_threshold,
+                )
+                accepted = [attempt for attempt in attempts if attempt.get("ok")]
+                if summary is None or len(accepted) != 1:
+                    raise CalibrationError("active mesh Tap did not acquire one sample")
+                sample = accepted[0]
+                contact_x = float(sample["contact_x"])
+                contact_y = float(sample["contact_y"])
+                contact_z = float(sample["contact_z"])
+                measured_bed_to_nozzle_gap = mesh_transform_z - contact_z
+                residual = measured_bed_to_nozzle_gap - self.bed_to_nozzle_gap
+                record.update(
+                    {
+                        "actual_x": contact_x,
+                        "actual_y": contact_y,
+                        "raw_contact_z": contact_z,
+                        "mesh_transform_z": mesh_transform_z,
+                        "measured_bed_to_nozzle_gap": measured_bed_to_nozzle_gap,
+                        "gap_residual": residual,
+                        "post_retract_toolhead_z": sample[
+                            "post_retract_toolhead_z"
+                        ],
+                        "attempts": attempts,
+                    }
+                )
+                if (
+                    abs(contact_x - point.x) > TAP_CONTACT_XY_TOLERANCE
+                    or abs(contact_y - point.y) > TAP_CONTACT_XY_TOLERANCE
+                ):
+                    raise CalibrationError(
+                        "active mesh Tap physical XY mismatch: "
+                        f"requested=({point.x:.3f}, {point.y:.3f}) "
+                        f"actual=({contact_x:.6f}, {contact_y:.6f})"
+                    )
+                if abs(residual) > TAP_MESH_ACTIVE_CONTACT_TOLERANCE:
+                    raise CalibrationError(
+                        "active mesh produces the wrong physical nozzle clearance: "
+                        f"mesh_transform_z={mesh_transform_z:.6f} "
+                        f"raw_contact_z={contact_z:.6f} "
+                        f"measured_gap={measured_bed_to_nozzle_gap:.6f} "
+                        f"target_gap={self.bed_to_nozzle_gap:.6f} "
+                        f"residual={residual:.6f} "
+                        f"tolerance={TAP_MESH_ACTIVE_CONTACT_TOLERANCE:.6f}"
+                    )
+                record["passed"] = True
+            except Exception as exc:
+                record["passed"] = False
+                record["error"] = str(exc)
+                failures.append(
+                    f"({point.x:.3f}, {point.y:.3f}): {record['error']}"
+                )
+                _logger.warning("I1.6 active Tap mesh verification failed: %s", failures[-1])
+            records.append(record)
+        verification = {
+            "profile": TAP_MESH_PROFILE,
+            "mesh_min": asdict(mesh_min),
+            "mesh_max": asdict(mesh_max),
+            "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
+            "tap_contact_target_z": self.tap_contact_target_z,
+            "transform_sample_gcode_z": TAP_MESH_VERIFY_GCODE_Z,
+            "point_tolerance": TAP_MESH_ACTIVE_CONTACT_TOLERANCE,
+            "xy_tolerance": TAP_CONTACT_XY_TOLERANCE,
+            "points": records,
+            "failure_count": len(failures),
+            "failures": failures,
+            "passed": not failures,
+        }
+        _logger.info(
+            "I1.6 active Tap mesh verification finished: passed=%s failures=%d",
+            verification["passed"],
+            verification["failure_count"],
+        )
+        return verification
+
     def final_mesh(self, *, clean_frame: bool = True) -> None:
         """Create and retain a transient native T0 Tap mesh."""
 
@@ -1812,8 +2098,18 @@ class Iteration1Runner:
         self._gcode("T0")
         self._gcode(command, timeout=900.0)
         if self.dry_run:
-            self.checkpoint(Phase.MESH_SCAN, committed=False)
+            self.checkpoint(
+                Phase.MESH_SCAN,
+                committed=False,
+                bed_to_nozzle_gap=self.bed_to_nozzle_gap,
+                tap_contact_target_z=self.tap_contact_target_z,
+            )
             return
+        # A named BED_MESH_CALIBRATE result is retained as a session profile,
+        # but Klipper does not activate that profile automatically.  Activate
+        # the just-measured surface before checking its live matrix or Tap
+        # contacts; this is an activation, not a persisted SAVE_CONFIG change.
+        self._gcode(f"BED_MESH_PROFILE LOAD={TAP_MESH_PROFILE}")
         status = self.client.status(["bed_mesh", "configfile"])
         pending = status.get("configfile", {}).get("save_config_pending_items", {})
         require_only_transient_mesh_pending(pending)
@@ -1823,6 +2119,7 @@ class Iteration1Runner:
             raise CalibrationError(
                 f"native Tap mesh did not leave active profile {TAP_MESH_PROFILE}"
             )
+        verification = self.verify_active_tap_mesh(status)
         artifact = {
             "method": "tap",
             "profile": TAP_MESH_PROFILE,
@@ -1831,10 +2128,24 @@ class Iteration1Runner:
             "samples": 1,
             "horizontal_move_z": TAP_MESH_HORIZONTAL_MOVE_Z,
             "probe_count": TAP_MESH_PROBE_COUNT,
+            "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
+            "tap_contact_target_z": self.tap_contact_target_z,
             "mesh_status": mesh,
             "pending_sections": sorted(pending_sections(pending)),
+            "active_profile_verification": verification,
         }
         self.store.write_json("mesh-tap.json", artifact)
+        if not verification["passed"]:
+            self.checkpoint(
+                Phase.MESH_SCAN,
+                committed=False,
+                mesh_status=status,
+                mesh_tap=artifact,
+            )
+            raise CalibrationError(
+                "active Tap mesh verification failed after surveying all points: "
+                + "; ".join(verification["failures"])
+            )
         self.checkpoint(
             Phase.MESH_SCAN,
             committed=True,
