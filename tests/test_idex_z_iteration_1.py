@@ -123,6 +123,37 @@ def test_post_eddy_probe_reference_runs_regular_probe_and_records_evidence():
     assert runner.store.writes["post-eddy-probe-reference.json"] == evidence
 
 
+def test_post_eddy_probe_residual_is_report_only(caplog):
+    module = _load_module()
+
+    class Store:
+        def write_json(self, name, value):
+            self.value = value
+
+    runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = False
+    runner.store = Store()
+    runner.raw_calibration = {
+        "eddy_relative_calibration": {
+            "nozzle_to_coil": {"x": -57.391, "y": -18.997, "z": 1.399}
+        }
+    }
+    runner.bed_to_nozzle_gap = 0.2
+    runner.tap_contact_target_z = -0.2
+    runner._validate_eddy_reference_pose = lambda _pose: {"test": True}
+    probe_zs = iter([-0.17, -0.17, -0.17, -0.17, -0.2])
+    runner._capture_regular_eddy_probe = lambda **_kwargs: {
+        "probe_result": {"x": 150.0, "y": 150.0, "z": next(probe_zs)},
+        "position": {},
+    }
+
+    evidence = runner.verify_eddy_probe_reference({"median": -0.2})
+
+    assert evidence["median_residual"] == pytest.approx(0.03)
+    assert evidence["residual_gate"] == {"passed": False, "enforced": False}
+    assert "report-only gate" in caplog.text
+
+
 def test_eddy_manual_probe_targets_configured_physical_contact_coordinate():
     module = _load_module()
 
@@ -229,11 +260,12 @@ def test_tap_threshold_is_required_from_calib():
 def test_bed_to_nozzle_gap_is_required_from_calib():
     module = _load_module()
 
-    assert module.configured_bed_to_nozzle_gap(
-        {"bed_to_nozzle_gap": 0.2}
-    ) == pytest.approx(0.2)
+    for value in (0.2, 0.0, -0.1):
+        assert module.configured_bed_to_nozzle_gap(
+            {"bed_to_nozzle_gap": value}
+        ) == pytest.approx(value)
 
-    for value in (None, 0.0, -0.1, float("nan")):
+    for value in (None, True, float("nan"), float("inf"), float("-inf")):
         with pytest.raises(module.CalibrationError, match="bed_to_nozzle_gap"):
             module.configured_bed_to_nozzle_gap({"bed_to_nozzle_gap": value})
 
@@ -315,7 +347,7 @@ def test_gcode_logs_and_persists_new_klipper_responses(tmp_path, caplog):
     ]
 
 
-def test_direct_step_can_reload_stale_run_state_but_resume_remains_strict(
+def test_stale_run_state_can_reload_for_resume_and_direct_steps(
     tmp_path, monkeypatch
 ):
     module = _load_module()
@@ -329,11 +361,11 @@ def test_direct_step_can_reload_stale_run_state_but_resume_remains_strict(
     )
     monkeypatch.setattr(module, "_config_hashes", lambda: {"calib.yaml": "new"})
 
-    with pytest.raises(module.CalibrationError, match="source hashes changed"):
-        module._load_run_state(run_dir)
-
     state = module._load_run_state(run_dir, strict_hashes=False)
     assert state.run_id == "run"
+
+    # Resume uses the same non-strict load path so deployment-first preflight
+    # can synchronize the current source before any motion resumes.
 
 
 def test_prior_workflow_version_is_rejected_for_the_physical_datum_change(tmp_path):
@@ -387,6 +419,7 @@ def test_legacy_mesh_verify_state_is_rejected_after_native_tap_mesh_change(tmp_p
 def test_resume_after_eddy_calibration_runs_mesh_from_a_clean_frame():
     module = _load_module()
     runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = False
     runner.state = module.RunState(
         run_id="resume-after-eddy",
         phase=module.Phase.EDDY_CALIBRATION.value,
@@ -394,7 +427,9 @@ def test_resume_after_eddy_calibration_runs_mesh_from_a_clean_frame():
     )
     calls = []
     runner.confirm = lambda: calls.append("confirm")
-    runner.preflight = lambda **kwargs: calls.append("preflight")
+    runner.preflight = lambda **kwargs: calls.append(
+        f"preflight:{kwargs.get('sync_printer')}"
+    )
     runner.final_mesh = lambda *, clean_frame=True: calls.append(f"mesh:{clean_frame}")
     runner.checkpoint = lambda phase, **kwargs: calls.append(phase.value)
     runner.write_final_report = lambda: calls.append("report")
@@ -403,7 +438,7 @@ def test_resume_after_eddy_calibration_runs_mesh_from_a_clean_frame():
 
     assert calls == [
         "confirm",
-        "preflight",
+        "preflight:True",
         "mesh:True",
         module.Phase.FINISH.value,
         "report",
@@ -413,6 +448,7 @@ def test_resume_after_eddy_calibration_runs_mesh_from_a_clean_frame():
 def test_resume_after_committed_tap_mesh_finishes_without_mesh_diagnostic():
     module = _load_module()
     runner = object.__new__(module.Iteration1Runner)
+    runner.dry_run = False
     runner.state = module.RunState(
         run_id="resume-after-tap-mesh",
         phase=module.Phase.MESH_SCAN.value,
@@ -420,14 +456,21 @@ def test_resume_after_committed_tap_mesh_finishes_without_mesh_diagnostic():
     )
     calls = []
     runner.confirm = lambda: calls.append("confirm")
-    runner.preflight = lambda **kwargs: calls.append("preflight")
+    runner.preflight = lambda **kwargs: calls.append(
+        f"preflight:{kwargs.get('sync_printer')}"
+    )
     runner.final_mesh = lambda **kwargs: (_ for _ in ()).throw(AssertionError("mesh"))
     runner.checkpoint = lambda phase, **kwargs: calls.append(phase.value)
     runner.write_final_report = lambda: calls.append("report")
 
     runner.resume()
 
-    assert calls == ["confirm", "preflight", module.Phase.FINISH.value, "report"]
+    assert calls == [
+        "confirm",
+        "preflight:True",
+        module.Phase.FINISH.value,
+        "report",
+    ]
 
 
 def test_full_run_reuses_verified_frames_for_drive_current_and_mesh():
@@ -439,7 +482,9 @@ def test_full_run_reuses_verified_frames_for_drive_current_and_mesh():
     )
     calls = []
     runner.confirm = lambda: calls.append("confirm")
-    runner.preflight = lambda: calls.append("preflight")
+    runner.preflight = lambda **kwargs: calls.append(
+        f"preflight:{kwargs.get('sync_printer')}"
+    )
     runner.bootstrap_tap = lambda: (
         calls.append("bootstrap") or type("Summary", (), {"median": 0.0})()
     )
@@ -457,7 +502,7 @@ def test_full_run_reuses_verified_frames_for_drive_current_and_mesh():
 
     assert calls == [
         "confirm",
-        "preflight",
+        "preflight:True",
         "bootstrap",
         "endstops",
         "center",

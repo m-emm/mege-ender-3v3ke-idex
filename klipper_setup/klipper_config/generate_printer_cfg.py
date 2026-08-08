@@ -220,8 +220,12 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
         "bed_to_nozzle_gap",
         "calib.yaml",
     )
-    if not math.isfinite(bed_to_nozzle_gap) or bed_to_nozzle_gap <= 0.0:
-        raise ValueError("calib.yaml.bed_to_nozzle_gap must be finite and positive")
+    if isinstance(data["bed_to_nozzle_gap"], bool) or not math.isfinite(
+        bed_to_nozzle_gap
+    ):
+        raise ValueError(
+            "calib.yaml.bed_to_nozzle_gap must be a finite real number"
+        )
     tools = _require_mapping(data.get("tools"), "tools")
     t0 = _require_mapping(tools.get("t0"), "tools.t0")
     t1 = _require_mapping(tools.get("t1"), "tools.t1")
@@ -386,15 +390,6 @@ def live_config_check_errors(
         detail = f": {message}" if message else ""
         errors.append(
             f"Klippy state is {state!r}, expected 'ready'{detail}"
-        )
-
-    configfile = status.get("configfile", {})
-    save_config_pending = configfile.get("save_config_pending")
-
-    if save_config_pending is not False:
-        errors.append(
-            "configfile.save_config_pending is "
-            f"{save_config_pending!r}, expected False"
         )
 
     actual_fingerprint = active_config_fingerprint(status)

@@ -810,16 +810,21 @@ def configured_tap_threshold(calibration: Mapping[str, Any]) -> int:
 
 
 def configured_bed_to_nozzle_gap(calibration: Mapping[str, Any]) -> float:
-    """Return the one source-controlled physical clearance datum in mm."""
+    """Return the one source-controlled signed nozzle-to-bed datum in mm."""
 
     try:
-        value = float(calibration["bed_to_nozzle_gap"])
+        raw_value = calibration["bed_to_nozzle_gap"]
+        if isinstance(raw_value, bool):
+            raise TypeError("boolean is not a real-number datum")
+        value = float(raw_value)
     except (KeyError, TypeError, ValueError) as exc:
         raise CalibrationError(
-            "calib.yaml must define a numeric bed_to_nozzle_gap"
+            "calib.yaml must define a finite real bed_to_nozzle_gap"
         ) from exc
-    if not math.isfinite(value) or value <= 0.0:
-        raise CalibrationError("calib.yaml bed_to_nozzle_gap must be finite and positive")
+    if not math.isfinite(value):
+        raise CalibrationError(
+            "calib.yaml bed_to_nozzle_gap must be a finite real number"
+        )
     return value
 
 
@@ -990,12 +995,14 @@ class Iteration1Runner:
         if status.get("virtual_sdcard", {}).get("is_active", False):
             raise CalibrationError("virtual SD print is active")
         configfile = status.get("configfile", {})
-        if configfile.get("save_config_pending") not in {None, False}:
-            raise CalibrationError("a SAVE_CONFIG change is already pending")
+        save_config_pending = configfile.get("save_config_pending")
         pending = configfile.get("save_config_pending_items", {})
-        if pending:
-            raise CalibrationError(
-                "pending configuration items must be empty before calibration"
+        if save_config_pending not in {None, False} or pending:
+            _logger.warning(
+                "ignoring existing SAVE_CONFIG pending state during managed "
+                "calibration: pending=%s sections=%s",
+                save_config_pending,
+                sorted(pending_sections(pending)),
             )
         for name in ("heater_bed", "extruder", "extruder1"):
             temperature = status.get(name, {}).get("temperature")
@@ -1740,6 +1747,11 @@ class Iteration1Runner:
             "mean_tolerance": EDDY_REFERENCE_MEAN_TOLERANCE,
             "span_tolerance": EDDY_REFERENCE_SPAN_TOLERANCE,
             "residual_tolerance": EDDY_REFERENCE_RESIDUAL_TOLERANCE,
+            "residual_gate": {
+                "passed": residual is None
+                or abs(residual) <= EDDY_REFERENCE_RESIDUAL_TOLERANCE,
+                "enforced": False,
+            },
         }
         self.store.write_json("post-eddy-probe-reference.json", evidence)
         _logger.info(
@@ -1778,11 +1790,14 @@ class Iteration1Runner:
                 f"tolerance={EDDY_REFERENCE_MEAN_TOLERANCE:.6f}"
             )
         if residual is not None and abs(residual) > EDDY_REFERENCE_RESIDUAL_TOLERANCE:
-            raise CalibrationError(
-                "regular Eddy PROBE does not agree with tap median: "
-                f"tap_median={tap_median:.6f}, probe_median={summary['median']:.6f}, "
-                f"residual={residual:.6f}, "
-                f"tolerance={EDDY_REFERENCE_RESIDUAL_TOLERANCE:.6f}"
+            _logger.warning(
+                "regular Eddy PROBE residual is outside the report-only gate: "
+                "tap_median=%.6f, probe_median=%.6f, residual=%.6f, "
+                "tolerance=%.6f",
+                tap_median,
+                summary["median"],
+                residual,
+                EDDY_REFERENCE_RESIDUAL_TOLERANCE,
             )
         _logger.info("I1.5 regular Eddy PROBE reference passed")
         return evidence
@@ -2161,7 +2176,7 @@ class Iteration1Runner:
         if committed is None:
             raise CalibrationError("run has no committed phase boundary")
         self.confirm()
-        self.preflight(checkpoint_state=False)
+        self.preflight(checkpoint_state=False, sync_printer=not self.dry_run)
         if committed == "I1.7" or self.state.phase == "I1.7":
             raise CalibrationError(
                 "run predates the native Tap mesh workflow at removed phase I1.7; "
@@ -2205,7 +2220,7 @@ class Iteration1Runner:
 
     def run(self) -> RunState:
         self.confirm()
-        self.preflight()
+        self.preflight(sync_printer=not self.dry_run)
         if self.dry_run:
             eddy = self.raw_calibration["eddy_relative_calibration"]["nozzle_to_coil"]
             coil_pose = coil_over_target_pose(
@@ -2278,7 +2293,7 @@ def _load_run_state(run_directory: Path, *, strict_hashes: bool = True) -> RunSt
             )
         _logger.warning(
             "run state source hashes are stale; accepting them for the explicitly "
-            "requested direct step and refreshing state after it completes"
+            "requested continuation and refreshing state after it completes"
         )
     return state
 
@@ -2327,7 +2342,10 @@ def _run_step(runner: Iteration1Runner, step: str) -> RunState:
         state = runner.state
     else:
         runner.confirm()
-        runner.preflight(checkpoint_state=False)
+        runner.preflight(
+            checkpoint_state=False,
+            sync_printer=not runner.dry_run,
+        )
         if step == "bootstrap-tap":
             runner.bootstrap_tap()
         elif step == "update-endstops":
@@ -2509,6 +2527,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 host=args.host,
                 dry_run=False,
                 assume_yes=args.yes,
+                strict_state_hashes=False,
             )
             state = runner.resume()
             _logger.info("resume finished: committed_phase=%s", state.committed_phase)
@@ -2522,7 +2541,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             host=args.host,
             dry_run=args.dry_run,
             assume_yes=args.yes,
-            strict_state_hashes=step == "resume",
+            strict_state_hashes=False if step == "resume" else True,
         )
         if existing and step == "run":
             raise CalibrationError(

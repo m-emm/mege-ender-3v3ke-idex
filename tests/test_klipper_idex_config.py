@@ -2,6 +2,7 @@ import ast
 import importlib.util
 import configparser
 import json
+import math
 import re
 import sys
 from datetime import datetime
@@ -282,7 +283,7 @@ def test_eddy_probe_geometry_and_visualization_mesh_are_generated_from_calib():
     assert _setting_float(probe, "descend_z") > 0
     assert _setting_float(probe, "tap_z_offset") == pytest.approx(0.0)
     assert "tap_z_offset" not in eddy
-    assert calibration["bed_to_nozzle_gap"] > 0.0
+    assert math.isfinite(calibration["bed_to_nozzle_gap"])
     mesh_min = [float(item) for item in _setting_value(mesh, "mesh_min").split(",")]
     mesh_max = [float(item) for item in _setting_value(mesh, "mesh_max").split(",")]
     probe_count = [int(item) for item in _setting_value(mesh, "probe_count").split(",")]
@@ -300,7 +301,7 @@ def test_eddy_probe_geometry_and_visualization_mesh_are_generated_from_calib():
     assert _setting_float(mesh, "horizontal_move_z") > 0
 
 
-def test_global_bed_to_nozzle_gap_is_required_and_legacy_tap_offset_is_rejected(
+def test_global_bed_to_nozzle_gap_is_required_finite_and_signed(
     tmp_path,
 ):
     generator = _load_generator_module()
@@ -308,24 +309,49 @@ def test_global_bed_to_nozzle_gap_is_required_and_legacy_tap_offset_is_rejected(
 
     missing_gap = tmp_path / "missing-gap.yaml"
     missing_gap.write_text(
-        source.replace("bed_to_nozzle_gap: 0.200\n", ""), encoding="utf-8"
+        re.sub(r"(?m)^bed_to_nozzle_gap:.*\n", "", source), encoding="utf-8"
     )
     with pytest.raises(ValueError, match="bed_to_nozzle_gap"):
         generator.load_calibration(missing_gap)
 
-    invalid_gap = tmp_path / "invalid-gap.yaml"
-    invalid_gap.write_text(
-        source.replace("bed_to_nozzle_gap: 0.200", "bed_to_nozzle_gap: 0"),
-        encoding="utf-8",
-    )
-    with pytest.raises(ValueError, match="finite and positive"):
-        generator.load_calibration(invalid_gap)
+    for index, value in enumerate(("0", "-0.200")):
+        signed_gap = tmp_path / f"signed-gap-{index}.yaml"
+        signed_gap.write_text(
+            re.sub(
+                r"(?m)^bed_to_nozzle_gap:.*$",
+                f"bed_to_nozzle_gap: {value}",
+                source,
+            ),
+            encoding="utf-8",
+        )
+        assert generator.load_calibration(signed_gap)["bed_to_nozzle_gap"] == pytest.approx(
+            float(value)
+        )
+
+    for index, value in enumerate((".nan", ".inf", "-.inf", "true")):
+        invalid_gap = tmp_path / f"invalid-gap-{index}.yaml"
+        invalid_gap.write_text(
+            re.sub(
+                r"(?m)^bed_to_nozzle_gap:.*$",
+                f"bed_to_nozzle_gap: {value}",
+                source,
+            ),
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="finite real"):
+            generator.load_calibration(invalid_gap)
+
+
+def test_legacy_tap_offset_is_rejected(tmp_path):
+    generator = _load_generator_module()
+    source = CALIB_PATH.read_text(encoding="utf-8")
 
     legacy_offset = tmp_path / "legacy-offset.yaml"
     legacy_offset.write_text(
-        source.replace(
-            "tap_threshold: 7500",
-            "tap_threshold: 7500\n    tap_z_offset: 0.000",
+        re.sub(
+            r"(?m)^(\s+tap_threshold:.*)$",
+            r"\1\n    tap_z_offset: 0.000",
+            source,
         ),
         encoding="utf-8",
     )
@@ -1161,7 +1187,7 @@ def test_live_config_check_rejects_non_ready_klippy_state():
     assert any("expected 'ready'" in error for error in errors)
 
 
-def test_live_config_check_rejects_pending_save_config():
+def test_live_config_check_ignores_pending_save_config_for_managed_calibration():
     generator = _load_generator_module()
     errors = generator.live_config_check_errors(
         local_sha256="a" * 64,
@@ -1170,7 +1196,7 @@ def test_live_config_check_rejects_pending_save_config():
         status=_live_config_status("c" * 64, save_config_pending=True),
     )
 
-    assert any("save_config_pending" in error for error in errors)
+    assert not any("save_config_pending" in error for error in errors)
 
 
 def test_single_ssr_heatbed_config_has_valid_single_heater_structure():

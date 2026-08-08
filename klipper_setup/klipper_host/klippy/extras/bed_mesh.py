@@ -613,7 +613,10 @@ class BedMeshCalibrate:
             need_cfg_update = True
 
         need_cfg_update |= self.set_adaptive_mesh(gcmd)
-        probe_method = gcmd.get("METHOD", "automatic")
+        # Mainsail's Calibrate button sends a bare BED_MESH_CALIBRATE.  This
+        # printer's authoritative mesh datum is Tap; the Eddy probe supplies
+        # its configured tap_threshold when TAP_THRESHOLD is omitted.
+        probe_method = gcmd.get("METHOD", "tap").lower()
 
         if need_cfg_update:
             self._verify_algorithm(gcmd.error)
@@ -867,7 +870,7 @@ class ProbeManager:
             self.faulty_regions.append((c1, c3))
 
     def start_probe(self, gcmd):
-        method = gcmd.get("METHOD", "automatic").lower()
+        method = gcmd.get("METHOD", "tap").lower()
         # The regular Eddy probe measures at its coil and therefore needs its
         # configured XY offset.  Tap measures directly under the nozzle, so
         # applying that Eddy offset would silently construct a mesh from a

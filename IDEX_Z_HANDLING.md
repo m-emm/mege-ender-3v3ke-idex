@@ -185,10 +185,11 @@ carriage, and apply the combined offset. See
 
 The checked-in Eddy section provides the frequency/height calibration,
 `descend_z: 0.5`, X/Y offsets, and the known-good `tap_threshold: 5000`.
-The separate top-level `bed_to_nozzle_gap` is the printer-wide physical
-clearance datum: at G-code `Z=0`, either nozzle is exactly that far above the
-bed. Iteration 1 treats the threshold and gap as canonical source-controlled
-inputs. Threshold discovery is not part of this workflow.
+The separate top-level `bed_to_nozzle_gap` is the printer-wide signed
+nozzle-to-bed datum: at G-code `Z=0`, a positive value is above the bed, zero
+is at contact, and a negative value is below it. Iteration 1 treats the
+threshold and gap as canonical source-controlled inputs. Threshold discovery
+is not part of this workflow.
 
 ### Why the GUI changes on a tool change
 
@@ -787,7 +788,8 @@ source-controlled printer configuration in which:
 
 - raw T0 Eddy tap contact at bed center `X=150`, `Y=150` is
   `-bed_to_nozzle_gap`;
-- G-code `Z=0` is `bed_to_nozzle_gap` above the physical bed for both tools;
+- G-code `Z=0` has the signed nozzle-to-bed datum `bed_to_nozzle_gap` for both
+  tools;
 - T1 preserves the existing vision-determined relative Z alignment to T0;
 - Eddy drive current and frequency/height calibration are regenerated in that
   coordinate frame;
@@ -846,11 +848,16 @@ pre-run snapshots, `state.json`, and phase evidence. A run directory can be
 named explicitly as above, or omitted for `--step run` to create a timestamped
 directory under `runs/idex_z_iteration_1/`.
 
+The complete run, resume, and mutating named steps first run the normal
+`update_menderpi.sh` deployment, then perform the parity check and continue.
+The explicit `preflight` step remains check-only. Dry-runs are also
+non-deploying.
+
 The supported steps are:
 
 | Step | Operation |
 | --- | --- |
-| `preflight` | Validate source, generated configuration, deployment checks, and live idle state |
+| `preflight` | Validate source, generated configuration, deployment checks, and live idle state; check-only |
 | `bootstrap-tap` | Home and acquire the guarded seven-tap center baseline |
 | `update-endstops` | Apply the saved bootstrap median to both native endstops and deploy |
 | `center-verify` | Verify five center taps at the configured physical contact target |
@@ -936,7 +943,8 @@ bed_z_reference:
   x: 150.000
   y: 150.000
 
-# Physical nozzle-to-bed clearance at G-code Z=0 for both tools.
+# Signed physical nozzle-to-bed datum at G-code Z=0 for both tools. Positive
+# is above the bed, zero is contact, and negative is below it.
 bed_to_nozzle_gap: 0.200
 
 eddy_relative_calibration:
@@ -954,9 +962,9 @@ points are runtime data: no `[bed_mesh default]` section, point matrix, or
 measured profile is added to `calib.yaml`, the template, or generated
 `printer.cfg`.
 
-`bed_to_nozzle_gap` is the only repository-owned global physical nozzle
-clearance adjustment. The generated Klipper `tap_z_offset` remains fixed at
-`0.000`; it is intentionally outside the calibration model.
+`bed_to_nozzle_gap` is the only repository-owned global signed nozzle-to-bed
+datum; it accepts any finite real value. The generated Klipper `tap_z_offset`
+remains fixed at `0.000`; it is intentionally outside the calibration model.
 
 The template's current literal `zero_reference_position: 170,170` is replaced
 by the generated `(150,150)` reference. No second center constant may remain in
@@ -1235,9 +1243,10 @@ repeatability limits, move to their median tap height, and capture
 2. Place the nozzle at `P - probe_offset_xy`, where `P=(150,150)` is the tap
    point, and take five regular `PROBE METHOD=probe` samples. Require the
    reported physical probe XY to be within `0.020 mm` of `P`, the regular
-   median and mean to be within `+/-0.020 mm` of `-bed_to_nozzle_gap`, the regular span to be no more
-   than `0.030 mm`, and the regular-minus-tap median residual to be within
-   `+/-0.020 mm`.
+   median and mean to be within `+/-0.020 mm` of `-bed_to_nozzle_gap`, and the
+   regular span to be no more than `0.030 mm`. The regular-minus-Tap median
+   residual remains recorded with its historical `+/-0.020 mm` reference
+   limit, but is report-only because native Tap now owns the bed mesh datum.
 3. If this regular-probe gate fails, record regular probes at 1, 2, and
    5 mm/s and stationary `METHOD=scan` samples at commanded Z values 3, 2, 1,
    and 0.5 mm over the same physical point. Interpret constant residuals as a
@@ -1567,9 +1576,9 @@ IDEX.get_position() = B.get_position() - d - o_t
 
 For T0 with `tool_z[0] = 0`, a tap reporting physical kinematic contact at
 `z_tap` implies `common_runtime_z_datum = z_tap + bed_to_nozzle_gap` when
-logical Z=0 is intended to retain the configured physical nozzle-to-bed
-clearance. The global `bed_to_nozzle_gap` remains the only physical-Z datum;
-this optional runtime datum would only rebase coordinates to preserve it.
+logical Z=0 is intended to retain the configured signed nozzle-to-bed datum.
+The global `bed_to_nozzle_gap` remains the only physical-Z datum; this
+optional runtime datum would only rebase coordinates to preserve it.
 
 Changing `common_runtime_z_datum` is a coordinate rebase, not an ordinary
 move. A future command must:
@@ -2230,8 +2239,8 @@ Expected result:
 - tap succeeds without excessive depression and has acceptable repeatability;
 - repeated output coordinates prove both methods measured the same physical
   bed point;
-- the regular-minus-tap residual remains within the accepted Iteration 1
-  tolerance at every same-point location;
+- the regular-minus-tap residual is recorded for diagnosis; it is no longer a
+  blocking Iteration 1 gate because native Tap owns the active bed mesh;
 - the historical approximately 1.170 mm mismatch does not reappear;
 - no calibration value changes during this read-only regression.
 
