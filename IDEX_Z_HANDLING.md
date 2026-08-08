@@ -677,35 +677,6 @@ reported bed Z should remain stable across the four heights. Use
 report. Both commands require T0, XYZ homing, and an already-cleared mesh; they
 will refuse to alter the mesh state themselves.
 
-### Tap-anchored curve doctoring
-
-If the pointwise scan-height diagnostic shows height-dependent inferred bed Z,
-correct the source-controlled frequency curve before changing mesh behavior.
-The standalone job establishes physical zero with three Taps at the canonical
-reference, samples native frequency at Tap-relative nozzle heights
-`0.5,1,2,3,4` mm, and remaps the dense Klipper curve through those anchors. It
-travels safely to the coil position, makes one descent to `0.1 mm` above the
-Tap datum, then takes every anchor while moving Z upwards; it only lifts to the
-safe travel height once after the complete anchor sweep.
-It does not save mesh data.
-
-```sh
-(cd /Users/mege/git/mege-ender-3v3ke-idex && \
-  python3 klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py \
-    --step curve-doctor \
-    --run-dir runs/idex_z_iteration_1/curve_doctor_1 \
-    --host pi@menderpi.local --yes)
-```
-
-The job first verifies that the printer is idle and safely deploys the managed
-diagnostic extra. It writes the candidate only to
-`eddy_relative_calibration.klipper.calibrate` in `calib.yaml`, regenerates and
-deploys it provisionally, then repeats the Tap reference and five stationary
-scan heights. It retains the candidate only when every Tap-relative scan error
-is within `+/-0.020 mm` and their span is at most `0.020 mm`; otherwise it
-restores and redeploys the prior curve while retaining the raw batches,
-candidate, validation, and rollback evidence in the run directory.
-
 ### How bed mesh transforms moves
 
 `BedMesh` registers itself as the initial G-code move transform by calling
