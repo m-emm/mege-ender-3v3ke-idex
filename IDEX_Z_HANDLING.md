@@ -1283,10 +1283,12 @@ The configured `[bed_mesh]` domain is deliberately Tap-safe:
 The left boundary was raised from `X=0` after the DAQ survey showed that `X=5`
 and `X=23.5` cannot make nozzle-contact Taps.
 
-The workflow selects T0 and runs exactly one native command:
+The workflow invokes the managed macro, which selects T0 and runs the native
+Tap command with the threshold and mesh settings generated from the single
+`tap_mesh` block in `calib.yaml`:
 
 ```gcode
-BED_MESH_CALIBRATE METHOD=tap TAP_THRESHOLD=<calib.yaml value> SAMPLES=1 HORIZONTAL_MOVE_Z=5 PROBE_COUNT=7,7 PROFILE=tap_7x7
+BED_MESH_IDEX_CALIBRATE
 ```
 
 Klipper records 49 nozzle-contact points, builds the mesh using the configured
@@ -1823,7 +1825,7 @@ The eventual startup order for a tap-anchored print should be:
 5. perform repeated validated T0 taps at the fixed anchor;
 6. either verify the static source-controlled datum or establish the optional
    per-print common runtime datum;
-7. run the native T0 `BED_MESH_CALIBRATE METHOD=tap` workflow over the
+7. run the managed T0 `BED_MESH_IDEX_CALIBRATE` workflow over the
    configured Tap-safe domain, using that anchor as `zero_reference_position`;
 8. permit T0/T1 printing only after datum, mesh, and relative-tool status agree.
 

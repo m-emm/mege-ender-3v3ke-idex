@@ -55,6 +55,45 @@ def _normalize_eddy_calibrate(value: str) -> str:
     )
 
 
+def _load_tap_mesh(data: dict[str, Any]) -> dict[str, Any]:
+    value = _require_mapping(data.get("tap_mesh"), "tap_mesh")
+    profile = value.get("profile")
+    if not isinstance(profile, str) or not profile.strip():
+        raise ValueError("tap_mesh.profile must be a non-empty string")
+    try:
+        samples = int(value["samples"])
+    except (KeyError, TypeError, ValueError):
+        raise ValueError("tap_mesh.samples must be an integer") from None
+    if isinstance(value["samples"], bool) or samples < 1:
+        raise ValueError("tap_mesh.samples must be at least 1")
+    horizontal_move_z = _require_float(
+        value,
+        "horizontal_move_z",
+        "tap_mesh",
+    )
+    if not math.isfinite(horizontal_move_z) or horizontal_move_z <= 0:
+        raise ValueError("tap_mesh.horizontal_move_z must be finite and positive")
+    probe_count = value.get("probe_count")
+    if (
+        not isinstance(probe_count, (list, tuple))
+        or len(probe_count) != 2
+        or any(isinstance(item, bool) for item in probe_count)
+    ):
+        raise ValueError("tap_mesh.probe_count must contain two integers")
+    try:
+        probe_count = tuple(int(item) for item in probe_count)
+    except (TypeError, ValueError):
+        raise ValueError("tap_mesh.probe_count must contain two integers") from None
+    if any(item < 3 for item in probe_count):
+        raise ValueError("tap_mesh.probe_count values must be at least 3")
+    return {
+        "profile": profile.strip(),
+        "samples": samples,
+        "horizontal_move_z": horizontal_move_z,
+        "probe_count": probe_count,
+    }
+
+
 def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
     defaults = {
         "nozzle_to_coil_x": -57.391,
@@ -226,6 +265,7 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
         raise ValueError(
             "calib.yaml.bed_to_nozzle_gap must be a finite real number"
         )
+    tap_mesh = _load_tap_mesh(data)
     tools = _require_mapping(data.get("tools"), "tools")
     t0 = _require_mapping(tools.get("t0"), "tools.t0")
     t1 = _require_mapping(tools.get("t1"), "tools.t1")
@@ -256,6 +296,7 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
             ),
         },
         "bed_to_nozzle_gap": bed_to_nozzle_gap,
+        "tap_mesh": tap_mesh,
         "tools": {
             "t0": {
                 "x_endstop": _require_float(
@@ -474,6 +515,14 @@ def template_values(
         "t1_x_endstop": format_mm(t1["x_endstop"]),
         "t1_y_endstop": format_mm(t1["y_endstop"]),
         "t1_z_endstop": format_mm(t1["z_endstop"]),
+        "tap_mesh_profile": calibration["tap_mesh"]["profile"],
+        "tap_mesh_samples": str(calibration["tap_mesh"]["samples"]),
+        "tap_mesh_horizontal_move_z": format_mm(
+            calibration["tap_mesh"]["horizontal_move_z"]
+        ),
+        "tap_mesh_probe_count": ",".join(
+            str(item) for item in calibration["tap_mesh"]["probe_count"]
+        ),
         "t0_y_offset": format_mm(0.0),
         "t1_y_offset": format_mm(
             t0["y_endstop"] - t1["y_endstop"]

@@ -348,7 +348,7 @@ class BedMeshCalibrate:
         self._profile_name = "default"
         self.gcode = self.printer.lookup_object('gcode')
         self.gcode.register_command(
-            'BED_MESH_CALIBRATE', self.cmd_BED_MESH_CALIBRATE,
+            '_BED_MESH_CALIBRATE_NATIVE', self.cmd_BED_MESH_CALIBRATE,
             desc=self.cmd_BED_MESH_CALIBRATE_help)
     def print_generated_points(self, print_func, truncate=False):
         x_offset = y_offset = 0.

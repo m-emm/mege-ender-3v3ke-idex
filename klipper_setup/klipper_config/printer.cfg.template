@@ -124,16 +124,28 @@ sensor_pin: eddy:gpio26
 horizontal_move_z: 2
 calibration_temp: ${eddy_temperature_calibration_temp}
 
+[gcode_macro BED_MESH_IDEX_CALIBRATE]
+description: Calibrate and activate the source-configured T0 Tap mesh.
+gcode:
+    {% set threshold = printer.configfile.settings["probe_eddy_current btt_eddy"].tap_threshold|float %}
+    T0
+    _BED_MESH_CALIBRATE_NATIVE PROFILE=${tap_mesh_profile} METHOD=tap TAP_THRESHOLD={threshold} SAMPLES=${tap_mesh_samples}
+
+[gcode_macro BED_MESH_CALIBRATE]
+description: GUI-compatible alias for the proven IDEX Tap mesh calibration.
+gcode:
+    BED_MESH_IDEX_CALIBRATE
+
 [bed_mesh]
 # Printing mesh measured with the Eddy-equipped T0 toolhead. Tool changes apply
 # the matching BED_MESH_OFFSET so this one physical-bed mesh follows both nozzles.
 # Tap requires a short mechanical settling period after each mesh-point move.
 # 45 mm/s leaves margin below the empirically reliable 50 mm/s no-dwell limit.
 speed: 45
-horizontal_move_z: 1
+horizontal_move_z: ${tap_mesh_horizontal_move_z}
 mesh_min: 42,20
 mesh_max: 190,275
-probe_count: 11,11
+probe_count: ${tap_mesh_probe_count}
 mesh_pps: 0,0
 zero_reference_position: ${bed_z_reference_x},${bed_z_reference_y}
 

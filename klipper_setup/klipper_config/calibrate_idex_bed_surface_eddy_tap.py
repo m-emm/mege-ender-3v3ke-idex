@@ -5,7 +5,7 @@ The script deliberately keeps measured mesh data out of the repository.  Eddy
 drive current and its height/frequency table are the only measured values that
 become canonical configuration.  The known-good tap threshold is read from
 ``calib.yaml`` and is never discovered or overwritten by this workflow.  The mesh made
-by ``BED_MESH_CALIBRATE`` remains session-local evidence.
+by ``BED_MESH_IDEX_CALIBRATE`` remains session-local evidence.
 
 The frequency/height calibration is guarded by a three-tap center reference
 before and after the sweep. Each guard records Klipper's complete
@@ -87,9 +87,6 @@ EDDY_REFERENCE_SPAN_TOLERANCE = 0.040
 EDDY_REFERENCE_XY_TOLERANCE = 0.020
 EDDY_REFERENCE_RESIDUAL_TOLERANCE = 0.020
 TAP_CONTACT_XY_TOLERANCE = 0.020
-TAP_MESH_PROFILE = "tap_7x7"
-TAP_MESH_PROBE_COUNT = "7,7"
-TAP_MESH_HORIZONTAL_MOVE_Z = 5.0
 TAP_MESH_ACTIVE_CONTACT_TOLERANCE = 0.030
 TAP_MESH_VERIFY_GCODE_Z = 5.0
 ARMING_PHRASE = "CALIBRATE IDEX Z ITERATION 1"
@@ -504,9 +501,9 @@ def pending_sections(pending: Any, *, _root: bool = True) -> set[str]:
     return found
 
 
-def require_only_transient_mesh_pending(pending: Any) -> None:
+def require_only_transient_mesh_pending(pending: Any, profile: str) -> None:
     sections = pending_sections(pending)
-    unexpected = sections - {f"bed_mesh {TAP_MESH_PROFILE}"}
+    unexpected = sections - {f"bed_mesh {profile}"}
     if unexpected:
         raise CalibrationError(
             "unexpected pending config after mesh scan: "
@@ -828,6 +825,51 @@ def configured_bed_to_nozzle_gap(calibration: Mapping[str, Any]) -> float:
     return value
 
 
+def configured_tap_mesh(calibration: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the sole source-controlled managed Tap mesh settings."""
+
+    try:
+        value = calibration["tap_mesh"]
+        if not isinstance(value, Mapping):
+            raise TypeError
+        profile = value["profile"]
+        samples = value["samples"]
+        horizontal_move_z = value["horizontal_move_z"]
+        probe_count = value["probe_count"]
+        if not isinstance(profile, str) or not profile.strip():
+            raise TypeError
+        if isinstance(samples, bool) or not isinstance(samples, int) or samples < 1:
+            raise TypeError
+        if isinstance(horizontal_move_z, bool):
+            raise TypeError
+        horizontal_move_z = float(horizontal_move_z)
+        if not math.isfinite(horizontal_move_z) or horizontal_move_z <= 0:
+            raise TypeError
+        if (
+            not isinstance(probe_count, Sequence)
+            or isinstance(probe_count, (str, bytes))
+            or len(probe_count) != 2
+            or any(
+                isinstance(item, bool) or not isinstance(item, int)
+                for item in probe_count
+            )
+            or any(item < 3 for item in probe_count)
+        ):
+            raise TypeError
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CalibrationError(
+            "calib.yaml must define tap_mesh with profile, samples, "
+            "horizontal_move_z, and two-value probe_count"
+        ) from exc
+    return {
+        "profile": profile.strip(),
+        "samples": samples,
+        "horizontal_move_z": horizontal_move_z,
+        "probe_count": tuple(probe_count),
+        "probe_count_text": ",".join(str(item) for item in probe_count),
+    }
+
+
 def _run_local(
     command: Sequence[str], *, check: bool = True
 ) -> subprocess.CompletedProcess[str]:
@@ -877,6 +919,7 @@ class Iteration1Runner:
         self.state = RunState(run_id=store.path.name, phase=Phase.PREFLIGHT.value)
         self.raw_calibration = _load_raw_calibration()
         self.tap_threshold = configured_tap_threshold(self.raw_calibration)
+        self.tap_mesh = configured_tap_mesh(self.raw_calibration)
         self.bed_to_nozzle_gap = configured_bed_to_nozzle_gap(self.raw_calibration)
         self.tap_contact_target_z = -self.bed_to_nozzle_gap
         _logger.info(
@@ -2063,7 +2106,7 @@ class Iteration1Runner:
                 _logger.warning("I1.6 active Tap mesh verification failed: %s", failures[-1])
             records.append(record)
         verification = {
-            "profile": TAP_MESH_PROFILE,
+            "profile": self.tap_mesh["profile"],
             "mesh_min": asdict(mesh_min),
             "mesh_max": asdict(mesh_max),
             "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
@@ -2097,20 +2140,16 @@ class Iteration1Runner:
             if pending:
                 raise CalibrationError("pending configuration exists before Tap mesh")
         command = (
-            "BED_MESH_CALIBRATE METHOD=tap "
-            f"TAP_THRESHOLD={self.tap_threshold:.3f} SAMPLES=1 "
-            f"HORIZONTAL_MOVE_Z={TAP_MESH_HORIZONTAL_MOVE_Z:.0f} "
-            f"PROBE_COUNT={TAP_MESH_PROBE_COUNT} PROFILE={TAP_MESH_PROFILE}"
+            "BED_MESH_IDEX_CALIBRATE"
         )
         _logger.info(
-            "running native Tap mesh: profile=%s threshold=%.3f probe_count=%s "
+            "running IDEX Tap mesh macro: profile=%s threshold=%.3f probe_count=%s "
             "horizontal_move_z=%.3f",
-            TAP_MESH_PROFILE,
+            self.tap_mesh["profile"],
             self.tap_threshold,
-            TAP_MESH_PROBE_COUNT,
-            TAP_MESH_HORIZONTAL_MOVE_Z,
+            self.tap_mesh["probe_count_text"],
+            self.tap_mesh["horizontal_move_z"],
         )
-        self._gcode("T0")
         self._gcode(command, timeout=900.0)
         if self.dry_run:
             self.checkpoint(
@@ -2120,29 +2159,30 @@ class Iteration1Runner:
                 tap_contact_target_z=self.tap_contact_target_z,
             )
             return
-        # A named BED_MESH_CALIBRATE result is retained as a session profile,
+        # A named IDEX Tap mesh result is retained as a session profile,
         # but Klipper does not activate that profile automatically.  Activate
         # the just-measured surface before checking its live matrix or Tap
         # contacts; this is an activation, not a persisted SAVE_CONFIG change.
-        self._gcode(f"BED_MESH_PROFILE LOAD={TAP_MESH_PROFILE}")
+        self._gcode(f"BED_MESH_PROFILE LOAD={self.tap_mesh['profile']}")
         status = self.client.status(["bed_mesh", "configfile"])
         pending = status.get("configfile", {}).get("save_config_pending_items", {})
-        require_only_transient_mesh_pending(pending)
+        require_only_transient_mesh_pending(pending, self.tap_mesh["profile"])
         mesh = status.get("bed_mesh", {})
         matrix = mesh.get("mesh_matrix") or mesh.get("probed_matrix")
-        if mesh.get("profile_name") != TAP_MESH_PROFILE or not matrix:
+        if mesh.get("profile_name") != self.tap_mesh["profile"] or not matrix:
             raise CalibrationError(
-                f"native Tap mesh did not leave active profile {TAP_MESH_PROFILE}"
+                "native Tap mesh did not leave active profile "
+                f"{self.tap_mesh['profile']}"
             )
         verification = self.verify_active_tap_mesh(status)
         artifact = {
             "method": "tap",
-            "profile": TAP_MESH_PROFILE,
+            "profile": self.tap_mesh["profile"],
             "command": command,
             "tap_threshold": self.tap_threshold,
-            "samples": 1,
-            "horizontal_move_z": TAP_MESH_HORIZONTAL_MOVE_Z,
-            "probe_count": TAP_MESH_PROBE_COUNT,
+            "samples": self.tap_mesh["samples"],
+            "horizontal_move_z": self.tap_mesh["horizontal_move_z"],
+            "probe_count": self.tap_mesh["probe_count_text"],
             "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
             "tap_contact_target_z": self.tap_contact_target_z,
             "mesh_status": mesh,

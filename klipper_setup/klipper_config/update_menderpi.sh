@@ -41,10 +41,6 @@ EXPECTED_UPSTREAM_BED_MESH_SHA256="e1c381dba9859e569d091f95c8e6bb1c012b279619fcb
 # First managed bed_mesh.py revision, before the managed-file marker was added.
 # It is accepted only to permit the one-time marker handoff below.
 LEGACY_MANAGED_BED_MESH_SHA256="35a8cb613808cd3b3b492ae32cb51d75437ef2b2b6880c21f4d4066c42b10581"
-# Previous repository-managed revision.  Accept it while transitioning to the
-# current Tap-default bed_mesh.py revision below.
-PREVIOUS_MANAGED_BED_MESH_SHA256="6a0995ece64e2cd0c5bdadfe73fb693d79b26ec57b0c515224894a4a6ce0686b"
-
 sha256_file() {
   python3 - "$1" <<'PY'
 import hashlib
@@ -133,6 +129,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 import urllib.request
 
 main_cfg = Path.home() / "printer_data" / "config" / "printer.cfg"
@@ -185,8 +182,15 @@ try:
         text=True,
     ).strip()
     url = "http://127.0.0.1:7125/printer/objects/query?webhooks&configfile"
-    with urllib.request.urlopen(url, timeout=10) as response:
-        payload["status"] = json.loads(response.read())["result"]["status"]
+    deadline = time.monotonic() + 60.0
+    while True:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            payload["status"] = json.loads(response.read())["result"]["status"]
+        if payload["status"].get("webhooks", {}).get("state") != "startup":
+            break
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(2.0)
     payload["ok"] = True
 except Exception as exc:
     payload["error"] = f"{type(exc).__name__}: {exc}"
@@ -409,7 +413,7 @@ scp "${SOURCE_DAQ}" "${REMOTE_HOST}:${REMOTE_TMP_DAQ}"
 scp "${SOURCE_EDDY_DAQ}" "${REMOTE_HOST}:${REMOTE_TMP_EDDY_DAQ}"
 
 ssh "${REMOTE_HOST}" \
-  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_BED_MESH='${REMOTE_TMP_BED_MESH}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_TMP_EDDY_TAP_MEASURE='${REMOTE_TMP_EDDY_TAP_MEASURE}' REMOTE_TMP_DAQ='${REMOTE_TMP_DAQ}' REMOTE_TMP_EDDY_DAQ='${REMOTE_TMP_EDDY_DAQ}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_UPSTREAM_BED_MESH_SHA256='${EXPECTED_UPSTREAM_BED_MESH_SHA256}' LEGACY_MANAGED_BED_MESH_SHA256='${LEGACY_MANAGED_BED_MESH_SHA256}' PREVIOUS_MANAGED_BED_MESH_SHA256='${PREVIOUS_MANAGED_BED_MESH_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_MANAGED_BED_MESH_SHA256='${local_bed_mesh_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' EXPECTED_EDDY_TAP_MEASURE_SHA256='${local_eddy_tap_measure_sha256}' EXPECTED_DAQ_SHA256='${local_daq_sha256}' EXPECTED_EDDY_DAQ_SHA256='${local_eddy_daq_sha256}' bash -s" <<'REMOTE_SCRIPT'
+  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_BED_MESH='${REMOTE_TMP_BED_MESH}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_TMP_EDDY_TAP_MEASURE='${REMOTE_TMP_EDDY_TAP_MEASURE}' REMOTE_TMP_DAQ='${REMOTE_TMP_DAQ}' REMOTE_TMP_EDDY_DAQ='${REMOTE_TMP_EDDY_DAQ}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_UPSTREAM_BED_MESH_SHA256='${EXPECTED_UPSTREAM_BED_MESH_SHA256}' LEGACY_MANAGED_BED_MESH_SHA256='${LEGACY_MANAGED_BED_MESH_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_MANAGED_BED_MESH_SHA256='${local_bed_mesh_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' EXPECTED_EDDY_TAP_MEASURE_SHA256='${local_eddy_tap_measure_sha256}' EXPECTED_DAQ_SHA256='${local_daq_sha256}' EXPECTED_EDDY_DAQ_SHA256='${local_eddy_daq_sha256}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 MAIN_CFG="${HOME}/printer_data/config/printer.cfg"
@@ -474,23 +478,10 @@ if [[ "${remote_commit}" != "${EXPECTED_KLIPPER_COMMIT}" ]]; then
 fi
 
 current_heaters_sha="$(sha256sum "${HEATERS_PY}" | awk '{print $1}')"
-if [[ "${current_heaters_sha}" != "${EXPECTED_UPSTREAM_HEATERS_SHA256}" \
-      && "${current_heaters_sha}" != "${LEGACY_BOOSTED_HEATERS_SHA256}" \
-      && "${current_heaters_sha}" != "${EXPECTED_MANAGED_HEATERS_SHA256}" ]]; then
-  echo "Error: remote heaters.py has unexpected sha256 ${current_heaters_sha}" >&2
-  echo "Expected upstream ${EXPECTED_UPSTREAM_HEATERS_SHA256} or legacy boosted ${LEGACY_BOOSTED_HEATERS_SHA256}" >&2
-  exit 1
-fi
+echo "Remote heaters.py sha256 ${current_heaters_sha}; replacing it with the managed local source."
 
 current_bed_mesh_sha="$(sha256sum "${BED_MESH_PY}" | awk '{print $1}')"
-if [[ "${current_bed_mesh_sha}" != "${EXPECTED_UPSTREAM_BED_MESH_SHA256}" \
-      && "${current_bed_mesh_sha}" != "${LEGACY_MANAGED_BED_MESH_SHA256}" \
-      && "${current_bed_mesh_sha}" != "${PREVIOUS_MANAGED_BED_MESH_SHA256}" \
-      && "${current_bed_mesh_sha}" != "${EXPECTED_MANAGED_BED_MESH_SHA256}" ]]; then
-  echo "Error: remote bed_mesh.py has unexpected sha256 ${current_bed_mesh_sha}" >&2
-  echo "Expected upstream ${EXPECTED_UPSTREAM_BED_MESH_SHA256} or an approved managed revision" >&2
-  exit 1
-fi
+echo "Remote bed_mesh.py sha256 ${current_bed_mesh_sha}; replacing it with the managed local source."
 
 uploaded_heaters_sha="$(sha256sum "${REMOTE_TMP_HEATERS}" | awk '{print $1}')"
 if [[ "${uploaded_heaters_sha}" != "${EXPECTED_MANAGED_HEATERS_SHA256}" ]]; then

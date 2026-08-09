@@ -566,11 +566,13 @@ def test_pending_config_supports_mapping_and_record_shapes():
         == 17
     )
     module.require_only_transient_mesh_pending(
-        {f"bed_mesh {module.TAP_MESH_PROFILE}": {"mesh_matrix": []}}
+        {"bed_mesh tap_7x7": {"mesh_matrix": []}},
+        "tap_7x7",
     )
     with pytest.raises(module.CalibrationError, match="unexpected pending"):
         module.require_only_transient_mesh_pending(
-            {"bed_mesh default": {}, "stepper_z": {"position_endstop": 1}}
+            {"bed_mesh default": {}, "stepper_z": {"position_endstop": 1}},
+            "tap_7x7",
         )
 
 
@@ -617,6 +619,14 @@ def test_atomic_calibration_update(tmp_path):
 
 
 def _tap_mesh_runner(module, *, profile=None, pending=None):
+    tap_mesh = {
+        "profile": "tap_7x7",
+        "samples": 1,
+        "horizontal_move_z": 5.0,
+        "probe_count": (7, 7),
+        "probe_count_text": "7,7",
+    }
+
     class Store:
         def __init__(self):
             self.writes = {}
@@ -631,13 +641,13 @@ def _tap_mesh_runner(module, *, profile=None, pending=None):
             if objects == ["bed_mesh", "configfile"]:
                 return {
                     "bed_mesh": {
-                        "profile_name": profile or module.TAP_MESH_PROFILE,
+                        "profile_name": profile or tap_mesh["profile"],
                         "mesh_matrix": [[0.0, 0.0], [0.0, 0.0]],
                     },
                     "configfile": {
                         "save_config_pending_items": pending
                         if pending is not None
-                        else {f"bed_mesh {module.TAP_MESH_PROFILE}": {}},
+                        else {f"bed_mesh {tap_mesh['profile']}": {}},
                         "settings": {
                             "bed_mesh": {
                                 "mesh_min": "42,20",
@@ -651,6 +661,14 @@ def _tap_mesh_runner(module, *, profile=None, pending=None):
     runner = object.__new__(module.Iteration1Runner)
     runner.dry_run = False
     runner.tap_threshold = 7500.0
+    runner.tap_mesh = {
+        "profile": "tap_7x7",
+        "samples": 1,
+        "horizontal_move_z": 5.0,
+        "probe_count": (7, 7),
+        "probe_count_text": "7,7",
+    }
+    runner.tap_mesh = tap_mesh
     runner.bed_to_nozzle_gap = 0.2
     runner.tap_contact_target_z = -0.2
     runner.client = Client()
@@ -675,17 +693,12 @@ def test_final_mesh_uses_native_tap_profile_and_active_contact_verification():
     runner.final_mesh()
 
     assert commands == [
-        ("T0", {}),
-        (
-            "BED_MESH_CALIBRATE METHOD=tap TAP_THRESHOLD=7500.000 SAMPLES=1 "
-            "HORIZONTAL_MOVE_Z=5 PROBE_COUNT=7,7 PROFILE=tap_7x7",
-            {"timeout": 900.0},
-        ),
+        ("BED_MESH_IDEX_CALIBRATE", {"timeout": 900.0}),
         ("BED_MESH_PROFILE LOAD=tap_7x7", {}),
     ]
     assert all("EDDY_" not in command[0] for command in commands)
     assert commands[-1][0] == "BED_MESH_PROFILE LOAD=tap_7x7"
-    assert runner.store.writes["mesh-tap.json"]["profile"] == module.TAP_MESH_PROFILE
+    assert runner.store.writes["mesh-tap.json"]["profile"] == "tap_7x7"
     assert runner.store.writes["mesh-tap.json"]["tap_contact_target_z"] == pytest.approx(
         -0.2
     )
@@ -822,6 +835,13 @@ def test_final_mesh_runs_one_native_tap_mesh_at_safe_clearance():
     runner = object.__new__(module.Iteration1Runner)
     runner.dry_run = True
     runner.tap_threshold = 7500.0
+    runner.tap_mesh = {
+        "profile": "tap_7x7",
+        "samples": 1,
+        "horizontal_move_z": 5.0,
+        "probe_count": (7, 7),
+        "probe_count_text": "7,7",
+    }
     runner.bed_to_nozzle_gap = 0.2
     runner.tap_contact_target_z = -0.2
     scripts = []
@@ -834,12 +854,7 @@ def test_final_mesh_runs_one_native_tap_mesh_at_safe_clearance():
     runner.final_mesh()
 
     assert scripts == [
-        ("T0", {}),
-        (
-            "BED_MESH_CALIBRATE METHOD=tap TAP_THRESHOLD=7500.000 SAMPLES=1 "
-            "HORIZONTAL_MOVE_Z=5 PROBE_COUNT=7,7 PROFILE=tap_7x7",
-            {"timeout": 900.0},
-        ),
+        ("BED_MESH_IDEX_CALIBRATE", {"timeout": 900.0}),
     ]
     assert checkpoints == [
         (
@@ -859,6 +874,13 @@ def test_final_mesh_can_reuse_committed_post_eddy_frame():
     runner = object.__new__(module.Iteration1Runner)
     runner.dry_run = True
     runner.tap_threshold = 7500.0
+    runner.tap_mesh = {
+        "profile": "tap_7x7",
+        "samples": 1,
+        "horizontal_move_z": 5.0,
+        "probe_count": (7, 7),
+        "probe_count_text": "7,7",
+    }
     runner.bed_to_nozzle_gap = 0.2
     runner.tap_contact_target_z = -0.2
     homes = []
@@ -918,6 +940,13 @@ def test_direct_drive_current_and_mesh_steps_start_with_clean_frame():
     mesh_runner = object.__new__(module.Iteration1Runner)
     mesh_runner.dry_run = True
     mesh_runner.tap_threshold = 7500.0
+    mesh_runner.tap_mesh = {
+        "profile": "tap_7x7",
+        "samples": 1,
+        "horizontal_move_z": 5.0,
+        "probe_count": (7, 7),
+        "probe_count_text": "7,7",
+    }
     mesh_runner.bed_to_nozzle_gap = 0.2
     mesh_runner.tap_contact_target_z = -0.2
     mesh_homes = []
