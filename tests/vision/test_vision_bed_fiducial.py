@@ -84,7 +84,7 @@ def test_detect_four_bed_fiducials_from_real_metric_frame(
     assert image is not None
     assert image.shape[:2] == (sidecar["height"], sidecar["width"])
 
-    detection = _module().detect_four_fiducials(image)
+    detection = _module().detect_four_fiducials(image, require_locator=False)
 
     centers = np.asarray(detection["centers_px"], dtype=np.float64)
     assert centers.shape == (4, 2)
@@ -116,6 +116,7 @@ def test_analyze_metric_from_real_forward_reverse_capture(tmp_path):
         tmp_path,
         frames=frames,
         patch_points_mm=[[3, 3], [11, 3], [3, 11], [11, 11]],
+        require_locator=False,
     )
 
     assert result["accepted"], result["reasons"]

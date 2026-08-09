@@ -1044,7 +1044,9 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
 
         image = cv2.imread(str(path), cv2.IMREAD_COLOR)
         assert image is not None, f"could not decode committed frame {path}"
-        four_fiducials = analyzer.detect_four_fiducials(image)
+        four_fiducials = analyzer.detect_four_fiducials(
+            image, require_locator=False
+        )
         assert np.asarray(four_fiducials["centers_px"]).shape == (4, 2)
         assert len(four_fiducials["radii_px"]) == 4
         assert four_fiducials["candidate_count"] >= 4
@@ -1101,6 +1103,5 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
             _logger.warning(
                 f"Center offset for {path_obj.name} is {offset}, which exceeds the threshold. See overlay at {overlay_path}"
             )
-
 
 

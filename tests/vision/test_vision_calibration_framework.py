@@ -478,7 +478,6 @@ def test_flat_priors_replace_active_seed_fact_dependencies():
         "fiducial_origin_xy_mm",
         "fiducial_spacing_xy_mm",
         "fiducial_z_mm",
-        "fiducial_right_angle_deg",
     }
     assert not (FILES / "vision_calibration_priors.json").exists()
     assert all(

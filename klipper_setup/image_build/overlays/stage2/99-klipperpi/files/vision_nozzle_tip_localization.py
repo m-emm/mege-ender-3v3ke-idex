@@ -450,6 +450,7 @@ def localize_nozzle_tip_grid(
     commanded_x_vector_px_per_mm: np.ndarray | None = None,
     minimum_direct_detections: int = 2,
     physical_tip_cluster_radius_px: float = 7.0,
+    require_locator: bool = True,
 ) -> dict[str, Any]:
     """Locate one tool's physical nozzle tip in a registration grid."""
     if len(frame_paths) != len(frames):
@@ -619,7 +620,9 @@ def localize_nozzle_tip_grid(
             )
         tool = frame["tool"]
 
-        four_fiducials = detect_four_fiducials(image)
+        four_fiducials = detect_four_fiducials(
+            image, require_locator=require_locator
+        )
         four_fiducials_registrations.append(
             {
                 "seq": index,

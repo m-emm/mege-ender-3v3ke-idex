@@ -751,7 +751,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "_load_calib_yaml" not in calibration_script
     assert "sync-priors" not in calibration_script
     assert "class CalibDAO" in dao_script
-    assert "fiducial_angles()" in four_fiducial_analyzer
+    assert "fiducial_angles()" not in four_fiducial_analyzer
     assert "EXPECTED_RIGHT_EDGE_ANGLE_DEG" not in four_fiducial_analyzer
 
     assert (

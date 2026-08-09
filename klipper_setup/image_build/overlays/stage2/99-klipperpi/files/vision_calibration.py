@@ -166,9 +166,6 @@ def _is_compute_only_job_type(job_type: str) -> bool:
 
 def _prior_provenance(job_type: str) -> dict[str, Any]:
     result: dict[str, Any] = {"sha256": CALIB.priors_hash()}
-    if job_type in {BED_FIDUCIAL_METRIC_JOB, BED_TAB_CORNER_JOB, *FINE_NOZZLE_XZ_JOBS}:
-        right, up = CALIB.fiducial_angles()
-        result["fiducial_angles_deg"] = {"right": right, "up": up}
     if job_type in {BED_FIDUCIAL_METRIC_JOB, RED_MARKER_X_JOB}:
         result["fiducial_centers_xy_mm"] = CALIB.fiducial_centers()
     if job_type == BED_TAB_CORNER_JOB:

@@ -40,7 +40,6 @@ def _files(tmp_path):
             "fiducial_origin_xy_mm": [3.0, 3.0],
             "fiducial_spacing_xy_mm": [8.0, 8.0],
             "fiducial_z_mm": -0.6,
-            "fiducial_right_angle_deg": -5.0,
         },
     )
     _write_yaml(
@@ -70,7 +69,6 @@ def test_consumer_methods_return_values_and_derived_geometry(tmp_path):
         [11.0, 11.0],
     ]
     assert dao.fiducial_z() == -0.6
-    assert dao.fiducial_angles() == (-5.0, -95.0)
     assert dao.tool_datums()["t1"]["x_endstop"] == 351.7
     assert dao.calib_hash().startswith("sha256:")
     assert dao.priors_hash().startswith("sha256:")
@@ -111,7 +109,7 @@ def test_methods_validate_only_the_fields_they_consume(tmp_path):
         dao.fiducial_z()
 
 
-def test_four_fiducial_selection_uses_dao_angles():
+def test_four_fiducial_selection_uses_geometry_without_angle_prior():
     if str(FILES) not in sys.path:
         sys.path.insert(0, str(FILES))
     spec = importlib.util.spec_from_file_location(
@@ -137,11 +135,6 @@ def test_four_fiducial_selection_uses_dao_angles():
         {"center_px": point, "radius_px": 10.0} for point in points
     ]
 
-    class Angles:
-        @staticmethod
-        def fiducial_angles():
-            return -20.0, -110.0
-
-    selected = finder.find_four_fiducials(candidates, calib=Angles())
+    selected = finder.find_four_fiducials(candidates)
 
     assert len(selected) == 4

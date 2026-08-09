@@ -27,9 +27,22 @@
     "style": "white concentric circles on black"
   },
   "files": {
-    "bed_y_four_fiducials.svg": "515243b59031ab1a640f8fe454648bf2993b05d4c1b077b5a9a17f5f1c1e366b",
-    "bed_y_four_fiducials_a4.pdf": "aebf64beac8c937f26b39d3ecc77c3336e15e8065653e37fc0467de3fb6056b0",
-    "bed_y_four_fiducials_a4.svg": "f3cba2bfc54a470436550ef2b76dc2dffa5ccea8faa691e8db27803b63eed7f8"
+    "bed_y_four_fiducials.svg": "681d8cc35ab1c057844bafe80ee0e1c1733d789ffe4f03f33da0b7ac8dd75890",
+    "bed_y_four_fiducials_a4.pdf": "1a45d7842616d29b48eedd9d60ec01a1a59a6ce458b3dabe44a68ac8d5414621",
+    "bed_y_four_fiducials_a4.svg": "0f956fd95cd8941b31f810da646e57af7f10a3ff5b2ab7a642f3af854a1b8cad"
+  },
+  "locator": {
+    "data_matrix_black_bits": [
+      "1100",
+      "1101",
+      "0111",
+      "0011"
+    ],
+    "dictionary": "DICT_4X4_50",
+    "kind": "aruco",
+    "marker_id": 42,
+    "marker_side_mm": 3.8,
+    "quiet_zone_side_mm": 4.6
   },
   "patch": {
     "background": "black",
@@ -42,5 +55,5 @@
     "print_instruction": "Print at 100% / actual size; disable fit-to-page and scaling.",
     "width_mm": 210.0
   },
-  "schema_version": 1
+  "schema_version": 2
 }

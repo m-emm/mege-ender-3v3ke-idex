@@ -470,6 +470,7 @@ def analyze_measurement(
     frames: list[dict[str, Any]],
     reference: dict[str, Any],
     acquisition_calibration: dict[str, Any],
+    require_locator: bool = True,
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     if len(frame_paths) != len(frames):
@@ -519,7 +520,9 @@ def analyze_measurement(
         if image is None:
             raise ToolXYError(f"cannot decode {path}")
         try:
-            fiducials = detect_four_fiducials(image)
+            fiducials = detect_four_fiducials(
+                image, require_locator=require_locator
+            )
         except FourFiducialError as exc:
             records_by_seq[source_seq] = {
                 "seq": source_seq,
@@ -553,6 +556,7 @@ def analyze_measurement(
                 propagate_missing_rings=True,
                 commanded_x_vector_px_per_mm=image_x_vector,
                 physical_tip_cluster_radius_px=16.0,
+                require_locator=require_locator,
             )
         except NozzleTipLocalizationError as exc:
             localized = None

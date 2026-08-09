@@ -87,16 +87,6 @@ class CalibDAO:
             raise ValueError(f"{self.priors_path} requires numeric fiducial_z_mm")
         return float(value)
 
-    def fiducial_angles(self) -> tuple[float, float]:
-        priors = self._load(self.priors_path, "vision priors")
-        value = priors.get("fiducial_right_angle_deg")
-        if not isinstance(value, (int, float)):
-            raise ValueError(
-                f"{self.priors_path} requires numeric fiducial_right_angle_deg"
-            )
-        right = float(value)
-        return right, right - 90.0
-
     def tool_datums(self) -> dict[str, dict[str, float]]:
         calib = self._load(self.calib_path, "synchronized calibration")
         tools = calib.get("tools")

@@ -242,7 +242,11 @@ def test_analysis_cancels_commanded_x_and_y_and_rejects_a_datum_outlier(
         "centers_px": [[90.0, 90.0], [110.0, 90.0], [90.0, 110.0], [110.0, 110.0]],
         "radii_px": [4.0, 4.0, 4.0, 4.0],
     }
-    monkeypatch.setattr(module, "detect_four_fiducials", lambda _image: fiducials)
+    monkeypatch.setattr(
+        module,
+        "detect_four_fiducials",
+        lambda _image, **_kwargs: fiducials,
+    )
 
     def localize(_paths, *, frames, **_kwargs):
         registrations = []
@@ -368,6 +372,7 @@ def test_real_images_publish_stable_tool_xy_datum(tool, tmp_path):
             ],
         },
         acquisition_calibration=source_manifest["acquisition_calibration"],
+        require_locator=False,
     )
 
     assert result["accepted"], result["reasons"]

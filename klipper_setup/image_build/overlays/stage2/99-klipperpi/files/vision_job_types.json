@@ -8,14 +8,14 @@
       "camera": "nozzle_cam",
       "profile": "vision",
       "light_pixels": {
-        "1": 0.45,
-        "2": 0.45,
-        "3": 0.45,
-        "4": 0.45,
-        "5": 0.45,
-        "6": 0.45,
-        "7": 0.45,
-        "8": 0.45
+        "1": 0.05,
+        "2": 0.05,
+        "3": 0.05,
+        "4": 0.05,
+        "5": 0.05,
+        "6": 0.05,
+        "7": 0.05,
+        "8": 0.05
       },
       "localizer": {
         "kind": "four_concentric_circle_square_metric",
@@ -30,7 +30,7 @@
         0
       ],
       "velocity_mm_s": 60,
-      "settle_ms": 300,
+      "settle_ms": 1500,
       "publish_on_accept": true,
       "requires": [],
       "fact_names": [

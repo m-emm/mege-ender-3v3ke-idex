@@ -20,6 +20,16 @@ PATCH_SIZE_MM = 14.0
 FIDUCIAL_SPACING_MM = 8.0
 FIDUCIAL_DIAMETER_MM = 3.0
 
+LOCATOR_MARKER_ID = 42
+LOCATOR_MARKER_SIDE_MM = 3.8
+LOCATOR_QUIET_ZONE_MM = 4.6
+LOCATOR_DATA_MATRIX = (
+    "1100",
+    "1101",
+    "0111",
+    "0011",
+)
+
 OUTER_RING_STROKE_MM = 0.30
 OUTER_RING_RADIUS_MM = (FIDUCIAL_DIAMETER_MM - OUTER_RING_STROKE_MM) / 2.0
 INNER_RING_RADIUS_MM = 0.75
@@ -30,6 +40,46 @@ PATCH_X_MM = 30.0
 PATCH_Y_MM = 30.0
 
 ARTIFACT_STEM = "bed_y_four_fiducials"
+
+
+def _locator_svg(indent: str) -> str:
+    center = PATCH_SIZE_MM / 2.0
+    quiet_x = center - LOCATOR_QUIET_ZONE_MM / 2.0
+    quiet_y = center - LOCATOR_QUIET_ZONE_MM / 2.0
+    marker_x = center - LOCATOR_MARKER_SIDE_MM / 2.0
+    marker_y = center - LOCATOR_MARKER_SIDE_MM / 2.0
+    cell = LOCATOR_MARKER_SIDE_MM / 6.0
+    cells = []
+    for row, bits in enumerate(LOCATOR_DATA_MATRIX, start=1):
+        for column, bit in enumerate(bits, start=1):
+            if bit == "0":
+                cells.append(
+                    (
+                        f'{indent}  <rect x="{marker_x + column * cell:g}" '
+                        f'y="{marker_y + row * cell:g}" width="{cell:g}" '
+                        f'height="{cell:g}" fill="#ffffff"/>'
+                    )
+                )
+    return "\n".join(
+        (
+            f'{indent}<g id="aruco-locator" data-marker-id="{LOCATOR_MARKER_ID}" '
+            'shape-rendering="crispEdges">',
+            (
+                f'{indent}  <rect class="locator-quiet-zone" '
+                f'x="{quiet_x:g}" y="{quiet_y:g}" '
+                f'width="{LOCATOR_QUIET_ZONE_MM:g}" '
+                f'height="{LOCATOR_QUIET_ZONE_MM:g}" fill="#ffffff"/>'
+            ),
+            (
+                f'{indent}  <rect class="locator-marker" '
+                f'x="{marker_x:g}" y="{marker_y:g}" '
+                f'width="{LOCATOR_MARKER_SIDE_MM:g}" '
+                f'height="{LOCATOR_MARKER_SIDE_MM:g}" fill="#000000"/>'
+            ),
+            *cells,
+            f"{indent}</g>",
+        )
+    )
 
 
 def _fiducial_centers() -> tuple[tuple[str, float, float], ...]:
@@ -78,6 +128,7 @@ def _patch_body(indent: str = "  ") -> str:
                 f'width="{PATCH_SIZE_MM:g}" height="{PATCH_SIZE_MM:g}" '
                 'fill="#000000"/>'
             ),
+            _locator_svg(indent),
             fiducials,
         )
     )
@@ -94,7 +145,10 @@ def _standalone_svg() -> str:
                 'shape-rendering="geometricPrecision">'
             ),
             "  <title>Bed Y four-fiducial patch</title>",
-            "  <desc>Four 3 mm concentric-circle fiducials on an 8 mm square.</desc>",
+            (
+                "  <desc>Four 3 mm concentric-circle fiducials on an 8 mm square "
+                "with a centered ArUco-compatible locator.</desc>"
+            ),
             _patch_body(),
             "</svg>",
             "",
@@ -197,7 +251,8 @@ def _a4_sheet_svg() -> str:
             (
                 f'  <text x="{PATCH_X_MM:g}" y="{PATCH_Y_MM + PATCH_SIZE_MM + 12:g}" '
                 'font-family="Arial, sans-serif" font-size="3">'
-                "Four 3 mm markers; centers form an 8 x 8 mm square.</text>"
+                "Four 3 mm markers; centers form an 8 x 8 mm square; centered "
+                "locator ID 42.</text>"
             ),
             (
                 f'  <text x="{PATCH_X_MM:g}" y="{PATCH_Y_MM + PATCH_SIZE_MM + 17:g}" '
@@ -266,7 +321,7 @@ def _write_manifest(
     pdf_path: Path,
 ) -> None:
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "artifact": "bed_y_four_fiducials",
         "coordinate_units": "mm",
         "patch": {
@@ -281,9 +336,16 @@ def _write_manifest(
             "center_spacing_x_mm": FIDUCIAL_SPACING_MM,
             "center_spacing_y_mm": FIDUCIAL_SPACING_MM,
             "centers_xy_mm": {
-                fiducial_id: [cx, cy]
-                for fiducial_id, cx, cy in _fiducial_centers()
+                fiducial_id: [cx, cy] for fiducial_id, cx, cy in _fiducial_centers()
             },
+        },
+        "locator": {
+            "kind": "aruco",
+            "dictionary": "DICT_4X4_50",
+            "marker_id": LOCATOR_MARKER_ID,
+            "marker_side_mm": LOCATOR_MARKER_SIDE_MM,
+            "quiet_zone_side_mm": LOCATOR_QUIET_ZONE_MM,
+            "data_matrix_black_bits": list(LOCATOR_DATA_MATRIX),
         },
         "pdf": {
             "page": "A4 portrait",

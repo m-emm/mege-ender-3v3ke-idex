@@ -216,6 +216,7 @@ def analyze_metric(
     *,
     frames: list[dict[str, Any]],
     patch_points_mm: list[list[float]],
+    require_locator: bool = True,
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     images = [cv2.imread(str(path), cv2.IMREAD_COLOR) for path in frame_paths]
@@ -224,7 +225,9 @@ def analyze_metric(
     failures: list[str] = []
     if not images or images[0] is None:
         raise BedFiducialError("metric reference frame cannot be decoded")
-    reference_detection = detect_four_fiducials(images[0])
+    reference_detection = detect_four_fiducials(
+        images[0], require_locator=require_locator
+    )
     reference_centers = np.asarray(reference_detection["centers_px"], dtype=np.float64)
     reference_roi = list(reference_detection["roi_px"])
     for index, image in enumerate(images):
@@ -232,7 +235,9 @@ def analyze_metric(
             if image is None:
                 raise BedFiducialError("frame cannot be decoded")
             detection = (
-                reference_detection if index == 0 else detect_four_fiducials(image)
+                reference_detection
+                if index == 0
+                else detect_four_fiducials(image, require_locator=require_locator)
             )
             tracking = _track_patch_translation(
                 images[0],
