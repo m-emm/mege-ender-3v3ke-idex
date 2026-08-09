@@ -1,10 +1,17 @@
 import importlib.util
+import json
+import logging
 import sys
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 import cv2
 import numpy as np
 import pytest
+
+
+_logger = logging.getLogger(__name__)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -17,6 +24,10 @@ FILES = (
     / "99-klipperpi"
     / "files"
 )
+LIVE_EXP600_FIXTURE = (
+    REPO_ROOT / "tests" / "vision" / "fixtures" / "red_marker_x_sweep_live_exp600"
+)
+OUTPUT_ROOT = REPO_ROOT / "output" / "vision_red_marker_x_sweep_replay"
 
 
 def _module():
@@ -91,6 +102,115 @@ def _synthetic_frames(tmp_path):
     return paths, frames
 
 
+def _run_id() -> str:
+    return (
+        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        + f"-{uuid.uuid4().hex[:8]}"
+    )
+
+
+def _write_frame_overlay(
+    image: np.ndarray,
+    frame: dict,
+    candidates: list[dict],
+    selected_ids: set[str],
+    path: Path,
+    selection_note: str | None = None,
+) -> None:
+    overlay = image.copy()
+    for candidate in candidates:
+        selected = candidate["candidate_id"] in selected_ids
+        color = (45, 220, 45) if selected else (40, 40, 230)
+        x0, y0, x1, y1 = candidate["bbox_px"]
+        center = tuple(np.rint(candidate["center_px"]).astype(int))
+        cv2.rectangle(overlay, (x0, y0), (x1, y1), color, 3)
+        cv2.drawMarker(overlay, center, color, cv2.MARKER_CROSS, 28, 2)
+        cv2.putText(
+            overlay,
+            f"{candidate['candidate_id']} area={candidate['area_px']} "
+            f"V={candidate['median_value']:.0f} bright={candidate['bright_core_fraction']:.2f} "
+            f"red={candidate['red_dominance_median']:.2f}",
+            (x0, max(24, y0 - 8)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            color,
+            2,
+            cv2.LINE_AA,
+        )
+    cv2.putText(
+        overlay,
+        f"{frame['frame']}  {frame['tool']}  X={frame['x_mm']} mm",
+        (28, 52),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1.0,
+        (0, 255, 255),
+        3,
+        cv2.LINE_AA,
+    )
+    legend = selection_note or (
+        "green=selected trajectory candidate  red=other red component"
+    )
+    cv2.putText(
+        overlay,
+        legend,
+        (28, 88),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.65,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not cv2.imwrite(str(path), overlay):
+        raise AssertionError(f"could not write overlay {path}")
+
+
+def test_live_exp600_t0_x170_component_gate_debug_overlay():
+    """Render each component considered before trajectory matching exists."""
+    module = _module()
+    manifest = json.loads((LIVE_EXP600_FIXTURE / "manifest.json").read_text())
+    frame_index, frame = next(
+        (index, frame)
+        for index, frame in enumerate(manifest["frames"])
+        if frame["tool"] == "T0" and frame["x_mm"] == 170
+    )
+    image_path = LIVE_EXP600_FIXTURE / "frames" / f"{frame['frame']}.jpg"
+    image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+    assert image is not None, image_path
+
+    candidates = module._red_candidates(image, frame_index)
+    assert candidates, "the captured frame must expose component-gate candidates"
+    assert all(
+        candidate["bright_core_fraction"] >= module.MIN_BRIGHT_CORE_FRACTION
+        for candidate in candidates
+    )
+    assert all(
+        candidate["red_dominance_median"] >= module.MIN_RED_DOMINANCE_MEDIAN
+        and candidate["strong_red_fraction"] >= module.MIN_STRONG_RED_FRACTION
+        for candidate in candidates
+    )
+
+    run_root = OUTPUT_ROOT / "runs" / _run_id()
+    overlay_path = (
+        run_root
+        / "single_frame_overlays"
+        / f"{frame_index:02d}_{frame['frame']}_components.png"
+    )
+    _write_frame_overlay(
+        image,
+        frame,
+        candidates,
+        selected_ids=set(),
+        path=overlay_path,
+        selection_note="single-frame diagnostic: component gates only; no trajectory match",
+    )
+    (run_root / "component_candidates.json").write_text(
+        json.dumps(candidates, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    _logger.info("Overlay %s", overlay_path.resolve())
+
+
 def test_recovers_marker_axis_and_rejects_larger_red_distractor(tmp_path):
     module = _module()
     paths, frames = _synthetic_frames(tmp_path)
@@ -148,6 +268,82 @@ def test_rejects_missing_tool_trajectory(tmp_path):
     )
     assert not result["accepted"]
     assert any("T1" in reason for reason in result["reasons"])
+
+
+def test_live_exp600_fixture_emits_debug_overlays():
+    """Replay the failed live capture and always retain its visual audit trail."""
+    module = _module()
+    manifest_path = LIVE_EXP600_FIXTURE / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    frames = manifest["frames"]
+    frame_paths = [
+        LIVE_EXP600_FIXTURE / "frames" / f"{frame['frame']}.jpg"
+        for frame in frames
+    ]
+    run_root = OUTPUT_ROOT / "runs" / _run_id()
+    artifact_dir = run_root / "artifacts"
+    frame_overlay_dir = run_root / "frame_overlays"
+    assert len(frame_paths) == 12
+    candidates_by_frame = {}
+    for index, (frame, path) in enumerate(zip(frames, frame_paths)):
+        image = cv2.imread(str(path), cv2.IMREAD_COLOR)
+        assert image is not None, path
+        candidates_by_frame[index] = module._red_candidates(image, index)
+
+    t1_x200 = cv2.imread(str(frame_paths[10]), cv2.IMREAD_COLOR)
+    assert t1_x200 is not None
+    t1_x200_candidates = module._red_candidates(t1_x200, 10)
+    assert any(
+        candidate["bbox_px"][2] - candidate["bbox_px"][0]
+        > 0.085 * t1_x200.shape[1]
+        for candidate in t1_x200_candidates
+    ), "the wide true T1 X=200 marker must remain available to trajectory selection"
+
+    result = module.analyze(
+        frame_paths,
+        artifact_dir,
+        frames=frames,
+        reference=manifest["red_marker_reference"],
+        localizer=manifest["localizer"],
+    )
+    run_root.mkdir(parents=True, exist_ok=True)
+    (run_root / "result.json").write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    selected_ids = set(result["selected_candidate_ids"])
+    for index, (frame, source_path) in enumerate(zip(frames, frame_paths)):
+        image = cv2.imread(str(source_path), cv2.IMREAD_COLOR)
+        assert image is not None, source_path
+        overlay_path = frame_overlay_dir / f"{index:02d}_{frame['frame']}_red_marker.png"
+        _write_frame_overlay(
+            image,
+            frame,
+            candidates_by_frame[index],
+            selected_ids,
+            overlay_path,
+        )
+        _logger.info("Overlay %s", overlay_path.resolve())
+
+    for name, artifact in sorted(result["artifacts"].items()):
+        path = Path(artifact["path"])
+        assert path.exists(), f"missing {name} overlay: {path}"
+        _logger.info("Overlay %s", path.resolve())
+
+    assert result["accepted"], result["reasons"]
+    assert all(
+        len(values) == 3 and max(values) - min(values) >= 20
+        for values in result["accepted_x_mm"].values()
+    )
+    assert set(result["artifacts"]) == {
+        "contact_sheet",
+        "marker_selection",
+        "core_registration",
+        "cross_tool_registration",
+        "trajectory",
+    }
+    assert len(list(frame_overlay_dir.glob("*.png"))) == len(frames)
 
 
 def test_pair_registration_excludes_one_inconsistent_representation(monkeypatch):

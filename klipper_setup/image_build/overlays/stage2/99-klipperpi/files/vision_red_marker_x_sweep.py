@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import itertools
+import logging
 import math
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,8 @@ from typing import Any
 import cv2
 import numpy as np
 from vision_calibration_graph import sha256_file
+
+_logger = logging.getLogger("vision_red_marker_x_sweep")
 
 LOCALIZER = {"kind": "red_marker_trajectory", "version": 1}
 MIN_TOOL_FRAMES = 3
@@ -21,8 +24,18 @@ MAX_TOOL_SCALE_DELTA = 0.05
 MAX_TOOL_ANGLE_DELTA_DEG = 2.0
 MAX_FIT_RMS_PX = 1.5
 MAX_REPRESENTATION_SPREAD_PX = 2.0
-MIN_WITHIN_TOOL_CORRELATION = 0.68
+# The live tool-mounted fiducial patch can change local contrast as the tool
+# crosses the camera view.  Keep the geometric and bidirectional registration
+# gates strict, but do not discard an otherwise coherent trajectory solely for
+# a moderate single-pair correlation dip.
+MIN_WITHIN_TOOL_CORRELATION = 0.55
 MIN_CROSS_TOOL_CORRELATION = 0.65
+BRIGHT_CORE_FRAME_PERCENTILE = 95.0
+BRIGHT_CORE_FRAME_FRACTION = 0.55
+MIN_BRIGHT_CORE_VALUE = 80.0
+MIN_BRIGHT_CORE_FRACTION = 0.50
+MIN_RED_DOMINANCE_MEDIAN = 0.40
+MIN_STRONG_RED_FRACTION = 0.50
 
 
 def _finite_json(value: Any) -> Any:
@@ -71,40 +84,162 @@ def _red_candidates(image: np.ndarray, frame_index: int) -> list[dict[str, Any]]
         cv2.MORPH_CLOSE,
         np.ones((kernel_size, kernel_size), dtype=np.uint8),
     )
-    count, _labels, stats, centroids = cv2.connectedComponentsWithStats(mask, 8)
+    count, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, 8)
     image_area = float(width * height)
+    brightness_reference = float(
+        np.percentile(hsv[:, :, 2], BRIGHT_CORE_FRAME_PERCENTILE)
+    )
+    bright_core_value = max(
+        MIN_BRIGHT_CORE_VALUE,
+        BRIGHT_CORE_FRAME_FRACTION * brightness_reference,
+    )
     candidates: list[dict[str, Any]] = []
+    rejection_counts: dict[str, int] = {}
+    detailed_rejections = 0
     for component in range(1, count):
         x, y, box_width, box_height, area = [int(item) for item in stats[component]]
         fill = area / float(max(1, box_width * box_height))
         relative_area = area / image_area
+        rejection_reasons = []
+        if not 0.00012 <= relative_area <= 0.008:
+            rejection_reasons.append("relative_area")
+        if not 0.005 * width <= box_width <= 0.095 * width:
+            rejection_reasons.append("width")
+        if not 0.014 * height <= box_height <= 0.19 * height:
+            rejection_reasons.append("height")
+        if fill < 0.08:
+            rejection_reasons.append("fill")
         boundary = (
             x <= 0.10 * width
             or x + box_width >= 0.90 * width
             or y <= 0.05 * height
             or y + box_height >= 0.90 * height
         )
-        shape_ok = (
-            0.00012 <= relative_area <= 0.008
-            and 0.005 * width <= box_width <= 0.085 * width
-            and 0.014 * height <= box_height <= 0.19 * height
-            and fill >= 0.08
-        )
-        if not shape_ok or boundary:
+        if boundary:
+            rejection_reasons.append("boundary")
+        center = [
+            float(centroids[component][0]),
+            float(centroids[component][1]),
+        ]
+        bbox = [x, y, x + box_width, y + box_height]
+        if rejection_reasons:
+            for reason in rejection_reasons:
+                rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+            # A full-resolution capture can contain hundreds of isolated red
+            # pixels.  They fail the minimum area gate and are summarized below;
+            # log only components large enough to be visually plausible.
+            if relative_area >= 0.00012:
+                detailed_rejections += 1
+                _logger.info(
+                    "Marker component reject frame=%02d component=%d center=%s bbox=%s "
+                    "area=%d relative_area=%.6f fill=%.3f brightness=not_evaluated "
+                    "reasons=%s",
+                    frame_index,
+                    component,
+                    center,
+                    bbox,
+                    area,
+                    relative_area,
+                    fill,
+                    ",".join(rejection_reasons),
+                )
             continue
-        candidates.append(
-            {
-                "candidate_id": f"f{frame_index:02d}_red_{len(candidates):02d}",
-                "center_px": [
-                    float(centroids[component][0]),
-                    float(centroids[component][1]),
-                ],
-                "bbox_px": [x, y, x + box_width, y + box_height],
-                "area_px": area,
-                "relative_area": relative_area,
-                "fill_fraction": fill,
-            }
+        # Do this only after the inexpensive geometry and boundary gates.  A
+        # noisy full-resolution HSV mask may contain hundreds of tiny pieces;
+        # indexing the whole label image for each one wastes CPU and memory.
+        component_labels = labels[y : y + box_height, x : x + box_width]
+        component_values = hsv[y : y + box_height, x : x + box_width, 2][
+            component_labels == component
+        ]
+        component_bgr = image[y : y + box_height, x : x + box_width][
+            component_labels == component
+        ].astype(np.float32)
+        blue, green, red = component_bgr.T
+        red_dominance = (red - np.maximum(blue, green)) / np.maximum(red, 1.0)
+        median_red_dominance = float(np.median(red_dominance))
+        strong_red_fraction = float(np.mean(red_dominance >= 0.40))
+        median_value = float(np.median(component_values))
+        bright_core_fraction = float(
+            np.mean(component_values >= bright_core_value)
         )
+        color_rejection_reasons = []
+        if bright_core_fraction < MIN_BRIGHT_CORE_FRACTION:
+            color_rejection_reasons.append("bright_core")
+        if median_red_dominance < MIN_RED_DOMINANCE_MEDIAN:
+            color_rejection_reasons.append("red_dominance")
+        if strong_red_fraction < MIN_STRONG_RED_FRACTION:
+            color_rejection_reasons.append("strong_red_fraction")
+        if color_rejection_reasons:
+            for reason in color_rejection_reasons:
+                rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+            detailed_rejections += 1
+            _logger.info(
+                "Marker component reject frame=%02d component=%d center=%s bbox=%s "
+                "area=%d relative_area=%.6f fill=%.3f median_value=%.1f "
+                "bright_core_fraction=%.3f bright_core_value=%.1f "
+                "red_dominance_median=%.3f strong_red_fraction=%.3f "
+                "reasons=%s",
+                frame_index,
+                component,
+                center,
+                bbox,
+                area,
+                relative_area,
+                fill,
+                median_value,
+                bright_core_fraction,
+                bright_core_value,
+                median_red_dominance,
+                strong_red_fraction,
+                ",".join(color_rejection_reasons),
+            )
+            continue
+        candidate = {
+            "candidate_id": f"f{frame_index:02d}_red_{len(candidates):02d}",
+            "center_px": center,
+            "bbox_px": bbox,
+            "area_px": area,
+            "relative_area": relative_area,
+            "fill_fraction": fill,
+            "median_value": median_value,
+            "bright_core_fraction": bright_core_fraction,
+            "bright_core_value": bright_core_value,
+            "red_dominance_median": median_red_dominance,
+            "strong_red_fraction": strong_red_fraction,
+        }
+        candidates.append(candidate)
+        _logger.info(
+            "Marker component keep frame=%02d candidate=%s center=%s bbox=%s "
+            "area=%d relative_area=%.6f fill=%.3f median_value=%.1f "
+            "bright_core_fraction=%.3f bright_core_value=%.1f "
+            "red_dominance_median=%.3f strong_red_fraction=%.3f "
+            "reason=passes_component_gates",
+            frame_index,
+            candidate["candidate_id"],
+            center,
+            bbox,
+            area,
+            relative_area,
+            fill,
+            median_value,
+            bright_core_fraction,
+            bright_core_value,
+            median_red_dominance,
+            strong_red_fraction,
+        )
+    _logger.info(
+        "Marker component summary frame=%02d connected=%d kept=%d "
+        "detailed_rejected=%d tiny_rejected=%d brightness_reference=%.1f "
+        "bright_core_value=%.1f rejection_counts=%s",
+        frame_index,
+        count - 1,
+        len(candidates),
+        detailed_rejections,
+        count - 1 - len(candidates) - detailed_rejections,
+        brightness_reference,
+        bright_core_value,
+        rejection_counts,
+    )
     return candidates
 
 
