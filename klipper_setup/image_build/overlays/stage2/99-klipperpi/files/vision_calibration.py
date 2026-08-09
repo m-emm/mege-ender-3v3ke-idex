@@ -35,6 +35,7 @@ from vision_calibration_graph import (
     content_hash,
     load_json,
     publish_fact_set,
+    publish_seed_fact_set,
     rebuild_catalog,
     sha256_file,
     utc_now,

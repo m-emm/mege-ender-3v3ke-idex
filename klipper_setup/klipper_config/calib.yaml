@@ -24,11 +24,11 @@ vision_relative_alignment:
   source: accepted vision-derived T1/T0 Z relationship
 tools:
   t0:
-    x_endstop: -77.635
+    x_endstop: -85.472
     y_endstop: -14.800
     z_endstop: 293.626
   t1:
-    x_endstop: 353.087
+    x_endstop: 346.416
     y_endstop: -13.615
     z_endstop: 292.402
     
