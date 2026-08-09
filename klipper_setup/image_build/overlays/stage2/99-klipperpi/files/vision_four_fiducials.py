@@ -18,12 +18,16 @@ LOCATOR_MARKER_CENTER_MM = PATCH_SIZE_MM / 2.0
 
 EXPECTED_EDGE_LENGTH_PX = 80.0
 EDGE_LENGTH_TOLERANCE_FRACTION = 0.5
-FOURTH_POINT_TOLERANCE_PX = 7.0
-MAX_RADIUS_RATIO = 2.0
 MAX_SIDE_BALANCE_FRACTION = 0.18
 MIN_LOCATOR_MARKER_SIDE_PX = 20.0
 MAX_PATCH_OUTSIDE_FRACTION = 0.02
+# Keep the historical radius sanity check; square geometry and the
+# ArUco-projected ROI do the primary false-quartet rejection.
+MAX_RADIUS_RATIO = 2.0
+CIRCLE_SEARCH_PADDING_PX = 50
 MAX_EXHAUSTIVE_QUARTET_CANDIDATES = 32
+CIRCLE_CENTER_REFINE_PX = 6.0
+ARUCO_FALLBACK_SCALE = 1.25
 
 _PATCH_CORNERS_MM = np.asarray(
     [
@@ -105,6 +109,10 @@ def order_quad(
 
 def _geometry_details(ordered: np.ndarray) -> tuple[float, dict[str, Any]] | None:
     tl, tr, bl, br = ordered
+    # Keep the established square geometry gates.  In particular, this
+    # deliberately scores the four points as a square rather than comparing
+    # their angle to a calibrated camera angle.  The ArUco reference is used
+    # separately for the physical corner labels.
     edges = np.asarray(
         [tr - tl, br - tr, bl - br, tl - bl],
         dtype=np.float64,
@@ -144,6 +152,7 @@ def _geometry_details(ordered: np.ndarray) -> tuple[float, dict[str, Any]] | Non
     )
     if side_balance > MAX_SIDE_BALANCE_FRACTION:
         return None
+    area = abs(_cross_2d(edges[0], -edges[3]))
     shape_error = (
         opposite_error
         + side_balance
@@ -158,6 +167,7 @@ def _geometry_details(ordered: np.ndarray) -> tuple[float, dict[str, Any]] | Non
         "opposite_error_fraction": opposite_error,
         "side_balance_fraction": side_balance,
         "diagonal_midpoint_error_px": diagonal_midpoint_error,
+        "area_px2": area,
         "parallel_error": parallel_error,
         "orthogonality_error": orthogonality_error,
         "right_edge_angle_deg": _angle_deg(edges[0]),
@@ -190,7 +200,13 @@ def find_four_fiducials(
     *,
     reference_centers_px: np.ndarray | None = None,
 ) -> list[dict[str, Any]]:
-    """Select a square of four circles using geometry only."""
+    """Select four circles using the historical geometry matcher.
+
+    The historical matcher is retained here because its side/diagonal
+    construction rejects plausible-looking but non-square quartets well.  No
+    absolute image angle is involved; an ArUco reference is only used to
+    resolve the final physical corner labels.
+    """
 
     if len(candidates) < 4:
         raise FourFiducialError("fewer than four circular fiducial candidates")
@@ -205,14 +221,9 @@ def find_four_fiducials(
     side_min = expected_edge_length_px * (1.0 - EDGE_LENGTH_TOLERANCE_FRACTION)
     side_max = expected_edge_length_px * (1.0 + EDGE_LENGTH_TOLERANCE_FRACTION)
 
-    best: tuple[float, np.ndarray] | None = None
     if len(candidates) <= MAX_EXHAUSTIVE_QUARTET_CANDIDATES:
         quartet_indices = itertools.combinations(range(len(candidates)), 4)
     else:
-        # Keep the old bounded graph search for unusually noisy full-frame
-        # legacy detection.  Locator ROIs are normally small enough for the
-        # complete quartet search above, which avoids assuming that a square's
-        # diagonal is also a side-length neighbor.
         neighbors = [set() for _ in candidates]
         pairs: list[tuple[int, int]] = []
         for left_index, right_index in itertools.combinations(
@@ -231,10 +242,11 @@ def find_four_fiducials(
             )
         )
 
+    best: tuple[float, np.ndarray] | None = None
     for indices_tuple in quartet_indices:
         indices = list(indices_tuple)
         points = centers[indices]
-        geometry = quad_geometry(points, reference_centers_px=reference_centers_px)
+        geometry = quad_geometry(points)
         if geometry is None:
             continue
         _geometry_score, details = geometry
@@ -255,14 +267,19 @@ def find_four_fiducials(
         )
         if best is None or score < best[0]:
             ordered = order_quad(points, reference_centers_px)
-            ordered_indices = [
-                indices[int(np.where(np.all(points == point, axis=1))[0][0])]
-                for point in ordered
-            ]
-            best = score, np.asarray(ordered_indices, dtype=int)
+            ordered_indices = np.asarray(
+                [
+                    indices[int(np.where(np.all(points == point, axis=1))[0][0])]
+                    for point in ordered
+                ],
+                dtype=int,
+            )
+            best = score, ordered_indices
 
     if best is None:
-        raise FourFiducialError("no four-fiducial square geometry found")
+        raise FourFiducialError(
+            "no four-fiducial square geometry candidate passed checks"
+        )
     return [candidates[index] for index in best[1]]
 
 
@@ -289,13 +306,43 @@ def _aruco_detector() -> Any:
 def _detect_aruco(image: np.ndarray) -> tuple[list[np.ndarray], np.ndarray | None]:
     detector = _aruco_detector()
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    if isinstance(detector, tuple):
-        aruco = cv2.aruco
-        corners, ids, _rejected = aruco.detectMarkers(
-            gray, detector[0], parameters=detector[1]
+    # The locator is only a few dozen pixels wide in live XY captures. A
+    # small blur suppresses camera noise and compression ringing around the
+    # marker cells without introducing a memory-heavy pyramid or upscaled
+    # image. This matters especially at the low-Z XY capture height.
+    gray = cv2.GaussianBlur(gray, (3, 3), 0)
+
+    def detect(source: np.ndarray):
+        if isinstance(detector, tuple):
+            aruco = cv2.aruco
+            return aruco.detectMarkers(source, detector[0], parameters=detector[1])
+        return detector.detectMarkers(source)
+
+    corners, ids, rejected = detect(gray)
+
+    # At the low-Z XY capture height the marker is only about 34 px wide.
+    # Some frames contain a perfectly visible marker whose cell boundaries
+    # are nevertheless too small for the native detector.  Retry only when
+    # the desired marker was not found; this keeps the usual path at native
+    # resolution and bounds the extra memory to one temporary grayscale
+    # image.  Map the successful corners back to original image coordinates.
+    marker_found = ids is not None and any(
+        int(marker_id) == LOCATOR_MARKER_ID for marker_id in ids.reshape(-1)
+    )
+    if not marker_found:
+        scale = ARUCO_FALLBACK_SCALE
+        enlarged = cv2.resize(
+            gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC
         )
-    else:
-        corners, ids, _rejected = detector.detectMarkers(gray)
+        enlarged_corners, enlarged_ids, enlarged_rejected = detect(enlarged)
+        if enlarged_ids is not None:
+            corners = [
+                np.asarray(marker_corners, dtype=np.float32) / scale
+                for marker_corners in enlarged_corners
+            ]
+            ids = enlarged_ids
+            rejected = enlarged_rejected
+        del enlarged
     return corners, ids
 
 
@@ -374,17 +421,24 @@ def _detect_circle_candidates(
     if roi_px is None:
         x0, y0, x1, y1 = 0, 0, width, height
     else:
-        x0, y0, x1, y1 = roi_px
+        padding = int(round(CIRCLE_SEARCH_PADDING_PX * width / 1920.0))
+        if patch_corners_px is not None:
+            patch = np.asarray(patch_corners_px, dtype=np.float64)
+            base_x0 = int(math.floor(np.min(patch[:, 0])))
+            base_y0 = int(math.floor(np.min(patch[:, 1])))
+            base_x1 = int(math.ceil(np.max(patch[:, 0])))
+            base_y1 = int(math.ceil(np.max(patch[:, 1])))
+        else:
+            base_x0, base_y0, base_x1, base_y1 = roi_px
+        x0 = max(0, base_x0 - padding)
+        y0 = max(0, base_y0 - padding)
+        x1 = min(width, base_x1 + padding)
+        y1 = min(height, base_y1 + padding)
     crop = image[y0:y1, x0:x1]
     scale = expected_edge_length_px / EXPECTED_EDGE_LENGTH_PX
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     enhanced = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
     blurred = cv2.GaussianBlur(enhanced, (5, 5), 1.2)
-    if patch_corners_px is not None:
-        mask = np.zeros(gray.shape, dtype=np.uint8)
-        polygon = np.rint(np.asarray(patch_corners_px) - [x0, y0]).astype(np.int32)
-        cv2.fillConvexPoly(mask, polygon, 255)
-        blurred = cv2.bitwise_and(blurred, blurred, mask=mask)
     circles = cv2.HoughCircles(
         blurred,
         cv2.HOUGH_GRADIENT,
@@ -431,7 +485,85 @@ def _detect_circle_candidates(
         raise FourFiducialError(
             f"only {len(deduplicated)} independent ring candidates detected"
         )
+    full_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    full_gray_blurred = cv2.GaussianBlur(full_gray, (3, 3), 0)
+    gradients_x = cv2.Sobel(full_gray_blurred, cv2.CV_32F, 1, 0, ksize=3)
+    gradients_y = cv2.Sobel(full_gray_blurred, cv2.CV_32F, 0, 1, ksize=3)
+    gradient = cv2.magnitude(gradients_x, gradients_y)
+    del full_gray_blurred, gradients_x, gradients_y
+    deduplicated = [
+        _refine_circle_candidate(gradient, candidate, scale=scale)
+        for candidate in deduplicated
+    ]
     return deduplicated, [x0, y0, x1, y1]
+
+
+def _refine_circle_candidate(
+    gradient: np.ndarray,
+    candidate: dict[str, Any],
+    *,
+    scale: float,
+) -> dict[str, Any]:
+    """Move a Hough seed onto the strongest circular edge nearby.
+
+    HoughCircles can settle on an inner edge of these multi-ring markers,
+    particularly when one side is glare-obscured.  A small local search over
+    center and radius recovers the outer ring without an image pyramid or a
+    large temporary mask, which is important on the Raspberry Pi.
+    """
+
+    center = np.asarray(candidate["center_px"], dtype=np.float64)
+    radius = float(candidate["radius_px"])
+    angles = np.linspace(0.0, 2.0 * math.pi, 72, endpoint=False)
+    best: tuple[float, np.ndarray, float] | None = None
+    search_step = max(0.5, scale)
+    offsets = np.arange(
+        -CIRCLE_CENTER_REFINE_PX * scale,
+        CIRCLE_CENTER_REFINE_PX * scale + search_step * 0.5,
+        search_step,
+    )
+    # Hough may find an inner ring, but refining back to a smaller radius
+    # would turn a valid outer-ring seed into another inner-ring false match.
+    radius_min = max(6.0 * scale, radius)
+    radius_max = min(24.0 * scale, radius + 7.0 * scale)
+    for offset_x in offsets:
+        for offset_y in offsets:
+            trial_center = center + [offset_x, offset_y]
+            for trial_radius in np.arange(
+                radius_min,
+                radius_max + search_step * 0.5,
+                search_step,
+            ):
+                xs = np.rint(trial_center[0] + trial_radius * np.cos(angles)).astype(
+                    int
+                )
+                ys = np.rint(trial_center[1] + trial_radius * np.sin(angles)).astype(
+                    int
+                )
+                valid = (
+                    (xs >= 0)
+                    & (xs < gradient.shape[1])
+                    & (ys >= 0)
+                    & (ys < gradient.shape[0])
+                )
+                if int(np.count_nonzero(valid)) < 54:
+                    continue
+                values = gradient[ys[valid], xs[valid]].astype(np.float64)
+                score = float(np.percentile(values, 70) + 0.4 * np.median(values))
+                if best is None or score > best[0]:
+                    best = score, trial_center.copy(), float(trial_radius)
+
+    if best is None:
+        return candidate
+    score, refined_center, refined_radius = best
+    return {
+        **candidate,
+        "center_px": refined_center.tolist(),
+        "radius_px": refined_radius,
+        "hough_center_px": center.tolist(),
+        "hough_radius_px": radius,
+        "center_refinement_score": score,
+    }
 
 
 def _detect_legacy(image: np.ndarray) -> dict[str, Any]:
@@ -490,25 +622,18 @@ def detect_four_fiducials(
     expected_centers = np.asarray(
         locator["expected_fiducial_centers_px"], dtype=np.float64
     )
-    expected_edge = float(
-        np.mean(
-            [
-                np.linalg.norm(expected_centers[1] - expected_centers[0]),
-                np.linalg.norm(expected_centers[3] - expected_centers[2]),
-                np.linalg.norm(expected_centers[2] - expected_centers[0]),
-                np.linalg.norm(expected_centers[3] - expected_centers[1]),
-            ]
-        )
-    )
     candidates, roi = _detect_circle_candidates(
         image,
         roi_px=locator["roi_px"],
         patch_corners_px=patch_corners,
-        expected_edge_length_px=expected_edge,
+        # The locator supplies orientation and an ROI. Do not use its
+        # nominal marker-to-patch scale to tune Hough: the printed marker's
+        # border and the four-circle spacing have different optical edges.
+        expected_edge_length_px=EXPECTED_EDGE_LENGTH_PX,
     )
     selected = find_four_fiducials(
         candidates,
-        expected_edge_length_px=expected_edge,
+        expected_edge_length_px=EXPECTED_EDGE_LENGTH_PX,
         reference_centers_px=expected_centers,
     )
     centers = np.asarray([candidate["center_px"] for candidate in selected])

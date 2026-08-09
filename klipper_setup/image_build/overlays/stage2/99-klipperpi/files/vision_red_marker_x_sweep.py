@@ -159,9 +159,7 @@ def _red_candidates(image: np.ndarray, frame_index: int) -> list[dict[str, Any]]
         median_red_dominance = float(np.median(red_dominance))
         strong_red_fraction = float(np.mean(red_dominance >= 0.40))
         median_value = float(np.median(component_values))
-        bright_core_fraction = float(
-            np.mean(component_values >= bright_core_value)
-        )
+        bright_core_fraction = float(np.mean(component_values >= bright_core_value))
         color_rejection_reasons = []
         if bright_core_fraction < MIN_BRIGHT_CORE_FRACTION:
             color_rejection_reasons.append("bright_core")

@@ -6,7 +6,6 @@
 import logging
 import re
 
-
 _logger = logging.getLogger(__name__)
 XY_TOLERANCE = 0.020
 
@@ -47,7 +46,9 @@ class EddyDaq:
         try:
             return self.printer.lookup_object("eddy_tap_measure")
         except Exception as exc:
-            raise self.gcode.error("Eddy native measurement helper is unavailable") from exc
+            raise self.gcode.error(
+                "Eddy native measurement helper is unavailable"
+            ) from exc
 
     def _require_ready(self, command_name):
         return self._eddy_helper()._require_scan_ready(command_name)
@@ -68,9 +69,7 @@ class EddyDaq:
         }
         try:
             gcode_move = self.printer.lookup_object("gcode_move")
-            gcode_status = gcode_move.get_status(
-                self.printer.get_reactor().monotonic()
-            )
+            gcode_status = gcode_move.get_status(self.printer.get_reactor().monotonic())
             for prefix, values in (
                 ("gcode", gcode_status.get("gcode_position")),
                 ("homing_origin", gcode_status.get("homing_origin")),
@@ -78,9 +77,7 @@ class EddyDaq:
                 if values is None:
                     continue
                 for index, axis in enumerate("xyz"):
-                    snapshot["%s_%s" % (prefix, axis)] = self._axis(
-                        values, index, axis
-                    )
+                    snapshot["%s_%s" % (prefix, axis)] = self._axis(values, index, axis)
         except Exception:
             pass
         try:

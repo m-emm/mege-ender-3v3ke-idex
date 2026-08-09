@@ -21,6 +21,7 @@ MINIMUM_TIP_CORRELATION = 0.22
 MINIMUM_MEDIAN_TIP_CORRELATION = 0.38
 MAXIMUM_REPRESENTATION_SPREAD_PX = 2.5
 MAXIMUM_DATUM_RESIDUAL_MM = 0.5
+MAXIMUM_FIDUCIAL_JITTER_PX = 1.5
 MINIMUM_ACCEPTED_FRAMES = 3
 MINIMUM_ACCEPTED_X_SPAN_MM = 8.0
 
@@ -408,8 +409,13 @@ def _write_overlays(
         if record.get("tip_center_px") is not None:
             tip = tuple(np.rint(record["tip_center_px"]).astype(int))
             cv2.drawMarker(image, tip, color, cv2.MARKER_CROSS, 20, 3)
-        for center in record.get("fiducial_centers_px") or []:
-            cv2.circle(image, tuple(np.rint(center).astype(int)), 8, (0, 255, 255), 2)
+        centers = record.get("fiducial_centers_px") or []
+        radii = record.get("fiducial_radii_px") or []
+        for index, center in enumerate(centers):
+            radius = float(radii[index]) if index < len(radii) else 8.0
+            center_px = tuple(np.rint(center).astype(int))
+            cv2.circle(image, center_px, max(2, int(round(radius))), (0, 255, 255), 2)
+            cv2.drawMarker(image, center_px, (0, 255, 255), cv2.MARKER_CROSS, 12, 1)
         command = frame["commanded_position_mm"]
         lines = [
             (
@@ -520,9 +526,7 @@ def analyze_measurement(
         if image is None:
             raise ToolXYError(f"cannot decode {path}")
         try:
-            fiducials = detect_four_fiducials(
-                image, require_locator=require_locator
-            )
+            fiducials = detect_four_fiducials(image, require_locator=require_locator)
         except FourFiducialError as exc:
             records_by_seq[source_seq] = {
                 "seq": source_seq,
@@ -547,6 +551,26 @@ def analyze_measurement(
         analysis_frame = dict(frame)
         analysis_frame["expected_marker_pixel_px"] = expected_marker.tolist()
         valid_frames.append(analysis_frame)
+
+    fiducial_jitter_px = None
+    fiducial_jitter_per_corner_px = None
+    fiducial_jitter_reason = None
+    if require_locator and len(fiducials_by_source_seq) >= 2:
+        stationary_centers = np.asarray(
+            [
+                fiducials_by_source_seq[source_seq]["centers_px"]
+                for source_seq in sorted(fiducials_by_source_seq)
+            ],
+            dtype=np.float64,
+        )
+        jitter = np.ptp(stationary_centers, axis=0)
+        fiducial_jitter_per_corner_px = jitter.tolist()
+        fiducial_jitter_px = float(np.max(jitter))
+        if fiducial_jitter_px > MAXIMUM_FIDUCIAL_JITTER_PX:
+            fiducial_jitter_reason = (
+                f"stationary fiducial jitter {fiducial_jitter_px:.3f} px "
+                f"exceeds {MAXIMUM_FIDUCIAL_JITTER_PX:.3f} px"
+            )
 
     if len(valid_frames) >= 2:
         try:
@@ -603,6 +627,10 @@ def analyze_measurement(
                     **registration,
                     "seq": source_seq,
                     "fiducial_centers_px": fiducial_centers,
+                    "fiducial_radii_px": np.asarray(
+                        fiducials.get("radii_px", []), dtype=np.float64
+                    ),
+                    "fiducial_geometry": fiducials.get("geometry"),
                     "fiducial_patch_center_px": fiducial_center,
                     "tip_center_px": tip_center,
                     "fiducials_to_tip_xy_mm": delta_mm,
@@ -612,6 +640,12 @@ def analyze_measurement(
                     "rejection_reasons": reasons,
                 }
             )
+
+    if fiducial_jitter_reason:
+        for record in records_by_seq.values():
+            if record.get("accepted"):
+                record["accepted"] = False
+                record["rejection_reasons"].append(fiducial_jitter_reason)
 
     preliminary = [record for record in records_by_seq.values() if record["accepted"]]
     if preliminary:
@@ -645,6 +679,8 @@ def analyze_measurement(
     accepted_x = sorted({float(record["x_mm"]) for record in accepted_records})
     accepted_x_span = accepted_x[-1] - accepted_x[0] if len(accepted_x) >= 2 else 0.0
     reasons = []
+    if fiducial_jitter_reason:
+        reasons.append(fiducial_jitter_reason)
     if len(accepted_records) < MINIMUM_ACCEPTED_FRAMES:
         reasons.append(
             f"only {len(accepted_records)} accepted frames; "
@@ -686,6 +722,8 @@ def analyze_measurement(
             "accepted_count": len(accepted_records),
             "captured_count": len(frames),
             "accepted_x_span_mm": accepted_x_span,
+            "fiducial_jitter_px": fiducial_jitter_px,
+            "fiducial_jitter_per_corner_px": fiducial_jitter_per_corner_px,
             "records": records,
             "artifacts": artifacts,
         }

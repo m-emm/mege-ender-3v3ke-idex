@@ -620,9 +620,7 @@ def localize_nozzle_tip_grid(
             )
         tool = frame["tool"]
 
-        four_fiducials = detect_four_fiducials(
-            image, require_locator=require_locator
-        )
+        four_fiducials = detect_four_fiducials(image, require_locator=require_locator)
         four_fiducials_registrations.append(
             {
                 "seq": index,

@@ -1,11 +1,17 @@
 import importlib.util
+import logging
 import math
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 import cv2
 import numpy as np
 import pytest
+
+
+_logger = logging.getLogger(__name__)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -18,6 +24,10 @@ FILES = (
     / "99-klipperpi"
     / "files"
 )
+LIVE_XY_FIXTURE = (
+    REPO_ROOT / "tests" / "vision" / "fixtures" / "fiducial_locator_xy"
+)
+OUTPUT_ROOT = REPO_ROOT / "output" / "vision_fiducial_locator_replay"
 
 
 def _module():
@@ -150,3 +160,188 @@ def test_circle_geometry_reports_edge_angle_without_a_camera_angle_prior():
     assert geometry is not None
     _score, details = geometry
     assert abs(float(details["right_edge_angle_deg"]) - angle_deg) < 1e-6
+
+
+def test_live_xy_ring_centers_are_refined_and_render_debug_overlay():
+    """Replay one live XY frame and leave a directly inspectable overlay."""
+
+    module = _module()
+    frame_path = LIVE_XY_FIXTURE / "t0_x197p000_z0p500.jpg"
+    image = cv2.imread(str(frame_path), cv2.IMREAD_COLOR)
+    assert image is not None, f"could not decode {frame_path}"
+
+    detection = module.detect_four_fiducials(image)
+    centers = np.asarray(detection["centers_px"], dtype=np.float64)
+    assert centers.shape == (4, 2)
+
+    # Fixture-local annotations from the bright outer ring, in the detector's
+    # oriented [top_left, top_right, bottom_left, bottom_right] order.
+    annotated_centers = np.asarray(
+        [
+            [874.2, 541.3],
+            [794.5, 545.4],
+            [870.0, 462.2],
+            [789.6, 466.0],
+        ],
+        dtype=np.float64,
+    )
+    refined_errors = np.linalg.norm(centers - annotated_centers, axis=1)
+    assert np.max(refined_errors) < 2.0
+
+    run_id = (
+        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        + "-"
+        + uuid4().hex[:8]
+    )
+    overlay_path = OUTPUT_ROOT / "runs" / run_id / "t0_x197_fiducials.png"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    overlay = image.copy()
+
+    patch = np.rint(np.asarray(detection["patch_corners_px"])).astype(np.int32)
+    cv2.polylines(overlay, [patch], True, (0, 255, 0), 2, cv2.LINE_AA)
+    for candidate in detection["candidates"]:
+        center = tuple(np.rint(np.asarray(candidate["center_px"])).astype(int))
+        cv2.circle(
+            overlay,
+            center,
+            int(round(candidate["radius_px"])),
+            (255, 0, 0),
+            2,
+            cv2.LINE_AA,
+        )
+    radii = detection["radii_px"]
+    for index, (center, radius, annotated) in enumerate(
+        zip(centers, radii, annotated_centers)
+    ):
+        refined = tuple(np.rint(center).astype(int))
+        reference = tuple(np.rint(annotated).astype(int))
+        cv2.circle(
+            overlay,
+            refined,
+            int(round(radius)),
+            (0, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.drawMarker(overlay, refined, (0, 255, 0), cv2.MARKER_CROSS, 22, 2)
+        cv2.drawMarker(overlay, reference, (255, 0, 255), cv2.MARKER_TILTED_CROSS, 18, 2)
+        cv2.putText(
+            overlay,
+            f"{index}: d={refined_errors[index]:.1f}px",
+            (refined[0] + 12, refined[1] - 12),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (0, 255, 0),
+            2,
+            cv2.LINE_AA,
+        )
+
+    assert cv2.imwrite(str(overlay_path), overlay)
+    _logger.info("Overlay %s", overlay_path.resolve())
+
+
+def test_t0_xy_replay_has_stable_fiducials_across_four_frames():
+    """The stationary bed patch must not jitter as the tool moves in X."""
+
+    module = _module()
+    frame_paths = [
+        LIVE_XY_FIXTURE / f"{index:02d}_t0_x{191 + 2 * index}p000_z0p500.jpg"
+        for index in range(1, 5)
+    ]
+    detections = []
+    for frame_path in frame_paths:
+        image = cv2.imread(str(frame_path), cv2.IMREAD_COLOR)
+        assert image is not None, f"could not decode {frame_path}"
+        detections.append((frame_path, image, module.detect_four_fiducials(image)))
+
+    centers = np.asarray(
+        [detection["centers_px"] for _path, _image, detection in detections],
+        dtype=np.float64,
+    )
+    center_spread = np.ptp(centers, axis=0)
+    assert float(np.max(center_spread)) < 1.5, center_spread
+
+    run_id = (
+        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        + "-"
+        + uuid4().hex[:8]
+    )
+    overlay_dir = OUTPUT_ROOT / "runs" / run_id / "t0_xy_replay_overlays"
+    overlay_dir.mkdir(parents=True, exist_ok=True)
+    median_centers = np.median(centers, axis=0)
+    for frame_path, image, detection in detections:
+        overlay = image.copy()
+        patch = np.rint(np.asarray(detection["patch_corners_px"])).astype(np.int32)
+        cv2.polylines(overlay, [patch], True, (0, 255, 0), 2, cv2.LINE_AA)
+        detected_centers = np.asarray(detection["centers_px"], dtype=np.float64)
+        for center, radius in zip(detected_centers, detection["radii_px"]):
+            center_px = tuple(np.rint(center).astype(int))
+            cv2.circle(
+                overlay,
+                center_px,
+                int(round(radius)),
+                (0, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
+            cv2.drawMarker(overlay, center_px, (0, 255, 0), cv2.MARKER_CROSS, 18, 2)
+        for candidate in detection["candidates"]:
+            if "hough_center_px" not in candidate:
+                continue
+            hough_center = tuple(
+                np.rint(np.asarray(candidate["hough_center_px"])).astype(int)
+            )
+            cv2.circle(
+                overlay,
+                hough_center,
+                int(round(candidate["hough_radius_px"])),
+                (255, 0, 0),
+                1,
+                cv2.LINE_AA,
+            )
+        frame_spread = np.ptp(
+            np.asarray(
+                [d["centers_px"] for _p, _i, d in detections], dtype=np.float64
+            ),
+            axis=0,
+        )
+        cv2.putText(
+            overlay,
+            f"{frame_path.stem} max_spread={float(np.max(frame_spread)):.2f}px",
+            (24, 40),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (0, 255, 0),
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            overlay,
+            "blue=Hough seed yellow=refined circle green=refined center",
+            (24, 72),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.65,
+            (0, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+        output_path = overlay_dir / f"{frame_path.stem}_fiducials.png"
+        assert cv2.imwrite(str(output_path), overlay)
+        _logger.info("Overlay %s", output_path.resolve())
+
+    np.testing.assert_allclose(median_centers, centers[0], atol=1.5)
+
+
+def test_live_xy_aruco_fallback_handles_small_marker_frames():
+    """The low-Z marker remains locatable when native ArUco misses it."""
+
+    module = _module()
+    for frame_name in (
+        "02_t0_x195p000_z0p500.jpg",
+        "03_t0_x197p000_z0p500.jpg",
+    ):
+        image = cv2.imread(str(LIVE_XY_FIXTURE / frame_name), cv2.IMREAD_COLOR)
+        assert image is not None, f"could not decode {frame_name}"
+        detection = module.detect_four_fiducials(image)
+        assert detection["locator"]["marker_id"] == module.LOCATOR_MARKER_ID
+        assert len(detection["centers_px"]) == 4

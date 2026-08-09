@@ -152,9 +152,13 @@ class PrinterDaq:
             "DAQ_JOB_START", self.cmd_DAQ_JOB_START, desc="Start a persistent DAQ job."
         )
         self.gcode.register_command(
-            "DAQ_JOB_FINISH", self.cmd_DAQ_JOB_FINISH, desc="Finish a persistent DAQ job."
+            "DAQ_JOB_FINISH",
+            self.cmd_DAQ_JOB_FINISH,
+            desc="Finish a persistent DAQ job.",
         )
-        self.printer.register_event_handler("klippy:disconnect", self._handle_disconnect)
+        self.printer.register_event_handler(
+            "klippy:disconnect", self._handle_disconnect
+        )
 
     def _handle_disconnect(self):
         self.store.close()
