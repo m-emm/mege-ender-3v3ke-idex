@@ -13,8 +13,13 @@ bed_to_nozzle_gap: 0.0
 # The generated printer.cfg and calibration runner both consume these values.
 tap_mesh:
   profile: tap_7x7
-  samples: 3
+  # One contact per grid point is the managed default.  A caller may still
+  # request a larger explicit SAMPLES value for a diagnostic run.
+  samples: 1
   horizontal_move_z: 5.0
+  # Eddy rapid-scan height; unlike Tap travel clearance this must stay within
+  # the calibrated Eddy sensor range above the bed.
+  rapid_scan_height: 0.5
   probe_count: [7, 7]
 # Accepted vision-derived relationship. Iteration 1 may translate both
 # endstops, but must never change this relative T1/T0 Z alignment.

@@ -621,8 +621,10 @@ def test_atomic_calibration_update(tmp_path):
 def _tap_mesh_runner(module, *, profile=None, pending=None):
     tap_mesh = {
         "profile": "tap_7x7",
+        "rapid_profile": "tap_7x7_eddy_rapid",
         "samples": 1,
         "horizontal_move_z": 5.0,
+        "rapid_scan_height": 0.5,
         "probe_count": (7, 7),
         "probe_count_text": "7,7",
     }
@@ -635,19 +637,39 @@ def _tap_mesh_runner(module, *, profile=None, pending=None):
             self.writes[name] = value
 
     class Client:
+        def __init__(self):
+            self.active_profile = profile or tap_mesh["profile"]
+
         def status(self, objects):
             if objects == ["configfile"]:
                 return {"configfile": {"save_config_pending_items": {}}}
             if objects == ["bed_mesh", "configfile"]:
+                profiles = {
+                    tap_mesh["profile"]: {"points": [[0.0, 0.0], [0.0, 0.0]]},
+                    tap_mesh["rapid_profile"]: {
+                        "points": [[0.1, 0.1], [0.1, 0.1]]
+                    },
+                }
+                active_pending = (
+                    pending
+                    if pending is not None
+                    else {
+                        f"bed_mesh {tap_mesh['profile']}": {},
+                        **(
+                            {f"bed_mesh {tap_mesh['rapid_profile']}": {}}
+                            if self.active_profile == tap_mesh["rapid_profile"]
+                            else {}
+                        ),
+                    }
+                )
                 return {
                     "bed_mesh": {
-                        "profile_name": profile or tap_mesh["profile"],
+                        "profile_name": self.active_profile,
                         "mesh_matrix": [[0.0, 0.0], [0.0, 0.0]],
+                        "profiles": profiles,
                     },
                     "configfile": {
-                        "save_config_pending_items": pending
-                        if pending is not None
-                        else {f"bed_mesh {tap_mesh['profile']}": {}},
+                        "save_config_pending_items": active_pending,
                         "settings": {
                             "bed_mesh": {
                                 "mesh_min": "42,20",
@@ -663,6 +685,7 @@ def _tap_mesh_runner(module, *, profile=None, pending=None):
     runner.tap_threshold = 7500.0
     runner.tap_mesh = {
         "profile": "tap_7x7",
+        "rapid_profile": "tap_7x7_eddy_rapid",
         "samples": 1,
         "horizontal_move_z": 5.0,
         "probe_count": (7, 7),
@@ -687,7 +710,24 @@ def test_final_mesh_uses_native_tap_profile_and_active_contact_verification():
     runner = _tap_mesh_runner(module)
     commands = []
     checkpoints = []
-    runner._gcode = lambda script, **kwargs: commands.append((script, kwargs))
+    def gcode(script, **kwargs):
+        commands.append((script, kwargs))
+        if script == "BED_MESH_PROFILE LOAD=tap_7x7":
+            runner.client.active_profile = "tap_7x7"
+        elif script == "BED_MESH_PROFILE LOAD=tap_7x7_eddy_rapid":
+            runner.client.active_profile = "tap_7x7_eddy_rapid"
+
+    runner._gcode = gcode
+    runner.verify_active_tap_mesh = lambda status, **kwargs: {
+        "passed": True,
+        "failures": [],
+        "points": [],
+    }
+    runner.verify_active_rapid_scan_mesh = lambda status, **kwargs: {
+        "passed": True,
+        "failures": [],
+        "points": [],
+    }
     runner.checkpoint = lambda *args, **kwargs: checkpoints.append((args, kwargs))
 
     runner.final_mesh()
@@ -695,10 +735,23 @@ def test_final_mesh_uses_native_tap_profile_and_active_contact_verification():
     assert commands == [
         ("BED_MESH_IDEX_CALIBRATE", {"timeout": 900.0}),
         ("BED_MESH_PROFILE LOAD=tap_7x7", {}),
+        (
+            "BED_MESH_CLEAR\nT0\n"
+            "_BED_MESH_CALIBRATE_NATIVE PROFILE=tap_7x7_eddy_rapid "
+            "METHOD=rapid_scan SAMPLES=1 HORIZONTAL_MOVE_Z=0.500",
+            {"timeout": 900.0},
+        ),
+        ("BED_MESH_PROFILE LOAD=tap_7x7_eddy_rapid", {}),
+        ("BED_MESH_PROFILE LOAD=tap_7x7", {}),
     ]
-    assert all("EDDY_" not in command[0] for command in commands)
     assert commands[-1][0] == "BED_MESH_PROFILE LOAD=tap_7x7"
     assert runner.store.writes["mesh-tap.json"]["profile"] == "tap_7x7"
+    assert runner.store.writes["mesh-rapid-scan.json"]["profile"] == (
+        "tap_7x7_eddy_rapid"
+    )
+    assert runner.store.writes["mesh-comparison.json"]["left_half"]["mean_abs"] == (
+        pytest.approx(0.1)
+    )
     assert runner.store.writes["mesh-tap.json"]["tap_contact_target_z"] == pytest.approx(
         -0.2
     )
@@ -870,33 +923,47 @@ def test_active_absolute_tap_mesh_maps_the_tapped_plane_to_gcode_zero():
     )
 
 
-def test_final_mesh_keeps_active_profile_and_evidence_after_failed_verification():
+def test_final_mesh_completes_diagnostic_after_failed_tap_verification():
     module = _load_module()
     runner = _tap_mesh_runner(module)
     checkpoints = []
-    runner._gcode = lambda *_args, **_kwargs: None
+    def gcode(script, **_kwargs):
+        if script == "BED_MESH_PROFILE LOAD=tap_7x7":
+            runner.client.active_profile = "tap_7x7"
+        elif script == "BED_MESH_PROFILE LOAD=tap_7x7_eddy_rapid":
+            runner.client.active_profile = "tap_7x7_eddy_rapid"
+
+    runner._gcode = gcode
     runner.checkpoint = lambda *args, **kwargs: checkpoints.append((args, kwargs))
-    runner.verify_active_tap_mesh = lambda _status: {
-        "passed": False,
-        "failures": ["(42.000, 20.000): simulated failure"],
-        "points": [{} for _ in range(9)],
+    tap_calls = []
+
+    def verify_tap(_status, **kwargs):
+        tap_calls.append(kwargs)
+        if not kwargs:
+            return {
+                "passed": False,
+                "failures": ["(42.000, 20.000): simulated failure"],
+                "points": [{} for _ in range(9)],
+            }
+        return {"passed": True, "failures": [], "points": []}
+
+    runner.verify_active_tap_mesh = verify_tap
+    runner.verify_active_rapid_scan_mesh = lambda _status, **_kwargs: {
+        "passed": True,
+        "failures": [],
+        "points": [],
     }
 
-    with pytest.raises(module.CalibrationError, match="surveying all points"):
+    with pytest.raises(module.CalibrationError, match="completing the dual-mesh"):
         runner.final_mesh()
 
     artifact = runner.store.writes["mesh-tap.json"]
     assert artifact["active_profile_verification"]["passed"] is False
-    assert checkpoints == [
-        (
-            (module.Phase.MESH_SCAN,),
-            {
-                "committed": False,
-                "mesh_status": runner.client.status(["bed_mesh", "configfile"]),
-                "mesh_tap": artifact,
-            },
-        )
-    ]
+    assert "mesh-rapid-scan.json" in runner.store.writes
+    assert "mesh-comparison.json" in runner.store.writes
+    assert tap_calls == [{}, {"profile": "tap_7x7_eddy_rapid", "enforce_residual": False}]
+    assert checkpoints[-1][0] == (module.Phase.MESH_SCAN,)
+    assert checkpoints[-1][1]["committed"] is False
 
 
 def test_final_mesh_runs_one_native_tap_mesh_at_safe_clearance():

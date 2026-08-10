@@ -90,7 +90,7 @@ TAP_CONTACT_XY_TOLERANCE = 0.020
 TAP_MESH_ACTIVE_CONTACT_TOLERANCE = 0.030
 TAP_MESH_VERIFY_GCODE_Z = 5.0
 ARMING_PHRASE = "CALIBRATE IDEX Z ITERATION 1"
-WORKFLOW_VERSION = 5
+WORKFLOW_VERSION = 6
 
 
 class CalibrationError(RuntimeError):
@@ -501,9 +501,12 @@ def pending_sections(pending: Any, *, _root: bool = True) -> set[str]:
     return found
 
 
-def require_only_transient_mesh_pending(pending: Any, profile: str) -> None:
+def require_only_transient_mesh_pending(
+    pending: Any, *profiles: str
+) -> None:
     sections = pending_sections(pending)
-    unexpected = sections - {f"bed_mesh {profile}"}
+    expected = {f"bed_mesh {profile}" for profile in profiles}
+    unexpected = sections - expected
     if unexpected:
         raise CalibrationError(
             "unexpected pending config after mesh scan: "
@@ -835,6 +838,7 @@ def configured_tap_mesh(calibration: Mapping[str, Any]) -> dict[str, Any]:
         profile = value["profile"]
         samples = value["samples"]
         horizontal_move_z = value["horizontal_move_z"]
+        rapid_scan_height = value.get("rapid_scan_height", 0.5)
         probe_count = value["probe_count"]
         if not isinstance(profile, str) or not profile.strip():
             raise TypeError
@@ -844,6 +848,11 @@ def configured_tap_mesh(calibration: Mapping[str, Any]) -> dict[str, Any]:
             raise TypeError
         horizontal_move_z = float(horizontal_move_z)
         if not math.isfinite(horizontal_move_z) or horizontal_move_z <= 0:
+            raise TypeError
+        if isinstance(rapid_scan_height, bool):
+            raise TypeError
+        rapid_scan_height = float(rapid_scan_height)
+        if not math.isfinite(rapid_scan_height) or rapid_scan_height <= 0:
             raise TypeError
         if (
             not isinstance(probe_count, Sequence)
@@ -859,14 +868,90 @@ def configured_tap_mesh(calibration: Mapping[str, Any]) -> dict[str, Any]:
     except (KeyError, TypeError, ValueError) as exc:
         raise CalibrationError(
             "calib.yaml must define tap_mesh with profile, samples, "
-            "horizontal_move_z, and two-value probe_count"
+            "horizontal_move_z, rapid_scan_height, and two-value probe_count"
         ) from exc
     return {
         "profile": profile.strip(),
+        "rapid_profile": f"{profile.strip()}_eddy_rapid",
         "samples": samples,
         "horizontal_move_z": horizontal_move_z,
+        "rapid_scan_height": rapid_scan_height,
         "probe_count": tuple(probe_count),
         "probe_count_text": ",".join(str(item) for item in probe_count),
+    }
+
+
+def mesh_profile_points(status: Mapping[str, Any], profile: str) -> list[list[float]]:
+    """Return the raw stored points for one transient Klipper mesh profile."""
+
+    bed_mesh = status.get("bed_mesh")
+    if not isinstance(bed_mesh, Mapping):
+        raise CalibrationError("bed_mesh status is unavailable")
+    profiles = bed_mesh.get("profiles")
+    if not isinstance(profiles, Mapping):
+        raise CalibrationError("bed_mesh profiles are unavailable")
+    profile_data = profiles.get(profile)
+    if not isinstance(profile_data, Mapping):
+        raise CalibrationError(f"bed_mesh profile {profile!r} is unavailable")
+    points = profile_data.get("points") or profile_data.get("probed_matrix")
+    if not isinstance(points, Sequence) or isinstance(points, (str, bytes)):
+        raise CalibrationError(f"bed_mesh profile {profile!r} has no point matrix")
+    matrix: list[list[float]] = []
+    for row in points:
+        if not isinstance(row, Sequence) or isinstance(row, (str, bytes)):
+            raise CalibrationError(f"bed_mesh profile {profile!r} has an invalid row")
+        values = [float(value) for value in row]
+        if not values or not all(math.isfinite(value) for value in values):
+            raise CalibrationError(f"bed_mesh profile {profile!r} has invalid values")
+        matrix.append(values)
+    if not matrix or len({len(row) for row in matrix}) != 1:
+        raise CalibrationError(f"bed_mesh profile {profile!r} has an invalid matrix")
+    return matrix
+
+
+def compare_mesh_profile_points(
+    tap_points: Sequence[Sequence[float]],
+    rapid_points: Sequence[Sequence[float]],
+) -> dict[str, Any]:
+    """Compare two same-grid meshes and summarize left/right differences."""
+
+    if len(tap_points) != len(rapid_points) or not tap_points:
+        raise CalibrationError("mesh profiles do not have matching row counts")
+    if any(len(a) != len(b) for a, b in zip(tap_points, rapid_points)):
+        raise CalibrationError("mesh profiles do not have matching column counts")
+    deltas = [
+        [float(rapid) - float(tap) for tap, rapid in zip(tap_row, rapid_row)]
+        for tap_row, rapid_row in zip(tap_points, rapid_points)
+    ]
+    flat = [value for row in deltas for value in row]
+    left = [
+        deltas[row][column]
+        for row in range(len(deltas))
+        for column in range(len(deltas[row]))
+        if column < len(deltas[row]) / 2
+    ]
+    right = [
+        deltas[row][column]
+        for row in range(len(deltas))
+        for column in range(len(deltas[row]))
+        if column >= len(deltas[row]) / 2
+    ]
+
+    def summary(values: Sequence[float]) -> dict[str, float]:
+        return {
+            "mean": statistics.fmean(values),
+            "mean_abs": statistics.fmean(abs(value) for value in values),
+            "rms": math.sqrt(statistics.fmean(value * value for value in values)),
+            "max_abs": max(abs(value) for value in values),
+        }
+
+    return {
+        "rows": len(deltas),
+        "columns": len(deltas[0]),
+        "delta_rapid_minus_tap": deltas,
+        "all": summary(flat),
+        "left_half": summary(left),
+        "right_half": summary(right),
     }
 
 
@@ -1259,6 +1344,55 @@ class Iteration1Runner:
             summary.standard_deviation,
         )
         return summary, attempts
+
+    def collect_eddy_scan(
+        self, *, x: float, y: float, scan_height: float
+    ) -> dict[str, float]:
+        """Acquire one stationary Eddy scan for a requested bed coordinate.
+
+        Eddy's coil is offset from the nozzle.  The requested X/Y here is the
+        bed coordinate reported by the probe, so the nozzle is moved to the
+        inverse-offset pose before ``PROBE METHOD=scan``.
+        """
+
+        eddy = self.raw_calibration["eddy_relative_calibration"]["nozzle_to_coil"]
+        coil_offset_x = float(eddy["x"])
+        coil_offset_y = float(eddy["y"])
+        nozzle_x = x - coil_offset_x
+        nozzle_y = y - coil_offset_y
+        _logger.info(
+            "Eddy scan started: bed=(%.3f, %.3f) nozzle=(%.3f, %.3f) height=%.3f",
+            x,
+            y,
+            nozzle_x,
+            nozzle_y,
+            scan_height,
+        )
+        self._gcode(
+            f"G90\nG1 X{nozzle_x:.3f} Y{nozzle_y:.3f} "
+            f"Z{scan_height:.3f} F1200\n"
+            "PROBE METHOD=scan SAMPLES=1\nM400"
+        )
+        if self.dry_run:
+            result = {"x": x, "y": y, "z": 0.0}
+        else:
+            result = probe_result_from_status(self.client.status(["probe"]))
+            if (
+                abs(result["x"] - x) > TAP_CONTACT_XY_TOLERANCE
+                or abs(result["y"] - y) > TAP_CONTACT_XY_TOLERANCE
+            ):
+                raise CalibrationError(
+                    "Eddy scan physical XY mismatch: "
+                    f"requested=({x:.3f}, {y:.3f}) "
+                    f"actual=({result['x']:.6f}, {result['y']:.6f})"
+                )
+        _logger.info(
+            "Eddy scan finished: bed=(%.3f, %.3f) inferred_bed_z=%.6f",
+            result["x"],
+            result["y"],
+            result["z"],
+        )
+        return result
 
     @staticmethod
     def require_center_tap(
@@ -2012,9 +2146,22 @@ class Iteration1Runner:
             )
         return toolhead_z - gcode_z
 
-    def verify_active_tap_mesh(self, status: Mapping[str, Any]) -> dict[str, Any]:
-        """Verify that active mesh compensation produces the configured clearance."""
+    def verify_active_tap_mesh(
+        self,
+        status: Mapping[str, Any],
+        *,
+        profile: str | None = None,
+        enforce_residual: bool = True,
+    ) -> dict[str, Any]:
+        """Verify an active mesh against fresh Tap contacts.
 
+        ``enforce_residual=False`` is used for the deliberately diagnostic
+        rapid-scan-vs-Tap comparison: acquisition failures still fail the
+        report, while method disagreement is recorded instead of aborting the
+        two-profile experiment.
+        """
+
+        profile = profile or self.tap_mesh["profile"]
         mesh_min, mesh_max = configured_mesh_bounds(status)
         if not (
             mesh_min.x <= REFERENCE_X <= mesh_max.x
@@ -2033,10 +2180,13 @@ class Iteration1Runner:
         )
         records: list[dict[str, Any]] = []
         failures: list[str] = []
+        residual_failures: list[str] = []
         _logger.info(
-            "I1.6 active Tap mesh verification started: points=%d gap=%.6f",
+            "I1.6 active Tap mesh verification started: profile=%s points=%d gap=%.6f enforced=%s",
+            profile,
             len(points),
             self.bed_to_nozzle_gap,
+            enforce_residual,
         )
         for point in points:
             record: dict[str, Any] = {
@@ -2067,6 +2217,10 @@ class Iteration1Runner:
                 contact_z = float(summary.median)
                 measured_bed_to_nozzle_gap = mesh_transform_z - contact_z
                 residual = measured_bed_to_nozzle_gap - self.bed_to_nozzle_gap
+                corrected_commanded_tap_z = contact_z - mesh_transform_z
+                corrected_commanded_tap_z_residual = (
+                    corrected_commanded_tap_z - self.tap_contact_target_z
+                )
                 record.update(
                     {
                         "actual_x": contact_x,
@@ -2075,6 +2229,8 @@ class Iteration1Runner:
                         "mesh_transform_z": mesh_transform_z,
                         "measured_bed_to_nozzle_gap": measured_bed_to_nozzle_gap,
                         "gap_residual": residual,
+                        "corrected_commanded_tap_z": corrected_commanded_tap_z,
+                        "corrected_commanded_tap_z_residual": corrected_commanded_tap_z_residual,
                         "post_retract_toolhead_z": sample[
                             "post_retract_toolhead_z"
                         ],
@@ -2091,15 +2247,19 @@ class Iteration1Runner:
                         f"actual=({contact_x:.6f}, {contact_y:.6f})"
                     )
                 if abs(residual) > TAP_MESH_ACTIVE_CONTACT_TOLERANCE:
-                    raise CalibrationError(
-                        "active mesh produces the wrong physical nozzle clearance: "
-                        f"mesh_transform_z={mesh_transform_z:.6f} "
-                        f"raw_contact_z={contact_z:.6f} "
-                        f"measured_gap={measured_bed_to_nozzle_gap:.6f} "
-                        f"target_gap={self.bed_to_nozzle_gap:.6f} "
-                        f"residual={residual:.6f} "
+                    message = (
+                        f"({point.x:.3f}, {point.y:.3f}): "
+                        "active mesh Tap residual exceeds tolerance: "
+                        f"profile={profile} residual={residual:.6f} "
                         f"tolerance={TAP_MESH_ACTIVE_CONTACT_TOLERANCE:.6f}"
                     )
+                    residual_failures.append(message)
+                    record["residual_within_tolerance"] = False
+                    if enforce_residual:
+                        raise CalibrationError(message)
+                    _logger.warning("%s (report-only)", message)
+                else:
+                    record["residual_within_tolerance"] = True
                 record["passed"] = True
             except Exception as exc:
                 record["passed"] = False
@@ -2110,7 +2270,9 @@ class Iteration1Runner:
                 _logger.warning("I1.6 active Tap mesh verification failed: %s", failures[-1])
             records.append(record)
         verification = {
-            "profile": self.tap_mesh["profile"],
+            "profile": profile,
+            "measurement": "tap",
+            "enforced": enforce_residual,
             "mesh_min": asdict(mesh_min),
             "mesh_max": asdict(mesh_max),
             "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
@@ -2121,19 +2283,117 @@ class Iteration1Runner:
             "points": records,
             "failure_count": len(failures),
             "failures": failures,
-            "passed": not failures,
+            "residual_failures": residual_failures,
+            "residual_failure_count": len(residual_failures),
+            "passed": not failures and (not enforce_residual or not residual_failures),
         }
         _logger.info(
-            "I1.6 active Tap mesh verification finished: passed=%s failures=%d",
+            "I1.6 active Tap mesh verification finished: profile=%s passed=%s failures=%d residual_failures=%d",
+            profile,
+            verification["passed"],
+            verification["failure_count"],
+            verification["residual_failure_count"],
+        )
+        return verification
+
+    def verify_active_rapid_scan_mesh(
+        self, status: Mapping[str, Any], *, profile: str
+    ) -> dict[str, Any]:
+        """Validate a rapid-scan mesh against fresh stationary Eddy scans."""
+
+        mesh_min, mesh_max = configured_mesh_bounds(status)
+        points = tuple(
+            MeshPoint(x, y)
+            for y in (mesh_min.y, REFERENCE_Y, mesh_max.y)
+            for x in (mesh_min.x, REFERENCE_X, mesh_max.x)
+        )
+        records: list[dict[str, Any]] = []
+        failures: list[str] = []
+        _logger.info(
+            "I1.6 active rapid-scan mesh verification started: profile=%s points=%d",
+            profile,
+            len(points),
+        )
+        for point in points:
+            record: dict[str, Any] = {
+                "requested_x": point.x,
+                "requested_y": point.y,
+            }
+            try:
+                mesh_transform_z = self.active_mesh_transform_z_at(point)
+                scan = self.collect_eddy_scan(
+                    x=point.x,
+                    y=point.y,
+                    scan_height=self.tap_mesh["rapid_scan_height"],
+                )
+                corrected_commanded_scan_z = scan["z"] - mesh_transform_z
+                record.update(
+                    {
+                        "actual_x": scan["x"],
+                        "actual_y": scan["y"],
+                        "raw_scan_z": scan["z"],
+                        "mesh_transform_z": mesh_transform_z,
+                        "corrected_commanded_scan_z": corrected_commanded_scan_z,
+                    }
+                )
+                if abs(corrected_commanded_scan_z) > TAP_MESH_ACTIVE_CONTACT_TOLERANCE:
+                    record["residual_within_tolerance"] = False
+                    _logger.warning(
+                        "rapid-scan self residual (report-only): profile=%s "
+                        "point=(%.3f, %.3f) scan_z=%.6f transform=%.6f "
+                        "corrected=%.6f tolerance=%.6f",
+                        profile,
+                        point.x,
+                        point.y,
+                        scan["z"],
+                        mesh_transform_z,
+                        corrected_commanded_scan_z,
+                        TAP_MESH_ACTIVE_CONTACT_TOLERANCE,
+                    )
+                else:
+                    record["residual_within_tolerance"] = True
+                record["passed"] = True
+            except Exception as exc:
+                record["passed"] = False
+                record["error"] = str(exc)
+                failures.append(f"({point.x:.3f}, {point.y:.3f}): {exc}")
+                _logger.warning("rapid-scan mesh verification failed: %s", failures[-1])
+            records.append(record)
+        verification = {
+            "profile": profile,
+            "measurement": "eddy_scan",
+            "mesh_min": asdict(mesh_min),
+            "mesh_max": asdict(mesh_max),
+            "point_tolerance": TAP_MESH_ACTIVE_CONTACT_TOLERANCE,
+            "points": records,
+            "failure_count": len(failures),
+            "failures": failures,
+            "passed": not failures,
+            "residuals_report_only": True,
+        }
+        _logger.info(
+            "I1.6 active rapid-scan mesh verification finished: profile=%s "
+            "passed=%s failures=%d",
+            profile,
             verification["passed"],
             verification["failure_count"],
         )
         return verification
 
     def final_mesh(self, *, clean_frame: bool = True) -> None:
-        """Create and retain a transient native T0 Tap mesh."""
+        """Create, compare, and diagnose transient Tap and Eddy meshes."""
 
-        _logger.info("I1.6 native T0 Tap mesh started")
+        tap_profile = self.tap_mesh["profile"]
+        rapid_profile = self.tap_mesh.get(
+            "rapid_profile", f"{tap_profile}_eddy_rapid"
+        )
+        _logger.info(
+            "I1.6 dual mesh workflow started: tap_profile=%s rapid_profile=%s "
+            "tap_samples=%d",
+            tap_profile,
+            rapid_profile,
+            self.tap_mesh["samples"],
+        )
         if clean_frame:
             self._home_clean_frame()
         else:
@@ -2147,9 +2407,9 @@ class Iteration1Runner:
             "BED_MESH_IDEX_CALIBRATE"
         )
         _logger.info(
-            "running IDEX Tap mesh macro: profile=%s threshold=%.3f probe_count=%s "
+            "running IDEX one-tap mesh macro: profile=%s threshold=%.3f probe_count=%s "
             "horizontal_move_z=%.3f",
-            self.tap_mesh["profile"],
+            tap_profile,
             self.tap_threshold,
             self.tap_mesh["probe_count_text"],
             self.tap_mesh["horizontal_move_z"],
@@ -2167,51 +2427,161 @@ class Iteration1Runner:
         # but Klipper does not activate that profile automatically.  Activate
         # the just-measured surface before checking its live matrix or Tap
         # contacts; this is an activation, not a persisted SAVE_CONFIG change.
-        self._gcode(f"BED_MESH_PROFILE LOAD={self.tap_mesh['profile']}")
+        self._gcode(f"BED_MESH_PROFILE LOAD={tap_profile}")
         status = self.client.status(["bed_mesh", "configfile"])
         pending = status.get("configfile", {}).get("save_config_pending_items", {})
-        require_only_transient_mesh_pending(pending, self.tap_mesh["profile"])
+        require_only_transient_mesh_pending(pending, tap_profile)
         mesh = status.get("bed_mesh", {})
         matrix = mesh.get("mesh_matrix") or mesh.get("probed_matrix")
-        if mesh.get("profile_name") != self.tap_mesh["profile"] or not matrix:
+        if mesh.get("profile_name") != tap_profile or not matrix:
             raise CalibrationError(
                 "native Tap mesh did not leave active profile "
-                f"{self.tap_mesh['profile']}"
+                f"{tap_profile}"
             )
-        verification = self.verify_active_tap_mesh(status)
-        artifact = {
+        tap_verification = self.verify_active_tap_mesh(status)
+        tap_artifact = {
             "method": "tap",
-            "profile": self.tap_mesh["profile"],
+            "profile": tap_profile,
             "command": command,
             "tap_threshold": self.tap_threshold,
             "samples": self.tap_mesh["samples"],
             "horizontal_move_z": self.tap_mesh["horizontal_move_z"],
+            "rapid_scan_height": self.tap_mesh["rapid_scan_height"],
             "probe_count": self.tap_mesh["probe_count_text"],
             "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
             "tap_contact_target_z": self.tap_contact_target_z,
             "mesh_status": mesh,
             "pending_sections": sorted(pending_sections(pending)),
-            "active_profile_verification": verification,
+            "active_profile_verification": tap_verification,
         }
-        self.store.write_json("mesh-tap.json", artifact)
-        if not verification["passed"]:
+        self.store.write_json("mesh-tap.json", tap_artifact)
+        tap_validation_failed = not tap_verification["passed"]
+        if tap_validation_failed:
+            _logger.warning(
+                "Tap mesh validation failed; continuing report-only to complete "
+                "the requested rapid-scan comparison: %s",
+                "; ".join(tap_verification["failures"]),
+            )
+
+        # The second profile is deliberately not loaded through a SAVE_CONFIG
+        # path.  Klipper retains both named profiles in memory and reports them
+        # as pending transient config; the Tap profile is restored at the end.
+        rapid_command = (
+            f"BED_MESH_CLEAR\nT0\n"
+            f"_BED_MESH_CALIBRATE_NATIVE PROFILE={rapid_profile} "
+            "METHOD=rapid_scan SAMPLES=1 "
+            f"HORIZONTAL_MOVE_Z={self.tap_mesh['rapid_scan_height']:.3f}"
+        )
+        _logger.info(
+            "running Eddy rapid-scan mesh: profile=%s scan_height=%.3f "
+            "probe_count=%s",
+            rapid_profile,
+            self.tap_mesh["rapid_scan_height"],
+            self.tap_mesh["probe_count_text"],
+        )
+        self._gcode(rapid_command, timeout=900.0)
+        self._gcode(f"BED_MESH_PROFILE LOAD={rapid_profile}")
+        rapid_status = self.client.status(["bed_mesh", "configfile"])
+        rapid_pending = rapid_status.get("configfile", {}).get(
+            "save_config_pending_items", {}
+        )
+        require_only_transient_mesh_pending(rapid_pending, tap_profile, rapid_profile)
+        rapid_mesh = rapid_status.get("bed_mesh", {})
+        rapid_matrix = rapid_mesh.get("mesh_matrix") or rapid_mesh.get("probed_matrix")
+        if rapid_mesh.get("profile_name") != rapid_profile or not rapid_matrix:
+            raise CalibrationError(
+                "rapid-scan mesh did not leave active profile "
+                f"{rapid_profile}"
+            )
+
+        tap_points = mesh_profile_points(status, tap_profile)
+        rapid_points = mesh_profile_points(rapid_status, rapid_profile)
+        comparison = compare_mesh_profile_points(tap_points, rapid_points)
+        self.store.write_json(
+            "mesh-comparison.json",
+            {
+                "tap_profile": tap_profile,
+                "rapid_profile": rapid_profile,
+                **comparison,
+            },
+        )
+        _logger.info(
+            "mesh comparison rapid-minus-tap: all_mean_abs=%.6f all_max_abs=%.6f "
+            "left_mean_abs=%.6f left_max_abs=%.6f right_mean_abs=%.6f",
+            comparison["all"]["mean_abs"],
+            comparison["all"]["max_abs"],
+            comparison["left_half"]["mean_abs"],
+            comparison["left_half"]["max_abs"],
+            comparison["right_half"]["mean_abs"],
+        )
+
+        rapid_scan_verification = self.verify_active_rapid_scan_mesh(
+            rapid_status, profile=rapid_profile
+        )
+        rapid_tap_verification = self.verify_active_tap_mesh(
+            rapid_status, profile=rapid_profile, enforce_residual=False
+        )
+        rapid_artifact = {
+            "method": "rapid_scan",
+            "profile": rapid_profile,
+            "command": rapid_command,
+            "samples": 1,
+            "horizontal_move_z": self.tap_mesh["horizontal_move_z"],
+            "rapid_scan_height": self.tap_mesh["rapid_scan_height"],
+            "probe_count": self.tap_mesh["probe_count_text"],
+            "bed_to_nozzle_gap": self.bed_to_nozzle_gap,
+            "tap_contact_target_z": self.tap_contact_target_z,
+            "mesh_status": rapid_mesh,
+            "pending_sections": sorted(pending_sections(rapid_pending)),
+            "active_profile_scan_verification": rapid_scan_verification,
+            "active_profile_tap_cross_verification": rapid_tap_verification,
+        }
+        self.store.write_json("mesh-rapid-scan.json", rapid_artifact)
+
+        if not rapid_scan_verification["passed"]:
             self.checkpoint(
                 Phase.MESH_SCAN,
                 committed=False,
-                mesh_status=status,
-                mesh_tap=artifact,
+                mesh_status=rapid_status,
+                mesh_tap=tap_artifact,
+                mesh_rapid_scan=rapid_artifact,
+                mesh_comparison=comparison,
             )
             raise CalibrationError(
-                "active Tap mesh verification failed after surveying all points: "
-                + "; ".join(verification["failures"])
+                "rapid-scan mesh acquisition verification failed: "
+                + "; ".join(rapid_scan_verification["failures"])
             )
+
+        # Leave the authoritative one-tap mesh active for subsequent printing.
+        self._gcode(f"BED_MESH_PROFILE LOAD={tap_profile}")
+        final_status = self.client.status(["bed_mesh", "configfile"])
+        final_pending = final_status.get("configfile", {}).get(
+            "save_config_pending_items", {}
+        )
+        require_only_transient_mesh_pending(final_pending, tap_profile, rapid_profile)
+        committed = tap_verification["passed"] and rapid_scan_verification["passed"]
         self.checkpoint(
             Phase.MESH_SCAN,
-            committed=True,
-            mesh_status=status,
-            mesh_tap=artifact,
+            committed=committed,
+            mesh_status=final_status,
+            mesh_tap=tap_artifact,
+            mesh_rapid_scan=rapid_artifact,
+            mesh_comparison=comparison,
         )
-        _logger.info("I1.6 native T0 Tap mesh finished and remains active")
+        _logger.info(
+            "I1.6 dual mesh workflow finished: active_profile=%s "
+            "tap_passed=%s rapid_scan_self_passed=%s rapid_tap_cross_passed=%s",
+            tap_profile,
+            tap_verification["passed"],
+            rapid_scan_verification["passed"],
+            rapid_tap_verification["passed"],
+        )
+        if tap_validation_failed:
+            raise CalibrationError(
+                "active Tap mesh verification failed after completing the dual-mesh "
+                "diagnostic: "
+                + "; ".join(tap_verification["failures"])
+            )
 
     def resume(self) -> RunState:
         """Continue only from the last committed phase boundary."""

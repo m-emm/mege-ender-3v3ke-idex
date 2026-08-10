@@ -41,7 +41,7 @@ def test_generated_mesh_commands_route_through_idex_tap_macro():
     assert "PROFILE=tap_7x7 METHOD=tap" in config
     assert "SAMPLES={samples}" in config
     assert "SAMPLES_RESULT=median" in config
-    assert "default(3)" in config
+    assert "default(1)" in config
     assert "zero_reference_position:" not in config
     assert "horizontal_move_z: 5.000" in config
     assert "probe_count: 7,7" in config

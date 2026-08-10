@@ -73,6 +73,13 @@ def _load_tap_mesh(data: dict[str, Any]) -> dict[str, Any]:
     )
     if not math.isfinite(horizontal_move_z) or horizontal_move_z <= 0:
         raise ValueError("tap_mesh.horizontal_move_z must be finite and positive")
+    rapid_scan_height = _require_float(
+        value,
+        "rapid_scan_height",
+        "tap_mesh",
+    ) if "rapid_scan_height" in value else 0.5
+    if not math.isfinite(rapid_scan_height) or rapid_scan_height <= 0:
+        raise ValueError("tap_mesh.rapid_scan_height must be finite and positive")
     probe_count = value.get("probe_count")
     if (
         not isinstance(probe_count, (list, tuple))
@@ -90,6 +97,7 @@ def _load_tap_mesh(data: dict[str, Any]) -> dict[str, Any]:
         "profile": profile.strip(),
         "samples": samples,
         "horizontal_move_z": horizontal_move_z,
+        "rapid_scan_height": rapid_scan_height,
         "probe_count": probe_count,
     }
 
