@@ -128,6 +128,29 @@ def test_prepare_builds_both_tool_grids_with_per_tool_commanded_y():
     ] == [173.0 + value for value in definition["x_offsets_from_bed_tab_mm"]]
 
 
+def test_prepare_propagates_optional_xy_nozzle_image_prior():
+    module = _module()
+    inputs = _inputs()
+    prior = {
+        "model": "linear_commanded_x_to_pixel_v1",
+        "x_mm_range": [191.0, 199.0],
+        "coefficients_px": [[-786.0, 500.0], [9.9, 0.0]],
+        "fit_rms_px": [0.1, 0.1],
+        "source_commanded_z_mm": 0.5,
+    }
+    inputs["t0_xy_datum"] = {"nozzle_image_prior": prior}
+    inputs["t1_xy_datum"] = {"nozzle_image_prior": prior}
+
+    result = module.prepare_sweep(
+        _definition(),
+        input_values=inputs,
+        resolved=_resolved(),
+    )
+
+    assert result["references"]["t0"]["nozzle_image_prior"] == prior
+    assert result["references"]["t1"]["nozzle_image_prior"] == prior
+
+
 def test_prepare_rejects_z_outside_loaded_limits():
     module = _module()
     definition = json.loads(json.dumps(_definition()))
@@ -163,6 +186,89 @@ def test_robust_u_x_slope_rejects_an_outlier():
 
     assert module._fit_robust_u_x_slope(records) == pytest.approx(2.0)
     assert module._fit_robust_u_x_slope(records[:2]) is None
+
+
+def test_huber_row_fit_preserves_point_diagnostics_and_downweights_outlier():
+    module = _module()
+    x_values = np.asarray([0.0, 1.0, 2.0, 3.0, 4.0])
+    u_values = np.asarray([10.0, 12.0, 14.0, 16.0, 100.0])
+
+    fit = module._fit_row_trajectory(
+        x_values,
+        u_values,
+        method="huber_irls",
+    )
+
+    assert fit["slope"] == pytest.approx(2.0)
+    assert bool(fit["downweighted"][-1]) is True
+    assert float(fit["weights"][-1]) == pytest.approx(0.0)
+    assert len(fit["residuals_px"]) == len(x_values)
+
+
+def _synthetic_shared_fits(delta_mm=-0.6):
+    fits = []
+    for tool in ("T0", "T1"):
+        for z_mm in (0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5):
+            physical_z = z_mm + (delta_mm if tool == "T1" else 0.0)
+            fits.append(
+                {
+                    "tool": tool,
+                    "z_mm": z_mm,
+                    "slope_u_px_per_mm": 9.85 - 0.1 * physical_z + 0.01 * physical_z**2,
+                    "slope_uncertainty_px_per_mm": 0.03,
+                    "u_x_correlation_coefficient": 0.999,
+                }
+            )
+    return fits
+
+
+def test_profiled_shared_fit_recovers_delta_independent_of_input_order():
+    module = _module()
+    fits = _synthetic_shared_fits()
+
+    result = module.estimate_tool_z_delta(fits)
+    reversed_result = module.estimate_tool_z_delta(list(reversed(fits)))
+
+    assert result["available"] is True
+    assert result["t1_z_delta_mm"] == pytest.approx(-0.6, abs=0.02)
+    assert reversed_result["t1_z_delta_mm"] == pytest.approx(
+        result["t1_z_delta_mm"], abs=1.0e-9
+    )
+    assert result["fit_method"] == "quadratic_profiled_huber_with_jackknife"
+    assert result["jackknife_delta_span_mm"] == pytest.approx(0.0, abs=1.0e-5)
+
+
+def test_profiled_shared_fit_bound_saturation_is_unavailable():
+    module = _module()
+    fits = _synthetic_shared_fits(delta_mm=2.2)
+
+    result = module.estimate_tool_z_delta(fits)
+
+    assert result["available"] is False
+    assert result["boundary_saturated"] is True
+    assert "operational T1 delta bound" in result["reason"]
+
+
+def test_profiled_shared_fit_reports_leave_one_row_instability(monkeypatch):
+    module = _module()
+    fits = _synthetic_shared_fits()
+
+    original_profile = module._profile_shared_curve
+
+    def unstable_profile(rows, **kwargs):
+        result = original_profile(rows, **kwargs)
+        if len(rows) == len(fits) - 1:
+            row_signature = sum(int(round(row["z_mm"] * 10.0)) for row in rows)
+            result["delta"] += 0.8 if row_signature % 2 else -0.8
+        return result
+
+    monkeypatch.setattr(module, "_profile_shared_curve", unstable_profile)
+
+    result = module.estimate_tool_z_delta(fits)
+
+    assert result["available"] is False
+    assert result["jackknife_delta_span_mm"] > module.MAX_DELTA_JACKKNIFE_SPAN_MM
+    assert "leave-one-row-out" in result["reason"]
 
 
 def test_registration_quality_rejects_bad_image_correlation():
@@ -325,12 +431,25 @@ def test_analysis_writes_raw_records_and_two_plots(tmp_path, monkeypatch):
         "tool_xz_sweep_u_vs_x",
         "tool_xz_sweep_u_slope_vs_z",
         "tool_xz_sweep_shared_z_fit",
+        "fit_strategy_comparison",
+        "fit_strategy_comparison_plot",
     }
     fits = result["u_x_linear_fits"]
     t0_fit = next(fit for fit in fits if fit["tool"] == "T0" and fit["z_mm"] == 0.5)
     assert t0_fit["slope_u_px_per_mm"] == pytest.approx(1.0)
     assert t0_fit["sample_count"] == 3
-    assert t0_fit["fit_method"] == "theil_sen"
+    assert t0_fit["fit_method"] == "huber_irls"
+    assert all(
+        "point_diagnostics" in fit
+        for fit in fits
+        if fit["slope_u_px_per_mm"] is not None
+    )
+    assert (
+        result["fit_strategy_comparison"]["strategies"]["huber_irls_plus_huber"][
+            "shared_z_curve_fit"
+        ]["available"]
+        is False
+    )
     assert any(fit["slope_u_px_per_mm"] is None for fit in fits)
     assert result["shared_z_curve_fit"]["available"] is False
     assert result["warnings"]

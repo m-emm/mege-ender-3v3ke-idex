@@ -165,9 +165,7 @@ def test_prepare_accepts_configured_capture_y_and_commanded_z():
 
     assert result["reference"]["capture_y_mm"] == -13.1
     assert result["reference"]["commanded_z_mm"] == 1.25
-    assert {
-        frame["commanded_position_mm"][2] for frame in result["frames"]
-    } == {1.25}
+    assert {frame["commanded_position_mm"][2] for frame in result["frames"]} == {1.25}
 
 
 def test_tool_xy_gcode_homes_and_returns_to_t0():
@@ -299,19 +297,37 @@ def test_analysis_cancels_commanded_x_and_y_and_rejects_a_datum_outlier(
     assert result["y_datum_mm"] == -20.0
     assert not result["records"][-1]["accepted"]
     assert "datum residual" in result["records"][-1]["rejection_reasons"][-1]
-    assert module.build_measurement_fact(
+    measurement_fact = module.build_measurement_fact(
         result,
         acquisition_calibration=acquisition,
-    ) == {
+    )
+    assert {
+        key: measurement_fact[key]
+        for key in (
+            "x_datum_mm",
+            "y_datum_mm",
+            "acquisition_endstop_xy_mm",
+            "commanded_z_mm",
+        )
+    } == {
         "x_datum_mm": 50.0,
         "y_datum_mm": -20.0,
         "acquisition_endstop_xy_mm": [-77.635, -14.8],
         "commanded_z_mm": 0.5,
     }
+    prior = measurement_fact["nozzle_image_prior"]
+    assert prior["model"] == "linear_commanded_x_to_pixel_v1"
+    assert prior["x_mm_range"] == [100.0, 115.0]
+    assert prior["source_commanded_z_mm"] == 0.5
+    assert prior["sample_count"] == 4
+    assert len(prior["coefficients_px"]) == 2
+    assert len(prior["fit_rms_px"]) == 2
 
 
 def _fact_value(fact_set, fact_name):
-    return next(fact["value"] for fact in fact_set["facts"] if fact["name"] == fact_name)
+    return next(
+        fact["value"] for fact in fact_set["facts"] if fact["name"] == fact_name
+    )
 
 
 @pytest.mark.parametrize("tool", ["T0", "T1"])
@@ -329,16 +345,16 @@ def test_real_images_publish_stable_tool_xy_datum(tool, tmp_path):
     frame_paths = [directory / f"{frame['frame']}.jpg" for frame in frames]
     for frame, image_path in zip(frames, frame_paths):
         sidecar = json.loads((directory / f"{frame['frame']}.json").read_text())
-        assert sidecar["sha256"] == "sha256:" + hashlib.sha256(
-            image_path.read_bytes()
-        ).hexdigest()
+        assert (
+            sidecar["sha256"]
+            == "sha256:" + hashlib.sha256(image_path.read_bytes()).hexdigest()
+        )
         assert sidecar["commanded_position_mm"] == frame["commanded_position_mm"]
 
     fine_reference = source_manifest["fine_reference"]
     source_facts = json.loads(
         (
-            FIXTURE
-            / fixture["source_fact_sets"]["red_marker_and_mapping"]["path"]
+            FIXTURE / fixture["source_fact_sets"]["red_marker_and_mapping"]["path"]
         ).read_text()
     )
     mapping = _fact_value(
@@ -356,9 +372,7 @@ def test_real_images_publish_stable_tool_xy_datum(tool, tmp_path):
             "image_x_vector_px_per_mm": fine_reference[
                 "fiducial_x_vector_at_fine_capture_px_per_mm"
             ],
-            "image_y_vector_px_per_mm": fine_reference[
-                "image_y_axis_vector_px_per_mm"
-            ],
+            "image_y_vector_px_per_mm": fine_reference["image_y_axis_vector_px_per_mm"],
             "marker_x_vector_px_per_mm": marker["quality"][
                 "tool_axis_vectors_px_per_mm"
             ][tool],
@@ -367,9 +381,7 @@ def test_real_images_publish_stable_tool_xy_datum(tool, tmp_path):
                 "fiducial_reference_printer_xy_mm"
             ],
             "marker_offset_mm": marker["offset_mm"],
-            "marker_reference_commanded_x_mm": marker[
-                "reference_commanded_x_mm"
-            ],
+            "marker_reference_commanded_x_mm": marker["reference_commanded_x_mm"],
         },
         acquisition_calibration=source_manifest["acquisition_calibration"],
         require_locator=False,
@@ -400,16 +412,11 @@ def test_real_fixture_retains_exact_source_fact_sets():
     )
     red = json.loads(
         (
-            FIXTURE
-            / fixture["source_fact_sets"]["red_marker_and_mapping"]["path"]
+            FIXTURE / fixture["source_fact_sets"]["red_marker_and_mapping"]["path"]
         ).read_text()
     )
-    assert _fact_value(
-        bed, "camera.nozzle_cam.bed_fiducial.local_metric_model"
-    )
-    assert _fact_value(
-        red, "camera.nozzle_cam.bed_fiducial.printer_xy_mapping"
-    )
+    assert _fact_value(bed, "camera.nozzle_cam.bed_fiducial.local_metric_model")
+    assert _fact_value(red, "camera.nozzle_cam.bed_fiducial.printer_xy_mapping")
     assert _fact_value(red, "tool.t0.red_marker_to_bed_tab_x_mm")
     assert _fact_value(red, "tool.t1.red_marker_to_bed_tab_x_mm")
 
@@ -504,9 +511,10 @@ def test_candidate_corrects_both_t1_endstop_signs_and_preserves_calib(tmp_path):
     assert candidate["tools"]["t1"]["x_endstop"] == pytest.approx(351.197384)
     assert candidate["tools"]["t1"]["y_endstop"] == pytest.approx(-13.677878)
     assert result["warnings"]
-    assert cv2.imread(
-        str(tmp_path / "analysis" / "artifacts" / "tool_xy_candidate.png")
-    ) is not None
+    assert (
+        cv2.imread(str(tmp_path / "analysis" / "artifacts" / "tool_xy_candidate.png"))
+        is not None
+    )
     assert module.build_candidate_fact(result)["x_alignment_error_mm"] == pytest.approx(
         0.541616
     )

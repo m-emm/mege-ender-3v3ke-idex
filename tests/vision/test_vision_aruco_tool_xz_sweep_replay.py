@@ -24,6 +24,7 @@ Run only the quick single-image inspection with:
 
 from __future__ import annotations
 
+import copy
 import importlib.util
 import json
 import logging
@@ -55,11 +56,6 @@ DATASET_ROOT = (
     / "20260809_aruco_tool_xz_sweep_after_xy"
 )
 OUTPUT_ROOT = REPO_ROOT / "output" / "vision_aruco_tool_xz_sweep_replay"
-# Diagnostic-only bounds around the XY-calibrated nozzle prediction.  These are
-# deliberately not passed to the nozzle detector yet: this test is only meant
-# to show whether the prior is useful for restricting the search.
-NOZZLE_PRIOR_ROI_HALF_WIDTH_PX = 40.0
-NOZZLE_PRIOR_ROI_HALF_HEIGHT_PX = 35.0
 
 
 def _analyzer_module():
@@ -77,9 +73,7 @@ def _analyzer_module():
 
 def _run_root(label: str) -> Path:
     run_id = (
-        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-        + "-"
-        + uuid4().hex[:8]
+        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + "-" + uuid4().hex[:8]
     )
     root = OUTPUT_ROOT / "runs" / run_id / label
     root.mkdir(parents=True, exist_ok=False)
@@ -105,7 +99,7 @@ def _write_result(root: Path, result: dict) -> None:
     )
 
 
-def _load_nozzle_xy_priors() -> dict[str, dict[str, np.ndarray]]:
+def _load_nozzle_xy_priors() -> dict[str, dict]:
     """Fit image-space nozzle position as a function of commanded X.
 
     The observations are from the preceding XY calibration, at Z=0.5 mm.
@@ -113,14 +107,14 @@ def _load_nozzle_xy_priors() -> dict[str, dict[str, np.ndarray]]:
     any XZ-sweep nozzle result, so the diagnostic cannot become circular.
     """
 
-    priors: dict[str, dict[str, np.ndarray]] = {}
+    priors: dict[str, dict] = {}
     for tool in ("T0", "T1"):
         fact_path = DATASET_ROOT / "source_inputs" / f"{tool.lower()}_xy_fact_set.json"
         if not fact_path.is_file():
             pytest.skip(f"XY prior fact set is absent: {fact_path}")
-        observations = json.loads(fact_path.read_text(encoding="utf-8"))[
-            "provenance"
-        ]["observations"]["records"]
+        observations = json.loads(fact_path.read_text(encoding="utf-8"))["provenance"][
+            "observations"
+        ]["records"]
         x_mm = np.asarray([record["x_mm"] for record in observations], dtype=np.float64)
         centers = np.asarray(
             [record["center_px"] for record in observations], dtype=np.float64
@@ -128,9 +122,14 @@ def _load_nozzle_xy_priors() -> dict[str, dict[str, np.ndarray]]:
         design = np.column_stack((np.ones_like(x_mm), x_mm))
         coefficients, _, _, _ = np.linalg.lstsq(design, centers, rcond=None)
         residuals = design @ coefficients - centers
+        fit_rms = np.sqrt(np.mean(residuals**2, axis=0))
         priors[tool] = {
-            "coefficients": coefficients,
-            "fit_rms_px": np.sqrt(np.mean(residuals**2, axis=0)),
+            "model": "linear_commanded_x_to_pixel_v1",
+            "x_mm_range": [float(np.min(x_mm)), float(np.max(x_mm))],
+            "coefficients_px": coefficients.tolist(),
+            "fit_rms_px": fit_rms.tolist(),
+            "source_commanded_z_mm": 0.5,
+            "sample_count": int(len(x_mm)),
         }
         _logger.info(
             "Nozzle prior %s x->pixel coefficients x=(%.3f, %.3f) "
@@ -140,10 +139,17 @@ def _load_nozzle_xy_priors() -> dict[str, dict[str, np.ndarray]]:
             coefficients[1, 0],
             coefficients[0, 1],
             coefficients[1, 1],
-            priors[tool]["fit_rms_px"][0],
-            priors[tool]["fit_rms_px"][1],
+            fit_rms[0],
+            fit_rms[1],
         )
     return priors
+
+
+def _replay_references(manifest: dict, priors: dict[str, dict]) -> dict:
+    references = copy.deepcopy(manifest["tool_xz_reference"])
+    for tool in ("T0", "T1"):
+        references[tool.lower()]["nozzle_image_prior"] = priors[tool]
+    return references
 
 
 def _draw_nozzle_prior_roi(
@@ -158,13 +164,17 @@ def _draw_nozzle_prior_roi(
     assert overlay is not None
     height, width = overlay.shape[:2]
     coefficients = prior["coefficients"]
-    predicted_center = np.array(
-        [1.0, float(frame["x_mm"])], dtype=np.float64
-    ) @ coefficients
+    predicted_center = (
+        np.array([1.0, float(frame["x_mm"])], dtype=np.float64) @ coefficients
+    )
     x0 = max(0, int(round(predicted_center[0] - NOZZLE_PRIOR_ROI_HALF_WIDTH_PX)))
     y0 = max(0, int(round(predicted_center[1] - NOZZLE_PRIOR_ROI_HALF_HEIGHT_PX)))
-    x1 = min(width - 1, int(round(predicted_center[0] + NOZZLE_PRIOR_ROI_HALF_WIDTH_PX)))
-    y1 = min(height - 1, int(round(predicted_center[1] + NOZZLE_PRIOR_ROI_HALF_HEIGHT_PX)))
+    x1 = min(
+        width - 1, int(round(predicted_center[0] + NOZZLE_PRIOR_ROI_HALF_WIDTH_PX))
+    )
+    y1 = min(
+        height - 1, int(round(predicted_center[1] + NOZZLE_PRIOR_ROI_HALF_HEIGHT_PX))
+    )
 
     # Cyan distinguishes this prior ROI from the yellow fiducials, green
     # selected nozzle, and magenta ArUco/patch geometry already on the overlay.
@@ -269,14 +279,26 @@ def _log_and_check_overlays(frames: list[dict], paths: list[Path], result: dict)
         assert overlay is not None
         assert overlay.shape == source.shape
         record = result["records"][int(frame["seq"])]
+        localization = record.get("localization") or {}
+        if record["nozzle_detected"]:
+            assert localization.get("localization_method") == "bright_circle_roi_v1"
+            assert localization.get("roi_px") is not None
+            roi_x0, roi_y0, roi_x1, roi_y1 = localization["roi_px"]
+            u, v = record["nozzle_uv_px"]
+            assert roi_x0 <= u <= roi_x1
+            assert roi_y0 <= v <= roi_y1
         _logger.info(
-            "Overlay %s tool=%s x=%.3f z=%.3f fiducials=%s nozzle=%s",
+            "Overlay %s tool=%s x=%.3f z=%.3f fiducials=%s nozzle=%s "
+            "method=%s score=%s row_residual=%s",
             overlay_path.resolve(),
             frame["tool"],
             float(frame["x_mm"]),
             float(frame["z_mm"]),
             "yes" if record["fiducials_detected"] else "no",
             "yes" if record["nozzle_detected"] else "no",
+            localization.get("localization_method", "none"),
+            localization.get("bright_circle_score", "n/a"),
+            localization.get("row_residual_px", "n/a"),
         )
 
 
@@ -287,16 +309,59 @@ def test_replay_aruco_tool_xz_sweep_writes_full_overlays(monkeypatch):
     analyzer = _analyzer_module()
     monkeypatch.setattr(analyzer, "GENERATE_OVERLAYS", True)
     root = _run_root("full_replay")
+    priors = _load_nozzle_xy_priors()
     result = analyzer.analyze(
         paths,
         root / "artifacts",
         frames=manifest["frames"],
-        references=manifest["tool_xz_reference"],
+        references=_replay_references(manifest, priors),
         acquisition_calibration=manifest["acquisition_calibration"],
     )
     _write_result(root, result)
-    _draw_prior_rois(manifest["frames"], result, _load_nozzle_xy_priors())
     _log_and_check_overlays(manifest["frames"], paths, result)
+
+    # The replay is intentionally acquisition-locked: the fitting experiment
+    # must consume the same 98 decoded frames and commanded positions.
+    assert len(manifest["frames"]) == 98
+    assert len(result["records"]) == len(manifest["frames"])
+    for frame, record in zip(manifest["frames"], result["records"]):
+        assert record["seq"] == frame["seq"]
+        assert record["tool"] == frame["tool"]
+        assert record["commanded_x_mm"] == pytest.approx(frame["x_mm"])
+        assert record["commanded_y_mm"] == pytest.approx(frame["y_mm"])
+        assert record["commanded_z_mm"] == pytest.approx(frame["z_mm"])
+
+    comparison = result["fit_strategy_comparison"]
+    assert {
+        "theil_sen_plus_soft_l1",
+        "ols_plus_linear",
+        "huber_irls_plus_huber",
+        "soft_l1_plus_soft_l1",
+    } == set(comparison["strategies"])
+    comparison_json = Path(result["artifacts"]["fit_strategy_comparison"]["path"])
+    comparison_plot = Path(result["artifacts"]["fit_strategy_comparison_plot"]["path"])
+    assert comparison_json.is_file()
+    assert comparison_plot.is_file()
+    assert all(
+        "row_fits" in strategy and "shared_z_curve_fit" in strategy
+        for strategy in comparison["strategies"].values()
+    )
+
+    shared_fit = result["shared_z_curve_fit"]
+    assert shared_fit["available"] is False
+    assert shared_fit["boundary_saturated"] is True
+    assert abs(shared_fit["t1_z_delta_mm"]) == pytest.approx(1.5)
+    assert "operational T1 delta bound" in shared_fit["reason"]
+    physical = shared_fit["physical_z_diagnostics"]
+    assert physical["acquisition_t0_z_endstop_mm"] == pytest.approx(293.626)
+    assert physical["acquisition_t1_z_endstop_mm"] == pytest.approx(292.402)
+    assert physical["manual_reference_delta_mm"] == pytest.approx(0.6)
+    assert physical["difference_from_manual_reference_mm"] == pytest.approx(0.9)
+    assert all(
+        "u_x_fit" in record
+        for record in result["records"]
+        if record["accepted_for_u_x_fit"]
+    )
 
     fiducial_count = sum(record["fiducials_detected"] for record in result["records"])
     nozzle_count = sum(record["nozzle_detected"] for record in result["records"])
@@ -310,6 +375,13 @@ def test_replay_aruco_tool_xz_sweep_writes_full_overlays(monkeypatch):
         fit_count,
         result["warnings"],
     )
+    false_points = {
+        7: np.asarray([1060.0, 515.0]),
+        71: np.asarray([1081.0, 524.0]),
+    }
+    for seq, false_point in false_points.items():
+        selected = np.asarray(result["records"][seq]["nozzle_uv_px"])
+        assert np.linalg.norm(selected - false_point) > 20.0
     assert result["accepted"] is True
 
 
@@ -329,12 +401,14 @@ def test_single_t0_z1_frame_overlay():
     assert image is not None
 
     fiducials = analyzer.detect_four_fiducials(image)
-    localized = analyzer.localize_nozzle_tip_grid(
+    prior = _load_nozzle_xy_priors()[frame["tool"]]
+    prior_center = np.asarray([1.0, float(frame["x_mm"])]) @ np.asarray(
+        prior["coefficients_px"], dtype=np.float64
+    )
+    localized = analyzer.localize_bright_nozzle_tip_grid(
         [source_path],
         frames=[frame],
-        propagate_missing_rings=True,
-        physical_tip_cluster_radius_px=16.0,
-        minimum_direct_detections=1,
+        roi_centers_px=[prior_center],
     )
     registration = localized["registrations"][0]
     record = analyzer._base_record(frame)
@@ -360,11 +434,11 @@ def test_single_t0_z1_frame_overlay():
             "localization": analyzer._finite(registration),
         }
     )
-    record["accepted_for_u_x_fit"] = not analyzer._registration_fit_reasons(registration)
+    record["accepted_for_u_x_fit"] = not analyzer._registration_fit_reasons(
+        registration
+    )
     overlay_path = _run_root("single_frame_overlays") / f"{frame['frame']}.png"
     analyzer._write_overlay(image, frame, record, overlay_path)
-    prior = _load_nozzle_xy_priors()[frame["tool"]]
-    _draw_nozzle_prior_roi(overlay_path, frame, record, prior)
     _logger.info(
         "Overlay %s tool=%s x=%.3f z=%.3f fiducial_angle=%.3f nozzle=(%.2f,%.2f)",
         overlay_path.resolve(),
@@ -379,3 +453,14 @@ def test_single_t0_z1_frame_overlay():
     overlay = cv2.imread(str(overlay_path), cv2.IMREAD_COLOR)
     assert overlay is not None
     assert overlay.shape == image.shape
+    assert registration["localization_method"] == "bright_circle_roi_v1"
+    assert (
+        registration["roi_px"][0]
+        <= registration["center_px"][0]
+        <= registration["roi_px"][2]
+    )
+    assert (
+        registration["roi_px"][1]
+        <= registration["center_px"][1]
+        <= registration["roi_px"][3]
+    )

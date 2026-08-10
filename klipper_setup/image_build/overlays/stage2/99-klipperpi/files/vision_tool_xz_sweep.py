@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import math
 from pathlib import Path
@@ -15,11 +16,16 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, minimize_scalar
 from scipy.stats import theilslopes
 from vision_four_fiducials import FourFiducialError, detect_four_fiducials
 from vision_nozzle_tip_localization import (
+    BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX,
+    BRIGHT_CIRCLE_MIN_SCORE,
+    BRIGHT_CIRCLE_ROI_HALF_HEIGHT_PX,
+    BRIGHT_CIRCLE_ROI_HALF_WIDTH_PX,
     NozzleTipLocalizationError,
+    localize_bright_nozzle_tip_grid,
     localize_nozzle_tip_grid,
 )
 
@@ -41,9 +47,14 @@ PLOT_COLORS = (
 GENERATE_OVERLAYS = False
 
 MIN_SHARED_CURVE_CORRELATION = 0.95
-SHARED_CURVE_F_SCALE_PX_PER_MM = 0.03
-SHARED_CURVE_OUTLIER_SIGMA = 4.0
+SHARED_CURVE_F_SCALE_PX_PER_MM = 0.10
+SHARED_CURVE_OUTLIER_SIGMA = 3.5
 SHARED_CURVE_MIN_OUTLIER_LIMIT_PX_PER_MM = 0.09
+XZ_Z_DELTA_LIMIT_MM = 1.5
+ROW_HUBER_F_SCALE_PX = 0.75
+ROW_ROBUST_OUTLIER_SIGMA = 3.5
+MAX_DELTA_JACKKNIFE_SPAN_MM = 0.50
+MANUAL_T1_Z_CORRECTION_REFERENCE_MM = 0.60
 MINIMUM_TIP_CORRELATION = 0.22
 MINIMUM_MEDIAN_TIP_CORRELATION = 0.38
 MAXIMUM_REPRESENTATION_SPREAD_PX = 2.5
@@ -89,6 +100,115 @@ def _vector(value: Any, name: str) -> np.ndarray:
     if result.shape != (2,) or not np.all(np.isfinite(result)):
         raise ToolXZSweepError(f"{name} must contain two finite values")
     return result
+
+
+def _nozzle_prior_center(
+    reference: dict[str, Any], commanded_x_mm: float
+) -> np.ndarray | None:
+    prior = reference.get("nozzle_image_prior")
+    if not isinstance(prior, dict):
+        return None
+    if prior.get("model") != "linear_commanded_x_to_pixel_v1":
+        return None
+    coefficients = np.asarray(prior.get("coefficients_px"), dtype=np.float64)
+    if coefficients.shape != (2, 2) or not np.all(np.isfinite(coefficients)):
+        return None
+    x_range = prior.get("x_mm_range")
+    if (
+        not isinstance(x_range, (list, tuple))
+        or len(x_range) != 2
+        or not all(isinstance(value, (int, float)) for value in x_range)
+    ):
+        return None
+    x_min, x_max = [float(value) for value in x_range]
+    if not x_min <= float(commanded_x_mm) <= x_max:
+        return None
+    center = np.asarray([1.0, float(commanded_x_mm)]) @ coefficients
+    return center if np.all(np.isfinite(center)) else None
+
+
+def _localize_tool_nozzle(
+    tool_paths: list[Path],
+    *,
+    tool_frames: list[dict[str, Any]],
+    reference: dict[str, Any],
+    localization_warnings: list[str],
+) -> dict[str, Any]:
+    prior_centers = [
+        _nozzle_prior_center(reference, float(frame["x_mm"])) for frame in tool_frames
+    ]
+    if all(center is not None for center in prior_centers):
+        _logger.info(
+            "Using XY-derived nozzle image prior for bright-circle localization "
+            "tool=%s frames=%d roi_half_size=(%.1f,%.1f)px",
+            tool_frames[0]["tool"],
+            len(tool_frames),
+            BRIGHT_CIRCLE_ROI_HALF_WIDTH_PX,
+            BRIGHT_CIRCLE_ROI_HALF_HEIGHT_PX,
+        )
+        bright = localize_bright_nozzle_tip_grid(
+            tool_paths,
+            frames=tool_frames,
+            roi_centers_px=[center for center in prior_centers if center is not None],
+        )
+        if any(
+            registration.get("center_px") is not None
+            for registration in bright["registrations"]
+        ):
+            return bright
+        raise NozzleTipLocalizationError(
+            "no bright circular candidates in XY-prior ROIs"
+        )
+
+    tool = str(tool_frames[0]["tool"])
+    warning = (
+        f"{tool} X/Z frames lack a complete XY nozzle image prior; "
+        "using legacy localization as a coarse ROI seed"
+    )
+    _logger.warning(warning)
+    localization_warnings.append(warning)
+    legacy = localize_nozzle_tip_grid(
+        tool_paths,
+        frames=tool_frames,
+        propagate_missing_rings=True,
+        physical_tip_cluster_radius_px=16.0,
+    )
+    legacy_centers = [
+        (
+            np.asarray(registration.get("center_px"), dtype=np.float64)
+            if registration.get("center_px") is not None
+            else None
+        )
+        for registration in legacy["registrations"]
+    ]
+    if not all(center is not None for center in legacy_centers):
+        return legacy
+    try:
+        bright = localize_bright_nozzle_tip_grid(
+            tool_paths,
+            frames=tool_frames,
+            roi_centers_px=[center for center in legacy_centers if center is not None],
+        )
+        if any(
+            registration.get("center_px") is not None
+            for registration in bright["registrations"]
+        ):
+            return bright
+        fallback_warning = (
+            f"{tool} bright-circle localization found no candidates in legacy ROIs; "
+            "retaining legacy localization"
+        )
+        _logger.warning(fallback_warning)
+        localization_warnings.append(fallback_warning)
+        return legacy
+    except NozzleTipLocalizationError as exc:
+        fallback_warning = (
+            f"{tool} bright-circle localization failed from legacy ROI seed; "
+            f"retaining legacy localization: {exc}"
+        )
+        _logger.warning(fallback_warning)
+        localization_warnings.append(fallback_warning)
+        return legacy
 
 
 def _tool_marker_vector(marker: dict[str, Any], tool: str) -> np.ndarray:
@@ -204,6 +324,10 @@ def _tool_reference(
         f"{tool} marker reference",
     )
     marker_x_vector = _tool_marker_vector(marker, tool)
+    xy_datum = input_values.get(f"{tool_key}_xy_datum")
+    nozzle_image_prior = (
+        xy_datum.get("nozzle_image_prior") if isinstance(xy_datum, dict) else None
+    )
 
     return {
         "tool": tool,
@@ -218,6 +342,7 @@ def _tool_reference(
         "corner_pixel_at_capture_px": corner_pixel_at_capture,
         "marker_offset_mm": marker_offset,
         "marker_reference_commanded_x_mm": marker_reference_x,
+        "nozzle_image_prior": nozzle_image_prior,
     }
 
 
@@ -333,6 +458,30 @@ def _base_record(frame: dict[str, Any]) -> dict[str, Any]:
 
 
 def _registration_fit_reasons(registration: dict[str, Any]) -> list[str]:
+    if registration.get("localization_method") == "bright_circle_roi_v1":
+        reasons = []
+        if registration.get("center_px") is None:
+            reasons.append(
+                registration.get(
+                    "rejection_reason", "bright circular nozzle tip was not detected"
+                )
+            )
+        score = registration.get("bright_circle_score")
+        if score is None:
+            reasons.append("bright-circle quality score is unavailable")
+        elif float(score) < BRIGHT_CIRCLE_MIN_SCORE:
+            reasons.append(
+                f"bright-circle contrast score is too low: {float(score):.1f}"
+            )
+        residual = registration.get("row_residual_px")
+        if residual is None:
+            reasons.append("bright-circle row residual is unavailable")
+        elif float(residual) > BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX:
+            reasons.append(
+                f"bright-circle row residual {float(residual):.2f} px exceeds "
+                f"{BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX:.2f} px"
+            )
+        return reasons
     required = (
         "minimum_correlation",
         "median_correlation",
@@ -406,7 +555,9 @@ def _write_overlay(
             20,
             2,
         )
-    if record.get("nozzle_uv_px") is not None:
+    localization = record.get("localization") or {}
+    bright_circle = localization.get("localization_method") == "bright_circle_roi_v1"
+    if record.get("nozzle_uv_px") is not None and not bright_circle:
         cv2.drawMarker(
             overlay,
             tuple(np.rint(record["nozzle_uv_px"]).astype(int)),
@@ -415,21 +566,34 @@ def _write_overlay(
             24,
             3,
         )
-    localization = record.get("localization") or {}
-    for key, marker_color, marker_type in (
-        ("predicted_tip_center_px", (0, 165, 255), cv2.MARKER_TILTED_CROSS),
-        ("tip_detector_center_px", (255, 0, 0), cv2.MARKER_STAR),
-    ):
-        point = localization.get(key)
-        if point is not None:
-            cv2.drawMarker(
-                overlay,
-                tuple(np.rint(point).astype(int)),
-                marker_color,
-                marker_type,
-                22,
-                2,
+    if bright_circle:
+        roi = localization.get("roi_px")
+        if isinstance(roi, (list, tuple)) and len(roi) == 4:
+            x0, y0, x1, y1 = [int(round(float(value))) for value in roi]
+            cv2.rectangle(overlay, (x0, y0), (x1, y1), (255, 255, 0), 1)
+        nozzle = record.get("nozzle_uv_px")
+        if nozzle is not None:
+            nozzle_point = tuple(np.rint(nozzle).astype(int))
+            nozzle_radius = max(
+                4, int(round(float(localization.get("bright_circle_radius_px", 8.0))))
             )
+            cv2.circle(overlay, nozzle_point, nozzle_radius, color, 2)
+            cv2.circle(overlay, nozzle_point, 2, color, -1)
+    else:
+        for key, marker_color, marker_type in (
+            ("predicted_tip_center_px", (0, 165, 255), cv2.MARKER_TILTED_CROSS),
+            ("tip_detector_center_px", (255, 0, 0), cv2.MARKER_STAR),
+        ):
+            point = localization.get(key)
+            if point is not None:
+                cv2.drawMarker(
+                    overlay,
+                    tuple(np.rint(point).astype(int)),
+                    marker_color,
+                    marker_type,
+                    22,
+                    2,
+                )
     nozzle = record["nozzle_uv_px"]
     nozzle_text = (
         f"nozzle u/v={float(nozzle[0]):.2f},{float(nozzle[1]):.2f} px"
@@ -463,12 +627,20 @@ def _write_overlay(
         "detected" if record["nozzle_detected"] else "nozzle not detected",
     ]
     if localization:
-        lines.append(
-            "tip fit="
-            f"corr={float(localization.get('minimum_correlation', 0.0)):.3f}/"
-            f"{float(localization.get('median_correlation', 0.0)):.3f} "
-            f"pred_err={float(localization.get('tip_prediction_error_px', 0.0)):.2f}px"
-        )
+        if bright_circle:
+            lines.append(
+                "bright circle="
+                f"score={float(localization.get('bright_circle_score', 0.0)):.1f} "
+                f"r={float(localization.get('bright_circle_radius_px', 0.0)):.1f}px "
+                f"row_res={float(localization.get('row_residual_px', 0.0)):.2f}px"
+            )
+        else:
+            lines.append(
+                "tip fit="
+                f"corr={float(localization.get('minimum_correlation', 0.0)):.3f}/"
+                f"{float(localization.get('median_correlation', 0.0)):.3f} "
+                f"pred_err={float(localization.get('tip_prediction_error_px', 0.0)):.2f}px"
+            )
     if record["reasons"]:
         lines.append("reasons: " + " | ".join(record["reasons"]))
     for index, line in enumerate(lines):
@@ -547,6 +719,110 @@ def _write_u_plot(records: list[dict[str, Any]], path: Path) -> None:
     plt.close(figure)
 
 
+def _fit_row_trajectory(
+    x_values: np.ndarray,
+    u_values: np.ndarray,
+    *,
+    method: str,
+) -> dict[str, Any]:
+    if len(x_values) < 3 or len(np.unique(x_values)) < 2:
+        return {"slope": None, "reason": "insufficient_X_trajectory"}
+
+    if method == "theil_sen":
+        slope, intercept, _, _ = theilslopes(u_values, x_values)
+        slope = float(slope)
+        intercept = float(intercept)
+    else:
+        if method in {"huber_irls", "soft_l1"}:
+            # Seed robust losses from the high-breakdown estimator.  Starting
+            # from OLS lets one far-end highlight retain too much leverage in
+            # the small (normally 5-point) X rows.
+            initial_slope, initial_intercept, _, _ = theilslopes(u_values, x_values)
+        else:
+            initial_slope, initial_intercept = np.polyfit(x_values, u_values, 1)
+
+        initial_residuals = (
+            float(initial_intercept) + float(initial_slope) * x_values - u_values
+        )
+        initial_center = float(np.median(initial_residuals))
+        initial_mad = float(np.median(np.abs(initial_residuals - initial_center)))
+        initial_scale = max(1.4826 * initial_mad, 0.10)
+        initial_standardized = (initial_residuals - initial_center) / initial_scale
+        robust_mask = np.abs(initial_standardized) <= ROW_ROBUST_OUTLIER_SIGMA
+        if int(np.count_nonzero(robust_mask)) < 3:
+            robust_mask = np.ones_like(initial_standardized, dtype=bool)
+
+        def residuals(parameters: np.ndarray) -> np.ndarray:
+            return parameters[0] + parameters[1] * x_values - u_values
+
+        if method == "ols":
+            loss = "linear"
+        elif method == "huber_irls":
+            loss = "huber"
+        elif method == "soft_l1":
+            loss = "soft_l1"
+        else:
+            raise ToolXZSweepError(f"unknown X trajectory fit method: {method}")
+
+        def robust_residuals(parameters: np.ndarray) -> np.ndarray:
+            return np.where(robust_mask, residuals(parameters), 0.0)
+
+        result = least_squares(
+            robust_residuals,
+            x0=np.asarray([initial_intercept, initial_slope], dtype=np.float64),
+            loss=loss,
+            f_scale=ROW_HUBER_F_SCALE_PX,
+            max_nfev=1000,
+        )
+        if not result.success:
+            return {"slope": None, "reason": result.message}
+        intercept = float(result.x[0])
+        slope = float(result.x[1])
+
+    fitted = intercept + slope * x_values
+    residual_values = u_values - fitted
+    residual_center = float(np.median(residual_values))
+    residual_mad = float(np.median(np.abs(residual_values - residual_center)))
+    robust_scale = max(1.4826 * residual_mad, 0.10)
+    standardized = (residual_values - residual_center) / robust_scale
+    if method == "huber_irls":
+        weights = np.minimum(
+            1.0, ROW_HUBER_F_SCALE_PX / np.maximum(np.abs(residual_values), 1.0e-9)
+        )
+    elif method == "soft_l1":
+        weights = 1.0 / np.sqrt(1.0 + (residual_values / ROW_HUBER_F_SCALE_PX) ** 2)
+    else:
+        weights = np.ones_like(residual_values)
+    if method in {"huber_irls", "soft_l1"}:
+        weights = np.where(robust_mask, weights, 0.0)
+    centered_x = x_values - np.average(x_values, weights=weights)
+    information = float(np.sum(weights * centered_x**2))
+    slope_uncertainty = (
+        float(robust_scale / math.sqrt(information)) if information > 0.0 else None
+    )
+    design = np.column_stack((np.ones_like(x_values), x_values))
+    weighted_design = design * np.sqrt(weights)[:, None]
+    normal_inverse = np.linalg.pinv(weighted_design.T @ weighted_design)
+    leverage = np.einsum(
+        "ij,jk,ik->i", weighted_design, normal_inverse, weighted_design
+    )
+    influence = leverage * standardized**2
+    return {
+        "slope": slope,
+        "intercept": intercept,
+        "fit_rms_px": float(np.sqrt(np.mean(residual_values**2))),
+        "robust_scale_px": robust_scale,
+        "slope_uncertainty_px_per_mm": slope_uncertainty,
+        "residuals_px": residual_values,
+        "weights": weights,
+        "standardized_residuals": standardized,
+        "leverage": leverage,
+        "influence": influence,
+        "downweighted": (weights < 0.80)
+        | (np.abs(standardized) > ROW_ROBUST_OUTLIER_SIGMA),
+    }
+
+
 def _fit_robust_u_x_slope(records: list[dict[str, Any]]) -> float | None:
     usable = [
         record
@@ -556,20 +832,14 @@ def _fit_robust_u_x_slope(records: list[dict[str, Any]]) -> float | None:
     ]
     if len(usable) < 3:
         return None
-
     x_values = np.asarray(
-        [float(record["commanded_x_mm"]) for record in usable],
-        dtype=np.float64,
+        [float(record["commanded_x_mm"]) for record in usable], dtype=np.float64
     )
     u_values = np.asarray(
-        [float(record["nozzle_uv_px"][0]) for record in usable],
-        dtype=np.float64,
+        [float(record["nozzle_uv_px"][0]) for record in usable], dtype=np.float64
     )
-    if len(np.unique(x_values)) < 2:
-        return None
-
-    slope, _intercept, _, _ = theilslopes(u_values, x_values)
-    return float(slope)
+    fit = _fit_row_trajectory(x_values, u_values, method="huber_irls")
+    return fit.get("slope")
 
 
 def _u_x_correlation(x_values: np.ndarray, u_values: np.ndarray) -> float | None:
@@ -583,8 +853,13 @@ def _u_x_correlation(x_values: np.ndarray, u_values: np.ndarray) -> float | None
     return correlation if math.isfinite(correlation) else None
 
 
-def _fit_u_x_models(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Fit robust ``u = intercept + slope * commanded_x`` tool/Z models."""
+def _fit_u_x_models(
+    records: list[dict[str, Any]],
+    *,
+    method: str = "huber_irls",
+    mutate_records: bool = True,
+) -> list[dict[str, Any]]:
+    """Fit one ``u = intercept + slope * commanded_x`` model per tool/Z row."""
     fits = []
     z_positions = sorted(
         {
@@ -627,7 +902,7 @@ def _fit_u_x_models(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     and not record.get("accepted_for_u_x_fit", True)
                     for record in row_records
                 ),
-                "fit_method": "theil_sen",
+                "fit_method": method,
                 "u_x_correlation_coefficient": _u_x_correlation(x_values, u_values),
                 "slope_u_px_per_mm": None,
                 "intercept_u_px": None,
@@ -635,12 +910,12 @@ def _fit_u_x_models(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "x_values_mm": x_values.tolist(),
                 "u_values_px": u_values.tolist(),
             }
-            slope = _fit_robust_u_x_slope(usable)
-            if slope is None:
+            row_fit = _fit_row_trajectory(x_values, u_values, method=method)
+            if row_fit.get("slope") is None:
                 fit["reason"] = (
                     "fewer than three usable nozzle detections"
                     if len(usable) < 3
-                    else "commanded X values do not span a robust linear fit"
+                    else str(row_fit.get("reason", "row trajectory fit failed"))
                 )
                 _logger.info(
                     "Robust nozzle u(x) fit unavailable tool=%s z_mm=%.3f "
@@ -652,22 +927,64 @@ def _fit_u_x_models(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 )
                 fits.append(fit)
                 continue
-
-            intercept = float(np.median(u_values - slope * x_values))
-            residuals = u_values - (slope * x_values + intercept)
-            fit["slope_u_px_per_mm"] = slope
-            fit["intercept_u_px"] = intercept
-            fit["fit_rms_px"] = float(np.sqrt(np.mean(residuals**2)))
+            fit["slope_u_px_per_mm"] = row_fit["slope"]
+            fit["intercept_u_px"] = row_fit["intercept"]
+            fit["fit_rms_px"] = row_fit["fit_rms_px"]
+            fit["robust_scale_px"] = row_fit["robust_scale_px"]
+            fit["slope_uncertainty_px_per_mm"] = row_fit["slope_uncertainty_px_per_mm"]
+            fit["downweighted_sample_count"] = int(
+                np.count_nonzero(row_fit["downweighted"])
+            )
+            fit["point_diagnostics"] = [
+                {
+                    "seq": int(record["seq"]),
+                    "x_mm": float(x_value),
+                    "u_px": float(u_value),
+                    "residual_px": float(residual),
+                    "weight": float(weight),
+                    "standardized_residual": float(standardized),
+                    "leverage": float(leverage),
+                    "influence_score": float(influence),
+                    "downweighted": bool(downweighted),
+                }
+                for record, x_value, u_value, residual, weight, standardized, downweighted, leverage, influence in zip(
+                    usable,
+                    x_values,
+                    u_values,
+                    row_fit["residuals_px"],
+                    row_fit["weights"],
+                    row_fit["standardized_residuals"],
+                    row_fit["downweighted"],
+                    row_fit["leverage"],
+                    row_fit["influence"],
+                )
+            ]
+            if mutate_records:
+                for point in fit["point_diagnostics"]:
+                    record = next(
+                        item for item in usable if int(item["seq"]) == point["seq"]
+                    )
+                    record["u_x_fit"] = {
+                        "method": method,
+                        "residual_px": point["residual_px"],
+                        "weight": point["weight"],
+                        "standardized_residual": point["standardized_residual"],
+                        "leverage": point["leverage"],
+                        "influence_score": point["influence_score"],
+                        "downweighted": point["downweighted"],
+                    }
             _logger.info(
                 "Fitted robust nozzle u(x) tool=%s z_mm=%.3f samples=%d "
-                "method=theil_sen slope=%.6f px/mm intercept=%.3f px "
-                "fit_rms=%.3f px",
+                "method=%s slope=%.6f px/mm intercept=%.3f px "
+                "fit_rms=%.3f px downweighted=%d",
                 tool,
                 z_mm,
                 len(usable),
+                method,
                 fit["slope_u_px_per_mm"],
                 fit["intercept_u_px"],
                 fit["fit_rms_px"],
+                fit["downweighted_sample_count"],
             )
             fits.append(fit)
     return fits
@@ -701,29 +1018,167 @@ def _shared_curve_is_identifiable(fits: list[dict[str, Any]]) -> bool:
     )
 
 
-def _least_squares_shared_curve(fits: list[dict[str, Any]]):
-    z_values, slope_values, is_t1 = _shared_curve_arrays(fits)
-
-    def residuals(parameters: np.ndarray) -> np.ndarray:
-        a, b, c, t1_z_delta = parameters
-        physical_z = z_values + is_t1 * t1_z_delta
-        predicted = a + b * physical_z + c * physical_z**2
-        return predicted - slope_values
-
-    result = least_squares(
-        residuals,
-        x0=np.asarray([9.85, -0.1, 0.0, -0.6], dtype=np.float64),
-        loss="soft_l1",
-        f_scale=SHARED_CURVE_F_SCALE_PX_PER_MM,
-        bounds=(
-            [-np.inf, -np.inf, -np.inf, -1.5],
-            [np.inf, np.inf, np.inf, 1.5],
-        ),
+def _shared_curve_weights(fits: list[dict[str, Any]]) -> np.ndarray:
+    uncertainties = np.asarray(
+        [max(float(fit.get("slope_uncertainty_px_per_mm", 1.0)), 0.02) for fit in fits],
+        dtype=np.float64,
     )
-    return result, residuals
+    weights = 1.0 / uncertainties**2
+    return weights / float(np.median(weights))
 
 
-def estimate_tool_z_delta(fits: list[dict[str, Any]]) -> dict[str, Any]:
+def _profile_shared_curve(
+    fits: list[dict[str, Any]],
+    *,
+    loss: str,
+    delta_limit_mm: float = XZ_Z_DELTA_LIMIT_MM,
+    include_profile: bool = False,
+) -> dict[str, Any]:
+    z_values, slope_values, is_t1 = _shared_curve_arrays(fits)
+    weights = _shared_curve_weights(fits)
+
+    def fit_at_delta(delta: float) -> dict[str, Any]:
+        physical_z = z_values + is_t1 * float(delta)
+        design = np.column_stack((np.ones_like(physical_z), physical_z, physical_z**2))
+        initial = np.linalg.lstsq(design, slope_values, rcond=None)[0]
+
+        def residuals(parameters: np.ndarray) -> np.ndarray:
+            return (design @ parameters - slope_values) * np.sqrt(weights)
+
+        result = least_squares(
+            residuals,
+            x0=initial,
+            loss=loss,
+            f_scale=SHARED_CURVE_F_SCALE_PX_PER_MM,
+            max_nfev=1000,
+        )
+        raw_residuals = design @ result.x - slope_values
+        return {
+            "delta": float(delta),
+            "coefficients": result.x,
+            "raw_residuals": raw_residuals,
+            "weighted_objective": float(2.0 * result.cost),
+            "weighted_rms": float(
+                np.sqrt(np.average(raw_residuals**2, weights=weights))
+            ),
+            "success": bool(result.success),
+        }
+
+    grid = np.linspace(-delta_limit_mm, delta_limit_mm, 601)
+    grid_results = [fit_at_delta(float(delta)) for delta in grid]
+    best_grid = min(grid_results, key=lambda item: item["weighted_objective"])
+    best = best_grid
+    if abs(float(best_grid["delta"])) < delta_limit_mm - 0.01:
+        left = max(-delta_limit_mm, float(best_grid["delta"]) - 0.02)
+        right = min(delta_limit_mm, float(best_grid["delta"]) + 0.02)
+        refined = minimize_scalar(
+            lambda delta: fit_at_delta(float(delta))["weighted_objective"],
+            bounds=(left, right),
+            method="bounded",
+            options={"xatol": 1.0e-5},
+        )
+        best = fit_at_delta(float(refined.x))
+    best["boundary_saturated"] = bool(
+        abs(float(best["delta"])) >= delta_limit_mm - 0.006
+    )
+    if include_profile:
+        best["profile"] = [
+            {
+                "delta_mm": item["delta"],
+                "weighted_objective": item["weighted_objective"],
+            }
+            for item in grid_results
+        ]
+    return best
+
+
+def _physical_z_diagnostics(
+    acquisition_calibration: dict[str, Any] | None,
+    delta_mm: float | None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "manual_reference_delta_mm": MANUAL_T1_Z_CORRECTION_REFERENCE_MM,
+        "difference_from_manual_reference_mm": (
+            None
+            if delta_mm is None
+            else float(delta_mm - MANUAL_T1_Z_CORRECTION_REFERENCE_MM)
+        ),
+    }
+    source = (
+        acquisition_calibration.get("tool_z_endstops_mm")
+        if isinstance(acquisition_calibration, dict)
+        else None
+    )
+    if not isinstance(source, dict):
+        return result
+    try:
+        t0 = float(source["t0"])
+        t1 = float(source["t1"])
+    except (KeyError, TypeError, ValueError):
+        return result
+    result["acquisition_t0_z_endstop_mm"] = t0
+    result["acquisition_t1_z_endstop_mm"] = t1
+    result["acquisition_t0_minus_t1_z_mm"] = t0 - t1
+    if delta_mm is not None:
+        result["suggested_t1_z_endstop_mm"] = t1 + float(delta_mm)
+        result["suggested_t0_minus_t1_z_mm"] = t0 - t1 - float(delta_mm)
+    return result
+
+
+def _fit_result_failure(
+    reason: str,
+    *,
+    excluded_rows: list[dict[str, Any]],
+    physical_diagnostics: dict[str, Any],
+    **extra: Any,
+) -> dict[str, Any]:
+    return {
+        "available": False,
+        "fit_method": "quadratic_profiled_huber_with_jackknife",
+        "reason": reason,
+        "included_rows": [],
+        "excluded_rows": excluded_rows,
+        "physical_z_diagnostics": physical_diagnostics,
+        **extra,
+    }
+
+
+def _influential_frame_points(fits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    points = []
+    for fit in fits:
+        for point in fit.get("point_diagnostics", []):
+            if (
+                not point.get("downweighted")
+                and float(point.get("influence_score", 0.0)) < 0.5
+            ):
+                continue
+            points.append(
+                {
+                    "tool": fit["tool"],
+                    "z_mm": float(fit["z_mm"]),
+                    "seq": int(point["seq"]),
+                    "x_mm": float(point["x_mm"]),
+                    "residual_px": float(point["residual_px"]),
+                    "weight": float(point["weight"]),
+                    "standardized_residual": float(point["standardized_residual"]),
+                    "leverage": float(point.get("leverage", 0.0)),
+                    "influence_score": float(point.get("influence_score", 0.0)),
+                    "downweighted": bool(point.get("downweighted", False)),
+                }
+            )
+    return sorted(
+        points,
+        key=lambda point: (-point["influence_score"], point["seq"]),
+    )
+
+
+def estimate_tool_z_delta(
+    fits: list[dict[str, Any]],
+    *,
+    acquisition_calibration: dict[str, Any] | None = None,
+    loss: str = "huber",
+    include_profile: bool = False,
+) -> dict[str, Any]:
     excluded_rows = []
     quality_rows = []
     for fit in fits:
@@ -732,6 +1187,7 @@ def estimate_tool_z_delta(fits: list[dict[str, Any]]) -> dict[str, Any]:
             "z_mm": float(fit["z_mm"]),
             "slope_u_px_per_mm": fit.get("slope_u_px_per_mm"),
             "u_x_correlation_coefficient": fit.get("u_x_correlation_coefficient"),
+            "slope_uncertainty_px_per_mm": fit.get("slope_uncertainty_px_per_mm"),
         }
         slope = fit.get("slope_u_px_per_mm")
         correlation = fit.get("u_x_correlation_coefficient")
@@ -759,25 +1215,21 @@ def estimate_tool_z_delta(fits: list[dict[str, Any]]) -> dict[str, Any]:
         )
         return {
             "available": False,
-            "fit_method": "quadratic_soft_l1_with_mad_prefilter",
+            "fit_method": "quadratic_profiled_huber_with_jackknife",
             "reason": reason,
             "included_rows": [],
             "excluded_rows": excluded_rows,
+            "physical_z_diagnostics": _physical_z_diagnostics(
+                acquisition_calibration, None
+            ),
         }
 
-    initial_result, initial_residuals_fn = _least_squares_shared_curve(quality_rows)
-    if not initial_result.success:
-        reason = f"initial shared-curve optimization failed: {initial_result.message}"
-        _logger.info("Shared nozzle slope curve unavailable reason=%s", reason)
-        return {
-            "available": False,
-            "fit_method": "quadratic_soft_l1_with_mad_prefilter",
-            "reason": reason,
-            "included_rows": [],
-            "excluded_rows": excluded_rows,
-        }
-
-    initial_residuals = initial_residuals_fn(initial_result.x)
+    initial = _profile_shared_curve(
+        quality_rows,
+        loss=loss,
+        include_profile=include_profile,
+    )
+    initial_residuals = initial["raw_residuals"]
     residual_center = float(np.median(initial_residuals))
     residual_mad = float(np.median(np.abs(initial_residuals - residual_center)))
     robust_sigma = 1.4826 * residual_mad
@@ -819,51 +1271,176 @@ def estimate_tool_z_delta(fits: list[dict[str, Any]]) -> dict[str, Any]:
             "excluded_rows": excluded_rows,
         }
 
-    result, residuals_fn = _least_squares_shared_curve(retained_rows)
-    if not result.success:
-        reason = f"final shared-curve optimization failed: {result.message}"
-        _logger.info("Shared nozzle slope curve unavailable reason=%s", reason)
-        return {
-            "available": False,
-            "fit_method": "quadratic_soft_l1_with_mad_prefilter",
-            "reason": reason,
-            "outlier_residual_limit_px_per_mm": residual_limit,
-            "included_rows": [],
-            "excluded_rows": excluded_rows,
-        }
+    final = _profile_shared_curve(
+        retained_rows,
+        loss=loss,
+        include_profile=include_profile,
+    )
+    if not final["success"]:
+        return _fit_result_failure(
+            "final shared-curve optimization failed",
+            excluded_rows=excluded_rows,
+            physical_diagnostics=_physical_z_diagnostics(acquisition_calibration, None),
+            outlier_residual_limit_px_per_mm=residual_limit,
+        )
 
-    final_residuals = residuals_fn(result.x)
+    final_residuals = final["raw_residuals"]
     included_rows = [
         {
             "tool": fit["tool"],
             "z_mm": float(fit["z_mm"]),
             "slope_u_px_per_mm": float(fit["slope_u_px_per_mm"]),
             "u_x_correlation_coefficient": fit.get("u_x_correlation_coefficient"),
+            "slope_uncertainty_px_per_mm": fit.get("slope_uncertainty_px_per_mm"),
             "residual_px_per_mm": float(residual),
         }
         for fit, residual in zip(retained_rows, final_residuals)
     ]
-    a, b, c, t1_z_delta = result.x
+    t1_z_delta = float(final["delta"])
+    jackknife_deltas = []
+    for index in range(len(retained_rows)):
+        leave_one_out = retained_rows[:index] + retained_rows[index + 1 :]
+        if not _shared_curve_is_identifiable(leave_one_out):
+            continue
+        leave_one_out_fit = _profile_shared_curve(leave_one_out, loss=loss)
+        if leave_one_out_fit["success"]:
+            jackknife_deltas.append(float(leave_one_out_fit["delta"]))
+    jackknife_min = min(jackknife_deltas) if jackknife_deltas else None
+    jackknife_max = max(jackknife_deltas) if jackknife_deltas else None
+    jackknife_span = (
+        None
+        if jackknife_min is None or jackknife_max is None
+        else jackknife_max - jackknife_min
+    )
+    unstable = (
+        final["boundary_saturated"]
+        or not jackknife_deltas
+        or jackknife_span > MAX_DELTA_JACKKNIFE_SPAN_MM
+        or jackknife_min < -XZ_Z_DELTA_LIMIT_MM
+        or jackknife_max > XZ_Z_DELTA_LIMIT_MM
+    )
+    physical_diagnostics = _physical_z_diagnostics(acquisition_calibration, t1_z_delta)
+    common = {
+        "fit_method": "quadratic_profiled_huber_with_jackknife",
+        "curve_intercept": float(final["coefficients"][0]),
+        "curve_linear_z": float(final["coefficients"][1]),
+        "curve_quadratic_z": float(final["coefficients"][2]),
+        "t1_z_delta_mm": t1_z_delta,
+        "rms_slope_px_per_mm": float(np.sqrt(np.mean(final_residuals**2))),
+        "weighted_rms_slope_px_per_mm": float(final["weighted_rms"]),
+        "maximum_slope_residual_px_per_mm": float(np.max(np.abs(final_residuals))),
+        "outlier_residual_limit_px_per_mm": residual_limit,
+        "included_rows": included_rows,
+        "excluded_rows": excluded_rows,
+        "boundary_saturated": bool(final["boundary_saturated"]),
+        "jackknife_delta_min_mm": jackknife_min,
+        "jackknife_delta_max_mm": jackknife_max,
+        "jackknife_delta_span_mm": jackknife_span,
+        "jackknife_deltas_mm": jackknife_deltas,
+        "influential_frame_points": _influential_frame_points(fits),
+        "physical_z_diagnostics": physical_diagnostics,
+    }
+    if include_profile:
+        common["delta_profile"] = final.get("profile", [])
+    if unstable:
+        if final["boundary_saturated"]:
+            reason = "shared Z fit saturated the operational T1 delta bound"
+        elif (
+            jackknife_span is not None and jackknife_span > MAX_DELTA_JACKKNIFE_SPAN_MM
+        ):
+            reason = "shared Z fit is unstable under leave-one-row-out analysis"
+        else:
+            reason = "shared Z fit has insufficient stability diagnostics"
+        return {"available": False, "reason": reason, **common}
     _logger.info(
         "Fitted shared nozzle slope curve rows=%d excluded=%d "
         "t1_z_delta_mm=%.6f rms_slope_px_per_mm=%.6f",
         len(retained_rows),
         len(excluded_rows),
-        float(t1_z_delta),
-        float(np.sqrt(np.mean(final_residuals**2))),
+        t1_z_delta,
+        common["rms_slope_px_per_mm"],
     )
-    return {
-        "available": True,
-        "fit_method": "quadratic_soft_l1_with_mad_prefilter",
-        "curve_intercept": float(a),
-        "curve_linear_z": float(b),
-        "curve_quadratic_z": float(c),
-        "t1_z_delta_mm": float(t1_z_delta),
-        "rms_slope_px_per_mm": float(np.sqrt(np.mean(final_residuals**2))),
-        "outlier_residual_limit_px_per_mm": residual_limit,
-        "included_rows": included_rows,
-        "excluded_rows": excluded_rows,
+    return {"available": True, **common}
+
+
+def _compare_fit_strategies(
+    records: list[dict[str, Any]],
+    *,
+    acquisition_calibration: dict[str, Any],
+) -> dict[str, Any]:
+    strategies = {
+        "theil_sen_plus_soft_l1": ("theil_sen", "soft_l1"),
+        "ols_plus_linear": ("ols", "linear"),
+        "huber_irls_plus_huber": ("huber_irls", "huber"),
+        "soft_l1_plus_soft_l1": ("soft_l1", "soft_l1"),
     }
+    result: dict[str, Any] = {
+        "fit_strategy_version": "xz_trajectory_fit_comparison_v1",
+        "delta_limit_mm": XZ_Z_DELTA_LIMIT_MM,
+        "strategies": {},
+    }
+    for name, (row_method, curve_loss) in strategies.items():
+        fits = _fit_u_x_models(
+            records,
+            method=row_method,
+            mutate_records=False,
+        )
+        shared = estimate_tool_z_delta(
+            fits,
+            acquisition_calibration=acquisition_calibration,
+            loss=curve_loss,
+            include_profile=True,
+        )
+        shared["strategy_name"] = name
+        result["strategies"][name] = {
+            "row_fit_method": row_method,
+            "shared_curve_loss": curve_loss,
+            "shared_z_curve_fit": shared,
+            "row_fits": fits,
+        }
+    result["physical_context"] = _physical_z_diagnostics(
+        acquisition_calibration, MANUAL_T1_Z_CORRECTION_REFERENCE_MM
+    )
+    return _finite(result)
+
+
+def _write_fit_strategy_comparison_plot(comparison: dict[str, Any], path: Path) -> None:
+    strategies = comparison.get("strategies", {})
+    names = list(strategies)
+    labels = [name.replace("_plus_", "\n") for name in names]
+    deltas = []
+    rms_values = []
+    colors = []
+    for name in names:
+        shared = strategies[name].get("shared_z_curve_fit", {})
+        delta = shared.get("t1_z_delta_mm")
+        deltas.append(float(delta) if delta is not None else np.nan)
+        rms = shared.get("rms_slope_px_per_mm")
+        rms_values.append(float(rms) if rms is not None else np.nan)
+        colors.append("#D62728" if not shared.get("available") else "#2CA02C")
+
+    figure, axes = plt.subplots(1, 2, figsize=(12, 5))
+    axes[0].bar(labels, deltas, color=colors)
+    axes[0].axhline(XZ_Z_DELTA_LIMIT_MM, color="#555555", linestyle="--")
+    axes[0].axhline(-XZ_Z_DELTA_LIMIT_MM, color="#555555", linestyle="--")
+    axes[0].axhline(
+        MANUAL_T1_Z_CORRECTION_REFERENCE_MM,
+        color="#1F77B4",
+        linestyle=":",
+        label="manual reference +0.6 mm",
+    )
+    axes[0].set_ylabel("T1 delta (mm)")
+    axes[0].set_title("Fit strategy T1 delta")
+    axes[0].legend(fontsize=8)
+    axes[0].grid(True, axis="y", alpha=0.3)
+
+    axes[1].bar(labels, rms_values, color=colors)
+    axes[1].set_ylabel("Shared slope RMS (px/mm)")
+    axes[1].set_title("Fit strategy residual")
+    axes[1].grid(True, axis="y", alpha=0.3)
+    figure.tight_layout()
+    figure.savefig(path, dpi=160)
+    plt.close(figure)
 
 
 def _write_slope_plot(
@@ -1080,6 +1657,7 @@ def analyze(
     artifact_dir.mkdir(parents=True, exist_ok=True)
     records = [_base_record(frame) for frame in frames]
     valid_for_localization: dict[str, list[int]] = {"T0": [], "T1": []}
+    localization_warnings: list[str] = []
     image_dimensions: list[int] | None = None
 
     for index, (path, frame, record) in enumerate(zip(frame_paths, frames, records)):
@@ -1164,11 +1742,11 @@ def analyze(
             len(indices),
         )
         try:
-            localized = localize_nozzle_tip_grid(
+            localized = _localize_tool_nozzle(
                 tool_paths,
-                frames=tool_frames,
-                propagate_missing_rings=True,
-                physical_tip_cluster_radius_px=16.0,
+                tool_frames=tool_frames,
+                reference=references.get(tool.lower(), {}),
+                localization_warnings=localization_warnings,
             )
         except NozzleTipLocalizationError as exc:
             _logger.info(
@@ -1184,7 +1762,23 @@ def analyze(
             continue
         for registration in localized["registrations"]:
             source_index = indices[int(registration["seq"])]
-            center = _vector(registration.get("center_px"), "nozzle center")
+            if registration.get("center_px") is None:
+                rejection_reasons = _registration_fit_reasons(registration)
+                records[source_index]["u_x_fit_rejection_reasons"] = rejection_reasons
+                records[source_index]["reasons"].extend(
+                    "nozzle localization rejected: " + reason
+                    for reason in rejection_reasons
+                )
+                records[source_index]["localization"] = _finite(
+                    {
+                        key: value
+                        for key, value in registration.items()
+                        if key
+                        not in {"center_px", "marker_center_px", "ring_center_px"}
+                    }
+                )
+                continue
+            center = _vector(registration["center_px"], "nozzle center")
             records[source_index]["nozzle_uv_px"] = center.tolist()
             records[source_index]["nozzle_detected"] = True
             fit_rejection_reasons = _registration_fit_reasons(registration)
@@ -1249,8 +1843,37 @@ def analyze(
     _logger.info("Wrote X/Z sweep u(x) plot path=%s", plot_path)
     artifacts["tool_xz_sweep_u_vs_x"] = _artifact(plot_path)
 
-    u_x_linear_fits = _fit_u_x_models(records)
-    shared_z_curve_fit = estimate_tool_z_delta(u_x_linear_fits)
+    u_x_linear_fits = _fit_u_x_models(records, method="huber_irls")
+    shared_z_curve_fit = estimate_tool_z_delta(
+        u_x_linear_fits,
+        acquisition_calibration=acquisition_calibration,
+        loss="huber",
+        include_profile=True,
+    )
+    fit_strategy_comparison = _compare_fit_strategies(
+        records,
+        acquisition_calibration=acquisition_calibration,
+    )
+    comparison_json_path = artifact_dir / "fit_strategy_comparison.json"
+    comparison_json_path.write_text(
+        json.dumps(fit_strategy_comparison, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    _logger.info(
+        "Wrote X/Z fit strategy comparison path=%s",
+        comparison_json_path,
+    )
+    artifacts["fit_strategy_comparison"] = _artifact(comparison_json_path)
+    comparison_plot_path = artifact_dir / "fit_strategy_comparison.png"
+    _write_fit_strategy_comparison_plot(
+        fit_strategy_comparison,
+        comparison_plot_path,
+    )
+    _logger.info(
+        "Wrote X/Z fit strategy comparison plot path=%s",
+        comparison_plot_path,
+    )
+    artifacts["fit_strategy_comparison_plot"] = _artifact(comparison_plot_path)
     slope_plot_path = artifact_dir / "tool_xz_sweep_u_slope_vs_z.png"
     _write_slope_plot(
         u_x_linear_fits,
@@ -1275,6 +1898,7 @@ def analyze(
         for record in records
     )
     warnings = []
+    warnings.extend(localization_warnings)
     if missing_fiducials:
         warnings.append(f"{missing_fiducials} frame(s) lack four-fiducial detections")
     if missing_nozzles:
@@ -1318,6 +1942,7 @@ def analyze(
             "records": records,
             "u_x_linear_fits": u_x_linear_fits,
             "shared_z_curve_fit": shared_z_curve_fit,
+            "fit_strategy_comparison": fit_strategy_comparison,
             "acquisition_calibration": acquisition_calibration,
             "artifacts": artifacts,
         }

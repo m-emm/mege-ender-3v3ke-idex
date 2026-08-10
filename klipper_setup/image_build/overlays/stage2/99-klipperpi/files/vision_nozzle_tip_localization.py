@@ -10,6 +10,7 @@ from typing import Any
 
 import cv2
 import numpy as np
+from scipy.stats import theilslopes
 from vision_four_fiducials import detect_four_fiducials
 
 _logger = logging.getLogger(__name__)
@@ -17,6 +18,12 @@ _logger = logging.getLogger(__name__)
 
 class NozzleTipLocalizationError(RuntimeError):
     pass
+
+
+BRIGHT_CIRCLE_ROI_HALF_WIDTH_PX = 40.0
+BRIGHT_CIRCLE_ROI_HALF_HEIGHT_PX = 35.0
+BRIGHT_CIRCLE_MIN_SCORE = 45.0
+BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX = 4.0
 
 
 def _red_candidates(image: np.ndarray, frame_index: int) -> list[dict[str, Any]]:
@@ -326,6 +333,313 @@ def _tip_candidates(
         ):
             unique.append(candidate)
     return unique[:8]
+
+
+def _bright_circle_score(
+    gray: np.ndarray, center: np.ndarray, radius: float
+) -> tuple[float, float, float]:
+    """Score a bright disk against the surrounding annulus."""
+
+    margin = max(3, int(math.ceil(1.7 * radius)))
+    center_x, center_y = [float(value) for value in center]
+    x0 = max(0, int(math.floor(center_x)) - margin)
+    y0 = max(0, int(math.floor(center_y)) - margin)
+    x1 = min(gray.shape[1], int(math.ceil(center_x)) + margin + 1)
+    y1 = min(gray.shape[0], int(math.ceil(center_y)) + margin + 1)
+    yy, xx = np.indices((y1 - y0, x1 - x0), dtype=np.float64)
+    distance = np.hypot(xx + x0 - center_x, yy + y0 - center_y)
+    inner = gray[y0:y1, x0:x1][distance <= 0.45 * radius]
+    annulus = gray[y0:y1, x0:x1][
+        (distance >= 0.9 * radius) & (distance <= 1.6 * radius)
+    ]
+    if inner.size < 8 or annulus.size < 16:
+        return -math.inf, 0.0, 0.0
+    inner_mean = float(np.mean(inner))
+    annulus_mean = float(np.mean(annulus))
+    return inner_mean - annulus_mean, inner_mean, annulus_mean
+
+
+def _bright_circle_candidates(
+    image: np.ndarray,
+    roi_center: np.ndarray,
+    *,
+    half_width_px: float = BRIGHT_CIRCLE_ROI_HALF_WIDTH_PX,
+    half_height_px: float = BRIGHT_CIRCLE_ROI_HALF_HEIGHT_PX,
+) -> dict[str, Any]:
+    """Find bright circular spots inside one prior-constrained ROI."""
+
+    height, width = image.shape[:2]
+    scale = min(width / 1920.0, height / 1080.0)
+    half_width = max(12, int(round(half_width_px * scale)))
+    half_height = max(12, int(round(half_height_px * scale)))
+    center_x, center_y = [float(value) for value in roi_center]
+    x0 = max(0, int(round(center_x)) - half_width)
+    y0 = max(0, int(round(center_y)) - half_height)
+    x1 = min(width, int(round(center_x)) + half_width + 1)
+    y1 = min(height, int(round(center_y)) + half_height + 1)
+    gray = _gray(image)
+    roi = gray[y0:y1, x0:x1]
+    blurred = cv2.GaussianBlur(roi, (5, 5), 1.2)
+    min_radius = max(3, int(round(5.0 * scale)))
+    max_radius = max(min_radius + 2, int(round(14.0 * scale)))
+    min_distance = max(6.0, 10.0 * scale)
+    circles = cv2.HoughCircles(
+        blurred,
+        cv2.HOUGH_GRADIENT,
+        dp=1.0,
+        minDist=min_distance,
+        param1=80.0,
+        param2=7.0,
+        minRadius=min_radius,
+        maxRadius=max_radius,
+    )
+    candidates: list[dict[str, Any]] = []
+    if circles is not None:
+        for local_x, local_y, radius in circles[0]:
+            score, inner_mean, annulus_mean = _bright_circle_score(
+                roi,
+                np.asarray([local_x, local_y], dtype=np.float64),
+                float(radius),
+            )
+            if not math.isfinite(score):
+                continue
+            candidates.append(
+                {
+                    "center_px": [
+                        float(local_x + x0),
+                        float(local_y + y0),
+                    ],
+                    "radius_px": float(radius),
+                    "score": float(score),
+                    "inner_mean": inner_mean,
+                    "annulus_mean": annulus_mean,
+                }
+            )
+    candidates.sort(key=lambda item: float(item["score"]), reverse=True)
+    candidates = candidates[:8]
+    score_margin = (
+        float(candidates[0]["score"] - candidates[1]["score"])
+        if len(candidates) >= 2
+        else None
+    )
+    return {
+        "roi_px": [x0, y0, x1, y1],
+        "prior_center_px": [center_x, center_y],
+        "candidates": candidates,
+        "score_margin": score_margin,
+    }
+
+
+def _refine_bright_circle(
+    gray: np.ndarray, center: np.ndarray, radius: float
+) -> tuple[np.ndarray, float, float, float]:
+    """Refine a Hough center on a small subpixel grid."""
+
+    best_center = np.asarray(center, dtype=np.float64)
+    best_radius = float(radius)
+    best_score, best_inner, best_annulus = _bright_circle_score(
+        gray, best_center, best_radius
+    )
+    for dx in np.linspace(-1.0, 1.0, 9):
+        for dy in np.linspace(-1.0, 1.0, 9):
+            trial_center = np.asarray(center, dtype=np.float64) + [dx, dy]
+            score, inner, annulus = _bright_circle_score(
+                gray, trial_center, best_radius
+            )
+            if score > best_score:
+                best_center = trial_center
+                best_score = score
+                best_inner = inner
+                best_annulus = annulus
+    return best_center, best_radius, best_score, best_inner - best_annulus
+
+
+def _robust_line(values_x: np.ndarray, values_y: np.ndarray) -> tuple[float, float]:
+    if len(values_x) >= 3 and len(np.unique(values_x)) >= 2:
+        slope, intercept, _low, _high = theilslopes(values_y, values_x)
+        return float(slope), float(intercept)
+    return 0.0, float(np.median(values_y))
+
+
+def localize_bright_nozzle_tip_grid(
+    frame_paths: list[Path],
+    *,
+    frames: list[dict[str, Any]],
+    roi_centers_px: list[np.ndarray],
+    half_width_px: float = BRIGHT_CIRCLE_ROI_HALF_WIDTH_PX,
+    half_height_px: float = BRIGHT_CIRCLE_ROI_HALF_HEIGHT_PX,
+) -> dict[str, Any]:
+    """Locate bright circular nozzle tips using prior-constrained ROIs."""
+
+    if len(frame_paths) != len(frames) or len(frames) != len(roi_centers_px):
+        raise NozzleTipLocalizationError("bright-tip inputs have inconsistent lengths")
+    registrations: list[dict[str, Any]] = []
+    candidate_records: dict[int, dict[str, Any]] = {}
+    for index, (path, roi_center) in enumerate(zip(frame_paths, roi_centers_px)):
+        image = cv2.imread(str(path), cv2.IMREAD_COLOR)
+        if image is None:
+            raise NozzleTipLocalizationError(
+                f"bright-tip image {index} cannot be decoded"
+            )
+        candidate_records[index] = _bright_circle_candidates(
+            image,
+            np.asarray(roi_center, dtype=np.float64),
+            half_width_px=half_width_px,
+            half_height_px=half_height_px,
+        )
+        del image
+
+    selected: dict[int, dict[str, Any]] = {}
+    row_keys = sorted({(str(frame["tool"]), float(frame["z_mm"])) for frame in frames})
+    for tool, z_mm in row_keys:
+        indices = [
+            index
+            for index, frame in enumerate(frames)
+            if str(frame["tool"]) == tool
+            and abs(float(frame["z_mm"]) - z_mm) < 1.0e-9
+            and candidate_records[index]["candidates"]
+        ]
+        if not indices:
+            continue
+        x_values = np.asarray([float(frames[index]["x_mm"]) for index in indices])
+        initial = [candidate_records[index]["candidates"][0] for index in indices]
+        initial_centers = np.asarray(
+            [candidate["center_px"] for candidate in initial], dtype=np.float64
+        )
+        u_slope, u_intercept = _robust_line(x_values, initial_centers[:, 0])
+        v_slope, v_intercept = _robust_line(x_values, initial_centers[:, 1])
+        for index, x_mm in zip(indices, x_values):
+            predicted = np.asarray(
+                [
+                    u_slope * x_mm + u_intercept,
+                    v_slope * x_mm + v_intercept,
+                ],
+                dtype=np.float64,
+            )
+            candidates = candidate_records[index]["candidates"]
+            top_score = float(candidates[0]["score"])
+            candidate = min(
+                candidates,
+                key=lambda item: float(
+                    np.linalg.norm(
+                        np.asarray(item["center_px"], dtype=np.float64) - predicted
+                    )
+                    + 0.05 * (top_score - float(item["score"]))
+                ),
+            )
+            selected[index] = dict(candidate)
+
+    for index in range(len(frames)):
+        diagnostics = candidate_records[index]
+        candidate = selected.get(index)
+        if candidate is None:
+            continue
+        image = cv2.imread(str(frame_paths[index]), cv2.IMREAD_COLOR)
+        if image is None:
+            raise NozzleTipLocalizationError(
+                f"bright-tip image {index} cannot be decoded during refinement"
+            )
+        gray = _gray(image)
+        refined_center, radius, score, contrast = _refine_bright_circle(
+            gray,
+            np.asarray(candidate["center_px"], dtype=np.float64),
+            float(candidate["radius_px"]),
+        )
+        del image
+        selected[index]["center_px"] = refined_center.tolist()
+        selected[index]["score"] = score
+        selected[index]["inner_annulus_contrast"] = contrast
+
+    selected_centers = {
+        index: np.asarray(candidate["center_px"], dtype=np.float64)
+        for index, candidate in selected.items()
+    }
+    for tool, z_mm in row_keys:
+        indices = [
+            index
+            for index, frame in enumerate(frames)
+            if index in selected_centers
+            and str(frame["tool"]) == tool
+            and abs(float(frame["z_mm"]) - z_mm) < 1.0e-9
+        ]
+        if not indices:
+            continue
+        x_values = np.asarray([float(frames[index]["x_mm"]) for index in indices])
+        centers = np.asarray([selected_centers[index] for index in indices])
+        u_slope, u_intercept = _robust_line(x_values, centers[:, 0])
+        v_slope, v_intercept = _robust_line(x_values, centers[:, 1])
+        for index in indices:
+            x_mm = float(frames[index]["x_mm"])
+            trajectory_center = np.asarray(
+                [
+                    u_slope * x_mm + u_intercept,
+                    v_slope * x_mm + v_intercept,
+                ]
+            )
+            selected[index]["row_residual_px"] = float(
+                np.linalg.norm(selected_centers[index] - trajectory_center)
+            )
+
+    for index, frame in enumerate(frames):
+        diagnostics = candidate_records[index]
+        candidate = selected.get(index)
+        if candidate is None:
+            registrations.append(
+                {
+                    "seq": index,
+                    "tool": frame["tool"],
+                    "x_mm": float(frame["x_mm"]),
+                    "z_mm": float(frame["z_mm"]),
+                    "center_px": None,
+                    "localization_method": "bright_circle_roi_v1",
+                    "roi_px": diagnostics["roi_px"],
+                    "prior_center_px": diagnostics["prior_center_px"],
+                    "candidates": diagnostics["candidates"],
+                    "candidate_score_margin": diagnostics["score_margin"],
+                    "bright_circle_score": None,
+                    "bright_circle_radius_px": None,
+                    "row_residual_px": None,
+                    "rejection_reason": "no bright circular candidate",
+                }
+            )
+            continue
+        residual = float(candidate.get("row_residual_px", math.inf))
+        score = float(candidate["score"])
+        rejection_reason = None
+        if score < BRIGHT_CIRCLE_MIN_SCORE:
+            rejection_reason = (
+                f"bright-circle contrast score {score:.1f} is below "
+                f"{BRIGHT_CIRCLE_MIN_SCORE:.1f}"
+            )
+        elif residual > BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX:
+            rejection_reason = (
+                f"row residual {residual:.2f} px exceeds "
+                f"{BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX:.2f} px"
+            )
+        registrations.append(
+            {
+                "seq": index,
+                "tool": frame["tool"],
+                "x_mm": float(frame["x_mm"]),
+                "z_mm": float(frame["z_mm"]),
+                "center_px": candidate["center_px"],
+                "localization_method": "bright_circle_roi_v1",
+                "roi_px": diagnostics["roi_px"],
+                "prior_center_px": diagnostics["prior_center_px"],
+                "candidates": diagnostics["candidates"],
+                "candidate_score_margin": diagnostics["score_margin"],
+                "bright_circle_score": score,
+                "bright_circle_radius_px": float(candidate["radius_px"]),
+                "bright_circle_inner_annulus_contrast": float(
+                    candidate.get("inner_annulus_contrast", score)
+                ),
+                "tip_detector_center_px": candidate["center_px"],
+                "row_residual_px": residual,
+                "rejection_reason": rejection_reason,
+                "accepted_for_u_x_fit": rejection_reason is None,
+            }
+        )
+    return {"registrations": registrations}
 
 
 def _crop(

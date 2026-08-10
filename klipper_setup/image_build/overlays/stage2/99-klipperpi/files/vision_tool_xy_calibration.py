@@ -113,6 +113,37 @@ def _pixel_delta_to_printer_xy_mm(
     return np.linalg.solve(basis, _vector(pixel_delta, "pixel delta"))
 
 
+def _nozzle_image_prior(details: dict[str, Any]) -> dict[str, Any] | None:
+    """Build the X-to-image prior consumed by the combined X/Z sweep."""
+
+    records = [
+        record
+        for record in details.get("records", [])
+        if record.get("accepted") and record.get("center_px") is not None
+    ]
+    if len(records) < 2:
+        return None
+    x_values = np.asarray(
+        [float(record["x_mm"]) for record in records], dtype=np.float64
+    )
+    centers = np.asarray([record["center_px"] for record in records], dtype=np.float64)
+    if len(np.unique(x_values)) < 2 or centers.shape != (len(records), 2):
+        return None
+    design = np.column_stack((np.ones_like(x_values), x_values))
+    coefficients, _, _, _ = np.linalg.lstsq(design, centers, rcond=None)
+    residuals = design @ coefficients - centers
+    return _finite(
+        {
+            "model": "linear_commanded_x_to_pixel_v1",
+            "x_mm_range": [float(np.min(x_values)), float(np.max(x_values))],
+            "coefficients_px": coefficients,
+            "fit_rms_px": np.sqrt(np.mean(residuals**2, axis=0)),
+            "source_commanded_z_mm": float(details["commanded_z_mm"]),
+            "sample_count": len(records),
+        }
+    )
+
+
 def _active_tool_state(resolved: dict[str, Any]) -> dict[str, Any]:
     snapshot = resolved.get("active_tool_calibration")
     if not isinstance(snapshot, dict):
@@ -748,12 +779,16 @@ def build_measurement_fact(
         raise ToolXYError(
             "acquisition calibration lacks the selected endstop"
         ) from None
-    return {
+    value = {
         "x_datum_mm": float(details["x_datum_mm"]),
         "y_datum_mm": float(details["y_datum_mm"]),
         "acquisition_endstop_xy_mm": acquisition_xy,
         "commanded_z_mm": float(details["commanded_z_mm"]),
     }
+    image_prior = _nozzle_image_prior(details)
+    if image_prior is not None:
+        value["nozzle_image_prior"] = image_prior
+    return value
 
 
 def _source_xy_endstops(source: dict[str, Any], label: str) -> dict[str, list[float]]:
