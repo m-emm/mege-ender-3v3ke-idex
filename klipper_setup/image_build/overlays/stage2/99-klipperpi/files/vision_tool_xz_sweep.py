@@ -20,13 +20,17 @@ from scipy.optimize import least_squares, minimize_scalar
 from scipy.stats import theilslopes
 from vision_four_fiducials import FourFiducialError, detect_four_fiducials
 from vision_nozzle_tip_localization import (
+    BRIGHT_CIRCLE_LEGACY_MIN_SCORE,
+    BRIGHT_CIRCLE_MAX_CONSENSUS_RMS_PX,
     BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX,
-    BRIGHT_CIRCLE_MIN_SCORE,
+    BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIERS,
+    BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIER_FRACTION,
     BRIGHT_CIRCLE_ROI_HALF_HEIGHT_PX,
     BRIGHT_CIRCLE_ROI_HALF_WIDTH_PX,
+    BRIGHT_CIRCLE_SCORE_FLOOR,
     NozzleTipLocalizationError,
+    evaluate_bright_circle_quality,
     localize_bright_nozzle_tip_grid,
-    localize_nozzle_tip_grid,
 )
 
 _logger = logging.getLogger(__name__)
@@ -88,6 +92,101 @@ def _artifact(path: Path) -> dict[str, str]:
     }
 
 
+def _compare_bright_circle_gates(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Report the retired brightness gate beside the active geometry gate."""
+
+    per_frame: list[dict[str, Any]] = []
+    counts = {
+        "bright_circle_records": 0,
+        "legacy_accepted": 0,
+        "active_accepted": 0,
+        "newly_admitted_geometry_consensus": 0,
+        "rejected_by_active_gate": 0,
+        "nozzle_not_detected": 0,
+    }
+    for record in records:
+        localization = record.get("localization") or {}
+        if localization.get("localization_method") != "bright_circle_roi_v1":
+            continue
+        counts["bright_circle_records"] += 1
+        score_value = localization.get("bright_circle_score")
+        score = None if score_value is None else float(score_value)
+        residual_value = localization.get("row_residual_px")
+        residual = None if residual_value is None else float(residual_value)
+        legacy_reasons: list[str] = []
+        if record.get("nozzle_uv_px") is None:
+            legacy_reasons.append("bright circular nozzle tip was not detected")
+        if score is None or not math.isfinite(score):
+            legacy_reasons.append("bright-circle quality score is unavailable")
+        elif score < BRIGHT_CIRCLE_LEGACY_MIN_SCORE:
+            legacy_reasons.append(
+                f"bright-circle contrast score is too low: {score:.1f}"
+            )
+        if residual is None or not math.isfinite(residual):
+            legacy_reasons.append("bright-circle row residual is unavailable")
+        elif residual > BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX:
+            legacy_reasons.append(
+                f"bright-circle row residual {residual:.2f} px exceeds "
+                f"{BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX:.2f} px"
+            )
+        legacy_accepted = not legacy_reasons
+        active_gate = localization.get("quality_gate") or {}
+        active_accepted = bool(record.get("accepted_for_u_x_fit", False))
+        if legacy_accepted:
+            counts["legacy_accepted"] += 1
+        if active_accepted:
+            counts["active_accepted"] += 1
+        if active_accepted and not legacy_accepted:
+            counts["newly_admitted_geometry_consensus"] += 1
+            category = "newly_admitted_geometry_consensus"
+        elif active_accepted:
+            category = "accepted_by_both"
+        elif record.get("nozzle_uv_px") is None:
+            counts["nozzle_not_detected"] += 1
+            category = "nozzle_not_detected"
+        else:
+            counts["rejected_by_active_gate"] += 1
+            category = "rejected_by_active_gate"
+        per_frame.append(
+            {
+                "seq": int(record["seq"]),
+                "tool": record["tool"],
+                "commanded_x_mm": float(record["commanded_x_mm"]),
+                "commanded_z_mm": float(record["commanded_z_mm"]),
+                "selected_center_px": record.get("nozzle_uv_px"),
+                "bright_circle_score": score,
+                "row_residual_px": residual,
+                "candidate_score_margin": localization.get("candidate_score_margin"),
+                "trajectory_consensus": localization.get("trajectory_consensus"),
+                "quality_gate": active_gate,
+                "legacy_accepted": legacy_accepted,
+                "legacy_rejection_reasons": legacy_reasons,
+                "active_accepted": active_accepted,
+                "active_rejection_reasons": record.get(
+                    "u_x_fit_rejection_reasons", []
+                ),
+                "category": category,
+                "candidates": localization.get("candidates", []),
+            }
+        )
+    return {
+        "comparison_version": "bright_circle_gate_comparison_v1",
+        "legacy_gate": {
+            "minimum_score": BRIGHT_CIRCLE_LEGACY_MIN_SCORE,
+            "maximum_row_residual_px": BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX,
+        },
+        "active_gate": {
+            "minimum_score_floor": BRIGHT_CIRCLE_SCORE_FLOOR,
+            "minimum_consensus_inliers": BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIERS,
+            "minimum_consensus_fraction": BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIER_FRACTION,
+            "maximum_consensus_rms_px": BRIGHT_CIRCLE_MAX_CONSENSUS_RMS_PX,
+            "maximum_row_residual_px": BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX,
+        },
+        "counts": counts,
+        "frames": per_frame,
+    }
+
+
 def _number(mapping: dict[str, Any], key: str, context: str) -> float:
     value = mapping.get(key)
     if not isinstance(value, (int, float)) or not math.isfinite(float(value)):
@@ -108,23 +207,54 @@ def _nozzle_prior_center(
     prior = reference.get("nozzle_image_prior")
     if not isinstance(prior, dict):
         return None
-    if prior.get("model") != "linear_commanded_x_to_pixel_v1":
+    if prior.get("model") != "linear_commanded_x_to_image_uv_v1":
         return None
-    coefficients = np.asarray(prior.get("coefficients_px"), dtype=np.float64)
+    try:
+        coefficients = np.asarray(prior.get("coefficients_px"), dtype=np.float64)
+    except (TypeError, ValueError):
+        return None
     if coefficients.shape != (2, 2) or not np.all(np.isfinite(coefficients)):
-        return None
-    x_range = prior.get("x_mm_range")
-    if (
-        not isinstance(x_range, (list, tuple))
-        or len(x_range) != 2
-        or not all(isinstance(value, (int, float)) for value in x_range)
-    ):
-        return None
-    x_min, x_max = [float(value) for value in x_range]
-    if not x_min <= float(commanded_x_mm) <= x_max:
         return None
     center = np.asarray([1.0, float(commanded_x_mm)]) @ coefficients
     return center if np.all(np.isfinite(center)) else None
+
+
+def _validated_nozzle_prior_centers(
+    reference: dict[str, Any],
+    *,
+    tool: str,
+    commanded_x_values: list[float],
+) -> list[np.ndarray]:
+    """Require a complete, finite XY-derived image prior for an X/Z sweep."""
+
+    context = f"{tool} nozzle_image_prior"
+    prior = reference.get("nozzle_image_prior")
+    if not isinstance(prior, dict):
+        raise ToolXZSweepError(
+            f"{context} is required; rerun the XY calibration to publish the "
+            "commanded-X image line model"
+        )
+    if prior.get("model") != "linear_commanded_x_to_image_uv_v1":
+        raise ToolXZSweepError(
+            f"{context}.model must be linear_commanded_x_to_image_uv_v1"
+        )
+
+    try:
+        coefficients = np.asarray(prior.get("coefficients_px"), dtype=np.float64)
+    except (TypeError, ValueError):
+        coefficients = np.empty((0, 0), dtype=np.float64)
+    if coefficients.shape != (2, 2) or not np.all(np.isfinite(coefficients)):
+        raise ToolXZSweepError(f"{context}.coefficients_px must be a finite 2x2 matrix")
+
+    centers: list[np.ndarray] = []
+    for commanded_x_mm in commanded_x_values:
+        center = np.asarray([1.0, float(commanded_x_mm)]) @ coefficients
+        if center.shape != (2,) or not np.all(np.isfinite(center)):
+            raise ToolXZSweepError(
+                f"{context} predicts a non-finite image center at X={commanded_x_mm:.3f} mm"
+            )
+        centers.append(center)
+    return centers
 
 
 def _localize_tool_nozzle(
@@ -132,83 +262,34 @@ def _localize_tool_nozzle(
     *,
     tool_frames: list[dict[str, Any]],
     reference: dict[str, Any],
-    localization_warnings: list[str],
 ) -> dict[str, Any]:
-    prior_centers = [
-        _nozzle_prior_center(reference, float(frame["x_mm"])) for frame in tool_frames
-    ]
-    if all(center is not None for center in prior_centers):
-        _logger.info(
-            "Using XY-derived nozzle image prior for bright-circle localization "
-            "tool=%s frames=%d roi_half_size=(%.1f,%.1f)px",
-            tool_frames[0]["tool"],
-            len(tool_frames),
-            BRIGHT_CIRCLE_ROI_HALF_WIDTH_PX,
-            BRIGHT_CIRCLE_ROI_HALF_HEIGHT_PX,
-        )
-        bright = localize_bright_nozzle_tip_grid(
-            tool_paths,
-            frames=tool_frames,
-            roi_centers_px=[center for center in prior_centers if center is not None],
-        )
-        if any(
-            registration.get("center_px") is not None
-            for registration in bright["registrations"]
-        ):
-            return bright
-        raise NozzleTipLocalizationError(
-            "no bright circular candidates in XY-prior ROIs"
-        )
-
     tool = str(tool_frames[0]["tool"])
-    warning = (
-        f"{tool} X/Z frames lack a complete XY nozzle image prior; "
-        "using legacy localization as a coarse ROI seed"
+    prior_centers = _validated_nozzle_prior_centers(
+        reference,
+        tool=tool,
+        commanded_x_values=[float(frame["x_mm"]) for frame in tool_frames],
     )
-    _logger.warning(warning)
-    localization_warnings.append(warning)
-    legacy = localize_nozzle_tip_grid(
+    _logger.info(
+        "Using commanded-X XY image prior for bright-circle localization "
+        "tool=%s frames=%d roi_half_size=(%.1f,%.1f)px",
+        tool,
+        len(tool_frames),
+        BRIGHT_CIRCLE_ROI_HALF_WIDTH_PX,
+        BRIGHT_CIRCLE_ROI_HALF_HEIGHT_PX,
+    )
+    bright = localize_bright_nozzle_tip_grid(
         tool_paths,
         frames=tool_frames,
-        propagate_missing_rings=True,
-        physical_tip_cluster_radius_px=16.0,
+        roi_centers_px=prior_centers,
     )
-    legacy_centers = [
-        (
-            np.asarray(registration.get("center_px"), dtype=np.float64)
-            if registration.get("center_px") is not None
-            else None
-        )
-        for registration in legacy["registrations"]
-    ]
-    if not all(center is not None for center in legacy_centers):
-        return legacy
-    try:
-        bright = localize_bright_nozzle_tip_grid(
-            tool_paths,
-            frames=tool_frames,
-            roi_centers_px=[center for center in legacy_centers if center is not None],
-        )
-        if any(
-            registration.get("center_px") is not None
-            for registration in bright["registrations"]
-        ):
-            return bright
-        fallback_warning = (
-            f"{tool} bright-circle localization found no candidates in legacy ROIs; "
-            "retaining legacy localization"
-        )
-        _logger.warning(fallback_warning)
-        localization_warnings.append(fallback_warning)
-        return legacy
-    except NozzleTipLocalizationError as exc:
-        fallback_warning = (
-            f"{tool} bright-circle localization failed from legacy ROI seed; "
-            f"retaining legacy localization: {exc}"
-        )
-        _logger.warning(fallback_warning)
-        localization_warnings.append(fallback_warning)
-        return legacy
+    if any(
+        registration.get("center_px") is not None
+        for registration in bright["registrations"]
+    ):
+        return bright
+    raise NozzleTipLocalizationError(
+        f"{tool} has no bright circular candidates in commanded-X prior ROIs"
+    )
 
 
 def _tool_marker_vector(marker: dict[str, Any], tool: str) -> np.ndarray:
@@ -381,12 +462,18 @@ def prepare_sweep(
 
     references = {}
     frames = []
+    commanded_x_values = [float(corner_xy[0]) + offset for offset in x_offsets]
     for tool in tools:
         reference = _tool_reference(
             tool,
             definition=definition,
             input_values=input_values,
             resolved=resolved,
+        )
+        _validated_nozzle_prior_centers(
+            reference,
+            tool=tool,
+            commanded_x_values=commanded_x_values,
         )
         references[tool.lower()] = reference
         for z_mm in z_positions:
@@ -459,29 +546,8 @@ def _base_record(frame: dict[str, Any]) -> dict[str, Any]:
 
 def _registration_fit_reasons(registration: dict[str, Any]) -> list[str]:
     if registration.get("localization_method") == "bright_circle_roi_v1":
-        reasons = []
-        if registration.get("center_px") is None:
-            reasons.append(
-                registration.get(
-                    "rejection_reason", "bright circular nozzle tip was not detected"
-                )
-            )
-        score = registration.get("bright_circle_score")
-        if score is None:
-            reasons.append("bright-circle quality score is unavailable")
-        elif float(score) < BRIGHT_CIRCLE_MIN_SCORE:
-            reasons.append(
-                f"bright-circle contrast score is too low: {float(score):.1f}"
-            )
-        residual = registration.get("row_residual_px")
-        if residual is None:
-            reasons.append("bright-circle row residual is unavailable")
-        elif float(residual) > BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX:
-            reasons.append(
-                f"bright-circle row residual {float(residual):.2f} px exceeds "
-                f"{BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX:.2f} px"
-            )
-        return reasons
+        quality_gate = evaluate_bright_circle_quality(registration)
+        return list(quality_gate["reasons"])
     required = (
         "minimum_correlation",
         "median_correlation",
@@ -523,6 +589,15 @@ def _write_overlay(
     record: dict[str, Any],
     path: Path,
 ) -> None:
+    def _finite_float(value: Any, default: float = 0.0) -> float:
+        if value is None:
+            return default
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return default
+        return number if np.isfinite(number) else default
+
     overlay = image.copy()
     color = (0, 255, 0) if record["nozzle_detected"] else (0, 0, 255)
     centers = record.get("fiducial_centers_uv_px") or []
@@ -571,11 +646,22 @@ def _write_overlay(
         if isinstance(roi, (list, tuple)) and len(roi) == 4:
             x0, y0, x1, y1 = [int(round(float(value))) for value in roi]
             cv2.rectangle(overlay, (x0, y0), (x1, y1), (255, 255, 0), 1)
+        prior_center = localization.get("prior_center_px")
+        if isinstance(prior_center, (list, tuple)) and len(prior_center) == 2:
+            cv2.drawMarker(
+                overlay,
+                tuple(np.rint(prior_center).astype(int)),
+                (0, 165, 255),
+                cv2.MARKER_CROSS,
+                12,
+                1,
+            )
         nozzle = record.get("nozzle_uv_px")
         if nozzle is not None:
             nozzle_point = tuple(np.rint(nozzle).astype(int))
             nozzle_radius = max(
-                4, int(round(float(localization.get("bright_circle_radius_px", 8.0))))
+                4,
+                int(round(_finite_float(localization.get("bright_circle_radius_px"), 8.0))),
             )
             cv2.circle(overlay, nozzle_point, nozzle_radius, color, 2)
             cv2.circle(overlay, nozzle_point, 2, color, -1)
@@ -628,11 +714,23 @@ def _write_overlay(
     ]
     if localization:
         if bright_circle:
+            prior_center = localization.get("prior_center_px")
+            lines.append(
+                "ROI prior="
+                + (
+                    f"{float(prior_center[0]):.2f},{float(prior_center[1]):.2f}px "
+                    "method=bright_circle_roi_v1"
+                    if isinstance(prior_center, (list, tuple))
+                    and len(prior_center) == 2
+                    else "n/a method=bright_circle_roi_v1"
+                )
+            )
             lines.append(
                 "bright circle="
-                f"score={float(localization.get('bright_circle_score', 0.0)):.1f} "
-                f"r={float(localization.get('bright_circle_radius_px', 0.0)):.1f}px "
-                f"row_res={float(localization.get('row_residual_px', 0.0)):.2f}px"
+                f"score={_finite_float(localization.get('bright_circle_score')):.1f} "
+                f"r={_finite_float(localization.get('bright_circle_radius_px')):.1f}px "
+                f"row_res={_finite_float(localization.get('row_residual_px')):.2f}px "
+                f"gate={(localization.get('quality_gate') or {}).get('mode', 'n/a')}"
             )
         else:
             lines.append(
@@ -1654,10 +1752,17 @@ def analyze(
     if {frame.get("tool") for frame in frames} != {"T0", "T1"}:
         raise ToolXZSweepError("X/Z sweep requires both T0 and T1 frames")
 
+    for tool in ("T0", "T1"):
+        tool_frames = [frame for frame in frames if str(frame["tool"]) == tool]
+        _validated_nozzle_prior_centers(
+            references.get(tool.lower(), {}),
+            tool=tool,
+            commanded_x_values=[float(frame["x_mm"]) for frame in tool_frames],
+        )
+
     artifact_dir.mkdir(parents=True, exist_ok=True)
     records = [_base_record(frame) for frame in frames]
     valid_for_localization: dict[str, list[int]] = {"T0": [], "T1": []}
-    localization_warnings: list[str] = []
     image_dimensions: list[int] | None = None
 
     for index, (path, frame, record) in enumerate(zip(frame_paths, frames, records)):
@@ -1746,7 +1851,6 @@ def analyze(
                 tool_paths,
                 tool_frames=tool_frames,
                 reference=references.get(tool.lower(), {}),
-                localization_warnings=localization_warnings,
             )
         except NozzleTipLocalizationError as exc:
             _logger.info(
@@ -1810,6 +1914,24 @@ def analyze(
         )
 
     artifacts: dict[str, dict[str, str]] = {}
+    bright_circle_gate_comparison = _compare_bright_circle_gates(records)
+    gate_comparison_path = artifact_dir / "bright_circle_gate_comparison.json"
+    gate_comparison_path.write_text(
+        json.dumps(bright_circle_gate_comparison, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    _logger.info(
+        "Wrote bright-circle gate comparison path=%s legacy_accepted=%d "
+        "active_accepted=%d newly_admitted=%d active_rejected=%d",
+        gate_comparison_path,
+        bright_circle_gate_comparison["counts"]["legacy_accepted"],
+        bright_circle_gate_comparison["counts"]["active_accepted"],
+        bright_circle_gate_comparison["counts"][
+            "newly_admitted_geometry_consensus"
+        ],
+        bright_circle_gate_comparison["counts"]["rejected_by_active_gate"],
+    )
+    artifacts["bright_circle_gate_comparison"] = _artifact(gate_comparison_path)
     if GENERATE_OVERLAYS:
         overlay_dir = artifact_dir / "tool_xz_sweep_overlays"
         overlay_dir.mkdir(parents=True, exist_ok=True)
@@ -1898,7 +2020,6 @@ def analyze(
         for record in records
     )
     warnings = []
-    warnings.extend(localization_warnings)
     if missing_fiducials:
         warnings.append(f"{missing_fiducials} frame(s) lack four-fiducial detections")
     if missing_nozzles:
@@ -1943,6 +2064,7 @@ def analyze(
             "u_x_linear_fits": u_x_linear_fits,
             "shared_z_curve_fit": shared_z_curve_fit,
             "fit_strategy_comparison": fit_strategy_comparison,
+            "bright_circle_gate_comparison": bright_circle_gate_comparison,
             "acquisition_calibration": acquisition_calibration,
             "artifacts": artifacts,
         }

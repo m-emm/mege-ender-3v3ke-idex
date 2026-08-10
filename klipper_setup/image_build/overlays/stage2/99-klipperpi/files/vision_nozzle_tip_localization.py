@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import math
+from itertools import combinations, product
 from pathlib import Path
 from typing import Any
 
@@ -22,8 +23,126 @@ class NozzleTipLocalizationError(RuntimeError):
 
 BRIGHT_CIRCLE_ROI_HALF_WIDTH_PX = 40.0
 BRIGHT_CIRCLE_ROI_HALF_HEIGHT_PX = 35.0
-BRIGHT_CIRCLE_MIN_SCORE = 45.0
+BRIGHT_CIRCLE_LEGACY_MIN_SCORE = 45.0
+BRIGHT_CIRCLE_SCORE_FLOOR = -10.0
+BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIERS = 4
+BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIER_FRACTION = 2.0 / 3.0
+BRIGHT_CIRCLE_MAX_CONSENSUS_RMS_PX = 2.5
 BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX = 4.0
+BRIGHT_CIRCLE_MAX_ROW_V_SLOPE_PX_PER_MM = 1.0
+
+
+def evaluate_bright_circle_quality(registration: dict[str, Any]) -> dict[str, Any]:
+    """Evaluate one selected bright-circle registration for X/Z fitting.
+
+    Brightness is a useful detector diagnostic, but it is not sufficient as an
+    acceptance gate because the real tip can be dimmer than vertically shifted
+    highlights.  The active fallback therefore requires a valid joint
+    trajectory consensus and keeps the brightness floor only as a sanity
+    check.
+    """
+
+    reasons: list[str] = []
+    score_value = registration.get("bright_circle_score")
+    score = None if score_value is None else float(score_value)
+    residual_value = registration.get("row_residual_px")
+    residual = None if residual_value is None else float(residual_value)
+    consensus = registration.get("trajectory_consensus")
+    consensus_inlier_count = 0
+    consensus_sample_count = 0
+    consensus_rms = None
+    minimum_consensus_inliers = BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIERS
+
+    if registration.get("center_px") is None:
+        reasons.append("bright circular nozzle tip was not detected")
+    if score is None or not math.isfinite(score):
+        reasons.append("bright-circle quality score is unavailable")
+    elif score < BRIGHT_CIRCLE_SCORE_FLOOR:
+        reasons.append(
+            f"bright-circle contrast score {score:.1f} is below the active "
+            f"floor {BRIGHT_CIRCLE_SCORE_FLOOR:.1f}"
+        )
+
+    if consensus is None:
+        reasons.append("bright-circle trajectory consensus is unavailable")
+    else:
+        consensus_inlier_count = int(consensus.get("inlier_count", 0))
+        consensus_sample_count = int(consensus.get("sample_count", 0))
+        consensus_rms_value = consensus.get("inlier_rms_px")
+        consensus_rms = (
+            None
+            if consensus_rms_value is None
+            else float(consensus_rms_value)
+        )
+        if consensus_sample_count > 0:
+            minimum_consensus_inliers = max(
+                BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIERS,
+                int(
+                    math.ceil(
+                        BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIER_FRACTION
+                        * consensus_sample_count
+                    )
+                ),
+            )
+        if consensus_inlier_count < minimum_consensus_inliers:
+            reasons.append(
+                "bright-circle trajectory consensus has "
+                f"{consensus_inlier_count}/{consensus_sample_count} inliers; "
+                f"at least {minimum_consensus_inliers} are required"
+            )
+        if consensus_rms is None or not math.isfinite(consensus_rms):
+            reasons.append("bright-circle trajectory consensus RMS is unavailable")
+        elif consensus_rms > BRIGHT_CIRCLE_MAX_CONSENSUS_RMS_PX:
+            reasons.append(
+                "bright-circle trajectory consensus RMS "
+                f"{consensus_rms:.2f} px exceeds "
+                f"{BRIGHT_CIRCLE_MAX_CONSENSUS_RMS_PX:.2f} px"
+            )
+        if not registration.get("trajectory_consensus_inlier", False):
+            reasons.append("selected bright-circle candidate is not a trajectory inlier")
+
+    if residual is None or not math.isfinite(residual):
+        reasons.append("bright-circle row residual is unavailable")
+    elif residual > BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX:
+        reasons.append(
+            f"bright-circle row residual {residual:.2f} px exceeds "
+            f"{BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX:.2f} px"
+        )
+
+    accepted = not reasons
+    if accepted and score is not None and score >= BRIGHT_CIRCLE_LEGACY_MIN_SCORE:
+        mode = "normal_brightness"
+    elif accepted:
+        mode = "geometry_consensus_fallback"
+    else:
+        mode = "rejected"
+
+    return {
+        "accepted": accepted,
+        "mode": mode,
+        "legacy_score_threshold_px": BRIGHT_CIRCLE_LEGACY_MIN_SCORE,
+        "active_score_floor": BRIGHT_CIRCLE_SCORE_FLOOR,
+        "legacy_brightness_pass": score is not None
+        and score >= BRIGHT_CIRCLE_LEGACY_MIN_SCORE,
+        "brightness_floor_pass": score is not None
+        and math.isfinite(score)
+        and score >= BRIGHT_CIRCLE_SCORE_FLOOR,
+        "consensus_inlier_count": consensus_inlier_count,
+        "consensus_sample_count": consensus_sample_count,
+        "minimum_consensus_inliers": minimum_consensus_inliers,
+        "consensus_inlier_rms_px": consensus_rms,
+        "consensus_pass": consensus is not None
+        and consensus_inlier_count >= minimum_consensus_inliers
+        and consensus_rms is not None
+        and math.isfinite(consensus_rms)
+        and consensus_rms <= BRIGHT_CIRCLE_MAX_CONSENSUS_RMS_PX
+        and bool(registration.get("trajectory_consensus_inlier", False)),
+        "row_residual_px": residual,
+        "row_residual_pass": residual is not None
+        and math.isfinite(residual)
+        and residual <= BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX,
+        "reasons": reasons,
+    }
 
 
 def _red_candidates(image: np.ndarray, frame_index: int) -> list[dict[str, Any]]:
@@ -456,9 +575,120 @@ def _refine_bright_circle(
 
 def _robust_line(values_x: np.ndarray, values_y: np.ndarray) -> tuple[float, float]:
     if len(values_x) >= 3 and len(np.unique(values_x)) >= 2:
-        slope, intercept, _low, _high = theilslopes(values_y, values_x)
+        # The default ``separate`` intercept is median(y) - slope*median(x).
+        # That is not robust for a sloped trajectory when one point shifts the
+        # median y: it can move the whole predicted line by many pixels.  The
+        # ``joint`` intercept is the median of y - slope*x and therefore keeps
+        # the trajectory anchored to the majority of the pairwise slope
+        # estimate.
+        slope, intercept, _low, _high = theilslopes(
+            values_y, values_x, method="joint"
+        )
         return float(slope), float(intercept)
     return 0.0, float(np.median(values_y))
+
+
+def _trajectory_candidate_consensus(
+    x_values: np.ndarray,
+    candidate_lists: list[list[dict[str, Any]]],
+) -> dict[str, Any] | None:
+    """Find one joint u/v trajectory through the candidate circles.
+
+    The bright-circle score is deliberately not the primary selector: a
+    bright highlight can be vertically displaced from the nozzle.  Instead,
+    enumerate pair-defined trajectory hypotheses, reject implausibly steep
+    image-v trajectories, and prefer the hypothesis with the largest coherent
+    X coverage.  Brightness only breaks ties between geometrically equivalent
+    hypotheses.
+    """
+
+    if len(x_values) < 2 or len(candidate_lists) != len(x_values):
+        return None
+    if any(not candidates for candidates in candidate_lists):
+        return None
+
+    hypotheses: list[dict[str, Any]] = []
+    for first_index, second_index in combinations(range(len(x_values)), 2):
+        delta_x = float(x_values[second_index] - x_values[first_index])
+        if abs(delta_x) < 1.0e-9:
+            continue
+        for first, second in product(
+            candidate_lists[first_index], candidate_lists[second_index]
+        ):
+            first_center = np.asarray(first["center_px"], dtype=np.float64)
+            second_center = np.asarray(second["center_px"], dtype=np.float64)
+            slopes = (second_center - first_center) / delta_x
+            if abs(float(slopes[1])) > BRIGHT_CIRCLE_MAX_ROW_V_SLOPE_PX_PER_MM:
+                continue
+            intercepts = first_center - slopes * float(x_values[first_index])
+
+            selected: list[dict[str, Any]] = []
+            residuals: list[float] = []
+            inliers: list[bool] = []
+            for x_mm, candidates in zip(x_values, candidate_lists):
+                predicted = slopes * float(x_mm) + intercepts
+                candidate = min(
+                    candidates,
+                    key=lambda item: float(
+                        np.linalg.norm(
+                            np.asarray(item["center_px"], dtype=np.float64)
+                            - predicted
+                        )
+                    ),
+                )
+                residual = float(
+                    np.linalg.norm(
+                        np.asarray(candidate["center_px"], dtype=np.float64)
+                        - predicted
+                    )
+                )
+                selected.append(candidate)
+                residuals.append(residual)
+                inliers.append(residual <= BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX)
+
+            inlier_indices = [index for index, inlier in enumerate(inliers) if inlier]
+            if not inlier_indices:
+                continue
+            inlier_scores = [
+                float(selected[index]["score"]) for index in inlier_indices
+            ]
+            inlier_x = np.asarray([x_values[index] for index in inlier_indices])
+            hypotheses.append(
+                {
+                    "slopes": slopes,
+                    "intercepts": intercepts,
+                    "selected": selected,
+                    "residuals": residuals,
+                    "inliers": inliers,
+                    "inlier_count": len(inlier_indices),
+                    "inlier_x_span_mm": float(np.ptp(inlier_x))
+                    if len(inlier_indices) >= 2
+                    else 0.0,
+                    "median_inlier_score": float(np.median(inlier_scores)),
+                    "inlier_rms_px": float(
+                        np.sqrt(
+                            np.mean(
+                                np.asarray(residuals, dtype=np.float64)[
+                                    inlier_indices
+                                ]
+                                ** 2
+                            )
+                        )
+                    ),
+                }
+            )
+
+    if not hypotheses:
+        return None
+    return max(
+        hypotheses,
+        key=lambda hypothesis: (
+            int(hypothesis["inlier_count"]),
+            float(hypothesis["inlier_x_span_mm"]),
+            float(hypothesis["median_inlier_score"]),
+            -float(hypothesis["inlier_rms_px"]),
+        ),
+    )
 
 
 def localize_bright_nozzle_tip_grid(
@@ -502,32 +732,68 @@ def localize_bright_nozzle_tip_grid(
         if not indices:
             continue
         x_values = np.asarray([float(frames[index]["x_mm"]) for index in indices])
-        initial = [candidate_records[index]["candidates"][0] for index in indices]
-        initial_centers = np.asarray(
-            [candidate["center_px"] for candidate in initial], dtype=np.float64
-        )
-        u_slope, u_intercept = _robust_line(x_values, initial_centers[:, 0])
-        v_slope, v_intercept = _robust_line(x_values, initial_centers[:, 1])
-        for index, x_mm in zip(indices, x_values):
-            predicted = np.asarray(
-                [
-                    u_slope * x_mm + u_intercept,
-                    v_slope * x_mm + v_intercept,
-                ],
-                dtype=np.float64,
+        candidate_lists = [candidate_records[index]["candidates"] for index in indices]
+        consensus = _trajectory_candidate_consensus(x_values, candidate_lists)
+        if consensus is None:
+            initial = [candidates[0] for candidates in candidate_lists]
+            initial_centers = np.asarray(
+                [candidate["center_px"] for candidate in initial], dtype=np.float64
             )
-            candidates = candidate_records[index]["candidates"]
-            top_score = float(candidates[0]["score"])
-            candidate = min(
-                candidates,
-                key=lambda item: float(
-                    np.linalg.norm(
-                        np.asarray(item["center_px"], dtype=np.float64) - predicted
-                    )
-                    + 0.05 * (top_score - float(item["score"]))
+            u_slope, u_intercept = _robust_line(x_values, initial_centers[:, 0])
+            v_slope, v_intercept = _robust_line(x_values, initial_centers[:, 1])
+            consensus = {
+                "slopes": np.asarray([u_slope, v_slope], dtype=np.float64),
+                "intercepts": np.asarray([u_intercept, v_intercept], dtype=np.float64),
+                "selected": initial,
+                "residuals": [0.0] * len(initial),
+                "inliers": [True] * len(initial),
+                "inlier_count": len(initial),
+                "inlier_x_span_mm": float(np.ptp(x_values))
+                if len(x_values) >= 2
+                else 0.0,
+                "median_inlier_score": float(
+                    np.median([float(candidate["score"]) for candidate in initial])
                 ),
-            )
+                "inlier_rms_px": 0.0,
+            }
+            consensus_method = "robust_line_fallback"
+        else:
+            consensus_method = "pair_trajectory_consensus_v1"
+
+        _logger.info(
+            "Bright-circle trajectory consensus tool=%s z_mm=%.3f "
+            "inliers=%d/%d x_span=%.1fmm u_slope=%.3f v_slope=%.3f "
+            "median_score=%.1f method=%s",
+            tool,
+            z_mm,
+            int(consensus["inlier_count"]),
+            len(indices),
+            float(consensus["inlier_x_span_mm"]),
+            float(consensus["slopes"][0]),
+            float(consensus["slopes"][1]),
+            float(consensus["median_inlier_score"]),
+            consensus_method,
+        )
+        for index, candidate, inlier, trajectory_residual in zip(
+            indices,
+            consensus["selected"],
+            consensus["inliers"],
+            consensus["residuals"],
+        ):
             selected[index] = dict(candidate)
+            selected[index]["trajectory_consensus_inlier"] = bool(inlier)
+            selected[index]["trajectory_consensus_residual_px"] = float(
+                trajectory_residual
+            )
+            selected[index]["trajectory_consensus"] = {
+                "method": consensus_method,
+                "inlier_count": int(consensus["inlier_count"]),
+                "sample_count": len(indices),
+                "inlier_x_span_mm": float(consensus["inlier_x_span_mm"]),
+                "u_slope_px_per_mm": float(consensus["slopes"][0]),
+                "v_slope_px_per_mm": float(consensus["slopes"][1]),
+                "inlier_rms_px": float(consensus["inlier_rms_px"]),
+            }
 
     for index in range(len(frames)):
         diagnostics = candidate_records[index]
@@ -564,8 +830,14 @@ def localize_bright_nozzle_tip_grid(
         ]
         if not indices:
             continue
-        x_values = np.asarray([float(frames[index]["x_mm"]) for index in indices])
-        centers = np.asarray([selected_centers[index] for index in indices])
+        consensus_indices = [
+            index
+            for index in indices
+            if selected[index].get("trajectory_consensus_inlier", False)
+        ]
+        fit_indices = consensus_indices if len(consensus_indices) >= 2 else indices
+        x_values = np.asarray([float(frames[index]["x_mm"]) for index in fit_indices])
+        centers = np.asarray([selected_centers[index] for index in fit_indices])
         u_slope, u_intercept = _robust_line(x_values, centers[:, 0])
         v_slope, v_intercept = _robust_line(x_values, centers[:, 1])
         for index in indices:
@@ -579,66 +851,70 @@ def localize_bright_nozzle_tip_grid(
             selected[index]["row_residual_px"] = float(
                 np.linalg.norm(selected_centers[index] - trajectory_center)
             )
+            selected[index]["row_fit_inlier_count"] = len(fit_indices)
 
     for index, frame in enumerate(frames):
         diagnostics = candidate_records[index]
         candidate = selected.get(index)
         if candidate is None:
-            registrations.append(
-                {
-                    "seq": index,
-                    "tool": frame["tool"],
-                    "x_mm": float(frame["x_mm"]),
-                    "z_mm": float(frame["z_mm"]),
-                    "center_px": None,
-                    "localization_method": "bright_circle_roi_v1",
-                    "roi_px": diagnostics["roi_px"],
-                    "prior_center_px": diagnostics["prior_center_px"],
-                    "candidates": diagnostics["candidates"],
-                    "candidate_score_margin": diagnostics["score_margin"],
-                    "bright_circle_score": None,
-                    "bright_circle_radius_px": None,
-                    "row_residual_px": None,
-                    "rejection_reason": "no bright circular candidate",
-                }
-            )
-            continue
-        residual = float(candidate.get("row_residual_px", math.inf))
-        score = float(candidate["score"])
-        rejection_reason = None
-        if score < BRIGHT_CIRCLE_MIN_SCORE:
-            rejection_reason = (
-                f"bright-circle contrast score {score:.1f} is below "
-                f"{BRIGHT_CIRCLE_MIN_SCORE:.1f}"
-            )
-        elif residual > BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX:
-            rejection_reason = (
-                f"row residual {residual:.2f} px exceeds "
-                f"{BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX:.2f} px"
-            )
-        registrations.append(
-            {
+            registration = {
                 "seq": index,
                 "tool": frame["tool"],
                 "x_mm": float(frame["x_mm"]),
                 "z_mm": float(frame["z_mm"]),
-                "center_px": candidate["center_px"],
+                "center_px": None,
                 "localization_method": "bright_circle_roi_v1",
                 "roi_px": diagnostics["roi_px"],
                 "prior_center_px": diagnostics["prior_center_px"],
                 "candidates": diagnostics["candidates"],
                 "candidate_score_margin": diagnostics["score_margin"],
-                "bright_circle_score": score,
-                "bright_circle_radius_px": float(candidate["radius_px"]),
-                "bright_circle_inner_annulus_contrast": float(
-                    candidate.get("inner_annulus_contrast", score)
-                ),
-                "tip_detector_center_px": candidate["center_px"],
-                "row_residual_px": residual,
-                "rejection_reason": rejection_reason,
-                "accepted_for_u_x_fit": rejection_reason is None,
+                "bright_circle_score": None,
+                "bright_circle_radius_px": None,
+                "row_residual_px": None,
+                "trajectory_consensus": None,
+                "trajectory_consensus_inlier": False,
+                "trajectory_consensus_residual_px": None,
             }
-        )
+            quality_gate = evaluate_bright_circle_quality(registration)
+            registration["quality_gate"] = quality_gate
+            registration["rejection_reason"] = "; ".join(quality_gate["reasons"])
+            registration["accepted_for_u_x_fit"] = False
+            registrations.append(registration)
+            continue
+        residual = float(candidate.get("row_residual_px", math.inf))
+        score = float(candidate["score"])
+        registration = {
+            "seq": index,
+            "tool": frame["tool"],
+            "x_mm": float(frame["x_mm"]),
+            "z_mm": float(frame["z_mm"]),
+            "center_px": candidate["center_px"],
+            "localization_method": "bright_circle_roi_v1",
+            "roi_px": diagnostics["roi_px"],
+            "prior_center_px": diagnostics["prior_center_px"],
+            "candidates": diagnostics["candidates"],
+            "candidate_score_margin": diagnostics["score_margin"],
+            "bright_circle_score": score,
+            "bright_circle_radius_px": float(candidate["radius_px"]),
+            "bright_circle_inner_annulus_contrast": float(
+                candidate.get("inner_annulus_contrast", score)
+            ),
+            "tip_detector_center_px": candidate["center_px"],
+            "row_residual_px": residual,
+            "row_fit_inlier_count": int(candidate.get("row_fit_inlier_count", 0)),
+            "trajectory_consensus": candidate.get("trajectory_consensus"),
+            "trajectory_consensus_inlier": bool(
+                candidate.get("trajectory_consensus_inlier", False)
+            ),
+            "trajectory_consensus_residual_px": float(
+                candidate.get("trajectory_consensus_residual_px", math.inf)
+            ),
+        }
+        quality_gate = evaluate_bright_circle_quality(registration)
+        registration["quality_gate"] = quality_gate
+        registration["rejection_reason"] = "; ".join(quality_gate["reasons"])
+        registration["accepted_for_u_x_fit"] = bool(quality_gate["accepted"])
+        registrations.append(registration)
     return {"registrations": registrations}
 
 

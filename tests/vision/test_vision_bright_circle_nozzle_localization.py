@@ -52,6 +52,88 @@ def _write_blank_frames(tmp_path: Path, count: int) -> list[Path]:
     return paths
 
 
+def _registration_for_quality(
+    module,
+    *,
+    score: float = 20.0,
+    inlier_count: int = 4,
+    sample_count: int = 6,
+    consensus_rms: float = 1.0,
+    row_residual: float = 1.0,
+    consensus_inlier: bool = True,
+) -> dict:
+    return {
+        "center_px": [100.0, 90.0],
+        "bright_circle_score": score,
+        "row_residual_px": row_residual,
+        "trajectory_consensus_inlier": consensus_inlier,
+        "trajectory_consensus": {
+            "inlier_count": inlier_count,
+            "sample_count": sample_count,
+            "inlier_rms_px": consensus_rms,
+        },
+    }
+
+
+def test_geometry_consensus_accepts_dim_candidate_normally():
+    module = _module()
+
+    result = module.evaluate_bright_circle_quality(
+        _registration_for_quality(module, score=2.5)
+    )
+
+    assert result["accepted"] is True
+    assert result["mode"] == "geometry_consensus_fallback"
+    assert result["legacy_brightness_pass"] is False
+    assert result["consensus_pass"] is True
+
+
+def test_geometry_consensus_rejects_score_below_active_floor():
+    module = _module()
+
+    result = module.evaluate_bright_circle_quality(
+        _registration_for_quality(module, score=-10.1)
+    )
+
+    assert result["accepted"] is False
+    assert any("active floor" in reason for reason in result["reasons"])
+
+
+def test_geometry_consensus_rejects_insufficient_inliers():
+    module = _module()
+
+    result = module.evaluate_bright_circle_quality(
+        _registration_for_quality(module, inlier_count=3)
+    )
+
+    assert result["accepted"] is False
+    assert any("inliers" in reason for reason in result["reasons"])
+
+
+def test_geometry_consensus_rejects_high_consensus_rms():
+    module = _module()
+
+    result = module.evaluate_bright_circle_quality(
+        _registration_for_quality(module, consensus_rms=2.51)
+    )
+
+    assert result["accepted"] is False
+    assert any("consensus RMS" in reason for reason in result["reasons"])
+
+
+def test_robust_line_uses_majority_trajectory_with_sloped_outlier():
+    module = _module()
+    values_x = np.asarray([191.0, 193.0, 195.0, 197.0, 199.0])
+    values_y = np.asarray([1109.5, 1128.5, 1122.5, 1166.5, 1185.5])
+
+    slope, intercept = module._robust_line(values_x, values_y)
+    residuals = values_y - (slope * values_x + intercept)
+
+    assert slope == 9.5
+    assert intercept == -705.0
+    assert np.allclose(residuals, [0.0, 0.0, -25.0, 0.0, 0.0])
+
+
 def test_bright_circle_detector_prefers_disk_over_distractor(tmp_path):
     module = _module()
     image = np.full((540, 960, 3), 35, dtype=np.uint8)

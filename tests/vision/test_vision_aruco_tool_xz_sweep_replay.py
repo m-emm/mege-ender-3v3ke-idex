@@ -124,12 +124,8 @@ def _load_nozzle_xy_priors() -> dict[str, dict]:
         residuals = design @ coefficients - centers
         fit_rms = np.sqrt(np.mean(residuals**2, axis=0))
         priors[tool] = {
-            "model": "linear_commanded_x_to_pixel_v1",
-            "x_mm_range": [float(np.min(x_mm)), float(np.max(x_mm))],
+            "model": "linear_commanded_x_to_image_uv_v1",
             "coefficients_px": coefficients.tolist(),
-            "fit_rms_px": fit_rms.tolist(),
-            "source_commanded_z_mm": 0.5,
-            "sample_count": int(len(x_mm)),
         }
         _logger.info(
             "Nozzle prior %s x->pixel coefficients x=(%.3f, %.3f) "

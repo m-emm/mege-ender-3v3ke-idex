@@ -1223,6 +1223,31 @@ def _diagnostic_fields(
     ]
 
 
+_FACT_SET_FORBIDDEN_FIELD_TOKENS = ("uncertainty", "uncertainties", "covariance")
+
+
+def _fact_set_safe_diagnostics(value: Any) -> Any:
+    """Remove forbidden statistical-detail fields from publication copies.
+
+    Analysis results retain the complete fit diagnostics.  Fact sets have a
+    deliberately narrower schema and must not contain uncertainty or
+    covariance fields, including inside nested diagnostic records.
+    """
+
+    if isinstance(value, dict):
+        return {
+            key: _fact_set_safe_diagnostics(item)
+            for key, item in value.items()
+            if not any(
+                token in str(key).lower()
+                for token in _FACT_SET_FORBIDDEN_FIELD_TOKENS
+            )
+        }
+    if isinstance(value, list):
+        return [_fact_set_safe_diagnostics(item) for item in value]
+    return value
+
+
 def _fact(
     name: str,
     role: str,
@@ -1230,6 +1255,7 @@ def _fact(
     dependencies: list[dict[str, str]],
     coordinate_fields: set[str] = frozenset(),
 ) -> dict[str, Any]:
+    value = _fact_set_safe_diagnostics(value)
     return {
         "name": name,
         "definition_version": 1,
@@ -1788,7 +1814,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                     ),
                     "manifest_hash": manifest["manifest_hash"],
                     "priors": _prior_provenance(job_type),
-                    "observations": details,
+                    "observations": _fact_set_safe_diagnostics(details),
                 },
                 "fact_set_hash": "",
             }

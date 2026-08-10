@@ -114,7 +114,7 @@ def _pixel_delta_to_printer_xy_mm(
 
 
 def _nozzle_image_prior(details: dict[str, Any]) -> dict[str, Any] | None:
-    """Build the X-to-image prior consumed by the combined X/Z sweep."""
+    """Build the minimal commanded-X to image-UV line model."""
 
     records = [
         record
@@ -131,15 +131,10 @@ def _nozzle_image_prior(details: dict[str, Any]) -> dict[str, Any] | None:
         return None
     design = np.column_stack((np.ones_like(x_values), x_values))
     coefficients, _, _, _ = np.linalg.lstsq(design, centers, rcond=None)
-    residuals = design @ coefficients - centers
     return _finite(
         {
-            "model": "linear_commanded_x_to_pixel_v1",
-            "x_mm_range": [float(np.min(x_values)), float(np.max(x_values))],
+            "model": "linear_commanded_x_to_image_uv_v1",
             "coefficients_px": coefficients,
-            "fit_rms_px": np.sqrt(np.mean(residuals**2, axis=0)),
-            "source_commanded_z_mm": float(details["commanded_z_mm"]),
-            "sample_count": len(records),
         }
     )
 

@@ -270,6 +270,41 @@ def test_fact_items_are_exact_and_uncertainty_is_rejected():
         graph.validate_fact_set(uncertain)
 
 
+def test_publication_fact_copy_removes_forbidden_fit_detail_fields():
+    graph = _module("vision_calibration_graph.py", "vision_graph_safe_fact_test")
+    calibration = _module(
+        "vision_calibration.py", "vision_calibration_safe_fact_test"
+    )
+    fact = calibration._fact(
+        "camera.nozzle_cam.nozzle_tip.xz_sweep_report",
+        "diagnostic",
+        {
+            "fit": {
+                "slope_uncertainty_px_per_mm": 0.04,
+                "slope_px_per_mm": 9.4,
+            },
+            "covariance_matrix": [[1.0]],
+            "records": [{"uncertainties": [0.1], "seq": 1}],
+        },
+        [],
+    )
+    assert fact["value"] == {
+        "fit": {"slope_px_per_mm": 9.4},
+        "records": [{"seq": 1}],
+    }
+    record = _fact_set(
+        graph,
+        fact_name=fact["name"],
+        value=fact["value"],
+        value_roles={
+            item["field"]: item["role"] for item in fact["value_items"]
+        },
+        serial="safe-fit-details",
+        fact_role=fact["role"],
+    )
+    assert graph.validate_fact_set(record) == record
+
+
 def test_tool_xy_candidate_publication_is_a_valid_coordinate_fact():
     graph = _module("vision_calibration_graph.py", "vision_graph_xy_candidate_test")
     calibration = _module(

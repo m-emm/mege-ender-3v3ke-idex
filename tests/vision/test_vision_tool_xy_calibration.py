@@ -316,12 +316,9 @@ def test_analysis_cancels_commanded_x_and_y_and_rejects_a_datum_outlier(
         "commanded_z_mm": 0.5,
     }
     prior = measurement_fact["nozzle_image_prior"]
-    assert prior["model"] == "linear_commanded_x_to_pixel_v1"
-    assert prior["x_mm_range"] == [100.0, 115.0]
-    assert prior["source_commanded_z_mm"] == 0.5
-    assert prior["sample_count"] == 4
+    assert prior["model"] == "linear_commanded_x_to_image_uv_v1"
     assert len(prior["coefficients_px"]) == 2
-    assert len(prior["fit_rms_px"]) == 2
+    assert set(prior) == {"model", "coefficients_px"}
 
 
 def _fact_value(fact_set, fact_name):

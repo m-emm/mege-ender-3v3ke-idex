@@ -40,10 +40,17 @@ def _definition():
     return registry["job_types"]["idex_tool_xz_sweep_report"]
 
 
+def _prior():
+    return {
+        "model": "linear_commanded_x_to_image_uv_v1",
+        "coefficients_px": [[-786.0, 500.0], [9.9, 0.0]],
+    }
+
+
 def _inputs():
     return {
-        "t0_xy_datum": {},
-        "t1_xy_datum": {},
+        "t0_xy_datum": {"nozzle_image_prior": _prior()},
+        "t1_xy_datum": {"nozzle_image_prior": _prior()},
         "partial_bed_coordinate_system": {
             "corner_printer_xyz_mm": [173.0, -18.0, 0.0],
         },
@@ -128,16 +135,10 @@ def test_prepare_builds_both_tool_grids_with_per_tool_commanded_y():
     ] == [173.0 + value for value in definition["x_offsets_from_bed_tab_mm"]]
 
 
-def test_prepare_propagates_optional_xy_nozzle_image_prior():
+def test_prepare_requires_and_propagates_xy_nozzle_image_prior():
     module = _module()
     inputs = _inputs()
-    prior = {
-        "model": "linear_commanded_x_to_pixel_v1",
-        "x_mm_range": [191.0, 199.0],
-        "coefficients_px": [[-786.0, 500.0], [9.9, 0.0]],
-        "fit_rms_px": [0.1, 0.1],
-        "source_commanded_z_mm": 0.5,
-    }
+    prior = _prior()
     inputs["t0_xy_datum"] = {"nozzle_image_prior": prior}
     inputs["t1_xy_datum"] = {"nozzle_image_prior": prior}
 
@@ -149,6 +150,82 @@ def test_prepare_propagates_optional_xy_nozzle_image_prior():
 
     assert result["references"]["t0"]["nozzle_image_prior"] == prior
     assert result["references"]["t1"]["nozzle_image_prior"] == prior
+
+
+@pytest.mark.parametrize(
+    "mutate, expected",
+    [
+        (lambda inputs: inputs["t0_xy_datum"].clear(), "T0 nozzle_image_prior is required"),
+        (
+            lambda inputs: inputs["t1_xy_datum"].update(
+                {"nozzle_image_prior": {"model": "wrong"}}
+            ),
+            "T1 nozzle_image_prior.model",
+        ),
+        (
+            lambda inputs: inputs["t0_xy_datum"].update(
+                {
+                    "nozzle_image_prior": {
+                        "model": "linear_commanded_x_to_image_uv_v1",
+                        "coefficients_px": [[float("nan"), 500.0], [9.9, 0.0]],
+                    }
+                }
+            ),
+            "T0 nozzle_image_prior.coefficients_px",
+        ),
+    ],
+)
+def test_prepare_rejects_missing_malformed_or_incomplete_prior(mutate, expected):
+    module = _module()
+    inputs = _inputs()
+    mutate(inputs)
+
+    with pytest.raises(module.ToolXZSweepError, match=expected):
+        module.prepare_sweep(_definition(), input_values=inputs, resolved=_resolved())
+
+
+def test_prepare_accepts_exact_and_extrapolated_commanded_x_values():
+    module = _module()
+    result = module.prepare_sweep(
+        _definition(), input_values=_inputs(), resolved=_resolved()
+    )
+    assert result["references"]["t0"]["nozzle_image_prior"] == _prior()
+    assert result["references"]["t1"]["nozzle_image_prior"] == _prior()
+
+    definition = _definition()
+    definition["x_offsets_from_bed_tab_mm"] = [-100, 10, 25, 100]
+    result = module.prepare_sweep(
+        definition, input_values=_inputs(), resolved=_resolved()
+    )
+    assert len(result["frames"]) == 2 * 4 * len(definition["z_positions_mm"])
+
+
+def test_analysis_rejects_missing_prior_before_decoding_images(tmp_path):
+    module = _module()
+    frames = [
+        {
+            "seq": 0,
+            "tool": "T0",
+            "x_mm": 186.0,
+            "z_mm": 0.5,
+            "commanded_position_mm": [186.0, -14.3, 0.5],
+        },
+        {
+            "seq": 1,
+            "tool": "T1",
+            "x_mm": 186.0,
+            "z_mm": 0.5,
+            "commanded_position_mm": [186.0, -13.3, 0.5],
+        },
+    ]
+    with pytest.raises(module.ToolXZSweepError, match="T0 nozzle_image_prior is required"):
+        module.analyze(
+            [tmp_path / "does-not-exist-t0.jpg", tmp_path / "does-not-exist-t1.jpg"],
+            tmp_path / "artifacts",
+            frames=frames,
+            references={"t0": {}, "t1": {"nozzle_image_prior": _prior()}},
+            acquisition_calibration={},
+        )
 
 
 def test_prepare_rejects_z_outside_loaded_limits():
@@ -390,31 +467,44 @@ def test_analysis_writes_raw_records_and_two_plots(tmp_path, monkeypatch):
             "radii_px": [4.0, 4.0, 4.0, 4.0],
         }
 
-    def localize(_paths, *, frames, **_kwargs):
+    def localize(_paths, *, frames, roi_centers_px):
         return {
             "registrations": [
                 {
                     "seq": index,
                     "center_px": [120.0 + 5.0 * index, 80.0 + index],
-                    "minimum_correlation": 0.9,
-                    "median_correlation": 0.9,
-                    "representation_spread_px": 0.2,
-                    "tip_prediction_error_px": 1.0,
-                    "maximum_tip_prediction_error_px": 8.0,
+                    "localization_method": "bright_circle_roi_v1",
+                    "roi_px": [80, 40, 160, 120],
+                    "prior_center_px": roi_centers_px[index].tolist(),
+                    "bright_circle_score": 60.0,
+                    "bright_circle_radius_px": 10.0,
+                    "row_residual_px": 0.0,
+                    "trajectory_consensus": {
+                        "inlier_count": 4,
+                        "sample_count": 4,
+                        "inlier_rms_px": 0.0,
+                    },
+                    "trajectory_consensus_inlier": True,
+                    "trajectory_consensus_residual_px": 0.0,
                 }
                 for index, _frame in enumerate(frames)
             ]
         }
 
     monkeypatch.setattr(module, "detect_four_fiducials", detect)
-    monkeypatch.setattr(module, "localize_nozzle_tip_grid", localize)
+    monkeypatch.setattr(module, "localize_bright_nozzle_tip_grid", localize)
     monkeypatch.setattr(module.cv2, "imread", imread)
+
+    references = {
+        "t0": {"nozzle_image_prior": _prior()},
+        "t1": {"nozzle_image_prior": _prior()},
+    }
 
     result = module.analyze(
         paths,
         tmp_path / "artifacts",
         frames=frames,
-        references={"t0": {}, "t1": {}},
+        references=references,
         acquisition_calibration={"tool_xy_endstops_mm": {}},
     )
 
@@ -428,6 +518,7 @@ def test_analysis_writes_raw_records_and_two_plots(tmp_path, monkeypatch):
     assert (tmp_path / "artifacts" / "tool_xz_sweep_u_slope_vs_z.png").is_file()
     assert (tmp_path / "artifacts" / "tool_xz_sweep_shared_z_fit.png").is_file()
     assert set(result["artifacts"]) == {
+        "bright_circle_gate_comparison",
         "tool_xz_sweep_u_vs_x",
         "tool_xz_sweep_u_slope_vs_z",
         "tool_xz_sweep_shared_z_fit",
