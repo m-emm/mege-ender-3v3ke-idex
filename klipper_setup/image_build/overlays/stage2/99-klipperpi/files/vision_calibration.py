@@ -1635,10 +1635,19 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         {
                             "offset_mm": details["t0_red_marker_to_bed_tab_x_mm"],
                             "reference_commanded_x_mm": common_x,
+                            "image_line_model": details["tool_image_line_models"]["T0"],
+                            "image_line_capture_y_mm": details[
+                                "image_line_capture_y_mm"
+                            ],
                             **diagnostic,
                         },
                         dependencies,
-                        {"offset_mm", "reference_commanded_x_mm"},
+                        {
+                            "offset_mm",
+                            "reference_commanded_x_mm",
+                            "image_line_model",
+                            "image_line_capture_y_mm",
+                        },
                     ),
                     _fact(
                         "tool.t1.red_marker_to_bed_tab_x_mm",
@@ -1646,10 +1655,19 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         {
                             "offset_mm": details["t1_red_marker_to_bed_tab_x_mm"],
                             "reference_commanded_x_mm": common_x,
+                            "image_line_model": details["tool_image_line_models"]["T1"],
+                            "image_line_capture_y_mm": details[
+                                "image_line_capture_y_mm"
+                            ],
                             **diagnostic,
                         },
                         dependencies,
-                        {"offset_mm", "reference_commanded_x_mm"},
+                        {
+                            "offset_mm",
+                            "reference_commanded_x_mm",
+                            "image_line_model",
+                            "image_line_capture_y_mm",
+                        },
                     ),
                     _fact(
                         "camera.nozzle_cam.bed_fiducial.printer_xy_mapping",

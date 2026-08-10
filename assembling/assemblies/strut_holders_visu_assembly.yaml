@@ -1,0 +1,75 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Strut holders and Z-axis frame visualization assembly
+
+Builder:
+  Collection: true
+  Visualization:
+    parts:
+      - source: injected
+        assembly: printer_frame
+        artifact: all
+      - source: injected
+        assembly: print_bed
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: print_bed_undercarriage
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: y_axis
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: x_axis_lower_profile
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: x_axis_rail
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: x_axis_left_carriage
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: tool_head_mount_machined_bottom
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: sprite_extruder_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: left_z_axis_strut_holder
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: right_z_axis_strut_holder
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_profile_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_profile_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_carriage_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_top_bridge_profile
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_top_profile_gusset_left
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_top_profile_gusset_right
+        artifact: all
+        name_template: "{assembly_name}_{name}"

@@ -256,4 +256,7 @@ def create_z_axis_top_profile_gusset_assembly(
     for name, screw_visual in screw_visuals:
         retval.add_named_non_production_part(screw_visual, name)
 
+    retval.set_hidden_by_default("z_profile_to_align")
+    retval.set_hidden_by_default("top_profile_to_align")
+
     return retval

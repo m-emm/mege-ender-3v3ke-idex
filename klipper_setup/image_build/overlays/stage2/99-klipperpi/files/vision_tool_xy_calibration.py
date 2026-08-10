@@ -14,7 +14,7 @@ from calib_dao import CalibDAO
 from vision_four_fiducials import FourFiducialError, detect_four_fiducials
 from vision_nozzle_tip_localization import (
     NozzleTipLocalizationError,
-    localize_nozzle_tip_grid,
+    localize_bright_nozzle_tip_from_marker_prior_grid,
 )
 
 MINIMUM_TIP_CORRELATION = 0.22
@@ -91,6 +91,46 @@ def _tool_marker_vector(marker: dict[str, Any], tool: str) -> np.ndarray:
     if not isinstance(vectors, dict):
         raise ToolXYError(f"{tool} marker reference lacks its image motion vector")
     return _vector(vectors.get(tool), f"{tool} marker image motion vector")
+
+
+def _marker_image_line_model(marker: dict[str, Any], tool: str) -> tuple[np.ndarray, float]:
+    model = marker.get("image_line_model")
+    if not isinstance(model, dict):
+        raise ToolXYError(
+            f"{tool} red-marker image line model is missing from the "
+            "red-marker calibration; "
+            "rerun the red-marker calibration"
+        )
+    if model.get("model") != "linear_commanded_x_to_image_uv_v1":
+        raise ToolXYError(
+            f"{tool} red-marker image line model has unsupported model "
+            f"{model.get('model')!r}"
+        )
+    coefficients = np.asarray(model.get("coefficients_px"), dtype=np.float64)
+    if coefficients.shape != (2, 2) or not np.all(np.isfinite(coefficients)):
+        raise ToolXYError(
+            f"{tool} red-marker image line model coefficients must be a finite 2x2 matrix"
+        )
+    capture_y = marker.get("image_line_capture_y_mm")
+    if not isinstance(capture_y, (int, float)) or not math.isfinite(float(capture_y)):
+        raise ToolXYError(
+            f"{tool} red-marker image line model lacks finite capture Y provenance"
+        )
+    return coefficients, float(capture_y)
+
+
+def _marker_image_center_at_x(
+    coefficients: np.ndarray,
+    commanded_x: float,
+    *,
+    source_capture_y_mm: float,
+    capture_y_mm: float,
+    image_y_vector_px_per_mm: np.ndarray,
+) -> np.ndarray:
+    center = np.asarray([1.0, float(commanded_x)]) @ coefficients
+    return center + image_y_vector_px_per_mm * (
+        float(capture_y_mm) - float(source_capture_y_mm)
+    )
 
 
 def _pixel_delta_to_printer_xy_mm(
@@ -247,6 +287,9 @@ def prepare_measurement(
         f"{tool} marker reference",
     )
     marker_x_vector = _tool_marker_vector(marker, tool)
+    marker_line_coefficients, marker_line_capture_y = _marker_image_line_model(
+        marker, tool
+    )
 
     offsets_x = [
         float(item) for item in definition.get("x_offsets_from_bed_tab_mm", [])
@@ -258,8 +301,12 @@ def prepare_measurement(
         x_mm = float(corner_xy[0]) + offset_x
         if not float(axis_minimum[0]) <= x_mm <= float(axis_maximum[0]):
             raise ToolXYError(f"tool-XY commanded X {x_mm:.6f} is out of limits")
-        expected_marker = corner_pixel_at_capture + marker_x_vector * (
-            marker_offset + x_mm - marker_reference_x
+        expected_marker = _marker_image_center_at_x(
+            marker_line_coefficients,
+            x_mm,
+            source_capture_y_mm=marker_line_capture_y,
+            capture_y_mm=capture_y,
+            image_y_vector_px_per_mm=image_y_vector,
         )
         frames.append(
             {
@@ -296,6 +343,8 @@ def prepare_measurement(
                 "marker_x_vector_px_per_mm": marker_x_vector,
                 "marker_offset_mm": marker_offset,
                 "marker_reference_commanded_x_mm": marker_reference_x,
+                "marker_image_line_model": marker_line_coefficients,
+                "marker_image_line_capture_y_mm": marker_line_capture_y,
             },
             "active_tool_calibration": snapshot,
         }
@@ -367,28 +416,10 @@ def build_acquisition_gcode(
 
 
 def _registration_reasons(registration: dict[str, Any]) -> list[str]:
-    reasons = []
-    if float(registration["minimum_correlation"]) < MINIMUM_TIP_CORRELATION:
-        reasons.append(
-            f"minimum tip correlation is below {MINIMUM_TIP_CORRELATION:.2f}"
-        )
-    if float(registration["median_correlation"]) < MINIMUM_MEDIAN_TIP_CORRELATION:
-        reasons.append(
-            "median tip correlation is below " f"{MINIMUM_MEDIAN_TIP_CORRELATION:.2f}"
-        )
-    if (
-        float(registration["representation_spread_px"])
-        > MAXIMUM_REPRESENTATION_SPREAD_PX
-    ):
-        reasons.append(
-            "gray/contrast tip registrations disagree by more than "
-            f"{MAXIMUM_REPRESENTATION_SPREAD_PX:.1f} px"
-        )
-    if float(registration["tip_prediction_error_px"]) > float(
-        registration["maximum_tip_prediction_error_px"]
-    ):
-        reasons.append("physical-tip registration moved too far from its detector seed")
-    return reasons
+    quality_gate = registration.get("quality_gate")
+    if isinstance(quality_gate, dict):
+        return [str(reason) for reason in quality_gate.get("reasons", [])]
+    return ["bright-circle quality gate is unavailable"]
 
 
 def _endstop_line(acquisition_calibration: dict[str, Any]) -> str:
@@ -432,9 +463,23 @@ def _write_overlays(
         record = record_by_seq[int(frame["seq"])]
         accepted = bool(record.get("accepted"))
         color = (0, 255, 0) if accepted else (0, 0, 255)
+        bright_roi = record.get("roi_px")
+        if isinstance(bright_roi, (list, tuple)) and len(bright_roi) == 4:
+            x0, y0, x1, y1 = [int(round(float(value))) for value in bright_roi]
+            cv2.rectangle(image, (x0, y0), (x1, y1), (255, 255, 0), 2)
+        marker_prior = record.get("marker_prior_center_px")
+        if isinstance(marker_prior, (list, tuple)) and len(marker_prior) == 2:
+            marker_px = tuple(np.rint(marker_prior).astype(int))
+            cv2.drawMarker(image, marker_px, (255, 0, 255), cv2.MARKER_CROSS, 14, 2)
+        coarse_seed = record.get("coarse_seed_center_px")
+        if isinstance(coarse_seed, (list, tuple)) and len(coarse_seed) == 2:
+            coarse_px = tuple(np.rint(coarse_seed).astype(int))
+            cv2.circle(image, coarse_px, 13, (255, 180, 0), 2)
         if record.get("tip_center_px") is not None:
             tip = tuple(np.rint(record["tip_center_px"]).astype(int))
-            cv2.drawMarker(image, tip, color, cv2.MARKER_CROSS, 20, 3)
+            radius = float(record.get("bright_circle_radius_px") or 8.0)
+            cv2.circle(image, tip, max(3, int(round(radius))), color, 2)
+            cv2.drawMarker(image, tip, color, cv2.MARKER_CROSS, 12, 2)
         centers = record.get("fiducial_centers_px") or []
         radii = record.get("fiducial_radii_px") or []
         for index, center in enumerate(centers):
@@ -454,6 +499,12 @@ def _write_overlays(
                 f"{_display_xy_mm(record.get('fiducials_to_tip_xy_mm'))} "
                 f"x_datum={_display_mm(record.get('x_datum_mm'))} "
                 f"y_datum={_display_mm(record.get('y_datum_mm'))}"
+            ),
+            (
+                "bright_circle="
+                f"score={_display_mm(record.get('bright_circle_score'))} "
+                f"row_res={_display_mm(record.get('row_residual_px'))} "
+                f"method={record.get('localization_method', 'n/a')}"
             ),
             endstop_line,
         ]
@@ -536,6 +587,21 @@ def analyze_measurement(
         reference.get("marker_x_vector_px_per_mm"),
         "marker image motion vector",
     )
+    marker_line_model = reference.get("marker_image_line_model")
+    if marker_line_model is None:
+        raise ToolXYError(
+            "tool-XY reference lacks the red-marker image line model; "
+            "rerun the red-marker calibration"
+        )
+    marker_line_coefficients, marker_line_capture_y = _marker_image_line_model(
+        {
+            "image_line_model": marker_line_model,
+            "image_line_capture_y_mm": reference.get(
+                "marker_image_line_capture_y_mm"
+            ),
+        },
+        tool,
+    )
     commanded_z_values = {float(frame["commanded_position_mm"][2]) for frame in frames}
     if len(commanded_z_values) != 1 or not all(
         math.isfinite(value) for value in commanded_z_values
@@ -568,14 +634,15 @@ def analyze_measurement(
             np.asarray(fiducials["centers_px"], dtype=np.float64), axis=0
         )
         commanded_x = float(frame["commanded_position_mm"][0])
-        expected_marker = (
-            fiducial_center
-            + image_x_vector * float(corner_xy[0] - fiducial_xy[0])
-            + image_y_vector * float(corner_xy[1] - fiducial_xy[1])
-            + marker_x_vector * (marker_offset + commanded_x - marker_reference_x)
+        marker_prior_center = _marker_image_center_at_x(
+            marker_line_coefficients,
+            commanded_x,
+            source_capture_y_mm=marker_line_capture_y,
+            capture_y_mm=float(frame["commanded_position_mm"][1]),
+            image_y_vector_px_per_mm=image_y_vector,
         )
         analysis_frame = dict(frame)
-        analysis_frame["expected_marker_pixel_px"] = expected_marker.tolist()
+        analysis_frame["marker_prior_center_px"] = marker_prior_center.tolist()
         valid_frames.append(analysis_frame)
 
     fiducial_jitter_px = None
@@ -600,13 +667,16 @@ def analyze_measurement(
 
     if len(valid_frames) >= 2:
         try:
-            localized = localize_nozzle_tip_grid(
+            marker_prior_centers = [
+                np.asarray(frame["marker_prior_center_px"], dtype=np.float64)
+                for frame in valid_frames
+            ]
+            localized = localize_bright_nozzle_tip_from_marker_prior_grid(
                 valid_paths,
                 frames=valid_frames,
-                propagate_missing_rings=True,
-                commanded_x_vector_px_per_mm=image_x_vector,
+                marker_prior_centers_px=marker_prior_centers,
+                propagate_missing_seeds=True,
                 physical_tip_cluster_radius_px=16.0,
-                require_locator=require_locator,
             )
         except NozzleTipLocalizationError as exc:
             localized = None
@@ -638,6 +708,9 @@ def analyze_measurement(
             fiducials = fiducials_by_source_seq[source_seq]
             fiducial_centers = np.asarray(fiducials["centers_px"], dtype=np.float64)
             fiducial_center = np.mean(fiducial_centers, axis=0)
+            registration["marker_prior_center_px"] = frame[
+                "marker_prior_center_px"
+            ]
             tip_center = _vector(registration["center_px"], "tip center")
             delta_mm = _pixel_delta_to_printer_xy_mm(
                 tip_center - fiducial_center,

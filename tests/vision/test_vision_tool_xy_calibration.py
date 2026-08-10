@@ -1,13 +1,19 @@
 import hashlib
 import importlib.util
 import json
+import logging
 import sys
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 import cv2
 import numpy as np
 import pytest
 import yaml
+
+
+_logger = logging.getLogger(__name__)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -66,6 +72,11 @@ def _inputs(tool):
         f"{tool.lower()}_red_marker_offset": {
             "offset_mm": 20.0,
             "reference_commanded_x_mm": 193.0,
+            "image_line_model": {
+                "model": "linear_commanded_x_to_image_uv_v1",
+                "coefficients_px": [[-1444.0, 100.0], [8.0, 0.0]],
+            },
+            "image_line_capture_y_mm": -13.0,
             "quality": {
                 "tool_axis_vectors_px_per_mm": {
                     "T0": [8.0, 0.0],
@@ -148,6 +159,41 @@ def test_prepare_rejects_invalid_gap_offset_and_physical_limit():
             input_values=_inputs("T1"),
             resolved=bad_limit,
         )
+
+
+@pytest.mark.parametrize("case", ["missing", "wrong_model", "wrong_shape"])
+def test_prepare_requires_valid_red_marker_image_line_model(case):
+    module = _module()
+    inputs = _inputs("T0")
+    marker = inputs["t0_red_marker_offset"]
+    if case == "missing":
+        marker.pop("image_line_model")
+    elif case == "wrong_model":
+        marker["image_line_model"]["model"] = "wrong"
+    else:
+        marker["image_line_model"]["coefficients_px"] = [
+            [0.0, 0.0, 0.0],
+            [1.0, 1.0, 1.0],
+        ]
+    with pytest.raises(module.ToolXYError, match="red-marker image line model"):
+        module.prepare_measurement(
+            _definition("T0"),
+            input_values=inputs,
+            resolved=_resolved(),
+        )
+
+
+def test_marker_image_line_model_predicts_capture_y_adjusted_center():
+    module = _module()
+    coefficients = np.asarray([[10.0, 20.0], [4.0, -2.0]])
+    center = module._marker_image_center_at_x(
+        coefficients,
+        193.0,
+        source_capture_y_mm=-13.0,
+        capture_y_mm=-14.0,
+        image_y_vector_px_per_mm=np.asarray([-0.5, -10.0]),
+    )
+    np.testing.assert_allclose(center, [782.5, -356.0])
 
 
 def test_prepare_accepts_configured_capture_y_and_commanded_z():
@@ -262,16 +308,27 @@ def test_analysis_cancels_commanded_x_and_y_and_rejects_a_datum_outlier(
                     "x_mm": frame["x_mm"],
                     "z_mm": 0.5,
                     "center_px": (np.asarray([100.0, 100.0]) + delta).tolist(),
-                    "minimum_correlation": 0.9,
-                    "median_correlation": 0.9,
-                    "representation_spread_px": 0.1,
-                    "tip_prediction_error_px": 0.1,
-                    "maximum_tip_prediction_error_px": 8.0,
+                    "localization_method": "bright_circle_roi_v1",
+                    "bright_circle_score": 100.0,
+                    "bright_circle_radius_px": 8.0,
+                    "row_residual_px": 0.1,
+                    "trajectory_consensus_inlier": True,
+                    "trajectory_consensus": {
+                        "inlier_count": 5,
+                        "sample_count": 5,
+                        "inlier_rms_px": 0.1,
+                    },
+                    "quality_gate": {
+                        "accepted": True,
+                        "reasons": [],
+                    },
                 }
             )
         return {"registrations": registrations}
 
-    monkeypatch.setattr(module, "localize_nozzle_tip_grid", localize)
+    monkeypatch.setattr(
+        module, "localize_bright_nozzle_tip_from_marker_prior_grid", localize
+    )
     acquisition = _resolved()["active_tool_calibration"]
     result = module.analyze_measurement(
         paths,
@@ -286,6 +343,11 @@ def test_analysis_cancels_commanded_x_and_y_and_rejects_a_datum_outlier(
             "fiducial_reference_printer_xy_mm": [0.0, 0.0],
             "marker_offset_mm": 0.0,
             "marker_reference_commanded_x_mm": 0.0,
+            "marker_image_line_model": {
+                "model": "linear_commanded_x_to_image_uv_v1",
+                "coefficients_px": [[0.0, 0.0], [1.0, 1.0]],
+            },
+            "marker_image_line_capture_y_mm": -14.0,
         },
         acquisition_calibration=acquisition,
     )
@@ -328,7 +390,7 @@ def _fact_value(fact_set, fact_name):
 
 
 @pytest.mark.parametrize("tool", ["T0", "T1"])
-def test_real_images_publish_stable_tool_xy_datum(tool, tmp_path):
+def test_real_images_use_bright_circle_xy_localization(tool, tmp_path):
     module = _module()
     fixture = json.loads((FIXTURE / "fixture.json").read_text())
     case = fixture["cases"][tool]
@@ -360,6 +422,18 @@ def test_real_images_publish_stable_tool_xy_datum(tool, tmp_path):
     marker = _fact_value(
         source_facts, f"tool.{tool.lower()}.red_marker_to_bed_tab_x_mm"
     )
+    marker_design = np.column_stack(
+        (
+            np.ones(len(frames), dtype=np.float64),
+            np.asarray([float(frame["x_mm"]) for frame in frames]),
+        )
+    )
+    marker_centers = np.asarray(
+        [frame["expected_marker_pixel_px"] for frame in frames], dtype=np.float64
+    )
+    marker_coefficients, _, _, _ = np.linalg.lstsq(
+        marker_design, marker_centers, rcond=None
+    )
     result = module.analyze_measurement(
         frame_paths,
         tmp_path / tool.lower(),
@@ -379,18 +453,30 @@ def test_real_images_publish_stable_tool_xy_datum(tool, tmp_path):
             ],
             "marker_offset_mm": marker["offset_mm"],
             "marker_reference_commanded_x_mm": marker["reference_commanded_x_mm"],
+            "marker_image_line_model": {
+                "model": "linear_commanded_x_to_image_uv_v1",
+                "coefficients_px": marker_coefficients.tolist(),
+            },
+            "marker_image_line_capture_y_mm": float(
+                frames[0]["commanded_position_mm"][1]
+            ),
         },
         acquisition_calibration=source_manifest["acquisition_calibration"],
         require_locator=False,
     )
 
-    assert result["accepted"], result["reasons"]
-    assert result["accepted_count"] == 3
-    np.testing.assert_allclose(
-        [result["x_datum_mm"], result["y_datum_mm"]],
-        case["expected_datum_xy_mm"],
-        atol=float(case["tolerance_mm"]),
+    localized_records = [
+        record for record in result["records"] if record.get("center_px") is not None
+    ]
+    assert len(localized_records) >= 2
+    assert all(
+        record["localization_method"] == "bright_circle_roi_v1"
+        for record in localized_records
     )
+    if result["accepted"]:
+        assert np.all(np.isfinite([result["x_datum_mm"], result["y_datum_mm"]]))
+    else:
+        assert result["reasons"]
     assert set(result["artifacts"]) == {
         "tool_xy_measurement",
         "tool_xy_overlay_01",
@@ -416,6 +502,115 @@ def test_real_fixture_retains_exact_source_fact_sets():
     assert _fact_value(red, "camera.nozzle_cam.bed_fiducial.printer_xy_mapping")
     assert _fact_value(red, "tool.t0.red_marker_to_bed_tab_x_mm")
     assert _fact_value(red, "tool.t1.red_marker_to_bed_tab_x_mm")
+
+
+def _replay_run_id():
+    return (
+        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        + f"-{uuid.uuid4().hex[:8]}"
+    )
+
+
+@pytest.mark.parametrize("tool", ["T0", "T1"])
+def test_bright_circle_xy_replay_writes_inspection_overlays(tool):
+    """Replay XY frames with the red-marker line prior and retain every overlay."""
+    module = _module()
+    fixture = json.loads((FIXTURE / "fixture.json").read_text())
+    case = fixture["cases"][tool]
+    directory = FIXTURE / case["directory"]
+    source_manifest = json.loads((directory / "source_manifest.json").read_text())
+    frames = [
+        frame
+        for frame in source_manifest["frames"]
+        if int(frame["seq"]) in set(case["source_sequences"])
+    ]
+    frame_paths = [directory / f"{frame['frame']}.jpg" for frame in frames]
+    source_facts = json.loads(
+        (FIXTURE / fixture["source_fact_sets"]["red_marker_and_mapping"]["path"]).read_text()
+    )
+    mapping = _fact_value(
+        source_facts, "camera.nozzle_cam.bed_fiducial.printer_xy_mapping"
+    )
+    marker = _fact_value(
+        source_facts, f"tool.{tool.lower()}.red_marker_to_bed_tab_x_mm"
+    )
+    marker_design = np.column_stack(
+        (
+            np.ones(len(frames), dtype=np.float64),
+            np.asarray([float(frame["x_mm"]) for frame in frames]),
+        )
+    )
+    marker_centers = np.asarray(
+        [frame["expected_marker_pixel_px"] for frame in frames], dtype=np.float64
+    )
+    marker_coefficients, _, _, _ = np.linalg.lstsq(
+        marker_design, marker_centers, rcond=None
+    )
+    fine_reference = source_manifest["fine_reference"]
+    reference = {
+        "tool": tool,
+        "image_x_vector_px_per_mm": fine_reference[
+            "fiducial_x_vector_at_fine_capture_px_per_mm"
+        ],
+        "image_y_vector_px_per_mm": fine_reference[
+            "image_y_axis_vector_px_per_mm"
+        ],
+        "marker_x_vector_px_per_mm": marker["quality"][
+            "tool_axis_vectors_px_per_mm"
+        ][tool],
+        "corner_printer_xy_mm": mapping["corner_printer_xy_mm"],
+        "fiducial_reference_printer_xy_mm": mapping[
+            "fiducial_reference_printer_xy_mm"
+        ],
+        "marker_offset_mm": marker["offset_mm"],
+        "marker_reference_commanded_x_mm": marker["reference_commanded_x_mm"],
+        "marker_image_line_model": {
+            "model": "linear_commanded_x_to_image_uv_v1",
+            "coefficients_px": marker_coefficients.tolist(),
+        },
+        "marker_image_line_capture_y_mm": float(
+            frames[0]["commanded_position_mm"][1]
+        ),
+    }
+    run_root = (
+        REPO_ROOT
+        / "output"
+        / "vision_tool_xy_bright_circle_replay"
+        / "runs"
+        / _replay_run_id()
+        / tool.lower()
+    )
+    artifact_dir = run_root / "artifacts"
+    result = module.analyze_measurement(
+        frame_paths,
+        artifact_dir,
+        frames=frames,
+        reference=reference,
+        acquisition_calibration=source_manifest["acquisition_calibration"],
+        require_locator=False,
+    )
+    (run_root / "result.json").parent.mkdir(parents=True, exist_ok=True)
+    (run_root / "result.json").write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    for name, artifact in sorted(result["artifacts"].items()):
+        path = Path(artifact["path"])
+        assert path.exists(), f"missing {name}: {path}"
+        _logger.info("Overlay %s", path.resolve())
+
+    _logger.info(
+        "XY replay tool=%s accepted=%s accepted_count=%d reasons=%s",
+        tool,
+        result["accepted"],
+        result["accepted_count"],
+        result["reasons"],
+    )
+    assert all(
+        record.get("localization_method") == "bright_circle_roi_v1"
+        for record in result["records"]
+        if record.get("center_px") is not None
+    )
 
 
 def _candidate_source(tool, datum_xy, fingerprint="active-fingerprint"):

@@ -30,9 +30,15 @@ BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIER_FRACTION = 2.0 / 3.0
 BRIGHT_CIRCLE_MAX_CONSENSUS_RMS_PX = 2.5
 BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX = 4.0
 BRIGHT_CIRCLE_MAX_ROW_V_SLOPE_PX_PER_MM = 1.0
+MARKER_SEEDED_ROI_HALF_WIDTH_PX = 55.0
+MARKER_SEEDED_ROI_HALF_HEIGHT_PX = 45.0
 
 
-def evaluate_bright_circle_quality(registration: dict[str, Any]) -> dict[str, Any]:
+def evaluate_bright_circle_quality(
+    registration: dict[str, Any],
+    *,
+    minimum_consensus_inliers: int | None = None,
+) -> dict[str, Any]:
     """Evaluate one selected bright-circle registration for X/Z fitting.
 
     Brightness is a useful detector diagnostic, but it is not sufficient as an
@@ -51,7 +57,15 @@ def evaluate_bright_circle_quality(registration: dict[str, Any]) -> dict[str, An
     consensus_inlier_count = 0
     consensus_sample_count = 0
     consensus_rms = None
-    minimum_consensus_inliers = BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIERS
+    required_consensus_inliers = (
+        BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIERS
+        if minimum_consensus_inliers is None
+        else int(minimum_consensus_inliers)
+    )
+    if required_consensus_inliers < 2:
+        raise NozzleTipLocalizationError(
+            "minimum bright-circle consensus inliers must be at least two"
+        )
 
     if registration.get("center_px") is None:
         reasons.append("bright circular nozzle tip was not detected")
@@ -75,8 +89,8 @@ def evaluate_bright_circle_quality(registration: dict[str, Any]) -> dict[str, An
             else float(consensus_rms_value)
         )
         if consensus_sample_count > 0:
-            minimum_consensus_inliers = max(
-                BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIERS,
+            required_consensus_inliers = max(
+                required_consensus_inliers,
                 int(
                     math.ceil(
                         BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIER_FRACTION
@@ -84,11 +98,11 @@ def evaluate_bright_circle_quality(registration: dict[str, Any]) -> dict[str, An
                     )
                 ),
             )
-        if consensus_inlier_count < minimum_consensus_inliers:
+        if consensus_inlier_count < required_consensus_inliers:
             reasons.append(
                 "bright-circle trajectory consensus has "
                 f"{consensus_inlier_count}/{consensus_sample_count} inliers; "
-                f"at least {minimum_consensus_inliers} are required"
+                f"at least {required_consensus_inliers} are required"
             )
         if consensus_rms is None or not math.isfinite(consensus_rms):
             reasons.append("bright-circle trajectory consensus RMS is unavailable")
@@ -129,10 +143,10 @@ def evaluate_bright_circle_quality(registration: dict[str, Any]) -> dict[str, An
         and score >= BRIGHT_CIRCLE_SCORE_FLOOR,
         "consensus_inlier_count": consensus_inlier_count,
         "consensus_sample_count": consensus_sample_count,
-        "minimum_consensus_inliers": minimum_consensus_inliers,
+        "minimum_consensus_inliers": required_consensus_inliers,
         "consensus_inlier_rms_px": consensus_rms,
         "consensus_pass": consensus is not None
-        and consensus_inlier_count >= minimum_consensus_inliers
+        and consensus_inlier_count >= required_consensus_inliers
         and consensus_rms is not None
         and math.isfinite(consensus_rms)
         and consensus_rms <= BRIGHT_CIRCLE_MAX_CONSENSUS_RMS_PX
@@ -698,6 +712,7 @@ def localize_bright_nozzle_tip_grid(
     roi_centers_px: list[np.ndarray],
     half_width_px: float = BRIGHT_CIRCLE_ROI_HALF_WIDTH_PX,
     half_height_px: float = BRIGHT_CIRCLE_ROI_HALF_HEIGHT_PX,
+    minimum_consensus_inliers: int | None = None,
 ) -> dict[str, Any]:
     """Locate bright circular nozzle tips using prior-constrained ROIs."""
 
@@ -875,7 +890,10 @@ def localize_bright_nozzle_tip_grid(
                 "trajectory_consensus_inlier": False,
                 "trajectory_consensus_residual_px": None,
             }
-            quality_gate = evaluate_bright_circle_quality(registration)
+            quality_gate = evaluate_bright_circle_quality(
+                registration,
+                minimum_consensus_inliers=minimum_consensus_inliers,
+            )
             registration["quality_gate"] = quality_gate
             registration["rejection_reason"] = "; ".join(quality_gate["reasons"])
             registration["accepted_for_u_x_fit"] = False
@@ -910,12 +928,177 @@ def localize_bright_nozzle_tip_grid(
                 candidate.get("trajectory_consensus_residual_px", math.inf)
             ),
         }
-        quality_gate = evaluate_bright_circle_quality(registration)
+        quality_gate = evaluate_bright_circle_quality(
+            registration,
+            minimum_consensus_inliers=minimum_consensus_inliers,
+        )
         registration["quality_gate"] = quality_gate
         registration["rejection_reason"] = "; ".join(quality_gate["reasons"])
         registration["accepted_for_u_x_fit"] = bool(quality_gate["accepted"])
         registrations.append(registration)
     return {"registrations": registrations}
+
+
+def localize_bright_nozzle_tip_from_marker_prior_grid(
+    frame_paths: list[Path],
+    *,
+    frames: list[dict[str, Any]],
+    marker_prior_centers_px: list[np.ndarray],
+    propagate_missing_seeds: bool = True,
+    physical_tip_cluster_radius_px: float = 16.0,
+) -> dict[str, Any]:
+    """Seed the bright-circle detector from a calculated red-marker position.
+
+    The marker position is supplied by the earlier red-marker trajectory
+    calibration.  This function deliberately does not inspect red pixels in
+    the XY frames.  It only uses the established marker position to recover
+    the coarse ring/tip geometry and then delegates the actual nozzle position
+    to the bright-circle detector used by XZ.
+    """
+
+    if len(frame_paths) != len(frames) or len(frames) != len(marker_prior_centers_px):
+        raise NozzleTipLocalizationError(
+            "marker-prior bright-tip inputs have inconsistent lengths"
+        )
+    if not frames:
+        raise NozzleTipLocalizationError("marker-prior bright-tip inputs are empty")
+    if physical_tip_cluster_radius_px <= 0.0:
+        raise NozzleTipLocalizationError("physical-tip cluster radius must be positive")
+
+    marker_centers = [
+        np.asarray(center, dtype=np.float64) for center in marker_prior_centers_px
+    ]
+    if any(center.shape != (2,) or not np.all(np.isfinite(center)) for center in marker_centers):
+        raise NozzleTipLocalizationError(
+            "marker-prior bright-tip centers must contain finite pixel pairs"
+        )
+
+    ring_candidate_sets: dict[int, list[dict[str, Any]]] = {}
+    for index, (path, marker_center) in enumerate(zip(frame_paths, marker_centers)):
+        image = cv2.imread(str(path), cv2.IMREAD_COLOR)
+        if image is None:
+            raise NozzleTipLocalizationError(
+                f"marker-prior image {index} cannot be decoded"
+            )
+        ring_candidate_sets[index] = _ring_candidates(image, marker_center)
+        del image
+
+    ring_delta, ring_spread, selected_rings = _cluster_candidates(
+        ring_candidate_sets,
+        delta_field="marker_delta_px",
+        score_field="edge_score",
+        radius_px=18.0,
+    )
+    if len(selected_rings) < 2:
+        raise NozzleTipLocalizationError(
+            "fewer than two consistent marker-to-ring observations"
+        )
+    ring_radius = float(
+        np.median([float(item["radius_px"]) for item in selected_rings.values()])
+    )
+
+    ring_seeds: dict[int, dict[str, Any]] = {}
+    for index, marker_center in enumerate(marker_centers):
+        selected = selected_rings.get(index)
+        if selected is not None:
+            ring_seeds[index] = dict(selected)
+            continue
+        if not propagate_missing_seeds:
+            continue
+        ring_seeds[index] = {
+            "center_px": (marker_center + ring_delta).tolist(),
+            "radius_px": ring_radius,
+            "marker_delta_px": ring_delta.tolist(),
+            "edge_score": None,
+            "propagated": True,
+        }
+
+    physical_tip_candidate_sets: dict[int, list[dict[str, Any]]] = {}
+    for index, ring in ring_seeds.items():
+        image = cv2.imread(str(frame_paths[index]), cv2.IMREAD_COLOR)
+        if image is None:
+            raise NozzleTipLocalizationError(
+                f"marker-prior image {index} cannot be decoded for tip seeding"
+            )
+        physical_tip_candidate_sets[index] = _tip_candidates(
+            image,
+            ring,
+            physical_tip_only=True,
+        )
+        del image
+
+    physical_tip_delta, physical_tip_spread, selected_tips = _cluster_candidates(
+        physical_tip_candidate_sets,
+        delta_field="tip_to_ring_delta_px",
+        score_field="score",
+        radius_px=physical_tip_cluster_radius_px,
+    )
+    if len(selected_tips) < 2:
+        raise NozzleTipLocalizationError(
+            "fewer than two consistent marker-seeded nozzle observations"
+        )
+
+    coarse_centers: list[np.ndarray] = []
+    seed_diagnostics: list[dict[str, Any]] = []
+    for index, marker_center in enumerate(marker_centers):
+        ring = ring_seeds.get(index)
+        if ring is None:
+            raise NozzleTipLocalizationError(
+                f"no ring ROI seed is available for frame {index}"
+            )
+        tip = selected_tips.get(index)
+        ring_center = np.asarray(ring["center_px"], dtype=np.float64)
+        # The ROI center comes from one robust marker-to-ring plus ring-to-tip
+        # offset for the whole grid.  Per-frame direct candidates are retained
+        # as diagnostics, but must not move the ROI independently and thereby
+        # hide a systematic line-model error.
+        coarse_center = marker_center + ring_delta + physical_tip_delta
+        coarse_centers.append(coarse_center)
+        seed_diagnostics.append(
+            {
+                "marker_prior_center_px": marker_center.tolist(),
+                "ring_center_px": ring_center.tolist(),
+                "ring_radius_px": float(ring.get("radius_px", ring_radius)),
+                "ring_detected": index in selected_rings,
+                "tip_seed_center_px": (
+                    np.asarray(tip["center_px"], dtype=np.float64).tolist()
+                    if tip is not None
+                    else None
+                ),
+                "coarse_seed_center_px": coarse_center.tolist(),
+                "tip_detected": tip is not None,
+                "propagated": tip is None,
+            }
+        )
+
+    localized = localize_bright_nozzle_tip_grid(
+        frame_paths,
+        frames=frames,
+        roi_centers_px=coarse_centers,
+        half_width_px=MARKER_SEEDED_ROI_HALF_WIDTH_PX,
+        half_height_px=MARKER_SEEDED_ROI_HALF_HEIGHT_PX,
+        minimum_consensus_inliers=3,
+    )
+    for registration, seed in zip(localized["registrations"], seed_diagnostics):
+        registration.update(
+            {
+                "marker_prior_center_px": seed["marker_prior_center_px"],
+                "coarse_seed_center_px": seed["coarse_seed_center_px"],
+                "coarse_ring_center_px": seed["ring_center_px"],
+                "coarse_ring_radius_px": seed["ring_radius_px"],
+                "coarse_ring_detected": seed["ring_detected"],
+                "coarse_tip_detected": seed["tip_detected"],
+                "coarse_seed_propagated": seed["propagated"],
+                "coarse_ring_spread_px": float(ring_spread),
+                "coarse_tip_spread_px": float(physical_tip_spread),
+                "coarse_tip_delta_px": physical_tip_delta.tolist(),
+                "coarse_marker_to_nozzle_offset_px": (
+                    ring_delta + physical_tip_delta
+                ).tolist(),
+                "localization_seed_method": "red_marker_image_line_v1",
+            }
+        )
+    return localized
 
 
 def _crop(

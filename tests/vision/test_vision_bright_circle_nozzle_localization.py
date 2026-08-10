@@ -242,3 +242,77 @@ def test_row_residual_rejects_isolated_bright_circle_outlier(tmp_path, monkeypat
     assert outlier["row_residual_px"] > 4.0
     assert outlier["accepted_for_u_x_fit"] is False
     assert "row residual" in outlier["rejection_reason"]
+
+
+def test_marker_prior_uses_robust_offset_and_large_xy_roi(tmp_path, monkeypatch):
+    module = _module()
+    paths = _write_blank_frames(tmp_path, 3)
+    frames = [_frame(index, 191.0 + index) for index in range(3)]
+    marker_centers = [np.asarray([100.0 + index, 90.0]) for index in range(3)]
+    seen_rois = []
+
+    def rings(_image, marker):
+        marker = np.asarray(marker, dtype=np.float64)
+        center = marker + [50.0, 10.0]
+        return [
+            {
+                "center_px": center.tolist(),
+                "radius_px": 40.0,
+                "marker_delta_px": [50.0, 10.0],
+                "edge_score": 100.0,
+            }
+        ]
+
+    def tips(_image, ring, *, physical_tip_only=False):
+        assert physical_tip_only
+        center = np.asarray(ring["center_px"], dtype=np.float64) + [12.0, 2.0]
+        return [
+            {
+                "center_px": center.tolist(),
+                "tip_to_ring_delta_px": [12.0, 2.0],
+                "score": 100.0,
+            }
+        ]
+
+    def bright(_image, center, **kwargs):
+        seen_rois.append(kwargs)
+        center = np.asarray(center, dtype=np.float64)
+        return {
+            "roi_px": [
+                int(center[0] - kwargs["half_width_px"]),
+                int(center[1] - kwargs["half_height_px"]),
+                int(center[0] + kwargs["half_width_px"]),
+                int(center[1] + kwargs["half_height_px"]),
+            ],
+            "prior_center_px": center.tolist(),
+            "score_margin": 10.0,
+            "candidates": [
+                {
+                    "center_px": center.tolist(),
+                    "radius_px": 9.0,
+                    "score": 100.0,
+                }
+            ],
+        }
+
+    monkeypatch.setattr(module, "_ring_candidates", rings)
+    monkeypatch.setattr(module, "_tip_candidates", tips)
+    monkeypatch.setattr(module, "_bright_circle_candidates", bright)
+    monkeypatch.setattr(
+        module,
+        "_refine_bright_circle",
+        lambda _gray, center, radius: (center, radius, 100.0, 100.0),
+    )
+
+    result = module.localize_bright_nozzle_tip_from_marker_prior_grid(
+        paths,
+        frames=frames,
+        marker_prior_centers_px=marker_centers,
+    )
+
+    assert all(kwargs["half_width_px"] == 55.0 for kwargs in seen_rois)
+    assert all(kwargs["half_height_px"] == 45.0 for kwargs in seen_rois)
+    for registration in result["registrations"]:
+        assert registration["localization_seed_method"] == "red_marker_image_line_v1"
+        assert registration["coarse_marker_to_nozzle_offset_px"] == [62.0, 12.0]
+        assert registration["accepted_for_u_x_fit"] is True

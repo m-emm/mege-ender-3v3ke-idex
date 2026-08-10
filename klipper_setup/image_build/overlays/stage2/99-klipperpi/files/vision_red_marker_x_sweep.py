@@ -16,6 +16,7 @@ from vision_calibration_graph import sha256_file
 _logger = logging.getLogger("vision_red_marker_x_sweep")
 
 LOCALIZER = {"kind": "red_marker_trajectory", "version": 1}
+IMAGE_LINE_MODEL = "linear_commanded_x_to_image_uv_v1"
 MIN_TOOL_FRAMES = 3
 MIN_TOOL_SPAN_MM = 20.0
 MIN_SCALE_PX_PER_MM = 2.0
@@ -1007,6 +1008,17 @@ def analyze(
                     "T1": selection["t1"],
                 },
                 "cross_registration": selection["cross_registration"],
+                "tool_image_line_models": {
+                    tool: {
+                        "model": IMAGE_LINE_MODEL,
+                        "coefficients_px": [
+                            selection[tool.lower()]["intercept_px"],
+                            selection[tool.lower()]["axis_vector_px_per_mm"],
+                        ],
+                    }
+                    for tool in ("T0", "T1")
+                },
+                "image_line_capture_y_mm": float(reference["capture_y_mm"]),
             }
         )
         artifact_paths.update(

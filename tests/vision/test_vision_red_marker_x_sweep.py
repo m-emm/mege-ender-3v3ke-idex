@@ -332,6 +332,15 @@ def test_live_exp600_fixture_emits_debug_overlays():
         _logger.info("Overlay %s", path.resolve())
 
     assert result["accepted"], result["reasons"]
+    assert result["image_line_capture_y_mm"] == pytest.approx(
+        manifest["red_marker_reference"]["capture_y_mm"]
+    )
+    for tool in ("T0", "T1"):
+        model = result["tool_image_line_models"][tool]
+        assert model["model"] == "linear_commanded_x_to_image_uv_v1"
+        coefficients = np.asarray(model["coefficients_px"], dtype=np.float64)
+        assert coefficients.shape == (2, 2)
+        assert np.all(np.isfinite(coefficients))
     assert all(
         len(values) == 3 and max(values) - min(values) >= 20
         for values in result["accepted_x_mm"].values()
