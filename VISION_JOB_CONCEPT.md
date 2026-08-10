@@ -21,8 +21,7 @@ nozzle_cam_bed_fiducial_y_metric
 nozzle_cam_bed_tab_corner
 idex_tool_red_marker_x_sweep
 idex_rough_tool_x_verify
-idex_nozzle_fine_xz_grid_t0
-idex_nozzle_fine_xz_grid_t1
+idex_tool_xz_sweep_report
 ```
 
 The command surface is:
@@ -35,8 +34,7 @@ vision_calibration.py analyze <job-id>
 vision_calibration.py publish <job-id> <analysis-run-id>
 vision_calibration.py rebuild-catalog
 vision_calibration.py calculate-rough-x
-vision_calibration.py calculate-fine-tool-xyz --tool T0
-vision_calibration.py calculate-fine-tool-xyz --tool T1
+vision_calibration.py run idex_tool_xz_sweep_report --name tool_xz_sweep
 vision_calibration.py record-rough-x-activation ...
 ```
 
@@ -69,7 +67,9 @@ The live stages then:
 2. locate the bed-tab corner relative to the observed patch;
 3. sweep both red markers and independently calculate each tool's rough X;
 4. record and verify the activated rough X at X=183;
-5. fit the fine T0/T1 nozzle X/Z projection grid and print-plane coordinates.
+5. fit the combined T0/T1 nozzle X/Z projection sweep and print-plane
+   coordinates. The ArUco/bright-circle path is the sole supported X/Z
+   implementation; the former independent per-tool fine-XZ jobs are retired.
 
 No configured pixel position or ROI identifies the fiducial patch. Detection is
 coordinate-free within the image, and subsequent tight regions are derived

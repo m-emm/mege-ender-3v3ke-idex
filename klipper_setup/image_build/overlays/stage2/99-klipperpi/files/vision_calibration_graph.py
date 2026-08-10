@@ -26,8 +26,6 @@ JOB_TYPES = {
     "idex_tool_red_marker_x_sweep",
     "idex_rough_tool_x_verify",
     "idex_eddy_fiducial_xz_grid",
-    "idex_nozzle_fine_xz_grid_t0",
-    "idex_nozzle_fine_xz_grid_t1",
     "idex_tool_xy_measure_t0",
     "idex_tool_xy_measure_t1",
     "idex_tool_xz_sweep_report",

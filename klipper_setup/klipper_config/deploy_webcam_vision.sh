@@ -22,8 +22,6 @@ required_files=(
   vision_bed_fiducial.py
   vision_four_fiducials.py
   vision_eddy_fiducial_xz.py
-  vision_fine_tool_calibration.py
-  vision_nozzle_fine_xz.py
   vision_nozzle_tip_localization.py
   vision_tool_xy_calibration.py
   vision_tool_xz_sweep.py
@@ -93,8 +91,6 @@ scp \
   "${FILES_DIR}/vision_bed_fiducial.py" \
   "${FILES_DIR}/vision_four_fiducials.py" \
   "${FILES_DIR}/vision_eddy_fiducial_xz.py" \
-  "${FILES_DIR}/vision_fine_tool_calibration.py" \
-  "${FILES_DIR}/vision_nozzle_fine_xz.py" \
   "${FILES_DIR}/vision_nozzle_tip_localization.py" \
   "${FILES_DIR}/vision_tool_xy_calibration.py" \
   "${FILES_DIR}/vision_tool_xz_sweep.py" \
@@ -234,8 +230,6 @@ sudo install -m 0644 "${REMOTE_TMP}/vision_calibration_graph.py" /usr/local/bin/
 sudo install -m 0644 "${REMOTE_TMP}/vision_bed_fiducial.py" /usr/local/bin/vision_bed_fiducial.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_four_fiducials.py" /usr/local/bin/vision_four_fiducials.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_eddy_fiducial_xz.py" /usr/local/bin/vision_eddy_fiducial_xz.py
-sudo install -m 0644 "${REMOTE_TMP}/vision_fine_tool_calibration.py" /usr/local/bin/vision_fine_tool_calibration.py
-sudo install -m 0644 "${REMOTE_TMP}/vision_nozzle_fine_xz.py" /usr/local/bin/vision_nozzle_fine_xz.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_nozzle_tip_localization.py" /usr/local/bin/vision_nozzle_tip_localization.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_tool_xy_calibration.py" /usr/local/bin/vision_tool_xy_calibration.py
 sudo install -m 0644 "${REMOTE_TMP}/vision_tool_xz_sweep.py" /usr/local/bin/vision_tool_xz_sweep.py

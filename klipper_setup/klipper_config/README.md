@@ -73,11 +73,9 @@ The main files are:
 | Job preparation, acquisition, analysis dispatch, publication, and static UI generation | `vision_calibration.py` |
 | Job graph, manifests, dependencies, and validation | `vision_calibration_graph.py` |
 | Eddy fiducial X/Z circle analysis | `vision_eddy_fiducial_xz.py` |
-| Stage 5 nozzle-tip analysis | `vision_nozzle_fine_xz.py` |
 | Shared nozzle-tip localization | `vision_nozzle_tip_localization.py` |
 | Fixed-Z tool-XY measurement and candidate calculation | `vision_tool_xy_calibration.py` |
 | Combined post-XY nozzle X/Z sweep report | `vision_tool_xz_sweep.py` |
-| Stage 5.1 fine-tool calculation | `vision_fine_tool_calibration.py` |
 | Camera capture daemon | `vision_capture.py` |
 | Capture service definition | `vision-capture-nozzle-cam.service` |
 
@@ -85,7 +83,6 @@ For example, from the repository root:
 
 ```bash
 ${EDITOR:-vi} klipper_setup/image_build/overlays/stage2/99-klipperpi/files/vision_job_types.json
-${EDITOR:-vi} klipper_setup/image_build/overlays/stage2/99-klipperpi/files/vision_nozzle_fine_xz.py
 ```
 
 If a new Python module is added, also add it to the required-file, `scp`, and
@@ -165,22 +162,12 @@ Starting a new acquisition replaces any stale acquisition lock left by an
 aborted job. The displaced job is recorded as failed and its partial frames
 remain available for diagnosis; it cannot block the requested job.
 
-Run acquisition and analysis together with `run`. For example, the two Stage
-5 jobs are:
+Run acquisition and analysis together with `run`. The post-XY combined nozzle
+X/Z sweep is:
 
 ```bash
 ssh pi@menderpi.local \
-  '/usr/local/bin/vision_calibration.py run idex_nozzle_fine_xz_grid_t0 --name stage5_t0 --timeout 1200'
-
-ssh pi@menderpi.local \
-  '/usr/local/bin/vision_calibration.py run idex_nozzle_fine_xz_grid_t1 --name stage5_t1 --timeout 1200'
-```
-
-To stop after capturing the images, use `acquire` instead of `run`:
-
-```bash
-ssh pi@menderpi.local \
-  '/usr/local/bin/vision_calibration.py acquire idex_nozzle_fine_xz_grid_t0 --name stage5_t0 --timeout 1200'
+  '/usr/local/bin/vision_calibration.py run idex_tool_xz_sweep_report --name tool_xz_sweep --timeout 1200'
 ```
 
 Re-run analysis without moving the printer or capturing new images by using
@@ -317,49 +304,10 @@ commanded X/Z and image X/Y records:
 IDEX_EDDY_FIDUCIAL_XZ_ACQUIRE NAME=eddy_fiducial_xz
 ```
 
-Stage 5 is split into independent T0 and T1 jobs. Each job captures a
-56-frame nozzle grid: seven evenly spaced X columns at bed-tab offsets
-`10, 12.5, 15, 17.5, 20, 22.5, 25 mm` on eight complete Z rows spanning
-Z 0.5 through 25 mm. The outer circular ring is a coarse locator. Only a small
-ROI centered on the actual metallic nozzle tip contributes registration
-measurements:
-
-```gcode
-IDEX_NOZZLE_FINE_XZ_CALIBRATE_T0 NAME=fine_nozzle_xz_t0
-IDEX_NOZZLE_FINE_XZ_CALIBRATE_T1 NAME=fine_nozzle_xz_t1
-```
-
-Each job publishes only its own tool's nozzle-tip projection and registration
-model. It deliberately does not publish absolute nozzle XYZ or infer Z by
-forcing the nozzle X vector to equal the bed X vector; that solve is a
-separate per-tool follow-up operation.
-
-Stage 5.1 performs that gated calculation:
-
-```bash
-/usr/local/bin/vision_calibration.py calculate-fine-tool-xyz --tool T0
-/usr/local/bin/vision_calibration.py calculate-fine-tool-xyz --tool T1
-```
-
-Each accepted calculation writes a complete `calib_candidate.yaml`, changing
-only the selected tool's persisted XYZ datum, and publishes that tool's
-absolute nozzle-coordinate facts plus its per-tool candidate fact. A rejected
-calculation remains visible under `/vision/`, publishes nothing, and must not
-be deployed. A per-tool candidate is based on the active source calibration;
-after applying one candidate, recapture and recalculate the other tool rather
-than applying a candidate computed against the previous source file. After
-deploying an accepted candidate, verify the generated mappings by recording
-the active snapshot:
-
-```bash
-/usr/local/bin/vision_calibration.py record-fine-tool-xyz-activation \
-  <calculation-id> --expected-fingerprint=<active-config-fingerprint>
-```
-
-The calculation is the Stage 5.1 deployment gate. Do not deploy a rejected
-candidate. The independent post-activation XYZ verification described in the
-calibration concept is deliberately not exposed until its full X/Y dither and
-three-row Z-scale contract is implemented; there is no legacy X/Y-only alias.
+The combined report uses the ArUco-located ROI and bright-circle nozzle
+detector, then fits the T0/T1 X/Z trajectories and shared Z offset. It is
+diagnostic-only; an unavailable or bound-saturated shared fit must not be
+applied.
 
 After both tool XY datums have been corrected and deployed, start the combined
 report-only nozzle X/Z sweep with:
@@ -401,8 +349,6 @@ nozzle_cam_bed_tab_corner
 idex_tool_red_marker_x_sweep
 idex_rough_tool_x_verify
 idex_eddy_fiducial_xz_grid
-idex_nozzle_fine_xz_grid_t0
-idex_nozzle_fine_xz_grid_t1
 idex_tool_xz_sweep_report
 ```
 

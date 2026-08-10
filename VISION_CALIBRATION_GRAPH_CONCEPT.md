@@ -23,6 +23,16 @@ The clean acquisition runtime, synchronized capture, and job directory layout
 are described in `VISION_JOB_CONCEPT.md`. This document defines the
 calibration-specific graph above that runtime.
 
+### X/Z workflow status
+
+The active X/Z calibration job is `idex_tool_xz_sweep_report`, which acquires
+both tools and uses the ArUco-located ROI with the bright-circle nozzle finder.
+The former independent per-tool fine-XZ workflow and its fine-tool XYZ
+calculation/application stages are retired and must not be reintroduced. Any
+older job IDs or payload examples later in this historical design document are
+preserved only as documentation of the previous graph; they are not live job
+types or supported commands.
+
 ### Terminology note
 
 The first observed bed-reference stage uses the four-marker patch now attached

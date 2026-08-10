@@ -51,10 +51,6 @@ ROUGH_X_VERIFY_REMOTE_METHOD = "idex_rough_tool_x_verify"
 ROUGH_X_VERIFY_REMOTE_ACTION = "run_idex_rough_tool_x_verify"
 EDDY_FIDUCIAL_XZ_REMOTE_METHOD = "idex_eddy_fiducial_xz_acquire"
 EDDY_FIDUCIAL_XZ_REMOTE_ACTION = "run_idex_eddy_fiducial_xz_acquire"
-FINE_NOZZLE_T0_REMOTE_METHOD = "idex_nozzle_fine_xz_calibrate_t0"
-FINE_NOZZLE_T0_REMOTE_ACTION = "run_idex_nozzle_fine_xz_calibrate_t0"
-FINE_NOZZLE_T1_REMOTE_METHOD = "idex_nozzle_fine_xz_calibrate_t1"
-FINE_NOZZLE_T1_REMOTE_ACTION = "run_idex_nozzle_fine_xz_calibrate_t1"
 TOOL_XZ_SWEEP_REMOTE_METHOD = "idex_tool_xz_sweep_report"
 TOOL_XZ_SWEEP_REMOTE_ACTION = "run_idex_tool_xz_sweep_report"
 CALIBRATION_BIN = os.environ.get(
@@ -432,8 +428,6 @@ class VisionJobApi:
             "idex_tool_red_marker_x_sweep",
             "idex_rough_tool_x_verify",
             "idex_eddy_fiducial_xz_grid",
-            "idex_nozzle_fine_xz_grid_t0",
-            "idex_nozzle_fine_xz_grid_t1",
             "idex_tool_xy_measure_t0",
             "idex_tool_xy_measure_t1",
             "idex_tool_xz_sweep_report",
@@ -934,36 +928,6 @@ class KlippyRemoteDaemon:
                             result.stderr.strip()
                             or "Eddy fiducial X/Z acquisition job failed"
                         )
-                elif action in {
-                    FINE_NOZZLE_T0_REMOTE_ACTION,
-                    FINE_NOZZLE_T1_REMOTE_ACTION,
-                }:
-                    tool = "t0" if action == FINE_NOZZLE_T0_REMOTE_ACTION else "t1"
-                    command = [
-                        CALIBRATION_BIN,
-                        "run",
-                        f"idex_nozzle_fine_xz_grid_{tool}",
-                        "--name",
-                        sanitize_name(params.get("name", f"fine_nozzle_xz_{tool}")),
-                    ]
-                    fingerprint = str(params.get("active_config_fingerprint") or "")
-                    if fingerprint:
-                        command.extend(["--expected-fingerprint", fingerprint])
-                    result = subprocess.run(
-                        command,
-                        check=False,
-                        text=True,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        timeout=600,
-                    )
-                    if result.stdout.strip():
-                        log(result.stdout.strip())
-                    if result.returncode:
-                        raise CaptureError(
-                            result.stderr.strip()
-                            or f"fine nozzle {tool.upper()} X/Z calibration job failed"
-                        )
                 elif action == TOOL_XZ_SWEEP_REMOTE_ACTION:
                     command = [
                         CALIBRATION_BIN,
@@ -1050,16 +1014,6 @@ class KlippyRemoteDaemon:
             )
             self._register_method(
                 sock,
-                FINE_NOZZLE_T0_REMOTE_METHOD,
-                FINE_NOZZLE_T0_REMOTE_ACTION,
-            )
-            self._register_method(
-                sock,
-                FINE_NOZZLE_T1_REMOTE_METHOD,
-                FINE_NOZZLE_T1_REMOTE_ACTION,
-            )
-            self._register_method(
-                sock,
                 TOOL_XZ_SWEEP_REMOTE_METHOD,
                 TOOL_XZ_SWEEP_REMOTE_ACTION,
             )
@@ -1073,8 +1027,6 @@ class KlippyRemoteDaemon:
             valid.add(RED_MARKER_CALIBRATION_REMOTE_ACTION)
             valid.add(ROUGH_X_VERIFY_REMOTE_ACTION)
             valid.add(EDDY_FIDUCIAL_XZ_REMOTE_ACTION)
-            valid.add(FINE_NOZZLE_T0_REMOTE_ACTION)
-            valid.add(FINE_NOZZLE_T1_REMOTE_ACTION)
             valid.add(TOOL_XZ_SWEEP_REMOTE_ACTION)
         if action not in valid:
             return

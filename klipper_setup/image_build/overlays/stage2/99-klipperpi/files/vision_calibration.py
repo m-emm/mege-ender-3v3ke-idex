@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Graph-driven nozzle-camera calibration through the fine nozzle X/Z stage."""
+"""Graph-driven nozzle-camera calibration workflow."""
 
 from __future__ import annotations
 
@@ -44,12 +44,7 @@ from vision_calibration_graph import (
 )
 from vision_eddy_fiducial_xz import analyze as analyze_eddy_fiducial_xz
 from vision_eddy_xyz_offset import analyze as analyze_eddy_xyz_offset
-from vision_fine_tool_calibration import (
-    calculate_candidate as calculate_fine_tool_candidate,
-)
-from vision_fine_tool_calibration import write_artifacts as write_fine_tool_artifacts
 from vision_idex_xyz_offset import analyze_idex_xyz_offset
-from vision_nozzle_fine_xz import analyze as analyze_fine_nozzle_xz
 from vision_red_marker_x_sweep import analyze as analyze_red_marker_x_sweep
 from vision_rough_x_verification import analyze as analyze_rough_x_verification
 from vision_rough_x_verification import (
@@ -113,12 +108,6 @@ ROUGH_X_VERIFY_JOB = "idex_rough_tool_x_verify"
 IDEX_T0_T1_XYZ_OFFSET_JOB = "idex_t0_t1_xyz_offset"
 EDDY_FIDUCIAL_XZ_JOB = "idex_eddy_fiducial_xz_grid"
 EDDY_T0_XYZ_OFFSET_JOB = "idex_eddy_t0_xyz_offset"
-FINE_NOZZLE_XZ_T0_JOB = "idex_nozzle_fine_xz_grid_t0"
-FINE_NOZZLE_XZ_T1_JOB = "idex_nozzle_fine_xz_grid_t1"
-FINE_NOZZLE_XZ_JOBS = {
-    FINE_NOZZLE_XZ_T0_JOB,
-    FINE_NOZZLE_XZ_T1_JOB,
-}
 TOOL_XY_T0_JOB = "idex_tool_xy_measure_t0"
 TOOL_XY_T1_JOB = "idex_tool_xy_measure_t1"
 TOOL_XY_JOBS = {TOOL_XY_T0_JOB, TOOL_XY_T1_JOB}
@@ -130,8 +119,6 @@ JOB_TYPES = (
     RED_MARKER_X_JOB,
     ROUGH_X_VERIFY_JOB,
     EDDY_FIDUCIAL_XZ_JOB,
-    FINE_NOZZLE_XZ_T0_JOB,
-    FINE_NOZZLE_XZ_T1_JOB,
     TOOL_XY_T0_JOB,
     TOOL_XY_T1_JOB,
     TOOL_XZ_SWEEP_JOB,
@@ -171,7 +158,7 @@ def _prior_provenance(job_type: str) -> dict[str, Any]:
         result["fiducial_centers_xy_mm"] = CALIB.fiducial_centers()
     if job_type == BED_TAB_CORNER_JOB:
         result["bed_corner_xyz_mm"] = CALIB.bed_corner()
-    if job_type in {BED_TAB_CORNER_JOB, *FINE_NOZZLE_XZ_JOBS}:
+    if job_type == BED_TAB_CORNER_JOB:
         result["fiducial_z_mm"] = CALIB.fiducial_z()
     return result
 
@@ -453,7 +440,6 @@ def _preflight(
         RED_MARKER_X_JOB,
         ROUGH_X_VERIFY_JOB,
         EDDY_FIDUCIAL_XZ_JOB,
-        *FINE_NOZZLE_XZ_JOBS,
         *TOOL_XY_JOBS,
         TOOL_XZ_SWEEP_JOB,
     }:
@@ -1013,52 +999,6 @@ def prepare_job(
                         ],
                     }
                 )
-    elif job_type in FINE_NOZZLE_XZ_JOBS:
-        partial = input_values["partial_bed_coordinate_system"]
-        x_axis = input_values["image_x_axis_z2"]["axis_vector_px_per_mm"]
-        bed_tab_x = float(partial["corner_printer_xyz_mm"][0])
-        corner_at_capture = np.asarray(partial["corner_pixel_xy_px"]) + np.asarray(
-            partial["image_y_axis_vector_px_per_mm"]
-        ) * (
-            float(definition["capture_y_mm"])
-            - float(partial["corner_pixel_capture_y_mm"])
-        )
-        offsets = [float(item) for item in definition["x_offsets_from_bed_tab_mm"]]
-        full_z = [float(item) for item in definition["full_row_z_mm"]]
-        tool = str(definition["tool"])
-        marker = input_values[f"{tool.lower()}_red_marker_offset"]
-        for row_index, z_mm in enumerate(full_z):
-            row = offsets if row_index % 2 == 0 else list(reversed(offsets))
-            for offset in row:
-                x_mm = bed_tab_x + offset
-                seq = len(frames)
-                expected_marker = corner_at_capture + np.asarray(x_axis) * (
-                    float(marker["offset_mm"])
-                    + x_mm
-                    - float(marker["reference_commanded_x_mm"])
-                )
-                frames.append(
-                    {
-                        "seq": seq,
-                        "frame": (
-                            f"{seq:02d}_{tool.lower()}_" f"x{x_mm:.3f}_z{z_mm:.3f}"
-                        ).replace(".", "p"),
-                        "camera": "nozzle_cam",
-                        "profile": definition["profile"],
-                        "tool": tool,
-                        "x_offset_from_bed_tab_mm": offset,
-                        "x_mm": x_mm,
-                        "z_mm": z_mm,
-                        "y_mm": pose["capture_y_mm"],
-                        "expected_marker_pixel_px": expected_marker.tolist(),
-                        "discard_fresh_frames": 1,
-                        "commanded_position_mm": [
-                            x_mm,
-                            pose["capture_y_mm"],
-                            z_mm,
-                        ],
-                    }
-                )
     elif job_type in TOOL_XY_JOBS:
         assert tool_xy_prepared is not None
         frames = tool_xy_prepared["frames"]
@@ -1106,10 +1046,7 @@ def prepare_job(
             ),
         }
 
-    if job_type in {
-        RED_MARKER_X_JOB,
-        *FINE_NOZZLE_XZ_JOBS,
-    }:
+    if job_type == RED_MARKER_X_JOB:
         manifest["active_calibration_snapshot"] = resolved[
             "active_calibration_snapshot"
         ]
@@ -1142,51 +1079,6 @@ def prepare_job(
                 "t1_x_endstop_mm": active["t1_applied_x_endstop_mm"],
             },
         }
-    elif job_type in FINE_NOZZLE_XZ_JOBS:
-        metric = input_values["bed_metric"]
-        partial = input_values["partial_bed_coordinate_system"]
-        mapping = input_values["bed_fiducial_printer_xy_mapping"]
-        x_axis = input_values["image_x_axis_z2"]["axis_vector_px_per_mm"]
-        corner_at_capture = np.asarray(partial["corner_pixel_xy_px"]) + np.asarray(
-            partial["image_y_axis_vector_px_per_mm"]
-        ) * (
-            float(definition["capture_y_mm"])
-            - float(partial["corner_pixel_capture_y_mm"])
-        )
-        x_model = mapping["fiducial_x_vector_model_px_per_mm"]
-        fiducial_x_at_capture = np.asarray(
-            x_model["reference_vector_px_per_mm"],
-            dtype=np.float64,
-        ) + np.asarray(
-            x_model["capture_y_slope_px_per_mm_per_mm"],
-            dtype=np.float64,
-        ) * (
-            float(definition["capture_y_mm"]) - float(x_model["reference_capture_y_mm"])
-        )
-        fiducial_pixel_at_capture = np.mean(
-            np.asarray(metric["reference_marker_centers_px"], dtype=np.float64),
-            axis=0,
-        ) + np.asarray(
-            metric["image_y_axis_vector_px_per_mm"],
-            dtype=np.float64,
-        ) * (
-            float(definition["capture_y_mm"]) - float(metric["reference_capture_y_mm"])
-        )
-        manifest["fine_reference"] = {
-            "bed_tab_x_mm": partial["corner_printer_xyz_mm"][0],
-            "fiducial_plane_printer_z_mm": CALIB.fiducial_z(),
-            "fiducial_reference_printer_xy_mm": mapping[
-                "fiducial_reference_printer_xy_mm"
-            ],
-            "fiducial_reference_pixel_at_fine_capture_px": fiducial_pixel_at_capture.tolist(),
-            "fiducial_x_vector_at_fine_capture_px_per_mm": fiducial_x_at_capture.tolist(),
-            "fiducial_x_vector_model_px_per_mm": x_model,
-            "fine_capture_y_mm": float(definition["capture_y_mm"]),
-            "image_y_axis_vector_px_per_mm": metric["image_y_axis_vector_px_per_mm"],
-            "corner_pixel_at_fine_capture_px": corner_at_capture.tolist(),
-            "coarse_image_x_axis_px_per_mm": x_axis,
-        }
-        manifest["acquisition_calibration"] = _acquisition_calibration_snapshot()
     elif job_type in TOOL_XY_JOBS:
         assert tool_xy_prepared is not None
         manifest["tool_xy_reference"] = tool_xy_prepared["reference"]
@@ -1451,14 +1343,6 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 artifact_dir,
                 frames=manifest["frames"],
                 localizer=manifest["localizer"],
-            )
-        elif job_type in FINE_NOZZLE_XZ_JOBS:
-            details = analyze_fine_nozzle_xz(
-                frame_paths,
-                artifact_dir,
-                frames=manifest["frames"],
-                reference=manifest["fine_reference"],
-                acquisition_calibration=manifest.get("acquisition_calibration"),
             )
         elif job_type in TOOL_XY_JOBS:
             details = analyze_tool_xy_measurement(
@@ -1806,56 +1690,6 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         "diagnostic",
                         value,
                         dependencies,
-                    )
-                ]
-            elif job_type in FINE_NOZZLE_XZ_JOBS:
-                tool = str(manifest["frames"][0]["tool"])
-                projection = {
-                    "tool_models": details["models"],
-                    "fiducial_reference_printer_xy_mm": details[
-                        "fiducial_reference_printer_xy_mm"
-                    ],
-                    "fiducial_reference_pixel_at_fine_capture_px": details[
-                        "fiducial_reference_pixel_at_fine_capture_px"
-                    ],
-                    "fiducial_x_vector_at_fine_capture_px_per_mm": details[
-                        "fiducial_x_vector_at_fine_capture_px_per_mm"
-                    ],
-                    "fiducial_plane_printer_z_mm": details[
-                        "fiducial_plane_printer_z_mm"
-                    ],
-                    "fine_capture_y_mm": details["fine_capture_y_mm"],
-                    "image_y_axis_vector_px_per_mm": details[
-                        "image_y_axis_vector_px_per_mm"
-                    ],
-                    "tip_tracking": details["tip_tracking"],
-                    "vector_comparison_at_commanded_z0": details[
-                        "vector_comparison_at_commanded_z0"
-                    ],
-                    "quality": {
-                        "warnings": details["warnings"],
-                    },
-                    "supporting_artifact_hashes": {
-                        key: item["sha256"]
-                        for key, item in details["artifacts"].items()
-                    },
-                }
-                facts = [
-                    _fact(
-                        "camera.nozzle_cam.nozzle_tip."
-                        f"{tool.lower()}_projection_model",
-                        "coordinate_system",
-                        projection,
-                        dependencies,
-                        {
-                            "tool_models",
-                            "fiducial_reference_printer_xy_mm",
-                            "fiducial_reference_pixel_at_fine_capture_px",
-                            "fiducial_x_vector_at_fine_capture_px_per_mm",
-                            "fiducial_plane_printer_z_mm",
-                            "fine_capture_y_mm",
-                            "image_y_axis_vector_px_per_mm",
-                        },
                     )
                 ]
             elif job_type in TOOL_XY_JOBS:
@@ -2269,514 +2103,6 @@ def record_rough_x_activation(
     return {"candidate": candidate, "activation": activation}
 
 
-def _active_generated_calibration(status: dict[str, Any]) -> dict[str, float]:
-    settings = status["configfile"]["settings"]
-    tool_state = status.get("gcode_macro _IDEX_TOOL_STATE") or {}
-    return {
-        "t0_x_position_endstop": _number(
-            _settings(settings, "stepper_x"), "position_endstop", "stepper_x"
-        ),
-        "t1_x_position_endstop": _number(
-            _settings(settings, "dual_carriage"),
-            "position_endstop",
-            "dual_carriage",
-        ),
-        "y_position_endstop": _number(
-            _settings(settings, "stepper_y"), "position_endstop", "stepper_y"
-        ),
-        "z_position_endstop": _number(
-            _settings(settings, "stepper_z"), "position_endstop", "stepper_z"
-        ),
-        "t1_y_gcode_offset": _number(
-            tool_state, "t1_y_offset", "gcode_macro _IDEX_TOOL_STATE"
-        ),
-        "t1_z_gcode_offset": _number(
-            tool_state, "t1_z_offset", "gcode_macro _IDEX_TOOL_STATE"
-        ),
-    }
-
-
-def _require_generated_matches(
-    active: dict[str, float],
-    expected: dict[str, float],
-    *,
-    context: str,
-) -> None:
-    for field, expected_value in expected.items():
-        active_value = float(active[field])
-        if abs(active_value - float(expected_value)) > 0.0011:
-            raise VisionCalibrationError(
-                f"{context}: active {field}={active_value:.6f} differs from "
-                f"expected {float(expected_value):.6f}"
-            )
-
-
-def calculate_fine_tool_xyz(
-    *,
-    tool: str,
-    status: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    tool = tool.upper()
-    if tool not in {"T0", "T1"}:
-        raise VisionCalibrationError("fine-tool calculation requires T0 or T1")
-    projection_binding, projection_fact = _resolve_current_fact(
-        "nozzle_tip_projection",
-        f"camera.nozzle_cam.nozzle_tip.{tool.lower()}_projection_model",
-        1,
-    )
-    partial_binding, partial_fact = _resolve_current_fact(
-        "partial_bed_coordinate_system",
-        "camera.nozzle_cam.partial_bed_coordinate_system",
-        1,
-    )
-    metric_binding, metric_fact = _resolve_current_fact(
-        "bed_metric",
-        "camera.nozzle_cam.bed_fiducial.local_metric_model",
-        1,
-    )
-    mapping_binding, mapping_fact = _resolve_current_fact(
-        "bed_fiducial_printer_xy_mapping",
-        "camera.nozzle_cam.bed_fiducial.printer_xy_mapping",
-        1,
-    )
-    rough_binding, _rough_fact = _resolve_current_fact(
-        "rough_x_active_snapshot",
-        "calibration.rough_tool_x.active_snapshot",
-        1,
-    )
-    source_facts = [
-        projection_binding,
-        metric_binding,
-        partial_binding,
-        mapping_binding,
-        rough_binding,
-    ]
-    projection_fact_set = load_json(
-        CALIBRATION_ROOT / projection_binding["fact_set_path"]
-    )
-    registrations = (
-        projection_fact_set.get("provenance", {})
-        .get("observations", {})
-        .get("registrations")
-    )
-    if not isinstance(registrations, list) or not registrations:
-        raise VisionCalibrationError(
-            "nozzle-tip projection fact lacks bound registration observations"
-        )
-    metric_fact_set = load_json(CALIBRATION_ROOT / metric_binding["fact_set_path"])
-    metric_details = metric_fact_set.get("provenance", {}).get("observations", {})
-    metric_detections = metric_details.get("detection_records", [])
-    metric_observations = []
-    for record in metric_details.get("local_metric_records", []):
-        seq = int(record["seq"])
-        if not 0 <= seq < len(metric_detections):
-            continue
-        detection = metric_detections[seq]
-        if not isinstance(detection, dict) or not detection.get("centers_px"):
-            continue
-        metric_observations.append(
-            {
-                "seq": seq,
-                "commanded_y_mm": float(record["commanded_y_mm"]),
-                "centers_px": detection["centers_px"],
-            }
-        )
-    corner_fact_set = load_json(CALIBRATION_ROOT / partial_binding["fact_set_path"])
-    corner_details = corner_fact_set.get("provenance", {}).get("observations", {})
-    corner_capture_y = float(partial_fact["value"]["corner_pixel_capture_y_mm"])
-    corner_observations = [
-        {
-            "seq": int(record["frame_index"]),
-            "commanded_y_mm": corner_capture_y,
-            "pixel_px": record["registered_corner_pixel_xy_px"],
-        }
-        for record in corner_details.get("records", [])
-        if record.get("registered_corner_pixel_xy_px") is not None
-    ]
-    if len(metric_observations) < 4:
-        raise VisionCalibrationError(
-            "bed metric fact lacks enough bound fiducial observations"
-        )
-    if len(corner_observations) < 3:
-        raise VisionCalibrationError(
-            "bed-tab corner fact lacks enough bound corner observations"
-        )
-
-    old_datums = CALIB.tool_datums()
-    printer_status = status or query_printer_status()
-    old_generated = {
-        "t0_x_position_endstop": old_datums["t0"]["x_endstop"],
-        "t1_x_position_endstop": old_datums["t1"]["x_endstop"],
-        "y_position_endstop": old_datums["t0"]["y_endstop"],
-        "z_position_endstop": old_datums["t0"]["z_endstop"],
-        "t1_y_gcode_offset": (
-            old_datums["t0"]["y_endstop"] - old_datums["t1"]["y_endstop"]
-        ),
-        "t1_z_gcode_offset": (
-            old_datums["t0"]["z_endstop"] - old_datums["t1"]["z_endstop"]
-        ),
-    }
-    _require_generated_matches(
-        _active_generated_calibration(printer_status),
-        old_generated,
-        context="source calibration is not the active Klipper calibration",
-    )
-    calculation = calculate_fine_tool_candidate(
-        tool=tool,
-        projection=projection_fact["value"],
-        registrations=registrations,
-        metric_observations=metric_observations,
-        corner_observations=corner_observations,
-        physical_reference={"centers_patch_xy_mm": CALIB.fiducial_centers()},
-        mapping=mapping_fact["value"],
-        partial_bed=partial_fact["value"],
-        old_datums=old_datums,
-    )
-    fingerprint = str(
-        printer_status["gcode_macro _IDEX_CONFIG_FINGERPRINT"]["source_sha256"]
-    )
-    calculation_id = (
-        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-        + f"-fine_tool_xyz_{tool.lower()}"
-    )
-    calculation_dir = CALIBRATION_ROOT / "calculations" / calculation_id
-    calculation_dir.mkdir(parents=True)
-    candidate_path = calculation_dir / "calib_candidate.yaml"
-    candidate_hash = None
-    if calculation["accepted"]:
-        candidate_hash = CALIB.write_candidate(
-            candidate_path,
-            calculation["calibration"]["persisted_calib"]["new"],
-        )
-
-    calculation.update(
-        {
-            "schema": "vision-calibration-fine-tool-xyz-calculation",
-            "schema_version": 1,
-            "calculation_id": calculation_id,
-            "created_at_utc": utc_now(),
-            "source_facts": source_facts,
-            "source_calib_sha256": CALIB.calib_hash(),
-            "source_priors_sha256": CALIB.priors_hash(),
-            "source_priors": {
-                "fiducial_centers_xy_mm": CALIB.fiducial_centers(),
-                "fiducial_z_mm": CALIB.fiducial_z(),
-            },
-            "source_active_config_fingerprint": fingerprint,
-            "candidate_calib_path": (
-                "calib_candidate.yaml" if candidate_hash is not None else None
-            ),
-            "candidate_calib_sha256": candidate_hash,
-        }
-    )
-    calculation["artifacts"] = write_fine_tool_artifacts(
-        calculation, calculation_dir / "artifacts"
-    )
-
-    publication = None
-    if calculation["accepted"]:
-        dependencies = [
-            {
-                "fact_name": item["fact_name"],
-                "fact_set_hash": item["fact_set_hash"],
-            }
-            for item in source_facts
-        ]
-        tool_facts = []
-        for selected_tool in (tool,):
-            item = calculation["tools"][selected_tool]
-            crossing = item["scale_crossing"]
-            z_reference_value = {
-                "fiducial_reference_printer_x_mm": crossing[
-                    "fiducial_reference_printer_x_mm"
-                ],
-                "fiducial_x_vector_px_per_mm": crossing["fiducial_x_vector_px_per_mm"],
-                "commanded_z_at_fiducial_plane_mm": crossing[
-                    "commanded_z_at_fiducial_plane_mm"
-                ],
-                "fiducial_plane_printer_z_mm": crossing["fiducial_plane_printer_z_mm"],
-                "bed_referenced_z_at_commanded_zero_mm": crossing[
-                    "bed_referenced_z_at_commanded_zero_mm"
-                ],
-                "magnitude_crossing_commanded_z_mm": crossing[
-                    "magnitude_crossing_commanded_z_mm"
-                ],
-                "closest_full_vector_commanded_z_mm": crossing[
-                    "closest_full_vector_commanded_z_mm"
-                ],
-                "lateral_extrapolation_distance_mm": item[
-                    "lateral_extrapolation_distance_mm"
-                ],
-                "maximum_leave_out_change_mm": item["stability"]["maximum_change_mm"],
-                "position_fit_rms_px": item["projection_model"]["position_fit_rms_px"],
-            }
-            tool_facts.append(
-                _fact(
-                    f"tool.{tool.lower()}.nozzle_z_fiducial_reference",
-                    "coordinate_system",
-                    z_reference_value,
-                    dependencies,
-                    {
-                        "fiducial_reference_printer_x_mm",
-                        "fiducial_x_vector_px_per_mm",
-                        "commanded_z_at_fiducial_plane_mm",
-                        "fiducial_plane_printer_z_mm",
-                        "bed_referenced_z_at_commanded_zero_mm",
-                    },
-                )
-            )
-            value = {
-                "reference_commanded_xyz_mm": item["reference_commanded_xyz_mm"],
-                "measured_nozzle_xyz_mm": item["measured_nozzle_xyz_mm"],
-                "coordinate_residual_xyz_mm": item["coordinate_residual_xyz_mm"],
-            }
-            tool_facts.append(
-                _fact(
-                    f"tool.{tool.lower()}.nozzle_to_bed_tab_xyz_mm",
-                    "coordinate_system",
-                    value,
-                    dependencies,
-                    {
-                        "reference_commanded_xyz_mm",
-                        "measured_nozzle_xyz_mm",
-                        "coordinate_residual_xyz_mm",
-                    },
-                )
-            )
-        candidate_value = {
-            "tool": tool,
-            "calculation_id": calculation_id,
-            "persisted_calib": calculation["calibration"]["persisted_calib"],
-            "generated_klipper": calculation["calibration"]["generated_klipper"],
-            "candidate_calib_sha256": candidate_hash,
-            "source_calib_sha256": calculation["source_calib_sha256"],
-            "source_priors_sha256": calculation["source_priors_sha256"],
-            "source_active_config_fingerprint": fingerprint,
-            "z_reference_method": "fiducial_plane_lateral_scale_transport",
-        }
-        candidate_fact = _fact(
-            f"calibration.fine_tool_xyz.{tool.lower()}_candidate",
-            "coordinate_system",
-            candidate_value,
-            dependencies,
-            {"persisted_calib", "generated_klipper"},
-        )
-        publication = _publish_operation_fact_set(
-            f"fine_tool_xyz_{tool.lower()}_candidate",
-            facts=[*tool_facts, candidate_fact],
-            provenance={
-                "method": "stage_5_1_fiducial_plane_scale_transport",
-                "calculation_id": calculation_id,
-                "source_calib_sha256": calculation["source_calib_sha256"],
-                "source_priors_sha256": calculation["source_priors_sha256"],
-                "candidate_calib_sha256": candidate_hash,
-            },
-            applicability={
-                "printer": "menderpi",
-                "active_config_fingerprint": fingerprint,
-                "source_priors_sha256": calculation["source_priors_sha256"],
-                "source_fact_set_hashes": [
-                    item["fact_set_hash"] for item in source_facts
-                ],
-            },
-        )
-        calculation["candidate_fact_set_hash"] = publication["fact_set_hash"]
-    calculation["publication"] = publication
-    calculation["result_hash"] = canonical_hash(
-        {key: value for key, value in calculation.items() if key != "result_hash"}
-    )
-    atomic_write_json(calculation_dir / "result.json", calculation, immutable=True)
-    report = [
-        f"# Stage 5.1 fine {tool} XYZ calculation",
-        "",
-        f"- Calculation: `{calculation_id}`",
-        f"- State: **{'accepted' if calculation['accepted'] else 'rejected'}**",
-        f"- Source calib: `{calculation['source_calib_sha256']}`",
-        f"- Candidate calib: `{candidate_hash or 'not produced'}`",
-        "- Z reference: fiducial-plane lateral scale transport",
-        "",
-        "## Tool results",
-        "",
-    ]
-    for selected_tool in (tool,):
-        item = calculation["tools"][selected_tool]
-        report.extend(
-            [
-                f"### {selected_tool}",
-                "",
-                "- Coordinate residual XYZ: `"
-                + json.dumps(item["coordinate_residual_xyz_mm"])
-                + "` mm",
-                (
-                    "- Commanded Z at fiducial plane: "
-                    f"`{item['scale_crossing']['commanded_z_at_fiducial_plane_mm']:.6f}` mm"
-                ),
-                (
-                    "- Bed-referenced Z at commanded zero: "
-                    f"`{item['scale_crossing']['bed_referenced_z_at_commanded_zero_mm']:.6f}` mm"
-                ),
-                (
-                    "- Accepted projection samples: "
-                    f"`{item['projection_model']['accepted_count']}`"
-                ),
-                (
-                    "- Complete Z rows used: `"
-                    + ", ".join(
-                        f"{float(row['z_mm']):.3f} mm "
-                        f"({int(row['accepted_count'])} X samples)"
-                        for row in item["full_row_coverage"]
-                    )
-                    + "`"
-                ),
-                "",
-            ]
-        )
-        baseline = float(item["stability"]["baseline_commanded_z_at_fiducial_plane_mm"])
-        report.extend(
-            [
-                "## Sensitivity checks",
-                "",
-                (
-                    "These checks refit the complete model after deliberately "
-                    "removing data. A small crossing change means the result "
-                    "does not depend strongly on one measurement or one Z row."
-                ),
-                "",
-                (
-                    "- **Single-sample check:** remove one accepted X/Z image, "
-                    "refit, and compare its fiducial-plane crossing with the "
-                    f"full-data crossing `{baseline:+.6f}` mm."
-                ),
-                (
-                    "- **Full-row check:** remove every accepted X sample at "
-                    "one commanded Z height, refit from the remaining rows, "
-                    "and compare the crossing. This is the check previously "
-                    "reported as “leave-one-full-row crossing.”"
-                ),
-                "",
-                "| Omitted Z row | Refit crossing | Change from full data |",
-                "| ---: | ---: | ---: |",
-                *[
-                    (
-                        f"| {float(trial['left_out_z_mm']):.3f} mm "
-                        f"| {float(trial['commanded_z_at_fiducial_plane_mm']):+.6f} mm "
-                        f"| {float(trial['change_mm']):+.6f} mm |"
-                    )
-                    for trial in item["stability"]["trials"]
-                    if trial["kind"] == "leave_one_full_z_row"
-                ],
-                "",
-            ]
-        )
-    report.extend(
-        [
-            "## Rejection reasons",
-            "",
-            *([f"- {item}" for item in calculation["reasons"]] or ["- None"]),
-            "",
-            "## Warnings",
-            "",
-            *([f"- {item}" for item in calculation["warnings"]] or ["- None"]),
-            "",
-        ]
-    )
-    (calculation_dir / "report.md").write_text("\n".join(report), encoding="utf-8")
-    rebuild_and_render()
-    return {
-        "calculation_id": calculation_id,
-        "accepted": calculation["accepted"],
-        "reasons": calculation["reasons"],
-        "candidate_calib_path": (
-            str(candidate_path) if candidate_hash is not None else None
-        ),
-        "candidate_calib_sha256": candidate_hash,
-        "publication": publication,
-        "review_url": f"/vision/calibration/calculations/{calculation_id}/",
-        "tools": calculation["tools"],
-    }
-
-
-def record_fine_tool_xyz_activation(
-    *,
-    calculation_id: str,
-    expected_fingerprint: str | None = None,
-    status: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    calculation_dir = CALIBRATION_ROOT / "calculations" / _sanitize(calculation_id)
-    result = load_json(calculation_dir / "result.json")
-    if result.get("accepted") is not True:
-        raise VisionCalibrationError("rejected fine-tool calculation cannot activate")
-    candidate_path = calculation_dir / "calib_candidate.yaml"
-    if CALIB.calib_hash() != result["candidate_calib_sha256"]:
-        raise VisionCalibrationError(
-            "synchronized calib.yaml does not match the accepted candidate"
-        )
-    if sha256_file(candidate_path) != result["candidate_calib_sha256"]:
-        raise VisionCalibrationError("stored candidate calibration hash mismatch")
-    printer_status = status or query_printer_status()
-    fingerprint = str(
-        printer_status["gcode_macro _IDEX_CONFIG_FINGERPRINT"]["source_sha256"]
-    )
-    if expected_fingerprint and fingerprint != expected_fingerprint:
-        raise VisionCalibrationError(
-            f"active fingerprint {fingerprint} != {expected_fingerprint}"
-        )
-    expected_generated = result["calibration"]["generated_klipper"]["new"]
-    tool = str(result["tool"])
-    active_generated = _active_generated_calibration(printer_status)
-    _require_generated_matches(
-        active_generated,
-        expected_generated,
-        context="deployed fine calibration",
-    )
-    candidate_binding, candidate_fact = _resolve_current_fact(
-        "fine_tool_xyz_candidate",
-        f"calibration.fine_tool_xyz.{tool.lower()}_candidate",
-        1,
-    )
-    if candidate_fact["value"]["calculation_id"] != calculation_id:
-        raise VisionCalibrationError(
-            "current fine-tool candidate is not the requested calculation"
-        )
-    dependencies = [
-        {
-            "fact_name": candidate_binding["fact_name"],
-            "fact_set_hash": candidate_binding["fact_set_hash"],
-        }
-    ]
-    value = {
-        "calculation_id": calculation_id,
-        "persisted_calib": result["calibration"]["persisted_calib"]["new"],
-        "generated_klipper": active_generated,
-        "active_config_fingerprint": fingerprint,
-        "active_calib_sha256": CALIB.calib_hash(),
-        "z_reference_method": "fiducial_plane_lateral_scale_transport",
-        "supersedes": "calibration.rough_tool_x.active_snapshot",
-    }
-    fact = _fact(
-        f"calibration.fine_tool_xyz.{tool.lower()}_active_snapshot",
-        "coordinate_system",
-        value,
-        dependencies,
-        {"persisted_calib", "generated_klipper"},
-    )
-    activation = _publish_operation_fact_set(
-        f"fine_tool_xyz_{tool.lower()}_activation",
-        facts=[fact],
-        provenance={
-            "method": "verified_live_stage_5_1_activation",
-            "calculation_id": calculation_id,
-            "candidate_fact_set_hash": candidate_binding["fact_set_hash"],
-        },
-        applicability={
-            "printer": "menderpi",
-            "active_config_fingerprint": fingerprint,
-            "active_calib_sha256": CALIB.calib_hash(),
-        },
-    )
-    return {"active_snapshot": value, "activation": activation}
-
-
 def _json_link(path: str, label: str) -> str:
     return f'<a href="{html.escape(path)}">{html.escape(label)}</a>'
 
@@ -2865,54 +2191,6 @@ def _coordinate_summary(name: str, value: dict[str, Any]) -> str:
         "calibration.rough_tool_x.active_snapshot": [
             "t0_applied_x_endstop_mm",
             "t1_applied_x_endstop_mm",
-        ],
-        "camera.nozzle_cam.nozzle_tip.t0_projection_model": [
-            "fiducial_reference_printer_xy_mm",
-            "fiducial_x_vector_at_fine_capture_px_per_mm",
-            "fiducial_plane_printer_z_mm",
-            "fine_capture_y_mm",
-        ],
-        "camera.nozzle_cam.nozzle_tip.t1_projection_model": [
-            "fiducial_reference_printer_xy_mm",
-            "fiducial_x_vector_at_fine_capture_px_per_mm",
-            "fiducial_plane_printer_z_mm",
-            "fine_capture_y_mm",
-        ],
-        "tool.t0.nozzle_z_fiducial_reference": [
-            "commanded_z_at_fiducial_plane_mm",
-            "fiducial_plane_printer_z_mm",
-            "bed_referenced_z_at_commanded_zero_mm",
-        ],
-        "tool.t1.nozzle_z_fiducial_reference": [
-            "commanded_z_at_fiducial_plane_mm",
-            "fiducial_plane_printer_z_mm",
-            "bed_referenced_z_at_commanded_zero_mm",
-        ],
-        "tool.t0.nozzle_to_bed_tab_xyz_mm": [
-            "coordinate_residual_xyz_mm",
-            "measured_nozzle_xyz_mm",
-        ],
-        "tool.t1.nozzle_to_bed_tab_xyz_mm": [
-            "coordinate_residual_xyz_mm",
-            "measured_nozzle_xyz_mm",
-        ],
-        "calibration.fine_tool_xyz.t0_candidate": [
-            "persisted_calib",
-            "generated_klipper",
-        ],
-        "calibration.fine_tool_xyz.t1_candidate": [
-            "persisted_calib",
-            "generated_klipper",
-        ],
-        "calibration.fine_tool_xyz.t0_active_snapshot": [
-            "persisted_calib",
-            "generated_klipper",
-            "z_reference_method",
-        ],
-        "calibration.fine_tool_xyz.t1_active_snapshot": [
-            "persisted_calib",
-            "generated_klipper",
-            "z_reference_method",
         ],
         "calibration.idex_tool_xy.candidate": [
             "x_alignment_error_mm",
@@ -3174,15 +2452,10 @@ def main(argv: list[str] | None = None) -> int:
     publish_parser.add_argument("analysis_run_id")
     subparsers.add_parser("rebuild-catalog")
     subparsers.add_parser("calculate-rough-x")
-    fine_calculate_parser = subparsers.add_parser("calculate-fine-tool-xyz")
-    fine_calculate_parser.add_argument("--tool", required=True, choices=("T0", "T1"))
     record_parser = subparsers.add_parser("record-rough-x-activation")
     record_parser.add_argument("--old-t0", type=float, required=True)
     record_parser.add_argument("--old-t1", type=float, required=True)
     record_parser.add_argument("--expected-fingerprint")
-    fine_record_parser = subparsers.add_parser("record-fine-tool-xyz-activation")
-    fine_record_parser.add_argument("calculation_id")
-    fine_record_parser.add_argument("--expected-fingerprint")
     args = parser.parse_args(argv)
     try:
         if args.command == "prepare":
@@ -3216,17 +2489,10 @@ def main(argv: list[str] | None = None) -> int:
             rebuild_and_render()
         elif args.command == "calculate-rough-x":
             result = calculate_rough_x()
-        elif args.command == "calculate-fine-tool-xyz":
-            result = calculate_fine_tool_xyz(tool=args.tool)
         elif args.command == "record-rough-x-activation":
             result = record_rough_x_activation(
                 old_t0_x_endstop_mm=args.old_t0,
                 old_t1_x_endstop_mm=args.old_t1,
-                expected_fingerprint=args.expected_fingerprint,
-            )
-        elif args.command == "record-fine-tool-xyz-activation":
-            result = record_fine_tool_xyz_activation(
-                calculation_id=args.calculation_id,
                 expected_fingerprint=args.expected_fingerprint,
             )
         else:

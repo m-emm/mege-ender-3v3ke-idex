@@ -206,77 +206,6 @@
         "camera.nozzle_cam.eddy_fiducial.xz_image_positions"
       ]
     },
-    "idex_nozzle_fine_xz_grid_t0": {
-      "definition_version": 1,
-      "fact_definition_version": 1,
-      "camera": "nozzle_cam",
-      "profile": "analysis",
-      "light_macro": "NOZZLE_CAM_ANALYSIS_LIGHT",
-      "tool": "T0",
-      "localizer": {
-        "kind": "nozzle_tip_registration_grid",
-        "version": 1
-      },
-      "x_offsets_from_bed_tab_mm": [
-        10,
-        15,
-        20,
-        25,
-        27.5
-      ],
-      "full_row_z_mm": [
-        0.5,
-        4,
-        16
-      ],
-      "capture_y_mm": -14,
-      "safe_tool_change_z_mm": 9,
-      "velocity_mm_s": 110,
-      "settle_ms": 300,
-      "tool_change_settle_ms": 1000,
-      "discard_fresh_frames": 1,
-      "publish_on_accept": true,
-      "requires": [
-        {
-          "requirement": "bed_metric",
-          "fact_name": "camera.nozzle_cam.bed_fiducial.local_metric_model",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "partial_bed_coordinate_system",
-          "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "bed_fiducial_printer_xy_mapping",
-          "fact_name": "camera.nozzle_cam.bed_fiducial.printer_xy_mapping",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "image_x_axis_z2",
-          "fact_name": "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "t0_red_marker_offset",
-          "fact_name": "tool.t0.red_marker_to_bed_tab_x_mm",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "rough_x_active_snapshot",
-          "fact_name": "calibration.rough_tool_x.active_snapshot",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "rough_x_verified",
-          "fact_name": "calibration.rough_tool_x.verified",
-          "fact_definition_version": 1
-        }
-      ],
-      "fact_names": [
-        "camera.nozzle_cam.nozzle_tip.t0_projection_model"
-      ]
-    },
     "idex_eddy_t0_xyz_offset": {
       "definition_version": 1,
       "fact_definition_version": 1,
@@ -300,77 +229,6 @@
       ],
       "fact_names": [
         "camera.nozzle_cam.eddy_fiducial.t0_xyz_offset"
-      ]
-    },
-    "idex_nozzle_fine_xz_grid_t1": {
-      "definition_version": 1,
-      "fact_definition_version": 1,
-      "camera": "nozzle_cam",
-      "profile": "analysis",
-      "light_macro": "NOZZLE_CAM_ANALYSIS_LIGHT",
-      "tool": "T1",
-      "localizer": {
-        "kind": "nozzle_tip_registration_grid",
-        "version": 1
-      },
-      "x_offsets_from_bed_tab_mm": [
-        10,
-        15,
-        20,
-        25,
-        27.5
-      ],
-      "full_row_z_mm": [
-        0.5,
-        4,
-        16
-      ],
-      "capture_y_mm": -13,
-      "safe_tool_change_z_mm": 9,
-      "velocity_mm_s": 110,
-      "settle_ms": 300,
-      "tool_change_settle_ms": 1000,
-      "discard_fresh_frames": 1,
-      "publish_on_accept": true,
-      "requires": [
-        {
-          "requirement": "bed_metric",
-          "fact_name": "camera.nozzle_cam.bed_fiducial.local_metric_model",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "partial_bed_coordinate_system",
-          "fact_name": "camera.nozzle_cam.partial_bed_coordinate_system",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "bed_fiducial_printer_xy_mapping",
-          "fact_name": "camera.nozzle_cam.bed_fiducial.printer_xy_mapping",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "image_x_axis_z2",
-          "fact_name": "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "t1_red_marker_offset",
-          "fact_name": "tool.t1.red_marker_to_bed_tab_x_mm",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "rough_x_active_snapshot",
-          "fact_name": "calibration.rough_tool_x.active_snapshot",
-          "fact_definition_version": 1
-        },
-        {
-          "requirement": "rough_x_verified",
-          "fact_name": "calibration.rough_tool_x.verified",
-          "fact_definition_version": 1
-        }
-      ],
-      "fact_names": [
-        "camera.nozzle_cam.nozzle_tip.t1_projection_model"
       ]
     },
     "idex_tool_xy_measure_t0": {
@@ -482,22 +340,20 @@
         "version": 1
       },
       "x_offsets_from_bed_tab_mm": [
-        18,
-        20,
-        22,
+        10,
+        13,
+        16,
+        19,
         23,
-        24,
-        25,
         26
       ],
       "z_positions_mm": [
         0.5,
-        1,
         1.5,
-        2,
         2.5,
-        3,
-        3.5
+        3.5,
+        4.5,
+        5.5
       ],
       "capture_y_mm": -13.0,
       "capture_endstop_gap_mm": 0.5,

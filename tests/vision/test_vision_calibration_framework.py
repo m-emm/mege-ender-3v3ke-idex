@@ -206,10 +206,10 @@ def test_new_job_replaces_abandoned_acquisition_lock(tmp_path):
     )
 
 
-def test_fine_nozzle_marker_selection_rejects_distant_red_distractor(monkeypatch):
+def test_marker_selection_rejects_distant_red_distractor(monkeypatch):
     locator = _module(
         "vision_nozzle_tip_localization.py",
-        "vision_fine_marker_selection_test",
+        "vision_marker_selection_test",
     )
     expected = np.asarray([1083.0, 412.0])
     distractor = {"center_px": [1100.0, 521.0]}
@@ -225,9 +225,9 @@ def test_fine_nozzle_marker_selection_rejects_distant_red_distractor(monkeypatch
     assert record is None
 
 
-def test_fine_nozzle_physical_tip_sector_excludes_lower_tracking_anchor():
+def test_physical_tip_sector_excludes_lower_tracking_anchor():
     locator = _module(
-        "vision_nozzle_tip_localization.py", "vision_fine_tip_sector_test"
+        "vision_nozzle_tip_localization.py", "vision_tip_sector_test"
     )
 
     assert locator._is_physical_tip_delta(np.asarray([17.5, -2.0]), 63.0)
@@ -579,23 +579,6 @@ def test_fine_grid_localizes_the_nozzle_tip_inside_the_outer_ring():
     assert np.linalg.norm(recovered - ring_center) > 5.0
 
 
-def test_fine_grid_overlay_lists_both_tools_acquisition_xy_endstops():
-    analyzer = _module("vision_nozzle_fine_xz.py", "vision_nozzle_endstop_overlay_test")
-    snapshot = {
-        "tool_xy_endstops_mm": {
-            "t0": {"x": -70.125, "y": -14.25},
-            "t1": {"x": 350.75, "y": -13.5},
-        }
-    }
-
-    assert analyzer._acquisition_xy_endstop_line(snapshot) == (
-        "acquire calib endstops: T0 X=-70.125 Y=-14.250 | " "T1 X=350.750 Y=-13.500"
-    )
-    assert analyzer._acquisition_xy_endstop_line(None) == (
-        "acquire calib endstops: unavailable (legacy manifest)"
-    )
-
-
 def test_fine_grid_acquisition_snapshot_comes_from_dao():
     calibration = _module(
         "vision_calibration.py", "vision_fine_acquisition_calibration_test"
@@ -655,45 +638,3 @@ def test_tool_sweep_acquisition_snapshot_includes_z_endstops():
     snapshot = calibration._active_tool_xy_calibration(status)
 
     assert snapshot["tool_z_endstops_mm"] == {"t0": 290.0, "t1": 289.4}
-
-
-def test_fine_grid_analyzer_streams_frames_and_publishes_projection_only():
-    source = (FILES / "vision_nozzle_fine_xz.py").read_text(encoding="utf-8")
-    graph_source = (FILES / "vision_calibration_graph.py").read_text(encoding="utf-8")
-    registry = json.loads((FILES / "vision_job_types.json").read_text(encoding="utf-8"))
-    fine = registry["job_types"]["idex_nozzle_fine_xz_grid_t0"]
-
-    assert "images.append" not in source
-    assert "commanded_z_at_print_plane_mm" not in source
-    assert "fine X/Y verification may not command below Z=3" not in graph_source
-    assert fine["fact_names"] == ["camera.nozzle_cam.nozzle_tip.t0_projection_model"]
-
-
-def test_fine_tool_candidate_changes_only_the_selected_tool():
-    calculator = _module(
-        "vision_fine_tool_calibration.py",
-        "vision_fine_tool_candidate_scope_test",
-    )
-    old_datums = {
-        "t0": {"x_endstop": 1.0, "y_endstop": 2.0, "z_endstop": 3.0},
-        "t1": {"x_endstop": 4.0, "y_endstop": 5.0, "z_endstop": 6.0},
-    }
-
-    for tool, target, other in (
-        ("T0", "t0", "t1"),
-        ("T1", "t1", "t0"),
-    ):
-        result = calculator.generated_calibration(
-            old_datums,
-            tool=tool,
-            residual_xyz_mm=[0.1, 0.2, 0.3],
-        )
-
-        assert result["persisted_calib"]["new"][target] == {
-            "x": old_datums[target]["x_endstop"] + 0.1,
-            "y": old_datums[target]["y_endstop"] + 0.2,
-            "z": old_datums[target]["z_endstop"] + 0.3,
-        }
-        assert result["persisted_calib"]["new"][other] == {
-            axis: old_datums[other][f"{axis}_endstop"] for axis in ("x", "y", "z")
-        }
