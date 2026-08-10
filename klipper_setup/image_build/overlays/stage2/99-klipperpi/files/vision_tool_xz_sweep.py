@@ -322,6 +322,7 @@ def _base_record(frame: dict[str, Any]) -> dict[str, Any]:
         "commanded_z_mm": z_mm,
         "nozzle_uv_px": None,
         "fiducial_centers_uv_px": None,
+        "fiducial_fit": None,
         "fiducial_centroid_uv_px": None,
         "nozzle_detected": False,
         "accepted_for_u_x_fit": False,
@@ -376,8 +377,26 @@ def _write_overlay(
     overlay = image.copy()
     color = (0, 255, 0) if record["nozzle_detected"] else (0, 0, 255)
     centers = record.get("fiducial_centers_uv_px") or []
-    for center in centers:
-        cv2.circle(overlay, tuple(np.rint(center).astype(int)), 8, (0, 255, 255), 2)
+    radii = record.get("fiducial_radii_px") or []
+    for index, center in enumerate(centers):
+        radius = int(round(float(radii[index]))) if index < len(radii) else 8
+        cv2.circle(
+            overlay,
+            tuple(np.rint(center).astype(int)),
+            max(2, radius),
+            (0, 255, 255),
+            2,
+        )
+    fiducial_fit = record.get("fiducial_fit") or {}
+    patch_corners = fiducial_fit.get("patch_corners_px")
+    if patch_corners:
+        patch = np.rint(np.asarray(patch_corners, dtype=np.float64)).astype(np.int32)
+        cv2.polylines(overlay, [patch.reshape(-1, 1, 2)], True, (255, 180, 0), 2)
+    locator = fiducial_fit.get("locator") or {}
+    marker_corners = locator.get("marker_corners_px")
+    if marker_corners:
+        marker = np.rint(np.asarray(marker_corners, dtype=np.float64)).astype(np.int32)
+        cv2.polylines(overlay, [marker.reshape(-1, 1, 2)], True, (255, 0, 255), 2)
     if record.get("fiducial_centroid_uv_px") is not None:
         cv2.drawMarker(
             overlay,
@@ -396,6 +415,21 @@ def _write_overlay(
             24,
             3,
         )
+    localization = record.get("localization") or {}
+    for key, marker_color, marker_type in (
+        ("predicted_tip_center_px", (0, 165, 255), cv2.MARKER_TILTED_CROSS),
+        ("tip_detector_center_px", (255, 0, 0), cv2.MARKER_STAR),
+    ):
+        point = localization.get(key)
+        if point is not None:
+            cv2.drawMarker(
+                overlay,
+                tuple(np.rint(point).astype(int)),
+                marker_color,
+                marker_type,
+                22,
+                2,
+            )
     nozzle = record["nozzle_uv_px"]
     nozzle_text = (
         f"nozzle u/v={float(nozzle[0]):.2f},{float(nozzle[1]):.2f} px"
@@ -417,8 +451,24 @@ def _write_overlay(
                 else "n/a"
             )
         ),
+        (
+            "fiducial fit="
+            + (
+                f"right={float(fiducial_fit['right_edge_angle_deg']):+.2f}deg "
+                f"down={float(fiducial_fit['down_edge_angle_deg']):+.2f}deg"
+                if fiducial_fit.get("right_edge_angle_deg") is not None
+                else "n/a"
+            )
+        ),
         "detected" if record["nozzle_detected"] else "nozzle not detected",
     ]
+    if localization:
+        lines.append(
+            "tip fit="
+            f"corr={float(localization.get('minimum_correlation', 0.0)):.3f}/"
+            f"{float(localization.get('median_correlation', 0.0)):.3f} "
+            f"pred_err={float(localization.get('tip_prediction_error_px', 0.0)):.2f}px"
+        )
     if record["reasons"]:
         lines.append("reasons: " + " | ".join(record["reasons"]))
     for index, line in enumerate(lines):
@@ -1069,6 +1119,25 @@ def analyze(
             record["fiducial_radii_px"] = [
                 float(value) for value in fiducials["radii_px"]
             ]
+            locator = fiducials.get("locator")
+            record["fiducial_fit"] = _finite(
+                {
+                    "roi_px": fiducials.get("roi_px"),
+                    "patch_corners_px": fiducials.get("patch_corners_px"),
+                    "right_edge_angle_deg": fiducials.get("right_edge_angle_deg"),
+                    "down_edge_angle_deg": fiducials.get("down_edge_angle_deg"),
+                    "geometry": fiducials.get("geometry"),
+                    "locator": (
+                        {
+                            "marker_id": locator.get("marker_id"),
+                            "marker_corners_px": locator.get("marker_corners_px"),
+                            "marker_side_px": locator.get("marker_side_px"),
+                        }
+                        if isinstance(locator, dict)
+                        else None
+                    ),
+                }
+            )
             record["fiducial_centroid_uv_px"] = np.mean(centers, axis=0).tolist()
             valid_for_localization[frame["tool"]].append(index)
             _logger.info(
