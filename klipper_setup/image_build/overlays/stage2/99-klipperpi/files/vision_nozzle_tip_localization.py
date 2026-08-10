@@ -84,9 +84,7 @@ def evaluate_bright_circle_quality(
         consensus_sample_count = int(consensus.get("sample_count", 0))
         consensus_rms_value = consensus.get("inlier_rms_px")
         consensus_rms = (
-            None
-            if consensus_rms_value is None
-            else float(consensus_rms_value)
+            None if consensus_rms_value is None else float(consensus_rms_value)
         )
         if consensus_sample_count > 0:
             required_consensus_inliers = max(
@@ -113,7 +111,9 @@ def evaluate_bright_circle_quality(
                 f"{BRIGHT_CIRCLE_MAX_CONSENSUS_RMS_PX:.2f} px"
             )
         if not registration.get("trajectory_consensus_inlier", False):
-            reasons.append("selected bright-circle candidate is not a trajectory inlier")
+            reasons.append(
+                "selected bright-circle candidate is not a trajectory inlier"
+            )
 
     if residual is None or not math.isfinite(residual):
         reasons.append("bright-circle row residual is unavailable")
@@ -595,9 +595,7 @@ def _robust_line(values_x: np.ndarray, values_y: np.ndarray) -> tuple[float, flo
         # ``joint`` intercept is the median of y - slope*x and therefore keeps
         # the trajectory anchored to the majority of the pairwise slope
         # estimate.
-        slope, intercept, _low, _high = theilslopes(
-            values_y, values_x, method="joint"
-        )
+        slope, intercept, _low, _high = theilslopes(values_y, values_x, method="joint")
         return float(slope), float(intercept)
     return 0.0, float(np.median(values_y))
 
@@ -645,15 +643,13 @@ def _trajectory_candidate_consensus(
                     candidates,
                     key=lambda item: float(
                         np.linalg.norm(
-                            np.asarray(item["center_px"], dtype=np.float64)
-                            - predicted
+                            np.asarray(item["center_px"], dtype=np.float64) - predicted
                         )
                     ),
                 )
                 residual = float(
                     np.linalg.norm(
-                        np.asarray(candidate["center_px"], dtype=np.float64)
-                        - predicted
+                        np.asarray(candidate["center_px"], dtype=np.float64) - predicted
                     )
                 )
                 selected.append(candidate)
@@ -675,16 +671,14 @@ def _trajectory_candidate_consensus(
                     "residuals": residuals,
                     "inliers": inliers,
                     "inlier_count": len(inlier_indices),
-                    "inlier_x_span_mm": float(np.ptp(inlier_x))
-                    if len(inlier_indices) >= 2
-                    else 0.0,
+                    "inlier_x_span_mm": (
+                        float(np.ptp(inlier_x)) if len(inlier_indices) >= 2 else 0.0
+                    ),
                     "median_inlier_score": float(np.median(inlier_scores)),
                     "inlier_rms_px": float(
                         np.sqrt(
                             np.mean(
-                                np.asarray(residuals, dtype=np.float64)[
-                                    inlier_indices
-                                ]
+                                np.asarray(residuals, dtype=np.float64)[inlier_indices]
                                 ** 2
                             )
                         )
@@ -763,9 +757,9 @@ def localize_bright_nozzle_tip_grid(
                 "residuals": [0.0] * len(initial),
                 "inliers": [True] * len(initial),
                 "inlier_count": len(initial),
-                "inlier_x_span_mm": float(np.ptp(x_values))
-                if len(x_values) >= 2
-                else 0.0,
+                "inlier_x_span_mm": (
+                    float(np.ptp(x_values)) if len(x_values) >= 2 else 0.0
+                ),
                 "median_inlier_score": float(
                     np.median([float(candidate["score"]) for candidate in initial])
                 ),
@@ -968,7 +962,10 @@ def localize_bright_nozzle_tip_from_marker_prior_grid(
     marker_centers = [
         np.asarray(center, dtype=np.float64) for center in marker_prior_centers_px
     ]
-    if any(center.shape != (2,) or not np.all(np.isfinite(center)) for center in marker_centers):
+    if any(
+        center.shape != (2,) or not np.all(np.isfinite(center))
+        for center in marker_centers
+    ):
         raise NozzleTipLocalizationError(
             "marker-prior bright-tip centers must contain finite pixel pairs"
         )

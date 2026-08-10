@@ -875,9 +875,7 @@ def prepare_job(
                 definition,
                 input_values=input_values,
                 resolved=resolved,
-                input_bindings={
-                    item["requirement"]: item for item in input_facts
-                },
+                input_bindings={item["requirement"]: item for item in input_facts},
             )
         except ToolXZSweepError as exc:
             raise VisionCalibrationError(str(exc)) from None
@@ -1243,8 +1241,7 @@ def _fact_set_safe_diagnostics(value: Any) -> Any:
             key: _fact_set_safe_diagnostics(item)
             for key, item in value.items()
             if not any(
-                token in str(key).lower()
-                for token in _FACT_SET_FORBIDDEN_FIELD_TOKENS
+                token in str(key).lower() for token in _FACT_SET_FORBIDDEN_FIELD_TOKENS
             )
         }
     if isinstance(value, list):
@@ -2090,15 +2087,18 @@ def post_endstop_xy_check(
             tool=tool,
             active_calibration=active,
         )
+        prepared = result.get("prepared")
+        if not isinstance(prepared, dict) or not prepared.get("job_id"):
+            raise VisionCalibrationError(
+                f"post-endstop XY check {tool} returned no prepared job id"
+            )
         refreshed[tool] = {
-            "job_id": result["job_id"],
+            "job_id": prepared["job_id"],
             "analysis_run_id": analysis["analysis_run_id"],
             "review_url": analysis["review_url"],
             "fact_name": fact_name,
             "fact_set_hash": binding["fact_set_hash"],
-            "acquisition_endstop_xy_mm": fact["value"][
-                "acquisition_endstop_xy_mm"
-            ],
+            "acquisition_endstop_xy_mm": fact["value"]["acquisition_endstop_xy_mm"],
             "nozzle_image_prior": prior,
         }
         _logger.info(

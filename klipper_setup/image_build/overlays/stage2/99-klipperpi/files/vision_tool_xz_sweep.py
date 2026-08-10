@@ -23,8 +23,8 @@ from vision_nozzle_tip_localization import (
     BRIGHT_CIRCLE_LEGACY_MIN_SCORE,
     BRIGHT_CIRCLE_MAX_CONSENSUS_RMS_PX,
     BRIGHT_CIRCLE_MAX_ROW_RESIDUAL_PX,
-    BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIERS,
     BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIER_FRACTION,
+    BRIGHT_CIRCLE_MIN_TRAJECTORY_INLIERS,
     BRIGHT_CIRCLE_ROI_HALF_HEIGHT_PX,
     BRIGHT_CIRCLE_ROI_HALF_WIDTH_PX,
     BRIGHT_CIRCLE_SCORE_FLOOR,
@@ -75,9 +75,7 @@ def _xy_endstop_pair(value: Any, context: str) -> np.ndarray:
     except (TypeError, ValueError):
         result = np.empty((0,), dtype=np.float64)
     if result.shape != (2,) or not np.all(np.isfinite(result)):
-        raise ToolXZSweepError(
-            f"{context} must contain finite X/Y endstop values"
-        )
+        raise ToolXZSweepError(f"{context} must contain finite X/Y endstop values")
     return result
 
 
@@ -95,9 +93,7 @@ def _active_xy_endstop_pair(
     except (KeyError, TypeError, ValueError):
         result = np.empty((0,), dtype=np.float64)
     if result.shape != (2,) or not np.all(np.isfinite(result)):
-        raise ToolXZSweepError(
-            f"{context} has invalid active {tool} XY endstops"
-        )
+        raise ToolXZSweepError(f"{context} has invalid active {tool} XY endstops")
     return result
 
 
@@ -251,9 +247,7 @@ def _compare_bright_circle_gates(records: list[dict[str, Any]]) -> dict[str, Any
                 "legacy_accepted": legacy_accepted,
                 "legacy_rejection_reasons": legacy_reasons,
                 "active_accepted": active_accepted,
-                "active_rejection_reasons": record.get(
-                    "u_x_fit_rejection_reasons", []
-                ),
+                "active_rejection_reasons": record.get("u_x_fit_rejection_reasons", []),
                 "category": category,
                 "candidates": localization.get("candidates", []),
             }
@@ -766,7 +760,11 @@ def _write_overlay(
             nozzle_point = tuple(np.rint(nozzle).astype(int))
             nozzle_radius = max(
                 4,
-                int(round(_finite_float(localization.get("bright_circle_radius_px"), 8.0))),
+                int(
+                    round(
+                        _finite_float(localization.get("bright_circle_radius_px"), 8.0)
+                    )
+                ),
             )
             cv2.circle(overlay, nozzle_point, nozzle_radius, color, 2)
             cv2.circle(overlay, nozzle_point, 2, color, -1)
@@ -2037,9 +2035,7 @@ def analyze(
         gate_comparison_path,
         bright_circle_gate_comparison["counts"]["legacy_accepted"],
         bright_circle_gate_comparison["counts"]["active_accepted"],
-        bright_circle_gate_comparison["counts"][
-            "newly_admitted_geometry_consensus"
-        ],
+        bright_circle_gate_comparison["counts"]["newly_admitted_geometry_consensus"],
         bright_circle_gate_comparison["counts"]["rejected_by_active_gate"],
     )
     artifacts["bright_circle_gate_comparison"] = _artifact(gate_comparison_path)

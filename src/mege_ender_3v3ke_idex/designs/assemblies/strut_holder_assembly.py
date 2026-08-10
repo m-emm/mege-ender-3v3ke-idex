@@ -54,7 +54,8 @@ def create_strut_holder_assembly(
     long_holes = PartCollector()
     for fb in [Alignment.FRONT, Alignment.BACK]:
         long_hole = create_rounded_slab(
-            (strut_holder_wall_height - 2 * hole_diameter ) *math.cos(math.radians(strut_holder_hole_tilt)),
+            (strut_holder_wall_height - 2 * hole_diameter)
+            * math.cos(math.radians(strut_holder_hole_tilt)),
             hole_diameter,
             500,
             hole_diameter / 2,
@@ -75,9 +76,7 @@ def create_strut_holder_assembly(
         )
         long_holes = long_holes.fuse(long_hole)
 
-        screw_hole = create_cylinder(
-            hole_diameter / 2, 500
-        )
+        screw_hole = create_cylinder(hole_diameter / 2, 500)
 
         screw_hole = align(
             screw_hole,
@@ -88,9 +87,8 @@ def create_strut_holder_assembly(
             screw_hole,
             strut_holder_base,
             fb.edge_alignment,
-
         )
-        screw_hole =  translate(0, -fb.sign*1.5*hole_diameter, 0)(screw_hole)
+        screw_hole = translate(0, -fb.sign * 1.5 * hole_diameter, 0)(screw_hole)
 
         strut_holder_base = strut_holder_base.cut(screw_hole)
 

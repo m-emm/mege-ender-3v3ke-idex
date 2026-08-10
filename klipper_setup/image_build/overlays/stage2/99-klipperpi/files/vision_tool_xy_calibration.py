@@ -79,9 +79,7 @@ def _fit_fiducial_similarity(
         v_transpose[-1, :] *= -1.0
         rotation = v_transpose.T @ u_matrix.T
     denominator = float(np.sum(reference_centered * reference_centered))
-    scale = (
-        float(np.sum(singular_values)) / denominator if denominator > 0.0 else 1.0
-    )
+    scale = float(np.sum(singular_values)) / denominator if denominator > 0.0 else 1.0
     predicted = scale * reference_centered @ rotation + observed_mean
     return predicted, scale, observed_mean
 
@@ -96,8 +94,10 @@ def _fiducial_pose_jitter(centers: np.ndarray) -> dict[str, Any]:
     separately while the raw corner metric remains available for diagnostics.
     """
     values = np.asarray(centers, dtype=np.float64)
-    if values.ndim != 3 or values.shape[1:] != (4, 2) or not np.all(
-        np.isfinite(values)
+    if (
+        values.ndim != 3
+        or values.shape[1:] != (4, 2)
+        or not np.all(np.isfinite(values))
     ):
         raise ToolXYError("fiducial centers must be a finite N x 4 x 2 array")
     if values.shape[0] < 2:
@@ -112,9 +112,7 @@ def _fiducial_pose_jitter(centers: np.ndarray) -> dict[str, Any]:
     scales = []
     translations = []
     for observed in values:
-        predicted, scale, translation = _fit_fiducial_similarity(
-            reference, observed
-        )
+        predicted, scale, translation = _fit_fiducial_similarity(reference, observed)
         residual = observed - predicted
         residual_rms.append(float(np.sqrt(np.mean(residual * residual))))
         residual_point_max.append(float(np.max(np.linalg.norm(residual, axis=1))))
@@ -188,7 +186,9 @@ def _tool_marker_vector(marker: dict[str, Any], tool: str) -> np.ndarray:
     return _vector(vectors.get(tool), f"{tool} marker image motion vector")
 
 
-def _marker_image_line_model(marker: dict[str, Any], tool: str) -> tuple[np.ndarray, float]:
+def _marker_image_line_model(
+    marker: dict[str, Any], tool: str
+) -> tuple[np.ndarray, float]:
     model = marker.get("image_line_model")
     if not isinstance(model, dict):
         raise ToolXYError(
@@ -694,9 +694,7 @@ def analyze_measurement(
     marker_line_coefficients, marker_line_capture_y = _marker_image_line_model(
         {
             "image_line_model": marker_line_model,
-            "image_line_capture_y_mm": reference.get(
-                "marker_image_line_capture_y_mm"
-            ),
+            "image_line_capture_y_mm": reference.get("marker_image_line_capture_y_mm"),
         },
         tool,
     )
@@ -756,16 +754,10 @@ def analyze_measurement(
             dtype=np.float64,
         )
         fiducial_pose_jitter = _fiducial_pose_jitter(stationary_centers)
-        fiducial_jitter_per_corner_px = fiducial_pose_jitter[
-            "raw_corner_jitter_px"
-        ]
-        fiducial_jitter_px = fiducial_pose_jitter[
-            "translation_jitter_max_px"
-        ]
+        fiducial_jitter_per_corner_px = fiducial_pose_jitter["raw_corner_jitter_px"]
+        fiducial_jitter_px = fiducial_pose_jitter["translation_jitter_max_px"]
         if fiducial_pose_jitter["reasons"]:
-            fiducial_jitter_reason = "; ".join(
-                fiducial_pose_jitter["reasons"]
-            )
+            fiducial_jitter_reason = "; ".join(fiducial_pose_jitter["reasons"])
 
     if len(valid_frames) >= 2:
         try:
@@ -810,9 +802,7 @@ def analyze_measurement(
             fiducials = fiducials_by_source_seq[source_seq]
             fiducial_centers = np.asarray(fiducials["centers_px"], dtype=np.float64)
             fiducial_center = np.mean(fiducial_centers, axis=0)
-            registration["marker_prior_center_px"] = frame[
-                "marker_prior_center_px"
-            ]
+            registration["marker_prior_center_px"] = frame["marker_prior_center_px"]
             tip_center = _vector(registration["center_px"], "tip center")
             delta_mm = _pixel_delta_to_printer_xy_mm(
                 tip_center - fiducial_center,

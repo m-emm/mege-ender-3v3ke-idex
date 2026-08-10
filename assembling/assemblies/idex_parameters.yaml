@@ -920,8 +920,8 @@ globals:
       "$sub": "${strut_holder_length} - 25"
   strut_holder_mount_screw_size: "M5"
   z_axis_strut_back_offset: 15
-  z_axis_back_strut_length: 500
-  z_axis_back_strut_angle: 20
+  z_axis_back_strut_length: 450
+  z_axis_back_strut_angle: 18
   z_axis_top_bridge_profile_back_offset: 7
   z_axis_top_bridge_profile_top_drop: 80
   z_axis_top_profile_gusset_wall_thickness: 5

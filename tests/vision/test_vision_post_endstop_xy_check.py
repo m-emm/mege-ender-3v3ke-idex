@@ -96,7 +96,7 @@ def test_post_endstop_xy_check_runs_both_jobs_and_returns_fresh_priors(monkeypat
         calls.append((name, job_type, expected_fingerprint, timeout))
         tool = "T0" if job_type.endswith("t0") else "T1"
         return {
-            "job_id": f"job-{tool.lower()}",
+            "prepared": {"job_id": f"job-{tool.lower()}"},
             "analysis": {
                 "state": "accepted",
                 "analysis_run_id": f"analysis-{tool.lower()}",
