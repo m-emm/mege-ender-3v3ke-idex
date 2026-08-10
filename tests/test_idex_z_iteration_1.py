@@ -801,6 +801,75 @@ def test_active_tap_mesh_verification_records_failure_after_all_points():
     assert len(calls) == 9
 
 
+def test_active_tap_mesh_verification_uses_configured_tap_median():
+    module = _load_module()
+    runner = _tap_mesh_runner(module)
+    runner.tap_mesh["samples"] = 3
+    status = runner.client.status(["bed_mesh", "configfile"])
+    sample_counts = []
+
+    def collect_taps(**kwargs):
+        sample_counts.append((kwargs["count"], kwargs["max_attempts"]))
+        values = [-0.201, -0.199, -0.200]
+        return (
+            module.summarize_taps(values),
+            [
+                {
+                    "ok": True,
+                    "contact_x": kwargs["x"],
+                    "contact_y": kwargs["y"],
+                    "contact_z": value,
+                    "post_retract_toolhead_z": 3.8,
+                }
+                for value in values
+            ],
+        )
+
+    runner.collect_taps = collect_taps
+    runner.active_mesh_transform_z_at = lambda _point: 0.0
+    verification = module.Iteration1Runner.verify_active_tap_mesh(runner, status)
+
+    assert verification["passed"] is True
+    assert sample_counts == [(3, 3)] * 9
+    assert all(
+        point["raw_contact_z"] == pytest.approx(-0.200)
+        for point in verification["points"]
+    )
+
+
+def test_active_absolute_tap_mesh_maps_the_tapped_plane_to_gcode_zero():
+    module = _load_module()
+    runner = _tap_mesh_runner(module)
+    runner.bed_to_nozzle_gap = 0.0
+    runner.tap_contact_target_z = 0.0
+    status = runner.client.status(["bed_mesh", "configfile"])
+    raw_contact_z = 0.054576
+
+    def collect_taps(**kwargs):
+        return (
+            module.summarize_taps([raw_contact_z]),
+            [
+                {
+                    "ok": True,
+                    "contact_x": kwargs["x"],
+                    "contact_y": kwargs["y"],
+                    "contact_z": raw_contact_z,
+                    "post_retract_toolhead_z": 3.8,
+                }
+            ],
+        )
+
+    runner.collect_taps = collect_taps
+    runner.active_mesh_transform_z_at = lambda _point: raw_contact_z
+    verification = module.Iteration1Runner.verify_active_tap_mesh(runner, status)
+
+    assert verification["passed"] is True
+    assert all(
+        point["measured_bed_to_nozzle_gap"] == pytest.approx(0.0)
+        for point in verification["points"]
+    )
+
+
 def test_final_mesh_keeps_active_profile_and_evidence_after_failed_verification():
     module = _load_module()
     runner = _tap_mesh_runner(module)

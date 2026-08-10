@@ -128,13 +128,15 @@ calibration_temp: ${eddy_temperature_calibration_temp}
 description: Calibrate and activate the source-configured T0 Tap mesh.
 gcode:
     {% set threshold = printer.configfile.settings["probe_eddy_current btt_eddy"].tap_threshold|float %}
+    {% set samples = params.SAMPLES|default(${tap_mesh_samples})|int %}
     T0
-    _BED_MESH_CALIBRATE_NATIVE PROFILE=${tap_mesh_profile} METHOD=tap TAP_THRESHOLD={threshold} SAMPLES=${tap_mesh_samples}
+    _BED_MESH_CALIBRATE_NATIVE PROFILE=${tap_mesh_profile} METHOD=tap TAP_THRESHOLD={threshold} SAMPLES={samples} SAMPLES_RESULT=median
 
 [gcode_macro BED_MESH_CALIBRATE]
 description: GUI-compatible alias for the proven IDEX Tap mesh calibration.
 gcode:
-    BED_MESH_IDEX_CALIBRATE
+    {% set samples = params.SAMPLES|default(${tap_mesh_samples})|int %}
+    BED_MESH_IDEX_CALIBRATE SAMPLES={samples}
 
 [bed_mesh]
 # Printing mesh measured with the Eddy-equipped T0 toolhead. Tool changes apply
@@ -147,7 +149,8 @@ mesh_min: 42,20
 mesh_max: 190,275
 probe_count: ${tap_mesh_probe_count}
 mesh_pps: 0,0
-zero_reference_position: ${bed_z_reference_x},${bed_z_reference_y}
+# Keep absolute Tap contact coordinates in the live transform.  At G-code Z=0,
+# the active mesh must place the nozzle at the Tap-derived bed plane.
 
 [printer]
 kinematics: cartesian

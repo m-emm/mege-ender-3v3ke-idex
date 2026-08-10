@@ -5,6 +5,7 @@
 
 import statistics
 
+
 COMPARISON_XY_TOLERANCE = 0.020
 DEFAULT_RAW_DURATION = 0.200
 ASCENT_APPROACH_CLEARANCE = 0.100
@@ -140,6 +141,34 @@ class EddyTapMeasure:
             )
         )
         toolhead.wait_moves()
+
+    def _active_mesh_transform_z(self, toolhead):
+        """Return physical Z minus logical Z at the current XY, if meshed."""
+        eventtime = self.printer.get_reactor().monotonic()
+        bed_mesh = self.printer.lookup_object("bed_mesh")
+        mesh_status = bed_mesh.get_status(eventtime)
+        mesh_matrix = mesh_status.get("mesh_matrix", [])
+        if not mesh_status.get("profile_name") or not any(mesh_matrix):
+            return None
+
+        gcode_move = self.printer.lookup_object("gcode_move")
+        gcode_status = gcode_move.get_status(eventtime)
+        gcode_position = gcode_status.get("gcode_position")
+        toolhead_position = toolhead.get_position()
+        if gcode_position is None or len(gcode_position) < 3:
+            raise self.gcode.error(
+                "EDDY_TAP_MEASURE cannot read logical G-code Z with active bed mesh"
+            )
+        if len(toolhead_position) < 3:
+            raise self.gcode.error(
+                "EDDY_TAP_MEASURE cannot read physical toolhead Z with active bed mesh"
+            )
+        return float(toolhead_position[2]) - float(gcode_position[2])
+
+    @staticmethod
+    def _commanded_z_for_tap(tap_z, mesh_transform_z):
+        """Map a raw physical tap Z to the logical Z command for that plane."""
+        return float(tap_z) - float(mesh_transform_z)
 
     @staticmethod
     def _axis_value(value, axis_index, axis_name):
@@ -503,6 +532,7 @@ class EddyTapMeasure:
             self._require_t0_and_clear_mesh(command_name)
 
         self._move_to_reference(toolhead, x, y, xy_speed)
+        mesh_transform_z = self._active_mesh_transform_z(toolhead)
         gcmd.respond_info(
             "EDDY_TAP_MEASURE: reference=(%.3f, %.3f), taps=%d, threshold=%.3f "
             "eddy_mode=%s xy_speed=%.3f" % (x, y, count, threshold, eddy_mode, xy_speed)
@@ -571,6 +601,22 @@ class EddyTapMeasure:
             % (mean, median, minimum, maximum, span, standard_deviation)
         )
 
+        commanded_z_for_tap_median = None
+        if mesh_transform_z is None:
+            gcmd.respond_info(
+                "EDDY_TAP_MEASURE mesh: inactive; "
+                "commanded_z_for_tap_median=unavailable"
+            )
+        else:
+            commanded_z_for_tap_median = self._commanded_z_for_tap(
+                median, mesh_transform_z
+            )
+            gcmd.respond_info(
+                "EDDY_TAP_MEASURE mesh: active_transform_z=%.6f "
+                "tap_median_z=%.6f commanded_z_for_tap_median=%.6f"
+                % (mesh_transform_z, median, commanded_z_for_tap_median)
+            )
+
         measurement = {
             "eddy_mode": eddy_mode,
             "bed_x": x,
@@ -587,6 +633,10 @@ class EddyTapMeasure:
             "tap_coordinate_deltas": [
                 {"x": sample["x"] - x, "y": sample["y"] - y} for sample in tap_samples
             ],
+            "mesh": {
+                "active_transform_z": mesh_transform_z,
+                "commanded_z_for_tap_median": commanded_z_for_tap_median,
+            },
         }
         self.last_tap_measurement = measurement
 

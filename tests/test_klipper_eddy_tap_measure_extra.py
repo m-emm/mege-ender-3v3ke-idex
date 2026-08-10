@@ -57,7 +57,13 @@ class FakeGcode:
         for line in script.splitlines():
             if line.startswith("G1 "):
                 for axis, value in re.findall(r"([XYZ])(-?[0-9.]+)", line):
-                    self.printer.toolhead.position["XYZ".index(axis)] = float(value)
+                    axis_index = "XYZ".index(axis)
+                    logical_value = float(value)
+                    self.printer.gcode_move.gcode_position[axis_index] = logical_value
+                    physical_value = logical_value
+                    if axis == "Z" and self.printer.bed_mesh.active:
+                        physical_value += self.printer.bed_mesh.transform_z
+                    self.printer.toolhead.position[axis_index] = physical_value
             if line == "PROBE METHOD=scan SAMPLES=1":
                 toolhead = self.printer.toolhead.position
                 offsets = self.printer.probe.get_offsets()
@@ -214,14 +220,23 @@ class FakeIDEXManualTuning:
 
 
 class FakeBedMesh:
-    def __init__(self, active=False):
+    def __init__(self, active=False, transform_z=0.0):
         self.active = active
+        self.transform_z = transform_z
 
     def get_status(self, _eventtime):
         return {
             "profile_name": "default" if self.active else "",
             "mesh_matrix": [[0.0]] if self.active else [[]],
         }
+
+
+class FakeGcodeMove:
+    def __init__(self):
+        self.gcode_position = [0.0, 0.0, 5.0, 0.0]
+
+    def get_status(self, _eventtime):
+        return {"gcode_position": list(self.gcode_position)}
 
 
 class FakeTemperatureProbe:
@@ -243,6 +258,7 @@ class FakePrinter:
         self.eddy_sensor = FakeEddySensor(self.toolhead)
         self.idex_manual_tuning = FakeIDEXManualTuning()
         self.bed_mesh = FakeBedMesh()
+        self.gcode_move = FakeGcodeMove()
         self.temperature_probe = FakeTemperatureProbe()
         self.reactor = FakeReactor()
         self.gcode.printer = self
@@ -253,6 +269,7 @@ class FakePrinter:
             "probe_eddy_current btt_eddy": self.eddy_sensor,
             "idex_manual_tuning": self.idex_manual_tuning,
             "bed_mesh": self.bed_mesh,
+            "gcode_move": self.gcode_move,
             "temperature_probe btt_eddy": self.temperature_probe,
         }
 
@@ -304,7 +321,7 @@ class FakeConfig:
 def test_eddy_tap_measure_reports_contact_statistics_and_threshold_override():
     module = _load()
     printer = FakePrinter()
-    module.load_config(FakeConfig(printer))
+    measure = module.load_config(FakeConfig(printer))
 
     gcmd = FakeGcmd({"X": 123.456, "Y": 234.567, "THRESHOLD": 5100, "COUNT": 3})
     printer.gcode.commands["_EDDY_TAP_MEASURE"](gcmd)
@@ -318,11 +335,43 @@ def test_eddy_tap_measure_reports_contact_statistics_and_threshold_override():
     assert "reference=(123.456, 234.567)" in gcmd.responses[0]
     assert "contact=(123.456, 234.567, -0.012000)" in gcmd.responses[1]
     assert "post_retract_z=3.990000" in gcmd.responses[1]
-    assert "mean=-0.010000 median=-0.010000" in gcmd.responses[-2]
-    assert "span=0.004000" in gcmd.responses[-2]
+    assert any("mean=-0.010000 median=-0.010000" in response for response in gcmd.responses)
+    assert any("span=0.004000" in response for response in gcmd.responses)
+    assert any(
+        "EDDY_TAP_MEASURE mesh: inactive; commanded_z_for_tap_median=unavailable"
+        in response
+        for response in gcmd.responses
+    )
     assert "tap_median=-0.010000 eddy_probe=-0.004000" in gcmd.responses[-1]
     assert "delta_probe_minus_tap=0.006000" in gcmd.responses[-1]
+    measurement = measure.get_status(0.0)["last_tap_measurement"]
+    assert measurement["mesh"] == {
+        "active_transform_z": None,
+        "commanded_z_for_tap_median": None,
+    }
     assert all(session.ended for session in printer.probe.sessions)
+
+
+def test_eddy_tap_measure_maps_tap_z_through_active_mesh_transform():
+    module = _load()
+    printer = FakePrinter()
+    printer.bed_mesh.active = True
+    printer.bed_mesh.transform_z = 0.037
+    measure = module.load_config(FakeConfig(printer))
+
+    gcmd = FakeGcmd({"X": 123.456, "Y": 234.567, "COUNT": 1})
+    printer.gcode.commands["_EDDY_TAP_MEASURE"](gcmd)
+
+    assert any(
+        "active_transform_z=0.037000 tap_median_z=-0.012000 "
+        "commanded_z_for_tap_median=-0.049000" in response
+        for response in gcmd.responses
+    )
+    measurement = measure.get_status(0.0)["last_tap_measurement"]
+    assert measurement["mesh"] == {
+        "active_transform_z": pytest.approx(0.037),
+        "commanded_z_for_tap_median": pytest.approx(-0.049),
+    }
 
 
 def test_eddy_tap_measure_scan_mode_reports_same_point_structured_evidence():

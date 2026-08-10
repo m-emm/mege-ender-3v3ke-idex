@@ -37,9 +37,12 @@ def test_generated_mesh_commands_route_through_idex_tap_macro():
     assert "METHOD=tap" in config
     assert "TAP_THRESHOLD={threshold}" in config
     assert "[gcode_macro BED_MESH_CALIBRATE]" in config
-    assert "BED_MESH_IDEX_CALIBRATE\n" in config
+    assert "BED_MESH_IDEX_CALIBRATE SAMPLES={samples}\n" in config
     assert "PROFILE=tap_7x7 METHOD=tap" in config
-    assert "SAMPLES=1" in config
+    assert "SAMPLES={samples}" in config
+    assert "SAMPLES_RESULT=median" in config
+    assert "default(3)" in config
+    assert "zero_reference_position:" not in config
     assert "horizontal_move_z: 5.000" in config
     assert "probe_count: 7,7" in config
 

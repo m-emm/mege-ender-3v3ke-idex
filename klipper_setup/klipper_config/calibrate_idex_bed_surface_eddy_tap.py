@@ -2046,21 +2046,25 @@ class Iteration1Runner:
                 "expected_bed_to_nozzle_gap": self.bed_to_nozzle_gap,
             }
             try:
+                tap_count = int(self.tap_mesh["samples"])
                 mesh_transform_z = self.active_mesh_transform_z_at(point)
                 summary, attempts = self.collect_taps(
                     x=point.x,
                     y=point.y,
-                    count=1,
-                    max_attempts=1,
+                    count=tap_count,
+                    max_attempts=tap_count,
                     tap_threshold=self.tap_threshold,
                 )
                 accepted = [attempt for attempt in attempts if attempt.get("ok")]
-                if summary is None or len(accepted) != 1:
-                    raise CalibrationError("active mesh Tap did not acquire one sample")
-                sample = accepted[0]
+                if summary is None or len(accepted) != tap_count:
+                    raise CalibrationError(
+                        "active mesh Tap did not acquire the configured sample count: "
+                        f"expected={tap_count} got={len(accepted)}"
+                    )
+                sample = accepted[-1]
                 contact_x = float(sample["contact_x"])
                 contact_y = float(sample["contact_y"])
-                contact_z = float(sample["contact_z"])
+                contact_z = float(summary.median)
                 measured_bed_to_nozzle_gap = mesh_transform_z - contact_z
                 residual = measured_bed_to_nozzle_gap - self.bed_to_nozzle_gap
                 record.update(
