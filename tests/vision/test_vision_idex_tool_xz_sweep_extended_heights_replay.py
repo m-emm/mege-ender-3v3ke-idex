@@ -112,6 +112,12 @@ def _injected_linear_prior_references(manifest: dict) -> dict:
     }
     for tool, prior in priors.items():
         references[tool]["nozzle_image_prior"] = prior
+        endstop = manifest["acquisition_calibration"]["tool_xy_endstops_mm"][tool]
+        references[tool]["nozzle_image_prior_source"] = {
+            "acquisition_endstop_xy_mm": [endstop["x"], endstop["y"]],
+            "fact_name": f"tool.{tool}.vision_xy_datum",
+            "fact_set_hash": f"sha256:replay-{tool}",
+        }
     return references
 
 

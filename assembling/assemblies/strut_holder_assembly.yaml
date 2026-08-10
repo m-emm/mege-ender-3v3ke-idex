@@ -2,6 +2,28 @@ ShellforgepyBuilderVersion: "2026-03-27"
 
 Description: Simple strut holder blank
 
+Parameters:
+  strut_holder_width:
+    Type: Float
+  strut_holder_length:
+    Type: Float
+  strut_holder_thickness:
+    Type: Float
+  strut_holder_fillet_radius:
+    Type: Float
+  strut_holder_wall_height:
+    Type: Float
+  strut_holder_wall_thickness:
+    Type: Float
+  strut_holder_strut_size:
+    Type: Float
+  strut_holder_strut_clearance:
+    Type: Float
+  strut_holder_wall_length:
+    Type: Float
+  strut_holder_mount_screw_size:
+    Type: String
+
 Builder:
   Visualization:
     parts:
@@ -9,6 +31,11 @@ Builder:
         artifact: leader
         name: strut_holder
   Production:
+    process_data_preset: petgcf_max_strength_high_speed_06
+    process_data:
+      overrides:
+        process_overrides:
+          enable_support: "0"
     parts:
       - source: self
         artifact: leader

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import copy
 import json
 import logging
 import sys
@@ -87,11 +88,19 @@ def test_replay_latest_live_idex_tool_xz_sweep_writes_overlays(monkeypatch):
     analyzer = _analyzer_module()
     monkeypatch.setattr(analyzer, "GENERATE_OVERLAYS", True)
     root = _run_root()
+    references = copy.deepcopy(manifest["tool_xz_reference"])
+    for tool in ("t0", "t1"):
+        endstop = manifest["acquisition_calibration"]["tool_xy_endstops_mm"][tool]
+        references[tool]["nozzle_image_prior_source"] = {
+            "acquisition_endstop_xy_mm": [endstop["x"], endstop["y"]],
+            "fact_name": f"tool.{tool}.vision_xy_datum",
+            "fact_set_hash": f"sha256:replay-{tool}",
+        }
     result = analyzer.analyze(
         image_paths,
         root / "artifacts",
         frames=manifest["frames"],
-        references=manifest["tool_xz_reference"],
+        references=references,
         acquisition_calibration=manifest["acquisition_calibration"],
     )
     (root / "result.json").write_text(

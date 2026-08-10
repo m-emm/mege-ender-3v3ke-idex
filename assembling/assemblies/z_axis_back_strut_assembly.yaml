@@ -1,0 +1,25 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: One angled 2020 profile for the rear Z-axis strut
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: z_axis_back_strut
+  Production:
+    parts: []
+
+Parameters:
+  z_axis_back_strut_length:
+    Type: Float
+  z_axis_back_strut_angle:
+    Type: Float
+
+Parts:
+  ZAxisBackStrutAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_back_strut_assembly.create_z_axis_back_strut_assembly

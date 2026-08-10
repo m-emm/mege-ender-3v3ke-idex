@@ -104,8 +104,20 @@ local versioned `calib.yaml` still contains the acquisition-time T0/T1 X/Y
 endstops, updates only `tools.t1.{x,y}_endstop`, and regenerates the versioned
 `printer.cfg`. It does not deploy or restart the printer. Review the diff, then
 use `update_menderpi.sh` to deploy the generated Klipper config and
-`deploy_webcam_vision.sh` to synchronize the DAO copy of `calib.yaml` before
-rerunning both measurement jobs.
+`deploy_webcam_vision.sh` to synchronize the DAO copy of `calib.yaml`.
+
+After deployment, a changed tool endstop invalidates the old XY image prior.
+Refresh both priors and verify their provenance with:
+
+```bash
+/usr/local/bin/vision_calibration.py post-endstop-xy-check \
+  --name post_endstop_xy_check
+```
+
+This runs the existing T0 and T1 XY measurement jobs, publishes fresh
+commanded-X image-line models, and verifies that both were captured with the
+currently active XY endstops. The X/Z sweep refuses to prepare until these
+source endstops match its active calibration snapshot.
 
 ### Deploy and start the complete vision stack
 
@@ -309,8 +321,8 @@ detector, then fits the T0/T1 X/Z trajectories and shared Z offset. It is
 diagnostic-only; an unavailable or bound-saturated shared fit must not be
 applied.
 
-After both tool XY datums have been corrected and deployed, start the combined
-report-only nozzle X/Z sweep with:
+After the post-endstop XY check succeeds, start the combined report-only nozzle
+X/Z sweep with:
 
 ```gcode
 IDEX_TOOL_XZ_SWEEP_REPORT NAME=tool_xz_sweep_report

@@ -55,6 +55,7 @@ SHARED_CURVE_F_SCALE_PX_PER_MM = 0.10
 SHARED_CURVE_OUTLIER_SIGMA = 3.5
 SHARED_CURVE_MIN_OUTLIER_LIMIT_PX_PER_MM = 0.09
 XZ_Z_DELTA_LIMIT_MM = 1.5
+XY_ENDSTOP_MATCH_TOLERANCE_MM = 0.0011
 ROW_HUBER_F_SCALE_PX = 0.75
 ROW_ROBUST_OUTLIER_SIGMA = 3.5
 MAX_DELTA_JACKKNIFE_SPAN_MM = 0.50
@@ -66,6 +67,94 @@ MAXIMUM_REPRESENTATION_SPREAD_PX = 2.5
 
 class ToolXZSweepError(RuntimeError):
     pass
+
+
+def _xy_endstop_pair(value: Any, context: str) -> np.ndarray:
+    try:
+        result = np.asarray(value, dtype=np.float64)
+    except (TypeError, ValueError):
+        result = np.empty((0,), dtype=np.float64)
+    if result.shape != (2,) or not np.all(np.isfinite(result)):
+        raise ToolXZSweepError(
+            f"{context} must contain finite X/Y endstop values"
+        )
+    return result
+
+
+def _active_xy_endstop_pair(
+    active_calibration: dict[str, Any], tool: str, context: str
+) -> np.ndarray:
+    endstops = active_calibration.get("tool_xy_endstops_mm")
+    if not isinstance(endstops, dict):
+        raise ToolXZSweepError(f"{context} lacks active tool XY endstops")
+    item = endstops.get(tool.lower())
+    if not isinstance(item, dict):
+        raise ToolXZSweepError(f"{context} lacks active {tool} XY endstops")
+    try:
+        result = np.asarray([item["x"], item["y"]], dtype=np.float64)
+    except (KeyError, TypeError, ValueError):
+        result = np.empty((0,), dtype=np.float64)
+    if result.shape != (2,) or not np.all(np.isfinite(result)):
+        raise ToolXZSweepError(
+            f"{context} has invalid active {tool} XY endstops"
+        )
+    return result
+
+
+def validate_xy_datum_endstops(
+    xy_datum: dict[str, Any],
+    *,
+    tool: str,
+    active_calibration: dict[str, Any],
+) -> np.ndarray:
+    """Require an XY prior to have been acquired with the active XY endstops."""
+
+    context = f"{tool} vision_xy_datum"
+    if not isinstance(xy_datum, dict):
+        raise ToolXZSweepError(f"{context} is required")
+    source = _xy_endstop_pair(
+        xy_datum.get("acquisition_endstop_xy_mm"),
+        f"{context}.acquisition_endstop_xy_mm",
+    )
+    active = _active_xy_endstop_pair(active_calibration, tool, context)
+    difference = source - active
+    if np.any(np.abs(difference) > XY_ENDSTOP_MATCH_TOLERANCE_MM):
+        raise ToolXZSweepError(
+            f"{context} is stale: prior acquired with XY endstops "
+            f"X={source[0]:.3f}, Y={source[1]:.3f}, but active endstops are "
+            f"X={active[0]:.3f}, Y={active[1]:.3f}; run "
+            "post-endstop-xy-check before the X/Z sweep"
+        )
+    return source
+
+
+def _validate_reference_prior_source(
+    reference: dict[str, Any],
+    *,
+    tool: str,
+    acquisition_calibration: dict[str, Any],
+) -> np.ndarray:
+    source = reference.get("nozzle_image_prior_source")
+    if not isinstance(source, dict):
+        raise ToolXZSweepError(
+            f"{tool} X/Z reference lacks nozzle_image_prior_source; "
+            "rerun post-endstop-xy-check"
+        )
+    source_xy = _xy_endstop_pair(
+        source.get("acquisition_endstop_xy_mm"),
+        f"{tool} nozzle_image_prior_source.acquisition_endstop_xy_mm",
+    )
+    active = _active_xy_endstop_pair(
+        acquisition_calibration, tool, f"{tool} X/Z acquisition calibration"
+    )
+    if np.any(np.abs(source_xy - active) > XY_ENDSTOP_MATCH_TOLERANCE_MM):
+        raise ToolXZSweepError(
+            f"{tool} X/Z reference uses a stale XY prior acquired with "
+            f"endstops X={source_xy[0]:.3f}, Y={source_xy[1]:.3f}, while the "
+            f"capture used X={active[0]:.3f}, Y={active[1]:.3f}; rerun "
+            "post-endstop-xy-check"
+        )
+    return source_xy
 
 
 def _finite(value: Any) -> Any:
@@ -334,6 +423,7 @@ def _tool_reference(
     definition: dict[str, Any],
     input_values: dict[str, Any],
     resolved: dict[str, Any],
+    input_binding: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     tool_key = tool.lower()
     snapshot = _active_tool_state(resolved)
@@ -406,9 +496,21 @@ def _tool_reference(
     )
     marker_x_vector = _tool_marker_vector(marker, tool)
     xy_datum = input_values.get(f"{tool_key}_xy_datum")
+    source_endstops = validate_xy_datum_endstops(
+        xy_datum,
+        tool=tool,
+        active_calibration=snapshot,
+    )
     nozzle_image_prior = (
         xy_datum.get("nozzle_image_prior") if isinstance(xy_datum, dict) else None
     )
+    prior_source: dict[str, Any] = {
+        "acquisition_endstop_xy_mm": source_endstops,
+    }
+    if isinstance(input_binding, dict):
+        for key in ("fact_name", "fact_set_hash", "fact_set_path"):
+            if input_binding.get(key) is not None:
+                prior_source[key] = input_binding[key]
 
     return {
         "tool": tool,
@@ -424,6 +526,7 @@ def _tool_reference(
         "marker_offset_mm": marker_offset,
         "marker_reference_commanded_x_mm": marker_reference_x,
         "nozzle_image_prior": nozzle_image_prior,
+        "nozzle_image_prior_source": prior_source,
     }
 
 
@@ -432,6 +535,7 @@ def prepare_sweep(
     *,
     input_values: dict[str, Any],
     resolved: dict[str, Any],
+    input_bindings: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     tools = definition.get("tools")
     if tools != ["T0", "T1"]:
@@ -469,6 +573,7 @@ def prepare_sweep(
             definition=definition,
             input_values=input_values,
             resolved=resolved,
+            input_binding=(input_bindings or {}).get(f"{tool.lower()}_xy_datum"),
         )
         _validated_nozzle_prior_centers(
             reference,
@@ -1754,10 +1859,16 @@ def analyze(
 
     for tool in ("T0", "T1"):
         tool_frames = [frame for frame in frames if str(frame["tool"]) == tool]
+        reference = references.get(tool.lower(), {})
         _validated_nozzle_prior_centers(
-            references.get(tool.lower(), {}),
+            reference,
             tool=tool,
             commanded_x_values=[float(frame["x_mm"]) for frame in tool_frames],
+        )
+        _validate_reference_prior_source(
+            reference,
+            tool=tool,
+            acquisition_calibration=acquisition_calibration,
         )
 
     artifact_dir.mkdir(parents=True, exist_ok=True)

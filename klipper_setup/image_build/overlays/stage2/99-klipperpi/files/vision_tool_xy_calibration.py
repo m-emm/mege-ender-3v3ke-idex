@@ -21,7 +21,9 @@ MINIMUM_TIP_CORRELATION = 0.22
 MINIMUM_MEDIAN_TIP_CORRELATION = 0.38
 MAXIMUM_REPRESENTATION_SPREAD_PX = 2.5
 MAXIMUM_DATUM_RESIDUAL_MM = 0.5
-MAXIMUM_FIDUCIAL_JITTER_PX = 1.5
+MAXIMUM_FIDUCIAL_TRANSLATION_JITTER_PX = 1.5
+MAXIMUM_FIDUCIAL_POSE_RESIDUAL_RMS_PX = 1.0
+MAXIMUM_FIDUCIAL_POSE_RESIDUAL_POINT_PX = 1.5
 MINIMUM_ACCEPTED_FRAMES = 3
 MINIMUM_ACCEPTED_X_SPAN_MM = 8.0
 
@@ -59,6 +61,99 @@ def _vector(value: Any, name: str) -> np.ndarray:
     if result.shape != (2,) or not np.all(np.isfinite(result)):
         raise ToolXYError(f"{name} must contain two finite values")
     return result
+
+
+def _fit_fiducial_similarity(
+    reference: np.ndarray, observed: np.ndarray
+) -> tuple[np.ndarray, float, np.ndarray]:
+    """Fit the small rigid scale/rotation change between two labelled squares."""
+    reference_mean = np.mean(reference, axis=0)
+    observed_mean = np.mean(observed, axis=0)
+    reference_centered = reference - reference_mean
+    observed_centered = observed - observed_mean
+    u_matrix, singular_values, v_transpose = np.linalg.svd(
+        reference_centered.T @ observed_centered
+    )
+    rotation = v_transpose.T @ u_matrix.T
+    if np.linalg.det(rotation) < 0.0:
+        v_transpose[-1, :] *= -1.0
+        rotation = v_transpose.T @ u_matrix.T
+    denominator = float(np.sum(reference_centered * reference_centered))
+    scale = (
+        float(np.sum(singular_values)) / denominator if denominator > 0.0 else 1.0
+    )
+    predicted = scale * reference_centered @ rotation + observed_mean
+    return predicted, scale, observed_mean
+
+
+def _fiducial_pose_jitter(centers: np.ndarray) -> dict[str, Any]:
+    """Measure motion of the fiducial patch, separating it from corner noise.
+
+    The old gate took the maximum peak-to-peak value of each corner independently.
+    That treats a single noisy circle as motion of the whole patch.  Here the
+    median labelled square is used as a reference and each frame is fitted with
+    one similarity transform.  Translation and fit residuals are then gated
+    separately while the raw corner metric remains available for diagnostics.
+    """
+    values = np.asarray(centers, dtype=np.float64)
+    if values.ndim != 3 or values.shape[1:] != (4, 2) or not np.all(
+        np.isfinite(values)
+    ):
+        raise ToolXYError("fiducial centers must be a finite N x 4 x 2 array")
+    if values.shape[0] < 2:
+        raise ToolXYError("at least two fiducial frames are required for jitter")
+
+    raw_corner_jitter = np.ptp(values, axis=0)
+    patch_centers = np.mean(values, axis=1)
+    translation_jitter = np.ptp(patch_centers, axis=0)
+    reference = np.median(values, axis=0)
+    residual_rms = []
+    residual_point_max = []
+    scales = []
+    translations = []
+    for observed in values:
+        predicted, scale, translation = _fit_fiducial_similarity(
+            reference, observed
+        )
+        residual = observed - predicted
+        residual_rms.append(float(np.sqrt(np.mean(residual * residual))))
+        residual_point_max.append(float(np.max(np.linalg.norm(residual, axis=1))))
+        scales.append(float(scale))
+        translations.append(translation.tolist())
+
+    residual_rms_max = float(max(residual_rms))
+    residual_point_maximum = float(max(residual_point_max))
+    translation_jitter_max = float(np.max(translation_jitter))
+    reasons = []
+    if translation_jitter_max > MAXIMUM_FIDUCIAL_TRANSLATION_JITTER_PX:
+        reasons.append(
+            f"fiducial patch translation jitter {translation_jitter_max:.3f} px "
+            f"exceeds {MAXIMUM_FIDUCIAL_TRANSLATION_JITTER_PX:.3f} px"
+        )
+    if residual_rms_max > MAXIMUM_FIDUCIAL_POSE_RESIDUAL_RMS_PX:
+        reasons.append(
+            f"fiducial pose residual RMS {residual_rms_max:.3f} px exceeds "
+            f"{MAXIMUM_FIDUCIAL_POSE_RESIDUAL_RMS_PX:.3f} px"
+        )
+    if residual_point_maximum > MAXIMUM_FIDUCIAL_POSE_RESIDUAL_POINT_PX:
+        reasons.append(
+            f"fiducial pose point residual {residual_point_maximum:.3f} px "
+            f"exceeds {MAXIMUM_FIDUCIAL_POSE_RESIDUAL_POINT_PX:.3f} px"
+        )
+    return {
+        "raw_corner_jitter_px": raw_corner_jitter.tolist(),
+        "raw_corner_jitter_max_px": float(np.max(raw_corner_jitter)),
+        "patch_centers_px": patch_centers.tolist(),
+        "translation_jitter_per_axis_px": translation_jitter.tolist(),
+        "translation_jitter_max_px": translation_jitter_max,
+        "pose_residual_rms_px": residual_rms,
+        "pose_residual_rms_max_px": residual_rms_max,
+        "pose_residual_point_max_px": residual_point_maximum,
+        "similarity_scales": scales,
+        "similarity_translations_px": translations,
+        "method": "median_square_similarity_pose_v1",
+        "reasons": reasons,
+    }
 
 
 def _number(mapping: dict[str, Any], key: str, context: str) -> float:
@@ -343,7 +438,10 @@ def prepare_measurement(
                 "marker_x_vector_px_per_mm": marker_x_vector,
                 "marker_offset_mm": marker_offset,
                 "marker_reference_commanded_x_mm": marker_reference_x,
-                "marker_image_line_model": marker_line_coefficients,
+                "marker_image_line_model": {
+                    "model": "linear_commanded_x_to_image_uv_v1",
+                    "coefficients_px": marker_line_coefficients.tolist(),
+                },
                 "marker_image_line_capture_y_mm": marker_line_capture_y,
             },
             "active_tool_calibration": snapshot,
@@ -647,6 +745,7 @@ def analyze_measurement(
 
     fiducial_jitter_px = None
     fiducial_jitter_per_corner_px = None
+    fiducial_pose_jitter = None
     fiducial_jitter_reason = None
     if require_locator and len(fiducials_by_source_seq) >= 2:
         stationary_centers = np.asarray(
@@ -656,13 +755,16 @@ def analyze_measurement(
             ],
             dtype=np.float64,
         )
-        jitter = np.ptp(stationary_centers, axis=0)
-        fiducial_jitter_per_corner_px = jitter.tolist()
-        fiducial_jitter_px = float(np.max(jitter))
-        if fiducial_jitter_px > MAXIMUM_FIDUCIAL_JITTER_PX:
-            fiducial_jitter_reason = (
-                f"stationary fiducial jitter {fiducial_jitter_px:.3f} px "
-                f"exceeds {MAXIMUM_FIDUCIAL_JITTER_PX:.3f} px"
+        fiducial_pose_jitter = _fiducial_pose_jitter(stationary_centers)
+        fiducial_jitter_per_corner_px = fiducial_pose_jitter[
+            "raw_corner_jitter_px"
+        ]
+        fiducial_jitter_px = fiducial_pose_jitter[
+            "translation_jitter_max_px"
+        ]
+        if fiducial_pose_jitter["reasons"]:
+            fiducial_jitter_reason = "; ".join(
+                fiducial_pose_jitter["reasons"]
             )
 
     if len(valid_frames) >= 2:
@@ -823,6 +925,7 @@ def analyze_measurement(
             "accepted_x_span_mm": accepted_x_span,
             "fiducial_jitter_px": fiducial_jitter_px,
             "fiducial_jitter_per_corner_px": fiducial_jitter_per_corner_px,
+            "fiducial_pose_jitter": fiducial_pose_jitter,
             "records": records,
             "artifacts": artifacts,
         }

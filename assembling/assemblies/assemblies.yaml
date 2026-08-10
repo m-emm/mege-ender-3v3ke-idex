@@ -109,6 +109,7 @@ placement:
     - part: left_z_axis_strut_holder_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left
       alignment: BACK
+
     - part: left_z_axis_strut_holder_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left
       alignment: STACK_TOP
@@ -122,6 +123,44 @@ placement:
     - part: right_z_axis_strut_holder_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_right
       alignment: STACK_TOP
+
+    - part: left_z_axis_back_strut_assembly
+      to: printer_frame_assembly.non_production_parts.frame_profile_left
+      alignment: CENTER
+      axes: [0]
+    - part: left_z_axis_back_strut_assembly
+      to: printer_frame_assembly.non_production_parts.frame_profile_left
+      alignment: BACK
+      post_translation:
+        - 0
+        - $expr:
+            "$sub": "-1 * ${z_axis_strut_back_offset}"
+        - 0
+
+    - part: left_z_axis_back_strut_assembly
+      to: printer_frame_assembly.non_production_parts.frame_profile_left
+      alignment: STACK_TOP
+      stack_gap:
+        $ref: strut_holder_thickness
+
+    - part: right_z_axis_back_strut_assembly
+      to: printer_frame_assembly.non_production_parts.frame_profile_right
+      alignment: CENTER
+      axes: [0]
+    - part: right_z_axis_back_strut_assembly
+      to: printer_frame_assembly.non_production_parts.frame_profile_right
+      alignment: BACK
+      post_translation:
+        - 0
+        - $expr:
+            "$sub": "-1 * ${z_axis_strut_back_offset}"
+        - 0
+
+    - part: right_z_axis_back_strut_assembly
+      to: printer_frame_assembly.non_production_parts.frame_profile_right
+      alignment: STACK_TOP
+      stack_gap:
+        $ref: strut_holder_thickness
 
     - part: print_bed_assembly.non_production_parts.print_bed_foil
       to: printer_frame_assembly
@@ -1429,12 +1468,56 @@ assemblies:
     resource_file: strut_holder_assembly.yaml
     depends_on:
       - printer_frame_assembly
+      - left_z_axis_back_strut_assembly
+    inject_parts:
+      strut: left_z_axis_back_strut_assembly
+    parameters:
+      strut_holder_width: !Ref strut_holder_width
+      strut_holder_length: !Ref strut_holder_length
+      strut_holder_thickness: !Ref strut_holder_thickness
+      strut_holder_fillet_radius: !Ref strut_holder_fillet_radius
+      strut_holder_wall_height: !Ref strut_holder_wall_height
+      strut_holder_wall_thickness: !Ref strut_holder_wall_thickness
+      strut_holder_strut_size: !Ref strut_holder_strut_size
+      strut_holder_strut_clearance: !Ref strut_holder_strut_clearance
+      strut_holder_wall_length: !Ref strut_holder_wall_length
+      strut_holder_mount_screw_size: !Ref strut_holder_mount_screw_size
 
   - name: right_z_axis_strut_holder_assembly
 
     resource_file: strut_holder_assembly.yaml
     depends_on:
       - printer_frame_assembly
+      - right_z_axis_back_strut_assembly
+    inject_parts:
+      strut: right_z_axis_back_strut_assembly
+    parameters:
+      strut_holder_width: !Ref strut_holder_width
+      strut_holder_length: !Ref strut_holder_length
+      strut_holder_thickness: !Ref strut_holder_thickness
+      strut_holder_fillet_radius: !Ref strut_holder_fillet_radius
+      strut_holder_wall_height: !Ref strut_holder_wall_height
+      strut_holder_wall_thickness: !Ref strut_holder_wall_thickness
+      strut_holder_strut_size: !Ref strut_holder_strut_size
+      strut_holder_strut_clearance: !Ref strut_holder_strut_clearance
+      strut_holder_wall_length: !Ref strut_holder_wall_length
+      strut_holder_mount_screw_size: !Ref strut_holder_mount_screw_size
+
+  - name: left_z_axis_back_strut_assembly
+
+    resource_file: z_axis_back_strut_assembly.yaml
+    depends_on: []
+    parameters:
+      z_axis_back_strut_length: !Ref z_axis_back_strut_length
+      z_axis_back_strut_angle: !Ref z_axis_back_strut_angle
+
+  - name: right_z_axis_back_strut_assembly
+
+    resource_file: z_axis_back_strut_assembly.yaml
+    depends_on: []
+    parameters:
+      z_axis_back_strut_length: !Ref z_axis_back_strut_length
+      z_axis_back_strut_angle: !Ref z_axis_back_strut_angle
 
   - name: strut_holders_visu_assembly
 
@@ -1451,6 +1534,8 @@ assemblies:
       - sprite_extruder_left_assembly
       - left_z_axis_strut_holder_assembly
       - right_z_axis_strut_holder_assembly
+      - left_z_axis_back_strut_assembly
+      - right_z_axis_back_strut_assembly
       - z_axis_profile_left_assembly
       - z_axis_profile_right_assembly
       - z_axis_carriage_left_assembly
@@ -1469,6 +1554,8 @@ assemblies:
       sprite_extruder_left: sprite_extruder_left_assembly
       left_z_axis_strut_holder: left_z_axis_strut_holder_assembly
       right_z_axis_strut_holder: right_z_axis_strut_holder_assembly
+      left_z_axis_back_strut: left_z_axis_back_strut_assembly
+      right_z_axis_back_strut: right_z_axis_back_strut_assembly
       z_axis_profile_left: z_axis_profile_left_assembly
       z_axis_profile_right: z_axis_profile_right_assembly
       z_axis_carriage_left: z_axis_carriage_left_assembly

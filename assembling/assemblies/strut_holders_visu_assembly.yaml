@@ -50,6 +50,14 @@ Builder:
         artifact: all
         name_template: "{assembly_name}_{name}"
       - source: injected
+        assembly: left_z_axis_back_strut
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: right_z_axis_back_strut
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
         assembly: z_axis_profile_left
         artifact: all
         name_template: "{assembly_name}_{name}"

@@ -48,9 +48,19 @@ def _prior():
 
 
 def _inputs():
+    endstops = {
+        "t0": {"x": -77.635, "y": -14.8},
+        "t1": {"x": 351.739, "y": -13.8},
+    }
     return {
-        "t0_xy_datum": {"nozzle_image_prior": _prior()},
-        "t1_xy_datum": {"nozzle_image_prior": _prior()},
+        "t0_xy_datum": {
+            "nozzle_image_prior": _prior(),
+            "acquisition_endstop_xy_mm": [endstops["t0"]["x"], endstops["t0"]["y"]],
+        },
+        "t1_xy_datum": {
+            "nozzle_image_prior": _prior(),
+            "acquisition_endstop_xy_mm": [endstops["t1"]["x"], endstops["t1"]["y"]],
+        },
         "partial_bed_coordinate_system": {
             "corner_printer_xyz_mm": [173.0, -18.0, 0.0],
         },
@@ -139,8 +149,14 @@ def test_prepare_requires_and_propagates_xy_nozzle_image_prior():
     module = _module()
     inputs = _inputs()
     prior = _prior()
-    inputs["t0_xy_datum"] = {"nozzle_image_prior": prior}
-    inputs["t1_xy_datum"] = {"nozzle_image_prior": prior}
+    inputs["t0_xy_datum"] = {
+        "nozzle_image_prior": prior,
+        "acquisition_endstop_xy_mm": [-77.635, -14.8],
+    }
+    inputs["t1_xy_datum"] = {
+        "nozzle_image_prior": prior,
+        "acquisition_endstop_xy_mm": [351.739, -13.8],
+    }
 
     result = module.prepare_sweep(
         _definition(),
@@ -150,12 +166,58 @@ def test_prepare_requires_and_propagates_xy_nozzle_image_prior():
 
     assert result["references"]["t0"]["nozzle_image_prior"] == prior
     assert result["references"]["t1"]["nozzle_image_prior"] == prior
+    assert result["references"]["t1"]["nozzle_image_prior_source"][
+        "acquisition_endstop_xy_mm"
+    ] == pytest.approx([351.739, -13.8])
+
+
+@pytest.mark.parametrize(
+    "tool, source",
+    [
+        ("t0", [-77.0, -14.8]),
+        ("t1", [350.0, -13.8]),
+    ],
+)
+def test_prepare_rejects_xy_prior_acquired_before_endstop_correction(tool, source):
+    module = _module()
+    inputs = _inputs()
+    inputs[f"{tool}_xy_datum"]["acquisition_endstop_xy_mm"] = source
+
+    with pytest.raises(module.ToolXZSweepError, match="is stale.*post-endstop-xy-check"):
+        module.prepare_sweep(_definition(), input_values=inputs, resolved=_resolved())
+
+
+def test_prepare_propagates_xy_prior_fact_binding():
+    module = _module()
+    result = module.prepare_sweep(
+        _definition(),
+        input_values=_inputs(),
+        input_bindings={
+            "t0_xy_datum": {
+                "fact_name": "tool.t0.vision_xy_datum",
+                "fact_set_hash": "sha256:t0",
+                "fact_set_path": "jobs/t0/fact_set.json",
+            },
+            "t1_xy_datum": {
+                "fact_name": "tool.t1.vision_xy_datum",
+                "fact_set_hash": "sha256:t1",
+                "fact_set_path": "jobs/t1/fact_set.json",
+            },
+        },
+        resolved=_resolved(),
+    )
+    source = result["references"]["t1"]["nozzle_image_prior_source"]
+    assert source["fact_name"] == "tool.t1.vision_xy_datum"
+    assert source["fact_set_hash"] == "sha256:t1"
 
 
 @pytest.mark.parametrize(
     "mutate, expected",
     [
-        (lambda inputs: inputs["t0_xy_datum"].clear(), "T0 nozzle_image_prior is required"),
+        (
+            lambda inputs: inputs["t0_xy_datum"].pop("nozzle_image_prior"),
+            "T0 nozzle_image_prior is required",
+        ),
         (
             lambda inputs: inputs["t1_xy_datum"].update(
                 {"nozzle_image_prior": {"model": "wrong"}}
@@ -496,8 +558,18 @@ def test_analysis_writes_raw_records_and_two_plots(tmp_path, monkeypatch):
     monkeypatch.setattr(module.cv2, "imread", imread)
 
     references = {
-        "t0": {"nozzle_image_prior": _prior()},
-        "t1": {"nozzle_image_prior": _prior()},
+        "t0": {
+            "nozzle_image_prior": _prior(),
+            "nozzle_image_prior_source": {
+                "acquisition_endstop_xy_mm": [-77.635, -14.8]
+            },
+        },
+        "t1": {
+            "nozzle_image_prior": _prior(),
+            "nozzle_image_prior_source": {
+                "acquisition_endstop_xy_mm": [351.739, -13.8]
+            },
+        },
     }
 
     result = module.analyze(
@@ -505,7 +577,12 @@ def test_analysis_writes_raw_records_and_two_plots(tmp_path, monkeypatch):
         tmp_path / "artifacts",
         frames=frames,
         references=references,
-        acquisition_calibration={"tool_xy_endstops_mm": {}},
+        acquisition_calibration={
+            "tool_xy_endstops_mm": {
+                "t0": {"x": -77.635, "y": -14.8},
+                "t1": {"x": 351.739, "y": -13.8},
+            }
+        },
     )
 
     assert result["accepted"] is True

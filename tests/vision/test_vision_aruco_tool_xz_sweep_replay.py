@@ -144,7 +144,14 @@ def _load_nozzle_xy_priors() -> dict[str, dict]:
 def _replay_references(manifest: dict, priors: dict[str, dict]) -> dict:
     references = copy.deepcopy(manifest["tool_xz_reference"])
     for tool in ("T0", "T1"):
-        references[tool.lower()]["nozzle_image_prior"] = priors[tool]
+        tool_key = tool.lower()
+        references[tool_key]["nozzle_image_prior"] = priors[tool]
+        endstop = manifest["acquisition_calibration"]["tool_xy_endstops_mm"][tool_key]
+        references[tool_key]["nozzle_image_prior_source"] = {
+            "acquisition_endstop_xy_mm": [endstop["x"], endstop["y"]],
+            "fact_name": f"tool.{tool_key}.vision_xy_datum",
+            "fact_set_hash": f"sha256:replay-{tool_key}",
+        }
     return references
 
 

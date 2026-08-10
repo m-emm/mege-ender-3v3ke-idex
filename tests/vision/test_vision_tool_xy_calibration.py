@@ -196,6 +196,29 @@ def test_marker_image_line_model_predicts_capture_y_adjusted_center():
     np.testing.assert_allclose(center, [782.5, -356.0])
 
 
+def test_fiducial_jitter_gate_ignores_single_corner_noise_but_rejects_patch_motion():
+    module = _module()
+    square = np.asarray(
+        [[874.0, 541.0], [794.5, 546.0], [869.5, 462.0], [790.0, 465.5]],
+        dtype=float,
+    )
+    frames = np.repeat(square[None, :, :], 5, axis=0)
+    frames[1, 1, 1] += 1.7
+
+    metrics = module._fiducial_pose_jitter(frames)
+
+    assert metrics["raw_corner_jitter_max_px"] == pytest.approx(1.7)
+    assert metrics["translation_jitter_max_px"] < 1.5
+    assert metrics["pose_residual_rms_max_px"] < 1.0
+    assert metrics["pose_residual_point_max_px"] < 1.5
+    assert metrics["reasons"] == []
+
+    moved = frames.copy()
+    moved[4, :, 0] += 2.0
+    moved_metrics = module._fiducial_pose_jitter(moved)
+    assert any("translation jitter" in reason for reason in moved_metrics["reasons"])
+
+
 def test_prepare_accepts_configured_capture_y_and_commanded_z():
     module = _module()
     definition = json.loads(json.dumps(_definition("T1")))

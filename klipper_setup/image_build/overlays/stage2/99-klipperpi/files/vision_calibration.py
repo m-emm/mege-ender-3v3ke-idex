@@ -68,6 +68,7 @@ from vision_tool_xy_calibration import (
 from vision_tool_xz_sweep import ToolXZSweepError
 from vision_tool_xz_sweep import analyze as analyze_tool_xz_sweep
 from vision_tool_xz_sweep import prepare_sweep as prepare_tool_xz_sweep
+from vision_tool_xz_sweep import validate_xy_datum_endstops
 
 _logger = logging.getLogger(__name__)
 
@@ -874,6 +875,9 @@ def prepare_job(
                 definition,
                 input_values=input_values,
                 resolved=resolved,
+                input_bindings={
+                    item["requirement"]: item for item in input_facts
+                },
             )
         except ToolXZSweepError as exc:
             raise VisionCalibrationError(str(exc)) from None
@@ -1986,6 +1990,131 @@ def compute_job(
     return {"job_id": job_id, "analysis": analysis}
 
 
+def _validate_post_endstop_xy_fact(
+    value: dict[str, Any],
+    *,
+    tool: str,
+    active_calibration: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate the fresh XY fact that will seed the next X/Z sweep."""
+
+    validate_xy_datum_endstops(
+        value,
+        tool=tool,
+        active_calibration=active_calibration,
+    )
+    prior = value.get("nozzle_image_prior")
+    context = f"{tool} vision_xy_datum.nozzle_image_prior"
+    if not isinstance(prior, dict):
+        raise VisionCalibrationError(f"{context} is missing")
+    if prior.get("model") != "linear_commanded_x_to_image_uv_v1":
+        raise VisionCalibrationError(
+            f"{context}.model must be linear_commanded_x_to_image_uv_v1"
+        )
+    try:
+        coefficients = np.asarray(prior.get("coefficients_px"), dtype=np.float64)
+    except (TypeError, ValueError):
+        coefficients = np.empty((0, 0), dtype=np.float64)
+    if coefficients.shape != (2, 2) or not np.all(np.isfinite(coefficients)):
+        raise VisionCalibrationError(
+            f"{context}.coefficients_px must be a finite 2x2 matrix"
+        )
+    return {
+        "model": prior["model"],
+        "coefficients_px": coefficients.tolist(),
+    }
+
+
+def post_endstop_xy_check(
+    name: str = "post_endstop_xy_check",
+    *,
+    timeout: float = 900.0,
+    expected_fingerprint: str | None = None,
+) -> dict[str, Any]:
+    """Refresh both XY priors after an XY endstop deployment.
+
+    The existing per-tool XY jobs remain the source of the image line models;
+    this workflow makes the required post-deployment refresh explicit and
+    verifies the published facts before an X/Z sweep can consume them.
+    """
+
+    active = _active_tool_xy_calibration(query_printer_status())
+    active_fingerprint = active["active_fingerprint"]
+    if expected_fingerprint and expected_fingerprint != active_fingerprint:
+        raise VisionCalibrationError(
+            f"active fingerprint {active_fingerprint} != {expected_fingerprint}"
+        )
+
+    jobs = {
+        "T0": (
+            TOOL_XY_T0_JOB,
+            "t0_xy_datum",
+            "tool.t0.vision_xy_datum",
+        ),
+        "T1": (
+            TOOL_XY_T1_JOB,
+            "t1_xy_datum",
+            "tool.t1.vision_xy_datum",
+        ),
+    }
+    refreshed: dict[str, Any] = {}
+    for tool, (job_type, requirement, fact_name) in jobs.items():
+        job_name = f"{_sanitize(name)}_{tool.lower()}"
+        _logger.info(
+            "Post-endstop XY check starting tool=%s job_type=%s active_fingerprint=%s",
+            tool,
+            job_type,
+            active_fingerprint,
+        )
+        result = run_job(
+            job_name,
+            job_type=job_type,
+            expected_fingerprint=active_fingerprint,
+            timeout=timeout,
+        )
+        analysis = result.get("analysis")
+        if not isinstance(analysis, dict) or analysis.get("state") != "accepted":
+            reasons = (analysis or {}).get("details", {}).get("reasons", [])
+            raise VisionCalibrationError(
+                f"post-endstop XY check rejected {tool}: "
+                + ("; ".join(str(reason) for reason in reasons) or "unknown reason")
+            )
+        if not analysis.get("publication"):
+            raise VisionCalibrationError(
+                f"post-endstop XY check {tool} was accepted but not published"
+            )
+
+        binding, fact = _resolve_current_fact(requirement, fact_name, 1)
+        prior = _validate_post_endstop_xy_fact(
+            fact["value"],
+            tool=tool,
+            active_calibration=active,
+        )
+        refreshed[tool] = {
+            "job_id": result["job_id"],
+            "analysis_run_id": analysis["analysis_run_id"],
+            "review_url": analysis["review_url"],
+            "fact_name": fact_name,
+            "fact_set_hash": binding["fact_set_hash"],
+            "acquisition_endstop_xy_mm": fact["value"][
+                "acquisition_endstop_xy_mm"
+            ],
+            "nozzle_image_prior": prior,
+        }
+        _logger.info(
+            "Post-endstop XY check published tool=%s fact_set=%s prior=%s",
+            tool,
+            binding["fact_set_hash"],
+            prior["coefficients_px"],
+        )
+
+    return {
+        "accepted": True,
+        "active_tool_calibration": active,
+        "tools": refreshed,
+    }
+
+
 def acquire_job(
     name: str,
     *,
@@ -2481,6 +2610,10 @@ def main(argv: list[str] | None = None) -> int:
         subparser.add_argument("--expected-fingerprint")
         if command in {"acquire", "run"}:
             subparser.add_argument("--timeout", type=float, default=300.0)
+    post_xy_parser = subparsers.add_parser("post-endstop-xy-check")
+    post_xy_parser.add_argument("--name", default="post_endstop_xy_check")
+    post_xy_parser.add_argument("--expected-fingerprint")
+    post_xy_parser.add_argument("--timeout", type=float, default=900.0)
     compute_parser = subparsers.add_parser("compute")
     compute_parser.add_argument(
         "job_type",
@@ -2524,6 +2657,12 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.command == "compute":
             result = compute_job(args.name, job_type=args.job_type)
+        elif args.command == "post-endstop-xy-check":
+            result = post_endstop_xy_check(
+                args.name,
+                timeout=args.timeout,
+                expected_fingerprint=args.expected_fingerprint,
+            )
         elif args.command == "analyze":
             result = analyze_job(args.job_id)
         elif args.command == "publish":
