@@ -12,7 +12,7 @@ bed_to_nozzle_gap: 0.0
 # The single source of truth for the managed GUI/workflow Tap mesh command.
 # The generated printer.cfg and calibration runner both consume these values.
 tap_mesh:
-  profile: tap_7x7
+  profile: default
   # One contact per grid point is the managed default.  A caller may still
   # request a larger explicit SAMPLES value for a diagnostic run.
   samples: 1
@@ -21,6 +21,30 @@ tap_mesh:
   # the calibrated Eddy sensor range above the bed.
   rapid_scan_height: 0.5
   probe_count: [7, 7]
+  # Source-controlled copy of the mesh measured on the printer on 2026-08-11.
+  # Re-run the Tap calibration, read the active profile, and replace this
+  # block when the stable bed geometry is intentionally updated.
+  saved_mesh:
+    version: 1
+    points:
+      - [0.075355, 0.105234, 0.111446, 0.090449, 0.097054, 0.104396, 0.113473]
+      - [0.052024, 0.087907, 0.105378, 0.137184, 0.151357, 0.163638, 0.157802]
+      - [0.071783, 0.102735, 0.121981, 0.146059, 0.146374, 0.154214, 0.141086]
+      - [0.084784, 0.118071, 0.136452, 0.150244, 0.144433, 0.134838, 0.113577]
+      - [0.072567, 0.087976, 0.106026, 0.109470, 0.100994, 0.095914, 0.078253]
+      - [0.074003, 0.072693, 0.076058, 0.081559, 0.066203, 0.044677, 0.027191]
+      - [0.057470, 0.037510, 0.022980, 0.020699, 0.010578, -0.001702, -0.011107]
+    mesh_params:
+      min_x: 42.0
+      max_x: 189.96
+      min_y: 20.0
+      max_y: 275.0
+      x_count: 7
+      y_count: 7
+      mesh_x_pps: 0
+      mesh_y_pps: 0
+      algo: lagrange
+      tension: 0.2
 # Accepted vision-derived relationship. Iteration 1 may translate both
 # endstops, but must never change this relative T1/T0 Z alignment.
 vision_relative_alignment:

@@ -49,9 +49,7 @@ def _render_config_option(name: str, value: str) -> str:
 def _normalize_eddy_calibrate(value: str) -> str:
     """Normalize a YAML block scalar to Klipper's multiline option format."""
     return "\n".join(
-        line.strip()
-        for line in value.strip().splitlines()
-        if line.strip()
+        line.strip() for line in value.strip().splitlines() if line.strip()
     )
 
 
@@ -73,11 +71,15 @@ def _load_tap_mesh(data: dict[str, Any]) -> dict[str, Any]:
     )
     if not math.isfinite(horizontal_move_z) or horizontal_move_z <= 0:
         raise ValueError("tap_mesh.horizontal_move_z must be finite and positive")
-    rapid_scan_height = _require_float(
-        value,
-        "rapid_scan_height",
-        "tap_mesh",
-    ) if "rapid_scan_height" in value else 0.5
+    rapid_scan_height = (
+        _require_float(
+            value,
+            "rapid_scan_height",
+            "tap_mesh",
+        )
+        if "rapid_scan_height" in value
+        else 0.5
+    )
     if not math.isfinite(rapid_scan_height) or rapid_scan_height <= 0:
         raise ValueError("tap_mesh.rapid_scan_height must be finite and positive")
     probe_count = value.get("probe_count")
@@ -99,6 +101,87 @@ def _load_tap_mesh(data: dict[str, Any]) -> dict[str, Any]:
         "horizontal_move_z": horizontal_move_z,
         "rapid_scan_height": rapid_scan_height,
         "probe_count": probe_count,
+    }
+
+
+def _load_saved_mesh(
+    data: dict[str, Any], probe_count: tuple[int, int]
+) -> dict[str, Any] | None:
+    value = data.get("saved_mesh")
+    if value is None:
+        return None
+    value = _require_mapping(value, "tap_mesh.saved_mesh")
+    try:
+        version = int(value["version"])
+    except (KeyError, TypeError, ValueError):
+        raise ValueError("tap_mesh.saved_mesh.version must be an integer") from None
+    if version != 1:
+        raise ValueError("tap_mesh.saved_mesh.version must be 1")
+
+    points = value.get("points")
+    if not isinstance(points, (list, tuple)) or len(points) != probe_count[1]:
+        raise ValueError(
+            "tap_mesh.saved_mesh.points must have one row per Y probe point"
+        )
+    normalized_points = []
+    for row in points:
+        if not isinstance(row, (list, tuple)) or len(row) != probe_count[0]:
+            raise ValueError(
+                "tap_mesh.saved_mesh.points must have one value per X probe point"
+            )
+        normalized_row = []
+        for point in row:
+            try:
+                point = float(point)
+            except (TypeError, ValueError):
+                raise ValueError(
+                    "tap_mesh.saved_mesh.points must contain numeric values"
+                ) from None
+            if not math.isfinite(point):
+                raise ValueError(
+                    "tap_mesh.saved_mesh.points must contain finite values"
+                )
+            normalized_row.append(point)
+        normalized_points.append(tuple(normalized_row))
+
+    mesh_params = _require_mapping(
+        value.get("mesh_params"), "tap_mesh.saved_mesh.mesh_params"
+    )
+    normalized_params: dict[str, Any] = {}
+    for name, kind in (
+        ("min_x", float),
+        ("max_x", float),
+        ("min_y", float),
+        ("max_y", float),
+        ("x_count", int),
+        ("y_count", int),
+        ("mesh_x_pps", int),
+        ("mesh_y_pps", int),
+        ("algo", str),
+        ("tension", float),
+    ):
+        if name not in mesh_params:
+            raise ValueError(f"Missing tap_mesh.saved_mesh.mesh_params.{name}")
+        try:
+            parsed = kind(mesh_params[name])
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"tap_mesh.saved_mesh.mesh_params.{name} has an invalid value"
+            ) from None
+        if kind is float and not math.isfinite(parsed):
+            raise ValueError(f"tap_mesh.saved_mesh.mesh_params.{name} must be finite")
+        normalized_params[name] = parsed
+    if (
+        normalized_params["x_count"] != probe_count[0]
+        or normalized_params["y_count"] != probe_count[1]
+    ):
+        raise ValueError(
+            "tap_mesh.saved_mesh.mesh_params counts must match tap_mesh.probe_count"
+        )
+    return {
+        "version": version,
+        "points": tuple(normalized_points),
+        "mesh_params": normalized_params,
     }
 
 
@@ -170,11 +253,7 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
 
             calibrate = _normalize_eddy_calibrate(calibrate_value)
 
-            pairs = [
-                item.strip()
-                for item in calibrate.split(",")
-                if item.strip()
-            ]
+            pairs = [item.strip() for item in calibrate.split(",") if item.strip()]
 
             if len(pairs) < 9:
                 raise ValueError(
@@ -270,10 +349,12 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
     if isinstance(data["bed_to_nozzle_gap"], bool) or not math.isfinite(
         bed_to_nozzle_gap
     ):
-        raise ValueError(
-            "calib.yaml.bed_to_nozzle_gap must be a finite real number"
-        )
+        raise ValueError("calib.yaml.bed_to_nozzle_gap must be a finite real number")
     tap_mesh = _load_tap_mesh(data)
+    saved_mesh = _load_saved_mesh(
+        _require_mapping(data.get("tap_mesh"), "tap_mesh"),
+        tap_mesh["probe_count"],
+    )
     tools = _require_mapping(data.get("tools"), "tools")
     t0 = _require_mapping(tools.get("t0"), "tools.t0")
     t1 = _require_mapping(tools.get("t1"), "tools.t1")
@@ -305,6 +386,7 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
         },
         "bed_to_nozzle_gap": bed_to_nozzle_gap,
         "tap_mesh": tap_mesh,
+        "saved_mesh": saved_mesh,
         "tools": {
             "t0": {
                 "x_endstop": _require_float(
@@ -347,6 +429,38 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
 
 def format_mm(value: float) -> str:
     return f"{value:.3f}"
+
+
+def _render_saved_mesh_profile(profile: str, saved_mesh: dict[str, Any] | None) -> str:
+    if saved_mesh is None:
+        return ""
+    params = saved_mesh["mesh_params"]
+    lines = [
+        f"[bed_mesh {profile}]",
+        f"version: {saved_mesh['version']}",
+        "points:",
+    ]
+    lines.extend(
+        "    " + ", ".join(f"{point:.6f}" for point in row)
+        for row in saved_mesh["points"]
+    )
+    for name in (
+        "min_x",
+        "max_x",
+        "min_y",
+        "max_y",
+        "x_count",
+        "y_count",
+        "mesh_x_pps",
+        "mesh_y_pps",
+        "algo",
+        "tension",
+    ):
+        value = params[name]
+        if isinstance(value, float):
+            value = f"{value:.6f}"
+        lines.append(f"{name}: {value}")
+    return "\n".join(lines)
 
 
 def _hash_file(
@@ -437,9 +551,7 @@ def live_config_check_errors(
     if state != "ready":
         message = webhooks.get("state_message")
         detail = f": {message}" if message else ""
-        errors.append(
-            f"Klippy state is {state!r}, expected 'ready'{detail}"
-        )
+        errors.append(f"Klippy state is {state!r}, expected 'ready'{detail}")
 
     actual_fingerprint = active_config_fingerprint(status)
 
@@ -462,11 +574,13 @@ def live_config_check_errors(
 def template_values(
     calibration: dict[str, Any],
     config_fingerprint: str,
-) -> dict[str, str]:    
+) -> dict[str, str]:
     t0 = calibration["tools"]["t0"]
     t1 = calibration["tools"]["t1"]
     bed_grid_zero = calibration["bed_grid_zero"]
     bed_z_reference = calibration.get("bed_z_reference", bed_grid_zero)
+    tap_mesh = calibration["tap_mesh"]
+    saved_mesh = calibration.get("saved_mesh")
 
     eddy_relative_calibration = calibration.get("eddy_relative_calibration") or {
         "nozzle_to_coil_x": -57.391,
@@ -508,8 +622,7 @@ def template_values(
 
     if temperature_calibration_temp is None:
         raise ValueError(
-            "Missing "
-            "eddy_relative_calibration.temperature_probe.calibration_temp"
+            "Missing " "eddy_relative_calibration.temperature_probe.calibration_temp"
         )
 
     return {
@@ -523,28 +636,16 @@ def template_values(
         "t1_x_endstop": format_mm(t1["x_endstop"]),
         "t1_y_endstop": format_mm(t1["y_endstop"]),
         "t1_z_endstop": format_mm(t1["z_endstop"]),
-        "tap_mesh_profile": calibration["tap_mesh"]["profile"],
-        "tap_mesh_samples": str(calibration["tap_mesh"]["samples"]),
-        "tap_mesh_horizontal_move_z": format_mm(
-            calibration["tap_mesh"]["horizontal_move_z"]
-        ),
-        "tap_mesh_probe_count": ",".join(
-            str(item) for item in calibration["tap_mesh"]["probe_count"]
-        ),
+        "tap_mesh_profile": tap_mesh["profile"],
+        "tap_mesh_samples": str(tap_mesh["samples"]),
+        "tap_mesh_horizontal_move_z": format_mm(tap_mesh["horizontal_move_z"]),
+        "tap_mesh_probe_count": ",".join(str(item) for item in tap_mesh["probe_count"]),
         "t0_y_offset": format_mm(0.0),
-        "t1_y_offset": format_mm(
-            t0["y_endstop"] - t1["y_endstop"]
-        ),
-        "t1_z_offset": format_mm(
-            t0["z_endstop"] - t1["z_endstop"]
-        ),
-        "t1_mesh_y_offset": format_mm(
-            t1["y_endstop"] - t0["y_endstop"]
-        ),
-        "t1_mesh_zfade_offset": format_mm(
-            t1["z_endstop"] - t0["z_endstop"]
-        ),
-        "config_fingerprint": config_fingerprint,        
+        "t1_y_offset": format_mm(t0["y_endstop"] - t1["y_endstop"]),
+        "t1_z_offset": format_mm(t0["z_endstop"] - t1["z_endstop"]),
+        "t1_mesh_y_offset": format_mm(t1["y_endstop"] - t0["y_endstop"]),
+        "t1_mesh_zfade_offset": format_mm(t1["z_endstop"] - t0["z_endstop"]),
+        "config_fingerprint": config_fingerprint,
         "eddy_nozzle_to_coil_x": format_mm(
             eddy_relative_calibration["nozzle_to_coil_x"]
         ),
@@ -554,12 +655,11 @@ def template_values(
         "eddy_nozzle_to_coil_z": format_mm(
             eddy_relative_calibration["nozzle_to_coil_z"]
         ),
-        "eddy_klipper_calibration": "\n".join(
-            eddy_klipper_lines
+        "eddy_klipper_calibration": "\n".join(eddy_klipper_lines),
+        "eddy_temperature_calibration_temp": (f"{temperature_calibration_temp:.6f}"),
+        "tap_mesh_saved_profile": _render_saved_mesh_profile(
+            tap_mesh["profile"], saved_mesh
         ),
-        "eddy_temperature_calibration_temp": (
-            f"{temperature_calibration_temp:.6f}"
-        ),        
     }
 
 
@@ -572,9 +672,7 @@ def render_config(
         calib_path,
         template_path,
     )
-    template = Template(
-        template_path.read_text(encoding="utf-8")
-    )
+    template = Template(template_path.read_text(encoding="utf-8"))
     return template.substitute(
         template_values(
             calibration,
@@ -585,10 +683,7 @@ def render_config(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=(
-            "Render printer.cfg from calib.yaml "
-            "and printer.cfg.template."
-        )
+        description=("Render printer.cfg from calib.yaml " "and printer.cfg.template.")
     )
     parser.add_argument(
         "--calib",
@@ -656,8 +751,7 @@ def main(argv: list[str] | None = None) -> int:
 
         if current != rendered:
             print(
-                f"{args.output} is stale; "
-                f"run {Path(__file__).name}.",
+                f"{args.output} is stale; " f"run {Path(__file__).name}.",
                 file=sys.stderr,
             )
             return 1

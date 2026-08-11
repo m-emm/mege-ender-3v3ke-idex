@@ -151,6 +151,12 @@ probe_count: ${tap_mesh_probe_count}
 mesh_pps: 0,0
 # Keep absolute Tap contact coordinates in the live transform.  At G-code Z=0,
 # the active mesh must place the nozzle at the Tap-derived bed plane.
+${tap_mesh_saved_profile}
+
+[delayed_gcode _BED_MESH_LOAD_DEFAULT]
+initial_duration: 1.0
+gcode:
+    BED_MESH_PROFILE LOAD=${tap_mesh_profile}
 
 [printer]
 kinematics: cartesian

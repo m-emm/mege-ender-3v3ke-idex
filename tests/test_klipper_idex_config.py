@@ -380,7 +380,7 @@ def test_eddy_klipper_calibration_curve_round_trips_exactly():
     calibration = {
         "bed_grid_zero": {"x": 113.3, "y": 107.0},
         "tap_mesh": {
-            "profile": "tap_7x7",
+            "profile": "default",
             "samples": 1,
             "horizontal_move_z": 5.0,
             "probe_count": (7, 7),
@@ -1385,7 +1385,7 @@ def test_idex_tool_offsets_are_derived_from_calibration_values():
     calibration = {
         "bed_grid_zero": {"x": 1.0, "y": 2.0},
         "tap_mesh": {
-            "profile": "tap_7x7",
+            "profile": "default",
             "samples": 1,
             "horizontal_move_z": 5.0,
             "probe_count": (7, 7),
