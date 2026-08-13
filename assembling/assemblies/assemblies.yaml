@@ -1154,6 +1154,8 @@ process_data_generators:
     function: mege_3devops.process_data.mege_ender_3v3ke_idex.resolve_idex_process_data_from_parameters
   mege3devops_idex_t1_tpu95a_06_high_speed:
     function: mege_3devops.process_data.mege_ender_3v3ke_idex.t1_tpu95a_06_high_speed_process_data
+  mege3devops_mender3_epa_cf_nylon:
+    function: mege_3devops.process_data.mender3.process_data.epa_cf_nylon_process_data
 
 process_data_presets:
   pla_medium_strength_max_quality_06:
@@ -1199,6 +1201,18 @@ process_data_presets:
         top_surface_acceleration: "2650"
         internal_solid_infill_acceleration: "4240"
         sparse_infill_acceleration: "4240"
+
+  epa_cf_nylon_stock_creality_06:
+    generator: mege3devops_mender3_epa_cf_nylon
+    arguments:
+      nozzle_diameter: 0.6
+      nozzle_temperature: 250
+      bed_temperature: 80
+      fan_speed: 40
+      fan_cooling_layer_time: 20
+      print_speed: 45
+      brim_width: 8.0
+      layer_height: 0.3
 
   petgcf_medium_strength_high_speed_06:
     generator: mege3devops_parametric

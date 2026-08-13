@@ -27,14 +27,17 @@ Builder:
       export_individual_parts: false
       plates:
         - name: x_axis_composite
-          process_data_preset: petgcf_medium_strength_high_speed_06
+          process_data_preset: epa_cf_nylon_stock_creality_06
           process_data:
             overrides:
               process_overrides:
-                support_type: tree(auto)
-                enable_support: "1"
+                enable_support: "0"
+                wall_loops: "3"
           parts:
             - x_axis_composite
+        - name: axis_holding_counter_flange
+          process_data_preset: petgcf_medium_strength_high_speed_06
+          parts:
             - axis_holding_counter_flange
       auto_assign_plates: false
 

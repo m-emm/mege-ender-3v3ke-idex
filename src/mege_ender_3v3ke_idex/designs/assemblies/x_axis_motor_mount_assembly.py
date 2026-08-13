@@ -130,6 +130,8 @@ def create_x_axis_motor_mount_assembly(
     motor_mount_plate_size,
     motor_mount_plate_thickness,
     motor_mount_shield_mount_screw_length,
+    motor_mount_side_wall_thickness=1.5,
+    motor_mount_side_wall_height=10,
     motor_pulley_gap,
     motor_pulley_idlers_distance,
     motor_x_offset,
@@ -313,6 +315,35 @@ def create_x_axis_motor_mount_assembly(
         Alignment.STACK_FRONT,
     )
     motor_bridge = motor_bridge.fuse(motor_bridge_front_bevel)
+
+    side_walls = PartCollector()
+    for lr in (Alignment.LEFT, Alignment.RIGHT):
+
+        side_wall = create_box(
+            motor_mount_side_wall_thickness,
+            motor_bbox_size[1],
+            motor_mount_side_wall_height,
+        )
+
+        side_wall = align(side_wall, motor_bridge, Alignment.CENTER)
+        side_wall = align(side_wall, motor_bridge, Alignment.BACK)
+        side_wall = align(side_wall, motor_bridge, Alignment.STACK_TOP)
+        side_wall = align(side_wall, motor_bridge, lr)
+
+        side_walls = side_walls.fuse(side_wall)
+
+    side_walls_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
+
+    side_walls_cutter = rotate(45, axis=(1, 0, 0))(side_walls_cutter)
+
+    side_walls_cutter, _ = cut_in_two(side_walls_cutter, cut_normal=(0, 1, 0))
+    side_walls_cutter = align(side_walls_cutter, side_walls, Alignment.CENTER)
+    side_walls_cutter = align(side_walls_cutter, side_walls, Alignment.FRONT)    
+    side_walls_cutter = align(side_walls_cutter, side_walls, Alignment.BOTTOM)
+
+    side_walls = side_walls.cut(side_walls_cutter)
+
+    motor_bridge = motor_bridge.fuse(side_walls)
 
     cone_height = 4
     cones = PartCollector()
