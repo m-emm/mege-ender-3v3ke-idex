@@ -169,8 +169,8 @@
         "kind": "eddy_fiducial_circle",
         "version": 2,
         "expected_center_1080": [
-          970,
-          310
+          800,
+          290
         ],
         "search_radius_1080": 130,
         "radius_range_1080": [
@@ -183,10 +183,10 @@
         "center_weight": 0.03
       },
       "x_positions_mm": [
-        230,
-        234.666667,
-        239.333333,
-        244
+        198,
+        208,
+        218,
+        228
       ],
       "z_positions_mm": [
         0.5,

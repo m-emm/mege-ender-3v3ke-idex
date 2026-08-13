@@ -9,22 +9,16 @@
 
 ## Mechanical Design tasks
 
-- y axis energy chain consolidation / improvement
-- y axis stepper driver high-power
-- heatbed psu housing
+- re-print x axis motor holders in nylon
+- redesign left toolhead belt clamp, and reprint in nylon
 - cable management around the printer
-- holders for filament sensors
-- covers for bottoms of mcus
 - filament guidance
-- holders for heatbed PSU
-- toolhead alignment mechanism
-- nozzle cleaning pads holders
-- idex alignment sensor
+- holders for filament sensors
+- dual filament spool drybox
+- covers for bottoms of mcus
 - z/y fine tuner
+- y axis accelerometer
 
-## Electrical tasks
-
-- Thermal fuse for heatbed / whole printer
 
 
 ## On Hold
@@ -47,3 +41,11 @@
 - bed leveling wheels
 - x axis collision toolhead mount carriage stopper
 - belt clamp: replace nuts wirh insets
+- y axis energy chain consolidation / improvement
+- y axis stepper driver high-power
+- heatbed psu housing (not done - replaced by HV heatbed)
+- holders for heatbed PSU (not done - replaced by HV heatbed )
+- Thermal fuse for heatbed / whole printer
+- nozzle cleaning pads holders
+- idex alignment sensor (done with nozzle camera / vision)
+- toolhead alignment mechanism (not done - replaced by vision alignment)

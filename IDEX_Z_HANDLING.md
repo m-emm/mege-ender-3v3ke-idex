@@ -957,10 +957,9 @@ eddy_relative_calibration:
 
 The generator uses `bed_z_reference` for the configured
 `zero_reference_position`. Mesh bounds, probe count, interpolation, and scan
-motion settings remain normal source-controlled configuration. Measured mesh
-points are runtime data: no `[bed_mesh default]` section, point matrix, or
-measured profile is added to `calib.yaml`, the template, or generated
-`printer.cfg`.
+motion settings and the reviewed measured point matrix are source-controlled
+configuration. The matrix is stored under `tap_mesh.saved_mesh` in `calib.yaml`
+and rendered as `[bed_mesh default]` in the generated `printer.cfg`.
 
 `bed_to_nozzle_gap` is the only repository-owned global signed nozzle-to-bed
 datum; it accepts any finite real value. The generated Klipper `tap_z_offset`

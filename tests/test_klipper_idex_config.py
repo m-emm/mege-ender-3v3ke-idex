@@ -629,10 +629,10 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     ]
     eddy_definition = registry["job_types"]["idex_eddy_fiducial_xz_grid"]
     assert eddy_definition["x_positions_mm"] == [
-        230,
-        234.666667,
-        239.333333,
-        244,
+        198,
+        208,
+        218,
+        228,
     ]
     assert eddy_definition["z_positions_mm"] == [0.5, 3.333333, 6.166667, 9]
     assert eddy_definition["profile"] == "analysis"
@@ -1877,6 +1877,10 @@ def test_idex_print_brush_macro_is_separate_from_normal_tool_selection():
     t1_macro = _section(config_text, "gcode_macro T1")
 
     assert _macro_variable_float(tool_state, "brush_distance") > 0.0
+    prime_length = _macro_variable_float(tool_state, "brush_prime_length")
+    retract_length = _macro_variable_float(tool_state, "brush_retract_length")
+    assert prime_length > 0.0
+    assert 0.0 < retract_length < prime_length
     assert "stepper_x.position_endstop|float" in brush_macro
     assert "dual_carriage.position_endstop|float" in brush_macro
     assert "left_home_x + brush_distance" in brush_macro

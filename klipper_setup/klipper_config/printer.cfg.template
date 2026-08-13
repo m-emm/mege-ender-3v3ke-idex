@@ -835,13 +835,13 @@ variable_bed_grid_zero_x: ${bed_grid_zero_x}
 variable_bed_grid_zero_y: ${bed_grid_zero_y}
 variable_offset_move_speed: 5.0
 variable_park_move_speed: 180.0
-variable_brush_distance: 35.0
+variable_brush_distance: 40
 variable_brush_cycles: 3
 variable_brush_prime_length: 8.0
-variable_brush_retract_length: 1.0
+variable_brush_retract_length: 0.3
 variable_brush_prime_speed: 5.0
 variable_brush_retract_speed: 30.0
-variable_brush_move_speed: 30.0
+variable_brush_move_speed: 120
 gcode:
 
 [idex_manual_tuning]

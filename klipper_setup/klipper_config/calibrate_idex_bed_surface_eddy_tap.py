@@ -562,7 +562,7 @@ def reject_mesh_data_in_canonical(data: Mapping[str, Any]) -> None:
     present = forbidden.intersection(data)
     if present:
         raise CalibrationError(
-            "measured mesh data must remain runtime-only; found "
+            "raw measured mesh data must be stored under tap_mesh.saved_mesh; found "
             + ", ".join(sorted(present))
         )
 
@@ -2628,7 +2628,7 @@ class Iteration1Runner:
                 f"- Run: `{self.state.run_id}`\n"
                 f"- Final committed phase: `{self.state.committed_phase}`\n"
                 "- Mesh validation scope: tap-safe region\n"
-                "- Measured mesh data: runtime-only; not written to canonical configuration\n",
+                "- Measured mesh data: review and download into tap_mesh.saved_mesh before deployment\n",
                 encoding="utf-8",
             )
 
