@@ -4441,3 +4441,9 @@ assemblies:
     resource_file: pressure_advance_calibration_tpu95_assembly.yaml
     depends_on: []
     parameters: {}
+
+  - name: test_coupon_assembly
+
+    resource_file: test_coupon_assembly.yaml
+    depends_on: []
+    parameters: {}
