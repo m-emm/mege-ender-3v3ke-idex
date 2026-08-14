@@ -2,6 +2,10 @@
 
 from shellforgepy.simple import *
 import math
+import logging
+
+
+_logger = logging.getLogger(__name__)
 
 coupon_length = 40
 coupon_width = 40
@@ -14,7 +18,7 @@ wall_length = 30
 wall_spacing = 0
 
 
-base_plate_thickness = 2.0
+base_plate_thickness = 0.8
 base_plate_border = 3
 
 fin_thickness = 0.85
@@ -110,6 +114,8 @@ def create_test_coupon_assembly():
         coupon_size[1] + 2 * base_plate_border,
         base_plate_thickness,
     )
+
+    _logger.info(f"Base plate size: {base_plate_size}")
 
     base_plate = create_filleted_box(
         base_plate_size[0],

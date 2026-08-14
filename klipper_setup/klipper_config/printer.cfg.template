@@ -854,6 +854,7 @@ gcode:
 
 [gcode_macro _IDEX_PART_FAN_STATE]
 variable_speed: 0.0
+variable_midpoint_boost: 0.20
 gcode:
 
 [gcode_macro _IDEX_APPLY_PART_FAN]
@@ -877,12 +878,18 @@ gcode:
 description: Route slicer part cooling to the currently active IDEX tool.
 gcode:
     {% set tool_state = printer["gcode_macro _IDEX_TOOL_STATE"] %}
+    {% set fan_state = printer["gcode_macro _IDEX_PART_FAN_STATE"] %}
+
     {% set requested = params.S|default(255)|float %}
     {% set clamped = 0.0 if requested < 0.0 else (255.0 if requested > 255.0 else requested) %}
-    {% set speed = clamped / 255.0 %}
+    {% set x = clamped / 255.0 %}
+
+    {% set boost = fan_state.midpoint_boost|float %}
+    {% set mapped = x + 4.0 * boost * x * (1.0 - x) %}
+    {% set speed = 0.0 if mapped < 0.0 else (1.0 if mapped > 1.0 else mapped) %}
+
     SET_GCODE_VARIABLE MACRO=_IDEX_PART_FAN_STATE VARIABLE=speed VALUE={speed}
     _IDEX_APPLY_PART_FAN TOOL={tool_state.active_tool|int}
-
 [gcode_macro M107]
 description: Turn off both IDEX part cooling fans.
 gcode:

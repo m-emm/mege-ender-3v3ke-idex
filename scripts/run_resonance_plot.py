@@ -29,6 +29,8 @@ DEFAULT_TMP_DIR = "/tmp"
 DEFAULT_KLIPPER_PYTHON = "/opt/klipper-env/bin/python"
 DEFAULT_CALIBRATE_SHAPER = "/opt/klipper/scripts/calibrate_shaper.py"
 DEFAULT_PLOT_DPI = 300
+DEFAULT_MEASURE_AT_X = 117.5
+DEFAULT_MEASURE_AT_Z = 20.0
 
 CHIP_OBJECTS = {
     "left_toolhead": "adxl345 left_toolhead",
@@ -280,9 +282,18 @@ def chip_object_name(chip: str) -> str:
     )
 
 
-def build_test_gcode(axis: str, chip: str) -> str:
+def build_test_gcode(
+    axis: str,
+    chip: str,
+    measure_at_x: float = DEFAULT_MEASURE_AT_X,
+    measure_at_z: float = DEFAULT_MEASURE_AT_Z,
+) -> str:
     chip_object = chip_object_name(chip)
-    return f'TEST_RESONANCES AXIS={axis} CHIPS="{chip_object}"'
+    resonance_gcode = (
+        f'TEST_RESONANCES AXIS={axis} CHIPS="{chip_object}" '
+        f"POINT={measure_at_x:g},117.5,{measure_at_z:g}"
+    )
+    return f"G28\n{resonance_gcode}"
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -300,6 +311,24 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--render-only",
         metavar="CSV",
         help="Render an existing resonances CSV without running printer motion.",
+    )
+    parser.add_argument(
+        "--measure-at-x",
+        type=float,
+        default=DEFAULT_MEASURE_AT_X,
+        help=(
+            "X coordinate in millimeters for the resonance measurement. "
+            f"Default: {DEFAULT_MEASURE_AT_X:g}"
+        ),
+    )
+    parser.add_argument(
+        "--measure-at-z",
+        type=float,
+        default=DEFAULT_MEASURE_AT_Z,
+        help=(
+            "Z coordinate in millimeters for the resonance measurement. "
+            f"Default: {DEFAULT_MEASURE_AT_Z:g}"
+        ),
     )
     parser.add_argument("--moonraker-url", default=os.environ.get("MOONRAKER_URL", DEFAULT_MOONRAKER_URL))
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR)
@@ -350,7 +379,12 @@ def main(argv: list[str]) -> int:
 
         tmp_dir = Path(args.tmp_dir)
         known_files = set(tmp_dir.glob(resonance_pattern(tmp_dir, axis)))
-        gcode = build_test_gcode(axis, chip)
+        gcode = build_test_gcode(
+            axis,
+            chip,
+            args.measure_at_x,
+            args.measure_at_z,
+        )
         start_time = time.time()
 
         print(f"Running: {gcode}")

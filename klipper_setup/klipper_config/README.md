@@ -36,8 +36,9 @@ python wiring/validate_wiring.py
 
 `update_menderpi.sh --check` verifies the generated local `printer.cfg`, the
 remote `~/printer_data/config/printer.cfg`, the managed remote
-`/opt/klipper/klippy/extras/heaters.py` and `bed_mesh.py`, and the config Klippy has loaded via
-Moonraker without uploading files or restarting Klipper.
+`/opt/klipper/klippy/extras/heaters.py` and `bed_mesh.py`, the deployed
+resonance helper, and the config Klippy has loaded via Moonraker without
+uploading files or restarting Klipper.
 
 `update_menderpi.sh` copies local `printer.cfg` to
 `~/printer_data/config/printer.cfg` on `pi@menderpi.local`, backs up the
@@ -47,6 +48,33 @@ restarts Klipper, verifies the Moonraker/Klippy state, then runs
 `deploy_vision_code.sh` to synchronize all tracked top-level vision Python,
 JSON, and PNG assets plus `priors.yaml`, restart the four vision services, and
 rebuild the static vision catalog.
+
+## Resonance measurements
+
+The live resonance helpers are in the repository-level `scripts/` directory.
+Run the default X-axis measurement from the repository root with:
+
+```bash
+scripts/run_resonance_plot.sh
+```
+
+This homes all axes first, then uses the left toolhead accelerometer and
+measures at Z=20 mm. Each run is stored in its own timestamped directory under
+`runs/klipper_resonance/`. To choose another measurement height, pass the
+explicit option; X is assumed when no axis is supplied:
+
+```bash
+scripts/run_resonance_plot.sh X --measure-at-z=150
+```
+
+For a Y-axis measurement, the X coordinate can be selected explicitly:
+
+```bash
+scripts/run_resonance_plot.sh Y --measure-at-x=150 --measure-at-z=150
+```
+
+The wrapper copies the complete Pi-side run directory locally, including the
+raw resonance CSV, calibration CSV, plot, summary, and latest aliases.
 
 ## Vision Code Development, Deployment, and Artifact Download
 

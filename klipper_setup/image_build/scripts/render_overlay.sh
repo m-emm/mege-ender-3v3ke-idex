@@ -8,7 +8,7 @@ OVERLAY_SRC="${IMAGE_BUILD_DIR}/overlays/stage2/99-klipperpi"
 PIGEN_DIR="${IMAGE_BUILD_DIR}/pi-gen"
 SECRETS_DIR="${IMAGE_BUILD_DIR}/secrets"
 OUT_CONFIG="${PIGEN_DIR}/config"
-RESONANCE_HELPER_SRC="${IMAGE_BUILD_DIR}/../klipper_config/archive/resonance/run_resonance_plot.py"
+RESONANCE_HELPER_SRC="${IMAGE_BUILD_DIR}/../../scripts/run_resonance_plot.py"
 CALIB_SRC="${IMAGE_BUILD_DIR}/../klipper_config/calib.yaml"
 PRIORS_SRC="${IMAGE_BUILD_DIR}/../klipper_config/priors.yaml"
 
