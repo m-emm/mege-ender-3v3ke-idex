@@ -1341,6 +1341,7 @@ process_data_presets:
     generator: mege3devops_idex_parametric
     arguments:
       material_name: petg_cf_generic
+      toolhead: T0
       nozzle_diameter_mm: 0.6
       nozzle_hardened: true
       nozzle_high_flow: true
