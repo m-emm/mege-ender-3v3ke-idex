@@ -129,7 +129,7 @@ def create_part_fan_assembly(
 
     blower_ring_with_cut = front_part_fan.use_as_cutter_on(blower_ring_with_cut)
 
-    feeder_ring_bottom = blower_ring.get_named_follower("feeder_ring_bottom")
+    feeder_ring_bottom = blower_ring.get_named_non_production_part("feeder_ring_bottom")
 
     front_outlet_cutter = create_convex_hull(front_outlet)
 

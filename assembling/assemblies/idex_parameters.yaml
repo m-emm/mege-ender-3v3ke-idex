@@ -1363,7 +1363,7 @@ globals:
   part_fan_axis_from_left_offset: 17.2
   part_fan_body_cutter_clearance: 0.1
   part_fan_duct_extension_length: 55
-  part_fan_ducts_clearance: 2
+  part_fan_ducts_clearance: 3
   part_fan_fillet_radius: 2
   part_fan_hole_diameter: 31
   part_fan_mount_plate_blow_direction_offset: 0

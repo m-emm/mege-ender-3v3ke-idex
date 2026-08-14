@@ -173,95 +173,6 @@ def create_blower_ring_assembly(
         blower_center_offset=blower_center_offset,
         feeder_ring_rotation_angle=feeder_ring_rotation_angle,
     )
-    for i in range(num_blowers):
-        blower_tube_length = (
-            feeder_ring_inner_diameter / 2
-            - blowers_nozzle_center_distance
-            + feeder_ring_wall
-        ) + math.tan(math.radians(blowers_down_angle)) * blowers_duct_diameter
-
-        blower_tube = create_cylinder(
-            blowers_duct_diameter / 2 + blowers_wall,
-            blower_tube_length,
-            direction=(1, 0, 0),
-        )
-
-        blower_tube_bb = get_bounding_box(blower_tube)
-        blower_tube_length = blower_tube_bb[1][0] - blower_tube_bb[0][0]
-        blower_tube_center = get_bounding_box_center(blower_tube)
-
-        blowers_nozzle_tip_scale = blowers_nozzle_tip_scales[i]
-
-        def squeeze_z_transform_function(point, squeeze_scale_function):
-            x, y, z = point
-            relative_x = x - blower_tube_bb[0][0]
-            air_scale = _blower_air_squeeze_scale(
-                tip_scale=blowers_nozzle_tip_scale,
-                relative_x=relative_x,
-                blower_tube_length=blower_tube_length,
-            )
-            scale_factor = squeeze_scale_function(air_scale)
-            relative_z = z - blower_tube_center[2]
-            new_relative_z = relative_z * scale_factor
-            new_z = blower_tube_center[2] + new_relative_z
-            return x, y, new_z
-
-        def blower_outer_transform_function(point):
-            return squeeze_z_transform_function(
-                point,
-                lambda air_scale: _blower_outer_squeeze_scale(
-                    air_scale=air_scale,
-                    blowers_duct_diameter=blowers_duct_diameter,
-                    blowers_wall=blowers_wall,
-                ),
-            )
-
-        def blower_air_transform_function(point):
-            return squeeze_z_transform_function(point, lambda air_scale: air_scale)
-
-        blower_tube = transform_with_function_tesselating(
-            blower_tube,
-            blower_outer_transform_function,
-        )
-
-        blower_tube = translate(
-            blowers_nozzle_center_distance,
-            blower_center_offset,
-            0,
-        )(blower_tube)
-
-        blower_tube_cutter = create_cylinder(
-            blowers_duct_diameter / 2,
-            blower_tube_length + 2 * blowers_wall,
-            direction=(1, 0, 0),
-        )
-        blower_tube_cutter = transform_with_function_tesselating(
-            blower_tube_cutter,
-            blower_air_transform_function,
-        )
-        blower_tube_cutter = align(
-            blower_tube_cutter,
-            blower_tube,
-            Alignment.CENTER,
-        )
-
-        blower_tube = rotate(
-            -blowers_down_angle,
-            axis=(0, 1, 0),
-            center=(blower_tube_length, 0, 0),
-        )(blower_tube)
-        blower_tube_cutter = rotate(
-            -blowers_down_angle,
-            axis=(0, 1, 0),
-            center=(blower_tube_length, 0, 0),
-        )(blower_tube_cutter)
-
-        angle = i * 360 / num_blowers
-        blower_tube = rotate(angle)(blower_tube)
-        blower_tube_cutter = rotate(angle)(blower_tube_cutter)
-
-        blower_tubes = blower_tubes.fuse(blower_tube)
-        blower_tube_cutters = blower_tube_cutters.fuse(blower_tube_cutter)
 
     feeder_ring_angle = 360 / (num_blowers + 1) * num_blowers + feeder_ring_extra_angle
     feeder_ring_outer_radius = (
@@ -309,10 +220,134 @@ def create_blower_ring_assembly(
     feeder_ring = feeder_ring_rotation(feeder_ring)
     feeder_ring_cutter = feeder_ring_rotation(feeder_ring_cutter)
 
-    blower_ring = blower_tubes.fuse(feeder_ring)
-    blower_ring = blower_ring.cut(blower_tube_cutters)
+
+
+
+
+    blower_lip_overlap = 1.5
+    blower_lip_outer_height = 6
+    blower_lip_duct_thickness = 3
+
+    blower_lip_overall_height = feeder_ring_height / 4
+
+    blower_lip_outer_radius = feeder_ring_inner_diameter / 2 + blower_lip_overlap
+
+    blower_bite_cutter_angle = 360 - feeder_ring_angle
+
+    blower_lip_average_radius = (
+        blower_lip_outer_radius + blowers_nozzle_center_distance
+    ) / 2
+
+    blower_lip_equivalent_angle_for_wall = (
+        feeder_ring_wall / blower_lip_average_radius * (180 / math.pi)
+    )
+
+    blower_duct_bite_cutter_angle = (
+
+        blower_bite_cutter_angle + 2 * blower_lip_equivalent_angle_for_wall
+    )
+    blower_lip_connector_cutter_angle = 360 - blower_duct_bite_cutter_angle
+
+
+    blower_lip_duct_outer_radius = feeder_ring_inner_diameter / 2 + feeder_ring_wall
+    blower_lip_duct = create_ring(blower_lip_duct_outer_radius, feeder_ring_inner_diameter / 2, blower_lip_duct_thickness, angle = blower_lip_connector_cutter_angle)
+
+    blower_lip_duct = align(blower_lip_duct, feeder_ring, Alignment.BOTTOM)
+
+    blower_lip_duct = translate(0, 0, feeder_ring_wall)(blower_lip_duct)
+
+
+    blower_lip_duct_cone = create_cone(
+        feeder_ring_inner_diameter / 2, blowers_nozzle_center_distance, blower_lip_overall_height, angle=blower_lip_connector_cutter_angle
+    )
+    blower_lip_duct_cone = rotate(180, axis=(1, 0, 0))(blower_lip_duct_cone)
+    blower_lip_duct_cone = rotate(-90 )(blower_lip_duct_cone)
+
+    blower_lip_duct_cone = align(blower_lip_duct_cone, blower_lip_duct, Alignment.STACK_BOTTOM)
+
+
+    blower_lip_duct_top = create_cylinder(feeder_ring_inner_diameter / 2, blower_lip_duct_thickness, angle=blower_lip_connector_cutter_angle)
+    blower_lip_duct_top = align(blower_lip_duct_top, blower_lip_duct, Alignment.TOP)
+
+
+    blower_lip_duct_top_cutter = create_cone(
+        feeder_ring_inner_diameter / 2, blowers_nozzle_center_distance, blower_lip_overall_height,
+    )
+
+    blower_lip_duct_top_cutter = rotate(180, axis=(1, 0, 0))(blower_lip_duct_top_cutter)
+
+    blower_lip_duct_top_cutter = align(blower_lip_duct_top_cutter, blower_lip_duct_top, Alignment.TOP)
+
+
+    
+
+    blower_lip_duct_center_cutter = create_cylinder(blowers_nozzle_center_distance-2, 500)    
+    blower_lip_duct_center_cutter = align(blower_lip_duct_center_cutter, blower_lip_duct, Alignment.CENTER, axes=[2])
+
+    
+
+
+    blower_lip_duct = blower_lip_duct.fuse(blower_lip_duct_cone)
+    blower_lip_duct = blower_lip_duct.fuse(blower_lip_duct_top)
+
+    blower_lip_duct = blower_lip_duct.cut(blower_lip_duct_top_cutter)
+    blower_lip_duct = blower_lip_duct.cut(blower_lip_duct_center_cutter)
+
+
+    blower_lip_duct = feeder_ring_rotation(blower_lip_duct)
+    blower_lip_duct = rotate(180-blower_lip_equivalent_angle_for_wall)(blower_lip_duct)
+
+
+
+
+
+    blower_lip_cone = create_cone(
+        blower_lip_outer_radius, blowers_nozzle_center_distance, feeder_ring_height / 4, angle=feeder_ring_angle
+    )
+    blower_lip_cone = rotate(180, axis=(1, 0, 0))(blower_lip_cone)
+    
+
+
+    blower_lip_top = create_cylinder(blower_lip_outer_radius, blower_lip_outer_height, angle=feeder_ring_angle)
+    blower_lip_top = rotate(180, axis=(1, 0, 0))(blower_lip_top)
+
+    blower_lip_top = align(blower_lip_top, blower_lip_cone, Alignment.STACK_TOP)
+    blower_lip = blower_lip_cone.fuse(blower_lip_top)
+
+    blower_lip_top_cutter = create_cone(blower_lip_outer_radius, blowers_nozzle_center_distance, feeder_ring_height / 4)
+    blower_lip_top_cutter = rotate(180, axis=(1, 0, 0))(blower_lip_top_cutter)
+
+    blower_lip_top_cutter = align(blower_lip_top_cutter, blower_lip_top, Alignment.TOP)
+
+
+    blower_lip = blower_lip.cut(blower_lip_top_cutter)
+
+    blower_lip = rotate(-90-blower_lip_equivalent_angle_for_wall)(blower_lip)
+
+
+    blower_lip_center_cutter = create_cylinder(blowers_nozzle_center_distance, 500)
+
+    blower_lip_center_cutter = align(blower_lip_center_cutter, blower_lip, Alignment.CENTER, axes=[2])
+    blower_lip = blower_lip.cut(blower_lip_center_cutter)
+
+
+    blower_lip = rotate(feeder_ring_rotation_angle+180)(blower_lip)
+
+    
+    blower_lip = align(
+        blower_lip,
+        blower_lip_duct,
+        Alignment.TOP,        
+    )
+
+    blower_lip = translate(0, 0, (blower_lip_outer_height - blower_lip_duct_thickness)/2)(blower_lip)
+    
+
+
+
+    blower_ring = feeder_ring
     blower_ring = blower_ring.cut(feeder_ring_cutter)
-    feeder_ring = feeder_ring.cut(blower_tube_cutters)
+
     blower_ring = rotate(feeder_ring_rotation_angle + 180, axis=(0, 0, 1))(blower_ring)
     feeder_ring = rotate(feeder_ring_rotation_angle + 180, axis=(0, 0, 1))(feeder_ring)
     ring_center_reference = rotate(
@@ -320,17 +355,25 @@ def create_blower_ring_assembly(
         axis=(0, 0, 1),
     )(ring_center_reference)
 
+    
+    blower_ring = blower_ring.fuse(blower_lip)
+    blower_ring = blower_ring.cut(blower_lip_duct)
+    feeder_ring = feeder_ring.cut(blower_lip_duct)
+
     blower_ring_bbox = get_bounding_box(blower_ring)
     bottom_normalization = translate(0, 0, -blower_ring_bbox[0][2])
     blower_ring = bottom_normalization(blower_ring)
     ring_center_reference = bottom_normalization(ring_center_reference)
     feeder_ring = bottom_normalization(feeder_ring)
+    blower_lip_duct = bottom_normalization(blower_lip_duct)
+    blower_lip = bottom_normalization(blower_lip)
 
     retval = LeaderFollowersCuttersPart(blower_ring)
     retval.add_named_non_production_part(
         ring_center_reference,
         "ring_center_reference",
     )
+    retval.set_hidden_by_default("ring_center_reference")
     retval.add_named_follower(feeder_ring, "feeder_ring")
 
     feeder_ring_bottom_cutter = create_box(BIG_THING, BIG_THING, BIG_THING)
@@ -346,6 +389,13 @@ def create_blower_ring_assembly(
     )
 
     feeder_ring_bottom = feeder_ring.cut(feeder_ring_bottom_cutter)
-    retval.add_named_follower(feeder_ring_bottom, "feeder_ring_bottom")
+    retval.add_named_non_production_part(feeder_ring_bottom, "feeder_ring_bottom")
+    retval.set_hidden_by_default("feeder_ring_bottom")
+
+    retval.add_named_non_production_part(blower_lip_duct, "blower_lip_duct")
+    retval.set_hidden_by_default("blower_lip_duct")
+
+    retval.add_named_non_production_part(blower_lip, "blower_lip")
+    retval.set_hidden_by_default("blower_lip")
 
     return retval

@@ -240,6 +240,7 @@ def test_blower_ring_assembly_exposes_standalone_ring():
 
     blower_ring_bbox = get_bounding_box(blower_ring.leader)
     blower_ring_size = get_bounding_box_size(blower_ring.leader)
+    feeder_ring = blower_ring.get_named_follower("feeder_ring")
     ring_center_reference = blower_ring.get_named_non_production_part(
         "ring_center_reference"
     )
@@ -247,6 +248,7 @@ def test_blower_ring_assembly_exposes_standalone_ring():
     ring_center_reference_center = get_bounding_box_center(ring_center_reference)
 
     assert get_volume(blower_ring.leader) > 0
+    assert get_volume(blower_ring.leader) > get_volume(feeder_ring)
     assert blower_ring_bbox[0][2] == pytest.approx(0)
     assert all(size > 0 for size in blower_ring_size)
     assert get_volume(ring_center_reference) == pytest.approx(0.001)
