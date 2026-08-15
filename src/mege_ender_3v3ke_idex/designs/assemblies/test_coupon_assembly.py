@@ -1,9 +1,9 @@
 """Simple hardcoded PETG-CF test coupon assembly."""
 
-from shellforgepy.simple import *
-import math
 import logging
+import math
 
+from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
 

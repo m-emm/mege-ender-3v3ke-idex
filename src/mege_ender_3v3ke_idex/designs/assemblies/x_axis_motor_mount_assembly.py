@@ -338,7 +338,7 @@ def create_x_axis_motor_mount_assembly(
 
     side_walls_cutter, _ = cut_in_two(side_walls_cutter, cut_normal=(0, 1, 0))
     side_walls_cutter = align(side_walls_cutter, side_walls, Alignment.CENTER)
-    side_walls_cutter = align(side_walls_cutter, side_walls, Alignment.FRONT)    
+    side_walls_cutter = align(side_walls_cutter, side_walls, Alignment.FRONT)
     side_walls_cutter = align(side_walls_cutter, side_walls, Alignment.BOTTOM)
 
     side_walls = side_walls.cut(side_walls_cutter)
