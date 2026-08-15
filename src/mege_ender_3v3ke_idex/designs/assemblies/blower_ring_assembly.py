@@ -299,6 +299,24 @@ def create_blower_ring_assembly(
 
 
 
+    blower_lip_duct_inner_walls = PartCollector()
+
+    blower_lip_duct_inner_wall_width = 1
+    blower_lip_duct_num_inner_walls = 5
+
+    for i in range(blower_lip_duct_num_inner_walls):
+
+        inner_wall = create_box(500, blower_lip_duct_inner_wall_width, 500)
+        inner_wall = rotate(i * 360 / blower_lip_duct_num_inner_walls)(inner_wall)
+        blower_lip_duct_inner_walls = blower_lip_duct_inner_walls.fuse(inner_wall)
+
+    blower_lip_duct_inner_walls = align(blower_lip_duct_inner_walls, blower_lip_duct, Alignment.CENTER, axes=[2])
+
+    blower_lip_duct = blower_lip_duct.cut(blower_lip_duct_inner_walls)
+
+
+
+
 
 
     blower_lip_cone = create_cone(
@@ -368,6 +386,21 @@ def create_blower_ring_assembly(
     blower_lip_duct = bottom_normalization(blower_lip_duct)
     blower_lip = bottom_normalization(blower_lip)
 
+    central_cutter = create_cylinder(
+        feeder_ring_inner_diameter / 2 + 2*feeder_ring_wall, BIG_THING
+    )
+
+    central_cutter = align(central_cutter, blower_ring, Alignment.TOP)
+    central_cutter = translate(0, 0, -2 * feeder_ring_wall)(central_cutter)
+
+    bottom_cutter = create_ring(feeder_ring_outer_radius, feeder_ring_inner_radius, BIG_THING)
+    bottom_cutter = align(bottom_cutter, blower_ring, Alignment.TOP)
+    bottom_cutter = translate(0, 0, -feeder_ring_height+feeder_ring_wall)(bottom_cutter)
+
+    central_cutter = central_cutter.fuse(bottom_cutter)
+
+    blower_ring, central_blower = take_bite_out_of(blower_ring, central_cutter)
+
     retval = LeaderFollowersCuttersPart(blower_ring)
     retval.add_named_non_production_part(
         ring_center_reference,
@@ -397,5 +430,7 @@ def create_blower_ring_assembly(
 
     retval.add_named_non_production_part(blower_lip, "blower_lip")
     retval.set_hidden_by_default("blower_lip")
+
+    retval.add_named_follower(central_blower, "central_blower")
 
     return retval

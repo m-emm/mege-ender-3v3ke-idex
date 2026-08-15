@@ -1274,7 +1274,7 @@ globals:
   duct_back_mount_plate_width_border: 10
   feeder_ring_extra_angle: 10
   feeder_ring_height: 11
-  feeder_ring_inner_diameter: 37
+  feeder_ring_inner_diameter: 35
   feeder_ring_rotation_angle: -10
   feeder_ring_wall: 1.5
   feeder_ring_width: 11
