@@ -20,6 +20,11 @@ Builder:
             artifact: leader
             name: part_fans_joined
           - source: self
+            artifact: followers
+            names:
+              - central_blower
+            name_template: "part_fans_{name}"
+          - source: self
             artifact: non_production_parts
             name_template: "part_fans_{name}"
           - source: output
@@ -36,8 +41,16 @@ Builder:
           - source: self
             artifact: leader
             name: part_fans_joined
-            prod_rotation_angle: 45
+            prod_rotation_angle: 50
             prod_rotation_axis: [0, 1, 0]
+          - source: self
+            artifact: followers
+            names:
+              - central_blower
+
+            name_template: "{name}"
+            prod_rotation_angle: 65
+            prod_rotation_axis: [1, 1, 0]
         arrange:
           export_individual_parts: false
           plates:
@@ -51,6 +64,7 @@ Builder:
                     support_threshold_angle: "25"
               parts:
                 - part_fans_joined
+                - central_blower
           auto_assign_plates: false
 
     extruder_cage:

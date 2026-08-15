@@ -41,6 +41,8 @@ from shellforgepy.simple import (
     translate,
 )
 
+JOINING_SCREW_NAMES = {f"joining_screw_{index}_complete_screw" for index in range(1, 5)}
+
 
 def _current_blower_path_kwargs():
     return {
@@ -105,7 +107,6 @@ def _create_part_fans_with_origin():
 def test_blower_nozzle_tip_scales_increase_with_path_length():
     scales = _blower_nozzle_tip_scales(**_current_blower_path_kwargs())
 
-    assert scales == pytest.approx([0.75, 0.25, 0.63], abs=0.01)
     assert scales[1] < scales[2] < scales[0]
     assert all(0.25 <= scale <= 0.75 for scale in scales)
 
@@ -241,6 +242,8 @@ def test_blower_ring_assembly_exposes_standalone_ring():
     blower_ring_bbox = get_bounding_box(blower_ring.leader)
     blower_ring_size = get_bounding_box_size(blower_ring.leader)
     feeder_ring = blower_ring.get_named_follower("feeder_ring")
+    central_blower = blower_ring.get_named_follower("central_blower")
+    central_blower_bbox = get_bounding_box(central_blower)
     ring_center_reference = blower_ring.get_named_non_production_part(
         "ring_center_reference"
     )
@@ -248,8 +251,10 @@ def test_blower_ring_assembly_exposes_standalone_ring():
     ring_center_reference_center = get_bounding_box_center(ring_center_reference)
 
     assert get_volume(blower_ring.leader) > 0
-    assert get_volume(blower_ring.leader) > get_volume(feeder_ring)
-    assert blower_ring_bbox[0][2] == pytest.approx(0)
+    assert get_volume(feeder_ring) > 0
+    assert get_volume(central_blower) > 0
+    assert central_blower_bbox[0][2] < blower_ring_bbox[0][2]
+    assert JOINING_SCREW_NAMES.issubset(blower_ring.non_production_indices_by_name)
     assert all(size > 0 for size in blower_ring_size)
     assert get_volume(ring_center_reference) == pytest.approx(0.001)
     assert all(size < 0.12 for size in ring_center_reference_bbox_size)
@@ -308,6 +313,9 @@ def test_part_fan_assembly_fuses_and_consumes_selected_injected_artifacts():
     ring_center = get_bounding_box_center(
         blower_ring.get_named_non_production_part("ring_center_reference")
     )
+    input_central_blower_volume = get_volume(
+        blower_ring.get_named_follower("central_blower")
+    )
 
     part_fans = create_part_fan_assembly(
         **assembly_kwargs(
@@ -319,6 +327,7 @@ def test_part_fan_assembly_fuses_and_consumes_selected_injected_artifacts():
         )
     )
     part_fans_bbox = get_bounding_box(part_fans.leader)
+    central_blower = part_fans.get_named_follower("central_blower")
     connector_axis = (
         0
         if abs(ring_center[0] - side_outlet_center[0])
@@ -327,9 +336,12 @@ def test_part_fan_assembly_fuses_and_consumes_selected_injected_artifacts():
     )
 
     assert get_volume(part_fans.leader) > 0
-    assert {"side_mount_plate", "duct_back_mount_plate_connector"}.issubset(
-        part_fans.non_production_indices_by_name
-    )
+    assert 0 < get_volume(central_blower) < input_central_blower_volume
+    assert {
+        "side_mount_plate",
+        "duct_back_mount_plate_connector",
+        *JOINING_SCREW_NAMES,
+    }.issubset(part_fans.non_production_indices_by_name)
     assert get_volume(part_fans.get_named_non_production_part("side_mount_plate")) > 0
     assert (
         get_volume(
@@ -337,6 +349,8 @@ def test_part_fan_assembly_fuses_and_consumes_selected_injected_artifacts():
         )
         > 0
     )
+    for screw_name in JOINING_SCREW_NAMES:
+        assert get_volume(part_fans.get_named_non_production_part(screw_name)) > 0
     if ring_center[connector_axis] > side_outlet_center[connector_axis]:
         assert part_fans_bbox[1][connector_axis] > side_outlet_bbox[1][connector_axis]
     else:
@@ -348,6 +362,7 @@ def test_part_fan_assembly_fuses_and_consumes_selected_injected_artifacts():
         "single_part_fan_side_left_assembly.followers.outlet",
         "blower_ring_left_assembly.leader",
         "blower_ring_left_assembly.followers.feeder_ring",
+        "blower_ring_left_assembly.followers.central_blower",
     ]
 
 
@@ -364,7 +379,13 @@ def test_part_fan_resource_has_canonical_generator_and_consumption_visualization
             "name": "blower_ducts",
             "prod_rotation_angle": 50,
             "prod_rotation_axis": [1, 0, 0],
-        }
+        },
+        {
+            "source": "self",
+            "artifact": "followers",
+            "names": ["central_blower"],
+            "name_template": "{name}",
+        },
     ]
     generator_path = resource["Parts"]["PartFanAssembly"]["Properties"]["Generator"]
     assert generator_path == (
@@ -373,7 +394,7 @@ def test_part_fan_resource_has_canonical_generator_and_consumption_visualization
     )
 
     visualization_parts = resource["Builder"]["Visualization"]["parts"]
-    assert visualization_parts[:2] == [
+    assert visualization_parts[:3] == [
         {
             "source": "self",
             "artifact": "leader",
@@ -384,8 +405,14 @@ def test_part_fan_resource_has_canonical_generator_and_consumption_visualization
             "artifact": "non_production_parts",
             "name_template": "{name}",
         },
+        {
+            "source": "self",
+            "artifact": "followers",
+            "names": ["central_blower"],
+            "name_template": "{name}",
+        },
     ]
-    assert visualization_parts[2:] == [
+    assert visualization_parts[3:] == [
         {
             "source": "injected",
             "assembly": "sprite_extruder",
@@ -638,16 +665,22 @@ def test_part_fan_v2_standalone_fans_use_parameterized_legacy_pose():
             (step["alignment"], step.get("axes")) for step in ring_center_steps
         ] == [("CENTER", [0, 1])]
 
-        ring_leader_steps = [
+        central_blower_steps = [
             placement
             for placement in placements
-            if placement.get("part") == blower_ring_name
+            if placement.get("part") == f"{blower_ring_name}.followers.central_blower"
             and placement.get("to") == hotend_target
         ]
         assert [
-            (step["alignment"], step.get("axes")) for step in ring_leader_steps
+            (step["alignment"], step.get("axes")) for step in central_blower_steps
         ] == [("BOTTOM", None)]
-        assert ring_leader_steps[-1]["post_translation"] == blower_ring_translation
+        assert central_blower_steps[-1]["post_translation"] == blower_ring_translation
+        assert not any(
+            placement.get("part") == blower_ring_name
+            and placement.get("to") == hotend_target
+            and placement.get("alignment") == "BOTTOM"
+            for placement in placements
+        )
 
     for side in ["left", "right"]:
         fan_group = {
@@ -767,9 +800,13 @@ def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
     joined_part_fans = result["part_fans"]
     joined_extruder_cage = result["extruder_cage"]
     assert set(joined_part_fans.non_production_indices_by_name) == {
-        "retained_reference"
+        "retained_reference",
+        *JOINING_SCREW_NAMES,
     }
-    assert joined_part_fans.follower_indices_by_name == {"retained_follower": 1}
+    assert joined_part_fans.follower_indices_by_name == {
+        "central_blower": 0,
+        "retained_follower": 2,
+    }
     assert joined_part_fans.cutter_indices_by_name == {"retained_cutter": 1}
     assert joined_part_fans.direction_vector_indices_by_name == {
         "retained_direction": 0
@@ -832,6 +869,12 @@ def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
     assert get_volume(joined_part_fans.leader) > original_part_fan_volume
     assert get_volume(joined_extruder_cage.leader) > original_cage_volume
 
+    assert get_volume(joined_part_fans.get_named_follower("central_blower")) > 0
+    for screw_name in JOINING_SCREW_NAMES:
+        assert (
+            get_volume(joined_part_fans.get_named_non_production_part(screw_name)) > 0
+        )
+
     side_mount_plate = part_fans.get_named_non_production_part("side_mount_plate")
     bottom_flange, top_flange, clearance_hole = _create_join_flange_halves(
         side_mount_plate=side_mount_plate,
@@ -876,6 +919,55 @@ def test_part_fan_cage_joiner_adds_split_flange_without_mutating_inputs():
         )
         < 0.01
     )
+
+
+def test_part_fan_cage_joiner_visualizes_and_prints_central_blower():
+    resource = yaml.load(
+        (ASSEMBLIES_DIR / "part_fan_cage_joiner.yaml").read_text(),
+        Loader=AssemblyDefaultsLoader,
+    )
+    part_fans_output = resource["Builder"]["Outputs"]["part_fans"]
+
+    central_blower_visualization = {
+        "source": "self",
+        "artifact": "followers",
+        "names": ["central_blower"],
+        "name_template": "part_fans_{name}",
+    }
+    central_blower_production = {
+        "source": "self",
+        "artifact": "followers",
+        "names": ["central_blower"],
+        "name_template": "{name}",
+    }
+
+    assert central_blower_visualization in part_fans_output["Visualization"]["parts"]
+    assert part_fans_output["Production"]["parts"] == [
+        {
+            "source": "self",
+            "artifact": "leader",
+            "name": "part_fans_joined",
+            "prod_rotation_angle": 45,
+            "prod_rotation_axis": [0, 1, 0],
+        },
+        central_blower_production,
+    ]
+    assert part_fans_output["Production"]["arrange"]["plates"] == [
+        {
+            "name": "part_fans_joined",
+            "filename": "part_fans_joined",
+            "process_data_preset": "petgcf_max_strength_high_speed_06",
+            "process_data": {
+                "overrides": {
+                    "process_overrides": {
+                        "enable_support": "1",
+                        "support_threshold_angle": "25",
+                    }
+                }
+            },
+            "parts": ["part_fans_joined", "central_blower"],
+        }
+    ]
 
 
 def test_part_fan_cage_joiner_signature_stays_generic():

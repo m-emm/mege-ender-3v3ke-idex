@@ -812,7 +812,7 @@ placement:
       to: sprite_extruder_left_assembly.non_production_parts.hotend
       alignment: CENTER
       axes: [0, 1]
-    - part: blower_ring_left_assembly
+    - part: blower_ring_left_assembly.followers.central_blower
       to: sprite_extruder_left_assembly.non_production_parts.hotend
       alignment: BOTTOM
       post_translation:
@@ -876,7 +876,7 @@ placement:
       to: sprite_extruder_right_assembly.non_production_parts.hotend
       alignment: CENTER
       axes: [0, 1]
-    - part: blower_ring_right_assembly
+    - part: blower_ring_right_assembly.followers.central_blower
       to: sprite_extruder_right_assembly.non_production_parts.hotend
       alignment: BOTTOM
       post_translation:

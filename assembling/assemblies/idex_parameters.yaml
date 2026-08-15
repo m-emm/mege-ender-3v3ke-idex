@@ -1261,7 +1261,7 @@ globals:
   nozzle_y_offset: 7.5
   nozzle_tip_diameter: 1.0
   blower_center_offset: 4
-  blowers_down_angle: 35
+  blowers_down_angle: 75
   blowers_duct_diameter: 6
   blowers_nozzle_center_distance: 10
   blowers_wall: 1.5

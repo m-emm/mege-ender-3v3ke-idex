@@ -89,6 +89,7 @@ def create_part_fan_assembly(
     front_outlet = front_part_fan.get_named_follower("outlet")
     side_fan_mount_plate = side_part_fan.get_named_follower("mount_plate")
     side_outlet = side_part_fan.get_named_follower("outlet")
+    central_blower = blower_ring.get_named_follower("central_blower")
 
     part_fans = front_mount_plate
     part_fans = part_fans.fuse(front_outlet)
@@ -124,10 +125,13 @@ def create_part_fan_assembly(
 
     front_part_fan_cutter = create_convex_hull(front_part_fan.leader, front_outlet)
     blower_ring_with_cut = blower_ring.leader.cut(front_part_fan_cutter)
+    central_blower = central_blower.cut(front_part_fan_cutter)
 
     blower_ring_with_cut = blower_ring_with_cut.cut(duct_extension_air_cutter)
+    central_blower = central_blower.cut(duct_extension_air_cutter)
 
     blower_ring_with_cut = front_part_fan.use_as_cutter_on(blower_ring_with_cut)
+    central_blower = front_part_fan.use_as_cutter_on(central_blower)
 
     feeder_ring_bottom = blower_ring.get_named_non_production_part("feeder_ring_bottom")
 
@@ -139,7 +143,9 @@ def create_part_fan_assembly(
 
     feeder_ring_bottom_with_cut = feeder_ring_bottom_with_cut.cut(front_fan_cutter)
 
-    blower_ring_with_cut = blower_ring_with_cut.fuse(feeder_ring_bottom_with_cut)
+    duct_extension = duct_extension.cut(central_blower)
+
+    # blower_ring_with_cut = blower_ring_with_cut.fuse(feeder_ring_bottom_with_cut)
 
     side_mount_plate = create_box(
         tool_head_additional_mount_plate_thickness,
@@ -197,13 +203,18 @@ def create_part_fan_assembly(
     part_fans = part_fans.fuse(duct_back_mount_plate_connector)
 
     part_fans = sprite_extruder.use_as_cutter_on(part_fans)
+    central_blower = sprite_extruder.use_as_cutter_on(central_blower)
 
     retval = LeaderFollowersCuttersPart(part_fans)
+    retval.add_named_follower(central_blower, "central_blower")
     retval.add_named_non_production_part(side_mount_plate, "side_mount_plate")
     retval.add_named_non_production_part(
         duct_back_mount_plate_connector,
         "duct_back_mount_plate_connector",
     )
+    for name, screw_part in blower_ring.get_named_non_production_part_items():
+        if name.startswith("joining_screw_"):
+            retval.add_named_non_production_part(screw_part, name)
     retval.add_consumed_part_ref(
         front_part_fan.part_ref_for_named_follower("mount_plate")
     )
@@ -215,5 +226,8 @@ def create_part_fan_assembly(
     retval.add_consumed_part_ref(side_part_fan.part_ref_for_named_follower("outlet"))
     retval.add_consumed_part_ref(blower_ring.part_ref_for_leader())
     retval.add_consumed_part_ref(blower_ring.part_ref_for_named_follower("feeder_ring"))
+    retval.add_consumed_part_ref(
+        blower_ring.part_ref_for_named_follower("central_blower")
+    )
 
     return retval

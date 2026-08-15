@@ -20,6 +20,11 @@ Builder:
       - source: self
         artifact: non_production_parts
         name_template: "{name}"
+      - source: self
+        artifact: followers
+        names:
+          - central_blower
+        name_template: "{name}"
 
       - source: injected
         assembly: sprite_extruder
@@ -62,6 +67,11 @@ Builder:
         name: blower_ducts
         prod_rotation_angle: 50
         prod_rotation_axis: [1, 0, 0]
+      - source: self
+        artifact: followers
+        names:
+          - central_blower
+        name_template: "{name}"
 
 Parameters:
   duct_extension_width:
