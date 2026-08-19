@@ -91,6 +91,11 @@ def test_tool_head_mount_machined_top_is_carriage_plate_with_mount_holes():
         cutout_bbox[1][1] - cutout_bbox[0][1],
     ) == pytest.approx((46.3, 53.7))
     assert _local_xy_center(cutout, plate_bbox) == pytest.approx((42.25, 24.85))
+    cutout_reference = mount.get_named_non_production_part("extruder_cutout_reference")
+    cutout_reference_bbox = get_bounding_box(cutout_reference)
+    assert cutout_reference_bbox[0] == pytest.approx(cutout_bbox[0])
+    assert cutout_reference_bbox[1] == pytest.approx(cutout_bbox[1])
+    assert "extruder_cutout_reference" in mount.hidden_by_default_names
 
     expected_sprite_hole_centers = {
         "hole_drill_LEFT_FRONT": (5.0, 5.0),

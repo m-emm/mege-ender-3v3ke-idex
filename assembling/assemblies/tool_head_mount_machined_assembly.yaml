@@ -14,6 +14,95 @@ Builder:
         - front_angle
       width: 512
       height: 512
+    construction_drawings:
+      - name: tool_head_mount_machined_top
+        view: top
+        parts:
+          - source: self
+            artifact: leader
+            name: tool_head_mount_machined
+        units: mm
+        scale: 1.0
+        precision: 2
+        annotations:
+          - id: tool_head_mount_width
+            operation: bounding_box_x_dimension
+            target: tool_head_mount_machined_bottom_assembly.leader
+            placement:
+              alignments:
+                - alignment: STACK_FRONT
+                  stack_gap: 8
+          - id: tool_head_mount_left_web_width
+            operation: linear_dimension
+            from:
+              target: tool_head_mount_machined_bottom_assembly.leader
+              edge: EDGE_LEFT
+            to:
+              target: tool_head_mount_machined_bottom_assembly.non_production_parts.extruder_cutout_reference
+              edge: EDGE_LEFT
+            dimension_direction: RIGHT
+            placement:
+              alignments:
+                - alignment: STACK_FRONT
+                  stack_gap: 6
+
+          - id: tool_head_mount_cutout_height
+            operation: linear_dimension
+            from:
+              target: tool_head_mount_machined_bottom_assembly.non_production_parts.extruder_cutout_reference
+              edge: EDGE_BACK
+            to:
+              target: tool_head_mount_machined_bottom_assembly.leader
+              edge: EDGE_FRONT
+            dimension_direction: BACK
+            placement:
+              alignments:
+                - alignment: STACK_LEFT
+                  stack_gap: 6
+
+          - id: tool_head_mount_right_web_width
+            operation: linear_dimension
+            from:
+              target: tool_head_mount_machined_bottom_assembly.non_production_parts.extruder_cutout_reference
+              edge: EDGE_RIGHT
+            to:
+              target: tool_head_mount_machined_bottom_assembly.leader
+              edge: EDGE_RIGHT
+            dimension_direction: RIGHT
+            placement:
+              alignments:
+                - alignment: STACK_FRONT
+                  stack_gap: 6
+          - id: tool_head_mount_height
+            operation: bounding_box_y_dimension
+            target: tool_head_mount_machined_bottom_assembly.leader
+            placement:
+              alignments:
+                - alignment: STACK_LEFT
+                  stack_gap: 8
+          - id: left_front_hole_diameter
+            operation: circle_diameter
+            target: tool_head_mount_machined_bottom_assembly.cutters.hole_drill_RIGHT_FRONT
+            quantity: 14
+            placement:
+              alignments:
+                - alignment: STACK_RIGHT
+                  stack_gap: 10
+        frame: technical
+        sheet:
+          format: A4
+          orientation: landscape
+          margin: 10
+          border: true
+          title_block:
+            title: Tool Head Mount (Machined)
+            drawing_number: THM-MACHINED-BOTTOM
+            revision: A
+            material: Aluminum
+            units: mm
+            scale: "1:1"
+            source: tool_head_mount_machined_bottom_assembly
+        output: svg
     parts:
       - source: self
         artifact: leader

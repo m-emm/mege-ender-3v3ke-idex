@@ -122,6 +122,11 @@ def create_tool_head_mount_machined_assembly(
     carriage_mount_plate = LeaderFollowersCuttersPart(leader=carriage_mount_plate)
     for name, cutter in cutters.items():
         carriage_mount_plate.add_named_cutter(cutter, name)
+    carriage_mount_plate.add_named_non_production_part(
+        extruder_cutout_cutter,
+        "extruder_cutout_reference",
+    )
+    carriage_mount_plate.set_hidden_by_default("extruder_cutout_reference")
 
     carriage_mount_plate = align(carriage_mount_plate, carriage, Alignment.CENTER)
     carriage_mount_plate = align(

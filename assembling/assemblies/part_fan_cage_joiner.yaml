@@ -41,7 +41,7 @@ Builder:
           - source: self
             artifact: leader
             name: part_fans_joined
-            prod_rotation_angle: 50
+            prod_rotation_angle: 0
             prod_rotation_axis: [0, 1, 0]
           - source: self
             artifact: followers
@@ -49,7 +49,7 @@ Builder:
               - central_blower
 
             name_template: "{name}"
-            prod_rotation_angle: 65
+            prod_rotation_angle: 0
             prod_rotation_axis: [1, 1, 0]
         arrange:
           export_individual_parts: false

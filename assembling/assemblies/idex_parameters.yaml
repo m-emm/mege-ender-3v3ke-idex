@@ -604,7 +604,7 @@ globals:
   eddy_duo_fiducial_cross_length: 6.5
   eddy_duo_fiducial_stroke_width: 0.4
   eddy_duo_fiducial_marking_height: 0.01
-  eddy_duo_tool_head_side_gap: -3
+  eddy_duo_tool_head_side_gap: -25.3
   eddy_duo_tool_head_front_gap: 1.0
   eddy_duo_nozzle_clearance: 2.5
 
@@ -1276,7 +1276,7 @@ globals:
   feeder_ring_height: 11
   feeder_ring_inner_diameter: 35
   feeder_ring_rotation_angle: -10
-  feeder_ring_wall: 1.5
+  feeder_ring_wall: 2.2
   feeder_ring_width: 11
   hot_side_holes_y_pitch: 18
   hot_side_holes_back_distance: 7

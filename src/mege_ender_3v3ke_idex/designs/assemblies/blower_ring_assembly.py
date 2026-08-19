@@ -221,8 +221,8 @@ def create_blower_ring_assembly(
     feeder_ring_cutter = feeder_ring_rotation(feeder_ring_cutter)
 
     blower_lip_overlap = 1.5
-    blower_lip_outer_height = 6
-    blower_lip_duct_thickness = 3
+    blower_lip_outer_height = 7
+    blower_lip_duct_thickness = 3.5
 
     blower_lip_overall_height = feeder_ring_height * 0.43
 
@@ -407,7 +407,16 @@ def create_blower_ring_assembly(
         bottom_cutter
     )
 
+    extra_flange_height = 1
+    top_ring_cutter = create_ring(
+        feeder_ring_inner_radius + feeder_ring_wall / 2,
+        feeder_ring_inner_radius,
+        extra_flange_height,
+    )
+    top_ring_cutter = align(top_ring_cutter, central_cutter, Alignment.STACK_TOP)
+
     central_cutter = central_cutter.fuse(bottom_cutter)
+    central_cutter = central_cutter.fuse(top_ring_cutter)
 
     blower_ring, central_blower = take_bite_out_of(blower_ring, central_cutter)
 
@@ -415,8 +424,8 @@ def create_blower_ring_assembly(
     joining_screw_size = "M2.5"
     joining_screw_length = 10
     joining_screw_num_screws = 5
-    boss_height = 5
-    boss_diameter = MScrew.from_size(joining_screw_size).cylinder_head_diameter + 0.5
+    boss_height = feeder_ring_height - 2 * feeder_ring_wall
+    boss_diameter = MScrew.from_size(joining_screw_size).cylinder_head_diameter + 1
 
     joining_screw_circle_radius = (
         feeder_ring_inner_diameter / 2 + feeder_ring_outer_radius
