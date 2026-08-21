@@ -10,31 +10,42 @@ Builder:
         name_template: "{assembly_name}_{name}"
 
   Production:
-    process_data_preset: tpu_minimal_quality_minimal_strength_06
-    process_data:
-      overrides:
-        process_overrides:
-          # This uses scarf seam settings
-          # it is very effective for round parts to reduce the seam visibility / mechanical roundness of the part
-          # This improved the roundness of this part significantly
-          enable_support: "0"
-          brim_type: no_brim
-          sparse_infill_density: "30%"
-          seam_position: aligned
-          seam_slope_type: all
-          seam_slope_conditional: "1"
-          outer_wall_speed: "75"
-          outer_wall_line_width: "0.9"
     parts:
       - source: self
         artifact: leader
         name: filament_guide
+        prod_rotation_angle: -90
+        prod_rotation_axis: [1, 0, 0]
+      - source: self
+        artifact: non_production_parts
+        names:
+          - right_filament_guide_spool
+        name_template: "{name}"
     arrange:
       export_individual_parts: false
       plates:
-        - name: filament_guide
+        - name: filament_guide_petgcf
+          process_data_preset: petgcf_max_strength_high_speed_06
           parts:
             - filament_guide
+        - name: right_filament_guide_spool_tpu
+          process_data_preset: tpu_minimal_quality_minimal_strength_06
+          process_data:
+            overrides:
+              process_overrides:
+                # This uses scarf seam settings
+                # it is very effective for round parts to reduce the seam visibility / mechanical roundness of the part
+                # This improved the roundness of this part significantly
+                enable_support: "0"
+                brim_type: no_brim
+                sparse_infill_density: "30%"
+                seam_position: aligned
+                seam_slope_type: all
+                seam_slope_conditional: "1"
+                outer_wall_speed: "75"
+                outer_wall_line_width: "0.9"
+          parts:
+            - right_filament_guide_spool
       auto_assign_plates: false
 
 Parameters: {}
