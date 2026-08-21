@@ -1,0 +1,47 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Assembly configuration for the filament-guide spools
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+
+  Production:
+    process_data_preset: tpu_minimal_quality_minimal_strength_06
+    process_data:
+      overrides:
+        process_overrides:
+          # This uses scarf seam settings
+          # it is very effective for round parts to reduce the seam visibility / mechanical roundness of the part
+          # This improved the roundness of this part significantly
+          enable_support: "0"
+          brim_type: no_brim
+          sparse_infill_density: "30%"
+          seam_position: aligned
+          seam_slope_type: all
+          seam_slope_conditional: "1"
+          outer_wall_speed: "75"
+          outer_wall_line_width: "0.9"
+    parts:
+      - source: self
+        artifact: leader
+        name: filament_guide
+    arrange:
+      export_individual_parts: false
+      plates:
+        - name: filament_guide
+          parts:
+            - filament_guide
+      auto_assign_plates: false
+
+Parameters: {}
+
+Parts:
+  FilamentGuideAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.filament_guide_assembly.create_filament_guide_assembly
