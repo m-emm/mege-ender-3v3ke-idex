@@ -22,7 +22,7 @@ from typing import Any
 import cv2
 import numpy as np
 from calib_dao import CalibDAO
-from vision_bed_fiducial import analyze_corner, analyze_metric
+from vision_bed_fiducial import analyze_metric
 from vision_calibration_graph import (
     ANALYSIS_SCHEMA,
     FACT_SET_SCHEMA,
@@ -103,7 +103,6 @@ FRAMEBUFFER_DIR = Path(
 MOONRAKER_URL = os.environ.get("VISION_MOONRAKER_URL", "http://127.0.0.1")
 
 BED_FIDUCIAL_METRIC_JOB = "nozzle_cam_bed_fiducial_y_metric"
-BED_TAB_CORNER_JOB = "nozzle_cam_bed_tab_corner"
 RED_MARKER_X_JOB = "idex_tool_red_marker_x_sweep"
 ROUGH_X_VERIFY_JOB = "idex_rough_tool_x_verify"
 IDEX_T0_T1_XYZ_OFFSET_JOB = "idex_t0_t1_xyz_offset"
@@ -116,7 +115,6 @@ TOOL_XZ_SWEEP_JOB = "idex_tool_xz_sweep_report"
 TOOL_XY_CANDIDATE_JOB = "idex_tool_xy_candidate"
 JOB_TYPES = (
     BED_FIDUCIAL_METRIC_JOB,
-    BED_TAB_CORNER_JOB,
     RED_MARKER_X_JOB,
     ROUGH_X_VERIFY_JOB,
     EDDY_FIDUCIAL_XZ_JOB,
@@ -133,7 +131,6 @@ HASH_PLACEHOLDER = "sha256:PLACEHOLDER"
 _LOGGED_CATALOG_WARNINGS: set[str] = set()
 CALIB = CalibDAO()
 RETIRED_PRIOR_FACT_NAMES = {
-    "bed.tab_corner.printer_xyz",
     "bed.fiducial_patch.physical_reference",
     "bed.fiducial_patch.printer_z_mm",
 }
@@ -157,9 +154,8 @@ def _prior_provenance(job_type: str) -> dict[str, Any]:
     result: dict[str, Any] = {"sha256": CALIB.priors_hash()}
     if job_type in {BED_FIDUCIAL_METRIC_JOB, RED_MARKER_X_JOB}:
         result["fiducial_centers_xy_mm"] = CALIB.fiducial_centers()
-    if job_type == BED_TAB_CORNER_JOB:
-        result["bed_corner_xyz_mm"] = CALIB.bed_corner()
-    if job_type == BED_TAB_CORNER_JOB:
+    if job_type == BED_FIDUCIAL_METRIC_JOB:
+        result["fiducial_reference_printer_xyz_mm"] = CALIB.fiducial_reference()
         result["fiducial_z_mm"] = CALIB.fiducial_z()
     return result
 
@@ -439,7 +435,7 @@ def _preflight(
         "capture_z_mm": float(definition.get("capture_z_mm", axis_minimum[2])),
         "safe_tool_change_z_mm": float(definition.get("safe_tool_change_z_mm", 5.0)),
     }
-    if job_type in {BED_FIDUCIAL_METRIC_JOB, BED_TAB_CORNER_JOB}:
+    if job_type == BED_FIDUCIAL_METRIC_JOB:
         clearance = float(definition.get("capture_z_below_top_mm", 0.0))
         if not math.isfinite(clearance) or clearance <= 0.0:
             raise VisionCalibrationError(
@@ -467,14 +463,6 @@ def _preflight(
                 (pose["x_mm"], pose["y_base_mm"] + float(offset), pose["z_mm"])
                 for offset in definition["y_offsets_mm"]
             ]
-        )
-    elif job_type == BED_TAB_CORNER_JOB:
-        positions.append(
-            (
-                pose["x_mm"],
-                pose["y_base_mm"] + float(definition["capture_y_offset_mm"]),
-                pose["z_mm"],
-            )
         )
     elif job_type in {
         RED_MARKER_X_JOB,
@@ -674,7 +662,7 @@ def _gcode(
     ]
     job_type = manifest["job_type"]
     frames = manifest["frames"]
-    if job_type in {BED_FIDUCIAL_METRIC_JOB, BED_TAB_CORNER_JOB}:
+    if job_type == BED_FIDUCIAL_METRIC_JOB:
         profile = frames[0]["profile"]
         lines.extend(
             [
@@ -812,7 +800,6 @@ def _metric_x_axis_at_capture(
 def _bed_fiducial_printer_xy_mapping(
     *,
     metric: dict[str, Any],
-    partial: dict[str, Any],
     image_x_axis: list[float],
     patch_points_mm: list[list[float]],
     capture_y_mm: float,
@@ -834,17 +821,22 @@ def _bed_fiducial_printer_xy_mapping(
     )
     if not math.isfinite(float(np.linalg.cond(printer_to_patch))):
         raise VisionCalibrationError("resolved patch/printer basis is singular")
-    corner_patch = np.asarray(partial["corner_patch_xy_mm"], dtype=np.float64)
-    corner_printer = np.asarray(
-        partial["corner_printer_xyz_mm"][:2],
+    fiducial_reference_patch = np.asarray(
+        metric["patch_reference_center_xy_mm"], dtype=np.float64
+    )
+    fiducial_reference_printer = np.asarray(
+        metric["fiducial_reference_printer_xyz_mm"][:2],
         dtype=np.float64,
     )
     patch_to_printer = np.linalg.inv(printer_to_patch)
-    patch_origin = corner_printer - patch_to_printer @ corner_patch
+    patch_origin = (
+        fiducial_reference_printer - patch_to_printer @ fiducial_reference_patch
+    )
     fiducial_centers = [
         (
-            corner_printer
-            + patch_to_printer @ (np.asarray(point, dtype=np.float64) - corner_patch)
+            fiducial_reference_printer
+            + patch_to_printer
+            @ (np.asarray(point, dtype=np.float64) - fiducial_reference_patch)
         ).tolist()
         for point in patch_points_mm
     ]
@@ -853,18 +845,39 @@ def _bed_fiducial_printer_xy_mapping(
         axis=0,
     )
     return {
-        "corner_patch_xy_mm": corner_patch.tolist(),
-        "corner_printer_xy_mm": corner_printer.tolist(),
+        "fiducial_reference_patch_xy_mm": fiducial_reference_patch.tolist(),
+        "fiducial_reference_printer_xy_mm": fiducial_reference_printer.tolist(),
         "patch_x_vector_per_printer_x_mm": patch_x,
         "patch_y_vector_per_printer_y_mm": patch_y.tolist(),
         "printer_to_patch_xy_matrix": printer_to_patch.tolist(),
         "patch_to_printer_xy_matrix": patch_to_printer.tolist(),
         "patch_origin_printer_xy_mm": patch_origin.tolist(),
         "fiducial_center_printer_xy_mm": fiducial_centers,
-        "fiducial_reference_printer_xy_mm": reference.tolist(),
+        "fiducial_patch_centroid_printer_xy_mm": reference.tolist(),
         "fiducial_x_vector_model_px_per_mm": image_x_model,
         "fiducial_x_vector_at_red_capture_px_per_mm": image_x_at_capture,
         "red_capture_y_mm": float(capture_y_mm),
+    }
+
+
+def _fiducial_reference_at_capture(
+    metric: dict[str, Any], capture_y_mm: float
+) -> dict[str, Any]:
+    centers = np.asarray(metric["reference_marker_centers_px"], dtype=np.float64)
+    if centers.shape != (4, 2) or not np.all(np.isfinite(centers)):
+        raise VisionCalibrationError(
+            "bed metric requires four fiducial reference centers"
+        )
+    image_y = np.asarray(metric["image_y_axis_vector_px_per_mm"], dtype=np.float64)
+    reference_y = float(metric["reference_capture_y_mm"])
+    pixel = np.mean(centers, axis=0) + image_y * (float(capture_y_mm) - reference_y)
+    return {
+        "fiducial_reference_pixel_xy_px": pixel.tolist(),
+        "fiducial_reference_capture_y_mm": float(capture_y_mm),
+        "fiducial_reference_printer_xyz_mm": metric[
+            "fiducial_reference_printer_xyz_mm"
+        ],
+        "image_y_axis_vector_px_per_mm": metric["image_y_axis_vector_px_per_mm"],
     }
 
 
@@ -948,26 +961,6 @@ def prepare_job(
                     ],
                 }
             )
-    elif job_type == BED_TAB_CORNER_JOB:
-        offset = float(definition["capture_y_offset_mm"])
-        for seq in range(int(definition["duplicate_count"])):
-            frames.append(
-                {
-                    "seq": seq,
-                    "frame": f"corner_duplicate_{seq:02d}",
-                    "camera": "nozzle_cam",
-                    "profile": definition["profile"],
-                    "tool": "T0",
-                    "light_pixels": definition["light_pixels"],
-                    "duplicate_index": seq,
-                    "discard_fresh_frames": int(definition["discard_fresh_frames"]),
-                    "commanded_position_mm": [
-                        pose["x_mm"],
-                        pose["y_base_mm"] + offset,
-                        pose["z_mm"],
-                    ],
-                }
-            )
     elif job_type == RED_MARKER_X_JOB:
         for tool in ("T0", "T1"):
             for x_mm in definition["x_positions_mm"]:
@@ -989,10 +982,10 @@ def prepare_job(
                     }
                 )
     elif job_type == ROUGH_X_VERIFY_JOB:
-        bed_tab_x = float(
-            input_values["partial_bed_coordinate_system"]["corner_printer_xyz_mm"][0]
+        fiducial_x = float(CALIB.fiducial_reference()[0])
+        command_x = fiducial_x + float(
+            definition["verification_offset_from_fiducial_x_mm"]
         )
-        command_x = bed_tab_x + float(definition["verification_offset_x_mm"])
         definition["command_x_mm"] = command_x
         for tool in ("T0", "T1"):
             seq = len(frames)
@@ -1092,26 +1085,20 @@ def prepare_job(
             "active_calibration_snapshot"
         ]
     if job_type == RED_MARKER_X_JOB:
-        partial = input_values["partial_bed_coordinate_system"]
+        metric = input_values["bed_metric"]
         manifest["red_marker_reference"] = {
-            "corner_pixel_xy_px": partial["corner_pixel_xy_px"],
-            "corner_pixel_capture_y_mm": partial["corner_pixel_capture_y_mm"],
-            "corner_printer_xyz_mm": partial["corner_printer_xyz_mm"],
-            "image_y_axis_vector_px_per_mm": partial["image_y_axis_vector_px_per_mm"],
+            **_fiducial_reference_at_capture(metric, float(definition["capture_y_mm"])),
             "capture_y_mm": float(definition["capture_y_mm"]),
             "capture_z_mm": float(definition["capture_z_mm"]),
         }
     elif job_type == ROUGH_X_VERIFY_JOB:
-        partial = input_values["partial_bed_coordinate_system"]
+        metric = input_values["bed_metric"]
         x_axis = input_values["image_x_axis"]["axis_vector_px_per_mm"]
         active = input_values["rough_x_active_snapshot"]
         manifest["verification_reference"] = {
             "command_x_mm": definition["command_x_mm"],
-            "expected_offset_mm": definition["verification_offset_x_mm"],
-            "corner_pixel_xy_px": partial["corner_pixel_xy_px"],
-            "corner_pixel_capture_y_mm": partial["corner_pixel_capture_y_mm"],
-            "corner_printer_xyz_mm": partial["corner_printer_xyz_mm"],
-            "image_y_axis_vector_px_per_mm": partial["image_y_axis_vector_px_per_mm"],
+            "expected_offset_mm": definition["verification_offset_from_fiducial_x_mm"],
+            **_fiducial_reference_at_capture(metric, float(definition["capture_y_mm"])),
             "image_x_axis_vector_px_per_mm": x_axis,
             "capture_y_mm": float(definition["capture_y_mm"]),
             "capture_z_mm": float(definition["capture_z_mm"]),
@@ -1416,26 +1403,6 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 frames=manifest["frames"],
                 patch_points_mm=CALIB.fiducial_centers(),
             )
-        elif job_type == BED_TAB_CORNER_JOB:
-            metric = _resolve_current_fact(
-                "bed_metric",
-                "camera.nozzle_cam.bed_fiducial.local_metric_model",
-                1,
-            )[1]["value"]
-            capture_y = float(manifest["frames"][0]["commanded_position_mm"][1])
-            expected_marker_centers = np.asarray(
-                metric["reference_marker_centers_px"], dtype=np.float64
-            ) + np.asarray(
-                metric["image_y_axis_vector_px_per_mm"], dtype=np.float64
-            ) * (
-                capture_y - float(metric["reference_capture_y_mm"])
-            )
-            details = analyze_corner(
-                frame_paths,
-                artifact_dir,
-                frames=manifest["frames"],
-                expected_marker_centers_px=expected_marker_centers.tolist(),
-            )
         elif job_type == RED_MARKER_X_JOB:
             details = analyze_red_marker_x_sweep(
                 frame_paths,
@@ -1548,6 +1515,8 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                     "patch_reference_center_xy_mm": details[
                         "patch_reference_center_xy_mm"
                     ],
+                    "fiducial_reference_printer_xyz_mm": CALIB.fiducial_reference(),
+                    "fiducial_plane_printer_z_mm": CALIB.fiducial_z(),
                     "patch_y_vector_per_printer_y_mm": details[
                         "patch_y_vector_per_printer_y_mm"
                     ],
@@ -1592,76 +1561,13 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                             "image_y_axis_vector_px_per_mm",
                             "patch_to_image_homography",
                             "patch_reference_center_xy_mm",
+                            "fiducial_reference_printer_xyz_mm",
+                            "fiducial_plane_printer_z_mm",
                             "patch_y_vector_per_printer_y_mm",
                             "patch_x_axis_candidates_patch_mm_per_printer_mm",
                             "image_x_axis_candidate_models",
                             "reference_marker_centers_px",
                             "reference_capture_y_mm",
-                        },
-                    )
-                ]
-            elif job_type == BED_TAB_CORNER_JOB:
-                input_values = {
-                    item["requirement"]: _resolve_current_fact(
-                        item["requirement"],
-                        item["fact_name"],
-                        item["fact_definition_version"],
-                    )[1]["value"]
-                    for item in _active_input_facts(manifest)
-                }
-                metric = input_values["bed_metric"]
-                corner_capture_y = float(
-                    manifest["frames"][0]["commanded_position_mm"][1]
-                )
-                corner_at_metric_reference = np.asarray(
-                    details["corner_pixel_xy_px"], dtype=np.float64
-                ) - np.asarray(
-                    metric["image_y_axis_vector_px_per_mm"],
-                    dtype=np.float64,
-                ) * (
-                    corner_capture_y - float(metric["reference_capture_y_mm"])
-                )
-                corner_patch = _homography_inverse_point(
-                    metric["patch_to_image_homography"],
-                    corner_at_metric_reference.tolist(),
-                )
-                value = {
-                    "corner_pixel_xy_px": details["corner_pixel_xy_px"],
-                    "corner_pixel_capture_y_mm": corner_capture_y,
-                    "corner_pixel_at_metric_reference_px": corner_at_metric_reference.tolist(),
-                    "corner_printer_xyz_mm": CALIB.bed_corner(),
-                    "corner_patch_xy_mm": corner_patch,
-                    "image_y_axis_vector_px_per_mm": metric[
-                        "image_y_axis_vector_px_per_mm"
-                    ],
-                    "fiducial_plane_printer_z_mm": CALIB.fiducial_z(),
-                    "observed_patch_marker_centers_px": details[
-                        "patch_marker_centers_px"
-                    ],
-                    "quality": {
-                        "usable_frame_count": details["usable_frame_count"],
-                        "repeatability_max_px": details["repeatability_max_px"],
-                        "warnings": details["warnings"],
-                    },
-                    "supporting_artifact_hashes": {
-                        key: item["sha256"]
-                        for key, item in details["artifacts"].items()
-                    },
-                }
-                facts = [
-                    _fact(
-                        "camera.nozzle_cam.partial_bed_coordinate_system",
-                        "coordinate_system",
-                        value,
-                        dependencies,
-                        {
-                            "corner_pixel_xy_px",
-                            "corner_pixel_capture_y_mm",
-                            "corner_printer_xyz_mm",
-                            "corner_patch_xy_mm",
-                            "image_y_axis_vector_px_per_mm",
-                            "fiducial_plane_printer_z_mm",
-                            "observed_patch_marker_centers_px",
                         },
                     )
                 ]
@@ -1698,7 +1604,6 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 common_x = details["common_commanded_x_mm"]
                 mapping = _bed_fiducial_printer_xy_mapping(
                     metric=input_values["bed_metric"],
-                    partial=input_values["partial_bed_coordinate_system"],
                     image_x_axis=details["common_axis_vector_px_per_mm"],
                     patch_points_mm=CALIB.fiducial_centers(),
                     capture_y_mm=float(
@@ -1719,10 +1624,10 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         {"axis_vector_px_per_mm"},
                     ),
                     _fact(
-                        "tool.t0.red_marker_to_bed_tab_x_mm",
+                        "tool.t0.red_marker_to_fiducial_x_mm",
                         "coordinate_system",
                         {
-                            "offset_mm": details["t0_red_marker_to_bed_tab_x_mm"],
+                            "offset_mm": details["t0_red_marker_to_fiducial_x_mm"],
                             "reference_commanded_x_mm": common_x,
                             "image_line_model": details["tool_image_line_models"]["T0"],
                             "image_line_capture_y_mm": details[
@@ -1739,10 +1644,10 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         },
                     ),
                     _fact(
-                        "tool.t1.red_marker_to_bed_tab_x_mm",
+                        "tool.t1.red_marker_to_fiducial_x_mm",
                         "coordinate_system",
                         {
-                            "offset_mm": details["t1_red_marker_to_bed_tab_x_mm"],
+                            "offset_mm": details["t1_red_marker_to_fiducial_x_mm"],
                             "reference_commanded_x_mm": common_x,
                             "image_line_model": details["tool_image_line_models"]["T1"],
                             "image_line_capture_y_mm": details[
@@ -1767,15 +1672,15 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                         },
                         dependencies,
                         {
-                            "corner_patch_xy_mm",
-                            "corner_printer_xy_mm",
+                            "fiducial_reference_patch_xy_mm",
+                            "fiducial_reference_printer_xy_mm",
                             "patch_x_vector_per_printer_x_mm",
                             "patch_y_vector_per_printer_y_mm",
                             "printer_to_patch_xy_matrix",
                             "patch_to_printer_xy_matrix",
                             "patch_origin_printer_xy_mm",
                             "fiducial_center_printer_xy_mm",
-                            "fiducial_reference_printer_xy_mm",
+                            "fiducial_patch_centroid_printer_xy_mm",
                             "fiducial_x_vector_model_px_per_mm",
                             "fiducial_x_vector_at_red_capture_px_per_mm",
                             "red_capture_y_mm",
@@ -1843,7 +1748,7 @@ def analyze_job(job_id: str) -> dict[str, Any]:
                 value = {
                     "camera": "nozzle_cam",
                     "tools": details["tools"],
-                    "x_offsets_from_bed_tab_mm": details["x_offsets_from_bed_tab_mm"],
+                    "x_offsets_from_fiducial_mm": details["x_offsets_from_fiducial_mm"],
                     "z_positions_mm": details["z_positions_mm"],
                     "image_dimensions_px": details["image_dimensions_px"],
                     "records": details["records"],
@@ -2252,10 +2157,10 @@ def calculate_rough_x(
     status: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     t0_binding, t0 = _resolve_current_fact(
-        "t0_marker", "tool.t0.red_marker_to_bed_tab_x_mm", 1
+        "t0_marker", "tool.t0.red_marker_to_fiducial_x_mm", 1
     )
     t1_binding, t1 = _resolve_current_fact(
-        "t1_marker", "tool.t1.red_marker_to_bed_tab_x_mm", 1
+        "t1_marker", "tool.t1.red_marker_to_fiducial_x_mm", 1
     )
     printer_status = status or query_printer_status()
     settings = printer_status["configfile"]["settings"]
@@ -2266,7 +2171,7 @@ def calculate_rough_x(
         _settings(settings, "dual_carriage"), "position_endstop", "dual_carriage"
     )
     candidate = calculate_rough_x_candidate(
-        prior_xyz_mm=CALIB.bed_corner(),
+        prior_xyz_mm=CALIB.fiducial_reference(),
         t0_marker_fact=t0["value"],
         t1_marker_fact=t1["value"],
         old_t0_x_endstop_mm=(
@@ -2308,7 +2213,7 @@ def record_rough_x_activation(
                 f"active {tool} endstop {active[tool]} != candidate {expected}"
             )
     value = {
-        "bed_tab_x_mm": candidate["bed_tab_corner_xyz_mm"][0],
+        "fiducial_reference_x_mm": candidate["fiducial_reference_printer_xyz_mm"][0],
         "t0_old_x_endstop_mm": old_t0_x_endstop_mm,
         "t0_calculated_correction_mm": candidate["tools"]["T0"][
             "calculated_correction_mm"
@@ -2339,7 +2244,7 @@ def record_rough_x_activation(
         value,
         dependencies,
         {
-            "bed_tab_x_mm",
+            "fiducial_reference_x_mm",
             "t0_old_x_endstop_mm",
             "t0_calculated_correction_mm",
             "t0_applied_x_endstop_mm",
@@ -2417,7 +2322,6 @@ img{{max-width:100%;height:auto}} .card{{background:#20242b;border:1px solid #4a
 
 def _coordinate_summary(name: str, value: dict[str, Any]) -> str:
     fields = {
-        "bed.tab_corner.printer_xyz": ["xyz_mm"],
         "bed.fiducial_patch.physical_reference": [
             "outer_diameter_mm",
             "center_spacing_xy_mm",
@@ -2428,11 +2332,6 @@ def _coordinate_summary(name: str, value: dict[str, Any]) -> str:
             "patch_y_vector_per_printer_y_mm",
             "image_x_axis_candidate_models",
         ],
-        "camera.nozzle_cam.partial_bed_coordinate_system": [
-            "corner_pixel_xy_px",
-            "corner_printer_xyz_mm",
-            "corner_patch_xy_mm",
-        ],
         "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2": [
             "axis_vector_px_per_mm"
         ],
@@ -2441,11 +2340,11 @@ def _coordinate_summary(name: str, value: dict[str, Any]) -> str:
             "patch_y_vector_per_printer_y_mm",
             "fiducial_reference_printer_xy_mm",
         ],
-        "tool.t0.red_marker_to_bed_tab_x_mm": [
+        "tool.t0.red_marker_to_fiducial_x_mm": [
             "offset_mm",
             "reference_commanded_x_mm",
         ],
-        "tool.t1.red_marker_to_bed_tab_x_mm": [
+        "tool.t1.red_marker_to_fiducial_x_mm": [
             "offset_mm",
             "reference_commanded_x_mm",
         ],

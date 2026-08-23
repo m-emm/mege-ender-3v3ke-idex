@@ -285,22 +285,6 @@ gcode:
         active_config_fingerprint=fingerprint
     )}
 
-[gcode_macro IDEX_BED_TAB_CORNER_CALIBRATE]
-description: Acquire and analyze the dependency-bound nozzle-camera bed-tab corner job.
-gcode:
-    {% set name = params.NAME|default("bed_tab_corner") %}
-    {% set print_state = printer.print_stats.state %}
-    {% set fingerprint = printer["gcode_macro _IDEX_CONFIG_FINGERPRINT"].source_sha256 %}
-    {% if print_state not in ["standby", "complete"] %}
-        { action_raise_error("IDEX_BED_TAB_CORNER_CALIBRATE requires an idle printer; print_stats.state=" ~ print_state) }
-    {% endif %}
-    RESPOND TYPE=echo MSG="Bed-tab corner calibration queued: NAME={name}. Watch /vision/ for progress."
-    {action_call_remote_method(
-        "idex_bed_tab_corner_calibrate",
-        name=name,
-        active_config_fingerprint=fingerprint
-    )}
-
 [gcode_macro IDEX_RED_MARKER_X_SWEEP_CALIBRATE]
 description: Acquire, analyze, and publish the coarse T0/T1 red-marker X facts.
 gcode:
@@ -318,7 +302,7 @@ gcode:
     )}
 
 [gcode_macro IDEX_ROUGH_X_VERIFY]
-description: Verify both calibrated red markers at X=bed-tab-X+10 mm.
+description: Verify both calibrated red markers at the fiducial-relative rough-X position.
 gcode:
     {% set name = params.NAME|default("rough_x_verify") %}
     {% set print_state = printer.print_stats.state %}
@@ -326,7 +310,7 @@ gcode:
     {% if print_state not in ["standby", "complete"] %}
         { action_raise_error("IDEX_ROUGH_X_VERIFY requires an idle printer; print_stats.state=" ~ print_state) }
     {% endif %}
-    RESPOND TYPE=echo MSG="Rough T0/T1 X verification queued at bed-tab X+10 mm. Watch /vision/ for both frames and residuals."
+    RESPOND TYPE=echo MSG="Rough T0/T1 X verification queued at the fiducial-relative position. Watch /vision/ for both frames and residuals."
     {action_call_remote_method(
         "idex_rough_tool_x_verify",
         name=name,

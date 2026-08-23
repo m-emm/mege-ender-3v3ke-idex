@@ -365,15 +365,9 @@ def prepare_measurement(
         internal_y - metric_reference_y
     )
     image_x_vector = _x_vector_at_capture(mapping, internal_y)
-    corner_xy = _vector(mapping.get("corner_printer_xy_mm"), "bed corner printer XY")
     fiducial_xy = _vector(
         mapping.get("fiducial_reference_printer_xy_mm"),
         "fiducial reference printer XY",
-    )
-    corner_pixel_at_capture = (
-        patch_center_at_capture
-        + image_x_vector * (corner_xy[0] - fiducial_xy[0])
-        + image_y_vector * (corner_xy[1] - fiducial_xy[1])
     )
     marker_offset = _number(marker, "offset_mm", f"{tool} marker reference")
     marker_reference_x = _number(
@@ -387,13 +381,13 @@ def prepare_measurement(
     )
 
     offsets_x = [
-        float(item) for item in definition.get("x_offsets_from_bed_tab_mm", [])
+        float(item) for item in definition.get("x_offsets_from_fiducial_mm", [])
     ]
     if not offsets_x or not all(math.isfinite(item) for item in offsets_x):
         raise ToolXYError("tool-XY X offsets must contain finite numeric values")
     frames = []
     for seq, offset_x in enumerate(offsets_x):
-        x_mm = float(corner_xy[0]) + offset_x
+        x_mm = float(fiducial_xy[0]) + offset_x
         if not float(axis_minimum[0]) <= x_mm <= float(axis_maximum[0]):
             raise ToolXYError(f"tool-XY commanded X {x_mm:.6f} is out of limits")
         expected_marker = _marker_image_center_at_x(
@@ -412,7 +406,7 @@ def prepare_measurement(
                 "camera": "nozzle_cam",
                 "profile": definition["profile"],
                 "tool": tool,
-                "x_offset_from_bed_tab_mm": offset_x,
+                "x_offset_from_fiducial_mm": offset_x,
                 "x_mm": x_mm,
                 "y_mm": capture_y,
                 "z_mm": commanded_z,
@@ -432,7 +426,7 @@ def prepare_measurement(
                 "capture_endstop_gap_mm": gap,
                 "commanded_z_mm": commanded_z,
                 "fiducial_reference_printer_xy_mm": fiducial_xy,
-                "corner_printer_xy_mm": corner_xy,
+                "fiducial_reference_pixel_at_capture_px": patch_center_at_capture,
                 "image_x_vector_px_per_mm": image_x_vector,
                 "image_y_vector_px_per_mm": image_y_vector,
                 "marker_x_vector_px_per_mm": marker_x_vector,
@@ -670,7 +664,6 @@ def analyze_measurement(
     image_y_vector = _vector(
         reference.get("image_y_vector_px_per_mm"), "image Y vector"
     )
-    corner_xy = _vector(reference.get("corner_printer_xy_mm"), "bed corner printer XY")
     fiducial_xy = _vector(
         reference.get("fiducial_reference_printer_xy_mm"),
         "fiducial reference printer XY",

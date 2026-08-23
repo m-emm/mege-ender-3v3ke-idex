@@ -282,20 +282,14 @@ links use the `/vision/` URL prefix.
 ## Vision Calibration Framework
 
 The clean chain starts with the flat values in `priors.yaml` for the 8 mm
-square fiducial patch, its printer-Z plane (`-0.6 mm`), and the bed-tab corner
-(`[173, -18, 0] mm`). Vision runtime code reads these through `CalibDAO`; they
+square fiducial patch, its printer-Z plane (`-0.6 mm`), and the master fiducial-centre datum
+(`[166.709424, -24.839235, -0.6] mm`). Vision runtime code reads these through `CalibDAO`; they
 are configuration, not published graph facts.
 Capture the six-frame `0, 10, 20, 20, 10, 0 mm` printer-Y sweep under the
 standard nozzle-camera lighting and recover the local fiducial metric:
 
 ```gcode
 IDEX_BED_FIDUCIAL_METRIC_CALIBRATE NAME=bed_fiducial_metric
-```
-
-Observe the bed-tab corner relative to that metric:
-
-```gcode
-IDEX_BED_TAB_CORNER_CALIBRATE NAME=bed_tab_corner
 ```
 
 The coarse red-marker sweep establishes image X and both tool relations:
@@ -307,7 +301,7 @@ IDEX_RED_MARKER_X_SWEEP_CALIBRATE NAME=red_marker_x_sweep
 Accepted red-marker jobs publish their three coordinate facts immediately. They
 do not modify `calib.yaml` or activate either tool's X endstop.
 
-Calculate both tool X endstops independently from the fixed bed prior:
+Calculate both tool X endstops independently from the fixed fiducial datum:
 
 ```bash
 /usr/local/bin/vision_calibration.py calculate-rough-x
@@ -330,8 +324,8 @@ X=183:
 IDEX_ROUGH_X_VERIFY NAME=rough_x_activation_verify
 ```
 
-The verification expects each red marker to project 10 mm along the measured
-image-X axis from the fixed bed-tab corner and expects the two marker image-X
+The verification expects each red marker to project 16.290576 mm along the measured
+image-X axis from the fixed fiducial-centre datum and expects the two marker image-X
 positions to agree. It is report-only and does not change configuration.
 
 The independent Eddy diagnostic commands T0 through four X positions from
@@ -385,7 +379,6 @@ The corresponding host job types, in dependency order, are:
 
 ```text
 nozzle_cam_bed_fiducial_y_metric
-nozzle_cam_bed_tab_corner
 idex_tool_red_marker_x_sweep
 idex_rough_tool_x_verify
 idex_eddy_fiducial_xz_grid

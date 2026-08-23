@@ -1,4 +1,4 @@
-bed_corner_xyz_mm: [173.0, -18.0, 0.0]
+fiducial_reference_printer_xyz_mm: [160.0, -24.839235, -0.6]
 fiducial_origin_xy_mm: [3.0, 3.0]
 fiducial_spacing_xy_mm: [8.0, 8.0]
 fiducial_z_mm: -0.6

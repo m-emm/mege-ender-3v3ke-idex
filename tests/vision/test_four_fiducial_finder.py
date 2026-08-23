@@ -194,12 +194,6 @@ def _write_downstream_absolute_x_plot(tool, result, path, *, show_model):
                 float(result["fiducial_reference_pixel_at_fine_capture_px"][0]),
                 (175, 70, 165),
             ),
-            (
-                "bed-tab fiducial",
-                float(result["bed_tab_printer_x_mm"]),
-                float(result["bed_tab_corner_pixel_at_fine_capture_px"][0]),
-                (35, 115, 220),
-            ),
         )
         dense_z_values = np.linspace(model_z_min, model_z_max, 181)
         predicted_x_values = (
@@ -1103,5 +1097,4 @@ def test_replay_captured_t0_and_t1_and_render_overlays():
             _logger.warning(
                 f"Center offset for {path_obj.name} is {offset}, which exceeds the threshold. See overlay at {overlay_path}"
             )
-
 

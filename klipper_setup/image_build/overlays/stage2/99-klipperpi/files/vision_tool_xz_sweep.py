@@ -472,15 +472,9 @@ def _tool_reference(
         internal_y - metric_reference_y
     )
     image_x_vector = _x_vector_at_capture(mapping, internal_y)
-    corner_xy = _vector(mapping.get("corner_printer_xy_mm"), "bed corner printer XY")
     fiducial_xy = _vector(
         mapping.get("fiducial_reference_printer_xy_mm"),
         "fiducial reference printer XY",
-    )
-    corner_pixel_at_capture = (
-        patch_center_at_capture
-        + image_x_vector * (corner_xy[0] - fiducial_xy[0])
-        + image_y_vector * (corner_xy[1] - fiducial_xy[1])
     )
     marker_offset = _number(marker, "offset_mm", f"{tool} marker reference")
     marker_reference_x = _number(
@@ -514,9 +508,8 @@ def _tool_reference(
         "image_x_vector_px_per_mm": image_x_vector,
         "image_y_vector_px_per_mm": image_y_vector,
         "marker_x_vector_px_per_mm": marker_x_vector,
-        "corner_printer_xy_mm": corner_xy,
         "fiducial_reference_printer_xy_mm": fiducial_xy,
-        "corner_pixel_at_capture_px": corner_pixel_at_capture,
+        "fiducial_reference_pixel_at_capture_px": patch_center_at_capture,
         "marker_offset_mm": marker_offset,
         "marker_reference_commanded_x_mm": marker_reference_x,
         "nozzle_image_prior": nozzle_image_prior,
@@ -537,7 +530,7 @@ def prepare_sweep(
 
     x_offsets = [
         _number({"value": value}, "value", "X offsets")
-        for value in definition.get("x_offsets_from_bed_tab_mm", [])
+        for value in definition.get("x_offsets_from_fiducial_mm", [])
     ]
     z_positions = [
         _number({"value": value}, "value", "Z positions")
@@ -546,11 +539,12 @@ def prepare_sweep(
     if not x_offsets or not z_positions:
         raise ToolXZSweepError("X/Z sweep requires non-empty X and Z positions")
 
-    partial = input_values.get("partial_bed_coordinate_system")
-    if not isinstance(partial, dict):
-        raise ToolXZSweepError("X/Z sweep lacks the bed-tab coordinate system")
-    corner_xy = _vector(
-        partial.get("corner_printer_xyz_mm", [])[:2], "bed corner printer XY"
+    mapping = input_values.get("bed_fiducial_printer_xy_mapping")
+    if not isinstance(mapping, dict):
+        raise ToolXZSweepError("X/Z sweep lacks the fiducial printer mapping")
+    fiducial_xy = _vector(
+        mapping.get("fiducial_reference_printer_xy_mm"),
+        "fiducial reference printer XY",
     )
 
     axis_minimum = resolved.get("axis_minimum")
@@ -560,7 +554,7 @@ def prepare_sweep(
 
     references = {}
     frames = []
-    commanded_x_values = [float(corner_xy[0]) + offset for offset in x_offsets]
+    commanded_x_values = [float(fiducial_xy[0]) + offset for offset in x_offsets]
     for tool in tools:
         reference = _tool_reference(
             tool,
@@ -577,7 +571,7 @@ def prepare_sweep(
         references[tool.lower()] = reference
         for z_mm in z_positions:
             for offset_x in x_offsets:
-                x_mm = float(corner_xy[0]) + offset_x
+                x_mm = float(fiducial_xy[0]) + offset_x
                 y_mm = float(reference["capture_y_mm"])
                 if not float(axis_minimum[0]) <= x_mm <= float(axis_maximum[0]):
                     raise ToolXZSweepError(
@@ -585,9 +579,9 @@ def prepare_sweep(
                     )
                 if not float(axis_minimum[2]) <= z_mm <= float(axis_maximum[2]):
                     raise ToolXZSweepError(f"commanded Z {z_mm:.6f} is out of limits")
-                expected_marker = reference["corner_pixel_at_capture_px"] + reference[
-                    "marker_x_vector_px_per_mm"
-                ] * (
+                expected_marker = reference[
+                    "fiducial_reference_pixel_at_capture_px"
+                ] + reference["marker_x_vector_px_per_mm"] * (
                     reference["marker_offset_mm"]
                     + x_mm
                     - reference["marker_reference_commanded_x_mm"]
@@ -602,7 +596,7 @@ def prepare_sweep(
                         "camera": "nozzle_cam",
                         "profile": definition["profile"],
                         "tool": tool,
-                        "x_offset_from_bed_tab_mm": offset_x,
+                        "x_offset_from_fiducial_mm": offset_x,
                         "x_mm": x_mm,
                         "y_mm": y_mm,
                         "z_mm": z_mm,
@@ -617,7 +611,7 @@ def prepare_sweep(
             "frames": frames,
             "references": references,
             "active_tool_calibration": _active_tool_state(resolved),
-            "x_offsets_from_bed_tab_mm": x_offsets,
+            "x_offsets_from_fiducial_mm": x_offsets,
             "z_positions_mm": z_positions,
         }
     )
@@ -2162,8 +2156,8 @@ def analyze(
             "reasons": [],
             "warnings": warnings,
             "tools": ["T0", "T1"],
-            "x_offsets_from_bed_tab_mm": sorted(
-                {float(frame["x_offset_from_bed_tab_mm"]) for frame in frames}
+            "x_offsets_from_fiducial_mm": sorted(
+                {float(frame["x_offset_from_fiducial_mm"]) for frame in frames}
             ),
             "z_positions_mm": sorted({float(frame["z_mm"]) for frame in frames}),
             "image_dimensions_px": image_dimensions,

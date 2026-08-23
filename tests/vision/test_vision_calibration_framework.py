@@ -91,7 +91,7 @@ def test_registry_does_not_pin_tunable_job_values():
     registry = json.loads((FILES / "vision_job_types.json").read_text(encoding="utf-8"))
     measurement = registry["job_types"]["idex_tool_xy_measure_t0"]
     measurement["tool"] = "T1"
-    measurement["x_offsets_from_bed_tab_mm"] = [22.0, 10.0, 22.0]
+    measurement["x_offsets_from_fiducial_mm"] = [22.0, 10.0, 22.0]
     measurement["commanded_z_mm"] = 1.25
     measurement["capture_endstop_gap_mm"] = 0.75
     measurement["safe_tool_change_z_mm"] = 12.0
@@ -641,13 +641,12 @@ def test_flat_priors_replace_active_seed_fact_dependencies():
     priors = yaml.safe_load(priors_path.read_text(encoding="utf-8"))
     registry = json.loads((FILES / "vision_job_types.json").read_text(encoding="utf-8"))
     retired = {
-        "bed.tab_corner.printer_xyz",
         "bed.fiducial_patch.physical_reference",
         "bed.fiducial_patch.printer_z_mm",
     }
 
     assert set(priors) == {
-        "bed_corner_xyz_mm",
+        "fiducial_reference_printer_xyz_mm",
         "fiducial_origin_xy_mm",
         "fiducial_spacing_xy_mm",
         "fiducial_z_mm",

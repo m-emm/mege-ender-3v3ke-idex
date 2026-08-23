@@ -70,9 +70,14 @@ class CalibDAO:
             raise ValueError(f"{path} requires numeric {key}[{length}]")
         return [float(item) for item in value]
 
-    def bed_corner(self) -> list[float]:
+    def fiducial_reference(self) -> list[float]:
         priors = self._load(self.priors_path, "vision priors")
-        return self._vector(priors, "bed_corner_xyz_mm", 3, self.priors_path)
+        return self._vector(
+            priors,
+            "fiducial_reference_printer_xyz_mm",
+            3,
+            self.priors_path,
+        )
 
     def fiducial_centers(self) -> list[list[float]]:
         priors = self._load(self.priors_path, "vision priors")

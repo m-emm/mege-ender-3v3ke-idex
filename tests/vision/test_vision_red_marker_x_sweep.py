@@ -219,10 +219,9 @@ def test_recovers_marker_axis_and_rejects_larger_red_distractor(tmp_path):
         tmp_path / "artifacts",
         frames=frames,
         reference={
-            "corner_pixel_xy_px": [300.0, 100.0],
-            "corner_printer_xyz_mm": [170.0, -20.0, 0.0],
+            "fiducial_reference_pixel_xy_px": [300.0, 100.0],
+            "fiducial_reference_printer_xyz_mm": [166.709424, -24.839235, -0.6],
             "image_y_axis_vector_px_per_mm": [-0.11, -5.25],
-            "corner_pixel_capture_y_mm": -20.0,
             "capture_y_mm": -14.0,
         },
         localizer={"kind": "red_marker_trajectory", "version": 1},
@@ -258,10 +257,9 @@ def test_rejects_missing_tool_trajectory(tmp_path):
         tmp_path / "missing-artifacts",
         frames=frames,
         reference={
-            "corner_pixel_xy_px": [300.0, 100.0],
-            "corner_printer_xyz_mm": [170.0, -20.0, 0.0],
+            "fiducial_reference_pixel_xy_px": [300.0, 100.0],
+            "fiducial_reference_printer_xyz_mm": [166.709424, -24.839235, -0.6],
             "image_y_axis_vector_px_per_mm": [-0.11, -5.25],
-            "corner_pixel_capture_y_mm": -20.0,
             "capture_y_mm": -14.0,
         },
         localizer={"kind": "red_marker_trajectory", "version": 1},
@@ -303,7 +301,11 @@ def test_live_exp600_fixture_emits_debug_overlays():
         frame_paths,
         artifact_dir,
         frames=frames,
-        reference=manifest["red_marker_reference"],
+        reference={
+            **manifest["red_marker_reference"],
+            "fiducial_reference_pixel_xy_px": manifest["red_marker_reference"]["corner_pixel_xy_px"],
+            "fiducial_reference_printer_xyz_mm": [166.709424, -24.839235, -0.6],
+        },
         localizer=manifest["localizer"],
     )
     run_root.mkdir(parents=True, exist_ok=True)

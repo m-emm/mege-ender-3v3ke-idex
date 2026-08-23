@@ -61,9 +61,6 @@ def _inputs():
             "nozzle_image_prior": _prior(),
             "acquisition_endstop_xy_mm": [endstops["t1"]["x"], endstops["t1"]["y"]],
         },
-        "partial_bed_coordinate_system": {
-            "corner_printer_xyz_mm": [173.0, -18.0, 0.0],
-        },
         "bed_metric": {
             "image_y_axis_vector_px_per_mm": [0.0, -10.0],
             "reference_marker_centers_px": [
@@ -75,7 +72,6 @@ def _inputs():
             "reference_capture_y_mm": -14.0,
         },
         "bed_fiducial_printer_xy_mapping": {
-            "corner_printer_xy_mm": [173.0, -18.0],
             "fiducial_reference_printer_xy_mm": [180.0, -11.0],
             "fiducial_x_vector_model_px_per_mm": {
                 "reference_vector_px_per_mm": [10.0, 0.0],
@@ -122,7 +118,7 @@ def test_prepare_builds_both_tool_grids_with_per_tool_commanded_y():
         resolved=_resolved(),
     )
 
-    expected_per_tool = len(definition["x_offsets_from_bed_tab_mm"]) * len(
+    expected_per_tool = len(definition["x_offsets_from_fiducial_mm"]) * len(
         definition["z_positions_mm"]
     )
     assert len(result["frames"]) == 2 * expected_per_tool
@@ -141,8 +137,8 @@ def test_prepare_builds_both_tool_grids_with_per_tool_commanded_y():
     } == {-13.3}
     assert [
         frame["commanded_position_mm"][0]
-        for frame in result["frames"][: len(definition["x_offsets_from_bed_tab_mm"])]
-    ] == [173.0 + value for value in definition["x_offsets_from_bed_tab_mm"]]
+        for frame in result["frames"][: len(definition["x_offsets_from_fiducial_mm"])]
+    ] == [180.0 + value for value in definition["x_offsets_from_fiducial_mm"]]
 
 
 def test_prepare_requires_and_propagates_xy_nozzle_image_prior():
@@ -255,7 +251,7 @@ def test_prepare_accepts_exact_and_extrapolated_commanded_x_values():
     assert result["references"]["t1"]["nozzle_image_prior"] == _prior()
 
     definition = _definition()
-    definition["x_offsets_from_bed_tab_mm"] = [-100, 10, 25, 100]
+    definition["x_offsets_from_fiducial_mm"] = [-100, 10, 25, 100]
     result = module.prepare_sweep(
         definition, input_values=_inputs(), resolved=_resolved()
     )
@@ -493,7 +489,7 @@ def test_analysis_writes_raw_records_and_two_plots(tmp_path, monkeypatch):
                 "seq": seq,
                 "frame": f"frame_{seq}",
                 "tool": tool,
-                "x_offset_from_bed_tab_mm": x_mm - 173.0,
+                "x_offset_from_fiducial_mm": x_mm - 180.0,
                 "x_mm": x_mm,
                 "y_mm": y_mm,
                 "z_mm": z_mm,

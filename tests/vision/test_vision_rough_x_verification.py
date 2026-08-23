@@ -36,10 +36,9 @@ def _module():
 def _reference():
     return {
         "image_x_axis_vector_px_per_mm": [4.0, 0.0],
-        "corner_pixel_xy_px": [300.0, 300.0],
-        "corner_printer_xyz_mm": [173.0, -18.0, 0.0],
+        "fiducial_reference_pixel_xy_px": [300.0, 300.0],
+        "fiducial_reference_printer_xyz_mm": [160.0, -24.839235, -0.6],
         "image_y_axis_vector_px_per_mm": [0.0, -5.0],
-        "corner_pixel_capture_y_mm": -18.0,
         "capture_y_mm": -18.0,
         "expected_offset_mm": 10.0,
         "command_x_mm": 183.0,
@@ -76,12 +75,12 @@ def _verification_frames(tmp_path, marker_x=340, include_marker=True):
     return paths, frames
 
 
-def test_calculates_both_endstops_against_fixed_bed_prior():
+def test_calculates_both_endstops_against_fixed_fiducial_prior():
     module = _module()
     result = module.calculate_candidate(
-        prior_xyz_mm=[173.0, -18.0, 0.0],
-        t0_marker_fact={"offset_mm": 16.6, "reference_commanded_x_mm": 190.0},
-        t1_marker_fact={"offset_mm": 6.6, "reference_commanded_x_mm": 190.0},
+        prior_xyz_mm=[166.709424, -24.839235, -0.6],
+        t0_marker_fact={"offset_mm": 22.890576, "reference_commanded_x_mm": 190.0},
+        t1_marker_fact={"offset_mm": 12.890576, "reference_commanded_x_mm": 190.0},
         old_t0_x_endstop_mm=-80.4,
         old_t1_x_endstop_mm=357.5,
     )
@@ -90,6 +89,26 @@ def test_calculates_both_endstops_against_fixed_bed_prior():
     assert result["tools"]["T1"]["calculated_correction_mm"] == pytest.approx(-10.4)
     assert result["tools"]["T0"]["candidate_x_endstop_mm"] == pytest.approx(-80.8)
     assert result["tools"]["T1"]["candidate_x_endstop_mm"] == pytest.approx(347.1)
+
+
+def test_rebased_fiducial_datum_changes_candidates_by_only_the_datum_delta():
+    module = _module()
+    result = module.calculate_candidate(
+        prior_xyz_mm=[160.0, -24.839235, -0.6],
+        t0_marker_fact={"offset_mm": 19.518139793553985, "reference_commanded_x_mm": 180.0},
+        t1_marker_fact={"offset_mm": 19.408633398503337, "reference_commanded_x_mm": 180.0},
+        old_t0_x_endstop_mm=-85.472,
+        old_t1_x_endstop_mm=346.104,
+    )
+
+    assert result["tools"]["T0"]["calculated_correction_mm"] == pytest.approx(
+        -0.4818602064
+    )
+    assert result["tools"]["T1"]["calculated_correction_mm"] == pytest.approx(
+        -0.5913666015
+    )
+    assert result["tools"]["T0"]["candidate_x_endstop_mm"] == pytest.approx(-85.954)
+    assert result["tools"]["T1"]["candidate_x_endstop_mm"] == pytest.approx(345.513)
 
 
 def test_accepts_two_markers_at_expected_x_projection(tmp_path):
@@ -115,12 +134,45 @@ def test_accepts_two_markers_at_expected_x_projection(tmp_path):
     }
 
 
-def test_projects_corner_from_its_capture_y_not_the_physical_prior_y(tmp_path):
+def test_representation_spread_is_reported_as_warning_not_rejection(tmp_path, monkeypatch):
+    module = _module()
+    paths, frames = _verification_frames(tmp_path)
+
+    def registration_with_representation_spread(*_args, **_kwargs):
+        return {
+            "shift_px": [0.0, 0.0],
+            "minimum_correlation": 0.8,
+            "median_correlation": 0.9,
+            "maximum_forward_reverse_disagreement_px": 1.0,
+            "boundary_hit": False,
+            "usable_representations": ["gray", "clahe"],
+            "representations": {
+                "gray": {"combined_shift_px": [0.0, 0.0]},
+                "clahe": {"combined_shift_px": [3.4, 0.0]},
+            },
+        }
+
+    monkeypatch.setattr(module, "_pair_registration", registration_with_representation_spread)
+    result = module.analyze(
+        paths,
+        tmp_path / "spread-warning-artifacts",
+        frames=frames,
+        reference=_reference(),
+        localizer={"kind": "rough_x_marker_verification", "version": 1},
+    )
+
+    assert result["accepted"]
+    assert not result["reasons"]
+    assert result["warnings"] == [
+        "grayscale and CLAHE image-X marker registrations differ by 3.400 px; diagnostic only"
+    ]
+
+
+def test_uses_the_fiducial_reference_at_the_verification_capture_y(tmp_path):
     module = _module()
     paths, frames = _verification_frames(tmp_path)
     reference = _reference()
-    reference["corner_pixel_xy_px"] = [300.0, 100.0]
-    reference["corner_pixel_capture_y_mm"] = 5.0
+    reference["fiducial_reference_pixel_xy_px"] = [300.0, 200.0]
     reference["capture_y_mm"] = -15.0
 
     result = module.analyze(
@@ -131,7 +183,7 @@ def test_projects_corner_from_its_capture_y_not_the_physical_prior_y(tmp_path):
         localizer={"kind": "rough_x_marker_verification", "version": 1},
     )
 
-    assert result["corner_pixel_at_capture_y_px"] == pytest.approx([300.0, 200.0])
+    assert result["fiducial_reference_pixel_at_capture_y_px"] == pytest.approx([300.0, 200.0])
 
 
 def test_rejects_mutually_aligned_markers_at_wrong_absolute_x(tmp_path):

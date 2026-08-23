@@ -20,7 +20,7 @@ LOCALIZER = {"kind": "rough_x_marker_verification", "version": 1}
 MAX_ABSOLUTE_RESIDUAL_MM = 1.5
 MAX_CROSS_TOOL_DISAGREEMENT_MM = 1.0
 MIN_CROSS_TOOL_CORRELATION = 0.65
-MAX_REPRESENTATION_SPREAD_PX = 2.5
+REPRESENTATION_SPREAD_WARNING_PX = 2.5
 MAX_FORWARD_REVERSE_DISAGREEMENT_PX = 2.5
 
 
@@ -48,10 +48,10 @@ def calculate_candidate(
     decimals: int = 3,
 ) -> dict[str, Any]:
     if len(prior_xyz_mm) != 3:
-        raise ValueError("bed-tab prior must contain XYZ")
-    bed_tab_x = float(prior_xyz_mm[0])
+        raise ValueError("fiducial reference prior must contain XYZ")
+    fiducial_x = float(prior_xyz_mm[0])
     result: dict[str, Any] = {
-        "bed_tab_corner_xyz_mm": [float(value) for value in prior_xyz_mm],
+        "fiducial_reference_printer_xyz_mm": [float(value) for value in prior_xyz_mm],
         "tools": {},
     }
     for tool, fact, old_endstop in (
@@ -60,11 +60,11 @@ def calculate_candidate(
     ):
         offset = float(fact["offset_mm"])
         reference_x = float(fact["reference_commanded_x_mm"])
-        correction = bed_tab_x + offset - reference_x
+        correction = fiducial_x + offset - reference_x
         exact_candidate = float(old_endstop) + correction
         result["tools"][tool] = {
             "old_x_endstop_mm": float(old_endstop),
-            "marker_to_bed_tab_x_mm": offset,
+            "marker_to_fiducial_x_mm": offset,
             "reference_commanded_x_mm": reference_x,
             "calculated_correction_mm": correction,
             "exact_candidate_x_endstop_mm": exact_candidate,
@@ -75,11 +75,11 @@ def calculate_candidate(
 
 def _projection_mm(
     point: np.ndarray,
-    corner: np.ndarray,
+    reference: np.ndarray,
     unit_x: np.ndarray,
     scale: float,
 ) -> float:
-    return float(np.dot(point - corner, unit_x) / scale)
+    return float(np.dot(point - reference, unit_x) / scale)
 
 
 def _image_x_representation_spread_px(
@@ -105,7 +105,7 @@ def _image_x_representation_spread_px(
 def _select_candidate(
     candidates: list[dict[str, Any]],
     *,
-    corner: np.ndarray,
+    reference: np.ndarray,
     unit_x: np.ndarray,
     scale: float,
     expected_offset_mm: float,
@@ -113,7 +113,7 @@ def _select_candidate(
     scored = []
     for candidate in candidates:
         center = np.asarray(candidate["center_px"], dtype=float)
-        offset = _projection_mm(center, corner, unit_x, scale)
+        offset = _projection_mm(center, reference, unit_x, scale)
         scored.append(
             {
                 **candidate,
@@ -151,7 +151,7 @@ def _verification_overlay(
     images: list[np.ndarray],
     records: list[dict[str, Any]],
     *,
-    corner: np.ndarray,
+    reference: np.ndarray,
     expected_point: np.ndarray,
     unit_x: np.ndarray,
     path: Path,
@@ -162,7 +162,7 @@ def _verification_overlay(
         _line_through_projection(panel, expected_point, unit_x, (0, 255, 255), 4)
         cv2.circle(
             panel,
-            tuple(int(round(value)) for value in corner),
+            tuple(int(round(value)) for value in reference),
             14,
             (255, 255, 0),
             3,
@@ -201,7 +201,7 @@ def _verification_overlay(
         )
         cv2.putText(
             panel,
-            "yellow: expected +10 mm image-X  cyan: bed-tab corner",
+            "yellow: expected marker image-X  cyan: fiducial reference",
             (35, 100),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.75,
@@ -292,22 +292,20 @@ def analyze(
     if not math.isfinite(scale) or scale <= 0.0:
         raise ValueError("rough-X verification image X axis is degenerate")
     unit_x = x_vector / scale
-    corner = np.asarray(reference["corner_pixel_xy_px"], dtype=float)
-    y_vector = np.asarray(reference["image_y_axis_vector_px_per_mm"], dtype=float)
-    capture_y = float(reference["capture_y_mm"])
-    corner_at_capture = corner + y_vector * (
-        capture_y - float(reference["corner_pixel_capture_y_mm"])
+    fiducial_reference = np.asarray(
+        reference["fiducial_reference_pixel_xy_px"], dtype=float
     )
     expected_offset = float(reference["expected_offset_mm"])
-    expected_point = corner_at_capture + x_vector * expected_offset
+    expected_point = fiducial_reference + x_vector * expected_offset
 
     records = []
     reasons: list[str] = []
+    warnings: list[str] = []
     for index, (image, frame) in enumerate(zip(images, frames)):
         candidates = _red_candidates(image, index)
         selected, scored = _select_candidate(
             candidates,
-            corner=corner_at_capture,
+            reference=fiducial_reference,
             unit_x=unit_x,
             scale=scale,
             expected_offset_mm=expected_offset,
@@ -343,7 +341,7 @@ def analyze(
             registration["shift_px"], dtype=float
         )
         t1_registered_offset = _projection_mm(
-            registered_t1_center, corner_at_capture, unit_x, scale
+            registered_t1_center, fiducial_reference, unit_x, scale
         )
         records[1]["registered_marker_center_px"] = registered_t1_center.tolist()
         records[1]["marker_offset_mm"] = t1_registered_offset
@@ -352,11 +350,12 @@ def analyze(
             reasons.append("cross-tool marker registration hit a search boundary")
         if registration["minimum_correlation"] < MIN_CROSS_TOOL_CORRELATION:
             reasons.append("cross-tool marker registration correlation is too low")
-        if (
-            registration["image_x_representation_spread_px"]
-            > MAX_REPRESENTATION_SPREAD_PX
-        ):
-            reasons.append("grayscale and CLAHE image-X marker registrations disagree")
+        representation_spread_px = registration["image_x_representation_spread_px"]
+        if representation_spread_px > REPRESENTATION_SPREAD_WARNING_PX:
+            warnings.append(
+                "grayscale and CLAHE image-X marker registrations differ by "
+                f"{representation_spread_px:.3f} px; diagnostic only"
+            )
         if (
             registration["maximum_forward_reverse_disagreement_px"]
             > MAX_FORWARD_REVERSE_DISAGREEMENT_PX
@@ -387,7 +386,7 @@ def analyze(
     _verification_overlay(
         images,
         records,
-        corner=corner_at_capture,
+        reference=fiducial_reference,
         expected_point=expected_point,
         unit_x=unit_x,
         path=overlay_path,
@@ -409,11 +408,11 @@ def analyze(
         {
             "accepted": not reasons,
             "reasons": sorted(set(reasons)),
-            "warnings": [],
+            "warnings": sorted(set(warnings)),
             "localizer": LOCALIZER,
             "verification_command_x_mm": float(reference["command_x_mm"]),
             "expected_offset_mm": expected_offset,
-            "corner_pixel_at_capture_y_px": corner_at_capture.tolist(),
+            "fiducial_reference_pixel_at_capture_y_px": fiducial_reference.tolist(),
             "expected_image_x_point_px": expected_point.tolist(),
             "image_x_axis_vector_px_per_mm": x_vector.tolist(),
             "records": records,

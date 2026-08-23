@@ -61,7 +61,6 @@ def _inputs(tool):
             "reference_capture_y_mm": -14.0,
         },
         "bed_fiducial_printer_xy_mapping": {
-            "corner_printer_xy_mm": [173.0, -18.0],
             "fiducial_reference_printer_xy_mm": [180.0, -11.0],
             "fiducial_x_vector_model_px_per_mm": {
                 "reference_vector_px_per_mm": [10.0, 0.0],
@@ -119,10 +118,10 @@ def test_prepare_derives_per_tool_command_y_with_one_physical_gap(
     assert result["reference"]["capture_y_mm"] == expected_command_y
     assert result["reference"]["internal_capture_y_mm"] == -14.3
     assert result["reference"]["capture_endstop_gap_mm"] == 0.5
-    offsets = _definition(tool)["x_offsets_from_bed_tab_mm"]
+    offsets = _definition(tool)["x_offsets_from_fiducial_mm"]
     assert len(result["frames"]) == len(offsets)
     assert [frame["x_mm"] for frame in result["frames"]] == [
-        173.0 + offset for offset in offsets
+        180.0 + offset for offset in offsets
     ]
     assert {
         tuple(frame["commanded_position_mm"][1:]) for frame in result["frames"]
@@ -270,7 +269,7 @@ def test_tool_xy_gcode_homes_and_returns_to_t0():
     assert lines.count("T1") == 1
     assert lines[-4] == "T0"
     assert sum(line.startswith("VISION_CAPTURE_SYNC") for line in lines) == len(
-        definition["x_offsets_from_bed_tab_mm"]
+        definition["x_offsets_from_fiducial_mm"]
     )
     assert all("Z0.500000" in line for line in lines if line.startswith("G1 Z0."))
 
@@ -362,7 +361,6 @@ def test_analysis_cancels_commanded_x_and_y_and_rejects_a_datum_outlier(
             "image_x_vector_px_per_mm": [1.0, 0.0],
             "image_y_vector_px_per_mm": [0.0, 1.0],
             "marker_x_vector_px_per_mm": [1.0, 0.0],
-            "corner_printer_xy_mm": [0.0, 0.0],
             "fiducial_reference_printer_xy_mm": [0.0, 0.0],
             "marker_offset_mm": 0.0,
             "marker_reference_commanded_x_mm": 0.0,
@@ -470,7 +468,6 @@ def test_real_images_use_bright_circle_xy_localization(tool, tmp_path):
             "marker_x_vector_px_per_mm": marker["quality"][
                 "tool_axis_vectors_px_per_mm"
             ][tool],
-            "corner_printer_xy_mm": mapping["corner_printer_xy_mm"],
             "fiducial_reference_printer_xy_mm": mapping[
                 "fiducial_reference_printer_xy_mm"
             ],
@@ -581,7 +578,6 @@ def test_bright_circle_xy_replay_writes_inspection_overlays(tool):
         "marker_x_vector_px_per_mm": marker["quality"][
             "tool_axis_vectors_px_per_mm"
         ][tool],
-        "corner_printer_xy_mm": mapping["corner_printer_xy_mm"],
         "fiducial_reference_printer_xy_mm": mapping[
             "fiducial_reference_printer_xy_mm"
         ],

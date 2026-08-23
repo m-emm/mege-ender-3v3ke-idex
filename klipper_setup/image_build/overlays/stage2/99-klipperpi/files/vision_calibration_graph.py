@@ -22,7 +22,6 @@ RETIRED_FACT_ROLES = {"acquisition_profile"}
 FACT_ROLES = ACTIVE_FACT_ROLES | RETIRED_FACT_ROLES
 JOB_TYPES = {
     "nozzle_cam_bed_fiducial_y_metric",
-    "nozzle_cam_bed_tab_corner",
     "idex_tool_red_marker_x_sweep",
     "idex_rough_tool_x_verify",
     "idex_eddy_fiducial_xz_grid",
@@ -34,7 +33,6 @@ JOB_TYPES = {
     "idex_t0_t1_xyz_offset",
 }
 RETIRED_PRIOR_FACT_NAMES = {
-    "bed.tab_corner.printer_xyz",
     "bed.fiducial_patch.physical_reference",
     "bed.fiducial_patch.printer_z_mm",
 }
@@ -322,9 +320,7 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                     "dependency fact_set_hash must be canonical"
                 )
 
-        if name == "bed.tab_corner.printer_xyz":
-            _numeric_vector(fact_value.get("xyz_mm"), 3, "bed-tab XYZ")
-        elif name == "bed.fiducial_patch.printer_z_mm":
+        if name == "bed.fiducial_patch.printer_z_mm":
             if not isinstance(fact_value.get("z_mm"), (int, float)):
                 raise CalibrationGraphError("fiducial printer Z must be numeric")
         elif name == "camera.nozzle_cam.bed_fiducial.local_metric_model":
@@ -333,18 +329,13 @@ def validate_fact_set(record: Any) -> dict[str, Any]:
                 2,
                 "metric printer-Y vector",
             )
-        elif name == "camera.nozzle_cam.partial_bed_coordinate_system":
-            _numeric_vector(fact_value.get("corner_pixel_xy_px"), 2, "corner pixel")
-            _numeric_vector(
-                fact_value.get("corner_printer_xyz_mm"), 3, "corner printer XYZ"
-            )
         elif name == "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2":
             _numeric_vector(
                 fact_value.get("axis_vector_px_per_mm"), 2, "image X vector"
             )
         elif name in {
-            "tool.t0.red_marker_to_bed_tab_x_mm",
-            "tool.t1.red_marker_to_bed_tab_x_mm",
+            "tool.t0.red_marker_to_fiducial_x_mm",
+            "tool.t1.red_marker_to_fiducial_x_mm",
         }:
             for field in ("offset_mm", "reference_commanded_x_mm"):
                 if not isinstance(fact_value.get(field), (int, float)):

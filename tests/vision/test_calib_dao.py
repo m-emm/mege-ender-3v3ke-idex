@@ -36,7 +36,7 @@ def _files(tmp_path):
     _write_yaml(
         priors,
         {
-            "bed_corner_xyz_mm": [173.0, -18.0, 0.0],
+            "fiducial_reference_printer_xyz_mm": [166.709424, -24.839235, -0.6],
             "fiducial_origin_xy_mm": [3.0, 3.0],
             "fiducial_spacing_xy_mm": [8.0, 8.0],
             "fiducial_z_mm": -0.6,
@@ -61,7 +61,7 @@ def test_consumer_methods_return_values_and_derived_geometry(tmp_path):
     calib, priors = _files(tmp_path)
     dao = module.CalibDAO(calib, priors)
 
-    assert dao.bed_corner() == [173.0, -18.0, 0.0]
+    assert dao.fiducial_reference() == [166.709424, -24.839235, -0.6]
     assert dao.fiducial_centers() == [
         [3.0, 3.0],
         [11.0, 3.0],
@@ -104,7 +104,7 @@ def test_methods_validate_only_the_fields_they_consume(tmp_path):
     _write_yaml(priors, value)
     dao = module.CalibDAO(calib, priors)
 
-    assert dao.bed_corner() == [173.0, -18.0, 0.0]
+    assert dao.fiducial_reference() == [166.709424, -24.839235, -0.6]
     with pytest.raises(ValueError, match="fiducial_z_mm"):
         dao.fiducial_z()
 

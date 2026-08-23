@@ -480,7 +480,6 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     metric_macro = _section(
         config_text, "gcode_macro IDEX_BED_FIDUCIAL_METRIC_CALIBRATE"
     )
-    corner_macro = _section(config_text, "gcode_macro IDEX_BED_TAB_CORNER_CALIBRATE")
     red_marker_macro = _section(
         config_text, "gcode_macro IDEX_RED_MARKER_X_SWEEP_CALIBRATE"
     )
@@ -550,14 +549,13 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "IDEX_BED_FIDUCIAL_LIGHTING_CALIBRATE" not in template_text
     assert '"idex_bed_fiducial_metric_calibrate"' in metric_macro
     assert "active_config_fingerprint=fingerprint" in metric_macro
-    assert '"idex_bed_tab_corner_calibrate"' in corner_macro
+    assert "IDEX_BED_TAB_CORNER_CALIBRATE" not in config_text
     assert '"idex_red_marker_x_sweep_calibrate"' in red_marker_macro
     assert '"idex_rough_tool_x_verify"' in rough_x_verify_macro
     assert '"idex_eddy_fiducial_xz_acquire"' in eddy_fiducial_macro
     assert '"idex_tool_xz_sweep_report"' in tool_xz_sweep_macro
     for calibration_macro in (
         metric_macro,
-        corner_macro,
         red_marker_macro,
         rough_x_verify_macro,
         eddy_fiducial_macro,
@@ -570,7 +568,6 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert registry["schema_version"] == 1
     assert set(registry["job_types"]) == {
         "nozzle_cam_bed_fiducial_y_metric",
-        "nozzle_cam_bed_tab_corner",
         "idex_tool_red_marker_x_sweep",
         "idex_rough_tool_x_verify",
         "idex_eddy_fiducial_xz_grid",
@@ -588,30 +585,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert metric_definition["velocity_mm_s"] == 60
     assert metric_definition["settle_ms"] > 0
     assert metric_definition["requires"] == []
-    corner_definition = registry["job_types"]["nozzle_cam_bed_tab_corner"]
-    assert corner_definition["definition_version"] == 1
-    assert corner_definition["duplicate_count"] == 5
-    assert corner_definition["discard_fresh_frames"] == 1
-    assert corner_definition["capture_y_offset_mm"] == 20
-    assert metric_definition["profile"] == corner_definition["profile"]
-    assert metric_definition["light_pixels"] == corner_definition["light_pixels"]
     assert set(metric_definition["light_pixels"]) == {
         str(index) for index in range(1, 9)
     }
-    assert corner_definition["localizer"] == {
-        "kind": "bed_tab_corner_relative_to_fiducial_patch",
-        "version": 1,
-    }
-    assert corner_definition["profile"] == "vision"
-    assert set(corner_definition["light_pixels"]) == {
-        str(index) for index in range(1, 9)
-    }
-    assert all(
-        0.0 < value <= 1.0 for value in corner_definition["light_pixels"].values()
-    )
-    assert [item["fact_name"] for item in corner_definition["requires"]] == [
-        "camera.nozzle_cam.bed_fiducial.local_metric_model",
-    ]
     red_marker_definition = registry["job_types"]["idex_tool_red_marker_x_sweep"]
     assert red_marker_definition["definition_version"] == 1
     assert red_marker_definition["x_positions_mm"] == [160, 170, 180, 190, 200, 210]
@@ -619,13 +595,25 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert red_marker_definition["publish_on_accept"] is True
     rough_x_definition = registry["job_types"]["idex_rough_tool_x_verify"]
     assert rough_x_definition["definition_version"] == 1
-    assert rough_x_definition["verification_offset_x_mm"] == 10
+    assert rough_x_definition["verification_offset_from_fiducial_x_mm"] == pytest.approx(23.0)
     assert rough_x_definition["discard_fresh_frames"] == 1
     assert rough_x_definition["publish_on_accept"] is True
     assert [item["fact_name"] for item in rough_x_definition["requires"]] == [
-        "camera.nozzle_cam.partial_bed_coordinate_system",
+        "camera.nozzle_cam.bed_fiducial.local_metric_model",
         "camera.nozzle_cam.image_x_axis_vector_px_per_mm_at_z2",
         "calibration.rough_tool_x.active_snapshot",
+    ]
+    assert [160.0 + rough_x_definition["verification_offset_from_fiducial_x_mm"]] == [
+        pytest.approx(183.0)
+    ]
+    for tool in ("t0", "t1"):
+        xy_definition = registry["job_types"][f"idex_tool_xy_measure_{tool}"]
+        assert [160.0 + value for value in xy_definition["x_offsets_from_fiducial_mm"]] == [
+            pytest.approx(value) for value in (191.0, 193.0, 195.0, 197.0, 199.0)
+        ]
+    xz_definition = registry["job_types"]["idex_tool_xz_sweep_report"]
+    assert [160.0 + value for value in xz_definition["x_offsets_from_fiducial_mm"]] == [
+        pytest.approx(value) for value in (183.0, 186.0, 189.0, 192.0, 195.0, 198.0)
     ]
     eddy_definition = registry["job_types"]["idex_eddy_fiducial_xz_grid"]
     assert eddy_definition["x_positions_mm"] == [
@@ -643,7 +631,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     ]
     assert "VisionJobApi" in capture_script
     assert "idex_bed_fiducial_metric_calibrate" in capture_script
-    assert "idex_bed_tab_corner_calibrate" in capture_script
+    assert "idex_bed_tab_corner_calibrate" not in capture_script
     assert "idex_red_marker_x_sweep_calibrate" in capture_script
     assert "idex_rough_tool_x_verify" in capture_script
     assert "idex_eddy_fiducial_xz_grid" in capture_script
@@ -665,7 +653,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "from vision_four_fiducials import" in fiducial_analyzer
     assert "def detect_four_fiducials" not in fiducial_analyzer
     assert "analyze_metric" in fiducial_analyzer
-    assert "analyze_corner" in fiducial_analyzer
+    assert "analyze_corner" not in fiducial_analyzer
     assert "expected_corner_px" not in fiducial_analyzer
     assert "def analyze(" in eddy_fiducial_analyzer
     assert "SIFT" in eddy_fiducial_analyzer
@@ -776,7 +764,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "nozzle_cam_bed_fiducial_y_metric" in klipper_readme
     assert "IDEX_BED_FIDUCIAL_LIGHTING_CALIBRATE" not in klipper_readme
     assert "IDEX_BED_FIDUCIAL_METRIC_CALIBRATE" in klipper_readme
-    assert "IDEX_BED_TAB_CORNER_CALIBRATE" in klipper_readme
+    assert "IDEX_BED_TAB_CORNER_CALIBRATE" not in klipper_readme
     assert "IDEX_RED_MARKER_X_SWEEP_CALIBRATE" in klipper_readme
     assert "IDEX_ROUGH_X_VERIFY" in klipper_readme
     assert "IDEX_EDDY_FIDUCIAL_XZ_ACQUIRE" in klipper_readme

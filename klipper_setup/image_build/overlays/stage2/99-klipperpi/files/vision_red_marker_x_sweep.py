@@ -960,15 +960,13 @@ def analyze(
         cross_shift = np.asarray(
             selection["cross_registration"]["shift_px"], dtype=float
         )
-        corner_pixel = np.asarray(reference["corner_pixel_xy_px"], dtype=float)
-        capture_y = float(reference["capture_y_mm"])
-        corner_at_capture = corner_pixel + y_axis_vector * (
-            capture_y - float(reference["corner_pixel_capture_y_mm"])
+        fiducial_reference = np.asarray(
+            reference["fiducial_reference_pixel_xy_px"], dtype=float
         )
         marker0 = np.asarray(selection["t0_center_px"], dtype=float)
         marker1 = marker0 + cross_shift
-        t0_offset = float(np.dot(marker0 - corner_at_capture, unit_x) / scale)
-        t1_offset = float(np.dot(marker1 - corner_at_capture, unit_x) / scale)
+        t0_offset = float(np.dot(marker0 - fiducial_reference, unit_x) / scale)
+        t1_offset = float(np.dot(marker1 - fiducial_reference, unit_x) / scale)
         result.update(
             {
                 "accepted": not reasons,
@@ -998,11 +996,11 @@ def analyze(
                 "cross_tool_minimum_correlation": selection["cross_registration"][
                     "minimum_correlation"
                 ],
-                "corner_pixel_at_capture_y_px": corner_at_capture.tolist(),
+                "fiducial_reference_pixel_at_capture_y_px": fiducial_reference.tolist(),
                 "t0_marker_pixel_px": marker0.tolist(),
                 "t1_marker_pixel_px": marker1.tolist(),
-                "t0_red_marker_to_bed_tab_x_mm": t0_offset,
-                "t1_red_marker_to_bed_tab_x_mm": t1_offset,
+                "t0_red_marker_to_fiducial_x_mm": t0_offset,
+                "t1_red_marker_to_fiducial_x_mm": t1_offset,
                 "selected_tracks": {
                     "T0": selection["t0"],
                     "T1": selection["t1"],

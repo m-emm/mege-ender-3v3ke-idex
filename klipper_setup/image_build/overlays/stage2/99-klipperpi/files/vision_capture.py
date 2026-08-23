@@ -43,8 +43,6 @@ PROFILE_REMOTE_ACTION = os.environ.get(
 )
 METRIC_CALIBRATION_REMOTE_METHOD = "idex_bed_fiducial_metric_calibrate"
 METRIC_CALIBRATION_REMOTE_ACTION = "run_idex_bed_fiducial_metric_calibrate"
-CORNER_CALIBRATION_REMOTE_METHOD = "idex_bed_tab_corner_calibrate"
-CORNER_CALIBRATION_REMOTE_ACTION = "run_idex_bed_tab_corner_calibrate"
 RED_MARKER_CALIBRATION_REMOTE_METHOD = "idex_red_marker_x_sweep_calibrate"
 RED_MARKER_CALIBRATION_REMOTE_ACTION = "run_idex_red_marker_x_sweep_calibrate"
 ROUGH_X_VERIFY_REMOTE_METHOD = "idex_rough_tool_x_verify"
@@ -424,7 +422,6 @@ class VisionJobApi:
             raise CaptureError("unsupported acquisition manifest schema_version")
         if manifest.get("job_type") not in (
             "nozzle_cam_bed_fiducial_y_metric",
-            "nozzle_cam_bed_tab_corner",
             "idex_tool_red_marker_x_sweep",
             "idex_rough_tool_x_verify",
             "idex_eddy_fiducial_xz_grid",
@@ -825,32 +822,6 @@ class KlippyRemoteDaemon:
                             result.stderr.strip()
                             or "bed-fiducial metric calibration job failed"
                         )
-                elif action == CORNER_CALIBRATION_REMOTE_ACTION:
-                    command = [
-                        CALIBRATION_BIN,
-                        "run",
-                        "nozzle_cam_bed_tab_corner",
-                        "--name",
-                        sanitize_name(params.get("name", "bed_tab_corner")),
-                    ]
-                    fingerprint = str(params.get("active_config_fingerprint") or "")
-                    if fingerprint:
-                        command.extend(["--expected-fingerprint", fingerprint])
-                    result = subprocess.run(
-                        command,
-                        check=False,
-                        text=True,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        timeout=300,
-                    )
-                    if result.stdout.strip():
-                        log(result.stdout.strip())
-                    if result.returncode:
-                        raise CaptureError(
-                            result.stderr.strip()
-                            or "bed-tab corner calibration job failed"
-                        )
                 elif action == RED_MARKER_CALIBRATION_REMOTE_ACTION:
                     command = [
                         CALIBRATION_BIN,
@@ -994,11 +965,6 @@ class KlippyRemoteDaemon:
             )
             self._register_method(
                 sock,
-                CORNER_CALIBRATION_REMOTE_METHOD,
-                CORNER_CALIBRATION_REMOTE_ACTION,
-            )
-            self._register_method(
-                sock,
                 RED_MARKER_CALIBRATION_REMOTE_METHOD,
                 RED_MARKER_CALIBRATION_REMOTE_ACTION,
             )
@@ -1023,7 +989,6 @@ class KlippyRemoteDaemon:
         valid = {REMOTE_ACTION, PROFILE_REMOTE_ACTION}
         if REGISTER_CALIBRATION:
             valid.add(METRIC_CALIBRATION_REMOTE_ACTION)
-            valid.add(CORNER_CALIBRATION_REMOTE_ACTION)
             valid.add(RED_MARKER_CALIBRATION_REMOTE_ACTION)
             valid.add(ROUGH_X_VERIFY_REMOTE_ACTION)
             valid.add(EDDY_FIDUCIAL_XZ_REMOTE_ACTION)
