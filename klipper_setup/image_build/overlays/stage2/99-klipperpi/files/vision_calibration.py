@@ -261,7 +261,7 @@ def query_printer_status() -> dict[str, Any]:
     objects = (
         "webhooks&print_stats&virtual_sdcard&toolhead&gcode_move&configfile"
         "&extruder&extruder1&heater_bed&gcode_macro%20_IDEX_CONFIG_FINGERPRINT"
-        "&gcode_macro%20_IDEX_TOOL_STATE"
+        "&gcode_macro%20_IDEX_TOOL_STATE&bed_mesh"
     )
     return _moonraker_get(f"/printer/objects/query?{objects}")["status"]
 
@@ -278,6 +278,24 @@ def _number(mapping: dict[str, Any], key: str, context: str) -> float:
     if not isinstance(value, (int, float)):
         raise VisionCalibrationError(f"{context}.{key} is unavailable")
     return float(value)
+
+
+def _active_mesh_positive_max(status: dict[str, Any]) -> float:
+    """Return a conservative positive Z correction bound for the active mesh."""
+    mesh = status.get("bed_mesh")
+    if not isinstance(mesh, dict):
+        return 0.0
+    matrix = mesh.get("mesh_matrix")
+    if not isinstance(matrix, list):
+        return 0.0
+    values = []
+    for row in matrix:
+        if not isinstance(row, list):
+            continue
+        for value in row:
+            if isinstance(value, (int, float)) and math.isfinite(float(value)):
+                values.append(float(value))
+    return max(0.0, max(values, default=0.0))
 
 
 def _active_tool_xy_calibration(status: dict[str, Any]) -> dict[str, Any]:
@@ -421,6 +439,27 @@ def _preflight(
         "capture_z_mm": float(definition.get("capture_z_mm", axis_minimum[2])),
         "safe_tool_change_z_mm": float(definition.get("safe_tool_change_z_mm", 5.0)),
     }
+    if job_type in {BED_FIDUCIAL_METRIC_JOB, BED_TAB_CORNER_JOB}:
+        clearance = float(definition.get("capture_z_below_top_mm", 0.0))
+        if not math.isfinite(clearance) or clearance <= 0.0:
+            raise VisionCalibrationError(
+                f"{job_type} requires a positive capture_z_below_top_mm"
+            )
+        mesh_positive_max = _active_mesh_positive_max(status)
+        capture_z = axis_maximum[2] - clearance
+        if capture_z + mesh_positive_max > axis_maximum[2] + 1.0e-9:
+            raise VisionCalibrationError(
+                f"{job_type} capture Z {capture_z:.3f} plus active mesh correction "
+                f"{mesh_positive_max:.3f} exceeds Z maximum {axis_maximum[2]:.3f}"
+            )
+        if capture_z < axis_minimum[2]:
+            raise VisionCalibrationError(
+                f"{job_type} capture Z {capture_z:.3f} is below Z minimum "
+                f"{axis_minimum[2]:.3f}"
+            )
+        pose["z_mm"] = capture_z
+        pose["capture_z_below_top_mm"] = clearance
+        pose["active_mesh_positive_max_mm"] = mesh_positive_max
     positions = []
     if job_type == BED_FIDUCIAL_METRIC_JOB:
         positions.extend(
@@ -1139,6 +1178,39 @@ def _start_print(job_id: str) -> None:
     _moonraker_post("/printer/print/start", {"filename": f"vision_jobs/{job_id}.gcode"})
 
 
+def _append_job_event(job_dir: Path, event: str, payload: dict[str, Any]) -> None:
+    record = {
+        "event": event,
+        "job_id": job_dir.name,
+        "timestamp_utc": utc_now(),
+        **payload,
+    }
+    with (job_dir / "events.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, separators=(",", ":")) + "\n")
+
+
+def _mark_acquisition_failed(
+    job_id: str,
+    failure: str,
+    *,
+    printer_state: str,
+) -> dict[str, Any]:
+    job_dir = CALIBRATION_ROOT / "jobs" / job_id
+    state = _update_state(
+        job_dir,
+        state="failed",
+        failure=failure,
+        printer_state=printer_state,
+        failed_at_utc=utc_now(),
+    )
+    _append_job_event(
+        job_dir,
+        "failed",
+        {"state": "failed", "error": failure, "printer_state": printer_state},
+    )
+    return state
+
+
 def _wait_for_acquisition(job_id: str, timeout: float) -> dict[str, Any]:
     path = CALIBRATION_ROOT / "jobs" / job_id / "state.json"
     deadline = time.monotonic() + timeout
@@ -1146,6 +1218,22 @@ def _wait_for_acquisition(job_id: str, timeout: float) -> dict[str, Any]:
     while time.monotonic() < deadline:
         latest = load_json(path)
         if latest.get("state") in {"acquired", "failed"}:
+            break
+        try:
+            printer_status = _moonraker_get("/printer/objects/query?print_stats")[
+                "status"
+            ].get("print_stats", {})
+        except Exception:
+            printer_status = {}
+        printer_state = str(printer_status.get("state", "")).lower()
+        filename = str(printer_status.get("filename", ""))
+        if printer_state == "error" and job_id in filename:
+            failure = str(printer_status.get("message") or "Klipper print error")
+            latest = _mark_acquisition_failed(
+                job_id,
+                failure,
+                printer_state=printer_state,
+            )
             break
         time.sleep(0.25)
     if latest.get("state") != "acquired":

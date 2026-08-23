@@ -144,7 +144,7 @@ def test_generated_acquisition_gcode_homes_before_job_motion():
             "resolved_pose": {
                 "x_mm": -77.635,
                 "y_base_mm": -14.8,
-                "z_mm": 293.75,
+                "z_mm": 283.669,
             }
         },
         "frames": [
@@ -153,7 +153,7 @@ def test_generated_acquisition_gcode_homes_before_job_motion():
                 "frame": "metric_y_00_00mm",
                 "profile": "vision",
                 "light_pixels": {str(index): 0.45 for index in range(1, 9)},
-                "commanded_position_mm": [-77.635, -14.8, 293.75],
+                "commanded_position_mm": [-77.635, -14.8, 283.669],
             }
         ],
     }
@@ -175,6 +175,144 @@ def test_generated_acquisition_gcode_homes_before_job_motion():
             "MANIFEST_HASH=sha256:manifest GCODE_HASH=sha256:gcode"
         ),
     ]
+    assert "G1 Z283.669000 F3600.000" in lines
+    assert "G1 Z293.669000 F3600.000" not in lines
+
+
+def test_bed_capture_z_stays_below_top_after_active_mesh_correction(monkeypatch):
+    calibration = _module(
+        "vision_calibration.py", "vision_bed_capture_z_clearance_test"
+    )
+    definition = json.loads(
+        (FILES / "vision_job_types.json").read_text(encoding="utf-8")
+    )["job_types"]["nozzle_cam_bed_fiducial_y_metric"]
+    status = {
+        "webhooks": {"state": "ready"},
+        "print_stats": {"state": "standby"},
+        "virtual_sdcard": {"is_active": False},
+        "configfile": {
+            "settings": {
+                "stepper_x": {
+                    "position_min": -85.472,
+                    "position_max": 255.0,
+                    "position_endstop": -85.472,
+                },
+                "dual_carriage": {
+                    "position_min": 16.0,
+                    "position_max": 346.104,
+                    "position_endstop": 346.104,
+                },
+                "stepper_y": {"position_min": -14.8, "position_max": 296.0},
+                "stepper_z": {"position_min": -2.2, "position_max": 293.669},
+            }
+        },
+        "gcode_macro _IDEX_CONFIG_FINGERPRINT": {"source_sha256": "test"},
+        "gcode_macro _IDEX_TOOL_STATE": {
+            "t0_y_endstop": -14.8,
+            "t1_y_endstop": -13.284,
+            "t0_z_endstop": 293.669,
+            "t1_z_endstop": 293.175,
+        },
+        "bed_mesh": {"mesh_matrix": [[0.075355, 0.163638], [0.02, -0.01]]},
+        "extruder": {"temperature": 20.0, "target": 0.0},
+        "extruder1": {"temperature": 20.0, "target": 0.0},
+        "heater_bed": {"temperature": 20.0, "target": 0.0},
+    }
+    monkeypatch.setattr(calibration, "_profile_names", lambda: {"vision"})
+    monkeypatch.setattr(
+        calibration,
+        "_framebuffer_status",
+        lambda: {"frame_seq": 1, "width": 1920, "height": 1080},
+    )
+
+    resolved = calibration._preflight(
+        status,
+        "nozzle_cam_bed_fiducial_y_metric",
+        definition,
+        None,
+    )
+
+    assert resolved["pose"]["z_mm"] == pytest.approx(283.669)
+    assert resolved["pose"]["capture_z_below_top_mm"] == pytest.approx(10.0)
+    assert resolved["pose"]["active_mesh_positive_max_mm"] == pytest.approx(0.163638)
+
+
+def test_bed_capture_z_rejects_mesh_correction_beyond_clearance(monkeypatch):
+    calibration = _module(
+        "vision_calibration.py", "vision_bed_capture_z_mesh_limit_test"
+    )
+    definition = json.loads(
+        (FILES / "vision_job_types.json").read_text(encoding="utf-8")
+    )["job_types"]["nozzle_cam_bed_fiducial_y_metric"]
+    definition["capture_z_below_top_mm"] = 0.1
+    status = {
+        "webhooks": {"state": "ready"},
+        "print_stats": {"state": "standby"},
+        "virtual_sdcard": {"is_active": False},
+        "configfile": {
+            "settings": {
+                "stepper_x": {"position_min": -85.0, "position_max": 255.0},
+                "dual_carriage": {"position_max": 346.0},
+                "stepper_y": {"position_min": -14.8, "position_max": 296.0},
+                "stepper_z": {"position_min": -2.2, "position_max": 293.669},
+            }
+        },
+        "gcode_macro _IDEX_CONFIG_FINGERPRINT": {"source_sha256": "test"},
+        "bed_mesh": {"mesh_matrix": [[0.2]]},
+        "extruder": {"temperature": 20.0, "target": 0.0},
+        "extruder1": {"temperature": 20.0, "target": 0.0},
+        "heater_bed": {"temperature": 20.0, "target": 0.0},
+    }
+    monkeypatch.setattr(calibration, "_profile_names", lambda: {"vision"})
+    monkeypatch.setattr(
+        calibration,
+        "_framebuffer_status",
+        lambda: {"frame_seq": 1, "width": 1920, "height": 1080},
+    )
+
+    with pytest.raises(calibration.VisionCalibrationError, match="exceeds Z maximum"):
+        calibration._preflight(
+            status,
+            "nozzle_cam_bed_fiducial_y_metric",
+            definition,
+            None,
+        )
+
+
+def test_acquisition_print_error_marks_job_failed(tmp_path, monkeypatch):
+    calibration = _module("vision_calibration.py", "vision_acquisition_error_test")
+    calibration.CALIBRATION_ROOT = tmp_path / "calibration"
+    job_id = "test-print-error"
+    job_dir = calibration.CALIBRATION_ROOT / "jobs" / job_id
+    job_dir.mkdir(parents=True)
+    (job_dir / "state.json").write_text(
+        json.dumps({"job_id": job_id, "state": "acquiring"}),
+        encoding="utf-8",
+    )
+    (job_dir / "events.jsonl").write_text("", encoding="utf-8")
+    monkeypatch.setattr(
+        calibration,
+        "_moonraker_get",
+        lambda _path: {
+            "status": {
+                "print_stats": {
+                    "state": "error",
+                    "filename": f"vision_jobs/{job_id}.gcode",
+                    "message": "Move out of range: 0.000 -14.800 293.744 [0.000]",
+                }
+            }
+        },
+    )
+
+    with pytest.raises(calibration.VisionCalibrationError, match="failed"):
+        calibration._wait_for_acquisition(job_id, timeout=1.0)
+
+    state = json.loads((job_dir / "state.json").read_text(encoding="utf-8"))
+    assert state["state"] == "failed"
+    assert state["failure"] == "Move out of range: 0.000 -14.800 293.744 [0.000]"
+    assert "\"event\":\"failed\"" in (
+        job_dir / "events.jsonl"
+    ).read_text(encoding="utf-8")
 
 
 def test_new_job_replaces_abandoned_acquisition_lock(tmp_path):

@@ -29,6 +29,7 @@
         10,
         0
       ],
+      "capture_z_below_top_mm": 10.0,
       "velocity_mm_s": 60,
       "settle_ms": 1500,
       "publish_on_accept": true,
@@ -57,6 +58,7 @@
         "version": 1
       },
       "capture_y_offset_mm": 20,
+      "capture_z_below_top_mm": 10.0,
       "duplicate_count": 5,
       "velocity_mm_s": 60,
       "settle_ms": 1500,

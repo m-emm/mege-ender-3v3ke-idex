@@ -1,7 +1,8 @@
 """Filament-guide assembly reference geometry."""
 
-from shellforgepy.simple import *
 import logging
+
+from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
 
