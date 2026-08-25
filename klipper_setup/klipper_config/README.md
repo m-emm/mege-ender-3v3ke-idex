@@ -375,6 +375,12 @@ T1 Z delta` and regenerates `printer.cfg`. Because Z homes at the top, a
 negative fitted delta reduces `z_endstop` and raises the T1 nozzle. The helper
 only edits the local source-of-truth files; deployment remains explicit.
 
+> Calibration boundary (2026-08-23): the accepted T0/T1 XY state is the end
+> calibration state for the IDEX tools. The XZ sweep implementation is retained
+> for historical and diagnostic use, but is no longer a calibration authority.
+> T0 Z calibration is maintained by the Eddy sensor, Tap, and the active bed
+> mesh; the accepted T0/T1 relative offset remains unchanged.
+
 The corresponding host job types, in dependency order, are:
 
 ```text

@@ -38,7 +38,23 @@ def test_common_endstop_update_preserves_relative_alignment():
     assert delta == pytest.approx(-0.241)
     assert t0 == pytest.approx(293.259)
     assert t1 == pytest.approx(291.985)
-    module.assert_relative_alignment(293.5, 292.226, t0, t1, expected_delta=1.274)
+    module.assert_relative_alignment(293.5, 292.226, t0, t1)
+
+
+def test_relative_alignment_is_derived_from_endstops_only():
+    module = _load_module()
+
+    old_t0, old_t1 = 293.669, 293.175
+    new_t0, new_t1, _ = module.common_endstop_update(
+        old_t0,
+        old_t1,
+        tap_contact_z=-0.25,
+        contact_target_z=0.0,
+    )
+
+    assert old_t0 - old_t1 == pytest.approx(0.494)
+    assert new_t0 - new_t1 == pytest.approx(old_t0 - old_t1)
+    module.assert_relative_alignment(old_t0, old_t1, new_t0, new_t1)
 
 
 def test_tap_measurement_uses_probe_contact_not_post_retract_toolhead_position():
@@ -623,6 +639,7 @@ def _tap_mesh_runner(module, *, profile=None, pending=None):
         "profile": "tap_7x7",
         "rapid_profile": "tap_7x7_eddy_rapid",
         "samples": 1,
+        "settle_ms": 100,
         "horizontal_move_z": 5.0,
         "rapid_scan_height": 0.5,
         "probe_count": (7, 7),
@@ -672,7 +689,7 @@ def _tap_mesh_runner(module, *, profile=None, pending=None):
                         "save_config_pending_items": active_pending,
                         "settings": {
                             "bed_mesh": {
-                                "mesh_min": "42,20",
+                                "mesh_min": "66.66,62.5",
                                 "mesh_max": "190,275",
                             }
                         },
@@ -696,7 +713,7 @@ def _tap_mesh_runner(module, *, profile=None, pending=None):
     runner.tap_contact_target_z = -0.2
     runner.client = Client()
     runner.store = Store()
-    runner._home_clean_frame = lambda: None
+    runner._home_clean_mesh_frame = lambda: None
     runner.verify_active_tap_mesh = lambda _status: {
         "passed": True,
         "failures": [],
@@ -733,7 +750,7 @@ def test_final_mesh_uses_native_tap_profile_and_active_contact_verification():
     runner.final_mesh()
 
     assert commands == [
-        ("BED_MESH_IDEX_CALIBRATE", {"timeout": 900.0}),
+        ("BED_MESH_CALIBRATE SETTLE_MS=100", {"timeout": 900.0}),
         ("BED_MESH_PROFILE LOAD=tap_7x7", {}),
         (
             "BED_MESH_CLEAR\nT0\n"
@@ -746,6 +763,7 @@ def test_final_mesh_uses_native_tap_profile_and_active_contact_verification():
     ]
     assert commands[-1][0] == "BED_MESH_PROFILE LOAD=tap_7x7"
     assert runner.store.writes["mesh-tap.json"]["profile"] == "tap_7x7"
+    assert runner.store.writes["mesh-tap.json"]["settle_ms"] == 100
     assert runner.store.writes["mesh-rapid-scan.json"]["profile"] == (
         "tap_7x7_eddy_rapid"
     )
@@ -803,13 +821,13 @@ def test_active_tap_mesh_verification_surveys_configured_bounds_and_reference():
 
     assert verification["passed"] is True
     assert calls == [
-        (42.0, 20.0),
-        (150.0, 20.0),
-        (190.0, 20.0),
-        (42.0, 150.0),
+        (66.66, 62.5),
+        (150.0, 62.5),
+        (190.0, 62.5),
+        (66.66, 150.0),
         (150.0, 150.0),
         (190.0, 150.0),
-        (42.0, 275.0),
+        (66.66, 275.0),
         (150.0, 275.0),
         (190.0, 275.0),
     ]
@@ -974,6 +992,7 @@ def test_final_mesh_runs_one_native_tap_mesh_at_safe_clearance():
     runner.tap_mesh = {
         "profile": "tap_7x7",
         "samples": 1,
+        "settle_ms": 100,
         "horizontal_move_z": 5.0,
         "probe_count": (7, 7),
         "probe_count_text": "7,7",
@@ -983,14 +1002,14 @@ def test_final_mesh_runs_one_native_tap_mesh_at_safe_clearance():
     scripts = []
     checkpoints = []
     homes = []
-    runner._home_clean_frame = lambda: homes.append("home")
+    runner._home_clean_mesh_frame = lambda: homes.append("home")
     runner._gcode = lambda script, **kwargs: scripts.append((script, kwargs))
     runner.checkpoint = lambda *args, **kwargs: checkpoints.append((args, kwargs))
 
     runner.final_mesh()
 
     assert scripts == [
-        ("BED_MESH_IDEX_CALIBRATE", {"timeout": 900.0}),
+        ("BED_MESH_CALIBRATE SETTLE_MS=100", {"timeout": 900.0}),
     ]
     assert checkpoints == [
         (
@@ -1005,6 +1024,24 @@ def test_final_mesh_runs_one_native_tap_mesh_at_safe_clearance():
     assert homes == ["home"]
 
 
+def test_mesh_clean_frame_leaves_the_single_t0_selection_to_the_public_macro():
+    module = _load_module()
+    runner = object.__new__(module.Iteration1Runner)
+    scripts = []
+    runner._gcode = lambda script, **kwargs: scripts.append((script, kwargs))
+
+    runner._home_clean_mesh_frame()
+
+    assert scripts == [
+        (
+            "M140 S0\nM104 T0 S0\nM104 T1 S0\n"
+            "BED_MESH_CLEAR\nSET_GCODE_OFFSET X=0 Y=0 Z=0 MOVE=0\n"
+            "G28",
+            {},
+        )
+    ]
+
+
 def test_final_mesh_can_reuse_committed_post_eddy_frame():
     module = _load_module()
     runner = object.__new__(module.Iteration1Runner)
@@ -1013,6 +1050,7 @@ def test_final_mesh_can_reuse_committed_post_eddy_frame():
     runner.tap_mesh = {
         "profile": "tap_7x7",
         "samples": 1,
+        "settle_ms": 100,
         "horizontal_move_z": 5.0,
         "probe_count": (7, 7),
         "probe_count_text": "7,7",
@@ -1020,7 +1058,7 @@ def test_final_mesh_can_reuse_committed_post_eddy_frame():
     runner.bed_to_nozzle_gap = 0.2
     runner.tap_contact_target_z = -0.2
     homes = []
-    runner._home_clean_frame = lambda: homes.append("home")
+    runner._home_clean_mesh_frame = lambda: homes.append("home")
     runner._gcode = lambda *args, **kwargs: None
     runner.checkpoint = lambda *args, **kwargs: None
 
@@ -1079,6 +1117,7 @@ def test_direct_drive_current_and_mesh_steps_start_with_clean_frame():
     mesh_runner.tap_mesh = {
         "profile": "tap_7x7",
         "samples": 1,
+        "settle_ms": 100,
         "horizontal_move_z": 5.0,
         "probe_count": (7, 7),
         "probe_count_text": "7,7",
@@ -1086,7 +1125,7 @@ def test_direct_drive_current_and_mesh_steps_start_with_clean_frame():
     mesh_runner.bed_to_nozzle_gap = 0.2
     mesh_runner.tap_contact_target_z = -0.2
     mesh_homes = []
-    mesh_runner._home_clean_frame = lambda: mesh_homes.append("home")
+    mesh_runner._home_clean_mesh_frame = lambda: mesh_homes.append("home")
     mesh_runner._gcode = lambda *args, **kwargs: None
     mesh_runner.checkpoint = lambda *args, **kwargs: None
 

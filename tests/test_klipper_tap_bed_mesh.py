@@ -27,26 +27,44 @@ def test_bare_bed_mesh_calibrate_defaults_to_tap_and_keeps_nozzle_coordinates():
     assert 'if method == "rapid_scan" and can_scan:' in source
 
 
-def test_generated_mesh_commands_route_through_idex_tap_macro():
+def test_generated_mesh_commands_use_the_canonical_tap_macro():
     config = (REPO_ROOT / "klipper_setup/klipper_config/printer.cfg").read_text(
         encoding="utf-8"
     )
 
-    assert "[gcode_macro BED_MESH_IDEX_CALIBRATE]" in config
-    assert "T0\n    _BED_MESH_CALIBRATE_NATIVE" in config
+    canonical = config.split("[gcode_macro BED_MESH_CALIBRATE]", 1)[1].split(
+        "[gcode_macro BED_MESH_IDEX_CALIBRATE]", 1
+    )[0]
+    compatibility = config.split("[gcode_macro BED_MESH_IDEX_CALIBRATE]", 1)[1].split(
+        "[bed_mesh]", 1
+    )[0]
+
+    assert "T0\n    _BED_MESH_CALIBRATE_NATIVE" in canonical
     assert "METHOD=tap" in config
     assert "TAP_THRESHOLD={threshold}" in config
-    assert "[gcode_macro BED_MESH_CALIBRATE]" in config
-    assert "BED_MESH_IDEX_CALIBRATE SAMPLES={samples}\n" in config
+    assert "SETTLE_MS={settle_ms}" in config
+    assert "BED_MESH_CALIBRATE SAMPLES={samples} SETTLE_MS={settle_ms}" in compatibility
+    assert "\n    T0\n" not in compatibility
+    assert "_BED_MESH_CALIBRATE_NATIVE" not in compatibility
     assert "PROFILE=default METHOD=tap" in config
     assert "[bed_mesh default]" in config
     assert "BED_MESH_PROFILE LOAD=default" in config
     assert "SAMPLES={samples}" in config
     assert "SAMPLES_RESULT=median" in config
     assert "default(1)" in config
+    assert "default(100)" in config
     assert "zero_reference_position:" not in config
     assert "horizontal_move_z: 5.000" in config
     assert "probe_count: 7,7" in config
+
+
+def test_tap_mesh_supports_an_explicit_per_point_settle_diagnostic():
+    source = PRIMARY_BED_MESH.read_text(encoding="utf-8")
+
+    assert "class SettledProbePointsHelper(probe.ProbePointsHelper):" in source
+    assert 'gcmd.get_int("SETTLE_MS", 0, minval=0)' in source
+    assert "super()._move_next(probe_num)" in source
+    assert 'lookup_object("toolhead").dwell(self._settle_seconds)' in source
 
 
 def test_direct_mesh_zero_reference_is_applied_once_to_an_aliased_matrix():

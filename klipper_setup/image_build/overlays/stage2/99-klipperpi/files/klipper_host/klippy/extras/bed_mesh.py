@@ -898,6 +898,29 @@ class BedMeshCalibrate:
             logging.info("  %-4d| %-17s| %-25s| %s" % (i, gen_pt, probed_pt, corr_pt))
 
 
+class SettledProbePointsHelper(probe.ProbePointsHelper):
+    """Allow an explicit post-XY dwell before each automatic probe.
+
+    The upstream helper starts probing immediately after it queues the move to
+    the next point.  That is normally desirable, but the IDEX Tap diagnostic
+    path needs to distinguish a field/deflection problem from a carriage that
+    has not mechanically settled after a mesh move.  ``SETTLE_MS`` defaults to
+    zero, preserving the upstream timing for normal mesh calibration.
+    """
+
+    def start_probe(self, gcmd):
+        self._settle_seconds = gcmd.get_int("SETTLE_MS", 0, minval=0) / 1000.0
+        try:
+            return super().start_probe(gcmd)
+        finally:
+            self._settle_seconds = 0.0
+
+    def _move_next(self, probe_num):
+        super()._move_next(probe_num)
+        if self._settle_seconds:
+            self.printer.lookup_object("toolhead").dwell(self._settle_seconds)
+
+
 class ProbeManager:
     def __init__(self, config, orig_config, finalize_cb):
         self.printer = config.get_printer()
@@ -912,7 +935,7 @@ class ProbeManager:
         self.base_points = []
         self.substitutes = collections.OrderedDict()
         self.is_round = orig_config["radius"] is not None
-        self.probe_helper = probe.ProbePointsHelper(config, finalize_cb, [])
+        self.probe_helper = SettledProbePointsHelper(config, finalize_cb, [])
         self.probe_helper.use_xy_offsets(True)
         self.rapid_scan_helper = RapidScanHelper(config, self, finalize_cb)
         self._init_faulty_regions(config)

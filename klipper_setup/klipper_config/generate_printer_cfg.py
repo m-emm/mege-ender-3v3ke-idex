@@ -64,6 +64,12 @@ def _load_tap_mesh(data: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("tap_mesh.samples must be an integer") from None
     if isinstance(value["samples"], bool) or samples < 1:
         raise ValueError("tap_mesh.samples must be at least 1")
+    try:
+        settle_ms = int(value["settle_ms"])
+    except (KeyError, TypeError, ValueError):
+        raise ValueError("tap_mesh.settle_ms must be an integer") from None
+    if isinstance(value["settle_ms"], bool) or settle_ms < 0:
+        raise ValueError("tap_mesh.settle_ms must be non-negative")
     horizontal_move_z = _require_float(
         value,
         "horizontal_move_z",
@@ -98,6 +104,7 @@ def _load_tap_mesh(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "profile": profile.strip(),
         "samples": samples,
+        "settle_ms": settle_ms,
         "horizontal_move_z": horizontal_move_z,
         "rapid_scan_height": rapid_scan_height,
         "probe_count": probe_count,
@@ -638,6 +645,7 @@ def template_values(
         "t1_z_endstop": format_mm(t1["z_endstop"]),
         "tap_mesh_profile": tap_mesh["profile"],
         "tap_mesh_samples": str(tap_mesh["samples"]),
+        "tap_mesh_settle_ms": str(tap_mesh["settle_ms"]),
         "tap_mesh_horizontal_move_z": format_mm(tap_mesh["horizontal_move_z"]),
         "tap_mesh_probe_count": ",".join(str(item) for item in tap_mesh["probe_count"]),
         "t0_y_offset": format_mm(0.0),

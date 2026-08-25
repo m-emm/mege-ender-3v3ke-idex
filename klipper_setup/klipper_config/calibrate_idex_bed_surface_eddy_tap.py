@@ -5,7 +5,7 @@ The script deliberately keeps measured mesh data out of the repository.  Eddy
 drive current and its height/frequency table are the only measured values that
 become canonical configuration.  The known-good tap threshold is read from
 ``calib.yaml`` and is never discovered or overwritten by this workflow.  The mesh made
-by ``BED_MESH_IDEX_CALIBRATE`` remains session-local evidence.
+by the canonical ``BED_MESH_CALIBRATE`` command remains session-local evidence.
 
 The frequency/height calibration is guarded by a three-tap center reference
 before and after the sweep. Each guard records Klipper's complete
@@ -359,8 +359,6 @@ def assert_relative_alignment(
     old_t1: float,
     new_t0: float,
     new_t1: float,
-    *,
-    expected_delta: float | None = None,
     tolerance: float = 1e-9,
 ) -> None:
     old_delta = float(old_t0) - float(old_t1)
@@ -370,40 +368,6 @@ def assert_relative_alignment(
             f"common endstop update changed T0/T1 relative Z: "
             f"{old_delta:.9f} -> {new_delta:.9f}"
         )
-    if expected_delta is not None and not math.isclose(
-        old_delta, float(expected_delta), abs_tol=tolerance
-    ):
-        raise CalibrationError(
-            f"stored vision T1/T0 Z delta {expected_delta!r} does not match "
-            f"current source delta {old_delta:.9f}"
-        )
-
-
-def validate_vision_relative_provenance(
-    calibration: Mapping[str, Any],
-    *,
-    tolerance: float | None = None,
-) -> float:
-    provenance = calibration.get("vision_relative_alignment")
-    if not isinstance(provenance, Mapping):
-        raise CalibrationError(
-            "calib.yaml is missing vision_relative_alignment provenance"
-        )
-    try:
-        expected = float(provenance["t0_minus_t1_z"])
-        declared_tolerance = float(provenance["tolerance_mm"])
-    except (KeyError, TypeError, ValueError) as exc:
-        raise CalibrationError(
-            "vision_relative_alignment must declare t0_minus_t1_z and " "tolerance_mm"
-        ) from exc
-    if declared_tolerance <= 0:
-        raise CalibrationError("vision relative-alignment tolerance must be positive")
-    if tolerance is not None and declared_tolerance > tolerance:
-        raise CalibrationError(
-            "vision relative-alignment provenance tolerance is broader than "
-            "the workflow acceptance tolerance"
-        )
-    return expected
 
 
 def coil_over_target_pose(
@@ -837,12 +801,15 @@ def configured_tap_mesh(calibration: Mapping[str, Any]) -> dict[str, Any]:
             raise TypeError
         profile = value["profile"]
         samples = value["samples"]
+        settle_ms = value["settle_ms"]
         horizontal_move_z = value["horizontal_move_z"]
         rapid_scan_height = value.get("rapid_scan_height", 0.5)
         probe_count = value["probe_count"]
         if not isinstance(profile, str) or not profile.strip():
             raise TypeError
         if isinstance(samples, bool) or not isinstance(samples, int) or samples < 1:
+            raise TypeError
+        if isinstance(settle_ms, bool) or not isinstance(settle_ms, int) or settle_ms < 0:
             raise TypeError
         if isinstance(horizontal_move_z, bool):
             raise TypeError
@@ -868,12 +835,13 @@ def configured_tap_mesh(calibration: Mapping[str, Any]) -> dict[str, Any]:
     except (KeyError, TypeError, ValueError) as exc:
         raise CalibrationError(
             "calib.yaml must define tap_mesh with profile, samples, "
-            "horizontal_move_z, rapid_scan_height, and two-value probe_count"
+            "settle_ms, horizontal_move_z, rapid_scan_height, and two-value probe_count"
         ) from exc
     return {
         "profile": profile.strip(),
         "rapid_profile": f"{profile.strip()}_eddy_rapid",
         "samples": samples,
+        "settle_ms": settle_ms,
         "horizontal_move_z": horizontal_move_z,
         "rapid_scan_height": rapid_scan_height,
         "probe_count": tuple(probe_count),
@@ -1085,7 +1053,6 @@ class Iteration1Runner:
             _logger.info("preflight: deploying managed diagnostic support files")
             _run_local([str(DEPLOY_PATH)])
         _run_local([str(DEPLOY_PATH), "--check"])
-        expected_delta = validate_vision_relative_provenance(self.raw_calibration)
         tools = self.raw_calibration.get("tools", {})
         t0 = tools.get("t0", {})
         t1 = tools.get("t1", {})
@@ -1094,10 +1061,6 @@ class Iteration1Runner:
             float(t1["z_endstop"]),
             float(t0["z_endstop"]),
             float(t1["z_endstop"]),
-            expected_delta=expected_delta,
-            tolerance=float(
-                self.raw_calibration["vision_relative_alignment"]["tolerance_mm"]
-            ),
         )
         status = self.client.status(status_objects)
         self._validate_status_preflight(status)
@@ -1240,6 +1203,16 @@ class Iteration1Runner:
             "M140 S0\nM104 T0 S0\nM104 T1 S0\n"
             "BED_MESH_CLEAR\nSET_GCODE_OFFSET X=0 Y=0 Z=0 MOVE=0\n"
             "G28\nT0"
+        )
+
+    def _home_clean_mesh_frame(self) -> None:
+        """Home a clean mesh frame; the canonical mesh macro selects T0 once."""
+
+        _logger.info("homing clean mesh frame: heaters off, mesh/offsets clear, G28")
+        self._gcode(
+            "M140 S0\nM104 T0 S0\nM104 T1 S0\n"
+            "BED_MESH_CLEAR\nSET_GCODE_OFFSET X=0 Y=0 Z=0 MOVE=0\n"
+            "G28"
         )
 
     def collect_taps(
@@ -1538,7 +1511,6 @@ class Iteration1Runner:
         tools = self.raw_calibration["tools"]
         t0_old = float(tools["t0"]["z_endstop"])
         t1_old = float(tools["t1"]["z_endstop"])
-        expected = validate_vision_relative_provenance(self.raw_calibration)
         t0_new, t1_new, delta = common_endstop_update(
             t0_old,
             t1_old,
@@ -1546,7 +1518,7 @@ class Iteration1Runner:
             contact_target_z=self.tap_contact_target_z,
         )
         assert_relative_alignment(
-            t0_old, t1_old, t0_new, t1_new, expected_delta=expected, tolerance=1e-9
+            t0_old, t1_old, t0_new, t1_new, tolerance=1e-9
         )
         if self.dry_run:
             self.checkpoint(
@@ -2389,13 +2361,14 @@ class Iteration1Runner:
         )
         _logger.info(
             "I1.6 dual mesh workflow started: tap_profile=%s rapid_profile=%s "
-            "tap_samples=%d",
+            "tap_samples=%d settle_ms=%d",
             tap_profile,
             rapid_profile,
             self.tap_mesh["samples"],
+            self.tap_mesh["settle_ms"],
         )
         if clean_frame:
-            self._home_clean_frame()
+            self._home_clean_mesh_frame()
         else:
             _logger.info("I1.6 reusing the committed post-Eddy clean frame")
         if not self.dry_run:
@@ -2403,16 +2376,15 @@ class Iteration1Runner:
             pending = before.get("configfile", {}).get("save_config_pending_items", {})
             if pending:
                 raise CalibrationError("pending configuration exists before Tap mesh")
-        command = (
-            "BED_MESH_IDEX_CALIBRATE"
-        )
+        command = f"BED_MESH_CALIBRATE SETTLE_MS={self.tap_mesh['settle_ms']}"
         _logger.info(
-            "running IDEX one-tap mesh macro: profile=%s threshold=%.3f probe_count=%s "
-            "horizontal_move_z=%.3f",
+            "running canonical one-tap mesh macro: profile=%s threshold=%.3f probe_count=%s "
+            "horizontal_move_z=%.3f settle_ms=%d",
             tap_profile,
             self.tap_threshold,
             self.tap_mesh["probe_count_text"],
             self.tap_mesh["horizontal_move_z"],
+            self.tap_mesh["settle_ms"],
         )
         self._gcode(command, timeout=900.0)
         if self.dry_run:
@@ -2445,6 +2417,7 @@ class Iteration1Runner:
             "command": command,
             "tap_threshold": self.tap_threshold,
             "samples": self.tap_mesh["samples"],
+            "settle_ms": self.tap_mesh["settle_ms"],
             "horizontal_move_z": self.tap_mesh["horizontal_move_z"],
             "rapid_scan_height": self.tap_mesh["rapid_scan_height"],
             "probe_count": self.tap_mesh["probe_count_text"],

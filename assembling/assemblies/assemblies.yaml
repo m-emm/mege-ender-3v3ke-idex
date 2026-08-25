@@ -4164,6 +4164,11 @@ assemblies:
     resource_file: blower_ring_assembly.yaml
     depends_on: []
 
+  - name: blower_assembly
+
+    resource_file: blower_assembly.yaml
+    depends_on: []
+
   - name: blower_ring_left_assembly
 
     resource_file: blower_ring_assembly.yaml

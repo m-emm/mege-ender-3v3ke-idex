@@ -1,0 +1,48 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Simplified 51 mm blower reference assembly
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: all
+        name_template: "{name}"
+
+  Production:
+    parts: []
+
+Parameters:
+  blower_body_size:
+    Type: Float
+  blower_thickness:
+    Type: Float
+  blower_hole_diameter:
+    Type: Float
+  blower_mount_hole_diameter:
+    Type: Float
+  blower_wall_thickness:
+    Type: Float
+  blower_left_body_size_reduction:
+    Type: Float
+  blower_outlet_inner_height:
+    Type: Float
+  blower_outlet_inner_width:
+    Type: Float
+  blower_mount_hole_1_center_y_offset:
+    Type: Float
+  blower_mount_hole_1_center_x_offset:
+    Type: Float
+  blower_mount_hole_2_center_y_offset:
+    Type: Float
+  blower_mount_hole_2_center_x_offset:
+    Type: Float
+  blower_outlet_end_from_center:
+    Type: Float
+
+Parts:
+  BlowerAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.blower_assembly.create_blower_assembly

@@ -637,7 +637,7 @@ Use this order to remove the discrepancy without hiding its cause:
    threshold and compare tap/regular Eddy at identical physical points. A full
    recalibration is preferred over translating an uncertain old curve.
 6. **Generate the mesh.** Create one native T0 nozzle-contact Tap mesh over the
-   configured Tap-safe domain `(42,20)..(190,275)`, zeroed at `(150,150)`, and
+   configured Tap-safe domain `(66.66,62.5)..(190,275)`, zeroed at `(150,150)`, and
    keep the source-controlled `default` profile active in Klipper memory.
 
 This sequence treats the approximately `1.170 mm` value as a diagnostic of the
@@ -1275,17 +1275,24 @@ resumed workflow boundaries still begin from the full clean homed frame.
 #### I1.6: native T0 Tap mesh
 
 The configured `[bed_mesh]` domain is deliberately Tap-safe:
-`mesh_min: 42,20`, `mesh_max: 190,275`, with `(150,150)` as its zero reference.
-The left boundary was raised from `X=0` after the DAQ survey showed that `X=5`
-and `X=23.5` cannot make nozzle-contact Taps.
+`mesh_min: 66.66,62.5`, `mesh_max: 190,275`, with `(150,150)` as its zero
+reference.  The replacement PEI sheet leaves the old front row and left edge
+over the magnetic undersheet.  Eddy mapping and individual Tap checks showed
+the first reliable inward point at `(66.66,62.5)`; the old `Y=20` row failed
+the Tap quality gate across the tested X line.
 
 The workflow invokes the managed macro, which selects T0 and runs the native
 Tap command with the threshold and mesh settings generated from the single
 `tap_mesh` block in `calib.yaml`:
 
 ```gcode
-BED_MESH_IDEX_CALIBRATE
+G28
+BED_MESH_CALIBRATE
 ```
+
+`BED_MESH_CALIBRATE` is the canonical operator and automation command.  The
+older `BED_MESH_IDEX_CALIBRATE` name remains a compatibility alias and forwards
+to the same command with the same sample and settle settings.
 
 Klipper records 49 nozzle-contact points, builds the mesh using the configured
 bounds and zero reference, makes `default` active, and stages its updated
@@ -1821,7 +1828,7 @@ The eventual startup order for a tap-anchored print should be:
 5. perform repeated validated T0 taps at the fixed anchor;
 6. either verify the static source-controlled datum or establish the optional
    per-print common runtime datum;
-7. run the managed T0 `BED_MESH_IDEX_CALIBRATE` workflow over the
+7. run the managed T0 `BED_MESH_CALIBRATE` workflow over the
    configured Tap-safe domain, using that anchor as `zero_reference_position`;
 8. permit T0/T1 printing only after datum, mesh, and relative-tool status agree.
 

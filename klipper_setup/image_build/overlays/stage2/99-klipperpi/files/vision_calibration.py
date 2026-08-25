@@ -111,6 +111,11 @@ EDDY_T0_XYZ_OFFSET_JOB = "idex_eddy_t0_xyz_offset"
 TOOL_XY_T0_JOB = "idex_tool_xy_measure_t0"
 TOOL_XY_T1_JOB = "idex_tool_xy_measure_t1"
 TOOL_XY_JOBS = {TOOL_XY_T0_JOB, TOOL_XY_T1_JOB}
+# Operational calibration boundary (2026-08-23): the accepted T0/T1 XY state
+# is the end of the IDEX tool calibration. The XZ sweep remains preserved as
+# diagnostic code, but is decommissioned as a calibration authority; T0 Z is
+# maintained by Eddy sensing, Tap, and the active bed mesh, while the current
+# T0/T1 relative offset remains unchanged.
 TOOL_XZ_SWEEP_JOB = "idex_tool_xz_sweep_report"
 TOOL_XY_CANDIDATE_JOB = "idex_tool_xy_candidate"
 JOB_TYPES = (

@@ -124,28 +124,32 @@ sensor_pin: eddy:gpio26
 horizontal_move_z: 2
 calibration_temp: ${eddy_temperature_calibration_temp}
 
-[gcode_macro BED_MESH_IDEX_CALIBRATE]
-description: Calibrate and activate the source-configured T0 Tap mesh.
+[gcode_macro BED_MESH_CALIBRATE]
+description: Calibrate and activate the canonical source-configured T0 Tap mesh.
 gcode:
     {% set threshold = printer.configfile.settings["probe_eddy_current btt_eddy"].tap_threshold|float %}
     {% set samples = params.SAMPLES|default(${tap_mesh_samples})|int %}
+    {% set settle_ms = params.SETTLE_MS|default(${tap_mesh_settle_ms})|int %}
     T0
-    _BED_MESH_CALIBRATE_NATIVE PROFILE=${tap_mesh_profile} METHOD=tap TAP_THRESHOLD={threshold} SAMPLES={samples} SAMPLES_RESULT=median
+    _BED_MESH_CALIBRATE_NATIVE PROFILE=${tap_mesh_profile} METHOD=tap TAP_THRESHOLD={threshold} SAMPLES={samples} SAMPLES_RESULT=median SETTLE_MS={settle_ms}
 
-[gcode_macro BED_MESH_CALIBRATE]
-description: GUI-compatible alias for the proven IDEX Tap mesh calibration.
+[gcode_macro BED_MESH_IDEX_CALIBRATE]
+description: Compatibility alias for the canonical T0 Tap mesh calibration.
 gcode:
     {% set samples = params.SAMPLES|default(${tap_mesh_samples})|int %}
-    BED_MESH_IDEX_CALIBRATE SAMPLES={samples}
+    {% set settle_ms = params.SETTLE_MS|default(${tap_mesh_settle_ms})|int %}
+    BED_MESH_CALIBRATE SAMPLES={samples} SETTLE_MS={settle_ms}
 
 [bed_mesh]
 # Printing mesh measured with the Eddy-equipped T0 toolhead. Tool changes apply
 # the matching BED_MESH_OFFSET so this one physical-bed mesh follows both nozzles.
+# The replacement PEI sheet does not cover the old front/left boundary.  Keep
+# Tap and normal printing inside the first proven sheet-covered grid row.
 # Tap requires a short mechanical settling period after each mesh-point move.
 # 45 mm/s leaves margin below the empirically reliable 50 mm/s no-dwell limit.
 speed: 45
 horizontal_move_z: ${tap_mesh_horizontal_move_z}
-mesh_min: 42,20
+mesh_min: 66.66,62.5
 mesh_max: 190,275
 probe_count: ${tap_mesh_probe_count}
 mesh_pps: 0,0
@@ -1119,7 +1123,11 @@ gcode:
     {% set move_offsets = 1 if "x" in homed and "y" in homed and "z" in homed else 0 %}
     {% set can_move_offsets = 1 if move_offsets and offset_target_y >= axis_min.y|float and offset_target_y <= axis_max.y|float and offset_target_z >= axis_min.z|float and offset_target_z <= axis_max.z|float else 0 %}
     IDEX_MANUAL_TUNING_CAPTURE TOOL={current_tool}
-    ACTIVATE_EXTRUDER EXTRUDER=extruder
+    # Klipper rejects ACTIVATE_EXTRUDER for the already-active tool. Keep T0
+    # idempotent so public commands may safely select their required tool.
+    {% if printer.toolhead.extruder != "extruder" %}
+        ACTIVATE_EXTRUDER EXTRUDER=extruder
+    {% endif %}
     SET_GCODE_VARIABLE MACRO=_IDEX_TOOL_STATE VARIABLE=active_tool VALUE=0
     SET_GCODE_VARIABLE MACRO=IDEX_NEXT_PRINTABLE_CORNER VARIABLE=corner_index VALUE=0
     {% if "x" in homed %}

@@ -382,6 +382,7 @@ def test_eddy_klipper_calibration_curve_round_trips_exactly():
         "tap_mesh": {
             "profile": "default",
             "samples": 1,
+            "settle_ms": 100,
             "horizontal_move_z": 5.0,
             "probe_count": (7, 7),
         },
@@ -1180,6 +1181,14 @@ def test_idex_part_fan_pins_and_slicer_routing():
     assert "_IDEX_APPLY_PART_FAN TOOL=1" in _section(config_text, "gcode_macro T1")
 
 
+def test_t0_macro_is_idempotent_when_t0_is_already_active():
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    t0_macro = _section(config_text, "gcode_macro T0")
+
+    assert '{% if printer.toolhead.extruder != "extruder" %}' in t0_macro
+    assert "ACTIVATE_EXTRUDER EXTRUDER=extruder" in t0_macro
+
+
 def test_bed_cooling_macro_moves_t0_to_center_and_waits_for_target():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     bed_cooling = _section(config_text, "gcode_macro BED_COOLING")
@@ -1375,6 +1384,7 @@ def test_idex_tool_offsets_are_derived_from_calibration_values():
         "tap_mesh": {
             "profile": "default",
             "samples": 1,
+            "settle_ms": 100,
             "horizontal_move_z": 5.0,
             "probe_count": (7, 7),
         },
