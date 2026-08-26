@@ -32,22 +32,9 @@ Builder:
         name_template: "sprite_extruder_{name}"
 
       - source: injected
-        assembly: front_part_fan
-        artifact: leader
-        name: front_part_fan
-      - source: injected
-        assembly: front_part_fan
-        artifact: followers
-        name_template: "front_part_fan_{name}"
-
-      - source: injected
-        assembly: side_part_fan
-        artifact: leader
-        name: side_part_fan
-      - source: injected
-        assembly: side_part_fan
-        artifact: followers
-        name_template: "side_part_fan_{name}"
+        assembly: blower
+        artifact: all
+        name_template: "blower_{name}"
 
       - source: injected
         assembly: blower_ring
@@ -74,41 +61,7 @@ Builder:
         name_template: "{name}"
 
 Parameters:
-  duct_extension_width:
-    Type: Float
-  part_fan_duct_extension_length:
-    Type: Float
-  feeder_ring_height:
-    Type: Float
-  feeder_ring_wall:
-    Type: Float
-  tool_head_additional_mount_plate_clearance:
-    Type: Float
-  tool_head_additional_mount_plate_depth:
-    Type: Float
-  tool_head_additional_mount_plate_depth_offset:
-    Type: Float
-  tool_head_additional_mount_plate_height:
-    Type: Float
-  tool_head_additional_mount_plate_thickness:
-    Type: Float
-  tool_head_back_mount_plate_connector_height:
-    Type: Float
-  tool_head_back_mount_plate_connector_thickness:
-    Type: Float
-  tool_head_back_mount_plate_connector_width:
-    Type: Float
-  duct_back_mount_plate_height:
-    Type: Float
-  duct_back_mount_plate_height_border:
-    Type: Float
-  duct_back_mount_plate_offset:
-    Type: Float
-  duct_back_mount_plate_thickness:
-    Type: Float
-  duct_back_mount_plate_width:
-    Type: Float
-  duct_back_mount_plate_width_border:
+  blower_wall_thickness:
     Type: Float
 
 Parts:

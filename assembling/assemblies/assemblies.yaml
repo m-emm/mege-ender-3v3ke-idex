@@ -459,54 +459,6 @@ placement:
         - tool_head_cable_attach_shield_left_assembly
       to: tool_head_mount_machined_bottom_assembly
 
-    - part: left_blower_assembly
-      post_rotation:
-        angle: -90
-        axis: [0, 1, 0]
-
-    - part: left_blower_assembly
-      post_rotation:
-        angle: -90
-        axis: [0, 0, 1]
-
-    - part: right_blower_assembly
-      post_rotation:
-        angle: 90
-        axis: [0, 1, 0]
-
-    - part: right_blower_assembly
-      post_rotation:
-        angle: -90
-        axis: [0, 0, 1]
-
-    - part: left_blower_assembly
-      to: tool_head_mount_machined_bottom_assembly
-      alignment: CENTER
-    - part: left_blower_assembly
-      to: tool_head_mount_machined_bottom_assembly
-      alignment: STACK_TOP
-    - part: left_blower_assembly
-      to: tool_head_mount_machined_bottom_assembly
-      alignment: FRONT
-
-    - part: right_blower_assembly
-      to: tool_head_mount_machined_top_assembly
-      alignment: CENTER
-    - part: right_blower_assembly
-      to: tool_head_mount_machined_top_assembly
-      alignment: STACK_TOP
-    - part: right_blower_assembly
-      to: tool_head_mount_machined_top_assembly
-      alignment: FRONT
-
-    - rigid_group:
-        - left_blower_assembly
-      to: tool_head_mount_machined_bottom_assembly
-
-    - rigid_group:
-        - right_blower_assembly
-      to: tool_head_mount_machined_top_assembly
-
     - part: sprite_extruder_left_assembly
       to: tool_head_mount_machined_bottom_assembly
       alignment: CENTER
@@ -815,47 +767,45 @@ placement:
         - nitehawk_board_right_assembly
       to: sprite_extruder_right_assembly
 
-    - part: single_part_fan_front_left_assembly
+    - part: left_blower_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 0, 1]
+
+    - part: right_blower_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 0, 1]
+    - part: left_blower_assembly
+      post_rotation:
+        angle: 180
+        axis: [0, 1, 0]
+
+    - part: right_blower_assembly
+      post_rotation:
+        angle: 180
+        axis: [0, 1, 0]
+
+    - part: left_blower_assembly
       post_rotation:
         angle:
           $expr:
             "$sub": "180 - ${part_fan_v2_front_rotation}"
         axis: [1, 0, 0]
-    - part: single_part_fan_front_left_assembly
+    - part: left_blower_assembly
       to: sprite_extruder_left_assembly.non_production_parts.hotend
       alignment: CENTER
       axes: [0]
-    - part: single_part_fan_front_left_assembly
+    - part: left_blower_assembly
       to: sprite_extruder_left_assembly.non_production_parts.hotend
       alignment: BOTTOM
-    - part: single_part_fan_front_left_assembly
+    - part: left_blower_assembly
       to: sprite_extruder_left_assembly.non_production_parts.hotend
       alignment: STACK_FRONT
       post_translation:
         - 0
         - $ref: part_fan_v2_front_y_shift
         - $ref: part_fan_v2_front_z_shift
-    - part: single_part_fan_side_left_assembly
-      post_rotation:
-        angle: 90
-        axis: [0, 0, 1]
-    - part: single_part_fan_side_left_assembly
-      post_rotation:
-        angle: 90
-        axis: [0, 1, 0]
-
-    - part: single_part_fan_side_left_assembly.followers.mount_plate
-      to: sprite_extruder_left_assembly
-      alignment: FRONT
-    - part: single_part_fan_side_left_assembly.followers.mount_plate
-      to: sprite_extruder_left_assembly
-      alignment: STACK_RIGHT
-      stack_gap:
-        $ref: part_fan_v2_side_stack_gap
-      post_translation:
-        - 0
-        - $ref: part_fan_v2_side_y_shift
-        - 0
     - part: blower_ring_left_assembly.non_production_parts.ring_center_reference
       to: sprite_extruder_left_assembly.non_production_parts.hotend
       alignment: CENTER
@@ -867,59 +817,32 @@ placement:
         - 0
         - 0
         - $ref: part_fan_ducts_clearance
-    - part: single_part_fan_side_left_assembly.followers.outlet
-      to: blower_ring_left_assembly
-      alignment: STACK_TOP
-      stack_gap: -2
     - rigid_group:
-        - single_part_fan_front_left_assembly
-        - single_part_fan_side_left_assembly
+        - left_blower_assembly
         - blower_ring_left_assembly
       to: sprite_extruder_left_assembly
-    - part: single_part_fan_front_right_assembly
+    - part: right_blower_assembly
       post_rotation:
         angle:
           $expr:
             "$sub": "180 - ${part_fan_v2_front_rotation}"
         axis: [1, 0, 0]
 
-    - part: single_part_fan_front_right_assembly
+    - part: right_blower_assembly
       to: sprite_extruder_right_assembly.non_production_parts.hotend
       alignment: CENTER
       axes: [0]
 
-    - part: single_part_fan_front_right_assembly
+    - part: right_blower_assembly
       to: sprite_extruder_right_assembly.non_production_parts.hotend
       alignment: BOTTOM
-    - part: single_part_fan_front_right_assembly
+    - part: right_blower_assembly
       to: sprite_extruder_right_assembly.non_production_parts.hotend
       alignment: STACK_FRONT
       post_translation:
         - 0
         - $ref: part_fan_v2_front_y_shift
         - $ref: part_fan_v2_front_z_shift
-    - part: single_part_fan_side_right_assembly
-      post_rotation:
-        angle: 90
-        axis: [0, 0, 1]
-
-    - part: single_part_fan_side_right_assembly
-      post_rotation:
-        angle: 90
-        axis: [0, 1, 0]
-    - part: single_part_fan_side_right_assembly.followers.mount_plate
-      to: sprite_extruder_right_assembly
-      alignment: FRONT
-
-    - part: single_part_fan_side_right_assembly.followers.mount_plate
-      to: sprite_extruder_right_assembly
-      alignment: STACK_RIGHT
-      stack_gap:
-        $ref: part_fan_v2_side_stack_gap
-      post_translation:
-        - 0
-        - $ref: part_fan_v2_side_y_shift
-        - 0
     - part: blower_ring_right_assembly.non_production_parts.ring_center_reference
       to: sprite_extruder_right_assembly.non_production_parts.hotend
       alignment: CENTER
@@ -931,13 +854,8 @@ placement:
         - 0
         - 0
         - $ref: part_fan_ducts_clearance
-    - part: single_part_fan_side_right_assembly.followers.outlet
-      to: blower_ring_right_assembly
-      alignment: STACK_TOP
-      stack_gap: -2
     - rigid_group:
-        - single_part_fan_front_right_assembly
-        - single_part_fan_side_right_assembly
+        - right_blower_assembly
         - blower_ring_right_assembly
       to: sprite_extruder_right_assembly
 
@@ -4249,14 +4167,14 @@ assemblies:
       - x_axis_left_carriage_assembly
       - tool_head_mount_machined_bottom_assembly
       - sprite_extruder_left_assembly
-      - single_part_fan_front_left_assembly
-      - single_part_fan_side_left_assembly
+      - left_blower_assembly
       - blower_ring_left_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_left_assembly
-      front_part_fan: single_part_fan_front_left_assembly
-      side_part_fan: single_part_fan_side_left_assembly
+      blower: left_blower_assembly
       blower_ring: blower_ring_left_assembly
+    parameters:
+      blower_wall_thickness: !Ref blower_wall_thickness
 
   - name: part_fan_right_assembly
 
@@ -4266,14 +4184,14 @@ assemblies:
       - x_axis_right_carriage_assembly
       - tool_head_mount_machined_top_assembly
       - sprite_extruder_right_assembly
-      - single_part_fan_front_right_assembly
-      - single_part_fan_side_right_assembly
+      - right_blower_assembly
       - blower_ring_right_assembly
     inject_parts:
       sprite_extruder: sprite_extruder_right_assembly
-      front_part_fan: single_part_fan_front_right_assembly
-      side_part_fan: single_part_fan_side_right_assembly
+      blower: right_blower_assembly
       blower_ring: blower_ring_right_assembly
+    parameters:
+      blower_wall_thickness: !Ref blower_wall_thickness
 
   - name: part_fan_cage_left_join
 
