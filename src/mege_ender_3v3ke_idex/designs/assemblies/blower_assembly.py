@@ -50,12 +50,6 @@ def create_blower_assembly(
 
     body = body.cut(blower_hole)
 
-    blower_inner_space_cutter = create_cylinder(
-        blower_body_size / 2 - blower_wall_thickness - blower_left_body_size_reduction,
-        blower_thickness - 2 * blower_wall_thickness,
-    )
-    blower_inner_space_cutter = align(blower_inner_space_cutter, body, Alignment.CENTER)
-    body = body.cut(blower_inner_space_cutter)
     duct_cutter = create_box(
         blower_body_size / 2, blower_outlet_inner_height, blower_outlet_inner_width
     )
@@ -73,10 +67,68 @@ def create_blower_assembly(
         z_enlargement=blower_wall_thickness,
     )
 
+    duct_aligner = align_translation(duct, body, Alignment.BACK)
+
+    duct = duct_aligner(duct)
+    duct_cutter = duct_aligner(duct_cutter)
+
     duct = duct.cut(duct_cutter)
+
+    duct_size = get_bounding_box_size(duct)
+
+    blower_inner_space_cutter = create_cylinder(
+        blower_body_size / 2 - blower_wall_thickness - blower_left_body_size_reduction,
+        duct_size[2],
+    )
+    blower_inner_space_cutter = align(blower_inner_space_cutter, body, Alignment.CENTER)
+    body = body.cut(blower_inner_space_cutter)
+
     duct = duct.cut(blower_inner_space_cutter)
 
     body = body.cut(duct_cutter)
     body = body.fuse(duct)
+
+    mount_flange_extra_radius = 1
+    mount_flange_connection_size = 8
+    for x_offset, y_offset in [
+        (blower_mount_hole_1_center_x_offset, blower_mount_hole_1_center_y_offset),
+        (blower_mount_hole_2_center_x_offset, blower_mount_hole_2_center_y_offset),
+    ]:
+        mount_flange = create_cylinder(
+            (blower_mount_hole_diameter / 2) + mount_flange_extra_radius,
+            blower_thickness,
+        )
+
+        mount_flange = align(mount_flange, center_reference, Alignment.CENTER)
+        mount_flange = align(mount_flange, body, Alignment.BOTTOM)
+        mount_flange = translate(x_offset, y_offset, 0)(mount_flange)
+
+        bhc = create_box_hole_cutter(
+            blower_mount_hole_diameter + mount_flange_connection_size,
+            blower_mount_hole_diameter + mount_flange_connection_size,
+            100,
+        )
+
+        bhc = align(bhc, mount_flange, Alignment.CENTER)
+
+        body_part = bhc.use_as_cutter_on(body)
+
+        mount_flange = create_convex_hull(mount_flange, body_part)
+
+        mount_flange_drill = create_cylinder(
+            blower_mount_hole_diameter / 2, blower_thickness + 1
+        )
+        mount_flange_drill = align(
+            mount_flange_drill, center_reference, Alignment.CENTER
+        )
+        mount_flange_drill = align(
+            mount_flange_drill, mount_flange, Alignment.CENTER, axes=[2]
+        )
+        mount_flange_drill = translate(x_offset, y_offset, 0)(mount_flange_drill)
+
+        mount_flange = mount_flange.cut(mount_flange_drill)
+        mount_flange = mount_flange.cut(blower_inner_space_cutter)
+
+        body = body.fuse(mount_flange)
 
     return body

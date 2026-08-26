@@ -1268,8 +1268,8 @@ globals:
   blower_left_body_size_reduction: 3
   blower_outlet_inner_height: 17.6
   blower_outlet_inner_width: 12.2
-  blower_mount_hole_1_center_y_offset: 20.0
-  blower_mount_hole_1_center_x_offset: 18.0
+  blower_mount_hole_1_center_y_offset: -20.0
+  blower_mount_hole_1_center_x_offset: -18.0
   blower_mount_hole_2_center_y_offset: 23.0
   blower_mount_hole_2_center_x_offset: 20.0
   blower_outlet_end_from_center: 25.4
