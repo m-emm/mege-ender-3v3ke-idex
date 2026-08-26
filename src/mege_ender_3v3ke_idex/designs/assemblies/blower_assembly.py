@@ -90,6 +90,7 @@ def create_blower_assembly(
 
     mount_flange_extra_radius = 1
     mount_flange_connection_size = 8
+    drills = []
     for x_offset, y_offset in [
         (blower_mount_hole_1_center_x_offset, blower_mount_hole_1_center_y_offset),
         (blower_mount_hole_2_center_x_offset, blower_mount_hole_2_center_y_offset),
@@ -115,9 +116,7 @@ def create_blower_assembly(
 
         mount_flange = create_convex_hull(mount_flange, body_part)
 
-        mount_flange_drill = create_cylinder(
-            blower_mount_hole_diameter / 2, blower_thickness + 1
-        )
+        mount_flange_drill = create_cylinder(blower_mount_hole_diameter / 2, 50)
         mount_flange_drill = align(
             mount_flange_drill, center_reference, Alignment.CENTER
         )
@@ -127,8 +126,22 @@ def create_blower_assembly(
         mount_flange_drill = translate(x_offset, y_offset, 0)(mount_flange_drill)
 
         mount_flange = mount_flange.cut(mount_flange_drill)
+        drills.append(mount_flange_drill)
         mount_flange = mount_flange.cut(blower_inner_space_cutter)
 
         body = body.fuse(mount_flange)
 
-    return body
+    retval = LeaderFollowersCuttersPart(body)
+
+    for i, drill in enumerate(drills):
+        retval.add_named_cutter(drill, f"mount_hole_{i+1}")
+
+    retval.add_named_cutter(duct_cutter, "duct_cutter")
+
+    retval.add_named_non_production_part(duct_cutter, "duct_cutter_visualization")
+    retval.set_hidden_by_default("duct_cutter_visualization", True)
+
+    retval.add_named_non_production_part(center_reference, "center_reference")
+    retval.set_hidden_by_default("center_reference", True)
+
+    return retval

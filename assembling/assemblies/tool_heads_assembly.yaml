@@ -113,6 +113,15 @@ Builder:
             - 0
             - 0
       - source: injected
+        assembly: left_blower
+        artifact: all
+        name_template: "left_blower_{name}"
+        animation:
+          x_carriage_1:
+            - { $ref: x_axis_x_travel }
+            - 0
+            - 0
+      - source: injected
         assembly: tool_head_cable_attach_shield_left
         artifact: all
         name_template: "tool_head_cable_attach_shield_left_{name}"
@@ -197,6 +206,15 @@ Builder:
         assembly: tool_head_mount_machined_top
         artifact: all
         name_template: "tool_head_mount_machined_top_{name}"
+        animation:
+          x_carriage_2:
+            - { $ref: x_axis_x_travel_negative }
+            - 0
+            - 0
+      - source: injected
+        assembly: right_blower
+        artifact: all
+        name_template: "right_blower_{name}"
         animation:
           x_carriage_2:
             - { $ref: x_axis_x_travel_negative }

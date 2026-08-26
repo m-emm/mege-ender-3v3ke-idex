@@ -459,6 +459,54 @@ placement:
         - tool_head_cable_attach_shield_left_assembly
       to: tool_head_mount_machined_bottom_assembly
 
+    - part: left_blower_assembly
+      post_rotation:
+        angle: -90
+        axis: [0, 1, 0]
+
+    - part: left_blower_assembly
+      post_rotation:
+        angle: -90
+        axis: [0, 0, 1]
+
+    - part: right_blower_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 1, 0]
+
+    - part: right_blower_assembly
+      post_rotation:
+        angle: -90
+        axis: [0, 0, 1]
+
+    - part: left_blower_assembly
+      to: tool_head_mount_machined_bottom_assembly
+      alignment: CENTER
+    - part: left_blower_assembly
+      to: tool_head_mount_machined_bottom_assembly
+      alignment: STACK_TOP
+    - part: left_blower_assembly
+      to: tool_head_mount_machined_bottom_assembly
+      alignment: FRONT
+
+    - part: right_blower_assembly
+      to: tool_head_mount_machined_top_assembly
+      alignment: CENTER
+    - part: right_blower_assembly
+      to: tool_head_mount_machined_top_assembly
+      alignment: STACK_TOP
+    - part: right_blower_assembly
+      to: tool_head_mount_machined_top_assembly
+      alignment: FRONT
+
+    - rigid_group:
+        - left_blower_assembly
+      to: tool_head_mount_machined_bottom_assembly
+
+    - rigid_group:
+        - right_blower_assembly
+      to: tool_head_mount_machined_top_assembly
+
     - part: sprite_extruder_left_assembly
       to: tool_head_mount_machined_bottom_assembly
       alignment: CENTER
@@ -3937,6 +3985,8 @@ assemblies:
       - part_fan_right_joined_assembly
       - tool_head_mount_machined_bottom_assembly
       - tool_head_mount_machined_top_assembly
+      - left_blower_assembly
+      - right_blower_assembly
       - tool_head_cable_attach_shield_left_assembly
       - tool_head_cable_attach_shield_right_assembly
       - x_axis_belt_carriage_bottom_remainder_assembly
@@ -3961,6 +4011,8 @@ assemblies:
       part_fan_right: part_fan_right_joined_assembly
       tool_head_mount_machined_bottom: tool_head_mount_machined_bottom_assembly
       tool_head_mount_machined_top: tool_head_mount_machined_top_assembly
+      left_blower: left_blower_assembly
+      right_blower: right_blower_assembly
       tool_head_cable_attach_shield_left: tool_head_cable_attach_shield_left_assembly
       tool_head_cable_attach_shield_right: tool_head_cable_attach_shield_right_assembly
       x_axis_belt_carriage_bottom: x_axis_belt_carriage_bottom_remainder_assembly
@@ -4165,6 +4217,16 @@ assemblies:
     depends_on: []
 
   - name: blower_assembly
+
+    resource_file: blower_assembly.yaml
+    depends_on: []
+
+  - name: left_blower_assembly
+
+    resource_file: blower_assembly.yaml
+    depends_on: []
+
+  - name: right_blower_assembly
 
     resource_file: blower_assembly.yaml
     depends_on: []
