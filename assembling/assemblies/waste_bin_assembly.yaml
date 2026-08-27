@@ -15,7 +15,7 @@ Builder:
         name_template: "{assembly_name}_{name}"
 
       - source: dependencies
-        assembly: part_fan_left_joined_assembly
+        assembly: part_fan_left_assembly
         artifact: leader
         name_template: "{assembly_name}_{name}"
 

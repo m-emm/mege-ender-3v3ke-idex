@@ -21,6 +21,10 @@ def create_blower_assembly(
 ):
     """Create the blower body as a cylindrical reference volume."""
 
+    blower_outlet_wall_top_thickness = 1.0
+    mount_flange_extra_radius = 0.5
+    mount_flange_connection_size = 8
+
     center_reference = create_box(0.01, 0.01, 0.01)
 
     body_raw = create_cylinder(blower_body_size / 2, blower_thickness)
@@ -56,16 +60,20 @@ def create_blower_assembly(
     duct_cutter = align(duct_cutter, body, Alignment.CENTER)
     duct_cutter = align(duct_cutter, center_reference, Alignment.STACK_RIGHT)
     duct_cutter = align(duct_cutter, body, Alignment.BACK)
+    duct_cutter = align(duct_cutter, body, Alignment.TOP)
 
-    duct_cutter = translate(-blower_outlet_end_from_center, -blower_wall_thickness, 0)(
+
+    duct_cutter = translate(-blower_outlet_end_from_center, -blower_wall_thickness, -blower_outlet_wall_top_thickness)(
         duct_cutter
     )
 
     duct = materialize_bounding_box(
         duct_cutter,
         y_enlargement=blower_wall_thickness,
-        z_enlargement=blower_wall_thickness,
+        z_size = blower_thickness
     )
+
+    duct = align(duct, body, Alignment.TOP)
 
     duct_aligner = align_translation(duct, body, Alignment.BACK)
 
@@ -78,18 +86,25 @@ def create_blower_assembly(
 
     blower_inner_space_cutter = create_cylinder(
         blower_body_size / 2 - blower_wall_thickness - blower_left_body_size_reduction,
-        duct_size[2],
+        blower_thickness -2*blower_wall_thickness
     )
     blower_inner_space_cutter = align(blower_inner_space_cutter, body, Alignment.CENTER)
     body = body.cut(blower_inner_space_cutter)
 
-    duct = duct.cut(blower_inner_space_cutter)
+
+    blower_full_inner_space_cutter = create_cylinder(
+        blower_body_size / 2 - blower_wall_thickness,
+        blower_thickness)
+
+    blower_full_inner_space_cutter = align(blower_full_inner_space_cutter, body, Alignment.CENTER)
+    
+    duct = duct.cut(blower_full_inner_space_cutter)
+
+    
 
     body = body.cut(duct_cutter)
     body = body.fuse(duct)
 
-    mount_flange_extra_radius = 1
-    mount_flange_connection_size = 8
     drills = []
     for x_offset, y_offset in [
         (blower_mount_hole_1_center_x_offset, blower_mount_hole_1_center_y_offset),
@@ -128,6 +143,7 @@ def create_blower_assembly(
         mount_flange = mount_flange.cut(mount_flange_drill)
         drills.append(mount_flange_drill)
         mount_flange = mount_flange.cut(blower_inner_space_cutter)
+
 
         body = body.fuse(mount_flange)
 

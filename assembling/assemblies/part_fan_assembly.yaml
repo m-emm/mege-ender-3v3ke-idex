@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Part fan fused connector assembly
+Description: Temporary direct-mount blower duct placeholder
 
 Builder:
   Visualization:
@@ -20,48 +20,27 @@ Builder:
       - source: self
         artifact: non_production_parts
         name_template: "{name}"
-      - source: self
-        artifact: followers
-        names:
-          - central_blower
-        name_template: "{name}"
-
-      - source: injected
-        assembly: sprite_extruder
-        artifact: all
-        name_template: "sprite_extruder_{name}"
-
       - source: injected
         assembly: blower
         artifact: all
         name_template: "blower_{name}"
-
-      - source: injected
-        assembly: blower_ring
-        artifact: leader
-        name: blower_ring
 
   Production:
     process_data_preset: petgcf_max_strength_high_speed_06
     process_data:
       overrides:
         process_overrides:
-          enable_support: "1"
+          enable_support: "0"
           support_threshold_angle: "25"
     parts:
       - source: self
         artifact: leader
-        name: blower_ducts
-        prod_rotation_angle: 50
-        prod_rotation_axis: [1, 0, 0]
-      - source: self
-        artifact: followers
-        names:
-          - central_blower
-        name_template: "{name}"
+        name: blower_duct_placeholder
 
 Parameters:
-  blower_wall_thickness:
+  blower_body_size:
+    Type: Float
+  blower_thickness:
     Type: Float
 
 Parts:
