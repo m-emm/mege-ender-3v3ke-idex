@@ -21,12 +21,12 @@ def create_part_fan_assembly(
     nozzle_struts_pitch = 9
     nozzle_wall = 2
 
-    side_mount_plate_thickness = 5
+    side_mount_plate_thickness = 6
     side_mount_plate_height = 40
     side_mount_plate_depth = 30
 
     mount_plate_blower_clearance = 1.0
-    mount_plate_extra_radius = 4
+    mount_plate_extra_radius = 5.5
     mount_screw_size = "M4"
     mount_screw_length = 20
     mount_nut_pocket_clearance = 0.5
