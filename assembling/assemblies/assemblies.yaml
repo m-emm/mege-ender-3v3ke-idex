@@ -809,7 +809,6 @@ placement:
         $expr:
           "$sub": "-${blower_extruder_y_offset}"
 
-
     - part: right_blower_assembly
       to: sprite_extruder_right_assembly
       alignment: STACK_BOTTOM

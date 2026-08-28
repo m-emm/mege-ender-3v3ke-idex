@@ -62,15 +62,14 @@ def create_blower_assembly(
     duct_cutter = align(duct_cutter, body, Alignment.BACK)
     duct_cutter = align(duct_cutter, body, Alignment.TOP)
 
-
-    duct_cutter = translate(-blower_outlet_end_from_center, -blower_wall_thickness, -blower_outlet_wall_top_thickness)(
-        duct_cutter
-    )
+    duct_cutter = translate(
+        -blower_outlet_end_from_center,
+        -blower_wall_thickness,
+        -blower_outlet_wall_top_thickness,
+    )(duct_cutter)
 
     duct = materialize_bounding_box(
-        duct_cutter,
-        y_enlargement=blower_wall_thickness,
-        z_size = blower_thickness
+        duct_cutter, y_enlargement=blower_wall_thickness, z_size=blower_thickness
     )
 
     duct = align(duct, body, Alignment.TOP)
@@ -86,21 +85,20 @@ def create_blower_assembly(
 
     blower_inner_space_cutter = create_cylinder(
         blower_body_size / 2 - blower_wall_thickness - blower_left_body_size_reduction,
-        blower_thickness -2*blower_wall_thickness
+        blower_thickness - 2 * blower_wall_thickness,
     )
     blower_inner_space_cutter = align(blower_inner_space_cutter, body, Alignment.CENTER)
     body = body.cut(blower_inner_space_cutter)
 
-
     blower_full_inner_space_cutter = create_cylinder(
-        blower_body_size / 2 - blower_wall_thickness,
-        blower_thickness)
+        blower_body_size / 2 - blower_wall_thickness, blower_thickness
+    )
 
-    blower_full_inner_space_cutter = align(blower_full_inner_space_cutter, body, Alignment.CENTER)
-    
+    blower_full_inner_space_cutter = align(
+        blower_full_inner_space_cutter, body, Alignment.CENTER
+    )
+
     duct = duct.cut(blower_full_inner_space_cutter)
-
-    
 
     body = body.cut(duct_cutter)
     body = body.fuse(duct)
@@ -143,7 +141,6 @@ def create_blower_assembly(
         mount_flange = mount_flange.cut(mount_flange_drill)
         drills.append(mount_flange_drill)
         mount_flange = mount_flange.cut(blower_inner_space_cutter)
-
 
         body = body.fuse(mount_flange)
 

@@ -1253,7 +1253,7 @@ globals:
   y_axis_energy_chain_start_fixture_type: "MOUNT_EYE_FLAT"
   y_axis_energy_chain_start_fixture_vertical_side_thickness: null
   y_axis_energy_chain_width: 15
-  hotend_diameter: 13.9
+  hotend_diameter: 14.2
   hotend_overall_length: 33
   nozzle_diameter: 6.6
   nozzle_length: 4.4
@@ -1269,11 +1269,11 @@ globals:
   blower_outlet_inner_height: 17.6
   blower_outlet_inner_width: 12.2
   blower_mount_hole_1_center_x_offset: -18.0
-  blower_mount_hole_1_center_y_offset: -20.0  
+  blower_mount_hole_1_center_y_offset: -20.0
   blower_mount_hole_2_center_x_offset: 20.0
   blower_mount_hole_2_center_y_offset: 23.0
   blower_outlet_end_from_center: 25.4
-  blower_extruder_gap: 6
+  blower_extruder_gap: 9
   blower_extruder_y_offset: 15
   blower_center_offset: 4
   blowers_down_angle: 75
@@ -1314,7 +1314,7 @@ globals:
   lever_angle: 45
   lever_center_offset: 4.4
   lever_front_inset: 1
-  hotend_x_distance_from_right_edge: 18
+  hotend_x_distance_from_right_edge: 17.3
   holder_mount_plate_depth: 28
   holder_mount_plate_left_extension: 19
   holder_mount_plate_size: 8
