@@ -1273,8 +1273,8 @@ globals:
   blower_mount_hole_2_center_x_offset: 20.0
   blower_mount_hole_2_center_y_offset: 23.0
   blower_outlet_end_from_center: 25.4
-  blower_extruder_gap: 9
-  blower_extruder_y_offset: 15
+  blower_extruder_gap: 8
+  blower_extruder_y_offset: 20
   blower_center_offset: 4
   blowers_down_angle: 75
   blowers_duct_diameter: 6

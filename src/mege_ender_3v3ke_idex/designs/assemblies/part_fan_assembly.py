@@ -11,13 +11,13 @@ def create_part_fan_assembly(
     mount_plate_thickness = 4
     inner_gap = 29
     duct_size = 11
-    nozzle_length = 40
+    nozzle_length = 35
     oblique_nozzle_size = 4
-    oblique_nozzle_bottom_thickness = 9
+    oblique_nozzle_bottom_thickness = 11
     oblique_nozzle_wall = 1.5
 
-    nozzle_thickness = 3
-    nozzle_struts_thickness = 2
+    nozzle_thickness = 4
+    nozzle_struts_thickness = 1.2
     nozzle_struts_pitch = 9
     nozzle_wall = 2
 
@@ -26,7 +26,10 @@ def create_part_fan_assembly(
     side_mount_plate_depth = 30
 
     mount_plate_blower_clearance = 1.0
-    mount_plate_extra_radius = 2
+    mount_plate_extra_radius = 4
+    mount_screw_size = "M4"
+    mount_screw_length = 20
+    mount_nut_pocket_clearance = 0.5
 
     side_mount_plate_y_offset = -3
 
@@ -68,6 +71,9 @@ def create_part_fan_assembly(
     blower_mount_plate = blower_mount_plate.cut(blower_mount_plate_inner_cutter)
 
     hole_extensions = PartCollector()
+    mount_nut_pocket_cutters = []
+    mount_nuts = []
+    mount_screws = []
     for name, cutter in blower.get_named_cutter_items():
         if name == "duct_cutter":
             continue
@@ -79,6 +85,29 @@ def create_part_fan_assembly(
         hole_extension = align(hole_extension, cutter, Alignment.CENTER)
         hole_extension = align(hole_extension, blower_mount_plate, Alignment.BOTTOM)
         hole_extensions = hole_extensions.fuse(hole_extension)
+
+        mount_nut_pocket = create_square_nut(
+            mount_screw_size,
+            slack=mount_nut_pocket_clearance,
+            no_hole=True,
+        )
+        mount_nut_pocket = align(mount_nut_pocket, cutter, Alignment.CENTER)
+        mount_nut_pocket = align(mount_nut_pocket, blower_mount_plate, Alignment.BOTTOM)
+        mount_nut_pocket_cutters.append((name, mount_nut_pocket))
+
+        mount_nut = create_square_nut(mount_screw_size)
+        mount_nut = align(mount_nut, mount_nut_pocket, Alignment.CENTER)
+        mount_nut = align(mount_nut, mount_nut_pocket, Alignment.BOTTOM)
+        mount_nuts.append((name, mount_nut))
+
+        mount_screw = create_complete_screw_assembly(
+            mount_screw_size, mount_screw_length
+        )
+        mount_screw = align(mount_screw, cutter, Alignment.CENTER)
+        mount_screw = align(mount_screw, blower, Alignment.TOP)
+        mount_screws.append(
+            (name, mount_screw.get_named_non_production_part("complete_screw"))
+        )
 
     blower_mount_plate = blower.use_as_cutter_on(blower_mount_plate)
     placeholder = placeholder.fuse(blower_mount_plate)
@@ -172,7 +201,7 @@ def create_part_fan_assembly(
         nozzle_cutter = align(nozzle_cutter, inner_cutter, lr)
         nozzle_cutter = align(nozzle_cutter, placeholder, Alignment.BOTTOM)
         nozzle_cutter = align(nozzle_cutter, placeholder, Alignment.BACK)
-        nozzle_cutter = translate(0, -nozzle_wall, nozzle_wall)(nozzle_cutter)
+        nozzle_cutter = translate(0, -1.5 * nozzle_wall, nozzle_wall)(nozzle_cutter)
 
         nozzle_struts = PartCollector()
         num_struts = int(nozzle_cutter_depth / nozzle_struts_pitch)
@@ -254,8 +283,28 @@ def create_part_fan_assembly(
 
     blower_mount_plate = blower_mount_plate.fuse(hole_extensions)
 
+    for _, mount_nut_pocket_cutter in mount_nut_pocket_cutters:
+        blower_mount_plate = blower_mount_plate.cut(mount_nut_pocket_cutter)
+
     blower_mount_plate = blower.use_as_cutter_on(blower_mount_plate)
     blower_mount_plate = blower_mount_plate.cut(inner_cutter)
     placeholder = placeholder.fuse(blower_mount_plate)
 
-    return LeaderFollowersCuttersPart(placeholder)
+    for _, mount_nut_pocket_cutter in mount_nut_pocket_cutters:
+        placeholder = placeholder.cut(mount_nut_pocket_cutter)
+
+    retval = LeaderFollowersCuttersPart(placeholder)
+
+    for name, nut_pocket_cutter in mount_nut_pocket_cutters:
+        retval.add_named_cutter(
+            nut_pocket_cutter,
+            f"{name}_square_nut_pocket",
+        )
+
+    for name, mount_nut in mount_nuts:
+        retval.add_named_non_production_part(mount_nut, f"{name}_square_nut")
+
+    for name, mount_screw in mount_screws:
+        retval.add_named_non_production_part(mount_screw, f"{name}_screw")
+
+    return retval
