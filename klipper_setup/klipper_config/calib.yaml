@@ -16,28 +16,28 @@ tap_mesh:
   # One contact per grid point is the managed default.  A caller may still
   # request a larger explicit SAMPLES value for a diagnostic run.
   samples: 1
-  # Tap needs a short post-XY-move mechanical settle.  Two consecutive full
-  # 7x7 meshes at 100 ms completed on 2026-08-24, including the former
-  # insufficient-slope point at X=189.956, Y=239.544.
-  settle_ms: 100
+  # Tap needs a post-XY-move mechanical settle. At the intermittent
+  # insufficient-slope point X=169.408, Y=62.506, a 3x3 native mesh and
+  # repeated single taps were stable with a 500 ms dwell on 2026-08-28.
+  settle_ms: 500
   horizontal_move_z: 5.0
   # Eddy rapid-scan height; unlike Tap travel clearance this must stay within
   # the calibrated Eddy sensor range above the bed.
   rapid_scan_height: 0.5
   probe_count: [7, 7]
-  # Source-controlled copy of the mesh measured on the replacement bed on
-  # 2026-08-25.  This is the reviewed, repeatable 7x7 Tap profile inside the
-  # current PEI-covered mesh domain.
+  # Source-controlled copy of the mesh measured after the left toolhead
+  # rebuild on 2026-08-28.  Two full 7x7 Tap passes completed cleanly with
+  # 0.00572 mm mean absolute drift and 0.02669 mm worst-case drift.
   saved_mesh:
     version: 1
     points:
-      - [0.057772, 0.077115, 0.110504, 0.114016, 0.105312, 0.098052, 0.096143]
-      - [0.120073, 0.145766, 0.177555, 0.182322, 0.185368, 0.173973, 0.159673]
-      - [0.135039, 0.162887, 0.184337, 0.181731, 0.183186, 0.169852, 0.169977]
-      - [0.133055, 0.152090, 0.179335, 0.192297, 0.195567, 0.207330, 0.178609]
-      - [0.137490, 0.143167, 0.159465, 0.170805, 0.176374, 0.176034, 0.172466]
-      - [0.093124, 0.120720, 0.132863, 0.147307, 0.141673, 0.127180, 0.146183]
-      - [0.073753, 0.075394, 0.090117, 0.083278, 0.110340, 0.093392, 0.102010]
+      - [0.071933, 0.093534, 0.110661, 0.107789, 0.097202, 0.096418, 0.105921]
+      - [0.115408, 0.138341, 0.163894, 0.176632, 0.175142, 0.152153, 0.168973]
+      - [0.131999, 0.147480, 0.169238, 0.179008, 0.174132, 0.161379, 0.162659]
+      - [0.133981, 0.144342, 0.176456, 0.174749, 0.177359, 0.182148, 0.153814]
+      - [0.135717, 0.147342, 0.160265, 0.153130, 0.165586, 0.156998, 0.160968]
+      - [0.096578, 0.111837, 0.126159, 0.130876, 0.135152, 0.120938, 0.123494]
+      - [0.075018, 0.068360, 0.082249, 0.071460, 0.110994, 0.088006, 0.106654]
     mesh_params:
       min_x: 66.66
       max_x: 189.96

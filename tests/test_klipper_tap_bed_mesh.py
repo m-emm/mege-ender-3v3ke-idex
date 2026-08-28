@@ -1,7 +1,10 @@
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+CALIBRATION = REPO_ROOT / "klipper_setup/klipper_config/calib.yaml"
 PRIMARY_BED_MESH = (
     REPO_ROOT / "klipper_setup/klipper_host/klippy/extras/bed_mesh.py"
 )
@@ -31,6 +34,7 @@ def test_generated_mesh_commands_use_the_canonical_tap_macro():
     config = (REPO_ROOT / "klipper_setup/klipper_config/printer.cfg").read_text(
         encoding="utf-8"
     )
+    calibration = yaml.safe_load(CALIBRATION.read_text(encoding="utf-8"))
 
     canonical = config.split("[gcode_macro BED_MESH_CALIBRATE]", 1)[1].split(
         "[gcode_macro BED_MESH_IDEX_CALIBRATE]", 1
@@ -52,7 +56,7 @@ def test_generated_mesh_commands_use_the_canonical_tap_macro():
     assert "SAMPLES={samples}" in config
     assert "SAMPLES_RESULT=median" in config
     assert "default(1)" in config
-    assert "default(100)" in config
+    assert f"default({calibration['tap_mesh']['settle_ms']})" in config
     assert "zero_reference_position:" not in config
     assert "horizontal_move_z: 5.000" in config
     assert "probe_count: 7,7" in config
