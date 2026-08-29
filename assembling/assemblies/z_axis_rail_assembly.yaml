@@ -1,0 +1,29 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: One vertical MGN12 rail with a centered MGN12H carriage
+
+Builder:
+  Visualization:
+    parts:
+      - source: self
+        artifact: leader
+        name: rail
+      - source: self
+        artifact: followers
+        name_template: "{name}"
+  Production:
+    parts: []
+
+Parameters:
+  z_axis_rail_length:
+    Type: Float
+
+Parts:
+  ZAxisRailAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_rail_assembly.create_z_axis_rail_assembly
+      Properties:
+        z_axis_rail_length:
+          $ref: z_axis_rail_length

@@ -518,6 +518,28 @@ placement:
     - part: z_axis_profile_left_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_left
       alignment: STACK_TOP
+    - part: z_axis_left_rail_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 1, 0]
+    - part: z_axis_left_rail_assembly
+      post_rotation:
+        angle: -90
+        axis: [0, 0, 1]
+
+    - part: z_axis_left_rail_assembly
+      to: z_axis_profile_left_assembly
+      alignment: CENTER
+      axes: [0]
+    - part: z_axis_left_rail_assembly
+      to: z_axis_profile_left_assembly
+      alignment: BOTTOM
+    - part: z_axis_left_rail_assembly
+      to: z_axis_profile_left_assembly
+      alignment: STACK_FRONT
+    - rigid_group:
+        - z_axis_left_rail_assembly
+      to: z_axis_profile_left_assembly
     - part: z_axis_guide_rod_left_assembly
       to: z_axis_profile_left_assembly
       alignment: CENTER
@@ -544,6 +566,29 @@ placement:
     - part: z_axis_profile_right_assembly
       to: printer_frame_assembly.non_production_parts.frame_profile_right
       alignment: STACK_TOP
+    - part: z_axis_right_rail_assembly
+      post_rotation:
+        angle: 90
+        axis: [0, 1, 0]
+    - part: z_axis_right_rail_assembly
+      post_rotation:
+        angle: -90
+        axis: [0, 0, 1]
+    - part: z_axis_right_rail_assembly
+      to: z_axis_profile_right_assembly
+      alignment: CENTER
+      axes: [0]
+    - part: z_axis_right_rail_assembly
+      to: z_axis_profile_right_assembly
+      alignment: BOTTOM
+    - part: z_axis_right_rail_assembly
+      to: z_axis_profile_right_assembly
+      alignment: STACK_FRONT
+
+    - rigid_group:
+        - z_axis_right_rail_assembly
+      to: z_axis_profile_right_assembly
+
     - part: z_axis_guide_rod_right_assembly
       to: z_axis_profile_right_assembly
       alignment: CENTER
@@ -3146,6 +3191,20 @@ assemblies:
       z_axis_guide_rod_diameter: !Ref z_axis_guide_rod_diameter
       z_axis_guide_rod_length: !Ref z_axis_guide_rod_length
 
+  - name: z_axis_left_rail_assembly
+
+    resource_file: z_axis_rail_assembly.yaml
+    depends_on: []
+    parameters:
+      z_axis_rail_length: !Ref z_axis_rail_length
+
+  - name: z_axis_right_rail_assembly
+
+    resource_file: z_axis_rail_assembly.yaml
+    depends_on: []
+    parameters:
+      z_axis_rail_length: !Ref z_axis_rail_length
+
   - name: z_axis_bottom_support_left_assembly
 
     resource_file: z_axis_bottom_support_assembly.yaml
@@ -3731,6 +3790,8 @@ assemblies:
       - z_axis_profile_right_assembly
       - z_axis_guide_rod_left_assembly
       # - z_axis_guide_rod_right_assembly
+      - z_axis_left_rail_assembly
+      - z_axis_right_rail_assembly
       - z_axis_threaded_rod_left_assembly
       - z_axis_threaded_rod_right_assembly
       - z_axis_motor_mount_left_assembly
@@ -3792,6 +3853,8 @@ assemblies:
       # z_axis_profile_right: z_axis_profile_right_assembly
       z_axis_guide_rod_left: z_axis_guide_rod_left_assembly
       #      z_axis_guide_rod_right: z_axis_guide_rod_right_assembly
+      z_axis_left_rail: z_axis_left_rail_assembly
+      z_axis_right_rail: z_axis_right_rail_assembly
       z_axis_threaded_rod_left: z_axis_threaded_rod_left_assembly
       #     z_axis_threaded_rod_right: z_axis_threaded_rod_right_assembly
       z_axis_motor_mount_left: z_axis_motor_mount_left_assembly

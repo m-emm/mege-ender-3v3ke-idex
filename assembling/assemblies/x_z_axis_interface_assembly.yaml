@@ -40,6 +40,14 @@ Builder:
       - source: injected
         assembly: z_axis_profile_left
         artifact: all
+      - source: injected
+        assembly: z_axis_left_rail
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_right_rail
+        artifact: all
+        name_template: "{assembly_name}_{name}"
       # - source: injected
       #   assembly: z_axis_profile_right
       #   artifact: all
@@ -274,32 +282,6 @@ Builder:
         assembly: part_fan_left
         artifact: all
         name_template: "{assembly_name}_{name}"
-        animation:
-          x_carriage_1:
-            - { $ref: x_axis_x_travel }
-            - 0
-            - 0
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: single_part_fan_front_left_assembly
-        artifact: leader
-        name: part_fan_left_front_body
-        animation:
-          x_carriage_1:
-            - { $ref: x_axis_x_travel }
-            - 0
-            - 0
-          z_axis:
-            - 0
-            - 0
-            - { $ref: z_axis_z_travel }
-      - source: dependencies
-        assembly: single_part_fan_side_left_assembly
-        artifact: leader
-        name: part_fan_left_side_body
         animation:
           x_carriage_1:
             - { $ref: x_axis_x_travel }

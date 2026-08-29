@@ -3,9 +3,6 @@
 import math
 
 from mege_ender_3v3ke_idex.designs.nema_motors import create_nema_composite
-from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
-    create_four_screws_mount_assembly,
-)
 from mege_ender_3v3ke_idex.designs.z_axis_components import (
     create_pillow_block_bearing,
     create_profile_mount_plate,
@@ -28,12 +25,8 @@ def _get_profile_part(z_axis_profile):
     )
 
 
-def _get_guide_rod_part(z_axis_guide_rod):
-    return (
-        z_axis_guide_rod.leader
-        if hasattr(z_axis_guide_rod, "leader")
-        else z_axis_guide_rod
-    )
+def _get_rail_part(z_axis_rail):
+    return z_axis_rail.leader if hasattr(z_axis_rail, "leader") else z_axis_rail
 
 
 def _get_threaded_rod_part(z_axis_threaded_rod):
@@ -51,7 +44,7 @@ def _get_threaded_rod_coupler_reference(z_axis_threaded_rod):
 def create_z_axis_motor_mount_assembly(
     *,
     z_axis_profile,
-    z_axis_guide_rod,
+    z_axis_rail,
     z_axis_threaded_rod,
     side,
     BIG_THING,
@@ -64,14 +57,8 @@ def create_z_axis_motor_mount_assembly(
     z_axis_additional_screw_mount_clearance,
     z_axis_default_clearance_hole_type,
     z_axis_default_screw_nut_cutter_clearance,
-    z_axis_guide_rod_clamp_depth,
-    z_axis_guide_rod_clamp_rod_clearance,
-    z_axis_guide_rod_clamp_screw_length,
-    z_axis_guide_rod_clamp_screw_size,
-    z_axis_guide_rod_clamp_thickness,
-    z_axis_guide_rod_clamp_width,
-    z_axis_guide_rod_diameter,
     z_axis_motor_mount_plate_depth,
+    z_axis_motor_mount_plate_box_height,
     z_axis_motor_mount_plate_profile_distance,
     z_axis_motor_mount_plate_size,
     z_axis_motor_mount_plate_box_wall,
@@ -98,13 +85,12 @@ def create_z_axis_motor_mount_assembly(
     z_axis_pillow_block_bearing_rod_holder_length,
     z_axis_pillow_block_bearing_rod_holder_outer_diameter,
     z_axis_pillow_block_bottom_base_bridge_width,
-    z_axis_rod_clamp_gap,
 ):
     """Create the printable motor mount assembly for one z-axis side."""
 
     side_alignment = _to_side_alignment(side)
     profile = _get_profile_part(z_axis_profile)
-    guide_rod = _get_guide_rod_part(z_axis_guide_rod)
+    rail = _get_rail_part(z_axis_rail)
     threaded_rod = _get_threaded_rod_part(z_axis_threaded_rod)
     coupler = _get_threaded_rod_coupler_reference(z_axis_threaded_rod)
 
