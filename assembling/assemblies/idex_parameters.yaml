@@ -976,8 +976,8 @@ globals:
   z_axis_profile_mount_plate_fillet_radius: 3
   z_axis_profile_mount_plate_height: 70
   z_axis_profile_mount_plate_clearance: 0.3
-  z_axis_top_profile_mount_plate_height: 70
-  z_axis_profile_mount_plate_num_holes: 3
+  z_axis_top_profile_mount_plate_height: 40
+  z_axis_profile_mount_plate_num_holes: 2
   z_axis_profile_mount_plate_screw_inset: 5
   z_axis_profile_mount_plate_thickness: 5
   z_axis_top_mount_depth: 66
