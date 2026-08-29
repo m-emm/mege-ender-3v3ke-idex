@@ -142,8 +142,9 @@ Builder:
             - 0
 
       - source: injected
-        assembly: z_axis_guide_rod_left
+        assembly: z_axis_left_rail
         artifact: all
+        name_template: "{assembly_name}_{name}"
 
       - source: injected
         assembly: z_axis_profile_left

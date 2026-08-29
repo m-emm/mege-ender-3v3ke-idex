@@ -21,14 +21,13 @@ MIGRATED_PETGCF_RESOURCE_FILES = (
     "hv_switchbox_assembly.yaml",
     "nitehawk_usb_dual_board_housing_assembly.yaml",
     "part_fan_assembly.yaml",
-    "part_fan_cage_joiner.yaml",
     "printer_host_and_screen_assembly.yaml",
     "tb6600_stripboard_interface_housing_assembly.yaml",
     "tool_heads_assembly.yaml",
     "vision_light_mount_assembly.yaml",
     "x_axis_belt_carriage_assembly.yaml",
     "y_z_axis_mcu_holder_fan_joiner.yaml",
-    "z_axis_guide_rod_top_mount_assembly.yaml",
+    "z_axis_top_mount_assembly.yaml",
 )
 
 

@@ -168,28 +168,6 @@ def create_axial_rod_clamp(
     return retval
 
 
-def create_igus_drylin_bearing(
-    *,
-    z_axis_igus_drylin_bearing_inner_diameter,
-    z_axis_igus_drylin_bearing_length,
-    z_axis_igus_drylin_bearing_outer_diameter,
-    cutter_clearance,
-    cutter_extra_length,
-):
-    bearing = create_ring(
-        z_axis_igus_drylin_bearing_outer_diameter / 2,
-        z_axis_igus_drylin_bearing_inner_diameter / 2,
-        z_axis_igus_drylin_bearing_length,
-    )
-    cutter = create_cylinder(
-        (z_axis_igus_drylin_bearing_outer_diameter / 2) + cutter_clearance,
-        z_axis_igus_drylin_bearing_length + cutter_extra_length,
-    )
-    cutter = align(cutter, bearing, Alignment.CENTER)
-
-    return LeaderFollowersCuttersPart(bearing, cutters=[cutter])
-
-
 def create_pillow_block_bearing(
     *,
     BIG_THING,

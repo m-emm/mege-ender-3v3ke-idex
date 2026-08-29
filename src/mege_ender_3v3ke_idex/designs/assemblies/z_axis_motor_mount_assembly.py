@@ -53,10 +53,6 @@ def create_z_axis_motor_mount_assembly(
     motor_mount_boss_clearance_z,
     motor_mount_plate_fillet_radius,
     motor_mount_plate_thickness,
-    z_axis_cylinder_head_clearance,
-    z_axis_additional_screw_mount_clearance,
-    z_axis_default_clearance_hole_type,
-    z_axis_default_screw_nut_cutter_clearance,
     z_axis_motor_mount_plate_depth,
     z_axis_motor_mount_plate_box_height,
     z_axis_motor_mount_plate_profile_distance,
@@ -235,28 +231,17 @@ def create_z_axis_motor_mount_assembly(
         pillow_block_bearing_screw_spacer_cutter
     )
 
-    guide_rod_clamp = create_filleted_box(
-        z_axis_guide_rod_clamp_width,
-        z_axis_guide_rod_clamp_depth,
-        z_axis_guide_rod_clamp_thickness,
-        motor_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
-    )
-    guide_rod_clamp = align(guide_rod_clamp, mount_plate, Alignment.CENTER)
-    guide_rod_clamp = align(guide_rod_clamp, guide_rod, Alignment.CENTER, axes=[0, 1])
-    guide_rod_clamp = align(guide_rod_clamp, mount_plate, Alignment.STACK_TOP)
-
     mount_plate_box = create_filleted_box(
         z_axis_motor_mount_plate_size,
         z_axis_motor_mount_plate_size,
-        z_axis_guide_rod_clamp_thickness,
+        z_axis_motor_mount_plate_box_height,
         motor_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
     mount_plate_box_cutter = create_filleted_box(
         z_axis_motor_mount_plate_size - 2 * z_axis_motor_mount_plate_box_wall,
         z_axis_motor_mount_plate_size - 2 * z_axis_motor_mount_plate_box_wall,
-        z_axis_guide_rod_clamp_thickness,
+        z_axis_motor_mount_plate_box_height,
         motor_mount_plate_fillet_radius,
         no_fillets_at=[Alignment.BOTTOM, Alignment.TOP],
     )
@@ -265,11 +250,12 @@ def create_z_axis_motor_mount_assembly(
     )
     mount_plate_box = mount_plate_box.cut(mount_plate_box_cutter)
     mount_plate_box = align(mount_plate_box, mount_plate, Alignment.CENTER)
+    mount_plate_box = align(mount_plate_box, rail, Alignment.CENTER, axes=[0])
     mount_plate_box = align(mount_plate_box, mount_plate, Alignment.STACK_TOP)
     mount_plate_box = align(mount_plate_box, z_axis_profile, Alignment.STACK_FRONT)
 
     mount_plate_box_side_hole_cutter_size = (
-        z_axis_guide_rod_clamp_thickness * 0.8 / math.sqrt(2)
+        z_axis_motor_mount_plate_box_height * 0.8 / math.sqrt(2)
     )
 
     mount_plate_box_side_hole_cutter = create_filleted_box(
@@ -304,41 +290,10 @@ def create_z_axis_motor_mount_assembly(
 
     mount_plate_box = mount_plate_box.fuse(mount_plate_box_back)
 
-    mount_plate_box_back_half, mount_plate_box_front_half = cut_in_two(
-        mount_plate_box, cut_normal=(0, 1, 0)
-    )
-
-    screws_mount_assembly = create_four_screws_mount_assembly(
-        guide_rod_clamp,
-        z_axis_guide_rod_clamp_screw_size,
-        z_axis_guide_rod_clamp_screw_length,
-        Alignment.FRONT,
-        flush_with_top=True,
-        cylinder_head_cutter_clearance=z_axis_cylinder_head_clearance,
-        clearance_type=z_axis_default_clearance_hole_type,
-        additional_screw_mount_clearance=z_axis_additional_screw_mount_clearance,
-        nut_cutter_clearance=z_axis_default_screw_nut_cutter_clearance,
-    )
-    guide_rod_clamp = screws_mount_assembly.use_as_cutter_on(guide_rod_clamp)
-
-    mount_plate_box_front_half = screws_mount_assembly.use_as_cutter_on(
-        mount_plate_box_front_half
-    )
-
-    mount_plate = mount_plate.fuse(mount_plate_box_front_half)
-    mount_plate = mount_plate.fuse(mount_plate_box_back_half)
+    mount_plate = mount_plate.fuse(mount_plate_box)
 
     mount_plate = motor.use_as_cutter_on(mount_plate)
-
-    guide_rod_cutter = create_cylinder(
-        z_axis_guide_rod_diameter / 2 + z_axis_guide_rod_clamp_rod_clearance,
-        2 * BIG_THING,
-    )
-    guide_rod_cutter = align(guide_rod_cutter, guide_rod, Alignment.CENTER)
-
-    mount_plate = mount_plate.fuse(guide_rod_clamp)
     mount_plate = mount_plate.fuse(profile_mount_plates)
-    mount_plate = mount_plate.cut(guide_rod_cutter)
     mount_plate = mount_plate.fuse(pillow_bearing_mount_plate)
 
     for cutter_index in range(2):
@@ -379,22 +334,7 @@ def create_z_axis_motor_mount_assembly(
 
         mount_plate = mount_plate.fuse(pillow_bearing_mount_plate_support)
 
-    guide_rod_center = get_bounding_box_center(guide_rod)
-    guide_rod_clamp_center = get_bounding_box_center(guide_rod_clamp)
-    cut_point = (
-        guide_rod_clamp_center[0],
-        guide_rod_center[1],
-        guide_rod_clamp_center[2],
-    )
-    mount_plate_back, mount_plate_clamp_part = cut_in_two(
-        mount_plate,
-        cut_normal=(0, 1, 0),
-        cut_thickness=z_axis_rod_clamp_gap,
-        cut_point=cut_point,
-    )
-
-    retval = LeaderFollowersCuttersPart(leader=mount_plate_back)
-    retval.add_named_follower(mount_plate_clamp_part, "mount_plate_clamp_part")
+    retval = LeaderFollowersCuttersPart(leader=mount_plate)
 
     retval.add_named_non_production_part(
         pillow_block_bearing.leader,
@@ -404,7 +344,4 @@ def create_z_axis_motor_mount_assembly(
         retval.add_named_non_production_part(part, name)
     for name, part in motor.get_named_follower_items():
         retval.add_named_non_production_part(part, name)
-    for name, part in screws_mount_assembly.get_named_non_production_part_items():
-        retval.add_named_non_production_part(part, f"guide_rod_clamp_{name}")
-
     return retval

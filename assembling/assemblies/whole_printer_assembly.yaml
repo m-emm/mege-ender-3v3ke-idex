@@ -102,11 +102,13 @@ Builder:
         assembly: z_axis_profile_right
         artifact: all
       - source: injected
-        assembly: z_axis_guide_rod_left
+        assembly: z_axis_left_rail
         artifact: all
+        name_template: "{assembly_name}_{name}"
       - source: injected
-        assembly: z_axis_guide_rod_right
+        assembly: z_axis_right_rail
         artifact: all
+        name_template: "{assembly_name}_{name}"
       - source: injected
         assembly: z_axis_threaded_rod_left
         artifact: leader
@@ -128,7 +130,7 @@ Builder:
         artifact: all
         name_template: "{assembly_name}_{name}"
       - source: injected
-        assembly: z_axis_guide_rod_top_mount_left
+        assembly: z_axis_top_mount_left
         artifact: all
         name_template: "{assembly_name}_{name}"
       - source: injected
@@ -136,7 +138,7 @@ Builder:
         artifact: all
         name_template: "{assembly_name}_{name}"
       - source: injected
-        assembly: z_axis_guide_rod_top_mount_right
+        assembly: z_axis_top_mount_right
         artifact: all
         name_template: "{assembly_name}_{name}"
       - source: injected

@@ -1,6 +1,6 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for one z-axis carriage
+Description: Assembly configuration for one monolithic z-axis carriage
 
 Builder:
   Visualization:
@@ -8,9 +8,6 @@ Builder:
       - source: self
         artifact: leader
         name: carriage
-      - source: self
-        artifact: followers
-        name_template: "{name}"
       - source: self
         artifact: non_production_parts
         exclude_names:
@@ -24,24 +21,9 @@ Builder:
         name: carriage
         prod_rotation_angle: 180
         prod_rotation_axis: [0, 1, 0]
-      - source: self
-        artifact: followers
-        name_template: "{name}"
-        prod_rotation_angle: 90
-        prod_rotation_axis: [0, 1, 0]
-    arrange:
-      export_individual_parts: false
-      plates:
-        - name: z_axis_carriage
-          parts:
-            - carriage
-            - carriage_clamp_0
-      auto_assign_plates: false
 
 Parameters:
   carriage_z_offset:
-    Type: Float
-  z_axis_carriage_back_depth:
     Type: Float
   z_axis_carriage_back_height:
     Type: Float
@@ -51,11 +33,7 @@ Parameters:
     Type: Float
   z_axis_carriage_front_height:
     Type: Float
-  z_axis_carriage_mount_screw_size:
-    Type: String
-  z_axis_carriage_profile_clearance:
-    Type: Float
-  z_axis_carriage_rod_clamp_screw_inset:
+  z_axis_carriage_profile_center_distance:
     Type: Float
   z_axis_carriage_threaded_rod_clearance:
     Type: Float
@@ -83,24 +61,8 @@ Parameters:
     Type: Float
   z_axis_creality_nut_threaded_rod_cuide_cutter_clearance:
     Type: Float
-  z_axis_cylinder_head_clearance:
-    Type: Float
-  z_axis_additional_screw_mount_clearance:
-    Type: Float
   z_axis_default_clearance_hole_type:
     Type: String
-  z_axis_default_screw_nut_cutter_clearance:
-    Type: Float
-  z_axis_guide_rod_carriage_clamp_screw_length:
-    Type: Float
-  z_axis_igus_drylin_bearing_cutter_clearance:
-    Type: Float
-  z_axis_igus_drylin_bearing_inner_diameter:
-    Type: Float
-  z_axis_igus_drylin_bearing_length:
-    Type: Float
-  z_axis_igus_drylin_bearing_outer_diameter:
-    Type: Float
   z_axis_nut_screw_hole_clearence_type:
     Type: String
   z_axis_threaded_rod_diameter:
@@ -113,4 +75,4 @@ Parts:
     Type: Shellforgepy::Assembly
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_carriage_assembly_v2.create_z_axis_carriage_assembly_v2
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_carriage_assembly.create_z_axis_carriage_assembly

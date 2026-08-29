@@ -1,16 +1,13 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for one z-axis motor mount
+Description: Assembly configuration for one monolithic z-axis motor mount
 
 Builder:
   Visualization:
     parts:
       - source: self
         artifact: leader
-        name: mount_plate_back
-      - source: self
-        artifact: followers
-        name_template: "{name}"
+        name: mount_plate
       - source: self
         artifact: non_production_parts
         name_template: "{name}"
@@ -18,10 +15,7 @@ Builder:
     parts:
       - source: self
         artifact: leader
-        name: mount_plate_back
-      - source: self
-        artifact: followers
-        name_template: "{name}"
+        name: mount_plate
 
 Parameters:
   side:
@@ -36,29 +30,9 @@ Parameters:
     Type: Float
   motor_mount_plate_thickness:
     Type: Float
-  z_axis_cylinder_head_clearance:
-    Type: Float
-  z_axis_additional_screw_mount_clearance:
-    Type: Float
-  z_axis_default_clearance_hole_type:
-    Type: String
-  z_axis_default_screw_nut_cutter_clearance:
-    Type: Float
-  z_axis_guide_rod_clamp_depth:
-    Type: Float
-  z_axis_guide_rod_clamp_rod_clearance:
-    Type: Float
-  z_axis_guide_rod_clamp_screw_length:
-    Type: Float
-  z_axis_guide_rod_clamp_screw_size:
-    Type: String
-  z_axis_guide_rod_clamp_thickness:
-    Type: Float
-  z_axis_guide_rod_clamp_width:
-    Type: Float
-  z_axis_guide_rod_diameter:
-    Type: Float
   z_axis_motor_mount_plate_depth:
+    Type: Float
+  z_axis_motor_mount_plate_box_height:
     Type: Float
   z_axis_motor_mount_plate_profile_distance:
     Type: Float
@@ -111,8 +85,6 @@ Parameters:
   z_axis_pillow_block_bearing_rod_holder_outer_diameter:
     Type: Float
   z_axis_pillow_block_bottom_base_bridge_width:
-    Type: Float
-  z_axis_rod_clamp_gap:
     Type: Float
 
 Parts:
