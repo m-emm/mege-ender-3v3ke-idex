@@ -842,7 +842,8 @@ gcode:
 
 [gcode_macro _IDEX_PART_FAN_STATE]
 variable_speed: 0.0
-variable_midpoint_boost: 0.20
+# Keep M106 linear: the new part blower has Creality-equivalent output.
+variable_midpoint_boost: 0.0
 gcode:
 
 [gcode_macro _IDEX_APPLY_PART_FAN]
