@@ -900,9 +900,19 @@ placement:
       stack_gap:
         $ref: nozzle_bed_reach_margin
 
+    - rigid_group:
+        - z_axis_right_rail_bottom_carriage_assembly
+        - z_axis_right_rail_top_carriage_assembly
+      to: z_axis_carriage_right_assembly
+
     - part: z_axis_carriage_right_assembly.non_production_parts.x_axis_alignment_reference
       to: x_axis_lower_profile_assembly
       alignment: BOTTOM
+
+    - rigid_group:
+        - z_axis_left_rail_bottom_carriage_assembly
+        - z_axis_left_rail_top_carriage_assembly
+      to: z_axis_carriage_left_assembly
 
     - part: z_axis_carriage_left_assembly.non_production_parts.x_axis_alignment_reference
       to: x_axis_lower_profile_assembly
@@ -3419,8 +3429,9 @@ assemblies:
       z_axis_top_mount_carriage_clearance: !Ref z_axis_top_mount_carriage_clearance
       z_axis_carriage_width: !Ref z_axis_carriage_width
 
-  - name: z_axis_carriage_left_assembly
+  - name: z_axis_carriage_left_joiner
 
+    kind: join
     resource_file: z_axis_carriage_assembly.yaml
     depends_on:
       - z_axis_profile_left_assembly
@@ -3440,6 +3451,8 @@ assemblies:
       z_axis_carriage_threaded_rod_clearance: !Ref z_axis_carriage_threaded_rod_clearance
       z_axis_carriage_width: !Ref z_axis_carriage_width
       z_axis_carriage_x_axis_connector_thickness: !Ref z_axis_carriage_x_axis_connector_thickness
+      z_axis_rail_carriage_gap: !Ref z_axis_rail_carriage_gap
+      z_axis_rail_carriage_offset_above_carriage: !Ref z_axis_rail_carriage_offset_above_carriage
       z_axis_creality_nut_base_cut_radius: !Ref z_axis_creality_nut_base_cut_radius
       z_axis_creality_nut_base_length: !Ref z_axis_creality_nut_base_length
       z_axis_creality_nut_base_thickness: !Ref z_axis_creality_nut_base_thickness
@@ -3455,8 +3468,14 @@ assemblies:
       z_axis_threaded_rod_diameter: !Ref z_axis_threaded_rod_diameter
       z_axis_x_axis_to_carriage_gap: !Ref z_axis_x_axis_to_carriage_gap
 
-  - name: z_axis_carriage_right_assembly
+    outputs:
+      carriage: z_axis_carriage_left_assembly
+      bottom_rail_carriage: z_axis_left_rail_bottom_carriage_assembly
+      top_rail_carriage: z_axis_left_rail_top_carriage_assembly
 
+  - name: z_axis_carriage_right_joiner
+
+    kind: join
     resource_file: z_axis_carriage_assembly.yaml
     depends_on:
       - z_axis_profile_right_assembly
@@ -3476,6 +3495,8 @@ assemblies:
       z_axis_carriage_threaded_rod_clearance: !Ref z_axis_carriage_threaded_rod_clearance
       z_axis_carriage_width: !Ref z_axis_carriage_width
       z_axis_carriage_x_axis_connector_thickness: !Ref z_axis_carriage_x_axis_connector_thickness
+      z_axis_rail_carriage_gap: !Ref z_axis_rail_carriage_gap
+      z_axis_rail_carriage_offset_above_carriage: !Ref z_axis_rail_carriage_offset_above_carriage
       z_axis_creality_nut_base_cut_radius: !Ref z_axis_creality_nut_base_cut_radius
       z_axis_creality_nut_base_length: !Ref z_axis_creality_nut_base_length
       z_axis_creality_nut_base_thickness: !Ref z_axis_creality_nut_base_thickness
@@ -3490,6 +3511,11 @@ assemblies:
       z_axis_nut_screw_hole_clearence_type: !Ref z_axis_nut_screw_hole_clearence_type
       z_axis_threaded_rod_diameter: !Ref z_axis_threaded_rod_diameter
       z_axis_x_axis_to_carriage_gap: !Ref z_axis_x_axis_to_carriage_gap
+
+    outputs:
+      carriage: z_axis_carriage_right_assembly
+      bottom_rail_carriage: z_axis_right_rail_bottom_carriage_assembly
+      top_rail_carriage: z_axis_right_rail_top_carriage_assembly
 
   - name: whole_printer_assembly
 
@@ -3519,6 +3545,10 @@ assemblies:
       - z_axis_top_mount_right_assembly
       - z_axis_carriage_left_assembly
       - z_axis_carriage_right_assembly
+      - z_axis_left_rail_bottom_carriage_assembly
+      - z_axis_left_rail_top_carriage_assembly
+      - z_axis_right_rail_bottom_carriage_assembly
+      - z_axis_right_rail_top_carriage_assembly
       - z_axis_top_bridge_profile_assembly
       - z_axis_top_profile_gusset_left_assembly
       - z_axis_top_profile_gusset_right_assembly
@@ -3587,6 +3617,10 @@ assemblies:
       z_axis_top_mount_right: z_axis_top_mount_right_assembly
       z_axis_carriage_left: z_axis_carriage_left_assembly
       z_axis_carriage_right: z_axis_carriage_right_assembly
+      z_axis_left_rail_bottom_carriage: z_axis_left_rail_bottom_carriage_assembly
+      z_axis_left_rail_top_carriage: z_axis_left_rail_top_carriage_assembly
+      z_axis_right_rail_bottom_carriage: z_axis_right_rail_bottom_carriage_assembly
+      z_axis_right_rail_top_carriage: z_axis_right_rail_top_carriage_assembly
       z_axis_top_bridge_profile: z_axis_top_bridge_profile_assembly
       z_axis_top_profile_gusset_left: z_axis_top_profile_gusset_left_assembly
       z_axis_top_profile_gusset_right: z_axis_top_profile_gusset_right_assembly
@@ -3643,6 +3677,8 @@ assemblies:
       - sprite_extruder_left_assembly
       - part_fan_left_assembly
       - waste_bin_left_assembly
+      - z_axis_left_rail_bottom_carriage_assembly
+      - z_axis_left_rail_top_carriage_assembly
 
     inject_parts:
       waste_bin_left: waste_bin_left_assembly
@@ -3654,6 +3690,8 @@ assemblies:
       z_axis_threaded_rod_left: z_axis_threaded_rod_left_assembly
       z_axis_motor_mount_left: z_axis_motor_mount_left_assembly
       z_axis_carriage_left: z_axis_carriage_left_assembly
+      z_axis_left_rail_bottom_carriage: z_axis_left_rail_bottom_carriage_assembly
+      z_axis_left_rail_top_carriage: z_axis_left_rail_top_carriage_assembly
 
     parameters:
       waste_bin_width: !Ref waste_bin_width
@@ -3687,6 +3725,8 @@ assemblies:
       - z_axis_top_mount_left_assembly
       - z_axis_top_mount_right_assembly
       - z_axis_carriage_left_assembly
+      - z_axis_left_rail_bottom_carriage_assembly
+      - z_axis_left_rail_top_carriage_assembly
       # - z_axis_carriage_right_assembly
       - z_axis_top_bridge_profile_assembly
       - z_axis_top_profile_gusset_left_assembly
@@ -3748,6 +3788,8 @@ assemblies:
       z_axis_top_mount_left: z_axis_top_mount_left_assembly
       #   z_axis_top_mount_right: z_axis_top_mount_right_assembly
       z_axis_carriage_left: z_axis_carriage_left_assembly
+      z_axis_left_rail_bottom_carriage: z_axis_left_rail_bottom_carriage_assembly
+      z_axis_left_rail_top_carriage: z_axis_left_rail_top_carriage_assembly
       #   z_axis_carriage_right: z_axis_carriage_right_assembly
       z_axis_top_bridge_profile: z_axis_top_bridge_profile_assembly
       # z_axis_top_profile_gusset_left: z_axis_top_profile_gusset_left_assembly

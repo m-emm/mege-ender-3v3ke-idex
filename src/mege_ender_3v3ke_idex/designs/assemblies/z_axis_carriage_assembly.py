@@ -1,5 +1,6 @@
 """Declarative monolithic z-axis carriage assembly."""
 
+import copy
 import math
 
 from mege_ender_3v3ke_idex.designs.alu_extrusion_profile import ExtrusionProfileType
@@ -65,7 +66,29 @@ def _get_part(part):
     return part.leader if hasattr(part, "leader") else part
 
 
-def create_z_axis_carriage_assembly(
+def _replacement_rail_carriage(z_axis_rail, name):
+    """Extract one MGN12H block as a full replacement assembly."""
+
+    metadata_by_name = z_axis_rail.additional_data.get("carriage_metadata_by_name", {})
+    if name not in metadata_by_name:
+        raise KeyError(
+            f"Missing MGN12H metadata for {name!r}; available names: "
+            f"{sorted(metadata_by_name)}"
+        )
+
+    carriage = LeaderFollowersCuttersPart(
+        leader=z_axis_rail.get_follower_part_by_name(name).copy(),
+        additional_data=copy.deepcopy(metadata_by_name[name]),
+    )
+    carriage.add_named_cutter(
+        z_axis_rail.get_named_cutter(f"{name}_mounting_holes").copy(),
+        "mounting_holes",
+    )
+    carriage.add_consumed_part_ref(z_axis_rail.part_ref_for_named_follower(name))
+    return carriage
+
+
+def join_z_axis_carriage_assembly(
     *,
     z_axis_profile,
     z_axis_rail,
@@ -80,6 +103,8 @@ def create_z_axis_carriage_assembly(
     z_axis_carriage_threaded_rod_clearance,
     z_axis_carriage_width,
     z_axis_carriage_x_axis_connector_thickness,
+    z_axis_rail_carriage_gap,
+    z_axis_rail_carriage_offset_above_carriage,
     z_axis_creality_nut_base_cut_radius,
     z_axis_creality_nut_base_length,
     z_axis_creality_nut_base_thickness,
@@ -95,7 +120,7 @@ def create_z_axis_carriage_assembly(
     z_axis_threaded_rod_diameter,
     z_axis_x_axis_to_carriage_gap,
 ):
-    """Create one monolithic carriage body around the retained Z hardware."""
+    """Create the printable carriage and movable replacement MGN12H blocks."""
 
     profile = _get_part(z_axis_profile)
     rail = _get_part(z_axis_rail)
@@ -322,7 +347,7 @@ def create_z_axis_carriage_assembly(
             0,
         )(enhancement)
         enhancements = enhancements.fuse(enhancement)
-    carriage_back = carriage_back.fuse(enhancements)
+    # carriage_back = carriage_back.fuse(enhancements)
 
     carriage_body = carriage_front_block.fuse(carriage_back)
     carriage_body = carriage_body.fuse(x_axis_mount_plate_bottom)
@@ -443,35 +468,67 @@ def create_z_axis_carriage_assembly(
 
     retval.leader = retval.leader.cut(front_cutter)
 
-    rail_carriages_fused = rail_carriages[0].fuse(rail_carriages[1])
-
-    carriage_mount_plate = materialize_bounding_box(rail_carriages_fused, y_size=3)
-    carriage_mount_plate = align(carriage_mount_plate, retval, Alignment.BACK)
-    carriage_mount_plate = align(carriage_mount_plate, retval, Alignment.TOP)
-
-    carriage_mount_plate = translate(0, 0, 30)(carriage_mount_plate)
-
-    z_axis_rail_aligned = z_axis_rail.aligned_from_follower(
-        "top_carriage", carriage_mount_plate, Alignment.TOP
+    replacement_rail_carriages = {
+        name: _replacement_rail_carriage(z_axis_rail, name)
+        for name in ("bottom_carriage", "top_carriage")
+    }
+    replacement_rail_carriages["top_carriage"] = align(
+        replacement_rail_carriages["top_carriage"],
+        retval,
+        Alignment.TOP,
+    )
+    replacement_rail_carriages["top_carriage"] = translate(
+        0,
+        0,
+        z_axis_rail_carriage_offset_above_carriage,
+    )(replacement_rail_carriages["top_carriage"])
+    replacement_rail_carriages["bottom_carriage"] = align(
+        replacement_rail_carriages["bottom_carriage"],
+        replacement_rail_carriages["top_carriage"],
+        Alignment.STACK_BOTTOM,
+        stack_gap=z_axis_rail_carriage_gap,
     )
 
-    carriage_mount_plate = z_axis_rail_aligned.use_as_cutter_on(carriage_mount_plate)
+    rail_carriages_fused = replacement_rail_carriages["bottom_carriage"].leader.fuse(
+        replacement_rail_carriages["top_carriage"].leader
+    )
+
+    current_bbox_size = get_bounding_box_size(retval)
+
+    carriage_mount_plate = materialize_bounding_box(
+        rail_carriages_fused, y_size=3, x_size=current_bbox_size[0]
+    )
+    carriage_mount_plate = align(carriage_mount_plate, retval, Alignment.BACK)
+    for replacement_carriage in replacement_rail_carriages.values():
+        carriage_mount_plate = replacement_carriage.use_as_cutter_on(
+            carriage_mount_plate
+        )
 
     side_mount_plates = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        side_mount_plate = create_box(3, 30, 12)
+        carriage_center = get_bounding_box_center(retval)
+        carriage_size = get_bounding_box_size(retval)
+        mount_plate_center = get_bounding_box_center(carriage_mount_plate)
+        mount_plate_size = get_bounding_box_size(carriage_mount_plate)
+        connector_height = 10
+        side_mount_plate = create_box(3, 30, connector_height)
         side_mount_plate = align(
             side_mount_plate, carriage_mount_plate, Alignment.CENTER
         )
         side_mount_plate = align(side_mount_plate, carriage_mount_plate, lr)
-        side_mount_plate = align(
-            side_mount_plate, carriage_mount_plate, Alignment.BOTTOM
-        )
+        side_mount_plate = align(side_mount_plate, retval, Alignment.CENTER, axes=[2])
         side_mount_plate = align(
             side_mount_plate, carriage_mount_plate, Alignment.STACK_FRONT
         )
-        side_mount_plate = translate(0, 0, 17)(side_mount_plate)
         side_mount_plates = side_mount_plates.fuse(side_mount_plate)
+
+        side_top_mount_plate = create_box(3, current_bbox_size[1], 40)
+        side_top_mount_plate = align(
+            side_top_mount_plate, carriage_mount_plate, Alignment.TOP
+        )
+        side_top_mount_plate = align(side_top_mount_plate, carriage_mount_plate, lr)
+        side_top_mount_plate = align(side_top_mount_plate, retval, Alignment.FRONT)
+        side_mount_plates = side_mount_plates.fuse(side_top_mount_plate)
 
     retval.leader = retval.leader.fuse(side_mount_plates)
     retval.leader = retval.leader.fuse(carriage_mount_plate)
@@ -491,4 +548,11 @@ def create_z_axis_carriage_assembly(
     )
     retval.set_hidden_by_default("x_axis_alignment_reference")
 
-    return translate(0, 0, carriage_z_offset)(retval)
+    placement = translate(0, 0, carriage_z_offset)
+    return {
+        "carriage": placement(retval),
+        "bottom_rail_carriage": placement(
+            replacement_rail_carriages["bottom_carriage"]
+        ),
+        "top_rail_carriage": placement(replacement_rail_carriages["top_carriage"]),
+    }

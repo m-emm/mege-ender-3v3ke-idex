@@ -7,6 +7,7 @@ Usage:
     cd <project_root> && SHELLFORGEPY_PRODUCTION=1 ./run.sh path/to/mgh_linear.py
 """
 
+import copy
 import logging
 import os
 
@@ -67,12 +68,12 @@ def create_mgn12h_carriage():
 
     carriage = LeaderFollowersCuttersPart(
         carriage,
-        cutters=[holes],
         additional_data={
             "screw_hole_diameter": screw_hole_diameter,
             "screw_hole_pitch": mgn_12h_screw_hole_pitch,
         },
     )
+    carriage.add_named_cutter(holes, "mounting_holes")
 
     carriage = translate(0, 0, mgn_12h_h1)(carriage)
 
@@ -208,13 +209,19 @@ def create_mgn12h_rail_with_carriages(
     if len(carriage_names) != len(carriage_offsets):
         raise ValueError("carriage_names must match carriage_offsets length")
 
+    carriage_metadata_by_name = {}
     for carriage_offset, carriage_name in zip(carriage_offsets, carriage_names):
         carriage = create_mgn12h_carriage()
+        carriage_metadata_by_name[carriage_name] = copy.deepcopy(
+            carriage.additional_data
+        )
         carriage = align(carriage, rail.leader, Alignment.CENTER, axes=[0, 1])
         carriage = translate(carriage_offset, 0, 0)(carriage)
         carriage = carriage.prefixed_copy(carriage_name)
         rail.add_named_follower(carriage.leader, name=carriage_name)
         rail = rail.merge_except_leader(carriage)
+
+    rail.additional_data["carriage_metadata_by_name"] = carriage_metadata_by_name
 
     return rail
 

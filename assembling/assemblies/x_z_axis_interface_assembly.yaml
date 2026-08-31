@@ -45,11 +45,17 @@ Builder:
         artifact: leader
         name_template: "{assembly_name}_{name}"
       - source: injected
-        assembly: z_axis_left_rail
-        artifact: followers
-        names:
-          - bottom_carriage
-          - top_carriage
+        assembly: z_axis_left_rail_bottom_carriage
+        artifact: all
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
+      - source: injected
+        assembly: z_axis_left_rail_top_carriage
+        artifact: all
         name_template: "{assembly_name}_{name}"
         animation:
           z_axis:
@@ -58,7 +64,7 @@ Builder:
             - { $ref: z_axis_z_travel }
       - source: injected
         assembly: z_axis_right_rail
-        artifact: all
+        artifact: leader
         name_template: "{assembly_name}_{name}"
       # - source: injected
       #   assembly: z_axis_profile_right

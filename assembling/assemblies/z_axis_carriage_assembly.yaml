@@ -1,26 +1,66 @@
 ShellforgepyBuilderVersion: "2026-03-27"
 
-Description: Assembly configuration for one monolithic z-axis carriage
+Description: Joiner for one monolithic z-axis carriage and its movable MGN12H blocks
 
 Builder:
-  Visualization:
-    parts:
-      - source: self
-        artifact: leader
-        name: carriage
-      - source: self
-        artifact: non_production_parts
-        exclude_names:
-          - x_axis_alignment_reference
-        name_template: "{name}"
-  Production:
-    process_data_preset: petgcf_max_strength_high_speed_06
-    parts:
-      - source: self
-        artifact: leader
-        name: carriage
-        prod_rotation_angle: 180
-        prod_rotation_axis: [0, 1, 0]
+  Outputs:
+    carriage:
+      Visualization:
+        parts:
+          - source: self
+            artifact: leader
+            name: carriage
+          - source: self
+            artifact: non_production_parts
+            exclude_names:
+              - x_axis_alignment_reference
+            name_template: "{name}"
+          - source: output
+            assembly: bottom_rail_carriage
+            artifact: leader
+            name: bottom_rail_carriage
+          - source: output
+            assembly: top_rail_carriage
+            artifact: leader
+            name: top_rail_carriage
+          - source: injected
+            assembly: z_axis_rail
+            artifact: leader
+            name: z_axis_rail
+          - source: injected
+            assembly: z_axis_profile
+            artifact: leader
+            name: z_axis_profile
+          - source: injected
+            assembly: z_axis_threaded_rod
+            artifact: leader
+            name: z_axis_threaded_rod
+      Production:
+        process_data_preset: petgcf_max_strength_high_speed_06
+        parts:
+          - source: self
+            artifact: leader
+            name: carriage
+            prod_rotation_angle: 180
+            prod_rotation_axis: [0, 1, 0]
+
+    bottom_rail_carriage:
+      Visualization:
+        parts:
+          - source: self
+            artifact: leader
+            name: bottom_carriage
+      Production:
+        parts: []
+
+    top_rail_carriage:
+      Visualization:
+        parts:
+          - source: self
+            artifact: leader
+            name: top_carriage
+      Production:
+        parts: []
 
 Parameters:
   carriage_z_offset:
@@ -40,6 +80,10 @@ Parameters:
   z_axis_carriage_width:
     Type: Float
   z_axis_carriage_x_axis_connector_thickness:
+    Type: Float
+  z_axis_rail_carriage_gap:
+    Type: Float
+  z_axis_rail_carriage_offset_above_carriage:
     Type: Float
   z_axis_creality_nut_base_cut_radius:
     Type: Float
@@ -71,8 +115,8 @@ Parameters:
     Type: Float
 
 Parts:
-  ZAxisCarriageAssembly:
-    Type: Shellforgepy::Assembly
+  ZAxisCarriageJoiner:
+    Type: Shellforgepy::AssemblyJoiner
 
     Properties:
-      Generator: mege_ender_3v3ke_idex.designs.assemblies.z_axis_carriage_assembly.create_z_axis_carriage_assembly
+      Joiner: mege_ender_3v3ke_idex.designs.assemblies.z_axis_carriage_assembly.join_z_axis_carriage_assembly
