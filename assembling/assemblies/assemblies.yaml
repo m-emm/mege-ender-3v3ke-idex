@@ -537,6 +537,11 @@ placement:
     - part: z_axis_left_rail_assembly
       to: z_axis_profile_left_assembly
       alignment: STACK_FRONT
+      post_translation:
+        - 0
+        - 0
+        - $ref: z_axis_rail_z_offset
+
     - rigid_group:
         - z_axis_left_rail_assembly
       to: z_axis_profile_left_assembly
@@ -565,6 +570,10 @@ placement:
     - part: z_axis_right_rail_assembly
       to: z_axis_profile_right_assembly
       alignment: STACK_FRONT
+      post_translation:
+        - 0
+        - 0
+        - $ref: z_axis_rail_z_offset
 
     - rigid_group:
         - z_axis_right_rail_assembly

@@ -143,8 +143,20 @@ Builder:
 
       - source: injected
         assembly: z_axis_left_rail
-        artifact: all
+        artifact: leader
         name_template: "{assembly_name}_{name}"
+      - source: injected
+        assembly: z_axis_left_rail
+        artifact: followers
+        names:
+          - bottom_carriage
+          - top_carriage
+        name_template: "{assembly_name}_{name}"
+        animation:
+          z_axis:
+            - 0
+            - 0
+            - { $ref: z_axis_z_travel }
 
       - source: injected
         assembly: z_axis_profile_left

@@ -99,7 +99,10 @@ def create_z_axis_carriage_assembly(
 
     profile = _get_part(z_axis_profile)
     rail = _get_part(z_axis_rail)
-    rail_carriage = z_axis_rail.get_follower_part_by_name("carriage")
+    rail_carriages = [
+        z_axis_rail.get_follower_part_by_name(name)
+        for name in ("bottom_carriage", "top_carriage")
+    ]
     threaded_rod = _get_part(z_axis_threaded_rod)
 
     carriage_front_block = create_filleted_box(
@@ -146,14 +149,19 @@ def create_z_axis_carriage_assembly(
 
     front_block_center = get_bounding_box_center(carriage_front_block)
     front_block_size = get_bounding_box_size(carriage_front_block)
-    rail_carriage_center = get_bounding_box_center(rail_carriage)
-    rail_carriage_size = get_bounding_box_size(rail_carriage)
     bridge_front = (
         front_block_center[1]
         + front_block_size[1] / 2
         - 2 * z_axis_carriage_fillet_radius
     )
-    bridge_back = rail_carriage_center[1] - rail_carriage_size[1] / 2
+    rail_carriage_front_planes = [
+        get_bounding_box_center(rail_carriage)[1]
+        - get_bounding_box_size(rail_carriage)[1] / 2
+        for rail_carriage in rail_carriages
+    ]
+    if max(rail_carriage_front_planes) - min(rail_carriage_front_planes) > 1e-6:
+        raise ValueError("Z-axis MGN12H carriages must share a mounting plane")
+    bridge_back = min(rail_carriage_front_planes)
     bridge_depth = bridge_back - bridge_front
     if bridge_depth <= 0:
         raise ValueError(
@@ -428,6 +436,46 @@ def create_z_axis_carriage_assembly(
 
     retval.leader = retval.leader.fuse(brass_angle_thread_inset_bosses)
     retval.leader = retval.leader.cut(brass_angle_thread_inset_cutters)
+
+    front_cutter = create_box(500, 500, 500)
+    front_cutter = align(front_cutter, retval, Alignment.CENTER)
+    front_cutter = align(front_cutter, bottom_brass_angle, Alignment.BACK)
+
+    retval.leader = retval.leader.cut(front_cutter)
+
+    rail_carriages_fused = rail_carriages[0].fuse(rail_carriages[1])
+
+    carriage_mount_plate = materialize_bounding_box(rail_carriages_fused, y_size=3)
+    carriage_mount_plate = align(carriage_mount_plate, retval, Alignment.BACK)
+    carriage_mount_plate = align(carriage_mount_plate, retval, Alignment.TOP)
+
+    carriage_mount_plate = translate(0, 0, 30)(carriage_mount_plate)
+
+    z_axis_rail_aligned = z_axis_rail.aligned_from_follower(
+        "top_carriage", carriage_mount_plate, Alignment.TOP
+    )
+
+    carriage_mount_plate = z_axis_rail_aligned.use_as_cutter_on(carriage_mount_plate)
+
+    side_mount_plates = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        side_mount_plate = create_box(3, 30, 12)
+        side_mount_plate = align(
+            side_mount_plate, carriage_mount_plate, Alignment.CENTER
+        )
+        side_mount_plate = align(side_mount_plate, carriage_mount_plate, lr)
+        side_mount_plate = align(
+            side_mount_plate, carriage_mount_plate, Alignment.BOTTOM
+        )
+        side_mount_plate = align(
+            side_mount_plate, carriage_mount_plate, Alignment.STACK_FRONT
+        )
+        side_mount_plate = translate(0, 0, 17)(side_mount_plate)
+        side_mount_plates = side_mount_plates.fuse(side_mount_plate)
+
+    retval.leader = retval.leader.fuse(side_mount_plates)
+    retval.leader = retval.leader.fuse(carriage_mount_plate)
+
     retval.add_named_non_production_part(
         brass_angle_thread_inserts,
         "brass_angle_thread_inserts",

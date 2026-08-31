@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 
 import pytest
@@ -84,9 +85,7 @@ def test_active_z_axis_resources_and_scenes_have_no_guide_rod_references():
         assert "z_axis_guide_rod" not in path.read_text(), path
 
     assert not (ASSEMBLIES_DIR / "z_axis_guide_rod_assembly.yaml").exists()
-    assert not (
-        ASSEMBLIES_DIR / "z_axis_guide_rod_top_mount_assembly.yaml"
-    ).exists()
+    assert not (ASSEMBLIES_DIR / "z_axis_guide_rod_top_mount_assembly.yaml").exists()
     assert not (SOURCE_ASSEMBLIES_DIR / "z_axis_guide_rod_assembly.py").exists()
     assert not (
         SOURCE_ASSEMBLIES_DIR / "z_axis_guide_rod_top_mount_assembly.py"
@@ -118,9 +117,7 @@ def test_z_axis_carriage_is_monolithic_and_retains_brass_angle_hardware():
     profile = create_z_axis_profile_assembly(
         **assembly_kwargs(create_z_axis_profile_assembly, side="left")
     )
-    rail = create_z_axis_rail_assembly(
-        **assembly_kwargs(create_z_axis_rail_assembly)
-    )
+    rail = create_z_axis_rail_assembly(**assembly_kwargs(create_z_axis_rail_assembly))
     threaded_rod = create_z_axis_threaded_rod_assembly(
         **assembly_kwargs(create_z_axis_threaded_rod_assembly)
     )
@@ -145,30 +142,48 @@ def test_z_axis_carriage_is_monolithic_and_retains_brass_angle_hardware():
         "threaded_rod_nut",
         "x_axis_alignment_reference",
     } <= non_production_names
-    assert len(
-        {
-            name
-            for name in non_production_names
-            if name.startswith("screw_reference_") and name.endswith("_screw")
-        }
-    ) == 6
-    assert not any("bearing" in name or "clamp" in name for name in non_production_names)
+    assert (
+        len(
+            {
+                name
+                for name in non_production_names
+                if name.startswith("screw_reference_") and name.endswith("_screw")
+            }
+        )
+        == 6
+    )
+    assert not any(
+        "bearing" in name or "clamp" in name for name in non_production_names
+    )
 
     carriage_center = get_bounding_box_center(carriage.leader)
     carriage_size = get_bounding_box_size(carriage.leader)
-    rail_carriage = rail.get_follower_part_by_name("carriage")
-    rail_carriage_center = get_bounding_box_center(rail_carriage)
-    rail_carriage_size = get_bounding_box_size(rail_carriage)
-    assert carriage_center[1] + carriage_size[1] / 2 == pytest.approx(
-        rail_carriage_center[1] - rail_carriage_size[1] / 2
-    )
+    for rail_carriage_name in ("bottom_carriage", "top_carriage"):
+        rail_carriage = rail.get_follower_part_by_name(rail_carriage_name)
+        rail_carriage_center = get_bounding_box_center(rail_carriage)
+        rail_carriage_size = get_bounding_box_size(rail_carriage)
+        assert carriage_center[1] + carriage_size[1] / 2 == pytest.approx(
+            rail_carriage_center[1] - rail_carriage_size[1] / 2
+        )
 
 
 def test_top_mount_retained_geometry_is_not_sized_by_big_thing():
     source = (SOURCE_ASSEMBLIES_DIR / "z_axis_top_mount_assembly.py").read_text()
+    tree = ast.parse(source)
+    retained_geometry_calls = [
+        call
+        for call in ast.walk(tree)
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Name)
+        and call.func.id in {"create_box", "create_filleted_box"}
+    ]
 
-    assert "z_axis_top_mount_width,\n        z_axis_top_mount_depth," in source
-    assert "z_axis_top_mount_width,\n        BIG_THING," not in source
+    assert not any(
+        isinstance(node, ast.Name) and node.id == "BIG_THING"
+        for call in retained_geometry_calls
+        for argument in call.args
+        for node in ast.walk(argument)
+    )
 
 
 def test_standalone_lm8luu_remains_buildable_but_has_no_dependants_or_injections():

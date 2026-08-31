@@ -906,6 +906,7 @@ globals:
   z_axis_z_travel: 300
   z_axis_profile_length: 500
   z_axis_rail_length: 500
+  z_axis_rail_z_offset: 110
   strut_holder_width: 40
   strut_holder_length: 80
   strut_holder_thickness: 5

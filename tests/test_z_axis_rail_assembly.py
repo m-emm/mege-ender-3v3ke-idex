@@ -46,11 +46,12 @@ def test_z_axis_rail_instances_share_resource_and_required_placements():
             "to": profile_name,
             "alignment": "BOTTOM",
         } in placements
-        assert {
-            "part": rail_name,
-            "to": profile_name,
-            "alignment": "STACK_FRONT",
-        } in placements
+        assert any(
+            placement.get("part") == rail_name
+            and placement.get("to") == profile_name
+            and placement.get("alignment") == "STACK_FRONT"
+            for placement in placements
+        )
 
 
 def test_z_axis_rail_resource_exposes_rail_and_carriage():
@@ -63,7 +64,11 @@ def test_z_axis_rail_resource_exposes_rail_and_carriage():
         == "mege_ender_3v3ke_idex.designs.assemblies.z_axis_rail_assembly.create_z_axis_rail_assembly"
     )
     assert resource["Parameters"]["z_axis_rail_length"] == {"Type": "Float"}
-    assert {"source": "self", "artifact": "leader", "name": "rail"} in visualization_parts
+    assert {
+        "source": "self",
+        "artifact": "leader",
+        "name": "rail",
+    } in visualization_parts
     assert {
         "source": "self",
         "artifact": "followers",
@@ -71,18 +76,25 @@ def test_z_axis_rail_resource_exposes_rail_and_carriage():
     } in visualization_parts
 
 
-def test_z_axis_rail_generator_centers_one_mgn12h_carriage_on_rail():
+def test_z_axis_rail_generator_exposes_two_mgn12h_carriages_on_rail():
     rail_length = DEFAULTS["z_axis_rail_length"]
     assembly = create_z_axis_rail_assembly(z_axis_rail_length=rail_length)
 
     assert get_bounding_box_size(assembly.leader)[0] == pytest.approx(rail_length)
-    assert list(assembly.follower_indices_by_name) == ["carriage"]
+    assert list(assembly.follower_indices_by_name) == [
+        "bottom_carriage",
+        "top_carriage",
+    ]
 
     rail_center = get_bounding_box_center(assembly.leader)
-    carriage_center = get_bounding_box_center(
-        assembly.get_follower_part_by_name("carriage")
+    carriage_centers = [
+        get_bounding_box_center(assembly.get_follower_part_by_name(name))
+        for name in ("bottom_carriage", "top_carriage")
+    ]
+    assert all(
+        center[1] == pytest.approx(rail_center[1]) for center in carriage_centers
     )
-    assert carriage_center[:2] == pytest.approx(rail_center[:2])
+    assert carriage_centers[0][0] != pytest.approx(carriage_centers[1][0])
 
 
 def test_x_z_interface_visualizes_both_z_axis_rails():
@@ -98,9 +110,27 @@ def test_x_z_interface_visualizes_both_z_axis_rails():
 
         assert rail_name in interface["depends_on"]
         assert interface["inject_parts"][rail_alias] == rail_name
-        assert {
-            "source": "injected",
-            "assembly": rail_alias,
-            "artifact": "all",
-            "name_template": "{assembly_name}_{name}",
-        } in visualization_parts
+        if side == "left":
+            assert {
+                "source": "injected",
+                "assembly": rail_alias,
+                "artifact": "leader",
+                "name_template": "{assembly_name}_{name}",
+            } in visualization_parts
+            assert {
+                "source": "injected",
+                "assembly": rail_alias,
+                "artifact": "followers",
+                "names": ["bottom_carriage", "top_carriage"],
+                "name_template": "{assembly_name}_{name}",
+                "animation": {
+                    "z_axis": [0, 0, {"$ref": "z_axis_z_travel"}],
+                },
+            } in visualization_parts
+        else:
+            assert {
+                "source": "injected",
+                "assembly": rail_alias,
+                "artifact": "all",
+                "name_template": "{assembly_name}_{name}",
+            } in visualization_parts
