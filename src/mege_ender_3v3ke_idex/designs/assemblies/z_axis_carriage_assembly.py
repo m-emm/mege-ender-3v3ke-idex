@@ -420,11 +420,12 @@ def join_z_axis_carriage_assembly(
         if name.startswith("brass_angle_hole_drill"):
             brass_angle_screw_references[f"screw_reference_bottom__{name}"] = part
 
-    brass_angle_thread_inset_bosses = PartCollector()
-    brass_angle_thread_inset_cutters = PartCollector()
-    brass_angle_thread_inserts = PartCollector()
     for name, part in brass_angle_screw_references.items():
-        mount_screw = create_complete_screw_assembly("M4", 25)
+        mount_screw = create_complete_screw_assembly(
+            "M4",
+            25,
+            clearance_type=z_axis_default_clearance_hole_type,
+        )
         mount_screw = rotate(90, axis=(1, 0, 0))(mount_screw)
         mount_screw = align(mount_screw, part, Alignment.CENTER)
         mount_screw = align(
@@ -439,28 +440,23 @@ def join_z_axis_carriage_assembly(
             f"{name}_screw",
         )
 
-        threaded_insert = create_thread_inset_assembly("M4", thickness=8.2)
-        threaded_insert = rotate(90, axis=(1, 0, 0))(threaded_insert)
-        threaded_insert = align(threaded_insert, part, Alignment.CENTER)
-        threaded_insert = align(
-            threaded_insert,
-            carriage_front_block,
+        mount_nut = create_nut("M4")
+        mount_nut = rotate(90, axis=(1, 0, 0))(mount_nut)
+        mount_nut = align(
+            mount_nut,
+            mount_screw.get_named_non_production_part("complete_screw"),
+            Alignment.CENTER,
+            axes=[0, 2],
+        )
+        mount_nut = align(
+            mount_nut,
+            mount_screw.get_named_non_production_part("complete_screw"),
             Alignment.BACK,
         )
-        inset_boss = threaded_insert.get_named_cutter("assembly_cutter")
-        inset_cutter = inset_boss.cut(threaded_insert.leader)
-        brass_angle_thread_inset_bosses = brass_angle_thread_inset_bosses.fuse(
-            inset_boss
+        retval.add_named_non_production_part(
+            mount_nut,
+            f"{name}_nut",
         )
-        brass_angle_thread_inset_cutters = brass_angle_thread_inset_cutters.fuse(
-            inset_cutter
-        )
-        brass_angle_thread_inserts = brass_angle_thread_inserts.fuse(
-            threaded_insert.get_named_non_production_part("thread_inset")
-        )
-
-    retval.leader = retval.leader.fuse(brass_angle_thread_inset_bosses)
-    retval.leader = retval.leader.cut(brass_angle_thread_inset_cutters)
 
     front_cutter = create_box(500, 500, 500)
     front_cutter = align(front_cutter, retval, Alignment.CENTER)
@@ -533,10 +529,6 @@ def join_z_axis_carriage_assembly(
     retval.leader = retval.leader.fuse(side_mount_plates)
     retval.leader = retval.leader.fuse(carriage_mount_plate)
 
-    retval.add_named_non_production_part(
-        brass_angle_thread_inserts,
-        "brass_angle_thread_inserts",
-    )
     retval.add_named_non_production_part(
         bottom_brass_angle.leader,
         "carriage_bottom_brass_angle",

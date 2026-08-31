@@ -6,35 +6,42 @@ Builder:
   Outputs:
     carriage:
       Visualization:
+        preview:
+          enabled: true
+          views:
+            - isometric
+            - front
+            - back
+            - top
+            - bottom
+            - left
+            - right
+          width: 700
+          height: 700
         parts:
           - source: self
-            artifact: leader
-            name: carriage
-          - source: self
-            artifact: non_production_parts
-            exclude_names:
-              - x_axis_alignment_reference
+            artifact: all
             name_template: "{name}"
           - source: output
             assembly: bottom_rail_carriage
-            artifact: leader
-            name: bottom_rail_carriage
+            artifact: all
+            name_template: "bottom_rail_carriage_{name}"
           - source: output
             assembly: top_rail_carriage
-            artifact: leader
-            name: top_rail_carriage
+            artifact: all
+            name_template: "top_rail_carriage_{name}"
           - source: injected
             assembly: z_axis_rail
-            artifact: leader
-            name: z_axis_rail
+            artifact: all
+            name_template: "z_axis_rail_{name}"
           - source: injected
             assembly: z_axis_profile
-            artifact: leader
-            name: z_axis_profile
+            artifact: all
+            name_template: "z_axis_profile_{name}"
           - source: injected
             assembly: z_axis_threaded_rod
-            artifact: leader
-            name: z_axis_threaded_rod
+            artifact: all
+            name_template: "z_axis_threaded_rod_{name}"
       Production:
         process_data_preset: petgcf_max_strength_high_speed_06
         parts:
