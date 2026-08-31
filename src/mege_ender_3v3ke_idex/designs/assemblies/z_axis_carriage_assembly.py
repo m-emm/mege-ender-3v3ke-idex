@@ -464,6 +464,30 @@ def join_z_axis_carriage_assembly(
 
     retval.leader = retval.leader.cut(front_cutter)
 
+    top_nut_inset = 4
+    hidden_nut_cutters = {}
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+        hidden_nut_cutter = create_hidden_nut_pocket_cutter(
+            "M3",
+            bottom_cutter_length=8,
+            top_cutter_length=100,
+            slack=0.4,
+            square_nut=True,
+        )
+
+        hidden_nut_cutter = rotate(-lr.sign * 90)(hidden_nut_cutter)
+        hidden_nut_cutter = rotate(90, axis=(1, 0, 0))(hidden_nut_cutter)
+
+        hidden_nut_cutter = align(hidden_nut_cutter, retval, Alignment.EDGE_TOP)
+        hidden_nut_cutter = align(hidden_nut_cutter, retval, Alignment.BACK)
+        hidden_nut_cutter = align(hidden_nut_cutter, retval, lr.edge_alignment)
+
+        hidden_nut_cutter = translate(-lr.sign * top_nut_inset, -4, -top_nut_inset)(
+            hidden_nut_cutter
+        )
+
+        hidden_nut_cutters[lr.name.lower()] = hidden_nut_cutter
+
     replacement_rail_carriages = {
         name: _replacement_rail_carriage(z_axis_rail, name)
         for name in ("bottom_carriage", "top_carriage")
@@ -500,34 +524,97 @@ def join_z_axis_carriage_assembly(
             carriage_mount_plate
         )
 
+    side_plate_depth = 15
+
+    side_mount_plate_thickness = 3.5
+    connector_height = 14
+
     side_mount_plates = PartCollector()
+    bottom_side_mount_plates = PartCollector()
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
-        carriage_center = get_bounding_box_center(retval)
-        carriage_size = get_bounding_box_size(retval)
-        mount_plate_center = get_bounding_box_center(carriage_mount_plate)
-        mount_plate_size = get_bounding_box_size(carriage_mount_plate)
-        connector_height = 10
-        side_mount_plate = create_box(3, 30, connector_height)
-        side_mount_plate = align(
-            side_mount_plate, carriage_mount_plate, Alignment.CENTER
+        side_mount_plate = materialize_bounding_box(
+            carriage_mount_plate,
+            y_size=side_plate_depth,
+            x_size=side_mount_plate_thickness,
         )
+        side_mount_plate = align(side_mount_plate, carriage_mount_plate, Alignment.TOP)
         side_mount_plate = align(side_mount_plate, carriage_mount_plate, lr)
-        side_mount_plate = align(side_mount_plate, retval, Alignment.CENTER, axes=[2])
+
         side_mount_plate = align(
             side_mount_plate, carriage_mount_plate, Alignment.STACK_FRONT
         )
         side_mount_plates = side_mount_plates.fuse(side_mount_plate)
 
-        side_top_mount_plate = create_box(3, current_bbox_size[1], 40)
-        side_top_mount_plate = align(
-            side_top_mount_plate, carriage_mount_plate, Alignment.TOP
+        bottom_side_mount_plate = create_box(
+            side_mount_plate_thickness, current_bbox_size[1], connector_height
         )
-        side_top_mount_plate = align(side_top_mount_plate, carriage_mount_plate, lr)
-        side_top_mount_plate = align(side_top_mount_plate, retval, Alignment.FRONT)
-        side_mount_plates = side_mount_plates.fuse(side_top_mount_plate)
+
+        bottom_side_mount_plate = align(
+            bottom_side_mount_plate, retval, Alignment.CENTER
+        )
+        bottom_side_mount_plate = align(
+            bottom_side_mount_plate, carriage_mount_plate, Alignment.BACK
+        )
+        bottom_side_mount_plate = align(
+            bottom_side_mount_plate, carriage_mount_plate, lr
+        )
+        bottom_side_mount_plates = bottom_side_mount_plates.fuse(
+            bottom_side_mount_plate
+        )
+
+        side_mount_plates = side_mount_plates.fuse(bottom_side_mount_plate)
+
+    flange_thickness = 6
+    bottom_flange = materialize_bounding_box(
+        bottom_side_mount_plates, y_size=2 * flange_thickness
+    )
+    bottom_flange = align(bottom_flange, retval, Alignment.CENTER, axes=[1])
+
+    bottom_flange_drill_off_center = 10
+    bottom_flange_drills = PartCollector()
+    for lr in [Alignment.LEFT, Alignment.RIGHT]:
+
+        bottom_flange_drill = create_cylinder(
+            MScrew.from_size("M5").clearance_hole_loose / 2, 100
+        )
+        bottom_flange_drill = rotate(
+            90,
+            axis=(
+                1,
+                0,
+                0,
+            ),
+        )(bottom_flange_drill)
+
+        bottom_flange_drill = align(
+            bottom_flange_drill, bottom_flange, Alignment.CENTER
+        )
+
+        bottom_flange_drill = translate(lr.sign * bottom_flange_drill_off_center, 0, 0)(
+            bottom_flange_drill
+        )
+
+        bottom_flange_drills = bottom_flange_drills.fuse(bottom_flange_drill)
+
+    bottom_flange = bottom_flange.cut(bottom_flange_drills)
+
+    retval.leader = retval.leader.fuse(bottom_flange)
 
     retval.leader = retval.leader.fuse(side_mount_plates)
     retval.leader = retval.leader.fuse(carriage_mount_plate)
+
+    for name, hidden_nut_cutter in hidden_nut_cutters.items():
+        retval.leader = hidden_nut_cutter.use_as_cutter_on(retval.leader)
+
+        retval.add_named_non_production_part(
+            hidden_nut_cutter.leader, f"hidden_square_nut_{name}"
+        )
+
+    back_part, retval.leader = cut_in_two(retval.leader, cut_normal=(0, 1, 0))
+
+    retval.leader = retval.leader.cut(bottom_flange_drills)
+
+    retval.add_named_follower(back_part, "back_part")
 
     retval.add_named_non_production_part(
         bottom_brass_angle.leader,

@@ -44,12 +44,21 @@ Builder:
             name_template: "z_axis_threaded_rod_{name}"
       Production:
         process_data_preset: petgcf_max_strength_high_speed_06
+        process_data:
+          process_overrides:
+            enable_support: "1"
+
         parts:
           - source: self
             artifact: leader
             name: carriage
-            prod_rotation_angle: 180
-            prod_rotation_axis: [0, 1, 0]
+            prod_rotation_angle: 90
+            prod_rotation_axis: [1, 0, 0]
+          - source: self
+            artifact: followers.back_part
+            name: back_part
+            prod_rotation_angle: -90
+            prod_rotation_axis: [1, 0, 0]
 
     bottom_rail_carriage:
       Visualization:
