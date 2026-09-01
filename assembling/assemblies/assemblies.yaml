@@ -4345,3 +4345,9 @@ assemblies:
     resource_file: test_coupon_assembly.yaml
     depends_on: []
     parameters: {}
+
+  - name: mgn_12_4040_m3_counter_rail_assembly
+
+    resource_file: mgn_12_4040_m3_counter_rail_assembly.yaml
+    depends_on: []
+    parameters: {}
