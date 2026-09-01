@@ -21,9 +21,10 @@ def create_mgn_12_4040_m3_counter_rail_assembly():
 
     bottom_cut_thickness = 2
 
-    length = (num_holes - 0.7) * hole_pitch
+    length = (num_holes - 0.6) * hole_pitch
 
     thread_inset_boss_extra_radius = 0.5
+    thread_inset_hole_radius_adjustment = -0.1
     inserts = None
     for i in range(num_holes):
         insert = create_thread_inset_assembly(
@@ -31,6 +32,7 @@ def create_mgn_12_4040_m3_counter_rail_assembly():
             thickness=counter_thickness + groove_guide_thickness,
             extra_radius=thread_inset_boss_extra_radius,
             clearance_type="normal",
+            thread_inset_hole_radius_adjustment=thread_inset_hole_radius_adjustment,
         )
 
         insert = translate(i * hole_pitch, 0, 0)(insert)
