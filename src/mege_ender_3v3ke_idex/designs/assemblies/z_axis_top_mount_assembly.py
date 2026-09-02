@@ -15,12 +15,12 @@ def create_profile_mount_plate(
     num_holes,
     screw_inset,
 ):
-    plate = create_filleted_box(
+    plate = create_box(
         profile_mount_width,
         z_axis_profile_mount_plate_thickness,
         z_axis_profile_mount_plate_height,
-        z_axis_profile_mount_plate_fillet_radius,
-        no_fillets_at=[Alignment.FRONT, Alignment.BACK, Alignment.BOTTOM],
+        # z_axis_profile_mount_plate_fillet_radius,
+        # no_fillets_at=[Alignment.FRONT, Alignment.BACK, Alignment.BOTTOM],
     )
 
     hole_drill_diameter = MScrew.from_size("M5").clearance_hole_loose

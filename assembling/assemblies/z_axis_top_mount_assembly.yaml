@@ -16,17 +16,17 @@ Builder:
     process_data:
       overrides:
         process_overrides:
-          enable_support: "1"
+          enable_support: "0"
           support_threshold_angle: "25"
-          sparse_infill_density: "75%"
-          top_shell_layers: "4"
-          bottom_shell_layers: "4"
+          sparse_infill_density: "45%"
+          top_shell_layers: "2"
+          bottom_shell_layers: "2"
     parts:
       - source: self
         artifact: leader
         name: top_mount
-        prod_rotation_angle: 45
-        prod_rotation_axis: [1, 0, 0]
+        prod_rotation_angle: 90
+        prod_rotation_axis: [0, 1, 0]
 
 Parameters:
   z_axis_endstop_cable_hole_size:
