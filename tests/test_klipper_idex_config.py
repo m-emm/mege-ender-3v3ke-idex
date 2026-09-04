@@ -235,6 +235,32 @@ def test_printer_cfg_is_generated_from_calibration_source():
     )
 
 
+def test_dual_carriage_input_shapers_are_generated_from_calibration_source():
+    generator = _load_generator_module()
+    calibration = generator.load_calibration(CALIB_PATH)
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    input_shaper = _section(config_text, "input_shaper")
+    initializer = _section(config_text, "delayed_gcode init_input_shaper")
+
+    assert "shaper_type_" not in input_shaper
+    assert "shaper_freq_" not in input_shaper
+
+    command_lines = [
+        line.strip()
+        for line in initializer.splitlines()
+        if line.strip().startswith("SET_INPUT_SHAPER ")
+    ]
+    assert len(command_lines) == 2
+
+    for line, tool in zip(command_lines, ("t1", "t0"), strict=True):
+        x_shaper = calibration["input_shaper"]["carriages"][tool]["x"]
+        y_shaper = calibration["input_shaper"]["y"]
+        assert f"SHAPER_TYPE_X={x_shaper['type']}" in line
+        assert f"SHAPER_FREQ_X={x_shaper['frequency_hz']:.3f}" in line
+        assert f"SHAPER_TYPE_Y={y_shaper['type']}" in line
+        assert f"SHAPER_FREQ_Y={y_shaper['frequency_hz']:.3f}" in line
+
+
 def test_printer_cfg_check_rejects_stale_output(tmp_path):
     generator = _load_generator_module()
     stale_cfg = tmp_path / "printer.cfg"
@@ -379,6 +405,13 @@ def test_eddy_klipper_calibration_curve_round_trips_exactly():
     )
     calibration = {
         "bed_grid_zero": {"x": 113.3, "y": 107.0},
+        "input_shaper": {
+            "carriages": {
+                "t0": {"x": {"type": "mzv", "frequency_hz": 32.0}},
+                "t1": {"x": {"type": "mzv", "frequency_hz": 32.0}},
+            },
+            "y": {"type": "ei", "frequency_hz": 40.0},
+        },
         "tap_mesh": {
             "profile": "default",
             "samples": 1,
@@ -1381,6 +1414,13 @@ def test_idex_tool_offsets_are_derived_from_calibration_values():
     generator = _load_generator_module()
     calibration = {
         "bed_grid_zero": {"x": 1.0, "y": 2.0},
+        "input_shaper": {
+            "carriages": {
+                "t0": {"x": {"type": "mzv", "frequency_hz": 32.0}},
+                "t1": {"x": {"type": "mzv", "frequency_hz": 32.0}},
+            },
+            "y": {"type": "ei", "frequency_hz": 40.0},
+        },
         "tap_mesh": {
             "profile": "default",
             "samples": 1,

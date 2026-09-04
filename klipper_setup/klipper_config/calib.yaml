@@ -9,6 +9,16 @@ bed_z_reference:
 # is above the bed, zero is contact, and negative is below it. Raw Tap contact
 # is intentionally targeted at -bed_to_nozzle_gap.
 bed_to_nozzle_gap: 0.0
+# Measured on 2026-09-03 at X=117.5, Y=117.5, Z=20 using the left
+# toolhead ADXL345. Klipper stores X shaping per IDEX carriage; until T1 is
+# remeasured, the latest T0 X result is intentionally applied to both.
+input_shaper:
+  carriages:
+    t0:
+      x: { type: mzv, frequency_hz: 31.6 }
+    t1:
+      x: { type: mzv, frequency_hz: 31.6 }
+  y: { type: 2hump_ei, frequency_hz: 44.2 }
 # The single source of truth for the managed GUI/workflow Tap mesh command.
 # The generated printer.cfg and calibration runner both consume these values.
 tap_mesh:
@@ -21,23 +31,20 @@ tap_mesh:
   # repeated single taps were stable with a 500 ms dwell on 2026-08-28.
   settle_ms: 500
   horizontal_move_z: 5.0
-  # Eddy rapid-scan height; unlike Tap travel clearance this must stay within
-  # the calibrated Eddy sensor range above the bed.
-  rapid_scan_height: 0.5
   probe_count: [7, 7]
-  # Source-controlled copy of the mesh measured after the left toolhead
-  # rebuild on 2026-08-28.  Two full 7x7 Tap passes completed cleanly with
-  # 0.00572 mm mean absolute drift and 0.02669 mm worst-case drift.
+  # Source-controlled copy of the mesh measured after the complete Z-axis
+  # rebuild on 2026-09-04. The live 7x7 Tap matrix passed five independent
+  # single-Tap checks at the center and all four mesh corners.
   saved_mesh:
     version: 1
     points:
-      - [0.071933, 0.093534, 0.110661, 0.107789, 0.097202, 0.096418, 0.105921]
-      - [0.115408, 0.138341, 0.163894, 0.176632, 0.175142, 0.152153, 0.168973]
-      - [0.131999, 0.147480, 0.169238, 0.179008, 0.174132, 0.161379, 0.162659]
-      - [0.133981, 0.144342, 0.176456, 0.174749, 0.177359, 0.182148, 0.153814]
-      - [0.135717, 0.147342, 0.160265, 0.153130, 0.165586, 0.156998, 0.160968]
-      - [0.096578, 0.111837, 0.126159, 0.130876, 0.135152, 0.120938, 0.123494]
-      - [0.075018, 0.068360, 0.082249, 0.071460, 0.110994, 0.088006, 0.106654]
+      - [0.034864, 0.068636, 0.100114, 0.123343, 0.111136, 0.118888, 0.106404]
+      - [-0.006511, 0.028297, 0.089920, 0.076861, 0.104693, 0.104095, 0.117214]
+      - [-0.023787, -0.015292, 0.011099, 0.038776, 0.064049, 0.089172, 0.123154]
+      - [-0.154275, -0.091129, -0.039946, -0.004316, 0.025513, 0.093869, 0.079019]
+      - [-0.226111, -0.187519, -0.129170, -0.083119, -0.023318, 0.015393, 0.062862]
+      - [-0.326370, -0.267344, -0.194413, -0.173617, -0.116504, -0.029769, 0.005660]
+      - [-0.424954, -0.364903, -0.295710, -0.242285, -0.187549, -0.119580, -0.021884]
     mesh_params:
       min_x: 66.66
       max_x: 189.96
@@ -55,11 +62,11 @@ tools:
   t0:
     x_endstop: -85.472
     y_endstop: -14.800
-    z_endstop: 293.919
+    z_endstop: 291.493
   t1:
     x_endstop: 345.984
     y_endstop: -13.226
-    z_endstop: 293.425
+    z_endstop: 290.999
 
 eddy_relative_calibration:
   temperature_probe:

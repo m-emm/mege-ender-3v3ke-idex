@@ -443,7 +443,9 @@ position, while tap bypasses them. See
 [`manual_probe.create_probe_result()`](klipper_setup/rp2040_firmware/klipper/klippy/extras/manual_probe.py#L8-L22).
 
 `METHOD=probe` is also not a special Eddy method in this pinned Klipper version.
-Only `scan`, `rapid_scan`, and `tap` receive special Eddy parameter handling.
+Only `scan`, `rapid_scan`, and `tap` receive special Eddy parameter handling;
+the managed mesh workflow uses only `tap` because rapid-scan verification is
+retired.
 Any other method string falls back to the regular descend probe path. See
 [`EddyParameterHelper.get_probe_params()`](klipper_setup/rp2040_firmware/klipper/klippy/extras/probe_eddy_current.py#L1011-L1034)
 and
@@ -864,7 +866,7 @@ The supported steps are:
 | `tap-baseline` | Run `bootstrap-tap`, `update-endstops`, and `center-verify` in sequence |
 | `drive-current` | Run the Eddy drive-current calibration and deploy its result |
 | `eddy-frequency` | Run the guarded Eddy height/frequency calibration, including pre/post three-tap references and a post-calibration same-target regular Eddy `PROBE` check |
-| `mesh` | Create, activate, and verify the transient Tap mesh |
+| `mesh` | Create and activate the transient Tap mesh, then verify it with five single Tap contacts at its four corners and center. Rapid-scan verification is retired and must not be run. |
 | `run` | Execute the complete fresh Iteration 1 workflow |
 | `resume` | Continue from the last committed phase in `state.json` |
 

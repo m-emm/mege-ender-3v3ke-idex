@@ -57,7 +57,7 @@ Builder:
           - source: self
             artifact: followers.back_part
             name: back_part
-            prod_rotation_angle: -90
+            prod_rotation_angle: 45
             prod_rotation_axis: [1, 0, 0]
 
     bottom_rail_carriage:

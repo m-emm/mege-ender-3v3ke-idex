@@ -564,6 +564,16 @@ def join_z_axis_carriage_assembly(
 
         side_mount_plates = side_mount_plates.fuse(bottom_side_mount_plate)
 
+    back_side_cutter = create_box(500, 500, 500)
+
+    back_side_cutter = align(back_side_cutter, carriage_front_block, Alignment.CENTER)
+    back_side_cutter = align(back_side_cutter, carriage_front_block, Alignment.STACK_TOP)
+    back_side_cutter = align(
+        back_side_cutter,
+        replacement_rail_carriages["top_carriage"],
+        Alignment.STACK_RIGHT,
+    )
+
     flange_thickness = 6
     bottom_flange = materialize_bounding_box(
         bottom_side_mount_plates, y_size=2 * flange_thickness
@@ -602,6 +612,7 @@ def join_z_axis_carriage_assembly(
 
     retval.leader = retval.leader.fuse(side_mount_plates)
     retval.leader = retval.leader.fuse(carriage_mount_plate)
+    retval.leader = retval.leader.cut(back_side_cutter)
 
     for name, hidden_nut_cutter in hidden_nut_cutters.items():
         retval.leader = hidden_nut_cutter.use_as_cutter_on(retval.leader)

@@ -463,6 +463,17 @@ accel_chip: adxl345 left_toolhead
 probe_points:
     117.5, 117.5, 20
 
+[input_shaper]
+# Dual-carriage shapers must be assigned at runtime, not as section options.
+
+[delayed_gcode init_input_shaper]
+initial_duration: 0.1
+gcode:
+    SET_DUAL_CARRIAGE CARRIAGE=1
+    SET_INPUT_SHAPER SHAPER_TYPE_X=${input_shaper_t1_x_type} SHAPER_FREQ_X=${input_shaper_t1_x_frequency} SHAPER_TYPE_Y=${input_shaper_y_type} SHAPER_FREQ_Y=${input_shaper_y_frequency}
+    SET_DUAL_CARRIAGE CARRIAGE=0
+    SET_INPUT_SHAPER SHAPER_TYPE_X=${input_shaper_t0_x_type} SHAPER_FREQ_X=${input_shaper_t0_x_frequency} SHAPER_TYPE_Y=${input_shaper_y_type} SHAPER_FREQ_Y=${input_shaper_y_frequency}
+
 # X-axis Pico wiring follows:
 # klipper_setup/klipper_config/wiring/pico_w_btt_tmc2226_x.yaml
 #

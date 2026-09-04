@@ -77,17 +77,6 @@ def _load_tap_mesh(data: dict[str, Any]) -> dict[str, Any]:
     )
     if not math.isfinite(horizontal_move_z) or horizontal_move_z <= 0:
         raise ValueError("tap_mesh.horizontal_move_z must be finite and positive")
-    rapid_scan_height = (
-        _require_float(
-            value,
-            "rapid_scan_height",
-            "tap_mesh",
-        )
-        if "rapid_scan_height" in value
-        else 0.5
-    )
-    if not math.isfinite(rapid_scan_height) or rapid_scan_height <= 0:
-        raise ValueError("tap_mesh.rapid_scan_height must be finite and positive")
     probe_count = value.get("probe_count")
     if (
         not isinstance(probe_count, (list, tuple))
@@ -106,8 +95,49 @@ def _load_tap_mesh(data: dict[str, Any]) -> dict[str, Any]:
         "samples": samples,
         "settle_ms": settle_ms,
         "horizontal_move_z": horizontal_move_z,
-        "rapid_scan_height": rapid_scan_height,
         "probe_count": probe_count,
+    }
+
+
+def _load_input_shaper(data: dict[str, Any]) -> dict[str, Any]:
+    value = _require_mapping(data.get("input_shaper"), "input_shaper")
+    supported_types = {"zv", "mzv", "zvd", "ei", "2hump_ei", "3hump_ei"}
+
+    def load_axis(axis_value: Any, path: str) -> dict[str, Any]:
+        axis_value = _require_mapping(axis_value, path)
+        shaper_type = axis_value.get("type")
+        if shaper_type not in supported_types:
+            raise ValueError(
+                f"{path}.type must be one of: " f"{', '.join(sorted(supported_types))}"
+            )
+        frequency_hz = _require_float(axis_value, "frequency_hz", path)
+        if not math.isfinite(frequency_hz) or frequency_hz <= 0:
+            raise ValueError(f"{path}.frequency_hz must be finite and positive")
+        return {
+            "type": shaper_type,
+            "frequency_hz": frequency_hz,
+        }
+
+    carriages = _require_mapping(
+        value.get("carriages"),
+        "input_shaper.carriages",
+    )
+    normalized_carriages = {}
+    for tool in ("t0", "t1"):
+        carriage = _require_mapping(
+            carriages.get(tool),
+            f"input_shaper.carriages.{tool}",
+        )
+        normalized_carriages[tool] = {
+            "x": load_axis(
+                carriage.get("x"),
+                f"input_shaper.carriages.{tool}.x",
+            )
+        }
+
+    return {
+        "carriages": normalized_carriages,
+        "y": load_axis(value.get("y"), "input_shaper.y"),
     }
 
 
@@ -392,6 +422,7 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
             ),
         },
         "bed_to_nozzle_gap": bed_to_nozzle_gap,
+        "input_shaper": _load_input_shaper(data),
         "tap_mesh": tap_mesh,
         "saved_mesh": saved_mesh,
         "tools": {
@@ -587,6 +618,7 @@ def template_values(
     bed_grid_zero = calibration["bed_grid_zero"]
     bed_z_reference = calibration.get("bed_z_reference", bed_grid_zero)
     tap_mesh = calibration["tap_mesh"]
+    input_shaper = calibration["input_shaper"]
     saved_mesh = calibration.get("saved_mesh")
 
     eddy_relative_calibration = calibration.get("eddy_relative_calibration") or {
@@ -648,6 +680,16 @@ def template_values(
         "tap_mesh_settle_ms": str(tap_mesh["settle_ms"]),
         "tap_mesh_horizontal_move_z": format_mm(tap_mesh["horizontal_move_z"]),
         "tap_mesh_probe_count": ",".join(str(item) for item in tap_mesh["probe_count"]),
+        "input_shaper_t0_x_type": input_shaper["carriages"]["t0"]["x"]["type"],
+        "input_shaper_t0_x_frequency": (
+            f"{input_shaper['carriages']['t0']['x']['frequency_hz']:.3f}"
+        ),
+        "input_shaper_t1_x_type": input_shaper["carriages"]["t1"]["x"]["type"],
+        "input_shaper_t1_x_frequency": (
+            f"{input_shaper['carriages']['t1']['x']['frequency_hz']:.3f}"
+        ),
+        "input_shaper_y_type": input_shaper["y"]["type"],
+        "input_shaper_y_frequency": f"{input_shaper['y']['frequency_hz']:.3f}",
         "t0_y_offset": format_mm(0.0),
         "t1_y_offset": format_mm(t0["y_endstop"] - t1["y_endstop"]),
         "t1_z_offset": format_mm(t0["z_endstop"] - t1["z_endstop"]),
