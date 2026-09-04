@@ -38,6 +38,7 @@ EXPECTED_KLIPPER_TAGS = {
     "tmc5160 stepper_y.spi_software_miso_pin",
     "tmc5160 stepper_y.spi_software_mosi_pin",
     "tmc5160 stepper_y.spi_software_sclk_pin",
+    "gcode_button multi_head_zero.pin",
     "dotstar vision_light.clock_pin",
     "dotstar vision_light.data_pin",
     "stepper_z.step_pin",
@@ -116,6 +117,25 @@ def test_reserved_mosfet_driver_remains_wired_but_unconfigured():
 
     assert "MOSFET_RESERVED_UNUSED_" in prefixes
     assert "klipper" not in mosfet_control
+
+
+def test_multi_head_zero_reuses_legacy_primary_y_endstop_header():
+    wiring = yaml.safe_load(ACTIVE_Y_Z_WIRING_PATH.read_text(encoding="utf-8"))
+    prefixes = {pin_set["prefix"] for pin_set in wiring["pin_sets"]}
+    signal_wire = next(
+        wire for wire in wiring["wires"] if wire["from"] == "PICO_GPIO_4"
+    )
+
+    assert "MULTI_HEAD_ZERO_" in prefixes
+    assert "ENDSTOP_Y_" not in prefixes
+    assert signal_wire["to"] == "MULTI_HEAD_ZERO_NC"
+    assert signal_wire["klipper"] == "gcode_button multi_head_zero.pin"
+    assert _wire_nodes_connected(wiring, "MULTI_HEAD_ZERO_GND", "PWR_GND")
+    assert _wire_nodes_connected(
+        wiring,
+        "MULTI_HEAD_ZERO_VCC_UNUSED",
+        "PICO_THREEV3_OUT_36",
+    )
 
 
 def test_generated_wiring_svgs_are_current():
@@ -758,6 +778,17 @@ def test_generated_yz_wiring_svg_includes_vision_light_header():
         assert "VISION_APA102_GND" in svg_text
         assert "VISION_APA102_CLOCK" in svg_text
         assert "VISION_APA102_DATA" in svg_text
+
+
+def test_generated_yz_wiring_svg_includes_multi_head_zero_header():
+    for view in ("top", "bottom"):
+        svg_text = (
+            WIRING_DIR / "diagrams" / f"pico_w_btt_tmc2226_y_z_{view}.svg"
+        ).read_text()
+
+        assert "MULTI_HEAD_ZERO_NC" in svg_text
+        assert "MULTI_HEAD_ZERO_GND" in svg_text
+        assert "MULTI_HEAD_ZERO_VCC_UNUSED" in svg_text
 
 
 def test_active_looking_legacy_wiring_paths_are_removed():

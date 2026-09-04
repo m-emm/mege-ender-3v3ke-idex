@@ -1,5 +1,7 @@
 """Self-contained front-spar mount for the multi-head-zero reference."""
 
+import math
+
 from mege_ender_3v3ke_idex.designs.screw_mount_assembly import (
     create_screw_mount_assembly,
 )
@@ -102,7 +104,33 @@ def create_multi_head_zero_mount_assembly(
     back_wall = align(back_wall, front_spar_keepout, Alignment.STACK_BACK)
     back_wall = align(back_wall, bottom_wall, Alignment.BOTTOM)
 
+    lips = PartCollector()
+    lip_size = 1.5
+    lip_protrusion = 1
+    lip_z_offset = 0.0
+    for fr in [Alignment.FRONT, Alignment.BACK]:
+
+        lip = create_box(multi_head_zero_mount_clamp_width, lip_size, lip_size)
+
+        lip = rotate(45, axis=(1, 0, 0))(lip)
+
+        lip = align(lip, bottom_wall, Alignment.CENTER)
+        if fr == Alignment.FRONT:
+            lip = align(lip, front_wall, Alignment.BACK)
+        else:
+            lip = align(lip, back_wall, Alignment.FRONT)
+
+        lip = align(lip, bottom_wall, Alignment.EDGE_TOP)
+        lip = translate(
+            0,
+            -fr.sign * lip_protrusion,
+            spar_size[2] + lip_z_offset + math.sqrt(2) / 2 * lip_size,
+        )(lip)
+
+        lips = lips.fuse(lip)
+
     u_channel = front_wall.fuse(back_wall).fuse(bottom_wall)
+    u_channel = u_channel.fuse(lips)
 
     screw_z_reference = create_box(
         1,
@@ -210,10 +238,13 @@ def create_multi_head_zero_mount_assembly(
     bridge_size = get_bounding_box_size(bridge)
 
     top_mount_plate = materialize_bounding_box(
-        multi_head_zero_body_reference, z_size=4, x_size=bridge_size[0]
+        multi_head_zero_body_reference, z_size=4, x_size=bridge_size[0], y_enlargement=5
     )
     top_mount_plate = align(
         top_mount_plate, multi_head_zero_body_reference, Alignment.STACK_TOP
+    )
+    top_mount_plate = align(
+        top_mount_plate, multi_head_zero_body_reference, Alignment.FRONT
     )
 
     top_mount_plate = multi_head_zero.use_as_cutter_on(top_mount_plate)

@@ -237,7 +237,7 @@ placement:
       post_translation:
         - $ref: multi_head_zero_mount_x_offset
         - 0
-        - 0
+        - $ref: multi_head_zero_mount_z_offset
 
     - rigid_group:
         - multi_head_zero_assembly

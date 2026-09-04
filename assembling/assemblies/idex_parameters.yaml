@@ -616,7 +616,8 @@ globals:
   multi_head_zero_ball_shaft_diameter: 5.0
   multi_head_zero_ball_shaft_receptacle_diameter: 11.0
   multi_head_zero_ball_shaft_receptacle_height: 10.0
-  multi_head_zero_mount_x_offset: -55
+  multi_head_zero_mount_x_offset: -50
+  multi_head_zero_mount_z_offset: 3
   multi_head_zero_mount_clamp_fillet_radius: 1.4
   multi_head_zero_mount_clamp_width: 24.0
   multi_head_zero_mount_u_wall_thickness: 4.0

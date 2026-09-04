@@ -4,12 +4,15 @@ metadata:
   version_label: "Pico W + TB6600 Y + BTT TMC2226 dual Z"
   klipper_mcu: ""
   notes: |
-    Active Y uses the external TB6600-style interface: STEP=GPIO0, DIR=GPIO1, EN=GPIO2, endstop=GPIO4.
+    Active Y uses the dedicated y_pico/TMC5160 adapter; its physical endstop is on y_pico GPIO4.
+    The primary Pico TB6600-style interface remains reserved: STEP=GPIO0, DIR=GPIO1, EN=GPIO2.
+    The legacy primary-Pico Y-endstop header is repurposed for multi-head-zero: NC signal=GPIO4, COM=GND.
+    Its third header pin remains connected to 3.3V but is unused; do not connect it to the dry-contact switch.
     TMC1 is reserved as the Y fallback: STEP=GPIO11, DIR=GPIO10, EN=GPIO12, UART=GPIO9.
     TMC1 fallback DIAG: TMC top DIAG pad to GPIO3 through 1.2k series resistor.
     Driver2 (Z-left): STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5.
     Driver3 (Z-right): STEP=GPIO14, DIR=GPIO15, EN=GPIO16, UART=GPIO13.
-    Live Y motor phases are on the external TB6600 driver; the local TMC1 motor wiring is reserved for rollback.
+    Live Y motor phases are on the dedicated TMC5160 driver; the local TMC1 motor wiring is reserved for rollback.
     Z endstops: Z-left=GPIO22, Z-right=GPIO17.
     Heatbed SSR: SSR_OUT=GPIO20 with Pico logic ground for the single 220V 750W bed.
     Reserved MOSFET driver: HEATBED_ON=GPIO21 remains wired but has no active Klipper assignment.
@@ -219,13 +222,13 @@ pin_sets:
       - GND
       - CLOCK
       - DATA
-  - prefix: ENDSTOP_Y_
+  - prefix: MULTI_HEAD_ZERO_
     origin: [34, 20]
     direction: down
     pins:
-      - "NO"
+      - "NC"
       - GND
-      - VCC
+      - VCC_UNUSED
   - prefix: MOTOR_Y_
     origin: [34, 25]
     direction: down
@@ -442,8 +445,11 @@ wires:
     type: data
     color: "#9ca3af"
 
+  # Multi-head-zero reuses the former primary-Pico Y-endstop header. The NC
+  # switch contact uses only signal and ground; the powered third pin is unused.
   - from: PICO_GPIO_4
-    to: ENDSTOP_Y_NO
+    to: MULTI_HEAD_ZERO_NC
+    klipper: "gcode_button multi_head_zero.pin"
     type: data
   - from: PICO_GPIO_22_29
     to: ENDSTOP_Z_LEFT_NO
@@ -454,19 +460,19 @@ wires:
     klipper: stepper_z1.endstop_pin
     type: data
   - from: PWR_GND
-    to: ENDSTOP_Y_GND
+    to: MULTI_HEAD_ZERO_GND
     type: ground
-  - from: ENDSTOP_Y_GND
+  - from: MULTI_HEAD_ZERO_GND
     to: ENDSTOP_Z_LEFT_GND
     type: ground
   - from: ENDSTOP_Z_LEFT_GND
     to: ENDSTOP_Z_RIGHT_GND
     type: ground
-  - from: ENDSTOP_Y_VCC
+  - from: MULTI_HEAD_ZERO_VCC_UNUSED
     to: PICO_THREEV3_OUT_36
     type: lv_power
   - from: ENDSTOP_Z_LEFT_VCC
-    to: ENDSTOP_Y_VCC
+    to: MULTI_HEAD_ZERO_VCC_UNUSED
     type: lv_power
   - from: ENDSTOP_Z_RIGHT_VCC
     to: ENDSTOP_Z_LEFT_VCC
