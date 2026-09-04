@@ -64,9 +64,9 @@ tools:
     y_endstop: -14.800
     z_endstop: 291.493
   t1:
-    x_endstop: 345.984
-    y_endstop: -13.226
-    z_endstop: 290.999
+    x_endstop: 346.484
+    y_endstop: -13.726
+    z_endstop: 290.876
 
 eddy_relative_calibration:
   temperature_probe:

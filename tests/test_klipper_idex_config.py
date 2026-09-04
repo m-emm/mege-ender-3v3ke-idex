@@ -237,12 +237,11 @@ def test_printer_cfg_is_generated_from_calibration_source():
 
 def test_multi_head_zero_is_monitor_only_on_legacy_primary_y_pin():
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
-    button = _section(template, "gcode_button multi_head_zero")
+    button = _section(template, "multi_head_zero_probe")
     stepper_y = _section(template, "stepper_y")
 
     assert _setting_value(button, "pin") == "^gpio4"
-    assert "TRIGGERED (NC circuit open)" in button
-    assert "READY (NC circuit closed)" in button
+    assert _setting_float(button, "probe_speed") > 0
     assert _setting_value(stepper_y, "endstop_pin") == "^!y_pico:gpio4"
 
 

@@ -24,7 +24,9 @@ SOURCE_IDEX_MANUAL_TUNING="${SCRIPT_DIR}/../klipper_host/klippy/extras/idex_manu
 SOURCE_EDDY_TAP_MEASURE="${SCRIPT_DIR}/../klipper_host/klippy/extras/eddy_tap_measure.py"
 SOURCE_DAQ="${SCRIPT_DIR}/../klipper_host/klippy/extras/daq.py"
 SOURCE_EDDY_DAQ="${SCRIPT_DIR}/../klipper_host/klippy/extras/eddy_daq.py"
+SOURCE_MULTI_HEAD_ZERO_PROBE="${SCRIPT_DIR}/../klipper_host/klippy/extras/multi_head_zero_probe.py"
 SOURCE_RESONANCE_HELPER="${SCRIPT_DIR}/../../scripts/run_resonance_plot.py"
+SOURCE_MULTI_HEAD_ZERO_HELPER="${SCRIPT_DIR}/../../scripts/run_multi_head_zero_contact_map.py"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 REMOTE_KLIPPER_DIR="${MENDERPI_KLIPPER_DIR:-/opt/klipper}"
 REMOTE_TMP_CFG="/tmp/printer.cfg.$$"
@@ -35,7 +37,9 @@ REMOTE_TMP_IDEX_MANUAL_TUNING="/tmp/idex_manual_tuning.py.$$"
 REMOTE_TMP_EDDY_TAP_MEASURE="/tmp/eddy_tap_measure.py.$$"
 REMOTE_TMP_DAQ="/tmp/daq.py.$$"
 REMOTE_TMP_EDDY_DAQ="/tmp/eddy_daq.py.$$"
+REMOTE_TMP_MULTI_HEAD_ZERO_PROBE="/tmp/multi_head_zero_probe.py.$$"
 REMOTE_TMP_RESONANCE_HELPER="/tmp/run_resonance_plot.py.$$"
+REMOTE_TMP_MULTI_HEAD_ZERO_HELPER="/tmp/run_multi_head_zero_contact_map.py.$$"
 EXPECTED_KLIPPER_COMMIT="ca8230d505b7ba7fd225bfa6ed9655bc4520e805"
 EXPECTED_UPSTREAM_HEATERS_SHA256="a95d83be80296a7ff970ea6e1b73746d1a97a7d3e47ce621c02a89d80451ac9d"
 LEGACY_BOOSTED_HEATERS_SHA256="b3b362086277fc7202fb12c022aa210da7cc15a470bf536f2cc0d3d507719830"
@@ -81,12 +85,20 @@ check_local_support_files() {
     echo "Error: Klipper DAQ extras not found: ${SOURCE_DAQ}, ${SOURCE_EDDY_DAQ}" >&2
     exit 1
   fi
+  if [[ ! -f "${SOURCE_MULTI_HEAD_ZERO_PROBE}" ]]; then
+    echo "Error: Klipper multi-head-zero probe extra not found: ${SOURCE_MULTI_HEAD_ZERO_PROBE}" >&2
+    exit 1
+  fi
   if [[ ! -f "${SOURCE_RESONANCE_HELPER}" ]]; then
     echo "Error: resonance helper not found: ${SOURCE_RESONANCE_HELPER}" >&2
     exit 1
   fi
+  if [[ ! -f "${SOURCE_MULTI_HEAD_ZERO_HELPER}" ]]; then
+    echo "Error: multi-head-zero contact-map helper not found: ${SOURCE_MULTI_HEAD_ZERO_HELPER}" >&2
+    exit 1
+  fi
 
-  python3 - "${SOURCE_HEATERS}" "${SOURCE_BED_MESH}" "${SOURCE_VISION}" "${SOURCE_IDEX_MANUAL_TUNING}" "${SOURCE_EDDY_TAP_MEASURE}" "${SOURCE_DAQ}" "${SOURCE_EDDY_DAQ}" "${SOURCE_RESONANCE_HELPER}" <<'PY'
+  python3 - "${SOURCE_HEATERS}" "${SOURCE_BED_MESH}" "${SOURCE_VISION}" "${SOURCE_IDEX_MANUAL_TUNING}" "${SOURCE_EDDY_TAP_MEASURE}" "${SOURCE_DAQ}" "${SOURCE_EDDY_DAQ}" "${SOURCE_MULTI_HEAD_ZERO_PROBE}" "${SOURCE_RESONANCE_HELPER}" "${SOURCE_MULTI_HEAD_ZERO_HELPER}" <<'PY'
 import ast
 import sys
 from pathlib import Path
@@ -106,7 +118,9 @@ check_live_config() {
   echo "  Klipper Eddy tap measurement extra: ${SOURCE_EDDY_TAP_MEASURE}"
   echo "  Klipper generic DAQ extra: ${SOURCE_DAQ}"
   echo "  Klipper Eddy DAQ extra: ${SOURCE_EDDY_DAQ}"
+  echo "  Klipper multi-head-zero probe extra: ${SOURCE_MULTI_HEAD_ZERO_PROBE}"
   echo "  Resonance helper: ${SOURCE_RESONANCE_HELPER}"
+  echo "  Multi-head-zero contact-map helper: ${SOURCE_MULTI_HEAD_ZERO_HELPER}"
 
   python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --check
   check_local_support_files
@@ -124,7 +138,9 @@ check_live_config() {
   local_eddy_tap_measure_sha256="$(sha256_file "${SOURCE_EDDY_TAP_MEASURE}")"
   local_daq_sha256="$(sha256_file "${SOURCE_DAQ}")"
   local_eddy_daq_sha256="$(sha256_file "${SOURCE_EDDY_DAQ}")"
+  local_multi_head_zero_probe_sha256="$(sha256_file "${SOURCE_MULTI_HEAD_ZERO_PROBE}")"
   local_resonance_helper_sha256="$(sha256_file "${SOURCE_RESONANCE_HELPER}")"
+  local_multi_head_zero_helper_sha256="$(sha256_file "${SOURCE_MULTI_HEAD_ZERO_HELPER}")"
   expected_fingerprint="$(
     python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --fingerprint
   )"
@@ -149,7 +165,9 @@ idex_manual_tuning_py = klipper_dir / "klippy" / "extras" / "idex_manual_tuning.
 eddy_tap_measure_py = klipper_dir / "klippy" / "extras" / "eddy_tap_measure.py"
 daq_py = klipper_dir / "klippy" / "extras" / "daq.py"
 eddy_daq_py = klipper_dir / "klippy" / "extras" / "eddy_daq.py"
+multi_head_zero_probe_py = klipper_dir / "klippy" / "extras" / "multi_head_zero_probe.py"
 resonance_helper = Path.home() / "printer_data" / "config" / "resonance" / "run_resonance_plot.py"
+multi_head_zero_helper = Path.home() / "printer_data" / "config" / "multi_head_zero_probe" / "run_multi_head_zero_contact_map.py"
 payload = {
     "ok": False,
     "remote_config_path": str(main_cfg),
@@ -160,7 +178,9 @@ payload = {
     "remote_eddy_tap_measure_path": str(eddy_tap_measure_py),
     "remote_daq_path": str(daq_py),
     "remote_eddy_daq_path": str(eddy_daq_py),
+    "remote_multi_head_zero_probe_path": str(multi_head_zero_probe_py),
     "remote_resonance_helper_path": str(resonance_helper),
+    "remote_multi_head_zero_helper_path": str(multi_head_zero_helper),
 }
 
 try:
@@ -186,9 +206,19 @@ try:
         if eddy_daq_py.is_file()
         else ""
     )
+    payload["remote_multi_head_zero_probe_sha256"] = (
+        hashlib.sha256(multi_head_zero_probe_py.read_bytes()).hexdigest()
+        if multi_head_zero_probe_py.is_file()
+        else ""
+    )
     payload["remote_resonance_helper_sha256"] = (
         hashlib.sha256(resonance_helper.read_bytes()).hexdigest()
         if resonance_helper.is_file()
+        else ""
+    )
+    payload["remote_multi_head_zero_helper_sha256"] = (
+        hashlib.sha256(multi_head_zero_helper.read_bytes()).hexdigest()
+        if multi_head_zero_helper.is_file()
         else ""
     )
     subprocess.check_call(["/opt/klipper-env/bin/python3", "-c", "import sqlitedict"])
@@ -226,7 +256,9 @@ PY
   CHECK_LOCAL_EDDY_TAP_MEASURE_SHA256="${local_eddy_tap_measure_sha256}" \
   CHECK_LOCAL_DAQ_SHA256="${local_daq_sha256}" \
   CHECK_LOCAL_EDDY_DAQ_SHA256="${local_eddy_daq_sha256}" \
+  CHECK_LOCAL_MULTI_HEAD_ZERO_PROBE_SHA256="${local_multi_head_zero_probe_sha256}" \
   CHECK_LOCAL_RESONANCE_HELPER_SHA256="${local_resonance_helper_sha256}" \
+  CHECK_LOCAL_MULTI_HEAD_ZERO_HELPER_SHA256="${local_multi_head_zero_helper_sha256}" \
   CHECK_EXPECTED_KLIPPER_COMMIT="${EXPECTED_KLIPPER_COMMIT}" \
   CHECK_REMOTE_HOST="${REMOTE_HOST}" \
   CHECK_REMOTE_PAYLOAD="${remote_payload}" \
@@ -252,7 +284,9 @@ local_idex_manual_tuning_sha256 = os.environ["CHECK_LOCAL_IDEX_MANUAL_TUNING_SHA
 local_eddy_tap_measure_sha256 = os.environ["CHECK_LOCAL_EDDY_TAP_MEASURE_SHA256"]
 local_daq_sha256 = os.environ["CHECK_LOCAL_DAQ_SHA256"]
 local_eddy_daq_sha256 = os.environ["CHECK_LOCAL_EDDY_DAQ_SHA256"]
+local_multi_head_zero_probe_sha256 = os.environ["CHECK_LOCAL_MULTI_HEAD_ZERO_PROBE_SHA256"]
 local_resonance_helper_sha256 = os.environ["CHECK_LOCAL_RESONANCE_HELPER_SHA256"]
+local_multi_head_zero_helper_sha256 = os.environ["CHECK_LOCAL_MULTI_HEAD_ZERO_HELPER_SHA256"]
 expected_fingerprint = os.environ["CHECK_EXPECTED_FINGERPRINT"]
 expected_klipper_commit = os.environ["CHECK_EXPECTED_KLIPPER_COMMIT"]
 remote_payload = json.loads(os.environ["CHECK_REMOTE_PAYLOAD"])
@@ -280,7 +314,9 @@ remote_idex_manual_tuning_sha256 = remote_payload.get("remote_idex_manual_tuning
 remote_eddy_tap_measure_sha256 = remote_payload.get("remote_eddy_tap_measure_sha256", "")
 remote_daq_sha256 = remote_payload.get("remote_daq_sha256", "")
 remote_eddy_daq_sha256 = remote_payload.get("remote_eddy_daq_sha256", "")
+remote_multi_head_zero_probe_sha256 = remote_payload.get("remote_multi_head_zero_probe_sha256", "")
 remote_resonance_helper_sha256 = remote_payload.get("remote_resonance_helper_sha256", "")
+remote_multi_head_zero_helper_sha256 = remote_payload.get("remote_multi_head_zero_helper_sha256", "")
 remote_klipper_commit = remote_payload.get("remote_klipper_commit", "")
 status = remote_payload.get("status", {})
 webhooks = status.get("webhooks", {})
@@ -302,8 +338,12 @@ print(f"  Local daq.py sha256: {local_daq_sha256}")
 print(f"  Remote daq.py sha256: {remote_daq_sha256}")
 print(f"  Local eddy_daq.py sha256: {local_eddy_daq_sha256}")
 print(f"  Remote eddy_daq.py sha256: {remote_eddy_daq_sha256}")
+print(f"  Local multi_head_zero_probe.py sha256: {local_multi_head_zero_probe_sha256}")
+print(f"  Remote multi_head_zero_probe.py sha256: {remote_multi_head_zero_probe_sha256}")
 print(f"  Local resonance helper sha256: {local_resonance_helper_sha256}")
 print(f"  Remote resonance helper sha256: {remote_resonance_helper_sha256}")
+print(f"  Local multi-head-zero helper sha256: {local_multi_head_zero_helper_sha256}")
+print(f"  Remote multi-head-zero helper sha256: {remote_multi_head_zero_helper_sha256}")
 print(f"  Remote Klipper commit: {remote_klipper_commit}")
 print(f"  Klippy state: {webhooks.get('state')}")
 print(f"  save_config_pending: {configfile.get('save_config_pending')}")
@@ -351,10 +391,20 @@ if remote_eddy_daq_sha256 != local_eddy_daq_sha256:
         "remote Klipper eddy_daq.py sha256 does not match local extra "
         f"({remote_eddy_daq_sha256} != {local_eddy_daq_sha256})"
     )
+if remote_multi_head_zero_probe_sha256 != local_multi_head_zero_probe_sha256:
+    errors.append(
+        "remote Klipper multi_head_zero_probe.py sha256 does not match local extra "
+        f"({remote_multi_head_zero_probe_sha256} != {local_multi_head_zero_probe_sha256})"
+    )
 if remote_resonance_helper_sha256 != local_resonance_helper_sha256:
     errors.append(
         "remote resonance helper sha256 does not match local source "
         f"({remote_resonance_helper_sha256} != {local_resonance_helper_sha256})"
+    )
+if remote_multi_head_zero_helper_sha256 != local_multi_head_zero_helper_sha256:
+    errors.append(
+        "remote multi-head-zero helper sha256 does not match local source "
+        f"({remote_multi_head_zero_helper_sha256} != {local_multi_head_zero_helper_sha256})"
     )
 if remote_klipper_commit != expected_klipper_commit:
     errors.append(
@@ -406,7 +456,7 @@ if [[ ! -f "${SOURCE_CFG}" ]]; then
 fi
 
 cleanup_remote_tmp() {
-  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}' '${REMOTE_TMP_BED_MESH}' '${REMOTE_TMP_VISION}' '${REMOTE_TMP_IDEX_MANUAL_TUNING}' '${REMOTE_TMP_EDDY_TAP_MEASURE}' '${REMOTE_TMP_DAQ}' '${REMOTE_TMP_EDDY_DAQ}' '${REMOTE_TMP_RESONANCE_HELPER}'" >/dev/null 2>&1 || true
+  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}' '${REMOTE_TMP_BED_MESH}' '${REMOTE_TMP_VISION}' '${REMOTE_TMP_IDEX_MANUAL_TUNING}' '${REMOTE_TMP_EDDY_TAP_MEASURE}' '${REMOTE_TMP_DAQ}' '${REMOTE_TMP_EDDY_DAQ}' '${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}' '${REMOTE_TMP_RESONANCE_HELPER}' '${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}'" >/dev/null 2>&1 || true
 }
 trap cleanup_remote_tmp EXIT
 
@@ -417,7 +467,9 @@ local_idex_manual_tuning_sha256="$(sha256_file "${SOURCE_IDEX_MANUAL_TUNING}")"
 local_eddy_tap_measure_sha256="$(sha256_file "${SOURCE_EDDY_TAP_MEASURE}")"
 local_daq_sha256="$(sha256_file "${SOURCE_DAQ}")"
 local_eddy_daq_sha256="$(sha256_file "${SOURCE_EDDY_DAQ}")"
+local_multi_head_zero_probe_sha256="$(sha256_file "${SOURCE_MULTI_HEAD_ZERO_PROBE}")"
 local_resonance_helper_sha256="$(sha256_file "${SOURCE_RESONANCE_HELPER}")"
+local_multi_head_zero_helper_sha256="$(sha256_file "${SOURCE_MULTI_HEAD_ZERO_HELPER}")"
 
 echo "Updating ${REMOTE_HOST} with THE active Klipper config and host extras..."
 echo "  Source: ${SOURCE_CFG}"
@@ -428,7 +480,9 @@ echo "  Klipper IDEX manual tuning extra: ${SOURCE_IDEX_MANUAL_TUNING}"
 echo "  Klipper Eddy tap measurement extra: ${SOURCE_EDDY_TAP_MEASURE}"
 echo "  Klipper generic DAQ extra: ${SOURCE_DAQ}"
 echo "  Klipper Eddy DAQ extra: ${SOURCE_EDDY_DAQ}"
+echo "  Klipper multi-head-zero probe extra: ${SOURCE_MULTI_HEAD_ZERO_PROBE}"
 echo "  Resonance helper: ${SOURCE_RESONANCE_HELPER}"
+echo "  Multi-head-zero contact-map helper: ${SOURCE_MULTI_HEAD_ZERO_HELPER}"
 
 scp "${SOURCE_CFG}" "${REMOTE_HOST}:${REMOTE_TMP_CFG}"
 scp "${SOURCE_HEATERS}" "${REMOTE_HOST}:${REMOTE_TMP_HEATERS}"
@@ -438,10 +492,12 @@ scp "${SOURCE_IDEX_MANUAL_TUNING}" "${REMOTE_HOST}:${REMOTE_TMP_IDEX_MANUAL_TUNI
 scp "${SOURCE_EDDY_TAP_MEASURE}" "${REMOTE_HOST}:${REMOTE_TMP_EDDY_TAP_MEASURE}"
 scp "${SOURCE_DAQ}" "${REMOTE_HOST}:${REMOTE_TMP_DAQ}"
 scp "${SOURCE_EDDY_DAQ}" "${REMOTE_HOST}:${REMOTE_TMP_EDDY_DAQ}"
+scp "${SOURCE_MULTI_HEAD_ZERO_PROBE}" "${REMOTE_HOST}:${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}"
 scp "${SOURCE_RESONANCE_HELPER}" "${REMOTE_HOST}:${REMOTE_TMP_RESONANCE_HELPER}"
+scp "${SOURCE_MULTI_HEAD_ZERO_HELPER}" "${REMOTE_HOST}:${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}"
 
 ssh "${REMOTE_HOST}" \
-  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_BED_MESH='${REMOTE_TMP_BED_MESH}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_TMP_EDDY_TAP_MEASURE='${REMOTE_TMP_EDDY_TAP_MEASURE}' REMOTE_TMP_DAQ='${REMOTE_TMP_DAQ}' REMOTE_TMP_EDDY_DAQ='${REMOTE_TMP_EDDY_DAQ}' REMOTE_TMP_RESONANCE_HELPER='${REMOTE_TMP_RESONANCE_HELPER}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_UPSTREAM_BED_MESH_SHA256='${EXPECTED_UPSTREAM_BED_MESH_SHA256}' LEGACY_MANAGED_BED_MESH_SHA256='${LEGACY_MANAGED_BED_MESH_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_MANAGED_BED_MESH_SHA256='${local_bed_mesh_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' EXPECTED_EDDY_TAP_MEASURE_SHA256='${local_eddy_tap_measure_sha256}' EXPECTED_DAQ_SHA256='${local_daq_sha256}' EXPECTED_EDDY_DAQ_SHA256='${local_eddy_daq_sha256}' EXPECTED_RESONANCE_HELPER_SHA256='${local_resonance_helper_sha256}' bash -s" <<'REMOTE_SCRIPT'
+  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_BED_MESH='${REMOTE_TMP_BED_MESH}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_TMP_EDDY_TAP_MEASURE='${REMOTE_TMP_EDDY_TAP_MEASURE}' REMOTE_TMP_DAQ='${REMOTE_TMP_DAQ}' REMOTE_TMP_EDDY_DAQ='${REMOTE_TMP_EDDY_DAQ}' REMOTE_TMP_MULTI_HEAD_ZERO_PROBE='${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}' REMOTE_TMP_RESONANCE_HELPER='${REMOTE_TMP_RESONANCE_HELPER}' REMOTE_TMP_MULTI_HEAD_ZERO_HELPER='${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_UPSTREAM_BED_MESH_SHA256='${EXPECTED_UPSTREAM_BED_MESH_SHA256}' LEGACY_MANAGED_BED_MESH_SHA256='${LEGACY_MANAGED_BED_MESH_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_MANAGED_BED_MESH_SHA256='${local_bed_mesh_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' EXPECTED_EDDY_TAP_MEASURE_SHA256='${local_eddy_tap_measure_sha256}' EXPECTED_DAQ_SHA256='${local_daq_sha256}' EXPECTED_EDDY_DAQ_SHA256='${local_eddy_daq_sha256}' EXPECTED_MULTI_HEAD_ZERO_PROBE_SHA256='${local_multi_head_zero_probe_sha256}' EXPECTED_RESONANCE_HELPER_SHA256='${local_resonance_helper_sha256}' EXPECTED_MULTI_HEAD_ZERO_HELPER_SHA256='${local_multi_head_zero_helper_sha256}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 MAIN_CFG="${HOME}/printer_data/config/printer.cfg"
@@ -452,7 +508,9 @@ IDEX_MANUAL_TUNING_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/idex_manual_tuning.py
 EDDY_TAP_MEASURE_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/eddy_tap_measure.py"
 DAQ_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/daq.py"
 EDDY_DAQ_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/eddy_daq.py"
+MULTI_HEAD_ZERO_PROBE_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/multi_head_zero_probe.py"
 RESONANCE_HELPER="${HOME}/printer_data/config/resonance/run_resonance_plot.py"
+MULTI_HEAD_ZERO_HELPER="${HOME}/printer_data/config/multi_head_zero_probe/run_multi_head_zero_contact_map.py"
 TS="$(date +%Y%m%d-%H%M%S)"
 CFG_BACKUP="${MAIN_CFG}.bak.${TS}"
 HEATERS_BACKUP="${HEATERS_PY}.bak.${TS}"
@@ -462,7 +520,9 @@ IDEX_MANUAL_TUNING_BACKUP="${IDEX_MANUAL_TUNING_PY}.bak.${TS}"
 EDDY_TAP_MEASURE_BACKUP="${EDDY_TAP_MEASURE_PY}.bak.${TS}"
 DAQ_BACKUP="${DAQ_PY}.bak.${TS}"
 EDDY_DAQ_BACKUP="${EDDY_DAQ_PY}.bak.${TS}"
+MULTI_HEAD_ZERO_PROBE_BACKUP="${MULTI_HEAD_ZERO_PROBE_PY}.bak.${TS}"
 RESONANCE_HELPER_BACKUP="${RESONANCE_HELPER}.bak.${TS}"
+MULTI_HEAD_ZERO_HELPER_BACKUP="${MULTI_HEAD_ZERO_HELPER}.bak.${TS}"
 
 if [[ ! -f "${REMOTE_TMP_CFG}" ]]; then
   echo "Error: uploaded config not found: ${REMOTE_TMP_CFG}" >&2
@@ -492,8 +552,16 @@ if [[ ! -f "${REMOTE_TMP_DAQ}" || ! -f "${REMOTE_TMP_EDDY_DAQ}" ]]; then
   echo "Error: uploaded DAQ extras not found" >&2
   exit 1
 fi
+if [[ ! -f "${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}" ]]; then
+  echo "Error: uploaded multi-head-zero probe extra not found: ${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}" >&2
+  exit 1
+fi
 if [[ ! -f "${REMOTE_TMP_RESONANCE_HELPER}" ]]; then
   echo "Error: uploaded resonance helper not found: ${REMOTE_TMP_RESONANCE_HELPER}" >&2
+  exit 1
+fi
+if [[ ! -f "${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}" ]]; then
+  echo "Error: uploaded multi-head-zero contact-map helper not found: ${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}" >&2
   exit 1
 fi
 if [[ ! -f "${HEATERS_PY}" ]]; then
@@ -552,9 +620,19 @@ if [[ "${uploaded_daq_sha}" != "${EXPECTED_DAQ_SHA256}" || "${uploaded_eddy_daq_
   echo "Error: uploaded DAQ extra sha256 does not match local managed source" >&2
   exit 1
 fi
+uploaded_multi_head_zero_probe_sha="$(sha256sum "${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}" | awk '{print $1}')"
+if [[ "${uploaded_multi_head_zero_probe_sha}" != "${EXPECTED_MULTI_HEAD_ZERO_PROBE_SHA256}" ]]; then
+  echo "Error: uploaded multi-head-zero probe extra sha256 does not match local managed source" >&2
+  exit 1
+fi
 uploaded_resonance_helper_sha="$(sha256sum "${REMOTE_TMP_RESONANCE_HELPER}" | awk '{print $1}')"
 if [[ "${uploaded_resonance_helper_sha}" != "${EXPECTED_RESONANCE_HELPER_SHA256}" ]]; then
   echo "Error: uploaded resonance helper sha256 ${uploaded_resonance_helper_sha} does not match local source" >&2
+  exit 1
+fi
+uploaded_multi_head_zero_helper_sha="$(sha256sum "${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}" | awk '{print $1}')"
+if [[ "${uploaded_multi_head_zero_helper_sha}" != "${EXPECTED_MULTI_HEAD_ZERO_HELPER_SHA256}" ]]; then
+  echo "Error: uploaded multi-head-zero contact-map helper sha256 does not match local source" >&2
   exit 1
 fi
 
@@ -678,6 +756,24 @@ else
 fi
 rm -f "${REMOTE_TMP_EDDY_TAP_MEASURE}"
 
+if [[ -f "${MULTI_HEAD_ZERO_PROBE_PY}" ]]; then
+  current_multi_head_zero_probe_sha="$(sha256sum "${MULTI_HEAD_ZERO_PROBE_PY}" | awk '{print $1}')"
+else
+  current_multi_head_zero_probe_sha=""
+fi
+if [[ "${current_multi_head_zero_probe_sha}" == "${EXPECTED_MULTI_HEAD_ZERO_PROBE_SHA256}" ]]; then
+  echo "Klipper multi-head-zero probe extra already installed: ${MULTI_HEAD_ZERO_PROBE_PY}"
+else
+  mkdir -p "$(dirname -- "${MULTI_HEAD_ZERO_PROBE_PY}")"
+  if [[ -f "${MULTI_HEAD_ZERO_PROBE_PY}" ]]; then
+    cp -a "${MULTI_HEAD_ZERO_PROBE_PY}" "${MULTI_HEAD_ZERO_PROBE_BACKUP}"
+    echo "Backed up: ${MULTI_HEAD_ZERO_PROBE_BACKUP}"
+  fi
+  cp -a "${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}" "${MULTI_HEAD_ZERO_PROBE_PY}"
+  echo "Installed: ${MULTI_HEAD_ZERO_PROBE_PY}"
+fi
+rm -f "${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}"
+
 if ! /opt/klipper-env/bin/python3 -c 'import sqlitedict' >/dev/null 2>&1; then
   /opt/klipper-env/bin/pip install 'sqlitedict==2.1.0'
 fi
@@ -731,6 +827,25 @@ else
   echo "Installed resonance helper: ${RESONANCE_HELPER}"
 fi
 rm -f "${REMOTE_TMP_RESONANCE_HELPER}"
+
+mkdir -p "$(dirname -- "${MULTI_HEAD_ZERO_HELPER}")"
+if [[ -f "${MULTI_HEAD_ZERO_HELPER}" ]]; then
+  current_multi_head_zero_helper_sha="$(sha256sum "${MULTI_HEAD_ZERO_HELPER}" | awk '{print $1}')"
+else
+  current_multi_head_zero_helper_sha=""
+fi
+if [[ "${current_multi_head_zero_helper_sha}" == "${EXPECTED_MULTI_HEAD_ZERO_HELPER_SHA256}" ]]; then
+  echo "Multi-head-zero contact-map helper already installed: ${MULTI_HEAD_ZERO_HELPER}"
+else
+  if [[ -f "${MULTI_HEAD_ZERO_HELPER}" ]]; then
+    cp -a "${MULTI_HEAD_ZERO_HELPER}" "${MULTI_HEAD_ZERO_HELPER_BACKUP}"
+    echo "Backed up: ${MULTI_HEAD_ZERO_HELPER_BACKUP}"
+  fi
+  cp -a "${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}" "${MULTI_HEAD_ZERO_HELPER}"
+  chmod 0755 "${MULTI_HEAD_ZERO_HELPER}"
+  echo "Installed multi-head-zero contact-map helper: ${MULTI_HEAD_ZERO_HELPER}"
+fi
+rm -f "${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}"
 
 mkdir -p "$(dirname -- "${MAIN_CFG}")"
 

@@ -33,17 +33,79 @@ Builder:
           process_data:
             overrides:
               process_overrides:
-                # This uses scarf seam settings
-                # it is very effective for round parts to reduce the seam visibility / mechanical roundness of the part
-                # This improved the roundness of this part significantly
+                # Force the finest supported 0.6 mm-nozzle layer height and
+                # preserve small circular details with nozzle-width walls.
+                adaptive_layer_height: "0"
+                layer_height: "0.15"
+                initial_layer_print_height: "0.28"
+                line_width: "0.62"
+                initial_layer_line_width: "0.66"
+                outer_wall_line_width: "0.60"
+                inner_wall_line_width: "0.62"
+                internal_solid_infill_line_width: "0.62"
+                sparse_infill_line_width: "0.65"
+                top_surface_line_width: "0.60"
+                resolution: "0.012"
+                precise_outer_wall: "1"
+                wall_generator: arachne
+                wall_sequence: inner wall/outer wall
+                wall_loops: "2"
+                top_shell_layers: "4"
+                top_shell_thickness: "0"
+                bottom_shell_layers: "4"
+                bottom_shell_thickness: "0"
+
+                # Keep visible surfaces deliberately slow and calm. Internal
+                # paths remain slightly faster without becoming ambitious TPU.
+                outer_wall_speed: "20"
+                external_perimeter_speed: "20"
+                top_surface_speed: "20"
+                small_perimeter_speed: 50%
+                small_perimeter_threshold: "20"
+                inner_wall_speed: "30"
+                internal_solid_infill_speed: "30"
+                solid_infill_speed: "30"
+                gap_fill_speed: "20"
+                gap_infill_speed: "20"
+                sparse_infill_speed: "30"
+                bridge_speed: "25"
+                initial_layer_speed: "20"
+                initial_layer_infill_speed: "30"
+                travel_speed: "250"
+                outer_wall_acceleration: "800"
+                top_surface_acceleration: "800"
+                inner_wall_acceleration: "1200"
+                internal_solid_infill_acceleration: "1200"
+                sparse_infill_acceleration: "1200"
+                default_acceleration: "1200"
+                initial_layer_acceleration: "800"
+                bridge_acceleration: "800"
+                travel_acceleration: "3000"
+                outer_wall_jerk: "5"
+                top_surface_jerk: "5"
+                inner_wall_jerk: "8"
+                infill_jerk: "8"
+                default_jerk: "8"
+                initial_layer_jerk: "5"
+                travel_jerk: "8"
+
+                # Scarf and wipe settings reduce the visible seam on the round
+                # spool while avoiding the seam gap that can leave holes in TPU.
                 enable_support: "0"
                 brim_type: no_brim
                 sparse_infill_density: "30%"
                 seam_position: aligned
                 seam_slope_type: all
                 seam_slope_conditional: "1"
-                outer_wall_speed: "75"
-                outer_wall_line_width: "0.9"
+                seam_slope_inner_walls: "1"
+                seam_slope_steps: "20"
+                seam_gap: "0"
+                wipe_on_loops: "1"
+                wipe_before_external_loop: "1"
+                role_based_wipe_speed: "1"
+                reduce_crossing_wall: "1"
+                slow_down_layer_time: "9"
+                pressure_advance: "0.015"
           parts:
             - right_filament_guide_spool
       auto_assign_plates: false

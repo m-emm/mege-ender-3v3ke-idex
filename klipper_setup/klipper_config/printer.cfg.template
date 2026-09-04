@@ -564,19 +564,21 @@ stealthchop_threshold: 0
 # The multi-head-zero normally-closed microswitch reuses the primary Pico's
 # legacy Y-endstop header. The active Y endstop remains on y_pico:gpio4.
 # With the internal pull-up enabled, a closed circuit is RELEASED and an
-# actuated or disconnected/open circuit is PRESSED.
-[gcode_button multi_head_zero]
+# actuated or disconnected/open circuit is TRIGGERED. This custom endstop owns
+# GPIO4 so it can both report state and stop timed probing moves.
+[multi_head_zero_probe]
 pin: ^gpio4
-press_gcode:
-    RESPOND TYPE=echo MSG="Multi-head-zero: TRIGGERED (NC circuit open)"
-release_gcode:
-    RESPOND TYPE=echo MSG="Multi-head-zero: READY (NC circuit closed)"
+clearance_z: 2.5
+approach_z: 2.0
+target_z: -1.0
+travel_speed: 20.0
+probe_speed: 1.0
 
 # Reserved legacy Y TMC2226 rollback config. Keep this commented while the
 # dedicated TMC5160T Plus Y driver is live.
 # To switch back: restore the STEP/DIR/EN/UART/DIAG wiring tags in
 # pico_w_btt_tmc2226_y_z.yaml, comment the TMC5160 [stepper_y] above, then
-# comment the [gcode_button multi_head_zero] section, reconnect the physical Y
+# comment the [multi_head_zero_probe] section, reconnect the physical Y
 # endstop to the primary Pico GPIO4 header, and uncomment this block.
 #
 # [stepper_y]

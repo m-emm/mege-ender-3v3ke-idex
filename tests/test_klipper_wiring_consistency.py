@@ -38,7 +38,7 @@ EXPECTED_KLIPPER_TAGS = {
     "tmc5160 stepper_y.spi_software_miso_pin",
     "tmc5160 stepper_y.spi_software_mosi_pin",
     "tmc5160 stepper_y.spi_software_sclk_pin",
-    "gcode_button multi_head_zero.pin",
+    "multi_head_zero_probe.pin",
     "dotstar vision_light.clock_pin",
     "dotstar vision_light.data_pin",
     "stepper_z.step_pin",
@@ -129,7 +129,7 @@ def test_multi_head_zero_reuses_legacy_primary_y_endstop_header():
     assert "MULTI_HEAD_ZERO_" in prefixes
     assert "ENDSTOP_Y_" not in prefixes
     assert signal_wire["to"] == "MULTI_HEAD_ZERO_NC"
-    assert signal_wire["klipper"] == "gcode_button multi_head_zero.pin"
+    assert signal_wire["klipper"] == "multi_head_zero_probe.pin"
     assert _wire_nodes_connected(wiring, "MULTI_HEAD_ZERO_GND", "PWR_GND")
     assert _wire_nodes_connected(
         wiring,

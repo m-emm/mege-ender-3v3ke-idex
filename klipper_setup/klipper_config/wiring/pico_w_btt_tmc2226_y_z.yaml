@@ -449,7 +449,7 @@ wires:
   # switch contact uses only signal and ground; the powered third pin is unused.
   - from: PICO_GPIO_4
     to: MULTI_HEAD_ZERO_NC
-    klipper: "gcode_button multi_head_zero.pin"
+    klipper: "multi_head_zero_probe.pin"
     type: data
   - from: PICO_GPIO_22_29
     to: ENDSTOP_Z_LEFT_NO

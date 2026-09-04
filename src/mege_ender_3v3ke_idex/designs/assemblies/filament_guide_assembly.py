@@ -1,38 +1,52 @@
 """Filament-guide assembly reference geometry."""
 
 import logging
+import math
 
 from shellforgepy.simple import *
 
 _logger = logging.getLogger(__name__)
 
+axle_screw_size = "M3"
+bearing_radial_clearance = 0.2
+wheel_thickness = 3
+wheel_z_oversize = 1
+
+spool_height = 5
+spool_waist_diameter = 10
+extra_shaft_cutter_size = 0.9
+
+num_inner_bite_cutters = 12
+mount_eye_depth = 20
+mount_eye_fillet_radius = 2
+mount_eye_screw_hole_inset = 6
+mount_eye_screw_size = "M5"
+
 
 def create_filament_guide_spool():
 
-    wheel_thickness = 3
-    wheel_z_oversize = 1
-
-    spool_height = 5
-    spool_waist_diameter = 14
-    extra_shaft_cutter_size = 2
-
-    num_inner_bite_cutters = 12
-    inner_bite_depth = 1
-
-    bearing_type = "695"  # "625"
+    bearing_type = "683"  # "695"  # "625"
 
     bearing = create_ball_bearing_mockup_assembly(
         bearing_type,
         shaft_cutter_length=100,
         shaft_cutter_clearance=extra_shaft_cutter_size,
+        radial_clearance=bearing_radial_clearance,
     )
 
     bearing_size = get_bounding_box_size(bearing)
     shaft_cutter = bearing.get_named_cutter("shaft_cutter")
 
     shaft_cutter_size = get_bounding_box_size(shaft_cutter)
-    bearing_clearance_cutter_size = get_bounding_box_size(
-        bearing.get_named_cutter("clearance_cutter")
+    bearing_clearance_cutter = bearing.get_named_cutter("clearance_cutter")
+    bearing_clearance_cutter_size = get_bounding_box_size(bearing_clearance_cutter)
+    bearing_clearance_radius = bearing_clearance_cutter_size[0] / 2
+    inner_bite_half_sector_angle = math.pi / num_inner_bite_cutters
+    inner_bite_cutter_center_radius = bearing_clearance_radius / math.cos(
+        inner_bite_half_sector_angle
+    )
+    inner_bite_cutter_radius = bearing_clearance_radius * math.tan(
+        inner_bite_half_sector_angle
     )
 
     wheel_diameter = bearing_size[0] + 2 * wheel_thickness
@@ -58,10 +72,10 @@ def create_filament_guide_spool():
         angle = i * 360 / num_inner_bite_cutters
 
         inner_bite_cutter = create_cylinder(
-            inner_bite_depth, bearing_clearance_cutter_size[2]
+            inner_bite_cutter_radius, bearing_clearance_cutter_size[2]
         )
 
-        inner_bite_cutter = translate(bearing_clearance_cutter_size[0] / 2, 0, 0)(
+        inner_bite_cutter = translate(inner_bite_cutter_center_radius, 0, 0)(
             inner_bite_cutter
         )
         inner_bite_cutter = rotate(angle)(inner_bite_cutter)
@@ -69,6 +83,8 @@ def create_filament_guide_spool():
 
     inner_bite_cutters = align(inner_bite_cutters, half_spool, Alignment.CENTER)
     inner_bite_cutters = align(inner_bite_cutters, half_spool, Alignment.BOTTOM)
+
+    inner_bite_cutters = inner_bite_cutters.cut(bearing_clearance_cutter)
 
     half_spool = half_spool.cut(inner_bite_cutters)
 
@@ -114,7 +130,7 @@ def create_filament_guide_spool():
 def create_filament_guide_assembly():
     frame_depth = 8.5
     frame_width = 4
-    spacer_thickness = 1.5
+    spacer_thickness = 0.5
     spacer_bearing_clearance = 0.2
     spool_gap = 0.1
     frame_spool_clearance = 1.5
@@ -168,7 +184,9 @@ def create_filament_guide_assembly():
         _logger.info(f"Checking cutter: {name}")
         checked_one = True
         if "shaft" in name:
-            clearance_hole_diameter = MScrew.from_size("M5").clearance_hole_normal
+            clearance_hole_diameter = MScrew.from_size(
+                axle_screw_size
+            ).clearance_hole_normal
             screw_cutter = create_cylinder(clearance_hole_diameter / 2, 100)
             screw_cutter = align(screw_cutter, cutter, Alignment.CENTER)
 
@@ -191,10 +209,6 @@ def create_filament_guide_assembly():
 
     retval = retval.fuse(spacers)
 
-    mount_eye_depth = 20
-    mount_eye_fillet_radius = 2
-    mount_eye_screw_hole_inset = 6
-    mount_eye_screw_size = "M5"
     mount_eye_hole_diameter = MScrew.from_size(
         mount_eye_screw_size
     ).clearance_hole_normal
