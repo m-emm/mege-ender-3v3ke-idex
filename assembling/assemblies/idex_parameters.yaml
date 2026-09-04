@@ -617,6 +617,23 @@ globals:
   multi_head_zero_ball_shaft_receptacle_diameter: 11.0
   multi_head_zero_ball_shaft_receptacle_height: 10.0
   multi_head_zero_mount_x_offset: -55
+  multi_head_zero_mount_clamp_fillet_radius: 1.4
+  multi_head_zero_mount_clamp_width: 24.0
+  multi_head_zero_mount_u_wall_thickness: 4.0
+  multi_head_zero_mount_u_bottom_thickness: 3.0
+  multi_head_zero_mount_u_spar_clearance_y: 0.3
+  multi_head_zero_mount_u_spar_clearance_z: 0.8
+  multi_head_zero_mount_u_ear_height_above_spar: 12.0
+  multi_head_zero_mount_u_screw_gap_above_spar: 6.0
+  multi_head_zero_mount_clamp_screw_size: "M3"
+  multi_head_zero_mount_clamp_screw_length: 20
+  multi_head_zero_mount_clamp_screw_inset: 5.0
+  multi_head_zero_mount_clamp_nut_clearance: 0.35
+  multi_head_zero_mount_clamp_cylinder_head_clearance: 0.5
+  multi_head_zero_mount_clamp_thread_inset_holder_thickness: 7.0
+  multi_head_zero_mount_clamp_thread_inset_extra_radius: 1.5
+  multi_head_zero_mount_clamp_thread_inset_hole_radius_adjustment: -0.1
+  multi_head_zero_mount_screw_mount_clearance_type: "loose"
   multi_head_zero_ball_stack_gap: 1.0
 
   electric_switchboard_height: 100

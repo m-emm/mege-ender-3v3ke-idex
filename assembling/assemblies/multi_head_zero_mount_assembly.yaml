@@ -12,6 +12,17 @@ Builder:
         - left
       width: 512
       height: 512
+      variants:
+        - name: clamp_detail
+          views:
+            - isometric
+            - front
+            - back
+          width: 1024
+          height: 1024
+          hide:
+            - print_bed_
+            - print_bed_undercarriage_
     parts:
       - source: injected
         assembly: print_bed
@@ -28,24 +39,57 @@ Builder:
       - source: self
         artifact: leader
         name: multi_head_zero_mount
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
 
   Production:
-    process_data_preset: petgcf_max_strength_high_speed_06
+    process_data_preset: petgcf_max_strength_high_speed_06_idex_stock_matched # petgcf_max_strength_high_speed_06
+    process_data:
+      overrides:
+        process_overrides:
+          enable_support: "1"
     parts:
       - source: self
         artifact: leader
         name: multi_head_zero_mount
-        prod_rotation_angle: 90
+        prod_rotation_angle: 0
         prod_rotation_axis: [1, 0, 0]
-    arrange:
-      export_individual_parts: false
-      prod_gap: 12.0
-      plates:
-        - name: multi_head_zero_mount
-          process_data_preset: petgcf_max_strength_high_speed_06
-          parts:
-            - multi_head_zero_mount
-      auto_assign_plates: false
+Parameters:
+  multi_head_zero_mount_clamp_fillet_radius:
+    Type: Float
+  multi_head_zero_mount_clamp_width:
+    Type: Float
+  multi_head_zero_mount_u_wall_thickness:
+    Type: Float
+  multi_head_zero_mount_u_bottom_thickness:
+    Type: Float
+  multi_head_zero_mount_u_spar_clearance_y:
+    Type: Float
+  multi_head_zero_mount_u_spar_clearance_z:
+    Type: Float
+  multi_head_zero_mount_u_ear_height_above_spar:
+    Type: Float
+  multi_head_zero_mount_u_screw_gap_above_spar:
+    Type: Float
+  multi_head_zero_mount_clamp_screw_size:
+    Type: String
+  multi_head_zero_mount_clamp_screw_length:
+    Type: Float
+  multi_head_zero_mount_clamp_screw_inset:
+    Type: Float
+  multi_head_zero_mount_clamp_nut_clearance:
+    Type: Float
+  multi_head_zero_mount_clamp_cylinder_head_clearance:
+    Type: Float
+  multi_head_zero_mount_clamp_thread_inset_holder_thickness:
+    Type: Float
+  multi_head_zero_mount_clamp_thread_inset_extra_radius:
+    Type: Float
+  multi_head_zero_mount_clamp_thread_inset_hole_radius_adjustment:
+    Type: Float
+  multi_head_zero_mount_screw_mount_clearance_type:
+    Type: String
 
 Parts:
   MultiHeadZeroMountAssembly:
