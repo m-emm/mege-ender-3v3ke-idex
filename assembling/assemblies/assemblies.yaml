@@ -4166,6 +4166,11 @@ assemblies:
     resource_file: eddy_duo_assembly.yaml
     depends_on: []
 
+  - name: multi_head_zero_assembly
+
+    resource_file: multi_head_zero_assembly.yaml
+    depends_on: []
+
   - name: y_axis_driver_board_holder_assembly
 
     resource_file: pinout_base_plate_assembly.yaml

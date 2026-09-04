@@ -567,7 +567,9 @@ def join_z_axis_carriage_assembly(
     back_side_cutter = create_box(500, 500, 500)
 
     back_side_cutter = align(back_side_cutter, carriage_front_block, Alignment.CENTER)
-    back_side_cutter = align(back_side_cutter, carriage_front_block, Alignment.STACK_TOP)
+    back_side_cutter = align(
+        back_side_cutter, carriage_front_block, Alignment.STACK_TOP
+    )
     back_side_cutter = align(
         back_side_cutter,
         replacement_rail_carriages["top_carriage"],

@@ -608,6 +608,15 @@ globals:
   eddy_duo_tool_head_front_gap: 1.0
   eddy_duo_nozzle_clearance: 2.5
 
+  multi_head_zero_body_width: 17.2
+  multi_head_zero_body_depth: 20.0
+  multi_head_zero_body_height: 22.0
+  multi_head_zero_ball_top_height: 23.5
+  multi_head_zero_ball_diameter: 10.0
+  multi_head_zero_ball_shaft_diameter: 5.0
+  multi_head_zero_ball_shaft_receptacle_diameter: 11.0
+  multi_head_zero_ball_shaft_receptacle_height: 10.0
+
   electric_switchboard_height: 100
   electric_switchboard_width: 40
   electric_switchboard_depth: 120

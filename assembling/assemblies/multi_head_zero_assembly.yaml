@@ -1,0 +1,55 @@
+ShellforgepyBuilderVersion: "2026-03-27"
+
+Description: Standalone multi-head zero reference assembly
+
+Builder:
+  Visualization:
+    preview:
+      enabled: true
+      views:
+        - isometric
+        - front
+        - back
+        - left
+        - right
+        - top
+        - bottom
+      width: 700
+      height: 700
+    parts:
+      - source: self
+        artifact: leader
+        name: multi_head_zero_body
+      - source: self
+        artifact: non_production_parts
+        name_template: "{name}"
+        animation:
+          multi_head_zero_press: [0, 0, -0.7]
+
+  Production:
+    parts: []
+
+Parameters:
+  multi_head_zero_body_width:
+    Type: Float
+  multi_head_zero_body_depth:
+    Type: Float
+  multi_head_zero_body_height:
+    Type: Float
+  multi_head_zero_ball_top_height:
+    Type: Float
+  multi_head_zero_ball_diameter:
+    Type: Float
+  multi_head_zero_ball_shaft_diameter:
+    Type: Float
+  multi_head_zero_ball_shaft_receptacle_diameter:
+    Type: Float
+  multi_head_zero_ball_shaft_receptacle_height:
+    Type: Float
+
+Parts:
+  MultiHeadZeroAssembly:
+    Type: Shellforgepy::Assembly
+
+    Properties:
+      Generator: mege_ender_3v3ke_idex.designs.assemblies.multi_head_zero_assembly.create_multi_head_zero_assembly
