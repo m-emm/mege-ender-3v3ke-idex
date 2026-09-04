@@ -37,6 +37,8 @@ def create_multi_head_zero_assembly(
         multi_head_zero_body_height,
     )
 
+    body_reference = body
+
     mount_hole_drills = None
 
     for lr in [Alignment.LEFT, Alignment.RIGHT]:
@@ -156,5 +158,7 @@ def create_multi_head_zero_assembly(
     connector = translate(0, 0, connector_bottom_offset)(connector)
 
     assembly.add_named_non_production_part(connector, "connector")
+    assembly.add_named_non_production_part(body_reference, "body_reference")
+    assembly.set_hidden_by_default("body_reference")
 
     return assembly

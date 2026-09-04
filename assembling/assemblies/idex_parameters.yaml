@@ -616,6 +616,8 @@ globals:
   multi_head_zero_ball_shaft_diameter: 5.0
   multi_head_zero_ball_shaft_receptacle_diameter: 11.0
   multi_head_zero_ball_shaft_receptacle_height: 10.0
+  multi_head_zero_mount_x_offset: -55
+  multi_head_zero_ball_stack_gap: 1.0
 
   electric_switchboard_height: 100
   electric_switchboard_width: 40

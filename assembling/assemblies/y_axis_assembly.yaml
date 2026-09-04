@@ -104,6 +104,24 @@ Builder:
             - { $ref: print_bed_y_travel }
             - 0
       - source: dependencies
+        assembly: multi_head_zero_assembly
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
+        assembly: multi_head_zero_mount_assembly
+        artifact: all
+        name_template: "{assembly_name}_{artifact}_{default_name}"
+        animation:
+          bed_y:
+            - 0
+            - { $ref: print_bed_y_travel }
+            - 0
+      - source: dependencies
         assembly: nozzle_cam_assembly
         artifact: all
         name_template: "{assembly_name}_{artifact}_{default_name}"

@@ -216,6 +216,33 @@ placement:
       alignment: CENTER
       axes: [1]
 
+    - part: multi_head_zero_assembly
+      to: print_bed_assembly
+      alignment: CENTER
+      axes: [0]
+      post_rotation:
+        angle: 90
+        axis: [0, 0, 1]
+        center: multi_head_zero_assembly.CENTER
+
+    - part: multi_head_zero_assembly.non_production_parts.ball
+      to: print_bed_assembly.non_production_parts.print_bed_foil
+      alignment: TOP
+    - part: multi_head_zero_assembly.non_production_parts.ball
+      to: print_bed_assembly
+      alignment: STACK_FRONT
+      stack_gap:
+        $ref: multi_head_zero_ball_stack_gap
+    - part: multi_head_zero_assembly
+      post_translation:
+        - $ref: multi_head_zero_mount_x_offset
+        - 0
+        - 0
+
+    - rigid_group:
+        - multi_head_zero_assembly
+      to: print_bed_assembly
+
     - part: apa_strip_back_assembly
       to: print_bed_assembly.non_production_parts.print_bed_foil
       alignment: CENTER
@@ -4170,6 +4197,18 @@ assemblies:
 
     resource_file: multi_head_zero_assembly.yaml
     depends_on: []
+
+  - name: multi_head_zero_mount_assembly
+
+    resource_file: multi_head_zero_mount_assembly.yaml
+    depends_on:
+      - print_bed_assembly
+      - print_bed_undercarriage_assembly
+      - multi_head_zero_assembly
+    inject_parts:
+      print_bed: print_bed_assembly
+      print_bed_undercarriage: print_bed_undercarriage_assembly
+      multi_head_zero: multi_head_zero_assembly
 
   - name: y_axis_driver_board_holder_assembly
 
