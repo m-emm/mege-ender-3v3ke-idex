@@ -2,9 +2,15 @@
 
 ## Purpose
 
-Provide a slow, repeatable 3D contact-measurement move for a Klipper-based printer. A contact switch (for example, a ball probe) stops an arbitrary XYZ trajectory and reports the corresponding Cartesian contact point. This is a concept note only; the mechanical probe, calibration, and user-facing commands remain to be designed.
+Provide a slow, repeatable 3D contact-measurement move for a Klipper-based
+printer. A contact switch stops an arbitrary XYZ trajectory and reports the
+corresponding Cartesian contact point.
 
-## Brief architecture sketch
+The calibration goal is a high-accuracy X/Y/Z measurement of each toolhead's
+ball crown using 18 physical contacts per toolhead: nine phase-1 seed contacts,
+one phase-1 summit contact, and eight phase-2 ring contacts.
+
+## Architecture
 
 ```text
 planned XYZ move
@@ -12,189 +18,224 @@ planned XYZ move
         v
 custom contact-probe object ----> MCU contact input
         |                                  |
-        | registers X, Y, Z… steppers       | trigger timestamp
+        | registers X, Y, Z steppers       | trigger timestamp
         v                                  v
 Klipper HomingMove / probing_move ----> Cartesian XYZ trigger position
 ```
 
-The custom probe object is an MCU endstop/contact input attached to every stepper that contributes to the measurement move. On contact, all participating axes stop and Klipper reconstructs the XYZ position at the trigger time.
-
-## Reusing Klipper’s probing infrastructure
-
-Use Klipper’s existing `PrinterHoming.probing_move()` / `HomingMove` path rather than building a parallel motion-and-timestamp system.
-
-- `probing_move()` accepts an MCU probe/endstop and a target XYZ position; it is not intrinsically Z-only.
-- `HomingMove` records the participating steppers’ motion and obtains each stepper’s position at the switch trigger timestamp.
-- With `probe_pos=True`, Klipper runs those trigger-time stepper positions through the kinematics to reconstruct the Cartesian XYZ contact position.
-
-The standard `[probe]` object is deliberately Z-oriented, so it is not the right object by itself for arbitrary-direction 3D contact measurement.
-
-## Custom contact-probe object
-
-Implement a small custom probe/endstop object around the contact switch. During MCU identification/setup, add every relevant kinematic stepper to its MCU endstop:
+Use Klipper's existing `PrinterHoming.probing_move()` / `HomingMove` path. The
+custom probe object registers every stepper that may move during the contact
+trajectory with its MCU endstop:
 
 ```python
 for stepper in toolhead.get_kinematics().get_steppers():
     mcu_endstop.add_stepper(stepper)
 ```
 
-In the final implementation, “relevant” should mean every stepper that may move during the probing trajectory. This lets the existing homing machinery stop and timestamp X, Y, and all Z steppers as one measurement event.
+With `probe_pos=True`, Klipper reconstructs the Cartesian contact position from
+the participating steppers at the switch trigger timestamp. The standard
+`[probe]` object remains Z-oriented and is not used for this general contact
+measurement.
 
-## Multi-MCU considerations
+Klipper supports contact input and moved steppers on different MCUs. All
+steppers of one multi-stepper axis must remain on the same MCU. The mechanism
+must tolerate the small physical overtravel caused by deceleration and any
+multi-MCU trigger relay delay.
 
-Klipper supports probing/homing where the contact input and moved steppers live on different MCUs. The motion controller accounts for the trigger timestamp when reporting the contact position.
+Call the probing move with `check_movement=False`. Keep the returned trigger
+position separate from the physical halt position: trigger position is the
+measurement; halt position is relevant only to mechanical clearance. The
+current vertical implementation approaches at 1 mm/s and retracts to Z=2.5 mm
+after every completed or no-contact attempt.
 
-- It is acceptable for X to be on one MCU and Y/Z on another, with the contact input on either of those or a third MCU.
-- All steppers of one multi-stepper axis must remain on the same MCU for multi-MCU homing/probing. For example, do not split `Z` and `Z1` across MCUs.
-- There can be a small physical stop delay while the trigger is relayed to other MCUs. The mechanism must safely tolerate that extra travel.
+## Lean first step: ten-contact coarse maximum
 
-## Motion details
+The only implemented search is a deliberately rough, fast locator. It exists
+to provide an approximate T0/T1 ball crown for a later refinement method.
 
-Call the probing move with `check_movement=False`. A general 3D contact move should be permitted even when it has no Z component or moves in a direction that ordinary probing validation would reject; safety still comes from explicit travel limits, a conservative target, and a sound mechanical design.
-
-Keep the two reported concepts separate:
-
-- **Trigger position:** the kinematically reconstructed XYZ position at the switch’s trigger timestamp. This is the measurement result.
-- **Halt position:** where the machine physically came to rest after deceleration and, in a multi-MCU setup, any relay delay. This matters for clearance and mechanics, not for the measured coordinate.
-
-Probe slowly—roughly 1–3 mm/s for the final approach is a sensible initial range. At 2 mm/s, a 25 ms worst-case inter-MCU stop delay corresponds to about 0.05 mm of additional physical travel.
-
-## First implementation: raw T0/T1 contact-height map
-
-The first useful implementation is deliberately a data-collection tool, not a
-calibration feature. It should make repeated vertical contact moves over the
-multi-head-zero area, save every raw trigger coordinate, and render those
-measurements. It must not fit a plane or surface, calculate tool offsets,
-write calibration values, or alter normal homing/probing behavior.
-
-### Initial measurement envelope
-
-The measured contact area begins at the known front-edge location:
-
-```text
-reference contact area: X=77 mm, Y=-14 mm, expected Z contact near 0 mm
-```
-
-`Y=-14` is close to the configured front soft limit, so the initial grid must
-extend only toward positive Y. The default first-pass raster is a 5 × 5 grid:
-
-```text
-X coordinates: 73, 75, 77, 79, 81 mm
-Y coordinates: -14, -12, -10, -8, -6 mm
-```
-
-This covers X=77 ±4 mm and the first 8 mm behind the front edge without
-commanding travel beyond the front boundary. The grid dimensions, spacing, and
-repeat count should be explicit command parameters when this is implemented;
-the values above are the initial safe default, not calibration data.
-
-Run the full grid independently for T0 and T1. Each commanded coordinate is an
-absolute machine coordinate after selecting the respective tool. Do not derive
-one tool's result from the other tool's offset or assume their contact maps are
-identical.
-
-### Per-point contact sequence
-
-For each tool and grid point:
-
-1. Require an idle, fully homed printer and select the requested tool.
-2. Move to a conservative clearance height, initially Z=5 mm, before every XY
-   travel move.
-3. Move to the grid X/Y coordinate, then descend to a fixed approach height,
-   initially Z=3 mm.
-4. Make a vertical contact move toward a conservative lower bound below the
-   expected Z=0 contact plane, initially Z=-1 mm, at 1–2 mm/s.
-5. On the multi-head-zero trigger, record Klipper's reconstructed trigger XYZ
-   coordinate as the raw measurement, retract to clearance, and repeat at the
-   same point.
-
-Use three repeats per grid point initially: 25 points × 3 samples = 75 raw
-samples per tool, 150 samples for one T0/T1 run. Traverse each Y row in
-alternating X direction (serpentine order) to reduce non-measurement travel;
-the saved coordinates, rather than traversal order, define the map.
-
-Before a full raster, require a guarded single-point trial at X=77, Y=-14 to
-confirm that the ball triggers near the expected Z range and has enough safe
-mechanical overtravel. A missing trigger, unexpected trigger, loss of homing,
-or motion-limit violation must abort the run immediately and retain the failed
-event in the run record; it must never silently continue with a fabricated
-height.
-
-### Raw data contract
-
-Store one immutable record per contact attempt in a run directory, with a
-machine-readable CSV plus a JSON run manifest. Each raw record should include:
-
-- run ID, timestamp, tool (`T0` or `T1`), sample index, grid row/column, and
-  commanded X/Y;
-- approach start Z, lower target Z, requested approach speed, and the raw
-  trigger X/Y/Z returned by Klipper;
-- whether the contact completed, failed, or was aborted, together with the
-  reason and the active configuration/source fingerprint.
-
-The source data remains append-only for the run. Do not average repeated
-measurements, apply offsets, subtract T0 from T1, remove outliers, or convert
-the values into fitted coefficients in this iteration.
-
-### First plots
-
-Generate plots directly from the raw records after a completed or aborted run:
-
-- a per-tool XY scatter plot, with each raw sample coloured by its raw trigger
-  Z;
-- for a complete rectangular grid, a raw trigger-Z contour and X/Z
-  cross-sections, one labelled line per Y coordinate.
-
-The acquisition-order trace is intentionally omitted: it does not help locate
-the ball. Grid contours are visual interpolations of explicitly labelled raw
-points only; neither mode may fit a surface or produce a T0-to-T1 correction
-map.
-
-### Adaptive maximum-search alternative
-
-Before taking a dense contour map, locate the highest directly observed contact
-point for each tool independently. This is a bounded coordinate hill-climb, not
-a ball fit and not a calibration operation.
-
-The initial safe envelope is deliberately wider than the first observed grid:
+The fixed safe envelope is:
 
 ```text
 X: 72 to 79 mm
 Y: -14.8 to -9 mm
 ```
 
-For each tool, the search must:
+For each tool independently:
 
-1. Measure a 3 × 3 seed grid spanning the full envelope.
-2. Select the seed point with the highest raw trigger Z.
-3. Measure unvisited X-/X+/Y-/Y+ neighbours at a 1.0 mm step. Advance as soon
-   as one improves the raw trigger Z by more than the small repeatability
-   threshold; otherwise reduce the step.
-4. When no neighbour improves, halve the step to 0.5 mm and then 0.2 mm.
-   Stop at 0.2 mm, after 30 contact attempts, or when the observed maximum is
-   at an envelope edge.
+1. Select the tool, home XYZ, clear the bed mesh, and require the normally
+   closed contact switch to be released.
+2. Measure a wide 3 × 3 seed grid spanning the envelope. Every attempt starts
+   from the configured approach height, probes toward the conservative lower-Z
+   target, and retracts to clearance.
+3. Exclude `no_contact` samples from fitting, while retaining them in the raw
+   records and plot.
+4. Fit the completed seed contacts to the normalized six-term quadratic
+   `z = c + bx*x + by*y + qxx*x^2 + qxy*x*y + qyy*y^2`.
+5. Require at least six completed contacts, full rank, acceptable conditioning,
+   a strictly negative-definite Hessian, and a vertex strictly inside the safe
+   envelope. Any failure aborts; there is no alternative or fallback search.
+6. Move to the fitted X/Y vertex and take exactly one tenth physical contact.
+   This contact must trigger and retract successfully.
 
-The search records every attempt. A point that reaches the conservative lower
-target without triggering is a `no_contact` record, retracts to clearance, and
-does not participate in the maximum comparison. A switch, motion, homing, or
-configuration fault still aborts immediately.
+The coarse paraboloid's fitted Z is not a calibration measurement: fitting the
+whole ball envelope overestimates the crown height. The result used downstream
+is therefore:
 
-Write the observed maximum's machine `X`, `Y`, and raw trigger `Z` to the JSON
-manifest and console output. Generate a single maximum-search plot showing the
-raw contact locations, no-contact locations, the measured-contact path, and
-the marked winner. Do not generate a contour from these sparse adaptive points.
+- X/Y: the fitted paraboloid vertex;
+- Z: the raw trigger Z from the tenth physical verification contact.
 
-Once a search terminates without being boundary-limited, use its reported X/Y
-as the centre for a separate 5 × 5 contour grid for that same tool. The grid is
-a later collection operation; the maximum search does not launch it itself.
+The live measurements observed approximately 0.18–0.20 mm XY disagreement
+between this coarse result and the former 19-contact local refinement. The
+tenth raw Z agreed within 0.000–0.0025 mm in those runs. For planning, treat the
+coarse locator as roughly 0.25 mm in XY and 0.01 mm in Z, not as final metrology.
 
-## Next steps
+## Artifacts and calibration
 
-1. Define the ball/switch mechanics, allowable overtravel, and retraction strategy.
-2. Prototype the custom contact-probe object and a guarded single-point contact
-   command at X=77, Y=-14.
-3. Use the adaptive maximum search for T0 and T1, then centre a separate 5 × 5
-   grid on each observed maximum.
-4. Inspect repeatability, trigger-position versus halt-position behavior, and
-   the raw T0/T1 maps before deciding whether any fitting or calibration is
-   justified.
+Each run writes an immutable CSV plus a schema-v3 JSON manifest. Records include
+the tool, phase, commanded X/Y, contact status, approach parameters, trigger and
+halt coordinates, and final retraction state. The manifest stores the fit
+coefficients and normalization, rank, condition number, RMSE, curvature,
+predicted vertex, highest raw contact, and verified coarse point.
+
+The single plot is named `T0_maximum_search.png` or
+`T1_maximum_search.png`. It shows seed contacts, no-contact markers, fitted
+contours, the highest raw contact, and the fitted/verified XY vertex. The title
+always identifies the tool.
+
+Calibration and deployment are separate from measurement acquisition. First,
+complete one paired 18-contact run for T0 and T1 with the same source
+configuration. Only after both runs have completed successfully may the helper
+calculate the calibration values and prepare a deployable result. It adjusts
+only T1:
+
+- subtract the measured T1-minus-T0 X/Y difference from the T1 X/Y endstops;
+- add the measured T1-minus-T0 raw-Z difference to the T1 Z endstop;
+- preserve T0 values, regenerate `printer.cfg`, and require the normal deploy
+  and parity check.
+
+After deployment, run a separate, deliberately quick five-contact verification
+for each toolhead using a common verification pattern under that deployed
+configuration.
+This verification is measurement-only: it must report the residual T0/T1 X/Y/Z
+alignment and pass/fail result, but it must not calculate, write, or deploy
+another calibration. Its purpose is to demonstrate that the just-deployed
+calibration aligned T0 and T1, not to fold verification data back into it.
+
+## Phase 2: eight-contact ring refinement
+
+Phase 1 and phase 2 have deliberately different jobs:
+
+- **Phase 1:** nine seed contacts plus one physical summit contact provide a
+  rough X/Y centre and an excellent measured `z_max` at the ball crown.
+- **Phase 2:** eight contacts on a ring provide the accurate X/Y centre. The
+  ring intentionally moves down the sphere, where a horizontal position error
+  produces a strong and measurable Z variation.
+
+This is not another search, and it is not a local two-step sphere fit. Start
+with the rough phase-1 centre `(x_rough, y_rough)`, known ball radius
+`R = 5 mm`, and the known summit height `z_max`. Command eight equally spaced
+contacts on a circle of radius `r = 3.5 mm`:
+
+```text
+theta_i = 0, 45, ..., 315 degrees
+x_i = x_rough + r * cos(theta_i)
+y_i = y_rough + r * sin(theta_i)
+```
+
+Collect the eight trigger heights `z_i` and fit their first Fourier harmonic:
+
+```text
+z(theta) ~= C + A * cos(theta) + B * sin(theta)
+
+A = (2 / 8) * sum(z_i * cos(theta_i))
+B = (2 / 8) * sum(z_i * sin(theta_i))
+```
+
+The displacement from the rough centre to the ball centre is then:
+
+```text
+dx = A * sqrt(R^2 - r^2) / r
+dy = B * sqrt(R^2 - r^2) / r
+
+x_refined = x_rough + dx
+y_refined = y_rough + dy
+```
+
+For `R = 5 mm` and `r = 3.5 mm`, the scale factor
+`sqrt(R^2 - r^2) / r` is about `1.0202`. Thus the first-harmonic Z amplitude
+has nearly 1:1 micrometre sensitivity to the XY error. A constant Z offset
+cancels from `A` and `B`, so `z_max` is not required for the XY estimate.
+
+The excellent phase-1 `z_max` remains useful as a diagnostic. It predicts each
+ring contact using the exact known sphere; the eight residuals can validate the
+contacts and, if wanted, support a two-parameter least-squares refinement of
+only `(dx, dy)`. The sphere radius and top height are fixed--there is no sphere
+fit and no second local search.
+
+```python
+import numpy as np
+
+
+R_BALL = 5.0
+R_CIRCLE = 3.5
+N_TAPS = 8
+
+
+def make_ring_points(x_rough, y_rough, r_circle=R_CIRCLE, n=N_TAPS):
+    """Return equally spaced angles and XY contact targets around rough XY."""
+    theta = np.arange(n) * 2.0 * np.pi / n
+    xy = np.column_stack((
+        x_rough + r_circle * np.cos(theta),
+        y_rough + r_circle * np.sin(theta),
+    ))
+    return theta, xy
+
+
+def fit_xy_from_ring(x_rough, y_rough, theta, z,
+                     r_ball=R_BALL, r_circle=R_CIRCLE):
+    """First-harmonic estimate of the true ball centre from ring contacts."""
+    theta = np.asarray(theta)
+    z = np.asarray(z)
+    if len(theta) != len(z):
+        raise ValueError("theta and z must have the same length")
+
+    # z(theta) ~= C + A*cos(theta) + B*sin(theta)
+    A = 2.0 / len(theta) * np.sum(z * np.cos(theta))
+    B = 2.0 / len(theta) * np.sum(z * np.sin(theta))
+    scale = np.sqrt(r_ball**2 - r_circle**2) / r_circle
+
+    dx = scale * A
+    dy = scale * B
+    return x_rough + dx, y_rough + dy
+
+
+def sphere_z(xy, x_center, y_center, z_max, r_ball=R_BALL):
+    """Exact expected Z on the upper hemisphere; used for diagnostics."""
+    xy = np.asarray(xy)
+    radial_sq = (xy[:, 0] - x_center)**2 + (xy[:, 1] - y_center)**2
+    return z_max - r_ball + np.sqrt(r_ball**2 - radial_sq)
+
+
+def calibrate_xy(x_rough, y_rough, z_max, tap_function):
+    """
+    tap_function(xy_points) returns the eight measured trigger Z values.
+
+    z_max is not needed by the harmonic estimate. It is retained to check the
+    exact-sphere residuals produced by the resulting XY centre.
+    """
+    theta, ring_xy = make_ring_points(x_rough, y_rough)
+    ring_z = np.asarray(tap_function(ring_xy))
+    x_fit, y_fit = fit_xy_from_ring(x_rough, y_rough, theta, ring_z)
+
+    residuals = ring_z - sphere_z(ring_xy, x_fit, y_fit, z_max)
+    return {
+        "x": x_fit,
+        "y": y_fit,
+        "z": z_max,
+        "dx": x_fit - x_rough,
+        "dy": y_fit - y_rough,
+        "ring_xy": ring_xy,
+        "ring_z": ring_z,
+        "sphere_residuals": residuals,
+    }
+```

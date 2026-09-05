@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect raw multi-head-zero contacts and render non-fitted plots on the Pi."""
+"""Locate the multi-head-zero crown with ten guarded contact attempts."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import argparse
 import csv
 import datetime as dt
 import json
-import os
 import sys
 import urllib.error
 import urllib.parse
@@ -23,14 +22,13 @@ from matplotlib import pyplot as plt
 
 DEFAULT_MOONRAKER_URL = "http://127.0.0.1:7125"
 DEFAULT_OUTPUT_DIR = "~/printer_data/config/multi_head_zero_probe/runs"
-MAX_SEARCH_X_MIN = 72.0
-MAX_SEARCH_X_MAX = 79.0
-MAX_SEARCH_Y_MIN = -14.8
-MAX_SEARCH_Y_MAX = -9.0
-MAX_SEARCH_INITIAL_STEP = 1.0
-MAX_SEARCH_MIN_STEP = 0.2
-MAX_SEARCH_CONTACT_LIMIT = 30
-MAX_SEARCH_IMPROVEMENT_EPSILON = 0.005
+SEARCH_X_MIN = 72.0
+SEARCH_X_MAX = 79.0
+SEARCH_Y_MIN = -14.8
+SEARCH_Y_MAX = -9.0
+FIT_CONDITION_LIMIT = 1.0e6
+FIT_CONCAVITY_EPSILON = 1.0e-6
+CONTACT_COUNT = 10
 
 
 class ContactMapError(RuntimeError):
@@ -82,37 +80,18 @@ def status(moonraker_url):
     return payload["result"]["status"]
 
 
-def parse_values(value, option):
-    try:
-        values = [float(part.strip()) for part in value.split(",") if part.strip()]
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError(
-            "%s must be a comma-separated list of numbers" % option
-        ) from exc
-    if not values:
-        raise argparse.ArgumentTypeError("%s must not be empty" % option)
-    return values
-
-
 def build_parser():
     parser = argparse.ArgumentParser(
-        description="Collect raw multi-head-zero contact heights and render raw plots."
+        description=(
+            "Locate the multi-head-zero crown from a wide 3x3 seed and one "
+            "physical verification contact."
+        )
     )
     parser.add_argument("--tool", choices=("T0", "T1"), default="T0")
-    parser.add_argument(
-        "--x-values", default="75.2,75.6,76,76.4,76.8,77.2,77.6,78,78.4,78.8"
-    )
-    parser.add_argument(
-        "--y-values", default="-14.8,-14.4,-14,-13.6,-13.2,-12.8,-12.4,-12,-11.6,-11.2"
-    )
-    parser.add_argument("--repeats", type=int, default=1)
-    parser.add_argument("--strategy", choices=("grid", "max-search"), default="grid")
-    parser.add_argument("--x-min", type=float, default=MAX_SEARCH_X_MIN)
-    parser.add_argument("--x-max", type=float, default=MAX_SEARCH_X_MAX)
-    parser.add_argument("--y-min", type=float, default=MAX_SEARCH_Y_MIN)
-    parser.add_argument("--y-max", type=float, default=MAX_SEARCH_Y_MAX)
-    parser.add_argument("--max-contacts", type=int, default=MAX_SEARCH_CONTACT_LIMIT)
-    parser.add_argument("--min-step", type=float, default=MAX_SEARCH_MIN_STEP)
+    parser.add_argument("--x-min", type=float, default=SEARCH_X_MIN)
+    parser.add_argument("--x-max", type=float, default=SEARCH_X_MAX)
+    parser.add_argument("--y-min", type=float, default=SEARCH_Y_MIN)
+    parser.add_argument("--y-max", type=float, default=SEARCH_Y_MAX)
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--run-name")
     parser.add_argument("--moonraker-url", default=DEFAULT_MOONRAKER_URL)
@@ -127,7 +106,9 @@ def build_parser():
 def run_name(value):
     if value:
         return value
-    return dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ_T0_contact_map")
+    return dt.datetime.now(dt.timezone.utc).strftime(
+        "%Y%m%dT%H%M%SZ_T0_coarse_maximum_search"
+    )
 
 
 def write_artifacts(output_dir, manifest, records):
@@ -157,29 +138,22 @@ def perform_contact(
     x,
     y,
     sample_index,
-    allow_no_contact,
-    **record_fields,
+    phase,
 ):
-    command = "MULTI_HEAD_ZERO_CONTACT X=%.3f Y=%.3f TOOL=%d" % (
+    command = "MULTI_HEAD_ZERO_CONTACT X=%.3f Y=%.3f TOOL=%d ALLOW_NO_CONTACT=1" % (
         x,
         y,
         tool_index,
     )
-    if allow_no_contact:
-        command += " ALLOW_NO_CONTACT=1"
     record = {
         "sample_index": sample_index,
         "commanded_x": x,
         "commanded_y": y,
         "tool": tool,
         "command": command,
-        **record_fields,
+        "phase": phase,
     }
     try:
-        # Moonraker accepts scripts before their motion has completed. M400
-        # makes this request synchronous from the runner's perspective, so the
-        # following status read belongs to this contact rather than the prior
-        # one.
         run_gcode(moonraker_url, command + "\nM400")
     except ContactMapError as exc:
         record["status"] = "failed"
@@ -211,76 +185,6 @@ def completed_records(records):
     return [record for record in records if record.get("status") == "completed"]
 
 
-def render_grid_plots(output_dir, tool, records):
-    complete = completed_records(records)
-    if not complete:
-        return None
-    x_values = [record["commanded_x"] for record in complete]
-    y_values = [record["commanded_y"] for record in complete]
-    z_values = [record["trigger_z"] for record in complete]
-    figure, axes = plt.subplots(1, 3, figsize=(18, 5), constrained_layout=True)
-    scatter = axes[0].scatter(x_values, y_values, c=z_values, cmap="viridis", s=100)
-    axes[0].set_title("Raw multi-head-zero trigger Z by commanded XY (%s)" % tool)
-    axes[0].set_xlabel("Commanded X (mm)")
-    axes[0].set_ylabel("Commanded Y (mm)")
-    axes[0].grid(True, alpha=0.3)
-    figure.colorbar(scatter, ax=axes[0], label="Raw trigger Z (mm)")
-    unique_x = sorted(set(x_values))
-    unique_y = sorted(set(y_values))
-    grid_records = {
-        (record["commanded_x"], record["commanded_y"]): record["trigger_z"]
-        for record in complete
-    }
-    if len(grid_records) == len(unique_x) * len(unique_y) == len(complete):
-        x_grid, y_grid = np.meshgrid(unique_x, unique_y)
-        z_grid = np.array(
-            [
-                [grid_records[(x_value, y_value)] for x_value in unique_x]
-                for y_value in unique_y
-            ]
-        )
-        contour = axes[1].contourf(x_grid, y_grid, z_grid, levels=12, cmap="viridis")
-        lines = axes[1].contour(
-            x_grid, y_grid, z_grid, levels=8, colors="white", linewidths=0.8
-        )
-        axes[1].clabel(lines, inline=True, fontsize=8, fmt="%.3f")
-        figure.colorbar(contour, ax=axes[1], label="Raw trigger Z (mm)")
-        axes[1].set_title("Raw trigger-Z contour (%s)" % tool)
-        axes[1].set_xlabel("Commanded X (mm)")
-        axes[1].set_ylabel("Commanded Y (mm)")
-        axes[1].grid(True, alpha=0.3)
-    else:
-        axes[1].text(
-            0.5,
-            0.5,
-            "Contour requires one raw\nmeasurement per XY grid point.",
-            ha="center",
-            va="center",
-            transform=axes[1].transAxes,
-        )
-        axes[1].set_axis_off()
-    for y_value in unique_y:
-        row = sorted(
-            (record for record in complete if record["commanded_y"] == y_value),
-            key=lambda record: record["commanded_x"],
-        )
-        axes[2].plot(
-            [record["commanded_x"] for record in row],
-            [record["trigger_z"] for record in row],
-            "o-",
-            label="Y=%.1f" % y_value,
-        )
-    axes[2].set_title("Raw X/Z cross-sections (%s)" % tool)
-    axes[2].set_xlabel("Commanded X (mm)")
-    axes[2].set_ylabel("Raw trigger Z (mm)")
-    axes[2].grid(True, alpha=0.3)
-    axes[2].legend(title="Commanded Y", fontsize=8, ncol=2)
-    plot_path = output_dir / ("%s_raw_contact_map.png" % tool)
-    figure.savefig(plot_path, dpi=200)
-    plt.close(figure)
-    return plot_path
-
-
 def is_within_bounds(x, y, bounds):
     return (
         bounds["x_min"] <= x <= bounds["x_max"]
@@ -288,149 +192,242 @@ def is_within_bounds(x, y, bounds):
     )
 
 
-def point_key(x, y):
-    return (round(x, 3), round(y, 3))
-
-
-def is_boundary_point(record, bounds):
-    x = record["commanded_x"]
-    y = record["commanded_y"]
-    return any(
-        abs(value - boundary) < 0.001
-        for value, boundary in (
-            (x, bounds["x_min"]),
-            (x, bounds["x_max"]),
-            (y, bounds["y_min"]),
-            (y, bounds["y_max"]),
-        )
+def is_strictly_within_bounds(x, y, bounds, margin=0.001):
+    return (
+        bounds["x_min"] + margin < x < bounds["x_max"] - margin
+        and bounds["y_min"] + margin < y < bounds["y_max"] - margin
     )
 
 
-def run_maximum_search(args, tool_index, records):
+def maximum_payload(record):
+    return {
+        "sample_index": record["sample_index"],
+        "x": record["commanded_x"],
+        "y": record["commanded_y"],
+        "trigger_z": record["trigger_z"],
+    }
+
+
+def fit_paraboloid(records, bounds):
+    complete = completed_records(records)
+    result = {
+        "model": "normalized_quadratic_paraboloid",
+        "status": "invalid",
+        "sample_count": len(complete),
+        "validation_errors": [],
+    }
+    if len(complete) < 6:
+        result["validation_errors"].append("insufficient_contacts")
+        return result
+
+    x_values = np.asarray(
+        [float(record["commanded_x"]) for record in complete], dtype=float
+    )
+    y_values = np.asarray(
+        [float(record["commanded_y"]) for record in complete], dtype=float
+    )
+    z_values = np.asarray(
+        [float(record["trigger_z"]) for record in complete], dtype=float
+    )
+    origin = np.asarray([x_values.mean(), y_values.mean()])
+    scale = np.asarray([np.ptp(x_values) / 2.0, np.ptp(y_values) / 2.0])
+    if np.any(scale <= 1.0e-9):
+        result["validation_errors"].append("degenerate_xy_span")
+        return result
+
+    u_values = (x_values - origin[0]) / scale[0]
+    v_values = (y_values - origin[1]) / scale[1]
+    design = np.column_stack(
+        (
+            np.ones(len(complete)),
+            u_values,
+            v_values,
+            u_values**2,
+            u_values * v_values,
+            v_values**2,
+        )
+    )
+    coefficients, _, rank, singular_values = np.linalg.lstsq(
+        design, z_values, rcond=None
+    )
+    fitted_values = design @ coefficients
+    condition_number = (
+        float(singular_values[0] / singular_values[-1])
+        if singular_values[-1] > 0.0
+        else None
+    )
+    hessian = np.asarray(
+        [
+            [2.0 * coefficients[3], coefficients[4]],
+            [coefficients[4], 2.0 * coefficients[5]],
+        ]
+    )
+    eigenvalues = np.linalg.eigvalsh(hessian)
+    machine_hessian = hessian / np.outer(scale, scale)
+    result.update(
+        {
+            "origin": {"x": float(origin[0]), "y": float(origin[1])},
+            "scale": {"x": float(scale[0]), "y": float(scale[1])},
+            "coefficients": {
+                "constant": float(coefficients[0]),
+                "x": float(coefficients[1]),
+                "y": float(coefficients[2]),
+                "xx": float(coefficients[3]),
+                "xy": float(coefficients[4]),
+                "yy": float(coefficients[5]),
+            },
+            "rank": int(rank),
+            "condition_number": condition_number,
+            "rmse_mm": float(np.sqrt(np.mean((fitted_values - z_values) ** 2))),
+            "machine_hessian_eigenvalues_per_mm": [
+                float(value) for value in np.linalg.eigvalsh(machine_hessian)
+            ],
+        }
+    )
+    if rank != 6:
+        result["validation_errors"].append("rank_deficient")
+    if condition_number is None or condition_number > FIT_CONDITION_LIMIT:
+        result["validation_errors"].append("ill_conditioned")
+    if not np.all(eigenvalues < -FIT_CONCAVITY_EPSILON):
+        result["validation_errors"].append("not_strictly_concave")
+
+    try:
+        normalized_vertex = -np.linalg.solve(hessian, coefficients[1:3])
+    except np.linalg.LinAlgError:
+        result["validation_errors"].append("singular_hessian")
+        return result
+    vertex = origin + scale * normalized_vertex
+    vertex_design = np.asarray(
+        [
+            1.0,
+            normalized_vertex[0],
+            normalized_vertex[1],
+            normalized_vertex[0] ** 2,
+            normalized_vertex[0] * normalized_vertex[1],
+            normalized_vertex[1] ** 2,
+        ]
+    )
+    result["predicted_maximum"] = {
+        "x": float(vertex[0]),
+        "y": float(vertex[1]),
+        "z": float(vertex_design @ coefficients),
+    }
+    if not is_within_bounds(vertex[0], vertex[1], bounds):
+        result["validation_errors"].append("vertex_outside_search_bounds")
+    elif not is_strictly_within_bounds(vertex[0], vertex[1], bounds):
+        result["validation_errors"].append("vertex_on_search_boundary")
+    if not result["validation_errors"]:
+        result["status"] = "valid"
+    return result
+
+
+def evaluate_paraboloid(fit, x_values, y_values):
+    coefficients = fit["coefficients"]
+    origin = fit["origin"]
+    scale = fit["scale"]
+    u_values = (np.asarray(x_values) - origin["x"]) / scale["x"]
+    v_values = (np.asarray(y_values) - origin["y"]) / scale["y"]
+    return (
+        coefficients["constant"]
+        + coefficients["x"] * u_values
+        + coefficients["y"] * v_values
+        + coefficients["xx"] * u_values**2
+        + coefficients["xy"] * u_values * v_values
+        + coefficients["yy"] * v_values**2
+    )
+
+
+def run_maximum_search(args, tool_index, records, contact_function=perform_contact):
     bounds = {
         "x_min": args.x_min,
         "x_max": args.x_max,
         "y_min": args.y_min,
         "y_max": args.y_max,
     }
-    seed_x_values = np.linspace(args.x_min, args.x_max, 3).tolist()
-    seed_y_values = np.linspace(args.y_min, args.y_max, 3).tolist()
-    visited = set()
-
-    def sample(x, y, phase, step_mm=None, candidate_direction=None):
-        if len(records) >= args.max_contacts:
-            return None
-        key = point_key(x, y)
-        if key in visited:
-            return None
-        visited.add(key)
-        record = perform_contact(
-            args.moonraker_url,
-            tool=args.tool,
-            tool_index=tool_index,
-            x=x,
-            y=y,
-            sample_index=len(records) + 1,
-            allow_no_contact=True,
-            phase=phase,
-            step_mm=step_mm,
-            candidate_direction=candidate_direction,
-        )
-        records.append(record)
-        return record
-
-    for y in seed_y_values:
-        for x in seed_x_values:
-            sample(x, y, "coarse_seed")
-    eligible = completed_records(records)
-    if not eligible:
-        raise ContactMapError("maximum search found no contact in its 3x3 seed")
-    current = max(eligible, key=lambda record: record["trigger_z"])
-    step_mm = MAX_SEARCH_INITIAL_STEP
-    termination_reason = None
-    while True:
-        if len(records) >= args.max_contacts:
-            termination_reason = "contact_budget"
-            break
-        candidates = []
-        for direction, delta_x, delta_y in (
-            ("x_minus", -step_mm, 0.0),
-            ("x_plus", step_mm, 0.0),
-            ("y_minus", 0.0, -step_mm),
-            ("y_plus", 0.0, step_mm),
-        ):
-            x = current["commanded_x"] + delta_x
-            y = current["commanded_y"] + delta_y
-            if is_within_bounds(x, y, bounds) and point_key(x, y) not in visited:
-                candidates.append((direction, x, y))
-        improved = False
-        for direction, x, y in candidates:
-            record = sample(x, y, "ascent", step_mm, direction)
-            if (
-                record is not None
-                and record.get("status") == "completed"
-                and record["trigger_z"]
-                > current["trigger_z"] + MAX_SEARCH_IMPROVEMENT_EPSILON
-            ):
-                current = record
-                improved = True
-                break
-            if len(records) >= args.max_contacts:
-                break
-        if improved:
-            continue
-        if len(records) >= args.max_contacts:
-            termination_reason = "contact_budget"
-            break
-        if step_mm <= args.min_step:
-            termination_reason = (
-                "boundary_limited"
-                if is_boundary_point(current, bounds)
-                else "converged"
+    for y in np.linspace(args.y_min, args.y_max, 3):
+        for x in np.linspace(args.x_min, args.x_max, 3):
+            record = contact_function(
+                args.moonraker_url,
+                tool=args.tool,
+                tool_index=tool_index,
+                x=float(x),
+                y=float(y),
+                sample_index=len(records) + 1,
+                phase="coarse_seed",
             )
-            break
-        step_mm = max(args.min_step, step_mm / 2.0)
+            records.append(record)
+
+    fit = fit_paraboloid(records, bounds)
+    if fit["status"] != "valid":
+        raise ContactMapError(
+            "coarse paraboloid fit invalid: %s" % ", ".join(fit["validation_errors"])
+        )
+    predicted = fit["predicted_maximum"]
+    verification = contact_function(
+        args.moonraker_url,
+        tool=args.tool,
+        tool_index=tool_index,
+        x=predicted["x"],
+        y=predicted["y"],
+        sample_index=CONTACT_COUNT,
+        phase="coarse_fit_verification",
+    )
+    records.append(verification)
+    if verification.get("status") != "completed":
+        raise ContactMapError(
+            "coarse fitted vertex produced no contact", record=verification
+        )
     maximum = max(completed_records(records), key=lambda record: record["trigger_z"])
     return {
+        "algorithm": "coarse_paraboloid_10_contact_v1",
         "bounds": bounds,
+        "contact_count": CONTACT_COUNT,
         "seed_grid_size": 3,
-        "initial_step_mm": MAX_SEARCH_INITIAL_STEP,
-        "minimum_step_mm": args.min_step,
-        "maximum_contacts": args.max_contacts,
-        "improvement_epsilon_mm": MAX_SEARCH_IMPROVEMENT_EPSILON,
-        "termination_reason": termination_reason,
-        "found_maximum": {
-            "sample_index": maximum["sample_index"],
-            "x": maximum["commanded_x"],
-            "y": maximum["commanded_y"],
-            "trigger_z": maximum["trigger_z"],
-        },
+        "termination_reason": "coarse_verified",
+        "fit_status": "valid",
+        "fit": fit,
+        "found_maximum": maximum_payload(maximum),
+        "predicted_maximum": predicted,
+        "verified_maximum": maximum_payload(verification),
     }
 
 
 def render_maximum_search(output_dir, tool, records, search_summary):
     complete = completed_records(records)
+    fit = search_summary["fit"]
+    bounds = search_summary["bounds"]
     figure, axis = plt.subplots(figsize=(8, 6), constrained_layout=True)
-    if complete:
-        scatter = axis.scatter(
-            [record["commanded_x"] for record in complete],
-            [record["commanded_y"] for record in complete],
-            c=[record["trigger_z"] for record in complete],
-            cmap="viridis",
-            s=90,
-            zorder=3,
-        )
-        figure.colorbar(scatter, ax=axis, label="Raw trigger Z (mm)")
-        ordered = sorted(complete, key=lambda record: record["sample_index"])
-        axis.plot(
-            [record["commanded_x"] for record in ordered],
-            [record["commanded_y"] for record in ordered],
-            "--",
-            color="0.35",
-            alpha=0.7,
-            zorder=1,
-            label="Measured-contact path",
-        )
+    fit_x = np.linspace(bounds["x_min"], bounds["x_max"], 100)
+    fit_y = np.linspace(bounds["y_min"], bounds["y_max"], 100)
+    fit_x_grid, fit_y_grid = np.meshgrid(fit_x, fit_y)
+    fit_contours = axis.contour(
+        fit_x_grid,
+        fit_y_grid,
+        evaluate_paraboloid(fit, fit_x_grid, fit_y_grid),
+        levels=10,
+        colors="black",
+        linewidths=0.7,
+        alpha=0.45,
+        zorder=2,
+    )
+    axis.clabel(fit_contours, inline=True, fontsize=7, fmt="%.3f")
+    axis.plot(
+        [],
+        [],
+        color="black",
+        alpha=0.45,
+        linewidth=0.7,
+        label="Coarse fitted paraboloid",
+    )
+    scatter = axis.scatter(
+        [record["commanded_x"] for record in complete],
+        [record["commanded_y"] for record in complete],
+        c=[record["trigger_z"] for record in complete],
+        cmap="viridis",
+        s=90,
+        zorder=3,
+    )
+    figure.colorbar(scatter, ax=axis, label="Raw trigger Z (mm)")
     no_contacts = [record for record in records if record.get("status") == "no_contact"]
     if no_contacts:
         axis.scatter(
@@ -443,36 +440,59 @@ def render_maximum_search(output_dir, tool, records, search_summary):
             zorder=4,
             label="No contact at target Z",
         )
-    maximum = search_summary["found_maximum"]
+    observed = search_summary["found_maximum"]
+    predicted = search_summary["predicted_maximum"]
+    verified = search_summary["verified_maximum"]
     axis.scatter(
-        [maximum["x"]],
-        [maximum["y"]],
+        [observed["x"]],
+        [observed["y"]],
         marker="*",
         color="gold",
         edgecolors="black",
         s=260,
         zorder=5,
-        label="Observed maximum",
+        label="Highest raw contact",
     )
-    axis.annotate(
-        "max: X=%.3f, Y=%.3f, Z=%.4f"
-        % (maximum["x"], maximum["y"], maximum["trigger_z"]),
-        (maximum["x"], maximum["y"]),
-        xytext=(8, 8),
-        textcoords="offset points",
+    axis.scatter(
+        [predicted["x"]],
+        [predicted["y"]],
+        marker="D",
+        facecolors="none",
+        edgecolors="deepskyblue",
+        linewidths=2,
+        s=130,
+        zorder=6,
+        label="Fitted and verified XY",
     )
-    bounds = search_summary["bounds"]
+    axis.scatter(
+        [verified["x"]],
+        [verified["y"]],
+        marker="o",
+        facecolors="none",
+        edgecolors="white",
+        linewidths=2,
+        s=210,
+        zorder=7,
+    )
     axis.set_xlim(bounds["x_min"], bounds["x_max"])
     axis.set_ylim(bounds["y_min"], bounds["y_max"])
     axis.set_aspect("equal", adjustable="box")
-    axis.set_title(
-        "Adaptive multi-head-zero maximum search (%s, %s)"
-        % (tool, search_summary["termination_reason"])
-    )
+    axis.set_title("10-contact multi-head-zero coarse search (%s)" % tool)
     axis.set_xlabel("Commanded X (mm)")
     axis.set_ylabel("Commanded Y (mm)")
     axis.grid(True, alpha=0.3)
-    axis.legend(loc="best")
+    axis.text(
+        0.02,
+        0.02,
+        "Fitted/verified XY: %.3f, %.3f\nVerified raw Z: %.4f"
+        % (verified["x"], verified["y"], verified["trigger_z"]),
+        transform=axis.transAxes,
+        va="bottom",
+        fontsize=9,
+        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.85},
+        zorder=8,
+    )
+    axis.legend(loc="upper right", fontsize=8)
     plot_path = output_dir / ("%s_maximum_search.png" % tool)
     figure.savefig(plot_path, dpi=200)
     plt.close(figure)
@@ -481,21 +501,8 @@ def render_maximum_search(output_dir, tool, records, search_summary):
 
 def main(argv):
     args = build_parser().parse_args(argv)
-    if args.repeats < 1 or args.repeats > 8:
-        raise ContactMapError("--repeats must be in 1..8")
-    x_values = parse_values(args.x_values, "--x-values")
-    y_values = parse_values(args.y_values, "--y-values")
-    if args.strategy == "grid" and len(x_values) * len(y_values) * args.repeats > 128:
-        raise ContactMapError(
-            "refusing more than 128 raw contacts in one first-iteration run"
-        )
-    if args.strategy == "max-search":
-        if not args.x_min < args.x_max or not args.y_min < args.y_max:
-            raise ContactMapError("maximum-search bounds must have a positive span")
-        if args.max_contacts < 9 or args.max_contacts > 128:
-            raise ContactMapError("--max-contacts must be in 9..128")
-        if args.min_step <= 0.0 or args.min_step > MAX_SEARCH_INITIAL_STEP:
-            raise ContactMapError("--min-step must be in (0, 1.0]")
+    if not args.x_min < args.x_max or not args.y_min < args.y_max:
+        raise ContactMapError("search bounds must have a positive span")
     tool_index = int(args.tool[-1])
     run_id = run_name(args.run_name).replace("T0", args.tool)
     output_dir = Path(args.output_dir).expanduser() / run_id
@@ -504,13 +511,10 @@ def main(argv):
     if start_status.get("webhooks", {}).get("state") != "ready":
         raise ContactMapError("Klipper is not ready")
     manifest = {
-        "schema_version": 1,
+        "schema_version": 3,
         "run_id": run_id,
         "tool": args.tool,
-        "strategy": args.strategy,
-        "x_values": x_values,
-        "y_values": y_values,
-        "repeats": args.repeats,
+        "strategy": "coarse-max-search",
         "started_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "initial_status": start_status,
         "status": "running",
@@ -525,32 +529,10 @@ def main(argv):
         raise ContactMapError("preparation did not establish XYZ homing")
     if prepared_status.get("multi_head_zero_probe", {}).get("state") == "TRIGGERED":
         raise ContactMapError("multi-head-zero is already triggered before the run")
-    sample_index = 0
     search_summary = None
     try:
-        if args.strategy == "max-search":
-            search_summary = run_maximum_search(args, tool_index, records)
-            manifest["maximum_search"] = search_summary
-        else:
-            for row_index, y in enumerate(y_values):
-                row_x_values = (
-                    x_values if row_index % 2 == 0 else list(reversed(x_values))
-                )
-                for x in row_x_values:
-                    for repeat_index in range(args.repeats):
-                        sample_index += 1
-                        record = perform_contact(
-                            args.moonraker_url,
-                            tool=args.tool,
-                            tool_index=tool_index,
-                            x=x,
-                            y=y,
-                            sample_index=sample_index,
-                            allow_no_contact=False,
-                            row_index=row_index,
-                            repeat_index=repeat_index,
-                        )
-                        records.append(record)
+        search_summary = run_maximum_search(args, tool_index, records)
+        manifest["maximum_search"] = search_summary
     except Exception as exc:
         failed_record = getattr(exc, "record", None)
         if failed_record is not None and failed_record not in records:
@@ -566,23 +548,21 @@ def main(argv):
     plot_path = (
         render_maximum_search(output_dir, args.tool, records, search_summary)
         if search_summary is not None
-        else render_grid_plots(output_dir, args.tool, records)
+        else None
     )
     print("Manifest: %s" % manifest_path)
     print("Records: %s" % csv_path)
     if plot_path is not None:
         print("Plot: %s" % plot_path)
-    if search_summary is not None:
-        maximum = search_summary["found_maximum"]
+        predicted = search_summary["predicted_maximum"]
+        verified = search_summary["verified_maximum"]
         print(
-            "Observed maximum: %s X=%.3f Y=%.3f raw Z=%.6f (%s)"
-            % (
-                args.tool,
-                maximum["x"],
-                maximum["y"],
-                maximum["trigger_z"],
-                search_summary["termination_reason"],
-            )
+            "Coarse fitted maximum: %s X=%.6f Y=%.6f fitted Z=%.6f"
+            % (args.tool, predicted["x"], predicted["y"], predicted["z"])
+        )
+        print(
+            "Verified coarse point: %s X=%.6f Y=%.6f raw Z=%.6f"
+            % (args.tool, verified["x"], verified["y"], verified["trigger_z"])
         )
     if manifest["status"] != "completed":
         raise ContactMapError(manifest["error"])

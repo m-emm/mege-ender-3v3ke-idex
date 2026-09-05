@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply a T1 IDEX calibration candidate from two maximum-search manifests."""
+"""Apply T1 IDEX endstops from paired ten-contact coarse-search manifests."""
 
 from __future__ import annotations
 
@@ -30,8 +30,8 @@ class CalibrationError(RuntimeError):
 def build_parser():
     parser = argparse.ArgumentParser(
         description=(
-            "Update tools.t1 endstops from converged T0/T1 multi-head-zero "
-            "maximum searches."
+            "Update tools.t1 endstops from verified T0/T1 ten-contact "
+            "multi-head-zero searches."
         )
     )
     parser.add_argument("--t0-run", type=Path, required=True)
@@ -63,17 +63,27 @@ def load_run(run_dir, expected_tool):
         raise CalibrationError(
             "%s is not a %s maximum-search run" % (manifest_path, expected_tool)
         )
+    if manifest.get("schema_version") != 3:
+        raise CalibrationError("%s is not a ten-contact schema-v3 run" % manifest_path)
     if (
-        manifest.get("strategy") != "max-search"
+        manifest.get("strategy") != "coarse-max-search"
         or manifest.get("status") != "completed"
     ):
-        raise CalibrationError("%s is not a completed maximum search" % manifest_path)
+        raise CalibrationError(
+            "%s is not a completed coarse maximum search" % manifest_path
+        )
     search = manifest.get("maximum_search")
-    if not isinstance(search, dict) or search.get("termination_reason") != "converged":
-        raise CalibrationError("%s did not converge" % manifest_path)
-    maximum = search.get("found_maximum")
+    if (
+        not isinstance(search, dict)
+        or search.get("algorithm") != "coarse_paraboloid_10_contact_v1"
+        or search.get("termination_reason") != "coarse_verified"
+        or search.get("fit_status") != "valid"
+        or search.get("contact_count") != 10
+    ):
+        raise CalibrationError("%s has no valid ten-contact result" % manifest_path)
+    maximum = search.get("verified_maximum")
     if not isinstance(maximum, dict):
-        raise CalibrationError("%s has no observed maximum" % manifest_path)
+        raise CalibrationError("%s has no verified coarse point" % manifest_path)
     return {
         "manifest": manifest,
         "x": _finite(maximum.get("x"), "%s maximum X" % expected_tool),
@@ -197,7 +207,7 @@ def main(argv):
     source = verify_sources(t0_run, t1_run, calibration)
     error, suggested = suggested_t1_endstops(source, t0_run, t1_run)
     print(
-        "Observed T1-minus-T0 maximum error: "
+        "T1-minus-T0 maximum error: "
         "X=%+.6f Y=%+.6f Z=%+.6f mm" % (error["x"], error["y"], error["z"])
     )
     print(
