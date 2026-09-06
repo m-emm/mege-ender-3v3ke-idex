@@ -444,6 +444,7 @@ PY
 
 if [[ "${MODE}" == "check" ]]; then
   check_live_config
+  MENDERPI_HOST="${REMOTE_HOST}" bash "${SCRIPT_DIR}/deploy_multi_head_zero_calibration_dashboard.sh" --check
   exit 0
 fi
 
@@ -946,6 +947,9 @@ REMOTE_SCRIPT
 
 echo "Verifying deployed config and host extras..."
 check_live_config
+
+echo "Deploying the multi-head-zero calibration dashboard..."
+MENDERPI_HOST="${REMOTE_HOST}" bash "${SCRIPT_DIR}/deploy_multi_head_zero_calibration_dashboard.sh"
 
 echo "Deploying the complete tracked vision code set..."
 MENDERPI_HOST="${REMOTE_HOST}" "${SCRIPT_DIR}/deploy_vision_code.sh"

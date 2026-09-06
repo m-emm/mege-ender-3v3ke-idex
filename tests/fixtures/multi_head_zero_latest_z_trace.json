@@ -1,0 +1,18 @@
+{
+  "mesh": {
+    "profile_name": "",
+    "mesh_matrix": [[]]
+  },
+  "t0": {
+    "calibration_centre_logical_z": 0.838,
+    "verification_centre_logical_z": 0.7155,
+    "verification_centre_machine_z": 0.7155,
+    "verification_gcode_origin_z": 0.0
+  },
+  "t1": {
+    "calibration_centre_machine_z": 1.5175,
+    "verification_centre_logical_z": 0.8575,
+    "verification_centre_machine_z": 1.5175,
+    "verification_gcode_origin_z": 0.66
+  }
+}

@@ -487,7 +487,8 @@ rotation_distance: 36
 endstop_pin: ^x_pico:gpio4
 position_endstop: ${t0_x_endstop}
 position_min: ${t0_x_endstop}
-position_max: 255.000
+# Measured parked-tool reach with T1 at its right endstop.
+position_max: ${t0_x_position_max}
 homing_positive_dir: false
 homing_speed: 25
 second_homing_speed: 3
@@ -506,12 +507,16 @@ microsteps: 16
 rotation_distance: 36
 endstop_pin: ^x_pico:gpio22
 position_endstop: ${t1_x_endstop}
-position_min: 16.0
+# Measured parked-tool reach with T0 at its left endstop.
+position_min: ${t1_x_position_min}
 position_max: ${t1_x_endstop}
 homing_positive_dir: true
 homing_speed: 25
 second_homing_speed: 3
 homing_retract_dist: 5
+# This only controls Klipper simultaneous-carriage modes. Normal IDEX operation
+# parks the inactive carriage, so the parked-tool position limits above are the
+# physical toolhead-clearance authority.
 safe_distance: 10
 
 [tmc2209 stepper_x]
@@ -568,11 +573,26 @@ stealthchop_threshold: 0
 # GPIO4 so it can both report state and stop timed probing moves.
 [multi_head_zero_probe]
 pin: ^gpio4
-clearance_z: 2.5
-approach_z: 2.0
+# Public START_Z defaults to this logical height.  It is the point at which
+# guarded descent begins and the height used between repeated contacts.
+start_z: 4.0
+# Machine height used only for safe recovery, tool selection, and XY travel.
+recovery_z: 10.0
+# The guarded descent always stops here in the selected tool's logical frame.
 target_z: -1.0
 travel_speed: 20.0
 probe_speed: 1.0
+# Generated physical priors consumed by the deployed contact-map runner.
+ball_radius_mm: ${multi_head_zero_ball_radius_mm}
+ball_front_gap_mm: ${multi_head_zero_ball_front_gap_mm}
+y_zero_behind_front_edge_mm: ${multi_head_zero_y_zero_behind_front_edge_mm}
+target_x: ${multi_head_zero_target_x}
+target_y: ${multi_head_zero_target_y}
+seed_x_min: ${multi_head_zero_seed_x_min}
+seed_x_max: ${multi_head_zero_seed_x_max}
+seed_y_min: ${multi_head_zero_seed_y_min}
+seed_y_max: ${multi_head_zero_seed_y_max}
+ring_radius_mm: ${multi_head_zero_ring_radius_mm}
 
 # Reserved legacy Y TMC2226 rollback config. Keep this commented while the
 # dedicated TMC5160T Plus Y driver is live.

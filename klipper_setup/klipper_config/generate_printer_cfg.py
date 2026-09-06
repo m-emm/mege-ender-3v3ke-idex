@@ -366,6 +366,76 @@ def _load_eddy_relative_calibration(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _load_idex_x_reach(data: dict[str, Any]) -> dict[str, float]:
+    value = _require_mapping(data.get("idex_x_reach"), "idex_x_reach")
+    values = {
+        key: _require_float(value, key, "idex_x_reach")
+        for key in (
+            "safety_margin_mm",
+            "first_contact_nozzle_separation_mm",
+            "t0_position_max",
+            "t1_position_min",
+        )
+    }
+    if any(not math.isfinite(item) for item in values.values()):
+        raise ValueError("idex_x_reach values must be finite")
+    if values["safety_margin_mm"] < 0:
+        raise ValueError("idex_x_reach.safety_margin_mm must be non-negative")
+    if values["first_contact_nozzle_separation_mm"] <= 0:
+        raise ValueError(
+            "idex_x_reach.first_contact_nozzle_separation_mm must be positive"
+        )
+    return values
+
+
+def _load_multi_head_zero_probe(data: dict[str, Any]) -> dict[str, Any]:
+    value = _require_mapping(data.get("multi_head_zero_probe"), "multi_head_zero_probe")
+    target = _require_mapping(value.get("target"), "multi_head_zero_probe.target")
+    seed_bounds = _require_mapping(
+        value.get("seed_bounds"), "multi_head_zero_probe.seed_bounds"
+    )
+    result = {
+        "ball_diameter_mm": _require_float(
+            value, "ball_diameter_mm", "multi_head_zero_probe"
+        ),
+        "ball_front_gap_mm": _require_float(
+            value, "ball_front_gap_mm", "multi_head_zero_probe"
+        ),
+        "y_zero_behind_front_edge_mm": _require_float(
+            value, "y_zero_behind_front_edge_mm", "multi_head_zero_probe"
+        ),
+        "target_x": _require_float(target, "x", "multi_head_zero_probe.target"),
+        "target_y": _require_float(target, "y", "multi_head_zero_probe.target"),
+        "seed_x_min": _require_float(
+            seed_bounds, "x_min", "multi_head_zero_probe.seed_bounds"
+        ),
+        "seed_x_max": _require_float(
+            seed_bounds, "x_max", "multi_head_zero_probe.seed_bounds"
+        ),
+        "seed_y_min": _require_float(
+            seed_bounds, "y_min", "multi_head_zero_probe.seed_bounds"
+        ),
+        "seed_y_max": _require_float(
+            seed_bounds, "y_max", "multi_head_zero_probe.seed_bounds"
+        ),
+        "refinement_ring_radius_mm": _require_float(
+            value, "refinement_ring_radius_mm", "multi_head_zero_probe"
+        ),
+    }
+    if any(not math.isfinite(item) for item in result.values()):
+        raise ValueError("multi_head_zero_probe values must be finite")
+    if result["ball_diameter_mm"] <= 0 or result["refinement_ring_radius_mm"] <= 0:
+        raise ValueError("multi_head_zero_probe diameters and radii must be positive")
+    if result["refinement_ring_radius_mm"] >= result["ball_diameter_mm"] / 2.0:
+        raise ValueError("multi_head_zero_probe refinement ring must lie on the ball")
+    if (
+        result["seed_x_min"] >= result["seed_x_max"]
+        or result["seed_y_min"] >= result["seed_y_max"]
+    ):
+        raise ValueError("multi_head_zero_probe seed bounds must have a positive span")
+    return result
+
+
 def load_calibration(calib_path: Path) -> dict[str, Any]:
     data = yaml.safe_load(calib_path.read_text(encoding="utf-8"))
     data = _require_mapping(data, "calib.yaml")
@@ -425,6 +495,8 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
         "input_shaper": _load_input_shaper(data),
         "tap_mesh": tap_mesh,
         "saved_mesh": saved_mesh,
+        "idex_x_reach": _load_idex_x_reach(data),
+        "multi_head_zero_probe": _load_multi_head_zero_probe(data),
         "tools": {
             "t0": {
                 "x_endstop": _require_float(
@@ -620,6 +692,8 @@ def template_values(
     tap_mesh = calibration["tap_mesh"]
     input_shaper = calibration["input_shaper"]
     saved_mesh = calibration.get("saved_mesh")
+    idex_x_reach = calibration["idex_x_reach"]
+    multi_head_zero_probe = calibration["multi_head_zero_probe"]
 
     eddy_relative_calibration = calibration.get("eddy_relative_calibration") or {
         "nozzle_to_coil_x": -57.391,
@@ -675,6 +749,26 @@ def template_values(
         "t1_x_endstop": format_mm(t1["x_endstop"]),
         "t1_y_endstop": format_mm(t1["y_endstop"]),
         "t1_z_endstop": format_mm(t1["z_endstop"]),
+        "t0_x_position_max": format_mm(idex_x_reach["t0_position_max"]),
+        "t1_x_position_min": format_mm(idex_x_reach["t1_position_min"]),
+        "multi_head_zero_ball_radius_mm": format_mm(
+            multi_head_zero_probe["ball_diameter_mm"] / 2.0
+        ),
+        "multi_head_zero_ball_front_gap_mm": format_mm(
+            multi_head_zero_probe["ball_front_gap_mm"]
+        ),
+        "multi_head_zero_y_zero_behind_front_edge_mm": format_mm(
+            multi_head_zero_probe["y_zero_behind_front_edge_mm"]
+        ),
+        "multi_head_zero_target_x": format_mm(multi_head_zero_probe["target_x"]),
+        "multi_head_zero_target_y": format_mm(multi_head_zero_probe["target_y"]),
+        "multi_head_zero_seed_x_min": format_mm(multi_head_zero_probe["seed_x_min"]),
+        "multi_head_zero_seed_x_max": format_mm(multi_head_zero_probe["seed_x_max"]),
+        "multi_head_zero_seed_y_min": format_mm(multi_head_zero_probe["seed_y_min"]),
+        "multi_head_zero_seed_y_max": format_mm(multi_head_zero_probe["seed_y_max"]),
+        "multi_head_zero_ring_radius_mm": format_mm(
+            multi_head_zero_probe["refinement_ring_radius_mm"]
+        ),
         "tap_mesh_profile": tap_mesh["profile"],
         "tap_mesh_samples": str(tap_mesh["samples"]),
         "tap_mesh_settle_ms": str(tap_mesh["settle_ms"]),

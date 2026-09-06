@@ -60,13 +60,40 @@ tap_mesh:
 # workflow may translate both together, but must preserve their difference.
 tools:
   t0:
-    x_endstop: -85.472
-    y_endstop: -14.800
+    x_endstop: -85.991
+    y_endstop: -14.995
     z_endstop: 291.493
   t1:
-    x_endstop: 346.457
-    y_endstop: -13.732
-    z_endstop: 290.878
+    x_endstop: 345.036
+    y_endstop: -13.444
+    z_endstop: 290.833
+
+# Measured parked-tool clearance for normal IDEX operation. With T0 at
+# X=-85.4, T1 first clears it at X=16.0: exactly 101.4 mm nozzle separation.
+# This is deliberately separate from Klipper's dual_carriage.safe_distance,
+# which only governs simultaneous carriage modes that this printer does not use
+# in normal operation.
+idex_x_reach:
+  model: measured_parked_tool_clearance_v1
+  safety_margin_mm: 0.000
+  first_contact_nozzle_separation_mm: 101.400
+  t0_position_max: 244.538
+  t1_position_min: 15.409
+
+# Multi-head-zero's physical ball and coordinate-frame priors. The selected
+# target is intentionally nominal; the guarded calibration measures the real
+# centre. CLI bounds remain diagnostic overrides of the generated defaults.
+multi_head_zero_probe:
+  ball_diameter_mm: 10.000
+  ball_front_gap_mm: 1.000
+  y_zero_behind_front_edge_mm: 3.000
+  target: { x: 75.000, y: -9.000 }
+  seed_bounds:
+    x_min: 72.000
+    x_max: 78.000
+    y_min: -12.000
+    y_max: -6.000
+  refinement_ring_radius_mm: 2.800
 
 eddy_relative_calibration:
   temperature_probe:

@@ -1,0 +1,64 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #101419;
+  color: #e6edf3;
+}
+
+body { margin: 0; }
+main { max-width: 1650px; margin: 0 auto; padding: 22px; }
+header { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+h1 { margin: 0; font-size: 1.5rem; }
+p { color: #aab7c5; }
+time, .hint { color: #8190a1; font-size: .86rem; }
+.events { margin: 14px 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.event { background: #202934; border-radius: 5px; padding: 6px 9px; font-size: .84rem; }
+.chapter { margin-top: 18px; padding-top: 14px; border-top: 1px solid #2b3745; }
+.chapter[hidden] { display: none; }
+.chapter-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.chapter-heading span { display: block; color: #7f91a5; font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; }
+.chapter-heading h2 { margin: 2px 0 0; font-size: 1.2rem; }
+.chapter-heading strong { color: #9db3ca; font-size: .88rem; }
+.tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 16px; }
+.tool { background: #18202a; border: 1px solid #2b3745; border-radius: 8px; padding: 15px; }
+.outcome { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.outcome-card { background: #18202a; border: 1px solid #2b3745; border-radius: 8px; padding: 15px; }
+.outcome-card h2 { margin-top: 0; font-size: 1.05rem; }
+.outcome-card.pass { border-color: #4ba878; }
+.outcome-card.fail { border-color: #bc635f; }
+.outcome-card dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; margin: 0; }
+.outcome-card dt { color: #8e9cab; }
+.outcome-card dd { margin: 0; font-weight: 600; }
+.tool h2 { margin: 0 0 4px; font-size: 1.15rem; }
+.state { font-size: .88rem; color: #9db3ca; }
+.state.completed { color: #6fd199; }
+.state.aborted, .state.failed { color: #ff857f; }
+.numbers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.number { background: #111820; border-radius: 5px; padding: 8px; }
+.number span { display: block; color: #8e9cab; font-size: .74rem; }
+.number strong { font-size: 1rem; }
+.calculation-details { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: -2px 0 10px; font-size: .8rem; }
+.calculation-details dt { color: #8e9cab; }
+.calculation-details dd { margin: 0; }
+svg { width: 100%; height: 345px; background: #10161d; border-radius: 5px; }
+.axis { stroke: #506070; stroke-width: 1; }
+.reference-plane { fill: #172a37; stroke: #58758c; stroke-width: 1.25; }
+.grid-line { stroke: #58758c; stroke-width: 1.25; opacity: .95; }
+.reference-label { fill: #8e9cab; font-size: 10px; }
+.stalk { stroke: #6d839a; stroke-width: 1.5; stroke-linecap: round; opacity: .85; }
+.point { stroke: #e8eef5; stroke-width: .7; }
+.latest { stroke: #ffffff; stroke-width: 2; }
+.plot-button { display: block; width: 100%; margin-top: 12px; padding: 0; border: 0; border-radius: 5px; background: #fff; cursor: zoom-in; }
+.plot-button:focus-visible { outline: 3px solid #55b8ef; outline-offset: 3px; }
+.plot-button img { display: block; width: 100%; border-radius: 5px; }
+.outcome-card .plot-button img { max-height: 520px; object-fit: contain; }
+.plot-modal { width: min(96vw, 1800px); height: min(96vh, 1200px); padding: 34px 18px 18px; border: 1px solid #506070; border-radius: 8px; background: #101419; }
+.plot-modal::backdrop { background: rgba(0, 0, 0, .86); }
+.plot-modal img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.plot-modal-close { position: absolute; top: 5px; right: 9px; border: 0; background: transparent; color: #e6edf3; font-size: 2rem; line-height: 1; cursor: pointer; }
+.offset-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.offset-table th, .offset-table td { padding: 5px 2px; border-bottom: 1px solid #2b3745; text-align: right; }
+.offset-table th:first-child, .offset-table td:first-child { text-align: left; }
+.offset-table th { color: #8e9cab; font-size: .75rem; font-weight: 500; }
+.empty { padding: 22px; background: #18202a; border-radius: 8px; }
+@media (max-width: 700px) { main { padding: 14px; } header, .chapter-heading { display: block; } .tools { grid-template-columns: 1fr; } .plot-modal { width: 100vw; height: 100vh; border-radius: 0; } }

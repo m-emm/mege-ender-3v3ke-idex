@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Multi-head-zero calibration</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Multi-head-zero calibration</h1>
+          <p id="headline">Loading latest calibration status…</p>
+        </div>
+        <time id="updated"></time>
+      </header>
+      <section id="events" class="events" aria-label="Latest calibration events"></section>
+      <section id="calibration-chapter" class="chapter" aria-labelledby="calibration-heading" hidden>
+        <div class="chapter-heading">
+          <div><span>Chapter 1</span><h2 id="calibration-heading">18-contact calibration</h2></div>
+          <strong id="calibration-state"></strong>
+        </div>
+        <section id="calibration-tools" class="tools" aria-label="Tool calibration measurements"></section>
+        <section id="calibration-outcome" class="outcome" aria-label="Calibration calculations"></section>
+      </section>
+      <section id="verification-chapter" class="chapter" aria-labelledby="verification-heading" hidden>
+        <div class="chapter-heading">
+          <div><span>Chapter 2</span><h2 id="verification-heading">Nine-contact verification</h2></div>
+          <strong id="verification-state"></strong>
+        </div>
+        <section id="verification-tools" class="tools" aria-label="Tool verification measurements"></section>
+        <section id="verification-outcome" class="outcome" aria-label="Verification outcome"></section>
+      </section>
+      <div id="empty" class="empty" hidden>No calibration run has been published yet.</div>
+      <p class="hint">This page refreshes every second. Immutable run artifacts remain in the calibration run directory.</p>
+    </main>
+    <dialog id="plot-modal" class="plot-modal" aria-label="Expanded calibration plot">
+      <button id="plot-modal-close" class="plot-modal-close" type="button" aria-label="Close expanded plot">×</button>
+      <img id="plot-modal-image" alt="Expanded calibration plot">
+    </dialog>
+    <script src="app.js"></script>
+  </body>
+</html>

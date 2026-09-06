@@ -8,7 +8,8 @@ from shellforgepy.simple import *
 _logger = logging.getLogger(__name__)
 
 axle_screw_size = "M3"
-bearing_radial_clearance = 0.2
+bearing_radial_clearance = 0.1
+bearing_axial_clearance = 0.6
 wheel_thickness = 3
 wheel_z_oversize = 1
 
@@ -17,6 +18,7 @@ spool_waist_diameter = 10
 extra_shaft_cutter_size = 0.9
 
 num_inner_bite_cutters = 12
+skip_every_nth_inner_bite_cutter = 2
 mount_eye_depth = 20
 mount_eye_fillet_radius = 2
 mount_eye_screw_hole_inset = 6
@@ -32,6 +34,7 @@ def create_filament_guide_spool():
         shaft_cutter_length=100,
         shaft_cutter_clearance=extra_shaft_cutter_size,
         radial_clearance=bearing_radial_clearance,
+        axial_clearance=bearing_axial_clearance,
     )
 
     bearing_size = get_bounding_box_size(bearing)
@@ -68,6 +71,8 @@ def create_filament_guide_spool():
 
     inner_bite_cutters = PartCollector()
     for i in range(num_inner_bite_cutters):
+        if (i + 1) % skip_every_nth_inner_bite_cutter == 0:
+            continue
 
         angle = i * 360 / num_inner_bite_cutters
 

@@ -3,8 +3,6 @@
 # Copyright (C) 2026 Markus Emmenegger
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
-from . import homing
-
 
 class MultiHeadZeroProbe:
     """Perform guarded vertical contacts with the multi-head-zero switch."""
@@ -13,11 +11,25 @@ class MultiHeadZeroProbe:
         self.printer = config.get_printer()
         self.gcode = self.printer.lookup_object("gcode")
         self.pin = config.get("pin")
-        self.clearance_z = config.getfloat("clearance_z", 2.5, above=0.0)
-        self.approach_z = config.getfloat("approach_z", 2.0)
+        self.start_z = config.getfloat("start_z", 4.0)
+        self.recovery_z = config.getfloat("recovery_z", 10.0, above=0.0)
         self.target_z = config.getfloat("target_z", -1.0)
         self.travel_speed = config.getfloat("travel_speed", 20.0, above=0.0)
         self.probe_speed = config.getfloat("probe_speed", 1.0, above=0.0)
+        self.priors = {
+            "ball_radius_mm": config.getfloat("ball_radius_mm", 5.0, above=0.0),
+            "ball_front_gap_mm": config.getfloat("ball_front_gap_mm", 1.0),
+            "y_zero_behind_front_edge_mm": config.getfloat(
+                "y_zero_behind_front_edge_mm", 3.0
+            ),
+            "target_x": config.getfloat("target_x", 75.0),
+            "target_y": config.getfloat("target_y", -9.0),
+            "seed_x_min": config.getfloat("seed_x_min", 72.0),
+            "seed_x_max": config.getfloat("seed_x_max", 78.0),
+            "seed_y_min": config.getfloat("seed_y_min", -12.0),
+            "seed_y_max": config.getfloat("seed_y_max", -6.0),
+            "ring_radius_mm": config.getfloat("ring_radius_mm", 2.8, above=0.0),
+        }
         self.mcu_endstop = self.printer.lookup_object("pins").setup_pin(
             "endstop", self.pin
         )
@@ -29,7 +41,10 @@ class MultiHeadZeroProbe:
         self.gcode.register_command(
             "MULTI_HEAD_ZERO_CONTACT",
             self.cmd_MULTI_HEAD_ZERO_CONTACT,
-            desc="Perform one guarded multi-head-zero vertical contact.",
+            desc=(
+                "Measure the configured ball with TOOL=0|1, optional COUNT, "
+                "START_Z, X, and Y."
+            ),
         )
         self.gcode.register_command(
             "QUERY_MULTI_HEAD_ZERO",
@@ -47,11 +62,12 @@ class MultiHeadZeroProbe:
         return {
             "pin": self.pin,
             "state": self.last_state,
-            "clearance_z": self.clearance_z,
-            "approach_z": self.approach_z,
+            "start_z": self.start_z,
+            "recovery_z": self.recovery_z,
             "target_z": self.target_z,
             "travel_speed": self.travel_speed,
             "probe_speed": self.probe_speed,
+            "priors": self.priors,
             "last_measurement": self.last_measurement,
         }
 
@@ -67,7 +83,7 @@ class MultiHeadZeroProbe:
         self.last_state = state
         return state
 
-    def _require_homed_idle_unmeshed(self, command_name):
+    def _require_homed_idle(self, command_name):
         eventtime = self.printer.get_reactor().monotonic()
         toolhead = self.printer.lookup_object("toolhead")
         homed_axes = toolhead.get_status(eventtime).get("homed_axes", "")
@@ -83,75 +99,79 @@ class MultiHeadZeroProbe:
                 "%s requires an idle printer; print_stats.state=%s"
                 % (command_name, print_state)
             )
-        mesh_status = self.printer.lookup_object("bed_mesh").get_status(eventtime)
-        if mesh_status.get("profile_name") or any(mesh_status.get("mesh_matrix", [])):
-            raise self.gcode.error(
-                "%s requires no active bed mesh; run BED_MESH_CLEAR first"
-                % command_name
-            )
         return toolhead
 
-    def _require_active_tool(self, tool):
-        active_tool = (
-            self.printer.lookup_object("idex_manual_tuning")
-            .get_status(self.printer.get_reactor().monotonic())
-            .get("active_tool")
+    def _clear_active_mesh(self, toolhead):
+        eventtime = self.printer.get_reactor().monotonic()
+        mesh_status = self.printer.lookup_object("bed_mesh").get_status(eventtime)
+        active = bool(mesh_status.get("profile_name")) or any(
+            mesh_status.get("mesh_matrix", [])
         )
-        if active_tool != tool:
+        if active:
+            self.gcode.run_script_from_command("BED_MESH_CLEAR\nM400")
+            toolhead.wait_moves()
+        mesh_status = self.printer.lookup_object("bed_mesh").get_status(
+            self.printer.get_reactor().monotonic()
+        )
+        if mesh_status.get("profile_name") or any(mesh_status.get("mesh_matrix", [])):
             raise self.gcode.error(
-                "MULTI_HEAD_ZERO_CONTACT TOOL=%d requires active T%d; select T%d first"
-                % (tool, tool, tool)
+                "MULTI_HEAD_ZERO_CONTACT could not clear the active bed mesh"
             )
-        return active_tool
+        return active
 
-    def _require_limits(self, toolhead, x, y):
-        status = toolhead.get_status(self.printer.get_reactor().monotonic())
-        axis_minimum = status.get("axis_minimum")
-        axis_maximum = status.get("axis_maximum")
-        if axis_minimum is None or axis_maximum is None:
-            raise self.gcode.error("MULTI_HEAD_ZERO_CONTACT cannot read axis limits")
-        limits = [
-            (
-                "X",
-                x,
-                self._axis_value(axis_minimum, 0),
-                self._axis_value(axis_maximum, 0),
-            ),
-            (
-                "Y",
-                y,
-                self._axis_value(axis_minimum, 1),
-                self._axis_value(axis_maximum, 1),
-            ),
-            (
-                "clearance Z",
-                self.clearance_z,
-                self._axis_value(axis_minimum, 2),
-                self._axis_value(axis_maximum, 2),
-            ),
-            (
-                "approach Z",
-                self.approach_z,
-                self._axis_value(axis_minimum, 2),
-                self._axis_value(axis_maximum, 2),
-            ),
-            (
-                "target Z",
-                self.target_z,
-                self._axis_value(axis_minimum, 2),
-                self._axis_value(axis_maximum, 2),
-            ),
-        ]
-        for label, value, minimum, maximum in limits:
-            if not minimum <= value <= maximum:
-                raise self.gcode.error(
-                    "MULTI_HEAD_ZERO_CONTACT %s %.3f is outside limits [%.3f, %.3f]"
-                    % (label, value, minimum, maximum)
-                )
-        if not self.clearance_z > self.approach_z > self.target_z:
-            raise self.gcode.error(
-                "MULTI_HEAD_ZERO_CONTACT requires clearance_z > approach_z > target_z"
+    def _active_tool_status(self):
+        eventtime = self.printer.get_reactor().monotonic()
+        toolhead = self.printer.lookup_object("toolhead")
+        carriage_status = self.printer.lookup_object("dual_carriage").get_status(
+            eventtime
+        )
+        return {
+            "active_tool": self.printer.lookup_object("idex_manual_tuning")
+            .get_status(eventtime)
+            .get("active_tool"),
+            "macro_active_tool": self.printer.lookup_object(
+                "gcode_macro _IDEX_TOOL_STATE"
             )
+            .get_status(eventtime)
+            .get("active_tool"),
+            "active_extruder": toolhead.get_status(eventtime).get("extruder"),
+            "carriage_0": carriage_status.get("carriage_0"),
+            "carriage_1": carriage_status.get("carriage_1"),
+        }
+
+    def _require_active_tool(self, tool):
+        observed = self._active_tool_status()
+        expected_extruder = "extruder" if tool == 0 else "extruder1"
+        expected_carriages = (
+            ("PRIMARY", "INACTIVE") if tool == 0 else ("INACTIVE", "PRIMARY")
+        )
+        if (
+            observed["active_tool"] != tool
+            or observed["macro_active_tool"] != tool
+            or observed["active_extruder"] != expected_extruder
+            or (observed["carriage_0"], observed["carriage_1"]) != expected_carriages
+        ):
+            raise self.gcode.error(
+                "MULTI_HEAD_ZERO_CONTACT TOOL=%d physical selection mismatch: "
+                "manual=%s macro=%s extruder=%s carriage_0=%s carriage_1=%s"
+                % (
+                    tool,
+                    observed["active_tool"],
+                    observed["macro_active_tool"],
+                    observed["active_extruder"],
+                    observed["carriage_0"],
+                    observed["carriage_1"],
+                )
+            )
+        return observed
+
+    def _select_tool(self, tool, toolhead):
+        observed = self._active_tool_status()
+        if observed["active_tool"] != tool:
+            self.gcode.run_script_from_command("T%d\nM400" % tool)
+            toolhead.wait_moves()
+            return True, self._require_active_tool(tool)
+        return False, self._require_active_tool(tool)
 
     def _gcode_origin(self):
         origin = (
@@ -161,145 +181,329 @@ class MultiHeadZeroProbe:
         )
         return [float(value) for value in origin]
 
-    def _move_to_start(self, toolhead, x, y):
-        origin = self._gcode_origin()
-        gcode_x = x - origin[0]
-        gcode_y = y - origin[1]
-        gcode_clearance_z = self.clearance_z - origin[2]
-        gcode_approach_z = self.approach_z - origin[2]
-        self.gcode.run_script_from_command(
-            "G90\nG1 Z%.3f F%.0f\nG1 X%.3f Y%.3f F%.0f\nG1 Z%.3f F%.0f"
-            % (
-                gcode_clearance_z,
-                self.travel_speed * 60.0,
-                gcode_x,
-                gcode_y,
-                self.travel_speed * 60.0,
-                gcode_approach_z,
-                self.travel_speed * 60.0,
-            )
-        )
-        toolhead.wait_moves()
-        return {
-            "gcode_origin": origin,
-            "gcode_x": gcode_x,
-            "gcode_y": gcode_y,
-            "gcode_clearance_z": gcode_clearance_z,
-            "gcode_approach_z": gcode_approach_z,
-        }
+    @staticmethod
+    def _logical_to_machine(logical, origin):
+        return [float(value) + float(offset) for value, offset in zip(logical, origin)]
 
-    def _retract_to_clearance(self, toolhead):
-        current = toolhead.get_position()
-        current[2] = self.clearance_z
+    @staticmethod
+    def _machine_to_logical(machine, origin):
+        return [float(value) - float(offset) for value, offset in zip(machine, origin)]
+
+    def _machine_limits(self, toolhead):
+        status = toolhead.get_status(self.printer.get_reactor().monotonic())
+        minimum = status.get("axis_minimum")
+        maximum = status.get("axis_maximum")
+        if minimum is None or maximum is None:
+            raise self.gcode.error("MULTI_HEAD_ZERO_CONTACT cannot read axis limits")
+        return minimum, maximum
+
+    def _require_machine_value(self, toolhead, label, value, axis):
+        minimum, maximum = self._machine_limits(toolhead)
+        lower = self._axis_value(minimum, axis)
+        upper = self._axis_value(maximum, axis)
+        if not lower <= value <= upper:
+            raise self.gcode.error(
+                "MULTI_HEAD_ZERO_CONTACT %s %.3f is outside limits [%.3f, %.3f]"
+                % (label, value, lower, upper)
+            )
+
+    def _lift_to_recovery(self, toolhead):
+        self._require_machine_value(toolhead, "recovery Z", self.recovery_z, 2)
+        current = [float(value) for value in toolhead.get_position()]
+        if current[2] >= self.recovery_z:
+            return False, current
+        current[2] = self.recovery_z
         toolhead.manual_move(current, self.travel_speed)
         toolhead.wait_moves()
+        return True, [float(value) for value in toolhead.get_position()]
+
+    def _move_to_logical_target(self, toolhead, x, y, start_z):
+        self.gcode.run_script_from_command(
+            "G90\nG1 X%.3f Y%.3f F%.0f\nG1 Z%.3f F%.0f"
+            % (x, y, self.travel_speed * 60.0, start_z, self.travel_speed * 60.0)
+        )
+        toolhead.wait_moves()
+        return [float(value) for value in toolhead.get_position()]
+
+    def _retract_to_start(self, toolhead, machine_start_z):
+        current = [float(value) for value in toolhead.get_position()]
+        current[2] = machine_start_z
+        toolhead.manual_move(current, self.travel_speed)
+        toolhead.wait_moves()
+
+    def _prepare_batch(self, x, y, requested_tool, start_z):
+        toolhead = self._require_homed_idle("MULTI_HEAD_ZERO_CONTACT")
+        mesh_cleared = self._clear_active_mesh(toolhead)
+        preflight_state = self._switch_state(toolhead)
+        recovery_lifted, recovery_position = self._lift_to_recovery(toolhead)
+        post_recovery_state = self._switch_state(toolhead)
+        if post_recovery_state != "RELEASED":
+            raise self.gcode.error(
+                "MULTI_HEAD_ZERO_CONTACT switch remains %s after upward recovery "
+                "to machine Z=%.3f; inspect the ball contact or NC wiring"
+                % (post_recovery_state, recovery_position[2])
+            )
+        tool_switched, tool_selection = self._select_tool(requested_tool, toolhead)
+        origin = self._gcode_origin()
+        machine_target = self._logical_to_machine((x, y, self.target_z), origin)
+        machine_start = self._logical_to_machine((x, y, start_z), origin)
+        self._require_machine_value(toolhead, "X", machine_target[0], 0)
+        self._require_machine_value(toolhead, "Y", machine_target[1], 1)
+        self._require_machine_value(toolhead, "START_Z", machine_start[2], 2)
+        self._require_machine_value(toolhead, "target Z", machine_target[2], 2)
+        pre_descent_state = self._switch_state(toolhead)
+        if pre_descent_state != "RELEASED":
+            raise self.gcode.error(
+                "MULTI_HEAD_ZERO_CONTACT switch became %s before XY/descent; "
+                "inspect the ball contact or NC wiring" % pre_descent_state
+            )
+        start_position = self._move_to_logical_target(toolhead, x, y, start_z)
+        return {
+            "commanded_x": x,
+            "commanded_y": y,
+            "requested_tool": requested_tool,
+            "start_z": start_z,
+            "target_z": self.target_z,
+            "recovery_z": self.recovery_z,
+            "gcode_origin": origin,
+            "machine_commanded_x": machine_target[0],
+            "machine_commanded_y": machine_target[1],
+            "machine_start_z": machine_start[2],
+            "machine_target_z": machine_target[2],
+            "mesh_cleared": mesh_cleared,
+            "preflight_state": preflight_state,
+            "recovery_lifted": recovery_lifted,
+            "recovery_position": recovery_position,
+            "post_recovery_state": post_recovery_state,
+            "tool_switched": tool_switched,
+            "tool_selection": tool_selection,
+            "pre_descent_state": pre_descent_state,
+            "start_position": start_position,
+        }
 
     def cmd_QUERY_MULTI_HEAD_ZERO(self, gcmd):
         toolhead = self.printer.lookup_object("toolhead")
         gcmd.respond_info("multi_head_zero: %s" % self._switch_state(toolhead))
 
-    def cmd_MULTI_HEAD_ZERO_CONTACT(self, gcmd):
-        x = gcmd.get_float("X")
-        y = gcmd.get_float("Y")
-        requested_tool = gcmd.get_int("TOOL", minval=0, maxval=1)
-        allow_no_contact = gcmd.get_int("ALLOW_NO_CONTACT", 0, minval=0, maxval=1)
-        measurement = {
-            "commanded_x": x,
-            "commanded_y": y,
-            "requested_tool": requested_tool,
-            "allow_no_contact": bool(allow_no_contact),
-            "approach_z": self.approach_z,
-            "target_z": self.target_z,
-            "clearance_z": self.clearance_z,
-            "probe_speed": self.probe_speed,
-            "status": "failed",
-        }
+    def _contact_once(self, preparation, allow_no_contact):
+        measurement = dict(preparation)
+        measurement.update(
+            {"allow_no_contact": bool(allow_no_contact), "status": "failed"}
+        )
         self.last_measurement = measurement
+        toolhead = self.printer.lookup_object("toolhead")
+        start_position = [float(value) for value in toolhead.get_position()]
+        target_position = list(start_position)
+        target_position[2] = preparation["machine_target_z"]
         try:
-            toolhead = self._require_homed_idle_unmeshed("MULTI_HEAD_ZERO_CONTACT")
-            measurement["active_tool"] = self._require_active_tool(requested_tool)
-            self._require_limits(toolhead, x, y)
-            measurement["preflight_state"] = self._switch_state(toolhead)
-            if measurement["preflight_state"] != "RELEASED":
-                raise self.gcode.error(
-                    "MULTI_HEAD_ZERO_CONTACT requires a released NC switch before motion"
-                )
-            measurement.update(self._move_to_start(toolhead, x, y))
-            start_position = [float(value) for value in toolhead.get_position()]
-            target_position = list(start_position)
-            target_position[2] = self.target_z
-            try:
-                trigger_position = self.printer.lookup_object("homing").probing_move(
-                    self.mcu_endstop, target_position, self.probe_speed
-                )
-            except self.printer.command_error as exc:
-                if not (
-                    allow_no_contact
-                    and str(exc) == "No trigger on probe after full movement"
-                ):
-                    raise
-                measurement.update(
-                    {
-                        "status": "no_contact",
-                        "no_contact_reason": "target_reached",
-                        "target_position": [float(value) for value in target_position],
-                        "halt_position": [
-                            float(value) for value in toolhead.get_position()
-                        ],
-                    }
-                )
-                self._retract_to_clearance(toolhead)
-                measurement["post_retract_position"] = [
-                    float(value) for value in toolhead.get_position()
-                ]
-                measurement["post_retract_state"] = self._switch_state(toolhead)
-                if measurement["post_retract_state"] != "RELEASED":
-                    raise self.gcode.error(
-                        "MULTI_HEAD_ZERO_CONTACT no-contact retract left the "
-                        "switch %s" % measurement["post_retract_state"]
-                    )
-                gcmd.respond_info(
-                    "Multi-head-zero no contact: T%d commanded=(%.3f, %.3f) "
-                    "reached target Z=%.6f"
-                    % (
-                        measurement["active_tool"],
-                        x,
-                        y,
-                        self.target_z,
-                    )
-                )
-                return
-            halt_position = [float(value) for value in toolhead.get_position()]
+            trigger_position = self.printer.lookup_object("homing").probing_move(
+                self.mcu_endstop, target_position, self.probe_speed
+            )
+        except self.printer.command_error as exc:
+            if not (
+                allow_no_contact
+                and str(exc) == "No trigger on probe after full movement"
+            ):
+                raise
+            measurement.update(
+                {
+                    "status": "no_contact",
+                    "no_contact_reason": "target_reached",
+                    "tap_start_position": start_position,
+                    "target_position": [float(value) for value in target_position],
+                    "halt_position": [
+                        float(value) for value in toolhead.get_position()
+                    ],
+                }
+            )
+            self._retract_to_start(toolhead, preparation["machine_start_z"])
+        else:
+            trigger_position = [float(value) for value in trigger_position]
+            logical_trigger = self._machine_to_logical(
+                trigger_position, preparation["gcode_origin"]
+            )
             measurement.update(
                 {
                     "status": "completed",
-                    "start_position": start_position,
+                    "tap_start_position": start_position,
                     "target_position": [float(value) for value in target_position],
-                    "trigger_position": [float(value) for value in trigger_position],
-                    "halt_position": halt_position,
-                    "trigger_x": float(trigger_position[0]),
-                    "trigger_y": float(trigger_position[1]),
-                    "trigger_z": float(trigger_position[2]),
+                    "trigger_position": trigger_position,
+                    "halt_position": [
+                        float(value) for value in toolhead.get_position()
+                    ],
+                    "trigger_x": trigger_position[0],
+                    "trigger_y": trigger_position[1],
+                    "trigger_z": trigger_position[2],
+                    "logical_trigger_x": logical_trigger[0],
+                    "logical_trigger_y": logical_trigger[1],
+                    "logical_trigger_z": logical_trigger[2],
                 }
             )
-            self._retract_to_clearance(toolhead)
-            measurement["post_retract_position"] = [
-                float(value) for value in toolhead.get_position()
-            ]
-            measurement["post_retract_state"] = self._switch_state(toolhead)
+            self._retract_to_start(toolhead, preparation["machine_start_z"])
+        measurement["post_retract_position"] = [
+            float(value) for value in toolhead.get_position()
+        ]
+        measurement["post_retract_state"] = self._switch_state(toolhead)
+        if measurement["post_retract_state"] != "RELEASED":
+            raise self.gcode.error(
+                "MULTI_HEAD_ZERO_CONTACT retract left the switch %s"
+                % measurement["post_retract_state"]
+            )
+        return measurement
+
+    @staticmethod
+    def _tap_statistics(samples):
+        values = [float(sample["z"]) for sample in samples]
+        if not values:
+            return {
+                "count": 0,
+                "mean": None,
+                "median": None,
+                "minimum": None,
+                "maximum": None,
+                "span": None,
+                "standard_deviation": None,
+            }
+        import statistics
+
+        return {
+            "count": len(values),
+            "mean": statistics.fmean(values),
+            "median": statistics.median(values),
+            "minimum": min(values),
+            "maximum": max(values),
+            "span": max(values) - min(values),
+            "standard_deviation": statistics.pstdev(values),
+        }
+
+    def cmd_MULTI_HEAD_ZERO_CONTACT(self, gcmd):
+        requested_tool = gcmd.get_int("TOOL", minval=0, maxval=1)
+        x = gcmd.get_float("X", self.priors["target_x"])
+        y = gcmd.get_float("Y", self.priors["target_y"])
+        start_z = gcmd.get_float("START_Z", self.start_z)
+        if start_z < self.start_z:
+            raise self.gcode.error(
+                "MULTI_HEAD_ZERO_CONTACT START_Z %.3f is below the configured "
+                "safe minimum %.3f" % (start_z, self.start_z)
+            )
+        count = gcmd.get_int("COUNT", 1, minval=1, maxval=100)
+        # Calibration seeds may opt into no-contact records. Normal console use
+        # deliberately remains strict and does not need this parameter.
+        allow_no_contact = gcmd.get_int("ALLOW_NO_CONTACT", 0, minval=0, maxval=1)
+        result = {
+            "requested_tool": requested_tool,
+            "commanded_x": x,
+            "commanded_y": y,
+            "start_z": start_z,
+            "count": count,
+            "status": "failed",
+        }
+        self.last_measurement = result
+        try:
             gcmd.respond_info(
-                "Multi-head-zero contact: T%d commanded=(%.3f, %.3f) trigger=(%.6f, %.6f, %.6f)"
+                "Multi-head-zero: preparing T%d at logical X=%.3f Y=%.3f "
+                "START_Z=%.3f (%d tap%s)"
+                % (requested_tool, x, y, start_z, count, "" if count == 1 else "s")
+            )
+            preparation = self._prepare_batch(x, y, requested_tool, start_z)
+            if preparation["mesh_cleared"]:
+                gcmd.respond_info("Multi-head-zero: active bed mesh cleared")
+            if preparation["recovery_lifted"]:
+                gcmd.respond_info(
+                    "Multi-head-zero: upward recovery to machine Z=%.3f"
+                    % preparation["recovery_position"][2]
+                )
+            if preparation["tool_switched"]:
+                gcmd.respond_info("Multi-head-zero: selected T%d" % requested_tool)
+            measurements = []
+            samples = []
+            for index in range(count):
+                measurement = self._contact_once(preparation, allow_no_contact)
+                measurements.append(measurement)
+                if measurement["status"] == "completed":
+                    samples.append(
+                        {
+                            "x": measurement["logical_trigger_x"],
+                            "y": measurement["logical_trigger_y"],
+                            "z": measurement["logical_trigger_z"],
+                        }
+                    )
+                    gcmd.respond_info(
+                        "Multi-head-zero contact: T%d tap %d/%d logical "
+                        "trigger=(%.6f, %.6f, %.6f)"
+                        % (
+                            requested_tool,
+                            index + 1,
+                            count,
+                            measurement["logical_trigger_x"],
+                            measurement["logical_trigger_y"],
+                            measurement["logical_trigger_z"],
+                        )
+                    )
+                else:
+                    gcmd.respond_info(
+                        "Multi-head-zero contact: T%d tap %d/%d status=%s"
+                        % (requested_tool, index + 1, count, measurement["status"])
+                    )
+            statistics = self._tap_statistics(samples)
+            result = dict(measurements[-1])
+            result.update(
+                {
+                    "count": count,
+                    "completed_count": len(samples),
+                    "no_contact_count": sum(
+                        measurement["status"] == "no_contact"
+                        for measurement in measurements
+                    ),
+                    "measurements": measurements,
+                    "tap": {"count": count, "samples": samples, **statistics},
+                    "statistics": statistics,
+                }
+            )
+            if result["no_contact_count"]:
+                result["status"] = "no_contact"
+            self.last_measurement = result
+            gcmd.respond_info(
+                "Multi-head-zero statistics: T%d count=%d mean=%s median=%s "
+                "min=%s max=%s span=%s stddev=%s"
                 % (
-                    measurement["active_tool"],
-                    x,
-                    y,
-                    measurement["trigger_x"],
-                    measurement["trigger_y"],
-                    measurement["trigger_z"],
+                    requested_tool,
+                    count,
+                    (
+                        "%.6f" % statistics["mean"]
+                        if statistics["mean"] is not None
+                        else "n/a"
+                    ),
+                    (
+                        "%.6f" % statistics["median"]
+                        if statistics["median"] is not None
+                        else "n/a"
+                    ),
+                    (
+                        "%.6f" % statistics["minimum"]
+                        if statistics["minimum"] is not None
+                        else "n/a"
+                    ),
+                    (
+                        "%.6f" % statistics["maximum"]
+                        if statistics["maximum"] is not None
+                        else "n/a"
+                    ),
+                    (
+                        "%.6f" % statistics["span"]
+                        if statistics["span"] is not None
+                        else "n/a"
+                    ),
+                    (
+                        "%.6f" % statistics["standard_deviation"]
+                        if statistics["standard_deviation"] is not None
+                        else "n/a"
+                    ),
                 )
             )
         except Exception as exc:
-            measurement["error"] = str(exc)
+            result["error"] = str(exc)
+            self.last_measurement = result
             raise
 
 
